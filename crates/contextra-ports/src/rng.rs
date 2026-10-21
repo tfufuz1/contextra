@@ -45,30 +45,11 @@ impl SystemRng {
     }
 }
 
-impl EntropyRng for SystemRng {
-    fn fill_bytes(&self, dest: &mut [u8]) {
-        use std::collections::hash_map::RandomState;
-        use std::hash::{BuildHasher, Hasher};
-        let mut written = 0;
-        while written < dest.len() {
-            let val = RandomState::new().build_hasher().finish();
-            let bytes = val.to_le_bytes();
-            let chunk = (dest.len() - written).min(8);
-            dest[written..written + chunk].copy_from_slice(&bytes[..chunk]);
-            written += chunk;
-        }
-    }
-
+impl SeededRng for SystemRng {
     fn next_u64(&self) -> u64 {
         use std::collections::hash_map::RandomState;
         use std::hash::{BuildHasher, Hasher};
         RandomState::new().build_hasher().finish()
-    }
-}
-
-impl SeededRng for SystemRng {
-    fn next_u64(&self) -> u64 {
-        EntropyRng::next_u64(self)
     }
 
     fn fill_bytes(&self, dest: &mut [u8]) {
@@ -76,10 +57,28 @@ impl SeededRng for SystemRng {
     }
 
     fn next_unit_f64(&self) -> f64 {
-        let mantissa = EntropyRng::next_u64(self) >> 11;
+        let mantissa = self.next_u64() >> 11;
         (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
     }
 }
+
+/// DEPRECATION NOTICE: This implementation of [`EntropyRng`] for [`SystemRng`] uses non-CSPRNG
+/// process entropy (`std::collections::hash_map::RandomState`) and WILL BE REMOVED in Session W3-01.
+///
+/// It does NOT override [`EntropyRng::fill_secret`] (returning [`RngError::SecretUnsupported`]).
+/// Migration path: Use `OsEntropyRng` for cryptographic material generation.
+impl EntropyRng for SystemRng {
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        SeededRng::fill_bytes(self, dest);
+    }
+
+    fn next_u64(&self) -> u64 {
+        SeededRng::next_u64(self)
+    }
+}
+
+/// Marker trait for cryptographically secure random number generators.
+pub trait CryptoRng: Send + Sync + 'static {}
 
 /// Port trait for cryptographic entropy sources (keys, nonces, IVs, salts).
 ///
@@ -197,6 +196,5 @@ mod tests {
         let mut key = [0u8; 32];
         generate_key(&rng, &mut key);
         assert_eq!(key, [0xAA; 32]);
-        // Note: MockSeededRng cannot be passed to generate_key because SeededRng does not implement EntropyRng.
     }
 }

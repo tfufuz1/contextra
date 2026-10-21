@@ -169,7 +169,6 @@ fn test_block_search_functions_all_return_first_index_for_multi_version_keys() {
     )
     .expect("search entry should succeed");
     assert!(entry_res.is_some());
-
 }
 
 use proptest::prelude::*;
@@ -245,11 +244,26 @@ async fn test_reader_e2e_multi_version_point_lookup_never_returns_older_visible_
     let mut builder = SstableBuilder::create(&path).await.expect("create builder");
 
     // Add 5 versions for key "mv_key" in descending seq order
-    builder.add(b"mv_key", b"val_v5_seq50", 50, 5).await.unwrap();
-    builder.add(b"mv_key", b"val_v4_seq40", 40, 4).await.unwrap();
-    builder.add(b"mv_key", b"val_v3_seq30", 30, 3).await.unwrap();
-    builder.add(b"mv_key", b"val_v2_seq20", 20, 2).await.unwrap();
-    builder.add(b"mv_key", b"val_v1_seq10", 10, 1).await.unwrap();
+    builder
+        .add(b"mv_key", b"val_v5_seq50", 50, 5)
+        .await
+        .unwrap();
+    builder
+        .add(b"mv_key", b"val_v4_seq40", 40, 4)
+        .await
+        .unwrap();
+    builder
+        .add(b"mv_key", b"val_v3_seq30", 30, 3)
+        .await
+        .unwrap();
+    builder
+        .add(b"mv_key", b"val_v2_seq20", 20, 2)
+        .await
+        .unwrap();
+    builder
+        .add(b"mv_key", b"val_v1_seq10", 10, 1)
+        .await
+        .unwrap();
 
     builder.finish().await.expect("finish builder");
 
@@ -261,12 +275,20 @@ async fn test_reader_e2e_multi_version_point_lookup_never_returns_older_visible_
     assert_eq!(res_latest.1, 50);
 
     // Point lookup bounded at max_seq=35 -> MUST return newest visible version v3 (seq 30)
-    let res_bounded_35 = reader.get_at(b"mv_key", 35, u64::MAX).await.unwrap().expect("must exist");
+    let res_bounded_35 = reader
+        .get_at(b"mv_key", 35, u64::MAX)
+        .await
+        .unwrap()
+        .expect("must exist");
     assert_eq!(res_bounded_35.0.as_ref(), b"val_v3_seq30");
     assert_eq!(res_bounded_35.1, 30);
 
     // Point lookup bounded at max_seq=15 -> MUST return newest visible version v1 (seq 10)
-    let res_bounded_15 = reader.get_at(b"mv_key", 15, u64::MAX).await.unwrap().expect("must exist");
+    let res_bounded_15 = reader
+        .get_at(b"mv_key", 15, u64::MAX)
+        .await
+        .unwrap()
+        .expect("must exist");
     assert_eq!(res_bounded_15.0.as_ref(), b"val_v1_seq10");
     assert_eq!(res_bounded_15.1, 10);
 }

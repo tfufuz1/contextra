@@ -3,7 +3,12 @@
 // ZWECK: Property-based tests for numerical normalization, finite outputs, and empty/whitespace input edge cases.
 // INVARIANTEN: No NaN or Inf in output vectors (is_finite true); no panics on arbitrary string lengths or empty inputs; proptest with 50 cases.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 
 use contextra_infer_candle::CandleEmbedClient;
 use contextra_ports::EmbeddingProvider;

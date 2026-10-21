@@ -416,7 +416,8 @@ impl Manifest {
                 }
                 ManifestEntry::RollbackComplete { .. }
                 | ManifestEntry::WalCheckpoint { .. }
-                | ManifestEntry::FormatVersionRecord { .. } => {}
+                | ManifestEntry::FormatVersionRecord { .. }
+                | ManifestEntry::WalAnchor { .. } => {}
                 ManifestEntry::Replace { removed, added, .. } => {
                     for p in removed {
                         let key = p
@@ -475,7 +476,8 @@ impl Manifest {
                 ManifestEntry::Add { .. }
                 | ManifestEntry::RollbackComplete { .. }
                 | ManifestEntry::WalCheckpoint { .. }
-                | ManifestEntry::FormatVersionRecord { .. } => {}
+                | ManifestEntry::FormatVersionRecord { .. }
+                | ManifestEntry::WalAnchor { .. } => {}
             }
         }
 

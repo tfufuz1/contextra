@@ -4,11 +4,11 @@
 // INVARIANTEN: Canary key raw-scan verification, crash safety at 3 interruption points, zero-panic.
 
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
 use contextra_store::manifest::Manifest;
+use contextra_types::TxId;
 use tempfile::TempDir;
 
 struct DummyProbe(u64);

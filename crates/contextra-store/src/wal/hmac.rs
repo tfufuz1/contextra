@@ -221,12 +221,14 @@ impl Wal {
     }
 
     /// Exposes the HMAC integrity key for testing.
+    #[cfg(test)]
     pub fn integrity_key_for_test(&self) -> Result<[u8; 32]> {
         self.get_integrity_key()
     }
 
     /// Returns the static legacy HMAC integrity key for testing.
     #[doc(hidden)]
+    #[cfg(test)]
     pub fn legacy_integrity_key_for_test() -> [u8; 32] {
         deobfuscate_legacy_integrity_key()
     }
@@ -238,7 +240,17 @@ impl Wal {
     /// malicious filesystem tampering, as an attacker with write access to the directory
     /// can also alter or replace `.wal_integrity_key`. For cryptographic tamper resistance,
     /// an active `KeyManager` (passphrase-derived keying) must be supplied.
+    #[cfg(not(any(test, feature = "test-utils")))]
     pub(crate) async fn load_or_create_integrity_key(wal_path: &Path) -> Result<[u8; 32]> {
+        Self::load_or_create_integrity_key_impl(wal_path).await
+    }
+
+    #[cfg(any(test, feature = "test-utils"))]
+    pub async fn load_or_create_integrity_key(wal_path: &Path) -> Result<[u8; 32]> {
+        Self::load_or_create_integrity_key_impl(wal_path).await
+    }
+
+    async fn load_or_create_integrity_key_impl(wal_path: &Path) -> Result<[u8; 32]> {
         let parent = wal_path.parent().unwrap_or_else(|| Path::new(""));
         let dir_path = if parent.as_os_str().is_empty() {
             Path::new(".")
@@ -320,7 +332,15 @@ impl Wal {
                 )));
             }
             if let Err(e) = file.sync_all().await {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                    if rm_err.kind() != std::io::ErrorKind::NotFound {
+                        tracing::warn!(
+                            path = %tmp_path.display(),
+                            error = %rm_err,
+                            "Failed to remove temporary WAL integrity key file after sync failure"
+                        );
+                    }
+                }
                 return Err(ContextraError::Storage(format!(
                     "Failed to sync WAL integrity key file: {}",
                     e
@@ -330,12 +350,28 @@ impl Wal {
 
             #[cfg(windows)]
             if let Err(e) = super::io::set_restrictive_file_acl(&tmp_path) {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                    if rm_err.kind() != std::io::ErrorKind::NotFound {
+                        tracing::warn!(
+                            path = %tmp_path.display(),
+                            error = %rm_err,
+                            "Failed to remove temporary WAL integrity key file after ACL failure"
+                        );
+                    }
+                }
                 return Err(e.into());
             }
 
             let link_res = super::fs::hard_link(&tmp_path, &key_path).await;
-            let _ = super::fs::remove_file(&tmp_path).await;
+            if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                if rm_err.kind() != std::io::ErrorKind::NotFound {
+                    tracing::warn!(
+                        path = %tmp_path.display(),
+                        error = %rm_err,
+                        "Failed to remove temporary WAL integrity key file after hard_link"
+                    );
+                }
+            }
 
             match link_res {
                 Ok(()) => {
@@ -434,7 +470,15 @@ impl Wal {
 
         let marker_content = Self::calculate_retirement_marker_hash(wal_path, new_key);
         if let Err(e) = file.write_all(marker_content.as_bytes()).await {
-            let _ = super::fs::remove_file(&tmp_path).await;
+            if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                if rm_err.kind() != std::io::ErrorKind::NotFound {
+                    tracing::warn!(
+                        path = %tmp_path.display(),
+                        error = %rm_err,
+                        "Failed to remove temporary WAL migration marker file after write failure"
+                    );
+                }
+            }
             return Err(ContextraError::Storage(format!(
                 "Failed to write WAL migration marker: {}",
                 e
@@ -442,7 +486,15 @@ impl Wal {
         }
 
         if let Err(e) = file.sync_all().await {
-            let _ = super::fs::remove_file(&tmp_path).await;
+            if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                if rm_err.kind() != std::io::ErrorKind::NotFound {
+                    tracing::warn!(
+                        path = %tmp_path.display(),
+                        error = %rm_err,
+                        "Failed to remove temporary WAL migration marker file after sync failure"
+                    );
+                }
+            }
             return Err(ContextraError::Storage(format!(
                 "Failed to sync WAL migration marker file: {}",
                 e
@@ -451,7 +503,15 @@ impl Wal {
         drop(file);
 
         if let Err(e) = super::fs::rename(&tmp_path, &marker_path).await {
-            let _ = super::fs::remove_file(&tmp_path).await;
+            if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                if rm_err.kind() != std::io::ErrorKind::NotFound {
+                    tracing::warn!(
+                        path = %tmp_path.display(),
+                        error = %rm_err,
+                        "Failed to remove temporary WAL migration marker file after rename failure"
+                    );
+                }
+            }
             return Err(ContextraError::Storage(format!(
                 "Failed to rename WAL migration marker from {} to {}: {}",
                 tmp_path.display(),
@@ -532,7 +592,15 @@ impl Wal {
             };
 
             if let Err(e) = file.write_all(&bytes).await {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                    if rm_err.kind() != std::io::ErrorKind::NotFound {
+                        tracing::warn!(
+                            path = %tmp_path.display(),
+                            error = %rm_err,
+                            "Failed to remove temporary WAL UUID sidecar file after write failure"
+                        );
+                    }
+                }
                 return Err(ContextraError::Storage(format!(
                     "Failed to write WAL UUID sidecar: {}",
                     e
@@ -540,7 +608,15 @@ impl Wal {
             }
 
             if let Err(e) = file.sync_all().await {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                    if rm_err.kind() != std::io::ErrorKind::NotFound {
+                        tracing::warn!(
+                            path = %tmp_path.display(),
+                            error = %rm_err,
+                            "Failed to remove temporary WAL UUID sidecar file after sync failure"
+                        );
+                    }
+                }
                 return Err(ContextraError::Storage(format!(
                     "Failed to sync WAL UUID sidecar file: {}",
                     e
@@ -549,7 +625,15 @@ impl Wal {
             drop(file);
 
             let link_res = super::fs::hard_link(&tmp_path, &uuid_path).await;
-            let _ = super::fs::remove_file(&tmp_path).await;
+            if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                if rm_err.kind() != std::io::ErrorKind::NotFound {
+                    tracing::warn!(
+                        path = %tmp_path.display(),
+                        error = %rm_err,
+                        "Failed to remove temporary WAL UUID sidecar file after hard_link"
+                    );
+                }
+            }
 
             match link_res {
                 Ok(()) => {
@@ -575,7 +659,7 @@ mod tests {
 
         let legacy_key = Wal::legacy_integrity_key_for_test();
         let op = WalOp::Put {
-            tx_id: TxId::new(1),
+            tx_id: TxId::try_new(1).unwrap(),
             key: b"malicious_key".to_vec(),
             value: b"malicious_val".to_vec(),
         };
@@ -607,7 +691,7 @@ mod tests {
 
         let legacy_key = Wal::legacy_integrity_key_for_test();
         let op = WalOp::Put {
-            tx_id: TxId::new(1),
+            tx_id: TxId::try_new(1).unwrap(),
             key: b"forged_key".to_vec(),
             value: b"forged_val".to_vec(),
         };

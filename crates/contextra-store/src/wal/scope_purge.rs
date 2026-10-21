@@ -105,8 +105,9 @@ impl OrxWalPurgeIntent {
         buffer.extend_from_slice(&(payload.len() as u32).to_le_bytes());
         buffer.extend_from_slice(&payload);
 
-        atomic_replace(path, &buffer)
-            .map_err(|e| ContextraError::Storage(format!("Failed to write WAL purge intent: {}", e)))
+        atomic_replace(path, &buffer).map_err(|e| {
+            ContextraError::Storage(format!("Failed to write WAL purge intent: {}", e))
+        })
     }
 
     pub fn read_from_file(path: &Path) -> Result<Option<Self>> {
@@ -115,6 +116,61 @@ impl OrxWalPurgeIntent {
         }
 
         let bytes = std::fs::read(path).map_err(|e| {
+            ContextraError::Storage(format!("Failed to read WAL purge intent: {}", e))
+        })?;
+
+        if bytes.len() < 13 {
+            return Err(ContextraError::Storage(
+                "WAL purge intent header too short".into(),
+            ));
+        }
+
+        if &bytes[0..4] != WAL_INTENT_MAGIC {
+            return Err(ContextraError::Storage(
+                "Invalid WAL purge intent magic header".into(),
+            ));
+        }
+
+        if bytes[4] != WAL_INTENT_VERSION {
+            return Err(ContextraError::Storage(format!(
+                "Unsupported WAL purge intent version: {}",
+                bytes[4]
+            )));
+        }
+
+        let checksum_bytes: [u8; 4] = bytes[5..9]
+            .try_into()
+            .map_err(|_| ContextraError::Storage("Invalid checksum length".into()))?;
+        let expected_checksum = u32::from_le_bytes(checksum_bytes);
+
+        let len_bytes: [u8; 4] = bytes[9..13]
+            .try_into()
+            .map_err(|_| ContextraError::Storage("Invalid payload len length".into()))?;
+        let payload_len = u32::from_le_bytes(len_bytes) as usize;
+
+        if bytes.len() < 13 + payload_len {
+            return Err(ContextraError::Storage(
+                "WAL purge intent payload truncated".into(),
+            ));
+        }
+
+        let payload = &bytes[13..13 + payload_len];
+        if crc32fast::hash(payload) != expected_checksum {
+            return Err(ContextraError::Storage(
+                "WAL purge intent CRC32 checksum mismatch".into(),
+            ));
+        }
+
+        let intent = Self::from_bytes(payload)?;
+        Ok(Some(intent))
+    }
+
+    pub async fn read_from_file_async(path: &Path) -> Result<Option<Self>> {
+        if !tokio::fs::try_exists(path).await.unwrap_or(false) {
+            return Ok(None);
+        }
+
+        let bytes = tokio::fs::read(path).await.map_err(|e| {
             ContextraError::Storage(format!("Failed to read WAL purge intent: {}", e))
         })?;
 
@@ -180,7 +236,9 @@ pub async fn purge_wal_scope(
     scope: &PurgeScope,
     as_of_tx: u64,
     key_manager: Option<Arc<KeyManager>>,
-    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))] fault_plan: Option<Arc<crate::wal::WalFailpoints>>,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))] fault_plan: Option<
+        Arc<crate::wal::WalFailpoints>,
+    >,
 ) -> Result<WalPurgeReport> {
     resume_wal_scope_purge(wal_dir).await?;
 
@@ -230,10 +288,7 @@ pub async fn purge_wal_scope(
         let file_type = classify_wal_filename(filename);
         if matches!(
             file_type,
-            WalFileType::Active
-                | WalFileType::Sealed
-                | WalFileType::Archived
-                | WalFileType::Backup
+            WalFileType::Active | WalFileType::Sealed | WalFileType::Archived | WalFileType::Backup
         ) {
             candidates.push(path);
         }
@@ -288,7 +343,7 @@ pub async fn purge_wal_scope(
         // Rewrite required
         let tmp_path = path.with_extension("purge_tmp");
 
-        let integrity_key = wal.integrity_key_for_test()?;
+        let integrity_key = wal.get_integrity_key()?;
 
         let mut kept_entries = Vec::new();
         for (_, entry, _) in &entries {
@@ -449,7 +504,9 @@ async fn remove_if_exists(p: &Path) -> std::io::Result<()> {
 }
 
 fn check_and_clear_failpoint(
-    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))] fault_plan: Option<&crate::wal::WalFailpoints>,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))] fault_plan: Option<
+        &crate::wal::WalFailpoints,
+    >,
     fp: u32,
 ) -> bool {
     #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]

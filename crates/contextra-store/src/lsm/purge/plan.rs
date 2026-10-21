@@ -47,6 +47,7 @@ impl PurgePhase {
     pub fn to_u8(self) -> u8 {
         self.code()
     }
+}
 
     /// Backwards compatibility method.
     #[must_use]

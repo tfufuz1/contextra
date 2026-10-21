@@ -4,7 +4,7 @@
 
 use super::backend::PurgeBackend;
 use super::dispose::dispose_obsolete_files;
-use super::failpoint::{OrxFailpointSet, OrxPurgeError};
+use super::failpoint::OrxFailpointSet;
 use super::intent::OrxPurgeIntent;
 use super::plan::PurgePhase;
 use crate::compaction::purge_filter::{FreeSpaceProbe, PurgeReport, PurgeScope};
@@ -16,8 +16,10 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub enum PurgeOutcome {
     /// Pipeline completed all phases successfully.
+    #[error("Purge completed: {0:?}")]
     Completed(PurgeReport),
     /// Pipeline completed all phases, but obsolete file disposal encountered refusals.
+    #[error("Purge completed with {refusals} disposal refusals: {report:?}")]
     CompletedWithRefusals {
         report: PurgeReport,
         refusals: usize,
@@ -38,8 +40,8 @@ impl PurgeOutcome {
         )
     }
 
-    /// Converts the outcome into a Result<PurgeReport, OrxPurgeError>.
-    pub fn into_result(self) -> Result<PurgeReport, OrxPurgeError> {
+    /// Converts the outcome into a Result<PurgeReport, PurgeError>.
+    pub fn into_result(self) -> Result<PurgeReport, PurgeError> {
         match self {
             PurgeOutcome::Completed(report) | PurgeOutcome::CompletedWithRefusals { report, .. } => Ok(report),
             PurgeOutcome::Failed { error, .. } => Err(OrxPurgeError::from(error)),
@@ -52,7 +54,7 @@ pub type HookCallback = Box<dyn Fn() -> std::io::Result<()> + Send + Sync>;
 
 /// Scope reconstruction callback function type.
 pub type ScopeReconstructFn =
-    Box<dyn Fn(Option<u64>, Option<[u8; 32]>) -> Result<PurgeScope, OrxPurgeError> + Send + Sync>;
+    Box<dyn Fn(Option<u64>, Option<[u8; 32]>) -> Result<PurgeScope, PurgeError> + Send + Sync>;
 
 /// Configuration and callbacks for purge lifecycle steps.
 #[derive(Default)]
@@ -116,11 +118,14 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
         &self,
         intent: &mut OrxPurgeIntent,
         phase: PurgePhase,
-    ) -> Result<(), OrxPurgeError> {
+    ) -> Result<(), PurgeError> {
         intent.phase = phase;
         intent
             .write_to_file(&self.intent_file)
-            .map_err(OrxPurgeError::Io)
+            .map_err(|e| PurgeError::Write {
+                file: self.intent_file.to_string_lossy().to_string(),
+                source: e.to_string(),
+            })
     }
 
     /// Executes complete purge pipeline and returns `PurgeOutcome`.
@@ -175,7 +180,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
         space_probe: Option<&dyn FreeSpaceProbe>,
         hooks: &OrxHooks,
         secure_delete: bool,
-    ) -> Result<PurgeReport, OrxPurgeError> {
+    ) -> Result<PurgeReport, PurgeError> {
         self.execute_purge_outcome(scope, as_of_tx, space_probe, hooks, secure_delete)
             .await
             .into_result()
@@ -204,7 +209,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 fence_guard = Some(guard);
 
                 if let Some(ref f) = hooks.fence_acquire {
-                    f().map_err(OrxPurgeError::Io)?;
+                    f().map_err(|e| PurgeError::Fence(e.to_string()))?;
                 }
                 fence_acquired = true;
                 self.record_phase(&mut intent, PurgePhase::Fenced)?;
@@ -215,7 +220,10 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
             if intent.phase <= PurgePhase::Flushed {
                 self.backend.flush_memtable().await.map_err(OrxPurgeError::from)?;
                 if let Some(ref f) = hooks.flush_memtable {
-                    f().map_err(OrxPurgeError::Io)?;
+                    f().map_err(|e| PurgeError::Write {
+                        file: "flush_memtable".to_string(),
+                        source: e.to_string(),
+                    })?;
                 }
                 self.record_phase(&mut intent, PurgePhase::Flushed)?;
                 self.check_failpoint("after_flush")?;
@@ -254,8 +262,12 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 self.record_phase(&mut intent, PurgePhase::Disposing)?;
                 self.check_failpoint("after_manifest_before_unlink")?;
 
-                let disp_rep =
-                    dispose_obsolete_files(&self.storage_dir, report.obsolete_files.clone(), secure_delete).await?;
+                let disp_rep = dispose_obsolete_files(
+                    &self.storage_dir,
+                    report.obsolete_files.clone(),
+                    secure_delete,
+                )
+                .await?;
                 refusals = disp_rep.refusals.len();
 
                 self.check_failpoint("mid_dispose_journal")?;
@@ -267,7 +279,10 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 self.record_phase(&mut intent, PurgePhase::WalRetiring)?;
                 self.backend.retire_wal().await.map_err(OrxPurgeError::from)?;
                 if let Some(ref cb) = hooks.wal_retire {
-                    cb().map_err(OrxPurgeError::Io)?;
+                    cb().map_err(|e| PurgeError::Write {
+                        file: "wal_retire".to_string(),
+                        source: e.to_string(),
+                    })?;
                 }
                 self.check_failpoint("after_wal_callback")?;
             }
@@ -276,9 +291,13 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
             if intent.phase <= PurgePhase::Finalizing {
                 self.record_phase(&mut intent, PurgePhase::Witnessing)?;
                 if let Some(ref cb) = hooks.witness {
-                    cb().map_err(OrxPurgeError::Io)?;
+                    cb().map_err(|e| PurgeError::Write {
+                        file: "witness".to_string(),
+                        source: e.to_string(),
+                    })?;
                 }
                 self.check_failpoint("after_witness")?;
+            }
 
                 self.record_phase(&mut intent, PurgePhase::Finalizing)?;
                 self.check_failpoint("after_finalize")?;
@@ -295,7 +314,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
             if intent.phase <= PurgePhase::Released {
                 fence_guard.take();
                 if let Some(ref f) = hooks.fence_release {
-                    f().map_err(OrxPurgeError::Io)?;
+                    f().map_err(|e| PurgeError::Fence(e.to_string()))?;
                 }
                 fence_acquired = false;
 
@@ -303,7 +322,10 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 self.check_failpoint("after_release")?;
 
                 if self.intent_file.exists() {
-                    durable_remove(&self.intent_file).map_err(OrxPurgeError::Io)?;
+                    durable_remove(&self.intent_file).map_err(|e| PurgeError::Write {
+                        file: self.intent_file.to_string_lossy().to_string(),
+                        source: e.to_string(),
+                    })?;
                 }
                 self.check_failpoint("after_intent_cleanup")?;
             }
@@ -347,21 +369,22 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
         hooks: &OrxHooks,
         secure_delete: bool,
         space_probe: Option<&dyn FreeSpaceProbe>,
-    ) -> Result<PurgeReport, OrxPurgeError> {
+    ) -> Result<PurgeReport, PurgeError> {
         self.execute_from_intent_outcome(intent, scope, hooks, secure_delete, space_probe)
             .await
             .into_result()
     }
 
-    fn check_failpoint(&self, name: &str) -> Result<(), OrxPurgeError> {
+    fn check_failpoint(&self, name: &'static str) -> Result<(), PurgeError> {
         if let Some(ref set) = self.failpoints {
             if set.is_active(name) {
-                return Err(OrxPurgeError::FailpointTriggered(name.to_string()));
+                #[cfg(any(test, feature = "fault-injection"))]
+                return Err(PurgeError::Failpoint(name));
             }
         }
-        #[cfg(feature = "fault-injection")]
+        #[cfg(any(test, feature = "fault-injection"))]
         if std::env::var(format!("PURGE_FAILPOINT_{}", name)).is_ok() {
-            return Err(OrxPurgeError::FailpointTriggered(name.to_string()));
+            return Err(PurgeError::Failpoint(name));
         }
         Ok(())
     }

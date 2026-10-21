@@ -1,13 +1,14 @@
 // FILE-CONTEXT
-// STAND: 2026-10-14
+// STAND: 2026-10-21
 // ZWECK: Implementation of ErasureBackend trait for LsmStorage (§5.11, F-05, REG-15).
 // INVARIANTEN: Zero-panic, physical scope derivation without downcasts, fail-closed errors.
 
-use std::sync::Arc;
-use contextra_types::{ContextraError, TxId};
 use contextra_ports::erasure::{
-    ErasureBackend, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId, PurgeOutput,
+    ErasureBackend, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId,
+    PurgeOutput,
 };
+use contextra_types::{ContextraError, TxId};
+use std::sync::Arc;
 
 use crate::compaction::purge_filter::PurgeScope;
 use crate::lsm::engine::LsmStorage;
@@ -42,14 +43,18 @@ impl LsmStorage {
 }
 
 impl ErasureBackend for LsmStorage {
-    fn physical_scope(&self, scope: &LogicalScope) -> std::result::Result<PhysicalScope, ContextraError> {
+    fn physical_scope(
+        &self,
+        scope: &LogicalScope,
+    ) -> std::result::Result<PhysicalScope, ContextraError> {
         match scope {
             LogicalScope::Document {
                 doc_id,
                 collection_id,
                 tenant_id,
             } => {
-                let doc_key = format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
+                let doc_key =
+                    format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
                 PhysicalScope::try_new(*tenant_id, vec![doc_key], vec![])
             }
             LogicalScope::Collection {
@@ -68,7 +73,11 @@ impl ErasureBackend for LsmStorage {
         }
     }
 
-    fn acquire_fence(&self, scope: &PhysicalScope, id: PurgeId) -> std::result::Result<FenceGuard, ContextraError> {
+    fn acquire_fence(
+        &self,
+        scope: &PhysicalScope,
+        id: PurgeId,
+    ) -> std::result::Result<FenceGuard, ContextraError> {
         let mut fence_targets = Vec::new();
         fence_targets.extend_from_slice(scope.prefixes());
         fence_targets.extend_from_slice(scope.keys());
@@ -82,7 +91,9 @@ impl ErasureBackend for LsmStorage {
         let fen_guard = self
             .erasure_fence
             .acquire_scope_fence_for(fence_targets)
-            .map_err(|e| ContextraError::InvalidInput(format!("Fence acquisition failed: {:?}", e)))?;
+            .map_err(|e| {
+                ContextraError::InvalidInput(format!("Fence acquisition failed: {:?}", e))
+            })?;
 
         let fence_id = fen_guard.id();
         std::mem::forget(fen_guard);
@@ -100,15 +111,19 @@ impl ErasureBackend for LsmStorage {
         probe: &dyn FreeSpaceProbe,
     ) -> std::result::Result<PurgeOutput, PurgeError> {
         if tokio::runtime::Handle::try_current().is_ok() {
-            return Err(PurgeError::Io(std::io::Error::other(
-                "ErasureBackend::purge_physical called synchronously from within an active Tokio runtime context; use LsmStorage::purge_physical_async instead",
-            )));
+            return Err(PurgeError::Write {
+                file: "purge_physical".to_string(),
+                source_details: "ErasureBackend::purge_physical called synchronously from within an active Tokio runtime context; use LsmStorage::purge_physical_async instead".to_string(),
+            });
         }
 
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .map_err(|e| PurgeError::Io(std::io::Error::other(e.to_string())))?;
+            .map_err(|e| PurgeError::Write {
+                file: "purge_physical".to_string(),
+                source_details: e.to_string(),
+            })?;
 
         rt.block_on(self.purge_physical_async(scope, as_of, probe))
     }

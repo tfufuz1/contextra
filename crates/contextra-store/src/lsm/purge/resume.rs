@@ -51,12 +51,8 @@ pub async fn resume_pending_for_backend<B: PurgeBackend>(
         let journal = PendingDeleteJournal::open(&journal_file)?;
         let obsolete_files = journal.pending().to_vec();
 
-        let disp_rep = dispose_obsolete_files_with_policy(
-            storage_dir,
-            obsolete_files,
-            dispose_policy,
-        )
-        .await?;
+        let disp_rep =
+            dispose_obsolete_files_with_policy(storage_dir, obsolete_files, dispose_policy).await?;
 
         return Ok(Some((
             PurgeReport {

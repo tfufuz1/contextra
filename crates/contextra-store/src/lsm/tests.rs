@@ -30,3 +30,15 @@ mod mvcc_tests;
 mod recovery_tests;
 #[cfg(test)]
 mod scan_tests;
+#[cfg(test)]
+mod w1_02_async_observer_tests;
+#[cfg(test)]
+mod w1_02_cancel_safety_tests;
+#[cfg(test)]
+mod w1_02_fence_tests;
+#[cfg(test)]
+mod w1_02_phantom_commit_tests;
+#[cfg(test)]
+mod w1_02_scan_hygiene_tests;
+#[cfg(test)]
+mod w1_02_seq_visibility_tests;

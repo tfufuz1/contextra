@@ -15,7 +15,7 @@ pub mod wiring;
 
 pub use backend::{MockBackend, PurgeBackend};
 pub use dispose::OrxDisposeReport;
-pub use failpoint::{CANONICAL_FAILPOINTS, OrxFailpointSet, OrxPurgeError};
+pub use failpoint::{OrxFailpointSet, OrxPurgeError, CANONICAL_FAILPOINTS};
 pub use intent::OrxPurgeIntent;
 pub use orchestrator::{HookCallback, OrxHooks, PurgeOrchestrator, ScopeReconstructFn};
 pub use plan::PurgePhase;

@@ -1,8 +1,8 @@
 //! Integration / unit tests for LSM scan limits, source distribution, and range bounds safety.
 
 use bytes::Bytes;
-use contextra_types::TxId;
 use contextra_store::memtable::{is_valid_range_bounds, MemTable};
+use contextra_types::TxId;
 use std::collections::BTreeMap;
 use std::ops::Bound;
 

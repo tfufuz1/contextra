@@ -277,3 +277,57 @@ impl<S: StorageEngine> super::index_struct::InvertedIndex<S> {
         Ok(evidence)
     }
 }
+
+impl<S: StorageEngine> contextra_ports::LayerScan for super::index_struct::InvertedIndex<S> {
+    fn layer_id(&self) -> u16 {
+        20
+    }
+
+    fn scan(&self, scope: &contextra_ports::PhysicalScope) -> std::result::Result<contextra_ports::LayerObservation, contextra_ports::ScanError> {
+        let total_docs = self.total_docs.load(Ordering::SeqCst);
+        let total_tokens = self.total_tokens.load(Ordering::SeqCst);
+        let item_count = total_docs;
+
+        if item_count == 0 {
+            let digest = blake3::hash(b"text_empty").into();
+            return Ok(contextra_ports::LayerObservation {
+                layer_id: 20,
+                clean: true,
+                state_digest: digest,
+                item_count: 0,
+            });
+        }
+
+        let mut matches = 0u64;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"contextra/text/v1");
+        hasher.update(&total_docs.to_le_bytes());
+        hasher.update(&total_tokens.to_le_bytes());
+
+        self.resident_index.visit_entries(|term, plist| {
+            hasher.update(term.as_bytes());
+            for p in plist.as_slice() {
+                let doc_str = p.doc_id().inner().to_string();
+                let key_0 = format!("t:0:{}", doc_str).into_bytes();
+                let key_1 = format!("t:1:{}", doc_str).into_bytes();
+                if scope.matches_key(&key_0)
+                    || scope.matches_key(&key_1)
+                    || scope.keys().iter().any(|k| {
+                        std::str::from_utf8(k)
+                            .map(|s| s.ends_with(&doc_str))
+                            .unwrap_or(false)
+                    })
+                {
+                    matches += 1;
+                }
+            }
+        });
+
+        Ok(contextra_ports::LayerObservation {
+            layer_id: 20,
+            clean: matches == 0,
+            state_digest: hasher.finalize().into(),
+            item_count,
+        })
+    }
+}

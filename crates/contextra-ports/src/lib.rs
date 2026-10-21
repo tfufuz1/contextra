@@ -55,6 +55,8 @@ pub mod kv_bridge_port;
 pub mod license;
 /// Grounding validator traits and context preparer contracts.
 pub mod lifecycle;
+/// WASM merge operator host port trait (§4.3, §4.12).
+pub mod merge_host;
 /// Merge operator and factory port traits (§4.3).
 pub mod merge_operator;
 /// Metrics reporting port trait.
@@ -97,6 +99,7 @@ pub use kv::*;
 pub use kv_bridge_port::*;
 pub use license::*;
 pub use lifecycle::*;
+pub use merge_host::*;
 pub use merge_operator::*;
 pub use metrics::*;
 pub use observability::*;
@@ -140,6 +143,7 @@ mod dyn_safety {
     fn _assert_dyn_write_gate(_: Option<&dyn WriteGate>) {}
     fn _assert_dyn_free_space_probe(_: Option<&dyn FreeSpaceProbe>) {}
     fn _assert_dyn_merge_operator(_: Option<&dyn MergeOperator>) {}
+    fn _assert_dyn_merge_operator_host(_: Option<&dyn MergeOperatorHost>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -168,5 +172,6 @@ mod dyn_safety {
         _assert_dyn_write_gate(None);
         _assert_dyn_free_space_probe(None);
         _assert_dyn_merge_operator(None);
+        _assert_dyn_merge_operator_host(None);
     }
 }

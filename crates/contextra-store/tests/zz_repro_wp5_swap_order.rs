@@ -45,9 +45,15 @@ async fn test_purge_two_ssts_first_becomes_empty() -> Result<()> {
     StorageEngine::flush(&storage).await?;
 
     // Vor dem Purge: Beide Schlüssel lesbar
-    assert!(storage.get_at_seq(b"key_to_purge", u64::MAX).await?.is_some());
+    assert!(storage
+        .get_at_seq(b"key_to_purge", u64::MAX)
+        .await?
+        .is_some());
     assert_eq!(
-        storage.get_at_seq(b"key_preserved", u64::MAX).await?.as_deref(),
+        storage
+            .get_at_seq(b"key_preserved", u64::MAX)
+            .await?
+            .as_deref(),
         Some(&b"val_preserved"[..])
     );
 
@@ -56,11 +62,19 @@ async fn test_purge_two_ssts_first_becomes_empty() -> Result<()> {
     // SSTable 2 behält key_preserved (-> Replace)
     let probe = TestProbe;
     let scope = PurgeScope::Keys(vec![b"key_to_purge".to_vec()]);
-    let report = storage.purge_keys(scope, 100, Some(&probe)).await
+    let report = storage
+        .purge_keys(scope, 100, Some(&probe))
+        .await
         .map_err(|e| contextra_types::ContextraError::Storage(format!("Purge failed: {:?}", e)))?;
 
-    assert_eq!(report.records_purged, 2, "Es müssen 2 Versionen von key_to_purge bereinigt worden sein");
-    assert_eq!(report.sstables_replaced, 2, "2 SSTables mussten angefasst werden");
+    assert_eq!(
+        report.records_purged, 2,
+        "Es müssen 2 Versionen von key_to_purge bereinigt worden sein"
+    );
+    assert_eq!(
+        report.sstables_replaced, 2,
+        "2 SSTables mussten angefasst werden"
+    );
 
     // Nach dem Purge:
     // 1. key_to_purge ist restlos verschwunden

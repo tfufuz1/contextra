@@ -45,7 +45,7 @@ pub(crate) struct DiskAnnIndexInner {
     pub(crate) hnsw_fallback: RwLock<Option<Arc<crate::hnsw::HnswIndex>>>,
     pub(crate) tombstones: RwLock<TombstoneSet>,
     pub(crate) compute_pool: ComputePool,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "experimental-diskann"))]
     pub(crate) failpoint: parking_lot::Mutex<Option<String>>,
 }
 
@@ -274,23 +274,23 @@ impl DiskAnnIndex {
                 hnsw_fallback: RwLock::new(None),
                 tombstones: RwLock::new(TombstoneSet::new()),
                 compute_pool,
-                #[cfg(test)]
+                    #[cfg(any(test, feature = "experimental-diskann"))]
                 failpoint: parking_lot::Mutex::new(None),
             }),
         })
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "experimental-diskann"))]
     pub fn set_failpoint(&self, point: &str) {
         *self.inner.failpoint.lock() = Some(point.to_string());
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "experimental-diskann"))]
     pub fn clear_failpoint(&self) {
         *self.inner.failpoint.lock() = None;
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "experimental-diskann"))]
     pub(crate) fn maybe_failpoint(&self, name: &str) -> Result<()> {
         let guard = self.inner.failpoint.lock();
         if let Some(ref active) = *guard {

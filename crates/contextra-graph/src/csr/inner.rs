@@ -149,6 +149,15 @@ impl GraphInner {
     }
 
     #[inline]
+    pub fn entity_exists(&self, id: EntityId) -> bool {
+        if let Some(&idx) = self.id_map.get(&id) {
+            self.entity_at(idx).is_some()
+        } else {
+            false
+        }
+    }
+
+    #[inline]
     pub(crate) fn entity_at(&self, idx: usize) -> Option<&Entity> {
         self.entities.get(idx).filter(|e| e.id != EntityId::new(0))
     }
@@ -515,10 +524,6 @@ impl GraphInner {
         self.out_weight_sums[node_idx] = sum;
     }
 
-    // TODO(WP-GR1 / PR-23): Graph Compaction Edge-Loss:
-    // Sicherstellen, dass bei der Verdichtung von `pending_edges` und alten CSR-Arrays
-    // unter parallelen Lesern und Tombstones keine Kanten zwischen `old_start..old_end`
-    // verloren gehen oder Offsets korrumpiert werden.
     /// Compacts pending edges in the delta buffer into the main CSR arrays.
     pub fn compact(&mut self) {
         let num_nodes = self.reverse_map.len();
@@ -549,7 +554,7 @@ impl GraphInner {
         let mut new_source_doc_ids =
             Vec::with_capacity(self.source_doc_ids.len() + self.pending_edge_count);
 
-        let mut current_offset = 0;
+        let mut current_offset: usize = 0;
         new_offsets.push(current_offset);
 
         for i in 0..num_nodes {
@@ -567,12 +572,15 @@ impl GraphInner {
                 0
             };
 
-            for j in old_start..old_end {
+            let safe_start = old_start.min(self.targets.len());
+            let safe_end = old_end.clamp(safe_start, self.targets.len());
+
+            for j in safe_start..safe_end {
                 let target = self.targets[j];
                 if !self.tombstoned_edges.contains(&(i, target)) {
                     node_edges.push(EdgePayload {
                         target,
-                        weight: self.weights[j],
+                        weight: self.weights.get(j).copied().unwrap_or(1.0),
                         tx_valid_from: self.tx_valid_from_at(j),
                         tx_valid_to: self.tx_valid_to_at(j),
                         business_valid_from: self.business_valid_from_at(j),
@@ -602,7 +610,14 @@ impl GraphInner {
                 new_business_valid_froms.push(edge.business_valid_from.unwrap_or(i64::MIN));
                 new_business_valid_tos.push(edge.business_valid_to.unwrap_or(i64::MIN));
                 new_source_doc_ids.push(edge.source_doc_id.unwrap_or(DocId::new(0)));
-                current_offset += 1;
+                if let Some(next_offset) = current_offset.checked_add(1) {
+                    current_offset = next_offset;
+                } else {
+                    tracing::error!(
+                        "CSR offset arithmetic overflow at usize boundary during compaction"
+                    );
+                    break;
+                }
             }
 
             new_offsets.push(current_offset);
@@ -792,10 +807,34 @@ impl GraphInner {
     }
 }
 
-/// RAII guard wrapping the writer mutex guard, automatically publishing updated `Arc<GraphInner>` snapshots to `ArcSwap` on drop.
-pub(crate) struct InnerWriteGuard<'a> {
+/// RAII guard wrapping the writer mutex guard, publishing updated `Arc<GraphInner>` snapshots
+/// to `ArcSwap` when explicitly committed via `commit()`.
+///
+/// Implements Copy-on-Write (CoW) / lazy clone tracking:
+/// `write_state` is only cloned when a mutating method (`deref_mut`) is actually called.
+/// If dropped without calling `commit()`, rollback clones the snapshot ONLY if mutations occurred.
+pub struct InnerWriteGuard<'a> {
     pub(crate) guard: parking_lot::MutexGuard<'a, GraphInner>,
     pub(crate) arc_swap: &'a ArcSwap<GraphInner>,
+    pub(crate) committed: bool,
+    pub(crate) mutated: bool,
+}
+
+impl<'a> InnerWriteGuard<'a> {
+    /// Returns whether any mutation was performed on this write guard via `DerefMut`.
+    #[inline]
+    pub fn is_mutated(&self) -> bool {
+        self.mutated
+    }
+
+    /// Explicitly commits in-memory mutations to `ArcSwap` for RCU readers.
+    #[inline]
+    pub fn commit(mut self) {
+        self.committed = true;
+        if self.mutated {
+            self.arc_swap.store(Arc::new((*self.guard).clone()));
+        }
+    }
 }
 
 impl<'a> std::ops::Deref for InnerWriteGuard<'a> {
@@ -807,20 +846,17 @@ impl<'a> std::ops::Deref for InnerWriteGuard<'a> {
 
 impl<'a> std::ops::DerefMut for InnerWriteGuard<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        self.mutated = true;
         &mut self.guard
     }
 }
 
 impl<'a> Drop for InnerWriteGuard<'a> {
     fn drop(&mut self) {
-        // TODO(WP-GR2 / PR-24): Graph Clone-on-Drop beheben:
-        // Das Klonen des gesamten `GraphInner` (`(*self.guard).clone()`) bei jedem Guard-Drop
-        // führt zu massiven Allokations- und Latenzspitzen. Durch gezielte CoW-/RCU-Aktualisierung
-        // oder Batching ersetzen.
-        // TODO(WP-GR3 / PR-25): Graph Rollback unterstützen:
-        // Schlägt eine übergeordnete Operation fehl, publiziert `Drop` unkontrolliert den
-        // mutierten Zwischenzustand an `arc_swap`. Der Guard benötigt ein explizites Commit-Signal;
-        // ohne Commit muss der modifizierte Zustand auf den vorherigen Snapshot zurückgerollt werden.
-        self.arc_swap.store(Arc::new((*self.guard).clone()));
+        if !self.committed && self.mutated {
+            // Roll back write_state to current ArcSwap snapshot only when mutated
+            let current_snapshot = self.arc_swap.load_full();
+            *self.guard = (*current_snapshot).clone();
+        }
     }
 }

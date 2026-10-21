@@ -6,9 +6,11 @@ use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
 use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp, WalReplayOptions};
-use contextra_types::{ContextraError, ResourceBudget, ResourceTracker, Result, TOMBSTONE_BIT, TxId};
-use contextra_mvcc::{SnapshotRegistry, TxBuffer};
 use contextra_mvcc::snapshot::SnapshotFloor;
+use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_types::{
+    ContextraError, ResourceBudget, ResourceTracker, Result, TxId, TOMBSTONE_BIT,
+};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -291,27 +293,35 @@ impl LsmStorage {
         let salt_bytes: [u8; 32] = salt.as_slice().try_into().unwrap_or([0u8; 32]);
         let ledger_key = crate::erasure_ledger::LedgerKey::derive_from_master_secret(&salt_bytes);
         let db_has_data = !directory_is_pristine(&config.path).await?;
-        let (ledger_opt, ledger_status) = crate::erasure_ledger::ErasureLedger::open_or_fail_closed(
-            &config.path,
-            ledger_key,
-            db_has_data,
-            None,
-        ).await?;
+        let (ledger_opt, ledger_status) =
+            crate::erasure_ledger::ErasureLedger::open_or_fail_closed(
+                &config.path,
+                ledger_key,
+                db_has_data,
+                None,
+            )
+            .await?;
 
         let read_only = !matches!(
             ledger_status,
-            crate::erasure_ledger::LedgerOpenStatus::Ok | crate::erasure_ledger::LedgerOpenStatus::Fresh
+            crate::erasure_ledger::LedgerOpenStatus::Ok
+                | crate::erasure_ledger::LedgerOpenStatus::Fresh
         );
 
-        let erasure_ledger_handle = ledger_opt.map(|l| Arc::new(crate::erasure_ledger::ErasureLedgerHandle::new(l)));
+        let erasure_ledger_handle =
+            ledger_opt.map(|l| Arc::new(crate::erasure_ledger::ErasureLedgerHandle::new(l)));
 
         let mut replay_options = WalReplayOptions::default();
         if let Some(ref handle) = erasure_ledger_handle {
-            replay_options.filter = Some(Arc::new(crate::erasure_ledger::LedgerReplayFilter::new(Arc::clone(handle))));
+            replay_options.filter = Some(Arc::new(crate::erasure_ledger::LedgerReplayFilter::new(
+                Arc::clone(handle),
+            )));
         }
         for (_ts, wal_path) in &wal_files {
             let wal = Wal::open_read_only(wal_path, key_manager.clone()).await?;
-            let (wal_entries, _report) = wal.replay_with_filter(replay_options.filter.as_deref()).await?;
+            let (wal_entries, _report) = wal
+                .replay_with_filter(replay_options.filter.as_deref())
+                .await?;
 
             if let Some((_, last_entry, _)) = wal_entries.last() {
                 last_replayed_hmac = Some(last_entry.checksum);
@@ -388,21 +398,34 @@ impl LsmStorage {
 
         if let Some(expected_hwm) = manifest_hwm {
             let actual_tail_hmac = last_replayed_hmac.unwrap_or([0u8; 32]);
-            let check_hmac = if replayed_hmac_set.contains(&expected_hwm)
-                || valid_manifest_sstables
-                    .as_ref()
-                    .is_some_and(|s| !s.is_empty())
-            {
-                expected_hwm
-            } else {
-                actual_tail_hmac
-            };
-            if contextra_crypto::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err()
-            {
-                return Err(ContextraError::wal_truncation_detected(
-                    expected_hwm,
-                    actual_tail_hmac,
-                ));
+            let first_frame_prev = None;
+            let entries_empty = replayed_hmac_set.len() <= 1;
+
+            let check_res = crate::wal::verify_wal_anchor(
+                &expected_hwm,
+                &actual_tail_hmac,
+                &replayed_hmac_set,
+                first_frame_prev,
+                entries_empty,
+            );
+
+            if check_res.is_err() {
+                let check_hmac = if replayed_hmac_set.contains(&expected_hwm)
+                    || valid_manifest_sstables
+                        .as_ref()
+                        .is_some_and(|s| !s.is_empty())
+                {
+                    expected_hwm
+                } else {
+                    actual_tail_hmac
+                };
+                if contextra_crypto::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err()
+                {
+                    return Err(ContextraError::wal_truncation_detected(
+                        expected_hwm,
+                        actual_tail_hmac,
+                    ));
+                }
             }
         }
 
@@ -564,7 +587,10 @@ impl LsmStorage {
         // --- Recovery Bausteine Wiring ---
         // 2. Witness Scan über SSTable Dateiklassen (Verdrahtung Punkt 4)
         let sst_read = sstables.read().await;
-        let live_sst_paths: Vec<_> = sst_read.iter().map(|s| s.file_path().to_path_buf()).collect();
+        let live_sst_paths: Vec<_> = sst_read
+            .iter()
+            .map(|s| s.file_path().to_path_buf())
+            .collect();
         drop(sst_read);
 
         let witness_res = crate::sstable::collect_witnesses(
@@ -604,9 +630,12 @@ impl LsmStorage {
                     );
                     for file_path in &orphan_plan.files_to_remove {
                         if file_path.exists() {
-                            let receipt = contextra_durable_fs::scrub_and_remove(file_path).map_err(|e| {
-                                ContextraError::Storage(format!("Orphan GC failed during LSM recovery: {e}"))
-                            })?;
+                            let receipt = contextra_durable_fs::scrub_and_remove(file_path)
+                                .map_err(|e| {
+                                    ContextraError::Storage(format!(
+                                        "Orphan GC failed during LSM recovery: {e}"
+                                    ))
+                                })?;
                             tracing::debug!(
                                 path = ?file_path,
                                 method = ?receipt.method,
@@ -835,8 +864,14 @@ impl LsmStorage {
                 "Executing pending rollback recovery for TxId({})",
                 target_tx
             );
+            let tx_id = TxId::try_new(target_tx).map_err(|e| {
+                ContextraError::Storage(format!(
+                    "Invalid target_tx {} in pending rollback intent file: {}",
+                    target_tx, e
+                ))
+            })?;
             storage
-                .rollback_to_tx(TxId::new(target_tx))
+                .rollback_to_tx(tx_id)
                 .await
                 .map_err(|e| {
                     ContextraError::Storage(format!(
@@ -1149,12 +1184,12 @@ mod tests {
         {
             let old_wal = Wal::open_with_key_manager(&old_wal_path, None).await?;
             let op_put1 = WalOp::Put {
-                tx_id: contextra_types::TxId::new(1),
+                tx_id: contextra_types::TxId::try_new(1).unwrap(),
                 key: b"key1".to_vec(),
                 value: b"val1".to_vec(),
             };
             let op_end1 = WalOp::TxEnd {
-                tx_id: contextra_types::TxId::new(1),
+                tx_id: contextra_types::TxId::try_new(1).unwrap(),
                 committed: true,
             };
             let (batch1, _) = old_wal
@@ -1165,12 +1200,12 @@ mod tests {
 
             let active_wal = Wal::open_with_key_manager(&active_wal_path, None).await?;
             let op_put2 = WalOp::Put {
-                tx_id: contextra_types::TxId::new(2),
+                tx_id: contextra_types::TxId::try_new(2).unwrap(),
                 key: b"key2".to_vec(),
                 value: b"val2".to_vec(),
             };
             let op_end2 = WalOp::TxEnd {
-                tx_id: contextra_types::TxId::new(2),
+                tx_id: contextra_types::TxId::try_new(2).unwrap(),
                 committed: true,
             };
             let (batch2, _) = active_wal

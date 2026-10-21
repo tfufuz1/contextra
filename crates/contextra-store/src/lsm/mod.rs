@@ -1,75 +1,18 @@
 //! LSM-Tree (Log-Structured Merge-Tree) storage engine.
 // FILE-CONTEXT
-// STAND: 2026-08-30T21:49:55Z (SESSION: 283abf0f)
+// STAND: 2026-10-21
 // ZWECK: LSM-Tree-Implementierung (MemTable + SSTable + Compaction)
 // INVARIANTEN: Compaction darf keine Daten verlieren; WAL-Replay vor MemTable-Aufbau; LOCK-REIHENFOLGE: commit_mutex → state.write/read → MemTable-RwLock
 //              Single-Commit: state.write (Flush-Schutz). Group-Commit-Leader: state.read (commit_mutex hält Isolation).
 // NICHT-OFFENSICHTLICH: Compaction-Lock muss VOR MemTable-Lock genommen werden (Deadlock-Gefahr)
 // SIEHE AUCH: wal.rs, sstable.rs, DECISIONS.md ADR-003
 
-// INVARIANT: Zentraler Storage-Engine-Orchestrator des Triebwerks.
-// IMPLEMENTS: StorageEngine Trait (contextra-ports/src/storage.rs)
-// READ-PATH:  get() → Active MemTable → Immutable MemTables → SSTables (newest first)
-// WRITE-PATH: put()/delete() → TxBuffer → commit() → WAL + MemTable
-// FLUSH:      MemTable > size_limit → rotate → SSTable schreiben → cleanup
-// BACKGROUND: CompactionEngine läuft als tokio::spawn loop
-// INVARIANTE: WAL Replay bei Neustart stellt MemTable deterministisch wieder her.
-//!
-//! The `LsmStorage` engine provides a high-performance, persistent key-value store
-//! implementing the `StorageEngine` trait.
-//!
-//! ## Architecture
-//! - **MemTable**: An in-memory sorted buffer (`BTreeMap`) that absorbs all writes.
-//!   Once it reaches a size threshold, it is frozen (becoming an immutable MemTable)
-//!   and eventually flushed to disk as an SSTable.
-//! - **WAL (Write-Ahead Log)**: Ensures durability by logging all operations before
-//!   they are applied to the MemTable.
-//! - **SSTables (Sorted String Tables)**: Persistent, immutable files on disk.
-//!   They are organized into tiers by the Compaction Engine.
-//! - **Compaction**: A background process that merges multiple SSTables into one,
-//!   deduplicating keys and garbage-collecting tombstones.
-//! - **MVCC (Multi-Version Concurrency Control)**: Supports snapshots and transactional
-//!   isolation via sequence numbers and the `SnapshotRegistry`.
-//!
-//! ## Read Path
-//! 1. Check the active MemTable.
-//! 2. Check immutable MemTables (from newest to oldest).
-//! 3. Check SSTables (from newest to oldest).
-//!    Newer sequence numbers shadow older ones for the same key.
-//!
-//! ## Write Path
-//! 1. Operations are staged in the `TxBuffer`.
-//! 2. On `commit()`, operations acquire `commit_mutex` to serialize sequence assignment,
-//!    are written to the WAL (with fsync durability), and applied to the active MemTable.
-//! 3. When the MemTable exceeds `memtable_size_limit`, it rotates to an immutable MemTable
-//!    and is flushed asynchronously to a new SSTable file on disk.
-//!
-//! ## Compaction
-//! Compaction runs as a background task. When the number of SSTables in a tier exceeds
-//! configured thresholds, compaction merges multiple SSTables into a single new SSTable,
-//! deduplicating key versions and garbage-collecting tombstones not pinned by active snapshots.
-//!
-//! ## `commit_mutex` Role
-//! `commit_mutex` serializes sequence allocation and WAL batch preparation during commits, preventing
-//! snapshot inversion. In the group commit leader path, `commit_mutex` is released prior to executing physical
-//! disk I/O (`wal.append_batch`) and re-acquired afterwards for MemTable updates / visibility advancement (and on error for WAL rollback).
-//!
-//! ## Lock Hierarchy & Concurrency Control
-//! To prevent deadlocks, locks across the LSM storage engine must be acquired in the following strict order:
-//! 1. `commit_mutex` (`tokio::sync::Mutex<()>`) - Acquired during sequence/batch preparation, rollback_to_tx, and state mutations.
-//! 2. `pending_commit_queue` (`tokio::sync::Mutex<Option<PendingCommitQueue>>`) - Protects group commit queue coordination.
-//! 3. `state` write lock (`tokio::sync::RwLock<LsmState>`) - Protects active/immutable memtable pointers & active WAL handle.
-//! 4. `wal` (`RwLock<Arc<Wal>>`) - Protects active WAL reference.
-//! 5. `wal.truncate_lock` (`tokio::sync::Mutex<()>`) - Innermost WAL I/O truncation/append guard.
-//!
-//! Note: `intent_locks` (`std::Mutex`) and `tx_buffer` shards are leaf locks; no `.await` points are permitted while holding leaf locks.
-
 pub(super) use crate::memtable::MemTable;
 pub(super) use crate::sstable::{SstableBuilder, SstableReader};
 pub(super) use crate::wal::{Wal, WalOp};
 pub(super) use bytes::Bytes;
-pub(super) use contextra_types::{ContextraError, Result, TxId};
 pub(super) use contextra_ports::{BoxFuture, StorageEngine};
+pub(super) use contextra_types::{ContextraError, Result, TxId};
 pub(super) use std::path::PathBuf;
 pub(super) use std::sync::atomic::Ordering;
 
@@ -98,6 +41,10 @@ pub mod ops;
 
 pub use config::{DurabilityConfigError, DurabilityMode, LsmConfig};
 pub use engine::{LsmStorage, StorageHealth};
+pub use fence::{
+    fenced_keys, ErasureFence, ErasureGate, FenDocLockGuard, FenFenceGuard, FenceError,
+    FenceHandle, FenceScopeState, FenceTarget, FencedKey, InflightGuard, PrefixFence, WriteTicket,
+};
 pub use gc_floor::GcFloor;
 pub use fence::{ErasureFence, FenceError};
 pub use probe::ZeuStoreProbe;

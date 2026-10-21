@@ -27,7 +27,10 @@ async fn test_commit_failure_closed_flusher_sequence_and_chain_recovery() {
     let _ = storage.close().await;
 
     let tx_fail = TxId::new(99);
-    storage.put(tx_fail, b"fail_key", b"fail_val").await.expect("put fail");
+    storage
+        .put(tx_fail, b"fail_key", b"fail_val")
+        .await
+        .expect("put fail");
     let commit_res = storage.commit(tx_fail).await;
     assert!(
         commit_res.is_err(),

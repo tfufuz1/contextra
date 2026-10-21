@@ -6,6 +6,8 @@
 // - State & Fence Consistency: Bei Fehler wird das Erasure Fence freigegeben und das Intent-File bleibt für resume_pending auf Disk.
 
 use contextra_store::compaction::purge_filter::PurgeScope;
+use contextra_store::lsm::config::LsmConfig;
+use contextra_store::lsm::LsmStorage;
 use contextra_store::lsm::purge::orchestrator::PurgeOutcome;
 use contextra_store::lsm::purge::{
     resume_pending, MockBackend, OrxFailpointSet, OrxHooks, OrxPurgeIntent, PurgeOrchestrator, PurgePhase,
@@ -129,7 +131,7 @@ async fn test_repetition_after_wal_error_completes_purge() -> std::io::Result<()
     hooks.wal_retire = None;
 
     // Resume execution
-    let res_opt = resume_pending(dir.path(), &hooks, None)
+    let res_opt = resume_pending_for_storage(&storage, &hooks, None)
         .await
         .expect("Resumption after fixing WAL error should succeed");
 

@@ -99,6 +99,7 @@ impl GraphIndexExt for CsrGraph {
                 }
                 inner.communities.remove(&entity);
                 inner.is_dirty = true;
+                inner.commit();
             }
 
             // LSM-Storage Marker / Deletion schreiben
@@ -152,6 +153,7 @@ impl GraphIndex for CsrGraph {
                 inner
                     .staged_entities
                     .insert((tx, entity.id), entity.clone());
+                inner.commit();
             }
 
             if let Some(ref storage) = self.storage {
@@ -222,6 +224,9 @@ impl GraphIndex for CsrGraph {
             // ensuring rollback does not leak entity indices into id_map/reverse_map.
             {
                 let mut inner = self.inner_write();
+                if let Some(removals) = inner.staged_removals.get_mut(&tx) {
+                    removals.retain(|&(f, t)| !(f == edge.from && t == edge.to));
+                }
                 inner
                     .staged_edges
                     .entry((tx, edge.from))
@@ -235,6 +240,7 @@ impl GraphIndex for CsrGraph {
                         business_valid_to: edge.business_valid_to,
                         source_doc_id: edge.source_doc_id,
                     });
+                inner.commit();
             }
 
             if let Some(ref storage) = self.storage {
@@ -285,7 +291,7 @@ impl GraphIndex for CsrGraph {
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
-            let as_of_tx = TxId::new(seq_no);
+            let as_of_tx = TxId::try_new(seq_no).unwrap_or_else(|_| TxId::internal());
             if is_suspicious_tx_id(as_of_tx) {
                 tracing::warn!(
                     tx_id = seq_no,
@@ -331,8 +337,8 @@ impl GraphIndex for CsrGraph {
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
-            self.traverse_at_time(start_node, max_hops, TxId::new(seq_no))
-                .await
+            let as_of_tx = TxId::try_new(seq_no).unwrap_or_else(|_| TxId::internal());
+            self.traverse_at_time(start_node, max_hops, as_of_tx).await
         })
     }
 
@@ -711,6 +717,7 @@ impl GraphIndex for CsrGraph {
                                 .or_default()
                                 .insert((from_id, edge.target));
                         }
+                        inner.tombstoned_edges.remove(&(from_idx, to_idx));
                         converted_edges.push(EdgePayload {
                             target: to_idx,
                             weight: edge.weight,
@@ -756,6 +763,8 @@ impl GraphIndex for CsrGraph {
                 inner.compact();
             }
 
+            inner.commit();
+
             self.last_tx_id.fetch_max(tx.inner(), Ordering::SeqCst);
 
             Ok(())
@@ -784,11 +793,15 @@ impl GraphIndex for CsrGraph {
             }
             {
                 let mut inner = self.inner_write();
+                if let Some(edges) = inner.staged_edges.get_mut(&(tx, from)) {
+                    edges.retain(|e| e.target != to);
+                }
                 inner
                     .staged_removals
                     .entry(tx)
                     .or_default()
                     .push((from, to));
+                inner.commit();
             }
             if let Some(ref storage) = self.storage {
                 self.delete_edge_persistence(storage.as_ref(), tx, &from, &to)
@@ -824,20 +837,27 @@ impl GraphIndex for CsrGraph {
             inner.staged_entities.retain(|&(t, _), _| t != tx);
             inner.staged_edges.retain(|&(t, _), _| t != tx);
             inner.staged_removals.remove(&tx);
+            inner.commit();
             Ok(())
         })
     }
 
     fn rollback_to_tx<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            // Physical rollback for CSR graph is driven by WAL replay or reloading state from storage.
-            // In-memory staged transactions are handled by rollback().
-            Ok(())
+            // Physical point-in-time rollback for arbitrary historical TxId is unsupported
+            // in memory without WAL replay / storage reload (INV-NOOP-1).
+            Err(ContextraError::CapabilityUnsupported {
+                capability: "rollback_to_tx".to_string(),
+                reason: "In-memory rollback_to_tx for historical TxId is unsupported on CsrGraph; use rollback(tx) for active staged transactions or reload from storage".to_string(),
+            })
         })
     }
 
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        Box::pin(async move { Ok(TxId::new(self.last_tx_id.load(Ordering::SeqCst))) })
+        Box::pin(async move {
+            let raw_tx = self.last_tx_id.load(Ordering::SeqCst);
+            TxId::try_new(raw_tx)
+        })
     }
 
     fn len<'a>(&'a self) -> BoxFuture<'a, usize> {

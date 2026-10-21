@@ -56,65 +56,17 @@ impl OrxFailpointSet {
     }
 }
 
-/// Errors occurring during purge orchestration and recovery.
-#[derive(Debug, Error)]
-pub enum OrxPurgeError {
-    #[error("I/O error during purge operation: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Purge operation blocked: {0:?}")]
-    Blocked(PurgeBlocked),
-
-    #[error("Corrupted purge intent: {0}")]
-    CorruptedIntent(String),
-
-    #[error("Failpoint triggered: {0}")]
-    FailpointTriggered(String),
-}
-
-impl From<PurgeBlocked> for OrxPurgeError {
-    fn from(b: PurgeBlocked) -> Self {
-        OrxPurgeError::Blocked(b)
-    }
-}
-
-impl From<PurgeError> for OrxPurgeError {
-    fn from(err: PurgeError) -> Self {
-        match err {
-            PurgeError::Io(e) => OrxPurgeError::Io(e),
-            PurgeError::CorruptedIntent(s) => OrxPurgeError::CorruptedIntent(s),
-            PurgeError::FailpointTriggered(s) => OrxPurgeError::FailpointTriggered(s),
-            other => OrxPurgeError::Blocked(other.into()),
-        }
-    }
-}
-
-impl From<OrxPurgeError> for PurgeError {
-    fn from(err: OrxPurgeError) -> Self {
-        match err {
-            OrxPurgeError::Io(e) => PurgeError::Io(e),
-            OrxPurgeError::Blocked(b) => b.into(),
-            OrxPurgeError::CorruptedIntent(s) => PurgeError::CorruptedIntent(s),
-            OrxPurgeError::FailpointTriggered(s) => PurgeError::FailpointTriggered(s),
-        }
-    }
-}
-
-impl From<OrxPurgeError> for PurgeBlocked {
-    fn from(err: OrxPurgeError) -> Self {
-        let pe: PurgeError = err.into();
-        pe.into()
-    }
-}
+/// Type alias for [`PurgeError`] maintained for backwards compatibility if needed.
+pub type OrxPurgeError = PurgeError;
 
 #[macro_export]
 macro_rules! purge_failpoint {
     ($name:expr) => {
-        #[cfg(feature = "fault-injection")]
+        #[cfg(any(test, feature = "fault-injection"))]
         if std::env::var(concat!("PURGE_FAILPOINT_", $name)).is_ok() {
             return Err(
-                $crate::lsm::purge::failpoint::OrxPurgeError::FailpointTriggered(
-                    $name.to_string(),
+                $crate::compaction::purge_filter::PurgeError::Failpoint(
+                    $name,
                 ),
             );
         }

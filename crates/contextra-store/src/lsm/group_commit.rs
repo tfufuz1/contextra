@@ -7,8 +7,8 @@
 
 use crate::lsm::config::DurabilityMode;
 use crate::wal::{PreparedBatch, Wal};
-use contextra_types::{Result, TxId};
 use contextra_mvcc::IndexOp;
+use contextra_types::{Result, TxId};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 

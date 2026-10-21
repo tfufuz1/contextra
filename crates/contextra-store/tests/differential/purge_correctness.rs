@@ -96,7 +96,10 @@ fn compute_dir_hashes(dir: &Path) -> BTreeMap<String, String> {
                     let mut hasher = Sha256::new();
                     hasher.update(&bytes);
                     let hash_hex = format!("{:x}", hasher.finalize());
-                    map.insert(path.file_name().unwrap().to_string_lossy().to_string(), hash_hex);
+                    map.insert(
+                        path.file_name().unwrap().to_string_lossy().to_string(),
+                        hash_hex,
+                    );
                 }
             }
         }
@@ -148,7 +151,10 @@ async fn invariante_i1_outside_scope_snap() -> contextra_types::Result<()> {
     let as_of_tx = 10u64;
     let scope = PurgeScope::Prefixes(vec![b"t:4:".to_vec()]);
 
-    let report = storage.purge_keys(scope.clone(), as_of_tx, None).await.unwrap();
+    let report = storage
+        .purge_keys(scope.clone(), as_of_tx, None)
+        .await
+        .unwrap();
     model.purge(&scope, as_of_tx);
 
     for file in &report.obsolete_files {
@@ -164,13 +170,11 @@ async fn invariante_i1_outside_scope_snap() -> contextra_types::Result<()> {
         ];
 
         for key in outside_keys {
-            let lsm_val = storage
-                .get_at_seq(key, snap_seq)
-                .await?
-                .map(|b| b.to_vec());
+            let lsm_val = storage.get_at_seq(key, snap_seq).await?.map(|b| b.to_vec());
             let model_val = model.get_at_seq(key, snap_seq);
             assert_eq!(
-                lsm_val, model_val,
+                lsm_val,
+                model_val,
                 "Invariante I1 violation: Key '{:?}' outside scope diverged at snap_seq {}",
                 String::from_utf8_lossy(key),
                 snap_seq
@@ -199,7 +203,9 @@ async fn invariante_i2_version_ordering_and_l0_overlap() -> contextra_types::Res
     let mut model = PurgeReferenceModel::new();
 
     // Flush 1: SSTable 1 (L0) contains ONLY purgeable keys (becomes empty during purge)
-    storage.put(TxId(1), b"purge:earlier_1", b"val_purge_1").await?;
+    storage
+        .put(TxId(1), b"purge:earlier_1", b"val_purge_1")
+        .await?;
     storage.commit(TxId(1)).await?;
     let s1 = storage.last_applied_seq();
     model.put(s1, b"purge:earlier_1".to_vec(), b"val_purge_1".to_vec());
@@ -233,7 +239,10 @@ async fn invariante_i2_version_ordering_and_l0_overlap() -> contextra_types::Res
     let as_of_tx = s2;
     let scope = PurgeScope::Prefixes(vec![b"purge:".to_vec(), b"key_a".to_vec()]);
 
-    let report = storage.purge_keys(scope.clone(), as_of_tx, None).await.unwrap();
+    let report = storage
+        .purge_keys(scope.clone(), as_of_tx, None)
+        .await
+        .unwrap();
     model.purge(&scope, as_of_tx);
 
     for file in &report.obsolete_files {
@@ -241,16 +250,31 @@ async fn invariante_i2_version_ordering_and_l0_overlap() -> contextra_types::Res
     }
 
     // Verify MVCC point reads for key_a, key_b, and purge:earlier_1
-    let val_purge = storage.get_at_seq(b"purge:earlier_1", s5 + 1).await?.map(|b| b.to_vec());
+    let val_purge = storage
+        .get_at_seq(b"purge:earlier_1", s5 + 1)
+        .await?
+        .map(|b| b.to_vec());
     assert_eq!(val_purge, None, "Early empty SSTable keys must be purged");
 
-    let val_a_s5 = storage.get_at_seq(b"key_a", s5 + 1).await?.map(|b| b.to_vec());
+    let val_a_s5 = storage
+        .get_at_seq(b"key_a", s5 + 1)
+        .await?
+        .map(|b| b.to_vec());
     let model_a_s5 = model.get_at_seq(b"key_a", s5 + 1);
-    assert_eq!(val_a_s5, model_a_s5, "Newer version in subsequent SSTable must remain intact");
+    assert_eq!(
+        val_a_s5, model_a_s5,
+        "Newer version in subsequent SSTable must remain intact"
+    );
 
-    let val_b_s5 = storage.get_at_seq(b"key_b", s5 + 1).await?.map(|b| b.to_vec());
+    let val_b_s5 = storage
+        .get_at_seq(b"key_b", s5 + 1)
+        .await?
+        .map(|b| b.to_vec());
     let model_b_s5 = model.get_at_seq(b"key_b", s5 + 1);
-    assert_eq!(val_b_s5, model_b_s5, "Unrelated key_b in overlapping L0 must remain intact");
+    assert_eq!(
+        val_b_s5, model_b_s5,
+        "Unrelated key_b in overlapping L0 must remain intact"
+    );
 
     Ok(())
 }
@@ -273,7 +297,9 @@ async fn invariante_i3_raw_sweep_purged_in_scope() -> contextra_types::Result<()
     let canary_bytes = b"CANARY_SECRET_PURGE_TARGET_998877665544".to_vec();
     let keep_canary = b"CANARY_SECRET_KEEP_OUTSIDE_112233445566".to_vec();
 
-    storage.put(TxId(1), b"purge_target_k1", &canary_bytes).await?;
+    storage
+        .put(TxId(1), b"purge_target_k1", &canary_bytes)
+        .await?;
     storage.put(TxId(2), b"keep_k2", &keep_canary).await?;
     storage.commit(TxId(1)).await?;
     storage.commit(TxId(2)).await?;
@@ -313,7 +339,8 @@ async fn invariante_i3_raw_sweep_purged_in_scope() -> contextra_types::Result<()
 /// Invariante I4: Ein injizierter Lesefehler an jedem Offset führt zu Err und
 /// byteidentischen Dateien (Dateihash vor und nach dem Lauf gleich).
 #[tokio::test]
-async fn invariante_i4_fault_injection_error_and_byte_identical_files() -> contextra_types::Result<()> {
+async fn invariante_i4_fault_injection_error_and_byte_identical_files(
+) -> contextra_types::Result<()> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -345,7 +372,11 @@ async fn invariante_i4_fault_injection_error_and_byte_identical_files() -> conte
     let corrupt_file_name = sst_path.file_name().unwrap().to_string_lossy().to_string();
 
     // Corrupt SSTable header to simulate read error on offset 0
-    fs::write(&sst_path, b"CORRUPTED_GARBAGE_BYTES_SIMULATING_READ_FAULT_AT_OFFSET_0").unwrap();
+    fs::write(
+        &sst_path,
+        b"CORRUPTED_GARBAGE_BYTES_SIMULATING_READ_FAULT_AT_OFFSET_0",
+    )
+    .unwrap();
 
     let scope = PurgeScope::Keys(vec![b"fault_key1".to_vec()]);
     let res = storage.purge_keys(scope, 100, None).await;
@@ -357,7 +388,7 @@ async fn invariante_i4_fault_injection_error_and_byte_identical_files() -> conte
     );
 
     match res {
-        Err(PurgeError::ReadError { file, .. }) => {
+        Err(PurgeError::Read { file, .. }) => {
             assert!(file.contains("sst"), "Error must reference faulty SSTable file");
         }
         Err(other) => {
@@ -410,26 +441,53 @@ async fn invariante_i5_idempotent_double_purge() -> contextra_types::Result<()> 
     let scope = PurgeScope::Keys(vec![b"idem_k1".to_vec()]);
 
     // First purge
-    let report1 = storage.purge_keys(scope.clone(), as_of_tx, None).await.unwrap();
+    let report1 = storage
+        .purge_keys(scope.clone(), as_of_tx, None)
+        .await
+        .unwrap();
     model.purge(&scope, as_of_tx);
 
     for file in &report1.obsolete_files {
         let _ = contextra_durable_fs::durable_remove(file);
     }
 
-    let state1_k2 = storage.get_at_seq(b"idem_k2", as_of_tx).await?.map(|b| b.to_vec());
-    let state1_k1 = storage.get_at_seq(b"idem_k1", as_of_tx).await?.map(|b| b.to_vec());
+    let state1_k2 = storage
+        .get_at_seq(b"idem_k2", as_of_tx)
+        .await?
+        .map(|b| b.to_vec());
+    let state1_k1 = storage
+        .get_at_seq(b"idem_k1", as_of_tx)
+        .await?
+        .map(|b| b.to_vec());
 
     // Second purge on same scope
-    let report2 = storage.purge_keys(scope.clone(), as_of_tx, None).await.unwrap();
+    let report2 = storage
+        .purge_keys(scope.clone(), as_of_tx, None)
+        .await
+        .unwrap();
 
-    let state2_k2 = storage.get_at_seq(b"idem_k2", as_of_tx).await?.map(|b| b.to_vec());
-    let state2_k1 = storage.get_at_seq(b"idem_k1", as_of_tx).await?.map(|b| b.to_vec());
+    let state2_k2 = storage
+        .get_at_seq(b"idem_k2", as_of_tx)
+        .await?
+        .map(|b| b.to_vec());
+    let state2_k1 = storage
+        .get_at_seq(b"idem_k1", as_of_tx)
+        .await?
+        .map(|b| b.to_vec());
 
     // Verify idempotency: records purged in 2nd run is 0 and state matches
-    assert_eq!(report2.records_purged, 0, "Second purge must purge 0 records");
-    assert_eq!(state1_k1, state2_k1, "State for purged key must remain identical after double purge");
-    assert_eq!(state1_k2, state2_k2, "State for kept key must remain identical after double purge");
+    assert_eq!(
+        report2.records_purged, 0,
+        "Second purge must purge 0 records"
+    );
+    assert_eq!(
+        state1_k1, state2_k1,
+        "State for purged key must remain identical after double purge"
+    );
+    assert_eq!(
+        state1_k2, state2_k2,
+        "State for kept key must remain identical after double purge"
+    );
     assert_eq!(state2_k2, model.get_at_seq(b"idem_k2", as_of_tx));
 
     Ok(())
@@ -455,7 +513,9 @@ fn diff_op_strategy() -> impl Strategy<Value = DifferentialOp> {
         (key_strat.clone(), val_strat).prop_map(|(k, v)| DifferentialOp::Put(k, v)),
         key_strat.clone().prop_map(DifferentialOp::Delete),
         (key_strat.clone(), 1..100u64).prop_map(|(k, seq)| DifferentialOp::GetAtSeq(k, seq)),
-        key_strat.clone().prop_map(|prefix| DifferentialOp::PurgePrefix(prefix[..prefix.len().min(4)].to_vec())),
+        key_strat
+            .clone()
+            .prop_map(|prefix| DifferentialOp::PurgePrefix(prefix[..prefix.len().min(4)].to_vec())),
         Just(DifferentialOp::Flush),
     ]
 }

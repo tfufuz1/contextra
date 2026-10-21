@@ -5,12 +5,12 @@
 
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::wal::{
-    purge_wal_scope, scan_wal_directory, Wal, WalOp, WalScanInputs, WalScopeSpec,
-    WalFaultPlan, FAILPOINT_AFTER_RENAME, FAILPOINT_AFTER_REWRITE, FAILPOINT_BEFORE_REWRITE,
+    purge_wal_scope, scan_wal_directory, Wal, WalFaultPlan, WalOp, WalScanInputs, WalScopeSpec,
+    FAILPOINT_AFTER_RENAME, FAILPOINT_AFTER_REWRITE, FAILPOINT_BEFORE_REWRITE,
 };
-use std::sync::Arc;
 use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
 
@@ -36,7 +36,9 @@ async fn test_purge_canary_key_removed_and_witness_clean() -> Result<()> {
         value: b"val2".to_vec(),
     };
 
-    let (batch, _) = wal.prepare_batch(vec![(op1, 1), (op2, 2), (op3, 3)]).await?;
+    let (batch, _) = wal
+        .prepare_batch(vec![(op1, 1), (op2, 2), (op3, 3)])
+        .await?;
     wal.append_batch(batch).await?;
     wal.close().await?;
 
@@ -205,7 +207,9 @@ async fn test_replay_after_purge_does_not_resurrect_deleted_key() -> Result<()> 
         value: b"perm_val".to_vec(),
     };
 
-    let (batch, _) = wal.prepare_batch(vec![(op1, 1), (op2, 2), (op3, 3)]).await?;
+    let (batch, _) = wal
+        .prepare_batch(vec![(op1, 1), (op2, 2), (op3, 3)])
+        .await?;
     wal.append_batch(batch).await?;
     wal.close().await?;
 

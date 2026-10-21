@@ -38,25 +38,15 @@ impl IpcProxy {
         }
         #[cfg(windows)]
         {
-            let client = tokio::net::windows::named_pipe::ClientOptions::new()
-                .open(endpoint_path)
-                .map_err(|e| {
-                    ContextraError::Internal(format!(
-                        "Proxy failed to open Primary Named Pipe at {}: {e}",
-                        endpoint_path.display()
-                    ))
-                })?;
-
-            info!(
-                endpoint = %endpoint_path.display(),
-                "Proxy connected to Primary Named Pipe. Starting stdio <-> IPC loop."
-            );
-
-            self.run_bidirectional_loop(client).await
+            let _ = endpoint_path;
+            Err(ContextraError::Unsupported(
+                "Windows IPC proxy is unsupported".to_string(),
+            ))
         }
     }
 
     /// Internal bidirectional loop forwarding stdin -> IPC and IPC -> stdout.
+    #[cfg(unix)]
     async fn run_bidirectional_loop<S>(&self, stream: S) -> Result<(), ContextraError>
     where
         S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + 'static,

@@ -7,13 +7,34 @@
 use crate::error::CryptoError;
 use serde::{Deserialize, Serialize};
 
+/// Qualifikationsniveau eines Zeitstempel-Ankers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum QualificationLevel {
+    /// Lokaler monotoner Zeitanker.
+    LocalMonotonic,
+    /// Externe verifizierte Qualifizierung (nur durch Verifier-Beweis konstruierbar).
+    Qualified(RealTsaProofToken),
+}
+
+/// Privater Proof-Token, der nur durch erfolgreiche `RealTsaVerifier`-Prüfung ausgestellt werden kann.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RealTsaProofToken {
+    _private: (),
+}
+
+impl RealTsaProofToken {
+    #[allow(dead_code)]
+    pub(crate) fn new() -> Self {
+        Self { _private: () }
+    }
+}
+
 /// Qualifikationsstatus eines Zeitstempel-Ankers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AnchorQualification {
-    /// Qualifizierter elektronischer Zeitstempel gemäß eIDAS Art. 42 / § 371a ZPO.
+    /// Qualifizierter elektronischer Zeitstempel.
     Qualified,
     /// Nicht qualifizierter Zeitstempel (z. B. lokaler Entwicklungs- oder Test-Anker).
-    /// HINWEIS: Ein nicht qualifizierter Anker entfaltet keine Vermutungswirkung nach eIDAS Art. 42.
     NotQualified,
 }
 
@@ -47,14 +68,20 @@ pub trait TsaSignatureVerifier: Send + Sync {
 }
 
 /// Pass-Through-Verifier für Tests oder vertrauenswürdige In-Memory-TSA-Mocks.
+#[cfg(any(test, feature = "testing", feature = "test-support", feature = "test-utils"))]
 #[derive(Debug, Clone, Default)]
-pub struct NoOpTsaSignatureVerifier;
+pub struct AcceptAllTsaVerifier;
 
-impl TsaSignatureVerifier for NoOpTsaSignatureVerifier {
+#[cfg(any(test, feature = "testing", feature = "test-support", feature = "test-utils"))]
+impl TsaSignatureVerifier for AcceptAllTsaVerifier {
     fn verify_signature(&self, _signed_data: &[u8], _signature: &[u8]) -> Result<(), CryptoError> {
         Ok(())
     }
 }
+
+#[cfg(any(test, feature = "testing", feature = "test-support", feature = "test-utils"))]
+#[deprecated(note = "NoOpTsaSignatureVerifier is renamed to AcceptAllTsaVerifier")]
+pub type NoOpTsaSignatureVerifier = AcceptAllTsaVerifier;
 
 /// Lokaler monotoner Zeitanker für Entwicklung und Tests.
 ///

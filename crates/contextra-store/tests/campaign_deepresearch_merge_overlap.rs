@@ -1,10 +1,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_mvcc::snapshot::SnapshotRegistry;
-use contextra_types::error::Result;
-use contextra_types::types::budget::{ResourceBudget, ResourceTracker};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
+use contextra_types::error::Result;
+use contextra_types::types::budget::{ResourceBudget, ResourceTracker};
 use std::sync::Arc;
 use tempfile::tempdir;
 

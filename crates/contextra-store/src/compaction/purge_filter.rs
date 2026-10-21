@@ -12,8 +12,8 @@ pub trait CompactionRecordFilter: Send + Sync {
     fn drop_record(&self, key: &[u8], tx: u64) -> bool;
 }
 
-pub use contextra_ports::{FreeSpaceProbe, ProbeError};
 pub use contextra_ports::erasure::PurgeError;
+pub use contextra_ports::{FreeSpaceProbe, ProbeError};
 
 /// Production disk space probe using `statvfs` via `contextra-sys`.
 pub struct StatvfsSpaceProbe {
@@ -164,14 +164,20 @@ impl PurgeBlocked {
         match self {
             Self::ActiveSnapshot { .. } => "Close open read transactions / snapshots",
             Self::InsufficientDiskSpace { .. } => "Free disk space or increase storage capacity",
-            Self::UnclassifiedFiles { .. } => "Clean up untracked or stale files in storage directory",
+            Self::UnclassifiedFiles { .. } => {
+                "Clean up untracked or stale files in storage directory"
+            }
             Self::CheckpointClones { .. } => "Purge or release registered checkpoint clones",
             Self::ReaderPinned => "Wait for active reader scan to finish",
             Self::CompactionBusy => "Retry after current background compaction completes",
-            Self::SecureDeleteUnsupported { .. } => "Disable scrub requirement or run on supported filesystem",
+            Self::SecureDeleteUnsupported { .. } => {
+                "Disable scrub requirement or run on supported filesystem"
+            }
             Self::Unimplemented => "Enable purge compaction feature",
             Self::ScanTimeout => "Retry with smaller batch size or increased timeout",
-            Self::UnknownFreeSpace => "Provide a FreeSpaceProbe implementation or ensure disk space is queryable",
+            Self::UnknownFreeSpace => {
+                "Provide a FreeSpaceProbe implementation or ensure disk space is queryable"
+            }
             Self::ReadError { .. } => "Check disk health or file permissions",
             Self::WriteError { .. } => "Check disk space or write permissions",
             Self::ManifestError { .. } => "Check manifest file integrity",
@@ -182,9 +188,9 @@ impl PurgeBlocked {
 impl From<PurgeBlocked> for PurgeError {
     fn from(b: PurgeBlocked) -> Self {
         match b {
-            PurgeBlocked::ActiveSnapshot { min_seq } => {
-                PurgeError::SnapshotPinned { oldest_pin_age: min_seq }
-            }
+            PurgeBlocked::ActiveSnapshot { min_seq } => PurgeError::SnapshotPinned {
+                oldest_pin_age: min_seq,
+            },
             PurgeBlocked::CheckpointClones { copy_ids } => {
                 PurgeError::CheckpointClones { copy_ids }
             }
@@ -196,25 +202,23 @@ impl From<PurgeBlocked> for PurgeError {
                     available: Some(free),
                 }
             }
-            PurgeBlocked::UnclassifiedFiles { count } => {
-                PurgeError::UnclassifiedFiles { count }
-            }
+            PurgeBlocked::UnclassifiedFiles { count } => PurgeError::UnclassifiedFiles { count },
             PurgeBlocked::SecureDeleteUnsupported { reason } => {
                 PurgeError::SecureDeleteUnsupported { reason }
             }
             PurgeBlocked::Unimplemented => PurgeError::Unimplemented,
             PurgeBlocked::ScanTimeout => PurgeError::ScanTimeout,
             PurgeBlocked::UnknownFreeSpace => PurgeError::UnknownFreeSpace,
-            PurgeBlocked::ReadError { file, offset, details } => {
-                PurgeError::ReadError {
-                    file,
-                    offset,
-                    source_details: details,
-                }
-            }
-            PurgeBlocked::WriteError { file, details } => {
-                PurgeError::WriteError { file, details }
-            }
+            PurgeBlocked::ReadError {
+                file,
+                offset,
+                details,
+            } => PurgeError::ReadError {
+                file,
+                offset,
+                source_details: details,
+            },
+            PurgeBlocked::WriteError { file, details } => PurgeError::WriteError { file, details },
             PurgeBlocked::ManifestError { details } => PurgeError::Manifest(details),
         }
     }
@@ -223,9 +227,9 @@ impl From<PurgeBlocked> for PurgeError {
 impl From<PurgeError> for PurgeBlocked {
     fn from(e: PurgeError) -> Self {
         match e {
-            PurgeError::SnapshotPinned { oldest_pin_age } => {
-                PurgeBlocked::ActiveSnapshot { min_seq: oldest_pin_age }
-            }
+            PurgeError::SnapshotPinned { oldest_pin_age } => PurgeBlocked::ActiveSnapshot {
+                min_seq: oldest_pin_age,
+            },
             PurgeError::CheckpointClones { copy_ids } => {
                 PurgeBlocked::CheckpointClones { copy_ids }
             }
@@ -237,25 +241,23 @@ impl From<PurgeError> for PurgeBlocked {
                     free: available.unwrap_or(0),
                 }
             }
-            PurgeError::UnclassifiedFiles { count } => {
-                PurgeBlocked::UnclassifiedFiles { count }
-            }
+            PurgeError::UnclassifiedFiles { count } => PurgeBlocked::UnclassifiedFiles { count },
             PurgeError::SecureDeleteUnsupported { reason } => {
                 PurgeBlocked::SecureDeleteUnsupported { reason }
             }
             PurgeError::Unimplemented => PurgeBlocked::Unimplemented,
             PurgeError::ScanTimeout => PurgeBlocked::ScanTimeout,
             PurgeError::UnknownFreeSpace => PurgeBlocked::UnknownFreeSpace,
-            PurgeError::ReadError { file, offset, source_details } => {
-                PurgeBlocked::ReadError {
-                    file,
-                    offset,
-                    details: source_details,
-                }
-            }
-            PurgeError::WriteError { file, details } => {
-                PurgeBlocked::WriteError { file, details }
-            }
+            PurgeError::ReadError {
+                file,
+                offset,
+                source_details,
+            } => PurgeBlocked::ReadError {
+                file,
+                offset,
+                details: source_details,
+            },
+            PurgeError::WriteError { file, details } => PurgeBlocked::WriteError { file, details },
             PurgeError::Manifest(details) => PurgeBlocked::ManifestError { details },
             PurgeError::FenceConflict => PurgeBlocked::CompactionBusy,
             PurgeError::Io(io_err) => PurgeBlocked::WriteError {

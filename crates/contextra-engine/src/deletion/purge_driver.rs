@@ -14,7 +14,7 @@ use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_crypto::deletion_proof::issuer::IssRequest;
 use contextra_crypto::deletion_proof::probe::WitStoreProbe;
 use contextra_crypto::deletion_proof::types::{hash_deleted_keys_length_prefixed, DeletionScope};
-use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
+use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeError, PurgeScope};
 use contextra_store::copy_registry::CopyRegistry;
 use contextra_store::lsm::purge::PurgeOrchestrator;
 use contextra_store::lsm::witness::ZeuIssueRequest;
@@ -164,29 +164,13 @@ impl<'a> DpiPurgeDriver<'a> {
             .await
         {
             Ok(rep) => rep,
-            Err(blocked) => {
-                match &blocked {
-                    PurgeBlocked::ReadError { file, offset, details } => {
-                        return Err(ContextraError::Storage(format!(
-                            "Read error at file {file}, offset {offset}: {details}"
-                        )));
-                    }
-                    PurgeBlocked::WriteError { file, details } => {
-                        return Err(ContextraError::Storage(format!(
-                            "Write error at file {file}: {details}"
-                        )));
-                    }
-                    PurgeBlocked::ManifestError { details } => {
-                        return Err(ContextraError::Storage(format!(
-                            "Manifest error during purge: {details}"
-                        )));
-                    }
-                    _ => {
-                        let reason = blocked.to_string();
-                        let retry_hint = blocked.retry_hint().to_string();
-                        return Ok(PurgeHandle::Blocked { reason, retry_hint });
-                    }
-                }
+            Err(PurgeError::Blocked(blocked)) => {
+                let reason = blocked.to_string();
+                let retry_hint = blocked.retry_hint().to_string();
+                return Ok(PurgeHandle::Blocked { reason, retry_hint });
+            }
+            Err(hard_err) => {
+                return Err(ContextraError::Storage(format!("Physical purge failed: {hard_err}")));
             }
         };
 

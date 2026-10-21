@@ -2,7 +2,7 @@
 // STAND: 2026-10-15
 // ZWECK: Targeted tests for each PurgeError variant in LsmStorage::purge_keys.
 
-use contextra_ports::erasure::{FreeSpaceProbe, PurgeError};
+use contextra_ports::erasure::{FreeSpaceProbe, PurgeBlocked, PurgeError};
 use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::config::LsmConfig;
@@ -39,10 +39,10 @@ async fn test_purge_error_snapshot_pinned() -> contextra_types::Result<()> {
 
     let res = storage.purge_keys(scope, 20, None).await;
     match res {
-        Err(PurgeError::SnapshotPinned { oldest_pin_age }) => {
-            assert_eq!(oldest_pin_age, 10);
+        Err(PurgeError::Blocked(PurgeBlocked::ActiveSnapshot { min_seq })) => {
+            assert_eq!(min_seq, 10);
         }
-        other => panic!("Expected PurgeError::SnapshotPinned, got {:?}", other),
+        other => panic!("Expected PurgeError::Blocked(ActiveSnapshot), got {:?}", other),
     }
 
     Ok(())
@@ -68,11 +68,11 @@ async fn test_purge_error_insufficient_disk_space() -> contextra_types::Result<(
 
     let res = storage.purge_keys(scope, 10, Some(&probe)).await;
     match res {
-        Err(PurgeError::InsufficientDiskSpace { needed, available }) => {
+        Err(PurgeError::Blocked(PurgeBlocked::InsufficientDiskSpace { needed, free })) => {
             assert!(needed >= 1024 * 1024);
-            assert_eq!(available, Some(0));
+            assert_eq!(free, 0);
         }
-        other => panic!("Expected PurgeError::InsufficientDiskSpace, got {:?}", other),
+        other => panic!("Expected PurgeError::Blocked(InsufficientDiskSpace), got {:?}", other),
     }
 
     Ok(())
@@ -102,10 +102,10 @@ async fn test_purge_error_read_error() -> contextra_types::Result<()> {
     let scope = PurgeScope::Keys(vec![b"corrupt_me".to_vec()]);
     let res = storage.purge_keys(scope, 10, None).await;
     match res {
-        Err(PurgeError::ReadError { file, .. }) => {
+        Err(PurgeError::Read { file, .. }) => {
             assert!(file.contains("sst"));
         }
-        other => panic!("Expected PurgeError::ReadError, got {:?}", other),
+        other => panic!("Expected PurgeError::Read, got {:?}", other),
     }
 
     Ok(())
@@ -138,10 +138,10 @@ async fn test_purge_error_write_error() -> contextra_types::Result<()> {
     let _ = fs::set_permissions(dir.path(), permissions);
 
     match res {
-        Err(PurgeError::WriteError { file, .. }) => {
+        Err(PurgeError::Write { file, .. }) => {
             assert!(file.contains(".tmp") || file.contains("sst"));
         }
-        other => panic!("Expected PurgeError::WriteError, got {:?}", other),
+        other => panic!("Expected PurgeError::Write, got {:?}", other),
     }
 
     Ok(())
@@ -151,7 +151,10 @@ async fn test_purge_error_write_error() -> contextra_types::Result<()> {
 async fn test_purge_error_manifest() -> contextra_types::Result<()> {
     // Test that Manifest error variant exists, formats correctly and holds details
     let err = PurgeError::Manifest("Failed to write manifest entry".to_string());
-    assert_eq!(err.to_string(), "Manifest error: Failed to write manifest entry");
+    assert_eq!(
+        err.to_string(),
+        "Manifest error: Failed to write manifest entry"
+    );
     match err {
         PurgeError::Manifest(msg) => assert_eq!(msg, "Failed to write manifest entry"),
         _ => panic!("Expected Manifest variant"),
@@ -162,7 +165,7 @@ async fn test_purge_error_manifest() -> contextra_types::Result<()> {
 #[tokio::test]
 async fn test_purge_error_compaction_busy() -> contextra_types::Result<()> {
     // Test that CompactionBusy error variant exists and formats correctly
-    let err = PurgeError::CompactionBusy;
-    assert_eq!(err.to_string(), "Compaction busy");
+    let err = PurgeBlocked::CompactionBusy;
+    assert_eq!(err.to_string(), "Compaction engine busy, retry purge later");
     Ok(())
 }

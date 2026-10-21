@@ -44,7 +44,8 @@ async fn flush_preserves_pinned_snapshot() -> Result<(), Box<dyn std::error::Err
 }
 
 #[tokio::test]
-async fn test_wiring_selftest_invalid_port_set_rejected() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_wiring_selftest_invalid_port_set_rejected() -> Result<(), Box<dyn std::error::Error>>
+{
     let res = contextra::wiring_selftest::verify_wiring(false, true, false);
     assert!(res.is_err());
     if let Err(ContextraError::PolicyViolation(msg)) = res {

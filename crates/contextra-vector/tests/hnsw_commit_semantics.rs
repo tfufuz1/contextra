@@ -167,7 +167,7 @@ async fn test_zeroed_ram_slot_on_safe_free_vs_retention() -> Result<()> {
     index.commit(tx2).await?;
 
     // Verify via public API (scan_residue) that RAM node vector for doc1 has zero non-zero vector bytes
-    let report1 = index.scan_residue(doc1);
+    let report1 = index.scan_residue_report(doc1);
     assert_eq!(
         report1.non_zero_vector_bytes, 0,
         "Vector in safe-freed slot for doc1 must be zeroed"
@@ -189,7 +189,7 @@ async fn test_zeroed_ram_slot_on_safe_free_vs_retention() -> Result<()> {
     index.commit(tx4).await?;
 
     // Verify via public API (scan_residue) that RAM node vector for doc2 retains non-zero vector bytes while pinned
-    let report2 = index.scan_residue(doc2);
+    let report2 = index.scan_residue_report(doc2);
     assert!(
         report2.non_zero_vector_bytes > 0,
         "Vector in retained node slot for doc2 must NOT be zeroed while pinned by snapshot"

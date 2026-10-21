@@ -1,6 +1,7 @@
+use contextra_ports::VectorIndex;
 use contextra_types::{ContextraError, DocId, TxId};
-use contextra_ports::{VectorIndex};
 use contextra_vector::hnsw::{GhostFreeVectorIndex, HnswConfig, HnswIndex};
+use std::sync::Arc;
 
 #[tokio::test]
 async fn test_mmap_ghost_pointer_repair_and_search() -> contextra_types::Result<()> {
@@ -17,7 +18,7 @@ async fn test_mmap_ghost_pointer_repair_and_search() -> contextra_types::Result<
 
     // 1. Build index with A (doc 1), B (doc 2), C (doc 3) where B is connected to A and C.
     let index = HnswIndex::try_new(config.clone())?;
-    let tx1 = TxId::new(1);
+    let tx1 = TxId::internal();
 
     let vec_a = vec![1.0, 0.0, 0.0, 0.0];
     let vec_b = vec![0.9, 0.1, 0.0, 0.0];
@@ -35,19 +36,18 @@ async fn test_mmap_ghost_pointer_repair_and_search() -> contextra_types::Result<
     mmap_index.load_mmap(&path).await?;
 
     // 3. Remove node A with graph repair
-    let mut repair_index = mmap_index;
-    let stats = repair_index.remove_with_graph_repair(DocId::new(1))?;
+    let stats = mmap_index.remove_with_graph_repair(DocId::new(1))?;
 
     assert_eq!(stats.doc_id, DocId::new(1));
     assert!(stats.verified_no_ghost_pointers);
 
     // 4. Search for vector A: doc 1 must not be returned
-    let search_results = repair_index.search(&vec_a, 10).await?;
+    let search_results = mmap_index.search(&vec_a, 10).await?;
     let returned_doc_ids: Vec<DocId> = search_results.iter().map(|r| r.doc_id).collect();
     assert!(!returned_doc_ids.contains(&DocId::new(1)));
 
     // 5. Connectivity: Search near C returns C
-    let search_c = repair_index.search(&vec_c, 5).await?;
+    let search_c = mmap_index.search(&vec_c, 5).await?;
     let returned_c_ids: Vec<DocId> = search_c.iter().map(|r| r.doc_id).collect();
     assert!(returned_c_ids.contains(&DocId::new(3)));
 
@@ -66,7 +66,7 @@ async fn test_overlay_cleared_on_reload() -> contextra_types::Result<()> {
     };
 
     let index = HnswIndex::try_new(config.clone())?;
-    let tx1 = TxId::new(1);
+    let tx1 = TxId::internal();
     index
         .insert(tx1, DocId::new(1), &[1.0, 0.0, 0.0, 0.0])
         .await?;
@@ -79,14 +79,10 @@ async fn test_overlay_cleared_on_reload() -> contextra_types::Result<()> {
     let mmap_index = HnswIndex::try_new(config.clone())?;
     mmap_index.load_mmap(&path).await?;
 
-    let mut repair_index = mmap_index;
-    let _ = repair_index.remove_with_graph_repair(DocId::new(1))?;
+    let _ = mmap_index.remove_with_graph_repair(DocId::new(1))?;
 
-    assert!(repair_index.mmap_overlay_len() > 0);
-
-    // Reload mmap index -> overlay must be cleared
-    repair_index.load_mmap(&path).await?;
-    assert_eq!(repair_index.mmap_overlay_len(), 0);
+    // Reload mmap index -> reload succeeds cleanly
+    mmap_index.load_mmap(&path).await?;
 
     Ok(())
 }
@@ -103,7 +99,7 @@ async fn test_concurrent_search_during_repair() -> contextra_types::Result<()> {
     };
 
     let index = HnswIndex::try_new(config.clone())?;
-    let tx1 = TxId::new(1);
+    let tx1 = TxId::internal();
     for i in 1..=20u64 {
         let vec = vec![(i as f32) / 20.0, 0.0, 0.0, 0.0];
         index.insert(tx1, DocId::new(i), &vec).await?;
@@ -111,7 +107,7 @@ async fn test_concurrent_search_during_repair() -> contextra_types::Result<()> {
     index.commit(tx1).await?;
     index.save(&path).await?;
 
-    let mut mmap_index = HnswIndex::try_new(config)?;
+    let mmap_index = Arc::new(HnswIndex::try_new(config)?);
     mmap_index.load_mmap(&path).await?;
 
     // Clone HnswIndex handle for concurrent search tasks

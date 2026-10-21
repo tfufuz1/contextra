@@ -110,11 +110,15 @@ impl Ord for Candidate {
     }
 }
 
-pub struct RebuildGuard<'a>(pub &'a AtomicBool);
+pub struct RebuildGuard<'a> {
+    pub rebuilding: &'a AtomicBool,
+    pub notify: &'a tokio::sync::Notify,
+}
 
 impl<'a> Drop for RebuildGuard<'a> {
     fn drop(&mut self) {
-        self.0.store(false, Ordering::SeqCst);
+        self.rebuilding.store(false, Ordering::SeqCst);
+        self.notify.notify_waiters();
     }
 }
 
@@ -142,6 +146,87 @@ impl HnswIndex {
     pub fn inner_core(&self) -> &HnswIndexCore {
         &self.inner
     }
+
+    pub fn inner_core_arc(&self) -> std::sync::Arc<HnswIndexCore> {
+        self.inner.clone()
+    }
+
+    pub fn set_ram_vector_at_for_test(&self, slot: usize, vector: VectorData) {
+        let mut nodes = self.inner.hot.nodes.write();
+        if let Some(node) = nodes.get_mut(slot) {
+            node.vector = vector;
+        }
+    }
+
+    pub fn try_new_with_clock(
+        config: HnswConfig,
+        clock: std::sync::Arc<dyn contextra_ports::Clock>,
+    ) -> Result<Self> {
+        let rng = std::sync::Arc::new(VectorSeededRng::new(DEFAULT_LAYER_SEED));
+        Self::try_new_with_clock_and_rng(config, clock, rng)
+    }
+
+    pub fn try_new_with_clock_and_rng(
+        config: HnswConfig,
+        clock: std::sync::Arc<dyn contextra_ports::Clock>,
+        rng: std::sync::Arc<dyn contextra_ports::Rng>,
+    ) -> Result<Self> {
+        config.validate()?;
+
+        let compute_pool = config.compute_pool.clone().unwrap_or_default();
+        let ml = 1.0 / (config.m as f64).ln();
+        #[cfg(feature = "partial-index-rebuild")]
+        let partial_rebuild_config = config.partial_rebuild_config.clone();
+
+        Ok(Self {
+            inner: std::sync::Arc::new(HnswIndexCore {
+                hot: HnswHotCore {
+                    nodes: RwLock::new(Vec::new()),
+                    doc_to_node: RwLock::new(AHashMap::new()),
+                    entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
+                    ram_entry_point: AtomicU32::new(SENTINEL_NO_ENTRY_POINT),
+                    max_layer: AtomicU64::new(0),
+                    ml,
+                    layer_seed: AtomicU64::new(DEFAULT_LAYER_SEED),
+                    deleted_count: AtomicU64::new(0),
+                    write_mutex: Mutex::new(()),
+                    last_tx_id: AtomicU64::new(0),
+                    rebuilding: AtomicBool::new(false),
+                    rebuild_notify: tokio::sync::Notify::new(),
+                    arena: HnswArena::new(),
+                },
+                cold: HnswColdCore {
+                    config,
+                    validation_error: None,
+                    tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
+                    quantizer: RwLock::new(None),
+                    sq8_bias: RwLock::new(Sq8Bias::default()),
+                    mmap_index: RwLock::new(None),
+                    seq_log: RwLock::new(contextra_core::SequenceLog::new()),
+                    rebuild_count: AtomicU64::new(0),
+                    visited_dead_nodes: AtomicU64::new(0),
+                    deleted_nodes: RwLock::new(RoaringTreemap::new()),
+                    compute_pool,
+                    rng,
+                    metrics_sink: RwLock::new(std::sync::Arc::new(
+                        contextra_ports::NoopMetricsSink,
+                    )),
+                    clock,
+                    last_rebuild_tick: Mutex::new(None),
+                    consecutive_rapid_rebuilds: AtomicU32::new(0),
+                    #[cfg(feature = "partial-index-rebuild")]
+                    traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
+                        partial_rebuild_config,
+                    )),
+                    fault_injection_skip_zeroize: AtomicBool::new(false),
+                    #[cfg(test)]
+                    fault_injection_insert_target: AtomicU64::new(u64::MAX),
+                    #[cfg(test)]
+                    fault_injection_insert_count: AtomicU64::new(0),
+                },
+            }),
+        })
+    }
 }
 
 #[repr(align(64))]
@@ -160,6 +245,7 @@ pub struct HnswHotCore {
     pub write_mutex: Mutex<()>,
     pub last_tx_id: AtomicU64,
     pub rebuilding: AtomicBool,
+    pub rebuild_notify: tokio::sync::Notify,
     pub arena: HnswArena,
 }
 
@@ -242,7 +328,8 @@ pub struct HnswColdCore {
     pub compute_pool: crate::compute_pool::ComputePool,
     pub rng: std::sync::Arc<dyn contextra_ports::Rng>,
     pub metrics_sink: RwLock<std::sync::Arc<dyn contextra_ports::MetricsSink>>,
-    pub last_rebuild_instant: Mutex<Option<std::time::Instant>>,
+    pub clock: std::sync::Arc<dyn contextra_ports::Clock>,
+    pub last_rebuild_tick: Mutex<Option<u64>>,
     pub consecutive_rapid_rebuilds: AtomicU32,
     #[cfg(feature = "partial-index-rebuild")]
     pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
@@ -295,6 +382,7 @@ impl HnswIndex {
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
+                    rebuild_notify: tokio::sync::Notify::new(),
                     arena: HnswArena::new(),
                 },
                 cold: HnswColdCore {
@@ -313,7 +401,8 @@ impl HnswIndex {
                     metrics_sink: RwLock::new(std::sync::Arc::new(
                         contextra_ports::NoopMetricsSink,
                     )),
-                    last_rebuild_instant: Mutex::new(None),
+                    clock: std::sync::Arc::new(contextra_ports::SystemClock::new()),
+                    last_rebuild_tick: Mutex::new(None),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
@@ -364,6 +453,7 @@ impl HnswIndex {
                     write_mutex: Mutex::new(()),
                     last_tx_id: AtomicU64::new(0),
                     rebuilding: AtomicBool::new(false),
+                    rebuild_notify: tokio::sync::Notify::new(),
                     arena: HnswArena::new(),
                 },
                 cold: HnswColdCore {
@@ -382,7 +472,8 @@ impl HnswIndex {
                     metrics_sink: RwLock::new(std::sync::Arc::new(
                         contextra_ports::NoopMetricsSink,
                     )),
-                    last_rebuild_instant: Mutex::new(None),
+                    clock: std::sync::Arc::new(contextra_ports::SystemClock::new()),
+                    last_rebuild_tick: Mutex::new(None),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
                     traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(

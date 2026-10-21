@@ -7,7 +7,7 @@ use super::types::{
 };
 use super::wal_receipt::compute_hmac_sha256;
 use crate::ed25519_proof::SignatureVersion;
-use contextra_types::{ContextraError, Result, TxId};
+use contextra_types::{Result, TxId};
 
 impl DeletionProof {
     /// Erstellt und signiert einen DeletionProof nach Layer-Bereinigung.
@@ -94,73 +94,72 @@ impl DeletionProof {
 
     /// Constructs the full, length-prefixed HMAC payload for version 2 proofs binding all fields.
     pub(super) fn construct_v2_full_payload(&self) -> Result<Vec<u8>> {
-        let scope_bytes =
-            bincode::serialize(&self.scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
-        let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
-        let timestamp_bytes = self.timestamp.to_le_bytes();
-        let covered_layers_bytes = bincode::serialize(&self.covered_layers)
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
-        let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
-        let graph_repair_bytes = bincode::serialize(&self.graph_repair)
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
-
-        let mut payload = Vec::with_capacity(128 + scope_bytes.len() + covered_layers_bytes.len());
+        let mut payload = Vec::with_capacity(128);
         payload.extend_from_slice(b"contextra-hmac-v2-full:");
 
-        let scope_len = u32::try_from(scope_bytes.len()).unwrap_or(u32::MAX);
-        payload.extend_from_slice(&scope_len.to_le_bytes());
-        payload.extend_from_slice(&scope_bytes);
+        let mut writer = crate::canonical::CanonicalWriter::new();
 
-        payload.extend_from_slice(&self.deleted_keys_hash);
-        payload.extend_from_slice(&tx_bytes);
-        payload.extend_from_slice(&timestamp_bytes);
-
-        let covered_len = u32::try_from(covered_layers_bytes.len()).unwrap_or(u32::MAX);
-        payload.extend_from_slice(&covered_len.to_le_bytes());
-        payload.extend_from_slice(&covered_layers_bytes);
-
-        let excluded_len = u32::try_from(excluded_scopes_bytes.len()).unwrap_or(u32::MAX);
-        payload.extend_from_slice(&excluded_len.to_le_bytes());
-        payload.extend_from_slice(&excluded_scopes_bytes);
-
-        let graph_len = u32::try_from(graph_repair_bytes.len()).unwrap_or(u32::MAX);
-        payload.extend_from_slice(&graph_len.to_le_bytes());
-        payload.extend_from_slice(&graph_repair_bytes);
-
-        match &self.wal_chain_receipt {
-            Some(receipt) => {
-                payload.push(1u8);
-                payload.extend_from_slice(receipt);
+        match &self.scope {
+            DeletionScope::Document { doc_id, tenant_id } => {
+                let mut scope_w = crate::canonical::CanonicalWriter::new();
+                scope_w.write_u8(1, 1);
+                scope_w.write_u64(2, tenant_id.as_u64());
+                scope_w.write_u64(3, doc_id.0);
+                writer.write_bytes(1, scope_w.finish()?);
             }
-            None => {
-                payload.push(0u8);
+            DeletionScope::Collection { collection_id, tenant_id } => {
+                let mut scope_w = crate::canonical::CanonicalWriter::new();
+                scope_w.write_u8(1, 2);
+                scope_w.write_u64(2, tenant_id.as_u64());
+                scope_w.write_u64(3, collection_id.0);
+                writer.write_bytes(1, scope_w.finish()?);
+            }
+            DeletionScope::Tenant { tenant_id } => {
+                let mut scope_w = crate::canonical::CanonicalWriter::new();
+                scope_w.write_u8(1, 3);
+                scope_w.write_u64(2, tenant_id.as_u64());
+                writer.write_bytes(1, scope_w.finish()?);
             }
         }
 
-        match self.audit_chain_position {
-            Some(pos) => {
-                payload.push(1u8);
-                payload.extend_from_slice(&pos.to_le_bytes());
-            }
-            None => {
-                payload.push(0u8);
-            }
+        writer.write_bytes32(2, &self.deleted_keys_hash);
+        writer.write_u64(3, self.deleted_after_tx.0);
+        writer.write_u64(4, self.timestamp);
+
+        let mut layers_w = crate::canonical::CanonicalWriter::new();
+        for (i, layer) in self.covered_layers.iter().enumerate() {
+            layers_w.write_u16((i + 1) as u16, layer.layer_id());
+        }
+        writer.write_bytes(5, layers_w.finish()?);
+
+        let mut excl_w = crate::canonical::CanonicalWriter::new();
+        for (i, scope) in self.excluded_scopes.iter().enumerate() {
+            excl_w.write_u16((i + 1) as u16, scope.id());
+        }
+        writer.write_bytes(6, excl_w.finish()?);
+
+        let mut repair_w = crate::canonical::CanonicalWriter::new();
+        for (i, rep) in self.graph_repair.iter().enumerate() {
+            let mut rep_item = crate::canonical::CanonicalWriter::new();
+            rep_item.write_u64(1, rep.doc_id.0);
+            rep_item.write_bool(2, rep.verified_no_ghost_pointers);
+            rep_item.write_u64(3, rep.attested_at as u64);
+            repair_w.write_bytes((i + 1) as u16, rep_item.finish()?);
+        }
+        writer.write_bytes(7, repair_w.finish()?);
+
+        if let Some(ref receipt) = self.wal_chain_receipt {
+            writer.write_bytes32(8, receipt);
+        }
+        if let Some(pos) = self.audit_chain_position {
+            writer.write_u64(9, pos);
+        }
+        if let Some(ref warning) = self.integrity_warning {
+            writer.write_string(10, warning);
         }
 
-        match &self.integrity_warning {
-            Some(warning) => {
-                payload.push(1u8);
-                let warn_bytes = warning.as_bytes();
-                let warn_len = u32::try_from(warn_bytes.len()).unwrap_or(u32::MAX);
-                payload.extend_from_slice(&warn_len.to_le_bytes());
-                payload.extend_from_slice(warn_bytes);
-            }
-            None => {
-                payload.push(0u8);
-            }
-        }
-
+        let canon_bytes = writer.finish()?;
+        payload.extend_from_slice(&canon_bytes);
         Ok(payload)
     }
 }

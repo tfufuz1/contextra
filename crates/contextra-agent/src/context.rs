@@ -265,9 +265,7 @@ impl AgentContext {
 }
 
 /// Agent execution engine helper managing per-step cache directives during workflow execution.
-#[deprecated(
-    note = "AgentEngine is a deprecated wrapper struct. Use OrchestratorEngine instead."
-)]
+#[deprecated(note = "AgentEngine is a deprecated wrapper struct. Use OrchestratorEngine instead.")]
 #[derive(Debug, Clone, Default)]
 pub struct AgentEngine {
     /// Active cache directive set during step execution.
@@ -551,7 +549,8 @@ mod tests {
     async fn test_reset_for_new_event_resets_status_and_node() -> contextra_types::Result<()> {
         let temp_dir = tempfile::TempDir::new()?;
         let config = contextra_db::ContextraConfig::default();
-        let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+        let db =
+            Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
         let state_coll = db.collection("test_reset_event").await?;
         let mut ctx = AgentContext::try_new(
             "test_reset_task",
@@ -586,7 +585,8 @@ mod tests {
     async fn test_next_retry_step_count_calculation() -> contextra_types::Result<()> {
         let temp_dir = tempfile::TempDir::new()?;
         let config = contextra_db::ContextraConfig::default();
-        let db = Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
+        let db =
+            Arc::new(contextra_db::Contextra::open_with_config(temp_dir.path(), config).await?);
         let state_coll = db.collection("test_retry_step").await?;
         let mut ctx = AgentContext::try_new(
             "test_retry_task",

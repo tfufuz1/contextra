@@ -1,6 +1,6 @@
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use std::time::Duration;
 use tempfile::TempDir;

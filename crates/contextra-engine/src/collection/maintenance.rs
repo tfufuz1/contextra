@@ -246,9 +246,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             if let Some(ref id_str) = meta_id {
                                 let user_key = self.namespaced_key(id_str.as_bytes(), 0);
                                 if let Some(user_val) = self.storage.get(&user_key).await? {
-                                    if let Ok(stored) =
-                                        StoredDocument::from_slice(&user_val)
-                                    {
+                                    if let Ok(stored) = StoredDocument::from_slice(&user_val) {
                                         stored_doc = Some(stored);
                                     }
                                 }
@@ -561,7 +559,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             >(imp_val.clone())
                             {
                                 if imp.decay != contextra_types::DecayFunction::None {
-                                    let effective = imp.effective_score(TxId::new(now_tx));
+                                    let effective = imp.effective_score(TxId::try_new(now_tx)?);
                                     if effective < Self::DECAY_DELETION_THRESHOLD {
                                         expired_ids.push(user_key);
                                     }

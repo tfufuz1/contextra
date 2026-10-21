@@ -1,8 +1,8 @@
-use contextra_types::{Result, TxId};
 use contextra_store::{
     sstable::{BlockBuilder, SstableBuilder},
     wal::{Wal, WalOp},
 };
+use contextra_types::{Result, TxId};
 use tempfile::tempdir;
 
 #[tokio::test]

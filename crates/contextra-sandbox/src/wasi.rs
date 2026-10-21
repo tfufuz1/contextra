@@ -7,6 +7,8 @@
 
 //! WASI preview1 Host Function Implementations (§4.18).
 
+#![allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+
 use wasmtime::{Caller, Linker};
 
 use crate::executor::SandboxState;
@@ -270,7 +272,7 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                                 .data()
                                 .stdout_buf
                                 .lock()
-                                .map_err(|e| wasmtime::Error::msg(e.to_string()))?;
+                                .unwrap_or_else(|e| e.into_inner());
                             if guard.len().saturating_add(slice.len()) > max_output_bytes {
                                 return Err(wasmtime::Error::from(OutputLimitExceededError {
                                     stream: "stdout",
@@ -283,7 +285,7 @@ pub(crate) fn register(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::
                                 .data()
                                 .stderr_buf
                                 .lock()
-                                .map_err(|e| wasmtime::Error::msg(e.to_string()))?;
+                                .unwrap_or_else(|e| e.into_inner());
                             if guard.len().saturating_add(slice.len()) > max_output_bytes {
                                 return Err(wasmtime::Error::from(OutputLimitExceededError {
                                     stream: "stderr",

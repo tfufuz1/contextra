@@ -102,7 +102,7 @@ impl Contextra {
                 }
             }
         } else {
-            let tx = TxId::new(0);
+            let tx = TxId::try_new(0)?;
             storage
                 .put(tx, dim_key, config.dimension.to_string().as_bytes())
                 .await?;
@@ -205,14 +205,18 @@ impl Contextra {
                 self.set_embedder(Arc::new(client)).await?;
                 Ok(())
             }
-            EmbeddingBackend::Onnx { .. } => Err(contextra_types::ContextraError::capability_unsupported(
-                "onnx",
-                "ONNX embedding backend not supported directly in contextra-engine",
-            )),
-            EmbeddingBackend::Ollama { .. } => Err(contextra_types::ContextraError::capability_unsupported(
-                "ollama",
-                "Ollama embedding backend not supported directly in contextra-engine",
-            )),
+            EmbeddingBackend::Onnx { .. } => {
+                Err(contextra_types::ContextraError::capability_unsupported(
+                    "onnx",
+                    "ONNX embedding backend not supported directly in contextra-engine",
+                ))
+            }
+            EmbeddingBackend::Ollama { .. } => {
+                Err(contextra_types::ContextraError::capability_unsupported(
+                    "ollama",
+                    "Ollama embedding backend not supported directly in contextra-engine",
+                ))
+            }
         }
     }
 
@@ -622,7 +626,10 @@ mod consolidation_launcher_tests {
             ..Default::default()
         };
         let res_onnx = Contextra::open_with_config(dir.path(), config_onnx).await;
-        assert!(matches!(res_onnx, Err(contextra_types::ContextraError::CapabilityUnsupported { .. })));
+        assert!(matches!(
+            res_onnx,
+            Err(contextra_types::ContextraError::CapabilityUnsupported { .. })
+        ));
 
         // Ollama fails with capability_unsupported
         let config_ollama = ContextraConfig {
@@ -633,7 +640,10 @@ mod consolidation_launcher_tests {
             ..Default::default()
         };
         let res_ollama = Contextra::open_with_config(dir.path(), config_ollama).await;
-        assert!(matches!(res_ollama, Err(contextra_types::ContextraError::CapabilityUnsupported { .. })));
+        assert!(matches!(
+            res_ollama,
+            Err(contextra_types::ContextraError::CapabilityUnsupported { .. })
+        ));
 
         Ok(())
     }
