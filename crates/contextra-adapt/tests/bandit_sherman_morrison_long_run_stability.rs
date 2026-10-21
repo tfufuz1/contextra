@@ -184,38 +184,43 @@ fn test_sherman_morrison_100k_updates_frobenius_stability() {
 
         // Reset ground-truth accumulation on soft restart
         if state.refactorizations > refac_before {
-            a_matrix_f64 = vec![0.0f64; d * d];
+            a_ref_f64 = vec![0.0f64; d * d];
             for i in 0..d {
-                a_matrix_f64[i * d + i] = 1.0;
+                a_ref_f64[i * d + i] = 1.0;
             }
             for i in 0..d {
                 for j in 0..d {
-                    a_matrix_f64[i * d + j] =
-                        gamma_f64 * a_matrix_f64[i * d + j] + (x[i] as f64) * (x[j] as f64);
+                    a_ref_f64[i * d + j] =
+                        gamma_f64 * a_ref_f64[i * d + j] + (x[i] as f64) * (x[j] as f64);
                 }
             }
         }
 
         if t % 10_000 == 0 {
-            let ref_inv_f64 = naive_matrix_inverse_f64(&a_matrix_f64, d)
+            let ref_inv_f64 = naive_matrix_inverse_f64(&a_ref_f64, d)
                 .expect("Ground truth matrix reinversion must succeed");
 
             let mut diff_frob_sq = 0.0f64;
             let mut ref_frob_sq = 0.0f64;
 
-            let std_sm = var_sm.sqrt();
-            let std_ref = var_ref.sqrt();
-            let abs_diff = (std_sm - std_ref).abs();
+            for i in 0..d {
+                for j in 0..d {
+                    let diff = (state.inv_a[i * d + j] as f64) - ref_inv_f64[i * d + j];
+                    diff_frob_sq += diff * diff;
+                    ref_frob_sq += ref_inv_f64[i * d + j] * ref_inv_f64[i * d + j];
+                }
+            }
+            let rel_frob = diff_frob_sq.sqrt() / ref_frob_sq.sqrt();
 
             assert!(
-                abs_diff < 1e-3,
-                "Standard deviation tolerance exceeded at step {t}: SM={std_sm:.6}, Ref={std_ref:.6}, diff={abs_diff:.6e}"
+                rel_frob < 1e-2,
+                "Frobenius relative error exceeds tolerance at step {t}: rel_frob={rel_frob:.6e}"
             );
         }
     }
 
     assert!(
-        state.rebuild_count() > 0,
-        "Rebuilds must occur periodically to prevent matrix drift across 10^5 updates"
+        state.refactorizations > 0,
+        "Refactorizations must occur periodically to prevent matrix drift across 10^5 updates"
     );
 }
