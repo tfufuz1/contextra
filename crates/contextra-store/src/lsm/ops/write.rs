@@ -8,7 +8,7 @@
 
 use super::super::config::DurabilityMode;
 use super::super::engine::LsmStorage;
-use super::super::fence::InflightGuard;
+use super::super::fence::{fenced_keys_kv, FencedKey};
 use super::super::group_commit::{
     execute_group_commit_append, GroupCommitRequest, GroupCommitSharedState, PendingCommitQueue,
     WalQueueGuard,
@@ -717,61 +717,51 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             std::mem::take(&mut shared_guard.requests)
         };
 
-        // Window 1: Fence Check for Leader + Followers under commit_mutex
-        if storage.erasure_fence().is_active() {
-            for op in &leader_ops {
-                let key = match op {
-                    IndexOp::Insert { data, .. } => &data.0[..],
-                    IndexOp::Delete { data, .. } => {
-                        if let Some((k, _)) = data {
-                            &k[..]
-                        } else {
-                            continue;
-                        }
-                    }
-                    _ => continue,
-                };
-                if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
-                    let mut batch_txs = vec![leader_tx_id];
-                    batch_txs.extend(requests.iter().map(|r| r.tx_id));
-                    storage.cleanup_intent_locks_for_txs(&batch_txs);
-                    let err_msg = format!("Commit rejected by erasure fence: {e}");
-                    for r in requests {
-                        let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
-                    }
-                    return Err(ContextraError::Storage(err_msg));
-                }
+        // Window 1: Collect ALL keys across Leader + Followers and enter_write atomically
+        let mut all_batch_keys: Vec<&[u8]> = Vec::with_capacity(
+            leader_ops.len() + requests.iter().map(|r| r.ops.len()).sum::<usize>(),
+        );
+
+        let mut contains_unknown_key = false;
+        for op in &leader_ops {
+            match fenced_keys_kv(op) {
+                FencedKey::Exact(k) => all_batch_keys.push(k),
+                FencedKey::Unknown => contains_unknown_key = true,
             }
-            for r in &requests {
-                for op in &r.ops {
-                    let key = match op {
-                        IndexOp::Insert { data, .. } => &data.0[..],
-                        IndexOp::Delete { data, .. } => {
-                            if let Some((k, _)) = data {
-                                &k[..]
-                            } else {
-                                continue;
-                            }
-                        }
-                        _ => continue,
-                    };
-                    if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
-                        let mut batch_txs = vec![leader_tx_id];
-                        batch_txs.extend(requests.iter().map(|r| r.tx_id));
-                        storage.cleanup_intent_locks_for_txs(&batch_txs);
-                        let err_msg = format!("Commit rejected by erasure fence: {e}");
-                        for req in requests {
-                            let _ = req
-                                .sender
-                                .send(Err(ContextraError::Storage(err_msg.clone())));
-                        }
-                        return Err(ContextraError::Storage(err_msg));
-                    }
+        }
+        for r in &requests {
+            for op in &r.ops {
+                match fenced_keys_kv(op) {
+                    FencedKey::Exact(k) => all_batch_keys.push(k),
+                    FencedKey::Unknown => contains_unknown_key = true,
                 }
             }
         }
 
-        let _inflight_guard = InflightGuard::new(&storage.erasure_fence().gate);
+        if contains_unknown_key && storage.erasure_fence().is_active() {
+            let mut batch_txs = vec![leader_tx_id];
+            batch_txs.extend(requests.iter().map(|r| r.tx_id));
+            storage.cleanup_intent_locks_for_txs(&batch_txs);
+            let err_msg = "Commit rejected by erasure fence: Unknown key payload in batch during active fence".to_string();
+            for r in requests {
+                let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
+            }
+            return Err(ContextraError::Storage(err_msg));
+        }
+
+        let _write_ticket = match storage.erasure_fence().enter_write(all_batch_keys) {
+            Ok(ticket) => ticket,
+            Err(e) => {
+                let mut batch_txs = vec![leader_tx_id];
+                batch_txs.extend(requests.iter().map(|r| r.tx_id));
+                storage.cleanup_intent_locks_for_txs(&batch_txs);
+                let err_msg = format!("Commit rejected by erasure fence: {e}");
+                for r in requests {
+                    let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
+                }
+                return Err(ContextraError::Storage(err_msg));
+            }
+        };
 
         let mut follower_prep = Vec::with_capacity(requests.len());
         for r in &requests {
@@ -881,7 +871,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             storage.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);
             storage.advance_visibility(req_tx_id);
         }
-        drop(_inflight_guard);
+        drop(_write_ticket);
 
         let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
         if let Err(obs_err) = storage.notify_commit_observers(

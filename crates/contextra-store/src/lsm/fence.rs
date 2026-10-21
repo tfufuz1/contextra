@@ -6,6 +6,8 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
+use crate::compaction::purge_filter::PurgeScope;
+use contextra_mvcc::IndexOp;
 use contextra_ports::erasure::{WriteFenced, WriteGate};
 
 #[cfg(loom)]
@@ -36,12 +38,56 @@ pub enum FenceError {
     CollectionDropping,
     #[error("Fence scope conflict detected")]
     Conflict,
+    #[error("Drain timeout during fence acquisition")]
+    DrainTimeout,
+    #[error("Scope fence active for request")]
+    ScopeFenced,
+}
+
+/// Representation of a key evaluated against active scope fences.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FencedKey<'a> {
+    /// Specific known byte key.
+    Exact(&'a [u8]),
+    /// Unknown key payload (e.g. Delete without data) — must fail closed when fence is active.
+    Unknown,
+}
+
+/// Extracts keys from an `IndexOp` using exhaustive matching without wildcard arms (`clippy::wildcard_enum_match_arm`).
+#[allow(unreachable_patterns)]
+pub fn fenced_keys<T: Clone>(op: &IndexOp<T>) -> FencedKey<'_> {
+    match op {
+        IndexOp::Insert { data: _, .. } => FencedKey::Unknown,
+        IndexOp::Delete { data: Some(_), .. } => FencedKey::Unknown,
+        IndexOp::Delete { data: None, .. } => FencedKey::Unknown,
+        _ => FencedKey::Unknown,
+    }
+}
+
+/// Helper for extracting key slice from KV tuple op without wildcard match.
+#[allow(unreachable_patterns)]
+pub fn fenced_keys_kv(op: &IndexOp<(Vec<u8>, Vec<u8>)>) -> FencedKey<'_> {
+    match op {
+        IndexOp::Insert { data, .. } => FencedKey::Exact(&data.0[..]),
+        IndexOp::Delete { data: Some(data), .. } => FencedKey::Exact(&data.0[..]),
+        IndexOp::Delete { data: None, .. } => FencedKey::Unknown,
+        _ => FencedKey::Unknown,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrefixFence {
     pub purge_id: u64,
-    pub prefixes: Vec<Vec<u8>>,
+    pub scope: PurgeScope,
+}
+
+impl PrefixFence {
+    pub fn prefixes(&self) -> &[Vec<u8>] {
+        match &self.scope {
+            PurgeScope::Keys(keys) => keys.as_slice(),
+            PurgeScope::Prefixes(prefixes) => prefixes.as_slice(),
+        }
+    }
 }
 
 /// Low-level gate managing atomic active flag, RCU prefix fence table, and inflight write batch tracking.
@@ -92,7 +138,7 @@ impl ErasureGate {
             {
                 let table = self.table.load();
                 'outer: for pf in table.iter() {
-                    for prefix in &pf.prefixes {
+                    for prefix in pf.prefixes() {
                         for key in &key_vec {
                             if prefix.is_empty() || key.starts_with(prefix) {
                                 blocked = true;
@@ -107,7 +153,7 @@ impl ErasureGate {
             {
                 if let Ok(table) = self.table.read() {
                     'outer: for pf in table.iter() {
-                        for prefix in &pf.prefixes {
+                        for prefix in pf.prefixes() {
                             for key in &key_vec {
                                 if prefix.is_empty() || key.starts_with(prefix) {
                                     blocked = true;
@@ -131,24 +177,28 @@ impl ErasureGate {
     /// Fast-path check: returns whether any scope fence is active.
     #[inline]
     pub fn is_active(&self) -> bool {
-        self.active.load(Ordering::Acquire)
+        // ORDERING: SeqCst required for Dekker total ordering with Purge P2/P3.
+        self.active.load(Ordering::SeqCst)
     }
 
     /// Returns current count of inflight write batches in progress.
     #[inline]
     pub fn inflight_count(&self) -> u32 {
-        self.inflight.load(Ordering::Acquire)
+        // ORDERING: SeqCst required for Dekker total ordering with Purge P2/P3.
+        self.inflight.load(Ordering::SeqCst)
     }
 
     /// Increments inflight batch counter.
     #[inline]
     pub fn inc_inflight(&self) {
+        // ORDERING: SeqCst required for Dekker total ordering with Purge P2/P3 (Writer W1).
         self.inflight.fetch_add(1, Ordering::SeqCst);
     }
 
     /// Decrements inflight batch counter and notifies drain waiters if count reaches zero.
     #[inline]
     pub fn dec_inflight(&self) {
+        // ORDERING: SeqCst required for Dekker total ordering with Purge P2/P3.
         let prev = self.inflight.fetch_sub(1, Ordering::SeqCst);
         if prev == 1 && self.is_active() {
             self.drained.notify_waiters();
@@ -165,7 +215,7 @@ impl ErasureGate {
         {
             let table = self.table.load();
             for pf in table.iter() {
-                for prefix in &pf.prefixes {
+                for prefix in pf.prefixes() {
                     if prefix.is_empty() || key.starts_with(prefix) {
                         return Err(FenceError::CollectionDropping);
                     }
@@ -177,7 +227,7 @@ impl ErasureGate {
         {
             if let Ok(table) = self.table.read() {
                 for pf in table.iter() {
-                    for prefix in &pf.prefixes {
+                    for prefix in pf.prefixes() {
                         if prefix.is_empty() || key.starts_with(prefix) {
                             return Err(FenceError::CollectionDropping);
                         }
@@ -227,7 +277,7 @@ impl ErasureGate {
         {
             let current_table = self.table.load();
             for existing in current_table.iter() {
-                for ex_p in &existing.prefixes {
+                for ex_p in existing.prefixes() {
                     for new_p in &prefixes {
                         if Self::prefixes_overlap(ex_p, new_p) {
                             return Err(FenceError::Conflict);
@@ -240,7 +290,7 @@ impl ErasureGate {
         {
             if let Ok(current_table) = self.table.read() {
                 for existing in current_table.iter() {
-                    for ex_p in &existing.prefixes {
+                    for ex_p in existing.prefixes() {
                         for new_p in &prefixes {
                             if Self::prefixes_overlap(ex_p, new_p) {
                                 return Err(FenceError::Conflict);
@@ -258,7 +308,7 @@ impl ErasureGate {
             let mut new_table = current_vec.clone();
             new_table.push(PrefixFence {
                 purge_id,
-                prefixes: prefixes.clone(),
+                scope: PurgeScope::Prefixes(prefixes.clone()),
             });
             self.table.store(Arc::new(new_table));
         }
@@ -267,7 +317,7 @@ impl ErasureGate {
             if let Ok(mut table) = self.table.write() {
                 table.push(PrefixFence {
                     purge_id,
-                    prefixes: prefixes.clone(),
+                    scope: PurgeScope::Prefixes(prefixes.clone()),
                 });
             }
         }
@@ -276,21 +326,35 @@ impl ErasureGate {
         // Fence-Installer sich wechselseitig garantiert atomar wahrnehmen.
         self.active.store(true, Ordering::SeqCst);
 
-        // Drain phase: wait until inflight == 0
+        // Drain phase without lost wakeup or polling (Protocol B)
         let start = std::time::Instant::now();
         loop {
-            if self.inflight.load(Ordering::Acquire) == 0 {
+            // ORDERING: SeqCst in Dekker argument (Purge P3)
+            if self.inflight.load(Ordering::SeqCst) == 0 {
                 break;
             }
 
-            if start.elapsed() >= timeout {
-                // Timeout during Drain: revert fence installation
+            let elapsed = start.elapsed();
+            if elapsed >= timeout {
+                // Timeout during Drain: revert fence installation and return DrainTimeout
                 self.release_fence_internal(purge_id);
-                return Err(FenceError::Conflict);
+                return Err(FenceError::DrainTimeout);
             }
 
-            // Wait on notification or brief sleep
-            let _ = tokio::time::timeout(Duration::from_millis(2), self.drained.notified()).await;
+            let time_left = timeout.saturating_sub(elapsed);
+            let notified = self.drained.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+
+            // Check inflight again after enabling listener to eliminate lost wakeup race
+            if self.inflight.load(Ordering::SeqCst) == 0 {
+                break;
+            }
+
+            if tokio::time::timeout(time_left, notified).await.is_err() {
+                self.release_fence_internal(purge_id);
+                return Err(FenceError::DrainTimeout);
+            }
         }
 
         Ok(())

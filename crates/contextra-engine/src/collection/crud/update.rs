@@ -22,7 +22,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             )));
         }
 
-        self.check_write_allowed()?;
         let _guard = self.kv_locks.lock_for(id).await;
         drop(_guard);
         let db_tx = self.begin_transaction()?;

@@ -56,9 +56,7 @@ pub use orphan::{
     orphaned_checkpoint_count, pending_rollback_count, register_orphaned_checkpoint,
     register_pinned_seq_no_orphan, OrphanRegistry,
 };
-pub use restore_filter::{
-    filter_restore_records, filter_restore_records_with_report, CpyRestoreFilter, RestoreFilterReport, RestorePolicy,
-};
+pub use restore_filter::{filter_restore_records, CpyRestoreFilter};
 #[cfg(any(test, feature = "test-utils"))]
 pub use restore_filter::NoOpRestoreFilter;
 pub use store::{purge_registered_checkpoint, CheckpointRegistry, PersistentCheckpointStore};

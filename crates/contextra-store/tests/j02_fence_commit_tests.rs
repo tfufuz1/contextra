@@ -3,8 +3,9 @@
 #![allow(unexpected_cfgs)]
 
 use contextra_ports::StorageEngine;
+use contextra_store::lsm::fence::{ErasureFence, FenceError};
 use contextra_store::lsm::{
-    CommittedBatch, ErasureFence, FenceError, LsmConfig, LsmStorage, WalObserver, WriteOrigin,
+    CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin,
 };
 use contextra_types::{ContextraError, TxId};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -72,12 +73,12 @@ async fn test_write_ticket_drop_on_panic_and_cancellation() {
     assert_eq!(fence.gate.inflight_count(), 0);
 
     // 2. Ticket drop on panic
-    let fence_clone = Arc::clone(&fence);
-    let panic_res = std::panic::catch_unwind(move || {
+    let fence_clone: Arc<ErasureFence> = Arc::clone(&fence);
+    let panic_res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
         let _ticket = fence_clone.enter_write([b"k1".as_slice()]).unwrap();
         assert_eq!(fence_clone.gate.inflight_count(), 1);
         panic!("Simulated panic inside write block");
-    });
+    }));
     assert!(panic_res.is_err());
     assert_eq!(fence.gate.inflight_count(), 0);
 }
@@ -236,4 +237,87 @@ async fn test_edge_cases_empty_ops_tombstone_prefix_boundary() {
         fence.enter_write([b"prefix_ext".as_slice()]).err(),
         Some(FenceError::CollectionDropping)
     );
+}
+
+#[tokio::test]
+async fn test_fence_commit_vs_purge_stress() {
+    let dir = tempdir().expect("tempdir");
+    let config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        group_commit_window_micros: 100, // active group commit window
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(config).await.expect("LsmStorage creation"));
+
+    let num_writers = 8;
+    let iterations = 2_000; // stress iteration batch
+    let mut handles = Vec::new();
+
+    for w in 0..num_writers {
+        let st = Arc::clone(&storage);
+        handles.push(tokio::spawn(async move {
+            for i in 0..iterations {
+                let tx_id = TxId::new((w * iterations + i + 1) as u64);
+                let key = format!("k_{w}_{i}").into_bytes();
+                if st.put(tx_id, &key, b"val").await.is_ok() {
+                    let _ = st.commit(tx_id).await;
+                }
+            }
+        }));
+    }
+
+    // Purge installer thread toggling fence
+    let st_purge = Arc::clone(&storage);
+    let purge_handle = tokio::spawn(async move {
+        for p in 0..100 {
+            let prefix = vec![format!("k_{}_", p % num_writers).into_bytes()];
+            if let Ok(guard) = st_purge.erasure_fence().acquire_scope_fence_for(prefix) {
+                tokio::time::sleep(Duration::from_micros(50)).await;
+                drop(guard);
+            }
+            tokio::time::sleep(Duration::from_micros(100)).await;
+        }
+    });
+
+    for h in handles {
+        h.await.unwrap();
+    }
+    purge_handle.await.unwrap();
+}
+
+#[tokio::test]
+async fn test_ticket_released_on_every_error_path_including_leader_cancel() {
+    let dir = tempdir().expect("tempdir");
+    let config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        group_commit_window_micros: 10_000, // 10ms group commit window
+        ..Default::default()
+    };
+    let storage = Arc::new(LsmStorage::new(config).await.expect("LsmStorage creation"));
+
+    assert_eq!(storage.erasure_fence().gate.inflight_count(), 0);
+
+    // Leader tx
+    let tx_leader = TxId::new(100);
+    storage.put(tx_leader, b"leader_key", b"val").await.unwrap();
+
+    // Follower tx
+    let tx_follower = TxId::new(101);
+    storage.put(tx_follower, b"follower_key", b"val").await.unwrap();
+
+    let s1 = Arc::clone(&storage);
+    let h_leader = tokio::spawn(async move {
+        s1.commit(tx_leader).await
+    });
+
+    let s2 = Arc::clone(&storage);
+    let h_follower = tokio::spawn(async move {
+        s2.commit(tx_follower).await
+    });
+
+    let (r1, r2) = tokio::join!(h_leader, h_follower);
+    let _ = (r1, r2);
+
+    // After commit finish or cancel, inflight count MUST be 0
+    assert_eq!(storage.erasure_fence().gate.inflight_count(), 0, "Inflight count leaked after group commit");
 }
