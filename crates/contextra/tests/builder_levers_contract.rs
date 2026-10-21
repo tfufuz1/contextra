@@ -8,11 +8,11 @@ use std::time::Duration;
 use contextra::performance_profile::PerformanceProfile;
 use contextra::query_rewriter::LlmQueryRewriter;
 use contextra::ContextraBuilder;
-use contextra_types::error::ContextraError;
-use contextra_types::types::domain::DistanceMetric;
 use contextra_db::{ContextraConfig, EmbeddingBackend};
 use contextra_ports::license::{FeatureRing, LicenseGate, OpenFastGate};
 use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_types::error::ContextraError;
+use contextra_types::types::domain::DistanceMetric;
 
 struct DummyLlmGenerator;
 impl LlmTextGenerator for DummyLlmGenerator {
@@ -212,5 +212,66 @@ fn test_builder_encryption_passphrase_debug_redacted() {
     assert!(
         debug_output.contains("***"),
         "Redacted passphrase marker '***' missing in Debug output!"
+    );
+}
+
+#[tokio::test]
+async fn test_builder_invalid_dimension_zero_fails() {
+    let seed: u64 = 20261021_03;
+    println!("builder_contract zero_dim seed: {}", seed);
+
+    let res = ContextraBuilder::new(0)
+        .with_storage_path("./tmp_test_zero_dim")
+        .build()
+        .await;
+
+    assert!(res.is_err(), "Dimension 0 must fail builder validation");
+    let err_msg = res.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("Dimension"),
+        "Error message should mention Dimension, got: {err_msg}"
+    );
+}
+
+#[tokio::test]
+async fn test_builder_empty_storage_path_fails() {
+    let seed: u64 = 20261021_04;
+    println!("builder_contract empty_path seed: {}", seed);
+
+    let res = ContextraBuilder::new(16)
+        .with_storage_path("")
+        .build()
+        .await;
+
+    assert!(
+        res.is_err(),
+        "Empty storage path must fail builder validation"
+    );
+    let err_msg = res.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("StoragePath"),
+        "Error message should mention StoragePath, got: {err_msg}"
+    );
+}
+
+#[tokio::test]
+async fn test_builder_invalid_integrity_license_signature_fails() {
+    let seed: u64 = 20261021_05;
+    println!("builder_contract invalid_license seed: {}", seed);
+
+    let dummy_payload = b"unauthorized payload";
+    let dummy_sig = [0xffu8; 64];
+    let dummy_key = [0x01u8; 32];
+
+    let res = ContextraBuilder::new(16)
+        .with_integrity_license(dummy_payload, &dummy_sig, &dummy_key)
+        .build()
+        .await;
+
+    assert!(res.is_err(), "Invalid integrity license must fail build()");
+    let err_msg = res.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("LicenseGate") || err_msg.contains("signature"),
+        "Error message should mention LicenseGate or signature, got: {err_msg}"
     );
 }

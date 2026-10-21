@@ -439,9 +439,131 @@ impl ObserverRegistry {
         let now_nanos = clock.monotonic_nanos();
         let cooldown_nanos = 1_000_000_000u64;
 
-        for worker in &observers_snapshot {
-            if !ctx.durable && worker.inner.requires_durability() {
-                continue;
+        let mut panicking: Vec<Arc<dyn WalObserver>> = Vec::new();
+
+        let mut run_notify = || -> contextra_types::Result<()> {
+            for worker in &observers_snapshot {
+                if !ctx.durable && worker.inner.requires_durability() {
+                    continue;
+                }
+
+                if worker.is_circuit_breaker_open(now_nanos) {
+                    worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                    return Err(ContextraError::Storage(format!(
+                        "WalObserver circuit breaker open for tx {}",
+                        ctx.tx_id.inner()
+                    )));
+                }
+
+                let event = CommitEvent {
+                    entries: entries.to_vec(),
+                    seq_no,
+                    tx_id: ctx.tx_id,
+                    origin: ctx.origin,
+                };
+
+                let (done_tx, done_rx) = sync_channel(1);
+                let task = WorkerTask { event, done_tx };
+
+                if worker.sender.try_send(task).is_err() {
+                    worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                    worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
+                    worker
+                        .circuit_breaker_open_until_nanos
+                        .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
+                    tracing::warn!(
+                        tx_id = ctx.tx_id.inner(),
+                        "WalObserver queue full; dropped event and tripped circuit breaker"
+                    );
+                    return Err(ContextraError::Storage(format!(
+                        "WalObserver queue full for tx {}",
+                        ctx.tx_id.inner()
+                    )));
+                }
+
+                // TODO(WP-ST1 / PR-8 Schritt 3): `recv_timeout` durch asynchrones mpsc mit `try_send` ersetzen:
+                // Das synchrone Blockieren des Commit-Pfads via `done_rx.recv_timeout(max_latency)` sowie
+                // die Fehlerrückgabe an den Aufrufer führen zu Latenzspitzen und Phantom-Commits.
+                // Umbau auf ungebundenen/gepufferten `tokio::sync::mpsc` mit non-blocking `try_send`,
+                // isoliertem Worker-Task und zählerbasiertem Catch-up ohne Propagation von Fehlern in den Commit.
+                match done_rx.recv_timeout(max_latency) {
+                    Ok(WorkResult::Completed { elapsed_nanos, res }) => {
+                        if elapsed_nanos > max_latency_nanos {
+                            worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                            worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
+                            worker
+                                .circuit_breaker_open_until_nanos
+                                .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
+                            tracing::warn!(
+                                elapsed_us = elapsed_nanos / 1_000,
+                                max_allowed_us = max_latency_nanos / 1_000,
+                                tx_id = ctx.tx_id.inner(),
+                                "WalObserver exceeded max_observer_latency; tripped circuit breaker"
+                            );
+                            return Err(ContextraError::Storage(format!(
+                                "WalObserver execution timed out ({}us > {}us) for tx {}",
+                                elapsed_nanos / 1_000,
+                                max_latency_nanos / 1_000,
+                                ctx.tx_id.inner()
+                            )));
+                        } else {
+                            worker.consecutive_drops.store(0, Ordering::Relaxed);
+                            worker
+                                .circuit_breaker_open_until_nanos
+                                .store(0, Ordering::Relaxed);
+                            if let Err(e) = res {
+                                return Err(ContextraError::Storage(format!(
+                                    "WalObserver notification failed for tx {}: {}",
+                                    ctx.tx_id.inner(),
+                                    e
+                                )));
+                            }
+                        }
+                    }
+                    Ok(WorkResult::Panicked(msg)) => {
+                        worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                        worker
+                            .circuit_breaker_open_until_nanos
+                            .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
+                        tracing::error!(
+                            tx_id = ctx.tx_id.inner(),
+                            panic_msg = %msg,
+                            "WalObserver panicked during on_commit execution; deregistering observer"
+                        );
+                        panicking.push(Arc::clone(&worker.inner));
+                        return Err(ContextraError::Storage(format!(
+                            "WalObserver panicked for tx {}: {}",
+                            ctx.tx_id.inner(),
+                            msg
+                        )));
+                    }
+                    Err(RecvTimeoutError::Timeout) => {
+                        worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                        worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
+                        worker
+                            .circuit_breaker_open_until_nanos
+                            .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
+                        tracing::warn!(
+                            max_allowed_us = max_latency_nanos / 1_000,
+                            tx_id = ctx.tx_id.inner(),
+                            "WalObserver timed out on commit path; tripped circuit breaker"
+                        );
+                        return Err(ContextraError::Storage(format!(
+                            "WalObserver timed out for tx {}",
+                            ctx.tx_id.inner()
+                        )));
+                    }
+                    Err(RecvTimeoutError::Disconnected) => {
+                        worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                        worker
+                            .circuit_breaker_open_until_nanos
+                            .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
+                        return Err(ContextraError::Storage(format!(
+                            "WalObserver worker disconnected for tx {}",
+                            ctx.tx_id.inner()
+                        )));
+                    }
+                }
             }
 
             if worker.is_circuit_breaker_open(now_nanos) {

@@ -398,21 +398,24 @@ impl LsmStorage {
 
         if let Some(expected_hwm) = manifest_hwm {
             let actual_tail_hmac = last_replayed_hmac.unwrap_or([0u8; 32]);
-            let check_hmac = if replayed_hmac_set.contains(&expected_hwm)
-                || valid_manifest_sstables
-                    .as_ref()
-                    .is_some_and(|s| !s.is_empty())
-            {
-                expected_hwm
-            } else {
-                actual_tail_hmac
-            };
-            if contextra_crypto::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err()
-            {
-                return Err(ContextraError::wal_truncation_detected(
-                    expected_hwm,
-                    actual_tail_hmac,
-                ));
+            let hwm_reached = replayed_hmac_set.contains(&expected_hwm);
+            if !hwm_reached && expected_hwm != [0u8; 32] {
+                match config.wal_recovery_mode {
+                    crate::wal::WalRecoveryMode::Strict => {
+                        return Err(ContextraError::wal_truncation_detected(
+                            expected_hwm,
+                            actual_tail_hmac,
+                        ));
+                    }
+                    crate::wal::WalRecoveryMode::Warn => {
+                        tracing::warn!(
+                            target: "contextra_store::wal_recovery",
+                            expected_hwm = ?expected_hwm,
+                            actual_tail_hmac = ?actual_tail_hmac,
+                            "WAL truncation or unanchored tail detected during startup recovery; continuing under WalRecoveryMode::Warn"
+                        );
+                    }
+                }
             }
         }
 
@@ -862,8 +865,14 @@ impl LsmStorage {
                 "Executing pending rollback recovery for TxId({})",
                 target_tx
             );
+            let tx_id = TxId::try_new(target_tx).map_err(|e| {
+                ContextraError::Storage(format!(
+                    "Invalid target_tx {} in pending rollback intent file: {}",
+                    target_tx, e
+                ))
+            })?;
             storage
-                .rollback_to_tx(TxId::new(target_tx))
+                .rollback_to_tx(tx_id)
                 .await
                 .map_err(|e| {
                     ContextraError::Storage(format!(
@@ -1165,12 +1174,12 @@ mod tests {
         {
             let old_wal = Wal::open_with_key_manager(&old_wal_path, None).await?;
             let op_put1 = WalOp::Put {
-                tx_id: contextra_types::TxId::new(1),
+                tx_id: contextra_types::TxId::try_new(1).unwrap(),
                 key: b"key1".to_vec(),
                 value: b"val1".to_vec(),
             };
             let op_end1 = WalOp::TxEnd {
-                tx_id: contextra_types::TxId::new(1),
+                tx_id: contextra_types::TxId::try_new(1).unwrap(),
                 committed: true,
             };
             let (batch1, _) = old_wal
@@ -1181,12 +1190,12 @@ mod tests {
 
             let active_wal = Wal::open_with_key_manager(&active_wal_path, None).await?;
             let op_put2 = WalOp::Put {
-                tx_id: contextra_types::TxId::new(2),
+                tx_id: contextra_types::TxId::try_new(2).unwrap(),
                 key: b"key2".to_vec(),
                 value: b"val2".to_vec(),
             };
             let op_end2 = WalOp::TxEnd {
-                tx_id: contextra_types::TxId::new(2),
+                tx_id: contextra_types::TxId::try_new(2).unwrap(),
                 committed: true,
             };
             let (batch2, _) = active_wal

@@ -134,6 +134,9 @@ impl<'a> PurgeOrchestrator<'a> {
     // Standalone-Resume muss entweder einen echten `LsmStorage`-Handle erhalten oder eine deterministische
     // Offline-Compaction durchführen, damit anstehende Purges nach Absturz vollständig ausgeführt werden.
     /// Creates a standalone `PurgeOrchestrator` without active storage.
+    ///
+    /// Running compaction (Phase P4) with standalone orchestrator will fail-closed with an error
+    /// to ensure `purge.intent` is preserved until active storage is attached.
     pub fn new_standalone(storage_dir: &Path) -> Self {
         let storage_dir = storage_dir.to_path_buf();
         let intent_file = storage_dir.join("purge.intent");
@@ -326,6 +329,11 @@ impl<'a> PurgeOrchestrator<'a> {
                             return Err(OrxPurgeError::from(err));
                         }
                     }
+                } else {
+                    return Err(OrxPurgeError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "Storage handle required for PurgeCompaction (P4)",
+                    )));
                 }
 
                 self.check_failpoint("after_compaction_before_manifest")?;

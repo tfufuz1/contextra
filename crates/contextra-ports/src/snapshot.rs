@@ -58,4 +58,3 @@ impl ReadSnapshot {
         self.max_seq.0
     }
 }
-

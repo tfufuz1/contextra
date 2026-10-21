@@ -2,8 +2,8 @@
 // ZWECK: PerformanceProfile Presets for Contextra (Spec B.1.6, EP1)
 // INVARIANTEN: PerformanceProfile::default() == PerformanceProfile::Balanced
 
-pub use contextra_ports::license::VectorDeleteMode;
 use contextra_ports::erasure::ErasureMode;
+pub use contextra_ports::license::VectorDeleteMode;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_store::lsm::config::{DurabilityConfigError, DurabilityMode};
 

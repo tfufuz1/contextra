@@ -69,11 +69,15 @@ pub const WAL_V2_HEADER: [u8; 4] = *b"MFW2";
 /// Magic header for V3 WAL files (`b"MFW3"`).
 pub const WAL_V3_HEADER: [u8; 4] = *b"MFW3";
 
+/// Magic header for V4 WAL files (`b"MFW4"`).
+pub const WAL_V4_HEADER: [u8; 4] = *b"MFW4";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum WalVersion {
     V1, // Legacy: kein HMAC
     V2, // Legacy: HMAC ohne tx_id
-    V3, // Current: HMAC mit tx_id
+    V3, // Legacy V3: HMAC mit tx_id
+    V4, // V4: CRC32-Header, Cross-Segment Chaining & WalAnchor (ADR-N12 / N13)
 }
 
 /// A batch of prepared WAL entries bound to a specific HMAC chain.
@@ -420,6 +424,16 @@ impl WalEntry {
             .map_err(|_| WalParseError::Truncated)?;
 
         let (op, read_bytes) = match op_type {
+            3 => {
+                // SegmentHeader (V4)
+                let seg_seq_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;
+                let prev_hmac_bytes = remaining.get(8..40).ok_or(WalParseError::Truncated)?;
+                let _seg_seq = u64::from_le_bytes(seg_seq_bytes.try_into().map_err(|_| WalParseError::Truncated)?);
+                let mut prev_hmac_arr = [0u8; 32];
+                prev_hmac_arr.copy_from_slice(prev_hmac_bytes);
+                // Return dummy Put with key b"__wal_segment_header__" for internal handling
+                (WalOp::Put { tx_id: TxId::internal(), key: b"__wal_segment_header__".to_vec(), value: prev_hmac_arr.to_vec() }, 40usize)
+            }
             0 => {
                 // Put
                 let tx_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;

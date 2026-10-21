@@ -16,7 +16,7 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use super::legacy_integrity_key;
 use super::{
     PreparedBatch, Wal, WalCommand, WalEntry, WalOp, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER,
-    WAL_V3_HEADER,
+    WAL_V3_HEADER, WAL_V4_HEADER,
 };
 
 #[cfg(feature = "wal-integrity")]
@@ -138,7 +138,9 @@ async fn detect_wal_header(
     if file_size >= 4 {
         let mut header_buf = [0u8; 4];
         if reader.read_exact(&mut header_buf).await.is_ok() {
-            if header_buf == WAL_V3_HEADER {
+            if header_buf == WAL_V4_HEADER {
+                return Ok((WalVersion::V4, 4));
+            } else if header_buf == WAL_V3_HEADER {
                 return Ok((WalVersion::V3, 4));
             } else if header_buf == WAL_V2_HEADER {
                 return Ok((WalVersion::V2, 4));

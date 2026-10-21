@@ -7,7 +7,7 @@ use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
 #[allow(deprecated)]
 use crate::orphan::global_orphan_registry;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
-use crate::restore_filter::CpyRestoreFilter;
+use crate::restore_filter::{CpyRestoreFilter, RestorePolicy};
 use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_store::copy_registry::{CopyRegEntry, CopyRegistry};
@@ -195,8 +195,8 @@ pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
     id_generator: Arc<dyn contextra_ports::IdGenerator>,
     /// Option: Checkpoint-Scrubbing bei Dokument-Löschung (§5.10 / E31)
     checkpoint_scrub_on_erase: bool,
-    /// Injizierter Anti-Resurrection Restore-Filter (N9, Fail-Closed Default)
-    restore_filter: Option<Arc<dyn CpyRestoreFilter>>,
+    /// Injizierte Anti-Resurrection Restore-Policy (N9, Fail-Closed Default)
+    restore_policy: RestorePolicy,
     /// Injected metrics sink for operational monitoring
     metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
 }
@@ -306,7 +306,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
             clock,
             id_generator,
             checkpoint_scrub_on_erase: false,
-            restore_filter: None,
+            restore_policy: RestorePolicy::ForbidAfterErasure,
             metrics_sink: None,
         })
     }
@@ -487,20 +487,31 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         Ok(count)
     }
 
+    /// Sets the anti-resurrection restore policy for the store.
+    pub fn with_restore_policy(mut self, policy: RestorePolicy) -> Self {
+        self.restore_policy = policy;
+        self
+    }
+
+    /// Sets the anti-resurrection restore policy dynamically.
+    pub fn set_restore_policy(&mut self, policy: RestorePolicy) {
+        self.restore_policy = policy;
+    }
+
+    /// Returns the current anti-resurrection restore policy.
+    pub fn restore_policy(&self) -> &RestorePolicy {
+        &self.restore_policy
+    }
+
     /// Sets the anti-resurrection restore filter for the store (N9, fail-closed default).
-    ///
-    /// # Fail-Closed Default
-    /// Without an explicitly set `restore_filter`, restoring a checkpoint when a deletion history exists
-    /// (`last_tx > meta.tx_id`) will fail closed to prevent resurrection of erased data.
-    /// To bypass filtering explicitly, set `NoOpRestoreFilter` via `with_restore_filter(Arc::new(NoOpRestoreFilter))`.
     pub fn with_restore_filter(mut self, filter: Arc<dyn CpyRestoreFilter>) -> Self {
-        self.restore_filter = Some(filter);
+        self.restore_policy = RestorePolicy::Filter(filter);
         self
     }
 
     /// Sets the anti-resurrection restore filter dynamically.
     pub fn set_restore_filter(&mut self, filter: Arc<dyn CpyRestoreFilter>) {
-        self.restore_filter = Some(filter);
+        self.restore_policy = RestorePolicy::Filter(filter);
     }
 
     pub fn set_metrics_sink(&mut self, sink: Arc<dyn contextra_ports::MetricsSink>) {
@@ -780,20 +791,25 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         let last_tx = self.storage.last_tx_id().await?;
         let has_deletion_history = last_tx > meta.tx_id;
 
-        if has_deletion_history && self.restore_filter.is_none() {
-            return Err(ContextraError::Transaction(format!(
-                "Fail-closed restore barrier: Cannot restore checkpoint '{}' (TxId {}) without a CpyRestoreFilter when subsequent transactions exist (last TxId {}). Anti-resurrection filter is required.",
-                name,
-                meta.tx_id.inner(),
-                last_tx.inner()
-            )));
+        match &self.restore_policy {
+            RestorePolicy::ForbidAfterErasure => {
+                if has_deletion_history {
+                    return Err(ContextraError::Transaction(format!(
+                        "Fail-closed restore barrier: Cannot restore checkpoint '{}' (TxId {}) with RestorePolicy::ForbidAfterErasure when subsequent transactions exist (last TxId {}). Anti-resurrection filter is required.",
+                        name,
+                        meta.tx_id.inner(),
+                        last_tx.inner()
+                    )));
+                }
+            }
+            RestorePolicy::Filter(_) => {}
         }
 
         // 1. Rollback storage state
         self.storage.rollback_to_tx(meta.tx_id).await?;
 
         // 2. Anti-Resurrection filter application (if filter present)
-        if let Some(ref filter) = self.restore_filter {
+        if let RestorePolicy::Filter(ref filter) = self.restore_policy {
             let all_entries = self
                 .storage
                 .scan(std::ops::Bound::Unbounded, std::ops::Bound::Unbounded, None)

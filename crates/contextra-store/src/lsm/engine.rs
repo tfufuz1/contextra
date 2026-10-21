@@ -343,21 +343,25 @@ impl LsmStorage {
     // mit `#[cfg(any(test, feature = "test-utils"))]` abgesichert werden, damit sie nicht versehentlich
     // im Standard-Produktions-Build exponiert werden.
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn compaction_engine_for_test(&self) -> Arc<CompactionEngine> {
         Arc::clone(&self.compaction_engine)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn sstables_for_test(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
         Arc::clone(&self.sstables)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn block_cache_for_test(&self) -> Arc<BlockCache> {
         Arc::clone(&self.block_cache)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn budget_for_test(&self) -> Arc<ResourceTracker> {
         Arc::clone(&self.budget)
     }
@@ -369,6 +373,7 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub async fn maybe_compact_for_test(&self) -> Result<bool> {
         self.compaction_engine
             .maybe_compact(&self.sstables, &self.config.path)

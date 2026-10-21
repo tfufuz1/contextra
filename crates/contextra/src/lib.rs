@@ -9,6 +9,7 @@ pub mod builder;
 pub mod collection_profile;
 pub mod performance_profile;
 pub mod query_rewriter;
+pub use builder::wiring_selftest;
 
 #[cfg(feature = "compliance")]
 pub mod compliance;
@@ -20,15 +21,15 @@ pub use compliance::*;
 pub use contextra_core::error::ContextraError;
 pub use contextra_core::types::domain::{DocId, ScoredDocument};
 pub use contextra_core::DistanceMetric;
-pub use contextra_db::{
-    chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
-    Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
-    EncryptionConfig, KekSource, SearchResult, TextEmbeddingEngine,
-};
 pub use contextra_db::engine;
 pub use contextra_db::engine::{
     deletion::{ForgetOptions, PurgeMode},
     ForgetReceipt, LayerStatus,
+};
+pub use contextra_db::{
+    chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
+    Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
+    EncryptionConfig, KekSource, SearchResult, TextEmbeddingEngine,
 };
 pub use query_rewriter::LlmQueryRewriter;
 

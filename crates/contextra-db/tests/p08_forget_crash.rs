@@ -164,7 +164,7 @@ async fn run_child_workload(_target_marker: &str, db_path_str: &str) {
         emit_marker("MARKER_5_AFTER_PROOF_GENERATION");
     }
 
-    let _ = db.close().await;
+    db.close().await.expect("close child db");
 }
 
 fn emit_marker(marker: &str) {

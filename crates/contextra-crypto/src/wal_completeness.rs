@@ -44,6 +44,37 @@ pub fn verify_wal_chain_completeness(
     }
 }
 
+/// Helper structure representing segment metadata collected during replay for chain validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WalSegmentSummary {
+    /// Segment sequence number.
+    pub segment_seq: u64,
+    /// First entry's prev_hmac (or header's prev_segment_hmac).
+    pub first_prev_hmac: [u8; 32],
+    /// Last entry's HMAC in the segment.
+    pub last_hmac: [u8; 32],
+    /// Indicates whether any entry in this segment matches the target Checkpoint HWM.
+    pub contains_hwm: bool,
+}
+
+/// Verifies segment continuity (I-WAL-1) across consecutive WAL segments.
+pub fn verify_segment_chain_continuity(
+    segments: &[WalSegmentSummary],
+) -> Result<(), CryptoError> {
+    for window in segments.windows(2) {
+        let prev = &window[0];
+        let curr = &window[1];
+        if curr.segment_seq != prev.segment_seq + 1 {
+            return Err(CryptoError::WalTruncationDetected);
+        }
+        let matches: bool = curr.first_prev_hmac.ct_eq(&prev.last_hmac).into();
+        if !matches {
+            return Err(CryptoError::WalTruncationDetected);
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -258,16 +258,16 @@ async fn run_child_crash_workload(db_path_str: &str) {
 
     println!("CRASH_MARKER:STARTING_DELETE_OPERATION");
     use std::io::Write;
-    let _ = std::io::stdout().flush();
+    std::io::stdout().flush().expect("flush stdout");
 
     if let Ok(db) = Contextra::open_with_config(&db_path, config).await {
         println!("CRASH_MARKER:ABORTING_PROCESS_MID_DELETE");
-        let _ = std::io::stdout().flush();
+        std::io::stdout().flush().expect("flush stdout");
 
         let _ = db
             .drop_collection("person_a_col", tenant_a, proof_key)
             .await;
-        let _ = db.flush().await;
+        db.flush().await.expect("flush db");
     }
 }
 

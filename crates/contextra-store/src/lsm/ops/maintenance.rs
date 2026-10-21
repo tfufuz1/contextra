@@ -49,5 +49,5 @@ pub(super) async fn last_seq_no(storage: &LsmStorage) -> Result<u64> {
 }
 
 pub(super) async fn last_tx_id(storage: &LsmStorage) -> Result<TxId> {
-    Ok(TxId::new(storage.last_committed_tx.load(Ordering::SeqCst)))
+    TxId::try_new(storage.last_committed_tx.load(Ordering::SeqCst))
 }

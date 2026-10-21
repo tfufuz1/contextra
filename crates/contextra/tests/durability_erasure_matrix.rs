@@ -3,9 +3,9 @@
 // INVARIANTEN: All 9 matrix cases must be explicitly tested.
 
 use contextra::builder::ContextraBuilder;
-use contextra_types::error::ContextraError;
 use contextra_ports::erasure::ErasureMode;
 use contextra_store::lsm::DurabilityMode;
+use contextra_types::error::ContextraError;
 use tempfile::TempDir;
 
 #[tokio::test]
@@ -35,11 +35,20 @@ async fn test_durability_erasure_matrix_all_9_cases() -> Result<(), Box<dyn std:
         .build()
         .await;
     if cfg!(feature = "erasure") {
-        assert!(db2.is_ok(), "Full x Assured must succeed with erasure feature");
+        assert!(
+            db2.is_ok(),
+            "Full x Assured must succeed with erasure feature"
+        );
     } else {
-        assert!(db2.is_err(), "Full x Assured must fail when erasure feature is missing");
+        assert!(
+            db2.is_err(),
+            "Full x Assured must fail when erasure feature is missing"
+        );
         if let Err(ContextraError::PolicyViolation(msg)) = db2 {
-            assert!(msg.contains("erasure"), "Error must mention erasure feature");
+            assert!(
+                msg.contains("erasure"),
+                "Error must mention erasure feature"
+            );
         }
     }
 
@@ -54,9 +63,15 @@ async fn test_durability_erasure_matrix_all_9_cases() -> Result<(), Box<dyn std:
         .build()
         .await;
     if cfg!(feature = "erasure") {
-        assert!(db3.is_ok(), "Full x Attested must succeed with erasure feature");
+        assert!(
+            db3.is_ok(),
+            "Full x Attested must succeed with erasure feature"
+        );
     } else {
-        assert!(db3.is_err(), "Full x Attested must fail when erasure feature is missing");
+        assert!(
+            db3.is_err(),
+            "Full x Attested must fail when erasure feature is missing"
+        );
     }
 
     // 4. (WalNoHmac, Off) => OK
@@ -84,7 +99,10 @@ async fn test_durability_erasure_matrix_all_9_cases() -> Result<(), Box<dyn std:
     if cfg!(feature = "erasure") {
         assert!(db5.is_ok(), "WalNoHmac x Assured must succeed with warning");
     } else {
-        assert!(db5.is_err(), "WalNoHmac x Assured must fail when erasure feature is missing");
+        assert!(
+            db5.is_err(),
+            "WalNoHmac x Assured must fail when erasure feature is missing"
+        );
     }
 
     // 6. (WalNoHmac, Attested) => Forbidden (INV-DURABILITY-RING)
@@ -101,7 +119,9 @@ async fn test_durability_erasure_matrix_all_9_cases() -> Result<(), Box<dyn std:
     if let Err(err) = db6 {
         let msg = err.to_string();
         assert!(
-            msg.contains("INV-DURABILITY-RING") || msg.contains("Incompatible") || msg.contains("erasure"),
+            msg.contains("INV-DURABILITY-RING")
+                || msg.contains("Incompatible")
+                || msg.contains("erasure"),
             "Expected INV-DURABILITY-RING error, got: {msg}"
         );
     }
@@ -132,7 +152,9 @@ async fn test_durability_erasure_matrix_all_9_cases() -> Result<(), Box<dyn std:
     if let Err(err) = db8 {
         let msg = err.to_string();
         assert!(
-            msg.contains("INV-DURABILITY-RING") || msg.contains("Incompatible") || msg.contains("erasure"),
+            msg.contains("INV-DURABILITY-RING")
+                || msg.contains("Incompatible")
+                || msg.contains("erasure"),
             "Expected INV-DURABILITY-RING error, got: {msg}"
         );
     }
@@ -151,7 +173,9 @@ async fn test_durability_erasure_matrix_all_9_cases() -> Result<(), Box<dyn std:
     if let Err(err) = db9 {
         let msg = err.to_string();
         assert!(
-            msg.contains("INV-DURABILITY-RING") || msg.contains("Incompatible") || msg.contains("erasure"),
+            msg.contains("INV-DURABILITY-RING")
+                || msg.contains("Incompatible")
+                || msg.contains("erasure"),
             "Expected INV-DURABILITY-RING error, got: {msg}"
         );
     }

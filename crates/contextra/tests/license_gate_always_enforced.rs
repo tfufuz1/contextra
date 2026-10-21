@@ -2,10 +2,10 @@
 
 use contextra::builder::ContextraBuilder;
 use contextra::performance_profile::{PerformanceProfile, VectorDeleteMode};
-use contextra_types::error::ContextraError;
 use contextra_license::SignedLicenseGate;
 use contextra_ports::license::FeatureRing;
 use contextra_store::lsm::config::DurabilityMode;
+use contextra_types::error::ContextraError;
 
 #[tokio::test]
 async fn open_without_gate_never_grants_sovereign() {
@@ -20,7 +20,10 @@ async fn open_without_gate_never_grants_sovereign() {
     let _ = std::fs::remove_dir_all(&tmp_path);
 
     let db = contextra::open(&tmp_path).await.unwrap();
-    assert_eq!(db.config().erasure_mode, contextra_ports::erasure::ErasureMode::Off);
+    assert_eq!(
+        db.config().erasure_mode,
+        contextra_ports::erasure::ErasureMode::Off
+    );
 
     let _ = std::fs::remove_dir_all(&tmp_path);
 }
@@ -84,7 +87,10 @@ async fn compliance_profile_with_valid_integrity_license_activates_deletion_proo
         .await
         .expect("Build should succeed with valid integrity license");
 
-    assert_ne!(db.config().erasure_mode, contextra_ports::erasure::ErasureMode::Off);
+    assert_ne!(
+        db.config().erasure_mode,
+        contextra_ports::erasure::ErasureMode::Off
+    );
     assert_eq!(db.config().durability_mode, DurabilityMode::Full);
     assert_eq!(
         db.config().vector_delete_mode,
