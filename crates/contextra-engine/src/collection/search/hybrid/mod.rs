@@ -3,7 +3,7 @@
 
 mod query;
 
-pub use query::{HYBRID_PIPELINE_STAGES, HybridPipelineStage};
+pub use query::{HybridPipelineStage, HYBRID_PIPELINE_STAGES};
 
 use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{extract_effective_importance, Collection};
@@ -33,7 +33,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Legacy wrapper for hybrid search with reranking.
     /// Scheduled for removal in v0.2.0. Use `Collection::query().reranker()` instead.
-    #[deprecated(since = "0.1.0", note = "Use Collection::query().reranker() instead. Scheduled for removal in v0.2.0.")]
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use Collection::query().reranker() instead. Scheduled for removal in v0.2.0."
+    )]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, text, vector, reranker, anchor_entities))]
     pub async fn hybrid_search_reranked(
@@ -151,13 +154,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             let vector_results = if is_vector_zero {
                 Vec::new()
             } else {
-                self.search_filtered_at(
-                    vector,
-                    k.saturating_mul(Self::OVERFETCH_FACTOR),
-                    None,
-                    seq,
-                )
-                .await?
+                self.search_filtered_at(vector, k.saturating_mul(Self::OVERFETCH_FACTOR), None, seq)
+                    .await?
             };
 
             // 2. Text Signal (Candidate overfetching for RRF fusion)
@@ -184,7 +182,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             let (vw, tw, _gw) = crate::fusion::weights_to_signal_factors(weights);
 
-            let target_community_id: Option<u64> = if let Some(same_comm_entity) = same_community_as {
+            let target_community_id: Option<u64> = if let Some(same_comm_entity) = same_community_as
+            {
                 self.get_community(same_comm_entity).await?
             } else {
                 None

@@ -220,6 +220,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
         validate_embedding(embedding)?;
 
+        self.check_write_allowed()?;
         let db_tx = self.begin_transaction()?;
 
         match self.insert_op(&db_tx, id, embedding, metadata).await {
@@ -382,6 +383,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
+        self.check_write_allowed()?;
         let _guards = self
             .lock_keys_sorted(docs.iter().map(|(id, _, _)| id.as_str()))
             .await;
@@ -456,6 +458,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
+        self.check_write_allowed()?;
         let _guard = self.kv_locks.lock_for(id).await;
         let db_tx = self.begin_transaction()?;
         let result = self.update_op(&db_tx, id, embedding, metadata).await;
@@ -504,6 +507,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         self.apply_insert_backpressure().await;
+        self.check_write_allowed()?;
         let _guards = self
             .lock_keys_sorted(docs.iter().map(|(id, _, _)| id.as_str()))
             .await;

@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     pub(super) fn trigger_kv_store_rollback(&self, doc_ids: &[DocId]) -> Result<()> {
-        if let Some(kv_store) = self.collection.kv_store() {
+        if let Ok(kv_store) = self.collection.kv_store() {
             let chunk_ids: Vec<u64> = doc_ids
                 .iter()
                 .map(|d| Ok(d.inner()))
