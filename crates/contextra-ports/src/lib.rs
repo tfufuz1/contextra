@@ -61,6 +61,8 @@ pub mod merge_operator;
 pub mod metrics;
 /// Observability and lifecycle re-exports.
 pub mod observability;
+/// OS entropy source backed by getrandom.
+pub mod os_entropy;
 /// Plugin registry and dependency resolution.
 pub mod plugin;
 /// QueryRewriter port trait for multi-step retrieval sub-query generation.
@@ -69,16 +71,16 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
-/// Secret bytes port abstractions for secure key and seed handling.
+/// Secret byte container type with zeroization.
 pub mod secret;
 /// Read snapshot and snapshot reader port traits (§7.2).
 pub mod snapshot;
 /// Key-value storage engine traits.
 pub mod storage;
-/// Time port traits (§7.4).
-pub mod time;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
 pub mod text_index;
+/// Time port traits (§7.4).
+pub mod time;
 /// Vector retrieval and HNSW indexing traits.
 pub mod vector_index;
 /// Composition Root wiring module.
@@ -99,6 +101,7 @@ pub use lifecycle::*;
 pub use merge_operator::*;
 pub use metrics::*;
 pub use observability::*;
+pub use os_entropy::*;
 pub use plugin::*;
 pub use query_rewriter::*;
 pub use reranker::*;

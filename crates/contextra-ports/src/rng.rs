@@ -12,18 +12,16 @@
 
 use std::sync::Arc;
 
-/// Marker trait for cryptographically secure random number generators (CSPRNG).
-///
-/// MUST NOT be implemented by deterministic or non-cryptographic PRNGs (e.g. [`SystemRng`], [`SeededRng`]).
-/// Security-critical paths like cryptographic key generation must statically require [`CryptoRng`].
-///
-/// ```compile_fail
-/// use contextra_ports::{CryptoRng, SystemRng};
-/// fn require_csprng<R: CryptoRng>(_: &R) {}
-/// let sys_rng = SystemRng::new();
-/// require_csprng(&sys_rng);
-/// ```
-pub trait CryptoRng: Send + Sync + 'static {}
+/// Error type returned by entropy sources when requested operations fail or are unsupported.
+#[derive(Debug, thiserror::Error)]
+pub enum RngError {
+    /// The entropy source is unavailable or encountered an OS/hardware error.
+    #[error("entropy source unavailable: {0}")]
+    Unavailable(String),
+    /// The source is not a cryptographic entropy source capable of generating secret material.
+    #[error("source is not a cryptographic entropy source")]
+    SecretUnsupported,
+}
 
 /// Standard non-cryptographic system entropy generator backed by system/process entropy.
 ///
@@ -53,13 +51,12 @@ impl SystemRng {
     }
 }
 
-impl SeededRng for SystemRng {
-    fn next_u64(&self) -> u64 {
-        use std::collections::hash_map::RandomState;
-        use std::hash::{BuildHasher, Hasher};
-        RandomState::new().build_hasher().finish()
-    }
-
+/// DEPRECATION NOTICE: This implementation of [`EntropyRng`] for [`SystemRng`] uses non-CSPRNG
+/// process entropy (`std::collections::hash_map::RandomState`) and WILL BE REMOVED in Session W3-01.
+///
+/// It does NOT override [`EntropyRng::fill_secret`] (returning [`RngError::SecretUnsupported`]).
+/// Migration path: Use `OsEntropyRng` for cryptographic material generation.
+impl EntropyRng for SystemRng {
     fn fill_bytes(&self, dest: &mut [u8]) {
         use std::collections::hash_map::RandomState;
         use std::hash::{BuildHasher, Hasher};
@@ -88,6 +85,13 @@ pub trait EntropyRng: Send + Sync + 'static {
 
     /// Generates the next pseudorandom 64-bit unsigned integer from secure entropy.
     fn next_u64(&self) -> u64;
+
+    /// NORMATIV: Nur Quellen aus Betriebssystem oder KMS überschreiben diese Methode.
+    /// Fehler werden propagiert, nie durch Nullbytes ersetzt. Default = Err(SecretUnsupported).
+    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
+        let _ = dest;
+        Err(RngError::SecretUnsupported)
+    }
 }
 
 /// Port trait for non-cryptographic, deterministic, or test random number generators.
@@ -120,6 +124,10 @@ impl<T: EntropyRng + ?Sized> EntropyRng for Arc<T> {
 
     fn next_u64(&self) -> u64 {
         (**self).next_u64()
+    }
+
+    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
+        (**self).fill_secret(dest)
     }
 }
 

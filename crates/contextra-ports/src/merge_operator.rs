@@ -14,4 +14,3 @@ pub trait MergeOperator: Send + Sync {
         operands: &[&[u8]],
     ) -> Result<Vec<u8>>;
 }
-

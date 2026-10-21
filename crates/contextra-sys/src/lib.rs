@@ -21,8 +21,8 @@ pub use wiring::SysWiring;
 
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
 pub use aligned::{AlignedBuf, ALIGNMENT};
-pub use crypto_rng::OsCryptoRng;
-pub use determinism::{SeededRng, SystemClock, SystemIdGen, SystemRng};
+#[allow(deprecated)]
+pub use determinism::{SeededRng, SplitMix64, SystemClock, SystemIdGen, SystemRng};
 pub use durability::{
     flush_dir, flush_file, fs_class, rename_durable, FlushKind, FsClass, OsSyscallBackend,
     SyscallBackend,

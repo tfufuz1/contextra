@@ -1,75 +1,45 @@
-//! Secret bytes port abstractions for secure key and seed handling.
+//! Cryptographic secret byte container with automatic zeroization and type-level protections.
 
-use std::fmt;
-use zeroize::Zeroize;
+use crate::rng::{EntropyRng, RngError};
+use zeroize::Zeroizing;
 
-/// Stack-allocated fixed-size secret byte buffer that is zeroized upon drop.
+/// Fixed-size container for sensitive cryptographic bytes (keys, salts, seeds).
 ///
-/// Ensures cryptographic material is safely scrubbed from RAM when dropped,
-/// and prevents accidental exposure via [`fmt::Debug`] or [`fmt::Display`].
-pub struct SecretBytes<const N: usize> {
-    inner: [u8; N],
-}
+/// Ensures memory zeroization upon drop, redacts `Debug` formatting, and forbids `Clone` or `Copy`.
+pub struct SecretBytes<const N: usize>(Zeroizing<[u8; N]>);
 
 impl<const N: usize> SecretBytes<N> {
-    /// Constructs a new [`SecretBytes`] wrapping `bytes`.
-    pub fn new(bytes: [u8; N]) -> Self {
-        Self { inner: bytes }
+    /// Generates new secret bytes using the given cryptographic entropy source.
+    ///
+    /// Calls `rng.fill_secret(&mut buf)` exclusively to ensure non-CSPRNG sources are rejected.
+    pub fn generate(rng: &dyn EntropyRng) -> Result<Self, RngError> {
+        let mut buf = [0u8; N];
+        rng.fill_secret(&mut buf)?;
+        Ok(Self(Zeroizing::new(buf)))
     }
 
-    /// Exposes a read-only reference to the underlying secret array.
-    pub fn expose_secret(&self) -> &[u8; N] {
-        &self.inner
+    /// Exposes a reference to the underlying secret bytes array.
+    pub fn expose(&self) -> &[u8; N] {
+        &self.0
     }
 
-    /// Exposes a read-only slice to the underlying secret bytes.
-    pub fn as_slice(&self) -> &[u8] {
-        &self.inner
-    }
-
-    /// Explicitly zeroizes the secret byte array in memory.
-    pub fn zeroize(&mut self) {
-        self.inner.zeroize();
-    }
-}
-
-impl<const N: usize> Drop for SecretBytes<N> {
-    fn drop(&mut self) {
-        self.inner.zeroize();
-    }
-}
-
-impl<const N: usize> fmt::Debug for SecretBytes<N> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "SecretBytes([REDACTED])")
+    /// Constant-time equality check between two `SecretBytes` instances.
+    pub fn ct_eq(&self, other: &Self) -> bool {
+        let a = self.expose().as_slice();
+        let b = other.expose().as_slice();
+        if a.len() != b.len() {
+            return false;
+        }
+        let mut res = 0u8;
+        for (x, y) in a.iter().zip(b.iter()) {
+            res |= x ^ y;
+        }
+        res == 0
     }
 }
 
-impl<const N: usize> fmt::Display for SecretBytes<N> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[REDACTED]")
-    }
-}
-
-impl<const N: usize> Zeroize for SecretBytes<N> {
-    fn zeroize(&mut self) {
-        self.inner.zeroize();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_secret_bytes_redaction_and_zeroize() {
-        let mut secret = SecretBytes::new([0xAA; 32]);
-        assert_eq!(secret.expose_secret(), &[0xAA; 32]);
-        assert_eq!(secret.as_slice(), &[0xAA; 32]);
-        assert_eq!(format!("{:?}", secret), "SecretBytes([REDACTED])");
-        assert_eq!(format!("{}", secret), "[REDACTED]");
-
-        secret.zeroize();
-        assert_eq!(secret.expose_secret(), &[0; 32]);
+impl<const N: usize> std::fmt::Debug for SecretBytes<N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SecretBytes<{}>((redacted))", N)
     }
 }
