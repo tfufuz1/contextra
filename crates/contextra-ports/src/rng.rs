@@ -24,8 +24,6 @@ pub enum RngError {
 }
 
 /// Standard non-cryptographic system entropy generator backed by system/process entropy.
-///
-/// NOTE: [`SystemRng`] does NOT implement [`CryptoRng`] or [`EntropyRng`] and MUST NOT be used for cryptographic key generation.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SystemRng;
 
@@ -37,12 +35,12 @@ impl SystemRng {
 
     /// Generates the next pseudorandom 64-bit unsigned integer.
     pub fn next_u64(&self) -> u64 {
-        SeededRng::next_u64(self)
+        EntropyRng::next_u64(self)
     }
 
     /// Fills `dest` with pseudorandom bytes.
     pub fn fill_bytes(&self, dest: &mut [u8]) {
-        SeededRng::fill_bytes(self, dest);
+        EntropyRng::fill_bytes(self, dest);
     }
 
     /// Returns a pseudorandom `f64` in `[0.0, 1.0)`.
@@ -70,8 +68,24 @@ impl EntropyRng for SystemRng {
         }
     }
 
+    fn next_u64(&self) -> u64 {
+        use std::collections::hash_map::RandomState;
+        use std::hash::{BuildHasher, Hasher};
+        RandomState::new().build_hasher().finish()
+    }
+}
+
+impl SeededRng for SystemRng {
+    fn next_u64(&self) -> u64 {
+        EntropyRng::next_u64(self)
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        EntropyRng::fill_bytes(self, dest);
+    }
+
     fn next_unit_f64(&self) -> f64 {
-        let mantissa = SeededRng::next_u64(self) >> 11;
+        let mantissa = EntropyRng::next_u64(self) >> 11;
         (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
     }
 }
@@ -114,8 +128,6 @@ pub trait SeededRng: Send + Sync + 'static {
 /// Deprecated per E55 / §7.4: `Rng` is ambiguous. Use [`EntropyRng`] or [`SeededRng`] explicitly.
 #[deprecated(since = "0.1.0", note = "Use SeededRng or EntropyRng per §7.4 / E55")]
 pub use SeededRng as Rng;
-
-impl<T: CryptoRng + ?Sized> CryptoRng for Arc<T> {}
 
 impl<T: EntropyRng + ?Sized> EntropyRng for Arc<T> {
     fn fill_bytes(&self, dest: &mut [u8]) {

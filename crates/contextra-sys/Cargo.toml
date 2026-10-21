@@ -30,3 +30,5 @@ ports = ["dep:contextra-ports"]
 [dependencies]
 memmap2 = { workspace = true }
 tracing = { workspace = true }
+rand = { workspace = true }
+contextra-ports = { workspace = true, optional = true }

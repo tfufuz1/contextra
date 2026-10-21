@@ -8,7 +8,7 @@
 
 use super::super::config::DurabilityMode;
 use super::super::engine::LsmStorage;
-use super::super::fence::InflightGuard;
+use super::super::fence::WriteTicket;
 use super::super::group_commit::{
     execute_group_commit_append, GroupCommitRequest, GroupCommitSharedState, PendingCommitQueue,
     WalQueueGuard,
@@ -300,6 +300,19 @@ fn prepare_tx_ops(
     Ok((wal_ops, mem_updates, first_seq))
 }
 
+/// Helper to collect key slices from an `IndexOp`.
+fn collect_op_keys<'a>(op: &'a IndexOp<(Vec<u8>, Vec<u8>)>, keys: &mut Vec<&'a [u8]>) {
+    match op {
+        IndexOp::Insert { data, .. } => keys.push(&data.0[..]),
+        IndexOp::Delete { data, .. } => {
+            if let Some((k, _)) = data {
+                keys.push(&k[..]);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Commits staged transaction operations to disk and memory.
 ///
 /// Observability Mandate (v17 Teil 11 & Teil 2.2):
@@ -364,40 +377,39 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         return Ok(());
     }
 
-    // N8: Enter write scope atomically via enter_write
-    let write_ticket = {
-        let keys_to_check: Vec<&[u8]> = ops
-            .iter()
-            .filter_map(|op| match op {
-                IndexOp::Insert { data, .. } => Some(&data.0[..]),
-                IndexOp::Delete { data, .. } => data.as_ref().map(|(k, _)| &k[..]),
-                _ => None,
-            })
-            .collect();
-
-        storage
-            .erasure_fence()
-            .enter_write(keys_to_check.iter().copied())
-            .map_err(|e| {
-                storage.cleanup_intent_locks_for_tx(tx_id);
-                ContextraError::Storage(format!("Commit rejected by erasure fence: {e}"))
-            })?
-    };
-
-    // 3. SSI ReadSet Validierung unter commit_mutex
-    if let Some(ref rs) = read_set {
-        if !rs.is_empty() {
-            if let Err(e) = storage.ssi_validator.validate(tx_id, rs) {
-                storage.cleanup_intent_locks_for_tx(tx_id);
-                return Err(e);
-            }
-        }
-    }
-
-    let wal = storage.wal.read().await.clone();
-
     // If group commit window is disabled (0 micros), perform immediate single commit
     if storage.config.group_commit_window_micros == 0 {
+        // N8: Enter write scope atomically via enter_write
+        let mut keys_to_check = Vec::with_capacity(ops.len());
+        for op in &ops {
+            collect_op_keys(op, &mut keys_to_check);
+        }
+
+        let write_ticket = match storage
+            .erasure_fence()
+            .enter_write(keys_to_check.iter().copied())
+        {
+            Ok(ticket) => ticket,
+            Err(e) => {
+                storage.cleanup_intent_locks_for_tx(tx_id);
+                return Err(ContextraError::Storage(format!(
+                    "Commit rejected by erasure fence: {e}"
+                )));
+            }
+        };
+
+        // 3. SSI ReadSet Validierung unter commit_mutex
+        if let Some(ref rs) = read_set {
+            if !rs.is_empty() {
+                if let Err(e) = storage.ssi_validator.validate(tx_id, rs) {
+                    storage.cleanup_intent_locks_for_tx(tx_id);
+                    return Err(e);
+                }
+            }
+        }
+
+        let wal = storage.wal.read().await.clone();
+
         let (wal_ops, mem_updates, first_seq) = match prepare_tx_ops(storage, tx_id, &ops) {
             Ok(res) => res,
             Err(e) => {
@@ -503,6 +515,18 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         storage.cleanup_intent_locks_for_tx(tx_id);
         return Ok(());
     }
+
+    // 3. SSI ReadSet Validierung unter commit_mutex
+    if let Some(ref rs) = read_set {
+        if !rs.is_empty() {
+            if let Err(e) = storage.ssi_validator.validate(tx_id, rs) {
+                storage.cleanup_intent_locks_for_tx(tx_id);
+                return Err(e);
+            }
+        }
+    }
+
+    let wal = storage.wal.read().await.clone();
 
     // --- PHASE 2b: Group Commit Coordination ---
     // LOCK ORDER 2: pending_commit_queue
@@ -717,61 +741,33 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             std::mem::take(&mut shared_guard.requests)
         };
 
-        // Window 1: Fence Check for Leader + Followers under commit_mutex
-        if storage.erasure_fence().is_active() {
-            for op in &leader_ops {
-                let key = match op {
-                    IndexOp::Insert { data, .. } => &data.0[..],
-                    IndexOp::Delete { data, .. } => {
-                        if let Some((k, _)) = data {
-                            &k[..]
-                        } else {
-                            continue;
-                        }
-                    }
-                    _ => continue,
-                };
-                if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
-                    let mut batch_txs = vec![leader_tx_id];
-                    batch_txs.extend(requests.iter().map(|r| r.tx_id));
-                    storage.cleanup_intent_locks_for_txs(&batch_txs);
-                    let err_msg = format!("Commit rejected by erasure fence: {e}");
-                    for r in requests {
-                        let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
-                    }
-                    return Err(ContextraError::Storage(err_msg));
-                }
-            }
-            for r in &requests {
-                for op in &r.ops {
-                    let key = match op {
-                        IndexOp::Insert { data, .. } => &data.0[..],
-                        IndexOp::Delete { data, .. } => {
-                            if let Some((k, _)) = data {
-                                &k[..]
-                            } else {
-                                continue;
-                            }
-                        }
-                        _ => continue,
-                    };
-                    if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
-                        let mut batch_txs = vec![leader_tx_id];
-                        batch_txs.extend(requests.iter().map(|r| r.tx_id));
-                        storage.cleanup_intent_locks_for_txs(&batch_txs);
-                        let err_msg = format!("Commit rejected by erasure fence: {e}");
-                        for req in requests {
-                            let _ = req
-                                .sender
-                                .send(Err(ContextraError::Storage(err_msg.clone())));
-                        }
-                        return Err(ContextraError::Storage(err_msg));
-                    }
-                }
+        // N8: Aggregiere alle Schlüssel von Leader & Followers und erwirbe das WriteTicket für den gesamten Batch.
+        let mut batch_keys = Vec::new();
+        for op in &leader_ops {
+            collect_op_keys(op, &mut batch_keys);
+        }
+        for req in &requests {
+            for op in &req.ops {
+                collect_op_keys(op, &mut batch_keys);
             }
         }
 
-        let _inflight_guard = InflightGuard::new(&storage.erasure_fence().gate);
+        let write_ticket: WriteTicket<'_> = match storage
+            .erasure_fence()
+            .enter_write(batch_keys.iter().copied())
+        {
+            Ok(ticket) => ticket,
+            Err(e) => {
+                let mut batch_txs = vec![leader_tx_id];
+                batch_txs.extend(requests.iter().map(|r| r.tx_id));
+                storage.cleanup_intent_locks_for_txs(&batch_txs);
+                let err_msg = format!("Group commit batch rejected by erasure fence: {e}");
+                for r in requests {
+                    let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
+                }
+                return Err(ContextraError::Storage(err_msg));
+            }
+        };
 
         let mut follower_prep = Vec::with_capacity(requests.len());
         for r in &requests {
@@ -803,6 +799,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 for r in requests {
                     let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
                 }
+                drop(write_ticket);
                 return Err(e);
             }
         };
@@ -865,6 +862,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                     tracing::warn!(follower_tx = ?r.tx_id, "Follower dropped receiver during group commit failure notification");
                 }
             }
+            drop(write_ticket);
             return Err(ContextraError::Storage(err_msg));
         }
 
@@ -881,7 +879,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             storage.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);
             storage.advance_visibility(req_tx_id);
         }
-        drop(_inflight_guard);
+        drop(write_ticket);
 
         let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
         if let Err(obs_err) = storage.notify_commit_observers(
