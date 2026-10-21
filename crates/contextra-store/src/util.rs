@@ -16,6 +16,7 @@ pub fn increment_wal_cleanup_failures() {
 }
 
 /// Returns the current count of failed WAL cleanup attempts.
+#[allow(dead_code)]
 pub fn wal_cleanup_failures_total() -> u64 {
     WAL_CLEANUP_FAILURES_TOTAL.load(Ordering::Relaxed)
 }
