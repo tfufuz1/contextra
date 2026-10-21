@@ -158,7 +158,10 @@ impl ProofIssuer {
 
             for _retry in 0..3 {
                 for probe in probes {
-                    if probe.current_generation(layer) == expected_gen {
+                    #[allow(deprecated)]
+                    if probe.current_generation(layer) == expected_gen
+                        || probe.try_current_generation(layer.clone()).unwrap_or(0) == expected_gen.0
+                    {
                         gen_match = true;
                         break;
                     }
@@ -313,6 +316,7 @@ impl ProofIssuer {
         }
 
         // Build ProofV4
+        #[allow(deprecated)]
         let mut builder = ProofBuilder::new(req.scope.clone(), &self.db_instance_id)
             .with_stage(req.stage)
             .with_storage_scope(&req.storage_scope)
