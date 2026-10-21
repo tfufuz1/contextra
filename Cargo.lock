@@ -717,6 +717,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "trybuild",
 ]
 
 [[package]]

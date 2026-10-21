@@ -28,7 +28,10 @@ futures-executor = "0.3"
 dirs = "6.0.0"
 
 [features]
-test-utils = []
+default = []
+checkpoint = []
+test-utils = ["testing"]
+testing = []
 
 [dev-dependencies]
 contextra-checkpoint = { path = ".", features = ["test-utils"] }
@@ -37,6 +40,7 @@ tempfile = { workspace = true }
 proptest = "1.4"
 criterion = { version = "0.5", features = ["async_tokio"] }
 contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
+trybuild = "1.0"
 
 [target.'cfg(loom)'.dependencies]
 
