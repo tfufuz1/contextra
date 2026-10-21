@@ -75,33 +75,6 @@ pub trait CryptoRng: Send + Sync + 'static {}
 /// DEPRECATION NOTICE: This implementation of [`EntropyRng`] for [`SystemRng`] uses non-CSPRNG
 /// process entropy (`std::collections::hash_map::RandomState`) and WILL BE REMOVED in Session W3-01.
 ///
-/// It does NOT override [`EntropyRng::fill_secret`] (returning [`RngError::SecretUnsupported`]).
-/// Migration path: Use `OsEntropyRng` for cryptographic material generation.
-impl EntropyRng for SystemRng {
-    fn fill_bytes(&self, dest: &mut [u8]) {
-        use std::collections::hash_map::RandomState;
-        use std::hash::{BuildHasher, Hasher};
-        let mut written = 0;
-        while written < dest.len() {
-            let val = RandomState::new().build_hasher().finish();
-            let bytes = val.to_le_bytes();
-            let chunk = (dest.len() - written).min(8);
-            dest[written..written + chunk].copy_from_slice(&bytes[..chunk]);
-            written += chunk;
-        }
-    }
-
-    fn next_u64(&self) -> u64 {
-        use std::collections::hash_map::RandomState;
-        use std::hash::{BuildHasher, Hasher};
-        RandomState::new().build_hasher().finish()
-    }
-}
-
-/// DEPRECATION NOTICE: This implementation of [`EntropyRng`] for [`SystemRng`] uses non-CSPRNG
-/// process entropy (`std::collections::hash_map::RandomState`) and WILL BE REMOVED in Session W3-01.
-///
-/// It does NOT override [`EntropyRng::fill_secret`] (returning [`RngError::SecretUnsupported`]).
 /// Migration path: Use `OsEntropyRng` for cryptographic material generation.
 impl EntropyRng for SystemRng {
     fn fill_bytes(&self, dest: &mut [u8]) {
