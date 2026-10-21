@@ -222,7 +222,8 @@ async fn test_merge_operator_deterministic_output() {
             &out_path1,
             min_seq,
             true,
-        , None)
+            None,
+        )
         .await
         .unwrap();
 
