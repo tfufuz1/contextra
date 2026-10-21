@@ -191,9 +191,7 @@ pub(super) async fn delete_many(
     storage
         .erasure_fence()
         .check_write_allowed_batch(keys.iter().map(|k| k.as_slice()))
-        .map_err(|e| {
-            ContextraError::Storage(format!("Delete rejected by erasure fence: {e}"))
-        })?;
+        .map_err(|e| ContextraError::Storage(format!("Delete rejected by erasure fence: {e}")))?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(
@@ -904,20 +902,39 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             return Err(ContextraError::Storage(err_msg));
         }
 
-        // TODO(WP-ST1 / PR-8 Schritte 1, 2 / S1): Phantom-Commit im Group-Commit Pfad:
-        // Auch hier wird `notify_commit_observers` vor dem Anwenden der Memtable-Updates aufgerufen
-        // und Fehler mit `?` propagiert. Die Benachrichtigung muss erst nach Anwendung aller Updates
-        // auf Memtable und Sichtbarkeit erfolgen, und Observer-Fehler dürfen den Commit nicht abbrechen.
-        let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
-        if let Err(obs_err) = storage.notify_commit_observers(
-            &leader_entries_for_observer,
-            leader_tx_id,
-            WriteOrigin::UserWrite,
-            is_durable,
-        ) {
-            tracing::warn!(leader_tx = ?leader_tx_id, error = %obs_err, "Leader commit observer notification error");
+        // Group Commit Sequence Invariant (Option A / D-14):
+        // 1. Append WAL
+        // 2. Apply Memtable
+        // 3. Visibility
+        // 4. Observer
+
+        let state = storage.state.read().await;
+
+        // Leader: Memtable Update & Visibility
+        storage.apply_mem_updates(&state.memtable, &leader_mem_updates, leader_tx_id);
+        storage.advance_visibility(leader_tx_id);
+
+        // Followers: Memtable Updates & Visibility
+        for (i, r) in requests.iter().enumerate() {
+            let follower_mem_updates = &follower_prep[i].1;
+            storage.apply_mem_updates(&state.memtable, follower_mem_updates, r.tx_id);
+            storage.advance_visibility(r.tx_id);
         }
 
+        // Leader: Observer Notification
+        let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
+        if storage.has_observers() && !leader_entries_for_observer.is_empty() {
+            if let Err(obs_err) = storage.notify_commit_observers(
+                &leader_entries_for_observer,
+                leader_tx_id,
+                WriteOrigin::UserWrite,
+                is_durable,
+            ) {
+                tracing::warn!(leader_tx = ?leader_tx_id, error = %obs_err, "Leader commit observer notification error");
+            }
+        }
+
+        // Followers: Observer Notifications
         let mut current_idx = leader_entries_count;
         for (i, r) in requests.iter().enumerate() {
             let follower_mem_updates = &follower_prep[i].1;
