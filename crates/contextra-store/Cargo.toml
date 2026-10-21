@@ -28,6 +28,8 @@ wal-integrity = []
 wal-v4-wip = []
 memory-only-storage = []
 fault-injection = []
+# Enables WAL and purge orchestrator failpoint triggers for crash consistency fault injection testing.
+failpoints = ["fault-injection"]
 block-cache-v2 = ["dep:quick_cache"]
 docid-128 = ["contextra-types/docid-128"]
 legacy-wal-key = []
