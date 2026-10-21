@@ -12,7 +12,6 @@ use contextra_crypto::deletion_proof::proof_store::ProofStoreWarning;
 use contextra_crypto::deletion_proof::signer::{ProofKeyPairSigner, ProofSigner};
 use contextra_crypto::deletion_proof::types::{DeletionScope, ExcludedScope};
 use contextra_crypto::deletion_witness::LayerWitness;
-use contextra_ports::Rng;
 use contextra_types::{ContextraError, Result, TxId};
 use tracing::error;
 use zeroize::Zeroizing;
@@ -77,12 +76,15 @@ impl ProofSignerSource for FileOrCsprngSignerSource {
                 })?;
             }
 
-            // TODO(WP-S1 / PR-3 Schritt 4 / F-01): `SystemRng` durch echten CSPRNG (`CryptoRng` / `OsCryptoRng`) ersetzen!
-            // Befund F-01: `SystemRng` ist ein deterministischer SplitMix64-Generator und KEIN kryptographischer PRNG.
-            // Die Generierung von Ed25519-Schlüsseln aus schwachen Entropiequellen bricht alle Lösch- und Nachweisgarantien.
-            let rng = contextra_ports::SystemRng::new();
+            // SEC-1 / F-01: Seed-Erzeugung verwendet den echten OS-CSPRNG (`OsCryptoRng`),
+            // um fälschbare Löschnachweise durch schwache SplitMix64-Entropie auszuschließen.
+            let rng = contextra_sys::OsCryptoRng::new();
             let mut secret = [0u8; 32];
-            rng.fill_bytes(&mut secret);
+            rng.try_fill_bytes(&mut secret).map_err(|e| {
+                ContextraError::Crypto(format!(
+                    "Failed to generate CSPRNG seed for Ed25519 proof signer: {e}"
+                ))
+            })?;
 
             let keypair = ProofKeyPairSigner::from_secret_bytes(secret);
             keypair.save_to_file(&self.key_path).map_err(|e| {

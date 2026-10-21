@@ -11,6 +11,7 @@ pub mod env_observe;
 pub mod hardening;
 pub mod mlock;
 pub mod mmap;
+pub mod crypto_rng;
 pub mod posix;
 /// OS-based cryptographically secure random number generation (`OsCryptoRng`).
 pub mod crypto_rng;
