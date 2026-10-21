@@ -170,7 +170,8 @@ contextra-license = { path = "crates/contextra-license" }
 [workspace.lints.rust]
 unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)', 'cfg(feature, values("onnx", "failpoints"))'] }
+# TODO(WP-0b / PR-2 Schritt 1): `unexpected_cfgs = "deny"` mit vollständiger `check-cfg` Liste aktivieren
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)', 'cfg(feature, values("onnx"))'] }
 
 [workspace.lints.clippy]
 # TODO(WP-0b / PR-2 Schritt 3): `let_underscore_must_use = "warn"` Lint hinzufügen

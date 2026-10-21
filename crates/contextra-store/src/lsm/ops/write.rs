@@ -190,7 +190,9 @@ pub(super) async fn delete_many(
     storage
         .erasure_fence()
         .check_write_allowed_batch(keys.iter().map(|k| k.as_slice()))
-        .map_err(|e| ContextraError::Storage(format!("Delete rejected by erasure fence: {e}")))?;
+        .map_err(|e| {
+            ContextraError::Storage(format!("Delete rejected by erasure fence: {e}"))
+        })?;
     storage.apply_backpressure().await;
     if !storage.budget.has_memory_capacity() {
         return Err(ContextraError::Storage(
@@ -364,21 +366,28 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         return Ok(());
     }
 
-    // N8: Enter write scope atomically via enter_write
-    let write_ticket = {
-        let keys_to_check: Vec<&[u8]> = ops
-            .iter()
-            .filter_map(|op| match op {
-                IndexOp::Insert { data, .. } => Some(&data.0[..]),
-                IndexOp::Delete { data, .. } => data.as_ref().map(|(k, _)| &k[..]),
-                _ => None,
-            })
-            .collect();
-
-        storage
-            .erasure_fence()
-            .enter_write(keys_to_check.iter().copied())
-            .map_err(|e| {
+    // TODO(WP-6 / PR-9 Schritt 2 / N8): Check-then-Act Race beheben:
+    // Befund N8: `is_active()` Check vor `InflightGuard::new` erzeugt ein TOCTOU-Fenster,
+    // in dem eine Löschtransaktion ein Erasure-Fence aktivieren kann, nachdem dieser Check
+    // passiert wurde, aber bevor der Inflight-Guard aktiv ist.
+    // Implementierung:
+    // `is_active()` Check und manuelle Scope-Prüfung entfernen und durch atomares
+    // `storage.erasure_fence().enter_write(...)` ersetzen, das ein RAII `WriteTicket` liefert.
+    // Check erasure fence permissions for all staged operations prior to commit
+    if storage.erasure_fence().is_active() {
+        for op in &ops {
+            let key = match op {
+                IndexOp::Insert { data, .. } => &data.0[..],
+                IndexOp::Delete { data, .. } => {
+                    if let Some((k, _)) = data {
+                        &k[..]
+                    } else {
+                        continue;
+                    }
+                }
+                _ => continue,
+            };
+            if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
                 storage.cleanup_intent_locks_for_tx(tx_id);
                 ContextraError::Storage(format!("Commit rejected by erasure fence: {e}"))
             })?
@@ -401,7 +410,10 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         let (wal_ops, mem_updates, first_seq) = match prepare_tx_ops(storage, tx_id, &ops) {
             Ok(res) => res,
             Err(e) => {
-                // N8/WP-ST1: Sequence rollback deleted to prevent sequence number collisions.
+                // TODO(WP-ST1 / PR-8 Schritt 5): Seq-Rollback streichen!
+                // Das Zurücksetzen von `next_seq_no` auf `start_seq` führt bei konkurrierenden Schreibern
+                // zu doppelter Vergabe von Sequence Numbers und Datenkorruption.
+                storage.next_seq_no.store(start_seq, Ordering::SeqCst);
                 storage.cleanup_intent_locks_for_tx(tx_id);
                 return Err(e);
             }
@@ -410,6 +422,8 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         let (wal_entries, prev_hmac) = match wal.prepare_batch(wal_ops).await {
             Ok(res) => res,
             Err(e) => {
+                // TODO(WP-ST1 / PR-8 Schritt 5): Seq-Rollback streichen!
+                storage.next_seq_no.store(start_seq, Ordering::SeqCst);
                 if first_seq > 0 {
                     storage.ssi_validator.forget_from(first_seq);
                 }
@@ -429,6 +443,10 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         let append_handle = tokio::spawn(async move {
             match durability_mode {
                 DurabilityMode::Full | DurabilityMode::WalNoHmac => {
+                    // TODO(WP-ST3 / PR-27): Locks über I/O minimieren/optimieren:
+                    // `truncate_guard` wird über die gesamte Dauer des Datei-Appends und Fsyncs gehalten.
+                    // Prüfen, ob das Halten dieses Locks über asynchrone Disk-I/O hinweg durch feinkörnigere
+                    // atomare Offset-Reservierung entkoppelt werden kann.
                     let truncate_guard = wal.truncate_lock.lock().await;
                     let start_offset = wal.size();
                     let append_res = wal.append_batch_locked(wal_entries, &truncate_guard).await;
@@ -468,6 +486,8 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
         if let Err(e) = single_append_res {
             wal_for_rollback.rollback_hmac(prev_hmac).await;
+            // TODO(WP-ST1 / PR-8 Schritt 5): Seq-Rollback streichen!
+            storage.next_seq_no.store(start_seq, Ordering::SeqCst);
             if first_seq > 0 {
                 storage.ssi_validator.forget_from(first_seq);
             }
@@ -477,13 +497,14 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             )));
         }
 
-        // S1: Symmetrical commit order: WAL append -> Memtable apply -> Advance visibility -> Notify observers
-        // LOCK ORDER 4: state (read guard: sufficient because MemTable uses internal RwLock; state.write is only for flush swap)
-        let state = storage.state.read().await;
-        storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
-        storage.advance_visibility(tx_id);
-        drop(write_ticket);
-
+        // TODO(WP-ST1 / PR-8 Schritte 1, 2, 4 / S1): Phantom-Commit Bug beheben:
+        // Befund S1: `notify_commit_observers` wird VOR `apply_mem_updates` aufgerufen und Fehler
+        // werden mit `?` propagiert. Schlägt ein Observer fehl, bricht die Funktion ab, obwohl der WAL
+        // bereits erfolgreich geschrieben wurde. Die Daten sind im WAL persistent, aber nicht in Memtable/Visibility.
+        // Implementierung:
+        // 1. Schritt 1: `notify_commit_observers` MUSS NACH `apply_mem_updates` und `advance_visibility` ausgeführt werden.
+        // 2. Schritt 2: Observer-Fehler dürfen den Commit nicht abbrechen (kein `?`). Bei Fehlern: Zähler inkrementieren + asynchronen Catch-up.
+        // 3. Schritt 4: Commit-Phase (Append -> Apply -> Visibility) in einem ununterbrechbaren Task kapseln.
         let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
         if let Err(obs_err) = storage.notify_commit_observers(
             &entries_for_observer,
@@ -858,21 +879,10 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             return Err(ContextraError::Storage(err_msg));
         }
 
-        type MemUpdateBatch<'a> = (TxId, &'a [(Vec<u8>, Vec<u8>, u64)]);
-        let mut all_updates: Vec<MemUpdateBatch> = Vec::with_capacity(1 + requests.len());
-        all_updates.push((leader_tx_id, &leader_mem_updates));
-        for (i, r) in requests.iter().enumerate() {
-            all_updates.push((r.tx_id, &follower_prep[i].1));
-        }
-
-        // LOCK ORDER 4: state (read guard: symmetrical with single-commit, MemTable uses internal RwLock)
-        let state = storage.state.read().await;
-        for (req_tx_id, mem_updates) in all_updates {
-            storage.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);
-            storage.advance_visibility(req_tx_id);
-        }
-        drop(_write_ticket);
-
+        // TODO(WP-ST1 / PR-8 Schritte 1, 2 / S1): Phantom-Commit im Group-Commit Pfad:
+        // Auch hier wird `notify_commit_observers` vor dem Anwenden der Memtable-Updates aufgerufen
+        // und Fehler mit `?` propagiert. Die Benachrichtigung muss erst nach Anwendung aller Updates
+        // auf Memtable und Sichtbarkeit erfolgen, und Observer-Fehler dürfen den Commit nicht abbrechen.
         let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
         if let Err(obs_err) = storage.notify_commit_observers(
             &leader_entries_for_observer,

@@ -129,64 +129,11 @@ impl ErasureGate {
         }
     }
 
-    /// Enters write scope by incrementing inflight counter atomically (`SeqCst`),
-    /// checking active fence status (`SeqCst`), and validating keys against prefix fences.
-    ///
-    /// If fence is active and any key violates active prefixes, `dec_inflight()` is called
-    /// and `FenceError::CollectionDropping` is returned.
-    ///
-    /// Returns a RAII `WriteTicket` that automatically decrements the inflight counter on drop.
-    pub fn enter_write<'a, 'k, I>(&'a self, keys: I) -> Result<WriteTicket<'a>, FenceError>
-    where
-        I: IntoIterator<Item = &'k [u8]>,
-    {
-        self.inc_inflight();
-
-        if self.active.load(Ordering::SeqCst) {
-            let key_vec: Vec<&'k [u8]> = keys.into_iter().collect();
-            let mut blocked = false;
-
-            #[cfg(not(loom))]
-            {
-                // ORDERING: RCU pointer load via ArcSwap uses Acquire ordering internally.
-                let table = self.table.load();
-                'outer: for pf in table.iter() {
-                    for prefix in pf.prefixes() {
-                        for key in &key_vec {
-                            if prefix.is_empty() || key.starts_with(prefix) {
-                                blocked = true;
-                                break 'outer;
-                            }
-                        }
-                    }
-                }
-            }
-
-            #[cfg(loom)]
-            {
-                if let Ok(table) = self.table.read() {
-                    'outer: for pf in table.iter() {
-                        for prefix in pf.prefixes() {
-                            for key in &key_vec {
-                                if prefix.is_empty() || key.starts_with(prefix) {
-                                    blocked = true;
-                                    break 'outer;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if blocked {
-                self.dec_inflight();
-                return Err(FenceError::CollectionDropping);
-            }
-        }
-
-        Ok(WriteTicket { gate: self })
-    }
-
+    // TODO(WP-6 / PR-9 Schritt 1): `enter_write` mit RAII `WriteTicket` implementieren:
+    // Um Check-then-Act Races (Befund N8) im Schreiber zu verhindern, muss `enter_write` atomar:
+    // 1. `self.inc_inflight()` unter `SeqCst` ausführen.
+    // 2. Prüfen, ob `self.active` gesetzt ist (unter `SeqCst`). Falls ja, Keys gegen Präfix-Tabelle prüfen.
+    // 3. Ein RAII `WriteTicket` zurückgeben, das bei Drop automatisch `dec_inflight()` aufruft.
     /// Fast-path check: returns whether any scope fence is active.
     #[inline]
     pub fn is_active(&self) -> bool {
@@ -338,8 +285,12 @@ impl ErasureGate {
             }
         }
 
-        // ORDERING: SeqCst required for Dekker total ordering with Writer W1/W2.
-        self.active.store(true, Ordering::SeqCst);
+        // TODO(WP-6 / PR-9 Schritt 3 / N9): `Ordering::Release` -> `Ordering::SeqCst` im Dekker-Muster:
+        // Befund N9: `self.active.store(true, Ordering::Release)` reicht nicht aus, um CPU-Store-Buffer-Reordering
+        // gegen den anschließenden Load von `self.inflight` zu verhindern (klassisches Dekker-Muster).
+        // Beide Operationen müssen mit `Ordering::SeqCst` ausgeführt werden, damit Schreiber und
+        // Fence-Installer sich wechselseitig garantiert atomar wahrnehmen.
+        self.active.store(true, Ordering::Release);
 
         // Drain phase without lost wakeup or polling (Protocol B)
         let start = std::time::Instant::now();
