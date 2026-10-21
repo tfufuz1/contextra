@@ -12,8 +12,9 @@
 use bytes::Bytes;
 use contextra_wire::{
     adapter::WireBuffer, root_as_search_response, size_prefixed_root_as_search_response, Embedding,
-    EmbeddingArgs, ScoredDocument, ScoredDocumentArgs, SearchResponse, SearchResponseArgs,
-    VectorIndexUpdate, VectorIndexUpdateArgs,
+    EmbeddingArgs, HyperEdge, HyperEdgeArgs, HyperEdgeId, HyperEdgeIdArgs, RoleBinding,
+    RoleBindingArgs, RoleId, RoleIdArgs, ScoredDocument, ScoredDocumentArgs, SearchResponse,
+    SearchResponseArgs, VectorIndexUpdate, VectorIndexUpdateArgs,
 };
 use flatbuffers::FlatBufferBuilder;
 use std::sync::Arc;
@@ -276,6 +277,68 @@ fn test_concurrency_parallel_serialization() {
     for t in threads {
         t.join().expect("Thread panicked");
     }
+}
+
+#[test]
+fn test_default_accessors_without_panic() {
+    let mut builder = FlatBufferBuilder::new();
+
+    // 1. Embedding default metric
+    let emb_offset = Embedding::create(&mut builder, &EmbeddingArgs::default());
+    builder.finish_minimal(emb_offset);
+    let emb = flatbuffers::root::<Embedding>(builder.finished_data()).unwrap();
+    assert_eq!(emb.metric(), 0);
+
+    // 2. ScoredDocument default score
+    builder.reset();
+    let doc_offset = ScoredDocument::create(&mut builder, &ScoredDocumentArgs::default());
+    builder.finish_minimal(doc_offset);
+    let doc = flatbuffers::root::<ScoredDocument>(builder.finished_data()).unwrap();
+    assert_eq!(doc.score(), 0.0);
+
+    // 3. SearchResponse default total_hits & processing_time_ms
+    builder.reset();
+    let resp_offset = SearchResponse::create(&mut builder, &SearchResponseArgs::default());
+    builder.finish_minimal(resp_offset);
+    let resp = flatbuffers::root::<SearchResponse>(builder.finished_data()).unwrap();
+    assert_eq!(resp.total_hits(), 0);
+    assert_eq!(resp.processing_time_ms(), 0.0);
+
+    // 4. RoleId default id
+    builder.reset();
+    let role_id_offset = RoleId::create(&mut builder, &RoleIdArgs::default());
+    builder.finish_minimal(role_id_offset);
+    let role_id = flatbuffers::root::<RoleId>(builder.finished_data()).unwrap();
+    assert_eq!(role_id.id(), 0);
+
+    // 5. HyperEdgeId default id
+    builder.reset();
+    let hyper_edge_id_offset = HyperEdgeId::create(&mut builder, &HyperEdgeIdArgs::default());
+    builder.finish_minimal(hyper_edge_id_offset);
+    let hyper_edge_id = flatbuffers::root::<HyperEdgeId>(builder.finished_data()).unwrap();
+    assert_eq!(hyper_edge_id.id(), 0);
+
+    // 6. RoleBinding default role & entity
+    builder.reset();
+    let role_binding_offset = RoleBinding::create(&mut builder, &RoleBindingArgs::default());
+    builder.finish_minimal(role_binding_offset);
+    let role_binding = flatbuffers::root::<RoleBinding>(builder.finished_data()).unwrap();
+    assert_eq!(role_binding.role(), 0);
+    assert_eq!(role_binding.entity(), 0);
+
+    // 7. HyperEdge default scalar fields
+    builder.reset();
+    let hyper_edge_offset = HyperEdge::create(&mut builder, &HyperEdgeArgs::default());
+    builder.finish_minimal(hyper_edge_offset);
+    let hyper_edge = flatbuffers::root::<HyperEdge>(builder.finished_data()).unwrap();
+    assert_eq!(hyper_edge.id(), 0);
+    assert_eq!(hyper_edge.predicate(), 0);
+    assert_eq!(hyper_edge.weight(), 0.0);
+    assert_eq!(hyper_edge.tx_valid_from(), 0);
+    assert_eq!(hyper_edge.tx_valid_to(), 0);
+    assert_eq!(hyper_edge.business_valid_from(), 0);
+    assert_eq!(hyper_edge.business_valid_to(), 0);
+    assert_eq!(hyper_edge.source_doc_id(), 0);
 }
 
 #[test]

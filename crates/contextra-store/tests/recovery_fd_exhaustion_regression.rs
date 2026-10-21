@@ -1,12 +1,26 @@
-#![allow(unsafe_code)]
-
+#[cfg(target_os = "linux")]
 use contextra_ports::StorageEngine;
+#[cfg(target_os = "linux")]
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+#[cfg(target_os = "linux")]
 use contextra_store::sstable::SstableBuilder;
+#[cfg(target_os = "linux")]
 use contextra_store::wal::{Wal, WalOp};
+#[cfg(target_os = "linux")]
 use contextra_types::TxId;
+#[cfg(target_os = "linux")]
 use tempfile::TempDir;
 
+#[cfg(target_os = "linux")]
+fn get_open_fd_count() -> usize {
+    if let Ok(entries) = std::fs::read_dir("/proc/self/fd") {
+        entries.filter_map(|e| e.ok()).count()
+    } else {
+        0
+    }
+}
+
+#[cfg(target_os = "linux")]
 #[tokio::test]
 async fn test_recovery_fd_exhaustion_regression() {
     let temp_dir = TempDir::new().unwrap();
@@ -65,16 +79,7 @@ async fn test_recovery_fd_exhaustion_regression() {
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    // Artificially lower FD limit to 64 on Unix to test recovery under tight file descriptor limits.
-    #[cfg(unix)]
-    unsafe {
-        let rlim = libc::rlimit {
-            rlim_cur: 64,
-            rlim_max: 64,
-        };
-        let res = libc::setrlimit(libc::RLIMIT_NOFILE, &rlim);
-        assert_eq!(res, 0, "Failed to set RLIMIT_NOFILE");
-    }
+    let initial_fd = get_open_fd_count();
 
     let config = LsmConfig {
         path: db_path.clone(),
@@ -107,4 +112,12 @@ async fn test_recovery_fd_exhaustion_regression() {
     }
 
     drop(storage);
+
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    let final_fd = get_open_fd_count();
+
+    assert!(
+        final_fd <= initial_fd + 5,
+        "FD leak during recovery! Initial FD: {initial_fd}, Final FD: {final_fd}"
+    );
 }

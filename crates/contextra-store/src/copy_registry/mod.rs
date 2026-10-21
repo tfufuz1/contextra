@@ -21,91 +21,7 @@ pub fn file_id_for_name(name: &str) -> [u8; 16] {
     file_id
 }
 
-/// Kind of copy recorded in the registry.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CopyKind {
-    Hardlink = 1,
-    Reflink = 2,
-    FullCopy = 3,
-}
-
-/// An entry in the copy registry.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CopyRegEntry {
-    pub copy_id: [u8; 16],
-    pub kind: CopyKind,
-    pub file_ids: Vec<[u8; 16]>,
-    pub created_tx: u64,
-}
-
-impl CopyRegEntry {
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        buf.extend_from_slice(&self.copy_id);
-        let kind_u8 = match self.kind {
-            CopyKind::Hardlink => 1u8,
-            CopyKind::Reflink => 2u8,
-            CopyKind::FullCopy => 3u8,
-        };
-        buf.push(kind_u8);
-        #[allow(clippy::cast_possible_truncation)]
-        buf.extend_from_slice(&(self.file_ids.len() as u32).to_be_bytes());
-        for fid in &self.file_ids {
-            buf.extend_from_slice(fid);
-        }
-        buf.extend_from_slice(&self.created_tx.to_be_bytes());
-        Ok(buf)
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() < 16 + 1 + 4 + 8 {
-            return Err(ContextraError::Serialization(
-                "CopyRegEntry too short".into(),
-            ));
-        }
-
-        let mut copy_id = [0u8; 16];
-        copy_id.copy_from_slice(&bytes[0..16]);
-
-        let kind = match bytes[16] {
-            1 => CopyKind::Hardlink,
-            2 => CopyKind::Reflink,
-            3 => CopyKind::FullCopy,
-            k => {
-                return Err(ContextraError::Serialization(format!(
-                    "Unknown CopyKind {}",
-                    k
-                )))
-            }
-        };
-
-        let file_count = u32::from_be_bytes(bytes[17..21].try_into().unwrap_or([0; 4])) as usize;
-        let expected_len = 16 + 1 + 4 + (file_count * 16) + 8;
-        if bytes.len() < expected_len {
-            return Err(ContextraError::Serialization(
-                "CopyRegEntry truncated file_ids".into(),
-            ));
-        }
-
-        let mut offset = 21;
-        let mut file_ids = Vec::with_capacity(file_count);
-        for _ in 0..file_count {
-            let mut fid = [0u8; 16];
-            fid.copy_from_slice(&bytes[offset..offset + 16]);
-            file_ids.push(fid);
-            offset += 16;
-        }
-
-        let created_tx = u64::from_be_bytes(bytes[offset..offset + 8].try_into().unwrap_or([0; 8]));
-
-        Ok(Self {
-            copy_id,
-            kind,
-            file_ids,
-            created_tx,
-        })
-    }
-}
+pub use contextra_core::copy_registry::{CopyKind, CopyRegEntry};
 
 /// Persistent registry tracking physical/virtual snapshot file copies.
 pub struct CopyRegistry {
@@ -268,5 +184,30 @@ impl CopyRegistry {
 
         contextra_durable_fs::atomic_replace(&path, &buffer)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_id_for_name_bit_exactness() {
+        let name1 = "000001.sst";
+        let name2 = "manifest.json";
+
+        let id1 = file_id_for_name(name1);
+        let id2 = file_id_for_name(name2);
+
+        let expected1_hash = blake3::Hasher::new_derive_key("contextra/copy-file-id/v1")
+            .update(name1.as_bytes())
+            .finalize();
+        let mut expected1 = [0u8; 16];
+        expected1.copy_from_slice(&expected1_hash.as_bytes()[..16]);
+
+        assert_eq!(id1, expected1);
+        assert_ne!(id1, [0u8; 16]);
+        assert_ne!(id2, [0u8; 16]);
+        assert_ne!(id1, id2);
     }
 }

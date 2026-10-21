@@ -12,10 +12,9 @@ pub mod hardening;
 pub mod mlock;
 pub mod mmap;
 pub mod posix;
+/// OS-based cryptographically secure random number generation (`OsCryptoRng`).
+pub mod crypto_rng;
 pub mod rng;
-// TODO(WP-S1 / PR-3 Schritt 3): `crates/contextra-sys/src/crypto_rng.rs` implementieren (`pub mod crypto_rng;`).
-// Implementierung von `OsCryptoRng` unter Verwendung des OS-Entropie-Syscalls (z.B. via `getrandom`),
-// um echten kryptographischen Zufall in Ring 0 bereitzustellen und den `CryptoRng`-Trait zu erfüllen.
 pub mod vault;
 pub mod wiring;
 

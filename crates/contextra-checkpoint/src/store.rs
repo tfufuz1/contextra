@@ -10,7 +10,8 @@ use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeq
 use crate::restore_filter::{CpyRestoreFilter, RestorePolicy};
 use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::BoxFuture;
-use contextra_store::copy_registry::{CopyRegEntry, CopyRegistry};
+use contextra_core::copy_registry::CopyRegEntry;
+use contextra_store::copy_registry::CopyRegistry;
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
