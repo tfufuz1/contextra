@@ -3,8 +3,9 @@
 #![allow(unexpected_cfgs)]
 
 use contextra_ports::StorageEngine;
+use contextra_store::lsm::fence::{ErasureFence, FenceError};
 use contextra_store::lsm::{
-    CommittedBatch, ErasureFence, FenceError, LsmConfig, LsmStorage, WalObserver, WriteOrigin,
+    CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin,
 };
 use contextra_types::{ContextraError, TxId};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -72,12 +73,12 @@ async fn test_write_ticket_drop_on_panic_and_cancellation() {
     assert_eq!(fence.gate.inflight_count(), 0);
 
     // 2. Ticket drop on panic
-    let fence_clone = Arc::clone(&fence);
-    let panic_res = std::panic::catch_unwind(move || {
+    let fence_clone: Arc<ErasureFence> = Arc::clone(&fence);
+    let panic_res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
         let _ticket = fence_clone.enter_write([b"k1".as_slice()]).unwrap();
         assert_eq!(fence_clone.gate.inflight_count(), 1);
         panic!("Simulated panic inside write block");
-    });
+    }));
     assert!(panic_res.is_err());
     assert_eq!(fence.gate.inflight_count(), 0);
 }

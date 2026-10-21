@@ -332,18 +332,10 @@ mod tests {
         std::fs::write(&test_file, b"acl test")?;
 
         let res_set = set_restrictive_file_acl(&test_file);
-        assert!(
-            res_set.is_ok(),
-            "set_restrictive_file_acl failed: {:?}",
-            res_set
-        );
+        assert!(res_set.is_ok(), "set_restrictive_file_acl failed: {:?}", res_set);
 
         let res_verify = verify_file_acl_owner_only(&test_file);
-        assert!(
-            res_verify.is_ok(),
-            "verify_file_acl_owner_only failed: {:?}",
-            res_verify
-        );
+        assert!(res_verify.is_ok(), "verify_file_acl_owner_only failed: {:?}", res_verify);
 
         let _ = std::fs::remove_file(test_file);
         Ok(())

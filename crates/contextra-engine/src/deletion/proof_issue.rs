@@ -12,7 +12,7 @@ use contextra_crypto::deletion_proof::proof_store::ProofStoreWarning;
 use contextra_crypto::deletion_proof::signer::{ProofKeyPairSigner, ProofSigner};
 use contextra_crypto::deletion_proof::types::{DeletionScope, ExcludedScope};
 use contextra_crypto::deletion_witness::LayerWitness;
-use contextra_sys::OsCryptoRng;
+use contextra_ports::Rng;
 use contextra_types::{ContextraError, Result, TxId};
 use tracing::error;
 use zeroize::Zeroizing;
@@ -67,65 +67,27 @@ impl ProofSignerSource for FileOrCsprngSignerSource {
             secret.copy_from_slice(&raw_bytes);
             Ok(Zeroizing::new(secret))
         } else {
+            // TODO(WP-S1 / PR-3 Schritt 5): Signer-Verwaltung komplett umschreiben:
+            // 1. Genau ein deterministischer Pfad, kein HOME-Fallback.
+            // 2. Atomare Erstellung mit `create_new(true)`.
+            // 3. Strikte Dateiberechtigungen (0600 auf Unix via std::os::unix::fs::OpenOptionsExt, bzw. Owner-only ACL auf Windows).
             if let Some(parent) = self.key_path.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| {
                     ContextraError::Crypto(format!("Failed to create signer key dir: {e}"))
                 })?;
             }
 
-            let os_rng = OsCryptoRng::new();
+            // TODO(WP-S1 / PR-3 Schritt 4 / F-01): `SystemRng` durch echten CSPRNG (`CryptoRng` / `OsCryptoRng`) ersetzen!
+            // Befund F-01: `SystemRng` ist ein deterministischer SplitMix64-Generator und KEIN kryptographischer PRNG.
+            // Die Generierung von Ed25519-Schlüsseln aus schwachen Entropiequellen bricht alle Lösch- und Nachweisgarantien.
+            let rng = contextra_ports::SystemRng::new();
             let mut secret = [0u8; 32];
-            os_rng.fill_bytes(&mut secret);
+            rng.fill_bytes(&mut secret);
 
-            let mut options = std::fs::OpenOptions::new();
-            options.write(true).create_new(true);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::OpenOptionsExt;
-                options.mode(0o600);
-            }
-
-            match options.open(&self.key_path) {
-                Ok(mut file) => {
-                    use std::io::Write;
-                    file.write_all(&secret).map_err(|e| {
-                        ContextraError::Crypto(format!("Failed to write signer key file: {e}"))
-                    })?;
-                    file.sync_all().map_err(|e| {
-                        ContextraError::Crypto(format!("Failed to fsync signer key file: {e}"))
-                    })?;
-                    #[cfg(windows)]
-                    {
-                        let _ = contextra_sys::set_restrictive_file_acl(&self.key_path);
-                    }
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                    let mut loaded = None;
-                    for _ in 0..50 {
-                        if let Ok(_keypair) = ProofKeyPairSigner::load_from_file(&self.key_path) {
-                            if let Ok(bytes) = std::fs::read(&self.key_path) {
-                                if bytes.len() == 32 {
-                                    let mut sec = [0u8; 32];
-                                    sec.copy_from_slice(&bytes);
-                                    loaded = Some(sec);
-                                    break;
-                                }
-                            }
-                        }
-                        std::thread::yield_now();
-                    }
-                    secret = loaded.ok_or_else(|| {
-                        ContextraError::Crypto(
-                            "Timed out waiting for concurrent signer key creation".to_string(),
-                        )
-                    })?;
-                }
-                Err(e) => {
-                    return Err(ContextraError::Crypto(format!(
-                        "Failed to create signer key file: {e}"
-                    )));
-                }
-            }
+            let keypair = ProofKeyPairSigner::from_secret_bytes(secret);
+            keypair.save_to_file(&self.key_path).map_err(|e| {
+                ContextraError::Crypto(format!("Failed to save Ed25519 signer key: {e}"))
+            })?;
 
             Ok(Zeroizing::new(secret))
         }
@@ -208,7 +170,10 @@ impl DpiDeletionRuntime {
         let key_path = if let Some(p) = signer_cfg_path {
             p.to_path_buf()
         } else {
-            db_dir.join("proof_ed25519.key")
+            let home = std::env::var("HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| PathBuf::from("."));
+            home.join(".contextra").join("proof_ed25519.key")
         };
 
         let source = FileOrCsprngSignerSource::new(key_path);

@@ -186,7 +186,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         drop(sstables);
         drop(state);
 
-        // Delete ALL sealed WAL files whose data was flushed into SSTable (H4b)
+        // Delete sealed WAL files whose data was flushed into SSTable (S5: retain failed entries)
         {
             let mut pending_guard = storage.pending_sealed_wals.lock().await;
             let active_wal_path = {
@@ -195,8 +195,9 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             };
 
             let mut remaining_wals = Vec::new();
+            let to_process = std::mem::take(&mut *pending_guard);
 
-            for (wal_path, hmac) in pending_guard.drain(..) {
+            for (wal_path, hmac) in to_process {
                 if wal_path == active_wal_path {
                     remaining_wals.push((wal_path, hmac));
                     continue;
@@ -215,11 +216,10 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                 })
                 .await;
 
-                let mut successfully_deleted = false;
-
+                let mut succeeded = false;
                 match remove_res {
                     Ok(Ok(())) => {
-                        successfully_deleted = true;
+                        succeeded = true;
                         let uuid_sidecar =
                             std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
                         let sidecar = uuid_sidecar.clone();
@@ -227,47 +227,28 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                             contextra_durable_fs::durable_remove(&sidecar)
                         })
                         .await;
-                        match sidecar_res {
-                            Ok(Ok(())) => {}
-                            Ok(Err(e)) if e.kind() == std::io::ErrorKind::NotFound => {}
-                            Ok(Err(e)) => {
-                                crate::util::increment_wal_cleanup_failures();
-                                tracing::warn!(
-                                    "Could not delete WAL sidecar {:?}: {e}",
-                                    uuid_sidecar
-                                );
-                            }
-                            Err(e) => {
-                                crate::util::increment_wal_cleanup_failures();
-                                tracing::error!(
-                                    "Join error deleting WAL sidecar {:?}: {e}",
-                                    uuid_sidecar
-                                );
+                        if let Ok(Err(e)) = sidecar_res {
+                            if e.kind() != std::io::ErrorKind::NotFound {
+                                tracing::warn!("wal_cleanup_failures_total: Could not delete sidecar {:?}: {}", uuid_sidecar, e);
                             }
                         }
                     }
                     Ok(Err(e)) if e.kind() == std::io::ErrorKind::NotFound => {
-                        successfully_deleted = true;
+                        succeeded = true;
                     }
                     Ok(Err(e)) => {
-                        crate::util::increment_wal_cleanup_failures();
-                        tracing::warn!(
-                            "Could not delete old WAL {:?}: {e}",
-                            wal_path
-                        );
+                        crate::util::WAL_CLEANUP_FAILURES_TOTAL.fetch_add(1, Ordering::Relaxed);
+                        tracing::warn!("wal_cleanup_failures_total: Could not delete old WAL {:?}: {}", wal_path, e);
                     }
-                    Err(e) => {
-                        crate::util::increment_wal_cleanup_failures();
-                        tracing::error!(
-                            "Join error deleting old WAL {:?}: {e}",
-                            wal_path
-                        );
+                    Err(join_err) => {
+                        crate::util::WAL_CLEANUP_FAILURES_TOTAL.fetch_add(1, Ordering::Relaxed);
+                        tracing::error!("wal_cleanup_failures_total: Join error deleting old WAL {:?}: {}", wal_path, join_err);
                     }
                 }
 
                 drop(trunc_guard_opt);
 
-                if !successfully_deleted {
+                if !succeeded {
                     remaining_wals.push((wal_path, hmac));
                 }
             }

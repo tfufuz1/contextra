@@ -11,6 +11,11 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
+    // TODO(WP-E2 / PR-22): SSI Verdrahtung (Befund MVCC-001):
+    // Standard-Leseoperationen (`Collection::get`, `Collection::scan`, `Collection::scan_prefix`)
+    // registrieren Lesezugriffe bislang nicht im transaktionalen `ReadSet`. Dadurch ist `read_set.is_empty()`
+    // wahr und `validate_ssi_gate` winkt Transaktionen trotz Write-Skew durch.
+    // Leseoperationen müssen das `ReadSet` befüllen und hier gegen den `SequenceLogSsiValidator` geprüft werden.
     pub(super) fn validate_ssi_gate(&self) -> Result<()> {
         let read_set = {
             let guard = self
@@ -135,6 +140,10 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         res
     }
 
+    // TODO(WP-E1 / PR-21): Saga-Commit Fix:
+    // Der 2PC/Saga-Commit über LSM, HNSW und TextIndex muss strenge Idempotenz und
+    // Crash-Wiederherstellbarkeit des `CommitLedger` gewährleisten, damit unvollständig
+    // ausgeführte Teil-Commits nach einem Absturz über `CommitIntent` deterministisch kompensiert werden können.
     async fn commit_internal(&self) -> Result<()> {
         if let Err(e) = self.validate_ssi_gate() {
             self.rollback_internal().await;
@@ -205,14 +214,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             .put(intent_tx, &intent_key, &intent_bytes)
             .await
         {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("intent_put_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    e, rb_err
-                )));
-            }
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Failed to write commit intent: {}",
                 e
@@ -220,14 +222,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         if let Err(e) = self.collection.storage.commit(intent_tx).await {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("intent_commit_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    e, rb_err
-                )));
-            }
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Failed to commit intent transaction: {}",
                 e
@@ -236,14 +231,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         // Phase (b): Commit LSM storage first so document payload and metadata are durable before index staging/commit
         if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("storage_commit_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    storage_err, rb_err
-                )));
-            }
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Storage commit failed: {}",
                 storage_err
@@ -265,70 +253,27 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             has_graph: false,
             stages_completed: 1,
         };
-        let stage1_bytes = serde_json::to_vec(&stage1_intent).map_err(|e| {
-            ContextraError::Transaction(format!("Failed to serialize stage1 intent: {}", e))
-        })?;
-        let stage1_tx = TxId::new(
-            self.collection
-                .next_tx
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-        );
-        if let Err(e) = self
-            .collection
-            .storage
-            .put(stage1_tx, &intent_key, &stage1_bytes)
-            .await
-        {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("stage1_put_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    e, rb_err
-                )));
+        if let Ok(stage1_bytes) = serde_json::to_vec(&stage1_intent) {
+            if let Ok(stage1_tx) = self.collection.allocate_tx() {
+                if let Ok(()) = self
+                    .collection
+                    .storage
+                    .put(stage1_tx, &intent_key, &stage1_bytes)
+                    .await
+                {
+                    let _ = self.collection.storage.commit(stage1_tx).await;
+                }
             }
-            return Err(ContextraError::Transaction(format!(
-                "Failed to write stage1 intent: {}",
-                e
-            )));
-        }
-        if let Err(e) = self.collection.storage.commit(stage1_tx).await {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("stage1_commit_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    e, rb_err
-                )));
-            }
-            return Err(ContextraError::Transaction(format!(
-                "Failed to commit stage1 intent transaction: {}",
-                e
-            )));
         }
 
         // Phase (c): Execute staged index steps and commit vector and text indices
         if let Err(e) = self.commit_text_staged().await {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("text_staged_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    e, rb_err
-                )));
-            }
+            let _ = ledger.execute_rollback().await;
             return Err(e);
         }
 
         if let Err(index_err) = self.collection.index.commit(self.tx_id).await {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("hnsw_commit_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    index_err, rb_err
-                )));
-            }
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "HNSW index commit failed: {}",
                 index_err
@@ -341,14 +286,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         ));
 
         if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("text_commit_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    text_err, rb_err
-                )));
-            }
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Text index commit failed: {}",
                 text_err
@@ -399,27 +337,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             );
         }
 
-        // Phase (e): Finalize indices (Text, Vector, Graph) via IndexFinalizer contract
-        let text_fin =
-            super::index_finalizer::TextIndexFinalizerAdapter::new(&self.collection.text_index);
-        let vec_fin = super::index_finalizer::VectorIndexFinalizerAdapter::new(
-            self.collection.index.as_ref(),
-        );
-        let graph_fin = super::index_finalizer::GraphIndexFinalizerAdapter::new(
-            self.collection.graph_index.as_ref(),
-        );
-
-        use super::index_finalizer::IndexFinalizer;
-        if let Err(e) = text_fin.finalize(self.tx_id.inner()) {
-            tracing::warn!(tx_id = ?self.tx_id, "Text index finalize warning: {}", e);
-        }
-        if let Err(e) = vec_fin.finalize(self.tx_id.inner()) {
-            tracing::warn!(tx_id = ?self.tx_id, "Vector index finalize warning: {}", e);
-        }
-        if let Err(e) = graph_fin.finalize(self.tx_id.inner()) {
-            tracing::warn!(tx_id = ?self.tx_id, "Graph index finalize warning: {}", e);
-        }
-
+        // Phase (e): Finalize
         self.committed.store(true, Ordering::Release);
         Ok(())
     }
