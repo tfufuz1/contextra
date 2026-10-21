@@ -11,19 +11,14 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 static ENTROPY_COUNTER: AtomicU64 = AtomicU64::new(1);
 const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
 
-// TODO(WP-0 / PR-1 Schritt 1 / B0-d): Bridge-Trait implementieren: `impl Clock for SystemClock`.
-// Befund B0-d: `SystemClock` existiert doppelt in `contextra-ports` und `contextra-sys`. Die Version
-// in `contextra-sys` implementiert bislang nicht den `Clock`-Trait aus `contextra-ports`.
-// WICHTIG (Ring-DAG-Hierarchie): Da `contextra-sys` (Ring 0) nicht unkontrolliert von `contextra-ports`
-// (Ring 1) abhängen darf, soll die Trait-Implementierung direkt in `contextra-sys` über ein optionales
-// Feature `ports` bereitgestellt werden (`#[cfg(feature = "ports")] impl contextra_ports::Clock for SystemClock`).
-// Anschließend Consumer-Dateien von `contextra_ports::SystemClock` auf `contextra_sys::SystemClock` migrieren.
 /// Production system clock implementation backed by [`SystemTime`] and [`Instant`].
 #[derive(Debug, Clone, Copy)]
+#[deprecated(note = "use contextra_ports::SystemClock")]
 pub struct SystemClock {
     start_instant: Instant,
 }
 
+#[allow(deprecated)]
 impl SystemClock {
     /// Creates a new [`SystemClock`] with current instant as monotonic baseline.
     // DETERMINISM-EXCEPTION: SystemClock port implementation in contextra-sys
@@ -59,6 +54,7 @@ impl SystemClock {
     }
 }
 
+#[allow(deprecated)]
 impl Default for SystemClock {
     fn default() -> Self {
         Self::new()
@@ -67,19 +63,19 @@ impl Default for SystemClock {
 
 /// A fast, thread-safe SplitMix64 pseudorandom generator seeded with process entropy.
 #[derive(Debug)]
-pub struct SeededRng {
+pub struct SplitMix64 {
     state: AtomicU64,
 }
 
-impl SeededRng {
-    /// Creates a new [`SeededRng`] initialized with the given 64-bit seed.
+impl SplitMix64 {
+    /// Creates a new [`SplitMix64`] initialized with the given 64-bit seed.
     pub fn new(seed: u64) -> Self {
         Self {
             state: AtomicU64::new(seed),
         }
     }
 
-    /// Creates a new [`SeededRng`] seeded from process/runtime entropy.
+    /// Creates a new [`SplitMix64`] seeded from process/runtime entropy.
     pub fn from_entropy() -> Self {
         let counter = ENTROPY_COUNTER.fetch_add(1, Ordering::Relaxed);
 
@@ -113,8 +109,14 @@ impl SeededRng {
             let val = self.next_u64();
             let bytes = val.to_le_bytes();
             let len = dest.len().min(8);
-            dest[..len].copy_from_slice(&bytes[..len]);
-            dest = &mut dest[len..];
+            if let (Some(dst_slice), Some(src_slice)) = (dest.get_mut(..len), bytes.get(..len)) {
+                dst_slice.copy_from_slice(src_slice);
+            }
+            if let Some(rem) = dest.get_mut(len..) {
+                dest = rem;
+            } else {
+                break;
+            }
         }
     }
 
@@ -125,21 +127,23 @@ impl SeededRng {
     }
 }
 
-// TODO(WP-0 / PR-1 Schritt 2): Bridge-Trait implementieren: `impl Rng for SystemRng`.
-// `SystemRng` soll das RNG-Port-Interface (z.B. `contextra_ports::Rng` bzw. `EntropyRng`/`SeededRng`)
-// unter `#[cfg(feature = "ports")]` implementieren, um Vereinheitlichung und Port-Konsolidierung
-// unter Einhaltung der Ring-DAG-Hierarchie zu sichern.
+/// Deprecated type alias for [`SplitMix64`]. Use [`SplitMix64`] or `contextra_ports::SeededRng`.
+#[deprecated(note = "use SplitMix64 or contextra_ports::SeededRng")]
+pub type SeededRng = SplitMix64;
+
 /// Standard non-cryptographic system RNG seeded from process entropy.
 #[derive(Debug)]
+#[deprecated(note = "use contextra_ports::SystemRng")]
 pub struct SystemRng {
-    inner: SeededRng,
+    inner: SplitMix64,
 }
 
+#[allow(deprecated)]
 impl SystemRng {
     /// Creates a new [`SystemRng`].
     pub fn new() -> Self {
         Self {
-            inner: SeededRng::from_entropy(),
+            inner: SplitMix64::from_entropy(),
         }
     }
 
@@ -159,6 +163,7 @@ impl SystemRng {
     }
 }
 
+#[allow(deprecated)]
 impl Default for SystemRng {
     fn default() -> Self {
         Self::new()
@@ -202,6 +207,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(deprecated)]
     fn test_system_clock_monotonic_and_wall() {
         let clock = SystemClock::new();
         let t1 = clock.monotonic_nanos();
@@ -213,6 +219,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_system_rng_isolation() {
         let rng1 = SystemRng::new();
         let rng2 = SystemRng::new();

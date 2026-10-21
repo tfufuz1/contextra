@@ -1074,12 +1074,15 @@ dependencies = [
  "contextra-ports",
  "contextra-types",
  "futures-util",
+ "getrandom 0.2.17",
  "proptest",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
+ "tracing",
  "trybuild",
+ "zeroize",
 ]
 
 [[package]]
