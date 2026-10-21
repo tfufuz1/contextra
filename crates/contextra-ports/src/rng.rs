@@ -47,32 +47,7 @@ impl SystemRng {
 
 impl EntropyRng for SystemRng {
     fn fill_bytes(&self, dest: &mut [u8]) {
-        use std::collections::hash_map::RandomState;
-        use std::hash::{BuildHasher, Hasher};
-        let mut written = 0;
-        while written < dest.len() {
-            let val = RandomState::new().build_hasher().finish();
-            let bytes = val.to_le_bytes();
-            let chunk = (dest.len() - written).min(8);
-            dest[written..written + chunk].copy_from_slice(&bytes[..chunk]);
-            written += chunk;
-        }
-    }
-
-    fn next_u64(&self) -> u64 {
-        use std::collections::hash_map::RandomState;
-        use std::hash::{BuildHasher, Hasher};
-        RandomState::new().build_hasher().finish()
-    }
-}
-
-impl SeededRng for SystemRng {
-    fn next_u64(&self) -> u64 {
-        EntropyRng::next_u64(self)
-    }
-
-    fn fill_bytes(&self, dest: &mut [u8]) {
-        EntropyRng::fill_bytes(self, dest);
+        SeededRng::fill_bytes(self, dest);
     }
 
     fn next_unit_f64(&self) -> f64 {
