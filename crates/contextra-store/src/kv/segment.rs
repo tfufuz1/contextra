@@ -7,8 +7,8 @@
 #![forbid(unsafe_code)]
 
 use crate::kv::delete_mode::KvDeleteMode;
-use contextra_types::ContextraError;
 use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
+use contextra_types::ContextraError;
 use std::sync::Arc;
 
 /// Configuration for KV segment storage and shredding behavior.

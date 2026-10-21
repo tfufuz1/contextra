@@ -171,4 +171,3 @@ pub fn binary_search_entry_in_block(
         None => Ok(None),
     }
 }
-

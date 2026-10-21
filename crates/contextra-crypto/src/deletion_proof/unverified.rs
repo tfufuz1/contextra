@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_unverified_proof_raw_unverified_access() {
-        let keypair = DeletionProofKeyPair::generate();
+        let _keypair = DeletionProofKeyPair::generate();
         let wrong_keypair = DeletionProofKeyPair::generate();
 
         let raw_proof = DeletionProof {

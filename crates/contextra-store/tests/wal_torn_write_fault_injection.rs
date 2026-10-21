@@ -1,7 +1,7 @@
 #![cfg(feature = "fault-injection")]
 
-use contextra_types::TxId;
 use contextra_store::wal::{Wal, WalOp};
+use contextra_types::TxId;
 use tempfile::tempdir;
 
 static TEST_MUTEX: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -28,8 +28,12 @@ async fn test_wal_torn_write_causes_poisoning_and_blocks_further_appends() {
     assert!(initial_size > 0);
 
     // Set fault injection for a partial write
-    wal.fault_plan().fail_append_after_partial_bytes.store(10, std::sync::atomic::Ordering::SeqCst);
-    wal.fault_plan().fail_append_partial_once.store(true, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan()
+        .fail_append_after_partial_bytes
+        .store(10, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan()
+        .fail_append_partial_once
+        .store(true, std::sync::atomic::Ordering::SeqCst);
 
     let op2 = WalOp::Put {
         tx_id: TxId::new(101),
@@ -95,8 +99,12 @@ async fn test_wal_recover_from_poison_restores_handle_and_preserves_valid_entrie
     wal.append_batch(batch1).await.unwrap();
 
     // Trigger torn write
-    wal.fault_plan().fail_append_after_partial_bytes.store(15, std::sync::atomic::Ordering::SeqCst);
-    wal.fault_plan().fail_append_partial_once.store(true, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan()
+        .fail_append_after_partial_bytes
+        .store(15, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan()
+        .fail_append_partial_once
+        .store(true, std::sync::atomic::Ordering::SeqCst);
 
     let op_torn = WalOp::Put {
         tx_id: TxId::new(201),

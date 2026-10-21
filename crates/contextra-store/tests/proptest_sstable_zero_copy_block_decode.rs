@@ -1,6 +1,5 @@
 use contextra_store::sstable::{
-    binary_search_entry_in_block, BlockBuilder, BlockCache, SstableBuilder,
-    SstableReader,
+    binary_search_entry_in_block, BlockBuilder, BlockCache, SstableBuilder, SstableReader,
 };
 use proptest::prelude::*;
 use std::io::Write;

@@ -1,7 +1,7 @@
-use contextra_types::{Result, TxId};
 use contextra_store::sstable::BlockBuilder;
 use contextra_store::wal::hmac::LegacyKeyStatus;
 use contextra_store::wal::{Wal, WalOp};
+use contextra_types::{Result, TxId};
 use tempfile::tempdir;
 
 #[tokio::test]

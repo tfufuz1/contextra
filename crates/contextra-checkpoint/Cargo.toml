@@ -37,6 +37,7 @@ tempfile = { workspace = true }
 proptest = "1.4"
 criterion = { version = "0.5", features = ["async_tokio"] }
 contextra-testkit = { version = "0.1.0", path = "../contextra-testkit" }
+trybuild = "1.0"
 
 [target.'cfg(loom)'.dependencies]
 

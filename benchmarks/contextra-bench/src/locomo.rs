@@ -1,15 +1,17 @@
 // FILE-CONTEXT
-// STAND: 2026-10-02
+// STAND: 2026-10-22
 // ZWECK: Loader und Evaluation Harness für das LoCoMo Benchmark (SNAP Research / Long Conversational Memory) mit echten Embeddings und Turn-Level Evidence Resolution
 // INVARIANTEN: Lose Kopplung über Search-Closure, keine Panic im Produktionscode, aussagekräftige Fehler.
 
 use crate::long_mem_eval::{BoxFuture, ScoredChunk};
-use contextra_core::{ContextraError, Result};
+use contextra_types::ContextraError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+
+type Result<T> = std::result::Result<T, ContextraError>;
 
 /// Canonical LoCoMo Question Categories (1 to 5).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -527,7 +529,7 @@ mod tests {
             })
                 as crate::long_mem_eval::BoxFuture<
                     'static,
-                    contextra_core::Result<Vec<ScoredChunk>>,
+                    std::result::Result<Vec<ScoredChunk>, ContextraError>,
                 >
         };
 

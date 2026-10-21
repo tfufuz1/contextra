@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-13
+// STAND: 2026-10-22
 // ZWECK: Byteweiser Rohsweep ueber das DB-Verzeichnis fuer das Canary-Orakel (Spezifikation T1).
 // INVARIANTEN: No unsafe code allowed (##![forbid(unsafe_code)]).
 // DOKTRIN: Fail-closed (I/O-Fehler abbrechen). Zero-Panic. Memory-bounded 1-MiB Fenster. Scope: files_only.
@@ -20,6 +20,73 @@ struct SweepContext<'a> {
     files_scanned: u64,
     bytes_scanned: u64,
     hits: Vec<OrcHit>,
+}
+
+/// Builder for configured raw directory sweep operations.
+pub struct RawSweep<'a> {
+    data_dir: &'a Path,
+    markers: Vec<Vec<u8>>,
+}
+
+impl<'a> RawSweep<'a> {
+    /// Creates a new `RawSweep` builder targeting `data_dir`.
+    pub fn new(data_dir: &'a Path) -> Self {
+        Self {
+            data_dir,
+            markers: Vec::new(),
+        }
+    }
+
+    /// Adds a marker byte sequence to search for.
+    pub fn with_marker(mut self, marker: impl Into<Vec<u8>>) -> Self {
+        self.markers.push(marker.into());
+        self
+    }
+
+    /// Adds multiple marker byte sequences to search for.
+    pub fn with_markers(mut self, markers: impl IntoIterator<Item = Vec<u8>>) -> Self {
+        self.markers.extend(markers);
+        self
+    }
+
+    /// Executes the sweep across all files in `data_dir`.
+    pub fn run(self) -> io::Result<OrcSweepReport> {
+        raw_sweep(self.data_dir, &self.markers)
+    }
+
+    /// Positive control check: plants a marker into a temporary file within `data_dir`,
+    /// executes the sweep, and asserts that the planted marker was detected.
+    /// Returns `Err` if the sweep fails to detect the planted marker.
+    pub fn assert_detects_planted(data_dir: &Path, marker: &[u8]) -> io::Result<()> {
+        if marker.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Cannot plant empty marker for positive control",
+            ));
+        }
+
+        // Ensure data_dir exists
+        fs::create_dir_all(data_dir)?;
+
+        // Plant marker in a temp file inside data_dir
+        let temp_file_path = data_dir.join(".positive_control_canary.tmp");
+        fs::write(&temp_file_path, marker)?;
+
+        let sweep_res = RawSweep::new(data_dir).with_marker(marker.to_vec()).run();
+
+        // Clean up planted temp file regardless of outcome
+        let _ = fs::remove_file(&temp_file_path);
+
+        let report = sweep_res?;
+        if report.hits.is_empty() {
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Positive control failed: RawSweep failed to detect planted marker in data directory",
+            ))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// Sweeps the directory tree at `root` recursively for all `needles` and their multi-encoding variants.

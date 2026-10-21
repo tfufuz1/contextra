@@ -3,8 +3,8 @@
 //! and deterministic recovery after restart.
 
 use contextra_ports::storage::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use parking_lot::Mutex;
 use rand::seq::SliceRandom;
 use std::collections::{HashMap, HashSet};

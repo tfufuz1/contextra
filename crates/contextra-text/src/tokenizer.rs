@@ -21,14 +21,16 @@ static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>>
 
 fn get_protected_regex() -> Option<&'static Regex> {
     PROTECTED_REGEX
-        .get_or_init(|| match Regex::new(PROTECTED_PATTERN) {
-            Ok(re) => Some(re),
-            Err(err) => {
-                tracing::error!(
-                    error = %err,
-                    "Protected regex initialization failed; proceeding without URL/email protection"
-                );
-                None
+        .get_or_init(|| {
+            match Regex::new(PROTECTED_PATTERN) {
+                Ok(re) => Some(re),
+                Err(err) => {
+                    tracing::error!(
+                        error = %err,
+                        "Protected regex initialization failed; proceeding without URL/email protection"
+                    );
+                    None
+                }
             }
         })
         .as_ref()

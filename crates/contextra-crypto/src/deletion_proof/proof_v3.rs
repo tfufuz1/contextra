@@ -143,38 +143,66 @@ impl DeletionProof {
         let mut payload = Vec::with_capacity(128);
         payload.extend_from_slice(b"contextra/deletion-proof/v3\0");
 
-        let scope_bytes =
-            bincode::serialize(&self.scope).map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
-        let timestamp_bytes = self.timestamp.to_le_bytes();
-        let covered_layers_bytes = bincode::serialize(&self.covered_layers)
-            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
-            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        let graph_repair_bytes = bincode::serialize(&self.graph_repair)
-            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let mut writer = crate::canonical::CanonicalWriter::new();
 
-        let receipt_part = match &self.wal_chain_receipt {
-            Some(receipt) => receipt.as_slice(),
-            None => &[],
-        };
+        match &self.scope {
+            DeletionScope::Document { doc_id, tenant_id } => {
+                let mut scope_w = crate::canonical::CanonicalWriter::new();
+                scope_w.write_u8(1, 1);
+                scope_w.write_u64(2, tenant_id.as_u64());
+                scope_w.write_u64(3, doc_id.0);
+                writer.write_bytes(1, scope_w.finish().map_err(|e| CryptoError::Crypto(e.to_string()))?);
+            }
+            DeletionScope::Collection { collection_id, tenant_id } => {
+                let mut scope_w = crate::canonical::CanonicalWriter::new();
+                scope_w.write_u8(1, 2);
+                scope_w.write_u64(2, tenant_id.as_u64());
+                scope_w.write_u64(3, collection_id.0);
+                writer.write_bytes(1, scope_w.finish().map_err(|e| CryptoError::Crypto(e.to_string()))?);
+            }
+            DeletionScope::Tenant { tenant_id } => {
+                let mut scope_w = crate::canonical::CanonicalWriter::new();
+                scope_w.write_u8(1, 3);
+                scope_w.write_u64(2, tenant_id.as_u64());
+                writer.write_bytes(1, scope_w.finish().map_err(|e| CryptoError::Crypto(e.to_string()))?);
+            }
+        }
 
-        let audit_pos_bytes = self.audit_chain_position.map(|p| p.to_le_bytes());
-        let audit_pos_part = match &audit_pos_bytes {
-            Some(ref pos_b) => pos_b.as_slice(),
-            None => &[],
-        };
+        writer.write_bytes32(2, &self.deleted_keys_hash);
+        writer.write_u64(3, self.deleted_after_tx.0);
+        writer.write_u64(4, self.timestamp);
 
-        payload.extend_from_slice(&scope_bytes);
-        payload.extend_from_slice(&self.deleted_keys_hash);
-        payload.extend_from_slice(&tx_bytes);
-        payload.extend_from_slice(&timestamp_bytes);
-        payload.extend_from_slice(&covered_layers_bytes);
-        payload.extend_from_slice(&excluded_scopes_bytes);
-        payload.extend_from_slice(&graph_repair_bytes);
-        payload.extend_from_slice(receipt_part);
-        payload.extend_from_slice(audit_pos_part);
+        let mut layers_w = crate::canonical::CanonicalWriter::new();
+        for (i, layer) in self.covered_layers.iter().enumerate() {
+            layers_w.write_u16((i + 1) as u16, layer.layer_id());
+        }
+        writer.write_bytes(5, layers_w.finish().map_err(|e| CryptoError::Crypto(e.to_string()))?);
 
+        let mut excl_w = crate::canonical::CanonicalWriter::new();
+        for (i, scope) in self.excluded_scopes.iter().enumerate() {
+            excl_w.write_u16((i + 1) as u16, scope.id());
+        }
+        writer.write_bytes(6, excl_w.finish().map_err(|e| CryptoError::Crypto(e.to_string()))?);
+
+        let mut repair_w = crate::canonical::CanonicalWriter::new();
+        for (i, rep) in self.graph_repair.iter().enumerate() {
+            let mut rep_item = crate::canonical::CanonicalWriter::new();
+            rep_item.write_u64(1, rep.doc_id.0);
+            rep_item.write_bool(2, rep.verified_no_ghost_pointers);
+            rep_item.write_u64(3, rep.attested_at as u64);
+            repair_w.write_bytes((i + 1) as u16, rep_item.finish().map_err(|e| CryptoError::Crypto(e.to_string()))?);
+        }
+        writer.write_bytes(7, repair_w.finish().map_err(|e| CryptoError::Crypto(e.to_string()))?);
+
+        if let Some(ref receipt) = self.wal_chain_receipt {
+            writer.write_bytes32(8, receipt);
+        }
+        if let Some(pos) = self.audit_chain_position {
+            writer.write_u64(9, pos);
+        }
+
+        let canon_bytes = writer.finish().map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        payload.extend_from_slice(&canon_bytes);
         Ok(payload)
     }
 }

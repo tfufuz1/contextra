@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use contextra_ports::StorageEngine;
-use contextra_types::{Result, TxId};
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
+use contextra_types::{Result, TxId};
 use tempfile::tempdir;
 
 struct TestFreeSpaceProbe {
@@ -77,8 +77,7 @@ async fn test_purge_keys_crash_atomic_recovery() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_purge_keys_crash_before_manifest_commit_preserves_state() -> Result<()>
-{
+async fn test_purge_keys_crash_before_manifest_commit_preserves_state() -> Result<()> {
     let dir = tempdir()?;
     let db_path = dir.path().to_path_buf();
 

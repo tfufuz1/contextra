@@ -126,7 +126,9 @@ async fn child_writer() {
     let config = LsmConfig {
         path: db_path,
         group_commit_window_micros: group_commit_micros,
-        encryption: passphrase.map(EncryptionConfig::Passphrase).unwrap_or_default(),
+        encryption: passphrase
+            .map(EncryptionConfig::Passphrase)
+            .unwrap_or_default(),
         ..Default::default()
     };
 
@@ -275,7 +277,10 @@ async fn test_crash_kill_durability() {
         let config = LsmConfig {
             path: tmp_dir.path().to_path_buf(),
             group_commit_window_micros: group_commit_micros,
-            encryption: passphrase.clone().map(EncryptionConfig::Passphrase).unwrap_or_default(),
+            encryption: passphrase
+                .clone()
+                .map(EncryptionConfig::Passphrase)
+                .unwrap_or_default(),
             ..Default::default()
         };
 
@@ -476,7 +481,10 @@ async fn test_crash_kill_durability() {
             let corrupt_config = LsmConfig {
                 path: corrupt_tmp.path().to_path_buf(),
                 group_commit_window_micros: group_commit_micros,
-                encryption: passphrase.clone().map(EncryptionConfig::Passphrase).unwrap_or_default(),
+                encryption: passphrase
+                    .clone()
+                    .map(EncryptionConfig::Passphrase)
+                    .unwrap_or_default(),
                 ..Default::default()
             };
 

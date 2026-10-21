@@ -3,11 +3,15 @@
 
 use contextra_types::{ContextraError, Result};
 use std::path::Path;
+use std::sync::atomic::AtomicU64;
 
 #[cfg(not(loom))]
 use crate::lsm::config::DurabilityMode;
 #[cfg(not(loom))]
 use std::fs::{File, TryLockError};
+
+/// Global metric tracking total WAL cleanup failure events across LSM compaction cycles.
+pub static WAL_CLEANUP_FAILURES_TOTAL: AtomicU64 = AtomicU64::new(0);
 
 #[cfg(all(not(loom), any(test, feature = "test-utils")))]
 pub type DirLockSyncHookFn = fn(&Path) -> std::io::Result<()>;
@@ -171,7 +175,10 @@ mod tests {
             "DirLock::acquire MUST return Err when directory fsync fails"
         );
         assert!(
-            lock_res.unwrap_err().to_string().contains("simulated dirlock dir fsync failure"),
+            lock_res
+                .unwrap_err()
+                .to_string()
+                .contains("simulated dirlock dir fsync failure"),
             "Error message must convey directory fsync failure"
         );
     }

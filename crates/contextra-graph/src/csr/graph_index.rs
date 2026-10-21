@@ -224,6 +224,9 @@ impl GraphIndex for CsrGraph {
             // ensuring rollback does not leak entity indices into id_map/reverse_map.
             {
                 let mut inner = self.inner_write();
+                if let Some(removals) = inner.staged_removals.get_mut(&tx) {
+                    removals.retain(|&(f, t)| !(f == edge.from && t == edge.to));
+                }
                 inner
                     .staged_edges
                     .entry((tx, edge.from))
@@ -714,6 +717,7 @@ impl GraphIndex for CsrGraph {
                                 .or_default()
                                 .insert((from_id, edge.target));
                         }
+                        inner.tombstoned_edges.remove(&(from_idx, to_idx));
                         converted_edges.push(EdgePayload {
                             target: to_idx,
                             weight: edge.weight,
@@ -789,6 +793,9 @@ impl GraphIndex for CsrGraph {
             }
             {
                 let mut inner = self.inner_write();
+                if let Some(edges) = inner.staged_edges.get_mut(&(tx, from)) {
+                    edges.retain(|e| e.target != to);
+                }
                 inner
                     .staged_removals
                     .entry(tx)
@@ -837,9 +844,12 @@ impl GraphIndex for CsrGraph {
 
     fn rollback_to_tx<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            // Physical rollback for CSR graph is driven by WAL replay or reloading state from storage.
-            // In-memory staged transactions are handled by rollback().
-            Ok(())
+            // Physical point-in-time rollback for arbitrary historical TxId is unsupported
+            // in memory without WAL replay / storage reload (INV-NOOP-1).
+            Err(ContextraError::CapabilityUnsupported {
+                capability: "rollback_to_tx".to_string(),
+                reason: "In-memory rollback_to_tx for historical TxId is unsupported on CsrGraph; use rollback(tx) for active staged transactions or reload from storage".to_string(),
+            })
         })
     }
 

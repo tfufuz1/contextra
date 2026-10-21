@@ -1,5 +1,5 @@
-use contextra_types::{ContextraError, TxId};
 use contextra_store::wal::{Wal, WalEntry, WalOp, WAL_V3_HEADER};
+use contextra_types::{ContextraError, TxId};
 use std::sync::{Arc, Mutex};
 use tempfile::tempdir;
 use tokio::fs;

@@ -1,6 +1,6 @@
-use contextra_types::ContextraError;
 use contextra_store::lsm::config::DurabilityMode;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::ContextraError;
 use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::path::Path;

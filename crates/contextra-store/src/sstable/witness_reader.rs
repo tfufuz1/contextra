@@ -267,9 +267,7 @@ impl WitnessReader {
         if format_version >= 5 {
             let kid_bytes: [u8; 16] = trailer_buf
                 .get(b + 48..b + 64)
-                .ok_or_else(|| {
-                    WitnessReadError::CorruptFile("Invalid key_id in trailer".into())
-                })?
+                .ok_or_else(|| WitnessReadError::CorruptFile("Invalid key_id in trailer".into()))?
                 .try_into()
                 .unwrap_or([0; 16]);
             parsed_key_id = Some(KeyId(kid_bytes));
