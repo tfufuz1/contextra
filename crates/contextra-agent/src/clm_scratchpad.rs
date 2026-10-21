@@ -62,14 +62,20 @@ impl CountingContextEditAuditSink {
         }
     }
 
+    /// ORDERING-BEGRÜNDUNG:
+    /// `Ordering::Acquire` stellt sicher, dass Leseoperationen im aufrufenden Thread alle vorangegangenen
+    /// Schreibvorgänge (`fetch_add` mit `Release`) anderer Threads sehen.
     pub fn count(&self) -> u64 {
-        self.count.load(Ordering::Relaxed)
+        self.count.load(Ordering::Acquire)
     }
 }
 
 impl ContextEditAuditSink for CountingContextEditAuditSink {
+    /// ORDERING-BEGRÜNDUNG:
+    /// `Ordering::Release` gewährleistet, dass vorangegangene Schreiboperationen auf dem Scratchpad
+    /// im aufrufenden Thread für lesende Threads (`count()` mit `Acquire`) sichtbar werden.
     fn record_edit(&self, _record: ScratchpadEditRecord) {
-        self.count.fetch_add(1, Ordering::Relaxed);
+        self.count.fetch_add(1, Ordering::Release);
     }
 }
 
@@ -105,19 +111,25 @@ impl CountingScratchpadCacheInvalidator {
         }
     }
 
+    /// ORDERING-BEGRÜNDUNG:
+    /// `Ordering::Acquire` garantiert, dass das Lesen des Invalidation-Zählers mit vorangegangenen
+    /// Release-Inkrementen synchronisiert wird.
     pub fn count(&self) -> u64 {
-        self.count.load(Ordering::Relaxed)
+        self.count.load(Ordering::Acquire)
     }
 }
 
 impl ScratchpadCacheInvalidator for CountingScratchpadCacheInvalidator {
+    /// ORDERING-BEGRÜNDUNG:
+    /// `Ordering::Release` stellt sicher, dass Cache-Invalidierungsaufrufe vor dem Inkrementieren des
+    /// Zählers für lesende Threads mit `Acquire` sichtbar sind.
     fn invalidate_scratchpad_scope(
         &self,
         _tenant_id: TenantId,
         _task_id: &str,
         _subgoal_index: u64,
     ) {
-        self.count.fetch_add(1, Ordering::Relaxed);
+        self.count.fetch_add(1, Ordering::Release);
     }
 }
 
@@ -651,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pinned_region_immutability_guards() {
+    fn test_pinned_region_immutability_guards() -> Result<()> {
         let config = VaultConfig {
             max_capacity_bytes: 1024,
             attempt_mlock: false,
@@ -669,7 +681,7 @@ mod tests {
                 content: b"malicious append".to_vec(),
                 label: Some("sys_prompt".to_string()),
             },
-            TxId(1),
+            TxId::try_new(1)?,
         );
         assert!(err_append.is_err());
 
@@ -679,7 +691,7 @@ mod tests {
                 chunk_label: "sys_prompt".to_string(),
                 new_content: b"overwrite".to_vec(),
             },
-            TxId(2),
+            TxId::try_new(2)?,
         );
         assert!(err_replace.is_err());
 
@@ -688,8 +700,103 @@ mod tests {
             ScratchpadEditOp::Remove {
                 chunk_label: "sys_prompt".to_string(),
             },
-            TxId(3),
+            TxId::try_new(3)?,
         );
         assert!(err_remove.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_scratchpad_concurrent_writes_and_reads() -> Result<()> {
+        use std::sync::Mutex;
+
+        let config = VaultConfig {
+            max_capacity_bytes: 1024 * 1024,
+            attempt_mlock: false,
+        };
+        let pad = Arc::new(Mutex::new(ClmScratchpad::new(
+            "task-concurrent".to_string(),
+            config,
+        )));
+
+        let mut handles = Vec::new();
+        for i in 0..8 {
+            let pad_clone = Arc::clone(&pad);
+            handles.push(std::thread::spawn(move || {
+                let tx = TxId::try_new(10 + i as u64).map_err(|e| e.to_string())?;
+                let mut guard = pad_clone.lock().map_err(|e| e.to_string())?;
+                guard
+                    .apply_edit(
+                        ScratchpadEditOp::Append {
+                            content: format!("payload from thread {i}").into_bytes(),
+                            label: Some(format!("chunk_{i}")),
+                        },
+                        tx,
+                    )
+                    .map_err(|e| e.to_string())
+            }));
+        }
+
+        for h in handles {
+            h.join()
+                .map_err(|e| ContextraError::Internal(format!("{e:?}")))?
+                .map_err(ContextraError::Internal)?;
+        }
+
+        let guard = pad
+            .lock()
+            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+        assert!(guard.total_bytes() > 0);
+        assert_eq!(guard.chunks.len(), 8);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scratchpad_reset_during_active_access() -> Result<()> {
+        let config = VaultConfig {
+            max_capacity_bytes: 1024,
+            attempt_mlock: false,
+        };
+        let audit = Arc::new(CountingContextEditAuditSink::new());
+        let cache = Arc::new(CountingScratchpadCacheInvalidator::new());
+
+        let mut pad = ClmScratchpad::new("task-reset-flow".to_string(), config)
+            .with_audit_sink(audit.clone())
+            .with_cache_invalidator(cache.clone());
+
+        pad.apply_edit(
+            ScratchpadEditOp::Append {
+                content: b"subgoal 0 data".to_vec(),
+                label: Some("s0".to_string()),
+            },
+            TxId::try_new(100)?,
+        )?;
+
+        assert_eq!(audit.count(), 1);
+        assert_eq!(cache.count(), 0);
+
+        let cp = pad.checkpoint_and_reset()?;
+        assert_eq!(cp.completed_subgoal_index, 0);
+        assert_eq!(cp.chunk_count_at_checkpoint, 1);
+        assert_eq!(pad.total_bytes(), 0);
+        assert_eq!(pad.current_subgoal_index(), 1);
+
+        assert_eq!(audit.count(), 2);
+        assert_eq!(cache.count(), 1);
+
+        // Subsequent edit works on subgoal 1
+        pad.apply_edit(
+            ScratchpadEditOp::Append {
+                content: b"subgoal 1 data".to_vec(),
+                label: Some("s1".to_string()),
+            },
+            TxId::try_new(101)?,
+        )?;
+
+        assert_eq!(pad.total_bytes(), b"subgoal 1 data".len());
+        assert_eq!(audit.count(), 3);
+
+        Ok(())
     }
 }

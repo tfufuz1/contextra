@@ -114,7 +114,12 @@ impl HnswIndex {
             ));
         }
 
-        let scanned_at_tx = contextra_types::TxId::new(self.inner.hot.last_tx_id.load(std::sync::atomic::Ordering::Acquire));
+        let scanned_at_tx = contextra_types::TxId::try_new(
+            self.inner
+                .hot
+                .last_tx_id
+                .load(std::sync::atomic::Ordering::Acquire),
+        )?;
         if scanned_at_tx < args.as_of_tx {
             return Err(ContextraError::InvalidInput(format!(
                 "INV-D2-HNSW: scanned_at_tx ({:?}) < as_of_tx ({:?})",
@@ -124,11 +129,7 @@ impl HnswIndex {
 
         let store_gen = WitStoreGeneration(self.inner.hot.last_tx_id.load(std::sync::atomic::Ordering::Acquire));
 
-        let node_id = args
-            .doc_ids
-            .first()
-            .map(|d| d.inner())
-            .unwrap_or(0);
+        let node_id = args.doc_ids.first().map(|d| d.inner()).unwrap_or(0);
 
         let layer_evidence = WitLayerEvidence::HnswIndex {
             node_id,

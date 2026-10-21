@@ -1,5 +1,7 @@
 //! Integration tests for WASI I/O, limits, clock, random, proc_exit, and capabilities (§4.18).
 
+#![allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+
 use contextra_sandbox::{SandboxError, WasmCapabilities, WasmExecutor};
 use std::time::Duration;
 

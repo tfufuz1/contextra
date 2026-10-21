@@ -5,8 +5,8 @@
 
 use contextra_durable_fs::{
     scrub_and_remove, scrub_and_remove_with_injector, scrub_and_remove_with_mountinfo,
-    scrub_if_safe_with_mountinfo, FaultInjector, NoFault, ScrubMethod, ScrubOutcome,
-    ScrubPolicy, ScrubReceipt, ScrubRefusal,
+    scrub_if_safe_with_mountinfo, FaultInjector, NoFault, ScrubMethod, ScrubOutcome, ScrubPolicy,
+    ScrubReceipt, ScrubRefusal,
 };
 use tempfile::TempDir;
 
@@ -92,7 +92,10 @@ fn test_cow_detection_with_injected_mountinfo() -> std::io::Result<()> {
         Some(&injected_mountinfo),
     )?;
 
-    assert_eq!(outcome, ScrubOutcome::Refused(ScrubRefusal::CopyOnWriteFilesystem));
+    assert_eq!(
+        outcome,
+        ScrubOutcome::Refused(ScrubRefusal::CopyOnWriteFilesystem)
+    );
     assert!(file_path_2.exists());
 
     Ok(())

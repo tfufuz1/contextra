@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-08-30T15:00:19Z (SESSION: 283abf0f)
+// STAND: 2026-10-21T00:00:00Z (CARD J04 / J-15-F02)
 // ZWECK: In-Memory BTreeMap MemTable-Sharding mit MVCC Snapshot-Isolation.
 // INVARIANTEN: Sharding per Range-Sharding über 2-Byte-Key-Präfixe für normale Keys, Hash-Sharding der Suffixe für reservierte Systempräfixe; tombstone via TOMBSTONE_BIT in seq_no.
 // NICHT-OFFENSICHTLICH: Rollback(tx_id) entfernt alle Einträge der Transaktion atomar aus allen Shards.
@@ -235,7 +235,7 @@ impl MemTable {
 
         let versions = entries.entry(key).or_insert_with(|| Vec::with_capacity(2));
         let raw_seq = seq_no & !TOMBSTONE_BIT;
-        // FIX(2026-10-07): Fast-path push for in-order sequence numbers; binary search insert for out-of-order sequence numbers to maintain sorted order for get_at_seq.
+        // FIX(2026-10-07 / Card J04 J-15-F02): Fast-path push for in-order sequence numbers; binary search insert for out-of-order sequence numbers to maintain sorted order for get_at_seq deterministically and panic-freely.
         if versions.last().map_or(true, |(last_seq, _, _)| {
             (last_seq & !TOMBSTONE_BIT) <= raw_seq
         }) {

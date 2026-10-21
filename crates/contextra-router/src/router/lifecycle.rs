@@ -124,35 +124,36 @@ impl RouterEngine {
     }
 
     pub(crate) fn update_profiles_internal(&self, new_profiles: Vec<SlmProfile>) {
-        let current = self.state.load_full();
-        let mut old_cal = current.calibration.clone();
-        let new_cal: HashMap<String, ProfileCalibrationState> = new_profiles
-            .iter()
-            .map(|p| {
-                let mut state = old_cal
-                    .remove(&p.name)
-                    .unwrap_or_else(|| ProfileCalibrationState::new(p.min_relevance_score));
-                state.check_and_invalidate_fingerprint(p.fingerprint.as_ref());
-                (p.name.clone(), state)
-            })
-            .collect();
+        self.state.rcu(|current| {
+            let mut old_cal = current.calibration.clone();
+            let new_cal: HashMap<String, ProfileCalibrationState> = new_profiles
+                .iter()
+                .map(|p| {
+                    let mut state = old_cal
+                        .remove(&p.name)
+                        .unwrap_or_else(|| ProfileCalibrationState::new(p.min_relevance_score));
+                    state.check_and_invalidate_fingerprint(p.fingerprint.as_ref());
+                    (p.name.clone(), state)
+                })
+                .collect();
 
-        let mut old_watchers = current.lyapunov_watchers.clone();
-        let new_watchers: HashMap<String, LyapunovDriftWatcher> = new_profiles
-            .iter()
-            .map(|p| {
-                let watcher = old_watchers.remove(&p.name).unwrap_or_default();
-                (p.name.clone(), watcher)
-            })
-            .collect();
+            let mut old_watchers = current.lyapunov_watchers.clone();
+            let new_watchers: HashMap<String, LyapunovDriftWatcher> = new_profiles
+                .iter()
+                .map(|p| {
+                    let watcher = old_watchers.remove(&p.name).unwrap_or_default();
+                    (p.name.clone(), watcher)
+                })
+                .collect();
 
-        let new_state = RouterState {
-            profiles: new_profiles,
-            calibration: new_cal,
-            lyapunov_watchers: new_watchers,
-        };
+            let new_state = RouterState {
+                profiles: new_profiles.clone(),
+                calibration: new_cal,
+                lyapunov_watchers: new_watchers,
+            };
 
-        self.state.store(Arc::new(new_state));
+            Arc::new(new_state)
+        });
     }
 
     /// Returns a copy of the active SLM profiles.

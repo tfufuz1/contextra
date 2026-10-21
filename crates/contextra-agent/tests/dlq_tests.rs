@@ -109,7 +109,7 @@ async fn test_dlq_remove_and_string_tx_id_idempotency() -> Result<()> {
         session_id: "remove_session".to_string(),
         node_id: "node_x".to_string(),
         step_index: 2,
-        tx_id: Some(TxId::new(777)),
+        tx_id: Some(TxId::try_new(777).unwrap()),
         failure_reason: DeadLetterReason::ToolError {
             message: "error".to_string(),
         },
@@ -166,7 +166,7 @@ async fn test_dlq_replay_idempotency_scenarios() -> Result<()> {
         session_id: "idempotency_session".to_string(),
         node_id: "node_step_1".to_string(),
         step_index: 0,
-        tx_id: Some(TxId::new(9999)),
+        tx_id: Some(TxId::try_new(9999).unwrap()),
         failure_reason: DeadLetterReason::ToolError {
             message: "Failed before commit".to_string(),
         },
@@ -199,7 +199,7 @@ async fn test_dlq_replay_idempotency_scenarios() -> Result<()> {
         session_id: "idempotency_session".to_string(),
         node_id: "node_step_1".to_string(),
         step_index: 0,
-        tx_id: Some(TxId::new(500)),
+        tx_id: Some(TxId::try_new(500).unwrap()),
         failure_reason: DeadLetterReason::ToolError {
             message: "Failed after commit".to_string(),
         },

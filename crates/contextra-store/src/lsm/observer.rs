@@ -1,10 +1,10 @@
 // ZWECK: WalObserver Interface, Circuit-Breaker und Bounded-Dispatcher für Fail-Closed Commit-Sicherheit.
 
 use crate::wal::{WalEntry, WalOp};
-use contextra_types::{ContextraError, TxId};
 use contextra_ports::{Clock, SystemClock};
+use contextra_types::{ContextraError, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::{sync_channel, RecvTimeoutError, SyncSender};
+use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -110,22 +110,9 @@ struct CommitEvent {
     origin: WriteOrigin,
 }
 
-enum WorkResult {
-    Completed {
-        elapsed_nanos: u64,
-        res: contextra_types::Result<()>,
-    },
-    Panicked(String),
-}
-
-struct WorkerTask {
-    event: CommitEvent,
-    done_tx: SyncSender<WorkResult>,
-}
-
 struct BoundedObserverWorker {
     inner: Arc<dyn WalObserver>,
-    sender: SyncSender<WorkerTask>,
+    sender: SyncSender<CommitEvent>,
     dropped_count: Arc<AtomicU64>,
     circuit_breaker_open_until_nanos: Arc<AtomicU64>,
     consecutive_drops: Arc<AtomicU64>,
@@ -133,35 +120,76 @@ struct BoundedObserverWorker {
 }
 
 impl BoundedObserverWorker {
-    fn new(observer: Arc<dyn WalObserver>, clock: Arc<dyn Clock>) -> Self {
-        let (task_tx, task_rx) = sync_channel::<WorkerTask>(256);
+    fn new(
+        observer: Arc<dyn WalObserver>,
+        clock: Arc<dyn Clock>,
+        max_latency: parking_lot::RwLock<Duration>,
+    ) -> Self {
+        let (event_tx, event_rx) = sync_channel::<CommitEvent>(256);
         let dropped_count = Arc::new(AtomicU64::new(0));
         let circuit_breaker_open_until_nanos = Arc::new(AtomicU64::new(0));
         let consecutive_drops = Arc::new(AtomicU64::new(0));
 
         let obs_clone = Arc::clone(&observer);
         let clock_clone = Arc::clone(&clock);
+        let dropped_count_worker = Arc::clone(&dropped_count);
+        let cb_open_worker = Arc::clone(&circuit_breaker_open_until_nanos);
+        let consecutive_drops_worker = Arc::clone(&consecutive_drops);
 
         let thread_handle = thread::Builder::new()
             .name("wal-observer-worker".to_string())
             .spawn(move || {
-                while let Ok(task) = task_rx.recv() {
+                while let Ok(event) = event_rx.recv() {
                     let wal_refs: Vec<WalEntryRef<'_>> =
-                        task.event.entries.iter().map(WalEntryRef::new).collect();
+                        event.entries.iter().map(WalEntryRef::new).collect();
                     let batch = CommittedBatch {
                         entries: wal_refs,
-                        origin: task.event.origin,
+                        origin: event.origin,
                     };
 
                     let start_nanos = clock_clone.monotonic_nanos();
                     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        obs_clone.on_commit_fail_closed(&batch, task.event.seq_no, task.event.tx_id)
+                        obs_clone.on_commit_fail_closed(&batch, event.seq_no, event.tx_id)
                     }));
                     let end_nanos = clock_clone.monotonic_nanos();
                     let elapsed_nanos = end_nanos.saturating_sub(start_nanos);
 
-                    let result = match res {
-                        Ok(res) => WorkResult::Completed { elapsed_nanos, res },
+                    let max_latency_nanos = max_latency.read().as_nanos() as u64;
+                    let cooldown_nanos = 1_000_000_000u64;
+
+                    match res {
+                        Ok(Ok(())) => {
+                            if elapsed_nanos > max_latency_nanos {
+                                dropped_count_worker.fetch_add(1, Ordering::Relaxed);
+                                consecutive_drops_worker.fetch_add(1, Ordering::Relaxed);
+                                cb_open_worker.store(
+                                    end_nanos.saturating_add(cooldown_nanos),
+                                    Ordering::Relaxed,
+                                );
+                                tracing::warn!(
+                                    elapsed_us = elapsed_nanos / 1_000,
+                                    max_allowed_us = max_latency_nanos / 1_000,
+                                    tx_id = event.tx_id.inner(),
+                                    "WalObserver exceeded max_observer_latency; tripped circuit breaker"
+                                );
+                            } else {
+                                consecutive_drops_worker.store(0, Ordering::Relaxed);
+                                cb_open_worker.store(0, Ordering::Relaxed);
+                            }
+                        }
+                        Ok(Err(e)) => {
+                            dropped_count_worker.fetch_add(1, Ordering::Relaxed);
+                            consecutive_drops_worker.fetch_add(1, Ordering::Relaxed);
+                            cb_open_worker.store(
+                                end_nanos.saturating_add(cooldown_nanos),
+                                Ordering::Relaxed,
+                            );
+                            tracing::warn!(
+                                tx_id = event.tx_id.inner(),
+                                error = %e,
+                                "WalObserver returned error; tripped circuit breaker"
+                            );
+                        }
                         Err(payload) => {
                             let msg = if let Some(s) = payload.downcast_ref::<&str>() {
                                 (*s).to_string()
@@ -170,18 +198,26 @@ impl BoundedObserverWorker {
                             } else {
                                 "WalObserver panicked during callback".to_string()
                             };
-                            WorkResult::Panicked(msg)
+                            dropped_count_worker.fetch_add(1, Ordering::Relaxed);
+                            consecutive_drops_worker.fetch_add(1, Ordering::Relaxed);
+                            cb_open_worker.store(
+                                end_nanos.saturating_add(cooldown_nanos),
+                                Ordering::Relaxed,
+                            );
+                            tracing::error!(
+                                tx_id = event.tx_id.inner(),
+                                panic_msg = %msg,
+                                "WalObserver panicked during on_commit execution; tripped circuit breaker"
+                            );
                         }
-                    };
-
-                    let _ = task.done_tx.try_send(result);
+                    }
                 }
             })
             .ok();
 
         Self {
             inner: observer,
-            sender: task_tx,
+            sender: event_tx,
             dropped_count,
             circuit_breaker_open_until_nanos,
             consecutive_drops,
@@ -279,7 +315,11 @@ impl ObserverRegistry {
     /// Registers a new WAL observer.
     pub fn register_observer(&self, observer: Arc<dyn WalObserver>) {
         let clock = self.clock.read().clone();
-        let worker = Arc::new(BoundedObserverWorker::new(observer, clock));
+        let worker = Arc::new(BoundedObserverWorker::new(
+            observer,
+            clock,
+            parking_lot::RwLock::new(self.max_observer_latency()),
+        ));
         self.observers.write().push(worker);
     }
 
@@ -385,11 +425,7 @@ impl ObserverRegistry {
         };
 
         let clock = self.clock.read().clone();
-        let max_latency = self.max_observer_latency();
-        let max_latency_nanos = max_latency.as_nanos() as u64;
         let now_nanos = clock.monotonic_nanos();
-
-        // Circuit breaker cooldown: 1 second
         let cooldown_nanos = 1_000_000_000u64;
 
         let mut panicking: Vec<Arc<dyn WalObserver>> = Vec::new();
@@ -518,25 +554,33 @@ impl ObserverRegistry {
                     }
                 }
             }
-            Ok(())
-        };
 
-        let result = if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
-                tokio::task::block_in_place(run_notify)
-            } else {
-                run_notify()
+            if worker.is_circuit_breaker_open(now_nanos) {
+                worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                continue;
             }
-        } else {
-            run_notify()
-        };
 
-        if !panicking.is_empty() {
-            let mut guard = self.observers.write();
-            guard.retain(|w| !panicking.iter().any(|p| Arc::ptr_eq(&w.inner, p)));
+            let event = CommitEvent {
+                entries: entries.to_vec(),
+                seq_no,
+                tx_id: ctx.tx_id,
+                origin: ctx.origin,
+            };
+
+            if worker.sender.try_send(event).is_err() {
+                worker.dropped_count.fetch_add(1, Ordering::Relaxed);
+                worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
+                worker
+                    .circuit_breaker_open_until_nanos
+                    .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
+                tracing::warn!(
+                    tx_id = ctx.tx_id.inner(),
+                    "WalObserver queue full; dropped event and tripped circuit breaker"
+                );
+            }
         }
 
-        result
+        Ok(())
     }
 
     /// Synchronously notifies all registered observers of a committed batch.

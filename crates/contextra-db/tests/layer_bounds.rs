@@ -57,10 +57,9 @@ async fn test_layer_002_collection_persistence() {
     }
 }
 
-// INTENT: DAG Integrationstest fehlt
-// ZIEL: contextra-db -> contextra-text (BM25-Query nach Ingest)
+// INTENT: DAG Integrationstest
+// ZIEL: contextra-db -> contextra-text (BM25-Query nach Ingest via Collection Query Builder)
 #[tokio::test]
-#[ignore]
 async fn test_layer_003_hybrid_bm25_search() {
     let tmp = TempDir::new().expect("temp dir");
     let config = ContextraConfig {
@@ -71,21 +70,23 @@ async fn test_layer_003_hybrid_bm25_search() {
         .await
         .expect("open");
 
-    db.insert(
+    let col = db.collection("default").await.expect("collection");
+
+    col.insert(
         "doc-1",
         &[0.1, 0.1, 0.1, 0.1],
         Some(json!({"text": "the quick brown fox"})),
     )
     .await
     .expect("ins 1");
-    db.insert(
+    col.insert(
         "doc-2",
         &[0.1, 0.1, 0.1, 0.1],
         Some(json!({"content": "jumped over the lazy dog"})),
     )
     .await
     .expect("ins 2");
-    db.insert(
+    col.insert(
         "doc-3",
         &[0.1, 0.1, 0.1, 0.1],
         Some(json!({"text": "brown dogs are lazy"})),
@@ -94,16 +95,24 @@ async fn test_layer_003_hybrid_bm25_search() {
     .expect("ins 3");
 
     // Search for "fox" - should find doc-1
-    let results = db
-        .hybrid_search("fox", &[0.0, 0.0, 0.0, 0.0], 10, None)
+    let results = col
+        .query()
+        .text("fox")
+        .embedding([0.0, 0.0, 0.0, 0.0])
+        .k(10)
+        .execute()
         .await
         .expect("hybrid search");
     assert!(!results.is_empty());
     assert_eq!(results[0].id, "doc-1");
 
     // Search for "lazy dog" - should find doc-2 and doc-3
-    let results2 = db
-        .hybrid_search("lazy dog", &[0.0, 0.0, 0.0, 0.0], 10, None)
+    let results2 = col
+        .query()
+        .text("lazy dog")
+        .embedding([0.0, 0.0, 0.0, 0.0])
+        .k(10)
+        .execute()
         .await
         .expect("hybrid search 2");
     let ids: Vec<String> = results2.iter().map(|r| r.id.clone()).collect();

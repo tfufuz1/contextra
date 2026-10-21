@@ -35,3 +35,6 @@ docid-128 = ["contextra-types/docid-128"]
 tokio = { workspace = true, features = ["test-util", "macros"] }
 tempfile = { workspace = true }
 proptest = "1.4"
+
+[target.'cfg(loom)'.dev-dependencies]
+loom = "0.7"

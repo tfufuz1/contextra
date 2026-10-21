@@ -5,8 +5,8 @@
 
 #![forbid(unsafe_code)]
 
-use std::fmt;
 use crate::erasure_harness::raw_sweep::SweepHit;
+use std::fmt;
 
 /// Supported database field types for canary injection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -117,12 +117,7 @@ impl CanarySet {
         ];
 
         for (field_type, val_str) in str_fields {
-            build_string_needles(
-                field_type,
-                val_str,
-                &mut needles_bytes,
-                &mut needle_infos,
-            );
+            build_string_needles(field_type, val_str, &mut needles_bytes, &mut needle_infos);
         }
 
         build_vector_needles(
@@ -241,23 +236,48 @@ fn build_string_needles(
     };
 
     // 1. Raw UTF-8
-    add_needle(CanaryEncoding::RawUtf8, raw_bytes.clone(), out_bytes, out_infos);
+    add_needle(
+        CanaryEncoding::RawUtf8,
+        raw_bytes.clone(),
+        out_bytes,
+        out_infos,
+    );
 
     // 2. JSON Escaped
     let json_escaped = escape_json_str(val_str);
-    add_needle(CanaryEncoding::JsonEscaped, json_escaped.into_bytes(), out_bytes, out_infos);
+    add_needle(
+        CanaryEncoding::JsonEscaped,
+        json_escaped.into_bytes(),
+        out_bytes,
+        out_infos,
+    );
 
     // 3. Hex Lower
     let hex_lower: String = raw_bytes.iter().map(|b| format!("{:02x}", b)).collect();
-    add_needle(CanaryEncoding::HexLower, hex_lower.into_bytes(), out_bytes, out_infos);
+    add_needle(
+        CanaryEncoding::HexLower,
+        hex_lower.into_bytes(),
+        out_bytes,
+        out_infos,
+    );
 
     // 4. Hex Upper
     let hex_upper: String = raw_bytes.iter().map(|b| format!("{:02X}", b)).collect();
-    add_needle(CanaryEncoding::HexUpper, hex_upper.into_bytes(), out_bytes, out_infos);
+    add_needle(
+        CanaryEncoding::HexUpper,
+        hex_upper.into_bytes(),
+        out_bytes,
+        out_infos,
+    );
 
     // 5. Base64 Shift 0
     let b64_shift0 = base64_encode(&raw_bytes);
-    add_needle(CanaryEncoding::Base64Shift0, b64_shift0.into_bytes(), out_bytes, out_infos);
+    add_needle(
+        CanaryEncoding::Base64Shift0,
+        b64_shift0.into_bytes(),
+        out_bytes,
+        out_infos,
+    );
 
     // 6. Base64 Shift 1
     let mut bytes_shift1 = vec![0x00];
@@ -265,7 +285,12 @@ fn build_string_needles(
     let b64_full1 = base64_encode(&bytes_shift1);
     if b64_full1.len() > 4 {
         let b64_shift1 = b64_full1[2..b64_full1.len() - 2].to_string();
-        add_needle(CanaryEncoding::Base64Shift1, b64_shift1.into_bytes(), out_bytes, out_infos);
+        add_needle(
+            CanaryEncoding::Base64Shift1,
+            b64_shift1.into_bytes(),
+            out_bytes,
+            out_infos,
+        );
     }
 
     // 7. Base64 Shift 2
@@ -274,7 +299,12 @@ fn build_string_needles(
     let b64_full2 = base64_encode(&bytes_shift2);
     if b64_full2.len() > 4 {
         let b64_shift2 = b64_full2[3..b64_full2.len() - 2].to_string();
-        add_needle(CanaryEncoding::Base64Shift2, b64_shift2.into_bytes(), out_bytes, out_infos);
+        add_needle(
+            CanaryEncoding::Base64Shift2,
+            b64_shift2.into_bytes(),
+            out_bytes,
+            out_infos,
+        );
     }
 
     // 8. UTF-16LE
@@ -293,7 +323,12 @@ fn build_string_needles(
 
     // 10. Lowercase UTF-8
     let lower_bytes = val_str.to_lowercase().into_bytes();
-    add_needle(CanaryEncoding::LowercaseUtf8, lower_bytes, out_bytes, out_infos);
+    add_needle(
+        CanaryEncoding::LowercaseUtf8,
+        lower_bytes,
+        out_bytes,
+        out_infos,
+    );
 
     // 11. Fragment 12b
     if raw_bytes.len() >= 12 {
@@ -408,9 +443,18 @@ mod tests {
         assert!(!set.needles().is_empty());
         assert_eq!(set.needles().len(), set.needle_infos().len());
 
-        let has_docid = set.needle_infos().iter().any(|i| i.field_type == CanaryFieldType::DocId);
-        let has_text = set.needle_infos().iter().any(|i| i.field_type == CanaryFieldType::Text);
-        let has_vector = set.needle_infos().iter().any(|i| i.field_type == CanaryFieldType::Vector);
+        let has_docid = set
+            .needle_infos()
+            .iter()
+            .any(|i| i.field_type == CanaryFieldType::DocId);
+        let has_text = set
+            .needle_infos()
+            .iter()
+            .any(|i| i.field_type == CanaryFieldType::Text);
+        let has_vector = set
+            .needle_infos()
+            .iter()
+            .any(|i| i.field_type == CanaryFieldType::Vector);
 
         assert!(has_docid && has_text && has_vector);
     }

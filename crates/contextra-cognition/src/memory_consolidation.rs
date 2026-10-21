@@ -508,7 +508,7 @@ pub async fn run_structural_synthesis_pass(
                     content,
                     abstracts_from: valid_doc_ids,
                     source_community_hash: *comm_hash,
-                    created_at_tx: TxId::new(0),
+                    created_at_tx: TxId::INVALID,
                     llm_model_id: "llm-generator".to_string(),
                 });
             }

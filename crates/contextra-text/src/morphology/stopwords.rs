@@ -44,6 +44,9 @@ pub fn is_german_stopword(word: &str) -> bool {
 pub fn normalize_umlauts(input: &str) -> String {
     input
         .to_lowercase()
+        .replace("a\u{0308}", "ae")
+        .replace("o\u{0308}", "oe")
+        .replace("u\u{0308}", "ue")
         .replace('ä', "ae")
         .replace('ö', "oe")
         .replace('ü', "ue")

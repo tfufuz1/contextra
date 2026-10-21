@@ -37,7 +37,8 @@ async fn run_differential_ops(ops: Vec<Op>) -> Result<(), TestCaseError> {
     let dir = TempDir::new().map_err(|e| TestCaseError::fail(e.to_string()))?;
     let db_path = dir.path().join("diff.redb");
 
-    let store = RedbStorageEngine::open(&db_path).map_err(|e| TestCaseError::fail(e.to_string()))?;
+    let store =
+        RedbStorageEngine::open(&db_path).map_err(|e| TestCaseError::fail(e.to_string()))?;
 
     let mut ref_committed: BTreeMap<Vec<u8>, Vec<u8>> = BTreeMap::new();
     let mut ref_staged: BTreeMap<Vec<u8>, Option<Vec<u8>>> = BTreeMap::new();
@@ -61,7 +62,10 @@ async fn run_differential_ops(ops: Vec<Op>) -> Result<(), TestCaseError> {
                 ref_staged.insert(k, None);
             }
             Op::Get(k) => {
-                let store_val = store.get(&k).await.map_err(|e| TestCaseError::fail(e.to_string()))?;
+                let store_val = store
+                    .get(&k)
+                    .await
+                    .map_err(|e| TestCaseError::fail(e.to_string()))?;
                 let ref_val = ref_committed.get(&k).cloned().map(bytes::Bytes::from);
 
                 if store_val != ref_val {
@@ -91,7 +95,10 @@ async fn run_differential_ops(ops: Vec<Op>) -> Result<(), TestCaseError> {
                 }
             }
             Op::Commit => {
-                store.commit(current_tx).await.map_err(|e| TestCaseError::fail(e.to_string()))?;
+                store
+                    .commit(current_tx)
+                    .await
+                    .map_err(|e| TestCaseError::fail(e.to_string()))?;
 
                 for (k, v_opt) in std::mem::take(&mut ref_staged) {
                     match v_opt {

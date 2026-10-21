@@ -975,6 +975,15 @@ impl Wal {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
+    /// Returns the active integrity guarantee for this WAL instance.
+    pub fn integrity_guarantee(&self) -> WalIntegrityGuarantee {
+        if self.key_manager.is_some() {
+            WalIntegrityGuarantee::TamperEvident
+        } else {
+            WalIntegrityGuarantee::BitrotOnly
+        }
+    }
+
     pub fn legacy_key_used_for_test(&self) -> bool {
         self.legacy_key_used
             .load(std::sync::atomic::Ordering::Relaxed)

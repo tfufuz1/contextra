@@ -510,7 +510,7 @@ mod tests {
 
         let key = "audit:task-mig:step:1";
         let doc_id = contextra_types::DocId::from_key(key)?;
-        let tx = contextra_types::TxId::new(1);
+        let tx = contextra_types::TxId::try_new(1)?;
 
         let legacy_doc = serde_json::json!({
             "id": key,
@@ -663,7 +663,7 @@ impl StorageEngine for InMemoryStorageEngine {
     }
 
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<contextra_types::TxId>> {
-        Box::pin(async move { Ok(contextra_types::TxId::new(0)) })
+        Box::pin(async move { contextra_types::TxId::try_new(0) })
     }
 
     fn pin_checkpoint<'a>(&'a self, _seq_no: u64) -> BoxFuture<'a, Result<()>> {

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use bytes::Bytes;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use redb::{ReadableTable, TableDefinition};
 
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
@@ -41,7 +41,8 @@ fn encode_key(key: &[u8], seq: u64) -> Result<Vec<u8>> {
             u16::MAX
         ))
     })?;
-    let mut buf = Vec::with_capacity(2 + key.len() + 8);
+    let capacity = key.len().saturating_add(10);
+    let mut buf = Vec::with_capacity(capacity);
     buf.extend_from_slice(&key_len.to_be_bytes());
     buf.extend_from_slice(key);
     buf.extend_from_slice(&seq.to_be_bytes());
@@ -49,15 +50,16 @@ fn encode_key(key: &[u8], seq: u64) -> Result<Vec<u8>> {
 }
 
 fn decode_key(encoded: &[u8]) -> Option<(Vec<u8>, u64)> {
-    if encoded.len() < 2 + 8 {
+    let b0 = *encoded.first()?;
+    let b1 = *encoded.get(1)?;
+    let key_len = u16::from_be_bytes([b0, b1]) as usize;
+    let total_required = key_len.checked_add(10)?;
+    if encoded.len() < total_required {
         return None;
     }
-    let key_len = u16::from_be_bytes([encoded[0], encoded[1]]) as usize;
-    if encoded.len() < 2 + key_len + 8 {
-        return None;
-    }
-    let user_key = encoded[2..2 + key_len].to_vec();
-    let seq_bytes = <[u8; 8]>::try_from(&encoded[2 + key_len..2 + key_len + 8]).ok()?;
+    let end_key = key_len.checked_add(2)?;
+    let user_key = encoded.get(2..end_key)?.to_vec();
+    let seq_bytes = <[u8; 8]>::try_from(encoded.get(end_key..total_required)?).ok()?;
     let seq = u64::from_be_bytes(seq_bytes);
     Some((user_key, seq))
 }
@@ -79,13 +81,11 @@ fn encode_val(op: &StagedOp, tx_id: TxId) -> Vec<u8> {
 }
 
 fn decode_val(val_bytes: &[u8]) -> Option<(bool, TxId, &[u8])> {
-    if val_bytes.len() < 1 + 8 {
-        return None;
-    }
-    let is_tombstone = val_bytes[0] == 1;
-    let tx_id_bytes = <[u8; 8]>::try_from(&val_bytes[1..9]).ok()?;
+    let flag = *val_bytes.first()?;
+    let is_tombstone = flag == 1;
+    let tx_id_bytes = <[u8; 8]>::try_from(val_bytes.get(1..9)?).ok()?;
     let tx_id = TxId(u64::from_be_bytes(tx_id_bytes));
-    let payload = &val_bytes[9..];
+    let payload = val_bytes.get(9..)?;
     Some((is_tombstone, tx_id, payload))
 }
 
@@ -107,6 +107,7 @@ fn decode_val(val_bytes: &[u8]) -> Option<(bool, TxId, &[u8])> {
 pub struct RedbStorageEngine {
     db: Arc<redb::Database>,
     staging: Arc<RwLock<Staging>>,
+    commit_lock: Arc<Mutex<()>>,
     seq: Arc<AtomicU64>,
     last_tx: Arc<RwLock<TxId>>,
 }
@@ -166,6 +167,7 @@ impl RedbStorageEngine {
         Ok(Self {
             db: db_arc,
             staging: Arc::new(RwLock::new(Staging::default())),
+            commit_lock: Arc::new(Mutex::new(())),
             seq: Arc::new(AtomicU64::new(initial_seq)),
             last_tx: Arc::new(RwLock::new(TxId(initial_tx))),
         })
@@ -208,7 +210,8 @@ impl RedbStorageEngine {
         let mut key_versions: BTreeMap<Vec<u8>, (u64, bool, Vec<u8>)> = BTreeMap::new();
 
         for item in iter {
-            let (k, v) = item.map_err(|e| ContextraError::Storage(format!("redb iter item error: {e}")))?;
+            let (k, v) =
+                item.map_err(|e| ContextraError::Storage(format!("redb iter item error: {e}")))?;
             if let Some((user_key, ver_seq)) = decode_key(k.value()) {
                 if ver_seq <= as_of_seq && key_filter(&user_key) {
                     if let Some((is_tombstone, _, payload)) = decode_val(v.value()) {
@@ -216,7 +219,8 @@ impl RedbStorageEngine {
                             .get(&user_key)
                             .is_none_or(|(best_seq, _, _)| ver_seq >= *best_seq);
                         if is_newer {
-                            key_versions.insert(user_key, (ver_seq, is_tombstone, payload.to_vec()));
+                            key_versions
+                                .insert(user_key, (ver_seq, is_tombstone, payload.to_vec()));
                         }
                     }
                 }
@@ -263,7 +267,8 @@ impl StorageEngine for RedbStorageEngine {
 
             let mut latest: Option<(u64, bool, Vec<u8>)> = None;
             for item in range {
-                let (k, v) = item.map_err(|e| ContextraError::Storage(format!("redb item error: {e}")))?;
+                let (k, v) =
+                    item.map_err(|e| ContextraError::Storage(format!("redb item error: {e}")))?;
                 if let Some((_, ver_seq)) = decode_key(k.value()) {
                     if ver_seq <= seq {
                         if let Some((is_tombstone, _, payload)) = decode_val(v.value()) {
@@ -314,12 +319,15 @@ impl StorageEngine for RedbStorageEngine {
 
     fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
+            let _lock = self.commit_lock.lock();
+
             let ops = {
                 let mut staging = self.staging.write();
                 staging.uncommitted.remove(&tx_id)
             };
 
-            let new_seq = self.seq.fetch_add(1, Ordering::SeqCst) + 1;
+            let current_seq = self.seq.load(Ordering::SeqCst);
+            let new_seq = current_seq.saturating_add(1);
 
             let write_txn = self
                 .db
@@ -327,9 +335,9 @@ impl StorageEngine for RedbStorageEngine {
                 .map_err(|e| ContextraError::Storage(format!("redb begin write error: {e}")))?;
 
             {
-                let mut data_table = write_txn
-                    .open_table(DATA_TABLE)
-                    .map_err(|e| ContextraError::Storage(format!("redb open data table error: {e}")))?;
+                let mut data_table = write_txn.open_table(DATA_TABLE).map_err(|e| {
+                    ContextraError::Storage(format!("redb open data table error: {e}"))
+                })?;
 
                 if let Some(ops_map) = ops {
                     for (key, op) in ops_map {
@@ -343,22 +351,23 @@ impl StorageEngine for RedbStorageEngine {
                     }
                 }
 
-                let mut meta_table = write_txn
-                    .open_table(META_TABLE)
-                    .map_err(|e| ContextraError::Storage(format!("redb open meta table error: {e}")))?;
+                let mut meta_table = write_txn.open_table(META_TABLE).map_err(|e| {
+                    ContextraError::Storage(format!("redb open meta table error: {e}"))
+                })?;
 
-                meta_table
-                    .insert(META_LAST_SEQ, &new_seq)
-                    .map_err(|e| ContextraError::Storage(format!("redb insert meta seq error: {e}")))?;
-                meta_table
-                    .insert(META_LAST_TX, &tx_id.0)
-                    .map_err(|e| ContextraError::Storage(format!("redb insert meta tx error: {e}")))?;
+                meta_table.insert(META_LAST_SEQ, &new_seq).map_err(|e| {
+                    ContextraError::Storage(format!("redb insert meta seq error: {e}"))
+                })?;
+                meta_table.insert(META_LAST_TX, &tx_id.0).map_err(|e| {
+                    ContextraError::Storage(format!("redb insert meta tx error: {e}"))
+                })?;
             }
 
             write_txn
                 .commit()
                 .map_err(|e| ContextraError::Storage(format!("redb write commit error: {e}")))?;
 
+            self.seq.store(new_seq, Ordering::SeqCst);
             *self.last_tx.write() = tx_id;
             Ok(())
         })
@@ -374,6 +383,8 @@ impl StorageEngine for RedbStorageEngine {
 
     fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
+            let _lock = self.commit_lock.lock();
+
             {
                 let mut staging = self.staging.write();
                 staging.uncommitted.retain(|t, _| *t <= tx_id);
@@ -387,9 +398,9 @@ impl StorageEngine for RedbStorageEngine {
             let mut max_remaining_seq = 0u64;
 
             {
-                let mut data_table = write_txn
-                    .open_table(DATA_TABLE)
-                    .map_err(|e| ContextraError::Storage(format!("redb open data table error: {e}")))?;
+                let mut data_table = write_txn.open_table(DATA_TABLE).map_err(|e| {
+                    ContextraError::Storage(format!("redb open data table error: {e}"))
+                })?;
 
                 let mut keys_to_remove = Vec::new();
 
@@ -398,7 +409,8 @@ impl StorageEngine for RedbStorageEngine {
                     .map_err(|e| ContextraError::Storage(format!("redb iter error: {e}")))?;
 
                 for item in iter {
-                    let (k, v) = item.map_err(|e| ContextraError::Storage(format!("redb item error: {e}")))?;
+                    let (k, v) =
+                        item.map_err(|e| ContextraError::Storage(format!("redb item error: {e}")))?;
                     if let Some((_, ver_seq)) = decode_key(k.value()) {
                         if let Some((_, item_tx, _)) = decode_val(v.value()) {
                             if item_tx > tx_id {
@@ -411,9 +423,9 @@ impl StorageEngine for RedbStorageEngine {
                 }
 
                 for k in keys_to_remove {
-                    data_table
-                        .remove(k.as_slice())
-                        .map_err(|e| ContextraError::Storage(format!("redb remove key error: {e}")))?;
+                    data_table.remove(k.as_slice()).map_err(|e| {
+                        ContextraError::Storage(format!("redb remove key error: {e}"))
+                    })?;
                 }
 
                 let mut meta_table = write_txn
@@ -422,10 +434,12 @@ impl StorageEngine for RedbStorageEngine {
 
                 meta_table
                     .insert(META_LAST_SEQ, &max_remaining_seq)
-                    .map_err(|e| ContextraError::Storage(format!("redb update meta seq error: {e}")))?;
-                meta_table
-                    .insert(META_LAST_TX, &tx_id.0)
-                    .map_err(|e| ContextraError::Storage(format!("redb update meta tx error: {e}")))?;
+                    .map_err(|e| {
+                        ContextraError::Storage(format!("redb update meta seq error: {e}"))
+                    })?;
+                meta_table.insert(META_LAST_TX, &tx_id.0).map_err(|e| {
+                    ContextraError::Storage(format!("redb update meta tx error: {e}"))
+                })?;
             }
 
             write_txn
@@ -448,7 +462,7 @@ impl StorageEngine for RedbStorageEngine {
             let items = self.scan_prefix(b"").await?;
             let total_bytes: u64 = items
                 .iter()
-                .map(|(k, v)| (k.len() + v.len()) as u64)
+                .map(|(k, v)| k.len().saturating_add(v.len()) as u64)
                 .sum();
             Ok(StorageStats {
                 num_segments: 1,
@@ -478,9 +492,7 @@ impl StorageEngine for RedbStorageEngine {
         &'a self,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move {
-            self.collect_visible(u64::MAX, |k| k.starts_with(prefix), None)
-        })
+        Box::pin(async move { self.collect_visible(u64::MAX, |k| k.starts_with(prefix), None) })
     }
 
     fn scan_prefix_at<'a>(
@@ -488,9 +500,7 @@ impl StorageEngine for RedbStorageEngine {
         prefix: &'a [u8],
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move {
-            self.collect_visible(seq_no, |k| k.starts_with(prefix), None)
-        })
+        Box::pin(async move { self.collect_visible(seq_no, |k| k.starts_with(prefix), None) })
     }
 
     fn scan<'a>(
@@ -514,11 +524,19 @@ impl StorageEngine for RedbStorageEngine {
             self.collect_visible(
                 u64::MAX,
                 move |k| match (&start_bound, &end_bound) {
-                    (Bound::Included(s), Bound::Included(e)) => k >= s.as_slice() && k <= e.as_slice(),
-                    (Bound::Included(s), Bound::Excluded(e)) => k >= s.as_slice() && k < e.as_slice(),
+                    (Bound::Included(s), Bound::Included(e)) => {
+                        k >= s.as_slice() && k <= e.as_slice()
+                    }
+                    (Bound::Included(s), Bound::Excluded(e)) => {
+                        k >= s.as_slice() && k < e.as_slice()
+                    }
                     (Bound::Included(s), Bound::Unbounded) => k >= s.as_slice(),
-                    (Bound::Excluded(s), Bound::Included(e)) => k > s.as_slice() && k <= e.as_slice(),
-                    (Bound::Excluded(s), Bound::Excluded(e)) => k > s.as_slice() && k < e.as_slice(),
+                    (Bound::Excluded(s), Bound::Included(e)) => {
+                        k > s.as_slice() && k <= e.as_slice()
+                    }
+                    (Bound::Excluded(s), Bound::Excluded(e)) => {
+                        k > s.as_slice() && k < e.as_slice()
+                    }
                     (Bound::Excluded(s), Bound::Unbounded) => k > s.as_slice(),
                     (Bound::Unbounded, Bound::Included(e)) => k <= e.as_slice(),
                     (Bound::Unbounded, Bound::Excluded(e)) => k < e.as_slice(),

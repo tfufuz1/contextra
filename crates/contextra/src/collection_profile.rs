@@ -3,10 +3,10 @@
 // INVARIANTEN: INV-COLLECTION-PROFILE-1, INV-COLLECTION-PROFILE-2
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
-pub use contextra_types::types::domain::AutoExtractionMode;
 use contextra_ports::erasure::ErasureMode;
 use contextra_ports::license::LicenseGate;
 use contextra_store::kv::delete_mode::KvDeleteMode;
+pub use contextra_types::types::domain::AutoExtractionMode;
 
 /// Default auto extraction mode for standard deployment tiers.
 pub const DEFAULT_AUTO_EXTRACTION_MODE: AutoExtractionMode = AutoExtractionMode::Enabled;
@@ -92,21 +92,23 @@ impl DeploymentTier {
                 },
                 auto_extraction: DEFAULT_AUTO_EXTRACTION_MODE,
             },
-            Self::PowerUserLocal | Self::EnterpriseShared | Self::EnterpriseRegulated => CollectionProfile {
-                performance: PerformanceProfile::Balanced,
-                kv_delete_mode: KvDeleteMode::TombstoneOnly,
-                lsm_tuning: LsmTuning {
-                    memtable_size_limit: 64 << 20,
-                    max_ram_mb: 512,
-                    group_commit_window_micros: 2_000,
-                    block_cache_shards: 8,
-                },
-                auto_extraction: if matches!(self, Self::EnterpriseRegulated) {
-                    ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT
-                } else {
-                    DEFAULT_AUTO_EXTRACTION_MODE
-                },
-            },
+            Self::PowerUserLocal | Self::EnterpriseShared | Self::EnterpriseRegulated => {
+                CollectionProfile {
+                    performance: PerformanceProfile::Balanced,
+                    kv_delete_mode: KvDeleteMode::TombstoneOnly,
+                    lsm_tuning: LsmTuning {
+                        memtable_size_limit: 64 << 20,
+                        max_ram_mb: 512,
+                        group_commit_window_micros: 2_000,
+                        block_cache_shards: 8,
+                    },
+                    auto_extraction: if matches!(self, Self::EnterpriseRegulated) {
+                        ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT
+                    } else {
+                        DEFAULT_AUTO_EXTRACTION_MODE
+                    },
+                }
+            }
         }
     }
 }

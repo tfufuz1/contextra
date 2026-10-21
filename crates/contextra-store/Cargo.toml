@@ -68,7 +68,6 @@ contextra-ports = { workspace = true, features = ["test-utils", "backend-impl"] 
 contextra-core = { workspace = true }
 sha2 = "0.10"
 contextra-testkit = { workspace = true }
-contextra-vector = { workspace = true }
 libc = "0.2"
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }

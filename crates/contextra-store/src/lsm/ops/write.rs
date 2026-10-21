@@ -8,7 +8,7 @@
 
 use super::super::config::DurabilityMode;
 use super::super::engine::LsmStorage;
-use super::super::fence::InflightGuard;
+use super::super::fence::{fenced_keys_kv, FencedKey};
 use super::super::group_commit::{
     execute_group_commit_append, GroupCommitRequest, GroupCommitSharedState, PendingCommitQueue,
     WalQueueGuard,
@@ -16,10 +16,10 @@ use super::super::group_commit::{
 use super::super::observer::WriteOrigin;
 use super::super::validate::{derive_doc_id, validate_key, validate_value};
 use super::super::{WalOp, MAX_BATCH_SIZE, MAX_GROUP_COMMIT_BATCH_SIZE};
-use contextra_types::{ContextraError, Result, TOMBSTONE_BIT, TxId};
-use contextra_ports::StorageEngine;
 use contextra_mvcc::IndexOp;
 use contextra_mvcc::SsiValidator;
+use contextra_ports::StorageEngine;
+use contextra_types::{ContextraError, Result, TxId, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
@@ -389,12 +389,9 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             };
             if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
                 storage.cleanup_intent_locks_for_tx(tx_id);
-                return Err(ContextraError::Storage(format!(
-                    "Commit rejected by erasure fence: {e}"
-                )));
-            }
-        }
-    }
+                ContextraError::Storage(format!("Commit rejected by erasure fence: {e}"))
+            })?
+    };
 
     // 3. SSI ReadSet Validierung unter commit_mutex
     if let Some(ref rs) = read_set {
@@ -410,9 +407,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
 
     // If group commit window is disabled (0 micros), perform immediate single commit
     if storage.config.group_commit_window_micros == 0 {
-        let _inflight_guard = InflightGuard::new(&storage.erasure_fence().gate);
-
-        let start_seq = storage.next_seq_no.load(Ordering::Acquire);
         let (wal_ops, mem_updates, first_seq) = match prepare_tx_ops(storage, tx_id, &ops) {
             Ok(res) => res,
             Err(e) => {
@@ -512,18 +506,14 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         // 2. Schritt 2: Observer-Fehler dürfen den Commit nicht abbrechen (kein `?`). Bei Fehlern: Zähler inkrementieren + asynchronen Catch-up.
         // 3. Schritt 4: Commit-Phase (Append -> Apply -> Visibility) in einem ununterbrechbaren Task kapseln.
         let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
-        storage.notify_commit_observers(
+        if let Err(obs_err) = storage.notify_commit_observers(
             &entries_for_observer,
             tx_id,
             WriteOrigin::UserWrite,
             is_durable,
-        )?;
-
-        // LOCK ORDER 4: state (read guard: sufficient because MemTable uses internal RwLock; state.write is only for flush swap)
-        let state = storage.state.read().await;
-        storage.apply_mem_updates(&state.memtable, &mem_updates, tx_id);
-        storage.advance_visibility(tx_id);
-        drop(_inflight_guard);
+        ) {
+            tracing::warn!(tx = ?tx_id, error = %obs_err, "Commit observer notification encountered error; commit remains valid");
+        }
 
         let should_flush = state.memtable.size() > storage.config.memtable_size_limit;
         drop(state);
@@ -748,59 +738,51 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             std::mem::take(&mut shared_guard.requests)
         };
 
-        // Window 1: Fence Check for Leader + Followers under commit_mutex
-        if storage.erasure_fence().is_active() {
-            for op in &leader_ops {
-                let key = match op {
-                    IndexOp::Insert { data, .. } => &data.0[..],
-                    IndexOp::Delete { data, .. } => {
-                        if let Some((k, _)) = data {
-                            &k[..]
-                        } else {
-                            continue;
-                        }
-                    }
-                    _ => continue,
-                };
-                if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
-                    let mut batch_txs = vec![leader_tx_id];
-                    batch_txs.extend(requests.iter().map(|r| r.tx_id));
-                    storage.cleanup_intent_locks_for_txs(&batch_txs);
-                    let err_msg = format!("Commit rejected by erasure fence: {e}");
-                    for r in requests {
-                        let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
-                    }
-                    return Err(ContextraError::Storage(err_msg));
-                }
+        // Window 1: Collect ALL keys across Leader + Followers and enter_write atomically
+        let mut all_batch_keys: Vec<&[u8]> = Vec::with_capacity(
+            leader_ops.len() + requests.iter().map(|r| r.ops.len()).sum::<usize>(),
+        );
+
+        let mut contains_unknown_key = false;
+        for op in &leader_ops {
+            match fenced_keys_kv(op) {
+                FencedKey::Exact(k) => all_batch_keys.push(k),
+                FencedKey::Unknown => contains_unknown_key = true,
             }
-            for r in &requests {
-                for op in &r.ops {
-                    let key = match op {
-                        IndexOp::Insert { data, .. } => &data.0[..],
-                        IndexOp::Delete { data, .. } => {
-                            if let Some((k, _)) = data {
-                                &k[..]
-                            } else {
-                                continue;
-                            }
-                        }
-                        _ => continue,
-                    };
-                    if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
-                        let mut batch_txs = vec![leader_tx_id];
-                        batch_txs.extend(requests.iter().map(|r| r.tx_id));
-                        storage.cleanup_intent_locks_for_txs(&batch_txs);
-                        let err_msg = format!("Commit rejected by erasure fence: {e}");
-                        for req in requests {
-                            let _ = req.sender.send(Err(ContextraError::Storage(err_msg.clone())));
-                        }
-                        return Err(ContextraError::Storage(err_msg));
-                    }
+        }
+        for r in &requests {
+            for op in &r.ops {
+                match fenced_keys_kv(op) {
+                    FencedKey::Exact(k) => all_batch_keys.push(k),
+                    FencedKey::Unknown => contains_unknown_key = true,
                 }
             }
         }
 
-        let _inflight_guard = InflightGuard::new(&storage.erasure_fence().gate);
+        if contains_unknown_key && storage.erasure_fence().is_active() {
+            let mut batch_txs = vec![leader_tx_id];
+            batch_txs.extend(requests.iter().map(|r| r.tx_id));
+            storage.cleanup_intent_locks_for_txs(&batch_txs);
+            let err_msg = "Commit rejected by erasure fence: Unknown key payload in batch during active fence".to_string();
+            for r in requests {
+                let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
+            }
+            return Err(ContextraError::Storage(err_msg));
+        }
+
+        let _write_ticket = match storage.erasure_fence().enter_write(all_batch_keys) {
+            Ok(ticket) => ticket,
+            Err(e) => {
+                let mut batch_txs = vec![leader_tx_id];
+                batch_txs.extend(requests.iter().map(|r| r.tx_id));
+                storage.cleanup_intent_locks_for_txs(&batch_txs);
+                let err_msg = format!("Commit rejected by erasure fence: {e}");
+                for r in requests {
+                    let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
+                }
+                return Err(ContextraError::Storage(err_msg));
+            }
+        };
 
         let mut follower_prep = Vec::with_capacity(requests.len());
         for r in &requests {
@@ -902,12 +884,14 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         // und Fehler mit `?` propagiert. Die Benachrichtigung muss erst nach Anwendung aller Updates
         // auf Memtable und Sichtbarkeit erfolgen, und Observer-Fehler dürfen den Commit nicht abbrechen.
         let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
-        storage.notify_commit_observers(
+        if let Err(obs_err) = storage.notify_commit_observers(
             &leader_entries_for_observer,
             leader_tx_id,
             WriteOrigin::UserWrite,
             is_durable,
-        )?;
+        ) {
+            tracing::warn!(leader_tx = ?leader_tx_id, error = %obs_err, "Leader commit observer notification error");
+        }
 
         let mut current_idx = leader_entries_count;
         for (i, r) in requests.iter().enumerate() {
@@ -918,31 +902,18 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                     .entries()
                     .get(current_idx..current_idx + follower_entries_count)
                 {
-                    storage.notify_commit_observers(
+                    if let Err(obs_err) = storage.notify_commit_observers(
                         entries,
                         r.tx_id,
                         WriteOrigin::UserWrite,
                         is_durable,
-                    )?;
+                    ) {
+                        tracing::warn!(follower_tx = ?r.tx_id, error = %obs_err, "Follower commit observer notification error");
+                    }
                 }
             }
             current_idx += follower_entries_count;
         }
-
-        type MemUpdateBatch<'a> = (TxId, &'a [(Vec<u8>, Vec<u8>, u64)]);
-        let mut all_updates: Vec<MemUpdateBatch> = Vec::with_capacity(1 + requests.len());
-        all_updates.push((leader_tx_id, &leader_mem_updates));
-        for (i, r) in requests.iter().enumerate() {
-            all_updates.push((r.tx_id, &follower_prep[i].1));
-        }
-
-        // LOCK ORDER 4: state (read guard: symmetrical with single-commit, MemTable uses internal RwLock)
-        let state = storage.state.read().await;
-        for (req_tx_id, mem_updates) in all_updates {
-            storage.apply_mem_updates(&state.memtable, mem_updates, req_tx_id);
-            storage.advance_visibility(req_tx_id);
-        }
-        drop(_inflight_guard);
 
         let needs_flush = state.memtable.size() > storage.config.memtable_size_limit;
         drop(state);

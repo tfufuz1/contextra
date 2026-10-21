@@ -20,7 +20,8 @@ fn test_oracle_self_test_negative_control() {
     let dummy_path = tmp.path().join("dummy_storage.dat");
     let mut f = File::create(&dummy_path).expect("create dummy file");
     f.write_all(b"HEADER_PADDING_BYTES_").expect("write header");
-    f.write_all(canary_set.text.as_bytes()).expect("write canary bytes");
+    f.write_all(canary_set.text.as_bytes())
+        .expect("write canary bytes");
     f.write_all(b"_FOOTER_PADDING_BYTES").expect("write footer");
     f.flush().expect("flush dummy file");
 
@@ -111,7 +112,7 @@ async fn test_canary_oracle_current_state_found_in_sst_after_flush() {
 /// Target specification for S0/S1/S2 complete physical erasure via public deletion API (`forget`).
 /// Currently ignored as public deletion wiring is pending (LN-1.x).
 #[tokio::test]
-#[ignore = "LN-1.x: öffentliche Löschung noch nicht verdrahtet"]
+#[ignore = "LN-1.x: Facade-level public forget/PurgeDriver API is pending wiring on Contextra struct"]
 async fn test_canary_oracle_target_state_s0_s1_s2_erased() {
     let tmp = TempDir::new().expect("create temp dir");
     let config = ContextraConfig {

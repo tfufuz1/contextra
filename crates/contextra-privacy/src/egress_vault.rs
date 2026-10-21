@@ -39,7 +39,7 @@ pub struct SurrogateVault {
 
 impl std::fmt::Debug for SurrogateVault {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let entry_count = self.map.lock().map(|m| m.len()).unwrap_or(0);
+        let entry_count = self.map.lock().unwrap_or_else(|e| e.into_inner()).len();
         f.debug_struct("SurrogateVault")
             .field("entry_count", &entry_count)
             .finish_non_exhaustive()
@@ -82,18 +82,17 @@ impl SurrogateVault {
         let hash_hex = hasher.finalize().to_hex();
         let surrogate = format!("[USER_ENTITY_{}]", &hash_hex[..16]);
 
-        if let Ok(mut guard) = self.map.lock() {
-            if let Some(existing) = guard.get(&surrogate) {
-                if existing != entity_text {
-                    return Err(EgressVaultError::SurrogateCollision {
-                        surrogate,
-                        existing_plaintext: existing.clone(),
-                        new_plaintext: entity_text.to_string(),
-                    });
-                }
-            } else {
-                guard.insert(surrogate.clone(), entity_text.to_string());
+        let mut guard = self.map.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(existing) = guard.get(&surrogate) {
+            if existing != entity_text {
+                return Err(EgressVaultError::SurrogateCollision {
+                    surrogate,
+                    existing_plaintext: existing.clone(),
+                    new_plaintext: entity_text.to_string(),
+                });
             }
+        } else {
+            guard.insert(surrogate.clone(), entity_text.to_string());
         }
 
         Ok(surrogate)
@@ -101,15 +100,13 @@ impl SurrogateVault {
 
     /// Retrieves the original entity text for a given surrogate key if present.
     pub fn get_entity(&self, surrogate: &str) -> Option<String> {
-        self.map
-            .lock()
-            .ok()
-            .and_then(|guard| guard.get(surrogate).cloned())
+        let guard = self.map.lock().unwrap_or_else(|e| e.into_inner());
+        guard.get(surrogate).cloned()
     }
 
     /// Returns the current count of stored surrogate mappings.
     pub fn len(&self) -> usize {
-        self.map.lock().map(|m| m.len()).unwrap_or(0)
+        self.map.lock().unwrap_or_else(|e| e.into_inner()).len()
     }
 
     /// Returns true if the vault contains no surrogate mappings.
@@ -121,11 +118,10 @@ impl SurrogateVault {
 impl Drop for SurrogateVault {
     fn drop(&mut self) {
         self.session_salt.zeroize();
-        if let Ok(mut guard) = self.map.lock() {
-            for (mut k, mut v) in guard.drain() {
-                k.zeroize();
-                v.zeroize();
-            }
+        let mut guard = self.map.lock().unwrap_or_else(|e| e.into_inner());
+        for (mut k, mut v) in guard.drain() {
+            k.zeroize();
+            v.zeroize();
         }
     }
 }
@@ -282,7 +278,9 @@ pub async fn classify_layer1_arc(
                         pattern = %cp.regex.as_str(),
                         "Egress DLP sensitive pattern match detected"
                     );
-                    return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
+                    return EgressClassification::Block(BlockReason::SensitivePattern(
+                        cp.name.clone(),
+                    ));
                 }
             }
         }
@@ -517,7 +515,14 @@ impl EgressClassifier for EgressVault {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects, deprecated)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
+    deprecated
+)]
 mod tests {
     use super::*;
     use std::time::Instant;

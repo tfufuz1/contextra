@@ -328,7 +328,7 @@ pub fn atomic_replace_with_injector<F: FaultInjector>(
     injector.on_rename(&tmp_path, path)?;
     rename_durable(&tmp_path, path)?;
 
-    injector.on_dir_fsync(parent)?;
+    sync_dir_with_injector(parent, injector)?;
 
     std::mem::forget(guard);
 
@@ -353,7 +353,6 @@ pub fn durable_remove_with_injector<F: FaultInjector>(
     })?;
 
     std::fs::remove_file(path)?;
-    injector.on_dir_fsync(parent)?;
-    flush_dir(parent)?;
+    sync_dir_with_injector(parent, injector)?;
     Ok(())
 }

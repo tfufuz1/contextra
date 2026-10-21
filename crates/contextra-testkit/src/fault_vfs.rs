@@ -317,6 +317,39 @@ mod tests {
     }
 
     #[test]
+    fn test_fault_vfs_seed_reproducibility() {
+        let run_sequence = |seed: u64| {
+            let vfs = FaultVfs::new();
+            vfs.set_config(FaultConfig {
+                seed: Some(seed),
+                torn_write_after: Some(2),
+                lost_syncs_after: Some(1),
+                ..Default::default()
+            });
+
+            let mut write_results = Vec::new();
+            write_results.push(vfs.write_file(Path::new("a.txt"), b"data_a").is_ok());
+            write_results.push(vfs.write_file(Path::new("b.txt"), b"data_b").is_ok());
+            write_results.push(vfs.write_file(Path::new("c.txt"), b"data_c").is_ok());
+
+            let sync_res1 = vfs.sync().is_ok();
+            let sync_res2 = vfs.sync().is_ok();
+
+            (write_results, sync_res1, sync_res2, vfs.seed_log())
+        };
+
+        let seed = 98765;
+        let res1 = run_sequence(seed);
+        let res2 = run_sequence(seed);
+
+        assert_eq!(
+            res1, res2,
+            "Identical seed must yield identical fault sequence and seed log (seed {})",
+            seed
+        );
+    }
+
+    #[test]
     fn test_fault_vfs_lost_fsync() {
         let vfs = FaultVfs::new();
         vfs.set_config(FaultConfig {

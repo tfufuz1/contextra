@@ -37,3 +37,6 @@ kivi-quantization = []
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
+
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"

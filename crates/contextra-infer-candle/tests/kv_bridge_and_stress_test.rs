@@ -1,4 +1,10 @@
-#![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+#![allow(
+    deprecated,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 
 // FILE-CONTEXT
 // STAND: 2026-09-13T01:42:00Z (SESSION: 50c8c755)
@@ -9,10 +15,10 @@
 mod tests {
     use candle_core::Device;
     use contextra_crypto::{CryptoKey, KvSegmentCipher};
-    use contextra_kvcache::TenantIsolatedKvStore;
     use contextra_infer_candle::inference::CandleModelInner;
     use contextra_infer_candle::kv_bridge::KvCacheKey;
     use contextra_infer_candle::{CandleLlmClient, GaspValidator, KvBridgeAdapter};
+    use contextra_kvcache::TenantIsolatedKvStore;
     use contextra_ports::ResponseGroundingValidator;
     use contextra_types::{ModelFingerprint, Result, TenantId};
     use std::sync::Arc;

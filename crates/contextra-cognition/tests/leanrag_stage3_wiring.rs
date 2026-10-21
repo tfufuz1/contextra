@@ -148,7 +148,7 @@ async fn test_execute_leanrag_aggregation_stage_creates_superedge_in_csr_graph()
 
     let llm = TestMockLlm;
     let mut tracker = CommunityStabilityTracker::new();
-    let wal_tx = TxId::new(500);
+    let wal_tx = TxId::try_new(500).expect("TxId 500");
 
     // 3. Execute stage 3 aggregation
     let stage_res = execute_leanrag_aggregation_stage(

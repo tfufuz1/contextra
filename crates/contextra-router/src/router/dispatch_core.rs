@@ -56,104 +56,188 @@ impl RouterEngine {
         }
 
         // 3. Perform profile selection, scoring, calibration tracking, and confidence metric generation
-        // using an updated state snapshot swapped atomically via ArcSwap.
-        let current_state = self.state.load_full();
-        let mut new_state = (*current_state).clone();
+        // using atomic ArcSwap::rcu (Read-Copy-Update) to eliminate lost state updates under concurrency.
+        let mut selected_profile_out = None;
+        let mut confidence_metrics_out = None;
+        let mut is_bandit_decision_out = None;
+        let mut drift_status_out = None;
+        let mut select_err = None;
 
-        let (selected_profile, confidence_metrics, _is_bandit_decision) = {
-            let cal = &mut new_state.calibration;
+        self.state.rcu(|current_state| {
+            let mut new_state = (**current_state).clone();
 
-            // 1. Derive effective profiles using calibrated_min_score from calibration state
-            let effective_profiles: Vec<SlmProfile> = profiles
-                .iter()
-                .map(|p| {
-                    let mut ep = p.clone();
-                    if let Some(state) = cal.get_mut(&p.name) {
-                        state.check_and_invalidate_fingerprint(p.fingerprint.as_ref());
-                        if state.is_calibrated(p.fingerprint.as_ref()) {
-                            ep.min_relevance_score = state.calibrated_min_score;
+            let res = (|| {
+                let cal = &mut new_state.calibration;
+
+                // 1. Derive effective profiles using calibrated_min_score from calibration state
+                let effective_profiles: Vec<SlmProfile> = profiles
+                    .iter()
+                    .map(|p| {
+                        let mut ep = p.clone();
+                        if let Some(state) = cal.get_mut(&p.name) {
+                            state.check_and_invalidate_fingerprint(p.fingerprint.as_ref());
+                            if state.is_calibrated(p.fingerprint.as_ref()) {
+                                ep.min_relevance_score = state.calibrated_min_score;
+                            }
                         }
+                        ep
+                    })
+                    .collect();
+
+                // 2. Profile Selection: Bandit (opt-in) or Cascade (default)
+                #[cfg(feature = "bandit-routing")]
+                let bandit_selection =
+                    if matches!(self.routing_strategy, RoutingStrategy::ContextualBandit) {
+                        self.select_profile_bandit(&chunks, &effective_profiles, query_embedding)
+                    } else {
+                        None
+                    };
+                #[cfg(not(feature = "bandit-routing"))]
+                let bandit_selection: Option<(usize, SlmProfile, u32, f32)> = None;
+
+                let (selected_idx, selected_profile, is_bandit_decision) =
+                    if let Some((idx, profile, action_idx, propensity)) = bandit_selection {
+                        (idx, profile, Some((action_idx, propensity)))
+                    } else {
+                        let (idx, profile, _) =
+                            self.select_profile_cascade(&chunks, &effective_profiles, cal)?;
+                        (idx, profile, None)
+                    };
+
+                let profile_scores = compute_profile_scores(&profiles, &chunks);
+                let best_score = profile_scores.get(&selected_idx).copied().unwrap_or(0.0);
+                let second_best = profile_scores
+                    .iter()
+                    .filter(|(idx, _)| **idx != selected_idx)
+                    .map(|(_, s)| *s)
+                    .fold(0.0f32, f32::max);
+
+                let confidence_ratio = if second_best > 0.0 {
+                    (best_score / second_best) as f64
+                } else {
+                    2.0 // Single candidate -> high confidence
+                };
+
+                let non_conformity = if best_score > 0.0 {
+                    (1.0 / confidence_ratio as f32).clamp(0.0, 1.0)
+                } else {
+                    1.0
+                };
+
+                if let Some(state) = cal.get_mut(&selected_profile.name) {
+                    state.times_selected = state.times_selected.saturating_add(1);
+                    state.cumulative_confidence += confidence_ratio;
+                }
+
+                // 4. Construct ConfidenceMetrics from updated state
+                let metrics = cal.get(&selected_profile.name).map(|state| {
+                    let calibrated =
+                        state.conformal.window_total >= CALIBRATION_WARMUP_WINDOW as u64;
+                    if !calibrated {
+                        tracing::info!(
+                            profile = %selected_profile.name,
+                            samples = state.conformal.window_total,
+                            required = CALIBRATION_WARMUP_WINDOW,
+                            "Router in random-fallback mode: calibration not yet reliable"
+                        );
                     }
-                    ep
-                })
-                .collect();
+                    ConfidenceMetrics {
+                        score_lower: if calibrated {
+                            Some(best_score * (1.0 - state.conformal.alpha))
+                        } else {
+                            None
+                        },
+                        score_upper: if calibrated {
+                            Some(best_score * (1.0 + state.conformal.alpha))
+                        } else {
+                            None
+                        },
+                        calibrated,
+                        quantile_threshold: state.conformal.quantile_threshold,
+                        non_conformity_score: non_conformity,
+                        selection_margin: confidence_ratio as f32,
+                    }
+                });
 
-            // 2. Profile Selection: Bandit (opt-in) or Cascade (default)
-            #[cfg(feature = "bandit-routing")]
-            let bandit_selection =
-                if matches!(self.routing_strategy, RoutingStrategy::ContextualBandit) {
-                    self.select_profile_bandit(&chunks, &effective_profiles, query_embedding)
-                } else {
-                    None
+                // Update Lyapunov Drift Watcher with non-conformity score
+                let non_conformity_score = metrics
+                    .as_ref()
+                    .map(|m| m.non_conformity_score)
+                    .unwrap_or(1.0);
+
+                let drift_status = {
+                    let watchers = &mut new_state.lyapunov_watchers;
+                    if let Some(watcher) = watchers.get_mut(&selected_profile.name) {
+                        watcher.observe_score(non_conformity_score);
+                        let res = watcher.analyze();
+
+                        if let LyapunovResult::DriftDetected {
+                            lyapunov_exponent,
+                            ref reason,
+                        } = res
+                        {
+                            tracing::warn!(
+                                profile = %selected_profile.name,
+                                lambda = lyapunov_exponent,
+                                kl_divergence = reason.kl_divergence,
+                                "Lyapunov drift detected — conformal calibration may be stale"
+                            );
+
+                            #[cfg(feature = "bandit-routing")]
+                            {
+                                let k_drift = (1.0 + lyapunov_exponent.max(0.0)).clamp(1.5, 4.0);
+                                if let Some(profile_state) = new_state
+                                    .profiles
+                                    .iter_mut()
+                                    .find(|p| p.name == selected_profile.name)
+                                {
+                                    if let Some(ref bstate_arc) = profile_state.bandit_state {
+                                        let mut bstate_cloned = (*bstate_arc).clone();
+                                        bstate_cloned.on_drift_detected(k_drift);
+                                        profile_state.bandit_state = Some(bstate_cloned);
+                                    }
+                                }
+                            }
+                        }
+
+                        match res {
+                            LyapunovResult::InsufficientData => None,
+                            status => Some(status),
+                        }
+                    } else {
+                        None
+                    }
                 };
-            #[cfg(not(feature = "bandit-routing"))]
-            let bandit_selection: Option<(usize, SlmProfile, u32, f32)> = None;
 
-            let (selected_idx, selected_profile, is_bandit_decision) =
-                if let Some((idx, profile, action_idx, propensity)) = bandit_selection {
-                    (idx, profile, Some((action_idx, propensity)))
-                } else {
-                    let (idx, profile, _) =
-                        self.select_profile_cascade(&chunks, &effective_profiles, cal)?;
-                    (idx, profile, None)
-                };
+                Ok((selected_profile, metrics, is_bandit_decision, drift_status))
+            })();
 
-            let profile_scores = compute_profile_scores(&profiles, &chunks);
-            let best_score = profile_scores.get(&selected_idx).copied().unwrap_or(0.0);
-            let second_best = profile_scores
-                .iter()
-                .filter(|(idx, _)| **idx != selected_idx)
-                .map(|(_, s)| *s)
-                .fold(0.0f32, f32::max);
-
-            let confidence_ratio = if second_best > 0.0 {
-                (best_score / second_best) as f64
-            } else {
-                2.0 // Single candidate -> high confidence
-            };
-
-            let non_conformity = if best_score > 0.0 {
-                (1.0 / confidence_ratio as f32).clamp(0.0, 1.0)
-            } else {
-                1.0
-            };
-
-            if let Some(state) = cal.get_mut(&selected_profile.name) {
-                state.times_selected = state.times_selected.saturating_add(1);
-                state.cumulative_confidence += confidence_ratio;
+            match res {
+                Ok((prof, metrics, is_bandit, drift)) => {
+                    selected_profile_out = Some(prof);
+                    confidence_metrics_out = metrics;
+                    is_bandit_decision_out = is_bandit;
+                    drift_status_out = drift;
+                    select_err = None;
+                    Arc::new(new_state)
+                }
+                Err(err) => {
+                    select_err = Some(err);
+                    Arc::clone(current_state)
+                }
             }
+        });
 
-            // 4. Construct ConfidenceMetrics from updated state
-            let metrics = cal.get(&selected_profile.name).map(|state| {
-                let calibrated = state.conformal.window_total >= CALIBRATION_WARMUP_WINDOW as u64;
-                if !calibrated {
-                    tracing::info!(
-                        profile = %selected_profile.name,
-                        samples = state.conformal.window_total,
-                        required = CALIBRATION_WARMUP_WINDOW,
-                        "Router in random-fallback mode: calibration not yet reliable"
-                    );
-                }
-                ConfidenceMetrics {
-                    score_lower: if calibrated {
-                        Some(best_score * (1.0 - state.conformal.alpha))
-                    } else {
-                        None
-                    },
-                    score_upper: if calibrated {
-                        Some(best_score * (1.0 + state.conformal.alpha))
-                    } else {
-                        None
-                    },
-                    calibrated,
-                    quantile_threshold: state.conformal.quantile_threshold,
-                    non_conformity_score: non_conformity,
-                    selection_margin: confidence_ratio as f32,
-                }
-            });
+        if let Some(err) = select_err {
+            return Err(err);
+        }
 
-            (selected_profile, metrics, is_bandit_decision)
-        };
+        let selected_profile = selected_profile_out.ok_or_else(|| {
+            ContextraError::NotFound("Kein SLM-Profil konnte ausgewählt werden".to_string())
+        })?;
+        let confidence_metrics = confidence_metrics_out;
+        let _is_bandit_decision = is_bandit_decision_out;
+        let drift_status = drift_status_out;
 
         let decision_id = self.decision_ids.next();
         self.pending_decisions
@@ -174,61 +258,8 @@ impl RouterEngine {
             );
         }
 
-        // 4. Construct ContextWindow using ContextManager tailored to selected_profile.token_budget and min_relevance_score
+        // Construct ContextWindow using ContextManager tailored to selected_profile.token_budget and min_relevance_score
         let raw_chunks: Vec<ContextChunk> = chunks.into_iter().map(|(c, _)| c).collect();
-
-        // 5. Update Lyapunov Drift Watcher with non-conformity score
-        let non_conformity_score = confidence_metrics
-            .as_ref()
-            .map(|m| m.non_conformity_score)
-            .unwrap_or(1.0);
-
-        let drift_status = {
-            let watchers = &mut new_state.lyapunov_watchers;
-            if let Some(watcher) = watchers.get_mut(&selected_profile.name) {
-                watcher.observe_score(non_conformity_score);
-                let res = watcher.analyze();
-
-                if let LyapunovResult::DriftDetected {
-                    lyapunov_exponent,
-                    ref reason,
-                } = res
-                {
-                    tracing::warn!(
-                        profile = %selected_profile.name,
-                        lambda = lyapunov_exponent,
-                        kl_divergence = reason.kl_divergence,
-                        "Lyapunov drift detected — conformal calibration may be stale"
-                    );
-
-                    #[cfg(feature = "bandit-routing")]
-                    {
-                        let k_drift = (1.0 + lyapunov_exponent.max(0.0)).clamp(1.5, 4.0);
-                        if let Some(profile_state) = new_state
-                            .profiles
-                            .iter_mut()
-                            .find(|p| p.name == selected_profile.name)
-                        {
-                            if let Some(ref bstate_arc) = profile_state.bandit_state {
-                                let mut bstate_cloned = (*bstate_arc).clone();
-                                bstate_cloned.on_drift_detected(k_drift);
-                                profile_state.bandit_state = Some(bstate_cloned);
-                            }
-                        }
-                    }
-                }
-
-                match res {
-                    LyapunovResult::InsufficientData => None,
-                    status => Some(status),
-                }
-            } else {
-                None
-            }
-        };
-
-        // Store updated state atomically via ArcSwap
-        self.state.store(Arc::new(new_state));
 
         let context_window = self.context_preparer.prepare_context(
             raw_chunks,

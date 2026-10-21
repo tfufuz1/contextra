@@ -11,9 +11,9 @@
 
 use bytes::Bytes;
 use contextra_crypto::EncryptedKvLayer;
+use contextra_crypto::KvSegmentCipher;
 #[cfg(test)]
 use contextra_kvcache::{KvSegment, TenantIsolatedKvStore};
-use contextra_crypto::KvSegmentCipher;
 use contextra_ports::{ContextSegment, KvBridgeStorage};
 use contextra_types::{ModelFingerprint, TenantId, TxId};
 use serde::{Deserialize, Serialize};
@@ -299,7 +299,13 @@ impl std::fmt::Debug for KvBridgeAdapter {
 }
 
 #[cfg(test)]
-#[allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+#[allow(
+    deprecated,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 mod tests {
     use super::*;
     use contextra_crypto::CryptoKey;

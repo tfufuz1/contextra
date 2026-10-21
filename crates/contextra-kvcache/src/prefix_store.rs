@@ -145,6 +145,8 @@ impl TenantPrefixKvStore {
             .find_longest_prefix(tokens, self.reuse_policy)?;
         let group = partition.groups.get_mut(&pm.block_id)?;
 
+        // ORDERING RATIONALE: Ordering::Relaxed is sufficient because next_tick is a monotonic sequence counter
+        // for LRU eviction candidate ranking, operated under partitions RwLock write guard.
         group.tick = self.next_tick.fetch_add(1, Ordering::Relaxed);
 
         Some(KvPrefixHit {
@@ -192,6 +194,8 @@ impl TenantPrefixKvStore {
             }
         }
 
+        // ORDERING RATIONALE: Ordering::Relaxed is sufficient because next_group_id and next_tick are unique ID
+        // and LRU timestamp sequence generators operating within partitions RwLock write guard.
         let group_id = self.next_group_id.fetch_add(1, Ordering::Relaxed);
         let tick = self.next_tick.fetch_add(1, Ordering::Relaxed);
 
