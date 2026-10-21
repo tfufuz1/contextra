@@ -4,7 +4,8 @@
 //! INVARIANTEN: Zero-Panic, Fail-Closed, non-blocking sync decision evaluate für Hotpath/Replay.
 
 use super::{
-    serialize_frame, ErasureLedger, LedgerDecision, LedgerEntry, HEAD_FILENAME, LEDGER_FILENAME,
+    serialize_frame, AntiResurrection, ErasureLedger, LedgerDecision, LedgerEntry, HEAD_FILENAME,
+    LEDGER_FILENAME,
 };
 use crate::compaction::purge_filter::CompactionRecordFilter;
 use crate::wal::replay_filter::WalReplayFilter;
@@ -122,6 +123,15 @@ impl ErasureLedgerHandle {
     /// Returns a copy of all current ledger entries.
     pub fn entries(&self) -> Vec<LedgerEntry> {
         self.ledger.read().entries().to_vec()
+    }
+
+    /// Reapplies tombstones from the ledger with accelerated index.
+    pub fn reapply_tombstones_from_ledger(
+        &self,
+        storage_scope: &[u8],
+        truncation_anchor_mac: Option<[u8; 32]>,
+    ) -> (Vec<LedgerEntry>, AntiResurrection) {
+        self.ledger.read().reapply_tombstones_from_ledger(storage_scope, truncation_anchor_mac)
     }
 }
 
