@@ -1,0 +1,15 @@
+# Tests Manifest for PARK-SANDBOX (crates/contextra-sandbox)
+
+crates/contextra-sandbox/tests/pure_merge_operator_capabilities_test.rs::test_pure_capabilities_generation
+crates/contextra-sandbox/tests/sandbox_concurrency_and_edge_tests.rs::test_parallel_wasm_sandbox_isolation
+crates/contextra-sandbox/tests/sandbox_concurrency_and_edge_tests.rs::test_wasm_trap_isolation
+crates/contextra-sandbox/tests/sandbox_concurrency_and_edge_tests.rs::test_sandbox_drop_cancellation
+crates/contextra-sandbox/tests/sandbox_concurrency_and_edge_tests.rs::test_corrupted_wasm_rejection
+crates/contextra-sandbox/tests/sandbox_concurrency_and_edge_tests.rs::test_wasm_memory_page_limit_enforcement
+crates/contextra-sandbox/tests/sandbox_concurrency_and_edge_tests.rs::test_boundary_buffers
+crates/contextra-sandbox/tests/unverified_execute_gating_test.rs::test_unverified_execute_denied
+crates/contextra-sandbox/tests/wasm_boundary_tests.rs::test_wasm_executor_fuel_and_memory_limits
+crates/contextra-sandbox/tests/wasm_merge_function.rs::test_wasm_merge_function_execution
+crates/contextra-sandbox/tests/wasm_wasi_io.rs::test_wasi_io_streams
+docs/restore/PARK-SANDBOX/engine/merge_operator_adapter.rs.parked::tests::test_admit_into_registry_fake_host_success
+docs/restore/PARK-SANDBOX/engine/merge_operator_adapter.rs.parked::tests::test_admit_into_registry_fake_host_failure

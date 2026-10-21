@@ -1,0 +1,37 @@
+diff --git a/crates/contextra-engine/Cargo.toml b/crates/contextra-engine/Cargo.toml
+index d50efc615..60573dc2c 100644
+--- a/crates/contextra-engine/Cargo.toml
++++ b/crates/contextra-engine/Cargo.toml
+@@ -19,7 +19,6 @@ contextra-ports = { workspace = true }
+ contextra-mvcc = { workspace = true }
+ bytes = { workspace = true }
+ contextra-crypto = { workspace = true }
+-contextra-sandbox = { workspace = true, optional = true }
+ contextra-durable-fs = { path = "../contextra-durable-fs" }
+ contextra-store = { workspace = true }
+ blake3 = { workspace = true }
+@@ -68,7 +67,6 @@ reranking = []
+ # Assumes contextra-store has the encryption-at-rest feature (Aufgabe 7 / Spec §15.2)
+ encryption-at-rest = ["contextra-store/encryption-at-rest"]
+ bench = []
+-sandbox = ["dep:contextra-sandbox"]
+ experimental-diskann = ["contextra-vector/experimental-diskann"]
+ background-maintenance = []
+ graph-connectivity-health = ["contextra-graph/physio-percolation"]
+diff --git a/crates/contextra-engine/src/lib.rs b/crates/contextra-engine/src/lib.rs
+index 34c873efb..0114c962e 100644
+--- a/crates/contextra-engine/src/lib.rs
++++ b/crates/contextra-engine/src/lib.rs
+@@ -14,12 +14,6 @@ pub mod deletion;
+ pub mod extraction;
+ #[cfg(not(loom))]
+ pub mod kv_cache_integration;
+-#[cfg(not(loom))]
+-#[cfg(feature = "sandbox")]
+-pub mod merge_operator_adapter;
+-#[cfg(not(loom))]
+-#[cfg(feature = "sandbox")]
+-pub use merge_operator_adapter::WasmMergeOperator;
+ use contextra_ports::StorageEngine;
+ pub use contextra_ports::TextEmbeddingEngine;
+ pub use contextra_ports::VectorDeleteMode;
