@@ -784,11 +784,12 @@ mod tests {
             metadata: WitnessSstMetadata {
                 first_key: Bytes::new(),
                 last_key: Bytes::new(),
+                file_size: 20,
                 min_tx_id: 0,
                 max_tx_id: 0,
                 min_seq: 0,
                 max_seq: 0,
-                key_count: 0,
+                format_version: 5,
             },
             index: Vec::new(),
             index_offset: 20,
@@ -802,7 +803,7 @@ mod tests {
             is_encrypted: true,
         };
 
-        let res = reader.read_block(0, 20);
+        let res = reader.read_block_raw(0, 20);
         let err = res.unwrap_err();
         match err {
             WitnessReadError::NotWitnessable(msg) => {

@@ -153,7 +153,11 @@ pub async fn retire_segments_with_stream<S: WalDirStream>(
                     error = %err,
                     "Failed replay on WAL segment during retirement check"
                 );
-                continue;
+                return Err(ContextraError::Storage(format!(
+                    "Failed replay on WAL segment {} during retirement check: {}",
+                    path.display(),
+                    err
+                )));
             }
         };
 

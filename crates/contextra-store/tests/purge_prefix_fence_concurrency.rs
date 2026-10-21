@@ -60,7 +60,7 @@ async fn test_purge_prefix_fence_allows_concurrent_unrelated_writes_and_blocks_s
 
             // Attempt write on Scope A during purge of Scope A -> MUST be rejected by fence
             let res_a = st_a.put(TxId::try_new(11).unwrap(), b"scope_a:key2", b"val2").await;
-            if res_a.is_err() || !st_a.erasure_fence.check_write_allowed(b"scope_a:key2") {
+            if res_a.is_err() || !st_a.erasure_fence().check_write_allowed(b"scope_a:key2") {
                 wa.store(true, Ordering::SeqCst);
             }
         });

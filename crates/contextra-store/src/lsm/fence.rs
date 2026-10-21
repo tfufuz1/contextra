@@ -71,6 +71,11 @@ impl ErasureGate {
         }
     }
 
+    // TODO(WP-6 / PR-9 Schritt 1): `enter_write` mit RAII `WriteTicket` implementieren:
+    // Um Check-then-Act Races (Befund N8) im Schreiber zu verhindern, muss `enter_write` atomar:
+    // 1. `self.inc_inflight()` unter `SeqCst` ausführen.
+    // 2. Prüfen, ob `self.active` gesetzt ist (unter `SeqCst`). Falls ja, Keys gegen Präfix-Tabelle prüfen.
+    // 3. Ein RAII `WriteTicket` zurückgeben, das bei Drop automatisch `dec_inflight()` aufruft.
     /// Fast-path check: returns whether any scope fence is active.
     #[inline]
     pub fn is_active(&self) -> bool {
@@ -215,6 +220,11 @@ impl ErasureGate {
             }
         }
 
+        // TODO(WP-6 / PR-9 Schritt 3 / N9): `Ordering::Release` -> `Ordering::SeqCst` im Dekker-Muster:
+        // Befund N9: `self.active.store(true, Ordering::Release)` reicht nicht aus, um CPU-Store-Buffer-Reordering
+        // gegen den anschließenden Load von `self.inflight` zu verhindern (klassisches Dekker-Muster).
+        // Beide Operationen müssen mit `Ordering::SeqCst` ausgeführt werden, damit Schreiber und
+        // Fence-Installer sich wechselseitig garantiert atomar wahrnehmen.
         self.active.store(true, Ordering::Release);
 
         // Drain phase: wait until inflight == 0

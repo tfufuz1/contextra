@@ -3,7 +3,8 @@
 // ZWECK: Fehlerinjektionstest für Lesefehler mitten in einer SSTable während des Purge.
 
 use contextra_ports::StorageEngine;
-use contextra_store::compaction::purge_filter::{PurgeBlocked, PurgeScope};
+use contextra_ports::erasure::PurgeError;
+use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
 use contextra_types::TxId;
@@ -46,14 +47,14 @@ async fn test_purge_obsolete_fault_injection_read_error() -> Result<(), Box<dyn 
     assert!(result.is_err(), "purge_keys must fail on read error");
 
     match result.unwrap_err() {
-        PurgeBlocked::ReadError { file, details, .. } => {
+        PurgeError::ReadError { file, source_details, .. } => {
             assert!(
                 file.contains(sst_file.file_name().unwrap().to_str().unwrap()),
                 "ReadError must contain filename"
             );
-            assert!(!details.is_empty(), "ReadError details must not be empty");
+            assert!(!source_details.is_empty(), "ReadError details must not be empty");
         }
-        other => panic!("Expected PurgeBlocked::ReadError, got {:?}", other),
+        other => panic!("Expected PurgeError::ReadError, got {:?}", other),
     }
 
     // Restore original bytes to inspect filesystem state

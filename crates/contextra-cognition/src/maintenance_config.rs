@@ -5,6 +5,7 @@
 
 use contextra_engine::decay_controller::DecayControllerConfig;
 
+#[cfg(feature = "graph-connectivity-health")]
 pub use contextra_graph::percolation::PercolationConfig;
 
 /// Zentrale Konfiguration für den `MaintenanceScheduler` (§10.2).
@@ -30,6 +31,7 @@ pub struct MaintenanceConfig {
     /// Ob Perkolations-Gesundheitsprüfungen aktiviert sind. Default: true.
     pub percolation_enabled: bool,
     /// Perkolations-Konfiguration (critical_threshold, rebonding_similarity, max_new_edges_per_pass).
+    #[cfg(feature = "graph-connectivity-health")]
     #[serde(flatten)]
     pub percolation: PercolationConfig,
 
@@ -61,6 +63,7 @@ impl Default for MaintenanceConfig {
             #[cfg(feature = "edge-reinforcement-learning")]
             edge_reinforcement: contextra_graph::EdgeReinforcementConfig::default(),
             percolation_enabled: true,
+            #[cfg(feature = "graph-connectivity-health")]
             percolation: PercolationConfig::default(),
             replicator_enabled: false,
             replicator_lr: 0.05,

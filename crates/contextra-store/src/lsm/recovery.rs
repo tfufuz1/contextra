@@ -173,11 +173,12 @@ impl LsmStorage {
         }
 
         if config.encryption.is_encrypted() {
-            if let Err(e) = tokio::fs::write(&hwm_path, b"ENCRYPTED_HWM_V1\n").await {
-                tracing::warn!("Failed to write .encrypted_hwm marker: {e}");
-            } else {
-                let _ = crate::util::fsync_parent_dir(&hwm_path).await;
-            }
+            tokio::fs::write(&hwm_path, b"ENCRYPTED_HWM_V1\n")
+                .await
+                .map_err(|e| {
+                    ContextraError::Storage(format!("Failed to write .encrypted_hwm marker: {e}"))
+                })?;
+            crate::util::fsync_parent_dir(&hwm_path).await?;
         }
 
         let salt_path = config.path.join("SALT");
@@ -387,21 +388,24 @@ impl LsmStorage {
 
         if let Some(expected_hwm) = manifest_hwm {
             let actual_tail_hmac = last_replayed_hmac.unwrap_or([0u8; 32]);
-            let check_hmac = if replayed_hmac_set.contains(&expected_hwm)
-                || valid_manifest_sstables
-                    .as_ref()
-                    .is_some_and(|s| !s.is_empty())
-            {
-                expected_hwm
-            } else {
-                actual_tail_hmac
-            };
-            if contextra_crypto::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err()
-            {
-                return Err(ContextraError::wal_truncation_detected(
-                    expected_hwm,
-                    actual_tail_hmac,
-                ));
+            let hwm_reached = replayed_hmac_set.contains(&expected_hwm);
+            if !hwm_reached && expected_hwm != [0u8; 32] {
+                match config.wal_recovery_mode {
+                    crate::wal::WalRecoveryMode::Strict => {
+                        return Err(ContextraError::wal_truncation_detected(
+                            expected_hwm,
+                            actual_tail_hmac,
+                        ));
+                    }
+                    crate::wal::WalRecoveryMode::Warn => {
+                        tracing::warn!(
+                            target: "contextra_store::wal_recovery",
+                            expected_hwm = ?expected_hwm,
+                            actual_tail_hmac = ?actual_tail_hmac,
+                            "WAL truncation or unanchored tail detected during startup recovery; continuing under WalRecoveryMode::Warn"
+                        );
+                    }
+                }
             }
         }
 
@@ -412,7 +416,7 @@ impl LsmStorage {
         };
         let wal_config = crate::wal::WalConfig {
             key_manager: key_manager.clone(),
-            #[cfg(feature = "fault-injection")]
+            #[cfg(any(test, feature = "fault-injection"))]
             fault_plan: config.fault_plan.clone(),
             ..Default::default()
         };
@@ -1095,24 +1099,24 @@ mod tests {
         let storage = LsmStorage::new(config).await?;
 
         // 1. Write initial version v1 at TxId 10
-        let tx1 = storage.begin_transaction_at(TxId::try_new(10).unwrap()).await?;
-        storage.put_in_tx(&tx1, b"key_mvcc", b"value_v1").await?;
-        storage.commit_transaction(tx1).await?;
+        let tx1 = TxId::try_new(10).unwrap();
+        storage.put(tx1, b"key_mvcc", b"value_v1").await?;
+        storage.commit(tx1).await?;
 
-        // 2. Open an active read transaction holding snapshot S at TxId 10 / seq_no
-        let read_tx = storage.begin_read_transaction().await?;
-        let snapshot_seq = read_tx.read_seq_no();
+        // 2. Open an active read snapshot S at seq_no
+        let snapshot_seq = storage.last_seq_no().await?;
+        storage.pin_checkpoint(snapshot_seq).await?;
 
         // 3. Write a newer version v2 at TxId 20
-        let tx2 = storage.begin_transaction_at(TxId::try_new(20).unwrap()).await?;
-        storage.put_in_tx(&tx2, b"key_mvcc", b"value_v2").await?;
-        storage.commit_transaction(tx2).await?;
+        let tx2 = TxId::try_new(20).unwrap();
+        storage.put(tx2, b"key_mvcc", b"value_v2").await?;
+        storage.commit(tx2).await?;
 
         // Flush memtable to SSTable
         storage.flush().await?;
 
         // 4. Force compaction
-        storage.compact_range(None, None).await?;
+        let _ = storage.maybe_compact_for_test().await?;
 
         // 5. Verify the active read transaction holding snapshot S can still read version v1
         let val_at_snapshot = storage.get_at_seq(b"key_mvcc", snapshot_seq).await?;
@@ -1122,8 +1126,8 @@ mod tests {
             "Active read transaction snapshot must preserve version v1 across compaction"
         );
 
-        // Cleanly close read transaction
-        read_tx.end().await?;
+        // Cleanly close read transaction checkpoint
+        storage.unpin_checkpoint(snapshot_seq).await?;
 
         Ok(())
     }

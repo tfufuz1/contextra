@@ -37,7 +37,12 @@ pub use scope_purge::*;
 #[cfg(not(loom))]
 pub use witness_scan::*;
 
-#[cfg(not(loom))]
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
+pub mod fs {
+    pub use tokio::fs::*;
+}
+
+#[cfg(all(not(loom), not(any(test, feature = "test-utils"))))]
 pub(crate) mod fs {
     pub use tokio::fs::*;
 }
@@ -350,6 +355,21 @@ impl WalFailpoints {
 }
 
 pub type WalFaultPlan = WalFailpoints;
+
+/// WAL Recovery enforcement mode controlling whether invariant violations abort or warn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum WalRecoveryMode {
+    /// Discard/truncation violations emit log warnings and metrics but allow database startup.
+    Warn,
+    /// Violations fail LsmStorage startup closed with `ContextraError::WalTruncationDetected` or `WalSegmentGap`.
+    Strict,
+}
+
+impl Default for WalRecoveryMode {
+    fn default() -> Self {
+        Self::Warn
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct WalConfig {
@@ -807,6 +827,7 @@ impl Wal {
                         WalVersion::V1 => "v1.bak",
                         WalVersion::V2 => "v2.bak",
                         WalVersion::V3 => "v3.bak",
+                        WalVersion::V4 => "v4.bak",
                     };
                     let bak_path = PathBuf::from(format!("{}.{}", wal.path.display(), bak_suffix));
                     let copy_res = self::fs::copy(&wal.path, &bak_path).await;

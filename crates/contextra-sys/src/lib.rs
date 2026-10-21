@@ -13,6 +13,9 @@ pub mod mlock;
 pub mod mmap;
 pub mod posix;
 pub mod rng;
+// TODO(WP-S1 / PR-3 Schritt 3): `crates/contextra-sys/src/crypto_rng.rs` implementieren (`pub mod crypto_rng;`).
+// Implementierung von `OsCryptoRng` unter Verwendung des OS-Entropie-Syscalls (z.B. via `getrandom`),
+// um echten kryptographischen Zufall in Ring 0 bereitzustellen und den `CryptoRng`-Trait zu erfüllen.
 pub mod vault;
 pub mod wiring;
 

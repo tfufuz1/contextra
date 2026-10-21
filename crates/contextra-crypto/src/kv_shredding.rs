@@ -146,6 +146,7 @@ struct GroupEntry {
     wrapped_kek: Vec<u8>,
     kek_nonce: [u8; 12],
     record_deks: HashMap<u64, RecordDekEntry>,
+    #[allow(dead_code)]
     lifecycle_state: KeyLifecycleState,
 }
 

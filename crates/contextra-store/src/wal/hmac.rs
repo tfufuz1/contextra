@@ -274,7 +274,6 @@ impl Wal {
         if key_path.exists() {
             read_key_file(&key_path).await
         } else {
-            use contextra_ports::Rng;
             use rand::RngCore;
             use tokio::io::AsyncWriteExt;
 
@@ -311,6 +310,9 @@ impl Wal {
             };
 
             if let Err(e) = file.write_all(&key).await {
+                // TODO(WP-ST2 / PR-26): Stille I/O-Fehler beheben:
+                // `let _ = remove_file(...)` ignoriert Fehler stillschweigend. Stattdessen Fehler protokollieren
+                // (tracing::warn!) oder strukturiert sammeln, damit verwaiste Lock-/Temp-Dateien aufgespürt werden.
                 let _ = super::fs::remove_file(&tmp_path).await;
                 return Err(ContextraError::Storage(format!(
                     "Failed to write WAL integrity key: {}",
@@ -403,7 +405,6 @@ impl Wal {
             parent
         };
 
-        use contextra_ports::Rng;
         use tokio::io::AsyncWriteExt;
 
         let rng = contextra_ports::SystemRng::default();
@@ -489,7 +490,6 @@ impl Wal {
         if uuid_path.exists() {
             read_uuid_file(&uuid_path).await
         } else {
-            use contextra_ports::Rng;
             use tokio::io::AsyncWriteExt;
 
             let uuid = uuid::Uuid::new_v4();

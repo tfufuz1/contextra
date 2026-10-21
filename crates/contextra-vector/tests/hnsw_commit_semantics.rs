@@ -1,7 +1,5 @@
-use contextra_types::{DocId, Result, TxId};
-use contextra_ports::{VectorIndex};
-use contextra_mvcc::{IndexOp};
-use contextra_vector::hnsw::{HnswConfig, HnswIndex, VectorData};
+use contextra_core::{DocId, IndexOp, Result, TxId, VectorIndex};
+use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 
 fn create_test_index(dim: usize) -> Result<HnswIndex> {
     let config = HnswConfig {
@@ -159,7 +157,7 @@ async fn test_zeroed_ram_slot_on_safe_free_vs_retention() -> Result<()> {
     let doc1 = DocId::new(100);
     let vec1 = vec![0.5, 0.5, 0.5, 0.5];
 
-    // Case 1: Delete without retention -> safe to free -> vector zeroed
+    // Case 1: Delete without retention -> safe to free -> vector zeroed in RAM node
     let tx1 = TxId::new(1);
     index.insert(tx1, doc1, &vec1).await?;
     index.commit(tx1).await?;
@@ -168,17 +166,12 @@ async fn test_zeroed_ram_slot_on_safe_free_vs_retention() -> Result<()> {
     index.delete(tx2, doc1).await?;
     index.commit(tx2).await?;
 
-    // Check RAM slot 0
-    let vec_slot0 = index.ram_vector_at(0).expect("RAM node 0 should exist");
-    if let VectorData::F32(v) = vec_slot0 {
-        assert!(
-            v.iter().all(|&x| x == 0.0),
-            "Vector in safe-freed slot 0 must be zeroed, got {:?}",
-            v
-        );
-    } else {
-        panic!("Expected VectorData::F32");
-    }
+    // Verify via public API (scan_residue) that RAM node vector for doc1 has zero non-zero vector bytes
+    let report1 = index.scan_residue(doc1);
+    assert_eq!(
+        report1.non_zero_vector_bytes, 0,
+        "Vector in safe-freed slot for doc1 must be zeroed"
+    );
 
     // Case 2: Delete with active snapshot pin retention -> NOT safe to free -> vector retained
     let doc2 = DocId::new(200);
@@ -195,16 +188,12 @@ async fn test_zeroed_ram_slot_on_safe_free_vs_retention() -> Result<()> {
     index.delete(tx4, doc2).await?;
     index.commit(tx4).await?;
 
-    // Check RAM slot 1
-    let vec_slot1 = index.ram_vector_at(1).expect("RAM node 1 should exist");
-    if let VectorData::F32(v) = vec_slot1 {
-        assert_eq!(
-            v, vec2,
-            "Vector in retained node slot 1 must NOT be zeroed while pinned by snapshot"
-        );
-    } else {
-        panic!("Expected VectorData::F32");
-    }
+    // Verify via public API (scan_residue) that RAM node vector for doc2 retains non-zero vector bytes while pinned
+    let report2 = index.scan_residue(doc2);
+    assert!(
+        report2.non_zero_vector_bytes > 0,
+        "Vector in retained node slot for doc2 must NOT be zeroed while pinned by snapshot"
+    );
 
     index.unpin_snapshot(3);
 

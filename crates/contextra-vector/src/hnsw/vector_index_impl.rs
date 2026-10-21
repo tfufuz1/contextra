@@ -228,7 +228,7 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn residue(&self, id: DocId) -> Result<VectorResidue> {
-        let scan = self.scan_residue(id);
+        let scan = self.inner.scan_residue_report(id);
         Ok(VectorResidue {
             node_present: scan.node_found,
             incoming_edges: u32::try_from(scan.incoming_edges).unwrap_or(u32::MAX),

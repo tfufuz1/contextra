@@ -178,8 +178,7 @@ impl Contextra {
         let mut layer_statuses = Vec::new();
         let mut witnesses = Vec::new();
 
-        let manifest = self.storage.manifest_for_test();
-        let db_dir = manifest.path().parent().unwrap_or_else(|| Path::new("."));
+        let db_dir = self.storage.db_path();
 
         // Determine DB instance ID dynamically from ErasureLedger handle or db_dir Blake3 hash
         let db_instance_id = if let Some(ref handle) = self.storage.erasure_ledger_handle {

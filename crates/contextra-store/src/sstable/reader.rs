@@ -1168,7 +1168,7 @@ mod tests {
         std::fs::write(temp_file.path(), b"01234567890123456789").unwrap();
         let file = Arc::new(std::fs::File::open(temp_file.path()).unwrap());
 
-        let res = SstableReader::read_block_static(
+        let res = SstableReader::read_block_at_file(
             file,
             0,
             20,

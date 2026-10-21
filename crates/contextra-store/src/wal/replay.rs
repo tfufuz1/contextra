@@ -314,7 +314,7 @@ impl Wal {
         using_legacy_key: &mut bool,
     ) -> Result<()> {
         let verify_res = match version {
-            WalVersion::V3 => verifier.verify_and_update_v3(snapshot, chunk_start_pos),
+            WalVersion::V4 | WalVersion::V3 => verifier.verify_and_update_v3(snapshot, chunk_start_pos),
             WalVersion::V2 => verifier.verify_and_update_v2(snapshot, chunk_start_pos),
             WalVersion::V1 => {
                 verifier.skip_hmac_verify_legacy(snapshot);
@@ -332,7 +332,7 @@ impl Wal {
                 let mut legacy_verifier = IntegrityVerifier::new(&legacy_key);
                 legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
                 let legacy_res = match version {
-                    WalVersion::V3 => {
+                    WalVersion::V4 | WalVersion::V3 => {
                         legacy_verifier.verify_and_update_v3(snapshot, chunk_start_pos)
                     }
                     WalVersion::V2 => {

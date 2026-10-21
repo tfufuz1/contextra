@@ -3,6 +3,86 @@
 use contextra_types::DeterministicTimestamp;
 use std::sync::Arc;
 
+// TODO(WP-0 / PR-1 Schritt 4 / B0-d): Doppelte Definition von `SystemClock` bereinigen.
+// `SystemClock` existiert aktuell in beiden Crates (`contextra-ports` und `contextra-sys`).
+// Sobald `contextra-sys` den `Clock`-Trait via optionales Feature `ports` implementiert,
+// sollen alle 63 Consumer-Dateien auf `contextra_sys::SystemClock` umgestellt werden
+// und diese Definition hier als Re-export bzw. deprecated markiert werden.
+/// Production system clock implementation backed by [`std::time::SystemTime`] and [`std::time::Instant`].
+#[derive(Debug, Clone, Copy)]
+pub struct SystemClock {
+    start_instant: std::time::Instant,
+}
+
+impl SystemClock {
+    /// Creates a new [`SystemClock`] with current instant as monotonic baseline.
+    // DETERMINISM-EXCEPTION: SystemClock port implementation in contextra-ports
+    #[allow(clippy::disallowed_methods)]
+    pub fn new() -> Self {
+        Self {
+            start_instant: std::time::Instant::now(),
+        }
+    }
+
+    /// Returns the current wall-clock time as nanoseconds since the Unix epoch.
+    pub fn now_unix_nanos(&self) -> u64 {
+        Clock::now_unix_nanos(self)
+    }
+
+    /// Returns nanoseconds elapsed since monotonic baseline reference point.
+    pub fn monotonic_nanos(&self) -> u64 {
+        Clock::monotonic_nanos(self)
+    }
+}
+
+impl Default for SystemClock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Clock for SystemClock {
+    // DETERMINISM-EXCEPTION: SystemClock port implementation in contextra-ports
+    #[allow(clippy::disallowed_methods)]
+    fn now(&self) -> DeterministicTimestamp {
+        let wall_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+            .unwrap_or(0);
+        let mono_ctr = u64::try_from(
+            std::time::Instant::now()
+                .saturating_duration_since(self.start_instant)
+                .as_nanos(),
+        )
+        .unwrap_or(u64::MAX);
+        DeterministicTimestamp::new(wall_ms, mono_ctr)
+    }
+
+    // DETERMINISM-EXCEPTION: SystemClock port implementation in contextra-ports
+    #[allow(clippy::disallowed_methods)]
+    fn monotonic_ticks(&self) -> u64 {
+        u64::try_from(
+            std::time::Instant::now()
+                .saturating_duration_since(self.start_instant)
+                .as_nanos(),
+        )
+        .unwrap_or(u64::MAX)
+    }
+
+    // DETERMINISM-EXCEPTION: SystemClock port implementation in contextra-ports
+    #[allow(clippy::disallowed_methods)]
+    fn now_unix_nanos(&self) -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| u64::try_from(d.as_nanos()).unwrap_or(u64::MAX))
+            .unwrap_or(0)
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.monotonic_ticks()
+    }
+}
+
 /// Port trait for time operations, enabling deterministic testing by decoupling
 /// system wall-clock and monotonic time sources.
 pub trait Clock: Send + Sync + 'static {

@@ -32,6 +32,8 @@ pub struct OrxPurgeIntent {
     pub phase: PurgePhase,
     /// Execution attempt counter.
     pub attempt: u32,
+    /// Optional durable scope preserved for crash recovery without external reconstruction callback.
+    pub scope: Option<PurgeScope>,
 }
 
 impl OrxPurgeIntent {
@@ -53,6 +55,7 @@ impl OrxPurgeIntent {
             as_of_tx,
             phase: initial_phase,
             attempt: 1,
+            scope: Some(scope.clone()),
         }
     }
 
@@ -103,6 +106,29 @@ impl OrxPurgeIntent {
         buf.extend_from_slice(&self.as_of_tx.to_le_bytes());
         buf.push(self.phase.to_u8());
         buf.extend_from_slice(&self.attempt.to_le_bytes());
+
+        match &self.scope {
+            Some(PurgeScope::Keys(keys)) => {
+                buf.push(1u8);
+                buf.extend_from_slice(&(keys.len() as u32).to_le_bytes());
+                for k in keys {
+                    buf.extend_from_slice(&(k.len() as u32).to_le_bytes());
+                    buf.extend_from_slice(k);
+                }
+            }
+            Some(PurgeScope::Prefixes(prefixes)) => {
+                buf.push(2u8);
+                buf.extend_from_slice(&(prefixes.len() as u32).to_le_bytes());
+                for p in prefixes {
+                    buf.extend_from_slice(&(p.len() as u32).to_le_bytes());
+                    buf.extend_from_slice(p);
+                }
+            }
+            None => {
+                buf.push(0u8);
+            }
+        }
+
         buf
     }
 
@@ -193,6 +219,67 @@ impl OrxPurgeIntent {
                 .try_into()
                 .map_err(|_| Error::new(ErrorKind::InvalidData, "attempt parse error"))?,
         );
+        bytes = &bytes[4..];
+
+        let scope = if bytes.is_empty() {
+            None
+        } else {
+            match bytes[0] {
+                1 => {
+                    bytes = &bytes[1..];
+                    if bytes.len() < 4 {
+                        return Err(Error::new(ErrorKind::InvalidData, "truncated scope keys count"));
+                    }
+                    let count = u32::from_le_bytes(
+                        bytes[..4].try_into().map_err(|_| Error::new(ErrorKind::InvalidData, "parse count"))?,
+                    ) as usize;
+                    bytes = &bytes[4..];
+                    let mut keys = Vec::with_capacity(count);
+                    for _ in 0..count {
+                        if bytes.len() < 4 {
+                            return Err(Error::new(ErrorKind::InvalidData, "truncated scope key len"));
+                        }
+                        let len = u32::from_le_bytes(
+                            bytes[..4].try_into().map_err(|_| Error::new(ErrorKind::InvalidData, "parse len"))?,
+                        ) as usize;
+                        bytes = &bytes[4..];
+                        if bytes.len() < len {
+                            return Err(Error::new(ErrorKind::InvalidData, "truncated scope key bytes"));
+                        }
+                        keys.push(bytes[..len].to_vec());
+                        bytes = &bytes[len..];
+                    }
+                    Some(PurgeScope::Keys(keys))
+                }
+                2 => {
+                    bytes = &bytes[1..];
+                    if bytes.len() < 4 {
+                        return Err(Error::new(ErrorKind::InvalidData, "truncated scope prefixes count"));
+                    }
+                    let count = u32::from_le_bytes(
+                        bytes[..4].try_into().map_err(|_| Error::new(ErrorKind::InvalidData, "parse count"))?,
+                    ) as usize;
+                    bytes = &bytes[4..];
+                    let mut prefixes = Vec::with_capacity(count);
+                    for _ in 0..count {
+                        if bytes.len() < 4 {
+                            return Err(Error::new(ErrorKind::InvalidData, "truncated scope prefix len"));
+                        }
+                        let len = u32::from_le_bytes(
+                            bytes[..4].try_into().map_err(|_| Error::new(ErrorKind::InvalidData, "parse len"))?,
+                        ) as usize;
+                        bytes = &bytes[4..];
+                        if bytes.len() < len {
+                            return Err(Error::new(ErrorKind::InvalidData, "truncated scope prefix bytes"));
+                        }
+                        prefixes.push(bytes[..len].to_vec());
+                        bytes = &bytes[len..];
+                    }
+                    Some(PurgeScope::Prefixes(prefixes))
+                }
+                _ => None,
+            }
+        };
 
         Ok(Self {
             purge_id,
@@ -202,6 +289,7 @@ impl OrxPurgeIntent {
             as_of_tx,
             phase,
             attempt,
+            scope,
         })
     }
 

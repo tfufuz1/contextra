@@ -4,21 +4,25 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PurgePhase {
+    /// Phase 0: Pipeline initialized.
+    Init,
     /// Phase 1: Request admitted, intent file initialized with scope ledger reference.
     Admitted,
-    /// Phase 2: Active memtables flushed to SSTables.
+    /// Phase 2: Erasure fence acquired on scope.
+    FenceAcquired,
+    /// Phase 3: Active memtables flushed to SSTables.
     Flush,
-    /// Phase 3: Purge compaction executed and committed to manifest.
+    /// Phase 4: Purge compaction executed and committed to manifest.
     PurgeCompaction,
-    /// Phase 4: Obsolete files recorded to journal and durably deleted.
+    /// Phase 5: Obsolete files recorded to journal and durably deleted.
     Dispose,
-    /// Phase 5: WAL callback executed to retire obsolete WAL records.
+    /// Phase 6: WAL callback executed to retire obsolete WAL records.
     WalRetire,
-    /// Phase 6: Deletion proof witness generated/recorded.
+    /// Phase 7: Deletion proof witness generated/recorded.
     Witness,
-    /// Phase 7: Purge operation finalized.
+    /// Phase 8: Purge operation finalized.
     Finalize,
-    /// Phase 8: Erasure fence released and intent file removed.
+    /// Phase 9: Erasure fence released and intent file removed.
     Release,
 
     // Legacy phase enum variants preserved for backwards compatibility with existing serialized state.
@@ -53,9 +57,9 @@ impl PurgePhase {
 
     fn order(self) -> u8 {
         match self {
-            PurgePhase::P0Init => 0,
+            PurgePhase::Init | PurgePhase::P0Init => 0,
             PurgePhase::Admitted | PurgePhase::P1Intent => 1,
-            PurgePhase::P2FenceAcquired => 2,
+            PurgePhase::FenceAcquired | PurgePhase::P2FenceAcquired => 2,
             PurgePhase::Flush | PurgePhase::P3Flush => 3,
             PurgePhase::PurgeCompaction | PurgePhase::P4PurgeCompaction => 4,
             PurgePhase::Dispose | PurgePhase::P5Dispose => 5,
@@ -76,16 +80,16 @@ impl PurgePhase {
     #[must_use]
     pub fn from_u8(val: u8) -> Option<Self> {
         match val {
-            0 => Some(Self::P0Init),
-            1 => Some(Self::P1Intent),
-            2 => Some(Self::P2FenceAcquired),
-            3 => Some(Self::P3Flush),
-            4 => Some(Self::P4PurgeCompaction),
-            5 => Some(Self::P5Dispose),
-            6 => Some(Self::P6WalCallback),
+            0 => Some(Self::Init),
+            1 => Some(Self::Admitted),
+            2 => Some(Self::FenceAcquired),
+            3 => Some(Self::Flush),
+            4 => Some(Self::PurgeCompaction),
+            5 => Some(Self::Dispose),
+            6 => Some(Self::WalRetire),
             7 => Some(Self::Witness),
             8 => Some(Self::Finalize),
-            9 => Some(Self::P7Complete),
+            9 => Some(Self::Release),
             _ => None,
         }
     }

@@ -515,6 +515,10 @@ impl GraphInner {
         self.out_weight_sums[node_idx] = sum;
     }
 
+    // TODO(WP-GR1 / PR-23): Graph Compaction Edge-Loss:
+    // Sicherstellen, dass bei der Verdichtung von `pending_edges` und alten CSR-Arrays
+    // unter parallelen Lesern und Tombstones keine Kanten zwischen `old_start..old_end`
+    // verloren gehen oder Offsets korrumpiert werden.
     /// Compacts pending edges in the delta buffer into the main CSR arrays.
     pub fn compact(&mut self) {
         let num_nodes = self.reverse_map.len();
@@ -809,6 +813,14 @@ impl<'a> std::ops::DerefMut for InnerWriteGuard<'a> {
 
 impl<'a> Drop for InnerWriteGuard<'a> {
     fn drop(&mut self) {
+        // TODO(WP-GR2 / PR-24): Graph Clone-on-Drop beheben:
+        // Das Klonen des gesamten `GraphInner` (`(*self.guard).clone()`) bei jedem Guard-Drop
+        // führt zu massiven Allokations- und Latenzspitzen. Durch gezielte CoW-/RCU-Aktualisierung
+        // oder Batching ersetzen.
+        // TODO(WP-GR3 / PR-25): Graph Rollback unterstützen:
+        // Schlägt eine übergeordnete Operation fehl, publiziert `Drop` unkontrolliert den
+        // mutierten Zwischenzustand an `arc_swap`. Der Guard benötigt ein explizites Commit-Signal;
+        // ohne Commit muss der modifizierte Zustand auf den vorherigen Snapshot zurückgerollt werden.
         self.arc_swap.store(Arc::new((*self.guard).clone()));
     }
 }

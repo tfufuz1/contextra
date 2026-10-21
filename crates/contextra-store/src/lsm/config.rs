@@ -149,6 +149,8 @@ pub struct LsmConfig {
     /// Configuration for background compaction.
     pub compaction: CompactionConfig,
     pub encryption: EncryptionConfig,
+    /// Deprecated: Passphrase for AES-256 encryption. Use `encryption` with `EncryptionConfig::Passphrase` instead.
+    pub encryption_passphrase: Option<String>,
     /// Time window in microseconds to batch concurrent WAL commits before issuing fsync.
     /// Set to 0 to disable group commit batching (immediate single commit).
     pub group_commit_window_micros: u64,
@@ -166,14 +168,19 @@ pub struct LsmConfig {
     /// Maximum factor for internal merge set size relative to limit in bounded scans.
     /// Default is `crate::lsm::MAX_INTERNAL_MERGE_ENTRIES_FACTOR` (8).
     pub max_internal_merge_factor: usize,
-    #[cfg(feature = "fault-injection")]
+    /// Recovery enforcement mode for WAL tail/chain truncation verification.
+    #[serde(skip, default)]
+    pub wal_recovery_mode: crate::wal::WalRecoveryMode,
+    #[cfg(any(test, feature = "fault-injection"))]
     #[serde(skip, default)]
     pub fault_plan: std::sync::Arc<crate::wal::WalFaultPlan>,
 }
 
 impl LsmConfig {
     pub fn encryption_passphrase(&self) -> Option<String> {
-        self.encryption.passphrase()
+        self.encryption_passphrase
+            .clone()
+            .or_else(|| self.encryption.passphrase())
     }
 }
 
@@ -186,13 +193,15 @@ impl Default for LsmConfig {
             tx_timeout: Duration::from_secs(60),
             compaction: CompactionConfig::default(),
             encryption: EncryptionConfig::default(),
+            encryption_passphrase: None,
             group_commit_window_micros: 500,
             block_cache_shards: 64,
             durability_mode: DurabilityMode::default(),
             ssi_max_tracked_keys: 1_000_000,
             blob_bytes_threshold: crate::blob::DEFAULT_BLOB_THRESHOLD,
             max_internal_merge_factor: crate::lsm::MAX_INTERNAL_MERGE_ENTRIES_FACTOR,
-            #[cfg(feature = "fault-injection")]
+            wal_recovery_mode: crate::wal::WalRecoveryMode::Warn,
+            #[cfg(any(test, feature = "fault-injection"))]
             fault_plan: std::sync::Arc::new(crate::wal::WalFaultPlan::default()),
         }
     }

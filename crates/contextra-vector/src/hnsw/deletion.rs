@@ -30,11 +30,11 @@ pub trait GhostFreeVectorIndex {
     /// # Invariant
     /// `INV-DELETION-2`: After `Ok(stats)` returns, no neighborhood pointer in the entire index
     /// references `doc_id`.
-    fn remove_with_graph_repair(&mut self, doc_id: DocId) -> Result<DeletionStats>;
+    fn remove_with_graph_repair(&self, doc_id: DocId) -> Result<DeletionStats>;
 }
 
 impl GhostFreeVectorIndex for HnswIndex {
-    fn remove_with_graph_repair(&mut self, doc_id: DocId) -> Result<DeletionStats> {
+    fn remove_with_graph_repair(&self, doc_id: DocId) -> Result<DeletionStats> {
         // Lock hierarchy: 1. write_mutex
         let _write_lock = self.inner.hot.write_mutex.lock();
 

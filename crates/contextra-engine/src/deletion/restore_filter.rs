@@ -11,10 +11,29 @@ use contextra_crypto::revocation_log::{RevocationLog, RevocationTarget};
 use contextra_store::erasure_ledger::{ErasureLedger, ErasureLedgerHandle, LedgerDecision};
 use std::sync::Arc;
 
+/// Source of ledger decisions, making the presence of a ledger strictly required.
+#[derive(Clone)]
+pub enum LedgerSource {
+    /// Direct reference to an [`ErasureLedger`].
+    Direct(Arc<ErasureLedger>),
+    /// Reference to an [`ErasureLedgerHandle`].
+    Handle(Arc<ErasureLedgerHandle>),
+}
+
+impl LedgerSource {
+    /// Queries the underlying ledger for an erasure decision.
+    #[must_use]
+    pub fn decide(&self, scope: &[u8], key: &[u8], tx: u64) -> LedgerDecision {
+        match self {
+            Self::Direct(l) => l.decide(scope, key, tx),
+            Self::Handle(h) => h.decide(scope, key, tx),
+        }
+    }
+}
+
 /// Restore filter adapter implementing [`CpyRestoreFilter`] backed by [`RevocationLog`], [`KeyRegistry`] and [`ErasureLedger`].
 pub struct DpiRestoreFilter {
-    ledger: Option<Arc<ErasureLedger>>,
-    ledger_handle: Option<Arc<ErasureLedgerHandle>>,
+    ledger_source: LedgerSource,
     revocation_log: Option<Arc<RevocationLog>>,
     key_registry: Option<Arc<KeyRegistry>>,
     storage_scope: Vec<u8>,
@@ -30,8 +49,7 @@ impl DpiRestoreFilter {
         storage_scope: impl Into<Vec<u8>>,
     ) -> Self {
         Self {
-            ledger: Some(ledger),
-            ledger_handle: None,
+            ledger_source: LedgerSource::Direct(ledger),
             revocation_log,
             key_registry,
             storage_scope: storage_scope.into(),
@@ -47,8 +65,7 @@ impl DpiRestoreFilter {
         storage_scope: impl Into<Vec<u8>>,
     ) -> Self {
         Self {
-            ledger: None,
-            ledger_handle: Some(ledger_handle),
+            ledger_source: LedgerSource::Handle(ledger_handle),
             revocation_log,
             key_registry,
             storage_scope: storage_scope.into(),
@@ -136,12 +153,6 @@ impl CpyRestoreFilter for DpiRestoreFilter {
         }
 
         // 3. ErasureLedger decision query
-        if let Some(ref ledger) = self.ledger {
-            ledger.decide(&self.storage_scope, key, tx) == LedgerDecision::Drop
-        } else if let Some(ref handle) = self.ledger_handle {
-            handle.decide(&self.storage_scope, key, tx) == LedgerDecision::Drop
-        } else {
-            false
-        }
+        self.ledger_source.decide(&self.storage_scope, key, tx) == LedgerDecision::Drop
     }
 }

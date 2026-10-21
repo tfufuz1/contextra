@@ -367,6 +367,9 @@ pub enum PurgeError {
     /// Write fence conflict detected during purge execution.
     #[error("Fence conflict")]
     FenceConflict,
+    /// Background compaction currently busy.
+    #[error("Compaction busy")]
+    CompactionBusy,
     /// Read error during SSTable segment processing.
     #[error("Read error at file {file}, offset {offset}: {source_details}")]
     ReadError {
@@ -376,6 +379,14 @@ pub enum PurgeError {
         offset: u64,
         /// Error detail string.
         source_details: String,
+    },
+    /// Write error during SSTable segment processing.
+    #[error("Write error at file {file}: {details}")]
+    WriteError {
+        /// File path.
+        file: String,
+        /// Error details.
+        details: String,
     },
     /// I/O error wrapper.
     #[error("I/O error: {0}")]
@@ -392,6 +403,48 @@ pub enum PurgeError {
         /// Oldest snapshot pin age in clock ticks.
         oldest_pin_age: u64,
     },
+    /// Checkpoint clones present.
+    #[error("Checkpoint clones present: {copy_ids:?}")]
+    CheckpointClones {
+        /// Cloned copy identifiers.
+        copy_ids: Vec<String>,
+    },
+    /// Reader is pinned in active memtable / scan.
+    #[error("Reader pinned in active memtable or scan")]
+    ReaderPinned,
+    /// Unclassified files present in DB directory.
+    #[error("Unclassified files present in DB directory: {count}")]
+    UnclassifiedFiles {
+        /// Count of unclassified files.
+        count: usize,
+    },
+    /// Secure deletion is unsupported on current filesystem/environment.
+    #[error("Secure deletion unsupported: {reason}")]
+    SecureDeleteUnsupported {
+        /// Reason for lack of support.
+        reason: String,
+    },
+    /// Corrupted purge intent.
+    #[error("Corrupted purge intent: {0}")]
+    CorruptedIntent(String),
+    /// Failpoint triggered.
+    #[error("Failpoint triggered: {0}")]
+    FailpointTriggered(String),
+    /// Purge compaction implementation is not yet active (fail-closed).
+    #[error("Purge compaction implementation unimplemented")]
+    Unimplemented,
+    /// Scan timeout occurred.
+    #[error("Scan timeout occurred during purge")]
+    ScanTimeout,
+    /// Unknown free space.
+    #[error("Unknown free space")]
+    UnknownFreeSpace,
+}
+
+impl From<PurgeError> for ContextraError {
+    fn from(err: PurgeError) -> Self {
+        ContextraError::Storage(format!("Purge error: {err}"))
+    }
 }
 
 /// Storage backend contract for erasure operations (§5.5).

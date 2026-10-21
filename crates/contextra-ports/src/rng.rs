@@ -12,6 +12,75 @@
 
 use std::sync::Arc;
 
+// TODO(WP-S1 / PR-3 Schritt 1): `CryptoRng` Marker-Trait implementieren.
+// Aktuell implementiert `SystemRng` hier fälschlicherweise `EntropyRng` via std RandomState/Hasher,
+// was KEIN kryptographischer Zufallszahlengenerator (CSPRNG) ist und zu Befund F-01 führte.
+// Implementierungsaufgabe:
+// 1. Definiere `pub trait CryptoRng: Send + Sync {}` als typ-sicheren Marker für echte CSPRNGs.
+// 2. `SystemRng` darf `CryptoRng` NICHT implementieren.
+// 3. Kryptographische Pfade (wie Ed25519-Schlüsselerzeugung) müssen statisch `CryptoRng` fordern.
+/// Standard non-cryptographic system entropy generator backed by system/process entropy.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SystemRng;
+
+impl SystemRng {
+    /// Creates a new [`SystemRng`].
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Generates the next pseudorandom 64-bit unsigned integer.
+    pub fn next_u64(&self) -> u64 {
+        EntropyRng::next_u64(self)
+    }
+
+    /// Fills `dest` with pseudorandom bytes.
+    pub fn fill_bytes(&self, dest: &mut [u8]) {
+        EntropyRng::fill_bytes(self, dest);
+    }
+
+    /// Returns a pseudorandom `f64` in `[0.0, 1.0)`.
+    pub fn next_unit_f64(&self) -> f64 {
+        SeededRng::next_unit_f64(self)
+    }
+}
+
+impl EntropyRng for SystemRng {
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        use std::collections::hash_map::RandomState;
+        use std::hash::{BuildHasher, Hasher};
+        let mut written = 0;
+        while written < dest.len() {
+            let val = RandomState::new().build_hasher().finish();
+            let bytes = val.to_le_bytes();
+            let chunk = (dest.len() - written).min(8);
+            dest[written..written + chunk].copy_from_slice(&bytes[..chunk]);
+            written += chunk;
+        }
+    }
+
+    fn next_u64(&self) -> u64 {
+        use std::collections::hash_map::RandomState;
+        use std::hash::{BuildHasher, Hasher};
+        RandomState::new().build_hasher().finish()
+    }
+}
+
+impl SeededRng for SystemRng {
+    fn next_u64(&self) -> u64 {
+        EntropyRng::next_u64(self)
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        EntropyRng::fill_bytes(self, dest);
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        let mantissa = EntropyRng::next_u64(self) >> 11;
+        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
+    }
+}
+
 /// Port trait for cryptographic entropy sources (keys, nonces, IVs, salts).
 ///
 /// MUST be backed by genuine system/OS entropy or KMS. Test PRNGs MUST NOT implement this trait.

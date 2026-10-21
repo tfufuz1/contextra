@@ -238,4 +238,7 @@ pub struct ForgetOutcome {
     pub logical: FonLogicalHandle,
     /// Physical purge execution status handle, if physical purge was requested.
     pub physical: Option<PurgeHandle>,
+    /// Exact report of physical purge execution if performed.
+    #[serde(default)]
+    pub purge_report: Option<contextra_store::compaction::purge_filter::PurgeReport>,
 }

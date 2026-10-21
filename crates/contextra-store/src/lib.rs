@@ -47,6 +47,9 @@ pub mod sstable;
 pub mod system_pressure;
 #[cfg(not(loom))]
 pub mod tenant_codec;
+#[cfg(any(test, feature = "test-utils"))]
+pub mod util;
+#[cfg(not(any(test, feature = "test-utils")))]
 pub(crate) mod util;
 pub mod wal;
 

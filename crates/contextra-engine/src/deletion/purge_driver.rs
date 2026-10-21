@@ -10,7 +10,7 @@
 
 use std::time::Duration;
 
-use contextra_crypto::deletion_proof::claim_text::WitClaimText;
+use contextra_crypto::deletion_proof::claim_text::{WitAssurance, WitClaimText};
 use contextra_crypto::deletion_proof::issuer::IssRequest;
 use contextra_crypto::deletion_proof::probe::WitStoreProbe;
 use contextra_crypto::deletion_proof::types::{hash_deleted_keys_length_prefixed, DeletionScope};
@@ -165,64 +165,28 @@ impl<'a> DpiPurgeDriver<'a> {
         {
             Ok(rep) => rep,
             Err(blocked) => {
-                let (reason, retry_hint) = match blocked {
-                    PurgeBlocked::ActiveSnapshot { .. } => (
-                        "Active MVCC snapshot blocking compaction".to_string(),
-                        "Close open read transactions / snapshots".to_string(),
-                    ),
-                    PurgeBlocked::InsufficientDiskSpace { needed, free } => (
-                        format!(
-                            "Insufficient disk space for compaction: needed {needed}, free {free}"
-                        ),
-                        "Free disk space or increase storage capacity".to_string(),
-                    ),
-                    PurgeBlocked::UnclassifiedFiles { count } => (
-                        format!("Unclassified files in storage directory: {count}"),
-                        "Clean up untracked or stale files".to_string(),
-                    ),
-                    PurgeBlocked::CheckpointClones { copy_ids } => (
-                        format!("Checkpoint clones blocking purge: {}", copy_ids.join(", ")),
-                        "Purge or release registered checkpoint clones".to_string(),
-                    ),
-                    PurgeBlocked::ReaderPinned => (
-                        "Reader pinned in active memtable / scan".to_string(),
-                        "Wait for active reader scan to finish".to_string(),
-                    ),
-                    PurgeBlocked::CompactionBusy => (
-                        "Background compaction is busy".to_string(),
-                        "Retry after current compaction completes".to_string(),
-                    ),
-                    PurgeBlocked::SecureDeleteUnsupported { reason } => (
-                        format!("Secure delete unsupported: {reason}"),
-                        "Disable scrub requirement or run on supported filesystem".to_string(),
-                    ),
-                    PurgeBlocked::Unimplemented => (
-                        "Purge compaction implementation inactive".to_string(),
-                        "Enable purge compaction feature".to_string(),
-                    ),
-                    PurgeBlocked::ScanTimeout => (
-                        "Scan timeout during purge compaction".to_string(),
-                        "Retry with smaller batch size or increased timeout".to_string(),
-                    ),
-                    PurgeBlocked::UnknownFreeSpace => (
-                        "Free space probe unavailable or returned unknown".to_string(),
-                        "Provide a FreeSpaceProbe implementation or ensure disk space is queryable"
-                            .to_string(),
-                    ),
-                    PurgeBlocked::ReadError { file, offset, details } => (
-                        format!("Read error at file {file}, offset {offset}: {details}"),
-                        "Check disk health or file permissions".to_string(),
-                    ),
-                    PurgeBlocked::WriteError { file, details } => (
-                        format!("Write error at file {file}: {details}"),
-                        "Check disk space or write permissions".to_string(),
-                    ),
-                    PurgeBlocked::ManifestError { details } => (
-                        format!("Manifest error during purge: {details}"),
-                        "Check manifest file integrity".to_string(),
-                    ),
-                };
-                return Ok(PurgeHandle::Blocked { reason, retry_hint });
+                match &blocked {
+                    PurgeBlocked::ReadError { file, offset, details } => {
+                        return Err(ContextraError::Storage(format!(
+                            "Read error at file {file}, offset {offset}: {details}"
+                        )));
+                    }
+                    PurgeBlocked::WriteError { file, details } => {
+                        return Err(ContextraError::Storage(format!(
+                            "Write error at file {file}: {details}"
+                        )));
+                    }
+                    PurgeBlocked::ManifestError { details } => {
+                        return Err(ContextraError::Storage(format!(
+                            "Manifest error during purge: {details}"
+                        )));
+                    }
+                    _ => {
+                        let reason = blocked.to_string();
+                        let retry_hint = blocked.retry_hint().to_string();
+                        return Ok(PurgeHandle::Blocked { reason, retry_hint });
+                    }
+                }
             }
         };
 
@@ -232,13 +196,22 @@ impl<'a> DpiPurgeDriver<'a> {
             PurgeScope::Prefixes(p) => (Vec::new(), p.clone()),
         };
 
+        let claim = match opts.assurance {
+            WitAssurance::S0 => WitClaimText::S0,
+            WitAssurance::S1 => WitClaimText::S1,
+            WitAssurance::S2 => WitClaimText::S2V,
+            WitAssurance::S3 => WitClaimText::S3,
+            WitAssurance::S4 => WitClaimText::S4,
+            _ => WitClaimText::S0,
+        };
+
         let zeu_req = ZeuIssueRequest {
             scope_keys: scope_keys.clone(),
             scope_prefixes: scope_prefixes.clone(),
             as_of_tx,
             scanned_at_tx: as_of_tx,
             assurance: opts.assurance,
-            claim: WitClaimText::S2V,
+            claim,
             scanner_name: "dpi_purge_driver",
             scanner_version: 1,
             key_identifiers_claimed: false,
@@ -350,6 +323,7 @@ impl<'a> DpiPurgeDriver<'a> {
         let outcome = ForgetOutcome {
             logical: logical_handle.clone(),
             physical: Some(purge_handle),
+            purge_report: None,
         };
 
         Ok((outcome, sweep_report))

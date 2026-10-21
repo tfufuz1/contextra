@@ -50,6 +50,15 @@ impl Clone for ScalarQuantizer {
 }
 
 impl ScalarQuantizer {
+    /// Returns `true` if the quantizer has been successfully trained and is valid for quantization operations.
+    pub fn is_trained(&self) -> bool {
+        self.dimension > 0
+            && self.mins.len() == self.dimension
+            && self.maxes.len() == self.dimension
+            && self.scales.len() == self.dimension
+            && self.inv_scales.len() == self.dimension
+    }
+
     /// Creates a new ScalarQuantizer trained on a batch of vectors to find per-dimension min/max.
     ///
     /// For long-lived or growing collections, callers should periodically recalibrate the

@@ -97,11 +97,6 @@ impl LsmStorage {
     }
 
     /// Returns a watch receiver for monitoring system pressure levels.
-    /// Returns a reference to the storage engine's erasure fence instance.
-    pub fn erasure_fence(&self) -> &Arc<super::fence::ErasureFence> {
-        &self.erasure_fence
-    }
-
     pub fn pressure_receiver(
         &self,
     ) -> tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure> {
@@ -176,12 +171,17 @@ impl LsmStorage {
         self.task_tracker.spawn(future);
     }
 
-    #[cfg(feature = "fault-injection")]
+    /// Returns the database root directory path.
+    pub fn db_path(&self) -> &std::path::Path {
+        &self.config.path
+    }
+
+    #[cfg(any(test, feature = "fault-injection"))]
     pub fn fault_plan(&self) -> &Arc<crate::wal::WalFailpoints> {
         &self.config.fault_plan
     }
 
-    #[cfg(feature = "fault-injection")]
+    #[cfg(any(test, feature = "fault-injection"))]
     pub fn failpoints(&self) -> &Arc<crate::wal::WalFailpoints> {
         &self.config.fault_plan
     }
@@ -337,6 +337,12 @@ impl LsmStorage {
             .load(std::sync::atomic::Ordering::Acquire)
     }
 
+    // TODO(WP-0b / PR-2 Schritt 2 / F-08): Befund F-08 (Testmethoden im Produktionscode):
+    // `manifest_for_test` wurde bereits hinter `#[cfg(any(test, feature = "test-utils"))]` gestellt.
+    // Die übrigen Test-Hilfsmethoden (`compaction_engine_for_test`, `sstables_for_test`,
+    // `block_cache_for_test`, `budget_for_test`, `maybe_compact_for_test`) sollten ebenfalls konsequent
+    // mit `#[cfg(any(test, feature = "test-utils"))]` abgesichert werden, damit sie nicht versehentlich
+    // im Standard-Produktions-Build exponiert werden.
     #[doc(hidden)]
     pub fn compaction_engine_for_test(&self) -> Arc<CompactionEngine> {
         Arc::clone(&self.compaction_engine)
@@ -358,6 +364,7 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn manifest_for_test(&self) -> Arc<crate::manifest::Manifest> {
         Arc::clone(&self.manifest)
     }

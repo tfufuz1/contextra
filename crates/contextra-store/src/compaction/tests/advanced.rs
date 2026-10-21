@@ -211,7 +211,8 @@ async fn test_compaction_swap_maintains_shadowing_order_without_restart() {
             &output_path,
             min_snapshot_seq,
             false,
-        , None)
+            None,
+        )
         .await
         .expect("merge A and B into M");
 
@@ -462,7 +463,8 @@ async fn test_compaction_pressure_awareness() {
             &normal_out,
             u64::MAX,
             true,
-        , None)
+            None,
+        )
         .await
         .expect("merge under normal pressure");
     let duration_normal = start_normal.elapsed();

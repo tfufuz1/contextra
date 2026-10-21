@@ -11,7 +11,7 @@ use tempfile::tempdir;
 #[test]
 fn test_scope_fence_inside_outside_prefix() {
     let fence = ErasureFence::new();
-    let _guard = fence
+    let guard = fence
         .acquire_scope_fence_for(vec![b"coll_a:".to_vec()])
         .unwrap();
 
@@ -96,7 +96,7 @@ async fn test_doc_lock_atomic_conflict_no_partial_leak() {
 #[tokio::test]
 async fn test_scope_write_seq_increments_only_in_scope() {
     let fence = ErasureFence::new();
-    let guard = fence
+    let _guard = fence
         .acquire_scope_fence_for(vec![b"coll_a:".to_vec()])
         .unwrap();
 
@@ -160,7 +160,7 @@ async fn test_all_write_paths_respect_fence() {
     assert!(del_prefix_res.is_err());
 
     // 6. Path 'commit' (when operation staged before fence)
-    drop(_guard);
+    drop(guard);
     let tx_staged = TxId::try_new(2).unwrap();
     storage
         .put(tx_staged, b"locked:key4", b"val4")

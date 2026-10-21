@@ -9,22 +9,68 @@ use crate::lsm::config::DurabilityMode;
 #[cfg(not(loom))]
 use std::fs::{File, TryLockError};
 
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
+pub type DirLockSyncHookFn = fn(&Path) -> std::io::Result<()>;
+
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
+std::thread_local! {
+    static DIRLOCK_SYNC_HOOK: std::cell::RefCell<Option<DirLockSyncHookFn>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
+pub fn test_set_dirlock_sync_hook(hook: Option<DirLockSyncHookFn>) {
+    DIRLOCK_SYNC_HOOK.with(|h| {
+        *h.borrow_mut() = hook;
+    });
+}
+
+#[cfg(not(loom))]
+pub(crate) fn sync_dir_util(dir: &Path) -> std::io::Result<()> {
+    #[cfg(any(test, feature = "test-utils"))]
+    {
+        let mut hook_res = None;
+        DIRLOCK_SYNC_HOOK.with(|h| {
+            if let Some(hook) = *h.borrow() {
+                hook_res = Some(hook(dir));
+            }
+        });
+        if let Some(res) = hook_res {
+            return res;
+        }
+    }
+    contextra_durable_fs::sync_dir(dir)
+}
+
 /// Handle for exclusive database directory locking.
 #[cfg(not(loom))]
 #[derive(Debug)]
-pub(crate) struct DirLock {
+pub struct DirLock {
     _file: Option<File>,
 }
 
 #[cfg(not(loom))]
 impl DirLock {
     /// Acquires an exclusive lock on `dir/LOCK`.
-    pub(crate) fn acquire(dir: &Path, durability_mode: DurabilityMode) -> Result<Self> {
+    pub fn acquire(dir: &Path, durability_mode: DurabilityMode) -> Result<Self> {
         let lock_path = dir.join("LOCK");
-        let file = File::create(&lock_path).map_err(|e| {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(|e| {
+                ContextraError::Storage(format!(
+                    "Failed to open/create LOCK file at {}: {e}",
+                    lock_path.display()
+                ))
+            })?;
+
+        sync_dir_util(dir).map_err(|e| {
             ContextraError::Storage(format!(
-                "Failed to open/create LOCK file at {}: {e}",
-                lock_path.display()
+                "Failed to fsync directory for LOCK file at {}: {e}",
+                dir.display()
             ))
         })?;
 
@@ -60,8 +106,9 @@ fn decide_on_lock_error(
     }
 }
 
-#[cfg(all(test, not(loom)))]
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
 #[doc(hidden)]
+#[allow(dead_code)]
 pub fn test_decide_on_lock_error_wrapper(
     durability_mode: DurabilityMode,
     lock_path: &Path,
@@ -74,6 +121,60 @@ pub fn test_decide_on_lock_error_wrapper(
 mod tests {
     use super::*;
     use std::io::{Error, ErrorKind};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tempfile::TempDir;
+
+    static DIR_SYNC_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    fn mock_dir_sync_hook_ok(_path: &Path) -> std::io::Result<()> {
+        DIR_SYNC_COUNT.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn mock_dir_sync_hook_err(_path: &Path) -> std::io::Result<()> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "simulated dirlock dir fsync failure",
+        ))
+    }
+
+    #[test]
+    fn test_dirlock_acquire_invokes_dir_fsync() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let db_path = temp_dir.path();
+
+        DIR_SYNC_COUNT.store(0, Ordering::SeqCst);
+        test_set_dirlock_sync_hook(Some(mock_dir_sync_hook_ok));
+
+        let lock_res = DirLock::acquire(db_path, DurabilityMode::Full);
+        test_set_dirlock_sync_hook(None);
+
+        assert!(lock_res.is_ok(), "DirLock::acquire should succeed");
+        assert!(
+            DIR_SYNC_COUNT.load(Ordering::SeqCst) > 0,
+            "DirLock::acquire MUST invoke parent directory fsync after creating LOCK file"
+        );
+    }
+
+    #[test]
+    fn test_dirlock_acquire_propagates_dir_fsync_error() {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let db_path = temp_dir.path();
+
+        test_set_dirlock_sync_hook(Some(mock_dir_sync_hook_err));
+
+        let lock_res = DirLock::acquire(db_path, DurabilityMode::Full);
+        test_set_dirlock_sync_hook(None);
+
+        assert!(
+            lock_res.is_err(),
+            "DirLock::acquire MUST return Err when directory fsync fails"
+        );
+        assert!(
+            lock_res.unwrap_err().to_string().contains("simulated dirlock dir fsync failure"),
+            "Error message must convey directory fsync failure"
+        );
+    }
 
     #[test]
     fn test_decide_on_lock_error_semantics() {
