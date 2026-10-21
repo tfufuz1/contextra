@@ -221,12 +221,14 @@ impl Wal {
     }
 
     /// Exposes the HMAC integrity key for testing.
+    #[cfg(test)]
     pub fn integrity_key_for_test(&self) -> Result<[u8; 32]> {
         self.get_integrity_key()
     }
 
     /// Returns the static legacy HMAC integrity key for testing.
     #[doc(hidden)]
+    #[cfg(test)]
     pub fn legacy_integrity_key_for_test() -> [u8; 32] {
         deobfuscate_legacy_integrity_key()
     }

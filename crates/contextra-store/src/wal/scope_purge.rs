@@ -343,7 +343,7 @@ pub async fn purge_wal_scope(
         // Rewrite required
         let tmp_path = path.with_extension("purge_tmp");
 
-        let integrity_key = wal.integrity_key_for_test()?;
+        let integrity_key = wal.get_integrity_key()?;
 
         let mut kept_entries = Vec::new();
         for (_, entry, _) in &entries {
