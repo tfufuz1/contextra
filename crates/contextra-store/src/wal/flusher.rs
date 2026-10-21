@@ -52,19 +52,19 @@ fn respond_poisoned_error(cmd: WalCommand) {
     );
     match cmd {
         WalCommand::Append { ack, .. } => {
-            let _ = ack.send(Err(err));
+            let _ = ack.send(Err(err)); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
         }
         WalCommand::Truncate { ack, .. } => {
-            let _ = ack.send(Err(err));
+            let _ = ack.send(Err(err)); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
         }
         WalCommand::Seal { ack } => {
-            let _ = ack.send(Err(err));
+            let _ = ack.send(Err(err)); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
         }
         WalCommand::Rewrite { ack, .. } => {
-            let _ = ack.send(Err(err));
+            let _ = ack.send(Err(err)); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
         }
         WalCommand::Scan { ack, .. } => {
-            let _ = ack.send(Err(err));
+            let _ = ack.send(Err(err)); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
         }
     }
 }
@@ -455,7 +455,7 @@ impl Wal {
                             }
 
                             for ack in acks {
-                                let _ =
+                                let _ = // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
                                     ack.send(Err(ContextraError::Storage(write_err.to_string())));
                             }
                             continue;
@@ -512,7 +512,7 @@ impl Wal {
                             }
                             poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
                             for ack in acks {
-                                let _ =
+                                let _ = // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
                                     ack.send(Err(ContextraError::Storage(sync_err.to_string())));
                             }
                             continue;
@@ -529,7 +529,7 @@ impl Wal {
                             Err(e) => {
                                 poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
                                 for ack in acks {
-                                    let _ = ack.send(Err(ContextraError::Storage(format!(
+                                    let _ = ack.send(Err(ContextraError::Storage(format!( // INTENTIONAL-DROP: Receiver dropped ack channel.
                                         "WAL written_len overflow: {}",
                                         e
                                     ))));
@@ -544,7 +544,7 @@ impl Wal {
                         *last_hmac_guard = final_last_hmac_val;
 
                         for ack in acks {
-                            let _ = ack.send(Ok(()));
+                            let _ = ack.send(Ok(())); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
                         }
                     }
 
@@ -621,7 +621,7 @@ impl Wal {
                         }
                         .await;
 
-                        let _ = ack.send(res);
+                        let _ = ack.send(res); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
                     }
 
                     WalCommand::Seal { ack } => {
@@ -738,7 +738,7 @@ impl Wal {
                         }
                         .await;
 
-                        let _ = ack.send(res);
+                        let _ = ack.send(res); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
                     }
 
                     WalCommand::Rewrite {
@@ -906,7 +906,9 @@ impl Wal {
                             .await;
 
                             if let Err(err) = write_res {
-                                let _ = crate::wal::fs::remove_file(&temp_path).await;
+                                if let Err(e) = crate::wal::fs::remove_file(&temp_path).await {
+                                    tracing::warn!("Failed to remove temporary migration file {:?}: {}", temp_path, e);
+                                }
                                 poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
                                 return Err(err);
                             }
@@ -923,7 +925,7 @@ impl Wal {
                         }
                         .await;
 
-                        let _ = ack.send(res);
+                        let _ = ack.send(res); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
                     }
 
                     WalCommand::Scan {
@@ -962,7 +964,7 @@ impl Wal {
                             }
                         };
 
-                        let _ = ack.send(final_res);
+                        let _ = ack.send(final_res); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
                     }
                 }
             }

@@ -383,7 +383,7 @@ impl SstableReader {
 
             if let Some(parent) = path_buf.parent() {
                 let manifest_path = parent.join("MANIFEST");
-                if tokio::fs::try_exists(&manifest_path).await.unwrap_or(false) {
+                if manifest_path.exists() {
                     if let Ok(entries) = crate::manifest::Manifest::load(&manifest_path).await {
                         let tracker =
                             crate::manifest::ManifestFormatTracker::from_entries(&entries);

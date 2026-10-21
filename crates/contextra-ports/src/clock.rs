@@ -3,6 +3,11 @@
 use contextra_types::DeterministicTimestamp;
 use std::sync::Arc;
 
+// TODO(WP-0 / PR-1 Schritt 4 / B0-d): Doppelte Definition von `SystemClock` bereinigen.
+// `SystemClock` existiert aktuell in beiden Crates (`contextra-ports` und `contextra-sys`).
+// Sobald `contextra-sys` den `Clock`-Trait via optionales Feature `ports` implementiert,
+// sollen alle 63 Consumer-Dateien auf `contextra_sys::SystemClock` umgestellt werden
+// und diese Definition hier als Re-export bzw. deprecated markiert werden.
 /// Production system clock implementation backed by [`std::time::SystemTime`] and [`std::time::Instant`].
 #[derive(Debug, Clone, Copy)]
 pub struct SystemClock {
