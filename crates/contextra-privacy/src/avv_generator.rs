@@ -8,9 +8,7 @@ pub use contextra_avv_generator::{
 };
 
 /// Generiert einen vollständigen AVV-Entwurf im Markdown-Format unter Verwendung von [`render_avv_markdown`].
-#[deprecated(
-    note = "Nutze contextra-avv-generator anstelle von contextra-privacy::avv_generator"
-)]
+#[deprecated(note = "Nutze contextra-avv-generator anstelle von contextra-privacy::avv_generator")]
 pub fn generate_avv_draft(ctx: &AvvContext) -> String {
     render_avv_markdown(ctx).unwrap_or_else(|err| format!("Error rendering AVV draft: {err}"))
 }
@@ -27,8 +25,7 @@ mod tests {
         let ctx = AvvContext::new("Acme Corp GmbH", "Contextra Cloud Systems AG", tenant_id);
         let draft = generate_avv_draft(&ctx);
 
-        let required_disclaimer =
-            "Hinweis:** Vorlage, keine Rechtsberatung";
+        let required_disclaimer = "Hinweis:** Vorlage, keine Rechtsberatung";
         assert!(
             draft.contains(required_disclaimer),
             "AVV draft must contain legal disclaimer"

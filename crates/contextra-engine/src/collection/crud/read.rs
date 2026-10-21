@@ -30,6 +30,19 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.get_at_snapshot(id, seq).await
     }
 
+    /// Retrieves a document by string ID within transaction `tx`, recording the read into `tx`'s ReadSet for SSI tracking.
+    pub async fn get_tx(&self, tx: TxId, id: &str) -> Result<Option<crate::Document>> {
+        let seq = self.snapshot_seq().await?;
+        if let Some(doc) = self.get_at_seq_tracked(tx, id, seq).await? {
+            Ok(Some(crate::Document {
+                id: doc.id,
+                metadata: doc.metadata,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Retrieves a document at a specific snapshot point.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn get_at_snapshot(&self, id: &str, seq_no: u64) -> Result<Option<crate::Document>> {
@@ -75,7 +88,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if let Some(ref m) = meta.metadata {
                     if let Some(tx_val) = m.get("updated_at_tx") {
                         if let Some(u) = tx_val.as_u64() {
-                            return Ok(Some(TxId::new(u)));
+                            return Ok(TxId::try_new(u).ok());
                         }
                     }
                     if let Some(imp) = m.get("importance") {
@@ -89,6 +102,27 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
         Ok(None)
+    }
+
+    /// Scans documents in the collection matching a key prefix within transaction `tx`, recording prefix and keys in `tx`'s ReadSet.
+    pub async fn scan_prefix_tx(
+        &self,
+        tx: TxId,
+        prefix: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<(String, serde_json::Value)>> {
+        let seq = self.snapshot_seq().await?;
+        let real_prefix = if prefix.starts_with("__rel:") {
+            self.namespaced_key(
+                prefix.strip_prefix("__rel:").unwrap_or(prefix).as_bytes(),
+                2,
+            )
+        } else {
+            self.namespaced_key(prefix.as_bytes(), 0)
+        };
+        self.storage.scan_prefix_tracked(tx, &real_prefix).await?;
+
+        self.scan_prefix(prefix, limit).await
     }
 
     /// Scans documents in the collection that match a given key prefix.
@@ -180,6 +214,27 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         Ok(results)
+    }
+
+    /// Performs a range scan within transaction `tx`, recording prefix and keys in `tx`'s ReadSet.
+    pub async fn scan_tx(
+        &self,
+        tx: TxId,
+        start: std::ops::Bound<&[u8]>,
+        end: std::ops::Bound<&[u8]>,
+        limit: Option<usize>,
+    ) -> Result<Vec<(String, serde_json::Value)>> {
+        let seq = self.snapshot_seq().await?;
+        let start_bytes = match start {
+            std::ops::Bound::Included(b) => self.namespaced_key(b, 0),
+            std::ops::Bound::Excluded(b) => self.namespaced_key(b, 0),
+            std::ops::Bound::Unbounded => Vec::new(),
+        };
+        if !start_bytes.is_empty() {
+            self.storage.scan_prefix_tracked(tx, &start_bytes).await?;
+        }
+
+        self.scan(start, end, limit).await
     }
 
     /// Performs a range scan of documents in the collection.

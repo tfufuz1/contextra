@@ -333,7 +333,6 @@ fn test_h3_revocation_log_tamper_matrix() {
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "SEC-01/K1: AuditChain::verify_chain accepts rolled-back backup state (lack of external head anchor)"]
 fn test_h4_audit_chain_backup_rollback_vulnerability() {
     let (sk, vk) = test_ed25519_keypair();
     let mut chain = AuditChain::new();
@@ -370,25 +369,38 @@ fn test_h4_audit_chain_backup_rollback_vulnerability() {
             .expect("append");
     }
 
+    // System publishes current head anchor at index 19 (entry 20)
+    let anchor_20 = chain.anchor().expect("anchor 20");
+    assert_eq!(anchor_20.index, 19);
+
     // Attacker rolls back chain to backup_at_10
     let rolled_back_chain = backup_at_10;
 
-    // EXPECTATION: Rollback should be detectable via an external anchor (e.g. system state counter).
-    // DEFECT: Without an external anchor, verify_chain and verify_head_signature BOTH return true for the old backup!
+    // Rolled back chain internally satisfies isolated Blake3 hash linkage
     assert!(
         rolled_back_chain.verify_chain().expect("verify"),
         "Rolled back chain internally satisfies Blake3 hash linkage"
     );
     assert!(
         AuditChain::verify_head_signature(&head_sig_10, &vk).expect("verify sig"),
-        "Head signature for backup at 10 is cryptographically valid"
+        "Old head signature for backup at 10 is internally valid for that sub-state"
     );
 
-    // This assertion fails if there is no external state anchor tracking chain length >= 20
-    assert_eq!(
-        rolled_back_chain.len(),
-        20,
-        "BEFUND H4: Rolled-back chain cannot be distinguished from current head without external anchor"
+    // Verification against external head anchor MUST detect rollback fail-closed:
+    // 1. verify_chain_against_anchor returns false
+    let verify_anchor_res = rolled_back_chain
+        .verify_chain_against_anchor(&anchor_20)
+        .expect("verify against anchor");
+    assert!(
+        !verify_anchor_res,
+        "Rolled-back chain MUST fail verification against external head anchor"
+    );
+
+    // 2. verify_against_anchor returns Err(CryptoError) due to counter overflow
+    let verify_against_head_res = rolled_back_chain.verify_against_anchor(&anchor_20.entry_hash, anchor_20.index);
+    assert!(
+        matches!(verify_against_head_res, Err(CryptoError::Crypto(_))),
+        "verify_against_anchor MUST return Err when rolled-back chain is shorter than external anchor"
     );
 }
 

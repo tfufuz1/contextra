@@ -33,7 +33,7 @@ pub async fn cascade_invalidate_edges_for_superseded_doc(
     superseded_doc_id: DocId,
     wal_seq: u64,
 ) -> Result<CascadeInvalidationReport> {
-    let wal_tx = TxId::new(wal_seq);
+    let wal_tx = TxId::try_new(wal_seq)?;
 
     // 1. Lookup aller EdgeIds via DocId -> Set<EdgeId>-Index.
     let edge_ids = graph.edges_for_doc(superseded_doc_id);
@@ -245,7 +245,7 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
     superseded_doc_id: DocId,
     wal_seq: u64,
 ) -> Result<HyperedgeCascadeReport> {
-    let wal_tx = TxId::new(wal_seq);
+    let wal_tx = TxId::try_new(wal_seq)?;
     let mut candidate_ids = graph.hyperedges_for_doc(superseded_doc_id);
     if candidate_ids.is_empty() {
         return Ok(HyperedgeCascadeReport {
@@ -388,8 +388,7 @@ pub async fn cascade_invalidate_entity(
     wal_seq: u64,
     #[cfg(feature = "edge-reinforcement-learning")] buffer: Option<&EdgeReinforcementBuffer>,
 ) -> Result<EntityCascadeReport> {
-    #[allow(deprecated)]
-    let wal_tx = TxId::new(wal_seq);
+    let wal_tx = TxId::try_new(wal_seq)?;
     let mut report = EntityCascadeReport::new(entity_id);
 
     // 1. Collect hyperedges involving entity_id and tombstone them
@@ -472,7 +471,6 @@ pub async fn cascade_invalidate_entity(
     }
 
     // 4. Remove entity and its incident edges via remove_entity
-    use crate::GraphIndexExt;
     graph.remove_entity(wal_tx, entity_id).await?;
     report.tombstoned_edge_count = edge_count_before;
 
@@ -569,7 +567,7 @@ mod tests {
     #[tokio::test]
     async fn test_cascade_invalidation_tombstones_edges_of_superseded_doc() {
         let graph = std::sync::Arc::new(CsrGraph::new());
-        let tx1 = TxId::new(1);
+        let tx1 = TxId::try_new(1).unwrap();
         let doc_a = DocId::from_key("doc-a").unwrap();
         let doc_b = DocId::from_key("doc-b").unwrap();
 
@@ -633,7 +631,7 @@ mod tests {
     #[tokio::test]
     async fn test_cascade_invalidation_is_idempotent() {
         let graph = std::sync::Arc::new(CsrGraph::new());
-        let tx1 = TxId::new(1);
+        let tx1 = TxId::try_new(1).unwrap();
         let doc_a = DocId::from_key("doc-a").unwrap();
 
         let node1 = EntityId::new(100);
@@ -677,7 +675,7 @@ mod tests {
     #[tokio::test]
     async fn test_pathrag_sufficiency_excludes_cascaded_tombstones() {
         let graph = std::sync::Arc::new(CsrGraph::new());
-        let tx1 = TxId::new(1);
+        let tx1 = TxId::try_new(1).unwrap();
         let doc_a = DocId::from_key("doc-a").unwrap();
 
         let node1 = EntityId::new(10);
@@ -736,7 +734,7 @@ mod tests {
     #[tokio::test]
     async fn test_cascade_invalidation_max_wal_seq() {
         let graph = std::sync::Arc::new(CsrGraph::new());
-        let tx1 = TxId::new(1);
+        let tx1 = TxId::try_new(1).unwrap();
         let doc_a = DocId::from_key("doc-max-seq").unwrap();
 
         let node1 = EntityId::new(1001);
@@ -774,7 +772,7 @@ mod tests {
     #[tokio::test]
     async fn test_cascade_invalidation_multiple_edges_same_doc() {
         let graph = std::sync::Arc::new(CsrGraph::new());
-        let tx1 = TxId::new(1);
+        let tx1 = TxId::try_new(1).unwrap();
         let doc_multi = DocId::from_key("doc-multi").unwrap();
 
         let n1 = EntityId::new(10);
@@ -1021,7 +1019,7 @@ mod tests {
     #[tokio::test]
     async fn test_sweep_orphans_sweeps_degenerated_hyperedges() {
         let graph = CsrGraph::new();
-        let tx = TxId::new(1);
+        let tx = TxId::try_new(1).unwrap();
 
         let e1 = EntityId::new(10);
         let e2 = EntityId::new(20);
@@ -1070,7 +1068,7 @@ mod tests {
         graph.insert_hyperedge_direct(h2);
         graph.insert_hyperedge_direct(h3);
 
-        let swept = graph.sweep_orphans(TxId::new(10)).unwrap();
+        let swept = graph.sweep_orphans(TxId::try_new(10).unwrap()).unwrap();
         assert_eq!(
             swept, 2,
             "Must sweep exactly 2 orphaned hyperedges (h2 and h3)"

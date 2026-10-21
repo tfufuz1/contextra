@@ -13,10 +13,10 @@ use std::sync::Arc;
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     pub(super) fn validate_ssi_gate(&self) -> Result<()> {
         let read_set = {
-            let guard = match self.read_set.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let guard = self
+                .read_set
+                .lock()
+                .map_err(|_| ContextraError::Transaction("ReadSet lock poisoned".into()))?;
             guard.clone()
         };
 
@@ -41,10 +41,9 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
     pub(super) async fn commit_text_staged(&self) -> Result<()> {
         let seq_ops = {
-            let mut guard = match self.staged_text_sequence.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let mut guard = self.staged_text_sequence.lock().map_err(|_| {
+                ContextraError::Transaction("staged_text_sequence lock poisoned".into())
+            })?;
             std::mem::take(&mut *guard)
         };
 
@@ -87,17 +86,15 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             }
         } else {
             let text_deletes = {
-                let mut guard = match self.staged_text_deletes.lock() {
-                    Ok(g) => g,
-                    Err(p) => p.into_inner(),
-                };
+                let mut guard = self.staged_text_deletes.lock().map_err(|_| {
+                    ContextraError::Transaction("staged_text_deletes lock poisoned".into())
+                })?;
                 std::mem::take(&mut *guard)
             };
             let text_ops = {
-                let mut guard = match self.staged_text_ops.lock() {
-                    Ok(g) => g,
-                    Err(p) => p.into_inner(),
-                };
+                let mut guard = self.staged_text_ops.lock().map_err(|_| {
+                    ContextraError::Transaction("staged_text_ops lock poisoned".into())
+                })?;
                 std::mem::take(&mut *guard)
             };
 
@@ -149,26 +146,24 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             .namespaced_key(&self.tx_id.inner().to_le_bytes(), 3);
 
         let doc_ids = {
-            let guard = match self.staged_doc_ids.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let guard = self
+                .staged_doc_ids
+                .lock()
+                .map_err(|_| ContextraError::Transaction("staged_doc_ids lock poisoned".into()))?;
             Arc::clone(&guard)
         };
 
         let has_text = {
-            let ops = match self.staged_text_ops.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let dels = match self.staged_text_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let seq = match self.staged_text_sequence.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let ops = self
+                .staged_text_ops
+                .lock()
+                .map_err(|_| ContextraError::Transaction("staged_text_ops lock poisoned".into()))?;
+            let dels = self.staged_text_deletes.lock().map_err(|_| {
+                ContextraError::Transaction("staged_text_deletes lock poisoned".into())
+            })?;
+            let seq = self.staged_text_sequence.lock().map_err(|_| {
+                ContextraError::Transaction("staged_text_sequence lock poisoned".into())
+            })?;
             !ops.is_empty() || !dels.is_empty() || !seq.is_empty()
         };
 
@@ -180,26 +175,20 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         // Register CompensateLsmAction so storage keys are compensated if any subsequent commit step fails
         let f_keys = {
-            let mut guard = match self.staged_forward_keys.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let mut guard = self.staged_forward_keys.lock().map_err(|_| {
+                ContextraError::Transaction("staged_forward_keys lock poisoned".into())
+            })?;
             std::mem::take(&mut *guard)
         };
         let r_keys = {
-            let mut guard = match self.staged_reverse_keys.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let mut guard = self.staged_reverse_keys.lock().map_err(|_| {
+                ContextraError::Transaction("staged_reverse_keys lock poisoned".into())
+            })?;
             std::mem::take(&mut *guard)
         };
 
         // Phase (a): Write CommitIntent::Pending and commit it to storage durably first (F-20)
-        let intent_tx = TxId::new(
-            self.collection
-                .next_tx
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-        );
+        let intent_tx = self.collection.allocate_tx()?;
         let intent = CommitIntent::Pending {
             doc_ids: Arc::clone(&doc_ids),
             has_text,
@@ -371,11 +360,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         ));
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
-        let cleanup_tx = TxId::new(
-            self.collection
-                .next_tx
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-        );
+        let cleanup_tx = self.collection.allocate_tx()?;
         let commit_bytes = match serde_json::to_vec(&CommitIntent::Committed) {
             Ok(b) => b,
             Err(e) => {
