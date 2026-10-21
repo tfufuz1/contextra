@@ -342,6 +342,14 @@ impl ResidentPostingIndex {
         }
     }
 
+    /// Executes a callback for every term and posting list currently in the resident index.
+    pub fn visit_entries<F: FnMut(&str, &PostingList)>(&self, mut f: F) {
+        let guard = self.index.read();
+        for (term, plist) in guard.iter() {
+            f(term.as_str(), plist.as_ref());
+        }
+    }
+
     /// Clears the in-memory cache (e.g., on full re-sync).
     pub fn clear(&self) {
         self.index.write().clear();

@@ -22,6 +22,12 @@ pub enum GhostScan {
     Incomplete(IncompleteReason),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GhostVerificationReport {
+    pub is_complete: bool,
+    pub remaining_ghost_pointers: usize,
+}
+
 impl GhostScan {
     /// Returns true if and only if the scan completed fully and verified 0 ghost pointers remain.
     #[inline]

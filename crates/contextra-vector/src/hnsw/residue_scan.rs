@@ -424,3 +424,63 @@ impl HnswIndex {
         }
     }
 }
+
+impl contextra_ports::LayerScan for HnswIndex {
+    fn layer_id(&self) -> u16 {
+        3
+    }
+
+    fn scan(&self, scope: &contextra_ports::PhysicalScope) -> std::result::Result<contextra_ports::LayerObservation, contextra_ports::ScanError> {
+        let nodes = self.inner.hot.nodes.read();
+        let mmap_guard = self.inner.cold.mmap_index.read();
+        let mmap_count = mmap_guard.as_ref().map(|m| m.header.node_count() as usize).unwrap_or(0);
+        let item_count = (mmap_count + nodes.len()) as u64;
+
+        if item_count == 0 {
+            let digest = blake3::hash(b"hnsw_empty").into();
+            return Ok(contextra_ports::LayerObservation {
+                layer_id: 3,
+                clean: true,
+                state_digest: digest,
+                item_count: 0,
+            });
+        }
+
+        let mut matches = 0u64;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"contextra/hnsw/v1");
+
+        let deleted = self.inner.cold.deleted_nodes.read();
+
+        for (i, node) in nodes.iter().enumerate() {
+            let global_idx = mmap_count + i;
+            if deleted.contains(global_idx as u64) {
+                continue;
+            }
+
+            let doc_str = node.doc_id.inner().to_string();
+            let key_0 = format!("t:0:{}", doc_str).into_bytes();
+            let key_1 = format!("t:1:{}", doc_str).into_bytes();
+
+            let matches_keys = scope.matches_key(&key_0)
+                || scope.matches_key(&key_1)
+                || scope.keys().iter().any(|k| {
+                    std::str::from_utf8(k)
+                        .map(|s| s.ends_with(&doc_str))
+                        .unwrap_or(false)
+                });
+
+            if matches_keys {
+                matches += 1;
+            }
+            hasher.update(&node.doc_id.inner().to_le_bytes());
+        }
+
+        Ok(contextra_ports::LayerObservation {
+            layer_id: 3,
+            clean: matches == 0,
+            state_digest: hasher.finalize().into(),
+            item_count,
+        })
+    }
+}

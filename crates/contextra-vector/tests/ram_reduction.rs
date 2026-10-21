@@ -25,7 +25,7 @@ async fn test_ram_reduction_sq8_vs_f32() -> Result<(), Box<dyn std::error::Error
     }
     index_f32.commit(tx).await?;
 
-    let ram_f32 = index_f32.estimated_ram_bytes();
+    let ram_f32 = index_f32.stats().await?.memory_usage_bytes;
 
     // 2. Build SQ8 Quantized Index
     let config_sq8 = HnswConfig {
@@ -45,7 +45,7 @@ async fn test_ram_reduction_sq8_vs_f32() -> Result<(), Box<dyn std::error::Error
     }
     index_sq8.commit(tx).await?;
 
-    let ram_sq8 = index_sq8.estimated_ram_bytes();
+    let ram_sq8 = index_sq8.stats().await?.memory_usage_bytes;
 
     // 3. Verify RAM Reduction (SQ8 should consume ~75% less vector data RAM)
     assert!(
