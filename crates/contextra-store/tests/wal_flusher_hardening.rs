@@ -70,9 +70,15 @@ async fn test_poison_state_answers_all_commands_with_typed_error() -> Result<()>
 
     // Create a new WAL handle with failing injector
     let wal_fail = Wal::open_read_only(&path, None).await?;
-    wal_fail.enable_flusher_with_injector(file, WalFlusherConfig::default(), FailAllWritesInjector)?;
+    wal_fail.enable_flusher_with_injector(
+        file,
+        WalFlusherConfig::default(),
+        FailAllWritesInjector,
+    )?;
 
-    let res = wal_fail.append_batch(PreparedBatch::for_test(vec![entry])).await;
+    let res = wal_fail
+        .append_batch(PreparedBatch::for_test(vec![entry]))
+        .await;
     assert!(res.is_err(), "Append must fail with FailAllWritesInjector");
     assert!(wal_fail.is_poisoned(), "WAL handle must be poisoned");
 
@@ -110,7 +116,9 @@ async fn test_poison_state_answers_all_commands_with_typed_error() -> Result<()>
         err_str
     );
 
-    let res_scan = wal_fail.scan_entries_with_callback(1024, |_seq, _entry, _pos| true).await;
+    let res_scan = wal_fail
+        .scan_entries_with_callback(1024, |_seq, _entry, _pos| true)
+        .await;
     assert!(res_scan.is_err(), "Scan on poisoned WAL must return Err");
     let err_str = res_scan.unwrap_err().to_string();
     assert!(
@@ -138,7 +146,8 @@ async fn test_rewrite_crash_consistency_preserves_original_wal() -> Result<()> {
         &[1u8; 32],
         [0u8; 32],
     )?;
-    wal.append_batch(PreparedBatch::for_test(vec![entry.clone()])).await?;
+    wal.append_batch(PreparedBatch::for_test(vec![entry.clone()]))
+        .await?;
 
     let size_before = wal.size();
     assert!(size_before > 0);
@@ -155,7 +164,11 @@ async fn test_rewrite_crash_consistency_preserves_original_wal() -> Result<()> {
         .await?;
 
     let wal_crash = Wal::open_read_only(&path, None).await?;
-    wal_crash.enable_flusher_with_injector(file, WalFlusherConfig::default(), FailRenameInjector)?;
+    wal_crash.enable_flusher_with_injector(
+        file,
+        WalFlusherConfig::default(),
+        FailRenameInjector,
+    )?;
 
     let rewrite_res = wal_crash.rewrite_as_v3(&entries).await;
     assert!(rewrite_res.is_err(), "Rewrite must fail on rename fault");
@@ -163,7 +176,11 @@ async fn test_rewrite_crash_consistency_preserves_original_wal() -> Result<()> {
     // Reopen original path and verify entries are completely intact!
     let wal_reopened = Wal::open(&path).await?;
     let replayed = wal_reopened.replay().await?;
-    assert_eq!(replayed.len(), 1, "Original WAL must preserve all entries after failed rewrite");
+    assert_eq!(
+        replayed.len(),
+        1,
+        "Original WAL must preserve all entries after failed rewrite"
+    );
     if let WalOp::Put { key, value, tx_id } = &replayed[0].1.op {
         assert_eq!(key, b"original_key");
         assert_eq!(value, b"original_val");

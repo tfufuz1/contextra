@@ -1,7 +1,7 @@
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::lsm::config::DurabilityMode;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use tempfile::tempdir;
 
 #[tokio::test]

@@ -3,15 +3,16 @@
 // ZWECK: Tenant-Matrix-Tests (REG-15) für ErasureBackend über LsmStorage und TenantScopedStorage
 // INVARIANTEN: Strikte Mandanten-Isolation, fail-closed Mandanten-Auflösung, Pflicht-TenantId bei remove_doc_segments
 
-use std::panic::catch_unwind;
-use std::sync::Arc;
-use contextra_types::{CollectionId, DocId, TenantId, TxId};
 use contextra_ports::erasure::{
-    ErasureError, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId, ScopeOrigin,
+    ErasureError, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId,
+    ScopeOrigin,
 };
 use contextra_ports::{KvLifecycleHooks, StorageEngine};
 use contextra_store::lsm::LsmStorage;
 use contextra_store::tenant_codec::TenantScopedStorage;
+use contextra_types::{CollectionId, DocId, TenantId, TxId};
+use std::panic::catch_unwind;
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
@@ -66,7 +67,10 @@ async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
 
     let purge_id = PurgeId::new([2u8; 16]);
     assert_eq!(
-        lsm.erasure_backend().unwrap().acquire_fence(&foreign_scope, purge_id).unwrap_err(),
+        lsm.erasure_backend()
+            .unwrap()
+            .acquire_fence(&foreign_scope, purge_id)
+            .unwrap_err(),
         ErasureError::ForeignScope
     );
     assert_eq!(
@@ -94,9 +98,17 @@ async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
         .expect("key-only physical scope fence acquisition should succeed");
     drop(key_fence);
 
-    match eb_t1.purge_physical(&foreign_scope, TxId::try_new(1).unwrap(), &dummy_probe, &fence_guard) {
+    match eb_t1.purge_physical(
+        &foreign_scope,
+        TxId::try_new(1).unwrap(),
+        &dummy_probe,
+        &fence_guard,
+    ) {
         Err(PurgeError::FenceConflict) => (),
-        res => panic!("Expected FenceConflict for foreign scope in purge_physical, got {:?}", res),
+        res => panic!(
+            "Expected FenceConflict for foreign scope in purge_physical, got {:?}",
+            res
+        ),
     }
 
     // 5. Data isolation & Purge test
@@ -162,7 +174,9 @@ async fn test_fence_guard_drop_releases_fence_single_time_even_after_panic() {
 struct DummyProbe;
 
 impl FreeSpaceProbe for DummyProbe {
-    fn available_bytes(&self) -> std::result::Result<Option<u64>, contextra_ports::erasure::ProbeError> {
+    fn available_bytes(
+        &self,
+    ) -> std::result::Result<Option<u64>, contextra_ports::erasure::ProbeError> {
         Ok(Some(1024 * 1024 * 1024))
     }
 }
@@ -176,8 +190,10 @@ impl KvLifecycleHooks for TestKvHooks {
     fn on_rollback(&self, _tenant: TenantId, _chunk_ids: &[u64]) {}
 
     fn remove_doc_segments(&self, tenant: TenantId, doc: DocId) {
-        self.last_removed_tenant.store(tenant.inner(), std::sync::atomic::Ordering::SeqCst);
-        self.last_removed_doc.store(doc.inner(), std::sync::atomic::Ordering::SeqCst);
+        self.last_removed_tenant
+            .store(tenant.inner(), std::sync::atomic::Ordering::SeqCst);
+        self.last_removed_doc
+            .store(doc.inner(), std::sync::atomic::Ordering::SeqCst);
     }
 
     fn purge_tenant(&self, _tenant: TenantId) {}
@@ -195,6 +211,16 @@ fn test_remove_doc_segments_requires_mandatory_tenant_id() {
 
     hooks.remove_doc_segments(tenant, doc);
 
-    assert_eq!(hooks.last_removed_tenant.load(std::sync::atomic::Ordering::SeqCst), 42);
-    assert_eq!(hooks.last_removed_doc.load(std::sync::atomic::Ordering::SeqCst), 99);
+    assert_eq!(
+        hooks
+            .last_removed_tenant
+            .load(std::sync::atomic::Ordering::SeqCst),
+        42
+    );
+    assert_eq!(
+        hooks
+            .last_removed_doc
+            .load(std::sync::atomic::Ordering::SeqCst),
+        99
+    );
 }

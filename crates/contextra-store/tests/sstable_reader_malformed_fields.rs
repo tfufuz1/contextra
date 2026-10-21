@@ -53,9 +53,33 @@ async fn test_systematic_field_mutations_never_panic() {
 
     let target_file_path = tmp.path().join("mutated.sst");
 
-    let values_u16: [u16; 7] = [0, 1, file_len as u16, (file_len + 1) as u16, 0x7FFF, 0x8000, u16::MAX];
-    let values_u32: [u32; 7] = [0, 1, file_len as u32, (file_len + 1) as u32, 0x7FFF_FFFF, 0x8000_0000, u32::MAX];
-    let values_u64: [u64; 7] = [0, 1, file_len as u64, (file_len + 1) as u64, 0x7FFF_FFFF_FFFF_FFFF, 0x8000_0000_0000_0000, u64::MAX];
+    let values_u16: [u16; 7] = [
+        0,
+        1,
+        file_len as u16,
+        (file_len + 1) as u16,
+        0x7FFF,
+        0x8000,
+        u16::MAX,
+    ];
+    let values_u32: [u32; 7] = [
+        0,
+        1,
+        file_len as u32,
+        (file_len + 1) as u32,
+        0x7FFF_FFFF,
+        0x8000_0000,
+        u32::MAX,
+    ];
+    let values_u64: [u64; 7] = [
+        0,
+        1,
+        file_len as u64,
+        (file_len + 1) as u64,
+        0x7FFF_FFFF_FFFF_FFFF,
+        0x8000_0000_0000_0000,
+        u64::MAX,
+    ];
 
     // Collect targeted byte offsets for lengths, offsets, and counter fields across Header, Index, Data Blocks, and Footer
     let mut field_offsets_16: Vec<usize> = Vec::new();
@@ -64,8 +88,8 @@ async fn test_systematic_field_mutations_never_panic() {
 
     // 1. Footer (Trailer) fields (last 54 bytes)
     let trailer_start = file_len - 54;
-    field_offsets_64.push(trailer_start);      // min_tx_id
-    field_offsets_64.push(trailer_start + 8);  // max_tx_id
+    field_offsets_64.push(trailer_start); // min_tx_id
+    field_offsets_64.push(trailer_start + 8); // max_tx_id
     field_offsets_64.push(trailer_start + 16); // min_seq
     field_offsets_64.push(trailer_start + 24); // max_seq
     field_offsets_64.push(trailer_start + 32); // bloom_offset
@@ -81,7 +105,8 @@ async fn test_systematic_field_mutations_never_panic() {
         let mut pos = index_start + 4;
         while pos + 10 <= index_end {
             field_offsets_16.push(pos); // key_len
-            let k_len = u16::from_le_bytes(original_data[pos..pos + 2].try_into().unwrap()) as usize;
+            let k_len =
+                u16::from_le_bytes(original_data[pos..pos + 2].try_into().unwrap()) as usize;
             pos += 2 + k_len;
             if pos + 8 <= index_end {
                 field_offsets_64.push(pos); // block offset in index entry
@@ -103,13 +128,19 @@ async fn test_systematic_field_mutations_never_panic() {
         // Inspect entry fields within block
         while entry_pos + 22 <= data_end {
             field_offsets_16.push(entry_pos); // entry k_len
-            let k_len = u16::from_le_bytes(original_data[entry_pos..entry_pos + 2].try_into().unwrap()) as usize;
+            let k_len =
+                u16::from_le_bytes(original_data[entry_pos..entry_pos + 2].try_into().unwrap())
+                    as usize;
             entry_pos += 2 + k_len;
             if entry_pos + 20 <= data_end {
-                field_offsets_64.push(entry_pos);     // seq_no
+                field_offsets_64.push(entry_pos); // seq_no
                 field_offsets_64.push(entry_pos + 8); // tx_id
                 field_offsets_32.push(entry_pos + 16); // v_len
-                let v_len = u32::from_le_bytes(original_data[entry_pos + 16..entry_pos + 20].try_into().unwrap()) as usize;
+                let v_len = u32::from_le_bytes(
+                    original_data[entry_pos + 16..entry_pos + 20]
+                        .try_into()
+                        .unwrap(),
+                ) as usize;
                 entry_pos += 20 + v_len;
             } else {
                 break;

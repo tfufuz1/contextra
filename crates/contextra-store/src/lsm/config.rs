@@ -122,9 +122,9 @@ impl EncryptionConfig {
             Self::Keyring { kek_source, .. } => match kek_source {
                 KekSource::Passphrase(p) => Some(p.clone()),
                 KekSource::Environment(var) => std::env::var(var).ok(),
-                KekSource::File(path) => {
-                    std::fs::read_to_string(path).ok().map(|s| s.trim().to_string())
-                }
+                KekSource::File(path) => std::fs::read_to_string(path)
+                    .ok()
+                    .map(|s| s.trim().to_string()),
             },
         }
     }
@@ -168,6 +168,9 @@ pub struct LsmConfig {
     /// Maximum factor for internal merge set size relative to limit in bounded scans.
     /// Default is `crate::lsm::MAX_INTERNAL_MERGE_ENTRIES_FACTOR` (8).
     pub max_internal_merge_factor: usize,
+    /// Recovery enforcement mode for WAL tail/chain truncation verification.
+    #[serde(skip, default)]
+    pub wal_recovery_mode: crate::wal::WalRecoveryMode,
     #[cfg(any(test, feature = "fault-injection"))]
     #[serde(skip, default)]
     pub fault_plan: std::sync::Arc<crate::wal::WalFaultPlan>,
@@ -197,6 +200,7 @@ impl Default for LsmConfig {
             ssi_max_tracked_keys: 1_000_000,
             blob_bytes_threshold: crate::blob::DEFAULT_BLOB_THRESHOLD,
             max_internal_merge_factor: crate::lsm::MAX_INTERNAL_MERGE_ENTRIES_FACTOR,
+            wal_recovery_mode: crate::wal::WalRecoveryMode::Warn,
             #[cfg(any(test, feature = "fault-injection"))]
             fault_plan: std::sync::Arc::new(crate::wal::WalFaultPlan::default()),
         }

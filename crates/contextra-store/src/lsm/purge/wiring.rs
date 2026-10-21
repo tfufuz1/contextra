@@ -7,8 +7,8 @@ use super::failpoint::{OrxFailpointSet, OrxPurgeError};
 use super::orchestrator::{OrxHooks, PurgeOrchestrator};
 use super::resume::resume_pending_with_policy;
 use crate::compaction::purge_filter::PurgeReport;
-use contextra_types::Result;
 use contextra_ports::Clock;
+use contextra_types::Result;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -71,7 +71,9 @@ impl PurgeWiring {
     }
 
     /// Resumes any pending or interrupted purge operation present in the storage directory.
-    pub async fn resume_pending(&self) -> std::result::Result<Option<(PurgeReport, OrxDisposeReport)>, OrxPurgeError> {
+    pub async fn resume_pending(
+        &self,
+    ) -> std::result::Result<Option<(PurgeReport, OrxDisposeReport)>, OrxPurgeError> {
         resume_pending_with_policy(
             &self.storage_dir,
             &self.hooks,

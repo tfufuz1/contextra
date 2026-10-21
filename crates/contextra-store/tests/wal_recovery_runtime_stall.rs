@@ -3,8 +3,8 @@
 // INVARIANTEN: Replay throughput across subsequent windows MUST NOT drop below 50% of the baseline throughput (first 10%).
 // STAND: TS:2026-09-26T00:00:00Z
 
-use contextra_types::TxId;
 use contextra_store::wal::{ReplayProgressSink, Wal, WalEntry, WalOp, WalSeq, WAL_V3_HEADER};
+use contextra_types::TxId;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;

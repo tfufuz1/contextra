@@ -3,8 +3,8 @@
 #![cfg(feature = "fault-injection")]
 
 use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::{ContextraError, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -102,7 +102,10 @@ async fn test_group_commit_mid_batch_fsync_failure_atomicity() {
     storage.commit(tx_base).await.expect("commit base");
 
     // Configure fault injection to fail append_batch for tx 10
-    storage.fault_plan().fail_append_for_tx.store(10, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(10, Ordering::SeqCst);
 
     let barrier = Arc::new(tokio::sync::Barrier::new(10));
     let mut set = tokio::task::JoinSet::new();
@@ -136,7 +139,10 @@ async fn test_group_commit_mid_batch_fsync_failure_atomicity() {
     }
 
     // Reset fault injection flag
-    storage.fault_plan().fail_append_for_tx.store(0, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(0, Ordering::SeqCst);
 
     // All 10 tasks in the batch must receive an Err (no partial success)
     assert_eq!(

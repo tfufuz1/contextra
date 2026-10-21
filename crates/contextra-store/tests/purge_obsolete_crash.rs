@@ -13,7 +13,8 @@ use contextra_types::TxId;
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_purge_obsolete_crash_between_manifest_and_p5() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_purge_obsolete_crash_between_manifest_and_p5(
+) -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -57,7 +58,10 @@ async fn test_purge_obsolete_crash_between_manifest_and_p5() -> Result<(), Box<d
     let hooks = OrxHooks::default();
     let res = resume_pending(dir.path(), &hooks, None).await?;
 
-    assert!(res.is_some(), "resume_pending must detect pending journal work");
+    assert!(
+        res.is_some(),
+        "resume_pending must detect pending journal work"
+    );
 
     // VERIFY: The obsolete file is now durably removed from disk
     assert!(

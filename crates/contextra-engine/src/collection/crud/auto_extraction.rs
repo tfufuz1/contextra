@@ -201,13 +201,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         AutoExtractionConfig,
         ExtractorMode,
     )> {
-        self.auto_extraction.read().as_ref().map(|binding| {
-            (
-                binding.generator.clone(),
-                binding.config.clone(),
-                binding.mode,
-            )
-        })
+        self.auto_extraction
+            .read()
+            .as_ref()
+            .map(|binding| (binding.generator.clone(), binding.config.clone(), binding.mode))
     }
 }
 

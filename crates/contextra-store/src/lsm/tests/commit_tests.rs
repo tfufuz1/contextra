@@ -378,8 +378,14 @@ async fn test_group_commit_leader_releases_commit_mutex_during_disk_io() {
         .unwrap();
 
     // Inject 500ms delay into append_batch for tx_leader
-    storage.fault_plan().delay_append_for_tx.store(10, Ordering::SeqCst);
-    storage.fault_plan().delay_append_ms.store(500, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_for_tx
+        .store(10, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_ms
+        .store(500, Ordering::SeqCst);
 
     let storage_leader = Arc::clone(&storage);
     let leader_handle = tokio::spawn(async move { storage_leader.commit(tx_leader).await });
@@ -406,8 +412,14 @@ async fn test_group_commit_leader_releases_commit_mutex_during_disk_io() {
     // Clean up tasks and reset fault injection state
     leader_handle.await.expect("leader task").unwrap();
     follower_handle.await.expect("follower task").unwrap();
-    storage.fault_plan().delay_append_for_tx.store(0, Ordering::SeqCst);
-    storage.fault_plan().delay_append_ms.store(0, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_for_tx
+        .store(0, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_ms
+        .store(0, Ordering::SeqCst);
 }
 
 #[tokio::test]

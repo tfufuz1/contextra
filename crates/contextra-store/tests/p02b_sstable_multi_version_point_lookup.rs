@@ -1,8 +1,8 @@
 // ZWECK: Regressionstests für SSTable Multi-Version Point-Lookups (P02 Review F-02).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_types::TOMBSTONE_BIT;
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
+use contextra_types::TOMBSTONE_BIT;
 use std::sync::Arc;
 use tempfile::TempDir;
 

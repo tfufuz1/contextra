@@ -13,7 +13,7 @@ mod basic;
 mod checkpoint;
 mod filtered;
 pub mod hybrid;
-pub use hybrid::{HybridPipelineStage, HYBRID_PIPELINE_STAGES};
+pub use hybrid::{HYBRID_PIPELINE_STAGES, HybridPipelineStage};
 mod hydrate;
 
 pub use checkpoint::{

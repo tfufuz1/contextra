@@ -3,7 +3,7 @@
 // ZWECK: Integrationstests für RFC 3161 Zeitanker und RFC 9162 Transparenzlog.
 
 use contextra_crypto::deletion_proof::timestamp_anchor::{
-    AnchorQualification, DerTstInfoParser, LocalMonotonicAnchor, NoOpTsaSignatureVerifier,
+    AcceptAllTsaVerifier, AnchorQualification, DerTstInfoParser, LocalMonotonicAnchor,
     Rfc3161TimeAnchor, TimeAnchor,
 };
 use contextra_crypto::deletion_proof::transparency_log::{
@@ -77,7 +77,7 @@ fn test_rfc3161_anchor_parse_and_verify() {
     der.push(payload.len() as u8);
     der.extend_from_slice(&payload);
 
-    let verifier = NoOpTsaSignatureVerifier;
+    let verifier = AcceptAllTsaVerifier;
     let rfc_anchor = Rfc3161TimeAnchor::new(verifier);
 
     let receipt = rfc_anchor

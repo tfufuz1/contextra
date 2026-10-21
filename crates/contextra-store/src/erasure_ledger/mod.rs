@@ -25,6 +25,27 @@ pub const LEDGER_FILENAME: &str = "erasure.ledger";
 pub const HEAD_FILENAME: &str = "ledger.head";
 pub const INITIAL_CHAIN_MAC: [u8; 32] = [0u8; 32];
 
+#[cfg(any(test, feature = "test-utils"))]
+type DirFsyncHook = fn(&Path) -> std::io::Result<()>;
+
+#[cfg(any(test, feature = "test-utils"))]
+static DIR_FSYNC_HOOK: parking_lot::Mutex<Option<DirFsyncHook>> = parking_lot::Mutex::new(None);
+
+#[cfg(any(test, feature = "test-utils"))]
+pub fn test_set_ledger_dir_fsync_hook(hook: Option<DirFsyncHook>) {
+    *DIR_FSYNC_HOOK.lock() = hook;
+}
+
+pub(crate) async fn fsync_ledger_dir(path: &Path) -> Result<()> {
+    #[cfg(any(test, feature = "test-utils"))]
+    {
+        if let Some(hook) = *DIR_FSYNC_HOOK.lock() {
+            hook(path).map_err(|e| ContextraError::Storage(format!("ErasureLedger dir fsync failed: {e}")))?;
+        }
+    }
+    crate::util::fsync_parent_dir(path).await
+}
+
 /// Decision returned when evaluating whether a key version at transaction `tx` should be kept or dropped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LedgerDecision {
@@ -116,10 +137,6 @@ impl ErasureLedger {
             }
 
             // Fresh database: create new ledger
-            let mut db_instance_id = [0u8; 16];
-            let rng = contextra_ports::SystemRng::new();
-            contextra_ports::Rng::fill_bytes(&rng, &mut db_instance_id);
-
             let ledger = Self {
                 dir: dir.clone(),
                 key,
@@ -204,7 +221,7 @@ impl ErasureLedger {
             file.sync_all()
                 .await
                 .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            crate::util::fsync_parent_dir(&ledger_path).await?;
+            fsync_ledger_dir(&ledger_path).await?;
         }
 
         // Check head marker consistency
@@ -267,11 +284,15 @@ impl ErasureLedger {
             return Ok(());
         }
 
+        let mut batch_seen_proof_ids = HashSet::new();
+        let mut batch_seen_keyed_hashes = HashSet::new();
         let mut to_write = Vec::new();
         for entry in entries {
             if self.seen_proof_ids.contains(&entry.proof_id) || self.seen_keyed_hashes.contains(&entry.keyed_hash) {
                 continue;
             }
+            batch_seen_proof_ids.insert(entry.proof_id);
+            batch_seen_keyed_hashes.insert(entry.keyed_hash);
             to_write.push(entry.clone());
         }
 
@@ -280,6 +301,10 @@ impl ErasureLedger {
         }
 
         let ledger_path = self.dir.join(LEDGER_FILENAME);
+        let initial_len = match tokio::fs::metadata(&ledger_path).await {
+            Ok(meta) => meta.len(),
+            Err(_) => 0,
+        };
 
         let mut buffer = Vec::new();
         let mut current_mac = self.last_chain_mac;
@@ -293,21 +318,41 @@ impl ErasureLedger {
 
         let mut file = OpenOptions::new()
             .create(true)
+            .write(true)
             .append(true)
             .open(&ledger_path)
             .await
             .map_err(|e| ContextraError::Storage(format!("Failed to open ledger: {}", e)))?;
 
-        file.write_all(&buffer).await.map_err(|e| {
-            ContextraError::Storage(format!("ErasureLedger write_all failed: {}", e))
-        })?;
-        file.sync_all().await.map_err(|e| {
-            ContextraError::Storage(format!("ErasureLedger sync_all failed: {}", e))
-        })?;
+        if let Err(write_err) = file.write_all(&buffer).await {
+            let _ = file.set_len(initial_len).await;
+            return Err(ContextraError::Storage(format!("ErasureLedger write_all failed: {}", write_err)));
+        }
 
-        crate::util::fsync_parent_dir(&ledger_path).await?;
+        if let Err(sync_err) = file.sync_all().await {
+            let _ = file.set_len(initial_len).await;
+            return Err(ContextraError::Storage(format!("ErasureLedger sync_all failed: {}", sync_err)));
+        }
 
-        // Update state
+        if let Err(fsync_err) = fsync_ledger_dir(&ledger_path).await {
+            let _ = file.set_len(initial_len).await;
+            let _ = file.sync_all().await;
+            return Err(fsync_err);
+        }
+
+        // Write head marker to disk before mutating RAM state
+        let head_path = self.dir.join(HEAD_FILENAME);
+        let mut marker_bytes = Vec::with_capacity(52);
+        marker_bytes.extend_from_slice(b"ELDG");
+        marker_bytes.extend_from_slice(&self.db_instance_id);
+        marker_bytes.extend_from_slice(&current_mac);
+        if let Err(head_err) = contextra_durable_fs::atomic_replace(&head_path, &marker_bytes) {
+            let _ = file.set_len(initial_len).await;
+            let _ = file.sync_all().await;
+            return Err(ContextraError::Storage(format!("Head marker atomic replace failed: {head_err}")));
+        }
+
+        // Only mutate RAM state after ALL disk operations succeed
         self.last_chain_mac = current_mac;
         for entry in to_write {
             self.seen_proof_ids.insert(entry.proof_id);
@@ -317,8 +362,6 @@ impl ErasureLedger {
             }
             self.entries.push(entry);
         }
-
-        self.write_head_marker().await?;
 
         Ok(())
     }
@@ -392,6 +435,32 @@ impl ErasureLedger {
 
     pub fn seen_proof_ids(&self) -> &HashSet<[u8; 16]> {
         &self.seen_proof_ids
+    }
+
+    pub fn seen_keyed_hashes(&self) -> &HashSet<[u8; 32]> {
+        &self.seen_keyed_hashes
+    }
+
+    /// Returns `true` if `keyed_hash` has been recorded in the erasure ledger.
+    pub fn is_erased(&self, keyed_hash: &[u8; 32]) -> bool {
+        self.seen_keyed_hashes.contains(keyed_hash)
+    }
+
+    /// Returns `true` if a record with `keyed_hash` was erased at or after transaction `tx`
+    /// (i.e. `tx <= entry.erased_at_tx`).
+    pub fn is_erased_at_tx(&self, keyed_hash: &[u8; 32], tx: u64) -> bool {
+        self.entries
+            .iter()
+            .any(|e| e.keyed_hash == *keyed_hash && tx <= e.erased_at_tx)
+    }
+
+    /// Enumerates all ledger entries recorded at or after transaction `min_tx`.
+    pub fn entries_since_tx(&self, min_tx: u64) -> Vec<LedgerEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.erased_at_tx >= min_tx)
+            .cloned()
+            .collect()
     }
 
     pub fn update_after_append(&mut self, new_mac: [u8; 32], to_write: Vec<LedgerEntry>) {

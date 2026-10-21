@@ -2,8 +2,8 @@
 // STAND: 2026-10-13
 // ZWECK: Integrationstests für INV-WAL-LEGACY-KEY-1 (Legacy HMAC Key Isolation) sowie Replay/Batch/Truncation-Schutz.
 
-use contextra_types::{Result, TxId};
 use contextra_store::wal::{Wal, WalConfig, WalOp, WalVersion};
+use contextra_types::{Result, TxId};
 use tempfile::tempdir;
 
 #[tokio::test]

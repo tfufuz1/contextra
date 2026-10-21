@@ -1,6 +1,6 @@
 use contextra_ports::storage::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use tempfile::TempDir;

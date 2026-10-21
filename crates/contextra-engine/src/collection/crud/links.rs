@@ -140,7 +140,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         .get_at_seq_tracked(tx, &user_key, tx.inner())
                         .await?
                     {
-                        if let Ok(mut full_doc) = StoredDocument::from_slice(&user_bytes) {
+                        if let Ok(mut full_doc) =
+                            StoredDocument::from_slice(&user_bytes)
+                        {
                             let doc_obj = full_doc
                                 .metadata
                                 .get_or_insert_with(|| serde_json::json!({}));

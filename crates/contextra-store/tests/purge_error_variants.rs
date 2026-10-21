@@ -72,7 +72,10 @@ async fn test_purge_error_insufficient_disk_space() -> contextra_types::Result<(
             assert!(needed >= 1024 * 1024);
             assert_eq!(available, Some(0));
         }
-        other => panic!("Expected PurgeError::InsufficientDiskSpace, got {:?}", other),
+        other => panic!(
+            "Expected PurgeError::InsufficientDiskSpace, got {:?}",
+            other
+        ),
     }
 
     Ok(())
@@ -151,7 +154,10 @@ async fn test_purge_error_write_error() -> contextra_types::Result<()> {
 async fn test_purge_error_manifest() -> contextra_types::Result<()> {
     // Test that Manifest error variant exists, formats correctly and holds details
     let err = PurgeError::Manifest("Failed to write manifest entry".to_string());
-    assert_eq!(err.to_string(), "Manifest error: Failed to write manifest entry");
+    assert_eq!(
+        err.to_string(),
+        "Manifest error: Failed to write manifest entry"
+    );
     match err {
         PurgeError::Manifest(msg) => assert_eq!(msg, "Failed to write manifest entry"),
         _ => panic!("Expected Manifest variant"),

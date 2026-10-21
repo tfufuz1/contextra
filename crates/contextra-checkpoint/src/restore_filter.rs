@@ -40,11 +40,11 @@ impl<T: contextra_ports::RestoreGuard + ?Sized> CpyRestoreFilter for T {
 }
 
 /// No-op restore filter that allows all records to be restored (testing only).
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(any(test, feature = "testing"))]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct NoOpRestoreFilter;
 
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(any(test, feature = "testing"))]
 impl CpyRestoreFilter for NoOpRestoreFilter {
     fn drop_record(&self, _key: &[u8], _tx: u64) -> bool {
         false

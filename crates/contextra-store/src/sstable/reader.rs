@@ -471,10 +471,13 @@ impl SstableReader {
 
             idx_off
         } else if trailer_len >= 54 {
-            let magic_legacy =
-                u32::from_le_bytes(trailer_data[trailer_len - 4..trailer_len].try_into().map_err(|_| {
-                    ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0)
-                })?);
+            let magic_legacy = u32::from_le_bytes(
+                trailer_data[trailer_len - 4..trailer_len]
+                    .try_into()
+                    .map_err(|_| {
+                        ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0)
+                    })?,
+            );
             if magic_legacy == SSTABLE_MAGIC_LEGACY {
                 u64::from_le_bytes(
                     trailer_data[trailer_len - 12..trailer_len - 4]
@@ -560,11 +563,7 @@ impl SstableReader {
             let index_end = if has_bloom {
                 bloom_offset
             } else {
-                file_size.saturating_sub(if is_mfsx {
-                    trailer_size
-                } else {
-                    12
-                })
+                file_size.saturating_sub(if is_mfsx { trailer_size } else { 12 })
             };
 
             let index_read_len =
@@ -1183,7 +1182,8 @@ mod tests {
 
         let err = res.unwrap_err();
         assert!(
-            err.to_string().contains("ScopeKeyring required for v5 encrypted SSTable"),
+            err.to_string()
+                .contains("ScopeKeyring required for v5 encrypted SSTable"),
             "Expected ScopeKeyring error, got: {err}"
         );
     }

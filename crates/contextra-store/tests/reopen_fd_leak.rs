@@ -112,9 +112,7 @@ async fn reopen_1000_cycles_low_ulimit() {
             let tx_num = (i * 10 + j) as u64;
             let key = format!("key_{i}_{j}").into_bytes();
             let val = format!("val_{i}_{j}").into_bytes();
-            db.put(TxId::new(tx_num), &key, &val)
-                .await
-                .unwrap();
+            db.put(TxId::new(tx_num), &key, &val).await.unwrap();
             db.commit(TxId::new(tx_num)).await.unwrap();
         }
         if i % 50 == 0 {
