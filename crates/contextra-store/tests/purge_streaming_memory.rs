@@ -3,10 +3,10 @@
 // ZWECK: Test for single-pass streaming purge rewrite without buffering entries in a Vec (P-3 requirement).
 
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
+use contextra_types::TxId;
 use tempfile::tempdir;
 
 struct MockFreeSpaceProbe {
@@ -52,7 +52,10 @@ async fn test_purge_streaming_rewrite_memory_independence() -> contextra_types::
     let scope = PurgeScope::Prefixes(vec![b"purge:".to_vec()]);
 
     let as_of_tx = storage.last_applied_seq();
-    let report = storage.purge_keys(scope, as_of_tx, Some(&probe)).await.unwrap();
+    let report = storage
+        .purge_keys(scope, as_of_tx, Some(&probe))
+        .await
+        .unwrap();
 
     assert_eq!(report.records_purged, 1000);
     assert_eq!(report.sstables_replaced, 1);
@@ -62,12 +65,22 @@ async fn test_purge_streaming_rewrite_memory_independence() -> contextra_types::
         if i % 2 == 0 {
             let key = format!("purge:key_{:05}", i).into_bytes();
             let res = storage.get(&key).await?;
-            assert_eq!(res, None, "Purged key {:?} must be absent", String::from_utf8_lossy(&key));
+            assert_eq!(
+                res,
+                None,
+                "Purged key {:?} must be absent",
+                String::from_utf8_lossy(&key)
+            );
         } else {
             let key = format!("keep:key_{:05}", i).into_bytes();
             let expected_val = format!("val_{:05}", i).into_bytes();
             let res = storage.get(&key).await?.map(|b| b.to_vec());
-            assert_eq!(res, Some(expected_val), "Kept key {:?} must be present", String::from_utf8_lossy(&key));
+            assert_eq!(
+                res,
+                Some(expected_val),
+                "Kept key {:?} must be present",
+                String::from_utf8_lossy(&key)
+            );
         }
     }
 

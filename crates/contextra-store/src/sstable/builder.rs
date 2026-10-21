@@ -666,7 +666,8 @@ mod tests {
 
         let err = builder.finish().await.unwrap_err();
         assert!(
-            err.to_string().contains("ScopeKeyring required for v5 encrypted SSTable"),
+            err.to_string()
+                .contains("ScopeKeyring required for v5 encrypted SSTable"),
             "Expected ScopeKeyring error, got: {err}"
         );
     }

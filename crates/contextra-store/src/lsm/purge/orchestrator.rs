@@ -274,7 +274,9 @@ impl<'a> PurgeOrchestrator<'a> {
                 // kann hier kein Erasure-Fence im laufenden Engine-Kontext gesetzt werden.
                 if let Some(storage) = self.storage {
                     if fence_prefixes.is_empty() {
-                        return Err(OrxPurgeError::Blocked(PurgeBlocked::UnclassifiedFiles { count: 0 }));
+                        return Err(OrxPurgeError::Blocked(PurgeBlocked::UnclassifiedFiles {
+                            count: 0,
+                        }));
                     }
                     let guard = storage
                         .erasure_fence
@@ -335,8 +337,12 @@ impl<'a> PurgeOrchestrator<'a> {
                 self.record_phase(&mut intent, PurgePhase::Dispose)?;
                 self.check_failpoint("after_manifest_before_unlink")?;
 
-                let disp_rep =
-                    dispose_obsolete_files(&self.storage_dir, report.obsolete_files.clone(), secure_delete).await?;
+                let disp_rep = dispose_obsolete_files(
+                    &self.storage_dir,
+                    report.obsolete_files.clone(),
+                    secure_delete,
+                )
+                .await?;
                 refusals = disp_rep.refusals.len();
 
                 self.check_failpoint("mid_dispose_journal")?;

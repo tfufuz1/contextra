@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::{ContextraError, TxId};
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -33,7 +33,10 @@ async fn test_group_commit_fault_injection_all_participants_fail() {
     storage.commit(tx1).await.expect("commit base");
 
     // Force append_batch failure via fault_plan
-    storage.fault_plan().fail_append_for_tx.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
 
     // Now spawn 10 concurrent commit tasks in parallel
     let num_tasks = 10u64;
@@ -73,7 +76,10 @@ async fn test_group_commit_fault_injection_all_participants_fail() {
     assert_eq!(fail_count, 10, "All 10 tasks must fail");
 
     // Restore WAL write permissions and verify storage state is uncorrupted
-    storage.fault_plan().fail_append_for_tx.store(0, std::sync::atomic::Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(0, std::sync::atomic::Ordering::SeqCst);
 
     // Baseline key must still exist
     let base_val = storage

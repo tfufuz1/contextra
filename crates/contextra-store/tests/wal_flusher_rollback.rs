@@ -1,7 +1,7 @@
 #![cfg(feature = "fault-injection")]
 
-use contextra_types::TxId;
 use contextra_store::wal::{Wal, WalOp};
+use contextra_types::TxId;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -23,8 +23,12 @@ async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types
     let size_before = meta_before.len();
 
     // Trigger partial write failure in flusher
-    wal.fault_plan().fail_append_after_partial_bytes.store(20, std::sync::atomic::Ordering::SeqCst);
-    wal.fault_plan().fail_append_partial_once.store(true, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan()
+        .fail_append_after_partial_bytes
+        .store(20, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan()
+        .fail_append_partial_once
+        .store(true, std::sync::atomic::Ordering::SeqCst);
 
     let op2 = WalOp::Put {
         tx_id: TxId::new(2),
@@ -88,7 +92,9 @@ async fn test_flusher_truncate_failure_preserves_state() -> contextra_types::Res
     let size_before = wal.size();
     let hmac_before = wal.last_hmac_snapshot().await;
 
-    wal.fault_plan().fail_truncate_once.store(true, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan()
+        .fail_truncate_once
+        .store(true, std::sync::atomic::Ordering::SeqCst);
 
     let trunc_res = wal.truncate(4, [0u8; 32]).await;
     assert!(

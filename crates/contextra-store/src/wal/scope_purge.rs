@@ -105,8 +105,9 @@ impl OrxWalPurgeIntent {
         buffer.extend_from_slice(&(payload.len() as u32).to_le_bytes());
         buffer.extend_from_slice(&payload);
 
-        atomic_replace(path, &buffer)
-            .map_err(|e| ContextraError::Storage(format!("Failed to write WAL purge intent: {}", e)))
+        atomic_replace(path, &buffer).map_err(|e| {
+            ContextraError::Storage(format!("Failed to write WAL purge intent: {}", e))
+        })
     }
 
     pub fn read_from_file(path: &Path) -> Result<Option<Self>> {
@@ -180,7 +181,9 @@ pub async fn purge_wal_scope(
     scope: &PurgeScope,
     as_of_tx: u64,
     key_manager: Option<Arc<KeyManager>>,
-    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))] fault_plan: Option<Arc<crate::wal::WalFailpoints>>,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))] fault_plan: Option<
+        Arc<crate::wal::WalFailpoints>,
+    >,
 ) -> Result<WalPurgeReport> {
     resume_wal_scope_purge(wal_dir).await?;
 
@@ -230,10 +233,7 @@ pub async fn purge_wal_scope(
         let file_type = classify_wal_filename(filename);
         if matches!(
             file_type,
-            WalFileType::Active
-                | WalFileType::Sealed
-                | WalFileType::Archived
-                | WalFileType::Backup
+            WalFileType::Active | WalFileType::Sealed | WalFileType::Archived | WalFileType::Backup
         ) {
             candidates.push(path);
         }
@@ -449,7 +449,9 @@ async fn remove_if_exists(p: &Path) -> std::io::Result<()> {
 }
 
 fn check_and_clear_failpoint(
-    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))] fault_plan: Option<&crate::wal::WalFailpoints>,
+    #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))] fault_plan: Option<
+        &crate::wal::WalFailpoints,
+    >,
     fp: u32,
 ) -> bool {
     #[cfg(any(test, feature = "failpoints", feature = "fault-injection"))]

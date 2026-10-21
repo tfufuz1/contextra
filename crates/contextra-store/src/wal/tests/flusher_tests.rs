@@ -307,7 +307,9 @@ async fn test_wal_fsync_failure_poisons_handle() -> Result<()> {
     wal.append_batch(batch1).await?;
 
     // Set fail_sync_once
-    wal.fault_plan().fail_sync_once.store(true, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan()
+        .fail_sync_once
+        .store(true, std::sync::atomic::Ordering::SeqCst);
 
     let op2 = WalOp::Put {
         tx_id: TxId::new(2),

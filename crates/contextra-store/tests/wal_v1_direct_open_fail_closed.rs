@@ -1,5 +1,5 @@
-use contextra_types::TxId;
 use contextra_store::wal::{Wal, WalEntry, WalOp};
+use contextra_types::TxId;
 use tempfile::tempdir;
 use tokio::fs;
 

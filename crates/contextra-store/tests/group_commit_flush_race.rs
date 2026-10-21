@@ -2,8 +2,8 @@
 
 use bytes::Bytes;
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
@@ -39,8 +39,14 @@ async fn test_k2_flush_swap_race_crash_recovery() {
     let tx_id = TxId::new(100);
     storage.put(tx_id, b"key_k2", b"val_k2").await.unwrap();
 
-    storage.fault_plan().delay_append_for_tx.store(tx_id.inner(), Ordering::SeqCst);
-    storage.fault_plan().delay_append_ms.store(200, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_for_tx
+        .store(tx_id.inner(), Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_ms
+        .store(200, Ordering::SeqCst);
 
     let storage_clone = Arc::new(storage);
     let s1 = storage_clone.clone();
@@ -57,8 +63,14 @@ async fn test_k2_flush_swap_race_crash_recovery() {
     commit_res.unwrap().unwrap();
     let _ = flush_res;
 
-    storage_clone.fault_plan().delay_append_for_tx.store(0, Ordering::SeqCst);
-    storage_clone.fault_plan().delay_append_ms.store(0, Ordering::SeqCst);
+    storage_clone
+        .fault_plan()
+        .delay_append_for_tx
+        .store(0, Ordering::SeqCst);
+    storage_clone
+        .fault_plan()
+        .delay_append_ms
+        .store(0, Ordering::SeqCst);
 
     // Simulate crash without clean shutdown: copy DB directory
     let crash_dir = tempdir().unwrap();
@@ -142,8 +154,14 @@ async fn test_h5_follower_timeout_after_leader_acquisition() {
         .unwrap();
 
     // Delay WAL append for leader so follower's timeout expires while taken by leader
-    storage.fault_plan().delay_append_for_tx.store(tx_leader.inner(), Ordering::SeqCst);
-    storage.fault_plan().delay_append_ms.store(150, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_for_tx
+        .store(tx_leader.inner(), Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_ms
+        .store(150, Ordering::SeqCst);
 
     let s1 = storage.clone();
     let leader_task = tokio::spawn(async move { s1.commit(tx_leader).await });
@@ -154,8 +172,14 @@ async fn test_h5_follower_timeout_after_leader_acquisition() {
     let follower_task = tokio::spawn(async move { s2.commit(tx_follower).await });
 
     let (r1, r2) = tokio::join!(leader_task, follower_task);
-    storage.fault_plan().delay_append_for_tx.store(0, Ordering::SeqCst);
-    storage.fault_plan().delay_append_ms.store(0, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_for_tx
+        .store(0, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_ms
+        .store(0, Ordering::SeqCst);
 
     let res_leader = r1.unwrap();
     let res_follower = r2.unwrap();
@@ -185,10 +209,16 @@ async fn test_batch_append_error_recovery() {
     let tx_fail = TxId::new(900);
     storage.put(tx_fail, b"k_fail", b"v_fail").await.unwrap();
 
-    storage.fault_plan().fail_append_for_tx.store(tx_fail.inner(), Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(tx_fail.inner(), Ordering::SeqCst);
 
     let commit_res = storage.commit(tx_fail).await;
-    storage.fault_plan().fail_append_for_tx.store(0, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(0, Ordering::SeqCst);
 
     assert!(
         commit_res.is_err(),

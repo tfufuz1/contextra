@@ -14,10 +14,10 @@ use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::KeyManager;
 use crate::wal::Wal;
 use bytes::Bytes;
-use contextra_types::{ResourceTracker, Result, TxId};
-use contextra_ports::StorageEngine;
-use contextra_mvcc::{SnapshotRegistry, TxBuffer};
 use contextra_mvcc::snapshot::SnapshotFloor;
+use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_ports::StorageEngine;
+use contextra_types::{ResourceTracker, Result, TxId};
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -185,7 +185,6 @@ impl LsmStorage {
     pub fn failpoints(&self) -> &Arc<crate::wal::WalFailpoints> {
         &self.config.fault_plan
     }
-
 
     /// Returns the accumulated total memory budget tracking drift in bytes caused by
     /// unbudgeted memtable puts during commit when memory limit was exceeded.
@@ -473,7 +472,8 @@ impl LsmStorage {
             let header =
                 contextra_crypto::KdfHeader::new(contextra_crypto::KdfParams::default(), salt)?;
             Some(Arc::new(crate::wal::KeyManager::try_new_strict(
-                &passphrase, &header,
+                &passphrase,
+                &header,
             )?))
         } else {
             None

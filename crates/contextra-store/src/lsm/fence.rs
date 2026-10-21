@@ -1,12 +1,14 @@
 // FILE-CONTEXT
-// STAND: 2026-10-14
+// STAND: 2026-10-21
 // ZWECK: Scope-weite und präfixbasierte Schreibsperre (ErasureGate & ErasureFence) zur Blockierung von Schreibvorgängen während der Purge-Compaction.
 // INVARIANTEN: Lock-Hierarchie einhalten, keine Locks über .await, loom-kompatibel.
 
+#![deny(clippy::wildcard_enum_match_arm)]
+
+use contextra_mvcc::IndexOp;
+use contextra_ports::erasure::{WriteFenced, WriteGate};
 use std::collections::HashSet;
 use std::time::Duration;
-
-use contextra_ports::erasure::{WriteFenced, WriteGate};
 
 #[cfg(loom)]
 use loom::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -19,6 +21,32 @@ use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 #[cfg(not(loom))]
 use std::sync::Arc;
+
+/// Key variant passed to `ErasureFence::enter_write`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FencedKey<'a> {
+    Key(&'a [u8]),
+    Unknown,
+}
+
+impl<'a> From<&'a [u8]> for FencedKey<'a> {
+    fn from(s: &'a [u8]) -> Self {
+        FencedKey::Key(s)
+    }
+}
+
+impl<'a> From<&'a Vec<u8>> for FencedKey<'a> {
+    fn from(v: &'a Vec<u8>) -> Self {
+        FencedKey::Key(v.as_slice())
+    }
+}
+
+/// Target representation for fence registration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FenceTarget {
+    Exact(Vec<u8>),
+    Prefix(Vec<u8>),
+}
 
 /// Scope-wide write block state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,12 +64,28 @@ pub enum FenceError {
     CollectionDropping,
     #[error("Fence scope conflict detected")]
     Conflict,
+    #[error("Fence drain timeout")]
+    DrainTimeout,
+    #[error("Scope write fenced")]
+    ScopeFenced,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrefixFence {
     pub purge_id: u64,
     pub prefixes: Vec<Vec<u8>>,
+}
+
+/// Maps an `IndexOp` to `FencedKey` using exhaustive matching on known IndexOp variants.
+pub fn fenced_keys<'a>(op: &'a IndexOp<(Vec<u8>, Vec<u8>)>) -> FencedKey<'a> {
+    match op {
+        IndexOp::Insert { data, .. } => FencedKey::Key(&data.0[..]),
+        IndexOp::Delete {
+            data: Some((k, _)), ..
+        } => FencedKey::Key(&k[..]),
+        IndexOp::Delete { data: None, .. } => FencedKey::Unknown,
+        _ => FencedKey::Unknown,
+    }
 }
 
 /// Low-level gate managing atomic active flag, RCU prefix fence table, and inflight write batch tracking.
@@ -71,47 +115,57 @@ impl ErasureGate {
         }
     }
 
-    /// Enters write scope by incrementing inflight counter atomically (`SeqCst`),
-    /// checking active fence status (`SeqCst`), and validating keys against prefix fences.
-    ///
-    /// If fence is active and any key violates active prefixes, `dec_inflight()` is called
-    /// and `FenceError::CollectionDropping` is returned.
-    ///
-    /// Returns a RAII `WriteTicket` that automatically decrements the inflight counter on drop.
-    pub fn enter_write<'a, 'k, I>(&'a self, keys: I) -> Result<WriteTicket<'a>, FenceError>
+    /// Enters write scope according to normative Dekker rule:
+    /// W1: `inflight += 1` (`SeqCst`), W2: `load active` (`SeqCst`).
+    pub fn enter_write<'a, 'k, K, I>(&'a self, keys: I) -> Result<WriteTicket<'a>, FenceError>
     where
-        I: IntoIterator<Item = &'k [u8]>,
+        K: Into<FencedKey<'k>>,
+        I: IntoIterator<Item = K>,
     {
+        // W1: Inflight increment (SeqCst) BEFORE checking active
         self.inc_inflight();
 
+        // W2: Active check (SeqCst) AFTER inflight increment
         if self.active.load(Ordering::SeqCst) {
-            let key_vec: Vec<&'k [u8]> = keys.into_iter().collect();
+            let key_vec: Vec<FencedKey<'k>> = keys.into_iter().map(Into::into).collect();
             let mut blocked = false;
 
-            #[cfg(not(loom))]
-            {
-                let table = self.table.load();
-                'outer: for pf in table.iter() {
-                    for prefix in &pf.prefixes {
-                        for key in &key_vec {
-                            if prefix.is_empty() || key.starts_with(prefix) {
-                                blocked = true;
-                                break 'outer;
+            for fk in &key_vec {
+                match fk {
+                    FencedKey::Unknown => {
+                        blocked = true;
+                        break;
+                    }
+                    FencedKey::Key(key_bytes) => {
+                        #[cfg(not(loom))]
+                        {
+                            let table = self.table.load();
+                            for pf in table.iter() {
+                                for prefix in &pf.prefixes {
+                                    if prefix.is_empty() || key_bytes.starts_with(prefix) {
+                                        blocked = true;
+                                        break;
+                                    }
+                                }
+                                if blocked {
+                                    break;
+                                }
                             }
                         }
-                    }
-                }
-            }
 
-            #[cfg(loom)]
-            {
-                if let Ok(table) = self.table.read() {
-                    'outer: for pf in table.iter() {
-                        for prefix in &pf.prefixes {
-                            for key in &key_vec {
-                                if prefix.is_empty() || key.starts_with(prefix) {
-                                    blocked = true;
-                                    break 'outer;
+                        #[cfg(loom)]
+                        {
+                            if let Ok(table) = self.table.read() {
+                                for pf in table.iter() {
+                                    for prefix in &pf.prefixes {
+                                        if prefix.is_empty() || key_bytes.starts_with(prefix) {
+                                            blocked = true;
+                                            break;
+                                        }
+                                    }
+                                    if blocked {
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -131,13 +185,13 @@ impl ErasureGate {
     /// Fast-path check: returns whether any scope fence is active.
     #[inline]
     pub fn is_active(&self) -> bool {
-        self.active.load(Ordering::Acquire)
+        self.active.load(Ordering::SeqCst)
     }
 
     /// Returns current count of inflight write batches in progress.
     #[inline]
     pub fn inflight_count(&self) -> u32 {
-        self.inflight.load(Ordering::Acquire)
+        self.inflight.load(Ordering::SeqCst)
     }
 
     /// Increments inflight batch counter.
@@ -197,48 +251,37 @@ impl ErasureGate {
         p1.starts_with(p2) || p2.starts_with(p1)
     }
 
-    /// Installs a new prefix fence, drains inflight write batches until inflight == 0.
+    /// Installs a new prefix fence and drains inflight write batches until inflight == 0.
+    /// Short lock is strictly dropped BEFORE .await in drain phase.
     pub async fn acquire_fence(
         &self,
         purge_id: u64,
         prefixes: Vec<Vec<u8>>,
         timeout: Duration,
     ) -> Result<(), FenceError> {
-        #[cfg(not(loom))]
-        let _guard = self.install.lock();
-        #[cfg(loom)]
-        let _guard = self.install.lock().unwrap();
-
-        if prefixes.is_empty() {
-            return Err(FenceError::Conflict);
-        }
-
-        // Validate internal overlaps in requested prefixes
-        for i in 0..prefixes.len() {
-            for j in (i + 1)..prefixes.len() {
-                if Self::prefixes_overlap(&prefixes[i], &prefixes[j]) {
-                    return Err(FenceError::Conflict);
-                }
-            }
-        }
-
-        // Validate overlaps against existing prefix fences
-        #[cfg(not(loom))]
         {
-            let current_table = self.table.load();
-            for existing in current_table.iter() {
-                for ex_p in &existing.prefixes {
-                    for new_p in &prefixes {
-                        if Self::prefixes_overlap(ex_p, new_p) {
-                            return Err(FenceError::Conflict);
-                        }
+            #[cfg(not(loom))]
+            let _guard = self.install.lock();
+            #[cfg(loom)]
+            let _guard = self.install.lock().unwrap();
+
+            if prefixes.is_empty() {
+                return Err(FenceError::Conflict);
+            }
+
+            // Validate internal overlaps in requested prefixes
+            for i in 0..prefixes.len() {
+                for j in (i + 1)..prefixes.len() {
+                    if Self::prefixes_overlap(&prefixes[i], &prefixes[j]) {
+                        return Err(FenceError::Conflict);
                     }
                 }
             }
-        }
-        #[cfg(loom)]
-        {
-            if let Ok(current_table) = self.table.read() {
+
+            // Validate overlaps against existing prefix fences
+            #[cfg(not(loom))]
+            {
+                let current_table = self.table.load();
                 for existing in current_table.iter() {
                     for ex_p in &existing.prefixes {
                         for new_p in &prefixes {
@@ -249,55 +292,77 @@ impl ErasureGate {
                     }
                 }
             }
-        }
+            #[cfg(loom)]
+            {
+                if let Ok(current_table) = self.table.read() {
+                    for existing in current_table.iter() {
+                        for ex_p in &existing.prefixes {
+                            for new_p in &prefixes {
+                                if Self::prefixes_overlap(ex_p, new_p) {
+                                    return Err(FenceError::Conflict);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
-        // Install new fence into table
-        #[cfg(not(loom))]
-        {
-            let current_vec: &Vec<PrefixFence> = &**self.table.load();
-            let mut new_table = current_vec.clone();
-            new_table.push(PrefixFence {
-                purge_id,
-                prefixes: prefixes.clone(),
-            });
-            self.table.store(Arc::new(new_table));
-        }
-        #[cfg(loom)]
-        {
-            if let Ok(mut table) = self.table.write() {
-                table.push(PrefixFence {
+            // P1: Install new fence into table
+            #[cfg(not(loom))]
+            {
+                let current_vec: &Vec<PrefixFence> = &**self.table.load();
+                let mut new_table = current_vec.clone();
+                new_table.push(PrefixFence {
                     purge_id,
                     prefixes: prefixes.clone(),
                 });
+                self.table.store(Arc::new(new_table));
             }
+            #[cfg(loom)]
+            {
+                if let Ok(mut table) = self.table.write() {
+                    table.push(PrefixFence {
+                        purge_id,
+                        prefixes: prefixes.clone(),
+                    });
+                }
+            }
+
+            // P2: Active flag (SeqCst)
+            self.active.store(true, Ordering::SeqCst);
         }
 
-        // N9: Ordering::SeqCst im Dekker-Muster, damit Schreiber und
-        // Fence-Installer sich wechselseitig garantiert atomar wahrnehmen.
-        self.active.store(true, Ordering::SeqCst);
-
-        // Drain phase: wait until inflight == 0
+        // P3: Drain phase using Notified registered FIRST outside lock
         let start = std::time::Instant::now();
+        let mut notified = std::pin::pin!(self.drained.notified());
+
         loop {
-            if self.inflight.load(Ordering::Acquire) == 0 {
+            notified.as_mut().enable();
+            if self.inflight.load(Ordering::SeqCst) == 0 {
                 break;
             }
 
-            if start.elapsed() >= timeout {
-                // Timeout during Drain: revert fence installation
+            let elapsed = start.elapsed();
+            if elapsed >= timeout {
                 self.release_fence_internal(purge_id);
-                return Err(FenceError::Conflict);
+                return Err(FenceError::DrainTimeout);
             }
 
-            // Wait on notification or brief sleep
-            let _ = tokio::time::timeout(Duration::from_millis(2), self.drained.notified()).await;
+            let remaining = timeout.saturating_sub(elapsed);
+            if tokio::time::timeout(remaining, &mut notified)
+                .await
+                .is_err()
+            {
+                self.release_fence_internal(purge_id);
+                return Err(FenceError::DrainTimeout);
+            }
+            notified.set(self.drained.notified());
         }
 
         Ok(())
     }
 
     /// Releases a registered prefix fence by purge_id.
-    /// Returns true if a fence matching `purge_id` was found and removed.
     pub fn release_fence(&self, purge_id: u64) -> bool {
         #[cfg(not(loom))]
         let _guard = self.install.lock();
@@ -366,87 +431,22 @@ impl WriteGate for ErasureGate {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Proof token confirming an active fence registration. Drops and releases fence when dropped.
+#[derive(Debug)]
+pub struct FenceHandle<'a> {
+    pub fence: &'a ErasureFence,
+    pub purge_id: u64,
+}
 
-    #[tokio::test]
-    async fn test_erasure_gate_write_gate_trait() {
-        let gate = ErasureGate::new();
-        let write_gate: &dyn WriteGate = &gate;
-
-        assert!(!write_gate.is_active());
-        let batch = [b"key1".as_slice(), b"key2".as_slice()];
-        assert!(write_gate.check_batch(&mut batch.into_iter()).is_ok());
-
-        gate.acquire_fence(101, vec![b"key1".to_vec()], Duration::from_secs(1))
-            .await
-            .unwrap();
-
-        assert!(write_gate.is_active());
-
-        let batch_allowed = [b"key2".as_slice(), b"key3".as_slice()];
-        assert!(write_gate
-            .check_batch(&mut batch_allowed.into_iter())
-            .is_ok());
-
-        let batch_blocked = [b"key2".as_slice(), b"key1_sub".as_slice()];
-        assert_eq!(
-            write_gate.check_batch(&mut batch_blocked.into_iter()),
-            Err(WriteFenced)
-        );
-
-        gate.release_fence(101);
-        assert!(!write_gate.is_active());
-        assert!(write_gate
-            .check_batch(&mut batch_blocked.into_iter())
-            .is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_erasure_fence_blocking_and_isolation() {
-        let fence = ErasureFence::new();
-        assert!(!fence.is_active());
-
-        // Fast path: writes allowed
-        assert!(fence.check_write_allowed_scope(b"scope1:key1").is_ok());
-        assert!(fence
-            .check_write_allowed_batch([b"scope1:key1".as_slice(), b"scope2:key2".as_slice()])
-            .is_ok());
-
-        // 1. Acquire prefix fence for scope1
-        fence
-            .gate
-            .acquire_fence(101, vec![b"scope1:".to_vec()], Duration::from_secs(1))
-            .await
-            .unwrap();
-        assert!(fence.is_active());
-
-        // Writing inside locked scope is rejected (single & batch)
-        assert_eq!(
-            fence.check_write_allowed_scope(b"scope1:key1"),
-            Err(FenceError::CollectionDropping)
-        );
-        assert_eq!(
-            fence.check_write_allowed_batch([b"scope2:key2".as_slice(), b"scope1:key1".as_slice()]),
-            Err(FenceError::CollectionDropping)
-        );
-
-        // Writing outside locked scope during purge succeeds
-        assert!(fence.check_write_allowed_scope(b"scope2:key2").is_ok());
-        assert!(fence
-            .check_write_allowed_batch([b"scope2:key2".as_slice(), b"scope3:key3".as_slice()])
-            .is_ok());
-
-        // Release fence
-        fence.gate.release_fence(101);
-        assert!(!fence.is_active());
-        assert!(fence.check_write_allowed_scope(b"scope1:key1").is_ok());
+impl<'a> Drop for FenceHandle<'a> {
+    fn drop(&mut self) {
+        self.fence.gate.release_fence(self.purge_id);
     }
 }
 
 /// RAII Guard that decrements inflight counter when dropped.
 #[derive(Debug)]
+#[must_use]
 pub struct WriteTicket<'a> {
     gate: &'a ErasureGate,
 }
@@ -547,18 +547,18 @@ impl ErasureFence {
     }
 
     /// Returns `true` if any scope block, prefix fence, or document lock is currently active.
-    /// Fast-path zero-lock check for normal operation.
     #[inline]
     pub fn is_active(&self) -> bool {
-        self.active_fences.load(Ordering::Acquire) > 0 || self.gate.is_active()
+        self.active_fences.load(Ordering::SeqCst) > 0 || self.gate.is_active()
     }
 
     /// Atomically enters write scope for a batch of keys, returning a RAII `WriteTicket`.
-    pub fn enter_write<'a, 'k, I>(&'a self, keys: I) -> Result<WriteTicket<'a>, FenceError>
+    pub fn enter_write<'a, 'k, K, I>(&'a self, keys: I) -> Result<WriteTicket<'a>, FenceError>
     where
-        I: IntoIterator<Item = &'k [u8]>,
+        K: Into<FencedKey<'k>>,
+        I: IntoIterator<Item = K>,
     {
-        let key_vec: Vec<&'k [u8]> = keys.into_iter().collect();
+        let key_vec: Vec<FencedKey<'k>> = keys.into_iter().map(Into::into).collect();
         if self.is_active() {
             let state = *self.scope_state.read();
             if state == FenceScopeState::CollectionDropping {
@@ -568,9 +568,11 @@ impl ErasureFence {
 
             let locked_docs = self.locked_doc_ids.read();
             for key in &key_vec {
-                if locked_docs.contains(*key) {
-                    self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
-                    return Err(FenceError::Conflict);
+                if let FencedKey::Key(k) = key {
+                    if locked_docs.contains(*k) {
+                        self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
+                        return Err(FenceError::Conflict);
+                    }
                 }
             }
         }
@@ -579,14 +581,12 @@ impl ErasureFence {
     }
 
     /// Checks if a scope-wide, prefix-based, or document-level write block is currently active for `key`.
-    /// Returns `true` if write access is allowed, `false` if blocked by fence.
     #[inline]
     pub fn check_write_allowed(&self, key: &[u8]) -> bool {
         self.check_write_allowed_scope(key).is_ok()
     }
 
     /// Checks if write access is allowed for `key`. Returns `Err(FenceError)` if blocked.
-    /// Fast path: Returns `Ok(())` immediately if `!self.is_active()`.
     #[inline]
     pub fn check_write_allowed_scope(&self, key: &[u8]) -> Result<(), FenceError> {
         if !self.is_active() {
@@ -614,7 +614,6 @@ impl ErasureFence {
     }
 
     /// Checks if write access is allowed for a batch of keys.
-    /// Fast path: Returns `Ok(())` immediately if `!self.is_active()`.
     #[inline]
     pub fn check_write_allowed_batch<'a, I>(&self, keys: I) -> Result<(), FenceError>
     where
@@ -636,7 +635,7 @@ impl ErasureFence {
         let mut state = self.scope_state.write();
         if *state != FenceScopeState::CollectionDropping {
             *state = FenceScopeState::CollectionDropping;
-            self.active_fences.fetch_add(1, Ordering::Release);
+            self.active_fences.fetch_add(1, Ordering::SeqCst);
         }
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
@@ -646,7 +645,7 @@ impl ErasureFence {
         let mut state = self.scope_state.write();
         if *state == FenceScopeState::CollectionDropping {
             *state = FenceScopeState::Active;
-            self.active_fences.fetch_sub(1, Ordering::Release);
+            self.active_fences.fetch_sub(1, Ordering::SeqCst);
         }
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
@@ -693,7 +692,7 @@ impl ErasureFence {
             rt.block_on(run_acquire())?;
         }
 
-        self.active_fences.fetch_add(1, Ordering::Release);
+        self.active_fences.fetch_add(1, Ordering::SeqCst);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
 
         Ok(FenFenceGuard {
@@ -725,7 +724,7 @@ impl ErasureFence {
             return Err(e);
         }
 
-        self.active_fences.fetch_add(1, Ordering::Release);
+        self.active_fences.fetch_add(1, Ordering::SeqCst);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
 
         Ok(FenFenceGuard {
@@ -739,7 +738,7 @@ impl ErasureFence {
     /// Helper to release a registered prefix fence by ID.
     pub fn release_prefix_fence(&self, id: u64) {
         self.gate.release_fence(id);
-        self.active_fences.fetch_sub(1, Ordering::Release);
+        self.active_fences.fetch_sub(1, Ordering::SeqCst);
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
 
@@ -753,7 +752,7 @@ impl ErasureFence {
             }
         }
         if added > 0 {
-            self.active_fences.fetch_add(added, Ordering::Release);
+            self.active_fences.fetch_add(added, Ordering::SeqCst);
         }
     }
 
@@ -798,7 +797,7 @@ impl ErasureFence {
             }
         }
         self.active_fences
-            .fetch_add(doc_ids.len() as u32, Ordering::Release);
+            .fetch_add(doc_ids.len() as u32, Ordering::SeqCst);
 
         Ok(FenDocLockGuard {
             fence: self,
@@ -816,13 +815,13 @@ impl ErasureFence {
             }
         }
         if removed > 0 {
-            self.active_fences.fetch_sub(removed, Ordering::Release);
+            self.active_fences.fetch_sub(removed, Ordering::SeqCst);
         }
     }
 
     /// Returns current global scope write sequence number.
     pub fn scope_write_seq(&self) -> u64 {
-        self.scope_write_seq.load(Ordering::Acquire)
+        self.scope_write_seq.load(Ordering::SeqCst)
     }
 
     /// Returns current scope write sequence for the given guard.
@@ -832,12 +831,91 @@ impl ErasureFence {
 
     /// Takes a snapshot of the write sequence across active fences matching `prefixes`.
     pub fn snapshot_write_seq(&self, _prefixes: &[Vec<u8>]) -> u64 {
-        self.scope_write_seq.load(Ordering::Acquire)
+        self.scope_write_seq.load(Ordering::SeqCst)
     }
 }
 
 impl Default for ErasureFence {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_erasure_gate_write_gate_trait() {
+        let gate = ErasureGate::new();
+        let write_gate: &dyn WriteGate = &gate;
+
+        assert!(!write_gate.is_active());
+        let batch = [b"key1".as_slice(), b"key2".as_slice()];
+        assert!(write_gate.check_batch(&mut batch.into_iter()).is_ok());
+
+        gate.acquire_fence(101, vec![b"key1".to_vec()], Duration::from_secs(1))
+            .await
+            .unwrap();
+
+        assert!(write_gate.is_active());
+
+        let batch_allowed = [b"key2".as_slice(), b"key3".as_slice()];
+        assert!(write_gate
+            .check_batch(&mut batch_allowed.into_iter())
+            .is_ok());
+
+        let batch_blocked = [b"key2".as_slice(), b"key1_sub".as_slice()];
+        assert_eq!(
+            write_gate.check_batch(&mut batch_blocked.into_iter()),
+            Err(WriteFenced)
+        );
+
+        gate.release_fence(101);
+        assert!(!write_gate.is_active());
+        assert!(write_gate
+            .check_batch(&mut batch_blocked.into_iter())
+            .is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_erasure_fence_blocking_and_isolation() {
+        let fence = ErasureFence::new();
+        assert!(!fence.is_active());
+
+        // Fast path: writes allowed
+        assert!(fence.check_write_allowed_scope(b"scope1:key1").is_ok());
+        assert!(fence
+            .check_write_allowed_batch([b"scope1:key1".as_slice(), b"scope2:key2".as_slice()])
+            .is_ok());
+
+        // 1. Acquire prefix fence for scope1
+        fence
+            .gate
+            .acquire_fence(101, vec![b"scope1:".to_vec()], Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert!(fence.is_active());
+
+        // Writing inside locked scope is rejected (single & batch)
+        assert_eq!(
+            fence.check_write_allowed_scope(b"scope1:key1"),
+            Err(FenceError::CollectionDropping)
+        );
+        assert_eq!(
+            fence.check_write_allowed_batch([b"scope2:key2".as_slice(), b"scope1:key1".as_slice()]),
+            Err(FenceError::CollectionDropping)
+        );
+
+        // Writing outside locked scope during purge succeeds
+        assert!(fence.check_write_allowed_scope(b"scope2:key2").is_ok());
+        assert!(fence
+            .check_write_allowed_batch([b"scope2:key2".as_slice(), b"scope3:key3".as_slice()])
+            .is_ok());
+
+        // Release fence
+        fence.gate.release_fence(101);
+        assert!(!fence.is_active());
+        assert!(fence.check_write_allowed_scope(b"scope1:key1").is_ok());
     }
 }

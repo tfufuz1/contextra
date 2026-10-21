@@ -171,7 +171,10 @@ mod tests {
             "DirLock::acquire MUST return Err when directory fsync fails"
         );
         assert!(
-            lock_res.unwrap_err().to_string().contains("simulated dirlock dir fsync failure"),
+            lock_res
+                .unwrap_err()
+                .to_string()
+                .contains("simulated dirlock dir fsync failure"),
             "Error message must convey directory fsync failure"
         );
     }

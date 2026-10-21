@@ -31,7 +31,10 @@ async fn test_dispose_policy_refusal_require_scrub() {
     assert!(res.is_err(), "RequireScrub must fail on ScrubRefusal");
 
     // Target file and hardlink must still exist
-    assert!(target_file.exists(), "Target file must remain intact on refusal under RequireScrub");
+    assert!(
+        target_file.exists(),
+        "Target file must remain intact on refusal under RequireScrub"
+    );
     assert!(link_file.exists(), "Hardlink file must remain intact");
 
     // Journal must still contain the pending delete entry
@@ -102,5 +105,8 @@ async fn test_resume_pending_disposes_journal_obsolete_files() {
     assert_eq!(disp_rep.files_removed, 2);
     assert!(!file1.exists(), "file1 removed");
     assert!(!file2.exists(), "file2 removed");
-    assert!(!journal_path.exists(), "journal file cleaned up after complete removal");
+    assert!(
+        !journal_path.exists(),
+        "journal file cleaned up after complete removal"
+    );
 }

@@ -4,9 +4,9 @@
 //! INVARIANTEN:
 //! - I-4: Monotone Sequenznummern: seq_no == u64::MAX wird als Überlauf abgelehnt.
 
-use contextra_types::{ContextraError, Result, TxId};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::WalHmac;
+use contextra_types::{ContextraError, Result, TxId};
 
 use super::MAX_WAL_ENTRY_SIZE;
 
@@ -239,7 +239,10 @@ impl WalEntry {
                     })?;
                     let val_len_u32 = u32::try_from(value.len()).map_err(|_| {
                         ContextraError::Serialization(
-                            WalParseError::OversizedValue { limit: MAX_VALUE_SIZE }.to_string(),
+                            WalParseError::OversizedValue {
+                                limit: MAX_VALUE_SIZE,
+                            }
+                            .to_string(),
                         )
                     })?;
                     mac.update(&key_len_u32.to_le_bytes());
@@ -422,9 +425,8 @@ impl WalEntry {
                 let tx_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;
                 let klen_bytes = remaining.get(8..12).ok_or(WalParseError::Truncated)?;
 
-                let tx_raw = u64::from_le_bytes(
-                    tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?,
-                );
+                let tx_raw =
+                    u64::from_le_bytes(tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?);
                 let tx_id = TxId::try_new(tx_raw)
                     .map_err(|_| WalParseError::Malformed("invalid tx_id range"))?;
                 let key_len = u32::from_le_bytes(
@@ -484,9 +486,8 @@ impl WalEntry {
                 let tx_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;
                 let klen_bytes = remaining.get(8..12).ok_or(WalParseError::Truncated)?;
 
-                let tx_raw = u64::from_le_bytes(
-                    tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?,
-                );
+                let tx_raw =
+                    u64::from_le_bytes(tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?);
                 let tx_id = TxId::try_new(tx_raw)
                     .map_err(|_| WalParseError::Malformed("invalid tx_id range"))?;
                 let key_len = u32::from_le_bytes(
@@ -515,9 +516,8 @@ impl WalEntry {
                 let tx_bytes = remaining.get(0..8).ok_or(WalParseError::Truncated)?;
                 let committed_byte = *remaining.get(8).ok_or(WalParseError::Truncated)?;
 
-                let tx_raw = u64::from_le_bytes(
-                    tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?,
-                );
+                let tx_raw =
+                    u64::from_le_bytes(tx_bytes.try_into().map_err(|_| WalParseError::Truncated)?);
                 let tx_id = TxId::try_new(tx_raw)
                     .map_err(|_| WalParseError::Malformed("invalid tx_id range"))?;
                 if committed_byte > 1 {

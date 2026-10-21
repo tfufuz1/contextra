@@ -8,7 +8,8 @@ use std::sync::atomic::Ordering;
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_two_wal_instances_different_fault_plans_do_not_interfere() -> contextra_types::Result<()> {
+async fn test_two_wal_instances_different_fault_plans_do_not_interfere(
+) -> contextra_types::Result<()> {
     let dir1 = tempdir()?;
     let dir2 = tempdir()?;
 
@@ -19,7 +20,9 @@ async fn test_two_wal_instances_different_fault_plans_do_not_interfere() -> cont
     let wal2 = Wal::open(&wal2_path).await?;
 
     // Arm fault injection ONLY on wal1
-    wal1.fault_plan().fail_append_for_tx.store(u64::MAX, Ordering::SeqCst);
+    wal1.fault_plan()
+        .fail_append_for_tx
+        .store(u64::MAX, Ordering::SeqCst);
 
     let op1 = WalOp::Put {
         tx_id: TxId::new(1),
@@ -31,7 +34,10 @@ async fn test_two_wal_instances_different_fault_plans_do_not_interfere() -> cont
 
     // append_batch on wal1 should fail
     let res1 = wal1.append_batch(batch1).await;
-    assert!(res1.is_err(), "wal1 must fail when fault injection is set on wal1");
+    assert!(
+        res1.is_err(),
+        "wal1 must fail when fault injection is set on wal1"
+    );
 
     // append_batch on wal2 must succeed (unaffected by wal1's fault plan)
     let res2 = wal2.append_batch(batch2).await;
@@ -41,7 +47,8 @@ async fn test_two_wal_instances_different_fault_plans_do_not_interfere() -> cont
 }
 
 #[tokio::test]
-async fn test_two_lsm_storages_different_fault_plans_do_not_interfere() -> contextra_types::Result<()> {
+async fn test_two_lsm_storages_different_fault_plans_do_not_interfere(
+) -> contextra_types::Result<()> {
     let dir1 = tempdir()?;
     let dir2 = tempdir()?;
 
@@ -65,10 +72,16 @@ async fn test_two_lsm_storages_different_fault_plans_do_not_interfere() -> conte
     storage2.put(tx1, b"key1", b"val1").await?;
 
     let commit1 = storage1.commit(tx1).await;
-    assert!(commit1.is_err(), "storage1 commit must fail due to fault plan on storage1");
+    assert!(
+        commit1.is_err(),
+        "storage1 commit must fail due to fault plan on storage1"
+    );
 
     let commit2 = storage2.commit(tx1).await;
-    assert!(commit2.is_ok(), "storage2 commit must succeed independently of storage1");
+    assert!(
+        commit2.is_ok(),
+        "storage2 commit must succeed independently of storage1"
+    );
 
     Ok(())
 }
