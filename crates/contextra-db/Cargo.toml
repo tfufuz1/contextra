@@ -51,6 +51,10 @@ default = []
 encryption-at-rest = ["contextra-engine/encryption-at-rest"]
 bench = []
 background-maintenance = ["contextra-engine/background-maintenance"]
+# Enables coherence-bonus reciprocal rank fusion algorithms in contextra-engine for RRF evaluation.
+coherence-bonus-fusion = ["contextra-engine/coherence-bonus-fusion"]
+# Enables experimental out-of-core DiskANN vector index support in contextra-engine and contextra-vector.
+experimental-diskann = ["contextra-engine/experimental-diskann", "contextra-vector/experimental-diskann"]
 onnx = []
 reranking = []
 sandbox = []
