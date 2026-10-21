@@ -7,10 +7,10 @@ use contextra::builder::ContextraBuilder;
 use contextra::collection_profile::{CollectionProfile, DeploymentTier};
 use contextra::performance_profile::PerformanceProfile;
 use contextra::query_rewriter::LlmQueryRewriter;
-use contextra_types::types::domain::DistanceMetric;
 use contextra_db::EmbeddingBackend;
 use contextra_ports::license::OpenFastGate;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_types::types::domain::DistanceMetric;
 use std::sync::Arc;
 use std::time::Duration;
 

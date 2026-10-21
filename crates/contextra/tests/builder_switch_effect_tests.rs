@@ -2,14 +2,17 @@
 // ZWECK: Effect verification tests for every ContextraBuilder switch (G-05).
 // INVARIANTEN: Every builder switch must have a verifiable effect on builder inspection / wiring report.
 
-use std::sync::Arc;
 use contextra::builder::ContextraBuilder;
 use contextra_ports::erasure::{ErasureHooks, ErasureMode};
 use contextra_ports::license::OpenFastGate;
+use std::sync::Arc;
 
 struct DummyErasureHooks;
 impl ErasureHooks for DummyErasureHooks {
-    fn finish(&self, _token: contextra_ports::erasure::HookToken) -> contextra_types::Result<Option<contextra_ports::erasure::ErasureAttestation>> {
+    fn finish(
+        &self,
+        _token: contextra_ports::erasure::HookToken,
+    ) -> contextra_types::Result<Option<contextra_ports::erasure::ErasureAttestation>> {
         Ok(None)
     }
 }
@@ -49,7 +52,11 @@ fn test_builder_switch_effects() {
     // 6. with_license_gate
     let gate = Arc::new(OpenFastGate);
     let b6 = builder.clone().with_license_gate(gate);
-    assert_eq!(b6.license_gate().check_ring(contextra_ports::license::FeatureRing::Fast), Ok(()));
+    assert_eq!(
+        b6.license_gate()
+            .check_ring(contextra_ports::license::FeatureRing::Fast),
+        Ok(())
+    );
 
     // 7. with_router / without_router
     let b7 = builder.clone().with_router(true);

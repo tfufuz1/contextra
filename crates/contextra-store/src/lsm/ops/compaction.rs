@@ -169,7 +169,8 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
         // last_committed_tx MUSS vor sstables.push() aktualisiert werden — sonst Race-Fenster für parallele Reader, siehe DECISIONS.md ADR-043.
         let sst_max_tx = reader.metadata().max_tx_id;
-        storage.advance_visibility(contextra_types::TxId::new(sst_max_tx));
+        let sst_max_tx_id = contextra_types::TxId::try_new(sst_max_tx)?;
+        storage.advance_visibility(sst_max_tx_id);
 
         sstables.push(Arc::new(reader));
         sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);

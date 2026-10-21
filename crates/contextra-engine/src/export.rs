@@ -142,7 +142,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
                 let importance_score = extract_effective_importance(
                     &stored.metadata,
-                    contextra_types::TxId::new(u64::MAX),
+                    contextra_types::TxId::try_new(u64::MAX)?,
                 );
 
                 let links: Vec<MemoryLink> = stored

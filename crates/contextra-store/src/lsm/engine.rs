@@ -14,10 +14,10 @@ use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::KeyManager;
 use crate::wal::Wal;
 use bytes::Bytes;
-use contextra_types::{ResourceTracker, Result, TxId};
-use contextra_ports::StorageEngine;
-use contextra_mvcc::{SnapshotRegistry, TxBuffer};
 use contextra_mvcc::snapshot::SnapshotFloor;
+use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_ports::StorageEngine;
+use contextra_types::{ResourceTracker, Result, TxId};
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -186,7 +186,6 @@ impl LsmStorage {
         &self.config.fault_plan
     }
 
-
     /// Returns the accumulated total memory budget tracking drift in bytes caused by
     /// unbudgeted memtable puts during commit when memory limit was exceeded.
     pub fn budget_tracking_drift_bytes(&self) -> u64 {
@@ -337,28 +336,26 @@ impl LsmStorage {
             .load(std::sync::atomic::Ordering::Acquire)
     }
 
-    // TODO(WP-0b / PR-2 Schritt 2 / F-08): Befund F-08 (Testmethoden im Produktionscode):
-    // `manifest_for_test` wurde bereits hinter `#[cfg(any(test, feature = "test-utils"))]` gestellt.
-    // Die übrigen Test-Hilfsmethoden (`compaction_engine_for_test`, `sstables_for_test`,
-    // `block_cache_for_test`, `budget_for_test`, `maybe_compact_for_test`) sollten ebenfalls konsequent
-    // mit `#[cfg(any(test, feature = "test-utils"))]` abgesichert werden, damit sie nicht versehentlich
-    // im Standard-Produktions-Build exponiert werden.
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn compaction_engine_for_test(&self) -> Arc<CompactionEngine> {
         Arc::clone(&self.compaction_engine)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn sstables_for_test(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
         Arc::clone(&self.sstables)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn block_cache_for_test(&self) -> Arc<BlockCache> {
         Arc::clone(&self.block_cache)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub fn budget_for_test(&self) -> Arc<ResourceTracker> {
         Arc::clone(&self.budget)
     }
@@ -370,6 +367,7 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils"))]
     pub async fn maybe_compact_for_test(&self) -> Result<bool> {
         self.compaction_engine
             .maybe_compact(&self.sstables, &self.config.path)
@@ -473,7 +471,8 @@ impl LsmStorage {
             let header =
                 contextra_crypto::KdfHeader::new(contextra_crypto::KdfParams::default(), salt)?;
             Some(Arc::new(crate::wal::KeyManager::try_new_strict(
-                &passphrase, &header,
+                &passphrase,
+                &header,
             )?))
         } else {
             None

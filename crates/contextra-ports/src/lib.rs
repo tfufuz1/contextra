@@ -127,6 +127,7 @@ mod dyn_safety {
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
     fn _assert_dyn_response_grounding_validator(_: Option<&dyn ResponseGroundingValidator>) {}
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
+    fn _assert_dyn_crypto_rng(_: Option<&dyn CryptoRng>) {}
     fn _assert_dyn_entropy_rng(_: Option<&dyn EntropyRng>) {}
     fn _assert_dyn_seeded_rng(_: Option<&dyn SeededRng>) {}
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
@@ -155,6 +156,7 @@ mod dyn_safety {
         _assert_dyn_graph(None);
         _assert_dyn_embedding(None);
         _assert_dyn_clock(None);
+        _assert_dyn_crypto_rng(None);
         _assert_dyn_entropy_rng(None);
         _assert_dyn_seeded_rng(None);
         _assert_dyn_rng(None);

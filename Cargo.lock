@@ -1214,7 +1214,6 @@ dependencies = [
  "contextra-sys",
  "contextra-testkit",
  "contextra-types",
- "contextra-vector",
  "crc32fast",
  "criterion",
  "futures",
@@ -1262,8 +1261,10 @@ dependencies = [
 name = "contextra-sys"
 version = "0.1.0"
 dependencies = [
+ "contextra-ports",
  "libc",
  "memmap2",
+ "rand 0.8.8",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -1291,6 +1292,7 @@ dependencies = [
  "contextra-ports",
  "contextra-types",
  "itoa",
+ "loom",
  "parking_lot 0.12.5",
  "proptest",
  "regex",

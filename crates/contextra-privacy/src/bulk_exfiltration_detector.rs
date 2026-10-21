@@ -176,7 +176,12 @@ impl BulkExfiltrationDetector {
             .clone();
 
         let mut counter = entry_arc.lock();
-        counter.record_and_check(payload_len, self.max_bytes_per_window, self.window, now_ticks)
+        counter.record_and_check(
+            payload_len,
+            self.max_bytes_per_window,
+            self.window,
+            now_ticks,
+        )
     }
 }
 

@@ -3,7 +3,13 @@
 // ZWECK: Integration tests for Candle real forward-pass GGUF LLM and Bert embedding inference.
 // INVARIANTEN: Ignored by default unless binary model fixtures are present; executable with real-inference-tests flag / --include-ignored.
 
-#![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+#![allow(
+    deprecated,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 
 use contextra_infer_candle::{CandleEmbedClient, CandleLlmClient, CandleQuantization};
 use contextra_ports::{EmbeddingProvider, LlmTextGenerator};

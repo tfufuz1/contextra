@@ -294,7 +294,7 @@ impl Contextra {
                 "TxId counter exhausted: MAX_COLLECTION_SEQUENCE range exceeded. Collection must be recreated.".into(),
             ));
         }
-        Ok(TxId::new(id))
+        TxId::try_new(id)
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
@@ -441,9 +441,11 @@ impl Contextra {
         let mut hasher = blake3::Hasher::new();
         hasher.update(name.as_bytes());
         let hash_bytes = hasher.finalize();
-        let slice8: [u8; 8] = hash_bytes.as_bytes()[0..8]
-            .try_into()
-            .map_err(|_| contextra_types::ContextraError::Internal("Failed to extract 8 bytes for collection ID".into()))?;
+        let slice8: [u8; 8] = hash_bytes.as_bytes()[0..8].try_into().map_err(|_| {
+            contextra_types::ContextraError::Internal(
+                "Failed to extract 8 bytes for collection ID".into(),
+            )
+        })?;
         let col_id_u64 = u64::from_le_bytes(slice8);
         let collection_id = CollectionId::try_new(col_id_u64)?;
 
@@ -454,7 +456,10 @@ impl Contextra {
 
         let mut sorted_deleted_keys = deleted_keys.clone();
         sorted_deleted_keys.sort();
-        let deleted_keys_hash = contextra_crypto::deletion_proof::types::hash_deleted_keys_length_prefixed(&sorted_deleted_keys);
+        let deleted_keys_hash =
+            contextra_crypto::deletion_proof::types::hash_deleted_keys_length_prefixed(
+                &sorted_deleted_keys,
+            );
 
         let proof_stub = DeletionProof {
             signature_version: 4,
@@ -493,12 +498,17 @@ impl Contextra {
         payload.extend_from_slice(&excluded_scopes_bytes);
         payload.extend_from_slice(&graph_repair_bytes);
 
-        let key_bytes: [u8; 32] = proof_key[..32]
-            .try_into()
-            .map_err(|_| contextra_types::ContextraError::invalid_input("Proof key must be at least 32 bytes"))?;
-        let signer = contextra_crypto::deletion_proof::signer::ProofKeyPairSigner::from_secret_bytes(key_bytes);
+        let key_bytes: [u8; 32] = proof_key[..32].try_into().map_err(|_| {
+            contextra_types::ContextraError::invalid_input("Proof key must be at least 32 bytes")
+        })?;
+        let signer =
+            contextra_crypto::deletion_proof::signer::ProofKeyPairSigner::from_secret_bytes(
+                key_bytes,
+            );
         use contextra_crypto::deletion_proof::signer::ProofSigner;
-        let sig = signer.sign(&payload).map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
+        let sig = signer
+            .sign(&payload)
+            .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
 
         let proof = DeletionProof {
             signature: sig.to_vec(),

@@ -144,16 +144,20 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         // Executed NACH RRF-Fusion and VOR CrossEncoder Reranking to ensure high efficiency
         // (expensive CrossEncoder reranker is only invoked on temporally valid candidates).
         if let Some(as_of) = self.as_of_timestamp {
-            let as_of_tx = self.current_tx.unwrap_or(contextra_types::TxId::new(seq_no));
+            let as_of_tx = match self.current_tx {
+                Some(tx) => tx,
+                None => contextra_types::TxId::try_new(seq_no)?,
+            };
             results = crate::temporal_filter::apply_temporal_validity_filter_at_bitemporal(
                 results,
                 as_of_tx,
                 Some(as_of),
             );
         } else if self.query_timestamp.is_some() || self.current_tx.is_some() {
-            let ctx = self
-                .current_tx
-                .unwrap_or(contextra_types::TxId::new(seq_no));
+            let ctx = match self.current_tx {
+                Some(tx) => tx,
+                None => contextra_types::TxId::try_new(seq_no)?,
+            };
             results = crate::temporal_filter::apply_temporal_validity_filter(
                 results,
                 ctx,
@@ -342,9 +346,7 @@ where
                     serde_json::from_slice::<crate::collection::StoredDocumentMeta>(&bytes)
                 {
                     (meta.id, meta.metadata)
-                } else if let Ok(full) =
-                    crate::collection::StoredDocument::from_slice(&bytes)
-                {
+                } else if let Ok(full) = crate::collection::StoredDocument::from_slice(&bytes) {
                     (full.id, full.metadata)
                 } else {
                     continue;
@@ -390,16 +392,20 @@ where
         }
 
         if let Some(as_of) = self.as_of_timestamp {
-            let as_of_tx = self.current_tx.unwrap_or(contextra_types::TxId::new(seq_no));
+            let as_of_tx = match self.current_tx {
+                Some(tx) => tx,
+                None => contextra_types::TxId::try_new(seq_no)?,
+            };
             results = crate::temporal_filter::apply_temporal_validity_filter_at_bitemporal(
                 results,
                 as_of_tx,
                 Some(as_of),
             );
         } else if self.query_timestamp.is_some() || self.current_tx.is_some() {
-            let ctx = self
-                .current_tx
-                .unwrap_or(contextra_types::TxId::new(seq_no));
+            let ctx = match self.current_tx {
+                Some(tx) => tx,
+                None => contextra_types::TxId::try_new(seq_no)?,
+            };
             results = crate::temporal_filter::apply_temporal_validity_filter(
                 results,
                 ctx,
