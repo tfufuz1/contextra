@@ -61,8 +61,6 @@ pub mod merge_operator;
 pub mod metrics;
 /// Observability and lifecycle re-exports.
 pub mod observability;
-/// OS entropy source backed by getrandom.
-pub mod os_entropy;
 /// Plugin registry and dependency resolution.
 pub mod plugin;
 /// QueryRewriter port trait for multi-step retrieval sub-query generation.
@@ -71,16 +69,17 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
-/// Secret byte container type with zeroization.
-pub mod secret;
+// TODO(WP-S1 / PR-3 Schritt 2): `crates/contextra-ports/src/secret.rs` anlegen und `pub mod secret;` hier registrieren.
+// Soll den Typ `SecretBytes<N>` basierend auf `zeroize::Zeroizing` (oder manuell geschütztem Nullifying bei Drop)
+// implementieren, um kryptographisches Schlüsselmaterial im Speicher typsicher vor Leaks und Dumps zu schützen.
 /// Read snapshot and snapshot reader port traits (§7.2).
 pub mod snapshot;
 /// Key-value storage engine traits.
 pub mod storage;
-/// Text retrieval and indexing traits (BM25 / Inverted Index).
-pub mod text_index;
 /// Time port traits (§7.4).
 pub mod time;
+/// Text retrieval and indexing traits (BM25 / Inverted Index).
+pub mod text_index;
 /// Vector retrieval and HNSW indexing traits.
 pub mod vector_index;
 /// Composition Root wiring module.
@@ -101,12 +100,10 @@ pub use lifecycle::*;
 pub use merge_operator::*;
 pub use metrics::*;
 pub use observability::*;
-pub use os_entropy::*;
 pub use plugin::*;
 pub use query_rewriter::*;
 pub use reranker::*;
 pub use rng::*;
-pub use secret::*;
 pub use snapshot::*;
 pub use storage::*;
 pub use text_index::*;
@@ -127,7 +124,6 @@ mod dyn_safety {
     fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
     fn _assert_dyn_response_grounding_validator(_: Option<&dyn ResponseGroundingValidator>) {}
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
-    fn _assert_dyn_crypto_rng(_: Option<&dyn CryptoRng>) {}
     fn _assert_dyn_entropy_rng(_: Option<&dyn EntropyRng>) {}
     fn _assert_dyn_seeded_rng(_: Option<&dyn SeededRng>) {}
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
@@ -156,7 +152,6 @@ mod dyn_safety {
         _assert_dyn_graph(None);
         _assert_dyn_embedding(None);
         _assert_dyn_clock(None);
-        _assert_dyn_crypto_rng(None);
         _assert_dyn_entropy_rng(None);
         _assert_dyn_seeded_rng(None);
         _assert_dyn_rng(None);

@@ -5,6 +5,7 @@ use crate::types::*;
 use crate::Result;
 use std::future::Future;
 
+
 /// Abstract contract for generating consistent checkpoints.
 pub trait Checkpoint: Send + Sync + 'static {
     /// Takes a deterministic snapshot of the current state.
