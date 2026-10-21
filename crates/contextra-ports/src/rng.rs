@@ -98,21 +98,6 @@ impl EntropyRng for SystemRng {
     }
 }
 
-/// DEPRECATION NOTICE: This implementation of [`EntropyRng`] for [`SystemRng`] uses non-CSPRNG
-/// process entropy (`std::collections::hash_map::RandomState`) and WILL BE REMOVED in Session W3-01.
-///
-/// It does NOT override [`EntropyRng::fill_secret`] (returning [`RngError::SecretUnsupported`]).
-/// Migration path: Use `OsEntropyRng` for cryptographic material generation.
-impl EntropyRng for SystemRng {
-    fn fill_bytes(&self, dest: &mut [u8]) {
-        SeededRng::fill_bytes(self, dest);
-    }
-
-    fn next_u64(&self) -> u64 {
-        SeededRng::next_u64(self)
-    }
-}
-
 /// Port trait for cryptographic entropy sources (keys, nonces, IVs, salts).
 ///
 /// MUST be backed by genuine system/OS entropy or KMS. Test PRNGs MUST NOT implement this trait.
