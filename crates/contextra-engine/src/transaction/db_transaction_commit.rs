@@ -11,17 +11,12 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
-    // TODO(WP-E2 / PR-22): SSI Verdrahtung (Befund MVCC-001):
-    // Standard-Leseoperationen (`Collection::get`, `Collection::scan`, `Collection::scan_prefix`)
-    // registrieren Lesezugriffe bislang nicht im transaktionalen `ReadSet`. Dadurch ist `read_set.is_empty()`
-    // wahr und `validate_ssi_gate` winkt Transaktionen trotz Write-Skew durch.
-    // Leseoperationen müssen das `ReadSet` befüllen und hier gegen den `SequenceLogSsiValidator` geprüft werden.
     pub(super) fn validate_ssi_gate(&self) -> Result<()> {
         let read_set = {
-            let guard = match self.read_set.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let guard = self
+                .read_set
+                .lock()
+                .map_err(|_| ContextraError::Transaction("ReadSet lock poisoned".into()))?;
             guard.clone()
         };
 
@@ -46,10 +41,9 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
     pub(super) async fn commit_text_staged(&self) -> Result<()> {
         let seq_ops = {
-            let mut guard = match self.staged_text_sequence.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let mut guard = self.staged_text_sequence.lock().map_err(|_| {
+                ContextraError::Transaction("staged_text_sequence lock poisoned".into())
+            })?;
             std::mem::take(&mut *guard)
         };
 
@@ -92,17 +86,15 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             }
         } else {
             let text_deletes = {
-                let mut guard = match self.staged_text_deletes.lock() {
-                    Ok(g) => g,
-                    Err(p) => p.into_inner(),
-                };
+                let mut guard = self.staged_text_deletes.lock().map_err(|_| {
+                    ContextraError::Transaction("staged_text_deletes lock poisoned".into())
+                })?;
                 std::mem::take(&mut *guard)
             };
             let text_ops = {
-                let mut guard = match self.staged_text_ops.lock() {
-                    Ok(g) => g,
-                    Err(p) => p.into_inner(),
-                };
+                let mut guard = self.staged_text_ops.lock().map_err(|_| {
+                    ContextraError::Transaction("staged_text_ops lock poisoned".into())
+                })?;
                 std::mem::take(&mut *guard)
             };
 
@@ -143,10 +135,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         res
     }
 
-    // TODO(WP-E1 / PR-21): Saga-Commit Fix:
-    // Der 2PC/Saga-Commit über LSM, HNSW und TextIndex muss strenge Idempotenz und
-    // Crash-Wiederherstellbarkeit des `CommitLedger` gewährleisten, damit unvollständig
-    // ausgeführte Teil-Commits nach einem Absturz über `CommitIntent` deterministisch kompensiert werden können.
     async fn commit_internal(&self) -> Result<()> {
         if let Err(e) = self.validate_ssi_gate() {
             self.rollback_internal().await;
@@ -158,26 +146,24 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             .namespaced_key(&self.tx_id.inner().to_le_bytes(), 3);
 
         let doc_ids = {
-            let guard = match self.staged_doc_ids.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let guard = self
+                .staged_doc_ids
+                .lock()
+                .map_err(|_| ContextraError::Transaction("staged_doc_ids lock poisoned".into()))?;
             Arc::clone(&guard)
         };
 
         let has_text = {
-            let ops = match self.staged_text_ops.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let dels = match self.staged_text_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let seq = match self.staged_text_sequence.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let ops = self
+                .staged_text_ops
+                .lock()
+                .map_err(|_| ContextraError::Transaction("staged_text_ops lock poisoned".into()))?;
+            let dels = self.staged_text_deletes.lock().map_err(|_| {
+                ContextraError::Transaction("staged_text_deletes lock poisoned".into())
+            })?;
+            let seq = self.staged_text_sequence.lock().map_err(|_| {
+                ContextraError::Transaction("staged_text_sequence lock poisoned".into())
+            })?;
             !ops.is_empty() || !dels.is_empty() || !seq.is_empty()
         };
 
@@ -189,26 +175,20 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         // Register CompensateLsmAction so storage keys are compensated if any subsequent commit step fails
         let f_keys = {
-            let mut guard = match self.staged_forward_keys.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let mut guard = self.staged_forward_keys.lock().map_err(|_| {
+                ContextraError::Transaction("staged_forward_keys lock poisoned".into())
+            })?;
             std::mem::take(&mut *guard)
         };
         let r_keys = {
-            let mut guard = match self.staged_reverse_keys.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
+            let mut guard = self.staged_reverse_keys.lock().map_err(|_| {
+                ContextraError::Transaction("staged_reverse_keys lock poisoned".into())
+            })?;
             std::mem::take(&mut *guard)
         };
 
         // Phase (a): Write CommitIntent::Pending and commit it to storage durably first (F-20)
-        let intent_tx = TxId::new(
-            self.collection
-                .next_tx
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-        );
+        let intent_tx = self.collection.allocate_tx()?;
         let intent = CommitIntent::Pending {
             doc_ids: Arc::clone(&doc_ids),
             has_text,
@@ -225,7 +205,14 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             .put(intent_tx, &intent_key, &intent_bytes)
             .await
         {
-            let _ = ledger.execute_rollback().await;
+            if let Err(rb_err) = ledger.execute_rollback().await {
+                self.collection
+                    .mark_needs_recovery("intent_put_failed_rollback_failed");
+                return Err(ContextraError::Transaction(format!(
+                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
+                    e, rb_err
+                )));
+            }
             return Err(ContextraError::Transaction(format!(
                 "Failed to write commit intent: {}",
                 e
@@ -233,7 +220,14 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         if let Err(e) = self.collection.storage.commit(intent_tx).await {
-            let _ = ledger.execute_rollback().await;
+            if let Err(rb_err) = ledger.execute_rollback().await {
+                self.collection
+                    .mark_needs_recovery("intent_commit_failed_rollback_failed");
+                return Err(ContextraError::Transaction(format!(
+                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
+                    e, rb_err
+                )));
+            }
             return Err(ContextraError::Transaction(format!(
                 "Failed to commit intent transaction: {}",
                 e
@@ -242,7 +236,14 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         // Phase (b): Commit LSM storage first so document payload and metadata are durable before index staging/commit
         if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
-            let _ = ledger.execute_rollback().await;
+            if let Err(rb_err) = ledger.execute_rollback().await {
+                self.collection
+                    .mark_needs_recovery("storage_commit_failed_rollback_failed");
+                return Err(ContextraError::Transaction(format!(
+                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
+                    storage_err, rb_err
+                )));
+            }
             return Err(ContextraError::Transaction(format!(
                 "Storage commit failed: {}",
                 storage_err
@@ -264,30 +265,70 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             has_graph: false,
             stages_completed: 1,
         };
-        if let Ok(stage1_bytes) = serde_json::to_vec(&stage1_intent) {
-            let stage1_tx = TxId::new(
+        let stage1_bytes = serde_json::to_vec(&stage1_intent).map_err(|e| {
+            ContextraError::Transaction(format!("Failed to serialize stage1 intent: {}", e))
+        })?;
+        let stage1_tx = TxId::new(
+            self.collection
+                .next_tx
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        );
+        if let Err(e) = self
+            .collection
+            .storage
+            .put(stage1_tx, &intent_key, &stage1_bytes)
+            .await
+        {
+            if let Err(rb_err) = ledger.execute_rollback().await {
                 self.collection
-                    .next_tx
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-            );
-            if let Ok(()) = self
-                .collection
-                .storage
-                .put(stage1_tx, &intent_key, &stage1_bytes)
-                .await
-            {
-                let _ = self.collection.storage.commit(stage1_tx).await;
+                    .mark_needs_recovery("stage1_put_failed_rollback_failed");
+                return Err(ContextraError::Transaction(format!(
+                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
+                    e, rb_err
+                )));
             }
+            return Err(ContextraError::Transaction(format!(
+                "Failed to write stage1 intent: {}",
+                e
+            )));
+        }
+        if let Err(e) = self.collection.storage.commit(stage1_tx).await {
+            if let Err(rb_err) = ledger.execute_rollback().await {
+                self.collection
+                    .mark_needs_recovery("stage1_commit_failed_rollback_failed");
+                return Err(ContextraError::Transaction(format!(
+                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
+                    e, rb_err
+                )));
+            }
+            return Err(ContextraError::Transaction(format!(
+                "Failed to commit stage1 intent transaction: {}",
+                e
+            )));
         }
 
         // Phase (c): Execute staged index steps and commit vector and text indices
         if let Err(e) = self.commit_text_staged().await {
-            let _ = ledger.execute_rollback().await;
+            if let Err(rb_err) = ledger.execute_rollback().await {
+                self.collection
+                    .mark_needs_recovery("text_staged_failed_rollback_failed");
+                return Err(ContextraError::Transaction(format!(
+                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
+                    e, rb_err
+                )));
+            }
             return Err(e);
         }
 
         if let Err(index_err) = self.collection.index.commit(self.tx_id).await {
-            let _ = ledger.execute_rollback().await;
+            if let Err(rb_err) = ledger.execute_rollback().await {
+                self.collection
+                    .mark_needs_recovery("hnsw_commit_failed_rollback_failed");
+                return Err(ContextraError::Transaction(format!(
+                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
+                    index_err, rb_err
+                )));
+            }
             return Err(ContextraError::Transaction(format!(
                 "HNSW index commit failed: {}",
                 index_err
@@ -300,7 +341,14 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         ));
 
         if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {
-            let _ = ledger.execute_rollback().await;
+            if let Err(rb_err) = ledger.execute_rollback().await {
+                self.collection
+                    .mark_needs_recovery("text_commit_failed_rollback_failed");
+                return Err(ContextraError::Transaction(format!(
+                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
+                    text_err, rb_err
+                )));
+            }
             return Err(ContextraError::Transaction(format!(
                 "Text index commit failed: {}",
                 text_err
@@ -312,11 +360,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         ));
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
-        let cleanup_tx = TxId::new(
-            self.collection
-                .next_tx
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-        );
+        let cleanup_tx = self.collection.allocate_tx()?;
         let commit_bytes = match serde_json::to_vec(&CommitIntent::Committed) {
             Ok(b) => b,
             Err(e) => {
@@ -355,7 +399,27 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             );
         }
 
-        // Phase (e): Finalize
+        // Phase (e): Finalize indices (Text, Vector, Graph) via IndexFinalizer contract
+        let text_fin =
+            super::index_finalizer::TextIndexFinalizerAdapter::new(&self.collection.text_index);
+        let vec_fin = super::index_finalizer::VectorIndexFinalizerAdapter::new(
+            self.collection.index.as_ref(),
+        );
+        let graph_fin = super::index_finalizer::GraphIndexFinalizerAdapter::new(
+            self.collection.graph_index.as_ref(),
+        );
+
+        use super::index_finalizer::IndexFinalizer;
+        if let Err(e) = text_fin.finalize(self.tx_id.inner()) {
+            tracing::warn!(tx_id = ?self.tx_id, "Text index finalize warning: {}", e);
+        }
+        if let Err(e) = vec_fin.finalize(self.tx_id.inner()) {
+            tracing::warn!(tx_id = ?self.tx_id, "Vector index finalize warning: {}", e);
+        }
+        if let Err(e) = graph_fin.finalize(self.tx_id.inner()) {
+            tracing::warn!(tx_id = ?self.tx_id, "Graph index finalize warning: {}", e);
+        }
+
         self.committed.store(true, Ordering::Release);
         Ok(())
     }

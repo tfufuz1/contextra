@@ -1,5 +1,5 @@
 //! Split-Brain & Idempotency Integration Testsuite for Vector-ID ↔ Document Consistency.
-// ANCHOR[TEST:SPLIT_BRAIN_CONSISTENCY] STATUS:IN_PROGRESS (TS:2026-09-09T22:00:00Z) (SESSION: 504d02fc)
+// ANCHOR[TEST:SPLIT_BRAIN_CONSISTENCY] STATUS:DONE (TS:2026-10-21T00:00:00Z) (SESSION: 504d02fc)
 
 use contextra_db::context_compaction::ConsolidationSession;
 use contextra_db::transaction::CommitIntent;
@@ -565,4 +565,290 @@ async fn test_concurrent_partial_rebuild_and_context_compaction_no_lock_starvati
         !search_res.is_empty(),
         "Collection search must function cleanly post-concurrency"
     );
+}
+
+/// 5. `test_crash_after_lsm_commit_before_vector_commit_recovery`
+///
+/// Simulates crash point where LSM transaction was committed with pending CommitIntent
+/// but vector index commit was interrupted prior to execution.
+/// Verifies that upon re-opening, `repair_on_open()` recovers the pending intent and ensures
+/// the document vector is retrievable via vector search without missing entries.
+#[tokio::test]
+async fn test_crash_after_lsm_commit_before_vector_commit_recovery() {
+    let tmp = TempDir::new().expect("temp dir");
+    let dir_path = tmp.path().to_path_buf();
+
+    let config = ContextraConfig {
+        dimension: 4,
+        distance_metric: DistanceMetric::Cosine,
+        ..Default::default()
+    };
+
+    let doc_str = "doc_crash_lsm_only";
+    let doc_id = DocId::from_key(doc_str).expect("DocId from key");
+    let vec = vec![1.0, 0.0, 0.0, 0.0];
+
+    // Stage 1: Write document & pending intent to LSM storage, skip vector commit, and simulate crash (close DB)
+    {
+        let db = Contextra::open_with_config(&dir_path, config.clone())
+            .await
+            .expect("open db");
+        let col = db.collection("crash_lsm_col").await.expect("collection");
+
+        let tx = col.allocate_tx().expect("allocate_tx");
+        let user_key = col.namespaced_key(doc_str.as_bytes(), 0);
+        let doc_key = col.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+
+        let stored = json!({
+            "id": doc_str,
+            "embedding": vec,
+            "metadata": { "tag": "lsm_only" }
+        });
+        let meta_only = json!({
+            "id": doc_str,
+            "metadata": { "tag": "lsm_only" }
+        });
+
+        col.storage()
+            .put(tx, &user_key, &serde_json::to_vec(&stored).unwrap())
+            .await
+            .expect("put user_key");
+        col.storage()
+            .put(tx, &doc_key, &serde_json::to_vec(&meta_only).unwrap())
+            .await
+            .expect("put doc_key");
+
+        let intent_key = col.namespaced_key(&tx.inner().to_le_bytes(), 3);
+        let intent = CommitIntent::Pending {
+            doc_ids: std::sync::Arc::new(vec![doc_id]),
+            has_text: false,
+            has_graph: false,
+            stages_completed: 0,
+        };
+        col.storage()
+            .put(tx, &intent_key, &serde_json::to_vec(&intent).unwrap())
+            .await
+            .expect("put intent");
+        col.storage().commit(tx).await.expect("commit LSM");
+
+        db.close().await.expect("close db");
+    }
+
+    // Stage 2: Re-open DB. repair_on_open() should process pending intent and populate vector index
+    let db_reopened = Contextra::open_with_config(&dir_path, config)
+        .await
+        .expect("reopen db");
+    let col_reopened = db_reopened
+        .collection("crash_lsm_col")
+        .await
+        .expect("reopened collection");
+
+    let lsm_doc = col_reopened.get(doc_str).await.expect("get doc");
+    assert!(
+        lsm_doc.is_some(),
+        "Document must exist in LSM storage after recovery"
+    );
+
+    let search_results = col_reopened
+        .query()
+        .embedding(&vec)
+        .k(5)
+        .execute()
+        .await
+        .expect("search post recovery");
+
+    assert!(
+        search_results.iter().any(|r| r.id == doc_str),
+        "Vector search after recovery MUST find document 'doc_crash_lsm_only'"
+    );
+}
+
+/// 6. `test_reopen_with_corrupted_half_intent_file`
+///
+/// Simulates crash yielding a corrupted / partial CommitIntent key payload in LSM storage.
+/// Verifies repair_on_open() handles deserialization/corruption errors fail-closed without panicking,
+/// leaving the collection in a usable, valid state.
+#[tokio::test]
+async fn test_reopen_with_corrupted_half_intent_file() {
+    let tmp = TempDir::new().expect("temp dir");
+    let dir_path = tmp.path().to_path_buf();
+
+    let config = ContextraConfig {
+        dimension: 4,
+        distance_metric: DistanceMetric::Cosine,
+        ..Default::default()
+    };
+
+    // Stage 1: Insert valid baseline doc, then inject partial/corrupted intent bytes into storage
+    {
+        let db = Contextra::open_with_config(&dir_path, config.clone())
+            .await
+            .expect("open db");
+        let col = db.collection("corrupt_intent_col").await.expect("col");
+
+        col.insert(
+            "valid_doc",
+            &[1.0, 0.0, 0.0, 0.0],
+            Some(json!({"valid": true})),
+        )
+        .await
+        .expect("insert baseline");
+
+        let tx = col.allocate_tx().expect("allocate tx");
+        let intent_key = col.namespaced_key(&tx.inner().to_le_bytes(), 3);
+
+        // Put truncated/corrupted JSON payload for intent
+        col.storage()
+            .put(tx, &intent_key, b"{\"CommitIntent\": {\"partial\": ")
+            .await
+            .expect("put corrupt intent");
+        col.storage().commit(tx).await.expect("commit LSM");
+
+        db.close().await.expect("close db");
+    }
+
+    // Stage 2: Re-open DB. Repair must skip or handle corrupted intent without panicking
+    let db_reopened = Contextra::open_with_config(&dir_path, config)
+        .await
+        .expect("reopen db with corrupt intent");
+    let col_reopened = db_reopened
+        .collection("corrupt_intent_col")
+        .await
+        .expect("reopened collection");
+
+    let doc = col_reopened
+        .get("valid_doc")
+        .await
+        .expect("get baseline doc");
+    assert!(
+        doc.is_some(),
+        "Baseline document must remain intact and retrievable after corrupt intent recovery"
+    );
+
+    let search_res = col_reopened
+        .query()
+        .embedding(&[1.0, 0.0, 0.0, 0.0])
+        .k(5)
+        .execute()
+        .await
+        .expect("search post-corrupt recovery");
+
+    assert_eq!(search_res.len(), 1);
+    assert_eq!(search_res[0].id, "valid_doc");
+}
+
+/// 7. `test_parallel_multi_collection_stress_barrier`
+///
+/// Runs parallel writers, readers, and deleters across multiple isolated collections synchronized via `tokio::sync::Barrier`.
+/// Uses a fixed deterministic seed (P28) and verifies that post-run consistency scans find zero orphaned vector entries or dangling search results.
+#[tokio::test]
+async fn test_parallel_multi_collection_stress_barrier() {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use tokio::sync::Barrier;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let seed: u64 = 0x5011_7B24_1000_0000;
+    println!("MULTI_COL_STRESS_SEED={:#X}", seed);
+    let mut rng = SimpleRng::seed_from_u64(seed);
+
+    let config = ContextraConfig {
+        dimension: 4,
+        distance_metric: DistanceMetric::Cosine,
+        ..Default::default()
+    };
+
+    let db = Arc::new(
+        Contextra::open_with_config(tmp.path(), config)
+            .await
+            .expect("open db"),
+    );
+
+    let num_cols = 3;
+    let ops_per_col = 30;
+    let barrier = Arc::new(Barrier::new(num_cols + 1));
+    let mut join_set = tokio::task::JoinSet::new();
+
+    let committed_counter = Arc::new(AtomicU32::new(0));
+
+    for col_idx in 0..num_cols {
+        let db_ref = db.clone();
+        let barrier_ref = barrier.clone();
+        let committed_ref = committed_counter.clone();
+        let col_name = format!("stress_col_{}", col_idx);
+        let col_seed = rng.next_u64();
+
+        join_set.spawn(async move {
+            let col = db_ref.collection(&col_name).await.expect("get collection");
+            let mut local_rng = SimpleRng::seed_from_u64(col_seed);
+
+            // Wait for all worker tasks to reach starting gate
+            barrier_ref.wait().await;
+
+            for i in 0..ops_per_col {
+                let doc_id = format!("doc_{}_{:02}", col_idx, i);
+                let vec = vec![
+                    (local_rng.next_u64() % 100) as f32 / 100.0,
+                    (local_rng.next_u64() % 100) as f32 / 100.0,
+                    0.0,
+                    0.0,
+                ];
+
+                if col
+                    .insert(&doc_id, &vec, Some(json!({"col": col_idx, "idx": i})))
+                    .await
+                    .is_ok()
+                {
+                    committed_ref.fetch_add(1, Ordering::SeqCst);
+                }
+
+                // Interleave deletes for even indices
+                if i > 5 && i % 3 == 0 {
+                    let del_id = format!("doc_{}_{:02}", col_idx, i - 3);
+                    let _ = col.delete(&del_id).await;
+                }
+
+                // Interleave read queries
+                if i % 4 == 0 {
+                    let _ = col
+                        .query()
+                        .embedding(&[0.5, 0.5, 0.0, 0.0])
+                        .k(3)
+                        .execute()
+                        .await;
+                }
+
+                tokio::task::yield_now().await;
+            }
+        });
+    }
+
+    // Release all worker tasks simultaneously at barrier
+    barrier.wait().await;
+
+    while let Some(res) = join_set.join_next().await {
+        res.expect("worker task completed");
+    }
+
+    // Final Consistency Scan across all collections
+    for col_idx in 0..num_cols {
+        let col_name = format!("stress_col_{}", col_idx);
+        let col = db.collection(&col_name).await.expect("collection check");
+
+        let search_results = col
+            .query()
+            .embedding(&[0.5, 0.5, 0.0, 0.0])
+            .k(100)
+            .execute()
+            .await
+            .expect("final search");
+
+        for res in search_results {
+            let lsm_doc = col.get(&res.id).await.expect("get lsm doc");
+            assert!(
+                lsm_doc.is_some(),
+                "Consistency Scan Violation: Search returned doc '{}' in col '{}' which does NOT exist in LSM storage!",
+                res.id, col_name
+            );
+        }
+    }
 }

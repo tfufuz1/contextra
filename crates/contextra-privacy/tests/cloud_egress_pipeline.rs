@@ -1,12 +1,19 @@
 //! Integration tests for `CloudEgressPipeline` and `CloudEgressPipelineBuilder`.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects, deprecated)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
+    deprecated
+)]
 
 use contextra_privacy::{
-    handle_cloud_query, BlockReason, BoxFuture, BulkExfiltrationDetector, CloudEgressPipelineBuilder,
-    CloudQueryRequest, EgressClassification, EgressError, EgressGuardCheck, EgressVault, SessionId,
-    SurrogateVault,
+    handle_cloud_query, BlockReason, BoxFuture, BulkExfiltrationDetector,
+    CloudEgressPipelineBuilder, CloudQueryRequest, EgressClassification, EgressError,
+    EgressGuardCheck, EgressVault, SessionId, SurrogateVault,
 };
 use contextra_types::{TenantId, TenantScoped};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -55,7 +62,10 @@ async fn test_pipeline_volume_limit_exceeded_policy_violation() {
         max_results: None,
     };
     let res1 = pipeline.handle(TenantScoped::new(tenant_id, req1)).await;
-    assert!(res1.is_ok(), "First query under volume limit should succeed");
+    assert!(
+        res1.is_ok(),
+        "First query under volume limit should succeed"
+    );
 
     // Query 2: 60 bytes (50 + 60 = 110 > 100) -> Fails with PolicyViolation
     let req2 = CloudQueryRequest {
@@ -100,7 +110,10 @@ async fn test_pipeline_tenant_mismatch_rejected() {
                 "Expected tenant mismatch error, got: {msg}"
             );
         }
-        other => panic!("Expected EgressError::PolicyViolation for tenant mismatch, got {:?}", other),
+        other => panic!(
+            "Expected EgressError::PolicyViolation for tenant mismatch, got {:?}",
+            other
+        ),
     }
 }
 
@@ -194,7 +207,10 @@ async fn test_pipeline_surrogate_vault_builder_efficacy() {
 
     // Sanitize using configured vault
     let (sanitized, count) = configured_vault
-        .sanitize_and_vault("Contact alice@example.com", &contextra_privacy::NoOpRecognizer)
+        .sanitize_and_vault(
+            "Contact alice@example.com",
+            &contextra_privacy::NoOpRecognizer,
+        )
         .unwrap();
 
     assert_eq!(count, 1);

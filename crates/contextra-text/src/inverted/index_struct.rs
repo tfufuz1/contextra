@@ -106,6 +106,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
         if let Some(bytes) = self.storage.get(&meta_key).await? {
             let meta: TextIndexMetadata = bincode::deserialize(&bytes)
                 .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?;
+            // ORDERING RATIONALE: SeqCst store ensures loaded index statistics from persistent storage
+            // are globally published and visible to all concurrent reader threads before subsequent operations.
             self.total_docs.store(meta.total_docs, Ordering::SeqCst);
             self.total_tokens.store(meta.total_tokens, Ordering::SeqCst);
             self.avg_doc_len_x1000
@@ -490,6 +492,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
         };
 
         if change.docs_delta != 0 || change.tokens_delta != 0 {
+            // ORDERING RATIONALE: SeqCst fetch_add / fetch_sub provides atomic total modification ordering
+            // when committing document and token counts across concurrent transaction commits.
             if change.docs_delta > 0 {
                 self.total_docs
                     .fetch_add(change.docs_delta as u64, Ordering::SeqCst);
@@ -513,6 +517,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
             } else {
                 0
             };
+            // ORDERING RATIONALE: SeqCst store ensures the recomputed fixed-point avg_doc_len_x1000
+            // is published atomically alongside total_docs and total_tokens.
             self.avg_doc_len_x1000.store(avg_len, Ordering::SeqCst);
         }
 
@@ -580,6 +586,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
             return Ok(Vec::new());
         }
 
+        // ORDERING RATIONALE: Acquire load pairs with SeqCst stores during commit_stats(),
+        // ensuring BM25 scoring thread observes all preceding index storage writes committed prior to the stats update.
         let n = self.total_docs.load(Ordering::Acquire);
         let cached_avg_len_x1000 = self.avg_doc_len_x1000.load(Ordering::Acquire);
 

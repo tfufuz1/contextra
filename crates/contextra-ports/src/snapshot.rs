@@ -2,8 +2,8 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
 use contextra_types::TxId;
+use serde::{Deserialize, Serialize};
 
 /// Unique identifier for a read snapshot (§7.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -58,4 +58,3 @@ impl ReadSnapshot {
         self.max_seq.0
     }
 }
-

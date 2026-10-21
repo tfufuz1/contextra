@@ -1,5 +1,12 @@
 #![forbid(unsafe_code)]
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::arithmetic_side_effects, deprecated)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
+    deprecated
+)]
 //! Campaign J-27 Privacy Test Suite — Egress-Firewall, DLP Vault & Compliance Invariants
 
 use contextra_privacy::audit_trace::compute_audit_trace;

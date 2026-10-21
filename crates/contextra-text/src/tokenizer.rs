@@ -21,16 +21,14 @@ static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>>
 
 fn get_protected_regex() -> Option<&'static Regex> {
     PROTECTED_REGEX
-        .get_or_init(|| {
-            match Regex::new(PROTECTED_PATTERN) {
-                Ok(re) => Some(re),
-                Err(err) => {
-                    tracing::error!(
-                        error = %err,
-                        "Protected regex initialization failed; proceeding without URL/email protection"
-                    );
-                    None
-                }
+        .get_or_init(|| match Regex::new(PROTECTED_PATTERN) {
+            Ok(re) => Some(re),
+            Err(err) => {
+                tracing::error!(
+                    error = %err,
+                    "Protected regex initialization failed; proceeding without URL/email protection"
+                );
+                None
             }
         })
         .as_ref()
@@ -175,7 +173,14 @@ impl Tokenizer for GermanMorphTokenizer {
         for seg in segments {
             match seg {
                 TextSegment::Regular(s) => {
-                    for word in s.unicode_words() {
+                    let s_norm = s
+                        .replace("a\u{0308}", "ae")
+                        .replace("A\u{0308}", "Ae")
+                        .replace("o\u{0308}", "oe")
+                        .replace("O\u{0308}", "Oe")
+                        .replace("u\u{0308}", "ue")
+                        .replace("U\u{0308}", "Ue");
+                    for word in s_norm.unicode_words() {
                         let lower = word.to_lowercase();
                         let normalized = normalize_umlauts(&lower);
                         if stopwords.contains(&lower) || stopwords.contains(&normalized) {
@@ -507,7 +512,9 @@ mod tests {
 
         // German compound words and hyphenated terms in regular segments should be processed
         assert!(
-            tokens.iter().any(|t| t.contains("infrastruktur") || t.contains("anpassung")),
+            tokens
+                .iter()
+                .any(|t| t.contains("infrastruktur") || t.contains("anpassung")),
             "Regular German hyphenated compound terms should be tokenized. Tokens: {:?}",
             tokens
         );

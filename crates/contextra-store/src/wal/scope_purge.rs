@@ -163,6 +163,61 @@ impl OrxWalPurgeIntent {
         let intent = Self::from_bytes(payload)?;
         Ok(Some(intent))
     }
+
+    pub async fn read_from_file_async(path: &Path) -> Result<Option<Self>> {
+        if !tokio::fs::try_exists(path).await.unwrap_or(false) {
+            return Ok(None);
+        }
+
+        let bytes = tokio::fs::read(path).await.map_err(|e| {
+            ContextraError::Storage(format!("Failed to read WAL purge intent: {}", e))
+        })?;
+
+        if bytes.len() < 13 {
+            return Err(ContextraError::Storage(
+                "WAL purge intent header too short".into(),
+            ));
+        }
+
+        if &bytes[0..4] != WAL_INTENT_MAGIC {
+            return Err(ContextraError::Storage(
+                "Invalid WAL purge intent magic header".into(),
+            ));
+        }
+
+        if bytes[4] != WAL_INTENT_VERSION {
+            return Err(ContextraError::Storage(format!(
+                "Unsupported WAL purge intent version: {}",
+                bytes[4]
+            )));
+        }
+
+        let checksum_bytes: [u8; 4] = bytes[5..9]
+            .try_into()
+            .map_err(|_| ContextraError::Storage("Invalid checksum length".into()))?;
+        let expected_checksum = u32::from_le_bytes(checksum_bytes);
+
+        let len_bytes: [u8; 4] = bytes[9..13]
+            .try_into()
+            .map_err(|_| ContextraError::Storage("Invalid payload len length".into()))?;
+        let payload_len = u32::from_le_bytes(len_bytes) as usize;
+
+        if bytes.len() < 13 + payload_len {
+            return Err(ContextraError::Storage(
+                "WAL purge intent payload truncated".into(),
+            ));
+        }
+
+        let payload = &bytes[13..13 + payload_len];
+        if crc32fast::hash(payload) != expected_checksum {
+            return Err(ContextraError::Storage(
+                "WAL purge intent CRC32 checksum mismatch".into(),
+            ));
+        }
+
+        let intent = Self::from_bytes(payload)?;
+        Ok(Some(intent))
+    }
 }
 
 /// Report summarizing results of a WAL scope purge operation.

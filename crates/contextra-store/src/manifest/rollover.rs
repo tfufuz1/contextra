@@ -22,7 +22,7 @@ impl Manifest {
     /// Writes live entries into `MANIFEST.new.<pid>.<rand>`, flushes, fsyncs,
     /// atomically renames to `MANIFEST`, and fsyncs the parent directory.
     pub async fn rollover(&self, live_entries: &[ManifestEntry]) -> Result<()> {
-        let _ = self.maybe_rollover(live_entries, 0).await?;
+        let _ = self.maybe_rollover(live_entries, 0).await?; // INTENTIONAL-DROP: Return value is boolean indicating whether rollover occurred; error is propagated via ?.
         Ok(())
     }
 

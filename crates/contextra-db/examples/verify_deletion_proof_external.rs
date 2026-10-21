@@ -215,7 +215,9 @@ async fn main() -> contextra_types::Result<()> {
         Err(crypto_err) => {
             println!("\n  ❌ [Externer Prüfer] FEHLER ABGEFANGEN (Erwartetes Verhalten):");
             println!("     Fehlerdetails: {crypto_err}");
-            println!("  ✅ Verifikation des manipulierten Proofs korrekt mit Signatur-Fehler abgelehnt!");
+            println!(
+                "  ✅ Verifikation des manipulierten Proofs korrekt mit Signatur-Fehler abgelehnt!"
+            );
         }
     }
 

@@ -37,10 +37,7 @@ impl CommitLedger {
             }
         }
         if let Some(e) = first_error {
-            Err(ContextraError::Transaction(format!(
-                "Compensating action execution failed: {}",
-                e
-            )))
+            Err(e)
         } else {
             Ok(())
         }
@@ -90,11 +87,14 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateLsmActio
 
             while attempts < max_attempts && !success {
                 attempts += 1;
-                let rollback_tx = TxId::new(
-                    self.collection
-                        .next_tx
-                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-                );
+                let rollback_tx = match self.collection.allocate_tx() {
+                    Ok(tx) => tx,
+                    Err(e) => {
+                        tracing::error!("[INV-DB-3] Failed to allocate rollback TxId: {}", e);
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        continue;
+                    }
+                };
 
                 let mut comp_failed = false;
 
@@ -232,7 +232,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensateHnswAction<S, V> {
 impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswAction<S, V> {
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            if let Some(kv_store) = self.collection.kv_store() {
+            if let Ok(kv_store) = self.collection.kv_store() {
                 let chunk_ids: Vec<u64> = self
                     .doc_ids
                     .iter()
@@ -240,11 +240,10 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
                     .collect::<Result<Vec<u64>>>()?;
                 kv_store.on_rollback(self.tenant_id, &chunk_ids);
             }
-            let comp_tx = TxId::new(
-                self.collection
-                    .next_tx
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-            );
+            let comp_tx = match self.collection.allocate_tx() {
+                Ok(tx) => tx,
+                Err(e) => return Err(e),
+            };
             for &doc_id in self.doc_ids.iter() {
                 if let Err(e) = self.collection.index.delete(comp_tx, doc_id).await {
                     tracing::error!(
@@ -280,11 +279,10 @@ impl<S: StorageEngine, V: VectorIndex> CompensateTextAction<S, V> {
 impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateTextAction<S, V> {
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            let comp_tx = TxId::new(
-                self.collection
-                    .next_tx
-                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-            );
+            let comp_tx = match self.collection.allocate_tx() {
+                Ok(tx) => tx,
+                Err(e) => return Err(e),
+            };
             for &doc_id in self.doc_ids.iter() {
                 if let Err(e) = self
                     .collection

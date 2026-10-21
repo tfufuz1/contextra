@@ -44,19 +44,13 @@ impl SimpleRng {
     }
 }
 
-/// Resolves the test seed from `CHAOS_SEED` environment variable or generates a new random seed from system time.
+/// Resolves the test seed from `CHAOS_SEED` environment variable or uses a fixed deterministic default seed (P28).
 /// Logs and prints the seed to ensure reproducibility of any test failure.
 fn resolve_and_log_seed() -> u64 {
     let seed: u64 = std::env::var("CHAOS_SEED")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or_else(|| {
-            use std::time::{SystemTime, UNIX_EPOCH};
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos() as u64)
-                .unwrap_or(123456789)
-        });
+        .unwrap_or(0x9E37_79B9_7F4A_7C15);
 
     println!("CHAOS_SEED={}", seed);
     tracing::info!("CHAOS_SEED={}", seed);
@@ -173,7 +167,6 @@ impl GroundTruth {
 
 /// Scenario A: GPU/Inference busy + ENOSPC disk full simulation does not leave orphaned embeddings.
 #[tokio::test]
-#[ignore]
 async fn chaos_gpu_busy_disk_full_no_orphaned_embedding() {
     let seed = resolve_and_log_seed();
     let mut rng = SimpleRng::seed_from_u64(seed);

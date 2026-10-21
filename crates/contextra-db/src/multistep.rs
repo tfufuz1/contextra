@@ -142,8 +142,14 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         let original_query_owned = original_query.to_string();
         let vector_owned = vector.to_vec();
         contextra_types::public_api!("MultiStepEngine::search_with_embedder", {
-            self.search_with_embedder_inner(&original_query_owned, &vector_owned, k, rewriter, embedder)
-                .await
+            self.search_with_embedder_inner(
+                &original_query_owned,
+                &vector_owned,
+                k,
+                rewriter,
+                embedder,
+            )
+            .await
         })
     }
 
