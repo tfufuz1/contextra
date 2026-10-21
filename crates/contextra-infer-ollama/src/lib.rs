@@ -11,6 +11,7 @@ pub mod context_prefixer;
 mod embedding;
 pub mod importance;
 pub mod model_info;
+pub mod query_rewriter;
 
 pub use client::{
     build_rag_prompt, xml_escape, OllamaClient, OllamaConfig, DEFAULT_BASE_URL, DEFAULT_EMBED_MODEL,
@@ -22,3 +23,4 @@ pub use importance::{
     score_importance_with_calibrator, Confidence, ImportanceAssessment,
 };
 pub use model_info::ModelInfo;
+pub use query_rewriter::{OllamaQueryRewriter, OllamaQueryRewriterConfig};

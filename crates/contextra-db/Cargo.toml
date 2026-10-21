@@ -13,7 +13,10 @@ description = "Contextra — Embedded hybrid-search for AI agents"
 ring = "3"
 
 [dependencies]
+contextra-adapt = { workspace = true }
+contextra-cognition = { workspace = true }
 contextra-engine = { workspace = true }
+contextra-graph = { workspace = true }
 contextra-sys = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }

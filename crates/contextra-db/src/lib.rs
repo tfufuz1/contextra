@@ -29,16 +29,67 @@ pub mod reaper {
 }
 
 pub use contextra_engine::fusion;
+pub mod homeostat;
 pub mod multistep;
 pub mod volatile_vault;
 pub mod wiring;
 
+pub use homeostat::*;
 pub use multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
+pub use contextra_cognition::{
+    consolidation_executor, execute_background_consolidation, execute_consolidation_pass,
+    memory_consolidation, maintenance_config, maintenance_scheduler,
+    CommunityStabilityTracker, ConsolidationConfig, MaintenanceConfig, MaintenanceScheduler,
+    SynthesisConfig,
+};
+
+pub trait ContextraForgetExt {
+    fn purge_tenant(
+        &self,
+        tenant: contextra_types::TenantId,
+    ) -> impl std::future::Future<Output = contextra_types::Result<contextra_engine::ForgetReceipt>> + Send;
+}
+
+impl ContextraForgetExt for Contextra {
+    async fn purge_tenant(
+        &self,
+        tenant: contextra_types::TenantId,
+    ) -> contextra_types::Result<contextra_engine::ForgetReceipt> {
+        self.forget_tenant(tenant, contextra_engine::deletion::ForgetOptions::default()).await
+    }
+}
+
+pub trait CollectionExt<S: contextra_ports::StorageEngine, V: contextra_ports::VectorIndex> {
+    fn new_without_graph(
+        name: String,
+        storage: std::sync::Arc<S>,
+        index: std::sync::Arc<V>,
+        next_tx: std::sync::Arc<std::sync::atomic::AtomicU64>,
+        dimension: usize,
+        language: Language,
+    ) -> Self;
+}
+
+impl<S: contextra_ports::StorageEngine, V: contextra_ports::VectorIndex> CollectionExt<S, V>
+    for Collection<S, V>
+{
+    fn new_without_graph(
+        name: String,
+        storage: std::sync::Arc<S>,
+        index: std::sync::Arc<V>,
+        next_tx: std::sync::Arc<std::sync::atomic::AtomicU64>,
+        dimension: usize,
+        language: Language,
+    ) -> Self {
+        let graph_index = std::sync::Arc::new(contextra_graph::CsrGraph::new());
+        Self::new(name, storage, index, graph_index, next_tx, dimension, language)
+    }
+}
 
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
 
-pub use contextra_ports::{DriftStatusProvider, SegmentSynthesizer, TextEmbeddingEngine};
+pub use contextra_ports::{DriftStatusProvider, SegmentSynthesizer, StorageEngine, TextEmbeddingEngine};
 pub use contextra_types::DistanceMetric;
 pub use serde_json::json;
 
@@ -529,7 +580,7 @@ mod tests {
             .await
             .expect("ins"); // expect
 
-        db.drop_collection("drop-me", tenant_id, &[0u8; 32])
+        db.forget_collection("drop-me", contextra_engine::deletion::ForgetOptions::default())
             .await
             .expect("drop"); // expect
 
