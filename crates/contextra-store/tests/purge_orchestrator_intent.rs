@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-13
+// STAND: 2026-10-21
 // ZWECK: Integrationstests für OrxPurgeIntent Persistenz, Checksumme und Korruptionserkennung.
 
 use contextra_store::compaction::purge_filter::PurgeScope;

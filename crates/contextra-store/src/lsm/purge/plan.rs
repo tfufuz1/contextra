@@ -1,63 +1,79 @@
 // FILE-CONTEXT
 // STAND: 2026-10-21
-// ZWECK: Consolidated PurgePhase Lifecycle Enum und Phasenkontrolle (Spezifikation C5.1, WP-2).
+// ZWECK: Kanonische PurgePhase nach WP-2 / Spezifikation (u8-Codes 1..=9).
 
-use crate::compaction::purge_filter::PurgeError;
+use contextra_ports::erasure::PurgeError;
+use serde::{Deserialize, Serialize};
 
-/// Purge operation phase state machine (§C5.1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Multi-phase purge lifecycle state machine (codes 1..=9).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum PurgePhase {
-    /// Phase 1: Request admitted, intent file initialized with scope ledger reference.
+    /// Request admitted, intent and scope files written.
     Admitted = 1,
-    /// Phase 2: Erasure fence acquired on scope.
+    /// Erasure fence acquired on scope.
     Fenced = 2,
-    /// Phase 3: Active memtables flushed to SSTables.
+    /// Active memtables flushed.
     Flushed = 3,
-    /// Phase 4: Purge compaction executed and committed to manifest.
+    /// Purge rewrite executed and committed.
     Rewriting = 4,
-    /// Phase 5: Obsolete files recorded to journal and durably deleted.
+    /// Obsolete files disposed.
     Disposing = 5,
-    /// Phase 6: WAL callback executed to retire obsolete WAL records.
+    /// WAL retired.
     WalRetiring = 6,
-    /// Phase 7: Deletion proof witness generated/recorded.
+    /// Witness generated and recorded.
     Witnessing = 7,
-    /// Phase 8: Purge operation finalized.
+    /// Purge operation finalized.
     Finalizing = 8,
-    /// Phase 9: Erasure fence released and intent file removed.
+    /// Fence released and intent removed.
     Released = 9,
 }
 
 impl PurgePhase {
-    /// Converts phase to u8 numeric code for binary encoding.
+    /// Returns true if this phase must execute step `phase`.
     #[must_use]
-    pub const fn to_u8(self) -> u8 {
+    pub fn must_run(self, phase: PurgePhase) -> bool {
+        (self as u8) <= (phase as u8)
+    }
+
+    /// Converts phase to numeric u8 code.
+    #[must_use]
+    pub fn code(self) -> u8 {
         self as u8
     }
 
-    /// Returns `true` if `self` phase is strictly before `target` phase (i.e. `self < target`).
+    /// Backwards compatibility alias for code().
     #[must_use]
-    pub fn must_run(self, target: Self) -> bool {
-        self < target
+    pub fn to_u8(self) -> u8 {
+        self.code()
+    }
+}
+
+    /// Backwards compatibility method.
+    #[must_use]
+    pub fn from_u8(val: u8) -> Option<Self> {
+        Self::try_from(val).ok()
     }
 }
 
 impl TryFrom<u8> for PurgePhase {
     type Error = PurgeError;
 
-    fn try_from(code: u8) -> Result<Self, Self::Error> {
-        match code {
-            1 => Ok(Self::Admitted),
-            2 => Ok(Self::Fenced),
-            3 => Ok(Self::Flushed),
-            4 => Ok(Self::Rewriting),
-            5 => Ok(Self::Disposing),
-            6 => Ok(Self::WalRetiring),
-            7 => Ok(Self::Witnessing),
-            8 => Ok(Self::Finalizing),
-            9 => Ok(Self::Released),
-            0 => Err(PurgeError::Intent("Phase code 0 is invalid (never persisted)".to_string())),
-            c => Err(PurgeError::Intent(format!("Invalid or legacy PurgePhase code: {c}"))),
+    fn try_from(val: u8) -> Result<Self, Self::Error> {
+        match val {
+            1 => Ok(PurgePhase::Admitted),
+            2 => Ok(PurgePhase::Fenced),
+            3 => Ok(PurgePhase::Flushed),
+            4 => Ok(PurgePhase::Rewriting),
+            5 => Ok(PurgePhase::Disposing),
+            6 => Ok(PurgePhase::WalRetiring),
+            7 => Ok(PurgePhase::Witnessing),
+            8 => Ok(PurgePhase::Finalizing),
+            9 => Ok(PurgePhase::Released),
+            _ => Err(PurgeError::CorruptedIntent(format!(
+                "Invalid PurgePhase code: {}",
+                val
+            ))),
         }
     }
 }

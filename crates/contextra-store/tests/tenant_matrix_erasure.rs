@@ -4,9 +4,9 @@
 // INVARIANTEN: Strikte Mandanten-Isolation, fail-closed Mandanten-Auflösung, Pflicht-TenantId bei remove_doc_segments
 
 use contextra_ports::erasure::{
-    ErasureError, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId,
-    ScopeOrigin,
+    FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId,
 };
+use contextra_types::ContextraError;
 use contextra_ports::{KvLifecycleHooks, StorageEngine};
 use contextra_store::lsm::LsmStorage;
 use contextra_store::tenant_codec::TenantScopedStorage;
@@ -29,12 +29,12 @@ async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
     let storage_t1 = TenantScopedStorage::new(lsm.clone(), tenant_1);
     let storage_t2 = TenantScopedStorage::new(lsm.clone(), tenant_2);
 
-    // 1. Verify erasure_backend
-    assert!(lsm.erasure_backend().is_some());
-    assert!(storage_t1.erasure_backend().is_some());
-    assert!(storage_t2.erasure_backend().is_some());
+    // 1. Verify erasure_capabilities
+    assert!(lsm.erasure_capabilities().is_some());
+    assert!(storage_t1.erasure_capabilities().is_some());
+    assert!(storage_t2.erasure_capabilities().is_some());
 
-    let eb_t1 = storage_t1.erasure_backend().unwrap();
+    let eb_t1 = storage_t1.erasure_capabilities().unwrap();
 
     // 2. Physical scope resolution with matching TenantId
     let doc_scope = LogicalScope::Document {
@@ -43,52 +43,34 @@ async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
         collection_id: CollectionId(10),
     };
     let phys_scope = eb_t1.physical_scope(&doc_scope).unwrap();
-    assert_eq!(phys_scope.prefixes().len(), 1);
-    assert_eq!(phys_scope.prefixes()[0], b"t:101:10:");
+    assert!(phys_scope.prefixes().is_empty());
+    assert_eq!(phys_scope.keys().len(), 1);
+    assert_eq!(phys_scope.keys()[0], b"t:101:10:doc:1");
 
-    // 3. Physical scope resolution with mismatched TenantId MUST fail closed with ForeignScope
+    // 3. Physical scope resolution with mismatched TenantId MUST fail closed
     let mismatched_scope = LogicalScope::Document {
         doc_id: DocId(1),
         tenant_id: tenant_2,
         collection_id: CollectionId(10),
     };
     let err = eb_t1.physical_scope(&mismatched_scope).unwrap_err();
-    assert_eq!(err, ErasureError::ForeignScope);
-
-    // 4. Foreign origin check on acquire_fence / purge_physical across LsmStorage and TenantScopedStorage
-    let foreign_origin = ScopeOrigin::new(88888, [1u8; 32]);
-    let foreign_scope = PhysicalScope::try_new(
-        tenant_1,
-        foreign_origin,
-        vec![],
-        vec![b"t:101:10:".to_vec()],
-    )
-    .unwrap();
+    match err {
+        ContextraError::InvalidInput(msg) => {
+            assert!(msg.contains("TenantId mismatch"));
+        }
+        _ => panic!("Expected InvalidInput, got {:?}", err),
+    }
 
     let purge_id = PurgeId::new([2u8; 16]);
-    assert_eq!(
-        lsm.erasure_backend()
-            .unwrap()
-            .acquire_fence(&foreign_scope, purge_id)
-            .unwrap_err(),
-        ErasureError::ForeignScope
-    );
-    assert_eq!(
-        eb_t1.acquire_fence(&foreign_scope, purge_id).unwrap_err(),
-        ErasureError::ForeignScope
-    );
-
     let dummy_probe = DummyProbe;
     let fence_guard = lsm
-        .erasure_backend()
+        .erasure_capabilities()
         .unwrap()
         .acquire_fence(&phys_scope, purge_id)
         .unwrap();
 
-    let key_only_origin = ScopeOrigin::new(lsm.backend_id, [0u8; 32]);
     let key_only_scope = PhysicalScope::try_new(
         tenant_1,
-        key_only_origin,
         vec![b"t:101:doc:123".to_vec()],
         vec![],
     )
@@ -97,19 +79,6 @@ async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
         .acquire_fence(&key_only_scope, PurgeId::new([3u8; 16]))
         .expect("key-only physical scope fence acquisition should succeed");
     drop(key_fence);
-
-    match eb_t1.purge_physical(
-        &foreign_scope,
-        TxId::try_new(1).unwrap(),
-        &dummy_probe,
-        &fence_guard,
-    ) {
-        Err(PurgeError::FenceConflict) => (),
-        res => panic!(
-            "Expected FenceConflict for foreign scope in purge_physical, got {:?}",
-            res
-        ),
-    }
 
     // 5. Data isolation & Purge test
     let tx1 = TxId::try_new(10).unwrap();
@@ -121,7 +90,7 @@ async fn test_tenant_matrix_lsm_and_tenant_scoped_storage() {
     storage_t1.flush().await.unwrap();
 
     let tx_purge = TxId::try_new(20).unwrap();
-    let _ = eb_t1.purge_physical(&phys_scope, tx_purge, &dummy_probe, &fence_guard);
+    let _ = eb_t1.purge_physical(&phys_scope, tx_purge, &dummy_probe);
 
     // Tenant 2 value checked (unaffected)
     let get_t2 = storage_t2.get(b"doc:1").await.unwrap();
@@ -145,7 +114,7 @@ async fn test_fence_guard_drop_releases_fence_single_time_even_after_panic() {
         tenant_id: tenant_1,
         collection_id: CollectionId(10),
     };
-    let eb = lsm.erasure_backend().unwrap();
+    let eb = lsm.erasure_capabilities().unwrap();
     let _phys_scope = eb.physical_scope(&doc_scope).unwrap();
     let purge_id = PurgeId::new([7u8; 16]);
 
@@ -154,13 +123,13 @@ async fn test_fence_guard_drop_releases_fence_single_time_even_after_panic() {
     let _ = catch_unwind({
         let released_count = released_count.clone();
         move || {
-            let guard = FenceGuard::new(
+            let guard = FenceGuard::with_release(
                 purge_id,
-                Box::new(move || {
+                move || {
                     released_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                }),
+                },
             );
-            assert_eq!(guard.purge_id(), purge_id);
+            assert_eq!(guard.purge_id, purge_id);
             panic!("Simulated panic inside task holding FenceGuard");
         }
     });

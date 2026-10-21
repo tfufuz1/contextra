@@ -221,6 +221,31 @@ mod tests {
 ///
 /// # Errors
 /// Returns `ContextraError::Storage` if opening or syncing the parent directory fails.
+pub(crate) fn fsync_parent_dir_sync(path: &Path) -> Result<()> {
+    let parent = path.parent().unwrap_or_else(|| Path::new(""));
+    let dir_path = if parent.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        parent
+    };
+
+    let dir = std::fs::File::open(dir_path).map_err(|e| {
+        ContextraError::Storage(format!(
+            "Directory open failed for fsync on {}: {e}",
+            dir_path.display()
+        ))
+    })?;
+
+    dir.sync_all().map_err(|e| {
+        ContextraError::Storage(format!(
+            "Directory fsync failed for {}: {e}",
+            dir_path.display()
+        ))
+    })?;
+
+    Ok(())
+}
+
 pub(crate) async fn fsync_parent_dir(path: &Path) -> Result<()> {
     let parent = path.parent().unwrap_or_else(|| Path::new(""));
     let dir_path = if parent.as_os_str().is_empty() {

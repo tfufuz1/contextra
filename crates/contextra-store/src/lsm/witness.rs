@@ -49,6 +49,29 @@ pub enum MemScopeSpec<'a> {
 }
 
 /// Evidence collected from scanning MemTable residue.
+/// Computes the domain-tagged BLAKE3 footprint digest over canonically sorted keys and prefixes.
+pub fn compute_footprint_hash(keys: &[Vec<u8>], prefixes: &[Vec<u8>]) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new_derive_key("contextra/witness-footprint/v1");
+
+    let mut sorted_keys = keys.to_vec();
+    sorted_keys.sort_unstable();
+    hasher.update(&(sorted_keys.len() as u64).to_le_bytes());
+    for k in &sorted_keys {
+        hasher.update(&(k.len() as u64).to_le_bytes());
+        hasher.update(k);
+    }
+
+    let mut sorted_prefixes = prefixes.to_vec();
+    sorted_prefixes.sort_unstable();
+    hasher.update(&(sorted_prefixes.len() as u64).to_le_bytes());
+    for p in &sorted_prefixes {
+        hasher.update(&(p.len() as u64).to_le_bytes());
+        hasher.update(p);
+    }
+
+    *hasher.finalize().as_bytes()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MemScanEvidence {
     /// Number of memtables scanned (active + immutable).
@@ -273,6 +296,8 @@ impl LsmStorage {
             tombstones_found: total_entries as u64,
         };
 
+        let footprint_hash = compute_footprint_hash(&req.scope_keys, &req.scope_prefixes);
+
         let mem_witness = LayerWitness::issue(WitIssueArgs {
             layer: DeletionLayer::LsmMemtable,
             scope_hash,
@@ -280,7 +305,7 @@ impl LsmStorage {
             as_of_tx: req.as_of_tx,
             assurance: req.assurance,
             claim: req.claim,
-            footprint_hash: [0u8; 32],
+            footprint_hash,
             scope_write_seq: seq_before,
             scanner_name: req.scanner_name,
             scanner_version: req.scanner_version,
@@ -350,7 +375,7 @@ impl LsmStorage {
             as_of_tx: req.as_of_tx,
             assurance: req.assurance,
             claim: req.claim,
-            footprint_hash: [0u8; 32],
+            footprint_hash,
             scope_write_seq: seq_before,
             scanner_name: req.scanner_name,
             scanner_version: req.scanner_version,
@@ -384,7 +409,7 @@ impl LsmStorage {
             as_of_tx: req.as_of_tx,
             assurance: req.assurance,
             claim: req.claim,
-            footprint_hash: [0u8; 32],
+            footprint_hash,
             scope_write_seq: seq_before,
             scanner_name: req.scanner_name,
             scanner_version: req.scanner_version,
@@ -430,7 +455,7 @@ impl LsmStorage {
             as_of_tx: req.as_of_tx,
             assurance: req.assurance,
             claim: req.claim,
-            footprint_hash: [0u8; 32],
+            footprint_hash,
             scope_write_seq: seq_before,
             scanner_name: req.scanner_name,
             scanner_version: req.scanner_version,

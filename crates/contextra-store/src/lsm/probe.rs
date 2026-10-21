@@ -44,7 +44,9 @@ impl WitStoreProbe for ZeuStoreProbe {
             DeletionLayer::LsmMemtable => {
                 WitStoreGeneration(self.flush_counter.load(Ordering::Acquire))
             }
-            DeletionLayer::SsTableAllLevels | DeletionLayer::Manifest => WitStoreGeneration(1),
+            DeletionLayer::SsTableAllLevels | DeletionLayer::Manifest => {
+                WitStoreGeneration(self.flush_counter.load(Ordering::Acquire) + self.segment_counter.load(Ordering::Acquire))
+            }
             DeletionLayer::WalAllSegments { .. } => {
                 WitStoreGeneration(self.segment_counter.load(Ordering::Acquire))
             }
@@ -65,15 +67,12 @@ impl WitStoreProbe for ZeuStoreProbe {
 impl LsmStorage {
     /// Returns a thread-safe [`WitStoreProbe`] handle attached to this `LsmStorage` instance.
     pub fn store_probe(&self) -> Arc<dyn WitStoreProbe> {
-        let flush_ptr = Arc::new(AtomicU64::new(self.flush_counter.load(Ordering::Acquire)));
-        let segment_ptr = Arc::new(AtomicU64::new(self.segment_counter.load(Ordering::Acquire)));
-
         Arc::new(ZeuStoreProbe::new(
             Arc::clone(&self.sstables),
             Arc::clone(&self.manifest),
             Arc::clone(&self.erasure_fence),
-            flush_ptr,
-            segment_ptr,
+            Arc::clone(&self.flush_counter),
+            Arc::clone(&self.segment_counter),
         ))
     }
 }

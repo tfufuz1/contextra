@@ -46,6 +46,7 @@ pub use fence::{
     FenceHandle, FenceScopeState, FenceTarget, FencedKey, InflightGuard, PrefixFence, WriteTicket,
 };
 pub use gc_floor::GcFloor;
+pub use fence::{ErasureFence, FenceError};
 pub use probe::ZeuStoreProbe;
 
 pub(super) use guard::{CommitGuard, LsmState};
