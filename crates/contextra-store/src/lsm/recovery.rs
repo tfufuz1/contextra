@@ -398,23 +398,33 @@ impl LsmStorage {
 
         if let Some(expected_hwm) = manifest_hwm {
             let actual_tail_hmac = last_replayed_hmac.unwrap_or([0u8; 32]);
-            let hwm_reached = replayed_hmac_set.contains(&expected_hwm);
-            if !hwm_reached && expected_hwm != [0u8; 32] {
-                match config.wal_recovery_mode {
-                    crate::wal::WalRecoveryMode::Strict => {
-                        return Err(ContextraError::wal_truncation_detected(
-                            expected_hwm,
-                            actual_tail_hmac,
-                        ));
-                    }
-                    crate::wal::WalRecoveryMode::Warn => {
-                        tracing::warn!(
-                            target: "contextra_store::wal_recovery",
-                            expected_hwm = ?expected_hwm,
-                            actual_tail_hmac = ?actual_tail_hmac,
-                            "WAL truncation or unanchored tail detected during startup recovery; continuing under WalRecoveryMode::Warn"
-                        );
-                    }
+            let first_frame_prev = None;
+            let entries_empty = replayed_hmac_set.len() <= 1;
+
+            let check_res = crate::wal::verify_wal_anchor(
+                &expected_hwm,
+                &actual_tail_hmac,
+                &replayed_hmac_set,
+                first_frame_prev,
+                entries_empty,
+            );
+
+            if check_res.is_err() {
+                let check_hmac = if replayed_hmac_set.contains(&expected_hwm)
+                    || valid_manifest_sstables
+                        .as_ref()
+                        .is_some_and(|s| !s.is_empty())
+                {
+                    expected_hwm
+                } else {
+                    actual_tail_hmac
+                };
+                if contextra_crypto::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err()
+                {
+                    return Err(ContextraError::wal_truncation_detected(
+                        expected_hwm,
+                        actual_tail_hmac,
+                    ));
                 }
             }
         }

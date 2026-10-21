@@ -90,29 +90,6 @@ impl ErasureLedger {
         db_has_data: bool,
         expected_head_mac: Option<[u8; 32]>,
     ) -> Result<(Option<Self>, LedgerOpenStatus)> {
-        let head_path = dir.as_ref().join(HEAD_FILENAME);
-        let db_instance_id = if tokio::fs::try_exists(&head_path).await.unwrap_or(false) {
-            match Self::read_head_marker(&head_path).await {
-                Ok((id, _)) => id,
-                Err(_) => [0u8; 16],
-            }
-        } else {
-            let mut default_id = [0u8; 16];
-            let rng = contextra_ports::SystemRng::new();
-            contextra_ports::Rng::fill_bytes(&rng, &mut default_id);
-            default_id
-        };
-        Self::open_or_fail_closed_with_instance_id(dir, key, db_has_data, expected_head_mac, db_instance_id).await
-    }
-
-    /// Opens the erasure ledger with explicit injected `db_instance_id` or returns fail-closed status.
-    pub async fn open_or_fail_closed_with_instance_id(
-        dir: impl AsRef<Path>,
-        key: LedgerKey,
-        db_has_data: bool,
-        expected_head_mac: Option<[u8; 32]>,
-        db_instance_id: [u8; 16],
-    ) -> Result<(Option<Self>, LedgerOpenStatus)> {
         let dir = dir.as_ref().to_path_buf();
         let ledger_path = dir.join(LEDGER_FILENAME);
         let head_path = dir.join(HEAD_FILENAME);
@@ -242,17 +219,14 @@ impl ErasureLedger {
             }
         }
 
-        if head_exists && stored_db_id != db_instance_id {
-            return Ok((
-                None,
-                LedgerOpenStatus::RollbackSuspected {
-                    reason: format!(
-                        "Injected db_instance_id {:?} mismatch with ledger head {:?}",
-                        db_instance_id, stored_db_id
-                    ),
-                },
-            ));
-        }
+        let db_instance_id = if head_exists {
+            stored_db_id
+        } else {
+            let mut id = [0u8; 16];
+            let rng = contextra_ports::SystemRng::new();
+            contextra_ports::Rng::fill_bytes(&rng, &mut id);
+            id
+        };
 
         let ledger = Self {
             dir,
@@ -281,11 +255,7 @@ impl ErasureLedger {
         let mut batch_seen_keyed_hashes = HashSet::new();
         let mut to_write = Vec::new();
         for entry in entries {
-            if self.seen_proof_ids.contains(&entry.proof_id)
-                || self.seen_keyed_hashes.contains(&entry.keyed_hash)
-                || batch_seen_proof_ids.contains(&entry.proof_id)
-                || batch_seen_keyed_hashes.contains(&entry.keyed_hash)
-            {
+            if self.seen_proof_ids.contains(&entry.proof_id) {
                 continue;
             }
             batch_seen_proof_ids.insert(entry.proof_id);

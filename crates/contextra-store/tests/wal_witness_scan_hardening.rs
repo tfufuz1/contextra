@@ -8,10 +8,10 @@
 //! - Unklassifizierte Dateien invalidieren den Beweis.
 //! - Tail-Inspektion mit Raw-Needles laeuft auch unter encrypted_mode.
 
-use contextra_types::{ContextraError, TxId};
 use contextra_store::wal::{
     classify_wal_filename, scan_wal_directory, Wal, WalFileType, WalOp, WalScanInputs, WalScopeSpec,
 };
+use contextra_types::{ContextraError, TxId};
 use std::time::Duration;
 use tempfile::tempdir;
 

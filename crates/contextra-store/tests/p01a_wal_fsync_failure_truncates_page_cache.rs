@@ -32,7 +32,9 @@ async fn test_wal_fsync_failure_truncates_page_cache() -> Result<()> {
 
     // Step 2: Trigger fsync failure on second batch append
     #[cfg(feature = "fault-injection")]
-    wal.fault_plan().fail_sync_once.store(true, std::sync::atomic::Ordering::SeqCst);
+    wal.fault_plan()
+        .fail_sync_once
+        .store(true, std::sync::atomic::Ordering::SeqCst);
 
     let op2 = WalOp::Put {
         tx_id: TxId::new(2),

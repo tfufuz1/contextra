@@ -1,9 +1,9 @@
 use contextra_ports::erasure::{ErasureBackend, FreeSpaceProbe, LogicalScope, ProbeError, PurgeId};
-use contextra_types::{CollectionId, DocId, TenantId, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::{CollectionId, DocId, TenantId, TxId};
+use proptest::prelude::*;
 use std::sync::Arc;
 use tempfile::tempdir;
-use proptest::prelude::*;
 
 struct DummyProbe;
 impl FreeSpaceProbe for DummyProbe {
@@ -116,9 +116,15 @@ fn test_f6_purge_physical_outside_tokio_runtime_succeeds() {
 
     // Called outside tokio runtime context
     let result = storage.purge_physical(&phys_scope, tx, &probe);
-    assert!(result.is_ok(), "Expected purge_physical outside tokio runtime to succeed, got {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Expected purge_physical outside tokio runtime to succeed, got {:?}",
+        result
+    );
 
-    rt.block_on(async { storage.close().await.unwrap(); });
+    rt.block_on(async {
+        storage.close().await.unwrap();
+    });
 }
 
 #[tokio::test]
@@ -151,7 +157,10 @@ async fn test_f6_purge_physical_in_tokio_runtime_returns_io_error() {
                 msg
             );
         }
-        other => panic!("Expected PurgeError::Io when called inside Tokio runtime, got {:?}", other),
+        other => panic!(
+            "Expected PurgeError::Io when called inside Tokio runtime, got {:?}",
+            other
+        ),
     }
 
     storage.close().await.unwrap();
@@ -193,7 +202,9 @@ async fn test_f7_acquire_fence_isolation_and_drop() {
     // Key in tenant2 or col2 SHOULD NOT be fenced (F7 isolation requirement)
     let other_tenant_key = format!("t:202:10:doc:1").into_bytes();
     assert!(
-        storage.erasure_fence().check_write_allowed(&other_tenant_key),
+        storage
+            .erasure_fence()
+            .check_write_allowed(&other_tenant_key),
         "Writes to another tenant must not be fenced by document fence"
     );
 

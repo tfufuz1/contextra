@@ -53,13 +53,20 @@ async fn test_wal_retire_replay_error_propagates_and_preserves_hashes() -> Resul
     fs::write(&seg2_path, b"CORRUPTED_GARBAGE_WAL_DATA_HEADER_INVALID").unwrap();
 
     let pre_hashes = compute_file_hashes(dir_path);
-    assert_eq!(pre_hashes.len(), 2, "Expected 2 files before retirement attempt");
+    assert_eq!(
+        pre_hashes.len(),
+        2,
+        "Expected 2 files before retirement attempt"
+    );
 
     // Call retire_segments_up_to
     let res = retire_segments_up_to(dir_path, 100).await;
 
     // Assert it returns Err
-    assert!(res.is_err(), "retire_segments_up_to must propagate replay error as Err");
+    assert!(
+        res.is_err(),
+        "retire_segments_up_to must propagate replay error as Err"
+    );
 
     // Assert file hashes before and after failure are identical
     let post_hashes = compute_file_hashes(dir_path);

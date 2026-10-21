@@ -3,8 +3,8 @@
 //! against an independent `BTreeMap`-based reference model tracking active transactions, MVCC versions, and committed history.
 
 use contextra_ports::storage::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
 use std::collections::{BTreeMap, BTreeSet};

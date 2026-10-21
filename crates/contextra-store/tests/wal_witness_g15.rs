@@ -7,8 +7,8 @@
 //! because SSTable tombstone takes precedence over missing WAL log entries.
 
 use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::{ContextraError, TxId};
 use tempfile::tempdir;
 
 #[tokio::test]

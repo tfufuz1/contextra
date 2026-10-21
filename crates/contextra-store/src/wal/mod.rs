@@ -5,6 +5,7 @@
 //! - I-3 (Crash-Konsistenz): Restores Log up to last HMAC-verified frame.
 //! - I-5 (Poison-State Isolation): Flusher panics in close() are evaluated and propagated as ContextraError::Internal.
 
+pub mod anchor;
 pub mod encode;
 pub mod flusher;
 pub mod hmac;
@@ -24,6 +25,7 @@ mod tests;
 #[cfg(test)]
 mod open_heal_tests;
 
+pub use anchor::*;
 pub use encode::*;
 pub use flusher::*;
 #[cfg(feature = "wal-integrity")]
@@ -287,9 +289,9 @@ pub(crate) mod fs {
     pub type File = LoomFile;
 }
 
-use contextra_types::{ContextraError, Result};
 #[cfg(feature = "wal-integrity")]
 pub use contextra_crypto::crypto::KeyManager;
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -302,7 +304,10 @@ impl KeyManager {
     pub fn try_new(_passphrase: &str, _salt: &[u8]) -> Result<Self> {
         Ok(Self)
     }
-    pub fn try_new_strict(_passphrase: &str, _header: &contextra_crypto::kdf::KdfHeader) -> Result<Self> {
+    pub fn try_new_strict(
+        _passphrase: &str,
+        _header: &contextra_crypto::kdf::KdfHeader,
+    ) -> Result<Self> {
         Ok(Self)
     }
     pub fn derive_file_key(&self, _file_id: &[u8]) -> Result<Self> {

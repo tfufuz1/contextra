@@ -1,4 +1,4 @@
-// ZWECK: WalObserver Interface, Circuit-Breaker und Bounded-Dispatcher für Fail-Closed Commit-Sicherheit.
+// ZWECK: WalObserver Interface, Circuit-Breaker und non-blocking Bounded-Dispatcher für Fail-Closed Commit-Sicherheit.
 
 use crate::wal::{WalEntry, WalOp};
 use contextra_ports::{Clock, SystemClock};
@@ -239,6 +239,17 @@ pub struct ObserverRegistry {
     historical_drops: Arc<AtomicU64>,
     max_observer_latency: parking_lot::RwLock<Duration>,
     clock: parking_lot::RwLock<Arc<dyn Clock>>,
+}
+
+impl Clone for ObserverRegistry {
+    fn clone(&self) -> Self {
+        Self {
+            observers: parking_lot::RwLock::new(self.observers.read().clone()),
+            historical_drops: Arc::clone(&self.historical_drops),
+            max_observer_latency: parking_lot::RwLock::new(*self.max_observer_latency.read()),
+            clock: parking_lot::RwLock::new(self.clock.read().clone()),
+        }
+    }
 }
 
 impl Default for ObserverRegistry {

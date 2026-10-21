@@ -305,7 +305,8 @@ fn arb_wal_op() -> impl Strategy<Value = WalOp> {
             .prop_map(|(tx_id, key, value)| WalOp::Put { tx_id, key, value }),
         (arb_tx_id(), prop::collection::vec(any::<u8>(), 0..2048))
             .prop_map(|(tx_id, key)| WalOp::Delete { tx_id, key }),
-        (arb_tx_id(), any::<bool>()).prop_map(|(tx_id, committed)| WalOp::TxEnd { tx_id, committed }),
+        (arb_tx_id(), any::<bool>())
+            .prop_map(|(tx_id, committed)| WalOp::TxEnd { tx_id, committed }),
     ]
 }
 

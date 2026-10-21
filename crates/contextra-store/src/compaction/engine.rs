@@ -10,9 +10,9 @@ use super::merge_operator::MergeOperator;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
 use contextra_crypto::{KeyId, ScopeKeyring};
-use contextra_types::{Result, TOMBSTONE_BIT};
-use contextra_ports::StorageStats;
 use contextra_mvcc::snapshot::SnapshotFloor;
+use contextra_ports::StorageStats;
+use contextra_types::{Result, TOMBSTONE_BIT};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 
@@ -176,9 +176,7 @@ impl CompactionEngine {
         // happen atomically under one lock acquisition to prevent TOCTOU race conditions.
         let (mut input_ssts, is_full_compaction) = {
             let ssts = sstables.read().await;
-            if self.purge_scope.read().is_none()
-                && ssts.len() < self.config.min_sstables_per_tier
-            {
+            if self.purge_scope.read().is_none() && ssts.len() < self.config.min_sstables_per_tier {
                 return Ok(false);
             }
 
@@ -421,12 +419,12 @@ impl CompactionEngine {
         ssts: &[Arc<SstableReader>],
     ) -> Option<Vec<Arc<SstableReader>>> {
         if let Some((ref scope, ref probe)) = *self.purge_scope.read() {
-            let probe_ref = probe.as_ref().map(|p| &**p as &dyn super::purge_filter::FreeSpaceProbe);
-            if let Ok(candidates) = super::purge_select::select_purge_candidates(
-                ssts,
-                scope,
-                probe_ref,
-            ) {
+            let probe_ref = probe
+                .as_ref()
+                .map(|p| &**p as &dyn super::purge_filter::FreeSpaceProbe);
+            if let Ok(candidates) =
+                super::purge_select::select_purge_candidates(ssts, scope, probe_ref)
+            {
                 if !candidates.is_empty() {
                     return Some(candidates);
                 }
@@ -503,8 +501,9 @@ impl CompactionEngine {
                     tokio::time::sleep(std::time::Duration::from_nanos(delay_nanos)).await;
                     let now_after_nanos = self.clock.monotonic_nanos();
                     let effective_now = now_after_nanos.max(*io_last_reset_nanos + delay_nanos);
-                    let total_elapsed_secs =
-                        (effective_now.saturating_sub(*io_last_reset_nanos)) as f64 / 1_000_000_000.0;
+                    let total_elapsed_secs = (effective_now.saturating_sub(*io_last_reset_nanos))
+                        as f64
+                        / 1_000_000_000.0;
                     let allowed_bytes = (total_elapsed_secs * max_bps as f64) as u64;
                     *io_bytes_written = io_bytes_written.saturating_sub(allowed_bytes);
                     *io_last_reset_nanos = effective_now;
@@ -689,10 +688,16 @@ impl CompactionEngine {
                 // FIND-STO-002: Budgeted Compaction
                 if !self.budget.has_memory_capacity() {
                     let wait_start_nanos = self.clock.monotonic_nanos();
-                    let max_wait_nanos = u64::try_from(self.config.max_backpressure_wait.as_nanos())
-                        .unwrap_or(u64::MAX);
+                    let max_wait_nanos =
+                        u64::try_from(self.config.max_backpressure_wait.as_nanos())
+                            .unwrap_or(u64::MAX);
                     while !self.budget.has_memory_capacity() {
-                        if self.clock.monotonic_nanos().saturating_sub(wait_start_nanos) >= max_wait_nanos {
+                        if self
+                            .clock
+                            .monotonic_nanos()
+                            .saturating_sub(wait_start_nanos)
+                            >= max_wait_nanos
+                        {
                             let limit_bytes =
                                 self.config.max_memory_bytes.unwrap_or(128 * 1024 * 1024);
                             let used_mb = limit_bytes.div_ceil(1024 * 1024);
@@ -1050,7 +1055,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_manual_clock_rate_limiting_deterministic() -> Result<()> {
-        let tmp = TempDir::new().map_err(|e| contextra_types::ContextraError::Storage(e.to_string()))?;
+        let tmp =
+            TempDir::new().map_err(|e| contextra_types::ContextraError::Storage(e.to_string()))?;
         let registry = Arc::new(contextra_mvcc::SnapshotRegistry::new());
         let bc = create_block_cache(1);
         let manual_clock = Arc::new(contextra_ports::SystemClock::new());
@@ -1080,7 +1086,9 @@ mod tests {
         for i in 0..2u8 {
             let sst_path = tmp.path().join(format!("rate-sst-{i}.sst"));
             let mut builder = crate::sstable::SstableBuilder::create(&sst_path).await?;
-            builder.add(format!("k-{i}").as_bytes(), b"value-bytes", i as u64 + 1, 1).await?;
+            builder
+                .add(format!("k-{i}").as_bytes(), b"value-bytes", i as u64 + 1, 1)
+                .await?;
             builder.finish().await?;
 
             let reader = Arc::new(

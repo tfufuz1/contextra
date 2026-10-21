@@ -7,8 +7,8 @@
 //! a failing transaction undergoing WAL HMAC rollback and a concurrent successful commit.
 
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -64,7 +64,10 @@ async fn test_concurrent_commit_during_wal_rollback_preserves_hmac_chain() {
         .expect("put tx2 failed");
 
     // Activate fault injection hook specifically targeting tx1 (tx_id = 2)
-    storage.fault_plan().fail_append_for_tx.store(tx1.inner(), Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(tx1.inner(), Ordering::SeqCst);
 
     // Spawn concurrent commit tasks
     let task1 = tokio::spawn(async move { storage1.commit(tx1).await });

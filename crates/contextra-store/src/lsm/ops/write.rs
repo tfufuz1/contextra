@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
+// STAND: 2026-10-21
 // ZWECK: Implementiert Schreib- und Commit-Operationen (put, put_if_absent, delete, commit) für LsmStorage.
 // INVARIANTEN:
 // - Sperrenhierarchie: commit_mutex -> pending_commit_queue -> truncate_lock -> state.
@@ -8,14 +8,15 @@
 
 use super::super::config::DurabilityMode;
 use super::super::engine::LsmStorage;
-use super::super::fence::{fenced_keys_kv, FencedKey};
+use super::super::fence::{fenced_keys, FencedKey, InflightGuard};
 use super::super::group_commit::{
     execute_group_commit_append, GroupCommitRequest, GroupCommitSharedState, PendingCommitQueue,
     WalQueueGuard,
 };
-use super::super::observer::WriteOrigin;
+use super::super::observer::{CommitContext, WriteOrigin};
 use super::super::validate::{derive_doc_id, validate_key, validate_value};
 use super::super::{WalOp, MAX_BATCH_SIZE, MAX_GROUP_COMMIT_BATCH_SIZE};
+use bytes::Bytes;
 use contextra_mvcc::IndexOp;
 use contextra_mvcc::SsiValidator;
 use contextra_ports::StorageEngine;
@@ -366,28 +367,14 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         return Ok(());
     }
 
-    // TODO(WP-6 / PR-9 Schritt 2 / N8): Check-then-Act Race beheben:
-    // Befund N8: `is_active()` Check vor `InflightGuard::new` erzeugt ein TOCTOU-Fenster,
-    // in dem eine Löschtransaktion ein Erasure-Fence aktivieren kann, nachdem dieser Check
-    // passiert wurde, aber bevor der Inflight-Guard aktiv ist.
-    // Implementierung:
-    // `is_active()` Check und manuelle Scope-Prüfung entfernen und durch atomares
-    // `storage.erasure_fence().enter_write(...)` ersetzen, das ein RAII `WriteTicket` liefert.
-    // Check erasure fence permissions for all staged operations prior to commit
-    if storage.erasure_fence().is_active() {
-        for op in &ops {
-            let key = match op {
-                IndexOp::Insert { data, .. } => &data.0[..],
-                IndexOp::Delete { data, .. } => {
-                    if let Some((k, _)) = data {
-                        &k[..]
-                    } else {
-                        continue;
-                    }
-                }
-                _ => continue,
-            };
-            if let Err(e) = storage.erasure_fence().check_write_allowed_scope(key) {
+    // N8: Enter write scope atomically via enter_write
+    let write_ticket = {
+        let keys_to_check: Vec<FencedKey<'_>> = ops.iter().map(fenced_keys).collect();
+
+        storage
+            .erasure_fence()
+            .enter_write(keys_to_check)
+            .map_err(|e| {
                 storage.cleanup_intent_locks_for_tx(tx_id);
                 ContextraError::Storage(format!("Commit rejected by erasure fence: {e}"))
             })?
@@ -440,8 +427,20 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
         let durability_mode = storage.config.durability_mode;
         let wal_for_rollback = wal.clone();
 
+        let state = storage.state.read().await;
+        let memtable = Arc::clone(&state.memtable);
+        drop(state);
+
+        let budget = Arc::clone(&storage.budget);
+        let compaction_engine = Arc::clone(&storage.compaction_engine);
+        let last_applied_seq = Arc::clone(&storage.last_applied_seq);
+        let observer_registry = storage.observer_registry.clone();
+        let has_observers = storage.has_observers();
+        let memtable_limit = storage.config.memtable_size_limit;
+        let flush_notify = Arc::clone(&storage.flush_notify);
+
         let append_handle = tokio::spawn(async move {
-            match durability_mode {
+            let append_res = match durability_mode {
                 DurabilityMode::Full | DurabilityMode::WalNoHmac => {
                     // TODO(WP-ST3 / PR-27): Locks über I/O minimieren/optimieren:
                     // `truncate_guard` wird über die gesamte Dauer des Datei-Appends und Fsyncs gehalten.
@@ -458,14 +457,7 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                         }
                         wal.rollback_hmac(prev_hmac).await;
                         if wal.is_poisoned() {
-                            match wal.recover_from_poison().await {
-                                Ok(()) => {
-                                    tracing::info!("WAL successfully recovered from poison state")
-                                }
-                                Err(rec_err) => tracing::error!(
-                                    "Failed to recover WAL from poison state: {rec_err}"
-                                ),
-                            }
+                            let _ = wal.recover_from_poison().await;
                         }
                         drop(truncate_guard);
                     } else {
@@ -474,7 +466,62 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                     append_res
                 }
                 DurabilityMode::MemoryOnly => Ok(()),
+            };
+
+            if append_res.is_err() {
+                return append_res;
             }
+
+            // S1 & S4: Apply memtable updates & advance visibility inside spawned task so cancellation cannot abort visibility
+            let mut max_seq = 0u64;
+            for (key, value, seq) in &mem_updates {
+                let raw_seq = seq & !TOMBSTONE_BIT;
+                if raw_seq > max_seq {
+                    max_seq = raw_seq;
+                }
+                let entry_size = key.len()
+                    + value.len()
+                    + contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES;
+                let _ = budget.consume_memory(entry_size as u64);
+                memtable.put(
+                    Bytes::from(key.clone()),
+                    Bytes::from(value.clone()),
+                    *seq,
+                    tx_id.inner(),
+                );
+                compaction_engine.record_write_op(*seq);
+            }
+            if max_seq > 0 {
+                let mut current = last_applied_seq.load(Ordering::Acquire);
+                while max_seq > current {
+                    match last_applied_seq.compare_exchange_weak(
+                        current,
+                        max_seq,
+                        Ordering::Release,
+                        Ordering::Relaxed,
+                    ) {
+                        Ok(_) => break,
+                        Err(actual) => current = actual,
+                    }
+                }
+            }
+
+            let is_durable = durability_mode != DurabilityMode::MemoryOnly;
+            if has_observers && !entries_for_observer.is_empty() {
+                let seq_no = entries_for_observer.last().map(|e| e.seq_no).unwrap_or(0);
+                let ctx = CommitContext {
+                    tx_id,
+                    origin: WriteOrigin::UserWrite,
+                    durable: is_durable,
+                };
+                let _ = observer_registry.notify_with_context(&entries_for_observer, seq_no, ctx);
+            }
+
+            if memtable.size() > memtable_limit {
+                flush_notify.notify_one();
+            }
+
+            Ok(())
         });
 
         let single_append_res = match append_handle.await {
@@ -483,6 +530,8 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
                 "WAL append task panicked: {join_err}"
             ))),
         };
+
+        drop(write_ticket);
 
         if let Err(e) = single_append_res {
             wal_for_rollback.rollback_hmac(prev_hmac).await;
@@ -495,30 +544,6 @@ async fn commit_internal(storage: &LsmStorage, tx_id: TxId) -> Result<()> {
             return Err(ContextraError::Storage(format!(
                 "Commit failed (at WAL append), WAL anchor rollback executed: {e}"
             )));
-        }
-
-        // TODO(WP-ST1 / PR-8 Schritte 1, 2, 4 / S1): Phantom-Commit Bug beheben:
-        // Befund S1: `notify_commit_observers` wird VOR `apply_mem_updates` aufgerufen und Fehler
-        // werden mit `?` propagiert. Schlägt ein Observer fehl, bricht die Funktion ab, obwohl der WAL
-        // bereits erfolgreich geschrieben wurde. Die Daten sind im WAL persistent, aber nicht in Memtable/Visibility.
-        // Implementierung:
-        // 1. Schritt 1: `notify_commit_observers` MUSS NACH `apply_mem_updates` und `advance_visibility` ausgeführt werden.
-        // 2. Schritt 2: Observer-Fehler dürfen den Commit nicht abbrechen (kein `?`). Bei Fehlern: Zähler inkrementieren + asynchronen Catch-up.
-        // 3. Schritt 4: Commit-Phase (Append -> Apply -> Visibility) in einem ununterbrechbaren Task kapseln.
-        let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
-        if let Err(obs_err) = storage.notify_commit_observers(
-            &entries_for_observer,
-            tx_id,
-            WriteOrigin::UserWrite,
-            is_durable,
-        ) {
-            tracing::warn!(tx = ?tx_id, error = %obs_err, "Commit observer notification encountered error; commit remains valid");
-        }
-
-        let should_flush = state.memtable.size() > storage.config.memtable_size_limit;
-        drop(state);
-        if should_flush {
-            storage.request_flush();
         }
 
         storage.cleanup_intent_locks_for_tx(tx_id);
