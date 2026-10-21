@@ -264,11 +264,6 @@ impl ContextraBuilder {
     /// Configures KV shredding / cryptographic deletion mode.
     pub fn with_kv_shredding(mut self, enabled: bool) -> Self {
         self.kv_shredding_enabled = enabled;
-        if enabled {
-            self.config.vector_delete_mode = contextra_ports::VectorDeleteMode::CryptoShred;
-        } else {
-            self.config.vector_delete_mode = contextra_ports::VectorDeleteMode::BackgroundRepair;
-        }
         self
     }
 
@@ -351,7 +346,6 @@ impl ContextraBuilder {
 
     pub fn kv_shredding_enabled(&self) -> bool {
         self.kv_shredding_enabled
-            || self.config.vector_delete_mode == contextra_ports::VectorDeleteMode::CryptoShred
     }
 
     pub fn checkpoint_enabled(&self) -> bool {
