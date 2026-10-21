@@ -59,7 +59,7 @@ pub use orphan::{
 pub use restore_filter::{
     filter_restore_records, filter_restore_records_with_report, CpyRestoreFilter, RestoreFilterReport, RestorePolicy,
 };
-#[cfg(any(test, feature = "testing"))]
+#[cfg(any(test, feature = "test-utils"))]
 pub use restore_filter::NoOpRestoreFilter;
 pub use store::{purge_registered_checkpoint, CheckpointRegistry, PersistentCheckpointStore};
 

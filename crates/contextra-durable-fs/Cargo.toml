@@ -12,8 +12,13 @@ description = "Durable filesystem operations and synchronous disk flushing for C
 [package.metadata.contextra]
 ring = "0"
 
+[features]
+default = []
+test-utils = []
+
 [dependencies]
 contextra-sys = { path = "../contextra-sys", version = "0.1.0" }
+tracing = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

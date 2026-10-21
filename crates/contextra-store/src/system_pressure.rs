@@ -217,7 +217,7 @@ impl SystemPressureMonitor {
                         last_level = pressure.pressure_level;
                     }
 
-                    let _ = self.pressure_tx.send(pressure);
+                    let _ = self.pressure_tx.send(pressure); // INTENTIONAL-DROP: Non-blocking pressure broadcast notify; channel disconnect on engine shutdown is non-fatal.
                 }
             }
         }
@@ -316,7 +316,7 @@ mod tests {
         assert_eq!(updated.pressure_level, PressureLevel::Critical);
 
         cancellation.cancel();
-        let _ = handle.await;
+        let _ = handle.await; // INTENTIONAL-DROP: Test join handle drop after test cancellation.
     }
 
     #[tokio::test]
@@ -359,9 +359,9 @@ mod tests {
         );
 
         cancellation.cancel();
-        let _ = handle.await;
+        let _ = handle.await; // INTENTIONAL-DROP: Test join handle drop after test cancellation.
         for h in handles {
-            let _ = h.await;
+            let _ = h.await; // INTENTIONAL-DROP: Test join handles cleanup on test teardown.
         }
     }
 }

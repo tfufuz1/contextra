@@ -831,6 +831,7 @@ version = "0.1.0"
 dependencies = [
  "contextra-sys",
  "tempfile",
+ "tracing",
 ]
 
 [[package]]
@@ -1206,6 +1207,7 @@ dependencies = [
  "arc-swap",
  "blake3",
  "bytes",
+ "contextra-checkpoint",
  "contextra-core",
  "contextra-crypto",
  "contextra-durable-fs",
@@ -1235,6 +1237,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "trybuild",
  "uuid",
  "windows-sys 0.61.2",
  "zeroize",
