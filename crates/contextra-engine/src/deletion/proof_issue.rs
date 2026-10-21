@@ -12,10 +12,38 @@ use contextra_crypto::deletion_proof::proof_store::ProofStoreWarning;
 use contextra_crypto::deletion_proof::signer::{ProofKeyPairSigner, ProofSigner};
 use contextra_crypto::deletion_proof::types::{DeletionScope, ExcludedScope};
 use contextra_crypto::deletion_witness::LayerWitness;
-use contextra_sys::OsCryptoRng;
+use contextra_ports::{OsEntropyRng, SecretBytes};
 use contextra_types::{ContextraError, Result, TxId};
 use tracing::error;
 use zeroize::Zeroizing;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
+/// Validates that a key file is not a symlink and has strict 0600 permissions on Unix.
+fn check_key_file_security(path: &Path) -> Result<()> {
+    let meta = std::fs::symlink_metadata(path).map_err(|e| {
+        ContextraError::Crypto(format!("Failed to stat key file '{path:?}': {e}"))
+    })?;
+
+    if meta.file_type().is_symlink() {
+        return Err(ContextraError::Crypto(format!(
+            "Signer key file '{path:?}' cannot be a symlink"
+        )));
+    }
+
+    #[cfg(unix)]
+    {
+        let mode = meta.permissions().mode() & 0o777;
+        if mode != 0o600 {
+            return Err(ContextraError::Crypto(format!(
+                "Signer key file '{path:?}' permissions must be 0600, got 0{mode:o}"
+            )));
+        }
+    }
+
+    Ok(())
+}
 
 use super::copy_observer::DpiCopyObserverReport;
 use super::environment::observe_environment;
@@ -48,10 +76,7 @@ impl FileOrCsprngSignerSource {
 impl ProofSignerSource for FileOrCsprngSignerSource {
     fn get_signer_seed(&self) -> Result<Zeroizing<[u8; 32]>> {
         if self.key_path.exists() {
-            let _validated_signer =
-                ProofKeyPairSigner::load_from_file(&self.key_path).map_err(|e| {
-                    ContextraError::Crypto(format!("Failed to load Ed25519 signer key: {e}"))
-                })?;
+            check_key_file_security(&self.key_path)?;
 
             let raw_bytes = std::fs::read(&self.key_path)
                 .map_err(|e| ContextraError::Crypto(format!("Failed to read key file: {e}")))?;
@@ -73,9 +98,11 @@ impl ProofSignerSource for FileOrCsprngSignerSource {
                 })?;
             }
 
-            let os_rng = OsCryptoRng::new();
-            let mut secret = [0u8; 32];
-            os_rng.fill_bytes(&mut secret);
+            let os_rng = OsEntropyRng::new();
+            let secret_bytes = SecretBytes::<32>::generate(&os_rng).map_err(|e| {
+                ContextraError::Crypto(format!("Failed to generate CSPRNG secret key: {e}"))
+            })?;
+            let secret = *secret_bytes.expose();
 
             let mut options = std::fs::OpenOptions::new();
             options.write(true).create_new(true);
@@ -98,36 +125,27 @@ impl ProofSignerSource for FileOrCsprngSignerSource {
                     {
                         let _ = contextra_sys::set_restrictive_file_acl(&self.key_path);
                     }
+                    Ok(Zeroizing::new(secret))
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                    let mut loaded = None;
-                    for _ in 0..50 {
-                        if let Ok(_keypair) = ProofKeyPairSigner::load_from_file(&self.key_path) {
-                            if let Ok(bytes) = std::fs::read(&self.key_path) {
-                                if bytes.len() == 32 {
-                                    let mut sec = [0u8; 32];
-                                    sec.copy_from_slice(&bytes);
-                                    loaded = Some(sec);
-                                    break;
-                                }
-                            }
-                        }
-                        std::thread::yield_now();
-                    }
-                    secret = loaded.ok_or_else(|| {
-                        ContextraError::Crypto(
-                            "Timed out waiting for concurrent signer key creation".to_string(),
-                        )
+                    check_key_file_security(&self.key_path)?;
+                    let bytes = std::fs::read(&self.key_path).map_err(|e| {
+                        ContextraError::Crypto(format!("Failed to read key file: {e}"))
                     })?;
+                    if bytes.len() != 32 {
+                        return Err(ContextraError::Crypto(format!(
+                            "Invalid key file length: expected 32 bytes, got {}",
+                            bytes.len()
+                        )));
+                    }
+                    let mut sec = [0u8; 32];
+                    sec.copy_from_slice(&bytes);
+                    Ok(Zeroizing::new(sec))
                 }
-                Err(e) => {
-                    return Err(ContextraError::Crypto(format!(
-                        "Failed to create signer key file: {e}"
-                    )));
-                }
+                Err(e) => Err(ContextraError::Crypto(format!(
+                    "Failed to create signer key file: {e}"
+                ))),
             }
-
-            Ok(Zeroizing::new(secret))
         }
     }
 }

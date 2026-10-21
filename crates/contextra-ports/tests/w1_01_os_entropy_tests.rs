@@ -1,4 +1,4 @@
-use contextra_ports::{EntropyRng, OsEntropyRng, RngError, SecretBytes};
+use contextra_ports::{CryptoRng, EntropyRng, OsEntropyRng, RngError, SecretBytes};
 
 #[test]
 fn os_entropy_fills_and_differs_between_calls() {
@@ -21,6 +21,13 @@ fn os_entropy_fills_and_differs_between_calls() {
 #[test]
 fn os_entropy_error_propagates() {
     struct FailingEntropyRng;
+    impl CryptoRng for FailingEntropyRng {
+        fn fill_secret(&self, _dest: &mut [u8]) -> Result<(), RngError> {
+            Err(RngError::Unavailable(
+                "simulated OS entropy failure".to_string(),
+            ))
+        }
+    }
     impl EntropyRng for FailingEntropyRng {
         fn fill_bytes(&self, dest: &mut [u8]) {
             dest.fill(0);
@@ -28,10 +35,8 @@ fn os_entropy_error_propagates() {
         fn next_u64(&self) -> u64 {
             0
         }
-        fn fill_secret(&self, _dest: &mut [u8]) -> Result<(), RngError> {
-            Err(RngError::Unavailable(
-                "simulated OS entropy failure".to_string(),
-            ))
+        fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
+            CryptoRng::fill_secret(self, dest)
         }
     }
 

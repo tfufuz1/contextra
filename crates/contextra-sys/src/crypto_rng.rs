@@ -1,8 +1,6 @@
 //! OS-backed cryptographically secure random number generator (Ring 0).
 
-use rand::RngCore;
-
-/// Cryptographically secure OS-backed random number generator backed by [`rand::rngs::OsRng`].
+/// Cryptographically secure OS-backed random number generator backed by [`getrandom::getrandom`].
 ///
 /// Guaranteed to draw entropy directly from OS CSPRNG syscalls (e.g., `getrandom` / `getentropy` / `CryptGenRandom`).
 #[derive(Debug, Default, Clone, Copy)]
@@ -16,17 +14,31 @@ impl OsCryptoRng {
 
     /// Generates the next pseudorandom 64-bit unsigned integer using OS CSPRNG.
     pub fn next_u64(&self) -> u64 {
-        rand::rngs::OsRng.next_u64()
+        let mut buf = [0u8; 8];
+        let _ = getrandom::getrandom(&mut buf);
+        u64::from_le_bytes(buf)
     }
 
     /// Fills `dest` with cryptographically secure pseudorandom bytes using OS CSPRNG.
     pub fn fill_bytes(&self, dest: &mut [u8]) {
-        rand::rngs::OsRng.fill_bytes(dest);
+        let _ = getrandom::getrandom(dest);
+    }
+
+    /// Fills `dest` with cryptographically secure bytes, returning a Result if OS entropy is unavailable.
+    pub fn fill_secret(&self, dest: &mut [u8]) -> Result<(), String> {
+        getrandom::getrandom(dest)
+            .map_err(|e| format!("getrandom OS CSPRNG call failed: {e}"))
     }
 }
 
 #[cfg(feature = "ports")]
-impl contextra_ports::CryptoRng for OsCryptoRng {}
+impl contextra_ports::CryptoRng for OsCryptoRng {
+    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), contextra_ports::RngError> {
+        getrandom::getrandom(dest).map_err(|e| {
+            contextra_ports::RngError::Unavailable(format!("OS entropy source unavailable: {e}"))
+        })
+    }
+}
 
 #[cfg(feature = "ports")]
 impl contextra_ports::EntropyRng for OsCryptoRng {
@@ -37,21 +49,9 @@ impl contextra_ports::EntropyRng for OsCryptoRng {
     fn next_u64(&self) -> u64 {
         OsCryptoRng::next_u64(self)
     }
-}
 
-#[cfg(feature = "ports")]
-impl contextra_ports::SeededRng for OsCryptoRng {
-    fn next_u64(&self) -> u64 {
-        OsCryptoRng::next_u64(self)
-    }
-
-    fn fill_bytes(&self, dest: &mut [u8]) {
-        OsCryptoRng::fill_bytes(self, dest);
-    }
-
-    fn next_unit_f64(&self) -> f64 {
-        let mantissa = OsCryptoRng::next_u64(self) >> 11;
-        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
+    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), contextra_ports::RngError> {
+        contextra_ports::CryptoRng::fill_secret(self, dest)
     }
 }
 

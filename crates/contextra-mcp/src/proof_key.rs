@@ -85,6 +85,9 @@ pub(crate) fn resolve_deletion_proof_key(
 /// und gibt bei Warnzuständen einmalige `tracing::warn!`-Meldungen aus.
 pub fn deletion_proof_key_from_env() -> Result<Zeroizing<String>, McpError> {
     let res = crate::proof_key_env::resolve_proof_key_from_env();
+    if let Some(err) = res.error {
+        return Err(McpError::invalid_params(err));
+    }
     res.key
         .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))
 }

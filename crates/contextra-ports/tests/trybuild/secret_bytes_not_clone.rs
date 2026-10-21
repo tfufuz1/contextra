@@ -1,6 +1,12 @@
-use contextra_ports::{EntropyRng, SecretBytes};
+use contextra_ports::{CryptoRng, EntropyRng, SecretBytes};
 
 struct MockEntropy;
+impl CryptoRng for MockEntropy {
+    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), contextra_ports::RngError> {
+        dest.fill(1);
+        Ok(())
+    }
+}
 impl EntropyRng for MockEntropy {
     fn fill_bytes(&self, dest: &mut [u8]) {
         dest.fill(1);

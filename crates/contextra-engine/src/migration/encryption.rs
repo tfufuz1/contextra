@@ -94,8 +94,10 @@ pub async fn migrate_database_encryption(
             .map_err(|e| ContextraError::Storage(format!("Failed to read SALT: {e}")))?
     } else {
         let mut buf = [0u8; 32];
-        let rng = contextra_ports::SystemRng::new();
-        contextra_ports::Rng::fill_bytes(&rng, &mut buf);
+        let rng = contextra_ports::OsEntropyRng::new();
+        contextra_ports::CryptoRng::fill_secret(&rng, &mut buf).map_err(|e| {
+            ContextraError::Crypto(format!("Failed to generate SALT entropy: {e}"))
+        })?;
         tokio::fs::write(&salt_path, &buf)
             .await
             .map_err(|e| ContextraError::Storage(format!("Failed to write SALT: {e}")))?;

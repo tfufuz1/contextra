@@ -10,6 +10,8 @@ pub enum VectorDeleteMode {
     SynchronousRepair,
     /// Asynchronous background graph repair during vector deletion.
     BackgroundRepair,
+    /// Cryptographic shredding for vector deletion.
+    CryptoShred,
 }
 
 impl Default for VectorDeleteMode {

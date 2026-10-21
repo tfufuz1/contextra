@@ -19,6 +19,7 @@ pub mod wiring;
 
 pub use wiring::SysWiring;
 
+pub use crypto_rng::OsCryptoRng;
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
 pub use aligned::{AlignedBuf, ALIGNMENT};
 #[allow(deprecated)]

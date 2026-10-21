@@ -1,6 +1,12 @@
-use contextra_ports::{EntropyRng, RngError, SecretBytes};
+use contextra_ports::{CryptoRng, EntropyRng, RngError, SecretBytes};
 
 struct DummyEntropy;
+impl CryptoRng for DummyEntropy {
+    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
+        dest.fill(0x11);
+        Ok(())
+    }
+}
 impl EntropyRng for DummyEntropy {
     fn fill_bytes(&self, dest: &mut [u8]) {
         dest.fill(0x11);
@@ -21,7 +27,7 @@ fn secret_bytes_not_clone_and_debug_redacted() {
 
     let debug_str = format!("{:?}", sec);
     assert!(
-        debug_str.contains("redacted"),
+        debug_str.to_lowercase().contains("redacted"),
         "Debug string must contain 'redacted', got: {}",
         debug_str
     );
@@ -34,6 +40,12 @@ fn secret_bytes_not_clone_and_debug_redacted() {
 #[test]
 fn secret_bytes_ct_eq_semantics() {
     struct CustomEntropy(u8);
+    impl CryptoRng for CustomEntropy {
+        fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
+            dest.fill(self.0);
+            Ok(())
+        }
+    }
     impl EntropyRng for CustomEntropy {
         fn fill_bytes(&self, dest: &mut [u8]) {
             dest.fill(self.0);

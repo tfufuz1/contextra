@@ -1,11 +1,10 @@
-error[E0277]: the trait bound `MockSeededRng: EntropyRng` is not satisfied
+error[E0277]: the trait bound `MockSeededRng: CryptoRng` is not satisfied
   --> tests/trybuild/seeded_rng_does_not_implement_entropy_rng.rs:19:41
    |
 19 |     let _ = SecretBytes::<32>::generate(&rng);
-   |                                         ^^^^ the trait `EntropyRng` is not implemented for `MockSeededRng`
+   |                                         ^^^^ the trait `CryptoRng` is not implemented for `MockSeededRng`
    |
-   = help: the following other types implement trait `EntropyRng`:
+   = help: the following other types implement trait `CryptoRng`:
              Arc<T>
              OsEntropyRng
-             SystemRng
-   = note: required for the cast from `&MockSeededRng` to `&(dyn EntropyRng + 'static)`
+   = note: required for the cast from `&MockSeededRng` to `&dyn CryptoRng`

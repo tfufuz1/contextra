@@ -6,10 +6,14 @@
 use contextra_mcp::deletion_proof_key_from_env;
 use std::fs::File;
 use std::io::Write;
+use std::sync::Mutex;
 use tempfile::NamedTempFile;
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 #[test]
 fn test_short_key_rejected() {
+    let _guard = ENV_LOCK.lock().unwrap();
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY_FILE");
     std::env::remove_var("CONTEXTRA_PROOF_KEY_FILE");
     std::env::remove_var("CONTEXTRA_PROOF_KEY");
@@ -30,6 +34,7 @@ fn test_short_key_rejected() {
 
 #[test]
 fn test_null_key_rejected() {
+    let _guard = ENV_LOCK.lock().unwrap();
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY_FILE");
     std::env::remove_var("CONTEXTRA_PROOF_KEY_FILE");
     std::env::remove_var("CONTEXTRA_PROOF_KEY");
@@ -54,6 +59,7 @@ fn test_null_key_rejected() {
 
 #[test]
 fn test_repeating_pattern_key_rejected() {
+    let _guard = ENV_LOCK.lock().unwrap();
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY_FILE");
     std::env::remove_var("CONTEXTRA_PROOF_KEY_FILE");
     std::env::remove_var("CONTEXTRA_PROOF_KEY");
@@ -87,6 +93,7 @@ fn test_repeating_pattern_key_rejected() {
 
 #[test]
 fn test_low_entropy_key_rejected() {
+    let _guard = ENV_LOCK.lock().unwrap();
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY_FILE");
     std::env::remove_var("CONTEXTRA_PROOF_KEY_FILE");
     std::env::remove_var("CONTEXTRA_PROOF_KEY");
@@ -108,6 +115,7 @@ fn test_low_entropy_key_rejected() {
 
 #[test]
 fn test_known_dummy_key_rejected() {
+    let _guard = ENV_LOCK.lock().unwrap();
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY_FILE");
     std::env::remove_var("CONTEXTRA_PROOF_KEY_FILE");
     std::env::remove_var("CONTEXTRA_PROOF_KEY");
@@ -128,6 +136,7 @@ fn test_known_dummy_key_rejected() {
 
 #[test]
 fn test_key_file_with_permissive_permissions_rejected() {
+    let _guard = ENV_LOCK.lock().unwrap();
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
     std::env::remove_var("CONTEXTRA_PROOF_KEY");
 
@@ -167,6 +176,7 @@ fn test_key_file_with_permissive_permissions_rejected() {
 
 #[test]
 fn test_valid_key_file_with_0600_permissions_accepted() {
+    let _guard = ENV_LOCK.lock().unwrap();
     std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
     std::env::remove_var("CONTEXTRA_PROOF_KEY");
 

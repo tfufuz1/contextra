@@ -1,6 +1,6 @@
 //! OS-backed cryptographic entropy source using `getrandom`.
 
-use crate::rng::{EntropyRng, RngError};
+use crate::rng::{CryptoRng, EntropyRng, RngError};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 static POISONED: AtomicBool = AtomicBool::new(false);
@@ -30,7 +30,7 @@ impl OsEntropyRng {
     }
 }
 
-impl EntropyRng for OsEntropyRng {
+impl CryptoRng for OsEntropyRng {
     fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
         if POISONED.load(Ordering::SeqCst) {
             return Err(RngError::Unavailable(
@@ -48,6 +48,12 @@ impl EntropyRng for OsEntropyRng {
         }
 
         Ok(())
+    }
+}
+
+impl EntropyRng for OsEntropyRng {
+    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
+        CryptoRng::fill_secret(self, dest)
     }
 
     fn fill_bytes(&self, dest: &mut [u8]) {

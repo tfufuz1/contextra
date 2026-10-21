@@ -51,26 +51,24 @@ pub fn validate_proof_key_quality(bytes: &[u8]) -> Result<(), String> {
         ));
     }
 
-    if bytes.iter().all(|&b| b == 0) {
-        return Err("deletion proof key quality error: key cannot be all zero bytes".to_string());
+    if bytes.iter().all(|&b| b == 0 || b == b'0') {
+        return Err("deletion proof key quality error: null key rejected".to_string());
     }
 
     let first = bytes[0];
     if bytes.iter().all(|&b| b == first) {
-        return Err(
-            "deletion proof key quality error: key cannot consist of repeated single character"
-                .to_string(),
-        );
+        return Err("deletion proof key quality error: repeating pattern rejected".to_string());
     }
 
     // Prüfe auf offensichtliche Dummys / Testschlüssel
-    if bytes.windows(7).any(|w| w == b"default" || w == b"DEFAULT")
+    if bytes.windows(6).any(|w| w == b"change" || w == b"CHANGE")
+        || bytes.windows(7).any(|w| w == b"default" || w == b"DEFAULT")
         || bytes.windows(4).any(|w| w == b"test" || w == b"TEST")
         || bytes.windows(6).any(|w| w == b"sample" || w == b"SAMPLE")
         || bytes.windows(5).any(|w| w == b"12345" || w == b"abcde")
     {
         return Err(
-            "deletion proof key quality error: key contains weak dummy/pattern sequences"
+            "deletion proof key quality error: known test/default key value rejected"
                 .to_string(),
         );
     }
@@ -87,7 +85,7 @@ pub fn validate_proof_key_quality(bytes: &[u8]) -> Result<(), String> {
 
     if distinct_count < 16 {
         return Err(format!(
-            "deletion proof key quality error: insufficient byte diversity (expected at least 16 distinct bytes, got {distinct_count})"
+            "deletion proof key quality error: insufficient entropy (expected at least 16 distinct bytes, got {distinct_count})"
         ));
     }
 
@@ -119,16 +117,15 @@ fn load_proof_key_from_file(path: &str) -> Result<Zeroizing<String>, String> {
             ));
         }
 
-        let file_uid = symlink_meta.uid();
-        let current_uid = std::env::var("USER_ID")
-            .or_else(|_| std::env::var("UID"))
-            .ok()
-            .and_then(|s| s.parse::<u32>().ok())
-            .unwrap_or(1000);
-        if file_uid != current_uid && file_uid != 0 {
-            return Err(format!(
-                "deletion proof key file error: key file ownership mismatch (file UID {file_uid}, running as UID {current_uid})"
-            ));
+        if let Some(uid_str) = std::env::var("USER_ID").ok().or_else(|| std::env::var("UID").ok()) {
+            if let Ok(expected_uid) = uid_str.parse::<u32>() {
+                let file_uid = symlink_meta.uid();
+                if file_uid != expected_uid && file_uid != 0 {
+                    return Err(format!(
+                        "deletion proof key file error: key file ownership mismatch (file UID {file_uid}, running as UID {expected_uid})"
+                    ));
+                }
+            }
         }
     }
 

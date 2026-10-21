@@ -4,7 +4,12 @@ use contextra_ports::{CryptoRng, EntropyRng, SecretBytes};
 use std::sync::Arc;
 
 struct MockCryptoRng;
-impl CryptoRng for MockCryptoRng {}
+impl CryptoRng for MockCryptoRng {
+    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), contextra_ports::RngError> {
+        dest.fill(0x77);
+        Ok(())
+    }
+}
 impl EntropyRng for MockCryptoRng {
     fn fill_bytes(&self, dest: &mut [u8]) {
         dest.fill(0x77);
