@@ -13,6 +13,27 @@ pub trait IdGenerator: Send + Sync + 'static {
 /// Alias for [`IdGenerator`] trait for specification naming compatibility.
 pub use IdGenerator as IdGen;
 
+/// Atomic sequential 64-bit ID generator.
+#[derive(Debug)]
+pub struct SequentialIdGen {
+    next: std::sync::atomic::AtomicU64,
+}
+
+impl SequentialIdGen {
+    /// Creates a new `SequentialIdGen` initialized with the starting seed.
+    pub fn new(seed: u64) -> Self {
+        Self {
+            next: std::sync::atomic::AtomicU64::new(seed),
+        }
+    }
+}
+
+impl IdGenerator for SequentialIdGen {
+    fn next_id(&self) -> u64 {
+        self.next.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
 impl<T: IdGenerator + ?Sized> IdGenerator for Arc<T> {
     fn next_id(&self) -> u64 {
         (**self).next_id()

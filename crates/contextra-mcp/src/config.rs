@@ -242,6 +242,49 @@ pub struct IpcConfig {
     pub expected_uid: Option<u32>,
 }
 
+/// Resolves or generates the master encryption passphrase for MCP DB opening.
+pub fn resolve_mcp_encryption_config(
+    db_path: &std::path::Path,
+    args: &[String],
+) -> (Option<String>, bool) {
+    if args.iter().any(|a| a == "--disable-encryption-at-rest")
+        || std::env::var("CONTEXTRA_DISABLE_ENCRYPTION").is_ok()
+    {
+        return (None, true);
+    }
+
+    if let Ok(p) = std::env::var("CONTEXTRA_ENCRYPTION_PASSPHRASE") {
+        if !p.trim().is_empty() {
+            return (Some(p), false);
+        }
+    }
+
+    if let Ok(p) = std::env::var("CONTEXTRA_PASSPHRASE") {
+        if !p.trim().is_empty() {
+            return (Some(p), false);
+        }
+    }
+
+    let key_path = db_path.join(".contextra_master.key");
+    if key_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&key_path) {
+            let trimmed = content.trim().to_string();
+            if !trimmed.is_empty() {
+                return (Some(trimmed), false);
+            }
+        }
+    }
+
+    let mut key_bytes = [0u8; 32];
+    use rand::RngCore;
+    rand::rngs::OsRng.fill_bytes(&mut key_bytes);
+    let generated = key_bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    let _ = std::fs::create_dir_all(db_path);
+    let _ = std::fs::write(&key_path, &generated);
+
+    (Some(generated), false)
+}
+
 pub const DEFAULT_MAX_LINE_BYTES: usize = 8 * 1024 * 1024; // 8 MiB
 
 impl Default for IpcConfig {

@@ -92,9 +92,8 @@ pub async fn run_pathrag_sweep_long_mem_eval(
             let res = match col
                 .query()
                 .text(&scenario.query)
-                .strategy(SearchStrategy::PathRag {
+                .strategy(SearchStrategy::Hops {
                     max_hops: 4,
-                    sufficiency_threshold: t,
                 })
                 .k(10)
                 .execute()
@@ -246,9 +245,8 @@ pub async fn run_pathrag_sweep_locomo(
             let res = match col
                 .query()
                 .text(&case.question)
-                .strategy(SearchStrategy::PathRag {
+                .strategy(SearchStrategy::Hops {
                     max_hops: 4,
-                    sufficiency_threshold: t,
                 })
                 .k(10)
                 .execute()

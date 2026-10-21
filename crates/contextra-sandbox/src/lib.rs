@@ -19,7 +19,8 @@ pub mod output;
 pub mod wasi;
 
 pub use approval::{
-    classify_risk, ApprovalRequest, ApprovalRisk, ApprovalStatus, ApprovalTransitionError,
+    classify_risk, AdmittedModule, ApprovalRequest, ApprovalRisk, ApprovalStatus,
+    ApprovalTransitionError,
 };
 pub use capabilities::{MergeOperatorCapabilities, WasmCapabilities};
 pub use error::SandboxError;

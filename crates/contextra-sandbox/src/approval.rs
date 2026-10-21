@@ -11,6 +11,31 @@
 use crate::capabilities::WasmCapabilities;
 use thiserror::Error;
 
+/// Pre-compiled or pre-validated WASM guest module artifact.
+#[derive(Debug, Clone)]
+pub struct AdmittedModule {
+    bytes: Vec<u8>,
+}
+
+impl AdmittedModule {
+    pub fn new(bytes: Vec<u8>, _hash: [u8; 32]) -> Self {
+        Self { bytes }
+    }
+}
+
+impl std::ops::Deref for AdmittedModule {
+    type Target = [u8];
+    fn deref(&self) -> &Self::Target {
+        &self.bytes
+    }
+}
+
+impl AsRef<[u8]> for AdmittedModule {
+    fn as_ref(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
 /// Risk level classification for a requested WASM execution configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ApprovalRisk {

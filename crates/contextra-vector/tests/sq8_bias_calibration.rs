@@ -25,8 +25,9 @@ fn test_sq8_bias_calibration_audit_euclidean() {
         training_data.push(vec);
     }
 
-    let quantizer = ScalarQuantizer::train(&training_data, DistanceMetric::Euclidean)
-        .expect("ScalarQuantizer training");
+    let batch_refs: Vec<&[f32]> = training_data.iter().map(|v| v.as_slice()).collect();
+    let quantizer = ScalarQuantizer::train(&batch_refs, dim);
+    let bias = Sq8Bias::calibrate(&batch_refs, &quantizer, DistanceMetric::Euclidean);
 
     let num_pairs = 1000;
     let mut raw_errors = Vec::with_capacity(num_pairs);
@@ -46,7 +47,7 @@ fn test_sq8_bias_calibration_audit_euclidean() {
         let q2 = quantizer.encode(&v2);
 
         let sq8_raw = quantizer.distance_u8(&q1, &q2);
-        let sq8_calibrated = Sq8Bias::calibrate_distance(sq8_raw, DistanceMetric::Euclidean, &quantizer);
+        let sq8_calibrated = sq8_raw + bias.mean_bias;
 
         raw_errors.push((sq8_raw - exact_dist_sq).abs());
         calibrated_errors.push((sq8_calibrated - exact_dist_sq).abs());

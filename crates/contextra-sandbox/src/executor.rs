@@ -139,6 +139,16 @@ impl WasmExecutor {
     /// - `SandboxError::MemoryExceeded` wenn Memory-Limit überschritten
     /// - `SandboxError::InvalidModule` wenn WASM ungültig
     /// - `SandboxError::WasmTrap` bei WASM-Trap
+    pub async fn execute_admitted(
+        &self,
+        wasm_bytes: &[u8],
+        input: &[u8],
+        capabilities: &WasmCapabilities,
+        timeout: Duration,
+    ) -> Result<WasmOutput, SandboxError> {
+        self.execute(wasm_bytes, input, capabilities, timeout).await
+    }
+
     pub async fn execute(
         &self,
         wasm_bytes: &[u8],

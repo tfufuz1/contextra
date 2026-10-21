@@ -54,7 +54,7 @@ mod tests;
 pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
 };
-pub use config::*;
+pub use config::{resolve_mcp_encryption_config, *};
 pub use db_open::open_db_from_env;
 
 pub use egress_gateway::{

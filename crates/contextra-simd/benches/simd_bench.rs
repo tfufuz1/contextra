@@ -1,9 +1,6 @@
 #![allow(unsafe_code)]
 
-use contextra_simd::dispatch::{
-    cosine_distance, cosine_distance_with_features, detect, dot_product_distance,
-    dot_product_distance_with_features, euclidean_distance, euclidean_distance_with_features,
-};
+use contextra_simd::dispatch::{cosine_distance, dot_product_distance, euclidean_distance};
 use contextra_simd::kernels::scalar::{
     cosine_distance_scalar, dot_product_scalar, euclidean_distance_scalar,
 };
@@ -30,17 +27,6 @@ fn bench_simd_kernels(c: &mut Criterion) {
             |b_bench, _| b_bench.iter(|| cosine_distance_scalar(black_box(&a), black_box(&b))),
         );
 
-        let features = detect();
-        group.bench_with_input(
-            BenchmarkId::new("cosine_with_features", dim),
-            &dim,
-            |b_bench, _| {
-                b_bench.iter(|| {
-                    let _ = cosine_distance_with_features(black_box(&a), black_box(&b), &features);
-                })
-            },
-        );
-
         group.bench_with_input(
             BenchmarkId::new("cosine_dispatch", dim),
             &dim,
@@ -59,17 +45,6 @@ fn bench_simd_kernels(c: &mut Criterion) {
         );
 
         group.bench_with_input(
-            BenchmarkId::new("euclidean_with_features", dim),
-            &dim,
-            |b_bench, _| {
-                b_bench.iter(|| {
-                    let _ =
-                        euclidean_distance_with_features(black_box(&a), black_box(&b), &features);
-                })
-            },
-        );
-
-        group.bench_with_input(
             BenchmarkId::new("euclidean_dispatch", dim),
             &dim,
             |b_bench, _| {
@@ -84,17 +59,6 @@ fn bench_simd_kernels(c: &mut Criterion) {
             BenchmarkId::new("dot_product_scalar", dim),
             &dim,
             |b_bench, _| b_bench.iter(|| dot_product_scalar(black_box(&a), black_box(&b))),
-        );
-
-        group.bench_with_input(
-            BenchmarkId::new("dot_product_with_features", dim),
-            &dim,
-            |b_bench, _| {
-                b_bench.iter(|| {
-                    let _ =
-                        dot_product_distance_with_features(black_box(&a), black_box(&b), &features);
-                })
-            },
         );
 
         group.bench_with_input(

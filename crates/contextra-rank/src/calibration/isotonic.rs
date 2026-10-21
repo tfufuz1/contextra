@@ -6,6 +6,7 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::sync::Arc;
 
+pub const DEFAULT_ECE_REBUILD_THRESHOLD: f32 = 0.05;
 const ECE_BINS: usize = 10;
 const DEFAULT_WARMUP_REQUIRED: u32 = 50;
 const DEFAULT_MAX_OBSERVATIONS: usize = 2000;
@@ -220,6 +221,21 @@ impl IsotonicCalibrator {
                 }
             }
         }
+    }
+
+    /// Triggers an immediate model rebuild if current ECE exceeds `threshold`.
+    /// Returns `true` if a rebuild occurred, `false` otherwise.
+    pub fn maybe_rebuild_on_ece(&mut self, threshold: f32) -> bool {
+        if !threshold.is_finite() || threshold <= 0.0 {
+            return false;
+        }
+        if let Some(ece) = self.expected_calibration_error() {
+            if ece > threshold {
+                self.force_rebuild();
+                return true;
+            }
+        }
+        false
     }
 
     /// Calculates Expected Calibration Error over 10 bins.

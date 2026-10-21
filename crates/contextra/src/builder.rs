@@ -224,11 +224,10 @@ impl ContextraBuilder {
                 .authorize(requested_ring)
                 .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
 
-            let instance = Contextra::open_authorized(
+            let _authorized_token = authorized_token;
+            let instance = Contextra::open_with_config(
                 &self.storage_path,
                 self.config,
-                &authorized_token,
-                self.license_gate,
             )
             .await?;
 

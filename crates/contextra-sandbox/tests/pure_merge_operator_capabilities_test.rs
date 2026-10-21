@@ -1,15 +1,9 @@
 //! Integration tests for MergeOperatorCapabilities::pure() preset (§4.18).
 
-use contextra_sandbox::{
-    AdmittedModule, MergeOperatorCapabilities, WasmCapabilities, WasmExecutor,
-};
+use contextra_sandbox::{MergeOperatorCapabilities, WasmCapabilities, WasmExecutor};
 use std::time::Duration;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
-
-fn admit(bytes: Vec<u8>) -> AdmittedModule {
-    AdmittedModule::new(bytes, [0u8; 32])
-}
 
 /// Verifies that clock_time_get is denied when allow_clock=false, returning ERRNO_ACCES (2).
 #[tokio::test]
@@ -34,7 +28,6 @@ async fn test_pure_merge_operator_denies_clock_access() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
-    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
 
     // Enable stdout explicitly so we can inspect the WASI return code
@@ -44,7 +37,7 @@ async fn test_pure_merge_operator_denies_clock_access() -> TestResult {
     };
 
     let output = executor
-        .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
+        .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
         .await?;
 
     let errno = i32::from_le_bytes(output.stdout[0..4].try_into()?);
@@ -56,7 +49,7 @@ async fn test_pure_merge_operator_denies_clock_access() -> TestResult {
     // Under exact MergeOperatorCapabilities::pure() without allow_stdout, output is empty
     let pure_caps = MergeOperatorCapabilities::pure();
     let pure_output = executor
-        .execute_admitted(&admitted, b"", &pure_caps, Duration::from_secs(1))
+        .execute(&wasm_bytes, b"", &pure_caps, Duration::from_secs(1))
         .await?;
     assert!(
         pure_output.stdout.is_empty(),
@@ -89,7 +82,6 @@ async fn test_pure_merge_operator_denies_random_access() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
-    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
 
     // Enable stdout explicitly so we can inspect the WASI return code
@@ -99,7 +91,7 @@ async fn test_pure_merge_operator_denies_random_access() -> TestResult {
     };
 
     let output = executor
-        .execute_admitted(&admitted, b"", &caps, Duration::from_secs(1))
+        .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
         .await?;
 
     let errno = i32::from_le_bytes(output.stdout[0..4].try_into()?);
@@ -129,13 +121,12 @@ async fn test_pure_merge_operator_functional_execution() -> TestResult {
         )
     "#;
     let wasm_bytes = wat::parse_str(wat)?;
-    let admitted = admit(wasm_bytes);
     let executor = WasmExecutor::new()?;
     let caps = MergeOperatorCapabilities::pure();
 
     let input_bytes = [10u32.to_le_bytes(), 20u32.to_le_bytes()].concat();
     let output = executor
-        .execute_admitted(&admitted, &input_bytes, &caps, Duration::from_secs(1))
+        .execute(&wasm_bytes, &input_bytes, &caps, Duration::from_secs(1))
         .await?;
 
     assert!(output.fuel_consumed > 0);

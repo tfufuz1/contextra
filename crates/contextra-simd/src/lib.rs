@@ -12,9 +12,9 @@ pub mod kernels;
 pub mod wiring;
 
 pub use dispatch::{
-    cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, detect,
+    cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8,
     dot_product_distance, dot_product_distance_f32_bytes, dot_product_u8, euclidean_distance,
-    euclidean_distance_f32_bytes, euclidean_distance_sq_u8, CpuFeatures,
+    euclidean_distance_f32_bytes, euclidean_distance_sq_u8,
 };
 pub use kernels::scalar::{
     dot_product_f32_u8, euclidean_distance_sq_f32_u8, normalize_inplace, CosineSimilarityPartsU8,

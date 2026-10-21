@@ -3,7 +3,7 @@
 // INVARIANTEN: Zero-Panic, sicherer Fallback auf Skalar, wenn CPU-Features fehlen.
 
 use crate::kernels::*;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 
 /// Computes cosine distance between `a` and `b`, dispatching to SIMD hardware acceleration if available.
 ///

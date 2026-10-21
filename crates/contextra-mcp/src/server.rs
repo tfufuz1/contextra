@@ -53,7 +53,7 @@ impl McpServer {
 
         let injection_guard = Arc::new(PromptInjectionGuard::from_env());
         let plugin_registry = Some(Arc::new(contextra_ports::plugin::PluginRegistry::new(
-            server.db.license_gate(),
+            Arc::new(contextra_ports::license::OpenFastGate),
         )));
 
         Ok(server

@@ -450,6 +450,18 @@ impl HnswIndex {
         self.inner.set_layer_seed(seed);
     }
 
+    pub fn estimated_ram_bytes(&self) -> usize {
+        let nodes = self.inner.hot.nodes.read();
+        let mut bytes = nodes.len() * std::mem::size_of::<HnswNode>();
+        for node in nodes.iter() {
+            match &node.vector {
+                VectorData::F32(v) => bytes += v.len() * std::mem::size_of::<f32>(),
+                VectorData::U8(v) => bytes += v.len(),
+            }
+        }
+        bytes
+    }
+
     pub fn deleted_ratio(&self) -> f64 {
         self.inner.deleted_ratio()
     }
