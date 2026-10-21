@@ -43,6 +43,12 @@ pub enum ManifestEntry {
         max_version: u16,
         migrated_from: u16,
     },
+    /// Periodic WAL anchor recording segment_seq, byte offset, and entry HMAC (ADR-N12 / I-WAL-3).
+    WalAnchor {
+        segment_seq: u64,
+        offset: u64,
+        hmac: [u8; 32],
+    },
 }
 
 impl ManifestEntry {
@@ -103,6 +109,16 @@ impl ManifestEntry {
                 payload.push(*file_kind);
                 payload.extend_from_slice(&max_version.to_le_bytes());
                 payload.extend_from_slice(&migrated_from.to_le_bytes());
+            }
+            ManifestEntry::WalAnchor {
+                segment_seq,
+                offset,
+                hmac,
+            } => {
+                payload.push(6u8); // op_tag = 6
+                payload.extend_from_slice(&segment_seq.to_le_bytes());
+                payload.extend_from_slice(&offset.to_le_bytes());
+                payload.extend_from_slice(hmac);
             }
         }
 
@@ -408,6 +424,38 @@ impl ManifestEntry {
                     file_kind,
                     max_version,
                     migrated_from,
+                })
+            }
+            6 => {
+                // WalAnchor
+                if remaining.len() != 48 {
+                    return Err(ContextraError::Serialization(format!(
+                        "WalAnchor payload length mismatch: expected 48, got {}",
+                        remaining.len()
+                    )));
+                }
+                let seg_bytes = remaining.get(0..8).ok_or_else(|| {
+                    ContextraError::Serialization("WalAnchor segment_seq missing".into())
+                })?;
+                let segment_seq = u64::from_le_bytes(seg_bytes.try_into().map_err(|_| {
+                    ContextraError::Serialization("Invalid segment_seq format".into())
+                })?);
+                let off_bytes = remaining.get(8..16).ok_or_else(|| {
+                    ContextraError::Serialization("WalAnchor offset missing".into())
+                })?;
+                let offset = u64::from_le_bytes(off_bytes.try_into().map_err(|_| {
+                    ContextraError::Serialization("Invalid offset format".into())
+                })?);
+                let hmac_bytes = remaining.get(16..48).ok_or_else(|| {
+                    ContextraError::Serialization("WalAnchor hmac missing".into())
+                })?;
+                let hmac: [u8; 32] = hmac_bytes
+                    .try_into()
+                    .map_err(|_| ContextraError::Serialization("Invalid hmac format".into()))?;
+                Ok(ManifestEntry::WalAnchor {
+                    segment_seq,
+                    offset,
+                    hmac,
                 })
             }
             _ => Err(ContextraError::Serialization(format!(

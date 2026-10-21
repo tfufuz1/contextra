@@ -46,25 +46,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Retrieves a document at a specific snapshot point.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn get_at_snapshot(&self, id: &str, seq_no: u64) -> Result<Option<crate::Document>> {
-        self.get_at_snapshot_tracked(id, seq_no, None).await
-    }
-
-    /// Internal tracked reader for get_at_snapshot that records reads into `tx_opt` if provided.
-    pub async fn get_at_snapshot_tracked(
-        &self,
-        id: &str,
-        seq_no: u64,
-        tx_opt: Option<TxId>,
-    ) -> Result<Option<crate::Document>> {
         validate_doc_id(id)?;
         let key = self.namespaced_key(id.as_bytes(), 0);
-        let data_opt = if let Some(tx) = tx_opt {
-            self.storage.get_at_seq_tracked(tx, &key, seq_no).await?
-        } else {
-            self.storage.get_at_seq(&key, seq_no).await?
-        };
-
-        if let Some(data) = data_opt {
+        if let Some(data) = self.storage.get_at_seq(&key, seq_no).await? {
             if let Ok(stored) = StoredDocument::from_slice(&data) {
                 return Ok(Some(crate::Document {
                     id: stored.id,
@@ -151,10 +135,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         } else {
             self.namespaced_key(prefix.as_bytes(), 0)
         };
-
-        if let Ok(seq) = self.snapshot_seq().await {
-            let _ = seq;
-        }
 
         let mut results = Vec::new();
         let mut cursor: Option<Vec<u8>> = None;

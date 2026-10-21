@@ -846,10 +846,14 @@ impl<'a> std::ops::DerefMut for InnerWriteGuard<'a> {
 
 impl<'a> Drop for InnerWriteGuard<'a> {
     fn drop(&mut self) {
-        if !self.committed {
-            // Roll back write_state to current ArcSwap snapshot
-            let current_snapshot = self.arc_swap.load_full();
-            *self.guard = (*current_snapshot).clone();
-        }
+        // TODO(WP-GR2 / PR-24): Graph Clone-on-Drop beheben:
+        // Das Klonen des gesamten `GraphInner` (`(*self.guard).clone()`) bei jedem Guard-Drop
+        // führt zu massiven Allokations- und Latenzspitzen. Durch gezielte CoW-/RCU-Aktualisierung
+        // oder Batching ersetzen.
+        // TODO(WP-GR3 / PR-25): Graph Rollback unterstützen:
+        // Schlägt eine übergeordnete Operation fehl, publiziert `Drop` unkontrolliert den
+        // mutierten Zwischenzustand an `arc_swap`. Der Guard benötigt ein explizites Commit-Signal;
+        // ohne Commit muss der modifizierte Zustand auf den vorherigen Snapshot zurückgerollt werden.
+        self.arc_swap.store(Arc::new((*self.guard).clone()));
     }
 }

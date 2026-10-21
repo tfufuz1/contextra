@@ -45,12 +45,12 @@ impl SystemRng {
 
     /// Generates the next pseudorandom 64-bit unsigned integer.
     pub fn next_u64(&self) -> u64 {
-        SeededRng::next_u64(self)
+        EntropyRng::next_u64(self)
     }
 
     /// Fills `dest` with pseudorandom bytes.
     pub fn fill_bytes(&self, dest: &mut [u8]) {
-        SeededRng::fill_bytes(self, dest);
+        EntropyRng::fill_bytes(self, dest);
     }
 
     /// Returns a pseudorandom `f64` in `[0.0, 1.0)`.
@@ -79,8 +79,24 @@ impl SeededRng for SystemRng {
         }
     }
 
+    fn next_u64(&self) -> u64 {
+        use std::collections::hash_map::RandomState;
+        use std::hash::{BuildHasher, Hasher};
+        RandomState::new().build_hasher().finish()
+    }
+}
+
+impl SeededRng for SystemRng {
+    fn next_u64(&self) -> u64 {
+        EntropyRng::next_u64(self)
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        EntropyRng::fill_bytes(self, dest);
+    }
+
     fn next_unit_f64(&self) -> f64 {
-        let mantissa = SeededRng::next_u64(self) >> 11;
+        let mantissa = EntropyRng::next_u64(self) >> 11;
         (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
     }
 }
@@ -109,13 +125,6 @@ pub trait EntropyRng: Send + Sync + 'static {
 
     /// Generates the next pseudorandom 64-bit unsigned integer from secure entropy.
     fn next_u64(&self) -> u64;
-
-    /// NORMATIV: Nur Quellen aus Betriebssystem oder KMS überschreiben diese Methode.
-    /// Fehler werden propagiert, nie durch Nullbytes ersetzt. Default = Err(SecretUnsupported).
-    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
-        let _ = dest;
-        Err(RngError::SecretUnsupported)
-    }
 }
 
 /// Port trait for non-cryptographic, deterministic, or test random number generators.
@@ -146,10 +155,6 @@ impl<T: EntropyRng + ?Sized> EntropyRng for Arc<T> {
 
     fn next_u64(&self) -> u64 {
         (**self).next_u64()
-    }
-
-    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
-        (**self).fill_secret(dest)
     }
 }
 

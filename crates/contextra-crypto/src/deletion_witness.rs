@@ -55,7 +55,58 @@ use crate::deletion_proof::{
     DeletionLayer,
 };
 use contextra_types::{ContextraError, Result, TxId};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+/// Ergebnis eines physischen Storage-Scans für die Erzeugung eines [`LayerWitness`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScanOutcome {
+    /// Die durchsuchte Storage-Schicht.
+    pub layer: DeletionLayer,
+    /// Anzahl durchsuchter Einheiten.
+    pub units_scanned: u64,
+    /// Anzahl gefundener Treffer/Schlüssel.
+    pub matches_found: u64,
+    /// Transaktions-ID zum Zeitpunkt des Scans.
+    pub scanned_at_tx: TxId,
+    /// Ob eine leere Schicht explizit deklariert wurde.
+    pub empty_layer_declared: bool,
+    /// Gescannte Daten-Einheiten für die Footprint-Hash-Berechnung.
+    pub footprint_units: Vec<Vec<u8>>,
+}
+
+/// Fehler bei der Erzeugung eines [`LayerWitness`] aus einem [`ScanOutcome`].
+#[derive(Debug, thiserror::Error)]
+pub enum WitnessError {
+    /// Treffer beim Scan gefunden.
+    #[error("Matches found ({0}) during deletion scan")]
+    MatchesFound(u64),
+    /// Keine Einheiten durchsucht ohne leere Schichterklärung.
+    #[error("Zero units scanned without empty layer declaration")]
+    ZeroUnitsWithoutEmptyDeclaration,
+    /// Transaktions-ID Ungültigkeit.
+    #[error("Invalid tx ordering: scanned_at_tx < as_of_tx")]
+    InvalidTxOrdering,
+    /// Claim and assurance mismatch.
+    #[error("Claim and assurance mismatch: {0}")]
+    ClaimAssuranceMismatch(String),
+    /// Interner Contextra Fehler.
+    #[error("Contextra error: {0}")]
+    Contextra(#[from] ContextraError),
+}
+
+/// Berechnet den BLAKE3 Footprint-Hash über die kanonisch sortierte Menge gescannter Einheiten.
+pub fn compute_witness_footprint_hash(units: &[impl AsRef<[u8]>]) -> [u8; 32] {
+    let mut sorted_units: Vec<&[u8]> = units.iter().map(|u| u.as_ref()).collect();
+    sorted_units.sort();
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"contextra/witness-footprint/v1\0");
+    for unit in sorted_units {
+        let len_u32 = u32::try_from(unit.len()).unwrap_or(u32::MAX);
+        hasher.update(&len_u32.to_le_bytes());
+        hasher.update(unit);
+    }
+    *hasher.finalize().as_bytes()
+}
 
 /// Nicht außerhalb des Crate/Moduls konstruierbarer Token für autorisierte Issuance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -164,8 +215,56 @@ impl LayerWitness {
     /// # Errors
     /// Returns [`ContextraError::InvalidInput`] if invariants fail (z. B. `scanned_at_tx < as_of_tx`
     /// oder Assurance-Unstimmigkeiten).
+    #[allow(deprecated)]
     pub fn issue_sealed(_token: &WitnessIssuerToken, args: WitIssueArgs) -> Result<Self> {
         Self::issue(args)
+    }
+
+    /// Erzeugt einen [`LayerWitness`] direkt aus einem verifizierten [`ScanOutcome`].
+    ///
+    /// # Errors
+    /// - [`WitnessError::MatchesFound`] if `scan.matches_found > 0`.
+    /// - [`WitnessError::ZeroUnitsWithoutEmptyDeclaration`] if `scan.units_scanned == 0` and `!scan.empty_layer_declared`.
+    pub fn from_scan(
+        scan: ScanOutcome,
+        scope_hash: [u8; 32],
+        claim: WitClaimText,
+        assurance: WitAssurance,
+        clock: &dyn contextra_ports::Clock,
+    ) -> std::result::Result<Self, WitnessError> {
+        if scan.matches_found > 0 {
+            return Err(WitnessError::MatchesFound(scan.matches_found));
+        }
+
+        if scan.units_scanned == 0 && !scan.empty_layer_declared {
+            return Err(WitnessError::ZeroUnitsWithoutEmptyDeclaration);
+        }
+
+        let footprint_hash = compute_witness_footprint_hash(&scan.footprint_units);
+        let now_wall_ms = clock.now().wall_ms;
+
+        let args = WitIssueArgs {
+            layer: scan.layer,
+            scope_hash,
+            scanned_at_tx: scan.scanned_at_tx,
+            as_of_tx: scan.scanned_at_tx,
+            assurance,
+            claim,
+            footprint_hash,
+            scope_write_seq: scan.units_scanned,
+            scanner_name: "scan_outcome_scanner",
+            scanner_version: 1,
+            store_generation: WitStoreGeneration(now_wall_ms),
+            layer_evidence: WitLayerEvidence::Memtable {
+                memtables_scanned: u32::try_from(scan.units_scanned).unwrap_or(u32::MAX),
+                entries_found: scan.matches_found,
+                tombstones_found: 0,
+            },
+            key_identifiers_claimed: false,
+        };
+
+        #[allow(deprecated)]
+        Self::issue(args).map_err(WitnessError::from)
     }
 
     /// Erzeugt einen neuen `LayerWitness` unter Prüfung aller Schicht-Invarianten.
@@ -177,6 +276,9 @@ impl LayerWitness {
     /// - `scanned_at_tx < as_of_tx`
     /// - `claim` does not match `assurance`
     /// - `layer_evidence` fails invariant checks
+    #[deprecated(
+        note = "Direct use of issue() is deprecated per INV-ERA-6. Use LayerWitness::from_scan or issue_sealed instead."
+    )]
     #[doc(hidden)]
     pub fn issue(args: WitIssueArgs) -> Result<Self> {
         if args.scanned_at_tx < args.as_of_tx {
