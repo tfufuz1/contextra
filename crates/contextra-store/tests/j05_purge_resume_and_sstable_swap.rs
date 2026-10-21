@@ -11,7 +11,7 @@ use contextra_ports::erasure::PurgeError;
 use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::config::LsmConfig;
-use contextra_store::lsm::engine::LsmStorage;
+use contextra_store::lsm::LsmStorage;
 use contextra_store::lsm::purge::failpoint::OrxPurgeError;
 use contextra_store::lsm::purge::intent::OrxPurgeIntent;
 use contextra_store::lsm::purge::orchestrator::OrxHooks;
@@ -23,6 +23,10 @@ use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
 use std::collections::BTreeMap;
 use tempfile::tempdir;
+
+fn to_contextra_err(err: OrxPurgeError) -> contextra_types::ContextraError {
+    PurgeError::from(err).into()
+}
 
 /// Reference model for LSM storage state and purge behavior verification.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -175,7 +179,9 @@ async fn test_crash_resume_matrix_p1_to_p4_standalone_error_and_storage_completi
 
         // 4. Nun Storage öffnen und resume_pending_for_storage ausführen
         let storage = LsmStorage::open(config).await?;
-        let storage_res = resume_pending_for_storage(&storage, &hooks, None).await?;
+        let storage_res = resume_pending_for_storage(&storage, &hooks, None)
+            .await
+            .map_err(to_contextra_err)?;
         assert!(
             storage_res.is_some(),
             "resume_pending_for_storage must complete pending purge for phase {:?}",
@@ -235,11 +241,15 @@ async fn test_idempotency_double_resume_and_zero_keys() -> contextra_types::Resu
     let intent_file = dir.path().join("purge.intent");
     intent.write_to_file(&intent_file).unwrap();
 
-    let res1 = resume_pending_for_storage(&storage, &hooks, None).await?;
+    let res1 = resume_pending_for_storage(&storage, &hooks, None)
+        .await
+        .map_err(to_contextra_err)?;
     assert!(res1.is_some(), "First resume succeeds and returns report");
 
     // 2. Zweites Resume (doppeltes Resume) -> No-op, gibt Ok(None) zurück
-    let res2 = resume_pending_for_storage(&storage, &hooks, None).await?;
+    let res2 = resume_pending_for_storage(&storage, &hooks, None)
+        .await
+        .map_err(to_contextra_err)?;
     assert!(
         res2.is_none(),
         "Second resume must be a clean no-op returning Ok(None)"
@@ -257,7 +267,9 @@ async fn test_idempotency_double_resume_and_zero_keys() -> contextra_types::Resu
     );
     empty_intent.write_to_file(&intent_file).unwrap();
 
-    let res_empty = resume_pending_for_storage(&storage, &hooks, None).await?;
+    let res_empty = resume_pending_for_storage(&storage, &hooks, None)
+        .await
+        .map_err(to_contextra_err)?;
     assert!(
         res_empty.is_some(),
         "Resume with 0 keys intent completes successfully"
