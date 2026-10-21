@@ -80,6 +80,8 @@ path = "../../examples/governance_fixtures.rs"
 [features]
 default = ["fast"]
 fast = []
+erasure = ["contextra-store/erasure"]
+encryption-at-rest = ["contextra-store/encryption-at-rest", "contextra-db/encryption-at-rest"]
 docid-128 = ["contextra-types/docid-128"]
 sovereign = ["contextra-crypto", "contextra-privacy"]
 compliance = ["sovereign", "audit-export", "avv-generator"]
