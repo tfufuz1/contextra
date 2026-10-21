@@ -32,6 +32,7 @@ pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::Hn
     pub(super) staged_graph_edge_deletes: Mutex<Vec<(EntityId, EntityId)>>,
     pub(super) staged_hyperedges: Mutex<Vec<contextra_graph::hyperedge::HyperEdge>>,
     pub(super) committed: AtomicBool,
+    pub(super) untracked_reads: AtomicBool,
 }
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
@@ -59,7 +60,18 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             staged_graph_edge_deletes: Mutex::new(Vec::with_capacity(16)),
             staged_hyperedges: Mutex::new(Vec::with_capacity(16)),
             committed: AtomicBool::new(false),
+            untracked_reads: AtomicBool::new(false),
         }
+    }
+
+    /// Marks that this transaction performed an untracked read operation.
+    pub fn mark_untracked_read(&self) {
+        self.untracked_reads.store(true, Ordering::Release);
+    }
+
+    /// Returns `true` if this transaction performed an untracked read operation.
+    pub fn has_untracked_reads(&self) -> bool {
+        self.untracked_reads.load(Ordering::Acquire)
     }
 
     /// Ergonomie-Wrapper für Schlüssel-Staging ohne Vorwerte.

@@ -5,8 +5,8 @@
 #![cfg(feature = "fault-injection")]
 
 use contextra_ports::storage::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -30,14 +30,20 @@ async fn test_batch_scoped_rollback_preserves_prior_batch() {
     storage.commit(tx1).await.unwrap();
 
     // Inject fault for tx 2
-    storage.fault_plan().fail_append_for_tx.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
 
     let tx2 = TxId::new(2);
     storage.put(tx2, b"k2", b"v2").await.unwrap();
     let res = storage.commit(tx2).await;
     assert!(res.is_err(), "tx2 commit should fail on WAL append");
 
-    storage.fault_plan().fail_append_for_tx.store(0, std::sync::atomic::Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(0, std::sync::atomic::Ordering::SeqCst);
 
     // k1 must still be readable
     assert_eq!(
@@ -95,14 +101,20 @@ async fn test_rollback_preserves_immutable_memtables() {
     storage.request_flush();
 
     // Inject fault for tx 3
-    storage.fault_plan().fail_append_for_tx.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
 
     let tx3 = TxId::new(3);
     storage.put(tx3, b"k3", b"v3").await.unwrap();
     let res = storage.commit(tx3).await;
     assert!(res.is_err(), "tx3 commit should fail on WAL append");
 
-    storage.fault_plan().fail_append_for_tx.store(0, std::sync::atomic::Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .fail_append_for_tx
+        .store(0, std::sync::atomic::Ordering::SeqCst);
 
     // k1 and k2 must remain readable despite rollback of tx3
     assert_eq!(

@@ -1,6 +1,7 @@
 use super::*;
 use crate::memtable::is_valid_range_bounds;
 use contextra_types::{Result, TOMBSTONE_BIT};
+use std::sync::Arc;
 
 pub(super) enum SstableScanMode<'a> {
     Prefix(&'a [u8]),
@@ -92,10 +93,18 @@ impl LsmStorage {
         self.compaction_engine.record_read_op();
         let mut map: std::collections::BTreeMap<Bytes, (Bytes, u64)> =
             std::collections::BTreeMap::new();
-        let state = self.state.read().await;
-        let sstables = self.sstables.read().await;
 
-        let last_tx = self.last_committed_tx.load(Ordering::Acquire);
+        // Step 6 / S6: Take short snapshots of SSTable and Memtable readers under read guards
+        let (sstables, immutable_memtables, active_memtable) = {
+            let state = self.state.read().await;
+            let sstables = self.sstables.read().await.clone();
+            (
+                sstables,
+                state.immutable_memtables.clone(),
+                Arc::clone(&state.memtable),
+            )
+        };
+
         let max_accumulator_limit = contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR
             .saturating_mul(self.config.max_internal_merge_factor);
 
@@ -149,9 +158,8 @@ impl LsmStorage {
             let mut source_count = 0usize;
             for (k, v, seq, tx) in entries {
                 let raw_seq = seq & !TOMBSTONE_BIT;
-                if (tx <= last_tx || tx >= TxId::INTERNAL_BASE)
-                    && entry_filter(k.as_ref(), raw_seq, tx)
-                {
+                // S7 / INV-COM-2: Visibility is strictly governed by sequence number watermark.
+                if entry_filter(k.as_ref(), raw_seq, tx) {
                     let entry = map.entry(k).or_insert_with(|| (v.clone(), seq));
                     if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
                         *entry = (v, seq);
@@ -177,7 +185,7 @@ impl LsmStorage {
                     mt.scan_prefix_into_matching(
                         prefix,
                         u64::MAX,
-                        TxId(last_tx),
+                        TxId(u64::MAX),
                         target,
                         &entry_filter,
                     );
@@ -187,7 +195,7 @@ impl LsmStorage {
                         start,
                         end,
                         u64::MAX,
-                        TxId(last_tx),
+                        TxId(u64::MAX),
                         target,
                         &entry_filter,
                     );
@@ -195,7 +203,7 @@ impl LsmStorage {
             };
 
         // 2. Immutable memtables (older -> newer)
-        for mt in &state.immutable_memtables {
+        for mt in &immutable_memtables {
             scan_memtable(mt, &mut map);
             if check_accumulator && map.len() > max_accumulator_limit {
                 return Err(ContextraError::LimitExceeded {
@@ -208,7 +216,7 @@ impl LsmStorage {
         }
 
         // 3. Active memtable
-        scan_memtable(&state.memtable, &mut map);
+        scan_memtable(&active_memtable, &mut map);
         if check_accumulator && map.len() > max_accumulator_limit {
             return Err(ContextraError::LimitExceeded {
                 limit: max_accumulator_limit,

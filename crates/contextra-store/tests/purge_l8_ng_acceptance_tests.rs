@@ -1,8 +1,8 @@
 //! Acceptance tests for L8 (Probe semantics & sequential execution) and N-G (recovery scrub & real manifest generation).
 
-use contextra_store::compaction::purge_filter::{FreeSpaceProbe, ProbeError, PurgeError};
 use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::PurgeScope;
+use contextra_store::compaction::purge_filter::{FreeSpaceProbe, ProbeError, PurgeError};
 use contextra_store::compaction::purge_select::select_purge_candidates;
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
@@ -95,7 +95,9 @@ async fn test_l8_probe_none_sequential_processing() -> contextra_types::Result<(
 
     // Create 3 separate SSTables with candidate keys
     for i in 1..=3 {
-        storage.put(TxId(i), format!("key{i}").as_bytes(), b"value").await?;
+        storage
+            .put(TxId(i), format!("key{i}").as_bytes(), b"value")
+            .await?;
         storage.commit(TxId(i)).await?;
         StorageEngine::flush(&storage).await?;
     }

@@ -9,6 +9,7 @@ pub mod builder;
 pub mod collection_profile;
 pub mod performance_profile;
 pub mod query_rewriter;
+pub use builder::wiring_selftest;
 
 #[cfg(feature = "compliance")]
 pub mod compliance;

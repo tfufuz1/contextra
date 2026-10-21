@@ -10,7 +10,11 @@ pub enum VectorDeleteMode {
     SynchronousRepair,
     /// Asynchronous background graph repair during vector deletion.
     BackgroundRepair,
+<<<<<<< HEAD
+    /// Cryptographic shredding / deletion mode.
+=======
     /// Cryptographic shredding for vector deletion.
+>>>>>>> 0000a4c4f (feat(ports,sys,engine,mcp): implement CryptoRng, SecretBytes, and secure proof signer key loading (F-01, F-10, F-22))
     CryptoShred,
 }
 

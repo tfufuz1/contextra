@@ -3,7 +3,8 @@
 // ZWECK: CopyStatus und Re-Exports von contextra-store CopyRegEntry/CopyKind für Checkpoint Kopienregister.
 // INVARIANTEN: Zero-Panic, Fail-Closed.
 
-pub use contextra_store::copy_registry::{file_id_for_name, CopyKind, CopyRegEntry};
+pub use contextra_core::copy_registry::{CopyKind, CopyRegEntry};
+pub use contextra_store::copy_registry::file_id_for_name;
 
 /// Detailed status of a registered copy for scope / Article 17/19 verification.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

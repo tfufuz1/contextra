@@ -27,7 +27,6 @@ mod compensating_actions;
 mod db_transaction;
 mod db_transaction_commit;
 mod db_transaction_rollback;
-pub mod index_finalizer;
 mod intent;
 pub mod wiring;
 
@@ -40,6 +39,5 @@ pub use compensating_actions::{
     CompensatingAction, RollbackStagedAction,
 };
 pub use db_transaction::DbTransaction;
-pub use index_finalizer::IndexFinalizer;
 pub use intent::CommitIntent;
 pub use wiring::{TransactionWiring, TransactionWiringDeps};

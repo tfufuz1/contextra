@@ -13,9 +13,9 @@
 //!    Incomplete Replace record is safely discarded (no Err/panic), input SSTables remain active.
 
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
-use contextra_types::Result;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::Result;
+use contextra_types::TxId;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;

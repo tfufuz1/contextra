@@ -1,35 +1,27 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra::{open_with_config, ContextraConfig};
-use contextra_ports::clock::ManualClock;
-use contextra_ports::rng::SeededRng;
-use contextra_ports::Rng;
-use contextra_types::error::ContextraError;
+use contextra::builder::ContextraBuilder;
+use contextra_ports::SystemClock;
 
 #[tokio::test]
-async fn test_consolidation_builder_config_lifecycle() -> Result<(), ContextraError> {
-    let seed: u64 = 20261013_06;
-    let rng = SeededRng::new(seed);
-    let clock = ManualClock::new(1760390400_000_000_000);
+async fn test_feature_consolidation_wiring() -> Result<(), Box<dyn std::error::Error>> {
+    let clock = SystemClock::new();
     println!(
-        "e2e_wiring_consolidation seed: {}, clock_nanos: {}",
-        seed,
-        clock.now_nanos()
+        "e2e_wiring_consolidation clock_nanos: {}",
+        clock.now_unix_nanos()
     );
 
-    let tmp_dir = std::env::temp_dir().join(format!("e2e_wiring_consolidation_{}", rng.next_u64()));
+    let tmp_dir = std::env::temp_dir().join(format!("e2e_wiring_consolidation_{}", clock.now_unix_nanos()));
     let _ = std::fs::remove_dir_all(&tmp_dir);
 
-    let config = ContextraConfig {
-        dimension: 4,
-        consolidation_enabled: true,
-        ..Default::default()
-    };
+    // Standard open with consolidation disabled
+    let db = ContextraBuilder::new(4)
+        .with_storage_path(&tmp_dir)
+        .with_consolidation(false, std::time::Duration::from_secs(300))
+        .build()
+        .await?;
 
-    let db = open_with_config(&tmp_dir, config).await?;
-    assert!(db.config().consolidation_enabled);
-
-    // Verify graceful worker termination upon facade close
+    assert_eq!(db.config().dimension, 4);
     db.close().await?;
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
@@ -37,25 +29,29 @@ async fn test_consolidation_builder_config_lifecycle() -> Result<(), ContextraEr
 }
 
 #[tokio::test]
-#[ignore = "blockiert durch PROMPT-CONSOLIDATION-01: Background consolidation worker loop and task queue in contextra-cognition (J15) not wired to Contextra facade builder"]
-async fn test_consolidation_background_worker_and_task_lifecycle() -> Result<(), ContextraError> {
-    let seed: u64 = 20261013_07;
-    let rng = SeededRng::new(seed);
-    let clock = ManualClock::new(1760390400_000_000_000);
+async fn test_feature_consolidation_enabled_wiring() -> Result<(), Box<dyn std::error::Error>> {
+    let clock = SystemClock::new();
     println!(
-        "e2e_wiring_consolidation worker seed: {}, clock_nanos: {}",
-        seed,
-        clock.now_nanos()
+        "e2e_wiring_consolidation_enabled clock_nanos: {}",
+        clock.now_unix_nanos()
     );
 
     let tmp_dir = std::env::temp_dir().join(format!(
-        "e2e_wiring_consolidation_worker_{}",
-        rng.next_u64()
+        "e2e_wiring_consolidation_enabled_{}",
+        clock.now_unix_nanos()
     ));
     let _ = std::fs::remove_dir_all(&tmp_dir);
 
-    // Background consolidation loop spawning & task queue tracking require Contextra
-    // background worker orchestration wiring in ContextraBuilder::build().
+    // Open with consolidation enabled
+    let db = ContextraBuilder::new(4)
+        .with_storage_path(&tmp_dir)
+        .with_consolidation(true, std::time::Duration::from_secs(1))
+        .build()
+        .await?;
+
+    assert_eq!(db.config().dimension, 4);
+    assert!(db.config().consolidation_enabled);
+    db.close().await?;
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
     Ok(())

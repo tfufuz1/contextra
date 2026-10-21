@@ -39,10 +39,12 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 [features]
 test-utils = []
 test-support = []
+testing = []
 kv-encryption = []
+legacy-verify = []
 
 [dev-dependencies]
-contextra-crypto = { path = ".", features = ["test-utils", "test-support"] }
+contextra-crypto = { path = ".", features = ["test-utils", "test-support", "legacy-verify"] }
 contextra-kvcache = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }

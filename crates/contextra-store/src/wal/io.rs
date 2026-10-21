@@ -5,9 +5,9 @@
 //! - I-1: HMAC-Verkettung muss intakt sein. Nach verworfenem Tail dürfen keine weiteren Frames verarbeitet werden.
 //! - I-3: End-of-File Partial Entries werden als Tail Truncation behandelt.
 
-use contextra_types::{ContextraError, Result, TxId};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
+use contextra_types::{ContextraError, Result, TxId};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
@@ -16,9 +16,8 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use super::legacy_integrity_key;
 use super::{
     PreparedBatch, Wal, WalCommand, WalEntry, WalOp, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER,
-    WAL_V3_HEADER,
+    WAL_V3_HEADER, WAL_V4_HEADER,
 };
-
 
 #[cfg(feature = "wal-integrity")]
 struct WalVerifierCtx<'a> {
@@ -56,7 +55,12 @@ impl<'a> WalVerifierCtx<'a> {
     }
 
     #[allow(deprecated)]
-    fn verify(&mut self, entry: &WalEntry, version: WalVersion, chunk_start_pos: u64) -> Result<()> {
+    fn verify(
+        &mut self,
+        entry: &WalEntry,
+        version: WalVersion,
+        chunk_start_pos: u64,
+    ) -> Result<()> {
         let (op_type, key, value) = match &entry.op {
             WalOp::Put { key, value, .. } => (0u8, key.clone(), value.clone()),
             WalOp::Delete { key, .. } => (1u8, key.clone(), Vec::new()),
@@ -73,8 +77,12 @@ impl<'a> WalVerifierCtx<'a> {
         };
 
         let verify_res = match version {
-            WalVersion::V3 => self.verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
-            WalVersion::V2 => self.verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
+            WalVersion::V3 => self
+                .verifier
+                .verify_and_update_v3(&snapshot, chunk_start_pos),
+            WalVersion::V2 => self
+                .verifier
+                .verify_and_update_v2(&snapshot, chunk_start_pos),
             WalVersion::V1 => {
                 self.verifier.skip_hmac_verify_legacy(&snapshot);
                 Ok(())
@@ -87,8 +95,12 @@ impl<'a> WalVerifierCtx<'a> {
                 let mut legacy_verifier = IntegrityVerifier::new(&legacy_key);
                 legacy_verifier.set_last_hmac(self.verifier.last_hmac_snapshot());
                 let legacy_res = match version {
-                    WalVersion::V3 => legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos),
-                    WalVersion::V2 => legacy_verifier.verify_and_update_v2(&snapshot, chunk_start_pos),
+                    WalVersion::V3 => {
+                        legacy_verifier.verify_and_update_v3(&snapshot, chunk_start_pos)
+                    }
+                    WalVersion::V2 => {
+                        legacy_verifier.verify_and_update_v2(&snapshot, chunk_start_pos)
+                    }
                     WalVersion::V1 => {
                         legacy_verifier.skip_hmac_verify_legacy(&snapshot);
                         Ok(())
@@ -104,7 +116,8 @@ impl<'a> WalVerifierCtx<'a> {
                     );
                     self.verifier = legacy_verifier;
                     self.using_legacy_key = true;
-                    self.legacy_key_used.store(true, std::sync::atomic::Ordering::SeqCst);
+                    self.legacy_key_used
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
                     Ok(())
                 } else {
                     Err(e.into())
@@ -125,7 +138,9 @@ async fn detect_wal_header(
     if file_size >= 4 {
         let mut header_buf = [0u8; 4];
         if reader.read_exact(&mut header_buf).await.is_ok() {
-            if header_buf == WAL_V3_HEADER {
+            if header_buf == WAL_V4_HEADER {
+                return Ok((WalVersion::V4, 4));
+            } else if header_buf == WAL_V3_HEADER {
                 return Ok((WalVersion::V3, 4));
             } else if header_buf == WAL_V2_HEADER {
                 return Ok((WalVersion::V2, 4));
@@ -356,10 +371,7 @@ where
             let mut nonce = [0u8; 12];
             nonce.copy_from_slice(nonce_slice);
             let ciphertext = entry_data_raw.get(12..).ok_or_else(|| {
-                ContextraError::wal_corruption(
-                    chunk_start_pos,
-                    "WAL entry missing ciphertext",
-                )
+                ContextraError::wal_corruption(chunk_start_pos, "WAL entry missing ciphertext")
             })?;
             decrypted_data = match km.decrypt_auto_nonce(ciphertext, &nonce) {
                 Ok(data) => data,
@@ -401,17 +413,12 @@ where
                 if key_manager.is_some() && version != WalVersion::V1 {
                     return Err(ContextraError::wal_corruption(
                         chunk_start_pos,
-                        format!(
-                            "Deserialization failed in authenticated entry: {parse_err}"
-                        ),
+                        format!("Deserialization failed in authenticated entry: {parse_err}"),
                     ));
                 }
-                if let Some(err) = Wal::handle_wal_entry_parse_error(
-                    parse_err,
-                    chunk_start_pos,
-                    pos,
-                    file_size,
-                ) {
+                if let Some(err) =
+                    Wal::handle_wal_entry_parse_error(parse_err, chunk_start_pos, pos, file_size)
+                {
                     return Err(err);
                 }
                 return Ok(false);
@@ -536,22 +543,35 @@ impl Wal {
 
         #[cfg(feature = "fault-injection")]
         {
-            let fail_tx = self.fault_plan.fail_append_for_tx.load(std::sync::atomic::Ordering::SeqCst);
+            let fail_tx = self
+                .fault_plan
+                .fail_append_for_tx
+                .load(std::sync::atomic::Ordering::SeqCst);
             if fail_tx != 0
                 && entries
                     .iter()
                     .any(|e| e.tx_id().inner() == fail_tx || fail_tx == u64::MAX)
             {
-                self.fault_plan.fail_append_for_tx.store(0, std::sync::atomic::Ordering::SeqCst);
+                self.fault_plan
+                    .fail_append_for_tx
+                    .store(0, std::sync::atomic::Ordering::SeqCst);
                 return Err(ContextraError::Storage(
                     "Simulated WAL append_batch I/O failure via fault injection".into(),
                 ));
             }
 
-            let delay_tx = self.fault_plan.delay_append_for_tx.load(std::sync::atomic::Ordering::SeqCst);
+            let delay_tx = self
+                .fault_plan
+                .delay_append_for_tx
+                .load(std::sync::atomic::Ordering::SeqCst);
             if delay_tx != 0 && entries.iter().any(|e| e.tx_id().inner() == delay_tx) {
-                let delay_ms = self.fault_plan.delay_append_ms.load(std::sync::atomic::Ordering::SeqCst);
-                self.fault_plan.delay_append_for_tx.store(0, std::sync::atomic::Ordering::SeqCst);
+                let delay_ms = self
+                    .fault_plan
+                    .delay_append_ms
+                    .load(std::sync::atomic::Ordering::SeqCst);
+                self.fault_plan
+                    .delay_append_for_tx
+                    .store(0, std::sync::atomic::Ordering::SeqCst);
                 if delay_ms > 0 {
                     tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
                 }
@@ -891,10 +911,7 @@ impl Wal {
     }
 
     /// Rewrites legacy V1 or V2 WAL files as V3.
-    pub async fn rewrite_as_v3(
-        &self,
-        replayed_entries: &[(u64, WalEntry, u64)],
-    ) -> Result<()> {
+    pub async fn rewrite_as_v3(&self, replayed_entries: &[(u64, WalEntry, u64)]) -> Result<()> {
         let integrity_key = self.get_integrity_key()?;
 
         let flusher_tx = {
@@ -1035,7 +1052,9 @@ impl Wal {
     /// Setzt `FAIL_TRUNCATE_ONCE = true`. Wird vom Flusher nach Auslösung zurückgesetzt.
     #[cfg(feature = "fault-injection")]
     pub fn arm_truncate_failure_for_test(&self) {
-        self.fault_plan.fail_truncate_once.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.fault_plan
+            .fail_truncate_once
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 }
 

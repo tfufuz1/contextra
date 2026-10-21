@@ -9,10 +9,10 @@ use tempfile::TempDir;
 
 use proptest::prelude::*;
 
-use contextra_types::{CollectionId, DocId, TenantId, TxId};
 use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::tenant_codec::{TenantKeyCodec, TenantScopedStorage};
+use contextra_types::{CollectionId, DocId, TenantId, TxId};
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]

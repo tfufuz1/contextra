@@ -1,7 +1,7 @@
 use contextra_ports::StorageEngine;
-use contextra_types::{Result, TxId};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
+use contextra_types::{Result, TxId};
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -32,7 +32,9 @@ async fn test_erasure_fence_blocking() -> Result<()> {
     assert!(!storage.erasure_fence().check_write_allowed(b"key1"));
     assert!(storage.erasure_fence().check_write_allowed(b"key2"));
 
-    storage.erasure_fence().unlock_documents(&[b"key1".to_vec()]);
+    storage
+        .erasure_fence()
+        .unlock_documents(&[b"key1".to_vec()]);
     assert!(storage.erasure_fence().check_write_allowed(b"key1"));
 
     Ok(())

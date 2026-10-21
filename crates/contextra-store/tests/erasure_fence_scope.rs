@@ -306,7 +306,10 @@ async fn test_purge_physical_async_context() {
     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         storage.purge_physical(&scope, TxId::try_new(1).unwrap(), &probe)
     }));
-    assert!(res.is_ok(), "Expected no panic when calling purge_physical inside async context");
+    assert!(
+        res.is_ok(),
+        "Expected no panic when calling purge_physical inside async context"
+    );
 
     storage.close().await.unwrap();
 }

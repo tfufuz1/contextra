@@ -79,8 +79,8 @@ pub fn load_log_records_from_jsonl<P: AsRef<Path>>(path: P) -> Result<Vec<Replay
     let mut records = Vec::new();
 
     for (line_num, line_res) in reader.lines().enumerate() {
-        let line = line_res
-            .with_context(|| format!("Error reading line {} in log file", line_num + 1))?;
+        let line =
+            line_res.with_context(|| format!("Error reading line {} in log file", line_num + 1))?;
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
@@ -203,10 +203,7 @@ impl SyntheticLogGenerator {
                 expected_rewards.push(prob);
             }
 
-            let oracle_reward = expected_rewards
-                .iter()
-                .copied()
-                .fold(0.0f32, f32::max);
+            let oracle_reward = expected_rewards.iter().copied().fold(0.0f32, f32::max);
 
             // Logging policy: epsilon-greedy on baseline model
             let mut baseline_scores = Vec::with_capacity(self.num_arms as usize);
@@ -444,7 +441,8 @@ pub fn run_replay_evaluation(options: ReplayOptions) -> Result<ReplayReport> {
     let verdict = if overall_passed {
         "PASSED (FC-TS shows statistically significant improvement over Sherman-Morrison on >= 3 scenarios)".into()
     } else {
-        "FAILED (FC-TS failed to achieve statistically significant improvement on >= 3 scenarios)".into()
+        "FAILED (FC-TS failed to achieve statistically significant improvement on >= 3 scenarios)"
+            .into()
     };
 
     let report = ReplayReport {
@@ -535,8 +533,7 @@ fn evaluate_fc_ts(
             0.0
         };
 
-        let dr_step_reward =
-            r_hat_chosen + match_weight * (record.reward as f64 - r_hat_logged);
+        let dr_step_reward = r_hat_chosen + match_weight * (record.reward as f64 - r_hat_logged);
         dr_cum_reward += dr_step_reward;
 
         let oracle_r = record.oracle_reward.unwrap_or(1.0) as f64;
@@ -623,8 +620,7 @@ fn evaluate_sherman_morrison(
             0.0
         };
 
-        let dr_step_reward =
-            r_hat_chosen + match_weight * (record.reward as f64 - r_hat_logged);
+        let dr_step_reward = r_hat_chosen + match_weight * (record.reward as f64 - r_hat_logged);
         dr_cum_reward += dr_step_reward;
 
         let oracle_r = record.oracle_reward.unwrap_or(1.0) as f64;
@@ -683,8 +679,7 @@ fn evaluate_uniform_random(
             0.0
         };
 
-        let dr_step_reward =
-            r_hat_chosen + match_weight * (record.reward as f64 - r_hat_logged);
+        let dr_step_reward = r_hat_chosen + match_weight * (record.reward as f64 - r_hat_logged);
         dr_cum_reward += dr_step_reward;
 
         let oracle_r = record.oracle_reward.unwrap_or(1.0) as f64;
@@ -707,17 +702,37 @@ pub fn generate_replay_markdown_summary(report: &ReplayReport) -> String {
 
     md.push_str("# Off-Policy Replay Evaluation Report (Decision F8)\n\n");
     md.push_str(&format!("- **Timestamp**: {}\n", report.timestamp));
-    md.push_str(&format!("- **Mode**: {}\n", if report.smoke_profile { "Smoke (< 60s)" } else { "Full Replay" }));
-    md.push_str(&format!("- **Seeds per Scenario**: {}\n", report.seeds_per_scenario));
-    md.push_str(&format!("- **Steps per Seed**: {}\n", report.steps_per_seed));
-    md.push_str(&format!("- **Passed Scenarios**: {} / {}\n", report.passed_scenarios, report.total_scenarios));
+    md.push_str(&format!(
+        "- **Mode**: {}\n",
+        if report.smoke_profile {
+            "Smoke (< 60s)"
+        } else {
+            "Full Replay"
+        }
+    ));
+    md.push_str(&format!(
+        "- **Seeds per Scenario**: {}\n",
+        report.seeds_per_scenario
+    ));
+    md.push_str(&format!(
+        "- **Steps per Seed**: {}\n",
+        report.steps_per_seed
+    ));
+    md.push_str(&format!(
+        "- **Passed Scenarios**: {} / {}\n",
+        report.passed_scenarios, report.total_scenarios
+    ));
     md.push_str(&format!("- **Final Verdict**: `{}`\n\n", report.verdict));
 
     md.push_str("| Scenario | FC-TS Regret (95% CI) | Sherman-Morrison Regret (95% CI) | Random Regret (95% CI) | FC-TS Improvement (Lower Bound) | Status |\n");
     md.push_str("| :--- | :--- | :--- | :--- | :--- | :---: |\n");
 
     for res in &report.scenario_results {
-        let status = if res.passed { "✅ PASSED" } else { "❌ FAILED" };
+        let status = if res.passed {
+            "✅ PASSED"
+        } else {
+            "❌ FAILED"
+        };
         md.push_str(&format!(
             "| {} | {:.1} [{:.1}, {:.1}] | {:.1} [{:.1}, {:.1}] | {:.1} [{:.1}, {:.1}] | {:.2} (LB: **{:.2}**) | {} |\n",
             res.scenario.name(),

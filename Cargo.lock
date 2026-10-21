@@ -671,17 +671,19 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "contextra-adapt",
- "contextra-core",
  "contextra-db",
  "contextra-graph",
  "contextra-infer-candle",
  "contextra-infer-onnx",
+ "contextra-ports",
  "contextra-store",
  "contextra-text",
+ "contextra-types",
  "contextra-vector",
  "criterion",
  "hdrhistogram",
  "libc",
+ "parking_lot 0.12.5",
  "rand 0.8.8",
  "redb",
  "serde",
@@ -715,6 +717,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "trybuild",
 ]
 
 [[package]]
@@ -934,7 +937,6 @@ dependencies = [
  "contextra-infer-onnx",
  "contextra-ports",
  "contextra-rank",
- "contextra-sys",
  "contextra-types",
  "futures",
  "futures-util",
@@ -1075,15 +1077,12 @@ dependencies = [
  "contextra-ports",
  "contextra-types",
  "futures-util",
- "getrandom 0.2.17",
  "proptest",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
- "tracing",
  "trybuild",
- "zeroize",
 ]
 
 [[package]]
@@ -1263,9 +1262,9 @@ name = "contextra-sys"
 version = "0.1.0"
 dependencies = [
  "contextra-ports",
- "getrandom 0.2.17",
  "libc",
  "memmap2",
+ "rand 0.8.8",
  "tracing",
  "windows-sys 0.61.2",
 ]

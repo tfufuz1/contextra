@@ -1,9 +1,9 @@
 use super::*;
 use crate::wal::KeyManager;
 use crate::wal::Wal;
-use contextra_types::TxId;
 #[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::wal_crypto::WalHmac;
+use contextra_types::TxId;
 #[cfg(feature = "encryption-at-rest")]
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -341,10 +341,7 @@ async fn test_hmac_chain_intact_after_append_failure() {
     wal.rotate_and_seal().await.expect("seal wal");
 
     let append_res = wal.append_batch(batch2).await;
-    assert!(
-        append_res.is_err(),
-        "append_batch must fail on sealed WAL"
-    );
+    assert!(append_res.is_err(), "append_batch must fail on sealed WAL");
 
     // 4. Verify rollback_hmac restores last_hmac_snapshot to pre-batch state
     wal.rollback_hmac(prev_hmac).await;

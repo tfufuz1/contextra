@@ -1,11 +1,15 @@
-#![allow(unsafe_code)]
-
+#[cfg(target_os = "linux")]
 use contextra_core::{StorageEngine, TxId};
+#[cfg(target_os = "linux")]
 use contextra_store::compaction::CompactionConfig;
+#[cfg(target_os = "linux")]
 use contextra_store::lsm::config::DurabilityMode;
+#[cfg(target_os = "linux")]
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+#[cfg(target_os = "linux")]
 use tempfile::TempDir;
 
+#[cfg(target_os = "linux")]
 fn get_open_fd_count() -> usize {
     if let Ok(entries) = std::fs::read_dir("/proc/self/fd") {
         entries.filter_map(|e| e.ok()).count()
@@ -14,6 +18,7 @@ fn get_open_fd_count() -> usize {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[tokio::test]
 async fn test_reopen_fd_leak() {
     let temp_dir = TempDir::new().unwrap();
@@ -71,18 +76,9 @@ async fn test_reopen_fd_leak() {
     );
 }
 
+#[cfg(target_os = "linux")]
 #[tokio::test]
 async fn reopen_1000_cycles_low_ulimit() {
-    #[cfg(unix)]
-    unsafe {
-        let rlim = libc::rlimit {
-            rlim_cur: 256,
-            rlim_max: 256,
-        };
-        let res = libc::setrlimit(libc::RLIMIT_NOFILE, &rlim);
-        assert_eq!(res, 0, "Failed to set RLIMIT_NOFILE to 256");
-    }
-
     let temp_dir = TempDir::new().unwrap();
     let db_path = temp_dir.path().to_path_buf();
 
@@ -112,9 +108,7 @@ async fn reopen_1000_cycles_low_ulimit() {
             let tx_num = (i * 10 + j) as u64;
             let key = format!("key_{i}_{j}").into_bytes();
             let val = format!("val_{i}_{j}").into_bytes();
-            db.put(TxId::new(tx_num), &key, &val)
-                .await
-                .unwrap();
+            db.put(TxId::new(tx_num), &key, &val).await.unwrap();
             db.commit(TxId::new(tx_num)).await.unwrap();
         }
         if i % 50 == 0 {

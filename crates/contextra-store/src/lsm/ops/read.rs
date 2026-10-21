@@ -2,8 +2,8 @@ use super::super::engine::LsmStorage;
 use super::super::scan::{check_in_range, SstableScanMode};
 use super::super::validate_key;
 use bytes::Bytes;
-use contextra_types::{Result, TOMBSTONE_BIT};
 use contextra_ports::StorageEngine;
+use contextra_types::{Result, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 
 pub(crate) async fn get_tracked(
@@ -80,8 +80,8 @@ pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes
     let snapshot_seq = _lease.seq_no();
     let res = storage.get_at_seq(key, snapshot_seq).await?;
     tracing::debug!(
-        "LsmStorage::get key={:?} seq={} found={}",
-        String::from_utf8_lossy(key),
+        "LsmStorage::get len={} seq={} found={}",
+        key.len(),
         snapshot_seq,
         res.is_some()
     );
@@ -96,8 +96,7 @@ pub(super) async fn get_at_seq(
     validate_key(key)?;
     let _lease = storage.snapshot_registry.acquire(|| seq_no);
     storage.compaction_engine.record_read_op();
-    // Genau EINMAL laden — Snapshot-Konsistenz über die gesamte Methode (INVARIANT-2)
-    let snapshot_tx = storage.last_committed_tx.load(Ordering::Acquire);
+
     let (memtable, immutable_memtables) = {
         let state = storage.state.read().await;
         (
@@ -105,14 +104,13 @@ pub(super) async fn get_at_seq(
             state.immutable_memtables.clone(),
         )
     };
-    tracing::debug!(
-        "LsmStorage::get_at_seq key={:?} seq={} snapshot_tx={}",
-        String::from_utf8_lossy(key),
-        seq_no,
-        snapshot_tx
-    );
 
-    // 1. MemTable (only if seq_no in entry <= target seq_no AND tx_id <= snapshot_tx)
+    // S7 / INV-COM-2: Visibility is governed strictly by sequence number watermark (`seq_no <= last_applied_seq`).
+    let snapshot_tx = u64::MAX;
+
+    tracing::debug!("LsmStorage::get_at_seq len={} seq={}", key.len(), seq_no);
+
+    // 1. MemTable (filtered by target seq_no)
     if let Some((val, seq, _tx)) = memtable.get_at_seq(key, seq_no, snapshot_tx) {
         if (seq & TOMBSTONE_BIT) != 0 {
             return Ok(None);
@@ -130,28 +128,16 @@ pub(super) async fn get_at_seq(
         }
     }
 
-    // 3. SSTables (newest first, filtered by seq_no and snapshot_tx)
+    // 3. SSTables (newest first, filtered by seq_no)
     let sstables = storage.sstables.read().await.clone();
     for sst in sstables.iter().rev() {
-        if (sst.metadata().min_tx_id < contextra_types::TxId::INTERNAL_BASE
-            && snapshot_tx < sst.metadata().min_tx_id)
-            || seq_no < sst.metadata().min_seq
-        {
+        if seq_no < sst.metadata().min_seq {
             continue;
         }
-        if let Some((val, seq, tx)) = sst.get_at(key, seq_no, snapshot_tx).await? {
-            tracing::debug!(
-                "LsmStorage::get_at_seq SSTable check: seq={} target_seq={} tx={} snapshot_tx={}",
-                seq & !TOMBSTONE_BIT,
-                seq_no,
-                tx,
-                snapshot_tx
-            );
+        if let Some((val, seq, _tx)) = sst.get_at(key, seq_no, snapshot_tx).await? {
             if (seq & TOMBSTONE_BIT) != 0 {
-                tracing::debug!("LsmStorage::get_at_seq FOUND TOMBSTONE");
                 return Ok(None);
             }
-            tracing::debug!("LsmStorage::get_at_seq MATCH found in SSTable");
             return Ok(Some(val));
         }
     }
