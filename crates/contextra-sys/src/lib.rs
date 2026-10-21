@@ -13,6 +13,8 @@ pub mod mlock;
 pub mod mmap;
 pub mod crypto_rng;
 pub mod posix;
+/// OS-based cryptographically secure random number generation (`OsCryptoRng`).
+pub mod crypto_rng;
 pub mod rng;
 pub mod vault;
 pub mod wiring;

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 /// INVARIANTE INV-TENANT-1: TenantId(0) ist SYSTEM-reserviert.
 /// `TenantId::try_new(0)` → Err. Keine Ausnahmen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(try_from = "u64")]
 #[repr(transparent)]
 pub struct TenantId(pub u64);
 
@@ -523,5 +524,47 @@ impl TryFrom<u64> for TxId {
 impl std::fmt::Display for TxId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "TxId({})", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tenant_id_deserialize_zero_rejected() {
+        let json = "0";
+        let res: std::result::Result<TenantId, _> = serde_json::from_str(json);
+        assert!(
+            res.is_err(),
+            "Deserialisierung von TenantId(0) muss fehlschlagen"
+        );
+    }
+
+    #[test]
+    fn test_tenant_id_deserialize_valid() {
+        let json = "7";
+        let tenant: TenantId =
+            serde_json::from_str(json).expect("Deserialisierung von 7 muss erfolgreich sein");
+        assert_eq!(tenant, TenantId::try_new(7).unwrap());
+    }
+
+    #[test]
+    fn test_tenant_id_serde_roundtrip_valid() {
+        let original = TenantId::try_new(7).unwrap();
+        let serialized = serde_json::to_string(&original).expect("Serialisierung fehlgeschlagen");
+        let deserialized: TenantId =
+            serde_json::from_str(&serialized).expect("Deserialisierung fehlgeschlagen");
+        assert_eq!(original, deserialized);
+    }
+
+    #[test]
+    fn test_tenant_id_system_constructor() {
+        let sys = TenantId::SYSTEM;
+        assert_eq!(sys.inner(), 0);
+        assert!(sys.is_system());
+
+        let sys_fn = TenantId::system();
+        assert_eq!(sys_fn, TenantId::SYSTEM);
     }
 }
