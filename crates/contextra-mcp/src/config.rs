@@ -9,7 +9,6 @@ static LLM_PROVIDER_DEPRECATION_WARN_ONCE: Once = Once::new();
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum EmbeddingBackend {
     None,
-    LocalOnnx,
     Candle,
     Ollama,
 }
@@ -71,6 +70,12 @@ impl EmbeddingConfig {
         if trimmed_provider.is_empty() {
             let msg = "Kein Embedding-Provider konfiguriert. Bitte CONTEXTRA_EMBEDDING_PROVIDER (oder EMBEDDING_PROVIDER) auf 'mock' setzen.".to_string();
             return Err(ContextraError::InvalidInput(msg));
+        }
+
+        if trimmed_provider.eq_ignore_ascii_case("onnx") || trimmed_provider.eq_ignore_ascii_case("localonnx") {
+            return Err(ContextraError::InvalidInput(
+                "Backend onnx ist in v1.0 geparkt, siehe docs/restore/PARK-ONNX".to_string(),
+            ));
         }
 
         if trimmed_provider.eq_ignore_ascii_case("mock") {
@@ -383,6 +388,20 @@ mod tests {
         };
         let res = config.build_provider();
         assert!(matches!(res, Err(ContextraError::InvalidInput(_))));
+    }
+
+    #[test]
+    fn test_embedding_config_onnx_parked_error() {
+        let config = EmbeddingConfig {
+            provider: "onnx".to_string(),
+        };
+        let res = config.build_provider();
+        match res {
+            Err(ContextraError::InvalidInput(msg)) => {
+                assert_eq!(msg, "Backend onnx ist in v1.0 geparkt, siehe docs/restore/PARK-ONNX");
+            }
+            other => panic!("Expected typed error for parked onnx backend, got: {other:?}"),
+        }
     }
 
     #[test]
