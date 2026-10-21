@@ -15,6 +15,7 @@ ring = "tooling"
 [features]
 default = ["fault-injection"]
 fault-injection = []
+testing = []
 
 [dependencies]
 contextra-ports = { workspace = true }

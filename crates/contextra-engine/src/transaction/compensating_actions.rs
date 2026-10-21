@@ -37,7 +37,10 @@ impl CommitLedger {
             }
         }
         if let Some(e) = first_error {
-            Err(e)
+            Err(ContextraError::Transaction(format!(
+                "Compensating action execution failed: {}",
+                e
+            )))
         } else {
             Ok(())
         }
@@ -232,7 +235,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensateHnswAction<S, V> {
 impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswAction<S, V> {
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            if let Ok(kv_store) = self.collection.kv_store() {
+            if let Some(kv_store) = self.collection.kv_store() {
                 let chunk_ids: Vec<u64> = self
                     .doc_ids
                     .iter()

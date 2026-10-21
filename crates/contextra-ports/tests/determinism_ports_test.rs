@@ -1,8 +1,6 @@
 //! Integration tests for determinism ports (Clock, EntropyRng, SeededRng, IdGen / IdGenerator).
 
-use contextra_ports::{
-    Clock, DeterministicTimestamp, EntropyRng, IdGen, IdGenerator, Rng, SeededRng,
-};
+use contextra_ports::{Clock, DeterministicTimestamp, EntropyRng, IdGen, IdGenerator, Rng, SeededRng};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 

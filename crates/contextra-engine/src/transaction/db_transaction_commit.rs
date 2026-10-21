@@ -11,6 +11,11 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
+    // TODO(WP-E2 / PR-22): SSI Verdrahtung (Befund MVCC-001):
+    // Standard-Leseoperationen (`Collection::get`, `Collection::scan`, `Collection::scan_prefix`)
+    // registrieren Lesezugriffe bislang nicht im transaktionalen `ReadSet`. Dadurch ist `read_set.is_empty()`
+    // wahr und `validate_ssi_gate` winkt Transaktionen trotz Write-Skew durch.
+    // Leseoperationen müssen das `ReadSet` befüllen und hier gegen den `SequenceLogSsiValidator` geprüft werden.
     pub(super) fn validate_ssi_gate(&self) -> Result<()> {
         if self.has_untracked_reads() {
             return Err(ContextraError::CapabilityUnsupported {
@@ -142,6 +147,10 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         res
     }
 
+    // TODO(WP-E1 / PR-21): Saga-Commit Fix:
+    // Der 2PC/Saga-Commit über LSM, HNSW und TextIndex muss strenge Idempotenz und
+    // Crash-Wiederherstellbarkeit des `CommitLedger` gewährleisten, damit unvollständig
+    // ausgeführte Teil-Commits nach einem Absturz über `CommitIntent` deterministisch kompensiert werden können.
     async fn commit_internal(&self) -> Result<()> {
         if let Err(e) = self.validate_ssi_gate() {
             self.rollback_internal().await;
@@ -212,14 +221,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             .put(intent_tx, &intent_key, &intent_bytes)
             .await
         {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("intent_put_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    e, rb_err
-                )));
-            }
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Failed to write commit intent: {}",
                 e
@@ -227,14 +229,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         if let Err(e) = self.collection.storage.commit(intent_tx).await {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("intent_commit_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    e, rb_err
-                )));
-            }
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Failed to commit intent transaction: {}",
                 e
@@ -243,14 +238,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
 
         // Phase (b): Commit LSM storage (SINGLE POINT OF COMMIT - INV-IDX-1)
         if let Err(storage_err) = self.collection.storage.commit(self.tx_id).await {
-            if let Err(rb_err) = ledger.execute_rollback().await {
-                self.collection
-                    .mark_needs_recovery("storage_commit_failed_rollback_failed");
-                return Err(ContextraError::Transaction(format!(
-                    "CommitFailedRollbackFailed {{ cause: {:?}, rollback: {:?} }}",
-                    storage_err, rb_err
-                )));
-            }
+            let _ = ledger.execute_rollback().await;
             return Err(ContextraError::Transaction(format!(
                 "Storage commit failed: {}",
                 storage_err

@@ -68,7 +68,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         opts.options.validate()?;
 
-        if opts.options.assurance > contextra_crypto::deletion_proof::claim_text::WitAssurance::S0 {
+        if opts.options.assurance
+            > contextra_crypto::deletion_proof::claim_text::WitAssurance::S0
+        {
             return Err(ContextraError::capability_unsupported(
                 "real_scan_erasure",
                 "Assurance levels above S0 require real storage scans",
@@ -86,8 +88,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let _key_guard = self.kv_locks.lock_for(id).await;
 
-        let is_off_mode = opts.options.assurance
-            == contextra_crypto::deletion_proof::claim_text::WitAssurance::S0
+        let is_off_mode = opts.options.assurance == contextra_crypto::deletion_proof::claim_text::WitAssurance::S0
             && opts.options.purge == crate::deletion::forget_options::PurgeMode::None;
 
         let maybe_backend = self.storage.erasure_capabilities();
@@ -102,31 +103,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let user_key = self.namespaced_key(id.as_bytes(), 0);
         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
 
-        let (
-            footprint_hash,
-            scope_hash,
-            prefixes,
-            explicit_keys,
-            observed_empty,
-            _scope_prefixes_ref,
-        ) = if is_off_mode {
+        let (footprint_hash, scope_hash, prefixes, explicit_keys, observed_empty, _scope_prefixes_ref) = if is_off_mode {
             let explicit = vec![user_key.clone(), doc_key.clone()];
-            let scope_hash =
-                contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed(&explicit);
+            let scope_hash = contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed(&explicit);
             let prefixes = Vec::<Vec<u8>>::new();
-            (
-                [0u8; 32],
-                scope_hash,
-                prefixes,
-                explicit,
-                false,
-                Vec::<Vec<u8>>::new(),
-            )
+            ([0u8; 32], scope_hash, prefixes, explicit, false, Vec::<Vec<u8>>::new())
         } else {
             let footprint = self.erasure_footprint(doc_id).await?;
-            let scope_hash = contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed(
-                &footprint.keys.explicit,
-            );
+            let scope_hash = contextra_crypto::deletion_proof::hash_deleted_keys_length_prefixed(&footprint.keys.explicit);
             (
                 footprint.hash,
                 scope_hash,
@@ -166,11 +150,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         db_tx.commit().await?;
 
         if let Err(e) = self.index.delete(erased_at_tx, doc_id).await {
-            tracing::error!(
-                "Post-commit vector index delete failed for doc {}: {:?}",
-                id,
-                e
-            );
+            tracing::error!("Post-commit vector index delete failed for doc {}: {:?}", id, e);
         }
 
         self.check_and_trigger_community_detection(1);
