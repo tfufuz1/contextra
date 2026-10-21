@@ -12,6 +12,14 @@
 
 use std::sync::Arc;
 
+/// Marker trait for cryptographically secure random number generators (CSPRNG).
+///
+/// MUST NOT be implemented by deterministic or non-cryptographic PRNGs (e.g. [`SystemRng`], [`SeededRng`]).
+/// Security-critical paths like cryptographic key generation must statically require [`CryptoRng`].
+pub trait CryptoRng: Send + Sync + 'static {}
+
+impl<T: CryptoRng + ?Sized> CryptoRng for Arc<T> {}
+
 /// Error type returned by entropy sources when requested operations fail or are unsupported.
 #[derive(Debug, thiserror::Error)]
 pub enum RngError {
@@ -25,7 +33,7 @@ pub enum RngError {
 
 /// Standard non-cryptographic system entropy generator backed by system/process entropy.
 ///
-/// NOTE: [`SystemRng`] does NOT implement [`CryptoRng`] or [`EntropyRng`] and MUST NOT be used for cryptographic key generation.
+/// NOTE: [`SystemRng`] does NOT implement [`CryptoRng`] and MUST NOT be used for cryptographic key generation.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SystemRng;
 
@@ -51,12 +59,13 @@ impl SystemRng {
     }
 }
 
-/// DEPRECATION NOTICE: This implementation of [`EntropyRng`] for [`SystemRng`] uses non-CSPRNG
-/// process entropy (`std::collections::hash_map::RandomState`) and WILL BE REMOVED in Session W3-01.
-///
-/// It does NOT override [`EntropyRng::fill_secret`] (returning [`RngError::SecretUnsupported`]).
-/// Migration path: Use `OsEntropyRng` for cryptographic material generation.
-impl EntropyRng for SystemRng {
+impl SeededRng for SystemRng {
+    fn next_u64(&self) -> u64 {
+        use std::collections::hash_map::RandomState;
+        use std::hash::{BuildHasher, Hasher};
+        RandomState::new().build_hasher().finish()
+    }
+
     fn fill_bytes(&self, dest: &mut [u8]) {
         use std::collections::hash_map::RandomState;
         use std::hash::{BuildHasher, Hasher};
@@ -73,6 +82,21 @@ impl EntropyRng for SystemRng {
     fn next_unit_f64(&self) -> f64 {
         let mantissa = SeededRng::next_u64(self) >> 11;
         (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
+    }
+}
+
+/// DEPRECATION NOTICE: This implementation of [`EntropyRng`] for [`SystemRng`] uses non-CSPRNG
+/// process entropy (`std::collections::hash_map::RandomState`) and WILL BE REMOVED in Session W3-01.
+///
+/// It does NOT override [`EntropyRng::fill_secret`] (returning [`RngError::SecretUnsupported`]).
+/// Migration path: Use `OsEntropyRng` for cryptographic material generation.
+impl EntropyRng for SystemRng {
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        SeededRng::fill_bytes(self, dest);
+    }
+
+    fn next_u64(&self) -> u64 {
+        SeededRng::next_u64(self)
     }
 }
 
@@ -114,8 +138,6 @@ pub trait SeededRng: Send + Sync + 'static {
 /// Deprecated per E55 / §7.4: `Rng` is ambiguous. Use [`EntropyRng`] or [`SeededRng`] explicitly.
 #[deprecated(since = "0.1.0", note = "Use SeededRng or EntropyRng per §7.4 / E55")]
 pub use SeededRng as Rng;
-
-impl<T: CryptoRng + ?Sized> CryptoRng for Arc<T> {}
 
 impl<T: EntropyRng + ?Sized> EntropyRng for Arc<T> {
     fn fill_bytes(&self, dest: &mut [u8]) {
@@ -205,6 +227,5 @@ mod tests {
         let mut key = [0u8; 32];
         generate_key(&rng, &mut key);
         assert_eq!(key, [0xAA; 32]);
-        // Note: MockSeededRng cannot be passed to generate_key because SeededRng does not implement EntropyRng.
     }
 }
