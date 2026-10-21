@@ -25,7 +25,9 @@ windows-sys = { version = "0.61", features = [
 libc = "0.2"
 
 [dependencies]
+contextra-ports = { workspace = true, optional = true }
 memmap2 = { workspace = true }
+rand = { workspace = true }
 tracing = { workspace = true }
 # TODO(WP-0 / PR-1 Schritt 3): Optionale Dependency `contextra-ports = { workspace = true, optional = true }`
 # und Feature `ports = ["dep:contextra-ports"]` hinzufügen, um Trait-Implementierungen (Clock/Rng) bereitzustellen,

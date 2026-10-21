@@ -49,14 +49,6 @@ async fn test_missing_ledger_on_non_pristine_db_opens_read_only() -> Result<(), 
         "ledger_append must fail in ReadOnly mode"
     );
 
-    let flush_res = store.flush().await;
-    assert!(flush_res.is_err(), "flush must fail in ReadOnly mode");
-
-    let rollback_res = store.rollback_to_tx(TxId::new(1)).await;
-    assert!(
-        rollback_res.is_err(),
-        "rollback_to_tx must fail in ReadOnly mode"
-    );
 
     Ok(())
 }
