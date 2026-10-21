@@ -46,7 +46,7 @@ use contextra_types::{ContextraError, DocId, Result, TxId};
 use contextra_vector::HnswIndex;
 use serde::{Deserialize, Serialize};
 #[cfg(not(loom))]
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64};
 #[cfg(not(loom))]
 use std::sync::Arc;
 
@@ -101,15 +101,6 @@ impl Default for LoadPolicy {
     }
 }
 
-/// Collection health status indicating whether store and indices are consistent or require recovery.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CollectionHealth {
-    /// Collection store and indices are consistent and operational.
-    Healthy,
-    /// Collection experienced a commit/rollback failure resulting in store/index divergence and requires recovery.
-    NeedsRecovery,
-}
-
 /// Configuration for a collection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CollectionConfig {
@@ -137,21 +128,8 @@ mod kv_store_tests {
     #[tokio::test]
     async fn test_kv_store_feature_behavior() {
         let dir = tempdir().unwrap();
-        let lsm = Arc::new(
-            LsmStorage::new(LsmConfig {
-                path: dir.path().to_path_buf(),
-                ..Default::default()
-            })
-            .await
-            .unwrap(),
-        );
-        let hnsw = Arc::new(
-            HnswIndex::try_new(HnswConfig {
-                dimension: 4,
-                ..Default::default()
-            })
-            .unwrap(),
-        );
+        let lsm = Arc::new(LsmStorage::new(LsmConfig { path: dir.path().to_path_buf(), ..Default::default() }).await.unwrap());
+        let hnsw = Arc::new(HnswIndex::try_new(HnswConfig { dimension: 4, ..Default::default() }).unwrap());
         let graph = Arc::new(CsrGraph::new());
         let mut col = Collection::new(
             "test".into(),
@@ -173,8 +151,8 @@ mod kv_store_tests {
 
         #[cfg(not(feature = "encryption-at-rest"))]
         {
-            // Without encryption-at-rest, kv_store is disabled and returns CapabilityUnsupported as designed
-            assert!(col.kv_store().is_err());
+            // Without encryption-at-rest, kv_store is disabled and returns None as designed
+            assert!(col.kv_store().is_none());
         }
     }
 }
@@ -207,34 +185,25 @@ impl StoredDocument {
 
         let id_bytes = self.id.as_bytes();
         let id_len = u32::try_from(id_bytes.len()).map_err(|_| {
-            ContextraError::invalid_input(
-                "Document ID length exceeds u32 limit for v2 binary encoding",
-            )
+            ContextraError::invalid_input("Document ID length exceeds u32 limit for v2 binary encoding")
         })?;
 
         let emb_len = u32::try_from(self.embedding.len()).map_err(|_| {
-            ContextraError::invalid_input(
-                "Embedding vector length exceeds u32 limit for v2 binary encoding",
-            )
+            ContextraError::invalid_input("Embedding vector length exceeds u32 limit for v2 binary encoding")
         })?;
 
         let meta_bytes = match &self.metadata {
             Some(meta) => serde_json::to_vec(meta).map_err(|e| {
-                ContextraError::Serialization(format!(
-                    "Failed to serialize metadata for v2 binary encoding: {e}"
-                ))
+                ContextraError::Serialization(format!("Failed to serialize metadata for v2 binary encoding: {e}"))
             })?,
             None => Vec::new(),
         };
 
         let meta_len = u32::try_from(meta_bytes.len()).map_err(|_| {
-            ContextraError::invalid_input(
-                "Metadata byte length exceeds u32 limit for v2 binary encoding",
-            )
+            ContextraError::invalid_input("Metadata byte length exceeds u32 limit for v2 binary encoding")
         })?;
 
-        let total_cap =
-            5 + 4 + id_bytes.len() + 4 + (self.embedding.len() * 4) + 4 + meta_bytes.len();
+        let total_cap = 5 + 4 + id_bytes.len() + 4 + (self.embedding.len() * 4) + 4 + meta_bytes.len();
         let mut buf = Vec::with_capacity(total_cap);
 
         buf.extend_from_slice(&STORED_DOCUMENT_MAGIC);
@@ -298,9 +267,7 @@ impl StoredDocument {
             }
             let id = std::str::from_utf8(&bytes[offset..offset + id_len])
                 .map_err(|e| {
-                    ContextraError::Serialization(format!(
-                        "Invalid UTF-8 in StoredDocument v2 id: {e}"
-                    ))
+                    ContextraError::Serialization(format!("Invalid UTF-8 in StoredDocument v2 id: {e}"))
                 })?
                 .to_string();
             offset += id_len;
@@ -331,9 +298,7 @@ impl StoredDocument {
             let mut embedding = Vec::with_capacity(emb_len);
             for chunk in bytes[offset..offset + emb_bytes_len].chunks_exact(4) {
                 let arr: [u8; 4] = chunk.try_into().map_err(|_| {
-                    ContextraError::Serialization(
-                        "Slice conversion failed for f32 byte chunk".into(),
-                    )
+                    ContextraError::Serialization("Slice conversion failed for f32 byte chunk".into())
                 })?;
                 let val = f32::from_le_bytes(arr);
                 if !val.is_finite() {
@@ -367,9 +332,7 @@ impl StoredDocument {
             let metadata = if meta_len > 0 {
                 let meta_slice = &bytes[offset..offset + meta_len];
                 let val: serde_json::Value = serde_json::from_slice(meta_slice).map_err(|e| {
-                    ContextraError::Serialization(format!(
-                        "Invalid metadata JSON in StoredDocument v2: {e}"
-                    ))
+                    ContextraError::Serialization(format!("Invalid metadata JSON in StoredDocument v2: {e}"))
                 })?;
                 Some(val)
             } else {
@@ -712,8 +675,6 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) metrics: parking_lot::RwLock<Arc<dyn MetricsSink>>,
     /// Stores report of the last index load operation.
     pub(super) last_load_report: parking_lot::Mutex<Option<IndexLoadReport>>,
-    /// Collection health status.
-    pub(super) health: Arc<AtomicBool>,
 }
 
 #[cfg(not(loom))]
@@ -744,7 +705,6 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             clock: parking_lot::RwLock::new(self.clock.read().clone()),
             metrics: parking_lot::RwLock::new(self.metrics.read().clone()),
             last_load_report: parking_lot::Mutex::new(self.last_load_report.lock().clone()),
-            health: self.health.clone(),
         }
     }
 }
@@ -825,45 +785,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             clock: parking_lot::RwLock::new(Arc::new(SystemClock::new())),
             metrics: parking_lot::RwLock::new(Arc::new(NoopMetricsSink)),
             last_load_report: parking_lot::Mutex::new(None),
-            health: Arc::new(AtomicBool::new(true)),
-        }
-    }
-
-    /// Returns the current health status of the collection.
-    pub fn health(&self) -> CollectionHealth {
-        if self.health.load(Ordering::Acquire) {
-            CollectionHealth::Healthy
-        } else {
-            CollectionHealth::NeedsRecovery
-        }
-    }
-
-    /// Marks the collection health as `NeedsRecovery` and records health degradation metric.
-    pub fn mark_needs_recovery(&self, reason: &str) {
-        self.health.store(false, Ordering::Release);
-        crate::metrics_names::record_counter_safe(
-            &*self.metrics_sink(),
-            "contextra_collection_health_degraded_total",
-            1,
-            &[("collection", &self.name), ("reason", reason)],
-        );
-        tracing::error!(
-            collection = %self.name,
-            reason = %reason,
-            "Collection health degraded to NeedsRecovery"
-        );
-    }
-
-    /// Verifies that writes are permitted for this collection.
-    /// Returns `Err(ContextraError::PolicyViolation)` if health is `NeedsRecovery`.
-    pub fn check_write_allowed(&self) -> Result<()> {
-        if self.health() == CollectionHealth::NeedsRecovery {
-            Err(ContextraError::PolicyViolation(format!(
-                "Write operations blocked for collection '{}': health is NeedsRecovery",
-                self.name
-            )))
-        } else {
-            Ok(())
         }
     }
 
@@ -980,10 +901,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Attaches a `TenantIsolatedKvStore` to the collection for KV cache rollback management.
     #[cfg(feature = "encryption-at-rest")]
-    pub fn with_kv_store(
-        mut self,
-        kv_store: Arc<contextra_kvcache::TenantIsolatedKvStore>,
-    ) -> Self {
+    pub fn with_kv_store(mut self, kv_store: Arc<contextra_kvcache::TenantIsolatedKvStore>) -> Self {
         self.kv_store = Some(kv_store);
         self
     }
@@ -1003,25 +921,15 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
-    /// Returns `Err(ContextraError::CapabilityUnsupported)` when kv_store is disabled or unconfigured (INV-NOOP-1).
     #[cfg(feature = "encryption-at-rest")]
-    pub fn kv_store(&self) -> Result<&Arc<contextra_kvcache::TenantIsolatedKvStore>> {
-        self.kv_store
-            .as_ref()
-            .ok_or_else(|| ContextraError::CapabilityUnsupported {
-                capability: "kv_store".into(),
-                reason: "KV store not configured for this collection".into(),
-            })
+    pub fn kv_store(&self) -> Option<&Arc<contextra_kvcache::TenantIsolatedKvStore>> {
+        self.kv_store.as_ref()
     }
 
     /// Returns a reference to the attached `TenantIsolatedKvStore`, if configured.
-    /// Returns `Err(ContextraError::CapabilityUnsupported)` when kv_store is disabled or unconfigured (INV-NOOP-1).
     #[cfg(not(feature = "encryption-at-rest"))]
-    pub fn kv_store(&self) -> Result<&Arc<contextra_kvcache::TenantIsolatedKvStore>> {
-        Err(ContextraError::CapabilityUnsupported {
-            capability: "kv_store".into(),
-            reason: "KV store feature encryption-at-rest disabled".into(),
-        })
+    pub fn kv_store(&self) -> Option<&Arc<contextra_kvcache::TenantIsolatedKvStore>> {
+        None
     }
 
     /// Sets the text embedder for this collection (consuming version).
@@ -1300,63 +1208,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         *self.last_load_report.lock() = Some(report.clone());
 
-        // Perform index finalizer sequence reconciliation check on recovery
-        self.reconcile_index_finalizer_sequences().await?;
-
         Ok(report)
-    }
-
-    /// Checks last finalized sequence numbers across text, vector, and graph indices against storage sequence.
-    /// If an index returns unsupported capability or sequence mismatch that cannot be reconciled,
-    /// marks collection health as `NeedsRecovery`.
-    pub async fn reconcile_index_finalizer_sequences(&self) -> Result<()> {
-        let text_fin =
-            crate::transaction::index_finalizer::TextIndexFinalizerAdapter::new(&self.text_index);
-        let vec_fin = crate::transaction::index_finalizer::VectorIndexFinalizerAdapter::new(
-            self.index.as_ref(),
-        );
-        let graph_fin = crate::transaction::index_finalizer::GraphIndexFinalizerAdapter::new(
-            self.graph_index.as_ref(),
-        );
-
-        use crate::transaction::index_finalizer::IndexFinalizer;
-
-        let last_seq = match self.storage.last_seq_no().await {
-            Ok(seq) => seq,
-            Err(e) => {
-                self.mark_needs_recovery(&format!("Storage last_seq_no lookup failed: {e}"));
-                return Ok(());
-            }
-        };
-
-        let check_index = |name: &str, res: Result<u64>| {
-            match res {
-                Ok(index_seq) if index_seq < last_seq => {
-                    tracing::warn!(
-                        collection = %self.name,
-                        index = name,
-                        index_seq,
-                        last_seq,
-                        "Index sequence lagging behind store sequence — index finalizer catch-up needed"
-                    );
-                }
-                Ok(_) => {}
-                Err(ContextraError::CapabilityUnsupported { .. }) => {
-                    // Supported behavior for un-versioned index types
-                }
-                Err(e) => {
-                    self.mark_needs_recovery(&format!(
-                        "Index sequence check failed for {name}: {e}"
-                    ));
-                }
-            }
-        };
-
-        check_index("text", text_fin.last_finalized_seq());
-        check_index("vector", vec_fin.last_finalized_seq());
-        check_index("graph", graph_fin.last_finalized_seq());
-
-        Ok(())
     }
 
     /// Migrates old doc_keys (with Embedding) to new doc_keys (only Metadata).

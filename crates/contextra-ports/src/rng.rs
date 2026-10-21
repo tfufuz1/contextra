@@ -12,20 +12,14 @@
 
 use std::sync::Arc;
 
-/// Error type returned by entropy sources when requested operations fail or are unsupported.
-#[derive(Debug, thiserror::Error)]
-pub enum RngError {
-    /// The entropy source is unavailable or encountered an OS/hardware error.
-    #[error("entropy source unavailable: {0}")]
-    Unavailable(String),
-    /// The source is not a cryptographic entropy source capable of generating secret material.
-    #[error("source is not a cryptographic entropy source")]
-    SecretUnsupported,
-}
-
+// TODO(WP-S1 / PR-3 Schritt 1): `CryptoRng` Marker-Trait implementieren.
+// Aktuell implementiert `SystemRng` hier fälschlicherweise `EntropyRng` via std RandomState/Hasher,
+// was KEIN kryptographischer Zufallszahlengenerator (CSPRNG) ist und zu Befund F-01 führte.
+// Implementierungsaufgabe:
+// 1. Definiere `pub trait CryptoRng: Send + Sync {}` als typ-sicheren Marker für echte CSPRNGs.
+// 2. `SystemRng` darf `CryptoRng` NICHT implementieren.
+// 3. Kryptographische Pfade (wie Ed25519-Schlüsselerzeugung) müssen statisch `CryptoRng` fordern.
 /// Standard non-cryptographic system entropy generator backed by system/process entropy.
-///
-/// NOTE: [`SystemRng`] does NOT implement [`CryptoRng`] or [`EntropyRng`] and MUST NOT be used for cryptographic key generation.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SystemRng;
 
@@ -37,12 +31,12 @@ impl SystemRng {
 
     /// Generates the next pseudorandom 64-bit unsigned integer.
     pub fn next_u64(&self) -> u64 {
-        SeededRng::next_u64(self)
+        EntropyRng::next_u64(self)
     }
 
     /// Fills `dest` with pseudorandom bytes.
     pub fn fill_bytes(&self, dest: &mut [u8]) {
-        SeededRng::fill_bytes(self, dest);
+        EntropyRng::fill_bytes(self, dest);
     }
 
     /// Returns a pseudorandom `f64` in `[0.0, 1.0)`.
@@ -104,6 +98,21 @@ impl EntropyRng for SystemRng {
     }
 }
 
+/// DEPRECATION NOTICE: This implementation of [`EntropyRng`] for [`SystemRng`] uses non-CSPRNG
+/// process entropy (`std::collections::hash_map::RandomState`) and WILL BE REMOVED in Session W3-01.
+///
+/// It does NOT override [`EntropyRng::fill_secret`] (returning [`RngError::SecretUnsupported`]).
+/// Migration path: Use `OsEntropyRng` for cryptographic material generation.
+impl EntropyRng for SystemRng {
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        SeededRng::fill_bytes(self, dest);
+    }
+
+    fn next_u64(&self) -> u64 {
+        SeededRng::next_u64(self)
+    }
+}
+
 /// Port trait for cryptographic entropy sources (keys, nonces, IVs, salts).
 ///
 /// MUST be backed by genuine system/OS entropy or KMS. Test PRNGs MUST NOT implement this trait.
@@ -113,13 +122,6 @@ pub trait EntropyRng: Send + Sync + 'static {
 
     /// Generates the next pseudorandom 64-bit unsigned integer from secure entropy.
     fn next_u64(&self) -> u64;
-
-    /// NORMATIV: Nur Quellen aus Betriebssystem oder KMS überschreiben diese Methode.
-    /// Fehler werden propagiert, nie durch Nullbytes ersetzt. Default = Err(SecretUnsupported).
-    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
-        let _ = dest;
-        Err(RngError::SecretUnsupported)
-    }
 }
 
 /// Port trait for non-cryptographic, deterministic, or test random number generators.
@@ -143,8 +145,6 @@ pub trait SeededRng: Send + Sync + 'static {
 #[deprecated(since = "0.1.0", note = "Use SeededRng or EntropyRng per §7.4 / E55")]
 pub use SeededRng as Rng;
 
-impl<T: CryptoRng + ?Sized> CryptoRng for Arc<T> {}
-
 impl<T: EntropyRng + ?Sized> EntropyRng for Arc<T> {
     fn fill_bytes(&self, dest: &mut [u8]) {
         (**self).fill_bytes(dest);
@@ -152,10 +152,6 @@ impl<T: EntropyRng + ?Sized> EntropyRng for Arc<T> {
 
     fn next_u64(&self) -> u64 {
         (**self).next_u64()
-    }
-
-    fn fill_secret(&self, dest: &mut [u8]) -> Result<(), RngError> {
-        (**self).fill_secret(dest)
     }
 }
 
@@ -233,6 +229,5 @@ mod tests {
         let mut key = [0u8; 32];
         generate_key(&rng, &mut key);
         assert_eq!(key, [0xAA; 32]);
-        // Note: MockSeededRng cannot be passed to generate_key because SeededRng does not implement EntropyRng.
     }
 }

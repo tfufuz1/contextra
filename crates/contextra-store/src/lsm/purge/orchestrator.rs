@@ -125,6 +125,14 @@ impl<'a> PurgeOrchestrator<'a> {
         }
     }
 
+    // TODO(WP-4 / PR-13 / N1): Befund N1 beheben (Resume ist No-op bei `storage: None`):
+    // `new_standalone` initialisiert `storage: None`. Wird dieser Orchestrator für Recovery/Resume
+    // (`resume_pending_purge` in `resume.rs`) aufgerufen, wird Phase P4 (`PurgeCompaction`)
+    // stillschweigend übersprungen, da `self.storage` `None` ist. Das Intent-File wird abgeräumt,
+    // ohne dass die Schlüssel jemals per Compaction gelöscht wurden.
+    // Implementierungsaufgabe:
+    // Standalone-Resume muss entweder einen echten `LsmStorage`-Handle erhalten oder eine deterministische
+    // Offline-Compaction durchführen, damit anstehende Purges nach Absturz vollständig ausgeführt werden.
     /// Creates a standalone `PurgeOrchestrator` without active storage.
     ///
     /// Running compaction (Phase P4) with standalone orchestrator will fail-closed with an error
@@ -308,6 +316,9 @@ impl<'a> PurgeOrchestrator<'a> {
                 self.record_phase(&mut intent, PurgePhase::PurgeCompaction)?;
                 self.check_failpoint("mid_compaction_output")?;
 
+                // TODO(WP-4 / PR-13 / N1): Bei `self.storage == None` wird `purge_keys` komplett übersprungen!
+                // Für Standalone-Recovery muss hier entweder `storage` bereitgestellt oder ein Fehler
+                // zurückgegeben werden, damit kein Intent fälschlicherweise als erfolgreich gelöscht markiert wird.
                 if let Some(storage) = self.storage {
                     match storage
                         .purge_keys(scope, intent.as_of_tx, space_probe)

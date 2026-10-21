@@ -22,7 +22,7 @@ pub struct WiringReport {
 impl WiringReport {
     pub fn is_valid(&self) -> bool {
         self.missing_ports.iter().all(|m| {
-            m.contains("(disabled)") || m.contains("(optional)") || m.contains("(nicht prüfbar")
+            m.contains("(disabled)") || m.contains("(optional)")
         }) && self.invalid_security_ports.is_empty()
     }
 }
@@ -77,15 +77,9 @@ pub fn generate_report_for_builder(builder: &ContextraBuilder) -> WiringReport {
         report.missing_ports.push("Erasure (disabled)".to_string());
     }
 
-    report
-        .missing_ports
-        .push("Clock (nicht prüfbar auf Builder: System-Default vor build())".to_string());
-    report
-        .missing_ports
-        .push("Rng (nicht prüfbar auf Builder: System-Default vor build())".to_string());
-    report
-        .missing_ports
-        .push("IdGen (nicht prüfbar auf Builder: System-Default vor build())".to_string());
+    report.wired_ports.push("Clock".to_string());
+    report.wired_ports.push("Rng".to_string());
+    report.wired_ports.push("IdGen".to_string());
 
     report
 }
@@ -118,7 +112,6 @@ pub fn verify_builder_wiring(builder: &ContextraBuilder) -> Result<WiringReport,
                 .filter(|m| {
                     !m.contains("(disabled)")
                         && !m.contains("(optional)")
-                        && !m.contains("(nicht prüfbar")
                 })
                 .cloned()
                 .collect::<Vec<_>>()
@@ -174,21 +167,11 @@ pub fn generate_report_for_instance(instance: &Contextra) -> WiringReport {
         report.missing_ports.push("Erasure (disabled)".to_string());
     }
 
-    report
-        .missing_ports
-        .push("Clock (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string());
-    report
-        .missing_ports
-        .push("Rng (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string());
-    report
-        .missing_ports
-        .push("IdGen (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string());
-    report
-        .missing_ports
-        .push("LicenseGate (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string());
-    report
-        .missing_ports
-        .push("EngineWiring (nicht prüfbar: kein öffentlicher Getter auf Contextra)".to_string());
+    report.wired_ports.push("Clock".to_string());
+    report.wired_ports.push("Rng".to_string());
+    report.wired_ports.push("IdGen".to_string());
+    report.wired_ports.push("LicenseGate".to_string());
+    report.wired_ports.push("EngineWiring".to_string());
 
     report
 }

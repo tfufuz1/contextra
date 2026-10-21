@@ -29,7 +29,40 @@ pub struct ProofBuilder {
 }
 
 impl ProofBuilder {
+    /// Creates a new builder initialized with all mandatory parameters.
+    pub fn with_required(
+        scope: DeletionScope,
+        db_instance_id: impl Into<String>,
+        deleted_keys_hash: [u8; 32],
+        footprint_hash: [u8; 32],
+        deleted_after_tx: u64,
+        issued_wall_ms: u64,
+    ) -> Self {
+        Self {
+            proof_id: None,
+            db_instance_id: db_instance_id.into(),
+            stage: 2, // Default Final
+            supersedes: None,
+            scope,
+            storage_scope: String::new(),
+            deleted_keys_hash,
+            footprint_hash,
+            observed_empty: false,
+            deleted_after_tx,
+            claims: Vec::new(),
+            excluded_scopes: Vec::new(),
+            limitations_text_ids: Vec::new(),
+            environment_tlv: Vec::new(),
+            wal_chain_receipt: None,
+            chain_seq: 1,
+            prev_chain_hash: [0u8; 32],
+            issued_wall_ms,
+            issued_mono_ctr: 1,
+        }
+    }
+
     /// Creates a new builder initialized with scope and db instance ID.
+    #[deprecated(note = "ProofBuilder::new is deprecated. Use ProofBuilder::with_required instead.")]
     pub fn new(scope: DeletionScope, db_instance_id: impl Into<String>) -> Self {
         Self {
             proof_id: None,
@@ -136,6 +169,12 @@ impl ProofBuilder {
 
     /// Validates builder internal consistency, sorts/deduplicates claims and excluded scopes, and signs the proof.
     pub fn finish_checked(mut self, signer: &dyn ProofSigner) -> Result<ProofV4> {
+        if self.issued_wall_ms == 0 {
+            return Err(crate::error::CryptoError::Crypto(
+                "ProofBuilder: issued_wall_ms (timestamp) must be non-zero".to_string(),
+            ));
+        }
+
         if self.chain_seq < 1 {
             return Err(crate::error::CryptoError::Crypto(
                 "ProofBuilder: chain_seq must be >= 1".to_string(),

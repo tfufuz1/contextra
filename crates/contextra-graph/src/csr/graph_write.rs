@@ -120,6 +120,7 @@ impl CsrGraph {
             guard: self.write_state.lock(),
             arc_swap: &self.inner,
             committed: false,
+            mutated: false,
         }
     }
 
@@ -769,6 +770,7 @@ impl CsrGraph {
                     .or_default()
                     .insert((from, to));
             }
+            inner.tombstoned_edges.remove(&(from_idx, to_idx));
             inner
                 .pending_edges
                 .entry(from_idx)
@@ -917,6 +919,7 @@ impl CsrGraph {
                 .or_default()
                 .insert((from, to));
         }
+        inner.tombstoned_edges.remove(&(from_idx, to_idx));
         inner
             .pending_edges
             .entry(from_idx)
