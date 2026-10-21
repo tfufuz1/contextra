@@ -51,6 +51,23 @@ impl SystemRng {
     }
 }
 
+impl SeededRng for SystemRng {
+    fn next_u64(&self) -> u64 {
+        use std::collections::hash_map::RandomState;
+        use std::hash::{BuildHasher, Hasher};
+        RandomState::new().build_hasher().finish()
+    }
+
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        EntropyRng::fill_bytes(self, dest);
+    }
+
+    fn next_unit_f64(&self) -> f64 {
+        let mantissa = self.next_u64() >> 11;
+        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
+    }
+}
+
 /// DEPRECATION NOTICE: This implementation of [`EntropyRng`] for [`SystemRng`] uses non-CSPRNG
 /// process entropy (`std::collections::hash_map::RandomState`) and WILL BE REMOVED in Session W3-01.
 ///
@@ -70,11 +87,13 @@ impl EntropyRng for SystemRng {
         }
     }
 
-    fn next_unit_f64(&self) -> f64 {
-        let mantissa = SeededRng::next_u64(self) >> 11;
-        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
+    fn next_u64(&self) -> u64 {
+        SeededRng::next_u64(self)
     }
 }
+
+/// Marker trait for cryptographically secure random number generators.
+pub trait CryptoRng: Send + Sync + 'static {}
 
 /// Port trait for cryptographic entropy sources (keys, nonces, IVs, salts).
 ///

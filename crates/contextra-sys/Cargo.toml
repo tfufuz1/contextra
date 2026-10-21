@@ -28,5 +28,7 @@ libc = "0.2"
 ports = ["dep:contextra-ports"]
 
 [dependencies]
+contextra-ports = { workspace = true, optional = true }
 memmap2 = { workspace = true }
+rand = { workspace = true }
 tracing = { workspace = true }
