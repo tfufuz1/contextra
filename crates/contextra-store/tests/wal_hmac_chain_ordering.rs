@@ -7,9 +7,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::wal::Wal;
+use contextra_types::TxId;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -137,8 +137,14 @@ async fn test_out_of_order_append_hmac_chain_ordering() {
         .expect("put tx_b failed");
 
     // Configure fault injection delay: Task A (tx_a = 1) is delayed by 500ms in append_batch after prepare_batch
-    storage.fault_plan().delay_append_for_tx.store(tx_a.inner(), Ordering::SeqCst);
-    storage.fault_plan().delay_append_ms.store(500, Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_for_tx
+        .store(tx_a.inner(), Ordering::SeqCst);
+    storage
+        .fault_plan()
+        .delay_append_ms
+        .store(500, Ordering::SeqCst);
 
     let storage_a = Arc::clone(&storage);
     let task_a = tokio::spawn(async move { storage_a.commit(tx_a).await });

@@ -30,7 +30,8 @@ name = "scale-100k"
 path = "src/bin/scale_100k.rs"
 
 [dependencies]
-contextra-core = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-types = { workspace = true }
 contextra-store = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-text = { workspace = true }
@@ -48,6 +49,7 @@ tracing-subscriber = { workspace = true }
 anyhow = "1"
 hdrhistogram = "7"
 rand = { workspace = true }
+parking_lot = { workspace = true }
 
 [[bench]]
 name = "competitive_kv"
@@ -59,6 +61,10 @@ harness = false
 
 [[bench]]
 name = "long_mem_eval"
+harness = false
+
+[[bench]]
+name = "w1_12_baselines"
 harness = false
 
 [dev-dependencies]

@@ -5,7 +5,8 @@
 
 use crate::locomo::{load_locomo_dataset, LocomoQuestionCategory};
 use crate::long_mem_eval::{LongMemEvalQuestionType, RegressionSuite};
-use contextra_core::Result;
+use contextra_types::ContextraError;
+type Result<T> = std::result::Result<T, ContextraError>;
 use contextra_db::{Contextra, ContextraConfig, SearchStrategy};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -101,7 +102,7 @@ pub async fn run_pathrag_sweep_long_mem_eval(
                 .await
             {
                 Ok(r) => r,
-                Err(contextra_core::ContextraError::SnapshotUnsupportedForSignal(_)) => Vec::new(),
+                Err(ContextraError::SnapshotUnsupportedForSignal(_)) => Vec::new(),
                 Err(e) => return Err(e),
             };
 
@@ -255,7 +256,7 @@ pub async fn run_pathrag_sweep_locomo(
                 .await
             {
                 Ok(r) => r,
-                Err(contextra_core::ContextraError::SnapshotUnsupportedForSignal(_)) => Vec::new(),
+                Err(ContextraError::SnapshotUnsupportedForSignal(_)) => Vec::new(),
                 Err(e) => return Err(e),
             };
 

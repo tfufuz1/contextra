@@ -197,6 +197,5 @@ mod tests {
         let mut key = [0u8; 32];
         generate_key(&rng, &mut key);
         assert_eq!(key, [0xAA; 32]);
-        // Note: MockSeededRng cannot be passed to generate_key because SeededRng does not implement EntropyRng.
     }
 }

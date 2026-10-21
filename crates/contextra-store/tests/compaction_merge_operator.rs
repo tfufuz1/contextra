@@ -1,12 +1,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_mvcc::SnapshotRegistry;
-use contextra_types::{
-    ContextraError, ResourceBudget, ResourceTracker, Result, TOMBSTONE_BIT,
-};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
 use contextra_testkit::ManualClock;
+use contextra_types::{ContextraError, ResourceBudget, ResourceTracker, Result, TOMBSTONE_BIT};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
@@ -471,7 +469,7 @@ async fn test_merge_operator_wall_clock_timeout_fail_safe() {
     let dir = tempdir().unwrap();
     let cache = Arc::new(BlockCache::new(1024 * 1024));
     let snapshot_reg = Arc::new(SnapshotRegistry::new());
-    let budget = create_tracker(100);
+    let budget = createtracker(100);
     let manual_clock = Arc::new(ManualClock::new(1_000_000_000));
 
     let sst1_path = dir.path().join("sst1.sst");
@@ -547,3 +545,6 @@ async fn test_merge_operator_wall_clock_timeout_fail_safe() {
     assert_eq!(val_old.as_ref(), b"old_data");
 }
 
+fn createtracker(mem_mb: usize) -> Arc<ResourceTracker> {
+    create_tracker(mem_mb)
+}

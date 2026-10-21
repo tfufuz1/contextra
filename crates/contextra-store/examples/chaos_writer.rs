@@ -5,8 +5,8 @@
 //! states (`START` / `COMMITTED`) to an external ground-truth file for crash recovery verification.
 
 use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::{ContextraError, TxId};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;

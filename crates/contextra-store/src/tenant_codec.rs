@@ -15,11 +15,11 @@
 
 use crate::lsm::LsmStorage;
 use bytes::Bytes;
-use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
-use contextra_ports::StorageStats;
 use contextra_crypto::deletion_witness::LayerWitness;
 use contextra_ports::erasure::{ErasureBackend, LogicalScope, PhysicalScope};
+use contextra_ports::StorageStats;
 use contextra_ports::{BoxFuture, Result, StorageEngine};
+use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
 use std::ops::Bound;
 use std::sync::Arc;
 
@@ -899,7 +899,8 @@ impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
                         self.codec.tenant_id, tenant_id
                     )));
                 }
-                let doc_key = format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
+                let doc_key =
+                    format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
                 PhysicalScope::try_new(*tenant_id, vec![doc_key], vec![])
             }
             LogicalScope::Collection {
@@ -948,13 +949,16 @@ impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
         scope: &PhysicalScope,
         as_of: TxId,
         probe: &dyn contextra_ports::erasure::FreeSpaceProbe,
-    ) -> std::result::Result<contextra_ports::erasure::PurgeOutput, contextra_ports::erasure::PurgeError> {
+    ) -> std::result::Result<
+        contextra_ports::erasure::PurgeOutput,
+        contextra_ports::erasure::PurgeError,
+    > {
         if let Some(backend) = self.inner.erasure_capabilities_handle() {
             backend.purge_physical(scope, as_of, probe)
         } else {
-            Err(contextra_ports::erasure::PurgeError::Io(std::io::Error::other(
-                "Underlying storage engine does not support ErasureBackend",
-            )))
+            Err(contextra_ports::erasure::PurgeError::Io(
+                std::io::Error::other("Underlying storage engine does not support ErasureBackend"),
+            ))
         }
     }
 }
@@ -1065,14 +1069,8 @@ mod tests {
         let key_a = codec_a.encode_chunk_key(&col, doc);
         // Key von Tenant A darf NICHT mit Präfix von Tenant B matchen (VETO-F10)
         assert!(!key_a.starts_with(codec_b.scan_prefix()));
-        assert_ne!(
-            TenantKeyCodec::decode_tenant_id(&key_a),
-            Some(tenant_b)
-        );
-        assert_eq!(
-            TenantKeyCodec::decode_tenant_id(&key_a),
-            Some(tenant_a)
-        );
+        assert_ne!(TenantKeyCodec::decode_tenant_id(&key_a), Some(tenant_b));
+        assert_eq!(TenantKeyCodec::decode_tenant_id(&key_a), Some(tenant_a));
     }
 
     #[test]

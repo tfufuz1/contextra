@@ -1,7 +1,7 @@
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::wal::{Wal, WalOp};
 use contextra_store::{CompactionConfig, LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use tempfile::TempDir;
 
 #[tokio::test]

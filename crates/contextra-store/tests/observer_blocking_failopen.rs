@@ -3,8 +3,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::{CommittedBatch, LsmConfig, LsmStorage, ObserverRegistry, WalObserver};
+use contextra_types::TxId;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};

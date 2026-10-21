@@ -17,7 +17,6 @@ use super::{Wal, WalEntry, WalVersion, WAL_V3_HEADER};
 #[allow(dead_code)]
 static WAL_SEAL_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
-
 #[allow(dead_code)]
 pub(crate) enum WalCommand {
     Append {

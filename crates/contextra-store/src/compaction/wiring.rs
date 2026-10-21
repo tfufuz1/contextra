@@ -2,8 +2,8 @@
 // ZWECK: Entrypoint für die spätere Verdrahtung in contextra/src/builder.rs (Regel 7 / Einstiegspunkt-Vertrag).
 
 use crate::compaction::{CompactionConfig, CompactionEngine};
-use contextra_types::{ResourceTracker, Result};
 use contextra_mvcc::snapshot::SnapshotFloor;
+use contextra_types::{ResourceTracker, Result};
 use std::sync::Arc;
 
 /// Composition Root Wiring-Struktur für contextra-store Compaction.

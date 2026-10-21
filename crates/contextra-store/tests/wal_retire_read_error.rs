@@ -80,7 +80,11 @@ async fn test_retire_segments_aborts_on_read_error_and_preserves_files() -> Resu
     wal2.close().await?;
 
     let hashes_before = compute_dir_hashes(dir_path);
-    assert_eq!(hashes_before.len(), 2, "Expected 2 segment files before retirement");
+    assert_eq!(
+        hashes_before.len(),
+        2,
+        "Expected 2 segment files before retirement"
+    );
 
     let stream = MockErrorDirStream {
         entries: vec![seg1_path.clone(), seg2_path.clone()],
@@ -90,7 +94,10 @@ async fn test_retire_segments_aborts_on_read_error_and_preserves_files() -> Resu
 
     let result = retire_segments_with_stream(stream, 10, ScrubPolicy::Disabled).await;
 
-    assert!(result.is_err(), "retire_segments_with_stream must return an error when stream fails");
+    assert!(
+        result.is_err(),
+        "retire_segments_with_stream must return an error when stream fails"
+    );
 
     let err_str = result.unwrap_err().to_string();
     assert!(

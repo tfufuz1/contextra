@@ -20,6 +20,7 @@
 
 pub mod anti_tamper;
 pub mod audit_chain;
+pub mod canonical;
 pub mod crypto;
 pub mod deletion_proof;
 pub mod deletion_proof_typestate;
@@ -42,13 +43,28 @@ pub use audit_chain::{
     compute_record_commitment, AuditChain, AuditChainEntry, AuditChainHeadSignature, DataClass,
     EncryptedCommitmentSalt,
 };
+pub use canonical::{CanonicalReader, CanonicalTlvEntry, CanonicalWriter};
 pub use crypto::KeyManager as CryptoKey;
 pub use crypto::KeyManager;
 pub use deletion_proof::{
+    keys::{KeyClass, TrustEntry, TrustList},
+    probe::ProbeError,
+    probe::ZeuStoreProbe,
+    signer::{ProofSignerProvider, SignerError},
+    timestamp_anchor::{
+        AnchorQualification, AnchorReceipt, LocalMonotonicAnchor, QualificationLevel,
+        RealTsaProofToken, Rfc3161TimeAnchor, TimeAnchor, TsaSignatureVerifier,
+    },
+    verify::{verify_standalone, VerifiedProof, VerifyError},
     DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, DurabilityProof,
     ExcludedScope, LayerCleanupProof,
 };
-pub use deletion_witness::{LayerWitness, WitnessEvidence};
+#[cfg(any(test, feature = "testing", feature = "test-support", feature = "test-utils"))]
+#[allow(deprecated)]
+pub use deletion_proof::timestamp_anchor::{AcceptAllTsaVerifier, NoOpTsaSignatureVerifier};
+pub use deletion_witness::{
+    compute_witness_footprint_hash, LayerWitness, ScanOutcome, WitnessError, WitnessEvidence,
+};
 pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};

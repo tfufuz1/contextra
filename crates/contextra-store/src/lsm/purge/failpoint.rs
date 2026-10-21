@@ -113,9 +113,7 @@ macro_rules! purge_failpoint {
         #[cfg(feature = "fault-injection")]
         if std::env::var(concat!("PURGE_FAILPOINT_", $name)).is_ok() {
             return Err(
-                $crate::lsm::purge::failpoint::OrxPurgeError::FailpointTriggered(
-                    $name.to_string(),
-                ),
+                $crate::lsm::purge::failpoint::OrxPurgeError::FailpointTriggered($name.to_string()),
             );
         }
     };

@@ -1,15 +1,17 @@
 // FILE-CONTEXT
-// STAND: 2026-10-12
+// STAND: 2026-10-22
 // ZWECK: Seedable, deterministic PRNG for Deterministic Simulation Testing (DST).
 // INVARIANTEN: Bit-identical random streams for identical seeds across executions.
 
 use contextra_ports::{EntropyRng as EntropyRngPort, SystemRng};
 
-/// Type-separated entropy RNG source for non-deterministic runtime entropy.
+/// Type-separated entropy RNG source for non-deterministic runtime entropy in tests.
 ///
 /// Unlike [`SeededRng`], `EntropyRng` CANNOT be initialized with a fixed seed value.
 /// This enforces type-level separation between deterministic test generators ([`SeededRng`])
 /// and real non-deterministic entropy sources ([`EntropyRng`]).
+///
+/// MUST NOT implement cryptographic secret-filling methods (`fill_secret`).
 #[derive(Debug, Default)]
 pub struct EntropyRng {
     inner: SystemRng,
@@ -33,6 +35,9 @@ impl EntropyRngPort for EntropyRng {
         EntropyRngPort::fill_bytes(&self.inner, dest);
     }
 }
+
+/// Alias for test environment entropy source.
+pub type DeterministicTestRng = EntropyRng;
 
 pub use contextra_ports::SeededRng as PortSeededRng;
 

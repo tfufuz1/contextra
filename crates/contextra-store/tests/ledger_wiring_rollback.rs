@@ -1,11 +1,11 @@
 //! Integration test for crash scenario between ledger_append and Tombstone commit.
 
 use contextra_ports::StorageEngine;
-use contextra_types::{ContextraError, TxId};
 use contextra_store::erasure_ledger::{
     compute_keyed_hash, LedgerEntry, LedgerEntryKind, LedgerKey,
 };
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::{ContextraError, TxId};
 use tempfile::tempdir;
 
 #[tokio::test]
