@@ -53,24 +53,36 @@ pub enum FencedKey<'a> {
     Unknown,
 }
 
-/// Extracts keys from an `IndexOp` using exhaustive matching without wildcard arms (`clippy::wildcard_enum_match_arm`).
-#[allow(unreachable_patterns)]
+/// Extracts keys from an `IndexOp` using exhaustive matching.
+/// `#[non_exhaustive]` on `IndexOp` requires a catch-all arm for potential future variants.
 pub fn fenced_keys<T: Clone>(op: &IndexOp<T>) -> FencedKey<'_> {
     match op {
-        IndexOp::Insert { data: _, .. } => FencedKey::Unknown,
-        IndexOp::Delete { data: Some(_), .. } => FencedKey::Unknown,
-        IndexOp::Delete { data: None, .. } => FencedKey::Unknown,
+        IndexOp::Insert { doc_id: _, data: _ } => FencedKey::Unknown,
+        IndexOp::Delete {
+            doc_id: _,
+            data: Some(_),
+        } => FencedKey::Unknown,
+        IndexOp::Delete {
+            doc_id: _,
+            data: None,
+        } => FencedKey::Unknown,
         _ => FencedKey::Unknown,
     }
 }
 
-/// Helper for extracting key slice from KV tuple op without wildcard match.
-#[allow(unreachable_patterns)]
+/// Helper for extracting key slice from KV tuple op.
+/// `#[non_exhaustive]` on `IndexOp` requires a catch-all arm for potential future variants.
 pub fn fenced_keys_kv(op: &IndexOp<(Vec<u8>, Vec<u8>)>) -> FencedKey<'_> {
     match op {
-        IndexOp::Insert { data, .. } => FencedKey::Exact(&data.0[..]),
-        IndexOp::Delete { data: Some(data), .. } => FencedKey::Exact(&data.0[..]),
-        IndexOp::Delete { data: None, .. } => FencedKey::Unknown,
+        IndexOp::Insert { doc_id: _, data } => FencedKey::Exact(&data.0[..]),
+        IndexOp::Delete {
+            doc_id: _,
+            data: Some(data),
+        } => FencedKey::Exact(&data.0[..]),
+        IndexOp::Delete {
+            doc_id: _,
+            data: None,
+        } => FencedKey::Unknown,
         _ => FencedKey::Unknown,
     }
 }
@@ -136,6 +148,7 @@ impl ErasureGate {
 
             #[cfg(not(loom))]
             {
+                // ORDERING: RCU pointer load via ArcSwap uses Acquire ordering internally.
                 let table = self.table.load();
                 'outer: for pf in table.iter() {
                     for prefix in pf.prefixes() {
@@ -213,6 +226,7 @@ impl ErasureGate {
 
         #[cfg(not(loom))]
         {
+            // ORDERING: RCU pointer load via ArcSwap uses Acquire ordering internally.
             let table = self.table.load();
             for pf in table.iter() {
                 for prefix in pf.prefixes() {
@@ -275,6 +289,7 @@ impl ErasureGate {
         // Validate overlaps against existing prefix fences
         #[cfg(not(loom))]
         {
+            // ORDERING: RCU pointer load via ArcSwap uses Acquire ordering internally.
             let current_table = self.table.load();
             for existing in current_table.iter() {
                 for ex_p in existing.prefixes() {
@@ -304,6 +319,7 @@ impl ErasureGate {
         // Install new fence into table
         #[cfg(not(loom))]
         {
+            // ORDERING: RCU pointer load via ArcSwap uses Acquire ordering internally.
             let current_vec: &Vec<PrefixFence> = &**self.table.load();
             let mut new_table = current_vec.clone();
             new_table.push(PrefixFence {
@@ -322,8 +338,7 @@ impl ErasureGate {
             }
         }
 
-        // N9: Ordering::SeqCst im Dekker-Muster, damit Schreiber und
-        // Fence-Installer sich wechselseitig garantiert atomar wahrnehmen.
+        // ORDERING: SeqCst required for Dekker total ordering with Writer W1/W2.
         self.active.store(true, Ordering::SeqCst);
 
         // Drain phase without lost wakeup or polling (Protocol B)
@@ -374,6 +389,7 @@ impl ErasureGate {
     fn release_fence_internal(&self, purge_id: u64) -> bool {
         #[cfg(not(loom))]
         {
+            // ORDERING: RCU pointer load via ArcSwap uses Acquire ordering internally.
             let current_vec: &Vec<PrefixFence> = &**self.table.load();
             let mut new_table = current_vec.clone();
             let len_before = new_table.len();
@@ -382,6 +398,7 @@ impl ErasureGate {
             let is_empty = new_table.is_empty();
             self.table.store(Arc::new(new_table));
             if is_empty {
+                // ORDERING: SeqCst required when deactivating fence for total ordering.
                 self.active.store(false, Ordering::SeqCst);
             }
             removed
@@ -394,6 +411,7 @@ impl ErasureGate {
                 table.retain(|f| f.purge_id != purge_id);
                 let removed = table.len() < len_before;
                 if table.is_empty() {
+                    // ORDERING: SeqCst required when deactivating fence for total ordering.
                     self.active.store(false, Ordering::SeqCst);
                 }
                 removed
@@ -556,6 +574,7 @@ impl<'a> FenFenceGuard<'a> {
 
     /// Returns current write sequence number for this guard scope.
     pub fn scope_write_seq(&self) -> u64 {
+        // ORDERING: Acquire to synchronize with sequence update writes.
         self.write_seq.load(Ordering::Acquire)
     }
 
@@ -614,6 +633,7 @@ impl ErasureFence {
     /// Fast-path zero-lock check for normal operation.
     #[inline]
     pub fn is_active(&self) -> bool {
+        // ORDERING: Acquire ordering to observe recent fence count increments.
         self.active_fences.load(Ordering::Acquire) > 0 || self.gate.is_active()
     }
 
@@ -626,6 +646,7 @@ impl ErasureFence {
         if self.is_active() {
             let state = *self.scope_state.read();
             if state == FenceScopeState::CollectionDropping {
+                // ORDERING: SeqCst to maintain global sequence monotonicity.
                 self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
                 return Err(FenceError::CollectionDropping);
             }
@@ -633,6 +654,7 @@ impl ErasureFence {
             let locked_docs = self.locked_doc_ids.read();
             for key in &key_vec {
                 if locked_docs.contains(*key) {
+                    // ORDERING: SeqCst to maintain global sequence monotonicity.
                     self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
                     return Err(FenceError::Conflict);
                 }
@@ -659,17 +681,20 @@ impl ErasureFence {
 
         let state = *self.scope_state.read();
         if state == FenceScopeState::CollectionDropping {
+            // ORDERING: SeqCst to maintain global sequence monotonicity.
             self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
             return Err(FenceError::CollectionDropping);
         }
 
         if let Err(e) = self.gate.check_write_allowed(key) {
+            // ORDERING: SeqCst to maintain global sequence monotonicity.
             self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
             return Err(e);
         }
 
         let locked_docs = self.locked_doc_ids.read();
         if locked_docs.contains(key) {
+            // ORDERING: SeqCst to maintain global sequence monotonicity.
             self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
             return Err(FenceError::Conflict);
         }
@@ -700,8 +725,10 @@ impl ErasureFence {
         let mut state = self.scope_state.write();
         if *state != FenceScopeState::CollectionDropping {
             *state = FenceScopeState::CollectionDropping;
+            // ORDERING: Release to publish active fence flag before releasing lock.
             self.active_fences.fetch_add(1, Ordering::Release);
         }
+        // ORDERING: SeqCst to maintain global sequence monotonicity.
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
 
@@ -710,8 +737,10 @@ impl ErasureFence {
         let mut state = self.scope_state.write();
         if *state == FenceScopeState::CollectionDropping {
             *state = FenceScopeState::Active;
+            // ORDERING: Release to publish fence removal before releasing lock.
             self.active_fences.fetch_sub(1, Ordering::Release);
         }
+        // ORDERING: SeqCst to maintain global sequence monotonicity.
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
 
@@ -725,6 +754,7 @@ impl ErasureFence {
             return Err(FenceError::CollectionDropping);
         }
 
+        // ORDERING: SeqCst to guarantee unique monotonic fence IDs.
         let id = self.next_fence_id.fetch_add(1, Ordering::SeqCst);
         let write_seq = Arc::new(AtomicU64::new(0));
 
@@ -757,7 +787,9 @@ impl ErasureFence {
             rt.block_on(run_acquire())?;
         }
 
+        // ORDERING: Release to make new active fence state visible.
         self.active_fences.fetch_add(1, Ordering::Release);
+        // ORDERING: SeqCst to advance global write sequence counter.
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
 
         Ok(FenFenceGuard {
@@ -778,6 +810,7 @@ impl ErasureFence {
             return Err(FenceError::CollectionDropping);
         }
 
+        // ORDERING: SeqCst to guarantee unique monotonic fence IDs.
         let id = self.next_fence_id.fetch_add(1, Ordering::SeqCst);
         let write_seq = Arc::new(AtomicU64::new(0));
 
@@ -789,7 +822,9 @@ impl ErasureFence {
             return Err(e);
         }
 
+        // ORDERING: Release to make new active fence state visible.
         self.active_fences.fetch_add(1, Ordering::Release);
+        // ORDERING: SeqCst to advance global write sequence counter.
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
 
         Ok(FenFenceGuard {
@@ -803,7 +838,9 @@ impl ErasureFence {
     /// Helper to release a registered prefix fence by ID.
     pub fn release_prefix_fence(&self, id: u64) {
         self.gate.release_fence(id);
+        // ORDERING: Release to publish fence count decrement.
         self.active_fences.fetch_sub(1, Ordering::Release);
+        // ORDERING: SeqCst to advance global write sequence counter.
         self.scope_write_seq.fetch_add(1, Ordering::SeqCst);
     }
 
@@ -817,6 +854,7 @@ impl ErasureFence {
             }
         }
         if added > 0 {
+            // ORDERING: Release to make locked document count update visible.
             self.active_fences.fetch_add(added, Ordering::Release);
         }
     }
@@ -858,9 +896,11 @@ impl ErasureFence {
 
         for id in &doc_ids {
             if locked.insert(id.clone()) {
+                // ORDERING: SeqCst to track document lock count globally.
                 self.active_fence_count.fetch_add(1, Ordering::SeqCst);
             }
         }
+        // ORDERING: Release to make active doc lock count visible.
         self.active_fences
             .fetch_add(doc_ids.len() as u32, Ordering::Release);
 
@@ -880,12 +920,14 @@ impl ErasureFence {
             }
         }
         if removed > 0 {
+            // ORDERING: Release to publish active fence decrement.
             self.active_fences.fetch_sub(removed, Ordering::Release);
         }
     }
 
     /// Returns current global scope write sequence number.
     pub fn scope_write_seq(&self) -> u64 {
+        // ORDERING: Acquire to observe sequence counter updates.
         self.scope_write_seq.load(Ordering::Acquire)
     }
 
@@ -896,6 +938,7 @@ impl ErasureFence {
 
     /// Takes a snapshot of the write sequence across active fences matching `prefixes`.
     pub fn snapshot_write_seq(&self, _prefixes: &[Vec<u8>]) -> u64 {
+        // ORDERING: Acquire to observe sequence counter updates.
         self.scope_write_seq.load(Ordering::Acquire)
     }
 }
