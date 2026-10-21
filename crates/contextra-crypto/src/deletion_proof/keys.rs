@@ -3,7 +3,84 @@
 use crate::ed25519_proof::SignatureVersion;
 use crate::error::Result;
 use rand::RngCore;
+use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
+
+/// Einstufung der Schlüsselklasse bezüglich Vertrauen und Lebenszyklus (D12/E-12).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KeyClass {
+    /// Aktueller, aktiver Schlüssel im Gültigkeitsfenster.
+    Current,
+    /// Alter, aus schwacher Quelle erzeugter oder abgelaufener Schlüssel.
+    Legacy,
+    /// Widerrufer Schlüssel.
+    Revoked,
+}
+
+/// Vertrauensliste für Schlüssel mit Gültigkeitsfenstern und Schlüsselklassen (D12/E-12).
+#[derive(Debug, Clone, Default)]
+pub struct TrustList {
+    entries: std::collections::HashMap<[u8; 32], TrustEntry>,
+}
+
+/// Eintrag in der `TrustList`.
+#[derive(Debug, Clone)]
+pub struct TrustEntry {
+    /// BLAKE3 key ID.
+    pub key_id: [u8; 32],
+    /// Ed25519 public verification key.
+    pub verifying_key: ed25519_dalek::VerifyingKey,
+    /// Gültig ab (Unix timestamp ms).
+    pub valid_from_ms: u64,
+    /// Gültig bis (Unix timestamp ms).
+    pub valid_until_ms: u64,
+    /// Zugewiesene Schlüsselklasse.
+    pub class: KeyClass,
+}
+
+impl TrustList {
+    /// Erzeugt eine neue leere `TrustList`.
+    pub fn new() -> Self {
+        Self {
+            entries: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Registriert einen Schlüssel in der `TrustList`.
+    pub fn register_key(
+        &mut self,
+        key_id: [u8; 32],
+        verifying_key: ed25519_dalek::VerifyingKey,
+        valid_from_ms: u64,
+        valid_until_ms: u64,
+        class: KeyClass,
+    ) {
+        self.entries.insert(
+            key_id,
+            TrustEntry {
+                key_id,
+                verifying_key,
+                valid_from_ms,
+                valid_until_ms,
+                class,
+            },
+        );
+    }
+
+    /// Sucht einen Schlüssel und ermittelt seine effektive `KeyClass` zum gegebenen Ausstellungszeitpunkt.
+    pub fn lookup(&self, key_id: &[u8; 32], issued_ms: u64) -> Option<(KeyClass, &ed25519_dalek::VerifyingKey)> {
+        let entry = self.entries.get(key_id)?;
+        if entry.class == KeyClass::Revoked {
+            return Some((KeyClass::Revoked, &entry.verifying_key));
+        }
+
+        if issued_ms < entry.valid_from_ms || issued_ms > entry.valid_until_ms {
+            return Some((KeyClass::Legacy, &entry.verifying_key));
+        }
+
+        Some((entry.class, &entry.verifying_key))
+    }
+}
 
 /// Source of resolved deletion proof key (environment variables or key files).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

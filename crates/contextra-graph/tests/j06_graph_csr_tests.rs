@@ -1,6 +1,6 @@
 use contextra_graph::csr::CsrGraph;
 use contextra_ports::GraphIndex;
-use contextra_types::{Edge, Entity, EntityId, TxId};
+use contextra_types::{ContextraError, Edge, Entity, EntityId, TxId};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -157,6 +157,187 @@ async fn test_compaction_edge_cases() {
     let n3_tomb = graph.neighbors(e3).await.unwrap();
     assert!(n1_tomb.is_empty());
     assert!(n3_tomb.is_empty());
+}
+
+#[tokio::test]
+async fn graph_readd_edge_survives_compact() {
+    let graph = Arc::new(CsrGraph::new());
+    let tx1 = TxId::try_new(1).unwrap();
+    let tx2 = TxId::try_new(2).unwrap();
+    let tx3 = TxId::try_new(3).unwrap();
+
+    let e1 = EntityId::new(100);
+    let e2 = EntityId::new(200);
+
+    GraphIndex::add_entity(
+        graph.as_ref(),
+        tx1,
+        Entity::new(e1, "Node1", "Type"),
+    )
+    .await
+    .unwrap();
+    GraphIndex::add_entity(
+        graph.as_ref(),
+        tx1,
+        Entity::new(e2, "Node2", "Type"),
+    )
+    .await
+    .unwrap();
+
+    // 1. Add edge e1 -> e2
+    GraphIndex::add_edge(
+        graph.as_ref(),
+        tx1,
+        Edge::new(e1, e2, "rel_v1").with_weight(1.5),
+    )
+    .await
+    .unwrap();
+    GraphIndex::commit(graph.as_ref(), tx1).await.unwrap();
+
+    // Compact to move e1 -> e2 into CSR arrays
+    graph.compact();
+
+    // Verify edge exists before removal
+    assert_eq!(graph.neighbors(e1).await.unwrap(), vec![e2]);
+
+    // 2. Remove edge e1 -> e2 (tombstone added)
+    GraphIndex::remove_edge(graph.as_ref(), tx2, e1, e2)
+        .await
+        .unwrap();
+    GraphIndex::commit(graph.as_ref(), tx2).await.unwrap();
+
+    // Verify edge is hidden
+    assert!(graph.neighbors(e1).await.unwrap().is_empty());
+
+    // 3. Re-add edge e1 -> e2 with new weight
+    GraphIndex::add_edge(
+        graph.as_ref(),
+        tx3,
+        Edge::new(e1, e2, "rel_v2").with_weight(3.5),
+    )
+    .await
+    .unwrap();
+    GraphIndex::commit(graph.as_ref(), tx3).await.unwrap();
+
+    // Verify edge is present before compaction
+    let n_before_compact = graph.neighbors(e1).await.unwrap();
+    assert_eq!(
+        n_before_compact,
+        vec![e2],
+        "Re-added edge must be present in neighbors before compaction"
+    );
+
+    // 4. Compact graph
+    graph.compact();
+
+    // Verify edge survives compaction with new weight
+    let n_after_compact = graph.neighbors(e1).await.unwrap();
+    assert_eq!(
+        n_after_compact,
+        vec![e2],
+        "Re-added edge MUST survive compaction and not be dropped by stale tombstone"
+    );
+}
+
+#[tokio::test]
+async fn graph_guard_drop_does_not_clone_graph() {
+    let graph = Arc::new(CsrGraph::new());
+    let tx = TxId::try_new(1).unwrap();
+
+    // Populate large graph in memory
+    for i in 1..=500 {
+        GraphIndex::add_entity(
+            graph.as_ref(),
+            tx,
+            Entity::new(EntityId::new(i), format!("N{i}"), "Type"),
+        )
+        .await
+        .unwrap();
+    }
+    GraphIndex::commit(graph.as_ref(), tx).await.unwrap();
+
+    let count_before = graph.entity_count();
+
+    // Acquire write guard and deref without mutating (read-only write guard)
+    {
+        let guard = graph.inner_write();
+        let _exists = guard.entity_exists(EntityId::new(1));
+        assert!(!guard.is_mutated(), "Guard must not be marked mutated on read-only Deref access");
+        // Guard drops here without calling commit() or deref_mut()
+    }
+
+    assert_eq!(graph.entity_count(), count_before);
+}
+
+#[tokio::test]
+async fn graph_tx_op_order_last_write_wins() {
+    let graph = Arc::new(CsrGraph::new());
+    let tx1 = TxId::try_new(10).unwrap();
+    let e1 = EntityId::new(10);
+    let e2 = EntityId::new(20);
+
+    GraphIndex::add_entity(
+        graph.as_ref(),
+        tx1,
+        Entity::new(e1, "E1", "Type"),
+    )
+    .await
+    .unwrap();
+    GraphIndex::add_entity(
+        graph.as_ref(),
+        tx1,
+        Entity::new(e2, "E2", "Type"),
+    )
+    .await
+    .unwrap();
+
+    // Sequence within same transaction: add -> remove -> add
+    GraphIndex::add_edge(
+        graph.as_ref(),
+        tx1,
+        Edge::new(e1, e2, "rel1").with_weight(1.0),
+    )
+    .await
+    .unwrap();
+    GraphIndex::remove_edge(graph.as_ref(), tx1, e1, e2)
+        .await
+        .unwrap();
+    GraphIndex::add_edge(
+        graph.as_ref(),
+        tx1,
+        Edge::new(e1, e2, "rel2").with_weight(2.0),
+    )
+    .await
+    .unwrap();
+
+    GraphIndex::commit(graph.as_ref(), tx1).await.unwrap();
+
+    // Read APIs should see final valid edge (last write wins)
+    let neighbors = graph.neighbors(e1).await.unwrap();
+    assert_eq!(neighbors, vec![e2]);
+
+    // Read API must be strictly read-only and not mutate graph inner state
+    let count_before_read = graph.edge_count();
+    let _ = graph.neighbors(e1).await.unwrap();
+    let _ = graph.entity_exists(e1);
+    let _ = graph.get_source_doc_id(0);
+    let count_after_read = graph.edge_count();
+
+    assert_eq!(count_before_read, count_after_read);
+}
+
+#[tokio::test]
+async fn graph_rollback_to_tx_effective_or_unsupported() {
+    let graph = Arc::new(CsrGraph::new());
+    let tx1 = TxId::try_new(100).unwrap();
+
+    let res = GraphIndex::rollback_to_tx(graph.as_ref(), tx1).await;
+    match res {
+        Err(ContextraError::CapabilityUnsupported { capability, .. }) => {
+            assert_eq!(capability, "rollback_to_tx");
+        }
+        other => panic!("rollback_to_tx must return Err(CapabilityUnsupported) instead of Ok(()), got {:?}", other),
+    }
 }
 
 #[tokio::test]

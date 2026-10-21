@@ -1,11 +1,79 @@
 //! Deletion proof signature and WAL receipt verification logic.
 
-use super::keys::VerificationKey;
+use super::keys::{KeyClass, TrustList, VerificationKey};
 use super::proof::DeletionProof;
+use super::proof_v4::ProofV4;
 use super::wal_receipt::{compute_hmac_sha256, verify_wal_delete_receipt};
 use crate::ed25519_proof::{DeletionProofError, SignatureVersion};
 use crate::error::CryptoError;
 use contextra_types::{ContextraError, Result};
+use serde::{Deserialize, Serialize};
+
+/// Cryptographically verified version 4 deletion proof.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifiedProof {
+    /// Inner verified version 4 proof.
+    pub proof_v4: ProofV4,
+    /// Resolved key class of the signing key at issuance time.
+    pub key_class: KeyClass,
+}
+
+/// Standalone proof verification errors.
+#[derive(Debug, thiserror::Error)]
+pub enum VerifyError {
+    /// Invalid proof format or TLV header.
+    #[error("Invalid proof format or TLV header: {0}")]
+    InvalidFormat(String),
+    /// Key ID not found in trust list.
+    #[error("Unknown or untrusted key ID")]
+    UntrustedKey,
+    /// Key ID is revoked.
+    #[error("Revoked key ID")]
+    RevokedKey,
+    /// Invalid cryptographic signature.
+    #[error("Invalid signature")]
+    InvalidSignature,
+    /// Policy violation.
+    #[error("Policy violation: {0}")]
+    PolicyViolation(String),
+    /// Contextra error wrapper.
+    #[error("Contextra error: {0}")]
+    Contextra(#[from] ContextraError),
+}
+
+/// Verifies a version 4 deletion proof in standalone mode without any dependency on engine or store.
+pub fn verify_standalone(
+    proof: &ProofV4,
+    trust_list: &TrustList,
+) -> std::result::Result<VerifiedProof, VerifyError> {
+    let (key_class, vk) = trust_list
+        .lookup(&proof.signer_key_id, proof.issued_wall_ms)
+        .ok_or(VerifyError::UntrustedKey)?;
+
+    if key_class == KeyClass::Revoked {
+        return Err(VerifyError::RevokedKey);
+    }
+
+    let canon = proof
+        .try_construct_canonical_payload()
+        .map_err(|e| VerifyError::InvalidFormat(e.to_string()))?;
+
+    ProofV4::check_unknown_critical_tags(&canon)
+        .map_err(|e| VerifyError::InvalidFormat(e.to_string()))?;
+
+    let is_valid = proof
+        .verify_signature(&vk.to_bytes())
+        .map_err(|e| VerifyError::InvalidFormat(e.to_string()))?;
+
+    if !is_valid {
+        return Err(VerifyError::InvalidSignature);
+    }
+
+    Ok(VerifiedProof {
+        proof_v4: proof.clone(),
+        key_class,
+    })
+}
 
 impl DeletionProof {
     /// Parst und liefert die typsichere Signaturversion des Beweises.
@@ -27,20 +95,29 @@ impl DeletionProof {
             .map_err(|e| ContextraError::Internal(e.to_string()))?;
 
         let key = key.into();
-        let scope_bytes =
-            bincode::serialize(&self.scope).map_err(|e| ContextraError::Internal(e.to_string()))?;
         let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
 
         match (version, key) {
-            (SignatureVersion::V1, VerificationKey::HmacV1(proof_key))
-            | (SignatureVersion::V1, VerificationKey::HmacV2(proof_key))
-            | (SignatureVersion::V1, VerificationKey::Hmac(proof_key)) => {
-                let expected = compute_hmac_sha256(
-                    proof_key,
-                    &[&scope_bytes, &self.deleted_keys_hash, &tx_bytes],
-                )?;
-                use subtle::ConstantTimeEq;
-                Ok(expected.as_slice().ct_eq(&self.signature).into())
+            (SignatureVersion::V1, VerificationKey::HmacV1(_proof_key))
+            | (SignatureVersion::V1, VerificationKey::HmacV2(_proof_key))
+            | (SignatureVersion::V1, VerificationKey::Hmac(_proof_key)) => {
+                #[cfg(feature = "legacy-verify")]
+                {
+                    let scope_bytes = bincode::serialize(&self.scope)
+                        .map_err(|e| ContextraError::Internal(e.to_string()))?;
+                    let expected = compute_hmac_sha256(
+                        _proof_key,
+                        &[&scope_bytes, &self.deleted_keys_hash, &tx_bytes],
+                    )?;
+                    use subtle::ConstantTimeEq;
+                    Ok(expected.as_slice().ct_eq(&self.signature).into())
+                }
+                #[cfg(not(feature = "legacy-verify"))]
+                {
+                    Err(ContextraError::Internal(
+                        "V1 legacy signature verification requires 'legacy-verify' feature".to_string(),
+                    ))
+                }
             }
             (SignatureVersion::V2, VerificationKey::HmacV2(proof_key))
             | (SignatureVersion::V2, VerificationKey::Hmac(proof_key)) => {
@@ -51,29 +128,37 @@ impl DeletionProof {
                     return Ok(true);
                 }
 
-                // Alt-Verifikation: Fallback für früher erzeugte v2-Proofs
-                let covered_layers_bytes = bincode::serialize(&self.covered_layers)
-                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
-                let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
-                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
-                let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
-                let receipt_part = if self.wal_chain_receipt.is_some() {
-                    receipt_bytes.as_slice()
-                } else {
-                    &[]
-                };
-                let expected_legacy = compute_hmac_sha256(
-                    proof_key,
-                    &[
-                        &scope_bytes,
-                        &self.deleted_keys_hash,
-                        &tx_bytes,
-                        &covered_layers_bytes,
-                        &excluded_scopes_bytes,
-                        receipt_part,
-                    ],
-                )?;
-                Ok(expected_legacy.as_slice().ct_eq(&self.signature).into())
+                #[cfg(feature = "legacy-verify")]
+                {
+                    let scope_bytes = bincode::serialize(&self.scope)
+                        .map_err(|e| ContextraError::Internal(e.to_string()))?;
+                    let covered_layers_bytes = bincode::serialize(&self.covered_layers)
+                        .map_err(|e| ContextraError::Internal(e.to_string()))?;
+                    let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
+                        .map_err(|e| ContextraError::Internal(e.to_string()))?;
+                    let receipt_bytes = self.wal_chain_receipt.unwrap_or([0u8; 32]);
+                    let receipt_part = if self.wal_chain_receipt.is_some() {
+                        receipt_bytes.as_slice()
+                    } else {
+                        &[]
+                    };
+                    let expected_legacy = compute_hmac_sha256(
+                        proof_key,
+                        &[
+                            &scope_bytes,
+                            &self.deleted_keys_hash,
+                            &tx_bytes,
+                            &covered_layers_bytes,
+                            &excluded_scopes_bytes,
+                            receipt_part,
+                        ],
+                    )?;
+                    return Ok(expected_legacy.as_slice().ct_eq(&self.signature).into());
+                }
+                #[cfg(not(feature = "legacy-verify"))]
+                {
+                    Ok(false)
+                }
             }
             (SignatureVersion::V3, VerificationKey::Ed25519(verifying_key)) => {
                 let payload = self
