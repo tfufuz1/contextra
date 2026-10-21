@@ -91,6 +91,8 @@ onnx = ["contextra-infer-onnx/onnx", "contextra-db/onnx"]
 candle = ["contextra-infer-candle"]
 ollama = ["contextra-infer-ollama"]
 router = ["contextra-router", "contextra-rank"]
+erasure = []
+encryption-at-rest = ["contextra-db/encryption-at-rest"]
 
 [lints]
 workspace = true

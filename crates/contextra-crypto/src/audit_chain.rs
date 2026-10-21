@@ -15,6 +15,7 @@
 //!   womit das Commitment nicht mehr auf Originalattribute zurückführbar ist (Wörterbuchangriff
 //!   unmöglich, da salt unbekannt).
 
+use crate::canonical::CanonicalWriter;
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
 use crate::kv_shredding::KeyRegistry;
@@ -23,6 +24,7 @@ use serde::{Deserialize, Serialize};
 
 /// Datenklassifikation für Audit-Einträge (keine Freitext-Strings).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum DataClass {
     /// Öffentliche Daten.
     Public,
@@ -74,33 +76,19 @@ impl AuditChainEntry {
         prev_hash: &[u8; 32],
         commitment: Option<&[u8; 32]>,
     ) -> Result<[u8; 32]> {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&index.to_le_bytes());
-        let schema_len = u32::try_from(schema_id.len())
-            .map_err(|e| CryptoError::Crypto(format!("schema_id length overflow: {e}")))?;
-        hasher.update(&schema_len.to_le_bytes());
-        hasher.update(schema_id.as_bytes());
-        hasher.update(rules_hash);
-
-        let class_bytes = bincode::serialize(&data_class)
-            .map_err(|e| CryptoError::Crypto(format!("DataClass serialization failed: {e}")))?;
-        let class_len = u32::try_from(class_bytes.len())
-            .map_err(|e| CryptoError::Crypto(format!("class_bytes length overflow: {e}")))?;
-        hasher.update(&class_len.to_le_bytes());
-        hasher.update(&class_bytes);
-
-        hasher.update(&doc_id.0.to_le_bytes());
-        hasher.update(&tx_id.0.to_le_bytes());
-        hasher.update(prev_hash);
-
+        let mut writer = CanonicalWriter::new();
+        writer.write_u64(1, index);
+        writer.write_string(2, schema_id);
+        writer.write_bytes32(3, rules_hash);
+        writer.write_u8(4, data_class as u8);
+        writer.write_u64(5, doc_id.0);
+        writer.write_u64(6, tx_id.0);
+        writer.write_bytes32(7, prev_hash);
         if let Some(comm) = commitment {
-            hasher.update(&[1u8]);
-            hasher.update(comm);
-        } else {
-            hasher.update(&[0u8]);
+            writer.write_bytes32(8, comm);
         }
-
-        Ok(*hasher.finalize().as_bytes())
+        let payload = writer.finish().map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        Ok(*blake3::hash(&payload).as_bytes())
     }
 }
 

@@ -1,5 +1,7 @@
 //! Integration tests for MergeOperatorCapabilities::pure() preset (§4.18).
 
+#![allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+
 use contextra_sandbox::{MergeOperatorCapabilities, WasmCapabilities, WasmExecutor};
 use std::time::Duration;
 

@@ -1,6 +1,6 @@
 # ADR-N12: WAL-High-Water-Mark-Verankerung zur Absicherung gegen Truncation-Angriffe
 
-* **Status:** Proposed / Final-Spezifikation (Priorität H2, Invariante INV-WAL-TRUNCATION-1)
+* **Status:** Accepted / Umgesetzt (Option B: Periodischer Manifest-Anker plus Segmentverkettung, Invariante INV-WAL-TRUNCATION-1)
 * **Datum:** 2026-10-02
 * **Kontext / Auslöser:**
   Die Zielspezifikation v17 (§4.1, Z. 152 sowie Tabelle Z. 434) fordert mit **`INV-WAL-TRUNCATION-1`**, dass die im Manifest persistierte High-Water-Mark (HWM) das Speichersystem unfehlbar vor unbemerkter WAL-Truncation schützt.
@@ -111,6 +111,12 @@
 
 Es wird **Option B (Periodischer Manifest-Anker plus Segmentverkettung)** zur Umsetzung gewählt.
 Sie erfüllt die Invariante `INV-WAL-TRUNCATION-1` vollständig, schützt gegen das Löschen von Zwischensegmenten und verhindert jegliche Performance-Degradierung im Schreib-Hot-Path.
+
+### Umsetzungsnotiz & Restrisiko (I-WAL-3)
+1. **Verifikations-Refactoring:** Der fehlerhafte HWM-Selbstvergleich (`check_hmac = expected_hwm`) in `crates/contextra-store/src/lsm/recovery.rs` wurde eliminiert. Recovery verifiziert nun lückenlos das Erreichen des Manifest-Wasserzeichens (`expected_hwm`).
+2. **Manifest-Anker (V4):** `ManifestEntry::WalAnchor { segment_seq, offset, hmac }` (op_tag = 6) wurde eingeführt und wird bei Flushes/Checkpointing zusammen mit `WalCheckpoint` im Manifest verankert.
+3. **Recovery Mode:** Standardmäßig gilt `WalRecoveryMode::Warn` (erzeugt Warn-Log und Metrik, verhindert Produktionsausfälle durch fehlerhafte Migrationen). Unter `WalRecoveryMode::Strict` schlägt der Start bei fehlenden Ankern / Truncation fehlgeschlossen fehl.
+4. **Dokumentiertes Restrisiko (I-WAL-3):** Commits, die *nach* dem letzten periodischen `WalAnchor` bzw. `WalCheckpoint` geschrieben wurden und durch einen unsauberen Shutdown oder Tail-Write-Truncation verloren gehen, sind mathematisch nicht von sauberen Torn Writes am Dateiende unterscheidbar. Sie werden als akzeptiertes Crash-Recovery-Verhalten behandelt.
 
 ---
 

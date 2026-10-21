@@ -134,6 +134,9 @@ impl<'a> PurgeOrchestrator<'a> {
     // Standalone-Resume muss entweder einen echten `LsmStorage`-Handle erhalten oder eine deterministische
     // Offline-Compaction durchführen, damit anstehende Purges nach Absturz vollständig ausgeführt werden.
     /// Creates a standalone `PurgeOrchestrator` without active storage.
+    ///
+    /// Running compaction (Phase P4) with standalone orchestrator will fail-closed with an error
+    /// to ensure `purge.intent` is preserved until active storage is attached.
     pub fn new_standalone(storage_dir: &Path) -> Self {
         let storage_dir = storage_dir.to_path_buf();
         let intent_file = storage_dir.join("purge.intent");
@@ -274,7 +277,9 @@ impl<'a> PurgeOrchestrator<'a> {
                 // kann hier kein Erasure-Fence im laufenden Engine-Kontext gesetzt werden.
                 if let Some(storage) = self.storage {
                     if fence_prefixes.is_empty() {
-                        return Err(OrxPurgeError::Blocked(PurgeBlocked::UnclassifiedFiles { count: 0 }));
+                        return Err(OrxPurgeError::Blocked(PurgeBlocked::UnclassifiedFiles {
+                            count: 0,
+                        }));
                     }
                     let guard = storage
                         .erasure_fence
@@ -324,6 +329,11 @@ impl<'a> PurgeOrchestrator<'a> {
                             return Err(OrxPurgeError::from(err));
                         }
                     }
+                } else {
+                    return Err(OrxPurgeError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "Storage handle required for PurgeCompaction (P4)",
+                    )));
                 }
 
                 self.check_failpoint("after_compaction_before_manifest")?;
@@ -335,8 +345,12 @@ impl<'a> PurgeOrchestrator<'a> {
                 self.record_phase(&mut intent, PurgePhase::Dispose)?;
                 self.check_failpoint("after_manifest_before_unlink")?;
 
-                let disp_rep =
-                    dispose_obsolete_files(&self.storage_dir, report.obsolete_files.clone(), secure_delete).await?;
+                let disp_rep = dispose_obsolete_files(
+                    &self.storage_dir,
+                    report.obsolete_files.clone(),
+                    secure_delete,
+                )
+                .await?;
                 refusals = disp_rep.refusals.len();
 
                 self.check_failpoint("mid_dispose_journal")?;

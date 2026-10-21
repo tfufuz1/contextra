@@ -54,6 +54,29 @@ impl FileOwnershipCheck for FakeFileOwnershipCheck {
     }
 }
 
+/// Fehler beim Bereitstellen eines ProofSigners.
+#[derive(Debug, thiserror::Error)]
+pub enum SignerError {
+    /// Signer ist nicht verfügbar.
+    #[error("Proof signer unavailable")]
+    Unavailable,
+    /// Ungültige Schlüssel-ID.
+    #[error("Invalid key ID")]
+    InvalidKeyId,
+    /// Interner Fehler.
+    #[error("Internal signer error: {0}")]
+    Internal(String),
+}
+
+/// Provider-Schnittstelle zum Laden von Signern und Datenbank-Instanz-IDs.
+pub trait ProofSignerProvider: Send + Sync {
+    /// Liefert den aktiven `ProofSigner`.
+    fn signer(&self) -> std::result::Result<&dyn ProofSigner, SignerError>;
+
+    /// Liefert die 16-Byte Datenbank-Instanz-ID.
+    fn db_instance_id(&self) -> std::result::Result<[u8; 16], SignerError>;
+}
+
 /// Trait defining proof signing capability and key identification.
 pub trait ProofSigner: Send + Sync {
     /// Signs a message byte slice and returns a 64-byte Ed25519 signature.

@@ -356,6 +356,21 @@ impl WalFailpoints {
 
 pub type WalFaultPlan = WalFailpoints;
 
+/// WAL Recovery enforcement mode controlling whether invariant violations abort or warn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum WalRecoveryMode {
+    /// Discard/truncation violations emit log warnings and metrics but allow database startup.
+    Warn,
+    /// Violations fail LsmStorage startup closed with `ContextraError::WalTruncationDetected` or `WalSegmentGap`.
+    Strict,
+}
+
+impl Default for WalRecoveryMode {
+    fn default() -> Self {
+        Self::Warn
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct WalConfig {
     pub key_manager: Option<Arc<KeyManager>>,
@@ -812,6 +827,7 @@ impl Wal {
                         WalVersion::V1 => "v1.bak",
                         WalVersion::V2 => "v2.bak",
                         WalVersion::V3 => "v3.bak",
+                        WalVersion::V4 => "v4.bak",
                     };
                     let bak_path = PathBuf::from(format!("{}.{}", wal.path.display(), bak_suffix));
                     let copy_res = self::fs::copy(&wal.path, &bak_path).await;
@@ -957,6 +973,15 @@ impl Wal {
     pub fn allow_legacy_fallback_for_test(&self) -> bool {
         self.allow_legacy_integrity_key_fallback
             .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Returns the active integrity guarantee for this WAL instance.
+    pub fn integrity_guarantee(&self) -> WalIntegrityGuarantee {
+        if self.key_manager.is_some() {
+            WalIntegrityGuarantee::TamperEvident
+        } else {
+            WalIntegrityGuarantee::BitrotOnly
+        }
     }
 
     pub fn legacy_key_used_for_test(&self) -> bool {

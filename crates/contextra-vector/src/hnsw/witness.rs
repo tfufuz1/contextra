@@ -127,12 +127,7 @@ impl HnswIndex {
             )));
         }
 
-        let store_gen = WitStoreGeneration(
-            self.inner
-                .hot
-                .last_tx_id
-                .load(std::sync::atomic::Ordering::Acquire),
-        );
+        let store_gen = WitStoreGeneration(self.inner.hot.last_tx_id.load(std::sync::atomic::Ordering::Acquire));
 
         let node_id = args.doc_ids.first().map(|d| d.inner()).unwrap_or(0);
 

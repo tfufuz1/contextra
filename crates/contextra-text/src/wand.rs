@@ -261,7 +261,13 @@ pub async fn block_max_wand_search<S: StorageEngine>(
     // Retrieve posting lists for all query terms
     let mut cursors: Vec<TermCursor> = Vec::with_capacity(terms.len());
     for term in terms {
-        let list = match resident_index.get(term) {
+        let initial_list = if is_latest {
+            resident_index.get(term)
+        } else {
+            None
+        };
+
+        let list = match initial_list {
             Some(l) => l,
             None => {
                 let prefix = prefix_helper(term);
@@ -332,10 +338,14 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                     }
                 };
 
-                resident_index.insert_list(term.clone(), plist);
-                match resident_index.get(term) {
-                    Some(l) => l,
-                    None => Arc::new(PostingList::empty()),
+                if is_latest {
+                    resident_index.insert_list(term.clone(), plist.clone());
+                    match resident_index.get(term) {
+                        Some(l) => l,
+                        None => Arc::new(PostingList::empty()),
+                    }
+                } else {
+                    Arc::new(plist)
                 }
             }
         };
