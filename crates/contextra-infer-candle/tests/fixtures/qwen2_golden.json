@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Qwen2 Golden Token Test Fixture",
+  "description": "Golden token output comparison fixture for Qwen2.5-Coder GGUF models. Set CONTEXTRA_QWEN_GGUF environment variable pointing to Qwen2 GGUF file to run integration tests.",
+  "model_id": "Qwen2.5-Coder-1.5B-Instruct-Q8_0",
+  "temperature": 0.0,
+  "max_tokens": 64,
+  "prompts": [
+    {
+      "prompt": "def fibonacci(n):",
+      "expected_tokens": []
+    }
+  ],
+  "generation_instructions": "To populate expected_tokens, run Ollama or llama.cpp with Qwen2.5-Coder GGUF at temp=0.0: llama-cli -m qwen2.5-coder-1.5b-instruct-q8_0.gguf -p 'def fibonacci(n):' -n 64 --temp 0"
+}
