@@ -14,7 +14,7 @@ ring = "0"
 
 [dependencies]
 contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-ports = { workspace = true, features = ["backend-impl"] }
 contextra-core = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-durable-fs = { path = "../contextra-durable-fs" }
@@ -27,7 +27,9 @@ rand = { workspace = true }
 roaring = { workspace = true }
 tracing = { workspace = true }
 memmap2 = { workspace = true }
+blake3 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["sync", "time"] }
 
 [features]
 default = []

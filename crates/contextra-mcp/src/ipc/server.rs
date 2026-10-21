@@ -1,8 +1,10 @@
 //! IPC Server implementation managing Unix Domain Socket or Windows Named Pipe listeners.
 
 use crate::config::IpcConfig;
+#[cfg(unix)]
 use crate::ipc::peer_cred::validate_unix_peer_credentials;
 use contextra_types::ContextraError;
+#[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -190,10 +192,8 @@ impl IpcServer {
             + Sync
             + 'static,
     {
-        info!(
-            endpoint = %self.endpoint_path.display(),
-            "IPC Windows Named Pipe server initialized."
-        );
-        Ok(())
+        Err(ContextraError::Unsupported(
+            "Windows Named Pipe IPC listener is unsupported".to_string(),
+        ))
     }
 }

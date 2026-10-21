@@ -18,7 +18,8 @@
 // ZWECK: Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone.
 // INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen, Registrierung vor Disk-Link.
 
-use crate::copy_registry::{file_id_for_name, CopyKind, CopyRegEntry};
+use crate::copy_registry::file_id_for_name;
+use contextra_core::copy_registry::{CopyKind, CopyRegEntry};
 use contextra_mvcc::SnapshotRegistry;
 use contextra_store::copy_registry::CopyRegistry;
 use contextra_types::{ContextraError, Result};

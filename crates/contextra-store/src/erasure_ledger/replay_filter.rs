@@ -4,8 +4,7 @@
 //! INVARIANTEN: Zero-Panic, Fail-Closed, non-blocking sync decision evaluate für Hotpath/Replay.
 
 use super::{
-    serialize_frame, AntiResurrection, ErasureLedger, LedgerDecision, LedgerEntry, HEAD_FILENAME,
-    LEDGER_FILENAME,
+    serialize_frame, ErasureLedger, LedgerDecision, LedgerEntry, HEAD_FILENAME, LEDGER_FILENAME,
 };
 use crate::compaction::purge_filter::CompactionRecordFilter;
 use crate::wal::replay_filter::WalReplayFilter;
@@ -42,11 +41,20 @@ impl ErasureLedgerHandle {
 
         let (dir, key, last_mac, db_instance_id, to_write) = {
             let guard = self.ledger.read();
+            let mut batch_seen_proof_ids = std::collections::HashSet::new();
+            let mut batch_seen_keyed_hashes = std::collections::HashSet::new();
             let mut to_write = Vec::new();
             for entry in entries {
-                if !guard.seen_proof_ids().contains(&entry.proof_id) {
-                    to_write.push(entry.clone());
+                if guard.seen_proof_ids().contains(&entry.proof_id)
+                    || guard.seen_keyed_hashes().contains(&entry.keyed_hash)
+                    || batch_seen_proof_ids.contains(&entry.proof_id)
+                    || batch_seen_keyed_hashes.contains(&entry.keyed_hash)
+                {
+                    continue;
                 }
+                batch_seen_proof_ids.insert(entry.proof_id);
+                batch_seen_keyed_hashes.insert(entry.keyed_hash);
+                to_write.push(entry.clone());
             }
             (
                 guard.dir().to_path_buf(),
@@ -62,6 +70,11 @@ impl ErasureLedgerHandle {
         }
 
         let ledger_path = dir.join(LEDGER_FILENAME);
+        let initial_len = match tokio::fs::metadata(&ledger_path).await {
+            Ok(meta) => meta.len(),
+            Err(_) => 0,
+        };
+
         let mut buffer = Vec::new();
         let mut current_mac = last_mac;
 
@@ -74,19 +87,27 @@ impl ErasureLedgerHandle {
 
         let mut file = tokio::fs::OpenOptions::new()
             .create(true)
+            .write(true)
             .append(true)
             .open(&ledger_path)
             .await
             .map_err(|e| ContextraError::Storage(format!("Failed to open ledger: {}", e)))?;
 
-        file.write_all(&buffer).await.map_err(|e| {
-            ContextraError::Storage(format!("ErasureLedger write_all failed: {}", e))
-        })?;
-        file.sync_all().await.map_err(|e| {
-            ContextraError::Storage(format!("ErasureLedger sync_all failed: {}", e))
-        })?;
+        if let Err(write_err) = file.write_all(&buffer).await {
+            let _ = file.set_len(initial_len).await;
+            return Err(ContextraError::Storage(format!("ErasureLedger write_all failed: {}", write_err)));
+        }
 
-        crate::util::fsync_parent_dir(&ledger_path).await?;
+        if let Err(sync_err) = file.sync_all().await {
+            let _ = file.set_len(initial_len).await;
+            return Err(ContextraError::Storage(format!("ErasureLedger sync_all failed: {}", sync_err)));
+        }
+
+        if let Err(fsync_err) = fsync_ledger_dir(&ledger_path).await {
+            let _ = file.set_len(initial_len).await;
+            let _ = file.sync_all().await;
+            return Err(fsync_err);
+        }
 
         // Write head marker atomically
         let head_path = dir.join(HEAD_FILENAME);
@@ -123,15 +144,6 @@ impl ErasureLedgerHandle {
     /// Returns a copy of all current ledger entries.
     pub fn entries(&self) -> Vec<LedgerEntry> {
         self.ledger.read().entries().to_vec()
-    }
-
-    /// Reapplies tombstones from the ledger with accelerated index.
-    pub fn reapply_tombstones_from_ledger(
-        &self,
-        storage_scope: &[u8],
-        truncation_anchor_mac: Option<[u8; 32]>,
-    ) -> (Vec<LedgerEntry>, AntiResurrection) {
-        self.ledger.read().reapply_tombstones_from_ledger(storage_scope, truncation_anchor_mac)
     }
 }
 

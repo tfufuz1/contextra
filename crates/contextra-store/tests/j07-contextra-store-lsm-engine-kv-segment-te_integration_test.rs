@@ -26,13 +26,10 @@
 //! 22. `encode_graph_key`
 
 use bytes::Bytes;
-use contextra_mvcc::snapshot::SnapshotRegistry;
-use contextra_ports::{StorageEngine, StorageStats};
-use contextra_types::{
-    CollectionId, ContextraError, DocId, ResourceBudget, ResourceTracker, TenantId, TxId,
-};
 use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
+use contextra_mvcc::snapshot::SnapshotRegistry;
 use contextra_ports::SystemClock;
+use contextra_ports::{StorageEngine, StorageStats};
 use contextra_store::{
     compaction::{
         adaptive::{AdaptiveCompactionPlan, AdaptiveCompactionPlanner, WorkloadMetricsSnapshot},
@@ -45,6 +42,9 @@ use contextra_store::{
     memtable::MemTable,
     sstable::BlockCache,
     tenant_codec::TenantKeyCodec,
+};
+use contextra_types::{
+    CollectionId, ContextraError, DocId, ResourceBudget, ResourceTracker, TenantId, TxId,
 };
 use std::{collections::BTreeMap, ops::Bound, sync::Arc, time::Duration};
 use tempfile::TempDir;

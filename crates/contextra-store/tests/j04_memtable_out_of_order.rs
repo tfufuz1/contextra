@@ -3,8 +3,9 @@
 // ORAKEL: Invariant Zero-Panic and Snapshot Isolation — MemTable::put preserves sorted version order and correct get_at_seq visibility under all insertion permutations and concurrent access.
 
 use bytes::Bytes;
-use contextra_ports::SeededRng;
+use contextra_sys::SeededRng;
 use contextra_store::memtable::{is_tombstone, MemTable};
+use contextra_testkit::SeededRng;
 use contextra_types::{TxId, TOMBSTONE_BIT};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Barrier};
@@ -58,10 +59,7 @@ fn test_all_permutations_of_4_puts_seq_1_5_5_10() {
             b"v10",
             "Permutation {perm_idx} latest val mismatch"
         );
-        assert_eq!(
-            latest_seq, 10,
-            "Permutation {perm_idx} latest seq mismatch"
-        );
+        assert_eq!(latest_seq, 10, "Permutation {perm_idx} latest seq mismatch");
 
         // 2. Verify get_at_seq across checkpoints
         // seq < 1 => None
@@ -192,7 +190,9 @@ fn test_concurrent_out_of_order_puts_and_snapshot_readers() {
     const ITERATIONS_PER_WRITER: usize = 200;
     const SEED: u64 = 0xDEAF_BEEF_42;
 
-    println!("Executing test_concurrent_out_of_order_puts_and_snapshot_readers with Seed: {SEED:#X}");
+    println!(
+        "Executing test_concurrent_out_of_order_puts_and_snapshot_readers with Seed: {SEED:#X}"
+    );
 
     let mt = Arc::new(MemTable::new());
     let barrier = Arc::new(Barrier::new(NUM_WRITERS + NUM_READERS));
@@ -203,12 +203,12 @@ fn test_concurrent_out_of_order_puts_and_snapshot_readers() {
         let mt_clone = Arc::clone(&mt);
         let barrier_clone = Arc::clone(&barrier);
         handles.push(thread::spawn(move || {
-            let mut rng = SeededRng::new(SEED + thread_id as u64);
+            let mt_rng = SeededRng::new(SEED + thread_id as u64);
             barrier_clone.wait();
 
             for i in 0..ITERATIONS_PER_WRITER {
                 // Generate sequence number non-monotonically
-                let raw_seq = (rng.next_u64() % 1000) + 1;
+                let raw_seq = (mt_rng.next_u64() % 1000) + 1;
                 let tx_id = (thread_id as u64 * 1000) + (i as u64 + 1);
 
                 let key = if i % 2 == 0 {
@@ -228,11 +228,11 @@ fn test_concurrent_out_of_order_puts_and_snapshot_readers() {
         let mt_clone = Arc::clone(&mt);
         let barrier_clone = Arc::clone(&barrier);
         handles.push(thread::spawn(move || {
-            let mut rng = SeededRng::new(SEED + 100 + reader_id as u64);
+            let mt_rng = SeededRng::new(SEED + 100 + reader_id as u64);
             barrier_clone.wait();
 
             for _ in 0..ITERATIONS_PER_WRITER {
-                let query_seq = (rng.next_u64() % 1000) + 1;
+                let query_seq = (mt_rng.next_u64() % 1000) + 1;
 
                 // get_at_seq on shared_key must never panic or return invalid order
                 if let Some((_, found_seq, _)) =
@@ -263,7 +263,8 @@ fn test_concurrent_out_of_order_puts_and_snapshot_readers() {
     }
 
     for h in handles {
-        h.join().expect("Thread panicked during concurrent stress test");
+        h.join()
+            .expect("Thread panicked during concurrent stress test");
     }
 
     // Final verification: verify sorted order of all versions in shared_key

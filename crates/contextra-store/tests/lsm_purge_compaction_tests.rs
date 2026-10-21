@@ -1,8 +1,8 @@
 use contextra_ports::StorageEngine;
-use contextra_types::{Result, TxId};
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
+use contextra_types::{Result, TxId};
 use tempfile::tempdir;
 
 struct TestFreeSpaceProbe {
@@ -71,7 +71,11 @@ async fn test_purge_keys_success() -> Result<()> {
     let scope = PurgeScope::Keys(vec![b"purge_target".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert!(res.is_ok(), "purge_keys must succeed when disk space is available: {:?}", res);
+    assert!(
+        res.is_ok(),
+        "purge_keys must succeed when disk space is available: {:?}",
+        res
+    );
 
     Ok(())
 }

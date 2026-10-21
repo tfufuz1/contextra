@@ -271,6 +271,12 @@ impl LsmStorage {
                 }
             }
 
+            // WP-5a: Direkter Nachschlag in HashMap<PathBuf, Option<Arc<SstableReader>>>
+            // TODO(WP-5a / PR-7): Der HashMap-basierte Swap mit Vorab-Validierung von `replaced_old_paths`
+            // ist am HEAD implementiert. Für PR-7 noch abzuschließen:
+            // 1. Release-fähige Invarianten-Prüfung (nicht nur debug_assert), falls `replacement_map` nach Durchlauf nicht leer ist.
+            // 2. Property-Test für SSTable-Swap unter parallelen Compactions.
+            // 3. Eigenschaftstest mit Referenz-Orakel zur Validierung der Datenkonsistenz nach Re-Indexing.
             let mut replacement_map: std::collections::HashMap<
                 std::path::PathBuf,
                 Option<Arc<SstableReader>>,

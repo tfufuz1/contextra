@@ -8,7 +8,6 @@
 // 4. Kein Beweis / Zeuge ohne abgeschlossene Phasen.
 
 use contextra_ports::{Rng, StorageEngine};
-use contextra_testkit::{ManualClock, TestkitSeededRng as SeededRng};
 use contextra_store::compaction::purge_filter::{FreeSpaceProbe, PurgeScope};
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::purge::dispose::DisposePolicy;
@@ -18,6 +17,7 @@ use contextra_store::lsm::purge::{
     CANONICAL_FAILPOINTS,
 };
 use contextra_store::lsm::LsmStorage;
+use contextra_testkit::{ManualClock, TestkitSeededRng as SeededRng};
 use contextra_types::TxId;
 use std::env;
 use std::sync::Arc;

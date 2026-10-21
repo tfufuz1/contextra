@@ -177,7 +177,7 @@ mod tests {
         let (master_key, header) = KeyManager::try_new_argon2id("pass").unwrap();
         let keystore = MfksKeystore::new(header, vec![], vec![]).unwrap();
         let clock = Arc::new(contextra_ports::SystemClock::new());
-        let sk = ed25519_dalek::SigningKey::generate(&mut rand::thread_rng());
+        let sk = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
         let vk = sk.verifying_key();
         let log = Arc::new(RevocationLog::new_in_memory(clock.clone(), Some(sk), vk));
         let registry = Arc::new(KeyRegistry::new());

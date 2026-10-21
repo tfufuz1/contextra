@@ -265,7 +265,7 @@ impl ContextraBuilder {
     pub fn with_kv_shredding(mut self, enabled: bool) -> Self {
         self.kv_shredding_enabled = enabled;
         if enabled {
-            self.config.vector_delete_mode = contextra_ports::VectorDeleteMode::CryptoShred;
+            self.config.vector_delete_mode = contextra_ports::VectorDeleteMode::SynchronousRepair;
         } else {
             self.config.vector_delete_mode = contextra_ports::VectorDeleteMode::BackgroundRepair;
         }
@@ -351,7 +351,7 @@ impl ContextraBuilder {
 
     pub fn kv_shredding_enabled(&self) -> bool {
         self.kv_shredding_enabled
-            || self.config.vector_delete_mode == contextra_ports::VectorDeleteMode::CryptoShred
+            || self.config.vector_delete_mode == contextra_ports::VectorDeleteMode::SynchronousRepair
     }
 
     pub fn checkpoint_enabled(&self) -> bool {
@@ -499,7 +499,7 @@ mod tests {
             .build()
             .await;
         assert!(res.is_err());
-        let err_msg = res.unwrap_err().to_string();
+        let err_msg = format!("{:?}", res.unwrap_err());
         assert!(
             err_msg.contains("StoragePath"),
             "Error message should mention StoragePath, got: {err_msg}"
@@ -513,7 +513,7 @@ mod tests {
             .build()
             .await;
         assert!(res.is_err());
-        let err_msg = res.unwrap_err().to_string();
+        let err_msg = format!("{:?}", res.unwrap_err());
         assert!(
             err_msg.contains("Dimension"),
             "Error message should mention Dimension, got: {err_msg}"
@@ -527,7 +527,7 @@ mod tests {
             .build()
             .await;
         assert!(res.is_err());
-        let err_msg = res.unwrap_err().to_string();
+        let err_msg = format!("{:?}", res.unwrap_err());
         assert!(
             err_msg.contains("LicenseGate"),
             "Error message should mention LicenseGate, got: {err_msg}"

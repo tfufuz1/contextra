@@ -20,10 +20,11 @@ pub struct ProcessHardeningStatus {
 ///
 /// On Linux platforms (`cfg(target_os = "linux")`), this sets `RLIMIT_CORE` to `0` via
 /// `setrlimit` and disables process dumpability via `prctl(PR_SET_DUMPABLE, 0)`.
-/// On non-Linux platforms, this is a safe no-op that reports `platform_supported = false`.
+/// On non-Linux platforms, attempting process hardening fails closed with [`std::io::ErrorKind::Unsupported`].
 ///
 /// # Errors
-/// Returns an [`std::io::Error`] if any system call fails during hardening on supported platforms.
+/// Returns an [`std::io::Error`] if any system call fails during hardening on supported platforms,
+/// or [`std::io::ErrorKind::Unsupported`] on unsupported target platforms (INV-NOOP-1).
 #[cfg(target_os = "linux")]
 pub fn harden_process() -> io::Result<ProcessHardeningStatus> {
     let rlim = libc::rlimit {
@@ -31,8 +32,8 @@ pub fn harden_process() -> io::Result<ProcessHardeningStatus> {
         rlim_max: 0,
     };
 
-    // SAFETY: setrlimit passing RLIMIT_CORE with a valid pointer to libc::rlimit struct
-    // on Linux is safe and does not modify invalid memory locations.
+    // SAFETY: setrlimit passing RLIMIT_CORE with a valid pointer to initialized stack-allocated
+    // libc::rlimit struct on Linux is safe and does not modify invalid memory locations.
     let res_rlimit = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &rlim) };
     if res_rlimit != 0 {
         return Err(io::Error::last_os_error());
@@ -52,14 +53,13 @@ pub fn harden_process() -> io::Result<ProcessHardeningStatus> {
     })
 }
 
-/// Hardens the current process on non-Linux platforms (fallback no-op stub).
+/// Hardens the current process on non-Linux platforms (fails closed per INV-NOOP-1).
 #[cfg(not(target_os = "linux"))]
 pub fn harden_process() -> io::Result<ProcessHardeningStatus> {
-    Ok(ProcessHardeningStatus {
-        core_dump_disabled: false,
-        dumpable_disabled: false,
-        platform_supported: false,
-    })
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "Process hardening is unsupported on non-Linux target platforms (INV-NOOP-1)",
+    ))
 }
 
 #[cfg(test)]
@@ -69,14 +69,27 @@ mod tests {
     #[test]
     fn test_harden_process_execution() {
         let res = harden_process();
-        assert!(res.is_ok(), "harden_process failed: {res:?}");
-        let status = res.expect("status ok");
         if cfg!(target_os = "linux") {
+            assert!(res.is_ok(), "harden_process failed on Linux: {res:?}");
+            let status = res.expect("status ok");
             assert!(status.platform_supported);
             assert!(status.core_dump_disabled);
             assert!(status.dumpable_disabled);
         } else {
-            assert!(!status.platform_supported);
+            assert!(res.is_err(), "harden_process MUST fail on non-Linux per INV-NOOP-1");
+            let err = res.unwrap_err();
+            assert_eq!(err.kind(), io::ErrorKind::Unsupported);
+        }
+    }
+
+    #[test]
+    fn hardening_unsupported_is_startup_error() {
+        let res = harden_process();
+        if cfg!(target_os = "linux") {
+            let _ = res;
+        } else {
+            assert!(res.is_err(), "harden_process MUST return Err on unsupported platforms (INV-NOOP-1)");
+            assert_eq!(res.unwrap_err().kind(), io::ErrorKind::Unsupported);
         }
     }
 }

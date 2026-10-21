@@ -18,9 +18,7 @@ use std::fs;
 use std::sync::Arc;
 use tempfile::tempdir;
 
-fn setup_keyring(
-    dir: &std::path::Path,
-) -> (Arc<ScopeKeyring>, KeyScope, KeyId) {
+fn setup_keyring(dir: &std::path::Path) -> (Arc<ScopeKeyring>, KeyScope, KeyId) {
     let (km, _) = KeyManager::try_new_argon2id("test_master_passphrase_32_bytes!").unwrap();
     let clock = Arc::new(ManualClock::new(1_000_000_000));
     let rng = Arc::new(SystemRng::new());
@@ -48,14 +46,21 @@ async fn test_v5_roundtrip_and_v4_backward_compatibility() {
         .await
         .unwrap();
 
-    builder5.add(b"user:001", b"value_alpha", 10, 1).await.unwrap();
-    builder5.add(b"user:002", b"value_beta", 20, 2).await.unwrap();
+    builder5
+        .add(b"user:001", b"value_alpha", 10, 1)
+        .await
+        .unwrap();
+    builder5
+        .add(b"user:002", b"value_beta", 20, 2)
+        .await
+        .unwrap();
     builder5.finish().await.unwrap();
 
     // 2. Read back Format v5 SSTable
-    let reader5 = SstableReader::open_with_keyring(&v5_path, Arc::clone(&cache), Some(keyring.clone()), None)
-        .await
-        .unwrap();
+    let reader5 =
+        SstableReader::open_with_keyring(&v5_path, Arc::clone(&cache), Some(keyring.clone()), None)
+            .await
+            .unwrap();
 
     assert_eq!(reader5.format_version, 5);
     assert_eq!(reader5.key_id(), Some(key_id));
@@ -69,13 +74,17 @@ async fn test_v5_roundtrip_and_v4_backward_compatibility() {
     // 3. Write Format v4 SSTable (unencrypted legacy)
     let v4_path = tmp.path().join("v4_data.sst");
     let mut builder4 = SstableBuilder::create(&v4_path).await.unwrap();
-    builder4.add(b"legacy:001", b"value_legacy", 5, 1).await.unwrap();
+    builder4
+        .add(b"legacy:001", b"value_legacy", 5, 1)
+        .await
+        .unwrap();
     builder4.finish().await.unwrap();
 
     // 4. Read back Format v4 SSTable using open_with_keyring
-    let reader4 = SstableReader::open_with_keyring(&v4_path, Arc::clone(&cache), Some(keyring), None)
-        .await
-        .unwrap();
+    let reader4 =
+        SstableReader::open_with_keyring(&v4_path, Arc::clone(&cache), Some(keyring), None)
+            .await
+            .unwrap();
 
     assert_eq!(reader4.format_version, 4);
     assert_eq!(reader4.key_id(), None);
@@ -99,14 +108,22 @@ async fn test_block_swap_detection_via_aad() {
     let large_val = vec![b'X'; 3000];
     for i in 0..10 {
         let key = format!("key_{:04}", i);
-        builder.add(key.as_bytes(), &large_val, i as u64 + 1, 1).await.unwrap();
+        builder
+            .add(key.as_bytes(), &large_val, i as u64 + 1, 1)
+            .await
+            .unwrap();
     }
     builder.finish().await.unwrap();
 
     // Verify normal reader works before tampering
-    let reader_ok = SstableReader::open_with_keyring(&sst_path, Arc::clone(&cache), Some(keyring.clone()), None)
-        .await
-        .unwrap();
+    let reader_ok = SstableReader::open_with_keyring(
+        &sst_path,
+        Arc::clone(&cache),
+        Some(keyring.clone()),
+        None,
+    )
+    .await
+    .unwrap();
     assert!(reader_ok.get(b"key_0000").await.unwrap().is_some());
 
     // Tamper with file: Swap block 0 payload with block 1 payload on disk
@@ -132,22 +149,16 @@ async fn test_block_swap_detection_via_aad() {
 
     // Copy block1 payload into block0 position and block0 payload into block1 position
     let min_len = len0.min(len1);
-    raw_bytes[off0 as usize..(off0 as usize + min_len)]
-        .copy_from_slice(&block1[..min_len]);
-    raw_bytes[off1 as usize..(off1 as usize + min_len)]
-        .copy_from_slice(&block0[..min_len]);
+    raw_bytes[off0 as usize..(off0 as usize + min_len)].copy_from_slice(&block1[..min_len]);
+    raw_bytes[off1 as usize..(off1 as usize + min_len)].copy_from_slice(&block0[..min_len]);
 
     let swapped_path = tmp.path().join("swapped_blocks.sst");
     fs::write(&swapped_path, &raw_bytes).unwrap();
 
     // Open swapped SSTable and attempt read — opening or reading must fail closed due to AAD mismatch
-    let reader_swapped_res = SstableReader::open_with_keyring(
-        &swapped_path,
-        create_block_cache(1),
-        Some(keyring),
-        None,
-    )
-    .await;
+    let reader_swapped_res =
+        SstableReader::open_with_keyring(&swapped_path, create_block_cache(1), Some(keyring), None)
+            .await;
 
     match reader_swapped_res {
         Ok(reader) => {
@@ -160,7 +171,12 @@ async fn test_block_swap_detection_via_aad() {
         Err(err) => {
             // Decryption failure during open_with_keyring (read_first_key) is also expected and valid
             assert!(
-                matches!(err, ContextraError::Crypto(_) | ContextraError::Storage(_) | ContextraError::ParseError(_)),
+                matches!(
+                    err,
+                    ContextraError::Crypto(_)
+                        | ContextraError::Storage(_)
+                        | ContextraError::ParseError(_)
+                ),
                 "Expected crypto or storage error, got {:?}",
                 err
             );
@@ -181,18 +197,27 @@ async fn test_scope_keyring_destroy_yields_key_destroyed_and_no_canary() {
         .await
         .unwrap();
 
-    builder.add(b"doc:999", canary_secret, 1, 100).await.unwrap();
+    builder
+        .add(b"doc:999", canary_secret, 1, 100)
+        .await
+        .unwrap();
     builder.finish().await.unwrap();
 
     // Verify reader works prior to destruction
-    let reader_pre = SstableReader::open_with_keyring(&sst_path, Arc::clone(&cache), Some(keyring.clone()), None)
-        .await
-        .unwrap();
+    let reader_pre = SstableReader::open_with_keyring(
+        &sst_path,
+        Arc::clone(&cache),
+        Some(keyring.clone()),
+        None,
+    )
+    .await
+    .unwrap();
     let pre_val = reader_pre.get(b"doc:999").await.unwrap().unwrap();
     assert_eq!(pre_val.0.as_ref(), canary_secret);
 
     // Verify WitnessReader works prior to destruction
-    let mut witness_pre = WitnessReader::open_with_keyring(&sst_path, None, Some(keyring.clone())).unwrap();
+    let mut witness_pre =
+        WitnessReader::open_with_keyring(&sst_path, None, Some(keyring.clone())).unwrap();
     let pre_entries = witness_pre.read_all_entries().unwrap();
     assert_eq!(pre_entries.len(), 1);
     assert_eq!(pre_entries[0].value.as_ref(), canary_secret);
@@ -202,7 +227,13 @@ async fn test_scope_keyring_destroy_yields_key_destroyed_and_no_canary() {
     assert!(receipt.key_ids.contains(&key_id));
 
     // 1. Reader open or get must return Err(KeyDestroyed)
-    let reader_post_res = SstableReader::open_with_keyring(&sst_path, create_block_cache(1), Some(keyring.clone()), None).await;
+    let reader_post_res = SstableReader::open_with_keyring(
+        &sst_path,
+        create_block_cache(1),
+        Some(keyring.clone()),
+        None,
+    )
+    .await;
     match reader_post_res {
         Ok(reader) => {
             let post_res = reader.get(b"doc:999").await;
@@ -289,30 +320,48 @@ async fn test_compaction_isolation_across_scopes() {
 
     // Write input SSTable A under Scope A
     let sst_a_path = tmp.path().join("scope_a_in.sst");
-    let mut builder_a = SstableBuilder::create_with_scope_keyring(&sst_a_path, keyring.clone(), key_a)
+    let mut builder_a =
+        SstableBuilder::create_with_scope_keyring(&sst_a_path, keyring.clone(), key_a)
+            .await
+            .unwrap();
+    builder_a
+        .add(b"col_a_key1", b"secret_a1", 1, 1)
         .await
         .unwrap();
-    builder_a.add(b"col_a_key1", b"secret_a1", 1, 1).await.unwrap();
     builder_a.finish().await.unwrap();
 
     let reader_a = Arc::new(
-        SstableReader::open_with_keyring(&sst_a_path, Arc::clone(&cache), Some(keyring.clone()), None)
-            .await
-            .unwrap(),
+        SstableReader::open_with_keyring(
+            &sst_a_path,
+            Arc::clone(&cache),
+            Some(keyring.clone()),
+            None,
+        )
+        .await
+        .unwrap(),
     );
 
     // Write input SSTable B under Scope B
     let sst_b_path = tmp.path().join("scope_b_in.sst");
-    let mut builder_b = SstableBuilder::create_with_scope_keyring(&sst_b_path, keyring.clone(), key_b)
+    let mut builder_b =
+        SstableBuilder::create_with_scope_keyring(&sst_b_path, keyring.clone(), key_b)
+            .await
+            .unwrap();
+    builder_b
+        .add(b"col_b_key1", b"secret_b1", 1, 1)
         .await
         .unwrap();
-    builder_b.add(b"col_b_key1", b"secret_b1", 1, 1).await.unwrap();
     builder_b.finish().await.unwrap();
 
     let reader_b = Arc::new(
-        SstableReader::open_with_keyring(&sst_b_path, Arc::clone(&cache), Some(keyring.clone()), None)
-            .await
-            .unwrap(),
+        SstableReader::open_with_keyring(
+            &sst_b_path,
+            Arc::clone(&cache),
+            Some(keyring.clone()),
+            None,
+        )
+        .await
+        .unwrap(),
     );
 
     let floor = Arc::new(contextra_mvcc::SnapshotRegistry::new()) as Arc<dyn SnapshotFloor>;
@@ -373,7 +422,13 @@ async fn test_compaction_isolation_across_scopes() {
     keyring.destroy(&scope_a).unwrap();
 
     // Verify Scope A compacted file is unreadable (KeyDestroyed)
-    let reader_a_compact_res = SstableReader::open_with_keyring(&output_a_path, create_block_cache(1), Some(keyring.clone()), None).await;
+    let reader_a_compact_res = SstableReader::open_with_keyring(
+        &output_a_path,
+        create_block_cache(1),
+        Some(keyring.clone()),
+        None,
+    )
+    .await;
     match reader_a_compact_res {
         Ok(reader) => {
             let res_a = reader.get(b"col_a_key1").await;
@@ -392,9 +447,14 @@ async fn test_compaction_isolation_across_scopes() {
     }
 
     // Verify Scope B compacted file remains fully readable!
-    let reader_b_compact = SstableReader::open_with_keyring(&output_b_path, create_block_cache(1), Some(keyring), None)
-        .await
-        .unwrap();
+    let reader_b_compact = SstableReader::open_with_keyring(
+        &output_b_path,
+        create_block_cache(1),
+        Some(keyring),
+        None,
+    )
+    .await
+    .unwrap();
     let val_b = reader_b_compact.get(b"col_b_key1").await.unwrap().unwrap();
     assert_eq!(val_b.0.as_ref(), b"secret_b1");
 }
@@ -417,10 +477,12 @@ async fn test_corrupt_header_or_unknown_key_id_fails() {
     let (km2, _) = KeyManager::try_new_argon2id("different_passphrase_32_bytes!!").unwrap();
     let clock2 = Arc::new(ManualClock::new(1_000_000_000));
     let rng2 = Arc::new(SystemRng::new());
-    let keyring2 = Arc::new(ScopeKeyring::open(tmp.path().join("kr2"), &km2, clock2, rng2).unwrap());
+    let keyring2 =
+        Arc::new(ScopeKeyring::open(tmp.path().join("kr2"), &km2, clock2, rng2).unwrap());
 
     // Reading with keyring2 where key_id does not exist must fail closed
-    let reader_res = SstableReader::open_with_keyring(&sst_path, Arc::clone(&cache), Some(keyring2), None).await;
+    let reader_res =
+        SstableReader::open_with_keyring(&sst_path, Arc::clone(&cache), Some(keyring2), None).await;
     match reader_res {
         Ok(reader) => {
             let res = reader.get(b"k1").await;

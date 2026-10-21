@@ -109,12 +109,12 @@ impl DiskAnnIndex {
         let index_path = self.inner.config.index_path.clone();
         self.write_incremental_to_file_sync(&index_path, &pending)?;
 
-        #[cfg(test)]
+        #[cfg(any(test, feature = "experimental-diskann"))]
         self.maybe_failpoint("after_rename")?;
 
         self.load_sync()?; // Mmap neu laden
 
-        #[cfg(test)]
+        #[cfg(any(test, feature = "experimental-diskann"))]
         self.maybe_failpoint("before_wal_removal")?;
 
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");

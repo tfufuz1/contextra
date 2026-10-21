@@ -2,8 +2,8 @@
 // STAND: 2026-10-15
 // ZWECK: Fehlerinjektionstest für Lesefehler mitten in einer SSTable während des Purge.
 
-use contextra_ports::StorageEngine;
 use contextra_ports::erasure::PurgeError;
+use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::lsm::config::LsmConfig;
 use contextra_store::lsm::LsmStorage;
@@ -12,7 +12,8 @@ use std::fs;
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_purge_obsolete_fault_injection_read_error() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_purge_obsolete_fault_injection_read_error() -> Result<(), Box<dyn std::error::Error>>
+{
     let dir = tempdir()?;
     let config = LsmConfig {
         path: dir.path().to_path_buf(),
@@ -39,7 +40,10 @@ async fn test_purge_obsolete_fault_injection_read_error() -> Result<(), Box<dyn 
     let original_bytes = fs::read(&sst_file)?;
 
     // Corrupt the SSTable header to simulate a read error mid-scan
-    fs::write(&sst_file, b"CORRUPTED_HEADER_INVALID_SSTABLE_BYTES_TRIGGERING_READ_ERROR")?;
+    fs::write(
+        &sst_file,
+        b"CORRUPTED_HEADER_INVALID_SSTABLE_BYTES_TRIGGERING_READ_ERROR",
+    )?;
 
     let scope = PurgeScope::Keys(vec![key1]);
     let result = storage.purge_keys(scope, 10, None).await;

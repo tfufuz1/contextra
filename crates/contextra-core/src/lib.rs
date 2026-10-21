@@ -15,6 +15,10 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+/// Copy registry types.
+pub mod copy_registry;
+pub use copy_registry::{CopyKind, CopyRegEntry};
+
 // Re-export Ring-0 modular crates
 #[deprecated(
     since = "0.1.0",

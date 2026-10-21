@@ -121,6 +121,18 @@ fn hash_remainder(remainder: &[u8]) -> usize {
     (hash as usize) % SHARD_COUNT
 }
 
+#[inline]
+fn upper_bound_for_prefix(prefix: &[u8]) -> Option<Vec<u8>> {
+    let mut ub = prefix.to_vec();
+    while let Some(last) = ub.pop() {
+        if last < 0xFF {
+            ub.push(last + 1);
+            return Some(ub);
+        }
+    }
+    None
+}
+
 /// A single shard of the MemTable, holding a subset of the key space.
 #[derive(Debug)]
 struct MemTableShard {
@@ -402,7 +414,7 @@ impl MemTable {
     fn saturating_sub_size(&self, n: usize) {
         let _ = self
             .size
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| { // INTENTIONAL-DROP: fetch_update closure always returns Some, so fetch_update always succeeds.
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| {
                 Some(v.saturating_sub(n))
             });
     }
@@ -470,6 +482,7 @@ impl MemTable {
         let max_tx_val = max_tx.inner();
         let max_seq = seq_no & !TOMBSTONE_BIT;
         let shard_range = Self::shard_range_for_prefix(prefix);
+        let prefix_ub = upper_bound_for_prefix(prefix);
 
         for shard_idx in shard_range {
             let entries = self.shards[shard_idx].entries.read();
@@ -477,7 +490,12 @@ impl MemTable {
                 entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded))
             {
                 if !k.starts_with(prefix) {
-                    break;
+                    if let Some(ref ub) = prefix_ub {
+                        if k.as_ref() >= ub.as_slice() {
+                            break;
+                        }
+                    }
+                    continue;
                 }
                 let mut best_version: Option<(&Bytes, u64)> = None;
                 for (seq, val, tx) in versions {
@@ -621,6 +639,7 @@ impl MemTable {
     /// Counts ALL versions (put/merge/tombstone) with `seq <= as_of_tx` for keys starting with `prefix`.
     pub fn count_all_versions_prefix(&self, prefix: &[u8], as_of_tx: u64) -> (usize, usize) {
         let shard_range = Self::shard_range_for_prefix(prefix);
+        let prefix_ub = upper_bound_for_prefix(prefix);
         let mut total = 0;
         let mut tombstones = 0;
         for shard_idx in shard_range {
@@ -629,7 +648,12 @@ impl MemTable {
                 entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded))
             {
                 if !k.starts_with(prefix) {
-                    break;
+                    if let Some(ref ub) = prefix_ub {
+                        if k.as_ref() >= ub.as_slice() {
+                            break;
+                        }
+                    }
+                    continue;
                 }
                 for (seq, _, tx) in versions {
                     if *tx <= as_of_tx || *tx >= TxId::INTERNAL_BASE {
@@ -661,6 +685,7 @@ impl MemTable {
     /// Counts non-tombstone versions for any key starting with `prefix` across target shards.
     pub fn count_non_tombstone_prefix(&self, prefix: &[u8]) -> usize {
         let shard_range = Self::shard_range_for_prefix(prefix);
+        let prefix_ub = upper_bound_for_prefix(prefix);
         let mut count = 0;
         for shard_idx in shard_range {
             let entries = self.shards[shard_idx].entries.read();
@@ -668,7 +693,12 @@ impl MemTable {
                 entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded))
             {
                 if !k.starts_with(prefix) {
-                    break;
+                    if let Some(ref ub) = prefix_ub {
+                        if k.as_ref() >= ub.as_slice() {
+                            break;
+                        }
+                    }
+                    continue;
                 }
                 count += versions
                     .iter()

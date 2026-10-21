@@ -2,8 +2,8 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_store::util::{test_set_dirlock_sync_hook, DirLock};
 use contextra_store::lsm::config::DurabilityMode;
+use contextra_store::util::{test_set_dirlock_sync_hook, DirLock};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tempfile::TempDir;
@@ -55,7 +55,10 @@ fn test_dirlock_acquire_propagates_dir_fsync_error() {
         "DirLock::acquire MUST return Err when directory fsync fails"
     );
     assert!(
-        lock_res.unwrap_err().to_string().contains("simulated dirlock dir fsync failure"),
+        lock_res
+            .unwrap_err()
+            .to_string()
+            .contains("simulated dirlock dir fsync failure"),
         "Error message must convey directory fsync failure"
     );
 }

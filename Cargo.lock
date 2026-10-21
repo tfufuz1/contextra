@@ -671,17 +671,19 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "contextra-adapt",
- "contextra-core",
  "contextra-db",
  "contextra-graph",
  "contextra-infer-candle",
  "contextra-infer-onnx",
+ "contextra-ports",
  "contextra-store",
  "contextra-text",
+ "contextra-types",
  "contextra-vector",
  "criterion",
  "hdrhistogram",
  "libc",
+ "parking_lot 0.12.5",
  "rand 0.8.8",
  "redb",
  "serde",
@@ -715,6 +717,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "trybuild",
 ]
 
 [[package]]
@@ -828,7 +831,6 @@ version = "0.1.0"
 dependencies = [
  "contextra-sys",
  "tempfile",
- "tracing",
 ]
 
 [[package]]
@@ -889,6 +891,7 @@ dependencies = [
  "contextra-types",
  "criterion",
  "futures",
+ "loom",
  "parking_lot 0.12.5",
  "proptest",
  "scc",
@@ -934,7 +937,6 @@ dependencies = [
  "contextra-infer-onnx",
  "contextra-ports",
  "contextra-rank",
- "contextra-sys",
  "contextra-types",
  "futures",
  "futures-util",
@@ -1075,15 +1077,12 @@ dependencies = [
  "contextra-ports",
  "contextra-types",
  "futures-util",
- "getrandom 0.2.17",
  "proptest",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
- "tracing",
  "trybuild",
- "zeroize",
 ]
 
 [[package]]
@@ -1206,7 +1205,6 @@ dependencies = [
  "arc-swap",
  "blake3",
  "bytes",
- "contextra-checkpoint",
  "contextra-core",
  "contextra-crypto",
  "contextra-durable-fs",
@@ -1236,7 +1234,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
- "trybuild",
  "uuid",
  "windows-sys 0.61.2",
  "zeroize",
@@ -1291,6 +1288,7 @@ name = "contextra-text"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "blake3",
  "bytes",
  "contextra-ports",
  "contextra-types",
@@ -1329,6 +1327,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
+ "blake3",
  "contextra-core",
  "contextra-crypto",
  "contextra-durable-fs",

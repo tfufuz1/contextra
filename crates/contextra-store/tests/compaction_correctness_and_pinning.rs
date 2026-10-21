@@ -1,6 +1,6 @@
 use contextra_ports::StorageEngine;
-use contextra_types::{Result, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::{Result, TxId};
 use tempfile::TempDir;
 
 #[tokio::test]

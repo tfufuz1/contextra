@@ -3,11 +3,12 @@
 // ZWECK: Implementation of ErasureBackend trait for LsmStorage (§5.11, F-05, REG-15).
 // INVARIANTEN: Zero-panic, physical scope derivation without downcasts, fail-closed errors.
 
-use std::sync::Arc;
-use contextra_types::{ContextraError, TxId};
 use contextra_ports::erasure::{
-    ErasureBackend, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId, PurgeOutput,
+    ErasureBackend, FenceGuard, FreeSpaceProbe, LogicalScope, PhysicalScope, PurgeError, PurgeId,
+    PurgeOutput,
 };
+use contextra_types::{ContextraError, TxId};
+use std::sync::Arc;
 
 use crate::compaction::purge_filter::PurgeScope;
 use crate::lsm::engine::LsmStorage;
@@ -42,14 +43,18 @@ impl LsmStorage {
 }
 
 impl ErasureBackend for LsmStorage {
-    fn physical_scope(&self, scope: &LogicalScope) -> std::result::Result<PhysicalScope, ContextraError> {
+    fn physical_scope(
+        &self,
+        scope: &LogicalScope,
+    ) -> std::result::Result<PhysicalScope, ContextraError> {
         match scope {
             LogicalScope::Document {
                 doc_id,
                 collection_id,
                 tenant_id,
             } => {
-                let doc_key = format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
+                let doc_key =
+                    format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
                 PhysicalScope::try_new(*tenant_id, vec![doc_key], vec![])
             }
             LogicalScope::Collection {
@@ -68,7 +73,11 @@ impl ErasureBackend for LsmStorage {
         }
     }
 
-    fn acquire_fence(&self, scope: &PhysicalScope, id: PurgeId) -> std::result::Result<FenceGuard, ContextraError> {
+    fn acquire_fence(
+        &self,
+        scope: &PhysicalScope,
+        id: PurgeId,
+    ) -> std::result::Result<FenceGuard, ContextraError> {
         let mut fence_targets = Vec::new();
         fence_targets.extend_from_slice(scope.prefixes());
         fence_targets.extend_from_slice(scope.keys());
@@ -82,7 +91,9 @@ impl ErasureBackend for LsmStorage {
         let fen_guard = self
             .erasure_fence
             .acquire_scope_fence_for(fence_targets)
-            .map_err(|e| ContextraError::InvalidInput(format!("Fence acquisition failed: {:?}", e)))?;
+            .map_err(|e| {
+                ContextraError::InvalidInput(format!("Fence acquisition failed: {:?}", e))
+            })?;
 
         let fence_id = fen_guard.id();
         std::mem::forget(fen_guard);
