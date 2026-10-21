@@ -257,9 +257,7 @@ mod non_loom_tests {
         drop(guard);
 
         let kv = KvKeyLocks::new();
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .build()
-            .unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread().build().unwrap();
         rt.block_on(async {
             let _guard_oob = kv.lock_shard(9999).await;
             assert!(kv.try_lock_shard(9999).is_none());

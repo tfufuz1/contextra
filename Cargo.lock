@@ -888,6 +888,7 @@ dependencies = [
  "contextra-types",
  "criterion",
  "futures",
+ "loom",
  "parking_lot 0.12.5",
  "proptest",
  "scc",
@@ -1074,15 +1075,12 @@ dependencies = [
  "contextra-ports",
  "contextra-types",
  "futures-util",
- "getrandom 0.2.17",
  "proptest",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
  "tokio",
- "tracing",
  "trybuild",
- "zeroize",
 ]
 
 [[package]]
@@ -1261,10 +1259,8 @@ dependencies = [
 name = "contextra-sys"
 version = "0.1.0"
 dependencies = [
- "contextra-ports",
  "libc",
  "memmap2",
- "rand 0.8.8",
  "tracing",
  "windows-sys 0.61.2",
 ]

@@ -1,4 +1,4 @@
-use contextra_ports::{DeleteOutcome, PurgeId, PurgeState, TxId};
+use contextra_ports::{DeleteOutcome, PurgeState, TxId, PurgeId};
 
 #[test]
 fn test_purge_state_u8_encoding_golden() {
@@ -32,10 +32,7 @@ fn test_delete_outcome_variants() {
 
     let assured = DeleteOutcome::Assured { tx, purge_id };
     match assured {
-        DeleteOutcome::Assured {
-            tx: t,
-            purge_id: pid,
-        } => {
+        DeleteOutcome::Assured { tx: t, purge_id: pid } => {
             assert_eq!(t, tx);
             assert_eq!(pid, purge_id);
         }
