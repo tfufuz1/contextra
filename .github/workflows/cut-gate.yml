@@ -1,0 +1,88 @@
+name: Cut Gate
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: Workspace Compile Check
+    runs-on: ubuntu-latest
+    # continue-on-error ist true, solange kein Tag v0.4.0 existiert,
+    # da der Workspace während der Umstrukturierung nicht durchgehend kompilieren muss.
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Workspace Cargo Check
+        run: cargo check --workspace --locked --all-targets
+
+  manifest:
+    name: Restore Manifest & Baseline Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Generate Current Test List
+        run: |
+          mkdir -p /tmp/cut_gate
+          cargo test --workspace -- --list > /tmp/cut_gate/current_tests.txt || true
+
+      - name: Run Manifest Check Script
+        run: python3 tools/cut_gate/manifest_check.py --current /tmp/cut_gate/current_tests.txt
+
+  api:
+    name: API Snapshot Diff Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@0b93645e9fea7312eeddf96e72c7f8a7a52233f2 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Run API Diff Script
+        run: python3 tools/cut_gate/api_diff.py
+
+  smoke:
+    name: Smoke Test Placeholder
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Run Smoke Tests Script (if exists)
+        run: |
+          if [ -f tests/smoke/run.sh ]; then
+            chmod +x tests/smoke/run.sh
+            ./tests/smoke/run.sh
+          else
+            echo "INFO: tests/smoke/run.sh existiert noch nicht (wird in Q9 angelegt). Überspringe Smoke-Tests."
+          fi
