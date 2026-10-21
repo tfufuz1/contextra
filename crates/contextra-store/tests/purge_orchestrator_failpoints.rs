@@ -50,7 +50,7 @@ async fn test_all_14_failpoints_preserves_state_and_resumes() -> std::io::Result
             );
             let intent = OrxPurgeIntent::read_from_file(&intent_path)?.expect("valid intent");
             assert!(
-                intent.phase <= PurgePhase::Release,
+                intent.phase <= PurgePhase::Released,
                 "Phase at failpoint {} must be recorded",
                 fp_name
             );

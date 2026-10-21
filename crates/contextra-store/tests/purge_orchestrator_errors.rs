@@ -6,9 +6,11 @@
 // - State & Fence Consistency: Bei Fehler wird das Erasure Fence freigegeben und das Intent-File bleibt für resume_pending auf Disk.
 
 use contextra_store::compaction::purge_filter::PurgeScope;
+use contextra_store::lsm::config::LsmConfig;
+use contextra_store::lsm::LsmStorage;
 use contextra_store::lsm::purge::orchestrator::PurgeOutcome;
 use contextra_store::lsm::purge::{
-    resume_pending, OrxFailpointSet, OrxHooks, OrxPurgeIntent, PurgeOrchestrator, PurgePhase,
+    resume_pending, resume_pending_for_storage, OrxFailpointSet, OrxHooks, OrxPurgeIntent, PurgeOrchestrator, PurgePhase,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -31,8 +33,9 @@ async fn test_record_phase_failpoint_returns_failed_and_preserves_intent() -> st
         .await;
 
     match outcome {
-        PurgeOutcome::Failed { phase, error_msg } => {
-            assert_eq!(phase, PurgePhase::P1Intent);
+        PurgeOutcome::Failed { phase, error } => {
+            assert_eq!(phase, PurgePhase::Admitted);
+            let error_msg = error.to_string();
             assert!(
                 error_msg.contains("after_intent"),
                 "Error message should mention failpoint name: {}",
@@ -49,7 +52,7 @@ async fn test_record_phase_failpoint_returns_failed_and_preserves_intent() -> st
     );
 
     let intent = OrxPurgeIntent::read_from_file(&intent_path)?.expect("valid intent on disk");
-    assert_eq!(intent.phase, PurgePhase::P1Intent);
+    assert_eq!(intent.phase, PurgePhase::Admitted);
 
     Ok(())
 }
@@ -57,7 +60,14 @@ async fn test_record_phase_failpoint_returns_failed_and_preserves_intent() -> st
 #[tokio::test]
 async fn test_wal_callback_error_returns_failed_and_releases_fence() -> std::io::Result<()> {
     let dir = tempdir()?;
-    let orchestrator = PurgeOrchestrator::new_standalone(dir.path());
+    let config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::open(config)
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    let orchestrator = PurgeOrchestrator::new(&storage);
 
     let fence_acquired = Arc::new(AtomicBool::new(false));
     let fence_released = Arc::new(AtomicBool::new(false));
@@ -89,8 +99,9 @@ async fn test_wal_callback_error_returns_failed_and_releases_fence() -> std::io:
         .await;
 
     match outcome {
-        PurgeOutcome::Failed { phase, error_msg } => {
-            assert_eq!(phase, PurgePhase::P6WalCallback);
+        PurgeOutcome::Failed { phase, error } => {
+            assert_eq!(phase, PurgePhase::WalRetiring);
+            let error_msg = error.to_string();
             assert!(
                 error_msg.contains("WAL callback simulated failure"),
                 "Error msg: {}",
@@ -116,7 +127,7 @@ async fn test_wal_callback_error_returns_failed_and_releases_fence() -> std::io:
     );
 
     let intent = OrxPurgeIntent::read_from_file(&intent_path)?.expect("valid intent");
-    assert_eq!(intent.phase, PurgePhase::P6WalCallback);
+    assert_eq!(intent.phase, PurgePhase::WalRetiring);
 
     Ok(())
 }
@@ -124,7 +135,14 @@ async fn test_wal_callback_error_returns_failed_and_releases_fence() -> std::io:
 #[tokio::test]
 async fn test_repetition_after_wal_error_completes_purge() -> std::io::Result<()> {
     let dir = tempdir()?;
-    let orchestrator = PurgeOrchestrator::new_standalone(dir.path());
+    let config = LsmConfig {
+        path: dir.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::open(config)
+        .await
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    let orchestrator = PurgeOrchestrator::new(&storage);
 
     let mut hooks = OrxHooks::default();
     hooks.wal_retire = Some(Box::new(|| {
@@ -154,7 +172,7 @@ async fn test_repetition_after_wal_error_completes_purge() -> std::io::Result<()
     }));
 
     // Resume execution
-    let res_opt = resume_pending(dir.path(), &hooks, None)
+    let res_opt = resume_pending_for_storage(&storage, &hooks, None)
         .await
         .expect("Resumption after fixing WAL error should succeed");
 

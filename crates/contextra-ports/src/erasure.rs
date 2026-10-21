@@ -45,7 +45,7 @@ impl ErasureMode {
 }
 
 /// Unique identifier for a purge operation (§5.5).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct PurgeId(pub [u8; 16]);
 
 impl PurgeId {
@@ -362,92 +362,129 @@ pub struct PurgeOutput {
     pub duration_ticks: u64,
 }
 
-/// Error during purge compaction (§5.5).
-#[derive(Debug, Error)]
-pub enum PurgeError {
-    /// Insufficient free disk space to write rewritten SSTable segments.
-    #[error("Insufficient disk space: needed {needed} bytes, available {available:?}")]
-    InsufficientDiskSpace {
-        /// Disk space needed in bytes.
-        needed: u64,
-        /// Available disk space in bytes (None = probe unknown).
-        available: Option<u64>,
-    },
-    /// Write fence conflict detected during purge execution.
-    #[error("Fence conflict")]
-    FenceConflict,
-    /// Background compaction currently busy.
-    #[error("Compaction busy")]
-    CompactionBusy,
-    /// Read error during SSTable segment processing.
-    #[error("Read error at file {file}, offset {offset}: {source_details}")]
-    ReadError {
-        /// Segment path.
-        file: String,
-        /// Offset in file.
-        offset: u64,
-        /// Error detail string.
-        source_details: String,
-    },
-    /// Write error during SSTable segment processing.
-    #[error("Write error at file {file}: {details}")]
-    WriteError {
-        /// File path.
-        file: String,
-        /// Error details.
-        details: String,
-    },
-    /// I/O error wrapper.
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
-    /// Manifest log processing error.
-    #[error("Manifest error: {0}")]
-    Manifest(String),
-    /// Free space probe failed.
-    #[error("Probe failed: {0}")]
-    ProbeFailed(String),
-    /// Long-lived snapshot pin prevents physical deletion.
-    #[error("Snapshot pinned: oldest pin age {oldest_pin_age} ticks")]
-    SnapshotPinned {
-        /// Oldest snapshot pin age in clock ticks.
-        oldest_pin_age: u64,
-    },
+/// Reasons why a purge compaction operation is blocked (precondition / temporary condition, safe to retry).
+#[derive(Debug, Clone, PartialEq, Eq, Error, strum::EnumIter)]
+pub enum PurgeBlocked {
+    /// Active MVCC snapshot pins a sequence number <= as_of_tx.
+    #[error("Active MVCC snapshot pins min_seq {min_seq}")]
+    ActiveSnapshot { min_seq: u64 },
     /// Checkpoint clones present.
     #[error("Checkpoint clones present: {copy_ids:?}")]
-    CheckpointClones {
-        /// Cloned copy identifiers.
-        copy_ids: Vec<String>,
-    },
+    CheckpointClones { copy_ids: Vec<String> },
     /// Reader is pinned in active memtable / scan.
     #[error("Reader pinned in active memtable or scan")]
     ReaderPinned,
+    /// Background compaction currently busy.
+    #[error("Background compaction currently busy")]
+    CompactionBusy,
+    /// Purge operation already in progress.
+    #[error("Purge operation in progress")]
+    PurgeInProgress,
+    /// Insufficient disk space to write compacted SSTables safely.
+    #[error("Insufficient disk space: needed {needed}, free {free}")]
+    InsufficientDiskSpace { needed: u64, free: u64 },
     /// Unclassified files present in DB directory.
     #[error("Unclassified files present in DB directory: {count}")]
-    UnclassifiedFiles {
-        /// Count of unclassified files.
-        count: usize,
-    },
+    UnclassifiedFiles { count: usize },
     /// Secure deletion is unsupported on current filesystem/environment.
     #[error("Secure deletion unsupported: {reason}")]
-    SecureDeleteUnsupported {
-        /// Reason for lack of support.
-        reason: String,
-    },
-    /// Corrupted purge intent.
-    #[error("Corrupted purge intent: {0}")]
-    CorruptedIntent(String),
-    /// Failpoint triggered.
-    #[error("Failpoint triggered: {0}")]
-    FailpointTriggered(String),
-    /// Purge compaction implementation is not yet active (fail-closed).
-    #[error("Purge compaction implementation unimplemented")]
-    Unimplemented,
-    /// Scan timeout occurred.
-    #[error("Scan timeout occurred during purge")]
-    ScanTimeout,
+    SecureDeleteUnsupported { reason: String },
     /// Unknown free space.
     #[error("Unknown free space")]
     UnknownFreeSpace,
+}
+
+impl Default for PurgeBlocked {
+    fn default() -> Self {
+        Self::ActiveSnapshot { min_seq: 0 }
+    }
+}
+
+impl PurgeBlocked {
+    /// Actionable retry recommendation for the caller.
+    #[must_use]
+    pub fn retry_hint(&self) -> &'static str {
+        match self {
+            Self::ActiveSnapshot { .. } => "Close open read transactions / snapshots",
+            Self::CheckpointClones { .. } => "Purge or release registered checkpoint clones",
+            Self::ReaderPinned => "Wait for active reader scan to finish",
+            Self::CompactionBusy => "Retry after current background compaction completes",
+            Self::PurgeInProgress => "Retry after active purge operation finishes",
+            Self::InsufficientDiskSpace { .. } => "Free disk space or increase storage capacity",
+            Self::UnclassifiedFiles { .. } => "Clean up untracked or stale files in storage directory",
+            Self::SecureDeleteUnsupported { .. } => "Disable scrub requirement or run on supported filesystem",
+            Self::UnknownFreeSpace => "Provide a FreeSpaceProbe implementation or ensure disk space is queryable",
+        }
+    }
+}
+
+/// Hard or blocked error during purge operations (§5.5).
+#[derive(Debug, Error, strum::EnumIter)]
+pub enum PurgeError {
+    /// Operation blocked by precondition (can be retried).
+    #[error("Purge blocked: {0}")]
+    Blocked(#[from] PurgeBlocked),
+
+    /// Read error during SSTable / storage processing.
+    #[error("Read error at file {file}, offset {offset}: {source}")]
+    Read {
+        file: String,
+        offset: u64,
+        source: String,
+    },
+
+    /// Write error during SSTable / storage processing.
+    #[error("Write error at file {file}: {source}")]
+    Write {
+        file: String,
+        source: String,
+    },
+
+    /// Manifest log or state error.
+    #[error("Manifest error: {0}")]
+    Manifest(String),
+
+    /// Pending delete journal error.
+    #[error("Journal error: {0}")]
+    Journal(String),
+
+    /// Write fence conflict or acquisition failure.
+    #[error("Fence error: {0}")]
+    Fence(String),
+
+    /// Corrupted or invalid purge intent.
+    #[error("Intent error: {0}")]
+    Intent(String),
+
+    /// Scope unavailable during reconstruction or execution.
+    #[error("Scope unavailable for purge_id {purge_id:?}")]
+    ScopeUnavailable { purge_id: PurgeId },
+
+    /// Scope mismatch between intent and expected scope.
+    #[error("Scope mismatch for purge_id {purge_id:?}")]
+    ScopeMismatch { purge_id: PurgeId },
+
+    /// Key residue discovered after purge sweep.
+    #[error("Residue found at file {file}")]
+    ResidueFound { file: String },
+
+    /// Disposal/scrubbing refused by policy or system constraint.
+    #[error("Dispose refused: {0}")]
+    DisposeRefused(String),
+
+    /// Failpoint triggered during test execution.
+    #[cfg(any(test, feature = "fault-injection"))]
+    #[error("Failpoint triggered: {0}")]
+    Failpoint(&'static str),
+}
+
+impl From<std::io::Error> for PurgeError {
+    fn from(err: std::io::Error) -> Self {
+        PurgeError::Write {
+            file: "<io>".to_string(),
+            source: err.to_string(),
+        }
+    }
 }
 
 impl From<PurgeError> for ContextraError {

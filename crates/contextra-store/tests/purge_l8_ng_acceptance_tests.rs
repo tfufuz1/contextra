@@ -1,6 +1,6 @@
 //! Acceptance tests for L8 (Probe semantics & sequential execution) and N-G (recovery scrub & real manifest generation).
 
-use contextra_store::compaction::purge_filter::{FreeSpaceProbe, ProbeError, PurgeError};
+use contextra_store::compaction::purge_filter::{FreeSpaceProbe, ProbeError, PurgeBlocked, PurgeError};
 use contextra_ports::StorageEngine;
 use contextra_store::compaction::purge_filter::PurgeScope;
 use contextra_store::compaction::purge_select::select_purge_candidates;
@@ -49,8 +49,8 @@ async fn test_l8_probe_some_zero_yields_insufficient_disk_space() -> contextra_t
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
     match res {
-        Err(PurgeError::InsufficientDiskSpace { available, .. }) => {
-            assert_eq!(available, Some(0));
+        Err(PurgeError::Blocked(PurgeBlocked::InsufficientDiskSpace { free, .. })) => {
+            assert_eq!(free, 0);
         }
         other => panic!("Expected InsufficientDiskSpace, got {:?}", other),
     }
@@ -79,7 +79,10 @@ async fn test_l8_probe_error_yields_probe_failed() -> contextra_types::Result<()
     let scope = PurgeScope::Keys(vec![b"key1".to_vec()]);
 
     let res = storage.purge_keys(scope, 100, Some(&probe)).await;
-    assert!(res.is_ok() || matches!(res, Err(PurgeError::CompactionBusy)));
+    match res {
+        Err(PurgeError::Blocked(PurgeBlocked::UnknownFreeSpace)) => {}
+        other => panic!("Expected UnknownFreeSpace, got {:?}", other),
+    }
 
     Ok(())
 }

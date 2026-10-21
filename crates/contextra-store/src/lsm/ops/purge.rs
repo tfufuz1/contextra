@@ -1,9 +1,9 @@
 // FILE-CONTEXT
-// STAND: 2026-10-13
+// STAND: 2026-10-21
 // ZWECK: Implementation von LsmStorage::purge_keys (Compaction-basierte Bereinigung).
 // INVARIANTEN: Active snapshot pin check, Disk space pre-flight probe, atomic manifest transitions, Zero-panic.
 
-use crate::compaction::purge_filter::{FreeSpaceProbe, PurgeError, PurgeReport, PurgeScope};
+use crate::compaction::purge_filter::{FreeSpaceProbe, PurgeBlocked, PurgeError, PurgeReport, PurgeScope};
 use crate::lsm::engine::LsmStorage;
 use crate::manifest::ManifestEntry;
 use crate::sstable::{SstableBuilder, SstableReader};
@@ -25,15 +25,16 @@ impl LsmStorage {
         // 1. Active snapshot pin check
         let min_active_seq = self.snapshot_registry.min_active_seqno();
         if min_active_seq <= as_of_tx {
-            return Err(PurgeError::SnapshotPinned {
-                oldest_pin_age: min_active_seq,
-            });
+            return Err(PurgeBlocked::ActiveSnapshot { min_seq: min_active_seq }.into());
         }
 
-        // 2. Active Memtable Flush to SSTable first
+        // 2. Active Memtable Flush to SSTable first (Flush errors produce PurgeError::Write, never CompactionBusy)
         StorageEngine::flush(self)
             .await
-            .map_err(|_| PurgeError::CompactionBusy)?;
+            .map_err(|e| PurgeError::Write {
+                file: "memtable_flush".to_string(),
+                source: format!("Flush failed during purge_keys: {e}"),
+            })?;
 
         // Snapshot existing sstables list under read lock
         let snapshot_sstables = {
@@ -47,8 +48,7 @@ impl LsmStorage {
             .map(|sst| sst.metadata().file_size)
             .sum();
 
-        // 3. Disk space probe check (L8 fix)
-        // None probe means "unknown", not "0 bytes free". Purge is permitted to start.
+        // 3. Disk space probe check
         let needed_space = total_bytes.max(1024 * 1024);
         let free_space_opt = match space_probe {
             Some(p) => p.free_space_bytes(),
@@ -57,11 +57,14 @@ impl LsmStorage {
 
         if let Some(free_space) = free_space_opt {
             if free_space < needed_space || free_space == 0 {
-                return Err(PurgeError::InsufficientDiskSpace {
+                return Err(PurgeBlocked::InsufficientDiskSpace {
                     needed: needed_space,
-                    available: Some(free_space),
-                });
+                    free: free_space,
+                }.into());
             }
+        }
+        if free_space_opt.is_none() && space_probe.is_some() {
+            return Err(PurgeBlocked::UnknownFreeSpace.into());
         }
 
         let mut sstables_to_rewrite = Vec::new();
@@ -69,10 +72,10 @@ impl LsmStorage {
         // Identify SSTables that contain keys matching scope
         for sst in &snapshot_sstables {
             let sst_path_str = sst.file_path().to_string_lossy().to_string();
-            let mut stream = sst.stream().await.map_err(|e| PurgeError::ReadError {
+            let mut stream = sst.stream().await.map_err(|e| PurgeError::Read {
                 file: sst_path_str.clone(),
                 offset: 0,
-                source_details: e.to_string(),
+                source: e.to_string(),
             })?;
             let mut matches = false;
             loop {
@@ -85,10 +88,10 @@ impl LsmStorage {
                     }
                     Ok(None) => break,
                     Err(e) => {
-                        return Err(PurgeError::ReadError {
+                        return Err(PurgeError::Read {
                             file: sst_path_str,
                             offset: 0,
-                            source_details: e.to_string(),
+                            source: e.to_string(),
                         });
                     }
                 }
@@ -119,10 +122,10 @@ impl LsmStorage {
         for old_sst in &sstables_to_rewrite {
             let old_path = old_sst.file_path().to_path_buf();
             let old_path_str = old_path.to_string_lossy().to_string();
-            let mut stream = old_sst.stream().await.map_err(|e| PurgeError::ReadError {
+            let mut stream = old_sst.stream().await.map_err(|e| PurgeError::Read {
                 file: old_path_str.clone(),
                 offset: 0,
-                source_details: e.to_string(),
+                source: e.to_string(),
             })?;
 
             let mut valid_entries = Vec::new();
@@ -139,10 +142,10 @@ impl LsmStorage {
                     }
                     Ok(None) => break,
                     Err(e) => {
-                        return Err(PurgeError::ReadError {
+                        return Err(PurgeError::Read {
                             file: old_path_str,
                             offset: 0,
-                            source_details: e.to_string(),
+                            source: e.to_string(),
                         });
                     }
                 }
@@ -171,9 +174,9 @@ impl LsmStorage {
                 let mut builder =
                     SstableBuilder::create_with_key_manager(&tmp_path, self.key_manager.clone())
                         .await
-                        .map_err(|e| PurgeError::WriteError {
+                        .map_err(|e| PurgeError::Write {
                             file: tmp_path.to_string_lossy().to_string(),
-                            details: e.to_string(),
+                            source: e.to_string(),
                         })?;
 
                 builder.set_format_version(old_sst.format_version);
@@ -182,30 +185,30 @@ impl LsmStorage {
                     builder
                         .add(k, v, *seq, *tx)
                         .await
-                        .map_err(|e| PurgeError::WriteError {
+                        .map_err(|e| PurgeError::Write {
                             file: tmp_path.to_string_lossy().to_string(),
-                            details: e.to_string(),
+                            source: e.to_string(),
                         })?;
                 }
 
-                let meta = builder.finish().await.map_err(|e| PurgeError::WriteError {
+                let meta = builder.finish().await.map_err(|e| PurgeError::Write {
                     file: tmp_path.to_string_lossy().to_string(),
-                    details: e.to_string(),
+                    source: e.to_string(),
                 })?;
 
                 // Atomic rename tmp -> final
                 tokio::fs::rename(&tmp_path, &final_path)
                     .await
-                    .map_err(|e| PurgeError::WriteError {
+                    .map_err(|e| PurgeError::Write {
                         file: final_path.to_string_lossy().to_string(),
-                        details: e.to_string(),
+                        source: e.to_string(),
                     })?;
 
                 if let Some(parent) = final_path.parent() {
                     crate::util::fsync_parent_dir(parent).await.map_err(|e| {
-                        PurgeError::WriteError {
+                        PurgeError::Write {
                             file: final_path.to_string_lossy().to_string(),
-                            details: format!("Directory fsync failed: {e}"),
+                            source: format!("Directory fsync failed: {e}"),
                         }
                     })?;
                 }
@@ -216,10 +219,10 @@ impl LsmStorage {
                     self.key_manager.clone(),
                 )
                 .await
-                .map_err(|e| PurgeError::ReadError {
+                .map_err(|e| PurgeError::Read {
                     file: final_path.to_string_lossy().to_string(),
                     offset: 0,
-                    source_details: e.to_string(),
+                    source: e.to_string(),
                 })?;
 
                 replacements.push((old_path.clone(), Some(Arc::new(new_reader))));
@@ -237,20 +240,14 @@ impl LsmStorage {
         let journal_path = db_path.join("pending_delete.journal");
         let mut journal =
             contextra_durable_fs::PendingDeleteJournal::open(&journal_path).map_err(|e| {
-                PurgeError::WriteError {
-                    file: journal_path.to_string_lossy().to_string(),
-                    details: e.to_string(),
-                }
+                PurgeError::Journal(format!("Failed to open journal {}: {e}", journal_path.display()))
             })?;
 
         for old_path in &replaced_old_paths {
             if !journal.pending().contains(old_path) {
                 journal
                     .record(old_path)
-                    .map_err(|e| PurgeError::WriteError {
-                        file: journal_path.to_string_lossy().to_string(),
-                        details: e.to_string(),
-                    })?;
+                    .map_err(|e| PurgeError::Journal(format!("Failed to record in journal: {e}")))?;
             }
         }
 
@@ -260,7 +257,7 @@ impl LsmStorage {
             .await
             .map_err(|e| PurgeError::Manifest(e.to_string()))?;
 
-        // 5. In-Memory SSTable Set Update — position-preserving replacement (L6 fix & WP-5a fix)
+        // 5. In-Memory SSTable Set Update
         {
             let mut sst_guard = self.sstables.write().await;
 
@@ -270,7 +267,7 @@ impl LsmStorage {
                 .collect();
             for old_path in &replaced_old_paths {
                 if !current_paths.contains(old_path) {
-                    return Err(PurgeError::CompactionBusy);
+                    return Err(PurgeBlocked::CompactionBusy.into());
                 }
             }
 
@@ -292,7 +289,7 @@ impl LsmStorage {
             }
 
             if !replacement_map.is_empty() {
-                return Err(PurgeError::CompactionBusy);
+                return Err(PurgeBlocked::CompactionBusy.into());
             }
 
             *sst_guard = updated_sstables;
