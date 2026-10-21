@@ -2,6 +2,7 @@
 //! (a) returns an error to the caller, and
 //! (b) leaves all segment files unchanged (no files deleted or modified).
 
+use contextra_durable_fs::ScrubPolicy;
 use contextra_store::wal::{retire_segments_with_stream, Wal, WalDirEntry, WalDirStream, WalOp};
 use contextra_types::{ContextraError, Result, TxId};
 use sha2::{Digest, Sha256};
@@ -91,7 +92,7 @@ async fn test_retire_segments_aborts_on_read_error_and_preserves_files() -> Resu
         error_at_idx: 1, // Error on second entry
     };
 
-    let result = retire_segments_with_stream(stream, 10).await;
+    let result = retire_segments_with_stream(stream, 10, ScrubPolicy::Disabled).await;
 
     assert!(
         result.is_err(),

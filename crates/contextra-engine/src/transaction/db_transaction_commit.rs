@@ -328,14 +328,20 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                     .await;
                 }
             }
-
-            if !committed_marker_written {
-                tracing::error!(
-                    tx_id = ?self.tx_id,
-                    "[T-06] Failed to write CommitIntent::Committed after {} attempts; transaction marked as commit-uncertain for recovery inspection",
-                    max_retries
-                );
+            if attempt < max_retries {
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    50 * u64::try_from(attempt).unwrap_or(1),
+                ))
+                .await;
             }
+        }
+
+        if !committed_marker_written {
+            tracing::error!(
+                tx_id = ?self.tx_id,
+                "[T-06] Failed to write CommitIntent::Committed after {} attempts; transaction marked as commit-uncertain for recovery inspection",
+                max_retries
+            );
         }
 
         // Phase (e): Finalize

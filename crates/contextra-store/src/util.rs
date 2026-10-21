@@ -3,50 +3,100 @@
 
 use contextra_types::{ContextraError, Result};
 use std::path::Path;
+use std::sync::atomic::AtomicU64;
 
-use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(not(loom))]
+use crate::lsm::config::DurabilityMode;
+#[cfg(not(loom))]
+use std::fs::{File, TryLockError};
 
-pub use contextra_durable_fs::{LockError, LockPolicy};
-
+/// Global metric tracking total WAL cleanup failure events across LSM compaction cycles.
 pub static WAL_CLEANUP_FAILURES_TOTAL: AtomicU64 = AtomicU64::new(0);
 
-/// Increments the global counter tracking failed WAL cleanup attempts.
-pub fn increment_wal_cleanup_failures() {
-    WAL_CLEANUP_FAILURES_TOTAL.fetch_add(1, Ordering::Relaxed);
-}
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
+pub type DirLockSyncHookFn = fn(&Path) -> std::io::Result<()>;
 
-/// Returns the current count of failed WAL cleanup attempts.
-pub fn wal_cleanup_failures_total() -> u64 {
-    WAL_CLEANUP_FAILURES_TOTAL.load(Ordering::Relaxed)
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
+std::thread_local! {
+    static DIRLOCK_SYNC_HOOK: std::cell::RefCell<Option<DirLockSyncHookFn>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 #[cfg(all(not(loom), any(test, feature = "test-utils")))]
-pub use contextra_durable_fs::test_set_dirlock_sync_hook;
+pub fn test_set_dirlock_sync_hook(hook: Option<DirLockSyncHookFn>) {
+    DIRLOCK_SYNC_HOOK.with(|h| {
+        *h.borrow_mut() = hook;
+    });
+}
 
 #[cfg(not(loom))]
-impl From<crate::lsm::config::DurabilityMode> for contextra_durable_fs::LockPolicy {
-    fn from(mode: crate::lsm::config::DurabilityMode) -> Self {
-        match mode {
-            crate::lsm::config::DurabilityMode::Full
-            | crate::lsm::config::DurabilityMode::WalNoHmac => {
-                contextra_durable_fs::LockPolicy::FailClosed
+pub(crate) fn sync_dir_util(dir: &Path) -> std::io::Result<()> {
+    #[cfg(any(test, feature = "test-utils"))]
+    {
+        let mut hook_res = None;
+        DIRLOCK_SYNC_HOOK.with(|h| {
+            if let Some(hook) = *h.borrow() {
+                hook_res = Some(hook(dir));
             }
-            crate::lsm::config::DurabilityMode::MemoryOnly => {
-                contextra_durable_fs::LockPolicy::UnsafeNoLock
+        });
+        if let Some(res) = hook_res {
+            return res;
+        }
+    }
+    contextra_durable_fs::sync_dir(dir)
+}
+
+/// Handle for exclusive database directory locking.
+#[cfg(not(loom))]
+#[derive(Debug)]
+pub struct DirLock {
+    _file: Option<File>,
+}
+
+#[cfg(not(loom))]
+impl DirLock {
+    /// Acquires an exclusive lock on `dir/LOCK`.
+    pub fn acquire(dir: &Path, durability_mode: DurabilityMode) -> Result<Self> {
+        let lock_path = dir.join("LOCK");
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(|e| {
+                ContextraError::Storage(format!(
+                    "Failed to open/create LOCK file at {}: {e}",
+                    lock_path.display()
+                ))
+            })?;
+
+        sync_dir_util(dir).map_err(|e| {
+            ContextraError::Storage(format!(
+                "Failed to fsync directory for LOCK file at {}: {e}",
+                dir.display()
+            ))
+        })?;
+
+        match file.try_lock() {
+            Ok(()) => Ok(Self { _file: Some(file) }),
+            Err(TryLockError::WouldBlock) => Err(ContextraError::Storage(
+                "Datenverzeichnis bereits in Benutzung".into(),
+            )),
+            Err(TryLockError::Error(e)) => {
+                decide_on_lock_error(durability_mode, &lock_path, &e).map(|_file| Self { _file })
             }
         }
     }
 }
 
-#[cfg(all(not(loom), any(test, feature = "test-utils")))]
-#[doc(hidden)]
-pub fn test_decide_on_lock_error_wrapper(
-    durability_mode: crate::lsm::config::DurabilityMode,
+#[cfg(not(loom))]
+fn decide_on_lock_error(
+    durability_mode: DurabilityMode,
     lock_path: &Path,
     err: &std::io::Error,
-) -> Result<Option<std::fs::File>> {
-    let policy = LockPolicy::from(durability_mode);
-    if policy == LockPolicy::FailClosed {
+) -> Result<Option<File>> {
+    if durability_mode == DurabilityMode::Full || durability_mode == DurabilityMode::WalNoHmac {
         Err(ContextraError::Storage(format!(
             "Dateisperre auf diesem Dateisystem nicht unterstützt ({}): {err}",
             lock_path.display()
@@ -60,30 +110,15 @@ pub fn test_decide_on_lock_error_wrapper(
     }
 }
 
-/// Handle for exclusive database directory locking.
-#[cfg(not(loom))]
-#[derive(Debug)]
-pub struct DirLock(
-    #[allow(dead_code, reason = "Held for lifetime of database instance to maintain flock")]
-    pub contextra_durable_fs::DirLock,
-);
-
-#[cfg(not(loom))]
-impl DirLock {
-    /// Acquires an exclusive lock on `dir/LOCK`.
-    pub fn acquire<P: Into<LockPolicy>>(dir: &Path, policy: P) -> Result<Self> {
-        let lock = contextra_durable_fs::DirLock::acquire(dir, policy.into())
-            .map_err(|e| match e {
-                LockError::Conflict => {
-                    ContextraError::Storage("Datenverzeichnis bereits in Benutzung".into())
-                }
-                LockError::Unsupported(msg) => ContextraError::Storage(format!(
-                    "Dateisperre auf diesem Dateisystem nicht unterstützt ({msg})"
-                )),
-                LockError::Io(err) => ContextraError::Storage(err.to_string()),
-            })?;
-        Ok(Self(lock))
-    }
+#[cfg(all(not(loom), any(test, feature = "test-utils")))]
+#[doc(hidden)]
+#[allow(dead_code)]
+pub fn test_decide_on_lock_error_wrapper(
+    durability_mode: DurabilityMode,
+    lock_path: &Path,
+    err: &std::io::Error,
+) -> Result<Option<File>> {
+    decide_on_lock_error(durability_mode, lock_path, err)
 }
 
 #[cfg(all(test, not(loom)))]
@@ -149,11 +184,33 @@ mod tests {
     }
 
     #[test]
-    fn test_decide_on_lock_policy_mapping() {
-        use crate::lsm::config::DurabilityMode;
-        assert_eq!(LockPolicy::from(DurabilityMode::Full), LockPolicy::FailClosed);
-        assert_eq!(LockPolicy::from(DurabilityMode::WalNoHmac), LockPolicy::FailClosed);
-        assert_eq!(LockPolicy::from(DurabilityMode::MemoryOnly), LockPolicy::UnsafeNoLock);
+    fn test_decide_on_lock_error_semantics() {
+        let dummy_path = Path::new("/tmp/test_LOCK");
+        let mock_err = Error::new(ErrorKind::Unsupported, "Operation not supported");
+
+        // DurabilityMode::Full -> Err
+        let full_res = decide_on_lock_error(DurabilityMode::Full, dummy_path, &mock_err);
+        assert!(full_res.is_err());
+        assert!(full_res
+            .unwrap_err()
+            .to_string()
+            .contains("Dateisperre auf diesem Dateisystem nicht unterstützt"));
+
+        // DurabilityMode::WalNoHmac -> Err (Fail-closed fix per decision D1!)
+        let wal_res = decide_on_lock_error(DurabilityMode::WalNoHmac, dummy_path, &mock_err);
+        assert!(
+            wal_res.is_err(),
+            "WalNoHmac must fail closed on lock failure"
+        );
+        assert!(wal_res
+            .unwrap_err()
+            .to_string()
+            .contains("Dateisperre auf diesem Dateisystem nicht unterstützt"));
+
+        // DurabilityMode::MemoryOnly -> Ok(None)
+        let mem_res = decide_on_lock_error(DurabilityMode::MemoryOnly, dummy_path, &mock_err);
+        assert!(mem_res.is_ok());
+        assert!(mem_res.unwrap().is_none());
     }
 }
 

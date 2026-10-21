@@ -5,6 +5,7 @@
 //! - I-3 (Crash-Konsistenz): Restores Log up to last HMAC-verified frame.
 //! - I-5 (Poison-State Isolation): Flusher panics in close() are evaluated and propagated as ContextraError::Internal.
 
+pub mod anchor;
 pub mod encode;
 pub mod flusher;
 pub mod hmac;
@@ -24,6 +25,7 @@ mod tests;
 #[cfg(test)]
 mod open_heal_tests;
 
+pub use anchor::*;
 pub use encode::*;
 pub use flusher::*;
 #[cfg(feature = "wal-integrity")]

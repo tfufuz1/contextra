@@ -19,7 +19,6 @@ pub use entry::{
     compute_keyed_hash, parse_frame, serialize_frame, FrameReadResult, LedgerEntry,
     LedgerEntryKind, LedgerKey, ERASED_LEDGER_DOMAIN,
 };
-use contextra_ports::{LayerObservation, LayerScan, PhysicalScope, ScanError};
 
 pub const LEDGER_FILENAME: &str = "erasure.ledger";
 pub const HEAD_FILENAME: &str = "ledger.head";
@@ -53,18 +52,6 @@ pub enum LedgerDecision {
     Drop,
 }
 
-/// Status returned when checking or applying anti-resurrection guarantees (E-4 / INV-ERA-1).
-///
-/// NOTE: "Truncation without verifiable anchor brings deleted keys back" safety must NOT be claimed
-/// unless the truncation anchor is verified against ledger chain MAC.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AntiResurrection {
-    /// Accelerated tombstone reapplication with verified truncation anchor guarantees anti-resurrection.
-    Guaranteed { tombstones_reapplied: usize },
-    /// Truncation without verifiable anchor or missing acceleration index cannot guarantee anti-resurrection.
-    NotGuaranteed { reason: &'static str },
-}
-
 /// Status returned when opening the erasure ledger.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LedgerOpenStatus {
@@ -81,7 +68,6 @@ pub struct ErasureLedger {
     last_chain_mac: [u8; 32],
     entries: Vec<LedgerEntry>,
     seen_proof_ids: HashSet<[u8; 16]>,
-    seen_keyed_hashes: HashSet<[u8; 32]>,
     distinct_prefix_lens: HashSet<u32>,
     db_instance_id: [u8; 16],
 }
@@ -98,26 +84,11 @@ impl std::fmt::Debug for ErasureLedger {
 
 impl ErasureLedger {
     /// Opens the erasure ledger or returns fail-closed status if rollback/corruption is suspected.
-    #[deprecated(note = "use open_or_fail_closed_with_instance_id to inject db_instance_id")]
     pub async fn open_or_fail_closed(
         dir: impl AsRef<Path>,
         key: LedgerKey,
         db_has_data: bool,
         expected_head_mac: Option<[u8; 32]>,
-    ) -> Result<(Option<Self>, LedgerOpenStatus)> {
-        let mut default_id = [0u8; 16];
-        let rng = contextra_ports::SystemRng::new();
-        contextra_ports::Rng::fill_bytes(&rng, &mut default_id);
-        Self::open_or_fail_closed_with_instance_id(dir, key, db_has_data, expected_head_mac, default_id).await
-    }
-
-    /// Opens the erasure ledger with explicit injected `db_instance_id` or returns fail-closed status.
-    pub async fn open_or_fail_closed_with_instance_id(
-        dir: impl AsRef<Path>,
-        key: LedgerKey,
-        db_has_data: bool,
-        expected_head_mac: Option<[u8; 32]>,
-        db_instance_id: [u8; 16],
     ) -> Result<(Option<Self>, LedgerOpenStatus)> {
         let dir = dir.as_ref().to_path_buf();
         let ledger_path = dir.join(LEDGER_FILENAME);
@@ -143,7 +114,6 @@ impl ErasureLedger {
                 last_chain_mac: INITIAL_CHAIN_MAC,
                 entries: Vec::new(),
                 seen_proof_ids: HashSet::new(),
-                seen_keyed_hashes: HashSet::new(),
                 distinct_prefix_lens: HashSet::new(),
                 db_instance_id,
             };
@@ -162,7 +132,6 @@ impl ErasureLedger {
         let mut prev_mac = INITIAL_CHAIN_MAC;
         let mut entries = Vec::new();
         let mut seen_proof_ids = HashSet::new();
-        let mut seen_keyed_hashes = HashSet::new();
         let mut distinct_prefix_lens = HashSet::new();
         let mut torn_tail_detected = false;
         let mut verified_len = 0;
@@ -175,11 +144,10 @@ impl ErasureLedger {
                     chain_mac,
                     frame_len,
                 } => {
-                    if seen_proof_ids.contains(&entry.proof_id) || seen_keyed_hashes.contains(&entry.keyed_hash) {
+                    if seen_proof_ids.contains(&entry.proof_id) {
                         // Deduplicated entry
                     } else {
                         seen_proof_ids.insert(entry.proof_id);
-                        seen_keyed_hashes.insert(entry.keyed_hash);
                         if let LedgerEntryKind::Prefix { prefix_len } = entry.kind {
                             distinct_prefix_lens.insert(prefix_len);
                         }
@@ -251,14 +219,14 @@ impl ErasureLedger {
             }
         }
 
-        if head_exists && stored_db_id != db_instance_id {
-            return Ok((
-                None,
-                LedgerOpenStatus::RollbackSuspected {
-                    reason: "Injected db_instance_id mismatch with ledger head".into(),
-                },
-            ));
-        }
+        let db_instance_id = if head_exists {
+            stored_db_id
+        } else {
+            let mut id = [0u8; 16];
+            let rng = contextra_ports::SystemRng::new();
+            contextra_ports::Rng::fill_bytes(&rng, &mut id);
+            id
+        };
 
         let ledger = Self {
             dir,
@@ -266,7 +234,6 @@ impl ErasureLedger {
             last_chain_mac: prev_mac,
             entries,
             seen_proof_ids,
-            seen_keyed_hashes,
             distinct_prefix_lens,
             db_instance_id,
         };
@@ -288,7 +255,7 @@ impl ErasureLedger {
         let mut batch_seen_keyed_hashes = HashSet::new();
         let mut to_write = Vec::new();
         for entry in entries {
-            if self.seen_proof_ids.contains(&entry.proof_id) || self.seen_keyed_hashes.contains(&entry.keyed_hash) {
+            if self.seen_proof_ids.contains(&entry.proof_id) {
                 continue;
             }
             batch_seen_proof_ids.insert(entry.proof_id);
@@ -356,7 +323,6 @@ impl ErasureLedger {
         self.last_chain_mac = current_mac;
         for entry in to_write {
             self.seen_proof_ids.insert(entry.proof_id);
-            self.seen_keyed_hashes.insert(entry.keyed_hash);
             if let LedgerEntryKind::Prefix { prefix_len } = entry.kind {
                 self.distinct_prefix_lens.insert(prefix_len);
             }
@@ -467,7 +433,6 @@ impl ErasureLedger {
         self.last_chain_mac = new_mac;
         for entry in to_write {
             self.seen_proof_ids.insert(entry.proof_id);
-            self.seen_keyed_hashes.insert(entry.keyed_hash);
             if let LedgerEntryKind::Prefix { prefix_len } = entry.kind {
                 self.distinct_prefix_lens.insert(prefix_len);
             }
@@ -477,52 +442,6 @@ impl ErasureLedger {
 
     pub fn entries(&self) -> &[LedgerEntry] {
         &self.entries
-    }
-
-    /// Reapplies tombstones from the ledger using an accelerated hash index over `keyed_hash`.
-    ///
-    /// If `truncation_anchor_mac` is `None` or does not match the ledger's verified head MAC,
-    /// returns `AntiResurrection::NotGuaranteed` per INV-ERA-1 / E-4.
-    pub fn reapply_tombstones_from_ledger(
-        &self,
-        _storage_scope: &[u8],
-        truncation_anchor_mac: Option<[u8; 32]>,
-    ) -> (Vec<LedgerEntry>, AntiResurrection) {
-        let anchor_valid = match truncation_anchor_mac {
-            Some(anchor) => anchor == self.last_chain_mac,
-            None => false,
-        };
-
-        // Build accelerated index over keyed_hashes present in ledger entries for this scope
-        let accelerated_index: HashSet<[u8; 32]> = self
-            .entries
-            .iter()
-            .map(|e| e.keyed_hash)
-            .collect();
-
-        let matching: Vec<LedgerEntry> = self
-            .entries
-            .iter()
-            .filter(|e| accelerated_index.contains(&e.keyed_hash))
-            .cloned()
-            .collect();
-
-        if !anchor_valid {
-            (
-                matching,
-                AntiResurrection::NotGuaranteed {
-                    reason: "Missing or unverified truncation anchor; anti-resurrection cannot be guaranteed",
-                },
-            )
-        } else {
-            let count = matching.len();
-            (
-                matching,
-                AntiResurrection::Guaranteed {
-                    tombstones_reapplied: count,
-                },
-            )
-        }
     }
 
     async fn write_head_marker(&self) -> Result<()> {
@@ -552,49 +471,5 @@ impl ErasureLedger {
         head_mac.copy_from_slice(&bytes[20..52]);
 
         Ok((db_id, head_mac))
-    }
-}
-
-impl LayerScan for ErasureLedger {
-    fn layer_id(&self) -> u16 {
-        // Layer ID 12 for ErasureLedger layer
-        12
-    }
-
-    fn scan(&self, scope: &PhysicalScope) -> std::result::Result<LayerObservation, ScanError> {
-        let mut matches_found: u64 = 0;
-        let storage_scope = b"lsm";
-
-        for key_bytes in scope.keys() {
-            let key_hash = compute_keyed_hash(&self.key, storage_scope, key_bytes);
-            for entry in &self.entries {
-                if entry.keyed_hash == key_hash {
-                    matches_found += 1;
-                }
-            }
-        }
-
-        for prefix_bytes in scope.prefixes() {
-            let prefix_hash = compute_keyed_hash(&self.key, storage_scope, prefix_bytes);
-            for entry in &self.entries {
-                if entry.keyed_hash == prefix_hash {
-                    matches_found += 1;
-                }
-            }
-        }
-
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&self.layer_id().to_le_bytes());
-        hasher.update(self.last_chain_mac());
-        hasher.update(&(self.entries.len() as u64).to_le_bytes());
-
-        let state_digest = *hasher.finalize().as_bytes();
-
-        Ok(LayerObservation {
-            layer_id: self.layer_id(),
-            clean: matches_found == 0,
-            state_digest,
-            item_count: self.entries.len() as u64,
-        })
     }
 }

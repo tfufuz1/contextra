@@ -414,7 +414,7 @@ impl MemTable {
     fn saturating_sub_size(&self, n: usize) {
         let _ = self
             .size
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| { // INTENTIONAL-DROP: fetch_update closure always returns Some, so fetch_update always succeeds.
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| {
                 Some(v.saturating_sub(n))
             });
     }

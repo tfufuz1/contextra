@@ -28,8 +28,6 @@ futures-executor = "0.3"
 dirs = "6.0.0"
 
 [features]
-default = []
-checkpoint = []
 test-utils = []
 
 [dev-dependencies]

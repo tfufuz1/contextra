@@ -463,69 +463,28 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 
     /// Scrubt und entfernt alle Checkpoints, die zu einer spezifischen Collection gehören (§5.10 / E31).
     pub async fn scrub_collection_checkpoints(&self, collection_id: &str) -> Result<usize> {
-        #[cfg(not(feature = "checkpoint"))]
-        {
-            let _ = collection_id;
-            return Err(ContextraError::capability_unsupported(
-                "checkpoint",
-                "Checkpoint scrub feature 'checkpoint' is disabled",
-            ));
-        }
-
-        #[cfg(feature = "checkpoint")]
-        {
-            let all_checkpoints = self.list_checkpoints().await?;
-            let mut count = 0;
-            for cp in all_checkpoints {
-                if cp.collection_id == collection_id {
-                    self.scrub_checkpoint(&cp.name).await?;
-                    count += 1;
-                }
+        let all_checkpoints = self.list_checkpoints().await?;
+        let mut count = 0;
+        for cp in all_checkpoints {
+            if cp.collection_id == collection_id {
+                self.scrub_checkpoint(&cp.name).await?;
+                count += 1;
             }
-            Ok(count)
         }
+        Ok(count)
     }
 
     /// Scrubt und entfernt alle Checkpoints eines Mandanten / Namespace (§5.10 / E31).
     pub async fn scrub_tenant_checkpoints(&self, tenant_id: &str) -> Result<usize> {
-        #[cfg(not(feature = "checkpoint"))]
-        {
-            let _ = tenant_id;
-            return Err(ContextraError::capability_unsupported(
-                "checkpoint",
-                "Checkpoint scrub feature 'checkpoint' is disabled",
-            ));
-        }
-
-        #[cfg(feature = "checkpoint")]
-        {
-            let all_checkpoints = self.list_checkpoints().await?;
-            let mut count = 0;
-            for cp in all_checkpoints {
-                if cp.collection_id.contains(tenant_id) || self.namespace.contains(tenant_id) {
-                    self.scrub_checkpoint(&cp.name).await?;
-                    count += 1;
-                }
+        let all_checkpoints = self.list_checkpoints().await?;
+        let mut count = 0;
+        for cp in all_checkpoints {
+            if cp.collection_id.contains(tenant_id) || self.namespace.contains(tenant_id) {
+                self.scrub_checkpoint(&cp.name).await?;
+                count += 1;
             }
-            Ok(count)
         }
-    }
-
-    /// Explicitly purges a single named checkpoint (§5.10).
-    pub async fn purge_checkpoint_by_name(&self, name: &str) -> Result<()> {
-        #[cfg(not(feature = "checkpoint"))]
-        {
-            let _ = name;
-            return Err(ContextraError::capability_unsupported(
-                "checkpoint",
-                "Checkpoint scrub feature 'checkpoint' is disabled",
-            ));
-        }
-
-        #[cfg(feature = "checkpoint")]
-        {
-            self.scrub_checkpoint(name).await
-        }
+        Ok(count)
     }
 
     /// Sets the anti-resurrection restore policy for the store.
