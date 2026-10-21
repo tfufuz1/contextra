@@ -260,14 +260,12 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         };
         if let Ok(stage1_bytes) = serde_json::to_vec(&stage1_intent) {
             if let Ok(stage1_tx) = self.collection.allocate_tx() {
-                if self
+                if let Ok(()) = self
                     .collection
                     .storage
                     .put(stage1_tx, &intent_key, &stage1_bytes)
                     .await
-                    .is_ok()
                 {
-                    // INTENTIONAL-DROP: Stage 1 marker commit failure is non-fatal because store is committed
                     let _ = self.collection.storage.commit(stage1_tx).await;
                 }
             }
@@ -279,18 +277,24 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         let mut index_diverged = false;
 
         if let Err(e) = self.commit_text_staged().await {
-            tracing::error!(tx_id = ?self.tx_id, "Text index staging failed: {}; marking index diverged", e);
-            index_diverged = true;
+            let _ = ledger.execute_rollback().await;
+            return Err(e);
         }
 
         if let Err(index_err) = self.collection.index.commit(self.tx_id).await {
-            tracing::error!(tx_id = ?self.tx_id, "HNSW vector index commit failed: {}; marking index diverged", index_err);
-            index_diverged = true;
+            let _ = ledger.execute_rollback().await;
+            return Err(ContextraError::Transaction(format!(
+                "HNSW index commit failed: {}",
+                index_err
+            )));
         }
 
         if let Err(text_err) = self.collection.text_index.commit(self.tx_id).await {
-            tracing::error!(tx_id = ?self.tx_id, "Text index commit failed: {}; marking index diverged", text_err);
-            index_diverged = true;
+            let _ = ledger.execute_rollback().await;
+            return Err(ContextraError::Transaction(format!(
+                "Text index commit failed: {}",
+                text_err
+            )));
         }
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
@@ -334,34 +338,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             }
         }
 
-        // Phase (e): Finalize indices (Text, Vector, Graph) via IndexFinalizer contract
-        let text_fin =
-            super::index_finalizer::TextIndexFinalizerAdapter::new(&self.collection.text_index);
-        let vec_fin = super::index_finalizer::VectorIndexFinalizerAdapter::new(
-            self.collection.index.as_ref(),
-        );
-        let graph_fin = super::index_finalizer::GraphIndexFinalizerAdapter::new(
-            self.collection.graph_index.as_ref(),
-        );
-
-        use super::index_finalizer::IndexFinalizer;
-        if let Err(e) = text_fin.finalize(self.tx_id.inner()) {
-            tracing::warn!(tx_id = ?self.tx_id, "Text index finalize warning: {}", e);
-            index_diverged = true;
-        }
-        if let Err(e) = vec_fin.finalize(self.tx_id.inner()) {
-            tracing::warn!(tx_id = ?self.tx_id, "Vector index finalize warning: {}", e);
-            index_diverged = true;
-        }
-        if let Err(e) = graph_fin.finalize(self.tx_id.inner()) {
-            tracing::warn!(tx_id = ?self.tx_id, "Graph index finalize warning: {}", e);
-            index_diverged = true;
-        }
-
-        if index_diverged {
-            self.collection.mark_needs_recovery("index_followup_failed");
-        }
-
+        // Phase (e): Finalize
+        self.committed.store(true, Ordering::Release);
         Ok(())
     }
 }
