@@ -11,12 +11,8 @@ use contextra_ports::{GraphIndex, MetricsSink, StorageEngine, TextIndex, VectorI
 use contextra_types::{DocId, Result};
 
 /// Fixed pipeline stages for hybrid search processing (§W1-15).
-pub const HYBRID_PIPELINE_STAGES: &[&str] = &[
-    "signal_retrieval",
-    "fusion",
-    "rerank",
-    "egress_filter",
-];
+pub const HYBRID_PIPELINE_STAGES: &[&str] =
+    &["signal_retrieval", "fusion", "rerank", "egress_filter"];
 
 /// Typed pipeline stage identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -30,7 +26,10 @@ pub enum HybridPipelineStage {
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Performs hybrid search combining BM25, vector, and graph signals configured via `HybridQuery`.
     /// Scheduled for removal in v0.2.0. Use `Collection::query().query_config()` instead.
-    #[deprecated(since = "0.1.0", note = "Use Collection::query() instead. Scheduled for removal in v0.2.0.")]
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use Collection::query() instead. Scheduled for removal in v0.2.0."
+    )]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, query))]
     pub async fn hybrid_search_with_query(
@@ -52,7 +51,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         snapshot: &contextra_ports::ReadSnapshot,
     ) -> Result<Vec<crate::SearchResult>> {
         let (results, _) = self
-            .hybrid_search_with_query_and_report_at(query, snapshot, SignalFailurePolicy::Fail, None)
+            .hybrid_search_with_query_and_report_at(
+                query,
+                snapshot,
+                SignalFailurePolicy::Fail,
+                None,
+            )
             .await?;
         Ok(results)
     }
