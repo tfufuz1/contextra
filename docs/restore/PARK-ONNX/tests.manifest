@@ -1,0 +1,3 @@
+# tests.manifest for PARK-ONNX
+# Format: <ursprünglicher Pfad>::<Funktionsname>
+# Keine Tests in behaltenen Allowlist-Crates mussten verschoben werden.
