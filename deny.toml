@@ -71,7 +71,6 @@ deny = [
         "contextra-mcp",
         "contextra-privacy",
         "contextra-py",
-        "contextra-router",
         "contextra-sandbox",
         "contextra-testkit",
         "reqwest",

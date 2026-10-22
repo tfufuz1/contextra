@@ -494,7 +494,7 @@ mod tests {
 
         let mut db = ClaimsDatabase::default();
         db.claims.push(ClaimEntry {
-            krate: "contextra-router".to_string(),
+            krate: "contextra-mcp".to_string(),
             issue: "ADR-063".to_string(),
             timestamp: "2026-09-08T18:00:00Z".to_string(),
             session_id: "s1".to_string(),
@@ -508,7 +508,7 @@ mod tests {
         let loaded = ClaimsDatabase::load(&path);
         assert_eq!(loaded.claims.len(), 1);
         assert_eq!(
-            loaded.find_active_claim("contextra-router").unwrap().issue,
+            loaded.find_active_claim("contextra-mcp").unwrap().issue,
             "ADR-063"
         );
         assert!(loaded.find_active_claim("contextra-core").is_none());

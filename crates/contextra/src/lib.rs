@@ -33,10 +33,6 @@ pub use contextra_db::{
 };
 pub use query_rewriter::LlmQueryRewriter;
 
-#[cfg(feature = "router")]
-pub use contextra_router as router;
-
-#[cfg(feature = "router")]
 pub use contextra_rank as rank;
 
 #[cfg(feature = "ollama")]

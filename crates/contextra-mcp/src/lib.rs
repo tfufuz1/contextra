@@ -37,7 +37,6 @@ pub mod prompt_injection;
 pub mod proof_key;
 pub mod proof_key_env;
 pub mod protocol;
-pub mod routing;
 pub mod sandbox;
 pub mod server;
 pub mod server_dispatch;
@@ -75,8 +74,7 @@ pub use prompt_injection::{
 };
 
 #[cfg(feature = "kv-bridge")]
-pub use routing::setup_kv_bridge;
-pub use routing::{setup_routing, RoutingHandle};
+pub use server::setup_kv_bridge;
 
 pub use server::McpServer;
 pub use validation::{is_write_allowed_by_env, validate_collection_name};

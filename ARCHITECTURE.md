@@ -94,7 +94,6 @@ Die folgende Tabelle führt alle 35 im Workspace definierten Crates auf, eingeor
 | `contextra-db` | Ring 3 | Contextra — Embedded hybrid-search for AI agents |
 | `contextra-engine` | Ring 3 | Contextra — Core storage, index, and transaction orchestrator engine |
 | `contextra-privacy` | Ring 3 | Cloud Egress Security, DLP & Exfiltration Protection for Contextra (Ring 3) |
-| `contextra-router` | Ring 3 | Keine Beschreibung |
 | `contextra` | Ring 4 | Contextra — Embedded hybrid-search for AI agents (Facade) |
 | `contextra-license` | Ring 4 | License and activation enforcement gate layer for Contextra feature rings |
 | `contextra-mcp` | Ring 4 | Keine Beschreibung |
@@ -121,7 +120,6 @@ graph TD
     contextra[contextra] --> contextra_ports[contextra-ports]
     contextra[contextra] --> contextra_privacy[contextra-privacy]
     contextra[contextra] --> contextra_rank[contextra-rank]
-    contextra[contextra] --> contextra_router[contextra-router]
     contextra[contextra] --> contextra_store[contextra-store]
     contextra[contextra] --> contextra_types[contextra-types]
     contextra_adapt[contextra-adapt] --> contextra_ports[contextra-ports]
@@ -130,7 +128,6 @@ graph TD
     contextra_agent[contextra-agent] --> contextra_db[contextra-db]
     contextra_agent[contextra-agent] --> contextra_graph[contextra-graph]
     contextra_agent[contextra-agent] --> contextra_ports[contextra-ports]
-    contextra_agent[contextra-agent] --> contextra_router[contextra-router]
     contextra_agent[contextra-agent] --> contextra_store[contextra-store]
     contextra_agent[contextra-agent] --> contextra_types[contextra-types]
     contextra_audit_export[contextra-audit-export] --> contextra_ports[contextra-ports]
@@ -222,16 +219,10 @@ graph TD
     contextra_py[contextra-py] --> contextra_core[contextra-core]
     contextra_py[contextra-py] --> contextra_db[contextra-db]
     contextra_py[contextra-py] --> contextra_rank[contextra-rank]
-    contextra_py[contextra-py] --> contextra_router[contextra-router]
     contextra_py[contextra-py] --> contextra_store[contextra-store]
     contextra_py[contextra-py] --> contextra_types[contextra-types]
     contextra_rank[contextra-rank] --> contextra_ports[contextra-ports]
     contextra_rank[contextra-rank] --> contextra_types[contextra-types]
-    contextra_router[contextra-router] --> contextra_adapt[contextra-adapt]
-    contextra_router[contextra-router] --> contextra_ports[contextra-ports]
-    contextra_router[contextra-router] --> contextra_privacy[contextra-privacy]
-    contextra_router[contextra-router] --> contextra_types[contextra-types]
-    contextra_router[contextra-router] --> contextra_wire[contextra-wire]
     contextra_sandbox[contextra-sandbox]
     contextra_simd[contextra-simd] --> contextra_core[contextra-core]
     contextra_store[contextra-store] --> contextra_core[contextra-core]
@@ -253,7 +244,6 @@ graph TD
     contextra_vector[contextra-vector] --> contextra_types[contextra-types]
     contextra_wire[contextra-wire]
     xtask[xtask] --> contextra_bench[contextra-bench]
-    xtask[xtask] --> contextra_router[contextra-router]
     xtask[xtask] --> contextra_types[contextra-types]
 ```
 <!-- END GENERATED -->

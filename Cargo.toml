@@ -19,7 +19,6 @@ members = [
     "crates/contextra-mcp",
     "crates/contextra-agent",
     "crates/contextra-infer-ollama",
-    "crates/contextra-router",
     "benchmarks/contextra-bench",
     "crates/contextra-infer-candle",
     "crates/contextra-sandbox",
@@ -130,7 +129,6 @@ contextra-mcp   = { path = "crates/contextra-mcp" }
 contextra-agent = { path = "crates/contextra-agent" }
 contextra-infer-ollama = { path = "crates/contextra-infer-ollama" }
 contextra-ollama = { package = "contextra-infer-ollama", path = "crates/contextra-infer-ollama" } # <!-- crate-ref-ignore -->
-contextra-router = { path = "crates/contextra-router" }
 contextra-infer-candle = { path = "crates/contextra-infer-candle" }
 contextra-candle = { package = "contextra-infer-candle", path = "crates/contextra-infer-candle" } # <!-- crate-ref-ignore -->
 contextra-sandbox = { path = "crates/contextra-sandbox" }

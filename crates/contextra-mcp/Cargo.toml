@@ -18,7 +18,7 @@ kv-bridge = ["contextra-infer-candle/kv-bridge", "dep:contextra-infer-candle"]
 test-utils = []
 
 [dependencies]
-contextra = { workspace = true, features = ["router"] }
+contextra = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-license = { workspace = true }

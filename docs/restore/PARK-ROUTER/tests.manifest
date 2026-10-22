@@ -1,0 +1,2 @@
+crates/contextra-mcp/tests/mcp_test.rs::test_mcp_boot_without_routing_config
+crates/contextra-mcp/tests/mcp_test.rs::test_mcp_boot_with_routing_config

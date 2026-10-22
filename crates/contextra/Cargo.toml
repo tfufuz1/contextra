@@ -25,8 +25,7 @@ serde_json = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
 contextra-infer-candle = { workspace = true, optional = true }
 contextra-infer-ollama = { workspace = true, optional = true }
-contextra-router = { workspace = true, optional = true }
-contextra-rank = { workspace = true, optional = true }
+contextra-rank = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 
@@ -88,7 +87,6 @@ audit-export = ["dep:contextra-audit-export"]
 avv-generator = ["dep:contextra-avv-generator"]
 candle = ["contextra-infer-candle"]
 ollama = ["contextra-infer-ollama"]
-router = ["contextra-router", "contextra-rank"]
 
 [lints]
 workspace = true

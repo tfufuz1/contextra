@@ -4,9 +4,6 @@ use crate::io::{read_line_bounded, MAX_RPC_BYTES};
 use crate::prompt_injection::PromptInjectionGuard;
 use crate::proof_key::deletion_proof_key_from_env;
 use crate::protocol::JsonRpcResponse;
-#[cfg(feature = "kv-bridge")]
-use crate::routing::setup_kv_bridge;
-use crate::routing::RoutingHandle;
 use crate::sandbox::{McpSandbox, SandboxPolicy};
 use crate::validation::{is_write_allowed_by_env, resolve_session_tenant_from_env};
 use contextra::Contextra;
@@ -22,7 +19,6 @@ pub struct McpServer {
     pub sandbox: Arc<McpSandbox>,
     pub injection_guard: Arc<PromptInjectionGuard>,
     pub egress_classifier: Arc<dyn EgressClassifier>,
-    pub routing: Option<Arc<RoutingHandle>>,
     pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
     #[cfg(feature = "kv-bridge")]
     pub kv_bridge: Option<Arc<contextra_infer_candle::KvBridgeAdapter>>,
@@ -92,11 +88,21 @@ impl McpServer {
             sandbox,
             injection_guard: Arc::new(PromptInjectionGuard::from_env()),
             egress_classifier: Arc::new(DefaultEgressClassifier::default()),
-            routing: None,
             plugin_registry: None,
             #[cfg(feature = "kv-bridge")]
             kv_bridge,
         }
+    }
+
+    /// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
+    #[cfg(feature = "kv-bridge")]
+    pub fn setup_kv_bridge(
+        _db: &Arc<Contextra>,
+    ) -> Option<Arc<contextra_infer_candle::KvBridgeAdapter>> {
+        tracing::info!(
+            "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
+        );
+        None
     }
 
     #[cfg(feature = "kv-bridge")]
@@ -115,11 +121,6 @@ impl McpServer {
 
     pub fn with_egress_classifier(mut self, classifier: Arc<dyn EgressClassifier>) -> Self {
         self.egress_classifier = classifier;
-        self
-    }
-
-    pub fn with_routing(mut self, routing: Option<Arc<RoutingHandle>>) -> Self {
-        self.routing = routing;
         self
     }
 

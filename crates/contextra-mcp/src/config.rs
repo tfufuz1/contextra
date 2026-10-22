@@ -72,7 +72,9 @@ impl EmbeddingConfig {
             return Err(ContextraError::InvalidInput(msg));
         }
 
-        if trimmed_provider.eq_ignore_ascii_case("onnx") || trimmed_provider.eq_ignore_ascii_case("localonnx") {
+        if trimmed_provider.eq_ignore_ascii_case("onnx")
+            || trimmed_provider.eq_ignore_ascii_case("localonnx")
+        {
             return Err(ContextraError::InvalidInput(
                 "Backend onnx ist in v1.0 geparkt, siehe docs/restore/PARK-ONNX".to_string(),
             ));
@@ -154,8 +156,7 @@ impl LlmConfig {
         }
 
         let provider = resolved.value;
-        let llm_model =
-            std::env::var("CONTEXTRA_LLM_MODEL").unwrap_or_else(|_| "mock".to_string());
+        let llm_model = std::env::var("CONTEXTRA_LLM_MODEL").unwrap_or_else(|_| "mock".to_string());
 
         Self {
             provider,
@@ -186,53 +187,6 @@ pub fn create_llm_text_generator(
         other => Err(ContextraError::InvalidInput(format!(
             "Unknown LLM provider '{other}'. Expected 'mock'."
         ))),
-    }
-}
-
-/// Router configuration settings.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
-pub struct RouterConfig {
-    /// List of SLM profiles. If non-empty, routing is enabled.
-    pub profiles: Vec<contextra::router::SlmProfile>,
-    /// Optional path to routing profiles JSON file.
-    pub profiles_path: Option<PathBuf>,
-    /// Optional path to persistent calibration state.
-    pub calibration_store_path: Option<PathBuf>,
-}
-
-impl RouterConfig {
-    /// Loads configuration from environment variables with fallbacks.
-    pub fn from_env() -> Self {
-        let profiles_path = std::env::var("CONTEXTRA_ROUTER_PROFILES_PATH")
-            .ok()
-            .map(PathBuf::from);
-
-        let calibration_store_path = std::env::var("CONTEXTRA_ROUTER_CALIBRATION_PATH")
-            .ok()
-            .map(PathBuf::from);
-
-        let mut profiles = Vec::new();
-        if let Some(ref path) = profiles_path {
-            if let Ok(bytes) = std::fs::read(path) {
-                if let Ok(loaded) =
-                    serde_json::from_slice::<Vec<contextra::router::SlmProfile>>(&bytes)
-                {
-                    profiles = loaded;
-                }
-            }
-        } else if let Ok(json_str) = std::env::var("CONTEXTRA_ROUTER_PROFILES_JSON") {
-            if let Ok(loaded) =
-                serde_json::from_str::<Vec<contextra::router::SlmProfile>>(&json_str)
-            {
-                profiles = loaded;
-            }
-        }
-
-        Self {
-            profiles,
-            profiles_path,
-            calibration_store_path,
-        }
     }
 }
 
@@ -398,7 +352,10 @@ mod tests {
         let res = config.build_provider();
         match res {
             Err(ContextraError::InvalidInput(msg)) => {
-                assert_eq!(msg, "Backend onnx ist in v1.0 geparkt, siehe docs/restore/PARK-ONNX");
+                assert_eq!(
+                    msg,
+                    "Backend onnx ist in v1.0 geparkt, siehe docs/restore/PARK-ONNX"
+                );
             }
             other => panic!("Expected typed error for parked onnx backend, got: {other:?}"),
         }

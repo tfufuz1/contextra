@@ -40,7 +40,6 @@ body:
         - contextra-privacy
         - contextra-py
         - contextra-rank
-        - contextra-router
         - contextra-sandbox
         - contextra-simd
         - contextra-store

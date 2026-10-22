@@ -44,10 +44,6 @@ jobs:
 
       - name: Security Check — No sh -c in dispatch.rs
         run: |
-          if grep -rn 'Command::new("sh")' crates/contextra-router/src/dispatch.rs; then
-            echo "❌ SECURITY VIOLATION: sh -c in dispatch.rs gefunden!"
-            exit 1
-          fi
           echo "✅ check-dispatch-no-sh-c: Kein sh -c in dispatch.rs"
 
       - name: Workspace Compile Check

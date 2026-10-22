@@ -130,9 +130,6 @@
 - name: crate:contextra-rank
   color: C5DEF5
   description: Betrifft Crate crates/contextra-rank
-- name: crate:contextra-router
-  color: C5DEF5
-  description: Betrifft Crate crates/contextra-router
 - name: crate:contextra-sandbox
   color: C5DEF5
   description: Betrifft Crate crates/contextra-sandbox

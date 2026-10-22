@@ -1,0 +1,790 @@
+diff --git a/crates/contextra-mcp/Cargo.toml b/crates/contextra-mcp/Cargo.toml
+index 4908e4780..40fe84791 100644
+--- a/crates/contextra-mcp/Cargo.toml
++++ b/crates/contextra-mcp/Cargo.toml
+@@ -18,7 +18,7 @@ kv-bridge = ["contextra-infer-candle/kv-bridge", "dep:contextra-infer-candle"]
+ test-utils = []
+
+ [dependencies]
+-contextra = { workspace = true, features = ["router"] }
++contextra = { workspace = true }
+ contextra-types = { workspace = true }
+ contextra-ports = { workspace = true }
+ contextra-license = { workspace = true }
+diff --git a/crates/contextra-mcp/src/config.rs b/crates/contextra-mcp/src/config.rs
+index c8af52a95..c3c55edfd 100644
+--- a/crates/contextra-mcp/src/config.rs
++++ b/crates/contextra-mcp/src/config.rs
+@@ -72,7 +72,9 @@ impl EmbeddingConfig {
+             return Err(ContextraError::InvalidInput(msg));
+         }
+
+-        if trimmed_provider.eq_ignore_ascii_case("onnx") || trimmed_provider.eq_ignore_ascii_case("localonnx") {
++        if trimmed_provider.eq_ignore_ascii_case("onnx")
++            || trimmed_provider.eq_ignore_ascii_case("localonnx")
++        {
+             return Err(ContextraError::InvalidInput(
+                 "Backend onnx ist in v1.0 geparkt, siehe docs/restore/PARK-ONNX".to_string(),
+             ));
+@@ -154,8 +156,7 @@ impl LlmConfig {
+         }
+
+         let provider = resolved.value;
+-        let llm_model =
+-            std::env::var("CONTEXTRA_LLM_MODEL").unwrap_or_else(|_| "mock".to_string());
++        let llm_model = std::env::var("CONTEXTRA_LLM_MODEL").unwrap_or_else(|_| "mock".to_string());
+
+         Self {
+             provider,
+@@ -189,53 +190,6 @@ pub fn create_llm_text_generator(
+     }
+ }
+
+-/// Router configuration settings.
+-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+-pub struct RouterConfig {
+-    /// List of SLM profiles. If non-empty, routing is enabled.
+-    pub profiles: Vec<contextra::router::SlmProfile>,
+-    /// Optional path to routing profiles JSON file.
+-    pub profiles_path: Option<PathBuf>,
+-    /// Optional path to persistent calibration state.
+-    pub calibration_store_path: Option<PathBuf>,
+-}
+-
+-impl RouterConfig {
+-    /// Loads configuration from environment variables with fallbacks.
+-    pub fn from_env() -> Self {
+-        let profiles_path = std::env::var("CONTEXTRA_ROUTER_PROFILES_PATH")
+-            .ok()
+-            .map(PathBuf::from);
+-
+-        let calibration_store_path = std::env::var("CONTEXTRA_ROUTER_CALIBRATION_PATH")
+-            .ok()
+-            .map(PathBuf::from);
+-
+-        let mut profiles = Vec::new();
+-        if let Some(ref path) = profiles_path {
+-            if let Ok(bytes) = std::fs::read(path) {
+-                if let Ok(loaded) =
+-                    serde_json::from_slice::<Vec<contextra::router::SlmProfile>>(&bytes)
+-                {
+-                    profiles = loaded;
+-                }
+-            }
+-        } else if let Ok(json_str) = std::env::var("CONTEXTRA_ROUTER_PROFILES_JSON") {
+-            if let Ok(loaded) =
+-                serde_json::from_str::<Vec<contextra::router::SlmProfile>>(&json_str)
+-            {
+-                profiles = loaded;
+-            }
+-        }
+-
+-        Self {
+-            profiles,
+-            profiles_path,
+-            calibration_store_path,
+-        }
+-    }
+-}
+-
+ /// IPC and transport security configuration.
+ #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+ pub struct IpcConfig {
+@@ -398,7 +352,10 @@ mod tests {
+         let res = config.build_provider();
+         match res {
+             Err(ContextraError::InvalidInput(msg)) => {
+-                assert_eq!(msg, "Backend onnx ist in v1.0 geparkt, siehe docs/restore/PARK-ONNX");
++                assert_eq!(
++                    msg,
++                    "Backend onnx ist in v1.0 geparkt, siehe docs/restore/PARK-ONNX"
++                );
+             }
+             other => panic!("Expected typed error for parked onnx backend, got: {other:?}"),
+         }
+diff --git a/crates/contextra-mcp/src/ipc/channel.rs b/crates/contextra-mcp/src/ipc/channel.rs
+index 4adadab84..1c2195d5e 100644
+--- a/crates/contextra-mcp/src/ipc/channel.rs
++++ b/crates/contextra-mcp/src/ipc/channel.rs
+@@ -24,7 +24,9 @@ impl Channel {
+ }
+
+ /// Configures channel bounds for framing and buffer capacities.
+-pub fn configure_channel_bounds(max_line_bytes: usize) -> Result<usize, contextra_types::ContextraError> {
++pub fn configure_channel_bounds(
++    max_line_bytes: usize,
++) -> Result<usize, contextra_types::ContextraError> {
+     if max_line_bytes == 0 {
+         return Err(contextra_types::ContextraError::InvalidInput(
+             "Channel line limit must be greater than 0".into(),
+diff --git a/crates/contextra-mcp/src/lib.rs b/crates/contextra-mcp/src/lib.rs
+index 977ae1341..99e4e65ca 100644
+--- a/crates/contextra-mcp/src/lib.rs
++++ b/crates/contextra-mcp/src/lib.rs
+@@ -37,7 +37,6 @@ pub mod prompt_injection;
+ pub mod proof_key;
+ pub mod proof_key_env;
+ pub mod protocol;
+-pub mod routing;
+ pub mod sandbox;
+ pub mod server;
+ pub mod server_dispatch;
+@@ -75,8 +74,7 @@ pub use prompt_injection::{
+ };
+
+ #[cfg(feature = "kv-bridge")]
+-pub use routing::setup_kv_bridge;
+-pub use routing::{setup_routing, RoutingHandle};
++pub use server::setup_kv_bridge;
+
+ pub use server::McpServer;
+ pub use validation::{is_write_allowed_by_env, validate_collection_name};
+diff --git a/crates/contextra-mcp/src/proof_key_env.rs b/crates/contextra-mcp/src/proof_key_env.rs
+index cb790e3b9..512a80c46 100644
+--- a/crates/contextra-mcp/src/proof_key_env.rs
++++ b/crates/contextra-mcp/src/proof_key_env.rs
+@@ -106,7 +106,9 @@ fn load_proof_key_from_file(path: &str) -> Result<Zeroizing<String>, String> {
+         .map_err(|e| format!("deletion proof key file error: failed to stat '{path}': {e}"))?;
+
+     if symlink_meta.file_type().is_symlink() {
+-        return Err("deletion proof key file error: symlinks are forbidden for key files".to_string());
++        return Err(
++            "deletion proof key file error: symlinks are forbidden for key files".to_string(),
++        );
+     }
+
+     #[cfg(unix)]
+diff --git a/crates/contextra-mcp/src/routing.rs b/crates/contextra-mcp/src/routing.rs
+deleted file mode 100644
+index 23c5857a3..000000000
+--- a/crates/contextra-mcp/src/routing.rs
++++ /dev/null
+@@ -1,145 +0,0 @@
+-use crate::config::RouterConfig;
+-use contextra::Contextra;
+-use contextra_adapt::{PoolController, PoolControllerConfig};
+-use contextra_types::{ContextChunk, ContextWindow, ContextraError, EntityId, TokenBudget};
+-use std::sync::Arc;
+-
+-struct CollectionAdapter(Arc<contextra::Collection>);
+-
+-impl contextra::router::ports_local::HybridSearchProvider for CollectionAdapter {
+-    fn search_hybrid<'a>(
+-        &'a self,
+-        query_text: &'a str,
+-        query_embedding: &'a [f32],
+-        top_k: usize,
+-    ) -> contextra_ports::BoxFuture<'a, Result<Vec<ContextChunk>, ContextraError>> {
+-        Box::pin(async move {
+-            let search_results = self
+-                .0
+-                .query()
+-                .text(query_text)
+-                .vector(query_embedding)
+-                .k(top_k)
+-                .execute()
+-                .await?;
+-
+-            let mut chunks = Vec::with_capacity(search_results.len());
+-            for res in search_results {
+-                if let Ok(chunk) = ContextChunk::try_from(res) {
+-                    chunks.push(chunk);
+-                }
+-            }
+-            Ok(chunks)
+-        })
+-    }
+-}
+-
+-struct CommunityAdapter;
+-
+-impl contextra::router::ports_local::CommunityResolver for CommunityAdapter {
+-    fn get_community<'a>(
+-        &'a self,
+-        _entity_id: EntityId,
+-    ) -> contextra_ports::BoxFuture<'a, Result<Option<u64>, ContextraError>> {
+-        Box::pin(async move { Ok(None) })
+-    }
+-}
+-
+-struct ContextPreparerAdapter;
+-
+-impl contextra::router::ports_local::ContextPreparer for ContextPreparerAdapter {
+-    fn prepare_context(
+-        &self,
+-        chunks: Vec<ContextChunk>,
+-        budget: &TokenBudget,
+-        _relevance_threshold: f32,
+-    ) -> Result<ContextWindow, ContextraError> {
+-        let total_tokens = chunks.iter().map(|c| c.token_count).sum();
+-        let limit = budget.limit;
+-        let truncated = total_tokens > limit;
+-        Ok(ContextWindow {
+-            chunks,
+-            total_tokens,
+-            truncated,
+-        })
+-    }
+-}
+-
+-struct RouterDriftAdapter(Arc<contextra::router::DefaultRouterEngine>);
+-
+-impl contextra_ports::DriftStatusProvider for RouterDriftAdapter {
+-    fn overall_drift_status(&self) -> String {
+-        self.0.overall_drift_status()
+-    }
+-}
+-
+-/// Holds strong Arc references to routing, calibration and controller components to maintain live Weak references in `Contextra`.
+-pub struct RoutingHandle {
+-    pub router: Arc<contextra::router::DefaultRouterEngine>,
+-    pub calibrator: Arc<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>,
+-    pub pool_controller: Arc<parking_lot::Mutex<PoolController>>,
+-    #[allow(deprecated)]
+-    pub pid_controller: Arc<parking_lot::Mutex<contextra_adapt::PidController>>,
+-    pub _drift_adapter: Arc<dyn contextra_ports::DriftStatusProvider>,
+-}
+-
+-pub async fn setup_routing(
+-    db: &Arc<Contextra>,
+-    config: &RouterConfig,
+-) -> Result<Option<Arc<RoutingHandle>>, ContextraError> {
+-    if config.profiles.is_empty() {
+-        return Ok(None);
+-    }
+-
+-    let default_col = db.collection("default").await?;
+-
+-    let search_provider = Arc::new(CollectionAdapter(default_col.clone()));
+-    let community_resolver = Arc::new(CommunityAdapter);
+-    let context_preparer = Arc::new(ContextPreparerAdapter);
+-
+-    let router = Arc::new(contextra::router::RouterEngine::new(
+-        search_provider,
+-        community_resolver,
+-        context_preparer,
+-        config.profiles.clone(),
+-        config.calibration_store_path.clone(),
+-    ));
+-
+-    let calibrator = Arc::new(parking_lot::Mutex::new(
+-        contextra_rank::IsotonicCalibrator::with_defaults(),
+-    ));
+-
+-    let pool_controller = Arc::new(parking_lot::Mutex::new(
+-        PoolController::new(PoolControllerConfig::default())?,
+-    ));
+-
+-    #[allow(deprecated)]
+-    let pid_controller = Arc::new(parking_lot::Mutex::new(
+-        contextra_adapt::PidController::default(),
+-    ));
+-
+-    let drift_adapter: Arc<dyn contextra_ports::DriftStatusProvider> =
+-        Arc::new(RouterDriftAdapter(router.clone()));
+-    let router_weak = Arc::downgrade(&drift_adapter);
+-    db.set_router(router_weak);
+-    db.set_calibrator(Arc::downgrade(&calibrator));
+-
+-    Ok(Some(Arc::new(RoutingHandle {
+-        router,
+-        calibrator,
+-        pool_controller,
+-        pid_controller,
+-        _drift_adapter: drift_adapter,
+-    })))
+-}
+-
+-/// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
+-#[cfg(feature = "kv-bridge")]
+-pub fn setup_kv_bridge(
+-    _db: &Arc<Contextra>,
+-) -> Option<Arc<contextra_infer_candle::KvBridgeAdapter>> {
+-    tracing::info!(
+-        "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
+-    );
+-    None
+-}
+diff --git a/crates/contextra-mcp/src/server.rs b/crates/contextra-mcp/src/server.rs
+index 408f1a9bd..245ff8bc4 100644
+--- a/crates/contextra-mcp/src/server.rs
++++ b/crates/contextra-mcp/src/server.rs
+@@ -4,9 +4,6 @@ use crate::io::{read_line_bounded, MAX_RPC_BYTES};
+ use crate::prompt_injection::PromptInjectionGuard;
+ use crate::proof_key::deletion_proof_key_from_env;
+ use crate::protocol::JsonRpcResponse;
+-#[cfg(feature = "kv-bridge")]
+-use crate::routing::setup_kv_bridge;
+-use crate::routing::RoutingHandle;
+ use crate::sandbox::{McpSandbox, SandboxPolicy};
+ use crate::validation::{is_write_allowed_by_env, resolve_session_tenant_from_env};
+ use contextra::Contextra;
+@@ -22,7 +19,6 @@ pub struct McpServer {
+     pub sandbox: Arc<McpSandbox>,
+     pub injection_guard: Arc<PromptInjectionGuard>,
+     pub egress_classifier: Arc<dyn EgressClassifier>,
+-    pub routing: Option<Arc<RoutingHandle>>,
+     pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
+     #[cfg(feature = "kv-bridge")]
+     pub kv_bridge: Option<Arc<contextra_infer_candle::KvBridgeAdapter>>,
+@@ -92,13 +88,23 @@ impl McpServer {
+             sandbox,
+             injection_guard: Arc::new(PromptInjectionGuard::from_env()),
+             egress_classifier: Arc::new(DefaultEgressClassifier::default()),
+-            routing: None,
+             plugin_registry: None,
+             #[cfg(feature = "kv-bridge")]
+             kv_bridge,
+         }
+     }
+
++    /// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
++    #[cfg(feature = "kv-bridge")]
++    pub fn setup_kv_bridge(
++        _db: &Arc<Contextra>,
++    ) -> Option<Arc<contextra_infer_candle::KvBridgeAdapter>> {
++        tracing::info!(
++            "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
++        );
++        None
++    }
++
+     #[cfg(feature = "kv-bridge")]
+     pub fn with_kv_bridge(
+         mut self,
+@@ -118,11 +124,6 @@ impl McpServer {
+         self
+     }
+
+-    pub fn with_routing(mut self, routing: Option<Arc<RoutingHandle>>) -> Self {
+-        self.routing = routing;
+-        self
+-    }
+-
+     pub fn with_plugin_registry(
+         mut self,
+         registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
+diff --git a/crates/contextra-mcp/src/server_dispatch.rs b/crates/contextra-mcp/src/server_dispatch.rs
+index 6e43ff2db..ab9441634 100644
+--- a/crates/contextra-mcp/src/server_dispatch.rs
++++ b/crates/contextra-mcp/src/server_dispatch.rs
+@@ -412,7 +412,11 @@ impl McpServer {
+             | "contextra_plugin_status" => {
+                 let tool_name = req.method.as_str();
+                 if !self.is_tool_registered(tool_name) {
+-                    return JsonRpcResponse::err(id, -32601, format!("Method not found: {tool_name}"));
++                    return JsonRpcResponse::err(
++                        id,
++                        -32601,
++                        format!("Method not found: {tool_name}"),
++                    );
+                 }
+                 match self
+                     .sandbox
+diff --git a/crates/contextra-mcp/src/server_tools.rs b/crates/contextra-mcp/src/server_tools.rs
+index a63d34f11..1795983ae 100644
+--- a/crates/contextra-mcp/src/server_tools.rs
++++ b/crates/contextra-mcp/src/server_tools.rs
+@@ -98,10 +98,9 @@ impl McpServer {
+
+         let k_val = args.get("k").or_else(|| args.get("limit"));
+         let k_raw = match k_val {
+-            Some(Value::Number(n)) => n
+-                .as_u64()
+-                .ok_or_else(|| McpError::invalid_params("k/limit muss eine positive Ganzzahl sein"))?
+-                as usize,
++            Some(Value::Number(n)) => n.as_u64().ok_or_else(|| {
++                McpError::invalid_params("k/limit muss eine positive Ganzzahl sein")
++            })? as usize,
+             Some(_) => return Err(McpError::invalid_params("k/limit muss eine Zahl sein")),
+             None => 10,
+         };
+@@ -163,10 +162,7 @@ impl McpServer {
+     }
+
+     /// Hilfsfunktion zur Extraktion und Validierung der gemeinsamen Einfügeparameter (ID, Vektor, Text, Metadaten).
+-    fn parse_insert_params<'a>(
+-        &self,
+-        args: &'a Value,
+-    ) -> Result<ParsedInsertParams<'a>, McpError> {
++    fn parse_insert_params<'a>(&self, args: &'a Value) -> Result<ParsedInsertParams<'a>, McpError> {
+         let collection_name = if let Some(col_val) = args.get("collection") {
+             let s = col_val.as_str().ok_or_else(|| {
+                 McpError::invalid_params("Invalid params: 'collection' must be a string")
+@@ -445,8 +441,8 @@ impl McpServer {
+     /// Nachbedingung: Bei Angabe von `id` wird ein einzelnes Dokument gelöscht (ohne Löschnachweis, Scope `"collection_only"`).
+     /// Ohne `id` wird die gesamte Collection inkl. Erzeugung eines `DeletionProof` aus dem Umgebungsschlüssel gelöscht.
+     async fn handle_forget(&self, args: &Value) -> Result<Value, McpError> {
+-        let session_tenant = crate::validation::resolve_session_tenant_from_env()
+-            .map_err(McpError::from)?;
++        let session_tenant =
++            crate::validation::resolve_session_tenant_from_env().map_err(McpError::from)?;
+         let _tenant_id = crate::validation::validate_request_tenant(session_tenant, Some(args))?;
+
+         let col_name = match args.get("collection") {
+@@ -498,7 +494,9 @@ impl McpServer {
+         let assurance_requested = match args.get("assurance") {
+             Some(v) => {
+                 let s = v.as_str().ok_or_else(|| {
+-                    McpError::invalid_params("Invalid params: 'assurance' must be a string (S1, S2, S3, S4)")
++                    McpError::invalid_params(
++                        "Invalid params: 'assurance' must be a string (S1, S2, S3, S4)",
++                    )
+                 })?;
+                 match s.trim() {
+                     "S1" => contextra_crypto::deletion_proof::claim_text::WitAssurance::S1,
+@@ -518,12 +516,22 @@ impl McpServer {
+         let purge_requested = match args.get("purge") {
+             Some(v) => {
+                 let s = v.as_str().ok_or_else(|| {
+-                    McpError::invalid_params("Invalid params: 'purge' must be a string (None, Purge, PurgeWithScrub)")
++                    McpError::invalid_params(
++                        "Invalid params: 'purge' must be a string (None, Purge, PurgeWithScrub)",
++                    )
+                 })?;
+                 match s.trim() {
+                     "None" | "none" => contextra::ForgetOptions::default().purge,
+-                    "Purge" | "purge" => contextra::ForgetOptions::default().with_purge(contextra::PurgeMode::Purge).purge,
+-                    "PurgeWithScrub" | "purgewithscrub" => contextra::ForgetOptions::default().with_purge(contextra::PurgeMode::PurgeWithScrub).purge,
++                    "Purge" | "purge" => {
++                        contextra::ForgetOptions::default()
++                            .with_purge(contextra::PurgeMode::Purge)
++                            .purge
++                    }
++                    "PurgeWithScrub" | "purgewithscrub" => {
++                        contextra::ForgetOptions::default()
++                            .with_purge(contextra::PurgeMode::PurgeWithScrub)
++                            .purge
++                    }
+                     invalid => {
+                         return Err(McpError::invalid_params(format!(
+                             "Invalid purge mode '{invalid}'. Expected one of: None, Purge, PurgeWithScrub"
+@@ -549,7 +557,9 @@ impl McpServer {
+
+             let proof_present = receipt.proof.is_some();
+             let proof_val = match &receipt.proof {
+-                Some(p) => Some(serde_json::to_value(p).map_err(|e| McpError::internal_error(e.to_string()))?),
++                Some(p) => Some(
++                    serde_json::to_value(p).map_err(|e| McpError::internal_error(e.to_string()))?,
++                ),
+                 None => None,
+             };
+             let layers_val = serde_json::to_value(&receipt.layers)
+@@ -598,11 +608,17 @@ impl McpServer {
+                 "reason": reason,
+             }))
+         } else {
+-            let receipt = self.db.forget_collection(col_name, opts).await.map_err(McpError::from)?;
++            let receipt = self
++                .db
++                .forget_collection(col_name, opts)
++                .await
++                .map_err(McpError::from)?;
+
+             let proof_present = receipt.proof.is_some();
+             let proof_val = match &receipt.proof {
+-                Some(p) => Some(serde_json::to_value(p).map_err(|e| McpError::internal_error(e.to_string()))?),
++                Some(p) => Some(
++                    serde_json::to_value(p).map_err(|e| McpError::internal_error(e.to_string()))?,
++                ),
+                 None => None,
+             };
+             let layers_val = serde_json::to_value(&receipt.layers)
+@@ -718,22 +734,20 @@ impl McpServer {
+         }
+
+         let turns_scanned = turns.len();
+-        let (consolidation_res, synthesis_res) =
+-            contextra::execute_background_consolidation(
+-                col.as_ref(),
+-                &turns,
+-                &contextra::memory_consolidation::ConsolidationConfig::default(),
+-                None,
+-                None,
+-                None,
+-                None,
+-            )
+-            .await
+-            .map_err(McpError::from)?;
++        let (consolidation_res, synthesis_res) = contextra::execute_background_consolidation(
++            col.as_ref(),
++            &turns,
++            &contextra::memory_consolidation::ConsolidationConfig::default(),
++            None,
++            None,
++            None,
++            None,
++        )
++        .await
++        .map_err(McpError::from)?;
+
+         let duplicates_tombstoned_count = consolidation_res.duplicates_tombstoned.len();
+-        let cascade_tombstones_count =
+-            consolidation_res.cascade_edge_tombstones_needed.len();
++        let cascade_tombstones_count = consolidation_res.cascade_edge_tombstones_needed.len();
+         let synthesized_count = synthesis_res
+             .as_ref()
+             .map(|s| s.synthesized.len())
+@@ -815,9 +829,8 @@ impl McpServer {
+         let response =
+             egress_gateway::handle_cloud_query(request, self.egress_classifier.as_ref()).await?;
+
+-        serde_json::to_value(&response).map_err(|e| {
+-            McpError::internal_error(format!("Response serialization error: {e}"))
+-        })
++        serde_json::to_value(&response)
++            .map_err(|e| McpError::internal_error(format!("Response serialization error: {e}")))
+     }
+
+     /// Handler für `contextra_relate`.
+@@ -940,8 +953,7 @@ impl McpServer {
+         &self,
+         participants_arr: &'a [Value],
+     ) -> Result<Vec<(&'a str, &'a str)>, McpError> {
+-        let mut participant_pairs: Vec<(&str, &str)> =
+-            Vec::with_capacity(participants_arr.len());
++        let mut participant_pairs: Vec<(&str, &str)> = Vec::with_capacity(participants_arr.len());
+
+         for (idx, elem) in participants_arr.iter().enumerate() {
+             let obj = elem.as_object().ok_or_else(|| {
+@@ -1080,9 +1092,7 @@ impl McpServer {
+         let source_doc_id_opt = match args.get("source_doc_id") {
+             Some(v) if !v.is_null() => {
+                 let s = v.as_str().ok_or_else(|| {
+-                    McpError::invalid_params(
+-                        "Invalid params: 'source_doc_id' must be a string",
+-                    )
++                    McpError::invalid_params("Invalid params: 'source_doc_id' must be a string")
+                 })?;
+                 if s.trim().is_empty() {
+                     return Err(McpError::invalid_params("source_doc_id cannot be empty"));
+@@ -1136,16 +1146,15 @@ impl McpServer {
+         let reg_ref = match registry {
+             Some(r) => r,
+             None => {
+-                empty_registry = contextra_ports::plugin::PluginRegistry::new(
+-                    std::sync::Arc::new(contextra_license::OpenFastGate),
+-                );
++                empty_registry = contextra_ports::plugin::PluginRegistry::new(std::sync::Arc::new(
++                    contextra_license::OpenFastGate,
++                ));
+                 &empty_registry
+             }
+         };
+         let status = crate::plugin_status::handle_plugin_status(reg_ref).await?;
+-        serde_json::to_value(&status).map_err(|e| {
+-            McpError::internal_error(format!("Response serialization error: {e}"))
+-        })
++        serde_json::to_value(&status)
++            .map_err(|e| McpError::internal_error(format!("Response serialization error: {e}")))
+     }
+ }
+
+diff --git a/crates/contextra-mcp/src/tests.rs b/crates/contextra-mcp/src/tests.rs
+index bf749e721..67f06575a 100644
+--- a/crates/contextra-mcp/src/tests.rs
++++ b/crates/contextra-mcp/src/tests.rs
+@@ -288,10 +288,16 @@ async fn test_contextra_forget_single_doc() {
+     assert_eq!(json_res["id"], "101");
+     assert_eq!(json_res["assurance_requested"], "S1");
+     assert_eq!(json_res["assurance_reached"], "S0");
+-    assert!(json_res["reason"].as_str().unwrap().contains("Requested assurance S1 was not reached"));
++    assert!(json_res["reason"]
++        .as_str()
++        .unwrap()
++        .contains("Requested assurance S1 was not reached"));
+     assert_eq!(json_res["proof_present"], false);
+     assert_eq!(json_res["proof"], serde_json::Value::Null);
+-    assert!(json_res["exclusions"].as_array().unwrap().contains(&json!("client_and_llm_context_not_covered")));
++    assert!(json_res["exclusions"]
++        .as_array()
++        .unwrap()
++        .contains(&json!("client_and_llm_context_not_covered")));
+
+     // 4. Verify contextra_get returns null
+     let get_req = make_request(
+@@ -343,7 +349,10 @@ async fn test_contextra_forget_collection_with_proof() {
+     assert_eq!(json_res["assurance_requested"], "S1");
+     assert_eq!(json_res["assurance_reached"], "S0");
+     assert_eq!(json_res["ok"], false);
+-    assert!(json_res["exclusions"].as_array().unwrap().contains(&json!("client_and_llm_context_not_covered")));
++    assert!(json_res["exclusions"]
++        .as_array()
++        .unwrap()
++        .contains(&json!("client_and_llm_context_not_covered")));
+ }
+
+ #[tokio::test]
+@@ -625,7 +634,10 @@ async fn test_delete_tool_description_mentions_tombstone_and_no_proof_promise()
+     let (server, _tmp) = create_mock_server().await;
+     let req = make_request("tools/list", json!({}));
+     let response = server.handle(req).await;
+-    let tools = response.result.unwrap()["tools"].as_array().unwrap().clone();
++    let tools = response.result.unwrap()["tools"]
++        .as_array()
++        .unwrap()
++        .clone();
+
+     let delete_tool = tools
+         .iter()
+diff --git a/crates/contextra-mcp/src/tools_crud.rs b/crates/contextra-mcp/src/tools_crud.rs
+index a8ac8a01d..b88fd58cf 100644
+--- a/crates/contextra-mcp/src/tools_crud.rs
++++ b/crates/contextra-mcp/src/tools_crud.rs
+@@ -125,7 +125,9 @@ impl McpServer {
+
+         let proof_present = receipt.proof.is_some();
+         let proof_val = match &receipt.proof {
+-            Some(p) => Some(serde_json::to_value(p).map_err(|e| McpError::internal_error(e.to_string()))?),
++            Some(p) => {
++                Some(serde_json::to_value(p).map_err(|e| McpError::internal_error(e.to_string()))?)
++            }
+             None => None,
+         };
+
+diff --git a/crates/contextra-mcp/tests/mcp_test.rs b/crates/contextra-mcp/tests/mcp_test.rs
+index 05e866df5..f1e1ab15b 100644
+--- a/crates/contextra-mcp/tests/mcp_test.rs
++++ b/crates/contextra-mcp/tests/mcp_test.rs
+@@ -950,60 +950,6 @@ async fn test_stdio_transport_stability() {
+     let _ = child.wait().await;
+ }
+
+-#[tokio::test]
+-async fn test_mcp_boot_without_routing_config() {
+-    let tmp = TempDir::new().expect("temp dir");
+-    let db = Arc::new(Contextra::open(tmp.path()).await.expect("open db"));
+-    let embedder = Arc::new(MockEmbedder { dimension: 768 });
+-
+-    let router_config = contextra_mcp::RouterConfig::default();
+-    let routing = contextra_mcp::setup_routing(&db, &router_config)
+-        .await
+-        .expect("setup routing");
+-    assert!(routing.is_none());
+-
+-    let server = McpServer::with_write_permission(db.clone(), embedder, true)
+-        .expect("server new")
+-        .with_routing(routing);
+-
+-    let stats = server.db.stats().await.expect("db stats");
+-    assert_eq!(stats.drift_status, "nicht verfügbar");
+-}
+-
+-#[tokio::test]
+-async fn test_mcp_boot_with_routing_config() {
+-    let tmp = TempDir::new().expect("temp dir");
+-    let db = Arc::new(Contextra::open(tmp.path()).await.expect("open db"));
+-    let embedder = Arc::new(MockEmbedder { dimension: 768 });
+-
+-    let profile = contextra::router::SlmProfile::new(
+-        "test-profile",
+-        "http://localhost:11434",
+-        vec![1],
+-        contextra_types::TokenBudget::new(1000, 100),
+-        0.5,
+-    );
+-
+-    let router_config = contextra_mcp::RouterConfig {
+-        profiles: vec![profile],
+-        profiles_path: None,
+-        calibration_store_path: None,
+-    };
+-
+-    let routing = contextra_mcp::setup_routing(&db, &router_config)
+-        .await
+-        .expect("setup routing");
+-    assert!(routing.is_some());
+-
+-    let server = McpServer::with_write_permission(db.clone(), embedder, true)
+-        .expect("server new")
+-        .with_routing(routing);
+-
+-    let stats = server.db.stats().await.expect("db stats");
+-    assert_ne!(stats.drift_status, "nicht verfügbar");
+-    assert_eq!(stats.drift_status, "unbekannt");
+-}
+-
+ #[tokio::test]
+ async fn test_e2e_stdio_demo_flow() -> Result<(), Box<dyn std::error::Error>> {
+     let tmp = tempfile::TempDir::new()?;
+diff --git a/crates/contextra/Cargo.toml b/crates/contextra/Cargo.toml
+index e45845522..8c3441e7e 100644
+--- a/crates/contextra/Cargo.toml
++++ b/crates/contextra/Cargo.toml
+@@ -25,8 +25,7 @@ serde_json = { workspace = true }
+ uuid = { version = "1", features = ["v4"] }
+ contextra-infer-candle = { workspace = true, optional = true }
+ contextra-infer-ollama = { workspace = true, optional = true }
+-contextra-router = { workspace = true, optional = true }
+-contextra-rank = { workspace = true, optional = true }
++contextra-rank = { workspace = true }
+ tokio = { workspace = true }
+ thiserror = { workspace = true }
+
+@@ -88,7 +87,6 @@ audit-export = ["dep:contextra-audit-export"]
+ avv-generator = ["dep:contextra-avv-generator"]
+ candle = ["contextra-infer-candle"]
+ ollama = ["contextra-infer-ollama"]
+-router = ["contextra-router", "contextra-rank"]
+
+ [lints]
+ workspace = true
+diff --git a/crates/contextra/src/builder.rs b/crates/contextra/src/builder.rs
+index 93a0b675e..686833b29 100644
+--- a/crates/contextra/src/builder.rs
++++ b/crates/contextra/src/builder.rs
+@@ -351,7 +351,8 @@ impl ContextraBuilder {
+
+     pub fn kv_shredding_enabled(&self) -> bool {
+         self.kv_shredding_enabled
+-            || self.config.vector_delete_mode == contextra_ports::VectorDeleteMode::SynchronousRepair
++            || self.config.vector_delete_mode
++                == contextra_ports::VectorDeleteMode::SynchronousRepair
+     }
+
+     pub fn checkpoint_enabled(&self) -> bool {
+diff --git a/crates/contextra/src/lib.rs b/crates/contextra/src/lib.rs
+index 52252fbad..61782ecfa 100644
+--- a/crates/contextra/src/lib.rs
++++ b/crates/contextra/src/lib.rs
+@@ -33,10 +33,6 @@ pub use contextra_db::{
+ };
+ pub use query_rewriter::LlmQueryRewriter;
+
+-#[cfg(feature = "router")]
+-pub use contextra_router as router;
+-
+-#[cfg(feature = "router")]
+ pub use contextra_rank as rank;
+
+ #[cfg(feature = "ollama")]
+diff --git a/crates/contextra/src/wiring_selftest.rs b/crates/contextra/src/wiring_selftest.rs
+index f743c5c1a..faacd2abd 100644
+--- a/crates/contextra/src/wiring_selftest.rs
++++ b/crates/contextra/src/wiring_selftest.rs
+@@ -21,9 +21,10 @@ pub struct WiringReport {
+
+ impl WiringReport {
+     pub fn is_valid(&self) -> bool {
+-        self.missing_ports.iter().all(|m| {
+-            m.contains("(disabled)") || m.contains("(optional)")
+-        }) && self.invalid_security_ports.is_empty()
++        self.missing_ports
++            .iter()
++            .all(|m| m.contains("(disabled)") || m.contains("(optional)"))
++            && self.invalid_security_ports.is_empty()
+     }
+ }
+
+@@ -109,10 +110,7 @@ pub fn verify_builder_wiring(builder: &ContextraBuilder) -> Result<WiringReport,
+             report
+                 .missing_ports
+                 .iter()
+-                .filter(|m| {
+-                    !m.contains("(disabled)")
+-                        && !m.contains("(optional)")
+-                })
++                .filter(|m| !m.contains("(disabled)") && !m.contains("(optional)"))
+                 .cloned()
+                 .collect::<Vec<_>>()
+                 .join(", ")
