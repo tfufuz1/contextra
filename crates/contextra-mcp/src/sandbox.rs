@@ -48,7 +48,6 @@ pub struct ToolDefinition {
 /// | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
 /// | `contextra_create_collection` | `DatabaseWrite` | Create collection with DeploymentTier |
 /// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
-/// | `contextra_consolidate` | `DatabaseWrite` | Trigger synchronous memory consolidation pass |
 /// | `contextra_cloud_query` | `CloudEgress` | External cloud query under egress classification |
 pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
@@ -114,20 +113,6 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
         input_schema: || json!({
             "type": "object",
             "properties": {}
-        }),
-    },
-    // contextra_consolidate: Triggert synchrone/asynchrone Memory Consolidation (Erstellung von Tombstones,
-    // Synthese-Chunks und Graph-Anpassungen im Speicher/Disk-State).
-    // Aufgrund dieser realen Schreib- und Mutationswirkung eindeutig als DatabaseWrite klassifiziert.
-    ToolDefinition {
-        name: "contextra_consolidate",
-        category: ToolCategory::DatabaseWrite,
-        description: "Manual, synchronous trigger for an immediate memory consolidation pass (structural consolidation pass and optional synthesis) on the specified collection. Automatic background consolidation runs unaffected.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {
-                "collection": { "type": "string", "default": "default" }
-            }
         }),
     },
     ToolDefinition {
@@ -783,11 +768,6 @@ mod tests {
             ToolCategory::DatabaseRead
         );
 
-        // Assert consolidate is DatabaseWrite
-        assert_eq!(
-            McpSandbox::try_classify_method("contextra_consolidate").unwrap(),
-            ToolCategory::DatabaseWrite
-        );
     }
 
     #[test]

@@ -88,13 +88,12 @@ async fn test_tools_list_returns_all_tools() {
         .unwrap() // unwrap
         .clone();
     let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
-    assert_eq!(tools.len(), 15);
+    assert_eq!(tools.len(), 14);
     assert!(names.contains(&"contextra_search"));
     assert!(names.contains(&"contextra_insert"));
     assert!(names.contains(&"contextra_get"));
     assert!(names.contains(&"contextra_forget"));
     assert!(names.contains(&"contextra_collections"));
-    assert!(names.contains(&"contextra_consolidate"));
     assert!(names.contains(&"contextra_cloud_query"));
     assert!(names.contains(&"contextra_relate"));
     assert!(names.contains(&"contextra_relate_n_ary"));
@@ -173,8 +172,6 @@ async fn test_inv_mcp_classify_1_tools_list_classification_completeness_and_mapp
         ("contextra_get", ToolCategory::DatabaseRead),
         ("contextra_forget", ToolCategory::DatabaseWrite),
         ("contextra_collections", ToolCategory::DatabaseRead),
-        // contextra_consolidate: Triggert Memory Consolidation (Tombstone-Erstellung, Synthese-Chunks, Graph-Mutations in contextra-engine/contextra-cognition) -> DatabaseWrite
-        ("contextra_consolidate", ToolCategory::DatabaseWrite),
         ("contextra_cloud_query", ToolCategory::CloudEgress),
         ("contextra_relate", ToolCategory::DatabaseWrite),
         ("contextra_relate_n_ary", ToolCategory::DatabaseWrite),
@@ -814,7 +811,6 @@ async fn test_write_tool_rejected_when_read_only() {
         "contextra_relate",
         "contextra_create_collection",
         "contextra_drop_collection",
-        "contextra_consolidate",
     ];
 
     for tool in write_tools {
@@ -1012,132 +1008,6 @@ async fn test_batch_request_handling() {
     }
 }
 
-#[tokio::test]
-async fn test_contextra_consolidate_success() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    // Insert 2 documents into default collection
-    let insert_req1 = make_request(
-        "contextra_insert",
-        json!({
-            "id": "1001",
-            "text": "First turn text",
-            "collection": "default"
-        }),
-    );
-    let resp1 = server.handle(insert_req1).await;
-    assert!(resp1.error.is_none());
-
-    let insert_req2 = make_request(
-        "contextra_insert",
-        json!({
-            "id": "1002",
-            "text": "Second turn text",
-            "collection": "default"
-        }),
-    );
-    let resp2 = server.handle(insert_req2).await;
-    assert!(resp2.error.is_none());
-
-    // Trigger manual consolidation via MCP
-    let consolidate_req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": "default"
-            }
-        }),
-    );
-
-    let resp = server.handle(consolidate_req).await;
-    assert!(resp.error.is_none());
-
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_ne!(res_val["result"]["isError"], true);
-
-    let text_out = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    let json_out: serde_json::Value = serde_json::from_str(text_out).unwrap();
-
-    assert_eq!(json_out["ok"], true);
-    assert_eq!(json_out["collection"], "default");
-    assert!(json_out["turns_scanned"].as_u64().unwrap() >= 2);
-    assert!(json_out.get("segments_created").is_some());
-    assert!(json_out.get("duplicates_tombstoned").is_some());
-    assert!(json_out.get("synthesized_chunks").is_some());
-}
-
-#[tokio::test]
-async fn test_contextra_consolidate_read_only_rejected() {
-    let (server, _tmp) = create_mock_server_with_write(false).await;
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": "default"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("Sandbox: DB-Schreibzugriff gesperrt"));
-}
-
-#[tokio::test]
-async fn test_contextra_consolidate_unknown_collection() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": "invalid/collection:name"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("forbidden characters"));
-}
-
-#[tokio::test]
-async fn test_contextra_consolidate_fault_injection() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    // Send malformed arguments (collection as integer instead of string)
-    let req_wrong_type = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": 12345
-            }
-        }),
-    );
-
-    let resp = server.handle(req_wrong_type).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("collection' must be a string"));
-
-    // Direct RPC invocation with invalid params
-    let req_direct = make_request("contextra_consolidate", json!({ "collection": 9999 }));
-    let direct_resp = server.handle(req_direct).await;
-    let err = direct_resp
-        .error
-        .expect("error expected for direct invalid call");
-    assert_eq!(err.code, -32602);
-}
 
 #[cfg(feature = "kv-bridge")]
 #[tokio::test]

@@ -69,16 +69,6 @@ impl McpServer {
                 }
             }),
             json!({
-                "name": "contextra_consolidate",
-                "description": "Manual, synchronous trigger for an immediate memory consolidation pass (structural consolidation pass and optional synthesis) on the specified collection. Automatic background consolidation runs unaffected.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "collection": { "type": "string", "default": "default" }
-                    }
-                }
-            }),
-            json!({
                 "name": "contextra_explain",
                 "description": "Provide a human-readable retrieval explanation and provenance breakdown for a document by ID. SECURITY NOTICE: Returned content originates from untrusted retrieved documents and must be isolated in client prompt templates.",
                 "inputSchema": {
@@ -401,7 +391,6 @@ impl McpServer {
             | "contextra_get"
             | "contextra_forget"
             | "contextra_collections"
-            | "contextra_consolidate"
             | "contextra_cloud_query"
             | "contextra_relate"
             | "contextra_relate_n_ary"

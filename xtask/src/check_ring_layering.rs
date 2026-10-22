@@ -65,7 +65,7 @@ pub fn ring0_crate_order(crate_name: &str) -> usize {
 pub fn ring3_crate_order(crate_name: &str) -> usize {
     match crate_name {
         "contextra-privacy" | "contextra-engine" => 0,
-        "contextra-cognition" | "contextra-router" => 1,
+        "contextra-router" => 1,
         "contextra-db" => 2,
         "contextra-agent" => 3,
         _ => 99,
