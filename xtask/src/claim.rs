@@ -135,6 +135,7 @@ impl ClaimsDatabase {
             .count()
     }
 
+    #[cfg_attr(not(test), allow(dead_code))] // Query helper method tested via unit test suite
     pub fn count_active_claims(&self) -> usize {
         self.count_active_claims_at(Utc::now())
     }
@@ -174,6 +175,7 @@ pub fn expire_stale_claims_at(root: &Path, now: DateTime<Utc>) -> usize {
 }
 
 /// Prüft alle Claims in `.jules/claims.json` auf TTL-Ablauf zum aktuellen Zeitpunkt.
+#[cfg_attr(not(test), allow(dead_code))] // Expiry helper function tested via unit test suite
 pub fn expire_stale_claims(root: &Path) -> usize {
     expire_stale_claims_at(root, Utc::now())
 }
@@ -343,6 +345,7 @@ pub fn run_release_local_at(args: &[String], now: DateTime<Utc>, root_override: 
     true
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Release helper function included in test targets via #[path]
 pub fn run_release_local(args: &[String]) -> bool {
     run_release_local_at(args, Utc::now(), None)
 }

@@ -32,6 +32,7 @@ pub struct LoopGuardReport {
     pub findings: Vec<LoopGuardFinding>,
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Normalization helper included in test targets via #[path]
 pub fn loop_guard_normalize_error(text: &str) -> String {
     let mut normalized = text.to_string();
 
@@ -76,6 +77,7 @@ pub fn loop_guard_normalize_error(text: &str) -> String {
     normalized.trim().to_string()
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Hash helper included in test targets via #[path]
 pub fn loop_guard_hash_error(normalized_text: &str) -> String {
     blake3::hash(normalized_text.as_bytes())
         .to_hex()
@@ -95,6 +97,7 @@ pub fn loop_guard_load_state(root: &Path) -> LoopGuardState {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Persistence helper included in test targets via #[path]
 pub fn loop_guard_save_state(root: &Path, state: &LoopGuardState) -> Result<(), String> {
     let path = loop_guard_get_state_path(root);
     if let Some(parent) = path.parent() {
@@ -105,6 +108,7 @@ pub fn loop_guard_save_state(root: &Path, state: &LoopGuardState) -> Result<(), 
     fs::write(&path, json).map_err(|e| format!("Failed to write state to {}: {e}", path.display()))
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Text record helper included in test targets via #[path]
 pub fn loop_guard_record_text(
     root: &Path,
     gate_name: Option<&str>,
@@ -148,6 +152,7 @@ pub fn loop_guard_record_text(
     Ok((recorded_hash, count))
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Record helper included in test targets via #[path]
 pub fn loop_guard_record(
     root: &Path,
     gate_name: Option<&str>,
@@ -163,6 +168,7 @@ pub fn loop_guard_record(
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Check helper included in test targets via #[path]
 pub fn loop_guard_check(root: &Path, max_file_edits: u32) -> Result<(), String> {
     let state = loop_guard_load_state(root);
 
@@ -187,6 +193,7 @@ pub fn loop_guard_check(root: &Path, max_file_edits: u32) -> Result<(), String> 
     Ok(())
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Stop/escalate helper included in test targets via #[path]
 pub fn loop_guard_stop(root: &Path, reason: &str) -> Result<(), String> {
     let state = loop_guard_load_state(root);
 
@@ -234,6 +241,7 @@ pub fn loop_guard_stop(root: &Path, reason: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Reset helper included in test targets via #[path]
 pub fn loop_guard_reset(root: &Path) -> Result<(), String> {
     let path = loop_guard_get_state_path(root);
     if path.exists() {
@@ -247,6 +255,7 @@ pub fn loop_guard_reset(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Harness runner function included in test targets via #[path]
 pub fn run_loop_guard(args: &[String]) -> i32 {
     let mut root_path = match Command::new("git")
         .args(["rev-parse", "--show-toplevel"])

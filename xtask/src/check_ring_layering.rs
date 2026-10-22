@@ -127,6 +127,7 @@ pub struct RingViolation {
     pub allowlist_phase: Option<&'static str>,
     pub issue_ref: Option<&'static str>,
     pub expires_on: Option<&'static str>,
+    #[cfg_attr(not(test), allow(dead_code))] // Field inspected in test assertions and error formatting
     pub is_stale_allowlist: bool,
 }
 
@@ -161,11 +162,13 @@ struct CargoMetadata {
     workspace_members: HashSet<String>,
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Ring query helper function included in test targets via #[path]
 pub fn get_crate_ring(crate_name: &str) -> Option<Ring> {
     let ring_map = get_workspace_ring_map().ok()?;
     ring_map.get(crate_name).copied()
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Metadata JSON parser helper included in test targets via #[path]
 pub fn get_ring_map_from_metadata_json(json_str: &str) -> Result<HashMap<String, Ring>, String> {
     let metadata: CargoMetadata = serde_json::from_str(json_str)
         .map_err(|e| format!("Failed to parse cargo metadata: {}", e))?;
@@ -195,6 +198,7 @@ pub fn get_ring_map_from_metadata_json(json_str: &str) -> Result<HashMap<String,
     Ok(ring_map)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Ring map query function included in test targets via #[path]
 pub fn get_workspace_ring_map() -> Result<HashMap<String, Ring>, String> {
     let output = Command::new("cargo")
         .args(["metadata", "--format-version", "1", "--no-deps"])
@@ -423,14 +427,17 @@ pub fn check_ring_layering_from_metadata_json(
     Ok(violations)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_check_ring_layering(strict: bool) -> Result<bool, String> {
     run_check_ring_layering_with_options(strict, false)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_check_ring_layering_full(strict: bool) -> Result<bool, String> {
     run_check_ring_layering_with_options(strict, true)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_check_ring_layering_with_options(
     strict: bool,
     all_features: bool,

@@ -215,7 +215,7 @@ pub fn run_generate_adr(title: &str, dry_run: bool) -> Result<AdrResult, String>
 }
 
 /// Generiert einen URL-freundlichen Slug aus einem Titel.
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 fn generate_slug(title: &str) -> String {
     let slug: String = title
         .to_lowercase()

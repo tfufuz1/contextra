@@ -108,6 +108,7 @@ pub fn check_cargo_toml_dependencies(
     Ok(violations)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_check_ring0_async_purity() -> Result<bool, String> {
     println!("=== Running xtask check-ring0-async-purity ===");
 

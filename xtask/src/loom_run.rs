@@ -11,6 +11,7 @@ pub struct LoomTestFile {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(not(test), allow(dead_code))] // Result struct fields inspected in tests and callers
 pub struct LoomRunResult {
     pub discovered_files: Vec<LoomTestFile>,
     pub passed: bool,
@@ -59,6 +60,7 @@ pub fn discover_loom_tests(root: &Path) -> Vec<LoomTestFile> {
 /// Runs loom concurrency tests using `cargo test`.
 /// Sets `RUSTFLAGS="--cfg loom"` on the child process Command.
 /// Writes a report to `target/loom-report.md`.
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_loom(test_filter: Option<&str>, root: &Path) -> Result<LoomRunResult, String> {
     let discovered = discover_loom_tests(root);
     let start_time = Instant::now();

@@ -6,7 +6,7 @@ pub use crate::check_module_reachability::{
     KNOWN_TRANSITION_UNREACHABLE,
 };
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn run_check_orphan_modules(root: &std::path::Path) -> Result<Vec<String>, String> {
     let res = run_check_module_reachability(root)?;
     Ok(res.errors)

@@ -20,7 +20,8 @@ fn setup_temp_repo() -> tempfile::TempDir {
 
     let xtask_src = root.join("xtask/src");
     let harness_dir = xtask_src.join("harness");
-    fs::create_dir_all(root.join("xtask/config")); fs::create_dir_all(&harness_dir).expect("create_dir_all");
+    fs::create_dir_all(root.join("xtask/config")).expect("create_dir_all config");
+    fs::create_dir_all(&harness_dir).expect("create_dir_all harness");
 
     fs::write(
         xtask_src.join("main.rs"),
