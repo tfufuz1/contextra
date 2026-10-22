@@ -18,6 +18,7 @@ use scope_guard::{
 
 /// Haupt-Einstiegspunkt für `cargo xtask check-branch-overlap`.
 /// Greift Argumente aus der Umgebung ab (`std::env::args`).
+#[cfg_attr(not(test), allow(dead_code))] // Entry function included in test targets via #[path]
 pub fn run_check_branch_overlap() -> bool {
     let args: Vec<String> = std::env::args().collect();
     run_check_branch_overlap_with_args(&args)

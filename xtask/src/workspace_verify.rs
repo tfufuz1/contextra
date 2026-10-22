@@ -117,6 +117,7 @@ struct CargoJsonSpan {
     is_primary: bool,
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Path finder helper included in test targets via #[path]
 fn find_root_dir() -> PathBuf {
     if let Ok(cargo_manifest) = std::env::var("CARGO_MANIFEST_DIR") {
         let path = PathBuf::from(cargo_manifest);
@@ -254,6 +255,7 @@ fn parse_cargo_json_diagnostics(stdout_str: &str) -> Vec<Diagnostic> {
     diags
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_workspace_verify(
     config: WorkspaceVerifyConfig,
     output_dir: &Path,
@@ -262,6 +264,7 @@ pub fn run_workspace_verify(
     run_workspace_verify_in_root(&root, config, output_dir)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_workspace_verify_in_root(
     root: &Path,
     config: WorkspaceVerifyConfig,

@@ -175,6 +175,7 @@ pub fn run_shell_commit_audit_impl(
     })
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_shell_commit_audit(
     since_days: Option<u32>,
     fail_on_count: Option<usize>,

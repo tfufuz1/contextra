@@ -39,6 +39,7 @@ pub fn build_pytest_cmd(test_filter: Option<&str>, root: &Path) -> (String, Vec<
 }
 
 /// Runs python binding tests for `crates/contextra-py`.
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_py_test(test_filter: Option<&str>, root: &Path) -> Result<bool, String> {
     let py_dir = root.join("crates").join("contextra-py");
 

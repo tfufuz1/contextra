@@ -17,6 +17,7 @@ pub enum SecurityPattern {
 }
 
 impl SecurityPattern {
+    #[cfg_attr(not(test), allow(dead_code))] // Pattern string helper included in test targets via #[path]
     pub fn as_str(&self) -> &'static str {
         match self {
             SecurityPattern::ShellInterpolation => "ShellInterpolation",
@@ -34,6 +35,7 @@ pub struct SecurityFinding {
     pub context: String,
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Path finder helper included in test targets via #[path]
 fn find_root_dir() -> PathBuf {
     if let Ok(cargo_manifest) = std::env::var("CARGO_MANIFEST_DIR") {
         let path = PathBuf::from(cargo_manifest);
@@ -56,6 +58,7 @@ fn find_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // File collector helper included in test targets via #[path]
 fn collect_rs_files(dir: &Path, crate_filter: Option<&str>) -> Vec<PathBuf> {
     let mut rs_files = Vec::new();
     if !dir.exists() {
@@ -83,12 +86,14 @@ fn collect_rs_files(dir: &Path, crate_filter: Option<&str>) -> Vec<PathBuf> {
     rs_files
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Helper struct included in test targets via #[path]
 struct AsyncFnBlock {
     has_std_fs: bool,
     has_spawn_blocking: bool,
     std_fs_lines: Vec<(usize, String)>,
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Scanner helper included in test targets via #[path]
 fn scan_rs_file(
     file_path: &Path,
     root: &Path,
@@ -213,6 +218,7 @@ fn scan_rs_file(
     Ok(findings)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_security_scan(
     crate_filter: Option<&str>,
     pattern_filter: Option<SecurityPattern>,
@@ -221,6 +227,7 @@ pub fn run_security_scan(
     run_security_scan_in_root(&root, crate_filter, pattern_filter)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_security_scan_in_root(
     root: &Path,
     crate_filter: Option<&str>,

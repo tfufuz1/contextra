@@ -20,7 +20,7 @@ pub struct CrateRefViolation {
     pub crate_name: String,
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn get_active_workspace_members(root: &Path) -> Result<HashSet<String>, String> {
     let output = Command::new("cargo")
         .args(["metadata", "--format-version=1", "--no-deps"])
@@ -59,7 +59,7 @@ pub fn get_active_workspace_members(root: &Path) -> Result<HashSet<String>, Stri
     Ok(workspace_members)
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn extract_crate_references(line: &str) -> Vec<String> {
     if line.contains("<!-- crate-ref-ignore -->") {
         return Vec::new();
@@ -91,7 +91,7 @@ pub fn extract_crate_references(line: &str) -> Vec<String> {
 ///
 /// `docs/archive/` wird bewusst ausgeschlossen, da es eingefrorene historische
 /// Snapshots enthält, die absichtlich veraltete/entfernte Crate-Namen nennen.
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn should_check_file(rel_path_str: &str) -> bool {
     // Normalisiere Pfad-Trennzeichen
     let normalized = rel_path_str.replace('\\', "/");
@@ -120,7 +120,7 @@ pub fn should_check_file(rel_path_str: &str) -> bool {
     clean.ends_with(".md") || clean.ends_with(".toml")
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn check_crate_references_in_content(
     content: &str,
     doc_rel_path: &str,
@@ -150,7 +150,7 @@ pub fn check_crate_references_in_content(
     violations
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn scan_and_check_workspace(root: &Path) -> Result<Vec<CrateRefViolation>, String> {
     let active_members = get_active_workspace_members(root)?;
     let mut violations = Vec::new();
@@ -197,7 +197,7 @@ pub fn scan_and_check_workspace(root: &Path) -> Result<Vec<CrateRefViolation>, S
     Ok(violations)
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn run_check_crate_references() -> Result<(), String> {
     println!("=== Running xtask check-crate-references ===");
     let root = match std::env::current_dir() {
@@ -231,7 +231,7 @@ pub fn run_check_crate_references() -> Result<(), String> {
     Ok(())
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn run() -> Result<(), String> {
     run_check_crate_references()
 }
