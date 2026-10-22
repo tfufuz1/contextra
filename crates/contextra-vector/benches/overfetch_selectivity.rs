@@ -1,7 +1,6 @@
 use contextra_types::{DistanceMetric, DocId, TxId};
-use contextra_ports::{VectorIndex};
-use contextra_ports::SeededRng;
-use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
+use contextra_ports::VectorIndex;
+use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex, VectorSeededRng};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -19,11 +18,11 @@ fn bench_overfetch_selectivity(c: &mut Criterion) {
         .build()
         .expect("Valid config");
 
-    let idx = HnswIndex::try_new_with_rng(config, Arc::new(SeededRng::new(123456)))
+    let idx = HnswIndex::try_new_with_rng(config, Arc::new(VectorSeededRng::new(123456)))
         .expect("Index creation");
 
     rt.block_on(async {
-        let tx = TxId::new(1);
+        let tx = TxId::try_new(1).expect("valid tx_id");
         let mut seed = 12345u64;
         for i in 1..=num_vecs {
             let doc_id = DocId::new(i as u64);
