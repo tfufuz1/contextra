@@ -5,7 +5,7 @@ use crate::prompt_injection::PromptInjectionGuard;
 use crate::proof_key::deletion_proof_key_from_env;
 use crate::protocol::JsonRpcResponse;
 #[cfg(feature = "kv-bridge")]
-use crate::routing::setup_kv_bridge;
+use crate::kv_wiring::setup_kv_bridge;
 use crate::routing::RoutingHandle;
 use crate::sandbox::{McpSandbox, SandboxPolicy};
 use crate::validation::{is_write_allowed_by_env, resolve_session_tenant_from_env};
