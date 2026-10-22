@@ -173,6 +173,7 @@ contextra_ports::reexport pub use reranker::*
 contextra_ports::reexport pub use rng::*
 contextra_ports::reexport pub use snapshot::*
 contextra_ports::reexport pub use storage::*
+contextra_ports::reexport pub use strum
 contextra_ports::reexport pub use text_index::*
 contextra_ports::reexport pub use vector_index::*
 contextra_ports::reexport pub use wiring::*
