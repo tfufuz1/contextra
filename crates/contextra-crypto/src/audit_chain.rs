@@ -81,7 +81,7 @@ impl AuditChainEntry {
         writer.write_string(2, schema_id);
         writer.write_bytes32(3, rules_hash);
         writer.write_u8(4, data_class as u8);
-        writer.write_u64(5, doc_id.0);
+        writer.write_doc_id(5, doc_id);
         writer.write_u64(6, tx_id.0);
         writer.write_bytes32(7, prev_hash);
         if let Some(comm) = commitment {

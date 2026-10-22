@@ -344,8 +344,8 @@ fn test_h4_audit_chain_backup_rollback_vulnerability() {
                 "schema_v1",
                 [0x11; 32],
                 DataClass::Confidential,
-                DocId(i),
-                TxId(i),
+                DocId::from(i as u64),
+                TxId(i as u64),
                 None,
             )
             .expect("append");
@@ -362,8 +362,8 @@ fn test_h4_audit_chain_backup_rollback_vulnerability() {
                 "schema_v1",
                 [0x11; 32],
                 DataClass::Confidential,
-                DocId(i),
-                TxId(i),
+                DocId::from(i as u64),
+                TxId(i as u64),
                 None,
             )
             .expect("append");
@@ -415,8 +415,8 @@ fn test_h4_audit_chain_tamper_detection_matrix() {
                 "schema_v1",
                 [0x22; 32],
                 DataClass::Internal,
-                DocId(i),
-                TxId(i),
+                DocId::from(i as u64),
+                TxId(i as u64),
                 Some([i as u8; 32]),
             )
             .expect("append");

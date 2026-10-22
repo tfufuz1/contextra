@@ -123,8 +123,8 @@ fn build_50_entry_chain(seed: u64) -> AuditChain {
         let schema = format!("schema_v{}", (i % 5) + 1);
         let rules_hash = blake3::hash(format!("rules_{}_{seed}", i / 5).as_bytes()).into();
         let data_class = data_classes[(i as usize) % data_classes.len()];
-        let doc_id = DocId(1000 + i);
-        let tx_id = TxId(5000 + i);
+        let doc_id = DocId::from(1000 + i as u64);
+        let tx_id = TxId(5000 + i as u64);
         let commitment = if i % 2 == 0 {
             Some(blake3::hash(format!("comm_salt_{i}_{seed}").as_bytes()).into())
         } else {
@@ -219,7 +219,7 @@ fn test_exhaustive_field_level_bit_flips_50_entries() {
 
         // (a.5) Mutate doc_id
         let mut tampered = base_chain.clone();
-        tampered.entries[i].doc_id = DocId(tampered.entries[i].doc_id.0 ^ 0xFFFF);
+        tampered.entries[i].doc_id = DocId::from(tampered.entries[i].doc_id.0 ^ 0xFFFF);
         assert!(
             !tampered.verify_chain().unwrap(),
             "DocId tampering at entry {i} must be detected"
@@ -391,7 +391,7 @@ fn test_tail_appending_and_signature_detection() {
             "schema_appended",
             [0x99u8; 32],
             DataClass::Public,
-            DocId(9999),
+            DocId::from(9999u64),
             TxId(9999),
             None,
         )
@@ -503,7 +503,7 @@ proptest! {
                 format!("schema_{i}"),
                 [i as u8; 32],
                 DataClass::Internal,
-                DocId(i as u64),
+                DocId::from(i as u64),
                 TxId(i as u64),
                 if i % 3 == 0 { Some([(i * 2) as u8; 32]) } else { None },
             ).unwrap();
@@ -517,7 +517,7 @@ proptest! {
         match mutation_type {
             0 => {
                 // Flip bit in doc_id
-                chain.entries[pos].doc_id = DocId(chain.entries[pos].doc_id.0 ^ 1);
+                chain.entries[pos].doc_id = DocId::from(chain.entries[pos].doc_id.0 ^ 1);
                 prop_assert!(!chain.verify_chain().unwrap());
             }
             1 => {
@@ -550,7 +550,7 @@ proptest! {
                     "appended_schema",
                     [0xEEu8; 32],
                     DataClass::Public,
-                    DocId(8888),
+                    DocId::from(8888u64),
                     TxId(8888),
                     None,
                 ).unwrap();

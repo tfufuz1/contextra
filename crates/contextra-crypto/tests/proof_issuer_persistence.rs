@@ -59,7 +59,7 @@ fn create_request(doc_id: u64, scope_hash: [u8; 32], tx: u64) -> IssRequest {
     let witness = create_valid_witness(DeletionLayer::LsmMemtable, scope_hash, tx);
     IssRequest {
         scope: DeletionScope::Document {
-            doc_id: DocId(doc_id),
+            doc_id: DocId::from(doc_id),
             tenant_id: TenantId::try_new(1).expect("tenant"),
         },
         storage_scope: format!("doc:{}", doc_id),

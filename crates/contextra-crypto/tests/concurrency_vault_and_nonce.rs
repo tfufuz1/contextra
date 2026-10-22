@@ -42,7 +42,7 @@ fn test_parallel_audit_chain_appends() {
                         "parallel_schema",
                         [0xAA; 32],
                         DataClass::Confidential,
-                        DocId(doc_num),
+                        DocId::from(doc_num),
                         TxId(doc_num + 1000),
                         None,
                     )

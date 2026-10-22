@@ -104,7 +104,7 @@ impl DeletionProof {
                 let mut scope_w = crate::canonical::CanonicalWriter::new();
                 scope_w.write_u8(1, 1);
                 scope_w.write_u64(2, tenant_id.as_u64());
-                scope_w.write_u64(3, doc_id.0);
+                scope_w.write_doc_id(3, *doc_id);
                 writer.write_bytes(1, scope_w.finish()?);
             }
             DeletionScope::Collection { collection_id, tenant_id } => {
@@ -141,7 +141,7 @@ impl DeletionProof {
         let mut repair_w = crate::canonical::CanonicalWriter::new();
         for (i, rep) in self.graph_repair.iter().enumerate() {
             let mut rep_item = crate::canonical::CanonicalWriter::new();
-            rep_item.write_u64(1, rep.doc_id.0);
+            rep_item.write_doc_id(1, rep.doc_id);
             rep_item.write_bool(2, rep.verified_no_ghost_pointers);
             rep_item.write_u64(3, rep.attested_at as u64);
             repair_w.write_bytes((i + 1) as u16, rep_item.finish()?);

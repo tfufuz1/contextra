@@ -95,7 +95,6 @@ impl DeletionProof {
             .map_err(|e| ContextraError::Internal(e.to_string()))?;
 
         let key = key.into();
-        let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
 
         match (version, key) {
             (SignatureVersion::V1, VerificationKey::HmacV1(_proof_key))
@@ -103,6 +102,7 @@ impl DeletionProof {
             | (SignatureVersion::V1, VerificationKey::Hmac(_proof_key)) => {
                 #[cfg(feature = "legacy-verify")]
                 {
+                    let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
                     let scope_bytes = bincode::serialize(&self.scope)
                         .map_err(|e| ContextraError::Internal(e.to_string()))?;
                     let expected = compute_hmac_sha256(
@@ -130,6 +130,7 @@ impl DeletionProof {
 
                 #[cfg(feature = "legacy-verify")]
                 {
+                    let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
                     let scope_bytes = bincode::serialize(&self.scope)
                         .map_err(|e| ContextraError::Internal(e.to_string()))?;
                     let covered_layers_bytes = bincode::serialize(&self.covered_layers)

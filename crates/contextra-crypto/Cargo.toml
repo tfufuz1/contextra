@@ -42,6 +42,7 @@ test-support = []
 testing = []
 kv-encryption = []
 legacy-verify = []
+docid-128 = ["contextra-types/docid-128"]
 
 [dev-dependencies]
 contextra-crypto = { path = ".", features = ["test-utils", "test-support", "legacy-verify"] }
