@@ -14,7 +14,10 @@ pub mod drift;
 pub mod explain;
 pub mod fusion;
 
-pub use calibration::{IsotonicCalibrator, PlattScaler};
+pub use calibration::{
+    AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError, IsotonicCalibrator,
+    PlattScaler,
+};
 pub use drift::{DriftDetector, DriftStatus};
 pub use explain::{explain, ExplanationEntry, RetrievalExplanation};
 pub use fusion::{
