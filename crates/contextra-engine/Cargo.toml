@@ -19,7 +19,6 @@ contextra-ports = { workspace = true }
 contextra-mvcc = { workspace = true }
 bytes = { workspace = true }
 contextra-crypto = { workspace = true }
-contextra-sandbox = { workspace = true, optional = true }
 contextra-durable-fs = { path = "../contextra-durable-fs" }
 contextra-store = { workspace = true }
 blake3 = { workspace = true }
@@ -68,7 +67,6 @@ reranking = []
 # Assumes contextra-store has the encryption-at-rest feature (Aufgabe 7 / Spec §15.2)
 encryption-at-rest = ["contextra-store/encryption-at-rest"]
 bench = []
-sandbox = ["dep:contextra-sandbox"]
 experimental-diskann = ["contextra-vector/experimental-diskann"]
 background-maintenance = []
 graph-connectivity-health = ["contextra-graph/physio-percolation"]

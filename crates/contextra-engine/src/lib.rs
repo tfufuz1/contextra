@@ -14,12 +14,6 @@ pub mod deletion;
 pub mod extraction;
 #[cfg(not(loom))]
 pub mod kv_cache_integration;
-#[cfg(not(loom))]
-#[cfg(feature = "sandbox")]
-pub mod merge_operator_adapter;
-#[cfg(not(loom))]
-#[cfg(feature = "sandbox")]
-pub use merge_operator_adapter::WasmMergeOperator;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
 pub use contextra_ports::VectorDeleteMode;
