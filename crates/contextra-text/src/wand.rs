@@ -146,7 +146,7 @@ impl TermCursor {
         }
         // If current cursor doc_id matches target doc_id, return current block max score
         if let Some(p) = postings.get(self.cursor) {
-            if p.doc_id == doc_id {
+            if u128::from(p.doc_id) == u128::from(doc_id) {
                 let block_idx = self.cursor / BLOCK_SIZE;
                 return self
                     .block_max_scores
@@ -157,7 +157,7 @@ impl TermCursor {
         }
         // Binary search for doc_id block index
         let blocks = self.posting_list.blocks();
-        match blocks.binary_search_by_key(&doc_id, |b| b.max_doc_id) {
+        match blocks.binary_search_by_key(&u128::from(doc_id), |b| u128::from(b.max_doc_id)) {
             Ok(idx) => self
                 .block_max_scores
                 .get(idx)
@@ -187,7 +187,7 @@ impl TermCursor {
         let blocks = self.posting_list.blocks();
         let mut block_idx = self.cursor / BLOCK_SIZE;
 
-        while block_idx < blocks.len() && blocks[block_idx].max_doc_id < target_doc_id {
+        while block_idx < blocks.len() && u128::from(blocks[block_idx].max_doc_id) < u128::from(target_doc_id) {
             block_idx += 1;
         }
 
@@ -201,7 +201,7 @@ impl TermCursor {
 
         // Binary search within current block / remaining postings
         let slice = &postings[self.cursor..];
-        match slice.binary_search_by_key(&target_doc_id, |p| p.doc_id) {
+        match slice.binary_search_by_key(&u128::from(target_doc_id), |p| u128::from(p.doc_id)) {
             Ok(offset) => self.cursor += offset,
             Err(offset) => self.cursor += offset,
         }
@@ -308,7 +308,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
 
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if val_bytes.len() == 4 {
-                                        let doc_id = DocId::new(doc_id_raw);
+                                        let doc_id = DocId::new(doc_id_raw.into());
                                         let tf = u32::from_le_bytes(
                                             (&val_bytes[..4]).try_into().map_err(|_| {
                                                 ContextraError::Storage(
@@ -369,7 +369,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if list
                                         .as_slice()
-                                        .binary_search_by_key(&doc_id_raw, |p| p.doc_id)
+                                        .binary_search_by_key(&u128::from(doc_id_raw), |p| u128::from(p.doc_id))
                                         .is_ok()
                                     {
                                         term_tbs_count += 1;
@@ -413,7 +413,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         }
 
         // Sort active cursors by current_doc_id ascending
-        cursors.sort_by_key(|c| c.current_doc_id().unwrap_or(DocIdRaw::MAX));
+        cursors.sort_by_key(|c| c.current_doc_id().map(u128::from).unwrap_or(u128::MAX));
 
         let threshold = top_k.min_threshold();
 
@@ -448,7 +448,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         };
 
         if min_doc_id == pivot_doc_id {
-            let doc_id = DocId::new(pivot_doc_id);
+            let doc_id = DocId::new(pivot_doc_id.into());
 
             // Check if block max scores at pivot_doc_id still exceed threshold
             let block_max_sum: f32 = cursors
@@ -780,7 +780,7 @@ mod tests {
         // "common" occurs in all 500 documents.
         // "rare" occurs in only 5 documents (DocId 100, 200, 300, 400, 500) with high frequency.
         for i in 1..=500 {
-            let doc_id = DocId::new(i as u64);
+            let doc_id = DocId::new((i as u64).into());
             let text = if i % 100 == 0 {
                 format!("common rare rare rare rare rare doc {}", i)
             } else {
@@ -797,9 +797,9 @@ mod tests {
         assert_eq!(query_results.len(), k);
 
         // The top 5 documents should be doc_ids 100, 200, 300, 400, 500 because they match "rare" 5x
-        let top_doc_ids: Vec<u64> = query_results
+        let top_doc_ids: Vec<u128> = query_results
             .iter()
-            .map(|(id, _)| id.inner() as u64)
+            .map(|(id, _)| u128::from(id.inner()))
             .collect();
         assert!(top_doc_ids.contains(&100));
         assert!(top_doc_ids.contains(&200));

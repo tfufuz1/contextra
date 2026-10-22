@@ -118,7 +118,7 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
     let mut current_doc_lengths = HashMap::new();
 
     for (i, text) in docs.iter().enumerate() {
-        let doc_id = DocId::new((i + 1) as u64);
+        let doc_id = DocId::new(((i + 1) as u64).into());
         let tx = TxId::new((i + 1) as u64);
         let tokens = DefaultTokenizer.tokenize(text);
         current_doc_lengths.insert(doc_id, tokens.len() as u64);
@@ -132,7 +132,7 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
 
     // Step 2: Delete 5 documents (DocId 1..=5)
     for i in 1..=5 {
-        let doc_id = DocId::new(i as u64);
+        let doc_id = DocId::new((i as u64).into());
         let tx = TxId::new(100 + i as u64);
         current_doc_lengths.remove(&doc_id);
 
@@ -153,7 +153,7 @@ async fn test_avgdl_accuracy_incremental_updates() -> Result<()> {
     ];
 
     for (i, text) in new_docs.iter().enumerate() {
-        let doc_id = DocId::new((11 + i) as u64);
+        let doc_id = DocId::new(((11 + i) as u64).into());
         let tx = TxId::new(200 + i as u64);
         let tokens = DefaultTokenizer.tokenize(text);
         current_doc_lengths.insert(doc_id, tokens.len() as u64);
@@ -412,13 +412,13 @@ async fn test_staged_stats_limit_exceeded() -> Result<()> {
     // Fill staged_stats up to MAX_STAGED_TRANSACTIONS
     for i in 1..=InvertedIndex::<MockStorage>::MAX_STAGED_TRANSACTIONS {
         let tx = TxId::new(i as u64);
-        let doc_id = DocId::new(i as u64);
+        let doc_id = DocId::new((i as u64).into());
         index.upsert_document(tx, doc_id, "test document").await?;
     }
 
     // The (MAX_STAGED_TRANSACTIONS + 1)-th transaction should fail with InvalidInput
     let overflow_tx = TxId::new((InvertedIndex::<MockStorage>::MAX_STAGED_TRANSACTIONS + 1) as u64);
-    let overflow_doc = DocId::new(999_999);
+    let overflow_doc = DocId::new(999_999u64.into());
     let err = index
         .upsert_document(overflow_tx, overflow_doc, "overflow text")
         .await
