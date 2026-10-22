@@ -69,6 +69,7 @@ rust-version = "1.89"
 [workspace.dependencies]
 # Error handling
 thiserror = "2"
+strum = { version = "0.26", features = ["derive"] }
 
 # Serialization
 serde = { version = "1", features = ["derive", "rc"] }

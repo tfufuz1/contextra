@@ -417,18 +417,18 @@ pub enum PurgeError {
     Blocked(#[from] PurgeBlocked),
 
     /// Read error during SSTable / storage processing.
-    #[error("Read error at file {file}, offset {offset}: {source}")]
+    #[error("Read error at file {file}, offset {offset}: {source_details}")]
     Read {
         file: String,
         offset: u64,
-        source: String,
+        source_details: String,
     },
 
     /// Write error during SSTable / storage processing.
-    #[error("Write error at file {file}: {source}")]
+    #[error("Write error at file {file}: {source_details}")]
     Write {
         file: String,
-        source: String,
+        source_details: String,
     },
 
     /// Manifest log or state error.
@@ -473,7 +473,7 @@ impl From<std::io::Error> for PurgeError {
     fn from(err: std::io::Error) -> Self {
         PurgeError::Write {
             file: "<io>".to_string(),
-            source: err.to_string(),
+            source_details: err.to_string(),
         }
     }
 }
