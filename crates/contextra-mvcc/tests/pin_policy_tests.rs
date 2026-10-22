@@ -3,7 +3,7 @@
 //! Tests for Snapshot Pin-Policy (`max_snapshot_age` and `pin_grace`) and `SnapshotExpired` error handling.
 
 use contextra_mvcc::{SnapshotRegistry, DEFAULT_MAX_SNAPSHOT_AGE_TICKS, DEFAULT_PIN_GRACE_TICKS};
-use contextra_ports::ManualClock;
+use contextra_testkit::ManualClock;
 use contextra_types::ContextraError;
 use std::sync::Arc;
 use std::time::Duration;

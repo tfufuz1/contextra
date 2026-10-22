@@ -76,7 +76,7 @@ fn test_tombstone_bit_masking_in_tx_buffer() {
 
 #[test]
 fn test_tombstone_bit_masking_in_seq_log() {
-    let doc_id = contextra_mvcc::types::DocId::from(100);
+    let doc_id = contextra_mvcc::types::DocId::new(100);
 
     let entry = SeqLogEntry {
         doc_id,
