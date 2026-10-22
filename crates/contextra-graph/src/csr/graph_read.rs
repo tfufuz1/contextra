@@ -400,10 +400,7 @@ impl CsrGraph {
                 let paths = engine.find_all_paths(start);
                 let rrf_signal = engine.to_rrf_signal(&paths);
                 for (doc_id, score) in rrf_signal {
-                    #[cfg(not(feature = "docid-128"))]
-                    let entity_id = EntityId::new(doc_id.0);
-                    #[cfg(feature = "docid-128")]
-                    let entity_id = EntityId::new(doc_id.0 as u64);
+                    let entity_id = EntityId::from_doc_id(doc_id);
 
                     combined
                         .entry(entity_id)

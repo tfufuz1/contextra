@@ -3,6 +3,8 @@
 // INVARIANTEN: Jede tombstonierte Kante erhaelt einen Provenienz-Eintrag mit WAL-Seq (INV-GRAPH-PROV-1).
 // STAND: TS:2026-08-30T19:00:00Z
 
+#[cfg(feature = "edge-reinforcement-learning")]
+use crate::edge_reinforcement_buffer::EdgeReinforcementBuffer;
 use crate::csr::CsrGraph;
 use contextra_types::{DocId, EntityId, Result, TxId};
 

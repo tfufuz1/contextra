@@ -443,16 +443,9 @@ impl<G: PathGraph> PathRAGEngine<G> {
             }
         }
 
-        #[cfg(not(feature = "docid-128"))]
         let mut result: Vec<(DocId, f32)> = scored
             .into_iter()
-            .map(|(id, score)| (DocId(id), score))
-            .collect();
-
-        #[cfg(feature = "docid-128")]
-        let mut result: Vec<(DocId, f32)> = scored
-            .into_iter()
-            .map(|(id, score)| (DocId(id as u128), score))
+            .map(|(id, score)| (DocId::from(id), score))
             .collect();
 
         result.sort_by(|a, b| b.1.total_cmp(&a.1));
