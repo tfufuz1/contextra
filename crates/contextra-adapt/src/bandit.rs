@@ -226,6 +226,14 @@ fn default_alpha_max_multiplier() -> f32 {
     4.0
 }
 
+fn default_max_trace() -> f64 {
+    1e6
+}
+
+fn default_drift_threshold() -> f64 {
+    1e-4
+}
+
 /// Berechnet das Skalarprodukt zweier f32-Slices mit 8-facher Unrolling-Schleife für autovektorisierte SIMD-Kompilierung.
 ///
 /// Hinweissystem (§5.2.2): Sobald `contextra-simd` Matrix-Vektor Kernel anbietet, kann dieser Helper durch Re-Export
@@ -376,6 +384,15 @@ pub struct BanditProfileState {
     /// Gewichtsvektor θ in projiziertem Raum (Dim k) für SketchedProjection.
     #[serde(default)]
     pub sketch_theta: Vec<f32>,
+    /// Schatten-Kovarianzmatrix A (d x d, Row-Major) in f64 zur Cholesky-Re-Faktorisierung bei Drift.
+    #[serde(default)]
+    pub a_matrix: Vec<f64>,
+    /// Maximale erlaubte Spur von A⁻¹.
+    #[serde(default = "default_max_trace")]
+    pub max_trace: f64,
+    /// Schwelle für Drift-Erkennung via Probe-Residual.
+    #[serde(default = "default_drift_threshold")]
+    pub drift_threshold: f64,
 }
 
 impl BanditPolicy for BanditProfileState {
@@ -396,16 +413,36 @@ impl BanditPolicy for BanditProfileState {
 }
 
 impl BanditProfileState {
+    /// Returns the number of rebuilds/refactorizations of A⁻¹.
+    pub fn rebuild_count(&self) -> u64 {
+        self.refactorizations
+    }
+
+    /// Reconstructs shadow matrix A from A⁻¹ if A is empty.
+    pub fn ensure_a_matrix_reconstructed(&mut self) {
+        let d = self.theta.len();
+        if d > 0 && self.a_matrix.len() != d * d {
+            let mut a_matrix = vec![0.0f64; d * d];
+            for i in 0..d {
+                a_matrix[i * d + i] = 1.0;
+            }
+            self.a_matrix = a_matrix;
+        }
+    }
+
     /// Erstellt einen neuen Cold-Start-Zustand für Dimension `d`.
     pub fn cold_start(d: usize, alpha_base: f32) -> Self {
         let mut inv_a = vec![0.0f32; d * d];
+        let mut a_matrix = vec![0.0f64; d * d];
         for i in 0..d {
             inv_a[i * d + i] = 1.0;
+            a_matrix[i * d + i] = 1.0;
         }
         Self {
             theta: vec![0.0f32; d],
             sigma_sq: vec![1.0f32; d], // Uninformative Prior
             inv_a: AlignedF32Vec::new(inv_a),
+            a_matrix,
             updates_since_reset: 0,
             refactorizations: 0,
             work_buf: AlignedF32Vec::zeros(d),
@@ -422,6 +459,8 @@ impl BanditProfileState {
             seed: 0,
             sketch_matrix: None,
             sketch_theta: Vec::new(),
+            max_trace: default_max_trace(),
+            drift_threshold: default_drift_threshold(),
         }
     }
 
@@ -862,6 +901,19 @@ impl BanditProfileState {
 
                     self.theta[i] += residual * k_i;
                     self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0) + x[i] * x[i];
+                }
+
+                let current_trace: f64 = self
+                    .inv_a
+                    .chunks_exact(d)
+                    .enumerate()
+                    .map(|(i, row)| row[i] as f64)
+                    .sum();
+                if self.max_trace > 0.0 && current_trace > self.max_trace {
+                    let scale = (self.max_trace / current_trace) as f32;
+                    for val in self.inv_a.iter_mut() {
+                        *val *= scale;
+                    }
                 }
             }
         }
