@@ -358,10 +358,16 @@ pub struct PurgeOutput {
 pub enum PurgeBlocked {
     /// Active MVCC snapshot pins a sequence number <= as_of_tx.
     #[error("Active MVCC snapshot pins min_seq {min_seq}")]
-    ActiveSnapshot { min_seq: u64 },
+    ActiveSnapshot {
+        /// Minimum pinned MVCC sequence number preventing purge.
+        min_seq: u64,
+    },
     /// Checkpoint clones present.
     #[error("Checkpoint clones present: {copy_ids:?}")]
-    CheckpointClones { copy_ids: Vec<String> },
+    CheckpointClones {
+        /// List of active checkpoint clone identifiers blocking purge.
+        copy_ids: Vec<String>,
+    },
     /// Reader is pinned in active memtable / scan.
     #[error("Reader pinned in active memtable or scan")]
     ReaderPinned,
@@ -373,13 +379,24 @@ pub enum PurgeBlocked {
     PurgeInProgress,
     /// Insufficient disk space to write compacted SSTables safely.
     #[error("Insufficient disk space: needed {needed}, free {free}")]
-    InsufficientDiskSpace { needed: u64, free: u64 },
+    InsufficientDiskSpace {
+        /// Required disk space in bytes for compaction output.
+        needed: u64,
+        /// Currently available free disk space in bytes.
+        free: u64,
+    },
     /// Unclassified files present in DB directory.
     #[error("Unclassified files present in DB directory: {count}")]
-    UnclassifiedFiles { count: usize },
+    UnclassifiedFiles {
+        /// Number of unclassified or untracked files in storage directory.
+        count: usize,
+    },
     /// Secure deletion is unsupported on current filesystem/environment.
     #[error("Secure deletion unsupported: {reason}")]
-    SecureDeleteUnsupported { reason: String },
+    SecureDeleteUnsupported {
+        /// Explanation why secure deletion is not supported.
+        reason: String,
+    },
     /// Unknown free space.
     #[error("Unknown free space")]
     UnknownFreeSpace,
@@ -419,15 +436,20 @@ pub enum PurgeError {
     /// Read error during SSTable / storage processing.
     #[error("Read error at file {file}, offset {offset}: {source_details}")]
     Read {
+        /// File path or identifier where the read error occurred.
         file: String,
+        /// Byte offset in the file where the read error occurred.
         offset: u64,
+        /// Detailed description or source of the read error.
         source_details: String,
     },
 
     /// Write error during SSTable / storage processing.
     #[error("Write error at file {file}: {source_details}")]
     Write {
+        /// File path or identifier where the write error occurred.
         file: String,
+        /// Detailed description or source of the write error.
         source_details: String,
     },
 
@@ -449,15 +471,24 @@ pub enum PurgeError {
 
     /// Scope unavailable during reconstruction or execution.
     #[error("Scope unavailable for purge_id {purge_id:?}")]
-    ScopeUnavailable { purge_id: PurgeId },
+    ScopeUnavailable {
+        /// Identifier of the purge operation with missing scope.
+        purge_id: PurgeId,
+    },
 
     /// Scope mismatch between intent and expected scope.
     #[error("Scope mismatch for purge_id {purge_id:?}")]
-    ScopeMismatch { purge_id: PurgeId },
+    ScopeMismatch {
+        /// Identifier of the purge operation with mismatched scope.
+        purge_id: PurgeId,
+    },
 
     /// Key residue discovered after purge sweep.
     #[error("Residue found at file {file}")]
-    ResidueFound { file: String },
+    ResidueFound {
+        /// File path where un-purged key residue was detected.
+        file: String,
+    },
 
     /// Disposal/scrubbing refused by policy or system constraint.
     #[error("Dispose refused: {0}")]
