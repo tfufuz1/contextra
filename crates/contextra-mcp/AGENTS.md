@@ -12,7 +12,7 @@ und Volatile-Result-Speicherung.
 
 | Datei | Verantwortung |
 |---|---|
-| `lib.rs` | `#![forbid(unsafe_code)]`, `McpServer`, Stdio-Event-Loop (`contextra_consolidate`, `contextra_cloud_query`, `uvx`-Distribution) |
+| `lib.rs` | `#![forbid(unsafe_code)]`, `McpServer`, Stdio-Event-Loop (`contextra_cloud_query`, `uvx`-Distribution) |
 | `config.rs` | CLI- und Server-Konfiguration (`McpConfig`) |
 | `protocol.rs` | `McpError`, JSON-RPC 2.0 Message-Parser und Typen |
 | `sandbox.rs` | `McpSandbox`, `SandboxPolicy`, `VolatileToolResult` (verschlüsselter RAM) |

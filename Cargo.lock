@@ -721,30 +721,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-cognition"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "blake3",
- "bytes",
- "contextra-engine",
- "contextra-graph",
- "contextra-infer-candle",
- "contextra-ports",
- "contextra-store",
- "contextra-types",
- "contextra-vector",
- "parking_lot 0.12.5",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
 name = "contextra-core"
 version = "0.1.0"
 dependencies = [
@@ -800,7 +776,6 @@ dependencies = [
  "blake3",
  "bytes",
  "contextra-checkpoint",
- "contextra-cognition",
  "contextra-crypto",
  "contextra-engine",
  "contextra-ports",

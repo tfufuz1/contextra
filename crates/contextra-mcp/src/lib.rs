@@ -20,7 +20,6 @@
 //! | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
 //! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |
 //! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
-//! | `contextra_consolidate` | `DatabaseWrite` | Synchronous trigger for memory consolidation pass |
 //! | `contextra_cloud_query` | `CloudEgress` | External cloud query under egress classification |
 
 pub mod bulk_exfiltration_detector;

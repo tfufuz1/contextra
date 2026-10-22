@@ -23,14 +23,6 @@ pub use contextra_engine::{
     SCHEMA_VERSION_V1,
 };
 
-// Re-exports from contextra-cognition
-pub use contextra_cognition::{
-    execute_background_consolidation, execute_consolidation_pass, CommunityStabilityTracker,
-    ConsolidationConfig, MaintenanceConfig, MaintenanceScheduler, SynthesisConfig,
-};
-pub mod memory_consolidation {
-    pub use contextra_cognition::memory_consolidation::*;
-}
 
 #[deprecated(note = "use background_workers instead")]
 pub mod reaper {

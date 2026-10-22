@@ -73,7 +73,7 @@ impl Ring {
             | "contextra-infer-ollama" => Some(Ring::Ring2),
 
             // Ring 3: Engine, Reasoning & Cognition
-            "contextra-engine" | "contextra-cognition" | "contextra-privacy"
+            "contextra-engine" | "contextra-privacy"
             | "contextra-router" | "contextra-agent" | "contextra-db" => Some(Ring::Ring3),
 
             // Ring 4: Public Facade & Protocol Servers

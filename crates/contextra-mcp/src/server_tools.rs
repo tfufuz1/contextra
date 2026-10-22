@@ -40,7 +40,6 @@ impl McpServer {
             "contextra_get" => self.handle_get(args).await,
             "contextra_forget" => self.handle_forget(args).await,
             "contextra_collections" => self.handle_collections().await,
-            "contextra_consolidate" => self.handle_consolidate(args).await,
             "contextra_cloud_query" => self.handle_cloud_query(args).await,
             "contextra_relate" => self.handle_relate(args).await,
             "contextra_relate_n_ary" => self.handle_relate_n_ary(args).await,
