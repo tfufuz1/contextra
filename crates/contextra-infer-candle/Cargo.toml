@@ -23,13 +23,14 @@ tokio = { workspace = true }
 futures-util = "0.3"
 serde = { workspace = true }
 tracing = { workspace = true }
-bincode = { workspace = true, optional = true }
+bincode = { workspace = true }
 half = "2.4"
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-rank = { workspace = true }
 parking_lot = { workspace = true }
 contextra-crypto = { workspace = true, optional = true }
+contextra-kvcache = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
@@ -46,8 +47,8 @@ required-features = ["kv-bridge"]
 default = []
 # Feature forwarding gate target re-exported by downstream workspace crates (e.g. contextra, contextra-mcp)
 candle = []
-kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:bincode"]
-kv-stage-b = ["dep:bincode"]
+kv-bridge = ["dep:contextra-crypto", "contextra-crypto/kv-encryption", "dep:contextra-kvcache", "contextra-kvcache/kv-encryption"]
+kv-stage-b = []
 
 [target.'cfg(target_os = "macos")'.dependencies]
 candle-core = { version = "0.11", features = ["metal"] }

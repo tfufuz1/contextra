@@ -6,7 +6,7 @@
 
 use crate::kv_state::{KvState, LayerKv};
 use crate::model::quantized_llama::QuantizedMatMul;
-use candle_core::quantized::{gguf_file, QMatMul};
+use candle_core::quantized::gguf_file;
 use candle_core::{DType, Device, IndexOp, Tensor};
 use candle_nn::{Embedding, Module};
 use candle_transformers::quantized_nn::RmsNorm;
@@ -93,7 +93,7 @@ impl Mlp {
         let w3 = self.feed_forward_w3.forward(xs)?;
         let silu_w1 = candle_nn::ops::silu(&w1)
             .map_err(|e| ContextraError::Internal(format!("SiLU error: {e}")))?;
-        let mul = (silu_w1 * w3)
+        let mul = candle_core::Tensor::mul(&silu_w1, &w3)
             .map_err(|e| ContextraError::Internal(format!("Tensor multiplication error: {e}")))?;
         self.feed_forward_w2.forward(&mul)
     }
@@ -328,7 +328,9 @@ impl ModelWeights {
                 // Tie word embeddings
                 let emb_qtensor = ct
                     .tensor(reader, "token_embd.weight", device)
-                    .map_err(|e| ContextraError::Internal(format!("Failed tied output weight: {e}")))?;
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed tied output weight: {e}"))
+                    })?;
                 QuantizedMatMul::from_qtensor(emb_qtensor)?
             }
         };

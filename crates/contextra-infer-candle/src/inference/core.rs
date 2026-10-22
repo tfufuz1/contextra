@@ -11,9 +11,7 @@
 //! Callers will experience backpressure (await on permit acquire) rather than Tokio thread pool exhaustion.
 
 use crate::gasp::GaspValidator;
-#[cfg(feature = "kv-stage-b")]
 use crate::model::quantized_llama::ModelWeights as LlamaWeights;
-#[cfg(feature = "kv-stage-b")]
 use crate::model::quantized_qwen2::ModelWeights as Qwen2Weights;
 use crate::model_registry::ModelFingerprint;
 use candle_core::quantized::gguf_file;

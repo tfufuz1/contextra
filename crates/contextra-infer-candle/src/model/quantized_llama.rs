@@ -85,14 +85,14 @@ pub struct QuantizedMatMul {
 }
 
 impl QuantizedMatMul {
-    fn from_qtensor(qtensor: QTensor) -> Result<Self, ContextraError> {
+    pub(crate) fn from_qtensor(qtensor: QTensor) -> Result<Self, ContextraError> {
         let inner = QMatMul::from_qtensor(qtensor)
             .map_err(|e| ContextraError::Internal(format!("Failed to build QMatMul: {e}")))?;
         let span = tracing::span!(tracing::Level::TRACE, "qmatmul");
         Ok(Self { inner, span })
     }
 
-    fn forward(&self, xs: &Tensor) -> Result<Tensor, ContextraError> {
+    pub(crate) fn forward(&self, xs: &Tensor) -> Result<Tensor, ContextraError> {
         let _enter = self.span.enter();
         self.inner
             .forward(xs)
