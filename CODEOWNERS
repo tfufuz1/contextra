@@ -1,5 +1,7 @@
 # CODEOWNERS - Contextra Governance & Ownership
 #
+# Hinweiskommentar: Pfad-Reviews für Auftrags-PRs der v1-Umstrukturierung gelten nicht als Merge-Voraussetzung, soweit das Repository das über Branch-Protection nicht erzwingt.
+#
 # Fachliche Begründung: CONTEXTRA_SPEC_2_.md §15.5 (Crate-Tier-Modell nach Kritikalität).
 # Diese Datei definiert die automatische Zuordnung von Code-Ownern für Pull Requests
 # basierend auf der Architektur-Kritikalität der verschiedenen Komponenten.
