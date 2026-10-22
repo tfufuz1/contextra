@@ -1,6 +1,5 @@
-#![deny(dead_code)]
 // FILE-CONTEXT
-// STAND: 2026-10-11T16:00:00Z (SESSION: 5984fc0d)
+// STAND: 2026-10-21T00:00:00Z
 // ZWECK: Crate root for contextra-infer-candle native GGUF inference backend.
 // INVARIANTEN: Zero unsafe code in crate; re-exports core inference types and gasp validator.
 
@@ -13,15 +12,9 @@
 //! Traits (`LlmTextGenerator`, `EmbeddingProvider`, `TextEmbeddingEngine`).
 //! Es kapselt Modell-Laden und Tensor-Inferenz ohne direkten Attention-Level- oder
 //! RoPE-Shift-Zugriff auf KV-Cache-Ebene.
-//!
-//! *Hinweis*: **Strategie A** (expliziter RoPE-Shift- und KV-Cache-Bridge-Zugriff für mandantenisolierte
-//! Cache-Projektionen) ist ein separates, zukünftiges Vorhaben und NICHT Gegenstand dieser Erstfassung.
 
 #![forbid(unsafe_code)]
 #![allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
-
-// REVIEW-PASS[1/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-09-16T16:13:00Z) (SESSION: afafdd44) PRÜFER-KONTEXT: FRESH
-// REVIEW-PASS[2/2] (ID: AGT-CANDLE-d495a019) (TS: 2026-10-11T16:00:00Z) (SESSION: 5984fc0d) PRÜFER-KONTEXT: FRESH
 
 pub mod attention_exporter;
 pub mod embedding;
@@ -45,12 +38,12 @@ pub use embedding::CandleEmbedClient;
 pub use embedding_provider::MAX_CANDLE_EMBED_BATCH_SIZE;
 pub use gasp::{GaspConfig, GaspValidator, DEFAULT_GROUNDING_THRESHOLD};
 #[cfg(feature = "kv-stage-b")]
-pub use inference::QuantizedLlamaModel;
+pub use inference::{QuantizedLlamaModel, QuantizedQwen2Model};
 pub use inference::*;
 #[cfg(feature = "kv-bridge")]
 pub use kv_bridge::KvBridgeAdapter;
 #[cfg(feature = "kv-stage-b")]
 pub use kv_state::{KvState, LayerKv};
 #[cfg(feature = "kv-stage-b")]
-pub use model::quantized_llama;
+pub use model::{quantized_llama, quantized_qwen2};
 pub use model_registry::{compute_fingerprint, CandleQuantization, ModelFingerprint};

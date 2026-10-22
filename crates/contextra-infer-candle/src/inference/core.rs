@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// STAND: 2026-09-12T00:00:00Z (SESSION: BACKPRESSURE-CONTRACT-D1)
-// ZWECK: Candle LLM text generator client implementing LlmTextGenerator.
+// STAND: 2026-10-21T00:00:00Z
+// ZWECK: Candle LLM text generator client implementing LlmTextGenerator with architecture dispatch.
 // INVARIANTEN: Thread-safe model access via Mutex; spawn_blocking for CPU inference execution.
 // Backpressure contract: max_concurrent_inferences limits spawn_blocking calls.
 // Callers will experience backpressure (await on permit acquire) rather than Tokio thread pool exhaustion.
@@ -12,13 +12,13 @@
 
 use crate::gasp::GaspValidator;
 #[cfg(feature = "kv-stage-b")]
-use crate::model::quantized_llama::ModelWeights;
+use crate::model::quantized_llama::ModelWeights as LlamaWeights;
+#[cfg(feature = "kv-stage-b")]
+use crate::model::quantized_qwen2::ModelWeights as Qwen2Weights;
 use crate::model_registry::ModelFingerprint;
 use candle_core::quantized::gguf_file;
 use candle_core::Device;
 use candle_transformers::generation::LogitsProcessor;
-#[cfg(not(feature = "kv-stage-b"))]
-use candle_transformers::models::quantized_llama::ModelWeights;
 use contextra_ports::{BoxFuture, BoxStream, ContextSegment};
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 use contextra_types::{ConfigFingerprint, ContextraError, Result, TenantId};
@@ -92,6 +92,29 @@ pub trait CandleModelInner: Send {
 
 /// Default maximum concurrent inference operations for Candle LLM text generation.
 pub const DEFAULT_MAX_CONCURRENT_INFERENCES: usize = 4;
+
+/// ChatML prompt formatting helper.
+pub fn format_chatml_prompt(user_message: &str, system_message: Option<&str>) -> String {
+    let mut formatted = String::new();
+    if let Some(sys) = system_message {
+        formatted.push_str("<|im_start|>system\n");
+        formatted.push_str(sys);
+        formatted.push_str("<|im_end|>\n");
+    }
+    formatted.push_str("<|im_start|>user\n");
+    formatted.push_str(user_message);
+    formatted.push_str("<|im_end|>\n<|im_start|>assistant\n");
+    formatted
+}
+
+/// Checks if a token ID represents a stop token (`<|im_end|>` = 151645 or `<|endoftext|>` = 151643 for Qwen2, EOS 2 for Llama).
+pub fn is_stop_token(token_id: u32, architecture: &str) -> bool {
+    match architecture {
+        "qwen2" => token_id == 151643 || token_id == 151645,
+        "llama" => token_id == 2 || token_id == 128001 || token_id == 128009,
+        _ => token_id == 2 || token_id == 151643 || token_id == 151645,
+    }
+}
 
 /// LLM Text Generator implementation powered by Candle inference engine.
 pub struct CandleLlmClient {
@@ -306,8 +329,6 @@ impl CandleLlmClient {
     }
 
     /// Tauscht das zugrundeliegende Modell und dessen Fingerprint zur Laufzeit aus.
-    /// Falls ein optionaler `GaspValidator` übergeben wird, wird dessen Kalibrierungsstatus
-    /// mit dem neuen Fingerprint invalidiert/aktualisiert (INV-CAL-2).
     pub fn swap_model(
         &mut self,
         new_model: Box<dyn CandleModelInner + Send>,
@@ -335,7 +356,7 @@ impl CandleLlmClient {
         self.fingerprint = new_fingerprint;
     }
 
-    /// Loads a `CandleLlmClient` from a model directory.
+    /// Loads a `CandleLlmClient` from a model directory with architecture dispatch.
     pub fn from_dir(
         model_dir: &std::path::Path,
         quantization: crate::model_registry::CandleQuantization,
@@ -375,7 +396,6 @@ impl CandleLlmClient {
         let gguf_path = model_dir.join("model.gguf");
         let fingerprint = if gguf_path.exists() {
             crate::model_registry::compute_fingerprint(&gguf_path, &quantization)?
-        // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         } else if let Ok(entries) = std::fs::read_dir(model_dir) {
             let mut gguf_found = None;
             for entry in entries.flatten() {
@@ -412,7 +432,6 @@ impl CandleLlmClient {
 
         let gguf_file_path = if gguf_path.exists() {
             Some(gguf_path)
-        // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         } else if let Ok(entries) = std::fs::read_dir(model_dir) {
             entries
                 .flatten()
@@ -424,7 +443,7 @@ impl CandleLlmClient {
 
         let device = Device::Cpu;
         let model: Box<dyn CandleModelInner + Send> = if let Some(path) = gguf_file_path {
-            Box::new(QuantizedLlamaModel::load(&path, &device)?)
+            load_quantized_model(&path, &device)?
         } else {
             // Fallback for empty/mock test directories or directories without GGUF weight binaries
             Box::new(DefaultCandleLlmModel)
@@ -434,16 +453,30 @@ impl CandleLlmClient {
     }
 }
 
+/// Dispatches model loading based on `general.architecture` GGUF metadata.
+pub fn load_quantized_model(
+    model_path: &Path,
+    device: &Device,
+) -> Result<Box<dyn CandleModelInner + Send>> {
+    let metadata = crate::gguf_loader::parse_gguf_metadata(model_path)?;
+    match metadata.architecture.as_str() {
+        "llama" => Ok(Box::new(QuantizedLlamaModel::load(model_path, device)?)),
+        "qwen2" => Ok(Box::new(QuantizedQwen2Model::load(model_path, device)?)),
+        other => Err(ContextraError::InvalidInput(format!(
+            "Unsupported GGUF model architecture: '{other}'. Supported architectures are 'llama' and 'qwen2'."
+        ))),
+    }
+}
+
 /// Real quantized Llama / GGUF model execution wrapper.
 pub struct QuantizedLlamaModel {
-    weights: ModelWeights,
+    weights: LlamaWeights,
     sample_len: usize,
 }
 
 impl QuantizedLlamaModel {
-    /// Loads GGUF quantized model weights from the specified file path.
+    /// Loads GGUF quantized Llama model weights from the specified file path.
     pub fn load(model_path: &Path, device: &Device) -> Result<Self> {
-        // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
         let mut file = File::open(model_path).map_err(|e| {
             ContextraError::Io(std::io::Error::new(
                 e.kind(),
@@ -461,7 +494,7 @@ impl QuantizedLlamaModel {
             ))
         })?;
 
-        let weights = ModelWeights::from_gguf(content, &mut file, device).map_err(|e| {
+        let weights = LlamaWeights::from_gguf(content, &mut file, device).map_err(|e| {
             ContextraError::Internal(format!(
                 "Failed to build quantized Llama model weights from GGUF {}: {e}",
                 model_path.display()
@@ -490,8 +523,6 @@ impl CandleModelInner for QuantizedLlamaModel {
                 head_dim: layer.head_dim as u32,
                 dtype: "f16".to_string(),
             };
-            // RoPE base frequency used in precomput_freqs_cis in quantized_llama.rs
-            // Hardcoded constant: freq_base = 10000.0
             let rope = contextra_ports::kv::RopeConfig {
                 base: 10000.0,
                 scaling: None,
@@ -606,7 +637,7 @@ impl CandleModelInner for QuantizedLlamaModel {
                     }
                 }
 
-                if next_token == 2 || next_token == 128001 || next_token == 128009 {
+                if is_stop_token(next_token, "llama") {
                     break;
                 }
             }
@@ -720,7 +751,7 @@ impl CandleModelInner for QuantizedLlamaModel {
             }
         }
 
-        if next_token != 2 && next_token != 128001 && next_token != 128009 {
+        if !is_stop_token(next_token, "llama") {
             for _i in 1..self.sample_len {
                 let last_token = *all_tokens.last().ok_or_else(|| {
                     ContextraError::Internal("all_tokens cannot be empty during generation".into())
@@ -772,7 +803,357 @@ impl CandleModelInner for QuantizedLlamaModel {
                     }
                 }
 
-                if next_token == 2 || next_token == 128001 || next_token == 128009 {
+                if is_stop_token(next_token, "llama") {
+                    break;
+                }
+            }
+        }
+
+        Ok(crate::inference::PrefixRun {
+            output: full_output,
+            prompt_tokens,
+            reused_tokens,
+            exported_prefix,
+        })
+    }
+}
+
+/// Real quantized Qwen2 / GGUF model execution wrapper.
+pub struct QuantizedQwen2Model {
+    weights: Qwen2Weights,
+    sample_len: usize,
+}
+
+impl QuantizedQwen2Model {
+    /// Loads GGUF quantized Qwen2 model weights from the specified file path.
+    pub fn load(model_path: &Path, device: &Device) -> Result<Self> {
+        let mut file = File::open(model_path).map_err(|e| {
+            ContextraError::Io(std::io::Error::new(
+                e.kind(),
+                format!(
+                    "Failed to open GGUF weight file {}: {e}",
+                    model_path.display()
+                ),
+            ))
+        })?;
+
+        let content = gguf_file::Content::read(&mut file).map_err(|e| {
+            ContextraError::Internal(format!(
+                "Failed to parse GGUF content header for {}: {e}",
+                model_path.display()
+            ))
+        })?;
+
+        let weights = Qwen2Weights::from_gguf(content, &mut file, device).map_err(|e| {
+            ContextraError::Internal(format!(
+                "Failed to build quantized Qwen2 model weights from GGUF {}: {e}",
+                model_path.display()
+            ))
+        })?;
+
+        Ok(Self {
+            weights,
+            sample_len: 256,
+        })
+    }
+}
+
+impl CandleModelInner for QuantizedQwen2Model {
+    #[cfg(feature = "kv-stage-b")]
+    fn kv_layout(
+        &self,
+    ) -> Option<(
+        contextra_ports::kv::KvLayout,
+        contextra_ports::kv::RopeConfig,
+    )> {
+        if let Some(layer) = self.weights.layers.first() {
+            let layout = contextra_ports::kv::KvLayout {
+                n_layer: self.weights.layers.len() as u32,
+                n_kv_head: layer.n_kv_head as u32,
+                head_dim: layer.head_dim as u32,
+                dtype: "f16".to_string(),
+            };
+            let rope = contextra_ports::kv::RopeConfig {
+                base: 10000.0,
+                scaling: None,
+            };
+            Some((layout, rope))
+        } else {
+            None
+        }
+    }
+
+    fn generate(
+        &mut self,
+        prompt: &str,
+        tokenizer: &tokenizers::Tokenizer,
+        device: &Device,
+    ) -> Result<String> {
+        let mut full_output = String::new();
+        self.generate_stream(prompt, tokenizer, device, &mut |chunk| {
+            full_output.push_str(&chunk);
+            true
+        })?;
+        Ok(full_output)
+    }
+
+    fn generate_stream(
+        &mut self,
+        prompt: &str,
+        tokenizer: &tokenizers::Tokenizer,
+        device: &Device,
+        on_token: &mut dyn FnMut(String) -> bool,
+    ) -> Result<String> {
+        #[cfg(feature = "kv-stage-b")]
+        {
+            let run =
+                self.generate_stream_with_prefix(prompt, tokenizer, device, None, on_token)?;
+            Ok(run.output)
+        }
+        #[cfg(not(feature = "kv-stage-b"))]
+        {
+            let tokens = tokenizer.encode(prompt, true).map_err(|e| {
+                ContextraError::InvalidInput(format!("Failed to tokenize prompt: {e}"))
+            })?;
+            let prompt_tokens = tokens.get_ids();
+            if prompt_tokens.is_empty() {
+                return Err(ContextraError::InvalidInput(
+                    "Encoded prompt tokens cannot be empty".to_string(),
+                ));
+            }
+
+            let mut logits_processor = LogitsProcessor::new(299792458, Some(0.7), Some(0.9));
+            let mut all_tokens = prompt_tokens.to_vec();
+            let mut generated_tokens = Vec::new();
+            let mut full_output = String::new();
+
+            let mut index_pos = 0;
+            for i in 0..self.sample_len {
+                let context_len = if i == 0 { all_tokens.len() } else { 1 };
+                let input_slice = if i == 0 {
+                    all_tokens.clone()
+                } else {
+                    vec![*all_tokens.last().ok_or_else(|| {
+                        ContextraError::Internal(
+                            "all_tokens cannot be empty during generation".into(),
+                        )
+                    })?]
+                };
+
+                let input_tensor = candle_core::Tensor::new(&input_slice[..], device)
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to create input tensor: {e}"))
+                    })?
+                    .unsqueeze(0)
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to unsqueeze tensor: {e}"))
+                    })?;
+
+                let logits = self
+                    .weights
+                    .forward(&input_tensor, index_pos)
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Quantized Qwen2 forward error: {e}"))
+                    })?;
+
+                let logits = logits.squeeze(0).map_err(|e| {
+                    ContextraError::Internal(format!("Failed to squeeze logits: {e}"))
+                })?;
+                let logits = logits
+                    .get(
+                        logits
+                            .dim(0)
+                            .map_err(|e| ContextraError::Internal(e.to_string()))?
+                            - 1,
+                    )
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to slice logits: {e}"))
+                    })?;
+
+                let next_token = logits_processor.sample(&logits).map_err(|e| {
+                    ContextraError::Internal(format!("Logits sampling failed: {e}"))
+                })?;
+
+                all_tokens.push(next_token);
+                generated_tokens.push(next_token);
+                index_pos += context_len;
+
+                if let Ok(piece) = tokenizer.decode(&[next_token], true) {
+                    if !piece.is_empty() {
+                        full_output.push_str(&piece);
+                        if !on_token(piece) {
+                            break;
+                        }
+                    }
+                }
+
+                if is_stop_token(next_token, "qwen2") {
+                    break;
+                }
+            }
+
+            Ok(full_output)
+        }
+    }
+
+    #[cfg(feature = "kv-stage-b")]
+    fn generate_stream_with_prefix(
+        &mut self,
+        prompt: &str,
+        tokenizer: &tokenizers::Tokenizer,
+        device: &Device,
+        seed: Option<crate::inference::PrefixSeed>,
+        on_token: &mut dyn FnMut(String) -> bool,
+    ) -> Result<crate::inference::PrefixRun> {
+        let tokens = tokenizer
+            .encode(prompt, true)
+            .map_err(|e| ContextraError::InvalidInput(format!("Failed to tokenize prompt: {e}")))?;
+        let prompt_tokens = tokens.get_ids().to_vec();
+        if prompt_tokens.is_empty() {
+            return Err(ContextraError::InvalidInput(
+                "Encoded prompt tokens cannot be empty".to_string(),
+            ));
+        }
+
+        let mut logits_processor = LogitsProcessor::new(299792458, Some(0.7), Some(0.9));
+        let mut all_tokens = prompt_tokens.clone();
+        let mut generated_tokens = Vec::new();
+        let mut full_output = String::new();
+
+        let mut reused_tokens = 0;
+        let mut index_pos = 0;
+        let mut prefill_logits = None;
+
+        if let Some(s) = seed {
+            if s.matched_len > 0 && s.matched_len < prompt_tokens.len() {
+                self.weights.clear_kv_cache();
+                if self.weights.import_kv_state(&s.state).is_ok() {
+                    let suffix = &prompt_tokens[s.matched_len..];
+                    if let Ok(input_tensor) =
+                        candle_core::Tensor::new(suffix, device).and_then(|t| t.unsqueeze(0))
+                    {
+                        if let Ok(logits) = self.weights.forward(&input_tensor, s.matched_len) {
+                            prefill_logits = Some(logits);
+                            reused_tokens = s.matched_len;
+                            index_pos = prompt_tokens.len();
+                        }
+                    }
+                }
+            }
+        }
+
+        if prefill_logits.is_none() {
+            self.weights.clear_kv_cache();
+            reused_tokens = 0;
+            let input_tensor = candle_core::Tensor::new(&prompt_tokens[..], device)
+                .map_err(|e| {
+                    ContextraError::Internal(format!("Failed to create input tensor: {e}"))
+                })?
+                .unsqueeze(0)
+                .map_err(|e| {
+                    ContextraError::Internal(format!("Failed to unsqueeze tensor: {e}"))
+                })?;
+            let logits = self.weights.forward(&input_tensor, 0).map_err(|e| {
+                ContextraError::Internal(format!("Quantized Qwen2 forward error: {e}"))
+            })?;
+            prefill_logits = Some(logits);
+            index_pos = prompt_tokens.len();
+        }
+
+        let exported_prefix = self
+            .weights
+            .export_kv_state()
+            .and_then(|st| st.export_block(0..prompt_tokens.len()))
+            .ok();
+
+        let logits = prefill_logits
+            .ok_or_else(|| ContextraError::Internal("Missing prefill logits".into()))?;
+        let logits = logits
+            .squeeze(0)
+            .map_err(|e| ContextraError::Internal(format!("Failed to squeeze logits: {e}")))?;
+        let logits = logits
+            .get(
+                logits
+                    .dim(0)
+                    .map_err(|e| ContextraError::Internal(e.to_string()))?
+                    - 1,
+            )
+            .map_err(|e| ContextraError::Internal(format!("Failed to slice logits: {e}")))?;
+
+        let next_token = logits_processor
+            .sample(&logits)
+            .map_err(|e| ContextraError::Internal(format!("Logits sampling failed: {e}")))?;
+
+        all_tokens.push(next_token);
+        generated_tokens.push(next_token);
+
+        if let Ok(piece) = tokenizer.decode(&[next_token], true) {
+            if !piece.is_empty() {
+                full_output.push_str(&piece);
+                if !on_token(piece) {
+                    return Ok(crate::inference::PrefixRun {
+                        output: full_output,
+                        prompt_tokens,
+                        reused_tokens,
+                        exported_prefix,
+                    });
+                }
+            }
+        }
+
+        if !is_stop_token(next_token, "qwen2") {
+            for _i in 1..self.sample_len {
+                let last_token = *all_tokens.last().ok_or_else(|| {
+                    ContextraError::Internal("all_tokens cannot be empty during generation".into())
+                })?;
+                let input_tensor = candle_core::Tensor::new(&[last_token], device)
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to create input tensor: {e}"))
+                    })?
+                    .unsqueeze(0)
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to unsqueeze tensor: {e}"))
+                    })?;
+
+                let logits = self
+                    .weights
+                    .forward(&input_tensor, index_pos)
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Quantized Qwen2 forward error: {e}"))
+                    })?;
+
+                let logits = logits.squeeze(0).map_err(|e| {
+                    ContextraError::Internal(format!("Failed to squeeze logits: {e}"))
+                })?;
+                let logits = logits
+                    .get(
+                        logits
+                            .dim(0)
+                            .map_err(|e| ContextraError::Internal(e.to_string()))?
+                            - 1,
+                    )
+                    .map_err(|e| {
+                        ContextraError::Internal(format!("Failed to slice logits: {e}"))
+                    })?;
+
+                let next_token = logits_processor.sample(&logits).map_err(|e| {
+                    ContextraError::Internal(format!("Logits sampling failed: {e}"))
+                })?;
+
+                all_tokens.push(next_token);
+                generated_tokens.push(next_token);
+                index_pos += 1;
+
+                if let Ok(piece) = tokenizer.decode(&[next_token], true) {
+                    if !piece.is_empty() {
+                        full_output.push_str(&piece);
+                        if !on_token(piece) {
+                            break;
+                        }
+                    }
+                }
+
+                if is_stop_token(next_token, "qwen2") {
                     break;
                 }
             }
@@ -879,9 +1260,6 @@ impl LlmTextGenerator for CandleLlmClient {
                         .into_bytes();
                         adapter.store_segment(tenant, key, fresh_bytes);
                     }
-                    // Since full prompt text is processed during placeholder KV-Bridge execution,
-                    // full prefill is always executed; prefill_skip_count is strictly reserved for
-                    // actual KV-tensor reuse savings (§9.2).
                     self.prefill_count
                         .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 }
