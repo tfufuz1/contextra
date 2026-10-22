@@ -141,7 +141,7 @@ impl LayerCleanupProof {
             None => 0,
         };
 
-        Self::new_after_verified_empty_internal(witness.layer().clone(), remaining)
+        Self::new_after_verified_empty(witness.layer().clone(), remaining)
     }
 
     /// Erzeugt einen Proof für `layer` NUR, wenn `verification` bestätigt,
