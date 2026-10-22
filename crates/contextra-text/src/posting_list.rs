@@ -59,7 +59,7 @@ impl Posting {
 
     #[inline]
     pub fn doc_id(&self) -> DocId {
-        DocId::new(self.doc_id)
+        DocId::new(self.doc_id.into())
     }
 }
 
@@ -103,8 +103,8 @@ pub struct PostingList {
 impl PostingList {
     /// Creates a new `PostingList` from a vector of postings, ensuring sorted order by DocId.
     pub fn new(mut postings: Vec<Posting>) -> Self {
-        postings.sort_unstable_by_key(|p| p.doc_id);
-        postings.dedup_by_key(|p| p.doc_id);
+        postings.sort_unstable_by_key(|p| u128::from(p.doc_id));
+        postings.dedup_by_key(|p| u128::from(p.doc_id));
         let blocks = compute_blocks(&postings);
         Self { postings, blocks }
     }
@@ -144,7 +144,7 @@ impl PostingList {
     /// Inserts or updates a posting for a doc_id using RCU/copy-on-write semantics.
     pub fn upsert(&self, posting: Posting) -> Self {
         let mut new_postings = self.postings.clone();
-        match new_postings.binary_search_by_key(&posting.doc_id, |p| p.doc_id) {
+        match new_postings.binary_search_by_key(&u128::from(posting.doc_id), |p| u128::from(p.doc_id)) {
             Ok(idx) => {
                 new_postings[idx] = posting;
             }
@@ -162,7 +162,7 @@ impl PostingList {
     /// Removes a posting for a doc_id using RCU/copy-on-write semantics.
     pub fn remove(&self, doc_id: DocId) -> Self {
         let mut new_postings = self.postings.clone();
-        if let Ok(idx) = new_postings.binary_search_by_key(&doc_id.inner(), |p| p.doc_id) {
+        if let Ok(idx) = new_postings.binary_search_by_key(&u128::from(doc_id.inner()), |p| u128::from(p.doc_id)) {
             new_postings.remove(idx);
         }
         let blocks = compute_blocks(&new_postings);
@@ -178,22 +178,25 @@ impl PostingList {
         buf.extend_from_slice(POSTING_LIST_V2_MAGIC);
         encode_varint(self.postings.len() as u64, &mut buf);
 
-        let mut prev_doc_id = 0u64;
+        let mut prev_doc_id = 0u128;
         for p in &self.postings {
-            let delta = (p.doc_id as u128)
-                .checked_sub(prev_doc_id as u128)
+            let doc_id_u128 = u128::from(p.doc_id);
+            let delta_u128 = doc_id_u128
+                .checked_sub(prev_doc_id)
                 .ok_or_else(|| {
                     ContextraError::Storage(
                         "Unsorted or overflow doc_id in posting list".to_string(),
                     )
-                })? as u64;
+                })?;
+            let delta = u64::try_from(delta_u128).map_err(|_| {
+                ContextraError::Storage(
+                    "Delta exceeds u64 max for varint encoding".to_string(),
+                )
+            })?;
             encode_varint(delta, &mut buf);
             encode_varint(p.tf as u64, &mut buf);
             encode_varint(p.doc_len as u64, &mut buf);
-            #[allow(clippy::unnecessary_cast)]
-            {
-                prev_doc_id = p.doc_id as u64;
-            }
+            prev_doc_id = doc_id_u128;
         }
 
         Ok(buf)
@@ -230,7 +233,7 @@ impl PostingList {
                 })?;
 
                 postings.push(Posting {
-                    doc_id: doc_id as DocIdRaw,
+                    doc_id: doc_id.into(),
                     tf,
                     doc_len,
                 });
@@ -462,7 +465,7 @@ mod tests {
             curr_doc_id += delta;
             let tf = ((i % 20) + 1) as u32;
             let doc_len = (50 + (i % 100)) as u32;
-            postings.push(Posting::new(DocId::new(curr_doc_id), tf, doc_len));
+            postings.push(Posting::new(DocId::new(curr_doc_id.into()), tf, doc_len));
         }
 
         let multi_list = PostingList::new(postings);
