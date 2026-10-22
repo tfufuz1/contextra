@@ -451,7 +451,7 @@ async fn test_wand_top_k_deterministic_tie_breaking_p28() -> Result<()> {
         index
             .insert(
                 tx,
-                DocId::new(i),
+                DocId::new(i.into()),
                 "identical deterministic score test content",
             )
             .await?;
