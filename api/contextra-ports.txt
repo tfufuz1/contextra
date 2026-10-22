@@ -1,0 +1,218 @@
+contextra_ports::BoxFuture pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>
+contextra_ports::BoxStream pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> + Send + 'a>>
+contextra_ports::attention pub mod attention
+contextra_ports::attention::AttentionExporter pub trait AttentionExporter: Send + Sync
+contextra_ports::attention::RequestId pub struct RequestId(pub u64)
+contextra_ports::checkpoint pub mod checkpoint
+contextra_ports::checkpoint::Checkpoint pub trait Checkpoint: Send + Sync + 'static
+contextra_ports::checkpoint::CheckpointCoordinator pub trait CheckpointCoordinator: Send + Sync + 'static
+contextra_ports::clock pub mod clock
+contextra_ports::clock::Clock pub trait Clock: Send + Sync + 'static
+contextra_ports::clock::SystemClock pub struct SystemClock
+contextra_ports::clock::SystemClock::monotonic_nanos pub fn monotonic_nanos(&self) -> u64
+contextra_ports::clock::SystemClock::new pub fn new() -> Self
+contextra_ports::clock::SystemClock::now_unix_nanos pub fn now_unix_nanos(&self) -> u64
+contextra_ports::embedding pub mod embedding
+contextra_ports::embedding::ContextSegment pub struct ContextSegment<'a>
+contextra_ports::embedding::EmbeddingError pub enum EmbeddingError
+contextra_ports::embedding::EmbeddingProvider pub trait EmbeddingProvider: Send + Sync + 'static
+contextra_ports::embedding::LlmTextGenerator pub trait LlmTextGenerator: Send + Sync + 'static
+contextra_ports::embedding::LlmTextGeneratorStreaming pub trait LlmTextGeneratorStreaming: LlmTextGenerator
+contextra_ports::embedding::MockEmbedder pub struct MockEmbedder
+contextra_ports::embedding::MockEmbedder::fixed_unit pub fn fixed_unit(dim: usize) -> Self
+contextra_ports::embedding::MockEmbedder::new pub fn new(dim: usize) -> Self
+contextra_ports::embedding::MockEmbedder::with_fixed_output pub fn with_fixed_output(fixed_output: Vec<f32>) -> Self
+contextra_ports::embedding::TextEmbeddingEngine pub trait TextEmbeddingEngine: Send + Sync + 'static
+contextra_ports::embedding::new pub fn new(chunk_id: u64, text: &'a str) -> Self
+contextra_ports::embedding::with_fingerprint pub fn with_fingerprint(mut self, fingerprint: &'a ModelFingerprint) -> Self
+contextra_ports::embedding::with_offset pub fn with_offset(chunk_id: u64, text: &'a str, offset: usize) -> Self
+contextra_ports::embedding::with_rope_offset pub fn with_rope_offset(mut self, offset: usize) -> Self
+contextra_ports::embedding_sanity pub mod embedding_sanity
+contextra_ports::embedding_sanity::EmbeddingSanityError pub enum EmbeddingSanityError
+contextra_ports::embedding_sanity::SanityReport pub struct SanityReport
+contextra_ports::embedding_sanity::check_embedding_sanity pub async fn check_embedding_sanity( provider: &dyn EmbeddingProvider, ) -> Result<SanityReport, EmbeddingSanityError>
+contextra_ports::erasure pub mod erasure
+contextra_ports::erasure::DeleteOutcome pub enum DeleteOutcome
+contextra_ports::erasure::EraseCtx pub struct EraseCtx<'a>
+contextra_ports::erasure::EraseError pub enum EraseError
+contextra_ports::erasure::ErasureBackend pub trait ErasureBackend: Send + Sync
+contextra_ports::erasure::ErasureHooks pub trait ErasureHooks: Send + Sync + 'static
+contextra_ports::erasure::ErasureMode pub enum ErasureMode
+contextra_ports::erasure::ErasureMode::requires_attestation pub fn requires_attestation(&self) -> bool
+contextra_ports::erasure::ErasureMode::requires_ledger pub fn requires_ledger(&self) -> bool
+contextra_ports::erasure::FenceGuard pub struct FenceGuard
+contextra_ports::erasure::FenceGuard::with_release pub fn with_release(purge_id: PurgeId, on_release: impl FnOnce() + Send + 'static) -> Self
+contextra_ports::erasure::FinishArtifact pub enum FinishArtifact
+contextra_ports::erasure::FreeSpaceProbe pub trait FreeSpaceProbe: Send + Sync
+contextra_ports::erasure::HookToken pub struct HookToken
+contextra_ports::erasure::LayerObservation pub struct LayerObservation
+contextra_ports::erasure::LayerScan pub trait LayerScan: Send + Sync
+contextra_ports::erasure::LogicalScope pub enum LogicalScope
+contextra_ports::erasure::LogicalScope::tenant_id pub fn tenant_id(&self) -> TenantId
+contextra_ports::erasure::NONE pub const NONE: Self = Self { id: 0, _no_copy: () }
+contextra_ports::erasure::PhysicalScope pub struct PhysicalScope
+contextra_ports::erasure::PhysicalScope::is_empty pub fn is_empty(&self) -> bool
+contextra_ports::erasure::PhysicalScope::keys pub fn keys(&self) -> &[Vec<u8>]
+contextra_ports::erasure::PhysicalScope::matches_key pub fn matches_key(&self, key: &[u8]) -> bool
+contextra_ports::erasure::PhysicalScope::prefixes pub fn prefixes(&self) -> &[Vec<u8>]
+contextra_ports::erasure::PhysicalScope::scope_digest pub fn scope_digest(&self) -> [u8; 32]
+contextra_ports::erasure::PhysicalScope::try_new pub fn try_new( tenant_id: TenantId, keys: Vec<Vec<u8>>, prefixes: Vec<Vec<u8>>, ) -> std::result::Result<Self, ContextraError>
+contextra_ports::erasure::ProbeError pub struct ProbeError(pub String)
+contextra_ports::erasure::PurgeBlocked pub enum PurgeBlocked
+contextra_ports::erasure::PurgeBlocked::retry_hint pub fn retry_hint(&self) -> &'static str
+contextra_ports::erasure::PurgeError pub enum PurgeError
+contextra_ports::erasure::PurgeId pub struct PurgeId(pub [u8; 16])
+contextra_ports::erasure::PurgeOutput pub struct PurgeOutput
+contextra_ports::erasure::PurgeState pub enum PurgeState
+contextra_ports::erasure::PurgeState::from_u8 pub fn from_u8(val: u8) -> Option<Self>
+contextra_ports::erasure::RestoreGuard pub trait RestoreGuard: Send + Sync
+contextra_ports::erasure::RestoreVerdict pub enum RestoreVerdict
+contextra_ports::erasure::ScanError pub struct ScanError
+contextra_ports::erasure::WriteFenced pub struct WriteFenced
+contextra_ports::erasure::WriteGate pub trait WriteGate: Send + Sync
+contextra_ports::erasure::fn pub const fn id(&self) -> u64
+contextra_ports::erasure::fn pub const fn new(bytes: [u8; 16]) -> Self
+contextra_ports::erasure::fn pub const fn new(id: u64) -> Self
+contextra_ports::erasure::fn pub const fn new(purge_id: PurgeId) -> Self
+contextra_ports::erasure::fn pub const fn to_u8(self) -> u8
+contextra_ports::graph pub mod graph
+contextra_ports::graph::GraphCollectionMutation pub trait GraphCollectionMutation: Send + Sync + 'static
+contextra_ports::graph::GraphMutationError pub enum GraphMutationError
+contextra_ports::graph::HyperEdgeId pub struct HyperEdgeId(pub u64)
+contextra_ports::graph::RoleBinding pub struct RoleBinding
+contextra_ports::graph::RoleBinding::new pub fn new(role: RoleId, entity: EntityId) -> Self
+contextra_ports::graph::RoleId pub struct RoleId(pub u32)
+contextra_ports::graph::fn pub const fn inner(self) -> u32
+contextra_ports::graph::fn pub const fn inner(self) -> u64
+contextra_ports::graph::fn pub const fn new(id: u32) -> Self
+contextra_ports::graph::fn pub const fn new(id: u64) -> Self
+contextra_ports::graph::reexport pub use crate::graph_index::{GraphIndex, GraphIndexStats}
+contextra_ports::graph_index pub mod graph_index
+contextra_ports::graph_index::CommunityResolver pub trait CommunityResolver: Send + Sync
+contextra_ports::graph_index::GraphIndex pub trait GraphIndex: Send + Sync + 'static
+contextra_ports::graph_index::GraphIndexStats pub struct GraphIndexStats
+contextra_ports::id_gen pub mod id_gen
+contextra_ports::id_gen::IdGenerator pub trait IdGenerator: Send + Sync + 'static
+contextra_ports::id_gen::reexport pub use IdGenerator as IdGen
+contextra_ports::ids pub mod ids
+contextra_ports::ids::reexport pub use crate::id_gen::{IdGen, IdGenerator}
+contextra_ports::kv pub mod kv
+contextra_ports::kv::KvBlock pub struct KvBlock
+contextra_ports::kv::KvLayout pub struct KvLayout
+contextra_ports::kv::KvLifecycleHooks pub trait KvLifecycleHooks: Send + Sync + 'static
+contextra_ports::kv::KvPrefixHit pub struct KvPrefixHit
+contextra_ports::kv::KvPrefixStore pub trait KvPrefixStore: Send + Sync + 'static
+contextra_ports::kv::PrefixKey pub struct PrefixKey
+contextra_ports::kv::RopeConfig pub struct RopeConfig
+contextra_ports::kv_bridge_port pub mod kv_bridge_port
+contextra_ports::kv_bridge_port::KvBridgeStorage pub trait KvBridgeStorage: Send + Sync
+contextra_ports::license pub mod license
+contextra_ports::license::AuthorizedRing pub struct AuthorizedRing
+contextra_ports::license::AuthorizedRing::ring pub fn ring(&self) -> FeatureRing
+contextra_ports::license::DefaultOpenGate pub type DefaultOpenGate = OpenFastGate
+contextra_ports::license::FeatureRing pub enum FeatureRing
+contextra_ports::license::LicenseError pub enum LicenseError
+contextra_ports::license::LicenseGate pub trait LicenseGate: Send + Sync
+contextra_ports::license::OpenFastGate pub struct OpenFastGate
+contextra_ports::license::VectorDeleteMode pub enum VectorDeleteMode
+contextra_ports::lifecycle pub mod lifecycle
+contextra_ports::lifecycle::ContextPreparer pub trait ContextPreparer: Send + Sync
+contextra_ports::lifecycle::GroundingAssessment pub struct GroundingAssessment
+contextra_ports::lifecycle::GroundingValidator pub trait GroundingValidator: Send + Sync
+contextra_ports::lifecycle::ResponseGroundingValidator pub trait ResponseGroundingValidator: Send + Sync
+contextra_ports::merge_host pub mod merge_host
+contextra_ports::merge_host::MergeOperatorHost pub trait MergeOperatorHost: Send + Sync
+contextra_ports::merge_operator pub mod merge_operator
+contextra_ports::merge_operator::MergeOperator pub trait MergeOperator: Send + Sync
+contextra_ports::metrics pub mod metrics
+contextra_ports::metrics::MetricEvent pub enum MetricEvent
+contextra_ports::metrics::MetricsSink pub trait MetricsSink: Send + Sync + 'static
+contextra_ports::metrics::NoopMetricsSink pub struct NoopMetricsSink
+contextra_ports::metrics::TestMetricsSink pub struct TestMetricsSink
+contextra_ports::metrics::TestMetricsSink::clear pub fn clear(&self)
+contextra_ports::metrics::TestMetricsSink::events pub fn events(&self) -> Vec<MetricEvent>
+contextra_ports::metrics::TestMetricsSink::new pub fn new() -> Self
+contextra_ports::observability pub mod observability
+contextra_ports::observability::DriftStatusProvider pub trait DriftStatusProvider: Send + Sync
+contextra_ports::observability::reexport pub use super::lifecycle::{GroundingAssessment, GroundingValidator, ResponseGroundingValidator}
+contextra_ports::plugin pub mod plugin
+contextra_ports::plugin::PluginCapability pub struct PluginCapability
+contextra_ports::plugin::PluginCapability::new pub fn new( name: &'static str, version: (u32, u32, u32), ring: u8, feature_ring_required: FeatureRing, ) -> Self
+contextra_ports::plugin::PluginError pub enum PluginError
+contextra_ports::plugin::PluginManifest pub trait PluginManifest: Send + Sync
+contextra_ports::plugin::PluginRegistry pub struct PluginRegistry
+contextra_ports::plugin::PluginRegistry::activate pub fn activate(&mut self, plugin: Box<dyn PluginManifest>) -> Result<(), PluginError>
+contextra_ports::plugin::PluginRegistry::activate_all pub fn activate_all( &mut self, plugins: Vec<Box<dyn PluginManifest>>, ) -> Result<(), PluginError>
+contextra_ports::plugin::PluginRegistry::current_feature_ring pub fn current_feature_ring(&self) -> FeatureRing
+contextra_ports::plugin::PluginRegistry::is_active pub fn is_active(&self, name: &str) -> bool
+contextra_ports::plugin::PluginRegistry::new pub fn new(gate: Arc<dyn LicenseGate>) -> Self
+contextra_ports::plugin::PluginRegistry::snapshot pub fn snapshot(&self) -> Vec<PluginCapability>
+contextra_ports::query_rewriter pub mod query_rewriter
+contextra_ports::query_rewriter::QueryRewriter pub trait QueryRewriter: Send + Sync
+contextra_ports::reexport pub use attention::*
+contextra_ports::reexport pub use checkpoint::*
+contextra_ports::reexport pub use clock::*
+contextra_ports::reexport pub use contextra_types::*
+contextra_ports::reexport pub use contextra_types::{error, error_dto, model_fingerprint, schema, tombstone, types}
+contextra_ports::reexport pub use embedding::*
+contextra_ports::reexport pub use erasure::*
+contextra_ports::reexport pub use graph::*
+contextra_ports::reexport pub use graph_index::*
+contextra_ports::reexport pub use id_gen::*
+contextra_ports::reexport pub use kv::*
+contextra_ports::reexport pub use kv_bridge_port::*
+contextra_ports::reexport pub use license::*
+contextra_ports::reexport pub use lifecycle::*
+contextra_ports::reexport pub use merge_host::*
+contextra_ports::reexport pub use merge_operator::*
+contextra_ports::reexport pub use metrics::*
+contextra_ports::reexport pub use observability::*
+contextra_ports::reexport pub use plugin::*
+contextra_ports::reexport pub use query_rewriter::*
+contextra_ports::reexport pub use reranker::*
+contextra_ports::reexport pub use rng::*
+contextra_ports::reexport pub use snapshot::*
+contextra_ports::reexport pub use storage::*
+contextra_ports::reexport pub use text_index::*
+contextra_ports::reexport pub use vector_index::*
+contextra_ports::reexport pub use wiring::*
+contextra_ports::reranker pub mod reranker
+contextra_ports::reranker::Reranker pub trait Reranker: Send + Sync
+contextra_ports::rng pub mod rng
+contextra_ports::rng::CryptoRng pub trait CryptoRng: Send + Sync + 'static {}
+contextra_ports::rng::EntropyRng pub trait EntropyRng: Send + Sync + 'static
+contextra_ports::rng::SeededRng pub trait SeededRng: Send + Sync + 'static
+contextra_ports::rng::SystemRng pub struct SystemRng
+contextra_ports::rng::SystemRng::fill_bytes pub fn fill_bytes(&self, dest: &mut [u8])
+contextra_ports::rng::SystemRng::new pub fn new() -> Self
+contextra_ports::rng::SystemRng::next_u64 pub fn next_u64(&self) -> u64
+contextra_ports::rng::SystemRng::next_unit_f64 pub fn next_unit_f64(&self) -> f64
+contextra_ports::rng::reexport pub use SeededRng as Rng
+contextra_ports::snapshot pub mod snapshot
+contextra_ports::snapshot::ReadSnapshot pub struct ReadSnapshot
+contextra_ports::snapshot::ReadSnapshot::from_seq pub fn from_seq(seq_no: u64) -> Self
+contextra_ports::snapshot::ReadSnapshot::max_seq pub fn max_seq(&self) -> u64
+contextra_ports::snapshot::ReadSnapshot::new pub fn new(id: SnapshotId, max_seq: TxId) -> Self
+contextra_ports::snapshot::ReadSnapshot::seq pub fn seq(&self) -> u64
+contextra_ports::snapshot::SnapshotId pub struct SnapshotId(pub u64)
+contextra_ports::snapshot::fn pub const fn inner(self) -> u64
+contextra_ports::snapshot::fn pub const fn new(id: u64) -> Self
+contextra_ports::storage pub mod storage
+contextra_ports::storage::MAX_SCAN_MERGE_ACCUMULATOR pub const MAX_SCAN_MERGE_ACCUMULATOR: usize = 100_000
+contextra_ports::storage::StorageEngine pub trait StorageEngine: Send + Sync + 'static
+contextra_ports::storage::StorageStats pub struct StorageStats
+contextra_ports::text_index pub mod text_index
+contextra_ports::text_index::SegmentSynthesizer pub trait SegmentSynthesizer: Send + Sync
+contextra_ports::text_index::TextIndex pub trait TextIndex: Send + Sync + 'static
+contextra_ports::text_index::TextIndexStats pub struct TextIndexStats
+contextra_ports::text_index::reexport pub use crate::embedding::TextEmbeddingEngine
+contextra_ports::time pub mod time
+contextra_ports::time::reexport pub use crate::clock::{Clock, SystemClock}
+contextra_ports::vector_index pub mod vector_index
+contextra_ports::vector_index::HybridSearchProvider pub trait HybridSearchProvider: Send + Sync
+contextra_ports::vector_index::VectorIndex pub trait VectorIndex: Send + Sync + 'static
+contextra_ports::vector_index::VectorIndexStats pub struct VectorIndexStats
+contextra_ports::vector_index::VectorResidue pub struct VectorResidue
+contextra_ports::wiring pub mod wiring
+contextra_ports::wiring::PortsWiring pub struct PortsWiring
+contextra_ports::wiring::PortsWiring::new pub fn new( clock: Arc<dyn Clock>, rng: Arc<dyn SeededRng>, id_gen: Arc<dyn IdGenerator>, ) -> Result<Self, ContextraError>

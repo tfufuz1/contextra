@@ -1,0 +1,279 @@
+contextra_types::error pub mod error
+contextra_types::error::CacheDirective pub enum CacheDirective
+contextra_types::error::ContextraError pub enum ContextraError
+contextra_types::error::ContextraError::capability_unsupported pub fn capability_unsupported( capability: impl Into<String>, reason: impl Into<String>, ) -> Self
+contextra_types::error::ContextraError::check_durability pub fn check_durability(condition: bool, msg: impl Into<String>) -> Result<()>
+contextra_types::error::ContextraError::check_vector_reference pub fn check_vector_reference( found: bool, doc_id: impl Into<String>, index_id: impl Into<String>, ) -> Result<()>
+contextra_types::error::ContextraError::checksum_mismatch pub fn checksum_mismatch(path: impl Into<String>, block_id: u64) -> Self
+contextra_types::error::ContextraError::committed_index_lagging pub fn committed_index_lagging(tx_id: u64, component: impl Into<String>) -> Self
+contextra_types::error::ContextraError::cross_device_link pub fn cross_device_link( source_path: impl Into<String>, target_path: impl Into<String>, ) -> Self
+contextra_types::error::ContextraError::durability_config pub fn durability_config(msg: impl Into<String>) -> Self
+contextra_types::error::ContextraError::erasure_incomplete pub fn erasure_incomplete(component: impl Into<String>, detail: impl Into<String>) -> Self
+contextra_types::error::ContextraError::from_kind_and_message pub fn from_kind_and_message(kind: &str, msg: impl Into<String>) -> Self
+contextra_types::error::ContextraError::invalid_input pub fn invalid_input(msg: impl Into<String>) -> Self
+contextra_types::error::ContextraError::is_occ_conflict pub fn is_occ_conflict(&self) -> bool
+contextra_types::error::ContextraError::kv_quantization pub fn kv_quantization(msg: impl Into<String>) -> Self
+contextra_types::error::ContextraError::limit_exceeded pub fn limit_exceeded(limit: usize, context: impl Into<String>) -> Self
+contextra_types::error::ContextraError::model_load pub fn model_load(path: impl Into<String>, reason: impl Into<String>) -> Self
+contextra_types::error::ContextraError::orphaned_vector_reference pub fn orphaned_vector_reference( doc_id: impl Into<String>, index_id: impl Into<String>, ) -> Self
+contextra_types::error::ContextraError::pin_budget_exceeded pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self
+contextra_types::error::ContextraError::snapshot_expired pub fn snapshot_expired(seq_no: u64, age_ticks: u64, max_age_ticks: u64) -> Self
+contextra_types::error::ContextraError::snapshot_unsupported_for_signal pub fn snapshot_unsupported_for_signal(strategy: impl Into<String>) -> Self
+contextra_types::error::ContextraError::wal_corruption pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self
+contextra_types::error::ContextraError::wal_segment_gap pub fn wal_segment_gap(before_segment_seq: u64, after_segment_seq: u64) -> Self
+contextra_types::error::ContextraError::wal_truncation_detected pub fn wal_truncation_detected(expected_hmac: [u8; 32], actual_hmac: [u8; 32]) -> Self
+contextra_types::error::HnswDeletionError pub enum HnswDeletionError
+contextra_types::error::Result pub type Result<T> = std::result::Result<T, ContextraError>
+contextra_types::error::StepId pub struct StepId(pub u64)
+contextra_types::error::fn pub const fn inner(self) -> u64
+contextra_types::error::fn pub const fn new(id: u64) -> Self
+contextra_types::error_dto pub mod error_dto
+contextra_types::error_dto::ContextraErrorDto pub struct ContextraErrorDto
+contextra_types::error_dto::ContextraErrorDto::new pub fn new(kind: impl Into<String>, message: impl Into<String>) -> Self
+contextra_types::error_dto::ContextraErrorDto::with_details pub fn with_details( kind: impl Into<String>, message: impl Into<String>, details: serde_json::Value, ) -> Self
+contextra_types::markdown pub mod markdown
+contextra_types::markdown::escape_markdown pub fn escape_markdown(input: &str) -> String
+contextra_types::model_fingerprint pub mod model_fingerprint
+contextra_types::model_fingerprint::ModelFingerprint pub struct ModelFingerprint
+contextra_types::model_fingerprint::ModelFingerprint::new pub fn new( hash: [u8; 32],
+contextra_types::panic_guard pub mod panic_guard
+contextra_types::panic_guard::HealthState pub enum HealthState
+contextra_types::panic_guard::HealthState::is_healthy pub fn is_healthy(self) -> bool
+contextra_types::panic_guard::HealthState::is_poisoned pub fn is_poisoned(self) -> bool
+contextra_types::panic_guard::PoisonHook pub type PoisonHook = Box<dyn Fn() + Send + Sync + 'static>
+contextra_types::panic_guard::guard_panic pub async fn guard_panic<F, T>(op_name: &str, f: F) -> Result<T> where F: Future<Output = Result<T>> + Send,
+contextra_types::panic_guard::guard_panic_with_hook pub async fn guard_panic_with_hook<F, T>(op_name: &str, hook: Option<&PoisonHook>, f: F) -> Result<T> where F: Future<Output = Result<T>> + Send,
+contextra_types::reexport pub use error::{ContextraError, Result}
+contextra_types::reexport pub use error_dto::ContextraErrorDto
+contextra_types::reexport pub use markdown::escape_markdown
+contextra_types::reexport pub use model_fingerprint::ModelFingerprint
+contextra_types::reexport pub use panic_guard::
+contextra_types::reexport pub use retrieval_strategy::RetrievalStrategy
+contextra_types::reexport pub use schema::{DocIdWidth, ManifestSchemaVersion}
+contextra_types::reexport pub use tenant_scope::{TenantScopeViolation, TenantScoped}
+contextra_types::reexport pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck}
+contextra_types::reexport pub use types::*
+contextra_types::reexport pub use types::math
+contextra_types::retrieval_strategy pub mod retrieval_strategy
+contextra_types::retrieval_strategy::RetrievalStrategy pub enum RetrievalStrategy
+contextra_types::schema pub mod schema
+contextra_types::schema::DocIdWidth pub enum DocIdWidth
+contextra_types::schema::DocIdWidth::bytes_len pub fn bytes_len(self) -> usize
+contextra_types::schema::DocIdWidth::current pub fn current() -> Self
+contextra_types::schema::DocIdWidth::current_bytes_len pub fn current_bytes_len() -> usize
+contextra_types::schema::ManifestSchemaVersion pub enum ManifestSchemaVersion
+contextra_types::schema::ManifestSchemaVersion::as_u8 pub fn as_u8(self) -> u8
+contextra_types::schema::ManifestSchemaVersion::doc_id_bytes_len pub fn doc_id_bytes_len(self) -> usize
+contextra_types::schema::ManifestSchemaVersion::doc_id_width pub fn doc_id_width(self) -> DocIdWidth
+contextra_types::schema::ManifestSchemaVersion::from_u8 pub fn from_u8(version_byte: u8) -> Result<Self>
+contextra_types::schema::ManifestSchemaVersion::from_u8_checked pub fn from_u8_checked(version_byte: u8) -> Result<Self>
+contextra_types::schema::ManifestSchemaVersion::is_compatible_with_current_build pub fn is_compatible_with_current_build(self) -> bool
+contextra_types::schema::ManifestSchemaVersion::validate_build_compatibility pub fn validate_build_compatibility(self) -> Result<Self>
+contextra_types::tenant_scope pub mod tenant_scope
+contextra_types::tenant_scope::TenantScopeViolation pub enum TenantScopeViolation
+contextra_types::tenant_scope::TenantScoped pub struct TenantScoped<T>
+contextra_types::tenant_scope::into_inner_checked pub fn into_inner_checked(self, expected: &TenantId) -> Result<T, TenantScopeViolation>
+contextra_types::tenant_scope::map pub fn map<U>(self, f: impl FnOnce(T) -> U) -> TenantScoped<U>
+contextra_types::tenant_scope::new pub fn new(tenant_id: TenantId, value: T) -> Self
+contextra_types::tenant_scope::tenant_id pub fn tenant_id(&self) -> &TenantId
+contextra_types::tombstone pub mod tombstone
+contextra_types::tombstone::SeqBitTombstone pub struct SeqBitTombstone
+contextra_types::tombstone::TombstoneSemanticsCheck pub trait TombstoneSemanticsCheck
+contextra_types::types pub mod types
+contextra_types::types::budget pub mod budget
+contextra_types::types::budget::BudgetStrategy pub enum BudgetStrategy
+contextra_types::types::budget::Reservation pub struct Reservation<'a>
+contextra_types::types::budget::ResourceBudget pub struct ResourceBudget
+contextra_types::types::budget::ResourceTracker pub struct ResourceTracker
+contextra_types::types::budget::ResourceTracker::budget pub fn budget(&self) -> &ResourceBudget
+contextra_types::types::budget::ResourceTracker::consume_memory pub fn consume_memory(&self, bytes: u64) -> Result<()>
+contextra_types::types::budget::ResourceTracker::has_memory_capacity pub fn has_memory_capacity(&self) -> bool
+contextra_types::types::budget::ResourceTracker::memory_used pub fn memory_used(&self) -> u64
+contextra_types::types::budget::ResourceTracker::new pub fn new(budget: ResourceBudget) -> Self
+contextra_types::types::budget::ResourceTracker::release_memory pub fn release_memory(&self, bytes: u64)
+contextra_types::types::budget::TokenBudget pub struct TokenBudget
+contextra_types::types::budget::TokenBudget::available pub fn available(&self) -> usize
+contextra_types::types::budget::TokenBudget::consume pub fn consume(&self, tokens: usize)
+contextra_types::types::budget::TokenBudget::consumed pub fn consumed(&self) -> usize
+contextra_types::types::budget::TokenBudget::effective_limit pub fn effective_limit(&self) -> usize
+contextra_types::types::budget::TokenBudget::for_model pub fn for_model(model: &str) -> Self
+contextra_types::types::budget::TokenBudget::new pub fn new(max_tokens: usize, reserve_tokens: usize) -> Self
+contextra_types::types::budget::TokenBudget::refund pub fn refund(&self, tokens: usize)
+contextra_types::types::budget::TokenBudget::reserve pub fn reserve(&self, amount: usize) -> Result<Reservation<'_>>
+contextra_types::types::budget::TokenBudget::try_reserve pub fn try_reserve(&self, tokens: usize) -> Result<()>
+contextra_types::types::budget::TokenBudget::with_reserved pub fn with_reserved(mut self, system_tokens: usize, answer_tokens: usize) -> Self
+contextra_types::types::budget::TokenBudget::with_strategy pub fn with_strategy(mut self, strategy: BudgetStrategy) -> Self
+contextra_types::types::budget::settle pub fn settle(self)
+contextra_types::types::domain pub mod domain
+contextra_types::types::domain::document::DistanceMetric pub enum DistanceMetric
+contextra_types::types::domain::document::DistanceMetric::compute pub fn compute(&self, a: &[f32], b: &[f32]) -> Result<f32>
+contextra_types::types::domain::document::DistanceMetric::compute_u8 pub fn compute_u8(&self, a: &[u8], b: &[u8]) -> Result<u32>
+contextra_types::types::domain::document::Embedding pub struct Embedding
+contextra_types::types::domain::document::Embedding::as_slice pub fn as_slice(&self) -> &[f32]
+contextra_types::types::domain::document::Embedding::dim pub fn dim(&self) -> usize
+contextra_types::types::domain::document::Embedding::l2_norm pub fn l2_norm(&self) -> f32
+contextra_types::types::domain::document::Embedding::new pub fn new(data: Vec<f32>) -> Self
+contextra_types::types::domain::document::Embedding::normalize pub fn normalize(&self) -> Self
+contextra_types::types::domain::document::RerankResult pub struct RerankResult
+contextra_types::types::domain::document::ScoredDocument pub struct ScoredDocument
+contextra_types::types::domain::document::ScoredDocument::new pub fn new(doc_id: DocId, score: f32) -> Self
+contextra_types::types::domain::ids::CollectionId pub struct CollectionId(pub u64)
+contextra_types::types::domain::ids::CollectionId::try_new pub fn try_new(id: u64) -> Result<Self>
+contextra_types::types::domain::ids::DEFAULT pub const DEFAULT: Self = Self(0)
+contextra_types::types::domain::ids::DocId pub struct DocId(pub u128)
+contextra_types::types::domain::ids::DocId pub struct DocId(pub u64)
+contextra_types::types::domain::ids::DocId::from_key pub fn from_key(key: &str) -> Result<Self>
+contextra_types::types::domain::ids::EntityId pub struct EntityId(pub u64)
+contextra_types::types::domain::ids::EntityId::as_bytes pub fn as_bytes(&self) -> Vec<u8>
+contextra_types::types::domain::ids::EntityId::from_doc_id pub fn from_doc_id(doc_id: DocId) -> Self
+contextra_types::types::domain::ids::EntityId::from_key pub fn from_key(key: &str) -> Result<Self>
+contextra_types::types::domain::ids::INTERNAL_BASE pub const INTERNAL_BASE: u64 = u64::MAX - 1_000_000
+contextra_types::types::domain::ids::INVALID pub const INVALID: Self = Self(0)
+contextra_types::types::domain::ids::MAX pub const MAX: Self = Self(u128::MAX)
+contextra_types::types::domain::ids::MAX pub const MAX: Self = Self(u64::MAX)
+contextra_types::types::domain::ids::MAX_COLLECTION_SEQUENCE pub const MAX_COLLECTION_SEQUENCE: u64 = 1_000_000_000_000
+contextra_types::types::domain::ids::MIN pub const MIN: Self = Self(0)
+contextra_types::types::domain::ids::SYSTEM pub const SYSTEM: Self = Self(0)
+contextra_types::types::domain::ids::TenantId pub struct TenantId(pub u64)
+contextra_types::types::domain::ids::TenantId::is_system pub fn is_system(self) -> bool
+contextra_types::types::domain::ids::TenantId::try_new pub fn try_new(id: u64) -> Result<Self>
+contextra_types::types::domain::ids::TxId pub struct TxId(pub u64)
+contextra_types::types::domain::ids::TxId::internal_with_offset pub fn internal_with_offset(offset: u64) -> Result<Self>
+contextra_types::types::domain::ids::TxId::is_valid_origin pub fn is_valid_origin(&self) -> bool
+contextra_types::types::domain::ids::TxId::try_from_internal_offset pub fn try_from_internal_offset(offset: u64) -> Result<Self>
+contextra_types::types::domain::ids::TxId::try_new pub fn try_new(id: u64) -> Result<Self>
+contextra_types::types::domain::ids::fn pub const fn as_u64(self) -> u64
+contextra_types::types::domain::ids::fn pub const fn inner(self) -> u128
+contextra_types::types::domain::ids::fn pub const fn inner(self) -> u64
+contextra_types::types::domain::ids::fn pub const fn internal() -> Self
+contextra_types::types::domain::ids::fn pub const fn new(id: u128) -> Self
+contextra_types::types::domain::ids::fn pub const fn new(id: u64) -> Self
+contextra_types::types::domain::ids::fn pub const fn new_unchecked(id: u64) -> Self
+contextra_types::types::domain::ids::fn pub const fn system() -> Self
+contextra_types::types::domain::misc::AutoExtractionMode pub enum AutoExtractionMode
+contextra_types::types::domain::misc::AutoExtractionMode::is_enabled pub fn is_enabled(self) -> bool
+contextra_types::types::domain::misc::ConfigFingerprint pub struct ConfigFingerprint
+contextra_types::types::domain::misc::ConfigFingerprint::new pub fn new( model_id: impl Into<String>, quantization: impl Into<String>, prompt_template: &str, temperature: f32, ) -> Self
+contextra_types::types::domain::misc::ConfigFingerprint::temperature pub fn temperature(&self) -> f32
+contextra_types::types::domain::misc::ConfigFingerprint::threshold pub fn threshold(&self) -> f32
+contextra_types::types::domain::misc::ConfigFingerprint::with_threshold pub fn with_threshold(mut self, threshold: f32) -> Self
+contextra_types::types::domain::misc::DeterministicTimestamp pub struct DeterministicTimestamp
+contextra_types::types::domain::misc::EXPIRY_METADATA_KEY pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq"
+contextra_types::types::domain::misc::Edge pub struct Edge
+contextra_types::types::domain::misc::Edge::new pub fn new(from: EntityId, to: EntityId, label: impl Into<String>) -> Self
+contextra_types::types::domain::misc::Edge::try_new pub fn try_new( from: EntityId, to: EntityId, label: impl Into<String>, weight: f32, ) -> Result<Self>
+contextra_types::types::domain::misc::Edge::with_business_validity pub fn with_business_validity(mut self, from: Option<i64>, to: Option<i64>) -> Self
+contextra_types::types::domain::misc::Edge::with_source_doc_id pub fn with_source_doc_id(mut self, doc_id: DocId) -> Self
+contextra_types::types::domain::misc::Edge::with_tx_validity pub fn with_tx_validity(self, from: Option<TxId>, to: Option<TxId>) -> Self
+contextra_types::types::domain::misc::Edge::with_validity pub fn with_validity(mut self, from: Option<TxId>, to: Option<TxId>) -> Self
+contextra_types::types::domain::misc::Edge::with_weight pub fn with_weight(mut self, weight: f32) -> Self
+contextra_types::types::domain::misc::Entity pub struct Entity
+contextra_types::types::domain::misc::Entity::new pub fn new(id: EntityId, name: impl Into<String>, entity_type: impl Into<String>) -> Self
+contextra_types::types::domain::misc::Entity::try_new pub fn try_new( id: EntityId, name: impl Into<String>, entity_type: impl Into<String>, ) -> Result<Self>
+contextra_types::types::domain::misc::LinkRelation pub enum LinkRelation
+contextra_types::types::domain::misc::MAX_SEARCH_K pub const MAX_SEARCH_K: usize = 1_000
+contextra_types::types::domain::misc::MemoryLink pub struct MemoryLink
+contextra_types::types::domain::misc::MemoryType pub enum MemoryType
+contextra_types::types::domain::misc::MemoryType::as_metadata_key pub fn as_metadata_key(&self) -> &'static str
+contextra_types::types::domain::misc::MemoryType::as_str pub fn as_str(&self) -> &'static str
+contextra_types::types::domain::misc::MemoryType::default_decay pub fn default_decay(&self) -> crate::types::importance::DecayFunction
+contextra_types::types::domain::misc::MemoryType::default_ttl_tx pub fn default_ttl_tx(&self) -> Option<u64>
+contextra_types::types::domain::misc::PprAlgorithm pub enum PprAlgorithm
+contextra_types::types::domain::misc::PprConfig pub struct PprConfig
+contextra_types::types::domain::misc::TOMBSTONE_BIT pub const TOMBSTONE_BIT: u64 = 1 << 63
+contextra_types::types::domain::misc::TlHfdParams pub struct TlHfdParams
+contextra_types::types::domain::misc::TlHfdParams::validate pub fn validate(&self) -> Result<()>
+contextra_types::types::domain::misc::WorkflowState pub struct WorkflowState
+contextra_types::types::domain::misc::fn pub const fn new(wall_ms: u64, mono_ctr: u64) -> Self
+contextra_types::types::domain::misc::hex::deserialize pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
+contextra_types::types::domain::misc::hex::serialize pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
+contextra_types::types::domain::reexport pub use document::*
+contextra_types::types::domain::reexport pub use document::RerankResult
+contextra_types::types::domain::reexport pub use ids::*
+contextra_types::types::domain::reexport pub use misc::*
+contextra_types::types::filter pub mod filter
+contextra_types::types::filter::FilterExpr pub enum FilterExpr
+contextra_types::types::filter::FilterExpr::evaluate pub fn evaluate(&self, metadata: &serde_json::Value) -> bool
+contextra_types::types::importance pub mod importance
+contextra_types::types::importance::DecayFunction pub enum DecayFunction
+contextra_types::types::importance::DecayFunction::decay_factor pub fn decay_factor(&self, created_at_tx: TxId, now_tx: TxId) -> f32
+contextra_types::types::importance::DecayFunction::decay_factor_wallclock pub fn decay_factor_wallclock( &self, created_at_epoch_secs: u64, now_epoch_secs: u64, created_at_tx: TxId, now_tx: TxId, ) -> f32
+contextra_types::types::importance::ImportanceScore pub struct ImportanceScore(f32)
+contextra_types::types::importance::ImportanceScore::new pub fn new(raw: f32) -> Self
+contextra_types::types::importance::ImportanceScore::value pub fn value(&self) -> f32
+contextra_types::types::importance::MemoryImportance pub struct MemoryImportance
+contextra_types::types::importance::MemoryImportance::effective_score pub fn effective_score(&self, now_tx: TxId) -> f32
+contextra_types::types::importance::MemoryImportance::new pub fn new(base_score: ImportanceScore, decay: DecayFunction, created_at_tx: TxId) -> Self
+contextra_types::types::math pub mod math
+contextra_types::types::math::SaturatingU8 pub struct SaturatingU8(u8)
+contextra_types::types::math::fn pub const fn get(self) -> u8
+contextra_types::types::math::fn pub const fn new(val: u8) -> Self
+contextra_types::types::reexport pub use budget::*
+contextra_types::types::reexport pub use domain::*
+contextra_types::types::reexport pub use filter::*
+contextra_types::types::reexport pub use importance::*
+contextra_types::types::reexport pub use math::*
+contextra_types::types::reexport pub use saos::*
+contextra_types::types::reexport pub use saturating::*
+contextra_types::types::saos pub mod saos
+contextra_types::types::saos::ContextChunk pub struct ContextChunk
+contextra_types::types::saos::ContextChunk::combined_text_owned pub fn combined_text_owned(&self) -> String
+contextra_types::types::saos::ContextChunk::combined_token_count pub fn combined_token_count(&self) -> usize
+contextra_types::types::saos::ContextChunk::has_context_prefix pub fn has_context_prefix(&self) -> bool
+contextra_types::types::saos::ContextWindow pub struct ContextWindow
+contextra_types::types::saos::FusionStrategy pub enum FusionStrategy
+contextra_types::types::saos::FusionWeights pub struct FusionWeights
+contextra_types::types::saos::FusionWeights::graph pub fn graph(&self) -> f32
+contextra_types::types::saos::FusionWeights::metadata pub fn metadata(&self) -> f32
+contextra_types::types::saos::FusionWeights::new pub fn new(vector: f32, text: f32, graph: f32) -> Result<Self>
+contextra_types::types::saos::FusionWeights::text pub fn text(&self) -> f32
+contextra_types::types::saos::FusionWeights::vector pub fn vector(&self) -> f32
+contextra_types::types::saos::GraphTraversalStrategy pub enum GraphTraversalStrategy
+contextra_types::types::saos::HybridQuery pub struct HybridQuery
+contextra_types::types::saos::HybridQuery::builder pub fn builder() -> HybridQueryBuilder
+contextra_types::types::saos::HybridQuery::community_boosted pub fn community_boosted(entity_id: EntityId) -> Result<Self>
+contextra_types::types::saos::HybridQuery::filtered pub fn filtered(filter: FilterExpr) -> Result<Self>
+contextra_types::types::saos::HybridQuery::graph_search pub fn graph_search( start_node: impl Into<String>, strategy: GraphTraversalStrategy, ) -> Result<Self>
+contextra_types::types::saos::HybridQuery::memory_filtered pub fn memory_filtered(types: Vec<MemoryType>) -> Result<Self>
+contextra_types::types::saos::HybridQuery::rerank_pool_config pub fn rerank_pool_config(multiplier: usize, max: usize) -> Result<Self>
+contextra_types::types::saos::HybridQuery::text_search pub fn text_search(text: impl Into<String>) -> Result<Self>
+contextra_types::types::saos::HybridQuery::vector_search pub fn vector_search(vector: Vec<f32>) -> Result<Self>
+contextra_types::types::saos::HybridQuery::with_failure_policy pub fn with_failure_policy(policy: OnSignalFailure) -> Result<Self>
+contextra_types::types::saos::HybridQuery::with_fusion pub fn with_fusion( weights: FusionWeights, strategy: impl Into<SignalFusionStrategies>, ) -> Result<Self>
+contextra_types::types::saos::HybridQuery::with_provenance_and_superseded pub fn with_provenance_and_superseded( include_provenance: bool, include_superseded: bool, ) -> Result<Self>
+contextra_types::types::saos::HybridQueryBuilder pub struct HybridQueryBuilder
+contextra_types::types::saos::HybridQueryBuilder::build pub fn build(self) -> Result<HybridQuery>
+contextra_types::types::saos::HybridQueryBuilder::new pub fn new() -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_filter pub fn with_filter(mut self, filter: FilterExpr) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_fusion_strategy pub fn with_fusion_strategy(mut self, strategy: impl Into<SignalFusionStrategies>) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_fusion_weights pub fn with_fusion_weights(mut self, weights: FusionWeights) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_graph_start_node pub fn with_graph_start_node(mut self, start: impl Into<String>) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_graph_strategy pub fn with_graph_strategy(mut self, strategy: GraphTraversalStrategy) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_include_provenance pub fn with_include_provenance(mut self, include: bool) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_include_superseded pub fn with_include_superseded(mut self, include: bool) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_k pub fn with_k(mut self, k: usize) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_memory_type_filter pub fn with_memory_type_filter(mut self, types: Vec<MemoryType>) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_on_signal_failure pub fn with_on_signal_failure(mut self, policy: OnSignalFailure) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_rerank_pool_max pub fn with_rerank_pool_max(mut self, max: usize) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_rerank_pool_multiplier pub fn with_rerank_pool_multiplier(mut self, multiplier: usize) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_same_community_as pub fn with_same_community_as(mut self, entity_id: EntityId) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_text_query pub fn with_text_query(mut self, q: impl Into<String>) -> Self
+contextra_types::types::saos::HybridQueryBuilder::with_vector_query pub fn with_vector_query(mut self, v: Vec<f32>) -> Self
+contextra_types::types::saos::OnSignalFailure pub enum OnSignalFailure
+contextra_types::types::saos::QueryOptions pub type QueryOptions = HybridQuery
+contextra_types::types::saos::QueryOptionsBuilder pub type QueryOptionsBuilder = HybridQueryBuilder
+contextra_types::types::saos::QueryRewriteOutput pub struct QueryRewriteOutput
+contextra_types::types::saos::QueryRewriteOutput::into_query_builder pub fn into_query_builder(self) -> HybridQueryBuilder
+contextra_types::types::saos::QueryRewriteOutput::is_empty pub fn is_empty(&self) -> bool
+contextra_types::types::saos::QueryRewriteOutput::new pub fn new( text_query: Option<String>, semantic_query: Option<String>, anchor_entities: Vec<String>, ) -> Self
+contextra_types::types::saos::QueryRewriteOutput::text_only pub fn text_only(text: impl Into<String>) -> Self
+contextra_types::types::saos::ScoredEntry pub struct ScoredEntry
+contextra_types::types::saos::Signal pub enum Signal
+contextra_types::types::saos::SignalFusionStrategies pub struct SignalFusionStrategies
+contextra_types::types::saos::SignalFusionStrategies::strategy_for_signal pub fn strategy_for_signal(&self, signal_name: &str) -> FusionStrategy
+contextra_types::types::saos::SignalFusionStrategies::uniform pub fn uniform(strategy: FusionStrategy) -> Self
+contextra_types::types::saos::reexport pub use super::domain::RerankResult
+contextra_types::types::saturating pub mod saturating
+contextra_types::types::saturating::SaturatingU16 pub struct SaturatingU16(u16)
+contextra_types::types::saturating::fn pub const fn get(self) -> u16
+contextra_types::types::saturating::fn pub const fn new(val: u16) -> Self
