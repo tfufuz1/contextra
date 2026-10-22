@@ -4,7 +4,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_range_loop)]
 
 use contextra_adapt::{BanditError, BanditImplementation, BanditProfileState, SeededRng};
-use contextra_ports::SeededRng as _;
 
 /// Referenz-RLS in f64 (Discounted Recursive Least Squares) zur Genauigkeitsprüfung.
 struct RlsF64 {
