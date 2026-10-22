@@ -269,6 +269,7 @@ pub fn check_single_commit(sha: &str, repo_dir: Option<&Path>) -> Result<(), Str
 }
 
 /// Löst einen Commit-Range (z. B. `base..head`) in eine Liste von Commit-SHAs auf via `git rev-list <range>`.
+#[cfg_attr(not(test), allow(dead_code))] // Helper function included in test targets via #[path]
 pub fn resolve_commit_range(range: &str, repo_dir: Option<&Path>) -> Result<Vec<String>, String> {
     let mut cmd = Command::new("git");
     if let Some(dir) = repo_dir {
@@ -298,6 +299,7 @@ pub fn resolve_commit_range(range: &str, repo_dir: Option<&Path>) -> Result<Vec<
 }
 
 /// Hauptfunktion für das Subkommando `check-commit-diff-integrity`.
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_check_commit_diff_integrity(args: &[String]) -> Result<(), String> {
     println!("=== Running xtask check-commit-diff-integrity ===");
 

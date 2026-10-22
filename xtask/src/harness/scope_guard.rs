@@ -30,6 +30,7 @@ pub struct ScopeGuardCard {
     #[serde(default)]
     pub scope: Vec<String>,
     #[serde(default)]
+    #[cfg_attr(not(test), allow(dead_code))] // Card config field parsed from TOML
     pub forbidden: Vec<String>,
 }
 
@@ -90,6 +91,7 @@ pub fn scope_guard_resolve_card_path(root: &Path, id_or_path: &str) -> PathBuf {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Harness runner function included in test targets via #[path]
 pub fn run_scope_guard(args: &[String]) -> i32 {
     let mut root_dir = scope_guard_default_root();
     let mut base = String::new();
@@ -282,6 +284,7 @@ pub fn run_scope_guard(args: &[String]) -> i32 {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Gate emit helper included in test targets via #[path]
 fn scope_guard_emit(res: ScopeGuardGateResult, json_output: bool, exit_code: i32) -> i32 {
     if json_output {
         println!("{}", serde_json::to_string(&res).unwrap_or_default());
@@ -301,6 +304,7 @@ fn scope_guard_emit(res: ScopeGuardGateResult, json_output: bool, exit_code: i32
     exit_code
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Root finder helper included in test targets via #[path]
 fn scope_guard_default_root() -> PathBuf {
     let output = Command::new("git")
         .args(["rev-parse", "--show-toplevel"])
@@ -314,6 +318,7 @@ fn scope_guard_default_root() -> PathBuf {
     env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Git merge-base helper included in test targets via #[path]
 fn scope_guard_git_merge_base(root: &Path, head: &str) -> String {
     let output = Command::new("git")
         .current_dir(root)
@@ -336,6 +341,7 @@ fn scope_guard_git_merge_base(root: &Path, head: &str) -> String {
     head.to_string()
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Git trailers helper included in test targets via #[path]
 fn scope_guard_git_log_trailers(root: &Path, base: &str, head: &str) -> String {
     let range = if base == head {
         head.to_string()
@@ -353,6 +359,7 @@ fn scope_guard_git_log_trailers(root: &Path, base: &str, head: &str) -> String {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Git diff helper included in test targets via #[path]
 fn scope_guard_get_changed_files(root: &Path, base: &str, head: &str) -> Vec<String> {
     let range = if base == head {
         format!("{}^..{}", head, head)

@@ -30,6 +30,7 @@ fn get_benchmark_iterations() -> usize {
 }
 
 /// Berechnet das P95-Perzentil aus einer Reihe von Latenzwerten in Microsekunden.
+#[cfg_attr(not(test), allow(dead_code))] // Public calculation helper tested via unit test suite
 pub fn calculate_p95(latencies_us: &[u64]) -> u64 {
     if latencies_us.is_empty() {
         return 0;

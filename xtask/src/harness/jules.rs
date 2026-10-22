@@ -29,6 +29,7 @@ pub struct JulesFacadeConfig {
     pub phase: JulesFacadePhaseConfig,
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Root finder helper included in test targets via #[path]
 pub fn jules_facade_find_root(start: &Path) -> PathBuf {
     let mut current = start.to_path_buf();
     loop {
@@ -267,6 +268,7 @@ pub fn jules_facade_execute_phase(
     (overall_status, json)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Facade runner function included in test targets via #[path]
 pub fn run_jules(args: &[String]) -> i32 {
     let mut root_dir: Option<PathBuf> = None;
     let mut json_output = false;

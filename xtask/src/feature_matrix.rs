@@ -18,6 +18,7 @@ pub enum FeatureDefault {
 }
 
 impl FeatureDefault {
+    #[cfg_attr(not(test), allow(dead_code))] // Feature display helper included in test targets via #[path]
     pub fn as_str(&self) -> &'static str {
         match self {
             FeatureDefault::On => "On",
@@ -43,6 +44,7 @@ pub struct FeatureCheckResult {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(not(test), allow(dead_code))] // TOML deserialization struct included in test targets via #[path]
 struct CargoTomlPartial {
     package: Option<PackagePartial>,
     features: Option<BTreeMap<String, Vec<String>>>,
@@ -51,10 +53,12 @@ struct CargoTomlPartial {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(not(test), allow(dead_code))] // TOML package struct included in test targets via #[path]
 struct PackagePartial {
     name: String,
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Path finder helper included in test targets via #[path]
 fn find_root_dir() -> PathBuf {
     if let Ok(cargo_manifest) = std::env::var("CARGO_MANIFEST_DIR") {
         let path = PathBuf::from(cargo_manifest);
@@ -77,6 +81,7 @@ fn find_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Feature scanner helper included in test targets via #[path]
 pub fn scan_crate_features(crates_dir: &Path) -> Result<Vec<FeatureEntry>, String> {
     let mut entries = Vec::new();
     if !crates_dir.exists() {
@@ -161,6 +166,7 @@ pub fn scan_crate_features(crates_dir: &Path) -> Result<Vec<FeatureEntry>, Strin
     Ok(entries)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_feature_matrix(
     test: bool,
     only: Option<&str>,
@@ -169,6 +175,7 @@ pub fn run_feature_matrix(
     run_feature_matrix_in_root(&root, test, only)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_feature_matrix_in_root(
     root: &Path,
     test: bool,

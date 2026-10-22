@@ -1,4 +1,4 @@
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 fn chrono_or_today_with_tags(tags: &[TagItem]) -> String {
     let mut latest_tag_date = String::new();
     for tag in tags {
@@ -37,7 +37,7 @@ fn chrono_or_today_with_tags(tags: &[TagItem]) -> String {
     }
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 fn chrono_or_today() -> String {
     chrono_or_today_with_tags(&[])
 }
@@ -702,7 +702,7 @@ pub fn update_markdown_section(
 }
 
 // NOTE: Konsolidierung mit check-duplicate-intent geprüft (TS: 2026-09-08T00:00:00Z) — unterschiedliche Datenmodelle (Session-Kontinuität-Markdown-Abschnittsgenerierung vs. PR-Commit-Duplikatsprüfungs-Gate), keine sinnvolle Code-Wiederverwendung identifiziert.
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 fn generate_session_continuity_section(tags: &[TagItem]) -> String {
     let root_path = find_root_dir();
     generate_session_continuity_section_from_root(&root_path, tags)
@@ -855,7 +855,7 @@ fn generate_session_continuity_section_from_root(root_path: &Path, tags: &[TagIt
     out
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 fn tokenize_title(title: &str) -> std::collections::HashSet<String> {
     title
         .to_lowercase()
@@ -865,7 +865,7 @@ fn tokenize_title(title: &str) -> std::collections::HashSet<String> {
         .collect()
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 fn jaccard_similarity(
     s1: &std::collections::HashSet<String>,
     s2: &std::collections::HashSet<String>,
@@ -882,7 +882,7 @@ fn jaccard_similarity(
     }
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 fn extract_scope(title: &str) -> String {
     if let Some(start) = title.find('(') {
         if let Some(end) = title[start..].find(')') {
@@ -1123,7 +1123,7 @@ fn generate_dag_topology_section(crates: &[CrateInfo]) -> String {
     out
 }
 
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 fn format_loc(loc: usize) -> String {
     let s = loc.to_string();
     let mut result = String::new();
@@ -2431,14 +2431,6 @@ fn main() {
         "check-duplicate-intent" => {
             if let Err(e) = check_duplicate_intent::check_duplicate_intent() {
                 eprintln!("❌ check-duplicate-intent failed: {}", e);
-                process::exit(1);
-            }
-        }
-        "check-commit-diff-integrity" => {
-            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
-            if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
-            {
-                eprintln!("❌ check-commit-diff-integrity failed: {}", e);
                 process::exit(1);
             }
         }

@@ -19,6 +19,7 @@ pub enum PanicKind {
 }
 
 impl PanicKind {
+    #[cfg_attr(not(test), allow(dead_code))] // Panic kind helper included in test targets via #[path]
     pub fn as_str(&self) -> &'static str {
         match self {
             PanicKind::Unwrap => "unwrap",
@@ -39,6 +40,7 @@ pub struct PanicEntry {
     pub is_test_code: bool,
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Path finder helper included in test targets via #[path]
 fn find_root_dir() -> PathBuf {
     if let Ok(cargo_manifest) = std::env::var("CARGO_MANIFEST_DIR") {
         let path = PathBuf::from(cargo_manifest);
@@ -61,6 +63,7 @@ fn find_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Baseline loader helper included in test targets via #[path]
 fn load_baseline(root: &Path) -> HashSet<(String, usize)> {
     let baseline_path = root.join(".github").join("unwrap_baseline.txt");
     let mut set = HashSet::new();
@@ -81,6 +84,7 @@ fn load_baseline(root: &Path) -> HashSet<(String, usize)> {
     set
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Scanner helper included in test targets via #[path]
 fn scan_rs_file(
     file_path: &Path,
     root: &Path,
@@ -164,6 +168,7 @@ fn scan_rs_file(
     Ok(entries)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // File collector helper included in test targets via #[path]
 fn collect_rs_files(dir: &Path, crate_filter: Option<&str>) -> Vec<PathBuf> {
     let mut rs_files = Vec::new();
     if !dir.exists() {
@@ -191,6 +196,7 @@ fn collect_rs_files(dir: &Path, crate_filter: Option<&str>) -> Vec<PathBuf> {
     rs_files
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_panic_inventory(
     crate_filter: Option<&str>,
     exclude_tests: bool,
@@ -200,6 +206,7 @@ pub fn run_panic_inventory(
     run_panic_inventory_in_root(&root, crate_filter, exclude_tests, strict)
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_panic_inventory_in_root(
     root: &Path,
     crate_filter: Option<&str>,

@@ -24,6 +24,7 @@ struct CrateEntryPartial {
     ring: String,
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Path finder helper included in test targets via #[path]
 fn find_root_dir() -> PathBuf {
     if let Ok(cargo_manifest) = std::env::var("CARGO_MANIFEST_DIR") {
         let path = PathBuf::from(cargo_manifest);
@@ -46,6 +47,7 @@ fn find_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
+#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_check_ring_capabilities_consistency() -> Result<Vec<RingConsistencyFinding>, String> {
     let root = find_root_dir();
     run_check_ring_capabilities_consistency_in_root(&root)
