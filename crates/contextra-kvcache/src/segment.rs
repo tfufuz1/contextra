@@ -421,7 +421,6 @@ impl KvSegment {
             encrypted_payload: Some(EncryptedSegmentPayload {
                 layer: encrypted_layer,
             }),
-            #[cfg(test)]
             test_inspector: None,
         })
     }
@@ -596,9 +595,8 @@ mod tests {
     #[test]
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_v0_legacy_backward_compatibility() {
-        #[allow(deprecated)]
-        let km = CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
-        let cipher = KvSegmentCipher::new(km);
+        let (km, _) = KeyManager::try_new_argon2id("passphrase-123456").unwrap();
+        let cipher = KvSegmentCipher::ephemeral(km);
         let tenant = TenantId::try_new(101).unwrap();
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
         let plaintext = b"legacy version 0 plaintext payload";
@@ -631,21 +629,22 @@ mod tests {
     #[test]
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_v1_vs_v0_key_separation() {
-        #[allow(deprecated)]
-        let km = CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
-        let cipher = KvSegmentCipher::new(km);
+        let (km1, _) = KeyManager::try_new_argon2id("passphrase-123456").unwrap();
+        let (km0, _) = KeyManager::try_new_argon2id("passphrase-123456").unwrap();
+        let cipher1 = KvSegmentCipher::ephemeral(km1);
+        let cipher0 = KvSegmentCipher::ephemeral(km0);
         let tenant = TenantId::try_new(101).unwrap();
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
         let plaintext = b"version 1 plaintext payload";
 
         let mut segment =
-            KvSegment::new_encrypted(&cipher, tenant, 1, fp, None, plaintext).unwrap();
+            KvSegment::new_encrypted(&cipher1, tenant, 1, fp, None, plaintext).unwrap();
 
-        let decrypted = segment.decrypt_data(&cipher).unwrap();
+        let decrypted = segment.decrypt_data(&cipher1).unwrap();
         assert_eq!(decrypted, plaintext);
 
         segment.key_derivation_version = 0;
-        let res = segment.decrypt_data(&cipher);
+        let res = segment.decrypt_data(&cipher0);
         assert!(
             res.is_err(),
             "Decryption of v1 ciphertext with v0 key derivation MUST fail"
@@ -655,9 +654,8 @@ mod tests {
     #[test]
     #[cfg(feature = "kv-encryption")]
     fn test_kv_segment_unsupported_version_error() {
-        #[allow(deprecated)]
-        let km = CryptoKey::try_new("passphrase-123456", b"salt-123456").unwrap();
-        let cipher = KvSegmentCipher::new(km);
+        let (km, _) = KeyManager::try_new_argon2id("passphrase-123456").unwrap();
+        let cipher = KvSegmentCipher::ephemeral(km);
         let tenant = TenantId::try_new(101).unwrap();
         let fp = ModelFingerprint::new([0x11u8; 32], "test-model", "Q4_K_M");
         let plaintext = b"unsupported version test payload";
