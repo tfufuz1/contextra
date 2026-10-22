@@ -28,22 +28,17 @@ pub mod gasp;
 #[cfg(feature = "kv-bridge")]
 pub mod kv_bridge;
 
-#[cfg(feature = "kv-stage-b")]
 pub mod kv_state;
-#[cfg(feature = "kv-stage-b")]
 pub mod model;
 
 pub use attention_exporter::*;
 pub use embedding::CandleEmbedClient;
 pub use embedding_provider::MAX_CANDLE_EMBED_BATCH_SIZE;
 pub use gasp::{GaspConfig, GaspValidator, DEFAULT_GROUNDING_THRESHOLD};
-#[cfg(feature = "kv-stage-b")]
-pub use inference::{QuantizedLlamaModel, QuantizedQwen2Model};
 pub use inference::*;
+pub use inference::{QuantizedLlamaModel, QuantizedQwen2Model};
 #[cfg(feature = "kv-bridge")]
 pub use kv_bridge::KvBridgeAdapter;
-#[cfg(feature = "kv-stage-b")]
 pub use kv_state::{KvState, LayerKv};
-#[cfg(feature = "kv-stage-b")]
 pub use model::{quantized_llama, quantized_qwen2};
 pub use model_registry::{compute_fingerprint, CandleQuantization, ModelFingerprint};

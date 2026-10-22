@@ -785,6 +785,7 @@ dependencies = [
  "candle-nn",
  "candle-transformers",
  "contextra-crypto",
+ "contextra-kvcache",
  "contextra-ports",
  "contextra-rank",
  "contextra-types",

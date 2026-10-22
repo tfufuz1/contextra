@@ -13,7 +13,9 @@ use bytes::Bytes;
 use contextra_crypto::EncryptedKvLayer;
 use contextra_crypto::KvSegmentCipher;
 #[cfg(test)]
-use contextra_kvcache::{KvSegment, TenantIsolatedKvStore};
+use contextra_kvcache::KvSegment;
+#[cfg(feature = "kv-bridge")]
+use contextra_kvcache::TenantIsolatedKvStore;
 use contextra_ports::{ContextSegment, KvBridgeStorage};
 use contextra_types::{ModelFingerprint, TenantId, TxId};
 use serde::{Deserialize, Serialize};
