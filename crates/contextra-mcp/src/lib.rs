@@ -32,6 +32,7 @@ pub mod egress_guard;
 pub mod explain;
 pub mod io;
 pub mod ipc;
+pub mod kv_wiring;
 pub mod plugin_status;
 pub mod prompt_injection;
 pub mod proof_key;
@@ -75,7 +76,7 @@ pub use prompt_injection::{
 };
 
 #[cfg(feature = "kv-bridge")]
-pub use routing::setup_kv_bridge;
+pub use kv_wiring::setup_kv_bridge;
 pub use routing::{setup_routing, RoutingHandle};
 
 pub use server::McpServer;
