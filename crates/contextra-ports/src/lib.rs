@@ -20,6 +20,7 @@ use std::pin::Pin;
 
 pub use contextra_types::*;
 pub use contextra_types::{error, error_dto, model_fingerprint, schema, tombstone, types};
+pub use strum;
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
