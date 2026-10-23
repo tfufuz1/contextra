@@ -40,16 +40,19 @@ async fn test_hnsw_docid_high_bits_isolation_and_tombstones() -> contextra_types
 
     let index = HnswIndex::try_new(config)?;
 
-    // SCHRITT 2: Zwei DocIds, die sich NUR in den oberen 64 Bit unterscheiden (falls docid-128 aktiviert ist).
-    #[cfg(feature = "docid-128")]
-    let id1 = DocId::from(1_u128);
-    #[cfg(feature = "docid-128")]
-    let id2 = DocId::from(1_u128 | (1_u128 << 64));
-
-    #[cfg(not(feature = "docid-128"))]
-    let id1 = DocId::from(1_u64);
-    #[cfg(not(feature = "docid-128"))]
-    let id2 = DocId::from(1001_u64);
+    // SCHRITT 2: Zwei DocIds. In 128-Bit-Modus unterscheiden sie sich NUR in den oberen 64 Bit.
+    let mut b1 = [0u8; DocId::BYTES];
+    b1[0] = 1;
+    let mut b2 = [0u8; DocId::BYTES];
+    if DocId::BYTES == 16 {
+        b2[0] = 1;
+        b2[8] = 1;
+    } else {
+        b2[0] = 233; // 1001 & 0xFF
+        b2[1] = 3;   // 1001 >> 8
+    }
+    let id1 = DocId::from_le_bytes(b1);
+    let id2 = DocId::from_le_bytes(b2);
 
     let id_max = DocId::MAX;
     let id_min = DocId::MIN; // DocId(0)
@@ -149,12 +152,21 @@ async fn test_hnsw_docid_high_bits_isolation_and_tombstones() -> contextra_types
 /// Modelliert das fehlerhafte Verhalten (as u64 Trunkierung von DocIds mit identischen unteren 64 Bit).
 /// Dieser Test zeigt, dass der Test das Problem zuverlässig aufdeckt (ROT wird), wenn eine as u64 Kürzung vorliegt.
 #[test]
-#[cfg(feature = "docid-128")]
 fn test_mutation_counter_proof_truncated_u64_causes_collision() {
+    if DocId::BYTES != 16 {
+        return;
+    }
     use ahash::AHashMap;
 
-    let id1 = DocId::from(1_u128);
-    let id2 = DocId::from(1_u128 | (1_u128 << 64));
+    let mut b1 = [0u8; DocId::BYTES];
+    b1[0] = 1;
+    let mut b2 = [0u8; DocId::BYTES];
+    b2[0] = 1;
+    if DocId::BYTES == 16 {
+        b2[8] = 1;
+    }
+    let id1 = DocId::from_le_bytes(b1);
+    let id2 = DocId::from_le_bytes(b2);
 
     // Mutated implementation: Casts DocId to u64
     let mut truncated_map: AHashMap<u64, &str> = AHashMap::new();

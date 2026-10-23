@@ -96,7 +96,6 @@ fn make_doc_id(id: u64) -> DocId {
 // ==========================================
 // H1: DocId Truncation & Collision (BUG-VEC-01)
 // ==========================================
-#[cfg(feature = "docid-128")]
 #[tokio::test]
 async fn test_h1_docid_u128_hnsw_collision_safety() -> Result<()> {
     let config = HnswConfig {
@@ -109,10 +108,23 @@ async fn test_h1_docid_u128_hnsw_collision_safety() -> Result<()> {
     };
     let index = HnswIndex::try_new(config)?;
 
-    // High 128-bit DocIds sharing lower 64 bits
-    let id_a = DocId::from(1u128);
-    let id_b = DocId::from((1u128 << 64) | 1u128);
-    let id_c = DocId::from((2u128 << 64) | 1u128);
+    let (id_a, id_b, id_c) = if DocId::BYTES == 16 {
+        let mut ba = [0u8; DocId::BYTES];
+        ba[0] = 1;
+        let mut bb = [0u8; DocId::BYTES];
+        bb[0] = 1;
+        bb[8] = 1;
+        let mut bc = [0u8; DocId::BYTES];
+        bc[0] = 1;
+        bc[8] = 2;
+        (
+            DocId::from_le_bytes(ba),
+            DocId::from_le_bytes(bb),
+            DocId::from_le_bytes(bc),
+        )
+    } else {
+        (make_doc_id(1), make_doc_id(1002), make_doc_id(2003))
+    };
 
     let v_a = vec![1.0, 0.0, 0.0, 0.0];
     let v_b = vec![0.0, 1.0, 0.0, 0.0];
@@ -127,7 +139,7 @@ async fn test_h1_docid_u128_hnsw_collision_safety() -> Result<()> {
     assert_eq!(
         all_ids.len(),
         3,
-        "H1 FAIL: High 64-bit DocIds collided or truncated in all_doc_ids"
+        "H1 FAIL: DocIds collided or truncated in all_doc_ids"
     );
 
     let res_a = index.search(&v_a, 1).await?;
@@ -144,38 +156,6 @@ async fn test_h1_docid_u128_hnsw_collision_safety() -> Result<()> {
     assert!(ids_after.contains(&id_a));
     assert!(ids_after.contains(&id_c));
     assert!(!ids_after.contains(&id_b));
-
-    Ok(())
-}
-
-#[cfg(not(feature = "docid-128"))]
-#[tokio::test]
-async fn test_h1_docid_u128_hnsw_collision_safety() -> Result<()> {
-    let config = HnswConfig {
-        dimension: 4,
-        m: 16,
-        ef_construction: 32,
-        ef_search: 32,
-        distance_metric: DistanceMetric::Euclidean,
-        ..Default::default()
-    };
-    let index = HnswIndex::try_new(config)?;
-
-    let id_a = make_doc_id(1);
-    let id_b = make_doc_id(1002);
-    let id_c = make_doc_id(2003);
-
-    let v_a = vec![1.0, 0.0, 0.0, 0.0];
-    let v_b = vec![0.0, 1.0, 0.0, 0.0];
-    let v_c = vec![0.0, 0.0, 1.0, 0.0];
-
-    index.insert(TxId(1), id_a, &v_a).await?;
-    index.insert(TxId(1), id_b, &v_b).await?;
-    index.insert(TxId(1), id_c, &v_c).await?;
-    index.commit(TxId(1)).await?;
-
-    let all_ids = index.all_doc_ids().await?;
-    assert_eq!(all_ids.len(), 3);
 
     Ok(())
 }

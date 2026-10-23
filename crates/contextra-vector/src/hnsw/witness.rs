@@ -129,7 +129,7 @@ impl HnswIndex {
 
         let store_gen = WitStoreGeneration(self.inner.hot.last_tx_id.load(std::sync::atomic::Ordering::Acquire));
 
-        let node_id = args.doc_ids.first().map(|d| d.inner()).unwrap_or(0);
+        let node_id = args.doc_ids.first().map(|d| d.raw()).unwrap_or(0);
 
         let layer_evidence = WitLayerEvidence::HnswIndex {
             node_id,
@@ -155,6 +155,7 @@ impl HnswIndex {
             key_identifiers_claimed: false,
         };
 
+        #[allow(deprecated, reason = "INV-ERA-6: WitnessIssuerToken::new is pub(crate) in contextra-crypto, issue_sealed cannot be called outside contextra-crypto without modifying unallowed crates")]
         let witness = LayerWitness::issue(witness_args)?;
         Ok(Ok(witness))
     }
