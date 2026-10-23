@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // ZWECK: AK-21 Collision test for length-prefixed key hash function hash_deleted_keys_length_prefixed.
 // INVARIANTEN: Distinct key chunk partitions of identical byte sequences MUST produce distinct length-prefixed hashes.

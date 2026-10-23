@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // ZWECK: Hardening- und Invarianten-Tests für RevocationLog (W1-02).
 // TEIL-TESTS: Error-Atomizität, Inkrementelle Verifikation, Signierte Marker, Restart-Roundtrip, is_durable.

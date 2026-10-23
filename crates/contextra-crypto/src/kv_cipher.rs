@@ -68,7 +68,7 @@ impl KvCipher for KeyManager {
         let (ct, nonce) = self
             .encrypt_auto_nonce(plaintext)
             .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))?;
-        let mut out = Vec::with_capacity(12 + ct.len());
+        let mut out = Vec::with_capacity((12_usize).saturating_add(ct.len()));
         out.extend_from_slice(&nonce);
         out.extend_from_slice(&ct);
         Ok(out)
@@ -80,13 +80,17 @@ impl KvCipher for KeyManager {
                 "Ciphertext too short for nonce payload".into(),
             ));
         }
-        let nonce: &[u8; 12] =
-            ciphertext[..12]
-                .try_into()
-                .map_err(|e: std::array::TryFromSliceError| {
-                    contextra_types::ContextraError::ParseError(e.to_string())
-                })?;
-        let ct = &ciphertext[12..];
+        let nonce_slice = ciphertext.get(..12).ok_or_else(|| {
+            contextra_types::ContextraError::Crypto("Ciphertext too short for nonce".into())
+        })?;
+        let nonce: &[u8; 12] = nonce_slice
+            .try_into()
+            .map_err(|e: std::array::TryFromSliceError| {
+                contextra_types::ContextraError::ParseError(e.to_string())
+            })?;
+        let ct = ciphertext.get(12..).ok_or_else(|| {
+            contextra_types::ContextraError::Crypto("Ciphertext body missing".into())
+        })?;
         self.decrypt_auto_nonce(ct, nonce)
             .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))
     }

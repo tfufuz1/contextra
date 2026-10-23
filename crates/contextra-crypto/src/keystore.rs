@@ -51,7 +51,10 @@ impl MfksKeystore {
     pub fn to_bytes(&self) -> Vec<u8> {
         let kdf_bytes = self.kdf_header.to_bytes();
         let mut out = Vec::with_capacity(
-            4 + 1 + 4 + kdf_bytes.len() + 4 + self.wrapped_deks.len() + 4 + self.registry_log.len(),
+            (17_usize)
+                .saturating_add(kdf_bytes.len())
+                .saturating_add(self.wrapped_deks.len())
+                .saturating_add(self.registry_log.len()),
         );
         out.extend_from_slice(MFKS_MAGIC);
         out.push(self.version);
@@ -78,12 +81,14 @@ impl MfksKeystore {
                 "MFKS Keystore Bytes zu kurz".to_string(),
             ));
         }
-        if &bytes[0..4] != MFKS_MAGIC {
+        if bytes.get(0..4) != Some(MFKS_MAGIC.as_slice()) {
             return Err(CryptoError::InvalidInput(
                 "Ungültiger MFKS Keystore Magic Marker".to_string(),
             ));
         }
-        let version = bytes[4];
+        let version = *bytes.get(4).ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen der MFKS Version".to_string())
+        })?;
         if version != MFKS_VERSION_1 {
             return Err(CryptoError::InvalidInput(format!(
                 "Nicht unterstützte MFKS Keystore Version: {version}"
@@ -91,48 +96,67 @@ impl MfksKeystore {
         }
 
         let kdf_len = u32::from_be_bytes(
-            bytes[5..9]
+            bytes.get(5..9)
+                .ok_or_else(|| CryptoError::InvalidInput("KDF Len Read Fail".to_string()))?
                 .try_into()
                 .map_err(|_| CryptoError::InvalidInput("KDF Len Read Fail".to_string()))?,
         ) as usize;
 
-        if bytes.len() < 9 + kdf_len + 8 {
+        let kdf_end = (9_usize).saturating_add(kdf_len);
+        if bytes.len() < kdf_end.saturating_add(8) {
             return Err(CryptoError::InvalidInput(
                 "Inkompletter MFKS KDF Header".to_string(),
             ));
         }
 
-        let kdf_header = KdfHeader::from_bytes(&bytes[9..9 + kdf_len])?;
+        let kdf_slice = bytes.get(9..kdf_end).ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen des KDF Headers".to_string())
+        })?;
+        let kdf_header = KdfHeader::from_bytes(kdf_slice)?;
 
-        let deks_offset = 9 + kdf_len;
+        let deks_offset = kdf_end;
+        let deks_len_slice = bytes.get(deks_offset..deks_offset.saturating_add(4)).ok_or_else(|| {
+            CryptoError::InvalidInput("DEKs Len Read Fail".to_string())
+        })?;
         let deks_len = u32::from_be_bytes(
-            bytes[deks_offset..deks_offset + 4]
+            deks_len_slice
                 .try_into()
                 .map_err(|_| CryptoError::InvalidInput("DEKs Len Read Fail".to_string()))?,
         ) as usize;
 
-        if bytes.len() < deks_offset + 4 + deks_len + 4 {
+        let deks_start = deks_offset.saturating_add(4);
+        let deks_end = deks_start.saturating_add(deks_len);
+        if bytes.len() < deks_end.saturating_add(4) {
             return Err(CryptoError::InvalidInput(
                 "Inkomplette MFKS DEKs".to_string(),
             ));
         }
 
-        let wrapped_deks = bytes[deks_offset + 4..deks_offset + 4 + deks_len].to_vec();
+        let wrapped_deks = bytes.get(deks_start..deks_end).ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen der DEKs".to_string())
+        })?.to_vec();
 
-        let log_offset = deks_offset + 4 + deks_len;
+        let log_offset = deks_end;
+        let log_len_slice = bytes.get(log_offset..log_offset.saturating_add(4)).ok_or_else(|| {
+            CryptoError::InvalidInput("Registry Log Len Read Fail".to_string())
+        })?;
         let log_len = u32::from_be_bytes(
-            bytes[log_offset..log_offset + 4]
+            log_len_slice
                 .try_into()
                 .map_err(|_| CryptoError::InvalidInput("Registry Log Len Read Fail".to_string()))?,
         ) as usize;
 
-        if bytes.len() < log_offset + 4 + log_len {
+        let log_start = log_offset.saturating_add(4);
+        let log_end = log_start.saturating_add(log_len);
+        if bytes.len() < log_end {
             return Err(CryptoError::InvalidInput(
                 "Inkompletter MFKS Registry Log".to_string(),
             ));
         }
 
-        let registry_log = bytes[log_offset + 4..log_offset + 4 + log_len].to_vec();
+        let registry_log = bytes.get(log_start..log_end).ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen des Registry Logs".to_string())
+        })?.to_vec();
 
         Ok(Self {
             version,

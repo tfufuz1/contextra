@@ -389,9 +389,7 @@ mod tests {
             doc_id: DocId(1),
             tenant_id: TenantId::try_new(1).expect("tenant"),
         };
-        let proof = ProofBuilder::new(scope, "db-store-test")
-            .with_deleted_after_tx(10)
-            .with_deleted_keys_hash([0x11; 32])
+        let proof = ProofBuilder::with_required(scope, "db-store-test", [0x11; 32], [0u8; 32], 10, 1)
             .finish(&signer)
             .expect("builder finish failed");
 

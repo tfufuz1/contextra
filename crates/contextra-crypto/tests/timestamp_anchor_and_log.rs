@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // STAND: 2026-10-13
 // ZWECK: Integrationstests für RFC 3161 Zeitanker und RFC 9162 Transparenzlog.

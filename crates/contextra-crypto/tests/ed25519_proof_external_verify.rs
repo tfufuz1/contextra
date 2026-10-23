@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // ZWECK: Integration tests for external verification of Ed25519 deletion proofs (version 3).
 // INVARIANTEN: Zero internal state required for verification. Injected deterministic RNGs only.

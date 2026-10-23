@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // ZWECK: Integration tests for CchSecureBuf zeroize behavior and safe memory inspection.
 // STAND: TS:2026-10-12T00:00:00Z

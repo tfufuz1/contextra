@@ -62,9 +62,9 @@ pub fn verify_segment_chain_continuity(
     segments: &[WalSegmentSummary],
 ) -> Result<(), CryptoError> {
     for window in segments.windows(2) {
-        let prev = &window[0];
-        let curr = &window[1];
-        if curr.segment_seq != prev.segment_seq + 1 {
+        let prev = window.get(0).ok_or(CryptoError::WalTruncationDetected)?;
+        let curr = window.get(1).ok_or(CryptoError::WalTruncationDetected)?;
+        if curr.segment_seq != prev.segment_seq.saturating_add(1) {
             return Err(CryptoError::WalTruncationDetected);
         }
         let matches: bool = curr.first_prev_hmac.ct_eq(&prev.last_hmac).into();
@@ -77,6 +77,8 @@ pub fn verify_segment_chain_continuity(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
     use super::*;
 
     #[test]

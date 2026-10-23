@@ -285,6 +285,8 @@ impl<'a> From<&'a ed25519_dalek::VerifyingKey> for VerificationKey<'a> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
     use super::*;
 
     #[test]

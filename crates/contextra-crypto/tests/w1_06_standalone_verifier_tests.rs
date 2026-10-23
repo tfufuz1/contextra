@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 //! Tests for Stage 6: Standalone Verifier (w1_06_*).
 
 #![forbid(unsafe_code)]

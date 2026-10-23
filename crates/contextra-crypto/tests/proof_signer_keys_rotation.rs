@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT (STAND 2026-10-13, ZWECK: Signer und Schlüsselverwaltung Integrationstests, INVARIANTEN: Zeroize-Hygiene, Fail-closed Rotation, UntrustedKeyList)
 
 use contextra_crypto::deletion_proof::keys::{InMemoryCsprngKeySource, ProofKeySource};

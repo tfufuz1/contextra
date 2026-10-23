@@ -410,15 +410,17 @@ impl DeletionProofBuilder<Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, Cleaned, 
     /// This method is only available when all 7 storage layers have been marked as [`Cleaned`].
     pub fn finish(self) -> contextra_types::Result<DeletionProof> {
         let durability = crate::deletion_proof::DurabilityProof::new(self.deleted_after_tx.0);
-        let signing_key = if self.proof_key.len() >= 32 {
-            let mut key_bytes = [0u8; 32];
-            key_bytes.copy_from_slice(&self.proof_key[..32]);
-            ed25519_dalek::SigningKey::from_bytes(&key_bytes)
-        } else {
-            return Err(contextra_types::ContextraError::Internal(
+        let key_slice = self.proof_key.get(..32).ok_or_else(|| {
+            contextra_types::ContextraError::Internal(
                 "proof_key must be at least 32 bytes for Ed25519 v4 signature".to_string(),
-            ));
-        };
+            )
+        })?;
+        let key_bytes: &[u8; 32] = key_slice.try_into().map_err(|_| {
+            contextra_types::ContextraError::Internal(
+                "Failed to convert proof_key slice to array".to_string(),
+            )
+        })?;
+        let signing_key = ed25519_dalek::SigningKey::from_bytes(key_bytes);
 
         DeletionProof::create_v4_internal(
             self.scope,

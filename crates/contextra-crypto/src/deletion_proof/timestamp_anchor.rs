@@ -122,7 +122,7 @@ impl TimeAnchor for LocalMonotonicAnchor {
             .as_secs();
 
         // Deterministische Seriennummer basierend auf Hash des Imprints + Timestamp
-        let mut serial = Vec::with_capacity(msg_imprint.len() + 8);
+        let mut serial = Vec::with_capacity(msg_imprint.len().saturating_add(8));
         serial.extend_from_slice(msg_imprint);
         serial.extend_from_slice(&now_secs.to_be_bytes());
 
@@ -171,13 +171,12 @@ impl DerTstInfoParser {
             )));
         }
 
-        if pos + length > der.len() {
+        let seq_end = pos.saturating_add(length);
+        if seq_end > der.len() {
             return Err(CryptoError::InvalidInput(
                 "DER SEQUENCE payload truncated".to_string(),
             ));
         }
-
-        let seq_end = pos + length;
 
         // Parse fields inside TSTInfo SEQUENCE sequentially:
         // 1. version INTEGER (0x02)
@@ -188,69 +187,78 @@ impl DerTstInfoParser {
 
         // 1. Version INTEGER
         let (v_tag, v_len) = Self::read_tlv_header(der, &mut pos)?;
-        if v_tag != 0x02 || pos + v_len > seq_end {
+        if v_tag != 0x02 || pos.saturating_add(v_len) > seq_end {
             return Err(CryptoError::InvalidInput(
                 "Invalid TSTInfo version field".to_string(),
             ));
         }
-        pos += v_len;
+        pos = pos.saturating_add(v_len);
 
         // 2. Policy OBJECT IDENTIFIER
         let (p_tag, p_len) = Self::read_tlv_header(der, &mut pos)?;
-        if p_tag != 0x06 || pos + p_len > seq_end {
+        if p_tag != 0x06 || pos.saturating_add(p_len) > seq_end {
             return Err(CryptoError::InvalidInput(
                 "Invalid TSTInfo policy field".to_string(),
             ));
         }
-        let policy_bytes = &der[pos..pos + p_len];
+        let policy_bytes = der.get(pos..pos.saturating_add(p_len)).ok_or_else(|| {
+            CryptoError::InvalidInput("Invalid policy_bytes range".to_string())
+        })?;
         let policy_oid = Self::parse_oid(policy_bytes)?;
-        pos += p_len;
+        pos = pos.saturating_add(p_len);
 
         // 3. messageImprint SEQUENCE
         let (mi_tag, mi_len) = Self::read_tlv_header(der, &mut pos)?;
-        if mi_tag != 0x30 || pos + mi_len > seq_end {
+        if mi_tag != 0x30 || pos.saturating_add(mi_len) > seq_end {
             return Err(CryptoError::InvalidInput(
                 "Invalid TSTInfo messageImprint field".to_string(),
             ));
         }
-        let mi_end = pos + mi_len;
+        let mi_end = pos.saturating_add(mi_len);
 
         // Inside messageImprint: AlgorithmIdentifier (SEQUENCE), hashedMessage (OCTET STRING)
         let (alg_tag, alg_len) = Self::read_tlv_header(der, &mut pos)?;
-        if alg_tag != 0x30 || pos + alg_len > mi_end {
+        if alg_tag != 0x30 || pos.saturating_add(alg_len) > mi_end {
             return Err(CryptoError::InvalidInput(
                 "Invalid messageImprint hashAlgorithm field".to_string(),
             ));
         }
-        pos += alg_len;
+        pos = pos.saturating_add(alg_len);
 
         let (hash_tag, hash_len) = Self::read_tlv_header(der, &mut pos)?;
-        if hash_tag != 0x04 || pos + hash_len > mi_end {
+        if hash_tag != 0x04 || pos.saturating_add(hash_len) > mi_end {
             return Err(CryptoError::InvalidInput(
                 "Invalid messageImprint hashedMessage field".to_string(),
             ));
         }
-        let message_imprint = der[pos..pos + hash_len].to_vec();
+        let message_imprint = der.get(pos..pos.saturating_add(hash_len)).ok_or_else(|| {
+            CryptoError::InvalidInput("Invalid message_imprint range".to_string())
+        })?.to_vec();
         pos = mi_end;
 
         // 4. serialNumber INTEGER
         let (sn_tag, sn_len) = Self::read_tlv_header(der, &mut pos)?;
-        if sn_tag != 0x02 || pos + sn_len > seq_end {
+        if sn_tag != 0x02 || pos.saturating_add(sn_len) > seq_end {
             return Err(CryptoError::InvalidInput(
                 "Invalid TSTInfo serialNumber field".to_string(),
             ));
         }
-        let serial_number = der[pos..pos + sn_len].to_vec();
-        pos += sn_len;
+        let serial_number = der.get(pos..pos.saturating_add(sn_len)).ok_or_else(|| {
+            CryptoError::InvalidInput("Invalid serial_number range".to_string())
+        })?.to_vec();
+        pos = pos.saturating_add(sn_len);
 
         // 5. genTime GeneralizedTime
         let (gt_tag, gt_len) = Self::read_tlv_header(der, &mut pos)?;
-        if gt_tag != 0x18 || pos + gt_len > seq_end {
+        if gt_tag != 0x18 || pos.saturating_add(gt_len) > seq_end {
             return Err(CryptoError::InvalidInput(
                 "Invalid TSTInfo genTime field".to_string(),
             ));
         }
-        let gen_time_str = std::str::from_utf8(&der[pos..pos + gt_len]).map_err(|_| {
+        let gen_time_bytes = der.get(pos..pos.saturating_add(gt_len)).ok_or_else(|| {
+            CryptoError::InvalidInput("Invalid gen_time range".to_string())
+        })?;
+        let gen_time_str = std::str::from_utf8(gen_time_bytes).map_err(|_| {
             CryptoError::InvalidInput("Invalid UTF-8/ASCII in GeneralizedTime".to_string())
         })?;
         let gen_time_unix_secs = Self::parse_generalized_time(gen_time_str)?;
@@ -270,8 +278,10 @@ impl DerTstInfoParser {
             ));
         }
 
-        let tag = der[*pos];
-        *pos += 1;
+        let tag = *der.get(*pos).ok_or_else(|| {
+            CryptoError::InvalidInput("Unexpected end of DER input while reading tag".to_string())
+        })?;
+        *pos = pos.saturating_add(1);
 
         if *pos >= der.len() {
             return Err(CryptoError::InvalidInput(
@@ -279,8 +289,10 @@ impl DerTstInfoParser {
             ));
         }
 
-        let first_len_byte = der[*pos];
-        *pos += 1;
+        let first_len_byte = *der.get(*pos).ok_or_else(|| {
+            CryptoError::InvalidInput("Unexpected end of DER input while reading first length byte".to_string())
+        })?;
+        *pos = pos.saturating_add(1);
 
         let length = if first_len_byte < 0x80 {
             first_len_byte as usize
@@ -295,17 +307,21 @@ impl DerTstInfoParser {
                     "DER length field exceeds maximum supported 4 bytes".to_string(),
                 ));
             }
-            if *pos + num_bytes > der.len() {
+            if pos.saturating_add(num_bytes) > der.len() {
                 return Err(CryptoError::InvalidInput(
                     "Unexpected EOF reading DER multi-byte length".to_string(),
                 ));
             }
 
+            let len_bytes = der.get(*pos..pos.saturating_add(num_bytes)).ok_or_else(|| {
+                CryptoError::InvalidInput("Invalid len_bytes range".to_string())
+            })?;
+
             let mut len: usize = 0;
-            for &b in &der[*pos..*pos + num_bytes] {
+            for &b in len_bytes {
                 len = (len << 8) | (b as usize);
             }
-            *pos += num_bytes;
+            *pos = pos.saturating_add(num_bytes);
             len
         };
 
@@ -320,16 +336,19 @@ impl DerTstInfoParser {
         let mut components = Vec::new();
 
         // First byte encodes components 1 and 2: X * 40 + Y
-        let first = bytes[0] as u32;
-        let x = first / 40;
-        let y = first % 40;
+        let first = *bytes.get(0).ok_or_else(|| {
+            CryptoError::InvalidInput("Empty OID first byte".to_string())
+        })? as u32;
+        let x = first.checked_div(40).unwrap_or(0);
+        let y = first.checked_rem(40).unwrap_or(0);
         components.push(x.to_string());
         components.push(y.to_string());
 
         let mut current_val: u64 = 0;
         let mut in_component = false;
 
-        for &b in &bytes[1..] {
+        let tail_bytes = bytes.get(1..).unwrap_or(&[]);
+        for &b in tail_bytes {
             let val = (b & 0x7F) as u64;
             if !in_component {
                 current_val = val;
@@ -384,7 +403,7 @@ impl DerTstInfoParser {
             CryptoError::InvalidInput("Invalid second in GeneralizedTime".to_string())
         })?;
 
-        if month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || min > 59 || sec > 60 {
+        if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || min > 59 || sec > 60 {
             return Err(CryptoError::InvalidInput(
                 "GeneralizedTime field value out of range".to_string(),
             ));
@@ -392,8 +411,20 @@ impl DerTstInfoParser {
 
         // Simplifizierte Konvertierung nach Unix-Timestamp
         let days_since_epoch = naive_days_from_civil(year as i32, month, day);
-        let unix_secs =
-            days_since_epoch as u64 * 86400 + hour as u64 * 3600 + min as u64 * 60 + sec as u64;
+        let days_secs = (days_since_epoch as u64).checked_mul(86400).ok_or_else(|| {
+            CryptoError::InvalidInput("Days secs overflow".to_string())
+        })?;
+        let hours_secs = (hour as u64).checked_mul(3600).ok_or_else(|| {
+            CryptoError::InvalidInput("Hours secs overflow".to_string())
+        })?;
+        let mins_secs = (min as u64).checked_mul(60).ok_or_else(|| {
+            CryptoError::InvalidInput("Mins secs overflow".to_string())
+        })?;
+
+        let unix_secs = days_secs
+            .saturating_add(hours_secs)
+            .saturating_add(mins_secs)
+            .saturating_add(sec as u64);
 
         Ok(unix_secs)
     }

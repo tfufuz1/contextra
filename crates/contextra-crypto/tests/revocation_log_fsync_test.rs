@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use contextra_crypto::revocation_log::{
     test_set_revocation_log_dir_sync_hook, RevocationLog,
 };

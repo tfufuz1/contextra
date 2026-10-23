@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // ZWECK: Strict length prefix tests, proptest non-collision proof, and golden checksum tests for WAL V3 HMAC verifier.
 
 use contextra_crypto::wal_crypto::{len_prefix, IntegrityVerifier, WalEntrySnapshot, WalHmac};
