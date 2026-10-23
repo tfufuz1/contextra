@@ -1,0 +1,29 @@
+Fr 23. Okt 13:44:02 CEST 2026
+2be26298d0625bc6a119413f2e99179bd99cdd67
+2be26298d 2026-10-23 Shell-Commit
+?? logs/00-env.txt
+?? logs/00-tools.txt
+rustc 1.89.0 (29483883e 2025-08-04)
+binary: rustc
+commit-hash: 29483883eed69d5fb4db01964cdf2af4d86e9cb2
+commit-date: 2025-08-04
+host: x86_64-unknown-linux-gnu
+release: 1.89.0
+LLVM version: 20.1.7
+cargo 1.89.0 (c24e10642 2025-06-23)
+Default host: x86_64-unknown-linux-gnu
+rustup home:  /home/freddy/.rustup
+
+installed toolchains
+--------------------
+stable-x86_64-unknown-linux-gnu (default)
+nightly-x86_64-unknown-linux-gnu
+1.89.0-x86_64-unknown-linux-gnu (active)
+
+active toolchain
+----------------
+name: 1.89.0-x86_64-unknown-linux-gnu
+active because: overridden by '/home/freddy/Projekte/contextra/rust-toolchain.toml'
+installed targets:
+  wasm32-wasip1
+  x86_64-unknown-linux-gnu
