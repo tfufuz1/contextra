@@ -16,10 +16,8 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub enum PurgeOutcome {
     /// Pipeline completed all phases successfully.
-    #[error("Purge completed: {0:?}")]
     Completed(PurgeReport),
     /// Pipeline completed all phases, but obsolete file disposal encountered refusals.
-    #[error("Purge completed with {refusals} disposal refusals: {report:?}")]
     CompletedWithRefusals {
         report: PurgeReport,
         refusals: usize,
@@ -44,7 +42,7 @@ impl PurgeOutcome {
     pub fn into_result(self) -> Result<PurgeReport, PurgeError> {
         match self {
             PurgeOutcome::Completed(report) | PurgeOutcome::CompletedWithRefusals { report, .. } => Ok(report),
-            PurgeOutcome::Failed { error, .. } => Err(OrxPurgeError::from(error)),
+            PurgeOutcome::Failed { error, .. } => Err(error),
         }
     }
 }
@@ -124,7 +122,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
             .write_to_file(&self.intent_file)
             .map_err(|e| PurgeError::Write {
                 file: self.intent_file.to_string_lossy().to_string(),
-                source: e.to_string(),
+                source_details: e.to_string(),
             })
     }
 
@@ -140,7 +138,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
         if let Err(e) = self.check_failpoint("p0_init") {
             return PurgeOutcome::Failed {
                 phase: PurgePhase::Admitted,
-                error: e.into(),
+                error: e,
             };
         }
 
@@ -157,14 +155,14 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
         if let Err(e) = self.record_phase(&mut intent, PurgePhase::Admitted) {
             return PurgeOutcome::Failed {
                 phase: PurgePhase::Admitted,
-                error: e.into(),
+                error: e,
             };
         }
 
         if let Err(e) = self.check_failpoint("after_intent") {
             return PurgeOutcome::Failed {
                 phase: PurgePhase::Admitted,
-                error: e.into(),
+                error: e,
             };
         }
 
@@ -205,7 +203,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 let guard = self
                     .backend
                     .acquire_fence(&scope, PurgeId::new(intent.purge_id))
-                    .map_err(|_e| OrxPurgeError::Blocked(crate::compaction::purge_filter::PurgeBlocked::CompactionBusy))?;
+                    .map_err(|_e| PurgeError::Fence("CompactionBusy".into()))?;
                 fence_guard = Some(guard);
 
                 if let Some(ref f) = hooks.fence_acquire {
@@ -218,11 +216,11 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
 
             // Phase 3: Flushed
             if intent.phase <= PurgePhase::Flushed {
-                self.backend.flush_memtable().await.map_err(OrxPurgeError::from)?;
+                self.backend.flush_memtable().await?;
                 if let Some(ref f) = hooks.flush_memtable {
                     f().map_err(|e| PurgeError::Write {
                         file: "flush_memtable".to_string(),
-                        source: e.to_string(),
+                        source_details: e.to_string(),
                     })?;
                 }
                 self.record_phase(&mut intent, PurgePhase::Flushed)?;
@@ -249,7 +247,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 {
                     Ok(rep) => report = rep,
                     Err(err) => {
-                        return Err(OrxPurgeError::from(err));
+                        return Err(err);
                     }
                 }
 
@@ -277,11 +275,11 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
             // Phase 6: WalRetiring
             if intent.phase <= PurgePhase::WalRetiring {
                 self.record_phase(&mut intent, PurgePhase::WalRetiring)?;
-                self.backend.retire_wal().await.map_err(OrxPurgeError::from)?;
+                self.backend.retire_wal().await?;
                 if let Some(ref cb) = hooks.wal_retire {
                     cb().map_err(|e| PurgeError::Write {
                         file: "wal_retire".to_string(),
-                        source: e.to_string(),
+                        source_details: e.to_string(),
                     })?;
                 }
                 self.check_failpoint("after_wal_callback")?;
@@ -293,21 +291,20 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 if let Some(ref cb) = hooks.witness {
                     cb().map_err(|e| PurgeError::Write {
                         file: "witness".to_string(),
-                        source: e.to_string(),
+                        source_details: e.to_string(),
                     })?;
                 }
                 self.check_failpoint("after_witness")?;
-            }
 
                 self.record_phase(&mut intent, PurgePhase::Finalizing)?;
                 self.check_failpoint("after_finalize")?;
             }
 
             // Verification scan before Phase 9 Released
-            if self.backend.scan_residue(&scope).await.map_err(OrxPurgeError::from)? {
-                return Err(OrxPurgeError::from(PurgeError::CorruptedIntent(
+            if self.backend.scan_residue(&scope).await? {
+                return Err(PurgeError::Intent(
                     "Residue detected during verification scan before release".into(),
-                )));
+                ));
             }
 
             // Phase 9: Released
@@ -324,7 +321,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 if self.intent_file.exists() {
                     durable_remove(&self.intent_file).map_err(|e| PurgeError::Write {
                         file: self.intent_file.to_string_lossy().to_string(),
-                        source: e.to_string(),
+                        source_details: e.to_string(),
                     })?;
                 }
                 self.check_failpoint("after_intent_cleanup")?;
@@ -355,7 +352,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 }
                 PurgeOutcome::Failed {
                     phase: intent.phase,
-                    error: err.into(),
+                    error: err,
                 }
             }
         }
