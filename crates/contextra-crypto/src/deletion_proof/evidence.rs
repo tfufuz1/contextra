@@ -93,7 +93,7 @@ pub enum WitLayerEvidence {
     /// HNSW Vektorindex Evidenz.
     HnswIndex {
         /// Knoten-ID.
-        node_id: u64,
+        node_id: contextra_types::DocIdRaw,
         /// Inbound Edges (muss 0 sein).
         incoming_edges: u32,
         /// Outbound Edges.
@@ -480,7 +480,7 @@ impl WitLayerEvidence {
                 marked_zeroed,
             } => {
                 encoder.add_u16(0x0001, 5); // Variant tag for HnswIndex
-                encoder.add_u64(0x0002, *node_id);
+                encoder.add_field(0x0002, node_id.to_be_bytes().to_vec());
                 encoder.add_u32(0x0003, *incoming_edges);
                 encoder.add_u32(0x0004, *outgoing_edges);
                 encoder.add_bool(0x0005, *pinned_by_reader);
