@@ -41,8 +41,9 @@ impl PurgeOutcome {
     /// Converts the outcome into a Result<PurgeReport, PurgeError>.
     pub fn into_result(self) -> Result<PurgeReport, PurgeError> {
         match self {
-            PurgeOutcome::Completed(report) | PurgeOutcome::CompletedWithRefusals { report, .. } => Ok(report),
-            PurgeOutcome::Failed { error, .. } => Err(error),
+            PurgeOutcome::Completed(report)
+            | PurgeOutcome::CompletedWithRefusals { report, .. } => Ok(report),
+            PurgeOutcome::Failed { error, .. } => Err(OrxPurgeError::from(error)),
         }
     }
 }
@@ -149,8 +150,14 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
         let mut purge_id_bytes = [0u8; 16];
         purge_id_bytes.copy_from_slice(&hasher.finalize().as_bytes()[..16]);
 
-        let mut intent =
-            OrxPurgeIntent::new(purge_id_bytes, &scope, as_of_tx, None, None, PurgePhase::Admitted);
+        let mut intent = OrxPurgeIntent::new(
+            purge_id_bytes,
+            &scope,
+            as_of_tx,
+            None,
+            None,
+            PurgePhase::Admitted,
+        );
 
         if let Err(e) = self.record_phase(&mut intent, PurgePhase::Admitted) {
             return PurgeOutcome::Failed {
@@ -203,7 +210,11 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 let guard = self
                     .backend
                     .acquire_fence(&scope, PurgeId::new(intent.purge_id))
-                    .map_err(|_e| PurgeError::Fence("CompactionBusy".into()))?;
+                    .map_err(|_e| {
+                        OrxPurgeError::Blocked(
+                            crate::compaction::purge_filter::PurgeBlocked::CompactionBusy,
+                        )
+                    })?;
                 fence_guard = Some(guard);
 
                 if let Some(ref f) = hooks.fence_acquire {
@@ -216,7 +227,10 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
 
             // Phase 3: Flushed
             if intent.phase <= PurgePhase::Flushed {
-                self.backend.flush_memtable().await?;
+                self.backend
+                    .flush_memtable()
+                    .await
+                    .map_err(OrxPurgeError::from)?;
                 if let Some(ref f) = hooks.flush_memtable {
                     f().map_err(|e| PurgeError::Write {
                         file: "flush_memtable".to_string(),
@@ -275,7 +289,10 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
             // Phase 6: WalRetiring
             if intent.phase <= PurgePhase::WalRetiring {
                 self.record_phase(&mut intent, PurgePhase::WalRetiring)?;
-                self.backend.retire_wal().await?;
+                self.backend
+                    .retire_wal()
+                    .await
+                    .map_err(OrxPurgeError::from)?;
                 if let Some(ref cb) = hooks.wal_retire {
                     cb().map_err(|e| PurgeError::Write {
                         file: "wal_retire".to_string(),
@@ -285,8 +302,8 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 self.check_failpoint("after_wal_callback")?;
             }
 
-            // Phase 7 & 8: Witnessing & Finalizing
-            if intent.phase <= PurgePhase::Finalizing {
+            // Phase 7: Witnessing
+            if intent.phase <= PurgePhase::Witnessing {
                 self.record_phase(&mut intent, PurgePhase::Witnessing)?;
                 if let Some(ref cb) = hooks.witness {
                     cb().map_err(|e| PurgeError::Write {
@@ -296,13 +313,20 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 }
                 self.check_failpoint("after_witness")?;
 
+            // Phase 8: Finalizing
+            if intent.phase <= PurgePhase::Finalizing {
                 self.record_phase(&mut intent, PurgePhase::Finalizing)?;
                 self.check_failpoint("after_finalize")?;
             }
 
             // Verification scan before Phase 9 Released
-            if self.backend.scan_residue(&scope).await? {
-                return Err(PurgeError::Intent(
+            if self
+                .backend
+                .scan_residue(&scope)
+                .await
+                .map_err(OrxPurgeError::from)?
+            {
+                return Err(OrxPurgeError::from(PurgeError::CorruptedIntent(
                     "Residue detected during verification scan before release".into(),
                 ));
             }
