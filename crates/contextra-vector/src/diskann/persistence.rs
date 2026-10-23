@@ -453,19 +453,11 @@ impl DiskAnnIndex {
                         mmap_ref.get(doc_id_offset..doc_id_end).ok_or_else(|| {
                             ContextraError::Index("DiskANN file truncated before doc_id".into())
                         })?;
-                    #[cfg(not(feature = "docid-128"))]
-                    let doc_id = u64::from_le_bytes(
-                        doc_id_bytes
-                            .try_into()
-                            .map_err(|_| ContextraError::Index("Corrupt doc_id".into()))?,
-                    );
-                    #[cfg(feature = "docid-128")]
-                    let doc_id = u128::from_le_bytes(
-                        doc_id_bytes
-                            .try_into()
-                            .map_err(|_| ContextraError::Index("Corrupt doc_id".into()))?,
-                    );
-                    ids.push(DocId::from(doc_id));
+                    let doc_id_arr: [u8; DocId::BYTES] = doc_id_bytes
+                        .try_into()
+                        .map_err(|_| ContextraError::Index("Corrupt doc_id".into()))?;
+                    let doc_id = DocId::from_le_bytes(doc_id_arr);
+                    ids.push(doc_id);
                 }
                 *inner.doc_ids.write() = ids;
                 Ok(())
@@ -638,18 +630,10 @@ impl DiskAnnIndex {
         let doc_id_bytes = node_data
             .get(cursor..doc_id_end)
             .ok_or_else(|| ContextraError::Index("Truncated DocId".into()))?;
-        #[cfg(not(feature = "docid-128"))]
-        let doc_id = DocId::from(u64::from_le_bytes(
-            doc_id_bytes
-                .try_into()
-                .map_err(|_| ContextraError::Index("Invalid DocId".into()))?,
-        ));
-        #[cfg(feature = "docid-128")]
-        let doc_id = DocId::from(u128::from_le_bytes(
-            doc_id_bytes
-                .try_into()
-                .map_err(|_| ContextraError::Index("Invalid DocId".into()))?,
-        ));
+        let doc_id_arr: [u8; DocId::BYTES] = doc_id_bytes
+            .try_into()
+            .map_err(|_| ContextraError::Index("Invalid DocId".into()))?;
+        let doc_id = DocId::from_le_bytes(doc_id_arr);
 
         let node = CachedNode {
             vector,
@@ -672,15 +656,17 @@ impl DiskAnnIndex {
     }
 }
 
-#[cfg(all(test, feature = "docid-128"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::diskann::config::DiskAnnConfig;
     use contextra_core::{DistanceMetric, DocId};
 
-    #[cfg(feature = "docid-128")]
     #[tokio::test]
     async fn test_docid_128_mmap_persistence_roundtrip() -> Result<()> {
+        if DocId::BYTES != 16 {
+            return Ok(());
+        }
         let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
         let index_path = temp_dir.path().join("docid128_mmap_roundtrip.idx");
 

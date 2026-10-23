@@ -232,10 +232,7 @@ impl HnswIndex {
 #[repr(align(64))]
 pub struct HnswHotCore {
     pub nodes: RwLock<Vec<HnswNode>>,
-    #[cfg(not(feature = "docid-128"))]
-    pub doc_to_node: RwLock<AHashMap<u64, usize>>,
-    #[cfg(feature = "docid-128")]
-    pub doc_to_node: RwLock<AHashMap<u128, usize>>,
+    pub doc_to_node: RwLock<AHashMap<contextra_types::DocIdRaw, usize>>,
     pub entry_point: AtomicU32,
     pub ram_entry_point: AtomicU32,
     pub max_layer: AtomicU64,
