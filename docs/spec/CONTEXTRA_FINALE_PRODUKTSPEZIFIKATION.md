@@ -3681,8 +3681,8 @@ Canonical domain types, IDs, budgets, filters, and error types for Contextra
 
 - `struct TenantId` — LAYER-BEGRÜNDUNG: · Methoden: new, try_new, inner, as_u64, is_system · impl: TryFrom
 - `struct CollectionId` — Internal collection identifier. · Methoden: new, try_new, inner, as_u64
-- `struct DocId` — Internal document identifier. · Methoden: new, inner, as_u64, from_key
-- `struct DocId` *[feature: docid-128]* — Internal document identifier (128-bit variant).
+- `struct DocId` — Internal document identifier. · Methoden: new, raw, inner, as_u64, to_le_bytes, from_le_bytes, from_key · Konstanten: BYTES (8 bzw. 16), MAX, MIN
+- `type DocIdRaw = u64` / `u128` *[feature: docid-128]* — Kanonischer Roh-Skalartyp der Dokumenten-ID für breitenagnostischen Code. Nur `contextra-types` verzweigt per `#[cfg(feature = "docid-128")]`.
 - `struct EntityId` — Internal entity identifier for graph nodes. · Methoden: new, inner, as_u64, as_bytes, from_doc_id, from_key
 - `struct TxId` — Transaction identifier. · Methoden: new, inner, as_u64, internal, try_from_internal_offset, is_valid_origin
 

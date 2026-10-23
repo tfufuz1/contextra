@@ -147,6 +147,17 @@ impl std::fmt::Display for CollectionId {
     }
 }
 
+/// Raw scalar primitive representing the width of a `DocId`.
+///
+/// In default configuration, `DocIdRaw` is `u64`.
+/// When feature `docid-128` is enabled (ADR-082), `DocIdRaw` is `u128`.
+#[cfg(not(feature = "docid-128"))]
+pub type DocIdRaw = u64;
+
+#[cfg(feature = "docid-128")]
+/// Raw scalar primitive representing the width of a `DocId` (128-bit variant).
+pub type DocIdRaw = u128;
+
 /// Internal document identifier.
 ///
 /// Under the default configuration, `DocId` wraps a 64-bit primitive (`u64`).
@@ -165,6 +176,8 @@ pub struct DocId(pub u128);
 
 #[cfg(not(feature = "docid-128"))]
 impl DocId {
+    /// Width of `DocId` in bytes (8 in default 64-bit mode).
+    pub const BYTES: usize = 8;
     /// Maximum possible `DocId` value (`u64::MAX`).
     pub const MAX: Self = Self(u64::MAX);
     /// Minimum possible `DocId` value (`0`).
@@ -176,9 +189,18 @@ impl DocId {
     pub const MIN: Self = Self(0);
 
     /// Creates a new `DocId` wrapping the provided `u64` identifier.
+    ///
+    /// Portable code working across `docid-128` configurations should use
+    /// `DocId::from(u64_value)` or `DocId::new(raw_value)` with `DocIdRaw`.
     #[inline]
     pub const fn new(id: u64) -> Self {
         Self(id)
+    }
+
+    /// Returns the inner raw primitive identifier (`DocIdRaw`).
+    #[inline]
+    pub const fn raw(self) -> DocIdRaw {
+        self.0
     }
 
     /// Returns the inner raw `u64` identifier.
@@ -188,10 +210,22 @@ impl DocId {
     }
 
     /// Deprecated backwards compatibility alias for .
-    #[deprecated(note = "Nutze inner()")]
+    #[deprecated(note = "Nutze inner() oder raw()")]
     #[inline]
     pub const fn as_u64(self) -> u64 {
         self.0
+    }
+
+    /// Returns the little-endian byte representation of this `DocId`.
+    #[inline]
+    pub const fn to_le_bytes(self) -> [u8; Self::BYTES] {
+        self.0.to_le_bytes()
+    }
+
+    /// Constructs a `DocId` from its little-endian byte representation.
+    #[inline]
+    pub const fn from_le_bytes(bytes: [u8; Self::BYTES]) -> Self {
+        Self(u64::from_le_bytes(bytes))
     }
 
     /// Derives a `DocId` from a string key using the first 8 bytes (64 bits) of its BLAKE3 hash.
@@ -218,15 +252,26 @@ impl DocId {
 
 #[cfg(feature = "docid-128")]
 impl DocId {
+    /// Width of `DocId` in bytes (16 in 128-bit mode).
+    pub const BYTES: usize = 16;
     /// Maximum possible `DocId` value (`u128::MAX`).
     pub const MAX: Self = Self(u128::MAX);
     /// Minimum possible `DocId` value (`0`).
     pub const MIN: Self = Self(0);
 
     /// Creates a new `DocId` wrapping the provided `u128` identifier.
+    ///
+    /// Portable code working across `docid-128` configurations should use
+    /// `DocId::from(u64_value)` or `DocId::new(raw_value)` with `DocIdRaw`.
     #[inline]
     pub const fn new(id: u128) -> Self {
         Self(id)
+    }
+
+    /// Returns the inner raw primitive identifier (`DocIdRaw`).
+    #[inline]
+    pub const fn raw(self) -> DocIdRaw {
+        self.0
     }
 
     /// Returns the inner raw `u128` identifier.
@@ -240,6 +285,18 @@ impl DocId {
     #[allow(clippy::cast_possible_truncation)]
     pub const fn as_u64(self) -> u64 {
         self.0 as u64
+    }
+
+    /// Returns the little-endian byte representation of this `DocId`.
+    #[inline]
+    pub const fn to_le_bytes(self) -> [u8; Self::BYTES] {
+        self.0.to_le_bytes()
+    }
+
+    /// Constructs a `DocId` from its little-endian byte representation.
+    #[inline]
+    pub const fn from_le_bytes(bytes: [u8; Self::BYTES]) -> Self {
+        Self(u128::from_le_bytes(bytes))
     }
 
     /// Derives a 128-bit `DocId` from a string key using the first 16 bytes (128 bits) of its BLAKE3 hash.
@@ -258,9 +315,17 @@ impl DocId {
     }
 }
 
+#[cfg(not(feature = "docid-128"))]
 impl From<u64> for DocId {
     fn from(id: u64) -> Self {
-        Self(id as _)
+        Self(id)
+    }
+}
+
+#[cfg(feature = "docid-128")]
+impl From<u64> for DocId {
+    fn from(id: u64) -> Self {
+        Self(u128::from(id))
     }
 }
 

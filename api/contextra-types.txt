@@ -117,12 +117,16 @@ contextra_types::types::domain::document::Embedding::normalize pub fn normalize(
 contextra_types::types::domain::document::RerankResult pub struct RerankResult
 contextra_types::types::domain::document::ScoredDocument pub struct ScoredDocument
 contextra_types::types::domain::document::ScoredDocument::new pub fn new(doc_id: DocId, score: f32) -> Self
+contextra_types::types::domain::ids::BYTES pub const BYTES: usize = 16
+contextra_types::types::domain::ids::BYTES pub const BYTES: usize = 8
 contextra_types::types::domain::ids::CollectionId pub struct CollectionId(pub u64)
 contextra_types::types::domain::ids::CollectionId::try_new pub fn try_new(id: u64) -> Result<Self>
 contextra_types::types::domain::ids::DEFAULT pub const DEFAULT: Self = Self(0)
 contextra_types::types::domain::ids::DocId pub struct DocId(pub u128)
 contextra_types::types::domain::ids::DocId pub struct DocId(pub u64)
 contextra_types::types::domain::ids::DocId::from_key pub fn from_key(key: &str) -> Result<Self>
+contextra_types::types::domain::ids::DocIdRaw pub type DocIdRaw = u128
+contextra_types::types::domain::ids::DocIdRaw pub type DocIdRaw = u64
 contextra_types::types::domain::ids::EntityId pub struct EntityId(pub u64)
 contextra_types::types::domain::ids::EntityId::as_bytes pub fn as_bytes(&self) -> Vec<u8>
 contextra_types::types::domain::ids::EntityId::from_doc_id pub fn from_doc_id(doc_id: DocId) -> Self
@@ -143,13 +147,16 @@ contextra_types::types::domain::ids::TxId::is_valid_origin pub fn is_valid_origi
 contextra_types::types::domain::ids::TxId::try_from_internal_offset pub fn try_from_internal_offset(offset: u64) -> Result<Self>
 contextra_types::types::domain::ids::TxId::try_new pub fn try_new(id: u64) -> Result<Self>
 contextra_types::types::domain::ids::fn pub const fn as_u64(self) -> u64
+contextra_types::types::domain::ids::fn pub const fn from_le_bytes(bytes: [u8; Self::BYTES]) -> Self
 contextra_types::types::domain::ids::fn pub const fn inner(self) -> u128
 contextra_types::types::domain::ids::fn pub const fn inner(self) -> u64
 contextra_types::types::domain::ids::fn pub const fn internal() -> Self
 contextra_types::types::domain::ids::fn pub const fn new(id: u128) -> Self
 contextra_types::types::domain::ids::fn pub const fn new(id: u64) -> Self
 contextra_types::types::domain::ids::fn pub const fn new_unchecked(id: u64) -> Self
+contextra_types::types::domain::ids::fn pub const fn raw(self) -> DocIdRaw
 contextra_types::types::domain::ids::fn pub const fn system() -> Self
+contextra_types::types::domain::ids::fn pub const fn to_le_bytes(self) -> [u8; Self::BYTES]
 contextra_types::types::domain::misc::AutoExtractionMode pub enum AutoExtractionMode
 contextra_types::types::domain::misc::AutoExtractionMode::is_enabled pub fn is_enabled(self) -> bool
 contextra_types::types::domain::misc::ConfigFingerprint pub struct ConfigFingerprint
