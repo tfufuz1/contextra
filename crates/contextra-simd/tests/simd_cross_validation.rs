@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 use contextra_simd::dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
     dot_product_distance_f32_bytes, dot_product_u8, euclidean_distance,

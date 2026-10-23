@@ -23,9 +23,15 @@ use crate::kernels::scalar::CosineSimilarityPartsU8;
 /// - Slices with length 0 or remainder elements not divisible by 8 are handled safely by the
 ///   vector loop condition and scalar tail loop.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
     let len = a.len();
     let mut i = 0;
 
@@ -98,9 +104,15 @@ pub unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
 /// - Slices with length 0 or remainder elements not divisible by 8 are handled safely by the
 ///   vector loop condition and scalar tail loop.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
     let len = a.len();
     let mut i = 0;
 
@@ -149,9 +161,15 @@ pub unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
 /// - Slices with length 0 or remainder elements not divisible by 8 are handled safely by the
 ///   vector loop condition and scalar tail loop.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
     let len = a.len();
     let mut i = 0;
 
@@ -198,9 +216,15 @@ pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 /// - Slices with length 0 or remainder elements not divisible by 8 are handled safely by the
 ///   vector loop condition and scalar tail loop.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+    debug_assert!(b_bytes.len() >= a.len() * 4);
     let len = a.len();
     let mut i = 0;
 
@@ -278,9 +302,15 @@ pub unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
 /// - Slices with length 0 or remainder elements not divisible by 8 are handled safely by the
 ///   vector loop condition and scalar tail loop.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+    debug_assert!(b_bytes.len() >= a.len() * 4);
     let len = a.len();
     let mut i = 0;
 
@@ -337,9 +367,15 @@ pub unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f3
 /// - Slices with length 0 or remainder elements not divisible by 8 are handled safely by the
 ///   vector loop condition and scalar tail loop.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+    debug_assert!(b_bytes.len() >= a.len() * 4);
     let len = a.len();
     let mut i = 0;
 
@@ -389,7 +425,11 @@ pub unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
 /// - The target CPU must support the `avx2` target feature. The caller must verify this at
 ///   runtime (e.g. via `is_x86_feature_detected!("avx2")`).
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    reason = "AVX register extraction and shuffle lane reduction"
+)]
 #[target_feature(enable = "avx2")]
 pub unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
     // SAFETY: All operations use valid AVX2 register intrinsics on input `v`; target feature `avx2` verified by caller.
@@ -415,7 +455,12 @@ pub unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
 /// - Slices with length 0 or remainder elements not divisible by 32 are handled safely by the
 ///   vector loop condition and scalar tail loop.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx2")]
 pub unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
@@ -474,7 +519,12 @@ pub unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
 /// - Slices with length 0 or remainder elements not divisible by 32 are handled safely by the
 ///   vector loop condition and scalar tail loop.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx2")]
 pub unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
@@ -535,7 +585,12 @@ pub unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
 /// - Slices with length 0 or remainder elements not divisible by 32 are handled safely by the
 ///   vector loop condition and scalar tail loop.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx2")]
 pub unsafe fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
     let len = a.len().min(b.len());
@@ -613,7 +668,11 @@ pub unsafe fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimil
 /// - The target CPU must support the `avx2` target feature. The caller must verify this at
 ///   runtime (e.g. via `is_x86_feature_detected!("avx2")`).
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    reason = "AVX register extraction and shift lane reduction"
+)]
 #[target_feature(enable = "avx2")]
 pub unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
     // SAFETY: All operations use valid AVX2 register intrinsics on input `v`; target feature `avx2` verified by caller.

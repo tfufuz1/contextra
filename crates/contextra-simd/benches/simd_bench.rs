@@ -1,4 +1,10 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 
 use contextra_simd::dispatch::{
     cosine_distance, cosine_distance_with_features, detect, dot_product_distance,

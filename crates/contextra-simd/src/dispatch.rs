@@ -51,9 +51,11 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx512::cosine_distance_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: Target features `avx2` and `fma` verified via runtime checks immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx2::cosine_distance_avx2(a, b) });
         }
     }
@@ -61,6 +63,7 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     #[cfg(target_arch = "aarch64")]
     {
         if std::arch::is_aarch64_feature_detected!("neon") {
+            // SAFETY: Target feature `neon` verified via runtime check immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { neon::cosine_distance_neon(a, b) });
         }
     }
@@ -90,9 +93,11 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx512::euclidean_distance_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: Target features `avx2` and `fma` verified via runtime checks immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx2::euclidean_distance_avx2(a, b) });
         }
     }
@@ -100,6 +105,7 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     #[cfg(target_arch = "aarch64")]
     {
         if std::arch::is_aarch64_feature_detected!("neon") {
+            // SAFETY: Target feature `neon` verified via runtime check immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { neon::euclidean_distance_neon(a, b) });
         }
     }
@@ -129,9 +135,11 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError>
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx512::dot_product_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: Target features `avx2` and `fma` verified via runtime checks immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx2::dot_product_avx2(a, b) });
         }
     }
@@ -139,6 +147,7 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError>
     #[cfg(target_arch = "aarch64")]
     {
         if std::arch::is_aarch64_feature_detected!("neon") {
+            // SAFETY: Target feature `neon` verified via runtime check immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { neon::dot_product_neon(a, b) });
         }
     }
@@ -158,7 +167,7 @@ pub fn dot_product_distance_with_features(
 #[inline]
 #[allow(unsafe_code)]
 pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, ContextraError> {
-    if b_bytes.len() < a.len() * 4 {
+    if b_bytes.len() < a.len().saturating_mul(4) {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
             got: b_bytes.len() / 4,
@@ -168,9 +177,11 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Conte
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; `b_bytes.len() >= a.len() * 4` is guaranteed by check above.
             return Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: Target features `avx2` and `fma` verified via runtime checks immediately prior; `b_bytes.len() >= a.len() * 4` is guaranteed by check above.
             return Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) });
         }
     }
@@ -182,7 +193,7 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Conte
 #[inline]
 #[allow(unsafe_code)]
 pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, ContextraError> {
-    if b_bytes.len() < a.len() * 4 {
+    if b_bytes.len() < a.len().saturating_mul(4) {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
             got: b_bytes.len() / 4,
@@ -192,9 +203,11 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Co
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; `b_bytes.len() >= a.len() * 4` is guaranteed by check above.
             return Ok(unsafe { avx512::euclidean_distance_f32_bytes_avx512(a, b_bytes) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: Target features `avx2` and `fma` verified via runtime checks immediately prior; `b_bytes.len() >= a.len() * 4` is guaranteed by check above.
             return Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) });
         }
     }
@@ -206,7 +219,7 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Co
 #[inline]
 #[allow(unsafe_code)]
 pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, ContextraError> {
-    if b_bytes.len() < a.len() * 4 {
+    if b_bytes.len() < a.len().saturating_mul(4) {
         return Err(ContextraError::EmbeddingDimensionMismatch {
             expected: a.len(),
             got: b_bytes.len() / 4,
@@ -216,9 +229,11 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; `b_bytes.len() >= a.len() * 4` is guaranteed by check above.
             return Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: Target features `avx2` and `fma` verified via runtime checks immediately prior; `b_bytes.len() >= a.len() * 4` is guaranteed by check above.
             return Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) });
         }
     }
@@ -239,13 +254,12 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f")
-            && is_x86_feature_detected!("avx512bw")
-            && is_x86_feature_detected!("avx512vnni")
-        {
-            return Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) });
+        if is_x86_feature_detected!("avx512f") && is_x86_feature_detected!("avx512bw") {
+            // SAFETY: Target features `avx512f` and `avx512bw` verified via runtime checks immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
+            return Ok(unsafe { avx512::dot_product_u8_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") {
+            // SAFETY: Target feature `avx2` verified via runtime check immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx2::dot_product_u8_avx2(a, b) });
         }
     }
@@ -275,9 +289,11 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") && is_x86_feature_detected!("avx512bw") {
+            // SAFETY: Target features `avx512f` and `avx512bw` verified via runtime checks immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") {
+            // SAFETY: Target feature `avx2` verified via runtime check immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) });
         }
     }
@@ -301,13 +317,12 @@ pub fn cosine_similarity_parts_u8(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f")
-            && is_x86_feature_detected!("avx512bw")
-            && is_x86_feature_detected!("avx512vnni")
-        {
+        if is_x86_feature_detected!("avx512f") && is_x86_feature_detected!("avx512bw") {
+            // SAFETY: Target features `avx512f` and `avx512bw` verified via runtime checks immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") {
+            // SAFETY: Target feature `avx2` verified via runtime check immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) });
         }
     }
