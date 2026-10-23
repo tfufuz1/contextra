@@ -19,11 +19,7 @@ pub const POSTING_LIST_V2_MAGIC: &[u8; 4] = b"PL\x02\x00";
 /// Block size for Block-Max WAND decomposition.
 pub const BLOCK_SIZE: usize = 64;
 
-#[cfg(not(feature = "docid-128"))]
-pub type DocIdRaw = u64;
-
-#[cfg(feature = "docid-128")]
-pub type DocIdRaw = u128;
+pub use contextra_types::DocIdRaw;
 
 /// Block-Max metadata for a chunk of postings (typically 64 postings).
 #[repr(C, align(8))]
@@ -38,7 +34,7 @@ pub struct PostingBlockInfo {
 }
 
 /// Compact representation of a single posting in a posting list.
-/// Packed with 8-byte alignment (16 bytes total) for optimal CPU cache alignment.
+/// Packed with 8-byte alignment for optimal CPU cache alignment.
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Posting {
@@ -51,7 +47,7 @@ impl Posting {
     #[inline]
     pub fn new(doc_id: DocId, tf: u32, doc_len: u32) -> Self {
         Self {
-            doc_id: doc_id.inner(),
+            doc_id: doc_id.raw(),
             tf,
             doc_len,
         }
@@ -59,7 +55,7 @@ impl Posting {
 
     #[inline]
     pub fn doc_id(&self) -> DocId {
-        DocId::new(self.doc_id.into())
+        DocId::from(self.doc_id)
     }
 }
 
@@ -162,7 +158,7 @@ impl PostingList {
     /// Removes a posting for a doc_id using RCU/copy-on-write semantics.
     pub fn remove(&self, doc_id: DocId) -> Self {
         let mut new_postings = self.postings.clone();
-        if let Ok(idx) = new_postings.binary_search_by_key(&u128::from(doc_id.inner()), |p| u128::from(p.doc_id)) {
+        if let Ok(idx) = new_postings.binary_search_by_key(&u128::from(doc_id.raw()), |p| u128::from(p.doc_id)) {
             new_postings.remove(idx);
         }
         let blocks = compute_blocks(&new_postings);
@@ -215,14 +211,14 @@ impl PostingList {
                 )));
             }
             let mut postings = Vec::with_capacity(count as usize);
-            let mut prev_doc_id = 0u64;
+            let mut prev_doc_id: DocIdRaw = 0;
 
             for _ in 0..count {
                 let delta = decode_varint(bytes, &mut offset)?;
                 let tf_u64 = decode_varint(bytes, &mut offset)?;
                 let doc_len_u64 = decode_varint(bytes, &mut offset)?;
 
-                let doc_id = prev_doc_id.checked_add(delta).ok_or_else(|| {
+                let doc_id = prev_doc_id.checked_add(DocIdRaw::from(delta)).ok_or_else(|| {
                     ContextraError::Storage("DocId overflow during delta decoding".to_string())
                 })?;
                 let tf: u32 = tf_u64
@@ -233,7 +229,7 @@ impl PostingList {
                 })?;
 
                 postings.push(Posting {
-                    doc_id: doc_id.into(),
+                    doc_id,
                     tf,
                     doc_len,
                 });
