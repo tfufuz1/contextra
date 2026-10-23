@@ -355,7 +355,7 @@ mod tests {
 
     fn sample_chunk(id: u64, content: &str) -> ContextChunk {
         ContextChunk {
-            doc_id: DocId::new(id),
+            doc_id: DocId::from(id),
             content: content.to_string(),
             relevance: 0.95,
             token_count: 20,
