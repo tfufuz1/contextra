@@ -10,17 +10,13 @@ use super::format::{
 };
 use super::types::{DiskAnnIndex, SearchCandidate};
 use crate::distance::compute_distance_trusted;
-use contextra_core::{ContextraError, DocId, Result};
-#[cfg(not(feature = "docid-128"))]
-pub(crate) type TombstoneSet = roaring::RoaringTreemap;
+use contextra_core::{ContextraError, DocId, DocIdRaw, Result};
 
-#[cfg(feature = "docid-128")]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct TombstoneSet {
-    pub(crate) set: std::collections::HashSet<u128>,
+    pub(crate) set: std::collections::HashSet<DocIdRaw>,
 }
 
-#[cfg(feature = "docid-128")]
 impl TombstoneSet {
     pub(crate) fn new() -> Self {
         Self {
@@ -28,11 +24,11 @@ impl TombstoneSet {
         }
     }
 
-    pub(crate) fn insert(&mut self, id: u128) -> bool {
+    pub(crate) fn insert(&mut self, id: DocIdRaw) -> bool {
         self.set.insert(id)
     }
 
-    pub(crate) fn contains(&self, id: u128) -> bool {
+    pub(crate) fn contains(&self, id: DocIdRaw) -> bool {
         self.set.contains(&id)
     }
 
@@ -183,20 +179,11 @@ impl DiskAnnIndex {
             let entry_offset = offset;
             offset += doc_id_size;
 
-            #[cfg(not(feature = "docid-128"))]
-            let doc_id = u64::from_le_bytes(
-                buf_id
-                    .as_slice()
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("Corrupt DocId in WAL".into()))?,
-            );
-            #[cfg(feature = "docid-128")]
-            let doc_id = u128::from_le_bytes(
-                buf_id
-                    .as_slice()
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("Corrupt DocId in WAL".into()))?,
-            );
+            let doc_id_bytes: [u8; std::mem::size_of::<DocId>()] = buf_id
+                .as_slice()
+                .try_into()
+                .map_err(|_| ContextraError::Storage("Corrupt DocId in WAL".into()))?;
+            let doc_id = DocId::from_le_bytes(doc_id_bytes).raw();
 
             let mut buf_hmac = [0u8; 32];
             if file.read_exact(&mut buf_hmac).is_err() {
@@ -337,16 +324,11 @@ impl DiskAnnIndex {
             }
             offset += 4;
 
-            #[cfg(not(feature = "docid-128"))]
-            let doc_id =
-                DocId::from(u64::from_le_bytes(buf_id.as_slice().try_into().map_err(
-                    |_| ContextraError::Storage("Corrupt DocId in WAL".into()),
-                )?));
-            #[cfg(feature = "docid-128")]
-            let doc_id =
-                DocId::from(u128::from_le_bytes(buf_id.as_slice().try_into().map_err(
-                    |_| ContextraError::Storage("Corrupt DocId in WAL".into()),
-                )?));
+            let doc_id_bytes: [u8; std::mem::size_of::<DocId>()] = buf_id
+                .as_slice()
+                .try_into()
+                .map_err(|_| ContextraError::Storage("Corrupt DocId in WAL".into()))?;
+            let doc_id = DocId::from_le_bytes(doc_id_bytes);
             let dim = u32::from_le_bytes(buf_dim) as usize;
 
             if dim == 0 || dim > MAX_PENDING_WAL_DIM {
@@ -720,13 +702,15 @@ impl DiskAnnIndex {
     }
 }
 
-#[cfg(all(test, feature = "docid-128"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    #[cfg(feature = "docid-128")]
     #[tokio::test]
-    async fn test_docid_128_wal_roundtrip() -> Result<()> {
+    async fn test_docid_wal_roundtrip() -> Result<()> {
+        if DocId::BYTES != 16 {
+            return Ok(());
+        }
         let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
         let pending_wal_path = temp_dir.path().join("test_128.pending.wal");
         let tombstone_wal_path = temp_dir.path().join("test_128.tombstone.wal");
