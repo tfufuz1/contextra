@@ -52,17 +52,7 @@ fn test_path_rag_to_rrf_signal_docid_conversion_and_sorting() {
     // Verify DocId matching expected numerical values
     let map: HashMap<DocId, f32> = signal.into_iter().collect();
 
-    #[cfg(not(feature = "docid-128"))]
-    {
-        assert!(map.contains_key(&DocId(10)));
-        assert!(map.contains_key(&DocId(20)));
-        assert!(map.contains_key(&DocId(30)));
-    }
-
-    #[cfg(feature = "docid-128")]
-    {
-        assert!(map.contains_key(&DocId(10u128)));
-        assert!(map.contains_key(&DocId(20u128)));
-        assert!(map.contains_key(&DocId(30u128)));
-    }
+    assert!(map.contains_key(&DocId::from(10)));
+    assert!(map.contains_key(&DocId::from(20)));
+    assert!(map.contains_key(&DocId::from(30)));
 }
