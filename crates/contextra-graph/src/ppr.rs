@@ -1143,6 +1143,7 @@ pub(crate) fn compute_ppr_dense(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod ppr_shadow_invariance_tests {
     use super::*;
     use crate::csr::CsrGraph;
@@ -1206,4 +1207,5 @@ mod ppr_shadow_invariance_tests {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests;

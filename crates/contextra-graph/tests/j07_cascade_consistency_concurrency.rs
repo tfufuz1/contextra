@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 // FILE-CONTEXT
 // ZWECK: Parallelitäts- und Edge-Case-Tests für Cascade-Invalidation & Consistency-Enforcement.
 // INVARIANTEN: Determinismus, keine wall-clock sleep(), Snapshot-Isolation, Zero-Panic.

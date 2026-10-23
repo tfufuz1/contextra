@@ -101,7 +101,7 @@ impl EdgeReinforcementBuffer {
             .iter()
             .filter(|s| s.from == entity || s.to == entity)
             .count();
-        co_count + tr_count
+        co_count.saturating_add(tr_count)
     }
 
     /// Purged alle gepufferten Signale (Co-Occurrence und Traversal), in denen `entity` vorkommt.
@@ -109,14 +109,14 @@ impl EdgeReinforcementBuffer {
         let mut co_guard = self.cooccurrence.lock();
         let len_co_before = co_guard.len();
         co_guard.retain(|s| s.from != entity && s.to != entity);
-        let removed_co = len_co_before - co_guard.len();
+        let removed_co = len_co_before.saturating_sub(co_guard.len());
 
         let mut tr_guard = self.traversal.lock();
         let len_tr_before = tr_guard.len();
         tr_guard.retain(|s| s.from != entity && s.to != entity);
-        let removed_tr = len_tr_before - tr_guard.len();
+        let removed_tr = len_tr_before.saturating_sub(tr_guard.len());
 
-        removed_co + removed_tr
+        removed_co.saturating_add(removed_tr)
     }
 
     /// Wendet alle gepufferten Signale auf den CSR-Graphen an und leert den Buffer.
@@ -170,6 +170,7 @@ impl EdgeReinforcementBuffer {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use contextra_types::EntityId;

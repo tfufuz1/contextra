@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 //! PPR Performance and Correctness Benchmark Test for contextra-graph
 //! Verifies numerical bit-identical determinism and buffer reuse efficiency in Personalized PageRank (PPR).
 

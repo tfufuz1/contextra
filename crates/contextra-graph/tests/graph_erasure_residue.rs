@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 use contextra_graph::cascade::cascade_invalidate_entity;
 use contextra_graph::community::CommunityAssignment;
 use contextra_graph::csr::{CsrGraph, EdgeType};

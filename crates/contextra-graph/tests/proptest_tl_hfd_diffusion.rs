@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 //! Property and differential test suite for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21, §22.2c).
 
 use ahash::AHashMap;

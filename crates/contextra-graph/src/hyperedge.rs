@@ -29,7 +29,8 @@ pub fn star_weight(weight: f32, cardinality: usize) -> f32 {
     if cardinality < 2 {
         weight
     } else {
-        (2.0 * weight) / ((cardinality - 1) as f32)
+        let card_minus_one = cardinality.saturating_sub(1);
+        (2.0 * weight) / (card_minus_one as f32)
     }
 }
 
@@ -386,6 +387,7 @@ impl RoleInterner {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
 

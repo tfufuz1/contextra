@@ -56,8 +56,8 @@ impl<T> ArcSlice<T> {
 
         Some(Self {
             shared: Arc::clone(&self.shared),
-            offset: self.offset + start,
-            len: end - start,
+            offset: self.offset.checked_add(start)?,
+            len: end.checked_sub(start)?,
         })
     }
 
@@ -97,7 +97,8 @@ impl<T> ArcSlice<T> {
     /// Returns a reference to the slice of elements.
     #[inline]
     pub fn as_slice(&self) -> &[T] {
-        &self.shared[self.offset..self.offset + self.len]
+        let end = self.offset.saturating_add(self.len);
+        self.shared.get(self.offset..end).unwrap_or(&[])
     }
 }
 
@@ -135,6 +136,7 @@ impl<'a, T> IntoIterator for &'a ArcSlice<T> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
 

@@ -85,8 +85,8 @@ pub fn shadow_compare_forward_push_vs_tl_hfd<G: PathGraph>(
     let k_fp = top_k.min(fp_sorted.len());
     let k_tl = top_k.min(tl_sorted.len());
 
-    let top_fp = &fp_sorted[..k_fp];
-    let top_tl = &tl_sorted[..k_tl];
+    let top_fp = fp_sorted.get(..k_fp).unwrap_or(&[]);
+    let top_tl = tl_sorted.get(..k_tl).unwrap_or(&[]);
 
     let set_fp: AHashSet<EntityId> = top_fp.iter().map(|(id, _)| *id).collect();
     let set_tl: AHashSet<EntityId> = top_tl.iter().map(|(id, _)| *id).collect();

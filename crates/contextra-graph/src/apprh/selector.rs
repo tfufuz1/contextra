@@ -144,9 +144,11 @@ impl ApprhSelector {
                 let fp_map = forward_push_ppr(graph, seeds, ppr_params);
                 let fp_sorted = normalize_and_sort(&fp_map);
 
-                let call_num = self.call_counter.fetch_add(1, Ordering::Relaxed) + 1;
-                let is_sampled = self.config.sample_interval > 0
-                    && (call_num % self.config.sample_interval == 0);
+                let call_num = self.call_counter.fetch_add(1, Ordering::Relaxed).saturating_add(1);
+                let is_sampled = match self.config.sample_interval.checked_rem_euclid(self.config.sample_interval) {
+                    _ if self.config.sample_interval == 0 => false,
+                    _ => call_num.checked_rem(self.config.sample_interval) == Some(0),
+                };
                 let within_budget = seeds.len() <= self.config.max_seeds;
 
                 if is_sampled && within_budget {

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 // FILE-CONTEXT
 // ZWECK: Integrations- und Evaluationstests für die regelbasierte Entitäts- und Relations-Extraktion in contextra-graph.
 

@@ -186,7 +186,8 @@ impl EntityExtractor for RuleBasedEntityExtractor {
                 for trigger in &pattern.triggers {
                     if let Some(pos) = sentence_lower.find(trigger) {
                         let left_part = &sentence_trimmed[..pos];
-                        let right_part = &sentence_trimmed[pos + trigger.len()..];
+                        let trigger_end = pos.saturating_add(trigger.len());
+                        let right_part = sentence_trimmed.get(trigger_end..).unwrap_or("");
 
                         let left_tokens: Vec<&str> = left_part.split_whitespace().collect();
                         let right_tokens: Vec<&str> = right_part.split_whitespace().collect();
@@ -257,7 +258,8 @@ pub fn ingest_extracted_relations(
 
         // Erstelle Hyperkanten-IDs
         let max_id = graph.max_hyperedge_id();
-        let next_he_id = HyperEdgeId::new(max_id + 1 + created_edges.len() as u64);
+        let offset = (created_edges.len() as u64).saturating_add(1);
+        let next_he_id = HyperEdgeId::new(max_id.saturating_add(offset));
 
         let participants = vec![
             RoleBinding::new(RoleId::new(1), source_id),
@@ -276,7 +278,7 @@ pub fn ingest_extracted_relations(
             }
             Err(GraphMutationError::DuplicateHyperEdgeId(_)) => {
                 // Falls ID kollidiert, versuche mit versetztem Offset
-                let alt_id = HyperEdgeId::new(next_he_id.inner() + 1000);
+                let alt_id = HyperEdgeId::new(next_he_id.inner().saturating_add(1000));
                 let participants_alt = vec![
                     RoleBinding::new(RoleId::new(1), source_id),
                     RoleBinding::new(RoleId::new(2), target_id),

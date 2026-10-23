@@ -29,8 +29,12 @@ pub fn truncate_participants(
             .then_with(|| a.cmp(&b))
     });
 
-    let mut truncated = Vec::with_capacity(max_sort_size + 1);
-    truncated.extend_from_slice(&sorted[..max_sort_size]);
+    let mut truncated = Vec::with_capacity(max_sort_size.saturating_add(1));
+    if let Some(top_slice) = sorted.get(..max_sort_size) {
+        truncated.extend_from_slice(top_slice);
+    } else {
+        truncated.extend_from_slice(&sorted);
+    }
 
     // Find participant with minimum x_v (tie-breaker: EntityId ascending)
     if let Some(&min_p) = sorted.last() {
@@ -111,6 +115,7 @@ pub fn compute_lovasz_extension(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
 

@@ -473,8 +473,8 @@ impl GraphInner {
             if self.out_weight_sums.len() < num_nodes {
                 self.out_weight_sums.resize(num_nodes, 0.0);
             }
-            if node_idx < self.out_weight_sums.len() {
-                self.out_weight_sums[node_idx] += weight;
+            if let Some(ows) = self.out_weight_sums.get_mut(node_idx) {
+                *ows += weight;
             }
         }
     }
@@ -488,18 +488,22 @@ impl GraphInner {
             self.out_weight_sums.resize(num_nodes, 0.0);
         }
         if self.entity_at(node_idx).is_none() {
-            self.out_weight_sums[node_idx] = 0.0;
+            if let Some(ows) = self.out_weight_sums.get_mut(node_idx) {
+                *ows = 0.0;
+            }
             return;
         }
 
         let mut sum = 0.0f32;
 
-        if node_idx < self.offsets.len() - 1 {
-            let start = self.offsets[node_idx];
-            let end = self.offsets[node_idx + 1];
+        let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
+        if node_idx < offsets_len_minus_1 {
+            let start = *self.offsets.get(node_idx).unwrap_or(&0);
+            let next_i = node_idx.saturating_add(1);
+            let end = *self.offsets.get(next_i).unwrap_or(&0);
             for j in start..end {
-                let target = self.targets[j];
-                let w = self.weights[j];
+                let Some(&target) = self.targets.get(j) else { continue };
+                let w = *self.weights.get(j).unwrap_or(&0.0);
                 if !self.tombstoned_edges.contains(&(node_idx, target))
                     && self.entity_at(target).is_some()
                     && w > 0.0
@@ -521,15 +525,18 @@ impl GraphInner {
             }
         }
 
-        self.out_weight_sums[node_idx] = sum;
+        if let Some(ows) = self.out_weight_sums.get_mut(node_idx) {
+            *ows = sum;
+        }
     }
 
     /// Compacts pending edges in the delta buffer into the main CSR arrays.
     pub fn compact(&mut self) {
         let num_nodes = self.reverse_map.len();
 
+        let num_nodes_plus_1 = num_nodes.saturating_add(1);
         if self.pending_edges.is_empty() && self.tombstoned_edges.is_empty() {
-            while self.offsets.len() < num_nodes + 1 {
+            while self.offsets.len() < num_nodes_plus_1 {
                 let last = *self.offsets.last().unwrap_or(&0);
                 self.offsets.push(last);
             }
@@ -540,19 +547,19 @@ impl GraphInner {
             return;
         }
 
-        let mut new_offsets = Vec::with_capacity(num_nodes + 1);
-        let mut new_targets = Vec::with_capacity(self.targets.len() + self.pending_edge_count);
-        let mut new_weights = Vec::with_capacity(self.weights.len() + self.pending_edge_count);
+        let mut new_offsets = Vec::with_capacity(num_nodes_plus_1);
+        let mut new_targets = Vec::with_capacity(self.targets.len().saturating_add(self.pending_edge_count));
+        let mut new_weights = Vec::with_capacity(self.weights.len().saturating_add(self.pending_edge_count));
         let mut new_tx_valid_froms =
-            Vec::with_capacity(self.tx_valid_froms.len() + self.pending_edge_count);
+            Vec::with_capacity(self.tx_valid_froms.len().saturating_add(self.pending_edge_count));
         let mut new_tx_valid_tos =
-            Vec::with_capacity(self.tx_valid_tos.len() + self.pending_edge_count);
+            Vec::with_capacity(self.tx_valid_tos.len().saturating_add(self.pending_edge_count));
         let mut new_business_valid_froms =
-            Vec::with_capacity(self.business_valid_froms.len() + self.pending_edge_count);
+            Vec::with_capacity(self.business_valid_froms.len().saturating_add(self.pending_edge_count));
         let mut new_business_valid_tos =
-            Vec::with_capacity(self.business_valid_tos.len() + self.pending_edge_count);
+            Vec::with_capacity(self.business_valid_tos.len().saturating_add(self.pending_edge_count));
         let mut new_source_doc_ids =
-            Vec::with_capacity(self.source_doc_ids.len() + self.pending_edge_count);
+            Vec::with_capacity(self.source_doc_ids.len().saturating_add(self.pending_edge_count));
 
         let mut current_offset: usize = 0;
         new_offsets.push(current_offset);
@@ -561,13 +568,15 @@ impl GraphInner {
             let mut node_edges = Vec::new();
 
             // 1. Get neighbors from old CSR
-            let old_start = if i < self.offsets.len() - 1 {
-                self.offsets[i]
+            let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
+            let old_start = if i < offsets_len_minus_1 {
+                *self.offsets.get(i).unwrap_or(&0)
             } else {
                 0
             };
-            let old_end = if i < self.offsets.len() - 1 {
-                self.offsets[i + 1]
+            let old_end = if i < offsets_len_minus_1 {
+                let next_i = i.saturating_add(1);
+                *self.offsets.get(next_i).unwrap_or(&0)
             } else {
                 0
             };
@@ -576,17 +585,18 @@ impl GraphInner {
             let safe_end = old_end.clamp(safe_start, self.targets.len());
 
             for j in safe_start..safe_end {
-                let target = self.targets[j];
-                if !self.tombstoned_edges.contains(&(i, target)) {
-                    node_edges.push(EdgePayload {
-                        target,
-                        weight: self.weights.get(j).copied().unwrap_or(1.0),
-                        tx_valid_from: self.tx_valid_from_at(j),
-                        tx_valid_to: self.tx_valid_to_at(j),
-                        business_valid_from: self.business_valid_from_at(j),
-                        business_valid_to: self.business_valid_to_at(j),
-                        source_doc_id: self.source_doc_id_at(j),
-                    });
+                if let Some(&target) = self.targets.get(j) {
+                    if !self.tombstoned_edges.contains(&(i, target)) {
+                        node_edges.push(EdgePayload {
+                            target,
+                            weight: self.weights.get(j).copied().unwrap_or(1.0),
+                            tx_valid_from: self.tx_valid_from_at(j),
+                            tx_valid_to: self.tx_valid_to_at(j),
+                            business_valid_from: self.business_valid_from_at(j),
+                            business_valid_to: self.business_valid_to_at(j),
+                            source_doc_id: self.source_doc_id_at(j),
+                        });
+                    }
                 }
             }
 
@@ -623,7 +633,7 @@ impl GraphInner {
             new_offsets.push(current_offset);
         }
 
-        while new_offsets.len() < num_nodes + 1 {
+        while new_offsets.len() < num_nodes_plus_1 {
             let last = *new_offsets.last().unwrap_or(&0);
             new_offsets.push(last);
         }
@@ -645,22 +655,28 @@ impl GraphInner {
 
         // Recompute out_weight_sums for all nodes during compaction
         self.out_weight_sums.resize(num_nodes, 0.0);
+        let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
         for i in 0..num_nodes {
             if self.entity_at(i).is_none() {
-                self.out_weight_sums[i] = 0.0;
+                if let Some(ows) = self.out_weight_sums.get_mut(i) {
+                    *ows = 0.0;
+                }
                 continue;
             }
-            let start = self.offsets[i];
-            let end = self.offsets[i + 1];
+            let start = if i < offsets_len_minus_1 { *self.offsets.get(i).unwrap_or(&0) } else { 0 };
+            let next_i = i.saturating_add(1);
+            let end = if i < offsets_len_minus_1 { *self.offsets.get(next_i).unwrap_or(&0) } else { 0 };
             let mut sum = 0.0f32;
             for j in start..end {
-                let target = self.targets[j];
-                let w = self.weights[j];
+                let Some(&target) = self.targets.get(j) else { continue };
+                let w = *self.weights.get(j).unwrap_or(&0.0);
                 if self.entity_at(target).is_some() && w > 0.0 {
                     sum += w;
                 }
             }
-            self.out_weight_sums[i] = sum;
+            if let Some(ows) = self.out_weight_sums.get_mut(i) {
+                *ows = sum;
+            }
         }
     }
 }
@@ -680,10 +696,12 @@ impl GraphInner {
             .get(&from_idx)
             .is_some_and(|edges| edges.iter().any(|e| e.target == to_idx));
 
-        let exists_csr = if from_idx < self.offsets.len() - 1 {
-            let start = self.offsets[from_idx];
-            let end = self.offsets[from_idx + 1];
-            self.targets[start..end].contains(&to_idx)
+        let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
+        let exists_csr = if from_idx < offsets_len_minus_1 {
+            let start = *self.offsets.get(from_idx).unwrap_or(&0);
+            let next_i = from_idx.saturating_add(1);
+            let end = *self.offsets.get(next_i).unwrap_or(&0);
+            self.targets.get(start..end).map_or(false, |slice| slice.contains(&to_idx))
         } else {
             false
         };
@@ -703,12 +721,13 @@ impl GraphInner {
                 None
             }
             .unwrap_or_else(|| {
-                if from_idx < self.offsets.len() - 1 {
-                    let start = self.offsets[from_idx];
-                    let end = self.offsets[from_idx + 1];
+                if from_idx < offsets_len_minus_1 {
+                    let start = *self.offsets.get(from_idx).unwrap_or(&0);
+                    let next_i = from_idx.saturating_add(1);
+                    let end = *self.offsets.get(next_i).unwrap_or(&0);
                     for j in start..end {
-                        if self.targets[j] == to_idx {
-                            return self.weights[j];
+                        if self.targets.get(j) == Some(&to_idx) {
+                            return *self.weights.get(j).unwrap_or(&1.0);
                         }
                     }
                 }
@@ -738,13 +757,16 @@ impl GraphInner {
                     }
                 }
             }
-            if from_idx < self.offsets.len() - 1 {
-                let start = self.offsets[from_idx];
-                let end = self.offsets[from_idx + 1];
+            let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
+            if from_idx < offsets_len_minus_1 {
+                let start = *self.offsets.get(from_idx).unwrap_or(&0);
+                let next_i = from_idx.saturating_add(1);
+                let end = *self.offsets.get(next_i).unwrap_or(&0);
                 for j in start..end {
-                    let t_idx = self.targets[j];
+                    let Some(&t_idx) = self.targets.get(j) else { continue };
+                    let w = *self.weights.get(j).unwrap_or(&1.0);
                     if let Some(&t_id) = self.reverse_map.get(t_idx) {
-                        target_ids.push((t_id, self.weights[j]));
+                        target_ids.push((t_id, w));
                     }
                 }
             }
@@ -792,12 +814,16 @@ impl GraphInner {
                     }
 
                     // Update in CSR arrays
-                    if from_idx < self.offsets.len() - 1 {
-                        let start = self.offsets[from_idx];
-                        let end = self.offsets[from_idx + 1];
+                    let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
+                    if from_idx < offsets_len_minus_1 {
+                        let start = *self.offsets.get(from_idx).unwrap_or(&0);
+                        let next_i = from_idx.saturating_add(1);
+                        let end = *self.offsets.get(next_i).unwrap_or(&0);
                         for j in start..end {
-                            if self.targets[j] == to_idx {
-                                self.weights[j] = new_weight;
+                            if self.targets.get(j) == Some(&to_idx) {
+                                if let Some(w_ref) = self.weights.get_mut(j) {
+                                    *w_ref = new_weight;
+                                }
                             }
                         }
                     }

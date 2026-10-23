@@ -43,11 +43,13 @@ impl<'a> PathGraph for SnapshotPathGraph<'a> {
         let mut seen = HashSet::new();
 
         // 1. Compacted CSR edges
-        if node_idx < self.inner.offsets.len() - 1 {
-            let start_edge = self.inner.offsets[node_idx];
-            let end_edge = self.inner.offsets[node_idx + 1];
+        let offsets_len_minus_1 = self.inner.offsets.len().saturating_sub(1);
+        if node_idx < offsets_len_minus_1 {
+            let start_edge = *self.inner.offsets.get(node_idx).unwrap_or(&0);
+            let next_i = node_idx.saturating_add(1);
+            let end_edge = *self.inner.offsets.get(next_i).unwrap_or(&0);
             for edge_idx in start_edge..end_edge {
-                let neighbor_idx = self.inner.targets[edge_idx];
+                let Some(&neighbor_idx) = self.inner.targets.get(edge_idx) else { continue };
                 if self
                     .inner
                     .tombstoned_edges
@@ -65,7 +67,8 @@ impl<'a> PathGraph for SnapshotPathGraph<'a> {
                 if is_edge_visible_bitemporal(tx_vf, tx_vt, self.as_of_tx, biz_vf, biz_vt, None) {
                     if let Some(&id) = self.inner.reverse_map.get(neighbor_idx) {
                         if seen.insert(id) {
-                            result.push((id, self.inner.weights[edge_idx]));
+                            let weight = *self.inner.weights.get(edge_idx).unwrap_or(&1.0);
+                            result.push((id, weight));
                         }
                     }
                 }
@@ -128,11 +131,13 @@ impl<'a> PathGraph for SnapshotPathGraph<'a> {
             };
 
             // 1. Compacted CSR edges
-            if u_idx < self.inner.offsets.len() - 1 {
-                let start_edge = self.inner.offsets[u_idx];
-                let end_edge = self.inner.offsets[u_idx + 1];
+            let offsets_len_minus_1 = self.inner.offsets.len().saturating_sub(1);
+            if u_idx < offsets_len_minus_1 {
+                let start_edge = *self.inner.offsets.get(u_idx).unwrap_or(&0);
+                let next_i = u_idx.saturating_add(1);
+                let end_edge = *self.inner.offsets.get(next_i).unwrap_or(&0);
                 for edge_idx in start_edge..end_edge {
-                    if self.inner.targets[edge_idx] == target_idx
+                    if self.inner.targets.get(edge_idx) == Some(&target_idx)
                         && !self.inner.tombstoned_edges.contains(&(u_idx, target_idx))
                     {
                         let tx_vf = self.inner.tx_valid_from_at(edge_idx);
@@ -149,7 +154,8 @@ impl<'a> PathGraph for SnapshotPathGraph<'a> {
                             None,
                         ) && seen.insert(u_id)
                         {
-                            result.push((u_id, self.inner.weights[edge_idx]));
+                            let weight = *self.inner.weights.get(edge_idx).unwrap_or(&1.0);
+                            result.push((u_id, weight));
                         }
                     }
                 }

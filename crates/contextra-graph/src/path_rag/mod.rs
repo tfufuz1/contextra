@@ -119,7 +119,7 @@ pub fn forward_push_ppr<G: PathGraph>(
             }
         }
 
-        let total_neighbors_count = binary_neighbors.len() + hyper_participants.len();
+        let total_neighbors_count = binary_neighbors.len().saturating_add(hyper_participants.len());
         let degree = (total_neighbors_count as f32).max(1.0);
 
         let r_u = *r.get(&u).unwrap_or(&0.0);
@@ -292,10 +292,10 @@ impl<G: PathGraph> PathRAGEngine<G> {
         let mut meeting_node: Option<EntityId> = None;
 
         let mut steps = 0;
-        let max_steps = self.config.max_hops * 1000; // Schutzzähler gegen Endlosschleife
+        let max_steps = self.config.max_hops.saturating_mul(1000); // Schutzzähler gegen Endlosschleife
 
         while (!heap_fwd.is_empty() || !heap_bwd.is_empty()) && steps < max_steps {
-            steps += 1;
+            steps = steps.saturating_add(1);
 
             // Vorwärts-Schritt
             if let Some(Reverse((d_bits, u))) = heap_fwd.pop() {
@@ -405,7 +405,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
             }
             for (nbr, _) in self.get_expanded_neighbors(curr) {
                 if nbr != source && targets.insert(nbr) {
-                    queue.push_back((nbr, depth + 1));
+                    queue.push_back((nbr, depth.saturating_add(1)));
                 }
             }
         }
@@ -437,7 +437,7 @@ impl<G: PathGraph> PathRAGEngine<G> {
 
         for path in paths.iter().filter(|p| self.sufficiency_check(p)) {
             for (i, &entity_id) in path.nodes.iter().enumerate() {
-                let position_weight = (i + 1) as f32 / path.nodes.len() as f32;
+                let position_weight = (i.saturating_add(1)) as f32 / path.nodes.len() as f32;
                 *scored.entry(entity_id.inner()).or_insert(0.0) +=
                     path.total_flow * position_weight;
             }
@@ -454,4 +454,5 @@ impl<G: PathGraph> PathRAGEngine<G> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests;

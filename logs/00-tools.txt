@@ -1,6 +1,0 @@
-grep is an alias for rg
-rg is /home/freddy/.nix-profile/bin/rg
-jq is /home/freddy/.nix-profile/bin/jq
-cargo is /home/freddy/.cargo/bin/cargo
-rustfmt is /home/freddy/.cargo/bin/rustfmt
-just is /home/freddy/.nix-profile/bin/just

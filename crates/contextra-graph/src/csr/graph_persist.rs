@@ -96,7 +96,7 @@ impl CsrGraph {
                 continue;
             }
             graph.load_entity_direct(entity)?;
-            entity_count += 1;
+            entity_count = entity_count.saturating_add(1);
         }
 
         // 2. Edges laden
@@ -192,7 +192,7 @@ impl CsrGraph {
                     business_valid_to,
                     source_doc_id,
                 )?;
-                edge_count += 1;
+                edge_count = edge_count.saturating_add(1);
             } else {
                 tracing::warn!(key = key_str, "Ungültiger graph edge key, übersprungen");
             }
@@ -250,7 +250,7 @@ impl CsrGraph {
                         let eid = EntityId::from(key_str);
                         if let Ok(comm_id) = serde_json::from_slice::<u64>(&raw_value) {
                             inner.communities.insert(eid, comm_id);
-                            community_count += 1;
+                            community_count = community_count.saturating_add(1);
                         }
                     }
                 }

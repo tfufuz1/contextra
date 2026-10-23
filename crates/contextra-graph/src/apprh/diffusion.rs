@@ -63,7 +63,7 @@ pub fn run_apprh_push<G: PathGraph>(
 
     while let Some(u) = queue.pop_front() {
         in_queue.remove(&u);
-        steps += 1;
+        steps = steps.saturating_add(1);
         if steps > max_iterations {
             break;
         }
@@ -84,7 +84,7 @@ pub fn run_apprh_push<G: PathGraph>(
         // 3. In APPRH, each hyperedge counts as 1 degree unit
         let binary_degree = binary_neighbors.len();
         let hyper_degree = hedge_ids.len();
-        let degree = ((binary_degree + hyper_degree) as f32).max(1.0);
+        let degree = (binary_degree.saturating_add(hyper_degree) as f32).max(1.0);
 
         let r_u = *r.get(&u).unwrap_or(&0.0);
         if !r_u.is_finite() {

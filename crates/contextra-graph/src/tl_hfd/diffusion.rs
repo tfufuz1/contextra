@@ -42,17 +42,14 @@ pub fn run_diffusion<G: PathGraph>(
 
     let seeds_set: AHashSet<EntityId> = seeds_sorted.iter().copied().collect();
 
+    let exp_capacity = (params.max_iterations as usize).saturating_mul(params.max_top_k_expansion);
     let mut active_nodes: AHashSet<EntityId> = AHashSet::with_capacity(
-        seeds_sorted
-            .len()
-            .saturating_add(params.max_iterations as usize * params.max_top_k_expansion),
+        seeds_sorted.len().saturating_add(exp_capacity),
     );
     active_nodes.extend(seeds_sorted.iter().copied());
 
     let mut x: AHashMap<EntityId, f32> = AHashMap::with_capacity(
-        seeds_sorted
-            .len()
-            .saturating_add(params.max_iterations as usize * params.max_top_k_expansion),
+        seeds_sorted.len().saturating_add(exp_capacity),
     );
     for &s in &seeds_sorted {
         x.insert(s, 0.0);
@@ -212,7 +209,7 @@ pub fn run_diffusion<G: PathGraph>(
         });
 
         let to_activate_count = boundary_scores.len().min(params.max_top_k_expansion);
-        let activated = &boundary_scores[..to_activate_count];
+        let activated = boundary_scores.get(..to_activate_count).unwrap_or(&[]);
 
         for &(v, _s) in activated {
             active_nodes.insert(v);
@@ -244,6 +241,7 @@ pub fn run_diffusion<G: PathGraph>(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::hyperedge::HyperEdge;

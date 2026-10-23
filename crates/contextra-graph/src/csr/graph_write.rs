@@ -212,7 +212,7 @@ impl CsrGraph {
 
             for node in topo_order {
                 if self.tombstone_hyperedge(node, wal_tx) {
-                    tombstoned_count += 1;
+                    tombstoned_count = tombstoned_count.saturating_add(1);
                 }
             }
 
@@ -278,9 +278,11 @@ impl CsrGraph {
             }
         }
 
-        if from_idx < inner.offsets.len() - 1 {
-            let start = inner.offsets[from_idx];
-            let end = inner.offsets[from_idx + 1];
+        let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
+        if from_idx < offsets_len_minus_1 {
+            let start = *inner.offsets.get(from_idx).unwrap_or(&0);
+            let next_i = from_idx.saturating_add(1);
+            let end = *inner.offsets.get(next_i).unwrap_or(&0);
             for j in start..end {
                 if inner.targets.get(j) == Some(&to_idx) {
                     return inner.source_doc_id_at(j);
@@ -318,9 +320,11 @@ impl CsrGraph {
                         }
                     }
                     // Record WAL transaction invalidation provenance on compacted CSR arrays
-                    if f_idx < inner.offsets.len() - 1 {
-                        let start = inner.offsets[f_idx];
-                        let end = inner.offsets[f_idx + 1];
+                    let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
+                    if f_idx < offsets_len_minus_1 {
+                        let start = *inner.offsets.get(f_idx).unwrap_or(&0);
+                        let next_i = f_idx.saturating_add(1);
+                        let end = *inner.offsets.get(next_i).unwrap_or(&0);
                         for j in start..end {
                             if inner.targets.get(j) == Some(&t_idx) {
                                 if let Some(tx_to) = inner.tx_valid_tos.get_mut(j) {
@@ -951,7 +955,7 @@ impl GraphCollectionMutation for CsrGraph {
         contextra_ports::graph::HyperEdgeId,
         contextra_ports::graph::GraphMutationError,
     > {
-        let next_id = crate::hyperedge::HyperEdgeId::new(self.max_hyperedge_id() + 1);
+        let next_id = crate::hyperedge::HyperEdgeId::new(self.max_hyperedge_id().saturating_add(1));
         let mapped_participants: Vec<crate::hyperedge::RoleBinding> = participants
             .iter()
             .map(|p| {

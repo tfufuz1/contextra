@@ -88,9 +88,13 @@ pub fn scan_entity_residue(
 
     for &entity_idx in &entity_indices {
         // Outgoing edges from entity
-        if entity_idx < inner.offsets.len() - 1 {
-            for j in inner.offsets[entity_idx]..inner.offsets[entity_idx + 1] {
-                let target_idx = inner.targets[j];
+        let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
+        if entity_idx < offsets_len_minus_1 {
+            let start = *inner.offsets.get(entity_idx).unwrap_or(&0);
+            let next_idx = entity_idx.saturating_add(1);
+            let end = *inner.offsets.get(next_idx).unwrap_or(&0);
+            for j in start..end {
+                let Some(&target_idx) = inner.targets.get(j) else { continue };
                 if !inner.tombstoned_edges.contains(&(entity_idx, target_idx)) {
                     let target_id = inner
                         .reverse_map
@@ -130,9 +134,12 @@ pub fn scan_entity_residue(
             };
 
             let mut found_incoming = false;
-            if src_idx < inner.offsets.len() - 1 {
-                for j in inner.offsets[src_idx]..inner.offsets[src_idx + 1] {
-                    if inner.targets[j] == entity_idx
+            if src_idx < offsets_len_minus_1 {
+                let start = *inner.offsets.get(src_idx).unwrap_or(&0);
+                let next_idx = src_idx.saturating_add(1);
+                let end = *inner.offsets.get(next_idx).unwrap_or(&0);
+                for j in start..end {
+                    if inner.targets.get(j) == Some(&entity_idx)
                         && !inner.tombstoned_edges.contains(&(src_idx, entity_idx))
                     {
                         found_incoming = true;

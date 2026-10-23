@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use contextra_ports::GraphIndex;
 use contextra_types::{Entity, EntityId};

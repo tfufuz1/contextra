@@ -130,6 +130,7 @@ pub fn log_tl_hfd_vs_baseline_discrepancy(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};

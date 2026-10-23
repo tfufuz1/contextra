@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 use contextra_graph::{validate_candidates_with_llm, GraphMutationError, HyperEdgeCandidate};
 use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::{DocId, EntityId};

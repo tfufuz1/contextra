@@ -79,11 +79,11 @@ impl DocEdgeIndex {
     /// Zählt die Anzahl der Kanten-Einträge im Index, in denen `entity` als Quell- oder Zielknoten auftaucht.
     pub fn count_references_for_entity(&self, entity: contextra_types::EntityId) -> usize {
         let guard = self.index.read();
-        let mut count = 0;
+        let mut count: usize = 0;
         for set in guard.values() {
             for &(from, to) in set {
                 if from == entity || to == entity {
-                    count += 1;
+                    count = count.saturating_add(1);
                 }
             }
         }
@@ -101,6 +101,7 @@ impl DocEdgeIndex {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use contextra_types::EntityId;

@@ -86,12 +86,13 @@ pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
         HashMap::new();
 
     for i in 0..n {
-        for j in (i + 1)..n {
-            let id1 = nodes[i];
-            let id2 = nodes[j];
+        let j_start = i.saturating_add(1);
+        for j in j_start..n {
+            let Some(&id1) = nodes.get(i) else { continue };
+            let Some(&id2) = nodes.get(j) else { continue };
 
-            let emb1 = &embeddings[&id1];
-            let emb2 = &embeddings[&id2];
+            let Some(emb1) = embeddings.get(&id1) else { continue };
+            let Some(emb2) = embeddings.get(&id2) else { continue };
 
             let sim = cosine_similarity(emb1, emb2);
             if sim <= config.rebonding_similarity {
@@ -107,7 +108,7 @@ pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
                 }
             }
 
-            if neighbors_cache[&id1].contains(&id2) {
+            if neighbors_cache.get(&id1).is_some_and(|set| set.contains(&id2)) {
                 continue;
             }
 
@@ -119,7 +120,7 @@ pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
                 }
             }
 
-            if neighbors_cache[&id2].contains(&id1) {
+            if neighbors_cache.get(&id2).is_some_and(|set| set.contains(&id1)) {
                 continue;
             }
 
@@ -137,6 +138,7 @@ pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::CsrGraph;

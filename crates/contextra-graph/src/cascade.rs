@@ -115,7 +115,7 @@ impl GraphGarbageCollection for CsrGraph {
                     for p in hedge.participants.iter() {
                         if let Some(&idx) = inner.id_map.get(&p.entity) {
                             if inner.entity_at(idx).is_some() {
-                                active_participant_count += 1;
+                                active_participant_count = active_participant_count.saturating_add(1);
                             }
                         }
                     }
@@ -130,7 +130,7 @@ impl GraphGarbageCollection for CsrGraph {
         let mut swept_count = 0usize;
         for hid in candidate_ids {
             if self.tombstone_hyperedge(hid, wal_tx) {
-                swept_count += 1;
+                swept_count = swept_count.saturating_add(1);
             }
         }
 
@@ -187,7 +187,7 @@ pub fn topological_sort_hyperedge_closure(
         let mut parents_in_closure = 0usize;
         for parent in parents {
             if node_set.contains(&parent) {
-                parents_in_closure += 1;
+                parents_in_closure = parents_in_closure.saturating_add(1);
                 children_map.entry(parent).or_default().push(node);
             }
         }
@@ -209,7 +209,7 @@ pub fn topological_sort_hyperedge_closure(
             for &child in children {
                 if let Some(deg) = in_degree.get_mut(&child) {
                     if *deg > 0 {
-                        *deg -= 1;
+                        *deg = deg.saturating_sub(1);
                         if *deg == 0 {
                             ready.push(std::cmp::Reverse(child));
                         }
@@ -418,19 +418,24 @@ pub async fn cascade_invalidate_entity(
     // 2. Count outgoing + incoming edges for report before removal
     let edge_count_before = {
         let inner = graph.inner_read();
-        let mut count = 0;
+        let mut count: usize = 0;
         if let Some(&idx) = inner.id_map.get(&entity_id) {
-            if idx < inner.offsets.len() - 1 {
-                for j in inner.offsets[idx]..inner.offsets[idx + 1] {
-                    if !inner.tombstoned_edges.contains(&(idx, inner.targets[j])) {
-                        count += 1;
+        let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
+        if idx < offsets_len_minus_1 {
+            let start = *inner.offsets.get(idx).unwrap_or(&0);
+            let next_idx = idx.saturating_add(1);
+            let end = *inner.offsets.get(next_idx).unwrap_or(&0);
+            for j in start..end {
+                let Some(&target_idx) = inner.targets.get(j) else { continue };
+                if !inner.tombstoned_edges.contains(&(idx, target_idx)) {
+                    count = count.saturating_add(1);
                     }
                 }
             }
             if let Some(pending) = inner.pending_edges.get(&idx) {
                 for edge in pending {
                     if !inner.tombstoned_edges.contains(&(idx, edge.target)) {
-                        count += 1;
+                    count = count.saturating_add(1);
                     }
                 }
             }
@@ -438,19 +443,22 @@ pub async fn cascade_invalidate_entity(
                 if src_idx == idx {
                     continue;
                 }
-                if src_idx < inner.offsets.len() - 1 {
-                    for j in inner.offsets[src_idx]..inner.offsets[src_idx + 1] {
-                        if inner.targets[j] == idx
+            if src_idx < offsets_len_minus_1 {
+                let start = *inner.offsets.get(src_idx).unwrap_or(&0);
+                let next_idx = src_idx.saturating_add(1);
+                let end = *inner.offsets.get(next_idx).unwrap_or(&0);
+                for j in start..end {
+                    if inner.targets.get(j) == Some(&idx)
                             && !inner.tombstoned_edges.contains(&(src_idx, idx))
                         {
-                            count += 1;
+                        count = count.saturating_add(1);
                         }
                     }
                 }
                 if let Some(pending) = inner.pending_edges.get(&src_idx) {
                     for edge in pending {
                         if edge.target == idx && !inner.tombstoned_edges.contains(&(src_idx, idx)) {
-                            count += 1;
+                        count = count.saturating_add(1);
                         }
                     }
                 }
@@ -558,6 +566,7 @@ pub fn verify_doc_hyperedge_deletion_completeness(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::csr::EdgeType;
