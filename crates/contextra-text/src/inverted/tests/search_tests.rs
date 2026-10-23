@@ -25,10 +25,7 @@ async fn test_wand_exact_threshold_tie_break_determinism(
     // Thus, all 5 documents will have EXACTLY the same BM25 score.
 
     for id_val in [10u64, 20, 30, 40, 50] {
-        #[cfg(not(feature = "docid-128"))]
-        let doc_id = DocId::new(id_val);
-        #[cfg(feature = "docid-128")]
-        let doc_id = DocId::new(id_val as u128);
+        let doc_id = DocId::from(id_val);
 
         index
             .upsert_document(tx, doc_id, "apple banana cherry")
