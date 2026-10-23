@@ -1,0 +1,193 @@
+./crates/contextra/Cargo.toml:84:docid-128 = ["contextra-types/docid-128"]
+./docs/restore/triage/T2_consumers.md:158:| `crates/contextra-db/tests/docid_128_consolidation.rs` | A | nein | - |
+./docs/restore/triage/T3_search.md:49:| f196a0e0 | 2026-10-11 | fix(vector): guard test modules in diskann behind docid-128 feature | `build.rs`<br>`persistence.rs` | +2/-6 / +0/-0 / +0/-0 | PORT-FIX | Absicherung der DiskANN Test-Module hinter docid-128 Feature (DiskANN später entfernt). | contextra-vector | ja | hoch |
+./docs/restore/triage/T3_search.md:287:| `crates/contextra-vector/tests/docid_128_hnsw.rs` | B | nein | 94601244 |
+./crates/contextra-types/Cargo.toml:17:docid-128 = []
+./crates/contextra-types/AGENTS.md:32:- **INV-DOCID-IDENTITY:** `DocId` kapselt standardmäßig `u64`. Unter Feature `docid-128` kapselt `DocId` `u128` (ADR-082 / Schema V2).
+./crates/contextra-text/Cargo.toml:33:docid-128 = ["contextra-types/docid-128"]
+./crates/contextra-types/tests/j35-contextra-types-fehler-schema-budget-dom_tests.rs:62:    let other_version = if cfg!(feature = "docid-128") {
+./crates/contextra-types/tests/docid_width_api.rs:5:    #[cfg(feature = "docid-128")]
+./crates/contextra-types/tests/docid_width_api.rs:11:    #[cfg(not(feature = "docid-128"))]
+./crates/contextra-types/tests/docid_width_api.rs:30:    #[cfg(not(feature = "docid-128"))]
+./crates/contextra-types/tests/docid_width_api.rs:34:    #[cfg(feature = "docid-128")]
+./crates/contextra-types/tests/docid_width_api.rs:46:    #[cfg(feature = "docid-128")]
+./crates/contextra-types/tests/docid_width_api.rs:52:    #[cfg(not(feature = "docid-128"))]
+./crates/contextra-types/tests/docid_width_api.rs:64:    #[cfg(feature = "docid-128")]
+./crates/contextra-types/tests/docid_width_api.rs:68:    #[cfg(not(feature = "docid-128"))]
+./xtask/docs/gates/xtask-loc-reduction-audit.md:59:| 22 | `xtask/src/migrate_docid_128.rs` | 267 | **B** | `main.rs -> mod migrate_docid_128;` | Kein CI Workflow (Einmal-Migration) | Migrations-Tooling für 128-bit DocIDs; Kandidat für Auslagerung. |
+./xtask/docs/gates/xtask-loc-reduction-audit.md:97:   - Modul `generate_adr.rs` (304 LOC), `gen_feature_catalog.rs` (100 LOC), `init_audit_fix.rs` (204 LOC), `migrate_docid_128.rs` (267 LOC) können in ein eigenständiges Dev-Crate `xtask-dev` oder unter `scripts/` verschoben werden.
+./crates/contextra-types/src/types/domain/ids.rs:153:/// When feature `docid-128` is enabled (ADR-082), `DocIdRaw` is `u128`.
+./crates/contextra-types/src/types/domain/ids.rs:154:#[cfg(not(feature = "docid-128"))]
+./crates/contextra-types/src/types/domain/ids.rs:157:#[cfg(feature = "docid-128")]
+./crates/contextra-types/src/types/domain/ids.rs:164:/// When feature `docid-128` is enabled (ADR-082), `DocId` wraps a 128-bit primitive (`u128`),
+./crates/contextra-types/src/types/domain/ids.rs:166:#[cfg(not(feature = "docid-128"))]
+./crates/contextra-types/src/types/domain/ids.rs:171:#[cfg(feature = "docid-128")]
+./crates/contextra-types/src/types/domain/ids.rs:177:#[cfg(not(feature = "docid-128"))]
+./crates/contextra-types/src/types/domain/ids.rs:193:    /// Portable code working across `docid-128` configurations should use
+./crates/contextra-types/src/types/domain/ids.rs:253:#[cfg(feature = "docid-128")]
+./crates/contextra-types/src/types/domain/ids.rs:264:    /// Portable code working across `docid-128` configurations should use
+./crates/contextra-types/src/types/domain/ids.rs:318:#[cfg(not(feature = "docid-128"))]
+./crates/contextra-types/src/types/domain/ids.rs:325:#[cfg(feature = "docid-128")]
+./crates/contextra-types/src/types/domain/ids.rs:332:#[cfg(feature = "docid-128")]
+./crates/contextra-types/src/types/domain/ids.rs:410:#[cfg(feature = "docid-128")]
+./docs/generated/feature-catalog.md:55:| `docid-128` | `contextra-core/docid-128`, `contextra-engine/docid-128` |
+./docs/generated/feature-catalog.md:63:| `docid-128` | `contextra-types/docid-128` |
+./docs/generated/feature-catalog.md:83:| `docid-128` | `contextra-core/docid-128` |
+./docs/generated/feature-catalog.md:101:| `docid-128` | `contextra-core/docid-128` |
+./docs/generated/feature-catalog.md:114:| `docid-128` | `contextra-core/docid-128` |
+./docs/generated/feature-catalog.md:128:| `docid-128` | `contextra-core/docid-128` |
+./docs/generated/feature-catalog.md:158:| `docid-128` | `contextra-core/docid-128` |
+./docs/generated/feature-catalog.md:180:| `docid-128` | `contextra-core/docid-128` |
+./docs/generated/feature-catalog.md:209:| `docid-128` | `contextra-core/docid-128` |
+./docs/generated/feature-catalog.md:226:| `docid-128` | `contextra-core/docid-128` |
+./docs/generated/feature-catalog.md:233:| `docid-128` | `default` / keine weiteren Flags |
+./docs/generated/feature-catalog.md:240:| `docid-128` | `contextra-core/docid-128` |
+./docs/FEATURES_SPECIFICATION.md:30:- **Einstellbare DocId-Bitbreite (`docid-128`):** Unter dem Feature `docid-128` wird `DocIdRaw` von `u64` auf `u128` skaliert.
+./docs/FEATURES_SPECIFICATION.md:225:| `contextra-store` | `wal-integrity` | `encryption-at-rest`, `deletion-proof`, `memory-only-storage`, `fault-injection`, `block-cache-v2`, `sieve-cache`, `docid-128` |
+./docs/FEATURES_SPECIFICATION.md:226:| `contextra-vector` | *keine* | `docid-128`, `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `graph`, `partial-index-rebuild` |
+./docs/FEATURES_SPECIFICATION.md:227:| `contextra-graph` | *keine* | `docid-128`, `graph-connectivity-health`, `edge-reinforcement-learning`, `ppr-forward-push`, `k-path-diffusion`, `apprh-diffusion` |
+./docs/FEATURES_SPECIFICATION.md:228:| `contextra-text` | *keine* | `bm25f`, `docid-128` |
+./docs/FEATURES_SPECIFICATION.md:233:| `contextra-infer-candle` | *keine* | `candle`, `docid-128`, `kv-bridge`, `kv-stage-b`, `cuda` |
+./docs/FEATURES_SPECIFICATION.md:235:| `contextra-mcp` | *keine* | `agent-workflows`, `onnx`, `candle`, `ollama`, `kv-bridge`, `test-utils`, `docid-128` |
+./docs/FEATURES_SPECIFICATION.md:236:| `contextra-engine` | *keine* | `encryption-at-rest`, `bench`, `sandbox`, `reranking`, `onnx`, `experimental-diskann`, `background-maintenance`, `graph-connectivity-health`, `docid-128`, `edge-reinforcement-learning`, `coherence-bonus-fusion`, `adaptive-candidate-pool-sizing`, `entity-extraction` |
+./docs/FEATURES_SPECIFICATION.md:237:| `contextra-db` | *keine* | `bench`, `sandbox`, `reranking`, `onnx`, `experimental-diskann`, `background-maintenance`, `graph-connectivity-health`, `coherence-bonus-fusion`, `adaptive-candidate-pool-sizing`, `volatile-vault`, `docid-128`, `edge-reinforcement-learning` |
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:18:2. **TXT-002 (S1, STATIC)**: Unter dem Feature `docid-128` schneidet `PostingList::encode_compact` 128-Bit `DocId`-Werte via `as u64` auf 64-Bit ab und korrumpiert die Delta-Varint-Kodierung für `DocId > u64::MAX`.
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:69:| Feature `docid-128` | Feature Flag für 128-bit DocId | `contextra-types` | `tests/docid_128_tombstone_resolution.rs` | 128-bit DocId Support | `OK` |
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:81:| **H5** | Posting-Kompression & Delta-Encoding Overflow | T2, T9 Bit-Flip & 128-Bit Input Inspection | **CONFIRMED** | **TXT-002**: Unter `cfg(feature = "docid-128")` wird `p.doc_id` (128-bit) via `as u64` beschnitten, was Varint-Encoding für `doc_id > u64::MAX` korrumpiert. |
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:111:#### ID TXT-002 | Feature docid-128 beschneidet 128-Bit DocId auf 64-Bit bei Delta-Varint-Kodierung
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:112:- **Severity**: S1 (Hoch unter Feature `docid-128`) | **Kategorie**: `LOGIK` | **Status**: `STATIC` | **Konfidenz**: Hoch
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:114:* **Beobachtung**: Wenn das Cargo-Feature `docid-128` aktiviert ist, wird `DocIdRaw` als `u128` definiert (`pub type DocIdRaw = u128`). In `encode_compact` und `decode_compact` wird `prev_doc_id` jedoch als `u64` geführt (`prev_doc_id = p.doc_id as u64`), und `encode_varint` nimmt ausschließlich `u64` entgegen.
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:125:* **Auswirkung**: Bei Nutzung des Features `docid-128` mit Werten oberhalb von `2^64 - 1` schlägt das Serialisieren von Postinglisten fehl (`StorageError: Unsorted or overflow doc_id in posting list`), oder dekodierte Postinglisten enthalten korrumpierte DocIDs.
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:126:* **Mindestweg zur Behebung**: Erweitere `encode_varint` / `decode_varint` oder erstelle eine `u128`-spezifische Variante `encode_varint_u128`, die bedingt durch `#[cfg(feature = "docid-128")]` verwendet wird, und führe `prev_doc_id` als `DocIdRaw`.
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:180:   * *Nutzen*: Beseitigt TXT-002 und macht das Feature `docid-128` sicher nutzbar.
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:261:title = "Fix 128-Bit DocId Varint Truncation under feature docid-128"
+./docs/analysis/TXT_01_text_ANALYSE_2026-10-21.md:267:command = "cargo test -p contextra-text --features docid-128"
+./docs/decisions/ADR-082-docid-width.md:22:1. **Cargo Feature-Flag:** Das `docid-128` Feature-Flag in `contextra-core` erlaubt die stufenweise Aktivierung.
+./docs/decisions/ADR-082-docid-width.md:24:3. **Migrations-Tool:** `cargo xtask migrate-docid-128` führt die deterministische Re-Derivierung von 64-Bit V1-Exports in 128-Bit V2-Exports durch.
+./docs/decisions/ADR-082-docid-width.md:27:Nur `contextra-types` verzweigt per conditional compilation (`#[cfg(feature = "docid-128")]`) auf die tatsächliche Repräsentation von `DocId` (`u64` vs. `u128`).
+./docs/decisions/ADR-082-docid-width.md:33:Die Feature-Flags `docid-128` aller nachgelagerten Crates sind reine Weiterreichungen an `contextra-types/docid-128` und werden NICHT in `#[cfg]` zur Verzweigung der Typbreite verwendet, um Cargo Feature Unification Type Mismatches zu verhindern.
+./docs/decisions/ADR-082-docid-width.md:37:* Downstream-Crates (`contextra-store`, `-index`, `-graph`, `-db`, `-mcp`, `-py`) werden in separaten Folge-Prompts auf `docid-128` umgestellt.
+./docs/analysis/FND_foundation_ANALYSE_2026-10-19.md:73:| **H2** | `DocId` Identifikatoren & Feature `docid-128` wirken konsistent | Bit-Decomposition, `docid-128` Compilation-Check | `REFUTED` (Code hält) | Section 9 |
+./docs/analysis/FND_foundation_ANALYSE_2026-10-19.md:217:2. **Feature `docid-128` Transparenz:**
+./docs/analysis/TXT_ANALYSE_2026-10-19.md:12:1. **TXT-001 (S1, VERDRAHTUNG):** In `InvertedIndex::ensure_term_loaded` führt das Fehlen eines Feature-Gates für `docid-128` bei der Parxung von Legazylschlüsseln im Fallback-Pfad zu unvollständiger Indexierung oder Parsing-Fehlern unter 128-Bit-DocIds.
+./docs/analysis/TXT_ANALYSE_2026-10-19.md:101:  In `ensure_term_loaded()` (Fallback-Pfad für Alt-Indices) und `block_max_wand_search()` werden Suffix-Strings aus Storage-Keys geparst. Dabei wird unter `#[cfg(not(feature = "docid-128"))]` auf `u64` und unter `#[cfg(feature = "docid-128")]` auf `u128` geparst.
+./docs/analysis/TXT_ANALYSE_2026-10-19.md:102:  In `index_struct.rs` wird jedoch an Zeile 190 der Typ `DocId::new(doc_id_raw)` konstruiert, ohne sicherzustellen, dass das Vorhandensein von 128-Bit DocIds in allen Hilfsfunktionen durchgängig behandelt wird. Wenn das Feature `docid-128` aktiviert ist, schlägt der String-Parse `suffix.parse::<u64>()` fehl, wenn Suffixe > `u64::MAX` vorliegen.
+./docs/analysis/TXT_ANALYSE_2026-10-19.md:104:  Statische Code-Analyse der `#[cfg(feature = "docid-128")]` Abzweigungen in `ensure_term_loaded` und `block_max_wand_search`.
+./docs/analysis/TXT_ANALYSE_2026-10-19.md:106:  Der Test `docid_128_tombstone_resolution.rs` prüft Tombstones, deckt aber den Legacy Prefix Scan Fallback mit `u128` Werten > `u64::MAX` nicht vollständig ab.
+./docs/analysis/TXT_ANALYSE_2026-10-19.md:108:  Bei Aktivierung des Features `docid-128` und Vorhandensein von Legacy Single-Key Postings mit 128-Bit DocIds schlägt das Parsing lautlos fehl (`.ok()`), wodurch Postings in der Suchphase übersprungen werden (Silent Recall Drop).
+./docs/analysis/TXT_ANALYSE_2026-10-19.md:334:description = "Unify string parsing of DocIds in index_struct.rs and wand.rs under docid-128 feature flag to prevent silent recall drops."
+./crates/contextra-types/src/schema.rs:19:        if cfg!(feature = "docid-128") {
+./docs/analysis/FND_types-core-ports_ANALYSE_2026-10-21.md:71:| **H2** | Identifikatoren: `DocId` BLAKE3-Kollisionen dokumentiert, `docid-128` wirkt durchgängig. | `cargo check -p contextra-types --features docid-128` und Inspektion von ADR-016 / ADR-082. | `REFUTED` (funktioniert) | Negativbefund N-01 |
+./docs/analysis/FND_types-core-ports_ANALYSE_2026-10-21.md:215:- **N-01 (DocId & docid-128)**: `DocId` verhält sich unter `docid-128` exakt wie in ADR-082 spezifiziert (128-bit BLAKE3 Truncation mit 16-Byte-Alignment). Der Kompilier-Check `cargo check -p contextra-types --features docid-128` verläuft fehlerfrei.
+./docs/analysis/FND_types-core-ports_ANALYSE_2026-10-21.md:277:6. `cd /tmp/audit-fnd && cargo check -p contextra-types --features docid-128` (Exit-Code: 0, Finished dev profile)
+./docs/analysis/kampagne/J-41.md:93:- **Erwartet:** Bei aktivierter Cargo-Feature `docid-128` ist `DocId` ein `u128`. Konvertierungen zu Index-Pointern müssen die Gültigkeit des Werts garantieren.
+./docs/analysis/kampagne/J-41.md:94:- **Tatsächlich:** `.map(|c| c.index as u32)` führt bei `docid-128` zu potentiellem Datenverlust in der oberen Hälfte der Bitbreite.
+./crates/contextra-text/tests/docid_128_tombstone_resolution.rs:217:async fn test_docid_128_tombstone_resolution_exceeding_u64_max() -> contextra_types::Result<()> {
+./crates/contextra-text/tests/docid_128_tombstone_resolution.rs:219:    let index = InvertedIndex::new(storage.clone(), "docid_128_test");
+./crates/contextra-text/tests/docid_128_tombstone_resolution.rs:246:    // Under docid-128, all tombstones for large_doc_id must be resolved and not silently skipped
+./docs/analysis/kampagne/J-11.md:12:In den Subsystemen wurden jedoch mehrere kritische Lücken aufgedeckt: `docid-128` schlägt workspace-weit beim Kompilieren fehl (S2), `--all-features` bricht in mehreren Crates ab wegen E0308 Type-Mismatches (S2) und `clippy` meldet workspace-weit Warnungen in Testzielen bei isoliertem Bauen.
+./docs/analysis/kampagne/J-11.md:16:- **Single-Feature & Clippy-Purity (Schritt 2):** ROT (44 Feature-Zusammenstellungen schlagen fehl, vor allem bei Clippy auf Test-Targets und `docid-128`)
+./docs/analysis/kampagne/J-11.md:20:**Reifegrad-Einschätzung:** **R1** (Funktioniert im Happy Path/Default-Pfad, zeigt aber erhebliche Brüchigkeit bei alternativen Feature-Kombinationen wie `docid-128` und `--all-features`).
+./docs/analysis/kampagne/J-11.md:24:- Weiterhin vorhanden: `docid-128` Inkompatibilität, E0308 in `contextra-vector` Test-Targets, Clippy `expect_used` in Facade-Tests.
+./docs/analysis/kampagne/J-11.md:37:| `cargo check --workspace --features docid-128` | 101 | 8.2s | `/tmp/J11/h5_check.log` | Workspace Compile-Fehler unter `docid-128` (H5) |
+./docs/analysis/kampagne/J-11.md:52:| **H5: `docid-128` Workspace-Durchreichung Inkonsistent** | BESTÄTIGT | [GEMESSEN] | `crates/contextra-py/src/bindings/types.rs:45` |
+./docs/analysis/kampagne/J-11.md:60:### J-11-F01: `docid-128` bricht beim Workspace-Bau mit Compile-Fehler ab (S2)
+./docs/analysis/kampagne/J-11.md:64:- **Erwartet:** `cargo check --workspace --features docid-128` baut alle Crates sauber mit 128-Bit DocId.
+./docs/analysis/kampagne/J-11.md:66:- **Ein-Zeilen-Reproduktionsbefehl:** `cargo check --workspace --features docid-128`
+./docs/analysis/kampagne/J-11.md:68:- **Fix-Skizze:** Typkonvertierungen in `contextra-py` per `cfg(feature = "docid-128")` auf `u128` anpassen und workspace-weite Weiterleitung absichern.
+./docs/analysis/kampagne/J-11.md:75:- **Tatsächlich:** Tests verwenden `DocId::new(i as u64)`, was unter `--all-features` (aktiviert `docid-128`) zu E0308 (`expected u128, found u64`) führt.
+./docs/analysis/kampagne/J-11.md:119:1. **Soll `docid-128` offiziell im Workspace unterstützt werden?** Falls ja, müssen `contextra-py` und sämtliche Test-Fixtures systematisch auf `u128`-Konvertierung umgestellt werden.
+./docs/analysis/kampagne/J-23.md:12:Die Kampagne J-23 hat das Crate `contextra-vector` (HNSW, DiskANN, ACORN) umfassend gegen die Hypothesen H1–H10 der Produktspezifikation auditiert. Die Verifikation nutzte ein unabhängiges, skalares Brute-Force-Referenzmodell (`IndependentScalarOracle`). Der Teststand kompiliert fehlerfrei in der Standard-Konfiguration (61 Unit-Tests, 10 Kampagnen-Tests grün). Unter `--all-features` liegt ein echter Kompilierfehler (E0308, `u128` vs `u64`) im Test `tests/filtered_selectivity_recall.rs` vor. In `HnswIndex` und `DiskANN` existieren bei aktivierter Feature-Flag `docid-128` potenzielle Typverengungen auf `u64`.
+./docs/analysis/kampagne/J-23.md:66:- **Tatsächlich:** Aktivierung von `docid-128` (Teil von `--all-features`) führt zu Typkonflikten (`DocId::new(u64)` erwartet `u128`).
+./docs/analysis/kampagne/J-23.md:72:- **Schwere:** S3 (Robustheitslücke bei Feature `docid-128`)
+./docs/analysis/kampagne/J-23.md:77:- **Reproduktionsbefehl:** `cargo test -p contextra-vector --features docid-128 --test campaign_j23_vector_index`
+./docs/analysis/kampagne/J-23.md:108:1. Soll das Feature `docid-128` verpflichtend in das CI-Gate `J-11/L-01` für alle Crates aufgenommen werden, um Kompilierfehler wie in `filtered_selectivity_recall.rs` künftig automatisch zu verhindern?
+./xtask/src/migrate_docid_128.rs:136:/// Parses CLI arguments for `cargo xtask migrate-docid-128` and runs migration.
+./xtask/src/migrate_docid_128.rs:138:    println!("=== xtask migrate-docid-128 ===");
+./docs/spec/00-meta-workspace-layout.md:176:(onnx, cuda, metal, wasmtime). **Keine typverändernden Features mehr** — `docid-128` entfällt ersatzlos
+./docs/spec/00-meta-workspace-layout.md:183:| ~~`docid-128`~~ | — (entfällt) | `contextra-core` | — | **Entfällt** (ADR-N05): typverändernde Features sind verboten; externes 128-Bit-`DocId` mit internem dichten `DocIdx(u32)` ist eine offene Entscheidung (§A2.4 Nr. 3), keine Compile-Time-Option |
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:70:- **vector:** `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `docid-128`
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:610:| 6.15 / 13.8 | `docid-128` | Ein Feature, das in `types`, `text` (Posting-Liste, WAND, Inverted-Index), `store`, `vector`, `graph`, `engine` mitgeschaltet wird; CI-Gate vorhanden. DocId = BLAKE3-Ableitung. **Kein Rückwärtspfad für 64-Bit-Datenbestände** (Aussage des Audit-Dokuments, nicht geprüft) **[D]** |
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:709:| 13.8 | `docid-128` einheitlich | I.1 |
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:1768:**Features:** default = `—`; weitere: `docid-128`, `graph-connectivity-health`, `edge-reinforcement-learning`, `ppr-forward-push`, `k-path-diffusion`, `apprh-diffusion`, `physio-percolation`, `physio-synaptic-edges`
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:2741:**Features:** default = `—`; weitere: `docid-128`
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:3153:**Features:** default = `wal-integrity`; weitere: `encryption-at-rest`, `deletion-proof`, `memory-only-storage`, `fault-injection`, `block-cache-v2`, `sieve-cache`, `docid-128`, `legacy-wal-key`
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:3272:- `fn derive_doc_id(key: &[u8]) -> DocId` *[feature: docid-128]*
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:3482:**Features:** default = `—`; weitere: `bm25f`, `docid-128`
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:3580:- `type DocIdRaw = u128` *[feature: docid-128]*
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:3608:**Features:** default = `—`; weitere: `docid-128`, `auto-extraction-opt-out`
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:3685:- `type DocIdRaw = u64` / `u128` *[feature: docid-128]* — Kanonischer Roh-Skalartyp der Dokumenten-ID für breitenagnostischen Code. Nur `contextra-types` verzweigt per `#[cfg(feature = "docid-128")]`.
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:3735:**Features:** default = `—`; weitere: `docid-128`, `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `graph`, `partial-index-rebuild`
+./docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md:3940:**Features:** default = `fast, candle`; weitere: `docid-128`, `sovereign`, `compliance`, `audit-export`, `avv-generator`, `onnx`, `ollama`, `router`
+./docs/spec/12-flatbuffers-schema.md:39:  source_doc_id: uint64;          // oder uint128-Encoding bei docid-128
+./docs/spec/20-migrationsplan-und-adr.md:34:| **3b** `db` zerlegen | L | Zerlegung in `engine`/`cognition`/`rank`/`adapt`/`router`/`privacy`; acht (real sechs) `hybrid_search_*`-Varianten → `search(SearchRequest)`; `docid-128` entfernt (ADR-N05) | `contextra-db` nur noch Re-Export; Fassade `contextra` ≤ 20 `pub fn` (heute 50 in `contextra-db`) |
+./docs/spec/14-feature-flag-politik.md:19:| `docid-128` | 🟡 | 128-Bit-BLAKE3-DocId, Rollout vollzogen, Default bleibt `u64` |
+./docs/spec/06-wissensgraph-datenmodell-a.md:32:#[cfg(not(feature = "docid-128"))]
+./docs/spec/06-wissensgraph-datenmodell-a.md:36:#[cfg(feature = "docid-128")]
+./docs/spec/06-wissensgraph-datenmodell-a.md:47:        #[cfg(not(feature = "docid-128"))]
+./docs/spec/06-wissensgraph-datenmodell-a.md:49:        #[cfg(feature = "docid-128")]
+./xtask/src/main.rs:111:mod migrate_docid_128;
+./xtask/src/main.rs:2927:        "migrate-docid-128" => {
+./xtask/src/main.rs:2929:            if !migrate_docid_128::run_cli(extra_args) {
+./xtask/src/main.rs:3436:            eprintln!("Available commands: audit-integrity-check, bench-compile, bench-download, bench-gate, bench-trend, check-action-pinning, check-adr-deadlines, check-agents-freshness, check-agents-integrity, check-audit-duplication, check-audit-tool-evidence, check-audit-verdict-independence, check-bandit-latency-budget, check-branch-overlap, check-commit-diff-integrity, check-commit-messages, check-compile, check-consistency, check-coverage-gate, check-crate-references, check-dag, check-doc-references, check-duplicate-core-primitives, check-duplicate-intent, check-duplicate-symbols, check-duplicate-symbols-cross-file, check-ffi-panic-boundary, check-flatbuffers-drift, check-jules-context-freshness, check-manifest-completeness, check-marker-drift, check-max-results-unbound, check-module-reachability, check-mutation-score-gate, check-nan-hot-loop, check-phantom-files, check-placeholder-refs, check-recall-stability, check-result-dropped-io, check-review-coverage, check-ring-capabilities-consistency, check-ring-layering, check-ring-layering-full, check-ring0-async-purity, check-stale-tags, check-toc-integrity, check-toctou-defaults, check-type-registry, check-unsafe-islands, check-veto-deadlines, check-vetoes, check-workflow-commands, claim, commit-health, consolidate-adrs, context-pack, context-tags, crate-context, debt-audit, env-validate, feature-matrix, forensic-test, gate-check, gen-feature-catalog, gen-prompter-data, gen-sbom, generate-adr, generate-diagnostics, generate-markers, hotspot-report, init-audit-fix, jules-preflight, jules-submit-gate, lint-unsafe-slices, loom-run, migrate-docid-128, mutation-score-record, panic-inventory, post-merge-report, pre-push, prune-branches, py-test, regenerate-flatbuffers, reproducible-build, run-community-detection, security-scan, session-init, shell-commit-audit, sync-docs, tag-health, validate-pr-checklist, validate-tags, workspace-verify");
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:70:- **vector:** `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `docid-128`
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:610:| 6.15 / 13.8 | `docid-128` | Ein Feature, das in `types`, `text` (Posting-Liste, WAND, Inverted-Index), `store`, `vector`, `graph`, `engine` mitgeschaltet wird; CI-Gate vorhanden. DocId = BLAKE3-Ableitung. **Kein Rückwärtspfad für 64-Bit-Datenbestände** (Aussage des Audit-Dokuments, nicht geprüft) **[D]** |
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:709:| 13.8 | `docid-128` einheitlich | I.1 |
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:1768:**Features:** default = `—`; weitere: `docid-128`, `graph-connectivity-health`, `edge-reinforcement-learning`, `ppr-forward-push`, `k-path-diffusion`, `apprh-diffusion`, `physio-percolation`, `physio-synaptic-edges`
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:2741:**Features:** default = `—`; weitere: `docid-128`
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:3153:**Features:** default = `wal-integrity`; weitere: `encryption-at-rest`, `deletion-proof`, `memory-only-storage`, `fault-injection`, `block-cache-v2`, `sieve-cache`, `docid-128`, `legacy-wal-key`
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:3272:- `fn derive_doc_id(key: &[u8]) -> DocId` *[feature: docid-128]*
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:3482:**Features:** default = `—`; weitere: `bm25f`, `docid-128`
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:3580:- `type DocIdRaw = u128` *[feature: docid-128]*
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:3608:**Features:** default = `—`; weitere: `docid-128`, `auto-extraction-opt-out`
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:3685:- `struct DocId` *[feature: docid-128]* — Internal document identifier (128-bit variant).
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:3735:**Features:** default = `—`; weitere: `docid-128`, `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `graph`, `partial-index-rebuild`
+./docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md:3940:**Features:** default = `fast, candle`; weitere: `docid-128`, `sovereign`, `compliance`, `audit-export`, `avv-generator`, `onnx`, `ollama`, `router`
+./docs/QUALITAETSPRUEFUNG_COMMIT_FUNKTIONEN_SPEZIFIKATION.md:315:### Commit 28: `f22ea4a` — refactor(docid-128): unify docid-128 feature in contextra-types and add CI gate
+./docs/QUALITAETSPRUEFUNG_COMMIT_FUNKTIONEN_SPEZIFIKATION.md:318:  - **Zentralisiertes `docid-128` Feature:** Durchschleifen des Features über `contextra-types/docid-128` für 128-Bit Dokument-IDs.
+./docs/QUALITAETSPRUEFUNG_COMMIT_FUNKTIONEN_SPEZIFIKATION.md:319:  - **`docid-128-check` CI Gate:** Dedizierter CI-Prüfschritt zur Sicherstellung der Kompilierbarkeit unter 128-Bit Dokument-IDs.
+./docs/QUALITAETSPRUEFUNG_COMMIT_FUNKTIONEN_SPEZIFIKATION.md:321:  - [ ] Führe `cargo check --workspace --features docid-128` aus.
+./docs/QUALITAETSPRUEFUNG_COMMIT_FUNKTIONEN_SPEZIFIKATION.md:361:   - Unifiziertes `docid-128` Feature.
+./xtask/config/registry.toml:611:name = "migrate-docid-128"
+./xtask/config/registry.toml:613:summary = "Legacy subcommand migrate-docid-128"
+./crates/contextra-crypto/Cargo.toml:45:docid-128 = ["contextra-types/docid-128"]
+./docs/audits/qa-soundness-loom-miri_AUDIT_2026-09-28.md:12:| **Phase 1: Workspace-Kompilierung & Feature-Matrix** | **FAIL** | Der Standard-Build scheitert in `contextra-kvcache` (Test `kivi_aead_order_enforced`), da Feature-Flags fehlen. `--all-features` schlägt fehl aufgrund von `u128`-Typ-Mismatches in DiskANN unter `docid-128` und fehlenden `Edge`-Typimporten in `contextra-graph`. Clippy scheitert an `unreachable!` Denial und Stil-Lints. |
+./docs/audits/qa-soundness-loom-miri_AUDIT_2026-09-28.md:33:  1. **`contextra-vector` (DiskANN unter `docid-128` Feature):**
+./docs/audits/qa-soundness-loom-miri_AUDIT_2026-09-28.md:36:     - **Ursache:** Wenn das Feature `docid-128` aktiviert ist, repräsentiert `DocId` ein `u128`. Roaring Bitsets (`roaring::Treemap`) erwarten ein `u64`.
+./docs/audits/qa-soundness-loom-miri_AUDIT_2026-09-28.md:110:### 5.2 Fix DiskANN `docid-128` Conversion
+./crates/contextra-store/Cargo.toml:34:docid-128 = ["contextra-types/docid-128"]
+./docs/audits/contextra-types_AUDIT_2026-03-30.md:25:| **P1** | **Newtype-Disziplin** | ✅ | `ids.rs:11`, `ids.rs:86`, `ids.rs:143/151`, `ids.rs:267`, `ids.rs:364`, `error.rs:39` | Alle Core-ID-Typen (`TenantId`, `CollectionId`, `DocId`, `EntityId`, `TxId`, `StepId`) sind als `#[repr(transparent)]` über `u64` definiert. Unter Feature `docid-128` (ADR-082) ergibt `DocId` korrekt `#[repr(transparent)] pub struct DocId(pub u128)`. `TenantId` und `TxId` verzichten auf ein unvalidiertes `From<u64>`. `TenantId::new()` ist als `#[deprecated]` markiert. |
+./docs/audits/ring-dag-integrity_AUDIT_2026-09-27.md:40:Die Aktivierung aller non-Default Feature-Flags (z. B. `contextra-store/docid-128`, `contextra-infer-onnx/onnx`, `contextra-rank/dibud`, `contextra-vector/experimental-diskann`) führt zu **keinen** zusätzlichen Ring-Überreitungen oder DAG-Zyklen. Die Ring-Isolation ist unter Vollexpansion zu 100 % invariant.
+./docs/audits/contextra-vector_AUDIT_2026-09-27.md:76:| **P2** | Feature Flag Hygiene | **PASSED** | `default = []` in `Cargo.toml`. `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `docid-128`, `partial-index-rebuild` are non-default. |
+./docs/archive/misc/audits/AUDIT_compilation_diagnostics_2026-09-18.md:15:| `contextra-core` | PASS | PASS | PASS | `docid-128`: PASS | 0 | 29 |
+./docs/archive/misc/audits/AUDIT_compilation_diagnostics_2026-09-18.md:92:### 2. Feature `contextra-core/docid-128`
+./docs/archive/misc/audits/AUDIT_compilation_diagnostics_2026-09-18.md:93:- **Status:** **PASS** (im vorherigen Audit gefundene Mismatches in `docid-128` wurden im aktuellen HEAD behoben).
+./docs/archive/misc/audits/AUDIT_compilation_diagnostics_2026-09-18.md:111:1. **`docid-128` Feature Mismatch in `contextra-core`:**
+./docs/archive/misc/audits/AUDIT_compilation_diagnostics_2026-09-18.md:112:   *Ergebnis:* **BEHOBEN** in HEAD `5685639c8b01`. `--features docid-128` baut nun fehlerfrei.
+./docs/archive/spec/CONTEXTRA_SPEC_v2.md:446:(onnx, cuda, metal, wasmtime). **Keine typverändernden Features mehr** — `docid-128` entfällt ersatzlos
+./docs/archive/spec/CONTEXTRA_SPEC_v2.md:453:| ~~`docid-128`~~ | — (entfällt) | `contextra-core` | — | **Entfällt** (ADR-N05): typverändernde Features sind verboten; externes 128-Bit-`DocId` mit internem dichten `DocIdx(u32)` ist eine offene Entscheidung (§A2.4 Nr. 3), keine Compile-Time-Option |
+./docs/archive/spec/CONTEXTRA_SPEC_v2.md:1389:#[cfg(not(feature = "docid-128"))]
+./docs/archive/spec/CONTEXTRA_SPEC_v2.md:1393:#[cfg(feature = "docid-128")]
+./docs/archive/spec/CONTEXTRA_SPEC_v2.md:1404:        #[cfg(not(feature = "docid-128"))]
+./docs/archive/spec/CONTEXTRA_SPEC_v2.md:1406:        #[cfg(feature = "docid-128")]
+./docs/archive/spec/CONTEXTRA_SPEC_v2.md:2697:  source_doc_id: uint64;          // oder uint128-Encoding bei docid-128
+./docs/archive/spec/CONTEXTRA_SPEC_v2.md:2767:| `docid-128` | 🟡 | 128-Bit-BLAKE3-DocId, Rollout vollzogen, Default bleibt `u64` |
+./docs/archive/spec/CONTEXTRA_SPEC_v2.md:3081:| **3b** `db` zerlegen | L | Zerlegung in `engine`/`cognition`/`rank`/`adapt`/`router`/`privacy`; acht (real sechs) `hybrid_search_*`-Varianten → `search(SearchRequest)`; `docid-128` entfernt (ADR-N05) | `contextra-db` nur noch Re-Export; Fassade `contextra` ≤ 20 `pub fn` (heute 50 in `contextra-db`) |
+./docs/archive/spec/GESAMTSPEZIFIKATION.md:818:(onnx, cuda, metal, wasmtime). **Keine typverändernden Features mehr** — `docid-128` entfällt ersatzlos
+./docs/archive/spec/GESAMTSPEZIFIKATION.md:825:| ~~`docid-128`~~ | — (entfällt) | `contextra-core` | — | **Entfällt** (ADR-N05): typverändernde Features sind verboten; externes 128-Bit-`DocId` mit internem dichten `DocIdx(u32)` ist eine offene Entscheidung (§A2.4 Nr. 3), keine Compile-Time-Option |
+./docs/archive/spec/GESAMTSPEZIFIKATION.md:1761:#[cfg(not(feature = "docid-128"))]
+./docs/archive/spec/GESAMTSPEZIFIKATION.md:1765:#[cfg(feature = "docid-128")]
+./docs/archive/spec/GESAMTSPEZIFIKATION.md:1776:        #[cfg(not(feature = "docid-128"))]
+./docs/archive/spec/GESAMTSPEZIFIKATION.md:1778:        #[cfg(feature = "docid-128")]
+./docs/archive/spec/GESAMTSPEZIFIKATION.md:3084:  source_doc_id: uint64;          // oder uint128-Encoding bei docid-128
+./docs/archive/spec/GESAMTSPEZIFIKATION.md:3160:| `docid-128` | 🟡 | 128-Bit-BLAKE3-DocId, Rollout vollzogen, Default bleibt `u64` |
+./docs/archive/spec/GESAMTSPEZIFIKATION.md:3513:| **3b** `db` zerlegen | L | Zerlegung in `engine`/`cognition`/`rank`/`adapt`/`router`/`privacy`; acht (real sechs) `hybrid_search_*`-Varianten → `search(SearchRequest)`; `docid-128` entfernt (ADR-N05) | `contextra-db` nur noch Re-Export; Fassade `contextra` ≤ 20 `pub fn` (heute 50 in `contextra-db`) |
+./docs/archive/jules/PROMPTER_RESTRUCTURING_PLAN.md:71:   - Feature `docid-128` schaltet 16-Byte BLAKE3 DocId Derivation frei.
+./crates/contextra-vector/Cargo.toml:36:docid-128 = ["contextra-types/docid-128"]
+./crates/contextra-vector/tests/docid_128_hnsw.rs:7:async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_types::Result<()> {
+./crates/contextra-vector/tests/docid_128_hnsw.rs:9:    let path = temp_dir.path().join("test_docid_128.hnsw");
+./crates/contextra-store/tests/docid_128_kv_engine.rs:39:async fn test_kv_engine_docid_128_uniqueness() {
+./crates/contextra-vector/tests/campaign_j41_vector.rs:21:    // Oracle: DocId can be u128 under docid-128 or u64 default.
+./crates/contextra-crypto/src/canonical.rs:67:    /// In `docid-128` configuration (`DocId` wraps `u128`), writes 16 LE bytes.
+./crates/contextra-vector/src/diskann/persistence.rs:666:    async fn test_docid_128_mmap_persistence_roundtrip() -> Result<()> {
+./crates/contextra-graph/Cargo.toml:17:docid-128 = ["contextra-types/docid-128"]

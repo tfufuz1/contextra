@@ -1,0 +1,15 @@
+error: mismatched closing delimiter: `}`
+   --> /home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/purge/orchestrator.rs:329:27
+    |
+328 |             {
+    |             - closing delimiter possibly meant for this
+329 |                 return Err(OrxPurgeError::from(PurgeError::CorruptedIntent(
+    |                           ^ unclosed delimiter
+--
+error: this file contains an unclosed delimiter
+   --> /home/freddy/Projekte/contextra/crates/contextra-store/src/lsm/purge/orchestrator.rs:412:3
+    |
+96  | impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
+    |                                                    - unclosed delimiter
+...
+306 |             if intent.phase <= PurgePhase::Witnessing {

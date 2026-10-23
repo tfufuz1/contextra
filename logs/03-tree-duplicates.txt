@@ -1,0 +1,896 @@
+base64 v0.13.1
+└── spm_precompiled v0.1.4
+    ├── tokenizers v0.21.4
+    │   └── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle)
+    │       └── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine)
+    │           └── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db)
+    │               └── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra)
+    │                   └── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp)
+    │                       [dev-dependencies]
+    │                       └── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+    │               [dev-dependencies]
+    │               └── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router)
+    │                   └── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+    └── tokenizers v0.22.2
+        └── candle-core v0.11.0
+            ├── candle-nn v0.11.0
+            │   ├── candle-transformers v0.11.0
+            │   │   └── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+            │   └── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+            ├── candle-transformers v0.11.0 (*)
+            └── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+
+base64 v0.22.1
+├── hyper-util v0.1.20
+│   ├── hyper-rustls v0.27.9
+│   │   └── reqwest v0.12.28
+│   │       └── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│   └── reqwest v0.12.28 (*)
+└── reqwest v0.12.28 (*)
+
+bitflags v1.3.2
+└── flatbuffers v24.12.23
+    └── contextra-wire v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-wire)
+        ├── contextra-core v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-core)
+        │   ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+        │   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector)
+        │       ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+        │       └── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+        │       [dev-dependencies]
+        │       ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+        │       ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+        │       └── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+        │   [dev-dependencies]
+        │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+        │   └── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store)
+        │       ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+        │       ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint)
+        │       │   ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+        │       │   └── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+        │       │   [dev-dependencies]
+        │       │   └── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+        │       ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+        │       ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+        │       └── contextra-testkit v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-testkit)
+        │           [dev-dependencies]
+        │           ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+        │           ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+        │           ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+        │           ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph)
+        │           │   └── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+        │           │   [dev-dependencies]
+        │           │   └── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+        │           ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc)
+        │           │   ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+        │           │   ├── contextra-core v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-core) (*)
+        │           │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+        │           │   └── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+        │           │   [dev-dependencies]
+        │           │   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+        │           ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+        │           └── contextra-store-redb v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store-redb)
+        │       [dev-dependencies]
+        │       ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+        │       └── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+        ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+        └── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+
+bitflags v2.13.1
+├── onig v6.5.3
+│   ├── tokenizers v0.21.4 (*)
+│   └── tokenizers v0.22.2 (*)
+├── proptest v1.11.0
+│   [dev-dependencies]
+│   ├── contextra-adapt v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-adapt)
+│   │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   └── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   │   [dev-dependencies]
+│   │   └── contextra-rank v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-rank)
+│   │       ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+│   │       ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │       ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │       ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   │       ├── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│   │       └── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+│   ├── contextra-core v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-core) (*)
+│   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto)
+│   │   ├── contextra-audit-export v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-audit-export)
+│   │   │   [dev-dependencies]
+│   │   │   └── contextra-audit-export v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-audit-export) (*)
+│   │   ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache)
+│   │   │   └── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │   [dev-dependencies]
+│   │   │   └── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   [dev-dependencies]
+│   │   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   │   └── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy)
+│   │       ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │       └── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   ├── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│   ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+│   ├── contextra-license v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-license)
+│   │   ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+│   │   └── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   [dev-dependencies]
+│   │   └── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+│   ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc) (*)
+│   ├── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports)
+│   │   ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+│   │   ├── contextra-adapt v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-adapt) (*)
+│   │   ├── contextra-audit-export v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-audit-export) (*)
+│   │   ├── contextra-avv-generator v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-avv-generator)
+│   │   │   └── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│   │   ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+│   │   ├── contextra-core v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-core) (*)
+│   │   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   │   ├── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│   │   ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+│   │   ├── contextra-license v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-license) (*)
+│   │   ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc) (*)
+│   │   ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│   │   ├── contextra-rank v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-rank) (*)
+│   │   ├── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   │   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   ├── contextra-store-redb v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store-redb)
+│   │   ├── contextra-testkit v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-testkit) (*)
+│   │   ├── contextra-text v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-text)
+│   │   │   ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   │   └── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │   [dev-dependencies]
+│   │   │   └── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   │   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   [dev-dependencies]
+│   │   ├── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports) (*)
+│   │   └── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   ├── contextra-rank v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-rank) (*)
+│   ├── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   ├── contextra-simd v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-simd)
+│   │   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   ├── contextra-store-redb v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store-redb)
+│   ├── contextra-text v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-text) (*)
+│   ├── contextra-types v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-types)
+│   │   ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+│   │   ├── contextra-adapt v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-adapt) (*)
+│   │   ├── contextra-audit-export v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-audit-export) (*)
+│   │   ├── contextra-avv-generator v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-avv-generator) (*)
+│   │   ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+│   │   ├── contextra-core v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-core) (*)
+│   │   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   │   ├── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│   │   ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+│   │   ├── contextra-license v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-license) (*)
+│   │   ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc) (*)
+│   │   ├── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports) (*)
+│   │   ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│   │   ├── contextra-rank v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-rank) (*)
+│   │   ├── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   │   ├── contextra-simd v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-simd) (*)
+│   │   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   ├── contextra-store-redb v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store-redb)
+│   │   ├── contextra-testkit v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-testkit) (*)
+│   │   ├── contextra-text v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-text) (*)
+│   │   ├── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   └── xtask v0.1.0 (/home/freddy/Projekte/contextra/xtask)
+│   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+├── raw-cpuid v11.6.0
+│   ├── gemm v0.19.0
+│   │   └── candle-core v0.11.0 (*)
+│   ├── gemm-c32 v0.19.0
+│   │   └── gemm v0.19.0 (*)
+│   ├── gemm-c64 v0.19.0
+│   │   └── gemm v0.19.0 (*)
+│   ├── gemm-common v0.19.0
+│   │   ├── gemm v0.19.0 (*)
+│   │   ├── gemm-c32 v0.19.0 (*)
+│   │   ├── gemm-c64 v0.19.0 (*)
+│   │   ├── gemm-f16 v0.19.0
+│   │   │   └── gemm v0.19.0 (*)
+│   │   ├── gemm-f32 v0.19.0
+│   │   │   ├── gemm v0.19.0 (*)
+│   │   │   └── gemm-f16 v0.19.0 (*)
+│   │   └── gemm-f64 v0.19.0
+│   │       └── gemm v0.19.0 (*)
+│   ├── gemm-f16 v0.19.0 (*)
+│   ├── gemm-f32 v0.19.0 (*)
+│   ├── gemm-f64 v0.19.0 (*)
+│   └── pulp v0.22.3
+│       └── gemm-common v0.19.0 (*)
+├── rustix v1.1.4
+│   └── tempfile v3.27.0
+│       ├── proptest v1.11.0 (*)
+│       ├── rusty-fork v0.3.1
+│       │   └── proptest v1.11.0 (*)
+│       ├── safetensors v0.8.0
+│       │   ├── candle-core v0.11.0 (*)
+│       │   └── candle-nn v0.11.0 (*)
+│       └── xtask v0.1.0 (/home/freddy/Projekte/contextra/xtask)
+│       [dev-dependencies]
+│       ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+│       ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+│       ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│       ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│       ├── contextra-durable-fs v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-durable-fs)
+│       │   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│       │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│       │   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│       │   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│       ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│       ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│       ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│       ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│       ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│       ├── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│       ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│       ├── contextra-store-redb v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store-redb)
+│       ├── contextra-testkit v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-testkit) (*)
+│       ├── contextra-text v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-text) (*)
+│       └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+└── tower-http v0.6.11
+    └── reqwest v0.12.28 (*)
+
+cpufeatures v0.2.17
+├── aes v0.8.4
+│   └── aes-gcm-siv v0.11.1
+│       └── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+├── argon2 v0.5.3
+│   └── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+├── curve25519-dalek v4.1.3
+│   └── ed25519-dalek v2.2.0
+│       ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│       └── contextra-license v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-license) (*)
+│       [dev-dependencies]
+│       └── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+├── polyval v0.6.2
+│   └── aes-gcm-siv v0.11.1 (*)
+└── sha2 v0.10.9
+    ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+    ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+    ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+    ├── contextra-types v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-types) (*)
+    └── ed25519-dalek v2.2.0 (*)
+    [dev-dependencies]
+    └── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+
+cpufeatures v0.3.1
+└── blake3 v1.8.7
+    ├── contextra-adapt v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-adapt) (*)
+    ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+    ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+    ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+    ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+    ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+    ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+    ├── contextra-license v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-license) (*)
+    ├── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports) (*)
+    ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+    ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+    ├── contextra-text v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-text) (*)
+    ├── contextra-types v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-types) (*)
+    ├── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+    └── xtask v0.1.0 (/home/freddy/Projekte/contextra/xtask)
+
+getrandom v0.2.17
+├── rand_core v0.6.4
+│   ├── crypto-common v0.1.7
+│   │   ├── aead v0.5.2
+│   │   │   └── aes-gcm-siv v0.11.1 (*)
+│   │   ├── cipher v0.4.4
+│   │   │   ├── aes v0.8.4 (*)
+│   │   │   ├── aes-gcm-siv v0.11.1 (*)
+│   │   │   └── ctr v0.9.2
+│   │   │       └── aes-gcm-siv v0.11.1 (*)
+│   │   ├── digest v0.10.7
+│   │   │   ├── blake2 v0.10.6
+│   │   │   │   └── argon2 v0.5.3 (*)
+│   │   │   ├── curve25519-dalek v4.1.3 (*)
+│   │   │   ├── hmac v0.12.1
+│   │   │   │   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   │   │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │   │   └── hkdf v0.12.4
+│   │   │   │       └── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   │   └── sha2 v0.10.9 (*)
+│   │   └── universal-hash v0.5.1
+│   │       └── polyval v0.6.2 (*)
+│   ├── ed25519-dalek v2.2.0 (*)
+│   ├── password-hash v0.5.0
+│   │   └── argon2 v0.5.3 (*)
+│   ├── rand v0.8.8
+│   │   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   ├── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│   │   ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│   │   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   ├── contextra-sys v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-sys)
+│   │   │   ├── contextra-adapt v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-adapt) (*)
+│   │   │   ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   │   ├── contextra-durable-fs v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-durable-fs) (*)
+│   │   │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   │   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   [dev-dependencies]
+│   │   └── contextra-license v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-license) (*)
+│   └── rand_chacha v0.3.1
+│       └── rand v0.8.8 (*)
+└── ring v0.17.14
+    ├── rustls v0.23.43
+    │   ├── hyper-rustls v0.27.9 (*)
+    │   ├── reqwest v0.12.28 (*)
+    │   └── tokio-rustls v0.26.4
+    │       ├── hyper-rustls v0.27.9 (*)
+    │       └── reqwest v0.12.28 (*)
+    └── rustls-webpki v0.103.15
+        └── rustls v0.23.43 (*)
+
+getrandom v0.3.4
+├── ahash v0.8.12
+│   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+│   ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc) (*)
+│   ├── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports) (*)
+│   ├── contextra-rank v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-rank) (*)
+│   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   ├── contextra-types v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-types) (*)
+│   ├── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   ├── quick_cache v0.6.24
+│   │   └── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   ├── tokenizers v0.21.4 (*)
+│   └── tokenizers v0.22.2 (*)
+├── rand_core v0.9.5
+│   ├── rand v0.9.5
+│   │   ├── candle-core v0.11.0 (*)
+│   │   ├── candle-transformers v0.11.0 (*)
+│   │   ├── float8 v0.7.0
+│   │   │   └── candle-core v0.11.0 (*)
+│   │   ├── half v2.7.1
+│   │   │   ├── candle-core v0.11.0 (*)
+│   │   │   ├── candle-nn v0.11.0 (*)
+│   │   │   ├── ciborium-ll v0.2.2
+│   │   │   │   └── ciborium v0.2.2
+│   │   │   │       └── criterion v0.5.1
+│   │   │   │           [dev-dependencies]
+│   │   │   │           ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+│   │   │   │           ├── contextra-adapt v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-adapt) (*)
+│   │   │   │           ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+│   │   │   │           ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   │   │           ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   │   │           ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   │   │           ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   │   │   │           ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc) (*)
+│   │   │   │           ├── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   │   │   │           ├── contextra-simd v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-simd) (*)
+│   │   │   │           ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   │   │           └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   │   ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   │   │   ├── float8 v0.7.0 (*)
+│   │   │   ├── gemm-common v0.19.0 (*)
+│   │   │   └── gemm-f16 v0.19.0 (*)
+│   │   ├── proptest v1.11.0 (*)
+│   │   ├── rand_distr v0.5.1
+│   │   │   ├── candle-core v0.11.0 (*)
+│   │   │   ├── float8 v0.7.0 (*)
+│   │   │   └── half v2.7.1 (*)
+│   │   ├── tokenizers v0.21.4 (*)
+│   │   └── tokenizers v0.22.2 (*)
+│   ├── rand_chacha v0.9.0
+│   │   ├── proptest v1.11.0 (*)
+│   │   └── rand v0.9.5 (*)
+│   └── rand_xorshift v0.4.0
+│       └── proptest v1.11.0 (*)
+├── tokenizers v0.21.4 (*)
+└── tokenizers v0.22.2 (*)
+
+getrandom v0.4.3
+├── tempfile v3.27.0 (*)
+└── uuid v1.26.0
+    ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+    └── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+
+hashbrown v0.16.1
+├── lru v0.16.4
+│   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+│   └── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+├── quick_cache v0.6.24 (*)
+└── safetensors v0.8.0 (*)
+
+hashbrown v0.17.1
+└── indexmap v2.14.1
+    ├── toml_edit v0.22.27
+    │   └── toml v0.8.23
+    │       └── xtask v0.1.0 (/home/freddy/Projekte/contextra/xtask)
+    │       [dev-dependencies]
+    │       └── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+    └── zip v8.6.0
+        └── candle-core v0.11.0 (*)
+
+itertools v0.10.5
+├── criterion v0.5.1 (*)
+└── criterion-plot v0.5.0
+    └── criterion v0.5.1 (*)
+
+itertools v0.14.0
+├── rayon-cond v0.4.0
+│   ├── tokenizers v0.21.4 (*)
+│   └── tokenizers v0.22.2 (*)
+├── tokenizers v0.21.4 (*)
+└── tokenizers v0.22.2 (*)
+
+proc-macro2 v1.0.107
+├── bytemuck_derive v1.12.0 (proc-macro)
+│   └── bytemuck v1.25.2
+│       ├── contextra-simd v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-simd) (*)
+│       ├── dyn-stack v0.13.2
+│       │   ├── gemm v0.19.0 (*)
+│       │   ├── gemm-c32 v0.19.0 (*)
+│       │   ├── gemm-c64 v0.19.0 (*)
+│       │   ├── gemm-common v0.19.0 (*)
+│       │   ├── gemm-f16 v0.19.0 (*)
+│       │   ├── gemm-f32 v0.19.0 (*)
+│       │   └── gemm-f64 v0.19.0 (*)
+│       ├── gemm-common v0.19.0 (*)
+│       ├── half v2.7.1 (*)
+│       ├── num-complex v0.4.6
+│       │   ├── gemm v0.19.0 (*)
+│       │   ├── gemm-c32 v0.19.0 (*)
+│       │   ├── gemm-c64 v0.19.0 (*)
+│       │   ├── gemm-common v0.19.0 (*)
+│       │   ├── gemm-f16 v0.19.0 (*)
+│       │   ├── gemm-f32 v0.19.0 (*)
+│       │   ├── gemm-f64 v0.19.0 (*)
+│       │   └── pulp v0.22.3 (*)
+│       ├── pulp v0.22.3 (*)
+│       └── roaring v0.10.12
+│           └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+├── curve25519-dalek-derive v0.1.1 (proc-macro)
+│   └── curve25519-dalek v4.1.3 (*)
+├── darling_core v0.20.11
+│   ├── darling v0.20.11
+│   │   └── derive_builder_core v0.20.2
+│   │       └── derive_builder_macro v0.20.2 (proc-macro)
+│   │           └── derive_builder v0.20.2
+│   │               ├── tokenizers v0.21.4 (*)
+│   │               └── tokenizers v0.22.2 (*)
+│   └── darling_macro v0.20.11 (proc-macro)
+│       └── darling v0.20.11 (*)
+├── derive_builder_core v0.20.2 (*)
+├── displaydoc v0.2.7 (proc-macro)
+│   ├── icu_collections v2.3.0
+│   │   ├── icu_normalizer v2.3.0
+│   │   │   └── idna_adapter v1.2.2
+│   │   │       └── idna v1.1.0
+│   │   │           └── url v2.5.8
+│   │   │               ├── reqwest v0.12.28 (*)
+│   │   │               └── tower-http v0.6.11 (*)
+│   │   └── icu_properties v2.3.0
+│   │       └── idna_adapter v1.2.2 (*)
+│   ├── icu_locale_core v2.3.0
+│   │   ├── icu_properties v2.3.0 (*)
+│   │   └── icu_provider v2.3.1
+│   │       ├── icu_normalizer v2.3.0 (*)
+│   │       └── icu_properties v2.3.0 (*)
+│   ├── icu_properties v2.3.0 (*)
+│   ├── icu_provider v2.3.1 (*)
+│   ├── tinystr v0.8.4
+│   │   └── icu_locale_core v2.3.0 (*)
+│   └── zerotrie v0.2.5
+│       ├── icu_properties v2.3.0 (*)
+│       └── icu_provider v2.3.1 (*)
+├── futures-macro v0.3.34 (proc-macro)
+│   └── futures-util v0.3.34
+│       ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│       ├── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│       ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│       ├── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports) (*)
+│       ├── futures v0.3.34
+│       │   ├── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│       │   └── criterion v0.5.1 (*)
+│       │   [dev-dependencies]
+│       │   ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│       │   └── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│       ├── futures-executor v0.3.34
+│       │   ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+│       │   └── futures v0.3.34 (*)
+│       ├── hyper-util v0.1.20 (*)
+│       ├── reqwest v0.12.28 (*)
+│       ├── tokio-util v0.7.19
+│       │   ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│       │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│       │   ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│       │   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│       │   └── reqwest v0.12.28 (*)
+│       ├── tower v0.5.3
+│       │   ├── reqwest v0.12.28 (*)
+│       │   └── tower-http v0.6.11 (*)
+│       └── tower-http v0.6.11 (*)
+├── monostate-impl v0.1.18 (proc-macro)
+│   └── monostate v0.1.18
+│       ├── tokenizers v0.21.4 (*)
+│       └── tokenizers v0.22.2 (*)
+├── quote v1.0.47
+│   ├── bytemuck_derive v1.12.0 (proc-macro) (*)
+│   ├── curve25519-dalek-derive v0.1.1 (proc-macro) (*)
+│   ├── darling_core v0.20.11 (*)
+│   ├── darling_macro v0.20.11 (proc-macro) (*)
+│   ├── derive_builder_core v0.20.2 (*)
+│   ├── displaydoc v0.2.7 (proc-macro) (*)
+│   ├── futures-macro v0.3.34 (proc-macro) (*)
+│   ├── monostate-impl v0.1.18 (proc-macro) (*)
+│   ├── serde_derive v1.0.229 (proc-macro)
+│   │   ├── criterion v0.5.1 (*)
+│   │   ├── serde v1.0.229
+│   │   │   ├── ahash v0.8.12 (*)
+│   │   │   ├── bincode v1.3.3
+│   │   │   │   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   │   │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │   │   ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   │   │   ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   │   │   │   ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+│   │   │   │   ├── contextra-license v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-license) (*)
+│   │   │   │   ├── contextra-text v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-text) (*)
+│   │   │   │   └── contextra-types v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-types) (*)
+│   │   │   │   [dev-dependencies]
+│   │   │   │   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   │   ├── candle-nn v0.11.0 (*)
+│   │   │   ├── candle-transformers v0.11.0 (*)
+│   │   │   ├── ciborium v0.2.2 (*)
+│   │   │   ├── compact_str v0.9.1
+│   │   │   │   ├── tokenizers v0.21.4 (*)
+│   │   │   │   └── tokenizers v0.22.2 (*)
+│   │   │   ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+│   │   │   ├── contextra-adapt v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-adapt) (*)
+│   │   │   ├── contextra-audit-export v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-audit-export) (*)
+│   │   │   ├── contextra-avv-generator v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-avv-generator) (*)
+│   │   │   ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+│   │   │   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   │   ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │   ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   │   ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   │   │   ├── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│   │   │   ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+│   │   │   ├── contextra-license v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-license) (*)
+│   │   │   ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   │   ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc) (*)
+│   │   │   ├── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports) (*)
+│   │   │   ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│   │   │   ├── contextra-rank v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-rank) (*)
+│   │   │   ├── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   │   │   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   │   ├── contextra-store-redb v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store-redb)
+│   │   │   ├── contextra-text v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-text) (*)
+│   │   │   ├── contextra-types v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-types) (*)
+│   │   │   ├── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   │   ├── contextra-wire v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-wire) (*)
+│   │   │   ├── criterion v0.5.1 (*)
+│   │   │   ├── dary_heap v0.3.9
+│   │   │   │   ├── tokenizers v0.21.4 (*)
+│   │   │   │   └── tokenizers v0.22.2 (*)
+│   │   │   ├── reqwest v0.12.28 (*)
+│   │   │   ├── safetensors v0.8.0 (*)
+│   │   │   ├── serde_plain v1.0.2
+│   │   │   │   └── candle-transformers v0.11.0 (*)
+│   │   │   ├── serde_spanned v0.6.9
+│   │   │   │   ├── toml v0.8.23 (*)
+│   │   │   │   └── toml_edit v0.22.27 (*)
+│   │   │   ├── serde_urlencoded v0.7.1
+│   │   │   │   └── reqwest v0.12.28 (*)
+│   │   │   ├── spm_precompiled v0.1.4 (*)
+│   │   │   ├── tinytemplate v1.2.1
+│   │   │   │   └── criterion v0.5.1 (*)
+│   │   │   ├── tokenizers v0.21.4 (*)
+│   │   │   ├── tokenizers v0.22.2 (*)
+│   │   │   ├── toml v0.8.23 (*)
+│   │   │   ├── toml_datetime v0.6.11
+│   │   │   │   ├── toml v0.8.23 (*)
+│   │   │   │   └── toml_edit v0.22.27 (*)
+│   │   │   ├── toml_edit v0.22.27 (*)
+│   │   │   ├── trybuild v1.0.122
+│   │   │   │   [dev-dependencies]
+│   │   │   │   ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+│   │   │   │   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   │   │   └── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports) (*)
+│   │   │   └── xtask v0.1.0 (/home/freddy/Projekte/contextra/xtask)
+│   │   └── trybuild v1.0.122 (*)
+│   ├── strum_macros v0.26.4 (proc-macro)
+│   │   └── strum v0.26.3
+│   │       └── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports) (*)
+│   ├── syn v2.0.119
+│   │   ├── curve25519-dalek-derive v0.1.1 (proc-macro) (*)
+│   │   ├── darling_core v0.20.11 (*)
+│   │   ├── darling_macro v0.20.11 (proc-macro) (*)
+│   │   ├── derive_builder_core v0.20.2 (*)
+│   │   ├── derive_builder_macro v0.20.2 (proc-macro) (*)
+│   │   ├── monostate-impl v0.1.18 (proc-macro) (*)
+│   │   ├── strum_macros v0.26.4 (proc-macro) (*)
+│   │   ├── synstructure v0.13.2
+│   │   │   ├── yoke-derive v0.8.2 (proc-macro)
+│   │   │   │   └── yoke v0.8.3
+│   │   │   │       ├── candle-core v0.11.0 (*)
+│   │   │   │       ├── icu_collections v2.3.0 (*)
+│   │   │   │       ├── icu_provider v2.3.1 (*)
+│   │   │   │       ├── zerotrie v0.2.5 (*)
+│   │   │   │       └── zerovec v0.11.8
+│   │   │   │           ├── icu_collections v2.3.0 (*)
+│   │   │   │           ├── icu_locale_core v2.3.0 (*)
+│   │   │   │           ├── icu_normalizer v2.3.0 (*)
+│   │   │   │           ├── icu_properties v2.3.0 (*)
+│   │   │   │           ├── icu_provider v2.3.1 (*)
+│   │   │   │           ├── potential_utf v0.1.6
+│   │   │   │           │   └── icu_collections v2.3.0 (*)
+│   │   │   │           └── tinystr v0.8.4 (*)
+│   │   │   └── zerofrom-derive v0.1.7 (proc-macro)
+│   │   │       └── zerofrom v0.1.8
+│   │   │           ├── icu_collections v2.3.0 (*)
+│   │   │           ├── icu_provider v2.3.1 (*)
+│   │   │           ├── yoke v0.8.3 (*)
+│   │   │           ├── zerotrie v0.2.5 (*)
+│   │   │           └── zerovec v0.11.8 (*)
+│   │   ├── tracing-attributes v0.1.31 (proc-macro)
+│   │   │   └── tracing v0.1.44
+│   │   │       ├── candle-transformers v0.11.0 (*)
+│   │   │       ├── contextra-adapt v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-adapt) (*)
+│   │   │       ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+│   │   │       ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   │       ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   │       ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │       ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   │       ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   │   │       ├── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│   │   │       ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+│   │   │       ├── contextra-license v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-license) (*)
+│   │   │       ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   │       ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc) (*)
+│   │   │       ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│   │   │       ├── contextra-rank v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-rank) (*)
+│   │   │       ├── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   │   │       ├── contextra-simd v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-simd) (*)
+│   │   │       ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   │       ├── contextra-store-redb v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store-redb)
+│   │   │       ├── contextra-sys v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-sys) (*)
+│   │   │       ├── contextra-testkit v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-testkit) (*)
+│   │   │       ├── contextra-text v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-text) (*)
+│   │   │       ├── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   │       ├── hyper-util v0.1.20 (*)
+│   │   │       ├── loom v0.7.2
+│   │   │       │   [dev-dependencies]
+│   │   │       │   ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   │       │   ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │       │   ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   │       │   ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc) (*)
+│   │   │       │   ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   │       │   └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   │       └── tracing-subscriber v0.3.23
+│   │   │           ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   │           ├── loom v0.7.2 (*)
+│   │   │           └── tracing-test v0.2.6
+│   │   │               [dev-dependencies]
+│   │   │               └── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│   │   │           [dev-dependencies]
+│   │   │           ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   │           └── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   │   ├── tracing-test-macro v0.2.6 (proc-macro)
+│   │   │   └── tracing-test v0.2.6 (*)
+│   │   ├── yoke-derive v0.8.2 (proc-macro) (*)
+│   │   ├── zerocopy-derive v0.8.56 (proc-macro)
+│   │   │   └── zerocopy v0.8.56
+│   │   │       ├── ahash v0.8.12 (*)
+│   │   │       ├── candle-core v0.11.0 (*)
+│   │   │       ├── half v2.7.1 (*)
+│   │   │       └── ppv-lite86 v0.2.21
+│   │   │           ├── rand_chacha v0.3.1 (*)
+│   │   │           └── rand_chacha v0.9.0 (*)
+│   │   ├── zerofrom-derive v0.1.7 (proc-macro) (*)
+│   │   └── zeroize_derive v1.5.0 (proc-macro)
+│   │       └── zeroize v1.9.0
+│   │           ├── aes-gcm-siv v0.11.1 (*)
+│   │           ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │           ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │           ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │           ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+│   │           ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │           ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│   │           ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │           ├── curve25519-dalek v4.1.3 (*)
+│   │           ├── ed25519-dalek v2.2.0 (*)
+│   │           ├── rustls v0.23.43 (*)
+│   │           └── rustls-pki-types v1.15.1
+│   │               ├── reqwest v0.12.28 (*)
+│   │               ├── rustls v0.23.43 (*)
+│   │               ├── rustls-webpki v0.103.15 (*)
+│   │               └── webpki-roots v1.0.9
+│   │                   ├── hyper-rustls v0.27.9 (*)
+│   │                   └── reqwest v0.12.28 (*)
+│   ├── syn v2.0.119
+│   │   └── xtask v0.1.0 (/home/freddy/Projekte/contextra/xtask)
+│   ├── syn v3.0.4
+│   │   ├── bytemuck_derive v1.12.0 (proc-macro) (*)
+│   │   ├── displaydoc v0.2.7 (proc-macro) (*)
+│   │   ├── futures-macro v0.3.34 (proc-macro) (*)
+│   │   ├── serde_derive v1.0.229 (proc-macro) (*)
+│   │   ├── thiserror-impl v2.0.20 (proc-macro)
+│   │   │   └── thiserror v2.0.20
+│   │   │       ├── candle-core v0.11.0 (*)
+│   │   │       ├── candle-nn v0.11.0 (*)
+│   │   │       ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+│   │   │       ├── contextra-adapt v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-adapt) (*)
+│   │   │       ├── contextra-audit-export v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-audit-export) (*)
+│   │   │       ├── contextra-avv-generator v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-avv-generator) (*)
+│   │   │       ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   │       ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   │       ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │       ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   │       ├── contextra-license v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-license) (*)
+│   │   │       ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   │       ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc) (*)
+│   │   │       ├── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports) (*)
+│   │   │       ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│   │   │       ├── contextra-rank v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-rank) (*)
+│   │   │       ├── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   │   │       ├── contextra-simd v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-simd) (*)
+│   │   │       ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   │       ├── contextra-store-redb v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store-redb)
+│   │   │       ├── contextra-text v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-text) (*)
+│   │   │       ├── contextra-types v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-types) (*)
+│   │   │       ├── tokenizers v0.21.4 (*)
+│   │   │       └── tokenizers v0.22.2 (*)
+│   │   ├── tokio-macros v2.7.2 (proc-macro)
+│   │   │   └── tokio v1.53.1
+│   │   │       ├── contextra v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra) (*)
+│   │   │       ├── contextra-checkpoint v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-checkpoint) (*)
+│   │   │       ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   │       ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │       ├── contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle) (*)
+│   │   │       ├── contextra-infer-ollama v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-ollama)
+│   │   │       ├── contextra-mcp v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mcp) (*)
+│   │   │       ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│   │   │       ├── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+│   │   │       ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   │       ├── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   │       ├── criterion v0.5.1 (*)
+│   │   │       ├── hyper v1.11.1
+│   │   │       │   ├── hyper-rustls v0.27.9 (*)
+│   │   │       │   ├── hyper-util v0.1.20 (*)
+│   │   │       │   └── reqwest v0.12.28 (*)
+│   │   │       ├── hyper-rustls v0.27.9 (*)
+│   │   │       ├── hyper-util v0.1.20 (*)
+│   │   │       ├── reqwest v0.12.28 (*)
+│   │   │       ├── tokio-rustls v0.26.4 (*)
+│   │   │       ├── tokio-util v0.7.19 (*)
+│   │   │       └── tower v0.5.3 (*)
+│   │   │       [dev-dependencies]
+│   │   │       ├── contextra-audit-export v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-audit-export) (*)
+│   │   │       ├── contextra-core v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-core) (*)
+│   │   │       ├── contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto) (*)
+│   │   │       ├── contextra-db v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-db) (*)
+│   │   │       ├── contextra-engine v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-engine) (*)
+│   │   │       ├── contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph) (*)
+│   │   │       ├── contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache) (*)
+│   │   │       ├── contextra-mvcc v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-mvcc) (*)
+│   │   │       ├── contextra-ports v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-ports) (*)
+│   │   │       ├── contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy) (*)
+│   │   │       ├── contextra-rank v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-rank) (*)
+│   │   │       ├── contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store) (*)
+│   │   │       ├── contextra-store-redb v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store-redb)
+│   │   │       ├── contextra-testkit v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-testkit) (*)
+│   │   │       ├── contextra-text v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-text) (*)
+│   │   │       └── contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector) (*)
+│   │   └── zerovec-derive v0.11.6 (proc-macro)
+│   │       └── zerovec v0.11.8 (*)
+│   ├── synstructure v0.13.2 (*)
+│   ├── thiserror-impl v2.0.20 (proc-macro) (*)
+│   ├── tokio-macros v2.7.2 (proc-macro) (*)
+│   ├── tracing-attributes v0.1.31 (proc-macro) (*)
+│   ├── tracing-test-macro v0.2.6 (proc-macro) (*)
+│   ├── xtask v0.1.0 (/home/freddy/Projekte/contextra/xtask)
+│   ├── yoke-derive v0.8.2 (proc-macro) (*)
+│   ├── zerocopy-derive v0.8.56 (proc-macro) (*)
+│   ├── zerofrom-derive v0.1.7 (proc-macro) (*)
+│   ├── zeroize_derive v1.5.0 (proc-macro) (*)
+│   └── zerovec-derive v0.11.6 (proc-macro) (*)
+├── serde_derive v1.0.229 (proc-macro) (*)
+├── strum_macros v0.26.4 (proc-macro) (*)
+├── syn v2.0.119 (*)
+├── syn v3.0.4 (*)
+├── synstructure v0.13.2 (*)
+├── thiserror-impl v2.0.20 (proc-macro) (*)
+├── tokio-macros v2.7.2 (proc-macro) (*)
+├── tracing-attributes v0.1.31 (proc-macro) (*)
+├── yoke-derive v0.8.2 (proc-macro) (*)
+├── zerocopy-derive v0.8.56 (proc-macro) (*)
+├── zerofrom-derive v0.1.7 (proc-macro) (*)
+├── zeroize_derive v1.5.0 (proc-macro) (*)
+└── zerovec-derive v0.11.6 (proc-macro) (*)
+
+proc-macro2 v1.0.107
+├── syn v2.0.119 (*)
+└── xtask v0.1.0 (/home/freddy/Projekte/contextra/xtask)
+
+rand v0.8.8 (*)
+
+rand v0.9.5 (*)
+
+rand_chacha v0.3.1 (*)
+
+rand_chacha v0.9.0 (*)
+
+rand_core v0.6.4 (*)
+
+rand_core v0.9.5 (*)
+
+serde_spanned v0.6.9 (*)
+
+serde_spanned v1.1.2
+└── toml v1.1.8+spec-1.1.0
+    └── trybuild v1.0.122 (*)
+
+shlex v1.3.0
+└── contextra-router v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-router) (*)
+
+shlex v2.0.1
+└── cc v1.4.4
+    [build-dependencies]
+    ├── blake3 v1.8.7 (*)
+    ├── esaxx-rs v0.1.10
+    │   ├── tokenizers v0.21.4 (*)
+    │   └── tokenizers v0.22.2 (*)
+    ├── generator v0.8.9
+    │   └── loom v0.7.2 (*)
+    ├── onig_sys v69.9.3
+    │   └── onig v6.5.3 (*)
+    └── ring v0.17.14 (*)
+
+syn v2.0.119 (*)
+
+syn v2.0.119 (*)
+
+syn v3.0.4 (*)
+
+tokenizers v0.21.4 (*)
+
+tokenizers v0.22.2 (*)
+
+toml v0.8.23 (*)
+
+toml v1.1.8+spec-1.1.0 (*)
+
+toml_datetime v0.6.11 (*)
+
+toml_datetime v1.1.2+spec-1.1.0
+└── toml v1.1.8+spec-1.1.0 (*)
+
+winnow v0.7.15
+└── toml_edit v0.22.27 (*)
+
+winnow v1.0.4
+├── toml v1.1.8+spec-1.1.0 (*)
+└── toml_parser v1.1.5+spec-1.1.0
+    └── toml v1.1.8+spec-1.1.0 (*)

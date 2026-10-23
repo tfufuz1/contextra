@@ -1,0 +1,12 @@
+    Checking contextra-store v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-store)
+    Checking contextra-graph v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-graph)
+    Checking contextra-audit-export v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-audit-export)
+    Checking contextra-crypto v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-crypto)
+error: could not compile `contextra-store` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+    Checking contextra-privacy v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-privacy)
+    Checking contextra-infer-candle v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-infer-candle)
+    Checking contextra-vector v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-vector)
+error: could not compile `contextra-vector` (test "diskann_docid128_tombstones") due to 2 previous errors
+    Checking contextra-kvcache v0.1.0 (/home/freddy/Projekte/contextra/crates/contextra-kvcache)
+error: could not compile `contextra-vector` (lib test) due to 18 previous errors; 13 warnings emitted

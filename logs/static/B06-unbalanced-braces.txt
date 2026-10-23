@@ -1,0 +1,11 @@
+xtask/src/check_duplicate_intent.rs open=246 close=244
+xtask/src/check_flatbuffers_drift.rs open=84 close=83
+crates/contextra-adapt/tests/fcts_drift_update_ring3_only.rs open=35 close=36
+xtask/src/gates/debt_audit.rs open=176 close=175
+xtask/src/check_toctou_trait_defaults.rs open=31 close=30
+crates/contextra-checkpoint/tests/manifest_fault_injection.rs open=12 close=10crates/contextra-checkpoint/tests/manifest_fault_injection.rs open=12 close=10
+crates/contextra-checkpoint/tests/txid_monotonicity_and_recovery.rs open=65 close=62
+crates/contextra-checkpoint/src/store/tests.rs open=123 close=120ccrates/contextra-store/src/lsm/purge/plan.rs open=11 close=12
+crates/contextra-store/src/lsm/purge/orchestrator.rs open=73 close=72
+crates/contextra-crates/contextra-db/tests/split_brain_vector_orphan_tcrates/contextra-router/srcrates/contextra-store/src/lsm/purge/plan.rs open=1crates/contextra-adapt/tests/fcts_drift_update_ring3_only.rs open=35 close=36
+crates/contextra-engine/tests/stored_document_migration.rs open=30 close=crates/contextra-infer-ollama/tests/campaign_stub_ollama.rs open=50 close=49
