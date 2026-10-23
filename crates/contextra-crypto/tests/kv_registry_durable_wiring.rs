@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 #![allow(deprecated)]
 use contextra_crypto::{CryptoError, KeyManager, KeyRegistry, Result};
 use contextra_ports::SystemClock;

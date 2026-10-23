@@ -70,6 +70,8 @@ impl From<DeletionProof> for UnverifiedProof {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
     use super::*;
     use crate::deletion_proof::keys::DeletionProofKeyPair;
     use contextra_types::{DocId, TenantId, TxId};

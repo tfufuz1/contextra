@@ -210,7 +210,9 @@ impl KeyManager {
         let (km, header) = Self::try_new_argon2id(passphrase)?;
         let mut salt = [0u8; 32];
         let copy_len = header.salt.len().min(32);
-        salt[..copy_len].copy_from_slice(&header.salt[..copy_len]);
+        if let (Some(dst), Some(src)) = (salt.get_mut(..copy_len), header.salt.get(..copy_len)) {
+            dst.copy_from_slice(src);
+        }
         Ok((km, salt))
     }
 
@@ -228,7 +230,7 @@ impl KeyManager {
                 file_id.len()
             )));
         }
-        let mut info = Vec::with_capacity(b"contextra-file-key-v1:".len() + 4 + file_id.len());
+        let mut info = Vec::with_capacity(b"contextra-file-key-v1:".len().saturating_add(4).saturating_add(file_id.len()));
         info.extend_from_slice(b"contextra-file-key-v1:");
         let file_id_len = u32::try_from(file_id.len()).unwrap_or(u32::MAX);
         info.extend_from_slice(&file_id_len.to_le_bytes());
@@ -326,10 +328,12 @@ impl KeyManager {
 
         let mut info = Vec::with_capacity(
             b"contextra-kv-layer-v2:".len()
-                + 8  // tenant_id (u64 LE)
-                + 32 // model hash
-                + 4 + model_id_bytes.len()      // u32 len prefix + data
-                + 4 + quantization_bytes.len(), // u32 len prefix + data
+                .saturating_add(8)
+                .saturating_add(32)
+                .saturating_add(4)
+                .saturating_add(model_id_bytes.len())
+                .saturating_add(4)
+                .saturating_add(quantization_bytes.len()),
         );
         info.extend_from_slice(b"contextra-kv-layer-v2:");
         info.extend_from_slice(&expected_tenant_id.inner().to_le_bytes());
@@ -519,7 +523,7 @@ impl KeyManager {
                 if val == u64::MAX {
                     None
                 } else {
-                    Some(val + 1)
+                    val.checked_add(1)
                 }
             })
             .map_err(|_| {
@@ -530,8 +534,12 @@ impl KeyManager {
             })?;
 
         let mut nonce_bytes = [0u8; 12];
-        nonce_bytes[0..4].copy_from_slice(&self.nonce_prefix);
-        nonce_bytes[4..12].copy_from_slice(&counter_val.to_be_bytes());
+        if let Some(prefix_dst) = nonce_bytes.get_mut(0..4) {
+            prefix_dst.copy_from_slice(&self.nonce_prefix);
+        }
+        if let Some(counter_dst) = nonce_bytes.get_mut(4..12) {
+            counter_dst.copy_from_slice(&counter_val.to_be_bytes());
+        }
 
         let cipher = self.cipher()?;
         let nonce = Nonce::from_slice(&nonce_bytes);

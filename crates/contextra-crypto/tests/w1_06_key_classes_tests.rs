@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 //! Tests for Stage 5: Key Classes & TrustList (w1_06_*).
 
 #![forbid(unsafe_code)]

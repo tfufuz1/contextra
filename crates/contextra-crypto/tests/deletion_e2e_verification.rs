@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 //! End-to-end integration and negative tests for deletion proof issuance, serialization, and autonomous external verification.
 
 #![forbid(unsafe_code)]

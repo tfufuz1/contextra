@@ -252,9 +252,7 @@ mod tests {
             tenant_id: TenantId::try_new(1).expect("tenant"),
         };
 
-        let proof = ProofBuilder::new(scope, "db-test")
-            .with_deleted_after_tx(50)
-            .with_deleted_keys_hash([0xAA; 32])
+        let proof = ProofBuilder::with_required(scope, "db-test", [0xAA; 32], [0u8; 32], 50, 1)
             .finish(&signer)
             .expect("finish failed");
 

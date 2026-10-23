@@ -91,6 +91,8 @@ impl From<CryptoError> for contextra_types::ContextraError {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
     use super::*;
     use contextra_types::ContextraError;
 

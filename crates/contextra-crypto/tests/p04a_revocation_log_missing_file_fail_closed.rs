@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // ZWECK: Integrationstest für P04 / F-3 (Missing RevocationLog File Fail-Closed & Truncation Protection).
 // INVARIANTEN: Reopen eines gelöschten oder gekürzten RevocationLogs MUSS mit CryptoError::IntegrityViolation fehlschlagen.
