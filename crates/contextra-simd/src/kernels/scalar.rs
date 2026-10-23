@@ -55,13 +55,9 @@ pub fn cosine_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
     let mut norm_a = 0.0f32;
     let mut norm_b = 0.0f32;
 
-    for (i, &x) in a.iter().enumerate() {
-        let b_val = f32::from_le_bytes([
-            b_bytes[i * 4],
-            b_bytes[i * 4 + 1],
-            b_bytes[i * 4 + 2],
-            b_bytes[i * 4 + 3],
-        ]);
+    for (&x, chunk) in a.iter().zip(b_bytes.chunks_exact(4)) {
+        let arr: [u8; 4] = chunk.try_into().unwrap_or([0; 4]);
+        let b_val = f32::from_le_bytes(arr);
         dot += x * b_val;
         norm_a += x * x;
         norm_b += b_val * b_val;
@@ -79,13 +75,9 @@ pub fn cosine_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
 #[inline]
 pub fn euclidean_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
     let mut sum = 0.0f32;
-    for (i, &x) in a.iter().enumerate() {
-        let b_val = f32::from_le_bytes([
-            b_bytes[i * 4],
-            b_bytes[i * 4 + 1],
-            b_bytes[i * 4 + 2],
-            b_bytes[i * 4 + 3],
-        ]);
+    for (&x, chunk) in a.iter().zip(b_bytes.chunks_exact(4)) {
+        let arr: [u8; 4] = chunk.try_into().unwrap_or([0; 4]);
+        let b_val = f32::from_le_bytes(arr);
         let diff = x - b_val;
         sum += diff * diff;
     }
@@ -95,13 +87,9 @@ pub fn euclidean_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
 #[inline]
 pub fn dot_product_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
     let mut dot = 0.0f32;
-    for (i, &x) in a.iter().enumerate() {
-        let b_val = f32::from_le_bytes([
-            b_bytes[i * 4],
-            b_bytes[i * 4 + 1],
-            b_bytes[i * 4 + 2],
-            b_bytes[i * 4 + 3],
-        ]);
+    for (&x, chunk) in a.iter().zip(b_bytes.chunks_exact(4)) {
+        let arr: [u8; 4] = chunk.try_into().unwrap_or([0; 4]);
+        let b_val = f32::from_le_bytes(arr);
         dot += x * b_val;
     }
     -dot
@@ -109,38 +97,37 @@ pub fn dot_product_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
 
 #[inline]
 pub fn dot_product_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
-    let min_len = a.len().min(b.len());
     let mut dot = 0u32;
-    for i in 0..min_len {
-        dot += (a[i] as u32) * (b[i] as u32);
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        let prod = u32::from(x).saturating_mul(u32::from(y));
+        dot = dot.saturating_add(prod);
     }
     dot
 }
 
 #[inline]
 pub fn euclidean_distance_sq_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
-    let min_len = a.len().min(b.len());
     let mut sum = 0u32;
-    for i in 0..min_len {
-        let diff = (a[i] as i32) - (b[i] as i32);
-        sum += (diff * diff) as u32;
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        let diff = i32::from(x).saturating_sub(i32::from(y));
+        let prod = (diff.saturating_mul(diff)) as u32;
+        sum = sum.saturating_add(prod);
     }
     sum
 }
 
 #[inline]
 pub fn cosine_similarity_parts_u8_scalar(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
-    let min_len = a.len().min(b.len());
     let mut dot = 0u32;
     let mut norm_a_sq = 0u32;
     let mut norm_b_sq = 0u32;
 
-    for i in 0..min_len {
-        let x = a[i] as u32;
-        let y = b[i] as u32;
-        dot += x * y;
-        norm_a_sq += x * x;
-        norm_b_sq += y * y;
+    for (&x_raw, &y_raw) in a.iter().zip(b.iter()) {
+        let x = u32::from(x_raw);
+        let y = u32::from(y_raw);
+        dot = dot.saturating_add(x.saturating_mul(y));
+        norm_a_sq = norm_a_sq.saturating_add(x.saturating_mul(x));
+        norm_b_sq = norm_b_sq.saturating_add(y.saturating_mul(y));
     }
 
     CosineSimilarityPartsU8 {
@@ -152,21 +139,19 @@ pub fn cosine_similarity_parts_u8_scalar(a: &[u8], b: &[u8]) -> CosineSimilarity
 
 #[inline]
 pub fn dot_product_f32_u8(a: &[f32], b: &[u8]) -> f32 {
-    let min_len = a.len().min(b.len());
     let mut dot = 0.0f32;
-    for i in 0..min_len {
-        dot += a[i] * (b[i] as f32);
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        dot += x * f32::from(y);
     }
     dot
 }
 
 #[inline]
 pub fn euclidean_distance_sq_f32_u8(a: &[f32], b: &[u8], alphas: &[f32], mins: &[f32]) -> f32 {
-    let min_len = a.len().min(b.len()).min(alphas.len()).min(mins.len());
     let mut sum = 0.0f32;
-    for i in 0..min_len {
-        let y_f32 = (b[i] as f32) * alphas[i] + mins[i];
-        let diff = a[i] - y_f32;
+    for (((&x, &y), &alpha), &min_val) in a.iter().zip(b.iter()).zip(alphas.iter()).zip(mins.iter()) {
+        let y_f32 = f32::from(y) * alpha + min_val;
+        let diff = x - y_f32;
         sum += diff * diff;
     }
     sum

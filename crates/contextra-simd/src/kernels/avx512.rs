@@ -22,9 +22,15 @@ use crate::kernels::scalar::CosineSimilarityPartsU8;
 ///   loads (`_mm512_loadu_ps`) are used.
 /// - **Length / Tail Handling:** Valid for any slice length including 0. Tail elements (< 16) are processed safely via scalar fallbacks.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx512f")]
 pub unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
     let len = a.len();
     let mut i = 0;
 
@@ -91,9 +97,15 @@ pub unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
 ///   loads (`_mm512_loadu_ps`) are used.
 /// - **Length / Tail Handling:** Valid for any slice length including 0. Tail elements (< 16) are processed safely via scalar fallbacks.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx512f")]
 pub unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
     let len = a.len();
     let mut i = 0;
 
@@ -138,9 +150,15 @@ pub unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
 ///   loads (`_mm512_loadu_ps`) are used.
 /// - **Length / Tail Handling:** Valid for any slice length including 0. Tail elements (< 16) are processed safely via scalar fallbacks.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx512f")]
 pub unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
     let len = a.len();
     let mut i = 0;
 
@@ -183,9 +201,15 @@ pub unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
 ///   loads (`_mm512_loadu_ps`) are used for both slices.
 /// - **Length / Tail Handling:** Valid for any length including 0. Tail elements (< 16) are processed safely via scalar fallbacks.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx512f")]
 pub unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+    debug_assert!(b_bytes.len() >= a.len() * 4);
     let len = a.len();
     let mut i = 0;
 
@@ -257,9 +281,15 @@ pub unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32
 ///   loads (`_mm512_loadu_ps`) are used for both slices.
 /// - **Length / Tail Handling:** Valid for any length including 0. Tail elements (< 16) are processed safely via scalar fallbacks.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx512f")]
 pub unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+    debug_assert!(b_bytes.len() >= a.len() * 4);
     let len = a.len();
     let mut i = 0;
 
@@ -312,9 +342,15 @@ pub unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> 
 ///   loads (`_mm512_loadu_ps`) are used for both slices.
 /// - **Length / Tail Handling:** Valid for any length including 0. Tail elements (< 16) are processed safely via scalar fallbacks.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx512f")]
 pub unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+    debug_assert!(b_bytes.len() >= a.len() * 4);
     let len = a.len();
     let mut i = 0;
 
@@ -361,7 +397,11 @@ pub unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
 /// - **CPU Feature Guarantee:** The caller must ensure that the target CPU supports `avx512f`.
 /// - **No Pointer Operations:** Operates entirely on SIMD registers; does not dereference memory.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    reason = "AVX-512 register extraction and shuffle lane reduction"
+)]
 #[target_feature(enable = "avx512f")]
 pub unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
     // SAFETY: AVX-512 intrinsic extraction and register lane reduction; target feature `avx512f` is verified by caller.
@@ -386,7 +426,12 @@ pub unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
 ///   loads (`_mm512_loadu_si512`) are used.
 /// - **Length / Tail Handling:** Valid for any slice length including 0. Tail elements (< 64) are processed safely via scalar fallbacks.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vnni")]
 pub unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
@@ -430,7 +475,12 @@ pub unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
 ///   loads (`_mm512_loadu_si512`) are used.
 /// - **Length / Tail Handling:** Valid for any slice length including 0. Tail elements (< 64) are processed safely via scalar fallbacks.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx512f", enable = "avx512bw")]
 pub unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
@@ -488,7 +538,12 @@ pub unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {
 ///   loads (`_mm512_loadu_si512`) are used.
 /// - **Length / Tail Handling:** Valid for any slice length including 0. Tail elements (< 64) are processed safely via scalar fallbacks.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vnni")]
 pub unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
     let len = a.len().min(b.len());
@@ -551,7 +606,11 @@ pub unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSim
 /// - **CPU Feature Guarantee:** The caller must ensure that the target CPU supports `avx512f`.
 /// - **No Pointer Operations:** Operates entirely on SIMD registers; does not dereference memory.
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    reason = "AVX-512 register extraction and shift lane reduction"
+)]
 #[target_feature(enable = "avx512f")]
 pub unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {
     // SAFETY: AVX-512 intrinsic extraction and register lane reduction; target feature `avx512f` is verified by caller.
