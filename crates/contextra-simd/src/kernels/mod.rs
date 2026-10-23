@@ -160,14 +160,12 @@ mod direct_kernel_differential_tests {
                         "AVX512 Dot f32_bytes len {len}"
                     );
 
-                    if is_x86_feature_detected!("avx512bw")
-                        && is_x86_feature_detected!("avx512vnni")
-                    {
-                        // SAFETY: Target features `avx512bw` and `avx512vnni` verified via runtime check immediately prior; `a_u8` and `b_u8` have identical length `len`.
-                        let k_dot_u8 = unsafe { avx512::dot_product_u8_avx512vnni(&a_u8, &b_u8) };
+                    if is_x86_feature_detected!("avx512bw") {
+                        // SAFETY: Target feature `avx512bw` verified via runtime check immediately prior; `a_u8` and `b_u8` have identical length `len`.
+                        let k_dot_u8 = unsafe { avx512::dot_product_u8_avx512(&a_u8, &b_u8) };
                         assert_eq!(sc_dot_u8, k_dot_u8, "AVX512 Dot u8 len {len}");
 
-                        // SAFETY: Target features `avx512bw` and `avx512vnni` verified via runtime check immediately prior; `a_u8` and `b_u8` have identical length `len`.
+                        // SAFETY: Target feature `avx512bw` verified via runtime check immediately prior; `a_u8` and `b_u8` have identical length `len`.
                         let k_parts_u8 =
                             unsafe { avx512::cosine_similarity_parts_u8_avx512(&a_u8, &b_u8) };
                         assert_eq!(sc_parts_u8, k_parts_u8, "AVX512 Cosine parts u8 len {len}");

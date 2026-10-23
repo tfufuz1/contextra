@@ -254,12 +254,9 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f")
-            && is_x86_feature_detected!("avx512bw")
-            && is_x86_feature_detected!("avx512vnni")
-        {
-            // SAFETY: Target features `avx512f`, `avx512bw`, and `avx512vnni` verified via runtime checks immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
-            return Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) });
+        if is_x86_feature_detected!("avx512f") && is_x86_feature_detected!("avx512bw") {
+            // SAFETY: Target features `avx512f` and `avx512bw` verified via runtime checks immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
+            return Ok(unsafe { avx512::dot_product_u8_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") {
             // SAFETY: Target feature `avx2` verified via runtime check immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
@@ -320,11 +317,8 @@ pub fn cosine_similarity_parts_u8(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f")
-            && is_x86_feature_detected!("avx512bw")
-            && is_x86_feature_detected!("avx512vnni")
-        {
-            // SAFETY: Target features `avx512f`, `avx512bw`, and `avx512vnni` verified via runtime checks immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
+        if is_x86_feature_detected!("avx512f") && is_x86_feature_detected!("avx512bw") {
+            // SAFETY: Target features `avx512f` and `avx512bw` verified via runtime checks immediately prior; `a.len() == b.len()` is guaranteed by dimension check above.
             return Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") {
