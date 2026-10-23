@@ -21,9 +21,15 @@ use std::arch::aarch64::*;
 /// - Remaining tail elements (`len % 4`) are accessed element-by-element where `i < len == a.len() == b.len()`.
 /// - For empty input slices (`len == 0`), no vector or tail reads occur and 1.0 is returned safely.
 #[cfg(target_arch = "aarch64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "neon")]
 pub unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
     let len = a.len();
     let mut i = 0;
 
@@ -80,9 +86,15 @@ pub unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
 /// - Remaining tail elements (`len % 4`) are accessed element-by-element where `i < len == a.len() == b.len()`.
 /// - For empty input slices (`len == 0`), no vector or tail reads occur and 0.0 is returned safely.
 #[cfg(target_arch = "aarch64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "neon")]
 pub unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
     let len = a.len();
     let mut i = 0;
 
@@ -125,9 +137,15 @@ pub unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
 /// - Remaining tail elements (`len % 4`) are accessed element-by-element where `i < len == a.len() == b.len()`.
 /// - For empty input slices (`len == 0`), no vector or tail reads occur and -0.0 is returned safely.
 #[cfg(target_arch = "aarch64")]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::arithmetic_side_effects,
+    clippy::indexing_slicing,
+    reason = "SIMD kernel hot loop index arithmetic bounded by slice length invariant"
+)]
 #[target_feature(enable = "neon")]
 pub unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
     let len = a.len();
     let mut i = 0;
 

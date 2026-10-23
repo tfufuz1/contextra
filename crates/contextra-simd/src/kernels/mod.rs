@@ -9,7 +9,13 @@ pub mod scalar;
 pub use scalar::*;
 
 #[cfg(test)]
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 mod direct_kernel_differential_tests {
     use super::*;
 
@@ -42,6 +48,7 @@ mod direct_kernel_differential_tests {
             #[cfg(target_arch = "x86_64")]
             {
                 if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+                    // SAFETY: Target features `avx2` and `fma` verified via runtime check immediately prior; slices `a` and `b` have identical length `len`.
                     let k_cos = unsafe { avx2::cosine_distance_avx2(&a, &b) };
                     let diff_cos = (sc_cos - k_cos).abs();
                     assert!(
@@ -49,6 +56,7 @@ mod direct_kernel_differential_tests {
                         "AVX2 Cosine len {len}"
                     );
 
+                    // SAFETY: Target features `avx2` and `fma` verified via runtime check immediately prior; slices `a` and `b` have identical length `len`.
                     let k_euc = unsafe { avx2::euclidean_distance_avx2(&a, &b) };
                     let diff_euc = (sc_euc - k_euc).abs();
                     assert!(
@@ -56,6 +64,7 @@ mod direct_kernel_differential_tests {
                         "AVX2 Euclidean len {len}"
                     );
 
+                    // SAFETY: Target features `avx2` and `fma` verified via runtime check immediately prior; slices `a` and `b` have identical length `len`.
                     let k_dot = unsafe { avx2::dot_product_avx2(&a, &b) };
                     let diff_dot = (sc_dot - k_dot).abs();
                     assert!(
@@ -63,6 +72,7 @@ mod direct_kernel_differential_tests {
                         "AVX2 Dot len {len}"
                     );
 
+                    // SAFETY: Target features `avx2` and `fma` verified via runtime check immediately prior; `b_bytes.len() == a.len() * 4`.
                     let k_cos_b = unsafe { avx2::cosine_distance_f32_bytes_avx2(&a, &b_bytes) };
                     let diff_cos_b = (sc_cos_b - k_cos_b).abs();
                     assert!(
@@ -70,6 +80,7 @@ mod direct_kernel_differential_tests {
                         "AVX2 Cosine f32_bytes len {len}"
                     );
 
+                    // SAFETY: Target features `avx2` and `fma` verified via runtime check immediately prior; `b_bytes.len() == a.len() * 4`.
                     let k_euc_b = unsafe { avx2::euclidean_distance_f32_bytes_avx2(&a, &b_bytes) };
                     let diff_euc_b = (sc_euc_b - k_euc_b).abs();
                     assert!(
@@ -77,6 +88,7 @@ mod direct_kernel_differential_tests {
                         "AVX2 Euclidean f32_bytes len {len}"
                     );
 
+                    // SAFETY: Target features `avx2` and `fma` verified via runtime check immediately prior; `b_bytes.len() == a.len() * 4`.
                     let k_dot_b = unsafe { avx2::dot_product_f32_bytes_avx2(&a, &b_bytes) };
                     let diff_dot_b = (sc_dot_b - k_dot_b).abs();
                     assert!(
@@ -84,18 +96,22 @@ mod direct_kernel_differential_tests {
                         "AVX2 Dot f32_bytes len {len}"
                     );
 
+                    // SAFETY: Target feature `avx2` verified via runtime check immediately prior; `a_u8` and `b_u8` have identical length `len`.
                     let k_dot_u8 = unsafe { avx2::dot_product_u8_avx2(&a_u8, &b_u8) };
                     assert_eq!(sc_dot_u8, k_dot_u8, "AVX2 Dot u8 len {len}");
 
+                    // SAFETY: Target feature `avx2` verified via runtime check immediately prior; `a_u8` and `b_u8` have identical length `len`.
                     let k_euc_u8 = unsafe { avx2::euclidean_distance_sq_u8_avx2(&a_u8, &b_u8) };
                     assert_eq!(sc_euc_u8, k_euc_u8, "AVX2 Euc sq u8 len {len}");
 
+                    // SAFETY: Target feature `avx2` verified via runtime check immediately prior; `a_u8` and `b_u8` have identical length `len`.
                     let k_parts_u8 = unsafe { avx2::cosine_similarity_parts_u8_avx2(&a_u8, &b_u8) };
                     assert_eq!(sc_parts_u8, k_parts_u8, "AVX2 Cosine parts u8 len {len}");
                 }
 
                 // 2. Direct AVX-512 Kernel Differential
                 if is_x86_feature_detected!("avx512f") {
+                    // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; slices `a` and `b` have identical length `len`.
                     let k_cos = unsafe { avx512::cosine_distance_avx512(&a, &b) };
                     let diff_cos = (sc_cos - k_cos).abs();
                     assert!(
@@ -103,6 +119,7 @@ mod direct_kernel_differential_tests {
                         "AVX512 Cosine len {len}"
                     );
 
+                    // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; slices `a` and `b` have identical length `len`.
                     let k_euc = unsafe { avx512::euclidean_distance_avx512(&a, &b) };
                     let diff_euc = (sc_euc - k_euc).abs();
                     assert!(
@@ -110,6 +127,7 @@ mod direct_kernel_differential_tests {
                         "AVX512 Euclidean len {len}"
                     );
 
+                    // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; slices `a` and `b` have identical length `len`.
                     let k_dot = unsafe { avx512::dot_product_avx512(&a, &b) };
                     let diff_dot = (sc_dot - k_dot).abs();
                     assert!(
@@ -117,6 +135,7 @@ mod direct_kernel_differential_tests {
                         "AVX512 Dot len {len}"
                     );
 
+                    // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; `b_bytes.len() == a.len() * 4`.
                     let k_cos_b = unsafe { avx512::cosine_distance_f32_bytes_avx512(&a, &b_bytes) };
                     let diff_cos_b = (sc_cos_b - k_cos_b).abs();
                     assert!(
@@ -124,6 +143,7 @@ mod direct_kernel_differential_tests {
                         "AVX512 Cosine f32_bytes len {len}"
                     );
 
+                    // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; `b_bytes.len() == a.len() * 4`.
                     let k_euc_b =
                         unsafe { avx512::euclidean_distance_f32_bytes_avx512(&a, &b_bytes) };
                     let diff_euc_b = (sc_euc_b - k_euc_b).abs();
@@ -132,6 +152,7 @@ mod direct_kernel_differential_tests {
                         "AVX512 Euclidean f32_bytes len {len}"
                     );
 
+                    // SAFETY: Target feature `avx512f` verified via runtime check immediately prior; `b_bytes.len() == a.len() * 4`.
                     let k_dot_b = unsafe { avx512::dot_product_f32_bytes_avx512(&a, &b_bytes) };
                     let diff_dot_b = (sc_dot_b - k_dot_b).abs();
                     assert!(
@@ -139,18 +160,19 @@ mod direct_kernel_differential_tests {
                         "AVX512 Dot f32_bytes len {len}"
                     );
 
-                    if is_x86_feature_detected!("avx512bw")
-                        && is_x86_feature_detected!("avx512vnni")
-                    {
-                        let k_dot_u8 = unsafe { avx512::dot_product_u8_avx512vnni(&a_u8, &b_u8) };
+                    if is_x86_feature_detected!("avx512bw") {
+                        // SAFETY: Target feature `avx512bw` verified via runtime check immediately prior; `a_u8` and `b_u8` have identical length `len`.
+                        let k_dot_u8 = unsafe { avx512::dot_product_u8_avx512(&a_u8, &b_u8) };
                         assert_eq!(sc_dot_u8, k_dot_u8, "AVX512 Dot u8 len {len}");
 
+                        // SAFETY: Target feature `avx512bw` verified via runtime check immediately prior; `a_u8` and `b_u8` have identical length `len`.
                         let k_parts_u8 =
                             unsafe { avx512::cosine_similarity_parts_u8_avx512(&a_u8, &b_u8) };
                         assert_eq!(sc_parts_u8, k_parts_u8, "AVX512 Cosine parts u8 len {len}");
                     }
 
                     if is_x86_feature_detected!("avx512bw") {
+                        // SAFETY: Target feature `avx512bw` verified via runtime check immediately prior; `a_u8` and `b_u8` have identical length `len`.
                         let k_euc_u8 =
                             unsafe { avx512::euclidean_distance_sq_u8_avx512(&a_u8, &b_u8) };
                         assert_eq!(sc_euc_u8, k_euc_u8, "AVX512 Euc sq u8 len {len}");
@@ -162,6 +184,7 @@ mod direct_kernel_differential_tests {
             #[cfg(target_arch = "aarch64")]
             {
                 if std::arch::is_aarch64_feature_detected!("neon") {
+                    // SAFETY: Target feature `neon` verified via runtime check immediately prior; slices `a` and `b` have identical length `len`.
                     let k_cos = unsafe { neon::cosine_distance_neon(&a, &b) };
                     let diff_cos = (sc_cos - k_cos).abs();
                     assert!(
@@ -169,6 +192,7 @@ mod direct_kernel_differential_tests {
                         "NEON Cosine len {len}"
                     );
 
+                    // SAFETY: Target feature `neon` verified via runtime check immediately prior; slices `a` and `b` have identical length `len`.
                     let k_euc = unsafe { neon::euclidean_distance_neon(&a, &b) };
                     let diff_euc = (sc_euc - k_euc).abs();
                     assert!(
@@ -176,6 +200,7 @@ mod direct_kernel_differential_tests {
                         "NEON Euclidean len {len}"
                     );
 
+                    // SAFETY: Target feature `neon` verified via runtime check immediately prior; slices `a` and `b` have identical length `len`.
                     let k_dot = unsafe { neon::dot_product_neon(&a, &b) };
                     let diff_dot = (sc_dot - k_dot).abs();
                     assert!(
