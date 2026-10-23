@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // ZWECK: Comprehensive test suite for ScopeKeyring and S4 Crypto-Erase under ADR-N27.
 // INVARIANTEN: Zeroize-on-drop, no raw key material in logs/Debug, crash-consistent state, tamper detection, multi-tenant isolation.

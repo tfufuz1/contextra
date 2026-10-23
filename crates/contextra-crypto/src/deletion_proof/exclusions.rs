@@ -62,6 +62,8 @@ pub fn mandatory_ids_for(assurance: WitAssurance) -> Vec<u16> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
     use super::*;
 
     #[test]

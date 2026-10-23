@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // ZWECK: Targeted security error path tests for RevocationLog, IntegrityVerifier, and KeyRegistry.
 // INVARIANTEN: Unsigned appends fail; tampered signatures reject; invalid op_type (>2) fail; double revocations are idempotent.

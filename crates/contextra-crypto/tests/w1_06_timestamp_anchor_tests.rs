@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 //! Tests for Stage 4: Timestamp Anchors (`AcceptAllTsaVerifier` & Qualification) (w1_06_*).
 
 #![forbid(unsafe_code)]

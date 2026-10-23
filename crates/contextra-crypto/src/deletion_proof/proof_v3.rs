@@ -209,6 +209,8 @@ impl DeletionProof {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
     use super::*;
     use super::super::types::{DeletionLayer, DeletionScope, ExcludedScope};
     use crate::ed25519_proof::SignatureVersion;

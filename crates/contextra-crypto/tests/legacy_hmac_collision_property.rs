@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // ZWECK: Property-Test for legacy v2 HMAC length-prefixed deletion keys hashing function against collisions.
 // INVARIANTEN: Distinct key collections and distinct segmentations MUST produce non-colliding Blake3 hashes.

@@ -125,8 +125,8 @@ impl DeletionProof {
                 let full_payload = self.construct_v2_full_payload()?;
                 let expected_full = compute_hmac_sha256(proof_key, &[&full_payload])?;
                 if expected_full.as_slice().ct_eq(&self.signature).into() {
-                    return Ok(true);
-                }
+                    Ok(true)
+                } else {
 
                 #[cfg(feature = "legacy-verify")]
                 {
@@ -159,6 +159,7 @@ impl DeletionProof {
                 #[cfg(not(feature = "legacy-verify"))]
                 {
                     Ok(false)
+                }
                 }
             }
             (SignatureVersion::V3, VerificationKey::Ed25519(verifying_key)) => {

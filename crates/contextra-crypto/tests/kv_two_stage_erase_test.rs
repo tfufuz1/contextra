@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // STAND: 2026-10-14
 // ZWECK: Integrationstest für zweistufige Krypto-Löschung (KeyRevoked, KeyQuarantined, KeyDestroyed) und Atomic Bitmask.

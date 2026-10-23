@@ -1,3 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+
 // FILE-CONTEXT
 // ZWECK: Targeted security tests for tenant-scoped KeyManager derivation (KeyManager::cipher_for_scoped).
 // INVARIANTEN: Multi-tenant cryptographic isolation. Rejects cross-tenant scope mismatches fail-closed.

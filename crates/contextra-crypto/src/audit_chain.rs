@@ -211,8 +211,10 @@ impl AuditChain {
         self.head_hash = entry_hash;
         self.entries.push(entry);
 
-        let last_idx = self.entries.len() - 1;
-        Ok(&self.entries[last_idx])
+        let last_idx = self.entries.len().saturating_sub(1);
+        self.entries.get(last_idx).ok_or_else(|| {
+            CryptoError::Crypto("Unexpected empty entries after append".to_string())
+        })
     }
 
     /// Liefert die Anzahl der Einträge in der Kette.

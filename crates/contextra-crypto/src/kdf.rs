@@ -155,13 +155,13 @@ impl KdfHeader {
 
             let start_nanos = clock.monotonic_nanos();
             let _ = derive_key_argon2id(dummy_passphrase, &header)?;
-            let elapsed_ms = (clock.monotonic_nanos().saturating_sub(start_nanos)) / 1_000_000;
+            let elapsed_ms = (clock.monotonic_nanos().saturating_sub(start_nanos)).checked_div(1_000_000).unwrap_or(0);
 
             if elapsed_ms >= target_ms || params.t_cost >= 20 {
                 return Ok(header);
             }
 
-            params.t_cost += 1;
+            params.t_cost = params.t_cost.saturating_add(1);
         }
     }
 
@@ -198,7 +198,7 @@ impl KdfHeader {
     /// Layout:
     /// `magic (4B "MFKD") | version (1B = 1) | kdf_id (1B = 1 Argon2id) | m_cost_kib (4B BE) | t_cost (4B BE) | p_cost (4B BE) | salt_len (4B BE) | salt (salt_len B)`
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(4 + 1 + 1 + 4 + 4 + 4 + 4 + self.salt.len());
+        let mut buf = Vec::with_capacity((22_usize).saturating_add(self.salt.len()));
         buf.extend_from_slice(KDF_HEADER_MAGIC);
         buf.push(self.version);
         buf.push(self.kdf_id);
@@ -226,13 +226,15 @@ impl KdfHeader {
             )));
         }
 
-        if &bytes[0..4] != KDF_HEADER_MAGIC {
+        if bytes.get(0..4) != Some(KDF_HEADER_MAGIC.as_slice()) {
             return Err(CryptoError::InvalidInput(
                 "Ungültige KdfHeader Magic Bytes".to_string(),
             ));
         }
 
-        let version = bytes[4];
+        let version = *bytes.get(4).ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen der Header Version".to_string())
+        })?;
         if version != KDF_HEADER_VERSION_1 {
             return Err(CryptoError::InvalidInput(format!(
                 "Nicht unterstützte KdfHeader Version: {}",
@@ -240,7 +242,9 @@ impl KdfHeader {
             )));
         }
 
-        let kdf_id = bytes[5];
+        let kdf_id = *bytes.get(5).ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen der KdfId".to_string())
+        })?;
         if kdf_id != KDF_ID_ARGON2ID {
             return Err(CryptoError::InvalidInput(format!(
                 "Nicht unterstützte KdfId: {}",
@@ -248,22 +252,27 @@ impl KdfHeader {
             )));
         }
 
-        let m_cost_kib = u32::from_be_bytes(bytes[6..10].try_into().map_err(|_| {
+        let m_cost_kib = u32::from_be_bytes(bytes.get(6..10).ok_or_else(|| {
             CryptoError::InvalidInput("Fehler beim Lesen von m_cost_kib".to_string())
+        })?.try_into().map_err(|_| {
+            CryptoError::InvalidInput("Fehler beim Konvertieren von m_cost_kib".to_string())
         })?);
-        let t_cost =
-            u32::from_be_bytes(bytes[10..14].try_into().map_err(|_| {
-                CryptoError::InvalidInput("Fehler beim Lesen von t_cost".to_string())
-            })?);
-        let p_cost =
-            u32::from_be_bytes(bytes[14..18].try_into().map_err(|_| {
-                CryptoError::InvalidInput("Fehler beim Lesen von p_cost".to_string())
-            })?);
+        let t_cost = u32::from_be_bytes(bytes.get(10..14).ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen von t_cost".to_string())
+        })?.try_into().map_err(|_| {
+            CryptoError::InvalidInput("Fehler beim Konvertieren von t_cost".to_string())
+        })?);
+        let p_cost = u32::from_be_bytes(bytes.get(14..18).ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen von p_cost".to_string())
+        })?.try_into().map_err(|_| {
+            CryptoError::InvalidInput("Fehler beim Konvertieren von p_cost".to_string())
+        })?);
 
-        let salt_len =
-            u32::from_be_bytes(bytes[18..22].try_into().map_err(|_| {
-                CryptoError::InvalidInput("Fehler beim Lesen von salt_len".to_string())
-            })?) as usize;
+        let salt_len = u32::from_be_bytes(bytes.get(18..22).ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen von salt_len".to_string())
+        })?.try_into().map_err(|_| {
+            CryptoError::InvalidInput("Fehler beim Konvertieren von salt_len".to_string())
+        })?) as usize;
 
         if salt_len < MIN_SALT_LEN {
             return Err(CryptoError::InvalidInput(format!(
@@ -277,15 +286,19 @@ impl KdfHeader {
             )));
         }
 
-        if bytes.len() < MIN_HEADER_LEN + salt_len {
+        let total_expected = MIN_HEADER_LEN.saturating_add(salt_len);
+        if bytes.len() < total_expected {
             return Err(CryptoError::InvalidInput(format!(
                 "KdfHeader unvollständig: Erwartet {} Bytes, vorhanden {} Bytes",
-                MIN_HEADER_LEN + salt_len,
+                total_expected,
                 bytes.len()
             )));
         }
 
-        let salt = bytes[MIN_HEADER_LEN..MIN_HEADER_LEN + salt_len].to_vec();
+        let salt_slice = bytes.get(MIN_HEADER_LEN..total_expected).ok_or_else(|| {
+            CryptoError::InvalidInput("Fehler beim Lesen des Salt".to_string())
+        })?;
+        let salt = salt_slice.to_vec();
 
         Ok(Self {
             version,
@@ -302,6 +315,8 @@ impl KdfHeader {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
     use super::*;
     use contextra_ports::SystemClock;
 

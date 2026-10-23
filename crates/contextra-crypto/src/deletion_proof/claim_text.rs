@@ -174,23 +174,23 @@ pub fn evaluate_layer_status(
     target_layer: &DeletionLayer,
     covered_layers: &[DeletionLayer],
 ) -> LayerVerificationStatus {
-    let is_covered = covered_layers.iter().any(|l| match (l, target_layer) {
-        (DeletionLayer::LsmMemtable, DeletionLayer::LsmMemtable) => true,
-        (DeletionLayer::SsTableAllLevels, DeletionLayer::SsTableAllLevels) => true,
-        (DeletionLayer::HnswIndex, DeletionLayer::HnswIndex) => true,
-        (DeletionLayer::WalAllSegments { .. }, DeletionLayer::WalAllSegments { .. }) => true,
-        (DeletionLayer::CsrGraph, DeletionLayer::CsrGraph) => true,
-        (DeletionLayer::KvCacheSegments, DeletionLayer::KvCacheSegments) => true,
-        (DeletionLayer::EmbeddingCache, DeletionLayer::EmbeddingCache) => true,
-        (DeletionLayer::TextIndex, DeletionLayer::TextIndex) => true,
-        (DeletionLayer::Relations, DeletionLayer::Relations) => true,
-        (DeletionLayer::Manifest, DeletionLayer::Manifest) => true,
-        (DeletionLayer::CheckpointClones, DeletionLayer::CheckpointClones) => true,
-        (DeletionLayer::ProcessCaches, DeletionLayer::ProcessCaches) => true,
-        (DeletionLayer::Keyring, DeletionLayer::Keyring) => true,
-        (DeletionLayer::ErasureLedger, DeletionLayer::ErasureLedger) => true,
-        _ => false,
-    });
+    let is_covered = covered_layers.iter().any(|l| matches!(
+        (l, target_layer),
+        (DeletionLayer::LsmMemtable, DeletionLayer::LsmMemtable)
+            | (DeletionLayer::SsTableAllLevels, DeletionLayer::SsTableAllLevels)
+            | (DeletionLayer::HnswIndex, DeletionLayer::HnswIndex)
+            | (DeletionLayer::WalAllSegments { .. }, DeletionLayer::WalAllSegments { .. })
+            | (DeletionLayer::CsrGraph, DeletionLayer::CsrGraph)
+            | (DeletionLayer::KvCacheSegments, DeletionLayer::KvCacheSegments)
+            | (DeletionLayer::EmbeddingCache, DeletionLayer::EmbeddingCache)
+            | (DeletionLayer::TextIndex, DeletionLayer::TextIndex)
+            | (DeletionLayer::Relations, DeletionLayer::Relations)
+            | (DeletionLayer::Manifest, DeletionLayer::Manifest)
+            | (DeletionLayer::CheckpointClones, DeletionLayer::CheckpointClones)
+            | (DeletionLayer::ProcessCaches, DeletionLayer::ProcessCaches)
+            | (DeletionLayer::Keyring, DeletionLayer::Keyring)
+            | (DeletionLayer::ErasureLedger, DeletionLayer::ErasureLedger)
+    ));
 
     if is_covered {
         LayerVerificationStatus::Verified
@@ -201,6 +201,8 @@ pub fn evaluate_layer_status(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+
     use super::*;
 
     #[test]

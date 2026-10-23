@@ -112,7 +112,7 @@ impl KmsProvider for LocalKmsProvider {
     fn wrap_key(&self, key_id: &str, plaintext: &[u8]) -> Result<Vec<u8>> {
         let km = self.master_key.derive_segment_key(key_id)?;
         let (cipher, nonce) = km.encrypt_auto_nonce(plaintext)?;
-        let mut out = Vec::with_capacity(12 + cipher.len());
+        let mut out = Vec::with_capacity((12_usize).saturating_add(cipher.len()));
         out.extend_from_slice(&nonce);
         out.extend_from_slice(&cipher);
         Ok(out)
@@ -123,9 +123,16 @@ impl KmsProvider for LocalKmsProvider {
             return Err(CryptoError::InvalidInput("Ciphertext zu kurz".to_string()));
         }
         let km = self.master_key.derive_segment_key(key_id)?;
+        let nonce_slice = ciphertext.get(0..12).ok_or_else(|| {
+            CryptoError::InvalidInput("Ciphertext zu kurz für Nonce".to_string())
+        })?;
         let mut nonce = [0u8; 12];
-        nonce.copy_from_slice(&ciphertext[0..12]);
-        km.decrypt_auto_nonce(&ciphertext[12..], &nonce)
+        nonce.copy_from_slice(nonce_slice);
+
+        let body = ciphertext.get(12..).ok_or_else(|| {
+            CryptoError::InvalidInput("Ciphertext Body fehlt".to_string())
+        })?;
+        km.decrypt_auto_nonce(body, &nonce)
     }
 
     fn destroy_key(&self, key_id: &str) -> Result<DestroyedKey> {
