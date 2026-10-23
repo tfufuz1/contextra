@@ -1,5 +1,5 @@
 use super::types::{Language, StagedStatsChange, TextIndexMetadata};
-use crate::posting_list::{Posting, ResidentPostingIndex};
+use crate::posting_list::{DocIdRaw, Posting, ResidentPostingIndex};
 use crate::tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -188,10 +188,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         for (key, val_bytes) in raw_entries {
             let suffix_bytes = &key[prefix.len()..];
             if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
-                #[cfg(not(feature = "docid-128"))]
-                let parsed_doc_id = suffix.parse::<u64>().ok();
-                #[cfg(feature = "docid-128")]
-                let parsed_doc_id = suffix.parse::<u128>().ok();
+                let parsed_doc_id = suffix.parse::<DocIdRaw>().ok();
 
                 if let Some(doc_id_raw) = parsed_doc_id {
                     if val_bytes.len() == 4 {
@@ -353,16 +350,10 @@ impl<S: StorageEngine> InvertedIndex<S> {
                 continue;
             }
 
-            #[cfg(not(feature = "docid-128"))]
             let doc_id_raw_opt = std::str::from_utf8(parts[0])
                 .ok()
-                .and_then(|s| s.parse::<u64>().ok())
-                .map(|v| DocId::new(v.into()));
-            #[cfg(feature = "docid-128")]
-            let doc_id_raw_opt = std::str::from_utf8(parts[0])
-                .ok()
-                .and_then(|s| s.parse::<u128>().ok())
-                .map(|v| DocId::new(v.into()));
+                .and_then(|s| s.parse::<DocIdRaw>().ok())
+                .map(DocId::from);
             let doc_id = match doc_id_raw_opt {
                 Some(v) => v,
                 None => continue,

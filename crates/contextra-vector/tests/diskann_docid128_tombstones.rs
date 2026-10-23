@@ -23,16 +23,15 @@ async fn test_diskann_docid128_tombstones_handling() -> Result<()> {
 
     let index = DiskAnnIndex::try_new(config)?;
 
-    // Construct two 128-bit IDs that differ strictly in the upper 64 bits
-    #[cfg(feature = "docid-128")]
-    let id1 = DocId::from(0x1_0000_0000_0000_0000_u128 | 42_u128);
-    #[cfg(feature = "docid-128")]
-    let id2 = DocId::from(0x2_0000_0000_0000_0000_u128 | 42_u128);
-
-    #[cfg(not(feature = "docid-128"))]
-    let id1 = DocId::from(42_u64);
-    #[cfg(not(feature = "docid-128"))]
-    let id2 = DocId::from(1042_u64);
+    // Construct two IDs that differ in upper 64 bits in 128-bit mode or distinct u64 in default mode
+    let (id1, id2) = if DocId::BYTES == 16 {
+        (
+            DocId::from(0x1_0000_0000_0000_0000_u128 | 42_u128),
+            DocId::from(0x2_0000_0000_0000_0000_u128 | 42_u128),
+        )
+    } else {
+        (DocId::from(42_u64), DocId::from(1042_u64))
+    };
 
     let v1 = vec![1.0, 0.0, 0.0, 0.0];
     let v2 = vec![0.0, 1.0, 0.0, 0.0];

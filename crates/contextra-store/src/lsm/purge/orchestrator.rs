@@ -16,10 +16,8 @@ use std::path::{Path, PathBuf};
 #[derive(Debug)]
 pub enum PurgeOutcome {
     /// Pipeline completed all phases successfully.
-    #[error("Purge completed: {0:?}")]
     Completed(PurgeReport),
     /// Pipeline completed all phases, but obsolete file disposal encountered refusals.
-    #[error("Purge completed with {refusals} disposal refusals: {report:?}")]
     CompletedWithRefusals {
         report: PurgeReport,
         refusals: usize,
@@ -125,7 +123,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
             .write_to_file(&self.intent_file)
             .map_err(|e| PurgeError::Write {
                 file: self.intent_file.to_string_lossy().to_string(),
-                source: e.to_string(),
+                source_details: e.to_string(),
             })
     }
 
@@ -141,7 +139,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
         if let Err(e) = self.check_failpoint("p0_init") {
             return PurgeOutcome::Failed {
                 phase: PurgePhase::Admitted,
-                error: e.into(),
+                error: e,
             };
         }
 
@@ -164,14 +162,14 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
         if let Err(e) = self.record_phase(&mut intent, PurgePhase::Admitted) {
             return PurgeOutcome::Failed {
                 phase: PurgePhase::Admitted,
-                error: e.into(),
+                error: e,
             };
         }
 
         if let Err(e) = self.check_failpoint("after_intent") {
             return PurgeOutcome::Failed {
                 phase: PurgePhase::Admitted,
-                error: e.into(),
+                error: e,
             };
         }
 
@@ -236,7 +234,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 if let Some(ref f) = hooks.flush_memtable {
                     f().map_err(|e| PurgeError::Write {
                         file: "flush_memtable".to_string(),
-                        source: e.to_string(),
+                        source_details: e.to_string(),
                     })?;
                 }
                 self.record_phase(&mut intent, PurgePhase::Flushed)?;
@@ -263,7 +261,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 {
                     Ok(rep) => report = rep,
                     Err(err) => {
-                        return Err(OrxPurgeError::from(err));
+                        return Err(err);
                     }
                 }
 
@@ -298,7 +296,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 if let Some(ref cb) = hooks.wal_retire {
                     cb().map_err(|e| PurgeError::Write {
                         file: "wal_retire".to_string(),
-                        source: e.to_string(),
+                        source_details: e.to_string(),
                     })?;
                 }
                 self.check_failpoint("after_wal_callback")?;
@@ -310,11 +308,10 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 if let Some(ref cb) = hooks.witness {
                     cb().map_err(|e| PurgeError::Write {
                         file: "witness".to_string(),
-                        source: e.to_string(),
+                        source_details: e.to_string(),
                     })?;
                 }
                 self.check_failpoint("after_witness")?;
-            }
 
             // Phase 8: Finalizing
             if intent.phase <= PurgePhase::Finalizing {
@@ -331,7 +328,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
             {
                 return Err(OrxPurgeError::from(PurgeError::CorruptedIntent(
                     "Residue detected during verification scan before release".into(),
-                )));
+                ));
             }
 
             // Phase 9: Released
@@ -348,7 +345,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 if self.intent_file.exists() {
                     durable_remove(&self.intent_file).map_err(|e| PurgeError::Write {
                         file: self.intent_file.to_string_lossy().to_string(),
-                        source: e.to_string(),
+                        source_details: e.to_string(),
                     })?;
                 }
                 self.check_failpoint("after_intent_cleanup")?;
@@ -379,7 +376,7 @@ impl<'a, B: PurgeBackend> PurgeOrchestrator<'a, B> {
                 }
                 PurgeOutcome::Failed {
                     phase: intent.phase,
-                    error: err.into(),
+                    error: err,
                 }
             }
         }

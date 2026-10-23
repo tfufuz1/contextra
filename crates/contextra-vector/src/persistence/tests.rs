@@ -284,7 +284,6 @@ fn test_open_rejects_unsupported_version() -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(feature = "docid-128"))]
 #[tokio::test]
 async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
     use crate::hnsw::{HnswConfig, HnswIndex};
@@ -292,7 +291,8 @@ async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("legacy_v1.hnsw");
 
-    let v1_header_bytes = [
+    let conn_offset = (64 + NodeRecord::SIZE) as u64;
+    let mut v1_header_bytes = [
         0x57, 0x53, 0x4E, 0x48, // magic "HNSW"
         0x01, 0x00, // version 1
         0x02, 0x00, 0x00, 0x00, // dimension 2
@@ -304,16 +304,17 @@ async fn test_v1_legacy_migration_load_degraded_fallback() -> Result<()> {
         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // node_count = 1
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // entry_point = 0
         64, 0, 0, 0, 0, 0, 0, 0, // nodes_offset = 64
-        89, 0, 0, 0, 0, 0, 0, 0, // connections_offset = 89
+        0, 0, 0, 0, 0, 0, 0, 0, // connections_offset (set below)
         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // last_tx_id = 1
     ];
+    v1_header_bytes[48..56].copy_from_slice(&conn_offset.to_le_bytes());
 
     let mut file_bytes = v1_header_bytes.to_vec();
     let record = NodeRecord {
         doc_id: 1,
         max_layer: 0,
-        vector_offset: 89 + 1 + 4 + 4,
-        connections_offset: 89,
+        vector_offset: conn_offset + 1 + 4 + 4,
+        connections_offset: conn_offset,
     };
     file_bytes.extend_from_slice(&record.to_bytes());
     file_bytes.push(1);

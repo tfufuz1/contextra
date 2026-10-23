@@ -23,6 +23,15 @@ UUIDv7 wird **ausdrücklich ausgeschlossen**. UUIDv7 ist zeitbasiert/zufallsbeha
 2. **Schema-Version 2:** Manifest & SSTable Version 2 kennzeichnet das 128-Bit-Format.
 3. **Migrations-Tool:** `cargo xtask migrate-docid-128` führt die deterministische Re-Derivierung von 64-Bit V1-Exports in 128-Bit V2-Exports durch.
 
+## Feature Unification & Codebase Architecture Guidelines
+Nur `contextra-types` verzweigt per conditional compilation (`#[cfg(feature = "docid-128")]`) auf die tatsächliche Repräsentation von `DocId` (`u64` vs. `u128`).
+Alle anderen Crates verwenden ausschließlich die breitenagnostische API:
+- Type alias `DocIdRaw`
+- Constant `DocId::BYTES`
+- Conversion methods `DocId::raw()`, `DocId::to_le_bytes()`, `DocId::from_le_bytes()`
+
+Die Feature-Flags `docid-128` aller nachgelagerten Crates sind reine Weiterreichungen an `contextra-types/docid-128` und werden NICHT in `#[cfg]` zur Verzweigung der Typbreite verwendet, um Cargo Feature Unification Type Mismatches zu verhindern.
+
 ## Konsequenzen
 * `GESAMTSPEZIFIKATION.md` und `ARCHITECTURE.md` dokumentieren normativ die v0.x 100-Mio.-Dokumenten-Grenze sowie das 128-Bit V2-Schema.
 * Downstream-Crates (`contextra-store`, `-index`, `-graph`, `-db`, `-mcp`, `-py`) werden in separaten Folge-Prompts auf `docid-128` umgestellt.

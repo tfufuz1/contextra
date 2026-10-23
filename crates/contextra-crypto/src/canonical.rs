@@ -63,18 +63,10 @@ impl CanonicalWriter {
 
     /// Appends a `DocId` value.
     ///
-    /// In default configuration (`DocId` wraps `u64`), writes 8 LE bytes (identical to `write_u64`).
-    #[cfg(not(feature = "docid-128"))]
-    pub fn write_doc_id(&mut self, tag: u16, id: contextra_types::DocId) {
-        self.write_u64(tag, id.0);
-    }
-
-    /// Appends a `DocId` value in 128-bit configuration.
-    ///
+    /// In default configuration (`DocId` wraps `u64`), writes 8 LE bytes.
     /// In `docid-128` configuration (`DocId` wraps `u128`), writes 16 LE bytes.
-    #[cfg(feature = "docid-128")]
     pub fn write_doc_id(&mut self, tag: u16, id: contextra_types::DocId) {
-        self.write_bytes(tag, id.0.to_le_bytes().to_vec());
+        self.write_bytes(tag, id.to_le_bytes().to_vec());
     }
 
     /// Appends a bool value (1 byte: 1 for true, 0 for false).
