@@ -16,7 +16,7 @@ pub enum EdgeType {
 
 /// Edge structure in CSR graph representation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CsrEdge {
+pub struct Edge {
     pub target: EntityId,
     pub weight: f32,
     pub edge_type: EdgeType,
@@ -26,9 +26,7 @@ pub struct CsrEdge {
     pub traversal_weight: f32, // τ_ij, initialisiert mit 0.0
 }
 
-pub type Edge = CsrEdge;
-
-impl CsrEdge {
+impl Edge {
     pub fn new(target: EntityId, weight: f32) -> Self {
         Self {
             target,

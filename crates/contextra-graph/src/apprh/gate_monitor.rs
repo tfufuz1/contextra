@@ -192,7 +192,7 @@ impl ApprhGateMonitor {
                         min_overlap = rec.top_k_overlap;
                     }
                     if rec.discrepancy {
-                        disc_count = disc_count.saturating_add(1);
+                        disc_count += 1;
                     }
                 }
 

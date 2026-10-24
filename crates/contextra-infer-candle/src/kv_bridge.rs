@@ -11,11 +11,9 @@
 
 use bytes::Bytes;
 use contextra_crypto::EncryptedKvLayer;
-use contextra_crypto::KvSegmentCipher;
 #[cfg(test)]
-use contextra_kvcache::KvSegment;
-#[cfg(feature = "kv-bridge")]
-use contextra_kvcache::TenantIsolatedKvStore;
+use contextra_crypto::KvSegment;
+use contextra_crypto::{KvSegmentCipher, TenantIsolatedKvStore};
 use contextra_ports::{ContextSegment, KvBridgeStorage};
 use contextra_types::{ModelFingerprint, TenantId, TxId};
 use serde::{Deserialize, Serialize};
@@ -301,17 +299,9 @@ impl std::fmt::Debug for KvBridgeAdapter {
 }
 
 #[cfg(test)]
-#[allow(
-    deprecated,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing
-)]
 mod tests {
     use super::*;
-    use contextra_crypto::CryptoKey;
-    use contextra_kvcache::EvictionWorker;
+    use contextra_crypto::{CryptoKey, EvictionWorker};
     use contextra_ports::BoxFuture;
     use contextra_types::Result;
     use std::collections::HashMap;
@@ -351,7 +341,7 @@ mod tests {
 
     fn create_test_adapter() -> KvBridgeAdapter {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
         KvBridgeAdapter::new(store, cipher)
     }
@@ -466,7 +456,7 @@ mod tests {
     #[test]
     fn test_with_lsm_fallback_without_lsm_store() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
         let adapter = KvBridgeAdapter::new(store, cipher);
 
@@ -479,7 +469,7 @@ mod tests {
     #[tokio::test]
     async fn test_lsm_fallback_ram_hit() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
         let mock_store = Arc::new(MockKvStorage::default());
 
@@ -499,7 +489,7 @@ mod tests {
     #[tokio::test]
     async fn test_lsm_fallback_ram_miss_lsm_hit() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
         let mock_store = Arc::new(MockKvStorage::default());
 
@@ -539,7 +529,7 @@ mod tests {
     #[tokio::test]
     async fn test_lsm_fallback_ram_miss_lsm_miss() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
         let mock_store = Arc::new(MockKvStorage::default());
 
@@ -554,7 +544,7 @@ mod tests {
     #[tokio::test]
     async fn test_lsm_fallback_fingerprint_mismatch() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
         let mock_store = Arc::new(MockKvStorage::default());
 
@@ -596,7 +586,7 @@ mod tests {
     async fn test_lsm_fallback_golden_zero_copy_async_bytes() {
         let master_km =
             CryptoKey::try_new("test-passphrase-golden", b"test-salt-golden123").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::with_capacity(1));
         let mock_store = Arc::new(MockKvStorage::default());
 
@@ -630,7 +620,7 @@ mod tests {
     #[tokio::test]
     async fn test_lsm_fallback_eviction_triggers_spill() {
         let master_km = CryptoKey::try_new("test-passphrase-kv", b"test-salt-12345").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         // Create store with capacity of 1 segment per tenant
         let store = Arc::new(TenantIsolatedKvStore::with_capacity(1));
         let mock_store = Arc::new(MockKvStorage::default());
@@ -662,7 +652,7 @@ mod tests {
     #[test]
     fn test_concurrency_parallel_requests_and_eviction() {
         let master_km = CryptoKey::try_new("concurrency-passphrase", b"salt-987654321").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
         let adapter = KvBridgeAdapter::new(Arc::clone(&store), cipher);
 

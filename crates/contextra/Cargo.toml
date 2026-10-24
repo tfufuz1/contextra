@@ -25,6 +25,7 @@ serde_json = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
 contextra-infer-candle = { workspace = true, optional = true }
 contextra-infer-ollama = { workspace = true, optional = true }
+contextra-infer-onnx = { workspace = true, optional = true }
 contextra-router = { workspace = true, optional = true }
 contextra-rank = { workspace = true, optional = true }
 tokio = { workspace = true }
@@ -32,60 +33,16 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-criterion = { workspace = true }
-contextra-license = { workspace = true, features = ["test-support"] }
-
-[[bench]]
-name = "competitive_bench"
-path = "../../benches/competitive_bench.rs"
-harness = false
-
-[[bench]]
-name = "migration_benchmarks"
-path = "../../benches/migration_benchmarks.rs"
-harness = false
-
-[[bench]]
-name = "relate_bench"
-path = "../../benches/relate_bench.rs"
-harness = false
-
-[[bench]]
-name = "rrf_scale_bench"
-path = "../../benches/rrf_scale_bench.rs"
-harness = false
-
-[[bench]]
-name = "scale_bench"
-path = "../../benches/scale_bench.rs"
-harness = false
-
-[[example]]
-name = "quickstart"
-path = "../../examples/quickstart.rs"
-
-[[example]]
-name = "hybrid_search"
-path = "../../examples/hybrid_search.rs"
-
-[[example]]
-name = "collections"
-path = "../../examples/collections.rs"
-
-[[example]]
-name = "governance_fixtures"
-path = "../../examples/governance_fixtures.rs"
 
 [features]
-default = ["fast"]
+default = ["fast", "candle"]
 fast = []
-erasure = ["contextra-store/erasure"]
-encryption-at-rest = ["contextra-store/encryption-at-rest", "contextra-db/encryption-at-rest"]
 docid-128 = ["contextra-types/docid-128"]
 sovereign = ["contextra-crypto", "contextra-privacy"]
 compliance = ["sovereign", "audit-export", "avv-generator"]
 audit-export = ["dep:contextra-audit-export"]
 avv-generator = ["dep:contextra-avv-generator"]
+onnx = ["contextra-infer-onnx/onnx", "contextra-db/onnx"]
 candle = ["contextra-infer-candle"]
 ollama = ["contextra-infer-ollama"]
 router = ["contextra-router", "contextra-rank"]

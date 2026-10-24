@@ -1,6 +1,6 @@
 use super::*;
 use bytes::Bytes;
-use contextra_types::ContextraError;
+use contextra_core::ContextraError;
 use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 
@@ -84,7 +84,7 @@ async fn test_block_bloom_filter_v4() {
 }
 
 #[test]
-fn test_binary_search_first_index_duplicate_keys_returns_first_index() {
+fn test_block_binary_search_duplicate_keys_returns_first_index() {
     let mut builder = BlockBuilder::new(4096);
     // Add 3 versions for key "dup_key" in descending sequence order
     builder.add(b"dup_key", b"v3", 30, 1);
@@ -123,174 +123,6 @@ fn test_binary_search_first_index_duplicate_keys_returns_first_index() {
     )
     .expect("search should succeed"); // #[cfg(test)]
     assert_eq!(first_idx, Some(0));
-}
-
-#[test]
-fn test_block_search_functions_all_return_first_index_for_multi_version_keys() {
-    let mut builder = BlockBuilder::new(4096);
-    // Add multiple version entries for "key_a" in descending sequence order
-    builder.add(b"key_a", b"v3", 300, 1);
-    builder.add(b"key_a", b"v2", 200, 1);
-    builder.add(b"key_a", b"v1", 100, 1);
-    // Add subsequent key "key_b"
-    builder.add(b"key_b", b"v1", 50, 1);
-
-    let block = builder.build();
-    let n = block.len();
-    let num_offsets = u32::from_le_bytes(block[n - 4..n].try_into().unwrap()) as usize;
-    let offsets_start = n - 8 - (num_offsets * 4);
-
-    let first_idx = block_search::binary_search_first_index_in_block(
-        &block,
-        offsets_start,
-        num_offsets,
-        b"key_a",
-        true,
-    )
-    .expect("search first index should succeed");
-    assert_eq!(first_idx, Some(0));
-
-    let index_res = block_search::binary_search_index_in_block(
-        &block,
-        offsets_start,
-        num_offsets,
-        b"key_a",
-        true,
-    )
-    .expect("search index should succeed");
-    assert_eq!(index_res, Ok(0));
-
-    let entry_res = block_search::binary_search_entry_in_block(
-        &block,
-        offsets_start,
-        num_offsets,
-        b"key_a",
-        true,
-    )
-    .expect("search entry should succeed");
-    assert!(entry_res.is_some());
-}
-
-use proptest::prelude::*;
-
-proptest! {
-    #[test]
-    fn proptest_block_search_multi_version_consistency(
-        num_versions in 1usize..=10,
-        num_neighbors in 0usize..=5
-    ) {
-        let mut builder = BlockBuilder::new(16 * 1024);
-        let target_key = b"target_key";
-
-        for i in 0..num_neighbors {
-            let k = format!("a_neighbor_{:02}", i);
-            builder.add(k.as_bytes(), b"val", 10, 1);
-        }
-
-        for i in (0..num_versions).rev() {
-            let seq = (i as u64 + 1) * 10;
-            let val = format!("v_{}", seq);
-            builder.add(target_key, val.as_bytes(), seq, 1);
-        }
-
-        for i in 0..num_neighbors {
-            let k = format!("z_neighbor_{:02}", i);
-            builder.add(k.as_bytes(), b"val", 10, 1);
-        }
-
-        let block = builder.build();
-        let n = block.len();
-        let num_offsets = u32::from_le_bytes(block[n - 4..n].try_into().unwrap()) as usize;
-        let offsets_start = n - 8 - (num_offsets * 4);
-
-        let expected_first_idx = num_neighbors;
-
-        let first_idx = block_search::binary_search_first_index_in_block(
-            &block,
-            offsets_start,
-            num_offsets,
-            target_key,
-            true,
-        ).unwrap();
-        prop_assert_eq!(first_idx, Some(expected_first_idx));
-
-        let index_res = block_search::binary_search_index_in_block(
-            &block,
-            offsets_start,
-            num_offsets,
-            target_key,
-            true,
-        ).unwrap();
-        prop_assert_eq!(index_res, Ok(expected_first_idx));
-
-        let entry_res = block_search::binary_search_entry_in_block(
-            &block,
-            offsets_start,
-            num_offsets,
-            target_key,
-            true,
-        ).unwrap();
-        prop_assert!(entry_res.is_some());
-
-    }
-}
-
-#[tokio::test]
-async fn test_reader_e2e_multi_version_point_lookup_never_returns_older_visible_version() {
-    let tmp = TempDir::new().expect("temp dir");
-    let path = tmp.path().join("reader_multi_version_e2e.sst");
-    let bc = create_block_cache(1);
-
-    let mut builder = SstableBuilder::create(&path).await.expect("create builder");
-
-    // Add 5 versions for key "mv_key" in descending seq order
-    builder
-        .add(b"mv_key", b"val_v5_seq50", 50, 5)
-        .await
-        .unwrap();
-    builder
-        .add(b"mv_key", b"val_v4_seq40", 40, 4)
-        .await
-        .unwrap();
-    builder
-        .add(b"mv_key", b"val_v3_seq30", 30, 3)
-        .await
-        .unwrap();
-    builder
-        .add(b"mv_key", b"val_v2_seq20", 20, 2)
-        .await
-        .unwrap();
-    builder
-        .add(b"mv_key", b"val_v1_seq10", 10, 1)
-        .await
-        .unwrap();
-
-    builder.finish().await.expect("finish builder");
-
-    let reader = SstableReader::open(&path, bc).await.expect("open reader");
-
-    // Standard point lookup at max_seq=u64::MAX -> MUST return newest version v5 (seq 50)
-    let res_latest = reader.get(b"mv_key").await.unwrap().expect("must exist");
-    assert_eq!(res_latest.0.as_ref(), b"val_v5_seq50");
-    assert_eq!(res_latest.1, 50);
-
-    // Point lookup bounded at max_seq=35 -> MUST return newest visible version v3 (seq 30)
-    let res_bounded_35 = reader
-        .get_at(b"mv_key", 35, u64::MAX)
-        .await
-        .unwrap()
-        .expect("must exist");
-    assert_eq!(res_bounded_35.0.as_ref(), b"val_v3_seq30");
-    assert_eq!(res_bounded_35.1, 30);
-
-    // Point lookup bounded at max_seq=15 -> MUST return newest visible version v1 (seq 10)
-    let res_bounded_15 = reader
-        .get_at(b"mv_key", 15, u64::MAX)
-        .await
-        .unwrap()
-        .expect("must exist");
-    assert_eq!(res_bounded_15.0.as_ref(), b"val_v1_seq10");
-    assert_eq!(res_bounded_15.1, 10);
 }
 
 #[tokio::test]

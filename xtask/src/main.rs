@@ -1,4 +1,9 @@
-#[cfg_attr(not(test), allow(dead_code))]
+// TODO P-G8: Lint hinzufügen der bei `unsafe fn` mit zwei gleichnamigen Slice-Parametern
+// (z.B. `a: &[u8], b: &[u8]`) prüft, ob `let n = a.len().min(b.len())` oder ein
+// äquivalenter Längen-Check vorhanden ist. Implementierung: `cargo-geiger` oder
+// ein custom `proc-macro`-basierter Lint via `dylint`.
+
+#[allow(dead_code)]
 fn chrono_or_today_with_tags(tags: &[TagItem]) -> String {
     let mut latest_tag_date = String::new();
     for tag in tags {
@@ -37,7 +42,7 @@ fn chrono_or_today_with_tags(tags: &[TagItem]) -> String {
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 fn chrono_or_today() -> String {
     chrono_or_today_with_tags(&[])
 }
@@ -56,7 +61,6 @@ mod check_audit_duplication;
 mod check_audit_tool_evidence;
 mod check_audit_verdict_independence;
 mod check_bandit_latency_budget;
-mod check_callers;
 mod check_commit_diff_integrity;
 mod check_commit_messages;
 mod check_compile;
@@ -702,7 +706,7 @@ pub fn update_markdown_section(
 }
 
 // NOTE: Konsolidierung mit check-duplicate-intent geprüft (TS: 2026-09-08T00:00:00Z) — unterschiedliche Datenmodelle (Session-Kontinuität-Markdown-Abschnittsgenerierung vs. PR-Commit-Duplikatsprüfungs-Gate), keine sinnvolle Code-Wiederverwendung identifiziert.
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 fn generate_session_continuity_section(tags: &[TagItem]) -> String {
     let root_path = find_root_dir();
     generate_session_continuity_section_from_root(&root_path, tags)
@@ -855,7 +859,7 @@ fn generate_session_continuity_section_from_root(root_path: &Path, tags: &[TagIt
     out
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 fn tokenize_title(title: &str) -> std::collections::HashSet<String> {
     title
         .to_lowercase()
@@ -865,7 +869,7 @@ fn tokenize_title(title: &str) -> std::collections::HashSet<String> {
         .collect()
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 fn jaccard_similarity(
     s1: &std::collections::HashSet<String>,
     s2: &std::collections::HashSet<String>,
@@ -882,7 +886,7 @@ fn jaccard_similarity(
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 fn extract_scope(title: &str) -> String {
     if let Some(start) = title.find('(') {
         if let Some(end) = title[start..].find(')') {
@@ -1123,7 +1127,7 @@ fn generate_dag_topology_section(crates: &[CrateInfo]) -> String {
     out
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 fn format_loc(loc: usize) -> String {
     let s = loc.to_string();
     let mut result = String::new();
@@ -2434,6 +2438,14 @@ fn main() {
                 process::exit(1);
             }
         }
+        "check-commit-diff-integrity" => {
+            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
+            if let Err(e) = check_commit_diff_integrity::run_check_commit_diff_integrity(extra_args)
+            {
+                eprintln!("❌ check-commit-diff-integrity failed: {}", e);
+                process::exit(1);
+            }
+        }
         "check-commit-messages" => {
             if let Err(e) = check_commit_messages::check_commit_messages() {
                 eprintln!("❌ check-commit-messages failed: {}", e);
@@ -2496,12 +2508,6 @@ fn main() {
         "check-bandit-latency-budget" => {
             if let Err(e) = check_bandit_latency_budget::check_bandit_latency_budget() {
                 eprintln!("❌ check-bandit-latency-budget failed: {}", e);
-                process::exit(1);
-            }
-        }
-        "check-callers" => {
-            let extra_args = if args.len() > 2 { &args[2..] } else { &[] };
-            if !check_callers::run_check_callers(extra_args) {
                 process::exit(1);
             }
         }

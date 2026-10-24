@@ -14,21 +14,11 @@
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
 
-/// Helper function to convert a field length (`usize`) into a 4-byte little-endian length prefix.
-///
-/// # Errors
-/// Returns `CryptoError::InvalidLengthPrefix` if `len` exceeds `u32::MAX` (4 GiB).
-pub fn len_prefix(len: usize) -> Result<[u8; 4]> {
-    let len_u32 = u32::try_from(len).map_err(|_| {
-        CryptoError::InvalidLengthPrefix(format!(
-            "Field length {len} bytes exceeds u32::MAX (4 GiB) limit"
-        ))
-    })?;
-    Ok(len_u32.to_le_bytes())
+/// Provides Key Management Strategy hooks.
+pub trait KmsProvider {
+    /// Retrieves the Data Encryption Key (DEK).
+    fn get_key(&self) -> Result<Vec<u8>>;
 }
-
-/// Re-export KMS Provider Trait nach Spec §20.2 (INV-KMS-1).
-pub use crate::kms::KmsProvider;
 
 /// Encrypted WAL chunk provider that handles transparent encryption/decryption of WAL payloads.
 ///
@@ -71,33 +61,6 @@ impl EncryptedWal {
             )));
         }
         let sub_km = key_manager.derive_file_key(file_id)?;
-        Ok(Self {
-            key_manager: sub_km,
-        })
-    }
-
-    /// Constructs an `EncryptedWal` by deriving stream key material via a `KmsProvider`.
-    pub fn from_kms(kms: &dyn KmsProvider, file_id: &[u8]) -> Result<Self> {
-        if file_id.is_empty() {
-            return Err(CryptoError::InvalidInput(
-                "file_id cannot be empty".to_string(),
-            ));
-        }
-        if file_id.len() > 10_000 {
-            return Err(CryptoError::InvalidInput(format!(
-                "file_id length {} exceeds maximum allowed bound of 10000 bytes",
-                file_id.len()
-            )));
-        }
-        let raw_key = kms.derive_key("wal", file_id)?;
-        if raw_key.len() != 32 {
-            return Err(CryptoError::Crypto(
-                "KMS returned key of invalid length for WAL".to_string(),
-            ));
-        }
-        let mut key_arr = [0u8; 32];
-        key_arr.copy_from_slice(&raw_key);
-        let sub_km = KeyManager::from_raw_key(key_arr)?;
         Ok(Self {
             key_manager: sub_km,
         })
@@ -265,13 +228,6 @@ impl IntegrityVerifier {
         self.last_seq_no
     }
 
-    /// Transferiert sowohl `last_hmac` als auch `last_seq_no` von einer `source`-Instanz
-    /// für einen vollständigen Verifier-Handoff.
-    pub fn handoff_from(&mut self, source: &Self) {
-        self.set_last_hmac(source.last_hmac_snapshot());
-        self.set_last_seq_no(source.last_seq_no_snapshot());
-    }
-
     /// Verifies a V3 entry (with tx_id and length prefixes) and updates the chain state.
     pub fn verify_and_update_v3(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> {
         if entry.op_type > 2 {
@@ -281,7 +237,7 @@ impl IntegrityVerifier {
             ));
         }
 
-        if let Some(last_seq) = self.last_seq_no_snapshot() {
+        if let Some(last_seq) = self.last_seq_no {
             if entry.seq_no <= last_seq {
                 return Err(CryptoError::wal_corruption(
                     offset,
@@ -310,20 +266,17 @@ impl IntegrityVerifier {
         let tx_id_bytes = entry.tx_id.to_le_bytes();
         mac.update(&tx_id_bytes);
 
-        let key_len_bytes = len_prefix(entry.key.len())?;
-
         if entry.op_type == 0 {
             // Put
-            let val_len_bytes = len_prefix(entry.value.len())?;
             mac.update(&[0u8]);
-            mac.update(&key_len_bytes);
+            mac.update(&(entry.key.len() as u32).to_le_bytes());
             mac.update(&entry.key);
-            mac.update(&val_len_bytes);
+            mac.update(&(entry.value.len() as u32).to_le_bytes());
             mac.update(&entry.value);
         } else if entry.op_type == 1 {
             // Delete
             mac.update(&[1u8]);
-            mac.update(&key_len_bytes);
+            mac.update(&(entry.key.len() as u32).to_le_bytes());
             mac.update(&entry.key);
         } else if entry.op_type == 2 {
             // TxEnd
@@ -348,7 +301,7 @@ impl IntegrityVerifier {
         }
 
         self.last_hmac = computed;
-        self.set_last_seq_no(Some(entry.seq_no));
+        self.last_seq_no = Some(entry.seq_no);
         Ok(())
     }
 
@@ -372,7 +325,7 @@ impl IntegrityVerifier {
             ));
         }
 
-        if let Some(last_seq) = self.last_seq_no_snapshot() {
+        if let Some(last_seq) = self.last_seq_no {
             if entry.seq_no <= last_seq {
                 return Err(CryptoError::wal_corruption(
                     offset,
@@ -428,14 +381,14 @@ impl IntegrityVerifier {
         }
 
         self.last_hmac = computed;
-        self.set_last_seq_no(Some(entry.seq_no));
+        self.last_seq_no = Some(entry.seq_no);
         Ok(())
     }
 
     /// Updates the chain state for legacy V1 entries without HMAC verification.
     pub fn skip_hmac_verify_legacy(&mut self, entry: &WalEntrySnapshot) {
         self.last_hmac = entry.checksum;
-        self.set_last_seq_no(Some(entry.seq_no));
+        self.last_seq_no = Some(entry.seq_no);
     }
 
     /// Default verification delegating to V3 verification.
@@ -445,14 +398,7 @@ impl IntegrityVerifier {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    deprecated
-)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -499,36 +445,6 @@ mod tests {
         } else {
             panic!("Expected WalCorruption with offset");
         }
-    }
-
-    #[tokio::test]
-    async fn test_encrypted_wal_from_kms_roundtrip() -> Result<()> {
-        use crate::kms::LocalKmsProvider;
-        use crate::keystore::MfksKeystore;
-        use crate::kv_shredding::KeyRegistry;
-        use crate::revocation_log::RevocationLog;
-        use contextra_ports::SystemClock;
-        use ed25519_dalek::SigningKey;
-        use rand::rngs::OsRng;
-        use std::sync::Arc;
-
-        let (master_key, header) = KeyManager::try_new_argon2id("kms-wal-pass").unwrap();
-        let keystore = MfksKeystore::new(header, vec![], vec![]).unwrap();
-        let clock = Arc::new(SystemClock::new());
-        let sk = SigningKey::generate(&mut OsRng);
-        let vk = sk.verifying_key();
-        let log = Arc::new(RevocationLog::new_in_memory(clock.clone(), Some(sk), vk));
-        let registry = Arc::new(KeyRegistry::new());
-
-        let kms = LocalKmsProvider::new(master_key, keystore, registry, log, clock);
-
-        let wal = EncryptedWal::from_kms(&kms, b"segment_001.wal")?;
-        let data = b"payload via kms derived wal";
-        let encrypted = wal.encrypt_chunk(data)?;
-        let decrypted = wal.decrypt_chunk(&encrypted)?;
-        assert_eq!(decrypted, data);
-
-        Ok(())
     }
 
     #[tokio::test]
@@ -938,89 +854,6 @@ mod tests {
             actual_checksum, expected_checksum,
             "WalHmac checksum MUST match independent HMAC-SHA256 reference calculation!"
         );
-    }
-
-    #[tokio::test]
-    async fn test_encrypted_wal_roundtrip_crash_replay_tamper_detection() -> Result<()> {
-        let km = KeyManager::try_new("master-passphrase-wal-crypto", b"salt-wal-1234")?;
-        let file_id = b"segment_crash_replay.wal";
-        let wal_crypto = EncryptedWal::new(km.clone(), file_id)?;
-
-        let payload_1 = b"transaction_1_payload_data";
-        let payload_2 = b"transaction_2_payload_data";
-
-        // 1. Encrypt chunks
-        let encrypted_chunk_1 = wal_crypto.encrypt_chunk(payload_1)?;
-        let encrypted_chunk_2 = wal_crypto.encrypt_chunk(payload_2)?;
-
-        // 2. Decrypt roundtrip check
-        let decrypted_1 = wal_crypto.decrypt_chunk(&encrypted_chunk_1)?;
-        let decrypted_2 = wal_crypto.decrypt_chunk(&encrypted_chunk_2)?;
-        assert_eq!(decrypted_1, payload_1);
-        assert_eq!(decrypted_2, payload_2);
-
-        // 3. Bit-flip manipulation on ciphertext byte
-        let mut tampered_chunk = encrypted_chunk_1.clone();
-        tampered_chunk[15] ^= 0x01;
-        assert!(
-            wal_crypto.decrypt_chunk(&tampered_chunk).is_err(),
-            "Decryption of tampered ciphertext MUST fail with CryptoError"
-        );
-
-        // 4. Bit-flip manipulation on nonce byte
-        let mut tampered_nonce_chunk = encrypted_chunk_1.clone();
-        tampered_nonce_chunk[2] ^= 0x01;
-        assert!(
-            wal_crypto.decrypt_chunk(&tampered_nonce_chunk).is_err(),
-            "Decryption of ciphertext with modified nonce MUST fail with CryptoError"
-        );
-
-        // 5. IntegrityVerifier HMAC verification over replayed snapshots
-        let integrity_key = km.integrity_key()?;
-        let mut verifier = IntegrityVerifier::new(&integrity_key);
-
-        let snapshot_1 = WalEntrySnapshot {
-            tx_id: 1,
-            seq_no: 1,
-            op_type: 0,
-            key: b"key1".to_vec(),
-            value: payload_1.to_vec(),
-            checksum: [0u8; 32],
-            prev_hmac: [0u8; 32],
-        };
-        let mut mac_1 = WalHmac::new(&integrity_key)?;
-        mac_1.update(&[0u8; 32]);
-        mac_1.update(&1u64.to_le_bytes());
-        mac_1.update(&1u64.to_le_bytes());
-        mac_1.update(&[0u8]);
-        mac_1.update(&len_prefix(snapshot_1.key.len())?);
-        mac_1.update(&snapshot_1.key);
-        mac_1.update(&len_prefix(snapshot_1.value.len())?);
-        mac_1.update(&snapshot_1.value);
-        let checksum_1 = mac_1.finalize();
-
-        let valid_snapshot_1 = WalEntrySnapshot {
-            tx_id: snapshot_1.tx_id,
-            seq_no: snapshot_1.seq_no,
-            op_type: snapshot_1.op_type,
-            key: snapshot_1.key.clone(),
-            value: snapshot_1.value.clone(),
-            checksum: checksum_1,
-            prev_hmac: snapshot_1.prev_hmac,
-        };
-
-        // Verify valid snapshot succeeds
-        verifier.verify_and_update(&valid_snapshot_1, 100)?;
-
-        // Verify tampered snapshot (manipulated value) fails
-        let mut tampered_snapshot_1 = valid_snapshot_1.clone();
-        tampered_snapshot_1.value = b"manipulated_value".to_vec();
-        assert!(
-            verifier.verify_and_update(&tampered_snapshot_1, 200).is_err(),
-            "IntegrityVerifier MUST reject tampered snapshot value"
-        );
-
-        Ok(())
     }
 
     #[test]

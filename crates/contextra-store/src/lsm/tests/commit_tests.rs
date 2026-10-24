@@ -167,6 +167,7 @@ async fn test_input_boundary_guards() {
     ));
 }
 
+#[cfg(feature = "fault-injection")]
 #[tokio::test]
 async fn test_lsm_commit_append_failure_restores_hmac() {
     let (storage, _tmp) = test_storage().await;
@@ -179,11 +180,7 @@ async fn test_lsm_commit_append_failure_restores_hmac() {
     let hmac_before = wal.last_hmac_snapshot().await;
     drop(wal);
 
-    // Seal active WAL so append fails during commit
-    {
-        let wal = storage.wal.read().await;
-        wal.rotate_and_seal().await.expect("seal wal");
-    }
+    storage.simulate_wal_append_failure_for_test().await;
 
     let tx2 = TxId::new(2);
     storage.put(tx2, b"k2", b"v2").await.unwrap();
@@ -216,8 +213,7 @@ async fn test_commit_tracks_budget_drift_on_consume_memory_failure() {
 
     let key = b"drift_key";
     let value = vec![b'v'; 60000];
-    let expected_entry_size =
-        (key.len() + value.len() + contextra_mvcc::tx_buffer::STAGING_ENTRY_OVERHEAD_BYTES) as u64;
+    let expected_entry_size = (key.len() + value.len() + 8) as u64;
 
     let tx = TxId::new(1);
     storage.put(tx, key, &value).await.expect("put succeeds");
@@ -262,8 +258,8 @@ async fn test_sequence_numbers_strictly_monotonic_across_concurrent_commits() {
 
     let last_seq = storage.last_seq_no().await.unwrap();
     assert_eq!(
-        last_seq, 20,
-        "10 commits must generate 20 sequence numbers (Put + TxEnd per commit) monotonically"
+        last_seq, 10,
+        "10 commits must generate sequence numbers 1..10 monotonically"
     );
 }
 
@@ -358,6 +354,9 @@ async fn test_system_pressure_wal_queue_backpressure_transition() {
 
 #[tokio::test]
 async fn test_group_commit_leader_releases_commit_mutex_during_disk_io() {
+    use crate::wal::DELAY_APPEND_FOR_TX;
+    use crate::wal::DELAY_APPEND_MS;
+
     let tmp = tempfile::TempDir::new().expect("temp dir");
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),
@@ -378,14 +377,8 @@ async fn test_group_commit_leader_releases_commit_mutex_during_disk_io() {
         .unwrap();
 
     // Inject 500ms delay into append_batch for tx_leader
-    storage
-        .fault_plan()
-        .delay_append_for_tx
-        .store(10, Ordering::SeqCst);
-    storage
-        .fault_plan()
-        .delay_append_ms
-        .store(500, Ordering::SeqCst);
+    DELAY_APPEND_FOR_TX.store(10, Ordering::SeqCst);
+    DELAY_APPEND_MS.store(500, Ordering::SeqCst);
 
     let storage_leader = Arc::clone(&storage);
     let leader_handle = tokio::spawn(async move { storage_leader.commit(tx_leader).await });
@@ -412,14 +405,8 @@ async fn test_group_commit_leader_releases_commit_mutex_during_disk_io() {
     // Clean up tasks and reset fault injection state
     leader_handle.await.expect("leader task").unwrap();
     follower_handle.await.expect("follower task").unwrap();
-    storage
-        .fault_plan()
-        .delay_append_for_tx
-        .store(0, Ordering::SeqCst);
-    storage
-        .fault_plan()
-        .delay_append_ms
-        .store(0, Ordering::SeqCst);
+    DELAY_APPEND_FOR_TX.store(0, Ordering::SeqCst);
+    DELAY_APPEND_MS.store(0, Ordering::SeqCst);
 }
 
 #[tokio::test]
@@ -475,8 +462,8 @@ async fn test_memory_only_commit_restores_hmac() {
 
     let wal = storage.wal.read().await;
     let hmac_after = wal.last_hmac_snapshot().await;
-    assert_ne!(
+    assert_eq!(
         hmac_after, hmac_before,
-        "last_hmac must be updated with batch HMAC for MemoryOnly durability"
+        "last_hmac must be restored to pre-commit state for MemoryOnly durability"
     );
 }

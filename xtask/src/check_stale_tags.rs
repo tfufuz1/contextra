@@ -360,7 +360,6 @@ pub fn check_stale_tags_impl(
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_check_stale_tags(threshold_days: i64, strict: bool) -> Result<(), String> {
     let root = xtask::find_root_dir();
     let now = Utc::now();

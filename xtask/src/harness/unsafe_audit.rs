@@ -250,7 +250,7 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
         }
     }
 
-    let baseline_path = root.join("xtask/config/governance/unsafe-safety-baseline.toml");
+    let baseline_path = root.join("governance/unsafe-safety-baseline.toml");
     let mut baseline_map: BTreeMap<String, usize> = BTreeMap::new();
 
     if baseline_path.exists() {
@@ -294,7 +294,7 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
                     "Missing // SAFETY: comments decreased in {} from {} to {}! Consider lowering baseline.",
                     file, baseline_missing, current_missing
                 ),
-                fix: "Update xtask/config/governance/unsafe-safety-baseline.toml".to_string(),
+                fix: "Update governance/unsafe-safety-baseline.toml".to_string(),
             });
         }
     }

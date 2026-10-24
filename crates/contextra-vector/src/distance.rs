@@ -20,7 +20,7 @@ pub use contextra_simd::{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_types::DistanceMetric;
+    use contextra_core::DistanceMetric;
 
     #[test]
     fn test_compute_distance_f32_bytes_equivalence() {
@@ -171,7 +171,7 @@ mod tests {
         let res = compute_distance(&a, &b, DistanceMetric::Cosine);
         assert!(matches!(
             res,
-            Err(contextra_types::ContextraError::EmbeddingDimensionMismatch {
+            Err(contextra_core::ContextraError::EmbeddingDimensionMismatch {
                 expected: 2,
                 got: 3
             })
@@ -185,7 +185,7 @@ mod tests {
         let res = cosine_distance(&a, &b);
         assert!(matches!(
             res,
-            Err(contextra_types::ContextraError::EmbeddingDimensionMismatch {
+            Err(contextra_core::ContextraError::EmbeddingDimensionMismatch {
                 expected: 2,
                 got: 3
             })
@@ -199,7 +199,7 @@ mod tests {
         let res = euclidean_distance(&a, &b);
         assert!(matches!(
             res,
-            Err(contextra_types::ContextraError::EmbeddingDimensionMismatch {
+            Err(contextra_core::ContextraError::EmbeddingDimensionMismatch {
                 expected: 2,
                 got: 3
             })
@@ -213,7 +213,7 @@ mod tests {
         let res = dot_product_distance(&a, &b);
         assert!(matches!(
             res,
-            Err(contextra_types::ContextraError::EmbeddingDimensionMismatch {
+            Err(contextra_core::ContextraError::EmbeddingDimensionMismatch {
                 expected: 2,
                 got: 3
             })

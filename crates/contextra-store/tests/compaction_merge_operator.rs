@@ -1,10 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_mvcc::SnapshotRegistry;
+use contextra_core::{
+    ContextraError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TOMBSTONE_BIT,
+};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
 use contextra_testkit::ManualClock;
-use contextra_types::{ContextraError, ResourceBudget, ResourceTracker, Result, TOMBSTONE_BIT};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
@@ -91,7 +92,7 @@ async fn test_merge_operator_counter_across_sstables() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, true, None)
+        .merge_sstables(&[reader1, reader2], &out_path, min_seq, true)
         .await
         .unwrap();
 
@@ -144,7 +145,7 @@ async fn test_merge_operator_fail_safe_retains_both() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, false, None)
+        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
         .await
         .unwrap();
 
@@ -215,18 +216,17 @@ async fn test_merge_operator_deterministic_output() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables_with_cancel(
+        .merge_sstables(
             &[reader1.clone(), reader2.clone()],
             &out_path1,
             min_seq,
             true,
-            None,
         )
         .await
         .unwrap();
 
     engine
-        .merge_sstables_with_cancel(&[reader1, reader2], &out_path2, min_seq, true, None)
+        .merge_sstables(&[reader1, reader2], &out_path2, min_seq, true)
         .await
         .unwrap();
 
@@ -288,7 +288,7 @@ async fn test_active_snapshot_prevents_merge() {
 
     // raw_seq of version 3 is >= min_seq (2), so it cannot be merged with version 1
     engine
-        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, false, None)
+        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
         .await
         .unwrap();
 
@@ -364,7 +364,7 @@ async fn test_tombstone_keys_are_not_merged() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, false, None)
+        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
         .await
         .unwrap();
 
@@ -443,7 +443,7 @@ async fn test_merge_operator_fuel_exhausted_fail_safe() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, false, None)
+        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
         .await
         .unwrap();
 
@@ -469,7 +469,7 @@ async fn test_merge_operator_wall_clock_timeout_fail_safe() {
     let dir = tempdir().unwrap();
     let cache = Arc::new(BlockCache::new(1024 * 1024));
     let snapshot_reg = Arc::new(SnapshotRegistry::new());
-    let budget = createtracker(100);
+    let budget = create_tracker(100);
     let manual_clock = Arc::new(ManualClock::new(1_000_000_000));
 
     let sst1_path = dir.path().join("sst1.sst");
@@ -524,7 +524,7 @@ async fn test_merge_operator_wall_clock_timeout_fail_safe() {
     let min_seq = snapshot_reg.min_active_seqno();
 
     engine
-        .merge_sstables_with_cancel(&[reader1, reader2], &out_path, min_seq, false, None)
+        .merge_sstables(&[reader1, reader2], &out_path, min_seq, false)
         .await
         .unwrap();
 
@@ -545,6 +545,42 @@ async fn test_merge_operator_wall_clock_timeout_fail_safe() {
     assert_eq!(val_old.as_ref(), b"old_data");
 }
 
-fn createtracker(mem_mb: usize) -> Arc<ResourceTracker> {
-    create_tracker(mem_mb)
+#[tokio::test]
+async fn test_merge_operator_pure_capabilities_enforcement() {
+    use contextra_sandbox::MergeOperatorCapabilities;
+
+    let pure_caps = MergeOperatorCapabilities::pure();
+    assert!(
+        !pure_caps.allow_stdout,
+        "stdout must be disabled in pure MergeOperatorCapabilities"
+    );
+    assert!(
+        !pure_caps.allow_stderr,
+        "stderr must be disabled in pure MergeOperatorCapabilities"
+    );
+    assert!(
+        !pure_caps.allow_filesystem,
+        "filesystem must be disabled in pure MergeOperatorCapabilities"
+    );
+    assert!(
+        !pure_caps.allow_network,
+        "network must be disabled in pure MergeOperatorCapabilities"
+    );
+    assert!(
+        !pure_caps.allow_clock,
+        "clock time access must be disabled in pure MergeOperatorCapabilities"
+    );
+    assert!(
+        pure_caps.random_seed.is_none(),
+        "PRNG seed must be None in pure MergeOperatorCapabilities"
+    );
+    assert_eq!(pure_caps.max_fuel, 10_000_000);
+    assert_eq!(pure_caps.max_wall_clock_ms, 5_000);
+
+    let config = CompactionConfig::default();
+    assert_eq!(config.merge_max_fuel, pure_caps.max_fuel);
+    assert_eq!(
+        config.merge_wall_clock_timeout,
+        Duration::from_millis(pure_caps.max_wall_clock_ms)
+    );
 }

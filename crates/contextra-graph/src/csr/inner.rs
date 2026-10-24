@@ -149,15 +149,6 @@ impl GraphInner {
     }
 
     #[inline]
-    pub fn entity_exists(&self, id: EntityId) -> bool {
-        if let Some(&idx) = self.id_map.get(&id) {
-            self.entity_at(idx).is_some()
-        } else {
-            false
-        }
-    }
-
-    #[inline]
     pub(crate) fn entity_at(&self, idx: usize) -> Option<&Entity> {
         self.entities.get(idx).filter(|e| e.id != EntityId::new(0))
     }
@@ -473,8 +464,8 @@ impl GraphInner {
             if self.out_weight_sums.len() < num_nodes {
                 self.out_weight_sums.resize(num_nodes, 0.0);
             }
-            if let Some(ows) = self.out_weight_sums.get_mut(node_idx) {
-                *ows += weight;
+            if node_idx < self.out_weight_sums.len() {
+                self.out_weight_sums[node_idx] += weight;
             }
         }
     }
@@ -488,22 +479,18 @@ impl GraphInner {
             self.out_weight_sums.resize(num_nodes, 0.0);
         }
         if self.entity_at(node_idx).is_none() {
-            if let Some(ows) = self.out_weight_sums.get_mut(node_idx) {
-                *ows = 0.0;
-            }
+            self.out_weight_sums[node_idx] = 0.0;
             return;
         }
 
         let mut sum = 0.0f32;
 
-        let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
-        if node_idx < offsets_len_minus_1 {
-            let start = *self.offsets.get(node_idx).unwrap_or(&0);
-            let next_i = node_idx.saturating_add(1);
-            let end = *self.offsets.get(next_i).unwrap_or(&0);
+        if node_idx < self.offsets.len() - 1 {
+            let start = self.offsets[node_idx];
+            let end = self.offsets[node_idx + 1];
             for j in start..end {
-                let Some(&target) = self.targets.get(j) else { continue };
-                let w = *self.weights.get(j).unwrap_or(&0.0);
+                let target = self.targets[j];
+                let w = self.weights[j];
                 if !self.tombstoned_edges.contains(&(node_idx, target))
                     && self.entity_at(target).is_some()
                     && w > 0.0
@@ -525,18 +512,15 @@ impl GraphInner {
             }
         }
 
-        if let Some(ows) = self.out_weight_sums.get_mut(node_idx) {
-            *ows = sum;
-        }
+        self.out_weight_sums[node_idx] = sum;
     }
 
     /// Compacts pending edges in the delta buffer into the main CSR arrays.
     pub fn compact(&mut self) {
         let num_nodes = self.reverse_map.len();
 
-        let num_nodes_plus_1 = num_nodes.saturating_add(1);
         if self.pending_edges.is_empty() && self.tombstoned_edges.is_empty() {
-            while self.offsets.len() < num_nodes_plus_1 {
+            while self.offsets.len() < num_nodes + 1 {
                 let last = *self.offsets.last().unwrap_or(&0);
                 self.offsets.push(last);
             }
@@ -547,56 +531,50 @@ impl GraphInner {
             return;
         }
 
-        let mut new_offsets = Vec::with_capacity(num_nodes_plus_1);
-        let mut new_targets = Vec::with_capacity(self.targets.len().saturating_add(self.pending_edge_count));
-        let mut new_weights = Vec::with_capacity(self.weights.len().saturating_add(self.pending_edge_count));
+        let mut new_offsets = Vec::with_capacity(num_nodes + 1);
+        let mut new_targets = Vec::with_capacity(self.targets.len() + self.pending_edge_count);
+        let mut new_weights = Vec::with_capacity(self.weights.len() + self.pending_edge_count);
         let mut new_tx_valid_froms =
-            Vec::with_capacity(self.tx_valid_froms.len().saturating_add(self.pending_edge_count));
+            Vec::with_capacity(self.tx_valid_froms.len() + self.pending_edge_count);
         let mut new_tx_valid_tos =
-            Vec::with_capacity(self.tx_valid_tos.len().saturating_add(self.pending_edge_count));
+            Vec::with_capacity(self.tx_valid_tos.len() + self.pending_edge_count);
         let mut new_business_valid_froms =
-            Vec::with_capacity(self.business_valid_froms.len().saturating_add(self.pending_edge_count));
+            Vec::with_capacity(self.business_valid_froms.len() + self.pending_edge_count);
         let mut new_business_valid_tos =
-            Vec::with_capacity(self.business_valid_tos.len().saturating_add(self.pending_edge_count));
+            Vec::with_capacity(self.business_valid_tos.len() + self.pending_edge_count);
         let mut new_source_doc_ids =
-            Vec::with_capacity(self.source_doc_ids.len().saturating_add(self.pending_edge_count));
+            Vec::with_capacity(self.source_doc_ids.len() + self.pending_edge_count);
 
-        let mut current_offset: usize = 0;
+        let mut current_offset = 0;
         new_offsets.push(current_offset);
 
         for i in 0..num_nodes {
             let mut node_edges = Vec::new();
 
             // 1. Get neighbors from old CSR
-            let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
-            let old_start = if i < offsets_len_minus_1 {
-                *self.offsets.get(i).unwrap_or(&0)
+            let old_start = if i < self.offsets.len() - 1 {
+                self.offsets[i]
             } else {
                 0
             };
-            let old_end = if i < offsets_len_minus_1 {
-                let next_i = i.saturating_add(1);
-                *self.offsets.get(next_i).unwrap_or(&0)
+            let old_end = if i < self.offsets.len() - 1 {
+                self.offsets[i + 1]
             } else {
                 0
             };
 
-            let safe_start = old_start.min(self.targets.len());
-            let safe_end = old_end.clamp(safe_start, self.targets.len());
-
-            for j in safe_start..safe_end {
-                if let Some(&target) = self.targets.get(j) {
-                    if !self.tombstoned_edges.contains(&(i, target)) {
-                        node_edges.push(EdgePayload {
-                            target,
-                            weight: self.weights.get(j).copied().unwrap_or(1.0),
-                            tx_valid_from: self.tx_valid_from_at(j),
-                            tx_valid_to: self.tx_valid_to_at(j),
-                            business_valid_from: self.business_valid_from_at(j),
-                            business_valid_to: self.business_valid_to_at(j),
-                            source_doc_id: self.source_doc_id_at(j),
-                        });
-                    }
+            for j in old_start..old_end {
+                let target = self.targets[j];
+                if !self.tombstoned_edges.contains(&(i, target)) {
+                    node_edges.push(EdgePayload {
+                        target,
+                        weight: self.weights[j],
+                        tx_valid_from: self.tx_valid_from_at(j),
+                        tx_valid_to: self.tx_valid_to_at(j),
+                        business_valid_from: self.business_valid_from_at(j),
+                        business_valid_to: self.business_valid_to_at(j),
+                        source_doc_id: self.source_doc_id_at(j),
+                    });
                 }
             }
 
@@ -620,20 +598,13 @@ impl GraphInner {
                 new_business_valid_froms.push(edge.business_valid_from.unwrap_or(i64::MIN));
                 new_business_valid_tos.push(edge.business_valid_to.unwrap_or(i64::MIN));
                 new_source_doc_ids.push(edge.source_doc_id.unwrap_or(DocId::new(0)));
-                if let Some(next_offset) = current_offset.checked_add(1) {
-                    current_offset = next_offset;
-                } else {
-                    tracing::error!(
-                        "CSR offset arithmetic overflow at usize boundary during compaction"
-                    );
-                    break;
-                }
+                current_offset += 1;
             }
 
             new_offsets.push(current_offset);
         }
 
-        while new_offsets.len() < num_nodes_plus_1 {
+        while new_offsets.len() < num_nodes + 1 {
             let last = *new_offsets.last().unwrap_or(&0);
             new_offsets.push(last);
         }
@@ -655,28 +626,22 @@ impl GraphInner {
 
         // Recompute out_weight_sums for all nodes during compaction
         self.out_weight_sums.resize(num_nodes, 0.0);
-        let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
         for i in 0..num_nodes {
             if self.entity_at(i).is_none() {
-                if let Some(ows) = self.out_weight_sums.get_mut(i) {
-                    *ows = 0.0;
-                }
+                self.out_weight_sums[i] = 0.0;
                 continue;
             }
-            let start = if i < offsets_len_minus_1 { *self.offsets.get(i).unwrap_or(&0) } else { 0 };
-            let next_i = i.saturating_add(1);
-            let end = if i < offsets_len_minus_1 { *self.offsets.get(next_i).unwrap_or(&0) } else { 0 };
+            let start = self.offsets[i];
+            let end = self.offsets[i + 1];
             let mut sum = 0.0f32;
             for j in start..end {
-                let Some(&target) = self.targets.get(j) else { continue };
-                let w = *self.weights.get(j).unwrap_or(&0.0);
+                let target = self.targets[j];
+                let w = self.weights[j];
                 if self.entity_at(target).is_some() && w > 0.0 {
                     sum += w;
                 }
             }
-            if let Some(ows) = self.out_weight_sums.get_mut(i) {
-                *ows = sum;
-            }
+            self.out_weight_sums[i] = sum;
         }
     }
 }
@@ -696,12 +661,10 @@ impl GraphInner {
             .get(&from_idx)
             .is_some_and(|edges| edges.iter().any(|e| e.target == to_idx));
 
-        let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
-        let exists_csr = if from_idx < offsets_len_minus_1 {
-            let start = *self.offsets.get(from_idx).unwrap_or(&0);
-            let next_i = from_idx.saturating_add(1);
-            let end = *self.offsets.get(next_i).unwrap_or(&0);
-            self.targets.get(start..end).map_or(false, |slice| slice.contains(&to_idx))
+        let exists_csr = if from_idx < self.offsets.len() - 1 {
+            let start = self.offsets[from_idx];
+            let end = self.offsets[from_idx + 1];
+            self.targets[start..end].contains(&to_idx)
         } else {
             false
         };
@@ -721,13 +684,12 @@ impl GraphInner {
                 None
             }
             .unwrap_or_else(|| {
-                if from_idx < offsets_len_minus_1 {
-                    let start = *self.offsets.get(from_idx).unwrap_or(&0);
-                    let next_i = from_idx.saturating_add(1);
-                    let end = *self.offsets.get(next_i).unwrap_or(&0);
+                if from_idx < self.offsets.len() - 1 {
+                    let start = self.offsets[from_idx];
+                    let end = self.offsets[from_idx + 1];
                     for j in start..end {
-                        if self.targets.get(j) == Some(&to_idx) {
-                            return *self.weights.get(j).unwrap_or(&1.0);
+                        if self.targets[j] == to_idx {
+                            return self.weights[j];
                         }
                     }
                 }
@@ -757,16 +719,13 @@ impl GraphInner {
                     }
                 }
             }
-            let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
-            if from_idx < offsets_len_minus_1 {
-                let start = *self.offsets.get(from_idx).unwrap_or(&0);
-                let next_i = from_idx.saturating_add(1);
-                let end = *self.offsets.get(next_i).unwrap_or(&0);
+            if from_idx < self.offsets.len() - 1 {
+                let start = self.offsets[from_idx];
+                let end = self.offsets[from_idx + 1];
                 for j in start..end {
-                    let Some(&t_idx) = self.targets.get(j) else { continue };
-                    let w = *self.weights.get(j).unwrap_or(&1.0);
+                    let t_idx = self.targets[j];
                     if let Some(&t_id) = self.reverse_map.get(t_idx) {
-                        target_ids.push((t_id, w));
+                        target_ids.push((t_id, self.weights[j]));
                     }
                 }
             }
@@ -814,16 +773,12 @@ impl GraphInner {
                     }
 
                     // Update in CSR arrays
-                    let offsets_len_minus_1 = self.offsets.len().saturating_sub(1);
-                    if from_idx < offsets_len_minus_1 {
-                        let start = *self.offsets.get(from_idx).unwrap_or(&0);
-                        let next_i = from_idx.saturating_add(1);
-                        let end = *self.offsets.get(next_i).unwrap_or(&0);
+                    if from_idx < self.offsets.len() - 1 {
+                        let start = self.offsets[from_idx];
+                        let end = self.offsets[from_idx + 1];
                         for j in start..end {
-                            if self.targets.get(j) == Some(&to_idx) {
-                                if let Some(w_ref) = self.weights.get_mut(j) {
-                                    *w_ref = new_weight;
-                                }
+                            if self.targets[j] == to_idx {
+                                self.weights[j] = new_weight;
                             }
                         }
                     }
@@ -833,34 +788,10 @@ impl GraphInner {
     }
 }
 
-/// RAII guard wrapping the writer mutex guard, publishing updated `Arc<GraphInner>` snapshots
-/// to `ArcSwap` when explicitly committed via `commit()`.
-///
-/// Implements Copy-on-Write (CoW) / lazy clone tracking:
-/// `write_state` is only cloned when a mutating method (`deref_mut`) is actually called.
-/// If dropped without calling `commit()`, rollback clones the snapshot ONLY if mutations occurred.
-pub struct InnerWriteGuard<'a> {
+/// RAII guard wrapping the writer mutex guard, automatically publishing updated `Arc<GraphInner>` snapshots to `ArcSwap` on drop.
+pub(crate) struct InnerWriteGuard<'a> {
     pub(crate) guard: parking_lot::MutexGuard<'a, GraphInner>,
     pub(crate) arc_swap: &'a ArcSwap<GraphInner>,
-    pub(crate) committed: bool,
-    pub(crate) mutated: bool,
-}
-
-impl<'a> InnerWriteGuard<'a> {
-    /// Returns whether any mutation was performed on this write guard via `DerefMut`.
-    #[inline]
-    pub fn is_mutated(&self) -> bool {
-        self.mutated
-    }
-
-    /// Explicitly commits in-memory mutations to `ArcSwap` for RCU readers.
-    #[inline]
-    pub fn commit(mut self) {
-        self.committed = true;
-        if self.mutated {
-            self.arc_swap.store(Arc::new((*self.guard).clone()));
-        }
-    }
 }
 
 impl<'a> std::ops::Deref for InnerWriteGuard<'a> {
@@ -872,17 +803,12 @@ impl<'a> std::ops::Deref for InnerWriteGuard<'a> {
 
 impl<'a> std::ops::DerefMut for InnerWriteGuard<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.mutated = true;
         &mut self.guard
     }
 }
 
 impl<'a> Drop for InnerWriteGuard<'a> {
     fn drop(&mut self) {
-        if !self.committed && self.mutated {
-            // Roll back write_state to current ArcSwap snapshot only when mutated
-            let current_snapshot = self.arc_swap.load_full();
-            *self.guard = (*current_snapshot).clone();
-        }
+        self.arc_swap.store(Arc::new((*self.guard).clone()));
     }
 }

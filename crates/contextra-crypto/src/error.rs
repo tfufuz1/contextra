@@ -21,9 +21,6 @@ pub enum CryptoError {
     #[error("invalid nonce or key length: {0}")]
     InvalidLength(String),
 
-    #[error("invalid length prefix: {0}")]
-    InvalidLengthPrefix(String),
-
     #[error("integrity check failed: authentication tag mismatch")]
     IntegrityViolation,
 
@@ -60,9 +57,6 @@ pub enum CryptoError {
 
     #[error("key or group has been revoked: {0}")]
     KeyRevoked(String),
-
-    #[error("durability proof required: operation is not durable (MemoryOnly storage or missing fsync proof)")]
-    NotDurable,
 }
 
 impl CryptoError {
@@ -80,7 +74,6 @@ impl From<CryptoError> for contextra_types::ContextraError {
         match e {
             CryptoError::WalCorruption { offset, reason } => Self::wal_corruption(offset, reason),
             CryptoError::InvalidInput(msg) => Self::InvalidInput(msg),
-            CryptoError::InvalidLengthPrefix(msg) => Self::InvalidInput(msg),
             CryptoError::KvFormatVersionMismatch { expected, found } => Self::InvalidInput(
                 format!("KV cache format version mismatch: expected {expected}, found {found}"),
             ),
@@ -91,8 +84,6 @@ impl From<CryptoError> for contextra_types::ContextraError {
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
-
     use super::*;
     use contextra_types::ContextraError;
 

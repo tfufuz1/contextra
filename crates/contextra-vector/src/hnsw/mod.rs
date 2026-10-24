@@ -9,10 +9,7 @@
 pub mod adaptive_ef;
 pub mod arena;
 pub mod deletion;
-pub mod residue_scan;
 pub mod sq8_bias;
-pub mod verify;
-pub mod witness;
 
 mod acorn_filtered;
 mod batch;
@@ -20,8 +17,7 @@ mod config;
 mod core_insert;
 mod core_rebuild;
 mod core_search;
-pub(crate) mod types;
-pub use types::VectorSeededRng;
+mod types;
 mod vector_index_impl;
 
 #[cfg(test)]
@@ -32,10 +28,7 @@ pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
 pub use config::{HnswConfig, HnswConfigBuilder};
 pub use deletion::{DeletionStats, GhostFreeVectorIndex};
-pub use residue_scan::{HnswResidueReport, ResDepth, ResHnswEvidence};
 pub use sq8_bias::Sq8Bias;
-pub use verify::{GhostScan, GhostVerificationReport, IncompleteReason};
-pub use witness::{HnwIssueArgs, HnwNoClaim};
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,
     RebuildStatus, SnapshotPinGuard, VectorData, HNSW_REBUILD_DELETION_RATIO,

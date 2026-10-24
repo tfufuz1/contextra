@@ -2,7 +2,7 @@
 
 use contextra_ports::{StorageEngine, TextIndex};
 use contextra_text::InvertedIndex;
-use contextra_types::{DocId, DocIdRaw, TxId};
+use contextra_types::{DocId, TxId};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -213,13 +213,14 @@ impl StorageEngine for MockStorage {
     }
 }
 
+#[cfg(feature = "docid-128")]
 #[tokio::test]
 async fn test_docid_128_tombstone_resolution_exceeding_u64_max() -> contextra_types::Result<()> {
     let storage = Arc::new(MockStorage::new());
     let index = InvertedIndex::new(storage.clone(), "docid_128_test");
 
-    // Construct a DocId at upper range of 64-bit / u128 DocIdRaw
-    let large_doc_id = DocId::from(DocIdRaw::from(u64::MAX));
+    // Construct a DocId > u64::MAX
+    let large_doc_id = DocId::new((u64::MAX as u128) + 42);
 
     // 1. Upsert document with large DocId
     let tx1 = TxId::new(1);

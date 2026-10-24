@@ -1,11 +1,3 @@
-#![allow(
-    deprecated,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing
-)]
-
 // FILE-CONTEXT
 // STAND: 2026-09-13T01:42:00Z (SESSION: 50c8c755)
 // ZWECK: Integration tests for KV-Bridge fail-open behavior, fingerprint mismatches, GASP grounding, and backpressure saturation.
@@ -14,11 +6,10 @@
 #[cfg(feature = "kv-bridge")]
 mod tests {
     use candle_core::Device;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher};
+    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
     use contextra_infer_candle::inference::CandleModelInner;
     use contextra_infer_candle::kv_bridge::KvCacheKey;
     use contextra_infer_candle::{CandleLlmClient, GaspValidator, KvBridgeAdapter};
-    use contextra_kvcache::TenantIsolatedKvStore;
     use contextra_ports::ResponseGroundingValidator;
     use contextra_types::{ModelFingerprint, Result, TenantId};
     use std::sync::Arc;
@@ -64,7 +55,7 @@ mod tests {
     fn create_test_kv_bridge() -> KvBridgeAdapter {
         let master_km =
             CryptoKey::try_new("test-passphrase-kv-stress", b"test-salt-99999").unwrap();
-        let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+        let cipher = Arc::new(KvSegmentCipher::new(master_km));
         let store = Arc::new(TenantIsolatedKvStore::new());
         KvBridgeAdapter::new(store, cipher)
     }
@@ -89,7 +80,7 @@ mod tests {
 
         // Store invalid/corrupt bytes under key using another cipher (simulating decryption key mismatch)
         let wrong_km = CryptoKey::try_new("wrong-passphrase-kv", b"test-salt-99999").unwrap();
-        let wrong_cipher = Arc::new(KvSegmentCipher::ephemeral(wrong_km));
+        let wrong_cipher = Arc::new(KvSegmentCipher::new(wrong_km));
         let wrong_adapter = KvBridgeAdapter::new(Arc::clone(&adapter.store), wrong_cipher);
 
         let corrupt_key = KvCacheKey::new(8888, fp.clone(), None);

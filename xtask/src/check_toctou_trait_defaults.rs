@@ -8,7 +8,7 @@ pub struct Violation {
     pub trait_name: String,
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 pub fn run_check_toctou_trait_defaults(root: &Path) -> Result<Vec<Violation>, String> {
     run_check_toctou_trait_defaults_with_options(root, false)
 }

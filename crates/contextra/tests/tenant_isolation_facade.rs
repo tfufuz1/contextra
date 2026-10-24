@@ -1,6 +1,5 @@
 use contextra::{open_with_config, ContextraConfig};
-use contextra_types::error::ContextraError;
-use contextra_types::types::domain::TenantId;
+use contextra_core::{ContextraError, TenantId};
 use serde_json::json;
 use tempfile::TempDir;
 

@@ -1,15 +1,16 @@
 #![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Targeted crash simulation tests for multi-index 2-Phase Commit consistency.
-// INVARIANTEN: No orphaned index entries (Text/Vector) can exist without a corresponding storage record.
+// INVARIANTEN: No orphaned index entries (Text/Graph/Vector) can exist without a corresponding storage record.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_engine::collection::{StoredDocument, StoredDocumentMeta};
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
+use contextra_graph::CsrGraph;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats, VectorIndex};
 use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::{ContextraError, DocId, Result, TxId};
+use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};
 use contextra_vector::HnswIndex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -185,10 +186,6 @@ impl<S: StorageEngine> StorageEngine for FaultyStorage<S> {
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         self.inner.scan(start, end, limit)
     }
-
-    fn erasure_backend(&self) -> Option<&dyn contextra_ports::ErasureBackend> {
-        self.inner.erasure_backend()
-    }
 }
 
 async fn create_faulty_collection() -> (
@@ -209,12 +206,14 @@ async fn create_faulty_collection() -> (
         })
         .unwrap(),
     );
+    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
-    let col = Collection::new_without_graph(
+    let col = Collection::new(
         "default".to_string(),
         storage.clone(),
         index,
+        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -235,6 +234,11 @@ async fn test_storage_commit_failure_leaves_no_orphaned_index_entries() -> Resul
         doc_id,
         "Critical crash window test document text".to_string(),
     );
+    tx.stage_graph_entity(Entity::new(
+        EntityId::from_key("501")?,
+        "Node501",
+        "Document",
+    ));
 
     // Inject storage commit failure in Phase (b)
     storage.fail_storage_commit.store(true, Ordering::SeqCst);
@@ -253,6 +257,16 @@ async fn test_storage_commit_failure_leaves_no_orphaned_index_entries() -> Resul
     assert!(
         text_hits.is_empty(),
         "Text index must not contain entries when storage commit failed"
+    );
+
+    // Verify zero orphaned entries in graph index
+    let neighbors = col
+        .graph_index()
+        .neighbors(EntityId::from_key("501")?)
+        .await?;
+    assert!(
+        neighbors.is_empty(),
+        "Graph index must not contain entity when storage commit failed"
     );
 
     Ok(())

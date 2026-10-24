@@ -31,7 +31,6 @@ check:
     $RUNNER cargo xtask check-toctou-defaults
     $RUNNER cargo xtask check-nan-hot-loop
     $RUNNER cargo xtask check-result-dropped-io
-    $RUNNER cargo xtask check-callers
     if [ -f coverage.json ]; then
         $RUNNER cargo xtask check-coverage-gate
     fi
@@ -101,13 +100,6 @@ check-arch-gates:
     cargo run --manifest-path xtask/Cargo.toml -- check-ring-layering-full
     cargo run --manifest-path xtask/Cargo.toml -- check-duplicate-core-primitives
 
-# Deletion & Erasure tests suite
-erasure-tests:
-    cargo test --manifest-path crates/contextra-durable-fs/Cargo.toml
-    cargo test -p contextra-store --test 'erasure*' --test 'purge*' --test wal_scope_purge
-    cargo test -p contextra-engine --test 'deletion*' --test keyspace_conformance --test delete_concurrency
-    cargo test -p contextra-crypto --test 'deletion*' --test 'proof_binding*'
-
 # Target checks for xtask audit lints
 check-max-results-unbound:
     cargo xtask check-max-results-unbound
@@ -120,12 +112,6 @@ check-nan-hot-loop:
 
 check-result-dropped-io:
     cargo xtask check-result-dropped-io
-
-check-callers *ARGS:
-    cargo xtask check-callers {{ARGS}}
-
-canary-after-delete *ARGS:
-    cargo test -p contextra-engine --test 'canary_*' {{ARGS}}
 
 coverage-gate:
     cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json

@@ -1,4 +1,4 @@
-//! Score calibration submodules (Isotonic + Platt scaling + Conformal calibration).
+//! Score calibration submodules (Conformal + Isotonic + Platt scaling).
 
 pub mod conformal;
 pub mod isotonic;

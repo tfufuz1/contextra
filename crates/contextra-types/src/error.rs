@@ -98,7 +98,7 @@ pub type Result<T> = std::result::Result<T, ContextraError>;
 /// # Non-Exhaustive Variant Guarantee
 /// This enum is marked `#[non_exhaustive]` to allow appending new error variants
 /// in future minor releases without breaking downstream `match` statements across crate boundaries
-/// (such as language bindings and client drivers).
+/// (such as `contextra-py` and `contextra-mcp`).
 ///
 /// Downstream callers matching on `ContextraError` must include a wildcard arm (`_ => ...`).
 /// New variants are appended strictly to the bottom of the enum to preserve binary and FFI compatibility.
@@ -354,48 +354,6 @@ pub enum ContextraError {
         /// Path of target file.
         target_path: String,
     },
-
-    /// Active read snapshot has expired due to max_snapshot_age policy.
-    #[error("Snapshot {seq_no} expired (age: {age_ticks} ticks > max_snapshot_age: {max_age_ticks} ticks)")]
-    SnapshotExpired {
-        /// Sequence number of expired snapshot.
-        seq_no: u64,
-        /// Age of snapshot in ticks.
-        age_ticks: u64,
-        /// Maximum allowed snapshot age in ticks.
-        max_age_ticks: u64,
-    },
-
-    /// Data encryption key has been destroyed / revoked (Crypto-Erase).
-    #[error("Key destroyed: {0}")]
-    KeyDestroyed(String),
-
-    /// WAL chain sequence interrupted between segments (missing or reordered segment). Fatal, do not retry.
-    #[error("WAL segment gap detected between sequence {before_segment_seq} and {after_segment_seq}: WAL chain broken (fatal, do not retry)")]
-    WalSegmentGap {
-        /// Sequence number of segment preceding the gap.
-        before_segment_seq: u64,
-        /// Sequence number of segment following the gap.
-        after_segment_seq: u64,
-    },
-
-    /// Transaction is permanently committed in core storage, but publishing in the specified index component failed. Do not retry operation.
-    #[error("Transaction {tx_id} permanently committed but publishing in component '{component}' failed: do not retry, index will be repaired")]
-    CommittedIndexLagging {
-        /// Transaction ID that is permanently committed.
-        tx_id: u64,
-        /// Component where publishing failed (e.g. vector index, text index).
-        component: String,
-    },
-
-    /// Erasure is committed in primary storage, but execution in specified component is incomplete. Retry or repair required.
-    #[error("Erasure committed in primary storage but incomplete in component '{component}': {detail} (retry or repair operation)")]
-    ErasureIncomplete {
-        /// Component where erasure is incomplete.
-        component: String,
-        /// Specific error or status detail explaining incomplete erasure.
-        detail: String,
-    },
 }
 
 impl ContextraError {
@@ -467,51 +425,9 @@ impl ContextraError {
         Self::KvQuantization(msg.into())
     }
 
-    /// Constructs a `ContextraError` from an error kind identifier and detail message.
-    pub fn from_kind_and_message(kind: &str, msg: impl Into<String>) -> Self {
-        let msg = msg.into();
-        match kind {
-            "DurabilityConfig" => Self::durability_config(msg),
-            "OrphanedVectorReference" => {
-                let parts: Vec<&str> = msg.split("->").collect();
-                if let (Some(&doc_id), Some(&index_id)) = (parts.first(), parts.get(1)) {
-                    Self::orphaned_vector_reference(doc_id.trim(), index_id.trim())
-                } else {
-                    Self::orphaned_vector_reference("unknown", msg)
-                }
-            }
-            "InvalidInput" => Self::invalid_input(msg),
-            "KvQuantization" => Self::kv_quantization(msg),
-            "PinBudgetExceeded" => Self::pin_budget_exceeded(msg),
-            _ => Self::Internal(msg),
-        }
-    }
-
     /// Creates a `DurabilityConfig` error.
     pub fn durability_config(msg: impl Into<String>) -> Self {
         Self::DurabilityConfig(msg.into())
-    }
-
-    /// Helper to validate durability configuration, producing `DurabilityConfig` on failure.
-    pub fn check_durability(condition: bool, msg: impl Into<String>) -> Result<()> {
-        if condition {
-            Ok(())
-        } else {
-            Err(Self::durability_config(msg))
-        }
-    }
-
-    /// Helper to validate vector reference existence, producing `OrphanedVectorReference` on failure.
-    pub fn check_vector_reference(
-        found: bool,
-        doc_id: impl Into<String>,
-        index_id: impl Into<String>,
-    ) -> Result<()> {
-        if found {
-            Ok(())
-        } else {
-            Err(Self::orphaned_vector_reference(doc_id, index_id))
-        }
     }
 
     /// Creates a `PinBudgetExceeded` error.
@@ -530,44 +446,11 @@ impl ContextraError {
         }
     }
 
-    /// Creates a `SnapshotExpired` error.
-    pub fn snapshot_expired(seq_no: u64, age_ticks: u64, max_age_ticks: u64) -> Self {
-        Self::SnapshotExpired {
-            seq_no,
-            age_ticks,
-            max_age_ticks,
-        }
-    }
-
     /// Creates a `WalTruncationDetected` error.
     pub fn wal_truncation_detected(expected_hmac: [u8; 32], actual_hmac: [u8; 32]) -> Self {
         Self::WalTruncationDetected {
             expected_hmac,
             actual_hmac,
-        }
-    }
-
-    /// Creates a `WalSegmentGap` error.
-    pub fn wal_segment_gap(before_segment_seq: u64, after_segment_seq: u64) -> Self {
-        Self::WalSegmentGap {
-            before_segment_seq,
-            after_segment_seq,
-        }
-    }
-
-    /// Creates a `CommittedIndexLagging` error.
-    pub fn committed_index_lagging(tx_id: u64, component: impl Into<String>) -> Self {
-        Self::CommittedIndexLagging {
-            tx_id,
-            component: component.into(),
-        }
-    }
-
-    /// Creates an `ErasureIncomplete` error.
-    pub fn erasure_incomplete(component: impl Into<String>, detail: impl Into<String>) -> Self {
-        Self::ErasureIncomplete {
-            component: component.into(),
-            detail: detail.into(),
         }
     }
 
@@ -1228,65 +1111,5 @@ mod tests {
         assert!(stale.is_occ_conflict());
         assert!(conflict.is_occ_conflict());
         assert!(!not_found.is_occ_conflict());
-    }
-
-    #[test]
-    fn test_new_error_variants_constructors_display_and_classification() {
-        // 1. WalSegmentGap (fatal, do not retry)
-        let err_gap = ContextraError::wal_segment_gap(10, 12);
-        assert_eq!(
-            err_gap.to_string(),
-            "WAL segment gap detected between sequence 10 and 12: WAL chain broken (fatal, do not retry)"
-        );
-        match &err_gap {
-            ContextraError::WalSegmentGap {
-                before_segment_seq,
-                after_segment_seq,
-            } => {
-                assert_eq!(*before_segment_seq, 10);
-                assert_eq!(*after_segment_seq, 12);
-            }
-            _ => panic!("Expected WalSegmentGap variant, got {:?}", err_gap),
-        }
-        assert!(
-            err_gap.to_string().contains("fatal, do not retry"),
-            "WalSegmentGap display must explicitly state fatal, do not retry action sequence"
-        );
-
-        // 2. CommittedIndexLagging (permanently committed, do not retry, index will be repaired)
-        let err_lagging = ContextraError::committed_index_lagging(1001, "vector_hnsw");
-        assert_eq!(
-            err_lagging.to_string(),
-            "Transaction 1001 permanently committed but publishing in component 'vector_hnsw' failed: do not retry, index will be repaired"
-        );
-        match &err_lagging {
-            ContextraError::CommittedIndexLagging { tx_id, component } => {
-                assert_eq!(*tx_id, 1001);
-                assert_eq!(component, "vector_hnsw");
-            }
-            _ => panic!("Expected CommittedIndexLagging variant, got {:?}", err_lagging),
-        }
-        assert!(
-            err_lagging.to_string().contains("do not retry, index will be repaired"),
-            "CommittedIndexLagging display must state non-retryable action sequence and component repair"
-        );
-
-        // 3. ErasureIncomplete (retry or repair operation)
-        let err_erasure = ContextraError::erasure_incomplete("text_index", "lock timeout during purge");
-        assert_eq!(
-            err_erasure.to_string(),
-            "Erasure committed in primary storage but incomplete in component 'text_index': lock timeout during purge (retry or repair operation)"
-        );
-        match &err_erasure {
-            ContextraError::ErasureIncomplete { component, detail } => {
-                assert_eq!(component, "text_index");
-                assert_eq!(detail, "lock timeout during purge");
-            }
-            _ => panic!("Expected ErasureIncomplete variant, got {:?}", err_erasure),
-        }
-        assert!(
-            err_erasure.to_string().contains("retry or repair operation"),
-            "ErasureIncomplete display must state retry/repair action sequence"
-        );
     }
 }

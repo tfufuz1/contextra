@@ -1,5 +1,4 @@
 #![deny(dead_code)]
-#![deny(clippy::print_stdout)]
 #![forbid(unsafe_code)]
 //! Layer-7-Rand-Crate ohne jegliche unsafe-Toleranz — verarbeitet direkt untrusted stdio-Input, siehe ADR-010.
 //!
@@ -10,28 +9,25 @@
 //! | `contextra_search` | `DatabaseRead` | Hybrid semantic search over stored documents |
 //! | `contextra_get` | `DatabaseRead` | Retrieve a document by ID |
 //! | `contextra_collections` | `DatabaseRead` | List all collections |
-//! | `contextra_explain` | `DatabaseRead` | Retrieval explanation and provenance breakdown |
+//! | `contextra_explain` | `DatabaseRead` | Provenance breakdown & retrieval explanation |
 //! | `contextra_plugin_status` | `DatabaseRead` | Status of active plugins & rings |
 //! | `contextra_insert` | `DatabaseWrite` | Store a document with auto-chunking & auto-embedding |
 //! | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
-//! | `contextra_delete` | `DatabaseWrite` | Logische Löschung (Tombstone), kein Nachweis |
-//! | `contextra_forget` | `DatabaseWrite` | High-assurance provable forget with V4 ForgetReceipt |
+//! | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
+//! | `contextra_forget` | `DatabaseWrite` | Delete document/collection with DeletionProof |
 //! | `contextra_relate` | `DatabaseWrite` | Create binary directed/bidirectional relationship |
 //! | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
 //! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |
 //! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
+//! | `contextra_consolidate` | `DatabaseWrite` | Synchronous trigger for memory consolidation pass |
 //! | `contextra_cloud_query` | `CloudEgress` | External cloud query under egress classification |
 
 pub mod bulk_exfiltration_detector;
-pub mod cli;
 pub mod config;
-pub mod db_open;
 pub mod egress_gateway;
 pub mod egress_guard;
 pub mod explain;
 pub mod io;
-pub mod ipc;
-pub mod kv_wiring;
 pub mod plugin_status;
 pub mod prompt_injection;
 pub mod proof_key;
@@ -44,9 +40,6 @@ pub mod server_dispatch;
 pub mod server_tools;
 pub mod tools_crud;
 pub mod validation;
-pub mod wiring;
-
-pub use wiring::{McpWiring, McpWiringDeps};
 
 #[cfg(test)]
 mod tests;
@@ -55,7 +48,6 @@ pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
 };
 pub use config::*;
-pub use db_open::open_db_from_env;
 
 pub use egress_gateway::{
     CloudQueryRequest, CloudQueryResponse, DefaultEgressClassifier, EgressClassification,
@@ -63,7 +55,6 @@ pub use egress_gateway::{
 };
 
 pub use explain::{ExplainRequest, ExplainResponse};
-pub use ipc::Channel;
 pub use plugin_status::{handle_plugin_status, PluginStatusEntry, PluginStatusResponse};
 pub use proof_key::deletion_proof_key_from_env;
 
@@ -75,7 +66,7 @@ pub use prompt_injection::{
 };
 
 #[cfg(feature = "kv-bridge")]
-pub use kv_wiring::setup_kv_bridge;
+pub use routing::setup_kv_bridge;
 pub use routing::{setup_routing, RoutingHandle};
 
 pub use server::McpServer;

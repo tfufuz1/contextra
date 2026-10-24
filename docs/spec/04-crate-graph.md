@@ -84,7 +84,7 @@ Ziel für sich — sie ist eine Konsequenz der Kriterien, mit einer offenen Kons
 | Ring | Crate | Inhalt | Herkunft (vorher) | Kriterium (P30) |
 |---|---|---|---|---|
 | **0** (sync, kein `tokio`) | `contextra-types` | IDs (`DocId`, `DocIdx`, `TxId`, `TenantId`), `ModelFingerprint`, Filter-AST, Budgets, Importance, `ErrorClass`, Schema-Versionen, Tombstone-Semantik | `contextra-core` (Teilmenge `types`) | D |
-| | `contextra-ports` | Traits (P27): `VectorIndex`/`TextIndex`/`GraphIndex`/`StorageRead` (sync), `StorageWrite`/`Embedder`/`LlmTextGenerator`/`KvPrefixStore`/`ToolSandbox` (async, `BoxFuture`), `Clock`/`Rng`/`IdGen`/`MetricsSink`/`DriftStatusProvider` | `contextra-core` (Teilmenge `traits`), `contextra-db::DriftStatusProvider` | D |
+| | `contextra-ports` | Traits (P27): `VectorIndex`/`TextIndex`/`GraphIndex`/`StorageRead` (sync), `StorageWrite`/`Embedder`/`TextGenerator`/`KvPrefixStore`/`ToolSandbox` (async, `BoxFuture`), `Clock`/`Rng`/`IdGen`/`MetricsSink`/`DriftStatusProvider` | `contextra-core` (Teilmenge `traits`), `contextra-db::DriftStatusProvider` | D |
 | | `contextra-mvcc` **(neu)** | `SeqLog`, `SnapshotRegistry`, `TxBuffer`; loom-getestet | `contextra-core` (`seq_log`, `snapshot`, `tx_buffer` — in der Vorfassung des Migrationsplans nicht zugeordnet, §A2.1 D4) | C, D |
 | | `contextra-wire` | FlatBuffers-Generat und Adapter, Unsafe-Insel | `contextra-core-ipc-gen` | U | <!-- crate-ref-ignore -->
 | | `contextra-sys` **(neu)** | `ReadOnlyMap` (mmap), `LockedBuf` (mlock/VirtualLock), Owner-only-ACL (Win32), Unsafe-Insel | verteilt über `contextra-store`, `contextra-vector`, `contextra-db` (§0.4) | U |

@@ -66,9 +66,9 @@ pub struct GermanCompoundSplitter {
 }
 
 impl GermanCompoundSplitter {
-    /// Creates a new German compound splitter loaded with the embedded German vocabulary and all domain vocabularies (Legal & Medical).
+    /// Creates a new German compound splitter loaded with the embedded German vocabulary.
     pub fn new() -> Self {
-        Self::new_with_all_domains()
+        Self::with_min_length(3)
     }
 
     /// Creates a splitter with custom minimum component length and default embedded vocabulary.
@@ -198,10 +198,12 @@ struct PathNode {
 
 impl MorphologicalTokenizer for GermanCompoundSplitter {
     fn decompose<'a>(&self, token: &'a str) -> Vec<&'a str> {
-        // Safe input validation: non-lowercased inputs safely return un-decomposed token without panicking.
-        if token.chars().any(|c| c.is_uppercase()) {
-            return vec![token];
-        }
+        debug_assert!(
+            token.chars().all(|c| !c.is_uppercase()),
+            "GermanCompoundSplitter::decompose received non-lowercase input: {:?}. \
+             Call normalize_umlauts() before decompose().",
+            token
+        );
 
         // Guard against oversized single tokens (e.g., > 128 bytes) to avoid O(n^2) DP overhead
         if token.len() <= self.min_component_len || token.len() > 128 {
@@ -249,16 +251,10 @@ impl MorphologicalTokenizer for GermanCompoundSplitter {
                         min_segment_len: new_min_len,
                     };
 
-                    let is_full_token = j == n;
                     let update = match &dp[j] {
                         None => true,
                         Some(existing) => {
-                            if is_full_token
-                                && existing.segment_count == 1
-                                && candidate.segment_count >= 2
-                            {
-                                true
-                            } else if candidate.segment_count < existing.segment_count {
+                            if candidate.segment_count < existing.segment_count {
                                 true
                             } else if candidate.segment_count == existing.segment_count {
                                 candidate.min_segment_len > existing.min_segment_len

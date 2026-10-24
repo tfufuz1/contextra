@@ -1,4 +1,4 @@
-use contextra_types::{ContextraError, DistanceMetric, Result};
+use contextra_core::{ContextraError, DistanceMetric, Result};
 
 use super::types::HNSW_REBUILD_DELETION_RATIO;
 

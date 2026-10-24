@@ -3,7 +3,6 @@ use std::process::Command;
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(not(test), allow(dead_code))] // Result struct included in test targets via #[path]
 pub struct BenchCompileResult {
     pub crate_name: String,
     pub bench_name: String,
@@ -85,7 +84,6 @@ pub fn build_bench_command_args(
 }
 
 /// Checks or runs all benchmark suites found in the workspace.
-#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_bench_compile(
     run_for_real: bool,
     root: &Path,

@@ -8,7 +8,7 @@ use contextra_license::{
     FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedLicenseGate,
 };
 use contextra_ports::clock::Clock;
-use contextra_types::{DeterministicTimestamp, TenantId};
+use contextra_types::TenantId;
 use ed25519_dalek::{Signer, SigningKey};
 use serde::Serialize;
 
@@ -17,14 +17,11 @@ struct TestClock {
 }
 
 impl Clock for TestClock {
-    fn now(&self) -> DeterministicTimestamp {
-        DeterministicTimestamp::new(
-            u64::try_from(self.now_unix_secs * 1000).unwrap_or(0),
-            0,
-        )
+    fn now_unix_nanos(&self) -> u64 {
+        (self.now_unix_secs * 1_000_000_000) as u64
     }
 
-    fn monotonic_ticks(&self) -> u64 {
+    fn monotonic_nanos(&self) -> u64 {
         0
     }
 }
@@ -90,7 +87,6 @@ fn test_new_payload_roundtrip_deserialization() {
         expires_at: Some(2000),
         feature_flags: BTreeMap::new(),
         installation_id_hash: Some(hash),
-        key_id: None,
     };
 
     let bincode_opts = bincode::options().with_fixint_encoding();
@@ -129,7 +125,6 @@ fn test_corrupted_new_payload_not_accepted_as_legacy() {
         expires_at: Some(2000),
         feature_flags: BTreeMap::new(),
         installation_id_hash: Some(hash),
-        key_id: None,
     };
 
     let bincode_opts = bincode::options().with_fixint_encoding();

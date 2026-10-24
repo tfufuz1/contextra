@@ -1,9 +1,9 @@
 #![cfg(feature = "fault-injection")]
 // FILE-CONTEXT: Integration test verifying clean rollback and absence of phantom entries on WAL write failure (disk full simulation). (TS: 2026-09-11)
 
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::TxId;
+use contextra_store::wal::FAIL_APPEND_FOR_TX;
 use std::sync::atomic::Ordering;
 use tempfile::tempdir;
 
@@ -40,10 +40,7 @@ async fn test_disk_full_during_embedding_write_leaves_no_phantom_state() {
         .await
         .expect("put tx2 failed");
 
-    storage
-        .fault_plan()
-        .fail_append_for_tx
-        .store(tx2.inner(), Ordering::SeqCst);
+    FAIL_APPEND_FOR_TX.store(tx2.inner(), Ordering::SeqCst);
 
     // Commit tx2 should fail due to simulated WAL append failure ("No space left on device" / fault injection)
     let commit_res = storage.commit(tx2).await;

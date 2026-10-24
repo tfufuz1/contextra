@@ -1,5 +1,3 @@
-use crate::contextra_impl::forget::ForgetReceipt;
-use crate::deletion::ForgetOptions;
 use crate::*;
 use contextra_store::LsmStorage;
 use contextra_types::{FilterExpr, Result};
@@ -77,9 +75,6 @@ impl Contextra {
         self.storage.last_seq_no().await
     }
 
-    /// Alias for `last_committed_seq()`.
-    /// Deprecated in favor of `last_committed_seq()`. Scheduled for removal in v0.2.0.
-    #[deprecated(since = "0.1.0", note = "Use last_committed_seq() instead. Scheduled for removal in v0.2.0.")]
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn create_snapshot(&self) -> Result<u64> {
         self.storage.last_seq_no().await
@@ -93,8 +88,7 @@ impl Contextra {
             .await
     }
 
-    /// Performs semantic search over stored embeddings.
-    #[deprecated(since = "0.1.0", note = "Use query() instead. Scheduled for removal in v0.2.0.")]
+    #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn search(&self, query: &[f32], k: usize) -> Result<Vec<SearchResult>> {
         self.default_col()
@@ -106,8 +100,27 @@ impl Contextra {
             .await
     }
 
-    /// Performs semantic search with `FilterExpr`.
-    #[deprecated(since = "0.1.0", note = "Use query() instead. Scheduled for removal in v0.2.0.")]
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use search_with_filter_expr with contextra_types::FilterExpr directly"
+    )]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub async fn search_with_filter(
+        &self,
+        query: &[f32],
+        k: usize,
+        filter: Option<MetadataFilter>,
+    ) -> Result<Vec<SearchResult>> {
+        let col = self.default_col().await?;
+        let mut builder = col.query().vector(query).k(k);
+        if let Some(f) = filter {
+            builder = builder.metadata_filter(f);
+        }
+        builder.execute().await
+    }
+
+    #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn search_with_filter_expr(
         &self,
@@ -149,8 +162,7 @@ impl Contextra {
             .await
     }
 
-    /// Performs semantic search using raw text.
-    #[deprecated(since = "0.1.0", note = "Use query() instead. Scheduled for removal in v0.2.0.")]
+    #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn search_text(&self, text: &str, k: usize) -> Result<Vec<SearchResult>> {
         self.default_col()
@@ -162,9 +174,6 @@ impl Contextra {
             .await
     }
 
-    /// Performs predicate closure-filtered search.
-    /// Justification: Maintained for legacy closure predicate filters; scheduled for removal in v0.2.0.
-    #[deprecated(since = "0.1.0", note = "Use query().filter_fn() instead. Scheduled for removal in v0.2.0.")]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, filter))]
     pub async fn search_filtered(
@@ -173,14 +182,14 @@ impl Contextra {
         k: usize,
         filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
     ) -> Result<Vec<SearchResult>> {
+        #[allow(deprecated)]
         self.default_col()
             .await?
             .search_filtered(query, k, filter)
             .await
     }
 
-    /// Performs hybrid search combining text, vector, and graph signals.
-    #[deprecated(since = "0.1.0", note = "Use query() instead. Scheduled for removal in v0.2.0.")]
+    #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, anchor_entities))]
     pub async fn hybrid_search(
         &self,
@@ -197,8 +206,28 @@ impl Contextra {
         builder.execute().await
     }
 
-    /// Performs hybrid search with custom signal fusion weights.
-    #[deprecated(since = "0.1.0", note = "Use query() instead. Scheduled for removal in v0.2.0.")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, reranker, anchor_entities))]
+    pub async fn hybrid_search_reranked(
+        &self,
+        text: &str,
+        vector: &[f32],
+        k: usize,
+        reranker: Option<&dyn contextra_ports::Reranker>,
+        anchor_entities: Option<&[contextra_types::EntityId]>,
+    ) -> Result<Vec<SearchResult>> {
+        let col = self.default_col().await?;
+        let mut builder = col.query().text(text).vector(vector).k(k);
+        if let Some(r) = reranker {
+            builder = builder.reranker(r);
+        }
+        if let Some(anchors) = anchor_entities {
+            builder = builder.anchors(anchors.iter().copied());
+        }
+        builder.execute().await
+    }
+
+    #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, anchor_entities, weights))]
     pub async fn hybrid_search_with_weights(
         &self,
@@ -219,8 +248,7 @@ impl Contextra {
         builder.execute().await
     }
 
-    /// Performs hybrid search with custom signal fusion weights and graph traversal strategy.
-    #[deprecated(since = "0.1.0", note = "Use query() instead. Scheduled for removal in v0.2.0.")]
+    #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, anchor_entities, weights, strategy))]
     pub async fn hybrid_search_with_strategy(
         &self,
@@ -243,6 +271,20 @@ impl Contextra {
             builder = builder.anchors(anchors.iter().copied());
         }
         builder.execute().await
+    }
+
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, query))]
+    pub async fn hybrid_search_with_query(
+        &self,
+        query: &contextra_types::HybridQuery,
+    ) -> Result<Vec<SearchResult>> {
+        self.default_col()
+            .await?
+            .query()
+            .query_config(query)
+            .execute()
+            .await
     }
 
     pub async fn delete(&self, id: &str) -> Result<()> {

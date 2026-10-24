@@ -356,51 +356,6 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "target_path": target_path,
                 })),
             },
-            ContextraError::SnapshotExpired {
-                seq_no,
-                age_ticks,
-                max_age_ticks,
-            } => Self {
-                kind: "SnapshotExpired".to_string(),
-                message: err.to_string(),
-                details: Some(serde_json::json!({
-                    "seq_no": seq_no,
-                    "age_ticks": age_ticks,
-                    "max_age_ticks": max_age_ticks,
-                })),
-            },
-            ContextraError::KeyDestroyed(msg) => Self {
-                kind: "KeyDestroyed".to_string(),
-                message: msg.clone(),
-                details: None,
-            },
-            ContextraError::WalSegmentGap {
-                before_segment_seq,
-                after_segment_seq,
-            } => Self {
-                kind: "WalSegmentGap".to_string(),
-                message: err.to_string(),
-                details: Some(serde_json::json!({
-                    "before_segment_seq": before_segment_seq,
-                    "after_segment_seq": after_segment_seq,
-                })),
-            },
-            ContextraError::CommittedIndexLagging { tx_id, component } => Self {
-                kind: "CommittedIndexLagging".to_string(),
-                message: err.to_string(),
-                details: Some(serde_json::json!({
-                    "tx_id": tx_id,
-                    "component": component,
-                })),
-            },
-            ContextraError::ErasureIncomplete { component, detail } => Self {
-                kind: "ErasureIncomplete".to_string(),
-                message: err.to_string(),
-                details: Some(serde_json::json!({
-                    "component": component,
-                    "detail": detail,
-                })),
-            },
         }
     }
 }
@@ -564,27 +519,6 @@ mod tests {
                 },
                 "CrossDeviceLink",
             ),
-            (
-                ContextraError::WalSegmentGap {
-                    before_segment_seq: 1,
-                    after_segment_seq: 3,
-                },
-                "WalSegmentGap",
-            ),
-            (
-                ContextraError::CommittedIndexLagging {
-                    tx_id: 100,
-                    component: "hnsw".into(),
-                },
-                "CommittedIndexLagging",
-            ),
-            (
-                ContextraError::ErasureIncomplete {
-                    component: "text".into(),
-                    detail: "busy".into(),
-                },
-                "ErasureIncomplete",
-            ),
         ];
 
         for (err, expected_kind) in variants {
@@ -610,37 +544,6 @@ mod tests {
         let deser_dto: ContextraErrorDto =
             serde_json::from_str(&json_str).expect("serde deserialize"); // unwrap allowed
         assert_eq!(dto, deser_dto);
-
-        // Test roundtrip for new variants
-        let gap_err = ContextraError::wal_segment_gap(5, 8);
-        let dto_gap = ContextraErrorDto::from(&gap_err);
-        assert_eq!(dto_gap.kind, "WalSegmentGap");
-        let gap_details = dto_gap.details.as_ref().expect("details exist");
-        assert_eq!(gap_details["before_segment_seq"], 5);
-        assert_eq!(gap_details["after_segment_seq"], 8);
-        let deser_gap: ContextraErrorDto =
-            serde_json::from_str(&serde_json::to_string(&dto_gap).expect("serialize")).expect("deserialize");
-        assert_eq!(dto_gap, deser_gap);
-
-        let lagging_err = ContextraError::committed_index_lagging(42, "graph_csr");
-        let dto_lagging = ContextraErrorDto::from(&lagging_err);
-        assert_eq!(dto_lagging.kind, "CommittedIndexLagging");
-        let lagging_details = dto_lagging.details.as_ref().expect("details exist");
-        assert_eq!(lagging_details["tx_id"], 42);
-        assert_eq!(lagging_details["component"], "graph_csr");
-        let deser_lagging: ContextraErrorDto =
-            serde_json::from_str(&serde_json::to_string(&dto_lagging).expect("serialize")).expect("deserialize");
-        assert_eq!(dto_lagging, deser_lagging);
-
-        let erasure_err = ContextraError::erasure_incomplete("vector_index", "lock contention");
-        let dto_erasure = ContextraErrorDto::from(&erasure_err);
-        assert_eq!(dto_erasure.kind, "ErasureIncomplete");
-        let erasure_details = dto_erasure.details.as_ref().expect("details exist");
-        assert_eq!(erasure_details["component"], "vector_index");
-        assert_eq!(erasure_details["detail"], "lock contention");
-        let deser_erasure: ContextraErrorDto =
-            serde_json::from_str(&serde_json::to_string(&dto_erasure).expect("serialize")).expect("deserialize");
-        assert_eq!(dto_erasure, deser_erasure);
     }
 
     #[test]

@@ -3,6 +3,7 @@
 // ZWECK: Subcommand cargo xtask bench-gate for benchmark regression evaluation
 // INVARIANTEN: Zero Panic, clear exit codes for CI governance.
 
+use contextra_bench::regression_gate::{run_regression_gate, DEFAULT_TOLERANCE_THRESHOLD};
 use std::path::PathBuf;
 
 pub fn run_bench_gate(args: &[String]) -> bool {
@@ -10,7 +11,7 @@ pub fn run_bench_gate(args: &[String]) -> bool {
 
     let mut results_path = PathBuf::from("benchmarks/results/current_metrics.json");
     let mut baseline_path = PathBuf::from("benchmarks/contextra-bench/baseline_metrics.json");
-    let mut threshold = 0.05f64;
+    let mut threshold = DEFAULT_TOLERANCE_THRESHOLD;
     let mut update_baseline = false;
 
     let mut i = 0;
@@ -49,6 +50,11 @@ pub fn run_bench_gate(args: &[String]) -> bool {
     println!("  Threshold    : {:.1}%", threshold * 100.0);
     println!("  Update mode  : {}", update_baseline);
 
-    println!("ℹ️ Bench gate check bypassed due to uncoupled bench dependency in xtask.");
-    true
+    match run_regression_gate(&results_path, &baseline_path, threshold, update_baseline) {
+        Ok(res) => res.passed,
+        Err(e) => {
+            eprintln!("❌ [BENCH-GATE ERROR]: {}", e);
+            false
+        }
+    }
 }

@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 
 use contextra_core::{
     ContextraError, DistanceMetric, DocId, IndexOp, Result, ScoredDocument, TxId, VectorIndex,
-    VectorIndexStats, VectorResidue,
+    VectorIndexStats,
 };
 
 use super::batch::{BatchContext, SearchContext};
@@ -225,16 +225,6 @@ impl VectorIndex for HnswIndex {
         filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
     ) -> Result<Vec<ScoredDocument>> {
         self.search_filtered_internal(query, k, filter, None).await
-    }
-
-    async fn residue(&self, id: DocId) -> Result<VectorResidue> {
-        let scan = self.scan_residue_report(id);
-        Ok(VectorResidue {
-            node_present: scan.node_found,
-            incoming_edges: u32::try_from(scan.incoming_edges).unwrap_or(u32::MAX),
-            outgoing_edges: u32::try_from(scan.outgoing_edges).unwrap_or(u32::MAX),
-            pinned: scan.pinned_by_reader,
-        })
     }
 
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
@@ -479,8 +469,7 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn last_tx_id(&self) -> Result<TxId> {
-        TxId::try_new(self.inner.hot.last_tx_id.load(Ordering::SeqCst))
-            .map_err(|e| ContextraError::InvalidInput(e.to_string()))
+        Ok(TxId::new(self.inner.hot.last_tx_id.load(Ordering::SeqCst)))
     }
 
     async fn all_doc_ids(&self) -> Result<Vec<DocId>> {

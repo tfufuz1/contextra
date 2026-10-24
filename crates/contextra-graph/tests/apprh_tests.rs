@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 //! Integration and unit tests for Averaging-based Personalized PageRank for Hypergraphs (APPRH).
 
 #![cfg(feature = "apprh-diffusion")]

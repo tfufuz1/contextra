@@ -63,8 +63,8 @@ pub fn shadow_compare_forward_push_vs_apprh<G: PathGraph>(
     let k_fp = top_k.min(fp_sorted.len());
     let k_apprh = top_k.min(apprh_sorted.len());
 
-    let top_fp = fp_sorted.get(..k_fp).unwrap_or(&[]);
-    let top_apprh = apprh_sorted.get(..k_apprh).unwrap_or(&[]);
+    let top_fp = &fp_sorted[..k_fp];
+    let top_apprh = &apprh_sorted[..k_apprh];
 
     let set_fp: AHashSet<EntityId> = top_fp.iter().map(|(id, _)| *id).collect();
     let set_apprh: AHashSet<EntityId> = top_apprh.iter().map(|(id, _)| *id).collect();

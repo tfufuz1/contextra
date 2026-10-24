@@ -129,7 +129,6 @@ pub fn run_hotspot_report_impl(
     Ok(hotspots)
 }
 
-#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_hotspot_report(
     since_days: u32,
     top_n: usize,

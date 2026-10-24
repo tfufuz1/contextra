@@ -3,8 +3,6 @@
 // INVARIANTEN: Jede tombstonierte Kante erhaelt einen Provenienz-Eintrag mit WAL-Seq (INV-GRAPH-PROV-1).
 // STAND: TS:2026-08-30T19:00:00Z
 
-#[cfg(feature = "edge-reinforcement-learning")]
-use crate::edge_reinforcement_buffer::EdgeReinforcementBuffer;
 use crate::csr::CsrGraph;
 use contextra_types::{DocId, EntityId, Result, TxId};
 
@@ -35,7 +33,7 @@ pub async fn cascade_invalidate_edges_for_superseded_doc(
     superseded_doc_id: DocId,
     wal_seq: u64,
 ) -> Result<CascadeInvalidationReport> {
-    let wal_tx = TxId::try_new(wal_seq)?;
+    let wal_tx = TxId::new(wal_seq);
 
     // 1. Lookup aller EdgeIds via DocId -> Set<EdgeId>-Index.
     let edge_ids = graph.edges_for_doc(superseded_doc_id);
@@ -115,7 +113,7 @@ impl GraphGarbageCollection for CsrGraph {
                     for p in hedge.participants.iter() {
                         if let Some(&idx) = inner.id_map.get(&p.entity) {
                             if inner.entity_at(idx).is_some() {
-                                active_participant_count = active_participant_count.saturating_add(1);
+                                active_participant_count += 1;
                             }
                         }
                     }
@@ -130,7 +128,7 @@ impl GraphGarbageCollection for CsrGraph {
         let mut swept_count = 0usize;
         for hid in candidate_ids {
             if self.tombstone_hyperedge(hid, wal_tx) {
-                swept_count = swept_count.saturating_add(1);
+                swept_count += 1;
             }
         }
 
@@ -187,7 +185,7 @@ pub fn topological_sort_hyperedge_closure(
         let mut parents_in_closure = 0usize;
         for parent in parents {
             if node_set.contains(&parent) {
-                parents_in_closure = parents_in_closure.saturating_add(1);
+                parents_in_closure += 1;
                 children_map.entry(parent).or_default().push(node);
             }
         }
@@ -209,7 +207,7 @@ pub fn topological_sort_hyperedge_closure(
             for &child in children {
                 if let Some(deg) = in_degree.get_mut(&child) {
                     if *deg > 0 {
-                        *deg = deg.saturating_sub(1);
+                        *deg -= 1;
                         if *deg == 0 {
                             ready.push(std::cmp::Reverse(child));
                         }
@@ -247,7 +245,7 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
     superseded_doc_id: DocId,
     wal_seq: u64,
 ) -> Result<HyperedgeCascadeReport> {
-    let wal_tx = TxId::try_new(wal_seq)?;
+    let wal_tx = TxId::new(wal_seq);
     let mut candidate_ids = graph.hyperedges_for_doc(superseded_doc_id);
     if candidate_ids.is_empty() {
         return Ok(HyperedgeCascadeReport {
@@ -348,154 +346,6 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
     })
 }
 
-/// Report summarizing the cascade invalidation of a deleted entity across all graph structures.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EntityCascadeReport {
-    /// Die gelöschte Entität.
-    pub entity_id: EntityId,
-    /// Anzahl tombstonierter CSR-Kanten (eingehend + ausgehend).
-    pub tombstoned_edge_count: usize,
-    /// Tombstonierte Hyperkanten-IDs.
-    pub tombstoned_hyperedges: Vec<crate::hyperedge::HyperEdgeId>,
-    /// Ob die Community-Zuordnung entfernt wurde.
-    pub community_removed: bool,
-    /// Anzahl aus dem `EdgeReinforcementBuffer` entfernter Signale.
-    pub buffer_signals_purged: usize,
-}
-
-impl EntityCascadeReport {
-    pub fn new(entity_id: EntityId) -> Self {
-        Self {
-            entity_id,
-            tombstoned_edge_count: 0,
-            tombstoned_hyperedges: Vec::new(),
-            community_removed: false,
-            buffer_signals_purged: 0,
-        }
-    }
-}
-
-/// Kaskadierende Bereinigung aller Bezüge zu einer Entität (`entity_id`) aus allen Graph-Teilstrukturen.
-///
-/// Bereinigt:
-/// 1. CSR-Kanten: Tombstoniert alle ausgehenden und eingehenden Kanten via `GraphIndexExt::remove_entity`.
-/// 2. Hyperkanten: Tombstoniert alle aktiven Hyperkanten, an denen die Entität als Participant beteiligt ist.
-/// 3. Community-Zuordnung: Entfernt den Eintrag der Entität aus `inner.communities` (ohne globale Neuberechnung).
-/// 4. Adjazenz-Cache (`edge_store`): Entfernt Cache-Einträge für `entity_id`.
-/// 5. Reinforcement Buffer: Purged gepufferte Signale bezüglich `entity_id`.
-/// 6. DocEdgeIndex: Entfernt Provenienz-Referenzen bezüglich `entity_id`.
-pub async fn cascade_invalidate_entity(
-    graph: &CsrGraph,
-    entity_id: EntityId,
-    wal_seq: u64,
-    #[cfg(feature = "edge-reinforcement-learning")] buffer: Option<&EdgeReinforcementBuffer>,
-) -> Result<EntityCascadeReport> {
-    let wal_tx = TxId::try_new(wal_seq)?;
-    let mut report = EntityCascadeReport::new(entity_id);
-
-    // 1. Collect hyperedges involving entity_id and tombstone them
-    let hyperedge_ids_to_tombstone = {
-        let inner = graph.inner_read();
-        let mut ids = Vec::new();
-        if let Some(set) = inner.hyperedge_index.get(&entity_id) {
-            for &hid in set {
-                if let Some(hedge) = inner.hyperedges.get(&hid) {
-                    if hedge.tx_valid_to.is_none() {
-                        ids.push(hid);
-                    }
-                }
-            }
-        }
-        ids
-    };
-
-    for hid in hyperedge_ids_to_tombstone {
-        if graph.tombstone_hyperedge(hid, wal_tx) {
-            report.tombstoned_hyperedges.push(hid);
-        }
-    }
-
-    // 2. Count outgoing + incoming edges for report before removal
-    let edge_count_before = {
-        let inner = graph.inner_read();
-        let mut count: usize = 0;
-        if let Some(&idx) = inner.id_map.get(&entity_id) {
-        let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
-        if idx < offsets_len_minus_1 {
-            let start = *inner.offsets.get(idx).unwrap_or(&0);
-            let next_idx = idx.saturating_add(1);
-            let end = *inner.offsets.get(next_idx).unwrap_or(&0);
-            for j in start..end {
-                let Some(&target_idx) = inner.targets.get(j) else { continue };
-                if !inner.tombstoned_edges.contains(&(idx, target_idx)) {
-                    count = count.saturating_add(1);
-                    }
-                }
-            }
-            if let Some(pending) = inner.pending_edges.get(&idx) {
-                for edge in pending {
-                    if !inner.tombstoned_edges.contains(&(idx, edge.target)) {
-                    count = count.saturating_add(1);
-                    }
-                }
-            }
-            for src_idx in 0..inner.reverse_map.len() {
-                if src_idx == idx {
-                    continue;
-                }
-            if src_idx < offsets_len_minus_1 {
-                let start = *inner.offsets.get(src_idx).unwrap_or(&0);
-                let next_idx = src_idx.saturating_add(1);
-                let end = *inner.offsets.get(next_idx).unwrap_or(&0);
-                for j in start..end {
-                    if inner.targets.get(j) == Some(&idx)
-                            && !inner.tombstoned_edges.contains(&(src_idx, idx))
-                        {
-                        count = count.saturating_add(1);
-                        }
-                    }
-                }
-                if let Some(pending) = inner.pending_edges.get(&src_idx) {
-                    for edge in pending {
-                        if edge.target == idx && !inner.tombstoned_edges.contains(&(src_idx, idx)) {
-                        count = count.saturating_add(1);
-                        }
-                    }
-                }
-            }
-        }
-        count
-    };
-
-    // 3. Remove community assignment and clear edge_store cache BEFORE remove_entity removes id_map entry
-    {
-        let mut inner = graph.inner_write();
-        report.community_removed = inner.communities.remove(&entity_id).is_some();
-        #[cfg(feature = "edge-reinforcement-learning")]
-        {
-            inner.edge_store.remove(&entity_id);
-            for edges in inner.edge_store.values_mut() {
-                edges.retain(|e| e.target != entity_id);
-            }
-        }
-    }
-
-    // 4. Remove entity and its incident edges via remove_entity
-    graph.remove_entity(wal_tx, entity_id).await?;
-    report.tombstoned_edge_count = edge_count_before;
-
-    // 5. Purge reinforcement buffer signals
-    #[cfg(feature = "edge-reinforcement-learning")]
-    if let Some(buf) = buffer {
-        report.buffer_signals_purged = buf.purge_signals_for_entity(entity_id);
-    }
-
-    // 6. Purge DocEdgeIndex references
-    graph.doc_edge_index.purge_entity(entity_id);
-
-    Ok(report)
-}
-
 /// Verifies byte-accurately that no active (non-tombstoned) hyperedge in `graph` directly or
 /// transitively (via `child_edge_ids`) references `target_doc_id`.
 ///
@@ -566,7 +416,6 @@ pub fn verify_doc_hyperedge_deletion_completeness(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use crate::csr::EdgeType;
@@ -578,7 +427,7 @@ mod tests {
     #[tokio::test]
     async fn test_cascade_invalidation_tombstones_edges_of_superseded_doc() {
         let graph = std::sync::Arc::new(CsrGraph::new());
-        let tx1 = TxId::try_new(1).unwrap();
+        let tx1 = TxId::new(1);
         let doc_a = DocId::from_key("doc-a").unwrap();
         let doc_b = DocId::from_key("doc-b").unwrap();
 
@@ -642,7 +491,7 @@ mod tests {
     #[tokio::test]
     async fn test_cascade_invalidation_is_idempotent() {
         let graph = std::sync::Arc::new(CsrGraph::new());
-        let tx1 = TxId::try_new(1).unwrap();
+        let tx1 = TxId::new(1);
         let doc_a = DocId::from_key("doc-a").unwrap();
 
         let node1 = EntityId::new(100);
@@ -686,7 +535,7 @@ mod tests {
     #[tokio::test]
     async fn test_pathrag_sufficiency_excludes_cascaded_tombstones() {
         let graph = std::sync::Arc::new(CsrGraph::new());
-        let tx1 = TxId::try_new(1).unwrap();
+        let tx1 = TxId::new(1);
         let doc_a = DocId::from_key("doc-a").unwrap();
 
         let node1 = EntityId::new(10);
@@ -745,7 +594,7 @@ mod tests {
     #[tokio::test]
     async fn test_cascade_invalidation_max_wal_seq() {
         let graph = std::sync::Arc::new(CsrGraph::new());
-        let tx1 = TxId::try_new(1).unwrap();
+        let tx1 = TxId::new(1);
         let doc_a = DocId::from_key("doc-max-seq").unwrap();
 
         let node1 = EntityId::new(1001);
@@ -783,7 +632,7 @@ mod tests {
     #[tokio::test]
     async fn test_cascade_invalidation_multiple_edges_same_doc() {
         let graph = std::sync::Arc::new(CsrGraph::new());
-        let tx1 = TxId::try_new(1).unwrap();
+        let tx1 = TxId::new(1);
         let doc_multi = DocId::from_key("doc-multi").unwrap();
 
         let n1 = EntityId::new(10);
@@ -1030,7 +879,7 @@ mod tests {
     #[tokio::test]
     async fn test_sweep_orphans_sweeps_degenerated_hyperedges() {
         let graph = CsrGraph::new();
-        let tx = TxId::try_new(1).unwrap();
+        let tx = TxId::new(1);
 
         let e1 = EntityId::new(10);
         let e2 = EntityId::new(20);
@@ -1079,7 +928,7 @@ mod tests {
         graph.insert_hyperedge_direct(h2);
         graph.insert_hyperedge_direct(h3);
 
-        let swept = graph.sweep_orphans(TxId::try_new(10).unwrap()).unwrap();
+        let swept = graph.sweep_orphans(TxId::new(10)).unwrap();
         assert_eq!(
             swept, 2,
             "Must sweep exactly 2 orphaned hyperedges (h2 and h3)"

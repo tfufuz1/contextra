@@ -31,8 +31,7 @@ pub use radix::{
 };
 pub use radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 pub use scratchpad_invalidation::{
-    CacheReport, CchRamClaim, PrefixStoreScratchpadInvalidator, ScratchpadCacheScope,
-    ScratchpadInvalidator,
+    PrefixStoreScratchpadInvalidator, ScratchpadCacheScope, ScratchpadInvalidator,
 };
 pub use segment::{
     KvSegment, KvSegmentContent, ShreddableSegmentKey, Tier2EncryptedSegment,

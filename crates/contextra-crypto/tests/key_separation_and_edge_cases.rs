@@ -4,14 +4,7 @@
 // NICHT-OFFENSICHTLICH: Handles extreme passphrase lengths, unicode, truncated ciphertexts, and 100MB payloads without panics.
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    deprecated
-)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_crypto::wal_crypto::EncryptedWal;
 use contextra_crypto::CryptoKey;

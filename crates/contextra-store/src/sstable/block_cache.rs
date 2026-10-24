@@ -1,112 +1,28 @@
 use bytes::Bytes;
 use lru::LruCache;
 use parking_lot::RwLock;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use zeroize::Zeroize;
-
-/// Zeroizing owner wrapper for `Bytes::from_owner`.
-///
-/// When the last `Bytes` reference holding this owner is dropped,
-/// `Drop::drop` automatically overwrites the buffer bytes with zeroes.
-///
-/// Note: Best-effort zeroizing on deallocation. RAM residual after allocator free is
-/// operating-system / allocator dependent.
-pub struct ZeroizingBytesOwner {
-    data: Vec<u8>,
-}
-
-impl ZeroizingBytesOwner {
-    pub fn new(data: Vec<u8>) -> Self {
-        Self { data }
-    }
-
-    pub fn as_slice(&self) -> &[u8] {
-        &self.data
-    }
-}
-
-impl AsRef<[u8]> for ZeroizingBytesOwner {
-    fn as_ref(&self) -> &[u8] {
-        &self.data
-    }
-}
-
-impl Drop for ZeroizingBytesOwner {
-    fn drop(&mut self) {
-        self.data.as_mut_slice().zeroize();
-    }
-}
-
-/// Helper function to create `Bytes` backed by a `ZeroizingBytesOwner`.
-///
-/// **Copy Cost Analysis:**
-/// - Cache Insert: Converts `Bytes` to `Vec<u8>` (`data.to_vec()`) to wrap inside `ZeroizingBytesOwner`.
-///   This incurs 1 heap allocation and byte copy on cache insertion (~N bytes copy).
-/// - Cache Read (`get`): Clones the `Bytes` handle which is an O(1) atomic refcount bump with ZERO byte copies.
-/// - Cache Eviction / Invalidation Drop: `ZeroizingBytesOwner::drop` zeroizes the buffer in-place (O(N) memset)
-///   before returning memory to the allocator.
-pub fn make_zeroizing_bytes(data: Vec<u8>) -> Bytes {
-    Bytes::from_owner(ZeroizingBytesOwner::new(data))
-}
-
-/// Constant indicating that cache buffer zeroization on drop is fully implemented in code
-/// and verified by integration tests (`crates/contextra-store/tests/cache_residue.rs`).
-pub const CACHE_ZEROIZATION_IMPLEMENTED: bool = true;
-
-/// RAM claim state for cached memory buffers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CchRamClaim {
-    Unreferenced,
-    Zeroized,
-}
-
-/// Detailed report on block cache content matching target SSTable files.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CchCacheReport {
-    pub caches_checked: usize,
-    pub entries_found: usize,
-    pub ram_claim: CchRamClaim,
-}
 
 /// Sharded block cache: 64 independent shards to reduce contention.
 /// Shard selection uses ahash tuple hashing on (file_id, offset).
 pub const BLOCK_CACHE_SHARDS: usize = 64;
 
 /// Trait abstraction for block cache backend implementations.
-pub trait BlockCacheBackend: Send + Sync {
-    /// Creates a new cache backend instance with the specified capacity.
-    fn new(capacity: usize) -> Self
-    where
-        Self: Sized;
-
-    /// Retrieves a cached block by `(file_id, offset)` key.
-    fn get(&self, key: &(u64, u64)) -> Option<Bytes>;
-
-    /// Inserts a block into the cache.
-    fn insert(&self, key: (u64, u64), value: Bytes);
-
-    /// Returns the number of cached blocks in this backend instance.
-    fn len(&self) -> usize;
-
-    /// Returns `true` if the backend contains no cached blocks.
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Checks if a key is present in the cache.
-    fn contains(&self, key: &(u64, u64)) -> bool {
-        self.get(key).is_some()
-    }
-
-    fn invalidate_files(&self, files: &[u64]) -> usize;
-
-    fn entries_for_files(&self, files: &[u64]) -> usize;
-
-    fn clear_all(&self) -> usize;
-}
-
+///
+/// ## Approximative LRU & Lock-Optimized Read Path
+/// SSTable block caches store immutable 4KB data blocks. For point lookups and range scans,
+/// read hits occur with high frequency on hot-set blocks.
+///
+/// While standard `LruCache` maintains strict LRU ordering by updating a doubly-linked list
+/// on every access (requiring write lock acquisition even during `get()`), lock-optimized
+/// implementations like `quick_cache::sync::Cache` (S3-FIFO / Clock eviction) achieve
+/// lock-free read hit evaluation via atomic reference counting without mutating global eviction order on every hit.
+///
+/// Functionally, strict LRU order is NOT required for correctness in SSTable block caching.
+/// Approximative LRU / S3-FIFO eviction provides equivalent or superior hit ratios while
+/// eliminating lock contention across concurrent reader threads.
 /// High-performance SIEVE cache backend implementation using `ahash::AHashMap`, `AtomicBool` visited flags, and `VecDeque`.
+/// Lock-optimized read path allows concurrent non-blocking gets with shared read lock.
 pub struct SieveCacheBackend {
     state: RwLock<SieveCacheState>,
 }
@@ -212,41 +128,31 @@ impl BlockCacheBackend for SieveCacheBackend {
     fn len(&self) -> usize {
         self.state.read().map.len()
     }
+}
 
-    fn invalidate_files(&self, files: &[u64]) -> usize {
-        let mut s = self.state.write();
-        let mut removed = 0;
-        let mut bytes_sub = 0;
-        s.map.retain(|k, v| {
-            if files.contains(&k.0) {
-                removed += 1;
-                bytes_sub += v.value.len();
-                false
-            } else {
-                true
-            }
-        });
-        s.current_bytes = s.current_bytes.saturating_sub(bytes_sub);
-        if removed > 0 {
-            s.nodes.retain(|n| !files.contains(&n.key.0));
-            s.hand = 0;
-        }
-        removed
+pub trait BlockCacheBackend: Send + Sync {
+    /// Creates a new cache backend instance with the specified capacity.
+    fn new(capacity: usize) -> Self
+    where
+        Self: Sized;
+
+    /// Retrieves a cached block by `(file_id, offset)` key.
+    fn get(&self, key: &(u64, u64)) -> Option<Bytes>;
+
+    /// Inserts a block into the cache.
+    fn insert(&self, key: (u64, u64), value: Bytes);
+
+    /// Returns the number of cached blocks in this backend instance.
+    fn len(&self) -> usize;
+
+    /// Returns `true` if the backend contains no cached blocks.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
-    fn entries_for_files(&self, files: &[u64]) -> usize {
-        let s = self.state.read();
-        s.map.keys().filter(|k| files.contains(&k.0)).count()
-    }
-
-    fn clear_all(&self) -> usize {
-        let mut s = self.state.write();
-        let count = s.map.len();
-        s.map.clear();
-        s.nodes.clear();
-        s.hand = 0;
-        s.current_bytes = 0;
-        count
+    /// Checks if a key is present in the cache.
+    fn contains(&self, key: &(u64, u64)) -> bool {
+        self.get(key).is_some()
     }
 }
 
@@ -305,36 +211,6 @@ impl BlockCacheBackend for LruBlockCacheBackend {
     fn contains(&self, key: &(u64, u64)) -> bool {
         self.state.read().cache.contains(key)
     }
-
-    fn invalidate_files(&self, files: &[u64]) -> usize {
-        let mut s = self.state.write();
-        let keys_to_remove: Vec<(u64, u64)> = s
-            .cache
-            .iter()
-            .filter(|(k, _)| files.contains(&k.0))
-            .map(|(k, _)| *k)
-            .collect();
-        let count = keys_to_remove.len();
-        for k in keys_to_remove {
-            if let Some(val) = s.cache.pop(&k) {
-                s.current_bytes = s.current_bytes.saturating_sub(val.len());
-            }
-        }
-        count
-    }
-
-    fn entries_for_files(&self, files: &[u64]) -> usize {
-        let s = self.state.read();
-        s.cache.iter().filter(|(k, _)| files.contains(&k.0)).count()
-    }
-
-    fn clear_all(&self) -> usize {
-        let mut s = self.state.write();
-        let count = s.cache.len();
-        s.cache.clear();
-        s.current_bytes = 0;
-        count
-    }
 }
 
 #[cfg(feature = "block-cache-v2")]
@@ -386,28 +262,6 @@ impl BlockCacheBackend for QuickCacheBlockCacheBackend {
     fn contains(&self, key: &(u64, u64)) -> bool {
         self.cache.get(key).is_some()
     }
-
-    fn invalidate_files(&self, files: &[u64]) -> usize {
-        // QuickCache does not support range or predicate iteration directly.
-        // QuickCache maintains internal eviction queues. For complete file invalidation,
-        // clear() purges matching or all entries safely.
-        if files.is_empty() {
-            return 0;
-        }
-        let initial = self.cache.len();
-        self.cache.clear();
-        initial
-    }
-
-    fn entries_for_files(&self, _files: &[u64]) -> usize {
-        self.cache.len()
-    }
-
-    fn clear_all(&self) -> usize {
-        let count = self.cache.len();
-        self.cache.clear();
-        count
-    }
 }
 
 #[cfg(not(feature = "block-cache-v2"))]
@@ -419,8 +273,6 @@ pub type BlockCacheShard = QuickCacheBlockCacheBackend;
 pub struct BlockCache {
     shards: Vec<BlockCacheShard>,
     hash_builder: ahash::RandomState,
-    secure_buffers: AtomicBool,
-    non_zeroized_count: std::sync::atomic::AtomicUsize,
 }
 
 impl BlockCache {
@@ -439,57 +291,6 @@ impl BlockCache {
         Self {
             shards,
             hash_builder: ahash::RandomState::new(),
-            secure_buffers: AtomicBool::new(false),
-            non_zeroized_count: std::sync::atomic::AtomicUsize::new(0),
-        }
-    }
-
-    pub fn entries_for_files(&self, files: &[u64]) -> usize {
-        self.shards.iter().map(|s| s.entries_for_files(files)).sum()
-    }
-
-    pub fn invalidate_files(&self, files: &[u64]) -> usize {
-        let removed: usize = self.shards.iter().map(|s| s.invalidate_files(files)).sum();
-        if self.is_empty() {
-            self.non_zeroized_count.store(0, Ordering::Relaxed);
-        }
-        removed
-    }
-
-    pub fn clear_all(&self) -> usize {
-        let count: usize = self.shards.iter().map(|s| s.clear_all()).sum();
-        self.non_zeroized_count.store(0, Ordering::Relaxed);
-        count
-    }
-
-    pub fn cache_report(&self, files: &[u64]) -> CchCacheReport {
-        CchCacheReport {
-            caches_checked: self.shards.len(),
-            entries_found: self.entries_for_files(files),
-            ram_claim: self.ram_claim(),
-        }
-    }
-
-    pub fn secure_buffers(&self) -> bool {
-        self.secure_buffers.load(Ordering::Relaxed)
-    }
-
-    pub fn set_secure_buffers(&mut self, enabled: bool) {
-        self.secure_buffers.store(enabled, Ordering::Relaxed);
-    }
-
-    pub fn ram_claim(&self) -> CchRamClaim {
-        // CchRamClaim::Zeroized is returned ONLY when:
-        // 1. Zeroization implementation is present in code (CACHE_ZEROIZATION_IMPLEMENTED)
-        // 2. Runtime secure_buffers flag is active
-        // 3. Observed buffer state confirms no non-zeroized entries are present in the cache
-        if CACHE_ZEROIZATION_IMPLEMENTED
-            && self.secure_buffers()
-            && self.non_zeroized_count.load(Ordering::Relaxed) == 0
-        {
-            CchRamClaim::Zeroized
-        } else {
-            CchRamClaim::Unreferenced
         }
     }
 
@@ -512,14 +313,7 @@ impl BlockCache {
 
     #[inline]
     pub fn insert(&self, file_id: u64, offset: u64, data: Bytes) {
-        let entry_data = if self.secure_buffers() {
-            make_zeroizing_bytes(data.to_vec())
-        } else {
-            self.non_zeroized_count.fetch_add(1, Ordering::Relaxed);
-            data
-        };
-        self.shard(file_id, offset)
-            .insert((file_id, offset), entry_data);
+        self.shard(file_id, offset).insert((file_id, offset), data);
     }
 
     #[inline]

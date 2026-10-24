@@ -1,9 +1,8 @@
 use bytes::Bytes;
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::manifest::{Manifest, ManifestEntry};
 use contextra_store::sstable::{BlockCache, SstableReader};
 use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::TxId;
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -199,8 +198,7 @@ async fn test_concurrent_commit_during_flush_is_durable() {
 
 #[tokio::test]
 async fn test_v1_sst_compatibility_fixture() {
-    let fixture_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/sst_v1_single_version.sst");
+    let fixture_path = "tests/fixtures/sst_v1_single_version.sst";
     let block_cache = Arc::new(BlockCache::new(100));
     let reader = SstableReader::open(fixture_path, block_cache)
         .await

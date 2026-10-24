@@ -165,7 +165,6 @@ pub fn check_gate(crate_name: &str, root: &Path) -> Result<MutationGateReport, M
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))] // Gate runner function included in test targets via #[path]
 pub fn run_check_mutation_score_gate(args: &[String], root: &Path) -> Result<(), String> {
     let mut crate_name = String::new();
     let mut i = 0;

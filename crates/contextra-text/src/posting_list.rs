@@ -19,7 +19,11 @@ pub const POSTING_LIST_V2_MAGIC: &[u8; 4] = b"PL\x02\x00";
 /// Block size for Block-Max WAND decomposition.
 pub const BLOCK_SIZE: usize = 64;
 
-pub use contextra_types::DocIdRaw;
+#[cfg(not(feature = "docid-128"))]
+pub type DocIdRaw = u64;
+
+#[cfg(feature = "docid-128")]
+pub type DocIdRaw = u128;
 
 /// Block-Max metadata for a chunk of postings (typically 64 postings).
 #[repr(C, align(8))]
@@ -34,7 +38,7 @@ pub struct PostingBlockInfo {
 }
 
 /// Compact representation of a single posting in a posting list.
-/// Packed with 8-byte alignment for optimal CPU cache alignment.
+/// Packed with 8-byte alignment (16 bytes total) for optimal CPU cache alignment.
 #[repr(C, align(8))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Posting {
@@ -47,7 +51,7 @@ impl Posting {
     #[inline]
     pub fn new(doc_id: DocId, tf: u32, doc_len: u32) -> Self {
         Self {
-            doc_id: doc_id.raw(),
+            doc_id: doc_id.inner(),
             tf,
             doc_len,
         }
@@ -55,7 +59,7 @@ impl Posting {
 
     #[inline]
     pub fn doc_id(&self) -> DocId {
-        DocId::from(self.doc_id)
+        DocId::new(self.doc_id)
     }
 }
 
@@ -99,8 +103,8 @@ pub struct PostingList {
 impl PostingList {
     /// Creates a new `PostingList` from a vector of postings, ensuring sorted order by DocId.
     pub fn new(mut postings: Vec<Posting>) -> Self {
-        postings.sort_unstable_by_key(|p| u128::from(p.doc_id));
-        postings.dedup_by_key(|p| u128::from(p.doc_id));
+        postings.sort_unstable_by_key(|p| p.doc_id);
+        postings.dedup_by_key(|p| p.doc_id);
         let blocks = compute_blocks(&postings);
         Self { postings, blocks }
     }
@@ -140,7 +144,7 @@ impl PostingList {
     /// Inserts or updates a posting for a doc_id using RCU/copy-on-write semantics.
     pub fn upsert(&self, posting: Posting) -> Self {
         let mut new_postings = self.postings.clone();
-        match new_postings.binary_search_by_key(&u128::from(posting.doc_id), |p| u128::from(p.doc_id)) {
+        match new_postings.binary_search_by_key(&posting.doc_id, |p| p.doc_id) {
             Ok(idx) => {
                 new_postings[idx] = posting;
             }
@@ -158,7 +162,7 @@ impl PostingList {
     /// Removes a posting for a doc_id using RCU/copy-on-write semantics.
     pub fn remove(&self, doc_id: DocId) -> Self {
         let mut new_postings = self.postings.clone();
-        if let Ok(idx) = new_postings.binary_search_by_key(&u128::from(doc_id.raw()), |p| u128::from(p.doc_id)) {
+        if let Ok(idx) = new_postings.binary_search_by_key(&doc_id.inner(), |p| p.doc_id) {
             new_postings.remove(idx);
         }
         let blocks = compute_blocks(&new_postings);
@@ -174,25 +178,22 @@ impl PostingList {
         buf.extend_from_slice(POSTING_LIST_V2_MAGIC);
         encode_varint(self.postings.len() as u64, &mut buf);
 
-        let mut prev_doc_id = 0u128;
+        let mut prev_doc_id = 0u64;
         for p in &self.postings {
-            let doc_id_u128 = u128::from(p.doc_id);
-            let delta_u128 = doc_id_u128
-                .checked_sub(prev_doc_id)
+            let delta = (p.doc_id as u128)
+                .checked_sub(prev_doc_id as u128)
                 .ok_or_else(|| {
                     ContextraError::Storage(
                         "Unsorted or overflow doc_id in posting list".to_string(),
                     )
-                })?;
-            let delta = u64::try_from(delta_u128).map_err(|_| {
-                ContextraError::Storage(
-                    "Delta exceeds u64 max for varint encoding".to_string(),
-                )
-            })?;
+                })? as u64;
             encode_varint(delta, &mut buf);
             encode_varint(p.tf as u64, &mut buf);
             encode_varint(p.doc_len as u64, &mut buf);
-            prev_doc_id = doc_id_u128;
+            #[allow(clippy::unnecessary_cast)]
+            {
+                prev_doc_id = p.doc_id as u64;
+            }
         }
 
         Ok(buf)
@@ -211,14 +212,14 @@ impl PostingList {
                 )));
             }
             let mut postings = Vec::with_capacity(count as usize);
-            let mut prev_doc_id: DocIdRaw = 0;
+            let mut prev_doc_id = 0u64;
 
             for _ in 0..count {
                 let delta = decode_varint(bytes, &mut offset)?;
                 let tf_u64 = decode_varint(bytes, &mut offset)?;
                 let doc_len_u64 = decode_varint(bytes, &mut offset)?;
 
-                let doc_id = prev_doc_id.checked_add(DocIdRaw::from(delta)).ok_or_else(|| {
+                let doc_id = prev_doc_id.checked_add(delta).ok_or_else(|| {
                     ContextraError::Storage("DocId overflow during delta decoding".to_string())
                 })?;
                 let tf: u32 = tf_u64
@@ -229,7 +230,7 @@ impl PostingList {
                 })?;
 
                 postings.push(Posting {
-                    doc_id,
+                    doc_id: doc_id as DocIdRaw,
                     tf,
                     doc_len,
                 });
@@ -301,13 +302,8 @@ impl ResidentPostingIndex {
     }
 
     /// Inserts or replaces a PostingList for a given term.
-    /// If `list` is empty, the term is purged from the resident index.
     pub fn insert_list(&self, term: String, list: PostingList) {
-        if list.is_empty() {
-            self.index.write().remove(&term);
-        } else {
-            self.index.write().insert(term, Arc::new(list));
-        }
+        self.index.write().insert(term, Arc::new(list));
     }
 
     /// Upserts a single posting for a term using RCU (Copy-On-Write).
@@ -323,11 +319,6 @@ impl ResidentPostingIndex {
 
     /// Removes a posting for a doc_id across a list of terms using RCU.
     pub fn remove_posting_from_terms(&self, terms: &[String], doc_id: DocId) {
-        self.remove_terms(doc_id, terms);
-    }
-
-    /// Removes postings for a given doc_id across specified terms from the in-memory cache (e.g., on transaction rollback).
-    pub fn remove_terms(&self, doc_id: DocId, terms: &[String]) {
         let mut guard = self.index.write();
         for term in terms {
             if let Some(list) = guard.get(term).cloned() {
@@ -341,11 +332,11 @@ impl ResidentPostingIndex {
         }
     }
 
-    /// Executes a callback for every term and posting list currently in the resident index.
-    pub fn visit_entries<F: FnMut(&str, &PostingList)>(&self, mut f: F) {
-        let guard = self.index.read();
-        for (term, plist) in guard.iter() {
-            f(term.as_str(), plist.as_ref());
+    /// Removes specified terms from the in-memory cache (e.g., on transaction rollback).
+    pub fn remove_terms(&self, terms: &[String]) {
+        let mut guard = self.index.write();
+        for term in terms {
+            guard.remove(term);
         }
     }
 
@@ -461,7 +452,7 @@ mod tests {
             curr_doc_id += delta;
             let tf = ((i % 20) + 1) as u32;
             let doc_len = (50 + (i % 100)) as u32;
-            postings.push(Posting::new(DocId::new(curr_doc_id.into()), tf, doc_len));
+            postings.push(Posting::new(DocId::new(curr_doc_id), tf, doc_len));
         }
 
         let multi_list = PostingList::new(postings);

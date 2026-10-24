@@ -9,7 +9,7 @@ pub struct Violation {
     pub line_content: String,
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 pub fn run_check_nan_validation_in_hot_loop(root: &Path) -> Result<Vec<Violation>, String> {
     run_check_nan_validation_in_hot_loop_with_options(root, false)
 }

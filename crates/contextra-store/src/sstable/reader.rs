@@ -3,14 +3,12 @@ use super::block_search::{
     binary_search_entry_in_block, binary_search_first_index_in_block, get_entry_at_index,
 };
 use super::bloom::BloomFilter;
-use super::builder::{build_block_aad, SstableMetadata};
+use super::builder::SstableMetadata;
 use super::io::pread_exact;
 use super::stream::SstableStream;
-use crate::format::{check_openable, FileKind, FormatHeader};
 use crate::wal::KeyManager;
 use bytes::Bytes;
-use contextra_crypto::{KeyId, ScopeKeyring};
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -228,14 +226,11 @@ pub struct SstableReader {
     /// Shared block cache.
     pub(super) block_cache: Arc<BlockCache>,
     pub(super) key_manager: Option<Arc<KeyManager>>,
-    pub(super) scope_keyring: Option<Arc<ScopeKeyring>>,
-    pub(super) key_id: Option<KeyId>,
-    pub(super) enc_version: u16,
     /// Optional whole-SSTable bloom filter for cross-block pre-checks.
     pub(super) bloom_filter: Option<BloomFilter>,
     /// Whether blocks have CRC32 checksums.
     pub(super) has_crc: bool,
-    /// Format version of the SSTable file (0, 1, 2, 3, 4, or 5).
+    /// Format version of the SSTable file (0, 1, 2, 3, or 4).
     pub format_version: u16,
 }
 
@@ -260,18 +255,6 @@ impl SstableReader {
         &self.file_path
     }
 
-    pub fn key_id(&self) -> Option<KeyId> {
-        self.key_id
-    }
-
-    pub fn index(&self) -> &[(Bytes, u64)] {
-        &self.index
-    }
-
-    pub fn index_offset(&self) -> u64 {
-        self.index_offset
-    }
-
     /// Opens an existing SSTable file for reading.
     pub async fn open(path: impl AsRef<Path>, block_cache: Arc<BlockCache>) -> Result<Self> {
         Self::open_with_key_manager(path, block_cache, None).await
@@ -280,15 +263,6 @@ impl SstableReader {
     pub async fn open_with_key_manager(
         path: impl AsRef<Path>,
         block_cache: Arc<BlockCache>,
-        key_manager: Option<Arc<KeyManager>>,
-    ) -> Result<Self> {
-        Self::open_with_keyring(path, block_cache, None, key_manager).await
-    }
-
-    pub async fn open_with_keyring(
-        path: impl AsRef<Path>,
-        block_cache: Arc<BlockCache>,
-        scope_keyring: Option<Arc<ScopeKeyring>>,
         key_manager: Option<Arc<KeyManager>>,
     ) -> Result<Self> {
         let path_buf = path.as_ref().to_path_buf();
@@ -320,14 +294,14 @@ impl SstableReader {
 
         let file = Arc::new(file);
 
-        // Read trailer: last 72 bytes (v5), 54 bytes (v1..v4), or 52 bytes (v0)
+        // Read trailer: last 54 bytes (v1..v4) or 52 bytes (v0)
         let trailer_data = {
             let f = Arc::clone(&file);
-            let read_len = usize::try_from(72u64.min(file_size))
+            let read_len = usize::try_from(54u64.min(file_size))
                 .map_err(|_| ContextraError::Storage("File size conversion failed".into()))?;
             tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
                 let mut buf = vec![0u8; read_len];
-                let offset = file_size.saturating_sub(read_len as u64);
+                let offset = file_size.saturating_sub(54);
                 pread_exact(&f, &mut buf, offset)?;
                 Ok(buf)
             })
@@ -343,54 +317,47 @@ impl SstableReader {
 
         let mut format_version = 0u16;
         let mut is_mfsx = false;
-        let mut parsed_key_id: Option<KeyId> = None;
-        let mut parsed_enc_version = 0u16;
-        let mut trailer_size = 54u64;
 
-        if trailer_len >= 12 {
-            let magic_slice = &trailer_data[trailer_len - 4..trailer_len];
-            let magic = u32::from_le_bytes(
-                magic_slice
-                    .try_into()
-                    .map_err(|_| ContextraError::Storage("Invalid trailer".into()))?,
-            );
-            if magic == SSTABLE_MAGIC_MFSX {
-                let ver_slice = &trailer_data[trailer_len - 6..trailer_len - 4];
-                let ver = u16::from_le_bytes(
-                    ver_slice
+        if trailer_len >= 54 {
+            if let Some(slice) = trailer_data.get(50..54) {
+                let magic_v1 = u32::from_le_bytes(
+                    slice
                         .try_into()
                         .map_err(|_| ContextraError::Storage("Invalid trailer".into()))?,
                 );
-                if ver >= 5 && trailer_len >= 72 {
-                    format_version = ver;
-                    is_mfsx = true;
-                    trailer_size = 72;
-                } else if ver >= 1 && trailer_len >= 54 {
-                    format_version = ver;
-                    is_mfsx = true;
-                    trailer_size = 54;
-                } else if ver == 0 && trailer_len >= 52 {
-                    format_version = 0;
-                    is_mfsx = true;
-                    trailer_size = 52;
+                if magic_v1 == SSTABLE_MAGIC_MFSX {
+                    if let Some(ver_slice) = trailer_data.get(48..50) {
+                        format_version = u16::from_le_bytes(
+                            ver_slice
+                                .try_into()
+                                .map_err(|_| ContextraError::Storage("Invalid trailer".into()))?,
+                        );
+                        is_mfsx = true;
+                    }
                 }
             }
         }
 
-        if is_mfsx {
-            let header = FormatHeader::new(*b"MFSX", format_version);
-            check_openable(FileKind::Sstable, &header, 5)?;
-
-            if let Some(parent) = path_buf.parent() {
-                let manifest_path = parent.join("MANIFEST");
-                if manifest_path.exists() {
-                    if let Ok(entries) = crate::manifest::Manifest::load(&manifest_path).await {
-                        let tracker =
-                            crate::manifest::ManifestFormatTracker::from_entries(&entries);
-                        tracker.verify_file_version(FileKind::Sstable, format_version)?;
-                    }
+        if !is_mfsx && trailer_len >= 52 {
+            if let Some(slice) = trailer_data.get(48..52) {
+                let magic_v0 = u32::from_le_bytes(
+                    slice
+                        .try_into()
+                        .map_err(|_| ContextraError::Storage("Invalid trailer".into()))?,
+                );
+                if magic_v0 == SSTABLE_MAGIC_MFSX {
+                    is_mfsx = true;
+                    format_version = 0;
                 }
             }
+        }
+
+        // Unknown format version error check (supports versions up to v4)
+        if is_mfsx && format_version > 4 {
+            return Err(ContextraError::Storage(format!(
+                "Unsupported SSTable format version: {}",
+                format_version
+            )));
         }
 
         let mut has_bloom = false;
@@ -402,41 +369,38 @@ impl SstableReader {
         let mut max_seq = 0;
 
         let index_offset = if is_mfsx {
-            let base = trailer_len.saturating_sub(usize::try_from(trailer_size).unwrap_or(54));
-            let offset_adjust = if format_version == 0 { 2 } else { 0 };
-            let b = base + offset_adjust;
-
+            let base = if format_version >= 1 { 0 } else { 2 };
             min_tx_id = u64::from_le_bytes(
                 trailer_data
-                    .get(b..b + 8)
+                    .get(base..base + 8)
                     .ok_or_else(|| ContextraError::ParseError("Invalid min_tx_id".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid min_tx_id".into()))?,
             );
             max_tx_id = u64::from_le_bytes(
                 trailer_data
-                    .get(b + 8..b + 16)
+                    .get(base + 8..base + 16)
                     .ok_or_else(|| ContextraError::ParseError("Invalid max_tx_id".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid max_tx_id".into()))?,
             );
             min_seq = u64::from_le_bytes(
                 trailer_data
-                    .get(b + 16..b + 24)
+                    .get(base + 16..base + 24)
                     .ok_or_else(|| ContextraError::ParseError("Invalid min_seq".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid min_seq".into()))?,
             );
             max_seq = u64::from_le_bytes(
                 trailer_data
-                    .get(b + 24..b + 32)
+                    .get(base + 24..base + 32)
                     .ok_or_else(|| ContextraError::ParseError("Invalid max_seq".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid max_seq".into()))?,
             );
             bloom_offset = u64::from_le_bytes(
                 trailer_data
-                    .get(b + 32..b + 40)
+                    .get(base + 32..base + 40)
                     .ok_or_else(|| ContextraError::ParseError("Invalid bloom_offset".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid bloom_offset".into()))?,
@@ -444,43 +408,21 @@ impl SstableReader {
             if bloom_offset > 0 {
                 has_bloom = true;
             }
-            let idx_off = u64::from_le_bytes(
+            u64::from_le_bytes(
                 trailer_data
-                    .get(b + 40..b + 48)
+                    .get(base + 40..base + 48)
                     .ok_or_else(|| ContextraError::ParseError("Invalid index_offset".into()))?
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("Invalid index_offset".into()))?,
-            );
-
-            if format_version >= 5 {
-                let kid_bytes: [u8; 16] = trailer_data
-                    .get(b + 48..b + 64)
-                    .ok_or_else(|| ContextraError::ParseError("Invalid key_id in trailer".into()))?
-                    .try_into()
-                    .map_err(|_| ContextraError::ParseError("Invalid key_id slice".into()))?;
-                parsed_key_id = Some(KeyId(kid_bytes));
-
-                parsed_enc_version = u16::from_le_bytes(
-                    trailer_data
-                        .get(b + 64..b + 66)
-                        .ok_or_else(|| ContextraError::ParseError("Invalid enc_version".into()))?
-                        .try_into()
-                        .map_err(|_| ContextraError::ParseError("Invalid enc_version".into()))?,
-                );
-            }
-
-            idx_off
+            )
         } else if trailer_len >= 54 {
-            let magic_legacy = u32::from_le_bytes(
-                trailer_data[trailer_len - 4..trailer_len]
-                    .try_into()
-                    .map_err(|_| {
-                        ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0)
-                    })?,
-            );
+            let magic_legacy =
+                u32::from_le_bytes(trailer_data[50..54].try_into().map_err(|_| {
+                    ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0)
+                })?);
             if magic_legacy == SSTABLE_MAGIC_LEGACY {
                 u64::from_le_bytes(
-                    trailer_data[trailer_len - 12..trailer_len - 4]
+                    trailer_data[42..50]
                         .try_into()
                         .map_err(|_| ContextraError::ParseError("Invalid index offset".into()))?,
                 )
@@ -495,7 +437,15 @@ impl SstableReader {
             ));
         };
 
-        let trailer_offset = file_size.saturating_sub(trailer_size);
+        let trailer_offset = file_size.saturating_sub(if is_mfsx {
+            if format_version >= 1 {
+                54
+            } else {
+                52
+            }
+        } else {
+            12
+        });
 
         if index_offset > trailer_offset
             || (has_bloom && (bloom_offset < index_offset || bloom_offset > trailer_offset))
@@ -507,7 +457,7 @@ impl SstableReader {
 
         let bloom_filter = if has_bloom {
             let bloom_end = if is_mfsx {
-                file_size.saturating_sub(trailer_size)
+                file_size.saturating_sub(if format_version >= 1 { 54 } else { 52 })
             } else {
                 file_size.saturating_sub(20)
             };
@@ -563,7 +513,15 @@ impl SstableReader {
             let index_end = if has_bloom {
                 bloom_offset
             } else {
-                file_size.saturating_sub(if is_mfsx { trailer_size } else { 12 })
+                file_size.saturating_sub(if is_mfsx {
+                    if format_version >= 1 {
+                        54
+                    } else {
+                        52
+                    }
+                } else {
+                    12
+                })
             };
 
             let index_read_len =
@@ -660,9 +618,6 @@ impl SstableReader {
                 offset,
                 next_offset,
                 &derived_km,
-                &scope_keyring,
-                parsed_key_id,
-                parsed_enc_version,
                 has_crc,
                 &path_buf,
             )
@@ -710,24 +665,17 @@ impl SstableReader {
             },
             block_cache,
             key_manager: derived_km,
-            scope_keyring,
-            key_id: parsed_key_id,
-            enc_version: parsed_enc_version,
             bloom_filter,
             has_crc,
             format_version,
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
     async fn read_block_at_file(
         file: Arc<std::fs::File>,
         offset: u64,
         next_offset: u64,
         key_manager: &Option<Arc<KeyManager>>,
-        scope_keyring: &Option<Arc<ScopeKeyring>>,
-        key_id: Option<KeyId>,
-        enc_version: u16,
         has_crc: bool,
         path: &Path,
     ) -> Result<Bytes> {
@@ -750,35 +698,7 @@ impl SstableReader {
         .map_err(|e| ContextraError::Storage(format!("Join error: {}", e)))?
         .map_err(|e| ContextraError::Storage(format!("Block read failed: {}", e)))?;
 
-        let block_data = if enc_version == 1 {
-            let (kr, kid) = match (scope_keyring.as_ref(), key_id) {
-                (Some(kr), Some(kid)) => (kr, kid),
-                _ => {
-                    return Err(ContextraError::Crypto(
-                        "ScopeKeyring required for v5 encrypted SSTable".into(),
-                    ));
-                }
-            };
-            let dek_handle = kr.dek(kid).map_err(|e| match e {
-                contextra_crypto::CryptoError::KeyRevoked(msg) => ContextraError::KeyDestroyed(msg),
-                other => ContextraError::Crypto(other.to_string()),
-            })?;
-
-            if data.len() < 12 {
-                return Err(ContextraError::Storage("Block too small for nonce".into()));
-            }
-            let mut nonce = [0u8; 12];
-            nonce.copy_from_slice(&data[0..12]);
-            let file_id_str = path
-                .file_name()
-                .map(|n| n.to_string_lossy())
-                .unwrap_or_default();
-            let aad = build_block_aad(file_id_str.as_bytes(), offset, &kid);
-            let decrypted = dek_handle
-                .decrypt(&data[12..], &nonce, &aad)
-                .map_err(|e| ContextraError::Crypto(e.to_string()))?;
-            Bytes::from(decrypted)
-        } else if let Some(km) = key_manager {
+        let block_data = if let Some(km) = key_manager {
             if data.len() < 12 {
                 return Err(ContextraError::Storage("Block too small for nonce".into()));
             }
@@ -823,9 +743,6 @@ impl SstableReader {
             offset,
             next_offset,
             &self.key_manager,
-            &self.scope_keyring,
-            self.key_id,
-            self.enc_version,
             self.has_crc,
             &self.file_path,
         )
@@ -863,7 +780,7 @@ impl SstableReader {
             start_idx -= 1;
         }
 
-        let max_seq_raw = max_seq & !contextra_types::TOMBSTONE_BIT;
+        let max_seq_raw = max_seq & !contextra_core::TOMBSTONE_BIT;
         let is_v3 = self.format_version >= 3;
 
         for idx in start_idx..self.index.len() {
@@ -960,9 +877,9 @@ impl SstableReader {
                             ));
                         }
 
-                        let raw_seq = seq_no & !contextra_types::TOMBSTONE_BIT;
+                        let raw_seq = seq_no & !contextra_core::TOMBSTONE_BIT;
                         if raw_seq <= max_seq_raw
-                            && (tx_id <= max_tx || tx_id >= contextra_types::TxId::INTERNAL_BASE)
+                            && (tx_id <= max_tx || tx_id >= contextra_core::TxId::INTERNAL_BASE)
                         {
                             let entry_val = block_data.slice(ep_val..end_val);
                             return Ok(Some((entry_val, seq_no, tx_id)));
@@ -1154,37 +1071,5 @@ impl SstableReader {
         }
 
         Ok(results)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_read_block_enc_version_without_keyring_errors() {
-        let temp_file = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(temp_file.path(), b"01234567890123456789").unwrap();
-        let file = Arc::new(std::fs::File::open(temp_file.path()).unwrap());
-
-        let res = SstableReader::read_block_at_file(
-            file,
-            0,
-            20,
-            &None,
-            &None,
-            None,
-            1,
-            true,
-            temp_file.path(),
-        )
-        .await;
-
-        let err = res.unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("ScopeKeyring required for v5 encrypted SSTable"),
-            "Expected ScopeKeyring error, got: {err}"
-        );
     }
 }

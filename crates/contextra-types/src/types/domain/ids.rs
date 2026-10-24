@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 /// INVARIANTE INV-TENANT-1: TenantId(0) ist SYSTEM-reserviert.
 /// `TenantId::try_new(0)` → Err. Keine Ausnahmen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(try_from = "u64")]
 #[repr(transparent)]
 pub struct TenantId(pub u64);
 
@@ -22,12 +21,6 @@ impl TenantId {
     #[deprecated(note = "Identisch zu TenantId::SYSTEM — nutze SYSTEM für Klarheit.")]
     pub const INVALID: Self = Self(0);
 
-    /// Explicit helper returning the `SYSTEM` tenant identifier (`TenantId(0)`).
-    #[inline]
-    pub const fn system() -> Self {
-        Self::SYSTEM
-    }
-
     /// Const-Konstruktor.
     #[deprecated(
         since = "0.1.0",
@@ -35,13 +28,6 @@ impl TenantId {
     )]
     #[inline]
     pub const fn new(id: u64) -> Self {
-        Self(id)
-    }
-
-    /// Unchecked constructor for hot-path use cases where invariants have already been verified.
-    #[doc(hidden)]
-    #[inline]
-    pub const fn new_unchecked(id: u64) -> Self {
         Self(id)
     }
 
@@ -147,17 +133,6 @@ impl std::fmt::Display for CollectionId {
     }
 }
 
-/// Raw scalar primitive representing the width of a `DocId`.
-///
-/// In default configuration, `DocIdRaw` is `u64`.
-/// When feature `docid-128` is enabled (ADR-082), `DocIdRaw` is `u128`.
-#[cfg(not(feature = "docid-128"))]
-pub type DocIdRaw = u64;
-
-#[cfg(feature = "docid-128")]
-/// Raw scalar primitive representing the width of a `DocId` (128-bit variant).
-pub type DocIdRaw = u128;
-
 /// Internal document identifier.
 ///
 /// Under the default configuration, `DocId` wraps a 64-bit primitive (`u64`).
@@ -176,8 +151,6 @@ pub struct DocId(pub u128);
 
 #[cfg(not(feature = "docid-128"))]
 impl DocId {
-    /// Width of `DocId` in bytes (8 in default 64-bit mode).
-    pub const BYTES: usize = 8;
     /// Maximum possible `DocId` value (`u64::MAX`).
     pub const MAX: Self = Self(u64::MAX);
     /// Minimum possible `DocId` value (`0`).
@@ -189,18 +162,9 @@ impl DocId {
     pub const MIN: Self = Self(0);
 
     /// Creates a new `DocId` wrapping the provided `u64` identifier.
-    ///
-    /// Portable code working across `docid-128` configurations should use
-    /// `DocId::from(u64_value)` or `DocId::new(raw_value)` with `DocIdRaw`.
     #[inline]
     pub const fn new(id: u64) -> Self {
         Self(id)
-    }
-
-    /// Returns the inner raw primitive identifier (`DocIdRaw`).
-    #[inline]
-    pub const fn raw(self) -> DocIdRaw {
-        self.0
     }
 
     /// Returns the inner raw `u64` identifier.
@@ -210,22 +174,10 @@ impl DocId {
     }
 
     /// Deprecated backwards compatibility alias for .
-    #[deprecated(note = "Nutze inner() oder raw()")]
+    #[deprecated(note = "Nutze inner()")]
     #[inline]
     pub const fn as_u64(self) -> u64 {
         self.0
-    }
-
-    /// Returns the little-endian byte representation of this `DocId`.
-    #[inline]
-    pub const fn to_le_bytes(self) -> [u8; Self::BYTES] {
-        self.0.to_le_bytes()
-    }
-
-    /// Constructs a `DocId` from its little-endian byte representation.
-    #[inline]
-    pub const fn from_le_bytes(bytes: [u8; Self::BYTES]) -> Self {
-        Self(u64::from_le_bytes(bytes))
     }
 
     /// Derives a `DocId` from a string key using the first 8 bytes (64 bits) of its BLAKE3 hash.
@@ -252,26 +204,15 @@ impl DocId {
 
 #[cfg(feature = "docid-128")]
 impl DocId {
-    /// Width of `DocId` in bytes (16 in 128-bit mode).
-    pub const BYTES: usize = 16;
     /// Maximum possible `DocId` value (`u128::MAX`).
     pub const MAX: Self = Self(u128::MAX);
     /// Minimum possible `DocId` value (`0`).
     pub const MIN: Self = Self(0);
 
     /// Creates a new `DocId` wrapping the provided `u128` identifier.
-    ///
-    /// Portable code working across `docid-128` configurations should use
-    /// `DocId::from(u64_value)` or `DocId::new(raw_value)` with `DocIdRaw`.
     #[inline]
     pub const fn new(id: u128) -> Self {
         Self(id)
-    }
-
-    /// Returns the inner raw primitive identifier (`DocIdRaw`).
-    #[inline]
-    pub const fn raw(self) -> DocIdRaw {
-        self.0
     }
 
     /// Returns the inner raw `u128` identifier.
@@ -282,21 +223,8 @@ impl DocId {
 
     /// Returns the lower 64 bits of the identifier for backwards compatibility.
     #[inline]
-    #[allow(clippy::cast_possible_truncation)]
     pub const fn as_u64(self) -> u64 {
         self.0 as u64
-    }
-
-    /// Returns the little-endian byte representation of this `DocId`.
-    #[inline]
-    pub const fn to_le_bytes(self) -> [u8; Self::BYTES] {
-        self.0.to_le_bytes()
-    }
-
-    /// Constructs a `DocId` from its little-endian byte representation.
-    #[inline]
-    pub const fn from_le_bytes(bytes: [u8; Self::BYTES]) -> Self {
-        Self(u128::from_le_bytes(bytes))
     }
 
     /// Derives a 128-bit `DocId` from a string key using the first 16 bytes (128 bits) of its BLAKE3 hash.
@@ -315,17 +243,9 @@ impl DocId {
     }
 }
 
-#[cfg(not(feature = "docid-128"))]
 impl From<u64> for DocId {
     fn from(id: u64) -> Self {
-        Self(id)
-    }
-}
-
-#[cfg(feature = "docid-128")]
-impl From<u64> for DocId {
-    fn from(id: u64) -> Self {
-        Self(u128::from(id))
+        Self(id as _)
     }
 }
 
@@ -373,7 +293,7 @@ impl EntityId {
     }
 
     /// Creates an `EntityId` directly from a `DocId`.
-    #[allow(clippy::unnecessary_cast, clippy::cast_possible_truncation)]
+    #[allow(clippy::unnecessary_cast)]
     pub fn from_doc_id(doc_id: DocId) -> Self {
         Self(doc_id.inner() as u64)
     }
@@ -386,7 +306,7 @@ impl EntityId {
     /// # Infallible Fallback
     /// If you need the old infallible behaviour (parse-as-u64 or hash), use `EntityId::from(key)` directly.
     /// Prefer this fallible variant for consistency with `DocId` at API boundaries.
-    #[allow(clippy::unnecessary_cast, clippy::cast_possible_truncation)]
+    #[allow(clippy::unnecessary_cast)]
     pub fn from_key(key: &str) -> Result<Self> {
         DocId::from_key(key).map(|d| Self(d.inner() as u64))
     }
@@ -475,44 +395,9 @@ impl TxId {
     pub const INTERNAL_BASE: u64 = u64::MAX - 1_000_000;
 
     /// Creates a new `TxId` wrapping the provided `u64` transaction identifier.
-    #[deprecated(
-        since = "0.1.0",
-        note = "Nutze TxId::try_new() oder TxId::internal() — new() umgeht AGT-GRAPH-001 und wird in einer künftigen Version entfernt."
-    )]
     #[inline]
     pub const fn new(id: u64) -> Self {
         Self(id)
-    }
-
-    /// Unchecked constructor for hot-path use cases where invariants have already been verified.
-    #[doc(hidden)]
-    #[inline]
-    pub const fn new_unchecked(id: u64) -> Self {
-        Self(id)
-    }
-
-    /// Safely constructs a `TxId`, verifying that `id` originates from a valid origin per AGT-GRAPH-001.
-    ///
-    /// # Domain Range Rules (AGT-GRAPH-001)
-    /// Valid transaction origins are:
-    /// - Collection sequence range: `id <= MAX_COLLECTION_SEQUENCE` (including `0` / `TxId::INVALID`)
-    /// - Internal system range: `id >= INTERNAL_BASE`
-    ///
-    /// Wall-clock derived timestamps or values in the unmanaged gap (`MAX_COLLECTION_SEQUENCE < id < INTERNAL_BASE`) are rejected.
-    ///
-    /// # Errors
-    /// Returns `ContextraError::Transaction` referencing AGT-GRAPH-001 if `id` falls into the invalid origin gap.
-    pub fn try_new(id: u64) -> Result<Self> {
-        let tx = Self(id);
-        if tx.is_valid_origin() {
-            Ok(tx)
-        } else {
-            Err(ContextraError::Transaction(format!(
-                "Invalid TxId origin {id}: violates AGT-GRAPH-001 range rules (must be <= MAX_COLLECTION_SEQUENCE ({}) or >= INTERNAL_BASE ({}))",
-                Self::MAX_COLLECTION_SEQUENCE,
-                Self::INTERNAL_BASE
-            )))
-        }
     }
 
     /// Returns the inner raw `u64` transaction identifier.
@@ -532,12 +417,6 @@ impl TxId {
     #[inline]
     pub const fn internal() -> Self {
         Self(Self::INTERNAL_BASE)
-    }
-
-    /// Returns a new internal/system transaction ID with the given offset from INTERNAL_BASE.
-    #[inline]
-    pub fn internal_with_offset(offset: u64) -> Result<Self> {
-        Self::try_from_internal_offset(offset)
     }
 
     /// Safely constructs an internal system TxId from an offset relative to `TxId::INTERNAL_BASE`.
@@ -578,58 +457,8 @@ const _: () = assert!(
 );
 const _: () = assert!(TxId::INTERNAL_BASE < u64::MAX);
 
-impl TryFrom<u64> for TxId {
-    type Error = ContextraError;
-
-    fn try_from(id: u64) -> Result<Self> {
-        Self::try_new(id)
-    }
-}
-
 impl std::fmt::Display for TxId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "TxId({})", self.0)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_tenant_id_deserialize_zero_rejected() {
-        let json = "0";
-        let res: std::result::Result<TenantId, _> = serde_json::from_str(json);
-        assert!(
-            res.is_err(),
-            "Deserialisierung von TenantId(0) muss fehlschlagen"
-        );
-    }
-
-    #[test]
-    fn test_tenant_id_deserialize_valid() {
-        let json = "7";
-        let tenant: TenantId =
-            serde_json::from_str(json).expect("Deserialisierung von 7 muss erfolgreich sein");
-        assert_eq!(tenant, TenantId::try_new(7).unwrap());
-    }
-
-    #[test]
-    fn test_tenant_id_serde_roundtrip_valid() {
-        let original = TenantId::try_new(7).unwrap();
-        let serialized = serde_json::to_string(&original).expect("Serialisierung fehlgeschlagen");
-        let deserialized: TenantId =
-            serde_json::from_str(&serialized).expect("Deserialisierung fehlgeschlagen");
-        assert_eq!(original, deserialized);
-    }
-
-    #[test]
-    fn test_tenant_id_system_constructor() {
-        let sys = TenantId::SYSTEM;
-        assert_eq!(sys.inner(), 0);
-        assert!(sys.is_system());
-
-        let sys_fn = TenantId::system();
-        assert_eq!(sys_fn, TenantId::SYSTEM);
     }
 }

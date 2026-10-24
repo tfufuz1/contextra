@@ -94,13 +94,13 @@ fn test_canary_protected_paths() {
     let temp_dir = create_temp_repo();
     let root = temp_dir.path();
 
-    fs::create_dir_all(root.join("xtask/config/governance")).unwrap();
+    fs::create_dir_all(root.join("governance")).unwrap();
     fs::create_dir_all(root.join("docs/decisions")).unwrap();
     fs::create_dir_all(root.join("xtask/src/harness")).unwrap();
     fs::create_dir_all(root.join("src")).unwrap();
 
     fs::write(
-        root.join("xtask/config/governance/protected-paths.toml"),
+        root.join("governance/protected-paths.toml"),
         r#"
 [[protected]]
 glob = "governance/**"
@@ -146,12 +146,12 @@ reason = "Agents"
     // Counter Fixture: Non-protected change passes
     let temp_dir_clean = create_temp_repo();
     let root_clean = temp_dir_clean.path();
-    fs::create_dir_all(root_clean.join("xtask/config/governance")).unwrap();
+    fs::create_dir_all(root_clean.join("governance")).unwrap();
     fs::create_dir_all(root_clean.join("docs/decisions")).unwrap();
     fs::create_dir_all(root_clean.join("xtask/src/harness")).unwrap();
     fs::create_dir_all(root_clean.join("src")).unwrap();
     fs::write(
-        root_clean.join("xtask/config/governance/protected-paths.toml"),
+        root_clean.join("governance/protected-paths.toml"),
         r#"
 [[protected]]
 glob = "governance/**"
@@ -545,12 +545,12 @@ fn test_canary_ratchet() {
     let temp_dir = create_temp_repo();
     let root = temp_dir.path();
 
-    fs::create_dir_all(root.join("xtask/config/governance")).unwrap();
+    fs::create_dir_all(root.join("governance")).unwrap();
     fs::create_dir_all(root.join(".github")).unwrap();
     fs::create_dir_all(root.join("crates/contextra-core/src")).unwrap();
 
     fs::write(
-        root.join("xtask/config/governance/ratchet.toml"),
+        root.join("governance/ratchet.toml"),
         r#"
 unwrap_legacy_grep = 0
 unwrap_exact = 0

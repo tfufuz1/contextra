@@ -4,7 +4,7 @@
 
 // NICHT für Produktion — O(n) Referenzimplementierung
 
-use contextra_types::{DistanceMetric, DocId};
+use contextra_core::{DistanceMetric, DocId};
 
 use crate::distance::compute_distance;
 

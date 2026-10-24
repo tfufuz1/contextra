@@ -90,6 +90,7 @@ Die folgende Tabelle führt alle 35 im Workspace definierten Crates auf, eingeor
 | `contextra-infer-onnx` | Ring 2 | Keine Beschreibung |
 | `contextra-sandbox` | Ring 2 | WASM Execution Boundary for Contextra MCP CodeExecution Permission |
 | `contextra-agent` | Ring 3 | Persistent agent workflow engine for Contextra — checkpoint/execute/audit loop |
+| `contextra-cognition` | Ring 3 | Contextra — Memory consolidation, compaction, and context management |
 | `contextra-db` | Ring 3 | Contextra — Embedded hybrid-search for AI agents |
 | `contextra-engine` | Ring 3 | Contextra — Core storage, index, and transaction orchestrator engine |
 | `contextra-privacy` | Ring 3 | Cloud Egress Security, DLP & Exfiltration Protection for Contextra (Ring 3) |
@@ -145,6 +146,12 @@ graph TD
     contextra_checkpoint[contextra-checkpoint] --> contextra_core[contextra-core]
     contextra_checkpoint[contextra-checkpoint] --> contextra_ports[contextra-ports]
     contextra_checkpoint[contextra-checkpoint] --> contextra_types[contextra-types]
+    contextra_cognition[contextra-cognition] --> contextra_engine[contextra-engine]
+    contextra_cognition[contextra-cognition] --> contextra_graph[contextra-graph]
+    contextra_cognition[contextra-cognition] --> contextra_ports[contextra-ports]
+    contextra_cognition[contextra-cognition] --> contextra_store[contextra-store]
+    contextra_cognition[contextra-cognition] --> contextra_types[contextra-types]
+    contextra_cognition[contextra-cognition] --> contextra_vector[contextra-vector]
     contextra_core[contextra-core] --> contextra_mvcc[contextra-mvcc]
     contextra_core[contextra-core] --> contextra_ports[contextra-ports]
     contextra_core[contextra-core] --> contextra_types[contextra-types]
@@ -152,6 +159,7 @@ graph TD
     contextra_crypto[contextra-crypto] --> contextra_types[contextra-types]
     contextra_db[contextra-db] --> contextra_adapt[contextra-adapt]
     contextra_db[contextra-db] --> contextra_checkpoint[contextra-checkpoint]
+    contextra_db[contextra-db] --> contextra_cognition[contextra-cognition]
     contextra_db[contextra-db] --> contextra_crypto[contextra-crypto]
     contextra_db[contextra-db] --> contextra_engine[contextra-engine]
     contextra_db[contextra-db] --> contextra_graph[contextra-graph]

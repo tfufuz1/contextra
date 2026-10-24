@@ -2,7 +2,7 @@
 
 use serde_json::json;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub fn run_explain(args: &[String]) -> i32 {
     let mut root_dir = explain_find_repo_root();

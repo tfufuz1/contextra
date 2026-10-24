@@ -52,7 +52,6 @@ pub mod percolation;
 pub mod ppr;
 pub mod ppr_stream;
 pub mod provenance;
-pub mod residue_scan;
 pub mod session_dag;
 pub mod tl_hfd;
 
@@ -64,10 +63,9 @@ pub use apprh::{
 };
 pub use arc_slice::ArcSlice;
 pub use cascade::{
-    cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_entity,
-    cascade_invalidate_hyperedges_for_superseded_doc, CascadeInvalidationReport, CascadeReport,
-    CascadeStatus, CascadeTicket, DeletionProof, EntityCascadeReport, GraphGarbageCollection,
-    HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
+    cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
+    CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket, DeletionProof,
+    GraphGarbageCollection, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
 };
 pub use community::{
     detect_communities, CommunityAssignment, CommunityDetectionConfig, StarExpansionIterator,
@@ -110,7 +108,6 @@ pub use ppr::compute_ppr_with_apprh_selector;
 pub use ppr::{DeletedView, PprContext};
 pub use ppr_stream::{PprCandidateStream, DEFAULT_PPR_STREAM_BATCH_SIZE};
 pub use provenance::{DocEdgeIndex, EdgeProvenance};
-pub use residue_scan::{scan_entity_residue, GraphResidueReport};
 pub use session_dag::{
     AgentStateNode, DagEdge, NodeIdx, NodesGuard, NodesWriteGuard, SessionBranchTree,
 };

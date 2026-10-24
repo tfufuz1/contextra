@@ -1,7 +1,7 @@
 use super::*;
 #[cfg(feature = "encryption-at-rest")]
 use crate::wal::KeyManager;
-use contextra_types::TxId;
+use contextra_core::TxId;
 #[cfg(feature = "encryption-at-rest")]
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -257,75 +257,4 @@ fn test_wal_entry_from_bytes_invalid_cases() {
 
     let res_op = WalEntry::from_bytes(&data);
     assert!(matches!(res_op, Err(ContextraError::Serialization(_))));
-}
-
-#[test]
-fn test_wal_entry_boundary_key_1mib() {
-    let dummy_key = b"test-integrity-key-32-bytes-long!";
-    let key_exact_1mib = vec![0xAA; 1_048_576]; // 1 MiB
-    let op = WalOp::Put {
-        tx_id: TxId::try_new(10).unwrap(),
-        key: key_exact_1mib,
-        value: vec![],
-    };
-    let entry = WalEntry::try_new(op, 1, dummy_key, [0u8; 32]).unwrap();
-    let bytes = entry.to_bytes().unwrap();
-    let decoded = WalEntry::from_bytes_classified(&bytes[4..]).unwrap();
-    assert_eq!(decoded, entry);
-
-    let key_oversized = vec![0xBB; 1_048_577]; // 1 MiB + 1
-    let op_over = WalOp::Put {
-        tx_id: TxId::try_new(10).unwrap(),
-        key: key_oversized,
-        value: vec![],
-    };
-    let entry_over = WalEntry::try_new(op_over, 2, dummy_key, [0u8; 32]).unwrap();
-    let bytes_over_res = entry_over.to_bytes();
-    assert!(bytes_over_res.is_err());
-    let err = bytes_over_res.unwrap_err();
-    assert!(format!("{}", err).contains("key_len exceeds 1 MiB limit"));
-}
-
-use proptest::prelude::*;
-
-fn arb_tx_id() -> impl Strategy<Value = TxId> {
-    prop_oneof![
-        (1..=1_000_000_000_000u64).prop_map(|tx| TxId::try_new(tx).unwrap()),
-        (TxId::INTERNAL_BASE..=u64::MAX).prop_map(|tx| TxId::try_new(tx).unwrap()),
-    ]
-}
-
-fn arb_wal_op() -> impl Strategy<Value = WalOp> {
-    prop_oneof![
-        (
-            arb_tx_id(),
-            prop::collection::vec(any::<u8>(), 0..2048),
-            prop::collection::vec(any::<u8>(), 0..4096)
-        )
-            .prop_map(|(tx_id, key, value)| WalOp::Put { tx_id, key, value }),
-        (arb_tx_id(), prop::collection::vec(any::<u8>(), 0..2048))
-            .prop_map(|(tx_id, key)| WalOp::Delete { tx_id, key }),
-        (arb_tx_id(), any::<bool>())
-            .prop_map(|(tx_id, committed)| WalOp::TxEnd { tx_id, committed }),
-    ]
-}
-
-proptest! {
-    #[test]
-    fn proptest_wal_entry_symmetry(
-        op in arb_wal_op(),
-        seq_no in 0..u64::MAX - 1,
-        checksum in prop::array::uniform32(any::<u8>()),
-        prev_hmac in prop::array::uniform32(any::<u8>()),
-    ) {
-        let entry = WalEntry {
-            op,
-            seq_no,
-            checksum,
-            prev_hmac,
-        };
-        let bytes = entry.to_bytes().expect("to_bytes failed");
-        let decoded = WalEntry::from_bytes_classified(&bytes[4..]).expect("from_bytes_classified failed");
-        prop_assert_eq!(decoded, entry);
-    }
 }

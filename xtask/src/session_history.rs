@@ -1,4 +1,4 @@
-//! NON-SCOPE: Weekly Digest ist in docs/ nicht spezifiziert und daher expliziter Nicht-Umfang.
+// TODO: weekly digest, separater Auftrag
 //! Lokales, rotierendes Session-History-Log für Contextra.
 //!
 //! Dieses Modul verwaltet ein chronologisches, git-ignoriertes Protokoll

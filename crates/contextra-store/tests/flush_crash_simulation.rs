@@ -4,10 +4,8 @@
 //! the SSTable is successfully persisted. On crash during the window between
 //! WAL delete and SSTable write, data loss would occur.
 
-use contextra_ports::StorageEngine;
-use contextra_store::lsm::config::EncryptionConfig;
+use contextra_core::{Result, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::{Result, TxId};
 use std::time::Duration;
 use tempfile::TempDir;
 
@@ -18,7 +16,7 @@ async fn test_storage_with_limit(limit: usize) -> (LsmStorage, TempDir) {
         memtable_size_limit: limit,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption: EncryptionConfig::None,
+        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = LsmStorage::new(config).await.expect("create storage");
@@ -83,7 +81,7 @@ async fn test_recovery_after_flush_via_reopen() -> Result<()> {
         memtable_size_limit: 1024 * 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption: EncryptionConfig::None,
+        encryption_passphrase: None,
         ..Default::default()
     };
 
@@ -147,7 +145,7 @@ async fn test_wal_replay_recovery_without_flush() -> Result<()> {
         memtable_size_limit: 1024 * 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption: EncryptionConfig::None,
+        encryption_passphrase: None,
         ..Default::default()
     };
 

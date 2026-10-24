@@ -157,10 +157,10 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
         });
 
         let mut steps = 0;
-        let max_steps = config.max_hops.saturating_mul(1000).saturating_add(100);
+        let max_steps = config.max_hops * 1000 + 100;
 
         while (!heap_fwd.is_empty() || !heap_bwd.is_empty()) && steps < max_steps {
-            steps = steps.saturating_add(1);
+            steps += 1;
 
             if found_paths.len() >= config.k {
                 break;
@@ -176,7 +176,7 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
                 let Some(&u) = curr_path.last() else {
                     continue;
                 };
-                let hops = curr_path.len().saturating_sub(1);
+                let hops = curr_path.len() - 1;
 
                 if hops < config.max_hops {
                     for (neighbor, weight) in self.get_expanded_neighbors(u) {
@@ -184,7 +184,7 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
                             continue;
                         }
 
-                        let new_hops = hops.saturating_add(1);
+                        let new_hops = hops + 1;
                         if new_hops > config.max_hops {
                             continue;
                         }
@@ -212,7 +212,7 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
                                     for &node in b_path.iter().rev().skip(1) {
                                         full_path.push(node);
                                     }
-                                    if full_path.len().saturating_sub(1) <= config.max_hops
+                                    if full_path.len() - 1 <= config.max_hops
                                         && is_simple_path(&full_path)
                                         && seen_paths.insert(full_path.clone())
                                     {
@@ -251,7 +251,7 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
                 let Some(&u) = curr_path.last() else {
                     continue;
                 };
-                let hops = curr_path.len().saturating_sub(1);
+                let hops = curr_path.len() - 1;
 
                 if hops < config.max_hops {
                     for (pred, weight) in self.get_expanded_predecessors(u) {
@@ -259,7 +259,7 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
                             continue;
                         }
 
-                        let new_hops = hops.saturating_add(1);
+                        let new_hops = hops + 1;
                         if new_hops > config.max_hops {
                             continue;
                         }
@@ -287,7 +287,7 @@ impl<G: PathGraph> KPathDiffusion for PathRAGEngine<G> {
                                     for &node in next_path.iter().rev().skip(1) {
                                         full_path.push(node);
                                     }
-                                    if full_path.len().saturating_sub(1) <= config.max_hops
+                                    if full_path.len() - 1 <= config.max_hops
                                         && is_simple_path(&full_path)
                                         && seen_paths.insert(full_path.clone())
                                     {

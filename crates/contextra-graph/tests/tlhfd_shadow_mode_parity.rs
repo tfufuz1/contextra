@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 //! Integration and parity tests for Thresholded Local Hyper-Flow Diffusion (TL-HFD, AK-16).
 
 use contextra_graph::path_rag::{PathGraph, PprParams};

@@ -2,10 +2,11 @@
 
 use contextra_mvcc::SequenceLogSsiValidator;
 use contextra_mvcc::SnapshotRegistry;
-use contextra_ports::{MetricEvent, MetricsSink, TestMetricsSink};
-use contextra_testkit::ManualClock;
+use contextra_ports::metrics::{MetricEvent, TestMetricsSink};
+use contextra_ports::MetricsSink;
 use parking_lot::RwLock;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 #[test]
 fn test_ssi_metrics_observability_threshold_and_coarsening() {
@@ -17,15 +18,16 @@ fn test_ssi_metrics_observability_threshold_and_coarsening() {
     let validator =
         SequenceLogSsiValidator::new_with_bounds(max_keys).with_metrics_sink(sink_container);
 
+    // Commit 17 distinct keys to exceed the 80% threshold (17 / 20 = 85%)
     for i in 1..=17 {
         let key = format!("user_key_{i:02}");
-        let seq = u64::try_from(i).unwrap_or(0);
-        validator.record_commit_key(key.as_bytes(), seq);
+        validator.record_commit_key(key.as_bytes(), i as u64);
     }
 
     let events = test_sink.events();
     assert!(!events.is_empty(), "Metric events must be recorded");
 
+    // Verify utilization ratio gauge
     let has_utilization_gauge = events.iter().any(|e| match e {
         MetricEvent::Gauge { name, value, .. } => {
             name == "mvcc_ssi_commit_register_utilization_ratio" && *value >= 0.80
@@ -38,6 +40,7 @@ fn test_ssi_metrics_observability_threshold_and_coarsening() {
         events
     );
 
+    // Verify coarsened buckets total gauge
     let has_coarsened_gauge = events.iter().any(|e| match e {
         MetricEvent::Gauge { name, value, .. } => {
             name == "mvcc_ssi_coarsened_buckets_total" && *value >= 1.0
@@ -57,19 +60,20 @@ fn test_ssi_metrics_observability_long_pin_duration() {
     let sink_container: Arc<RwLock<Arc<dyn MetricsSink>>> =
         Arc::new(RwLock::new(test_sink.clone() as Arc<dyn MetricsSink>));
 
-    let clock = Arc::new(ManualClock::new(350_000_000_000));
-    let registry = Arc::new(SnapshotRegistry::new().with_clock(clock));
-    let _lease = registry.acquire_at(|| 42, 0);
+    let registry = Arc::new(SnapshotRegistry::new());
+    let now = Instant::now();
+    let past_350s = now.checked_sub(Duration::from_secs(350)).unwrap_or(now);
+    let _guard = registry.register_at(42, past_350s);
 
     let max_keys = 20;
     let validator = SequenceLogSsiValidator::new_with_bounds(max_keys)
         .with_snapshot_registry(registry)
         .with_metrics_sink(sink_container);
 
+    // Commit 17 distinct keys to exceed threshold
     for i in 1..=17 {
         let key = format!("data_key_{i:02}");
-        let seq = u64::try_from(i).unwrap_or(0);
-        validator.record_commit_key(key.as_bytes(), seq);
+        validator.record_commit_key(key.as_bytes(), i as u64);
     }
 
     let events = test_sink.events();
@@ -97,6 +101,7 @@ fn test_ssi_metrics_observability_hot_swap_consistency() {
     let validator = SequenceLogSsiValidator::new_with_bounds(max_keys)
         .with_metrics_sink(sink_container.clone());
 
+    // Trigger metrics on initial sink
     validator.record_commit_key(b"key_init", 1);
     let events_sink1_before = sink1.events();
     assert_eq!(
@@ -105,11 +110,14 @@ fn test_ssi_metrics_observability_hot_swap_consistency() {
         "sink1 should receive initial metric call"
     );
 
+    // Swap the inner MetricsSink inside the RwLock container (simulating set_metrics_sink())
     let sink2 = Arc::new(TestMetricsSink::new());
     *sink_container.write() = sink2.clone() as Arc<dyn MetricsSink>;
 
+    // Trigger metrics again after hot-swap
     validator.record_commit_key(b"key_after_swap", 2);
 
+    // Verify sink1 received no new events after swap
     let events_sink1_after = sink1.events();
     assert_eq!(
         events_sink1_after.len(),
@@ -117,6 +125,7 @@ fn test_ssi_metrics_observability_hot_swap_consistency() {
         "sink1 should not receive events after hot-swap"
     );
 
+    // Verify sink2 received the new event
     let events_sink2 = sink2.events();
     assert_eq!(
         events_sink2.len(),

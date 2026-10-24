@@ -11,7 +11,8 @@ ring = "4"
 
 [features]
 default = []
-mock-providers = []
+agent-workflows = ["contextra-agent"]
+onnx = ["contextra-infer-onnx", "contextra-infer-onnx/onnx"]
 candle = ["dep:contextra-infer-candle"]
 ollama = ["dep:contextra-infer-ollama", "contextra/ollama"]
 kv-bridge = ["contextra-infer-candle/kv-bridge", "dep:contextra-infer-candle"]
@@ -27,7 +28,9 @@ contextra-rank = { workspace = true }
 contextra-adapt = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-privacy = { workspace = true }
+contextra-infer-onnx = { workspace = true, optional = true }
 contextra-infer-ollama = { workspace = true, optional = true }
+contextra-agent = { workspace = true, optional = true }
 contextra-infer-candle = { workspace = true, optional = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 rand = { workspace = true }
@@ -46,5 +49,4 @@ tokio-util = { version = "0.7", features = ["codec"] }
 futures-util = "0.3"
 
 [dev-dependencies]
-contextra-mcp = { path = ".", features = ["mock-providers"] }
 tempfile = "3"

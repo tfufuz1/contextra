@@ -5,18 +5,22 @@
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
 
 use super::format::{
-    CHECKSUM_SEED, MAX_PENDING_WAL_DIM, PENDING_WAL_HEADER_SIZE, PENDING_WAL_MAGIC,
+    DISKANN_INTEGRITY_KEY, MAX_PENDING_WAL_DIM, PENDING_WAL_HEADER_SIZE, PENDING_WAL_MAGIC,
     PENDING_WAL_VERSION, TOMBSTONE_WAL_HEADER_SIZE, TOMBSTONE_WAL_MAGIC, TOMBSTONE_WAL_VERSION,
 };
 use super::types::{DiskAnnIndex, SearchCandidate};
 use crate::distance::compute_distance_trusted;
-use contextra_core::{ContextraError, DocId, DocIdRaw, Result};
+use contextra_core::{ContextraError, DocId, Result};
+#[cfg(not(feature = "docid-128"))]
+pub(crate) type TombstoneSet = roaring::RoaringTreemap;
 
+#[cfg(feature = "docid-128")]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct TombstoneSet {
-    pub(crate) set: std::collections::HashSet<DocIdRaw>,
+    pub(crate) set: std::collections::HashSet<u128>,
 }
 
+#[cfg(feature = "docid-128")]
 impl TombstoneSet {
     pub(crate) fn new() -> Self {
         Self {
@@ -24,11 +28,11 @@ impl TombstoneSet {
         }
     }
 
-    pub(crate) fn insert(&mut self, id: DocIdRaw) -> bool {
+    pub(crate) fn insert(&mut self, id: u128) -> bool {
         self.set.insert(id)
     }
 
-    pub(crate) fn contains(&self, id: DocIdRaw) -> bool {
+    pub(crate) fn contains(&self, id: u128) -> bool {
         self.set.contains(&id)
     }
 
@@ -93,7 +97,7 @@ impl DiskAnnIndex {
         Ok(pruned)
     }
 
-    /// Appends a tombstone record to `tombstone.wal` with HMAC-SHA256 checksum protection.
+    /// Appends a tombstone record to `tombstone.wal` with HMAC-SHA256 integrity protection.
     ///
     /// # Binary Format
     /// - File Header (written on new/empty file creation): `[TWAL: 4 bytes] [version=1: 1 byte]`
@@ -122,14 +126,13 @@ impl DiskAnnIndex {
         }
 
         let id_bytes = id.inner().to_le_bytes();
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
+        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
         hmac.update(&id_bytes);
         let computed_hmac = hmac.finalize();
 
         file.write_all(&id_bytes).map_err(ContextraError::Io)?;
         file.write_all(&computed_hmac).map_err(ContextraError::Io)?;
         file.sync_all().map_err(ContextraError::Io)?;
-        super::durable_fs::sync_parent_dir(path)?;
         Ok(())
     }
 
@@ -143,9 +146,15 @@ impl DiskAnnIndex {
         if !path.exists() {
             return Ok(bitset);
         }
-        let mut file = std::fs::File::open(path).map_err(ContextraError::Io)?;
+        let mut file = match std::fs::File::open(path) {
+            Ok(f) => f,
+            Err(_) => return Ok(bitset),
+        };
 
-        let file_len = file.metadata().map_err(ContextraError::Io)?.len() as usize;
+        let file_len = match file.metadata() {
+            Ok(m) => m.len() as usize,
+            Err(_) => return Ok(bitset),
+        };
 
         if file_len == 0 {
             return Ok(bitset);
@@ -179,11 +188,20 @@ impl DiskAnnIndex {
             let entry_offset = offset;
             offset += doc_id_size;
 
-            let doc_id_bytes: [u8; std::mem::size_of::<DocId>()] = buf_id
-                .as_slice()
-                .try_into()
-                .map_err(|_| ContextraError::Storage("Corrupt DocId in WAL".into()))?;
-            let doc_id = DocId::from_le_bytes(doc_id_bytes).raw();
+            #[cfg(not(feature = "docid-128"))]
+            let doc_id = u64::from_le_bytes(
+                buf_id
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| ContextraError::Storage("Corrupt DocId in WAL".into()))?,
+            );
+            #[cfg(feature = "docid-128")]
+            let doc_id = u128::from_le_bytes(
+                buf_id
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| ContextraError::Storage("Corrupt DocId in WAL".into()))?,
+            );
 
             let mut buf_hmac = [0u8; 32];
             if file.read_exact(&mut buf_hmac).is_err() {
@@ -192,7 +210,7 @@ impl DiskAnnIndex {
             }
             offset += 32;
 
-            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
+            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
             hmac.update(&buf_id);
             let computed_hmac = hmac.finalize();
 
@@ -209,7 +227,7 @@ impl DiskAnnIndex {
         Ok(bitset)
     }
 
-    /// Appends a vector insertion record to `pending.wal` with HMAC-SHA256 checksum protection.
+    /// Appends a vector insertion record to `pending.wal` with HMAC-SHA256 integrity protection.
     ///
     /// # Binary Format
     /// - File Header (written on new/empty file creation): `[PWAL: 4 bytes] [version=1: 1 byte]`
@@ -255,20 +273,19 @@ impl DiskAnnIndex {
             entry_bytes.extend_from_slice(&val.to_le_bytes());
         }
 
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
+        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
         hmac.update(&entry_bytes);
         let computed_hmac = hmac.finalize();
 
         file.write_all(&entry_bytes).map_err(ContextraError::Io)?;
         file.write_all(&computed_hmac).map_err(ContextraError::Io)?;
         file.sync_all().map_err(ContextraError::Io)?;
-        super::durable_fs::sync_parent_dir(path)?;
         Ok(())
     }
 
     /// Reads and verifies uncommitted vector entries from `pending.wal`.
     ///
-    /// # Checksum & Defensive Parsing
+    /// # Integrity & Defensive Parsing
     /// 1. Validates the 5-byte file header (`PWAL` magic + version 1). Rejects unversioned/legacy formats.
     /// 2. Validates `dim` against `MAX_PENDING_WAL_DIM` (65,536) prior to buffer allocation to prevent allocation-DoS attacks.
     /// 3. Reads entry payload and entry HMAC, computing the expected HMAC-SHA256 over `(id || dim || embedding)`.
@@ -280,9 +297,15 @@ impl DiskAnnIndex {
         if !path.exists() {
             return Ok(Vec::new());
         }
-        let mut file = std::fs::File::open(path).map_err(ContextraError::Io)?;
+        let mut file = match std::fs::File::open(path) {
+            Ok(f) => f,
+            Err(_) => return Ok(Vec::new()),
+        };
 
-        let file_len = file.metadata().map_err(ContextraError::Io)?.len() as usize;
+        let file_len = match file.metadata() {
+            Ok(m) => m.len() as usize,
+            Err(_) => return Ok(Vec::new()),
+        };
 
         if file_len == 0 {
             return Ok(Vec::new());
@@ -324,11 +347,16 @@ impl DiskAnnIndex {
             }
             offset += 4;
 
-            let doc_id_bytes: [u8; std::mem::size_of::<DocId>()] = buf_id
-                .as_slice()
-                .try_into()
-                .map_err(|_| ContextraError::Storage("Corrupt DocId in WAL".into()))?;
-            let doc_id = DocId::from_le_bytes(doc_id_bytes);
+            #[cfg(not(feature = "docid-128"))]
+            let doc_id =
+                DocId::from(u64::from_le_bytes(buf_id.as_slice().try_into().map_err(
+                    |_| ContextraError::Storage("Corrupt DocId in WAL".into()),
+                )?));
+            #[cfg(feature = "docid-128")]
+            let doc_id =
+                DocId::from(u128::from_le_bytes(buf_id.as_slice().try_into().map_err(
+                    |_| ContextraError::Storage("Corrupt DocId in WAL".into()),
+                )?));
             let dim = u32::from_le_bytes(buf_dim) as usize;
 
             if dim == 0 || dim > MAX_PENDING_WAL_DIM {
@@ -355,7 +383,7 @@ impl DiskAnnIndex {
             }
             offset += 32;
 
-            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
+            let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
             hmac.update(&buf_id);
             hmac.update(&buf_dim);
             hmac.update(&vec_bytes);
@@ -380,6 +408,12 @@ impl DiskAnnIndex {
     }
 
     /// Liest uncommittete Pending-Vektoren aus `pending.wal` und fügt sie in den Index ein.
+    pub fn recover_pending_delta(
+        &self,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<usize>> + Send + '_>> {
+        Box::pin(async move { self.recover_pending_delta_sync() })
+    }
+
     pub fn recover_pending_delta_sync(&self) -> Result<usize> {
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
         if !pending_wal.exists() {
@@ -397,7 +431,7 @@ impl DiskAnnIndex {
             }
             self.persist_delta_sync()?;
         } else {
-            super::persistence::durable_remove(&pending_wal)?;
+            let _ = std::fs::remove_file(&pending_wal);
         }
         Ok(count)
     }
@@ -661,14 +695,26 @@ impl DiskAnnIndex {
     }
 
     pub fn build_sync(&self, vectors: &[Vec<f32>], ids: &[DocId]) -> Result<()> {
-        self.build_to_path_sync(&self.inner.config.index_path, vectors, ids)?;
+        let tmp_path = self.inner.config.index_path.with_extension("idx.tmp");
+        self.build_to_path_sync(&tmp_path, vectors, ids)?;
+
+        std::fs::rename(&tmp_path, &self.inner.config.index_path).map_err(ContextraError::Io)?;
+
+        // Fsync parent directory after rename for POSIX atomic directory entry durability
+        if let Some(parent) = self.inner.config.index_path.parent() {
+            let parent_dir = std::fs::File::open(parent).map_err(ContextraError::Io)?;
+            parent_dir.sync_all().map_err(ContextraError::Io)?;
+        }
 
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
-        super::persistence::durable_remove(&pending_wal)?;
+        if pending_wal.exists() {
+            let _ = std::fs::remove_file(&pending_wal);
+        }
 
         let tombstone_wal = self.inner.config.index_path.with_extension("tombstone.wal");
-        super::persistence::durable_remove(&tombstone_wal)?;
-
+        if tombstone_wal.exists() {
+            let _ = std::fs::remove_file(&tombstone_wal);
+        }
         self.inner.tombstones.write().clear();
 
         self.load_sync()?;
@@ -706,11 +752,9 @@ impl DiskAnnIndex {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "docid-128")]
     #[tokio::test]
-    async fn test_docid_wal_roundtrip() -> Result<()> {
-        if DocId::BYTES != 16 {
-            return Ok(());
-        }
+    async fn test_docid_128_wal_roundtrip() -> Result<()> {
         let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
         let pending_wal_path = temp_dir.path().join("test_128.pending.wal");
         let tombstone_wal_path = temp_dir.path().join("test_128.tombstone.wal");

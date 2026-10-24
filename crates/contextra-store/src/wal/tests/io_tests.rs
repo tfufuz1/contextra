@@ -1,6 +1,6 @@
 use super::*;
 use crate::wal::{Wal, WAL_V3_HEADER};
-use contextra_types::TxId;
+use contextra_core::TxId;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;
@@ -31,7 +31,6 @@ async fn test_wal_crash_consistency_write_without_fsync() {
             .open(&wal_path)
             .await
             .expect("open for append"); // expect
-        file.write_all(&WAL_V3_HEADER).await.expect("header");
         let bytes = entry.to_bytes().expect("to_bytes"); // expect
         file.write_all(&bytes).await.expect("write_all"); // expect
         file.flush().await.expect("flush"); // expect
@@ -98,7 +97,6 @@ async fn test_append_batch_partial_write_atomicity() {
 
     // Serialize all 3 entries into a single bytes payload
     let mut batch_bytes = Vec::new();
-    batch_bytes.extend_from_slice(&WAL_V3_HEADER);
     for e in entries.entries() {
         batch_bytes.extend_from_slice(&e.to_bytes().expect("to_bytes")); // expect
     }
@@ -180,19 +178,14 @@ async fn test_truncate_size_visible_atomically_with_file_state() {
     let done_poll = done.clone();
     let poller = tokio::spawn(async move {
         while !done_poll.load(std::sync::atomic::Ordering::SeqCst) {
-            // Read in-memory WAL size FIRST (mem_size), then physical disk metadata SECOND (disk_size)
-            // to avoid TOCTOU race condition during concurrent appends.
-            let mem_size = wal_poll.size();
             if let Ok(meta) = fs::metadata(wal_poll.path()).await {
                 let disk_size = meta.len();
-                // When mem_size > 4 (during/after append phase, before truncate),
-                // mem_size must never exceed physical disk_size.
-                if mem_size > 4 && disk_size > 4 {
-                    assert!(
-                        mem_size <= disk_size,
-                        "TOCTOU violation: in-memory WAL size ({mem_size}) > physical disk size ({disk_size})"
-                    );
-                }
+                let mem_size = wal_poll.size();
+                // In-memory size must never observe stale mem_size > disk_size after truncation
+                assert!(
+                    mem_size <= disk_size,
+                    "TOCTOU violation: in-memory WAL size ({mem_size}) > physical disk size ({disk_size})"
+                );
             }
             tokio::task::yield_now().await;
         }
@@ -450,9 +443,7 @@ async fn test_disk_full_mid_append_batch_rollback() -> Result<()> {
         .prepare_batch(vec![(op_fail1, 2), (op_fail2, 3)])
         .await?;
 
-    wal.fault_plan()
-        .fail_append_for_tx
-        .store(fail_tx.inner(), Ordering::SeqCst);
+    FAIL_APPEND_FOR_TX.store(fail_tx.inner(), Ordering::SeqCst);
 
     let append_res = wal.append_batch(batch).await;
     assert!(

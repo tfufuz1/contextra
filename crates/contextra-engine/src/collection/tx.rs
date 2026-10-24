@@ -23,7 +23,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 "TxId counter exhausted: MAX_COLLECTION_SEQUENCE range exceeded. Collection must be recreated.".into(),
             ));
         }
-        TxId::try_new(id)
+        Ok(TxId::new(id))
     }
 
     /// Begins a new atomic transaction for this collection.

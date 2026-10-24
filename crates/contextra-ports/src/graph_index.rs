@@ -311,7 +311,7 @@ pub struct GraphIndexStats {
     pub memory_usage_bytes: usize,
 }
 
-// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
+// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von contextra-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
 /// Contract for resolving graph community assignments for entities.
 pub trait CommunityResolver: Send + Sync {
     /// Resolves the optional community ID for a given entity.

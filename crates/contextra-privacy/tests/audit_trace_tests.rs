@@ -18,15 +18,6 @@ impl FixedClock {
 }
 
 impl Clock for FixedClock {
-    fn now(&self) -> contextra_types::DeterministicTimestamp {
-        let nanos = self.nanos.load(Ordering::Relaxed);
-        contextra_types::DeterministicTimestamp::new(nanos / 1_000_000, nanos)
-    }
-
-    fn monotonic_ticks(&self) -> u64 {
-        self.nanos.load(Ordering::Relaxed)
-    }
-
     fn now_unix_nanos(&self) -> u64 {
         self.nanos.load(Ordering::Relaxed)
     }

@@ -18,17 +18,14 @@ impl RouterEngine {
 
     /// Setzt Kalibrierungsstatistik für ein bestimmtes Profil zurück.
     pub fn reset_calibration(&self, profile_name: &str) {
-        self.state.rcu(|current| {
-            if current.calibration.contains_key(profile_name) {
-                let mut new_state = (**current).clone();
-                if let Some(state) = new_state.calibration.get_mut(profile_name) {
-                    state.reset();
-                }
-                Arc::new(new_state)
-            } else {
-                Arc::clone(current)
+        let current = self.state.load_full();
+        if current.calibration.contains_key(profile_name) {
+            let mut new_state = (*current).clone();
+            if let Some(state) = new_state.calibration.get_mut(profile_name) {
+                state.reset();
             }
-        });
+            self.state.store(Arc::new(new_state));
+        }
     }
 
     /// Gibt den aktuellen Lyapunov-Drift-Status für ein Profil zurück.
@@ -68,21 +65,17 @@ impl RouterEngine {
 
     /// Setzt die Baseline für den Lyapunov-Drift-Wächter eines bestimmten Profils.
     pub fn set_lyapunov_baseline(&self, profile_name: &str, baseline: &[f32]) -> bool {
-        let mut updated = false;
-        self.state.rcu(|current| {
-            if current.lyapunov_watchers.contains_key(profile_name) {
-                updated = true;
-                let mut new_state = (**current).clone();
-                if let Some(watcher) = new_state.lyapunov_watchers.get_mut(profile_name) {
-                    watcher.set_baseline(baseline);
-                }
-                Arc::new(new_state)
-            } else {
-                updated = false;
-                Arc::clone(current)
+        let current = self.state.load_full();
+        if current.lyapunov_watchers.contains_key(profile_name) {
+            let mut new_state = (*current).clone();
+            if let Some(watcher) = new_state.lyapunov_watchers.get_mut(profile_name) {
+                watcher.set_baseline(baseline);
             }
-        });
-        updated
+            self.state.store(Arc::new(new_state));
+            true
+        } else {
+            false
+        }
     }
 
     pub(super) fn evict_stale_decisions(&self) {
@@ -106,11 +99,6 @@ impl RouterEngine {
         }
     }
 
-    /// Completes a tracked routing decision using its `RoutingTicket` and records the ground-truth outcome.
-    pub fn complete(&self, ticket: RoutingTicket, outcome: RoutingOutcome) -> bool {
-        self.record_outcome(ticket.decision_id(), outcome)
-    }
-
     /// Muss vom Aufrufer (Agent-Loop) nach Abschluss des SLM-Aufrufs aufgerufen werden.
     /// Liefert das tatsächliche Ergebnis zurück und trainiert die Kalibrierung
     /// mit einem echten Ground-Truth-Signal.
@@ -129,80 +117,70 @@ impl RouterEngine {
             }
         };
 
-        #[cfg(feature = "bandit-routing")]
-        let pending_bandit_entry = self.pending_bandit.write().remove(&decision_id);
+        let current = self.state.load_full();
+        let active_fp = current
+            .profiles
+            .iter()
+            .find(|p| p.name == profile_name)
+            .and_then(|p| p.fingerprint.clone());
 
         let non_conformity = outcome.non_conformity_score();
 
-        self.state.rcu(|current| {
-            let active_fp = current
-                .profiles
-                .iter()
-                .find(|p| p.name == profile_name)
-                .and_then(|p| p.fingerprint.clone());
-
-            let mut new_state = (**current).clone();
-            if let Some(state) = new_state.calibration.get_mut(&profile_name) {
-                state.check_and_invalidate_fingerprint(active_fp.as_ref());
-                if active_fp.is_some() {
-                    state.recalibrate_conformal(non_conformity);
-                    tracing::debug!(
-                        profile = %profile_name,
-                        ?outcome,
-                        non_conformity,
-                        "Router outcome recorded"
-                    );
-                }
+        let mut new_state = (*current).clone();
+        if let Some(state) = new_state.calibration.get_mut(&profile_name) {
+            state.check_and_invalidate_fingerprint(active_fp.as_ref());
+            if active_fp.is_some() {
+                state.recalibrate_conformal(non_conformity);
+                tracing::debug!(
+                    profile = %profile_name,
+                    ?outcome,
+                    non_conformity,
+                    "Router outcome recorded"
+                );
             }
+        }
 
-            #[cfg(feature = "bandit-routing")]
-            {
-                if let Some(ref pending_bandit_entry) = pending_bandit_entry {
-                    let reward = 1.0 - non_conformity;
-                    if let Some(profile) = new_state
-                        .profiles
-                        .iter_mut()
-                        .find(|p| p.name == profile_name)
-                    {
-                        #[cfg(feature = "cloud-egress-guard")]
-                        let is_cloud = profile.transport.is_cloud();
-                        #[cfg(not(feature = "cloud-egress-guard"))]
-                        let is_cloud = false;
+        #[cfg(feature = "bandit-routing")]
+        {
+            if let Some(pending_bandit_entry) = self.pending_bandit.write().remove(&decision_id) {
+                let reward = 1.0 - non_conformity;
+                if let Some(profile) = new_state
+                    .profiles
+                    .iter_mut()
+                    .find(|p| p.name == profile_name)
+                {
+                    #[cfg(feature = "cloud-egress-guard")]
+                    let is_cloud = profile.transport.is_cloud();
+                    #[cfg(not(feature = "cloud-egress-guard"))]
+                    let is_cloud = false;
 
-                        let cost = profile.estimated_cost();
-                        if let Some(ref bstate_arc) = profile.bandit_state {
-                            let mut bstate_cloned = (*bstate_arc).clone();
-                            if let Err(err) = bstate_cloned.update(
-                                &pending_bandit_entry.context,
+                    let cost = profile.estimated_cost();
+                    if let Some(ref mut bstate) = profile.bandit_state {
+                        if let Err(err) =
+                            bstate.update(&pending_bandit_entry.context, reward, cost, is_cloud)
+                        {
+                            tracing::warn!(
+                                profile = %pending_bandit_entry.profile_name,
+                                action = pending_bandit_entry.action_idx,
+                                ?err,
+                                "Fehler beim BanditProfileState-Update in record_outcome"
+                            );
+                        } else {
+                            tracing::debug!(
+                                profile = %pending_bandit_entry.profile_name,
+                                action = pending_bandit_entry.action_idx,
+                                propensity = pending_bandit_entry.propensity,
                                 reward,
                                 cost,
-                                is_cloud,
-                            ) {
-                                tracing::warn!(
-                                    profile = %pending_bandit_entry.profile_name,
-                                    action = pending_bandit_entry.action_idx,
-                                    ?err,
-                                    "Fehler beim BanditProfileState-Update in record_outcome"
-                                );
-                            } else {
-                                profile.bandit_state = Some(bstate_cloned);
-                                tracing::debug!(
-                                    profile = %pending_bandit_entry.profile_name,
-                                    action = pending_bandit_entry.action_idx,
-                                    propensity = pending_bandit_entry.propensity,
-                                    reward,
-                                    cost,
-                                    "BanditProfileState erfolgreich aktualisiert"
-                                );
-                            }
+                                "BanditProfileState erfolgreich aktualisiert"
+                            );
                         }
                     }
                 }
             }
+        }
 
-            Arc::new(new_state)
-        });
-
+        self.state.store(Arc::new(new_state));
         true
     }
 
@@ -214,12 +192,11 @@ impl RouterEngine {
 
     /// Setzt Kalibrierungsstatistik für alle Profile zurück.
     pub fn reset_all_calibration(&self) {
-        self.state.rcu(|current| {
-            let mut new_state = (**current).clone();
-            for state in new_state.calibration.values_mut() {
-                state.reset();
-            }
-            Arc::new(new_state)
-        });
+        let current = self.state.load_full();
+        let mut new_state = (*current).clone();
+        for state in new_state.calibration.values_mut() {
+            state.reset();
+        }
+        self.state.store(Arc::new(new_state));
     }
 }

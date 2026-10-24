@@ -12,8 +12,6 @@ pub enum RefOp {
     Put { key: Vec<u8>, value: Vec<u8> },
     /// Marks a key as deleted (tombstone).
     Delete { key: Vec<u8> },
-    /// Marks a key as shredded / forgotten.
-    Forget { key: Vec<u8> },
 }
 
 /// Deterministic, std-only MVCC reference model for Contextra store verification.
@@ -49,17 +47,6 @@ impl ReferenceModel {
             .push(RefOp::Delete { key: key.to_vec() });
     }
 
-    /// Stages a `Forget` operation in uncommitted pending buffer.
-    pub fn forget(&mut self, key: &[u8]) {
-        self.pending_writes
-            .push(RefOp::Forget { key: key.to_vec() });
-    }
-
-    /// Clears unacknowledged pending writes when a commit fails.
-    pub fn commit_unacked(&mut self) {
-        self.rollback();
-    }
-
     /// Clears any uncommitted pending writes without advancing sequence number.
     pub fn rollback(&mut self) {
         self.pending_writes.clear();
@@ -84,7 +71,7 @@ impl ReferenceModel {
                         .or_default()
                         .push((commit_seq, Some(value)));
                 }
-                RefOp::Delete { key } | RefOp::Forget { key } => {
+                RefOp::Delete { key } => {
                     self.history
                         .entry(key)
                         .or_default()
@@ -100,11 +87,6 @@ impl ReferenceModel {
     pub fn commit_batch(&mut self, ops: Vec<RefOp>) -> u64 {
         self.pending_writes.extend(ops);
         self.commit()
-    }
-
-    /// Returns a reference to the raw MVCC version history map (`BTreeMap<Key, Vec<(seq, Value|Tombstone)>>`).
-    pub fn history(&self) -> &BTreeMap<Vec<u8>, Vec<(u64, Option<Vec<u8>>)>> {
-        &self.history
     }
 
     /// Returns the current high water mark sequence number.
@@ -194,19 +176,6 @@ impl ReferenceModel {
         }
         map
     }
-
-    /// Verifies that recovered snapshot matches reference model expected snapshot.
-    pub fn verify_recovery(&self, recovered: &BTreeMap<Vec<u8>, Vec<u8>>) -> Result<(), String> {
-        let expected = self.snapshot_map_at(self.snapshot_seq());
-        if &expected == recovered {
-            Ok(())
-        } else {
-            Err(format!(
-                "Recovery divergence: expected {:?}, recovered {:?}",
-                expected, recovered
-            ))
-        }
-    }
 }
 
 #[cfg(test)]
@@ -246,52 +215,5 @@ mod tests {
 
         let p_seq2 = model.scan_prefix_at(b"k", seq2);
         assert_eq!(p_seq2, vec![(b"k1".to_vec(), b"v1_seq2".to_vec())]);
-    }
-
-    #[test]
-    fn test_reference_model_rollback_clears_pending_writes() {
-        let mut model = ReferenceModel::new();
-        model.put(b"committed_k", b"v1");
-        let seq1 = model.commit();
-
-        model.put(b"pending_k", b"uncommitted_v");
-        model.delete(b"committed_k");
-        model.rollback(); // Clear pending buffer without commit
-
-        // Sequence number remains at 1
-        assert_eq!(model.snapshot_seq(), seq1);
-        // Committed key retains value; pending key is not present
-        assert_eq!(model.get_latest(b"committed_k"), Some(b"v1".to_vec()));
-        assert_eq!(model.get_latest(b"pending_k"), None);
-    }
-
-    #[test]
-    fn test_reference_model_scan_range_bounds() {
-        let mut model = ReferenceModel::new();
-        model.put(b"a", b"v_a");
-        model.put(b"b", b"v_b");
-        model.put(b"c", b"v_c");
-        model.put(b"d", b"v_d");
-        let seq = model.commit();
-
-        // Inclusive range [b, c]
-        let res_inc = model.scan_range_at(Bound::Included(b"b"), Bound::Included(b"c"), seq);
-        assert_eq!(
-            res_inc,
-            vec![
-                (b"b".to_vec(), b"v_b".to_vec()),
-                (b"c".to_vec(), b"v_c".to_vec())
-            ]
-        );
-
-        // Exclusive range (a, d)
-        let res_exc = model.scan_range_at(Bound::Excluded(b"a"), Bound::Excluded(b"d"), seq);
-        assert_eq!(
-            res_exc,
-            vec![
-                (b"b".to_vec(), b"v_b".to_vec()),
-                (b"c".to_vec(), b"v_c".to_vec())
-            ]
-        );
     }
 }

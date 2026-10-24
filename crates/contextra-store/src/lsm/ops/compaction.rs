@@ -2,7 +2,7 @@ use super::super::engine::LsmStorage;
 use super::super::{MemTable, SstableBuilder, SstableReader, Wal};
 use crate::compaction::retain_key_versions;
 use bytes::Bytes;
-use contextra_types::{ContextraError, Result, TOMBSTONE_BIT};
+use contextra_core::{ContextraError, Result, TOMBSTONE_BIT};
 use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -31,13 +31,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             .config
             .path
             .join(format!("wal-{:020}.log", flush_id));
-        let wal_config = crate::wal::WalConfig {
-            key_manager: storage.key_manager.clone(),
-            #[cfg(any(test, feature = "fault-injection"))]
-            fault_plan: storage.config.fault_plan.clone(),
-            ..Default::default()
-        };
-        let new_wal = Wal::open_with_config(wal_path, wal_config).await?;
+        let new_wal = Wal::open_with_key_manager(wal_path, storage.key_manager.clone()).await?;
         Some(new_wal)
     } else {
         None
@@ -61,13 +55,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                         .config
                         .path
                         .join(format!("wal-{:020}.log", flush_id));
-                    let wal_config = crate::wal::WalConfig {
-                        key_manager: storage.key_manager.clone(),
-                        #[cfg(any(test, feature = "fault-injection"))]
-                        fault_plan: storage.config.fault_plan.clone(),
-                        ..Default::default()
-                    };
-                    Wal::open_with_config(wal_path, wal_config).await?
+                    Wal::open_with_key_manager(wal_path, storage.key_manager.clone()).await?
                 }
             };
 
@@ -103,7 +91,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
     // ── Phase 3: Expensive I/O & Atomic Transition ──────────────────────────
     let phase3_res: Result<()> = async {
-        let floor_seq = storage.floor.floor();
+        let floor_seq = storage.snapshot_registry.min_active_seqno();
 
         let mut key_map: BTreeMap<Bytes, Vec<(Bytes, u64, u64)>> = BTreeMap::new();
 
@@ -169,8 +157,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
         // last_committed_tx MUSS vor sstables.push() aktualisiert werden — sonst Race-Fenster für parallele Reader, siehe DECISIONS.md ADR-043.
         let sst_max_tx = reader.metadata().max_tx_id;
-        let sst_max_tx_id = contextra_types::TxId::try_new(sst_max_tx)?;
-        storage.advance_visibility(sst_max_tx_id);
+        storage.advance_visibility(contextra_core::TxId::new(sst_max_tx));
 
         sstables.push(Arc::new(reader));
         sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
@@ -186,7 +173,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         drop(sstables);
         drop(state);
 
-        // Delete sealed WAL files whose data was flushed into SSTable (S5: retain failed entries)
+        // Delete ALL sealed WAL files whose data was flushed into SSTable (H4b)
         {
             let mut pending_guard = storage.pending_sealed_wals.lock().await;
             let active_wal_path = {
@@ -194,85 +181,48 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                 wal_read.path().to_path_buf()
             };
 
-            let mut remaining_wals = Vec::new();
-            let to_process = std::mem::take(&mut *pending_guard);
-
-            for (wal_path, hmac) in to_process {
-                if wal_path == active_wal_path {
-                    remaining_wals.push((wal_path, hmac));
-                    continue;
-                }
-
-                let mut trunc_guard_opt = None;
-                if let Some(ref old_wal) = old_wal_opt {
-                    if old_wal.path() == wal_path.as_path() {
-                        trunc_guard_opt = Some(old_wal.truncate_lock.lock().await);
+            for (wal_path, _) in pending_guard.drain(..) {
+                if wal_path != active_wal_path {
+                    let mut trunc_guard_opt = None;
+                    if let Some(ref old_wal) = old_wal_opt {
+                        if old_wal.path() == wal_path.as_path() {
+                            trunc_guard_opt = Some(old_wal.truncate_lock.lock().await);
+                        }
                     }
-                }
 
-                let p = wal_path.clone();
-                let remove_res = tokio::task::spawn_blocking(move || {
-                    contextra_durable_fs::durable_remove(&p)
-                })
-                .await;
-
-                let mut succeeded = false;
-                match remove_res {
-                    Ok(Ok(())) => {
-                        succeeded = true;
+                    if let Err(e) = tokio::fs::remove_file(&wal_path).await {
+                        tracing::debug!("Could not delete old WAL {:?}: {}", wal_path, e);
+                    } else {
                         let uuid_sidecar =
                             std::path::PathBuf::from(format!("{}.uuid", wal_path.display()));
-                        let sidecar = uuid_sidecar.clone();
-                        let sidecar_res = tokio::task::spawn_blocking(move || {
-                            contextra_durable_fs::durable_remove(&sidecar)
-                        })
-                        .await;
-                        if let Ok(Err(e)) = sidecar_res {
+                        if let Err(e) = tokio::fs::remove_file(&uuid_sidecar).await {
                             if e.kind() != std::io::ErrorKind::NotFound {
-                                tracing::warn!("wal_cleanup_failures_total: Could not delete sidecar {:?}: {}", uuid_sidecar, e);
+                                tracing::debug!(
+                                    "Could not delete sidecar {:?}: {}",
+                                    uuid_sidecar,
+                                    e
+                                );
                             }
                         }
                     }
-                    Ok(Err(e)) if e.kind() == std::io::ErrorKind::NotFound => {
-                        succeeded = true;
-                    }
-                    Ok(Err(e)) => {
-                        crate::util::WAL_CLEANUP_FAILURES_TOTAL.fetch_add(1, Ordering::Relaxed);
-                        tracing::warn!("wal_cleanup_failures_total: Could not delete old WAL {:?}: {}", wal_path, e);
-                    }
-                    Err(join_err) => {
-                        crate::util::WAL_CLEANUP_FAILURES_TOTAL.fetch_add(1, Ordering::Relaxed);
-                        tracing::error!("wal_cleanup_failures_total: Join error deleting old WAL {:?}: {}", wal_path, join_err);
-                    }
-                }
-
-                drop(trunc_guard_opt);
-
-                if !succeeded {
-                    remaining_wals.push((wal_path, hmac));
+                    drop(trunc_guard_opt);
                 }
             }
-
-            *pending_guard = remaining_wals;
-
-            if let Err(e) = crate::util::fsync_parent_dir(&storage.config.path).await {
-                tracing::warn!("Parent directory fsync after WAL cleanup failed: {e}");
-            }
+            let _ = crate::util::fsync_parent_dir(&storage.config.path).await;
         }
 
         let bytes_freed: u64 = to_flush.iter().map(|mt| mt.size() as u64).sum();
         storage.budget.release_memory(bytes_freed);
-        tracing::debug!(
-            freed_bytes = bytes_freed,
-            total_used_bytes = storage.budget.memory_used(),
-            "Memory budget released during SSTable flush"
-        );
 
         storage
             .budget_tracking_drift_bytes
             .store(0, std::sync::atomic::Ordering::Relaxed);
 
-        let prune_bound = storage.floor.floor();
+        let prune_bound = storage
+            .tx_buffer
+            .min_read_snapshot()
+            .unwrap_or(u64::MAX)
+            .min(storage.snapshot_registry.min_active_seqno());
         storage.ssi_validator.prune_through(prune_bound);
 
         tracing::info!("Flushed memtable to SSTable: {} bytes", bytes_freed);
@@ -282,16 +232,11 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
 
     if let Err(ref e) = phase3_res {
         if sst_path.exists() {
-            let p = sst_path.clone();
-            let res =
-                tokio::task::spawn_blocking(move || contextra_durable_fs::durable_remove(&p)).await;
-            if let Ok(Err(rm_err)) = res {
-                if rm_err.kind() != std::io::ErrorKind::NotFound {
-                    tracing::warn!(
-                        path = ?sst_path,
-                        "Failed to remove partial SSTable after flush failure: {rm_err}"
-                    );
-                }
+            if let Err(rm_err) = tokio::fs::remove_file(&sst_path).await {
+                tracing::warn!(
+                    path = ?sst_path,
+                    "Failed to remove partial SSTable after flush failure: {rm_err}"
+                );
             }
         }
 

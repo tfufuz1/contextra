@@ -1,17 +1,15 @@
-use crate::config::LlmConfig;
 use crate::egress_gateway::{DefaultEgressClassifier, EgressClassifier};
 use crate::io::{read_line_bounded, MAX_RPC_BYTES};
 use crate::prompt_injection::PromptInjectionGuard;
-use crate::proof_key::deletion_proof_key_from_env;
 use crate::protocol::JsonRpcResponse;
 #[cfg(feature = "kv-bridge")]
-use crate::kv_wiring::setup_kv_bridge;
+use crate::routing::setup_kv_bridge;
 use crate::routing::RoutingHandle;
 use crate::sandbox::{McpSandbox, SandboxPolicy};
-use crate::validation::{is_write_allowed_by_env, resolve_session_tenant_from_env};
+use crate::validation::is_write_allowed_by_env;
 use contextra::Contextra;
 use contextra_ports::EmbeddingProvider;
-use contextra_types::{ContextraError, TenantId};
+use contextra_types::ContextraError;
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{AsyncWriteExt, BufReader};
@@ -34,31 +32,6 @@ impl McpServer {
         embedder: Arc<dyn EmbeddingProvider>,
     ) -> Result<Self, ContextraError> {
         Self::with_write_permission(db, embedder, is_write_allowed_by_env())
-    }
-
-    /// Instantiates an `McpServer` fully configured from environment variables and default runtime components.
-    pub fn from_env(
-        db: Arc<Contextra>,
-        embedder: Arc<dyn EmbeddingProvider>,
-    ) -> Result<Self, ContextraError> {
-        let tenant = resolve_session_tenant_from_env().unwrap_or(TenantId::SYSTEM);
-        let allow_write = is_write_allowed_by_env();
-        let server = Self::with_write_permission(db, embedder, allow_write)?;
-
-        // Verify LLM generator build configuration from environment
-        let _llm_generator = LlmConfig::from_env().build_generator().ok();
-
-        // Verify deletion proof key configuration from environment if available
-        let _deletion_key = deletion_proof_key_from_env().ok();
-
-        let injection_guard = Arc::new(PromptInjectionGuard::from_env());
-        let gate: Arc<dyn contextra_ports::license::LicenseGate> =
-            Arc::new(contextra_ports::license::OpenFastGate);
-        let plugin_registry = Some(Arc::new(contextra_ports::plugin::PluginRegistry::new(gate)));
-
-        Ok(server
-            .with_injection_guard(injection_guard)
-            .with_plugin_registry(plugin_registry))
     }
 
     pub fn with_write_permission(
@@ -129,14 +102,6 @@ impl McpServer {
     ) -> Self {
         self.plugin_registry = registry;
         self
-    }
-
-    /// Retrieves and decrypts a volatile tool result stored in the MCP sandbox.
-    pub fn get_volatile_output(
-        &self,
-        key: &str,
-    ) -> Result<Option<zeroize::Zeroizing<Vec<u8>>>, ContextraError> {
-        self.sandbox.get_volatile(key)
     }
 
     /// Startet den MCP stdio-Loop.

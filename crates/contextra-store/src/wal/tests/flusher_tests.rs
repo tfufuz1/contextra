@@ -1,6 +1,6 @@
 use super::*;
 use crate::wal::{PreparedBatch, WalConfig, WalEntry, WalOp};
-use contextra_types::TxId;
+use contextra_core::TxId;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -306,10 +306,8 @@ async fn test_wal_fsync_failure_poisons_handle() -> Result<()> {
     let (batch1, _) = wal.prepare_batch(vec![(op1, 1)]).await?;
     wal.append_batch(batch1).await?;
 
-    // Set fail_sync_once
-    wal.fault_plan()
-        .fail_sync_once
-        .store(true, std::sync::atomic::Ordering::SeqCst);
+    // Set FAIL_SYNC_ONCE
+    crate::wal::flusher::FAIL_SYNC_ONCE.store(true, std::sync::atomic::Ordering::SeqCst);
 
     let op2 = WalOp::Put {
         tx_id: TxId::new(2),

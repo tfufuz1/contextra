@@ -1,10 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-10-11T00:00:00Z (SESSION: 0ccaf2ff)
-// ZWECK: Crate-Einstiegspunkt, Modul-Hierarchie und Re-Exports der contextra-store Storage Engine
-// INVARIANTEN: Strikte Kapselung LSM-interner Details (lsm::guard ist pub(crate)); #![forbid(unsafe_code)]
-// NICHT-OFFENSICHTLICH: Snapshot-Pinning nur über contextra-checkpoint Guard; Store-Module für Benches/Tests freigegeben
-// SIEHE AUCH: AGENTS.md, docs/audits/AUDIT_contextra-store_2026-10-04.md
-
 #![deny(dead_code)]
 //! `Contextra` Store — LSM-Tree based storage engine.
 //!
@@ -22,16 +15,8 @@
 #![allow(unexpected_cfgs)]
 
 #[cfg(not(loom))]
-pub mod blob;
-#[cfg(not(loom))]
 pub mod compaction;
-#[cfg(not(loom))]
-pub mod copy_registry;
 pub mod engine;
-#[cfg(not(loom))]
-pub mod erasure_ledger;
-#[cfg(not(loom))]
-pub mod format;
 pub mod kv;
 #[cfg(not(loom))]
 pub mod lsm;
@@ -40,29 +25,18 @@ pub mod manifest;
 #[cfg(not(loom))]
 pub mod memtable;
 #[cfg(not(loom))]
-pub mod restore_guard;
-#[cfg(not(loom))]
 pub mod sstable;
 #[cfg(not(loom))]
 pub mod system_pressure;
 #[cfg(not(loom))]
 pub mod tenant_codec;
-#[cfg(any(test, feature = "test-utils"))]
-pub mod util;
-#[cfg(not(any(test, feature = "test-utils")))]
 pub(crate) mod util;
 pub mod wal;
 
 // WP-4.1 (UNIMPLEMENTED): mmap-basierter SSTable-Zugriff für Out-of-Core-Daten.
 // Aktuell: reguläres tokio::fs/std::fs File-I/O in sstable.rs.
-// Siehe Audit-Dokumentation: docs/archive/misc/audits/AUDIT_contextra-store_2026-09-11.md
+// Tracking-Issue: TODO(owner): Issue anlegen
 // INVARIANTE: LSM-Kern bleibt blind gegenüber Indexstrukturen.
-
-// LSM/WAL Persistenz-Engine Architekturentwurf & Risikobetrachtung:
-// 1. Disk-Physik (fsync-Reihenfolge): Strikte Durchsetzung des atomaren Sequenzmusters `.tmp` Schreiben -> Datei `fsync` -> Atomares `rename` -> Parent Directory `fsync`. Verhindert TOCTOU-Races und unvollständige SSTable/Manifest-Dateien nach abrupten Crashs.
-// 2. Group-Commit Scope Reduction: `commit_mutex` wird nur während der Batch-Vorbereitung und Sequenzzuordnung gehalten, vor physischen Disk-I/O-Operationen (`wal.append_batch`) freigegeben und erst zur MemTable-Aktualisierung/Sichtbarkeits-Erweiterung erneut akquiriert. Reduziert Contention und Latenzspitzen unter hoher Schreiblast.
-// 3. HMAC-Chains: Fortlaufende V3 HMAC-Kettenverifizierung über WAL-Segmente hinweg in Kombination mit der Manifest High-Water-Mark. Bietet Schutz vor unbeabsichtigter WAL-Kürzung (INV-WAL-TRUNCATION-1) und Manipulationen.
-// 4. rollback_to_tx: Rollback-Mechanismus für uncommitted WAL- und MemTable-Einträge bei Abbruch oder Transaktionsfehlern, inklusive korrekter Speicherfreigabe im MemTable-Budget und Wiederherstellung des konsistenten LsmState.
 
 #[cfg(not(loom))]
 pub use compaction::{
@@ -79,8 +53,6 @@ pub use lsm::{
 };
 #[cfg(not(loom))]
 pub use manifest::{Manifest, ManifestEntry};
-#[cfg(not(loom))]
-pub use restore_guard::StreamingRestoreGuard;
 #[cfg(not(loom))]
 pub use system_pressure::{PressureLevel, SystemPressure, SystemPressureMonitor};
 #[cfg(not(loom))]

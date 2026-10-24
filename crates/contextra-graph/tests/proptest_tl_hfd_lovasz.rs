@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 //! Property and differential test suite for TL-HFD Lovász extension calculations (Spec §21.1, §22.2c, Audit F3).
 //!
 //! Evaluates `compute_lovasz_extension` and `truncate_participants` for invariant enforcement,

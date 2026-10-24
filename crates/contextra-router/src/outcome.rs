@@ -26,24 +26,6 @@ impl DecisionId {
     }
 }
 
-/// An in-flight routing ticket representing a pending decision awaiting an outcome.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct RoutingTicket {
-    decision_id: DecisionId,
-}
-
-impl RoutingTicket {
-    /// Creates a new `RoutingTicket` for the given `DecisionId`.
-    pub const fn new(decision_id: DecisionId) -> Self {
-        Self { decision_id }
-    }
-
-    /// Returns the associated `DecisionId`.
-    pub const fn decision_id(&self) -> DecisionId {
-        self.decision_id
-    }
-}
-
 /// Instanzgebundener Generator für monoton steigende `DecisionId`s (Spec §3 P29).
 #[derive(Debug)]
 pub struct DecisionIdGenerator {
@@ -59,17 +41,6 @@ impl DecisionIdGenerator {
     }
 
     /// Erzeugt die nächste monotone `DecisionId`.
-    ///
-    /// # Atomic Ordering Justification
-    /// **Classification**: Unique ID / Sequence Generator (Non-synchronizing).
-    /// **Ordering**: `Ordering::Relaxed`.
-    /// **Rationale**: `fetch_add(1, Ordering::Relaxed)` operates on a single isolated atomic counter
-    /// (`self.next`). The hardware guarantees total modification order for operations on this single
-    /// location, ensuring every thread observes a strictly unique, monotonically increasing `u64` value.
-    /// Because `DecisionId` generation does not publish or synchronize access to other shared memory locations
-    /// (synchronization for decision tracking is handled independently via `pending_decisions` lock or `ArcSwap`),
-    /// acquire/release memory barriers are unnecessary. Using `Ordering::Relaxed` avoids memory fence overhead
-    /// on weak-memory architectures (ARM/RISC-V) without violating monotonicity or uniqueness invariants.
     pub fn next(&self) -> DecisionId {
         DecisionId::from_raw(self.next.fetch_add(1, Ordering::Relaxed))
     }

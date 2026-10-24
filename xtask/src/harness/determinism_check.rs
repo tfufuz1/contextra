@@ -270,7 +270,7 @@ pub fn run_determinism_check(args: &[String]) -> i32 {
         }
     };
 
-    let allow_path = root.join("xtask/config/governance/determinism-allow.toml");
+    let allow_path = root.join("governance/determinism-allow.toml");
     let allow_entries: Vec<DeterminismCheckAllowEntry> = if allow_path.exists() {
         if let Ok(content) = fs::read_to_string(&allow_path) {
             if let Ok(parsed) = toml::from_str::<DeterminismCheckAllowFile>(&content) {
@@ -321,7 +321,7 @@ pub fn run_determinism_check(args: &[String]) -> i32 {
         })
         .collect();
 
-    let baseline_path = root.join("xtask/config/governance/determinism-baseline.toml");
+    let baseline_path = root.join("governance/determinism-baseline.toml");
     let mut baseline_entries: Vec<DeterminismCheckBaselineEntry> = Vec::new();
 
     if baseline_path.exists() {

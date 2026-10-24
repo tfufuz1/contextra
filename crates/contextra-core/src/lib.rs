@@ -15,10 +15,6 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-/// Copy registry types.
-pub mod copy_registry;
-pub use copy_registry::{CopyKind, CopyRegEntry};
-
 // Re-export Ring-0 modular crates
 #[deprecated(
     since = "0.1.0",
@@ -64,16 +60,6 @@ pub mod traits {
     since = "0.1.0",
     note = "Moved to contextra_mvcc as part of Ring-Modell Phase 1b"
 )]
-pub use contextra_mvcc::floor;
-#[deprecated(
-    since = "0.1.0",
-    note = "Moved to contextra_mvcc as part of Ring-Modell Phase 1b"
-)]
-pub use contextra_mvcc::lease;
-#[deprecated(
-    since = "0.1.0",
-    note = "Moved to contextra_mvcc as part of Ring-Modell Phase 1b"
-)]
 pub use contextra_mvcc::seq_log;
 #[deprecated(
     since = "0.1.0",
@@ -103,21 +89,9 @@ pub use contextra_mvcc::seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
 
 #[deprecated(
     since = "0.1.0",
-    note = "Moved to contextra_mvcc::floor as part of Ring-Modell Phase 1b"
-)]
-pub use contextra_mvcc::floor::{GcFloor, SnapshotFloor};
-
-#[deprecated(
-    since = "0.1.0",
-    note = "Moved to contextra_mvcc::lease as part of Ring-Modell Phase 1b"
-)]
-pub use contextra_mvcc::lease::SnapshotLease;
-
-#[deprecated(
-    since = "0.1.0",
     note = "Moved to contextra_mvcc::snapshot as part of Ring-Modell Phase 1b"
 )]
-pub use contextra_mvcc::snapshot::SnapshotRegistry;
+pub use contextra_mvcc::snapshot::{SnapshotGuard, SnapshotRegistry};
 
 #[deprecated(
     since = "0.1.0",

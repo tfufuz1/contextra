@@ -6,9 +6,9 @@
 //! Verifies that `commit_mutex` serialization prevents race conditions between
 //! a failing transaction undergoing WAL HMAC rollback and a concurrent successful commit.
 
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::TxId;
+use contextra_store::wal::FAIL_APPEND_FOR_TX;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -64,10 +64,7 @@ async fn test_concurrent_commit_during_wal_rollback_preserves_hmac_chain() {
         .expect("put tx2 failed");
 
     // Activate fault injection hook specifically targeting tx1 (tx_id = 2)
-    storage
-        .fault_plan()
-        .fail_append_for_tx
-        .store(tx1.inner(), Ordering::SeqCst);
+    FAIL_APPEND_FOR_TX.store(tx1.inner(), Ordering::SeqCst);
 
     // Spawn concurrent commit tasks
     let task1 = tokio::spawn(async move { storage1.commit(tx1).await });

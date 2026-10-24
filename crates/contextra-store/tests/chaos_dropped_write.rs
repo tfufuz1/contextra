@@ -3,10 +3,8 @@
 //!
 //! Evaluates the "fsync Error Propagation (ABSOLUT)" invariant defined in `crates/contextra-store/AGENTS.md`.
 
-use contextra_ports::storage::StorageEngine;
+use contextra_core::{ContextraError, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::error::ContextraError;
-use contextra_types::TxId;
 use std::fs::Permissions;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;

@@ -39,7 +39,7 @@ pub struct SurrogateVault {
 
 impl std::fmt::Debug for SurrogateVault {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let entry_count = self.map.lock().unwrap_or_else(|e| e.into_inner()).len();
+        let entry_count = self.map.lock().map(|m| m.len()).unwrap_or(0);
         f.debug_struct("SurrogateVault")
             .field("entry_count", &entry_count)
             .finish_non_exhaustive()
@@ -82,17 +82,18 @@ impl SurrogateVault {
         let hash_hex = hasher.finalize().to_hex();
         let surrogate = format!("[USER_ENTITY_{}]", &hash_hex[..16]);
 
-        let mut guard = self.map.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(existing) = guard.get(&surrogate) {
-            if existing != entity_text {
-                return Err(EgressVaultError::SurrogateCollision {
-                    surrogate,
-                    existing_plaintext: existing.clone(),
-                    new_plaintext: entity_text.to_string(),
-                });
+        if let Ok(mut guard) = self.map.lock() {
+            if let Some(existing) = guard.get(&surrogate) {
+                if existing != entity_text {
+                    return Err(EgressVaultError::SurrogateCollision {
+                        surrogate,
+                        existing_plaintext: existing.clone(),
+                        new_plaintext: entity_text.to_string(),
+                    });
+                }
+            } else {
+                guard.insert(surrogate.clone(), entity_text.to_string());
             }
-        } else {
-            guard.insert(surrogate.clone(), entity_text.to_string());
         }
 
         Ok(surrogate)
@@ -100,13 +101,15 @@ impl SurrogateVault {
 
     /// Retrieves the original entity text for a given surrogate key if present.
     pub fn get_entity(&self, surrogate: &str) -> Option<String> {
-        let guard = self.map.lock().unwrap_or_else(|e| e.into_inner());
-        guard.get(surrogate).cloned()
+        self.map
+            .lock()
+            .ok()
+            .and_then(|guard| guard.get(surrogate).cloned())
     }
 
     /// Returns the current count of stored surrogate mappings.
     pub fn len(&self) -> usize {
-        self.map.lock().unwrap_or_else(|e| e.into_inner()).len()
+        self.map.lock().map(|m| m.len()).unwrap_or(0)
     }
 
     /// Returns true if the vault contains no surrogate mappings.
@@ -118,10 +121,11 @@ impl SurrogateVault {
 impl Drop for SurrogateVault {
     fn drop(&mut self) {
         self.session_salt.zeroize();
-        let mut guard = self.map.lock().unwrap_or_else(|e| e.into_inner());
-        for (mut k, mut v) in guard.drain() {
-            k.zeroize();
-            v.zeroize();
+        if let Ok(mut guard) = self.map.lock() {
+            for (mut k, mut v) in guard.drain() {
+                k.zeroize();
+                v.zeroize();
+            }
         }
     }
 }
@@ -272,16 +276,13 @@ pub async fn classify_layer1_arc(
         let matches = set_cloned.matches(text);
         if matches.matched_any() {
             if let Some(first_idx) = matches.iter().next() {
-                if let Some(cp) = patterns_cloned.get(first_idx) {
-                    tracing::warn!(
-                        rule_id = %cp.name,
-                        pattern = %cp.regex.as_str(),
-                        "Egress DLP sensitive pattern match detected"
-                    );
-                    return EgressClassification::Block(BlockReason::SensitivePattern(
-                        cp.name.clone(),
-                    ));
-                }
+                let cp = &patterns_cloned[first_idx];
+                tracing::warn!(
+                    rule_id = %cp.name,
+                    pattern = %cp.regex.as_str(),
+                    "Egress DLP sensitive pattern match detected"
+                );
+                return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
             }
         }
         EgressClassification::Allow
@@ -331,7 +332,7 @@ impl EgressVault {
         let compiled = patterns
             .into_iter()
             .enumerate()
-            .map(|(idx, pat)| CompiledPattern::new(format!("R-{:03}", idx.saturating_add(1)), &pat))
+            .map(|(idx, pat)| CompiledPattern::new(format!("R-{:03}", idx + 1), &pat))
             .collect::<Result<Vec<_>, _>>()?;
 
         let set_patterns: Vec<&str> = compiled.iter().map(|p| p.regex.as_str()).collect();
@@ -427,7 +428,7 @@ impl EgressVault {
         }
 
         let mut current_text = Zeroizing::new(payload.to_string());
-        let mut replacement_count: usize = 0;
+        let mut replacement_count = 0;
 
         // Phase 1: Regex-Muster im Ersetzungsmodus anwenden
         for cp in self.patterns.iter() {
@@ -439,7 +440,7 @@ impl EgressVault {
                 let surrogate = self.surrogate_vault.generate_surrogate(entity_text)?;
                 new_text.push_str(&surrogate);
                 last_end = m.end();
-                replacement_count = replacement_count.saturating_add(1);
+                replacement_count += 1;
             }
             if last_end > 0 {
                 new_text.push_str(&current_text[last_end..]);
@@ -470,7 +471,7 @@ impl EgressVault {
                     let surrogate = self.surrogate_vault.generate_surrogate(entity_text)?;
                     current_text.replace_range(range.clone(), &surrogate);
                     last_processed_start = range.start;
-                    replacement_count = replacement_count.saturating_add(1);
+                    replacement_count += 1;
                 }
             }
         }
@@ -515,14 +516,7 @@ impl EgressClassifier for EgressVault {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    clippy::arithmetic_side_effects,
-    deprecated
-)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use std::time::Instant;

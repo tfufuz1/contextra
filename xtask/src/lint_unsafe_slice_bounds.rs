@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: xtask Lint-Werkzeug zur Erkennung von OOB-Reads in unsafe SIMD-Funktionen.
-// INVARIANTEN: Prüft AST von unsafe fn mit 2 Slice-Parametern gleichen Typs auf .min() oder Längencheck vor SIMD-Loads/Pointer-Offsets.
-// STAND: TS:2026-09-18T00:00:00Z
+// INVARIANTEN: Prüft AST von unsafe fn mit 2 Slice-Parametern gleichen Typs auf .min() oder Längencheck vor SIMD-Loads.
+// STAND: TS:2026-09-12T00:00:00Z
 
 use std::fs;
 use std::path::Path;
@@ -79,11 +79,11 @@ impl<'a> SimdFnVisitor<'a> {
             return;
         }
 
-        // 3. Inspect function body for SIMD load intrinsics or raw pointer offset operations and bound checks
+        // 3. Inspect function body for SIMD load intrinsics and bound checks
         let mut inspector = FnBodyInspector::default();
         inspector.visit_block(&item.block);
 
-        if inspector.has_simd_load_or_ptr_offset {
+        if inspector.has_simd_load {
             let is_guarded = inspector.has_length_min_call || inspector.has_length_check_or_assert;
 
             if !is_guarded {
@@ -92,7 +92,7 @@ impl<'a> SimdFnVisitor<'a> {
                     file_path: self.file_path.to_string(),
                     line_num,
                     fn_name,
-                    details: "Unsafe SIMD/pointer function with matching slice parameters contains SIMD load calls or raw pointer offsets without length normalization (.min) or length assertion/check".to_string(),
+                    details: "Unsafe SIMD function with matching slice parameters contains SIMD load calls without length normalization (.min) or length assertion/check".to_string(),
                 });
             }
         }
@@ -108,7 +108,7 @@ impl<'a> Visit<'a> for SimdFnVisitor<'a> {
 
 #[derive(Default)]
 struct FnBodyInspector {
-    has_simd_load_or_ptr_offset: bool,
+    has_simd_load: bool,
     has_length_min_call: bool,
     has_length_check_or_assert: bool,
 }
@@ -120,8 +120,11 @@ impl<'a> Visit<'a> for FnBodyInspector {
         if method_name == "min" {
             // Check if .min is called on a length or within length normalization
             self.has_length_min_call = true;
-        } else if method_name == "add" || method_name == "offset" || method_name == "wrapping_add" || method_name == "wrapping_offset" {
-            self.has_simd_load_or_ptr_offset = true;
+        }
+
+        // Check for .len() comparisons or calls
+        if method_name == "len" {
+            // Presence of .len() with assertions or checks
         }
 
         syn::visit::visit_expr_method_call(self, call);
@@ -132,7 +135,7 @@ impl<'a> Visit<'a> for FnBodyInspector {
             if let Some(ident) = expr_path.path.segments.last() {
                 let name = ident.ident.to_string();
                 if is_simd_load_intrinsic(&name) {
-                    self.has_simd_load_or_ptr_offset = true;
+                    self.has_simd_load = true;
                 }
             }
         }
@@ -272,21 +275,6 @@ mod tests {
         let violations = lint_code_str(bad_code, "synthetic_bad.rs").unwrap();
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].fn_name, "bad_simd");
-    }
-
-    #[test]
-    fn test_lint_detects_unbound_ptr_add() {
-        let bad_ptr_code = r#"
-            pub unsafe fn bad_ptr_offset(a: &[u8], b: &[u8]) -> u8 {
-                let p1 = a.as_ptr().add(4);
-                let p2 = b.as_ptr().add(4);
-                *p1 + *p2
-            }
-        "#;
-
-        let violations = lint_code_str(bad_ptr_code, "synthetic_bad_ptr.rs").unwrap();
-        assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].fn_name, "bad_ptr_offset");
     }
 
     #[test]

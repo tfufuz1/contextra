@@ -1,7 +1,7 @@
 #![cfg(not(loom))]
 use contextra_engine::fusion::{Signal, SignalFailurePolicy};
 use contextra_engine::{Collection, DistanceMetric, Language};
-use contextra_engine::no_graph_stubs::CsrGraph;
+use contextra_graph::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde_json::json;

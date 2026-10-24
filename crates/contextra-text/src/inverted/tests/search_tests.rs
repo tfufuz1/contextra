@@ -25,7 +25,10 @@ async fn test_wand_exact_threshold_tie_break_determinism(
     // Thus, all 5 documents will have EXACTLY the same BM25 score.
 
     for id_val in [10u64, 20, 30, 40, 50] {
-        let doc_id = DocId::from(id_val);
+        #[cfg(not(feature = "docid-128"))]
+        let doc_id = DocId::new(id_val);
+        #[cfg(feature = "docid-128")]
+        let doc_id = DocId::new(id_val as u128);
 
         index
             .upsert_document(tx, doc_id, "apple banana cherry")
@@ -51,7 +54,7 @@ async fn test_wand_exact_threshold_tie_break_determinism(
             k
         );
 
-        let doc_ids: Vec<u128> = results.iter().map(|(id, _)| u128::from(id.inner())).collect();
+        let doc_ids: Vec<u64> = results.iter().map(|(id, _)| id.inner() as u64).collect();
         assert_eq!(
             doc_ids,
             vec![10, 20, 30],
@@ -537,7 +540,7 @@ async fn test_bm25_bounded_top_k_ordering_equivalence() -> Result<()> {
     for i in 1..=20 {
         let text = "performance ".repeat(i);
         index
-            .upsert_document(tx, DocId::new((i as u64).into()), &text)
+            .upsert_document(tx, DocId::new(i as u64), &text)
             .await?;
     }
     index.commit_stats(tx).await?;
@@ -550,7 +553,7 @@ async fn test_bm25_bounded_top_k_ordering_equivalence() -> Result<()> {
 
     // Expected order: Doc 20 down to Doc 16 due to highest TF / score
     for (idx, (doc_id, score)) in results.iter().enumerate() {
-        let expected_doc_id = DocId::new(((20 - idx) as u64).into());
+        let expected_doc_id = DocId::new((20 - idx) as u64);
         assert_eq!(*doc_id, expected_doc_id, "Rank {} mismatch", idx);
         assert!(*score > 0.0);
     }
@@ -685,7 +688,7 @@ async fn test_high_frequency_term_resident_index_performance() -> Result<()> {
 
     // Populate 10,000 documents containing high-frequency term "system"
     for i in 1..=doc_count {
-        let doc_id = DocId::new((i as u64).into());
+        let doc_id = DocId::new(i as u64);
         let text = format!("system module process {}", i);
         index.upsert_document(tx, doc_id, &text).await?;
     }

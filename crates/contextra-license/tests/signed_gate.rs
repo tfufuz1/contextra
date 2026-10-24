@@ -7,7 +7,7 @@ use contextra_license::{
     FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedLicenseGate,
 };
 use contextra_ports::clock::Clock;
-use contextra_types::{DeterministicTimestamp, TenantId};
+use contextra_types::TenantId;
 use ed25519_dalek::{Signer, SigningKey};
 use rand::rngs::OsRng;
 
@@ -16,11 +16,11 @@ struct TestClock {
 }
 
 impl Clock for TestClock {
-    fn now(&self) -> DeterministicTimestamp {
-        DeterministicTimestamp::new(self.now_unix_secs * 1000, 0)
+    fn now_unix_nanos(&self) -> u64 {
+        self.now_unix_secs * 1_000_000_000
     }
 
-    fn monotonic_ticks(&self) -> u64 {
+    fn monotonic_nanos(&self) -> u64 {
         0
     }
 }
@@ -42,7 +42,6 @@ fn test_valid_signature_allowed_ring_sovereign() {
         expires_at: Some(2000000000), // Year 2033
         feature_flags: BTreeMap::from([("audit_export".to_string(), true)]),
         installation_id_hash: None,
-        key_id: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -73,7 +72,6 @@ fn test_valid_signature_missing_ring_compliance() {
         expires_at: Some(2000000000),
         feature_flags: BTreeMap::new(),
         installation_id_hash: None,
-        key_id: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -107,7 +105,6 @@ fn test_invalid_signature_rejected() {
         expires_at: Some(2000000000),
         feature_flags: BTreeMap::new(),
         installation_id_hash: None,
-        key_id: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -132,7 +129,6 @@ fn test_expired_license() {
         expires_at: Some(expires_at),
         feature_flags: BTreeMap::new(),
         installation_id_hash: None,
-        key_id: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");
@@ -168,7 +164,6 @@ fn test_inv_license_2_fast_ring_always_allowed() {
         expires_at: Some(expires_at),
         feature_flags: BTreeMap::new(),
         installation_id_hash: None,
-        key_id: None,
     };
 
     let payload_bytes = bincode::serialize(&payload).expect("serialization succeeds");

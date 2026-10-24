@@ -1,4 +1,3 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 use contextra_graph::{
     compute_co_occurrence_candidates, validate_candidates_with_llm, GraphMutationError,
     HyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,

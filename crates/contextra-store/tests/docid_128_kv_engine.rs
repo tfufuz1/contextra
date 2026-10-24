@@ -1,6 +1,5 @@
-use contextra_ports::StorageEngine;
+use contextra_core::{DocId, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::{DocId, TxId};
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -23,18 +22,28 @@ async fn test_kv_engine_put_get_default_docid() {
     let retrieved = storage.get(key1).await.expect("get key1");
     assert_eq!(retrieved.as_deref(), Some(&val1[..]));
 
-    let hash = blake3::hash(key1);
-    let mut bytes = [0u8; DocId::BYTES];
-    bytes.copy_from_slice(&hash.as_bytes()[..DocId::BYTES]);
-    let expected_doc_id = DocId::from_le_bytes(bytes);
-    assert_eq!(std::mem::size_of::<DocId>(), DocId::BYTES);
-    assert_eq!(expected_doc_id.to_le_bytes(), bytes);
-    assert_eq!(
-        expected_doc_id,
-        contextra_store::lsm::validate::derive_doc_id(key1)
-    );
+    #[cfg(not(feature = "docid-128"))]
+    {
+        let hash = blake3::hash(key1);
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&hash.as_bytes()[..8]);
+        let expected_doc_id = DocId::new(u64::from_le_bytes(bytes));
+        assert_eq!(std::mem::size_of::<DocId>(), 8);
+        assert_eq!(expected_doc_id.inner(), u64::from_le_bytes(bytes));
+    }
+
+    #[cfg(feature = "docid-128")]
+    {
+        let hash = blake3::hash(key1);
+        let mut bytes = [0u8; 16];
+        bytes.copy_from_slice(&hash.as_bytes()[..16]);
+        let expected_doc_id = DocId::new(u128::from_le_bytes(bytes));
+        assert_eq!(std::mem::size_of::<DocId>(), 16);
+        assert_eq!(expected_doc_id.inner(), u128::from_le_bytes(bytes));
+    }
 }
 
+#[cfg(feature = "docid-128")]
 #[tokio::test]
 async fn test_kv_engine_docid_128_uniqueness() {
     let dir = tempdir().expect("tempdir");
@@ -56,14 +65,14 @@ async fn test_kv_engine_docid_128_uniqueness() {
     let hash_a = blake3::hash(key_a);
     let hash_b = blake3::hash(key_b);
 
-    let mut bytes_a = [0u8; DocId::BYTES];
-    bytes_a.copy_from_slice(&hash_a.as_bytes()[..DocId::BYTES]);
-    let doc_id_a = DocId::from_le_bytes(bytes_a);
+    let mut bytes_a = [0u8; 16];
+    bytes_a.copy_from_slice(&hash_a.as_bytes()[..16]);
+    let doc_id_a = DocId::new(u128::from_le_bytes(bytes_a));
 
-    let mut bytes_b = [0u8; DocId::BYTES];
-    bytes_b.copy_from_slice(&hash_b.as_bytes()[..DocId::BYTES]);
-    let doc_id_b = DocId::from_le_bytes(bytes_b);
+    let mut bytes_b = [0u8; 16];
+    bytes_b.copy_from_slice(&hash_b.as_bytes()[..16]);
+    let doc_id_b = DocId::new(u128::from_le_bytes(bytes_b));
 
-    assert_ne!(doc_id_a.raw(), doc_id_b.raw());
-    assert_eq!(std::mem::size_of::<DocId>(), DocId::BYTES);
+    assert_ne!(doc_id_a.inner(), doc_id_b.inner());
+    assert_eq!(std::mem::size_of::<DocId>(), 16);
 }

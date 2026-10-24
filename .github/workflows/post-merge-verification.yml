@@ -1,17 +1,7 @@
-# Takt: Post-Merge (Push auf main) / workflow_dispatch
-# Zweck: Führt nach jedem Merge auf main Post-Merge-Berichte und Preflight-Prüfungen aus.
-# Lokaler Befehl: cargo run -p xtask -- post-merge-report && cargo run -p xtask -- jules-preflight
-
 name: Post-Merge Verification
-
 on:
   push:
     branches: ["main"]
-  workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -48,15 +38,6 @@ jobs:
 
       - name: Run Full Jules Preflight
         run: cargo run -p xtask -- jules-preflight
-
-      - name: Report Failure Summary
-        if: failure()
-        run: |
-          echo "### ❌ Post-Merge Jules Preflight Verification Failed" >> $GITHUB_STEP_SUMMARY
-          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "cargo run -p xtask -- post-merge-report && cargo run -p xtask -- jules-preflight" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Report Post-Merge Regression Failure
         if: failure()

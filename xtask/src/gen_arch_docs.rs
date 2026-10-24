@@ -32,7 +32,6 @@ struct MetadataDependency {
     name: String,
     kind: Option<String>,
     #[serde(default)]
-    #[cfg_attr(not(test), allow(dead_code))] // Deserialized from cargo metadata JSON for completeness
     path: Option<String>,
 }
 

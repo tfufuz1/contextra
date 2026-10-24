@@ -3,7 +3,6 @@
 
 #![allow(clippy::needless_range_loop)]
 
-pub use contextra_sys::SeededRng;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -138,17 +137,6 @@ pub struct SketchMatrix {
 }
 
 impl SketchMatrix {
-    /// Erstellt eine `SketchMatrix` mit mandantenisoliertem Seed aus `TenantId` und `base_seed`.
-    pub fn from_tenant_seed(
-        tenant_id: &contextra_types::TenantId,
-        base_seed: u64,
-        original_dim: usize,
-        projected_dim: usize,
-    ) -> Result<Self, BanditError> {
-        let seed = Self::derive_seed(tenant_id, base_seed);
-        Self::from_seed(seed, original_dim, projected_dim)
-    }
-
     /// Leitet einen mandantenisolierten PRNG-Seed via BLAKE3-Hash aus `TenantId` und `base_seed` ab.
     pub fn derive_seed(tenant_id: &contextra_types::TenantId, base_seed: u64) -> u64 {
         let mut hasher = blake3::Hasher::new();
@@ -173,12 +161,12 @@ impl SketchMatrix {
         }
 
         let scale = 1.0f32 / (projected_dim as f32).sqrt();
-        let rng = SeededRng::new(seed);
+        let rng = contextra_ports::SeededRng::new(seed);
         let total_elements = projected_dim * original_dim;
         let mut data = Vec::with_capacity(total_elements);
 
         for _ in 0..total_elements {
-            let bit = (rng.next_u64() & 1) == 0;
+            let bit = (contextra_ports::Rng::next_u64(&rng) & 1) == 0;
             data.push(if bit { scale } else { -scale });
         }
 
@@ -224,14 +212,6 @@ fn default_alpha_base() -> f32 {
 
 fn default_alpha_max_multiplier() -> f32 {
     4.0
-}
-
-fn default_max_trace() -> f64 {
-    1e6
-}
-
-fn default_drift_threshold() -> f64 {
-    1e-4
 }
 
 /// Berechnet das Skalarprodukt zweier f32-Slices mit 8-facher Unrolling-Schleife für autovektorisierte SIMD-Kompilierung.
@@ -342,9 +322,6 @@ pub struct BanditProfileState {
     /// Anzahl der update()-Aufrufe seit der letzten Neu-Initialisierung von inv_a.
     #[serde(default)]
     updates_since_reset: u64,
-    /// Anzahl der automatischen Re-Faktorisierungen / Soft-Restarts von inv_a.
-    #[serde(default)]
-    pub refactorizations: u64,
     /// Pre-allocated Buffer für Matrix-Vektor Produkte (d Elemente) zur Vermeidung von Hot-Path Allokationen.
     #[serde(skip, default)]
     pub work_buf: AlignedF32Vec,
@@ -384,15 +361,6 @@ pub struct BanditProfileState {
     /// Gewichtsvektor θ in projiziertem Raum (Dim k) für SketchedProjection.
     #[serde(default)]
     pub sketch_theta: Vec<f32>,
-    /// Schatten-Kovarianzmatrix A (d x d, Row-Major) in f64 zur Cholesky-Re-Faktorisierung bei Drift.
-    #[serde(default)]
-    pub a_matrix: Vec<f64>,
-    /// Maximale erlaubte Spur von A⁻¹.
-    #[serde(default = "default_max_trace")]
-    pub max_trace: f64,
-    /// Schwelle für Drift-Erkennung via Probe-Residual.
-    #[serde(default = "default_drift_threshold")]
-    pub drift_threshold: f64,
 }
 
 impl BanditPolicy for BanditProfileState {
@@ -413,38 +381,17 @@ impl BanditPolicy for BanditProfileState {
 }
 
 impl BanditProfileState {
-    /// Returns the number of rebuilds/refactorizations of A⁻¹.
-    pub fn rebuild_count(&self) -> u64 {
-        self.refactorizations
-    }
-
-    /// Reconstructs shadow matrix A from A⁻¹ if A is empty.
-    pub fn ensure_a_matrix_reconstructed(&mut self) {
-        let d = self.theta.len();
-        if d > 0 && self.a_matrix.len() != d * d {
-            let mut a_matrix = vec![0.0f64; d * d];
-            for i in 0..d {
-                a_matrix[i * d + i] = 1.0;
-            }
-            self.a_matrix = a_matrix;
-        }
-    }
-
     /// Erstellt einen neuen Cold-Start-Zustand für Dimension `d`.
     pub fn cold_start(d: usize, alpha_base: f32) -> Self {
         let mut inv_a = vec![0.0f32; d * d];
-        let mut a_matrix = vec![0.0f64; d * d];
         for i in 0..d {
             inv_a[i * d + i] = 1.0;
-            a_matrix[i * d + i] = 1.0;
         }
         Self {
             theta: vec![0.0f32; d],
             sigma_sq: vec![1.0f32; d], // Uninformative Prior
             inv_a: AlignedF32Vec::new(inv_a),
-            a_matrix,
             updates_since_reset: 0,
-            refactorizations: 0,
             work_buf: AlignedF32Vec::zeros(d),
             alpha: alpha_base,
             alpha_base,
@@ -459,8 +406,6 @@ impl BanditProfileState {
             seed: 0,
             sketch_matrix: None,
             sketch_theta: Vec::new(),
-            max_trace: default_max_trace(),
-            drift_threshold: default_drift_threshold(),
         }
     }
 
@@ -508,49 +453,6 @@ impl BanditProfileState {
         }
 
         Ok(())
-    }
-
-    /// Initialisiert die Sketched Projection mit einem mandantenisolierten PRNG-Seed.
-    pub fn init_tenant_sketch(
-        &mut self,
-        tenant_id: &contextra_types::TenantId,
-        base_seed: u64,
-        projected_dim: usize,
-    ) -> Result<(), BanditError> {
-        self.seed = SketchMatrix::derive_seed(tenant_id, base_seed);
-        self.ensure_sketched_state(projected_dim)
-    }
-
-    fn refactorize_inv_a(&mut self, dim: usize) {
-        let mut inv_a = vec![0.0f32; dim * dim];
-        for i in 0..dim {
-            inv_a[i * dim + i] = 1.0;
-        }
-        self.inv_a = AlignedF32Vec::new(inv_a);
-        self.updates_since_reset = 0;
-        self.refactorizations = self.refactorizations.saturating_add(1);
-    }
-
-    /// Stellt sicher, dass theta, sigma_sq, inv_a und work_buf für Dimension `d` konsistent sind.
-    pub fn ensure_dimensions(&mut self) {
-        let d = self.expected_dim();
-        if self.theta.len() != d {
-            self.theta.resize(d, 0.0);
-        }
-        if self.sigma_sq.len() != d {
-            self.sigma_sq.resize(d, 1.0);
-        }
-        if self.inv_a.len() != d * d {
-            let mut inv_a = vec![0.0f32; d * d];
-            for i in 0..d {
-                inv_a[i * d + i] = 1.0;
-            }
-            self.inv_a = AlignedF32Vec::new(inv_a);
-            self.updates_since_reset = 0;
-        }
-        if self.work_buf.len() != d {
-            self.work_buf = AlignedF32Vec::zeros(d);
-        }
     }
 
     fn ensure_inv_a(&mut self) {
@@ -647,25 +549,18 @@ impl BanditProfileState {
             return Ok(dot + self.alpha * variance_term - self.lambda * cost - privacy_penalty);
         }
 
-        let dot: f32 = if self.theta.len() == expected {
-            dot_product_f32(&self.theta, x)
-        } else {
-            0.0
-        };
+        let dot: f32 = dot_product_f32(&self.theta, x);
 
         let variance_term = match self.implementation {
-            BanditImplementation::DiagonalApproximation => {
-                let sum: f32 = (0..expected)
-                    .map(|i| {
-                        let s = self.sigma_sq.get(i).copied().unwrap_or(1.0);
-                        let xi = x[i];
-                        xi * xi / s.max(1e-8)
-                    })
-                    .sum();
-                sum.sqrt()
-            }
+            BanditImplementation::DiagonalApproximation => self
+                .sigma_sq
+                .iter()
+                .zip(x.iter())
+                .map(|(s, xi)| xi * xi / s.max(1e-8))
+                .sum::<f32>()
+                .sqrt(),
             BanditImplementation::ShermanMorrison | BanditImplementation::FlowCorrectedThompson => {
-                let d = expected;
+                let d = self.theta.len();
                 if self.inv_a.len() == d * d {
                     let var_sum: f32 = self
                         .inv_a
@@ -681,18 +576,16 @@ impl BanditProfileState {
                     }
                     var_sum.sqrt()
                 } else {
-                    let sum: f32 = (0..d)
-                        .map(|i| {
-                            let s = self.sigma_sq.get(i).copied().unwrap_or(1.0);
-                            let xi = x[i];
-                            xi * xi / s.max(1e-8)
-                        })
-                        .sum();
-                    sum.sqrt()
+                    self.sigma_sq
+                        .iter()
+                        .zip(x.iter())
+                        .map(|(s, xi)| xi * xi / s.max(1e-8))
+                        .sum::<f32>()
+                        .sqrt()
                 }
             }
             _ => {
-                let d = expected;
+                let d = self.theta.len();
                 if self.inv_a.len() == d * d {
                     let var_sum: f32 = self
                         .inv_a
@@ -708,14 +601,12 @@ impl BanditProfileState {
                     }
                     var_sum.sqrt()
                 } else {
-                    let sum: f32 = (0..d)
-                        .map(|i| {
-                            let s = self.sigma_sq.get(i).copied().unwrap_or(1.0);
-                            let xi = x[i];
-                            xi * xi / s.max(1e-8)
-                        })
-                        .sum();
-                    sum.sqrt()
+                    self.sigma_sq
+                        .iter()
+                        .zip(x.iter())
+                        .map(|(s, xi)| xi * xi / s.max(1e-8))
+                        .sum::<f32>()
+                        .sqrt()
                 }
             }
         };
@@ -743,19 +634,12 @@ impl BanditProfileState {
             });
         }
 
-        if !r_outcome.is_finite() || !cost.is_finite() || x.iter().any(|v| !v.is_finite()) {
-            return Err(BanditError::InvalidConfig(
-                "Non-finite value in update inputs".into(),
-            ));
-        }
-
-        self.ensure_dimensions();
-
         let privacy_penalty = if is_cloud_transport { self.mu } else { 0.0 };
         let r_adj = r_outcome - self.lambda * cost - privacy_penalty;
 
         // Effektiver Diskontfaktor γ (Post-Drift beschleunigter Decay vs. Normalbetrieb)
         let effective_gamma = if self.drift_steps_remaining > 0 {
+            self.drift_steps_remaining -= 1;
             self.drift_gamma
         } else {
             self.gamma
@@ -763,13 +647,10 @@ impl BanditProfileState {
 
         match self.implementation {
             BanditImplementation::DiagonalApproximation => {
-                for i in 0..self.theta.len() {
+                for (i, &xi) in x.iter().enumerate().take(self.theta.len()) {
                     self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0);
-                    self.theta[i] += r_adj * x[i] / self.sigma_sq[i].max(1e-8);
-                    self.sigma_sq[i] += x[i] * x[i];
-                }
-                if self.drift_steps_remaining > 0 {
-                    self.drift_steps_remaining -= 1;
+                    self.theta[i] += r_adj * xi / self.sigma_sq[i].max(1e-8);
+                    self.sigma_sq[i] += xi * xi;
                 }
             }
             BanditImplementation::SketchedProjection { projected_dim } => {
@@ -786,6 +667,7 @@ impl BanditProfileState {
                 let rx = sketch.project(x);
                 let k = projected_dim;
 
+                self.updates_since_reset += 1;
                 let gamma_inv = 1.0 / effective_gamma.max(1e-5);
 
                 let mut xt_v_disc = 0.0f32;
@@ -796,32 +678,14 @@ impl BanditProfileState {
                     xt_v_disc += rx[i] * v_disc_i;
                 }
 
-                let mut denominator = 1.0 + xt_v_disc;
-                let needs_refactorization =
-                    self.updates_since_reset >= SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
-                        || denominator <= 0.0;
-
-                if needs_refactorization {
-                    self.refactorize_inv_a(k);
-                    xt_v_disc = 0.0f32;
-                    for (i, row) in self.inv_a.chunks_exact(k).enumerate() {
-                        let row_dot = dot_product_f32(row, &rx);
-                        let v_disc_i = gamma_inv * row_dot;
-                        self.work_buf[i] = v_disc_i;
-                        xt_v_disc += rx[i] * v_disc_i;
-                    }
-                    denominator = 1.0 + xt_v_disc;
-                    if denominator <= 0.0 || !denominator.is_finite() {
-                        return Err(BanditError::PrecisionMatrixDriftDetected {
-                            updates_since_reset: self.updates_since_reset,
-                            denominator,
-                        });
-                    }
-                }
-
-                self.updates_since_reset += 1;
-                if self.drift_steps_remaining > 0 {
-                    self.drift_steps_remaining -= 1;
+                let denominator = 1.0 + xt_v_disc;
+                if self.updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
+                    || denominator <= 0.0
+                {
+                    return Err(BanditError::PrecisionMatrixDriftDetected {
+                        updates_since_reset: self.updates_since_reset,
+                        denominator,
+                    });
                 }
 
                 let denom_safe = denominator.max(1e-8);
@@ -845,6 +709,8 @@ impl BanditProfileState {
                 self.ensure_inv_a();
                 self.ensure_work_buf();
 
+                self.updates_since_reset += 1;
+
                 let gamma_inv = 1.0 / effective_gamma.max(1e-5);
 
                 // 1. Berechne v_disc = γ⁻¹ A⁻¹ x in work_buf und xᵀ v_disc (SIMD dot_product_f32)
@@ -857,32 +723,15 @@ impl BanditProfileState {
                 }
 
                 // 2. Denominator und Gain Vector k
-                let mut denominator = 1.0 + xt_v_disc;
-                let needs_refactorization =
-                    self.updates_since_reset >= SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
-                        || denominator <= 0.0;
+                let denominator = 1.0 + xt_v_disc;
 
-                if needs_refactorization {
-                    self.refactorize_inv_a(d);
-                    xt_v_disc = 0.0f32;
-                    for (i, row) in self.inv_a.chunks_exact(d).enumerate() {
-                        let row_dot = dot_product_f32(row, x);
-                        let v_disc_i = gamma_inv * row_dot;
-                        self.work_buf[i] = v_disc_i;
-                        xt_v_disc += x[i] * v_disc_i;
-                    }
-                    denominator = 1.0 + xt_v_disc;
-                    if denominator <= 0.0 || !denominator.is_finite() {
-                        return Err(BanditError::PrecisionMatrixDriftDetected {
-                            updates_since_reset: self.updates_since_reset,
-                            denominator,
-                        });
-                    }
-                }
-
-                self.updates_since_reset += 1;
-                if self.drift_steps_remaining > 0 {
-                    self.drift_steps_remaining -= 1;
+                if self.updates_since_reset > SHERMAN_MORRISON_REFACTORIZATION_INTERVAL
+                    || denominator <= 0.0
+                {
+                    return Err(BanditError::PrecisionMatrixDriftDetected {
+                        updates_since_reset: self.updates_since_reset,
+                        denominator,
+                    });
                 }
 
                 let denom_safe = denominator.max(1e-8);
@@ -902,19 +751,6 @@ impl BanditProfileState {
                     self.theta[i] += residual * k_i;
                     self.sigma_sq[i] = (self.sigma_sq[i] * effective_gamma).max(1.0) + x[i] * x[i];
                 }
-
-                let current_trace: f64 = self
-                    .inv_a
-                    .chunks_exact(d)
-                    .enumerate()
-                    .map(|(i, row)| row[i] as f64)
-                    .sum();
-                if self.max_trace > 0.0 && current_trace > self.max_trace {
-                    let scale = (self.max_trace / current_trace) as f32;
-                    for val in self.inv_a.iter_mut() {
-                        *val *= scale;
-                    }
-                }
             }
         }
 
@@ -927,15 +763,6 @@ impl BanditProfileState {
     /// drift_steps_remaining ← drift_decay_window (Default: 50)
     pub fn on_drift_detected(&mut self, k_drift: f32) {
         self.apply_drift_penalty(k_drift, self.alpha_max_multiplier, self.drift_gamma);
-    }
-
-    /// Observes current non-conformity scores via a `DriftPolicyBridge` and applies drift adaptation if detected.
-    pub fn observe_and_adapt_drift(
-        &mut self,
-        bridge: &mut crate::drift::DriftPolicyBridge,
-        current_scores: &[f32],
-    ) -> crate::lyapunov::LyapunovResult {
-        bridge.observe_and_react(current_scores, self)
     }
 }
 
@@ -1276,7 +1103,7 @@ mod tests {
     }
 
     #[test]
-    fn test_auto_recovery_after_1000_updates() {
+    fn test_drift_detected_after_1000_updates() {
         let d = 2;
         let mut state = BanditProfileState::cold_start(d, 0.5);
         state.implementation = BanditImplementation::ShermanMorrison;
@@ -1286,13 +1113,18 @@ mod tests {
         for _ in 0..1000 {
             state.update(&x, 1.0, 0.0, false).expect("valid update");
         }
-        assert_eq!(state.refactorizations, 0);
 
-        // The 1001st update triggers automatic refactorization and succeeds
+        // The 1001st update exceeds SHERMAN_MORRISON_REFACTORIZATION_INTERVAL (1000)
         let res = state.update(&x, 1.0, 0.0, false);
-        assert!(res.is_ok(), "Update 1001 must succeed via auto-recovery");
-        assert_eq!(state.refactorizations, 1);
-        assert_eq!(state.updates_since_reset, 1);
+        match res {
+            Err(BanditError::PrecisionMatrixDriftDetected {
+                updates_since_reset,
+                ..
+            }) => {
+                assert_eq!(updates_since_reset, 1001);
+            }
+            other => panic!("Expected PrecisionMatrixDriftDetected, got {:?}", other),
+        }
     }
 
     #[test]
@@ -1315,7 +1147,7 @@ mod tests {
     }
 
     #[test]
-    fn test_auto_recovery_on_nonpositive_denominator() {
+    fn test_drift_detected_on_nonpositive_denominator() {
         let d = 2;
         let mut state = BanditProfileState::cold_start(d, 0.5);
         state.implementation = BanditImplementation::ShermanMorrison;
@@ -1326,10 +1158,22 @@ mod tests {
         let x = vec![1.0f32, 0.0f32];
         let res = state.update(&x, 1.0, 0.0, false);
 
-        assert!(
-            res.is_ok(),
-            "Nonpositive denominator must trigger auto-recovery and succeed"
-        );
-        assert_eq!(state.refactorizations, 1);
+        match res {
+            Err(BanditError::PrecisionMatrixDriftDetected {
+                updates_since_reset,
+                denominator,
+            }) => {
+                assert_eq!(updates_since_reset, 1);
+                assert!(
+                    denominator <= 0.0,
+                    "Expected nonpositive denominator, got {}",
+                    denominator
+                );
+            }
+            other => panic!(
+                "Expected PrecisionMatrixDriftDetected error, got {:?}",
+                other
+            ),
+        }
     }
 }

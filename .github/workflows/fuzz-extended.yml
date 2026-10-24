@@ -1,16 +1,8 @@
-# Takt: Nightly (01:00 UTC) / workflow_dispatch
-# Zweck: Führt erweiterte Fuzzing-Tests über verschiedene Targets aus.
-# Lokaler Befehl: cargo +nightly fuzz run wal_mutation_chaos -- -max_total_time=3600
-
 name: Extended Fuzz Suite (Nightly)
 on:
   schedule:
     - cron: "0 01 * * *"
   workflow_dispatch: {}
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   fuzz-extended:
@@ -36,14 +28,6 @@ jobs:
         run: |
           cd crates/${{ matrix.target.crate }}
           cargo fuzz run ${{ matrix.target.target }} -- -max_total_time=3600
-      - name: Report Failure Summary
-        if: failure()
-        run: |
-          echo "### ❌ Extended Fuzz Target Failed: ${{ matrix.target.target }}" >> $GITHUB_STEP_SUMMARY
-          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "cd crates/${{ matrix.target.crate }} && cargo fuzz run ${{ matrix.target.target }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
       - name: Upload Corpus
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -51,4 +35,3 @@ jobs:
           name: fuzz-corpus-${{ matrix.target.target }}-${{ github.run_id }}
           path: crates/${{ matrix.target.crate }}/fuzz/corpus/${{ matrix.target.target }}
           if-no-files-found: warn
-          retention-days: 7

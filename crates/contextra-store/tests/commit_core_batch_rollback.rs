@@ -1,12 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_ports::storage::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::TxId;
 use tempfile::tempdir;
 
 #[tokio::test]
-#[cfg(feature = "fault-injection")]
+#[cfg_attr(not(feature = "fault-injection"), ignore)]
 async fn test_batch_rollback_does_not_truncate_valid_history() {
     let dir = tempdir().expect("tempdir creation failed");
     let path = dir.path().to_path_buf();
@@ -31,20 +30,14 @@ async fn test_batch_rollback_does_not_truncate_valid_history() {
     storage.commit(tx2).await.unwrap();
 
     // Force failure on tx 3
-    storage
-        .fault_plan()
-        .fail_append_for_tx
-        .store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
+    storage.simulate_wal_append_failure_for_test().await;
 
     let tx3 = TxId::new(3);
     storage.put(tx3, b"k3", b"v3").await.unwrap();
     let res = storage.commit(tx3).await;
     assert!(res.is_err(), "tx3 commit must fail");
 
-    storage
-        .fault_plan()
-        .fail_append_for_tx
-        .store(0, std::sync::atomic::Ordering::SeqCst);
+    storage.restore_wal_file_handle_for_test().await;
 
     // Verify k1 and k2 are still readable
     assert_eq!(

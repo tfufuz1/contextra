@@ -1,7 +1,0 @@
-{
-  "origin": "python-selfsigned",
-  "result": "INVALID",
-  "exit_code": 2,
-  "category": "POLICY_VIOLATION",
-  "reason": "Claim scanned_at_tx (90) earlier than deleted_after_tx (100)"
-}

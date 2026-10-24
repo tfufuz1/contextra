@@ -18,20 +18,17 @@ impl crate::path_rag::PathGraph for CsrGraph {
         let mut result = Vec::new();
         let mut seen = std::collections::HashSet::new();
 
-        let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
-        if node_idx < offsets_len_minus_1 {
-            let start_edge = *inner.offsets.get(node_idx).unwrap_or(&0);
-            let next_idx = node_idx.saturating_add(1);
-            let end_edge = *inner.offsets.get(next_idx).unwrap_or(&0);
+        if node_idx < inner.offsets.len() - 1 {
+            let start_edge = inner.offsets[node_idx];
+            let end_edge = inner.offsets[node_idx + 1];
             for edge_idx in start_edge..end_edge {
-                let Some(&neighbor_idx) = inner.targets.get(edge_idx) else { continue };
-                let weight = *inner.weights.get(edge_idx).unwrap_or(&1.0);
+                let neighbor_idx = inner.targets[edge_idx];
                 if !inner.tombstoned_edges.contains(&(node_idx, neighbor_idx))
                     && inner.entity_at(neighbor_idx).is_some()
                 {
                     if let Some(&id) = inner.reverse_map.get(neighbor_idx) {
                         if seen.insert(id) {
-                            result.push((id, weight));
+                            result.push((id, inner.weights[edge_idx]));
                         }
                     }
                 }
@@ -69,7 +66,6 @@ impl crate::path_rag::PathGraph for CsrGraph {
         let mut result = Vec::new();
         let mut seen = std::collections::HashSet::new();
         let num_nodes = inner.reverse_map.len();
-        let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
 
         for u_idx in 0..num_nodes {
             if inner.entity_at(u_idx).is_none() {
@@ -80,17 +76,15 @@ impl crate::path_rag::PathGraph for CsrGraph {
                 None => continue,
             };
 
-            if u_idx < offsets_len_minus_1 {
-                let start_edge = *inner.offsets.get(u_idx).unwrap_or(&0);
-                let next_idx = u_idx.saturating_add(1);
-                let end_edge = *inner.offsets.get(next_idx).unwrap_or(&0);
+            if u_idx < inner.offsets.len() - 1 {
+                let start_edge = inner.offsets[u_idx];
+                let end_edge = inner.offsets[u_idx + 1];
                 for edge_idx in start_edge..end_edge {
-                    let weight = *inner.weights.get(edge_idx).unwrap_or(&1.0);
-                    if inner.targets.get(edge_idx) == Some(&target_idx)
+                    if inner.targets[edge_idx] == target_idx
                         && !inner.tombstoned_edges.contains(&(u_idx, target_idx))
                         && seen.insert(u_id)
                     {
-                        result.push((u_id, weight));
+                        result.push((u_id, inner.weights[edge_idx]));
                     }
                 }
             }

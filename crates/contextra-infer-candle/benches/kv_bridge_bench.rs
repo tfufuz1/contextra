@@ -1,20 +1,11 @@
-#![allow(
-    deprecated,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing
-)]
-
 //! Benchmark: KV-Cache-Bridge Prefill Savings (§8, §10 Krit. #15, P7).
 //!
 //! Misst: Cache-Miss (voller Prefill) vs. Cache-Hit (entfällt Prefill).
 //! P7-Nachweis: Messbarer Throughput-Unterschied muss dokumentiert sein.
 //! Erwartete Speedup-Größenordnung: Cache-Hit ist signifikant schneller (O(1) Reference Lookup vs. Speicherallokation & Voller Prefill).
 
-use contextra_crypto::{CryptoKey, KvSegmentCipher};
+use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
 use contextra_infer_candle::kv_bridge::{KvBridgeAdapter, KvCacheKey};
-use contextra_kvcache::TenantIsolatedKvStore;
 use contextra_types::{ModelFingerprint, TenantId};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::sync::Arc;
@@ -24,7 +15,7 @@ const KV_SEGMENT_BYTES: usize = 256 * 1024;
 
 fn create_bench_adapter() -> (KvBridgeAdapter, TenantId, KvCacheKey) {
     let master_km = CryptoKey::try_new("bench-passphrase-kv", b"bench-salt-12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
     let store = Arc::new(TenantIsolatedKvStore::new());
     let adapter = KvBridgeAdapter::new(store, cipher);
 

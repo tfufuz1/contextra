@@ -12,44 +12,6 @@ use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEn
 use contextra_license::SignedLicenseGate;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate, OpenFastGate};
 
-#[path = "wiring_selftest.rs"]
-pub mod wiring_selftest;
-
-/// Error type returned during builder validation and instance construction (§4.7).
-#[derive(Debug, thiserror::Error)]
-pub enum BuildError {
-    /// Incomplete component wiring during self-test.
-    #[error("Incomplete component wiring for '{flag}': missing mandatory component '{missing}'")]
-    IncompleteWiring {
-        /// Name of the missing mandatory flag or component.
-        flag: String,
-        /// Details on missing mandatory items.
-        missing: String,
-    },
-
-    /// A required feature flag is missing for the specified operational mode.
-    #[error("Missing feature '{feature}' required for erasure mode '{mode}'")]
-    FeatureMissing {
-        /// Active mode string representation.
-        mode: String,
-        /// Missing Cargo feature name.
-        feature: String,
-    },
-
-    /// Standard Contextra domain error.
-    #[error(transparent)]
-    Contextra(#[from] ContextraError),
-}
-
-impl From<BuildError> for ContextraError {
-    fn from(err: BuildError) -> Self {
-        match err {
-            BuildError::Contextra(e) => e,
-            other => ContextraError::PolicyViolation(other.to_string()),
-        }
-    }
-}
-
 /// A builder for configuring and instantiating `Contextra`.
 ///
 /// `ContextraBuilder` acts as the primary builder pattern in the `contextra` facade (Ring 4).
@@ -62,12 +24,6 @@ pub struct ContextraBuilder {
     license_gate: Arc<dyn LicenseGate>,
     signed_license_error: Option<String>,
     performance_profile: Option<crate::performance_profile::PerformanceProfile>,
-    kms_enabled: bool,
-    kv_shredding_enabled: bool,
-    checkpoint_enabled: bool,
-    erasure_hooks: Option<Arc<dyn contextra_ports::erasure::ErasureHooks>>,
-    router_enabled: bool,
-    sandbox_enabled: bool,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
@@ -97,20 +53,12 @@ impl Clone for ContextraBuilder {
             license_gate: Arc::clone(&self.license_gate),
             signed_license_error: self.signed_license_error.clone(),
             performance_profile: self.performance_profile,
-            kms_enabled: self.kms_enabled,
-            kv_shredding_enabled: self.kv_shredding_enabled,
-            checkpoint_enabled: self.checkpoint_enabled,
-            erasure_hooks: self.erasure_hooks.clone(),
-            router_enabled: self.router_enabled,
-            sandbox_enabled: self.sandbox_enabled,
         }
     }
 }
 
 impl ContextraBuilder {
     /// Creates a new `ContextraBuilder` with specified vector dimension.
-    ///
-    /// By default, the builder initializes with [`OpenFastGate`] as its default license gate.
     pub fn new(dimension: usize) -> Self {
         Self {
             storage_path: PathBuf::from("./contextra_data"),
@@ -123,12 +71,6 @@ impl ContextraBuilder {
             license_gate: Arc::new(OpenFastGate),
             signed_license_error: None,
             performance_profile: None,
-            kms_enabled: false,
-            kv_shredding_enabled: false,
-            checkpoint_enabled: false,
-            erasure_hooks: None,
-            router_enabled: false,
-            sandbox_enabled: false,
         }
     }
 
@@ -152,13 +94,7 @@ impl ContextraBuilder {
 
     /// Sets the encryption passphrase for persistent storage.
     pub fn with_encryption_passphrase(mut self, passphrase: impl Into<String>) -> Self {
-        self.config.encryption = contextra_db::EncryptionConfig::Passphrase(passphrase.into());
-        self
-    }
-
-    /// Sets the full encryption configuration for persistent storage.
-    pub fn with_encryption_config(mut self, encryption: contextra_db::EncryptionConfig) -> Self {
-        self.config.encryption = encryption;
+        self.config.encryption_passphrase = Some(passphrase.into());
         self
     }
 
@@ -188,10 +124,8 @@ impl ContextraBuilder {
         self
     }
 
-    /// Attaches a cryptographic integrity license gate (§14.6, §15).
-    ///
-    /// Verifies that the payload matches the supplied key; this is not license enforcement.
-    pub fn with_integrity_license(
+    /// Attaches a cryptographic signed license gate (§14.6, §15).
+    pub fn with_signed_license(
         mut self,
         payload_bytes: &[u8],
         signature: &[u8; 64],
@@ -216,17 +150,6 @@ impl ContextraBuilder {
         self
     }
 
-    /// Attaches a cryptographic signed license gate (§14.6, §15).
-    #[deprecated(note = "renamed to with_integrity_license; removal 2027-01-31")]
-    pub fn with_signed_license(
-        self,
-        payload_bytes: &[u8],
-        signature: &[u8; 64],
-        verifying_key_bytes: &[u8; 32],
-    ) -> Self {
-        self.with_integrity_license(payload_bytes, signature, verifying_key_bytes)
-    }
-
     /// Sets the performance profile preset for the contextra instance.
     pub fn with_performance_profile(
         mut self,
@@ -243,190 +166,52 @@ impl ContextraBuilder {
         self
     }
 
-    /// Sets the operational erasure mode (§4.6).
-    pub fn with_erasure_mode(mut self, mode: contextra_ports::erasure::ErasureMode) -> Self {
-        self.config.erasure_mode = mode;
-        self.explicit_user_config = true;
-        self
-    }
-
-    /// Configures Key Management Service (KMS) integration.
-    pub fn with_kms(mut self, enabled: bool) -> Self {
-        self.kms_enabled = enabled;
-        self
-    }
-
-    /// Disables KMS integration.
-    pub fn without_kms(self) -> Self {
-        self.with_kms(false)
-    }
-
-    /// Configures KV shredding / cryptographic deletion mode.
-    pub fn with_kv_shredding(mut self, enabled: bool) -> Self {
-        self.kv_shredding_enabled = enabled;
-        if enabled {
-            self.config.vector_delete_mode = contextra_ports::VectorDeleteMode::SynchronousRepair;
-        } else {
-            self.config.vector_delete_mode = contextra_ports::VectorDeleteMode::BackgroundRepair;
-        }
-        self
-    }
-
-    /// Disables KV shredding.
-    pub fn without_kv_shredding(self) -> Self {
-        self.with_kv_shredding(false)
-    }
-
-    /// Configures persistent state checkpoints.
-    pub fn with_checkpoint(mut self, enabled: bool) -> Self {
-        self.checkpoint_enabled = enabled;
-        self
-    }
-
-    /// Disables state checkpoints.
-    pub fn without_checkpoint(self) -> Self {
-        self.with_checkpoint(false)
-    }
-
-    /// Attaches explicit erasure hooks for erasure proof generation (§4.6).
-    pub fn with_erasure_hooks(
-        mut self,
-        hooks: Arc<dyn contextra_ports::erasure::ErasureHooks>,
-    ) -> Self {
-        self.erasure_hooks = Some(hooks);
-        self
-    }
-
-    /// Configures query router integration.
-    pub fn with_router(mut self, enabled: bool) -> Self {
-        self.router_enabled = enabled;
-        self
-    }
-
-    /// Disables query router integration.
-    pub fn without_router(self) -> Self {
-        self.with_router(false)
-    }
-
-    /// Configures execution sandbox integration.
-    pub fn with_sandbox(mut self, enabled: bool) -> Self {
-        self.sandbox_enabled = enabled;
-        self
-    }
-
-    /// Disables execution sandbox integration.
-    pub fn without_sandbox(self) -> Self {
-        self.with_sandbox(false)
-    }
-
-    pub(crate) fn storage_path(&self) -> &PathBuf {
-        &self.storage_path
-    }
-
-    pub(crate) fn config(&self) -> &ContextraConfig {
-        &self.config
-    }
-
-    pub(crate) fn embedder(&self) -> Option<&Arc<dyn TextEmbeddingEngine>> {
-        self.embedder.as_ref()
-    }
-
-    pub(crate) fn license_gate(&self) -> &Arc<dyn LicenseGate> {
-        &self.license_gate
-    }
-
-    pub(crate) fn signed_license_error(&self) -> Option<&str> {
-        self.signed_license_error.as_deref()
-    }
-
-    pub(crate) fn performance_profile(
-        &self,
-    ) -> Option<crate::performance_profile::PerformanceProfile> {
-        self.performance_profile
-    }
-
-    pub fn kms_enabled(&self) -> bool {
-        self.kms_enabled || self.config.encryption.is_encrypted()
-    }
-
-    pub fn kv_shredding_enabled(&self) -> bool {
-        self.kv_shredding_enabled
-            || self.config.vector_delete_mode == contextra_ports::VectorDeleteMode::SynchronousRepair
-    }
-
-    pub fn checkpoint_enabled(&self) -> bool {
-        self.checkpoint_enabled
-    }
-
-    pub fn erasure_hooks(&self) -> Option<&Arc<dyn contextra_ports::erasure::ErasureHooks>> {
-        self.erasure_hooks.as_ref()
-    }
-
-    pub fn router_enabled(&self) -> bool {
-        self.router_enabled
-    }
-
-    pub fn sandbox_enabled(&self) -> bool {
-        self.sandbox_enabled
-    }
-
-    pub fn erasure_mode(&self) -> contextra_ports::erasure::ErasureMode {
-        self.config.erasure_mode
-    }
-
-    pub fn explicit_erasure_mode(&self) -> bool {
-        self.explicit_user_config
-    }
-
     /// Builds and initializes the `Contextra` engine instance.
     pub async fn build(mut self) -> Result<Contextra, ContextraError> {
-        contextra_types::public_api!("ContextraBuilder::build", {
-            wiring_selftest::verify_builder_wiring(&self)?;
+        if let Some(ref err_msg) = self.signed_license_error {
+            return Err(ContextraError::PolicyViolation(err_msg.clone()));
+        }
 
-            if let Some(ref err_msg) = self.signed_license_error {
-                return Err(ContextraError::PolicyViolation(err_msg.clone()));
-            }
-
-            let requested_ring = if let Some(profile) = self.performance_profile {
-                let resolved = profile.resolve();
-                if self.explicit_user_config {
-                    if self.config.durability_mode != resolved.durability_mode
-                        || self.config.vector_delete_mode != resolved.vector_delete_mode
-                    {
-                        return Err(ContextraError::PolicyViolation(
-                            "Explicit ContextraConfig conflicts with PerformanceProfile settings"
-                                .to_string(),
-                        ));
-                    }
-                } else {
-                    self.config.durability_mode = resolved.durability_mode;
-
-                    self.config.vector_delete_mode = resolved.vector_delete_mode;
+        let requested_ring = if let Some(profile) = self.performance_profile {
+            let resolved = profile.resolve();
+            if self.explicit_user_config {
+                if self.config.durability_mode != resolved.durability_mode
+                    || self.config.deletion_proof_active != resolved.deletion_proof_active
+                    || self.config.vector_delete_mode != resolved.vector_delete_mode
+                {
+                    return Err(ContextraError::PolicyViolation(
+                        "Explicit ContextraConfig conflicts with PerformanceProfile settings"
+                            .to_string(),
+                    ));
                 }
-                resolved.feature_ring
             } else {
-                FeatureRing::Fast
-            };
-
-            let authorized_token = self
-                .license_gate
-                .authorize(requested_ring)
-                .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
-
-            let instance = Contextra::open_authorized(
-                &self.storage_path,
-                self.config,
-                &authorized_token,
-                self.license_gate,
-            )
-            .await?;
-
-            if let Some(embedder) = self.embedder {
-                Ok(instance.with_embedder(embedder).await)
-            } else {
-                Ok(instance)
+                self.config.durability_mode = resolved.durability_mode;
+                self.config.deletion_proof_active = resolved.deletion_proof_active;
+                self.config.vector_delete_mode = resolved.vector_delete_mode;
             }
-        })
+            resolved.feature_ring
+        } else {
+            FeatureRing::Fast
+        };
+
+        let authorized_token = self
+            .license_gate
+            .authorize(requested_ring)
+            .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
+
+        let instance = Contextra::open_authorized(
+            &self.storage_path,
+            self.config,
+            &authorized_token,
+            self.license_gate,
+        )
+        .await?;
+
+        if let Some(embedder) = self.embedder {
+            Ok(instance.with_embedder(embedder).await)
+        } else {
+            Ok(instance)
+        }
     }
 }
 
@@ -465,7 +250,7 @@ mod tests {
         assert_eq!(builder.config.max_elements, 50000);
         assert_eq!(builder.config.distance_metric, DistanceMetric::Euclidean);
         assert_eq!(
-            builder.config.encryption_passphrase(),
+            builder.config.encryption_passphrase,
             Some("secret_pass".to_string())
         );
         assert!(!builder.config.consolidation_enabled);
@@ -490,63 +275,5 @@ mod tests {
         assert_eq!(db.len().await?, 0);
         let _ = std::fs::remove_dir_all(&tmp_path);
         Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_builder_missing_storage_path_fails() {
-        let res = ContextraBuilder::new(16)
-            .with_storage_path("")
-            .build()
-            .await;
-        assert!(res.is_err());
-        let err_msg = format!("{:?}", res.unwrap_err());
-        assert!(
-            err_msg.contains("StoragePath"),
-            "Error message should mention StoragePath, got: {err_msg}"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_builder_missing_dimension_fails() {
-        let res = ContextraBuilder::new(0)
-            .with_storage_path("./test_path")
-            .build()
-            .await;
-        assert!(res.is_err());
-        let err_msg = format!("{:?}", res.unwrap_err());
-        assert!(
-            err_msg.contains("Dimension"),
-            "Error message should mention Dimension, got: {err_msg}"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_builder_invalid_license_gate_fails() {
-        let res = ContextraBuilder::new(16)
-            .with_integrity_license(b"payload", &[0u8; 64], &[0u8; 32])
-            .build()
-            .await;
-        assert!(res.is_err());
-        let err_msg = format!("{:?}", res.unwrap_err());
-        assert!(
-            err_msg.contains("LicenseGate"),
-            "Error message should mention LicenseGate, got: {err_msg}"
-        );
-    }
-
-    #[test]
-    fn test_builder_report_optional_components_not_wired_when_missing() {
-        let builder = ContextraBuilder::new(16);
-        let report = wiring_selftest::generate_report_for_builder(&builder);
-        assert!(!report.wired_ports.contains(&"Embedder".to_string()));
-        assert!(!report.wired_ports.contains(&"Kms".to_string()));
-        assert!(report
-            .missing_ports
-            .iter()
-            .any(|m| m.contains("Embedder (optional)")));
-        assert!(report
-            .missing_ports
-            .iter()
-            .any(|m| m.contains("Kms (disabled)")));
     }
 }

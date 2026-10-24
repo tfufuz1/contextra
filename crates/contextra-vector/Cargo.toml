@@ -14,10 +14,9 @@ ring = "0"
 
 [dependencies]
 contextra-types = { workspace = true }
-contextra-ports = { workspace = true, features = ["backend-impl"] }
+contextra-ports = { workspace = true }
 contextra-core = { workspace = true }
 contextra-crypto = { workspace = true }
-contextra-durable-fs = { path = "../contextra-durable-fs" }
 contextra-simd = { workspace = true }
 contextra-sys = { workspace = true }
 subtle = "2.6"
@@ -27,9 +26,7 @@ rand = { workspace = true }
 roaring = { workspace = true }
 tracing = { workspace = true }
 memmap2 = { workspace = true }
-blake3 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-tokio = { workspace = true, features = ["sync", "time"] }
 
 [features]
 default = []
@@ -49,7 +46,6 @@ graph = []
 partial-index-rebuild = []
 
 [dev-dependencies]
-contextra-mvcc = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 criterion = "0.5"
 tempfile = "3"

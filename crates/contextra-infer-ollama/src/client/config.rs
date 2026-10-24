@@ -9,8 +9,9 @@ pub const DEFAULT_EMBED_MODEL: &str = "nomic-embed-text";
 pub const MAX_RETRIES: u32 = 3;
 /// Maximum allowed batch size for batch operations to prevent request timeouts and memory exhaustion.
 ///
-/// Bounded to 512 for consistency across embedding backends and to accommodate Ollama's
-/// sequential per-text embedding processing latency without exceeding standard HTTP client timeouts.
+/// Bounded to 512 to match `contextra_infer_onnx::MAX_EMBED_BATCH_SIZE` for consistency across embedding
+/// backends and to accommodate Ollama's sequential per-text embedding processing latency without
+/// exceeding standard HTTP client timeouts.
 pub const MAX_BATCH_SIZE: usize = 512;
 /// Maximum allowed text length in bytes (10 MB) to prevent OOM or DoS
 pub const MAX_TEXT_BYTES: usize = 10_000_000;

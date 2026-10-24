@@ -22,7 +22,7 @@ shlex = "1"
 contextra-types = { workspace = true }
 contextra-wire = { workspace = true }
 contextra-ports = { workspace = true }
-contextra-adapt = { workspace = true, features = ["off-policy-eval"] }
+contextra-adapt = { workspace = true }
 contextra-privacy = { workspace = true }
 arc-swap = "1"
 parking_lot = { workspace = true }

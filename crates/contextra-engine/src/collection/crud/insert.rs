@@ -104,9 +104,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Inserts a document with a Sequence-based Time-To-Live (TTL in committed ops).
-    ///
-    /// Sequence-based TTL sets `_expiry_seq` (`EXPIRY_METADATA_KEY`), which is scanned
-    /// and reaped by `Collection::reap_expired_documents` during background worker runs (`expiry_workers.rs`).
     #[tracing::instrument(level = "trace", skip(self, embedding, metadata))]
     pub async fn insert_with_ttl(
         &self,
@@ -244,7 +241,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if let Some(val) = self.storage.get(&doc_key).await? {
             let existing_id = if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
                 Some(meta.id)
-            } else if let Ok(full) = StoredDocument::from_slice(&val) {
+            } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
                 Some(full.id)
             } else {
                 None
@@ -271,7 +268,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if let Some(val) = self.storage.get_tracked(tx, &doc_key).await? {
             let existing_id = if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
                 Some(meta.id)
-            } else if let Ok(full) = StoredDocument::from_slice(&val) {
+            } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&val) {
                 Some(full.id)
             } else {
                 None
@@ -321,14 +318,14 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let old_user_val = self
             .storage
-            .get_at_seq_tracked(tx, &user_key, tx.inner())
+            .get_at_seq_tracked(tx, &user_key, u64::MAX)
             .await?;
         let old_doc_val = self
             .storage
-            .get_at_seq_tracked(tx, &doc_key, tx.inner())
+            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
             .await?;
 
-        let data = stored.encode_v2()?;
+        let data = serde_json::to_vec(&stored)?;
         self.storage.put(tx, &user_key, &data).await?;
 
         let meta_data = serde_json::to_vec(&meta_only)?;

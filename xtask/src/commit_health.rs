@@ -169,7 +169,6 @@ pub fn run_commit_health_impl(
     Ok(markdown)
 }
 
-#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_commit_health(since_days: u32, output: Option<&Path>) -> Result<String, String> {
     let root = xtask::find_root_dir();
     run_commit_health_impl(&root, since_days, output)

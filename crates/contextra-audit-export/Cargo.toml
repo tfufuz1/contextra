@@ -12,18 +12,12 @@ description = "GDPR Article 30 Processing Register export generator for Contextr
 [package.metadata.contextra]
 ring = "0"
 
-[features]
-default = []
-testkit = []
-
 [dependencies]
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
-contextra-crypto = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-contextra-audit-export = { path = ".", features = ["testkit"] }
 tokio = { workspace = true, features = ["rt", "macros"] }

@@ -1,4 +1,4 @@
-//! Harness module verifying synchronization between `xtask/config/governance/gates.toml`, `.jules/harness-phases.toml`, and `xtask/config/governance/verdict-required.toml`.
+//! Harness module verifying synchronization between `governance/gates.toml`, `.jules/harness-phases.toml`, and `governance/verdict-required.toml`.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -79,8 +79,8 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
 
     let mut findings = Vec::new();
 
-    // 1. Read xtask/config/governance/gates.toml
-    let gates_toml_path = root_dir.join("xtask/config/governance/gates.toml");
+    // 1. Read governance/gates.toml
+    let gates_toml_path = root_dir.join("governance/gates.toml");
     let catalog: Option<CatalogFile> = match fs::read_to_string(&gates_toml_path) {
         Ok(content) => match toml::from_str(&content) {
             Ok(parsed) => Some(parsed),
@@ -88,10 +88,10 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
                 findings.push(GateCatalogSyncFinding {
                     id: "GCS-001".to_string(),
                     severity: "error".to_string(),
-                    file: "xtask/config/governance/gates.toml".to_string(),
+                    file: "governance/gates.toml".to_string(),
                     line: 1,
-                    message: format!("xtask/config/governance/gates.toml konnte nicht geparst werden: {e}"),
-                    fix: "Korrigiere die TOML-Syntax in xtask/config/governance/gates.toml".to_string(),
+                    message: format!("governance/gates.toml konnte nicht geparst werden: {e}"),
+                    fix: "Korrigiere die TOML-Syntax in governance/gates.toml".to_string(),
                 });
                 None
             }
@@ -100,10 +100,10 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
             findings.push(GateCatalogSyncFinding {
                 id: "GCS-001".to_string(),
                 severity: "error".to_string(),
-                file: "xtask/config/governance/gates.toml".to_string(),
+                file: "governance/gates.toml".to_string(),
                 line: 1,
-                message: format!("xtask/config/governance/gates.toml konnte nicht gelesen werden: {e}"),
-                fix: "Erstelle xtask/config/governance/gates.toml gemäß Spezifikation".to_string(),
+                message: format!("governance/gates.toml konnte nicht gelesen werden: {e}"),
+                fix: "Erstelle governance/gates.toml gemäß Spezifikation".to_string(),
             });
             None
         }
@@ -113,8 +113,8 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
     let phases_toml_path = root_dir.join(".jules/harness-phases.toml");
     let local_phases_map = parse_harness_phases(&phases_toml_path, &mut findings);
 
-    // 3. Read xtask/config/governance/verdict-required.toml
-    let verdict_toml_path = root_dir.join("xtask/config/governance/verdict-required.toml");
+    // 3. Read governance/verdict-required.toml
+    let verdict_toml_path = root_dir.join("governance/verdict-required.toml");
     let ci_verdict_map = parse_verdict_required(&verdict_toml_path, &mut findings);
 
     if let Some(catalog) = catalog {
@@ -128,7 +128,7 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
                 if gate.required_local != local_req {
                     findings.push(GateCatalogSyncFinding {
                         id: "GCS-002".to_string(),
-                        file: "xtask/config/governance/gates.toml".to_string(),
+                        file: "governance/gates.toml".to_string(),
                         line: 1,
                         severity: "error".to_string(),
                         message: format!(
@@ -136,7 +136,7 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
                             gate.name, gate.required_local, local_req
                         ),
                         fix: format!(
-                            "Passe required_local in xtask/config/governance/gates.toml an '{}' an",
+                            "Passe required_local in governance/gates.toml an '{}' an",
                             local_req
                         ),
                     });
@@ -155,14 +155,14 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
                     if gate.required_local != local_req {
                         findings.push(GateCatalogSyncFinding {
                             id: "GCS-002".to_string(),
-                            file: "xtask/config/governance/gates.toml".to_string(),
+                            file: "governance/gates.toml".to_string(),
                             line: 1,
                             severity: "error".to_string(),
                             message: format!(
                                 "Gate '{}': required_local ({}) weicht von harness-phases.toml ({}) ab",
                                 gate.name, gate.required_local, local_req
                             ),
-                            fix: format!("Passe required_local in xtask/config/governance/gates.toml an '{}' an", local_req),
+                            fix: format!("Passe required_local in governance/gates.toml an '{}' an", local_req),
                         });
                     }
                 }
@@ -181,7 +181,7 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
                 if gate.required_ci != ci_req {
                     findings.push(GateCatalogSyncFinding {
                         id: "GCS-003".to_string(),
-                        file: "xtask/config/governance/gates.toml".to_string(),
+                        file: "governance/gates.toml".to_string(),
                         line: 1,
                         severity: "error".to_string(),
                         message: format!(
@@ -189,7 +189,7 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
                             gate.name, gate.required_ci, ci_req
                         ),
                         fix: format!(
-                            "Passe required_ci in xtask/config/governance/gates.toml an '{}' an",
+                            "Passe required_ci in governance/gates.toml an '{}' an",
                             ci_req
                         ),
                     });
@@ -203,11 +203,11 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
             if req && !catalog_names.contains(&norm_name) {
                 findings.push(GateCatalogSyncFinding {
                     id: "GCS-004".to_string(),
-                    file: "xtask/config/governance/gates.toml".to_string(),
+                    file: "governance/gates.toml".to_string(),
                     line: 1,
                     severity: "error".to_string(),
-                    message: format!("Lokales Pflichtgate '{}' (aus harness-phases.toml) fehlt im Katalog xtask/config/governance/gates.toml", norm_name),
-                    fix: format!("Füge einen Eintrag für Gate '{}' in xtask/config/governance/gates.toml ein", norm_name),
+                    message: format!("Lokales Pflichtgate '{}' (aus harness-phases.toml) fehlt im Katalog governance/gates.toml", norm_name),
+                    fix: format!("Füge einen Eintrag für Gate '{}' in governance/gates.toml ein", norm_name),
                 });
             }
         }
@@ -217,11 +217,11 @@ pub fn run_gates_catalog_sync(args: &[String]) -> i32 {
             if blocking && !catalog_names.contains(verdict_name) {
                 findings.push(GateCatalogSyncFinding {
                     id: "GCS-005".to_string(),
-                    file: "xtask/config/governance/gates.toml".to_string(),
+                    file: "governance/gates.toml".to_string(),
                     line: 1,
                     severity: "error".to_string(),
-                    message: format!("CI-Pflichtgate '{}' (aus verdict-required.toml) fehlt im Katalog xtask/config/governance/gates.toml", verdict_name),
-                    fix: format!("Füge einen Eintrag für Gate '{}' in xtask/config/governance/gates.toml ein", verdict_name),
+                    message: format!("CI-Pflichtgate '{}' (aus verdict-required.toml) fehlt im Katalog governance/gates.toml", verdict_name),
+                    fix: format!("Füge einen Eintrag für Gate '{}' in governance/gates.toml ein", verdict_name),
                 });
             }
         }
@@ -325,13 +325,13 @@ fn parse_verdict_required(
         Err(e) => {
             findings.push(GateCatalogSyncFinding {
                 id: "GCS-007".to_string(),
-                file: "xtask/config/governance/verdict-required.toml".to_string(),
+                file: "governance/verdict-required.toml".to_string(),
                 line: 1,
                 severity: "error".to_string(),
                 message: format!(
-                    "xtask/config/governance/verdict-required.toml konnte nicht gelesen werden: {e}"
+                    "governance/verdict-required.toml konnte nicht gelesen werden: {e}"
                 ),
-                fix: "Stelle sicher, dass xtask/config/governance/verdict-required.toml existiert".to_string(),
+                fix: "Stelle sicher, dass governance/verdict-required.toml existiert".to_string(),
             });
             return map;
         }
@@ -342,13 +342,13 @@ fn parse_verdict_required(
         Err(e) => {
             findings.push(GateCatalogSyncFinding {
                 id: "GCS-007".to_string(),
-                file: "xtask/config/governance/verdict-required.toml".to_string(),
+                file: "governance/verdict-required.toml".to_string(),
                 line: 1,
                 severity: "error".to_string(),
                 message: format!(
-                    "xtask/config/governance/verdict-required.toml konnte nicht geparst werden: {e}"
+                    "governance/verdict-required.toml konnte nicht geparst werden: {e}"
                 ),
-                fix: "Prüfe die TOML-Syntax in xtask/config/governance/verdict-required.toml".to_string(),
+                fix: "Prüfe die TOML-Syntax in governance/verdict-required.toml".to_string(),
             });
             return map;
         }

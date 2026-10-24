@@ -30,69 +30,23 @@
 // REVIEW-PASS[1/2] (TS: 2026-09-15T15:09:43Z) (SESSION: 2e382e86) PRÜFER-KONTEXT: FRESH
 // REVIEW-PASS[2/2] (TS: 2026-09-16T16:23:23Z) (SESSION: 8d62c439) PRÜFER-KONTEXT: FRESH
 
-pub mod copy_registry;
 mod guard;
 mod hardlink_cloner;
 mod manifest;
 mod meta;
 mod orphan;
-pub mod restore_filter;
 mod store;
-pub mod wiring;
 
-pub use copy_registry::{file_id_for_name, CopyKind, CopyRegEntry, CopyStatus};
 pub use guard::{CheckpointGuard, PinGuard};
 pub use hardlink_cloner::{CheckpointHardlinkCloner, DefaultHardlinkCloner, HardlinkCloneResult};
 pub use manifest::CheckpointManifest;
 pub use meta::{CheckpointMeta, StateCheckpoint};
-pub use orphan::{
-    monotonic_timestamp_ms, monotonic_timestamp_ms_with, InstanceOrphanRegistry, OrphanState,
-    PinId, PinnedSeqNoOrphan,
-};
 #[allow(deprecated)]
 pub use orphan::{
     await_pending_rollbacks, clear_all_orphaned_checkpoints, clear_orphaned_checkpoint,
     get_orphaned_checkpoints, get_orphaned_checkpoints_for_namespace, global_orphan_registry,
-    orphaned_checkpoint_count, pending_rollback_count, register_orphaned_checkpoint,
-    register_pinned_seq_no_orphan, OrphanRegistry,
+    monotonic_timestamp_ms, monotonic_timestamp_ms_with, orphaned_checkpoint_count,
+    pending_rollback_count, register_orphaned_checkpoint, register_pinned_seq_no_orphan,
+    InstanceOrphanRegistry, OrphanRegistry, OrphanState, PinId, PinnedSeqNoOrphan,
 };
-pub use restore_filter::{filter_restore_records, CpyRestoreFilter};
-#[cfg(any(test, feature = "test-utils"))]
-pub use restore_filter::NoOpRestoreFilter;
-pub use store::{purge_registered_checkpoint, CheckpointRegistry, PersistentCheckpointStore};
-
-pub(crate) fn block_on_sync<F, T>(future: F) -> contextra_types::Result<T>
-where
-    F: std::future::Future<Output = contextra_types::Result<T>> + Send + 'static,
-    T: Send + 'static,
-{
-    if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
-            tokio::task::block_in_place(|| handle.block_on(future))
-        } else {
-            std::thread::spawn(move || {
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))?;
-                rt.block_on(future)
-            })
-            .join()
-            .map_err(|_| {
-                contextra_types::ContextraError::Internal(
-                    "Thread panic during sync execution in async context".into(),
-                )
-            })?
-        }
-    } else {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| {
-                contextra_types::ContextraError::Internal(format!(
-                    "Failed to create Tokio runtime: {e}"
-                ))
-            })?;
-        rt.block_on(future)
-    }
-}
+pub use store::{CheckpointRegistry, PersistentCheckpointStore};

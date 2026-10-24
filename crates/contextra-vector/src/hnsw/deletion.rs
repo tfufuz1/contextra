@@ -8,7 +8,6 @@ use contextra_core::{error::HnswDeletionError, ContextraError, DocId, Result};
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex};
-use super::verify::{GhostScan, GhostVerificationReport};
 
 /// Statistics returned after a ghost-free node deletion and neighborhood repair.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,11 +30,11 @@ pub trait GhostFreeVectorIndex {
     /// # Invariant
     /// `INV-DELETION-2`: After `Ok(stats)` returns, no neighborhood pointer in the entire index
     /// references `doc_id`.
-    fn remove_with_graph_repair(&self, doc_id: DocId) -> Result<DeletionStats>;
+    fn remove_with_graph_repair(&mut self, doc_id: DocId) -> Result<DeletionStats>;
 }
 
 impl GhostFreeVectorIndex for HnswIndex {
-    fn remove_with_graph_repair(&self, doc_id: DocId) -> Result<DeletionStats> {
+    fn remove_with_graph_repair(&mut self, doc_id: DocId) -> Result<DeletionStats> {
         // Lock hierarchy: 1. write_mutex
         let _write_lock = self.inner.hot.write_mutex.lock();
 
@@ -251,7 +250,7 @@ impl GhostFreeVectorIndex for HnswIndex {
         // Fixed budget = (degree of deleted node) * (M) * 4
         let total_degree = target_max_layer * m;
         let budget = (total_degree.max(1)) * m * 4;
-        let remaining_ghost_pointers = self.verify_no_ghost_pointers_internal(target_idx as u32, budget);
+        let remaining_ghost_pointers = self.verify_no_ghost_pointers(target_idx as u32, budget);
 
         if remaining_ghost_pointers > 0 {
             return Err(ContextraError::GraphRepairFailed(
@@ -276,21 +275,7 @@ impl GhostFreeVectorIndex for HnswIndex {
 impl HnswIndex {
     /// Internal helper method to perform a verification scan across the 2nd-order neighborhood
     /// bounded by `budget` to ensure zero residual pointers to `target_idx` remain.
-    pub fn verify_no_ghost_pointers(
-        &self,
-        target_idx_u32: u32,
-        budget: usize,
-        _limit: Option<usize>,
-    ) -> (GhostVerificationReport, GhostScan) {
-        let count = self.verify_no_ghost_pointers_internal(target_idx_u32, budget);
-        let report = GhostVerificationReport {
-            is_complete: true,
-            remaining_ghost_pointers: count,
-        };
-        (report, GhostScan::Complete(count as u64))
-    }
-
-    fn verify_no_ghost_pointers_internal(&self, target_idx_u32: u32, budget: usize) -> usize {
+    fn verify_no_ghost_pointers(&self, target_idx_u32: u32, budget: usize) -> usize {
         let mmap_node_count = self
             .inner
             .cold

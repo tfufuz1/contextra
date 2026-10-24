@@ -13,12 +13,7 @@
 // | Tail Appending (Gültiger Eigenhash) | Nein | Ja | Erweitere Kette 0..n+k ist lokal valide, aber publizierte Head-Signatur sichert nur den früheren Head-Hash/Index. |
 
 #![forbid(unsafe_code)]
-#![allow(deprecated)]
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::cast_possible_truncation
-)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_crypto::{
     compute_record_commitment, AuditChain, AuditChainEntry, DataClass, DeletionProofKeyPair,
@@ -123,8 +118,8 @@ fn build_50_entry_chain(seed: u64) -> AuditChain {
         let schema = format!("schema_v{}", (i % 5) + 1);
         let rules_hash = blake3::hash(format!("rules_{}_{seed}", i / 5).as_bytes()).into();
         let data_class = data_classes[(i as usize) % data_classes.len()];
-        let doc_id = DocId::from(1000 + i as u64);
-        let tx_id = TxId(5000 + i as u64);
+        let doc_id = DocId(1000 + i);
+        let tx_id = TxId(5000 + i);
         let commitment = if i % 2 == 0 {
             Some(blake3::hash(format!("comm_salt_{i}_{seed}").as_bytes()).into())
         } else {
@@ -219,7 +214,7 @@ fn test_exhaustive_field_level_bit_flips_50_entries() {
 
         // (a.5) Mutate doc_id
         let mut tampered = base_chain.clone();
-        tampered.entries[i].doc_id = DocId::from(tampered.entries[i].doc_id.0 ^ 0xFFFF);
+        tampered.entries[i].doc_id = DocId(tampered.entries[i].doc_id.0 ^ 0xFFFF);
         assert!(
             !tampered.verify_chain().unwrap(),
             "DocId tampering at entry {i} must be detected"
@@ -391,7 +386,7 @@ fn test_tail_appending_and_signature_detection() {
             "schema_appended",
             [0x99u8; 32],
             DataClass::Public,
-            DocId::from(9999u64),
+            DocId(9999),
             TxId(9999),
             None,
         )
@@ -484,7 +479,7 @@ fn test_encrypted_commitment_salt_security_and_tamper() {
     assert!(wrong_group.decrypt(&registry).is_err());
 
     // 5. Decryption after subkey revocation (shredding) fails
-    assert!(registry.revoke_subkey(group_id).unwrap());
+    assert!(registry.revoke_subkey(group_id));
     assert!(enc_salt.decrypt(&registry).is_err());
 }
 
@@ -503,7 +498,7 @@ proptest! {
                 format!("schema_{i}"),
                 [i as u8; 32],
                 DataClass::Internal,
-                DocId::from(i as u64),
+                DocId(i as u64),
                 TxId(i as u64),
                 if i % 3 == 0 { Some([(i * 2) as u8; 32]) } else { None },
             ).unwrap();
@@ -517,7 +512,7 @@ proptest! {
         match mutation_type {
             0 => {
                 // Flip bit in doc_id
-                chain.entries[pos].doc_id = DocId::from(chain.entries[pos].doc_id.0 ^ 1);
+                chain.entries[pos].doc_id = DocId(chain.entries[pos].doc_id.0 ^ 1);
                 prop_assert!(!chain.verify_chain().unwrap());
             }
             1 => {
@@ -550,7 +545,7 @@ proptest! {
                     "appended_schema",
                     [0xEEu8; 32],
                     DataClass::Public,
-                    DocId::from(8888u64),
+                    DocId(8888),
                     TxId(8888),
                     None,
                 ).unwrap();

@@ -1,16 +1,9 @@
-# Takt: Nightly (02:00 UTC) / workflow_dispatch / pull_request (Pfadfilter)
-# Zweck: Führt Fehlereinjizierungs- und Chaos-Tests aus.
-# Lokaler Befehl: just chaos-matrix
-
 name: Nightly Chaos Matrix Tests
 on:
   schedule:
+    # Täglich um 02:00 UTC
     - cron: "0 2 * * *"
   workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -46,14 +39,12 @@ jobs:
       - name: Chaos L6-6 Concurrent Crash Recovery Matrix
         run: cargo test -p contextra-store --test chaos_matrix chaos_concurrent_crash_recovery_matrix -- --ignored --test-threads=1
 
-      - name: Report Failure Summary
+      - name: Report Failure
         if: failure()
-        run: |
-          echo "### ❌ Chaos Matrix Fault-Injection Suite Failed" >> $GITHUB_STEP_SUMMARY
-          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "cargo test -p contextra-store --test chaos_matrix -- --ignored" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            core.setFailed("Chaos Matrix test execution failed.");
 
   threadsanitizer:
     runs-on: ubuntu-latest
@@ -69,11 +60,3 @@ jobs:
           RUSTFLAGS="-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer" cargo +nightly test \
             -p contextra-vector --test deleted_nodes_lock_contention \
             --target x86_64-unknown-linux-gnu -- --test-threads=1
-      - name: Report Failure Summary
-        if: failure()
-        run: |
-          echo "### ❌ ThreadSanitizer (Race Detection S1-01, S1-11) Failed" >> $GITHUB_STEP_SUMMARY
-          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "RUSTFLAGS=\"-Z sanitizer=thread\" cargo +nightly test -p contextra-store --test toctou_put_if_absent --target x86_64-unknown-linux-gnu" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

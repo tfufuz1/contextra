@@ -16,4 +16,3 @@ ring = "0"
 thiserror = { workspace = true }
 serde = { workspace = true }
 contextra-types = { workspace = true }
-contextra-ports = { workspace = true }

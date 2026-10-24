@@ -2,8 +2,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use contextra_core::TxId;
 use contextra_store::wal::{Wal, WalConfig, WalEntry, WalOp, WAL_V3_HEADER};
-use contextra_types::TxId;
 use tempfile::tempdir;
 use tokio::fs;
 

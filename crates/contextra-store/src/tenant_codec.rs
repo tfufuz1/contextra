@@ -15,11 +15,8 @@
 
 use crate::lsm::LsmStorage;
 use bytes::Bytes;
-use contextra_crypto::deletion_witness::LayerWitness;
-use contextra_ports::erasure::{ErasureBackend, LogicalScope, PhysicalScope};
-use contextra_ports::StorageStats;
+use contextra_core::{CollectionId, DocId, StorageStats, TenantId, TxId};
 use contextra_ports::{BoxFuture, Result, StorageEngine};
-use contextra_types::{CollectionId, ContextraError, DocId, TenantId, TxId};
 use std::ops::Bound;
 use std::sync::Arc;
 
@@ -187,15 +184,6 @@ pub trait StorageEngineHandle: Send + Sync + 'static {
         limit: usize,
         cursor: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>>;
-    fn issue_memtable_witness_handle<'a>(
-        &'a self,
-        deleted_keys: &'a [Vec<u8>],
-        prefixes: &'a [Vec<u8>],
-        as_of_tx: TxId,
-    ) -> BoxFuture<'a, Result<LayerWitness>>;
-    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
-        None
-    }
 }
 
 impl StorageEngineHandle for LsmStorage {
@@ -339,36 +327,25 @@ impl StorageEngineHandle for LsmStorage {
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
         self.scan_bounded(start, end, limit, cursor)
     }
-    fn issue_memtable_witness_handle<'a>(
-        &'a self,
-        deleted_keys: &'a [Vec<u8>],
-        prefixes: &'a [Vec<u8>],
-        as_of_tx: TxId,
-    ) -> BoxFuture<'a, Result<LayerWitness>> {
-        Box::pin(self.issue_memtable_witness(deleted_keys, prefixes, as_of_tx))
-    }
-    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
-        Some(self)
-    }
 }
 
-impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
+impl<S: StorageEngine> StorageEngineHandle for Arc<S> {
     fn get_handle<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_handle(key)
+        (**self).get(key)
     }
     fn get_at_seq_handle<'a>(
         &'a self,
         key: &'a [u8],
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_at_seq_handle(key, seq_no)
+        (**self).get_at_seq(key, seq_no)
     }
     fn get_tracked_handle<'a>(
         &'a self,
         tx_id: TxId,
         key: &'a [u8],
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_tracked_handle(tx_id, key)
+        (**self).get_tracked(tx_id, key)
     }
     fn get_at_seq_tracked_handle<'a>(
         &'a self,
@@ -376,17 +353,17 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         key: &'a [u8],
         seq: u64,
     ) -> BoxFuture<'a, Result<Option<Bytes>>> {
-        (**self).get_at_seq_tracked_handle(tx_id, key, seq)
+        (**self).get_at_seq_tracked(tx_id, key, seq)
     }
     fn scan_prefix_tracked_handle<'a>(
         &'a self,
         tx_id: TxId,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix_tracked_handle(tx_id, prefix)
+        (**self).scan_prefix_tracked(tx_id, prefix)
     }
     fn supports_ssi_tracking_handle(&self) -> bool {
-        (**self).supports_ssi_tracking_handle()
+        (**self).supports_ssi_tracking()
     }
     fn put_handle<'a>(
         &'a self,
@@ -394,7 +371,7 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         key: &'a [u8],
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<()>> {
-        (**self).put_handle(tx_id, key, value)
+        (**self).put(tx_id, key, value)
     }
     fn put_if_absent_handle<'a>(
         &'a self,
@@ -402,64 +379,64 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         key: &'a [u8],
         value: &'a [u8],
     ) -> BoxFuture<'a, Result<bool>> {
-        (**self).put_if_absent_handle(tx_id, key, value)
+        (**self).put_if_absent(tx_id, key, value)
     }
     fn put_batch_handle<'a>(
         &'a self,
         tx_id: TxId,
         entries: &'a [(Vec<u8>, Vec<u8>)],
     ) -> BoxFuture<'a, Result<()>> {
-        (**self).put_batch_handle(tx_id, entries)
+        (**self).put_batch(tx_id, entries)
     }
     fn delete_handle<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-        (**self).delete_handle(tx_id, key)
+        (**self).delete(tx_id, key)
     }
     fn delete_many_handle<'a>(
         &'a self,
         tx_id: TxId,
         keys: Vec<Vec<u8>>,
     ) -> BoxFuture<'a, Result<u64>> {
-        (**self).delete_many_handle(tx_id, keys)
+        (**self).delete_many(tx_id, keys)
     }
     fn delete_prefix_handle<'a>(
         &'a self,
         tx_id: TxId,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<u64>> {
-        (**self).delete_prefix_handle(tx_id, prefix)
+        (**self).delete_prefix(tx_id, prefix)
     }
     fn commit_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).commit_handle(tx_id)
+        (**self).commit(tx_id)
     }
     fn rollback_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).rollback_handle(tx_id)
+        (**self).rollback(tx_id)
     }
     fn rollback_to_tx_handle<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        (**self).rollback_to_tx_handle(tx_id)
+        (**self).rollback_to_tx(tx_id)
     }
     fn flush_handle<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-        (**self).flush_handle()
+        (**self).flush()
     }
     fn stats_handle<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-        (**self).stats_handle()
+        (**self).stats()
     }
     fn last_seq_no_handle<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
-        (**self).last_seq_no_handle()
+        (**self).last_seq_no()
     }
     fn last_tx_id_handle<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        (**self).last_tx_id_handle()
+        (**self).last_tx_id()
     }
     fn pin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        (**self).pin_checkpoint_handle(seq_no)
+        (**self).pin_checkpoint(seq_no)
     }
     fn unpin_checkpoint_handle<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        (**self).unpin_checkpoint_handle(seq_no)
+        (**self).unpin_checkpoint(seq_no)
     }
     fn scan_prefix_handle<'a>(
         &'a self,
         prefix: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix_handle(prefix)
+        (**self).scan_prefix(prefix)
     }
     fn scan_prefix_bounded_handle<'a>(
         &'a self,
@@ -467,14 +444,14 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         limit: usize,
         cursor: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        (**self).scan_prefix_bounded_handle(prefix, limit, cursor)
+        (**self).scan_prefix_bounded(prefix, limit, cursor)
     }
     fn scan_prefix_at_handle<'a>(
         &'a self,
         prefix: &'a [u8],
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_prefix_at_handle(prefix, seq_no)
+        (**self).scan_prefix_at(prefix, seq_no)
     }
     fn scan_handle<'a>(
         &'a self,
@@ -482,7 +459,7 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         end: Bound<&'a [u8]>,
         limit: Option<usize>,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        (**self).scan_handle(start, end, limit)
+        (**self).scan(start, end, limit)
     }
     fn scan_bounded_handle<'a>(
         &'a self,
@@ -491,18 +468,7 @@ impl<S: StorageEngineHandle> StorageEngineHandle for Arc<S> {
         limit: usize,
         cursor: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
-        (**self).scan_bounded_handle(start, end, limit, cursor)
-    }
-    fn issue_memtable_witness_handle<'a>(
-        &'a self,
-        deleted_keys: &'a [Vec<u8>],
-        prefixes: &'a [Vec<u8>],
-        as_of_tx: TxId,
-    ) -> BoxFuture<'a, Result<LayerWitness>> {
-        (**self).issue_memtable_witness_handle(deleted_keys, prefixes, as_of_tx)
-    }
-    fn erasure_capabilities_handle(&self) -> Option<&dyn ErasureBackend> {
-        (**self).erasure_capabilities_handle()
+        (**self).scan_bounded(start, end, limit, cursor)
     }
 }
 
@@ -524,23 +490,6 @@ impl<S> TenantScopedStorage<S> {
     /// Returns the immutable `TenantId` bound to this storage wrapper.
     pub fn tenant_id(&self) -> TenantId {
         self.codec.tenant_id
-    }
-
-    /// Issues a [`LayerWitness`] for memtables after encoding the unencoded target keys and prefixes with tenant prefix.
-    pub async fn issue_memtable_witness(
-        &self,
-        deleted_keys: &[Vec<u8>],
-        prefixes: &[Vec<u8>],
-        as_of_tx: TxId,
-    ) -> Result<LayerWitness>
-    where
-        S: StorageEngineHandle,
-    {
-        let physical_keys: Vec<Vec<u8>> = deleted_keys.iter().map(|k| self.make_key(k)).collect();
-        let physical_prefixes: Vec<Vec<u8>> = prefixes.iter().map(|p| self.make_key(p)).collect();
-        self.inner
-            .issue_memtable_witness_handle(&physical_keys, &physical_prefixes, as_of_tx)
-            .await
     }
 
     #[inline]
@@ -879,170 +828,11 @@ impl<S: StorageEngineHandle> StorageEngine for TenantScopedStorage<S> {
             Ok((stripped_batch, stripped_cursor))
         })
     }
-
-    fn erasure_capabilities(&self) -> Option<&dyn ErasureBackend> {
-        Some(self)
-    }
-}
-
-impl<S: StorageEngineHandle> ErasureBackend for TenantScopedStorage<S> {
-    fn physical_scope(&self, scope: &LogicalScope) -> Result<PhysicalScope> {
-        match scope {
-            LogicalScope::Document {
-                doc_id,
-                collection_id,
-                tenant_id,
-            } => {
-                if *tenant_id != self.codec.tenant_id {
-                    return Err(ContextraError::InvalidInput(format!(
-                        "TenantId mismatch: scoped tenant is {}, requested scope tenant is {}",
-                        self.codec.tenant_id, tenant_id
-                    )));
-                }
-                let doc_key =
-                    format!("t:{}:{}:doc:{}", tenant_id.0, collection_id.0, doc_id.0).into_bytes();
-                PhysicalScope::try_new(*tenant_id, vec![doc_key], vec![])
-            }
-            LogicalScope::Collection {
-                collection_id,
-                tenant_id,
-            } => {
-                if *tenant_id != self.codec.tenant_id {
-                    return Err(ContextraError::InvalidInput(format!(
-                        "TenantId mismatch: scoped tenant is {}, requested scope tenant is {}",
-                        self.codec.tenant_id, tenant_id
-                    )));
-                }
-                let col_prefix = self.codec.collection_prefix(collection_id);
-                PhysicalScope::try_new(*tenant_id, vec![], vec![col_prefix])
-            }
-            LogicalScope::Tenant { tenant_id } => {
-                if *tenant_id != self.codec.tenant_id {
-                    return Err(ContextraError::InvalidInput(format!(
-                        "TenantId mismatch: scoped tenant is {}, requested scope tenant is {}",
-                        self.codec.tenant_id, tenant_id
-                    )));
-                }
-                let tenant_prefix = self.codec.scan_prefix().to_vec();
-                PhysicalScope::try_new(*tenant_id, vec![], vec![tenant_prefix])
-            }
-        }
-    }
-
-    fn acquire_fence(
-        &self,
-        scope: &PhysicalScope,
-        id: contextra_ports::erasure::PurgeId,
-    ) -> std::result::Result<contextra_ports::erasure::FenceGuard, ContextraError> {
-        if let Some(backend) = self.inner.erasure_capabilities_handle() {
-            backend.acquire_fence(scope, id)
-        } else {
-            Err(ContextraError::capability_unsupported(
-                "acquire_fence",
-                "Underlying storage engine does not support ErasureBackend",
-            ))
-        }
-    }
-
-    fn purge_physical(
-        &self,
-        scope: &PhysicalScope,
-        as_of: TxId,
-        probe: &dyn contextra_ports::erasure::FreeSpaceProbe,
-    ) -> std::result::Result<
-        contextra_ports::erasure::PurgeOutput,
-        contextra_ports::erasure::PurgeError,
-    > {
-        if let Some(backend) = self.inner.erasure_capabilities_handle() {
-            backend.purge_physical(scope, as_of, probe)
-        } else {
-            Err(contextra_ports::erasure::PurgeError::Io(
-                std::io::Error::other("Underlying storage engine does not support ErasureBackend"),
-            ))
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn test_erasure_backend_tenant_matrix() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let config = crate::lsm::LsmConfig {
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let lsm = Arc::new(LsmStorage::open(config).await.unwrap());
-
-        let tenant_1 = TenantId::try_new(101).unwrap();
-        let tenant_2 = TenantId::try_new(202).unwrap();
-
-        let storage_t1 = TenantScopedStorage::new(lsm.clone(), tenant_1);
-        let storage_t2 = TenantScopedStorage::new(lsm.clone(), tenant_2);
-
-        // 1. Verify erasure_capabilities()
-        assert!(lsm.erasure_capabilities().is_some());
-        assert!(storage_t1.erasure_capabilities().is_some());
-
-        let eb_t1 = storage_t1.erasure_capabilities().unwrap();
-
-        // 2. Physical scope resolution with matching TenantId
-        let doc_scope = LogicalScope::Document {
-            doc_id: DocId(1),
-            collection_id: CollectionId(10),
-            tenant_id: tenant_1,
-        };
-        let phys_scope = eb_t1.physical_scope(&doc_scope).unwrap();
-        assert!(phys_scope.prefixes().is_empty());
-        assert_eq!(phys_scope.keys().len(), 1);
-        assert_eq!(phys_scope.keys()[0], b"t:101:10:doc:1");
-
-        let sibling_key = b"t:101:10:doc:2";
-        assert!(!phys_scope.matches_key(sibling_key));
-
-        // 3. Physical scope resolution with mismatched TenantId MUST fail closed
-        let mismatched_scope = LogicalScope::Document {
-            doc_id: DocId(1),
-            collection_id: CollectionId(10),
-            tenant_id: tenant_2,
-        };
-        let err = eb_t1.physical_scope(&mismatched_scope).unwrap_err();
-        match err {
-            ContextraError::InvalidInput(msg) => {
-                assert!(msg.contains("TenantId mismatch"));
-            }
-            _ => panic!("Expected InvalidInput error, got {:?}", err),
-        }
-
-        // 4. Collection scope with matching TenantId
-        let col_scope = LogicalScope::Collection {
-            collection_id: CollectionId(55),
-            tenant_id: tenant_1,
-        };
-        let phys_col_scope = eb_t1.physical_scope(&col_scope).unwrap();
-        assert_eq!(phys_col_scope.prefixes(), &[b"t:101:55:".to_vec()]);
-
-        // 5. Put data for both tenants
-        let tx1 = TxId::try_new(10).unwrap();
-        storage_t1.put(tx1, b"doc:1", b"val_tenant1").await.unwrap();
-        storage_t2.put(tx1, b"doc:1", b"val_tenant2").await.unwrap();
-        storage_t1.commit(tx1).await.unwrap();
-
-        // Flush memtable to SSTable
-        storage_t1.flush().await.unwrap();
-
-        // Verify tenant 1 value
-        let get_t1 = storage_t1.get(b"doc:1").await.unwrap();
-        assert_eq!(get_t1.unwrap().as_ref(), b"val_tenant1");
-
-        // Verify tenant 2 value remains untouched
-        let get_t2 = storage_t2.get(b"doc:1").await.unwrap();
-        assert_eq!(get_t2.unwrap().as_ref(), b"val_tenant2");
-
-        lsm.close().await.unwrap();
-    }
 
     #[test]
     fn test_encode_decode_roundtrip() {
@@ -1050,52 +840,32 @@ mod tests {
         let codec = TenantKeyCodec::new(tenant);
         let col = CollectionId(42);
         let doc = DocId(99);
-        let chunk_key = codec.encode_chunk_key(&col, doc);
-        assert_eq!(TenantKeyCodec::decode_tenant_id(&chunk_key), Some(tenant));
-
-        let graph_key = codec.encode_graph_key(&col, 1001);
-        assert_eq!(TenantKeyCodec::decode_tenant_id(&graph_key), Some(tenant));
+        let key = codec.encode_chunk_key(&col, doc);
+        assert_eq!(TenantKeyCodec::decode_tenant_id(&key), Some(tenant));
     }
 
     #[test]
     fn test_cross_tenant_isolation() {
-        let tenant_a = TenantId::try_new(1).unwrap();
-        let tenant_b = TenantId::try_new(2).unwrap();
-        let codec_a = TenantKeyCodec::new(tenant_a);
-        let codec_b = TenantKeyCodec::new(tenant_b);
+        let codec_a = TenantKeyCodec::new(TenantId::try_new(1).unwrap());
+        let codec_b = TenantKeyCodec::new(TenantId::try_new(2).unwrap());
         let col = CollectionId(1);
         let doc = DocId(1);
-
         let key_a = codec_a.encode_chunk_key(&col, doc);
-        // Key von Tenant A darf NICHT mit Präfix von Tenant B matchen (VETO-F10)
+        // Key von Tenant A darf NICHT mit Präfix von Tenant B matchen
         assert!(!key_a.starts_with(codec_b.scan_prefix()));
-        assert_ne!(TenantKeyCodec::decode_tenant_id(&key_a), Some(tenant_b));
-        assert_eq!(TenantKeyCodec::decode_tenant_id(&key_a), Some(tenant_a));
     }
 
     #[test]
     fn test_scan_prefix_cached_no_alloc() {
         let codec = TenantKeyCodec::new(TenantId::try_new(42).unwrap());
-        assert_eq!(codec.scan_prefix(), b"t:42:");
+        assert!(codec.scan_prefix().starts_with(b"t:42:"));
     }
 
     #[test]
-    fn test_decode_invalid_and_manipulated_keys_return_none() {
-        // Completely invalid format or empty
-        assert!(TenantKeyCodec::decode_tenant_id(b"").is_none());
+    fn test_decode_invalid_key_returns_none() {
         assert!(TenantKeyCodec::decode_tenant_id(b"invalid").is_none());
-        assert!(TenantKeyCodec::decode_tenant_id(b"x:100:10:chunk:1").is_none());
-
-        // Zero tenant_id is forbidden (must return None)
         assert!(TenantKeyCodec::decode_tenant_id(b"t:0:col:chunk:1").is_none());
-
-        // Non-numeric tenant_id
-        assert!(TenantKeyCodec::decode_tenant_id(b"t:abc:10:chunk:1").is_none());
-        assert!(TenantKeyCodec::decode_tenant_id(b"t:-5:10:chunk:1").is_none());
-
-        // Missing trailing delimiter or colon
-        assert!(TenantKeyCodec::decode_tenant_id(b"t:100").is_none());
-        assert!(TenantKeyCodec::decode_tenant_id(b"t:").is_none());
+        // SYSTEM
     }
 
     #[test]

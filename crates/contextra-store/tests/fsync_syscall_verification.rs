@@ -1,8 +1,7 @@
 //! Test suite for fsync syscall discipline, call sequence verification, and performance overhead measurements.
 
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::{LsmConfig, LsmStorage};
-use contextra_types::TxId;
 use std::time::Instant;
 use tempfile::tempdir;
 

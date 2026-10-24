@@ -18,6 +18,7 @@ fn test_mcp_tool_registry_active_count_and_classification() {
         "contextra_get",
         "contextra_forget",
         "contextra_collections",
+        "contextra_consolidate",
         "contextra_cloud_query",
         "contextra_relate",
         "contextra_relate_n_ary",

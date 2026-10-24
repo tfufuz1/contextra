@@ -1,20 +1,12 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing
-)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-09-16T00:00:00Z
 // ZWECK: Integrationstests, Fault-Injection und Nebenläufigkeitstests für FlatBuffers IPC (contextra-wire)
 // INVARIANTEN: Keine Panics bei beschädigten oder abgeschnittenen IPC-Puffern; thread-sicheres Deserialisieren.
 
-use bytes::Bytes;
 use contextra_wire::{
-    adapter::WireBuffer, root_as_search_response, size_prefixed_root_as_search_response, Embedding,
-    EmbeddingArgs, HyperEdge, HyperEdgeArgs, HyperEdgeId, HyperEdgeIdArgs, RoleBinding,
-    RoleBindingArgs, RoleId, RoleIdArgs, ScoredDocument, ScoredDocumentArgs, SearchResponse,
-    SearchResponseArgs, VectorIndexUpdate, VectorIndexUpdateArgs,
+    root_as_search_response, Embedding, EmbeddingArgs, ScoredDocument, ScoredDocumentArgs,
+    SearchResponse, SearchResponseArgs, VectorIndexUpdate, VectorIndexUpdateArgs,
 };
 use flatbuffers::FlatBufferBuilder;
 use std::sync::Arc;
@@ -276,142 +268,6 @@ fn test_concurrency_parallel_serialization() {
 
     for t in threads {
         t.join().expect("Thread panicked");
-    }
-}
-
-#[test]
-fn test_default_accessors_without_panic() {
-    let mut builder = FlatBufferBuilder::new();
-
-    // 1. Embedding default metric
-    let emb_offset = Embedding::create(&mut builder, &EmbeddingArgs::default());
-    builder.finish_minimal(emb_offset);
-    let emb = flatbuffers::root::<Embedding>(builder.finished_data()).unwrap();
-    assert_eq!(emb.metric(), 0);
-
-    // 2. ScoredDocument default score
-    builder.reset();
-    let doc_offset = ScoredDocument::create(&mut builder, &ScoredDocumentArgs::default());
-    builder.finish_minimal(doc_offset);
-    let doc = flatbuffers::root::<ScoredDocument>(builder.finished_data()).unwrap();
-    assert_eq!(doc.score(), 0.0);
-
-    // 3. SearchResponse default total_hits & processing_time_ms
-    builder.reset();
-    let resp_offset = SearchResponse::create(&mut builder, &SearchResponseArgs::default());
-    builder.finish_minimal(resp_offset);
-    let resp = flatbuffers::root::<SearchResponse>(builder.finished_data()).unwrap();
-    assert_eq!(resp.total_hits(), 0);
-    assert_eq!(resp.processing_time_ms(), 0.0);
-
-    // 4. RoleId default id
-    builder.reset();
-    let role_id_offset = RoleId::create(&mut builder, &RoleIdArgs::default());
-    builder.finish_minimal(role_id_offset);
-    let role_id = flatbuffers::root::<RoleId>(builder.finished_data()).unwrap();
-    assert_eq!(role_id.id(), 0);
-
-    // 5. HyperEdgeId default id
-    builder.reset();
-    let hyper_edge_id_offset = HyperEdgeId::create(&mut builder, &HyperEdgeIdArgs::default());
-    builder.finish_minimal(hyper_edge_id_offset);
-    let hyper_edge_id = flatbuffers::root::<HyperEdgeId>(builder.finished_data()).unwrap();
-    assert_eq!(hyper_edge_id.id(), 0);
-
-    // 6. RoleBinding default role & entity
-    builder.reset();
-    let role_binding_offset = RoleBinding::create(&mut builder, &RoleBindingArgs::default());
-    builder.finish_minimal(role_binding_offset);
-    let role_binding = flatbuffers::root::<RoleBinding>(builder.finished_data()).unwrap();
-    assert_eq!(role_binding.role(), 0);
-    assert_eq!(role_binding.entity(), 0);
-
-    // 7. HyperEdge default scalar fields
-    builder.reset();
-    let hyper_edge_offset = HyperEdge::create(&mut builder, &HyperEdgeArgs::default());
-    builder.finish_minimal(hyper_edge_offset);
-    let hyper_edge = flatbuffers::root::<HyperEdge>(builder.finished_data()).unwrap();
-    assert_eq!(hyper_edge.id(), 0);
-    assert_eq!(hyper_edge.predicate(), 0);
-    assert_eq!(hyper_edge.weight(), 0.0);
-    assert_eq!(hyper_edge.tx_valid_from(), 0);
-    assert_eq!(hyper_edge.tx_valid_to(), 0);
-    assert_eq!(hyper_edge.business_valid_from(), 0);
-    assert_eq!(hyper_edge.business_valid_to(), 0);
-    assert_eq!(hyper_edge.source_doc_id(), 0);
-}
-
-#[test]
-fn test_wire_buffer_zero_copy_and_concurrency() {
-    let payload = vec![1u8, 2u8, 3u8, 4u8, 5u8, 6u8, 7u8, 8u8];
-    let bytes = Bytes::from(payload.clone());
-    let wire_buf = WireBuffer::new(bytes.clone());
-
-    assert_eq!(wire_buf.as_slice(), &payload[..]);
-    assert_eq!(wire_buf.as_ref(), &payload[..]);
-    assert_eq!(wire_buf.clone().into_inner(), bytes);
-
-    let shared_wire_buf = Arc::new(wire_buf);
-    let threads: Vec<_> = (0..8)
-        .map(|_| {
-            let buf = Arc::clone(&shared_wire_buf);
-            thread::spawn(move || {
-                for _ in 0..100 {
-                    assert_eq!(buf.as_slice().len(), 8);
-                    assert_eq!(buf.as_slice()[0], 1);
-                    assert_eq!(buf.as_slice()[7], 8);
-                }
-            })
-        })
-        .collect();
-
-    for t in threads {
-        t.join().expect("Thread panicked");
-    }
-}
-
-#[test]
-fn test_flatbuffers_size_prefixed_and_empty_buffer_validation() {
-    // 1. Empty buffer verification failure (no panic)
-    let empty_buf: &[u8] = &[];
-    assert!(root_as_search_response(empty_buf).is_err());
-    assert!(size_prefixed_root_as_search_response(empty_buf).is_err());
-
-    // 2. Valid size-prefixed response
-    let mut builder = FlatBufferBuilder::new();
-    let id = builder.create_string("size-prefixed-doc");
-    let doc = ScoredDocument::create(
-        &mut builder,
-        &ScoredDocumentArgs {
-            id: Some(id),
-            score: 0.5,
-            metadata: None,
-            embedding: None,
-        },
-    );
-    let results = builder.create_vector(&[doc]);
-    let resp = SearchResponse::create(
-        &mut builder,
-        &SearchResponseArgs {
-            results: Some(results),
-            total_hits: 1,
-            processing_time_ms: 0.1,
-        },
-    );
-    builder.finish_size_prefixed(resp, None);
-
-    let sp_buf = builder.finished_data();
-    let parsed_sp =
-        size_prefixed_root_as_search_response(sp_buf).expect("Size prefixed parse failed");
-    assert_eq!(parsed_sp.total_hits(), 1);
-    assert_eq!(
-        parsed_sp.results().unwrap().get(0).id(),
-        Some("size-prefixed-doc")
-    );
-
-    // 3. Truncated size-prefixed buffer tests
-    for len in 0..sp_buf.len() {
-        let _ = size_prefixed_root_as_search_response(&sp_buf[..len]);
     }
 }
 

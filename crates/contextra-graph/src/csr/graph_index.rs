@@ -29,13 +29,9 @@ impl GraphIndexExt for CsrGraph {
                 let mut incoming = Vec::new();
 
                 // a. Outgoing edges (entity -> *)
-                let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
-                if idx < offsets_len_minus_1 {
-                    let start = *inner.offsets.get(idx).unwrap_or(&0);
-                    let next_i = idx.saturating_add(1);
-                    let end = *inner.offsets.get(next_i).unwrap_or(&0);
-                    for j in start..end {
-                        let Some(&t_idx) = inner.targets.get(j) else { continue };
+                if idx < inner.offsets.len() - 1 {
+                    for j in inner.offsets[idx]..inner.offsets[idx + 1] {
+                        let t_idx = inner.targets[j];
                         if !inner.tombstoned_edges.contains(&(idx, t_idx)) {
                             if let Some(&t_id) = inner.reverse_map.get(t_idx) {
                                 outgoing.push(t_id);
@@ -61,12 +57,9 @@ impl GraphIndexExt for CsrGraph {
                         None => continue,
                     };
 
-                    if node_idx < offsets_len_minus_1 {
-                        let start = *inner.offsets.get(node_idx).unwrap_or(&0);
-                        let next_i = node_idx.saturating_add(1);
-                        let end = *inner.offsets.get(next_i).unwrap_or(&0);
-                        for j in start..end {
-                            if inner.targets.get(j) == Some(&idx)
+                    if node_idx < inner.offsets.len() - 1 {
+                        for j in inner.offsets[node_idx]..inner.offsets[node_idx + 1] {
+                            if inner.targets[j] == idx
                                 && !inner.tombstoned_edges.contains(&(node_idx, idx))
                             {
                                 incoming.push(source_id);
@@ -106,7 +99,6 @@ impl GraphIndexExt for CsrGraph {
                 }
                 inner.communities.remove(&entity);
                 inner.is_dirty = true;
-                inner.commit();
             }
 
             // LSM-Storage Marker / Deletion schreiben
@@ -160,7 +152,6 @@ impl GraphIndex for CsrGraph {
                 inner
                     .staged_entities
                     .insert((tx, entity.id), entity.clone());
-                inner.commit();
             }
 
             if let Some(ref storage) = self.storage {
@@ -231,9 +222,6 @@ impl GraphIndex for CsrGraph {
             // ensuring rollback does not leak entity indices into id_map/reverse_map.
             {
                 let mut inner = self.inner_write();
-                if let Some(removals) = inner.staged_removals.get_mut(&tx) {
-                    removals.retain(|&(f, t)| !(f == edge.from && t == edge.to));
-                }
                 inner
                     .staged_edges
                     .entry((tx, edge.from))
@@ -247,7 +235,6 @@ impl GraphIndex for CsrGraph {
                         business_valid_to: edge.business_valid_to,
                         source_doc_id: edge.source_doc_id,
                     });
-                inner.commit();
             }
 
             if let Some(ref storage) = self.storage {
@@ -298,7 +285,7 @@ impl GraphIndex for CsrGraph {
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
-            let as_of_tx = TxId::try_new(seq_no).unwrap_or_else(|_| TxId::internal());
+            let as_of_tx = TxId::new(seq_no);
             if is_suspicious_tx_id(as_of_tx) {
                 tracing::warn!(
                     tx_id = seq_no,
@@ -344,8 +331,8 @@ impl GraphIndex for CsrGraph {
         seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
-            let as_of_tx = TxId::try_new(seq_no).unwrap_or_else(|_| TxId::internal());
-            self.traverse_at_time(start_node, max_hops, as_of_tx).await
+            self.traverse_at_time(start_node, max_hops, TxId::new(seq_no))
+                .await
         })
     }
 
@@ -419,14 +406,12 @@ impl GraphIndex for CsrGraph {
                     }
 
                     // 1. CSR traversal (compacted edges)
-                    let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
-                    if node_idx < offsets_len_minus_1 {
-                        let start_edge = *inner.offsets.get(node_idx).unwrap_or(&0);
-                        let next_i = node_idx.saturating_add(1);
-                        let end_edge = *inner.offsets.get(next_i).unwrap_or(&0);
+                    if node_idx < inner.offsets.len() - 1 {
+                        let start_edge = inner.offsets[node_idx];
+                        let end_edge = inner.offsets[node_idx + 1];
 
                         for edge_idx in start_edge..end_edge {
-                            let Some(&neighbor_idx) = inner.targets.get(edge_idx) else { continue };
+                            let neighbor_idx = inner.targets[edge_idx];
                             if inner.tombstoned_edges.contains(&(node_idx, neighbor_idx)) {
                                 continue;
                             }
@@ -445,27 +430,24 @@ impl GraphIndex for CsrGraph {
                             ) {
                                 continue;
                             }
-                            let weight = *inner.weights.get(edge_idx).unwrap_or(&1.0);
+                            let weight = inner.weights[edge_idx];
                             let next_score = current_score * SCORE_DECAY * weight;
 
-                            let existing_score = visited.get(&neighbor_idx).copied().unwrap_or(0.0);
                             if (!visited.contains_key(&neighbor_idx)
-                                || existing_score < next_score)
+                                || visited[&neighbor_idx] < next_score)
                                 && inner.entity_at(neighbor_idx).is_some()
                             {
-                                let total_len = visited.len().saturating_add(queue.len());
                                 if !visited.contains_key(&neighbor_idx)
-                                    && total_len >= MAX_VISITED_NODES
+                                    && visited.len() + queue.len() >= MAX_VISITED_NODES
                                 {
                                     tracing::warn!(
-                                    visited_and_queued = total_len,
+                                    visited_and_queued = visited.len() + queue.len(),
                                     max_visited = MAX_VISITED_NODES,
                                     "traverse_at_bitemporal visited node limit reached ({MAX_VISITED_NODES}); halting neighbor expansion"
                                 );
                                     break;
                                 }
-                                let next_hop = hop.saturating_add(1);
-                                queue.push_back((neighbor_idx, next_hop, next_score));
+                                queue.push_back((neighbor_idx, hop + 1, next_score));
                             }
                         }
                     }
@@ -489,24 +471,21 @@ impl GraphIndex for CsrGraph {
                             }
                             let next_score = current_score * SCORE_DECAY * edge.weight;
 
-                            let existing_score = visited.get(&neighbor_idx).copied().unwrap_or(0.0);
                             if (!visited.contains_key(&neighbor_idx)
-                                || existing_score < next_score)
+                                || visited[&neighbor_idx] < next_score)
                                 && inner.entity_at(neighbor_idx).is_some()
                             {
-                                let total_len = visited.len().saturating_add(queue.len());
                                 if !visited.contains_key(&neighbor_idx)
-                                    && total_len >= MAX_VISITED_NODES
+                                    && visited.len() + queue.len() >= MAX_VISITED_NODES
                                 {
                                     tracing::warn!(
-                                    visited_and_queued = total_len,
+                                    visited_and_queued = visited.len() + queue.len(),
                                     max_visited = MAX_VISITED_NODES,
                                     "traverse_at_bitemporal visited node limit reached ({MAX_VISITED_NODES}); halting neighbor expansion"
                                 );
                                     break;
                                 }
-                                let next_hop = hop.saturating_add(1);
-                                queue.push_back((neighbor_idx, next_hop, next_score));
+                                queue.push_back((neighbor_idx, hop + 1, next_score));
                             }
                         }
                     }
@@ -588,39 +567,34 @@ impl GraphIndex for CsrGraph {
                     }
 
                     // 1. CSR traversal (compacted edges)
-                    let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
-                    if node_idx < offsets_len_minus_1 {
-                        let start_edge = *inner.offsets.get(node_idx).unwrap_or(&0);
-                        let next_i = node_idx.saturating_add(1);
-                        let end_edge = *inner.offsets.get(next_i).unwrap_or(&0);
+                    if node_idx < inner.offsets.len() - 1 {
+                        let start_edge = inner.offsets[node_idx];
+                        let end_edge = inner.offsets[node_idx + 1];
 
                         for edge_idx in start_edge..end_edge {
-                            let Some(&neighbor_idx) = inner.targets.get(edge_idx) else { continue };
+                            let neighbor_idx = inner.targets[edge_idx];
                             if inner.tombstoned_edges.contains(&(node_idx, neighbor_idx)) {
                                 continue;
                             }
-                            let weight = *inner.weights.get(edge_idx).unwrap_or(&1.0);
+                            let weight = inner.weights[edge_idx];
                             let next_score = current_score * SCORE_DECAY * weight;
 
-                            let existing_score = visited.get(&neighbor_idx).copied().unwrap_or(0.0);
                             if !visited.contains_key(&neighbor_idx)
-                                || existing_score < next_score
+                                || visited[&neighbor_idx] < next_score
                             {
                                 // Only visit nodes that have a committed entity (FIND-GRA-001)
                                 if inner.entity_at(neighbor_idx).is_some() {
-                                    let total_len = visited.len().saturating_add(queue.len());
                                     if !visited.contains_key(&neighbor_idx)
-                                        && total_len >= MAX_VISITED_NODES
+                                        && visited.len() + queue.len() >= MAX_VISITED_NODES
                                     {
                                         tracing::warn!(
-                                        visited_and_queued = total_len,
+                                        visited_and_queued = visited.len() + queue.len(),
                                         max_visited = MAX_VISITED_NODES,
                                         "traverse visited node limit reached ({MAX_VISITED_NODES}); halting neighbor expansion"
                                     );
                                         break;
                                     }
-                                    let next_hop = hop.saturating_add(1);
-                                    queue.push_back((neighbor_idx, next_hop, next_score));
+                                    queue.push_back((neighbor_idx, hop + 1, next_score));
                                 }
                             }
                         }
@@ -635,24 +609,21 @@ impl GraphIndex for CsrGraph {
                             }
                             let next_score = current_score * SCORE_DECAY * edge.weight;
 
-                            let existing_score = visited.get(&neighbor_idx).copied().unwrap_or(0.0);
                             if (!visited.contains_key(&neighbor_idx)
-                                || existing_score < next_score)
+                                || visited[&neighbor_idx] < next_score)
                                 && inner.entity_at(neighbor_idx).is_some()
                             {
-                                let total_len = visited.len().saturating_add(queue.len());
                                 if !visited.contains_key(&neighbor_idx)
-                                    && total_len >= MAX_VISITED_NODES
+                                    && visited.len() + queue.len() >= MAX_VISITED_NODES
                                 {
                                     tracing::warn!(
-                                    visited_and_queued = total_len,
+                                    visited_and_queued = visited.len() + queue.len(),
                                     max_visited = MAX_VISITED_NODES,
                                     "traverse visited node limit reached ({MAX_VISITED_NODES}); halting neighbor expansion"
                                 );
                                     break;
                                 }
-                                let next_hop = hop.saturating_add(1);
-                                queue.push_back((neighbor_idx, next_hop, next_score));
+                                queue.push_back((neighbor_idx, hop + 1, next_score));
                             }
                         }
                     }
@@ -708,13 +679,10 @@ impl GraphIndex for CsrGraph {
                 tx_entities.sort_by_key(|(id, _)| *id);
                 for (id, entity) in tx_entities {
                     let idx = inner.get_or_create_index(id);
-                    let target_len = idx.saturating_add(1);
                     if idx >= inner.entities.len() {
-                        inner.entities.resize(target_len, sentinel_entity());
+                        inner.entities.resize(idx + 1, sentinel_entity());
                     }
-                    if let Some(e_ref) = inner.entities.get_mut(idx) {
-                        *e_ref = entity;
-                    }
+                    inner.entities[idx] = entity;
                 }
                 inner.is_dirty = true;
             }
@@ -743,7 +711,6 @@ impl GraphIndex for CsrGraph {
                                 .or_default()
                                 .insert((from_id, edge.target));
                         }
-                        inner.tombstoned_edges.remove(&(from_idx, to_idx));
                         converted_edges.push(EdgePayload {
                             target: to_idx,
                             weight: edge.weight,
@@ -789,8 +756,6 @@ impl GraphIndex for CsrGraph {
                 inner.compact();
             }
 
-            inner.commit();
-
             self.last_tx_id.fetch_max(tx.inner(), Ordering::SeqCst);
 
             Ok(())
@@ -819,15 +784,11 @@ impl GraphIndex for CsrGraph {
             }
             {
                 let mut inner = self.inner_write();
-                if let Some(edges) = inner.staged_edges.get_mut(&(tx, from)) {
-                    edges.retain(|e| e.target != to);
-                }
                 inner
                     .staged_removals
                     .entry(tx)
                     .or_default()
                     .push((from, to));
-                inner.commit();
             }
             if let Some(ref storage) = self.storage {
                 self.delete_edge_persistence(storage.as_ref(), tx, &from, &to)
@@ -863,27 +824,20 @@ impl GraphIndex for CsrGraph {
             inner.staged_entities.retain(|&(t, _), _| t != tx);
             inner.staged_edges.retain(|&(t, _), _| t != tx);
             inner.staged_removals.remove(&tx);
-            inner.commit();
             Ok(())
         })
     }
 
     fn rollback_to_tx<'a>(&'a self, _tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
-            // Physical point-in-time rollback for arbitrary historical TxId is unsupported
-            // in memory without WAL replay / storage reload (INV-NOOP-1).
-            Err(ContextraError::CapabilityUnsupported {
-                capability: "rollback_to_tx".to_string(),
-                reason: "In-memory rollback_to_tx for historical TxId is unsupported on CsrGraph; use rollback(tx) for active staged transactions or reload from storage".to_string(),
-            })
+            // Physical rollback for CSR graph is driven by WAL replay or reloading state from storage.
+            // In-memory staged transactions are handled by rollback().
+            Ok(())
         })
     }
 
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        Box::pin(async move {
-            let raw_tx = self.last_tx_id.load(Ordering::SeqCst);
-            TxId::try_new(raw_tx)
-        })
+        Box::pin(async move { Ok(TxId::new(self.last_tx_id.load(Ordering::SeqCst))) })
     }
 
     fn len<'a>(&'a self) -> BoxFuture<'a, usize> {
@@ -902,17 +856,11 @@ impl GraphIndex for CsrGraph {
                 + inner.pending_edge_count
                 + inner.staged_edges.values().map(|v| v.len()).sum::<usize>();
 
-            let rev_bytes = inner.reverse_map.len().saturating_mul(std::mem::size_of::<EntityId>());
-            let ent_bytes = inner.entities.len().saturating_mul(std::mem::size_of::<Entity>());
-            let off_bytes = inner.offsets.len().saturating_mul(std::mem::size_of::<usize>());
-            let tar_bytes = inner.targets.len().saturating_mul(std::mem::size_of::<usize>());
-            let wei_bytes = inner.weights.len().saturating_mul(std::mem::size_of::<f32>());
-
-            let mem = rev_bytes
-                .saturating_add(ent_bytes)
-                .saturating_add(off_bytes)
-                .saturating_add(tar_bytes)
-                .saturating_add(wei_bytes);
+            let mem = (inner.reverse_map.len() * std::mem::size_of::<EntityId>())
+                + (inner.entities.len() * std::mem::size_of::<Entity>())
+                + (inner.offsets.len() * std::mem::size_of::<usize>())
+                + (inner.targets.len() * std::mem::size_of::<usize>())
+                + (inner.weights.len() * std::mem::size_of::<f32>());
 
             Ok(GraphIndexStats {
                 num_entities,

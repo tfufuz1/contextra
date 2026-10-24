@@ -20,8 +20,7 @@ fn setup_temp_repo() -> tempfile::TempDir {
 
     let xtask_src = root.join("xtask/src");
     let harness_dir = xtask_src.join("harness");
-    fs::create_dir_all(root.join("xtask/config")).expect("create_dir_all config");
-    fs::create_dir_all(&harness_dir).expect("create_dir_all harness");
+    fs::create_dir_all(&harness_dir).expect("create_dir_all");
 
     fs::write(
         xtask_src.join("main.rs"),
@@ -47,7 +46,7 @@ check-compile:
     .expect("write justfile");
 
     fs::write(
-        root.join("xtask/config/registry.toml"),
+        root.join("xtask/registry.toml"),
         r#"
 [[commands]]
 name = "sync-docs"
@@ -88,7 +87,7 @@ fn test_registry_check_missing_entry() {
     let root = dir.path();
 
     fs::write(
-        root.join("xtask/config/registry.toml"),
+        root.join("xtask/registry.toml"),
         r#"
 [[commands]]
 name = "sync-docs"
@@ -112,7 +111,7 @@ fn test_registry_check_orphaned_entry() {
     let root = dir.path();
 
     fs::write(
-        root.join("xtask/config/registry.toml"),
+        root.join("xtask/registry.toml"),
         r#"
 [[commands]]
 name = "sync-docs"

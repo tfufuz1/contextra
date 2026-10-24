@@ -36,6 +36,7 @@ pub use contextra_privacy::guarded_payload;
 pub mod fc_ts_dispatch;
 #[cfg(any(feature = "bandit-routing", feature = "flow-corrected-thompson"))]
 pub mod routing_strategy;
+#[cfg(feature = "cloud-egress-guard")]
 pub mod transport;
 
 #[cfg(all(test, feature = "bandit-routing"))]
@@ -47,9 +48,9 @@ pub use arm_registry::{ArmRegistry, ArmRegistryError};
 pub use contextra_adapt::{DriftReason, LyapunovDriftWatcher, LyapunovResult};
 pub use contextra_adapt::{OffPolicyEvaluator, OffPolicyStats};
 pub use dispatch::dispatch_to_slm;
-pub use outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome, RoutingTicket};
+pub use outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 pub use profile::SlmProfile;
-pub use router::{DefaultRouterEngine, RouterAdminView, RouterEngine, RoutingDecision};
+pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
 
 #[cfg(feature = "bandit-routing")]
 pub use contextra_adapt::{BanditImplementation, BanditPolicy, BanditProfileState};

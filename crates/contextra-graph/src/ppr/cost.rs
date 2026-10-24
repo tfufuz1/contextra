@@ -132,17 +132,6 @@ pub fn estimate_ppr_cost(
     seed_count: usize,
     config: &PprConfig,
 ) -> (PprCostEstimate, PprAlgorithm) {
-    estimate_ppr_cost_with_multiplier(stats, seed_count, config, None)
-}
-
-/// Estimates computational costs (in estimated edge accesses) for PPR algorithms, applying
-/// an optional recommended multiplier derived from calibrator feedback.
-pub fn estimate_ppr_cost_with_multiplier(
-    stats: Option<&GraphStats>,
-    seed_count: usize,
-    config: &PprConfig,
-    multiplier: Option<f64>,
-) -> (PprCostEstimate, PprAlgorithm) {
     let alpha = if config.damping_factor.is_nan()
         || config.damping_factor <= 0.0
         || config.damping_factor >= 1.0
@@ -161,12 +150,7 @@ pub fn estimate_ppr_cost_with_multiplier(
     let max_iters = (config.max_iterations.min(1000) as usize) as f64;
 
     // Asymptotic estimated edge accesses
-    let mut fp_cost = 1.0f64 / (epsilon * alpha);
-    if let Some(mult) = multiplier {
-        if mult.is_finite() && mult > 0.0 {
-            fp_cost *= mult;
-        }
-    }
+    let fp_cost = 1.0f64 / (epsilon * alpha);
 
     if let Some(st) = stats {
         if st.node_count > 0 {
@@ -199,7 +183,6 @@ pub fn estimate_ppr_cost_with_multiplier(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
 
@@ -259,31 +242,5 @@ mod tests {
         // mean ratio = (1.5 + 0.5) / 2 = 1.0
         let mult = calibrator.recommended_multiplier().unwrap();
         assert!((mult - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_cost_estimation_multiplier_feedback_switches_strategy() {
-        let config = PprConfig::default();
-        let stats = GraphStats::new(10_000, 100_000);
-        // Initially without multiplier: FP cost ~6.66M < PI cost 11.0M -> ForwardPush
-        let (_, choice_initial) = estimate_ppr_cost_with_multiplier(Some(&stats), 1, &config, None);
-        assert_eq!(choice_initial, PprAlgorithm::ForwardPush);
-
-        // Record high cost samples into calibrator
-        let calibrator = PprCostCalibrator::new();
-        calibrator.record(PprCostSample {
-            algorithm: PprAlgorithm::ForwardPush,
-            estimated_cost: 6_666_666.0,
-            measured_edge_accesses: 20_000_000, // 3x higher than estimated
-        });
-
-        let mult = calibrator.recommended_multiplier();
-        assert!(mult.is_some());
-        let mult_val = mult.unwrap();
-        assert!(mult_val > 2.5);
-
-        // With calibrator feedback multiplier (~3.0): FP cost becomes ~20.0M > PI cost 11.0M -> DensePowerIteration
-        let (_, choice_calibrated) = estimate_ppr_cost_with_multiplier(Some(&stats), 1, &config, mult);
-        assert_eq!(choice_calibrated, PprAlgorithm::DensePowerIteration);
     }
 }

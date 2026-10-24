@@ -5,4 +5,4 @@ fix = "Führe `cargo xtask can-merge` aus und behebe alle dort gelisteten Fehler
 anti_fix = "Erzwinge keinen Merge gegen gescheiterte Gates."
 adr = ["ADR-035"]
 related = ["can-merge", "ledger"]
-sources = ["CONSTITUTION.md", "xtask/docs/gates/gate-orchestrator.md"]
+sources = ["CONSTITUTION.md", "docs/gates/gate-orchestrator.md"]

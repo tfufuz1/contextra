@@ -7,10 +7,10 @@ use crate::ComputePool;
 use contextra_core::{DistanceMetric, DocId};
 use std::path::PathBuf;
 
-/// Fallback behavior policy when DiskANN loading, checksum validation, or reads fail.
+/// Fallback behavior policy when DiskANN loading, integrity checks, or reads fail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DiskAnnFallbackPolicy {
-    /// Transparently fall back to in-memory HNSW index on load failure or detected checksum mismatch.
+    /// Transparently fall back to in-memory HNSW index on load failure or detected corruption.
     #[default]
     UseHnswOnFailure,
     /// Immediately return a typed error on load failure or index corruption.
@@ -36,16 +36,13 @@ pub struct DiskAnnConfig {
     pub distance_metric: DistanceMetric,
     /// Whether to use SQ8 quantization.
     pub quantize: bool,
-    /// Fallback policy when index file loading or checksum validation fails.
+    /// Fallback policy when index file loading or integrity validation fails.
     pub fallback_policy: DiskAnnFallbackPolicy,
     /// Optionaler Override für den Pending-Flush-Threshold (für Benchmarks/Tests).
     /// None: adaptiver Threshold gemäß ADR-068 (max(50, min(1000, floor(N × 0.05)))).
     pub pending_flush_threshold: Option<u64>,
     /// Optional compute pool for background operations.
     pub compute_pool: Option<ComputePool>,
-    /// Whether to create a new empty index if the index file does not exist on load.
-    /// Default is `false` (missing index file returns a `NotFound` error).
-    pub create_if_missing: bool,
 }
 
 impl Default for DiskAnnConfig {
@@ -62,7 +59,6 @@ impl Default for DiskAnnConfig {
             fallback_policy: DiskAnnFallbackPolicy::default(),
             pending_flush_threshold: None,
             compute_pool: None,
-            create_if_missing: false,
         }
     }
 }

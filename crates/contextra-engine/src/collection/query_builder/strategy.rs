@@ -14,11 +14,11 @@ pub enum SearchStrategy {
     },
     /// Personalized PageRank power iteration graph traversal strategy.
     PersonalizedPageRank(contextra_types::PprConfig),
-    /// PathRAG bidirectional Dijkstra traversal with sufficiency filtering.
+    /// PathRAG bidirectional Dijkstra graph traversal strategy.
     PathRag {
         /// Maximum traversal hop depth.
         max_hops: usize,
-        /// Sufficiency threshold for filtering low-confidence paths (default 0.1).
+        /// Sufficiency threshold for filtering low-confidence paths.
         sufficiency_threshold: f64,
     },
 }
@@ -51,9 +51,7 @@ impl SearchStrategy {
         match self {
             SearchStrategy::Rrf => FusionStrategy::Rrf,
             SearchStrategy::ScoreNormalized => FusionStrategy::ScoreNormalized,
-            SearchStrategy::Hops { .. }
-            | SearchStrategy::PersonalizedPageRank(_)
-            | SearchStrategy::PathRag { .. } => FusionStrategy::Rrf,
+            _ => FusionStrategy::Rrf,
         }
     }
 

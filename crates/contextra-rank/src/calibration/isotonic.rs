@@ -11,9 +11,6 @@ const DEFAULT_WARMUP_REQUIRED: u32 = 50;
 const DEFAULT_MAX_OBSERVATIONS: usize = 2000;
 const REBUILD_THRESHOLD_NEW_OBS: usize = 10;
 
-/// Default Expected Calibration Error (ECE) threshold for triggering model rebuilds.
-pub const DEFAULT_ECE_REBUILD_THRESHOLD: f32 = 0.05;
-
 /// Isotonic Calibrator using Pool-Adjacent Violators Algorithm.
 #[derive(Clone)]
 pub struct IsotonicCalibrator {
@@ -126,35 +123,6 @@ impl IsotonicCalibrator {
         if self.model_dirty {
             self.rebuild_model();
         }
-    }
-
-    /// Triggers a model rebuild if ECE exceeds `threshold`.
-    /// Returns `true` if a rebuild occurred.
-    pub fn maybe_rebuild_on_ece(&mut self, threshold: f32) -> bool {
-        if !self.is_calibrated() || threshold.is_nan() {
-            return false;
-        }
-
-        let ece = self.expected_calibration_error().unwrap_or(0.0);
-        if ece > threshold {
-            self.rebuild_model();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Constructs a [`crate::fusion::SignalCalibrationContext`] for rank fusion pipeline integration.
-    pub fn calibration_context(
-        &self,
-        signal_name: impl Into<String>,
-        drift_status: crate::drift::DriftStatus,
-    ) -> crate::fusion::SignalCalibrationContext {
-        crate::fusion::SignalCalibrationContext::new(
-            signal_name,
-            self.is_calibrated(),
-            drift_status,
-        )
     }
 
     /// Resets observations if ConfigFingerprint changes (P8 Compliance).
@@ -312,19 +280,10 @@ impl IsotonicCalibrator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contextra_types::DeterministicTimestamp;
 
     struct FixedTestClock(u64);
 
     impl Clock for FixedTestClock {
-        fn now(&self) -> DeterministicTimestamp {
-            DeterministicTimestamp::new(self.0 / 1_000_000, 0)
-        }
-
-        fn monotonic_ticks(&self) -> u64 {
-            0
-        }
-
         fn now_unix_nanos(&self) -> u64 {
             self.0
         }

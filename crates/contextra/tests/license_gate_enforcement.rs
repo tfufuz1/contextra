@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use contextra::builder::ContextraBuilder;
 use contextra::performance_profile::PerformanceProfile;
+use contextra_core::error::ContextraError;
 use contextra_license::OpenFastGate;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
-use contextra_types::error::ContextraError;
 
 /// Test case a: Compliance profile without explicit with_license_gate fails using default OpenFastGate.
 #[tokio::test]

@@ -1,3 +1,0 @@
-# Tests Manifest: PARK-BENCH
-# No isolated test files/functions were moved into docs/restore/PARK-BENCH/tests.
-# All tests were internal to benchmarks/contextra-bench and removed together with the crate.

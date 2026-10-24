@@ -36,7 +36,6 @@ impl MetricsSink for NoopMetricsSink {
 }
 
 /// A recorded metric event captured by [`TestMetricsSink`].
-#[cfg(any(test, feature = "test-utils"))]
 #[derive(Debug, Clone, PartialEq)]
 pub enum MetricEvent {
     /// Counter increment event.
@@ -69,13 +68,11 @@ pub enum MetricEvent {
 }
 
 /// An in-memory [`MetricsSink`] implementation for testing that records all emitted metric events.
-#[cfg(any(test, feature = "test-utils"))]
 #[derive(Debug, Default, Clone)]
 pub struct TestMetricsSink {
     events: std::sync::Arc<std::sync::Mutex<Vec<MetricEvent>>>,
 }
 
-#[cfg(any(test, feature = "test-utils"))]
 impl TestMetricsSink {
     /// Creates a new empty [`TestMetricsSink`].
     pub fn new() -> Self {
@@ -99,7 +96,6 @@ impl TestMetricsSink {
     }
 }
 
-#[cfg(any(test, feature = "test-utils"))]
 impl MetricsSink for TestMetricsSink {
     fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
         let labels_vec = labels

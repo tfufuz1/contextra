@@ -1,5 +1,5 @@
+use contextra_core::{ContextraError, TxId};
 use contextra_store::wal::{KeyManager, Wal, WalEntry, WalOp, MAX_WAL_ENTRY_SIZE};
-use contextra_types::{ContextraError, TxId};
 use std::sync::Arc;
 use tempfile::tempdir;
 

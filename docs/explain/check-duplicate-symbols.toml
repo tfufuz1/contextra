@@ -5,4 +5,4 @@ fix = "Benenne das Symbol um oder versehe es mit einem modul-eindeutigen Präfix
 anti_fix = "Nutze keine bedingte Kompilierung, um Symbole zu verstecken."
 adr = ["ADR-065"]
 related = ["symbol-exists", "check-phantom-files"]
-sources = ["xtask/docs/gates/gov-d-cross-file-duplicates.md"]
+sources = ["docs/gates/gov-d-cross-file-duplicates.md"]

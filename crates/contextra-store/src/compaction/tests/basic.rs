@@ -1,5 +1,4 @@
 use super::*;
-use contextra_mvcc::snapshot::SnapshotFloor;
 
 use crate::sstable::{create_block_cache, SstableBuilder};
 use tempfile::TempDir;
@@ -49,8 +48,8 @@ fn prop_compaction_tombstone_masking_latest_operation_wins() {
                 registry,
                 Arc::clone(&bc),
                 None,
-                Arc::new(contextra_types::ResourceTracker::new(
-                    contextra_types::ResourceBudget {
+                Arc::new(contextra_core::ResourceTracker::new(
+                    contextra_core::ResourceBudget {
                         memory_limit: 1024 * 1024,
                     },
                 )),
@@ -86,7 +85,7 @@ fn prop_compaction_tombstone_masking_latest_operation_wins() {
 
             let output_path = tmp.path().join("merged.sst");
             engine
-                .merge_sstables_with_cancel(&input_ssts, &output_path, u64::MAX, true, None)
+                .merge_sstables(&input_ssts, &output_path, u64::MAX, true)
                 .await
                 .unwrap();
 
@@ -139,11 +138,11 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
     };
     let engine = CompactionEngine::new(
         config,
-        registry as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -151,15 +150,10 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
     );
 
     // Create older SSTable with many entries (large file size) but small max_seq (seq=10)
-    let pad_keys: Vec<String> = (0..100).map(|i| format!("pad_{:03}", i)).collect();
-    let mut large_entries: Vec<(&[u8], &[u8], u64)> = Vec::new();
+    let mut large_entries = Vec::new();
     large_entries.push((b"key-1".as_ref(), b"old_val".as_ref(), 10u64));
-    for k in &pad_keys {
-        large_entries.push((
-            k.as_bytes(),
-            b"large_padding_data_to_increase_file_size",
-            10u64,
-        ));
+    for _ in 0..100 {
+        large_entries.push((b"pad", b"large_padding_data_to_increase_file_size", 10u64));
     }
     let sst_old_large = create_test_sstable(
         tmp.path(),
@@ -196,7 +190,7 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
     // Perform merge
     let output = tmp.path().join("merged_chronological.sst");
     engine
-        .merge_sstables_with_cancel(&candidate_ssts, &output, u64::MAX, true, None)
+        .merge_sstables(&candidate_ssts, &output, u64::MAX, true)
         .await
         .expect("merge");
 
@@ -220,11 +214,11 @@ async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
-        registry as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -251,7 +245,7 @@ async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
 
     let output = tmp.path().join("merged_mvcc2.sst");
     engine
-        .merge_sstables_with_cancel(&[sst1, sst2], &output, 95, true, None)
+        .merge_sstables(&[sst1, sst2], &output, 95, true)
         .await
         .expect("merge");
 
@@ -283,8 +277,8 @@ async fn test_mvcc_retention_older_versions_below_floor_discarded() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -319,7 +313,7 @@ async fn test_mvcc_retention_older_versions_below_floor_discarded() {
 
     let output = tmp.path().join("merged_mvcc3.sst");
     engine
-        .merge_sstables_with_cancel(&[sst1, sst2, sst3], &output, 95, true, None)
+        .merge_sstables(&[sst1, sst2, sst3], &output, 95, true)
         .await
         .expect("merge");
 
@@ -351,8 +345,8 @@ async fn test_merge_deduplication() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -378,7 +372,7 @@ async fn test_merge_deduplication() {
 
     let output = tmp.path().join("merged.sst");
     engine
-        .merge_sstables_with_cancel(&[sst1, sst2], &output, u64::MAX, true, None)
+        .merge_sstables(&[sst1, sst2], &output, u64::MAX, true)
         .await
         .expect("merge"); // expect
 
@@ -404,8 +398,8 @@ async fn test_tombstone_gc_stream_advancement_preserves_subsequent_keys() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -431,7 +425,7 @@ async fn test_tombstone_gc_stream_advancement_preserves_subsequent_keys() {
 
     // min_snapshot_seq=100 -> key-a tombstone is GC'd during full compaction
     engine
-        .merge_sstables_with_cancel(&[sst1], &output, 100, true, None)
+        .merge_sstables(&[sst1], &output, 100, true)
         .await
         .expect("merge"); // expect
 
@@ -464,8 +458,8 @@ async fn test_tombstone_gc() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -485,7 +479,7 @@ async fn test_tombstone_gc() {
 
     // min_snapshot_seq=100 → tombstone at seq=5 is safe to GC
     engine
-        .merge_sstables_with_cancel(&[sst1], &output, 100, true, None)
+        .merge_sstables(&[sst1], &output, 100, true)
         .await
         .expect("merge"); // expect
 
@@ -508,8 +502,8 @@ async fn test_tombstone_preserved_with_active_snapshot() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -529,7 +523,7 @@ async fn test_tombstone_preserved_with_active_snapshot() {
 
     // min_snapshot_seq=2 → tombstone at seq=5 is NOT safe to GC
     engine
-        .merge_sstables_with_cancel(&[sst1], &output, 2, true, None)
+        .merge_sstables(&[sst1], &output, 2, true)
         .await
         .expect("merge"); // expect
 
@@ -552,11 +546,11 @@ async fn test_maybe_compact_full_cycle() {
     };
     let engine = CompactionEngine::new(
         config,
-        registry as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -624,8 +618,8 @@ async fn test_no_compaction_below_threshold() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -667,8 +661,8 @@ async fn test_compaction_aborts_on_concurrent_modification() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -719,8 +713,8 @@ async fn test_compaction_removes_uuid_sidecar_files() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -803,8 +797,8 @@ async fn test_compaction_swap_restores_shadowing_order_without_restart() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -821,11 +815,9 @@ async fn test_compaction_swap_restores_shadowing_order_without_restart() {
     .await;
 
     // SSTable C (non-input, intermediate seq, larger size so it is in a separate size tier): key "k1" -> "v_inter", seq 15
-    let pad_keys_c: Vec<String> = (0..100).map(|i| format!("padding_key_{:03}", i)).collect();
-    let mut entries_c: Vec<(&[u8], &[u8], u64)> =
-        vec![(b"k1".as_ref(), b"v_inter".as_ref(), 15u64)];
-    for k in &pad_keys_c {
-        entries_c.push((k.as_bytes(), b"padding_value_large_file", 15u64));
+    let mut entries_c = vec![(b"k1".as_ref(), b"v_inter".as_ref(), 15u64)];
+    for _ in 0..100 {
+        entries_c.push((b"padding_key", b"padding_value_large_file", 15u64));
     }
     let sst_c = create_test_sstable(tmp.path(), "sst_c.sst", &entries_c, Arc::clone(&bc)).await;
 
@@ -932,8 +924,8 @@ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -960,7 +952,7 @@ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
 
     let err = result.unwrap_err();
     match err {
-        contextra_types::ContextraError::MemoryBudgetExceeded { used_mb, limit_mb } => {
+        contextra_core::ContextraError::MemoryBudgetExceeded { used_mb, limit_mb } => {
             assert!(used_mb >= limit_mb);
         }
         other => panic!("Expected MemoryBudgetExceeded, got {:?}", other),
@@ -996,8 +988,8 @@ async fn test_compaction_succeeds_when_peak_memory_within_limit() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -1037,13 +1029,13 @@ async fn test_compaction_backpressure_timeout_exceeded() {
     };
 
     // Exhausted ResourceTracker budget: capacity limit = 0
-    let exhausted_tracker = Arc::new(contextra_types::ResourceTracker::new(
-        contextra_types::ResourceBudget { memory_limit: 0 },
+    let exhausted_tracker = Arc::new(contextra_core::ResourceTracker::new(
+        contextra_core::ResourceBudget { memory_limit: 0 },
     ));
 
     let engine = CompactionEngine::new(
         config,
-        registry as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
         exhausted_tracker,
@@ -1067,7 +1059,7 @@ async fn test_compaction_backpressure_timeout_exceeded() {
 
     let output_path = tmp.path().join("merged_timeout.sst");
     let result = engine
-        .merge_sstables_with_cancel(&[sst1, sst2], &output_path, u64::MAX, true, None)
+        .merge_sstables(&[sst1, sst2], &output_path, u64::MAX, true)
         .await;
 
     assert!(
@@ -1075,7 +1067,7 @@ async fn test_compaction_backpressure_timeout_exceeded() {
         "Merge should fail with timeout when budget is exhausted"
     );
     match result.unwrap_err() {
-        contextra_types::ContextraError::MemoryBudgetExceeded { .. } => {}
+        contextra_core::ContextraError::MemoryBudgetExceeded { .. } => {}
         other => panic!("Expected MemoryBudgetExceeded, got {:?}", other),
     }
 }
@@ -1085,11 +1077,11 @@ fn test_generate_sst_path_uniqueness() {
     let tmp = TempDir::new().expect("temp dir"); // expect
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
-        Arc::new(SnapshotRegistry::new()) as Arc<dyn SnapshotFloor>,
+        Arc::new(SnapshotRegistry::new()),
         create_block_cache(1),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),

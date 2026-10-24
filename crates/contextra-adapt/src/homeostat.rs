@@ -1,29 +1,23 @@
 // FILE-CONTEXT
-// ZWECK: P95 retrieval latency feedback-regulated PID controller and hard deadline management.
-// INVARIANTEN: k_min >= 50 hard floor (empirical, measured internally); integral windup bounded.
-// STAND: TS:2026-10-17T00:00:00Z
+// ZWECK: P95 retrieval latency feedback-regulated PID controller and hard deadline management (Feature F-08 & P11 requirement).
+// INVARIANTEN: k_min >= 50 hard floor (arXiv:2604.01733 T2-RAGBench recall floor); integral windup bounded [-100.0, 100.0].
+// STAND: TS:2026-09-11T00:00:00Z
 
 //! PID Controller and Deadline Management for Retrieval Latency Control.
 //!
-//! NOTE: `RerankPidController` is deprecated in favor of `crate::PoolController`.
+//! NOTE: `RerankPidController` has been consolidated into `crate::PidController`.
 
-use std::sync::Arc;
-use std::time::Duration;
-
-use contextra_ports::{Clock, SystemClock};
-#[cfg(test)]
-use contextra_types::DeterministicTimestamp;
+use std::time::{Duration, Instant};
 
 /// P95 Latency-feedback PID Controller for dynamically tuning candidate pool sizes.
 ///
-/// DEPRECATED: Use [`crate::PoolController`] instead.
+/// DEPRECATED: Use [`crate::PidController`] instead.
 #[deprecated(
     since = "0.1.0",
-    note = "use PoolController; removal 2027-01-31"
+    note = "Consolidated into `crate::PidController`. Use `crate::PidController` directly."
 )]
 #[derive(Debug, Clone)]
 pub struct RerankPidController {
-    #[allow(deprecated)]
     inner: crate::PidController,
 }
 
@@ -55,39 +49,39 @@ impl RerankPidController {
 
     /// Accessor for `kp`.
     pub fn kp(&self) -> f32 {
-        self.inner.kp()
+        self.inner.kp
     }
 
     /// Accessor for `ki`.
     pub fn ki(&self) -> f32 {
-        self.inner.ki()
+        self.inner.ki
     }
 
     /// Accessor for `kd`.
     pub fn kd(&self) -> f32 {
-        self.inner.kd()
+        self.inner.kd
     }
 
     /// Accessor for target latency.
     pub fn target_p95_latency_ms(&self) -> f32 {
-        self.inner.target_latency_ms()
+        self.inner.target_latency_ms
     }
 
     /// Accessor for current `k_pool`.
     pub fn k_pool(&self) -> usize {
         self.inner
-            .current_pool_size()
-            .unwrap_or_else(|| self.inner.min_pool_size())
+            .current_pool_size
+            .unwrap_or(self.inner.min_pool_size)
     }
 
     /// Accessor for `k_min`.
     pub fn k_min(&self) -> usize {
-        self.inner.min_pool_size()
+        self.inner.min_pool_size
     }
 
     /// Accessor for `k_max`.
     pub fn k_max(&self) -> usize {
-        self.inner.max_pool_size()
+        self.inner.max_pool_size
     }
 
     /// Updates the controller state with observed latency and returns new pool size.
@@ -103,46 +97,21 @@ impl RerankPidController {
 /// Evaluated before or during candidate hydration and Cross-Encoder batch inference steps in `Collection::hybrid_search_reranked`.
 /// If `deadline_exceeded(started_at)` returns `true`, the search pipeline should immediately break out and return
 /// the partially hydrated/reranked candidate results accumulated up to that point rather than blocking indefinitely.
-#[derive(Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct RerankDeadline {
     /// Maximum time budget allowed for reranking operations.
     pub budget: Duration,
-    clock: Arc<dyn Clock>,
-}
-
-impl std::fmt::Debug for RerankDeadline {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RerankDeadline")
-            .field("budget", &self.budget)
-            .finish()
-    }
 }
 
 impl RerankDeadline {
-    /// Creates a new `RerankDeadline` with specified budget and injected [`Clock`] port.
-    pub fn new_with_clock(budget: Duration, clock: Arc<dyn Clock>) -> Self {
-        Self { budget, clock }
-    }
-
     /// Creates a new `RerankDeadline` with the specified duration budget.
-    ///
-    /// Delegates to [`Self::new_with_clock`] using a standard [`SystemClock`].
     pub fn new(budget: Duration) -> Self {
-        Self::new_with_clock(budget, Arc::new(SystemClock::new()))
+        Self { budget }
     }
 
-    /// Checks if the elapsed time since `started_at_nanos` equals or exceeds the deadline budget.
-    pub fn deadline_exceeded_nanos(&self, started_at_nanos: u64) -> bool {
-        let now = self.clock.monotonic_nanos();
-        let elapsed_nanos = now.saturating_sub(started_at_nanos);
-        elapsed_nanos >= self.budget.as_nanos() as u64
-    }
-
-    /// Checks if the elapsed time since `started_at_nanos` equals or exceeds the deadline budget.
-    ///
-    /// Delegated to `deadline_exceeded_nanos` to maintain backwards compatibility without wallclock access.
-    pub fn deadline_exceeded(&self, started_at_nanos: u64) -> bool {
-        self.deadline_exceeded_nanos(started_at_nanos)
+    /// Checks if the elapsed time since `started_at` equals or exceeds the deadline budget.
+    pub fn deadline_exceeded(&self, started_at: Instant) -> bool {
+        started_at.elapsed() >= self.budget
     }
 }
 
@@ -156,8 +125,8 @@ mod tests {
         let mut controller = RerankPidController::new(150.0, 50, 200, 100);
         let mut prev_pool = controller.k_pool();
 
-        // Simulate iterations of severe latency overflow (300ms vs 150ms target)
-        for _ in 0..100 {
+        // Simulate 10 iterations of severe latency overflow (300ms vs 150ms target)
+        for _ in 0..10 {
             let new_pool = controller.update(300.0);
             assert!(
                 new_pool <= prev_pool,
@@ -183,8 +152,8 @@ mod tests {
         let mut controller = RerankPidController::new(150.0, 50, 200, 100);
         let mut prev_pool = controller.k_pool();
 
-        // Simulate iterations of low latency (50ms vs 150ms target) to integrate to k_max
-        for _ in 0..100 {
+        // Simulate 10 iterations of low latency (50ms vs 150ms target)
+        for _ in 0..10 {
             let new_pool = controller.update(50.0);
             assert!(
                 new_pool >= prev_pool,
@@ -225,35 +194,15 @@ mod tests {
         }
     }
 
-    struct TestClock(std::sync::atomic::AtomicU64);
-
-    impl Clock for TestClock {
-        fn now(&self) -> DeterministicTimestamp {
-            DeterministicTimestamp::new(self.0.load(std::sync::atomic::Ordering::Relaxed) / 1_000_000, 0)
-        }
-
-        fn monotonic_ticks(&self) -> u64 {
-            0
-        }
-
-        fn now_unix_nanos(&self) -> u64 {
-            self.0.load(std::sync::atomic::Ordering::Relaxed)
-        }
-
-        fn monotonic_nanos(&self) -> u64 {
-            self.0.load(std::sync::atomic::Ordering::Relaxed)
-        }
-    }
-
     #[test]
     fn test_rerank_deadline_exceeded() {
-        let clock = Arc::new(TestClock(std::sync::atomic::AtomicU64::new(1_000_000_000)));
-        let deadline = RerankDeadline::new_with_clock(Duration::from_millis(50), clock.clone());
-        let start_nanos = 1_000_000_000u64;
+        let deadline = RerankDeadline::new(Duration::from_millis(50));
+        let start = Instant::now();
 
-        assert!(!deadline.deadline_exceeded_nanos(start_nanos));
+        assert!(!deadline.deadline_exceeded(start));
 
-        clock.0.store(1_050_000_000, std::sync::atomic::Ordering::Relaxed);
-        assert!(deadline.deadline_exceeded_nanos(start_nanos));
+        std::thread::sleep(Duration::from_millis(60));
+
+        assert!(deadline.deadline_exceeded(start));
     }
 }

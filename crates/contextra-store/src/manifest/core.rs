@@ -5,130 +5,17 @@
 // HOTSPOTS: load, reconstruct_valid_sstables, append_batch
 // FORMATABKÜNDIGUNG (S-01 / T-04): `rank` in `ManifestEntry::Replace` ist abgekündigt. `reconstruct_valid_sstables` nutzt ausschließlich die Manifest-Operationsreihenfolge (`next_rank`). `recovery.rs` verwirft den Wert explizit.
 
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 use super::entry::ManifestEntry;
 use super::recovery::is_valid_tail_truncation_candidate;
 use super::MAX_MANIFEST_ENTRY_SIZE;
-use crate::format::{check_openable, FileKind, FormatError, FormatHeader};
 use crate::util::DirLock;
 
 pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
 pub const CURRENT_MANIFEST_VERSION: u8 = 1;
-
-/// Tracks highest recorded format versions per file kind from manifest entries.
-#[derive(Debug, Clone, Default)]
-pub struct ManifestFormatTracker {
-    pub max_sstable_version: u16,
-    pub max_blob_version: u16,
-    pub max_manifest_version: u16,
-    pub max_wal_version: u16,
-    pub max_ledger_version: u16,
-    pub id_width: Option<u8>,
-    pub allowed_sstable_migrated_from: std::collections::HashSet<u16>,
-    pub allowed_blob_migrated_from: std::collections::HashSet<u16>,
-    pub allowed_manifest_migrated_from: std::collections::HashSet<u16>,
-    pub allowed_wal_migrated_from: std::collections::HashSet<u16>,
-    pub allowed_ledger_migrated_from: std::collections::HashSet<u16>,
-}
-
-impl ManifestFormatTracker {
-    pub fn from_entries(entries: &[ManifestEntry]) -> Self {
-        let mut tracker = Self::default();
-        for entry in entries {
-            if let ManifestEntry::FormatVersionRecord {
-                file_kind,
-                max_version,
-                migrated_from,
-            } = entry
-            {
-                match file_kind {
-                    0 => {
-                        tracker.max_sstable_version = tracker.max_sstable_version.max(*max_version);
-                        if *migrated_from > 0 {
-                            tracker.allowed_sstable_migrated_from.insert(*migrated_from);
-                        }
-                    }
-                    1 => {
-                        tracker.max_blob_version = tracker.max_blob_version.max(*max_version);
-                        if *migrated_from > 0 {
-                            tracker.allowed_blob_migrated_from.insert(*migrated_from);
-                        }
-                    }
-                    2 => {
-                        tracker.max_manifest_version =
-                            tracker.max_manifest_version.max(*max_version);
-                        if *migrated_from > 0 {
-                            tracker
-                                .allowed_manifest_migrated_from
-                                .insert(*migrated_from);
-                        }
-                    }
-                    3 => {
-                        tracker.max_wal_version = tracker.max_wal_version.max(*max_version);
-                        if *migrated_from > 0 {
-                            tracker.allowed_wal_migrated_from.insert(*migrated_from);
-                        }
-                    }
-                    4 => {
-                        tracker.max_ledger_version = tracker.max_ledger_version.max(*max_version);
-                        if *migrated_from > 0 {
-                            tracker.allowed_ledger_migrated_from.insert(*migrated_from);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        tracker
-    }
-
-    pub fn verify_file_version(
-        &self,
-        kind: FileKind,
-        file_version: u16,
-    ) -> std::result::Result<(), FormatError> {
-        let (recorded_max, allowed_migrated) = match kind {
-            FileKind::Sstable => (
-                self.max_sstable_version,
-                &self.allowed_sstable_migrated_from,
-            ),
-            FileKind::Blob => (self.max_blob_version, &self.allowed_blob_migrated_from),
-            FileKind::Manifest => (
-                self.max_manifest_version,
-                &self.allowed_manifest_migrated_from,
-            ),
-            FileKind::Wal => (self.max_wal_version, &self.allowed_wal_migrated_from),
-            FileKind::Ledger => (self.max_ledger_version, &self.allowed_ledger_migrated_from),
-        };
-
-        if recorded_max > 0
-            && file_version < recorded_max
-            && !allowed_migrated.contains(&file_version)
-        {
-            return Err(FormatError::DowngradeAttempt {
-                kind,
-                file_version,
-                recorded_version: recorded_max,
-            });
-        }
-        Ok(())
-    }
-
-    pub fn verify_id_width(&self, expected_width: u8) -> std::result::Result<(), FormatError> {
-        if let Some(recorded_width) = self.id_width {
-            if recorded_width != expected_width {
-                return Err(FormatError::IdWidthMismatch {
-                    expected: expected_width,
-                    found: recorded_width,
-                });
-            }
-        }
-        Ok(())
-    }
-}
 
 /// Append-only Manifest file handle for recording active SSTable set transitions.
 pub struct Manifest {
@@ -285,13 +172,13 @@ impl Manifest {
             let mut header = [0u8; 5];
             if reader.read_exact(&mut header).await.is_ok() {
                 if &header[0..4] == MANIFEST_HEADER_MAGIC {
-                    let version = header[4] as u16;
-                    let format_header = FormatHeader::new(*MANIFEST_HEADER_MAGIC, version);
-                    check_openable(
-                        FileKind::Manifest,
-                        &format_header,
-                        CURRENT_MANIFEST_VERSION as u16,
-                    )?;
+                    let version = header[4];
+                    if version > CURRENT_MANIFEST_VERSION {
+                        return Err(ContextraError::Storage(format!(
+                            "Unsupported MANIFEST format version: {}",
+                            version
+                        )));
+                    }
                     pos = 5;
                 } else {
                     // Legacy version 0 manifest without header magic
@@ -414,10 +301,7 @@ impl Manifest {
                         .unwrap_or_else(|| path.clone());
                     valid_map.remove(&key);
                 }
-                ManifestEntry::RollbackComplete { .. }
-                | ManifestEntry::WalCheckpoint { .. }
-                | ManifestEntry::FormatVersionRecord { .. }
-                | ManifestEntry::WalAnchor { .. } => {}
+                ManifestEntry::RollbackComplete { .. } | ManifestEntry::WalCheckpoint { .. } => {}
                 ManifestEntry::Replace { removed, added, .. } => {
                     for p in removed {
                         let key = p
@@ -475,9 +359,7 @@ impl Manifest {
                 }
                 ManifestEntry::Add { .. }
                 | ManifestEntry::RollbackComplete { .. }
-                | ManifestEntry::WalCheckpoint { .. }
-                | ManifestEntry::FormatVersionRecord { .. }
-                | ManifestEntry::WalAnchor { .. } => {}
+                | ManifestEntry::WalCheckpoint { .. } => {}
             }
         }
 

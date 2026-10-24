@@ -27,9 +27,9 @@ pub enum DurabilityConfigError {
     },
 }
 
-impl From<DurabilityConfigError> for contextra_types::ContextraError {
+impl From<DurabilityConfigError> for contextra_core::ContextraError {
     fn from(err: DurabilityConfigError) -> Self {
-        contextra_types::ContextraError::DurabilityConfig(err.to_string())
+        contextra_core::ContextraError::DurabilityConfig(err.to_string())
     }
 }
 
@@ -45,7 +45,7 @@ impl DurabilityMode {
             WalNoHmac if deletion_proof_active => {
                 Err(DurabilityConfigError::IncompatibleCombination {
                     mode: self,
-                    feature: concat!("deletion", "-", "proof"),
+                    feature: "deletion-proof",
                     reason: "no HMAC integrity chain to anchor the proof",
                 })
             }
@@ -55,7 +55,7 @@ impl DurabilityMode {
             {
                 Err(DurabilityConfigError::IncompatibleCombination {
                     mode: self,
-                    feature: concat!("deletion", "-", "proof / FeatureRing::Sovereign"),
+                    feature: "deletion-proof / FeatureRing::Sovereign",
                     reason: "no persistence layer exists to prove deletion from",
                 })
             }
@@ -64,74 +64,8 @@ impl DurabilityMode {
     }
 }
 
-/// Source for Key Encryption Key (KEK).
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum KekSource {
-    Passphrase(String),
-    Environment(String),
-    File(PathBuf),
-}
-
-impl std::fmt::Debug for KekSource {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Passphrase(_) => write!(f, "Passphrase(***)"),
-            Self::Environment(var) => f.debug_tuple("Environment").field(var).finish(),
-            Self::File(path) => f.debug_tuple("File").field(path).finish(),
-        }
-    }
-}
-
-/// Encryption configuration for LSM storage and WAL.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[non_exhaustive]
-pub enum EncryptionConfig {
-    #[default]
-    None,
-    Passphrase(String),
-    Keyring {
-        dir: PathBuf,
-        kek_source: KekSource,
-    },
-}
-
-impl std::fmt::Debug for EncryptionConfig {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::None => write!(f, "EncryptionConfig::None"),
-            Self::Passphrase(_) => write!(f, "EncryptionConfig::Passphrase(***)"),
-            Self::Keyring { dir, kek_source } => f
-                .debug_struct("EncryptionConfig::Keyring")
-                .field("dir", dir)
-                .field("kek_source", kek_source)
-                .finish(),
-        }
-    }
-}
-
-impl EncryptionConfig {
-    pub fn is_encrypted(&self) -> bool {
-        !matches!(self, Self::None)
-    }
-
-    pub fn passphrase(&self) -> Option<String> {
-        match self {
-            Self::None => None,
-            Self::Passphrase(p) => Some(p.clone()),
-            Self::Keyring { kek_source, .. } => match kek_source {
-                KekSource::Passphrase(p) => Some(p.clone()),
-                KekSource::Environment(var) => std::env::var(var).ok(),
-                KekSource::File(path) => std::fs::read_to_string(path)
-                    .ok()
-                    .map(|s| s.trim().to_string()),
-            },
-        }
-    }
-}
-
 /// LSM storage configuration.
-// SEC-001 — Erweitere LsmConfig um `encryption` und AES-256.
+// SEC-001 — Erweitere LsmConfig um `encryption_passphrase` und AES-256.
 // TEST: cargo test -p contextra-store test_encrypted_db_unreadable_without_key
 // DONE: LsmConfig akzeptiert Passphrase, AES-256 wird für Disk-I/O verwendet.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -148,8 +82,6 @@ pub struct LsmConfig {
     pub tx_timeout: Duration,
     /// Configuration for background compaction.
     pub compaction: CompactionConfig,
-    pub encryption: EncryptionConfig,
-    /// Deprecated: Passphrase for AES-256 encryption. Use `encryption` with `EncryptionConfig::Passphrase` instead.
     pub encryption_passphrase: Option<String>,
     /// Time window in microseconds to batch concurrent WAL commits before issuing fsync.
     /// Set to 0 to disable group commit batching (immediate single commit).
@@ -162,26 +94,6 @@ pub struct LsmConfig {
     /// Maximum capacity of committed write keys tracked in SSI validator before pruning or rejecting.
     /// Default is 1,000,000 keys.
     pub ssi_max_tracked_keys: usize,
-    /// Threshold in bytes to determine whether a payload should be stored as a blob.
-    /// Default is `crate::blob::DEFAULT_BLOB_THRESHOLD` (65,536 bytes).
-    pub blob_bytes_threshold: u64,
-    /// Maximum factor for internal merge set size relative to limit in bounded scans.
-    /// Default is `crate::lsm::MAX_INTERNAL_MERGE_ENTRIES_FACTOR` (8).
-    pub max_internal_merge_factor: usize,
-    /// Recovery enforcement mode for WAL tail/chain truncation verification.
-    #[serde(skip, default)]
-    pub wal_recovery_mode: crate::wal::WalRecoveryMode,
-    #[cfg(any(test, feature = "fault-injection"))]
-    #[serde(skip, default)]
-    pub fault_plan: std::sync::Arc<crate::wal::WalFaultPlan>,
-}
-
-impl LsmConfig {
-    pub fn encryption_passphrase(&self) -> Option<String> {
-        self.encryption_passphrase
-            .clone()
-            .or_else(|| self.encryption.passphrase())
-    }
 }
 
 impl Default for LsmConfig {
@@ -192,17 +104,11 @@ impl Default for LsmConfig {
             max_ram_mb: 2048,
             tx_timeout: Duration::from_secs(60),
             compaction: CompactionConfig::default(),
-            encryption: EncryptionConfig::default(),
             encryption_passphrase: None,
             group_commit_window_micros: 500,
             block_cache_shards: 64,
             durability_mode: DurabilityMode::default(),
             ssi_max_tracked_keys: 1_000_000,
-            blob_bytes_threshold: crate::blob::DEFAULT_BLOB_THRESHOLD,
-            max_internal_merge_factor: crate::lsm::MAX_INTERNAL_MERGE_ENTRIES_FACTOR,
-            wal_recovery_mode: crate::wal::WalRecoveryMode::Warn,
-            #[cfg(any(test, feature = "fault-injection"))]
-            fault_plan: std::sync::Arc::new(crate::wal::WalFaultPlan::default()),
         }
     }
 }

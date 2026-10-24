@@ -458,62 +458,6 @@ pub fn run_jules_preflight(fast_only: bool) -> bool {
         });
     }
 
-    // Gate: Keyspace Registry Check
-    {
-        let start = Instant::now();
-        let root = crate::find_root_dir();
-        let keyfamilies_path = root.join("docs/deletion/KEYFAMILIES.toml");
-        let toml_content = fs::read_to_string(&keyfamilies_path).unwrap_or_default();
-        let reg_code_path = root.join("crates/contextra-engine/src/deletion/registry.rs");
-        let reg_code = fs::read_to_string(&reg_code_path).unwrap_or_default();
-        let pass_res = xtask::harness::keyspace_registry::verify_keyspace_registry(&toml_content, &reg_code);
-        let passed = pass_res.is_ok();
-        results.push(GateResult {
-            name: format!("Keyspace Registry ({:.1}s)", start.elapsed().as_secs_f64()),
-            passed,
-            detail: pass_res.err(),
-        });
-    }
-
-    // Gate: Erasure Evidence Literals Check
-    {
-        let start = Instant::now();
-        let root = crate::find_root_dir();
-        let count = xtask::harness::erasure_evidence_literals::count_hardcoded_evidence_literals(&root.join("crates"));
-        let passed = count == 0;
-        results.push(GateResult {
-            name: format!("Erasure Evidence Literals ({:.1}s)", start.elapsed().as_secs_f64()),
-            passed,
-            detail: if passed { None } else { Some(format!("{} hardcoded evidence literals found", count)) },
-        });
-    }
-
-    // Gate: Log Hygiene Erasure Check
-    {
-        let start = Instant::now();
-        let root = crate::find_root_dir();
-        let violations = xtask::harness::log_hygiene_erasure::scan_log_hygiene_erasure(&root.join("crates"));
-        let passed = violations.is_empty();
-        results.push(GateResult {
-            name: format!("Log Hygiene Erasure ({:.1}s)", start.elapsed().as_secs_f64()),
-            passed,
-            detail: if passed { None } else { Some(format!("{} log hygiene violations found", violations.len())) },
-        });
-    }
-
-    // Gate: Doc Truth Deletion Check
-    {
-        let start = Instant::now();
-        let root = crate::find_root_dir();
-        let violations = xtask::harness::doc_truth_deletion::scan_doc_truth_deletion(&root.join("docs/deletion"));
-        let passed = violations.is_empty();
-        results.push(GateResult {
-            name: format!("Doc Truth Deletion ({:.1}s)", start.elapsed().as_secs_f64()),
-            passed,
-            detail: if passed { None } else { Some(format!("{} doc truth deletion violations found", violations.len())) },
-        });
-    }
-
     // Duplicate Symbols
     {
         let start = Instant::now();

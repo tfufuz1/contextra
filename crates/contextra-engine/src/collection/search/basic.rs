@@ -27,6 +27,23 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.search_with_filter_expr(query_embedding, k, None).await
     }
 
+    /// Performs semantic search with an advanced metadata filter.
+    #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
+    #[allow(deprecated)]
+    #[tracing::instrument(level = "trace", skip(self, query, filter))]
+    pub async fn search_with_filter(
+        &self,
+        query: &[f32],
+        k: usize,
+        filter: Option<MetadataFilter>,
+    ) -> Result<Vec<crate::SearchResult>> {
+        let expr = match filter {
+            Some(f) => Some(FilterExpr::try_from(f)?),
+            None => None,
+        };
+        self.search_with_filter_expr(query, k, expr).await
+    }
+
     /// Performs semantic search with an advanced metadata filter expression (`FilterExpr`).
     #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
     #[allow(deprecated)]

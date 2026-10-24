@@ -18,7 +18,6 @@ use super::attention_score::{
 use super::eviction_worker::EvictionWorker;
 use super::radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 use super::segment::KvSegment;
-use zeroize::Zeroize;
 
 /// Optionaler Callback-Hook für Tier-2-LSM-Spill bei Eviction aus dem In-Memory LRU Cache.
 pub type SpillHandler = Arc<dyn Fn(TenantId, u64, Vec<u8>) + Send + Sync>;
@@ -89,14 +88,13 @@ impl TenantState {
             self.cache.resize(new_cap);
         }
 
-        if let Some((_, mut old)) = self.cache.push(id, segment) {
+        if let Some((_, old)) = self.cache.push(id, segment) {
             self.total_bytes = self.total_bytes.saturating_sub(old.len());
             if let Some(old_meta) = self.segment_meta.remove(&id) {
                 if matches!(old_meta.directive, CacheDirective::Pin { ttl: None }) {
                     self.pinned_bytes = self.pinned_bytes.saturating_sub(old.len() as u64);
                 }
             }
-            old.zeroize();
         }
 
         self.total_bytes = self.total_bytes.saturating_add(bytes);
@@ -120,12 +118,8 @@ impl TenantState {
         self.cache.get(&id).map(|s| s.as_bytes().to_vec())
     }
 
-    /// O(1) get für Entschlüsselung / Dequantisierung — benötigt &mut wegen LRU-Update.
-    #[cfg(any(
-        feature = "kv-encryption",
-        feature = "kivi-quantization",
-        feature = "kvcache-kivi-quant"
-    ))]
+    /// O(1) get für Entschlüsselung — benötigt &mut wegen LRU-Update.
+    #[cfg(feature = "kv-encryption")]
     fn get_segment_ref_mut(&mut self, id: u64) -> Option<&KvSegment> {
         self.cache.get(&id)
     }
@@ -166,9 +160,7 @@ impl TenantState {
             .collect();
 
         for id in ids_to_release {
-            if let Some(mut seg) = self.remove(id) {
-                seg.zeroize();
-            }
+            self.remove(id);
         }
     }
 
@@ -369,15 +361,13 @@ impl TenantIsolatedKvStore {
         (tenant.inner() as usize) & (self.shard_count - 1)
     }
 
-    /// Inserts a segment with an explicit declarative cache directive, enforcing segment validation.
+    /// Inserts a segment with an explicit declarative cache directive.
     pub fn insert_segment_with_directive(
         &self,
         tenant: TenantId,
         segment: KvSegment,
         directive: CacheDirective,
     ) -> Result<(), ContextraError> {
-        segment.validate()?;
-
         if matches!(directive, CacheDirective::NeverCache) {
             return Ok(());
         }
@@ -406,15 +396,6 @@ impl TenantIsolatedKvStore {
     /// Fügt ein Segment für einen bestimmten Tenant ein.
     pub fn insert_segment(&self, tenant: TenantId, segment: KvSegment) {
         let _ = self.insert_segment_with_directive(tenant, segment, CacheDirective::Auto);
-    }
-
-    /// Versucht, ein Segment für einen bestimmten Tenant einzufügen und gibt eventuelle Validierungsfehler zurück.
-    pub fn try_insert_segment(
-        &self,
-        tenant: TenantId,
-        segment: KvSegment,
-    ) -> Result<(), ContextraError> {
-        self.insert_segment_with_directive(tenant, segment, CacheDirective::Auto)
     }
 
     /// Releases transient cache segments created during a specific step.
@@ -484,7 +465,7 @@ impl TenantIsolatedKvStore {
         }
         let idx = self.shard_idx(tenant);
         let scores = self.attention_source();
-        let mut _deferred: Vec<KvSegment> = {
+        let _deferred: Vec<KvSegment> = {
             let mut shard = self.shards[idx].lock.write();
             if let Some(state) = shard.get_mut(&tenant) {
                 let removed = segment_ids
@@ -505,9 +486,6 @@ impl TenantIsolatedKvStore {
                 vec![]
             }
         };
-        for seg in &mut _deferred {
-            seg.zeroize();
-        }
         tracing::debug!(
             tenant_id = ?tenant,
             removed_segment_ids = ?segment_ids,
@@ -648,9 +626,6 @@ impl TenantIsolatedKvStore {
 
         'outer: while freed < target_free_bytes {
             let mut made_progress_in_pass = false;
-            // ORDERING RATIONALE: Ordering::Relaxed is sufficient because global_shard_offset is
-            // a round-robin heuristic index for eviction starting shard across threads.
-            // No safety or data invariant depends on cross-thread synchronization of this index.
             let start_shard =
                 self.global_shard_offset.fetch_add(1, Ordering::Relaxed) % self.shard_count;
 
@@ -675,9 +650,6 @@ impl TenantIsolatedKvStore {
                             let tenants: Vec<TenantId> = shard.keys().copied().collect();
                             let n = tenants.len();
                             if n > 0 {
-                                // ORDERING RATIONALE: Ordering::Relaxed is sufficient because eviction_round_offsets
-                                // is a round-robin heuristic index for tenant selection inside shard locks.
-                                // Mutex/RwLock synchronizes state; relaxed atomic increment suffices for fair round distribution.
                                 let offset = self.eviction_round_offsets[shard_idx]
                                     .fetch_add(1, Ordering::Relaxed)
                                     % n;
@@ -720,9 +692,6 @@ impl TenantIsolatedKvStore {
                             handler(ev.tenant_id, ev.segment_id, ev.to_spill_bytes());
                         }
                     }
-                    for seg in &mut deferred_drop {
-                        seg.zeroize();
-                    }
                     deferred_drop.clear();
 
                     #[cfg(test)]
@@ -753,9 +722,6 @@ impl TenantIsolatedKvStore {
                     all_segments.push(seg);
                 }
             }
-        }
-        for seg in &mut all_segments {
-            seg.zeroize();
         }
         drop(all_segments);
         tracing::warn!("KV emergency_wipe: all segments zeroized synchronously");

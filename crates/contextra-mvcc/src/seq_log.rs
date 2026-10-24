@@ -1,20 +1,18 @@
 //! Shared versioned sequence log for snapshot-isolated index searches (`_at` family).
 
 // FILE-CONTEXT
-// STAND: 2026-10-15T00:00:00Z
+// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
 // ZWECK: Shared Versioned Sequence Log für Snapshot-isolierte Index-Suchen (_at Familie).
 // INVARIANTEN: Sichtbarkeitsprüfung: insert_seq <= as_of && (delete_seq.is_none() || delete_seq > as_of).
 // HOTSPOTS: 20-75
 // NICHT-OFFENSICHTLICH: Compaction prunt Einträge erst wenn delete_seq < min_active_seqno.
+// SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-024)
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::types::DocId;
 
-/// Default maximum pin duration (5 minutes in nanoseconds / ticks) before diagnostic warnings are issued for expired pins.
-pub const DEFAULT_MAX_PIN_DURATION_TICKS: u64 = 300 * 1_000_000_000;
-
-/// Default maximum pin duration (5 minutes) for diagnostics.
+/// Default maximum pin duration (5 minutes) before diagnostic warnings are issued for expired pins.
 pub const DEFAULT_MAX_PIN_DURATION: Duration = Duration::from_secs(300);
 
 /// Versioned sequence log entry for snapshot isolation (`_at` family).
@@ -87,10 +85,10 @@ impl SeqLogChange {
 #[derive(Debug, Clone)]
 pub struct SequenceLog {
     entries: Vec<SeqLogEntry>,
-    pinned_snapshots: ahash::AHashMap<u64, Vec<u64>>,
+    pinned_snapshots: ahash::AHashMap<u64, Vec<Instant>>,
     compacted_below: Option<u64>,
     deletions: ahash::AHashMap<DocId, u64>,
-    max_pin_duration_ticks: u64,
+    max_pin_duration: Duration,
 }
 
 impl Default for SequenceLog {
@@ -100,52 +98,42 @@ impl Default for SequenceLog {
 }
 
 impl SequenceLog {
-    /// Creates a new empty sequence log with default max pin duration (5 minutes in ticks).
+    /// Creates a new empty sequence log with default max pin duration (5 minutes).
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
             pinned_snapshots: ahash::AHashMap::default(),
             compacted_below: None,
             deletions: ahash::AHashMap::default(),
-            max_pin_duration_ticks: DEFAULT_MAX_PIN_DURATION_TICKS,
+            max_pin_duration: DEFAULT_MAX_PIN_DURATION,
         }
     }
 
     /// Sets a custom maximum pin duration for diagnostics and returns `self`.
     pub fn with_max_pin_duration(mut self, duration: Duration) -> Self {
-        self.set_max_pin_duration(duration);
+        self.max_pin_duration = duration;
         self
-    }
-
-    /// Sets a custom maximum pin duration for diagnostics in ticks (nanoseconds).
-    pub fn set_max_pin_duration_ticks(&mut self, ticks: u64) {
-        self.max_pin_duration_ticks = ticks;
     }
 
     /// Sets a custom maximum pin duration for diagnostics.
     pub fn set_max_pin_duration(&mut self, duration: Duration) {
-        self.max_pin_duration_ticks = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
-    }
-
-    /// Returns the configured maximum pin duration in ticks (nanoseconds).
-    pub fn max_pin_duration_ticks(&self) -> u64 {
-        self.max_pin_duration_ticks
+        self.max_pin_duration = duration;
     }
 
     /// Returns the configured maximum pin duration.
     pub fn max_pin_duration(&self) -> Duration {
-        Duration::from_nanos(self.max_pin_duration_ticks)
+        self.max_pin_duration
     }
 
-    /// Pins a historical sequence number at baseline timestamp 0.
+    /// Pins a historical sequence number to prevent rebuild from purging soft-deleted nodes active at this snapshot.
     pub fn pin_snapshot(&mut self, seq_no: u64) {
-        self.pin_snapshot_at(seq_no, 0);
+        self.pin_snapshot_at(seq_no, Instant::now());
     }
 
-    /// Pins a historical sequence number at a specific timestamp in ticks (`at_ticks`) for deterministic testing and lease tracking.
-    pub fn pin_snapshot_at(&mut self, seq_no: u64, at_ticks: u64) {
+    /// Pins a historical sequence number at a specific timestamp for deterministic testing and lease tracking.
+    pub fn pin_snapshot_at(&mut self, seq_no: u64, at: Instant) {
         let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
-        self.pinned_snapshots.entry(seq_no).or_default().push(at_ticks);
+        self.pinned_snapshots.entry(seq_no).or_default().push(at);
     }
 
     /// Unpins a historical sequence number.
@@ -163,12 +151,12 @@ impl SequenceLog {
     }
 
     /// Returns all pinned sequence numbers whose active pin duration exceeds `max_pin_duration`
-    /// relative to the provided timestamp `now_ticks`.
-    pub fn expired_pins_at(&self, now_ticks: u64) -> Vec<u64> {
+    /// relative to the provided timestamp `now`.
+    pub fn expired_pins_at(&self, now: Instant) -> Vec<u64> {
         let mut expired = Vec::new();
         for (&seq_no, timestamps) in &self.pinned_snapshots {
             for &ts in timestamps {
-                if now_ticks.saturating_sub(ts) > self.max_pin_duration_ticks {
+                if now.saturating_duration_since(ts) > self.max_pin_duration {
                     expired.push(seq_no);
                     break;
                 }
@@ -180,24 +168,24 @@ impl SequenceLog {
 
     /// Returns all pinned sequence numbers whose active pin duration exceeds `max_pin_duration`.
     pub fn expired_pins(&self) -> Vec<u64> {
-        self.expired_pins_at(0)
+        self.expired_pins_at(Instant::now())
     }
 
-    /// Calculates the minimum sequence number currently pinned for snapshot retention at timestamp `now_ticks`.
+    /// Calculates the minimum sequence number currently pinned for snapshot retention at timestamp `now`.
     /// Returns `None` if no snapshot sequence numbers are pinned.
     ///
     /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
-    pub fn min_retention_seq_at(&self, now_ticks: u64) -> Option<u64> {
+    pub fn min_retention_seq_at(&self, now: Instant) -> Option<u64> {
         let min_seq = self.pinned_snapshots.keys().copied().min();
         if let Some(seq) = min_seq {
             if let Some(timestamps) = self.pinned_snapshots.get(&seq) {
                 for &ts in timestamps {
-                    let duration_ticks = now_ticks.saturating_sub(ts);
-                    if duration_ticks > self.max_pin_duration_ticks {
+                    let duration = now.saturating_duration_since(ts);
+                    if duration > self.max_pin_duration {
                         tracing::warn!(
                             seq_no = seq,
-                            max_pin_duration_ticks = self.max_pin_duration_ticks,
-                            elapsed_ticks = duration_ticks,
+                            max_pin_duration = ?self.max_pin_duration,
+                            elapsed = ?duration,
                             "Snapshot pin active beyond max duration"
                         );
                         break;
@@ -210,8 +198,10 @@ impl SequenceLog {
 
     /// Calculates the minimum sequence number currently pinned for snapshot retention.
     /// Returns `None` if no snapshot sequence numbers are pinned.
+    ///
+    /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
     pub fn min_retention_seq(&self) -> Option<u64> {
-        self.min_retention_seq_at(0)
+        self.min_retention_seq_at(Instant::now())
     }
 
     /// Returns the deletion sequence number of the given document, if currently soft-deleted.
@@ -334,8 +324,9 @@ mod tests {
 
     #[test]
     fn test_seq_log_entry_is_visible_o1() {
-        let doc = DocId::from_key("doc1").expect("valid doc id");
+        let doc = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
 
+        // Active entry (no delete)
         let active_entry = SeqLogEntry {
             doc_id: doc,
             insert_seq: 10,
@@ -345,6 +336,7 @@ mod tests {
         assert!(active_entry.is_visible(10));
         assert!(active_entry.is_visible(100));
 
+        // Deleted entry
         let deleted_entry = SeqLogEntry {
             doc_id: doc,
             insert_seq: 10,
@@ -353,6 +345,7 @@ mod tests {
         assert!(!deleted_entry.is_visible(9));
         assert!(deleted_entry.is_visible(10));
         assert!(deleted_entry.is_visible(19));
+        // Boundary case: delete_seq == as_of -> NOT visible (delete_seq > as_of is strict)
         assert!(!deleted_entry.is_visible(20));
         assert!(!deleted_entry.is_visible(21));
     }
@@ -363,43 +356,51 @@ mod tests {
         assert!(log.is_empty());
         assert_eq!(log.len(), 0);
 
-        let doc1 = DocId::from_key("doc1").expect("valid doc id");
-        let doc2 = DocId::from_key("doc2").expect("valid doc id");
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
+        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // expect #[cfg(test)]
 
+        // Insert doc1 at seq 10, doc2 at seq 20
         log.record_insert(doc1, 10);
         log.record_insert(doc2, 20);
         assert_eq!(log.len(), 2);
         assert!(!log.is_empty());
 
+        // Visibility before insert
         assert!(!log.is_visible(doc1, 5));
         assert!(!log.is_visible(doc2, 15));
 
+        // Visibility at and after insert
         assert!(log.is_visible(doc1, 10));
         assert!(log.is_visible(doc1, 15));
         assert!(log.is_visible(doc2, 20));
 
+        // Record delete for doc1 at seq 30
         log.record_delete(doc1, 30);
         assert_eq!(log.len(), 2);
 
+        // Visibility around delete seq
         assert!(log.is_visible(doc1, 29));
         assert!(!log.is_visible(doc1, 30));
         assert!(!log.is_visible(doc1, 35));
 
+        // doc2 remains visible
         assert!(log.is_visible(doc2, 35));
     }
 
     #[test]
     fn test_sequence_log_reinsert_after_delete() {
         let mut log = SequenceLog::new();
-        let doc1 = DocId::from_key("doc1").expect("valid doc id");
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
 
         log.record_insert(doc1, 10);
         log.record_delete(doc1, 20);
         assert!(!log.is_visible(doc1, 25));
 
+        // Re-insert doc1 at seq 30
         log.record_insert(doc1, 30);
         assert_eq!(log.len(), 2);
 
+        // Visibility timelines
         assert!(log.is_visible(doc1, 15));
         assert!(!log.is_visible(doc1, 25));
         assert!(log.is_visible(doc1, 30));
@@ -409,20 +410,25 @@ mod tests {
     #[test]
     fn test_sequence_log_compact() {
         let mut log = SequenceLog::new();
-        let doc1 = DocId::from_key("doc1").expect("valid doc id");
-        let doc2 = DocId::from_key("doc2").expect("valid doc id");
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
+        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // expect #[cfg(test)]
 
         log.record_insert(doc1, 10);
-        log.record_delete(doc1, 20);
+        log.record_delete(doc1, 20); // deleted at seq 20
 
         log.record_insert(doc2, 15);
-        log.record_delete(doc2, 40);
+        log.record_delete(doc2, 40); // deleted at seq 40
 
         assert_eq!(log.len(), 2);
 
+        // Compact with min_active_seqno = 30
+        // doc1 (delete_seq = 20 < 30) should be purged.
+        // doc2 (delete_seq = 40 >= 30) should be retained.
         log.compact(30);
         assert_eq!(log.len(), 1);
 
+        // Compact with min_active_seqno = 50
+        // doc2 (delete_seq = 40 < 50) should be purged.
         log.compact(50);
         assert_eq!(log.len(), 0);
         assert!(log.is_empty());
@@ -431,14 +437,16 @@ mod tests {
     #[test]
     fn test_sequence_log_edge_cases() {
         let mut log = SequenceLog::new();
-        let doc1 = DocId::from_key("doc1").expect("valid doc id");
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // expect #[cfg(test)]
 
+        // Delete non-existent doc should not panic or add entry
         log.record_delete(doc1, 10);
         assert_eq!(log.len(), 0);
 
+        // Multiple deletes on same active insert updates delete_seq or ignores second?
         log.record_insert(doc1, 5);
         log.record_delete(doc1, 15);
-        log.record_delete(doc1, 25);
+        log.record_delete(doc1, 25); // Should not overwrite existing delete_seq if already deleted
         assert!(log.is_visible(doc1, 10));
         assert!(!log.is_visible(doc1, 15));
     }
@@ -446,8 +454,8 @@ mod tests {
     #[test]
     fn test_sequence_log_changes_since() {
         let mut log = SequenceLog::new();
-        let doc1 = DocId::from_key("doc1").expect("valid doc id");
-        let doc2 = DocId::from_key("doc2").expect("valid doc id");
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
+        let doc2 = DocId::from_key("doc2").expect("valid doc id"); // #[cfg(test)]
 
         log.record_insert(doc1, 10);
         log.record_insert(doc2, 20);
@@ -512,7 +520,7 @@ mod tests {
     #[test]
     fn test_sequence_log_pinning_and_retention() {
         let mut log = SequenceLog::new();
-        let doc1 = DocId::from_key("doc1").expect("valid doc id");
+        let doc1 = DocId::from_key("doc1").expect("valid doc id"); // #[cfg(test)]
 
         log.record_insert(doc1, 10);
         log.record_delete(doc1, 20);
@@ -520,17 +528,21 @@ mod tests {
         assert_eq!(log.deletion_seq(doc1), Some(20));
         assert_eq!(log.min_retention_seq(), None);
 
-        log.pin_snapshot_at(5, 100);
-        assert_eq!(log.min_retention_seq_at(100), Some(5));
+        // Pin snapshot at seq 5 (older than insert_seq 10)
+        log.pin_snapshot(5);
+        assert_eq!(log.min_retention_seq(), Some(5));
 
-        log.pin_snapshot_at(15, 100);
-        assert_eq!(log.min_retention_seq_at(100), Some(5));
+        // Pin another snapshot at seq 15
+        log.pin_snapshot(15);
+        assert_eq!(log.min_retention_seq(), Some(5));
 
+        // Unpin seq 5
         log.unpin_snapshot(5);
-        assert_eq!(log.min_retention_seq_at(100), Some(15));
+        assert_eq!(log.min_retention_seq(), Some(15));
 
+        // Unpin seq 15
         log.unpin_snapshot(15);
-        assert_eq!(log.min_retention_seq_at(100), None);
+        assert_eq!(log.min_retention_seq(), None);
     }
 
     #[test]
@@ -538,30 +550,38 @@ mod tests {
         let mut log = SequenceLog::new().with_max_pin_duration(Duration::from_secs(10));
         assert_eq!(log.max_pin_duration(), Duration::from_secs(10));
 
-        let now_ticks = 20_000_000_000u64; // 20s
-        let past_5s = 15_000_000_000u64;
-        let past_15s = 5_000_000_000u64;
+        let now = Instant::now();
+        let past_5s = now.checked_sub(Duration::from_secs(5)).unwrap_or(now);
+        let past_15s = now.checked_sub(Duration::from_secs(15)).unwrap_or(now);
 
+        // Pin seq 100 at past_5s (not expired)
         log.pin_snapshot_at(100, past_5s);
+        // Pin seq 200 at past_15s (expired relative to now)
         log.pin_snapshot_at(200, past_15s);
 
-        let expired = log.expired_pins_at(now_ticks);
+        let expired = log.expired_pins_at(now);
         assert_eq!(expired, vec![200]);
 
+        // Pin seq 200 a second time at past_5s (now has 2 pins: 1 expired, 1 active)
         log.pin_snapshot_at(200, past_5s);
-        assert_eq!(log.min_retention_seq_at(now_ticks), Some(100));
+        assert_eq!(log.min_retention_seq(), Some(100));
 
-        assert_eq!(log.expired_pins_at(now_ticks), vec![200]);
+        // expired_pins_at should still report 200 because at least one pin on seq 200 is expired
+        assert_eq!(log.expired_pins_at(now), vec![200]);
 
+        // Unpin newest pin on 200 (pops past_5s pin)
         log.unpin_snapshot(200);
-        assert_eq!(log.expired_pins_at(now_ticks), vec![200]);
+        // past_15s pin remains for seq 200, so seq 200 is still reported as expired relative to now
+        assert_eq!(log.expired_pins_at(now), vec![200]);
 
+        // Unpin second pin on 200 (pops past_15s pin) -> no pins left for seq 200
         log.unpin_snapshot(200);
-        assert_eq!(log.expired_pins_at(now_ticks), Vec::<u64>::new());
-        assert_eq!(log.min_retention_seq_at(now_ticks), Some(100));
+        assert_eq!(log.expired_pins_at(now), Vec::<u64>::new());
+        assert_eq!(log.min_retention_seq(), Some(100));
 
+        // Unpin seq 100 -> no pins left
         log.unpin_snapshot(100);
-        assert_eq!(log.min_retention_seq_at(now_ticks), None);
+        assert_eq!(log.min_retention_seq(), None);
     }
 
     #[test]
@@ -572,13 +592,30 @@ mod tests {
         log.set_max_pin_duration(Duration::from_millis(50));
         assert_eq!(log.max_pin_duration(), Duration::from_millis(50));
 
-        let now_ticks = 200_000_000u64; // 200ms
-        let past_100ms = 100_000_000u64; // 100ms
+        let now = Instant::now();
+        let past_100ms = now.checked_sub(Duration::from_millis(100)).unwrap_or(now);
 
         log.pin_snapshot_at(42, past_100ms);
-        assert_eq!(log.expired_pins_at(now_ticks), vec![42]);
+        assert_eq!(log.expired_pins_at(now), vec![42]);
 
-        assert_eq!(log.min_retention_seq_at(now_ticks), Some(42));
-        assert_eq!(log.expired_pins_at(now_ticks), vec![42]);
+        // The pin is NOT automatically removed or forcibly unpinned
+        assert_eq!(log.min_retention_seq(), Some(42));
+        assert_eq!(log.expired_pins_at(now), vec![42]);
+    }
+
+    #[test]
+    fn test_sequence_log_zero_panic_time_arithmetic() {
+        let mut log = SequenceLog::new();
+        let now = Instant::now();
+        let future = now.checked_add(Duration::from_secs(100)).unwrap_or(now);
+
+        // Pin in the future (clock skew edge case)
+        log.pin_snapshot_at(50, future);
+
+        // Checking expired pins with 'now' should handle saturating duration without panic
+        let expired = log.expired_pins_at(now);
+        assert!(expired.is_empty());
+
+        assert_eq!(log.min_retention_seq(), Some(50));
     }
 }

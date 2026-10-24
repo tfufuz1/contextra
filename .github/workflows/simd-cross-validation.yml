@@ -1,20 +1,10 @@
-# Takt: Nightly (03:00 UTC) / workflow_dispatch / pull_request (Pfadfilter)
-# Zweck: Validiert SIMD-Kernel-Implementierungen gegen Skalar-Referenzen.
-# Lokaler Befehl: cargo test -p contextra-simd --test simd_cross_validation
-
 name: SIMD Cross Validation
 
 on:
-  schedule:
-    - cron: '0 3 * * *'
   pull_request:
     paths:
       - 'crates/contextra-simd/**'
   workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -30,6 +20,7 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
+          # TODO: Add aarch64-unknown-linux-gnu via QEMU / cross runner when QEMU cross-test pattern is established.
         rustflags:
           - ""
           - "-C target-feature=-avx2,-avx512f"
@@ -52,12 +43,3 @@ jobs:
         env:
           RUSTFLAGS: ${{ matrix.rustflags }}
         run: cargo test -p contextra-simd --test simd_cross_validation --target ${{ matrix.target }}
-
-      - name: Report Failure Summary
-        if: failure()
-        run: |
-          echo "### ❌ SIMD Cross Validation Failed (${{ matrix.target }}, rustflags=\"${{ matrix.rustflags }}\")" >> $GITHUB_STEP_SUMMARY
-          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "RUSTFLAGS=\"${{ matrix.rustflags }}\" cargo test -p contextra-simd --test simd_cross_validation --target ${{ matrix.target }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

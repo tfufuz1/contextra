@@ -1,7 +1,3 @@
-# Takt: Nightly (03:00 UTC) / workflow_dispatch / pull_request (Pfadfilter)
-# Zweck: Erkennt Data Races mittels ThreadSanitizer.
-# Lokaler Befehl: RUSTFLAGS="-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer" cargo +nightly test -p contextra-store --test toctou_put_if_absent --target x86_64-unknown-linux-gnu -- --test-threads=1
-
 name: ThreadSanitizer Race Detection
 on:
   schedule:
@@ -13,10 +9,6 @@ on:
       - 'crates/contextra-store/**'
       - 'crates/contextra-vector/**'
       - 'crates/contextra-graph/**'
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -33,35 +25,52 @@ jobs:
           components: rust-src
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
-      - name: ThreadSanitizer — Store TOCTOU Race Detection (S1-01)
-        run: |
-          RUSTFLAGS="-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer" cargo +nightly test \
-            -p contextra-store --test toctou_put_if_absent \
-            --target x86_64-unknown-linux-gnu -- --test-threads=1 --nocapture
+      - name: Install nightly toolchain
+        run: rustup target add x86_64-unknown-linux-gnu
 
-      - name: ThreadSanitizer — Vector Deleted Nodes Lock Contention (S1-11)
+      - name: TSan — TOCTOU put_if_absent (B-1)
+        env:
+          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
-          RUSTFLAGS="-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer" cargo +nightly test \
-            -p contextra-vector --test deleted_nodes_lock_contention \
-            --target x86_64-unknown-linux-gnu -- --test-threads=1 --nocapture
+          cargo +nightly test -p contextra-store \
+            --test toctou_put_if_absent \
+            --target x86_64-unknown-linux-gnu \
+            -- --test-threads=1 --nocapture
+        timeout-minutes: 10
 
-      - name: ThreadSanitizer — Store WAL Truncate Ordering (S1-14)
+      - name: TSan — deleted_nodes Lock-Contention (B-8)
+        env:
+          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
-          RUSTFLAGS="-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer" cargo +nightly test \
-            -p contextra-store --test wal_truncate_ordering \
-            --target x86_64-unknown-linux-gnu -- --test-threads=1 --nocapture
+          cargo +nightly test -p contextra-vector \
+            --test deleted_nodes_lock_contention \
+            --target x86_64-unknown-linux-gnu \
+            -- --test-threads=1 --nocapture
+        timeout-minutes: 10
 
-      - name: ThreadSanitizer — Graph Concurrent Edge Insertions & Traversal (S1-15)
+      - name: TSan — WAL Concurrent Flush+Truncate (B-7)
+        env:
+          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
         run: |
-          RUSTFLAGS="-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer" cargo +nightly test \
-            -p contextra-graph --test stress_dag \
-            --target x86_64-unknown-linux-gnu -- --test-threads=1 --nocapture
+          cargo +nightly test -p contextra-store \
+            --test wal_truncate_ordering \
+            --target x86_64-unknown-linux-gnu \
+            -- --test-threads=1 --nocapture
+        timeout-minutes: 10
 
-      - name: Report Failure Summary
+      - name: TSan — CSR Concurrent Insert+Query
+        env:
+          RUSTFLAGS: "-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer"
+        run: |
+          cargo +nightly test -p contextra-graph \
+            --test stress_dag \
+            --target x86_64-unknown-linux-gnu \
+            -- --test-threads=1 --nocapture
+        timeout-minutes: 15
+
+      - name: Report TSan Failure
         if: failure()
-        run: |
-          echo "### ❌ ThreadSanitizer Race Detection Failed" >> $GITHUB_STEP_SUMMARY
-          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "RUSTFLAGS=\"-Z sanitizer=thread -Cunsafe-allow-abi-mismatch=sanitizer\" cargo +nightly test -p contextra-store --test toctou_put_if_absent --target x86_64-unknown-linux-gnu -- --test-threads=1 --nocapture" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            core.setFailed("TSan Race Detection failed");

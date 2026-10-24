@@ -31,12 +31,12 @@ impl DomainVocabulary for LegalDomainVocabulary {
     }
 }
 
-/// Intern exportierte Hilfsfunktionen für direkten Slice-Zugriff.
-pub(crate) fn get_legal_compound_stems() -> &'static [&'static str] {
+/// Exportierte Hilfsfunktionen für direkten Slice-Zugriff.
+pub fn get_legal_compound_stems() -> &'static [&'static str] {
     get_parsed_legal().compound_stems
 }
 
-pub(crate) fn get_legal_protected_terms() -> &'static [&'static str] {
+pub fn get_legal_protected_terms() -> &'static [&'static str] {
     get_parsed_legal().protected_terms
 }
 

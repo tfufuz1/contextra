@@ -8,7 +8,7 @@ use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::sync::atomic::Ordering;
 
-use contextra_types::DocId;
+use contextra_core::DocId;
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex};

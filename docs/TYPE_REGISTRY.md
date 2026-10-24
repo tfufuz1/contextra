@@ -302,7 +302,7 @@
 | `DecayFunction` | `contextra-types` | `crates/contextra-types/src/types/importance.rs` | `enum` |
 | `DistanceMetric` | `contextra-types` | `crates/contextra-types/src/types/domain/document.rs` | `enum` |
 | `DocId` | `contextra-types` | `crates/contextra-types/src/types/domain/ids.rs` | `struct` |
-| `DocIdRaw` | `contextra-types` | `crates/contextra-types/src/types/domain/ids.rs` | `type` |
+| `DocId` | `contextra-types` | `crates/contextra-types/src/types/domain/ids.rs` | `struct` |
 | `DocIdWidth` | `contextra-types` | `crates/contextra-types/src/schema.rs` | `enum` |
 | `Edge` | `contextra-types` | `crates/contextra-types/src/types/domain/misc.rs` | `struct` |
 | `Embedding` | `contextra-types` | `crates/contextra-types/src/types/domain/document.rs` | `struct` |

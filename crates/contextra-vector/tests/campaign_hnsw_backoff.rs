@@ -1,8 +1,7 @@
 //! Campaign J-10 Test: HNSW Rebuild Backoff Cooldown Invariant Verification
 //! Demonstrates deterministic exponential backoff cooldown behavior under rapid rebuild requests.
 
-use contextra_types::{DocId, TxId};
-use contextra_ports::{VectorIndex};
+use contextra_core::{DocId, TxId, VectorIndex};
 use contextra_vector::hnsw::{HnswConfigBuilder, HnswIndex};
 use std::time::Duration;
 

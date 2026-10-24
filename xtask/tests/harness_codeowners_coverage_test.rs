@@ -11,10 +11,10 @@ fn test_codeowners_coverage_phantom_path() {
     let dir = tempdir().expect("tempdir");
     let root = dir.path();
 
-    fs::create_dir_all(root.join("xtask/config/governance")).expect("governance dir");
+    fs::create_dir_all(root.join("governance")).expect("governance dir");
 
     fs::write(
-        root.join("xtask/config/governance/protected-paths.toml"),
+        root.join("governance/protected-paths.toml"),
         r#"
 [[protected]]
 glob = "justfile"
@@ -48,10 +48,10 @@ fn test_codeowners_coverage_missing_glob() {
     let dir = tempdir().expect("tempdir");
     let root = dir.path();
 
-    fs::create_dir_all(root.join("xtask/config/governance")).expect("governance dir");
+    fs::create_dir_all(root.join("governance")).expect("governance dir");
 
     fs::write(
-        root.join("xtask/config/governance/protected-paths.toml"),
+        root.join("governance/protected-paths.toml"),
         r#"
 [[protected]]
 glob = "justfile"

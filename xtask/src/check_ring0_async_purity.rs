@@ -108,12 +108,11 @@ pub fn check_cargo_toml_dependencies(
     Ok(violations)
 }
 
-#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_check_ring0_async_purity() -> Result<bool, String> {
     println!("=== Running xtask check-ring0-async-purity ===");
 
     let root_dir = crate::find_root_dir();
-    let allowlist_path = root_dir.join("xtask/config/ring0-async-exceptions.toml");
+    let allowlist_path = root_dir.join("xtask/ring0-async-exceptions.toml");
     let allowlist = load_allowlist(&allowlist_path)?;
 
     // Alle Ring 0 Crates ermitteln

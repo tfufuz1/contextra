@@ -45,8 +45,6 @@ pub(crate) struct DiskAnnIndexInner {
     pub(crate) hnsw_fallback: RwLock<Option<Arc<crate::hnsw::HnswIndex>>>,
     pub(crate) tombstones: RwLock<TombstoneSet>,
     pub(crate) compute_pool: ComputePool,
-    #[cfg(any(test, feature = "experimental-diskann"))]
-    pub(crate) failpoint: parking_lot::Mutex<Option<String>>,
 }
 
 impl Clone for DiskAnnIndex {
@@ -82,11 +80,7 @@ mod tests {
     fn test_try_new_corrupt_magic_fails_immediately() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("corrupt_magic.dann");
-        std::fs::write(
-            &path,
-            b"BADM_corrupt_header_data_bytes_1234567890_padding_bytes",
-        )
-        .unwrap();
+        std::fs::write(&path, b"BADM_corrupt_header_data_bytes_1234567890_padding_bytes").unwrap();
 
         let config = DiskAnnConfig {
             index_path: path,
@@ -100,10 +94,7 @@ mod tests {
         assert!(res.is_err());
         let err = res.err().unwrap();
         match err {
-            ContextraError::Storage(msg) => assert!(
-                msg.contains("bad magic"),
-                "Expected bad magic error, got: {msg}"
-            ),
+            ContextraError::Storage(msg) => assert!(msg.contains("bad magic"), "Expected bad magic error, got: {msg}"),
             other => panic!("Expected Storage error with bad magic, got {:?}", other),
         }
     }
@@ -127,14 +118,8 @@ mod tests {
         assert!(res.is_err());
         let err = res.err().unwrap();
         match err {
-            ContextraError::Storage(msg) => assert!(
-                msg.contains("Header too small") || msg.contains("too small for header"),
-                "Expected Header too small error, got: {msg}"
-            ),
-            other => panic!(
-                "Expected Storage error with Header too small, got {:?}",
-                other
-            ),
+            ContextraError::Storage(msg) => assert!(msg.contains("Header too small") || msg.contains("too small for header"), "Expected Header too small error, got: {msg}"),
+            other => panic!("Expected Storage error with Header too small, got {:?}", other),
         }
     }
 
@@ -210,14 +195,11 @@ impl DiskAnnIndex {
             let file_len = metadata.len() as usize;
 
             if file_len < DiskAnnHeader::SIZE {
-                return Err(ContextraError::Storage(
-                    "DiskANN file too small for header".into(),
-                ));
+                return Err(ContextraError::Storage("DiskANN file too small for header".into()));
             }
 
             let mut header_buf = [0u8; DiskAnnHeader::SIZE];
-            file.read_exact(&mut header_buf)
-                .map_err(ContextraError::Io)?;
+            file.read_exact(&mut header_buf).map_err(ContextraError::Io)?;
 
             let header = DiskAnnHeader::try_from_bytes(&header_buf)?;
 
@@ -231,9 +213,7 @@ impl DiskAnnIndex {
 
             let header_sector_size = header.sector_size as usize;
             if header_sector_size == 0 {
-                return Err(ContextraError::Storage(
-                    "DiskANN header corrupt: sector_size is 0".into(),
-                ));
+                return Err(ContextraError::Storage("DiskANN header corrupt: sector_size is 0".into()));
             }
 
             let header_vector_size = if header.quantized != 0 {
@@ -245,11 +225,9 @@ impl DiskAnnIndex {
             let header_raw_node_size = header_vector_size + header_neighbors_size + doc_id_size;
             let header_node_size_bytes =
                 header_raw_node_size.div_ceil(header_sector_size) * header_sector_size;
-            let start_offset =
-                DiskAnnHeader::SIZE.div_ceil(header_sector_size) * header_sector_size;
-            let expected_min_size = start_offset.saturating_add(
-                (header.node_count as usize).saturating_mul(header_node_size_bytes),
-            );
+            let start_offset = DiskAnnHeader::SIZE.div_ceil(header_sector_size) * header_sector_size;
+            let expected_min_size = start_offset
+                .saturating_add((header.node_count as usize).saturating_mul(header_node_size_bytes));
             if file_len < expected_min_size {
                 return Err(ContextraError::Storage(format!(
                     "DiskANN file truncated or corrupt node_count: file len {}, expected at least {}",
@@ -274,33 +252,8 @@ impl DiskAnnIndex {
                 hnsw_fallback: RwLock::new(None),
                 tombstones: RwLock::new(TombstoneSet::new()),
                 compute_pool,
-                    #[cfg(any(test, feature = "experimental-diskann"))]
-                failpoint: parking_lot::Mutex::new(None),
             }),
         })
-    }
-
-    #[cfg(any(test, feature = "experimental-diskann"))]
-    pub fn set_failpoint(&self, point: &str) {
-        *self.inner.failpoint.lock() = Some(point.to_string());
-    }
-
-    #[cfg(any(test, feature = "experimental-diskann"))]
-    pub fn clear_failpoint(&self) {
-        *self.inner.failpoint.lock() = None;
-    }
-
-    #[cfg(any(test, feature = "experimental-diskann"))]
-    pub(crate) fn maybe_failpoint(&self, name: &str) -> Result<()> {
-        let guard = self.inner.failpoint.lock();
-        if let Some(ref active) = *guard {
-            if active == name {
-                return Err(ContextraError::Storage(format!(
-                    "Test failpoint triggered: {name}"
-                )));
-            }
-        }
-        Ok(())
     }
 
     /// Stößt `persist_delta()` asynchron im Tokio-Hintergrund-Task an,
@@ -312,7 +265,7 @@ impl DiskAnnIndex {
     pub(crate) fn check_quantizer_drift(&self, vector: &[f32]) {
         let q_guard = self.inner.quantizer.read();
         if let Some(ref q) = *q_guard {
-            let drift = q.calculate_vector_drift(vector);
+            let drift = q.check_drift(vector);
             if drift > 0.10 {
                 use std::sync::atomic::Ordering;
                 let count = self.inner.drift_warn_count.fetch_add(1, Ordering::Relaxed) + 1;

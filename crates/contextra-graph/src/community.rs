@@ -89,20 +89,20 @@ impl StarExpansionIterator {
     /// Liest das nächste Element inkl. Kantengewicht (Konvention K: `2w/(|e|-1)`).
     pub fn next_with_weight(&mut self) -> Option<(EntityId, VirtualHyperedgeNode, f32)> {
         while self.current_hyperedge_idx < self.hyperedge_keys.len() {
-            let key = *self.hyperedge_keys.get(self.current_hyperedge_idx)?;
+            let key = self.hyperedge_keys[self.current_hyperedge_idx];
             if let Some(hedge) = self.inner.hyperedges.get(&key) {
-                if let Some(part) = hedge.participants.get(self.current_participant_idx) {
-                    let entity_id = part.entity;
+                if self.current_participant_idx < hedge.participants.len() {
+                    let entity_id = hedge.participants[self.current_participant_idx].entity;
                     let vnode = VirtualHyperedgeNode {
                         hyperedge_id: hedge.id,
                     };
                     let weight =
                         crate::hyperedge::star_weight(hedge.weight, hedge.participants.len());
-                    self.current_participant_idx = self.current_participant_idx.saturating_add(1);
+                    self.current_participant_idx += 1;
                     return Some((entity_id, vnode, weight));
                 }
             }
-            self.current_hyperedge_idx = self.current_hyperedge_idx.saturating_add(1);
+            self.current_hyperedge_idx += 1;
             self.current_participant_idx = 0;
         }
         None
@@ -169,13 +169,12 @@ impl SimpleRng {
         if bound <= 1 {
             return 0;
         }
-        (self.next_u64() as usize).checked_rem(bound).unwrap_or(0)
+        (self.next_u64() as usize) % bound
     }
 
     fn shuffle<T>(&mut self, slice: &mut [T]) {
         for i in (1..slice.len()).rev() {
-            let bound = i.saturating_add(1);
-            let j = self.gen_range(bound);
+            let j = self.gen_range(i + 1);
             slice.swap(i, j);
         }
     }
@@ -228,16 +227,14 @@ pub async fn detect_communities(
 
         // Build undirected adjacency list with deduplicated max edge weights
         let mut adj_raw: HashMap<usize, HashMap<usize, f32>> = HashMap::new();
-        let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
         for &u in &valid_nodes {
-            if u < offsets_len_minus_1 {
-                let start = *inner.offsets.get(u).unwrap_or(&0);
-                let next_idx = u.saturating_add(1);
-                let end = *inner.offsets.get(next_idx).unwrap_or(&0);
+            if u < inner.offsets.len() - 1 {
+                let start = inner.offsets[u];
+                let end = inner.offsets[u + 1];
                 for edge_idx in start..end {
-                    let Some(&v) = inner.targets.get(edge_idx) else { continue };
+                    let v = inner.targets[edge_idx];
                     if !inner.tombstoned_edges.contains(&(u, v)) && inner.entity_at(v).is_some() {
-                        let w = *inner.weights.get(edge_idx).unwrap_or(&1.0);
+                        let w = inner.weights[edge_idx];
                         let w_val = if w > 0.0 { w } else { 1.0 };
                         adj_raw
                             .entry(u)
@@ -269,7 +266,7 @@ pub async fn detect_communities(
                                 .entry(virtual_node.hyperedge_id)
                                 .or_insert_with(|| {
                                     let idx = next_virtual_idx;
-                                    next_virtual_idx = next_virtual_idx.saturating_add(1);
+                                    next_virtual_idx += 1;
                                     valid_nodes.push(idx);
                                     idx
                                 });
@@ -309,8 +306,8 @@ pub async fn detect_communities(
     // Sort valid node indices: real entity nodes by EntityId ascending, then virtual nodes by index
     let mut node_indices = valid_nodes;
     node_indices.sort_by_key(|&idx| {
-        if let Some(eid) = reverse_map.get(idx) {
-            (0u8, eid.inner())
+        if idx < reverse_map.len() {
+            (0u8, reverse_map[idx].inner())
         } else {
             (1u8, idx as u64)
         }
@@ -328,11 +325,11 @@ pub async fn detect_communities(
 
     for (local_idx, &global_idx) in node_indices.iter().enumerate() {
         global_to_local.insert(global_idx, local_idx);
-        let (eid, u64_id) = if let Some(&eid) = reverse_map.get(global_idx) {
+        let (eid, u64_id) = if global_idx < reverse_map.len() {
+            let eid = reverse_map[global_idx];
             (eid, eid.inner())
         } else {
-            let offset = global_idx.saturating_sub(reverse_map.len()) as u64;
-            let u64_id = u64::MAX.saturating_sub(offset);
+            let u64_id = u64::MAX - (global_idx - reverse_map.len()) as u64;
             (EntityId::new(0), u64_id)
         };
         local_entity_ids.push(eid);
@@ -358,26 +355,21 @@ pub async fn detect_communities(
         while let Some((entity_id, vnode, weight)) = star_iter.next_with_weight() {
             if let Some(&local_entity_idx) = entity_to_local.get(&entity_id) {
                 let v_idx = *vnode_to_local.entry(vnode.hyperedge_id).or_insert_with(|| {
-                    let idx = num_entity_nodes.saturating_add(vnode_u64_ids.len());
+                    let idx = num_entity_nodes + vnode_u64_ids.len();
                     vnode_u64_ids.push(vnode.hyperedge_id.inner());
                     vnode_local_adj.push(Vec::new());
                     idx
                 });
 
-                let vnode_adj_idx = v_idx.saturating_sub(num_entity_nodes);
-                if let Some(adj_vec) = vnode_local_adj.get_mut(vnode_adj_idx) {
-                    adj_vec.push((local_entity_idx, weight));
-                }
+                vnode_local_adj[v_idx - num_entity_nodes].push((local_entity_idx, weight));
             }
         }
     }
 
-    let num_total_nodes = num_entity_nodes.saturating_add(vnode_u64_ids.len());
+    let num_total_nodes = num_entity_nodes + vnode_u64_ids.len();
     let mut local_u64_ids: Vec<u64> = Vec::with_capacity(num_total_nodes);
-    if let Some(slice) = local_entity_ids.get(..num_entity_nodes) {
-        for &eid in slice {
-            local_u64_ids.push(eid.inner());
-        }
+    for &eid in &local_entity_ids[..num_entity_nodes] {
+        local_u64_ids.push(eid.inner());
     }
     for &v_u64 in &vnode_u64_ids {
         local_u64_ids.push(v_u64);
@@ -391,12 +383,8 @@ pub async fn detect_communities(
         if let Some(&local_u) = global_to_local.get(&global_u) {
             for (&global_v, &w) in neighbors {
                 if let Some(&local_v) = global_to_local.get(&global_v) {
-                    if let Some(adj) = local_adj.get_mut(local_u) {
-                        adj.push((local_v, w));
-                    }
-                    if let Some(deg) = node_degrees.get_mut(local_u) {
-                        *deg += w;
-                    }
+                    local_adj[local_u].push((local_v, w));
+                    node_degrees[local_u] += w;
                 }
             }
         }
@@ -408,11 +396,9 @@ pub async fn detect_communities(
     if total_2m <= 0.0 {
         let mut assignments = Vec::with_capacity(num_real_nodes);
         for i in 0..num_real_nodes {
-            let Some(&entity_id) = local_entity_ids.get(i) else { continue };
-            let Some(&community_id) = local_u64_ids.get(i) else { continue };
             assignments.push(CommunityAssignment {
-                entity_id,
-                community_id,
+                entity_id: local_entity_ids[i],
+                community_id: local_u64_ids[i],
                 hyperedges_included: config.hyperedges_included,
             });
         }
@@ -424,9 +410,7 @@ pub async fn detect_communities(
     let mut community_degrees: HashMap<u64, f32> = HashMap::new();
 
     for i in 0..num_total_nodes {
-        let Some(&u64_id) = local_u64_ids.get(i) else { continue };
-        let Some(&deg) = node_degrees.get(i) else { continue };
-        community_degrees.insert(u64_id, deg);
+        community_degrees.insert(local_u64_ids[i], node_degrees[i]);
     }
 
     let mut last_unstable_nodes = 0usize;
@@ -442,21 +426,18 @@ pub async fn detect_communities(
         rng.shuffle(&mut order);
 
         for &u in &order {
-            let Some(&d_u) = node_degrees.get(u) else { continue };
+            let d_u = node_degrees[u];
             if d_u <= 0.0 {
                 continue;
             }
 
-            let Some(&c_cur) = communities.get(u) else { continue };
+            let c_cur = communities[u];
 
             // Calculate weight sum to neighbor communities
             let mut comm_weights: HashMap<u64, f32> = HashMap::new();
-            if let Some(adj) = local_adj.get(u) {
-                for &(v, w) in adj {
-                    if let Some(&c_v) = communities.get(v) {
-                        *comm_weights.entry(c_v).or_default() += w;
-                    }
-                }
+            for &(v, w) in &local_adj[u] {
+                let c_v = communities[v];
+                *comm_weights.entry(c_v).or_default() += w;
             }
 
             if comm_weights.is_empty() {
@@ -490,12 +471,10 @@ pub async fn detect_communities(
             // Deterministic Tie-Breaking: smallest community_id (u64 / EntityId)
             if let Some(&c_best) = candidate_communities.iter().min() {
                 if c_best != c_cur {
-                    if let Some(comm_ref) = communities.get_mut(u) {
-                        *comm_ref = c_best;
-                    }
+                    communities[u] = c_best;
                     *community_degrees.entry(c_cur).or_default() -= d_u;
                     *community_degrees.entry(c_best).or_default() += d_u;
-                    iter_changed = iter_changed.saturating_add(1);
+                    iter_changed += 1;
                 }
             }
         }
@@ -519,10 +498,9 @@ pub async fn detect_communities(
             let mut sub_degrees: HashMap<u64, f32> = HashMap::new();
 
             for &u in members {
-                let Some(&sub_id) = local_u64_ids.get(u) else { continue };
-                let Some(&deg) = node_degrees.get(u) else { continue };
+                let sub_id = local_u64_ids[u];
                 sub_comm.insert(u, sub_id);
-                sub_degrees.insert(sub_id, deg);
+                sub_degrees.insert(sub_id, node_degrees[u]);
             }
 
             let mut sub_changed = true;
@@ -530,24 +508,21 @@ pub async fn detect_communities(
 
             while sub_changed && sub_pass < 10 {
                 sub_changed = false;
-                sub_pass = sub_pass.saturating_add(1);
+                sub_pass += 1;
 
                 for &u in members {
-                    let Some(&d_u) = node_degrees.get(u) else { continue };
-                    let fallback_id = local_u64_ids.get(u).copied().unwrap_or(0);
+                    let d_u = node_degrees[u];
                     let s_cur = sub_comm
                         .get(&u)
                         .copied()
-                        .unwrap_or(fallback_id);
+                        .unwrap_or_else(|| local_u64_ids[u]);
 
                     // Calculate weight sum to sub-communities within members
                     let mut sub_weights: HashMap<u64, f32> = HashMap::new();
-                    if let Some(adj) = local_adj.get(u) {
-                        for &(v, w) in adj {
-                            if members.contains(&v) {
-                                if let Some(&s_v) = sub_comm.get(&v) {
-                                    *sub_weights.entry(s_v).or_default() += w;
-                                }
+                    for &(v, w) in &local_adj[u] {
+                        if members.contains(&v) {
+                            if let Some(&s_v) = sub_comm.get(&v) {
+                                *sub_weights.entry(s_v).or_default() += w;
                             }
                         }
                     }
@@ -594,24 +569,21 @@ pub async fn detect_communities(
             // Map each refined sub-community to its minimum u64 EntityId
             let mut sub_members: HashMap<u64, Vec<usize>> = HashMap::new();
             for &u in members {
-                let fallback_id = local_u64_ids.get(u).copied().unwrap_or(0);
                 let s_u = sub_comm
                     .get(&u)
                     .copied()
-                    .unwrap_or(fallback_id);
+                    .unwrap_or_else(|| local_u64_ids[u]);
                 sub_members.entry(s_u).or_default().push(u);
             }
 
             for (_sub_id, sub_nodes) in sub_members {
                 let min_eid = sub_nodes
                     .iter()
-                    .filter_map(|&u| local_u64_ids.get(u).copied())
+                    .map(|&u| local_u64_ids[u])
                     .min()
                     .unwrap_or(_comm_id);
                 for u in sub_nodes {
-                    if let Some(ref_comm) = refined_communities.get_mut(u) {
-                        *ref_comm = min_eid;
-                    }
+                    refined_communities[u] = min_eid;
                 }
             }
         }
@@ -619,12 +591,10 @@ pub async fn detect_communities(
         communities = refined_communities;
         community_degrees.clear();
         for (i, &comm_id) in communities.iter().enumerate().take(num_total_nodes) {
-            if let Some(&deg) = node_degrees.get(i) {
-                *community_degrees.entry(comm_id).or_default() += deg;
-            }
+            *community_degrees.entry(comm_id).or_default() += node_degrees[i];
         }
 
-        total_iter = total_iter.saturating_add(1);
+        total_iter += 1;
         last_unstable_nodes = iter_changed;
 
         if iter_changed == 0 {
@@ -644,7 +614,7 @@ pub async fn detect_communities(
     // Build final result list sorted by EntityId (only for actual Entity nodes, not virtual hyperedge nodes)
     let mut assignments = Vec::with_capacity(num_real_nodes);
     for (i, &community_id) in communities.iter().enumerate().take(num_real_nodes) {
-        let Some(&entity_id) = local_entity_ids.get(i) else { continue };
+        let entity_id = local_entity_ids[i];
         assignments.push(CommunityAssignment {
             entity_id,
             community_id,
@@ -656,5 +626,4 @@ pub async fn detect_communities(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests;

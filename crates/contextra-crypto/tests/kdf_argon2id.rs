@@ -2,12 +2,9 @@
 // ZWECK: Tests für Argon2id KDF Header, Parameter-Validierung, Parser-Robustheit und KeyManager Integration.
 // INVARIANTEN: Zero Panics bei Fuzzing/ungültigen Header-Bytes. Determinismus bei gleichen Eingaben. Unveränderte HKDF-Referenzwerte.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-
 use contextra_crypto::crypto::KeyManager;
 use contextra_crypto::kdf::{
-    derive_key_argon2id, KdfHeader, KdfParams, LEGACY_MIN_M_COST_KIB, LEGACY_MIN_P_COST,
-    LEGACY_MIN_T_COST, MIN_M_COST_KIB, MIN_P_COST, MIN_T_COST,
+    derive_key_argon2id, KdfHeader, KdfParams, MIN_M_COST_KIB, MIN_P_COST, MIN_T_COST,
 };
 use contextra_crypto::CryptoError;
 
@@ -233,32 +230,12 @@ fn test_kdf_header_salt_len_boundaries() {
 #[test]
 fn test_kdf_params_lower_bounds_validation() {
     // Untergrenzen: m_cost >= 19456, t_cost >= 2, p_cost >= 1
-    assert!(KdfParams::new(
-        LEGACY_MIN_M_COST_KIB - 1,
-        LEGACY_MIN_T_COST,
-        LEGACY_MIN_P_COST
-    )
-    .is_err());
-    assert!(KdfParams::new(
-        LEGACY_MIN_M_COST_KIB,
-        LEGACY_MIN_T_COST - 1,
-        LEGACY_MIN_P_COST
-    )
-    .is_err());
-    assert!(KdfParams::new(
-        LEGACY_MIN_M_COST_KIB,
-        LEGACY_MIN_T_COST,
-        LEGACY_MIN_P_COST - 1
-    )
-    .is_err());
+    assert!(KdfParams::new(MIN_M_COST_KIB - 1, MIN_T_COST, MIN_P_COST).is_err());
+    assert!(KdfParams::new(MIN_M_COST_KIB, MIN_T_COST - 1, MIN_P_COST).is_err());
+    assert!(KdfParams::new(MIN_M_COST_KIB, MIN_T_COST, MIN_P_COST - 1).is_err());
 
     let valid = KdfParams::new(MIN_M_COST_KIB, MIN_T_COST, MIN_P_COST);
     assert!(valid.is_ok());
-    assert!(valid.unwrap().meets_policy());
-
-    let legacy =
-        KdfParams::new(LEGACY_MIN_M_COST_KIB, LEGACY_MIN_T_COST, LEGACY_MIN_P_COST).unwrap();
-    assert!(!legacy.meets_policy());
 }
 
 #[test]

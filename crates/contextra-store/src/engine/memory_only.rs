@@ -42,7 +42,7 @@ impl Default for InMemoryStorageEngine {
             data: Arc::new(RwLock::new(BTreeMap::new())),
             staged: Arc::new(RwLock::new(BTreeMap::new())),
             seq: Arc::new(AtomicU64::new(0)),
-            last_tx: Arc::new(RwLock::new(TxId::INVALID)),
+            last_tx: Arc::new(RwLock::new(TxId::new(0))),
         }
     }
 }
@@ -273,7 +273,7 @@ mod tests {
     #[tokio::test]
     async fn test_in_memory_store_put_get_commit_contract() {
         let store = InMemoryStorageEngine::new();
-        let tx = TxId::try_new(1).unwrap();
+        let tx = TxId::new(1);
 
         assert!(store.get(b"key1").await.unwrap().is_none());
 
@@ -289,7 +289,7 @@ mod tests {
     #[tokio::test]
     async fn test_in_memory_store_transaction_isolation() {
         let store = InMemoryStorageEngine::new();
-        let tx = TxId::try_new(42).unwrap();
+        let tx = TxId::new(42);
 
         store.put(tx, b"uncommitted_key", b"val").await.unwrap();
         // Verify uncommitted write is invisible
@@ -306,8 +306,8 @@ mod tests {
     #[tokio::test]
     async fn test_in_memory_store_mvcc_get_at_seq() {
         let store = InMemoryStorageEngine::new();
-        let tx1 = TxId::try_new(1).unwrap();
-        let tx2 = TxId::try_new(2).unwrap();
+        let tx1 = TxId::new(1);
+        let tx2 = TxId::new(2);
 
         store.put(tx1, b"key_mvcc", b"v1").await.unwrap();
         store.commit(tx1).await.unwrap();
@@ -326,8 +326,8 @@ mod tests {
     #[tokio::test]
     async fn test_in_memory_store_rollback_to_tx() {
         let store = InMemoryStorageEngine::new();
-        let tx1 = TxId::try_new(10).unwrap();
-        let tx2 = TxId::try_new(20).unwrap();
+        let tx1 = TxId::new(10);
+        let tx2 = TxId::new(20);
 
         store.put(tx1, b"key_t1", b"v1").await.unwrap();
         store.commit(tx1).await.unwrap();
@@ -338,10 +338,7 @@ mod tests {
         // Roll back to tx1
         store.rollback_to_tx(tx1).await.unwrap();
 
-        assert_eq!(
-            store.get(b"key_t1").await.unwrap(),
-            Some(Bytes::from_static(b"v1"))
-        );
+        assert_eq!(store.get(b"key_t1").await.unwrap(), Some(Bytes::from_static(b"v1")));
         assert!(store.get(b"key_t2").await.unwrap().is_none());
     }
 
@@ -351,16 +348,13 @@ mod tests {
         let path = temp_dir.path().to_path_buf();
 
         let store = InMemoryStorageEngine::new();
-        let tx = TxId::try_new(100).unwrap();
+        let tx = TxId::new(100);
 
         store.put(tx, b"key_disk", b"val_disk").await.unwrap();
         store.commit(tx).await.unwrap();
         store.flush().await.unwrap();
 
         let entries = std::fs::read_dir(&path).unwrap().count();
-        assert_eq!(
-            entries, 0,
-            "Directory must remain empty as zero disk I/O occurs"
-        );
+        assert_eq!(entries, 0, "Directory must remain empty as zero disk I/O occurs");
     }
 }

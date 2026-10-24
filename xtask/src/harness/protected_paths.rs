@@ -454,7 +454,7 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
         return 2;
     }
 
-    let config_path = Path::new(work_dir).join("xtask/config/governance/protected-paths.toml");
+    let config_path = Path::new(work_dir).join("governance/protected-paths.toml");
     if !config_path.exists() {
         let msg = format!(
             "Konfigurationsdatei '{}' nicht gefunden.",
@@ -520,7 +520,7 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
 
     // Verify self-protection of config and module
     let required_protected = [
-        "xtask/config/governance/protected-paths.toml",
+        "governance/protected-paths.toml",
         "xtask/src/harness/protected_paths.rs",
     ];
     for req in required_protected {
@@ -534,7 +534,7 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
             }
         }
         if !covered {
-            let msg = format!("Selbstschutz-Verstoß: Pflichtpfad '{req}' ist nicht in xtask/config/governance/protected-paths.toml erfasst!");
+            let msg = format!("Selbstschutz-Verstoß: Pflichtpfad '{req}' ist nicht in governance/protected-paths.toml erfasst!");
             if json {
                 println!(
                     "{}",
@@ -545,10 +545,10 @@ pub fn run_protected_paths(args: &[String]) -> i32 {
                         "findings": [{
                             "id": "PP-SELF-PROTECT",
                             "severity": "error",
-                            "file": "xtask/config/governance/protected-paths.toml",
+                            "file": "governance/protected-paths.toml",
                             "line": 0,
                             "message": msg,
-                            "fix": format!("Füge eine Regel für '{req}' in xtask/config/governance/protected-paths.toml ein."),
+                            "fix": format!("Füge eine Regel für '{req}' in governance/protected-paths.toml ein."),
                             "reason": "Pflicht-Selbstschutz-Pfad fehlt in Konfiguration."
                         }]
                     })

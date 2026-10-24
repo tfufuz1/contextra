@@ -4,9 +4,11 @@
 
 #![cfg(feature = "fault-injection")]
 
-use contextra_store::wal::{Wal, WalConfig, WalOp, WalVersion};
+use contextra_core::{ContextraError, TxId};
+use contextra_store::wal::{
+    Wal, WalConfig, WalOp, WalVersion, FAIL_APPEND_FOR_TX, FAIL_TRUNCATE_ONCE,
+};
 use contextra_testkit::{FaultConfig, FaultVfs};
-use contextra_types::{ContextraError, TxId};
 use tempfile::TempDir;
 
 /// Number of fault time points tested per command type (at least 15 per task spec)
@@ -20,7 +22,11 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
     let tmp = TempDir::new().map_err(|e| format!("TempDir creation failed: {e}"))?;
     let wal_path = tmp.path().join("lifecycle_matrix.wal");
 
-    let config = WalConfig::default().with_legacy_fallback(true);
+    let config = WalConfig {
+        allow_legacy_integrity_key_fallback: true,
+        min_wal_version: WalVersion::V1,
+        ..Default::default()
+    };
 
     // 1. Initialise WAL and write 10 baseline entries
     let wal = Wal::open_with_config(&wal_path, config.clone())
@@ -50,22 +56,16 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
     let last_hmac_before_cmd = wal.last_hmac_snapshot().await;
 
     // Reset static fault injection handles
-    wal.fault_plan()
-        .fail_append_for_tx
-        .store(0, std::sync::atomic::Ordering::SeqCst);
-    wal.fault_plan()
-        .fail_truncate_once
-        .store(false, std::sync::atomic::Ordering::SeqCst);
+    FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
+    FAIL_TRUNCATE_ONCE.store(false, std::sync::atomic::Ordering::SeqCst);
 
     // 2. Trigger target WalCommand under injected fault at `time_point`
     let mut cmd_attempt_ok = false;
     match cmd_type {
         "Append" => {
-            // Use fault_plan when time_point maps to target TxId (11..=25)
+            // Use FAIL_APPEND_FOR_TX static when time_point maps to target TxId (11..=25)
             let fail_tx = 10 + (time_point as u64 % 15) + 1;
-            wal.fault_plan()
-                .fail_append_for_tx
-                .store(fail_tx, std::sync::atomic::Ordering::SeqCst);
+            FAIL_APPEND_FOR_TX.store(fail_tx, std::sync::atomic::Ordering::SeqCst);
 
             vfs.set_config(FaultConfig {
                 fail_writes_after: Some(time_point),
@@ -83,9 +83,7 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
         }
         "Truncate" => {
             if time_point % 2 == 0 {
-                wal.fault_plan()
-                    .fail_truncate_once
-                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                FAIL_TRUNCATE_ONCE.store(true, std::sync::atomic::Ordering::SeqCst);
             }
             vfs.set_config(FaultConfig {
                 fail_writes_after: Some(time_point),
@@ -117,8 +115,12 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
                 ..Default::default()
             });
 
-            if let Ok(replayed_entries) = wal.replay().await {
-                cmd_attempt_ok = wal.rewrite_as_v3(&replayed_entries).await.is_ok();
+            if let Ok((replayed_entries, _)) = wal.replay_mmap().await {
+                let dummy_key = [0u8; 32];
+                cmd_attempt_ok = wal
+                    .rewrite_as_v3_with_integrity_key(&replayed_entries, dummy_key)
+                    .await
+                    .is_ok();
             }
         }
         "Scan" => {
@@ -139,12 +141,8 @@ async fn test_command_crash_point(cmd_type: &str, time_point: usize) -> Result<b
     // Reset VFS fault config and static indicators before process restart simulation
     vfs.reset_counters();
     vfs.set_config(FaultConfig::default());
-    wal.fault_plan()
-        .fail_append_for_tx
-        .store(0, std::sync::atomic::Ordering::SeqCst);
-    wal.fault_plan()
-        .fail_truncate_once
-        .store(false, std::sync::atomic::Ordering::SeqCst);
+    FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
+    FAIL_TRUNCATE_ONCE.store(false, std::sync::atomic::Ordering::SeqCst);
 
     drop(wal);
 

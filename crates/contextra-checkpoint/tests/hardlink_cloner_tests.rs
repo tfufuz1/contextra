@@ -1,5 +1,5 @@
 use contextra_checkpoint::{CheckpointHardlinkCloner, DefaultHardlinkCloner};
-use contextra_mvcc::SnapshotRegistry;
+use contextra_core::SnapshotRegistry;
 use contextra_types::ContextraError;
 use std::fs;
 use std::sync::Arc;

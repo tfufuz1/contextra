@@ -245,7 +245,6 @@ pub fn run_audit_integrity_check_impl(
     Ok(results)
 }
 
-#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_audit_integrity_check(
     since_days: Option<u32>,
     fail_on_contradicted: bool,

@@ -2,20 +2,16 @@ use super::super::engine::LsmStorage;
 use super::super::scan::{check_in_range, SstableScanMode};
 use super::super::validate_key;
 use bytes::Bytes;
-use contextra_ports::StorageEngine;
-use contextra_types::{Result, TOMBSTONE_BIT};
+use contextra_core::{Result, StorageEngine, TOMBSTONE_BIT};
 use std::sync::atomic::Ordering;
 
 pub(crate) async fn get_tracked(
     storage: &LsmStorage,
-    tx_id: contextra_types::TxId,
+    tx_id: contextra_core::TxId,
     key: &[u8],
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    let _lease = storage
-        .snapshot_registry
-        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
-    let snapshot_seq = _lease.seq_no();
+    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
     get_at_seq_tracked(storage, tx_id, key, snapshot_seq).await
 }
 
@@ -35,16 +31,13 @@ pub(crate) async fn get_tracked(
 /// handled in a separate task.
 pub(crate) async fn get_at_seq_tracked(
     storage: &LsmStorage,
-    tx_id: contextra_types::TxId,
+    tx_id: contextra_core::TxId,
     key: &[u8],
     snapshot_seq: u64,
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    let _lease = storage.snapshot_registry.acquire(|| {
-        let current_seq = storage.last_applied_seq.load(Ordering::Acquire);
-        snapshot_seq.min(current_seq)
-    });
-    let registered_seq = _lease.seq_no();
+    let current_seq = storage.last_applied_seq.load(Ordering::Acquire);
+    let registered_seq = snapshot_seq.min(current_seq);
     storage
         .tx_buffer
         .register_read(tx_id, key.to_vec(), registered_seq);
@@ -53,16 +46,10 @@ pub(crate) async fn get_at_seq_tracked(
 
 pub(crate) async fn scan_prefix_tracked(
     storage: &LsmStorage,
-    tx_id: contextra_types::TxId,
+    tx_id: contextra_core::TxId,
     prefix: &[u8],
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let _lease = storage
-        .snapshot_registry
-        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
-    let snapshot_seq = _lease.seq_no();
-    storage
-        .tx_buffer
-        .register_prefix_read(tx_id, prefix.to_vec(), snapshot_seq);
+    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
     let results = storage.scan_prefix_at(prefix, snapshot_seq).await?;
     for (k, _) in &results {
         storage
@@ -74,14 +61,11 @@ pub(crate) async fn scan_prefix_tracked(
 
 pub(super) async fn get(storage: &LsmStorage, key: &[u8]) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    let _lease = storage
-        .snapshot_registry
-        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
-    let snapshot_seq = _lease.seq_no();
+    let snapshot_seq = storage.last_applied_seq.load(Ordering::Acquire);
     let res = storage.get_at_seq(key, snapshot_seq).await?;
     tracing::debug!(
-        "LsmStorage::get len={} seq={} found={}",
-        key.len(),
+        "LsmStorage::get key={:?} seq={} found={}",
+        String::from_utf8_lossy(key),
         snapshot_seq,
         res.is_some()
     );
@@ -94,9 +78,9 @@ pub(super) async fn get_at_seq(
     seq_no: u64,
 ) -> Result<Option<Bytes>> {
     validate_key(key)?;
-    let _lease = storage.snapshot_registry.acquire(|| seq_no);
     storage.compaction_engine.record_read_op();
-
+    // Genau EINMAL laden — Snapshot-Konsistenz über die gesamte Methode (INVARIANT-2)
+    let snapshot_tx = storage.last_committed_tx.load(Ordering::Acquire);
     let (memtable, immutable_memtables) = {
         let state = storage.state.read().await;
         (
@@ -104,13 +88,14 @@ pub(super) async fn get_at_seq(
             state.immutable_memtables.clone(),
         )
     };
+    tracing::debug!(
+        "LsmStorage::get_at_seq key={:?} seq={} snapshot_tx={}",
+        String::from_utf8_lossy(key),
+        seq_no,
+        snapshot_tx
+    );
 
-    // S7 / INV-COM-2: Visibility is governed strictly by sequence number watermark (`seq_no <= last_applied_seq`).
-    let snapshot_tx = u64::MAX;
-
-    tracing::debug!("LsmStorage::get_at_seq len={} seq={}", key.len(), seq_no);
-
-    // 1. MemTable (filtered by target seq_no)
+    // 1. MemTable (only if seq_no in entry <= target seq_no AND tx_id <= snapshot_tx)
     if let Some((val, seq, _tx)) = memtable.get_at_seq(key, seq_no, snapshot_tx) {
         if (seq & TOMBSTONE_BIT) != 0 {
             return Ok(None);
@@ -128,16 +113,28 @@ pub(super) async fn get_at_seq(
         }
     }
 
-    // 3. SSTables (newest first, filtered by seq_no)
+    // 3. SSTables (newest first, filtered by seq_no and snapshot_tx)
     let sstables = storage.sstables.read().await.clone();
     for sst in sstables.iter().rev() {
-        if seq_no < sst.metadata().min_seq {
+        if (sst.metadata().min_tx_id < contextra_core::TxId::INTERNAL_BASE
+            && snapshot_tx < sst.metadata().min_tx_id)
+            || seq_no < sst.metadata().min_seq
+        {
             continue;
         }
-        if let Some((val, seq, _tx)) = sst.get_at(key, seq_no, snapshot_tx).await? {
+        if let Some((val, seq, tx)) = sst.get_at(key, seq_no, snapshot_tx).await? {
+            tracing::debug!(
+                "LsmStorage::get_at_seq SSTable check: seq={} target_seq={} tx={} snapshot_tx={}",
+                seq & !TOMBSTONE_BIT,
+                seq_no,
+                tx,
+                snapshot_tx
+            );
             if (seq & TOMBSTONE_BIT) != 0 {
+                tracing::debug!("LsmStorage::get_at_seq FOUND TOMBSTONE");
                 return Ok(None);
             }
+            tracing::debug!("LsmStorage::get_at_seq MATCH found in SSTable");
             return Ok(Some(val));
         }
     }
@@ -149,11 +146,7 @@ pub(super) async fn scan_prefix(
     storage: &LsmStorage,
     prefix: &[u8],
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let _lease = storage
-        .snapshot_registry
-        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
-    let snapshot_seq = _lease.seq_no();
-    storage.scan_prefix_at(prefix, snapshot_seq).await
+    storage.scan_prefix_at(prefix, u64::MAX).await
 }
 
 pub(super) async fn scan_prefix_bounded(
@@ -162,9 +155,6 @@ pub(super) async fn scan_prefix_bounded(
     limit: usize,
     cursor: Option<&[u8]>,
 ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)> {
-    let _lease = storage
-        .snapshot_registry
-        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
     let cur_bytes = cursor.map(Bytes::copy_from_slice);
 
     let map = storage
@@ -227,7 +217,6 @@ pub(super) async fn scan_prefix_at(
     prefix: &[u8],
     seq_no: u64,
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let _lease = storage.snapshot_registry.acquire(|| seq_no);
     let map = storage
         .collect_visible_entries(
             SstableScanMode::Prefix(prefix),
@@ -256,10 +245,6 @@ pub(super) async fn scan_bounded(
     cursor: Option<&[u8]>,
 ) -> Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)> {
     use std::ops::Bound;
-
-    let _lease = storage
-        .snapshot_registry
-        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
 
     let effective_start = match cursor {
         Some(c) => Bound::Excluded(c),
@@ -315,9 +300,6 @@ pub(super) async fn scan(
     end: std::ops::Bound<&[u8]>,
     limit: Option<usize>,
 ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
-    let _lease = storage
-        .snapshot_registry
-        .acquire(|| storage.last_applied_seq.load(Ordering::Acquire));
     let map = storage
         .collect_visible_entries(
             SstableScanMode::Range(start, end),

@@ -214,7 +214,7 @@ pub fn scan_workspace_for_cross_file_duplicates(
 }
 
 /// Main entry point for `xtask check-duplicate-symbols-cross-file`.
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 pub fn run() -> Result<(), String> {
     let root_dirs = [
         Path::new("crates"),

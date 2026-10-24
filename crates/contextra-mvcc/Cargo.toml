@@ -26,7 +26,6 @@ tracing = { workspace = true }
 loom = "0.7"
 
 [dev-dependencies]
-contextra-testkit = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
 proptest = "1.4"
 criterion = { workspace = true }

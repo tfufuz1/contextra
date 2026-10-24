@@ -7,36 +7,36 @@ Siehe auch **[`FEATURES_SPECIFICATION.md`](FEATURES_SPECIFICATION.md)** für die
 | :--- | :---: | :---: | :--- | :--- |
 | `contextra-sandbox` | 0 | 3021 | 🟢 stable | WASM Execution Boundary und Isolations-Sandbox |
 | `contextra-sys` | 0 | 709 | 🟢 stable | Systemnahe Bindings, Low-Level I/O und Memory-Mapping |
-| `contextra-types` | 0 | 6846 | 🟢 stable | Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen) |
-| `contextra-wire` | 0 | 2173 | 🟢 stable | FlatBuffers Wire-Protokolle und Serialisierungs-Formate |
-| `contextra-avv-generator` | 1 | 443 | 🟡 experimental | AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO |
+| `contextra-types` | 0 | 6810 | 🟢 stable | Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen) |
+| `contextra-wire` | 0 | 1810 | 🟢 stable | FlatBuffers Wire-Protokolle und Serialisierungs-Formate |
+| `contextra-avv-generator` | 1 | 356 | 🟡 experimental | AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO |
 | `contextra-ports` | 1 | 3806 | 🟢 stable | Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung |
-| `contextra-adapt` | 2 | 6795 | 🟡 experimental | Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller) |
-| `contextra-audit-export` | 2 | 564 | 🟡 experimental | Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export |
-| `contextra-crypto` | 2 | 15954 | 🟢 stable | Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC |
+| `contextra-adapt` | 2 | 6817 | 🟡 experimental | Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller) |
+| `contextra-audit-export` | 2 | 460 | 🟡 experimental | Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export |
+| `contextra-crypto` | 2 | 12226 | 🟢 stable | Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC |
 | `contextra-license` | 2 | 1536 | 🟡 experimental | Lizenz- und Aktivierungsprüfung für Contextra Feature-Ringe |
-| `contextra-mvcc` | 2 | 4889 | 🟢 stable | Multi-Version Concurrency Control und Isolation-Mechanismen |
-| `contextra-privacy` | 2 | 4209 | 🟢 stable | Egress Filtering, Anonymisierung und Privacy Compliance Rules |
-| `contextra-rank` | 2 | 6176 | 🟢 stable | Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers) |
+| `contextra-mvcc` | 2 | 4719 | 🟢 stable | Multi-Version Concurrency Control und Isolation-Mechanismen |
+| `contextra-privacy` | 2 | 3641 | 🟢 stable | Egress Filtering, Anonymisierung und Privacy Compliance Rules |
+| `contextra-rank` | 2 | 6173 | 🟢 stable | Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers) |
 | `contextra-testkit` | 2 | 783 | 🟢 stable | Test Fixtures, Mock Engines und Chaos Matrix Harness |
 | `contextra-text` | 2 | 11912 | 🟢 stable | Volltextsuche und Inverted-Index (BM25 Engine) |
 | `contextra-core` | 3 | 368 | 🟢 stable | Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer |
 | `contextra-graph` | 3 | 28188 | 🟢 stable | CSR Graph-Engine, Path Graphing und GraphRAG Community Detection |
 | `contextra-infer-candle` | 3 | 6996 | 🟢 stable | Candle LLM Inference Client und KV-Bridge Adapter |
-| `contextra-infer-ollama` | 3 | 5237 | 🟢 stable | Ollama External Provider Client und Embeddings Integration |
+| `contextra-infer-ollama` | 3 | 5039 | 🟢 stable | Ollama External Provider Client und Embeddings Integration |
 | `contextra-kvcache` | 3 | 6623 | 🟢 stable | Stufenmodell KV-Cache Storage & Offloading |
 | `contextra-router` | 3 | 7955 | 🟢 stable | Lyapunov Drift Control und Multi-Candidate Search Routing Engine |
 | `contextra-checkpoint` | 4 | 7861 | 🟢 stable | Persistent Checkpoint Engine und Blake3 Manifest-Verifikation |
 | `contextra-infer-onnx` | 4 | 2300 | 🟡 experimental | ONNX Embeddings und Cross-Encoder Reranking Execution Provider |
 | `contextra-simd` | 4 | 1776 | 🟢 stable | SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen |
-| `contextra-store` | 4 | 50200 | 🟢 stable | LSM-Tree Storage Engine, WAL Durability und Compaction Engine |
-| `contextra-vector` | 5 | 24472 | 🟢 stable | Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung) |
-| `contextra-engine` | 6 | 26168 | 🟢 stable | Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02) |
+| `contextra-store` | 4 | 47768 | 🟢 stable | LSM-Tree Storage Engine, WAL Durability und Compaction Engine |
+| `contextra-vector` | 5 | 22463 | 🟢 stable | Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung) |
+| `contextra-engine` | 6 | 26100 | 🟢 stable | Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02) |
 | `contextra-cognition` | 7 | 8557 | 🟢 stable | Konsolidierungs- und Background Sleep Passes |
-| `contextra-db` | 8 | 13893 | 🟢 stable | Contextra Main Database Abstraction, Hybrid Search & Collections |
-| `contextra` | 9 | 2711 | 🟢 stable | Haupt-Library Facade für Endanwender |
+| `contextra-db` | 8 | 13331 | 🟢 stable | Contextra Main Database Abstraction, Hybrid Search & Collections |
+| `contextra` | 9 | 2713 | 🟢 stable | Haupt-Library Facade für Endanwender |
 | `contextra-agent` | 9 | 9342 | 🟢 stable | Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline |
-| `contextra-bench` | 9 | 7304 | 🔴 unklassifiziert | Contextra — Reproducible Benchmark Harness for Retrieval Accuracy |
-| `contextra-py` | 9 | 2303 | 🟢 stable | PyO3 Python Bindings |
-| `contextra-mcp` | 10 | 9949 | 🟢 stable | Model Context Protocol Server & Cloud Egress Gateway |
+| `contextra-bench` | 9 | 7293 | 🔴 unklassifiziert | Contextra — Reproducible Benchmark Harness for Retrieval Accuracy |
+| `contextra-py` | 9 | 2299 | 🟢 stable | PyO3 Python Bindings |
+| `contextra-mcp` | 10 | 9615 | 🟢 stable | Model Context Protocol Server & Cloud Egress Gateway |
 <!-- AUTOGENERATED:END:CRATE_INVENTORY -->

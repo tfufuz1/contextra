@@ -1,14 +1,13 @@
 use std::sync::Arc;
 // FILE-CONTEXT
 // ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
-// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence; idempotenter WAL-Recovery-Deduplizierung.
+// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
-// STAND: TS:2026-10-06T12:00:00Z (SESSION: fix/p03-d-diskann-pending-wal)
+// STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
 
 use super::config::{CachedNode, DiskAnnFallbackPolicy, VectorData};
-pub(crate) use super::durable_fs::{atomic_replace, durable_remove};
 use super::format::{
-    DiskAnnFooter, DiskAnnHeader, CHECKSUM_SEED, DISKANN_FOOTER_MAGIC, DISKANN_MAGIC,
+    DiskAnnFooter, DiskAnnHeader, DISKANN_FOOTER_MAGIC, DISKANN_INTEGRITY_KEY, DISKANN_MAGIC,
     DISKANN_VERSION,
 };
 use super::types::{DiskAnnIndex, DiskAnnIndexInner};
@@ -16,29 +15,6 @@ use contextra_core::{ContextraError, DocId, Result};
 use std::sync::atomic::Ordering;
 
 impl DiskAnnIndex {
-    pub(crate) fn remove_wal_file_robust(path: &std::path::Path) -> Result<()> {
-        if !path.exists() {
-            return Ok(());
-        }
-        if let Err(e) = std::fs::remove_file(path) {
-            if !path.exists() {
-                return Ok(());
-            }
-            if let Err(retry_err) = std::fs::remove_file(path) {
-                if path.exists() {
-                    return Err(ContextraError::Io(std::io::Error::new(
-                        retry_err.kind(),
-                        format!(
-                            "WAL file {} removal failed after retry; file remains intact and safe to replay: {retry_err} (initial error: {e})",
-                            path.display()
-                        ),
-                    )));
-                }
-            }
-        }
-        Ok(())
-    }
-
     pub fn trigger_background_persist_delta(&self) {
         if !self.inner.flushing_in_progress.swap(true, Ordering::AcqRel) {
             let index_clone = self.clone();
@@ -62,32 +38,17 @@ impl DiskAnnIndex {
     }
 
     pub fn persist_delta_sync(&self) -> Result<()> {
-        let raw_pending = {
+        let pending = {
             let mut guard = self.inner.pending_inserts.write();
             self.inner.pending_count.store(0, Ordering::Relaxed);
             std::mem::take(&mut *guard)
         };
 
-        // Deduplizierung über doc_id (Vektoren, deren doc_id bereits im Index existiert,
-        // werden nicht erneut eingefügt).
-        let existing_doc_ids = self.inner.doc_ids.read();
-        let mut seen_pending = std::collections::HashSet::new();
-        let mut pending = Vec::with_capacity(raw_pending.len());
-        for (id, vec) in raw_pending {
-            if existing_doc_ids.contains(&id) || !seen_pending.insert(id) {
-                tracing::info!(
-                    doc_id = %id.inner(),
-                    "DiskANN persist_delta_sync: DocId existiert bereits im Index oder doppelt in pending; Vektor wird verworfen (Idempotenz)"
-                );
-            } else {
-                pending.push((id, vec));
-            }
-        }
-        drop(existing_doc_ids);
-
         if pending.is_empty() {
             let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
-            durable_remove(&pending_wal)?;
+            if pending_wal.exists() {
+                let _ = std::fs::remove_file(&pending_wal);
+            }
             return Ok(());
         }
 
@@ -106,21 +67,31 @@ impl DiskAnnIndex {
         }
 
         // Inkrementeller Pfad
+        let tmp_path = self.inner.config.index_path.with_extension("delta.tmp");
+        self.write_incremental_to_file_sync(&tmp_path, &pending)?;
+
+        // Atomares Rename + Parent-fsync (INV-DISKANN-1, P3)
         let index_path = self.inner.config.index_path.clone();
-        self.write_incremental_to_file_sync(&index_path, &pending)?;
-
-        #[cfg(any(test, feature = "experimental-diskann"))]
-        self.maybe_failpoint("after_rename")?;
-
-        self.load_sync()?; // Mmap neu laden
-
-        #[cfg(any(test, feature = "experimental-diskann"))]
-        self.maybe_failpoint("before_wal_removal")?;
+        let tmp_file = std::fs::File::open(&tmp_path)?;
+        tmp_file
+            .sync_all()
+            .map_err(|e| ContextraError::Storage(format!("fsync tmp: {e}")))?;
+        drop(tmp_file);
+        std::fs::rename(&tmp_path, &index_path)
+            .map_err(|e| ContextraError::Storage(format!("rename: {e}")))?;
+        if let Some(parent) = index_path.parent() {
+            if let Ok(dir) = std::fs::File::open(parent) {
+                dir.sync_all()
+                    .map_err(|e| ContextraError::Storage(format!("parent fsync: {e}")))?;
+            }
+        }
 
         let pending_wal = self.inner.config.index_path.with_extension("pending.wal");
-        durable_remove(&pending_wal)?;
+        if pending_wal.exists() {
+            let _ = std::fs::remove_file(&pending_wal);
+        }
 
-        Ok(())
+        self.load_sync() // Mmap neu laden
     }
 
     #[allow(clippy::unnecessary_cast)]
@@ -162,9 +133,18 @@ impl DiskAnnIndex {
         vectors: &[Vec<f32>],
         ids: &[DocId],
     ) -> Result<()> {
+        use std::fs::OpenOptions;
+        use std::io::Write;
         use std::sync::atomic::Ordering;
 
         let n = vectors.len();
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .map_err(ContextraError::Io)?;
+
         let quantizer_opt = {
             let q_guard = self.inner.quantizer.read();
             q_guard.clone()
@@ -193,20 +173,18 @@ impl DiskAnnIndex {
             q_max,
         };
 
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
-        let mut buf = Vec::new();
+        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
 
         let header_bytes = header.to_bytes();
         hmac.update(&header_bytes);
-        buf.extend_from_slice(&header_bytes);
-
+        file.write_all(&header_bytes).map_err(ContextraError::Io)?;
         let padding = vec![
             0u8;
             self.inner.config.sector_size
                 - (DiskAnnHeader::SIZE % self.inner.config.sector_size)
         ];
         hmac.update(&padding);
-        buf.extend_from_slice(&padding);
+        file.write_all(&padding).map_err(ContextraError::Io)?;
 
         for i in 0..n {
             let mut node_buf = Vec::new();
@@ -236,7 +214,7 @@ impl DiskAnnIndex {
             }
 
             hmac.update(&node_buf);
-            buf.extend_from_slice(&node_buf);
+            file.write_all(&node_buf).map_err(ContextraError::Io)?;
         }
 
         let computed_hmac = hmac.finalize();
@@ -244,12 +222,14 @@ impl DiskAnnIndex {
             magic: *DISKANN_FOOTER_MAGIC,
             hmac: computed_hmac,
         };
-        buf.extend_from_slice(&footer.to_bytes());
+        file.write_all(&footer.to_bytes())
+            .map_err(ContextraError::Io)?;
 
-        atomic_replace(path, &buf)
+        file.sync_all().map_err(ContextraError::Io)?;
+        Ok(())
     }
 
-    pub fn init_hnsw_fallback(&self) -> Result<Arc<crate::hnsw::HnswIndex>> {
+    pub(crate) fn init_hnsw_fallback(&self) -> Result<Arc<crate::hnsw::HnswIndex>> {
         let hnsw_config = crate::hnsw::HnswConfig {
             dimension: self.inner.config.dimension,
             distance_metric: self.inner.config.distance_metric,
@@ -272,9 +252,6 @@ impl DiskAnnIndex {
         let wal_exists = pending_wal.exists();
 
         if !index_exists && !wal_exists {
-            if self.inner.config.create_if_missing {
-                return Ok(());
-            }
             return Err(ContextraError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 format!(
@@ -291,30 +268,36 @@ impl DiskAnnIndex {
 
                 // Clean up any orphaned temporary files from interrupted persist_delta or build calls
                 let delta_tmp = inner.config.index_path.with_extension("delta.tmp");
-                durable_remove(&delta_tmp)?;
-
+                if delta_tmp.exists() {
+                    if let Err(e) = std::fs::remove_file(&delta_tmp) {
+                        tracing::warn!(
+                            "Failed to remove orphaned delta.tmp file {}: {e}",
+                            delta_tmp.display()
+                        );
+                    }
+                }
                 let idx_tmp = inner.config.index_path.with_extension("idx.tmp");
-                durable_remove(&idx_tmp)?;
+                if idx_tmp.exists() {
+                    if let Err(e) = std::fs::remove_file(&idx_tmp) {
+                        tracing::warn!(
+                            "Failed to remove orphaned idx.tmp file {}: {e}",
+                            idx_tmp.display()
+                        );
+                    }
+                }
 
                 let file =
                     std::fs::File::open(&inner.config.index_path).map_err(ContextraError::Io)?;
                 let mmap = contextra_sys::mmap_readonly(&file).map_err(ContextraError::Io)?;
 
-                let disk_len = file
-                    .metadata()
-                    .map_err(ContextraError::Io)?
-                    .len() as usize;
-
-                if mmap.len() < DiskAnnHeader::SIZE + DiskAnnFooter::SIZE
-                    || disk_len < DiskAnnHeader::SIZE + DiskAnnFooter::SIZE
-                {
-                    return Err(ContextraError::Index(
+                if mmap.len() < DiskAnnHeader::SIZE + DiskAnnFooter::SIZE {
+                    return Err(ContextraError::Storage(
                         "DiskANN file too small for header and footer".into(),
                     ));
                 }
 
                 let header_slice = mmap.get(0..DiskAnnHeader::SIZE).ok_or_else(|| {
-                    ContextraError::Index("DiskANN file too small for header".into())
+                    ContextraError::Storage("DiskANN file too small for header".into())
                 })?;
                 let header = DiskAnnHeader::try_from_bytes(header_slice)?;
 
@@ -332,7 +315,7 @@ impl DiskAnnIndex {
                         ContextraError::Storage("DiskANN payload slice out of bounds".into())
                     })?;
 
-                let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED)?;
+                let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY)?;
                 hmac.update(payload);
                 let computed_hmac = hmac.finalize();
 
@@ -384,16 +367,10 @@ impl DiskAnnIndex {
                 let start_offset = DiskAnnHeader::SIZE.div_ceil(sector_size) * sector_size;
                 let expected_min_size = start_offset
                     .saturating_add((header.node_count as usize).saturating_mul(node_size_bytes));
-
-                let disk_len = file
-                    .metadata()
-                    .map_err(ContextraError::Io)?
-                    .len() as usize;
-
-                if file_len < expected_min_size || disk_len < expected_min_size {
-                    return Err(ContextraError::Index(format!(
+                if file_len < expected_min_size {
+                    return Err(ContextraError::Storage(format!(
                         "DiskANN file truncated or corrupt node_count: file len {}, expected at least {}",
-                        disk_len.min(file_len), expected_min_size
+                        file_len, expected_min_size
                     )));
                 }
 
@@ -422,10 +399,6 @@ impl DiskAnnIndex {
                             "Read offset must be sector-aligned".into(),
                         ));
                     }
-                    let current_disk_len = std::fs::metadata(&inner.config.index_path)
-                        .map(|m| m.len() as usize)
-                        .unwrap_or(0);
-
                     let inner_mmap = inner.mmap.read();
                     let mmap_ref = inner_mmap
                         .as_ref()
@@ -437,27 +410,23 @@ impl DiskAnnIndex {
                     let doc_id_end = doc_id_offset
                         .checked_add(doc_id_size)
                         .ok_or_else(|| ContextraError::Index("DocId end offset overflow".into()))?;
-
-                    // F-03: Protection against runtime file truncation during Mmap access.
-                    // Check both mmap region length and physical disk file size before reading slice.
-                    if doc_id_end > mmap_ref.len() || doc_id_end > current_disk_len {
-                        return Err(ContextraError::Index(
-                            "DiskANN file truncated before doc_id".into(),
-                        ));
-                    }
-
-                    // F-04: Alignment Safety Notice:
-                    // All binary reading in DiskANN uses byte-slice `from_le_bytes` parsing.
-                    // `from_le_bytes` operates on unaligned `[u8; N]` arrays safely on all CPUs.
                     let doc_id_bytes =
                         mmap_ref.get(doc_id_offset..doc_id_end).ok_or_else(|| {
-                            ContextraError::Index("DiskANN file truncated before doc_id".into())
+                            ContextraError::Storage("DiskANN file truncated before doc_id".into())
                         })?;
-                    let doc_id_arr: [u8; DocId::BYTES] = doc_id_bytes
-                        .try_into()
-                        .map_err(|_| ContextraError::Index("Corrupt doc_id".into()))?;
-                    let doc_id = DocId::from_le_bytes(doc_id_arr);
-                    ids.push(doc_id);
+                    #[cfg(not(feature = "docid-128"))]
+                    let doc_id = u64::from_le_bytes(
+                        doc_id_bytes
+                            .try_into()
+                            .map_err(|_| ContextraError::Index("Corrupt doc_id".into()))?,
+                    );
+                    #[cfg(feature = "docid-128")]
+                    let doc_id = u128::from_le_bytes(
+                        doc_id_bytes
+                            .try_into()
+                            .map_err(|_| ContextraError::Index("Corrupt doc_id".into()))?,
+                    );
+                    ids.push(DocId::from(doc_id));
                 }
                 *inner.doc_ids.write() = ids;
                 Ok(())
@@ -535,15 +504,8 @@ impl DiskAnnIndex {
             .checked_add(node_size)
             .ok_or_else(|| ContextraError::Index("Node end offset addition overflow".into()))?;
 
-        // F-03: Re-verify physical disk length before accessing node bytes to guard against concurrent file truncation
-        let current_disk_len = std::fs::metadata(&self.inner.config.index_path)
-            .map(|m| m.len() as usize)
-            .unwrap_or(0);
-
-        if end_offset > mmap.len() || end_offset > current_disk_len {
-            return Err(ContextraError::Index(
-                "Node offset out of bounds or file truncated".into(),
-            ));
+        if end_offset > mmap.len() {
+            return Err(ContextraError::Index("Node offset out of bounds".into()));
         }
 
         let node_data = mmap
@@ -630,10 +592,18 @@ impl DiskAnnIndex {
         let doc_id_bytes = node_data
             .get(cursor..doc_id_end)
             .ok_or_else(|| ContextraError::Index("Truncated DocId".into()))?;
-        let doc_id_arr: [u8; DocId::BYTES] = doc_id_bytes
-            .try_into()
-            .map_err(|_| ContextraError::Index("Invalid DocId".into()))?;
-        let doc_id = DocId::from_le_bytes(doc_id_arr);
+        #[cfg(not(feature = "docid-128"))]
+        let doc_id = DocId::from(u64::from_le_bytes(
+            doc_id_bytes
+                .try_into()
+                .map_err(|_| ContextraError::Index("Invalid DocId".into()))?,
+        ));
+        #[cfg(feature = "docid-128")]
+        let doc_id = DocId::from(u128::from_le_bytes(
+            doc_id_bytes
+                .try_into()
+                .map_err(|_| ContextraError::Index("Invalid DocId".into()))?,
+        ));
 
         let node = CachedNode {
             vector,
@@ -662,11 +632,9 @@ mod tests {
     use crate::diskann::config::DiskAnnConfig;
     use contextra_core::{DistanceMetric, DocId};
 
+    #[cfg(feature = "docid-128")]
     #[tokio::test]
     async fn test_docid_128_mmap_persistence_roundtrip() -> Result<()> {
-        if DocId::BYTES != 16 {
-            return Ok(());
-        }
         let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
         let index_path = temp_dir.path().join("docid128_mmap_roundtrip.idx");
 
@@ -689,7 +657,10 @@ mod tests {
         let doc1 = DocId::from(large_id1);
         let doc2 = DocId::from(large_id2);
 
-        let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![2.0, 0.0, 0.0, 0.0]];
+        let vectors = vec![
+            vec![1.0, 0.0, 0.0, 0.0],
+            vec![2.0, 0.0, 0.0, 0.0],
+        ];
         let ids = vec![doc1, doc2];
 
         index.build(&vectors, &ids).await?;

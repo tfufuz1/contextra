@@ -115,12 +115,10 @@ impl CsrGraph {
         self.inner.load()
     }
 
-    pub fn inner_write(&self) -> InnerWriteGuard<'_> {
+    pub(crate) fn inner_write(&self) -> InnerWriteGuard<'_> {
         InnerWriteGuard {
             guard: self.write_state.lock(),
             arc_swap: &self.inner,
-            committed: false,
-            mutated: false,
         }
     }
 
@@ -212,7 +210,7 @@ impl CsrGraph {
 
             for node in topo_order {
                 if self.tombstone_hyperedge(node, wal_tx) {
-                    tombstoned_count = tombstoned_count.saturating_add(1);
+                    tombstoned_count += 1;
                 }
             }
 
@@ -278,11 +276,9 @@ impl CsrGraph {
             }
         }
 
-        let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
-        if from_idx < offsets_len_minus_1 {
-            let start = *inner.offsets.get(from_idx).unwrap_or(&0);
-            let next_i = from_idx.saturating_add(1);
-            let end = *inner.offsets.get(next_i).unwrap_or(&0);
+        if from_idx < inner.offsets.len() - 1 {
+            let start = inner.offsets[from_idx];
+            let end = inner.offsets[from_idx + 1];
             for j in start..end {
                 if inner.targets.get(j) == Some(&to_idx) {
                     return inner.source_doc_id_at(j);
@@ -296,7 +292,7 @@ impl CsrGraph {
     /// Atomically tombstones a list of edges with WAL sequence provenance (INV-GRAPH-PROV-1),
     /// returning newly tombstoned edges and affected node IDs.
     #[allow(clippy::type_complexity)]
-    pub fn tombstone_edges_direct(
+    pub(crate) fn tombstone_edges_direct(
         &self,
         edges: &[(EntityId, EntityId)],
         wal_tx: TxId,
@@ -320,11 +316,9 @@ impl CsrGraph {
                         }
                     }
                     // Record WAL transaction invalidation provenance on compacted CSR arrays
-                    let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
-                    if f_idx < offsets_len_minus_1 {
-                        let start = *inner.offsets.get(f_idx).unwrap_or(&0);
-                        let next_i = f_idx.saturating_add(1);
-                        let end = *inner.offsets.get(next_i).unwrap_or(&0);
+                    if f_idx < inner.offsets.len() - 1 {
+                        let start = inner.offsets[f_idx];
+                        let end = inner.offsets[f_idx + 1];
                         for j in start..end {
                             if inner.targets.get(j) == Some(&t_idx) {
                                 if let Some(tx_to) = inner.tx_valid_tos.get_mut(j) {
@@ -344,7 +338,6 @@ impl CsrGraph {
         let mut affected_node_ids: Vec<EntityId> = affected_nodes_set.into_iter().collect();
         affected_node_ids.sort();
 
-        inner.commit();
         Ok((newly_tombstoned.len(), newly_tombstoned, affected_node_ids))
     }
 
@@ -429,7 +422,6 @@ impl CsrGraph {
                 .insert(hyperedge_id);
         }
         inner.hyperedges.insert(hyperedge_id, hyperedge_arc);
-        inner.commit();
     }
 
     /// Returns all non-tombstoned parent hyperedge IDs that contain `child` in `child_edge_ids`.
@@ -577,7 +569,6 @@ impl CsrGraph {
 
         inner_ptr.hyperedges.insert(id, updated_arc);
 
-        inner.commit();
         true
     }
 
@@ -681,7 +672,6 @@ impl CsrGraph {
             inner_ptr.hyperedges.insert(hyperedge_id, hyperedge_arc);
         }
 
-        inner.commit();
         Ok(())
     }
 
@@ -709,7 +699,6 @@ impl CsrGraph {
             inner.entities.resize(idx + 1, sentinel_entity());
         }
         inner.entities[idx] = entity;
-        inner.commit();
         Ok(())
     }
 
@@ -774,7 +763,6 @@ impl CsrGraph {
                     .or_default()
                     .insert((from, to));
             }
-            inner.tombstoned_edges.remove(&(from_idx, to_idx));
             inner
                 .pending_edges
                 .entry(from_idx)
@@ -791,18 +779,11 @@ impl CsrGraph {
             inner.pending_edge_count += 1;
             inner.is_dirty = true;
             inner.add_to_out_weight_sum(from_idx, weight);
-            let nc = inner.pending_edge_count >= self.config.rebuild_threshold;
-            inner.commit();
-            nc
+            inner.pending_edge_count >= self.config.rebuild_threshold
         }; // Write-Lock freigegeben
 
         if let Some(doc_id) = source_doc_id {
-            let prov = crate::provenance::EdgeProvenance::new(
-                (from, to),
-                vec![doc_id],
-                tx_valid_from.unwrap_or_else(TxId::internal),
-            );
-            self.doc_edge_index.record_provenance(&prov);
+            self.doc_edge_index.record(doc_id, (from, to));
         }
 
         // Phase 2: Compact außerhalb des Write-Locks (falls nötig)
@@ -821,10 +802,8 @@ impl CsrGraph {
         to: EntityId,
         weight: f32,
     ) -> Result<()> {
-        self.insert_edge_direct_with_bitemporal_validity(
-            from, to, weight, None, None, None, None, None,
-        )
-        .await
+        self.add_edge(from, to, weight, None, None, None, None, None, None, None)
+            .await
     }
 
     /// Directly inserts an edge with validity into the CSR graph without staging.
@@ -841,12 +820,14 @@ impl CsrGraph {
         tx_valid_from: Option<TxId>,
         tx_valid_to: Option<TxId>,
     ) -> Result<()> {
-        self.insert_edge_direct_with_bitemporal_validity(
+        self.add_edge(
             from,
             to,
             weight,
             tx_valid_from,
             tx_valid_to,
+            None,
+            None,
             None,
             None,
             None,
@@ -890,7 +871,6 @@ impl CsrGraph {
             inner.entities.push(sentinel_entity());
         }
         inner.entities[idx] = entity;
-        inner.commit();
         Ok(())
     }
 
@@ -923,7 +903,6 @@ impl CsrGraph {
                 .or_default()
                 .insert((from, to));
         }
-        inner.tombstoned_edges.remove(&(from_idx, to_idx));
         inner
             .pending_edges
             .entry(from_idx)
@@ -940,7 +919,6 @@ impl CsrGraph {
         inner.pending_edge_count += 1;
         inner.is_dirty = true;
         inner.add_to_out_weight_sum(from_idx, weight);
-        inner.commit();
         Ok(())
     }
 }
@@ -955,7 +933,7 @@ impl GraphCollectionMutation for CsrGraph {
         contextra_ports::graph::HyperEdgeId,
         contextra_ports::graph::GraphMutationError,
     > {
-        let next_id = crate::hyperedge::HyperEdgeId::new(self.max_hyperedge_id().saturating_add(1));
+        let next_id = crate::hyperedge::HyperEdgeId::new(self.max_hyperedge_id() + 1);
         let mapped_participants: Vec<crate::hyperedge::RoleBinding> = participants
             .iter()
             .map(|p| {

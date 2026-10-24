@@ -2,17 +2,22 @@
 // ZWECK: PID Latency Controller & Latency Budget Guard für Multi-Step Retrieval.
 // INVARIANTEN: Skalierungsfaktor immer in [0.3, 1.0] geklemmt; Integrator-Anti-Windup verhindert Oszillation.
 // RISIKO-FOKUS: Numerische Stabilität (kein Integrator-Windup, Non-Finite Schutz, Clamping).
-// STAND: TS:2026-10-17T00:00:00Z
+// STAND: TS:2026-09-13T00:00:00Z (SESSION: pid-regler-impl)
 
 //! PID Latency Controller & Latency Budget Guard.
 
-use std::sync::Arc;
-use contextra_ports::{Clock, SystemClock};
+use std::time::Instant;
 
 /// Konservativer Default für das P95-Latenzziel in Millisekunden (100ms).
+///
+/// HINWEIS: implementation_plan-db2.md identifiziert den genauen P95-Zielwert
+/// als offene Frage (50ms vs. 100ms). Wir wählen 100ms als konservativen Default
+/// und machen den Zielwert über `PidLatencyController::new(target_latency_ms)`
+/// vollständig konfigurierbar.
 pub const DEFAULT_TARGET_LATENCY_MS: f64 = 100.0;
 
-/// Unterer Clamp für den K-Pool-Skalierungsfaktor (30% des konfigurierten K-Pools).
+/// Unterer Clamp für den K-Pool-Skalierungsfaktor (30% des konfigurierten K-Pools),
+/// um APM-RECALL-COLLAPSE in Standardlastszenarien zu verhindern.
 pub const MIN_SCALING_FACTOR: f64 = 0.3;
 
 /// Oberer Clamp für den K-Pool-Skalierungsfaktor (100% des konfigurierten K-Pools).
@@ -23,11 +28,11 @@ pub const MAX_INTEGRAL: f64 = 10.0;
 
 /// Classical PID controller for dynamically scaling multi-step retrieval parameters (`k_pool`, `max_hops`).
 ///
-/// DEPRECATED: Use [`crate::PoolController`] instead.
-#[deprecated(
-    since = "0.1.0",
-    note = "use PoolController; removal 2027-01-31"
-)]
+/// HINWEIS ZUR ANTI-WINDUP STRATEGIE:
+/// Dieser Controller nutzt einfaches Integrations-Clamping auf `[-MAX_INTEGRAL, MAX_INTEGRAL]`.
+/// Für Anwendungsfälle mit expliziter Aktuatorsättigung (z.B. Pool-Größe an Min-/Max-Grenzen)
+/// steht in `pid.rs` der Trait [`AntiWindupController`](crate::AntiWindupController) mit
+/// `update_with_anti_windup` bereit, welcher die Integrationsakkumulation bei Sättigung vollständig aussetzt.
 #[derive(Debug, Clone)]
 pub struct PidLatencyController {
     /// Proportional gain coefficient.
@@ -44,14 +49,12 @@ pub struct PidLatencyController {
     previous_error: Option<f64>,
 }
 
-#[allow(deprecated)]
 impl Default for PidLatencyController {
     fn default() -> Self {
         Self::new(DEFAULT_TARGET_LATENCY_MS)
     }
 }
 
-#[allow(deprecated)]
 impl PidLatencyController {
     /// Creates a new `PidLatencyController` with specified target latency in milliseconds.
     pub fn new(target_latency_ms: f64) -> Self {
@@ -94,6 +97,10 @@ impl PidLatencyController {
     }
 
     /// Calculates scaling adjustment factor in range `[0.3, 1.0]` based on observed latency.
+    ///
+    /// - Observed latency > target_latency => scaling factor decreases towards 0.3.
+    /// - Observed latency <= target_latency => scaling factor recovers towards 1.0.
+    /// - Non-finite inputs (NaN / Inf) are safely handled without panicking or corrupting state.
     pub fn compute_adjustment(&mut self, observed_latency_ms: f64) -> f64 {
         if !observed_latency_ms.is_finite() || observed_latency_ms < 0.0 {
             tracing::warn!(
@@ -103,16 +110,25 @@ impl PidLatencyController {
             return MAX_SCALING_FACTOR;
         }
 
+        // Error signal: normalized error relative to target budget.
+        // Positive error indicates latency is UNDER budget.
+        // Negative error indicates latency is OVER budget.
         let error = (self.target_latency_ms - observed_latency_ms) / self.target_latency_ms;
+
+        // Anti-windup clamping for integral accumulator.
         self.integral = (self.integral + error).clamp(-MAX_INTEGRAL, MAX_INTEGRAL);
 
+        // Derivative term.
         let derivative = match self.previous_error {
             Some(prev) => error - prev,
             None => 0.0,
         };
         self.previous_error = Some(error);
 
+        // PID output calculation.
         let pid_output = (self.kp * error) + (self.ki * self.integral) + (self.kd * derivative);
+
+        // Base scaling factor = 1.0 + pid_output, clamped to [0.3, 1.0].
         let raw_scaling = 1.0 + pid_output;
 
         if raw_scaling.is_finite() {
@@ -130,51 +146,31 @@ impl PidLatencyController {
 }
 
 /// Simple, panic-free latency budget guard for iterative multi-step search loops.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct LatencyBudgetGuard {
-    clock: Arc<dyn Clock>,
-    start_monotonic_nanos: u64,
+    start: Instant,
     budget_ms: f64,
 }
 
-impl std::fmt::Debug for LatencyBudgetGuard {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LatencyBudgetGuard")
-            .field("start_monotonic_nanos", &self.start_monotonic_nanos)
-            .field("budget_ms", &self.budget_ms)
-            .finish()
-    }
-}
-
 impl LatencyBudgetGuard {
-    /// Creates a new `LatencyBudgetGuard` with specified budget in ms and injected [`Clock`] port.
-    pub fn new_with_clock(budget_ms: f64, clock: Arc<dyn Clock>) -> Self {
+    /// Creates a new `LatencyBudgetGuard` with the given budget in milliseconds.
+    pub fn new(budget_ms: f64) -> Self {
         let budget_ms = if budget_ms.is_finite() && budget_ms > 0.0 {
             budget_ms
         } else {
             DEFAULT_TARGET_LATENCY_MS
         };
 
-        let start_monotonic_nanos = clock.monotonic_nanos();
+        #[allow(clippy::disallowed_methods)]
         Self {
-            clock,
-            start_monotonic_nanos,
+            start: Instant::now(),
             budget_ms,
         }
     }
 
-    /// Creates a new `LatencyBudgetGuard` with the given budget in milliseconds.
-    ///
-    /// Delegates to [`Self::new_with_clock`] using a standard [`SystemClock`].
-    pub fn new(budget_ms: f64) -> Self {
-        Self::new_with_clock(budget_ms, Arc::new(SystemClock::new()))
-    }
-
     /// Returns elapsed time in milliseconds since guard instantiation.
     pub fn elapsed_ms(&self) -> f64 {
-        let now_nanos = self.clock.monotonic_nanos();
-        let elapsed_nanos = now_nanos.saturating_sub(self.start_monotonic_nanos);
-        elapsed_nanos as f64 / 1_000_000.0
+        self.start.elapsed().as_secs_f64() * 1000.0
     }
 
     /// Returns `true` if the elapsed time has exceeded the configured budget.
@@ -193,7 +189,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[allow(deprecated)]
     fn test_pid_controller_default_values() {
         let pid = PidLatencyController::default();
         assert_eq!(pid.target_latency_ms, 100.0);
@@ -203,20 +198,23 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_pid_controller_latency_series_monotonically_adjusts() {
         let mut pid = PidLatencyController::new(100.0);
 
+        // Under budget (50ms) -> scaling factor stays at MAX (1.0)
         let f_50 = pid.compute_adjustment(50.0);
         assert_eq!(f_50, 1.0);
 
+        // High latency over budget (200ms) -> scaling factor decreases
         let f_200 = pid.compute_adjustment(200.0);
         assert!(f_200 < 1.0);
 
+        // Even higher latency (500ms) -> scaling factor decreases further towards MIN (0.3)
         let f_500 = pid.compute_adjustment(500.0);
         assert!(f_500 <= f_200);
         assert!(f_500 >= MIN_SCALING_FACTOR);
 
+        // Latency drops back under budget (30ms) -> scaling factor recovers
         let mut f_recovering = f_500;
         for _ in 0..10 {
             let next_f = pid.compute_adjustment(30.0);
@@ -227,15 +225,16 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_pid_controller_clamping_bounds() {
         let mut pid = PidLatencyController::new(100.0);
 
+        // Extreme latency (10,000ms) must clamp to MIN_SCALING_FACTOR (0.3)
         for _ in 0..20 {
             let adj = pid.compute_adjustment(10000.0);
             assert_eq!(adj, MIN_SCALING_FACTOR);
         }
 
+        // Extreme low latency (1ms) must clamp to MAX_SCALING_FACTOR (1.0)
         for _ in 0..20 {
             let adj = pid.compute_adjustment(1.0);
             assert_eq!(adj, MAX_SCALING_FACTOR);
@@ -243,22 +242,23 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_pid_controller_anti_windup_clamping() {
         let mut pid = PidLatencyController::new(100.0);
 
+        // Saturate integral with extreme over-budget latencies
         for _ in 0..100 {
             pid.compute_adjustment(1000.0);
         }
 
+        // Verify integral magnitude is clamped to MAX_INTEGRAL
         assert_eq!(pid.integral, -MAX_INTEGRAL);
 
+        // Immediately dropping latency to budget (100ms) should begin integral recovery without infinite delay
         let f_normal = pid.compute_adjustment(100.0);
         assert!(f_normal >= MIN_SCALING_FACTOR);
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_pid_controller_nan_and_inf_safety() {
         let mut pid = PidLatencyController::new(100.0);
 

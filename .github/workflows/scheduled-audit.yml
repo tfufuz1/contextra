@@ -1,17 +1,9 @@
-# Takt: Wöchentlich (Fr 22:00 UTC) / workflow_dispatch
-# Zweck: Erstellt wöchentlichen Audit-Auftrag und stößt rotierendes Mutation Testing an.
-# Lokaler Befehl: cargo test --workspace --locked && cargo xtask check-ring-layering && cargo xtask panic-inventory
-
 name: Scheduled Proactive Audit
 on:
   schedule:
     # Jeden Freitag 22:00 UTC
     - cron: "0 22 * * 5"
   workflow_dispatch: {}
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   prepare-audit-context:
@@ -105,15 +97,6 @@ EOF
             - Verwende `cargo xtask panic-inventory` zur unwrap/expect-Prüfung.
           delete-branch: true
 
-      - name: Report Failure Summary
-        if: failure()
-        run: |
-          echo "### ❌ Scheduled Proactive Audit Preparation Failed" >> $GITHUB_STEP_SUMMARY
-          echo "Reproduziere lokal mit:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "cargo test --workspace --locked && cargo xtask check-ring-layering && cargo xtask panic-inventory" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
   trigger-mutation-testing:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -150,8 +133,3 @@ EOF
             } catch (err) {
               console.log(`Hinweis beim Ausloesen von mutation-testing.yml fuer ${targetCrate}:`, err.message);
             }
-
-      - name: Report Failure Summary
-        if: failure()
-        run: |
-          echo "### ❌ Scheduled Mutation Testing Dispatch Failed" >> $GITHUB_STEP_SUMMARY

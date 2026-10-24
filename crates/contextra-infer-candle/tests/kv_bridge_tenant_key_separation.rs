@@ -1,17 +1,9 @@
 #![cfg(feature = "kv-bridge")]
-#![allow(
-    deprecated,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing
-)]
 
 //! Verification test for KV-Bridge tenant key separation: Data encrypted under Tenant A key cannot be read under Tenant B.
 
-use contextra_crypto::{CryptoKey, KvSegmentCipher};
+use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
 use contextra_infer_candle::kv_bridge::{KvBridgeAdapter, KvCacheKey};
-use contextra_kvcache::TenantIsolatedKvStore;
 use contextra_types::{ModelFingerprint, TenantId};
 use std::sync::Arc;
 
@@ -20,7 +12,7 @@ use std::sync::Arc;
 fn setup_test_cipher() -> Arc<KvSegmentCipher> {
     let master_km =
         CryptoKey::try_new("test-passphrase-tenant-sep", b"test-salt-tenantsep").unwrap();
-    Arc::new(KvSegmentCipher::ephemeral(master_km))
+    Arc::new(KvSegmentCipher::new(master_km))
 }
 
 fn test_fingerprint() -> ModelFingerprint {

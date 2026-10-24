@@ -5,4 +5,4 @@ fix = "Schreibe zusätzliche Tests, die die überlebenden Mutanten abbilden und 
 anti_fix = "Lösche nicht die Quellcodezeilen, um Mutationstests zu umgehen."
 adr = ["ADR-035"]
 related = ["check-mutation-score-gate", "test-integrity"]
-sources = ["xtask/docs/gates/mutation-score-enforcement.md"]
+sources = ["docs/gates/mutation-score-enforcement.md"]

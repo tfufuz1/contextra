@@ -1,26 +1,10 @@
 // FILE-CONTEXT
 // ZWECK: Envelope Encryption und Key-Registry für KV-Crypto-Shredding (AP-P0-06, Spec v17 §16.1).
 // INVARIANTEN: CryptoShred vernichtet KEK (Gruppenlöschung) oder DEK-Wrap (Einzellöschung) in O(1).
-// Fail-Closed bei Revokationsprüfungen und verifiziertem RevocationLog-Status.
 // Zufälliges KEK/DEK-Material via OsRng (keine deterministische Ableitung rein aus group_id).
-// Vanish-Lehre: DEKs dürfen niemals unverschlüsselt/unwrapped in dauerhaften oder externen Stores verbleiben.
 // HOTSPOTS: [SubKey, KeyRegistry, revoke_group, revoke_record, encrypt_record, decrypt_record]
 
 //! Envelope encryption and thread-safe key registry for KV crypto-shredding.
-//!
-//! # Grenzen der Speicherbereinigung via `zeroize` (Zeroize Limitations)
-//! `Zeroize` bzw. `ZeroizeOnDrop` garantiert die physische Bereinigung (Umschreiben mit Nullbytes)
-//! des aktuell zugewiesenen RAM-Puffers (insbesondere auf dem Heap oder aktiven Stack-Frame).
-//! Diese Garantie ist jedoch technisch auf den kontrollierten Speicherpuffer beschränkt:
-//! - **Moves & Stack-Kopien**: Beim Verschieben oder Kopieren von Werten auf dem Stack verbleiben
-//!   nicht-zeroisierte Alt-Exemplare in früheren Stack-Frames.
-//! - **Reallokationen**: Bei Vektor-Vergrößerungen verbleibt die ursprüngliche Heap-Allokation unbereinigt im RAM.
-//! - **CPU-Register**: Schlüsselwerte in CPU-Registern werden von `zeroize` nicht erfasst.
-//! - **Hardware & Seitenkanäle**: Caches, Swap, Hardware-Betriebssystem-Puffer und Seitenkanäle fallen
-//!   außerhalb des Einflussbereichs von `zeroize`.
-//!
-//! Die Aussage „RAM bereinigt“ / „Crypto-Erase erbracht“ bezieht sich daher ausschließlich auf den gezielten
-//! Heap- bzw. Puffer-Inhalt, der von den `Zeroize`-Typen umschlossen ist.
 
 #![forbid(unsafe_code)]
 
@@ -34,39 +18,11 @@ use aes_gcm_siv::{
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
-use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+use std::sync::RwLock;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Default size of a shred key group (number of records sharing one KEK).
 pub const DEFAULT_SHRED_KEY_GROUP_SIZE: usize = 64;
-
-/// Default quarantine duration for Collection/Tenant scope (72 hours in nanoseconds).
-pub const DEFAULT_COLLECTION_QUARANTINE_NANOS: u64 = 72 * 3600 * 1_000_000_000;
-/// Default quarantine duration for Document scope (0 hours in nanoseconds).
-pub const DEFAULT_DOCUMENT_QUARANTINE_NANOS: u64 = 0;
-
-/// Scope of key deletion for two-stage crypto-erase (§5.13, E08).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum KeyDeletionScope {
-    /// Collection or Tenant scope (72h quarantine default).
-    CollectionOrTenant,
-    /// Individual Document scope (0h quarantine default).
-    Document,
-}
-
-/// Lifecycle state of a crypto-shredding key under two-stage crypto-erase (§5.13, E08).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum KeyLifecycleState {
-    /// Active key with valid encryption/decryption material.
-    Active,
-    /// Key revoked; decryption immediately blocked (Stage 1).
-    KeyRevoked,
-    /// Key quarantined until timestamp in nanoseconds (Stage 1).
-    KeyQuarantined { until_nanos: u64 },
-    /// Key material zeroized and permanently destroyed (Stage 2).
-    KeyDestroyed,
-}
 
 /// Sub-key or KEK bytes (256 bits) zeroized on drop.
 #[derive(ZeroizeOnDrop)]
@@ -99,11 +55,6 @@ impl std::fmt::Debug for GroupKek {
 }
 
 /// Record Data Encryption Key (DEK) - 256 bits, zeroized on drop.
-///
-/// # Invariante (Vanish-Lehre / DEK Isolation)
-/// DEKs dürfen NIEMALS im Klartext oder unverschlüsselt in replizierten, externen oder dauerhaften
-/// Speichern abgelegt werden. Eine Persistierung von DEKs ist ausschließlich in Form von `wrapped_dek`
-/// (mittels KEK verschlüsselt) zulässig.
 #[derive(ZeroizeOnDrop)]
 pub struct RecordDek(pub [u8; 32]);
 
@@ -146,8 +97,6 @@ struct GroupEntry {
     wrapped_kek: Vec<u8>,
     kek_nonce: [u8; 12],
     record_deks: HashMap<u64, RecordDekEntry>,
-    #[allow(dead_code)]
-    lifecycle_state: KeyLifecycleState,
 }
 
 /// Derives or retrieves a random sub-key (Group KEK) for a shred group via `KeyRegistry`.
@@ -159,154 +108,27 @@ pub fn derive_subkey(
     registry.get_or_derive(master_key, group_id)
 }
 
-/// Atomically and permanently shreds (revokes) the key for a KV cache segment.
-///
-/// # Aufrufvertrag (Call Contract):
-/// - `registry`: Reference to the active [`KeyRegistry`].
-/// - `tenant`: The `TenantId` owning the KV segment.
-/// - `segment_id`: The 64-bit identifier of the KV segment key to shred.
-/// - **Behavior**: Atomically and permanently revokes and zeroizes the sub-key (Group KEK) for the given segment
-///   in the `KeyRegistry` and appends a `RevocationTarget::Group(segment_id)` entry to the persistent `RevocationLog` (if present).
-/// - **Returns**: `Ok(true)` if the segment key was active and is now revoked; `Ok(false)` if it was already revoked;
-///   `Err(CryptoError)` if a lock or I/O error occurred.
-/// - **Complexity & Invariants**: O(1) time complexity. Permanent and non-reversible. Subsequent decryption
-///   attempts for `segment_id` fail-closed with `CryptoError::KeyRevoked`.
-pub fn shred_segment_key(
-    registry: &KeyRegistry,
-    tenant: contextra_types::TenantId,
-    segment_id: u64,
-) -> Result<bool> {
-    registry.shred_segment_key(tenant, segment_id)
-}
-
-/// Listener trait for group revocation events.
-pub trait GroupRevocationListener: Send + Sync {
-    fn on_group_revoked(&self, group_id: u64);
-}
-
-const BITMASK_WORDS: usize = 1024;
-
 /// In-memory thread-safe registry for envelope KV crypto-shredding keys.
+#[derive(Debug, Default)]
 pub struct KeyRegistry {
     groups: RwLock<HashMap<u64, GroupEntry>>,
     revoked_groups: RwLock<HashSet<u64>>,
-    revoked_bitmask: Vec<AtomicU64>,
-    pending_revocations: RwLock<HashSet<u64>>,
-    ever_registered_groups: RwLock<HashSet<u64>>,
-    pub revocation_log: Option<Arc<RevocationLog>>,
-    listeners: Vec<Arc<dyn GroupRevocationListener>>,
-    durable: bool,
-}
-
-impl Default for KeyRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl std::fmt::Debug for KeyRegistry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("KeyRegistry")
-            .field("groups", &self.groups)
-            .field("revoked_groups", &self.revoked_groups)
-            .field("ever_registered_groups", &self.ever_registered_groups)
-            .field("revocation_log", &self.revocation_log)
-            .field("listeners_count", &self.listeners.len())
-            .field("durable", &self.durable)
-            .finish()
-    }
+    pub revocation_log: Option<std::sync::Arc<RevocationLog>>,
 }
 
 impl KeyRegistry {
-    /// Creates a new empty `KeyRegistry` (in-memory, non-durable; intended primarily for tests or transient use).
+    /// Creates a new empty `KeyRegistry`.
     pub fn new() -> Self {
-        let mut bitmask = Vec::with_capacity(BITMASK_WORDS);
-        for _ in 0..BITMASK_WORDS {
-            bitmask.push(AtomicU64::new(0));
-        }
         Self {
             groups: RwLock::new(HashMap::new()),
             revoked_groups: RwLock::new(HashSet::new()),
-            revoked_bitmask: bitmask,
-            pending_revocations: RwLock::new(HashSet::new()),
-            ever_registered_groups: RwLock::new(HashSet::new()),
             revocation_log: None,
-            listeners: Vec::new(),
-            durable: false,
         }
-    }
-
-    /// Opens or creates a durable `KeyRegistry` backed by a file-based `RevocationLog` at `path`.
-    pub fn open_durable(
-        path: impl AsRef<std::path::Path>,
-        clock: Arc<dyn contextra_ports::Clock>,
-        signing_key: Option<ed25519_dalek::SigningKey>,
-        verifying_key: ed25519_dalek::VerifyingKey,
-        has_existing_keys: bool,
-    ) -> Result<Self> {
-        let log = RevocationLog::open_or_create_if_fresh(
-            path,
-            clock,
-            signing_key,
-            verifying_key,
-            has_existing_keys,
-        )?;
-        let mut bitmask = Vec::with_capacity(BITMASK_WORDS);
-        for _ in 0..BITMASK_WORDS {
-            bitmask.push(AtomicU64::new(0));
-        }
-        Ok(Self {
-            groups: RwLock::new(HashMap::new()),
-            revoked_groups: RwLock::new(HashSet::new()),
-            revoked_bitmask: bitmask,
-            pending_revocations: RwLock::new(HashSet::new()),
-            ever_registered_groups: RwLock::new(HashSet::new()),
-            revocation_log: Some(Arc::new(log)),
-            listeners: Vec::new(),
-            durable: true,
-        })
-    }
-
-    /// Returns `true` if this `KeyRegistry` is backed by a durable, file-based `RevocationLog`.
-    pub fn is_durable(&self) -> bool {
-        self.durable
-    }
-
-    /// Helper for testing poisoned locks behavior.
-    #[cfg(any(test, feature = "test-utils"))]
-    pub fn poison_groups_lock_for_test(self: &Arc<Self>) {
-        let registry = Arc::clone(self);
-        let _ = std::thread::spawn(move || {
-            if let Ok(_guard) = registry.groups.write() {
-                let slice: &[u8] = &[0];
-                let _ = slice[1];
-            }
-        })
-        .join();
-    }
-
-    /// Creates a new `KeyRegistry` backed by an in-memory `RevocationLog`.
-    pub fn new_in_memory(
-        clock: Arc<dyn contextra_ports::Clock>,
-        signing_key: Option<ed25519_dalek::SigningKey>,
-        verifying_key: ed25519_dalek::VerifyingKey,
-    ) -> Self {
-        Self::new().with_revocation_log(Arc::new(RevocationLog::new_in_memory(
-            clock,
-            signing_key,
-            verifying_key,
-        )))
     }
 
     /// Attaches an optional `RevocationLog` to check for persisted key/group revocations.
-    pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
+    pub fn with_revocation_log(mut self, log: std::sync::Arc<RevocationLog>) -> Self {
         self.revocation_log = Some(log);
-        self
-    }
-
-    /// Attaches a `GroupRevocationListener` to be notified on group revocation.
-    pub fn with_revocation_listener(mut self, listener: Arc<dyn GroupRevocationListener>) -> Self {
-        self.listeners.push(listener);
         self
     }
 
@@ -334,40 +156,17 @@ impl KeyRegistry {
         Some((rec.wrapped_dek.clone(), rec.dek_nonce))
     }
 
-    /// Checks if a group is revoked in O(1) lock-free time via atomic bitmask slices.
+    /// Checks if a group is revoked.
     pub fn is_group_revoked(&self, group_id: u64) -> bool {
         if let Some(ref log) = self.revocation_log {
             if log.is_revoked(&RevocationTarget::Group(group_id)) {
                 return true;
             }
-            if log.verify_integrity().is_err() {
-                return true;
-            }
         }
-
-        let word_idx = (group_id / 64) as usize;
-        let bit_offset = (group_id % 64) as u32;
-
-        if word_idx < self.revoked_bitmask.len() {
-            let mask = self.revoked_bitmask[word_idx].load(Ordering::Relaxed);
-            if (mask & (1u64 << bit_offset)) != 0 {
-                return true;
-            }
-        }
-
         if let Ok(guard) = self.revoked_groups.read() {
             guard.contains(&group_id)
         } else {
             true
-        }
-    }
-
-    /// Checks if a group was ever registered in this registry.
-    pub fn was_group_ever_registered(&self, group_id: u64) -> bool {
-        if let Ok(guard) = self.ever_registered_groups.read() {
-            guard.contains(&group_id)
-        } else {
-            false
         }
     }
 
@@ -406,226 +205,75 @@ impl KeyRegistry {
         }
 
         // Generate a random 32-byte Group KEK (never derived from group_id)
-        let mut kek_bytes = Zeroizing::new([0u8; 32]);
-        rand::rngs::OsRng.fill_bytes(&mut *kek_bytes);
+        let mut kek_bytes = [0u8; 32];
+        rand::rngs::OsRng.fill_bytes(&mut kek_bytes);
 
         // AEAD wrap the KEK using Master Key
-        let (wrapped_kek, kek_nonce) = master_key.encrypt_auto_nonce(&*kek_bytes)?;
+        let (wrapped_kek, kek_nonce) = master_key.encrypt_auto_nonce(&kek_bytes)?;
 
         let entry = GroupEntry {
-            kek: GroupKek(*kek_bytes),
+            kek: GroupKek(kek_bytes),
             wrapped_kek,
             kek_nonce,
             record_deks: HashMap::new(),
-            lifecycle_state: KeyLifecycleState::Active,
         };
 
-        let subkey = SubKey(*kek_bytes);
-
         write_guard.insert(group_id, entry);
-        if let Ok(mut ever_guard) = self.ever_registered_groups.write() {
-            ever_guard.insert(group_id);
-        }
-        Ok(subkey)
+        Ok(SubKey(kek_bytes))
     }
 
-    /// Phase 1: Initiates a revocation request for `group_id` (Zwei-Phasen-Modell).
-    /// Marks the group as pending revocation.
-    /// Returns `Ok(true)` if request was registered, `Ok(false)` if already finalized/revoked or pending.
-    pub fn request_revoke(&self, group_id: u64) -> Result<bool> {
-        if self.is_group_revoked(group_id) {
-            return Ok(false);
-        }
-
-        let mut pending_guard = self.pending_revocations.write().map_err(|_| {
-            CryptoError::Crypto("KeyRegistry pending_revocations write lock poisoned".to_string())
-        })?;
-
-        if pending_guard.contains(&group_id) {
-            return Ok(false);
-        }
-
-        pending_guard.insert(group_id);
-        Ok(true)
-    }
-
-    /// Cancels a pending revocation request for `group_id` prior to `finalize_revoke`.
-    /// Returns `Ok(true)` if pending revocation was canceled, `Ok(false)` if not pending,
-    /// or `Err(CryptoError::KeyRevoked)` if group was already finalized/revoked.
-    pub fn cancel_revoke(&self, group_id: u64) -> Result<bool> {
-        if self.is_group_revoked(group_id) {
-            return Err(CryptoError::KeyRevoked(format!(
-                "Cannot cancel revocation: group {group_id} has already been finalized and revoked"
-            )));
-        }
-
-        let mut pending_guard = self.pending_revocations.write().map_err(|_| {
-            CryptoError::Crypto("KeyRegistry pending_revocations write lock poisoned".to_string())
-        })?;
-
-        Ok(pending_guard.remove(&group_id))
-    }
-
-    /// Phase 2: Finalizes the revocation and physically destroys (zeroizes) KEK/DEKs for `group_id`.
-    /// Appends the revocation to `RevocationLog` and notifies listeners.
-    /// Returns `Ok(true)` if newly revoked, `Ok(false)` if already revoked.
-    pub fn finalize_revoke(&self, group_id: u64) -> Result<bool> {
-        if let Some(ref log) = self.revocation_log {
-            log.append(RevocationTarget::Group(group_id))
-                .map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        }
-
-        let mut revoked_guard = self.revoked_groups.write().map_err(|_| {
-            CryptoError::Crypto("KeyRegistry revoked_groups write lock poisoned".to_string())
-        })?;
+    /// Revokes (destroys) the Group KEK for `group_id` (Group Deletion / Group Crypto-Shredding).
+    /// Returns `true` if the group was active and is now revoked.
+    pub fn revoke_group(&self, group_id: u64) -> bool {
+        let mut revoked_guard = match self.revoked_groups.write() {
+            Ok(g) => g,
+            Err(_) => return false,
+        };
 
         if revoked_guard.contains(&group_id) {
-            return Ok(false);
+            return false;
         }
 
         revoked_guard.insert(group_id);
 
-        let word_idx = (group_id / 64) as usize;
-        let bit_offset = (group_id % 64) as u32;
-        if word_idx < self.revoked_bitmask.len() {
-            self.revoked_bitmask[word_idx].fetch_or(1u64 << bit_offset, Ordering::SeqCst);
-        }
-
-        if let Ok(mut pending_guard) = self.pending_revocations.write() {
-            pending_guard.remove(&group_id);
-        }
-
-        let mut groups_guard = match self.groups.write() {
-            Ok(g) => g,
-            Err(_) => {
-                // Group was inserted into revoked_groups above, so is_group_revoked remains true (fail-closed)
-                return Err(CryptoError::Crypto(
-                    "KeyRegistry groups write lock poisoned".to_string(),
-                ));
-            }
-        };
-
-        if let Some(mut entry) = groups_guard.remove(&group_id) {
-            entry.kek.0.zeroize();
-            entry.wrapped_kek.zeroize();
-            for (_, mut rec) in entry.record_deks.drain() {
-                rec.wrapped_dek.zeroize();
+        if let Ok(mut groups_guard) = self.groups.write() {
+            if let Some(mut entry) = groups_guard.remove(&group_id) {
+                entry.kek.0.zeroize();
+                entry.wrapped_kek.zeroize();
+                for (_, mut rec) in entry.record_deks.drain() {
+                    rec.wrapped_dek.zeroize();
+                }
+                return true;
             }
         }
 
-        drop(groups_guard);
-        drop(revoked_guard);
-
-        for listener in &self.listeners {
-            listener.on_group_revoked(group_id);
-        }
-
-        Ok(true)
-    }
-
-    /// Revokes a group under two-stage crypto-erase with scope quarantine duration (§5.13, E08).
-    pub fn revoke_group_with_scope(
-        &self,
-        group_id: u64,
-        scope: KeyDeletionScope,
-        current_time_nanos: u64,
-    ) -> Result<bool> {
-        let quarantine_duration = match scope {
-            KeyDeletionScope::CollectionOrTenant => DEFAULT_COLLECTION_QUARANTINE_NANOS,
-            KeyDeletionScope::Document => DEFAULT_DOCUMENT_QUARANTINE_NANOS,
-        };
-
-        let until_nanos = current_time_nanos.saturating_add(quarantine_duration);
-
-        let _state = if quarantine_duration > 0 {
-            KeyLifecycleState::KeyQuarantined { until_nanos }
-        } else {
-            KeyLifecycleState::KeyDestroyed
-        };
-
-        self.finalize_revoke(group_id)
-    }
-
-    /// Queries the current [`KeyLifecycleState`] for a group under the two-stage crypto-erase model.
-    ///
-    /// Returns [`KeyLifecycleState::KeyDestroyed`] if the group has been finalized/revoked,
-    /// or [`KeyLifecycleState::Active`] if active.
-    pub fn key_lifecycle_state(&self, group_id: u64, _current_time_nanos: u64) -> KeyLifecycleState {
-        if self.is_group_revoked(group_id) {
-            KeyLifecycleState::KeyDestroyed
-        } else {
-            KeyLifecycleState::Active
-        }
-    }
-
-    /// Checks if a group revocation is currently requested / pending.
-    pub fn is_revoke_pending(&self, group_id: u64) -> bool {
-        if let Ok(guard) = self.pending_revocations.read() {
-            guard.contains(&group_id)
-        } else {
-            false
-        }
-    }
-
-    /// Revokes (destroys) the Group KEK for `group_id` (Group Deletion / Group Crypto-Shredding).
-    /// Fully compatible with callers expecting direct group revocation (immediately finalizes).
-    /// Returns `true` if the group was active and is now revoked.
-    /// Fails with `Err(CryptoError::Crypto(...))` on poisoned locks.
-    pub fn revoke_group(&self, group_id: u64) -> Result<bool> {
-        self.finalize_revoke(group_id)
+        true
     }
 
     /// Revokes (destroys) the Group KEK for `group_id` in O(1). Alias for `revoke_group`.
-    pub fn revoke_subkey(&self, group_id: u64) -> Result<bool> {
+    pub fn revoke_subkey(&self, group_id: u64) -> bool {
         self.revoke_group(group_id)
-    }
-
-    /// Atomically and permanently shreds (revokes) the key for a KV segment (`segment_id`) for a given `tenant`.
-    ///
-    /// # Aufrufvertrag (Call Contract):
-    /// See [`shred_segment_key`].
-    pub fn shred_segment_key(&self, _tenant: contextra_types::TenantId, segment_id: u64) -> Result<bool> {
-        self.revoke_group(segment_id)
     }
 
     /// Revokes (destroys) the DEK wrap for a single record within `group_id` (Single Record Deletion).
     /// Leaves neighbor records in the same group intact and decryptable.
-    /// Only logs to `RevocationLog` if the record exists and is active.
-    /// Fails with `Err(CryptoError::Crypto(...))` on poisoned locks.
-    pub fn revoke_record(&self, group_id: u64, record_id: u64) -> Result<bool> {
+    pub fn revoke_record(&self, group_id: u64, record_id: u64) -> bool {
         if self.is_group_revoked(group_id) {
-            return Ok(false);
+            return false;
         }
 
-        let mut groups_guard = self.groups.write().map_err(|_| {
-            CryptoError::Crypto("KeyRegistry groups write lock poisoned".to_string())
-        })?;
-
-        let entry = match groups_guard.get_mut(&group_id) {
-            Some(e) => e,
-            None => return Ok(false),
-        };
-
-        let rec = match entry.record_deks.get_mut(&record_id) {
-            Some(r) => r,
-            None => return Ok(false),
-        };
-
-        if rec.revoked {
-            return Ok(false);
+        if let Ok(mut groups_guard) = self.groups.write() {
+            if let Some(entry) = groups_guard.get_mut(&group_id) {
+                if let Some(rec) = entry.record_deks.get_mut(&record_id) {
+                    if !rec.revoked {
+                        rec.revoked = true;
+                        rec.wrapped_dek.zeroize();
+                        return true;
+                    }
+                }
+            }
         }
-
-        rec.revoked = true;
-        rec.wrapped_dek.zeroize();
-
-        drop(groups_guard);
-
-        if let Some(ref log) = self.revocation_log {
-            log.append(RevocationTarget::Record(format!("{group_id}:{record_id}")))
-                .map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        }
-
-        Ok(true)
+        false
     }
 
     /// Returns `true` if `group_id` has an active KEK and is not revoked.
@@ -670,8 +318,8 @@ impl KeyRegistry {
         let kek_cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv KEK init failed: {e}")))?;
 
-        let mut dek_bytes = Zeroizing::new([0u8; 32]);
-        rand::rngs::OsRng.fill_bytes(&mut *dek_bytes);
+        let mut dek_bytes = [0u8; 32];
+        rand::rngs::OsRng.fill_bytes(&mut dek_bytes);
 
         let mut dek_nonce = [0u8; 12];
         rand::rngs::OsRng.fill_bytes(&mut dek_nonce);
@@ -679,7 +327,7 @@ impl KeyRegistry {
             .encrypt(Nonce::from_slice(&dek_nonce), dek_bytes.as_slice())
             .map_err(|e| CryptoError::Crypto(format!("DEK wrapping failed: {e}")))?;
 
-        let dek_cipher = Aes256GcmSiv::new_from_slice(&*dek_bytes)
+        let dek_cipher = Aes256GcmSiv::new_from_slice(&dek_bytes)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv DEK init failed: {e}")))?;
         let mut nonce = [0u8; 12];
         rand::rngs::OsRng.fill_bytes(&mut nonce);
@@ -726,22 +374,20 @@ impl KeyRegistry {
             )));
         }
 
-        if !self.is_record_active(payload.group_id, payload.record_id) {
-            return Err(CryptoError::Crypto(format!(
-                "Record {} in group {} is not active or has been revoked/shredded",
-                payload.record_id, payload.group_id
-            )));
-        }
-
-        if let Some((expected_wrapped_dek, expected_dek_nonce)) =
-            self.get_wrapped_dek(payload.group_id, payload.record_id)
-        {
-            if payload.wrapped_dek != expected_wrapped_dek
-                || payload.dek_nonce != expected_dek_nonce
-            {
+        if let Ok(groups_guard) = self.groups.read() {
+            if let Some(entry) = groups_guard.get(&payload.group_id) {
+                if let Some(rec) = entry.record_deks.get(&payload.record_id) {
+                    if rec.revoked {
+                        return Err(CryptoError::Crypto(format!(
+                            "Record {} in group {} has been revoked/shredded",
+                            payload.record_id, payload.group_id
+                        )));
+                    }
+                }
+            } else {
                 return Err(CryptoError::Crypto(format!(
-                    "Wrapped DEK mismatch for record {} in group {}",
-                    payload.record_id, payload.group_id
+                    "Group {} missing or revoked in KeyRegistry",
+                    payload.group_id
                 )));
             }
         }
@@ -750,14 +396,12 @@ impl KeyRegistry {
         let kek_cipher = Aes256GcmSiv::new_from_slice(&subkey.0)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv KEK init failed: {e}")))?;
 
-        let dek_bytes = Zeroizing::new(
-            kek_cipher
-                .decrypt(
-                    Nonce::from_slice(&payload.dek_nonce),
-                    payload.wrapped_dek.as_slice(),
-                )
-                .map_err(|e| CryptoError::Crypto(format!("DEK unwrap failed (key revoked?): {e}")))?,
-        );
+        let dek_bytes = kek_cipher
+            .decrypt(
+                Nonce::from_slice(&payload.dek_nonce),
+                payload.wrapped_dek.as_slice(),
+            )
+            .map_err(|e| CryptoError::Crypto(format!("DEK unwrap failed (key revoked?): {e}")))?;
 
         let dek_cipher = Aes256GcmSiv::new_from_slice(&dek_bytes)
             .map_err(|e| CryptoError::Crypto(format!("Aes256GcmSiv DEK init failed: {e}")))?;
@@ -807,7 +451,7 @@ impl KeyRegistry {
         ciphertext: &[u8],
         nonce_bytes: &[u8; 12],
     ) -> Result<Vec<u8>> {
-        if self.is_group_revoked(group_id) || self.get_wrapped_kek(group_id).is_none() {
+        if self.is_group_revoked(group_id) {
             return Err(CryptoError::KeyRevoked(format!(
                 "Sub-key for group {group_id} has been revoked or is missing"
             )));
@@ -835,14 +479,6 @@ impl KeyRegistry {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    deprecated
-)]
 mod tests {
     use super::*;
 
@@ -867,7 +503,7 @@ mod tests {
         }
 
         // Perform single record deletion (revoke record 10)
-        let revoked = registry.revoke_record(group_id, 10)?;
+        let revoked = registry.revoke_record(group_id, 10);
         assert!(revoked, "Record 10 must be successfully revoked");
 
         // Record 10 MUST fail decryption
@@ -901,7 +537,7 @@ mod tests {
         assert!(registry.is_group_active(group_id));
 
         // Revoke entire group (Group Deletion)
-        let revoked = registry.revoke_group(group_id)?;
+        let revoked = registry.revoke_group(group_id);
         assert!(revoked, "Group 100 revocation must succeed");
         assert!(!registry.is_group_active(group_id));
 
@@ -924,146 +560,6 @@ mod tests {
         assert!(
             res_encrypt.is_err(),
             "encrypt_with_group MUST consistently reject revoked group"
-        );
-
-        Ok(())
-    }
-
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    struct TestListener {
-        call_count: AtomicUsize,
-        last_revoked_group: std::sync::Mutex<Option<u64>>,
-    }
-
-    impl TestListener {
-        fn new() -> Self {
-            Self {
-                call_count: AtomicUsize::new(0),
-                last_revoked_group: std::sync::Mutex::new(None),
-            }
-        }
-    }
-
-    impl GroupRevocationListener for TestListener {
-        fn on_group_revoked(&self, group_id: u64) {
-            self.call_count.fetch_add(1, Ordering::SeqCst);
-            if let Ok(mut guard) = self.last_revoked_group.lock() {
-                *guard = Some(group_id);
-            }
-        }
-    }
-
-    #[test]
-    fn test_shred_segment_key_api() -> Result<()> {
-        let km = KeyManager::try_new("test-passphrase-shred-api", b"salt1")?;
-        let registry = KeyRegistry::new();
-        let tenant = contextra_types::TenantId::try_new(101).unwrap();
-        let segment_id = 555;
-
-        let subkey = registry.get_or_derive(&km, segment_id)?;
-        assert_eq!(subkey.0.len(), 32);
-        assert!(registry.is_group_active(segment_id));
-
-        // Shred segment key using shred_segment_key API
-        let shredded = shred_segment_key(&registry, tenant, segment_id)?;
-        assert!(shredded, "shred_segment_key must return Ok(true) on first shred");
-        assert!(!registry.is_group_active(segment_id));
-
-        // Subsequent shred attempt returns Ok(false)
-        let shredded_again = shred_segment_key(&registry, tenant, segment_id)?;
-        assert!(!shredded_again, "shred_segment_key must return Ok(false) on second shred");
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_group_revocation_listener_first_and_second_revocation() -> Result<()> {
-        let km = KeyManager::try_new("test-passphrase-listener", b"salt1")?;
-        let listener = Arc::new(TestListener::new());
-        let registry = KeyRegistry::new().with_revocation_listener(listener.clone());
-
-        let group_id = 200;
-        let _subkey = registry.get_or_derive(&km, group_id)?;
-
-        // (a) First revocation calls listener exactly once
-        let res1 = registry.revoke_group(group_id)?;
-        assert!(res1, "First revocation must return Ok(true)");
-        assert_eq!(
-            listener.call_count.load(Ordering::SeqCst),
-            1,
-            "Listener must be called exactly once on first revocation"
-        );
-        assert_eq!(
-            *listener.last_revoked_group.lock().unwrap(),
-            Some(group_id),
-            "Listener must receive the revoked group_id"
-        );
-
-        // (b) Second revocation does NOT call listener again
-        let res2 = registry.revoke_group(group_id)?;
-        assert!(!res2, "Second revocation must return Ok(false)");
-        assert_eq!(
-            listener.call_count.load(Ordering::SeqCst),
-            1,
-            "Listener must not be called again on second revocation"
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_group_revocation_listener_unknown_group_id() -> Result<()> {
-        let listener = Arc::new(TestListener::new());
-        let registry = KeyRegistry::new().with_revocation_listener(listener.clone());
-
-        let unknown_group_id = 999;
-        assert!(!registry.was_group_ever_registered(unknown_group_id));
-
-        // (c) Revoking an unknown group_id reports Ok(true) and calls listener once on first attempt
-        let res1 = registry.revoke_group(unknown_group_id)?;
-        assert!(res1, "Revoking unknown group_id returns Ok(true)");
-        assert_eq!(
-            listener.call_count.load(Ordering::SeqCst),
-            1,
-            "Listener is called once when revoking an unknown group_id for the first time"
-        );
-        assert_eq!(
-            *listener.last_revoked_group.lock().unwrap(),
-            Some(unknown_group_id)
-        );
-
-        // Second revocation attempt for same unknown group_id returns Ok(false) and does not call listener
-        let res2 = registry.revoke_group(unknown_group_id)?;
-        assert!(
-            !res2,
-            "Second revocation of unknown group_id returns Ok(false)"
-        );
-        assert_eq!(
-            listener.call_count.load(Ordering::SeqCst),
-            1,
-            "Listener is not called again on second revocation of unknown group_id"
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_key_registry_key_lifecycle_state() -> Result<()> {
-        let registry = KeyRegistry::new();
-        let group_id = 333;
-
-        // Active key lifecycle state
-        assert_eq!(
-            registry.key_lifecycle_state(group_id, 1_000_000),
-            KeyLifecycleState::Active
-        );
-
-        // After revocation, state transitions to KeyDestroyed
-        registry.revoke_group(group_id)?;
-        assert_eq!(
-            registry.key_lifecycle_state(group_id, 1_000_000),
-            KeyLifecycleState::KeyDestroyed
         );
 
         Ok(())

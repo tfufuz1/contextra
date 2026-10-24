@@ -62,6 +62,7 @@ deny = [
         "contextra",
         "contextra-agent",
         "contextra-bench",
+        "contextra-cognition",
         "contextra-db",
         "contextra-engine",
         "contextra-infer-candle",

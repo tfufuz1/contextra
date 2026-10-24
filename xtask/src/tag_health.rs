@@ -163,7 +163,6 @@ pub fn run_tag_health_impl(
     Ok(findings)
 }
 
-#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_tag_health(threshold_days: i64) -> Result<Vec<TagHealthFinding>, String> {
     let root = xtask::find_root_dir();
     run_tag_health_impl(&root, threshold_days)

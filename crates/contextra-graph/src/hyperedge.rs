@@ -6,7 +6,6 @@
 use crate::arc_slice::ArcSlice;
 use crate::csr::EdgeType;
 use crate::error::GraphMutationError;
-pub use contextra_ports::graph::{HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::{ContextraError, DocId, EntityId, Result, TxId};
 use scc::HashMap;
 use serde::{Deserialize, Serialize};
@@ -29,8 +28,89 @@ pub fn star_weight(weight: f32, cardinality: usize) -> f32 {
     if cardinality < 2 {
         weight
     } else {
-        let card_minus_one = cardinality.saturating_sub(1);
-        (2.0 * weight) / (card_minus_one as f32)
+        (2.0 * weight) / ((cardinality - 1) as f32)
+    }
+}
+
+/// Eindeutiger Identifikator für eine Hyperkante.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
+#[repr(transparent)]
+pub struct HyperEdgeId(pub u64);
+
+impl HyperEdgeId {
+    /// Erstellt eine neue `HyperEdgeId`.
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    /// Gibt den zugrundeliegenden `u64`-Wert zurück.
+    #[inline]
+    pub const fn inner(self) -> u64 {
+        self.0
+    }
+}
+
+impl From<u64> for HyperEdgeId {
+    fn from(id: u64) -> Self {
+        Self(id)
+    }
+}
+
+impl std::fmt::Display for HyperEdgeId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "HyperEdgeId({})", self.0)
+    }
+}
+
+/// Identifikator für die Rolle eines Teilnehmers in einer Hyperkante.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
+#[repr(transparent)]
+pub struct RoleId(pub u32);
+
+impl RoleId {
+    /// Erstellt eine neue `RoleId`.
+    #[inline]
+    pub const fn new(id: u32) -> Self {
+        Self(id)
+    }
+
+    /// Gibt den zugrundeliegenden `u32`-Wert zurück.
+    #[inline]
+    pub const fn inner(self) -> u32 {
+        self.0
+    }
+}
+
+impl From<u32> for RoleId {
+    fn from(id: u32) -> Self {
+        Self(id)
+    }
+}
+
+impl std::fmt::Display for RoleId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RoleId({})", self.0)
+    }
+}
+
+/// Bindung einer Entity an eine spezifische Rolle innerhalb einer Hyperkante.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RoleBinding {
+    /// Die Rolle der Entity in der Hyperkante.
+    pub role: RoleId,
+    /// Die gebundene Entity.
+    pub entity: EntityId,
+}
+
+impl RoleBinding {
+    /// Erstellt eine neue `RoleBinding`.
+    pub fn new(role: RoleId, entity: EntityId) -> Self {
+        Self { role, entity }
     }
 }
 
@@ -387,7 +467,6 @@ impl RoleInterner {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
 

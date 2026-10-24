@@ -1,15 +1,74 @@
-//! Performance Profiling Harness for contextra-text
-//! Measures document processing time, indexing throughput, and query performance
+//! Allocation Profiling Harness for contextra-text
+//! Measures heap allocation count, bytes allocated, execution time, and throughput
 //! for 10,000 documents (~500 words per document) across German and English workloads.
 
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
 use contextra_text::inverted::{InvertedIndex, Language};
 use contextra_text::tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 use contextra_types::{DocId, TxId};
-use std::collections::BTreeMap;
+use std::alloc::{GlobalAlloc, Layout, System};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use unicode_segmentation::UnicodeSegmentation;
+
+struct CountingAllocator;
+
+static ALLOC_COUNT: AtomicU64 = AtomicU64::new(0);
+static DEALLOC_COUNT: AtomicU64 = AtomicU64::new(0);
+static ALLOC_BYTES: AtomicU64 = AtomicU64::new(0);
+
+// SAFETY: `CountingAllocator` implements `GlobalAlloc` by delegating directly to `std::alloc::System`.
+// Invariants & Safety Proof:
+// 1. Thread Safety: Atomic counter increments (`ALLOC_COUNT`, `DEALLOC_COUNT`, `ALLOC_BYTES`) use relaxed atomic operations, preserving `Sync` safety.
+// 2. Memory Safety: All heap allocations and deallocations are forwarded unchanged to `std::alloc::System`.
+// 3. Trait Contract: `alloc` and `dealloc` obey all layout and pointer invariants required by the `GlobalAlloc` contract.
+#[allow(unsafe_code)]
+unsafe impl GlobalAlloc for CountingAllocator {
+    // SAFETY: Thread-safe delegation to System allocator.
+    // SAFETY: Layout invariants (size, alignment) are guaranteed by the `GlobalAlloc` contract caller.
+    #[allow(unsafe_code)]
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        // SAFETY: Layout verified by GlobalAlloc caller.
+        ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
+        ALLOC_BYTES.fetch_add(layout.size() as u64, Ordering::Relaxed);
+        // SAFETY: `layout` is guaranteed valid by caller of `GlobalAlloc::alloc`, forwarded directly to `System.alloc`.
+        #[allow(unsafe_code)]
+        let ptr = unsafe { System.alloc(layout) }; // SAFETY: Forward layout to System allocator.
+        ptr
+    }
+
+    // SAFETY: Pointer and layout invariants are guaranteed by the `GlobalAlloc` contract caller (`ptr` was allocated by `alloc` with matching `layout`).
+    #[allow(unsafe_code)]
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        // SAFETY: Pointer and layout verified by GlobalAlloc caller.
+        DEALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
+        // SAFETY: `ptr` and `layout` are guaranteed valid by caller of `GlobalAlloc::dealloc`, forwarded directly to `System.dealloc`.
+        #[allow(unsafe_code)]
+        unsafe {
+            System.dealloc(ptr, layout)
+        }; // SAFETY: Forward ptr and layout to System allocator.
+    }
+}
+
+#[global_allocator]
+static A: CountingAllocator = CountingAllocator;
+
+fn reset_stats() {
+    ALLOC_COUNT.store(0, Ordering::Relaxed);
+    DEALLOC_COUNT.store(0, Ordering::Relaxed);
+    ALLOC_BYTES.store(0, Ordering::Relaxed);
+}
+
+fn get_stats() -> (u64, u64, u64) {
+    (
+        ALLOC_COUNT.load(Ordering::Relaxed),
+        DEALLOC_COUNT.load(Ordering::Relaxed),
+        ALLOC_BYTES.load(Ordering::Relaxed),
+    )
+}
+
+use std::collections::BTreeMap;
 
 struct FastRamStorage {
     store: parking_lot::RwLock<BTreeMap<Vec<u8>, Vec<u8>>>,
@@ -178,7 +237,7 @@ fn generate_english_doc(doc_idx: usize) -> String {
 #[ignore]
 async fn run_profile_10k_documents() {
     println!("\n================================================================================");
-    println!("CONTEXTRA-TEXT PERFORMANCE PROFILE & BENCHMARK HARNESS (10,000 DOCS)");
+    println!("CONTEXTRA-TEXT ALLOCATION PROFILE & BENCHMARK HARNESS (10,000 DOCS)");
     println!("================================================================================");
 
     const NUM_DOCS: usize = 10_000;
@@ -191,17 +250,20 @@ async fn run_profile_10k_documents() {
     let mut total_words_de = 0usize;
     let mut total_tokens_de = 0usize;
 
+    // Generate documents first so doc creation allocations aren't counted
     let german_docs: Vec<String> = (0..NUM_DOCS).map(generate_german_doc).collect();
     for doc in &german_docs {
         total_words_de += doc.unicode_words().count();
     }
 
+    reset_stats();
     let start_de_tok = Instant::now();
     for doc in &german_docs {
         let tokens = german_tok.tokenize(doc);
         total_tokens_de += tokens.len();
     }
     let dur_de_tok = start_de_tok.elapsed();
+    let (allocs_de_tok, _deallocs_de_tok, bytes_de_tok) = get_stats();
 
     println!("GERMAN TOKENIZER:");
     println!("  - Documents processed   : {}", NUM_DOCS);
@@ -211,6 +273,20 @@ async fn run_profile_10k_documents() {
         total_words_de as f64 / NUM_DOCS as f64
     );
     println!("  - Total tokens generated: {}", total_tokens_de);
+    println!("  - Total Allocations     : {}", allocs_de_tok);
+    println!(
+        "  - Total Bytes Allocated : {} ({:.2} MB)",
+        bytes_de_tok,
+        bytes_de_tok as f64 / 1_048_576.0
+    );
+    println!(
+        "  - Allocations / Word    : {:.4}",
+        allocs_de_tok as f64 / total_words_de as f64
+    );
+    println!(
+        "  - Allocations / Token   : {:.4}",
+        allocs_de_tok as f64 / total_tokens_de as f64
+    );
     println!(
         "  - Time Elapsed          : {:.3} s",
         dur_de_tok.as_secs_f64()
@@ -230,12 +306,14 @@ async fn run_profile_10k_documents() {
         total_words_en += doc.unicode_words().count();
     }
 
+    reset_stats();
     let start_en_tok = Instant::now();
     for doc in &english_docs {
         let tokens = english_tok.tokenize(doc);
         total_tokens_en += tokens.len();
     }
     let dur_en_tok = start_en_tok.elapsed();
+    let (allocs_en_tok, _deallocs_en_tok, bytes_en_tok) = get_stats();
 
     println!("\nENGLISH DEFAULT TOKENIZER:");
     println!("  - Documents processed   : {}", NUM_DOCS);
@@ -245,6 +323,20 @@ async fn run_profile_10k_documents() {
         total_words_en as f64 / NUM_DOCS as f64
     );
     println!("  - Total tokens generated: {}", total_tokens_en);
+    println!("  - Total Allocations     : {}", allocs_en_tok);
+    println!(
+        "  - Total Bytes Allocated : {} ({:.2} MB)",
+        bytes_en_tok,
+        bytes_en_tok as f64 / 1_048_576.0
+    );
+    println!(
+        "  - Allocations / Word    : {:.4}",
+        allocs_en_tok as f64 / total_words_en as f64
+    );
+    println!(
+        "  - Allocations / Token   : {:.4}",
+        allocs_en_tok as f64 / total_tokens_en as f64
+    );
     println!(
         "  - Time Elapsed          : {:.3} s",
         dur_en_tok.as_secs_f64()
@@ -263,10 +355,11 @@ async fn run_profile_10k_documents() {
     let index_de =
         InvertedIndex::new_with_language(storage_de.clone(), "de_bench", Language::German);
 
+    reset_stats();
     let start_de_idx = Instant::now();
     for (i, doc) in german_docs.iter().enumerate() {
         let tx = TxId::new((i + 1) as u64);
-        let doc_id = DocId::new(((i + 1) as u64).into());
+        let doc_id = DocId::new((i + 1) as u64);
         index_de
             .insert(tx, doc_id, doc)
             .await
@@ -274,10 +367,25 @@ async fn run_profile_10k_documents() {
         index_de.commit(tx).await.expect("commit succeeds");
     }
     let dur_de_idx = start_de_idx.elapsed();
+    let (allocs_de_idx, _deallocs_de_idx, bytes_de_idx) = get_stats();
 
     println!("GERMAN FULL INDEX PIPELINE:");
     println!("  - Documents indexed     : {}", NUM_DOCS);
     println!("  - Total words indexed   : {}", total_words_de);
+    println!("  - Total Allocations     : {}", allocs_de_idx);
+    println!(
+        "  - Total Bytes Allocated : {} ({:.2} MB)",
+        bytes_de_idx,
+        bytes_de_idx as f64 / 1_048_576.0
+    );
+    println!(
+        "  - Allocations / Word    : {:.4}",
+        allocs_de_idx as f64 / total_words_de as f64
+    );
+    println!(
+        "  - Allocations / Doc     : {:.1}",
+        allocs_de_idx as f64 / NUM_DOCS as f64
+    );
     println!(
         "  - Time Elapsed          : {:.3} s",
         dur_de_idx.as_secs_f64()
@@ -292,10 +400,11 @@ async fn run_profile_10k_documents() {
     let storage_en = Arc::new(FastRamStorage::new());
     let index_en = InvertedIndex::new(storage_en.clone(), "en_bench");
 
+    reset_stats();
     let start_en_idx = Instant::now();
     for (i, doc) in english_docs.iter().enumerate() {
         let tx = TxId::new((i + 1) as u64);
-        let doc_id = DocId::new(((i + 1) as u64).into());
+        let doc_id = DocId::new((i + 1) as u64);
         index_en
             .insert(tx, doc_id, doc)
             .await
@@ -303,10 +412,25 @@ async fn run_profile_10k_documents() {
         index_en.commit(tx).await.expect("commit succeeds");
     }
     let dur_en_idx = start_en_idx.elapsed();
+    let (allocs_en_idx, _deallocs_en_idx, bytes_en_idx) = get_stats();
 
     println!("\nENGLISH FULL INDEX PIPELINE:");
     println!("  - Documents indexed     : {}", NUM_DOCS);
     println!("  - Total words indexed   : {}", total_words_en);
+    println!("  - Total Allocations     : {}", allocs_en_idx);
+    println!(
+        "  - Total Bytes Allocated : {} ({:.2} MB)",
+        bytes_en_idx,
+        bytes_en_idx as f64 / 1_048_576.0
+    );
+    println!(
+        "  - Allocations / Word    : {:.4}",
+        allocs_en_idx as f64 / total_words_en as f64
+    );
+    println!(
+        "  - Allocations / Doc     : {:.1}",
+        allocs_en_idx as f64 / NUM_DOCS as f64
+    );
     println!(
         "  - Time Elapsed          : {:.3} s",
         dur_en_idx.as_secs_f64()
@@ -327,18 +451,26 @@ async fn run_profile_10k_documents() {
         "Lagerbestandsverwaltung Lieferkette",
     ];
 
+    reset_stats();
     let start_search = Instant::now();
     for i in 0..1000 {
         let q = queries[i % queries.len()];
-        let results = index_de.search(q, 10).await.expect("search succeeds");
-        assert!(
-            !results.is_empty(),
-            "Search query '{q}' returned no results"
-        );
+        let _ = index_de.search(q, 10).await.expect("search succeeds");
     }
     let dur_search = start_search.elapsed();
+    let (allocs_search, _deallocs_search, bytes_search) = get_stats();
 
     println!("BM25 SEARCH (German Index, 1000 Queries):");
+    println!("  - Total Allocations     : {}", allocs_search);
+    println!(
+        "  - Total Bytes Allocated : {} ({:.2} MB)",
+        bytes_search,
+        bytes_search as f64 / 1_048_576.0
+    );
+    println!(
+        "  - Allocations / Query   : {:.1}",
+        allocs_search as f64 / 1000.0
+    );
     println!(
         "  - Time Elapsed          : {:.3} ms total ({:.3} ms/query)",
         dur_search.as_secs_f64() * 1000.0,

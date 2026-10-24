@@ -24,7 +24,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 let (id, metadata) =
                     if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
                         (meta.id, meta.metadata)
-                    } else if let Ok(full) = StoredDocument::from_slice(&bytes) {
+                    } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&bytes) {
                         (full.id, full.metadata)
                     } else {
                         tracing::warn!(doc_id = ?sd.doc_id, "Could not deserialize doc_key");
@@ -71,7 +71,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 let (id, metadata) =
                     if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
                         (meta.id, meta.metadata)
-                    } else if let Ok(full) = StoredDocument::from_slice(&bytes) {
+                    } else if let Ok(full) = serde_json::from_slice::<StoredDocument>(&bytes) {
                         (full.id, full.metadata)
                     } else {
                         tracing::warn!(doc_id = ?doc_id, "Could not deserialize doc_key");

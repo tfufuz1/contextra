@@ -12,8 +12,6 @@ use contextra_ports::kv::{KvBlock, KvPrefixHit, KvPrefixStore, PrefixKey};
 use contextra_types::{ContextraError, TenantId};
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use zeroize::Zeroize;
 
 use crate::radix::{KvReusePolicy, PrefixRadixTree};
 
@@ -27,46 +25,6 @@ struct BlockGroup {
     blocks: Vec<KvBlock>,
     bytes: usize,
     tick: u64,
-    test_inspector: Option<Arc<parking_lot::Mutex<Vec<u8>>>>,
-}
-
-impl Zeroize for BlockGroup {
-    fn zeroize(&mut self) {
-        let has_inspector = self.test_inspector.is_some();
-        let mut test_captured = Vec::new();
-
-        for block in &mut self.blocks {
-            let taken = std::mem::take(&mut block.data);
-            match taken.try_into_mut() {
-                Ok(mut mut_buf) => {
-                    if has_inspector {
-                        test_captured.extend_from_slice(&mut_buf);
-                    }
-                    mut_buf.as_mut().zeroize();
-                }
-                Err(shared_bytes) => {
-                    if !shared_bytes.is_empty() {
-                        tracing::warn!(
-                            "BlockGroup payload bytes are shared; in-place zeroize skipped"
-                        );
-                    }
-                }
-            }
-        }
-
-        if let Some(inspector) = &self.test_inspector {
-            if !test_captured.is_empty() && inspector.lock().is_empty() {
-                test_captured.as_mut_slice().zeroize();
-                *inspector.lock() = test_captured;
-            }
-        }
-    }
-}
-
-impl Drop for BlockGroup {
-    fn drop(&mut self) {
-        self.zeroize();
-    }
 }
 
 struct Partition {
@@ -145,8 +103,6 @@ impl TenantPrefixKvStore {
             .find_longest_prefix(tokens, self.reuse_policy)?;
         let group = partition.groups.get_mut(&pm.block_id)?;
 
-        // ORDERING RATIONALE: Ordering::Relaxed is sufficient because next_tick is a monotonic sequence counter
-        // for LRU eviction candidate ranking, operated under partitions RwLock write guard.
         group.tick = self.next_tick.fetch_add(1, Ordering::Relaxed);
 
         Some(KvPrefixHit {
@@ -194,8 +150,6 @@ impl TenantPrefixKvStore {
             }
         }
 
-        // ORDERING RATIONALE: Ordering::Relaxed is sufficient because next_group_id and next_tick are unique ID
-        // and LRU timestamp sequence generators operating within partitions RwLock write guard.
         let group_id = self.next_group_id.fetch_add(1, Ordering::Relaxed);
         let tick = self.next_tick.fetch_add(1, Ordering::Relaxed);
 
@@ -208,7 +162,6 @@ impl TenantPrefixKvStore {
                 blocks,
                 bytes: group_bytes,
                 tick,
-                test_inspector: None,
             },
         );
         partition.total_bytes += group_bytes;
@@ -288,66 +241,6 @@ impl TenantPrefixKvStore {
         }
 
         Ok(total_invalidated)
-    }
-
-    #[doc(hidden)]
-
-    /// Zählt die tatsächlichen Speicher-Einträge (`partition.groups`), die zu `scratchpad_key_prefix` passen.
-    pub fn count_prefix_scope_keys(
-        &self,
-        tenant: TenantId,
-        scratchpad_key_prefix: &[u32],
-        keys: &[PrefixKey],
-    ) -> Result<usize, ContextraError> {
-        if scratchpad_key_prefix.is_empty() {
-            return Ok(0);
-        }
-
-        let map = self.partitions.read();
-        let mut total_count = 0usize;
-
-        let target_partition_keys: Vec<PrefixKey> = if keys.is_empty() {
-            map.keys()
-                .filter(|(t, _)| *t == tenant)
-                .map(|(_, k)| k.clone())
-                .collect()
-        } else {
-            keys.to_vec()
-        };
-
-        for key in target_partition_keys {
-            let partition_key = (tenant, key);
-            if let Some(partition) = map.get(&partition_key) {
-                for group in partition.groups.values() {
-                    if group.tokens.starts_with(scratchpad_key_prefix) {
-                        total_count += 1;
-                    }
-                }
-            }
-        }
-
-        Ok(total_count)
-    }
-
-    pub fn set_group_test_inspector(
-        &self,
-        tenant: TenantId,
-        key: &PrefixKey,
-        tokens: &[u32],
-        inspector: Arc<parking_lot::Mutex<Vec<u8>>>,
-    ) {
-        let mut map = self.partitions.write();
-        if let Some(partition) = map.get_mut(&(tenant, key.clone())) {
-            if let Some(group_id) = partition
-                .tree
-                .find_longest_prefix(tokens, self.reuse_policy)
-                .map(|pm| pm.block_id)
-            {
-                if let Some(group) = partition.groups.get_mut(&group_id) {
-                    group.test_inspector = Some(inspector);
-                }
-            }
-        }
     }
 
     fn evict_to_budget_internal(

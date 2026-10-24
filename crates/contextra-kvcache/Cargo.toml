@@ -31,12 +31,10 @@ bytes = { workspace = true }
 default = []
 content-addressed-kv-cache = []
 kv-encryption = ["contextra-crypto/kv-encryption"]
+kvcache-attention-eviction = []
 kvcache-kivi-quant = []
 kivi-quantization = []
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
-
-[target.'cfg(loom)'.dependencies]
-loom = "0.7"

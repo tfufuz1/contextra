@@ -208,10 +208,10 @@ impl ConformalCalibrator {
     ///
     /// Returns `true` if the threshold was adjusted.
     pub fn update(&mut self, non_conformity_score: f32) -> bool {
-        self.window_total = self.window_total.saturating_add(1);
+        self.window_total += 1;
 
         let indicator = if non_conformity_score > self.quantile_threshold {
-            self.window_errors = self.window_errors.saturating_add(1);
+            self.window_errors += 1;
             1.0f32
         } else {
             0.0f32

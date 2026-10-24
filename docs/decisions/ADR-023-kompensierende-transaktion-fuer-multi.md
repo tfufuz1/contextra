@@ -1,14 +1,18 @@
-# ADR-023: Kompensierende Transaktion für Multi-Store relate() Operations
+# ADR-023: Kompensierende Transaktion für Multi-Store relate() Operations (F-01 / AGT-DB-005)
 
-* **Status:** Superseded (ersetzt durch ADR-N19 und ADR-N06 Option B)
-* **Datum:** 2026-08-28 (Aktualisiert: 2026-09-30)
-* **Kontext / Auslöser:**
-  `Collection::relate()` führt Operationen über heterogene Storage-Backends (`LsmStorage` und `CsrGraph`) aus. Nachdem `storage.commit(tx)` aufgerufen wurde, ist der `TxBuffer`-Eintrag für `tx` geleert und im WAL dauerhaft persistiert. Ein nachfolgender Fehler in `graph_index.commit(tx)` führte dazu, dass `rollback_relate(tx)` aufgerufen wurde, was wiederum `storage.rollback(tx)` aufrief.
-  Dieses ADR skizzierte eine kompensierende Transaktion als Saga-Muster, benutzte im Text jedoch fälschlicherweise die Bezeichnung "2-Phase Commit Protocol (2PC)".
 
-## Grund der Ersetzung (Superseded)
+*   **Datum**: 2026-08-28
+*   **Status**: ✅ Final
+*   **Kontext**: `Collection::relate()` führt Operationen über heterogene Storage-Backends (`LsmStorage` und `CsrGraph`) aus. Nachdem `storage.commit(tx)` aufgerufen wurde, ist der `TxBuffer`-Eintrag für `tx` geleert und im WAL dauerhaft persistiert. Ein nachfolgender Fehler in `graph_index.commit(tx)` führte dazu, dass `rollback_relate(tx)` aufgerufen wurde, was wiederum `storage.rollback(tx)` aufrief. Da `storage.rollback(tx)` jedoch nur uncommittete `TxBuffer`-Einträge verwirft (`tx_buffer.discard(tx)`), war der Rollback für den Storage-Teil ein wirkungsloser No-Op. Dies führte zu inkonsistentem Zustand zwischen Storage und Graph-Index.
+*   **Entscheidung**: Implementierung von Option A: Kompensierende Transaktion. Falls `storage.commit(tx)` erfolgreich ist, aber `graph_index.commit(tx)` fehlschlägt, wird eine kompensierende Löschtransaktion (`storage.delete()` + `storage.commit()`) mit einer neu allokierten `TxId` ausgeführt, um den bereits committeten Relations-Key wieder aus dem LSM-Storage zu entfernen (Tombstone-Eintrag schreiben).
+*   **Alternativen**:
+    - **Option B (2-Phase Commit Protocol)**: Einführung einer `prepare()`-Methode auf `GraphIndex`. Verworfen, da dies Trait-Verträge in `contextra-core` und allen Implementierungen anpassen müsste und höhere API-Komplexität mit sich bringt.
+    - **Option C (Vereinheitlichung der Commit-Klammer)**: `CsrGraph` und `LsmStorage` in eine gemeinsame Transaktionsklammer verschmelzen. Verworfen, da `CsrGraph` in-memory eigene CSR-Strukturen und Delta-Buffer verwaltet und eine Zusammenlegung die Layer-Architektur aufbrechen würde.
+*   **Begründung**: Option A benötigt keine breaking API-Änderungen an den Trait-Schnittstellen (`contextra-core`), hat vernachlässigbaren Performance-Overhead im Fehlerfall und ist vollständig konsistent mit bestehenden Tombstone- und Kompensationsmustern im Repo (wie `DbTransaction::commit()` in `transaction.rs`).
+*   **Konsequenzen**:
+    - `Collection::relate()` führt bei Fehlschlag von `graph_index.commit(tx)` nach erfolgreichem `storage.commit(tx)` einen kompensierenden Delete-Commit aus.
+    - Doc-Kommentare in `LsmStorage` und `StorageEngine` beschreiben die exakte Garantie: `rollback()` verwirft nur uncommittete `TxBuffer`-Einträge; ein Undo nach physischem Commit erfordert einen Compensating-Write.
 
-1. **Begriffs-Korrektur:** Die im ursprünglichen Text verwendete Bezeichnung "2PC" war fachlich inkorrekt. Es handelte sich nicht um ein zweiphasiges Commit-Protokoll mit verteilt-synchroner Prepare-Phase, sondern um ein Saga-Muster mit kompensierender Löschaktion.
-2. **Neues Konsistenzmodell (ADR-N19 / ADR-N06 Option B):** Gemäß Beschluss F4 (ADR-N19) gilt das Write-Ahead Log (`contextra-store::wal`) als einzige unumstößliche Datenquelle ("Single Source of Truth"). Der `CsrGraph` und alle weiteren Sekundärindizes sind reine abgeleitete Zustände ("Derived State"), die Änderungen aus dem WAL nachziehen. Kompensierende Transaktionen über heterogene Indizes hinweg entfallen; bei Index-Fehlern oder Unterm-Strich-Crashes replayed der Graph-Index deterministisch aus dem WAL [V].
+---
 
 ---

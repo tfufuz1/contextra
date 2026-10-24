@@ -2,8 +2,7 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use contextra_types::{DistanceMetric, DocId, TxId};
-use contextra_ports::{VectorIndex};
+use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 
 #[derive(Arbitrary, Debug)]

@@ -63,8 +63,6 @@ Referenz-Hash. Jede Schema-Änderung ohne begleitende Regenerierung schlägt den
 Gate MUSS grün sein, bevor `HyperEdgeFb` gemerged wird (H4), und erneut grün sein, bevor die
 `child_edge_ids`-Erweiterung gemerged wird (AK-19, §16.2).**
 
-**File-Identifier (`file_identifier "CTRA";`):** Das Schema deklariert den 4-Byte-Identifier `"CTRA"` zur Identifikation valider IPC-FlatBuffer-Nachrichten und zur Erkennung von Fremdpuffern beim Deserialisieren (siehe `crates/contextra-wire/src/wiring.rs`).
-
 ---
 
 <a id="13-fehler"></a>

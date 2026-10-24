@@ -9,7 +9,6 @@
 //!
 //! Backpressure contract: `max_concurrent_inferences` limits `spawn_blocking` calls.
 //! Callers will experience backpressure (await on permit acquire) rather than Tokio thread pool exhaustion.
-//! Verified Candle ML inference path: Executes GGUF forward passes via thread-safe `spawn_blocking` and enforces semaphore-based backpressure limits.
 
 mod core;
 

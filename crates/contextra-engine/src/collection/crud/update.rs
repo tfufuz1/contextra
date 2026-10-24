@@ -60,11 +60,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         let old_user_val = self
             .storage
-            .get_at_seq_tracked(tx, &user_key, tx.inner())
+            .get_at_seq_tracked(tx, &user_key, u64::MAX)
             .await?;
         let old_doc_val = self
             .storage
-            .get_at_seq_tracked(tx, &doc_key, tx.inner())
+            .get_at_seq_tracked(tx, &doc_key, u64::MAX)
             .await?;
         let is_update = old_user_val.is_some() || old_doc_val.is_some();
 
@@ -84,7 +84,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             metadata: metadata.clone(),
         };
         let meta_only = StoredDocumentMeta::from(&stored);
-        let data = stored.encode_v2()?;
+        let data = serde_json::to_vec(&stored)?;
         let meta_data = serde_json::to_vec(&meta_only)?;
 
         self.storage.put(tx, &user_key, &data).await?;

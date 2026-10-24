@@ -50,15 +50,6 @@ impl Clone for ScalarQuantizer {
 }
 
 impl ScalarQuantizer {
-    /// Returns `true` if the quantizer has been successfully trained and is valid for quantization operations.
-    pub fn is_trained(&self) -> bool {
-        self.dimension > 0
-            && self.mins.len() == self.dimension
-            && self.maxes.len() == self.dimension
-            && self.scales.len() == self.dimension
-            && self.inv_scales.len() == self.dimension
-    }
-
     /// Creates a new ScalarQuantizer trained on a batch of vectors to find per-dimension min/max.
     ///
     /// For long-lived or growing collections, callers should periodically recalibrate the
@@ -538,8 +529,7 @@ mod quantize_validation_tests {
     }
 
     #[test]
-    fn test_drift_ratio_accumulation_and_pure_calculate_vector_drift() -> contextra_core::Result<()>
-    {
+    fn test_drift_ratio_accumulation_and_pure_calculate_vector_drift() -> contextra_core::Result<()> {
         let vec1 = vec![0.0, 5.0, 10.0];
         let vec2 = vec![10.0, 5.0, 0.0];
         let batch = vec![vec1.as_slice(), vec2.as_slice()];
@@ -551,11 +541,7 @@ mod quantize_validation_tests {
         let out_of_bounds = vec![-5.0, 5.0, 15.0]; // 2 dimensions out of range
         let calc_drift = sq.calculate_vector_drift(&out_of_bounds);
         assert!((calc_drift - (2.0 / 3.0)).abs() < f32::EPSILON);
-        assert_eq!(
-            sq.drift_ratio(),
-            0.0,
-            "Pure drift calculation must not update drift ratio"
-        );
+        assert_eq!(sq.drift_ratio(), 0.0, "Pure drift calculation must not update drift ratio");
 
         // Quantizing in-range vector -> 1 query, 0 out-of-range -> ratio = 0.0
         let _ = sq.quantize(&[5.0, 5.0, 5.0])?;

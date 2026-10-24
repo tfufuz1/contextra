@@ -7,7 +7,6 @@ use contextra_license::{
     SignedLicenseGate,
 };
 use contextra_ports::clock::Clock;
-use contextra_types::DeterministicTimestamp;
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
 
@@ -16,11 +15,11 @@ struct TestClock {
 }
 
 impl Clock for TestClock {
-    fn now(&self) -> DeterministicTimestamp {
-        DeterministicTimestamp::new(self.now_unix_secs * 1000, 0)
+    fn now_unix_nanos(&self) -> u64 {
+        self.now_unix_secs * 1_000_000_000
     }
 
-    fn monotonic_ticks(&self) -> u64 {
+    fn monotonic_nanos(&self) -> u64 {
         0
     }
 }
@@ -65,13 +64,8 @@ fn test_step_3_mismatched_installation_id_returns_not_activated_before_signature
     });
 
     // Create an activation for expected_id with tampered signature to verify Step 3 runs BEFORE Step 4
-    let mut activation = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        expected_id,
-        2000,
-        &signing_key,
-    )
-    .expect("create_signed succeeds");
+    let mut activation =
+        SignedActivation::create_signed(FeatureRing::Sovereign, expected_id, 2000, &signing_key);
     activation.signature[0] ^= 0xFF; // Tamper signature
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
@@ -95,8 +89,7 @@ fn test_step_4_tampered_signature_returns_invalid_signature() {
     });
 
     let mut activation =
-        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 2000, &signing_key)
-            .expect("create_signed succeeds");
+        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 2000, &signing_key);
     activation.signature[0] ^= 0xFF; // Tamper signature
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
@@ -124,8 +117,7 @@ fn test_step_5_expired_activation_returns_expired() {
         local_id,
         expires_at_unix,
         &signing_key,
-    )
-    .expect("create_signed succeeds");
+    );
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
         .with_local_installation_id(local_id);
@@ -148,8 +140,7 @@ fn test_step_6_insufficient_activated_ring_returns_not_activated() {
 
     // Activated ring is Sovereign, but Compliance ring is requested
     let activation =
-        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 2000, &signing_key)
-            .expect("create_signed succeeds");
+        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, 2000, &signing_key);
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
         .with_local_installation_id(local_id);
@@ -164,15 +155,14 @@ fn test_step_6_insufficient_activated_ring_returns_not_activated() {
 #[test]
 fn test_step_7_fully_valid_activation_returns_ok() {
     let (signing_key, verifying_key) = generate_keypair();
-    let local_id = derive_local_installation_id_hash(None).expect("unbound hash succeeds");
+    let local_id = derive_local_installation_id_hash(None);
 
     let clock = Arc::new(TestClock {
         now_unix_secs: 1000,
     });
 
     let activation =
-        SignedActivation::create_signed(FeatureRing::Compliance, local_id, 2000, &signing_key)
-            .expect("create_signed succeeds");
+        SignedActivation::create_signed(FeatureRing::Compliance, local_id, 2000, &signing_key);
 
     let gate = SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock)
         .with_local_installation_id(local_id);

@@ -1,23 +1,16 @@
-//! FILE-CONTEXT: STAND/ZWECK/INVARIANTEN
-//! Stand: 2026-10-06
-//! Zweck: Background flusher actor processing WAL I/O commands sequentially with error truncation.
-//! Invarianten:
-//! - I-2 (Atomarer Group-Commit): Ungefluste Data-Bytes werden bei sync_all-Fehler sofort per set_len(size_before) zurückgeschnitten.
-//! - I-3 (Crash-Konsistenz): Nach fsync-Fehler verbleiben keine unbestätigten Bytes im Page-Cache.
-//! - I-5 (Poison-State Isolation): Nach I/O- oder fsync-Fehler bleibt das Handle poisoned bis zur expliziten Replay-Recovery.
-
-use contextra_durable_fs::{FaultInjector, NoFault};
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 use super::{Wal, WalEntry, WalVersion, WAL_V3_HEADER};
 
-#[allow(dead_code)]
 static WAL_SEAL_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
-#[allow(dead_code)]
+#[cfg(feature = "fault-injection")]
+pub(crate) static FAIL_SYNC_ONCE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 pub(crate) enum WalCommand {
     Append {
         payload: Vec<u8>,
@@ -42,30 +35,6 @@ pub(crate) enum WalCommand {
         item_tx: tokio::sync::mpsc::UnboundedSender<(u64, WalEntry, u64)>,
         ack: tokio::sync::oneshot::Sender<Result<WalVersion>>,
     },
-}
-
-#[allow(dead_code)]
-fn respond_poisoned_error(cmd: WalCommand) {
-    let err = ContextraError::Storage(
-        "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further operations".into(),
-    );
-    match cmd {
-        WalCommand::Append { ack, .. } => {
-            let _ = ack.send(Err(err)); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
-        }
-        WalCommand::Truncate { ack, .. } => {
-            let _ = ack.send(Err(err)); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
-        }
-        WalCommand::Seal { ack } => {
-            let _ = ack.send(Err(err)); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
-        }
-        WalCommand::Rewrite { ack, .. } => {
-            let _ = ack.send(Err(err)); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
-        }
-        WalCommand::Scan { ack, .. } => {
-            let _ = ack.send(Err(err)); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
-        }
-    }
 }
 
 impl std::fmt::Debug for WalCommand {
@@ -132,7 +101,6 @@ impl Default for WalFlusherConfig {
     }
 }
 
-#[allow(dead_code)]
 fn encode_encrypted_rewrite_chunks(
     v3_entries: &[WalEntry],
     km: &crate::wal::KeyManager,
@@ -182,44 +150,11 @@ fn encode_encrypted_rewrite_chunks(
 }
 
 impl Wal {
-    /// Enables background flusher actor for processing WAL I/O commands sequentially with default `NoFault` injector.
-    #[allow(dead_code)]
+    /// Enables background flusher actor for processing WAL I/O commands sequentially.
     pub(crate) fn enable_flusher_with_config(
-        &self,
-        file: crate::wal::fs::File,
-        config: WalFlusherConfig,
-    ) -> Result<()> {
-        self.enable_flusher_with_injector(file, config, NoFault)
-    }
-
-    /// Enables background flusher actor for processing WAL I/O commands sequentially with a custom `FaultInjector`.
-    #[allow(dead_code)]
-    #[cfg(any(test, feature = "test-utils"))]
-    pub fn enable_flusher_with_injector<F: FaultInjector + 'static>(
-        &self,
-        file: crate::wal::fs::File,
-        config: WalFlusherConfig,
-        injector: F,
-    ) -> Result<()> {
-        self.enable_flusher_with_injector_impl(file, config, injector)
-    }
-
-    #[allow(dead_code)]
-    #[cfg(not(any(test, feature = "test-utils")))]
-    pub(crate) fn enable_flusher_with_injector<F: FaultInjector + 'static>(
-        &self,
-        file: crate::wal::fs::File,
-        config: WalFlusherConfig,
-        injector: F,
-    ) -> Result<()> {
-        self.enable_flusher_with_injector_impl(file, config, injector)
-    }
-
-    fn enable_flusher_with_injector_impl<F: FaultInjector + 'static>(
         &self,
         mut file: crate::wal::fs::File,
         config: WalFlusherConfig,
-        injector: F,
     ) -> Result<()> {
         if config.queue_capacity == 0 {
             return Err(ContextraError::invalid_input(
@@ -227,10 +162,7 @@ impl Wal {
             ));
         }
 
-        let mut tx_guard = match self.flusher_tx.write() {
-            Ok(g) => g,
-            Err(e) => e.into_inner(),
-        };
+        let mut tx_guard = self.flusher_tx.write().unwrap_or_else(|e| e.into_inner());
         if tx_guard.is_some() {
             return Ok(());
         }
@@ -245,10 +177,7 @@ impl Wal {
         let fallback_integrity_key = self.fallback_integrity_key;
         let allow_legacy_integrity_key_fallback =
             Arc::clone(&self.allow_legacy_integrity_key_fallback);
-        let min_wal_version = self.min_wal_version;
         let legacy_key_used = Arc::clone(&self.legacy_key_used);
-        #[cfg(feature = "fault-injection")]
-        let fault_plan = self.fault_plan.clone();
 
         let handle = tokio::spawn(async move {
             let mut pending_cmd: Option<WalCommand> = None;
@@ -263,20 +192,26 @@ impl Wal {
                     },
                 };
 
-                if poisoned.load(std::sync::atomic::Ordering::SeqCst) {
-                    respond_poisoned_error(cmd);
-                    while let Ok(next_cmd) = rx.try_recv() {
-                        respond_poisoned_error(next_cmd);
-                    }
-                    continue;
-                }
-
                 match cmd {
                     WalCommand::Append {
                         payload,
                         last_hmac_val,
                         ack,
                     } => {
+                        if poisoned.load(std::sync::atomic::Ordering::SeqCst) {
+                            let _ = ack.send(Err(ContextraError::Storage(
+                                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+                            )));
+                            while let Ok(next_cmd) = rx.try_recv() {
+                                if let WalCommand::Append { ack, .. } = next_cmd {
+                                    let _ = ack.send(Err(ContextraError::Storage(
+                                        "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+                                    )));
+                                }
+                            }
+                            continue;
+                        }
+
                         let mut batch_payload = payload;
                         let mut final_last_hmac_val = last_hmac_val;
                         let mut acks = vec![ack];
@@ -350,13 +285,6 @@ impl Wal {
 
                         let write_res: Result<()> = async {
                             if write_header {
-                                injector.on_write(Some(&path), WAL_V3_HEADER.len()).map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "WAL flusher header write failed for {}: {}",
-                                        path.display(),
-                                        e
-                                    ))
-                                })?;
                                 file.write_all(&WAL_V3_HEADER).await.map_err(|e| {
                                     ContextraError::Storage(format!(
                                         "WAL flusher header write failed for {}: {}",
@@ -367,8 +295,7 @@ impl Wal {
                             }
 
                             #[cfg(feature = "fault-injection")]
-                            if fault_plan
-                                .fail_append_partial_once
+                            if crate::wal::FAIL_APPEND_PARTIAL_ONCE
                                 .compare_exchange(
                                     true,
                                     false,
@@ -377,8 +304,7 @@ impl Wal {
                                 )
                                 .is_ok()
                             {
-                                let partial_bytes = fault_plan
-                                    .fail_append_after_partial_bytes
+                                let partial_bytes = crate::wal::FAIL_APPEND_AFTER_PARTIAL_BYTES
                                     .swap(0, std::sync::atomic::Ordering::SeqCst);
                                 let cut = (partial_bytes as usize).min(batch_payload.len());
                                 if cut > 0 {
@@ -395,24 +321,15 @@ impl Wal {
                                         );
                                     }
                                 }
-                                fault_plan
-                                    .fail_append_after_partial_bytes
+                                crate::wal::FAIL_APPEND_AFTER_PARTIAL_BYTES
                                     .store(0, std::sync::atomic::Ordering::SeqCst);
-                                fault_plan
-                                    .fail_append_partial_once
+                                crate::wal::FAIL_APPEND_PARTIAL_ONCE
                                     .store(false, std::sync::atomic::Ordering::SeqCst);
                                 return Err(ContextraError::Storage(
                                     "Simulated WAL append partial write failure (FAIL_APPEND_PARTIAL_ONCE)".into(),
                                 ));
                             }
 
-                            injector.on_write(Some(&path), batch_payload.len()).map_err(|e| {
-                                ContextraError::Storage(format!(
-                                    "WAL flusher write failed for {}: {}",
-                                    path.display(),
-                                    e
-                                ))
-                            })?;
                             file.write_all(&batch_payload).await.map_err(|e| {
                                 ContextraError::Storage(format!(
                                     "WAL flusher write failed for {}: {}",
@@ -433,44 +350,18 @@ impl Wal {
                         .await;
 
                         if let Err(write_err) = write_res {
-                            let set_len_res = file.set_len(size_before).await;
-                            if let Err(ref e) = set_len_res {
-                                tracing::warn!(
-                                    wal_path = %path.display(),
-                                    error = %e,
-                                    "Failed to truncate file length to size_before during append write error recovery"
-                                );
-                            }
-                            let seek_res = file.seek(std::io::SeekFrom::Start(size_before)).await;
-                            if let Err(ref e) = seek_res {
-                                tracing::warn!(
-                                    wal_path = %path.display(),
-                                    error = %e,
-                                    "Failed to seek to size_before during append write error recovery"
-                                );
-                            }
-                            if set_len_res.is_err() || seek_res.is_err() {
-                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
-                            }
+                            poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
 
                             for ack in acks {
-                                let _ = // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
+                                let _ =
                                     ack.send(Err(ContextraError::Storage(write_err.to_string())));
                             }
                             continue;
                         }
 
                         let sync_res: Result<()> = async {
-                            injector.on_fsync(Some(&path)).map_err(|e| {
-                                ContextraError::Storage(format!(
-                                    "WAL fsync failed, outcome unknown: {}",
-                                    e
-                                ))
-                            })?;
-
                             #[cfg(feature = "fault-injection")]
-                            if fault_plan
-                                .fail_sync_once
+                            if FAIL_SYNC_ONCE
                                 .compare_exchange(
                                     true,
                                     false,
@@ -495,23 +386,9 @@ impl Wal {
                         .await;
 
                         if let Err(sync_err) = sync_res {
-                            if let Err(e) = file.set_len(size_before).await {
-                                tracing::warn!(
-                                    wal_path = %path.display(),
-                                    error = %e,
-                                    "Failed to truncate file length to size_before during append sync error recovery"
-                                );
-                            }
-                            if let Err(e) = file.seek(std::io::SeekFrom::Start(size_before)).await {
-                                tracing::warn!(
-                                    wal_path = %path.display(),
-                                    error = %e,
-                                    "Failed to seek to size_before during append sync error recovery"
-                                );
-                            }
                             poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
                             for ack in acks {
-                                let _ = // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
+                                let _ =
                                     ack.send(Err(ContextraError::Storage(sync_err.to_string())));
                             }
                             continue;
@@ -523,19 +400,7 @@ impl Wal {
 
                         let written_len = (if write_header { WAL_V3_HEADER.len() } else { 0 })
                             + batch_payload.len();
-                        let written_len_u64 = match u64::try_from(written_len) {
-                            Ok(l) => l,
-                            Err(e) => {
-                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
-                                for ack in acks {
-                                    let _ = ack.send(Err(ContextraError::Storage(format!( // INTENTIONAL-DROP: Receiver dropped ack channel.
-                                        "WAL written_len overflow: {}",
-                                        e
-                                    ))));
-                                }
-                                continue;
-                            }
-                        };
+                        let written_len_u64 = u64::try_from(written_len).unwrap_or(u64::MAX);
 
                         size.fetch_add(written_len_u64, std::sync::atomic::Ordering::SeqCst);
                         flusher_last_hmac = final_last_hmac_val;
@@ -543,7 +408,7 @@ impl Wal {
                         *last_hmac_guard = final_last_hmac_val;
 
                         for ack in acks {
-                            let _ = ack.send(Ok(())); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
+                            let _ = ack.send(Ok(()));
                         }
                     }
 
@@ -552,10 +417,16 @@ impl Wal {
                         new_last_hmac,
                         ack,
                     } => {
+                        if poisoned.load(std::sync::atomic::Ordering::SeqCst) {
+                            let _ = ack.send(Err(ContextraError::Storage(
+                                "WAL handle poisoned after suspected torn write; requires explicit recovery replay before further appends".into(),
+                            )));
+                            continue;
+                        }
+
                         let res: Result<()> = async {
                             #[cfg(feature = "fault-injection")]
-                            if fault_plan
-                                .fail_truncate_once
+                            if crate::wal::FAIL_TRUNCATE_ONCE
                                 .compare_exchange(
                                     true,
                                     false,
@@ -570,18 +441,11 @@ impl Wal {
                                 ));
                             }
 
+                            size.store(offset, std::sync::atomic::Ordering::SeqCst);
+
                             if let Err(e) = file.set_len(offset).await {
                                 return Err(ContextraError::Storage(format!(
                                     "WAL truncate failed for {}: {}",
-                                    path.display(),
-                                    e
-                                )));
-                            }
-
-                            if let Err(e) = injector.on_fsync(Some(&path)) {
-                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
-                                return Err(ContextraError::Storage(format!(
-                                    "WAL truncate fsync failed for {}: {}",
                                     path.display(),
                                     e
                                 )));
@@ -614,20 +478,17 @@ impl Wal {
                             let mut last_hmac_guard = last_hmac.lock().await;
                             *last_hmac_guard = new_last_hmac;
 
-                            size.store(offset, std::sync::atomic::Ordering::SeqCst);
-
                             Ok(())
                         }
                         .await;
 
-                        let _ = ack.send(res); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
+                        let _ = ack.send(res);
                     }
 
                     WalCommand::Seal { ack } => {
                         let res: Result<PathBuf> = async {
                             #[cfg(feature = "fault-injection")]
-                            if fault_plan
-                                .fail_sync_once
+                            if FAIL_SYNC_ONCE
                                 .compare_exchange(
                                     true,
                                     false,
@@ -641,14 +502,6 @@ impl Wal {
                                     "WAL fsync failed, outcome unknown: simulated fsync failure in seal".into(),
                                 ));
                             }
-
-                            injector.on_fsync(Some(&path)).map_err(|e| {
-                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
-                                ContextraError::Storage(format!(
-                                    "WAL fsync failed, outcome unknown: vor rotate_and_seal fehlgeschlagen: {}",
-                                    e
-                                ))
-                            })?;
 
                             file.sync_all().await.map_err(|e| {
                                 poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -682,15 +535,6 @@ impl Wal {
                                 }
                             };
 
-                            injector.on_rename(&path, &sealed_path).map_err(|e| {
-                                ContextraError::Storage(format!(
-                                    "WAL rotate_and_seal rename {} → {} fehlgeschlagen: {}",
-                                    path.display(),
-                                    sealed_path.display(),
-                                    e
-                                ))
-                            })?;
-
                             crate::wal::fs::rename(&path, &sealed_path)
                                 .await
                                 .map_err(|e| {
@@ -701,16 +545,6 @@ impl Wal {
                                         e
                                     ))
                                 })?;
-
-                            if let Some(parent) = sealed_path.parent() {
-                                injector.on_dir_fsync(parent).map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "WAL rotate_and_seal parent dir fsync failed for {}: {}",
-                                        parent.display(),
-                                        e
-                                    ))
-                                })?;
-                            }
 
                             crate::util::fsync_parent_dir(&sealed_path).await?;
 
@@ -737,7 +571,7 @@ impl Wal {
                         }
                         .await;
 
-                        let _ = ack.send(res); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
+                        let _ = ack.send(res);
                     }
 
                     WalCommand::Rewrite {
@@ -779,62 +613,39 @@ impl Wal {
                                 }
                             }
 
-                            let temp_name = format!(
-                                "{}.migrate.tmp",
-                                path.file_name().and_then(|n| n.to_str()).unwrap_or("wal")
-                            );
-                            let temp_path = path.with_file_name(temp_name);
-
                             let write_res: Result<()> = async {
-                                let mut temp_file = crate::wal::fs::OpenOptions::new()
-                                    .create(true)
-                                    .write(true)
-                                    .truncate(true)
-                                    .open(&temp_path)
-                                    .await
-                                    .map_err(|e| {
-                                        ContextraError::Storage(format!(
-                                            "WAL migration temporary file creation failed for {}: {}",
-                                            temp_path.display(),
-                                            e
-                                        ))
-                                    })?;
-
-                                injector.on_write(Some(&temp_path), total_bytes.len()).map_err(|e| {
+                                file.seek(std::io::SeekFrom::Start(0)).await.map_err(|e| {
                                     ContextraError::Storage(format!(
-                                        "WAL migration write failed for {}: {}",
-                                        temp_path.display(),
+                                        "WAL seek failed during migration for {}: {}",
+                                        path.display(),
+                                        e
+                                    ))
+                                })?;
+                                file.set_len(0).await.map_err(|e| {
+                                    ContextraError::Storage(format!(
+                                        "WAL truncate failed during migration for {}: {}",
+                                        path.display(),
                                         e
                                     ))
                                 })?;
 
-                                temp_file.write_all(&total_bytes).await.map_err(|e| {
+                                file.write_all(&total_bytes).await.map_err(|e| {
                                     ContextraError::Storage(format!(
                                         "WAL migration write failed for {}: {}",
-                                        temp_path.display(),
+                                        path.display(),
                                         e
                                     ))
                                 })?;
-
-                                temp_file.flush().await.map_err(|e| {
+                                file.flush().await.map_err(|e| {
                                     ContextraError::Storage(format!(
                                         "WAL migration flush failed for {}: {}",
-                                        temp_path.display(),
-                                        e
-                                    ))
-                                })?;
-
-                                injector.on_fsync(Some(&temp_path)).map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "WAL migration fsync failed for {}: {}",
-                                        temp_path.display(),
+                                        path.display(),
                                         e
                                     ))
                                 })?;
 
                                 #[cfg(feature = "fault-injection")]
-                                if fault_plan
-                                    .fail_sync_once
+                                if FAIL_SYNC_ONCE
                                     .compare_exchange(
                                         true,
                                         false,
@@ -848,68 +659,21 @@ impl Wal {
                                     ));
                                 }
 
-                                temp_file.sync_all().await.map_err(|e| {
+                                file.sync_all().await.map_err(|e| {
                                     ContextraError::Storage(format!(
                                         "WAL migration fsync failed for {}: {}",
-                                        temp_path.display(),
-                                        e
-                                    ))
-                                })?;
-
-                                injector.on_rename(&temp_path, &path).map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "WAL migration rename {} → {} failed: {}",
-                                        temp_path.display(),
                                         path.display(),
                                         e
                                     ))
                                 })?;
-
-                                crate::wal::fs::rename(&temp_path, &path).await.map_err(|e| {
-                                    ContextraError::Storage(format!(
-                                        "WAL migration rename {} → {} failed: {}",
-                                        temp_path.display(),
-                                        path.display(),
-                                        e
-                                    ))
-                                })?;
-
-                                if let Some(parent) = path.parent() {
-                                    injector.on_dir_fsync(parent).map_err(|e| {
-                                        ContextraError::Storage(format!(
-                                            "WAL migration parent dir fsync failed for {}: {}",
-                                            parent.display(),
-                                            e
-                                        ))
-                                    })?;
-                                }
-
-                                crate::util::fsync_parent_dir(&path).await?;
-
-                                file = crate::wal::fs::OpenOptions::new()
-                                    .create(true)
-                                    .append(true)
-                                    .read(true)
-                                    .open(&path)
-                                    .await
-                                    .map_err(|e| {
-                                        ContextraError::Storage(format!(
-                                            "WAL reopen handle failed after migration for {}: {}",
-                                            path.display(),
-                                            e
-                                        ))
-                                    })?;
 
                                 Ok(())
                             }
                             .await;
 
-                            if let Err(err) = write_res {
-                                if let Err(e) = crate::wal::fs::remove_file(&temp_path).await {
-                                    tracing::warn!("Failed to remove temporary migration file {:?}: {}", temp_path, e);
-                                }
+                            if write_res.is_err() {
                                 poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
-                                return Err(err);
+                                return write_res;
                             }
 
                             let total_len_u64 = u64::try_from(total_bytes.len())
@@ -924,7 +688,7 @@ impl Wal {
                         }
                         .await;
 
-                        let _ = ack.send(res); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
+                        let _ = ack.send(res);
                     }
 
                     WalCommand::Scan {
@@ -940,30 +704,14 @@ impl Wal {
                             fallback_integrity_key,
                             allow_legacy_integrity_key_fallback
                                 .load(std::sync::atomic::Ordering::SeqCst),
-                            min_wal_version,
                             &legacy_key_used,
                             |seq, entry, pos| item_tx.send((seq, entry, pos)).is_ok(),
                         )
                         .await;
 
-                        let seek_res = file.seek(std::io::SeekFrom::End(0)).await;
-                        let final_res = match seek_res {
-                            Ok(_) => res,
-                            Err(e) => {
-                                poisoned.store(true, std::sync::atomic::Ordering::SeqCst);
-                                let seek_err = ContextraError::Storage(format!(
-                                    "WAL seek to end after scan failed for {}: {}",
-                                    path.display(),
-                                    e
-                                ));
-                                match res {
-                                    Ok(_) => Err(seek_err),
-                                    Err(err) => Err(err),
-                                }
-                            }
-                        };
+                        let _ = file.seek(std::io::SeekFrom::End(0)).await; // INTENTIONAL-DROP
 
-                        let _ = ack.send(final_res); // INTENTIONAL-DROP: Receiver might have dropped/cancelled ack channel.
+                        let _ = ack.send(res);
                     }
                 }
             }
@@ -974,84 +722,5 @@ impl Wal {
             *guard = Some(handle);
         }
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod flusher_injector_tests {
-    use super::*;
-    use crate::wal::{PreparedBatch, WalOp};
-    use contextra_types::TxId;
-    use std::io::{Error, ErrorKind};
-    use tempfile::tempdir;
-
-    struct FsyncFailInjector;
-
-    impl FaultInjector for FsyncFailInjector {
-        fn on_fsync(&self, _path: Option<&std::path::Path>) -> std::io::Result<()> {
-            Err(Error::new(ErrorKind::Other, "simulated dst fsync error"))
-        }
-    }
-
-    #[tokio::test]
-    async fn test_fault_injector_fsync_error_no_ack_without_durability() {
-        let dir = tempdir().expect("tempdir");
-        let path = dir.path().join("fault_injector.wal");
-
-        let file = crate::wal::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .read(true)
-            .open(&path)
-            .await
-            .expect("open file");
-
-        let wal = Wal {
-            path: path.clone(),
-            size: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            header_written: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            key_manager: None,
-            fallback_integrity_key: Some([1u8; 32]),
-            allow_legacy_integrity_key_fallback: Arc::new(std::sync::atomic::AtomicBool::new(
-                false,
-            )),
-            min_wal_version: WalVersion::V3,
-            legacy_key_used: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            was_legacy_rekeyed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            last_hmac: Arc::new(tokio::sync::Mutex::new([0u8; 32])),
-            flusher_tx: std::sync::RwLock::new(None),
-            flusher_task: std::sync::Mutex::new(None),
-            sealed: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            truncate_lock: Arc::new(tokio::sync::Mutex::new(())),
-            poisoned: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            fault_plan: Arc::new(crate::wal::WalFailpoints::default()),
-        };
-
-        wal.enable_flusher_with_injector(file, WalFlusherConfig::default(), FsyncFailInjector)
-            .expect("enable flusher with injector");
-
-        let entry = WalEntry::try_new(
-            WalOp::Put {
-                key: b"k1".to_vec(),
-                value: b"v1".to_vec(),
-                tx_id: TxId(1),
-            },
-            1,
-            &[1u8; 32],
-            [0u8; 32],
-        )
-        .expect("entry creation");
-
-        let batch = PreparedBatch(vec![entry]);
-        let res = wal.append_batch(batch).await;
-
-        assert!(
-            res.is_err(),
-            "Append must return Err when fsync fails (no Ack without durability)"
-        );
-        assert!(
-            wal.is_poisoned(),
-            "Wal handle must be poisoned after fsync failure"
-        );
     }
 }

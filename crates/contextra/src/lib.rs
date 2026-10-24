@@ -9,27 +9,16 @@ pub mod builder;
 pub mod collection_profile;
 pub mod performance_profile;
 pub mod query_rewriter;
-pub use builder::wiring_selftest;
-
-#[cfg(feature = "compliance")]
-pub mod compliance;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::ContextraBuilder;
-#[cfg(feature = "compliance")]
-pub use compliance::*;
 pub use contextra_core::error::ContextraError;
 pub use contextra_core::types::domain::{DocId, ScoredDocument};
 pub use contextra_core::DistanceMetric;
-pub use contextra_db::engine;
-pub use contextra_db::engine::{
-    deletion::{ForgetOptions, PurgeMode},
-    ForgetReceipt, LayerStatus,
-};
 pub use contextra_db::{
     chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
     Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
-    EncryptionConfig, KekSource, SearchResult, TextEmbeddingEngine,
+    SearchResult, TextEmbeddingEngine,
 };
 pub use query_rewriter::LlmQueryRewriter;
 
@@ -45,6 +34,9 @@ pub use contextra_infer_ollama as ollama;
 #[cfg(feature = "candle")]
 pub use contextra_infer_candle as candle;
 
+#[cfg(feature = "onnx")]
+pub use contextra_infer_onnx as onnx;
+
 /// Creates a new `ContextraBuilder` for configuring and instantiating `Contextra`.
 pub fn builder(dimension: usize) -> ContextraBuilder {
     ContextraBuilder::new(dimension)
@@ -52,10 +44,7 @@ pub fn builder(dimension: usize) -> ContextraBuilder {
 
 /// Opens or creates a `Contextra` instance at the given storage path using default configuration and `OpenFastGate`.
 pub async fn open(path: impl AsRef<std::path::Path>) -> Result<Contextra, ContextraError> {
-    let path_buf = path.as_ref().to_path_buf();
-    contextra_types::public_api!("open", {
-        builder(768).with_storage_path(path_buf).build().await
-    })
+    builder(768).with_storage_path(path.as_ref()).build().await
 }
 
 /// Opens or creates a `Contextra` instance at the given storage path with an explicit configuration and `OpenFastGate`.
@@ -63,14 +52,11 @@ pub async fn open_with_config(
     path: impl AsRef<std::path::Path>,
     config: ContextraConfig,
 ) -> Result<Contextra, ContextraError> {
-    let path_buf = path.as_ref().to_path_buf();
-    contextra_types::public_api!("open_with_config", {
-        builder(config.dimension)
-            .with_storage_path(path_buf)
-            .with_config(config)
-            .build()
-            .await
-    })
+    builder(config.dimension)
+        .with_storage_path(path.as_ref())
+        .with_config(config)
+        .build()
+        .await
 }
 
 #[cfg(test)]

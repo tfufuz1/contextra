@@ -42,12 +42,13 @@ pub struct ToolDefinition {
 /// | `contextra_plugin_status` | `DatabaseRead` | Active plugin status & rings |
 /// | `contextra_insert` | `DatabaseWrite` | Store document (auto-embedding, auto-chunking) |
 /// | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
-/// | `contextra_delete` | `DatabaseWrite` | Logische Löschung (Tombstone), kein Nachweis |
-/// | `contextra_forget` | `DatabaseWrite` | High-assurance provable forget with V4 ForgetReceipt |
+/// | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
+/// | `contextra_forget` | `DatabaseWrite` | Delete document or entire collection |
 /// | `contextra_relate` | `DatabaseWrite` | Create directed/bidirectional binary relationship |
 /// | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
 /// | `contextra_create_collection` | `DatabaseWrite` | Create collection with DeploymentTier |
 /// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
+/// | `contextra_consolidate` | `DatabaseWrite` | Trigger synchronous memory consolidation pass |
 /// | `contextra_cloud_query` | `CloudEgress` | External cloud query under egress classification |
 pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
@@ -113,6 +114,20 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
         input_schema: || json!({
             "type": "object",
             "properties": {}
+        }),
+    },
+    // contextra_consolidate: Triggert synchrone/asynchrone Memory Consolidation (Erstellung von Tombstones,
+    // Synthese-Chunks und Graph-Anpassungen im Speicher/Disk-State).
+    // Aufgrund dieser realen Schreib- und Mutationswirkung eindeutig als DatabaseWrite klassifiziert.
+    ToolDefinition {
+        name: "contextra_consolidate",
+        category: ToolCategory::DatabaseWrite,
+        description: "Manual, synchronous trigger for an immediate memory consolidation pass (structural consolidation pass and optional synthesis) on the specified collection. Automatic background consolidation runs unaffected.",
+        input_schema: || json!({
+            "type": "object",
+            "properties": {
+                "collection": { "type": "string", "default": "default" }
+            }
         }),
     },
     ToolDefinition {
@@ -768,6 +783,11 @@ mod tests {
             ToolCategory::DatabaseRead
         );
 
+        // Assert consolidate is DatabaseWrite
+        assert_eq!(
+            McpSandbox::try_classify_method("contextra_consolidate").unwrap(),
+            ToolCategory::DatabaseWrite
+        );
     }
 
     #[test]

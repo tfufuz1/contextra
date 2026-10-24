@@ -3,8 +3,8 @@
 // INVARIANTEN: Replay throughput across subsequent windows MUST NOT drop below 50% of the baseline throughput (first 10%).
 // STAND: TS:2026-09-26T00:00:00Z
 
+use contextra_core::TxId;
 use contextra_store::wal::{ReplayProgressSink, Wal, WalEntry, WalOp, WalSeq, WAL_V3_HEADER};
-use contextra_types::TxId;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -53,9 +53,6 @@ async fn test_wal_recovery_linear_throughput_no_runtime_stall() {
         writer.write_all(&WAL_V3_HEADER).expect("write header");
 
         let integrity_key = [0u8; 32];
-        let key_path = dir.path().join(".wal_integrity_key");
-        std::fs::write(&key_path, &integrity_key).expect("write integrity key file");
-
         let mut prev_hmac = [0u8; 32];
 
         for i in 1..=TOTAL_ENTRIES {

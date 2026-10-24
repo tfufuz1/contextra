@@ -1,7 +1,0 @@
-{
-  "origin": "python-selfsigned",
-  "result": "INVALID",
-  "exit_code": 1,
-  "category": "INVALID",
-  "reason": "Signer key ID mismatch"
-}

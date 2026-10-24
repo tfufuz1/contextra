@@ -11,19 +11,6 @@ use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
-/// Vector residue measurement for deletion evidence.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct VectorResidue {
-    /// True if the document node exists in the vector index.
-    pub node_present: bool,
-    /// Number of incoming graph edges pointing to this node.
-    pub incoming_edges: u32,
-    /// Number of outgoing graph edges from this node.
-    pub outgoing_edges: u32,
-    /// True if the index or document node is pinned by an active reader snapshot.
-    pub pinned: bool,
-}
-
 /// Statistics for a vector index.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct VectorIndexStats {
@@ -134,17 +121,6 @@ pub trait VectorIndex: Send + Sync + 'static {
         }
     }
 
-    /// Measures residual state (node presence, edge counts, pinning status) for a document ID.
-    fn residue(&self, id: DocId) -> impl Future<Output = Result<VectorResidue>> + Send {
-        async move {
-            let _ = id;
-            Err(crate::error::ContextraError::capability_unsupported(
-                "vector_residue",
-                "Vector residue measurement is not supported by default for this vector engine",
-            ))
-        }
-    }
-
     /// Deletes a vector by its document ID.
     fn delete(&self, tx: TxId, id: DocId) -> impl Future<Output = Result<()>> + Send;
 
@@ -180,7 +156,7 @@ pub trait VectorIndex: Send + Sync + 'static {
     fn trigger_rebuild_async(&self) {}
 }
 
-// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
+// AI-TAG[ARCH][MINOR][RESOLVED] (virtuell verschoben von contextra-router/ports_local.rs per TODO(welle-3), siehe docs/refactor/router-db-edge-audit.md)
 /// Contract for executing hybrid (vector + text) queries for profile routing.
 pub trait HybridSearchProvider: Send + Sync {
     /// Executes a hybrid query returning matched context chunks with relevance scores.

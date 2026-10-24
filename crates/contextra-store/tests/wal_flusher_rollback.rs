@@ -1,11 +1,13 @@
 #![cfg(feature = "fault-injection")]
 
-use contextra_store::wal::{Wal, WalOp};
-use contextra_types::TxId;
+use contextra_core::TxId;
+use contextra_store::wal::{
+    Wal, WalOp, FAIL_APPEND_AFTER_PARTIAL_BYTES, FAIL_APPEND_PARTIAL_ONCE, FAIL_TRUNCATE_ONCE,
+};
 use tempfile::tempdir;
 
 #[tokio::test]
-async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types::Result<()> {
+async fn test_flusher_rollback_after_partial_append_failure() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let wal_path = dir.path().join("flusher_rollback.wal");
 
@@ -23,22 +25,17 @@ async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types
     let size_before = meta_before.len();
 
     // Trigger partial write failure in flusher
-    wal.fault_plan()
-        .fail_append_after_partial_bytes
-        .store(20, std::sync::atomic::Ordering::SeqCst);
-    wal.fault_plan()
-        .fail_append_partial_once
-        .store(true, std::sync::atomic::Ordering::SeqCst);
+    FAIL_APPEND_AFTER_PARTIAL_BYTES.store(20, std::sync::atomic::Ordering::SeqCst);
+    FAIL_APPEND_PARTIAL_ONCE.store(true, std::sync::atomic::Ordering::SeqCst);
 
     let op2 = WalOp::Put {
         tx_id: TxId::new(2),
         key: b"k2".to_vec(),
         value: b"v2".to_vec(),
     };
-    let (batch2, prev_hmac) = wal.prepare_batch(vec![(op2, 2)]).await?;
+    let (batch2, _) = wal.prepare_batch(vec![(op2, 2)]).await?;
     let res = wal.append_batch(batch2).await;
     assert!(res.is_err(), "Partial append write must fail");
-    wal.rollback_hmac(prev_hmac).await;
 
     // After flusher rollback, poisoned MUST be false and file size MUST equal size_before
     assert!(
@@ -53,13 +50,13 @@ async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types
         "File length on disk must be restored to size_before after rollback"
     );
 
-    // Subsequent append with seq_no 2 (since failed batch 2 was rolled back)
+    // Subsequent append must succeed
     let op3 = WalOp::Put {
         tx_id: TxId::new(3),
         key: b"k3".to_vec(),
         value: b"v3".to_vec(),
     };
-    let (batch3, _) = wal.prepare_batch(vec![(op3, 2)]).await?;
+    let (batch3, _) = wal.prepare_batch(vec![(op3, 3)]).await?;
     wal.append_batch(batch3).await?;
 
     drop(wal);
@@ -69,13 +66,13 @@ async fn test_flusher_rollback_after_partial_append_failure() -> contextra_types
     let replayed = wal_reopened.replay().await?;
     assert_eq!(replayed.len(), 2);
     assert_eq!(replayed[0].1.seq_no, 1);
-    assert_eq!(replayed[1].1.seq_no, 2);
+    assert_eq!(replayed[1].1.seq_no, 3);
 
     Ok(())
 }
 
 #[tokio::test]
-async fn test_flusher_truncate_failure_preserves_state() -> contextra_types::Result<()> {
+async fn test_flusher_truncate_failure_preserves_state() -> contextra_core::Result<()> {
     let dir = tempdir()?;
     let wal_path = dir.path().join("truncate_fail.wal");
 
@@ -92,9 +89,7 @@ async fn test_flusher_truncate_failure_preserves_state() -> contextra_types::Res
     let size_before = wal.size();
     let hmac_before = wal.last_hmac_snapshot().await;
 
-    wal.fault_plan()
-        .fail_truncate_once
-        .store(true, std::sync::atomic::Ordering::SeqCst);
+    FAIL_TRUNCATE_ONCE.store(true, std::sync::atomic::Ordering::SeqCst);
 
     let trunc_res = wal.truncate(4, [0u8; 32]).await;
     assert!(

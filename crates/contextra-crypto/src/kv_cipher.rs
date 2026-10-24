@@ -10,7 +10,7 @@
 //! - **Schritt 1 (Dieses Modul):** Erstellung des eigenständigen Krypto-Moduls `KvSegmentCipher`
 //!   mit kryptographischer Tenant-Isolation und Modell-Versionierungs-Trennung in `contextra-crypto`.
 //! - **Schritt 2:** Verdrahtung von `KvSegmentCipher` und `EncryptedKvLayer`
-//!   in den KV-Cache- und Inference-Komponenten zur Erweiterung der `KvSegment`-Struktur.
+//!   in `contextra-kvcache` und `contextra-infer-candle` (kv_bridge) zur Erweiterung der `KvSegment`-Struktur.
 //!
 //! # Nonce-Sicherheit & Nonce-Misuse-Resistance (RFC 8452)
 //! Das Modul verwendet AES-256-GCM-SIV mit per-call `OsRng` generierten 12-Byte-Nonces.
@@ -68,7 +68,7 @@ impl KvCipher for KeyManager {
         let (ct, nonce) = self
             .encrypt_auto_nonce(plaintext)
             .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))?;
-        let mut out = Vec::with_capacity((12_usize).saturating_add(ct.len()));
+        let mut out = Vec::with_capacity(12 + ct.len());
         out.extend_from_slice(&nonce);
         out.extend_from_slice(&ct);
         Ok(out)
@@ -80,25 +80,19 @@ impl KvCipher for KeyManager {
                 "Ciphertext too short for nonce payload".into(),
             ));
         }
-        let nonce_slice = ciphertext.get(..12).ok_or_else(|| {
-            contextra_types::ContextraError::Crypto("Ciphertext too short for nonce".into())
-        })?;
-        let nonce: &[u8; 12] = nonce_slice
-            .try_into()
-            .map_err(|e: std::array::TryFromSliceError| {
-                contextra_types::ContextraError::ParseError(e.to_string())
-            })?;
-        let ct = ciphertext.get(12..).ok_or_else(|| {
-            contextra_types::ContextraError::Crypto("Ciphertext body missing".into())
-        })?;
+        let nonce: &[u8; 12] =
+            ciphertext[..12]
+                .try_into()
+                .map_err(|e: std::array::TryFromSliceError| {
+                    contextra_types::ContextraError::ParseError(e.to_string())
+                })?;
+        let ct = &ciphertext[12..];
         self.decrypt_auto_nonce(ct, nonce)
             .map_err(|e| contextra_types::ContextraError::Crypto(e.to_string()))
     }
 }
 
 use crate::kv_shredding::KeyRegistry;
-use crate::revocation_log::RevocationLog;
-use std::sync::Arc;
 
 /// High-level cipher engine for KV-cache segment encryption and decryption.
 /// Consolidates onto `KeyRegistry` envelope crypto-shredding as the single shredding path.
@@ -108,27 +102,12 @@ pub struct KvSegmentCipher {
 }
 
 impl KvSegmentCipher {
-    /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager` and mandatory `RevocationLog`.
-    pub fn new(key_manager: KeyManager, log: Arc<RevocationLog>) -> Self {
-        let registry = KeyRegistry::new().with_revocation_log(log);
-        Self {
-            key_manager,
-            registry,
-        }
-    }
-
-    /// Creates an ephemeral in-memory `KvSegmentCipher` without persistent disk storage (primarily for tests and temporary caches).
-    pub fn ephemeral(key_manager: KeyManager) -> Self {
+    /// Creates a new `KvSegmentCipher` wrapping the workspace master `KeyManager`.
+    pub fn new(key_manager: KeyManager) -> Self {
         Self {
             key_manager,
             registry: KeyRegistry::new(),
         }
-    }
-
-    /// Attaches or overrides the `RevocationLog` on the underlying `KeyRegistry`.
-    pub fn with_revocation_log(mut self, log: Arc<RevocationLog>) -> Self {
-        self.registry = self.registry.with_revocation_log(log);
-        self
     }
 
     /// Returns a reference to the consolidated `KeyRegistry` for crypto-shredding key management.
@@ -232,7 +211,6 @@ impl KvCipher for KvSegmentCipher {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 mod tests {
     use super::*;
 
@@ -243,7 +221,7 @@ mod tests {
     #[test]
     fn test_kv_segment_cipher_encrypt_decrypt_roundtrip() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
 
         let tenant_id = TenantId::try_new(101).unwrap();
         let fp = dummy_fingerprint("model-v1");
@@ -260,7 +238,7 @@ mod tests {
     #[test]
     fn test_wrong_tenant_id_fails_decryption() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
 
         let tenant_a = TenantId::try_new(101).unwrap();
         let tenant_b = TenantId::try_new(202).unwrap();
@@ -281,7 +259,7 @@ mod tests {
     #[test]
     fn test_wrong_model_fingerprint_fails_decryption() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
 
         let tenant = TenantId::try_new(101).unwrap();
         let fp_q4 = ModelFingerprint::new([0x11u8; 32], "llama-3", "Q4_K_M");
@@ -302,7 +280,7 @@ mod tests {
     #[test]
     fn test_nonce_freshness_identical_plaintext() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
 
         let tenant = TenantId::try_new(101).unwrap();
         let fp = dummy_fingerprint("model-v1");
@@ -324,7 +302,7 @@ mod tests {
     #[test]
     fn test_invalid_format_version_returns_version_mismatch_error() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
 
         let tenant_id = TenantId::try_new(101).unwrap();
         let fp = dummy_fingerprint("model-v1");
@@ -349,7 +327,7 @@ mod tests {
     #[test]
     fn test_format_version_mismatch_returns_specific_error() {
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
         let tenant = TenantId::try_new(1).unwrap();
         let fp = dummy_fingerprint("model-v1");
         let plaintext = b"test payload";
@@ -372,73 +350,11 @@ mod tests {
     }
 
     #[test]
-    fn test_kv_cipher_revocation_survives_registry_reconstruction() {
-        use contextra_ports::SystemClock;
-        use ed25519_dalek::SigningKey;
-        use rand::rngs::OsRng;
-        use tempfile::tempdir;
-
-        let temp_dir = tempdir().expect("Failed to create temp dir");
-        let log_path = temp_dir.path().join("kv_revocation.log");
-
-        let sk = SigningKey::generate(&mut OsRng);
-        let vk = sk.verifying_key();
-        let clock = Arc::new(SystemClock::new());
-
-        let log = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk)
-            .expect("Failed to create persistent revocation log");
-        let log_arc = Arc::new(log);
-
-        let master_km1 = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher1 = KvSegmentCipher::new(master_km1, log_arc.clone());
-
-        let tenant_id = TenantId::try_new(101).unwrap();
-        let fp = dummy_fingerprint("model-v1");
-        let group_id = 888;
-        let plaintext = b"Sensitive persistent group payload";
-
-        let encrypted = cipher1
-            .encrypt_with_version(tenant_id, group_id, 1, fp.clone(), plaintext)
-            .unwrap();
-
-        // Revoke group_id on cipher1
-        let revoked = cipher1
-            .registry()
-            .revoke_group(group_id)
-            .expect("revoke_group failed");
-        assert!(revoked, "Group 888 must be revoked on cipher1");
-        assert!(cipher1.registry().is_group_revoked(group_id));
-
-        // Drop cipher1 and log_arc simulating process shutdown / registry destruction
-        drop(cipher1);
-        drop(log_arc);
-
-        // Re-open persistent revocation log and construct a new KvSegmentCipher with new KeyRegistry
-        let reopened_log = RevocationLog::open_or_create(&log_path, clock, None, vk)
-            .expect("Failed to reopen persistent revocation log");
-        let master_km2 = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher2 = KvSegmentCipher::new(master_km2, Arc::new(reopened_log));
-
-        // Assert group 888 is still revoked in the reconstructed cipher's registry
-        assert!(
-            cipher2.registry().is_group_revoked(group_id),
-            "Revocation MUST survive registry reconstruction on persisted log"
-        );
-
-        // Decryption of encrypted layer on new reconstructed cipher MUST fail due to key revocation
-        let decrypt_res = cipher2.decrypt_with_version(&encrypted, group_id, 1);
-        assert!(
-            decrypt_res.is_err(),
-            "Decryption on reconstructed cipher MUST fail for revoked group"
-        );
-    }
-
-    #[test]
     fn test_single_shredding_path_consolidation_and_revocation() {
         // PROOF OF CONSOLIDATION: KvSegmentCipher routes segment encryption through
         // KeyRegistry envelope crypto-shredding (the single consolidated shredding path).
         let master_km = KeyManager::try_new("master-passphrase", b"master-salt").unwrap();
-        let cipher = KvSegmentCipher::ephemeral(master_km);
+        let cipher = KvSegmentCipher::new(master_km);
         let tenant_id = TenantId::try_new(101).unwrap();
         let fp = dummy_fingerprint("model-v1");
         let segment_id = 42;
@@ -454,7 +370,7 @@ mod tests {
         assert_eq!(decrypted, plaintext);
 
         // Revoke sub-key in the consolidated KeyRegistry
-        let revoked = cipher.registry().revoke_subkey(segment_id).unwrap();
+        let revoked = cipher.registry().revoke_subkey(segment_id);
         assert!(revoked, "Sub-key revocation in KeyRegistry must succeed");
 
         // Decryption now fails because the single shredding path has been revoked

@@ -146,7 +146,7 @@ impl TermCursor {
         }
         // If current cursor doc_id matches target doc_id, return current block max score
         if let Some(p) = postings.get(self.cursor) {
-            if u128::from(p.doc_id) == u128::from(doc_id) {
+            if p.doc_id == doc_id {
                 let block_idx = self.cursor / BLOCK_SIZE;
                 return self
                     .block_max_scores
@@ -157,7 +157,7 @@ impl TermCursor {
         }
         // Binary search for doc_id block index
         let blocks = self.posting_list.blocks();
-        match blocks.binary_search_by_key(&u128::from(doc_id), |b| u128::from(b.max_doc_id)) {
+        match blocks.binary_search_by_key(&doc_id, |b| b.max_doc_id) {
             Ok(idx) => self
                 .block_max_scores
                 .get(idx)
@@ -187,7 +187,7 @@ impl TermCursor {
         let blocks = self.posting_list.blocks();
         let mut block_idx = self.cursor / BLOCK_SIZE;
 
-        while block_idx < blocks.len() && u128::from(blocks[block_idx].max_doc_id) < u128::from(target_doc_id) {
+        while block_idx < blocks.len() && blocks[block_idx].max_doc_id < target_doc_id {
             block_idx += 1;
         }
 
@@ -201,18 +201,9 @@ impl TermCursor {
 
         // Binary search within current block / remaining postings
         let slice = &postings[self.cursor..];
-        match slice.binary_search_by_key(&u128::from(target_doc_id), |p| u128::from(p.doc_id)) {
+        match slice.binary_search_by_key(&target_doc_id, |p| p.doc_id) {
             Ok(offset) => self.cursor += offset,
             Err(offset) => self.cursor += offset,
-        }
-    }
-
-    /// Advances cursor to the first posting with `doc_id > target_doc_id`.
-    fn advance_after(&mut self, target_doc_id: DocIdRaw) {
-        if let Some(next_target) = target_doc_id.checked_add(1) {
-            self.advance_to(next_target);
-        } else {
-            self.cursor = self.posting_list.as_slice().len();
         }
     }
 }
@@ -251,7 +242,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         storage.last_seq_no().await?
     };
 
-    let is_latest = max_seq.is_none();
+    let is_latest = max_seq.is_none() || max_seq == Some(u64::MAX);
     let total_docs_u32 = (total_docs as u32).max(1);
 
     let mut doc_len_cache: HashMap<DocId, Option<u32>> = HashMap::new();
@@ -270,13 +261,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
     // Retrieve posting lists for all query terms
     let mut cursors: Vec<TermCursor> = Vec::with_capacity(terms.len());
     for term in terms {
-        let initial_list = if is_latest {
-            resident_index.get(term)
-        } else {
-            None
-        };
-
-        let list = match initial_list {
+        let list = match resident_index.get(term) {
             Some(l) => l,
             None => {
                 let prefix = prefix_helper(term);
@@ -305,16 +290,19 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 let plist = match loaded_list {
                     Some(l) => l,
                     None => {
-                        let raw_entries = storage.scan_prefix_at(&prefix, seq).await?;
+                        let raw_entries = storage.scan_prefix_at(&prefix, u64::MAX).await?;
                         let mut postings = Vec::with_capacity(raw_entries.len());
                         for (key, val_bytes) in raw_entries {
                             let suffix_bytes = &key[prefix.len()..];
                             if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
-                                let parsed_doc_id = suffix.parse::<DocIdRaw>().ok();
+                                #[cfg(not(feature = "docid-128"))]
+                                let parsed_doc_id = suffix.parse::<u64>().ok();
+                                #[cfg(feature = "docid-128")]
+                                let parsed_doc_id = suffix.parse::<u128>().ok();
 
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if val_bytes.len() == 4 {
-                                        let doc_id = DocId::from(doc_id_raw);
+                                        let doc_id = DocId::new(doc_id_raw);
                                         let tf = u32::from_le_bytes(
                                             (&val_bytes[..4]).try_into().map_err(|_| {
                                                 ContextraError::Storage(
@@ -344,14 +332,10 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                     }
                 };
 
-                if is_latest {
-                    resident_index.insert_list(term.clone(), plist.clone());
-                    match resident_index.get(term) {
-                        Some(l) => l,
-                        None => Arc::new(PostingList::empty()),
-                    }
-                } else {
-                    Arc::new(plist)
+                resident_index.insert_list(term.clone(), plist);
+                match resident_index.get(term) {
+                    Some(l) => l,
+                    None => Arc::new(PostingList::empty()),
                 }
             }
         };
@@ -367,12 +351,15 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                         let suffix = &tbs_key[tbs_global_prefix.len()..];
                         if let Some(colon_pos) = suffix.iter().position(|&b| b == b':') {
                             if let Ok(doc_id_str) = std::str::from_utf8(&suffix[..colon_pos]) {
-                                let parsed_doc_id = doc_id_str.parse::<DocIdRaw>().ok();
+                                #[cfg(not(feature = "docid-128"))]
+                                let parsed_doc_id = doc_id_str.parse::<u64>().ok();
+                                #[cfg(feature = "docid-128")]
+                                let parsed_doc_id = doc_id_str.parse::<u128>().ok();
 
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if list
                                         .as_slice()
-                                        .binary_search_by_key(&u128::from(doc_id_raw), |p| u128::from(p.doc_id))
+                                        .binary_search_by_key(&doc_id_raw, |p| p.doc_id)
                                         .is_ok()
                                     {
                                         term_tbs_count += 1;
@@ -416,7 +403,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         }
 
         // Sort active cursors by current_doc_id ascending
-        cursors.sort_by_key(|c| c.current_doc_id().map(u128::from).unwrap_or(u128::MAX));
+        cursors.sort_by_key(|c| c.current_doc_id().unwrap_or(DocIdRaw::MAX));
 
         let threshold = top_k.min_threshold();
 
@@ -451,7 +438,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
         };
 
         if min_doc_id == pivot_doc_id {
-            let doc_id = DocId::from(pivot_doc_id);
+            let doc_id = DocId::new(pivot_doc_id);
 
             // Check if block max scores at pivot_doc_id still exceed threshold
             let block_max_sum: f32 = cursors
@@ -467,7 +454,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 // Block upper bound cannot beat top_k min_threshold -> advance leading cursors
                 for c in cursors.iter_mut() {
                     if c.current_doc_id() == Some(pivot_doc_id) {
-                        c.advance_after(pivot_doc_id);
+                        c.advance_to(pivot_doc_id + 1);
                     }
                 }
                 continue;
@@ -496,7 +483,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 if !is_active {
                     for c in cursors.iter_mut() {
                         if c.current_doc_id() == Some(pivot_doc_id) {
-                            c.advance_after(pivot_doc_id);
+                            c.advance_to(pivot_doc_id + 1);
                         }
                     }
                     continue;
@@ -544,7 +531,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                         }
                     }
 
-                    c.advance_after(pivot_doc_id);
+                    c.advance_to(pivot_doc_id + 1);
                 }
             }
 
@@ -599,10 +586,7 @@ mod tests {
 
     impl StorageEngine for MockStorage {
         fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-            Box::pin(async move {
-                let seq = self.last_seq_no().await?;
-                self.get_at_seq(key, seq).await
-            })
+            Box::pin(async move { self.get_at_seq(key, u64::MAX).await })
         }
         fn put<'a>(
             &'a self,
@@ -742,10 +726,7 @@ mod tests {
             &'a self,
             prefix: &'a [u8],
         ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-            Box::pin(async move {
-                let seq = self.last_seq_no().await?;
-                self.scan_prefix_at(prefix, seq).await
-            })
+            Box::pin(async move { self.scan_prefix_at(prefix, u64::MAX).await })
         }
         fn scan_prefix_at<'a>(
             &'a self,
@@ -783,7 +764,7 @@ mod tests {
         // "common" occurs in all 500 documents.
         // "rare" occurs in only 5 documents (DocId 100, 200, 300, 400, 500) with high frequency.
         for i in 1..=500 {
-            let doc_id = DocId::new((i as u64).into());
+            let doc_id = DocId::new(i as u64);
             let text = if i % 100 == 0 {
                 format!("common rare rare rare rare rare doc {}", i)
             } else {
@@ -800,9 +781,9 @@ mod tests {
         assert_eq!(query_results.len(), k);
 
         // The top 5 documents should be doc_ids 100, 200, 300, 400, 500 because they match "rare" 5x
-        let top_doc_ids: Vec<u128> = query_results
+        let top_doc_ids: Vec<u64> = query_results
             .iter()
-            .map(|(id, _)| u128::from(id.inner()))
+            .map(|(id, _)| id.inner() as u64)
             .collect();
         assert!(top_doc_ids.contains(&100));
         assert!(top_doc_ids.contains(&200));

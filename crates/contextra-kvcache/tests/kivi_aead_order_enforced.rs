@@ -1,21 +1,21 @@
 #![forbid(unsafe_code)]
 #![cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 
-use contextra_crypto::KeyManager;
+use contextra_crypto::CryptoKey;
 use contextra_kvcache::{KiviQuantizeConfig, KvSegment, KvSegmentContent, KvTensorView};
 use contextra_types::{ContextraError, Result, TenantId};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 struct TrackingCipher {
-    key: KeyManager,
+    key: CryptoKey,
     seal_calls: Arc<AtomicUsize>,
     open_calls: Arc<AtomicUsize>,
 }
 
 impl TrackingCipher {
     fn new() -> Self {
-        let (key, _) = KeyManager::try_new_argon2id("test-passphrase-12345").unwrap();
+        let key = CryptoKey::try_new("test-passphrase-12345", b"test-salt-67890").unwrap();
         Self {
             key,
             seal_calls: Arc::new(AtomicUsize::new(0)),

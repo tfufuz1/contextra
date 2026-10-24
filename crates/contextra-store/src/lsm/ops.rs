@@ -1,6 +1,5 @@
 mod compaction;
 mod maintenance;
-pub mod purge;
 pub(super) mod read;
 mod write;
 
@@ -140,7 +139,7 @@ impl StorageEngine for LsmStorage {
         Box::pin(compaction::flush(self))
     }
 
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_ports::StorageStats>> {
+    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_core::StorageStats>> {
         Box::pin(maintenance::stats(self))
     }
 
@@ -150,26 +149,5 @@ impl StorageEngine for LsmStorage {
 
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(maintenance::last_tx_id(self))
-    }
-
-    fn erasure_capabilities(&self) -> Option<&dyn contextra_ports::erasure::ErasureBackend> {
-        Some(self)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    #[tokio::test]
-    async fn test_lsm_storage_supports_ssi_tracking() {
-        let dir = tempdir().unwrap();
-        let lsm_config = LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        };
-        let storage = LsmStorage::new(lsm_config).await.unwrap();
-        assert!(storage.supports_ssi_tracking());
     }
 }

@@ -224,7 +224,6 @@ pub fn check_veto_deadlines_from_content_scoped(
     Ok(warning_entries)
 }
 
-#[cfg_attr(not(test), allow(dead_code))] // Helper function included in test targets via #[path]
 pub fn check_veto_deadlines_from_content(
     content: &str,
     now: DateTime<Utc>,
@@ -232,7 +231,6 @@ pub fn check_veto_deadlines_from_content(
     check_veto_deadlines_from_content_scoped(content, now, None)
 }
 
-#[cfg_attr(not(test), allow(dead_code))] // Git helper function included in test targets via #[path]
 fn get_git_changed_files(root: &Path) -> Vec<String> {
     let mut base = String::new();
     if let Ok(out) = std::process::Command::new("git")
@@ -265,7 +263,6 @@ fn get_git_changed_files(root: &Path) -> Vec<String> {
     Vec::new()
 }
 
-#[cfg_attr(not(test), allow(dead_code))] // Gate runner function included in test targets via #[path]
 pub fn run_check_veto_deadlines(now: DateTime<Utc>) -> Result<Vec<VetoDeadlineEntry>, String> {
     let root: PathBuf = crate::find_root_dir();
     let vetoes_path = root.join("VETOES.md");

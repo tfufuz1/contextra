@@ -79,7 +79,6 @@ pub fn build_curl_args(url: &str, target_path: &Path) -> Vec<String> {
 }
 
 /// Downloads benchmark datasets / test model fixtures using curl.
-#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_bench_download(dataset: Dataset, root: &Path) -> Result<(), String> {
     let targets = get_dataset_targets(dataset, root);
 

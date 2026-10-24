@@ -1,8 +1,8 @@
-// ZWECK: WalObserver Interface, Circuit-Breaker und non-blocking Bounded-Dispatcher für Fail-Closed Commit-Sicherheit.
+// ZWECK: WalObserver Interface, Circuit-Breaker und Bounded-Dispatcher für Fail-Open Commit-Sicherheit.
 
 use crate::wal::{WalEntry, WalOp};
+use contextra_core::TxId;
 use contextra_ports::{Clock, SystemClock};
-use contextra_types::{ContextraError, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, RecvTimeoutError, SyncSender};
 use std::sync::Arc;
@@ -85,22 +85,10 @@ pub trait WalObserver: Send + Sync {
     /// Notification callback executed upon batch commit.
     ///
     /// Invoked via a bounded, non-blocking dispatcher mechanism. The commit path enforces a
-    /// configurable maximum latency deadline (`max_observer_latency`).
+    /// configurable maximum latency deadline (`max_observer_latency`). Observers taking longer
+    /// than this deadline will time out on the commit path, increment drop counters, and trip
+    /// the circuit breaker to prevent blocking subsequent transaction commits.
     fn on_commit(&self, batch: &CommittedBatch<'_>, seq_no: u64, tx_id: TxId);
-
-    /// Notification callback executed upon batch commit with fail-closed error propagation.
-    ///
-    /// Defaults to delegating to `on_commit` and returning `Ok(())`. Observers returning `Err`
-    /// or panicking will cause transaction commit to fail closed.
-    fn on_commit_fail_closed(
-        &self,
-        batch: &CommittedBatch<'_>,
-        seq_no: u64,
-        tx_id: TxId,
-    ) -> contextra_types::Result<()> {
-        self.on_commit(batch, seq_no, tx_id);
-        Ok(())
-    }
 }
 
 struct CommitEvent {
@@ -110,17 +98,14 @@ struct CommitEvent {
     origin: WriteOrigin,
 }
 
+enum WorkResult {
+    Completed { elapsed_nanos: u64 },
+    Panicked,
+}
+
 struct WorkerTask {
     event: CommitEvent,
     done_tx: SyncSender<WorkResult>,
-}
-
-enum WorkResult {
-    Completed {
-        elapsed_nanos: u64,
-        res: contextra_types::Result<()>,
-    },
-    Panicked(String),
 }
 
 struct BoundedObserverWorker {
@@ -133,11 +118,7 @@ struct BoundedObserverWorker {
 }
 
 impl BoundedObserverWorker {
-    fn new(
-        observer: Arc<dyn WalObserver>,
-        clock: Arc<dyn Clock>,
-        _max_latency: parking_lot::RwLock<Duration>,
-    ) -> Self {
+    fn new(observer: Arc<dyn WalObserver>, clock: Arc<dyn Clock>) -> Self {
         let (task_tx, task_rx) = sync_channel::<WorkerTask>(256);
         let dropped_count = Arc::new(AtomicU64::new(0));
         let circuit_breaker_open_until_nanos = Arc::new(AtomicU64::new(0));
@@ -149,14 +130,6 @@ impl BoundedObserverWorker {
         let thread_handle = thread::Builder::new()
             .name("wal-observer-worker".to_string())
             .spawn(move || {
-                // Responsibility Invariant:
-                // The worker thread strictly executes the observer callback under `catch_unwind`,
-                // measures execution duration via the clock port, and sends the `WorkResult`
-                // back over `task.done_tx`.
-                //
-                // All drop counter increments (`dropped_count`), consecutive drop tracking,
-                // and circuit breaker state transitions are strictly managed by `notify_with_context`
-                // on the caller thread to prevent double-counting or race conditions.
                 while let Ok(task) = task_rx.recv() {
                     let wal_refs: Vec<WalEntryRef<'_>> =
                         task.event.entries.iter().map(WalEntryRef::new).collect();
@@ -167,31 +140,17 @@ impl BoundedObserverWorker {
 
                     let start_nanos = clock_clone.monotonic_nanos();
                     let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        obs_clone.on_commit_fail_closed(&batch, task.event.seq_no, task.event.tx_id)
+                        obs_clone.on_commit(&batch, task.event.seq_no, task.event.tx_id);
                     }));
                     let end_nanos = clock_clone.monotonic_nanos();
                     let elapsed_nanos = end_nanos.saturating_sub(start_nanos);
 
-                    let work_result = match res {
-                        Ok(inner_res) => WorkResult::Completed {
-                            elapsed_nanos,
-                            res: inner_res,
-                        },
-                        Err(payload) => {
-                            let msg = if let Some(s) = payload.downcast_ref::<&str>() {
-                                (*s).to_string()
-                            } else if let Some(s) = payload.downcast_ref::<String>() {
-                                s.clone()
-                            } else {
-                                "WalObserver panicked during callback".to_string()
-                            };
-                            WorkResult::Panicked(msg)
-                        }
+                    let result = match res {
+                        Ok(()) => WorkResult::Completed { elapsed_nanos },
+                        Err(_) => WorkResult::Panicked,
                     };
 
-                    // Send result back to caller. If caller timed out and dropped receiver,
-                    // send fails gracefully (which is expected and must not panic or alter worker state).
-                    let _ = task.done_tx.send(work_result);
+                    let _ = task.done_tx.try_send(result);
                 }
             })
             .ok();
@@ -220,17 +179,6 @@ pub struct ObserverRegistry {
     historical_drops: Arc<AtomicU64>,
     max_observer_latency: parking_lot::RwLock<Duration>,
     clock: parking_lot::RwLock<Arc<dyn Clock>>,
-}
-
-impl Clone for ObserverRegistry {
-    fn clone(&self) -> Self {
-        Self {
-            observers: parking_lot::RwLock::new(self.observers.read().clone()),
-            historical_drops: Arc::clone(&self.historical_drops),
-            max_observer_latency: parking_lot::RwLock::new(*self.max_observer_latency.read()),
-            clock: parking_lot::RwLock::new(self.clock.read().clone()),
-        }
-    }
 }
 
 impl Default for ObserverRegistry {
@@ -277,19 +225,10 @@ impl WalObserver for AsyncObserverAdapter {
         self.inner.requires_durability()
     }
 
-    fn on_commit(&self, batch: &CommittedBatch<'_>, seq_no: u64, tx_id: TxId) {
-        let _ = self.sender.try_send((seq_no, tx_id, batch.origin));
-    }
-
-    fn on_commit_fail_closed(
-        &self,
-        batch: &CommittedBatch<'_>,
-        seq_no: u64,
-        tx_id: TxId,
-    ) -> contextra_types::Result<()> {
-        self.sender
-            .try_send((seq_no, tx_id, batch.origin))
-            .map_err(|e| ContextraError::Storage(format!("AsyncObserverAdapter queue full: {e}")))
+    fn on_commit(&self, _batch: &CommittedBatch<'_>, seq_no: u64, tx_id: TxId) {
+        let _ = self
+            .sender
+            .try_send((seq_no, tx_id, WriteOrigin::UserWrite));
     }
 }
 
@@ -307,11 +246,7 @@ impl ObserverRegistry {
     /// Registers a new WAL observer.
     pub fn register_observer(&self, observer: Arc<dyn WalObserver>) {
         let clock = self.clock.read().clone();
-        let worker = Arc::new(BoundedObserverWorker::new(
-            observer,
-            clock,
-            parking_lot::RwLock::new(self.max_observer_latency()),
-        ));
+        let worker = Arc::new(BoundedObserverWorker::new(observer, clock));
         self.observers.write().push(worker);
     }
 
@@ -402,29 +337,26 @@ impl ObserverRegistry {
     /// When invoked within a multi-threaded Tokio async runtime context, blocking execution is offloaded via
     /// `tokio::task::block_in_place` to ensure transaction commit paths on Tokio runtime worker threads
     /// remain non-blocking.
-    pub fn notify_with_context(
-        &self,
-        entries: &[WalEntry],
-        seq_no: u64,
-        ctx: CommitContext,
-    ) -> contextra_types::Result<()> {
+    pub fn notify_with_context(&self, entries: &[WalEntry], seq_no: u64, ctx: CommitContext) {
         let observers_snapshot = {
             let guard = self.observers.read();
             if guard.is_empty() {
-                return Ok(());
+                return;
             }
             guard.clone()
         };
 
         let clock = self.clock.read().clone();
-        let now_nanos = clock.monotonic_nanos();
-        let cooldown_nanos = 1_000_000_000u64;
         let max_latency = self.max_observer_latency();
         let max_latency_nanos = max_latency.as_nanos() as u64;
+        let now_nanos = clock.monotonic_nanos();
+
+        // Circuit breaker cooldown: 1 second
+        let cooldown_nanos = 1_000_000_000u64;
 
         let mut panicking: Vec<Arc<dyn WalObserver>> = Vec::new();
 
-        let mut run_notify = || -> contextra_types::Result<()> {
+        let mut run_notify = || {
             for worker in &observers_snapshot {
                 if !ctx.durable && worker.inner.requires_durability() {
                     continue;
@@ -432,10 +364,7 @@ impl ObserverRegistry {
 
                 if worker.is_circuit_breaker_open(now_nanos) {
                     worker.dropped_count.fetch_add(1, Ordering::Relaxed);
-                    return Err(ContextraError::Storage(format!(
-                        "WalObserver circuit breaker open for tx {}",
-                        ctx.tx_id.inner()
-                    )));
+                    continue;
                 }
 
                 let event = CommitEvent {
@@ -458,28 +387,11 @@ impl ObserverRegistry {
                         tx_id = ctx.tx_id.inner(),
                         "WalObserver queue full; dropped event and tripped circuit breaker"
                     );
-                    return Err(ContextraError::Storage(format!(
-                        "WalObserver queue full for tx {}",
-                        ctx.tx_id.inner()
-                    )));
+                    continue;
                 }
 
-                // TODO(WP-ST1 / PR-8 Schritt 3): `recv_timeout` durch asynchrones mpsc mit `try_send` ersetzen:
-                // Das synchrone Blockieren des Commit-Pfads via `done_rx.recv_timeout(max_latency)` sowie
-                // die Fehlerrückgabe an den Aufrufer führen zu Latenzspitzen und Phantom-Commits.
-                // Umbau auf ungebundenen/gepufferten `tokio::sync::mpsc` mit non-blocking `try_send`,
-                // isoliertem Worker-Task und zählerbasiertem Catch-up ohne Propagation von Fehlern in den Commit.
-                let recv_res = if tokio::runtime::Handle::try_current()
-                    .map(|h| h.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread)
-                    .unwrap_or(false)
-                {
-                    tokio::task::block_in_place(|| done_rx.recv_timeout(max_latency))
-                } else {
-                    done_rx.recv_timeout(max_latency)
-                };
-
-                match recv_res {
-                    Ok(WorkResult::Completed { elapsed_nanos, res }) => {
+                match done_rx.recv_timeout(max_latency) {
+                    Ok(WorkResult::Completed { elapsed_nanos }) => {
                         if elapsed_nanos > max_latency_nanos {
                             worker.dropped_count.fetch_add(1, Ordering::Relaxed);
                             worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
@@ -492,49 +404,23 @@ impl ObserverRegistry {
                                 tx_id = ctx.tx_id.inner(),
                                 "WalObserver exceeded max_observer_latency; tripped circuit breaker"
                             );
-                            return Err(ContextraError::Storage(format!(
-                                "WalObserver execution timed out ({}us > {}us) for tx {}",
-                                elapsed_nanos / 1_000,
-                                max_latency_nanos / 1_000,
-                                ctx.tx_id.inner()
-                            )));
                         } else {
                             worker.consecutive_drops.store(0, Ordering::Relaxed);
                             worker
                                 .circuit_breaker_open_until_nanos
                                 .store(0, Ordering::Relaxed);
-                            if let Err(e) = res {
-                                worker.dropped_count.fetch_add(1, Ordering::Relaxed);
-                                worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
-                                worker.circuit_breaker_open_until_nanos.store(
-                                    now_nanos.saturating_add(cooldown_nanos),
-                                    Ordering::Relaxed,
-                                );
-                                return Err(ContextraError::Storage(format!(
-                                    "WalObserver notification failed for tx {}: {}",
-                                    ctx.tx_id.inner(),
-                                    e
-                                )));
-                            }
                         }
                     }
-                    Ok(WorkResult::Panicked(msg)) => {
+                    Ok(WorkResult::Panicked) => {
                         worker.dropped_count.fetch_add(1, Ordering::Relaxed);
-                        worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
                         worker
                             .circuit_breaker_open_until_nanos
                             .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
                         tracing::error!(
                             tx_id = ctx.tx_id.inner(),
-                            panic_msg = %msg,
                             "WalObserver panicked during on_commit execution; deregistering observer"
                         );
                         panicking.push(Arc::clone(&worker.inner));
-                        return Err(ContextraError::Storage(format!(
-                            "WalObserver panicked for tx {}: {}",
-                            ctx.tx_id.inner(),
-                            msg
-                        )));
                     }
                     Err(RecvTimeoutError::Timeout) => {
                         worker.dropped_count.fetch_add(1, Ordering::Relaxed);
@@ -545,46 +431,37 @@ impl ObserverRegistry {
                         tracing::warn!(
                             max_allowed_us = max_latency_nanos / 1_000,
                             tx_id = ctx.tx_id.inner(),
-                            "WalObserver timed out on commit path; tripped circuit breaker"
+                            "WalObserver timed out on commit path; tripped circuit breaker and continuing"
                         );
-                        return Err(ContextraError::Storage(format!(
-                            "WalObserver timed out for tx {}",
-                            ctx.tx_id.inner()
-                        )));
                     }
                     Err(RecvTimeoutError::Disconnected) => {
                         worker.dropped_count.fetch_add(1, Ordering::Relaxed);
-                        worker.consecutive_drops.fetch_add(1, Ordering::Relaxed);
                         worker
                             .circuit_breaker_open_until_nanos
                             .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
-                        return Err(ContextraError::Storage(format!(
-                            "WalObserver worker disconnected for tx {}",
-                            ctx.tx_id.inner()
-                        )));
                     }
                 }
             }
-            Ok(())
         };
 
-        let res = run_notify();
-
-        for obs in panicking {
-            self.deregister_observer(&obs);
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
+                tokio::task::block_in_place(run_notify);
+            } else {
+                run_notify();
+            }
+        } else {
+            run_notify();
         }
 
-        res
+        if !panicking.is_empty() {
+            let mut guard = self.observers.write();
+            guard.retain(|w| !panicking.iter().any(|p| Arc::ptr_eq(&w.inner, p)));
+        }
     }
 
     /// Synchronously notifies all registered observers of a committed batch.
-    pub fn notify(
-        &self,
-        entries: &[WalEntry],
-        seq_no: u64,
-        tx_id: TxId,
-        origin: WriteOrigin,
-    ) -> contextra_types::Result<()> {
+    pub fn notify(&self, entries: &[WalEntry], seq_no: u64, tx_id: TxId, origin: WriteOrigin) {
         self.notify_with_context(
             entries,
             seq_no,
@@ -593,7 +470,7 @@ impl ObserverRegistry {
                 origin,
                 durable: true,
             },
-        )
+        );
     }
 }
 

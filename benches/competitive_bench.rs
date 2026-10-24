@@ -1,8 +1,9 @@
 // ANCHOR[PERF:BENCH-003] STATUS:DONE (TS:2026-09-03T00:00:00Z) — Contextra Competitive Benchmark Suite
-// ZIEL: Criterion-basierte Messung von Write-Durchsatz und Hybrid-Search-Latenz
-// HINWEIS: ContextCompactor wurde im Rahmen der Core-Cut Reduktion entkoppelt.
+// ZIEL: Criterion-basierte Messung von Write-Durchsatz, Hybrid-Search-Latenz und Context-Compaction-Durchsatz
 
+use contextra_db::context_compaction::{CompactionStrategy, ContextCompactor};
 use contextra_db::Contextra;
+use contextra_types::{ContextChunk, DocId, TokenBudget};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
@@ -110,9 +111,52 @@ fn bench_hybrid_search_latency(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_compaction_throughput(c: &mut Criterion) {
+    let segment_counts = [10, 50, 200];
+
+    let mut group = c.benchmark_group("competitive_compaction_throughput");
+
+    for &m in &segment_counts {
+        group.throughput(Throughput::Elements(m as u64));
+
+        let chunks: Vec<ContextChunk> = (0..m)
+            .map(|i| ContextChunk {
+                doc_id: DocId::new(i as u64),
+                content: format!(
+                    "Memory segment {:03}: Tool execution output and context history log payload.",
+                    i
+                ),
+                relevance: 1.0 / ((i + 1) as f32),
+                token_count: 50,
+                metadata: if i % 3 == 0 {
+                    Some(serde_json::json!({"tool_output": true}))
+                } else {
+                    None
+                },
+                contextual_prefix: None,
+                links: Vec::new(),
+            })
+            .collect();
+
+        let target_budget = (m * 50) / 2; // Compact approximately half the chunks
+        let budget = TokenBudget::new(target_budget, 0);
+        let compactor = ContextCompactor::new(budget, CompactionStrategy::StatusToken);
+
+        group.bench_with_input(BenchmarkId::new("compact_segments", m), &m, |b, _| {
+            b.iter(|| {
+                let compacted = compactor.compact(chunks.clone());
+                assert!(compacted.tokens_used <= target_budget);
+            });
+        });
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_write_throughput,
-    bench_hybrid_search_latency
+    bench_hybrid_search_latency,
+    bench_compaction_throughput
 );
 criterion_main!(benches);

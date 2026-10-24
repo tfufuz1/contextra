@@ -88,12 +88,13 @@ async fn test_tools_list_returns_all_tools() {
         .unwrap() // unwrap
         .clone();
     let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
-    assert_eq!(tools.len(), 14);
+    assert_eq!(tools.len(), 15);
     assert!(names.contains(&"contextra_search"));
     assert!(names.contains(&"contextra_insert"));
     assert!(names.contains(&"contextra_get"));
     assert!(names.contains(&"contextra_forget"));
     assert!(names.contains(&"contextra_collections"));
+    assert!(names.contains(&"contextra_consolidate"));
     assert!(names.contains(&"contextra_cloud_query"));
     assert!(names.contains(&"contextra_relate"));
     assert!(names.contains(&"contextra_relate_n_ary"));
@@ -172,6 +173,8 @@ async fn test_inv_mcp_classify_1_tools_list_classification_completeness_and_mapp
         ("contextra_get", ToolCategory::DatabaseRead),
         ("contextra_forget", ToolCategory::DatabaseWrite),
         ("contextra_collections", ToolCategory::DatabaseRead),
+        // contextra_consolidate: Triggert Memory Consolidation (Tombstone-Erstellung, Synthese-Chunks, Graph-Mutations in contextra-engine/contextra-cognition) -> DatabaseWrite
+        ("contextra_consolidate", ToolCategory::DatabaseWrite),
         ("contextra_cloud_query", ToolCategory::CloudEgress),
         ("contextra_relate", ToolCategory::DatabaseWrite),
         ("contextra_relate_n_ary", ToolCategory::DatabaseWrite),
@@ -240,7 +243,7 @@ async fn test_contextra_forget_single_doc() {
     let insert_req = make_request(
         "contextra_insert",
         json!({
-            "id": "101",
+            "id": "forget_doc_1",
             "text": "Secret data to forget",
             "collection": "default"
         }),
@@ -255,7 +258,7 @@ async fn test_contextra_forget_single_doc() {
             "name": "contextra_forget",
             "arguments": {
                 "collection": "default",
-                "id": "101"
+                "id": "forget_doc_1"
             }
         }),
     );
@@ -263,14 +266,14 @@ async fn test_contextra_forget_single_doc() {
     let res_nc = serde_json::to_value(&resp_nc).unwrap();
     assert_eq!(res_nc["result"]["isError"], true);
 
-    // 3. Forget single doc with default S1 assurance (reaches S0 due to pending ErasureLedger layer, ok = false)
+    // 3. Forget single doc with confirm=true
     let forget_req = make_request(
         "tools/call",
         json!({
             "name": "contextra_forget",
             "arguments": {
                 "collection": "default",
-                "id": "101",
+                "id": "forget_doc_1",
                 "confirm": true
             }
         }),
@@ -281,20 +284,16 @@ async fn test_contextra_forget_single_doc() {
     assert_ne!(res_f["result"]["isError"], true);
     let text = res_f["result"]["content"][0]["text"].as_str().unwrap();
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-    assert_eq!(json_res["ok"], false);
-    assert_eq!(json_res["id"], "101");
-    assert_eq!(json_res["assurance_requested"], "S1");
-    assert_eq!(json_res["assurance_reached"], "S0");
-    assert!(json_res["reason"].as_str().unwrap().contains("Requested assurance S1 was not reached"));
-    assert_eq!(json_res["proof_present"], false);
+    assert_eq!(json_res["ok"], true);
+    assert_eq!(json_res["id"], "forget_doc_1");
     assert_eq!(json_res["proof"], serde_json::Value::Null);
-    assert!(json_res["exclusions"].as_array().unwrap().contains(&json!("client_and_llm_context_not_covered")));
+    assert_eq!(json_res["proof_scope"], "collection_only");
 
     // 4. Verify contextra_get returns null
     let get_req = make_request(
         "contextra_get",
         json!({
-            "id": "101",
+            "id": "forget_doc_1",
             "collection": "default"
         }),
     );
@@ -311,13 +310,36 @@ async fn test_contextra_forget_collection_with_proof() {
     let insert_req = make_request(
         "contextra_insert",
         json!({
-            "id": "102",
+            "id": "doc_in_col",
             "text": "Data in custom collection",
             "collection": col_name
         }),
     );
     let resp = server.handle(insert_req).await;
     assert!(resp.error.is_none());
+
+    // 1. Without proof key configured -> fails
+    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
+    std::env::remove_var("CONTEXTRA_PROOF_KEY");
+    let forget_req_nokey = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_forget",
+            "arguments": {
+                "collection": col_name,
+                "confirm": true
+            }
+        }),
+    );
+    let resp_nokey = server.handle(forget_req_nokey).await;
+    let res_nokey = serde_json::to_value(&resp_nokey).unwrap();
+    assert_eq!(res_nokey["result"]["isError"], true);
+    let err_text = res_nokey["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(err_text.contains("deletion proof key not configured"));
+
+    // 2. With proof key configured -> succeeds and generates DeletionProof
+    let test_key = "test_deletion_proof_key_32_bytes!";
+    std::env::set_var("CONTEXTRA_DELETION_PROOF_KEY", test_key);
 
     let forget_req = make_request(
         "tools/call",
@@ -336,11 +358,16 @@ async fn test_contextra_forget_collection_with_proof() {
 
     let text = res_drop["result"]["content"][0]["text"].as_str().unwrap();
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
+    assert_eq!(json_res["ok"], true);
     assert_eq!(json_res["collection"], col_name);
-    assert_eq!(json_res["assurance_requested"], "S1");
-    assert_eq!(json_res["assurance_reached"], "S0");
-    assert_eq!(json_res["ok"], false);
-    assert!(json_res["exclusions"].as_array().unwrap().contains(&json!("client_and_llm_context_not_covered")));
+    assert_eq!(json_res["proof_scope"], "collection");
+
+    let proof_val = &json_res["proof"];
+    let proof: contextra_crypto::deletion_proof::DeletionProof =
+        serde_json::from_value(proof_val.clone()).unwrap();
+    assert!(proof.verify(test_key.as_bytes()).unwrap());
+
+    std::env::remove_var("CONTEXTRA_DELETION_PROOF_KEY");
 }
 
 #[tokio::test]
@@ -572,84 +599,6 @@ async fn test_search_validates_empty_or_oversized_query() {
 }
 
 #[tokio::test]
-async fn test_contextra_forget_invalid_assurance_returns_invalid_params() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_forget",
-            "arguments": {
-                "collection": "default",
-                "id": "doc_1",
-                "confirm": true,
-                "assurance": "INVALID_LEVEL"
-            }
-        }),
-    );
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("Invalid assurance level 'INVALID_LEVEL'"));
-}
-
-#[tokio::test]
-async fn test_contextra_forget_invalid_purge_returns_invalid_params() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_forget",
-            "arguments": {
-                "collection": "default",
-                "id": "doc_1",
-                "confirm": true,
-                "purge": "INVALID_PURGE"
-            }
-        }),
-    );
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("Invalid purge mode 'INVALID_PURGE'"));
-}
-
-#[tokio::test]
-async fn test_delete_tool_description_mentions_tombstone_and_no_proof_promise() {
-    let (server, _tmp) = create_mock_server().await;
-    let req = make_request("tools/list", json!({}));
-    let response = server.handle(req).await;
-    let tools = response.result.unwrap()["tools"].as_array().unwrap().clone();
-
-    let delete_tool = tools
-        .iter()
-        .find(|t| t["name"] == "contextra_delete")
-        .expect("contextra_delete tool in list");
-    let desc = delete_tool["description"].as_str().unwrap();
-    assert!(
-        desc.contains("Tombstone"),
-        "contextra_delete description must contain 'Tombstone', got: '{desc}'"
-    );
-    assert!(
-        !desc.contains("issue a cryptographic DeletionProof"),
-        "contextra_delete description must not promise a cryptographic DeletionProof, got: '{desc}'"
-    );
-
-    let forget_tool = tools
-        .iter()
-        .find(|t| t["name"] == "contextra_forget")
-        .expect("contextra_forget tool in list");
-    let forget_desc = forget_tool["description"].as_str().unwrap();
-    assert!(
-        !forget_desc.contains("GDPR"),
-        "contextra_forget description must strictly avoid 'GDPR', got: '{forget_desc}'"
-    );
-}
-
-#[tokio::test]
 async fn test_create_collection_with_auto_extraction_param() {
     let (server, _tmp) = create_mock_server_with_write(true).await;
 
@@ -811,6 +760,7 @@ async fn test_write_tool_rejected_when_read_only() {
         "contextra_relate",
         "contextra_create_collection",
         "contextra_drop_collection",
+        "contextra_consolidate",
     ];
 
     for tool in write_tools {
@@ -1008,6 +958,132 @@ async fn test_batch_request_handling() {
     }
 }
 
+#[tokio::test]
+async fn test_contextra_consolidate_success() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    // Insert 2 documents into default collection
+    let insert_req1 = make_request(
+        "contextra_insert",
+        json!({
+            "id": "turn_doc_1",
+            "text": "First turn text",
+            "collection": "default"
+        }),
+    );
+    let resp1 = server.handle(insert_req1).await;
+    assert!(resp1.error.is_none());
+
+    let insert_req2 = make_request(
+        "contextra_insert",
+        json!({
+            "id": "turn_doc_2",
+            "text": "Second turn text",
+            "collection": "default"
+        }),
+    );
+    let resp2 = server.handle(insert_req2).await;
+    assert!(resp2.error.is_none());
+
+    // Trigger manual consolidation via MCP
+    let consolidate_req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_consolidate",
+            "arguments": {
+                "collection": "default"
+            }
+        }),
+    );
+
+    let resp = server.handle(consolidate_req).await;
+    assert!(resp.error.is_none());
+
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_ne!(res_val["result"]["isError"], true);
+
+    let text_out = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    let json_out: serde_json::Value = serde_json::from_str(text_out).unwrap();
+
+    assert_eq!(json_out["ok"], true);
+    assert_eq!(json_out["collection"], "default");
+    assert!(json_out["turns_scanned"].as_u64().unwrap() >= 2);
+    assert!(json_out.get("segments_created").is_some());
+    assert!(json_out.get("duplicates_tombstoned").is_some());
+    assert!(json_out.get("synthesized_chunks").is_some());
+}
+
+#[tokio::test]
+async fn test_contextra_consolidate_read_only_rejected() {
+    let (server, _tmp) = create_mock_server_with_write(false).await;
+
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_consolidate",
+            "arguments": {
+                "collection": "default"
+            }
+        }),
+    );
+
+    let resp = server.handle(req).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_eq!(res_val["result"]["isError"], true);
+    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(text.contains("Sandbox: DB-Schreibzugriff gesperrt"));
+}
+
+#[tokio::test]
+async fn test_contextra_consolidate_unknown_collection() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    let req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_consolidate",
+            "arguments": {
+                "collection": "invalid/collection:name"
+            }
+        }),
+    );
+
+    let resp = server.handle(req).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_eq!(res_val["result"]["isError"], true);
+    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(text.contains("forbidden characters"));
+}
+
+#[tokio::test]
+async fn test_contextra_consolidate_fault_injection() {
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    // Send malformed arguments (collection as integer instead of string)
+    let req_wrong_type = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_consolidate",
+            "arguments": {
+                "collection": 12345
+            }
+        }),
+    );
+
+    let resp = server.handle(req_wrong_type).await;
+    let res_val = serde_json::to_value(&resp).unwrap();
+    assert_eq!(res_val["result"]["isError"], true);
+    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(text.contains("collection' must be a string"));
+
+    // Direct RPC invocation with invalid params
+    let req_direct = make_request("contextra_consolidate", json!({ "collection": 9999 }));
+    let direct_resp = server.handle(req_direct).await;
+    let err = direct_resp
+        .error
+        .expect("error expected for direct invalid call");
+    assert_eq!(err.code, -32602);
+}
 
 #[cfg(feature = "kv-bridge")]
 #[tokio::test]
@@ -1018,7 +1094,7 @@ async fn test_kv_bridge_adapter_consulted_on_retrieve() {
     let dim = collection.dimension();
     let embedder = Arc::new(MockEmbedder { dimension: dim });
 
-    let store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
+    let store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
     let master_km =
         contextra_crypto::CryptoKey::try_new("test-mcp-kv", b"test-salt-mcp-kv").unwrap();
     let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km));

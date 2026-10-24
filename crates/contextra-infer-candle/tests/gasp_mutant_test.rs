@@ -1,10 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing
-)]
-
 // FILE-CONTEXT
 // STAND: 2026-09-09T12:44:49Z (SESSION: c74a1828)
 // ZWECK: Additional unit tests targeting mutants in GaspValidator and GaspConfig.
@@ -15,7 +8,7 @@ use contextra_types::{ContextChunk, ContextraError, DocId};
 
 fn chunk(id: u64, content: &str) -> ContextChunk {
     ContextChunk {
-        doc_id: DocId::from(id),
+        doc_id: DocId::new(id),
         content: content.to_string(),
         relevance: 1.0,
         token_count: 10,

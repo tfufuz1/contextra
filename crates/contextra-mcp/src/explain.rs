@@ -42,30 +42,40 @@ impl McpServer {
             .validate_tool_call("contextra_explain", args)
             .map_err(McpError::from)?;
 
-        let req: ExplainRequest = match serde_json::from_value(args.clone()) {
-            Ok(r) => r,
-            Err(_) => {
+        let id = match args.get("id") {
+            Some(v) => {
+                let s = v.as_str().ok_or_else(|| {
+                    McpError::invalid_params("Invalid params: 'id' must be a string")
+                })?;
+                if s.trim().is_empty() {
+                    return Err(McpError::invalid_params("id cannot be empty"));
+                }
+                if s.len() > 256 {
+                    return Err(McpError::invalid_params(
+                        "id length exceeds limit: max 256 chars",
+                    ));
+                }
+                s
+            }
+            None => {
                 return Err(McpError::invalid_params(
                     "id fehlt: missing required field 'id'",
                 ));
             }
         };
 
-        let id = req.id.trim();
-        if id.is_empty() {
-            return Err(McpError::invalid_params("id cannot be empty"));
-        }
-        if id.len() > 256 {
-            return Err(McpError::invalid_params(
-                "id length exceeds limit: max 256 chars",
-            ));
-        }
-
-        let col_name = if req.collection.trim().is_empty() {
-            "default"
+        let col_name = if let Some(col_val) = args.get("collection") {
+            let s = col_val.as_str().ok_or_else(|| {
+                McpError::invalid_params("Invalid params: 'collection' must be a string")
+            })?;
+            if s.trim().is_empty() {
+                "default"
+            } else {
+                validate_collection_name(s)?;
+                s
+            }
         } else {
-            validate_collection_name(&req.collection)?;
-            req.collection.as_str()
+            "default"
         };
 
         let col = self.db.collection(col_name).await.map_err(McpError::from)?;

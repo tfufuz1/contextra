@@ -1,6 +1,5 @@
 use crate::config::RouterConfig;
 use contextra::Contextra;
-use contextra_adapt::{PoolController, PoolControllerConfig};
 use contextra_types::{ContextChunk, ContextWindow, ContextraError, EntityId, TokenBudget};
 use std::sync::Arc;
 
@@ -73,12 +72,10 @@ impl contextra_ports::DriftStatusProvider for RouterDriftAdapter {
     }
 }
 
-/// Holds strong Arc references to routing, calibration and controller components to maintain live Weak references in `Contextra`.
+/// Holds strong Arc references to routing and calibration components to maintain live Weak references in `Contextra`.
 pub struct RoutingHandle {
     pub router: Arc<contextra::router::DefaultRouterEngine>,
     pub calibrator: Arc<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>,
-    pub pool_controller: Arc<parking_lot::Mutex<PoolController>>,
-    #[allow(deprecated)]
     pub pid_controller: Arc<parking_lot::Mutex<contextra_adapt::PidController>>,
     pub _drift_adapter: Arc<dyn contextra_ports::DriftStatusProvider>,
 }
@@ -109,11 +106,6 @@ pub async fn setup_routing(
         contextra_rank::IsotonicCalibrator::with_defaults(),
     ));
 
-    let pool_controller = Arc::new(parking_lot::Mutex::new(
-        PoolController::new(PoolControllerConfig::default())?,
-    ));
-
-    #[allow(deprecated)]
     let pid_controller = Arc::new(parking_lot::Mutex::new(
         contextra_adapt::PidController::default(),
     ));
@@ -123,12 +115,23 @@ pub async fn setup_routing(
     let router_weak = Arc::downgrade(&drift_adapter);
     db.set_router(router_weak);
     db.set_calibrator(Arc::downgrade(&calibrator));
+    db.set_pid_controller(Arc::downgrade(&pid_controller));
 
     Ok(Some(Arc::new(RoutingHandle {
         router,
         calibrator,
-        pool_controller,
         pid_controller,
         _drift_adapter: drift_adapter,
     })))
+}
+
+/// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
+#[cfg(feature = "kv-bridge")]
+pub fn setup_kv_bridge(
+    _db: &Arc<Contextra>,
+) -> Option<Arc<contextra_infer_candle::KvBridgeAdapter>> {
+    tracing::info!(
+        "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
+    );
+    None
 }

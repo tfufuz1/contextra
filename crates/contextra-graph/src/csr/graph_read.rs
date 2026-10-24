@@ -13,11 +13,10 @@ impl CsrGraph {
         // Double-checked locking to avoid unnecessary write locks (FIND-GRA-002)
         let snapshot = self.inner.load();
         let num_nodes = snapshot.reverse_map.len();
-        let num_nodes_plus_1 = num_nodes.saturating_add(1);
         if !snapshot.is_dirty
             && snapshot.pending_edges.is_empty()
             && snapshot.tombstoned_edges.is_empty()
-            && snapshot.offsets.len() == num_nodes_plus_1
+            && snapshot.offsets.len() == num_nodes + 1
         {
             return;
         }
@@ -28,11 +27,10 @@ impl CsrGraph {
         if inner.is_dirty
             || !inner.pending_edges.is_empty()
             || !inner.tombstoned_edges.is_empty()
-            || inner.offsets.len() != num_nodes_plus_1
+            || inner.offsets.len() != num_nodes + 1
         {
             inner.compact();
         }
-        inner.commit();
     }
 
     /// Asynchronously compacts the graph delta buffer.
@@ -42,7 +40,7 @@ impl CsrGraph {
         let is_needed = snapshot.is_dirty
             || !snapshot.pending_edges.is_empty()
             || !snapshot.tombstoned_edges.is_empty()
-            || snapshot.offsets.len() != num_nodes.saturating_add(1);
+            || snapshot.offsets.len() != num_nodes + 1;
 
         if !is_needed {
             return Ok(());
@@ -84,7 +82,6 @@ impl CsrGraph {
             inner.communities.insert(a.entity_id, a.community_id);
         }
         inner.communities_loaded = true;
-        inner.commit();
     }
 
     /// Retrieves community assignments for a batch of entity IDs in a single operation.
@@ -110,22 +107,18 @@ impl CsrGraph {
 
         if let Some(ref storage) = self.storage {
             let entries = storage.scan_prefix(GRAPH_COMMUNITY_PREFIX).await?;
-            {
-                let mut inner = self.inner_write();
-                inner.communities_loaded = true;
-                for (raw_key, raw_val) in entries {
-                    if let Some(key_payload) = raw_key.get(GRAPH_COMMUNITY_PREFIX.len()..) {
-                        if let Ok(key_str) = std::str::from_utf8(key_payload) {
-                            let eid = EntityId::from(key_str);
-                            if let Ok(comm_id) = serde_json::from_slice::<u64>(&raw_val) {
-                                inner.communities.insert(eid, comm_id);
-                            }
+            let mut inner = self.inner_write();
+            inner.communities_loaded = true;
+            for (raw_key, raw_val) in entries {
+                if let Some(key_payload) = raw_key.get(GRAPH_COMMUNITY_PREFIX.len()..) {
+                    if let Ok(key_str) = std::str::from_utf8(key_payload) {
+                        let eid = EntityId::from(key_str);
+                        if let Ok(comm_id) = serde_json::from_slice::<u64>(&raw_val) {
+                            inner.communities.insert(eid, comm_id);
                         }
                     }
                 }
-                inner.commit();
             }
-            let inner = self.inner_read();
             let mut map = HashMap::with_capacity(entity_ids.len());
             for &eid in entity_ids {
                 if let Some(&comm_id) = inner.communities.get(&eid) {
@@ -161,13 +154,9 @@ impl CsrGraph {
         };
 
         // 1. CSR targets
-        let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
-        if start_idx < offsets_len_minus_1 {
-            let start_edge = *inner.offsets.get(start_idx).unwrap_or(&0);
-            let next_i = start_idx.saturating_add(1);
-            let end_edge = *inner.offsets.get(next_i).unwrap_or(&0);
-            for edge_idx in start_edge..end_edge {
-                let Some(&neighbor_idx) = inner.targets.get(edge_idx) else { continue };
+        if start_idx < inner.offsets.len() - 1 {
+            for edge_idx in inner.offsets[start_idx]..inner.offsets[start_idx + 1] {
+                let neighbor_idx = inner.targets[edge_idx];
                 if !inner.tombstoned_edges.contains(&(start_idx, neighbor_idx))
                     && inner.entity_at(neighbor_idx).is_some()
                 {
@@ -217,13 +206,9 @@ impl CsrGraph {
 
         // Out-degree per node
         let mut out_degree = vec![0usize; n];
-        let offsets_len_minus_1 = inner.offsets.len().saturating_sub(1);
         for (i, deg) in out_degree.iter_mut().enumerate().take(n) {
-            if i < offsets_len_minus_1 {
-                let start = *inner.offsets.get(i).unwrap_or(&0);
-                let next_i = i.saturating_add(1);
-                let end = *inner.offsets.get(next_i).unwrap_or(&0);
-                *deg = end.saturating_sub(start);
+            if i < inner.offsets.len() - 1 {
+                *deg = inner.offsets[i + 1] - inner.offsets[i];
             }
         }
 
@@ -232,8 +217,8 @@ impl CsrGraph {
 
             // Account for dangling nodes (out_degree == 0)
             let dangling_sum: f32 = (0..n)
-                .filter(|&i| out_degree.get(i) == Some(&0))
-                .filter_map(|i| ranks.get(i).copied())
+                .filter(|&i| out_degree[i] == 0)
+                .map(|i| ranks[i])
                 .sum();
             let dangling_contrib = d * dangling_sum / (n as f32);
             for r in &mut next_ranks {
@@ -242,18 +227,14 @@ impl CsrGraph {
 
             // Distribute rank across outgoing edges
             for i in 0..n {
-                let deg = *out_degree.get(i).unwrap_or(&0);
+                let deg = out_degree[i];
                 if deg > 0 {
-                    let rank_i = *ranks.get(i).unwrap_or(&0.0);
-                    let share = d * rank_i / (deg as f32);
-                    let start = *inner.offsets.get(i).unwrap_or(&0);
-                    let next_i = i.saturating_add(1);
-                    let end = *inner.offsets.get(next_i).unwrap_or(&0);
+                    let share = d * ranks[i] / (deg as f32);
+                    let start = inner.offsets[i];
+                    let end = inner.offsets[i + 1];
                     for edge_idx in start..end {
-                        let Some(&target) = inner.targets.get(edge_idx) else { continue };
-                        if let Some(target_rank) = next_ranks.get_mut(target) {
-                            *target_rank += share;
-                        }
+                        let target = inner.targets[edge_idx];
+                        next_ranks[target] += share;
                     }
                 }
             }
@@ -380,7 +361,7 @@ impl CsrGraph {
         seq_no: u64,
     ) -> contextra_ports::BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
         Box::pin(async move {
-            let as_of_tx = TxId::try_new(seq_no).unwrap_or_else(|_| TxId::internal());
+            let as_of_tx = TxId::new(seq_no);
             if super::visibility::is_suspicious_tx_id(as_of_tx) {
                 tracing::warn!(
                     tx_id = seq_no,
@@ -413,7 +394,10 @@ impl CsrGraph {
                 let paths = engine.find_all_paths(start);
                 let rrf_signal = engine.to_rrf_signal(&paths);
                 for (doc_id, score) in rrf_signal {
-                    let entity_id = EntityId::from_doc_id(doc_id);
+                    #[cfg(not(feature = "docid-128"))]
+                    let entity_id = EntityId::new(doc_id.0);
+                    #[cfg(feature = "docid-128")]
+                    let entity_id = EntityId::new(doc_id.0 as u64);
 
                     combined
                         .entry(entity_id)

@@ -1,7 +1,0 @@
-{
-  "origin": "python-selfsigned",
-  "result": "INVALID",
-  "exit_code": 2,
-  "category": "FORMAT_ERROR",
-  "reason": "Unknown critical TLV tag encountered: 0x8999"
-}

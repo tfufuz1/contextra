@@ -118,10 +118,6 @@ pub enum GraphMutationError {
     #[error("Hyperedge not found: {0}")]
     HyperedgeNotFound(u64),
 
-    /// Hyperedge ID collision detected during batch commit.
-    #[error("Duplicate hyperedge ID detected during batch commit: {0}")]
-    DuplicateHyperEdgeId(HyperEdgeId),
-
     /// Invalid hyperedge weight.
     #[error("Invalid hyperedge weight {weight}: {reason}")]
     InvalidWeight {
@@ -213,12 +209,6 @@ mod tests {
         let contextra_err: ContextraError = err.into();
         assert!(
             matches!(contextra_err, ContextraError::InvalidInput(ref msg) if msg.contains("Invalid role binding: role_0"))
-        );
-
-        let dup_err = GraphMutationError::DuplicateHyperEdgeId(HyperEdgeId::new(42));
-        assert_eq!(
-            dup_err.to_string(),
-            "Duplicate hyperedge ID detected during batch commit: HyperEdgeId(42)"
         );
     }
 }

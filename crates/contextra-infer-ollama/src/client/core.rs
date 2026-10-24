@@ -7,58 +7,12 @@ use super::wire::{
     BatchEmbedRequest, BatchEmbedResponse, ChatMessage, ChatRequest, ChatStreamChunk, EmbedRequest,
     EmbedResponse, GenerateRequest, GenerateResponse,
 };
-use contextra_ports::Rng;
+use contextra_ports::{Rng, SeededRng};
 use contextra_types::{ContextraError, Result};
 use futures_util::StreamExt;
 use serde::Deserialize;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-
-const GOLDEN_RATIO_64: u64 = 0x9e37_79b9_7f4a_7c15;
-
-/// Local deterministic pseudorandom number generator implementing [`contextra_ports::SeededRng`].
-#[derive(Debug)]
-pub struct OllamaRng {
-    state: AtomicU64,
-}
-
-impl OllamaRng {
-    /// Erstellt eine neue [`OllamaRng`]-Instanz mit dem gegebenen Seed.
-    pub fn new(seed: u64) -> Self {
-        Self {
-            state: AtomicU64::new(seed),
-        }
-    }
-}
-
-impl contextra_ports::SeededRng for OllamaRng {
-    fn next_u64(&self) -> u64 {
-        let z = self
-            .state
-            .fetch_add(GOLDEN_RATIO_64, Ordering::SeqCst)
-            .wrapping_add(GOLDEN_RATIO_64);
-        let mut z = z;
-        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
-        z ^ (z >> 31)
-    }
-
-    fn fill_bytes(&self, mut dest: &mut [u8]) {
-        while !dest.is_empty() {
-            let val = self.next_u64();
-            let bytes = val.to_le_bytes();
-            let len = dest.len().min(8);
-            dest[..len].copy_from_slice(&bytes[..len]);
-            dest = &mut dest[len..];
-        }
-    }
-
-    fn next_unit_f64(&self) -> f64 {
-        let mantissa = self.next_u64() >> 11;
-        (mantissa as f64) * (1.0 / (1u64 << 53) as f64)
-    }
-}
 
 /// Default RNG seed for deterministic fallback.
 /// The Composition Root should inject an entropy-seeded RNG via `with_rng` if non-deterministic jitter is required.
@@ -117,9 +71,9 @@ impl OllamaClient {
                 reqwest::Client::new()
             }
         };
-        // Default RNG uses OllamaRng with a deterministic default seed.
+        // Default RNG uses SeededRng with a deterministic default seed.
         // The composition root should inject an entropy-seeded RNG via `with_rng` if non-deterministic jitter is required.
-        let rng: Arc<dyn Rng> = Arc::new(OllamaRng::new(DEFAULT_RNG_SEED));
+        let rng: Arc<dyn Rng> = Arc::new(SeededRng::new(DEFAULT_RNG_SEED));
         Self {
             config,
             client,
@@ -685,7 +639,13 @@ impl OllamaClient {
 
     /// Ensures that the specified model exists; returns `ContextraError::NotFound` with helpful instruction if missing.
     pub async fn ensure_model_available(&self, model: &str) -> Result<()> {
-        self.validate_model_available(model).await
+        validate_model_name(model)?;
+        if !self.is_model_available(model).await {
+            return Err(ContextraError::NotFound(format!(
+                "Ollama model '{model}' not found. Run: ollama pull {model}"
+            )));
+        }
+        Ok(())
     }
 
     /// Generates vector embedding with retry logic for transient failures.
@@ -1056,49 +1016,4 @@ pub(crate) fn parse_prompt_template(
         context,
         user_query,
     })
-}
-
-#[cfg(test)]
-mod core_tests {
-    use super::*;
-    use contextra_ports::SeededRng;
-
-    #[test]
-    fn test_ollama_rng_golden_sequence() {
-        let rng = OllamaRng::new(42);
-
-        let u64s: Vec<u64> = (0..5).map(|_| rng.next_u64()).collect();
-        assert_eq!(
-            u64s,
-            vec![
-                13679457532755275413,
-                2949826092126892291,
-                5139283748462763858,
-                6349198060258255764,
-                701532786141963250,
-            ],
-            "OllamaRng u64 sequence must match golden reference"
-        );
-
-        let f64s: Vec<f64> = (0..5).map(|_| rng.next_unit_f64()).collect();
-        assert_eq!(
-            f64s,
-            vec![
-                0.8682280765465323,
-                0.21840519371218436,
-                0.8006318767135033,
-                0.3399310389170206,
-                0.6184820663561348,
-            ],
-            "OllamaRng f64 sequence must match golden reference"
-        );
-
-        let mut buf = [0u8; 12];
-        rng.fill_bytes(&mut buf);
-        assert_eq!(
-            buf,
-            [191, 25, 91, 119, 74, 114, 116, 52, 190, 80, 22, 69],
-            "OllamaRng fill_bytes must match golden reference"
-        );
-    }
 }

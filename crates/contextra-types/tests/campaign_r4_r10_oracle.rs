@@ -3,7 +3,7 @@
 //! Demonstrates anti-mirroring (R4) by using mathematical invariants (bitwise shift and mask properties)
 //! and counter-test verification (R10) to confirm fail-case detection.
 
-use contextra_types::{DocId, TenantId, TxId};
+use contextra_types::{DocId, TxId, TenantId};
 
 #[test]
 fn test_doc_id_canonical_bit_decomposition_oracle() {
@@ -12,7 +12,7 @@ fn test_doc_id_canonical_bit_decomposition_oracle() {
     let doc_id = DocId::from(raw_val);
 
     // Test canonical properties
-    assert_eq!(u128::from(doc_id.inner()), u128::from(raw_val));
+    assert_eq!(doc_id.inner(), raw_val);
 }
 
 #[test]

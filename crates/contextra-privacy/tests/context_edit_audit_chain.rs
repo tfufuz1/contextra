@@ -27,17 +27,6 @@ impl MockSequenceClock {
 }
 
 impl Clock for MockSequenceClock {
-    fn now(&self) -> contextra_types::DeterministicTimestamp {
-        let nanos = self
-            .timestamps
-            .fetch_add(1000, std::sync::atomic::Ordering::Relaxed);
-        contextra_types::DeterministicTimestamp::new(nanos / 1_000_000, nanos)
-    }
-
-    fn monotonic_ticks(&self) -> u64 {
-        self.timestamps.load(std::sync::atomic::Ordering::Relaxed)
-    }
-
     fn now_unix_nanos(&self) -> u64 {
         self.timestamps
             .fetch_add(1000, std::sync::atomic::Ordering::Relaxed)
@@ -137,9 +126,7 @@ fn test_audit_chain_tampering_at_index_i() {
 
     // Tamper with record at index 2
     let tampered_index = 2;
-    if let Some(rec) = records.get_mut(tampered_index) {
-        rec.bytes_affected = rec.bytes_affected.saturating_add(1);
-    }
+    records[tampered_index].bytes_affected += 1;
 
     let res = verify_audit_chain(&records);
     assert_eq!(

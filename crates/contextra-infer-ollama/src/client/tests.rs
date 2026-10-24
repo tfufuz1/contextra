@@ -1595,7 +1595,7 @@ async fn test_llm_text_generator_streaming_ollama_mock() {
 
 #[test]
 fn test_retry_jitter_bounds() {
-    use super::core::OllamaRng as SeededRng;
+    use contextra_ports::SeededRng;
 
     let rng = SeededRng::new(42);
     for _ in 0..1000 {
@@ -1610,7 +1610,7 @@ fn test_retry_jitter_bounds() {
 
 #[test]
 fn test_retry_jitter_same_seed_reproducibility() {
-    use super::core::OllamaRng as SeededRng;
+    use contextra_ports::SeededRng;
 
     let rng1 = SeededRng::new(12345);
     let rng2 = SeededRng::new(12345);
@@ -1626,7 +1626,7 @@ fn test_retry_jitter_same_seed_reproducibility() {
 
 #[test]
 fn test_retry_jitter_different_seeds_divergence() {
-    use super::core::OllamaRng as SeededRng;
+    use contextra_ports::SeededRng;
 
     let rng1 = SeededRng::new(12345);
     let rng2 = SeededRng::new(54321);
@@ -1642,8 +1642,7 @@ fn test_retry_jitter_different_seeds_divergence() {
 
 #[test]
 fn test_with_rng_builder() {
-    use super::core::OllamaRng as SeededRng;
-    use contextra_ports::Rng;
+    use contextra_ports::{Rng, SeededRng};
     use std::sync::Arc;
 
     let custom_rng: Arc<dyn Rng> = Arc::new(SeededRng::new(99999));

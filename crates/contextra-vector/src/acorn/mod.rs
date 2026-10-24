@@ -8,7 +8,7 @@ pub mod naive_reference;
 pub use gamma_augmentation::compute_gamma_edge_budget;
 pub use naive_reference::NaiveReferenceIndex;
 
-use contextra_types::DocId;
+use contextra_core::DocId;
 
 /// Prädikatsagnostischer Suchpfad (ACORN-Muster, Patel et al. 2024).
 /// Im Gegensatz zu Post-Filtering wird das Prädikat WÄHREND der Graph-Traversal ausgewertet,

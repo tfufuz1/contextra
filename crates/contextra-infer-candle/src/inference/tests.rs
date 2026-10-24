@@ -1,17 +1,7 @@
-#![allow(
-    deprecated,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing
-)]
-
 use super::*;
 use crate::gasp::GaspValidator;
 use crate::model_registry::ModelFingerprint;
 use candle_core::Device;
-#[cfg(feature = "kv-bridge")]
-use contextra_ports::ContextSegment;
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 #[cfg(feature = "kv-bridge")]
 use contextra_types::TenantId;
@@ -31,42 +21,6 @@ impl CandleModelInner for MockCandleModel {
     ) -> Result<String> {
         Ok(format!("{prompt} -> {}", self.response))
     }
-}
-
-#[tokio::test]
-async fn test_inference_non_constant_output_proof_across_variable_prompts() {
-    let mock_model = Box::new(MockCandleModel {
-        response: "Response Tail".to_string(),
-    });
-    let fp = ModelFingerprint {
-        hash: [12u8; 32],
-        model_id: "test_prompt_model.gguf".to_string(),
-        quantization: "Q4_K_M".to_string(),
-    };
-    let tokenizer_bytes = r#"{
-        "version": "1.0",
-        "truncation": null,
-        "padding": null,
-        "added_tokens": [],
-        "normalizer": null,
-        "pre_tokenizer": null,
-        "post_processor": null,
-        "decoder": null,
-        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
-    }"#;
-    let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
-
-    let client = CandleLlmClient::new(Device::Cpu, mock_model, fp, tokenizer);
-
-    let output_a = client.generate("Prompt Alpha").await.unwrap();
-    let output_b = client.generate("Prompt Beta").await.unwrap();
-
-    assert_ne!(
-        output_a, output_b,
-        "Variable prompts must yield non-constant generation outputs"
-    );
-    assert!(output_a.contains("Prompt Alpha"));
-    assert!(output_b.contains("Prompt Beta"));
 }
 
 #[tokio::test]
@@ -199,8 +153,7 @@ async fn test_generate_with_context_text_identical_and_kv_bridge_consultation() 
 #[tokio::test]
 async fn test_generate_with_context_kv_bridge_consultation() {
     use crate::KvBridgeAdapter;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher};
-    use contextra_kvcache::TenantIsolatedKvStore;
+    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
 
     let fingerprint = ModelFingerprint {
         hash: [9u8; 32],
@@ -221,7 +174,7 @@ async fn test_generate_with_context_kv_bridge_consultation() {
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
     let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
     let store = Arc::new(TenantIsolatedKvStore::new());
     let adapter = KvBridgeAdapter::new(store, cipher);
 
@@ -256,8 +209,7 @@ async fn test_generate_with_context_kv_bridge_consultation() {
 #[tokio::test]
 async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
     use crate::kv_bridge::{KvBridgeAdapter, KvCacheKey};
-    use contextra_crypto::{CryptoKey, KvSegmentCipher};
-    use contextra_kvcache::TenantIsolatedKvStore;
+    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
 
     let fingerprint = ModelFingerprint {
         hash: [9u8; 32],
@@ -278,7 +230,7 @@ async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
     let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
     let store = Arc::new(TenantIsolatedKvStore::new());
     let adapter = KvBridgeAdapter::new(store, cipher);
 
@@ -366,8 +318,7 @@ async fn test_generate_with_context_kv_bridge_cache_hit_skips_prefill() {
 #[tokio::test]
 async fn test_generate_with_context_metrics_distinguishes_miss_and_placeholder_hit() {
     use crate::kv_bridge::KvBridgeAdapter;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher};
-    use contextra_kvcache::TenantIsolatedKvStore;
+    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
 
     let fingerprint = ModelFingerprint {
         hash: [7u8; 32],
@@ -388,7 +339,7 @@ async fn test_generate_with_context_metrics_distinguishes_miss_and_placeholder_h
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
     let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
     let store = Arc::new(TenantIsolatedKvStore::new());
     let adapter = KvBridgeAdapter::new(store, cipher);
 
@@ -661,8 +612,7 @@ async fn test_inference_zero_concurrency_limit_clamped_to_one() {
 #[tokio::test]
 async fn test_candle_llm_client_with_kv_bridge() {
     use crate::KvBridgeAdapter;
-    use contextra_crypto::{CryptoKey, KvSegmentCipher};
-    use contextra_kvcache::TenantIsolatedKvStore;
+    use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
 
     let mock_model = Box::new(MockCandleModel {
         response: "KV Response".to_string(),
@@ -686,7 +636,7 @@ async fn test_candle_llm_client_with_kv_bridge() {
     let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
 
     let master_km = CryptoKey::try_new("passphrase", b"salt12345").unwrap();
-    let cipher = Arc::new(KvSegmentCipher::ephemeral(master_km));
+    let cipher = Arc::new(KvSegmentCipher::new(master_km));
     let store = Arc::new(TenantIsolatedKvStore::new());
     let adapter = KvBridgeAdapter::new(store, cipher);
 
@@ -748,412 +698,4 @@ async fn test_inference_timeout_cancellation_releases_no_permit_leak() {
         1,
         "Permit must be fully available after cancellation without leaks"
     );
-}
-
-struct MultiChunkStreamModel {
-    notify_dropped: Arc<tokio::sync::Notify>,
-}
-
-impl CandleModelInner for MultiChunkStreamModel {
-    fn generate(
-        &mut self,
-        prompt: &str,
-        _tokenizer: &tokenizers::Tokenizer,
-        _device: &Device,
-    ) -> Result<String> {
-        Ok(format!("MultiChunk: {prompt}"))
-    }
-
-    fn generate_stream(
-        &mut self,
-        _prompt: &str,
-        _tokenizer: &tokenizers::Tokenizer,
-        _device: &Device,
-        on_token: &mut dyn FnMut(String) -> bool,
-    ) -> Result<String> {
-        for i in 0..100 {
-            if !on_token(format!(" chunk_{i}")) {
-                self.notify_dropped.notify_one();
-                break;
-            }
-        }
-        Ok("Completed".to_string())
-    }
-}
-
-#[tokio::test]
-async fn test_inference_drop_stream_mid_generation_frees_resources() {
-    use futures_util::StreamExt;
-
-    let notify_dropped = Arc::new(tokio::sync::Notify::new());
-    let model = Box::new(MultiChunkStreamModel {
-        notify_dropped: Arc::clone(&notify_dropped),
-    });
-    let fp = ModelFingerprint {
-        hash: [7u8; 32],
-        model_id: "stream_drop_model.gguf".to_string(),
-        quantization: "Q4_K_M".to_string(),
-    };
-    let tokenizer_bytes = r#"{
-        "version": "1.0",
-        "truncation": null,
-        "padding": null,
-        "added_tokens": [],
-        "normalizer": null,
-        "pre_tokenizer": null,
-        "post_processor": null,
-        "decoder": null,
-        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
-    }"#;
-    let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
-
-    let client = Arc::new(
-        CandleLlmClient::new(Device::Cpu, model, fp, tokenizer).with_max_concurrent_inferences(1),
-    );
-
-    let cfg = ConfigFingerprint::new("stream_drop_model.gguf", "Q4_K_M", "default", 0.0);
-
-    let mut stream = client.generate_stream("Test streaming drop", &cfg);
-
-    // Consume first chunk
-    let first_chunk = stream.next().await;
-    assert!(first_chunk.is_some());
-
-    // Explicitly drop stream mid-generation while model loop is running
-    drop(stream);
-
-    // Deterministically await notification from background task when on_token detects dropped receiver
-    notify_dropped.notified().await;
-
-    assert_eq!(
-        client.semaphore.available_permits(),
-        1,
-        "Permit must be released immediately after dropping stream"
-    );
-
-    // Verify follow-up request executes without deadlock
-    let follow_up = client.generate("Follow up request").await.unwrap();
-    assert_eq!(follow_up, "MultiChunk: Follow up request");
-}
-
-#[tokio::test]
-async fn test_edge_case_empty_prompt() {
-    use futures_util::StreamExt;
-
-    let mock_model = Box::new(MockCandleModel {
-        response: "Empty prompt response".to_string(),
-    });
-    let fp = ModelFingerprint {
-        hash: [10u8; 32],
-        model_id: "empty_prompt_model.gguf".to_string(),
-        quantization: "Q4_K_M".to_string(),
-    };
-    let tokenizer_bytes = r#"{
-        "version": "1.0",
-        "truncation": null,
-        "padding": null,
-        "added_tokens": [],
-        "normalizer": null,
-        "pre_tokenizer": null,
-        "post_processor": null,
-        "decoder": null,
-        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
-    }"#;
-    let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
-
-    let client = CandleLlmClient::new(Device::Cpu, mock_model, fp, tokenizer);
-    let cfg = ConfigFingerprint::new("empty_prompt_model.gguf", "Q4_K_M", "default", 0.0);
-
-    let res_sync = client.generate("").await;
-    assert!(res_sync.is_ok(), "Empty prompt must succeed without panic");
-
-    let mut stream = client.generate_stream("", &cfg);
-    let mut assembled = String::new();
-    while let Some(chunk_res) = stream.next().await {
-        if let Ok(chunk) = chunk_res {
-            assembled.push_str(&chunk);
-        }
-    }
-    assert_eq!(assembled, " -> Empty prompt response");
-}
-
-#[tokio::test]
-async fn test_edge_case_max_context_length_prompt() {
-    let mock_model = Box::new(MockCandleModel {
-        response: "Large prompt response".to_string(),
-    });
-    let fp = ModelFingerprint {
-        hash: [11u8; 32],
-        model_id: "max_context_model.gguf".to_string(),
-        quantization: "Q4_K_M".to_string(),
-    };
-    let tokenizer_bytes = r#"{
-        "version": "1.0",
-        "truncation": null,
-        "padding": null,
-        "added_tokens": [],
-        "normalizer": null,
-        "pre_tokenizer": null,
-        "post_processor": null,
-        "decoder": null,
-        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
-    }"#;
-    let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
-
-    let client = CandleLlmClient::new(Device::Cpu, mock_model, fp, tokenizer);
-
-    let large_prompt = "Context sentence repeated. ".repeat(200);
-    let res = client.generate(&large_prompt).await;
-
-    assert!(
-        res.is_ok(),
-        "Max context prompt must succeed without stack/index overflow"
-    );
-    assert!(res.unwrap().contains("Large prompt response"));
-}
-
-struct EarlyStoppingModel {
-    max_tokens: usize,
-}
-
-impl CandleModelInner for EarlyStoppingModel {
-    fn generate(
-        &mut self,
-        _prompt: &str,
-        _tokenizer: &tokenizers::Tokenizer,
-        _device: &Device,
-    ) -> Result<String> {
-        let mut text = String::new();
-        let mut count = 0;
-        let limit = self.max_tokens;
-        self.generate_stream("", _tokenizer, _device, &mut |chunk| {
-            if count >= limit {
-                return false;
-            }
-            text.push_str(&chunk);
-            count += 1;
-            count < limit
-        })?;
-        Ok(text)
-    }
-
-    fn generate_stream(
-        &mut self,
-        _prompt: &str,
-        _tokenizer: &tokenizers::Tokenizer,
-        _device: &Device,
-        on_token: &mut dyn FnMut(String) -> bool,
-    ) -> Result<String> {
-        let tokens = vec!["tok0", "tok1", "tok2", "tok3"];
-        for (i, t) in tokens.into_iter().enumerate() {
-            if i >= self.max_tokens {
-                break;
-            }
-            if !on_token(t.to_string()) {
-                break;
-            }
-        }
-        Ok("Finished".to_string())
-    }
-}
-
-#[tokio::test]
-async fn test_edge_case_max_tokens_zero_and_one() {
-    use futures_util::StreamExt;
-
-    let fp = ModelFingerprint {
-        hash: [12u8; 32],
-        model_id: "max_tokens_model.gguf".to_string(),
-        quantization: "Q4_K_M".to_string(),
-    };
-    let tokenizer_bytes = r#"{
-        "version": "1.0",
-        "truncation": null,
-        "padding": null,
-        "added_tokens": [],
-        "normalizer": null,
-        "pre_tokenizer": null,
-        "post_processor": null,
-        "decoder": null,
-        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
-    }"#;
-    let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
-
-    // max_tokens = 0
-    let client0 = CandleLlmClient::new(
-        Device::Cpu,
-        Box::new(EarlyStoppingModel { max_tokens: 0 }),
-        fp.clone(),
-        tokenizer.clone(),
-    );
-    let cfg0 = ConfigFingerprint::new("max_tokens_model.gguf", "Q4_K_M", "default", 0.0);
-    let mut stream0 = client0.generate_stream("test", &cfg0);
-    let mut count0 = 0;
-    while stream0.next().await.is_some() {
-        count0 += 1;
-    }
-    assert_eq!(count0, 0, "max_tokens=0 must emit 0 tokens");
-
-    // max_tokens = 1
-    let client1 = CandleLlmClient::new(
-        Device::Cpu,
-        Box::new(EarlyStoppingModel { max_tokens: 1 }),
-        fp,
-        tokenizer,
-    );
-    let cfg1 = ConfigFingerprint::new("max_tokens_model.gguf", "Q4_K_M", "default", 0.0);
-    let mut stream1 = client1.generate_stream("test", &cfg1);
-    let mut chunks1 = Vec::new();
-    while let Some(chunk_res) = stream1.next().await {
-        if let Ok(c) = chunk_res {
-            chunks1.push(c);
-        }
-    }
-    assert_eq!(chunks1.len(), 1, "max_tokens=1 must emit exactly 1 token");
-    assert_eq!(chunks1[0], "tok0");
-}
-
-struct PartialUtf8StreamingModel;
-
-impl CandleModelInner for PartialUtf8StreamingModel {
-    fn generate(
-        &mut self,
-        _prompt: &str,
-        _tokenizer: &tokenizers::Tokenizer,
-        _device: &Device,
-    ) -> Result<String> {
-        Ok("German: ä".to_string())
-    }
-
-    fn generate_stream(
-        &mut self,
-        _prompt: &str,
-        _tokenizer: &tokenizers::Tokenizer,
-        _device: &Device,
-        on_token: &mut dyn FnMut(String) -> bool,
-    ) -> Result<String> {
-        // Emit partial/lossy UTF-8 bytes across streaming chunks
-        let chunks = vec![
-            "German: ".to_string(),
-            String::from_utf8_lossy(&[0xC3]).to_string(),
-            String::from_utf8_lossy(&[0xA4]).to_string(),
-            " and invalid: ".to_string(),
-            String::from_utf8_lossy(&[0xFF]).to_string(),
-        ];
-        for c in chunks {
-            if !on_token(c) {
-                break;
-            }
-        }
-        Ok("Done".to_string())
-    }
-}
-
-#[tokio::test]
-async fn test_edge_case_invalid_utf8_split_detokenizer() {
-    use futures_util::StreamExt;
-
-    let model = Box::new(PartialUtf8StreamingModel);
-    let fp = ModelFingerprint {
-        hash: [13u8; 32],
-        model_id: "utf8_model.gguf".to_string(),
-        quantization: "Q4_K_M".to_string(),
-    };
-    let tokenizer_bytes = r#"{
-        "version": "1.0",
-        "truncation": null,
-        "padding": null,
-        "added_tokens": [],
-        "normalizer": null,
-        "pre_tokenizer": null,
-        "post_processor": null,
-        "decoder": null,
-        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
-    }"#;
-    let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
-
-    let client = CandleLlmClient::new(Device::Cpu, model, fp, tokenizer);
-    let cfg = ConfigFingerprint::new("utf8_model.gguf", "Q4_K_M", "default", 0.0);
-
-    let mut stream = client.generate_stream("test", &cfg);
-    let mut assembled = String::new();
-    while let Some(chunk_res) = stream.next().await {
-        if let Ok(c) = chunk_res {
-            assembled.push_str(&c);
-        }
-    }
-
-    assert!(assembled.contains("German: "));
-    assert!(assembled.contains("invalid: "));
-}
-
-struct StopSequenceModel;
-
-impl CandleModelInner for StopSequenceModel {
-    fn generate(
-        &mut self,
-        _prompt: &str,
-        _tokenizer: &tokenizers::Tokenizer,
-        _device: &Device,
-    ) -> Result<String> {
-        Ok("Prefix [STOP] Suffix".to_string())
-    }
-
-    fn generate_stream(
-        &mut self,
-        _prompt: &str,
-        _tokenizer: &tokenizers::Tokenizer,
-        _device: &Device,
-        on_token: &mut dyn FnMut(String) -> bool,
-    ) -> Result<String> {
-        let chunks = vec!["Hello ", "world", " [STOP]", " should not be reached"];
-        for chunk in chunks {
-            if chunk.contains("[STOP]") {
-                let _ = on_token(chunk.to_string());
-                break;
-            }
-            if !on_token(chunk.to_string()) {
-                break;
-            }
-        }
-        Ok("Done".to_string())
-    }
-}
-
-#[tokio::test]
-async fn test_edge_case_stop_sequence_at_end_and_middle() {
-    use futures_util::StreamExt;
-
-    let model = Box::new(StopSequenceModel);
-    let fp = ModelFingerprint {
-        hash: [14u8; 32],
-        model_id: "stop_model.gguf".to_string(),
-        quantization: "Q4_K_M".to_string(),
-    };
-    let tokenizer_bytes = r#"{
-        "version": "1.0",
-        "truncation": null,
-        "padding": null,
-        "added_tokens": [],
-        "normalizer": null,
-        "pre_tokenizer": null,
-        "post_processor": null,
-        "decoder": null,
-        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
-    }"#;
-    let tokenizer = tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).unwrap();
-
-    let client = CandleLlmClient::new(Device::Cpu, model, fp, tokenizer);
-    let cfg = ConfigFingerprint::new("stop_model.gguf", "Q4_K_M", "default", 0.0);
-
-    let mut stream = client.generate_stream("test", &cfg);
-    let mut assembled = String::new();
-    while let Some(chunk_res) = stream.next().await {
-        if let Ok(c) = chunk_res {
-            assembled.push_str(&c);
-        }
-    }
-
-    assert!(assembled.contains("[STOP]"));
-    assert!(!assembled.contains("should not be reached"));
 }

@@ -139,7 +139,7 @@ async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
     let doc_ids = [10u64, 20, 30, 40, 50, 60];
     for &id_val in &doc_ids {
         index
-            .upsert_document(tx, DocId::new(id_val.into()), "alpha beta gamma delta")
+            .upsert_document(tx, DocId::new(id_val), "alpha beta gamma delta")
             .await?;
     }
     index.commit(tx).await?;
@@ -175,10 +175,10 @@ async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
     );
 
     // (ii) Tie-break rule: Smaller DocId comes first
-    let returned_doc_ids: Vec<u128> = wand_results.iter().map(|(id, _)| u128::from(id.inner())).collect();
+    let returned_doc_ids: Vec<u64> = wand_results.iter().map(|(id, _)| id.inner()).collect();
     assert_eq!(
         returned_doc_ids,
-        vec![10u128, 20, 30],
+        vec![10, 20, 30],
         "On score tie, smaller DocIds must be prioritized: expected [10, 20, 30], got {:?}",
         returned_doc_ids
     );
@@ -192,7 +192,7 @@ async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
                 "All tied documents at threshold boundary must have identical score"
             );
             assert!(
-                u128::from(doc_id.inner()) <= 30,
+                doc_id.inner() <= 30,
                 "DocId {} exceeds boundary threshold DocId 30",
                 doc_id
             );
@@ -250,10 +250,10 @@ async fn test_wand_tie_break_heterogeneous_scores_threshold_boundary() -> Result
 
     assert_eq!(wand_results, reference);
 
-    let doc_ids: Vec<u128> = wand_results.iter().map(|(id, _)| u128::from(id.inner())).collect();
+    let doc_ids: Vec<u64> = wand_results.iter().map(|(id, _)| id.inner()).collect();
     assert_eq!(
         doc_ids,
-        vec![5u128, 10, 20],
+        vec![5, 10, 20],
         "Top-3 must be Doc 5 (highest score) followed by Doc 10 and Doc 20 (tied score, smaller DocIds)"
     );
 

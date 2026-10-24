@@ -1,6 +1,4 @@
 // ANCHOR[TEST:STO-005] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283)
-// REVIEW-PASS[1/2] STATUS:PASS (ID: TEST:STO-005) (TS: 2026-09-18T10:00:00Z) (SESSION: b8e4f1a2) PRÜFER-KONTEXT: FRESH — MANIFEST crash safety and SSTable non-resurrection verified.
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:STO-005) (TS: 2026-09-18T11:00:00Z) (SESSION: c9f5e2b3) PRÜFER-KONTEXT: FRESH — Independent review pass confirmed dead SSTable cleanup and tail-truncation handling.
 //! Integration tests for MANIFEST crash safety and SSTable non-resurrection.
 //!
 //! Verifies Opus Stufe 0 (Point 0.6) invariants:
@@ -12,10 +10,8 @@
 //! 3. Scenario C: Tail-truncated Replace record at MANIFEST end.
 //!    Incomplete Replace record is safely discarded (no Err/panic), input SSTables remain active.
 
-use contextra_ports::StorageEngine;
+use contextra_core::{Result, StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::Result;
-use contextra_types::TxId;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;

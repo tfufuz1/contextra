@@ -83,9 +83,9 @@ fn test_snapshot_registry_robustness_and_concurrency() {
         handles.push(std::thread::spawn(move || {
             for j in 0..iterations {
                 let seq = (i * iterations + j) as u64;
-                let lease = r.acquire(|| seq);
+                let guard = r.register(seq);
                 assert!(r.min_active_seqno() <= seq);
-                drop(lease);
+                drop(guard);
             }
         }));
     }
@@ -113,12 +113,10 @@ fn test_resource_tracker_edge_cases() {
 
 #[test]
 fn test_tx_buffer_orphan_reaper_concurrency() {
-    let clock = Arc::new(contextra_core::traits::SystemClock::new());
-    let registry = Arc::new(SnapshotRegistry::new().with_clock(clock));
-    let buffer = Arc::new(
-        TxBuffer::<String>::new_with_config(8, Duration::from_millis(5))
-            .with_snapshot_registry(registry),
-    );
+    let buffer = Arc::new(TxBuffer::<String>::new_with_config(
+        8,
+        Duration::from_millis(5),
+    ));
     let thread_count = 5;
     let iterations = 100;
     let mut handles = Vec::new();
@@ -128,7 +126,7 @@ fn test_tx_buffer_orphan_reaper_concurrency() {
         let b = buffer.clone();
         handles.push(std::thread::spawn(move || {
             for i in 0..iterations {
-                let tx = TxId::new_unchecked((t * iterations + i) as u64);
+                let tx = TxId::new((t * iterations + i) as u64);
                 b.begin(tx);
                 let _ = b.stage(
                     tx,

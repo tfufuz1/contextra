@@ -1,10 +1,9 @@
 use super::*;
-use contextra_mvcc::snapshot::SnapshotFloor;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_compaction_stress_and_gc() {
     use crate::lsm::{LsmConfig, LsmStorage};
-    use contextra_types::TxId;
+    use contextra_core::TxId;
     use std::sync::atomic::{AtomicBool, Ordering};
 
     let tmp = TempDir::new().expect("temp dir"); // expect
@@ -64,7 +63,7 @@ async fn test_compaction_stress_and_gc() {
 
     // 3. Register a Snapshot [INV-C1]
     let snapshot_seq = storage.last_seq_no().await.expect("last_seq_no"); // expect
-    let _guard = storage.snapshot_registry.acquire(|| snapshot_seq);
+    let _guard = storage.snapshot_registry.register(snapshot_seq);
 
     // 4. Heavy Load: 10,000 Inserts to trigger churn and background compaction
     for i in 0..10000 {
@@ -152,11 +151,11 @@ async fn test_compaction_swap_maintains_shadowing_order_without_restart() {
     };
     let engine = CompactionEngine::new(
         config,
-        registry.clone() as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -206,12 +205,11 @@ async fn test_compaction_swap_maintains_shadowing_order_without_restart() {
     let min_snapshot_seq = u64::MAX;
     let output_path = tmp.path().join("sst_merged_m.sst");
     engine
-        .merge_sstables_with_cancel(
+        .merge_sstables(
             &[sst_a.clone(), sst_b.clone()],
             &output_path,
             min_snapshot_seq,
             false,
-            None,
         )
         .await
         .expect("merge A and B into M");
@@ -276,11 +274,11 @@ async fn test_phantom_data_after_partial_compaction() {
             min_sstables_per_tier: 2,
             ..CompactionConfig::default()
         },
-        registry.clone() as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -326,13 +324,13 @@ async fn test_phantom_data_after_partial_compaction() {
     ]));
 
     // min_snapshot_seq is 100 (high enough that 20 would normally be GC'd)
-    registry.pin(100);
     let engine = Arc::new(engine);
+    engine.snapshot_registry.pin(100);
 
     // Manually trigger merger for {sst1, sst2} -> partial compaction
     let output_path = tmp.path().join("merged.sst");
     engine
-        .merge_sstables_with_cancel(&[sst1, sst2], &output_path, 100, false, None) // is_full = false
+        .merge_sstables(&[sst1, sst2], &output_path, 100, false) // is_full = false
         .await
         .expect("merge"); // expect
 
@@ -367,7 +365,7 @@ async fn test_phantom_data_after_partial_compaction() {
     .await;
 
     engine
-        .merge_sstables_with_cancel(&[sst1, sst2], &output_path_full, 100, true, None) // is_full = true
+        .merge_sstables(&[sst1, sst2], &output_path_full, 100, true) // is_full = true
         .await
         .expect("merge"); // expect
 
@@ -404,11 +402,11 @@ async fn test_compaction_pressure_awareness() {
 
     let engine = CompactionEngine::new(
         config,
-        registry as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -458,12 +456,11 @@ async fn test_compaction_pressure_awareness() {
     let normal_out = tmp.path().join("normal_merged.sst");
     let start_normal = tokio::time::Instant::now();
     engine
-        .merge_sstables_with_cancel(
+        .merge_sstables(
             &[Arc::clone(&sst1), Arc::clone(&sst2)],
             &normal_out,
             u64::MAX,
             true,
-            None,
         )
         .await
         .expect("merge under normal pressure");
@@ -484,7 +481,7 @@ async fn test_compaction_pressure_awareness() {
     let critical_out = tmp.path().join("critical_merged.sst");
     let start_critical = tokio::time::Instant::now();
     engine
-        .merge_sstables_with_cancel(&[sst1, sst2], &critical_out, u64::MAX, true, None)
+        .merge_sstables(&[sst1, sst2], &critical_out, u64::MAX, true)
         .await
         .expect("merge under critical pressure");
     let duration_critical = start_critical.elapsed();
@@ -532,11 +529,11 @@ async fn test_compaction_cancellation() {
     };
     let engine = Arc::new(CompactionEngine::new(
         config,
-        registry as Arc<dyn SnapshotFloor>,
+        registry,
         bc,
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -573,7 +570,7 @@ async fn test_compaction_cancellation() {
 #[tokio::test]
 async fn concurrent_flush_and_compact_is_safe() {
     use crate::lsm::{LsmConfig, LsmStorage};
-    use contextra_ports::StorageEngine;
+    use contextra_core::traits::StorageEngine;
 
     for _iteration in 0..10 {
         let tmp = tempfile::TempDir::new().unwrap(); // unwrap
@@ -603,7 +600,7 @@ async fn concurrent_flush_and_compact_is_safe() {
 
         // Insert initial data and flush to create SSTables
         for i in 0..10u64 {
-            let tx = contextra_types::TxId::new(i + 1);
+            let tx = contextra_core::TxId::new(i + 1);
             let key = format!("key-{:04}", i);
             let val = format!("val-{:04}", i);
             storage
@@ -615,7 +612,7 @@ async fn concurrent_flush_and_compact_is_safe() {
         storage.force_flush().await.expect("flush 1"); // expect
 
         for i in 10..20u64 {
-            let tx = contextra_types::TxId::new(i + 1);
+            let tx = contextra_core::TxId::new(i + 1);
             let key = format!("key-{:04}", i);
             let val = format!("val-{:04}", i);
             storage
@@ -628,7 +625,7 @@ async fn concurrent_flush_and_compact_is_safe() {
 
         // Write un-flushed memtable data for concurrent flush task
         for i in 20..30u64 {
-            let tx = contextra_types::TxId::new(i + 1);
+            let tx = contextra_core::TxId::new(i + 1);
             let key = format!("key-{:04}", i);
             let val = format!("val-{:04}", i);
             storage
@@ -678,11 +675,11 @@ async fn test_compaction_single_lock_candidate_selection_concurrency() {
     };
     let engine = CompactionEngine::new(
         config,
-        registry as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -725,7 +722,7 @@ async fn test_compaction_single_lock_candidate_selection_concurrency() {
     // in sstables list and can be safely merged without out-of-bounds panics.
     let output = tmp.path().join("merged_decoupled.sst");
     let merge_res = engine
-        .merge_sstables_with_cancel(&candidates, &output, u64::MAX, true, None)
+        .merge_sstables(&candidates, &output, u64::MAX, true)
         .await;
     assert!(
         merge_res.is_ok(),
@@ -750,11 +747,11 @@ async fn test_mvcc_floor_version_retained_for_active_snapshot() {
     let bc = create_block_cache(1);
     let engine = CompactionEngine::new(
         CompactionConfig::default(),
-        registry as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -792,7 +789,7 @@ async fn test_mvcc_floor_version_retained_for_active_snapshot() {
     // Versions > 15: seq 30, seq 20 (MUST both be retained).
     // Floor version (newest <= 15): seq 10 ("v10") (MUST be retained).
     engine
-        .merge_sstables_with_cancel(&[sst1, sst2, sst3], &output, 15, true, None)
+        .merge_sstables(&[sst1, sst2, sst3], &output, 15, true)
         .await
         .expect("merge");
 
@@ -823,11 +820,11 @@ async fn test_chain_linkage_tier_grouping() {
     };
     let engine = CompactionEngine::new(
         config,
-        registry as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -890,11 +887,11 @@ async fn test_compaction_concurrent_rollback_flush_no_panic() {
     };
     let engine = Arc::new(CompactionEngine::new(
         config,
-        registry as Arc<dyn SnapshotFloor>,
+        registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_types::ResourceTracker::new(
-            contextra_types::ResourceBudget {
+        Arc::new(contextra_core::ResourceTracker::new(
+            contextra_core::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -968,7 +965,7 @@ async fn test_compaction_concurrent_rollback_flush_no_panic() {
 
 #[tokio::test]
 async fn test_tombstone_retention_floor_with_active_snapshot() {
-    use contextra_types::TOMBSTONE_BIT;
+    use contextra_core::TOMBSTONE_BIT;
 
     let tmp = TempDir::new().expect("temp dir");
     let bc = create_block_cache(1);
@@ -982,14 +979,14 @@ async fn test_tombstone_retention_floor_with_active_snapshot() {
     let mut config = CompactionConfig::default();
     config.min_sstables_per_tier = 2;
 
-    let budget = Arc::new(contextra_types::ResourceTracker::new(
-        contextra_types::ResourceBudget {
+    let budget = Arc::new(contextra_core::ResourceTracker::new(
+        contextra_core::ResourceBudget {
             memory_limit: 100 * 1024 * 1024,
         },
     ));
     let engine = CompactionEngine::new(
         config,
-        registry.clone() as Arc<dyn SnapshotFloor>,
+        registry.clone(),
         bc.clone(),
         None,
         budget,
@@ -1015,7 +1012,7 @@ async fn test_tombstone_retention_floor_with_active_snapshot() {
 
     let output_path = tmp.path().join("sst-compacted.sst");
     engine
-        .merge_sstables_with_cancel(&[sst1], &output_path, 15, true, None)
+        .merge_sstables(&[sst1], &output_path, 15, true)
         .await
         .expect("compaction succeeds");
 

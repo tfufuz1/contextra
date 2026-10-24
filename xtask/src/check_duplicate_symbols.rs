@@ -376,7 +376,7 @@ pub fn scan_crate_for_cross_module_duplicate_symbols(
 }
 
 /// Scannt ein Crate-Verzeichnis dateiübergreifend auf doppelte öffentliche `fn`-Deklarationen.
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 pub fn scan_crate_for_cross_module_duplicate_fns(
     crate_root: &Path,
 ) -> Result<Vec<DuplicateSymbol>, String> {

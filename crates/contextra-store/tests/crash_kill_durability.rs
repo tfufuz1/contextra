@@ -1,6 +1,4 @@
-// ANCHOR[TEST:STO-004] STATUS:DONE (TS:2026-09-30T00:00:00Z) (SESSION: 8df4a1c7)
-// REVIEW-PASS[1/2] STATUS:PASS (ID: TEST:STO-004) (TS: 2026-09-30T10:00:00Z) (SESSION: b8e4f1a2) PRÜFER-KONTEXT: FRESH — SIGKILL process termination recovery and durability invariants verified.
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:STO-004) (TS: 2026-09-30T11:00:00Z) (SESSION: c9f5e2b3) PRÜFER-KONTEXT: FRESH — Independent review pass confirmed zero phantom keys and post-recovery write success.
+// ANCHOR[TEST:STO-004] STATUS:DONE (TS:2026-09-30T00:00:00Z)
 //! Crash kill durability verification test.
 //!
 //! Evaluates SIGKILL process termination recovery and durability invariants.
@@ -10,10 +8,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
-use contextra_ports::StorageEngine;
-use contextra_store::lsm::config::EncryptionConfig;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::TxId;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -126,9 +122,7 @@ async fn child_writer() {
     let config = LsmConfig {
         path: db_path,
         group_commit_window_micros: group_commit_micros,
-        encryption: passphrase
-            .map(EncryptionConfig::Passphrase)
-            .unwrap_or_default(),
+        encryption_passphrase: passphrase,
         ..Default::default()
     };
 
@@ -277,10 +271,7 @@ async fn test_crash_kill_durability() {
         let config = LsmConfig {
             path: tmp_dir.path().to_path_buf(),
             group_commit_window_micros: group_commit_micros,
-            encryption: passphrase
-                .clone()
-                .map(EncryptionConfig::Passphrase)
-                .unwrap_or_default(),
+            encryption_passphrase: passphrase.clone(),
             ..Default::default()
         };
 
@@ -481,10 +472,7 @@ async fn test_crash_kill_durability() {
             let corrupt_config = LsmConfig {
                 path: corrupt_tmp.path().to_path_buf(),
                 group_commit_window_micros: group_commit_micros,
-                encryption: passphrase
-                    .clone()
-                    .map(EncryptionConfig::Passphrase)
-                    .unwrap_or_default(),
+                encryption_passphrase: passphrase.clone(),
                 ..Default::default()
             };
 

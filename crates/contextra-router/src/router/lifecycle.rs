@@ -106,12 +106,36 @@ impl RouterEngine {
     }
 
     /// Dynamically updates configured SLM profiles at runtime (Hot-Reload).
-    #[deprecated(
-        since = "0.1.0",
-        note = "Nutze try_update_profiles() für kaskadierende Validierung vor dem Hot-Reload"
-    )]
     pub fn update_profiles(&self, new_profiles: Vec<SlmProfile>) {
-        let _ = self.try_update_profiles(new_profiles);
+        let current = self.state.load_full();
+        let mut old_cal = current.calibration.clone();
+        let new_cal: HashMap<String, ProfileCalibrationState> = new_profiles
+            .iter()
+            .map(|p| {
+                let mut state = old_cal
+                    .remove(&p.name)
+                    .unwrap_or_else(|| ProfileCalibrationState::new(p.min_relevance_score));
+                state.check_and_invalidate_fingerprint(p.fingerprint.as_ref());
+                (p.name.clone(), state)
+            })
+            .collect();
+
+        let mut old_watchers = current.lyapunov_watchers.clone();
+        let new_watchers: HashMap<String, LyapunovDriftWatcher> = new_profiles
+            .iter()
+            .map(|p| {
+                let watcher = old_watchers.remove(&p.name).unwrap_or_default();
+                (p.name.clone(), watcher)
+            })
+            .collect();
+
+        let new_state = RouterState {
+            profiles: new_profiles,
+            calibration: new_cal,
+            lyapunov_watchers: new_watchers,
+        };
+
+        self.state.store(Arc::new(new_state));
     }
 
     /// Validates all profiles and updates configured SLM profiles at runtime (Hot-Reload).
@@ -119,41 +143,8 @@ impl RouterEngine {
         for p in &new_profiles {
             p.validate()?;
         }
-        self.update_profiles_internal(new_profiles);
+        self.update_profiles(new_profiles);
         Ok(())
-    }
-
-    pub(crate) fn update_profiles_internal(&self, new_profiles: Vec<SlmProfile>) {
-        self.state.rcu(|current| {
-            let mut old_cal = current.calibration.clone();
-            let new_cal: HashMap<String, ProfileCalibrationState> = new_profiles
-                .iter()
-                .map(|p| {
-                    let mut state = old_cal
-                        .remove(&p.name)
-                        .unwrap_or_else(|| ProfileCalibrationState::new(p.min_relevance_score));
-                    state.check_and_invalidate_fingerprint(p.fingerprint.as_ref());
-                    (p.name.clone(), state)
-                })
-                .collect();
-
-            let mut old_watchers = current.lyapunov_watchers.clone();
-            let new_watchers: HashMap<String, LyapunovDriftWatcher> = new_profiles
-                .iter()
-                .map(|p| {
-                    let watcher = old_watchers.remove(&p.name).unwrap_or_default();
-                    (p.name.clone(), watcher)
-                })
-                .collect();
-
-            let new_state = RouterState {
-                profiles: new_profiles.clone(),
-                calibration: new_cal,
-                lyapunov_watchers: new_watchers,
-            };
-
-            Arc::new(new_state)
-        });
     }
 
     /// Returns a copy of the active SLM profiles.

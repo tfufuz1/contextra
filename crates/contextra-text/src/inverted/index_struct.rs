@@ -1,5 +1,5 @@
 use super::types::{Language, StagedStatsChange, TextIndexMetadata};
-use crate::posting_list::{DocIdRaw, Posting, ResidentPostingIndex};
+use crate::posting_list::{Posting, ResidentPostingIndex};
 use crate::tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -15,8 +15,8 @@ use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_S
 ///
 /// **Rule**: `commit_lock` must ALWAYS be acquired BEFORE acquiring `staged_stats`. Never hold synchronous lock guards across `.await` points.
 pub struct InvertedIndex<S: StorageEngine> {
-    pub(crate) storage: Arc<S>,
-    pub(crate) prefix: Vec<u8>,
+    storage: Arc<S>,
+    prefix: Vec<u8>,
     tokenizer: Arc<dyn Tokenizer>,
     pub(crate) total_docs: Arc<AtomicU64>,
     pub(crate) total_tokens: Arc<AtomicU64>,
@@ -89,11 +89,6 @@ impl<S: StorageEngine> InvertedIndex<S> {
         Self::new_with_language(storage, namespace, Language::English)
     }
 
-    /// Returns a reference to the resident posting index.
-    pub fn resident_index(&self) -> &Arc<ResidentPostingIndex> {
-        &self.resident_index
-    }
-
     /// Sets a custom tokenizer for the inverted index.
     pub fn with_tokenizer(mut self, tokenizer: Arc<dyn Tokenizer>) -> Self {
         self.tokenizer = tokenizer;
@@ -106,8 +101,6 @@ impl<S: StorageEngine> InvertedIndex<S> {
         if let Some(bytes) = self.storage.get(&meta_key).await? {
             let meta: TextIndexMetadata = bincode::deserialize(&bytes)
                 .map_err(|e| ContextraError::Storage(format!("bincode: {}", e)))?;
-            // ORDERING RATIONALE: SeqCst store ensures loaded index statistics from persistent storage
-            // are globally published and visible to all concurrent reader threads before subsequent operations.
             self.total_docs.store(meta.total_docs, Ordering::SeqCst);
             self.total_tokens.store(meta.total_tokens, Ordering::SeqCst);
             self.avg_doc_len_x1000
@@ -188,11 +181,14 @@ impl<S: StorageEngine> InvertedIndex<S> {
         for (key, val_bytes) in raw_entries {
             let suffix_bytes = &key[prefix.len()..];
             if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
-                let parsed_doc_id = suffix.parse::<DocIdRaw>().ok();
+                #[cfg(not(feature = "docid-128"))]
+                let parsed_doc_id = suffix.parse::<u64>().ok();
+                #[cfg(feature = "docid-128")]
+                let parsed_doc_id = suffix.parse::<u128>().ok();
 
                 if let Some(doc_id_raw) = parsed_doc_id {
                     if val_bytes.len() == 4 {
-                        let doc_id = DocId::new(doc_id_raw.into());
+                        let doc_id = DocId::new(doc_id_raw);
                         let tf =
                             u32::from_le_bytes((&val_bytes[..4]).try_into().map_err(|_| {
                                 ContextraError::Storage("Invalid posting tf length".into())
@@ -350,10 +346,16 @@ impl<S: StorageEngine> InvertedIndex<S> {
                 continue;
             }
 
+            #[cfg(not(feature = "docid-128"))]
             let doc_id_raw_opt = std::str::from_utf8(parts[0])
                 .ok()
-                .and_then(|s| s.parse::<DocIdRaw>().ok())
-                .map(DocId::from);
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(DocId::new);
+            #[cfg(feature = "docid-128")]
+            let doc_id_raw_opt = std::str::from_utf8(parts[0])
+                .ok()
+                .and_then(|s| s.parse::<u128>().ok())
+                .map(|v| DocId::new(v));
             let doc_id = match doc_id_raw_opt {
                 Some(v) => v,
                 None => continue,
@@ -428,8 +430,6 @@ impl<S: StorageEngine> InvertedIndex<S> {
                     self.ensure_term_loaded(term).await?;
                     let pl_doc_key = self.key_with_term_doc(term, doc_id);
                     self.storage.delete(tx, &pl_doc_key).await?;
-                    let pos_key = self.key_with_id(&format!("pos:{}:", term), doc_id.inner());
-                    self.storage.delete(tx, &pos_key).await?;
                     let tbs_key = self.key_tombstone(doc_id, term);
                     self.storage.put(tx, &tbs_key, &[]).await?;
 
@@ -438,12 +438,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
                     let plb_key = self.key_batch_posting_list(term);
                     if let Some(plist) = self.resident_index.get(term) {
-                        if plist.is_empty() {
-                            self.storage.delete(tx, &plb_key).await?;
-                        } else {
-                            let batch_bytes = plist.encode_compact()?;
-                            self.storage.put(tx, &plb_key, &batch_bytes).await?;
-                        }
+                        let batch_bytes = plist.encode_compact()?;
+                        self.storage.put(tx, &plb_key, &batch_bytes).await?;
                     } else {
                         self.storage.delete(tx, &plb_key).await?;
                     }
@@ -483,8 +479,6 @@ impl<S: StorageEngine> InvertedIndex<S> {
         };
 
         if change.docs_delta != 0 || change.tokens_delta != 0 {
-            // ORDERING RATIONALE: SeqCst fetch_add / fetch_sub provides atomic total modification ordering
-            // when committing document and token counts across concurrent transaction commits.
             if change.docs_delta > 0 {
                 self.total_docs
                     .fetch_add(change.docs_delta as u64, Ordering::SeqCst);
@@ -508,8 +502,6 @@ impl<S: StorageEngine> InvertedIndex<S> {
             } else {
                 0
             };
-            // ORDERING RATIONALE: SeqCst store ensures the recomputed fixed-point avg_doc_len_x1000
-            // is published atomically alongside total_docs and total_tokens.
             self.avg_doc_len_x1000.store(avg_len, Ordering::SeqCst);
         }
 
@@ -577,8 +569,6 @@ impl<S: StorageEngine> InvertedIndex<S> {
             return Ok(Vec::new());
         }
 
-        // ORDERING RATIONALE: Acquire load pairs with SeqCst stores during commit_stats(),
-        // ensuring BM25 scoring thread observes all preceding index storage writes committed prior to the stats update.
         let n = self.total_docs.load(Ordering::Acquire);
         let cached_avg_len_x1000 = self.avg_doc_len_x1000.load(Ordering::Acquire);
 

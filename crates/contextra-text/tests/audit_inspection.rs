@@ -257,8 +257,8 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
     let text = "alpha beta gamma delta epsilon zeta eta theta iota kappa";
     assert_eq!(DefaultTokenizer.tokenize(text).len(), 10);
 
-    for i in 1..=100u64 {
-        let doc_id = DocId::new(i.into());
+    for i in 1..=100 {
+        let doc_id = DocId::new(i);
         let tx = TxId::new(i);
         index.insert(tx, doc_id, text).await?;
         index.commit(tx).await?;
@@ -276,8 +276,8 @@ async fn test_b3_avgdl_consistency_100_insert_50_delete() -> contextra_types::Re
     assert_eq!(avgdl_x1000, 10.0, "avgdl after 100 docs must be 10.0");
 
     // Delete 50 documents
-    for i in 1..=50u64 {
-        let doc_id = DocId::new(i.into());
+    for i in 1..=50 {
+        let doc_id = DocId::new(i);
         let tx = TxId::new(100 + i);
         index.delete(tx, doc_id).await?;
         index.commit(tx).await?;

@@ -5,7 +5,6 @@ use crate::types::*;
 use crate::Result;
 use std::future::Future;
 
-
 /// Abstract contract for generating consistent checkpoints.
 pub trait Checkpoint: Send + Sync + 'static {
     /// Takes a deterministic snapshot of the current state.
@@ -49,4 +48,10 @@ pub trait CheckpointCoordinator: Send + Sync + 'static {
 
     /// Lists all active checkpoints.
     fn list_named_checkpoints(&self) -> impl Future<Output = Result<Vec<Self::Meta>>> + Send;
+}
+
+/// Represents a point-in-time view of the database.
+pub trait Snapshot: Send + Sync {
+    /// Returns the sequence number for this snapshot.
+    fn seq_no(&self) -> u64;
 }

@@ -257,14 +257,6 @@ pub trait StorageEngine: Send + Sync + 'static {
             ))
         })
     }
-
-    /// Returns an optional reference to the erasure backend capabilities of this storage engine (§8.3, ADR-01, D6).
-    ///
-    /// Replaces downcasts to concrete storage types. Concrete engines implementing `ErasureBackend`
-    /// override this method to provide physical scope translation and purge execution.
-    fn erasure_capabilities(&self) -> Option<&dyn crate::erasure::ErasureBackend> {
-        None
-    }
 }
 
 #[cfg(test)]

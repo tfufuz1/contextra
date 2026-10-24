@@ -2,21 +2,11 @@ use super::block_cache::{BLOCK_SIZE, SSTABLE_MAGIC_MFSX};
 use super::bloom::BloomFilter;
 use crate::wal::KeyManager;
 use bytes::{BufMut, Bytes, BytesMut};
-use contextra_crypto::{KeyId, ScopeKeyring};
-use contextra_types::{ContextraError, Result};
+use contextra_core::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-
-/// Constructs canonical Additional Authenticated Data (AAD) for SSTable block encryption.
-pub(super) fn build_block_aad(file_id: &[u8], block_offset: u64, key_id: &KeyId) -> Vec<u8> {
-    let mut aad = Vec::with_capacity(file_id.len() + 8 + 16);
-    aad.extend_from_slice(file_id);
-    aad.extend_from_slice(&block_offset.to_le_bytes());
-    aad.extend_from_slice(key_id.as_bytes());
-    aad
-}
 
 /// A builder for SSTable data blocks (Format v4 default, supports v3).
 pub struct BlockBuilder {
@@ -216,9 +206,6 @@ pub struct SstableBuilder {
     prev_key_last_seq: Option<u64>,
     offset: u64,
     key_manager: Option<Arc<KeyManager>>,
-    scope_keyring: Option<Arc<ScopeKeyring>>,
-    key_id: Option<KeyId>,
-    enc_version: u16,
     /// Whole-SSTable bloom filter for cross-block pre-checks.
     bloom_filter: BloomFilter,
     key_count: usize,
@@ -232,56 +219,7 @@ pub struct SstableBuilder {
 impl SstableBuilder {
     /// Creates a new SstableBuilder that writes to the given file path.
     pub async fn create(path: impl AsRef<Path>) -> Result<Self> {
-        Self::create_with_version(path, 4).await
-    }
-
-    /// Creates a new SstableBuilder with an explicit format version.
-    pub async fn create_with_version(path: impl AsRef<Path>, version: u16) -> Result<Self> {
-        let mut builder = Self::create_with_key_manager(path, None).await?;
-        builder.set_format_version(version);
-        Ok(builder)
-    }
-
-    /// Returns the estimated current total SSTable size written so far.
-    pub fn current_size(&self) -> u64 {
-        self.offset
-            .saturating_add(self.block_builder.current_size() as u64)
-    }
-
-    /// Creates a new SstableBuilder with scope keyring encryption (Format v5).
-    pub async fn create_with_scope_keyring(
-        path: impl AsRef<Path>,
-        scope_keyring: Arc<ScopeKeyring>,
-        key_id: KeyId,
-    ) -> Result<Self> {
-        let path_ref = path.as_ref();
-        let file = File::create(path_ref)
-            .await
-            .map_err(|e| ContextraError::Storage(format!("Failed to create SSTable: {}", e)))?;
-
-        let mut builder = Self {
-            path: path_ref.to_path_buf(),
-            file,
-            block_builder: BlockBuilder::new_with_version(BLOCK_SIZE, 5),
-            index: Vec::new(),
-            first_key: None,
-            last_key: None,
-            prev_key_last_seq: None,
-            offset: 0,
-            key_manager: None,
-            scope_keyring: Some(scope_keyring),
-            key_id: Some(key_id),
-            enc_version: 1,
-            bloom_filter: BloomFilter::new(100_000, 0.01),
-            key_count: 0,
-            min_tx_id: u64::MAX,
-            max_tx_id: 0,
-            min_seq: u64::MAX,
-            max_seq: 0,
-            format_version: 5,
-        };
-        builder.set_format_version(5);
-        Ok(builder)
+        Self::create_with_key_manager(path, None).await
     }
 
     pub async fn create_with_key_manager(
@@ -302,7 +240,7 @@ impl SstableBuilder {
             .await
             .map_err(|e| ContextraError::Storage(format!("Failed to create SSTable: {}", e)))?;
 
-        let mut builder = Self {
+        Ok(Self {
             path: path_ref.to_path_buf(),
             file,
             block_builder: BlockBuilder::new_with_version(BLOCK_SIZE, 4),
@@ -312,9 +250,6 @@ impl SstableBuilder {
             prev_key_last_seq: None,
             offset: 0,
             key_manager: derived_km,
-            scope_keyring: None,
-            key_id: None,
-            enc_version: 0,
             bloom_filter: BloomFilter::new(100_000, 0.01),
             key_count: 0,
             min_tx_id: u64::MAX,
@@ -322,9 +257,7 @@ impl SstableBuilder {
             min_seq: u64::MAX,
             max_seq: 0,
             format_version: 4,
-        };
-        builder.set_format_version(4);
-        Ok(builder)
+        })
     }
 
     /// Explicitly configures the SSTable format version to write (default: 4).
@@ -348,7 +281,7 @@ impl SstableBuilder {
             )));
         }
 
-        let raw_seq = seq_no & !contextra_types::TOMBSTONE_BIT;
+        let raw_seq = seq_no & !contextra_core::TOMBSTONE_BIT;
 
         if let Some(prev_k) = &self.last_key {
             if key < prev_k.as_ref() {
@@ -396,7 +329,7 @@ impl SstableBuilder {
     }
 
     async fn flush_block(&mut self) -> Result<()> {
-        if self.block_builder.is_empty() || self.block_builder.current_size() == 0 {
+        if self.block_builder.is_empty() {
             return Ok(());
         }
 
@@ -404,15 +337,6 @@ impl SstableBuilder {
             .last_key
             .clone()
             .ok_or_else(|| ContextraError::Storage("Missing last_key".into()))?;
-        let current_block_bytes = self.block_builder.current_size();
-        let estimated_total = self.current_size();
-        tracing::trace!(
-            path = %self.path.display(),
-            current_block_bytes,
-            estimated_total,
-            format_version = self.format_version,
-            "Flushing SSTable block"
-        );
         let block_data = std::mem::replace(
             &mut self.block_builder,
             BlockBuilder::new_with_version(BLOCK_SIZE, self.format_version),
@@ -427,33 +351,7 @@ impl SstableBuilder {
 
         let mut block = Bytes::from(block_with_crc);
 
-        if self.format_version >= 5 {
-            let (keyring, key_id) = match (&self.scope_keyring, self.key_id) {
-                (Some(kr), Some(kid)) => (kr, kid),
-                _ => {
-                    return Err(ContextraError::Crypto(
-                        "ScopeKeyring required for v5 encrypted SSTable".into(),
-                    ));
-                }
-            };
-            let dek_handle = keyring.dek(key_id).map_err(|e| match e {
-                contextra_crypto::CryptoError::KeyRevoked(msg) => ContextraError::KeyDestroyed(msg),
-                other => ContextraError::Crypto(other.to_string()),
-            })?;
-            let file_id_str = self
-                .path
-                .file_name()
-                .map(|n| n.to_string_lossy())
-                .unwrap_or_default();
-            let aad = build_block_aad(file_id_str.as_bytes(), self.offset, &key_id);
-            let (ciphertext, nonce) = dek_handle
-                .encrypt(&block, &aad)
-                .map_err(|e| ContextraError::Crypto(e.to_string()))?;
-            let mut new_block = BytesMut::with_capacity(12 + ciphertext.len());
-            new_block.put_slice(&nonce);
-            new_block.put_slice(&ciphertext);
-            block = new_block.freeze();
-        } else if let Some(km) = &self.key_manager {
+        if let Some(km) = &self.key_manager {
             let (encrypted, nonce) = km.encrypt_auto_nonce(&block)?;
             let mut new_block = BytesMut::with_capacity(12 + encrypted.len());
             new_block.put_slice(&nonce);
@@ -528,90 +426,43 @@ impl SstableBuilder {
             .await
             .map_err(|e| ContextraError::Storage(format!("SSTable bloom write failed: {}", e)))?;
 
-        if self.format_version >= 5 {
-            // Write 72-byte trailer for Format v5
-            self.file
-                .write_u64_le(self.min_tx_id)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            self.file
-                .write_u64_le(self.max_tx_id)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            self.file
-                .write_u64_le(self.min_seq)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            self.file
-                .write_u64_le(self.max_seq)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            self.file
-                .write_u64_le(bloom_offset)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            self.file
-                .write_u64_le(index_offset)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        // Write trailer: [min_tx][max_tx][min_seq][max_seq][bloom_offset][index_offset][version=4][magic]
+        // This is 54 bytes.
+        self.file
+            .write_u64_le(self.min_tx_id)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        self.file
+            .write_u64_le(self.max_tx_id)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        self.file
+            .write_u64_le(self.min_seq)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        self.file
+            .write_u64_le(self.max_seq)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        self.file
+            .write_u64_le(bloom_offset)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        self.file
+            .write_u64_le(index_offset)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
-            let key_id_bytes = self.key_id.map(|k| *k.as_bytes()).unwrap_or([0u8; 16]);
-            self.file
-                .write_all(&key_id_bytes)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
+        // Format version (default 4)
+        self.file
+            .write_u16_le(self.format_version)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
-            self.file
-                .write_u16_le(self.enc_version)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-
-            self.file
-                .write_u16_le(self.format_version)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-
-            self.file
-                .write_u32_le(SSTABLE_MAGIC_MFSX)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        } else {
-            // Write 54-byte trailer for Format v1..v4
-            self.file
-                .write_u64_le(self.min_tx_id)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            self.file
-                .write_u64_le(self.max_tx_id)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            self.file
-                .write_u64_le(self.min_seq)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            self.file
-                .write_u64_le(self.max_seq)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            self.file
-                .write_u64_le(bloom_offset)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-            self.file
-                .write_u64_le(index_offset)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-
-            self.file
-                .write_u16_le(self.format_version)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-
-            self.file
-                .write_u32_le(SSTABLE_MAGIC_MFSX)
-                .await
-                .map_err(|e| ContextraError::Storage(e.to_string()))?;
-        }
+        self.file
+            .write_u32_le(SSTABLE_MAGIC_MFSX)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
         self.file
             .sync_all()
@@ -643,32 +494,5 @@ impl SstableBuilder {
             min_seq: self.min_seq,
             max_seq: self.max_seq,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    #[tokio::test]
-    async fn test_v5_sstable_builder_without_keyring_errors() {
-        let dir = tempdir().unwrap();
-        let sst_path = dir.path().join("test_v5_no_keyring.sst");
-
-        let mut builder = SstableBuilder::create_with_version(&sst_path, 5)
-            .await
-            .unwrap();
-
-        let key = Bytes::from("test_key");
-        let val = Bytes::from("test_val");
-        builder.add(&key, &val, 100, 10).await.unwrap();
-
-        let err = builder.finish().await.unwrap_err();
-        assert!(
-            err.to_string()
-                .contains("ScopeKeyring required for v5 encrypted SSTable"),
-            "Expected ScopeKeyring error, got: {err}"
-        );
     }
 }

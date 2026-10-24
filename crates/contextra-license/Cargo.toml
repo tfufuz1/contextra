@@ -12,22 +12,15 @@ description = "License and activation enforcement gate layer for Contextra featu
 [package.metadata.contextra]
 ring = "4"
 
-[features]
-default = []
-dev-open-gate = []
-test-support = []
-
 [dependencies]
 thiserror = { workspace = true }
 serde = { workspace = true }
 bincode = { workspace = true }
 blake3 = { workspace = true }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
-subtle = "2.6"
 tracing = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 
 [dev-dependencies]
 rand = { workspace = true }
-proptest = "1.4"

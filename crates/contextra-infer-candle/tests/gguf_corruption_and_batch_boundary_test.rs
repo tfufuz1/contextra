@@ -1,10 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing
-)]
-
 // FILE-CONTEXT
 // STAND: 2026-09-11T16:00:00Z
 // ZWECK: Error path and boundary tests for GGUF loading, quantization mismatch, batch boundaries, and concurrent hot-swap.

@@ -358,13 +358,13 @@ pub fn gate_weakening_analyze_diff(
                 }
             }
 
-            if current_file == "xtask/config/governance/ratchet.toml" {
+            if current_file == "governance/ratchet.toml" {
                 if let Some(caps) = kv_re.captures(added) {
                     let key = caps[1].to_string();
                     if let Ok(new_val) = caps[2].parse::<u64>() {
                         let orig_output = Command::new("git")
                             .current_dir(root)
-                            .args(["show", &format!("{base}:xtask/config/governance/ratchet.toml")])
+                            .args(["show", &format!("{base}:governance/ratchet.toml")])
                             .output();
                         if let Ok(o) = orig_output {
                             if o.status.success() {

@@ -2,10 +2,10 @@
 
 use contextra::builder::ContextraBuilder;
 use contextra::performance_profile::{PerformanceProfile, VectorDeleteMode};
+use contextra_core::error::ContextraError;
 use contextra_license::SignedLicenseGate;
 use contextra_ports::license::FeatureRing;
 use contextra_store::lsm::config::DurabilityMode;
-use contextra_types::error::ContextraError;
 
 #[tokio::test]
 async fn open_without_gate_never_grants_sovereign() {
@@ -20,16 +20,13 @@ async fn open_without_gate_never_grants_sovereign() {
     let _ = std::fs::remove_dir_all(&tmp_path);
 
     let db = contextra::open(&tmp_path).await.unwrap();
-    assert_eq!(
-        db.config().erasure_mode,
-        contextra_ports::erasure::ErasureMode::Off
-    );
+    assert!(!db.config().deletion_proof_active);
 
     let _ = std::fs::remove_dir_all(&tmp_path);
 }
 
 #[tokio::test]
-async fn compliance_profile_without_integrity_license_returns_error() {
+async fn compliance_profile_without_signed_license_returns_error() {
     let tmp_path = std::env::temp_dir().join(format!(
         "contextra_lic_always_2_{}_{}",
         std::process::id(),
@@ -62,7 +59,7 @@ async fn compliance_profile_without_integrity_license_returns_error() {
 }
 
 #[tokio::test]
-async fn compliance_profile_with_valid_integrity_license_activates_deletion_proof() {
+async fn compliance_profile_with_valid_signed_license_activates_deletion_proof() {
     let tmp_path = std::env::temp_dir().join(format!(
         "contextra_lic_always_3_{}_{}",
         std::process::id(),
@@ -82,15 +79,12 @@ async fn compliance_profile_with_valid_integrity_license_activates_deletion_proo
     let db = ContextraBuilder::new(4)
         .with_storage_path(&tmp_path)
         .with_performance_profile(PerformanceProfile::Compliance)
-        .with_integrity_license(&payload_bytes, &signature, &verifying_key_bytes)
+        .with_signed_license(&payload_bytes, &signature, &verifying_key_bytes)
         .build()
         .await
-        .expect("Build should succeed with valid integrity license");
+        .expect("Build should succeed with valid signed license");
 
-    assert_ne!(
-        db.config().erasure_mode,
-        contextra_ports::erasure::ErasureMode::Off
-    );
+    assert!(db.config().deletion_proof_active);
     assert_eq!(db.config().durability_mode, DurabilityMode::Full);
     assert_eq!(
         db.config().vector_delete_mode,
@@ -122,7 +116,7 @@ async fn expired_signature_rejected() {
     let res = ContextraBuilder::new(4)
         .with_storage_path(&tmp_path)
         .with_performance_profile(PerformanceProfile::Compliance)
-        .with_integrity_license(&payload_bytes, &signature, &verifying_key_bytes)
+        .with_signed_license(&payload_bytes, &signature, &verifying_key_bytes)
         .build()
         .await;
 
@@ -163,7 +157,7 @@ async fn tampered_signature_rejected() {
     let res = ContextraBuilder::new(4)
         .with_storage_path(&tmp_path)
         .with_performance_profile(PerformanceProfile::Compliance)
-        .with_integrity_license(&payload_bytes, &signature, &verifying_key_bytes)
+        .with_signed_license(&payload_bytes, &signature, &verifying_key_bytes)
         .build()
         .await;
 
@@ -208,7 +202,7 @@ async fn explicit_conflicting_user_value_to_profile_returns_policy_violation() {
     let res = ContextraBuilder::new(4)
         .with_storage_path(&tmp_path)
         .with_performance_profile(PerformanceProfile::Compliance)
-        .with_integrity_license(&payload_bytes, &signature, &verifying_key_bytes)
+        .with_signed_license(&payload_bytes, &signature, &verifying_key_bytes)
         .with_config(config)
         .build()
         .await;

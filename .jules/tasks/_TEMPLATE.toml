@@ -1,24 +1,22 @@
-# Task-Karte Template (ADR-N30 Issue-kompatibel)
-# ID Format: T-YYYY-NNNN (z. B. T-2026-9004 aus Issue #9004)
+# Task-Karte Template
+# ID Format: T-YYYY-NNNN
 id        = "T-2026-0001"
 title     = "Kurzer, prägnanter Titel der Aufgabe"
-crate     = "contextra-core" # Crate-Name (muss in capabilities.toml existieren)
-tier      = 1                # Prompter Tier: 1, 2, 3 (muss zu prompter-tiers.toml passen)
-risk      = "none"           # Risiko-Klasse: sec | crash | simd | utf8 | fusion | concurrency | calib | none
-# issue   = 9004             # Optional: Referenzierte GitHub-Issue-Nummer
+crate     = "contextra-core"
+tier      = 1            # 1, 2, 3 (muss zu prompter-tiers.toml passen)
+risk      = "none"       # sec | crash | simd | utf8 | fusion | concurrency | calib | none
 goal      = "Präzise Beschreibung des angestrebten Zielzustands"
 non_goals = ["Was explizit nicht getan werden soll", "Kein Refactoring fremder Module"]
-scope     = ["crates/contextra-core/src/**"] # Erlaubte Pfadmuster (keine Vollglobs wie ** oder crates/**)
-forbidden = ["xtask/**", ".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"] # Geschützte Pfade
+scope     = ["crates/contextra-core/src/**"]
+forbidden = ["xtask/**", ".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
 invariants = ["Zero-Panic", "Single Error Root"]
 acceptance = [
   "cargo test -p contextra-core",
   "just check"
 ]
-evidence_required = ["Neuer Test, der die Funktionalität absichert"] # Pflicht bei risk != "none"
+evidence_required = ["Neuer Test, der die Funktionalität absichert"]
 
 [budget]
-files      = 5  # Max 25
-lines      = 200 # Max 1000
-iterations = 5  # Max 12
-# crates   = 2  # Optional: Max Anzahl berührter Crates
+files = 5
+lines = 200
+iterations = 5

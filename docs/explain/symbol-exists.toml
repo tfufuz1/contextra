@@ -5,4 +5,4 @@ fix = "Passe die Dokumentation an das reale Symbol an oder implementiere das feh
 anti_fix = "Erstelle keine leeren Dummy-Typen nur zur Beruhigung der Symbolprüfung."
 adr = ["ADR-065"]
 related = ["check-duplicate-symbols", "doc-truth"]
-sources = ["xtask/docs/gates/gov-d-cross-file-duplicates.md"]
+sources = ["docs/gates/gov-d-cross-file-duplicates.md"]

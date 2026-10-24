@@ -26,7 +26,7 @@ fn rrf_fusion(result_lists: &[Vec<DocId>], k: usize) -> HashMap<DocId, f32> {
     let mut scores = HashMap::new();
     for res in fused {
         if let Ok(id_val) = res.id.parse::<u64>() {
-            scores.insert(DocId::from(id_val), res.score);
+            scores.insert(DocId(id_val), res.score);
         }
     }
     scores

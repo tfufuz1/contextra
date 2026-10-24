@@ -11,7 +11,6 @@ pub struct LoomTestFile {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(not(test), allow(dead_code))] // Result struct fields inspected in tests and callers
 pub struct LoomRunResult {
     pub discovered_files: Vec<LoomTestFile>,
     pub passed: bool,
@@ -60,7 +59,6 @@ pub fn discover_loom_tests(root: &Path) -> Vec<LoomTestFile> {
 /// Runs loom concurrency tests using `cargo test`.
 /// Sets `RUSTFLAGS="--cfg loom"` on the child process Command.
 /// Writes a report to `target/loom-report.md`.
-#[cfg_attr(not(test), allow(dead_code))] // Runner function included in test targets via #[path]
 pub fn run_loom(test_filter: Option<&str>, root: &Path) -> Result<LoomRunResult, String> {
     let discovered = discover_loom_tests(root);
     let start_time = Instant::now();
@@ -74,8 +72,7 @@ pub fn run_loom(test_filter: Option<&str>, root: &Path) -> Result<LoomRunResult,
         // Skip tests that cannot run under `RUSTFLAGS="--cfg loom"`:
         // - `loom_relate_n_ary`: contextra-db depends on contextra-engine which gates Collection with #[cfg(not(loom))]
         // - `loom_quantizer_race_test`: tokio runtime builder enable_all() panics under Loom mock runtime
-        if file.path.contains("loom_relate_n_ary") || file.path.contains("loom_quantizer_race_test")
-        {
+        if file.path.contains("loom_relate_n_ary") || file.path.contains("loom_quantizer_race_test") {
             continue;
         }
 
@@ -123,9 +120,7 @@ pub fn run_loom(test_filter: Option<&str>, root: &Path) -> Result<LoomRunResult,
         report_content.push_str("| Crate | File | Status |\n");
         report_content.push_str("|---|---|---|\n");
         for file in &discovered {
-            let status_str = if file.path.contains("loom_relate_n_ary")
-                || file.path.contains("loom_quantizer_race_test")
-            {
+            let status_str = if file.path.contains("loom_relate_n_ary") || file.path.contains("loom_quantizer_race_test") {
                 "SKIPPED_NOT_LOOM"
             } else if passed {
                 "PASSED"

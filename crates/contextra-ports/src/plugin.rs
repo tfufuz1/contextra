@@ -37,10 +37,6 @@ impl PluginCapability {
 }
 
 /// Manifest trait implemented by dynamic or static plugins.
-///
-/// | Trait | Produktiv-Impl | Composition-Root-Aufrufer | Status |
-/// |---|---|---|---|
-/// | `PluginManifest` | `SimplePlugin` (`contextra-ports`) / `WasmPluginManifest` (`contextra-sandbox`) | `contextra-mcp` | Aktiver Port für Plugin-Erweiterbarkeit |
 pub trait PluginManifest: Send + Sync {
     /// Returns the name of the plugin.
     fn name(&self) -> &str;
@@ -125,11 +121,6 @@ impl PluginRegistry {
         } else {
             FeatureRing::Fast
         }
-    }
-
-    /// Activates a single plugin instance by delegating to [`activate_all`](Self::activate_all).
-    pub fn activate(&mut self, plugin: Box<dyn PluginManifest>) -> Result<(), PluginError> {
-        self.activate_all(vec![plugin])
     }
 
     /// Activates a batch of plugins in an all-or-nothing manner (INV-PLUGIN-DEPENDENCY).

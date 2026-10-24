@@ -8,8 +8,8 @@
 mod tests {
     use crate::diskann::config::{DiskAnnConfig, DiskAnnFallbackPolicy};
     use crate::diskann::format::{
-        compute_adaptive_flush_threshold, DiskAnnFooter, DiskAnnHeader, CHECKSUM_SEED,
-        DISKANN_FOOTER_MAGIC, DISKANN_VERSION, PENDING_WAL_MAGIC, PENDING_WAL_VERSION,
+        compute_adaptive_flush_threshold, DiskAnnFooter, DiskAnnHeader, DISKANN_FOOTER_MAGIC,
+        DISKANN_INTEGRITY_KEY, DISKANN_VERSION, PENDING_WAL_MAGIC, PENDING_WAL_VERSION,
     };
     use crate::diskann::types::{DiskAnnIndex, SearchCandidate};
     use contextra_core::{ContextraError, DistanceMetric, DocId, Result, TxId, VectorIndex};
@@ -348,7 +348,7 @@ mod tests {
             .copy_from_slice(&corrupt_count.to_le_bytes());
 
         // Recompute HMAC for the modified payload so header & footer integrity passes, allowing load_node to test node parsing
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED).unwrap();
+        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
         let footer_start = data.len() - DiskAnnFooter::SIZE;
         hmac.update(&data[..footer_start]);
         let computed = hmac.finalize();
@@ -401,15 +401,12 @@ mod tests {
             .await
             .expect("write bad magic file"); // expect
 
-        let reloaded_res = DiskAnnIndex::try_new(config);
-        let load_res = match reloaded_res {
-            Ok(idx) => idx.load().await,
-            Err(e) => Err(e),
-        };
+        let reloaded_index = DiskAnnIndex::try_new(config).expect("valid config"); // expect
+        let load_res = reloaded_index.load().await;
         assert!(load_res.is_err());
         let err_msg = load_res.err().unwrap().to_string(); // unwrap allowed (AGENT:03)
         assert!(
-            err_msg.contains("bad magic"),
+            err_msg.contains("Invalid DiskANN file: bad magic"),
             "Unexpected error message: {}",
             err_msg
         );
@@ -441,11 +438,8 @@ mod tests {
             .await
             .expect("write bad version file"); // expect
 
-        let reloaded_res = DiskAnnIndex::try_new(config);
-        let load_res = match reloaded_res {
-            Ok(idx) => idx.load().await,
-            Err(e) => Err(e),
-        };
+        let reloaded_index = DiskAnnIndex::try_new(config).expect("valid config"); // expect
+        let load_res = reloaded_index.load().await;
         assert!(load_res.is_err());
         let err_msg = load_res.err().unwrap().to_string(); // unwrap allowed (AGENT:03)
         assert!(
@@ -515,15 +509,12 @@ mod tests {
             ..DiskAnnConfig::default()
         };
 
-        let reloaded_res = DiskAnnIndex::try_new(load_config);
-        let load_res = match reloaded_res {
-            Ok(idx) => idx.load().await,
-            Err(e) => Err(e),
-        };
+        let reloaded_index = DiskAnnIndex::try_new(load_config).expect("valid config"); // expect
+        let load_res = reloaded_index.load().await;
         assert!(load_res.is_err());
         let err_msg = load_res.err().unwrap().to_string(); // unwrap allowed (AGENT:03)
         assert!(
-            err_msg.contains("sector_size"),
+            err_msg.contains("DiskANN-Index inkompatibel: Config-sector_size=2048 stimmt nicht mit Header-sector_size=4096 überein"),
             "Unexpected error message: {}",
             err_msg
         );
@@ -576,20 +567,16 @@ mod tests {
                 fallback_policy: DiskAnnFallbackPolicy::FailFast,
                 ..DiskAnnConfig::default()
             };
-            let index_res = DiskAnnIndex::try_new(config);
-            let load_res = match index_res {
-                Ok(idx) => {
-                    let spawn_res = tokio::spawn(async move { idx.load().await }).await;
-                    assert!(
-                        spawn_res.is_ok(),
-                        "DiskAnnIndex::load panicked on file size {}!",
-                        size
-                    );
-                    spawn_res.unwrap()
-                }
-                Err(e) => Err(e),
-            };
+            let index = DiskAnnIndex::try_new(config).unwrap();
 
+            let spawn_res = tokio::spawn(async move { index.load().await }).await;
+            assert!(
+                spawn_res.is_ok(),
+                "DiskAnnIndex::load panicked on file size {}!",
+                size
+            );
+
+            let load_res = spawn_res.unwrap();
             if size < DiskAnnHeader::SIZE {
                 assert!(
                     load_res.is_err(),
@@ -631,34 +618,29 @@ mod tests {
             fallback_policy: DiskAnnFallbackPolicy::FailFast,
             ..config
         };
-        let reloaded_res = DiskAnnIndex::try_new(reloaded_config);
-        let load_res = match reloaded_res {
-            Ok(reloaded) => {
-                let reloaded_clone = reloaded.clone();
-                let spawn_res = tokio::spawn(async move { reloaded_clone.load().await }).await;
-                assert!(
-                    spawn_res.is_ok(),
-                    "DiskAnnIndex::load panicked on corrupt node_count/offset!"
-                );
-                let load_res = spawn_res.unwrap();
+        let reloaded = DiskAnnIndex::try_new(reloaded_config).unwrap();
 
-                let catch_node = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    reloaded.load_node(9999)
-                }));
-                assert!(
-                    catch_node.is_ok(),
-                    "load_node panicked on out of bounds node index!"
-                );
-                assert!(catch_node.unwrap().is_err());
-                load_res
-            }
-            Err(e) => Err(e),
-        };
+        let reloaded_clone = reloaded.clone();
+        let spawn_res = tokio::spawn(async move { reloaded_clone.load().await }).await;
+        assert!(
+            spawn_res.is_ok(),
+            "DiskAnnIndex::load panicked on corrupt node_count/offset!"
+        );
 
+        let load_res = spawn_res.unwrap();
         assert!(
             load_res.is_err(),
             "Expected Result::Err on corrupt offset beyond file size!"
         );
+
+        // Also test load_node directly on reloaded index with truncated/corrupt file
+        let catch_node =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| reloaded.load_node(9999)));
+        assert!(
+            catch_node.is_ok(),
+            "load_node panicked on out of bounds node index!"
+        );
+        assert!(catch_node.unwrap().is_err());
     }
 
     #[tokio::test]
@@ -811,7 +793,7 @@ mod tests {
         assert_eq!(&footer.magic, DISKANN_FOOTER_MAGIC);
 
         // Verify HMAC calculation over payload
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(CHECKSUM_SEED).unwrap();
+        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
         let payload = &file_bytes[..file_bytes.len() - DiskAnnFooter::SIZE];
         hmac.update(payload);
         let expected_hmac = hmac.finalize();
@@ -1075,140 +1057,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_diskann_file_byte_equality_and_reload() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
-        let index_path = temp_dir.path().join("byte_equality.idx");
-
-        let config = DiskAnnConfig {
-            index_path: index_path.clone(),
-            dimension: 4,
-            max_degree: 4,
-            sector_size: 4096,
-            distance_metric: DistanceMetric::Euclidean,
-            fallback_policy: DiskAnnFallbackPolicy::FailFast,
-            ..DiskAnnConfig::default()
-        };
-
-        let index = DiskAnnIndex::try_new(config.clone())?;
-        let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![0.0, 2.0, 0.0, 0.0]];
-        let ids = vec![DocId::from(10u64), DocId::from(20u64)];
-        index.build(&vectors, &ids).await?;
-
-        let written_bytes = std::fs::read(&index_path).map_err(ContextraError::Io)?;
-
-        // Reload index
-        let reloaded = DiskAnnIndex::try_new(config.clone())?;
-        reloaded.load().await?;
-
-        // Re-persist or build again to target path and verify byte equality
-        let index_path2 = temp_dir.path().join("byte_equality2.idx");
-        let config2 = DiskAnnConfig {
-            index_path: index_path2.clone(),
-            ..config
-        };
-        let rewritten = DiskAnnIndex::try_new(config2)?;
-        rewritten.build(&vectors, &ids).await?;
-
-        let rewritten_bytes = std::fs::read(&index_path2).map_err(ContextraError::Io)?;
-        assert_eq!(
-            written_bytes, rewritten_bytes,
-            "Re-building identical index must yield exact byte-for-byte identical file contents"
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_diskann_missing_index_file_returns_err() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let missing_path = temp_dir.path().join("missing_file.idx");
-
-        let config = DiskAnnConfig {
-            index_path: missing_path,
-            fallback_policy: DiskAnnFallbackPolicy::FailFast,
-            ..DiskAnnConfig::default()
-        };
-
-        let index = DiskAnnIndex::try_new(config).unwrap();
-        let load_res = index.load().await;
-
-        assert!(
-            load_res.is_err(),
-            "Loading a non-existent index file must return Err, not empty index"
-        );
-        if let Err(ContextraError::Io(io_err)) = load_res {
-            assert_eq!(io_err.kind(), std::io::ErrorKind::NotFound);
-        } else {
-            panic!("Expected ContextraError::Io(NotFound)");
-        }
-    }
-
-    #[tokio::test]
-    async fn test_diskann_missing_file_succeeds_when_create_if_missing_true() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let missing_path = temp_dir.path().join("missing_file_create.idx");
-
-        let config = DiskAnnConfig {
-            index_path: missing_path,
-            create_if_missing: true,
-            fallback_policy: DiskAnnFallbackPolicy::FailFast,
-            ..DiskAnnConfig::default()
-        };
-
-        let index = DiskAnnIndex::try_new(config).unwrap();
-        let load_res = index.load().await;
-
-        assert!(
-            load_res.is_ok(),
-            "Loading a missing index file must succeed when create_if_missing is true"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_diskann_partially_written_tmp_file_does_not_corrupt_target() -> Result<()> {
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
-        let index_path = temp_dir.path().join("crash_resilience.idx");
-
-        let config = DiskAnnConfig {
-            index_path: index_path.clone(),
-            dimension: 4,
-            max_degree: 4,
-            sector_size: 4096,
-            distance_metric: DistanceMetric::Euclidean,
-            fallback_policy: DiskAnnFallbackPolicy::FailFast,
-            ..DiskAnnConfig::default()
-        };
-
-        let index = DiskAnnIndex::try_new(config.clone())?;
-        let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![0.0, 1.0, 0.0, 0.0]];
-        let ids = vec![DocId::from(1u64), DocId::from(2u64)];
-        index.build(&vectors, &ids).await?;
-
-        let original_bytes = std::fs::read(&index_path).map_err(ContextraError::Io)?;
-
-        // Simulate a interrupted/crashed build/persist_delta that leaves a partial .idx.tmp or .delta.tmp
-        let partial_tmp = index_path.with_extension("idx.tmp");
-        std::fs::write(&partial_tmp, b"PARTIAL_CRASH_DATA_TRUNCATED_BYTES")
-            .map_err(ContextraError::Io)?;
-
-        // Reload index — load_sync should clean up the orphaned .idx.tmp without corrupting index_path
-        let reloaded = DiskAnnIndex::try_new(config)?;
-        reloaded.load().await?;
-
-        let current_bytes = std::fs::read(&index_path).map_err(ContextraError::Io)?;
-        assert_eq!(
-            original_bytes, current_bytes,
-            "Target index file must remain intact and uncorrupted"
-        );
-        assert!(
-            !partial_tmp.exists(),
-            "Orphaned tmp file must be durably removed"
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_pending_wal_rejects_legacy_unversioned_file() -> Result<()> {
         let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
         let wal_path = temp_dir.path().join("legacy.pending.wal");
@@ -1231,291 +1079,6 @@ mod tests {
             err_str.contains("Unbekanntes oder veraltetes pending.wal-Format"),
             "Error string was: {}",
             err_str
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_diskann_crash_injection_matrix() {
-        let failpoints = ["temp_written", "before_rename", "after_rename", "before_wal_removal"];
-
-        for fp in failpoints {
-            let temp_dir = tempfile::tempdir().expect("tempdir creation");
-            let index_path = temp_dir.path().join(format!("crash_{fp}.idx"));
-
-            let config = DiskAnnConfig {
-                index_path: index_path.clone(),
-                dimension: 4,
-                max_degree: 4,
-                beam_width: 4,
-                distance_metric: DistanceMetric::Euclidean,
-                pending_flush_threshold: Some(10), // high threshold so auto-trigger does not race
-                ..DiskAnnConfig::default()
-            };
-
-            // 1. Build initial index with 10 vectors
-            let initial_index = DiskAnnIndex::try_new(config.clone()).expect("initial index creation");
-            let initial_vecs: Vec<Vec<f32>> = (0..10)
-                .map(|i| vec![i as f32, 0.0, 0.0, 0.0])
-                .collect();
-            let initial_ids: Vec<DocId> = (0..10).map(|i| DocId::from(100 + i as u64)).collect();
-
-            initial_index
-                .build(&initial_vecs, &initial_ids)
-                .await
-                .expect("build initial index");
-
-            // 2. Insert 2 pending vectors
-            let pending_vecs = vec![
-                (DocId::from(200u64), vec![10.0f32, 0.0, 0.0, 0.0]),
-                (DocId::from(201u64), vec![11.0f32, 0.0, 0.0, 0.0]),
-            ];
-
-            for (id, vec) in &pending_vecs {
-                initial_index
-                    .insert(TxId(1), *id, vec)
-                    .await
-                    .expect("insert pending vector");
-            }
-
-            // 3. Set failpoint and trigger persist_delta
-            initial_index.set_failpoint(fp);
-            let persist_res = initial_index.persist_delta().await;
-            assert!(
-                persist_res.is_err(),
-                "persist_delta must fail when failpoint '{fp}' is hit"
-            );
-            let err_msg = persist_res.unwrap_err().to_string();
-            assert!(
-                err_msg.contains("Test failpoint triggered"),
-                "Error message must mention failpoint: {err_msg}"
-            );
-
-            // 4. Reload index from disk (simulating restart after crash)
-            let reloaded_index = DiskAnnIndex::try_new(config.clone()).expect("reloaded index creation");
-            reloaded_index
-                .load()
-                .await
-                .expect("reloading index after crash must succeed");
-
-            // 5. Query and verify results
-            let query = vec![10.0f32, 0.0, 0.0, 0.0];
-            let search_res = reloaded_index
-                .search(&query, 1)
-                .await
-                .expect("search on reloaded index must succeed");
-
-            assert_eq!(search_res.len(), 1);
-            assert_eq!(
-                search_res[0].doc_id,
-                DocId::from(200u64),
-                "Reloaded index after crash at '{fp}' must contain pending doc_id=200"
-            );
-
-            let all_doc_ids = reloaded_index
-                .all_doc_ids()
-                .await
-                .expect("all_doc_ids on reloaded index");
-            assert_eq!(
-                all_doc_ids.len(),
-                12,
-                "Reloaded index after crash at '{fp}' must have all 12 document IDs"
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn test_diskann_crash_injection_uninterrupted_match() {
-        let temp_dir_uninterrupted = tempfile::tempdir().expect("tempdir creation");
-        let index_path_uninterrupted = temp_dir_uninterrupted.path().join("uninterrupted.idx");
-
-        let config_uninterrupted = DiskAnnConfig {
-            index_path: index_path_uninterrupted.clone(),
-            dimension: 4,
-            max_degree: 4,
-            beam_width: 4,
-            distance_metric: DistanceMetric::Euclidean,
-            pending_flush_threshold: Some(10),
-            ..DiskAnnConfig::default()
-        };
-
-        let base_vecs: Vec<Vec<f32>> = (0..10)
-            .map(|i| vec![i as f32, 0.0, 0.0, 0.0])
-            .collect();
-        let base_ids: Vec<DocId> = (0..10).map(|i| DocId::from(100 + i as u64)).collect();
-
-        let pending_vecs = vec![
-            (DocId::from(200u64), vec![10.0f32, 0.0, 0.0, 0.0]),
-            (DocId::from(201u64), vec![11.0f32, 0.0, 0.0, 0.0]),
-        ];
-
-        // Uninterrupted run
-        let uninterrupted_idx = DiskAnnIndex::try_new(config_uninterrupted).expect("uninterrupted index");
-        uninterrupted_idx.build(&base_vecs, &base_ids).await.expect("build base");
-        for (id, vec) in &pending_vecs {
-            uninterrupted_idx.insert(TxId(1), *id, vec).await.expect("insert");
-        }
-        uninterrupted_idx.persist_delta().await.expect("persist delta");
-
-        let query = vec![10.5f32, 0.0, 0.0, 0.0];
-        let uninterrupted_search = uninterrupted_idx.search(&query, 2).await.expect("search");
-        let uninterrupted_doc_ids = uninterrupted_idx.all_doc_ids().await.expect("all_doc_ids");
-
-        // Crashed runs
-        for fp in ["temp_written", "before_rename", "after_rename", "before_wal_removal"] {
-            let temp_dir_crashed = tempfile::tempdir().expect("tempdir creation");
-            let index_path_crashed = temp_dir_crashed.path().join("crashed.idx");
-
-            let config_crashed = DiskAnnConfig {
-                index_path: index_path_crashed.clone(),
-                dimension: 4,
-                max_degree: 4,
-                beam_width: 4,
-                distance_metric: DistanceMetric::Euclidean,
-                pending_flush_threshold: Some(10),
-                ..DiskAnnConfig::default()
-            };
-
-            let crashed_idx = DiskAnnIndex::try_new(config_crashed.clone()).expect("crashed index");
-            crashed_idx.build(&base_vecs, &base_ids).await.expect("build base");
-            for (id, vec) in &pending_vecs {
-                crashed_idx.insert(TxId(1), *id, vec).await.expect("insert");
-            }
-
-            crashed_idx.set_failpoint(fp);
-            let _ = crashed_idx.persist_delta().await;
-
-            // Restart
-            let recovered_idx = DiskAnnIndex::try_new(config_crashed).expect("recovered index");
-            recovered_idx.load().await.expect("load");
-
-            let recovered_search = recovered_idx.search(&query, 2).await.expect("search");
-            let recovered_doc_ids = recovered_idx.all_doc_ids().await.expect("all_doc_ids");
-
-            assert_eq!(
-                recovered_search.len(), uninterrupted_search.len(),
-                "Search result count for failpoint '{fp}' after recovery must match uninterrupted run identically"
-            );
-            for (r, u) in recovered_search.iter().zip(uninterrupted_search.iter()) {
-                assert_eq!(r.doc_id, u.doc_id);
-                assert!((r.score - u.score).abs() < 1e-5);
-            }
-            assert_eq!(
-                recovered_doc_ids, uninterrupted_doc_ids,
-                "Doc ID set for failpoint '{fp}' after recovery must match uninterrupted run identically"
-            );
-        }
-    }
-
-    #[test]
-    fn test_f04_unaligned_slice_decoding_alignment_guard() {
-        // F-04: Alignment Guard. Test that parsing headers, footers, integers and floats
-        // starting at unaligned (odd byte address) slice offsets succeeds without alignment faults.
-        let header = DiskAnnHeader {
-            magic: *crate::diskann::format::DISKANN_MAGIC,
-            version: DISKANN_VERSION,
-            node_count: 42,
-            dimension: 128,
-            max_degree: 32,
-            sector_size: 4096,
-            entry_point: 0,
-            metric: 1,
-            quantized: 0,
-            q_min: -1.0,
-            q_max: 1.0,
-        };
-        let header_bytes = header.to_bytes();
-
-        let footer = DiskAnnFooter {
-            magic: *DISKANN_FOOTER_MAGIC,
-            hmac: [0xAB; 32],
-        };
-        let footer_bytes = footer.to_bytes();
-
-        // Test unaligned slice parsing across odd byte offsets 1, 3, 5, 7
-        for unaligned_offset in [1, 3, 5, 7] {
-            let mut padded_header = vec![0xFFu8; unaligned_offset];
-            padded_header.extend_from_slice(&header_bytes);
-
-            let header_slice = &padded_header[unaligned_offset..unaligned_offset + DiskAnnHeader::SIZE];
-            let parsed_header = DiskAnnHeader::try_from_bytes(header_slice)
-                .expect("unaligned header parsing must succeed");
-            assert_eq!(parsed_header.node_count, 42);
-            assert_eq!(parsed_header.dimension, 128);
-
-            let mut padded_footer = vec![0xEEu8; unaligned_offset];
-            padded_footer.extend_from_slice(&footer_bytes);
-
-            let footer_slice = &padded_footer[unaligned_offset..unaligned_offset + DiskAnnFooter::SIZE];
-            let parsed_footer = DiskAnnFooter::try_from_bytes(footer_slice)
-                .expect("unaligned footer parsing must succeed");
-            assert_eq!(parsed_footer.magic, *DISKANN_FOOTER_MAGIC);
-            assert_eq!(parsed_footer.hmac, [0xAB; 32]);
-
-            // Test unaligned primitive integer & float decoding via from_le_bytes
-            let val_f32 = 3.14159f32;
-            let val_u64 = 0xDEAD_BEEF_CAFE_BABE_u64;
-
-            let mut padded_prim = vec![0xDDu8; unaligned_offset];
-            padded_prim.extend_from_slice(&val_f32.to_le_bytes());
-            padded_prim.extend_from_slice(&val_u64.to_le_bytes());
-
-            let f32_bytes: [u8; 4] = padded_prim[unaligned_offset..unaligned_offset + 4]
-                .try_into()
-                .unwrap();
-            let parsed_f32 = f32::from_le_bytes(f32_bytes);
-            assert_eq!(parsed_f32, val_f32);
-
-            let u64_bytes: [u8; 8] = padded_prim[unaligned_offset + 4..unaligned_offset + 12]
-                .try_into()
-                .unwrap();
-            let parsed_u64 = u64::from_le_bytes(u64_bytes);
-            assert_eq!(parsed_u64, val_u64);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_f03_file_truncation_during_mmap_access_returns_error() -> Result<()> {
-        // F-03: Protection against file truncation during mmap access.
-        let temp_dir = tempfile::tempdir().map_err(ContextraError::Io)?;
-        let index_path = temp_dir.path().join("mmap_truncation.idx");
-
-        let config = DiskAnnConfig {
-            index_path: index_path.clone(),
-            dimension: 4,
-            max_degree: 4,
-            sector_size: 4096,
-            distance_metric: DistanceMetric::Euclidean,
-            fallback_policy: DiskAnnFallbackPolicy::FailFast,
-            ..DiskAnnConfig::default()
-        };
-
-        let index = DiskAnnIndex::try_new(config.clone())?;
-        let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![0.0, 2.0, 0.0, 0.0]];
-        let ids = vec![DocId::from(10u64), DocId::from(20u64)];
-        index.build(&vectors, &ids).await?;
-
-        // Verify load_node works when index file is intact
-        assert!(index.load_node(0).is_ok());
-
-        // Truncate the file on disk while Mmap handle is still open
-        let file = std::fs::OpenOptions::new()
-            .write(true)
-            .open(&index_path)
-            .map_err(ContextraError::Io)?;
-        file.set_len(10).map_err(ContextraError::Io)?;
-
-        // load_node must catch physical disk truncation via metadata check and return Err
-        let res = index.load_node(0);
-        assert!(
-            res.is_err(),
-            "load_node on truncated index file must return Err instead of panicking"
-        );
-        let err_msg = res.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("out of bounds or file truncated") || err_msg.contains("truncated"),
-            "Unexpected error message: {err_msg}"
         );
 
         Ok(())

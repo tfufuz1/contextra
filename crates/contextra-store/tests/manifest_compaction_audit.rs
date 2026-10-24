@@ -1,11 +1,9 @@
 // Integration tests for store manifest and compaction audit findings.
 
-use contextra_mvcc::snapshot::SnapshotRegistry;
+use contextra_core::{ResourceBudget, ResourceTracker, SnapshotRegistry, TOMBSTONE_BIT};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine};
 use contextra_store::manifest::ManifestEntry;
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
-use contextra_types::types::budget::{ResourceBudget, ResourceTracker};
-use contextra_types::TOMBSTONE_BIT;
 use std::sync::Arc;
 use tempfile::tempdir;
 
@@ -111,7 +109,7 @@ async fn test_compaction_retention_exact_min_snapshot_seq() {
     // Therefore, seq 100 is the floor version for min_snapshot_seq = 100.
     // Seq 50 is strictly older than min_snapshot_seq and older than the floor version, so it MUST be discarded.
     engine
-        .merge_sstables_with_cancel(&[r1], &output_path, 100, true, None)
+        .merge_sstables(&[r1], &output_path, 100, true)
         .await
         .unwrap();
 

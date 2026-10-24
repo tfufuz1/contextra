@@ -1,6 +1,4 @@
 // ANCHOR[TEST:STO-004] STATUS:DONE (TS:2026-09-18T00:00:00Z) (SESSION: a4f61283)
-// REVIEW-PASS[1/2] STATUS:PASS (ID: TEST:STO-004) (TS: 2026-09-18T10:00:00Z) (SESSION: b8e4f1a2) PRÜFER-KONTEXT: FRESH — Systematic crash recovery across truncation points verified.
-// REVIEW-PASS[2/2] STATUS:PASS (ID: TEST:STO-004) (TS: 2026-09-18T11:00:00Z) (SESSION: c9f5e2b3) PRÜFER-KONTEXT: FRESH — Independent review pass confirmed consistency across write/sync fault limits.
 // LIMITATION: FaultVfs from contextra-testkit is an in-memory VFS simulation
 // (tracking operation counts like fail_writes_after / fail_syncs_after).
 // LsmStorage directly interacts with file systems via tokio::fs / std::fs.
@@ -8,10 +6,9 @@
 // combined with deterministic WAL disk boundary simulation for LsmStorage WAL operations.
 
 use bytes::Bytes;
-use contextra_ports::StorageEngine;
+use contextra_core::{StorageEngine, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_testkit::{FaultConfig, FaultVfs};
-use contextra_types::TxId;
 use tempfile::TempDir;
 
 /// Maximum IO / truncation points to test in systematic crash loop.
@@ -56,7 +53,7 @@ async fn systematic_crash_at_every_wal_io_point() {
             let commit_result = if res_put1.is_ok() && res_put2.is_ok() {
                 storage.commit(tx1).await
             } else {
-                Err(contextra_types::ContextraError::Storage(
+                Err(contextra_core::ContextraError::Storage(
                     "Simulated write error".into(),
                 ))
             };
@@ -65,7 +62,7 @@ async fn systematic_crash_at_every_wal_io_point() {
             let uncommitted_put_result = if commit_result.is_ok() {
                 storage.put(TxId::new(2), b"key3", b"val3").await
             } else {
-                Err(contextra_types::ContextraError::Storage(
+                Err(contextra_core::ContextraError::Storage(
                     "Skipped uncommitted put".into(),
                 ))
             };
