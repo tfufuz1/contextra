@@ -1,7 +1,0 @@
-# rules/caller-allowlist.toml
-# Allowlist for unused default features or experimental pub fns in check-callers.
-# Entries require reason and expiry date (YYYY-MM-DD).
-
-[allowlist]
-fast = { reason = "Default feature in contextra facade", expiry = "2026-12-31" }
-fault-injection = { reason = "Default feature in contextra-testkit harness", expiry = "2026-12-31" }
