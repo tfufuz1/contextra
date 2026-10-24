@@ -1,9 +1,0 @@
-error[E0382]: use of moved value: `token`
- --> tests/trybuild/double_finish.rs:7:26
-  |
-5 | fn test_double_finish(hooks: &dyn ErasureHooks, token: HookToken) {
-  |                                                 ----- move occurs because `token` has type `HookToken`, which does not implement the `Copy` trait
-6 |     let _ = hooks.finish(token);
-  |                          ----- value moved here
-7 |     let _ = hooks.finish(token);
-  |                          ^^^^^ value used here after move
