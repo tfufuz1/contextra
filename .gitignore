@@ -59,3 +59,7 @@ results/
 /.jules/gate_ledger.json
 /.jules/session.env
 /.jules/local/
+
+# MP-02 Gate evidence & xtask target
+target/evidence
+target/xtask

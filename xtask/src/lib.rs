@@ -5,12 +5,14 @@ use std::path::{Path, PathBuf};
 pub mod artifact_header;
 pub mod check_adr_deadlines;
 pub mod check_duplicate_core_primitives;
+pub mod check_phantom_files;
 pub mod check_vetoes;
+pub mod core;
 pub mod gates;
 pub mod generate_diagnostics;
 pub mod harness;
+pub mod legacy;
 pub mod reproducible_build;
-pub mod session_history;
 
 pub fn find_root_dir() -> PathBuf {
     if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {

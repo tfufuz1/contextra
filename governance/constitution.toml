@@ -1,0 +1,1731 @@
+# Contextra Maschinenlesbare Verfassungsdatei (Constitution)
+#
+# Referenzdokumente:
+# - Spezifikation (Fassung 1.3): docs/CONTEXTRA_SPEZIFIKATION.md
+# - Implementierungsplan: docs/CONTEXTRA_IMPLEMENTIERUNGSPLAN.md
+# - Meta-Plan: docs/CONTEXTRA_META_PLAN.md
+#
+# Entwurfsentscheidungen & Abweichungen:
+# 1. Single-Node-Doktrin (§4.1): ID "VETO-SINGLE-NODE" gewählt als kanonische Veto-ID.
+# 2. Prinzipien (§5): In Spec §5 sind explizit die 9 Prinzip-IDs P1, P2, P5, P7, P24, P26, P28, P29, P30 definiert.
+#    Die in Dokument C erwähnte Spanne "P1–P30" ist ungenau. Es wurden keine fehlenden Prinzip-IDs erfunden.
+# 3. Anforderungskatalog (§33): Alle 167 mechanisch ableitbaren Anforderungen aus §33 sind als [[requirement]] aufgenommen.
+
+[project]
+spec_version = "1.3"
+spec_path = "docs/CONTEXTRA_SPEZIFIKATION.md"
+plan_path = "docs/CONTEXTRA_IMPLEMENTIERUNGSPLAN.md"
+meta_plan_path = "docs/CONTEXTRA_META_PLAN.md"
+
+[[principle]]
+id = "P1"
+class = "K"
+title = "Ring-Disziplin"
+
+[[principle]]
+id = "P2"
+class = "K"
+title = "Unsafe nur in drei Inseln (simd, sys, wire) im eigenen Code; jeder handgeschriebene unsafe-Block trägt // SAFETY"
+
+[[principle]]
+id = "P5"
+class = "K"
+title = "DAG-Integrität"
+
+[[principle]]
+id = "P7"
+class = "K"
+title = "Zero-Panic im Produktionscode (unwrap/expect/panic!/todo!/unimplemented!/unreachable!, zusätzlich assert!, process"
+
+[[principle]]
+id = "P24"
+class = "K"
+title = "Aller Anwendungszustand (Dokumente, Metadaten, Indexabsichten, Lineage, Retention-Entscheidungen) geht durch das WAL; kein Seitenpfad schreibt ihn. Die einzigen zulässigen weiteren persistenten Zustände sind die in §7.11 abschließend aufgezählten Sidecar-Logs (Schlüssel, Widerruf, Audit, Löschjournal, Löschmenge); jede andere Persistenz ist ein Gate-Fehler (INV-SIDECAR-1)."
+
+[[principle]]
+id = "P26"
+class = "K"
+title = "Sync-Kern, Async-Schale"
+
+[[principle]]
+id = "P28"
+class = "K"
+title = "Determinismus"
+
+[[principle]]
+id = "P29"
+class = "K"
+title = "Wired-or-it-doesn't-exist (§3)."
+
+[[principle]]
+id = "P30"
+class = "K"
+title = "Kern-Isolation"
+
+[[invariant]]
+id = "INV-CORE-ISOLATION-1"
+class = "K"
+spec = "§5"
+mech = "G"
+phase = "PH0"
+phases = ["PH0"]
+reqs = ["REQ-ARCH-003"]
+
+[[invariant]]
+id = "INV-KMS-1"
+class = "K"
+spec = "§5"
+mech = "G + I"
+phase = "PH4"
+phases = ["PH4"]
+reqs = ["REQ-KEY-001"]
+
+[[invariant]]
+id = "INV-DELETION-WIRE-1"
+class = "K"
+spec = "§5"
+mech = "T + I"
+phase = "PH5"
+phases = ["PH4", "PH5"]
+reqs = ["REQ-DEL-001"]
+
+[[invariant]]
+id = "INV-SHRED-1"
+class = "K"
+spec = "§5"
+mech = "C + I"
+phase = "PH4"
+phases = ["PH4"]
+reqs = ["REQ-DEL-002"]
+
+[[invariant]]
+id = "INV-SSI-ACTIVE-1"
+class = "K"
+spec = "§5"
+mech = "P + C + L"
+phase = "PH3"
+phases = ["PH3"]
+reqs = ["REQ-MVCC-001"]
+
+[[invariant]]
+id = "INV-INDEX-SNAPSHOT-1"
+class = "K"
+spec = "§5"
+mech = "P + C + L"
+phase = "PH3"
+phases = ["PH3"]
+reqs = ["REQ-MVCC-002"]
+
+[[invariant]]
+id = "INV-DOC-SINGLE-SOURCE-1"
+class = "K"
+spec = "§5"
+mech = "G"
+phase = "PH0"
+phases = ["PH0"]
+reqs = ["REQ-GOV-004"]
+
+[[invariant]]
+id = "INV-RING0-DETERMINISM-1"
+class = "K"
+spec = "§5"
+mech = "G + P"
+phase = "PH1"
+phases = ["PH1"]
+reqs = ["REQ-ARCH-015", "REQ-DUR-015"]
+
+[[invariant]]
+id = "INV-NONDET-1"
+class = "K"
+spec = "§5"
+mech = "P + G"
+phase = "PH5"
+phases = ["PH1", "PH5"]
+reqs = ["REQ-DUR-012"]
+
+[[invariant]]
+id = "INV-WAL-SSOT-1"
+class = "K"
+spec = "§5"
+mech = "C + P"
+phase = "PH2"
+phases = ["PH2"]
+reqs = ["REQ-DUR-011", "REQ-DUR-016"]
+
+[[invariant]]
+id = "INV-ATOMIC-IDX-1"
+class = "K"
+spec = "§5"
+mech = "C + P"
+phase = "PH3"
+phases = ["PH2", "PH3"]
+reqs = ["REQ-DUR-011"]
+
+[[invariant]]
+id = "INV-INDEX-APPLY-1"
+class = "K"
+spec = "§5"
+mech = "C + P"
+phase = "PH3"
+phases = ["PH3"]
+reqs = ["REQ-DUR-011"]
+
+[[invariant]]
+id = "INV-TENANT-1"
+class = "K"
+spec = "§5"
+mech = "T + P + F + G"
+phase = "PH3"
+phases = ["PH3"]
+reqs = ["REQ-TEN-001"]
+
+[[invariant]]
+id = "INV-TENANT-IDX-1"
+class = "K"
+spec = "§5"
+mech = "T + P + F + G"
+phase = "PH3"
+phases = ["PH3"]
+reqs = ["REQ-IDX-001"]
+
+[[invariant]]
+id = "INV-KEYSPACE-1"
+class = "K"
+spec = "§5"
+mech = "T + P + F + G"
+phase = "PH3"
+phases = ["PH2", "PH3"]
+reqs = ["REQ-IDX-010"]
+
+[[invariant]]
+id = "INV-DERIVED-1"
+class = "K"
+spec = "§5"
+mech = "I + P"
+phase = "PH5"
+phases = ["PH4", "PH5"]
+reqs = ["REQ-DEL-007"]
+
+[[invariant]]
+id = "INV-ENCRYPT-REST-1"
+class = "K"
+spec = "§5"
+mech = "I + G + P"
+phase = "PH4"
+phases = ["PH4"]
+reqs = ["REQ-KEY-003"]
+
+[[invariant]]
+id = "INV-ENCRYPT-REST-2"
+class = "K"
+spec = "§5"
+mech = "I + G + P"
+phase = "PH4"
+phases = ["PH4"]
+reqs = ["REQ-KEY-004"]
+
+[[invariant]]
+id = "INV-FAILCLOSED-1"
+class = "K"
+spec = "§5"
+mech = "C + I"
+phase = "PH7"
+phases = ["PH2", "PH7"]
+reqs = ["REQ-ARCH-016"]
+
+[[invariant]]
+id = "INV-KDF-1"
+class = "K"
+spec = "§5"
+mech = "I + G + P"
+phase = "PH4"
+phases = ["PH4"]
+reqs = ["REQ-KEY-002"]
+
+[[invariant]]
+id = "INV-FSYNC-1"
+class = "K"
+spec = "§5"
+mech = "C"
+phase = "PH2"
+phases = ["PH2"]
+reqs = ["REQ-DUR-002"]
+
+[[invariant]]
+id = "INV-DURABILITY-PRIM-1"
+class = "K"
+spec = "§5"
+mech = "C"
+phase = "PH2"
+phases = ["PH2"]
+reqs = ["REQ-DUR-001"]
+
+[[invariant]]
+id = "INV-ENOSPC-1"
+class = "K"
+spec = "§5"
+mech = "C"
+phase = "PH2"
+phases = ["PH2"]
+reqs = ["REQ-DUR-003"]
+
+[[invariant]]
+id = "INV-IO-1"
+class = "K"
+spec = "§5"
+mech = "G + C"
+phase = "PH2"
+phases = ["PH2"]
+reqs = ["REQ-DUR-004"]
+
+[[invariant]]
+id = "INV-FORMAT-1"
+class = "K"
+spec = "§5"
+mech = "G + F"
+phase = "PH2"
+phases = ["PH2"]
+reqs = ["REQ-DUR-005"]
+
+[[invariant]]
+id = "INV-LOCK-ORDER-1"
+class = "K"
+spec = "§5"
+mech = "L + G"
+phase = "PH3"
+phases = ["PH3"]
+reqs = ["REQ-MVCC-004"]
+
+[[invariant]]
+id = "INV-HNSW-SLOT-1"
+class = "K"
+spec = "§5"
+mech = "L + G"
+phase = "PH3"
+phases = ["PH3"]
+reqs = ["REQ-IDX-002"]
+
+[[invariant]]
+id = "INV-EMBED-1"
+class = "K"
+spec = "§5"
+mech = "G + I"
+phase = "PH5"
+phases = ["PH5"]
+reqs = ["REQ-IDX-011"]
+
+[[invariant]]
+id = "INV-EMBED-2"
+class = "K"
+spec = "§5"
+mech = "G + I"
+phase = "PH5"
+phases = ["PH5"]
+reqs = ["REQ-IDX-011"]
+
+[[invariant]]
+id = "INV-WIRING-2"
+class = "K"
+spec = "§5"
+mech = "G + I"
+phase = "PH5"
+phases = ["PH0", "PH5"]
+reqs = ["REQ-DUR-015", "REQ-DEL-023", "REQ-FAC-003"]
+
+[[invariant]]
+id = "INV-DELETION-PORTS-1"
+class = "K"
+spec = "§5"
+mech = "G + I"
+phase = "PH4"
+phases = ["PH1", "PH4"]
+reqs = ["REQ-DEL-023"]
+
+[[invariant]]
+id = "INV-PROOF-COVERAGE-1"
+class = "K"
+spec = "§5"
+mech = "T + I"
+phase = "PH4"
+phases = ["PH4"]
+reqs = ["REQ-DEL-003"]
+
+[[invariant]]
+id = "INV-WITNESS-MINT-1"
+class = "K"
+spec = "§5"
+mech = "T + G"
+phase = "PH1"
+phases = ["PH1"]
+reqs = ["REQ-DEL-004"]
+
+[[invariant]]
+id = "INV-PROOF-KEY-1"
+class = "K"
+spec = "§5"
+mech = "T + P"
+phase = "PH4"
+phases = ["PH4"]
+reqs = ["REQ-DEL-005"]
+
+[[invariant]]
+id = "INV-CLAIMS-1"
+class = "K"
+spec = "§5"
+mech = "G"
+phase = "PH7"
+phases = ["PH4", "PH7"]
+reqs = ["REQ-DEL-006"]
+
+[[invariant]]
+id = "INV-PROVENANCE-1"
+class = "K"
+spec = "§5"
+mech = "G"
+phase = "PH0"
+phases = ["PH0"]
+reqs = ["REQ-GOV-001"]
+
+[[invariant]]
+id = "INV-PLATFORM-1"
+class = "K"
+spec = "§5"
+mech = "CI-Matrix + C"
+phase = "PH6"
+phases = ["PH2", "PH6"]
+reqs = ["REQ-PLT-001"]
+
+[[invariant]]
+id = "INV-IPC-1"
+class = "K"
+spec = "§5"
+mech = "I + C + G"
+phase = "PH6"
+phases = ["PH6"]
+reqs = ["REQ-MCP-002"]
+
+[[invariant]]
+id = "INV-STDOUT-1"
+class = "K"
+spec = "§5"
+mech = "I + C + G"
+phase = "PH6"
+phases = ["PH6"]
+reqs = ["REQ-MCP-001"]
+
+[[invariant]]
+id = "INV-CANCEL-1"
+class = "K"
+spec = "§5"
+mech = "I + C + G"
+phase = "PH6"
+phases = ["PH6"]
+reqs = ["REQ-MCP-007"]
+
+[[invariant]]
+id = "INV-FORGET-GUARD-1"
+class = "K"
+spec = "§5"
+mech = "I + P"
+phase = "PH6"
+phases = ["PH6"]
+reqs = ["REQ-MCP-005"]
+
+[[invariant]]
+id = "INV-TRUST-1"
+class = "K"
+spec = "§5"
+mech = "I + P"
+phase = "PH6"
+phases = ["PH6"]
+reqs = ["REQ-MCP-006"]
+
+[[invariant]]
+id = "INV-LOG-1"
+class = "K"
+spec = "§5"
+mech = "G + P"
+phase = "PH6"
+phases = ["PH5", "PH6"]
+reqs = ["REQ-AUD-002"]
+
+[[invariant]]
+id = "INV-RETENTION-1"
+class = "K"
+spec = "§5"
+mech = "P + I"
+phase = "PH5"
+phases = ["PH5"]
+reqs = ["REQ-COG-003"]
+
+[[invariant]]
+id = "INV-EVIDENCE-1"
+class = "K"
+spec = "§5.1"
+mech = "G"
+phase = "PH0"
+phases = ["PH0"]
+reqs = ["REQ-QA-001"]
+
+[[invariant]]
+id = "INV-ORACLE-1"
+class = "K"
+spec = "§5.1"
+mech = "P"
+phase = "PH4"
+phases = ["PH2", "PH3", "PH4"]
+reqs = ["REQ-QA-002"]
+
+[[invariant]]
+id = "INV-SCAN-1"
+class = "K"
+spec = "§5.1"
+mech = "G"
+phase = "PH0"
+phases = ["PH0"]
+reqs = ["REQ-ARCH-014"]
+
+[[invariant]]
+id = "INV-SIDECAR-1"
+class = "K"
+spec = "§5.1"
+mech = "G + C + I"
+phase = "PH4"
+phases = ["PH2", "PH4"]
+reqs = ["REQ-DUR-016"]
+
+[[invariant]]
+id = "INV-EMERGENCY-DEL-1"
+class = "K"
+spec = "§5.1"
+mech = "C + I"
+phase = "PH4"
+phases = ["PH2", "PH4"]
+reqs = ["REQ-DUR-017"]
+
+[[invariant]]
+id = "INV-ASOF-ERASE-1"
+class = "K"
+spec = "§5.1"
+mech = "P + L"
+phase = "PH4"
+phases = ["PH4"]
+reqs = ["REQ-DEL-030", "REQ-DEL-031"]
+
+[[invariant]]
+id = "INV-BOOT-1"
+class = "K"
+spec = "§5.1"
+mech = "I + C"
+phase = "PH5"
+phases = ["PH5"]
+reqs = ["REQ-FAC-005"]
+
+[[invariant]]
+id = "INV-KEYPURPOSE-1"
+class = "K"
+spec = "§5.1"
+mech = "G + P"
+phase = "PH4"
+phases = ["PH0", "PH4"]
+reqs = ["REQ-KEY-011"]
+
+[[invariant]]
+id = "INV-RESTORE-HORIZON-1"
+class = "K"
+spec = "§5.1"
+mech = "I + C + G"
+phase = "PH4"
+phases = ["PH4"]
+reqs = ["REQ-DEL-032", "REQ-DEL-033"]
+
+[[invariant]]
+id = "INV-ADMISSION-1"
+class = "R"
+spec = "§5.1"
+mech = "T + P + F"
+phase = "PH8"
+phases = ["PH8"]
+reqs = ["REQ-SBX-001"]
+
+[[invariant]]
+id = "INV-APPROVAL-1"
+class = "R"
+spec = "§5.1"
+mech = "T + P + F"
+phase = "PH8"
+phases = ["PH8"]
+reqs = ["REQ-SBX-002"]
+
+[[invariant]]
+id = "INV-WASM-DET-1"
+class = "R"
+spec = "§5.1"
+mech = "T + P + F"
+phase = "PH8"
+phases = ["PH8"]
+reqs = ["REQ-SBX-003"]
+
+[[invariant]]
+id = "INV-GASP-1"
+class = "R"
+spec = "§5.1"
+mech = "I + P"
+phase = "PH8"
+phases = ["PH8"]
+reqs = ["REQ-COG-001"]
+
+[[invariant]]
+id = "INV-EGRESS-BUDGET-1"
+class = "R"
+spec = "§5.1"
+mech = "I + P"
+phase = "PH8"
+phases = ["PH8"]
+reqs = ["REQ-PRV-002"]
+
+[[invariant]]
+id = "INV-DECAY-1"
+class = "R"
+spec = "§5.1"
+mech = "I + P"
+phase = "PH8"
+phases = ["PH8"]
+reqs = ["REQ-COG-003"]
+
+[[invariant]]
+id = "INV-MEMTYPE-1"
+class = "R"
+spec = "§5.1"
+mech = "I + P"
+phase = "PH8"
+phases = ["PH8"]
+reqs = ["REQ-COG-002"]
+
+[[invariant]]
+id = "INV-MEMTYPE-2"
+class = "R"
+spec = "§5.1"
+mech = "I + P"
+phase = "PH8"
+phases = ["PH8"]
+reqs = ["REQ-COG-002"]
+
+[[invariant]]
+id = "INV-MEMTYPE-3"
+class = "R"
+spec = "§5.1"
+mech = "I + P"
+phase = "PH8"
+phases = ["PH8"]
+reqs = ["REQ-COG-002"]
+
+[[invariant]]
+id = "INV-ROUTING-1"
+class = "E"
+spec = "§5.1"
+mech = "OFFEN"
+phase = "PH9"
+phases = ["PH9"]
+reqs = ["REQ-EXP-001"]
+
+[[invariant]]
+id = "INV-ROUTING-2"
+class = "E"
+spec = "§5.1"
+mech = "OFFEN"
+phase = "PH9"
+phases = ["PH9"]
+reqs = ["REQ-EXP-001"]
+
+[[invariant]]
+id = "INV-ROUTING-3"
+class = "E"
+spec = "§5.1"
+mech = "OFFEN"
+phase = "PH9"
+phases = ["PH9"]
+reqs = ["REQ-EXP-001"]
+
+[[invariant]]
+id = "INV-LICENSE-1"
+class = "E"
+spec = "§5.1"
+mech = "P"
+phase = "PH9"
+phases = ["PH9"]
+reqs = ["REQ-EXP-003"]
+
+[[invariant]]
+id = "INV-LICENSE-2"
+class = "E"
+spec = "§5.1"
+mech = "P"
+phase = "PH9"
+phases = ["PH9"]
+reqs = ["REQ-EXP-003"]
+
+[[invariant]]
+id = "INV-LICENSE-3"
+class = "E"
+spec = "§5.1"
+mech = "P"
+phase = "PH9"
+phases = ["PH9"]
+reqs = ["REQ-EXP-003"]
+
+[[veto]]
+id = "VETO-F10"
+status = "unverhandelbar"
+adr = ""
+keywords = ["cross-tenant", "tenant-boundary", "shared-cache", "shared-index", "shared-idf", "tenant_id"]
+
+[[veto]]
+id = "VETO-OP03"
+status = "unverhandelbar"
+adr = ""
+keywords = ["realtime-audio", "speech-to-text", "stt", "audio-stream"]
+
+[[veto]]
+id = "VETO-F02"
+status = "unverhandelbar"
+adr = ""
+keywords = ["partial hnsw rebuild", "rebuild_region", "rewiring", "partial-rewiring"]
+
+[[veto]]
+id = "VETO-SINGLE-NODE"
+status = "unverhandelbar"
+adr = ""
+keywords = ["sharding", "replication", "p2p", "peer-to-peer", "distributed-consensus", "raft"]
+
+[[evidence_level]]
+id = "E0"
+title = "E0"
+meaning = "Behauptung (Bericht, Agentenaussage, Dokument)"
+allowed_statement = "Ziel, Hypothese"
+
+[[evidence_level]]
+id = "E1"
+title = "E1"
+meaning = "Am Code gelesen (Datei:Zeile, Review)"
+allowed_statement = "im Code vorhanden/abwesend"
+
+[[evidence_level]]
+id = "E2"
+title = "E2"
+meaning = "Gate-/Skriptlauf auf bekanntem Commit, Protokoll archiviert"
+allowed_statement = "Gate grün/rot auf Commit X"
+
+[[evidence_level]]
+id = "E3"
+title = "E3"
+meaning = "Test- oder Chaos-Lauf reproduzierbar auf unabhängigem Runner"
+allowed_statement = "Verhalten belegt"
+
+[[evidence_level]]
+id = "E4"
+title = "E4"
+meaning = "E3 plus unabhängiges Orakel (§27.8), Mutation-Wirksamkeit und externer Review"
+allowed_statement = "Garantie belegt"
+
+[[requirement]]
+id = "REQ-ARCH-001"
+class = "K"
+mech = "G: cargo metadata gegen capabilities.toml"
+section = "§5, §6"
+
+[[requirement]]
+id = "REQ-ARCH-002"
+class = "K"
+mech = "G: Ring-/DAG-Gate"
+section = "§5"
+
+[[requirement]]
+id = "REQ-ARCH-003"
+class = "K"
+mech = "G: Kern-Isolation über cargo metadata"
+section = "§5, §6.0"
+
+[[requirement]]
+id = "REQ-ARCH-004"
+class = "K"
+mech = "G: Compiler-Lint + Unsafe-Inventar"
+section = "§5, §6.7"
+
+[[requirement]]
+id = "REQ-ARCH-005"
+class = "K"
+mech = "G: clippy deny + Allow-Zähler; P: Miri gegen sichere Referenz"
+section = "§5 P2, §6.7"
+
+[[requirement]]
+id = "REQ-ARCH-006"
+class = "K"
+mech = "G: Lint-Satz §27.5 + Ratchet (Ziel 0)"
+section = "§5 P7"
+
+[[requirement]]
+id = "REQ-ARCH-007"
+class = "K"
+mech = "C + I"
+section = "§5, §7"
+
+[[requirement]]
+id = "REQ-ARCH-008"
+class = "K"
+mech = "G: Abhängigkeitsbaum-Prüfung (Runtime-frei) + Zählung `async fn` (Ratchet, Ziel 0)"
+section = "§5 P26"
+
+[[requirement]]
+id = "REQ-ARCH-009"
+class = "K"
+mech = "G: clippy `disallowed_*` + P: Wiederholbarkeit"
+section = "§5 P28"
+
+[[requirement]]
+id = "REQ-ARCH-010"
+class = "K"
+mech = "G: Wired-Check + I"
+section = "§3, §5"
+
+[[requirement]]
+id = "REQ-ARCH-011"
+class = "K"
+mech = "G: Doc-Truth"
+section = "§6, §28.5"
+
+[[requirement]]
+id = "REQ-ARCH-012"
+class = "K"
+mech = "G: Feature-Matrix über cargo metadata"
+section = "§6.0"
+
+[[requirement]]
+id = "REQ-ARCH-013"
+class = "K"
+mech = "G"
+section = "§6.1"
+
+[[requirement]]
+id = "REQ-ARCH-014"
+class = "K"
+mech = "G: `public-api`-Gate (verbotene Signaturen: Klartext-Schlüsselrückgabe, `*_for_test`-Zugänge in Release-Features)"
+section = "§27.6, §30"
+
+[[requirement]]
+id = "REQ-ARCH-015"
+class = "K"
+mech = "G (`disallowed_*`, Ring-0-I/O-Scan) + P (Wiederholbarkeit, Reihenfolge-Permutation)"
+section = "§5, §6.1"
+
+[[requirement]]
+id = "REQ-ARCH-016"
+class = "K"
+mech = "C (Fehlerinjektion an jeder Schnittstelle) + I"
+section = "§5, §7.10"
+
+[[requirement]]
+id = "REQ-ARCH-017"
+class = "K"
+mech = "G: Deny-Liste über `cargo metadata` (Audio-/STT-Abhängigkeiten) + Review"
+section = "§4.1"
+
+[[requirement]]
+id = "REQ-ARCH-018"
+class = "K"
+mech = "G: Ring-Gate über `cargo metadata` und `capabilities.toml`"
+section = "§6.10"
+
+[[requirement]]
+id = "REQ-ARCH-019"
+class = "K"
+mech = "G: `public-api`-Gate + `compile_fail`-Doctests"
+section = "§6.10, §15.3"
+
+[[requirement]]
+id = "REQ-ARCH-020"
+class = "K"
+mech = "G: Feature-Matrix + Feature-Konsistenz"
+section = "§6.0, §27.5"
+
+[[requirement]]
+id = "REQ-ARCH-021"
+class = "K"
+mech = "G: Lint-Vererbungs-Gate + Allow-Zähler"
+section = "§5 P2, §27.5"
+
+[[requirement]]
+id = "REQ-ARCH-022"
+class = "K"
+mech = "G: clippy `disallowed_*` + Allowlist-Prüfung"
+section = "§5 P28, §27.5"
+
+[[requirement]]
+id = "REQ-ARCH-023"
+class = "K"
+mech = "G: Doc-Truth"
+section = "§6, §28.5"
+
+[[requirement]]
+id = "REQ-ARCH-024"
+class = "K"
+mech = "G + I"
+section = "§6.11"
+
+[[requirement]]
+id = "REQ-DUR-001"
+class = "K"
+mech = "C: FaultVfs je Plattform"
+section = "§7.3, §7.8"
+
+[[requirement]]
+id = "REQ-DUR-002"
+class = "K"
+mech = "C"
+section = "§5, §7.10"
+
+[[requirement]]
+id = "REQ-DUR-003"
+class = "K"
+mech = "C"
+section = "§5"
+
+[[requirement]]
+id = "REQ-DUR-004"
+class = "K"
+mech = "G (mmap-Nutzung) + C"
+section = "§7.7"
+
+[[requirement]]
+id = "REQ-DUR-005"
+class = "K"
+mech = "G: Kompatibilitätskorpus + F"
+section = "§7.2"
+
+[[requirement]]
+id = "REQ-DUR-006"
+class = "K"
+mech = "C + F"
+section = "§7.3"
+
+[[requirement]]
+id = "REQ-DUR-007"
+class = "K"
+mech = "C + I"
+section = "§7.3.1"
+
+[[requirement]]
+id = "REQ-DUR-008"
+class = "K"
+mech = "I + C"
+section = "§7.3.1, §23.4"
+
+[[requirement]]
+id = "REQ-DUR-009"
+class = "K"
+mech = "T: Enum-Varianten + G"
+section = "§23.2"
+
+[[requirement]]
+id = "REQ-DUR-010"
+class = "K"
+mech = "C"
+section = "§7.9"
+
+[[requirement]]
+id = "REQ-DUR-011"
+class = "K"
+mech = "C + P"
+section = "§5, §24"
+
+[[requirement]]
+id = "REQ-DUR-012"
+class = "K"
+mech = "P: Replay ohne Quellenaufruf + G"
+section = "§5"
+
+[[requirement]]
+id = "REQ-DUR-013"
+class = "K"
+mech = "B + I"
+section = "§7.3, §7.4"
+
+[[requirement]]
+id = "REQ-DUR-014"
+class = "K"
+mech = "C + I"
+section = "§4.4, §7.10"
+
+[[requirement]]
+id = "REQ-DUR-015"
+class = "K"
+mech = "G: Ring-0-I/O-Scan + C: `FaultVfs`"
+section = "§5, §7.8"
+
+[[requirement]]
+id = "REQ-DUR-016"
+class = "K"
+mech = "G + C + I"
+section = "§7.11"
+
+[[requirement]]
+id = "REQ-DUR-017"
+class = "K"
+mech = "C + I"
+section = "§7.12"
+
+[[requirement]]
+id = "REQ-MVCC-001"
+class = "K"
+mech = "P: Referenzmodell + C: History-Checker + L"
+section = "§8"
+
+[[requirement]]
+id = "REQ-MVCC-002"
+class = "K"
+mech = "P + L"
+section = "§5, §8"
+
+[[requirement]]
+id = "REQ-MVCC-003"
+class = "K"
+mech = "P"
+section = "§8"
+
+[[requirement]]
+id = "REQ-MVCC-004"
+class = "K"
+mech = "L + G (`await_holding_lock`)"
+section = "§8.1"
+
+[[requirement]]
+id = "REQ-MVCC-005"
+class = "K"
+mech = "G: Inventar-Abgleich"
+section = "§27.1"
+
+[[requirement]]
+id = "REQ-IDX-001"
+class = "K"
+mech = "P/F: Cross-Tenant + T"
+section = "§9.2"
+
+[[requirement]]
+id = "REQ-IDX-002"
+class = "K"
+mech = "L"
+section = "§9.3"
+
+[[requirement]]
+id = "REQ-IDX-003"
+class = "K"
+mech = "G: check_vetoes + P"
+section = "§4.1, §9.3"
+
+[[requirement]]
+id = "REQ-IDX-004"
+class = "K"
+mech = "P"
+section = "§9.4"
+
+[[requirement]]
+id = "REQ-IDX-005"
+class = "K"
+mech = "P"
+section = "§9.8"
+
+[[requirement]]
+id = "REQ-IDX-006"
+class = "K"
+mech = "P"
+section = "§9.6"
+
+[[requirement]]
+id = "REQ-IDX-007"
+class = "K"
+mech = "P + Miri"
+section = "§9.6"
+
+[[requirement]]
+id = "REQ-IDX-008"
+class = "K"
+mech = "P"
+section = "§10"
+
+[[requirement]]
+id = "REQ-IDX-009"
+class = "K"
+mech = "P"
+section = "§16, §25.3"
+
+[[requirement]]
+id = "REQ-IDX-010"
+class = "K"
+mech = "G + P"
+section = "§5"
+
+[[requirement]]
+id = "REQ-IDX-011"
+class = "K"
+mech = "G + I"
+section = "§15.3"
+
+[[requirement]]
+id = "REQ-IDX-012"
+class = "K"
+mech = "P"
+section = "§16.1"
+
+[[requirement]]
+id = "REQ-IDX-013"
+class = "R"
+mech = "P"
+section = "§11"
+
+[[requirement]]
+id = "REQ-IDX-014"
+class = "R"
+mech = "P"
+section = "§12"
+
+[[requirement]]
+id = "REQ-IDX-015"
+class = "K"
+mech = "G + I"
+section = "§15.3"
+
+[[requirement]]
+id = "REQ-KEY-001"
+class = "K"
+mech = "G + I: Selbsttest beim Start"
+section = "§5, §20.2"
+
+[[requirement]]
+id = "REQ-KEY-002"
+class = "K"
+mech = "P + I"
+section = "§5, §25.1"
+
+[[requirement]]
+id = "REQ-KEY-003"
+class = "K"
+mech = "I + G: Klartext-Scanner"
+section = "§5"
+
+[[requirement]]
+id = "REQ-KEY-004"
+class = "K"
+mech = "G + I"
+section = "§5"
+
+[[requirement]]
+id = "REQ-KEY-005"
+class = "K"
+mech = "P: Vektoren + Negativtests"
+section = "§20.1, §25.1"
+
+[[requirement]]
+id = "REQ-KEY-006"
+class = "K"
+mech = "C + F"
+section = "§20.2"
+
+[[requirement]]
+id = "REQ-KEY-007"
+class = "K"
+mech = "P + I"
+section = "§20.2"
+
+[[requirement]]
+id = "REQ-KEY-008"
+class = "K"
+mech = "G + P"
+section = "§20.1"
+
+[[requirement]]
+id = "REQ-KEY-009"
+class = "K"
+mech = "Review"
+section = "§3 Punkt 12"
+
+[[requirement]]
+id = "REQ-KEY-010"
+class = "K"
+mech = "G: Literal-Scan `no-literal-secrets`"
+section = "§20.8"
+
+[[requirement]]
+id = "REQ-KEY-011"
+class = "K"
+mech = "G + P"
+section = "§20.2c"
+
+[[requirement]]
+id = "REQ-DEL-001"
+class = "K"
+mech = "T: Typestate + I"
+section = "§5, §20.4"
+
+[[requirement]]
+id = "REQ-DEL-002"
+class = "K"
+mech = "C: Crash an jedem Punkt + I"
+section = "§5, §24.3"
+
+[[requirement]]
+id = "REQ-DEL-003"
+class = "K"
+mech = "T: Typestate-Builder + I"
+section = "§20.5"
+
+[[requirement]]
+id = "REQ-DEL-004"
+class = "K"
+mech = "T + G: Aufrufer-Regel"
+section = "§20.5"
+
+[[requirement]]
+id = "REQ-DEL-005"
+class = "K"
+mech = "T + P"
+section = "§20.5"
+
+[[requirement]]
+id = "REQ-DEL-006"
+class = "K"
+mech = "G"
+section = "§4.3, §20.12"
+
+[[requirement]]
+id = "REQ-DEL-007"
+class = "K"
+mech = "I + P"
+section = "§5, §20.4"
+
+[[requirement]]
+id = "REQ-DEL-008"
+class = "K"
+mech = "T + Mutation (Konstante ersetzen ⇒ Test rot) + G (`deletion-honesty`)"
+section = "§20.8"
+
+[[requirement]]
+id = "REQ-DEL-009"
+class = "K"
+mech = "G: Literal-Scan + I"
+section = "§20.8"
+
+[[requirement]]
+id = "REQ-DEL-010"
+class = "K"
+mech = "G + P"
+section = "§20.8, §29"
+
+[[requirement]]
+id = "REQ-DEL-011"
+class = "K"
+mech = "P + L"
+section = "§20.9"
+
+[[requirement]]
+id = "REQ-DEL-012"
+class = "K"
+mech = "L"
+section = "§20.9"
+
+[[requirement]]
+id = "REQ-DEL-013"
+class = "K"
+mech = "I"
+section = "§20.9, §24.4"
+
+[[requirement]]
+id = "REQ-DEL-014"
+class = "K"
+mech = "C: Crash-Matrix"
+section = "§20.10, §24.3"
+
+[[requirement]]
+id = "REQ-DEL-015"
+class = "K"
+mech = "G + P"
+section = "§20.11"
+
+[[requirement]]
+id = "REQ-DEL-016"
+class = "K"
+mech = "T + P"
+section = "§20.12"
+
+[[requirement]]
+id = "REQ-DEL-017"
+class = "K"
+mech = "F + P + Referenz-Verifier"
+section = "§20.5"
+
+[[requirement]]
+id = "REQ-DEL-018"
+class = "K"
+mech = "I"
+section = "§20.10"
+
+[[requirement]]
+id = "REQ-DEL-019"
+class = "K"
+mech = "C"
+section = "§20.3"
+
+[[requirement]]
+id = "REQ-DEL-020"
+class = "K"
+mech = "I + Canary-Scan (§27.9)"
+section = "§20.3, §20.4"
+
+[[requirement]]
+id = "REQ-DEL-021"
+class = "K"
+mech = "I"
+section = "§24.3"
+
+[[requirement]]
+id = "REQ-DEL-022"
+class = "K"
+mech = "C + F"
+section = "§20.6"
+
+[[requirement]]
+id = "REQ-DEL-023"
+class = "K"
+mech = "G: Port-Klassifikation + Wired-Check"
+section = "§5 INV-WIRING-2, §20"
+
+[[requirement]]
+id = "REQ-DEL-024"
+class = "K"
+mech = "I"
+section = "§20.2b"
+
+[[requirement]]
+id = "REQ-DEL-025"
+class = "K"
+mech = "P (AC-7) + C"
+section = "§20.2b"
+
+[[requirement]]
+id = "REQ-DEL-026"
+class = "K"
+mech = "G + P: Rohscan"
+section = "§20.2b"
+
+[[requirement]]
+id = "REQ-DEL-027"
+class = "K"
+mech = "G: Typfamilien-Zählung + `deletion-honesty`"
+section = "§6.10, §20.15"
+
+[[requirement]]
+id = "REQ-DEL-028"
+class = "K"
+mech = "P: Migrationstest + Review"
+section = "§20.1"
+
+[[requirement]]
+id = "REQ-DEL-029"
+class = "K"
+mech = "I: Canary-Läufe (§27.9)"
+section = "§20.15"
+
+[[requirement]]
+id = "REQ-DEL-030"
+class = "K"
+mech = "P + L"
+section = "§8, §20.9"
+
+[[requirement]]
+id = "REQ-DEL-031"
+class = "K"
+mech = "L + I"
+section = "§8, §25.4"
+
+[[requirement]]
+id = "REQ-DEL-032"
+class = "K"
+mech = "I + C + G"
+section = "§20.9"
+
+[[requirement]]
+id = "REQ-DEL-033"
+class = "K"
+mech = "P + I"
+section = "§20.11, §20.2c"
+
+[[requirement]]
+id = "REQ-DEL-034"
+class = "K"
+mech = "T + I: Canary (AC-16)"
+section = "§20.2b, §20.4a"
+
+[[requirement]]
+id = "REQ-DEL-035"
+class = "K"
+mech = "G: `deletion-honesty` (Textvergleich, AC-19)"
+section = "§4.3, §20.12"
+
+[[requirement]]
+id = "REQ-DEL-036"
+class = "K"
+mech = "I + C: `ManualClock` (AC-20)"
+section = "§20.10, §25.6"
+
+[[requirement]]
+id = "REQ-DEL-037"
+class = "K"
+mech = "I"
+section = "§20.17, §21.7"
+
+[[requirement]]
+id = "REQ-AUD-001"
+class = "K"
+mech = "P + F"
+section = "§20.6"
+
+[[requirement]]
+id = "REQ-AUD-002"
+class = "K"
+mech = "G: Log-Scanner + P"
+section = "§5"
+
+[[requirement]]
+id = "REQ-TEN-001"
+class = "K"
+mech = "T + P"
+section = "§5"
+
+[[requirement]]
+id = "REQ-TEN-002"
+class = "K"
+mech = "P/F"
+section = "§4.1"
+
+[[requirement]]
+id = "REQ-TEN-003"
+class = "K"
+mech = "T + G: Literal-Scan"
+section = "§4.1, §21.1"
+
+[[requirement]]
+id = "REQ-TEN-004"
+class = "K"
+mech = "T + I"
+section = "§24.5"
+
+[[requirement]]
+id = "REQ-TEN-005"
+class = "K"
+mech = "I + G"
+section = "§16"
+
+[[requirement]]
+id = "REQ-MCP-001"
+class = "K"
+mech = "G"
+section = "§21.0"
+
+[[requirement]]
+id = "REQ-MCP-002"
+class = "K"
+mech = "I + C"
+section = "§21.1"
+
+[[requirement]]
+id = "REQ-MCP-003"
+class = "K"
+mech = "I"
+section = "§21.2"
+
+[[requirement]]
+id = "REQ-MCP-004"
+class = "K"
+mech = "I"
+section = "§21.3"
+
+[[requirement]]
+id = "REQ-MCP-005"
+class = "K"
+mech = "I: Prompt-Injection-Szenarien"
+section = "§21.5"
+
+[[requirement]]
+id = "REQ-MCP-006"
+class = "K"
+mech = "I + P"
+section = "§21.6"
+
+[[requirement]]
+id = "REQ-MCP-007"
+class = "K"
+mech = "I + C"
+section = "§21.4"
+
+[[requirement]]
+id = "REQ-MCP-008"
+class = "K"
+mech = "F + I"
+section = "§21.4"
+
+[[requirement]]
+id = "REQ-MCP-009"
+class = "K"
+mech = "I"
+section = "§21.7"
+
+[[requirement]]
+id = "REQ-MCP-010"
+class = "K"
+mech = "I"
+section = "§21.8"
+
+[[requirement]]
+id = "REQ-FAC-001"
+class = "K"
+mech = "G: Wired-Check"
+section = "§22"
+
+[[requirement]]
+id = "REQ-FAC-002"
+class = "K"
+mech = "I"
+section = "§22"
+
+[[requirement]]
+id = "REQ-FAC-003"
+class = "K"
+mech = "G: Port-Klassifikation + Accept-All-Erkennung"
+section = "§5, §22"
+
+[[requirement]]
+id = "REQ-FAC-004"
+class = "K"
+mech = "G + I"
+section = "§15.3"
+
+[[requirement]]
+id = "REQ-FAC-005"
+class = "K"
+mech = "I + C"
+section = "§22.1"
+
+[[requirement]]
+id = "REQ-PLT-001"
+class = "K"
+mech = "CI-Matrix + C"
+section = "§23.4"
+
+[[requirement]]
+id = "REQ-PLT-002"
+class = "K"
+mech = "I"
+section = "§23.1, §23.2"
+
+[[requirement]]
+id = "REQ-PLT-003"
+class = "K"
+mech = "C: Windows-Handle-Nemesis"
+section = "§23.4"
+
+[[requirement]]
+id = "REQ-PLT-004"
+class = "K"
+mech = "I"
+section = "§21.7, §23.4"
+
+[[requirement]]
+id = "REQ-QA-001"
+class = "K"
+mech = "G: `cargo xtask verify` (§27.10)"
+section = "§3, §27.7"
+
+[[requirement]]
+id = "REQ-QA-002"
+class = "K"
+mech = "P: Referenzmodell / Brute-Force / Verifier anderer Sprache"
+section = "§3 Punkt 15, §27.8"
+
+[[requirement]]
+id = "REQ-QA-003"
+class = "K"
+mech = "G"
+section = "§27.1"
+
+[[requirement]]
+id = "REQ-QA-004"
+class = "K"
+mech = "G"
+section = "§27.1"
+
+[[requirement]]
+id = "REQ-QA-005"
+class = "K"
+mech = "G"
+section = "§27.1"
+
+[[requirement]]
+id = "REQ-QA-006"
+class = "K"
+mech = "C"
+section = "§27.3"
+
+[[requirement]]
+id = "REQ-QA-007"
+class = "K"
+mech = "B"
+section = "§26, §27.4"
+
+[[requirement]]
+id = "REQ-QA-008"
+class = "K"
+mech = "G: Meta-Gate"
+section = "§27.5"
+
+[[requirement]]
+id = "REQ-QA-009"
+class = "K"
+mech = "Review + CI"
+section = "§27.5"
+
+[[requirement]]
+id = "REQ-QA-010"
+class = "K"
+mech = "G: gate-weakening / test-integrity"
+section = "§28.2"
+
+[[requirement]]
+id = "REQ-GOV-001"
+class = "K"
+mech = "G"
+section = "§28.2"
+
+[[requirement]]
+id = "REQ-GOV-002"
+class = "K"
+mech = "G: protected-paths"
+section = "§28.2"
+
+[[requirement]]
+id = "REQ-GOV-003"
+class = "K"
+mech = "Review + G"
+section = "§28.6"
+
+[[requirement]]
+id = "REQ-GOV-004"
+class = "K"
+mech = "G: Doc-Truth (inkl. Konsistenz Register §5.2 ↔ §27.6 ↔ §33: jede `INV-*` einmal definiert, einmal in der Matrix, mindestens einmal referenziert)"
+section = "§5, §5.2, §28.5"
+
+[[requirement]]
+id = "REQ-GOV-005"
+class = "K"
+mech = "Review"
+section = "§28.1"
+
+[[requirement]]
+id = "REQ-GOV-006"
+class = "K"
+mech = "G: cargo-deny/audit/vet"
+section = "§28.4"
+
+[[requirement]]
+id = "REQ-SBX-001"
+class = "R"
+mech = "T + F"
+section = "§14.2"
+
+[[requirement]]
+id = "REQ-SBX-002"
+class = "R"
+mech = "T + I"
+section = "§14.1"
+
+[[requirement]]
+id = "REQ-SBX-003"
+class = "R"
+mech = "P"
+section = "§14.3"
+
+[[requirement]]
+id = "REQ-PRV-001"
+class = "R"
+mech = "T + I"
+section = "§19.1, §19.3"
+
+[[requirement]]
+id = "REQ-PRV-002"
+class = "R"
+mech = "I"
+section = "§19.1"
+
+[[requirement]]
+id = "REQ-PRV-003"
+class = "R"
+mech = "I"
+section = "§19.5"
+
+[[requirement]]
+id = "REQ-COG-001"
+class = "R"
+mech = "I + P"
+section = "§15.2"
+
+[[requirement]]
+id = "REQ-COG-002"
+class = "R"
+mech = "P"
+section = "§17.1"
+
+[[requirement]]
+id = "REQ-COG-003"
+class = "R"
+mech = "P + I"
+section = "§16.4, §17.0b"
+
+[[requirement]]
+id = "REQ-KVC-001"
+class = "R"
+mech = "B + G"
+section = "§2, §13.1"
+
+[[requirement]]
+id = "REQ-KVC-002"
+class = "R"
+mech = "I"
+section = "§13"
+
+[[requirement]]
+id = "REQ-EXP-001"
+class = "E"
+mech = "OFFEN (nicht normativ)"
+section = "§18a"
+
+[[requirement]]
+id = "REQ-EXP-002"
+class = "E"
+mech = "OFFEN (nicht normativ)"
+section = "§18"
+
+[[requirement]]
+id = "REQ-EXP-003"
+class = "E"
+mech = "P"
+section = "§23.5"
+
+[[requirement]]
+id = "REQ-EXP-004"
+class = "E"
+mech = "OFFEN (nicht normativ)"
+section = "§20.7"
+
+[[requirement]]
+id = "REQ-EXP-005"
+class = "E"
+mech = "OFFEN (nicht normativ)"
+section = "§10"
