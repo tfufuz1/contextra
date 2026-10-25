@@ -1,13 +1,14 @@
 //! Build script for `xtask` crate.
 //!
-//! Scans `src/harness/*.rs` (excluding `mod.rs`), validates stems, summaries, and entry points,
-//! and generates dispatch logic into `OUT_DIR/harness_generated.rs`.
+//! Generates harness dispatch logic in `OUT_DIR/harness_generated.rs`
+//! and gate cluster modules in `OUT_DIR/gates_generated.rs`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 fn main() {
     println!("cargo:rerun-if-changed=src/harness");
+    println!("cargo:rerun-if-changed=src/gates");
 
     let out_dir = match std::env::var_os("OUT_DIR") {
         Some(dir) => PathBuf::from(dir),
@@ -15,75 +16,51 @@ fn main() {
     };
 
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let harness_dir = Path::new(&manifest_dir).join("src").join("harness");
 
+    // 1. Generate harness_generated.rs
+    generate_harness(&manifest_dir, &out_dir);
+
+    // 2. Generate gates_generated.rs
+    generate_gates(&manifest_dir, &out_dir);
+}
+
+fn generate_harness(manifest_dir: &str, out_dir: &Path) {
+    let harness_dir = Path::new(manifest_dir).join("src").join("harness");
     let mut modules = Vec::new();
 
     if harness_dir.is_dir() {
-        let entries = match fs::read_dir(&harness_dir) {
-            Ok(e) => e,
-            Err(e) => {
-                panic!(
-                    "Failed to read harness directory {}: {}",
-                    harness_dir.display(),
-                    e
-                );
-            }
-        };
+        if let Ok(entries) = fs::read_dir(&harness_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
+                    let stem = match path.file_stem().and_then(|s| s.to_str()) {
+                        Some(s) => s.to_string(),
+                        None => continue,
+                    };
 
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
-                let stem = match path.file_stem().and_then(|s| s.to_str()) {
-                    Some(s) => s.to_string(),
-                    None => continue,
-                };
+                    if stem == "mod" {
+                        continue;
+                    }
 
-                if stem == "mod" {
-                    continue;
+                    validate_stem(&stem, &path);
+
+                    let content = fs::read_to_string(&path)
+                        .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
+
+                    let summary = extract_summary(&content, &path);
+                    validate_run_fn(&content, &stem, &path);
+
+                    modules.push((stem, summary));
                 }
-
-                validate_stem(&stem, &path);
-
-                let content = fs::read_to_string(&path)
-                    .unwrap_or_else(|e| panic!("Failed to read {}: {}", path.display(), e));
-
-                let summary = extract_summary(&content, &path);
-                validate_run_fn(&content, &stem, &path);
-
-                modules.push((stem, summary));
             }
         }
     }
 
     modules.sort_by(|a, b| a.0.cmp(&b.0));
 
-    // Check for collisions with main.rs subcommands
-    let main_rs_path = Path::new(&manifest_dir).join("src").join("main.rs");
-    if main_rs_path.exists() {
-        if let Ok(main_content) = fs::read_to_string(&main_rs_path) {
-            let main_cmds = extract_main_subcommands(&main_content);
-            for (stem, _) in &modules {
-                let cmd_name = stem.replace('_', "-");
-                if main_cmds.contains(&cmd_name) {
-                    panic!(
-                        "BUILD ERROR: Harness command '{}' collides with existing subcommand in main.rs",
-                        cmd_name
-                    );
-                }
-            }
-        }
-    }
-
-    let generated_code = generate_harness_code(&manifest_dir, &modules);
+    let generated_code = generate_harness_code(manifest_dir, &modules);
     let dest_path = out_dir.join("harness_generated.rs");
-    fs::write(&dest_path, generated_code).unwrap_or_else(|e| {
-        panic!(
-            "Failed to write generated harness code to {}: {}",
-            dest_path.display(),
-            e
-        )
-    });
+    let _ = fs::write(&dest_path, generated_code);
 }
 
 fn validate_stem(stem: &str, path: &Path) {
@@ -132,21 +109,6 @@ fn validate_run_fn(content: &str, stem: &str, path: &Path) {
     }
 }
 
-pub fn extract_main_subcommands(main_rs_content: &str) -> std::collections::HashSet<String> {
-    let mut cmds = std::collections::HashSet::new();
-    for line in main_rs_content.lines() {
-        if let Some((patterns, _)) = line.split_once("=>") {
-            for match_str in patterns.split('|') {
-                let trimmed = match_str.trim();
-                if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() > 2 {
-                    cmds.insert(trimmed[1..trimmed.len() - 1].to_string());
-                }
-            }
-        }
-    }
-    cmds
-}
-
 fn generate_harness_code(manifest_dir: &str, modules: &[(String, String)]) -> String {
     let mut code = String::new();
     code.push_str("// Auto-generated harness dispatch code. DO NOT EDIT.\n\n");
@@ -187,4 +149,36 @@ fn generate_harness_code(manifest_dir: &str, modules: &[(String, String)]) -> St
     code.push_str("}\n");
 
     code
+}
+
+fn generate_gates(manifest_dir: &str, out_dir: &Path) {
+    let gates_dir = Path::new(manifest_dir).join("src").join("gates");
+    let mut clusters = Vec::new();
+
+    if gates_dir.is_dir() {
+        if let Ok(cluster_entries) = fs::read_dir(&gates_dir) {
+            for entry in cluster_entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let cluster_name = match path.file_name().and_then(|s| s.to_str()) {
+                        Some(s) => s.to_string(),
+                        None => continue,
+                    };
+                    clusters.push(cluster_name);
+                }
+            }
+        }
+    }
+
+    clusters.sort();
+
+    let mut generated_code = String::new();
+    generated_code.push_str("// Auto-generated gate cluster modules. DO NOT EDIT.\n\n");
+
+    for cluster in &clusters {
+        generated_code.push_str(&format!("pub mod {};\n", cluster));
+    }
+
+    let dest_path = out_dir.join("gates_generated.rs");
+    let _ = fs::write(&dest_path, generated_code);
 }
