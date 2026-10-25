@@ -17,9 +17,11 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 10), and CPU feature `avx512f` is confirmed at runtime (line 19).
             return Ok(unsafe { avx512::cosine_distance_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 10), and CPU features `avx2` and `fma` are confirmed at runtime (line 23).
             return Ok(unsafe { avx2::cosine_distance_avx2(a, b) });
         }
     }
@@ -27,6 +29,7 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     #[cfg(target_arch = "aarch64")]
     {
         if std::arch::is_aarch64_feature_detected!("neon") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 10), and CPU feature `neon` is confirmed at runtime (line 31).
             return Ok(unsafe { neon::cosine_distance_neon(a, b) });
         }
     }
@@ -46,9 +49,11 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 42), and CPU feature `avx512f` is confirmed at runtime (line 51).
             return Ok(unsafe { avx512::euclidean_distance_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 42), and CPU features `avx2` and `fma` are confirmed at runtime (line 55).
             return Ok(unsafe { avx2::euclidean_distance_avx2(a, b) });
         }
     }
@@ -56,6 +61,7 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     #[cfg(target_arch = "aarch64")]
     {
         if std::arch::is_aarch64_feature_detected!("neon") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 42), and CPU feature `neon` is confirmed at runtime (line 63).
             return Ok(unsafe { neon::euclidean_distance_neon(a, b) });
         }
     }
@@ -75,9 +81,11 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError>
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 74), and CPU feature `avx512f` is confirmed at runtime (line 83).
             return Ok(unsafe { avx512::dot_product_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 74), and CPU features `avx2` and `fma` are confirmed at runtime (line 87).
             return Ok(unsafe { avx2::dot_product_avx2(a, b) });
         }
     }
@@ -85,6 +93,7 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError>
     #[cfg(target_arch = "aarch64")]
     {
         if std::arch::is_aarch64_feature_detected!("neon") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 74), and CPU feature `neon` is confirmed at runtime (line 95).
             return Ok(unsafe { neon::dot_product_neon(a, b) });
         }
     }
@@ -104,9 +113,11 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Conte
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: `b_bytes` length is validated to contain at least `a.len() * 4` bytes (line 106), and CPU feature `avx512f` is confirmed at runtime (line 115).
             return Ok(unsafe { avx512::cosine_distance_f32_bytes_avx512(a, b_bytes) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: `b_bytes` length is validated to contain at least `a.len() * 4` bytes (line 106), and CPU features `avx2` and `fma` are confirmed at runtime (line 119).
             return Ok(unsafe { avx2::cosine_distance_f32_bytes_avx2(a, b_bytes) });
         }
     }
@@ -126,9 +137,11 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Co
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: `b_bytes` length is validated to contain at least `a.len() * 4` bytes (line 130), and CPU feature `avx512f` is confirmed at runtime (line 139).
             return Ok(unsafe { avx512::euclidean_distance_f32_bytes_avx512(a, b_bytes) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: `b_bytes` length is validated to contain at least `a.len() * 4` bytes (line 130), and CPU features `avx2` and `fma` are confirmed at runtime (line 143).
             return Ok(unsafe { avx2::euclidean_distance_f32_bytes_avx2(a, b_bytes) });
         }
     }
@@ -148,9 +161,11 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") {
+            // SAFETY: `b_bytes` length is validated to contain at least `a.len() * 4` bytes (line 154), and CPU feature `avx512f` is confirmed at runtime (line 163).
             return Ok(unsafe { avx512::dot_product_f32_bytes_avx512(a, b_bytes) });
         }
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            // SAFETY: `b_bytes` length is validated to contain at least `a.len() * 4` bytes (line 154), and CPU features `avx2` and `fma` are confirmed at runtime (line 167).
             return Ok(unsafe { avx2::dot_product_f32_bytes_avx2(a, b_bytes) });
         }
     }
@@ -173,9 +188,11 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
             && is_x86_feature_detected!("avx512bw")
             && is_x86_feature_detected!("avx512vnni")
         {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 178), and CPU features `avx512f`, `avx512bw`, `avx512vnni` are confirmed at runtime (lines 187-189).
             return Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) });
         }
         if is_x86_feature_detected!("avx2") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 178), and CPU feature `avx2` is confirmed at runtime (line 193).
             return Ok(unsafe { avx2::dot_product_u8_avx2(a, b) });
         }
     }
@@ -195,9 +212,11 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
     #[cfg(target_arch = "x86_64")]
     {
         if is_x86_feature_detected!("avx512f") && is_x86_feature_detected!("avx512bw") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 205), and CPU features `avx512f` and `avx512bw` are confirmed at runtime (line 214).
             return Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 205), and CPU feature `avx2` is confirmed at runtime (line 218).
             return Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) });
         }
     }
@@ -223,9 +242,11 @@ pub fn cosine_similarity_parts_u8(
             && is_x86_feature_detected!("avx512bw")
             && is_x86_feature_detected!("avx512vnni")
         {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 232), and CPU features `avx512f`, `avx512bw`, `avx512vnni` are confirmed at runtime (lines 241-243).
             return Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) });
         }
         if is_x86_feature_detected!("avx2") {
+            // SAFETY: Slice lengths `a` and `b` are validated equal (line 232), and CPU feature `avx2` is confirmed at runtime (line 247).
             return Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) });
         }
     }
