@@ -1,5 +1,10 @@
 # contextra-kvcache
 
+Stufenmodell KV-Cache Storage & Offloading.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 1, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-kvcache` stellt den segmentierten KV-Cache und Eviction-Worker bereit (Ring 1).
 
 ## Zweck

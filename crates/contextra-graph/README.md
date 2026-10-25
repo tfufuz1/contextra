@@ -1,5 +1,10 @@
 # contextra-graph
 
+CSR Graph-Engine, Path Graphing und GraphRAG Community Detection.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-graph` stellt die CSR-Graphstruktur, Personalized PageRank und n-äre Hyperkanten bereit (Ring 0).
 
 ## Zweck

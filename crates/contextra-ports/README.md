@@ -1,5 +1,10 @@
 # contextra-ports
 
+Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-ports` definiert die abstrakten Trait-Interfaces für alle Contextra-Subsysteme (Ring 0).
 
 ## Zweck

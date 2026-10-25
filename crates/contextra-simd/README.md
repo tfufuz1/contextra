@@ -1,5 +1,10 @@
 # contextra-simd
 
+SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-simd` ist eine Unsafe-Insel für SIMD-Distanzkernel und Laufzeit-Hardware-Dispatch (Ring 0).
 
 ## Zweck

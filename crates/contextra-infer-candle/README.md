@@ -1,5 +1,10 @@
 # contextra-infer-candle
 
+Candle LLM Inference Client und KV-Bridge Adapter.
+
+Normativitätsklasse: **Rand `[R]`** (Ring 2, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-infer-candle` stellt die native GGUF-Inferenz und In-Memory-Inferenzunterstützung via Candle bereit (Ring 2).
 
 ## Zweck

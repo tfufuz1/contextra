@@ -1,5 +1,10 @@
 # contextra-router
 
+Lyapunov Drift Control und Multi-Candidate Search Routing Engine.
+
+Normativitätsklasse: **Experimentell `[E]`** (Ring 3, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-router` stellt das SLM-Profil-Routing und den Dispatcher bereit (Ring 3).
 
 ## Zweck

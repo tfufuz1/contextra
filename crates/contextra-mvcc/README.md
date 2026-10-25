@@ -1,5 +1,10 @@
 # contextra-mvcc
 
+Multi-Version Concurrency Control und Isolation-Mechanismen.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-mvcc` stellt Multi-Version Concurrency Control (MVCC) und Sequence Logs bereit (Ring 0).
 
 ## Zweck

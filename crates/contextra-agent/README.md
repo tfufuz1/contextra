@@ -1,5 +1,10 @@
 # contextra-agent
 
+Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 3, `stable`; §6.0, `capabilities.toml`).
+
+
 Persistent agent workflow engine for Contextra — `checkpoint → execute → commit → audit` loop.
 
 ## Overview

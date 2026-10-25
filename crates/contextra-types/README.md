@@ -1,5 +1,10 @@
 # contextra-types
 
+Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen).
+
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-types` definiert die zentralen Domänentypen und Fehler-Enums für Contextra (Ring 0).
 
 ## Zweck

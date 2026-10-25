@@ -1,5 +1,10 @@
 # contextra-text
 
+Volltextsuche und Inverted-Index (BM25 Engine).
+
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-text` stellt Volltextsuche, BM25/BM25F-Scoring und deutsche Morphologie bereit (Ring 0).
 
 ## Zweck

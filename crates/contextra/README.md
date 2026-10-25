@@ -1,5 +1,10 @@
 # contextra
 
+Haupt-Library Facade für Endanwender.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra` ist die primäre Fassade und Composition Root des Contextra Cognitive OS (Ring 4).
 
 ## Zweck

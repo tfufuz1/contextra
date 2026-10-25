@@ -1,5 +1,10 @@
 # contextra-infer-onnx
 
+ONNX Embeddings und Cross-Encoder Reranking Execution Provider.
+
+Normativitätsklasse: **Rand `[R]`** (Ring 2, `experimental`; §6.0, `capabilities.toml`).
+
+
 `contextra-infer-onnx` stellt die In-Process ONNX Embedding Engine und Cross-Encoder-Reranker bereit (Ring 2).
 
 ## Zweck

@@ -1,23 +1,11 @@
 # contextra-crypto
 
-`contextra-crypto` stellt die kryptographischen Grundlagen at rest und zur Datenintegrität bereit (Ring 0).
+Kryptografische Vaults, Zeroize, Egress-Verschlüsselung, HMAC-Chaining und Löschbeweise (`DeletionProof`) für Contextra.
 
-## Zweck
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
 
-Verwaltet AEAD-Verschlüsselung (AES-256-GCM-SIV), HKDF-Schlüsselableitung, HMAC-Integritätsketten für WAL-Einträge sowie DSGVO-Art.-17-Löschnachweise (`DeletionProof`).
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 0 (Kryptographischer Kern)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** Safe API (In-Memory Zeroization, Key Hierarchy)
-
-## Öffentliche API-Übersicht
-
-- **Key Management:** `KeyManager`, `CryptoKey`
-- **Deletion Proofs:** `DeletionProof`, `DeletionLayer`, `DeletionScope`, `LayerCleanupProof`
-- **Egress Vault & Filter:** `EgressVault`, `EgressClassifier`, `EgressClassification`, `CompiledPattern`
-
-## Architektur & Verweise
-
-Details zum Sicherheitsmodell finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §10.
+## Funktionen & Spezifikationsbezug
+- **AEAD-Verschlüsselung (REQ-KEY-001):** AES-256-GCM-SIV für SSTable-Blöcke und KV-Segmente über den Keystore (§20.1).
+- **WAL HMAC Chaining (REQ-KEY-001):** HMAC-SHA256 Chaining zur Manipulationserkennung im WAL.
+- **Kryptografischer Löschbeweis (INV-CLAIMS-1, REQ-DEL-005, REQ-DEL-006):** Erzeugung und Signatur von `DeletionProof` (Formatversion 4, §20.4) über sieben Schichten.
+- **Außenformulierung (INV-CLAIMS-1, §4.3):** Aussagen zur Löschung folgen zwingend der ehrlichen Außenformulierung; Werbeaussagen wie „100 % gelöscht“ oder „DSGVO-konform“ sind unzulässig.

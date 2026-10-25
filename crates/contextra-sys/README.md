@@ -1,5 +1,10 @@
 # contextra-sys
 
+Systemnahe Bindings, Low-Level I/O und Memory-Mapping.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-sys` ist eine Unsafe-Insel für OS-Systemaufrufe (Ring 0).
 
 ## Zweck

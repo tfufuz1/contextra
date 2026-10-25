@@ -1,5 +1,10 @@
 # contextra-db
 
+Contextra Main Database Abstraction, Hybrid Search & Collections.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 3, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-db` stellt die zentrale Orchestruierungs- und Collection-API für Contextra bereit (Ring 3).
 
 ## Zweck

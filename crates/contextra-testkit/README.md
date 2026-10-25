@@ -1,5 +1,10 @@
 # contextra-testkit
 
+Test Fixtures, Mock Engines und Chaos Matrix Harness.
+
+Normativitätsklasse: **Kern `[K]`** (Tooling, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-testkit` stellt Test-Infrastruktur und Determinismus-Werkzeuge bereit (Tooling).
 
 ## Zweck
