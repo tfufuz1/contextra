@@ -1,255 +1,409 @@
-# governance/gates.toml
-# Gate-Katalog für Contextra Qualitäts-Gates.
-# Definiert name, phase, required_local, required_ci, risk_class, owner und fixture für alle Gates.
+[meta]
+active_phase = "PH0"
 
 [[gate]]
-name = "claim"
-phase = "start"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "agent-ops"
-fixture = "none"
+name = "fmt"
+tier = "pr"
+from_phase = "PH0"
+kind = "cmd"
+enforces = []
+why = "Erfordert einheitliche Formatierung im gesamten Repository."
+owner = "MP-05"
+cmd = ["cargo", "fmt", "--check"]
 
 [[gate]]
-name = "context-pack"
-phase = "start"
-required_local = true
-required_ci = true
-risk_class = "medium"
-owner = "agent-ops"
-fixture = "none"
+name = "clippy-lintset"
+tier = "pr"
+from_phase = "PH0"
+kind = "cmd"
+enforces = ["P7", "P28", "INV-STDOUT-1", "INV-LOCK-ORDER-1"]
+why = "Erzwingt statische Codequalität und Sicherheits-Lints."
+owner = "MP-05"
+cmd = ["cargo", "clippy", "--workspace", "--all-targets", "--locked"]
 
 [[gate]]
-name = "scope-guard"
-phase = "check"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "governance"
-fixture = "none"
+name = "ring-dag"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["P1", "P5", "P30", "INV-CORE-ISOLATION-1"]
+why = "Verifiziert acyclische Ring-Abhängigkeiten im Crate-Graph."
+owner = "MP-03"
 
 [[gate]]
-name = "protected-paths"
-phase = "check"
-required_local = true
-required_ci = true
-risk_class = "critical"
-owner = "governance"
-fixture = "none"
+name = "ring0-async"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["P26"]
+why = "Stellt Reinheit von Async-Code in Ring 0 sicher."
+owner = "MP-03"
 
 [[gate]]
-name = "check-duplicate-symbols"
-phase = "check"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "architecture"
-fixture = "none"
+name = "capabilities-consistency"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-ARCH-011", "INV-DOC-SINGLE-SOURCE-1"]
+why = "Verifiziert Konsistenz von capabilities.toml mit Crate-Metadaten."
+owner = "MP-03"
 
 [[gate]]
-name = "symbol-exists"
-phase = "check"
-required_local = true
-required_ci = true
-risk_class = "medium"
-owner = "architecture"
-fixture = "none"
+name = "unsafe-inventory"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["P2", "REQ-ARCH-004", "REQ-ARCH-005", "REQ-ARCH-021"]
+why = "Überprüft und isoliert Unsafe-Codeblöcke."
+owner = "MP-05"
 
 [[gate]]
-name = "check-dag"
-phase = "verify"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "architecture"
-fixture = "none"
+name = "public-api"
+tier = "merge"
+from_phase = "PH0"
+kind = "cmd"
+enforces = ["INV-SCAN-1", "REQ-ARCH-014"]
+why = "Überwacht Änderungen an der öffentlichen API."
+owner = "MP-03"
+cmd = ["cargo", "public-api"]
+toolchain = "nightly-2024-11-01"
 
 [[gate]]
-name = "check-ring-layering"
-phase = "verify"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "architecture"
-fixture = "none"
+name = "feature-matrix"
+tier = "merge"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-ARCH-003", "REQ-ARCH-012", "INV-EMBED-1"]
+why = "Prüft gültige Feature-Kombinationen."
+owner = "MP-03"
 
 [[gate]]
-name = "check-vetoes"
-phase = "verify"
-required_local = true
-required_ci = true
-risk_class = "critical"
-owner = "governance"
-fixture = "none"
+name = "wired"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["P29", "INV-WIRING-2"]
+why = "Verifiziert die Verdrahtung aller Komponenten."
+owner = "MP-04"
 
 [[gate]]
-name = "ratchet"
-phase = "verify"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "governance"
-fixture = "none"
+name = "security-ports"
+tier = "pr"
+from_phase = "PH1"
+kind = "builtin"
+enforces = ["INV-WIRING-2", "INV-DELETION-PORTS-1", "INV-KMS-1"]
+why = "Erzwingt Sicherheitskontrollen an Port-Schnittstellen."
+owner = "MP-04"
 
 [[gate]]
-name = "gate-weakening"
-phase = "submit"
-required_local = true
-required_ci = true
-risk_class = "critical"
-owner = "governance"
-fixture = "none"
+name = "key-purposes"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["INV-KEYPURPOSE-1"]
+why = "Überprüft die korrekte Zweckbindung von Kryptoschlüsseln."
+owner = "MP-04"
 
 [[gate]]
-name = "test-integrity"
-phase = "submit"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "quality"
-fixture = "none"
+name = "witness-mint"
+tier = "pr"
+from_phase = "PH1"
+kind = "builtin"
+enforces = ["INV-WITNESS-MINT-1"]
+why = "Prüft Erzeugung und Signatur von Löschzeugen."
+owner = "MP-08"
 
 [[gate]]
-name = "session-report"
-phase = "submit"
-required_local = true
-required_ci = true
-risk_class = "low"
-owner = "agent-ops"
-fixture = "none"
+name = "deletion-types-once"
+tier = "pr"
+from_phase = "PH1"
+kind = "builtin"
+enforces = ["REQ-DEL-027"]
+why = "Stellt sicher, dass Löschtypen nicht doppelt definiert werden."
+owner = "MP-08"
+
+[[gate]]
+name = "deletion-honesty"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["INV-CLAIMS-1", "AC-10", "AC-19"]
+why = "Verifiziert die Korrektheit von Löschansprüchen."
+owner = "MP-08"
 
 [[gate]]
 name = "doc-truth"
-phase = "verify"
-required_local = true
-required_ci = true
-risk_class = "medium"
-owner = "architecture"
-fixture = "none"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["INV-DOC-SINGLE-SOURCE-1", "REQ-GOV-004"]
+why = "Erzwingt Übereinstimmung von Dokumentation und Code."
+owner = "MP-07"
 
 [[gate]]
-name = "registry-check"
-phase = "verify"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "governance"
-fixture = "none"
+name = "symbol-uniqueness"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["P29"]
+why = "Verhindert Namenskonflikte bei Symbolen."
+owner = "MP-04"
 
 [[gate]]
-name = "diff-budget"
-phase = "submit"
-required_local = false # Abweichung: in harness-phases.toml (submit) required = false, in verdict-required.toml blocking = true
-required_ci = true
-risk_class = "medium"
-owner = "agent-ops"
-fixture = "none"
+name = "code-lints"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["INV-IO-1", "INV-FAILCLOSED-1"]
+why = "Prüft Code-Richtlinien bezüglich I/O und Fail-Closed."
+owner = "MP-05"
+
+[[gate]]
+name = "ratchet"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-QA-005", "P7"]
+why = "Stellt sicher, dass Qualitätskennzahlen nicht absinken."
+owner = "MP-09"
+
+[[gate]]
+name = "determinism"
+tier = "pr"
+from_phase = "PH1"
+kind = "builtin"
+enforces = ["INV-RING0-DETERMINISM-1", "P28"]
+why = "Erzwingt Determinismus in kritischen Ausführungspfaden."
+owner = "MP-05"
+
+[[gate]]
+name = "protected-paths"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-GOV-002"]
+why = "Schützt geschützte Dateien vor unbefugter Änderung."
+owner = "MP-06"
+
+[[gate]]
+name = "gate-weakening"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-QA-010"]
+why = "Verhindert die Aufweichung von Qualitätsgates."
+owner = "MP-06"
+
+[[gate]]
+name = "test-integrity"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-QA-010"]
+why = "Verifiziert Vollständigkeit und Ausführung von Tests."
+owner = "MP-06"
+
+[[gate]]
+name = "scope-guard"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["INV-PROVENANCE-1"]
+why = "Beschränkt Änderungen auf den erlaubten Task-Scope."
+owner = "MP-06"
+
+[[gate]]
+name = "provenance"
+tier = "merge"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["INV-PROVENANCE-1", "REQ-GOV-001"]
+why = "Prüft Provenienz von Commits und Pull Requests."
+owner = "MP-06"
 
 [[gate]]
 name = "claims-in-pr"
-phase = "submit"
-required_local = false # Abweichung: in harness-phases.toml (submit) required = false, in verdict-required.toml blocking = true
-required_ci = true
-risk_class = "medium"
-owner = "agent-ops"
-fixture = "none"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["INV-EVIDENCE-1"]
+why = "Überprüft Claims in PR-Beschreibungen."
+owner = "MP-06"
 
 [[gate]]
-name = "task-card"
-phase = "start"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "agent-ops"
-fixture = "none"
+name = "veto-guard"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-GOV-001"]
+why = "Prüft auf geschützte Veto-Schlüsselwörter."
+owner = "MP-06"
 
 [[gate]]
-name = "ledger"
-phase = "submit"
-required_local = false # Abweichung: in harness-phases.toml (submit) required = false, in verdict-required.toml blocking = true
-required_ci = true
-risk_class = "high"
-owner = "governance"
-fixture = "none"
+name = "adr-index"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-GOV-003"]
+why = "Verifiziert die Konsistenz des ADR-Indexes."
+owner = "MP-07"
 
 [[gate]]
-name = "can-merge"
-phase = "submit"
-required_local = false # Exklusiv in verdict-required.toml
-required_ci = true
-risk_class = "critical"
-owner = "governance"
-fixture = "none"
+name = "deny"
+tier = "merge"
+from_phase = "PH0"
+kind = "cmd"
+enforces = ["REQ-GOV-006"]
+why = "Prüft Lizenzen und Abhängigkeits-Sicherheit via cargo deny."
+owner = "MP-09"
+cmd = ["cargo", "deny", "check"]
 
 [[gate]]
-name = "gate-determinism-check"
-phase = "verify"
-required_local = false # In harness-phases.toml als determinism-check required = false, in verdict-required.toml blocking = true
-required_ci = true
-risk_class = "high"
-owner = "core"
-fixture = "none"
+name = "audit"
+tier = "nightly"
+from_phase = "PH0"
+kind = "cmd"
+enforces = ["REQ-GOV-006"]
+why = "Prüft Sicherheitswarnungen in Abhängigkeiten."
+owner = "MP-09"
+cmd = ["cargo", "audit"]
 
 [[gate]]
-name = "gate-unsafe-audit"
-phase = "verify"
-required_local = false # In harness-phases.toml als unsafe-audit required = false, in verdict-required.toml blocking = true
-required_ci = true
-risk_class = "critical"
-owner = "security"
-fixture = "none"
+name = "sbom"
+tier = "nightly"
+from_phase = "PH0"
+kind = "builtin"
+enforces = []
+why = "Generiert und prüft Software Bill of Materials."
+owner = "MP-09"
 
 [[gate]]
-name = "gate-lock-audit"
-phase = "verify"
-required_local = false # In harness-phases.toml als lock-audit required = false, in verdict-required.toml blocking = true
-required_ci = true
-risk_class = "high"
-owner = "core"
-fixture = "none"
+name = "format-corpus"
+tier = "merge"
+from_phase = "PH2"
+kind = "cmd"
+enforces = ["INV-FORMAT-1"]
+why = "Prüft Korpus-Formatierung und -Schema."
+owner = "MP-05"
+cmd = ["cargo", "check", "--tests"]
 
 [[gate]]
-name = "gate-wal-replay-verify"
-phase = "verify"
-required_local = false # Exklusiv in verdict-required.toml
-required_ci = true
-risk_class = "critical"
-owner = "storage"
-fixture = "none"
+name = "merge-result-build"
+tier = "merge"
+from_phase = "PH0"
+kind = "cmd"
+enforces = ["INV-PROVENANCE-1"]
+why = "Baut das Arbeitsbereichs-Merge-Ergebnis vollständig."
+owner = "MP-05"
+cmd = ["cargo", "check", "--workspace", "--all-targets", "--locked"]
 
 [[gate]]
-name = "fuzz-smoke"
-phase = "verify"
-required_local = false
-required_ci = false
-risk_class = "low"
-owner = "security"
-fixture = "none"
+name = "gate-selftests"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-QA-008"]
+why = "Führt Selbsttests aller registrierten Gates aus."
+owner = "MP-02"
 
 [[gate]]
-name = "mutants-diff"
-phase = "verify"
-required_local = false
-required_ci = false
-risk_class = "low"
-owner = "quality"
-fixture = "none"
+name = "catalog-sync"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-QA-008", "REQ-GOV-004"]
+why = "Stellt 1:1 Übereinstimmung von Katalog, Code und Tests sicher."
+owner = "MP-02"
 
 [[gate]]
-name = "gates-catalog-sync"
-phase = "check"
-required_local = true
-required_ci = true
-risk_class = "critical"
-owner = "governance"
-fixture = "none"
+name = "evidence-complete"
+tier = "nightly"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["INV-EVIDENCE-1"]
+why = "Verifiziert Vollständigkeit aller erzeugten Evidenzdateien."
+owner = "MP-09"
 
 [[gate]]
-name = "codeowners-coverage"
-phase = "check"
-required_local = true
-required_ci = true
-risk_class = "high"
-owner = "governance"
-fixture = "none"
+name = "ci-hygiene"
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = []
+why = "Prüft Sauberkeit und Konsistenz der CI-Workflows."
+owner = "MP-06"
+
+[[gate]]
+name = "fuzz-matrix"
+tier = "heavy"
+from_phase = "PH1"
+kind = "xtask-heavy"
+enforces = ["REQ-QA-003"]
+why = "Führt Fuzzing-Testmatrix aus."
+owner = "MP-10"
+
+[[gate]]
+name = "fuzz-regression"
+tier = "pr"
+from_phase = "PH1"
+kind = "xtask-heavy"
+enforces = ["REQ-QA-003", "REQ-QA-004"]
+why = "Prüft auf Regressionen aus früheren Fuzz-Artefakten."
+owner = "MP-10"
+
+[[gate]]
+name = "miri"
+tier = "heavy"
+from_phase = "PH1"
+kind = "cmd"
+enforces = ["REQ-QA-004", "P2"]
+why = "Sucht Miri-basierte Undefined Behavior in Unsafe-Code."
+owner = "MP-10"
+cmd = ["cargo", "miri", "test"]
+toolchain = "nightly-2024-11-01"
+
+[[gate]]
+name = "loom-inventory"
+tier = "heavy"
+from_phase = "PH3"
+kind = "xtask-heavy"
+enforces = ["INV-LOCK-ORDER-1"]
+why = "Verifiziert Nebenläufigkeit und Sperrreihenfolgen via Loom."
+owner = "MP-10"
+
+[[gate]]
+name = "mutation"
+tier = "heavy"
+from_phase = "PH2"
+kind = "cmd"
+enforces = ["REQ-QA-005"]
+why = "Misst Mutation Score und Testabdeckung."
+owner = "MP-10"
+cmd = ["cargo", "mutants"]
+
+[[gate]]
+name = "chaos"
+tier = "heavy"
+from_phase = "PH2"
+kind = "xtask-heavy"
+enforces = ["REQ-QA-006"]
+why = "Injiziert Fehlermuster zur Chaos-Verifikation."
+owner = "MP-10"
+
+[[gate]]
+name = "bench-regression"
+tier = "heavy"
+from_phase = "PH2"
+kind = "xtask-heavy"
+enforces = ["REQ-QA-007"]
+why = "Überprüft Performance-Budgets auf Regressionen."
+owner = "MP-10"
+
+[[gate]]
+name = "platform-matrix"
+tier = "merge"
+from_phase = "PH6"
+kind = "builtin"
+enforces = ["INV-PLATFORM-1"]
+why = "Verifiziert Bau auf allen Zielplattformen."
+owner = "MP-10"
