@@ -79,7 +79,7 @@ pub enum EmbeddingError {
     },
 }
 
-/// Abstraction for all embedding providers (OllamaEmbedder, OnnxEmbedder, MockEmbedder).
+/// Abstraction for all embedding providers (e.g. OllamaEmbedder, OnnxEmbedder).
 pub trait EmbeddingProvider: Send + Sync + 'static {
     /// Returns the provider identifier/name (e.g. for logging/debugging).
     fn provider_name(&self) -> &str;
@@ -168,56 +168,9 @@ impl<T: EmbeddingProvider> TextEmbeddingEngine for T {
     }
 }
 
-/// Deterministic mock embedding provider for tests.
-pub struct MockEmbedder {
-    /// Target embedding dimensionality.
-    pub dim: usize,
-    /// Fixed output vector for deterministic testing.
-    pub fixed_output: Option<Vec<f32>>,
-}
-
-impl MockEmbedder {
-    /// Creates a new `MockEmbedder` with the specified dimension.
-    pub fn new(dim: usize) -> Self {
-        Self {
-            dim,
-            fixed_output: None,
-        }
-    }
-
-    /// Creates a new `MockEmbedder` with a fixed output vector.
-    pub fn with_fixed_output(fixed_output: Vec<f32>) -> Self {
-        let dim = fixed_output.len();
-        Self {
-            dim,
-            fixed_output: Some(fixed_output),
-        }
-    }
-}
-
-impl EmbeddingProvider for MockEmbedder {
-    fn provider_name(&self) -> &str {
-        "mock"
-    }
-
-    fn embed<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, Result<Vec<f32>, EmbeddingError>> {
-        Box::pin(async move {
-            Ok(self
-                .fixed_output
-                .clone()
-                .unwrap_or_else(|| vec![0.1f32; self.dim]))
-        })
-    }
-
-    fn embedding_dim(&self) -> usize {
-        self.dim
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TextEmbeddingEngine;
     #[tokio::test]
     async fn test_embedding_error_display() {
         let err1 = EmbeddingError::Unavailable("server down".into());
@@ -284,41 +237,6 @@ mod tests {
         let llm = MockDefaultLlm;
         let res = llm.generate_with_context(tenant, &[]).await?;
         assert_eq!(res, "Generated: ");
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_mock_embedder_methods() -> Result<(), Box<dyn std::error::Error>> {
-        let embedder = MockEmbedder::new(4);
-        assert_eq!(embedder.provider_name(), "mock");
-        assert_eq!(embedder.embedding_dim(), 4);
-
-        let vec = EmbeddingProvider::embed(&embedder, "test").await?;
-        assert_eq!(vec, vec![0.1, 0.1, 0.1, 0.1]);
-
-        let fixed = vec![1.0, 2.0, 3.0];
-        let fixed_embedder = MockEmbedder::with_fixed_output(fixed.clone());
-        assert_eq!(fixed_embedder.embedding_dim(), 3);
-        let res = EmbeddingProvider::embed(&fixed_embedder, "hello").await?;
-        assert_eq!(res, fixed);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_embedding_provider_batch_and_blanket_trait(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let embedder = MockEmbedder::new(2);
-        let batch_res = EmbeddingProvider::embed_batch(&embedder, &["a", "b"]).await?;
-        assert_eq!(batch_res.len(), 2);
-        assert_eq!(batch_res[0], vec![0.1, 0.1]);
-
-        // Test blanket impl of TextEmbeddingEngine for MockEmbedder
-        let engine: &dyn TextEmbeddingEngine = &embedder;
-        let single = engine.embed("text").await?;
-        assert_eq!(single, vec![0.1, 0.1]);
-
-        let batch = engine.embed_batch(&["x", "y"]).await?;
-        assert_eq!(batch.len(), 2);
         Ok(())
     }
 }
