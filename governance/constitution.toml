@@ -1,0 +1,95 @@
+# governance/constitution.toml
+# Maschinenlesbare Verfassung für Contextra nach Spezifikation 1.3 (§3, §4.1, §5, §28).
+
+version = "1.3"
+
+[[prinzip]]
+id = "P1"
+kurz = "Abhängigkeiten verlaufen strikt auf denselben oder tiefere Architektur-Ringe."
+quelle = "§5"
+durchgesetzt_durch = "check-ring-layering"
+status = "aktiv"
+
+[[prinzip]]
+id = "P2"
+kurz = "Unsafe-Code ist auf definierte Inseln beschränkt und verlangt explizite Safety-Begründungen."
+quelle = "§5"
+durchgesetzt_durch = "gate-unsafe-audit"
+status = "aktiv"
+
+[[prinzip]]
+id = "P5"
+kurz = "Der Abhängigkeitsgraph der Crates ist zyklenfrei und frei von unzulässigen Aufwärtskanten."
+quelle = "§5"
+durchgesetzt_durch = "check-dag"
+status = "aktiv"
+
+[[prinzip]]
+id = "P7"
+kurz = "Produktionscode ist frei von Panics und unterliegt monostrukturell fallenden Baselines."
+quelle = "§5"
+durchgesetzt_durch = "ratchet"
+status = "aktiv"
+
+[[prinzip]]
+id = "P24"
+kurz = "Sämtlicher Anwendungszustand wird primär über das Write-Ahead-Log geführt."
+quelle = "§5"
+durchgesetzt_durch = "gate-wal-replay-verify"
+status = "aktiv"
+
+[[prinzip]]
+id = "P26"
+kurz = "Ring-0-Crates enthalten keine Async-Runtime und führen synchrone Kernalgorithmen aus."
+quelle = "§5"
+durchgesetzt_durch = "offen"
+status = "aktiv"
+
+[[prinzip]]
+id = "P28"
+kurz = "Zeit, Zufall und IDs werden deterministisch über injizierte Ports bereitgestellt."
+quelle = "§5"
+durchgesetzt_durch = "gate-determinism-check"
+status = "aktiv"
+
+[[prinzip]]
+id = "P29"
+kurz = "Komponenten existieren erst, wenn sie vollständig und durchgängig verdrahtet sind."
+quelle = "§5"
+durchgesetzt_durch = "offen"
+status = "aktiv"
+
+[[prinzip]]
+id = "P30"
+kurz = "Kern-Crates [K] hängen niemals von Rand- oder experimentellen Crates [R]/[E] ab."
+quelle = "§5"
+durchgesetzt_durch = "check-dag"
+status = "aktiv"
+
+[[veto]]
+id = "VETO-F10"
+kurz = "Mandantenübergreifende Datenflüsse und Knowledge-Sharing sind strikt verboten."
+quelle = "§4.1"
+durchgesetzt_durch = "check-vetoes"
+status = "permanent_rejected"
+
+[[veto]]
+id = "VETO-OP03"
+kurz = "Echtzeit-Audio, Voice- und Speech-to-Text-Funktionen sind im Kern unzulässig."
+quelle = "§4.1"
+durchgesetzt_durch = "check-vetoes"
+status = "conditionally_accepted"
+
+[[veto]]
+id = "VETO-F02"
+kurz = "HNSW-Graph-Löschungen erfolgen ausschließlich per Tombstone-Pruning ohne Rewiring."
+quelle = "§4.1"
+durchgesetzt_durch = "check-vetoes"
+status = "conditionally_accepted"
+
+[[veto]]
+id = "VETO-SINGLE-NODE"
+kurz = "Kein Sharding, P2P oder verteilte Replikation zur Einhaltung der Single-Node-Doktrin."
+quelle = "§4.1"
+durchgesetzt_durch = "offen"
+status = "vorläufig, ADR-0001 offen"
