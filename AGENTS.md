@@ -1,15 +1,22 @@
 # Contextra — Agenten-Betriebsanleitung (AGENTS.md)
 
-Stand: 2026-09-30 (Systemspezifikation v15)
+Stand: 2026-10-25 (Spezifikation Fassung 1.2)
 
-## 1. Geltungsbereich und Rangfolge
+## 1. Geltungsbereich und Rangfolge der Informationsquellen (§0, §1)
 Diese Datei regelt die Arbeit aller autonomen Agenten im Repository.
-Bei Konflikten gilt stets folgende Rangfolge: Code + grüne Gates > AGENTS.md > docs/spec (`docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` / `docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`) > alle sonstigen Vorgaben.
+Bei Konflikten gilt zwingend folgende strikte Rangfolge:
+1. **Normative Gesamtspezifikation Fassung 1.2** (`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`; §0, §1)
+2. **Vetos und Architekturprinzipien** (§4.1, §5)
+3. **Capabilities Manifest** (`capabilities.toml`; INV-DOC-SINGLE-SOURCE-1)
+4. **Agenten-Betriebsanleitung** (`AGENTS.md`)
+5. **Produktionscode und grüne Quality Gates** (REQ-QA-010)
+
+Quality Gates dürfen niemals durch Ausnahmen, Sonderregeln oder lokale Overrides geschwächt oder umgangen werden (REQ-QA-010).
 
 ## 2. Start
 Arbeitskontext zu Beginn der Session laden:
-- `cargo run --manifest-path xtask/Cargo.toml -- jules-preflight`
-- Künftiger Start: `cargo xtask jules start --card <datei>` <!-- harness:planned -->
+- `cargo check --workspace`
+- `cargo xtask jules-preflight`
 
 ## 3. Ablauf
 Jeder Task folgt diesem iterativen Ablauf:
@@ -19,43 +26,15 @@ Jeder Task folgt diesem iterativen Ablauf:
 4. Kleinste mögliche Änderung durchführen.
 5. Verifizieren und PR-Text erstellen.
 
-## 4. Verifizieren
-- „Fertig" bedeutet ausnahmslos: Alle relevanten Gates, Lints und Tests sind grün.
-- Es ist verboten, Gates, Lints oder den Toolchain-Pin abzuschwächen oder zu umgehen, um Testergebnisse zu erzwingen.
+## 4. Verifizieren & Gate-Integrität (§27.5, §27.6, REQ-QA-010)
+- „Fertig“ bedeutet ausnahmslos: Alle relevanten Gates, Lints und Tests auf dem Merge-Ergebnis sind grün (REQ-QA-010).
+- Es ist streng verboten, Gates, Lints, Ratchets oder den Toolchain-Pin einzuschränken, abzuschwächen oder durch Ausnahmen zu umgehen (REQ-QA-010).
 - Geschützte Pfade: `.github/**`, `xtask/**`, `justfile`, `rust-toolchain.toml`, `deny.toml`, `capabilities.toml`, `AGENTS.md`, `.jules/setup/**`.
 
-### Pflichttabellen der Qualitäts-Gates
-| Gate | Phase | Lokal Pflicht | CI Pflicht | Risiko-Klasse | Owner |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `scope-guard` | check | ja | ja | hoch | governance |
-| `protected-paths` | check | ja | ja | kritisch | governance |
-| `symbol-exists` | check | ja | ja | mittel | architecture |
-| `ratchet` | verify | ja | ja | hoch | governance |
-| `gate-weakening` | submit | ja | ja | kritisch | governance |
-| `test-integrity` | submit | ja | ja | hoch | quality |
-| `session-report` | submit | ja | ja | niedrig | agent-ops |
-
-## 5. Scope
-- Ausschließlich Dateien im explizit freigegebenen Scope der Task-Karte bearbeiten.
-- Mängel außerhalb des Scopes nicht direkt beheben, sondern im PR-Text unter „Out-of-scope Findings" melden.
-
-## 6. Invarianten (verbindlich, v15 Teil F)
-- **Zero-Panic (P7):** Kein `unwrap()`, `expect()` oder `panic!()` in Produktionspfaden; Fehler per `Result` propagieren.
-- **Prozessaufrufe:** Niemals über `sh -c`; Parameter via `shlex` parsen und als Argument-Array übergeben.
-- **Unsafe-Isolierung:** `unsafe` ist streng isoliert auf die drei Unsafe-Inseln laut `capabilities.toml` (`contextra-simd`, `contextra-sys`, `contextra-wire`). Alle anderen Crates (inkl. `contextra-vector` / `distance.rs`) erzwingen `#![forbid(unsafe_code)]` bzw. sind 100% Safe Rust.
-- **Single-Node & Ein-Prozess-Garantie:** Contextra ist ein `cargo add`, kein Server. Multi-Node Scaling, Sharding, Peer-to-Peer-Sync oder Cluster-Logik sind verboten.
-- **Pure Rust Inferenz:** GGUF/Candle Inferenz via `contextra-infer-candle` ist das Standard-Backend.
-- **Sync-Kern (P26):** Ring 0 (`contextra-types`, `contextra-ports`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-adapt`, `contextra-crypto`, `contextra-wire`, `contextra-sys`, `contextra-simd`, `contextra-core`, `contextra-avv-generator`, `contextra-audit-export`) enthält keine Async-Runtime (`tokio`).
-- **Determinismus (P28):** Zeit, Zufall und IDs ausschließlich über injizierte Ports (`Clock`, `Rng`, `IdGenerator`); `TxId` über `collection.allocate_tx()` erzeugen; kein direktes `SystemTime::now()`/`thread_rng()` im Produktionscode.
-- **Speicher & Locks:** SIMD-Puffer (`contextra-simd`) korrekt ausrichten; Sperrenhierarchie einhalten (`collections` → `kv_locks` → `embedder`); keine Locks über `.await`-Punkte halten.
-- **Spec-Sync:** Jede API-Änderung MUSS `docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md` spiegeln.
-
-## Anti-Gaming
-Das Abschwächen, Umgehen oder Deaktivieren von Qualitäts-Gates, Lints, Schwellenwerten oder Toolchain-Pins ist streng verboten. Gate-Schutz erfolgt über `protected-paths` <!-- harness:planned -->, `gate-weakening` <!-- harness:planned --> und `ratchet` <!-- harness:planned -->.
-
-## 7. Nicht tun (Explizite Scope-Ausschlüsse v15 Teil 0.5)
-- Kein unkontrolliertes, globales Teilgraph-Rebuilding im HNSW-Index durchführen (Ausnahme: ADR-097).
-- Keine mandantenübergreifenden Datenflüsse oder Cross-Tenant-Aggregationen herstellen (`TenantId` isolation).
-- Keine Realtime-Audio- or Voice-Funktionen integrieren.
-- Keine Veto-Sperren ohne explizites ADR in `docs/decisions/` umgehen.
-- Keine Framework-Adapter (LangChain/LlamaIndex), kein horizontales Sharding, Peer-to-Peer-Sync, EU-AI-Act-Risikomapper oder externe HTTP-Inferenz als Standardabhängigkeit einfügen.
+## 5. Kernregeln aus der Spezifikation (Kurzform)
+- **Zero-Panic (§3, §27.6):** Kein `unwrap()`, `expect()` oder `panic!()` in Produktionspfaden; Fehler per `Result` propagieren.
+- **Unsafe-Isolierung (§6.7):** `unsafe` ist streng isoliert auf die drei Unsafe-Inseln laut `capabilities.toml` (`contextra-simd`, `contextra-sys`, `contextra-wire`). Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
+- **Single-Node & Ein-Prozess-Garantie (§1, §4.1):** Embedded Library (`cargo add contextra`), kein Server, kein Sharding, kein P2P.
+- **Determinismus (§3, §5, P28):** Zeit, Zufall und IDs ausschließlich über injizierte Ports (`Clock`, `Rng`, `IdGenerator`).
+- **Löschaussagen & Transparenz (INV-CLAIMS-1, §4.3, §20.12):** Aussagen zur Löschung folgen zwingend der Außenformulierung (§4.3) und Claim-Taxonomie (§20.12). Werbe- oder Pauschalaussagen zur Löschwirkung oder Rechtskonformität sind unzulässig.
+- **Kantenregeln (§6.10):** Unidirektionaler Datenfluss Ring 4 → 3 → 2 → 1 → 0. Der Kern ist geschlossen (§6.8).
