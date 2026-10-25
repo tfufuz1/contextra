@@ -2,27 +2,13 @@
 
 Volltextsuche und Inverted-Index (BM25 Engine).
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, §10, `capabilities.toml`).
 
+## Rolle in einem Satz
+`contextra-text` stellt eine Inverted-Index Volltextsuchmaschine mit BM25 Scoring, Block-Max-WAND und Text-Analyzer-Schnittstellen bereit.
 
-`contextra-text` stellt Volltextsuche, BM25/BM25F-Scoring und deutsche Morphologie bereit (Ring 0).
-
-## Zweck
-
-Indexiert Freitexte über residenten Postinglisten-Index, führt Block-Max WAND Top-k Selektion, BM25F Feldgewichtung und deutsche Kompositazerlegung durch.
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 0 (Synchroner Text-Kern)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-
-## Öffentliche API-Übersicht
-
-- **Scorer & Index:** `Bm25Scorer`, `InvertedIndex`, `ResidentPostingIndex`, `PostingList`
-- **BM25 / BM25F:** `BM25`, `BM25F`, `FieldId`, `FieldWeight`
-- **Tokenizer & Morphologie:** `Tokenizer`, `GermanMorphTokenizer`, `GermanCompoundSplitter`
-
-## Architektur & Verweise
-
-Details zur Volltextsuche finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §7.3.
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Volltextsuche)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)

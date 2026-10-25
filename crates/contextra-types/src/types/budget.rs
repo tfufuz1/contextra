@@ -290,7 +290,7 @@ impl<'a> Reservation<'a> {
 
 impl<'a> Drop for Reservation<'a> {
     /// Falls NICHT `settle()` aufgerufen meinte (z. B. wegen eines vorzeitigen `?`-Returns
-    /// im Aufrufer), wird die reservierte Menge garantiert und atomar zurückerstattet.
+    /// im Aufrufer), wird die reservierte Menge atomar zurückerstattet.
     fn drop(&mut self) {
         if !self.settled.load(Ordering::Acquire) {
             loop {

@@ -1,16 +1,31 @@
-# Contextra — AI-Assistenten-Kontext (`contextra-mvcc`)
+# AGENTS.md — `contextra-mvcc`
 
-## Verifizierter Codestand · Ring 0 (Fachkern)
+## 1. Rolle
+`contextra-mvcc` bietet deterministische Multi-Version Concurrency Control (SequenceLog, SnapshotRegistry, TxBuffer, ReadSet, SSI-Validator) für atomare Transaktionsisolation.
 
-> **Für AI-Assistenten:** Diese Datei beschreibt den Crate `contextra-mvcc`.
-> `contextra-mvcc` stellt MVCC-Primitiven bereit (SeqLog, SnapshotRegistry, TxBuffer).
-> Er ist strikt synchron (P26) und erzwingt `#![forbid(unsafe_code)]`.
+## 2. Ring, Klasse, Reifegrad & `may_use`
+- **Ring:** Ring 0 (Transaktionsisolation)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)
 
----
+## 3. Garantien & Anforderungen (§33)
+- **REQ-MVCC-001:** Atomare SSI-Validierung und Write-Skew Konflekterkennung (`SsiCommitGate`).
+- **REQ-MVCC-002:** RAII `SnapshotLease` Guarantees zur automatischen Freigabe alter Sequenznummern.
+- **Durchsetzungsmechanismus (§27.6):** Unit- & Integrationstests (`ssi_tests.rs`), Loom-Verifikation.
 
-## Crate-Topologie
+## 4. Verbotene Muster
+- Kein `unsafe` (`#![forbid(unsafe_code)]`).
+- Keine Halten von Synchronisations-Locks über `.await`-Punkte hinweg.
+- Kein Umgehen der `SnapshotLease` RAII-Guards.
 
-- **Ring 0 Fachkern**:
-  - `seq_log`: Sequentielles Änderungsprotokoll.
-  - `snapshot`: Snapshot-Isolation und Read-Pinning.
-  - `tx_buffer`: Transaktionales Staging und Orphan-Reaper.
+## 5. Implementierte & konsumierte Ports (Anhang A)
+- Konsumiert: `Clock` (über `contextra-ports` / Typen).
+- Stellt MVCC-Isolationsprüfungen für Storage & Index-Kerne bereit.
+
+## 6. Tests & Gates
+- **Loom Concurrency Check (REQ-MVCC-005):** Atomare Lock-Freiheits- und Dynamic Thread Concurrency Tests.
+- **Mutation-Score (REQ-QA-005):** Ziel >= 85 %.
+
+## 7. Offene Punkte
+- keine.

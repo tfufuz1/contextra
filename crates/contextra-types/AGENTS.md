@@ -1,15 +1,30 @@
-# Contextra — AI-Assistenten-Kontext (`contextra-types`)
+# AGENTS.md — `contextra-types`
 
-## Verifizierter Codestand · Ring 0 (Domain-Typen)
+## 1. Rolle
+`contextra-types` definiert die zentralen, produkt- und I/O-unabhängigen Domänentypen, Identifikatoren und Fehler-Enums des Gesamtsystems.
 
-> **Für AI-Assistenten:** Diese Datei beschreibt den Crate `contextra-types`.
-> `contextra-types` definiert die fundamentalen Identifikatoren (DocId, TxId, TenantId), Filter-AST und Budgets.
-> Er erzwingt `#![forbid(unsafe_code)]`.
+## 2. Ring, Klasse, Reifegrad & `may_use`
+- **Ring:** Ring 0 (Typen-Kern, I/O-frei, deterministisch)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **`may_use` (Obergrenze):** `(keine)` (Spec §6.9, `capabilities.toml`)
 
----
+## 3. Garantien & Anforderungen (§33)
+- **REQ-TYP-001:** Lossless DTO-Konvertierung für `ContextraError` (`ContextraErrorDto`).
+- **REQ-TYP-002:** Breite-agnostische `DocId`-Instanziierung (`DocId::new`).
+- **Durchsetzungsmechanismus (§27.6):** Statische Typenprüfung, `#![forbid(unsafe_code)]`, Unit-Tests.
 
-## Crate-Topologie
+## 4. Verbotene Muster
+- Kein `unsafe` (`#![forbid(unsafe_code)]`).
+- Keine Asynchronität oder I/O (keine `tokio`- oder FS-Abhängigkeiten).
+- Keine Abhängigkeiten zu anderen Contextra-Crates.
 
-- **Ring 0 Typen**:
-  - `DocId`, `TxId`, `TenantId`, `EntityId`, `Embedding`.
-  - Filter-AST und Budget-Typen.
+## 5. Implementierte & konsumierte Ports (Anhang A)
+- Konsumiert/Implementiert keine Ports direkt; Stellt reine Datenstrukturen (`DocId`, `TxId`, `TenantId`, `ContextraError`) bereit.
+
+## 6. Tests & Gates
+- **Fuzzing (REQ-QA-003):** Serde/Deserialisierungs-Fuzzing für DTOs.
+- **Mutation-Score (REQ-QA-005):** Ziel-Mutation-Score >= 85 %.
+
+## 7. Offene Punkte
+- keine (P-01 bis P-14 bleiben juristische Prüfpunkte gemäß §20.13).

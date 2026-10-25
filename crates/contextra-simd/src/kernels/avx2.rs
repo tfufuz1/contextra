@@ -1,6 +1,6 @@
 // FILE-CONTEXT
 // ZWECK: AVX2 SIMD-Intrinsics für f32, f32_bytes und u8 Distanzberechnungen.
-// INVARIANTEN: Target-Feature "avx2", "fma" garantiert vor Aufruf via Feature-Check.
+// INVARIANTEN: Target-Feature "avx2", "fma" vor Aufruf via Feature-Check verifiziert.
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;

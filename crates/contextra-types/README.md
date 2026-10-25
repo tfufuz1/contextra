@@ -2,27 +2,13 @@
 
 Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen).
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, `capabilities.toml`).
 
+## Rolle in einem Satz
+`contextra-types` definiert die zentralen, produkt- und I/O-unabhängigen Domänentypen, Identifikatoren und Fehler-Enums des Gesamtsystems.
 
-`contextra-types` definiert die zentralen Domänentypen und Fehler-Enums für Contextra (Ring 0).
-
-## Zweck
-
-Kannolischer Typen- und Fehlerkatalog des Gesamtsystems: Identifikatoren (`DocId`, `DocIdx`, `TxId`, `TenantId`), `ModelFingerprint`, `ContextraError`, DTOs und Tombstone-Semantik. Besitzt keine Asynchronität und kein I/O.
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 0 (Typen-Kern, kein `tokio`)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-
-## Öffentliche API-Übersicht
-
-- **Fehler & DTOs:** `ContextraError`, `Result`, `ContextraErrorDto`
-- **Fingerprints & Schema:** `ModelFingerprint`, `DocIdWidth`, `ManifestSchemaVersion`
-- **Tombstones & Types:** `SeqBitTombstone`, `TombstoneSemanticsCheck`, Identifikatoren
-
-## Architektur & Verweise
-
-Details zur Typenhierarchie finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) und `README.md` §4.2.
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Typen-Kern, deterministisch, kein `tokio`, I/O-frei)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `(keine)` (Spec §6.9, `capabilities.toml`)

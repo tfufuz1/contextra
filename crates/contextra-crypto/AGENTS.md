@@ -1,115 +1,37 @@
-# AGENTS.md — contextra-crypto (Cargo-Package-Name: `contextra-privacy`)
-> Layer 1 | Encryption-at-Rest, HMAC-Chaining, Zeroize | ~2300 LOC
-<!-- Stand: 2026-09-27 -->
+# AGENTS.md — `contextra-crypto`
 
-## 1. Zweck & Architekturrolle
+## 1. Rolle
+`contextra-crypto` stellt I/O-freie kryptographische Primitiven, Schlüsselverwaltung, Zeroization, Audit-Chains und DeletionProof-Erzeugung/Verifikation bereit.
 
-Verantwortlich für Encryption-at-Rest (AES-256-GCM-SIV) und Datenintegrität 
-(HMAC-Chaining im WAL). Kapselt die Key-Derivation (HKDF), Zeroize-Speicherhygiene 
-und den Anti-Tamper-Schutz der WAL-Einträge.
-*(Hinweis zur Namensgebung: Verzeichnisname `crates/contextra-crypto`, Cargo-Package-Name `contextra-privacy`).*
+## 2. Ring, Klasse, Reifegrad & `may_use`
+- **Ring:** Ring 0 (Kryptographie & Nachweislogik, I/O-frei, lock-frei in Produktionspfaden)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports` (Persistenz nur über den Port `DurableLog`; Spec §6.9, `capabilities.toml`)
 
-## 2. Modul-Karte
+## 3. Garantien & Anforderungen (§33, §20)
+- **REQ-CRY-001:** Kanonische TLV-Kodierung (`TlvEncoder`, `TlvField`) mit Big-Endian Tag (`u16`) / Length (`u32`) Sortierung.
+- **REQ-CRY-002:** Ed25519 strict Signaturprüfung (`verify_strict`) und BLAKE3 Hashketten.
+- **REQ-CRY-003:** Disclaimers & Claims gemäß Taxonomie (§20.12): `AUDIT_SCOPE_DISCLAIMER` verpflichtend in Claim-Texten; Vertraulichkeits- & Abwesenheitsbeweise ausgeschlossen.
+- **REQ-CRY-004:** Two-Phase Fail-Closed KMS Revocation (`LocalKmsProvider::destroy_key`).
+- **Durchsetzungsmechanismus (§27.6):** `#![forbid(unsafe_code)]`, offline `verify_proof` Tests, Testvektoren.
 
-| Datei / Modul | Verantwortung |
-|---|---|
-| `lib.rs` | `#![forbid(unsafe_code)]` im Produktionscode (Test-Only Unsafe für Zeroize-Verifikation) |
-| `crypto.rs` | `KeyManager` — HKDF Subkey Derivation, AES-256-GCM-SIV Ver-/Entschlüsselung |
-| `deletion_proof.rs` | Kryptographischer Löschnachweis (`DeletionProof`, `LayerCleanupProof`) |
-| `egress_vault.rs` | Egress Shield & Exfiltration Protection (`EgressVault`, `EgressClassifier`) |
-| `kv_cipher.rs` | KV-Segment-Verschlüsselung & Modell-Fingerprinting |
-| `kv_segment/` | Mandanten-isolierte KV-Cache-Security (`TenantIsolatedKvStore`, `KvSegment`, `EvictionWorker`) |
-| `wal_crypto.rs` | `WalHmac`, `IntegrityVerifier`, `EncryptedWal` — HMAC-Chaining Protokoll |
-| `anti_tamper.rs` | `VolatileEncryptionKey`, Speicherschutz (Zeroize) |
+## 4. Verbotene Muster
+- **Kein `unsafe` außerhalb der dedizierten Inseln** (`#![forbid(unsafe_code)]` strikt erzwungen).
+- **Kein I/O:** Persistenz erfolgt ausschließlich über den Port `DurableLog`.
+- **Keine Löschtypen außerhalb `crypto`/`ports`** (§6.10, Punkt 5).
+- Keine Erzeugung unverifizierter Proofs bei fehlenden Kernschichten (`possesses_full_core_coverage`).
+- Keinerlei Verwendung verbotener Werbe-Claims ("100% gelöscht", "garantiert", "DSGVO-konform").
 
-## 3. Kritische Invarianten
+## 5. Implementierte & konsumierte Ports (Anhang A)
+- Konsumiert: Port `DurableLog` für Persistenz, `EntropyRng` für CSPRNG Nonces.
+- Implementiert: `KmsProvider`, DeletionProof Offline-Verifier.
 
-### Key Derivation Kette
-Schlüssel MÜSSEN zwingend durch die `KeyManager` HKDF-Pipeline abgeleitet werden.
-**Pfad**: Passphrase + Salt → Master Key → `derive_file_key(file_id)` → Subkey.
-Hardcodierte Schlüssel sind absolut **VERBOTEN** (SECURITY BLOCKER).
+## 6. Tests & Gates
+- **Fuzzing (REQ-QA-003):** WAL-Replay & DeletionProof Deserialisierungs-Fuzzer.
+- **Multithread Concurrency:** Thread-Safety Tests für Vaults und Nonces (`concurrency_vault_and_nonce.rs`).
+- **KMS Revocation Gate:** `kms_revoke_fail_closed.rs`.
 
-### HMAC Chaining (WAL Integrität)
-Jeder WAL-Eintrag (`WalEntrySnapshot`) muss kryptographisch mit dem vorherigen Eintrag 
-verkettet werden (HMAC-Chain). Ein Bruch in der Kette indiziert Manipulation oder 
-Korruption und muss mit `ContextraError::WalCorruption` hart abbrechen.
-
-### Zeroize-Garantie
-Kryptographisches Schlüsselmaterial (`VolatileEncryptionKey`) implementiert den 
-`ZeroizeOnDrop` Trait. Schlüsselmaterial darf den Scope nicht als Klartext (`String` 
-oder `Vec<u8>`) verlassen, sondern MUSS in `zeroize::Zeroizing` oder dem dedizierten
-Volatile-Wrapper gekapselt sein.
-
-### Nonce-Uniqueness (AES-256-GCM-SIV)
-Verschlüsselungsoperationen (`encrypt_auto_nonce`) erzeugen zufällige Nonces.
-Auch wenn AES-GCM-SIV resistent gegen Nonce-Reuse ist, MUSS für jede Verschlüsselung
-eine neue, kryptographisch sichere Zufallszahl (`OsRng`) generiert werden.
-
-### Length-Prefixed Key Hash Single Source of Truth (INV-CRYPTO-DUPLICATE-1)
-`hash_deleted_keys_length_prefixed` ist kanonisch in `deletion_proof.rs` definiert.
-Andere Module wie `ed25519_proof.rs` MÜSSEN die Funktion direkt re-exportieren (`pub use crate::deletion_proof::hash_deleted_keys_length_prefixed;`) statt eine Duplikat-Funktion anzulegen.
-
-## 4. Public API Quick-Reference
-
-```rust
-// === Key Management (crypto.rs) ===
-pub struct KeyManager { ... }
-impl KeyManager {
-    pub fn try_new(passphrase: &str, salt: &[u8]) -> Result<Self>;
-    pub fn derive_file_key(&self, file_id: &[u8]) -> Result<Self>;
-    pub fn encrypt_auto_nonce(&self, data: &[u8]) -> Result<(Vec<u8>, [u8; 12])>;
-    pub fn decrypt_auto_nonce(&self, ciphertext: &[u8], nonce: &[u8; 12]) -> Result<Vec<u8>>;
-}
-
-// === WAL HMAC (wal_crypto.rs) ===
-pub struct IntegrityVerifier { ... }
-impl IntegrityVerifier {
-    pub fn verify_and_update_v3(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()>;
-}
-
-// === Anti-Tamper (anti_tamper.rs) ===
-pub struct VolatileEncryptionKey { ... }
-impl VolatileEncryptionKey {
-    pub fn emergency_wipe(&mut self);
-}
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-```rust
-// ❌ FALSCH — Plaintext-Vektor für Keys nutzen:
-let key: Vec<u8> = vec![...];
-// ✅ KORREKT — Zeroize Wrapper nutzen:
-let key = zeroize::Zeroizing::new(vec![...]);
-
-// ❌ FALSCH — Keys hart kodieren:
-let key = b"hardcoded_key_32bytes___________"; 
-// ✅ KORREKT:
-let key = load_or_create_integrity_key(&path)?;
-
-// ❌ FALSCH — HMAC-Fehler ignorieren:
-let _ = verifier.verify_and_update(...);
-// ✅ KORREKT:
-verifier.verify_and_update(...)
-    .map_err(|e| ContextraError::WalCorruption { ... })?;
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-Verschlüsselung und HMAC-Operationen sind rein synchron und Thread-Safe (CPU-bound).
-Keys und Verifier halten keine Locks. Instanzen wie `IntegrityVerifier` müssen 
-pro WAL-Writer mutabel gehalten werden (was durch den `write_lock` im `LsmStorage`
-gewährleistet wird).
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-store` (L1 Peer), `contextra-db` (L2)
-- **Genutzt von**: `contextra-store` (für WAL & SSTable Encryption), `contextra-mcp` (für Sandbox-Isolierung)
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| `rules/wal_crypto.md` | HMAC Chaining & Derivation Regeln |
-| `AGENTS.md (Non-Obvious Decisions)` | `unsafe` Ausnahme für Memory-Wipe Verifikation |
+## 7. Offene Punkte
+- **P-01 bis P-14 (§20.13):** Offene juristische Prüfpunkte bezüglich Schutzbedarf und Schlüsselvernichtungs-Attestierung.
+- **F-01 bis F-08 (§34):** Architekturentscheidungen zu Crypto-Erase und DeletionProof v4.

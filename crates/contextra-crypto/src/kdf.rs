@@ -160,7 +160,7 @@ impl KdfHeader {
 
     /// Parst einen `KdfHeader` aus Binärdaten.
     ///
-    /// Garantiert Panic-Freiheit (total function) bei beliebigen Byte-Eingaben.
+    /// Panic-Freiheit (total function) bei beliebigen Byte-Eingaben.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         // Minimal erforderliche Header-Länge ohne Salt: 4 (magic) + 1 (ver) + 1 (kdf_id) + 4*3 (params) + 4 (salt_len) = 22 Bytes
         const MIN_HEADER_LEN: usize = 22;
