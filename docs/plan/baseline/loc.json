@@ -1,0 +1,2437 @@
+{
+  "core_crates": [
+    "contextra-types",
+    "contextra-ports",
+    "contextra-mvcc",
+    "contextra-crypto",
+    "contextra-vector",
+    "contextra-text",
+    "contextra-store",
+    "contextra-checkpoint",
+    "contextra-engine",
+    "contextra-db",
+    "contextra",
+    "contextra-mcp"
+  ],
+  "crates": {
+    "contextra": {
+      "files": [
+        {
+          "loc": 209,
+          "path": "crates/contextra/src/agent_memory.rs"
+        },
+        {
+          "loc": 229,
+          "path": "crates/contextra/src/builder.rs"
+        },
+        {
+          "loc": 105,
+          "path": "crates/contextra/src/collection_profile.rs"
+        },
+        {
+          "loc": 68,
+          "path": "crates/contextra/src/lib.rs"
+        },
+        {
+          "loc": 75,
+          "path": "crates/contextra/src/performance_profile.rs"
+        },
+        {
+          "loc": 164,
+          "path": "crates/contextra/src/query_rewriter.rs"
+        }
+      ],
+      "files_count": 6,
+      "loc": 850
+    },
+    "contextra-adapt": {
+      "files": [
+        {
+          "loc": 923,
+          "path": "crates/contextra-adapt/src/bandit.rs"
+        },
+        {
+          "loc": 148,
+          "path": "crates/contextra-adapt/src/decay_controller.rs"
+        },
+        {
+          "loc": 233,
+          "path": "crates/contextra-adapt/src/drift.rs"
+        },
+        {
+          "loc": 633,
+          "path": "crates/contextra-adapt/src/flow_thompson.rs"
+        },
+        {
+          "loc": 147,
+          "path": "crates/contextra-adapt/src/homeostat.rs"
+        },
+        {
+          "loc": 31,
+          "path": "crates/contextra-adapt/src/lib.rs"
+        },
+        {
+          "loc": 393,
+          "path": "crates/contextra-adapt/src/lyapunov.rs"
+        },
+        {
+          "loc": 1,
+          "path": "crates/contextra-adapt/src/off_policy.rs"
+        },
+        {
+          "loc": 192,
+          "path": "crates/contextra-adapt/src/offpolicy.rs"
+        },
+        {
+          "loc": 328,
+          "path": "crates/contextra-adapt/src/pid.rs"
+        },
+        {
+          "loc": 181,
+          "path": "crates/contextra-adapt/src/pid_latency_controller.rs"
+        },
+        {
+          "loc": 180,
+          "path": "crates/contextra-adapt/src/rie_greedy.rs"
+        },
+        {
+          "loc": 83,
+          "path": "crates/contextra-adapt/src/shadow_mode.rs"
+        }
+      ],
+      "files_count": 13,
+      "loc": 3473
+    },
+    "contextra-agent": {
+      "files": [
+        {
+          "loc": 611,
+          "path": "crates/contextra-agent/src/audit.rs"
+        },
+        {
+          "loc": 60,
+          "path": "crates/contextra-agent/src/budget.rs"
+        },
+        {
+          "loc": 524,
+          "path": "crates/contextra-agent/src/clm_scratchpad.rs"
+        },
+        {
+          "loc": 435,
+          "path": "crates/contextra-agent/src/context.rs"
+        },
+        {
+          "loc": 319,
+          "path": "crates/contextra-agent/src/dlq.rs"
+        },
+        {
+          "loc": 722,
+          "path": "crates/contextra-agent/src/engine.rs"
+        },
+        {
+          "loc": 118,
+          "path": "crates/contextra-agent/src/engine/condition.rs"
+        },
+        {
+          "loc": 218,
+          "path": "crates/contextra-agent/src/engine/tests.rs"
+        },
+        {
+          "loc": 225,
+          "path": "crates/contextra-agent/src/event_source.rs"
+        },
+        {
+          "loc": 391,
+          "path": "crates/contextra-agent/src/goal_condition.rs"
+        },
+        {
+          "loc": 237,
+          "path": "crates/contextra-agent/src/graph.rs"
+        },
+        {
+          "loc": 25,
+          "path": "crates/contextra-agent/src/lib.rs"
+        },
+        {
+          "loc": 51,
+          "path": "crates/contextra-agent/src/step.rs"
+        }
+      ],
+      "files_count": 13,
+      "loc": 3936
+    },
+    "contextra-audit-export": {
+      "files": [
+        {
+          "loc": 101,
+          "path": "crates/contextra-audit-export/src/bsi_mapping.rs"
+        },
+        {
+          "loc": 10,
+          "path": "crates/contextra-audit-export/src/error.rs"
+        },
+        {
+          "loc": 46,
+          "path": "crates/contextra-audit-export/src/lib.rs"
+        },
+        {
+          "loc": 32,
+          "path": "crates/contextra-audit-export/src/markdown_template.rs"
+        },
+        {
+          "loc": 69,
+          "path": "crates/contextra-audit-export/src/testkit.rs"
+        }
+      ],
+      "files_count": 5,
+      "loc": 258
+    },
+    "contextra-avv-generator": {
+      "files": [
+        {
+          "loc": 8,
+          "path": "crates/contextra-avv-generator/src/error.rs"
+        },
+        {
+          "loc": 48,
+          "path": "crates/contextra-avv-generator/src/lib.rs"
+        },
+        {
+          "loc": 140,
+          "path": "crates/contextra-avv-generator/src/template.rs"
+        }
+      ],
+      "files_count": 3,
+      "loc": 196
+    },
+    "contextra-checkpoint": {
+      "files": [
+        {
+          "loc": 659,
+          "path": "crates/contextra-checkpoint/src/guard.rs"
+        },
+        {
+          "loc": 261,
+          "path": "crates/contextra-checkpoint/src/guard/tests.rs"
+        },
+        {
+          "loc": 132,
+          "path": "crates/contextra-checkpoint/src/hardlink_cloner.rs"
+        },
+        {
+          "loc": 21,
+          "path": "crates/contextra-checkpoint/src/lib.rs"
+        },
+        {
+          "loc": 149,
+          "path": "crates/contextra-checkpoint/src/manifest.rs"
+        },
+        {
+          "loc": 120,
+          "path": "crates/contextra-checkpoint/src/meta.rs"
+        },
+        {
+          "loc": 70,
+          "path": "crates/contextra-checkpoint/src/meta/tests.rs"
+        },
+        {
+          "loc": 497,
+          "path": "crates/contextra-checkpoint/src/orphan.rs"
+        },
+        {
+          "loc": 99,
+          "path": "crates/contextra-checkpoint/src/orphan/tests.rs"
+        },
+        {
+          "loc": 676,
+          "path": "crates/contextra-checkpoint/src/store.rs"
+        },
+        {
+          "loc": 693,
+          "path": "crates/contextra-checkpoint/src/store/tests.rs"
+        }
+      ],
+      "files_count": 11,
+      "loc": 3377
+    },
+    "contextra-cognition": {
+      "files": [
+        {
+          "loc": 535,
+          "path": "crates/contextra-cognition/src/aggregation_phase.rs"
+        },
+        {
+          "loc": 908,
+          "path": "crates/contextra-cognition/src/consolidation_executor.rs"
+        },
+        {
+          "loc": 66,
+          "path": "crates/contextra-cognition/src/consolidation_locks.rs"
+        },
+        {
+          "loc": 435,
+          "path": "crates/contextra-cognition/src/context.rs"
+        },
+        {
+          "loc": 29,
+          "path": "crates/contextra-cognition/src/context_compaction/cleanup.rs"
+        },
+        {
+          "loc": 239,
+          "path": "crates/contextra-cognition/src/context_compaction/compactor.rs"
+        },
+        {
+          "loc": 10,
+          "path": "crates/contextra-cognition/src/context_compaction/mod.rs"
+        },
+        {
+          "loc": 240,
+          "path": "crates/contextra-cognition/src/context_compaction/session.rs"
+        },
+        {
+          "loc": 497,
+          "path": "crates/contextra-cognition/src/context_compaction/tests.rs"
+        },
+        {
+          "loc": 23,
+          "path": "crates/contextra-cognition/src/context_compaction/types.rs"
+        },
+        {
+          "loc": 61,
+          "path": "crates/contextra-cognition/src/graph_sink.rs"
+        },
+        {
+          "loc": 69,
+          "path": "crates/contextra-cognition/src/leanrag_input.rs"
+        },
+        {
+          "loc": 46,
+          "path": "crates/contextra-cognition/src/lib.rs"
+        },
+        {
+          "loc": 58,
+          "path": "crates/contextra-cognition/src/maintenance_config.rs"
+        },
+        {
+          "loc": 438,
+          "path": "crates/contextra-cognition/src/maintenance_scheduler.rs"
+        },
+        {
+          "loc": 867,
+          "path": "crates/contextra-cognition/src/memory_consolidation.rs"
+        },
+        {
+          "loc": 63,
+          "path": "crates/contextra-cognition/src/semantic_aggregation_facade.rs"
+        },
+        {
+          "loc": 157,
+          "path": "crates/contextra-cognition/src/synthesis_phase.rs"
+        },
+        {
+          "loc": 91,
+          "path": "crates/contextra-cognition/src/transitivity_veto.rs"
+        }
+      ],
+      "files_count": 19,
+      "loc": 4832
+    },
+    "contextra-core": {
+      "files": [
+        {
+          "loc": 106,
+          "path": "crates/contextra-core/src/lib.rs"
+        }
+      ],
+      "files_count": 1,
+      "loc": 106
+    },
+    "contextra-crypto": {
+      "files": [
+        {
+          "loc": 95,
+          "path": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_tamper.rs"
+        },
+        {
+          "loc": 107,
+          "path": "crates/contextra-crypto/fuzz/fuzz_targets/deletion_proof_verify_external_fuzz.rs"
+        },
+        {
+          "loc": 133,
+          "path": "crates/contextra-crypto/fuzz/fuzz_targets/wal_hmac_chain_verify_fuzz.rs"
+        },
+        {
+          "loc": 85,
+          "path": "crates/contextra-crypto/src/anti_tamper.rs"
+        },
+        {
+          "loc": 232,
+          "path": "crates/contextra-crypto/src/audit_chain.rs"
+        },
+        {
+          "loc": 688,
+          "path": "crates/contextra-crypto/src/crypto.rs"
+        },
+        {
+          "loc": 1502,
+          "path": "crates/contextra-crypto/src/deletion_proof.rs"
+        },
+        {
+          "loc": 135,
+          "path": "crates/contextra-crypto/src/ed25519_proof.rs"
+        },
+        {
+          "loc": 100,
+          "path": "crates/contextra-crypto/src/error.rs"
+        },
+        {
+          "loc": 207,
+          "path": "crates/contextra-crypto/src/kdf.rs"
+        },
+        {
+          "loc": 272,
+          "path": "crates/contextra-crypto/src/kv_cipher.rs"
+        },
+        {
+          "loc": 144,
+          "path": "crates/contextra-crypto/src/kv_segment/eviction_worker.rs"
+        },
+        {
+          "loc": 6,
+          "path": "crates/contextra-crypto/src/kv_segment/mod.rs"
+        },
+        {
+          "loc": 262,
+          "path": "crates/contextra-crypto/src/kv_segment/segment.rs"
+        },
+        {
+          "loc": 651,
+          "path": "crates/contextra-crypto/src/kv_segment/store.rs"
+        },
+        {
+          "loc": 438,
+          "path": "crates/contextra-crypto/src/kv_shredding.rs"
+        },
+        {
+          "loc": 37,
+          "path": "crates/contextra-crypto/src/lib.rs"
+        },
+        {
+          "loc": 325,
+          "path": "crates/contextra-crypto/src/revocation_log.rs"
+        },
+        {
+          "loc": 30,
+          "path": "crates/contextra-crypto/src/wal_completeness.rs"
+        },
+        {
+          "loc": 656,
+          "path": "crates/contextra-crypto/src/wal_crypto.rs"
+        }
+      ],
+      "files_count": 20,
+      "loc": 6105
+    },
+    "contextra-db": {
+      "files": [
+        {
+          "loc": 90,
+          "path": "crates/contextra-db/examples/collections.rs"
+        },
+        {
+          "loc": 70,
+          "path": "crates/contextra-db/examples/hybrid_search.rs"
+        },
+        {
+          "loc": 44,
+          "path": "crates/contextra-db/examples/quickstart.rs"
+        },
+        {
+          "loc": 182,
+          "path": "crates/contextra-db/examples/verify_deletion_proof_external.rs"
+        },
+        {
+          "loc": 49,
+          "path": "crates/contextra-db/fuzz/fuzz_targets/rrf_fusion.rs"
+        },
+        {
+          "loc": 3,
+          "path": "crates/contextra-db/src/homeostat.rs"
+        },
+        {
+          "loc": 749,
+          "path": "crates/contextra-db/src/lib.rs"
+        },
+        {
+          "loc": 586,
+          "path": "crates/contextra-db/src/multistep.rs"
+        },
+        {
+          "loc": 308,
+          "path": "crates/contextra-db/src/volatile_vault.rs"
+        }
+      ],
+      "files_count": 9,
+      "loc": 2081
+    },
+    "contextra-engine": {
+      "files": [
+        {
+          "loc": 47,
+          "path": "crates/contextra-engine/src/background_workers/config.rs"
+        },
+        {
+          "loc": 97,
+          "path": "crates/contextra-engine/src/background_workers/expiry_workers.rs"
+        },
+        {
+          "loc": 83,
+          "path": "crates/contextra-engine/src/background_workers/hyperedge_worker.rs"
+        },
+        {
+          "loc": 21,
+          "path": "crates/contextra-engine/src/background_workers/mod.rs"
+        },
+        {
+          "loc": 146,
+          "path": "crates/contextra-engine/src/background_workers/orphan_workers.rs"
+        },
+        {
+          "loc": 668,
+          "path": "crates/contextra-engine/src/background_workers/tests.rs"
+        },
+        {
+          "loc": 904,
+          "path": "crates/contextra-engine/src/chunker.rs"
+        },
+        {
+          "loc": 229,
+          "path": "crates/contextra-engine/src/collection/crud/auto_extraction.rs"
+        },
+        {
+          "loc": 51,
+          "path": "crates/contextra-engine/src/collection/crud/delete.rs"
+        },
+        {
+          "loc": 495,
+          "path": "crates/contextra-engine/src/collection/crud/insert.rs"
+        },
+        {
+          "loc": 63,
+          "path": "crates/contextra-engine/src/collection/crud/internal.rs"
+        },
+        {
+          "loc": 54,
+          "path": "crates/contextra-engine/src/collection/crud/kv.rs"
+        },
+        {
+          "loc": 190,
+          "path": "crates/contextra-engine/src/collection/crud/links.rs"
+        },
+        {
+          "loc": 13,
+          "path": "crates/contextra-engine/src/collection/crud/mod.rs"
+        },
+        {
+          "loc": 249,
+          "path": "crates/contextra-engine/src/collection/crud/read.rs"
+        },
+        {
+          "loc": 311,
+          "path": "crates/contextra-engine/src/collection/crud/tests.rs"
+        },
+        {
+          "loc": 98,
+          "path": "crates/contextra-engine/src/collection/crud/update.rs"
+        },
+        {
+          "loc": 177,
+          "path": "crates/contextra-engine/src/collection/kv_lock.rs"
+        },
+        {
+          "loc": 783,
+          "path": "crates/contextra-engine/src/collection/maintenance.rs"
+        },
+        {
+          "loc": 580,
+          "path": "crates/contextra-engine/src/collection/mod.rs"
+        },
+        {
+          "loc": 224,
+          "path": "crates/contextra-engine/src/collection/query_builder/builder.rs"
+        },
+        {
+          "loc": 393,
+          "path": "crates/contextra-engine/src/collection/query_builder/builder_exec.rs"
+        },
+        {
+          "loc": 15,
+          "path": "crates/contextra-engine/src/collection/query_builder/mod.rs"
+        },
+        {
+          "loc": 37,
+          "path": "crates/contextra-engine/src/collection/query_builder/scope.rs"
+        },
+        {
+          "loc": 63,
+          "path": "crates/contextra-engine/src/collection/query_builder/strategy.rs"
+        },
+        {
+          "loc": 616,
+          "path": "crates/contextra-engine/src/collection/query_builder/tests.rs"
+        },
+        {
+          "loc": 31,
+          "path": "crates/contextra-engine/src/collection/query_builder/weights.rs"
+        },
+        {
+          "loc": 227,
+          "path": "crates/contextra-engine/src/collection/relate.rs"
+        },
+        {
+          "loc": 101,
+          "path": "crates/contextra-engine/src/collection/search/basic.rs"
+        },
+        {
+          "loc": 70,
+          "path": "crates/contextra-engine/src/collection/search/checkpoint.rs"
+        },
+        {
+          "loc": 206,
+          "path": "crates/contextra-engine/src/collection/search/filtered.rs"
+        },
+        {
+          "loc": 307,
+          "path": "crates/contextra-engine/src/collection/search/hybrid/mod.rs"
+        },
+        {
+          "loc": 433,
+          "path": "crates/contextra-engine/src/collection/search/hybrid/query.rs"
+        },
+        {
+          "loc": 96,
+          "path": "crates/contextra-engine/src/collection/search/hydrate.rs"
+        },
+        {
+          "loc": 12,
+          "path": "crates/contextra-engine/src/collection/search/mod.rs"
+        },
+        {
+          "loc": 27,
+          "path": "crates/contextra-engine/src/collection/tx.rs"
+        },
+        {
+          "loc": 323,
+          "path": "crates/contextra-engine/src/contextra_impl/collections.rs"
+        },
+        {
+          "loc": 302,
+          "path": "crates/contextra-engine/src/contextra_impl/crud.rs"
+        },
+        {
+          "loc": 53,
+          "path": "crates/contextra-engine/src/contextra_impl/diagnostics.rs"
+        },
+        {
+          "loc": 497,
+          "path": "crates/contextra-engine/src/contextra_impl/lifecycle.rs"
+        },
+        {
+          "loc": 5,
+          "path": "crates/contextra-engine/src/contextra_impl/mod.rs"
+        },
+        {
+          "loc": 25,
+          "path": "crates/contextra-engine/src/contextra_impl/wiring.rs"
+        },
+        {
+          "loc": 1,
+          "path": "crates/contextra-engine/src/decay_controller.rs"
+        },
+        {
+          "loc": 301,
+          "path": "crates/contextra-engine/src/export.rs"
+        },
+        {
+          "loc": 70,
+          "path": "crates/contextra-engine/src/extraction/mod.rs"
+        },
+        {
+          "loc": 89,
+          "path": "crates/contextra-engine/src/extraction/open_ie.rs"
+        },
+        {
+          "loc": 184,
+          "path": "crates/contextra-engine/src/extraction/rule_based.rs"
+        },
+        {
+          "loc": 87,
+          "path": "crates/contextra-engine/src/extraction/tests.rs"
+        },
+        {
+          "loc": 25,
+          "path": "crates/contextra-engine/src/extraction/types.rs"
+        },
+        {
+          "loc": 264,
+          "path": "crates/contextra-engine/src/filter.rs"
+        },
+        {
+          "loc": 48,
+          "path": "crates/contextra-engine/src/fusion.rs"
+        },
+        {
+          "loc": 103,
+          "path": "crates/contextra-engine/src/import.rs"
+        },
+        {
+          "loc": 46,
+          "path": "crates/contextra-engine/src/kv_cache_integration/mod.rs"
+        },
+        {
+          "loc": 568,
+          "path": "crates/contextra-engine/src/lib.rs"
+        },
+        {
+          "loc": 145,
+          "path": "crates/contextra-engine/src/merge_operator_adapter.rs"
+        },
+        {
+          "loc": 37,
+          "path": "crates/contextra-engine/src/metrics_names.rs"
+        },
+        {
+          "loc": 256,
+          "path": "crates/contextra-engine/src/temporal_filter.rs"
+        },
+        {
+          "loc": 73,
+          "path": "crates/contextra-engine/src/transaction/cleanup.rs"
+        },
+        {
+          "loc": 339,
+          "path": "crates/contextra-engine/src/transaction/compensating_actions.rs"
+        },
+        {
+          "loc": 155,
+          "path": "crates/contextra-engine/src/transaction/db_transaction.rs"
+        },
+        {
+          "loc": 338,
+          "path": "crates/contextra-engine/src/transaction/db_transaction_commit.rs"
+        },
+        {
+          "loc": 266,
+          "path": "crates/contextra-engine/src/transaction/db_transaction_rollback.rs"
+        },
+        {
+          "loc": 25,
+          "path": "crates/contextra-engine/src/transaction/intent.rs"
+        },
+        {
+          "loc": 15,
+          "path": "crates/contextra-engine/src/transaction/mod.rs"
+        },
+        {
+          "loc": 134,
+          "path": "crates/contextra-engine/src/transaction/tests.rs"
+        }
+      ],
+      "files_count": 65,
+      "loc": 12891
+    },
+    "contextra-graph": {
+      "files": [
+        {
+          "loc": 124,
+          "path": "crates/contextra-graph/src/apprh/diffusion.rs"
+        },
+        {
+          "loc": 15,
+          "path": "crates/contextra-graph/src/apprh/error.rs"
+        },
+        {
+          "loc": 183,
+          "path": "crates/contextra-graph/src/apprh/gate_monitor.rs"
+        },
+        {
+          "loc": 68,
+          "path": "crates/contextra-graph/src/apprh/mod.rs"
+        },
+        {
+          "loc": 87,
+          "path": "crates/contextra-graph/src/apprh/params.rs"
+        },
+        {
+          "loc": 143,
+          "path": "crates/contextra-graph/src/apprh/selector.rs"
+        },
+        {
+          "loc": 97,
+          "path": "crates/contextra-graph/src/apprh/shadow.rs"
+        },
+        {
+          "loc": 115,
+          "path": "crates/contextra-graph/src/arc_slice.rs"
+        },
+        {
+          "loc": 799,
+          "path": "crates/contextra-graph/src/cascade.rs"
+        },
+        {
+          "loc": 466,
+          "path": "crates/contextra-graph/src/community.rs"
+        },
+        {
+          "loc": 683,
+          "path": "crates/contextra-graph/src/community/tests.rs"
+        },
+        {
+          "loc": 328,
+          "path": "crates/contextra-graph/src/consistency_enforcement.rs"
+        },
+        {
+          "loc": 19,
+          "path": "crates/contextra-graph/src/csr.rs"
+        },
+        {
+          "loc": 748,
+          "path": "crates/contextra-graph/src/csr/graph_index.rs"
+        },
+        {
+          "loc": 228,
+          "path": "crates/contextra-graph/src/csr/graph_persist.rs"
+        },
+        {
+          "loc": 340,
+          "path": "crates/contextra-graph/src/csr/graph_read.rs"
+        },
+        {
+          "loc": 813,
+          "path": "crates/contextra-graph/src/csr/graph_write.rs"
+        },
+        {
+          "loc": 677,
+          "path": "crates/contextra-graph/src/csr/inner.rs"
+        },
+        {
+          "loc": 136,
+          "path": "crates/contextra-graph/src/csr/path_graph.rs"
+        },
+        {
+          "loc": 4,
+          "path": "crates/contextra-graph/src/csr/tests.rs"
+        },
+        {
+          "loc": 89,
+          "path": "crates/contextra-graph/src/csr/types.rs"
+        },
+        {
+          "loc": 43,
+          "path": "crates/contextra-graph/src/csr/visibility.rs"
+        },
+        {
+          "loc": 135,
+          "path": "crates/contextra-graph/src/edge_reinforcement.rs"
+        },
+        {
+          "loc": 146,
+          "path": "crates/contextra-graph/src/edge_reinforcement_buffer.rs"
+        },
+        {
+          "loc": 218,
+          "path": "crates/contextra-graph/src/entity_extraction.rs"
+        },
+        {
+          "loc": 76,
+          "path": "crates/contextra-graph/src/error.rs"
+        },
+        {
+          "loc": 634,
+          "path": "crates/contextra-graph/src/hyperedge.rs"
+        },
+        {
+          "loc": 122,
+          "path": "crates/contextra-graph/src/hyperedge_suggest.rs"
+        },
+        {
+          "loc": 94,
+          "path": "crates/contextra-graph/src/lib.rs"
+        },
+        {
+          "loc": 258,
+          "path": "crates/contextra-graph/src/path_rag/k_path.rs"
+        },
+        {
+          "loc": 340,
+          "path": "crates/contextra-graph/src/path_rag/mod.rs"
+        },
+        {
+          "loc": 185,
+          "path": "crates/contextra-graph/src/path_rag/snapshot.rs"
+        },
+        {
+          "loc": 479,
+          "path": "crates/contextra-graph/src/path_rag/tests.rs"
+        },
+        {
+          "loc": 236,
+          "path": "crates/contextra-graph/src/percolation.rs"
+        },
+        {
+          "loc": 895,
+          "path": "crates/contextra-graph/src/ppr.rs"
+        },
+        {
+          "loc": 174,
+          "path": "crates/contextra-graph/src/ppr/cost.rs"
+        },
+        {
+          "loc": 75,
+          "path": "crates/contextra-graph/src/ppr/shadow_hook.rs"
+        },
+        {
+          "loc": 107,
+          "path": "crates/contextra-graph/src/ppr/snapshot.rs"
+        },
+        {
+          "loc": 2,
+          "path": "crates/contextra-graph/src/ppr/tests.rs"
+        },
+        {
+          "loc": 112,
+          "path": "crates/contextra-graph/src/ppr_stream.rs"
+        },
+        {
+          "loc": 130,
+          "path": "crates/contextra-graph/src/provenance.rs"
+        },
+        {
+          "loc": 775,
+          "path": "crates/contextra-graph/src/session_dag.rs"
+        },
+        {
+          "loc": 182,
+          "path": "crates/contextra-graph/src/tl_hfd/diffusion.rs"
+        },
+        {
+          "loc": 13,
+          "path": "crates/contextra-graph/src/tl_hfd/error.rs"
+        },
+        {
+          "loc": 142,
+          "path": "crates/contextra-graph/src/tl_hfd/lovasz.rs"
+        },
+        {
+          "loc": 33,
+          "path": "crates/contextra-graph/src/tl_hfd/mod.rs"
+        },
+        {
+          "loc": 105,
+          "path": "crates/contextra-graph/src/tl_hfd/params.rs"
+        },
+        {
+          "loc": 101,
+          "path": "crates/contextra-graph/src/tl_hfd/shadow.rs"
+        }
+      ],
+      "files_count": 48,
+      "loc": 11974
+    },
+    "contextra-infer-candle": {
+      "files": [
+        {
+          "loc": 68,
+          "path": "crates/contextra-infer-candle/src/attention_exporter.rs"
+        },
+        {
+          "loc": 368,
+          "path": "crates/contextra-infer-candle/src/embedding.rs"
+        },
+        {
+          "loc": 75,
+          "path": "crates/contextra-infer-candle/src/embedding_provider.rs"
+        },
+        {
+          "loc": 511,
+          "path": "crates/contextra-infer-candle/src/gasp.rs"
+        },
+        {
+          "loc": 71,
+          "path": "crates/contextra-infer-candle/src/gguf_loader.rs"
+        },
+        {
+          "loc": 8,
+          "path": "crates/contextra-infer-candle/src/inference.rs"
+        },
+        {
+          "loc": 826,
+          "path": "crates/contextra-infer-candle/src/inference/core.rs"
+        },
+        {
+          "loc": 64,
+          "path": "crates/contextra-infer-candle/src/inference/prefix_reuse.rs"
+        },
+        {
+          "loc": 607,
+          "path": "crates/contextra-infer-candle/src/inference/tests.rs"
+        },
+        {
+          "loc": 553,
+          "path": "crates/contextra-infer-candle/src/kv_bridge.rs"
+        },
+        {
+          "loc": 262,
+          "path": "crates/contextra-infer-candle/src/kv_state.rs"
+        },
+        {
+          "loc": 29,
+          "path": "crates/contextra-infer-candle/src/lib.rs"
+        },
+        {
+          "loc": 2,
+          "path": "crates/contextra-infer-candle/src/model/mod.rs"
+        },
+        {
+          "loc": 497,
+          "path": "crates/contextra-infer-candle/src/model/quantized_llama.rs"
+        },
+        {
+          "loc": 109,
+          "path": "crates/contextra-infer-candle/src/model_registry.rs"
+        }
+      ],
+      "files_count": 15,
+      "loc": 4050
+    },
+    "contextra-infer-ollama": {
+      "files": [
+        {
+          "loc": 16,
+          "path": "crates/contextra-infer-ollama/src/client.rs"
+        },
+        {
+          "loc": 26,
+          "path": "crates/contextra-infer-ollama/src/client/config.rs"
+        },
+        {
+          "loc": 878,
+          "path": "crates/contextra-infer-ollama/src/client/core.rs"
+        },
+        {
+          "loc": 38,
+          "path": "crates/contextra-infer-ollama/src/client/errors.rs"
+        },
+        {
+          "loc": 1427,
+          "path": "crates/contextra-infer-ollama/src/client/tests.rs"
+        },
+        {
+          "loc": 53,
+          "path": "crates/contextra-infer-ollama/src/client/trait_impls.rs"
+        },
+        {
+          "loc": 48,
+          "path": "crates/contextra-infer-ollama/src/client/validation.rs"
+        },
+        {
+          "loc": 50,
+          "path": "crates/contextra-infer-ollama/src/client/wire.rs"
+        },
+        {
+          "loc": 316,
+          "path": "crates/contextra-infer-ollama/src/context_prefixer.rs"
+        },
+        {
+          "loc": 270,
+          "path": "crates/contextra-infer-ollama/src/embedding.rs"
+        },
+        {
+          "loc": 496,
+          "path": "crates/contextra-infer-ollama/src/importance.rs"
+        },
+        {
+          "loc": 17,
+          "path": "crates/contextra-infer-ollama/src/lib.rs"
+        },
+        {
+          "loc": 277,
+          "path": "crates/contextra-infer-ollama/src/model_info.rs"
+        },
+        {
+          "loc": 271,
+          "path": "crates/contextra-infer-ollama/src/query_rewriter.rs"
+        }
+      ],
+      "files_count": 14,
+      "loc": 4183
+    },
+    "contextra-infer-onnx": {
+      "files": [
+        {
+          "loc": 677,
+          "path": "crates/contextra-infer-onnx/src/lib.rs"
+        },
+        {
+          "loc": 35,
+          "path": "crates/contextra-infer-onnx/src/reranker/config.rs"
+        },
+        {
+          "loc": 156,
+          "path": "crates/contextra-infer-onnx/src/reranker/cross_encoder.rs"
+        },
+        {
+          "loc": 8,
+          "path": "crates/contextra-infer-onnx/src/reranker/mod.rs"
+        },
+        {
+          "loc": 287,
+          "path": "crates/contextra-infer-onnx/src/reranker/onnx.rs"
+        },
+        {
+          "loc": 425,
+          "path": "crates/contextra-infer-onnx/src/reranker/tests.rs"
+        }
+      ],
+      "files_count": 6,
+      "loc": 1588
+    },
+    "contextra-kvcache": {
+      "files": [
+        {
+          "loc": 186,
+          "path": "crates/contextra-kvcache/src/attention_score.rs"
+        },
+        {
+          "loc": 235,
+          "path": "crates/contextra-kvcache/src/eviction_worker.rs"
+        },
+        {
+          "loc": 33,
+          "path": "crates/contextra-kvcache/src/lib.rs"
+        },
+        {
+          "loc": 317,
+          "path": "crates/contextra-kvcache/src/prefix_store.rs"
+        },
+        {
+          "loc": 650,
+          "path": "crates/contextra-kvcache/src/quantize_kivi.rs"
+        },
+        {
+          "loc": 641,
+          "path": "crates/contextra-kvcache/src/radix.rs"
+        },
+        {
+          "loc": 166,
+          "path": "crates/contextra-kvcache/src/scratchpad_invalidation.rs"
+        },
+        {
+          "loc": 432,
+          "path": "crates/contextra-kvcache/src/segment.rs"
+        },
+        {
+          "loc": 915,
+          "path": "crates/contextra-kvcache/src/store.rs"
+        }
+      ],
+      "files_count": 9,
+      "loc": 3575
+    },
+    "contextra-license": {
+      "files": [
+        {
+          "loc": 6,
+          "path": "crates/contextra-license/src/lib.rs"
+        },
+        {
+          "loc": 301,
+          "path": "crates/contextra-license/src/signed_gate.rs"
+        }
+      ],
+      "files_count": 2,
+      "loc": 307
+    },
+    "contextra-mcp": {
+      "files": [
+        {
+          "loc": 28,
+          "path": "crates/contextra-mcp/fuzz/fuzz_targets/fuzz_jsonrpc_parsing.rs"
+        },
+        {
+          "loc": 54,
+          "path": "crates/contextra-mcp/fuzz/fuzz_targets/fuzz_prompt_injection_guard.rs"
+        },
+        {
+          "loc": 72,
+          "path": "crates/contextra-mcp/src/bin/contextra-mcp-server.rs"
+        },
+        {
+          "loc": 1,
+          "path": "crates/contextra-mcp/src/bulk_exfiltration_detector.rs"
+        },
+        {
+          "loc": 514,
+          "path": "crates/contextra-mcp/src/config.rs"
+        },
+        {
+          "loc": 22,
+          "path": "crates/contextra-mcp/src/egress_gateway.rs"
+        },
+        {
+          "loc": 97,
+          "path": "crates/contextra-mcp/src/egress_guard.rs"
+        },
+        {
+          "loc": 229,
+          "path": "crates/contextra-mcp/src/explain.rs"
+        },
+        {
+          "loc": 63,
+          "path": "crates/contextra-mcp/src/io.rs"
+        },
+        {
+          "loc": 43,
+          "path": "crates/contextra-mcp/src/lib.rs"
+        },
+        {
+          "loc": 32,
+          "path": "crates/contextra-mcp/src/plugin_status.rs"
+        },
+        {
+          "loc": 8,
+          "path": "crates/contextra-mcp/src/prompt_injection.rs"
+        },
+        {
+          "loc": 55,
+          "path": "crates/contextra-mcp/src/prompt_injection/audit.rs"
+        },
+        {
+          "loc": 528,
+          "path": "crates/contextra-mcp/src/prompt_injection/guard.rs"
+        },
+        {
+          "loc": 38,
+          "path": "crates/contextra-mcp/src/prompt_injection/policy.rs"
+        },
+        {
+          "loc": 325,
+          "path": "crates/contextra-mcp/src/prompt_injection/tests.rs"
+        },
+        {
+          "loc": 108,
+          "path": "crates/contextra-mcp/src/proof_key.rs"
+        },
+        {
+          "loc": 156,
+          "path": "crates/contextra-mcp/src/proof_key_env.rs"
+        },
+        {
+          "loc": 64,
+          "path": "crates/contextra-mcp/src/protocol.rs"
+        },
+        {
+          "loc": 116,
+          "path": "crates/contextra-mcp/src/routing.rs"
+        },
+        {
+          "loc": 711,
+          "path": "crates/contextra-mcp/src/sandbox.rs"
+        },
+        {
+          "loc": 156,
+          "path": "crates/contextra-mcp/src/server.rs"
+        },
+        {
+          "loc": 386,
+          "path": "crates/contextra-mcp/src/server_dispatch.rs"
+        },
+        {
+          "loc": 856,
+          "path": "crates/contextra-mcp/src/server_tools.rs"
+        },
+        {
+          "loc": 1148,
+          "path": "crates/contextra-mcp/src/tests.rs"
+        },
+        {
+          "loc": 202,
+          "path": "crates/contextra-mcp/src/tools_crud.rs"
+        },
+        {
+          "loc": 23,
+          "path": "crates/contextra-mcp/src/validation.rs"
+        }
+      ],
+      "files_count": 27,
+      "loc": 6035
+    },
+    "contextra-mvcc": {
+      "files": [
+        {
+          "loc": 12,
+          "path": "crates/contextra-mvcc/src/lib.rs"
+        },
+        {
+          "loc": 442,
+          "path": "crates/contextra-mvcc/src/seq_log.rs"
+        },
+        {
+          "loc": 295,
+          "path": "crates/contextra-mvcc/src/snapshot.rs"
+        },
+        {
+          "loc": 757,
+          "path": "crates/contextra-mvcc/src/ssi.rs"
+        },
+        {
+          "loc": 969,
+          "path": "crates/contextra-mvcc/src/tx_buffer.rs"
+        }
+      ],
+      "files_count": 5,
+      "loc": 2475
+    },
+    "contextra-ports": {
+      "files": [
+        {
+          "loc": 6,
+          "path": "crates/contextra-ports/src/attention.rs"
+        },
+        {
+          "loc": 28,
+          "path": "crates/contextra-ports/src/checkpoint.rs"
+        },
+        {
+          "loc": 68,
+          "path": "crates/contextra-ports/src/clock.rs"
+        },
+        {
+          "loc": 247,
+          "path": "crates/contextra-ports/src/embedding.rs"
+        },
+        {
+          "loc": 157,
+          "path": "crates/contextra-ports/src/graph.rs"
+        },
+        {
+          "loc": 374,
+          "path": "crates/contextra-ports/src/graph_index.rs"
+        },
+        {
+          "loc": 75,
+          "path": "crates/contextra-ports/src/id_gen.rs"
+        },
+        {
+          "loc": 191,
+          "path": "crates/contextra-ports/src/kv.rs"
+        },
+        {
+          "loc": 8,
+          "path": "crates/contextra-ports/src/kv_bridge_port.rs"
+        },
+        {
+          "loc": 93,
+          "path": "crates/contextra-ports/src/lib.rs"
+        },
+        {
+          "loc": 66,
+          "path": "crates/contextra-ports/src/license.rs"
+        },
+        {
+          "loc": 28,
+          "path": "crates/contextra-ports/src/lifecycle.rs"
+        },
+        {
+          "loc": 162,
+          "path": "crates/contextra-ports/src/metrics.rs"
+        },
+        {
+          "loc": 4,
+          "path": "crates/contextra-ports/src/observability.rs"
+        },
+        {
+          "loc": 336,
+          "path": "crates/contextra-ports/src/plugin.rs"
+        },
+        {
+          "loc": 35,
+          "path": "crates/contextra-ports/src/query_rewriter.rs"
+        },
+        {
+          "loc": 13,
+          "path": "crates/contextra-ports/src/reranker.rs"
+        },
+        {
+          "loc": 125,
+          "path": "crates/contextra-ports/src/rng.rs"
+        },
+        {
+          "loc": 183,
+          "path": "crates/contextra-ports/src/storage.rs"
+        },
+        {
+          "loc": 161,
+          "path": "crates/contextra-ports/src/text_index.rs"
+        },
+        {
+          "loc": 229,
+          "path": "crates/contextra-ports/src/vector_index.rs"
+        }
+      ],
+      "files_count": 21,
+      "loc": 2589
+    },
+    "contextra-privacy": {
+      "files": [
+        {
+          "loc": 49,
+          "path": "crates/contextra-privacy/src/audit_trace.rs"
+        },
+        {
+          "loc": 138,
+          "path": "crates/contextra-privacy/src/avv_generator.rs"
+        },
+        {
+          "loc": 236,
+          "path": "crates/contextra-privacy/src/bulk_exfiltration_detector.rs"
+        },
+        {
+          "loc": 214,
+          "path": "crates/contextra-privacy/src/context_edit_audit.rs"
+        },
+        {
+          "loc": 410,
+          "path": "crates/contextra-privacy/src/egress_gateway.rs"
+        },
+        {
+          "loc": 409,
+          "path": "crates/contextra-privacy/src/egress_guard.rs"
+        },
+        {
+          "loc": 721,
+          "path": "crates/contextra-privacy/src/egress_vault.rs"
+        },
+        {
+          "loc": 51,
+          "path": "crates/contextra-privacy/src/error.rs"
+        },
+        {
+          "loc": 48,
+          "path": "crates/contextra-privacy/src/guarded_payload.rs"
+        },
+        {
+          "loc": 40,
+          "path": "crates/contextra-privacy/src/lib.rs"
+        },
+        {
+          "loc": 143,
+          "path": "crates/contextra-privacy/src/processing_registry.rs"
+        }
+      ],
+      "files_count": 11,
+      "loc": 2459
+    },
+    "contextra-py": {
+      "files": [
+        {
+          "loc": 67,
+          "path": "crates/contextra-py/src/bindings/collection.rs"
+        },
+        {
+          "loc": 309,
+          "path": "crates/contextra-py/src/bindings/common.rs"
+        },
+        {
+          "loc": 397,
+          "path": "crates/contextra-py/src/bindings/crud_macros.rs"
+        },
+        {
+          "loc": 147,
+          "path": "crates/contextra-py/src/bindings/db.rs"
+        },
+        {
+          "loc": 29,
+          "path": "crates/contextra-py/src/bindings/db_stats.rs"
+        },
+        {
+          "loc": 12,
+          "path": "crates/contextra-py/src/bindings/document.rs"
+        },
+        {
+          "loc": 78,
+          "path": "crates/contextra-py/src/bindings/functions.rs"
+        },
+        {
+          "loc": 119,
+          "path": "crates/contextra-py/src/bindings/hyperedge.rs"
+        },
+        {
+          "loc": 25,
+          "path": "crates/contextra-py/src/bindings/mod.rs"
+        },
+        {
+          "loc": 57,
+          "path": "crates/contextra-py/src/bindings/runtime_state.rs"
+        },
+        {
+          "loc": 13,
+          "path": "crates/contextra-py/src/bindings/search_result.rs"
+        },
+        {
+          "loc": 17,
+          "path": "crates/contextra-py/src/bindings/storage_stats.rs"
+        },
+        {
+          "loc": 351,
+          "path": "crates/contextra-py/src/bindings/tests.rs"
+        },
+        {
+          "loc": 17,
+          "path": "crates/contextra-py/src/bindings/vector_index_stats.rs"
+        },
+        {
+          "loc": 186,
+          "path": "crates/contextra-py/src/kv_links.rs"
+        },
+        {
+          "loc": 51,
+          "path": "crates/contextra-py/src/lib.rs"
+        }
+      ],
+      "files_count": 16,
+      "loc": 1875
+    },
+    "contextra-rank": {
+      "files": [
+        {
+          "loc": 147,
+          "path": "crates/contextra-rank/src/calibration/conformal.rs"
+        },
+        {
+          "loc": 259,
+          "path": "crates/contextra-rank/src/calibration/isotonic.rs"
+        },
+        {
+          "loc": 6,
+          "path": "crates/contextra-rank/src/calibration/mod.rs"
+        },
+        {
+          "loc": 112,
+          "path": "crates/contextra-rank/src/calibration/platt.rs"
+        },
+        {
+          "loc": 53,
+          "path": "crates/contextra-rank/src/dibud/driver.rs"
+        },
+        {
+          "loc": 6,
+          "path": "crates/contextra-rank/src/dibud/mod.rs"
+        },
+        {
+          "loc": 240,
+          "path": "crates/contextra-rank/src/dibud/state.rs"
+        },
+        {
+          "loc": 85,
+          "path": "crates/contextra-rank/src/dibud/types.rs"
+        },
+        {
+          "loc": 91,
+          "path": "crates/contextra-rank/src/drift.rs"
+        },
+        {
+          "loc": 339,
+          "path": "crates/contextra-rank/src/explain.rs"
+        },
+        {
+          "loc": 154,
+          "path": "crates/contextra-rank/src/fusion/global.rs"
+        },
+        {
+          "loc": 25,
+          "path": "crates/contextra-rank/src/fusion/mod.rs"
+        },
+        {
+          "loc": 251,
+          "path": "crates/contextra-rank/src/fusion/normalized.rs"
+        },
+        {
+          "loc": 250,
+          "path": "crates/contextra-rank/src/fusion/provenance.rs"
+        },
+        {
+          "loc": 69,
+          "path": "crates/contextra-rank/src/fusion/resonance.rs"
+        },
+        {
+          "loc": 756,
+          "path": "crates/contextra-rank/src/fusion/rrf.rs"
+        },
+        {
+          "loc": 135,
+          "path": "crates/contextra-rank/src/fusion/signal.rs"
+        },
+        {
+          "loc": 66,
+          "path": "crates/contextra-rank/src/fusion/topk.rs"
+        },
+        {
+          "loc": 115,
+          "path": "crates/contextra-rank/src/fusion/types.rs"
+        },
+        {
+          "loc": 28,
+          "path": "crates/contextra-rank/src/lib.rs"
+        }
+      ],
+      "files_count": 20,
+      "loc": 3187
+    },
+    "contextra-router": {
+      "files": [
+        {
+          "loc": 91,
+          "path": "crates/contextra-router/src/arm_registry.rs"
+        },
+        {
+          "loc": 209,
+          "path": "crates/contextra-router/src/dispatch.rs"
+        },
+        {
+          "loc": 26,
+          "path": "crates/contextra-router/src/fc_ts_dispatch.rs"
+        },
+        {
+          "loc": 61,
+          "path": "crates/contextra-router/src/lib.rs"
+        },
+        {
+          "loc": 100,
+          "path": "crates/contextra-router/src/outcome.rs"
+        },
+        {
+          "loc": 20,
+          "path": "crates/contextra-router/src/ports_local.rs"
+        },
+        {
+          "loc": 343,
+          "path": "crates/contextra-router/src/profile.rs"
+        },
+        {
+          "loc": 437,
+          "path": "crates/contextra-router/src/router/dispatch_core.rs"
+        },
+        {
+          "loc": 127,
+          "path": "crates/contextra-router/src/router/lifecycle.rs"
+        },
+        {
+          "loc": 226,
+          "path": "crates/contextra-router/src/router/mod.rs"
+        },
+        {
+          "loc": 165,
+          "path": "crates/contextra-router/src/router/outcomes.rs"
+        },
+        {
+          "loc": 154,
+          "path": "crates/contextra-router/src/router/tests.rs"
+        },
+        {
+          "loc": 31,
+          "path": "crates/contextra-router/src/routing_strategy.rs"
+        },
+        {
+          "loc": 12,
+          "path": "crates/contextra-router/src/serde_helpers.rs"
+        },
+        {
+          "loc": 37,
+          "path": "crates/contextra-router/src/transport.rs"
+        }
+      ],
+      "files_count": 15,
+      "loc": 2039
+    },
+    "contextra-sandbox": {
+      "files": [
+        {
+          "loc": 372,
+          "path": "crates/contextra-sandbox/src/approval.rs"
+        },
+        {
+          "loc": 122,
+          "path": "crates/contextra-sandbox/src/capabilities.rs"
+        },
+        {
+          "loc": 24,
+          "path": "crates/contextra-sandbox/src/error.rs"
+        },
+        {
+          "loc": 528,
+          "path": "crates/contextra-sandbox/src/executor.rs"
+        },
+        {
+          "loc": 16,
+          "path": "crates/contextra-sandbox/src/lib.rs"
+        },
+        {
+          "loc": 67,
+          "path": "crates/contextra-sandbox/src/merge.rs"
+        },
+        {
+          "loc": 17,
+          "path": "crates/contextra-sandbox/src/output.rs"
+        },
+        {
+          "loc": 473,
+          "path": "crates/contextra-sandbox/src/wasi.rs"
+        }
+      ],
+      "files_count": 8,
+      "loc": 1619
+    },
+    "contextra-simd": {
+      "files": [
+        {
+          "loc": 200,
+          "path": "crates/contextra-simd/src/dispatch.rs"
+        },
+        {
+          "loc": 297,
+          "path": "crates/contextra-simd/src/kernels/avx2.rs"
+        },
+        {
+          "loc": 284,
+          "path": "crates/contextra-simd/src/kernels/avx512.rs"
+        },
+        {
+          "loc": 5,
+          "path": "crates/contextra-simd/src/kernels/mod.rs"
+        },
+        {
+          "loc": 79,
+          "path": "crates/contextra-simd/src/kernels/neon.rs"
+        },
+        {
+          "loc": 184,
+          "path": "crates/contextra-simd/src/kernels/scalar.rs"
+        },
+        {
+          "loc": 64,
+          "path": "crates/contextra-simd/src/lib.rs"
+        }
+      ],
+      "files_count": 7,
+      "loc": 1113
+    },
+    "contextra-store": {
+      "files": [
+        {
+          "loc": 45,
+          "path": "crates/contextra-store/examples/chaos_writer.rs"
+        },
+        {
+          "loc": 109,
+          "path": "crates/contextra-store/fuzz/fuzz_targets/fuzz_compaction_interleave.rs"
+        },
+        {
+          "loc": 24,
+          "path": "crates/contextra-store/fuzz/fuzz_targets/fuzz_manifest_load.rs"
+        },
+        {
+          "loc": 103,
+          "path": "crates/contextra-store/fuzz/fuzz_targets/fuzz_memtable_concurrent.rs"
+        },
+        {
+          "loc": 51,
+          "path": "crates/contextra-store/fuzz/fuzz_targets/fuzz_recovery_arbitrary_state.rs"
+        },
+        {
+          "loc": 30,
+          "path": "crates/contextra-store/fuzz/fuzz_targets/fuzz_sstable_binary_search.rs"
+        },
+        {
+          "loc": 36,
+          "path": "crates/contextra-store/fuzz/fuzz_targets/fuzz_wal_replay.rs"
+        },
+        {
+          "loc": 225,
+          "path": "crates/contextra-store/fuzz/fuzz_targets/wal_mutation_chaos.rs"
+        },
+        {
+          "loc": 34,
+          "path": "crates/contextra-store/fuzz/fuzz_targets/wal_roundtrip.rs"
+        },
+        {
+          "loc": 14,
+          "path": "crates/contextra-store/src/compaction.rs"
+        },
+        {
+          "loc": 269,
+          "path": "crates/contextra-store/src/compaction/adaptive.rs"
+        },
+        {
+          "loc": 36,
+          "path": "crates/contextra-store/src/compaction/config.rs"
+        },
+        {
+          "loc": 675,
+          "path": "crates/contextra-store/src/compaction/engine.rs"
+        },
+        {
+          "loc": 4,
+          "path": "crates/contextra-store/src/compaction/merge_operator.rs"
+        },
+        {
+          "loc": 59,
+          "path": "crates/contextra-store/src/compaction/retention.rs"
+        },
+        {
+          "loc": 30,
+          "path": "crates/contextra-store/src/compaction/tests.rs"
+        },
+        {
+          "loc": 303,
+          "path": "crates/contextra-store/src/engine/memory_only.rs"
+        },
+        {
+          "loc": 2,
+          "path": "crates/contextra-store/src/engine/mod.rs"
+        },
+        {
+          "loc": 32,
+          "path": "crates/contextra-store/src/kv/delete_mode.rs"
+        },
+        {
+          "loc": 4,
+          "path": "crates/contextra-store/src/kv/mod.rs"
+        },
+        {
+          "loc": 121,
+          "path": "crates/contextra-store/src/kv/segment.rs"
+        },
+        {
+          "loc": 40,
+          "path": "crates/contextra-store/src/lib.rs"
+        },
+        {
+          "loc": 119,
+          "path": "crates/contextra-store/src/lsm/commit.rs"
+        },
+        {
+          "loc": 90,
+          "path": "crates/contextra-store/src/lsm/config.rs"
+        },
+        {
+          "loc": 297,
+          "path": "crates/contextra-store/src/lsm/engine.rs"
+        },
+        {
+          "loc": 13,
+          "path": "crates/contextra-store/src/lsm/flush.rs"
+        },
+        {
+          "loc": 70,
+          "path": "crates/contextra-store/src/lsm/group_commit.rs"
+        },
+        {
+          "loc": 9,
+          "path": "crates/contextra-store/src/lsm/guard.rs"
+        },
+        {
+          "loc": 34,
+          "path": "crates/contextra-store/src/lsm/mod.rs"
+        },
+        {
+          "loc": 380,
+          "path": "crates/contextra-store/src/lsm/observer.rs"
+        },
+        {
+          "loc": 127,
+          "path": "crates/contextra-store/src/lsm/ops.rs"
+        },
+        {
+          "loc": 199,
+          "path": "crates/contextra-store/src/lsm/ops/compaction.rs"
+        },
+        {
+          "loc": 43,
+          "path": "crates/contextra-store/src/lsm/ops/maintenance.rs"
+        },
+        {
+          "loc": 276,
+          "path": "crates/contextra-store/src/lsm/ops/read.rs"
+        },
+        {
+          "loc": 636,
+          "path": "crates/contextra-store/src/lsm/ops/write.rs"
+        },
+        {
+          "loc": 779,
+          "path": "crates/contextra-store/src/lsm/recovery.rs"
+        },
+        {
+          "loc": 181,
+          "path": "crates/contextra-store/src/lsm/scan.rs"
+        },
+        {
+          "loc": 30,
+          "path": "crates/contextra-store/src/lsm/tests.rs"
+        },
+        {
+          "loc": 39,
+          "path": "crates/contextra-store/src/lsm/validate.rs"
+        },
+        {
+          "loc": 320,
+          "path": "crates/contextra-store/src/manifest/core.rs"
+        },
+        {
+          "loc": 324,
+          "path": "crates/contextra-store/src/manifest/entry.rs"
+        },
+        {
+          "loc": 10,
+          "path": "crates/contextra-store/src/manifest/mod.rs"
+        },
+        {
+          "loc": 110,
+          "path": "crates/contextra-store/src/manifest/recovery.rs"
+        },
+        {
+          "loc": 145,
+          "path": "crates/contextra-store/src/manifest/rollover.rs"
+        },
+        {
+          "loc": 344,
+          "path": "crates/contextra-store/src/manifest/tests.rs"
+        },
+        {
+          "loc": 790,
+          "path": "crates/contextra-store/src/memtable.rs"
+        },
+        {
+          "loc": 16,
+          "path": "crates/contextra-store/src/sstable.rs"
+        },
+        {
+          "loc": 272,
+          "path": "crates/contextra-store/src/sstable/block_cache.rs"
+        },
+        {
+          "loc": 176,
+          "path": "crates/contextra-store/src/sstable/block_search.rs"
+        },
+        {
+          "loc": 117,
+          "path": "crates/contextra-store/src/sstable/bloom.rs"
+        },
+        {
+          "loc": 422,
+          "path": "crates/contextra-store/src/sstable/builder.rs"
+        },
+        {
+          "loc": 28,
+          "path": "crates/contextra-store/src/sstable/io.rs"
+        },
+        {
+          "loc": 948,
+          "path": "crates/contextra-store/src/sstable/reader.rs"
+        },
+        {
+          "loc": 262,
+          "path": "crates/contextra-store/src/sstable/reader_ext.rs"
+        },
+        {
+          "loc": 117,
+          "path": "crates/contextra-store/src/sstable/stream.rs"
+        },
+        {
+          "loc": 757,
+          "path": "crates/contextra-store/src/sstable/tests.rs"
+        },
+        {
+          "loc": 278,
+          "path": "crates/contextra-store/src/system_pressure.rs"
+        },
+        {
+          "loc": 787,
+          "path": "crates/contextra-store/src/tenant_codec.rs"
+        },
+        {
+          "loc": 63,
+          "path": "crates/contextra-store/src/util.rs"
+        },
+        {
+          "loc": 355,
+          "path": "crates/contextra-store/src/wal/encode.rs"
+        },
+        {
+          "loc": 636,
+          "path": "crates/contextra-store/src/wal/flusher.rs"
+        },
+        {
+          "loc": 395,
+          "path": "crates/contextra-store/src/wal/hmac.rs"
+        },
+        {
+          "loc": 910,
+          "path": "crates/contextra-store/src/wal/io.rs"
+        },
+        {
+          "loc": 738,
+          "path": "crates/contextra-store/src/wal/mod.rs"
+        },
+        {
+          "loc": 680,
+          "path": "crates/contextra-store/src/wal/replay.rs"
+        },
+        {
+          "loc": 16,
+          "path": "crates/contextra-store/src/wal/tests.rs"
+        }
+      ],
+      "files_count": 66,
+      "loc": 15584
+    },
+    "contextra-sys": {
+      "files": [
+        {
+          "loc": 261,
+          "path": "crates/contextra-sys/src/acl_win32.rs"
+        },
+        {
+          "loc": 13,
+          "path": "crates/contextra-sys/src/lib.rs"
+        },
+        {
+          "loc": 94,
+          "path": "crates/contextra-sys/src/mlock.rs"
+        },
+        {
+          "loc": 27,
+          "path": "crates/contextra-sys/src/mmap.rs"
+        },
+        {
+          "loc": 73,
+          "path": "crates/contextra-sys/src/posix.rs"
+        },
+        {
+          "loc": 73,
+          "path": "crates/contextra-sys/src/vault.rs"
+        }
+      ],
+      "files_count": 6,
+      "loc": 541
+    },
+    "contextra-testkit": {
+      "files": [
+        {
+          "loc": 146,
+          "path": "crates/contextra-testkit/src/fault_vfs.rs"
+        },
+        {
+          "loc": 210,
+          "path": "crates/contextra-testkit/src/in_memory_store.rs"
+        },
+        {
+          "loc": 9,
+          "path": "crates/contextra-testkit/src/lib.rs"
+        },
+        {
+          "loc": 77,
+          "path": "crates/contextra-testkit/src/manual_clock.rs"
+        },
+        {
+          "loc": 162,
+          "path": "crates/contextra-testkit/src/reference_model.rs"
+        }
+      ],
+      "files_count": 5,
+      "loc": 604
+    },
+    "contextra-text": {
+      "files": [
+        {
+          "loc": 9,
+          "path": "crates/contextra-text/fuzz/fuzz_targets/fuzz_bm25_tokenize.rs"
+        },
+        {
+          "loc": 471,
+          "path": "crates/contextra-text/src/bm25.rs"
+        },
+        {
+          "loc": 29,
+          "path": "crates/contextra-text/src/domain/legal_de.rs"
+        },
+        {
+          "loc": 29,
+          "path": "crates/contextra-text/src/domain/medical_de.rs"
+        },
+        {
+          "loc": 98,
+          "path": "crates/contextra-text/src/domain/mod.rs"
+        },
+        {
+          "loc": 8,
+          "path": "crates/contextra-text/src/inverted.rs"
+        },
+        {
+          "loc": 533,
+          "path": "crates/contextra-text/src/inverted/index_struct.rs"
+        },
+        {
+          "loc": 60,
+          "path": "crates/contextra-text/src/inverted/morph_index.rs"
+        },
+        {
+          "loc": 3,
+          "path": "crates/contextra-text/src/inverted/tests.rs"
+        },
+        {
+          "loc": 29,
+          "path": "crates/contextra-text/src/inverted/types.rs"
+        },
+        {
+          "loc": 204,
+          "path": "crates/contextra-text/src/lib.rs"
+        },
+        {
+          "loc": 12,
+          "path": "crates/contextra-text/src/morphology.rs"
+        },
+        {
+          "loc": 207,
+          "path": "crates/contextra-text/src/morphology/compound_splitter.rs"
+        },
+        {
+          "loc": 13,
+          "path": "crates/contextra-text/src/morphology/metrics.rs"
+        },
+        {
+          "loc": 17,
+          "path": "crates/contextra-text/src/morphology/passthrough.rs"
+        },
+        {
+          "loc": 30,
+          "path": "crates/contextra-text/src/morphology/stopwords.rs"
+        },
+        {
+          "loc": 649,
+          "path": "crates/contextra-text/src/morphology/tests.rs"
+        },
+        {
+          "loc": 43,
+          "path": "crates/contextra-text/src/morphology/trie.rs"
+        },
+        {
+          "loc": 395,
+          "path": "crates/contextra-text/src/posting_list.rs"
+        },
+        {
+          "loc": 99,
+          "path": "crates/contextra-text/src/stream.rs"
+        },
+        {
+          "loc": 353,
+          "path": "crates/contextra-text/src/tokenizer.rs"
+        },
+        {
+          "loc": 717,
+          "path": "crates/contextra-text/src/wand.rs"
+        }
+      ],
+      "files_count": 22,
+      "loc": 4008
+    },
+    "contextra-types": {
+      "files": [
+        {
+          "loc": 812,
+          "path": "crates/contextra-types/src/error.rs"
+        },
+        {
+          "loc": 535,
+          "path": "crates/contextra-types/src/error_dto.rs"
+        },
+        {
+          "loc": 20,
+          "path": "crates/contextra-types/src/lib.rs"
+        },
+        {
+          "loc": 36,
+          "path": "crates/contextra-types/src/model_fingerprint.rs"
+        },
+        {
+          "loc": 66,
+          "path": "crates/contextra-types/src/retrieval_strategy.rs"
+        },
+        {
+          "loc": 77,
+          "path": "crates/contextra-types/src/schema.rs"
+        },
+        {
+          "loc": 41,
+          "path": "crates/contextra-types/src/tenant_scope.rs"
+        },
+        {
+          "loc": 83,
+          "path": "crates/contextra-types/src/tombstone.rs"
+        },
+        {
+          "loc": 12,
+          "path": "crates/contextra-types/src/types.rs"
+        },
+        {
+          "loc": 515,
+          "path": "crates/contextra-types/src/types/budget.rs"
+        },
+        {
+          "loc": 152,
+          "path": "crates/contextra-types/src/types/domain/document.rs"
+        },
+        {
+          "loc": 288,
+          "path": "crates/contextra-types/src/types/domain/ids.rs"
+        },
+        {
+          "loc": 378,
+          "path": "crates/contextra-types/src/types/domain/misc.rs"
+        },
+        {
+          "loc": 11,
+          "path": "crates/contextra-types/src/types/domain/mod.rs"
+        },
+        {
+          "loc": 333,
+          "path": "crates/contextra-types/src/types/filter.rs"
+        },
+        {
+          "loc": 204,
+          "path": "crates/contextra-types/src/types/importance.rs"
+        },
+        {
+          "loc": 685,
+          "path": "crates/contextra-types/src/types/saos.rs"
+        }
+      ],
+      "files_count": 17,
+      "loc": 4248
+    },
+    "contextra-vector": {
+      "files": [
+        {
+          "loc": 111,
+          "path": "crates/contextra-vector/fuzz/fuzz_targets/fuzz_hnsw_persistence.rs"
+        },
+        {
+          "loc": 78,
+          "path": "crates/contextra-vector/fuzz/fuzz_targets/hnsw_insert_search.rs"
+        },
+        {
+          "loc": 21,
+          "path": "crates/contextra-vector/src/acorn/gamma_augmentation.rs"
+        },
+        {
+          "loc": 46,
+          "path": "crates/contextra-vector/src/acorn/mod.rs"
+        },
+        {
+          "loc": 61,
+          "path": "crates/contextra-vector/src/acorn/naive_reference.rs"
+        },
+        {
+          "loc": 102,
+          "path": "crates/contextra-vector/src/candidate_stream.rs"
+        },
+        {
+          "loc": 155,
+          "path": "crates/contextra-vector/src/compute_pool.rs"
+        },
+        {
+          "loc": 631,
+          "path": "crates/contextra-vector/src/diskann/build.rs"
+        },
+        {
+          "loc": 51,
+          "path": "crates/contextra-vector/src/diskann/config.rs"
+        },
+        {
+          "loc": 48,
+          "path": "crates/contextra-vector/src/diskann/filtered.rs"
+        },
+        {
+          "loc": 174,
+          "path": "crates/contextra-vector/src/diskann/format.rs"
+        },
+        {
+          "loc": 14,
+          "path": "crates/contextra-vector/src/diskann/mod.rs"
+        },
+        {
+          "loc": 591,
+          "path": "crates/contextra-vector/src/diskann/persistence.rs"
+        },
+        {
+          "loc": 211,
+          "path": "crates/contextra-vector/src/diskann/predicate_augmented.rs"
+        },
+        {
+          "loc": 350,
+          "path": "crates/contextra-vector/src/diskann/search.rs"
+        },
+        {
+          "loc": 873,
+          "path": "crates/contextra-vector/src/diskann/tests.rs"
+        },
+        {
+          "loc": 231,
+          "path": "crates/contextra-vector/src/diskann/types.rs"
+        },
+        {
+          "loc": 156,
+          "path": "crates/contextra-vector/src/diskann/vector_index_impl.rs"
+        },
+        {
+          "loc": 201,
+          "path": "crates/contextra-vector/src/distance.rs"
+        },
+        {
+          "loc": 241,
+          "path": "crates/contextra-vector/src/hnsw/acorn_filtered.rs"
+        },
+        {
+          "loc": 179,
+          "path": "crates/contextra-vector/src/hnsw/adaptive_ef.rs"
+        },
+        {
+          "loc": 291,
+          "path": "crates/contextra-vector/src/hnsw/arena.rs"
+        },
+        {
+          "loc": 75,
+          "path": "crates/contextra-vector/src/hnsw/batch.rs"
+        },
+        {
+          "loc": 156,
+          "path": "crates/contextra-vector/src/hnsw/config.rs"
+        },
+        {
+          "loc": 397,
+          "path": "crates/contextra-vector/src/hnsw/core_insert.rs"
+        },
+        {
+          "loc": 801,
+          "path": "crates/contextra-vector/src/hnsw/core_rebuild.rs"
+        },
+        {
+          "loc": 659,
+          "path": "crates/contextra-vector/src/hnsw/core_search.rs"
+        },
+        {
+          "loc": 282,
+          "path": "crates/contextra-vector/src/hnsw/deletion.rs"
+        },
+        {
+          "loc": 25,
+          "path": "crates/contextra-vector/src/hnsw/mod.rs"
+        },
+        {
+          "loc": 83,
+          "path": "crates/contextra-vector/src/hnsw/sq8_bias.rs"
+        },
+        {
+          "loc": 313,
+          "path": "crates/contextra-vector/src/hnsw/tests.rs"
+        },
+        {
+          "loc": 683,
+          "path": "crates/contextra-vector/src/hnsw/types.rs"
+        },
+        {
+          "loc": 492,
+          "path": "crates/contextra-vector/src/hnsw/vector_index_impl.rs"
+        },
+        {
+          "loc": 23,
+          "path": "crates/contextra-vector/src/lib.rs"
+        },
+        {
+          "loc": 263,
+          "path": "crates/contextra-vector/src/partial_rebuild.rs"
+        },
+        {
+          "loc": 385,
+          "path": "crates/contextra-vector/src/persistence/header.rs"
+        },
+        {
+          "loc": 189,
+          "path": "crates/contextra-vector/src/persistence/mmap.rs"
+        },
+        {
+          "loc": 8,
+          "path": "crates/contextra-vector/src/persistence/mod.rs"
+        },
+        {
+          "loc": 72,
+          "path": "crates/contextra-vector/src/persistence/node.rs"
+        },
+        {
+          "loc": 415,
+          "path": "crates/contextra-vector/src/persistence/tests.rs"
+        },
+        {
+          "loc": 432,
+          "path": "crates/contextra-vector/src/quantize/mod.rs"
+        },
+        {
+          "loc": 398,
+          "path": "crates/contextra-vector/src/quantize/tests.rs"
+        },
+        {
+          "loc": 347,
+          "path": "crates/contextra-vector/src/quantize_rabitq.rs"
+        }
+      ],
+      "files_count": 43,
+      "loc": 11314
+    },
+    "contextra-wire": {
+      "files": [
+        {
+          "loc": 115,
+          "path": "crates/contextra-wire/build.rs"
+        },
+        {
+          "loc": 32,
+          "path": "crates/contextra-wire/fuzz/fuzz_targets/fuzz_flatbuffers_ipc.rs"
+        },
+        {
+          "loc": 25,
+          "path": "crates/contextra-wire/src/adapter.rs"
+        },
+        {
+          "loc": 1004,
+          "path": "crates/contextra-wire/src/contextra_generated.rs"
+        },
+        {
+          "loc": 111,
+          "path": "crates/contextra-wire/src/jsonrpc.rs"
+        },
+        {
+          "loc": 17,
+          "path": "crates/contextra-wire/src/lib.rs"
+        }
+      ],
+      "files_count": 6,
+      "loc": 1304
+    }
+  },
+  "summary": {
+    "core_loc": 71557,
+    "total_crates": 33,
+    "total_loc": 124776
+  }
+}
