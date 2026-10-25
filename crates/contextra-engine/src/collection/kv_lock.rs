@@ -157,14 +157,20 @@ mod loom_tests {
             }
         }
 
-        fn acquire_multi_sorted(&self, keys: &[&str]) -> Vec<loom::sync::MutexGuard<'_, ()>> {
+        fn acquire_multi_sorted(
+            &self,
+            keys: &[&str],
+        ) -> contextra_types::Result<Vec<loom::sync::MutexGuard<'_, ()>>> {
             let shard_indices =
                 sorted_unique_shards(keys.iter().copied(), self.shard_count, &self.hasher);
             let mut guards = Vec::with_capacity(shard_indices.len());
             for idx in shard_indices {
-                guards.push(self.shards[idx].lock().unwrap());
+                let guard = self.shards[idx]
+                    .lock()
+                    .map_err(|_| contextra_types::ContextraError::Internal("Lock poisoned".to_string()))?;
+                guards.push(guard);
             }
-            guards
+            Ok(guards)
         }
     }
 
@@ -175,16 +181,43 @@ mod loom_tests {
 
             let locks_t1 = Arc::clone(&locks);
             let t1 = thread::spawn(move || {
-                let _guards = locks_t1.acquire_multi_sorted(&["key_alpha", "key_beta"]);
+                let _guards = locks_t1
+                    .acquire_multi_sorted(&["key_alpha", "key_beta"])
+                    .expect("lock acquisition should succeed");
             });
 
             let locks_t2 = Arc::clone(&locks);
             let t2 = thread::spawn(move || {
-                let _guards = locks_t2.acquire_multi_sorted(&["key_beta", "key_alpha"]);
+                let _guards = locks_t2
+                    .acquire_multi_sorted(&["key_beta", "key_alpha"])
+                    .expect("lock acquisition should succeed");
             });
 
             t1.join().expect("thread 1 completes");
             t2.join().expect("thread 2 completes");
+        });
+    }
+
+    #[test]
+    fn test_loom_poisoned_mutex_returns_error() {
+        loom::model(|| {
+            let locks = Arc::new(LoomKvKeyLocks::new(4));
+
+            let locks_poisoner = Arc::clone(&locks);
+            let t_poisoner = thread::spawn(move || {
+                let _guard = locks_poisoner.shards[0].lock().unwrap();
+                panic!("Simulated panic to poison mutex shard 0");
+            });
+
+            let _ = t_poisoner.join(); // Ignore thread panic result
+
+            // Now attempting acquire_multi_sorted for shard 0 must return ContextraError::Internal instead of panicking
+            let res = locks.acquire_multi_sorted(&["key_0"]);
+            assert!(
+                matches!(res, Err(contextra_types::ContextraError::Internal(ref msg)) if msg == "Lock poisoned"),
+                "Expected ContextraError::Internal('Lock poisoned'), got {:?}",
+                res
+            );
         });
     }
 }
