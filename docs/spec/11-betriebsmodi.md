@@ -1,14 +1,5 @@
----
-source: CONTEXTRA_SPEC_v4_MASTER.md
-chapter: "11"
----
-## 11. Betriebsmodi
+# 11-betriebsmodi.md (Veraltet / Deprecated)
 
-Contextra wird ausschließlich eingebettet betrieben: im Prozess des aufrufenden Agenten (Rust- oder Python-Bindung)
-oder als lokaler MCP-Server über stdio-JSON-RPC. Es gibt keinen Server-Modus mit Netzwerk-Listener für
-Multi-Tenant-Zugriff. Der Cloud-Egress-Pfad (§10.4) ist der einzige Punkt, an dem Daten das lokale System
-verlassen — ausschließlich auf explizite Anforderung, nie als Hintergrundtelemetrie.
-
----
-
-<a id="12-schema"></a>
+> **VERALTET / DEPRECATING POINTER**
+> Dieses Kapitel ist veraltet. Die einzige normative Quelle der Soll-Architektur ist:
+> **[`docs/CONTEXTRA_SPEZIFIKATION_1.2.md`](../CONTEXTRA_SPEZIFIKATION_1.2.md)** (Spezifikation 1.2).

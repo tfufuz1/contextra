@@ -2,28 +2,13 @@
 
 Systemnahe Bindings, Low-Level I/O und Memory-Mapping.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **Kern `[K]`** (Ring 0 Unsafe-Insel, `stable`; §6.1, §6.7, §6.9, `capabilities.toml`).
 
+## Rolle in einem Satz
+`contextra-sys` bietet systemnahes Memory-Mapping (mmap), Prozess-Härtung und plattformspezifische I/O-Primitiven über eine sichere Fassade.
 
-`contextra-sys` ist eine Unsafe-Insel für OS-Systemaufrufe (Ring 0).
-
-## Zweck
-
-Kapselt plattformspezifische `unsafe`-Systemaufrufe: Memory Mapping (`mmap`), Memory Locking (`mlock`/`munlock`), Win32 Owner-only ACLs und POSIX File Descriptor Manipulationen.
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 0 (Unsafe-Insel)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** `#![allow(unsafe_code)]` — Isoliert in `contextra-sys`, Safe Public API.
-
-## Öffentliche API-Übersicht
-
-- **Memory Mapping:** `mmap_readonly`
-- **Memory Locking:** `mem_lock`, `mem_unlock`
-- **Win32 ACL:** `set_restrictive_file_acl`, `verify_file_acl_owner_only`
-- **POSIX:** `reopen_and_dup2`
-
-## Architektur & Verweise
-
-Details zur Isolierung von Systemaufrufen (§0.4 / §A2 D1) finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze).
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Unsafe-Insel 2 von 3, `#![deny(unsafe_code)]` ausgenommen)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types` (Spec §6.9, `capabilities.toml`)

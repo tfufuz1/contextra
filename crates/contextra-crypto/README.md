@@ -1,11 +1,16 @@
 # contextra-crypto
 
-Kryptografische Vaults, Zeroize, Egress-Verschlüsselung, HMAC-Chaining und Löschbeweise (`DeletionProof`) für Contextra.
+Kryptographische Vaults, Zeroize, Egress-Verschlüsselung, Audit-Ketten und Löschnachweise.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, §20, `capabilities.toml`).
 
-## Funktionen & Spezifikationsbezug
-- **AEAD-Verschlüsselung (REQ-KEY-001):** AES-256-GCM-SIV für SSTable-Blöcke und KV-Segmente über den Keystore (§20.1).
-- **WAL HMAC Chaining (REQ-KEY-001):** HMAC-SHA256 Chaining zur Manipulationserkennung im WAL.
-- **Kryptografischer Löschbeweis (INV-CLAIMS-1, REQ-DEL-005, REQ-DEL-006):** Erzeugung und Signatur von `DeletionProof` (Formatversion 4, §20.4) über sieben Schichten.
-- **Außenformulierung (INV-CLAIMS-1, §4.3):** Aussagen zur Löschung folgen zwingend der ehrlichen Außenformulierung; Werbeaussagen wie „100 % gelöscht“ oder „DSGVO-konform“ sind unzulässig.
+## Rolle in einem Satz
+`contextra-crypto` stellt I/O-freie kryptographische Primitiven, Schlüsselverwaltung, Zeroization, Audit-Chains und DeletionProof-Erzeugung/Verifikation bereit.
+
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Kryptographie & Nachweislogik, I/O-frei, keine Threads)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports` (Persistenz nur über Port `DurableLog`; Spec §6.9, `capabilities.toml`)
+
+*Hinweis zu Abweichungen:* `capabilities.toml` führt aktuell veraltetes `contextra-core` in `may_depend_on` (siehe `docs/status/ABW-L3.md`).

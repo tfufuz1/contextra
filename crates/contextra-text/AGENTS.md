@@ -1,117 +1,30 @@
-# AGENTS.md — contextra-text
-> Layer 1 | BM25 Inverted Index & Morphologische Tokenisierung | ~5000 LOC
+# AGENTS.md — `contextra-text`
 
-## 1. Zweck & Architekturrolle
+## 1. Rolle
+`contextra-text` stellt eine Inverted-Index Volltextsuchmaschine mit BM25 Scoring, Block-Max-WAND und Text-Analyzer-Schnittstellen bereit.
 
-Lexikalische Volltextsuch-Engine (Signal 2 der 4-Signal-Fusion). Implementiert einen
-transaktionalen Inverted Index (`InvertedIndex`), BM25-Scoring (`Bm25Scorer`) und
-eine erweiterte Tokenisierungs-Pipeline mit morphologischer Analyse (insbesondere
-für die DACH-Region: `GermanCompoundSplitter`, Umlaut-Normalisierung).
-Implementiert den `TextIndex` Trait aus `contextra-core`.
+## 2. Ring, Klasse, Reifegrad & `may_use`
+- **Ring:** Ring 0 (Volltextsuche)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)
 
-## 2. Modul-Karte
+## 3. Garantien & Anforderungen (§33, §10)
+- **REQ-TXT-001:** Deterministische Inverted Index Postings, BM25/BM25F Scoring.
+- **REQ-TXT-002:** `LayerScan` Implementierung (Layer ID 20) für Residuen-Spannungs-Scans.
+- **Durchsetzungsmechanismus (§27.6):** `#![forbid(unsafe_code)]`, Tokenizer Unit- & Integrationstests.
 
-| Datei | Verantwortung |
-|---|---|
-| `lib.rs` | Modul-Deklaration, `#![forbid(unsafe_code)]`, `Bm25Scorer` Facade |
-| `inverted.rs` | `InvertedIndex` — Transaktionaler Index (Persistenz via `StorageEngine`) |
-| `bm25.rs` | `BM25` — Score-Berechnung (IDF, TF, doc_len) |
-| `tokenizer.rs` | `Tokenizer` Trait, `DefaultTokenizer`, `GermanMorphTokenizer` |
-| `morphology.rs` | `GermanCompoundSplitter`, Umlaut-Normalisierung, Stopword-Filterung |
+## 4. Verbotene Muster
+- Kein `unsafe` (`#![forbid(unsafe_code)]`).
+- Keine unkontrollierte Speicherallokation bei großen Postings-Listen.
 
-## 3. Kritische Invarianten
+## 5. Implementierte & konsumierte Ports (Anhang A)
+- Implementiert: `TextIndex` (`InvertedIndex`), `Analyzer` (Standard-Analyzer).
+- Konsumiert: `Clock` Port.
 
-### Determinismus der Tokenisierung
-Tokenisierung **MUSS** deterministisch sein. Der Query-Pfad muss exakt dieselbe
-Tokenisierungs-Pipeline durchlaufen wie der Indexierungs-Pfad. Eine Diskrepanz
-führt zu Silent-Recall-Drops (Wörter werden indexiert, aber nicht gefunden).
+## 6. Tests & Gates
+- **Fuzzing (REQ-QA-003):** BM25 Tokenizer & Posting Fuzzer.
+- **LayerScan Verification:** Residuen-Scans im Text-Witness Integrations-Test.
 
-### Snapshot Isolation (search_at)
-`InvertedIndex` implementiert `search_at` und wertet die Sequence Number aus.
-Dies erfordert, dass bei der Suche die Index-Einträge aus der LSM-StorageEngine
-mit `get_at_seq()` oder `scan_prefix_at()` geladen werden, um MVCC-Korrektheit zu wahren.
-
-### Transaction-Aware Storage
-Der `InvertedIndex` persistiert keine eigenen Dateien, sondern nutzt die
-`StorageEngine` aus `contextra-core`. Alle Mutationen (`upsert_document`, `delete_document`)
-müssen die `TxId` an den zugrundeliegenden Storage weitergeben, damit sie atomar
-mit Vektor- und Graph-Updates committet werden.
-
-## 4. Public API Quick-Reference
-
-```rust
-// === Bm25Scorer (lib.rs) — Implementiert TextIndex ===
-pub struct Bm25Scorer<S: StorageEngine> { ... }
-impl<S> Bm25Scorer<S> {
-    pub fn new(storage: Arc<S>, namespace: &str) -> Self;
-    // Traits: search, search_at, insert, delete, commit, rollback
-}
-
-// === Tokenisierung & Morphologie (tokenizer.rs, morphology.rs) ===
-pub trait Tokenizer: Send + Sync {
-    fn tokenize(&self, text: &str) -> Vec<String>;
-}
-pub struct GermanMorphTokenizer { ... }
-pub struct GermanCompoundSplitter { ... }
-pub fn normalize_umlauts(input: &str) -> String;
-
-// === Inverted Index (inverted.rs) ===
-pub struct InvertedIndex<S: StorageEngine> { ... }
-impl<S> InvertedIndex<S> {
-    pub async fn search_bm25_at(&self, query_tokens: &[String], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>>;
-    pub async fn upsert_document(&self, tx: TxId, doc_id: DocId, text: &str) -> Result<()>;
-}
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-```rust
-// ❌ FALSCH — Tokenizer nur bei Ingestion verwenden:
-let tokens = text.split_whitespace(); // im Query-Pfad
-// ✅ KORREKT — Denselben Tokenizer für Query und Ingestion:
-let tokens = self.tokenizer.tokenize(query_text);
-
-// ❌ FALSCH — Direkter I/O im InvertedIndex:
-let file = tokio::fs::File::create("index.dat").await?;
-// ✅ KORREKT — Alle Persistenz geht über `self.storage` (LSM).
-
-// ❌ FALSCH — Tombstones (gelöschte Dokumente) im Score ignorieren:
-// ✅ KORREKT — resolve_tombstones() oder tombstone-aware scoring nutzen.
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-`Bm25Scorer` delegiert direkt an `InvertedIndex`. MVCC und Lock-Free Storage werden
-durch die darunterliegende `StorageEngine` garantiert. Der `InvertedIndex` selbst
-hält keine langlebigen Mutexe. Cache-Strukturen (DF-Counts, Avg-Doc-Len) nutzen
-`parking_lot::RwLock` für In-Memory-Updates.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0)
-- **Verbotene Imports**: `contextra-db` (L2), `contextra-store` (L1 Peer), `contextra-vector` (L1 Peer)
-- **Implementiert**: `TextIndex` aus `contextra-core`
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| `rules/test_quality.md` | Deterministic Search Recall Verification (ANCHOR-TXT-001) |
-| ADR-024 | Snapshot Isolation bei `search_at` |
-
-## 9. GermanCompoundSplitter & Morphologie
-
-Die deutsche Komposita-Zerlegung (`GermanCompoundSplitter` in `src/morphology.rs`) ist eine
-Spezialisierung für deutschsprachige KMU-Texte im DACH-Raum.
-
-### Schlüssel-Eigenschaften
-- **Embed-Dictionary**: Ein eingebettetes Wörterbuch (`src/data/german_words.txt`, 1.256 Wörter)
-  wird zur Compile-Zeit via `include_str!` eingebunden.
-- **Datenstruktur & Algorithmus**: Nutzt einen In-Memory Prefix-Trie ([`Trie`]) zur schnellen
-  Präfix- und Stamm-Prüfung sowie Dynamic Programming (DP) mit Fugen-Element-Unterstützung
-  (`-s-`, `-en-`, `-e-`, `-er-`, `-n-`, `-es-`).
-- **Binary-Size & Memory Impact**: Vergrößert die Binary marginal (ca. 10–15 KB). Der Prefix-Trie
-  wird beim Initialisieren (`GermanCompoundSplitter::new()`) dynamisch im Heap instanziiert.
-- **Test-Abdeckung**: Die Unit-Tests und Evaluierungssuiten (inkl. 55-KMU-Komposita Recall Test
-  `test_kmu_55_compounds_suite` und 10k-Iteration-Fuzzer) befinden sich direkt im `tests`-Modul
-  in `src/morphology.rs`.
+## 7. Offene Punkte
+- keine.

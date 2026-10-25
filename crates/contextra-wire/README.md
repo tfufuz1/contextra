@@ -2,26 +2,13 @@
 
 FlatBuffers Wire-Protokolle und Serialisierungs-Formate.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **Kern `[K]`** (Ring 0 Unsafe-Insel, `stable`; §6.1, §6.7, §6.9, `capabilities.toml`).
 
+## Rolle in einem Satz
+`contextra-wire` verwaltet performante Zero-Copy FlatBuffers Wire-Protokolle und Deserialisierungs-Primitiven.
 
-`contextra-wire` ist eine Unsafe-Insel für FlatBuffers IPC-Generat und Zero-Copy-Adapter (Ring 0).
-
-## Zweck
-
-Stellt auto-generierte FlatBuffers IPC-Bindings und Adapter für schnellen, allokationsfreien IPC-Datenaustausch bereit.
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 0 (Unsafe-Insel)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** `#![allow(unsafe_code)]` — Isoliert in `contextra-wire` für auto-generierten IPC-Code.
-
-## Öffentliche API-Übersicht
-
-- **Generated IPC:** `contextra_generated::mem_fuse::ipc::*`
-- **Adapter:** `adapter`
-
-## Architektur & Verweise
-
-Details zum IPC-Schema (§12) und CI-Drift-Gate finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) und `README.md` §12.
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Unsafe-Insel 3 von 3, FlatBuffers FFI)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types` (Spec §6.9, `capabilities.toml`)

@@ -2,26 +2,13 @@
 
 Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, Anhang A, `capabilities.toml`).
 
+## Rolle in einem Satz
+`contextra-ports` definiert sämtliche abstrakten Port-Traits und Schnittstellenverträge zur sauberen Entkopplung von Kern und Peripherie ohne eigene Implementierungen.
 
-`contextra-ports` definiert die abstrakten Trait-Interfaces für alle Contextra-Subsysteme (Ring 0).
-
-## Zweck
-
-Entkoppelt Ring 0/1/2/3-Komponenten durch `dyn`-kompatible Trait-Schnittstellen (Storage, VectorIndex, TextIndex, GraphIndex, Embedder, Clock, Rng, MetricsSink).
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 0 (Synchroner Ports-Kern)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-
-## Öffentliche API-Übersicht
-
-- **Futures/Streams:** `BoxFuture`, `BoxStream`
-- **Port Submodule:** `storage`, `vector_index`, `text_index`, `graph_index`, `embedding`, `checkpoint`, `lifecycle`, `observability`
-
-## Architektur & Verweise
-
-Details zur Entkopplung (P27) finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §3 und §4.2.
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Port-Fundament, deterministisch)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types` (Spec §6.9, `capabilities.toml`)

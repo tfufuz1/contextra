@@ -344,7 +344,7 @@ impl Default for RoleInterner {
 
 /// Sortiert und dedupliziert eine Menge von [`EntityId`]s in kanonischer (aufsteigender) Reihenfolge.
 ///
-/// Garantiert eine totale Ordnung zur Vermeidung von Lock-Order-Inversionen und
+/// Erzwingt eine totale Ordnung zur Vermeidung von Lock-Order-Inversionen und
 /// Deadlocks beim Belegen mehrerer Entitäts-Sperren (H2 / §5.1.2).
 #[inline]
 pub fn sort_dedup_entities(entities: &[EntityId]) -> Vec<EntityId> {
