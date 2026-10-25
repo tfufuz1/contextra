@@ -1,6 +1,6 @@
 # Contributing to Contextra
 
-Vielen Dank für dein Interesse, zu Contextra beizutragen! Dieses Dokument bündelt alle Richtlinien für Entwicklerinnen und Entwickler. Es basiert auf der normativen **Spezifikation 1.2** ([`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`](docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md), §27.0, §28.0) sowie den Governance-Regeln (§28.0).
+Vielen Dank für dein Interesse, zu Contextra beizutragen! Dieses Dokument bündelt alle Richtlinien für Entwicklerinnen und Entwickler. Es basiert auf der Normativen Gesamtspezifikation (Fassung 1.2; §27, §28).
 
 ## 1. Governance & Rangfolge (§28.0)
 
@@ -20,10 +20,11 @@ Es ist verboten, Qualitäts-Gates, Lints oder Toolchain-Pins durch Ausnahmen abz
 - **Just Task Runner:** `just` für Entwicklungsbefehle.
 
 ### Grundprinzipien & Invarianten
-- **Single-Node & Air-Gap (REQ-ARCH-001):** Keine Laufzeit-Annahmen über Cloud-Dienste; lokale Inferenz via Candle (`[R]`, §14.1) oder Ollama (`[R]`, §14.2).
-- **Zero-Panic-Doktrin (P7, §27.6):** Produktionscode darf im regulären Pfad niemals `panic!`, `.unwrap()` oder `.expect()` enthalten (`Result<T, E>` mit `ContextraError` nutzen).
-- **Safe Rust & Ring-Schichtenreinheit (§6.0, §6.10):** `#![forbid(unsafe_code)]` in allen Crates außerhalb der 3 Unsafe-Inseln (`contextra-simd`, `contextra-sys`, `contextra-wire`; §6.7). Abhängigkeiten fließen strikt unidirektional von Ring 4/3 nach Ring 0 (REQ-ARCH-003).
-- **Löschaussagen & Transparenz (INV-CLAIMS-1, REQ-DEL-006):** Aussagen zur Löschung folgen zwingend der Außenformulierung (§4.3, §20.12). Pauschale Werbeaussagen wie „100 % gelöscht“ oder „DSGVO-konform“ sind unzulässig.
+- **Single-Node & Air-Gap (§1, §4.1):** Keine Laufzeit-Annahmen über Cloud-Dienste; lokale Inferenz via Candle (`[R]`, §15) oder Ollama (`[R]`, §15).
+- **Zero-Panic-Doktrin (§3, §27.6):** Produktionscode darf im regulären Pfad niemals `panic!`, `.unwrap()` oder `.expect()` enthalten (`Result<T, E>` mit `ContextraError` nutzen).
+- **Safe Rust & Ring-Schichtenreinheit (§6.0, §6.10):** `#![forbid(unsafe_code)]` in allen Crates außerhalb der 3 Unsafe-Inseln (`contextra-simd`, `contextra-sys`, `contextra-wire`; §6.7). Abhängigkeiten fließen strikt unidirektional von Ring 4/3 nach Ring 0 (§6.10).
+- **Governance & Entwicklungsprozess (§28):** Änderungen an Vetos oder Invarianten benötigen eine ADR (`docs/decisions/`). Merges laufen serialisiert über eine Merge-Queue, die das Merge-Ergebnis testet (§28.2).
+- **Löschaussagen & Transparenz (INV-CLAIMS-1):** Aussagen zur Löschung folgen zwingend der Außenformulierung (§4.3, §20.12). Werbe- oder Pauschalaussagen zur Löschwirkung oder Rechtskonformität sind unzulässig (§4.3, §20.12).
 
 ### Local Build & Verification Commands
 ```bash
@@ -38,10 +39,10 @@ cargo xtask jules-preflight             # Preflight Verification Gate
 
 1. **Branching & Arbeitsablauf:** Erstelle einen Feature-Branch für deine Änderungen. Halte Diffs minimal und fokussiert (Minimal-Diff-Prinzip).
 2. **Preflight Checks:** Führe vor jedem PR `cargo xtask jules-preflight` aus. Alle Gates müssen lokal grün sein (§27.6).
-3. **Pull Request:** Reiche den PR ein. Stelle sicher, dass Commit-Nachrichten präzise sind und Invarianten (§5.2) nicht verletzt werden.
+3. **Pull Request:** Reiche den PR ein. Stelle sicher, dass Commit-Nachrichten präzise sind und Invarianten (§5) nicht verletzt werden.
 4. **Lizenzierung:** Beiträge stehen unter der [MIT License](LICENSE-MIT) und der [Apache License 2.0](LICENSE-APACHE).
 
-## 4. Testregeln & Qualitätssicherung (§27.0)
+## 3. Testregeln & Qualitätssicherung (§27)
 
 ### Testregeln & -kategorien (§27.1–§27.5)
 - **Anti-Mirroring-Prinzip:** Assertions müssen mit unabhängig ermittelten Referenzwerten arbeiten (kein Wiederholen der Formel im Test).
@@ -60,4 +61,5 @@ cargo test --workspace                  # Alle Workspace-Tests
 
 - **Systemarchitektur & Ring-Modell:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - **Agenten-Betriebsanleitung:** [`AGENTS.md`](AGENTS.md)
+- **Governance & Entwicklungsprozess:** [`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`](docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md) (§28)
 - **Normative Spezifikation:** [`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`](docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md)

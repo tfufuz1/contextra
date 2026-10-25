@@ -1,27 +1,51 @@
-# Statusbericht Abweichungen Lane L1 (Root-Dokumente)
+# Abweichungsbericht Lane L1 — Root-Dokumente
 
-Dieses Dokument erfasst alle im Rahmen von Lane L1 identifizierten Abweichungen, Vorbehalte und offenen Punkte gemäß den Vorgaben der Spezifikation 1.2 (§28.5).
-
----
-
-## Übersicht der behobenen Abweichungen
-
-| Datei | Spezifikationsabschnitt | Behobene Abweichung / Anpassung |
-|---|---|---|
-| `README.md` | §2.0, §4.3, §6.0, §13.1, §20.12 | Produktbeschreibung auf Missionen M1–M5 ausgerichtet; M1 (persistenter Prefix-Cache) explizit als Zielzustand/Opt-in gekennbezeichnet; Löschaussagen strikt nach INV-CLAIMS-1 (§4.3, §20.12) bereinigt; Crate-Tabelle an `capabilities.toml` und §6.0 angepasst. |
-| `ARCHITECTURE.md` | §6.0, §6.7, §6.8, §6.10, §6.11 | 5-Ring-Modell (Ring 0–4), Kantenregeln (§6.10), Kern-Geschlossenheit (§6.8) ohne Async in Ring 0 (P26), Rand-Brücken (§6.11) über `contextra-ports` und 3 Unsafe-Inseln (§6.7) vollständig spezifikationskonform dokumentiert; Crate-Inventar mit `capabilities.toml` abgeglichen. |
-| `docs/CHANGELOG.md` | §0.1, §34 | Eintrag „Spezifikation 1.2 übernommen“ mit Referenz ergänzt; historische Versionstabelle unverändert erhalten. |
-| `CONTRIBUTING.md` | §27.0, §28.0, REQ-QA-010 | Quell- und Entscheidungs-Rangfolge (§28.1) und Verbot der Gate-Schwächung (REQ-QA-010) aufgenommen. |
-| `SECURITY.md` | §10.0, §19.1, §30.0 | Bedrohungs- und Sicherheitsmodell explizit auf §30.0 und §10.0 referenziert; Ingestion- und Provenienz-Regeln (INV-PROVENANCE-1) verankert. |
-| `AGENTS.md` | §28.1, REQ-QA-010 | Verbindliche Rangfolge (§28.1) als erste Sektion verankert; Anti-Gaming / REQ-QA-010 gehärtet; Systemregeln in prägnanter Kurzform mit Paragraphenverweisen (§0–§34) konsolidiert. |
+**Stand:** 2026-10-25
+**Bezugs-Spezifikation:** CONTEXTRA Normative Gesamtspezifikation Fassung 1.2 (final)
+**Verifizierte Grundlagen:** `capabilities.toml` (Schema 2, Spec v4), Spezifikation 1.2 (§0–§34, Anhang A).
 
 ---
 
-## Verbleibende Vorbehalte & Ununsichere Stellen
+## Übersicht der behobenen Abweichungen je Spezifikationsabschnitt
 
-1. **Persistenter KV-Prefix-Cache (M1 / B1–B3, §13.1):** Der In-Memory-Prefix-Store ist im Code vorhanden, die persistenten Segmentdateien und das B1–B3 Tiering (§13.1) verbleiben im Zielzustand und sind in der Dokumentation entsprechend als Opt-in/Zielzustand ausgewiesen.
-2. **Qualitäts-Gate-Status im Repository:** Dokumentations-Linter/Gates im Repository weisen unabhängig von Lane L1 bestehende Vorerkrankungen auf (z. B. verwaiste Crate-Referenzen in Inline-Analyse-Dateien oder veraltete Datum-Header in Hilfs-Dokumenten). An Produktionscode-Logik oder Gate-Skripten wurden vereinbarungsgemäß (Regel 7) keine Änderungen vorgenommen.
+### 1. Spezifikationsbezug und Dokumentenstand (§0, §1)
+- **Ist-Zustand (vorbehalten):** `README.md`, `ARCHITECTURE.md` und `SECURITY.md` verwiesen auf „Normative Gesamtspezifikation v1.1“ bzw. „Systemspezifikation v15“.
+- **Abweichung:** Veraltete Dokumentenversionierung und falsche Spezifikationsreferenz.
+- **Soll-Zustand (§0):** Alle Root-Dokumente verweisen einheitlich auf Spezifikation Fassung 1.2 als einzige Quelle der Soll-Architektur.
+- **Status:** Behoben.
 
----
+### 2. Produktmissionen und M1-Aussagen (§2, §13.1)
+- **Ist-Zustand:** `README.md` behauptete M1 (persistenter Prefix-Cache) als aktive/stable Eigenschaft.
+- **Abweichung:** Die Bedingungen B1–B3 (§13.1) für die M1-Behauptung (Löschkette, external_kv Generator, Break-even-Gate) sind im Ist-Zustand nicht vollständig maschinell belegt.
+- **Soll-Zustand (§2, §13.1, REQ-KVC-001):** M1 wird nicht als Ist-Zustand behauptet, sondern als Rand-Funktion `[R]` (experimental) klassifiziert, solange B1–B3 nicht erbracht sind.
+- **Status:** Behoben.
 
-*Stand: 2026-10-25 — Erstellt für Lane L1 (Root-Dokumente) unter Spezifikation 1.2.*
+### 3. Invarianten, Vetos & Löschaussagen (§4.3, §20.12, INV-CLAIMS-1)
+- **Ist-Zustand:** `README.md`, `CONTRIBUTING.md` und `SECURITY.md` enthielten nicht-konforme Phrasen zur Löschgarantie und rechtlichen Konformität.
+- **Abweichung:** Verstoß gegen INV-CLAIMS-1 (§4.3) und Terminology-Vorgaben nach §20.12.
+- **Soll-Zustand:** Aussagen zur Löschung nutzen ausschließlich die verbindliche Außenformulierung nach §4.3 und Claim-Taxonomie (§20.12). Keine Pauschalversprechen.
+- **Status:** Behoben.
+
+### 4. Ring-Modell, Crate-Inventar, Kantenregeln & Rand-Brücken (§6.0, §6.7, §6.8, §6.10, §6.11)
+- **Ist-Zustand:** `ARCHITECTURE.md` hatte teilweise abweichende Crate-Klassifizierungen und veraltete Spezifikationsverweise.
+- **Abweichung:** Abweichung von `capabilities.toml` (INV-DOC-SINGLE-SOURCE-1) und fehlende explizite Darstellung der Kantenregeln (§6.10), Rand-Brücken (§6.11), Unsafe-Inseln (§6.7) sowie Kern-Geschlossenheit (§6.8).
+- **Soll-Zustand:** Crate-Tabelle entspricht 1:1 `capabilities.toml`. Architektur beschreibt Kantenregeln, Rand-Brücken und genau 3 Unsafe-Inseln (`simd`, `sys`, `wire`).
+- **Status:** Behoben.
+
+### 5. Changelog-Dokumentation (§28.5)
+- **Ist-Zustand:** `docs/CHANGELOG.md` enthielt keine Aktualisierung bezüglich Spezifikation 1.2.
+- **Abweichung:** Fehlende Dokumentation des Spezifikations-Upgrades im Tag-/Review-Bericht.
+- **Soll-Zustand:** Eintrag „Spezifikation 1.2 übernommen“ hinzugefügt, ohne historische Einträge zu verfälschen.
+- **Status:** Behoben.
+
+### 6. Governance und Sicherheitsmodell (§28, §30)
+- **Ist-Zustand:** `CONTRIBUTING.md` und `SECURITY.md` verwiesen nicht explizit auf §28 und §30 der Spezifikation 1.2.
+- **Abweichung:** Fehlende normative Querverweise.
+- **Soll-Zustand:** `CONTRIBUTING.md` verweist auf Governance (§28), `SECURITY.md` auf das Sicherheitsmodell (§30).
+- **Status:** Behoben.
+
+### 7. Quellen-Rangfolge und Gate-Integrität in `AGENTS.md` (§0, §1, §4.1, §5, REQ-QA-010)
+- **Ist-Zustand:** `AGENTS.md` definierte keine eindeutige Rangfolge der Informationsquellen.
+- **Abweichung:** Verstoß gegen das Gebot der klaren Hierarchie und Missbrauchsgefahr bei Gate-Ausnahmen.
+- **Soll-Zustand:** `AGENTS.md` legt fest: Spezifikation 1.2 (§0, §1) > Vetos & Prinzipien (§4.1, §5) > `capabilities.toml` > `AGENTS.md` > Code & grüne Gates. Gates dürfen nicht geschwächt werden (REQ-QA-010).
+- **Status:** Behoben.
