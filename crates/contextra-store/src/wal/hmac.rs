@@ -188,10 +188,12 @@ impl Wal {
         self.get_integrity_key()
     }
 
-    #[doc(hidden)]
-    #[allow(clippy::expect_used)]
+    #[cfg(test)]
     pub fn legacy_integrity_key_for_test() -> [u8; 32] {
-        legacy_integrity_key().expect("Legacy WAL key support is disabled at compile time.")
+        match legacy_integrity_key() {
+            Ok(key) => key,
+            Err(e) => panic!("Legacy WAL key support is disabled or unavailable: {e}"),
+        }
     }
 
     /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).
