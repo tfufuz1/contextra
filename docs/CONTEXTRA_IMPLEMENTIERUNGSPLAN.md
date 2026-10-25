@@ -2,9 +2,9 @@
 
 ```
 Dokument:  Begleitende Arbeitsunterlage zur Gesamtspezifikation (Dokument A)
-Bezug:     CONTEXTRA_SPEZIFIKATION.md, Fassung 1.2
+Bezug:     CONTEXTRA_SPEZIFIKATION.md, Fassung 1.3
 Code-Basis: https://github.com/tfufuz1/contextra, HEAD ef31d872c (2026-10-24)
-Stand:     2026-10-25
+Stand:     2026-10-25 (Plan 1.3: Löschkette ergänzt; Code-Befunde am selben HEAD)
 Evidenz:   Statusangaben E1 (am Code gelesen, §27.7 der Spezifikation)
 ```
 
@@ -33,10 +33,14 @@ Gelesen am Commit ef31d872c. „Kein Treffer“ heißt: Textsuche (`grep`) in `c
 |Δ-09|Kein `clippy.toml` im Wurzelverzeichnis.|Versionierte `clippy.toml` mit `disallowed-*` und begründeter Allowlist (REQ-ARCH-022, P28)|PH0|
 |Δ-10|`xtask/src/main.rs` kennt `workspace-verify` (Modi fast/audit/full), aber keinen Befehl `verify`. Kein Workspace `xtask-heavy`.|`cargo xtask verify` mit Evidenzdatei je Gate (§27.10, REQ-QA-001); `xtask-heavy` für Fuzz/Miri/Mutation/Chaos (§6.6)|PH0|
 |Δ-11|Kein Treffer für das Gate `deletion-honesty`; `governance/security_ports.toml` existiert nicht.|Gate `deletion-honesty` (AC-10); Port-Liste in `governance/security_ports.toml` (INV-WIRING-2, REQ-DEL-023)|PH0, PH4|
+|Δ-12|`contextra-checkpoint`: `hardlink_cloner.rs` klont SSTables per Hardlink; `restore_checkpoint` (`store.rs:647`) kennt weder `ErasedSet` noch Restore-Guard noch Höchstalter. `DeletionLayer` in `crypto/src/deletion_proof.rs` hat keine Checkpoint-Variante (E1).|Achte Löschschicht `Checkpoints` mit Participant, `checkpoint_policy`; Restore-Guard und Restore-Horizont (§20.2b Punkt 7, §20.4a, §20.9, INV-RESTORE-HORIZON-1, REQ-DEL-032, -034)|PH4|
+|Δ-13|Es gibt keinen `K_commit`: Commitments und Zweckregister kennen keinen Epochenschlüssel; `ErasedSet` trägt keine Epoche (E1: kein Treffer).|Epochenweise zufällige, gewrappte `K_commit[tenant, epoche]` mit Ablauf; neuer Eintrag in `governance/key_purposes.toml` (§20.11, §20.2c, REQ-DEL-033)|PH0, PH4|
+|Δ-14|Kein Scanner liest die entschlüsselte Sicht und keiner führt eine positive Kontrolle; `ScanMethod` kennt kein `DecryptedViewScan`; `ResidualReport` hat kein Feld `control_matches` (E1, Lesen von `deletion_proof.rs`).|Scanner in Rohsicht und entschlüsselter Sicht mit positiver Kontrolle; Beweisformat V4 trägt `control_matches` (§20.8 Punkt 7, §20.15, AC-1, AC-7)|PH4|
+|Δ-15|Keine Frist- und Eskalationslogik für `Partial`; kein Löschinventar in `doctor`; Außentexte ungeprüft gegen Claims (E1: kein Treffer).|Schwellen `partial_*`, Alarm/Eskalation, Löschinventar, Textvergleich im Gate `deletion-honesty` (§20.10, §20.17, §25.6, REQ-DEL-035..037)|PH4, PH5, PH6|
 
 **Bereits erfüllt (E1, ohne Anspruch auf Vollständigkeit):** 33 Verzeichnisse unter `crates/` (entspricht §6.6: 32 plus `core`); genau drei Crates mit `unsafe_island = true` (`simd`, `sys`, `wire`) und `forbid(unsafe_code)` in den `lib.rs` aller übrigen Crates; `FaultVfs`, `ManualClock` und ein Referenzmodell in `testkit`; Fuzz-Targets in `mcp`, `text` und `db`; Ratchet- und Baseline-Dateien unter `governance/`; Gates für Ring-Layering, Ring-0-Async-Reinheit und Ring-/Capabilities-Konsistenz in `xtask`; `LicenseGate` als Port.
 
-**Nicht untersucht (vor Planbeginn zu klären, kein Befund):** Sidecar-Logs (§7.11) und Zweckregister (§20.2c) im Code; Notreserve und Notlöschpfad (§7.12); Startsequenz B0–B9 (§22.1); Tenant-Lebenszyklus (§24.5); ob `DeletionLayer` genau die sieben Schichten aus §20.4 abbildet; ob `DeletionProof` Formatversion 4 trägt; ob SSI (INV-SSI-ACTIVE-1) im Produktionspfad aktiv ist; Schlüsselhierarchie und Verwahrungsstufen K0 bis K3; Wasmtime-Version gegen die Herstellerlinie (§14.3, §28.4); Stand der Abnahmekriterien AC-1 bis AC-15; Ist-Werte der Messverträge aus §26. Jeder dieser Punkte wird in der Eingangsprüfung der jeweiligen Phase als Δ-Eintrag nachgetragen.
+**Nicht untersucht (vor Planbeginn zu klären, kein Befund):** Sidecar-Logs (§7.11) und Zweckregister (§20.2c) im Code; Notreserve und Notlöschpfad (§7.12); Startsequenz B0–B9 (§22.1); Tenant-Lebenszyklus (§24.5); ob `DeletionLayer` genau die acht Schichten aus §20.4 abbildet; ob `DeletionProof` Formatversion 4 trägt; ob SSI (INV-SSI-ACTIVE-1) im Produktionspfad aktiv ist; Schlüsselhierarchie und Verwahrungsstufen K0 bis K3; Wasmtime-Version gegen die Herstellerlinie (§14.3, §28.4); Stand der Abnahmekriterien AC-1 bis AC-20; Ist-Werte der Messverträge aus §26. Jeder dieser Punkte wird in der Eingangsprüfung der jeweiligen Phase als Δ-Eintrag nachgetragen.
 
 ---
 
@@ -101,7 +105,7 @@ flowchart LR
 |0.5|`governance/security_ports.toml` mit Accept-All-Erkennung; Gate `deletion-honesty` (konstante Messwerte, verworfene Verifier-Ergebnisse, unbedingte `Ok(true)`)|INV-WIRING-2, INV-DELETION-PORTS-1, REQ-DEL-023, AC-10|
 |0.6|Workspace `xtask-heavy` für Fuzz, Miri, Mutation, Chaos; „SKIPPED“ gilt als rot|§6.6, REQ-QA-004, -005|
 |0.7|Unabhängiger Runner für Gate-Läufe festlegen (außerhalb der Agenten-Infrastruktur)|REQ-QA-009, §28.1 Punkt 1|
-|0.8|`governance/key_purposes.toml` (Zweckregister §20.2c) mit Gate: jedes HKDF-Label im Code steht im Register, Labels sind paarweise verschieden|INV-KEYPURPOSE-1, REQ-KEY-011|
+|0.8|`governance/key_purposes.toml` (Zweckregister §20.2c, einschließlich `K_commit[tenant, epoche]` als zufälliger, nicht abgeleiteter Schlüssel) mit Gate: jedes HKDF-Label im Code steht im Register, Labels sind paarweise verschieden|INV-KEYPURPOSE-1, REQ-KEY-011|
 
 **Abnahme PH0.** (1) `cargo xtask verify` läuft vollständig und schreibt je Gate eine Evidenzdatei; (1a) das Zweckregister-Gate ist grün und rot bei einem nicht registrierten Label; (2) ein absichtlich ausgelassenes Gate färbt den Lauf rot; (3) das Doc-Truth-Gate meldet rot, wenn in einer Testkopie der Spezifikation eine `INV-*` in §5.2 oder §27.6 fehlt; (4) Δ-01, Δ-09, Δ-10, Δ-11 sind geschlossen. Evidenz: E2.
 
@@ -157,7 +161,7 @@ flowchart LR
 
 ### PH4 — Kryptografie und Löschpfad
 
-**Ziel.** G2 und G3 sind belegt; `forget` löst alle sieben Schichten aus und erzeugt einen ehrlichen Beweis.
+**Ziel.** G2 und G3 sind belegt; `forget` löst alle acht Schichten aus und erzeugt einen ehrlichen Beweis.
 
 |WP|Arbeitspaket|Anker|
 |---|---|---|
@@ -166,15 +170,20 @@ flowchart LR
 |4.3|`KeyCustodian`-Implementierungen mit Verwahrungsstufen K0 bis K3; Claims nur bei K2 (mit Warnung) und K3 (attestiert)|F-08, §20.2a, §20.12, AC-14, AC-15|
 |4.4|Epochenmodell (`TenantKek` → `EpochKek` → `DocDek`/`SegKey`) für `erasure_required`; Re-Wrap statt Datenrewrite|F-01, §20.2b, REQ-DEL-024..026, REQ-KEY-007|
 |4.5|`DeletionProof` Formatversion 4 (Lesen v1 bis v3), `verify_external` nur aus `crypto`+`types`; Referenz-Verifier in anderer Sprache|§20.5, REQ-DEL-017, INV-PROOF-KEY-1|
-|4.6|Typestate-Builder: Beweis nur bei lückenloser Schichtabdeckung; jede der sieben Schichten genau einmal belegt oder mit `UncoveredReason` signiert|INV-DELETION-WIRE-1, INV-PROOF-COVERAGE-1, REQ-DEL-001, -003|
+|4.6|Typestate-Builder: Beweis nur bei lückenloser Schichtabdeckung; jede der acht Schichten genau einmal belegt oder mit `UncoveredReason` signiert|INV-DELETION-WIRE-1, INV-PROOF-COVERAGE-1, REQ-DEL-001, -003|
 |4.7|`ErasureParticipant` je Schicht, Messung nur vom Scanner der Schicht (`units_scanned > 0`); Löschsaga durabel, idempotent, wiederaufnehmbar; Lesesperre und Key-Lock; Legal Hold|§20.8..§20.10, REQ-DEL-008, -011, -012, -014, -018|
 |4.8|`RevocationLog` und `AuditChain` durabel, tenant-getrennt; INV-SHRED-1 (Schlüsselvernichtung und Log-Eintrag durable vor Receipt)|INV-SHRED-1, REQ-DEL-002, -022, REQ-AUD-001|
 |4.9|Kaskade über Lineage auf Ableitungen|INV-DERIVED-1, REQ-DEL-007|
-|4.10|Canary-Läufe über das gesamte Datenverzeichnis plus unabhängiger Zweitzeuge; Abnahmekriterien AC-1 bis AC-15|§27.9, §20.14|
+|4.10|Canary-Läufe über das gesamte Datenverzeichnis in Rohsicht und entschlüsselter Sicht mit positiver Kontrolle, plus unabhängiger Zweitzeuge; Abnahmekriterien AC-1 bis AC-20|§27.9, §20.14|
 |4.11|Externe Zusicherungen aus der belegten Garantiestufe generieren|INV-CLAIMS-1, REQ-DEL-006|
 |4.12|Lesesperre für historische Lesezugriffe: `as_of`, offene Snapshots und Checkpoint-Lesen prüfen den `ErasedSet`; Snapshot-Höchstalter `snapshot_max_age` mit `SnapshotExpired` (setzt WP 3.1 voraus)|INV-ASOF-ERASE-1, REQ-DEL-030, -031, §8, §20.9|
+|4.13|Schicht `Checkpoints`: Variante in `DeletionLayer` (Format V4), `ErasureParticipant` im Crate `checkpoint`, Scanner über Checkpoint-Dateien, `checkpoint_policy` (`ExpireNow`, `Rewrite`, `ExpireAfterHold`), `Partial{outstanding: Checkpoints}` mit Ablaufdatum. Voraussetzung: WP 1.2 (Typen genau einmal), WP 4.6|F-09, REQ-DEL-034, AC-16, Δ-12|
+|4.14|Restore-Guard und Restore-Horizont in `restore_checkpoint` und Import; Erzeugungszeit im signierten Manifest; Konfigurationsprüfung `backup_max_age ≤ erased_set_retention`|INV-RESTORE-HORIZON-1, REQ-DEL-032, AC-17, Δ-12|
+|4.15|`K_commit[tenant, epoche]`: zufällig, gewrappt, Epochenlänge `commit_epoch_len`, Vernichtung nach Epochenende + Aufbewahrung, Eintrag im `RevocationLog`; Zweckregistereintrag (WP 0.8); `ErasedSet` mit Epoche|F-10, REQ-DEL-033, AC-18, Δ-13|
+|4.16|Gate `deletion-honesty` um Textvergleich gegen die Claims der Standardkonfiguration (K1) erweitern; Außentext aus dem Beweis erzeugen (Vorlage §4.3)|F-11, REQ-DEL-035, AC-19, Δ-15|
+|4.17|Frist- und Eskalationslogik der Saga (`partial_alarm_after`, `partial_escalate_after`, `partial_deadline_report`) mit `ManualClock`; Löschinventar in `doctor` (CLI-Anteil in PH6)|REQ-DEL-036, -037, AC-20, §20.10, §20.17, Δ-15|
 
-**Abnahme PH4.** AC-1 bis AC-15 grün (u. a. Canary-Scan ohne Klartexttreffer, Crash-Matrix über jeden Journalzustand, Beweis-Negativsuite, bytegleicher Beweis mit `ManualClock`); Gate `deletion-honesty` grün und selbst per Mutation wirksam (AC-2, AC-10). Zusätzlich: Referenzmodelltest „`as_of` nach Löschung“ grün (INV-ASOF-ERASE-1). Evidenz: E3, G2/G3-Orakel E4. Rechtsfragen (§20.13) sind **kein** Abnahmekriterium dieser Phase, sondern Voraussetzung für Produkttexte (PH7).
+**Abnahme PH4.** AC-1 bis AC-20 grün (u. a. Canary-Scan ohne Klartexttreffer, Crash-Matrix über jeden Journalzustand, Beweis-Negativsuite, bytegleicher Beweis mit `ManualClock`); Gate `deletion-honesty` grün und selbst per Mutation wirksam (AC-2, AC-10). Zusätzlich: Referenzmodelltest „`as_of` nach Löschung“ grün (INV-ASOF-ERASE-1); Restore über dem Horizont wird verweigert (INV-RESTORE-HORIZON-1); der Scanner schlägt auf dem Kontroll-Datensatz an (AC-1). Evidenz: E3, G2/G3-Orakel E4. Rechtsfragen (§20.13) sind **kein** Abnahmekriterium dieser Phase, sondern Voraussetzung für Produkttexte (PH7).
 
 ### PH5 — Orchestrierung und Fassade
 
@@ -187,7 +196,7 @@ flowchart LR
 |5.3|Embedding-Identität: `embedding_model_hash` und Dimension je Collection, Abweisung bei Abweichung, Re-Embedding-Migration; kein Platzhalter-Embedder in Release-Features|INV-EMBED-1/-2, REQ-IDX-011, REQ-FAC-004|
 |5.4|Retention-Reaper mit WAL-Record je Entscheidung, Dry-run, Karenzzeit; Decay löscht nie|INV-RETENTION-1, §16.4|
 |5.5|`db`: Collections, Transaktionen, Tenant-Scoping aus der Transaktion; kennt keine Inferenz-Backends|INV-TENANT-1, REQ-TEN-001..003|
-|5.6|`contextra`: einzige Composition Root; Verdrahtungs-Selbsttest beim Start; Sicherheits-Ports ohne Null-/Accept-All-Standard; `forget` über alle sieben Schichten|REQ-FAC-001..003, INV-WIRING-2, INV-DELETION-WIRE-1|
+|5.6|`contextra`: einzige Composition Root; Verdrahtungs-Selbsttest beim Start; Sicherheits-Ports ohne Null-/Accept-All-Standard; `forget` über alle acht Schichten|REQ-FAC-001..003, INV-WIRING-2, INV-DELETION-WIRE-1|
 |5.7|Logs, Metriken, Fehlertexte ohne Nutzinhalte; Log-Scanner|INV-LOG-1, REQ-AUD-002|
 |5.8|Startsequenz B0–B9 (§22.1): jede Phase mit eigenem Verweigerungsfall; Lesesperre vor dem ersten Lesepfad armiert|INV-BOOT-1, REQ-FAC-005|
 |5.9|Tenant-Lebenszyklus (§24.5) und Quoten je Enterprise-Profil; `erase_tenant` als Saga über alle Scopes|REQ-TEN-004, -005|
@@ -248,7 +257,7 @@ Ohne Release-Zusage und ohne Beweislast für den Kern. Vorgehen: (1) `audit-expo
 
 ## 5. Zuordnung aller Invarianten zu Phasen
 
-Die Tabelle wird aus dem Register in §5.2 der Spezifikation erzeugt und führt alle 67 Invarianten. „Phase“ nennt, wo die Invariante eingeführt bzw. abgenommen wird; bei mehreren Phasen ist die letzte die Abnahme. Die Mechanismen entsprechen §27.6.
+Die Tabelle wird aus dem Register in §5.2 der Spezifikation erzeugt und führt alle 68 Invarianten. „Phase“ nennt, wo die Invariante eingeführt bzw. abgenommen wird; bei mehreren Phasen ist die letzte die Abnahme. Die Mechanismen entsprechen §27.6.
 
 |ID|Kl.|Phase|Mechanismus|
 |---|---|---|---|
@@ -302,6 +311,7 @@ Die Tabelle wird aus dem Register in §5.2 der Spezifikation erzeugt und führt 
 |INV-SIDECAR-1|`[K]`|PH2, PH4|G + C + I|
 |INV-EMERGENCY-DEL-1|`[K]`|PH2, PH4|C + I|
 |INV-ASOF-ERASE-1|`[K]`|PH4|P + L|
+|INV-RESTORE-HORIZON-1|`[K]`|PH4|I + C + G|
 |INV-BOOT-1|`[K]`|PH5|I + C|
 |INV-KEYPURPOSE-1|`[K]`|PH0, PH4|G + P|
 |INV-ADMISSION-1|`[R]`|PH8|T + P + F|
@@ -334,6 +344,9 @@ Die Tabelle wird aus dem Register in §5.2 der Spezifikation erzeugt und führt 
 |R-6|Große Rand-Crates (z. B. `graph`) sind umfangreich.|Gefahr, den Kern durch Rand-Arbeit zu belasten.|Strikte Feature-Flag-Trennung; PH8 erst nach dem jeweiligen Kern-Anker.|
 |R-7|Offene Prüfpunkte aus Abschnitt 1 („Nicht untersucht“).|Δ-Liste kann wachsen.|Eingangsprüfung je Phase, Ergebnis als Δ-Eintrag; Plan bei Bedarf fortschreiben, Dokument A bleibt unberührt.|
 |R-8|Sidecar-Logs erhöhen die Zahl der `fsync`-Punkte je Löschoperation (§7.11).|Latenz von `forget` und Kosten je Schreibvorgang steigen.|Benchmark in PH2 mit Schwellwert; Commit-Kosten bleiben ein Flush je WAL-Batch (§7.11 Regel 2).|
+|R-10|Hardlink-Checkpoints erreichen physisches Löschen nicht (Δ-12); `Rewrite` kostet Zeit und Wiederherstellungspunkte.|`forget` bleibt bis zum Ablauf `Partial`; Latenz und Platz steigen.|`erasure_required` zuerst für personenbezogene Collections klären (ADR, P-15); Benchmark `Rewrite` in PH4; Standard `ExpireAfterHold`.|
+|R-11|Ablauf von `K_commit` und Restore-Horizont verändern das Verhalten bestehender Verzeichnisse.|Alte Checkpoints werden verweigert; `ErasedSet`-Format erhält die Epoche.|Format-ADR vor WP 4.15 (INV-FORMAT-1); Lesen älterer Einträge als Epoche 0; Migration mit Vorab-Backup.|
+|R-12|Außentexte und Fristwerte sind Rechtsfragen (P-15 bis P-20).|Technische Abnahme grün, Aussage nicht freigegeben.|Werte als Startwerte (§25.6) markiert; Freigabe vor PH7 (R-4); kein Produkttext vor Gate-Grün und Rechtsprüfung.|
 |R-9|Anhang-A-Namen im Körper sind teils abweichend (A.2, Namensauflösung); ungeklärte Namen bleiben offen.|Gate-Fehler bei Abnahme, falls ungeklärt.|Zuordnung vor Beginn von PH8 festlegen; Doc-Truth-Gate prüft die Auflösungstabelle.|
 
 ---
