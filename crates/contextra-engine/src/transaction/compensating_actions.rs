@@ -213,12 +213,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAct
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
             );
             for &doc_id in self.doc_ids.iter() {
-                let eid_val = u64::try_from(doc_id.inner()).map_err(|_| {
-                    ContextraError::InvalidInput(format!(
-                        "DocId {} exceeds u64::MAX for EntityId conversion",
-                        doc_id.inner()
-                    ))
-                })?;
+                let eid_val = doc_id.inner();
                 let eid = EntityId::new(eid_val);
                 let _ = self
                     .collection
@@ -262,14 +257,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
                 let chunk_ids: Vec<u64> = self
                     .doc_ids
                     .iter()
-                    .map(|d| {
-                        u64::try_from(d.inner()).map_err(|_| {
-                            ContextraError::InvalidInput(format!(
-                                "DocId {} exceeds u64::MAX for chunk_id conversion",
-                                d.inner()
-                            ))
-                        })
-                    })
+                    .map(|d| Ok::<u64, ContextraError>(d.inner()))
                     .collect::<Result<Vec<u64>>>()?;
                 kv_store.on_rollback(self.tenant_id, &chunk_ids);
             }
