@@ -4,6 +4,7 @@
 
 | Zeitstempel | Crate/Datei | Typ | ID | Session | Status | Review-Pässe (unabhängig) | Beschreibung |
 |---|---|---|---|---|---|---|---|
+| `TS:2026-10-25T00:00:00Z` | `docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md` | `SPEC-MIGRATION` | `SPEC-1.2` | `L1` | `ADOPTED` | `1` | Spezifikation 1.2 übernommen (§0.1, §34). |
 | `TS:2026-10-01T00:00:00Z (SESSION: 5a38054a)` | `crates/contextra-agent/src/graph.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Declarative StateGraph definition routing workflow step transitions. |
 | `TS:2026-10-01T00:00:00Z (SESSION: 088b4a44)` | `crates/contextra-agent/src/goal_condition.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Strukturierte, deterministische Auswertung von Teilziel-Bedingungen (GoalCondition) für Agentenschritte. |
 | `TS:2026-10-01T00:00:00Z` | `crates/contextra-agent/src/clm_scratchpad.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Temporärer, aufgabengebundener Kontext-Scratchpad für sehr lange Agentenschleifen (Context-Language-Model). |
