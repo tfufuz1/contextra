@@ -1,33 +1,16 @@
 # contextra-vector
 
-Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung).
+Vektorsuche und Indexierung (HNSW, DiskANN, SQ8 Quantisierung).
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, §9.2, §9.3, `capabilities.toml`).
 
+## Rolle in einem Satz
+`contextra-vector` implementiert speichereffiziente Vektorindexierung und Ähnlichkeitssuche (HNSW, SQ8, ACL-Bitset) mit Mandantenisolation und Tombstone-Pruning.
 
-`contextra-vector` stellt den HNSW- und DiskANN-Vektorindex sowie Skalar-/RaBitQ-Quantisierung bereit (Ring 0 / In Migration nach `contextra-vector`).
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Vektorindexierung)
+- **Klasse:** Kern `[K]`
+- **Reifegrad:** `stable`
+- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-simd` (Spec §6.9, `capabilities.toml`)
 
-## Zweck
-
-Core Vector Search Engine für k-NN Abfragen, HNSW-Graphaufbau, DiskANN Disk-Backed Indexierung, SQ8 Skalarquantisierung und Mmap-Persistenz.
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 0 (Synchroner Vektorindex-Kern)
-- **Status:** 🟡 In Migration (Zielzustand: `contextra-vector`)
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]` (SIMD-Kernels wurden nach `contextra-simd` ausgelagert)
-
-## Öffentliche API-Übersicht
-
-- **HNSW Index:** `HnswIndex`, `HnswConfig`, `RebuildStatus`
-- **DiskANN Index:** `DiskAnnIndex`, `DiskAnnConfig`, `DiskAnnFallbackPolicy`
-- **Quantisierung:** `ScalarQuantizer`, `RaBitQQuantizer`
-- **Persistenz:** `HnswHeader`, `MmapIndex`
-
-## Safety & SIMD Isolation
-
-Im Zuge der Zielarchitektur v2 wurden alle hardwarenahen SIMD-Assembly/Intrinsics-Codeblöcke aus `contextra-vector` in das dedizierte Unsafe-Insel-Crate `contextra-simd` ausgelagert. `contextra-vector` selbst erzwingt `#![forbid(unsafe_code)]`.
-
-## Architektur & Verweise
-
-Details zum HNSW- und DiskANN-Index finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §7.4.
+*Sicherheits & Lösch-Invarianten:* VETO-F02 (Tombstone-Pruning ohne kryptographische Löschbeweise), INV-TENANT-IDX-1 (mandantenisolierte Vektorräume).

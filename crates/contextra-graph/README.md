@@ -2,28 +2,13 @@
 
 CSR Graph-Engine, Path Graphing und GraphRAG Community Detection.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+Normativitätsklasse: **Rand `[R]`** (Ring 0, `experimental`; §6.1, §6.9, §11, `capabilities.toml`).
 
+## Rolle in einem Satz
+`contextra-graph` stellt strukturelle Graph-Traversierung, CSR-Repräsentation, PPR und Community Detection für GraphRAG bereit.
 
-`contextra-graph` stellt die CSR-Graphstruktur, Personalized PageRank und n-äre Hyperkanten bereit (Ring 0).
-
-## Zweck
-
-Verwaltet gerichtete Wissensgraphen in CSR-Repräsentation, Forward-Push PPR (Andersen-Chung-Lang), Leiden Community Detection, n-äre Hyperkanten (`relate_n_ary`) und kaskadierende Invalidierung.
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 0 (Synchroner Graph-Kern)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-
-## Öffentliche API-Übersicht
-
-- **CSR Graph:** `CsrGraph`, `PathGraph`, `PathRAGEngine`
-- **Hyperkanten:** `HyperEdge`, `HyperEdgeId`, `RoleBinding`, `RoleId`, `RoleInterner`
-- **Cascade Invalidierung:** `cascade_invalidate_edges_for_superseded_doc`, `cascade_invalidate_hyperedges_for_superseded_doc`, `HyperedgeCascadeReport`
-- **Community Detection:** `detect_communities`, `CommunityDetectionConfig`, `StarExpansionIterator`
-
-## Architektur & Verweise
-
-Details zum Wissensgraphen, RCU-Snapshots und Hyperkanten finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §6.
+## Ring, Klasse & Reifegrad
+- **Ring:** Ring 0 (Graph-Engine)
+- **Klasse:** Rand `[R]`
+- **Reifegrad:** `experimental` (abweichend in `capabilities.toml` als `stable` geführt, siehe `docs/status/ABW-L3.md`)
+- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)

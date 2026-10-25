@@ -48,7 +48,7 @@ pub struct GraphRepairAttestation {
 /// wie `["ab", "c"]` und `["a", "bc"]` denselben Hash-Wert, da die Elementgrenzen im Byte-Strom
 /// nicht kodiert sind. Durch das Voranstellen der Schlüssellänge als 4-Byte Little-Endian integer
 /// (`(key.len() as u32).to_le_bytes()`) vor jedem Schlüssel-Byte-Array wird eine eindeutige,
-/// kollisionsfreie Kodierung für jede Sequenz von Schlüssel-Bytes garantiert.
+/// kollisionsfreie Kodierung für jede Sequenz von Schlüssel-Bytes.
 pub fn hash_deleted_keys_length_prefixed(deleted_keys: &[Vec<u8>]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     for key in deleted_keys {

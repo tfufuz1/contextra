@@ -12,7 +12,7 @@
 //!    den Tokio-Async-Executor blockieren.
 //!
 //! 2. **`emergency_wipe()`**: Für seltene Notfall-Löschungen (z.B. Prozess-Shutdown,
-//!    Sicherheits-Alarm). Synchron, blockierend, garantiert vor Rückkehr
+//!    Sicherheits-Alarm). Synchron, blockierend, vor Rückkehr
 //!    vollständig abgeschlossen — bewusst anders als der reguläre Worker-Pfad.
 
 use super::store::TenantIsolatedKvStore;
@@ -88,7 +88,7 @@ impl Drop for EvictionWorker {
 }
 
 /// SEPARATER Pfad für Notfall-Löschung (z.B. Prozess-Shutdown, expliziter
-/// Sicherheits-Trigger). Synchron, blockierend, garantiert vor Rückkehr abgeschlossen --
+/// Sicherheits-Trigger). Synchron, blockierend, vor Rückkehr abgeschlossen --
 /// bewusst ANDERS als der reguläre Worker-Pfad.
 pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
     store.clear_all();
