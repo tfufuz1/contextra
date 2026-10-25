@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![allow(ambiguous_glob_reexports)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod error;
 pub mod error_dto;
@@ -19,6 +20,7 @@ pub mod schema;
 pub mod tenant_scope;
 pub mod tombstone;
 pub mod types;
+pub mod witness;
 
 pub use error::{ContextraError, Result};
 pub use error_dto::ContextraErrorDto;
@@ -28,3 +30,4 @@ pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use types::*;
+pub use witness::{LayerWitness, RequestContext, SagaRecord, ScanMethod};
