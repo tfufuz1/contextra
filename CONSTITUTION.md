@@ -41,7 +41,7 @@ Das Dokumentationsmodell folgt einer strikten MECE-Aufteilung (Mutually Exclusiv
 - **`WORKING_STATE.md`**: Autogenerierter Tag- und Status-Bericht (rein dynamische Projektion, KEINE Architektur-Quelle).
 - **`docs/decisions/`**: Architektur-Entscheidungs-Aufzeichnungen (ADRs, indiziert via `docs/decisions/README.md`).
 - **`capabilities.toml`**: Alleinige Single Source of Truth für Ring-Modell, Crate-Reifegrade und Abhängigkeits-Topologie.
-- **`docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`**: Normative Produktspezifikation und Schnittstellen-Synthese.
+- **`docs/CONTEXTRA_SPEZIFIKATION.md` (bis docs/spec/SPEC.md existiert)**: Normative Produktspezifikation und Schnittstellen-Synthese.
 
 ## ⚖️ Governance
 
