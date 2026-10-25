@@ -12,7 +12,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             let chunk_ids: Vec<u64> = doc_ids
                 .iter()
                 .map(|d| {
-                    u64::try_from(d.inner()).map_err(|_| {
+                    u64::try_from(u128::from(d.inner())).map_err(|_| {
                         ContextraError::InvalidInput(format!(
                             "DocId {} exceeds u64::MAX for chunk_id conversion",
                             d.inner()

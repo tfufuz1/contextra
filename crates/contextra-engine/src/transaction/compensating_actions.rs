@@ -213,7 +213,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAct
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
             );
             for &doc_id in self.doc_ids.iter() {
-                let eid_val = u64::try_from(doc_id.inner()).map_err(|_| {
+                let eid_val = u64::try_from(u128::from(doc_id.inner())).map_err(|_| {
                     ContextraError::InvalidInput(format!(
                         "DocId {} exceeds u64::MAX for EntityId conversion",
                         doc_id.inner()
@@ -263,7 +263,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
                     .doc_ids
                     .iter()
                     .map(|d| {
-                        u64::try_from(d.inner()).map_err(|_| {
+                        u64::try_from(u128::from(d.inner())).map_err(|_| {
                             ContextraError::InvalidInput(format!(
                                 "DocId {} exceeds u64::MAX for chunk_id conversion",
                                 d.inner()
