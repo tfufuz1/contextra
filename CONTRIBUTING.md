@@ -2,7 +2,18 @@
 
 Vielen Dank für dein Interesse, zu Contextra beizutragen! Dieses Dokument bündelt alle Richtlinien für Entwicklerinnen und Entwickler. Es basiert auf der Normativen Gesamtspezifikation (Fassung 1.2; §27, §28).
 
-## 1. Kurzeinstieg (Setup & Build)
+## 1. Governance & Rangfolge (§28.0)
+
+Bei allen Beiträgen gilt die verbindliche Quell- und Entscheidungs-Rangfolge (§28.1):
+1. **Spezifikation 1.2** (`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`, §0, §1)
+2. **Vetos & Prinzipien** (§4.1, §5.0, P1–P30)
+3. **Crate-Inventar & Reifegrade** (`capabilities.toml`)
+4. **Agenten-Betriebsanleitung** (`AGENTS.md`)
+5. **Quellcode & grüne Gates**
+
+Es ist verboten, Qualitäts-Gates, Lints oder Toolchain-Pins durch Ausnahmen abzuschwächen (REQ-QA-010).
+
+## 2. Kurzeinstieg (Setup & Build)
 
 ### Voraussetzungen
 - **Rust Toolchain:** Stable Rust (1.80+) mit `cargo` und `rustfmt`.
@@ -24,7 +35,7 @@ just dag-check                          # Ring-Schichtenarchitektur (DAG) verifi
 cargo xtask jules-preflight             # Preflight Verification Gate
 ```
 
-## 2. Wie beigetragen wird (PR-Ablauf & Branching)
+## 3. Wie beigetragen wird (PR-Ablauf & Branching)
 
 1. **Branching & Arbeitsablauf:** Erstelle einen Feature-Branch für deine Änderungen. Halte Diffs minimal und fokussiert (Minimal-Diff-Prinzip).
 2. **Preflight Checks:** Führe vor jedem PR `cargo xtask jules-preflight` aus. Alle Gates müssen lokal grün sein (§27.6).
@@ -46,7 +57,7 @@ cargo xtask jules-preflight             # Preflight Verification Gate
 cargo test --workspace                  # Alle Workspace-Tests
 ```
 
-## 4. Weiterführende Dokumente
+## 5. Weiterführende Dokumente
 
 - **Systemarchitektur & Ring-Modell:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - **Agenten-Betriebsanleitung:** [`AGENTS.md`](AGENTS.md)

@@ -16,7 +16,7 @@ Contextra ist die lokale, eingebettete Speicher- und Gedächtnis-Infrastruktur f
 
 ---
 
-## Produktthese & Alleinstellungsmerkmale
+## Produktvision & Missionen M1–M5 (§2.0)
 
 1. **Ehrlicher Löschnachweis statt Zusage (INV-CLAIMS-1, §4.3):** Löschung nach `forget` bzw. `drop_collection` erfolgt logisch sofort (Tombstone, fsync, S0; §20.12). Ist der Schlüssel vernichtet, ist der Scope zusätzlich kryptografisch unlesbar (SK; §20.2a). Die physische Bereinigung (S1–S3) folgt nach Flush, Purge-Kompaktion und WAL-Scrub; erst dann wird ein signierter `DeletionProof` (Formatversion 4; §20.4) ausgestellt, der nicht belegte Schichten ehrlich ausweist (§4.3).
 2. **Embedded & Single-Node-Garantie (§1, §4.1):** Läuft vollständig ohne Netzwerk, ohne externe API-Keys, ohne separaten Serverprozess und ohne Telemetrie im selben Prozess wie die Anwendung des Nutzers (`cargo add contextra`). Single-Node, kein Sharding, keine Replikation (§1, §4.1).
@@ -29,9 +29,28 @@ Contextra ist die lokale, eingebettete Speicher- und Gedächtnis-Infrastruktur f
 
 ---
 
-## Capability Overview
+## Alleinstellungsmerkmale & Löschaussagen (INV-CLAIMS-1, §4.3, §20.12)
 
-Capabilities, Normativitätsklassen (`[K]`, `[R]`, `[E]`) und Reifegrade richten sich streng nach `capabilities.toml` und §6.0 der Spezifikation (INV-DOC-SINGLE-SOURCE-1).
+1. **Ehrlicher Löschnachweis statt Zusage (INV-CLAIMS-1, §4.3, REQ-DEL-006):**
+   Aussagen zur Löschung folgen zwingend der Außenformulierung gemäß §4.3 und §20.12 der Spezifikation:
+   > „Nach `forget` bzw. `drop_collection` ist der Scope logisch gelöscht (Tombstone, fsync; §20.12). Ist sein Schlüssel vernichtet, ist er zusätzlich kryptografisch unlesbar; das weist der Beweis aus. Die physische Bereinigung folgt nach Flush, Purge-Kompaktion und WAL-Bereinigung; erst dann wird ein vollständiger Nachweis für die im Beweis aufgeführten Schichten ausgestellt. Nicht aufgeführte Schichten sind nicht abgedeckt. Für den physischen Datenträger gelten die dokumentierten Rahmenbedingungen (verschlüsseltes Volume, Swap deaktiviert oder verschlüsselt, Backups ohne Keystore).“
+
+   *Unzulässige Formulierungen:* Pauschale Behauptungen wie „100 % gelöscht“, „DSGVO-konform“ oder „garantiert“ sind ausdrücklich unzulässig (INV-CLAIMS-1, §4.3, §20.12).
+
+2. **Embedded & Single-Node-Garantie (REQ-ARCH-001):**
+   Läuft vollständig ohne Netzwerk, ohne externe API-Keys, ohne separaten Serverprozess und ohne Telemetrie im selben Prozess wie die Anwendung des Nutzers (`cargo add contextra`). Single-Node, kein Sharding, keine Replikation (§1, §4.4).
+
+3. **Pure Rust Inferenz (`contextra-infer-candle`, Rand `[R]`, stable; §14.1):**
+   Lokale Inferenz ohne C++ / CUDA FFI-Abhängigkeiten oder extern laufende Dämonen (§6.0).
+
+4. **Deterministischer Kern (INV-RING0-DETERMINISM-1, P28, REQ-ARCH-015):**
+   Gleicher Anfangszustand und gleiche WAL-Folge liefern bit-identischen Zustand. Nichtdeterministische Quellen (LLM, Embeddings, Uhr) werden über injizierte Ports aufgezeichnet (P28). Zero-Panic-Garantie im Produktionspfad (P7; §27.6).
+
+---
+
+## Capability Overview & Reifegrad-Stand (§6.0, `capabilities.toml`)
+
+Capabilities, Normativitätsklassen (`Kern [K]`, `Rand [R]`, `Experimentell [E]`) und Reifegrade (`stable`, `experimental`) richten sich streng nach `capabilities.toml` und §6.0 der Spezifikation 1.2:
 
 | Feature / Crate | Klasse (§6.0) | Ring | Status / Maturity (`capabilities.toml`) | Spezifikationsbezug |
 |---|---|---|---|---|
@@ -70,7 +89,7 @@ Capabilities, Normativitätsklassen (`[K]`, `[R]`, `[E]`) und Reifegrade richten
 
 ---
 
-## Installation & Einbindung
+## Installation & Einbindung (§22.1)
 
 Füge `contextra` zu deiner `Cargo.toml` hinzu (§22):
 
@@ -135,7 +154,7 @@ Werbe- oder Pauschalaussagen zur Löschwirkung oder Rechtskonformität sind unzu
 
 ## Dokumentation & Spezifikationen
 
-- **Normative Gesamtspezifikation:** [`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`](docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md)
+- **Normative Spezifikation 1.2:** [`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`](docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md)
 - **Systemarchitektur & Ring-Modell:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - **Sicherheitsrichtlinie:** [`SECURITY.md`](SECURITY.md)
 - **Beitragswesen:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
@@ -144,7 +163,7 @@ Werbe- oder Pauschalaussagen zur Löschwirkung oder Rechtskonformität sind unzu
 
 ## Lizenzierung
 
-Contextra ist unter folgender Dual-Lizenz freigegeben:
+Contextra ist unter folgender Dual-Lizenz freigegeben (§0.2):
 
 - **Apache License, Version 2.0** ([`LICENSE-APACHE`](LICENSE-APACHE))
 - **MIT License** ([`LICENSE-MIT`](LICENSE-MIT))

@@ -16,7 +16,7 @@ Dieses Dokument ist die maßgebliche technische Architekturbeschreibung der Cont
 <a id="1-ring-modell"></a>
 ## 1. Ring-Modell (Ring 0–4) & Layering-Invarianten (§6.0, §6.10)
 
-Contextra gliedert seine Funktionalität in ein Fünf-Ring-Schichtenmodell (Ring 0 bis Ring 4; §6.0). Abhängigkeiten dürfen ausschließlich **von höheren Ringen auf tiefere Ringe** verlaufen (Kantenregel §6.10). Aufwärtskanten (z. B. ein Ring-0-Crate, das von einem Ring-3-Crate abhängt) sind streng verboten.
+Contextra gliedert seine Funktionalität in ein Fünf-Ring-Schichtenmodell (Ring 0 bis Ring 4; §6.0). Die Kantenregeln (§6.10) bestimmen verbindlich den erlaubten Abhängigkeitsfluss.
 
 ### 1.1 Definition der Ringe (§6.0)
 
@@ -43,8 +43,8 @@ Das System erzwingt strikte Directed Acyclic Graph (DAG) Modularität.
 
 ---
 
-<a id="2-crate-inventar"></a>
-## 2. Crate-Inventar & Normativitätsklassen (§6.0, `capabilities.toml`)
+<a id="2-kern-geschlossenheit--rand-bruecken"></a>
+## 2. Kern-Geschlossenheit (§6.8) & Rand-Brücken (§6.11)
 
 `capabilities.toml` ist die **einzige** Quelle für Ring, Klasse (`class`: `kern` `[K]`, `rand` `[R]`, `experimentell` `[E]`) und `maturity` je Crate (INV-DOC-SINGLE-SOURCE-1):
 
@@ -104,7 +104,7 @@ Standardmäßig gilt in allen Nicht-Insel-Crates `#![forbid(unsafe_code)]`. Es g
 2. **`contextra-simd`**: SIMD-Vektordistanzberechnungskerne (AVX2, AVX-512, NEON) mit Laufzeit-Dispatch.
 3. **`contextra-wire`**: FlatBuffers-generierter Code für Zero-Copy-Transfers.
 
-Jeder `unsafe`-Block in diesen Inseln muss zwingend mit einem `// SAFETY:`-Kommentar begründet werden.
+Jeder `unsafe`-Block in diesen Inseln muss zwingend mit einem `// SAFETY:`-Kommentar begründet werden (§6.7).
 
 ### 4.2 Sperrenhierarchie & Lock-Ordnung (INV-LOCK-ORDER-1)
 
