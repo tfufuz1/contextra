@@ -1,0 +1,125 @@
+warning: contextra-wire@0.1.0: flatc not found, using existing generated code.
+warning: use of deprecated method `quantize::ScalarQuantizer::check_drift`: Use `calculate_vector_drift` instead
+   --> crates/contextra-vector/src/diskann/types.rs:268:27
+    |
+268 |             let drift = q.check_drift(vector);
+    |                           ^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: `contextra-vector` (lib) generated 1 warning
+warning: use of deprecated method `contextra_engine::collection::search::basic::<impl contextra_engine::Collection<S, V>>::search`: use Collection::query() instead
+  --> crates/contextra-engine/tests/tenant_index_persistence_reload.rs:27:30
+   |
+27 |         let results = col_t1.search(&vec_query, 5).await?;
+   |                              ^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated method `contextra_engine::collection::search::basic::<impl contextra_engine::Collection<S, V>>::search`: use Collection::query() instead
+  --> crates/contextra-engine/tests/tenant_index_persistence_reload.rs:41:33
+   |
+41 |         let results_t1 = col_t1.search(&vec_query, 5).await?;
+   |                                 ^^^^^^
+
+warning: use of deprecated method `contextra_engine::collection::search::basic::<impl contextra_engine::Collection<S, V>>::search`: use Collection::query() instead
+  --> crates/contextra-engine/tests/tenant_index_persistence_reload.rs:51:33
+   |
+51 |         let results_t2 = col_t2.search(&vec_query, 5).await?;
+   |                                 ^^^^^^
+
+warning: `contextra-engine` (test "tenant_index_persistence_reload") generated 3 warnings
+warning: function `get_rss_bytes` is never used
+  --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:12:4
+   |
+12 | fn get_rss_bytes() -> usize {
+   |    ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: function `run_differential_large` is never used
+   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:385:10
+    |
+385 | async fn run_differential_large(ops: Vec<Op>) -> Result<(), TestCaseError> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: enum `SimpleOp` is never used
+   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:641:6
+    |
+641 | enum SimpleOp {
+    |      ^^^^^^^^
+
+warning: function `task_op_strategy` is never used
+   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:648:4
+    |
+648 | fn task_op_strategy(prefix: u8) -> impl Strategy<Value = SimpleOp> {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: function `run_concurrent_differential` is never used
+   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:663:10
+    |
+663 | async fn run_concurrent_differential(tasks_ops: Vec<Vec<SimpleOp>>) -> Result<(), TestCaseError> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `contextra-store` (test "differential_redb") generated 5 warnings
+warning: unused imports: `StorageEngine` and `TxId`
+ --> crates/contextra-store/tests/adaptive_compaction_determinism.rs:1:22
+  |
+1 | use contextra_core::{StorageEngine, TxId};
+  |                      ^^^^^^^^^^^^^  ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `CompactionStrategy`
+ --> crates/contextra-store/tests/adaptive_compaction_determinism.rs:4:32
+  |
+4 |     AdaptiveCompactionPlanner, CompactionStrategy, CostBasedAdaptivePlanner, WorkloadMetrics,
+  |                                ^^^^^^^^^^^^^^^^^^
+
+warning: `contextra-store` (test "adaptive_compaction_determinism") generated 2 warnings (run `cargo fix --test "adaptive_compaction_determinism"` to apply 2 suggestions)
+warning: unused import: `super::*`
+   --> crates/contextra-vector/src/diskann/build.rs:753:9
+    |
+753 |     use super::*;
+    |         ^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `super::*`
+   --> crates/contextra-vector/src/diskann/persistence.rs:631:9
+    |
+631 |     use super::*;
+    |         ^^^^^^^^
+
+warning: unused import: `crate::diskann::config::DiskAnnConfig`
+   --> crates/contextra-vector/src/diskann/persistence.rs:632:9
+    |
+632 |     use crate::diskann::config::DiskAnnConfig;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `DistanceMetric` and `DocId`
+   --> crates/contextra-vector/src/diskann/persistence.rs:633:26
+    |
+633 |     use contextra_core::{DistanceMetric, DocId};
+    |                          ^^^^^^^^^^^^^^  ^^^^^
+
+warning: use of deprecated method `quantize::ScalarQuantizer::check_drift`: Use `calculate_vector_drift` instead
+  --> crates/contextra-vector/src/quantize/tests.rs:34:19
+   |
+34 |     let drift = q.check_drift(&outlier_vec);
+   |                   ^^^^^^^^^^^
+
+warning: use of deprecated method `quantize::ScalarQuantizer::check_drift`: Use `calculate_vector_drift` instead
+   --> crates/contextra-vector/src/quantize/tests.rs:138:18
+    |
+138 |     assert_eq!(q.check_drift(&in_range), 0.0);
+    |                  ^^^^^^^^^^^
+
+warning: use of deprecated method `quantize::ScalarQuantizer::check_drift`: Use `calculate_vector_drift` instead
+   --> crates/contextra-vector/src/quantize/tests.rs:142:18
+    |
+142 |     assert_eq!(q.check_drift(&out_range), 0.5);
+    |                  ^^^^^^^^^^^
+
+warning: `contextra-vector` (lib test) generated 8 warnings (1 duplicate) (run `cargo fix --lib -p contextra-vector --tests` to apply 4 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.66s
