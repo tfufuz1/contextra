@@ -1,5 +1,10 @@
 # contextra-sandbox
 
+WASM Execution Boundary und Isolations-Sandbox.
+
+Normativitätsklasse: **Rand `[R]`** (Ring 2, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-sandbox` stellt eine isolierte WASM-Ausführungsgrenze bereit (Ring 2).
 
 ## Zweck

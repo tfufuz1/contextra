@@ -1,5 +1,10 @@
 # contextra-store
 
+LSM-Tree Storage Engine, WAL Durability und Compaction Engine.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 1, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-store` ist die LSM-Tree Storage Engine von Contextra (Ring 1).
 
 ## Zweck

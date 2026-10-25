@@ -1,5 +1,10 @@
 # contextra-infer-ollama
 
+Ollama External Provider Client und Embeddings Integration.
+
+Normativitätsklasse: **Rand `[R]`** (Ring 2, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-infer-ollama` stellt den Inferenz-Client für Ollama und Contextual Prefixing bereit (Ring 2).
 
 ## Zweck

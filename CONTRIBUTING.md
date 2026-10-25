@@ -1,6 +1,6 @@
 # Contributing to Contextra
 
-Vielen Dank für dein Interesse, zu Contextra beizutragen! Dieses Dokument bündelt alle Richtlinien für menschliche Entwickler.
+Vielen Dank für dein Interesse, zu Contextra beizutragen! Dieses Dokument bündelt alle Richtlinien für Entwicklerinnen und Entwickler. Es basiert auf der normativen Gesamtspezifikation ([`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`](docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md), §27.0, §28.0).
 
 ## 1. Kurzeinstieg (Setup & Build)
 
@@ -9,43 +9,44 @@ Vielen Dank für dein Interesse, zu Contextra beizutragen! Dieses Dokument bünd
 - **Just Task Runner:** `just` für Entwicklungsbefehle.
 
 ### Grundprinzipien & Invarianten
-- **Souveränität & Air-Gap:** Keine Laufzeit-Annahmen über Cloud-Dienste; lokale Inferenz via Ollama (`contextra-infer-ollama`).
-- **Zero-Panic-Gesetz:** Produktionscode darf niemals `panic!`, `.unwrap()` oder `.expect()` enthalten (`Result<T, E>` nutzen).
-- **Safe Rust & Schichtenreinheit:** `#![forbid(unsafe_code)]` in Produktions-Crates. Abhängigkeiten fließen strikt unidirektional von Layer 4/3 nach Layer 0 (`contextra-core`). Minimal-Diff-Prinzip einhalten.
+- **Single-Node & Air-Gap (REQ-ARCH-001):** Keine Laufzeit-Annahmen über Cloud-Dienste; lokale Inferenz via Candle (`[R]`, §14.1) oder Ollama (`[R]`, §14.2).
+- **Zero-Panic-Doktrin (P7, §27.6):** Produktionscode darf im regulären Pfad niemals `panic!`, `.unwrap()` oder `.expect()` enthalten (`Result<T, E>` mit `ContextraError` nutzen).
+- **Safe Rust & Ring-Schichtenreinheit (§6.0, §6.10):** `#![forbid(unsafe_code)]` in allen Crates außerhalb der 3 Unsafe-Inseln (`contextra-simd`, `contextra-sys`, `contextra-wire`; §5.0). Abhängigkeiten fließen strikt unidirektional von Ring 4/3 nach Ring 0 (REQ-ARCH-003).
+- **Löschaussagen & Transparenz (INV-CLAIMS-1, REQ-DEL-006):** Aussagen zur Löschung folgen zwingend der Außenformulierung (§4.3, §20.12). Pauschale Werbeaussagen wie „100 % gelöscht“ oder „DSGVO-konform“ sind unzulässig.
 
 ### Local Build & Verification Commands
 ```bash
-cargo check --workspace --exclude contextra-tauri  # Kompilierbarkeit <!-- crate-ref-ignore -->
-just check                                         # Clippy-Warnungen als Fehler
-cargo check --examples                             # Examples prüfen
-just dag-check                                     # Schichtenarchitektur (DAG) verifizieren
-cargo xtask jules-preflight                        # Preflight Verification Gate
+cargo check --workspace                 # Kompilierbarkeit prüfen
+just check                              # Clippy-Warnungen als Fehler behandeln
+cargo check --examples                  # Examples prüfen
+just dag-check                          # Ring-Schichtenarchitektur (DAG) verifizieren (§6.10)
+cargo xtask jules-preflight             # Preflight Verification Gate
 ```
 
 ## 2. Wie beigetragen wird (PR-Ablauf & Branching)
 
 1. **Branching & Arbeitsablauf:** Erstelle einen Feature-Branch für deine Änderungen. Halte Diffs minimal und fokussiert (Minimal-Diff-Prinzip).
-2. **Preflight Checks:** Führe vor jedem PR `cargo xtask jules-preflight` aus. Alle Gates müssen lokal grün sein.
-3. **Pull Request:** Reiche den PR ein. Stelle sicher, dass die Commit-Nachrichten präzise sind und Invarianten nicht verletzt werden.
+2. **Preflight Checks:** Führe vor jedem PR `cargo xtask jules-preflight` aus. Alle Gates müssen lokal grün sein (§27.6).
+3. **Pull Request:** Reiche den PR ein. Stelle sicher, dass Commit-Nachrichten präzise sind und Invarianten (§5.2) nicht verletzt werden.
 4. **Lizenzierung:** Beiträge stehen unter der [MIT License](LICENSE-MIT) und der [Apache License 2.0](LICENSE-APACHE).
 
-## 3. Testregeln & Qualitätssicherung
+## 3. Testregeln & Qualitätssicherung (§27.0)
 
-### Testregeln & -kategorien
+### Testregeln & -kategorien (§27.1–§27.5)
 - **Anti-Mirroring-Prinzip:** Assertions müssen mit unabhängig ermittelten Referenzwerten arbeiten (kein Wiederholen der Formel im Test).
 - **Pflichtabdeckung:** Jeder PR muss Tests für folgende Szenarien enthalten:
-  1. *Happy Path*, 2. *Leere Eingaben*, 3. *Einzelne Elemente*, 4. *Grenzwerte* (`u64::MAX`, `f32::INFINITY`), 5. *Fehlerpfade* (Dimension-Mismatches, korrupte Bytes), 6. *Concurrency* (Sperren & Atomics).
+  1. *Happy Path*, 2. *Leere Eingaben*, 3. *Einzelne Elemente*, 4. *Grenzwerte* (`u64::MAX`, `f32::INFINITY`), 5. *Fehlerpfade* (Dimension-Mismatches, korrupte Bytes), 6. *Concurrency* (Sperren & Atomics; INV-LOCK-ORDER-1).
 - **Proptests & Mutation-Check:** Proptests für SIMD/Skalar-Gegenüberstellungen. Vor Freigabe prüfen: *Schlägt ein Test fehl, wenn ein Operator im Produktionscode umgekehrt wird?*
 - **Hermetic Feature Gate Check:** `cargo check -p <crate> --no-default-features` prüft fehlende Default-Feature-Lecks.
 - **Allowances:** `.unwrap()` und `.expect()` sind ausschließlich in Test-Code (`#[cfg(test)]`) erlaubt.
 
 ### Tests ausführen
 ```bash
-cargo test --workspace --exclude contextra-tauri   # Alle Workspace-Tests <!-- crate-ref-ignore -->
+cargo test --workspace                  # Alle Workspace-Tests
 ```
-Für vertiefende Testregeln und Beispiele siehe [rules/testing.md](rules/testing.md) und [rules/test_quality.md](rules/test_quality.md).
 
-## 4. Agenten-Regeln & Weiterführende Dokumente
+## 4. Weiterführende Dokumente
 
-- **Für AI-Agenten:** [`AGENTS.md`](AGENTS.md) definiert verbindliche Regeln, Invarianten und Werkzeuge für automatisierte Agenten.
-- **Architektur:** Systemlayout und Ring-Modell sind in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) beschrieben.
+- **Systemarchitektur & Ring-Modell:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- **Agenten-Betriebsanleitung:** [`AGENTS.md`](AGENTS.md)
+- **Normative Spezifikation:** [`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`](docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md)

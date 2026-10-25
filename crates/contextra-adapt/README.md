@@ -1,5 +1,10 @@
 # contextra-adapt
 
+Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller).
+
+Normativitätsklasse: **Experimentell `[E]`** (Ring 0, `experimental`; §6.0, `capabilities.toml`).
+
+
 `contextra-adapt` stellt adaptive Kontroll-, Bandit-Routing- und Homeostat-Algorithmen für Contextra bereit (Ring 0).
 
 ## Zweck

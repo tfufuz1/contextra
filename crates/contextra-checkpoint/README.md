@@ -1,5 +1,10 @@
 # contextra-checkpoint
 
+Persistent Checkpoint Engine und Blake3 Manifest-Verifikation.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 1, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-checkpoint` verwaltet Time-Travel Checkpoints und Snapshots für Contextra (Ring 1).
 
 ## Zweck

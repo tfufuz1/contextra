@@ -1,5 +1,10 @@
 # contextra-vector
 
+Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung).
+
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-vector` stellt den HNSW- und DiskANN-Vektorindex sowie Skalar-/RaBitQ-Quantisierung bereit (Ring 0 / In Migration nach `contextra-vector`).
 
 ## Zweck

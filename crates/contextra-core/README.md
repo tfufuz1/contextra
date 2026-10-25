@@ -1,5 +1,10 @@
 # contextra-core
 
+Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-core` ist eine Strangler-Fassade für historische Core-Typen und Traits (Ring 0 / Legacy).
 
 ## Zweck

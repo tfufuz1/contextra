@@ -1,4 +1,9 @@
-# Contextra Python Bindings (`contextra-py`)
+# contextra-py
+
+PyO3 Python Bindings.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; §6.0, `capabilities.toml`).
+
 
 Official Python bindings for Contextra — an embedded 4-signal hybrid-search vector database built with Rust and PyO3.
 

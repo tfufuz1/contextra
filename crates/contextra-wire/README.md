@@ -1,5 +1,10 @@
 # contextra-wire
 
+FlatBuffers Wire-Protokolle und Serialisierungs-Formate.
+
+Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.0, `capabilities.toml`).
+
+
 `contextra-wire` ist eine Unsafe-Insel für FlatBuffers IPC-Generat und Zero-Copy-Adapter (Ring 0).
 
 ## Zweck
