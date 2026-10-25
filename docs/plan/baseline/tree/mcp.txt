@@ -1,0 +1,795 @@
+contextra-mcp v0.1.0 (/app/crates/contextra-mcp)
+├── contextra v0.1.0 (/app/crates/contextra)
+│   ├── contextra-core v0.1.0 (/app/crates/contextra-core)
+│   │   ├── contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)
+│   │   │   ├── ahash v0.8.12
+│   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   ├── getrandom v0.3.4
+│   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   └── libc v0.2.189
+│   │   │   │   ├── once_cell v1.21.4
+│   │   │   │   ├── serde v1.0.229
+│   │   │   │   │   ├── serde_core v1.0.229
+│   │   │   │   │   └── serde_derive v1.0.229 (proc-macro)
+│   │   │   │   │       ├── proc-macro2 v1.0.107
+│   │   │   │   │       │   └── unicode-ident v1.0.24
+│   │   │   │   │       ├── quote v1.0.47
+│   │   │   │   │       │   └── proc-macro2 v1.0.107 (*)
+│   │   │   │   │       └── syn v3.0.4
+│   │   │   │   │           ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │           ├── quote v1.0.47 (*)
+│   │   │   │   │           └── unicode-ident v1.0.24
+│   │   │   │   └── zerocopy v0.8.56
+│   │   │   │       └── zerocopy-derive v0.8.56 (proc-macro)
+│   │   │   │           ├── proc-macro2 v1.0.107 (*)
+│   │   │   │           ├── quote v1.0.47 (*)
+│   │   │   │           └── syn v2.0.119
+│   │   │   │               ├── proc-macro2 v1.0.107 (*)
+│   │   │   │               ├── quote v1.0.47 (*)
+│   │   │   │               └── unicode-ident v1.0.24
+│   │   │   ├── bytes v1.12.1
+│   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports)
+│   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   ├── bytes v1.12.1
+│   │   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types)
+│   │   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   │   ├── bincode v1.3.3
+│   │   │   │   │   │   └── serde v1.0.229 (*)
+│   │   │   │   │   ├── blake3 v1.8.7
+│   │   │   │   │   │   ├── arrayvec v0.7.8
+│   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   ├── constant_time_eq v0.4.2
+│   │   │   │   │   │   └── cpufeatures v0.3.1
+│   │   │   │   │   ├── bytes v1.12.1
+│   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   ├── serde_json v1.0.151
+│   │   │   │   │   │   ├── itoa v1.0.18
+│   │   │   │   │   │   ├── memchr v2.8.3
+│   │   │   │   │   │   ├── serde_core v1.0.229
+│   │   │   │   │   │   └── zmij v1.0.23
+│   │   │   │   │   ├── sha2 v0.10.9
+│   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   ├── cpufeatures v0.2.17
+│   │   │   │   │   │   └── digest v0.10.7
+│   │   │   │   │   │       ├── block-buffer v0.10.4
+│   │   │   │   │   │       │   └── generic-array v0.14.7
+│   │   │   │   │   │       │       └── typenum v1.20.1
+│   │   │   │   │   │       ├── crypto-common v0.1.7
+│   │   │   │   │   │       │   ├── generic-array v0.14.7 (*)
+│   │   │   │   │   │       │   ├── rand_core v0.6.4
+│   │   │   │   │   │       │   │   └── getrandom v0.2.17
+│   │   │   │   │   │       │   │       ├── cfg-if v1.0.4
+│   │   │   │   │   │       │   │       └── libc v0.2.189
+│   │   │   │   │   │       │   └── typenum v1.20.1
+│   │   │   │   │   │       └── subtle v2.6.1
+│   │   │   │   │   └── thiserror v2.0.20
+│   │   │   │   │       └── thiserror-impl v2.0.20 (proc-macro)
+│   │   │   │   │           ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │           ├── quote v1.0.47 (*)
+│   │   │   │   │           └── syn v3.0.4 (*)
+│   │   │   │   ├── futures-util v0.3.34
+│   │   │   │   │   ├── futures-core v0.3.34
+│   │   │   │   │   ├── futures-macro v0.3.34 (proc-macro)
+│   │   │   │   │   │   ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │   ├── quote v1.0.47 (*)
+│   │   │   │   │   │   └── syn v3.0.4 (*)
+│   │   │   │   │   ├── futures-task v0.3.34
+│   │   │   │   │   ├── pin-project-lite v0.2.17
+│   │   │   │   │   └── slab v0.4.12
+│   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   └── thiserror v2.0.20 (*)
+│   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   ├── parking_lot v0.12.5
+│   │   │   │   ├── lock_api v0.4.14
+│   │   │   │   │   └── scopeguard v1.2.0
+│   │   │   │   └── parking_lot_core v0.9.12
+│   │   │   │       ├── cfg-if v1.0.4
+│   │   │   │       ├── libc v0.2.189
+│   │   │   │       └── smallvec v1.15.2
+│   │   │   ├── serde v1.0.229 (*)
+│   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   └── tracing v0.1.44
+│   │   │       ├── pin-project-lite v0.2.17
+│   │   │       ├── tracing-attributes v0.1.31 (proc-macro)
+│   │   │       │   ├── proc-macro2 v1.0.107 (*)
+│   │   │       │   ├── quote v1.0.47 (*)
+│   │   │       │   └── syn v2.0.119 (*)
+│   │   │       └── tracing-core v0.1.36
+│   │   │           └── once_cell v1.21.4
+│   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   └── contextra-wire v0.1.0 (/app/crates/contextra-wire)
+│   │       ├── bytes v1.12.1
+│   │       ├── flatbuffers v24.12.23
+│   │       │   └── bitflags v1.3.2
+│   │       ├── serde v1.0.229 (*)
+│   │       └── serde_json v1.0.151 (*)
+│   ├── contextra-db v0.1.0 (/app/crates/contextra-db)
+│   │   ├── ahash v0.8.12 (*)
+│   │   ├── blake3 v1.8.7 (*)
+│   │   ├── bytes v1.12.1
+│   │   ├── contextra-adapt v0.1.0 (/app/crates/contextra-adapt)
+│   │   │   ├── blake3 v1.8.7 (*)
+│   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   ├── serde v1.0.229 (*)
+│   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   └── tracing v0.1.44 (*)
+│   │   ├── contextra-checkpoint v0.1.0 (/app/crates/contextra-checkpoint)
+│   │   │   ├── blake3 v1.8.7 (*)
+│   │   │   ├── bytes v1.12.1
+│   │   │   ├── contextra-core v0.1.0 (/app/crates/contextra-core) (*)
+│   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   ├── dirs v6.0.0
+│   │   │   │   └── dirs-sys v0.5.0
+│   │   │   │       ├── libc v0.2.189
+│   │   │   │       └── option-ext v0.2.0
+│   │   │   ├── futures-executor v0.3.34
+│   │   │   │   ├── futures-core v0.3.34
+│   │   │   │   ├── futures-task v0.3.34
+│   │   │   │   └── futures-util v0.3.34 (*)
+│   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   ├── serde v1.0.229 (*)
+│   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   ├── tokio v1.53.1
+│   │   │   │   ├── bytes v1.12.1
+│   │   │   │   ├── libc v0.2.189
+│   │   │   │   ├── mio v1.2.2
+│   │   │   │   │   └── libc v0.2.189
+│   │   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   │   ├── pin-project-lite v0.2.17
+│   │   │   │   ├── signal-hook-registry v1.4.8
+│   │   │   │   │   ├── errno v0.3.14
+│   │   │   │   │   │   └── libc v0.2.189
+│   │   │   │   │   └── libc v0.2.189
+│   │   │   │   ├── socket2 v0.6.5
+│   │   │   │   │   └── libc v0.2.189
+│   │   │   │   └── tokio-macros v2.7.2 (proc-macro)
+│   │   │   │       ├── proc-macro2 v1.0.107 (*)
+│   │   │   │       ├── quote v1.0.47 (*)
+│   │   │   │       └── syn v3.0.4 (*)
+│   │   │   └── tracing v0.1.44 (*)
+│   │   ├── contextra-cognition v0.1.0 (/app/crates/contextra-cognition)
+│   │   │   ├── ahash v0.8.12 (*)
+│   │   │   ├── blake3 v1.8.7 (*)
+│   │   │   ├── bytes v1.12.1
+│   │   │   ├── contextra-engine v0.1.0 (/app/crates/contextra-engine)
+│   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   ├── bincode v1.3.3 (*)
+│   │   │   │   ├── blake3 v1.8.7 (*)
+│   │   │   │   ├── bytes v1.12.1
+│   │   │   │   ├── contextra-adapt v0.1.0 (/app/crates/contextra-adapt) (*)
+│   │   │   │   ├── contextra-checkpoint v0.1.0 (/app/crates/contextra-checkpoint) (*)
+│   │   │   │   ├── contextra-graph v0.1.0 (/app/crates/contextra-graph)
+│   │   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   │   ├── arc-swap v1.9.2
+│   │   │   │   │   │   └── rustversion v1.0.23 (proc-macro)
+│   │   │   │   │   ├── bincode v1.3.3 (*)
+│   │   │   │   │   ├── blake3 v1.8.7 (*)
+│   │   │   │   │   ├── contextra-adapt v0.1.0 (/app/crates/contextra-adapt) (*)
+│   │   │   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   │   │   ├── scc v2.4.0
+│   │   │   │   │   │   └── sdd v3.0.10
+│   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   │   │   └── tracing v0.1.44 (*)
+│   │   │   │   ├── contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)
+│   │   │   │   │   ├── bytes v1.12.1
+│   │   │   │   │   ├── candle-core v0.11.0
+│   │   │   │   │   │   ├── byteorder v1.5.0
+│   │   │   │   │   │   ├── float8 v0.7.0
+│   │   │   │   │   │   │   ├── half v2.7.1
+│   │   │   │   │   │   │   │   ├── bytemuck v1.25.2
+│   │   │   │   │   │   │   │   │   └── bytemuck_derive v1.12.0 (proc-macro)
+│   │   │   │   │   │   │   │   │       ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │   │   │   │       ├── quote v1.0.47 (*)
+│   │   │   │   │   │   │   │   │       └── syn v3.0.4 (*)
+│   │   │   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   │   │   ├── num-traits v0.2.19
+│   │   │   │   │   │   │   │   │   └── libm v0.2.16
+│   │   │   │   │   │   │   │   ├── rand v0.9.5
+│   │   │   │   │   │   │   │   │   ├── rand_chacha v0.9.0
+│   │   │   │   │   │   │   │   │   │   ├── ppv-lite86 v0.2.21
+│   │   │   │   │   │   │   │   │   │   │   └── zerocopy v0.8.56 (*)
+│   │   │   │   │   │   │   │   │   │   └── rand_core v0.9.5
+│   │   │   │   │   │   │   │   │   │       └── getrandom v0.3.4 (*)
+│   │   │   │   │   │   │   │   │   └── rand_core v0.9.5 (*)
+│   │   │   │   │   │   │   │   ├── rand_distr v0.5.1
+│   │   │   │   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   │   │   │   └── rand v0.9.5 (*)
+│   │   │   │   │   │   │   │   └── zerocopy v0.8.56 (*)
+│   │   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   │   ├── rand v0.9.5 (*)
+│   │   │   │   │   │   │   └── rand_distr v0.5.1 (*)
+│   │   │   │   │   │   ├── gemm v0.19.0
+│   │   │   │   │   │   │   ├── dyn-stack v0.13.2
+│   │   │   │   │   │   │   │   ├── bytemuck v1.25.2 (*)
+│   │   │   │   │   │   │   │   └── dyn-stack-macros v0.1.3 (proc-macro)
+│   │   │   │   │   │   │   ├── gemm-c32 v0.19.0
+│   │   │   │   │   │   │   │   ├── dyn-stack v0.13.2 (*)
+│   │   │   │   │   │   │   │   ├── gemm-common v0.19.0
+│   │   │   │   │   │   │   │   │   ├── bytemuck v1.25.2 (*)
+│   │   │   │   │   │   │   │   │   ├── dyn-stack v0.13.2 (*)
+│   │   │   │   │   │   │   │   │   ├── half v2.7.1 (*)
+│   │   │   │   │   │   │   │   │   ├── libm v0.2.16
+│   │   │   │   │   │   │   │   │   ├── num-complex v0.4.6
+│   │   │   │   │   │   │   │   │   │   ├── bytemuck v1.25.2 (*)
+│   │   │   │   │   │   │   │   │   │   └── num-traits v0.2.19 (*)
+│   │   │   │   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   │   │   │   ├── once_cell v1.21.4
+│   │   │   │   │   │   │   │   │   ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │   │   │   │   │   ├── pulp v0.22.3
+│   │   │   │   │   │   │   │   │   │   ├── bytemuck v1.25.2 (*)
+│   │   │   │   │   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   │   │   │   │   ├── libm v0.2.16
+│   │   │   │   │   │   │   │   │   │   ├── num-complex v0.4.6 (*)
+│   │   │   │   │   │   │   │   │   │   ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │   │   │   │   │   │   ├── pulp-wasm-simd-flag v0.1.1
+│   │   │   │   │   │   │   │   │   │   ├── raw-cpuid v11.6.0
+│   │   │   │   │   │   │   │   │   │   │   └── bitflags v2.13.1
+│   │   │   │   │   │   │   │   │   │   └── reborrow v0.5.5
+│   │   │   │   │   │   │   │   │   ├── raw-cpuid v11.6.0 (*)
+│   │   │   │   │   │   │   │   │   ├── rayon v1.12.0
+│   │   │   │   │   │   │   │   │   │   ├── either v1.18.0
+│   │   │   │   │   │   │   │   │   │   └── rayon-core v1.13.0
+│   │   │   │   │   │   │   │   │   │       ├── crossbeam-deque v0.8.7
+│   │   │   │   │   │   │   │   │   │       │   ├── crossbeam-epoch v0.9.20
+│   │   │   │   │   │   │   │   │   │       │   │   └── crossbeam-utils v0.8.22
+│   │   │   │   │   │   │   │   │   │       │   └── crossbeam-utils v0.8.22
+│   │   │   │   │   │   │   │   │   │       └── crossbeam-utils v0.8.22
+│   │   │   │   │   │   │   │   │   └── seq-macro v0.3.6 (proc-macro)
+│   │   │   │   │   │   │   │   ├── num-complex v0.4.6 (*)
+│   │   │   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   │   │   ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │   │   │   │   ├── raw-cpuid v11.6.0 (*)
+│   │   │   │   │   │   │   │   └── seq-macro v0.3.6 (proc-macro)
+│   │   │   │   │   │   │   ├── gemm-c64 v0.19.0
+│   │   │   │   │   │   │   │   ├── dyn-stack v0.13.2 (*)
+│   │   │   │   │   │   │   │   ├── gemm-common v0.19.0 (*)
+│   │   │   │   │   │   │   │   ├── num-complex v0.4.6 (*)
+│   │   │   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   │   │   ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │   │   │   │   ├── raw-cpuid v11.6.0 (*)
+│   │   │   │   │   │   │   │   └── seq-macro v0.3.6 (proc-macro)
+│   │   │   │   │   │   │   ├── gemm-common v0.19.0 (*)
+│   │   │   │   │   │   │   ├── gemm-f16 v0.19.0
+│   │   │   │   │   │   │   │   ├── dyn-stack v0.13.2 (*)
+│   │   │   │   │   │   │   │   ├── gemm-common v0.19.0 (*)
+│   │   │   │   │   │   │   │   ├── gemm-f32 v0.19.0
+│   │   │   │   │   │   │   │   │   ├── dyn-stack v0.13.2 (*)
+│   │   │   │   │   │   │   │   │   ├── gemm-common v0.19.0 (*)
+│   │   │   │   │   │   │   │   │   ├── num-complex v0.4.6 (*)
+│   │   │   │   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   │   │   │   ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │   │   │   │   │   ├── raw-cpuid v11.6.0 (*)
+│   │   │   │   │   │   │   │   │   └── seq-macro v0.3.6 (proc-macro)
+│   │   │   │   │   │   │   │   ├── half v2.7.1 (*)
+│   │   │   │   │   │   │   │   ├── num-complex v0.4.6 (*)
+│   │   │   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   │   │   ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │   │   │   │   ├── raw-cpuid v11.6.0 (*)
+│   │   │   │   │   │   │   │   ├── rayon v1.12.0 (*)
+│   │   │   │   │   │   │   │   └── seq-macro v0.3.6 (proc-macro)
+│   │   │   │   │   │   │   ├── gemm-f32 v0.19.0 (*)
+│   │   │   │   │   │   │   ├── gemm-f64 v0.19.0
+│   │   │   │   │   │   │   │   ├── dyn-stack v0.13.2 (*)
+│   │   │   │   │   │   │   │   ├── gemm-common v0.19.0 (*)
+│   │   │   │   │   │   │   │   ├── num-complex v0.4.6 (*)
+│   │   │   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   │   │   ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │   │   │   │   ├── raw-cpuid v11.6.0 (*)
+│   │   │   │   │   │   │   │   └── seq-macro v0.3.6 (proc-macro)
+│   │   │   │   │   │   │   ├── num-complex v0.4.6 (*)
+│   │   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   │   ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │   │   │   ├── raw-cpuid v11.6.0 (*)
+│   │   │   │   │   │   │   └── seq-macro v0.3.6 (proc-macro)
+│   │   │   │   │   │   ├── half v2.7.1 (*)
+│   │   │   │   │   │   ├── libc v0.2.189
+│   │   │   │   │   │   ├── libm v0.2.16
+│   │   │   │   │   │   ├── memmap2 v0.9.11
+│   │   │   │   │   │   │   ├── libc v0.2.189
+│   │   │   │   │   │   │   └── stable_deref_trait v1.2.1
+│   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   ├── num_cpus v1.17.0
+│   │   │   │   │   │   │   └── libc v0.2.189
+│   │   │   │   │   │   ├── rand v0.9.5 (*)
+│   │   │   │   │   │   ├── rand_distr v0.5.1 (*)
+│   │   │   │   │   │   ├── rayon v1.12.0 (*)
+│   │   │   │   │   │   ├── safetensors v0.8.0
+│   │   │   │   │   │   │   ├── hashbrown v0.16.1
+│   │   │   │   │   │   │   │   ├── allocator-api2 v0.2.21
+│   │   │   │   │   │   │   │   ├── equivalent v1.0.2
+│   │   │   │   │   │   │   │   ├── foldhash v0.2.0
+│   │   │   │   │   │   │   │   └── serde_core v1.0.229
+│   │   │   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   │   │   │   └── tempfile v3.27.0
+│   │   │   │   │   │   │       ├── fastrand v2.5.0
+│   │   │   │   │   │   │       ├── getrandom v0.4.3
+│   │   │   │   │   │   │       │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   │       │   └── libc v0.2.189
+│   │   │   │   │   │   │       ├── once_cell v1.21.4
+│   │   │   │   │   │   │       └── rustix v1.1.4
+│   │   │   │   │   │   │           ├── bitflags v2.13.1
+│   │   │   │   │   │   │           └── linux-raw-sys v0.12.1
+│   │   │   │   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   │   │   │   ├── tokenizers v0.22.2
+│   │   │   │   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   │   │   │   ├── aho-corasick v1.1.5
+│   │   │   │   │   │   │   │   └── memchr v2.8.3
+│   │   │   │   │   │   │   ├── compact_str v0.9.1
+│   │   │   │   │   │   │   │   ├── castaway v0.2.4
+│   │   │   │   │   │   │   │   │   └── rustversion v1.0.23 (proc-macro)
+│   │   │   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   │   │   ├── itoa v1.0.18
+│   │   │   │   │   │   │   │   ├── rustversion v1.0.23 (proc-macro)
+│   │   │   │   │   │   │   │   ├── ryu v1.0.23
+│   │   │   │   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   │   │   │   └── static_assertions v1.1.0
+│   │   │   │   │   │   │   ├── dary_heap v0.3.9
+│   │   │   │   │   │   │   │   └── serde v1.0.229 (*)
+│   │   │   │   │   │   │   ├── derive_builder v0.20.2
+│   │   │   │   │   │   │   │   └── derive_builder_macro v0.20.2 (proc-macro)
+│   │   │   │   │   │   │   │       ├── derive_builder_core v0.20.2
+│   │   │   │   │   │   │   │       │   ├── darling v0.20.11
+│   │   │   │   │   │   │   │       │   │   ├── darling_core v0.20.11
+│   │   │   │   │   │   │   │       │   │   │   ├── fnv v1.0.7
+│   │   │   │   │   │   │   │       │   │   │   ├── ident_case v1.0.1
+│   │   │   │   │   │   │   │       │   │   │   ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │   │   │       │   │   │   ├── quote v1.0.47 (*)
+│   │   │   │   │   │   │   │       │   │   │   ├── strsim v0.11.1
+│   │   │   │   │   │   │   │       │   │   │   └── syn v2.0.119 (*)
+│   │   │   │   │   │   │   │       │   │   └── darling_macro v0.20.11 (proc-macro)
+│   │   │   │   │   │   │   │       │   │       ├── darling_core v0.20.11 (*)
+│   │   │   │   │   │   │   │       │   │       ├── quote v1.0.47 (*)
+│   │   │   │   │   │   │   │       │   │       └── syn v2.0.119 (*)
+│   │   │   │   │   │   │   │       │   ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │   │   │       │   ├── quote v1.0.47 (*)
+│   │   │   │   │   │   │   │       │   └── syn v2.0.119 (*)
+│   │   │   │   │   │   │   │       └── syn v2.0.119 (*)
+│   │   │   │   │   │   │   ├── esaxx-rs v0.1.10
+│   │   │   │   │   │   │   ├── getrandom v0.3.4 (*)
+│   │   │   │   │   │   │   ├── itertools v0.14.0
+│   │   │   │   │   │   │   │   └── either v1.18.0
+│   │   │   │   │   │   │   ├── log v0.4.34
+│   │   │   │   │   │   │   ├── macro_rules_attribute v0.2.3
+│   │   │   │   │   │   │   │   ├── macro_rules_attribute-proc_macro v0.2.3 (proc-macro)
+│   │   │   │   │   │   │   │   └── pastey v0.2.3 (proc-macro)
+│   │   │   │   │   │   │   ├── monostate v0.1.18
+│   │   │   │   │   │   │   │   ├── monostate-impl v0.1.18 (proc-macro)
+│   │   │   │   │   │   │   │   │   ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │   │   │   │   ├── quote v1.0.47 (*)
+│   │   │   │   │   │   │   │   │   └── syn v2.0.119 (*)
+│   │   │   │   │   │   │   │   └── serde_core v1.0.229
+│   │   │   │   │   │   │   ├── onig v6.5.3
+│   │   │   │   │   │   │   │   ├── bitflags v2.13.1
+│   │   │   │   │   │   │   │   ├── once_cell v1.21.4
+│   │   │   │   │   │   │   │   └── onig_sys v69.9.3
+│   │   │   │   │   │   │   ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │   │   │   ├── rand v0.9.5 (*)
+│   │   │   │   │   │   │   ├── rayon v1.12.0 (*)
+│   │   │   │   │   │   │   ├── rayon-cond v0.4.0
+│   │   │   │   │   │   │   │   ├── either v1.18.0
+│   │   │   │   │   │   │   │   ├── itertools v0.14.0 (*)
+│   │   │   │   │   │   │   │   └── rayon v1.12.0 (*)
+│   │   │   │   │   │   │   ├── regex v1.13.1
+│   │   │   │   │   │   │   │   ├── aho-corasick v1.1.5 (*)
+│   │   │   │   │   │   │   │   ├── memchr v2.8.3
+│   │   │   │   │   │   │   │   ├── regex-automata v0.4.18
+│   │   │   │   │   │   │   │   │   ├── aho-corasick v1.1.5 (*)
+│   │   │   │   │   │   │   │   │   ├── memchr v2.8.3
+│   │   │   │   │   │   │   │   │   └── regex-syntax v0.8.11
+│   │   │   │   │   │   │   │   └── regex-syntax v0.8.11
+│   │   │   │   │   │   │   ├── regex-syntax v0.8.11
+│   │   │   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   │   │   │   ├── spm_precompiled v0.1.4
+│   │   │   │   │   │   │   │   ├── base64 v0.13.1
+│   │   │   │   │   │   │   │   ├── nom v7.1.3
+│   │   │   │   │   │   │   │   │   ├── memchr v2.8.3
+│   │   │   │   │   │   │   │   │   └── minimal-lexical v0.2.1
+│   │   │   │   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   │   │   │   └── unicode-segmentation v1.13.3
+│   │   │   │   │   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   │   │   │   │   ├── unicode-normalization-alignments v0.1.12
+│   │   │   │   │   │   │   │   └── smallvec v1.15.2
+│   │   │   │   │   │   │   ├── unicode-segmentation v1.13.3
+│   │   │   │   │   │   │   └── unicode_categories v0.1.1
+│   │   │   │   │   │   ├── yoke v0.8.3
+│   │   │   │   │   │   │   ├── stable_deref_trait v1.2.1
+│   │   │   │   │   │   │   ├── yoke-derive v0.8.2 (proc-macro)
+│   │   │   │   │   │   │   │   ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │   │   │   ├── quote v1.0.47 (*)
+│   │   │   │   │   │   │   │   ├── syn v2.0.119 (*)
+│   │   │   │   │   │   │   │   └── synstructure v0.13.2
+│   │   │   │   │   │   │   │       ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │   │   │       ├── quote v1.0.47 (*)
+│   │   │   │   │   │   │   │       └── syn v2.0.119 (*)
+│   │   │   │   │   │   │   └── zerofrom v0.1.8
+│   │   │   │   │   │   │       └── zerofrom-derive v0.1.7 (proc-macro)
+│   │   │   │   │   │   │           ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │   │           ├── quote v1.0.47 (*)
+│   │   │   │   │   │   │           ├── syn v2.0.119 (*)
+│   │   │   │   │   │   │           └── synstructure v0.13.2 (*)
+│   │   │   │   │   │   ├── zerocopy v0.8.56 (*)
+│   │   │   │   │   │   └── zip v8.6.0
+│   │   │   │   │   │       ├── crc32fast v1.5.1
+│   │   │   │   │   │       │   └── cfg-if v1.0.4
+│   │   │   │   │   │       ├── indexmap v2.14.1
+│   │   │   │   │   │       │   ├── equivalent v1.0.2
+│   │   │   │   │   │       │   └── hashbrown v0.17.1
+│   │   │   │   │   │       ├── memchr v2.8.3
+│   │   │   │   │   │       └── typed-path v0.12.3
+│   │   │   │   │   ├── candle-nn v0.11.0
+│   │   │   │   │   │   ├── candle-core v0.11.0 (*)
+│   │   │   │   │   │   ├── half v2.7.1 (*)
+│   │   │   │   │   │   ├── libc v0.2.189
+│   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   ├── rayon v1.12.0 (*)
+│   │   │   │   │   │   ├── safetensors v0.8.0 (*)
+│   │   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   │   └── thiserror v2.0.20 (*)
+│   │   │   │   │   ├── candle-transformers v0.11.0
+│   │   │   │   │   │   ├── byteorder v1.5.0
+│   │   │   │   │   │   ├── candle-core v0.11.0 (*)
+│   │   │   │   │   │   ├── candle-nn v0.11.0 (*)
+│   │   │   │   │   │   ├── fancy-regex v0.18.0
+│   │   │   │   │   │   │   ├── bit-set v0.8.0
+│   │   │   │   │   │   │   │   └── bit-vec v0.8.0
+│   │   │   │   │   │   │   ├── regex-automata v0.4.18 (*)
+│   │   │   │   │   │   │   └── regex-syntax v0.8.11
+│   │   │   │   │   │   ├── num-traits v0.2.19 (*)
+│   │   │   │   │   │   ├── rand v0.9.5 (*)
+│   │   │   │   │   │   ├── rayon v1.12.0 (*)
+│   │   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   │   │   ├── serde_plain v1.0.2
+│   │   │   │   │   │   │   └── serde v1.0.229 (*)
+│   │   │   │   │   │   └── tracing v0.1.44 (*)
+│   │   │   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   │   │   ├── contextra-rank v0.1.0 (/app/crates/contextra-rank)
+│   │   │   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   │   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   │   │   │   └── tracing v0.1.44 (*)
+│   │   │   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   │   │   ├── futures-util v0.3.34 (*)
+│   │   │   │   │   ├── half v2.7.1 (*)
+│   │   │   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   ├── sha2 v0.10.9 (*)
+│   │   │   │   │   ├── tokenizers v0.21.4
+│   │   │   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   │   │   ├── aho-corasick v1.1.5 (*)
+│   │   │   │   │   │   ├── compact_str v0.9.1 (*)
+│   │   │   │   │   │   ├── dary_heap v0.3.9 (*)
+│   │   │   │   │   │   ├── derive_builder v0.20.2 (*)
+│   │   │   │   │   │   ├── esaxx-rs v0.1.10
+│   │   │   │   │   │   ├── getrandom v0.3.4 (*)
+│   │   │   │   │   │   ├── indicatif v0.17.11
+│   │   │   │   │   │   │   ├── console v0.15.11
+│   │   │   │   │   │   │   │   ├── libc v0.2.189
+│   │   │   │   │   │   │   │   ├── once_cell v1.21.4
+│   │   │   │   │   │   │   │   └── unicode-width v0.2.2
+│   │   │   │   │   │   │   ├── number_prefix v0.4.0
+│   │   │   │   │   │   │   ├── portable-atomic v1.15.0
+│   │   │   │   │   │   │   └── unicode-width v0.2.2
+│   │   │   │   │   │   ├── itertools v0.14.0 (*)
+│   │   │   │   │   │   ├── log v0.4.34
+│   │   │   │   │   │   ├── macro_rules_attribute v0.2.3 (*)
+│   │   │   │   │   │   ├── monostate v0.1.18 (*)
+│   │   │   │   │   │   ├── onig v6.5.3 (*)
+│   │   │   │   │   │   ├── paste v1.0.15 (proc-macro)
+│   │   │   │   │   │   ├── rand v0.9.5 (*)
+│   │   │   │   │   │   ├── rayon v1.12.0 (*)
+│   │   │   │   │   │   ├── rayon-cond v0.4.0 (*)
+│   │   │   │   │   │   ├── regex v1.13.1 (*)
+│   │   │   │   │   │   ├── regex-syntax v0.8.11
+│   │   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   │   │   ├── spm_precompiled v0.1.4 (*)
+│   │   │   │   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   │   │   │   ├── unicode-normalization-alignments v0.1.12 (*)
+│   │   │   │   │   │   ├── unicode-segmentation v1.13.3
+│   │   │   │   │   │   └── unicode_categories v0.1.1
+│   │   │   │   │   ├── tokio v1.53.1 (*)
+│   │   │   │   │   └── tracing v0.1.44 (*)
+│   │   │   │   ├── contextra-kvcache v0.1.0 (/app/crates/contextra-kvcache)
+│   │   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   │   ├── bincode v1.3.3 (*)
+│   │   │   │   │   ├── blake3 v1.8.7 (*)
+│   │   │   │   │   ├── bytes v1.12.1
+│   │   │   │   │   ├── contextra-crypto v0.1.0 (/app/crates/contextra-crypto)
+│   │   │   │   │   │   ├── aes-gcm-siv v0.11.1
+│   │   │   │   │   │   │   ├── aead v0.5.2
+│   │   │   │   │   │   │   │   ├── crypto-common v0.1.7 (*)
+│   │   │   │   │   │   │   │   └── generic-array v0.14.7 (*)
+│   │   │   │   │   │   │   ├── aes v0.8.4
+│   │   │   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   │   │   ├── cipher v0.4.4
+│   │   │   │   │   │   │   │   │   ├── crypto-common v0.1.7 (*)
+│   │   │   │   │   │   │   │   │   └── inout v0.1.4
+│   │   │   │   │   │   │   │   │       └── generic-array v0.14.7 (*)
+│   │   │   │   │   │   │   │   └── cpufeatures v0.2.17
+│   │   │   │   │   │   │   ├── cipher v0.4.4 (*)
+│   │   │   │   │   │   │   ├── ctr v0.9.2
+│   │   │   │   │   │   │   │   └── cipher v0.4.4 (*)
+│   │   │   │   │   │   │   ├── polyval v0.6.2
+│   │   │   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   │   │   ├── cpufeatures v0.2.17
+│   │   │   │   │   │   │   │   ├── opaque-debug v0.3.1
+│   │   │   │   │   │   │   │   └── universal-hash v0.5.1
+│   │   │   │   │   │   │   │       ├── crypto-common v0.1.7 (*)
+│   │   │   │   │   │   │   │       └── subtle v2.6.1
+│   │   │   │   │   │   │   ├── subtle v2.6.1
+│   │   │   │   │   │   │   └── zeroize v1.9.0
+│   │   │   │   │   │   │       └── zeroize_derive v1.5.0 (proc-macro)
+│   │   │   │   │   │   │           ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │   │           ├── quote v1.0.47 (*)
+│   │   │   │   │   │   │           └── syn v2.0.119 (*)
+│   │   │   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   │   │   ├── argon2 v0.5.3
+│   │   │   │   │   │   │   ├── base64ct v1.8.3
+│   │   │   │   │   │   │   ├── blake2 v0.10.6
+│   │   │   │   │   │   │   │   └── digest v0.10.7 (*)
+│   │   │   │   │   │   │   ├── cpufeatures v0.2.17
+│   │   │   │   │   │   │   └── password-hash v0.5.0
+│   │   │   │   │   │   │       ├── base64ct v1.8.3
+│   │   │   │   │   │   │       ├── rand_core v0.6.4 (*)
+│   │   │   │   │   │   │       └── subtle v2.6.1
+│   │   │   │   │   │   ├── bincode v1.3.3 (*)
+│   │   │   │   │   │   ├── blake3 v1.8.7 (*)
+│   │   │   │   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   │   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   │   │   │   ├── ed25519-dalek v2.2.0
+│   │   │   │   │   │   │   ├── curve25519-dalek v4.1.3
+│   │   │   │   │   │   │   │   ├── cfg-if v1.0.4
+│   │   │   │   │   │   │   │   ├── cpufeatures v0.2.17
+│   │   │   │   │   │   │   │   ├── curve25519-dalek-derive v0.1.1 (proc-macro)
+│   │   │   │   │   │   │   │   │   ├── proc-macro2 v1.0.107 (*)
+│   │   │   │   │   │   │   │   │   ├── quote v1.0.47 (*)
+│   │   │   │   │   │   │   │   │   └── syn v2.0.119 (*)
+│   │   │   │   │   │   │   │   ├── digest v0.10.7 (*)
+│   │   │   │   │   │   │   │   ├── subtle v2.6.1
+│   │   │   │   │   │   │   │   └── zeroize v1.9.0 (*)
+│   │   │   │   │   │   │   ├── ed25519 v2.2.3
+│   │   │   │   │   │   │   │   └── signature v2.2.0
+│   │   │   │   │   │   │   ├── rand_core v0.6.4 (*)
+│   │   │   │   │   │   │   ├── sha2 v0.10.9 (*)
+│   │   │   │   │   │   │   ├── subtle v2.6.1
+│   │   │   │   │   │   │   └── zeroize v1.9.0 (*)
+│   │   │   │   │   │   ├── hkdf v0.12.4
+│   │   │   │   │   │   │   └── hmac v0.12.1
+│   │   │   │   │   │   │       └── digest v0.10.7 (*)
+│   │   │   │   │   │   ├── hmac v0.12.1 (*)
+│   │   │   │   │   │   ├── lru v0.16.4
+│   │   │   │   │   │   │   └── hashbrown v0.16.1 (*)
+│   │   │   │   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   │   │   │   ├── rand v0.8.8
+│   │   │   │   │   │   │   ├── libc v0.2.189
+│   │   │   │   │   │   │   ├── rand_chacha v0.3.1
+│   │   │   │   │   │   │   │   ├── ppv-lite86 v0.2.21 (*)
+│   │   │   │   │   │   │   │   └── rand_core v0.6.4 (*)
+│   │   │   │   │   │   │   └── rand_core v0.6.4 (*)
+│   │   │   │   │   │   ├── regex v1.13.1 (*)
+│   │   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   │   │   ├── sha2 v0.10.9 (*)
+│   │   │   │   │   │   ├── subtle v2.6.1
+│   │   │   │   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   │   │   │   ├── tracing v0.1.44 (*)
+│   │   │   │   │   │   └── zeroize v1.9.0 (*)
+│   │   │   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   │   │   ├── lru v0.16.4 (*)
+│   │   │   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   │   ├── tracing v0.1.44 (*)
+│   │   │   │   │   └── zeroize v1.9.0 (*)
+│   │   │   │   ├── contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc) (*)
+│   │   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   │   ├── contextra-rank v0.1.0 (/app/crates/contextra-rank) (*)
+│   │   │   │   ├── contextra-store v0.1.0 (/app/crates/contextra-store)
+│   │   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   │   ├── blake3 v1.8.7 (*)
+│   │   │   │   │   ├── bytes v1.12.1
+│   │   │   │   │   ├── contextra-core v0.1.0 (/app/crates/contextra-core) (*)
+│   │   │   │   │   ├── contextra-crypto v0.1.0 (/app/crates/contextra-crypto) (*)
+│   │   │   │   │   ├── contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc) (*)
+│   │   │   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   │   │   ├── contextra-sys v0.1.0 (/app/crates/contextra-sys)
+│   │   │   │   │   │   ├── libc v0.2.189
+│   │   │   │   │   │   ├── memmap2 v0.9.11 (*)
+│   │   │   │   │   │   └── tracing v0.1.44 (*)
+│   │   │   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   │   │   ├── crc32fast v1.5.1 (*)
+│   │   │   │   │   ├── lru v0.16.4 (*)
+│   │   │   │   │   ├── memmap2 v0.9.11 (*)
+│   │   │   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   │   │   ├── rand v0.8.8 (*)
+│   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   │   │   ├── tokio v1.53.1 (*)
+│   │   │   │   │   ├── tokio-util v0.7.19
+│   │   │   │   │   │   ├── bytes v1.12.1
+│   │   │   │   │   │   ├── futures-core v0.3.34
+│   │   │   │   │   │   ├── futures-sink v0.3.34
+│   │   │   │   │   │   ├── futures-util v0.3.34 (*)
+│   │   │   │   │   │   ├── libc v0.2.189
+│   │   │   │   │   │   ├── pin-project-lite v0.2.17
+│   │   │   │   │   │   └── tokio v1.53.1 (*)
+│   │   │   │   │   ├── tracing v0.1.44 (*)
+│   │   │   │   │   └── uuid v1.26.0
+│   │   │   │   │       └── getrandom v0.4.3 (*)
+│   │   │   │   ├── contextra-sys v0.1.0 (/app/crates/contextra-sys) (*)
+│   │   │   │   ├── contextra-text v0.1.0 (/app/crates/contextra-text)
+│   │   │   │   │   ├── bincode v1.3.3 (*)
+│   │   │   │   │   ├── bytes v1.12.1
+│   │   │   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   │   │   ├── itoa v1.0.18
+│   │   │   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   │   │   ├── regex v1.13.1 (*)
+│   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   │   │   ├── tracing v0.1.44 (*)
+│   │   │   │   │   └── unicode-segmentation v1.13.3
+│   │   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   │   ├── contextra-vector v0.1.0 (/app/crates/contextra-vector)
+│   │   │   │   │   ├── ahash v0.8.12 (*)
+│   │   │   │   │   ├── contextra-core v0.1.0 (/app/crates/contextra-core) (*)
+│   │   │   │   │   ├── contextra-crypto v0.1.0 (/app/crates/contextra-crypto) (*)
+│   │   │   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   │   │   ├── contextra-simd v0.1.0 (/app/crates/contextra-simd)
+│   │   │   │   │   │   ├── bytemuck v1.25.2 (*)
+│   │   │   │   │   │   ├── contextra-core v0.1.0 (/app/crates/contextra-core) (*)
+│   │   │   │   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   │   │   │   └── tracing v0.1.44 (*)
+│   │   │   │   │   ├── contextra-sys v0.1.0 (/app/crates/contextra-sys) (*)
+│   │   │   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   │   │   ├── memmap2 v0.9.11 (*)
+│   │   │   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   │   │   ├── rand v0.8.8 (*)
+│   │   │   │   │   ├── roaring v0.10.12
+│   │   │   │   │   │   ├── bytemuck v1.25.2 (*)
+│   │   │   │   │   │   └── byteorder v1.5.0
+│   │   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   │   ├── subtle v2.6.1
+│   │   │   │   │   └── tracing v0.1.44 (*)
+│   │   │   │   ├── hmac v0.12.1 (*)
+│   │   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   │   ├── serde v1.0.229 (*)
+│   │   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   │   ├── sha2 v0.10.9 (*)
+│   │   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   │   ├── tokio v1.53.1 (*)
+│   │   │   │   ├── tokio-util v0.7.19 (*)
+│   │   │   │   ├── tracing v0.1.44 (*)
+│   │   │   │   └── zeroize v1.9.0 (*)
+│   │   │   ├── contextra-graph v0.1.0 (/app/crates/contextra-graph) (*)
+│   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   ├── contextra-store v0.1.0 (/app/crates/contextra-store) (*)
+│   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   ├── contextra-vector v0.1.0 (/app/crates/contextra-vector) (*)
+│   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   ├── serde v1.0.229 (*)
+│   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   ├── tokio v1.53.1 (*)
+│   │   │   ├── tokio-util v0.7.19 (*)
+│   │   │   └── tracing v0.1.44 (*)
+│   │   ├── contextra-crypto v0.1.0 (/app/crates/contextra-crypto) (*)
+│   │   ├── contextra-engine v0.1.0 (/app/crates/contextra-engine) (*)
+│   │   ├── contextra-graph v0.1.0 (/app/crates/contextra-graph) (*)
+│   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   ├── contextra-rank v0.1.0 (/app/crates/contextra-rank) (*)
+│   │   ├── contextra-store v0.1.0 (/app/crates/contextra-store) (*)
+│   │   ├── contextra-sys v0.1.0 (/app/crates/contextra-sys) (*)
+│   │   ├── contextra-text v0.1.0 (/app/crates/contextra-text) (*)
+│   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   ├── contextra-vector v0.1.0 (/app/crates/contextra-vector) (*)
+│   │   ├── parking_lot v0.12.5 (*)
+│   │   ├── serde v1.0.229 (*)
+│   │   ├── serde_json v1.0.151 (*)
+│   │   ├── thiserror v2.0.20 (*)
+│   │   ├── tokio v1.53.1 (*)
+│   │   ├── tokio-util v0.7.19 (*)
+│   │   ├── tracing v0.1.44 (*)
+│   │   └── zeroize v1.9.0 (*)
+│   ├── contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle) (*)
+│   ├── contextra-license v0.1.0 (/app/crates/contextra-license)
+│   │   ├── bincode v1.3.3 (*)
+│   │   ├── blake3 v1.8.7 (*)
+│   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   ├── ed25519-dalek v2.2.0 (*)
+│   │   ├── serde v1.0.229 (*)
+│   │   ├── thiserror v2.0.20 (*)
+│   │   └── tracing v0.1.44 (*)
+│   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   ├── contextra-rank v0.1.0 (/app/crates/contextra-rank) (*)
+│   ├── contextra-router v0.1.0 (/app/crates/contextra-router)
+│   │   ├── arc-swap v1.9.2 (*)
+│   │   ├── contextra-adapt v0.1.0 (/app/crates/contextra-adapt) (*)
+│   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   ├── contextra-privacy v0.1.0 (/app/crates/contextra-privacy)
+│   │   │   ├── blake3 v1.8.7 (*)
+│   │   │   ├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+│   │   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   │   ├── parking_lot v0.12.5 (*)
+│   │   │   ├── rand v0.8.8 (*)
+│   │   │   ├── regex v1.13.1 (*)
+│   │   │   ├── scc v2.4.0 (*)
+│   │   │   ├── serde v1.0.229 (*)
+│   │   │   ├── serde_json v1.0.151 (*)
+│   │   │   ├── thiserror v2.0.20 (*)
+│   │   │   ├── tokio v1.53.1 (*)
+│   │   │   ├── tracing v0.1.44 (*)
+│   │   │   └── zeroize v1.9.0 (*)
+│   │   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   │   ├── contextra-wire v0.1.0 (/app/crates/contextra-wire) (*)
+│   │   ├── parking_lot v0.12.5 (*)
+│   │   ├── serde v1.0.229 (*)
+│   │   ├── serde_json v1.0.151 (*)
+│   │   ├── shlex v1.3.0
+│   │   ├── thiserror v2.0.20 (*)
+│   │   ├── tokio v1.53.1 (*)
+│   │   └── tracing v0.1.44 (*)
+│   ├── contextra-store v0.1.0 (/app/crates/contextra-store) (*)
+│   ├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+│   ├── serde v1.0.229 (*)
+│   ├── serde_json v1.0.151 (*)
+│   ├── thiserror v2.0.20 (*)
+│   ├── tokio v1.53.1 (*)
+│   └── uuid v1.26.0 (*)
+├── contextra-adapt v0.1.0 (/app/crates/contextra-adapt) (*)
+├── contextra-crypto v0.1.0 (/app/crates/contextra-crypto) (*)
+├── contextra-license v0.1.0 (/app/crates/contextra-license) (*)
+├── contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+├── contextra-privacy v0.1.0 (/app/crates/contextra-privacy) (*)
+├── contextra-rank v0.1.0 (/app/crates/contextra-rank) (*)
+├── contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+├── contextra-wire v0.1.0 (/app/crates/contextra-wire) (*)
+├── futures-util v0.3.34 (*)
+├── parking_lot v0.12.5 (*)
+├── rand v0.8.8 (*)
+├── scc v2.4.0 (*)
+├── serde v1.0.229 (*)
+├── serde_json v1.0.151 (*)
+├── thiserror v2.0.20 (*)
+├── tokio v1.53.1 (*)
+├── tokio-util v0.7.19 (*)
+├── tracing v0.1.44 (*)
+├── tracing-subscriber v0.3.23
+│   ├── matchers v0.2.0
+│   │   └── regex-automata v0.4.18 (*)
+│   ├── nu-ansi-term v0.50.3
+│   ├── once_cell v1.21.4
+│   ├── regex-automata v0.4.18 (*)
+│   ├── sharded-slab v0.1.7
+│   │   └── lazy_static v1.5.0
+│   ├── smallvec v1.15.2
+│   ├── thread_local v1.1.10
+│   │   └── cfg-if v1.0.4
+│   ├── tracing v0.1.44 (*)
+│   ├── tracing-core v0.1.36 (*)
+│   └── tracing-log v0.2.0
+│       ├── log v0.4.34
+│       ├── once_cell v1.21.4
+│       └── tracing-core v0.1.36 (*)
+├── unicode-normalization v0.1.25
+│   └── tinyvec v1.12.0
+│       └── tinyvec_macros v0.1.1
+└── zeroize v1.9.0 (*)
