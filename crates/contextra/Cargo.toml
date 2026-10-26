@@ -10,7 +10,6 @@ description = "Contextra — Embedded hybrid-search for AI agents (Facade)"
 ring = "4"
 
 [dependencies]
-contextra-core = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-license = { workspace = true }
@@ -24,9 +23,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
 contextra-infer-candle = { workspace = true, optional = true }
-contextra-infer-ollama = { workspace = true, optional = true }
-contextra-infer-onnx = { workspace = true, optional = true }
-contextra-router = { workspace = true, optional = true }
 contextra-rank = { workspace = true, optional = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
@@ -42,10 +38,7 @@ sovereign = ["contextra-crypto", "contextra-privacy"]
 compliance = ["sovereign", "audit-export", "avv-generator"]
 audit-export = ["dep:contextra-audit-export"]
 avv-generator = ["dep:contextra-avv-generator"]
-onnx = ["contextra-infer-onnx/onnx", "contextra-db/onnx"]
 candle = ["contextra-infer-candle"]
-ollama = ["contextra-infer-ollama"]
-router = ["contextra-router", "contextra-rank"]
 
 [lints]
 workspace = true

@@ -1,13 +1,10 @@
-[lints]
-workspace = true
-
 [package]
 name = "contextra-rank"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "4-Signal Fusion, Isotonic & Platt Calibration, and Drift Detection for Contextra Cognitive OS"
+description = "Ranking, reciprocal rank fusion (RRF), and score normalization algorithms"
 
 [package.metadata.contextra]
 ring = "0"
@@ -22,9 +19,10 @@ tracing.workspace = true
 thiserror.workspace = true
 
 [features]
-dibud = []
+default = []
 
 [dev-dependencies]
-contextra-adapt.workspace = true
 proptest = "1"
-tokio = { workspace = true, features = ["full"] }
+
+[lints]
+workspace = true
