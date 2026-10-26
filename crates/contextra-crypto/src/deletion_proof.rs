@@ -91,12 +91,10 @@ impl DeletionProofKeyPair {
 /// Custody level for cryptographic key management during deletion proof generation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CustodyLevel {
-    /// Local custody.
-    Local,
-    /// Sovereign custody.
-    Sovereign,
-    /// Escrowed custody.
-    Escrow,
+    /// K0: keine Verwahrung (Verschlüsselung aus; nur EdgeMinimal/Entwicklung).
+    K0,
+    /// K1: lokaler, passphrasegeschützter Keystore.
+    K1,
 }
 
 /// Handle to the key used for signing deletion proofs.
@@ -989,7 +987,7 @@ mod tests {
             &saga,
             &w_remaining,
             &[],
-            CustodyLevel::Local,
+            CustodyLevel::K1,
             hmac_key.as_slice(),
             &clock,
         );
@@ -1008,7 +1006,7 @@ mod tests {
             &saga,
             &w_not_measured,
             &[],
-            CustodyLevel::Local,
+            CustodyLevel::K1,
             hmac_key.as_slice(),
             &clock,
         );
@@ -1036,7 +1034,7 @@ mod tests {
             &saga,
             &w_valid,
             &[ExcludedScope::LlmParameterMemory],
-            CustodyLevel::Local,
+            CustodyLevel::K1,
             hmac_key.as_slice(),
             &clock,
         );
