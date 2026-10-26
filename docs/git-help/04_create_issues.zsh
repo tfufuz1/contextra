@@ -12,83 +12,76 @@ REPO="tfufuz1/contextra"
 
 # ── Farbausgabe ───────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
-  C_GREEN="\033[0;32m"; C_RED="\033[0;31m"; C_YELLOW="\033[0;33m"
-  C_BLUE="\033[0;34m"; C_BOLD="\033[1m"; C_RESET="\033[0m"
+  C_GREEN=$'\033[0;32m'; C_RED=$'\033[0;31m'; C_YELLOW=$'\033[0;33m'
+  C_BLUE=$'\033[0;34m'; C_BOLD=$'\033[1m'; C_RESET=$'\033[0m'
 else
   C_GREEN=""; C_RED=""; C_YELLOW=""; C_BLUE=""; C_BOLD=""; C_RESET=""
 fi
 
-print_ok()    { print -P "${C_GREEN}✅ $*${C_RESET}" }
-print_error() { print -P "${C_RED}❌ Fehler: $*${C_RESET}" >&2 }
-print_warn()  { print -P "${C_YELLOW}⚠️  $*${C_RESET}" }
-print_step()  { print -P "${C_BLUE}▶  $*${C_RESET}" }
-print_info()  { print -P "${C_BOLD}ℹ  $*${C_RESET}" }
+print_ok()    { print -r -- "${C_GREEN}✅ $*${C_RESET}" }
+print_error() { print -r -- "${C_RED}❌ Fehler: $*${C_RESET}" >&2 }
+print_warn()  { print -r -- "${C_YELLOW}⚠️  $*${C_RESET}" }
+print_step()  { print -r -- "${C_BLUE}▶  $*${C_RESET}" }
+print_info()  { print -r -- "${C_BOLD}ℹ  $*${C_RESET}" }
 
 # ── gh-Prüfung ───────────────────────────────────────────────────────────────
 if ! command -v gh &>/dev/null; then
   print_error "gh CLI nicht gefunden. Führe zuerst 01_setup_github.zsh aus."
   exit 1
 fi
-if ! gh auth status &>/dev/null; then
+if ! gh api user --silent &>/dev/null; then
   print_error "Nicht bei GitHub authentifiziert. Führe zuerst 01_setup_github.zsh aus."
   exit 1
 fi
 
-# ── Milestone-Nummer abrufen ──────────────────────────────────────────────────
-get_milestone_number() {
-  local TITLE="$1"
-  gh api "repos/${REPO}/milestones" \
-    --jq ".[] | select(.title == \"${TITLE}\") | .number" 2>/dev/null || echo ""
+# ── Zähler & Cache ────────────────────────────────────────────────────────────
+typeset -i TOTAL_CREATED=0 TOTAL_SKIPPED=0 TOTAL_FAILED=0
+MS_TITLES=""       # Titel aller Milestones (einmal geladen)
+ISSUE_TITLES=""    # "Nr<TAB>Titel" aller Issues (einmal geladen)
+
+load_caches() {
+  print_step "Lade Milestones und vorhandene Issues…"
+  MS_TITLES=$(gh api "repos/${REPO}/milestones?state=all&per_page=100" \
+    --paginate --jq '.[].title') || { print_error "Milestones nicht ladbar (Token-Recht 'Issues: Read'?)"; exit 1; }
+  ISSUE_TITLES=$(gh issue list --repo "${REPO}" --state all --limit 1000 \
+    --json number,title --jq '.[] | "\(.number)\t\(.title)"') \
+    || { print_error "Issues nicht ladbar."; exit 1; }
 }
 
-# ── Issue-Erstellung ──────────────────────────────────────────────────────────
+# ── Issue-Erstellung (einzige Definition) ─────────────────────────────────────
+# Gibt NIE einen Fehlercode zurück, damit `set -e` nicht das ganze Skript
+# beim ersten Fehler abbricht; Fehler werden gezählt.
 create_issue() {
-  local TITLE="$1"
-  local BODY="$2"
-  local MILESTONE_TITLE="$3"
-  local LABELS="${4:-jules,task}"
+  local TITLE="$1" BODY="$2" MILESTONE_TITLE="$3" LABELS="${4:-jules,task}"
 
-  # Prüfen ob Issue schon existiert (by title)
-  EXISTING=$(gh issue list --repo "${REPO}" --state all \
-    --json title,number \
-    --jq ".[] | select(.title == \"${TITLE}\") | .number" 2>/dev/null || echo "")
-
+  local EXISTING
+  EXISTING=$(printf '%s\n' "$ISSUE_TITLES" | awk -F'\t' -v t="$TITLE" '$2 == t {print $1; exit}')
   if [[ -n "$EXISTING" ]]; then
     print_warn "  Existiert bereits: #${EXISTING} — '${TITLE}'"
+    (( TOTAL_SKIPPED++ )) || true
     return 0
   fi
 
-  MS_NUM=$(get_milestone_number "$MILESTONE_TITLE")
+  local -a ARGS=(--repo "${REPO}" --title "${TITLE}" --body "${BODY}" --label "${LABELS}")
+
+  # gh erwartet den Milestone-TITEL (nicht die Nummer!)
+  if printf '%s\n' "$MS_TITLES" | grep -qxF -- "$MILESTONE_TITLE"; then
+    ARGS+=(--milestone "${MILESTONE_TITLE}")
+  else
+    print_warn "  Milestone '${MILESTONE_TITLE}' nicht gefunden — Issue ohne Milestone (erst Skript 03 ausführen)."
+  fi
 
   print_step "  Erstelle: ${TITLE}"
-  print_step "  Führe aus: gh issue create --repo ${REPO} --title '${TITLE}' --label ${LABELS}..."
-
-  local ISSUE_URL
-  if [[ -n "$MS_NUM" ]]; then
-    ISSUE_URL=$(gh issue create \
-      --repo "${REPO}" \
-      --title "${TITLE}" \
-      --body "${BODY}" \
-      --label "${LABELS}" \
-      --milestone "${MS_NUM}" \
-      2>/dev/null || echo "")
-  else
-    print_warn "  Milestone '${MILESTONE_TITLE}' nicht gefunden — Issue ohne Milestone."
-    ISSUE_URL=$(gh issue create \
-      --repo "${REPO}" \
-      --title "${TITLE}" \
-      --body "${BODY}" \
-      --label "${LABELS}" \
-      2>/dev/null || echo "")
-  fi
-
-  if [[ -n "$ISSUE_URL" ]]; then
-    print_ok "  Erstellt: ${ISSUE_URL}"
-    return 0
+  local OUT
+  if OUT=$(gh issue create "${ARGS[@]}" 2>&1); then
+    print_ok "  Erstellt: ${OUT}"
+    (( TOTAL_CREATED++ )) || true
   else
     print_error "  Fehlgeschlagen: ${TITLE}"
-    return 1
+    print_warn "  GitHub-Antwort: ${OUT}"
+    (( TOTAL_FAILED++ )) || true
   fi
+  return 0
 }
 
 # ── Issue-Definitionen (exaktes Format aus GITHUB_WORKFLOW.md) ────────────────
@@ -518,10 +511,9 @@ main() {
   print "  a) Alle Phasen (0+1+2)"
   print ""
   print -n "Deine Wahl [0/1/2/a]: "
-  read -r CHOICE
+  read -r CHOICE || CHOICE=""
 
-  TOTAL_CREATED=0
-  TOTAL_FAILED=0
+  load_caches
 
   case "$CHOICE" in
     0) create_phase_0 ;;
@@ -532,13 +524,17 @@ main() {
   esac
 
   print ""
-  print -P "${C_BOLD}═══════════════════════════════════════${C_RESET}"
-  print_ok "Issue-Erstellung abgeschlossen."
+  print -r -- "${C_BOLD}═══════════════════════════════════════${C_RESET}"
+  print_info "Zusammenfassung:"
+  print "  Neu erstellt:   ${TOTAL_CREATED}"
+  print "  Übersprungen:   ${TOTAL_SKIPPED}"
+  print "  Fehlgeschlagen: ${TOTAL_FAILED}"
   print ""
   print_step "Offene Jules-Issues:"
   print_step "Führe aus: gh issue list --repo ${REPO} --label jules --state open"
   gh issue list --repo "${REPO}" --label "jules" --state open 2>/dev/null \
     || print_warn "Konnte Issues nicht auflisten."
+  (( TOTAL_FAILED == 0 )) || { print_error "${TOTAL_FAILED} Issue(s) fehlgeschlagen."; exit 1; }
 }
 
 main "$@"

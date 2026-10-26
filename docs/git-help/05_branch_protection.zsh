@@ -12,31 +12,31 @@ BRANCH="main"
 
 # ── Farbausgabe ───────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
-  C_GREEN="\033[0;32m"; C_RED="\033[0;31m"; C_YELLOW="\033[0;33m"
-  C_BLUE="\033[0;34m"; C_BOLD="\033[1m"; C_RESET="\033[0m"
+  C_GREEN=$'\033[0;32m'; C_RED=$'\033[0;31m'; C_YELLOW=$'\033[0;33m'
+  C_BLUE=$'\033[0;34m'; C_BOLD=$'\033[1m'; C_RESET=$'\033[0m'
 else
   C_GREEN=""; C_RED=""; C_YELLOW=""; C_BLUE=""; C_BOLD=""; C_RESET=""
 fi
 
-print_ok()    { print -P "${C_GREEN}✅ $*${C_RESET}" }
-print_error() { print -P "${C_RED}❌ Fehler: $*${C_RESET}" >&2 }
-print_warn()  { print -P "${C_YELLOW}⚠️  $*${C_RESET}" }
-print_step()  { print -P "${C_BLUE}▶  $*${C_RESET}" }
-print_info()  { print -P "${C_BOLD}ℹ  $*${C_RESET}" }
+print_ok()    { print -r -- "${C_GREEN}✅ $*${C_RESET}" }
+print_error() { print -r -- "${C_RED}❌ Fehler: $*${C_RESET}" >&2 }
+print_warn()  { print -r -- "${C_YELLOW}⚠️  $*${C_RESET}" }
+print_step()  { print -r -- "${C_BLUE}▶  $*${C_RESET}" }
+print_info()  { print -r -- "${C_BOLD}ℹ  $*${C_RESET}" }
 
 # ── gh-Prüfung ───────────────────────────────────────────────────────────────
 if ! command -v gh &>/dev/null; then
   print_error "gh CLI nicht gefunden. Führe zuerst 01_setup_github.zsh aus."
   exit 1
 fi
-if ! gh auth status &>/dev/null; then
+if ! gh api user --silent &>/dev/null; then
   print_error "Nicht bei GitHub authentifiziert. Führe zuerst 01_setup_github.zsh aus."
   exit 1
 fi
 
 # ── Erklärung ─────────────────────────────────────────────────────────────────
 print ""
-print -P "${C_BOLD}Was macht Branch-Protection?${C_RESET}"
+print -r -- "${C_BOLD}Was macht Branch-Protection?${C_RESET}"
 print ""
 print "Branch-Protection verhindert direkte Pushes auf 'main' und erzwingt:"
 print ""
@@ -97,7 +97,7 @@ JSONEOF
 )
 
 print_step "Führe aus: gh api repos/${REPO}/branches/${BRANCH}/protection (PUT)"
-RESULT=$(echo "$PAYLOAD" | gh api \
+RESULT=$(printf '%s' "$PAYLOAD" | gh api \
   "repos/${REPO}/branches/${BRANCH}/protection" \
   --method PUT \
   --input - \
@@ -110,7 +110,10 @@ else
   print_warn "Fehler-Details:"
   echo "$RESULT"
   print ""
-  print_info "Mögliche Ursache: Du brauchst Admin-Rechte auf dem Repository."
+  print_info "Mögliche Ursachen:"
+  print "  • Fine-grained Token braucht 'Administration: Read and write'"
+  print "  • Private Repos im Free-Plan unterstützen keine Branch-Protection (HTTP 403)"
+  print "  • Du brauchst Admin-Rechte auf dem Repository"
   print_info "Alternativ: Branch-Protection manuell einrichten unter:"
   print "  https://github.com/${REPO}/settings/branches"
   exit 1

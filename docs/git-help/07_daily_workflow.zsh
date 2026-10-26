@@ -11,25 +11,25 @@ REPO="tfufuz1/contextra"
 
 # ── Farbausgabe ───────────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
-  C_GREEN="\033[0;32m"; C_RED="\033[0;31m"; C_YELLOW="\033[0;33m"
-  C_BLUE="\033[0;34m"; C_BOLD="\033[1m"; C_RESET="\033[0m"
+  C_GREEN=$'\033[0;32m'; C_RED=$'\033[0;31m'; C_YELLOW=$'\033[0;33m'
+  C_BLUE=$'\033[0;34m'; C_BOLD=$'\033[1m'; C_RESET=$'\033[0m'
 else
   C_GREEN=""; C_RED=""; C_YELLOW=""; C_BLUE=""; C_BOLD=""; C_RESET=""
 fi
 
-print_ok()    { print -P "${C_GREEN}✅ $*${C_RESET}" }
-print_error() { print -P "${C_RED}❌ Fehler: $*${C_RESET}" >&2 }
-print_warn()  { print -P "${C_YELLOW}⚠️  $*${C_RESET}" }
-print_step()  { print -P "${C_BLUE}▶  $*${C_RESET}" }
-print_info()  { print -P "${C_BOLD}ℹ  $*${C_RESET}" }
-print_sep()   { print -P "${C_BOLD}───────────────────────────────────────────${C_RESET}" }
+print_ok()    { print -r -- "${C_GREEN}✅ $*${C_RESET}" }
+print_error() { print -r -- "${C_RED}❌ Fehler: $*${C_RESET}" >&2 }
+print_warn()  { print -r -- "${C_YELLOW}⚠️  $*${C_RESET}" }
+print_step()  { print -r -- "${C_BLUE}▶  $*${C_RESET}" }
+print_info()  { print -r -- "${C_BOLD}ℹ  $*${C_RESET}" }
+print_sep()   { print -r -- "${C_BOLD}───────────────────────────────────────────${C_RESET}" }
 
 # ── gh-Prüfung ───────────────────────────────────────────────────────────────
 if ! command -v gh &>/dev/null; then
   print_error "gh CLI nicht gefunden. Führe zuerst 01_setup_github.zsh aus."
   exit 1
 fi
-if ! gh auth status &>/dev/null; then
+if ! gh api user --silent &>/dev/null; then
   print_error "Nicht bei GitHub authentifiziert. Führe zuerst 01_setup_github.zsh aus."
   exit 1
 fi
@@ -39,9 +39,9 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unbekannt"
 CURRENT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unbekannt")
 
 print ""
-print -P "${C_BOLD}╔═══════════════════════════════════════════╗${C_RESET}"
-print -P "${C_BOLD}║   Contextra — Täglicher Workflow-Helfer   ║${C_RESET}"
-print -P "${C_BOLD}╚═══════════════════════════════════════════╝${C_RESET}"
+print -r -- "${C_BOLD}╔═══════════════════════════════════════════╗${C_RESET}"
+print -r -- "${C_BOLD}║   Contextra — Täglicher Workflow-Helfer   ║${C_RESET}"
+print -r -- "${C_BOLD}╚═══════════════════════════════════════════╝${C_RESET}"
 print ""
 print_info "Aktueller Stand:"
 print "  Branch: ${CURRENT_BRANCH}"
@@ -105,7 +105,7 @@ print ""
 print_sep
 print ""
 print -n "Issue-Nummer anzeigen (Enter zum Überspringen): "
-read -r ISSUE_NUM
+read -r ISSUE_NUM || ISSUE_NUM=""
 
 if [[ -n "$ISSUE_NUM" && "$ISSUE_NUM" =~ ^[0-9]+$ ]]; then
   print ""
@@ -117,7 +117,7 @@ if [[ -n "$ISSUE_NUM" && "$ISSUE_NUM" =~ ^[0-9]+$ ]]; then
   print_info "Branch für dieses Issue erstellen?"
   print_info "Empfohlenes Format: wp-X.Y-kurze-beschreibung (z.B. wp-1.1-engine-stub)"
   print -n "Branch-Name (Enter zum Überspringen): "
-  read -r BRANCH_NAME
+  read -r BRANCH_NAME || BRANCH_NAME=""
 
   if [[ -n "$BRANCH_NAME" ]]; then
     # Branch-Name bereinigen
@@ -125,10 +125,11 @@ if [[ -n "$ISSUE_NUM" && "$ISSUE_NUM" =~ ^[0-9]+$ ]]; then
 
     print ""
     print_step "Führe aus: git fetch origin && git checkout -b ${BRANCH_NAME} origin/main"
-    git fetch origin 2>/dev/null && \
-    git checkout -b "${BRANCH_NAME}" origin/main 2>/dev/null && \
-    print_ok "Branch '${BRANCH_NAME}' erstellt und ausgecheckt." || \
-    print_error "Branch-Erstellung fehlgeschlagen. Existiert er bereits?"
+    if git fetch origin && git checkout -b "${BRANCH_NAME}" origin/main; then
+      print_ok "Branch '${BRANCH_NAME}' erstellt und ausgecheckt."
+    else
+      print_error "Branch-Erstellung fehlgeschlagen (Meldung oben). Existiert er bereits?"
+    fi
 
     print ""
     print_info "Nächste Schritte:"

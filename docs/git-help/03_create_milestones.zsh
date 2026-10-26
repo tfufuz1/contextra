@@ -42,20 +42,18 @@ typeset -a MILESTONES=(
   "Phase 3 – Fundament|WP 3.1–3.5: Sicherheitsports, WAL, Vfs-Impl, Scanning-Infrastruktur"
 )
 
-# ── Vorhandene Milestones abrufen ─────────────────────────────────────────────
+# ── Vorhandene Milestones abrufen (inkl. geschlossene) ───────────────────────
 print_step "Lade vorhandene Milestones von GitHub…"
-print_step "Führe aus: gh api repos/${REPO}/milestones"
-EXISTING_MS=$(gh api "repos/${REPO}/milestones" --jq '.[].title' 2>/dev/null || echo "")
+print_step "Führe aus: gh api 'repos/${REPO}/milestones?state=all' --paginate"
+if ! EXISTING_MS=$(gh api "repos/${REPO}/milestones?state=all&per_page=100" \
+      --paginate --jq '.[].title' 2>&1); then
+  print_error "Milestones konnten nicht geladen werden:"
+  print "$EXISTING_MS"
+  print_info "Prüfe die Token-Rechte: Fine-grained Token braucht 'Issues: Read and write'."
+  exit 1
+fi
 print_ok "Milestones geladen."
 print ""
-
-# ── Datum-Abfrage-Funktion ────────────────────────────────────────────────────
-ask_date() {
-  local PHASE="$1"
-  print -n "  Fälligkeitsdatum für '${PHASE}' (Format: YYYY-MM-DD, oder Enter für kein Datum): "
-  read -r DATE_INPUT
-  echo "$DATE_INPUT"
-}
 
 # ── Milestones erstellen ──────────────────────────────────────────────────────
 print_info "Erstelle Milestones (idempotent — vorhandene werden übersprungen)…"
@@ -69,34 +67,31 @@ for MS_DEF in "${MILESTONES[@]}"; do
   TITLE="${MS_DEF%%|*}"
   DESC="${MS_DEF#*|}"
 
-  if echo "$EXISTING_MS" | grep -qxF "$TITLE"; then
+  if printf '%s\n' "$EXISTING_MS" | grep -qxF -- "$TITLE"; then
     print_warn "Existiert bereits: '${TITLE}' — übersprungen."
     (( SKIPPED++ )) || true
     continue
   fi
 
   print_info "Neuer Milestone: ${TITLE}"
-  DATE=$(ask_date "$TITLE")
 
-  # API-Payload aufbauen
-  if [[ -n "$DATE" ]]; then
-    # Datum in ISO8601 umwandeln (GitHub erwartet T00:00:00Z)
-    DUE_ON="${DATE}T00:00:00Z"
-    PAYLOAD=$(printf '{"title":"%s","description":"%s","due_on":"%s"}' \
-      "$TITLE" "$DESC" "$DUE_ON")
-  else
-    PAYLOAD=$(printf '{"title":"%s","description":"%s"}' "$TITLE" "$DESC")
+  # Fälligkeitsdatum abfragen (Prompt geht direkt ans Terminal)
+  print -n "  Fälligkeitsdatum (YYYY-MM-DD, oder Enter für keins): "
+  read -r DATE_INPUT
+
+  ARGS=(-f "title=${TITLE}" -f "description=${DESC}")
+  if [[ -n "$DATE_INPUT" ]]; then
+    ARGS+=(-f "due_on=${DATE_INPUT}T00:00:00Z")
   fi
 
-  print_step "Führe aus: gh api repos/${REPO}/milestones (POST)"
-  if echo "$PAYLOAD" | gh api "repos/${REPO}/milestones" \
-      --method POST \
-      --input - \
-      --jq '.title' 2>/dev/null | grep -q .; then
-    print_ok "  Erstellt: ${TITLE}${DATE:+ (fällig: ${DATE})}"
+  print_step "Führe aus: gh api -X POST repos/${REPO}/milestones -f title=… -f description=…"
+  if RESULT=$(gh api -X POST "repos/${REPO}/milestones" "${ARGS[@]}" \
+        --jq '.number' 2>&1); then
+    print_ok "  Erstellt: ${TITLE} (Nr. ${RESULT})"
     (( CREATED++ )) || true
   else
     print_error "  Fehlgeschlagen: ${TITLE}"
+    print_warn "  GitHub-Antwort: ${RESULT}"
     (( FAILED++ )) || true
   fi
   print ""
@@ -110,13 +105,12 @@ print "  Übersprungen:   ${SKIPPED}"
 print "  Fehlgeschlagen: ${FAILED}"
 print ""
 print_step "Aktuelle Milestones:"
-print_step "Führe aus: gh api repos/${REPO}/milestones --jq '.[] | \"#\\(.number) \\(.title) (offen: \\(.open_issues))\"'"
-gh api "repos/${REPO}/milestones" \
-  --jq '.[] | "#\(.number) \(.title) (offen: \(.open_issues))"' 2>/dev/null \
+gh api "repos/${REPO}/milestones?state=all" \
+  --jq '.[] | "#\(.number) \(.title) (offen: \(.open_issues))"' \
   || print_warn "Konnte Milestones nicht auflisten."
 
 if (( FAILED > 0 )); then
-  print_error "${FAILED} Milestone(s) konnten nicht erstellt werden."
+  print_error "${FAILED} Milestone(s) konnten nicht erstellt werden. Die GitHub-Antwort steht oben."
   exit 1
 fi
 print_ok "Fertig — alle Milestones gesetzt."
