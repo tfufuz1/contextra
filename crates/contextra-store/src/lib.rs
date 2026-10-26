@@ -17,6 +17,7 @@
 #[cfg(not(loom))]
 pub mod compaction;
 pub mod engine;
+pub mod fsync;
 pub mod kv;
 #[cfg(not(loom))]
 pub mod lsm;
