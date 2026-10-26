@@ -6,6 +6,7 @@
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 #![forbid(unsafe_code)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 //! Cryptography module for Contextra.
 //!
@@ -39,8 +40,8 @@ pub use audit_chain::{
 pub use crypto::KeyManager as CryptoKey;
 pub use crypto::KeyManager;
 pub use deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
-    LayerCleanupProof,
+    CustodyLevel, DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope,
+    ExcludedScope, LayerCleanupProof, SigningKeyHandle,
 };
 pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
