@@ -295,7 +295,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_dlq_metrics_gauge_depth() -> Result<()> {
-        use contextra_ports::{MetricEvent, TestMetricsSink};
+        use contextra_testkit::{MetricEvent, TestMetricsSink};
 
         let storage = Arc::new(InMemoryStorageEngine::new());
         let metrics = Arc::new(TestMetricsSink::new());

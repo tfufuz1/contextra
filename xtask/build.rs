@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     println!("cargo:rerun-if-changed=src/gates");
+    println!("cargo:rerun-if-changed=src/harness");
 
     let out_dir = match std::env::var_os("OUT_DIR") {
         Some(dir) => PathBuf::from(dir),
@@ -44,4 +45,75 @@ fn main() {
 
     let dest_path = out_dir.join("gates_generated.rs");
     let _ = fs::write(&dest_path, generated_code);
+
+    // Harness generation
+    let harness_dir = Path::new(&manifest_dir).join("src").join("harness");
+    let mut modules = Vec::new();
+
+    if harness_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(&harness_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
+                    let stem = match path.file_stem().and_then(|s| s.to_str()) {
+                        Some(s) => s.to_string(),
+                        None => continue,
+                    };
+                    if stem == "mod" {
+                        continue;
+                    }
+                    let content = fs::read_to_string(&path).unwrap_or_default();
+                    let first_line = content.lines().next().unwrap_or("");
+                    let summary = first_line
+                        .strip_prefix("//!")
+                        .map(|s| s.trim().to_string())
+                        .unwrap_or_default();
+                    modules.push((stem, summary));
+                }
+            }
+        }
+    }
+
+    modules.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let mut harness_code = String::new();
+    harness_code.push_str("// Auto-generated harness dispatch code. DO NOT EDIT.\n\n");
+
+    for (stem, _) in &modules {
+        let harness_path = Path::new(&manifest_dir)
+            .join("src")
+            .join("harness")
+            .join(format!("{}.rs", stem));
+        let path_str = harness_path.to_str().unwrap().replace('\\', "/");
+        harness_code.push_str(&format!("#[path = \"{}\"]\nmod {};\n\n", path_str, stem));
+    }
+
+    harness_code.push_str("pub fn dispatch(cmd: &str, _args: &[String]) -> Option<i32> {\n");
+    harness_code.push_str("    match cmd {\n");
+    for (stem, _) in &modules {
+        let cmd_name = stem.replace('_', "-");
+        harness_code.push_str(&format!(
+            "        \"{}\" => Some({}::run_{}(_args)),\n",
+            cmd_name, stem, stem
+        ));
+    }
+    harness_code.push_str("        _ => None,\n");
+    harness_code.push_str("    }\n");
+    harness_code.push_str("}\n\n");
+
+    harness_code.push_str("pub fn registered_commands() -> &'static [(&'static str, &'static str)] {\n");
+    harness_code.push_str("    &[\n");
+    for (stem, summary) in &modules {
+        let cmd_name = stem.replace('_', "-");
+        let escaped_summary = summary.replace('\\', "\\\\").replace('"', "\\\"");
+        harness_code.push_str(&format!(
+            "        (\"{}\", \"{}\"),\n",
+            cmd_name, escaped_summary
+        ));
+    }
+    harness_code.push_str("    ]\n");
+    harness_code.push_str("}\n");
+
+    let harness_dest = out_dir.join("harness_generated.rs");
+    let _ = fs::write(&harness_dest, harness_code);
 }
