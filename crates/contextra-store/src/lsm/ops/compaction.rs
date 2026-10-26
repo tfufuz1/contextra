@@ -208,7 +208,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
                     drop(trunc_guard_opt);
                 }
             }
-            let _ = crate::util::fsync_parent_dir(&storage.config.path).await;
+            crate::util::fsync_parent_dir(&storage.config.path).await?;
         }
 
         let bytes_freed: u64 = to_flush.iter().map(|mt| mt.size() as u64).sum();
