@@ -1,0 +1,259 @@
+Befehl: cargo test -p contextra-store --locked
+rustc -V: rustc 1.89.0 (29483883e 2025-08-04)
+Commit-Hash: 53c7d51401d5b67ce3358d5729fabd5b1f85fd4f
+Exit-Code: 101
+Dauer in Sekunden: 150.0
+Anzahl ausgeführter Tests: 0
+Anzahl übersprungener Tests: 0
+SHA-256 des Rohprotokolls: 85bc7677d353066b98a56f64f783a22bac4f12573c83f89d9541deed6ef1f515
+----------------------------------------
+=== STDOUT ===
+
+running 195 tests
+test compaction::retention::tests::test_tombstone_bit_masking ... ok
+test compaction::retention::tests::test_retain_versions_with_pinned_floor ... ok
+test compaction::tests::advanced::test_chain_linkage_tier_grouping ... ok
+test compaction::tests::advanced::test_compaction_cancellation ... ok
+test compaction::tests::advanced::test_compaction_concurrent_rollback_flush_no_panic ... ok
+test compaction::tests::advanced::test_compaction_single_lock_candidate_selection_concurrency ... ok
+test compaction::retention::tests::test_retain_versions_unpinned_floor_max ... FAILED
+test compaction::tests::advanced::test_compaction_swap_maintains_shadowing_order_without_restart ... ok
+test compaction::tests::advanced::test_mvcc_floor_version_retained_for_active_snapshot ... ok
+test compaction::tests::advanced::test_phantom_data_after_partial_compaction ... ok
+test compaction::tests::advanced::test_tombstone_retention_floor_with_active_snapshot ... ok
+test compaction::tests::advanced::test_compaction_pressure_awareness ... ok
+test compaction::tests::basic::test_compaction_aborts_on_concurrent_modification ... ok
+test compaction::tests::basic::test_compaction_aborts_when_peak_memory_exceeds_limit ... ok
+test compaction::tests::basic::test_compaction_backpressure_timeout_exceeded ... ok
+test compaction::tests::basic::test_compaction_candidate_selection_follows_chronological_order ... FAILED
+test compaction::tests::basic::test_compaction_removes_uuid_sidecar_files ... ok
+test compaction::tests::basic::test_compaction_succeeds_when_peak_memory_within_limit ... ok
+test compaction::tests::basic::test_compaction_swap_debug_assert_detects_unsorted_list ... ok
+test compaction::tests::basic::test_compaction_swap_restores_shadowing_order_without_restart ... FAILED
+test compaction::tests::basic::test_generate_sst_path_uniqueness ... ok
+test compaction::tests::basic::test_maybe_compact_full_cycle ... ok
+test compaction::tests::basic::test_merge_deduplication ... ok
+test compaction::tests::basic::test_mvcc_retention_floor_version_retained_for_snapshot ... ok
+test compaction::tests::basic::test_mvcc_retention_older_versions_below_floor_discarded ... ok
+test compaction::tests::basic::test_no_compaction_below_threshold ... ok
+test compaction::tests::basic::test_tombstone_gc ... ok
+test compaction::tests::basic::test_tombstone_gc_stream_advancement_preserves_subsequent_keys ... ok
+test compaction::tests::basic::test_tombstone_preserved_with_active_snapshot ... ok
+test fsync::tests::test_sync_file_and_parent_dir_unix ... ok
+test kv::delete_mode::tests::test_kv_delete_mode_default ... ok
+test kv::delete_mode::tests::test_kv_delete_mode_serde_roundtrip ... ok
+test lsm::observer::tests::test_write_origin_user_write ... ok
+test lsm::tests::commit_tests::test_commit_tracks_budget_drift_on_consume_memory_failure ... FAILED
+test lsm::tests::commit_tests::test_delete ... ok
+test lsm::tests::commit_tests::test_delete_memory_capacity_exceeded ... ok
+test lsm::tests::commit_tests::test_delete_prefix_removes_all_matching_keys ... ok
+test lsm::tests::commit_tests::test_group_commit_leader_releases_commit_mutex_during_disk_io ... ok
+test lsm::tests::commit_tests::test_input_boundary_guards ... ok
+test lsm::tests::commit_tests::test_lsm_storage_delete_many_uses_single_batch ... ok
+test lsm::tests::commit_tests::test_memory_only_commit_restores_hmac ... FAILED
+test lsm::tests::commit_tests::test_overwrite ... ok
+test lsm::tests::commit_tests::test_put_get_roundtrip ... ok
+test lsm::tests::commit_tests::test_rollback ... ok
+test lsm::tests::commit_tests::test_sequence_numbers_strictly_monotonic_across_concurrent_commits ... FAILED
+test lsm::tests::commit_tests::test_system_pressure_monitor_integration ... ok
+test lsm::tests::commit_tests::test_system_pressure_wal_queue_backpressure_transition ... ok
+test lsm::tests::flush_tests::test_close_durability ... ok
+test lsm::tests::flush_tests::test_compaction_roundtrip ... ok
+test lsm::tests::flush_tests::test_flush_creates_sstable ... ok
+test lsm::tests::flush_tests::test_flush_phase3_failure_retains_immutable_memtable_and_data ... ok
+test lsm::tests::flush_tests::test_pin_unpin_checkpoint_prevents_gc ... ok
+test compaction::tests::advanced::concurrent_flush_and_compact_is_safe ... ok
+test lsm::tests::mvcc_tests::test_commit_mutex_released_before_flusher_await ... ok
+test lsm::tests::flush_tests::test_sstable_ordering_after_consecutive_flushes ... ok
+test lsm::tests::mvcc_tests::test_concurrent_get_and_flush_latency ... ok
+test lsm::tests::mvcc_tests::test_delete_prefix_batch_single_tx_buffer_lock ... ok
+test compaction::tests::basic::prop_compaction_tombstone_masking_latest_operation_wins ... ok
+test lsm::tests::mvcc_tests::test_flush_during_read_transaction_snapshot_isolation ... ok
+test lsm::tests::mvcc_tests::test_lsm_put_if_absent_parallel_two_tasks ... ok
+test lsm::tests::mvcc_tests::test_lsm_put_if_absent_stress_200_tasks ... ok
+test lsm::tests::mvcc_tests::test_parallel_flush_counter_no_race ... ok
+test lsm::tests::mvcc_tests::test_put_if_absent_no_commit_mutex_hold ... ok
+test lsm::tests::mvcc_tests::test_put_if_absent_no_deadlock_and_no_commit_mutex_holding ... ok
+test lsm::tests::mvcc_tests::test_put_if_absent_sees_uncommitted_concurrent_stage ... ok
+test lsm::tests::mvcc_tests::test_two_instances_independent_flush_counters ... ok
+test lsm::tests::recovery_tests::test_aborted_transaction_discarded_on_open_recovery ... FAILED
+test lsm::tests::recovery_tests::test_lsm_rollback_persistence ... ok
+test lsm::tests::recovery_tests::test_recovery_scan_ignores_and_removes_tmp_files ... ok
+test lsm::tests::recovery_tests::test_rollback_crash_recovery_startup ... ok
+test lsm::tests::recovery_tests::test_rollback_drops_sstable_fully_stale_after_recompaction ... ok
+test lsm::tests::recovery_tests::test_rollback_recompacts_spanning_sstable ... ok
+test lsm::tests::recovery_tests::test_rollback_small_tx_inline_no_sstable ... ok
+test lsm::tests::recovery_tests::test_rollback_spanning_sstable_below_min_entries_threshold ... ok
+test lsm::tests::recovery_tests::test_rollback_to_tx_edge_cases ... ok
+test lsm::tests::recovery_tests::test_rollback_tombstone_sstable ... ok
+test lsm::tests::recovery_tests::test_rollback_tombstone_subsequent_ops ... ok
+test lsm::tests::recovery_tests::test_rollback_tombstone_wal ... ok
+test lsm::tests::recovery_tests::test_rollback_with_sstables ... ok
+test lsm::tests::recovery_tests::test_startup_flush_before_wal_cleanup ... ok
+test lsm::tests::recovery_tests::test_uncommitted_transaction_discarded_on_open_recovery ... FAILED
+test lsm::tests::recovery_tests::test_wal_discovery_mixed_filenames ... FAILED
+test lsm::tests::recovery_tests::test_wal_survives_process_restart ... ok
+test lsm::tests::recovery_tests::test_wal_uuid_sidecar_cleaned_up_on_startup ... ok
+test lsm::tests::mvcc_tests::test_concurrent_flush_and_get_at_seq_isolation ... ok
+test lsm::tests::scan_tests::test_bounded_scan_and_prefix_bounded_limits_candidate_evaluation ... ok
+test lsm::tests::scan_tests::test_get_at_seq_mvcc_sequence_correctness ... FAILED
+test lsm::tests::scan_tests::test_get_nonexistent ... ok
+test lsm::tests::scan_tests::test_get_records_read_op ... ok
+test lsm::tests::scan_tests::test_mvcc_snapshot_isolation ... ok
+test lsm::tests::scan_tests::test_scan_bounded_pagination_matches_full_scan ... ok
+test lsm::tests::scan_tests::test_scan_bounded_rejects_oversized_internal_merge ... ok
+test lsm::tests::scan_tests::test_scan_bounded_respects_accumulator_ceiling_with_wide_range ... ok
+test lsm::tests::scan_tests::test_scan_bounded_respects_limit_and_cursor ... ok
+test lsm::tests::scan_tests::test_scan_prefix_at_mvcc_sequence_filtering ... ok
+test lsm::tests::scan_tests::test_scan_prefix_at_snapshot_isolation ... ok
+test lsm::tests::scan_tests::test_scan_prefix_at_tombstone_isolation ... ok
+test lsm::tests::scan_tests::test_scan_prefix_at_uncommitted_isolation ... ok
+test lsm::tests::scan_tests::test_scan_prefix_bounded_pagination ... ok
+test lsm::tests::scan_tests::prop_lsm_scan_prefix_at_consistency ... ok
+test lsm::tests::scan_tests::test_scan_range ... ok
+test manifest::tests::test_manifest_crc_corruption_detection ... ok
+test manifest::tests::test_manifest_entry_roundtrip ... ok
+test lsm::tests::scan_tests::test_scan_prefix_memtable_shadows_sstable ... ok
+test manifest::tests::test_manifest_replace_tail_truncation_discards_incomplete_replace ... ok
+test manifest::tests::test_manifest_explicit_rollover ... ok
+test manifest::tests::test_manifest_rollover_crash_injection_preserves_old_manifest ... ok
+test manifest::tests::test_manifest_rollover_restart_recovery ... ok
+test manifest::tests::test_manifest_truncated_tail_recovery ... ok
+test manifest::tests::test_reconstruct_valid_sstables ... ok
+test memtable::tests::test_concurrent_put_no_data_loss ... ok
+test memtable::tests::test_concurrent_writer_and_range_scanner ... ok
+test memtable::tests::test_empty_memtable_edge_cases ... ok
+test memtable::tests::test_iter_all_versions ... ok
+test memtable::tests::test_iter_latest ... ok
+test memtable::tests::test_iter_ordering_across_shards ... ok
+test memtable::tests::test_mvcc_get_at_seq ... ok
+test memtable::tests::test_mvcc_tombstone_binary_search ... ok
+test memtable::tests::test_put_get ... ok
+test memtable::tests::test_range_sharding_monotonicity ... ok
+test memtable::tests::test_saturating_sub_size_underflow_saturates_to_zero ... ok
+test memtable::tests::test_scan_prefix_into_and_scan_range_into ... ok
+test memtable::tests::test_scan_prefix_into_bit_identity_with_iter ... ok
+test memtable::tests::test_scan_prefix_prunes_shards ... ok
+test memtable::tests::test_size_estimation_accuracy ... ok
+test memtable::tests::test_transaction_rollback ... ok
+test sstable::tests::test_binary_search_vs_linear_search_equivalence ... ok
+test sstable::tests::test_block_binary_search_duplicate_keys_returns_first_index ... ok
+test sstable::tests::test_block_bloom_filter_v4 ... ok
+test sstable::tests::test_block_builder_min_max_clamping ... ok
+test sstable::tests::test_block_builder_min_size ... ok
+test manifest::tests::test_manifest_rollover_reduces_size_and_preserves_live_sstables ... ok
+test sstable::tests::test_block_cache_byte_capacity_eviction_threshold ... ok
+test sstable::tests::test_block_cache_eviction_under_load ... ok
+test sstable::tests::test_block_cache_extreme_values ... ok
+test sstable::tests::test_block_cache_sequential_scan_sharding_distribution ... ok
+test sstable::tests::test_block_cache_shards_config_validation ... ok
+test sstable::tests::test_bloom_filter_boundary_clamping ... ok
+test sstable::tests::test_bloom_filter_fpr_within_bounds ... ok
+test sstable::tests::test_bloom_filter_integration ... ok
+test sstable::tests::test_bloom_filter_no_probe_repetition ... ok
+test sstable::tests::test_bloom_filter_roundtrip_and_too_short_bytes ... ok
+test sstable::tests::test_mfsx_bloom_filter_crc_recovery_no_false_rejections ... ok
+test sstable::tests::test_mmap_concurrent_readers ... ok
+test sstable::tests::test_mmap_read_correct_values ... ok
+test sstable::tests::test_block_cache_32_concurrent_readers_hotset_latency ... ok
+test sstable::tests::test_sstable_block_crc_corruption ... ok
+test sstable::tests::test_sharded_block_cache_concurrency_stress ... ok
+test sstable::tests::test_sstable_bloom_integration ... ok
+test sstable::tests::test_sstable_builder_duplicate_keys_coexist ... ok
+test sstable::tests::test_sstable_scan_prefix ... ok
+test sstable::tests::test_sstable_scan_range ... ok
+test sstable::tests::test_sstable_v2_multi_version_get_at ... ok
+test sstable::tests::test_sstable_builder_rejects_empty_and_oversized_inputs ... ok
+test system_pressure::tests::test_compute_pressure_thresholds ... ok
+test system_pressure::tests::test_monitor_run_cancellation ... ok
+test system_pressure::tests::test_watch_receiver_updates ... ok
+test tenant_codec::tests::test_cross_tenant_isolation ... ok
+test tenant_codec::tests::test_decode_invalid_key_returns_none ... ok
+test tenant_codec::tests::test_encode_decode_roundtrip ... ok
+test tenant_codec::tests::test_scan_prefix_cached_no_alloc ... ok
+test tenant_codec::tests::test_upper_bound_calculation ... ok
+test wal::io::tests::test_do_scan_entries_with_callback_v3_without_key_manager ... ok
+test wal::open_heal_tests::test_middle_corruption_does_not_truncate ... ok
+test wal::open_heal_tests::test_open_heal_encrypted_wal ... ok
+test wal::open_heal_tests::test_open_heal_huge_len_garbage_tail ... ok
+test system_pressure::tests::test_blocking_pool_load_triggers_pressure ... ok
+test wal::open_heal_tests::test_open_heal_truncated_tail_plaintext ... ok
+test wal::open_heal_tests::test_open_read_only_never_modifies_file ... ok
+test wal::open_heal_tests::test_truncate_uncommitted_tail_with_and_without_tx_end ... ok
+test wal::tests::encode_tests::test_wal_entry_crc_corruption_detected ... ok
+test wal::tests::encode_tests::test_wal_entry_crc_roundtrip ... ok
+test wal::tests::encode_tests::test_wal_entry_from_bytes_invalid_cases ... ok
+test wal::tests::encode_tests::test_wal_entry_header_fuzzing ... ok
+test wal::tests::encode_tests::test_wal_entry_serialization_roundtrip ... ok
+test wal::tests::encode_tests::test_wal_op_from_bytes_oversized_key_val ... ok
+test wal::tests::encode_tests::test_batch_plaintext_layout ... ok
+test wal::tests::flusher_tests::test_flusher_batch_window_coalesces_writes ... ok
+test wal::tests::flusher_tests::test_wal_flusher_actor_coalescing ... ok
+test wal::tests::flusher_tests::test_wal_queue_capacity_zero_rejected ... ok
+test wal::tests::flusher_tests::test_wal_flusher_actor_no_write_to_sealed ... ok
+test wal::tests::flusher_tests::test_wal_try_append_backpressure ... ok
+test wal::tests::flusher_tests::test_wal_rotate_and_seal_collision_avoidance ... ok
+test wal::tests::io_tests::test_append_batch_concurrent_double_header_write_race ... ok
+test wal::tests::io_tests::test_append_batch_partial_write_atomicity ... ok
+test wal::tests::io_tests::test_concurrent_append_batch_header_atomicity ... ok
+test wal::tests::io_tests::test_truncate_at_offset_zero_yields_empty_wal ... ok
+test wal::tests::io_tests::test_truncate_is_durable_across_simulated_crash ... ok
+test wal::tests::io_tests::test_wal_crash_consistency_write_without_fsync ... ok
+test wal::tests::io_tests::test_wal_direct_append_batch_fsync_discipline ... ok
+test wal::tests::io_tests::test_wal_rotate_and_seal_readonly_guarantee ... ok
+test wal::tests::io_tests::test_wal_rotate_seal_crash_mid_rename ... ok
+test wal::tests::io_tests::test_truncate_size_visible_atomically_with_file_state ... ok
+test lsm::tests::mvcc_tests::test_flush_during_active_snapshot_isolation_stress ... ok
+test compaction::tests::advanced::test_compaction_stress_and_gc has been running for over 60 seconds
+
+=== STDERR ===
+warning: unused imports: `StorageEngine` and `TxId`
+ --> crates/contextra-store/tests/adaptive_compaction_determinism.rs:1:22
+  |
+1 | use contextra_core::{StorageEngine, TxId};
+  |                      ^^^^^^^^^^^^^  ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `CompactionStrategy`
+ --> crates/contextra-store/tests/adaptive_compaction_determinism.rs:4:32
+  |
+4 |     AdaptiveCompactionPlanner, CompactionStrategy, CostBasedAdaptivePlanner, WorkloadMetrics,
+  |                                ^^^^^^^^^^^^^^^^^^
+
+warning: `contextra-store` (test "adaptive_compaction_determinism") generated 2 warnings (run `cargo fix --test "adaptive_compaction_determinism"` to apply 2 suggestions)
+warning: function `get_rss_bytes` is never used
+  --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:12:4
+   |
+12 | fn get_rss_bytes() -> usize {
+   |    ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: function `run_differential_large` is never used
+   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:385:10
+    |
+385 | async fn run_differential_large(ops: Vec<Op>) -> Result<(), TestCaseError> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: enum `SimpleOp` is never used
+   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:641:6
+    |
+641 | enum SimpleOp {
+    |      ^^^^^^^^
+
+warning: function `task_op_strategy` is never used
+   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:648:4
+    |
+648 | fn task_op_strategy(prefix: u8) -> impl Strategy<Value = SimpleOp> {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: function `run_concurrent_differential` is never used
+   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:663:10
+    |
+663 | async fn run_concurrent_differential(tasks_ops: Vec<Vec<SimpleOp>>) -> Result<(), TestCaseError> {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `contextra-store` (test "differential_redb") generated 5 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.47s
+     Running unittests src/lib.rs (target/debug/deps/contextra_store-d40059210cccd321)

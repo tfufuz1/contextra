@@ -1,0 +1,46 @@
+Befehl: cargo test -p contextra-mvcc --locked
+rustc -V: rustc 1.89.0 (29483883e 2025-08-04)
+Commit-Hash: 53c7d51401d5b67ce3358d5729fabd5b1f85fd4f
+Exit-Code: 101
+Dauer in Sekunden: 20.36
+Anzahl ausgeführter Tests: 0
+Anzahl übersprungener Tests: 0
+SHA-256 des Rohprotokolls: 685efe4161081e06b352f9714c2af55c3efcd3411b528df40cae2069b64c9bf6
+----------------------------------------
+=== STDOUT ===
+
+=== STDERR ===
+   Compiling syn v2.0.119
+   Compiling regex-automata v0.4.18
+   Compiling matchers v0.2.0
+   Compiling regex v1.13.1
+   Compiling zerocopy-derive v0.8.56
+   Compiling tracing-attributes v0.1.31
+   Compiling tracing v0.1.44
+   Compiling tracing-subscriber v0.3.23
+   Compiling zerocopy v0.8.56
+   Compiling loom v0.7.2
+   Compiling ahash v0.8.12
+   Compiling half v2.7.1
+   Compiling ppv-lite86 v0.2.21
+   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)
+   Compiling rand_chacha v0.9.0
+   Compiling ciborium-ll v0.2.2
+   Compiling ciborium v0.2.2
+   Compiling proptest v1.11.0
+   Compiling criterion v0.5.1
+   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)
+   Compiling contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)
+error[E0432]: unresolved imports `contextra_ports::metrics::MetricEvent`, `contextra_ports::metrics::TestMetricsSink`
+ --> crates/contextra-mvcc/tests/ssi_metrics_observability.rs:5:32
+  |
+5 | use contextra_ports::metrics::{MetricEvent, TestMetricsSink};
+  |                                ^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+  |                                |            |
+  |                                |            no `TestMetricsSink` in `metrics`
+  |                                |            help: a similar name exists in the module: `MetricsSink`
+  |                                no `MetricEvent` in `metrics`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `contextra-mvcc` (test "ssi_metrics_observability") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

@@ -1,0 +1,387 @@
+Befehl: cargo test -p contextra-mcp --locked
+rustc -V: rustc 1.89.0 (29483883e 2025-08-04)
+Commit-Hash: 53c7d51401d5b67ce3358d5729fabd5b1f85fd4f
+Exit-Code: 101
+Dauer in Sekunden: 53.16
+Anzahl ausgeführter Tests: 0
+Anzahl übersprungener Tests: 0
+SHA-256 des Rohprotokolls: be6efd277ca17e60913eea892ffd213a2fc7647d99a0e367dbf05b0855d208df
+----------------------------------------
+=== STDOUT ===
+
+=== STDERR ===
+   Compiling syn v2.0.119
+   Compiling serde_json v1.0.151
+   Compiling bytemuck_derive v1.12.0
+   Compiling rayon v1.12.0
+   Compiling bytemuck v1.25.2
+   Compiling hashbrown v0.16.1
+   Compiling num-complex v0.4.6
+   Compiling raw-cpuid v11.6.0
+   Compiling reborrow v0.5.5
+   Compiling pulp-wasm-simd-flag v0.1.1
+   Compiling dyn-stack v0.13.2
+   Compiling contextra-wire v0.1.0 (/app/crates/contextra-wire)
+   Compiling minimal-lexical v0.2.1
+   Compiling nom v7.1.3
+   Compiling onig_sys v69.9.3
+   Compiling castaway v0.2.4
+   Compiling itertools v0.14.0
+   Compiling pulp v0.22.3
+   Compiling darling_core v0.20.11
+   Compiling synstructure v0.13.2
+   Compiling zerocopy-derive v0.8.56
+   Compiling tracing-attributes v0.1.31
+   Compiling tracing v0.1.44
+   Compiling zeroize_derive v1.5.0
+   Compiling darling_macro v0.20.11
+   Compiling zerocopy v0.8.56
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling darling v0.20.11
+   Compiling zeroize v1.9.0
+   Compiling derive_builder_core v0.20.2
+   Compiling monostate-impl v0.1.18
+   Compiling curve25519-dalek v4.1.3
+   Compiling base64 v0.13.1
+   Compiling derive_builder_macro v0.20.2
+   Compiling static_assertions v1.1.0
+   Compiling ryu v1.0.23
+   Compiling macro_rules_attribute v0.2.3
+   Compiling compact_str v0.9.1
+   Compiling ed25519-dalek v2.2.0
+   Compiling derive_builder v0.20.2
+   Compiling spm_precompiled v0.1.4
+   Compiling aes-gcm-siv v0.11.1
+   Compiling monostate v0.1.18
+   Compiling zerofrom-derive v0.1.7
+   Compiling rayon-cond v0.4.0
+   Compiling onig v6.5.3
+   Compiling esaxx-rs v0.1.10
+   Compiling lru v0.16.4
+   Compiling unicode-normalization-alignments v0.1.12
+   Compiling ppv-lite86 v0.2.21
+   Compiling ahash v0.8.12
+   Compiling dary_heap v0.3.9
+   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)
+   Compiling unicode_categories v0.1.1
+   Compiling rand_chacha v0.9.0
+   Compiling rand_chacha v0.3.1
+   Compiling rand v0.9.5
+   Compiling rand v0.8.8
+   Compiling zerofrom v0.1.8
+   Compiling contextra-sys v0.1.0 (/app/crates/contextra-sys)
+   Compiling rand_distr v0.5.1
+   Compiling yoke-derive v0.8.2
+   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)
+   Compiling half v2.7.1
+   Compiling typed-path v0.12.3
+   Compiling gemm-common v0.19.0
+   Compiling contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)
+   Compiling gemm-f32 v0.19.0
+   Compiling gemm-c64 v0.19.0
+   Compiling contextra-core v0.1.0 (/app/crates/contextra-core)
+   Compiling gemm-f16 v0.19.0
+   Compiling gemm-c32 v0.19.0
+   Compiling gemm-f64 v0.19.0
+   Compiling contextra-crypto v0.1.0 (/app/crates/contextra-crypto)
+   Compiling gemm v0.19.0
+   Compiling contextra-simd v0.1.0 (/app/crates/contextra-simd)
+   Compiling zip v8.6.0
+   Compiling yoke v0.8.3
+   Compiling contextra-rank v0.1.0 (/app/crates/contextra-rank)
+   Compiling contextra-adapt v0.1.0 (/app/crates/contextra-adapt)
+   Compiling float8 v0.7.0
+   Compiling tokio-util v0.7.19
+   Compiling tokenizers v0.22.2
+   Compiling safetensors v0.8.0
+   Compiling roaring v0.10.12
+   Compiling num_cpus v1.17.0
+   Compiling bit-vec v0.8.0
+   Compiling console v0.15.11
+   Compiling bit-set v0.8.0
+   Compiling contextra-checkpoint v0.1.0 (/app/crates/contextra-checkpoint)
+   Compiling contextra-vector v0.1.0 (/app/crates/contextra-vector)
+   Compiling contextra-store v0.1.0 (/app/crates/contextra-store)
+   Compiling portable-atomic v1.15.0
+   Compiling contextra-text v0.1.0 (/app/crates/contextra-text)
+   Compiling candle-core v0.11.0
+   Compiling number_prefix v0.4.0
+   Compiling indicatif v0.17.11
+   Compiling contextra-engine v0.1.0 (/app/crates/contextra-engine)
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+ --> crates/contextra-engine/src/background_workers/hyperedge_worker.rs:6:5
+  |
+6 | use contextra_graph::hyperedge::HyperEdgeId;
+  |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+  |
+help: there is a crate or module with a similar name
+  |
+6 - use contextra_graph::hyperedge::HyperEdgeId;
+6 + use contextra_rank::hyperedge::HyperEdgeId;
+  |
+
+error[E0432]: unresolved import `contextra_graph`
+  --> crates/contextra-engine/src/collection/maintenance.rs:10:5
+   |
+10 | use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+   |
+help: there is a crate or module with a similar name
+   |
+10 - use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
+10 + use contextra_rank::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
+   |
+
+error[E0432]: unresolved import `contextra_graph`
+  --> crates/contextra-engine/src/collection/mod.rs:32:5
+   |
+32 | use contextra_graph::CsrGraph;
+   |     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+   |
+help: there is a crate or module with a similar name
+   |
+32 - use contextra_graph::CsrGraph;
+32 + use contextra_rank::CsrGraph;
+   |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/collection/relate.rs:105:17
+    |
+105 |     ) -> Result<contextra_graph::hyperedge::HyperEdgeId> {
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+105 -     ) -> Result<contextra_graph::hyperedge::HyperEdgeId> {
+105 +     ) -> Result<contextra_rank::hyperedge::HyperEdgeId> {
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/collection/relate.rs:143:32
+    |
+143 |         let role_bindings: Vec<contextra_graph::hyperedge::RoleBinding> = resolved_participants
+    |                                ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+143 -         let role_bindings: Vec<contextra_graph::hyperedge::RoleBinding> = resolved_participants
+143 +         let role_bindings: Vec<contextra_rank::hyperedge::RoleBinding> = resolved_participants
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/collection/relate.rs:155:25
+    |
+155 |         let hyperedge = contextra_graph::hyperedge::HyperEdge::new(
+    |                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+155 -         let hyperedge = contextra_graph::hyperedge::HyperEdge::new(
+155 +         let hyperedge = contextra_rank::hyperedge::HyperEdge::new(
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/collection/relate.rs:157:13
+    |
+157 |             contextra_graph::csr::EdgeType::Default,
+    |             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+157 -             contextra_graph::csr::EdgeType::Default,
+157 +             contextra_rank::csr::EdgeType::Default,
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/collection/relate.rs:169:13
+    |
+169 |             contextra_graph::hyperedge::HYPEREDGE_PREFIX,
+    |             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+169 -             contextra_graph::hyperedge::HYPEREDGE_PREFIX,
+169 +             contextra_rank::hyperedge::HYPEREDGE_PREFIX,
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+  --> crates/contextra-engine/src/transaction/db_transaction.rs:23:45
+   |
+23 |     pub(super) staged_hyperedges: Mutex<Vec<contextra_graph::hyperedge::HyperEdge>>,
+   |                                             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+   |
+help: there is a crate or module with a similar name
+   |
+23 -     pub(super) staged_hyperedges: Mutex<Vec<contextra_graph::hyperedge::HyperEdge>>,
+23 +     pub(super) staged_hyperedges: Mutex<Vec<contextra_rank::hyperedge::HyperEdge>>,
+   |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/transaction/db_transaction.rs:127:46
+    |
+127 |     pub fn stage_hyperedge(&self, hyperedge: contextra_graph::hyperedge::HyperEdge) {
+    |                                              ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+127 -     pub fn stage_hyperedge(&self, hyperedge: contextra_graph::hyperedge::HyperEdge) {
+127 +     pub fn stage_hyperedge(&self, hyperedge: contextra_rank::hyperedge::HyperEdge) {
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+  --> crates/contextra-engine/src/contextra_impl/collections.rs:59:13
+   |
+59 |             contextra_graph::CsrGraph::load_from_storage(tenant_storage.as_ref()).await?;
+   |             ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+   |
+help: there is a crate or module with a similar name
+   |
+59 -             contextra_graph::CsrGraph::load_from_storage(tenant_storage.as_ref()).await?;
+59 +             contextra_rank::CsrGraph::load_from_storage(tenant_storage.as_ref()).await?;
+   |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/contextra_impl/collections.rs:169:25
+    |
+169 |         let mut graph = contextra_graph::CsrGraph::load_from_storage(self.storage.as_ref()).await?;
+    |                         ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+169 -         let mut graph = contextra_graph::CsrGraph::load_from_storage(self.storage.as_ref()).await?;
+169 +         let mut graph = contextra_rank::CsrGraph::load_from_storage(self.storage.as_ref()).await?;
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/collection/relate.rs:125:27
+    |
+125 |             let role_id = contextra_graph::hyperedge::RoleId::new(role_doc_id.inner() as u32);
+    |                           ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+125 -             let role_id = contextra_graph::hyperedge::RoleId::new(role_doc_id.inner() as u32);
+125 +             let role_id = contextra_rank::hyperedge::RoleId::new(role_doc_id.inner() as u32);
+    |
+help: consider importing this struct
+    |
+1   + use contextra_ports::RoleId;
+    |
+help: if you import `RoleId`, refer to it directly
+    |
+125 -             let role_id = contextra_graph::hyperedge::RoleId::new(role_doc_id.inner() as u32);
+125 +             let role_id = RoleId::new(role_doc_id.inner() as u32);
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/collection/relate.rs:141:28
+    |
+141 |         let hyperedge_id = contextra_graph::hyperedge::HyperEdgeId::new(db_tx.tx_id.inner());
+    |                            ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+141 -         let hyperedge_id = contextra_graph::hyperedge::HyperEdgeId::new(db_tx.tx_id.inner());
+141 +         let hyperedge_id = contextra_rank::hyperedge::HyperEdgeId::new(db_tx.tx_id.inner());
+    |
+help: consider importing this struct
+    |
+1   + use contextra_ports::HyperEdgeId;
+    |
+help: if you import `HyperEdgeId`, refer to it directly
+    |
+141 -         let hyperedge_id = contextra_graph::hyperedge::HyperEdgeId::new(db_tx.tx_id.inner());
+141 +         let hyperedge_id = HyperEdgeId::new(db_tx.tx_id.inner());
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/collection/relate.rs:146:17
+    |
+146 |                 contextra_graph::hyperedge::RoleBinding::new(role_id, entity_id)
+    |                 ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+146 -                 contextra_graph::hyperedge::RoleBinding::new(role_id, entity_id)
+146 +                 contextra_rank::hyperedge::RoleBinding::new(role_id, entity_id)
+    |
+help: consider importing this struct
+    |
+1   + use contextra_ports::RoleBinding;
+    |
+help: if you import `RoleBinding`, refer to it directly
+    |
+146 -                 contextra_graph::hyperedge::RoleBinding::new(role_id, entity_id)
+146 +                 RoleBinding::new(role_id, entity_id)
+    |
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_kvcache`
+   --> crates/contextra-engine/src/contextra_impl/lifecycle.rs:116:33
+    |
+116 |         let kv_store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
+    |                                 ^^^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_kvcache`
+    |
+help: there is a crate or module with a similar name
+    |
+116 -         let kv_store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
+116 +         let kv_store = Arc::new(contextra_mvcc::TenantIsolatedKvStore::new());
+    |
+help: consider importing this struct through its public re-export
+    |
+1   + use crate::TenantIsolatedKvStore;
+    |
+help: if you import `TenantIsolatedKvStore`, refer to it directly
+    |
+116 -         let kv_store = Arc::new(contextra_kvcache::TenantIsolatedKvStore::new());
+116 +         let kv_store = Arc::new(TenantIsolatedKvStore::new());
+    |
+
+warning: use of deprecated function `kv_cache_integration::build_eviction_worker`: kvcache archiviert (WP 2.2). Wird in WP 2.1b entfernt.
+   --> crates/contextra-engine/src/contextra_impl/lifecycle.rs:117:60
+    |
+117 |         let eviction_worker = crate::kv_cache_integration::build_eviction_worker(kv_store);
+    |                                                            ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `contextra_graph`
+   --> crates/contextra-engine/src/collection/crud/links.rs:180:21
+    |
+180 |                     contextra_graph::cascade_invalidate_edges_for_superseded_doc(
+    |                     ^^^^^^^^^^^^^^^ use of unresolved module or unlinked crate `contextra_graph`
+    |
+help: there is a crate or module with a similar name
+    |
+180 -                     contextra_graph::cascade_invalidate_edges_for_superseded_doc(
+180 +                     contextra_rank::cascade_invalidate_edges_for_superseded_doc(
+    |
+
+error[E0609]: no field `pid_controller` on type `&Contextra`
+  --> crates/contextra-engine/src/contextra_impl/diagnostics.rs:33:14
+   |
+33 |             .pid_controller
+   |              ^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `storage`, `next_tx`, `dimension`, `config`, `license_gate` ... and 11 others
+
+error[E0560]: struct `Contextra` has no field named `pid_controller`
+   --> crates/contextra-engine/src/contextra_impl/lifecycle.rs:140:13
+    |
+140 |             pid_controller: parking_lot::RwLock::new(None),
+    |             ^^^^^^^^^^^^^^ `Contextra` does not have this field
+    |
+    = note: all struct fields are already assigned
+
+error[E0560]: struct `Contextra` has no field named `kv_eviction_worker`
+   --> crates/contextra-engine/src/contextra_impl/lifecycle.rs:141:13
+    |
+141 |             kv_eviction_worker: parking_lot::RwLock::new(Some(eviction_worker)),
+    |             ^^^^^^^^^^^^^^^^^^ `Contextra` does not have this field
+    |
+    = note: all struct fields are already assigned
+
+Some errors have detailed explanations: E0432, E0433, E0560, E0609.
+For more information about an error, try `rustc --explain E0432`.
+warning: `contextra-engine` (lib) generated 1 warning
+error: could not compile `contextra-engine` (lib) due to 20 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...

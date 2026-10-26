@@ -1,0 +1,146 @@
+Befehl: cargo xtask gate-list
+rustc -V: rustc 1.89.0 (29483883e 2025-08-04)
+Commit-Hash: 53c7d51401d5b67ce3358d5729fabd5b1f85fd4f
+Exit-Code: 0
+Dauer in Sekunden: 0.35
+Anzahl ausgeführter Tests: 0
+Anzahl übersprungener Tests: 0
+SHA-256 des Rohprotokolls: b8d66ee5dda04f406afb8a7ba90c14d7fe2bc483714ce9f053bbf8845a3a871f
+----------------------------------------
+=== STDOUT ===
+=== Configured Gates (Active Phase: PH0) ===
+  boot-order                [pr] Phasen B0–B9 in korrekter Reihenfolge (SPEC §17.3).
+  claim-generator           [pr] Außentexte nur aus Satzbibliothek, jeder Satz an Messwert gebunden (SPEC §17.3).
+  scope-guard               [pr] Beschränkt Änderungen auf den erlaubten Task-Scope.
+  key-purposes              [pr] Überprüft die korrekte Zweckbindung von Kryptoschlüsseln.
+  panic-surface             [pr] Kein unwrap/expect/panic/todo/unreachable/indexing in Produktionscode (SPEC §0.2 R2, §17.3). Ratchet-Baselines governance/ratchet.toml.
+  error-domain              [pr] Alle Fehler münden in ContextraError (SPEC §13.6, §17.3).
+  loc-budget                [merge] Code-Zeilenbudget nach tools/loc.py (SPEC §1.3, §4.2, §17.3).
+  wired                     [pr] Verifiziert die Verdrahtung aller Komponenten.
+  mutation                  [heavy] Misst Mutation Score und Testabdeckung.
+  protected-paths           [pr] Schützt geschützte Dateien vor unbefugter Änderung.
+  doc-truth                 [pr] Erzwingt Übereinstimmung von Dokumentation und Code.
+  bench-regression          [heavy] Überprüft Performance-Budgets auf Regressionen.
+  platform-matrix           [merge] Verifiziert Bau auf allen Zielplattformen.
+  ci-hygiene                [pr] Prüft Sauberkeit und Konsistenz der CI-Workflows.
+  loom-inventory            [heavy] Verifiziert Nebenläufigkeit und Sperrreihenfolgen via Loom.
+  miri                      [heavy] Sucht Miri-basierte Undefined Behavior in Unsafe-Code.
+  fuzz-matrix               [heavy] Führt Fuzzing-Testmatrix aus.
+  public-api                [merge] Überwacht Änderungen an der öffentlichen API.
+  format-corpus             [merge] Prüft Korpus-Formatierung und -Schema.
+  provenance                [merge] Prüft Provenienz von Commits und Pull Requests.
+  gate-selftests            [pr] Führt Selbsttests aller registrierten Gates aus.
+  ring0-async               [pr] Stellt Reinheit von Async-Code in Ring 0 sicher.
+  unbounded-spawn           [pr] Jede spawn-Stelle begrenzt (SPEC §17.3).
+  audit                     [nightly] Prüft Sicherheitswarnungen in Abhängigkeiten.
+  adr-index                 [pr] Verifiziert die Konsistenz des ADR-Indexes.
+  test-integrity            [pr] Verifiziert Vollständigkeit und Ausführung von Tests.
+  unsafe-inventory          [pr] Überprüft und isoliert Unsafe-Codeblöcke.
+  merge-result-build        [merge] Baut das Arbeitsbereichs-Merge-Ergebnis vollständig.
+  veto-guard                [pr] Prüft auf geschützte Veto-Schlüsselwörter.
+  feature-matrix            [merge] Prüft gültige Feature-Kombinationen.
+  no-security-stub          [pr] Keine Sicherheitsstubs in Produktion: kein cfg(not(feature))-Ersatz für Sicherheitscode (SPEC §17.3, A1). Befund B-02, B-15.
+  doc-stamp                 [pr] Dokumentstempel und Single-Source-Prüfung (SPEC §17.3, A9).
+  surface-coverage          [pr] Jede persistente Dateiklasse einer Löschschicht zugeordnet (SPEC §12.4, §17.3).
+  sbom                      [nightly] Generiert und prüft Software Bill of Materials.
+  capabilities-consistency  [pr] Verifiziert Konsistenz von capabilities.toml mit Crate-Metadaten.
+  no-literal-secrets        [pr] Keine Literal-Schlüssel, Mandanten-Fallbacks oder Hardcoded-Secrets (SPEC §17.3). Befund B-04.
+  symbol-uniqueness         [pr] Verhindert Namenskonflikte bei Symbolen.
+  deny                      [merge] Prüft Lizenzen und Abhängigkeits-Sicherheit via cargo deny.
+  clippy-lintset            [pr] Erzwingt statische Codequalität und Sicherheits-Lints.
+  deletion-types-once       [pr] Stellt sicher, dass Löschtypen nicht doppelt definiert werden.
+  security-ports            [pr] Erzwingt Sicherheitskontrollen an Port-Schnittstellen.
+  test-surface              [pr] Prüft Testabdeckungs-Mindestanforderungen je Crate (SPEC §17.3). 18 fehlend (IST).
+  determinism               [pr] Erzwingt Determinismus in kritischen Ausführungspfaden.
+  fuzz-regression           [pr] Prüft auf Regressionen aus früheren Fuzz-Artefakten.
+  catalog-sync              [pr] Stellt 1:1 Übereinstimmung von Katalog, Code und Tests sicher.
+  evidence-complete         [nightly] Verifiziert Vollständigkeit aller erzeugten Evidenzdateien.
+  inv-coverage              [merge] Jede INV-* Invariante hat einen Test, der ihre Verletzung erkennt (SPEC §17.3, A8).
+  witness-mint              [pr] Prüft Erzeugung und Signatur von Löschzeugen.
+  ratchet                   [pr] Stellt sicher, dass Qualitätskennzahlen nicht absinken.
+  chaos                     [heavy] Injiziert Fehlermuster zur Chaos-Verifikation.
+  deletion-honesty          [pr] Verifiziert die Korrektheit von Löschansprüchen.
+  ring-dag                  [pr] Verifiziert acyclische Ring-Abhängigkeiten im Crate-Graph (SPEC §17.3: ring-layering / ring-dag).
+  async-io                  [pr] Kein Blockieren im async-Kontext; keine Async-Runtime in Ring 0 (SPEC §17.3). 18 Verstöße (IST).
+  product-hull              [merge] Produkt baut ohne Rand-Module (SPEC §4.5, §17.3).
+  claims-in-pr              [pr] Überprüft Claims in PR-Beschreibungen.
+  code-lints                [pr] Prüft Code-Richtlinien bezüglich I/O und Fail-Closed.
+  gate-weakening            [pr] Verhindert die Aufweichung von Qualitätsgates.
+  fmt                       [pr] Erfordert einheitliche Formatierung im gesamten Repository.
+
+=== STDERR ===
+warning: unused import: `Path`
+ --> /app/xtask/src/harness/explain.rs:5:17
+  |
+5 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `super::common::*`
+ --> xtask/src/legacy/arch.rs:1:5
+  |
+1 | use super::common::*;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `PathBuf`
+ --> xtask/src/legacy/common.rs:1:23
+  |
+1 | use std::path::{Path, PathBuf};
+  |                       ^^^^^^^
+
+warning: unused variable: `ctx`
+  --> xtask/src/gates/gov/meta_gates.rs:21:19
+   |
+21 |     fn run(&self, ctx: &Context) -> Outcome {
+   |                   ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `args`
+ --> xtask/src/legacy/docs.rs:1:36
+  |
+1 | pub fn run_docs_command(cmd: &str, args: &[String]) -> Result<(), String> {
+  |                                    ^^^^ help: if this is intentional, prefix it with an underscore: `_args`
+
+warning: unused variable: `args`
+ --> xtask/src/legacy/session.rs:1:39
+  |
+1 | pub fn run_session_command(cmd: &str, args: &[String]) -> Result<(), String> {
+  |                                       ^^^^ help: if this is intentional, prefix it with an underscore: `_args`
+
+warning: function `loop_guard_record` is never used
+   --> /app/xtask/src/harness/loop_guard.rs:151:8
+    |
+151 | pub fn loop_guard_record(
+    |        ^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: function `loop_guard_check` is never used
+   --> /app/xtask/src/harness/loop_guard.rs:166:8
+    |
+166 | pub fn loop_guard_check(root: &Path, max_file_edits: u32) -> Result<(), String> {
+    |        ^^^^^^^^^^^^^^^^
+
+warning: function `loop_guard_reset` is never used
+   --> /app/xtask/src/harness/loop_guard.rs:237:8
+    |
+237 | pub fn loop_guard_reset(root: &Path) -> Result<(), String> {
+    |        ^^^^^^^^^^^^^^^^
+
+warning: function `run_loop_guard` is never used
+   --> /app/xtask/src/harness/loop_guard.rs:250:8
+    |
+250 | pub fn run_loop_guard(args: &[String]) -> i32 {
+    |        ^^^^^^^^^^^^^^
+
+warning: function `wal_replay_is_applicable` is never used
+   --> /app/xtask/src/harness/wal_replay_verify.rs:369:8
+    |
+369 | pub fn wal_replay_is_applicable(root: &Path, base: &str, head: &str) -> bool {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `xtask` (lib) generated 11 warnings (run `cargo fix --lib -p xtask` to apply 3 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.27s
+     Running `target/debug/xtask gate-list`

@@ -1,0 +1,186 @@
+Befehl: cargo test -p contextra-types --locked
+rustc -V: rustc 1.89.0 (29483883e 2025-08-04)
+Commit-Hash: 53c7d51401d5b67ce3358d5729fabd5b1f85fd4f
+Exit-Code: 0
+Dauer in Sekunden: 14.0
+Anzahl ausgeführter Tests: 127
+Anzahl übersprungener Tests: 0
+SHA-256 des Rohprotokolls: 804f0724c449a935319459cf8654ab01bf280eabf3f5c57268abb2344816490e
+----------------------------------------
+=== STDOUT ===
+
+running 120 tests
+test error::tests::test_checksum_mismatch_fields_not_transposed ... ok
+test error::tests::contextra_error_display_no_panic ... ok
+test error::tests::test_cross_device_link_display_and_helper ... ok
+test error::tests::test_capability_unsupported_helper ... ok
+test error::tests::test_dto_with_details_override ... ok
+test error::tests::test_error_constructor_helpers ... ok
+test error::tests::test_error_display_all_variants ... ok
+test error::tests::test_from_try_from_slice_error ... ok
+test error::tests::test_hnsw_connectivity_degraded_preserves_ratio ... ok
+test error::tests::test_from_conversions ... ok
+test error::tests::test_io_error_message_preserved ... ok
+test error::tests::test_is_occ_conflict ... ok
+test error::tests::test_invalid_input_helper ... ok
+test error::tests::test_json_error_message_preserved ... ok
+test error::tests::test_memory_budget_exceeded_fields_not_transposed ... ok
+test error::tests::test_model_load_and_orphaned_vector_display ... ok
+test error::tests::test_pin_budget_exceeded_display_and_helper ... ok
+test error::tests::test_result_alias ... ok
+test error::tests::test_transaction_timeout_fields_not_transposed ... ok
+test error::tests::test_step_id_and_cache_directive ... ok
+test error::tests::test_wal_corruption_fields_not_transposed ... ok
+test error_dto::tests::test_dto_constructors_and_display ... ok
+test error_dto::tests::test_dto_details_serialization ... ok
+test model_fingerprint::tests::test_model_fingerprint_new_and_serde ... ok
+test retrieval_strategy::tests::test_retrieval_strategy_display ... ok
+test error_dto::tests::test_dto_exhaustive_match_coverage ... ok
+test retrieval_strategy::tests::test_retrieval_strategy_serde_roundtrip ... ok
+test schema::tests::test_doc_id_width_bytes_len ... ok
+test tombstone::tests::test_flags_tombstone_detection ... ok
+test tombstone::tests::test_negative_cases ... ok
+test tombstone::tests::test_edge_case_already_tombstoned_seq ... ok
+test tombstone::tests::test_roundtrip_property ... ok
+test schema::tests::test_manifest_schema_version_roundtrip ... ok
+test types::budget::tests::test_budget_exceeded ... ok
+test types::budget::tests::test_capacity_threshold ... ok
+test types::budget::tests::test_consume_memory_overflow_prevention ... ok
+test types::budget::tests::test_release_memory_underflow_safety ... ok
+test types::budget::tests::test_reservation_drop_refund ... ok
+test types::budget::tests::test_reservation_over_budget_leaves_consumed_unchanged ... ok
+test types::budget::tests::test_reservation_successful_settle ... ok
+test types::budget::tests::test_reservation_concurrent_double_spend ... ok
+test types::budget::tests::test_concurrent_consumption ... ok
+test types::budget::tests::test_resource_tracker_basic ... ok
+test types::budget::tests::test_token_budget_edge_cases ... ok
+test types::budget::tests::test_token_budget_for_model ... ok
+test types::budget::tests::test_token_budget_strategies ... ok
+test types::domain::tests::doc_tests::test_core_distance_dimension_mismatch ... ok
+test types::domain::tests::doc_tests::test_distance_metric_dimension_mismatch ... ok
+test types::domain::tests::doc_tests::test_distance_metrics_empty_and_single_element ... ok
+test types::domain::tests::doc_tests::test_distance_metrics_f32 ... ok
+test types::domain::tests::doc_tests::test_distance_metrics_u8 ... ok
+test types::domain::tests::doc_tests::test_embedding_norm_and_normalize ... ok
+test types::domain::tests::doc_tests::test_embedding_normalize_edge_cases ... ok
+test types::domain::tests::doc_tests::test_u8_and_f32_distance_metrics_ranking_and_value_parity ... ok
+test types::domain::tests::ids_tests::doc_id_from_empty_returns_err ... ok
+test types::domain::tests::ids_tests::doc_id_valid_key_is_ok ... ok
+test types::domain::tests::ids_tests::test_doc_id_and_entity_id_unicode_keys ... ok
+test types::domain::tests::ids_tests::test_doc_id_determinism ... ok
+test types::domain::tests::ids_tests::prop_tx_id_overflow_isolation ... ok
+test types::domain::tests::ids_tests::prop_tx_id_range_isolation ... ok
+test types::domain::tests::ids_tests::test_doc_id_from_key_no_panic ... ok
+test types::domain::tests::ids_tests::test_doc_id_multibyte_unicode_keys ... ok
+test types::domain::tests::doc_tests::test_distance_metrics_u8_overflow ... ok
+test types::domain::tests::ids_tests::test_entity_id_methods ... ok
+test types::domain::tests::ids_tests::test_entity_id_from_key_empty_err ... ok
+test types::domain::tests::ids_tests::test_tenant_and_collection_id ... ok
+test types::domain::tests::ids_tests::test_tenant_id_collections_hashmap_btreemap ... ok
+test types::domain::tests::ids_tests::test_tenant_id_defaults_and_constants ... ok
+test types::domain::tests::ids_tests::test_tenant_id_hardening ... ok
+test types::domain::tests::ids_tests::test_tenant_id_serde_roundtrip ... ok
+test types::domain::tests::ids_tests::test_tenant_id_system_constant ... ok
+test types::domain::tests::ids_tests::test_tenant_id_system_reserved ... ok
+test types::domain::tests::ids_tests::test_tenant_id_try_from_boundary_and_display ... ok
+test types::domain::tests::ids_tests::test_tenant_id_valid ... ok
+test types::domain::tests::ids_tests::test_tx_id_internal ... ok
+test types::domain::tests::ids_tests::test_tx_id_invalid_sentinel_and_conversion_boundary ... ok
+test types::domain::tests::ids_tests::test_tx_id_is_valid_origin ... ok
+test types::domain::tests::ids_tests::test_tx_id_range_boundary_exhaustion_simulation ... ok
+test types::domain::tests::ids_tests::test_tx_id_ranges_and_internal_boundary_checks ... ok
+test types::domain::tests::ids_tests::test_tx_id_system_range_wraparound_safety ... ok
+test types::domain::tests::ids_tests::tx_id_ordering_is_consistent ... ok
+test types::domain::tests::misc_tests::test_edge_try_new_invalid_inputs ... ok
+test types::domain::tests::misc_tests::test_entity_try_new_invalid_inputs ... ok
+test types::domain::tests::misc_tests::test_entity_and_edge_try_new_validation ... ok
+test types::domain::tests::misc_tests::test_entity_and_edge ... ok
+test types::domain::tests::misc_tests::test_expiry_metadata_key_constant ... ok
+test types::domain::tests::misc_tests::test_serialization_roundtrips ... ok
+test types::domain::tests::misc_tests::test_memory_type_defaults_and_serde ... ok
+test types::domain::tests::misc_tests::test_workflow_state_hex_serde_roundtrip ... ok
+test types::filter::tests::test_filter_evaluate_null_and_empty_meta ... ok
+test types::filter::tests::test_filter_expr_evaluate_all_operators ... ok
+test types::filter::tests::test_filter_serialization ... ok
+test types::filter::tests::test_nested_filter_expression ... ok
+test types::filter::tests::test_filter_variants ... ok
+test types::importance::tests::test_decay_factor_exponential ... ok
+test types::importance::tests::test_decay_factor_none ... ok
+test types::importance::tests::test_decay_factor_out_of_order_tx ... ok
+test types::importance::tests::test_decay_factor_step_floor ... ok
+test types::importance::tests::test_decay_factor_wall_clock_exponential ... ok
+test types::importance::tests::test_importance_score_clamping_and_nan ... ok
+test types::importance::tests::test_memory_importance_effective_score ... ok
+test types::saos::tests::test_combined_text_empty_prefix_returns_content ... ok
+test types::saos::tests::test_combined_text_with_prefix ... ok
+test types::saos::tests::test_combined_text_without_prefix_returns_content ... ok
+test types::saos::tests::test_combined_token_count_with_prefix ... ok
+test types::saos::tests::test_fusion_weights_default_is_balanced ... ok
+test types::saos::tests::test_context_window_serialization ... ok
+test types::saos::tests::test_fusion_weights_nan ... ok
+test types::saos::tests::test_fusion_weights_invalid_sum ... ok
+test types::saos::tests::test_fusion_weights_negative_or_infinite ... ok
+test types::saos::tests::test_fusion_weights_valid ... ok
+test types::saos::tests::test_hybrid_query_builder_custom_weights ... ok
+test types::saos::tests::test_hybrid_query_builder_all_options ... ok
+test types::saos::tests::test_hybrid_query_builder_default_uses_balanced_weights ... ok
+test types::saos::tests::test_hybrid_query_builder_defaults ... ok
+test types::saos::tests::test_hybrid_query_builder_happy_path ... ok
+test types::saos::tests::test_serde_backward_compat_no_prefix_field ... ok
+test types::saos::tests::test_token_budget_edge_cases ... ok
+test types::saos::tests::prop_fusion_weights_never_panics ... ok
+test types::domain::tests::ids_tests::test_doc_id_from_key_collisions_and_distribution ... ok
+
+test result: ok. 120 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+
+running 3 tests
+test test_doc_id_canonical_bit_decomposition_oracle ... ok
+test test_tx_id_monotonicity_oracle ... ok
+test test_tenant_id_system_reservation_oracle ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test test_into_inner_checked_matching_tenant ... ok
+test test_into_inner_checked_mismatched_tenant_does_not_leak_value ... ok
+test test_map_preserves_tenant_id ... ok
+test test_tenant_scoped_new_and_tenant_id_getter ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+=== STDERR ===
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling zerocopy v0.8.56
+   Compiling serde v1.0.229
+   Compiling syn v3.0.4
+   Compiling num-traits v0.2.19
+   Compiling crypto-common v0.1.7
+   Compiling serde_json v1.0.151
+   Compiling tempfile v3.27.0
+   Compiling digest v0.10.7
+   Compiling rusty-fork v0.3.1
+   Compiling sha2 v0.10.9
+   Compiling rand v0.9.5
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling ppv-lite86 v0.2.21
+   Compiling thiserror v2.0.20
+   Compiling rand_chacha v0.9.0
+   Compiling proptest v1.11.0
+   Compiling bincode v1.3.3
+   Compiling ahash v0.8.12
+   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.46s
+     Running unittests src/lib.rs (target/debug/deps/contextra_types-54ba8824bba98b81)
+     Running tests/campaign_r4_r10_oracle.rs (target/debug/deps/campaign_r4_r10_oracle-3f83ef07289ae5f4)
+     Running tests/tenant_scope_isolation.rs (target/debug/deps/tenant_scope_isolation-07f98eaeceb41276)
+   Doc-tests contextra_types

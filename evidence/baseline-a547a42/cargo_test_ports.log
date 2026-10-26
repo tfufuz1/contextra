@@ -1,0 +1,86 @@
+Befehl: cargo test -p contextra-ports --locked
+rustc -V: rustc 1.89.0 (29483883e 2025-08-04)
+Commit-Hash: 53c7d51401d5b67ce3358d5729fabd5b1f85fd4f
+Exit-Code: 0
+Dauer in Sekunden: 13.69
+Anzahl ausgeführter Tests: 38
+Anzahl übersprungener Tests: 0
+SHA-256 des Rohprotokolls: f6e288b1571cb6ef7b70fef924d5fd11971d15ca2abc0357f948f46f4ae464f4
+----------------------------------------
+=== STDOUT ===
+
+running 36 tests
+test dyn_safety::test_dyn_safety_compiles ... ok
+test clock::tests::test_system_clock_now_unix_nanos ... ok
+test clock::tests::test_arc_dyn_clock ... ok
+test embedding::tests::test_generate_with_context_default_matches_concatenation ... ok
+test embedding::tests::test_embedding_error_display ... ok
+test embedding::tests::test_context_segment_and_generate_with_context_default ... ok
+test graph::tests::test_graph_collection_mutation_mock ... ok
+test graph::tests::test_graph_mutation_error_conversion ... ok
+test embedding::tests::test_generate_with_context_empty_segments ... ok
+test clock::tests::test_system_clock_monotonic_non_decreasing ... ok
+test graph_index::tests::test_csr_graph_capability ... ok
+test id_gen::tests::test_sequential_id_gen_monotonic ... ok
+test id_gen::tests::test_arc_dyn_id_gen ... ok
+test kv::tests::test_kv_prefix_store_mock_roundtrip ... ok
+test graph_index::tests::test_graph_index_defaults ... ok
+test license::dyn_safety::test_license_gate_dyn_safety ... ok
+test metrics::tests::test_mock_metrics_sink ... ok
+test metrics::tests::test_noop_metrics_sink ... ok
+test plugin::tests::test_plugin_registry_basic_flow ... ok
+test plugin::tests::test_plugin_registry_conflict_against_already_active_plugin ... ok
+test plugin::tests::test_plugin_registry_conflict_detection ... ok
+test plugin::tests::test_plugin_registry_license_denied ... ok
+test rng::tests::test_arc_dyn_rng ... ok
+test rng::tests::test_fill_bytes_lengths ... ok
+test rng::tests::test_from_entropy_different_sequences ... ok
+test rng::tests::test_next_unit_f64_in_bounds ... ok
+test rng::tests::test_seeded_rng_different_seeds ... ok
+test rng::tests::test_seeded_rng_reproducibility ... ok
+test storage::tests::test_storage_stats_serialization ... ok
+test text_index::tests::test_text_index_search_at_capability ... ok
+test text_index::tests::test_text_index_stats_serialization ... ok
+test text_index::tests::test_text_index_defaults ... ok
+test vector_index::tests::test_hnsw_search_at_capability ... ok
+test vector_index::tests::test_vector_index_stats_serialization ... ok
+test vector_index::tests::test_vector_index_defaults ... ok
+test id_gen::tests::test_sequential_id_gen_concurrent_no_duplicates ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 2 tests
+test prop_dag_dependencies_activated_successfully ... ok
+test prop_dependency_cycle_detected_and_no_plugins_activated ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+=== STDERR ===
+   Compiling syn v3.0.4
+   Compiling smallvec v1.15.2
+   Compiling futures-core v0.3.34
+   Compiling parking_lot_core v0.9.12
+   Compiling parking_lot v0.12.5
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.20
+   Compiling futures-macro v0.3.34
+   Compiling tokio-macros v2.7.2
+   Compiling tokio v1.53.1
+   Compiling futures-util v0.3.34
+   Compiling thiserror v2.0.20
+   Compiling serde v1.0.229
+   Compiling bincode v1.3.3
+   Compiling ahash v0.8.12
+   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)
+   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.45s
+     Running unittests src/lib.rs (target/debug/deps/contextra_ports-76ba2013295f48ad)
+     Running tests/plugin_registry_dependency_cycle.rs (target/debug/deps/plugin_registry_dependency_cycle-b3b420d5cd0553ce)
+   Doc-tests contextra_ports

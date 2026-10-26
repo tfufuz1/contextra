@@ -1,0 +1,88 @@
+Befehl: cargo xtask check-vetoes
+rustc -V: rustc 1.89.0 (29483883e 2025-08-04)
+Commit-Hash: 53c7d51401d5b67ce3358d5729fabd5b1f85fd4f
+Exit-Code: 0
+Dauer in Sekunden: 0.29
+Anzahl ausgeführter Tests: 0
+Anzahl übersprungener Tests: 0
+SHA-256 des Rohprotokolls: f11d509969cf4c20674f6e05ebc1c4a4b411f72420ff30023fca1b122e125661
+----------------------------------------
+=== STDOUT ===
+=== Running xtask check-vetoes ===
+
+=== STDERR ===
+warning: unused import: `Path`
+ --> /app/xtask/src/harness/explain.rs:5:17
+  |
+5 | use std::path::{Path, PathBuf};
+  |                 ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `super::common::*`
+ --> xtask/src/legacy/arch.rs:1:5
+  |
+1 | use super::common::*;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `PathBuf`
+ --> xtask/src/legacy/common.rs:1:23
+  |
+1 | use std::path::{Path, PathBuf};
+  |                       ^^^^^^^
+
+warning: unused variable: `ctx`
+  --> xtask/src/gates/gov/meta_gates.rs:21:19
+   |
+21 |     fn run(&self, ctx: &Context) -> Outcome {
+   |                   ^^^ help: if this is intentional, prefix it with an underscore: `_ctx`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `args`
+ --> xtask/src/legacy/docs.rs:1:36
+  |
+1 | pub fn run_docs_command(cmd: &str, args: &[String]) -> Result<(), String> {
+  |                                    ^^^^ help: if this is intentional, prefix it with an underscore: `_args`
+
+warning: unused variable: `args`
+ --> xtask/src/legacy/session.rs:1:39
+  |
+1 | pub fn run_session_command(cmd: &str, args: &[String]) -> Result<(), String> {
+  |                                       ^^^^ help: if this is intentional, prefix it with an underscore: `_args`
+
+warning: function `loop_guard_record` is never used
+   --> /app/xtask/src/harness/loop_guard.rs:151:8
+    |
+151 | pub fn loop_guard_record(
+    |        ^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: function `loop_guard_check` is never used
+   --> /app/xtask/src/harness/loop_guard.rs:166:8
+    |
+166 | pub fn loop_guard_check(root: &Path, max_file_edits: u32) -> Result<(), String> {
+    |        ^^^^^^^^^^^^^^^^
+
+warning: function `loop_guard_reset` is never used
+   --> /app/xtask/src/harness/loop_guard.rs:237:8
+    |
+237 | pub fn loop_guard_reset(root: &Path) -> Result<(), String> {
+    |        ^^^^^^^^^^^^^^^^
+
+warning: function `run_loop_guard` is never used
+   --> /app/xtask/src/harness/loop_guard.rs:250:8
+    |
+250 | pub fn run_loop_guard(args: &[String]) -> i32 {
+    |        ^^^^^^^^^^^^^^
+
+warning: function `wal_replay_is_applicable` is never used
+   --> /app/xtask/src/harness/wal_replay_verify.rs:369:8
+    |
+369 | pub fn wal_replay_is_applicable(root: &Path, base: &str, head: &str) -> bool {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `xtask` (lib) generated 11 warnings (run `cargo fix --lib -p xtask` to apply 3 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running `target/debug/xtask check-vetoes`
