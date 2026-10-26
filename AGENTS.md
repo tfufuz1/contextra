@@ -21,7 +21,7 @@ Bei Konflikten gilt zwingend folgende strikte Rangfolge:
 Quality Gates dürfen niemals durch Ausnahmen, Sonderregeln oder lokale Overrides geschwächt oder umgangen werden (REQ-QA-010).
 
 > **Agenten-spezifische Anleitungen:**
-> - `@Jules` → lies Abschnitt 2a und folge `agents/jules/SESSION_BOOTSTRAP.md`
+> - `@Jules` → lies Abschnitt 2a und folge `.agents/jules/SESSION_BOOTSTRAP.md`
 > - `Claude` / Antigravity → ignoriere Abschnitt 2a, lies stattdessen `CLAUDE.md`
 > - Alle anderen Agenten → Abschnitt 2b reicht
 
@@ -33,7 +33,7 @@ Quality Gates dürfen niemals durch Ausnahmen, Sonderregeln oder lokale Override
 
 ```bash
 # 1. Vorgefertigten Kontext lesen (durch refresh-context.sh beim Task-Start erzeugt)
-cat agents/jules/context/SESSION_START.md
+cat .agents/jules/context/SESSION_START.md
 
 # 2. Konkreten Task von GitHub holen
 gh issue list --state open --label "jules" --json number,title,body,milestone
@@ -43,8 +43,8 @@ gh issue view <N>
 cargo check --workspace
 ```
 
-> Vollständiger Ablauf: `agents/jules/SESSION_BOOTSTRAP.md`
-> GitHub-Konventionen (Labels, Protokollpflicht): `agents/jules/GITHUB_WORKFLOW.md`
+> Vollständiger Ablauf: `.agents/jules/SESSION_BOOTSTRAP.md`
+> GitHub-Konventionen (Labels, Protokollpflicht): `.agents/jules/GITHUB_WORKFLOW.md`
 
 ### @Jules — Ablauf je Task
 
@@ -86,7 +86,7 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für R
 - „Fertig" bedeutet ausnahmslos: Alle relevanten Gates, Lints und Tests auf dem Merge-Ergebnis sind grün (REQ-QA-010).
 - **Rebase-Pflicht (hochfrequentierte Entwicklung):** Vor jedem PR zwingend `git fetch origin && git rebase origin/main` ausführen. Nach dem Rebase Gates erneut prüfen. Kein PR ohne sauberen Rebase auf main.
 - Es ist streng verboten, Gates, Lints, Ratchets oder den Toolchain-Pin einzuschränken, abzuschwächen oder durch Ausnahmen zu umgehen (REQ-QA-010).
-- **Geschützte Pfade:** `.github/**`, `xtask/**`, `justfile`, `rust-toolchain.toml`, `deny.toml`, `capabilities.toml`, `AGENTS.md`, `agents/jules/setup/**`, `governance/**`.
+- **Geschützte Pfade:** `.github/**`, `xtask/**`, `justfile`, `rust-toolchain.toml`, `deny.toml`, `capabilities.toml`, `AGENTS.md`, `.agents/jules/setup/**`, `governance/**`.
 
 ---
 
@@ -267,7 +267,7 @@ Folgende Ports MÜSSEN in Produktion real implementiert sein. Null-/Test-/Accept
 | `governance/clippy.toml` | Workspace-Clippy: P28-Verbotsliste (disallowed-methods/-types) |
 | `governance/determinism-allow.toml` | Erlaubte Determinismus-Ausnahmen (ADR-098) |
 | `governance/protected-paths.toml` | Geschützte Pfade (REQ-GOV-002, §18.2) |
-| `agents/jules/SESSION_BOOTSTRAP.md` | Jules Session-Ablauf (primärer Pfad) |
-| `agents/jules/GITHUB_WORKFLOW.md` | GitHub-Konventionen für Jules |
+| `.agents/jules/SESSION_BOOTSTRAP.md` | Jules Session-Ablauf (primärer Pfad) |
+| `.agents/jules/GITHUB_WORKFLOW.md` | GitHub-Konventionen für Jules |
 | `CLAUDE.md` | Claude / Antigravity Agent Guide |
 | `docs/decisions/` | ADR-Index |

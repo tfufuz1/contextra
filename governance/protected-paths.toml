@@ -111,9 +111,5 @@ glob = "governance/**"
 reason = "Governance Single Source of Truth — schützt Gates, Ratchets und Policies."
 
 [[protected]]
-glob = "agents/**"
-reason = "Agenten-Konfiguration und Session-Skripte."
-
-[[protected]]
 glob = ".agents/**"
-reason = "Legacy Agenten-Konfiguration (wird schrittweise nach agents/ migriert)."
+reason = "Agenten-Konfiguration, Session-Skripte und Governance-Dateien."
