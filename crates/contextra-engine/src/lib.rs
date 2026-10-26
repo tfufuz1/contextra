@@ -234,14 +234,12 @@ pub mod fusion;
 pub mod import;
 #[cfg(not(loom))]
 pub mod kv_cache_integration;
+#[cfg(not(loom))]
 pub mod metrics_names;
 #[cfg(not(loom))]
 pub mod temporal_filter;
 #[cfg(not(loom))]
 pub mod transaction;
-
-#[cfg(not(loom))]
-pub use kv_cache_integration::build_eviction_worker;
 
 #[cfg(feature = "sandbox")]
 pub mod merge_operator_adapter;
@@ -275,7 +273,7 @@ pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWe
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
 #[cfg(feature = "graph-connectivity-health")]
-pub use contextra_graph::percolation::PercolationConfig;
+pub use collection::maintenance::PercolationConfig;
 pub use contextra_text::Language;
 #[cfg(not(loom))]
 #[allow(deprecated)]
@@ -540,10 +538,6 @@ pub struct Contextra {
     calibrator: parking_lot::RwLock<
         Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
     >,
-    pid_controller: parking_lot::RwLock<
-        Option<std::sync::Weak<parking_lot::Mutex<contextra_adapt::PidController>>>,
-    >,
-    kv_eviction_worker: parking_lot::RwLock<Option<contextra_kvcache::EvictionWorker>>,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
 }
 
@@ -568,16 +562,6 @@ impl Contextra {
     /// Returns a reference to the attached [`LicenseGate`].
     pub fn license_gate(&self) -> Arc<dyn LicenseGate> {
         Arc::clone(&self.license_gate)
-    }
-
-    /// Returns the active KV eviction worker's attention score source if initialized.
-    pub fn kv_eviction_attention_source(
-        &self,
-    ) -> Option<Arc<dyn contextra_kvcache::AttentionScoreSource>> {
-        self.kv_eviction_worker
-            .read()
-            .as_ref()
-            .map(|w| w.attention_source())
     }
 }
 
