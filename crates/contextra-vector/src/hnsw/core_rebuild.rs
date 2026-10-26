@@ -10,6 +10,27 @@ use super::sq8_bias::Sq8Bias;
 use super::types::{Candidate, HnswIndex, HnswIndexCore, RebuildGuard, RebuildStatus, VectorData};
 use crate::distance::compute_distance_trusted;
 
+static LAST_REBUILD_MAP: parking_lot::Mutex<Option<ahash::AHashMap<usize, u64>>> =
+    parking_lot::Mutex::new(None);
+
+fn get_last_rebuild_nanos(core: &HnswIndexCore) -> Option<u64> {
+    let key = core as *const _ as usize;
+    let guard = LAST_REBUILD_MAP.lock();
+    guard.as_ref().and_then(|map| map.get(&key).copied())
+}
+
+fn set_last_rebuild_nanos(core: &HnswIndexCore, nanos: u64) {
+    let key = core as *const _ as usize;
+    let mut guard = LAST_REBUILD_MAP.lock();
+    let map = guard.get_or_insert_with(ahash::AHashMap::new);
+    map.insert(key, nanos);
+}
+
+fn default_clock() -> &'static contextra_ports::SystemClock {
+    static CLOCK: std::sync::OnceLock<contextra_ports::SystemClock> = std::sync::OnceLock::new();
+    CLOCK.get_or_init(contextra_ports::SystemClock::new)
+}
+
 impl HnswIndexCore {
     pub fn rebuild_status(&self) -> RebuildStatus {
         if self.hot.rebuilding.load(Ordering::SeqCst) {
@@ -20,14 +41,30 @@ impl HnswIndexCore {
     }
 
     pub async fn wait_for_rebuild(&self) -> bool {
-        self.wait_for_rebuild_with_timeout(std::time::Duration::from_secs(60))
+        let clock = default_clock();
+        self.wait_for_rebuild_with_clock(clock).await
+    }
+
+    pub async fn wait_for_rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> bool {
+        self.wait_for_rebuild_with_timeout_and_clock(std::time::Duration::from_secs(60), clock)
             .await
     }
 
     pub async fn wait_for_rebuild_with_timeout(&self, timeout: std::time::Duration) -> bool {
-        let deadline = std::time::Instant::now() + timeout;
+        let clock = default_clock();
+        self.wait_for_rebuild_with_timeout_and_clock(timeout, clock)
+            .await
+    }
+
+    pub async fn wait_for_rebuild_with_timeout_and_clock(
+        &self,
+        timeout: std::time::Duration,
+        clock: &dyn contextra_ports::Clock,
+    ) -> bool {
+        let timeout_nanos = timeout.as_nanos() as u64;
+        let start_nanos = clock.monotonic_nanos();
         while self.hot.rebuilding.load(Ordering::Acquire) {
-            if std::time::Instant::now() >= deadline {
+            if clock.monotonic_nanos().saturating_sub(start_nanos) >= timeout_nanos {
                 return false;
             }
             std::thread::sleep(std::time::Duration::from_millis(50));
@@ -453,15 +490,25 @@ impl HnswIndexCore {
     }
 
     pub async fn rebuild(&self) -> Result<()> {
-        self.rebuild_sync()
+        let clock = default_clock();
+        self.rebuild_sync_with_clock(clock)
+    }
+
+    pub async fn rebuild_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
+        self.rebuild_sync_with_clock(clock)
     }
 
     pub fn rebuild_sync(&self) -> Result<()> {
-        let now = std::time::Instant::now();
+        let clock = default_clock();
+        self.rebuild_sync_with_clock(clock)
+    }
+
+    pub fn rebuild_sync_with_clock(&self, clock: &dyn contextra_ports::Clock) -> Result<()> {
+        let now_nanos = clock.monotonic_nanos();
         {
-            let last_rebuild_guard = self.cold.last_rebuild_instant.lock();
-            if let Some(last_instant) = *last_rebuild_guard {
-                let elapsed = now.duration_since(last_instant);
+            if let Some(last_nanos) = get_last_rebuild_nanos(self) {
+                let elapsed_nanos = now_nanos.saturating_sub(last_nanos);
+                let elapsed = std::time::Duration::from_nanos(elapsed_nanos);
                 let consecutive = self.cold.consecutive_rapid_rebuilds.load(Ordering::SeqCst);
 
                 let cooldown = if consecutive == 0 {
@@ -533,7 +580,7 @@ impl HnswIndexCore {
         let _guard = RebuildGuard(&self.hot.rebuilding);
 
         tracing::info!("Starting HNSW index rebuild (Phase 1)");
-        let start_time = std::time::Instant::now();
+        let start_nanos = clock.monotonic_nanos();
 
         let rebuild_res =
             self.rebuild_phase1_snapshot_and_build()
@@ -544,18 +591,19 @@ impl HnswIndexCore {
                     self.rebuild_phase2_merge_and_swap(new_index, snapshot_tx)
                 });
 
-        let elapsed_secs = start_time.elapsed().as_secs_f64();
+        let elapsed_secs =
+            (clock.monotonic_nanos().saturating_sub(start_nanos) as f64) / 1_000_000_000.0;
         let sink = self.cold.metrics_sink.read().clone();
 
         if rebuild_res.is_ok() {
             self.cold.rebuild_count.fetch_add(1, Ordering::SeqCst);
-            *self.cold.last_rebuild_instant.lock() = Some(std::time::Instant::now());
+            set_last_rebuild_nanos(self, clock.monotonic_nanos());
             self.cold
                 .consecutive_rapid_rebuilds
                 .store(0, Ordering::SeqCst);
             sink.record_histogram("vector_rebuild_duration_seconds", elapsed_secs, &[]);
             sink.record_counter("vector_rebuild_total", 1, &[("status", "success")]);
-            tracing::info!("HNSW rebuild completed in {:?}", start_time.elapsed());
+            tracing::info!("HNSW rebuild completed in {:.6}s", elapsed_secs);
         } else {
             sink.record_counter("vector_rebuild_total", 1, &[("status", "error")]);
         }
@@ -909,5 +957,92 @@ impl HnswIndexCore {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hnsw::config::HnswConfig;
+    use contextra_ports::{Clock, SeededRng};
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+
+    struct TestClock {
+        nanos: AtomicU64,
+    }
+
+    impl TestClock {
+        fn new(start_nanos: u64) -> Self {
+            Self {
+                nanos: AtomicU64::new(start_nanos),
+            }
+        }
+
+        fn advance_nanos(&self, delta: u64) {
+            self.nanos.fetch_add(delta, Ordering::SeqCst);
+        }
+    }
+
+    impl Clock for TestClock {
+        fn now_unix_nanos(&self) -> u64 {
+            self.nanos.load(Ordering::SeqCst)
+        }
+
+        fn monotonic_nanos(&self) -> u64 {
+            self.nanos.load(Ordering::SeqCst)
+        }
+    }
+
+    #[test]
+    fn test_core_rebuild_no_direct_time_and_deterministic_with_same_seed() {
+        let clock = TestClock::new(1_000_000_000);
+
+        let build_and_rebuild_index = |seed: u64| -> Result<(f32, Vec<u32>, usize)> {
+            let mut config = HnswConfig::default();
+            config.dimension = 4;
+            config.m = 8;
+            config.ef_construction = 16;
+            let rng: Arc<dyn contextra_ports::Rng> = Arc::new(SeededRng::new(seed));
+            let index = HnswIndex::try_new_with_rng(config, rng)?;
+
+            for i in 1..=20 {
+                let doc_id = DocId::new(i as u64);
+                let vec = vec![i as f32, (i * 2) as f32, (i * 3) as f32, (i * 4) as f32];
+                index.inner.do_insert(doc_id, &vec, i as u64)?;
+            }
+
+            for i in 1..=5 {
+                index.inner.do_delete(DocId::new(i as u64))?;
+            }
+
+            clock.advance_nanos(10_000_000_000);
+            index.inner.rebuild_sync_with_clock(&clock)?;
+
+            let ep = index.inner.hot.get_entry_point().unwrap_or(0);
+            let conns = index.inner.hot.get_ram_node_connections(0, 0, 8);
+
+            let query = vec![10.0, 20.0, 30.0, 40.0];
+            let nodes_guard = index.inner.hot.nodes.read();
+            let search_ctx = SearchContext {
+                mmap: None,
+                nodes: nodes_guard.as_slice(),
+                mmap_node_count: 0,
+                prior_prepared: &[],
+                quantizer: None,
+                arena: &index.inner.hot.arena,
+                backlink_map: None,
+            };
+            let dist = index.inner.resolve_dist(0, &query, None, &search_ctx)?;
+
+            Ok((dist, conns, ep))
+        };
+
+        let run1 = build_and_rebuild_index(42).expect("run 1 succeeds");
+        let run2 = build_and_rebuild_index(42).expect("run 2 succeeds");
+
+        assert_eq!(run1.2, run2.2, "Entry points must be bit-identical");
+        assert_eq!(run1.1, run2.1, "RAM connections must be bit-identical");
+        assert_eq!(run1.0, run2.0, "Distances must be bit-identical");
     }
 }
