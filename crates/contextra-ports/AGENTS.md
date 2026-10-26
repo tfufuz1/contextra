@@ -20,7 +20,7 @@
 - Keine direkten Systemzeit- oder OS-Zufallsaufrufe (`Instant::now`, `thread_rng` verboten per `clippy.toml`).
 
 ## 5. Implementierte & konsumierte Ports (Anhang A)
-- **Definiert sämtliche Ports (Anhang A.1 / A.2):** `StorageEngine`, `VectorIndex`, `TextIndex`, `GraphIndex`, `Clock`, `EntropyRng`, `DurableLog`, `ErasureParticipant`, `KeyCustodian` etc.
+- **Definiert sämtliche Ports (Anhang A.1 / A.2):** `StorageEngine`, `VectorIndex`, `TextIndex`, `Clock`, `EntropyRng`, `DurableLog` etc.
 
 ## 6. Tests & Gates
 - **Workspace Clippy Gate:** Verhinderung verbotener Methoden (`Instant::now`, `thread_rng`).
