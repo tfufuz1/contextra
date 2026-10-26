@@ -30,7 +30,7 @@ glob = "AGENTS.md"
 reason = "Zentrale Handlungsanweisungen und Verhaltenskodex für KI-Agenten."
 
 [[protected]]
-glob = ".jules/setup/**"
+glob = ".agents/jules/setup/**"
 reason = "Setup-Skripte für die Agenten-Umgebung."
 
 [[protected]]
@@ -86,11 +86,11 @@ glob = "rules/**"
 reason = "Architektur- und Sicherheitsregeln für Agenten und Entwicklung."
 
 [[protected]]
-glob = ".jules/harness-phases.toml"
+glob = ".agents/jules/harness-phases.toml"
 reason = "Phasen-Konfiguration des Harness Test-Runners."
 
 [[protected]]
-glob = ".jules/prompter-tiers.toml"
+glob = ".agents/jules/prompter-tiers.toml"
 reason = "Tier-Einteilungen der Prompter-Agenten."
 
 [[protected]]

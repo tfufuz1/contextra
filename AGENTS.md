@@ -5,7 +5,7 @@ Stand: 2026-10-25 (Spezifikation Fassung 1.2)
 ## 1. Geltungsbereich und Rangfolge der Informationsquellen (§0, §1)
 Diese Datei regelt die Arbeit aller autonomen Agenten im Repository.
 Bei Konflikten gilt zwingend folgende strikte Rangfolge:
-1. **Normative Gesamtspezifikation Fassung 1.2** (`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`; §0, §1)
+1. **Normative Gesamtspezifikation Fassung 1.2** (`docs/SPEC.md`; §0, §1)
 2. **Vetos und Architekturprinzipien** (§4.1, §5)
 3. **Capabilities Manifest** (`capabilities.toml`; INV-DOC-SINGLE-SOURCE-1)
 4. **Agenten-Betriebsanleitung** (`AGENTS.md`)
@@ -16,7 +16,9 @@ Quality Gates dürfen niemals durch Ausnahmen, Sonderregeln oder lokale Override
 ## 2. Start
 Arbeitskontext zu Beginn der Session laden:
 - `cargo check --workspace`
-- `cargo xtask jules-preflight`
+- `cargo xtask preflight`
+
+> Jules-spezifischer Bootstrap: siehe `.agents/jules/SESSION_BOOTSTRAP.md`
 
 ## 3. Ablauf
 Jeder Task folgt diesem iterativen Ablauf:
@@ -29,7 +31,7 @@ Jeder Task folgt diesem iterativen Ablauf:
 ## 4. Verifizieren & Gate-Integrität (§27.5, §27.6, REQ-QA-010)
 - „Fertig“ bedeutet ausnahmslos: Alle relevanten Gates, Lints und Tests auf dem Merge-Ergebnis sind grün (REQ-QA-010).
 - Es ist streng verboten, Gates, Lints, Ratchets oder den Toolchain-Pin einzuschränken, abzuschwächen oder durch Ausnahmen zu umgehen (REQ-QA-010).
-- Geschützte Pfade: `.github/**`, `xtask/**`, `justfile`, `rust-toolchain.toml`, `deny.toml`, `capabilities.toml`, `AGENTS.md`, `.jules/setup/**`.
+- Geschützte Pfade: `.github/**`, `xtask/**`, `justfile`, `rust-toolchain.toml`, `deny.toml`, `capabilities.toml`, `AGENTS.md`, `.agents/jules/setup/**`.
 
 ## 5. Kernregeln aus der Spezifikation (Kurzform)
 - **Zero-Panic (§3, §27.6):** Kein `unwrap()`, `expect()` oder `panic!()` in Produktionspfaden; Fehler per `Result` propagieren.

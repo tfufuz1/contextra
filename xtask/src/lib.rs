@@ -13,6 +13,7 @@ pub mod generate_diagnostics;
 pub mod harness;
 pub mod legacy;
 pub mod reproducible_build;
+pub mod session_history;
 
 pub fn find_root_dir() -> PathBuf {
     if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {

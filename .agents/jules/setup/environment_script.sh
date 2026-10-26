@@ -148,7 +148,7 @@ if cargo run -q --manifest-path xtask/Cargo.toml -- harness-list 2>/dev/null | g
 else warn "xtask env-attest (noch) nicht registriert"; fi
 
 # Kontext einmalig erzeugen (wird bei Task-Start erneut aktualisiert)
-[ -f .jules/setup/refresh-context.sh ] && bash .jules/setup/refresh-context.sh || warn "refresh-context.sh fehlt"
+[ -f .agents/jules/setup/refresh-context.sh ] && bash .agents/jules/setup/refresh-context.sh || warn "refresh-context.sh fehlt"
 
 # ── Working-Tree zurücksetzen (Jules verwirft sonst die Verifikation: "Working tree is dirty") ──
 if [ -n "$(git status --porcelain)" ]; then

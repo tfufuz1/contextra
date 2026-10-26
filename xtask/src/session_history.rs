@@ -2,7 +2,7 @@
 //! Lokales, rotierendes Session-History-Log für Contextra.
 //!
 //! Dieses Modul verwaltet ein chronologisches, git-ignoriertes Protokoll
-//! aller Agenten-Aktionen unter `.jules/session_history.jsonl`.
+//! aller Agenten-Aktionen unter `.agents/session_history.jsonl`.
 //!
 //! # Invarianten
 //! - **Zero-Panic-Doctrine**: Keine `.unwrap()` oder `.expect()` in Produktions-Pfade.
@@ -10,10 +10,9 @@
 //! - **Metadata-based Rotation**: Rotationsprüfung nutzt reine Metadaten-Abfragen (`fs::metadata`).
 
 use chrono::Utc;
-use contextra_types::ContextraError;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 /// Standard-Schwellenwert für die Log-Rotation (5 MB).
@@ -104,14 +103,14 @@ pub fn find_root_dir() -> PathBuf {
     }
 }
 
-/// Ermittelt den Standard-Pfad `.jules/session_history.jsonl` relativ zum Repository-Root.
+/// Ermittelt den Standard-Pfad `.agents/session_history.jsonl` relativ zum Repository-Root.
 pub fn default_session_history_path() -> PathBuf {
-    find_root_dir().join(".jules/session_history.jsonl")
+    find_root_dir().join(".agents/session_history.jsonl")
 }
 
-/// Hängt einen Eintrag an das globale Session-History-Log `.jules/session_history.jsonl` an.
+/// Hängt einen Eintrag an das globale Session-History-Log `.agents/session_history.jsonl` an.
 /// Führt bei Überschreitung der Standardgrößenschwelle (5 MB) eine automatische Rotation durch.
-pub fn append_entry(entry: &SessionHistoryEntry) -> Result<(), ContextraError> {
+pub fn append_entry(entry: &SessionHistoryEntry) -> Result<(), io::Error> {
     let path = default_session_history_path();
     let config = RotationConfig::default();
     append_entry_with_config(entry, &config, &path)
@@ -122,7 +121,7 @@ pub fn append_entry_with_config(
     entry: &SessionHistoryEntry,
     config: &RotationConfig,
     path: &Path,
-) -> Result<(), ContextraError> {
+) -> Result<(), io::Error> {
     if let Some(parent) = path.parent() {
         if !parent.exists() {
             fs::create_dir_all(parent)?;
@@ -137,7 +136,8 @@ pub fn append_entry_with_config(
         }
     }
 
-    let serialized = serde_json::to_string(entry)?;
+    let serialized = serde_json::to_string(entry)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
 
     writeln!(file, "{}", serialized)?;
@@ -145,7 +145,7 @@ pub fn append_entry_with_config(
 }
 
 /// Führt die Dateirotation durch: benennt `path` zu `path.1` um (und ältere Backups entsprechend `max_backups`).
-fn rotate_logs(path: &Path, max_backups: usize) -> Result<(), ContextraError> {
+fn rotate_logs(path: &Path, max_backups: usize) -> Result<(), io::Error> {
     for i in (1..max_backups).rev() {
         let src = path.with_extension(format!("jsonl.{}", i));
         let dst = path.with_extension(format!("jsonl.{}", i + 1));
@@ -179,27 +179,31 @@ mod tests {
         assert_eq!(entry.krate.as_deref(), Some("contextra-core"));
         assert_eq!(entry.issue.as_deref(), Some("ISSUE-42"));
 
-        let json = serde_json::to_string(&entry).unwrap();
-        let deserialized: SessionHistoryEntry = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&entry).expect("serialization must not fail in tests");
+        let deserialized: SessionHistoryEntry =
+            serde_json::from_str(&json).expect("deserialization must not fail in tests");
         assert_eq!(entry, deserialized);
     }
 
     #[test]
     fn test_append_single_entry() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("tempdir must be creatable in tests");
         let log_path = dir.path().join("session_history.jsonl");
 
         let entry = SessionHistoryEntry::new("sess-1", "preflight").with_crate("xtask");
 
         let config = RotationConfig::default();
-        append_entry_with_config(&entry, &config, &log_path).unwrap();
+        append_entry_with_config(&entry, &config, &log_path)
+            .expect("append must succeed in tests");
 
         assert!(log_path.exists());
-        let content = fs::read_to_string(&log_path).unwrap();
+        let content =
+            fs::read_to_string(&log_path).expect("log file must be readable in tests");
         let lines: Vec<&str> = content.lines().collect();
         assert_eq!(lines.len(), 1);
 
-        let parsed: SessionHistoryEntry = serde_json::from_str(lines[0]).unwrap();
+        let parsed: SessionHistoryEntry =
+            serde_json::from_str(lines[0]).expect("line must be valid JSON in tests");
         assert_eq!(parsed.session_id, "sess-1");
         assert_eq!(parsed.action, "preflight");
         assert_eq!(parsed.krate.as_deref(), Some("xtask"));
@@ -207,22 +211,27 @@ mod tests {
 
     #[test]
     fn test_append_multiple_entries_append_mode() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("tempdir must be creatable in tests");
         let log_path = dir.path().join("session_history.jsonl");
         let config = RotationConfig::default();
 
         let e1 = SessionHistoryEntry::new("sess-1", "claim").with_crate("contextra-store");
         let e2 = SessionHistoryEntry::new("sess-1", "preflight").with_crate("contextra-store");
 
-        append_entry_with_config(&e1, &config, &log_path).unwrap();
-        append_entry_with_config(&e2, &config, &log_path).unwrap();
+        append_entry_with_config(&e1, &config, &log_path)
+            .expect("append e1 must succeed in tests");
+        append_entry_with_config(&e2, &config, &log_path)
+            .expect("append e2 must succeed in tests");
 
-        let content = fs::read_to_string(&log_path).unwrap();
+        let content =
+            fs::read_to_string(&log_path).expect("log file must be readable in tests");
         let lines: Vec<&str> = content.lines().collect();
         assert_eq!(lines.len(), 2);
 
-        let p1: SessionHistoryEntry = serde_json::from_str(lines[0]).unwrap();
-        let p2: SessionHistoryEntry = serde_json::from_str(lines[1]).unwrap();
+        let p1: SessionHistoryEntry =
+            serde_json::from_str(lines[0]).expect("line 0 must be valid JSON in tests");
+        let p2: SessionHistoryEntry =
+            serde_json::from_str(lines[1]).expect("line 1 must be valid JSON in tests");
 
         assert_eq!(p1.action, "claim");
         assert_eq!(p2.action, "preflight");
@@ -230,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_log_rotation_on_size_threshold() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("tempdir must be creatable in tests");
         let log_path = dir.path().join("session_history.jsonl");
 
         // Set low size limit (50 bytes) so rotation triggers after first write
@@ -243,22 +252,26 @@ mod tests {
             .with_details(serde_json::json!({ "data": "larger_payload_to_exceed_limit" }));
 
         // First append creates log_path
-        append_entry_with_config(&e1, &config, &log_path).unwrap();
+        append_entry_with_config(&e1, &config, &log_path)
+            .expect("first append must succeed in tests");
         assert!(log_path.exists());
-        let meta1 = fs::metadata(&log_path).unwrap();
+        let meta1 = fs::metadata(&log_path).expect("metadata must be accessible in tests");
         assert!(meta1.len() >= 50);
 
         let e2 = SessionHistoryEntry::new("sess-2", "action-2");
 
         // Second append triggers rotation because size >= 50 bytes
-        append_entry_with_config(&e2, &config, &log_path).unwrap();
+        append_entry_with_config(&e2, &config, &log_path)
+            .expect("second append must succeed in tests");
 
         let rotated_path = dir.path().join("session_history.jsonl.1");
         assert!(rotated_path.exists(), "Rotated log file .1 must exist");
         assert!(log_path.exists(), "New active log file must exist");
 
-        let rotated_content = fs::read_to_string(&rotated_path).unwrap();
-        let active_content = fs::read_to_string(&log_path).unwrap();
+        let rotated_content =
+            fs::read_to_string(&rotated_path).expect("rotated file must be readable in tests");
+        let active_content =
+            fs::read_to_string(&log_path).expect("active log must be readable in tests");
 
         assert!(rotated_content.contains("sess-1"));
         assert!(active_content.contains("sess-2"));

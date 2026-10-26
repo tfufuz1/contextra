@@ -7,6 +7,14 @@
   Eintrag existiert. `just check-vetoes` läuft automatisch, ist aber kein Ersatz
   für manuelles Lesen vor Arbeitsbeginn an physio-*/Nucleation-artigen Features.
 
+## Schritt 0b: GitHub-Kontext laden
+Führe aus (bevor statische Docs gelesen werden):
+```bash
+gh issue list --label "context,session" --json number,title,body --limit 10
+gh pr list --state open --json number,title,body,labels --limit 5
+gh run list --limit 3
+```
+
 ## Phase 0 — Session-Identität etablieren, Task-Claiming & Context Pack erzeugen (30 Sekunden)
 
 ```bash
