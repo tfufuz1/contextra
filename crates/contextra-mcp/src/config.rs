@@ -191,7 +191,7 @@ pub fn create_embedding_provider(
             })
         }
         "mock" => {
-            let embedder = contextra_ports::MockEmbedder::new(768);
+            let embedder = MockEmbedder::new(768);
             Ok(Arc::new(embedder))
         }
         other => Err(ContextraError::InvalidInput(format!(
@@ -374,6 +374,36 @@ impl RouterConfig {
             profiles_path,
             calibration_store_path,
         }
+    }
+}
+
+/// Fallback Mock Embedder.
+#[derive(Debug, Clone)]
+pub struct MockEmbedder {
+    dimension: usize,
+}
+
+impl MockEmbedder {
+    pub fn new(dimension: usize) -> Self {
+        Self { dimension }
+    }
+}
+
+impl EmbeddingProvider for MockEmbedder {
+    fn provider_name(&self) -> &str {
+        "mock"
+    }
+
+    fn embed<'a>(
+        &'a self,
+        _text: &'a str,
+    ) -> contextra_ports::BoxFuture<'a, Result<Vec<f32>, contextra_ports::EmbeddingError>> {
+        let dim = self.dimension;
+        Box::pin(async move { Ok(vec![0.0; dim]) })
+    }
+
+    fn embedding_dim(&self) -> usize {
+        self.dimension
     }
 }
 

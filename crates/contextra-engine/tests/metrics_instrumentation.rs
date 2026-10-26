@@ -1,6 +1,7 @@
 use contextra_engine::metrics_names::{COMMIT_LATENCY, REBUILD_DURATION};
 use contextra_engine::{Contextra, ContextraConfig};
-use contextra_ports::{MetricEvent, MetricsSink, TestMetricsSink};
+use contextra_ports::MetricsSink;
+use contextra_testkit::{MetricEvent, TestMetricsSink};
 use std::sync::Arc;
 use tempfile::tempdir;
 

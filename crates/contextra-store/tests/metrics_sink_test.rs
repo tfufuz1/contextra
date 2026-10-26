@@ -1,5 +1,6 @@
 use contextra_core::{StorageEngine, TxId};
-use contextra_ports::{MetricEvent, MetricsSink, TestMetricsSink};
+use contextra_ports::MetricsSink;
+use contextra_testkit::{MetricEvent, TestMetricsSink};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::system_pressure::{
     SystemPressureMonitor, WAL_QUEUE_CRITICAL_THRESHOLD, WAL_QUEUE_ELEVATED_THRESHOLD,
