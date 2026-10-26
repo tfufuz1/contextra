@@ -1,0 +1,70 @@
+# .github/workflows/refresh-jules-context.yml
+# WP-X.5 / WP-X.4b — Automatisch SESSION_START.md aktualisieren.
+#
+# Pfad 1 (push/main): Generiert und committed SESSION_START.md nach jedem Merge.
+# Pfad 2 (pull_request): Generiert SESSION_START.md als Artefakt (read-only, kein Commit).
+#
+# NICHT merge-blockierend — informativ.
+
+name: Refresh Jules Context
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:       # WP-X.4b: beide Pfade — PR-Pfad als Artefakt (kein Commit)
+  workflow_dispatch:  # Manuelle Ausführung möglich
+
+permissions:
+  contents: write  # Für push-Pfad: Commit erforderlich. PR-Pfad: read-only durch if-Guard.
+
+jobs:
+  refresh-context:
+    name: Refresh agents/jules/context/SESSION_START.md
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@1.89.0
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          workspaces: |
+            .
+            xtask
+
+      - name: Run refresh-context.sh
+        run: bash agents/jules/setup/refresh-context.sh
+
+      # Pfad 1: push/main oder workflow_dispatch → Commit SESSION_START.md
+      - name: Commit updated SESSION_START.md (push/main only)
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add agents/jules/context/SESSION_START.md
+          if git diff --staged --quiet; then
+            echo "✅ SESSION_START.md unverändert — kein Commit nötig"
+          else
+            git commit -m "chore(agents): refresh SESSION_START.md [skip ci]
+
+Automatisch generiert von refresh-jules-context.yml bei Push auf main.
+Commit: ${{ github.sha }}"
+            git push
+            echo "✅ SESSION_START.md aktualisiert und committed"
+          fi
+
+      # Pfad 2: pull_request → SESSION_START.md als Artefakt hochladen (kein Commit)
+      - name: Upload SESSION_START.md as artifact (pull_request only)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-start-preview
+          path: agents/jules/context/SESSION_START.md
+          retention-days: 7

@@ -1,0 +1,103 @@
+# governance/key_purposes.toml — Schlüssel-Zweckbindung (INV-KEYPURPOSE-1)
+# doc-stamp: 2026-10-26 | Normativ: docs/SPEC.md §12.3, PLAN.md WP 0.4
+# HKDF-Label-Format: contextra/v1/<zweck> (SPEC §12.3, Gate key-purposes)
+# Jeder Schlüssel dient genau einem Zweck; Wiederverwendung = Gate-Fehler (INV-KEYPURPOSE-1).
+
+[[purpose]]
+label = "contextra/v1/eng"
+name = "EngineKey"
+purpose = "Engine-interne Ableitung"
+destruction_effect = "Engine-interne Operationen nicht mehr durchführbar"
+allowed_in = ["contextra-crypto"]
+
+[[purpose]]
+label = "contextra/v1/wal"
+name = "WalKey"
+purpose = "WAL-HMAC und -Verschlüsselung"
+destruction_effect = "WAL-Integrität nicht mehr prüfbar; Daten unlesbar"
+allowed_in = ["contextra-store"]
+
+[[purpose]]
+label = "contextra/v1/sc/keyreg"
+name = "SidecarKeyRegistry"
+purpose = "Sidecar: Schlüssel-Registry-Log"
+destruction_effect = "Schlüssel-History nicht mehr rekonstruierbar"
+allowed_in = ["contextra-store"]
+
+[[purpose]]
+label = "contextra/v1/sc/revoke"
+name = "SidecarRevoke"
+purpose = "Sidecar: Revocation-Log"
+destruction_effect = "Revokations-History nicht mehr verifizierbar"
+allowed_in = ["contextra-store"]
+
+[[purpose]]
+label = "contextra/v1/sc/audit"
+name = "SidecarAudit"
+purpose = "Sidecar: Audit-Chain"
+destruction_effect = "Audit-Trail nicht mehr integritätsprüfbar"
+allowed_in = ["contextra-store"]
+
+[[purpose]]
+label = "contextra/v1/sc/journal"
+name = "SidecarJournal"
+purpose = "Sidecar: Erasure-Journal"
+destruction_effect = "Lösch-Journal nicht mehr verifizierbar"
+allowed_in = ["contextra-store"]
+
+[[purpose]]
+label = "contextra/v1/sc/erased"
+name = "SidecarErased"
+purpose = "Sidecar: Erased-Set-Mirror"
+destruction_effect = "Gelöschte-Menge-Spiegel nicht mehr rekonstruierbar"
+allowed_in = ["contextra-engine", "contextra-store"]
+
+[[purpose]]
+label = "contextra/v1/keystore-root"
+name = "KeystoreRoot"
+purpose = "Root-Key für Keystore (K0)"
+destruction_effect = "Alle abgeleiteten Schlüssel unbrauchbar"
+allowed_in = ["contextra-crypto"]
+
+[[purpose]]
+label = "contextra/v1/kek"
+name = "KeyEncryptionKey"
+purpose = "KEK: verschlüsselt DEK (K1)"
+destruction_effect = "Alle DEKs unlesbar → Daten permanent nicht entschlüsselbar"
+allowed_in = ["contextra-crypto"]
+
+[[purpose]]
+label = "contextra/v1/docdek"
+name = "DocumentDataEncryptionKey"
+purpose = "DEK: Dokumenten-Verschlüsselung (AES-256-GCM-SIV)"
+destruction_effect = "Dokument permanent unlesbar (DSGVO Art. 17 Effekt)"
+allowed_in = ["contextra-crypto", "contextra-store"]
+
+[[purpose]]
+label = "contextra/v1/artkey"
+name = "ArtifactKey"
+purpose = "Artifact-Segment-Schlüssel"
+destruction_effect = "Artifact-Segmente permanent unlesbar"
+allowed_in = ["contextra-crypto", "contextra-text"]
+
+[[purpose]]
+label = "contextra/v1/kref"
+name = "CommitRefKey"
+purpose = "Commit-Referenz-Schlüssel (ersetzt K_commit aus E27)"
+destruction_effect = "Commit-Referenz nicht mehr verifizierbar"
+allowed_in = ["contextra-crypto"]
+
+[[purpose]]
+label = "contextra/v1/report-sign"
+name = "ReportSigningKey"
+purpose = "Berichts-Signatur — wird NIEMALS durch Löschung vernichtet"
+destruction_effect = "Unvernichtbar in v1.0; Wechsel erzeugt neue signer_key_id"
+allowed_in = ["contextra-crypto"]
+immortal = true
+
+[[purpose]]
+label = "contextra/v1/vault"
+name = "VaultKey"
+purpose = "Vault-Schlüssel für langfristige Schlüsselsicherung"
+destruction_effect = "Vault-Inhalt permanent unzugänglich"
+allowed_in = ["contextra-crypto"]

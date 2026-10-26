@@ -1,0 +1,51 @@
+# governance/ratchet.toml — Ratchet-Baselines (dürfen nur sinken, nie steigen)
+# doc-stamp: 2026-10-26 | Normativ: docs/SPEC.md §17, REQ-QA-005, PLAN.md WP 0.4
+# Baselines aus Commit a547a42. Jede Änderung muss durch ADR gerechtfertigt werden.
+#
+# Prinzip: Baselines sinken monoton. Ziel: 0 (wo nicht anders vermerkt).
+# Ein Ratchet ist kein Beleg für „null" (P7). Nur ein Gate-Lauf ist Beleg.
+#
+# Schema-Version 2 (WP 0.4): erweitert um PLAN.md §6/§17 Baselines.
+# Vorheriges Schema (v1): unwrap_legacy_grep, [unsafe_blocks] — bleibt für
+# Kompatibilität erhalten. Neue Felder kommen unter [baselines].
+
+# ── Legacy-Zähler (xtask-kompatibel, NICHT entfernen) ─────────────────────────
+unwrap_legacy_grep = 1175
+unwrap_exact = 502
+expect_exact = 242
+allow_attrs = 214
+ignore_attrs = 1
+forbid_unsafe_crates = 30
+
+[unsafe_blocks]
+contextra-crypto = 0
+contextra-simd = 285
+contextra-sys = 30
+contextra-wire = 27
+
+# ── Neue Baselines (PLAN.md WP 0.4, §6, §17) ─────────────────────────────────
+# Jeder Wert ist die Obergrenze. Neue PRs dürfen sie senken, nie erhöhen.
+[baselines]
+# Panic-Aufrufe in Produktionscode (P7) — Ziel: 0
+panic_calls = 2
+
+# async fn in Ring-0-Crates (D-09: Async bleibt Ratchet) — Ziel: 0
+async_fn_ring0_vector = 52
+async_fn_ring0_text = 43
+async_fn_ring0_rank = 1
+
+# SAFETY-Lücken: unsafe-Blöcke ohne vollständigen SAFETY-Kommentar (P2)
+safety_gaps = 49
+
+# Sensitive #[allow(...)] Attribute in Produktionscode — Ziel: 0
+sensitive_allow = 6
+
+# Zeit-Aufrufe in aktiven Crates (P28) — total: 44, aktiv: 35 (9 in Archiv)
+time_calls_active = 35
+
+# Tote Features (REQ-ARCH-012, WP 2.4) — Ziel: 0
+dead_features = 24
+
+# unwrap/expect in Produktionscode (P7, SPEC §0.2 R2) — Ziel: 0
+unwrap_exact = 502
+expect_exact = 242

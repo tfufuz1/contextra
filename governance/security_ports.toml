@@ -1,0 +1,148 @@
+# governance/security_ports.toml — Pflicht-Sicherheitsports (INV-WIRING-2)
+# doc-stamp: 2026-10-26 | Normativ: docs/SPEC.md §7.7, PLAN.md WP 0.4
+# Null-/Test-/Accept-All-Implementierungen als Standard-Impl sind UNZULÄSSIG (AGENTS.md §7).
+# Felder: name, crate, trait_path, class, prod_impl, wiring_test (PLAN.md WP 0.4)
+
+# ── Kern-Ports (class = "core") ────────────────────────────────────────────────
+
+[[port]]
+name = "KmsProvider"
+crate = "contextra-ports"
+trait_path = "contextra_ports::kms::KmsProvider"
+class = "core"
+prod_impl = "contextra_crypto::kms::K1Provider"
+wiring_test = "ports/tests/kms_wiring.rs"
+wp = "WP 5.1"
+inv = "INV-WIRING-2, INV-KMS-1"
+
+[[port]]
+name = "Vfs"
+crate = "contextra-ports"
+trait_path = "contextra_ports::vfs::Vfs"
+class = "core"
+prod_impl = "contextra_store::vfs::StdVfs"
+wiring_test = "ports/tests/vfs_wiring.rs"
+wp = "WP 4.1"
+inv = "INV-WIRING-2"
+
+[[port]]
+name = "DurableLog"
+crate = "contextra-ports"
+trait_path = "contextra_ports::log::DurableLog"
+class = "core"
+prod_impl = "contextra_store::sidecar::DurableLogImpl"
+wiring_test = "ports/tests/durable_log_wiring.rs"
+wp = "WP 4.2"
+inv = "INV-WIRING-2"
+
+[[port]]
+name = "ErasureJournal"
+crate = "contextra-ports"
+trait_path = "contextra_ports::journal::ErasureJournal"
+class = "core"
+prod_impl = "contextra_store::sidecar::ErasureJournalImpl"
+wiring_test = "ports/tests/erasure_journal_wiring.rs"
+wp = "WP 4.2"
+inv = "INV-WIRING-2"
+
+[[port]]
+name = "LayerScanner"
+crate = "contextra-ports"
+trait_path = "contextra_ports::scanner::LayerScanner"
+class = "core"
+prod_impl = "per-layer (WP 6.1–6.7)"
+wiring_test = "ports/tests/erasure_surface.rs"
+wp = "WP 6.1"
+inv = "INV-DELETION-PORTS-1"
+
+[[port]]
+name = "Purger"
+crate = "contextra-ports"
+trait_path = "contextra_ports::purger::Purger"
+class = "core"
+prod_impl = "contextra_store::compaction::RangePurger"
+wiring_test = "ports/tests/purger_wiring.rs"
+wp = "WP 6.1"
+inv = "INV-DELETION-PORTS-1"
+
+[[port]]
+name = "GroupRevocationListener"
+crate = "contextra-ports"
+trait_path = "contextra_ports::revocation::GroupRevocationListener"
+class = "core"
+prod_impl = "contextra_engine::revocation::RevocationListenerImpl"
+wiring_test = "ports/tests/revocation_wiring.rs"
+wp = "WP 7.3"
+inv = "INV-WIRING-2"
+
+[[port]]
+name = "EffaceableKeySlot"
+crate = "contextra-ports"
+trait_path = "contextra_ports::kms::EffaceableKeySlot"
+class = "core"
+prod_impl = "CapabilityUnsupported (K2/K3, D-10 — v1.0)"
+wiring_test = "ports/tests/kms_wiring.rs"
+wp = "WP 5.1"
+inv = "INV-KMS-1"
+
+[[port]]
+name = "ErasedSetMirror"
+crate = "contextra-ports"
+trait_path = "contextra_ports::mirror::ErasedSetMirror"
+class = "core"
+prod_impl = "contextra_engine::erasure::MirrorImpl"
+wiring_test = "ports/tests/erasure_surface.rs"
+wp = "WP 7.3"
+inv = "INV-WIRING-2"
+
+# ── Rand-Ports (class = "edge") — optional in v1.0 ────────────────────────────
+
+[[port]]
+name = "ModuleVerifier"
+crate = "contextra-ports"
+trait_path = "contextra_ports::verify::ModuleVerifier"
+class = "edge"
+prod_impl = "contextra-sandbox (optional)"
+wiring_test = "TBD (WP 8.x)"
+wp = "WP 8.x"
+inv = ""
+
+[[port]]
+name = "FilterModule"
+crate = "contextra-ports"
+trait_path = "contextra_ports::filter::FilterModule"
+class = "edge"
+prod_impl = "contextra-privacy (optional)"
+wiring_test = "TBD (WP 8.x)"
+wp = "WP 8.x"
+inv = ""
+
+[[port]]
+name = "EntityRecognizer"
+crate = "contextra-ports"
+trait_path = "contextra_ports::entity::EntityRecognizer"
+class = "edge"
+prod_impl = "contextra-privacy (optional)"
+wiring_test = "TBD (WP 8.x)"
+wp = "WP 8.x"
+inv = ""
+
+[[port]]
+name = "InjectionDetector"
+crate = "contextra-ports"
+trait_path = "contextra_ports::inject::InjectionDetector"
+class = "edge"
+prod_impl = "contextra-mcp (optional)"
+wiring_test = "TBD (WP 8.x)"
+wp = "WP 8.x"
+inv = ""
+
+[[port]]
+name = "EgressChannel"
+crate = "contextra-ports"
+trait_path = "contextra_ports::egress::EgressChannel"
+class = "edge"
+prod_impl = "contextra-privacy (optional)"
+wiring_test = "TBD (WP 8.x)"
+wp = "WP 8.x"
+inv = ""

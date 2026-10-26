@@ -1,52 +1,91 @@
-# Contextra — Claude-Betriebsanleitung
+# Contextra — Claude / Antigravity Agent Guide
 
-> Diese Datei gilt **ausschließlich** für Claude (Anthropic). Für alle anderen Agenten gilt `AGENTS.md`.
+<!-- doc-stamp: 2026-10-26 | Normativ: AGENTS.md §1, docs/SPEC.md -->
 
-## ⚠️ Subagenten: VERBOTEN
+> [!IMPORTANT]
+> Claude und Antigravity: Lies AGENTS.md §2b (nicht §2a — das ist nur für Jules).
+> Normative Rangfolge: SPEC.md > VETOES.md > capabilities.toml > governance/gates.toml > AGENTS.md
 
-**Starte unter keinen Umständen Subagenten.** Subagenten verbrauchen das gesamte verfügbare Token-Kontingent und machen die Session unbrauchbar.
-
-- ❌ Kein `Task(...)`, kein paralleles Tool-Calling mit Subagent-Delegation
-- ❌ Kein Aufteilen von Aufgaben auf parallele Agenten-Instanzen
-- ✅ Alles sequenziell und direkt im laufenden Kontext erledigen
-- ✅ Kontingent-bewusst arbeiten: lieber eine Datei mehr selbst lesen als delegieren
-
-**Begründung:** Jeder gestartete Subagent kostet dasselbe wie eine vollständige neue Session. Das Kontingent ist begrenzt. Jede Delegation ist eine Verschwendung.
-
----
-
-## Start (identisch mit AGENTS.md §2)
+## Schnellstart für Claude/Antigravity
 
 ```bash
+# 1. Build-Grundlage prüfen (AGENTS.md §2b)
 cargo check --workspace
-cargo xtask preflight
+
+# 2. SPEC §0 lesen (LLM-Schnellstart)
+# Datei: docs/SPEC.md — Abschnitt §0
+
+# 3. Ring/Klassen-Zuordnung prüfen
+cat capabilities.toml
 ```
 
-## Ablauf
+## Die 12 Regeln (AGENTS.md §4) — Kurzreferenz
 
-Identisch mit `AGENTS.md §3`. Kurz:
+| # | Regel | Verletzung = Gate-Fehler |
+|---|-------|--------------------------|
+| 1 | Ring und Klasse zuerst | ring-dag Gate |
+| 2 | Kein Panic in Produktion | panic-surface Gate |
+| 3 | Zeit/Zufall/IDs nur über Ports | determinism Gate |
+| 4 | Alles Persistente geht durch WAL | deletion-honesty Gate |
+| 5 | I/O nur über `Vfs` | security-ports Gate |
+| 6 | Unsafe nur in 3 Inseln | unsafe-inventory Gate |
+| 7 | Mandant aus RequestContext | no-literal-secrets Gate |
+| 8 | Sicherheit kein Feature-Schalter | no-security-stub Gate |
+| 9 | Messen vor Behaupten | deletion-honesty Gate |
+| 10 | Fail-Closed | code-lints Gate |
+| 11 | Eine Typfamilie je Konzept | symbol-uniqueness Gate |
+| 12 | Ein PR = ein WP | scope-guard Gate |
 
-1. Task lesen, Ziel verstehen.
-2. APIs und Dateipfade im Code verifizieren — niemals aus dem Gedächtnis annehmen.
-3. Kleinste mögliche Änderung. Kein Over-Engineering.
-4. Verifizieren: Gates, Lints, Tests grün.
-5. PR-Text formulieren.
+## Archiv-Crates — NICHT anfassen (WP 2.1)
 
-## Kontingent clever nutzen
+`contextra-graph`, `contextra-cognition`, `contextra-adapt`, `contextra-kvcache`,
+`contextra-router`, `contextra-agent`, `contextra-infer-onnx`, `contextra-infer-ollama`,
+`contextra-core`
 
-| Statt… | Besser… |
-|---|---|
-| Subagent starten um Datei zu lesen | `read_file` direkt aufrufen |
-| Subagent für Suche | `grep`/`find` via `run_command` |
-| Parallele Agenten für Teilaufgaben | Sequenziell, eine Sache nach der anderen |
-| Große Kontextmengen laden | Gezielt nur relevante Abschnitte lesen |
+> [!CAUTION]
+> Kein neuer Code für Archiv-Crates. Kein neues Abhängen davon (AGENTS.md §5.4).
 
-## Kernregeln (aus AGENTS.md §5)
+## Gates (governance/gates.toml)
 
-- **Zero-Panic:** Kein `unwrap()`, `expect()`, `panic!()` in Produktionspfaden.
-- **Unsafe-Isolierung:** Nur in `contextra-simd`, `contextra-sys`, `contextra-wire`.
-- **Single-Node:** Embedded Library, kein Server, kein Sharding.
-- **Determinismus:** Zeit/Zufall/IDs nur über injizierte Ports (`Clock`, `Rng`, `IdGenerator`).
-- **Gate-Integrität:** Gates, Lints, Ratchets niemals abschwächen oder umgehen (REQ-QA-010).
+```bash
+# Alle Gates prüfen
+just gates
 
-Vollständige Regeln: `AGENTS.md`, normative Spezifikation: `docs/SPEC.md`.
+# Einzelnes Gate erklären
+just gate ring-dag
+
+# Pre-Push (entspricht merge-gate)
+just pre-push
+```
+
+## Commit-Konventionen
+
+```
+WP-x.y(crate): Kurze Beschreibung
+
+- Was geändert und warum (SPEC §x.y)
+- Gate-Status vorher → nachher
+
+Gates: ring-layering=🟢 no-security-stub=🔴→🟡
+Closes: #<issue>
+```
+
+## Branch-Naming
+
+```
+wp/x.y-kurzbeschreibung       # z.B. wp/2.1-archive-graph
+fix/gate-name-beschreibung    # z.B. fix/ring-layering-engine-dep
+```
+
+## Governance-Referenzen
+
+| Datei | Zweck |
+|-------|-------|
+| `governance/gates.toml` | Gate-Katalog — Single Source of Truth (50+ Gates) |
+| `governance/ratchet.toml` | Qualitäts-Baselines (dürfen nur sinken, REQ-QA-005) |
+| `governance/security_ports.toml` | Pflicht-Sicherheitsports (INV-WIRING-2) |
+| `governance/key_purposes.toml` | HKDF-Labels und Schlüssel-Zweckbindung (INV-KEYPURPOSE-1) |
+| `governance/clippy.toml` | P28-Verbotsliste (disallowed-methods/-types) |
+| `governance/determinism-allow.toml` | Erlaubte Nicht-Determinismus-Ausnahmen (ADR-098) |
+| `governance/protected-paths.toml` | Geschützte Pfade (REQ-GOV-002) |
+| `governance/README.md` | Übersicht und Konsumenten-Dokumentation |

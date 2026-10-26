@@ -1,122 +1,184 @@
 # Contextra — Jules Session Bootstrap
-> Mascinenausführbare Checkliste. Jede Session MUSS mit dieser
-> Sequenz beginnen, bevor Code geschrieben oder Dateien geändert werden.
+> Maschinenausführbare Checkliste. Jede Session beginnt mit GitHub, nicht mit statischen Dateien.
+>
+> **Prinzip:** GitHub = agiler Kontext (Tasks, Reviews, CI). Statische Dateien = unveränderliche Regeln.
 
-- **VETOES.md** (Root): Permanent abgelehnte oder eingeschränkt akzeptierte Features.
-  Vor jeder neuen Feature-Implementierung mit "F-NN"-Bezeichnung prüfen ob ein
-  Eintrag existiert. `just check-vetoes` läuft automatisch, ist aber kein Ersatz
-  für manuelles Lesen vor Arbeitsbeginn an physio-*/Nucleation-artigen Features.
+---
 
-## Schritt 0b: GitHub-Kontext laden
-Führe aus (bevor statische Docs gelesen werden):
+## Schritt 0 — GitHub-Kontext laden (ERSTE Aktion, immer)
+
+`refresh-context.sh` hat `SESSION_START.md` bereits erzeugt. Es reicht, sie zu lesen:
+
 ```bash
-gh issue list --label "context,session" --json number,title,body --limit 10
-gh pr list --state open --json number,title,body,labels --limit 5
-gh run list --limit 3
+cat .agents/jules/context/SESSION_START.md
 ```
 
-## Phase 0 — Session-Identität etablieren, Task-Claiming & Context Pack erzeugen (30 Sekunden)
+Die Datei enthält bereits: Milestones · Task-Issues · Backlog · offene PRs · CI-Status mit fehlgeschlagenen Jobs · letzte Commits · CRITICAL-Tags · Claims · WORKING_STATE.
+
+**Bei Bedarf direkt nachschlagen (gh CLI ist immer bevorzugt):**
 
 ```bash
-cargo xtask session-init --crate <CRATE_NAME> --task "<KURZE_BESCHREIBUNG>" --output-env <!-- harness:planned --> <!-- doc-ref-ignore -->
-source .jules/session.env
-cargo xtask context-pack --crate <CRATE_NAME> <!-- harness:planned --> <!-- doc-ref-ignore -->
+# Welche Issues sind für mich (Jules)?
+gh issue list --state open --label "jules" --json number,title,body,milestone
+
+# Was steckt in einem Task-Issue?
+gh issue view <N>
+
+# Welcher CI-Run ist rot, und warum?
+gh run list --limit 5
+gh run view <RUN-ID> --log-failed
+
+# Was sind die neuesten PRs?
+gh pr list --state all --limit 10
+
+# Was ist der aktuelle Sprint?
+gh api repos/tfufuz1/contextra/milestones | jq '.[] | "\(.title): \(.open_issues) open"'
 ```
 
-Der Befehl `context-pack` erzeugt `.jules/context/CONTEXT_PACK.md` <!-- doc-ref-ignore -->. Dies ist die einzige Datei, die ein Agent zu Sessionbeginn lesen muss.
+> **Stop-Bedingung:** Sind CRITICAL/BLOCKER-Tags oder rote CI-Runs auf `main` in SESSION_START.md gelistet
+> → erst beheben, bevor anderer Code geschrieben wird.
 
-## Phase 1 — Offene Kritische Issues prüfen (30 Sekunden)
+---
+
+## Schritt 1 — Unveränderliche Regeln lesen (nur die relevanten)
+
+Rangfolge: `docs/SPEC.md` > `docs/VETOES.md` > `capabilities.toml` > `AGENTS.md`
 
 ```bash
-# BLOCKER und CRITICAL Tags — bei Fund: STOP, zuerst beheben
-grep -rn "AI-TAG\[.*\]\[BLOCKER\]\|AI-TAG\[.*\]\[CRITICAL\]" crates/ \
-  --include="*.rs" | grep -v "RESOLVED" || echo "  ✅ Keine"
+# Immer: Veto-Register prüfen (vor jeder Feature-Arbeit, F-NN-Bezeichnung)
+grep -A5 "feature_id: F-" docs/VETOES.md
 
-# Offene ANCHORS mit IN-PROGRESS Status
-grep -rn "ANCHOR\[.*\] STATUS:IN-PROGRESS" crates/ \
-  --include="*.rs" || echo "  (keine)"
-
-# WORKING_STATE.md lesen (autogeneriert, immer aktuell)
-head -50 WORKING_STATE.md
+# Crate-spezifische Regeln (Pfade in SESSION_START.md → Abschnitt "Crate-AGENTS.md")
+cat crates/<CRATE>/AGENTS.md
 ```
 
-## Phase 2 — Toolchain verifizieren (30 Sekunden)
+Aufgabenspezifisch:
+
+| Aufgabe | Zu lesende Regeldate |
+|---------|----------------------|
+| Store/WAL | `crates/contextra-store/AGENTS.md` · `rules/wal_crypto.md` |
+| SIMD/Vector | `crates/contextra-vector/AGENTS.md` · `rules/simd_safety.md` |
+| Neue Dependency | `rules/dependencies.md` |
+| Neue API | `docs/CONSTITUTION.md` · `docs/TYPE_REGISTRY.md` |
+| ADR schreiben | `docs/decisions/README.md` (letzte 5 lesen) |
+| Tests | `rules/testing.md` · `rules/test_quality.md` |
+| unsafe | `rules/simd_safety.md` — NUR in approved crates |
+
+---
+
+## Schritt 2 — Toolchain verifizieren
 
 ```bash
-# Verifiziere Build-Grundlage
 cargo check --workspace
-
-# Falls cargo nicht im PATH: Rust-Toolchain aktivieren
-# source "$HOME/.cargo/env" && cargo check --workspace
 ```
 
-## Phase 3 — Aufgaben-spezifischen Kontext laden
+---
 
-Lade basierend auf der Aufgabe:
-
-| Aufgabe-Typ | Zu lesende Dateien |
-|-------------|-------------------|
-| Code in `contextra-store/*` <!-- doc-ref-ignore --> | `crates/contextra-store/AGENTS.md`, `rules/wal_crypto.md`, `rules/async-io.md` |
-| Code in `contextra-vector/*` <!-- doc-ref-ignore --> | `crates/contextra-vector/AGENTS.md`, `rules/simd_safety.md` |
-| Code in `contextra-db/*` <!-- doc-ref-ignore --> | `crates/contextra-db/AGENTS.md` |
-| Neue Dependency | `rules/dependencies.md` → Cargo.lock prüfen → crates.io verifizieren |
-| Neue API-Oberfläche | `CONSTITUTION.md`, `docs/TYPE_REGISTRY.md` |
-| ADR schreiben | `docs/decisions/` (letzte 5 ADRs lesen), `CONSTITUTION.md §Governance` |
-| Tests schreiben | `rules/testing.md`, `rules/test_quality.md` |
-| unsafe Code | `rules/simd_safety.md` — NUR in approved files (AGENTS.md §4) |
-| Crypto/WAL | `rules/wal_crypto.md` → WAL-First-Regel verifizieren |
-
-## Phase 4 — Pre-Write-Check (vor JEDER Code-Änderung)
+## Schritt 3 — Pre-Write-Check (vor JEDER Code-Änderung)
 
 ```bash
-# API-Halluzinations-Schutz: Signatur vor Nutzung verifizieren
-grep -n "pub fn <METHODE>" crates/contextra-db/src/collection.rs
+# Symbol vor Nutzung verifizieren (niemals aus dem Gedächtnis annehmen)
+grep -n "pub fn <METHODE>" crates/<CRATE>/src/<DATEI>.rs
 
-# Typ-Dopplungs-Schutz: Typ-Register prüfen
+# Typ-Duplikat verhindern
 grep "<TYPNAME>" docs/TYPE_REGISTRY.md
-
-# DAG-Prüfung: Keine Layer-Verletzung
 ```
 
-## Phase 5 — Session-Ende (VOR letztem Commit)
+---
+
+## Schritt 4 — GitHub-Kommunikation (Pflicht bei Task-Arbeit)
 
 ```bash
-# 1. Format & Lint (Formatierung erzwingen + Clippy/Check)
+# Task-Start protokollieren
+gh issue comment <N> --body "🤖 Starte Arbeit: <kurze Beschreibung des Plans>"
+
+# Blocker sofort melden (nicht still ignorieren)
+gh issue create --title "🚫 Blocker: <Titel>" --label "bug,priority-p0"
+
+# Frage an Maintainer (statt Annahme treffen)
+gh issue comment <N> --body "❓ <Frage>"
+```
+
+---
+
+## Schritt 5 — Session-Ende: Gates
+
+```bash
 cargo fmt --all
-just check
-
-# 2. DAG-Integrität & Tech-Debt Audit
-just dag-check
-just debt-audit
-
-# 3. Tests
-just test
-
-# 4. Sync-Docs (generiert WORKING_STATE.md, CHANGELOG, etc.)
-just sync-docs
-
-# 5. Finaler Check
-just sync-docs-check
+just check          # Format + Clippy
+just dag-check      # Ring-DAG-Integrität
+just debt-audit     # Tech-Debt-Ratchet
+just test           # Nextest
+just sync-docs      # WORKING_STATE.md, CHANGELOG
 ```
 
-## Phase 6 — Pre-Submit Gate (BLOCKIEREND — kein Submit ohne ✅)
+---
 
-> **Invariante:** Führe zwingend `cargo xtask jules-submit-gate --crate <DEIN-CRATE>` aus. <!-- harness:planned --> <!-- doc-ref-ignore -->
-> Kein submit() vor ✅ SUBMIT GATE BESTANDEN. Bei Fehlschlag: STOP, Fix, Phase 6 erneut durchlaufen.
+## Schritt 6 — Rebase auf origin/main (PFLICHT, BLOCKIEREND)
+
+> **Warum:** Contextra wird hochfrequentiert entwickelt. Ein PR ohne vorherigen Rebase
+> erzeugt garantiert Merge-Konflikte auf main. Kein Submit ohne sauberen Rebase.
 
 ```bash
-# Pre-Submit Gate ausführen (Schritte 6.1–6.5 automatisiert)
-cargo xtask jules-submit-gate --crate <DEIN-CRATE> <!-- harness:planned --> <!-- doc-ref-ignore -->
+# 1. Neuesten Stand holen
+git fetch origin
+
+# 2. Rebase auf main
+git rebase origin/main
 ```
 
-> **Regel für Commit-Messages:** Jede in der PR-Beschreibung unter
-> "Hinzugefügt" oder "Getestet" genannte Datei MUSS in `git diff --name-only
-> origin/main...HEAD` erscheinen. Ausnahmen begründen, nie stillschweigend weglassen.
+**Bei Konflikten während des Rebase:**
+
+```bash
+# Konflikt-Dateien anzeigen
+git status
+
+# Für jede Konflikt-Datei: manuell auflösen, dann:
+git add <datei>
+git rebase --continue
+
+# Abbruch (zurück zum Ausgangszustand) falls zu komplex:
+git rebase --abort
+# → dann: gh issue comment <N> --body "⚠️ Rebase-Konflikt in <Dateien> — Maintainer bitte merge/rebase klären"
+```
+
+**Nach erfolgreichem Rebase — Gates ERNEUT laufen lassen:**
+
+```bash
+# Gates müssen auf dem rebased Stand grün sein
+just check && just test
+```
+
+> **Regel:** Schlägt ein Gate nach dem Rebase fehl, liegt ein echter Konflikt mit
+> Änderungen auf main vor. Fix durchführen, dann Gate erneut prüfen — KEIN skip.
+
+---
+
+## Schritt 7 — Pre-Submit Gate (BLOCKIEREND)
+
+```bash
+cargo xtask jules-submit-gate --crate <DEIN-CRATE>
+# Kein submit() vor ✅ SUBMIT GATE BESTANDEN.
+```
+
+```bash
+# Task schließen und verlinken
+gh issue close <N> --comment "✅ Erledigt in PR #<PR-N>"
+```
+
+> **Commit-Message-Regel:** Jede im PR-Body genannte Datei MUSS in
+> `git diff --name-only origin/main...HEAD` erscheinen.
+
+---
 
 ## Notfall-Eskalation (Prompt-Thrashing)
 
-Wenn derselbe Compiler-Fehler nach 2 Iterationen nicht behoben ist:
-1. **STOPP** — keinen weiteren Code schreiben
-2. Fehler auf minimales Beispiel reduzieren
-3. Fehlermeldung + Diff in Session-Log dokumentieren
-4. Entwickler um explizite Instruktion bitten
+Gleicher Compiler-Fehler nach 2 Iterationen → **STOPP**:
+
+```bash
+# Blocker-Issue öffnen mit minimalem Reproduktions-Beispiel
+gh issue create \
+  --title "🚫 Thrash: <Fehlermeldung kurz>" \
+  --label "bug,priority-p0" \
+  --body "## Fehler\n\`\`\`\n<Fehlermeldung>\n\`\`\`\n\n## Diff\n\`\`\`\n$(git diff)\n\`\`\`"
+```

@@ -1,66 +1,76 @@
-Task-Card: <id>
+<!-- Jules CI/CD Fixer aktivieren: Kommentiere "@jules fix-ci" im PR -->
+<!-- Jules Gate-Prüfung: Kommentiere "@jules check-gates" -->
+<!-- Jules Submit-Gate: cargo xtask jules-submit-gate --crate <CRATE> -->
 
-## Pull Request Checkliste
-
-### Code-Dimension (CI, Pflicht)
-- [ ] `cargo test --workspace` grün
-- [ ] `just dag-check` / `cargo xtask check-dag` grün (P1)
-- [ ] `cargo clippy --workspace -- -D warnings` grün
-- [ ] Kein neues `unsafe` ohne `// SAFETY:` (P2)
-- [ ] Kein neues `let _ =` auf I/O (P3)
-
-### Architektur-Dimension
-- [ ] **Reuse-Check (P10):** Wurde geprüft ob bestehende Funktionen (`score_batch()`, `tombstoned_edges`, `persist_calibration_state`) wiederverwendet werden können?
-  - Befund: _______________
-- [ ] **ADR eingetragen (P6):** Falls architektonisch relevant — ADR-Nummer: ___
-
-### Kalibrierungs-Dimension (P8, wenn Konfiguration geändert)
-- [ ] Änderung an SlmProfile/Prompt-Template/Modell-Config → Kalibrierungs-Reset-Test vorhanden
-- [ ] Keine neue Ad-hoc-Sigmoid-Logik — stattdessen `contextra-rank` verwendet
-
-### Provenienz-Dimension (wenn Graph-Code geändert)
-- [ ] Neue CSR-Kante hat `EdgeProvenance`-Eintrag (INV-GRAPH-PROV-1)
-- [ ] RRF-Fusion mit Kohärenz-Bonus: INV-PROV-2 eingehalten
-
-### Quantitative Aussagen (P7)
-- [ ] Keine neuen quantitativen Claims ohne Nachweis in `contextra-bench` oder ArXiv-Kennzeichnung
-
-### Chaos-Dimension (nur bei Storage-Änderungen)
-- [ ] Power-Cut-Simulation für WAL/Compaction
-- [ ] Zeroize-Nachweis wenn KV-Cache-Code berührt (P9)
-
-### Nicht-Implementieren-Prüfung
-- [ ] Kein partieller HNSW-Rebuild (VETO-01 / ADR-071)
-- [ ] Keine Cross-Tenant-Datenbewegung (VETO-02 / ADR-082)
+## WP-Zuordnung
+WP: <!-- z.B. WP 2.2 -->
+Crate: <!-- primäre Crate -->
+Ring: <!-- 0–4 -->
 
 ---
 
-## Ziel
-### Claim-Deklaration (Pflicht für alle Code-PRs)
-Claim-Crate: <!-- Pflicht: Crate-Name, den dieser PR primär ändert, z.B. contextra-router -->
-Claim-Issue: <!-- Aufgaben-ID oder ADR-Nummer, z.B. P8/ADR-063 -->
+## Checkliste
 
-### Warum?
+### Pflicht (CI blockierend)
+- [ ] `cargo test --workspace` grün
+- [ ] `just check` grün (Format + Clippy)
+- [ ] `cargo xtask jules-submit-gate --crate <CRATE>` ✅ SUBMIT GATE BESTANDEN
+- [ ] Rebase auf origin/main: `git fetch origin && git rebase origin/main`
 
+### Gates (CI blockierend — SPEC §17.3)
+- [ ] `ring-layering`: keine Aufwärtskante (Ringdisziplin P1/P5)
+- [ ] `no-security-stub`: kein `cfg(not(feature))` für Security-Typen (A1)
+- [ ] `panic-surface`: kein `unwrap`/`expect`/`panic!` in Produktionspfaden (P7)
+- [ ] `determinism`: Zeit/Zufall/IDs nur über Ports `Clock`/`Rng`/`IdGen` (P28)
+- [ ] `async-io`: kein direktes I/O in Ring-0-async (P26)
+- [ ] `witness-mint`: kein direktes Erstellen von `DeletionWitness` außerhalb des Purgers (INV-WITNESS-MINT-1)
+- [ ] `no-literal-secrets`: kein hartkodierter Schlüssel/Secret-Literal (REQ-KEY-010)
+- [ ] `test-surface`: keine `*_for_test`-Symbole in public API (INV-SCAN-1)
+- [ ] `doc-stamp`: Commit-Stempel in geänderten Docs aktualisiert (INV-DOC-SINGLE-SOURCE-1)
 
-## Änderungen
+### Veto-Check (SPEC §3.1)
+- [ ] **VETO-F10:** Kein mandantenübergreifender Datenfluss
+- [ ] **VETO-F02:** HNSW: kein Rewiring (nur Tombstone + Slot-Nullung + Rebuild)
+- [ ] **Single-Node-Doktrin:** kein Sharding, kein P2P, kein verteilter Betrieb
+
+### Unsafe (nur in simd / sys / wire)
+- [ ] Kein neues `unsafe` ohne `// SAFETY:` Begründung (P2)
+- [ ] `unsafe` nur in genehmigten Inseln: `contextra-simd`, `contextra-sys`, `contextra-wire`
+
+---
+
+## Beschreibung
+
 ### Was wurde geändert?
 
 
-## Invarianten berührt
-(aus AGENTS.md Invarianten-Katalog)
+### Warum? (Invariante / Anforderung)
+Invariante/REQ: <!-- z.B. INV-WIRING-2, REQ-DEL-001 -->
 
 
-## Verifikation
+### Verifikation
+Befehl: <!-- z.B. cargo nextest run -p contextra-store -->
 
+---
+
+## Jules CI/CD Integration
+<!--
+@jules fix-ci      → Jules analysiert und behebt CI-Fehler automatisch
+@jules check-gates → Jules prüft alle Gates und meldet Ergebnis
+-->
+
+---
 
 ## Out-of-scope Findings
 
 
-## Risiken/Rollback
+---
+
+## Risiken / Rollback
 
 
-## ADR/Spec-Sync
+---
 
-
-### Bekannte Einschränkungen / offene Folgepunkte
+## ADR / Spec-Sync
+ADR-Nummer: <!-- falls architektonisch relevant -->
+SPEC-Abschnitt: <!-- z.B. §4.2, §12.7 -->

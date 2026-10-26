@@ -49,15 +49,23 @@ coverage.json
 # Generierte Benchmark-/Test-Ergebnisse
 results/
 
-# Jules Session History Log
+# Jules Session History Log (alt: .jules/, neu: .agents/jules/)
 .jules/session_history.jsonl*
+.agents/jules/session_history.jsonl*
 
 .jules/claims.json
 .jules/SESSION.md
 .jules/verify/claim_precheck.sh
 .jules/context/
 
+# Jules dynamischer Kontext (bei jedem Task-Start neu erzeugt → nicht versionieren)
+.agents/jules/context/*.md
+.agents/jules/context/*.txt
+!.agents/jules/context/.gitkeep
+
 # Jules local state and gate artifacts (untracked)
 /.jules/gate_ledger.json
 /.jules/session.env
 /.jules/local/
+.agents/jules/session.env
+.agents/jules/gate_ledger.json

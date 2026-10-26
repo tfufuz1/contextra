@@ -175,7 +175,7 @@ contextra-license = { path = "crates/contextra-license" }
 [workspace.lints.rust]
 unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)', 'cfg(feature, values("onnx"))'] }
+unexpected_cfgs = { level = "deny", check-cfg = ['cfg(loom)', 'cfg(feature, values("onnx"))'] }
 
 [workspace.lints.clippy]
 undocumented_unsafe_blocks = "deny"
@@ -185,6 +185,15 @@ panic = "deny"
 todo = "deny"
 unimplemented = "deny"
 unreachable = "deny"
+# K-13: await_holding_lock fehlte (SPEC §17.3, PLAN.md WP 0.4)
+await_holding_lock = "deny"
+await_holding_refcell_ref = "deny"
+# SPEC §17.3: zusätzliche Sicherheits-Lints
+indexing_slicing = "deny"
+exit = "deny"
+dbg_macro = "deny"
+cast_possible_truncation = "warn"
+cast_sign_loss = "warn"
 
 [profile.release]
 panic = "unwind"

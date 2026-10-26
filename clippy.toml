@@ -1,0 +1,47 @@
+# clippy.toml — Workspace-Root Clippy-Konfiguration
+# doc-stamp: 2026-10-26 | Normativ: SPEC §0.2, §17.3, PLAN.md WP 0.4 (K-13)
+#
+# WICHTIG: Diese Datei wird von cargo clippy automatisch geladen.
+# Die ausführliche, dokumentierte Version liegt in governance/clippy.toml.
+# Beide müssen synchron gehalten werden (Gate: doc-truth).
+#
+# P28-Verbotsliste: disallowed-methods + disallowed-types
+# Ausnahmen: governance/determinism-allow.toml (ADR-098)
+
+# Kognitive Komplexität: max. 30 pro Funktion
+cognitive-complexity-threshold = 30
+
+# Typ-Konvertierungen
+too-many-arguments-threshold = 7
+
+# API-Stabilität
+avoid-breaking-exported-api = false
+
+# ── P28-Verbotsliste ──────────────────────────────────────────────────────────
+[[disallowed-methods]]
+path = "std::time::Instant::now"
+reason = "P28: Zeit nur über Clock-Port. Verwende contextra_ports::clock::Clock."
+
+[[disallowed-methods]]
+path = "std::time::SystemTime::now"
+reason = "P28: Zeit nur über Clock-Port. Verwende contextra_ports::clock::Clock."
+
+[[disallowed-methods]]
+path = "rand::thread_rng"
+reason = "P28: Zufall nur über Rng-Port. Ausnahme: Schlüssel/Salt/Nonce (ADR-098)."
+
+[[disallowed-methods]]
+path = "std::env::var"
+reason = "P28: Umgebungsvariablen nicht in Kernlogik."
+
+[[disallowed-methods]]
+path = "std::env::var_os"
+reason = "P28: Umgebungsvariablen nicht in Kernlogik."
+
+[[disallowed-types]]
+path = "std::collections::HashMap"
+reason = "P28: HashMap mit RandomState ist nicht-deterministisch in Kernlogik."
+
+[[disallowed-types]]
+path = "std::collections::HashSet"
+reason = "P28: HashSet mit RandomState ist nicht-deterministisch in Kernlogik."

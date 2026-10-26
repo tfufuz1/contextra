@@ -1,224 +1,344 @@
-# Contextra — Systemarchitektur & Ring-Modell
+<!-- doc-stamp: 2026-10-26 -->
 
-Dieses Dokument ist die maßgebliche technische Architekturbeschreibung des Contextra Kerns. Es übersetzt die **[Finale Produktspezifikation (Synthese)](spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)** in eine vertiefte Systembeschreibung, dokumentiert den Crate-Bestand, das Ring-0–4-Modell, die drei Produkt-Ringe (`fast`, `sovereign`, `compliance`), die Vier-Schichten-Interface-Architektur sowie die Systeminvarianten und Locking-Disziplin.
+# Contextra – Architekturübersicht
 
----
-
-## Inhaltsverzeichnis
-1. [Ring-Modell (Ring 0–4) & Produkt-Ringe](#1-ring-modell)
-2. [Vier-Schichten-Interface-Modell](#2-vier-schichten-modell)
-3. [Crate-Inventar & Abhängigkeitsmatrix](#3-crate-inventar)
-4. [DAG-Topologie (Automatisch generiert)](#4-dag-topologie)
-5. [Systeminvarianten P1–P30 (Automatisch generiert)](#5-systeminvarianten)
-6. [Unsafe-Inseln & Locking-Disziplin](#6-unsafe-inseln)
-7. [Referenzen & Weiterführende Dokumente](#7-referenzen)
+> **Normative Quelle:** Dieses Dokument ist ein **Lese-Hilfsmittel** und kein normatives Dokument.
+> Die alleinige normative Quelle für Architektur, Verhalten, Konstanten, Ringe, Klassen und Kantenregeln ist
+> **`docs/SPEC.md` (Gesamtspezifikation Fassung 2.3, §4)**. Bei jedem Widerspruch zwischen dieser Datei
+> und `docs/SPEC.md` gilt `docs/SPEC.md`.
+>
+> Stand: **26.10.2026** | Basis: Gesamtspezifikation 2.3 + Implementierungsplan 2 (Commit `a547a42`)
 
 ---
 
-<a id="1-ring-modell"></a>
-## 1. Ring-Modell (Ring 0–4) & Produkt-Ringe
+## 1. Einleitung
 
-Contextra gliedert seine Funktionalität architektonisch in ein Fünf-Ring-Schichtenmodell (Ring 0 bis Ring 4) sowie kommerziell/kryptographisch in drei Produkt-Ringe (`fast`, `sovereign`, `compliance`).
+Contextra ist ein **lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rust** (Single-Node,
+ein Prozess hält ein Datenverzeichnis). Er speichert Dokumente, findet sie hybrid (Vektor + BM25 +
+RRF-Fusion, mandantengetrennt) und löscht gemessen (physische Bereinigung über sechs Datenschichten,
+Messung am Speicher, Löschbericht mit ausgewiesenen Grenzen).
 
-### 1.1 Das Fünf-Ring-Schichtenmodell
+Dieses Dokument beschreibt:
+- das **Ring-Modell** mit allen Crates und ihren Klassen
+- den **Crate-Katalog** mit LOC-Budget, Unsafe-Markierung und Umbauaufgaben
+- die **Kantenregeln** (Ring-Disziplin P1/P5/P30)
+- die **Unsafe-Inseln** (exakt drei)
+- die **TODO-Liste** für ausstehende Archivierungs-Arbeitspakete (Phase 2)
 
-Abhängigkeiten dürfen ausschließlich **von höheren Ringen auf tiefere Ringe** verlaufen. Aufwärtskanten (z. B. ein Ring-0-Crate, das von einem Ring-3-Crate abhängt) sind streng verboten (Principle P5 / Ring Layering).
-
-* **Ring 0 — Foundation & Pure Numerics / Types (Sync-Kern)**:
-  Kerneigene Datenstrukturen, Typdefinitionen, Traits, Kryptographie, Mathematik, Vektor- und Graph-Primitive. Ring 0 enthält **kein `tokio`** (P26: *Sync-Kern, async-Schale*).
-  *Crates:* `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-wire`, `contextra-sys`, `contextra-simd`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-rank`, `contextra-adapt`.
-* **Ring 1 — Persistence & Cache**:
-  Persistenz-Engines (LSM-Tree, WAL mit Group-Commit, HMAC-Integritätskette) und Caching-Infrastruktur (KV-Cache, Checkpoint-Registry). Async-I/O an Grenzen erlaubt.
-  *Crates:* `contextra-store`, `contextra-kvcache`, `contextra-checkpoint`.
-* **Ring 2 — External Adapters & Sandboxing (Leaf Engines)**:
-  Isoliert flüchtige oder externe Schwergewicht-Abhängigkeiten (`candle`, `ollama`, `ort`/ONNX, `wasmtime`). Ring-2-Crates sind Blätter im Graphen und hängen nie von Ring 1 oder 3 ab.
-  *Crates:* `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-infer-onnx`, `contextra-sandbox`.
-* **Ring 3 — Orchestration & Cognition**:
-  Geschäfts- und Orchestrierungslogik (`Collection`, Multi-Index-Synthese, PII-Vault/Privacy Gateway, Profil-Routing, Agent-Workflow).
-  *Crates:* `contextra-engine`, `contextra-cognition`, `contextra-privacy`, `contextra-router`, `contextra-agent`.
-* **Ring 4 — Boundary & Composition Roots**:
-  Öffentliche Fassade (`contextra`), MCP-Server (`contextra-mcp`) und Language-Bindings (`contextra-py`). Bildet die einzige Composition Root.
-
-### 1.2 Die drei Produkt-Ringe (Open vs. Closed)
-
-- **Ring `fast` (MIT/Apache-2.0, Open Source):** Für jeden Nutzer frei zugänglich. Enthält Vektor-, Text- und Graph-Retrieval, Bandit-Routing sowie lokale Inferenz. Kein Krypto-Overhead im Hot-Path.
-- **Ring `sovereign` (Quelloffen, Opt-in Aktivierung):** Quellcode bleibt offen (Löschbeweis `DeletionProof`, Privacy Gateway, Zero-Net-Traffic). Aktivierung ist wegen Latenzkosten opt-in.
-- **Ring `compliance` (Closed-Source, Commercial):** Quellcode verlässt das Haus nie. Vertrieb als signiertes Binary/Appliance. Beinhaltet Lizenzschicht (`contextra-license`), BSI TR-02102-1 Mapping und Mandanten-Scoping. <!-- crate-ref-ignore -->
-
-### 1.3 Auto-Entity-Extraktion Konfiguration & Abschaltwege
-
-Die automatische OpenIE-Entitätsextraktion beim Einfügen von Dokumenten verfügt über zwei steuerbare Abschaltwege und eine strikte Vorrangordnung:
-
-1. **Compile-Zeit Opt-Out (`auto-extraction-opt-out` Feature):**
-   Das Aktivieren des Cargo-Features `auto-extraction-opt-out` deaktiviert die Entitätsextraktion statisch für den gesamten Build, unabhängig von jeglicher Laufzeit-Konfiguration.
-2. **Laufzeit-Konfiguration (`AutoExtractionMode` / `CollectionProfile`):**
-   Wenn das Compile-Zeit-Feature nicht gesetzt ist, erfolgt die Steuerung dynamisch per Collection über `AutoExtractionMode` (`Enabled` vs. `Disabled`) im `CollectionProfile` bzw. in `AutoExtractionConfig`.
-
-**Vorrangordnung (Precedence):**
-`Compile-Zeit Opt-Out (Feature)` **>** `Laufzeit Mode (Disabled)` **>** `Default Mode (Enabled)`
-
-*Falls `auto-extraction-opt-out` aktiv ist, hat eine Laufzeit-Einstellung `AutoExtractionMode::Enabled` keine Wirkung.*
-
-**Deployment-Tier Defaults & Spec D.6 Status:**
-- `EdgeMinimal`, `PowerUserLocal` und `EnterpriseShared` nutzen `DEFAULT_AUTO_EXTRACTION_MODE` (`AutoExtractionMode::Enabled`).
-- `EnterpriseRegulated` nutzt den benannten Tier-Default `ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT` (`AutoExtractionMode::Enabled`). Der Status ist im Code und in der Spezifikation als `DECISION-PENDING (Spec D.6)` hinterlegt.
+Die Zuordnung von Ring und Klasse je Crate ist maschinenlesbar in [`capabilities.toml`](../capabilities.toml)
+festgelegt (INV-DOC-SINGLE-SOURCE-1). Diese Datei ist die Single Source of Truth für Gates und Skripte.
 
 ---
 
-<a id="2-vier-schichten-modell"></a>
-## 2. Vier-Schichten-Interface-Modell
+## 2. Ring-Modell (SPEC.md §4.1)
 
-Jede Schnittstelle in Contextra gehört zu genau einer der vier Schichten gemäß §5 der Produktspezifikation:
+Der Datenfluss ist unidirektional: **Ring 4 → Ring 3 → Ring 2 → Ring 1 → Ring 0**.
+Eine Kante darf nur auf gleichen oder niedrigeren Ring zeigen (P1). Aufwärtskanten sind verboten (P5).
+`[K]`-Crates dürfen nie von `[R]`/`[E]`/`[A]`-Crates abhängen (P30, INV-CORE-ISOLATION-1).
 
-1. **Schicht 1 — Domänentypen (`contextra-types`):** Reine, serialisierbare Typen (`DocId`, `TxId`, `TenantId`, `FilterAST`, Budgets).
-2. **Schicht 2 — Ports (`contextra-ports`):** Trait-Definitionen (`StorageEngine`, `VectorIndex`, `TextIndex`, `GraphEngine`, `Embedder`).
-3. **Schicht 3 — Fassade (`contextra-engine`, `contextra`):** Das vereinigende High-Level API für Rust.
-4. **Schicht 4 — Produktgrenze (`contextra-mcp`, `contextra-py`, `contextra-wire`):** Stdio JSON-RPC MCP Server, PyO3 Bindings, FlatBuffers Schema.
+```
+Ring 4 │ Fassade/Schnittstellen
+       │  [K] contextra (Composition Root)
+       │  [K] contextra-mcp
+       │  [R] contextra-py
+       │  [E] contextra-license
+       │  [E] audit-export
+       │  [E] avv-generator
+       │
+Ring 3 │ Orchestrierung
+       │  [K] contextra-engine
+       │  [K] contextra-db
+       │  [R] contextra-privacy
+       │
+Ring 2 │ Isolation / Inferenz
+       │  [R] contextra-infer-candle
+       │  [R] contextra-sandbox
+       │
+Ring 1 │ Persistenz
+       │  [K] contextra-store
+       │  [K] contextra-checkpoint
+       │
+Ring 0 │ Fundament
+       │  [K] contextra-types
+       │  [K] contextra-ports
+       │  [K] contextra-mvcc
+       │  [K] contextra-crypto
+       │  [K] contextra-vector
+       │  [K] contextra-text
+       │  [K] contextra-rank  (nur fusion/)
+       │  Unsafe-Inseln: [K] contextra-simd · [K] contextra-sys · [K] contextra-wire
+       │
+Werkzeug (kein Ring)
+       │  contextra-testkit · xtask · xtask-heavy · bench · *-fuzz
+       │
+[A] ARCHIV (Tag archiv/v0, aus dem Workspace zu entfernen — siehe §7)
+       │  contextra-graph · contextra-cognition · contextra-adapt · contextra-kvcache
+       │  contextra-router · contextra-agent · contextra-infer-onnx · contextra-infer-ollama
+       │  contextra-core · vector/diskann · rank ohne fusion/
+```
+
+### Wirkung der Ringe
+
+Das Ring-Gate erlaubt jede **Abwärtskante**. Ein Ringverstoß liegt vor, wenn eine Kante aufwärts
+zeigt. Jedoch ist auch jede Abwärtskante `[K] → [R]/[E]/[A]` ein **Klassenverstoß** (P30), der
+über `may_depend_on` in `capabilities.toml` und das Klassen-Gate durchgesetzt wird.
 
 ---
 
-<a id="3-crate-inventar"></a>
-## 3. Crate-Inventar & Abhängigkeitsmatrix
+## 3. Normativitätsklassen
 
-Tabelle aller Kern-Crates unter `crates/`:
+| Kürzel | Klasse       | Bedeutung |
+|--------|-------------|-----------|
+| `[K]`  | **Kern**    | Gilt uneingeschränkt für v1.0; alle Gates und Garantien gelten vollständig. |
+| `[R]`  | **Rand**    | Gilt nur bei aktiviertem Feature (Release-Default **aus**); darf Kern-Garantien nie schwächen. |
+| `[E]`  | **Experimentell** | Nicht normativ; kein Bestandteil des Versprechens. |
+| `[A]`  | **Archiv**  | Aus dem Workspace entfernt (Tag `archiv/v0`), nicht normativ (SPEC.md Anhang B). |
 
-| Ring | Crate-Name | Inhalt & Verantwortlichkeit |
+Zielreife: `[K]` → `stable` (erst bei Evidenzstufe E4), `[R]`/`[E]` → `experimental` (SPEC.md §4.1).
+
+---
+
+## 4. Crate-Katalog mit LOC-Budget
+
+Budgets sind **Code-Zeilen** (ohne Leer-/Kommentarzeilen, ohne Tests, Werkzeug `loc.py`,
+SPEC.md §1.3). Sie dürfen nur sinken, außer eine Phasenabnahme nennt ausdrücklich Zuwachs.
+IST-Werte stammen aus Commit `c4f7299b6` (SPEC.md §4.2) bzw. Scan-Commit `a547a42` (PLAN.md §3.1).
+
+### 4.1 Ring 0 – Fundament
+
+| Crate | Ring | Kl. | Unsafe | IST (LOC) | Budget v1.0 | Umbauaufgaben |
+|---|---|---|---|---|---|---|
+| `contextra-types` | 0 | K | nein | 2.611 | 2.700 | `RequestContext`, `LayerWitness`-Grundtypen, `ModelIdentity`, IDs, Fehlerklassen |
+| `contextra-ports` | 0 | K | nein | 1.526 | 1.500 | Ports archivierter Crates entfernen, Mocks raus |
+| `contextra-sys` | 0 | K | **ja** | 428 | 450 | Unsafe-Insel; SAFETY-Lücken schließen; Durability-Primitive, `mlock`, `madvise`, Dateisperren |
+| `contextra-simd` | 0 | K | **ja** | 1.113 | 1.200 | Unsafe-Insel; Kernel `pub(crate)`, SAFETY, Miri; Abhängigkeit von `core` entfernen |
+| `contextra-wire` | 0 | K | **ja** | 190 (+1.201 gen.) | 200 | Unsafe-Insel; Lint-`allow` auf generierte Datei beschränken |
+| `contextra-mvcc` | 0 | K | nein | 1.585 | 1.600 | Zeitaufrufe (14) über `Clock`; SSI-Nachweis (T-SSI-1) |
+| `contextra-crypto` | 0 | K | nein | 2.992 | 3.200 | AEAD, KDF, Signaturen, `KmsProvider`-Impl (K0/K1), Löschbericht V5, `EffaceableKeySlot`; I/O-frei |
+| `contextra-vector` | 0 | K | nein | 6.701 | 6.800 | HNSW, SQ8, ACL-Bitset; DiskANN ins Archiv; `async` entfernen (Ratchet); `VectorScanner` |
+| `contextra-text` | 0 | K | nein | 2.329 | 2.400 | BM25, Block-Max-WAND; Panic in `tokenizer.rs:30` entfernen; `TextScanner` |
+| `contextra-rank` | 0 | K (reklass.) | nein | 1.709 (`fusion/`) | 1.750 | **Nur `fusion/`** behalten (RRF, Normalisierung, Explain); Rest ins Archiv |
+
+### 4.2 Ring 1 – Persistenz
+
+| Crate | Ring | Kl. | Unsafe | IST (LOC) | Budget v1.0 | Umbauaufgaben |
+|---|---|---|---|---|---|---|
+| `contextra-store` | 1 | K | nein | 13.066 | 13.400 | `Vfs`-Impl, `DurableLog`-Impl, Sidecars, Record-Umschlag, Purge-Kompaktion, `LsmScanner`; `core`-Abhängigkeit entfernen |
+| `contextra-checkpoint` | 1 | K | nein | 1.630 | 1.700 | Spur D/K, Restore-Guard, `CheckpointScanner`; `core`-Abhängigkeit entfernen |
+
+### 4.3 Ring 2 – Isolation / Inferenz (Rand)
+
+| Crate | Ring | Kl. | Unsafe | IST (LOC) | Budget v1.0 | Umbauaufgaben |
+|---|---|---|---|---|---|---|
+| `contextra-infer-candle` | 2 | R | nein | 2.660 | 2.660 | Embedding-Backend; optional; im Release-Default aus |
+| `contextra-sandbox` | 2 | R | nein | 1.105 | 1.105 | WASM-Isolierung; optional; im Release-Default aus |
+
+### 4.4 Ring 3 – Orchestrierung
+
+| Crate | Ring | Kl. | Unsafe | IST (LOC) | Budget v1.0 | Umbauaufgaben |
+|---|---|---|---|---|---|---|
+| `contextra-engine` | 3 | K | nein | 10.114 | 8.500 Ziel / 10.200 Grenze | Entkopplung von Archiv-Crates; Saga, Lesesperre, Boot; Stub-Löschung |
+| `contextra-db` | 3 | K | nein | 585 | 600 | Entkopplung von `cognition`, `graph`, `adapt`; keine eigene Logik |
+| `contextra-privacy` | 3 | R | nein | 1.331 | 1.331 | Egress-Filterung; optional; im Release-Default aus |
+
+### 4.5 Ring 4 – Fassade / Schnittstellen
+
+| Crate | Ring | Kl. | Unsafe | IST (LOC) | Budget v1.0 | Umbauaufgaben |
+|---|---|---|---|---|---|---|
+| `contextra` | 4 | K | nein | 729 | 800 | Composition Root, Boot B0–B9, Default `embedded`; Rand nur optional |
+| `contextra-mcp` | 4 | K | nein | 3.314 | 3.400 | Drei Werkzeuge (`memory_remember`, `memory_recall`, `memory_forget`), Pipeline, IPC |
+| `contextra-py` | 4 | R | nein | 1.426 | 1.426 | PyO3-Bindings; optional |
+| `contextra-license` | 4 | E | nein | 307 | 307 | Lizenzprüfung; experimentell |
+| `contextra-audit-export` | 4 | E | nein | 214 | 214 | Audit-Log-Export; experimentell |
+| `contextra-avv-generator` | 4 | E | nein | 196 | 196 | AVV-Generator Art. 28 DSGVO; experimentell |
+
+### 4.6 Werkzeug-Crates (kein Ring, kein Produktionscode)
+
+| Crate | Aufgabe |
+|---|---|
+| `contextra-testkit` | Fixtures, Chaos-Harness, `FaultVfs`, `ManualClock`, Fake-Verwahrer; nur `dev-dependency` |
+| `xtask` | Gates, CI-Skripte (31.991 Zeilen; **Schutzpfad**, keine Kürzung ohne Inventar) |
+| `xtask-heavy` | Fuzz, Miri, Mutation, Chaos |
+| `bench` / `*-fuzz` | Benchmarks und Fuzz-Targets |
+
+---
+
+## 5. Archiv-Crates
+
+<!-- TODO(WP-2.1): Archiv-Tag `archiv/v0` auf den Stand nach WP 1.x setzen und folgende Crates
+     aus dem Workspace entfernen. Diese Crates sind NICHT mehr Teil von Contextra v1.0.
+     Kein anderes Crate darf neu von ihnen abhängen. -->
+
+Die folgenden Crates werden per Git-Tag `archiv/v0` archiviert und danach aus dem Workspace entfernt
+(PLAN.md §3.2, D-04). Gemeinsam umfassen sie ca. 25.000 LOC Produktionscode.
+
+| Crate | LOC (Scan) | Grund der Archivierung |
 |---|---|---|
-| **0** | `contextra-types` | Identifikatoren (`DocId`, `TxId`, `TenantId`), Filter-AST, Kernel-Budgets |
-| **0** | `contextra-ports` | Trait-Verträge für Storage, Indizes, Embedder & Uhren |
-| **0** | `contextra-mvcc` | `SeqLog`, `SnapshotRegistry` und transaktionaler `TxBuffer` |
-| **0** | `contextra-wire` | FlatBuffers-IPC Generat & Zero-Copy Adapter (**Unsafe-Insel**) |
-| **0** | `contextra-sys` | System-Abstraktionen für `mmap`, `mlock` & Win32-ACLs (**Unsafe-Insel**) |
-| **0** | `contextra-simd` | AVX2/AVX-512/NEON SIMD-Distanzberechnungskerne (**Unsafe-Insel**) |
-| **0** | `contextra-crypto` | AES-256-GCM-SIV, WAL-HMAC-Kette, `DeletionProof`, Zeroize |
-| **0** | `contextra-vector` | HNSW, DiskANN, SQ8 / RaBitQ Quantisierung |
-| **0** | `contextra-text` | BM25 / BM25F Volltextindexierung & deutsche Morphologie |
-| **0** | `contextra-graph` | CSR Graph, Forward-Push PPR, Leiden Community-Detection, Hyperkanten |
-| **0** | `contextra-rank` | 4-Signal-Fusion, Isotonic- / Platt-Kalibrierung & Drift |
-| **0** | `contextra-adapt` | LinUCB Bandit, Sherman-Morrison, FC-TS, Lyapunov-Drift & PID |
-| **1** | `contextra-store` | LSM-Tree Storage Engine mit WAL Group-Commit & HMAC-Check |
-| **1** | `contextra-kvcache` | Verschlüsselter Prefix-Radix-Baum & KV-Cache Segmentverwaltung |
-| **1** | `contextra-checkpoint` | Time-Travel-Registry & Checkpoint-Verwaltung ohne globalen Zustand |
-| **2** | `contextra-infer-candle` | GGUF-Modell-Inferenz via Candle |
-| **2** | `contextra-infer-ollama` | HTTP-Inferenz-Client für Ollama |
-| **2** | `contextra-infer-onnx` | ONNX Embeddings & Cross-Encoder Reranking via `ort` |
-| **2** | `contextra-sandbox` | WASM-Ausführungsisolation mit Fuel- & Wall-Clock-Limits via Wasmtime |
-| **3** | `contextra-engine` | `Collection`, Multi-Index-Pläne & Schreibtransaktionen |
-| **3** | `contextra-cognition` | Dreistufige Kognitionspipeline, Synthese & Kompaktierung |
-| **3** | `contextra-privacy` | Cloud-Egress Gateway, PII-Vault, Surrogat-Tokenisierung & DLP |
-| **3** | `contextra-router` | SLM-Profil-Routing & MCP-Dispatch |
-| **3** | `contextra-agent` | Agenten-Workflow-Engine mit auditierbarer State-Machine |
-| **4** | `contextra` | Haupt-Fassade & Composition Root |
-| **4** | `contextra-mcp` | Stdio-JSON-RPC MCP Server |
-| **4** | `contextra-py` | PyO3 Python-FFI Bindings |
+| `contextra-graph` | 8.708 | Graph-Reasoning ist kein Ziel v1.0 (SPEC.md §2.3) |
+| `contextra-cognition` | 3.191 | Kognition/Konsolidierung ist kein Ziel v1.0 |
+| `contextra-adapt` | 2.193 | Online-Adaption ist kein Ziel v1.0 |
+| `contextra-kvcache` | 2.434 | Persistenter Prefix-Cache (M1) archiviert (SPEC.md §2.2) |
+| `contextra-router` | 1.465 | Router/Agentenlaufzeit ist kein Ziel v1.0 |
+| `contextra-agent` | 2.413 | Agent-Pipeline ist kein Ziel v1.0 |
+| `contextra-infer-onnx` | 952 | ONNX-Backend wird nicht ausgeliefert |
+| `contextra-infer-ollama` | 1.661 | Ollama-Backend wird nicht ausgeliefert |
+| `contextra-core` | 106 | Nur Kompatibilitätsfassade; entfällt (D-05) |
+| `vector/diskann` | – | DiskANN ist kein Ziel v1.0 (§2.3) |
+| `rank` ohne `fusion/` | ~1.263 | Kalibrierung, DiBuD, Drift: nicht Teil von Kern-`rank` |
+
+> **Ist-Zustand (26.10.2026):** Alle oben genannten Crates befinden sich noch im Workspace
+> (`Cargo.toml`). Die Archivierung beginnt mit WP 2.1 (nach Abschluss von Phase 1).
 
 ---
 
-<a id="4-dag-topologie"></a>
-## 4. DAG-Topologie (Automatisch generiert)
+## 6. Unsafe-Inseln (exakt drei)
 
-<!-- AUTOGENERATED:START:DAG_TOPOLOGY -->
-```
-Layer 0:  contextra-sandbox — WASM Execution Boundary und Isolations-Sandbox
-          contextra-sys — Systemnahe Bindings, Low-Level I/O und Memory-Mapping
-          contextra-types — Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen)
-          contextra-wire — FlatBuffers Wire-Protokolle und Serialisierungs-Formate
-Layer 1:  contextra-avv-generator — AVV (Auftragsverarbeitungsvertrag) Template Generator gemäß Art. 28 DSGVO (deps: contextra-types)
-          contextra-ports — Abstrakte Port-Schnittstellen und Trait-Definitionen für Entkopplung (deps: contextra-types)
-Layer 2:  contextra-adapt — Anpassungs- und Transformations-Layer für Datenmodelle (PID Latency Controller) (deps: contextra-ports, contextra-types)
-          contextra-audit-export — Audit Log Export und DSGVO Art. 30 Verarbeitungsverzeichnis-Export (deps: contextra-ports, contextra-types)
-          contextra-crypto — Kryptographische Vaults, Zeroize, Egress-Verschlüsselung und HMAC (deps: contextra-ports, contextra-types)
-          contextra-license — Lizenz- und Aktivierungsprüfung für Contextra Feature-Ringe (deps: contextra-ports, contextra-types)
-          contextra-mvcc — Multi-Version Concurrency Control und Isolation-Mechanismen (deps: contextra-ports, contextra-types)
-          contextra-privacy — Egress Filtering, Anonymisierung und Privacy Compliance Rules (deps: contextra-ports, contextra-types)
-          contextra-rank — Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen (RRF, Isotonische/Platt Kalibrierung, Bonus Scorers) (deps: contextra-ports, contextra-types)
-          contextra-testkit — Test Fixtures, Mock Engines und Chaos Matrix Harness (deps: contextra-ports, contextra-types)
-          contextra-text — Volltextsuche und Inverted-Index (BM25 Engine) (deps: contextra-ports, contextra-types)
-Layer 3:  contextra-core — Kern-Datenstrukturen, Tombstones, Invarianten und Memory-Buffer (deps: contextra-mvcc, contextra-ports, contextra-types, contextra-wire)
-          contextra-graph — CSR Graph-Engine, Path Graphing und GraphRAG Community Detection (deps: contextra-adapt, contextra-ports, contextra-types)
-          contextra-infer-candle — Candle LLM Inference Client und KV-Bridge Adapter (deps: contextra-crypto, contextra-ports, contextra-rank, contextra-types)
-          contextra-infer-ollama — Ollama External Provider Client und Embeddings Integration (deps: contextra-ports, contextra-rank, contextra-types)
-          contextra-kvcache — Stufenmodell KV-Cache Storage & Offloading (deps: contextra-crypto, contextra-ports, contextra-types)
-          contextra-router — Lyapunov Drift Control und Multi-Candidate Search Routing Engine (deps: contextra-adapt, contextra-ports, contextra-privacy, contextra-types, contextra-wire)
-Layer 4:  contextra-checkpoint — Persistent Checkpoint Engine und Blake3 Manifest-Verifikation (deps: contextra-core, contextra-ports, contextra-types)
-          contextra-infer-onnx — ONNX Embeddings und Cross-Encoder Reranking Execution Provider (deps: contextra-infer-candle, contextra-ports, contextra-rank, contextra-types)
-          contextra-simd — SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen (deps: contextra-core)
-          contextra-store — LSM-Tree Storage Engine, WAL Durability und Compaction Engine (deps: contextra-core, contextra-crypto, contextra-mvcc, contextra-ports, contextra-sys, contextra-types)
-Layer 5:  contextra-vector — Vektorsuche und Indexierung (HNSW, DiskANN, Quantisierung) (deps: contextra-core, contextra-crypto, contextra-ports, contextra-simd, contextra-sys, contextra-types)
-Layer 6:  contextra-engine — Compute Pool und Asynchrone Storage-Execution Layer (ADR-N02) (deps: contextra-adapt, contextra-checkpoint, contextra-crypto, contextra-graph, contextra-infer-candle, contextra-kvcache, contextra-mvcc, contextra-ports, contextra-rank, contextra-sandbox, contextra-store, contextra-sys, contextra-text, contextra-types, contextra-vector)
-Layer 7:  contextra-cognition — Konsolidierungs- und Background Sleep Passes (deps: contextra-engine, contextra-graph, contextra-ports, contextra-store, contextra-types, contextra-vector)
-Layer 8:  contextra-db — Contextra Main Database Abstraction, Hybrid Search & Collections (deps: contextra-adapt, contextra-checkpoint, contextra-cognition, contextra-crypto, contextra-engine, contextra-graph, contextra-ports, contextra-rank, contextra-store, contextra-sys, contextra-text, contextra-types, contextra-vector)
-Layer 9:  contextra — Haupt-Library Facade für Endanwender (deps: contextra-audit-export, contextra-avv-generator, contextra-core, contextra-crypto, contextra-db, contextra-infer-candle, contextra-infer-ollama, contextra-infer-onnx, contextra-license, contextra-ports, contextra-privacy, contextra-rank, contextra-router, contextra-store, contextra-types)
-          contextra-agent — Audit Engine, InMemoryStorageEngine und Agent Execution Pipeline (deps: contextra-checkpoint, contextra-db, contextra-graph, contextra-ports, contextra-router, contextra-store, contextra-types)
-          contextra-bench — Contextra — Reproducible Benchmark Harness for Retrieval Accuracy (deps: contextra-core, contextra-db, contextra-graph, contextra-infer-candle, contextra-infer-onnx, contextra-store, contextra-text, contextra-vector)
-          contextra-py — PyO3 Python Bindings (deps: contextra-adapt, contextra-core, contextra-db, contextra-rank, contextra-router, contextra-store, contextra-types)
-Layer 10:  contextra-mcp — Model Context Protocol Server & Cloud Egress Gateway (deps: contextra-adapt, contextra-agent, contextra-crypto, contextra-infer-candle, contextra-infer-ollama, contextra-infer-onnx, contextra-license, contextra-ports, contextra-privacy, contextra-rank, contextra-types, contextra-wire)
-```
+Nur die folgenden drei Crates dürfen `unsafe`-Code im Produktionspfad enthalten (SPEC.md §4.6, P2):
 
-**Aktiver Workspace-Build**: 34 Kern-Crates.
-<!-- AUTOGENERATED:END:DAG_TOPOLOGY -->
-
----
-
-<a id="5-systeminvarianten"></a>
-## 5. Systeminvarianten P1–P30 (Automatisch generiert)
-
-<!-- AUTOGENERATED:START:INVARIANTS_TABLE -->
-| Invariante | Status | Befund |
+| Insel | Crate | Aufgabe |
 |---|---|---|
-| **Souveränität** (Zero-C-Deps im Core) | ✅ Erfüllt | Core-Schichten laufen in Pure Rust. Ollama übernimmt LLM/Embeddings via HTTP. |
-| **Zero-Panic** | 🟢 Vollständig | Alle offenen `.expect()`-Stellen im Prod-Code wurden umgestellt. |
-| **Determinismus** (SIMD) | ✅ Erfüllt | Cross-Check SIMD vs. Skalar via Proptest. |
-| **WAL-Crash-Consistency** | ✅ Erfüllt | Fault-Injection im WAL, HMAC-Chaining. |
-| **Graph-Persistenz** | ✅ Erfüllt | Persistierung im LSM-Tree unter den Präfixen `__graph:entity:` und `__graph:edge:`. |
-| **DAG Integrity** | ✅ Erfüllt | Unidirektionale Schichten-Abhängigkeiten von Layer 0 bis Layer 4. |
-| **Disk-I/O Isolation** | ✅ Erfüllt | tokio::fs für Metadaten/Lifecycle, std::fs::File ausschließlich innerhalb spawn_blocking für Block-Level Random-Access (ADR-012). |
-| **Snapshot Isolation** | 🟢 Vollständig | Für Storage (LSM), Text (BM25) & Vektor (HNSW) vollständig implementiert. Graph-Suche operiert auf dem aktuellen In-Memory-Zustand (ADR-024). |
-<!-- AUTOGENERATED:END:INVARIANTS_TABLE -->
+| `simd` | `contextra-simd` | SIMD-beschleunigte Distanzberechnungen (AVX-512 > AVX2 > NEON > skalar) |
+| `sys` | `contextra-sys` | Systemnahe Bindings, Low-Level-I/O, Durability-Primitive (`fdatasync`, `F_FULLFSYNC`) |
+| `wire` | `contextra-wire` | FlatBuffers Wire-Protokolle, Zero-Copy-Deserialisierung |
+
+**Regeln für alle Inseln:**
+1. Die Insel exponiert ausschließlich eine **sichere** öffentliche API.
+2. Jeder `unsafe`-Block trägt `// SAFETY:` mit Begründung.
+3. Miri- und Property-Tests gegen eine sichere Referenzimplementierung.
+4. **Alle anderen Crates** setzen `#![forbid(unsafe_code)]`; workspaceweit gilt `unsafe_code = "deny"`.
+5. Generierter Code folgt P2; Generator und Version sind gepinnt; Ausgabe in der CI reproduzierbar.
+6. Das Gate weist generierten und handgeschriebenen `unsafe`-Code getrennt aus.
 
 ---
 
-<a id="6-unsafe-inseln"></a>
-## 6. Unsafe-Inseln & Locking-Disziplin
+## 7. Kantenregeln (Ring-Disziplin)
 
-### 6.1 Unsafe-Inseln
+### P1 – Ring-Disziplin
+Kanten (normal und build) zeigen ausschließlich auf gleichen oder niedrigeren Ring.
 
-Das Repository erzwingt `#![forbid(unsafe_code)]` in allen Crates mit exakt **drei zulässigen Unsafe-Inseln**:
+### P5 – DAG-Integrität
+Keine Aufwärtskanten, keine Zyklen (normal + build, **mit aufgelösten Features**).
+Dev-Aufwärtskanten nur als in `capabilities.toml` deklarierte Ausnahme.
 
-1. **`contextra-sys`**: OS-Level Operationen (`mmap`, `mlock`, Win32 ACLs).
-2. **`contextra-simd`**: Handoptimierte SIMD-Kerne (AVX2, AVX-512, NEON).
-3. **`contextra-wire`**: FlatBuffers-Zero-Copy-Adapter.
+### P30 – Kern-Isolation
+`[K]`-Crates hängen weder normal noch build (im Release-Default-Feature-Set) von `[R]`/`[E]`/`[A]`-Crates ab.
+Rand-Fähigkeiten erreichen den Kern ausschließlich über Ports, die die Fassade injiziert.
 
-Jeder `unsafe`-Block erfordert zwingend eine `// SAFETY:`-Begründung.
+### Erlaubte Abhängigkeiten (strikt, SPEC.md §4.4)
 
-### 6.2 Locking-Disziplin & Lock-Familien
+| Crate | darf abhängen von |
+|---|---|
+| `types` | – |
+| `ports` | `types` |
+| `sys`, `simd` | `types` (nur falls nötig) |
+| `wire` | `types` |
+| `mvcc` | `types`, `ports` |
+| `crypto` | `types`, `ports`, `sys` |
+| `vector` | `types`, `ports`, `simd` |
+| `text` | `types`, `ports` |
+| `rank` | `types`, `ports` |
+| `store` | `types`, `ports`, `mvcc`, `crypto`, `sys`, `wire` |
+| `checkpoint` | `types`, `ports`, `crypto` |
+| `engine` | `types`, `ports`, `mvcc`, `crypto`, `store`, `vector`, `text`, `rank`, `checkpoint` |
+| `db` | `types`, `ports`, `engine` |
+| `mcp` | `types`, `ports`, `wire`, `db`, `contextra` (nur Fassaden-API) |
+| `contextra` | alle; `[R]`/`[E]` nur als `optional = true` |
 
-```
-collections (RwLock) → kv_locks (schlüssel-granular via KvKeyLocks) → embedder (RwLock)
-```
-
-- Mehrfach-Locks werden ausnahmslos in fester Reihenfolge von links nach rechts akquiriert.
-- `KvKeyLocks` akquiriert Shard-Indizes zwingend in aufsteigend sortierter und deduplizierter Reihenfolge via `lock_many_sorted` und die reine synchrone Funktion `sorted_unique_shards`, um Selbst- und Kreuz-Deadlocks auszuschließen.
-- Kein `.await` unter gehaltenen synchronen Mutex/RwLock-Guards.
-
-#### Lock-Familien im Workspace
-
-Contextra setzt drei explizit getrennte Lock-Familien ein, je nach Latenz-, Async- und Verifikationsanforderungen:
-
-1. **`parking_lot` (`parking_lot::Mutex`, `parking_lot::RwLock`)**:
-   - *Verwendungszweck*: Synchroner Hot-Path, In-Memory-Indexstrukturen, Skipartitionierung und Caches (`MemTable`, `SkipList`, `InvertedIndex` Staged Stats, `HnswIndex` Node-Locks).
-   - *Regel*: Höchste Performance, kein Overhead für Async-Contexts; Guards dürfen **niemals** über `.await`-Punkte hinweg gehalten werden.
-2. **`tokio::sync` (`tokio::sync::Mutex`, `tokio::sync::RwLock`)**:
-   - *Verwendungszweck*: Asynchrone Schichten, bei denen Sperren über `.await`-Abläufe oder langlaufende I/O-Operationen gehalten werden müssen (z. B. `KvKeyLocks` in `Collection`, Hintergrund-Maintance, Transaktions-Commit-Pipeline).
-   - *Regel*: Verhindert Thread-Blocking der Tokio-Worker-Threads bei Latenzen im I/O-Pfad.
-3. **`std::sync` (`std::sync::Mutex`, `std::sync::RwLock`)**:
-   - *Verwendungszweck*: Standard-Bibliothekssynchronisation für statische/lazy Initialisierungen (`std::sync::LazyLock`), einfache synchrone State-Kapselung sowie Nebenläufigkeitsmodellierung in Loom-Tests (unter `cfg(loom)` abstrahiert via `loom::sync::Mutex`).
+Vollständige Regeln und verbotene Kanten: SPEC.md §4.4.
 
 ---
 
-<a id="7-referenzen"></a>
-## 7. Referenzen & Weiterführende Dokumente
+## 8. Reifegrad-Kriterien (SPEC.md §4.1)
 
-* **Normative Spezifikation (Synthese):** [`docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`](spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md)
-* **Agenten-Betriebsanleitung:** [`AGENTS.md`](../AGENTS.md)
-* **Compliance BSI TR-02102 Mapping:** [`docs/compliance/BSI_TR02102_MAPPING.md`](compliance/BSI_TR02102_MAPPING.md)
+`maturity = stable` setzt voraus:
+1. Alle Sicherheits-Ports des Crates sind produktiv verdrahtet (INV-WIRING-2).
+2. Alle Gates (SPEC.md §17.3) sind grün.
+3. Fuzz-, loom- und Miri-Abdeckung nach SPEC.md §17.1.
+
+Ein Crate mit ausschließlich Null-/Test-Implementierungen seiner Sicherheits-Ports gilt als `experimentell`.
+
+---
+
+## 9. Crate-Konzept-Karte (SPEC.md §0.3)
+
+| Konzept | Crate (Ring) | Modul / Ort |
+|---|---|---|
+| IDs, Fehlerklassen, `RequestContext`, `LayerWitness`-Grundtypen | `types` (0) | – |
+| Alle Traits (Ports) | `ports` (0) | SPEC.md §5 |
+| Snapshots, SSI, Sequenzen | `mvcc` (0) | SPEC.md §8 |
+| AEAD, KDF, Signatur, `KmsProvider`-Impl, Löschbericht, AuditChain, RevocationLog | `crypto` (0) | SPEC.md §12 |
+| HNSW, SQ8, ACL-Bitset | `vector` (0) | SPEC.md §9 |
+| BM25, Analyzer, Block-Max-WAND | `text` (0) | SPEC.md §10 |
+| RRF-Fusion, Normalisierung, Provenienz/Explain | `rank` (0, nur `fusion/`) | SPEC.md §11.5 |
+| SIMD-Kernel / OS-Primitive / Wire-Layout | `simd` / `sys` / `wire` (0, Unsafe-Inseln) | SPEC.md §4.6 |
+| WAL, Memtable, SSTable, Manifest, Kompaktion, `Vfs`, Journal | `store` (1) | SPEC.md §7 |
+| Interne Checkpoints, Restore-Guard | `checkpoint` (1) | SPEC.md §12.9, §12.17, §13.8 |
+| Planner, Chunking, Löschsaga, Epoch Seal, Lesesperre, Startsequenz | `engine` (3) | SPEC.md §11, §12.8, §12.2.4 |
+| Collections, Transaktionen, Embedded-API | `db` (3) | SPEC.md §13.9 |
+| MCP-Server, IPC-Proxy, CLI | `mcp` (4) | SPEC.md §13 |
+| Composition Root, öffentliche Rust-API | `contextra` (4) | SPEC.md §13.4 |
+
+---
+
+## 10. Locking-Disziplin
+
+Vollständige, geordnete Sperrenhierarchie; keine Sperr-Guards über `.await`
+(INV-LOCK-ORDER-1, `clippy::await_holding_lock = deny`). Details: SPEC.md §8.
+
+---
+
+## 11. TODO-Liste: Archivierungs-Arbeitspakete (PLAN.md Phase 2)
+
+<!-- Diese Arbeitspakete sind noch offen und müssen in der angegebenen Reihenfolge abgearbeitet werden. -->
+
+```
+TODO(WP-2.1): Archiv-Tag `archiv/v0` auf Stand nach WP 1.x setzen.
+              Folgende Crates werden zuerst aus `default-members` entfernt, nach Entkopplung
+              aus dem Workspace:
+              - contextra-graph
+              - contextra-cognition
+              - contextra-adapt
+              - contextra-kvcache
+              - contextra-router
+              - contextra-agent
+              - contextra-infer-onnx
+              - contextra-infer-ollama
+              - contextra-core
+              - vector/diskann
+              - rank ohne fusion/
+              Vorher MIGRATION-EDGES.md aus `cargo metadata` erzeugen.
+
+TODO(WP-2.2): `contextra-engine` von Graph/Adapt/KVCache/InferCandle entkoppeln.
+              Je Kante ein Commit, `cargo check` nach jedem Schritt.
+              Betroffene Module: kv_cache_integration/, extraction/, background_workers/,
+              collection/search/hybrid/, collection/maintenance.rs, etc.
+
+TODO(WP-2.3): `contextra-db`, `contextra-mcp`, `contextra` entkoppeln;
+              `contextra-core` vollständig entfernen (286 Dateien referenzieren `contextra_core`
+              — Migrationsskript mit Prüfung je Crate erforderlich).
+              Default-Feature auf `embedded` setzen.
+
+TODO(WP-2.4): Rand-Crates optional machen; Brücken über Ports sicherstellen.
+              `contextra` darf Rand-Crates nur über `optional = true` einbinden.
+
+TODO(WP-2.5): `capabilities.toml` auf Klassen (`class`-Feld) und strikte `may_depend_on`
+              umstellen (WP 3.6 der Spec). Alle 66 nicht deklarierten Kanten bereinigen;
+              Warnungen = Fehler setzen.
+```
+
+---
+
+## 12. Referenzen
+
+| Dokument | Zweck |
+|---|---|
+| [`docs/SPEC.md`](SPEC.md) | **Einzige normative Quelle** für alle Architektur-, Verhaltens- und Gate-Aussagen |
+| [`capabilities.toml`](../capabilities.toml) | Single Source of Truth für Ring, Klasse, Reifegrad je Crate (INV-DOC-SINGLE-SOURCE-1) |
+| [`AGENTS.md`](../AGENTS.md) | Agenten-Betriebsanleitung und Rangfolge der Informationsquellen |
+| [`docs/PLAN.md`](PLAN.md) | Implementierungsplan IST → SOLL (Arbeitsunterlage, nicht normativ) |
+
+> [!IMPORTANT]
+> Verweise auf frühere Dokumente wie `CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`,
+> `GESAMTSPEZIFIKATION.md`, `CONTEXTRA_SPEZIFIKATION.md` oder `spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`
+> sind **obsolet**. Diese Fassungen sind durch SPEC.md Fassung 2.3 vollständig ersetzt
+> und dürfen nicht mehr herangezogen werden (SPEC.md §1.1).
