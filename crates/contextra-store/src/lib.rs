@@ -30,6 +30,7 @@ pub mod sstable;
 pub mod system_pressure;
 #[cfg(not(loom))]
 pub mod tenant_codec;
+pub(crate) mod fsync;
 pub(crate) mod util;
 pub mod wal;
 
