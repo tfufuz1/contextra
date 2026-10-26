@@ -44,4 +44,13 @@ fn main() {
 
     let dest_path = out_dir.join("gates_generated.rs");
     let _ = fs::write(&dest_path, generated_code);
+
+    let harness_dest_path = out_dir.join("harness_generated.rs");
+    let _ = fs::write(
+        &harness_dest_path,
+        r#"// Auto-generated harness stub.
+pub fn dispatch(_cmd: &str, _args: &[String]) -> Option<i32> { None }
+pub fn registered_commands() -> Vec<(&'static str, &'static str)> { Vec::new() }
+"#,
+    );
 }
