@@ -9,6 +9,8 @@ use crate::lsm::config::DurabilityMode;
 #[cfg(not(loom))]
 use std::fs::{File, TryLockError};
 
+pub(crate) use crate::fsync::fsync_parent_dir;
+
 /// Handle for exclusive database directory locking.
 #[cfg(not(loom))]
 #[derive(Debug)]
@@ -49,5 +51,3 @@ impl DirLock {
         }
     }
 }
-
-pub(crate) use crate::fsync::sync_parent_dir as fsync_parent_dir;
