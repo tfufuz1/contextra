@@ -7,29 +7,7 @@ use std::sync::Arc;
 
 #[allow(dead_code)]
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
-    pub(super) fn trigger_kv_store_rollback(&self, doc_ids: &[DocId]) -> Result<()> {
-        if let Some(kv_store) = self.collection.kv_store() {
-            let chunk_ids: Vec<u64> = doc_ids
-                .iter()
-                .map(|d| {
-                    u64::try_from(d.inner()).map_err(|_| {
-                        ContextraError::InvalidInput(format!(
-                            "DocId {} exceeds u64::MAX for chunk_id conversion",
-                            d.inner()
-                        ))
-                    })
-                })
-                .collect::<Result<Vec<u64>>>()?;
-            let tenant = contextra_types::TenantId::try_new(1).unwrap_or_default();
-            kv_store.on_rollback(tenant, &chunk_ids);
-        }
-        Ok(())
-    }
-
     pub(super) async fn compensate_hnsw(&self, doc_ids: &[DocId]) {
-        if let Err(e) = self.trigger_kv_store_rollback(doc_ids) {
-            tracing::error!("[INV-DB-3] Trigger KV store rollback failed: {}", e);
-        }
         let comp_tx = TxId::new(
             self.collection
                 .next_tx
@@ -189,17 +167,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     }
 
     pub(super) async fn rollback_internal(&self) {
-        let doc_ids = {
-            let guard = match self.staged_doc_ids.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            Arc::clone(&guard)
-        };
-        if let Err(e) = self.trigger_kv_store_rollback(&doc_ids) {
-            tracing::error!("[INV-DB-3] Trigger KV store rollback failed: {}", e);
-        }
-
         if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
             tracing::error!("[INV-DB-3] Graph index rollback failed: {}", e);
         }
@@ -217,17 +184,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     /// Rolls back any uncommitted changes applied to all 4 sub-systems in reverse commit order.
     pub async fn rollback(self) -> Result<()> {
         self.committed.store(true, Ordering::Release);
-        let doc_ids = {
-            let guard = match self.staged_doc_ids.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            Arc::clone(&guard)
-        };
-        let kv_res = self.trigger_kv_store_rollback(&doc_ids);
-        if let Err(ref e) = kv_res {
-            tracing::error!("[INV-DB-3] KV store rollback failed: {}", e);
-        }
 
         let graph_res = self.collection.graph_index.rollback(self.tx_id).await;
         let text_res = self.collection.text_index.rollback(self.tx_id).await;
@@ -248,9 +204,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         let mut errors = Vec::new();
-        if let Err(e) = kv_res {
-            errors.push(format!("KV Store: {}", e));
-        }
         if let Err(e) = graph_res {
             errors.push(format!("Graph: {}", e));
         }
