@@ -3,8 +3,8 @@
 //! Observer Fail-Open, Differential BTreeMap Model, and System Pressure.
 
 use bytes::Bytes;
-use contextra_core::{StorageEngine, TenantId, TxId};
 use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
+use contextra_ports::StorageEngine;
 use contextra_store::{
     kv::{KvDeleteMode, KvSegmentConfig, KvSegmentManager},
     lsm::{
@@ -14,6 +14,7 @@ use contextra_store::{
     system_pressure::{PressureLevel, SystemPressureMonitor},
     tenant_codec::TenantScopedStorage,
 };
+use contextra_types::{TenantId, TxId};
 use std::collections::BTreeMap;
 use std::sync::{
     atomic::{AtomicU64, Ordering},

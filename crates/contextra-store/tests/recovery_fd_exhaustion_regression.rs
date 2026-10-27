@@ -1,9 +1,10 @@
 #![allow(unsafe_code)]
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::sstable::SstableBuilder;
 use contextra_store::wal::{Wal, WalOp};
+use contextra_types::TxId;
 use tempfile::TempDir;
 
 #[tokio::test]

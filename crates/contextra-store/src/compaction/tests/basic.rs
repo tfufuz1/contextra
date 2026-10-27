@@ -48,8 +48,8 @@ fn prop_compaction_tombstone_masking_latest_operation_wins() {
                 registry,
                 Arc::clone(&bc),
                 None,
-                Arc::new(contextra_core::ResourceTracker::new(
-                    contextra_core::ResourceBudget {
+                Arc::new(contextra_ports::ResourceTracker::new(
+                    contextra_ports::ResourceBudget {
                         memory_limit: 1024 * 1024,
                     },
                 )),
@@ -141,8 +141,8 @@ async fn test_compaction_candidate_selection_follows_chronological_order() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -217,8 +217,8 @@ async fn test_mvcc_retention_floor_version_retained_for_snapshot() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -277,8 +277,8 @@ async fn test_mvcc_retention_older_versions_below_floor_discarded() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -345,8 +345,8 @@ async fn test_merge_deduplication() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -398,8 +398,8 @@ async fn test_tombstone_gc_stream_advancement_preserves_subsequent_keys() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -458,8 +458,8 @@ async fn test_tombstone_gc() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -502,8 +502,8 @@ async fn test_tombstone_preserved_with_active_snapshot() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -549,8 +549,8 @@ async fn test_maybe_compact_full_cycle() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -618,8 +618,8 @@ async fn test_no_compaction_below_threshold() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -661,8 +661,8 @@ async fn test_compaction_aborts_on_concurrent_modification() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -713,8 +713,8 @@ async fn test_compaction_removes_uuid_sidecar_files() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -797,8 +797,8 @@ async fn test_compaction_swap_restores_shadowing_order_without_restart() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -924,8 +924,8 @@ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -952,7 +952,7 @@ async fn test_compaction_aborts_when_peak_memory_exceeds_limit() {
 
     let err = result.unwrap_err();
     match err {
-        contextra_core::ContextraError::MemoryBudgetExceeded { used_mb, limit_mb } => {
+        contextra_types::ContextraError::MemoryBudgetExceeded { used_mb, limit_mb } => {
             assert!(used_mb >= limit_mb);
         }
         other => panic!("Expected MemoryBudgetExceeded, got {:?}", other),
@@ -988,8 +988,8 @@ async fn test_compaction_succeeds_when_peak_memory_within_limit() {
         registry,
         Arc::clone(&bc),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),
@@ -1029,8 +1029,8 @@ async fn test_compaction_backpressure_timeout_exceeded() {
     };
 
     // Exhausted ResourceTracker budget: capacity limit = 0
-    let exhausted_tracker = Arc::new(contextra_core::ResourceTracker::new(
-        contextra_core::ResourceBudget { memory_limit: 0 },
+    let exhausted_tracker = Arc::new(contextra_ports::ResourceTracker::new(
+        contextra_ports::ResourceBudget { memory_limit: 0 },
     ));
 
     let engine = CompactionEngine::new(
@@ -1067,7 +1067,7 @@ async fn test_compaction_backpressure_timeout_exceeded() {
         "Merge should fail with timeout when budget is exhausted"
     );
     match result.unwrap_err() {
-        contextra_core::ContextraError::MemoryBudgetExceeded { .. } => {}
+        contextra_types::ContextraError::MemoryBudgetExceeded { .. } => {}
         other => panic!("Expected MemoryBudgetExceeded, got {:?}", other),
     }
 }
@@ -1080,8 +1080,8 @@ fn test_generate_sst_path_uniqueness() {
         Arc::new(SnapshotRegistry::new()),
         create_block_cache(1),
         None,
-        Arc::new(contextra_core::ResourceTracker::new(
-            contextra_core::ResourceBudget {
+        Arc::new(contextra_ports::ResourceTracker::new(
+            contextra_ports::ResourceBudget {
                 memory_limit: 1024 * 1024,
             },
         )),

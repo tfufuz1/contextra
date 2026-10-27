@@ -1,5 +1,6 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::{CommittedBatch, LsmConfig, LsmStorage, WalObserver, WriteOrigin};
+use contextra_types::TxId;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};

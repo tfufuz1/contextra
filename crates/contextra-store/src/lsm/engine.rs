@@ -8,7 +8,9 @@ use crate::sstable::{BlockCache, SstableReader};
 use crate::wal::KeyManager;
 use crate::wal::Wal;
 use bytes::Bytes;
-use contextra_core::{ResourceTracker, Result, SnapshotRegistry, StorageEngine, TxBuffer, TxId};
+use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_ports::{ResourceTracker, StorageEngine};
+use contextra_types::{Result, TxId};
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -116,18 +118,21 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub async fn simulate_wal_append_failure_for_test(&self) {
         #[cfg(feature = "fault-injection")]
         crate::wal::FAIL_APPEND_FOR_TX.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub async fn simulate_wal_append_failure_for_tx_for_test(&self, _tx_id: u64) {
         #[cfg(feature = "fault-injection")]
         crate::wal::FAIL_APPEND_FOR_TX.store(_tx_id, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub async fn restore_wal_file_handle_for_test(&self) {
         #[cfg(feature = "fault-injection")]
         crate::wal::FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -251,31 +256,37 @@ impl LsmStorage {
     }
 
     /// Returns the current `next_seq_no` value for testing verification.
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn next_seq_no_for_test(&self) -> u64 {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn sstables_for_test(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
         Arc::clone(&self.sstables)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn block_cache_for_test(&self) -> Arc<BlockCache> {
         Arc::clone(&self.block_cache)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn budget_for_test(&self) -> Arc<ResourceTracker> {
         Arc::clone(&self.budget)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn manifest_for_test(&self) -> Arc<crate::manifest::Manifest> {
         Arc::clone(&self.manifest)
     }
 
     #[doc(hidden)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub async fn maybe_compact_for_test(&self) -> Result<bool> {
         self.compaction_engine
             .maybe_compact(&self.sstables, &self.config.path)
@@ -292,14 +303,14 @@ impl LsmStorage {
             Ok(entries) => entries,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
             Err(e) => {
-                return Err(contextra_core::ContextraError::Storage(format!(
+                return Err(contextra_types::ContextraError::Storage(format!(
                     "Failed to read directory for legacy WAL check: {e}"
                 )))
             }
         };
 
         while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            contextra_core::ContextraError::Storage(format!(
+            contextra_types::ContextraError::Storage(format!(
                 "Failed to read directory entry for legacy WAL check: {e}"
             ))
         })? {
@@ -357,7 +368,7 @@ impl LsmStorage {
             Ok(entries) => entries,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(0),
             Err(e) => {
-                return Err(contextra_core::ContextraError::Storage(format!(
+                return Err(contextra_types::ContextraError::Storage(format!(
                     "Failed to read directory for legacy WAL migration: {e}"
                 )))
             }
@@ -370,7 +381,7 @@ impl LsmStorage {
         }
 
         let salt = tokio::fs::read(&salt_path).await.map_err(|e| {
-            contextra_core::ContextraError::Storage(format!(
+            contextra_types::ContextraError::Storage(format!(
                 "SALT file read failed during migration: {e}"
             ))
         })?;
@@ -386,7 +397,7 @@ impl LsmStorage {
         let mut migrated_count = 0usize;
 
         while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            contextra_core::ContextraError::Storage(format!(
+            contextra_types::ContextraError::Storage(format!(
                 "Failed to read directory entry for legacy WAL migration: {e}"
             ))
         })? {

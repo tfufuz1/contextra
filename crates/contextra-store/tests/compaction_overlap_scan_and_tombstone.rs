@@ -1,8 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::compaction::CompactionConfig;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
 use std::collections::BTreeMap;

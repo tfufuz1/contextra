@@ -6,7 +6,7 @@
 // FORMATABKÜNDIGUNG (S-01 / T-04): Der Schreibpfad schreibt kein rank mehr in Replace-Einträge (schreibt stets 0u64 für binäre Nutzlastkompatibilität).
 // Der Reader akzeptiert bestehende Einträge mit rank weiterhin und ignoriert das Feld für Sortierung oder Sichtbarkeit.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
 use super::MAX_MANIFEST_ENTRY_SIZE;
