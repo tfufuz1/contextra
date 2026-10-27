@@ -1,11 +1,13 @@
-# Contextra – Gesamtspezifikation 2.2 (eigenständige Fassung, Zielzustand v1.0)
+# Contextra – Gesamtspezifikation 2.4 (eigenständige Fassung, Zielzustand v1.0)
+
+> **Fassung 2.4 (Entwurf, Löschpfad optimiert und quellenbereinigt):** Auf Basis von 2.3. Neu: Garantiebegriff als dreistufiger technischer Vertrag (§2.4a), Quellenbereinigung mit Begründungsbasis (§12.1.2a), KeyTable-Shards und ehrliche Flash-Härtung im Epoch Seal (§12.2.4), Planung, Koaleszenz, zweistufige Messung und Profile (§12.8.9), Heap-Canary (§12.7.11), Lösch-Mutationskatalog (§17.11), AC-34 bis AC-38; interne Widersprüche aus 2.3 sind behoben (§26.6).
 
 > **Fassung 2.3 (Entwurf, Löschpfad überarbeitet):** Auf Basis von 2.2.1. **§12 ist vollständig durch die überarbeitete Löschspezifikation ersetzt** (zehn Löschschichten, Wirkungsklassen L/P/C*/C1–C3/M, Schlüsselvernichtung als Ebene B, Destroy-Protokoll, Epoch Seal, Zwei-Spuren-Backup, Berichtsformat V5). Alle davon abhängigen Stellen in §0 bis §11 und §13 bis §26 sind angepasst; die Änderungen stehen in §26.5. Rechtsfragen bleiben in §25.1 offen.
 
 ```
 Dokument:  Normative, eigenständige Gesamtspezifikation, Implementierungsspezifikation und Meta-Plan
-Fassung:   2.3 (Entwurf, baut auf 2.2.1 auf)
-Stand:     26.10.2026
+Fassung:   2.4 (Entwurf, baut auf 2.3 auf)
+Stand:     27.10.2026
 Status:    Entwurf zur Freigabe
 Ablage:    docs/SPEC.md (nach Freigabe)
 Ersetzt:   die Fassungen 1.3, 2.0 und 2.1 vollständig. Alle früheren Fassungen sind obsolet und DÜRFEN NICHT mehr herangezogen werden.
@@ -58,7 +60,7 @@ Contextra ist ein **lokaler, eingebetteter Wissens- und Gedächtnisspeicher in R
 
 ### 0.4 Die zehn wichtigsten Begriffe
 
-**Scope**: (Tenant, Collection) – Einheit von Schlüssel und Index. **Tenant/Mandant**: Isolationsgrenze (VETO-F10). **Akte**: in der Produkt-API eine Collection (Annahme O-14). **Saga**: durable Zustandsfolge einer Löschung (§12.8). **Schicht (`DeletionLayer`)**: Ort, an dem Nutzdaten liegen können; acht Typvarianten, sechs gemessen (§12.4). **Witness (`LayerWitness`)**: Messbeleg einer Schicht, nur von deren Scanner erzeugbar. **Löschbericht**: signierter Report aus Messungen (§12.7). **Lesesperre / `ErasedSet`**: ab `Frozen` liefert kein Lesepfad Daten des Scopes (§12.9). **Sidecar-Log**: append-only Sicherheitslog neben dem WAL (§7.9). **Ratchet**: Messwert darf nur besser werden (REQ-CHG-4).
+**Scope**: (Tenant, Collection) – Einheit von Schlüssel und Index. **Tenant/Mandant**: Isolationsgrenze (VETO-F10). **Akte**: in der Produkt-API eine Collection (Annahme O-14). **Saga**: durable Zustandsfolge einer Löschung (§12.8). **Schicht (`DeletionLayer`)**: Ort, an dem Nutzdaten liegen können; zehn Schichten, acht gemessen, `Graph` und `KvCache` `FeatureDisabled` (§12.4). **Witness (`LayerWitness`)**: Messbeleg einer Schicht, nur von deren Scanner erzeugbar. **Löschbericht**: signierter Report aus Messungen (§12.7). **Lesesperre / `ErasedSet`**: ab `Frozen` liefert kein Lesepfad Daten des Scopes (§12.9). **Sidecar-Log**: append-only Sicherheitslog neben dem WAL (§7.9). **Ratchet**: Messwert darf nur besser werden (REQ-CHG-4).
 
 ### 0.5 Was es in v1.0 nicht gibt
 
@@ -142,6 +144,21 @@ Graph-Reasoning, Kognition/Konsolidierung, Router/Agentenlaufzeit, Online-Adapti
 |G4|Ab `Frozen` liefert kein Lesepfad Daten des Scopes; ein Restore stellt sie nicht wieder her.|T-DEL-7/8/9|
 |G5|Kein Mandant liest, findet oder löscht Daten eines anderen (VETO-F10).|T-TEN-1/2|
 |G6|Nach hartem Abbruch ist der Zustand aus dem WAL rekonstruierbar („WAL First“, deterministische Recovery).|T-REC-2|
+|G7|Jede Löschzusage ist maschinell widerlegbar: ein Fehler in Bereinigung, Vernichtung, Messung oder Berichtsbildung lässt mindestens einen Test des Lösch-Mutationskatalogs (§17.11) scheitern; Klartext-Reste im Prozessspeicher werden im Test gemessen (§12.7.11).|T-DEL-15|
+
+### 2.4a Was „Garantie“ hier bedeutet (2.4)
+
+Contextra gibt **keine Rechtsgarantie** und **keine absolute Garantie**. Eine solche wäre nicht belegbar: Weder ein Gericht noch eine Aufsichtsbehörde hat Schlüsselvernichtung als Löschung anerkannt (P-01, P-02); die einzige behördliche Aussage dazu knüpft die Unlesbarkeit an Bedingungen („solange der Algorithmus nicht gebrochen wird, die Entschlüsselung nicht fortschreitet und der Schlüssel nicht kompromittiert war“, EDPB 02/2025 Rn. 51); die Norm für kryptografisches Löschen verlangt Zeroization **aller** Zielschlüssel und dass nie Klartext auf das Medium gelangte (NIST SP 800-88 Rev. 2), und beides lässt sich für RAM, Swap und Flash-Controller nicht aus Software beweisen. Das Wort „garantiert“ bleibt deshalb in jeder **Außenaussage** verboten (§12.11; Irreführungsrisiko nach § 5 UWG).
+
+Was Contextra **normativ garantiert** (Zielzustand, Beleg nach INV-EVIDENCE-1), ist ein dreistufiger technischer Vertrag:
+
+|Stufe|Garantie|Mechanismus|
+|---|---|---|
+|1 Konstruktion (Build-Zeit)|Kein Bericht ohne Messung; keine höhere Klasse als die Messung trägt; keine Schlüsselvernichtung vor Klasse P; keine Zeit-, Zufalls- oder Schlüsselquelle außerhalb der Ports|Typestate, `pub(crate)`-Konstruktoren, Gates `witness-mint`, `deletion-honesty`, `surface-coverage`, `claim-generator`|
+|2 Messung (Laufzeit)|Jede Schicht wird vom eigenen Scanner mit bestandener Positivkontrolle gemessen; jede Ebene-B-Aussage hat Inventar (jeder Chiffratblock einem Schlüssel zugeordnet), Nadelscan und Kanarien-Probe; Ebene A im RAM ist im Test über einen Heap-Canary gemessen|`LayerScanner`, `ScanSession`, UnitDirectory (§12.8.9), Heap-Canary (§12.7.11)|
+|3 Wirkung (bedingt)|Persistente Kopien liegen nur als Chiffrat unter vernichteten Schlüsseln vor — **unter den im Bericht benannten Annahmen** (A-FLASH, A-ALGO, A-KEYLEAK, A-RAM, A-EXTBACKUP, A-HOSTHIST, A-CLOCK)|Klassen L bis M (§12.5), Epoch Seal, Zwei-Spuren-Backup|
+
+**Lückenfreiheitsprinzip (Optimierungsmaßstab).** Das erreichbare Maximum ist erreicht, wenn jede Lücke im Löschpfad genau eine von drei Eigenschaften hat: (a) mechanisch **geschlossen** (Bereinigung plus Messung), (b) **gemessen und befristet** (Residuum mit Frist, z. B. `R-GRAPH`, `R-KEKEPOCH`), (c) als **Annahme oder Ausschluss** im Bericht benannt. Eine vierte Kategorie „unbenannt“ ist ein Defekt; das Gate `surface-coverage` und der Lösch-Mutationskatalog (§17.11) prüfen das mechanisch.
 
 ### 2.5 Robustheitsvertrag `[K]`
 
@@ -292,14 +309,17 @@ Spalten: ID · Klasse · Invariante · Mechanismus (Kürzel §1.4) · Anforderun
 |INV-SURFACE-1|K|Jede persistente Datei- und Strukturklasse des Format-Registers (§7.11) steht in genau einer Zeile der Schichttabelle (§12.4) oder in den Ausschlüssen (§12.20); ein neues Format ohne Schichtzuordnung bricht den Build (Gate `surface-coverage`).|G|REQ-DEL-N23|
 |INV-NO-DUMMY-PROOF-1|K|Kein Codepfad erzeugt einen `DeletionProof` ohne Scanner-Witness; `contextra_delete` und `contextra_drop_collection` erzeugen keinen Bericht außerhalb der Saga.|G+I|REQ-PRF-4|
 |INV-EPOCH-SEAL-1|K|Die Klassen C1 bis C3 gelten erst nach dem ersten Epoch Seal, der die Löschung umfasst; bis dahin lautet die Klasse C\* mit `residuals: [R-KEKEPOCH until]` (§12.2.4).|C+P|REQ-DEL-N24|
-|INV-ARTKEY-1|K|Jedes Index-Artefakt hat genau einen ArtKey; beim Neuschreiben wird der alte ArtKey vernichtet (§12.2.8).|P+C|REQ-DEL-N16|
+|INV-ARTKEY-1|K|Jedes Index-Artefakt hat genau einen ArtKey; der alte ArtKey wird bei einem Neuschreiben ohne Löschbezug (Merge) sofort, bei einem Neuschreiben aus einer Löschung **nach Siegel 2** im Destroy-Protokoll (Schritt 5) vernichtet, damit Inventar und entschlüsselte Messung vor der Vernichtung möglich bleiben (§12.2.8, INV-DEL-ORDER-1).|P+C|REQ-DEL-N16|
+|INV-SEAL-HARDENING-1|K|Der Bericht weist `flash_hardening ∈ {None, PassphraseRotated, ModuleBound, ProviderAttested}` aus; ein K1-Seal ohne Passphrasenwechsel ist `None` und stützt die Klasse C1 allein auf A-FLASH; die Angabe wird aus dem tatsächlichen Seal-Ablauf erzeugt, nie aus der Konfiguration (§12.2.4).|T+P|REQ-DEL-N40|
+|INV-HEAP-ZERO-1|K|Klartext von Nutzdaten (entschlüsselte Blöcke, Query-Puffer, Memtable-Werte, Arena-Slots, Caches) liegt nur in `Sensitive`-Arenen der Insel `sys` und wird bei Freigabe zeroisiert; ein Heap-Canary-Test findet nach Klasse P keinen Scope-Inhalt im Prozessspeicher (§12.7.11).|T+G+C|REQ-DEL-N41|
+|INV-UNITDIR-1|K|Jede persistente Datei trägt ein unter `K_eng` verschlüsseltes UnitDirectory (Einheit → Blöcke); die Messung stützt sich auf vollständiges Inventar; ein Block ohne Zuordnung ist ein Fehler (fail-closed); Einträge vernichteter Einheiten verschwinden beim Hygiene-Rewrite (§12.8.9).|P+G|REQ-DEL-N42|
 |INV-ADMISSION-1|R|(`sandbox`) Ein `AdmittedModule` ist nur über `ModuleVerifier::verify` konstruierbar; SHA-256-Digest aus den Bytes, nie vom Aufrufer. Unsignierte Module nur mit `ApprovalRisk::Low`, im Audit als `unsigned`.|T+P+F|REQ-SBX-001|
 |INV-APPROVAL-1|R|(`sandbox`) `High`-/`Elevated`-Module laufen nicht vor `ApprovalStatus::Approved`.|T+P+F|REQ-SBX-002|
 |INV-WASM-DET-1|R|(`sandbox`) Gleiches Modul, Eingabe und Fuel liefern auf x86-64 und aarch64 bit-identische Ergebnisse; Wall-Clock-/Epoch-Unterbrechung ist nur Sicherheitsnetz und fail-closed.|T+P+F|REQ-SBX-003|
 |INV-EGRESS-BUDGET-1|R|(`privacy`) Jede externe Wirkung ist budgetiert, auditiert und widerrufbar.|I+P|REQ-PRV-002|
 |INV-LICENSE-1/-2/-3|E|(`license`) Verstoß/Ablauf/fehlende Aktivierung degradiert auf Basisfunktion, nie Datenverlust oder -sperre; niedrigste Klasse (`Fast`) immer `Ok`; falsche Installationsbindung ⇒ `NotActivated` ohne Informationsleck.|P|REQ-EXP-003|
 
-**Zählung:** `[K]` 60 (53 der Fassung 1.3 minus `INV-SHRED-1` plus acht neue: `INV-DEL-ORDER-1`, `INV-NO-RESURRECTION-1`, `INV-BACKUP-SPLIT-1`, `INV-CLASS-MEASURED-1`, `INV-CLAIM-BIND-1`, `INV-SURFACE-1`, `INV-NO-DUMMY-PROOF-1`, `INV-EPOCH-SEAL-1`, `INV-ARTKEY-1`; die Summe ist vom Doc-Truth-Gate nachzuzählen), `[R]` 4, `[E]` 3 (als eine Zeile geführt). Das Doc-Truth-Gate prüft: jede `INV-*` einmal definiert, einmal im Mechanismus geführt, von mindestens einer Anforderung referenziert, IDs eindeutig (REQ-GOV-004).
+**Zählung:** `[K]` 64 (53 der Fassung 1.3 minus `INV-SHRED-1` plus neun neue aus 2.3 und drei aus 2.4 [`INV-SEAL-HARDENING-1`, `INV-HEAP-ZERO-1`, `INV-UNITDIR-1`]; die 2.3-Neuen sind: `INV-DEL-ORDER-1`, `INV-NO-RESURRECTION-1`, `INV-BACKUP-SPLIT-1`, `INV-CLASS-MEASURED-1`, `INV-CLAIM-BIND-1`, `INV-SURFACE-1`, `INV-NO-DUMMY-PROOF-1`, `INV-EPOCH-SEAL-1`, `INV-ARTKEY-1`; die Summe ist vom Doc-Truth-Gate nachzuzählen), `[R]` 4, `[E]` 3 (als eine Zeile geführt). Das Doc-Truth-Gate prüft: jede `INV-*` einmal definiert, einmal im Mechanismus geführt, von mindestens einer Anforderung referenziert, IDs eindeutig (REQ-GOV-004).
 
 ---
 
@@ -777,7 +797,7 @@ Liefert ein selektiver Filter weniger als `k` Treffer, MUSS das System in determ
 
 ### 10.1 BM25
 
-**BM25** (Startwerte k1 = 1,5, b = 0,75, per Recall-Benchmark zu kalibrieren), **BM25F** mit Feldgewichten, **Block-Max-WAND**. **Statistiken (IDF, Dokumentlängen) werden je Tenant geführt** (INV-TENANT-IDX-1). Der invertierte Index ist segmentiert, über `IndexIntent` konsistent, je Tenant/Collection getrennt; Löschung per Segment-Neuschreibung mit neuem ArtKey, alter ArtKey sofort vernichtet (§12.2.8, §12.8.2 Schritt 3); Segmentdateien liegen unter dem ArtKey. Terme, die nur in gelöschten Dokumenten vorkamen, MÜSSEN aus dem Termwörterbuch verschwinden (sonst bleibt ein Inhaltsrest).
+**BM25** (Startwerte k1 = 1,5, b = 0,75, per Recall-Benchmark zu kalibrieren), **BM25F** mit Feldgewichten, **Block-Max-WAND**. **Statistiken (IDF, Dokumentlängen) werden je Tenant geführt** (INV-TENANT-IDX-1). Der invertierte Index ist segmentiert, über `IndexIntent` konsistent, je Tenant/Collection getrennt; Löschung per Segment-Neuschreibung mit neuem ArtKey, alter ArtKey nach Siegel 2 vernichtet (§12.2.8, §12.8.2 Schritt 5); Segmentdateien liegen unter dem ArtKey. Terme, die nur in gelöschten Dokumenten vorkamen, MÜSSEN aus dem Termwörterbuch verschwinden (sonst bleibt ein Inhaltsrest).
 
 ### 10.2 Analyzer
 
@@ -862,16 +882,16 @@ Retention-Reaper/`MemoryType`-Ort (§11.6), BM25-Morphologie für deutsche Kompo
 #### 12.1.1 Grundsatz
 
 1. Art. 17 DSGVO verpflichtet zur Löschung **ohne unangemessene Verzögerung** (unverzüglich), auch ohne Antrag, definiert „Löschen“ aber nicht und schreibt keine Methode vor [R]. Löschen ist selbst Verarbeitung (Art. 5, 32). Das Standard-Datenschutzmodell (Baustein 60) versteht Löschen als **Unkenntlichmachen**: Der angeordnete Informationsverlust muss tatsächlich wirken [B ✔]. Technische Unmöglichkeit rechtfertigt keinen Verstoß (EDPB 02/2025 v2.0, Rn. 50) [B ✔].
-2. Die Aufsichten fordern **Wirksamkeit und Nachweisbarkeit** (EDPB 02/2025 Rn. 76; CEF-Bericht 2025: Löschung verifizieren und nachweisen können) [B ✔]. Art. 5 Abs. 2, 24, 32 verlangen Rechenschaft [R].
+2. Die Aufsichten fordern **Wirksamkeit und Nachweisbarkeit** (EDPB 02/2025 Rn. 63; CEF-Bericht 2025: Löschung verifizieren und nachweisen können) [B ✔]. Art. 5 Abs. 2, 24, 32 verlangen Rechenschaft [R].
 3. Es ist **keine höchstrichterliche Entscheidung bekannt**, die Schlüsselvernichtung als Löschung anerkennt (P-01, P-02).
 4. **Konstruktionsgrundsatz Verteidigung in der Tiefe.** Contextra stellt für jede erreichbare Datenschicht den Zustand her, den die **strengste** Auffassung verlangt (physische Bereinigung, Ebene A und Hygiene). Für nicht erreichbare Reste (Flash, Backups) kommt ein **zweiter, unabhängiger Mechanismus** hinzu (Schlüsselvernichtung mit Epoch Seal und Backup-Trennung, Ebene B). Jede Aussage im Bericht nennt ihre Voraussetzungen und Grenzen.
 5. **Beide Mechanismen sind notwendig, keiner genügt allein.** Ohne Ebene A bleiben Klartext und invertierbare Suchstrukturen (Vektoren, Ghost Vectors). Ohne Ebene B bleiben Flash-Reste und Kopien lesbar, weil Überschreiben auf SSD nicht zuverlässig wirkt (Wear-Leveling). Ohne die Backup-Spur wären Backups eine ungelöschte Kopie.
 
 #### 12.1.2 Quellenlage
 
-Die Spalte „Prüfung 2.3“ trennt, was in der Recherche (v3.1) geprüft wurde, von dem, was bei der Erstellung dieser Fassung am 26.10.2026 **zusätzlich** gegengeprüft wurde. Eine Quelle mit ◐ oder ○ DARF NICHT in Außentexte übernommen werden, bevor der Volltext geprüft ist (P-14).
+Die Spalte „Prüfung 2.3“ trennt, was bei der Quellenprüfung vor 2.3 geprüft wurde, von dem, was bei der Erstellung dieser Fassung am 26.10.2026 **zusätzlich** gegengeprüft wurde. Eine Quelle mit ◐ oder ○ DARF NICHT in Außentexte übernommen werden, bevor der Volltext geprüft ist (P-14).
 
-|Quelle|Aussage (paraphrasiert)|Status|Prüfung v3.1|Prüfung 2.3|
+|Quelle|Aussage (paraphrasiert)|Status|Prüfung vor 2.3|Prüfung 2.3|
 |---|---|---|---|---|
 |EDPB Guidelines 02/2025 Blockchain, v2.0 final (07.07.2026)|Rn. 51: Nach Schlüsselvernichtung sind verschlüsselte Daten unverständlich, solange der Algorithmus nicht gebrochen ist, die Entschlüsselung nicht fortschreitet und der Schlüssel nicht kompromittiert war; verschlüsselte Daten bleiben personenbezogen. Rn. 52: Hash mit Salt oder Schlüssel bleibt personenbezogen, nach Löschung des Schlüssels nicht mehr verknüpfbar, wenn dieser nicht kompromittiert war. Rn. 103–104: „effektive Anonymisierung“ durch Löschung der Off-chain-Daten. Rn. 85, 96, Empf. 13: Notfallplan für Algorithmenwechsel, periodische Neubewertung.|final; Analogie (Blockchain), keine unmittelbare Aussage zu RAG|✔|nicht erneut geöffnet|
 |EDPB Guidelines 02/2026 Anonymisierung, Entwurf v1.0 (07.07.2026), Konsultation bis 30.10.2026|Kriterien No Record Isolation, No Linkage, No Inference; kontextueller Ansatz; Verschlüsselung ist reversibel und kein Ersatz für Anonymisierung; Anonymisierung ist selbst Verarbeitung.|Entwurf|◐|offen (P-14)|
@@ -880,7 +900,7 @@ Die Spalte „Prüfung 2.3“ trennt, was in der Recherche (v3.1) geprüft wurde
 |NIST SP 800-88 Rev. 2 (26.09.2025), FAQ vom 16.07.2026|Cryptographic Erase (CE) nur bei: kein früherer Klartext, ausreichende Schlüssellänge und Entropie, Zeroization **aller** Zielschlüssel (DEK, Wrapping, Master); Backup- und Escrow-Kopien brauchen eigene Regeln; Teil-CE nur bei absoluter Sicherheit; Verification und Validation getrennt; Zertifikat mit Methode, Technik, Validierungsentscheidung, Concurrence. Rev. 1 ist zurückgezogen; technikspezifische Verfahren verweist Rev. 2 an IEEE 2883.|Norm/FAQ|✔ (FAQ), ◐ (Norm)|**bestätigt**: Veröffentlichung 26.09.2025, Rev. 1 zurückgezogen, CE-Vorbedingung „Verschlüsselung seit Bereitstellung aktiv, kein Klartext je geschrieben“ (Sekundärquellen); Volltext der Norm nicht geöffnet|
 |ISO/IEC 27040:2024|alle Kopien der Zielschlüssel sind zu bereinigen, sonst gilt es nicht als CE|Norm|◐|offen|
 |IEEE 2883:2022|technikspezifische Sanitisierungsverfahren je Medium|Norm|○|nur als Verweis von NIST Rev. 2 bestätigt|
-|BayLfD 30. TB (2020) Nr. 12.5|Zeitversetzte Backup-Löschung zulässig bei technischer Unmöglichkeit, begründeter Löschfrequenz, Zugriff nur über Restore, Nachlöschung bei jedem Restore, Dokumentation|Aufsichtsauffassung|✔|–|
+|BayLfD 30. TB (2020) Nr. 12.5|Zeitversetzte Backup-Löschung zulässig bei technischer Unmöglichkeit, begründeter Löschfrequenz, Zugriff nur über Restore, Nachlöschung bei jedem Restore, Dokumentation|Aufsichtsauffassung|◐|in 2.4 am Primärtext nicht wiederholt geprüft (P-14); trägt keine konkrete Frist|
 |SDM Baustein 60 V1.0a|Löschen als Unkenntlichmachen|Aufsichtsauffassung|✔ (Auszug)|–|
 |EuGH C-413/23 P (EDPS/SRB), 04.09.2025|Relativer Personenbezug; für den Verantwortlichen bleiben pseudonyme Daten personenbezogen, für Empfänger ohne Mittel kann dies anders sein|Urteil|◐|offen|
 |AG Lörrach, 03.03.2025, 3 C 1099/24|Kein Anspruch der betroffenen Person auf Löschnachweis ohne Streitfall|Instanzgericht|◐|offen|
@@ -889,6 +909,33 @@ Die Spalte „Prüfung 2.3“ trennt, was in der Recherche (v3.1) geprüft wurde
 |DSB Österreich, Bescheid 05.12.2018|Unkenntlichmachung zulässig, völlige Irreversibilität nicht nötig|Behörde|◐|offen|
 |eIDAS Art. 41, 42|Vermutung für Datum und Datenintegrität bei qualifiziertem Zeitstempel; § 371a ZPO betrifft qualifizierte Signaturen, nicht Zeitstempel unmittelbar|Recht|◐|offen|
 |Ghost Vectors, arXiv 2606.18497|Soft-gelöschte HNSW-Vektoren bleiben rekonstruierbar; Ghost-Knoten verändern Treffermengen und erzeugen Timing-Kanal|Preprint|✔|–|
+
+#### 12.1.2a Quellenbereinigung und Begründungsbasis (2.4)
+
+Mehrere in der Fachdiskussion kursierende Aussagen sind falsch zugeordnet oder nicht belegt. Das Design stützt sich **nicht** auf sie. Die Tabelle nennt je Aussage die Wertung und die Folge für das Design.
+
+|Aussage|Wertung|Folge im Design|
+|---|---|---|
+|„OLG Dresden 4 U 1278/21 erkennt Anonymisierung als ‚Minus zur Löschung‘ an und stützt Crypto-Shredding“|**Falsch zugeordnet.** Die Entscheidung (14.12.2021) betrifft eine Inkasso-Streitigkeit mit namensgleicher Person und das Zusammenwirken von Aufbewahrungspflichten und Löschanspruch (Prüfung je Datum). Die „Minus“-Formel stammt aus OLG Dresden 4 U 292/25 (03.02.2026, Instanzgericht, ◐) und nennt Schlüsselvernichtung nicht.|Contextra stützt keine Außenaussage auf Anonymisierungsurteile; Löschung wird gemessen (Ebene A) und zusätzlich kryptografisch abgesichert (Ebene B), nicht rechtlich umgedeutet (§12.1.1 Punkt 4).|
+|„Gerichte oder Aufsichten haben Crypto-Shredding als Löschung anerkannt“|**Nicht belegt.** Keine Entscheidung und keine Behördenaussage dazu gefunden; die einzige EDPB-Aussage (02/2025 Rn. 51, Blockchain) ist an Bedingungen geknüpft und eine Analogie.|Klassen mit benannten Annahmen (§12.5); „kryptografisch gelöscht“ nie ohne Custody und Annahmen (§12.11).|
+|„BSI TR-02102 und ISO/IEC 27040 empfehlen oder akzeptieren kryptografisches Löschen“|**Nicht belegt.** TR-02102 regelt Algorithmen und Schlüssellängen, nicht Löschen; die Akzeptanz durch ISO/IEC 27040 ist nicht am Normtext geprüft.|TR-02102 nur für die Algorithmenwahl (§12.2.1); als Löschbeleg dienen Messung und NIST-Bedingungen (LA-3, LA-15).|
+|„Aufsichten in Bayern, Baden-Württemberg und Berlin akzeptieren Backup-Rotation von 30, 60 oder 90 Tagen“|**Keine Primärquelle.** Belegt ist nur: Backups müssen nicht sofort überall verändert werden, nach einer Rücksicherung ist unmittelbar erneut zu löschen und der Vorgang zu überwachen (SDM Baustein 60, M60.S10, M60.P08; CEF 2025 Issue 6).|`key_backup_max_age` und `erased_set_retention` sind **eigene Setzungen** des Produkts, keine behördliche Vorgabe (§12.17, P-06). Die Wirkung hängt nicht an einer behördlichen Frist, sondern am Ablauf des Schlüssel-Backups.|
+|„§ 35 BDSG analog rechtfertigt Nicht-Löschen in Backups und Vektorindizes“|**Trägt nicht.** § 35 Abs. 1 BDSG gilt nur bei nicht automatisierter Verarbeitung und nicht bei unrechtmäßiger Verarbeitung; Zweifel an der Unionsrechtskonformität.|Kein Ausnahmepfad „unverhältnismäßiger Aufwand“ im Design; granulare Löschbarkeit ist Konstruktionsziel (§12.2.5).|
+|„EDPB 28/2024 stellt fest, dass Embeddings personenbezogen sind“|**Zu weit.** Die Stellungnahme prüft die Anonymität trainierter **KI-Modelle**, nicht eines Vektorindex. Die DSK-Orientierungshilfe RAG (10/2025) behandelt die Vektordatenbank als Verarbeitungsgegenstand mit Rechtsgrundlage, ohne Invertierbarkeitsprüfung; die Hamburger Gegenposition betrifft Tokens und Embeddings **im** Modell. Inversionsangriffe auf Text-Embeddings sind technisch belegt (Fachliteratur, ○).|Embeddings gelten **vorsorglich als personenbezogen** (P-05, LA-2); Schichten `VectorIndex` und `CachesAndVault` sind Pflicht (§12.4).|
+|„Die DSK-Orientierungshilfe RAG nennt Crypto-Shredding“|**Falsch.** Sie hält Vektoreinträge für adressierbar und löschbar, erwähnt Crypto-Shredding nicht und nennt Betroffenenrechte im Sprachmodell „weitgehend ungelöst“.|Löschung im Modell und beim Modellanbieter ist Nicht-Gegenstand (§12.20, `ModelParameters`).|
+|„AI Act Art. 12 verlangt die Protokollierung aller Ein- und Ausgaben“|**Überzeichnet.** Nur Hochrisiko-Systeme; verlangt Ereignisprotokolle; Art. 26 Abs. 6 stellt die Aufbewahrung unter den Vorbehalt des Unionsrechts, insbesondere des Datenschutzrechts. Hochrisiko-Fristen laut Digital Omnibus auf 02.12.2027 verschoben (◐, Amtsblatt prüfen).|Logs, Audit und Sidecars enthalten nur Referenz-Hashes und Zähler (INV-LOG-1, §12.10); kein Konflikt mit der Löschung.|
+|„Buchungsbelege 10 Jahre, § 203 StGB als Aufbewahrungsnorm“|**Veraltet bzw. falsch.** Buchungsbelege 8 Jahre seit 01.01.2025 (§ 147 Abs. 3 AO, § 257 Abs. 4 HGB; Banken, Versicherungen weiter 10 Jahre); Bücher, Abschlüsse 10 Jahre; Handels- und Geschäftsbriefe 6 Jahre; Patientenakte 10 Jahre nach Behandlungsabschluss (§ 630f Abs. 3 BGB); § 203 StGB ist Schweigepflicht.|`Restricted` je Datum, Archiv getrennt vom Retrieval-Index (§12.8.6, P-09, P-22).|
+|„Der Löschnachweis darf nicht aufbewahrt werden“ / „Nachweis ist nie geschuldet“|**Differenziert.** AG Lörrach (3 C 1099/24, erstinstanzlich, ◐): kein Anspruch der betroffenen Person auf individuellen Nachweis ohne Streitfall; OLG Dresden 4 U 940/24 (◐): der Verantwortliche muss sich die Löschung vom Auftragsverarbeiter nachweisen lassen; EDPB CEF 2025: Löschung verifizieren und nachweisen können.|Bericht datensparsam (Referenz-Hash statt ID, §12.10), Bescheinigung ohne Identifikatoren (§12.7.8).|
+
+**Tragende Begründungen des Designs** (Quelle in Klammern):
+
+1. *Löschen = Unkenntlichmachen, Kopien eingeschlossen* (SDM Baustein 60: vollzogen erst, wenn keine Kopie oder Replikation beim Verantwortlichen oder Auftragsverarbeiter besteht; Wipe unter Beachtung von Wear-Leveling) ⇒ zehn Schichten, Oberflächen-Inventar, Hygiene.
+2. *Technische Unmöglichkeit entschuldigt nicht* (EDPB 02/2025 Rn. 50) ⇒ Löschbarkeit ist Architekturvorgabe (DocDek je Einheit), kein Betreiberproblem.
+3. *Nachweisbarkeit schuldet der Verantwortliche* (Art. 5 Abs. 2, 24, 32 DSGVO; EuGH C-340/21; EDPB CEF 2025) ⇒ Bericht aus Messung, Verification und Validation getrennt (§12.7.7).
+4. *Kryptografisches Löschen nur mit Zeroization aller Zielschlüssel und ohne früheren Klartext* (NIST SP 800-88 Rev. 2) ⇒ Nadelscan über alle Dateien, Epoch Seal, Heap-Canary, Härtung (§12.18).
+5. *Restrisiko Algorithmus, Obsoleszenz, Quantencomputer, periodische Neubewertung, Notfallplan* (EDPB 02/2025 Rn. 85, 96) ⇒ Krypto-Agilität, `doctor crypto-drill` (§12.2.9).
+6. *Hash mit Schlüssel bleibt personenbezogen, bis der Schlüssel vernichtet ist* (EDPB 02/2025 Rn. 52) ⇒ Referenzschlüssel mit Ablauf (§12.10).
+7. *Relativer Personenbezug* (EuGH C-582/14, C-413/23 P) ⇒ Perspektivenmatrix (§12.1.4): das Urteil „unkenntlich“ gilt je Stelle und wird je Stelle ausgewiesen.
 
 #### 12.1.3 Rechtsstabilitätsmatrix
 
@@ -953,7 +1000,8 @@ Der Entwurf 02/2026 prüft Anonymität aus Sicht jeder Stelle mit realistischem 
 ```
 Wurzel (Custody-Slot K1 | K2 | K3)                    EffaceableKeySlot (§12.2.3)
  └─ KEK[coll, epoche]       je Collection und Epoche, gewrappt unter der Wurzel
-     ├─ DocDek[einheit]     je Betroffenen-Einheit, gewrappt unter KEK
+     ├─ ShardKek[shard, gen]  je KeyTable-Shard (§12.2.4), gewrappt unter KEK
+     │    └─ DocDek[einheit]  je Betroffenen-Einheit, gewrappt unter ShardKek
      ├─ ArtKey[artefakt]    je Index-Artefakt (Text-Segment, Graph-Snapshot), gewrappt unter KEK
      └─ K_ref[tenant, ref_epoche]   Referenzschlüssel (§12.10), zufällig, gewrappt unter KEK
 K_eng                       Struktur und Integrität (keine Nutzdaten), HKDF aus der Wurzel
@@ -992,21 +1040,23 @@ pub trait EffaceableKeySlot: Send + Sync {
 **Epoch Seal.**
 
 1. erzeugt `KEK[coll, e+1]`, gewrappt unter der Wurzel;
-2. wrappt **alle lebenden** DocDeks, ArtKeys und `K_ref` unter `KEK[e+1]` neu (Re-Wrap, kein Datenrewrite);
+2. erzeugt für jeden **geänderten Shard** (Shard mit Vernichtung seit dem letzten Seal) eine neue `ShardKek`-Generation, wrappt dessen lebende DocDeks neu und vernichtet die alte Generation; wrappt außerdem **alle** ShardKeks, ArtKeys und `K_ref` unter `KEK[e+1]` neu (Re-Wrap, kein Datenrewrite);
 3. schreibt die KeyTable atomar neu (REQ-FMT-5);
 4. vernichtet `KEK[e]` und dessen Wrap-Kopie nach dem Vernichtungsprotokoll (§12.2.7);
 5. bei K1 mit `rotate_passphrase_on_seal`: wechselt die Passphrase, sodass die alte Wurzel nicht mehr ableitbar ist, **wenn die alte Passphrase unbekannt ist**;
 6. bei K2/K3: ruft `rotate()` und anschließend `destroy()` am Slot.
 
-Nach dem Seal sind Flash-Reste gewrappter DocDeks früherer Epochen nur mit `KEK[e]` entschlüsselbar, und `KEK[e]` existiert nur noch als Rest unter der Wurzel. Bei K2 und K3 endet die Kette im Modul. Bei K1 bleibt die **Annahme A-FLASH** (§12.5.2); die Passphrasen-Rotation begrenzt sie zeitlich.
+Nach dem Seal sind Flash-Reste gewrappter DocDeks früherer Epochen nur mit `KEK[e]` entschlüsselbar, und `KEK[e]` existiert nur noch als Rest unter der Wurzel. Bei K2 und K3 endet die Kette im Modul. Bei K1 endet sie in der Passphrase. Ein Seal **ohne** Passphrasenwechsel erhöht bei K1 den Schutz gegen einen Angreifer mit Flash-Resten **und** Passphrase nicht: Reste des alten KDF-Headers (Salt) und der alten Wurzel-Wraps bleiben mit derselben Passphrase wieder ableitbar. Der Bericht weist deshalb `flash_hardening ∈ {None, PassphraseRotated, ModuleBound, ProviderAttested}` aus (INV-SEAL-HARDENING-1): K1 ohne Wechsel ⇒ `None`, die Klasse C1 stützt sich dann allein auf **A-FLASH** (§12.5.2); K1 mit Wechsel ⇒ `PassphraseRotated`, wirksam gegen Angreifer, die nur die alte Passphrase kennen. Der Passphrasenwechsel ist ein vom Betreiber ausgelöster Vorgang (`seal-now --rotate-passphrase`), nie automatisch. Der Seal bleibt auch ohne Wechsel nötig, weil er die Schlüsselkette bereinigt (Nadelscan, Klasse C1 nach Siegel 3) und Voraussetzung von K2/K3 ist. Der einzige Weg, A-FLASH auf Laptops und Servern zu ersetzen, ist K2 (nicht exportierbares Modul); K2 ist deshalb der priorisierte Ausbau (Spike S-K2).
 
-**Auslöser.** Zeitgesteuert (`kek_epoch_len`, Startwert 30 Tage), auf Anforderung (`seal-now`) und automatisch, wenn seit dem letzten Seal mindestens eine Löschung stattgefunden hat und `seal_after_deletion_max` erreicht ist (Startwert 7 Tage; **in `EnterpriseRegulated` Pflichtwert ≤ 72 h**, H-07). Löschungen innerhalb einer Epoche teilen sich einen Seal (Batch).
+**KeyTable-Shards (2.4).** Die KeyTable ist in `n_shards` Shards (Startwert 256, nach `hash(unit_ref)`) geteilt; jeder Shard hat eine eigene `ShardKek`-Generation. Begründung: Der gewrappte Blob eines vernichteten DocDek liegt nur in den Dateigenerationen **seines** Shards. Es genügt, diesen Shard unter einer neuen `ShardKek` neu zu schreiben, die alte zu vernichten und die Kette darüber (`KEK` ⇒ ShardKeks) auf `KEK[e+1]` umzustellen. Die Kosten sinken von O(alle Schlüssel) auf O(Schlüssel der geänderten Shards + `n_shards`), und ein Seal kann binnen Minuten statt Tagen laufen. Die Wirkung ist unverändert: Reste im Flash enden bei `KEK[e]`, das nur noch als Rest unter der Wurzel existiert.
+
+**Auslöser.** Zeitgesteuert (`kek_epoch_len`, Startwert 30 Tage), auf Anforderung (`seal-now`) und automatisch nach einer Löschung: Löschungen innerhalb von `seal_coalesce_window` (Startwert 15 min) teilen sich einen Seal; spätestens `seal_after_deletion_max` (Startwert 24 h; Profil `Maximum` 1 h; **in `EnterpriseRegulated` Pflichtwert ≤ 24 h**, H-07) nach der Löschung muss der Seal laufen. Der kürzere Standard folgt aus den Shard-Kosten (siehe unten): Ein Fenster von sieben Tagen verlängerte die Zeit, in der Flash-Reste des DocDek-Wraps unter `KEK[e]` stehen, ohne Kostenvorteil.
 
 **Klassenwirkung (INV-EPOCH-SEAL-1).** C1 bis C3 gelten erst nach dem ersten Seal, der die Löschung umfasst. Zwischen Vernichtung und Seal weist der Bericht die Klasse `C*` (vorläufig) mit `residuals: [R-KEKEPOCH until]` aus.
 
 **Crash-Sicherheit.** Der Seal ist ein eigener durabler Ablauf mit Journal. Ein Absturz mitten im Re-Wrap hinterlässt `KEK[e]` und `KEK[e+1]` nebeneinander und wird beim Start (B7) fortgesetzt. Der Seal ist idempotent.
 
-**Kosten.** Re-Wrap ist O(Anzahl Schlüssel), nicht O(Datenmenge). Die Messung gehört in `benchmarks/budgets.toml` (O-24, O-40).
+**Kosten.** Re-Wrap ist O(Schlüssel der geänderten Shards + `n_shards`), nicht O(Datenmenge) und nicht O(alle Schlüssel). Die Messung gehört in `benchmarks/budgets.toml` (O-24, O-40).
 
 #### 12.2.5 DocDek-Regeln
 
@@ -1048,13 +1098,13 @@ Postings und Graph enthalten viele Dokumente und können nicht unter einem DocDe
 |---|---|---|
 |Vektor-Payload im Snapshot|DocDek|Vernichtung des DocDek|
 |Graph-Snapshot (Topologie, Slot-Nummern)|ArtKey der Snapshot-Generation|Neuaufbau, danach Vernichtung des ArtKey (§12.16)|
-|Text-Segment (Postings, Termwörterbuch, Längen)|ArtKey je Segment|Segment neu schreiben mit neuem ArtKey, alten ArtKey sofort vernichten|
+|Text-Segment (Postings, Termwörterbuch, Längen)|ArtKey je Segment|Segment neu schreiben mit neuem ArtKey; alte Segmentdatei entfernen; alten ArtKey bei einer Löschung nach Siegel 2 vernichten (Schritt 5), bei einem Merge ohne Löschbezug sofort|
 
-INV-ARTKEY-1: Jedes Index-Artefakt hat genau einen ArtKey; beim Neuschreiben wird der alte vernichtet (REQ-DEL-N16).
+INV-ARTKEY-1: Jedes Index-Artefakt hat genau einen ArtKey; der alte wird bei Merge sofort, bei Löschung nach Siegel 2 vernichtet (REQ-DEL-N16). **Begründung:** Würde der alte ArtKey schon in Schritt 3 vernichtet, wären Pre-Destruction-Inventar und Messung der entschlüsselten Sicht (Schritt 4) für diese Artefakte unmöglich, und INV-DEL-ORDER-1 wäre unterlaufen. Die alte Segmentdatei ist ab Schritt 3 entfernt; bis Schritt 5 existiert nur noch ihr Flash-Rest, der unter dem (noch lebenden, nicht mehr referenzierten) ArtKey steht.
 
 #### 12.2.9 KeyTable, KeyRegistry, Krypto-Agilität, Keystore
 
-- **KeyTable** (Magic `MFKT`, §7.2) ist ein eigener Speicherbereich mit Ersetzen-Semantik. Nach jeder Vernichtung und jedem Seal wird die Segmentdatei ohne vernichtete Einträge neu geschrieben (REQ-DEL-N4). Atomares Ersetzen nach REQ-FMT-5, auch für den Keystore.
+- **KeyTable** (Magic `MFKT`, §7.2) ist ein eigener Speicherbereich mit Ersetzen-Semantik; in 2.4 in `n_shards` Dateien (Shards) geteilt (§12.2.4). Nach jeder Vernichtung und jedem Seal wird die Segmentdatei ohne vernichtete Einträge neu geschrieben (REQ-DEL-N4). Atomares Ersetzen nach REQ-FMT-5, auch für den Keystore.
 - **`KeyRegistry`** (`MFKR`) führt Ereignisse (`created`, `destroyed`, `sealed`) mit Referenz-Hash, ohne Schlüsselmaterial und ohne Wrap-Blob; append-only, HMAC-verkettet, über `DurableLog` mit `fsync` je Eintrag. Ein gelöschtes Log samt Marker bei vorhandenen Daten gilt als Manipulation (fail-closed).
 - **Krypto-Agilität (REQ-DEL-028, P-13).** Jedes persistierte kryptografische Objekt trägt Algorithmus- und Formatkennung. Ein Wechsel von AEAD, KDF, Hash oder Signatur ist ohne Datenverlust möglich (Re-Wrap bzw. Neuverschlüsselung per Kompaktion). Das Notfallverfahren bei Algorithmenversagen (EDPB Rn. 85, 96, Empf. 13) ist dokumentiert und wird halbjährlich per `doctor crypto-drill` geübt; die Eignung der Primitive wird periodisch neu bewertet.
 - `mlock` über `sys`; scheitert die Sperrung, meldet `mem_lock` dies wahrheitsgemäß, und `doctor` weist es aus (§12.18).
@@ -1087,7 +1137,7 @@ Der Typ `DeletionLayer` hat in 2.3 **zehn** Varianten (2.2.1: acht). Jede Schich
 |S1 Primärdaten (LSM, WAL)|`Lsm`|A (Memtable), B|`store` (`LsmScanner`)|Records unter DocDek; Memtable zeroizen; Hygiene: `compact_range(scope)`, WAL-Scrub (Segmente ohne Scope neu schreiben, alte entfernen, Verzeichnis-`fsync`)|Klartext, Chiffrat, Nadel|Memtable-Beleg erst nach `force_flush`; Tombstone-GC nur bei Vollkompaktion (§7.4)|
 |S1b Blob-Segmente|`BlobSegments`|B|`store` (`LsmScanner`)|Records unter DocDek; Hygiene: Segment-Rewrite|wie `Lsm`|**neu in 2.3**; früher unter `Lsm` versteckt, daher Lücke im Oberflächen-Inventar|
 |S2 Vektorindex|`VectorIndex`|A, B|`vector` (`VectorScanner`)|Arena-Slots (fp32, SQ8) nullen; Snapshot-Payload unter DocDek; Graph unter ArtKey, Neuaufbau (§12.16)|Slots mit Payload ≠ 0, Snapshot-Datei|kein Rewiring (VETO-F02); Slot-Nummern bis zum Neuaufbau nicht wiederverwendet (INV-HNSW-SLOT-1)|
-|S3 Textindex|`TextIndex`|A, B|`text` (`TextScanner`)|Segmente neu schreiben (neuer ArtKey, alter sofort vernichtet); Terme nur gelöschter Dokumente aus dem Wörterbuch; Statistik (IDF, Längen, Zähler) neu berechnen|Postings, Wörterbuch, Positionen|Terme müssen verschwinden, sonst Inhaltsrest|
+|S3 Textindex|`TextIndex`|A, B|`text` (`TextScanner`)|Segmente neu schreiben (neuer ArtKey, alter ArtKey nach Siegel 2 vernichtet, §12.8.2 Schritt 5); Terme nur gelöschter Dokumente aus dem Wörterbuch; Statistik (IDF, Längen, Zähler) neu berechnen|Postings, Wörterbuch, Positionen|Terme müssen verschwinden, sonst Inhaltsrest|
 |S4 Caches und Vault|`CachesAndVault`|A|`store`, `engine`, `privacy`|Block-, Embedding-, RRF-, Antwort-Cache und Surrogat-Vault invalidieren und zeroizen|`CacheScanner` (Enumeration nach Scope)|Antwort-Caches sind Pflicht (REQ-DEL-N7)|
 |S5 Audit, Lineage, Sidecars|`AuditLineage`|–|`engine`, `crypto` (`SidecarScanner`, `LineageScanner`)|Ableitungen kaskadieren (INV-DERIVED-1); Sidecars enthalten nur Referenz-Hashes, keine Nutzinhalte, keine Schlüssel|Referenzen ohne Klartext|Ableitungen mit weiteren Quellen neu ableiten oder `stale`|
 |S6 Interne Checkpoints|`Checkpoints`|B|`checkpoint` (`CheckpointScanner`)|Policy `Rewrite` (Standard), `ExpireNow`, `ExpireAfterHold` nur unter Hold (§12.5.4)|Rohsicht und entschlüsselte Sicht|Hardlink-Klone derselben SSTables liegen im Datenverzeichnis, also in der Kontrolle von Contextra|
@@ -1267,6 +1317,16 @@ Der Digest des Berichts wird optional über einen qualifizierten Zeitstempel (RF
 
 Der Bericht enthält nur Referenz-Hashes und gilt selbst als personenbezogen (EDPB Rn. 52). Aufbewahrung nach `report_retention` (Rechtsfrage P-07), danach pseudonym-ablaufend (§12.10). **Beweiskraft:** Der Bericht ist eine signierte Behauptung des löschenden Systems; die Signatur belegt nicht, dass Bytes fehlen. Unabhängige Aussagekraft entsteht aus gemessener Bereinigung, Nadelscan, Inventar und reproduzierbaren Canary-Läufen (§17.9).
 
+#### 12.7.11 Heap-Canary und Sensitive-Arenen (INV-HEAP-ZERO-1, 2.4)
+
+**Problem.** Ebene A verspricht, dass Klartext-Strukturen bereinigt sind. Das Rohdatei-Scanning sieht nur Dateien, nicht den Prozessspeicher; `zeroize` auf einzelnen Typen belegt nicht, dass Kopien in Allokator-Resten, Puffern oder Caches verschwunden sind. Ohne Messung bliebe die wichtigste Klartextquelle (RAM) ein Behauptungsfeld.
+
+**Regeln.**
+1. Klartext von Nutzdaten (entschlüsselte Blöcke im Block-Cache, Query- und Antwortpuffer, Memtable-Werte, Arena-Slots, Embedding-Caches) liegt ausschließlich in `Sensitive`-Arenen der Insel `sys` (eigene `mmap`-Regionen, `MADV_DONTDUMP`, `mlock` soweit möglich, Zeroisierung bei Freigabe und bei Invalidierung). Ein Typ `Sensitive<T>` ist die einzige Hülle für solche Werte; Gate `plaintext-types` lehnt Klartextpuffer außerhalb der Hülle ab (Schnittstellen bleiben sicher, `unsafe` nur in `sys`, P2).
+2. Der **Heap-Canary-Test** (Feature `test-hooks`, nie im Release) legt Canary-Daten an (≥ 32 Zufallsbyte, Embedding-Bytes, seltene Terme), führt Klasse P herbei und durchsucht den **Prozessspeicher** (Linux: `/proc/self/mem` mit `/proc/self/maps`; macOS: `vm_read`) nach den Needles. Erwartung: 0 Treffer außerhalb einer begründeten Allowlist (Testharness-eigene Kopien). Positivkontrolle: vor der Löschung muss der Scan die Needles finden.
+3. Der Test läuft in jedem CI-Lauf (Tier 1 und 2) und im Profil `Maximum` als `doctor`-Selbstprobe.
+4. **Grenze:** Der Test ist ein Regressionsdetektor für Contextras eigene Puffer, kein Beweis gegen Swap, Hibernation, Kernel- oder CPU-Caches und Fremdprozesse; diese bleiben A-RAM (§12.18, §12.20).
+
 ### 12.8 Löschsaga
 
 #### 12.8.1 Zustände
@@ -1288,11 +1348,11 @@ Weitere Zustände: `ReviewRequired` (Mixed-Segmente, §12.15), `Unfrozen` (Rück
 |---|---|---|---|
 |1|`Frozen`: `ErasedSet`-Eintrag (mit `subject_ref_hash` und `unit_ref_hash[]`), Lesesperre, `legal_state = Eingeschränkt`; Spiegelung an den `ErasedSetMirror` (§12.17.3)|`fsync` **vor** jeder Änderung|**L** (Siegel 1)|
 |2|`LogicallyDeleted`: Tombstone im WAL-Batch, Lineage-Kaskade|WAL-Commit|L|
-|3|`PlaintextPurged`: Ebene A bereinigen (Arena-Slots nullen, Caches zeroizen, Postings im Speicher, Antwort-Cache); Text-Segmente neu schreiben (neuer ArtKey, alter ArtKey sofort vernichtet)|Journal-Eintrag vor jedem Schritt|–|
+|3|`PlaintextPurged`: Ebene A bereinigen (Arena-Slots nullen, Caches zeroizen, Postings im Speicher, Antwort-Cache); Text-Segmente neu schreiben (neuer ArtKey; alte Segmentdatei entfernt; alter ArtKey bleibt bis Schritt 5)|Journal-Eintrag vor jedem Schritt|–|
 |4|`PlaintextMeasured`: Scanner Ebene A; **Pre-Destruction-Inventar** je `key_id`|Bericht mit Positivkontrolle|**P** (Siegel 2)|
-|5|`KeyDestroyed`: DocDek vernichten nach Destroy-Protokoll D1 bis D5 (§12.2.7), nach optionaler `erasure_grace`|Journal-Intent vor Vernichtung|–|
+|5|`KeyDestroyed`: DocDek **und alte ArtKeys** der Einheit vernichten nach Destroy-Protokoll D1 bis D5 (§12.2.7), nach optionaler `erasure_grace`|Journal-Intent vor Vernichtung|–|
 |6|`CryptoMeasured`: Nadelscan, Kanarien-Probe, Chiffrat-Identität (D6)|Bericht|**C***|
-|7|Epoch Seal (§12.2.4), soweit fällig oder `seal-now`|Journal|**C1/C2/C3** (Siegel 3)|
+|7|Epoch Seal (§12.2.4), koalesziert (`seal_coalesce_window`), spätestens nach `seal_after_deletion_max`, oder `seal-now`|Journal|**C1/C2/C3** (Siegel 3)|
 
 **Hygiene** (terminiert, ≤ `purge_rebuild_max_days`, Startwert 14 Tage):
 
@@ -1350,6 +1410,40 @@ Bei Aufbewahrungspflicht (Art. 17 Abs. 3) oder Legal Hold geht die Saga nach Sch
 #### 12.8.8 `forget` aus Aufrufersicht
 
 Autorisierung (Kategorie `Destructive`) und Forget-Guard (§13.3) → Schritt 1 (`Frozen`, durabel) → **sofortige Rückgabe** eines `DeletionReceipt` mit ehrlichem Teilbericht (Siegel 1, Klasse L) und `PendingDeletion`-Handle → Schritte 2 bis 7 (Minuten bis Stunden) → Hygiene → Bericht M. `report(id)` liefert den jeweils höchsten Stand. Idempotent und wiederaufnehmbar nach Absturz.
+
+#### 12.8.9 Planung, Effizienz und Profile (2.4)
+
+Die Sicherheitsinvarianten sind unabhängig von Effizienz und Profil; Planung ändert nur **Zeitpunkt, Bündelung und Messtiefe**, nie die Reihenfolge nach INV-DEL-ORDER-1 und nie die Klassenvoraussetzungen (INV-CLASS-MEASURED-1).
+
+**a) Planer.** Ein deterministischer Planer (Earliest-Deadline-First über die Fristen aus §12.19.1, Zeit aus `Clock`) ordnet die Schritte aller offenen Sagas. Schritte 1 und 2 (Sperre, Tombstone) und Messung Ebene A haben absoluten Vorrang vor Hygiene; Hygiene ist durch `SystemPressureMonitor` drosselbar, steigt aber mit näherndem `purge_rebuild_max_days` in der Priorität (kein Verhungern). Ein `dry_run` liefert Kostenvorschau (betroffene Dateien, Bytes, geschätzte Dauer) ohne Wirkung.
+
+**b) UnitDirectory (INV-UNITDIR-1).** Jede persistente Datei (SSTable, Blob-Segment, WAL-Segment, Text-Segment, Index-Snapshot) trägt einen unter `K_eng` verschlüsselten Metadatenblock mit den `doc_key_id` und Blockbereichen der enthaltenen Einheiten. Begründung: Die Blöcke sind per DocDek verschlüsselt und deshalb ohne Schlüssel nicht zuordenbar; ohne Verzeichnis müsste jede Löschung alle Dateien entschlüsseln oder blind scannen. Mit Verzeichnis ist (1) das Pre-Destruction-Inventar O(Dateien + Blöcke der Einheit), (2) die Purge-Kompaktion `compact_range` auf die tatsächlich betroffenen Dateien begrenzt, (3) die Vollständigkeitsprüfung („jeder Block einem lebenden oder vernichteten Schlüssel zugeordnet“) maschinell möglich. Einträge vernichteter Einheiten verschwinden beim Hygiene-Rewrite (Schritt 8); bis dahin sind sie Zufalls-IDs ohne Personenbezug (§12.7.6).
+
+**c) Zweistufige Messung (INV-UNITDIR-1, AC-35).** Der Rohbyte-Vollscan aller Dateien je Löschung wäre O(Datenmenge) und verhinderte häufige Löschungen. Er ist auch nicht nötig, weil ein Klartext-Needle in **verschlüsselten** Dateien nur bei einem Verschlüsselungsfehler trifft. Die Messung teilt sich deshalb:
+
+|Stufe|Gegenstand|Tiefe je Löschung|
+|---|---|---|
+|M1 Inventar|alle Dateien: Zuordnung jedes Blocks zu einem Schlüssel über das UnitDirectory; unzugeordnete Blöcke ⇒ Fehler|vollständig (Metadaten)|
+|M2 Klartext-fähige Bereiche|Memtable, Arenen, Caches, Temp, `.bak`, Journal, Sidecars, Logs, KeyTable-Dateien, Checkpoints im Rohzustand|vollständig, Multi-Needle (alle ausstehenden Needles einer Koaleszenz in einem Durchlauf)|
+|M3 Verschlüsselte Dateien|Nadelscan der Wrap-Nonces, Entropiestichprobe, Stichprobe von Blöcken auf Klartext-Needle|Stichprobe; volle Tiefe alle `full_scan_interval` (Startwert 7 Tage) sowie in jedem CI- und Canary-Lauf|
+
+Differenzbedingung: Der zweistufige Befund und der volle Rohscan liefern auf denselben Daten dasselbe Urteil; eine Abweichung ist ein Defekt des Scanners (AC-35). Klasse P stützt sich auf M1 und M2, Klasse C auf M1 bis M3.
+
+**d) Koaleszenz.** Löschungen innerhalb von `measure_coalesce_window` (Startwert 60 s) teilen sich einen Messlauf; innerhalb von `seal_coalesce_window` einen Seal; mehrere Löschungen derselben Collection einen Graph-Neuaufbau (§12.16). Jede Löschung erhält trotzdem einen eigenen, signierten Bericht mit ihren eigenen Witnesses; Siegel 1 (Klasse L) wird **nie** verzögert (AC-37).
+
+**e) Profile.** Das Profil `ErasureProfile` ändert nur Zeitfenster und Messtiefe:
+
+|Parameter|`Standard` (Default)|`Maximum`|
+|---|---|---|
+|`erasure_grace`|0|0|
+|`seal_after_deletion_max`|24 h|1 h|
+|Passphrasenwechsel beim Seal (K1)|auf Anforderung|bei jedem Seal Pflichtvorgang, sonst `flash_hardening = None`|
+|M3-Tiefe je Löschung|Stichprobe|vollständig|
+|`ErasedSetMirror`|empfohlen|Pflicht|
+|`checkpoint_policy`|`Rewrite`|`Rewrite`|
+|Heap-Canary im Betrieb (`doctor`-Selbstprobe)|aus|bei jeder Löschung|
+
+`EnterpriseRegulated` setzt mindestens `Maximum` für `erasure_grace`-Pflichtwert, Seal und Mirror (§14.2). Beide Profile erfüllen alle Invarianten; `Maximum` erkauft kürzere Restfenster mit höherer Last.
 
 ### 12.9 Lesesperre, Key-Lock und Restore-Guard
 
@@ -1438,6 +1532,11 @@ Eine Löschung gilt erst als bewiesen, wenn alle gültigen Kriterien grün sind.
 |AC-31|**Rücknahme.** `Unfreeze` nach D3 wird abgewiesen; im Regulated-Tier braucht `Unfreeze` zwei Personen.|Integration|
 |AC-32|**Uhr.** Bei Uhrrücksprung verweigern Horizont-, Karenz- und `valid_until`-Entscheidungen fail-closed (`ClockRegression`).|Chaos (Uhrsprung)|
 |AC-33|**Verification/Validation.** Im Regulated-Tier ist ein Bericht ohne Concurrence-Signatur `ValidationPending` und gilt nicht als Abschluss.|Typestate + Integration|
+|AC-34|**Heap-Canary.** Nach Klasse P findet der Prozessspeicher-Scan keinen Canary, kein Embedding-Byte-Muster und keinen seltenen Term des Scopes; die Positivkontrolle vor der Löschung findet sie; eine absichtlich nicht zeroisierte Kopie (Test-Mutation) wird gefunden.|Heap-Scan + Mutation|
+|AC-35|**Zweistufige Messung.** Auf 1.000 seed-reproduzierbaren Szenarien (mit Fehlerinjektion) liefern M1 bis M3 und der volle Rohscan dasselbe Urteil; ein Block ohne UnitDirectory-Zuordnung bricht die Messung (fail-closed).|Differentialtest + Property|
+|AC-36|**Shard-Seal.** Nach dem Seal enthält keine Datei Wrap-Nonce oder -Blob eines vernichteten Schlüssels; nur geänderte Shards wurden neu geschrieben (Zähler); der Aufwand wächst mit der Zahl geänderter Shards, nicht mit der Gesamtzahl der Schlüssel; Abbruch an jedem Teilschritt endet in Fortsetzung.|Crash-Matrix + Benchmark|
+|AC-37|**Koaleszenz.** n Löschungen in einem Fenster erzeugen n gültige Berichte mit einem Messlauf; keine Einheit erhält eine höhere Klasse, als ihre eigene Messung trägt; Siegel 1 erscheint unabhängig vom Fenster sofort.|Integration + `ManualClock`|
+|AC-38|**Flash-Härtung.** `flash_hardening` im Bericht folgt dem tatsächlichen Ablauf: K1-Seal ohne Passphrasenwechsel ⇒ `None`; mit Wechsel ⇒ `PassphraseRotated`; ein konfigurierter, nicht ausgeführter Wechsel ändert nichts.|Typestate + Integration|
 
 ### 12.13 Löschpfad: Komponenten und Platzierung
 
@@ -1554,7 +1653,7 @@ Die plattformspezifischen Aufrufe sind in Spike S-HRD zu verifizieren (O-38). Bi
 |`Frozen` (Klasse L)|intern|sofort nach Autorisierung|
 |Klasse P|intern, Zielgröße|≤ 1 Stunde|
 |Klasse C*|intern|unmittelbar nach P (zuzüglich `erasure_grace`)|
-|Epoch Seal|intern|≤ `seal_after_deletion_max` (7 Tage; Regulated ≤ 72 h)|
+|Epoch Seal|intern|≤ `seal_after_deletion_max` (24 h; Profil `Maximum` 1 h; Regulated ≤ 24 h)|
 |Hygiene (Klasse M)|intern, P-11|≤ `purge_rebuild_max_days` (14 Tage)|
 |Alarm bei `Partial`|intern|24 h|
 |Eskalation bei `Partial`|intern|14 Tage|
@@ -1594,7 +1693,7 @@ Dieser Abschnitt legt die Außenflächen fest, über die Contextra betrieben wir
 - **Rust-API:** `contextra` (Fassade, Composition Root) und `contextra-db` (Collections, Transaktionen). Öffentliche Funktionen: `Contextra::open`, `db()`, `remember`, `recall`, `forget`, `report(id)`, `restore_checkpoint`, `pin_checkpoint`, `as_of`, `shutdown`.
 - **MCP-Server (`contextra-mcp`):** Transport ist ausschließlich **stdio, JSON-RPC 2.0**. `stdout` gehört dem Protokoll (INV-STDOUT-1); Logs gehen nach `stderr` oder in eine Datei. Es gibt keinen TCP- oder UDP-Listener (INV-IPC-1).
 - **Primärprozess und Proxy (INV-IPC-1):** Genau ein Primärprozess hält das Datenverzeichnis und die Engine. Jeder weitere MCP-Host-Start erkennt den Primär über Lock- und Endpoint-Datei und arbeitet als **stdio↔IPC-Proxy**. IPC ist ein Unix-Domain-Socket (Verzeichnis `0700`, Socket `0600`) bzw. eine Named Pipe mit ACL. Peer-Credentials (`SO_PEERCRED`, `getpeereid`, `GetNamedPipeClientProcessId`) werden geprüft. Der Prinzipal besteht aus OS-Nutzer und Client-Name und wird über die Konfiguration einem Tenant zugeordnet. Der Primärprozess endet nach `idle_timeout` (Startwert 15 min) ohne Clients; fällt er aus, übernimmt der nächste Client nach Recovery. Alle Clients teilen dieselben Garantien.
-- **CLI:** `init`, `doctor`, `status`, `confirm <token>`, `migrate`. Die Befehle `verify-proof` (offline-Prüfung) und ein MCP-Statuswerkzeug sind in v1.0 nicht enthalten (O-Punkt, §25).
+- **CLI:** `init`, `doctor` (inkl. `verify-report`, `export-concept`, `crypto-drill`), `status`, `confirm <token>`, `migrate`, `seal-now` (optional `--rotate-passphrase`), `export-keys`. Ein MCP-Statuswerkzeug ist in v1.0 nicht enthalten (O-21).
 
 ### 13.2 Werkzeugoberfläche (MCP)
 
@@ -1784,7 +1883,11 @@ Werte mit **„fest“** sind unveränderlich. Werte mit **„Startwert“** sin
 | `erased_set_retention` | 90 Tage (≥ `key_backup_max_age` + Zuschlag; Pflichtwert ohne Standard in `EnterpriseRegulated`) | Rechtsgrundlage und Frist offen (P-07, P-16); Untergrenze `key_backup_max_age` (§12.10) |
 | `key_backup_max_age` | 30 Tage (≤ `erased_set_retention`) | Lebensdauer eines Schlüssel-Backups (Spur K, §12.17); Frist offen (P-06) |
 | `kek_epoch_len` | 30 Tage | Epoch Seal zeitgesteuert (§12.2.4) |
-| `seal_after_deletion_max` | 7 Tage (Regulated: ≤ 72 h) | Epoch Seal nach Löschung (H-07) |
+| `seal_after_deletion_max` | 24 h (`Maximum`: 1 h; Regulated: ≤ 24 h) | Epoch Seal nach Löschung (H-07); kurz, weil Seal nur geänderte KeyTable-Shards neu schreibt (§12.2.4) |
+| `seal_coalesce_window` | 15 min | Löschungen teilen sich einen Seal |
+| `measure_coalesce_window` | 60 s | Löschungen teilen sich einen Messlauf (§12.8.9) |
+| `full_scan_interval` | 7 Tage | volle Tiefe der Messung M3 (§12.8.9) |
+| `n_shards` | 256 | KeyTable-Shards; per Benchmark kalibrieren (O-42) |
 | `erasure_grace` | 0 (Obergrenze 72 h; Regulated: Pflichtwert ohne Standard) | Karenz zwischen Klasse P und Schlüsselvernichtung (§12.8.3) |
 | `purge_rebuild_max_days` | 14 Tage | Hygiene und Graph-Neuaufbau (§12.8.2, §12.16) |
 | `min_record_bytes` | 256 | Padmé-Padding (§12.2.6) |
@@ -1918,7 +2021,7 @@ Die Pflichttests der Garantien G1–G6 (§2.4) sind in dieser Fassung benannt. D
 | Test | Garantie | Prüfung | Mechanismus |
 |---|---|---|---|
 | T-DEL-1 | G1 | nach `Completed` keine Klartextreste in LSM, Vektor-, Textindex und Checkpoints (Canary-Scan) | C + I |
-| T-DEL-2 | G2 | Bericht entsteht nur aus gemessenen Restzahlen 0 mit Ergebnis `Erased` | T + P |
+| T-DEL-2 | G2 | Bericht entsteht nur aus gemessenen Restzahlen 0 mit der gemessenen Klasse (kein höherer Anspruch) | T + P |
 | T-DEL-3 | G2 | Signatur verifiziert mit falschem Schlüssel nicht | P |
 | T-DEL-4 | G3 | Absturz an jeder Stelle der Saga führt zu Fortsetzung oder `Partial` | C (Crash-Matrix) |
 | T-DEL-5 | G3 | kein Bericht ohne Löschung bei Absturz | C |
@@ -1932,7 +2035,7 @@ Die Pflichttests der Garantien G1–G6 (§2.4) sind in dieser Fassung benannt. D
 | T-EMB-1 | — | Modellwechsel wird abgewiesen; Migration nur mit Neuaufbau (§11.1) | I + G |
 | T-DET-1 | RB1 | HNSW-Aufbau mit festem Seed ist bit-identisch (INV-INDEX-APPLY-1) | P |
 
-Ergänzend gilt: AC-1 bis AC-33 aus §12.12 sind Abnahmekriterien für die Löschung. AC-7, AC-12, AC-14 und AC-15 bleiben unbelegt (Inhalt der Fassung 1.3 nicht rekonstruierbar, §25.3); die Nummern werden nicht neu vergeben. Neue Pflichttests zu G3/G4: T-DEL-10 (Destroy-Protokoll, AC-28), T-DEL-11 (Epoch Seal, AC-21), T-DEL-12 (Backup-Trennung, AC-22), T-DEL-13 (Nadelscan, AC-25), T-DEL-14 (keine Wiederauferstehung, AC-27).
+Ergänzend gilt: AC-1 bis AC-38 aus §12.12 sind Abnahmekriterien für die Löschung. AC-7, AC-12, AC-14 und AC-15 bleiben unbelegt (Inhalt der Fassung 1.3 nicht rekonstruierbar, §25.3); die Nummern werden nicht neu vergeben. Neue Pflichttests zu G3/G4/G7: T-DEL-15 (Lösch-Mutationskatalog, §17.11), T-DEL-10 (Destroy-Protokoll, AC-28), T-DEL-11 (Epoch Seal, AC-21), T-DEL-12 (Backup-Trennung, AC-22), T-DEL-13 (Nadelscan, AC-25), T-DEL-14 (keine Wiederauferstehung, AC-27).
 
 ### 17.6 Reifegrad (`maturity`)
 
@@ -1949,7 +2052,7 @@ Jede Kerngarantie RB1–RB4 (§2.5) hat ein Prüfmaß, das nicht aus denselben D
 | Garantie | Orakel |
 |---|---|
 | RB1 Crash und WAL | Referenzmodell der WAL-Semantik; Crash-Simulation mit `FaultVfs` (seed-reproduzierbar) |
-| RB2 Löschung | Canary-Scanner (§17.9) und Referenz-Verifier in anderer Sprache (der Referenz-Verifier entfällt mit REQ-PRF-6; in v1.0 wirkt nur der Canary-Scanner, Lücke, §25) |
+| RB2 Löschung | Canary-Scanner (§17.9), Heap-Canary (§12.7.11) und ein Referenz-Prüfer in anderer Sprache **nur als Testorakel** (nicht Produktbestandteil, REQ-PRF-6) |
 | RB3 Audit und Provenienz | unabhängige Referenzimplementierung der HMAC-Kette |
 | RB4 Isolation | Brute-Force-Referenz für ANN und ACL; History-Checker für SSI |
 
@@ -1962,6 +2065,41 @@ Ein Canary-Lauf legt Daten mit eindeutigen, zufällig erzeugten Markern an (Klar
 ### 17.10 Benchmarks und Trennung
 
 Benchmark-Code liegt im Crate `bench` (§4.2). Er enthält `unsafe`-Code, ist aber von Kernaussagen getrennt. Kernaussagen stützen sich nie auf Benchmarks allein.
+
+### 17.11 Lösch-Mutationskatalog (2.4, G7)
+
+Die Löschzusage ist nur so stark wie der schwächste Test. Das Gate `del-mutation` (nächtlich) fügt je Zeile **einen** Fehler in den Löschpfad ein (Mutant); **jeder** Mutant MUSS von mindestens einem benannten Test getötet werden, sonst ist das Gate rot. Neue Löschschritte erhalten vor dem Merge eine Zeile (A10).
+
+|ID|Mutant|tötender Test|
+|---|---|---|
+|M-DEL-01|Memtable-Werte werden nicht zeroisiert|AC-1, AC-34|
+|M-DEL-02|Antwort- oder RRF-Cache wird nicht invalidiert|AC-1 (entschlüsselte Sicht), AC-5|
+|M-DEL-03|SQ8-Code im Arena-Slot wird nicht genullt|`VectorScanner`-Test, AC-1|
+|M-DEL-04|Term bleibt im Wörterbuch|`TextScanner`-Test|
+|M-DEL-05|alte Text-Segmentdatei bleibt|AC-1, AC-35|
+|M-DEL-06|WAL-Scrub lässt Altsegment|AC-1, AC-3|
+|M-DEL-07|Blob-Rewrite entfällt|AC-35 (Inventar)|
+|M-DEL-08|D4 entfällt (alte KeyTable-Generation bleibt)|AC-25, AC-36|
+|M-DEL-09|`KeyCache` wird bei D2 nicht invalidiert|AC-5, AC-28|
+|M-DEL-10|D3 ohne Verzeichnis-`fsync`|AC-28 (Crash-Matrix)|
+|M-DEL-11|Schritt 5 beginnt vor Siegel 2|AC-31, Typestate (INV-DEL-ORDER-1)|
+|M-DEL-12|Scanner liefert konstant 0|AC-2, AC-26|
+|M-DEL-13|Positivkontrolle entfällt|AC-1|
+|M-DEL-14|Scanner liest nur Teilmenge der Dateien|Dateilisten-Digest gegen Verzeichnis (AC-35)|
+|M-DEL-15|`KEK[e]` überlebt den Seal|AC-21, AC-25|
+|M-DEL-16|geänderter Shard wird nicht neu geschrieben|AC-36|
+|M-DEL-17|Restore-Guard entfällt|AC-4, AC-27|
+|M-DEL-18|Lesesperre prüft nur `subject_ref_hash`, nicht `unit_ref_hash`|AC-5|
+|M-DEL-19|`as_of` umgeht die Lesesperre|T-DEL-9|
+|M-DEL-20|Klasse C1 ohne Epoch Seal ausgestellt|AC-6, INV-CLASS-MEASURED-1|
+|M-DEL-21|Satz ohne Messwert in der Satzbibliothek|AC-24|
+|M-DEL-22|Padding abgeschaltet|AC-30|
+|M-DEL-23|Mirror-Ausfall blockiert `Frozen`|Chaos (AC-29)|
+|M-DEL-24|Uhrrücksprung wird ignoriert|AC-32|
+|M-DEL-25|alter ArtKey schon in Schritt 3 vernichtet|AC-35 (Inventar vor Vernichtung), INV-DEL-ORDER-1|
+|M-DEL-26|`flash_hardening` aus Konfiguration statt aus Ablauf|AC-38|
+|M-DEL-27|Koaleszenz hebt die Klasse einer Einheit über ihre Messung|AC-37|
+|M-DEL-28|zweistufige Messung weicht vom Vollscan ab (Scanner übersieht Datei)|AC-35|
 
 ---
 
@@ -2134,6 +2272,11 @@ Der Katalog enthält jede normative Anforderung, die in dieser Fassung vorkommt,
 | REQ-DEL-N26 | [K] | `erasure_grace` ist im Regulated-Tier Pflichtwert ohne Standard (Obergrenze 72 h); `Unfreeze` bis D3, im Regulated-Tier mit zwei Personen (AC-31). | I | in 2.3 definiert (§12.8.3) |
 | REQ-DEL-N27 | [K] | Jedes Siegel (1 bis 4) ist ein signierter, in die AuditChain verketteter Bericht. | I | in 2.3 definiert (§12.8.5) |
 | REQ-DEL-N37 | [K] | Bestand ohne DocDek (`LegacyUnkeyed`) erreicht höchstens Klasse P, bis `contextra migrate --rekey-units` ihn je Einheit neu verschlüsselt hat; `doctor` weist den Anteil aus. | I + Migrationstest | in 2.3 definiert (§12.2.5) |
+| REQ-DEL-N40 | [K] | Die KeyTable MUSS in `n_shards` Shards mit eigener `ShardKek`-Generation geführt werden; der Epoch Seal MUSS geänderte Shards neu schreiben, alle ShardKeks, ArtKeys und `K_ref` unter `KEK[e+1]` neu wrappen und `KEK[e]` vernichten; der Bericht MUSS `flash_hardening` aus dem tatsächlichen Ablauf erzeugen (INV-SEAL-HARDENING-1). | Crash-Matrix + Typestate (AC-36, AC-38) | in 2.4 definiert (§12.2.4) |
+| REQ-DEL-N41 | [K] | Klartext von Nutzdaten MUSS in `Sensitive`-Arenen liegen und bei Freigabe zeroisiert werden; ein Heap-Canary-Test MUSS nach Klasse P 0 Treffer liefern (INV-HEAP-ZERO-1). | G (`plaintext-types`) + Heap-Scan (AC-34) | in 2.4 definiert (§12.7.11) |
+| REQ-DEL-N42 | [K] | Jede persistente Datei MUSS ein verschlüsseltes UnitDirectory tragen; die Messung MUSS zweistufig (M1 bis M3) sein, mit Differenzbedingung zum vollen Rohscan (INV-UNITDIR-1). | P + Differentialtest (AC-35) | in 2.4 definiert (§12.8.9) |
+| REQ-DEL-N43 | [K] | Der Lösch-Mutationskatalog (§17.11) MUSS vollständig getötet werden; neue Löschschritte brauchen vorab eine Katalogzeile. | G: `del-mutation` | in 2.4 definiert (§17.11) |
+| REQ-DEL-N44 | [K] | Der Planer MUSS Fristen deterministisch ordnen, Koaleszenzfenster einhalten, Siegel 1 nie verzögern und Profile (`Standard`, `Maximum`) ohne Änderung der Invarianten anwenden. | I + `ManualClock` (AC-37) | in 2.4 definiert (§12.8.9) |
 | REQ-DUR-001 | [K] | Der Commit-Punkt MUSS die plattformgerechte Durability-Primitive nutzen (1.3 §7.8); Ack erst danach (INV-DURABILITY-PRIM-1). | C: FaultVfs je Plattform | übernommen |
 | REQ-DUR-002 | [K] | Nach `fsync`/`fdatasync`-Fehler DARF kein Ack, kein Retry auf demselben Handle erfolgen; der WAL-Handle wird vergiftet (INV-FSYNC-1). | C | übernommen |
 | REQ-DUR-003 | [K] | Volles Medium DARF keinen Phantom-Eintrag und keinen halb angewendeten Batch hinterlassen; WAL-Segmente werden vorab reserviert (INV-ENOSPC-1). | C | übernommen |
@@ -2165,7 +2308,7 @@ Der Katalog enthält jede normative Anforderung, die in dieser Fassung vorkommt,
 | REQ-FGT-2 | – | Beim Start (B7) setzt die Engine jede Saga ohne `Completed` fort oder meldet `Partial{outstanding}`. | in 2.3 §12.8 tabelliert | in 2.3 definiert (nicht in 1.3 §33) |
 | REQ-FGT-3 | – | `Frozen` schreibt den `ErasedSet`-Eintrag durabel **vor** der ersten Löschoperation; ab dann gilt die Lesesperre. | in 2.3 §12.8 tabelliert | in 2.3 definiert (nicht in 1.3 §33) |
 | REQ-FGT-4 | – | Fehler von `fsync`, `rename`, `write` in Purgern führen zu `Partial`, nie zu stillem Weiterlaufen. `compaction.rs:211` (`let _ = fsync_parent_dir`) wird propagiert. | in 2.3 §12.8 tabelliert | in 2.3 definiert (nicht in 1.3 §33) |
-| REQ-FGT-5 | – | Ein Scanner-Ergebnis mit `remaining > 0` hält die Saga in `Measured` mit `ResidueRemaining{layer, count}`; es entsteht ein Bericht, kein `Erased`. | in 2.3 §12.8 tabelliert | in 2.3 definiert (nicht in 1.3 §33) |
+| REQ-FGT-5 | – | Ein Scanner-Ergebnis mit `remaining > 0` hält die Saga in `PlaintextMeasured`/`HygieneMeasured` mit `ResidueRemaining{layer, count}`; es entsteht ein Bericht, kein höherer Klassenanspruch. | in 2.3 §12.8 tabelliert | in 2.3 definiert (nicht in 1.3 §33) |
 | REQ-FGT-6 | – | Die Saga ist abbrechbar nur **zwischen** Schritten (§6 Punkt 5); Abbruch hinterlässt `Partial`. | in 2.3 §12.8 tabelliert | in 2.3 definiert (nicht in 1.3 §33) |
 | REQ-FGT-7 | – | Der `RequestContext` (Mandant, Prinzipal) kommt vom Aufrufer; kein Fallback auf `TenantId::SYSTEM` und kein `unwrap_or(TxId::new(1))` (heute `TenantId::try_new(1).unwrap_or(TenantId::SYSTEM)` in `tools_crud.rs:127,193`, `server_tools.rs:448`). | in 2.3 §12.8 tabelliert | in 2.3 definiert (nicht in 1.3 §33) |
 | REQ-FMT-1 | – | Jedes persistente Artefakt beginnt mit Magic (4 Byte), Formatversion (u16), Flags, Längenfeld und trägt eine Prüfsumme (CRC32C für Blöcke, Blake3 für Manifeste/Segmente). | in 2.2 §7.11 tabelliert | in 2.3 definiert (nicht in 1.3 §33) |
@@ -2217,7 +2360,7 @@ Der Katalog enthält jede normative Anforderung, die in dieser Fassung vorkommt,
 | REQ-MCP-006 | [K] | Recall MUSS Inhalt strukturiert mit `trust` und `source` liefern, nie als Anweisung (INV-TRUST-1). | I + P | übernommen |
 | REQ-MCP-007 | [K] | Abbruch MUSS kooperativ bis in die Engine wirken; nach dem WAL-Append wird er ignoriert (INV-CANCEL-1). | I + C | übernommen |
 | REQ-MCP-008 | [K] | Eingangs- und Ausgabegrenzen (RPC-Größe, `max_response_tokens`) MÜSSEN erzwungen und fuzz-geprüft sein. | F + I | übernommen |
-| REQ-MCP-009 | [K] | Die CLI MUSS `init`, `doctor`, `verify-proof`, `confirm`, `migrate` bereitstellen. | I | angepasst: `verify-proof` entfällt mit REQ-PRF-6 (1.3 §13.1) |
+| REQ-MCP-009 | [K] | Die CLI MUSS `init`, `doctor` (inkl. `verify-report`), `confirm`, `migrate`, `seal-now` bereitstellen. | I | angepasst: `verify-proof` ersetzt durch `doctor verify-report` (REQ-PRF-6) (1.3 §13.1) |
 | REQ-MCP-010 | [K] | Fehler MÜSSEN strukturiert und als retrybar/final klassifiziert sein. | I | übernommen |
 | REQ-MVCC-001 | [K] | SSI MUSS im Produktionspfad aktiv sein; Read-Sets inkl. Prefix-/Range-Phantomschutz werden bei jedem Commit validiert (INV-SSI-ACTIVE-1). | P: Referenzmodell + C: History-Checker + L | übernommen |
 | REQ-MVCC-002 | [K] | Indexeinträge MÜSSEN `born_seq`/`died_seq` tragen; Suchen sehen nur Einträge mit `born_seq ≤ S < died_seq` (INV-INDEX-SNAPSHOT-1). | P + L | übernommen |
@@ -2298,6 +2441,14 @@ Dieser Abschnitt hält die Gestaltungsentscheidungen fest, die für die Umsetzun
 | E49 | Pseudonyme | Referenz-Hash und Referenzschlüssel statt „Commitment“ (HMAC ist kein Commitment; EDPB Rn. 52) | §12.10 |
 | E50 | Mixed-Segmente | nie automatische Freigabe; Standard `BlockAll` | §12.15 |
 | E51 | Fristen | interne Zielgrößen; Contextra sendet nichts nach außen | §12.19 |
+| E52 | KeyTable-Shards | Seal-Kosten O(geänderte Shards); Seal binnen Minuten statt Tagen; Wirkung unverändert | §12.2.4 |
+| E53 | Zweistufige Messung und Koaleszenz | Vollständigkeit über Inventar (M1), Tiefe dort, wo Klartext möglich ist (M2), Stichprobe plus periodisch voll in verschlüsselten Dateien (M3); Mehrfach-Needle je Fenster | §12.8.9 |
+| E54 | ArtKey-Vernichtung nach Siegel 2 | Auflösung eines Widerspruchs aus 2.3 (Schritt 3 gegen INV-DEL-ORDER-1) | §12.2.8 |
+| E55 | Ehrliche Flash-Härtung | K1-Seal ohne Passphrasenwechsel erhöht A-FLASH-Schutz nicht; `flash_hardening` im Bericht; K2 priorisiert | §12.2.4 |
+| E56 | Heap-Canary | Ebene A im RAM wird im Test gemessen; Grenze A-RAM bleibt | §12.7.11 |
+| E57 | Lösch-Mutationskatalog | G7: jeder Fehler im Löschpfad wird von einem Test getötet | §17.11 |
+| E58 | Profile `Standard` und `Maximum` | gleiche Invarianten, andere Zeitfenster und Messtiefe | §12.8.9 |
+| E59 | Garantiebegriff | dreistufiger technischer Vertrag; „garantiert“ bleibt in Außenaussagen verboten | §2.4a |
 
 **Kollision der Kürzel.** Die Spikes S-E1 und S-E2 (§1.2) und die Evidenzstufen E1 und E2 (§1.4) tragen dieselben Kürzel. Die Spikes werden in dieser Ergänzung als **S-E1** und **S-E2** geführt. Eine Umbenennung der Spike-Kürzel in der Quelle ist offen (O-Punkt, §25.2).
 
@@ -2412,7 +2563,7 @@ Logs, Metriken, Fehlertexte und Panic-Meldungen enthalten nur IDs und Zähler, n
 
 ### 23.4 Audit
 
-Die `AuditChain` ist append-only, hash-verkettet, tenant-getrennt und durabel (REQ-AUD-001). Sie enthält Zugriffe, Löschungen, Löschberichte und Freigaben. Löschereignisse stehen mit `subject_commitment`, nie mit einer ID (§12.6).
+Die `AuditChain` ist append-only, hash-verkettet, tenant-getrennt und durabel (REQ-AUD-001). Sie enthält Zugriffe, Löschungen, Löschberichte und Freigaben. Löschereignisse stehen mit `subject_ref_hash`, nie mit einer ID (§12.6).
 
 ---
 
@@ -2444,7 +2595,7 @@ Siehe §13.8. Export und Restore unterliegen dem Restore-Horizont (INV-RESTORE-H
 Ein Tenant durchläuft die Zustände `Aktiv`, `Gesperrt` und `Gelöscht`.
 
 - **Aktiv → Gesperrt** (Kategorie `Admin`): keine Schreibzugriffe; Lesen nur für Betreiber mit Protokollierung; Schlüssel bleiben erhalten. Die Rückkehr nach `Aktiv` ist nur bei unveränderten Schlüsseln zulässig.
-- **Gesperrt → Gelöscht** (`erase_tenant`, Kategorie `Destructive`): Der Tenant wird im `ErasedSet` eingetragen, bevor die Saga beginnt (INV-BOOT-1). Jede Collection durchläuft die Stufen S1 bis S3. Je Scope entsteht ein Bericht.
+- **Gesperrt → Gelöscht** (`erase_tenant`, Kategorie `Destructive`): Der Tenant wird im `ErasedSet` eingetragen, bevor die Saga beginnt (INV-BOOT-1). Jede Collection durchläuft die Saga nach §12.8.2 (Klassen L bis M). Je Scope entstehen die Siegel 1 bis 4.
 - **Gelöscht** ist endgültig. Die Tenant-ID wird nie wiederverwendet. Schreibversuche liefern `TenantErased` (final).
 
 ---
@@ -2496,8 +2647,8 @@ Die Punkte sind offene Prüfaufträge an die Projektverantwortlichen, eine Facha
 | O-19 | `PowerUserLocal` als Tier übernehmen oder streichen? | §14.1 |
 | O-20 | Mechanismus der Bestätigung: Kanal der `confirm`-Befehl oder OS-Dialog; Gültigkeitsdauer des Tokens | §13.3 |
 | O-21 | Statuswerkzeug für MCP: ja oder nein in v1.0? | §13.1 |
-| O-22 | `verify-proof` (offline) in v1.0 oder entfallen (REQ-PRF-6 entfällt)? | §13.1 |
-| O-23 | Referenz-Verifier für RB2 (Orakel): entfällt mit REQ-PRF-6, aber §17.8 nennt ihn | §17.8 |
+| O-22 | geklärt in 2.4: `doctor verify-report` ersetzt `verify-proof` (REQ-PRF-6) | §13.1 |
+| O-23 | geklärt in 2.4: Referenz-Prüfer nur als Testorakel, nicht Produkt | §17.8 |
 | O-24 | Budgets und Recovery-Zeitbudgets je Tier in `benchmarks/budgets.toml` (Zahlen) | §16.4 |
 | O-25 | Garantieplattform der Vorgängerfassung und Matrix §13.7 (Windows Tier 2) gegen §0.5 abgleichen | §0.5, §13.7 |
 | O-26 | Lizenz: MIT OR Apache-2.0 (Repo) oder BSL 1.1 (Fachfragen); Lizenzgate (`license`) `[E]` | 1.3 §23.5, U-33 |
@@ -2514,6 +2665,11 @@ Die Punkte sind offene Prüfaufträge an die Projektverantwortlichen, eine Facha
 | O-38 | plattformspezifische Härtung (Spike S-HRD) | §12.18 |
 | O-40 | Kosten von Re-Wrap und Padding messen (`budgets.toml`) | §12.2.4, §12.2.6 |
 | O-41 | Typ-Abbildung der sieben Code-Varianten auf zehn Schichten (U-41) | §12.4 |
+| O-42 | Kalibrierung von `n_shards` und Messung der Seal-Kosten (AC-36) | §12.2.4 |
+| O-43 | Bedienkonzept für den K1-Passphrasenwechsel beim Seal (interaktiv, nie automatisch) und Priorität von K2 (Spike S-K2) | §12.2.4 |
+| O-44 | Heap-Scan auf macOS (`vm_read`) und Windows; Allowlist des Testharness | §12.7.11 |
+| O-45 | Bestätigung von `Standard` als Default-Profil und von `seal_after_deletion_max` = 24 h durch den Eigentümer | §12.8.9 |
+| O-46 | Primärtextprüfung von EDPB 02/2025 Rn. 63 und Rn. 87, BayLfD-Fundstelle und NIST-Rev.-2-Bedingungen vor Außennutzung (P-14) | §12.1.2a |
 
 ### 25.3 Lücken in der Nummerierung
 
@@ -2534,7 +2690,8 @@ Die Punkte sind offene Prüfaufträge an die Projektverantwortlichen, eine Facha
 | 2.0 und 2.1 | obsolet laut 2.2; **nicht** herangezogen |
 | 2.2 (Stand 26.10.2026) | Basisfassung |
 | 2.2.1 (vervollständigt) | Vorgänger dieser Fassung: §13 bis §26 und Anhänge A und B ergänzt |
-| 2.3 (Entwurf) | diese Fassung: §12 vollständig ersetzt, abhängige Stellen angepasst (§26.5) |
+| 2.3 (Entwurf) | Vorgänger: §12 vollständig ersetzt, abhängige Stellen angepasst (§26.5) |
+| 2.4 (Entwurf) | diese Fassung: Löschpfad optimiert, Quellenbereinigung, Widersprüche aus 2.3 behoben (§26.6) |
 
 ### 26.2 Übernahme aus 1.3
 
@@ -2618,4 +2775,25 @@ Die Gesamtsumme der Archiv-Zeilen ist 25.981 (ohne `contextra-core`). Die Zeilen
 3. **Nicht rückführbar (bewusst offen):** Inhalt von AC-7, AC-12, AC-14, AC-15 und der Entscheidungen E5 bis E14 usw. (§25.3).
 4. **Nicht am Code geprüft:** U-39 bis U-42 stammen aus dem Anhang und sind am Repository nicht verifiziert. Rechtsfundstellen mit ◐/○ sind vor Außennutzung im Volltext zu prüfen (P-14).
 5. **Zu klären vor Freigabe:** O-15 (Standard-Policy `Rewrite`), E44 (teilweise Rücknahme von E27), Aktivierung von K2/K3, Zählung der Invarianten und Anforderungen durch das Doc-Truth-Gate.
+
+### 26.6 Änderungen in Fassung 2.4 (Optimierung und Bereinigung)
+
+**Optimierungen (mit Begründung):**
+
+1. **Garantiebegriff (§2.4a, E59).** Eine absolute Löschgarantie ist weder rechtlich noch physikalisch belegbar; verbindlich ist ein dreistufiger technischer Vertrag aus Konstruktion, Messung und bedingter Wirkung. Das Lückenfreiheitsprinzip macht „maximal löschen“ prüfbar: jede Lücke geschlossen, gemessen und befristet oder als Annahme benannt.
+2. **KeyTable-Shards (E52).** Der Wrap-Blob eines vernichteten DocDek liegt nur im Shard seines Schlüssels; nur dieser Shard muss neu geschrieben werden. Seal-Kosten sinken von O(alle Schlüssel) auf O(geänderte Shards + `n_shards`); dadurch kann `seal_after_deletion_max` von 7 Tagen auf 24 h (Maximum 1 h) sinken und das Restfenster der Flash-Reste schrumpft entsprechend.
+3. **Ehrliche Flash-Härtung (E55).** Bei K1 ändert ein Seal ohne Passphrasenwechsel nichts an der Angreiferklasse „Flash-Reste plus Passphrase“, weil Reste des alten Salts und der Wurzel-Wraps mit derselben Passphrase ableitbar bleiben. Der Bericht weist das über `flash_hardening` aus; K2 wird als einziger Weg über A-FLASH hinaus priorisiert.
+4. **ArtKey-Vernichtung nach Siegel 2 (E54).** In 2.3 vernichtete Schritt 3 den alten ArtKey, bevor Inventar und Messung (Schritt 4) möglich waren; das widersprach INV-DEL-ORDER-1. Korrigiert in §3.4, §10.1, §12.2.8, §12.4, §12.8.2.
+5. **UnitDirectory und zweistufige Messung (E53).** Der Vollscan aller Dateien je Löschung ist O(Datenmenge) und für verschlüsselte Dateien aussagearm. Inventar (vollständig, Metadaten) plus Klartext-Scan dort, wo Klartext möglich ist, plus Stichprobe und periodische Volltiefe, abgesichert durch eine Differenzbedingung zum Vollscan.
+6. **Koaleszenz und Planer (E58, §12.8.9).** Messung, Seal und Graph-Neuaufbau werden über Fenster gebündelt; Siegel 1 bleibt sofort. Profile ändern Zeitfenster und Messtiefe, nie Invarianten.
+7. **Heap-Canary (E56).** Ebene A im Arbeitsspeicher wird im Test gemessen; `Sensitive`-Arenen in `sys` machen Zeroisierung typisiert. Grenze A-RAM bleibt ausgewiesen.
+8. **Lösch-Mutationskatalog (E57, G7).** 28 Mutanten müssen von Tests getötet werden; das macht die Zusage „jeder Fehler im Löschpfad fällt auf“ mechanisch prüfbar.
+
+**Bereinigungen:**
+
+1. Quellenbereinigung (§12.1.2a): Fehlzuordnungen (OLG Dresden 4 U 1278/21, BSI TR-02102, Backup-Fristen, § 35 BDSG, EDPB 28/2024, DSK-RAG-Papier, AI Act Art. 12, Aufbewahrungsfristen) sind ausgewiesen; Rn. 76 durch Rn. 63 ersetzt; BayLfD-Fundstelle auf ◐ herabgestuft.
+2. Widersprüche aus 2.3 behoben: Schichtzahl in §0.4 (zehn statt acht), Invariantenzählung (61 statt 60, jetzt 64), `verify-proof` gegen `doctor verify-report` (§13.1, REQ-MCP-009, O-22, O-23, §17.8), `subject_commitment` gegen `subject_ref_hash` (§23.4), alte Stufenbezeichnung in §24.5, `Erased` in T-DEL-2 und REQ-FGT-5.
+
+**Nicht geprüft in 2.4:** Die Rechtsfundstellen wurden nicht erneut am Primärtext geöffnet (P-14, O-46); die technischen Optimierungen sind Entwurf und brauchen Messläufe (O-42 bis O-45).
+
 
