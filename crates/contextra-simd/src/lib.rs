@@ -6,7 +6,6 @@
 //! Contextra SIMD — Ring 0 SIMD distance kernels and hardware runtime dispatch.
 
 #![allow(unsafe_code)]
-#![allow(clippy::undocumented_unsafe_blocks)]
 #![allow(clippy::missing_safety_doc)]
 #![allow(unused_unsafe)]
 

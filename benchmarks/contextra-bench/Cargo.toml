@@ -61,6 +61,7 @@ name = "long_mem_eval"
 harness = false
 
 [dev-dependencies]
+contextra-sys = { workspace = true }
 criterion = { workspace = true }
 libc = "0.2"
 redb = "2"

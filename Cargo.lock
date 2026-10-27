@@ -725,6 +725,7 @@ dependencies = [
  "contextra-infer-candle",
  "contextra-infer-onnx",
  "contextra-store",
+ "contextra-sys",
  "contextra-text",
  "contextra-vector",
  "criterion",

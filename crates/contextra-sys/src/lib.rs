@@ -11,5 +11,5 @@ pub mod vault;
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
 pub use mlock::{mem_lock, mem_unlock};
 pub use mmap::mmap_readonly;
-pub use posix::reopen_and_dup2;
+pub use posix::{ensure_fd_limit, reopen_and_dup2, set_fd_limit};
 pub use vault::LockedRegions;
