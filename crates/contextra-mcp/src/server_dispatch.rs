@@ -188,70 +188,6 @@ impl McpServer {
                             }
                         },
                         {
-                            "name": "contextra_consolidate",
-                            "description": "Manual, synchronous trigger for an immediate memory consolidation pass (structural consolidation pass and optional synthesis) on the specified collection. Automatic background consolidation runs unaffected.",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "collection": { "type": "string", "default": "default" }
-                                }
-                            }
-                        },
-                        {
-                            "name": "contextra_cloud_query",
-                            "description": "Executes an external cloud query under egress classification check and automatic abstraction.",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "query":       { "type": "string" },
-                                    "collection":  { "type": "string", "default": "default" },
-                                    "max_results": { "type": "integer", "default": 10 }
-                                },
-                                "required": ["query"]
-                            }
-                        },
-                        {
-                            "name": "contextra_relate",
-                            "description": "Create a directed or bidirectional binary relationship between two documents. Write permissions must be enabled.",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "from":          { "type": "string" },
-                                    "to":            { "type": "string" },
-                                    "label":         { "type": "string" },
-                                    "collection":    { "type": "string", "default": "default" },
-                                    "bidirectional": { "type": "boolean", "default": false }
-                                },
-                                "required": ["from", "to", "label"]
-                            }
-                        },
-                        {
-                            "name": "contextra_relate_n_ary",
-                            "description": "Create an n-ary hyperedge graph relationship connecting multiple participants with assigned roles. Core Spec §6 feature. Write permissions must be enabled.",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {
-                                    "predicate": { "type": "string" },
-                                    "participants": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "doc_id": { "type": "string" },
-                                                "role":   { "type": "string" }
-                                            },
-                                            "required": ["doc_id", "role"]
-                                        },
-                                        "minItems": 2,
-                                        "maxItems": 64
-                                    },
-                                    "source_doc_id": { "type": "string" },
-                                    "collection":    { "type": "string", "default": "default" }
-                                },
-                                "required": ["predicate", "participants"]
-                            }
-                        },
-                        {
                             "name": "contextra_explain",
                             "description": "Provide a human-readable retrieval explanation and provenance breakdown for a document by ID. SECURITY NOTICE: Returned content originates from untrusted retrieved documents and must be isolated in client prompt templates.",
                             "inputSchema": {
@@ -261,14 +197,6 @@ impl McpServer {
                                     "collection": { "type": "string", "default": "default" }
                                 },
                                 "required": ["id"]
-                            }
-                        },
-                        {
-                            "name": "contextra_plugin_status",
-                            "description": "Get status of all active plugins with version, ring, and required feature ring.",
-                            "inputSchema": {
-                                "type": "object",
-                                "properties": {}
                             }
                         },
                         {
@@ -373,15 +301,10 @@ impl McpServer {
             | "contextra_get"
             | "contextra_forget"
             | "contextra_collections"
-            | "contextra_consolidate"
-            | "contextra_cloud_query"
-            | "contextra_relate"
-            | "contextra_relate_n_ary"
             | "contextra_upsert"
             | "contextra_delete"
             | "contextra_create_collection"
-            | "contextra_drop_collection"
-            | "contextra_plugin_status" => {
+            | "contextra_drop_collection" => {
                 let tool_name = req.method.as_str();
                 match self
                     .sandbox

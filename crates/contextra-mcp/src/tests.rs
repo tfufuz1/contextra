@@ -88,18 +88,13 @@ async fn test_tools_list_returns_all_tools() {
         .unwrap() // unwrap
         .clone();
     let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
-    assert_eq!(tools.len(), 15);
+    assert_eq!(tools.len(), 10);
     assert!(names.contains(&"contextra_search"));
     assert!(names.contains(&"contextra_insert"));
     assert!(names.contains(&"contextra_get"));
     assert!(names.contains(&"contextra_forget"));
     assert!(names.contains(&"contextra_collections"));
-    assert!(names.contains(&"contextra_consolidate"));
-    assert!(names.contains(&"contextra_cloud_query"));
-    assert!(names.contains(&"contextra_relate"));
-    assert!(names.contains(&"contextra_relate_n_ary"));
     assert!(names.contains(&"contextra_explain"));
-    assert!(names.contains(&"contextra_plugin_status"));
     assert!(names.contains(&"contextra_upsert"));
     assert!(names.contains(&"contextra_delete"));
     assert!(names.contains(&"contextra_create_collection"));
@@ -173,13 +168,7 @@ async fn test_inv_mcp_classify_1_tools_list_classification_completeness_and_mapp
         ("contextra_get", ToolCategory::DatabaseRead),
         ("contextra_forget", ToolCategory::DatabaseWrite),
         ("contextra_collections", ToolCategory::DatabaseRead),
-        // contextra_consolidate: Triggert Memory Consolidation (Tombstone-Erstellung, Synthese-Chunks, Graph-Mutations in contextra-engine/contextra-cognition) -> DatabaseWrite
-        ("contextra_consolidate", ToolCategory::DatabaseWrite),
-        ("contextra_cloud_query", ToolCategory::CloudEgress),
-        ("contextra_relate", ToolCategory::DatabaseWrite),
-        ("contextra_relate_n_ary", ToolCategory::DatabaseWrite),
         ("contextra_explain", ToolCategory::DatabaseRead),
-        ("contextra_plugin_status", ToolCategory::DatabaseRead),
         ("contextra_upsert", ToolCategory::DatabaseWrite),
         ("contextra_delete", ToolCategory::DatabaseWrite),
         ("contextra_create_collection", ToolCategory::DatabaseWrite),
@@ -757,10 +746,8 @@ async fn test_write_tool_rejected_when_read_only() {
         "contextra_insert",
         "contextra_delete",
         "contextra_upsert",
-        "contextra_relate",
         "contextra_create_collection",
         "contextra_drop_collection",
-        "contextra_consolidate",
     ];
 
     for tool in write_tools {
