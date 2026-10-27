@@ -16,7 +16,7 @@ use crate::kernels::scalar::CosineSimilarityPartsU8;
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
-pub unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -79,7 +79,7 @@ pub unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
-pub unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -122,7 +122,7 @@ pub unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
-pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -162,7 +162,7 @@ pub unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
-pub unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -233,7 +233,7 @@ pub unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
-pub unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -286,7 +286,7 @@ pub unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f3
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2", enable = "fma")]
-pub unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -334,7 +334,7 @@ pub unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
-pub unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
+pub(crate) unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
     // SAFETY: Target feature `avx2` is enabled and `v` is a valid `__m256` vector register.
     let vlow = unsafe { _mm256_castps256_ps128(v) };
     // SAFETY: Target feature `avx2` is enabled and imm8 index 1 is in-bounds for 256-bit split into 128-bit halves.
@@ -356,7 +356,7 @@ pub unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
-pub unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
+pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -412,7 +412,7 @@ pub unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
-pub unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
+pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -473,7 +473,7 @@ pub unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
-pub unsafe fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
+pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -549,7 +549,7 @@ pub unsafe fn cosine_similarity_parts_u8_avx2(a: &[u8], b: &[u8]) -> CosineSimil
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx2")]
-pub unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
+pub(crate) unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
     // SAFETY: Target feature `avx2` is enabled and `v` is a valid `__m256i` vector register.
     let vlow = unsafe { _mm256_castsi256_si128(v) };
     // SAFETY: Target feature `avx2` is enabled and imm8 index 1 is in-bounds for 256-bit split into 128-bit halves.

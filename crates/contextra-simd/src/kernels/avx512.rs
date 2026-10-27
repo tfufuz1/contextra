@@ -16,7 +16,7 @@ use crate::kernels::scalar::CosineSimilarityPartsU8;
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
-pub unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -79,7 +79,7 @@ pub unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
-pub unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -122,7 +122,7 @@ pub unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
-pub unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -162,7 +162,7 @@ pub unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
-pub unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -233,7 +233,7 @@ pub unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
-pub unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -286,7 +286,7 @@ pub unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> 
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
-pub unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
+pub(crate) unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -334,7 +334,7 @@ pub unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
-pub unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
+pub(crate) unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
     // SAFETY: Target feature `avx512f` is enabled and `_mm512_extractf32x8_ps` extracts 256-bit halves (imm8 0 and 1) from 512-bit register `v`. `_mm256_add_ps` requires `avx` / `avx512f`.
     let v256 = unsafe { _mm256_add_ps(_mm512_extractf32x8_ps(v, 0), _mm512_extractf32x8_ps(v, 1)) };
     // SAFETY: Target feature `avx512f` is enabled and `v256` is a valid `__m256` vector register.
@@ -358,7 +358,7 @@ pub unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vnni")]
-pub unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
+pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -396,7 +396,7 @@ pub unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f", enable = "avx512bw")]
-pub unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {
+pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -457,7 +457,7 @@ pub unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 {
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vnni")]
-pub unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
+pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
@@ -516,7 +516,7 @@ pub unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSim
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f")]
-pub unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {
+pub(crate) unsafe fn hsum512_epi32_avx512(v: __m512i) -> i32 {
     // SAFETY: Target feature `avx512f` is enabled. `_mm512_castsi512_si256` reinterprets low 256 bits, `_mm512_extracti32x8_epi32` with imm8 1 extracts upper 256 bits of `v`. `_mm256_add_epi32` requires `avx2` / `avx512f`.
     let v256 =
         unsafe { _mm256_add_epi32(_mm512_castsi512_si256(v), _mm512_extracti32x8_epi32(v, 1)) };
