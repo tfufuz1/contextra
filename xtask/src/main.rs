@@ -121,6 +121,7 @@ fn main() {
         Ok(()) => std::process::exit(0),
         Err(_) => {
             eprintln!("Unknown xtask command: {}", cmd);
+            eprintln!("Available commands: check, verify, gate, explain");
             eprintln!("Run `cargo xtask --help` for a list of available commands.");
             eprintln!("Run `cargo xtask --list-gates` for all configured gates.");
             std::process::exit(1);

@@ -93,11 +93,49 @@ pub fn run_gov_command(cmd: &str, args: &[String]) -> Result<(), String> {
             Ok(())
         }
         "gate-check" => {
-            if args.is_empty() {
-                println!("Missing parameter --level <0..4>");
-                Err("Missing parameter".to_string())
-            } else {
-                Ok(())
+            let mut level_arg = None;
+            let mut crate_arg = None;
+            let mut i = 0;
+            while i < args.len() {
+                let curr = args.get(i).map(String::as_str);
+                let next = args.get(i + 1).map(String::as_str);
+                if curr == Some("--level") && next.is_some() {
+                    level_arg = next;
+                    i += 2;
+                } else if curr == Some("--crate") && next.is_some() {
+                    crate_arg = next;
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+            }
+
+            match level_arg {
+                Some("0") => {
+                    if crate_arg.is_none() {
+                        eprintln!("Fehler: --crate <name> ist für Gate Level 0 erforderlich.");
+                        Err("Fehler: --crate <name> ist für Gate Level 0 erforderlich.".to_string())
+                    } else {
+                        Ok(())
+                    }
+                }
+                Some(level_str @ ("2" | "3" | "4")) => {
+                    let prev_phase = level_str.parse::<u8>().unwrap_or(1).saturating_sub(1);
+                    let msg = format!(
+                        "Gate {} ist spezifiziert, aber die zugehörigen Abnahmekriterien aus Phase {} sind in dieser xtask-Version noch nicht als automatisierte Prüfung hinterlegt — siehe docs/spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md Teil A.3",
+                        level_str, prev_phase
+                    );
+                    eprintln!("{}", msg);
+                    Err(msg)
+                }
+                Some(_) | None => {
+                    if args.is_empty() {
+                        eprintln!("Missing parameter --level <0..4>");
+                        Err("Missing parameter".to_string())
+                    } else {
+                        Ok(())
+                    }
+                }
             }
         }
         _ => Err(format!("Unknown command in gov cluster: {}", cmd)),
