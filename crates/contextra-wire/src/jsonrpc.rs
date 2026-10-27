@@ -30,7 +30,10 @@ impl JsonRpcRequest {
         if self.jsonrpc != "2.0" {
             return Err(JsonRpcError {
                 code: -32600,
-                message: format!("Invalid JSON-RPC protocol version: expected '2.0', got '{}'", self.jsonrpc),
+                message: format!(
+                    "Invalid JSON-RPC protocol version: expected '2.0', got '{}'",
+                    self.jsonrpc
+                ),
                 data: None,
             });
         }
@@ -99,7 +102,12 @@ impl JsonRpcResponse {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
 mod tests {
     use super::*;
     use serde_json::json;

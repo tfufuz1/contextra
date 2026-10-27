@@ -130,7 +130,8 @@ mod tests {
         let expected1 = "    unsafe { self._tab.get::<u32>(RoleId::VT_ID, Some(0)) }.unwrap()";
         assert_eq!(wrap_tab_get_calls_in_unsafe(input1), expected1);
 
-        let input2 = "    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None)";
+        let input2 =
+            "    self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None)";
         let expected2 = "    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(ScoredDocument::VT_ID, None) }";
         assert_eq!(wrap_tab_get_calls_in_unsafe(input2), expected2);
 
