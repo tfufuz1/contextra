@@ -1203,7 +1203,7 @@ name = "contextra-simd"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "contextra-core",
+ "contextra-types",
  "criterion",
  "proptest",
  "thiserror 2.0.20",
