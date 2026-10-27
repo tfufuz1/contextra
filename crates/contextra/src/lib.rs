@@ -22,20 +22,10 @@ pub use contextra_db::{
 };
 pub use query_rewriter::LlmQueryRewriter;
 
-#[cfg(feature = "router")]
-pub use contextra_router as router;
-
-#[cfg(feature = "router")]
 pub use contextra_rank as rank;
-
-#[cfg(feature = "ollama")]
-pub use contextra_infer_ollama as ollama;
 
 #[cfg(feature = "candle")]
 pub use contextra_infer_candle as candle;
-
-#[cfg(feature = "onnx")]
-pub use contextra_infer_onnx as onnx;
 
 /// Creates a new `ContextraBuilder` for configuring and instantiating `Contextra`.
 pub fn builder(dimension: usize) -> ContextraBuilder {
