@@ -1,6 +1,6 @@
 # Kanten-Inventar Archiv-Crates — WP 2.1
 
-<!-- doc-stamp: 9bf32c038 | Generiert: tools/generate_migration_edges.py -->
+<!-- doc-stamp: e2675209c | Generiert: tools/generate_migration_edges.py -->
 
 > **Zweck.** Dieses Dokument listet alle Kanten von aktiven Crates zu Archiv-Crates.
 > Es ist die Abarbeitungsliste für WP 2.2, WP 2.3 und WP 2.4.
