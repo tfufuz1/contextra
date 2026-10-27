@@ -35,6 +35,7 @@ fn bench_simd_kernels(c: &mut Criterion) {
         #[cfg(target_arch = "x86_64")]
         if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
             group.bench_with_input(BenchmarkId::new("cosine_avx2", dim), &dim, |b_bench, _| {
+                // SAFETY: `is_x86_feature_detected!("avx2")` and `is_x86_feature_detected!("fma")` guard feature availability, and slices `a` and `b` have equal lengths `dim`.
                 b_bench.iter(|| unsafe { cosine_distance_avx2(black_box(&a), black_box(&b)) })
             });
         }
@@ -58,6 +59,7 @@ fn bench_simd_kernels(c: &mut Criterion) {
                 BenchmarkId::new("euclidean_avx2", dim),
                 &dim,
                 |b_bench, _| {
+                    // SAFETY: `is_x86_feature_detected!("avx2")` and `is_x86_feature_detected!("fma")` guard feature availability, and slices `a` and `b` have equal lengths `dim`.
                     b_bench
                         .iter(|| unsafe { euclidean_distance_avx2(black_box(&a), black_box(&b)) })
                 },
@@ -83,6 +85,7 @@ fn bench_simd_kernels(c: &mut Criterion) {
                 BenchmarkId::new("dot_product_avx2", dim),
                 &dim,
                 |b_bench, _| {
+                    // SAFETY: `is_x86_feature_detected!("avx2")` and `is_x86_feature_detected!("fma")` guard feature availability, and slices `a` and `b` have equal lengths `dim`.
                     b_bench.iter(|| unsafe { dot_product_avx2(black_box(&a), black_box(&b)) })
                 },
             );
