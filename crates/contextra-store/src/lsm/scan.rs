@@ -135,10 +135,10 @@ impl LsmStorage {
                     if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
                         *entry = (v, seq);
                     }
-                    if check_accumulator && map.len() > contextra_types::MAX_SCAN_MERGE_ACCUMULATOR
+                    if check_accumulator && map.len() > contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR
                     {
                         return Err(ContextraError::LimitExceeded {
-                            limit: contextra_types::MAX_SCAN_MERGE_ACCUMULATOR,
+                            limit: contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR,
                             context: format!(
                                 "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
                             ),
@@ -177,9 +177,9 @@ impl LsmStorage {
         // 2. Immutable memtables (older -> newer)
         for mt in &state.immutable_memtables {
             scan_memtable(mt, &mut map);
-            if check_accumulator && map.len() > contextra_types::MAX_SCAN_MERGE_ACCUMULATOR {
+            if check_accumulator && map.len() > contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR {
                 return Err(ContextraError::LimitExceeded {
-                    limit: contextra_types::MAX_SCAN_MERGE_ACCUMULATOR,
+                    limit: contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR,
                     context: format!(
                         "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
                     ),
@@ -189,9 +189,9 @@ impl LsmStorage {
 
         // 3. Active memtable
         scan_memtable(&state.memtable, &mut map);
-        if check_accumulator && map.len() > contextra_types::MAX_SCAN_MERGE_ACCUMULATOR {
+        if check_accumulator && map.len() > contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR {
             return Err(ContextraError::LimitExceeded {
-                limit: contextra_types::MAX_SCAN_MERGE_ACCUMULATOR,
+                limit: contextra_ports::MAX_SCAN_MERGE_ACCUMULATOR,
                 context: format!(
                     "{context_name}: internal merge accumulator exceeded — range too wide, narrow the scan range"
                 ),
