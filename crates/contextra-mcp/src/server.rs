@@ -2,8 +2,6 @@ use crate::egress_gateway::{DefaultEgressClassifier, EgressClassifier};
 use crate::io::{read_line_bounded, MAX_RPC_BYTES};
 use crate::prompt_injection::PromptInjectionGuard;
 use crate::protocol::JsonRpcResponse;
-#[cfg(feature = "kv-bridge")]
-use crate::routing::setup_kv_bridge;
 use crate::routing::RoutingHandle;
 use crate::sandbox::{McpSandbox, SandboxPolicy};
 use crate::validation::is_write_allowed_by_env;
@@ -22,8 +20,6 @@ pub struct McpServer {
     pub egress_classifier: Arc<dyn EgressClassifier>,
     pub routing: Option<Arc<RoutingHandle>>,
     pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
-    #[cfg(feature = "kv-bridge")]
-    pub kv_bridge: Option<Arc<contextra_infer_candle::KvBridgeAdapter>>,
 }
 
 impl McpServer {
@@ -56,9 +52,6 @@ impl McpServer {
         embedder: Arc<dyn EmbeddingProvider>,
         sandbox: Arc<McpSandbox>,
     ) -> Self {
-        #[cfg(feature = "kv-bridge")]
-        let kv_bridge = setup_kv_bridge(&db);
-
         Self {
             db,
             embedder,
@@ -67,18 +60,7 @@ impl McpServer {
             egress_classifier: Arc::new(DefaultEgressClassifier::default()),
             routing: None,
             plugin_registry: None,
-            #[cfg(feature = "kv-bridge")]
-            kv_bridge,
         }
-    }
-
-    #[cfg(feature = "kv-bridge")]
-    pub fn with_kv_bridge(
-        mut self,
-        kv_bridge: Option<Arc<contextra_infer_candle::KvBridgeAdapter>>,
-    ) -> Self {
-        self.kv_bridge = kv_bridge;
-        self
     }
 
     pub fn with_injection_guard(mut self, injection_guard: Arc<PromptInjectionGuard>) -> Self {

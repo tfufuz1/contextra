@@ -42,6 +42,62 @@ pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::R
     ))
 }
 
+/// Ensures the current process soft file descriptor limit (`RLIMIT_NOFILE`) is at least `min_fds`.
+/// If the current soft limit is lower, it attempts to raise it up to `min_fds` (or the hard limit).
+/// Returns `true` if the soft limit is at least `min_fds`, or `false` otherwise.
+pub fn ensure_fd_limit(min_fds: u64) -> bool {
+    #[cfg(unix)]
+    {
+        use std::mem::MaybeUninit;
+        let mut rlim = MaybeUninit::<libc::rlimit>::uninit();
+        // SAFETY: `getrlimit` reads the current RLIMIT_NOFILE limit into the uninitialized rlim struct pointer.
+        if unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, rlim.as_mut_ptr()) } == 0 {
+            // SAFETY: `getrlimit` returned success (0), initializing `rlim`.
+            let mut rlim = unsafe { rlim.assume_init() };
+            let min_fds_rlim = min_fds as libc::rlim_t;
+            if rlim.rlim_cur < min_fds_rlim {
+                let target = std::cmp::min(min_fds_rlim, rlim.rlim_max);
+                rlim.rlim_cur = target;
+                // SAFETY: `setrlimit` sets the process RLIMIT_NOFILE soft limit with valid values (`rlim_cur <= rlim_max`).
+                unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &rlim) };
+            }
+            let mut current_rlim = MaybeUninit::<libc::rlimit>::uninit();
+            // SAFETY: `getrlimit` reads updated limits into `current_rlim` buffer pointer.
+            if unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, current_rlim.as_mut_ptr()) } == 0 {
+                // SAFETY: `getrlimit` returned success (0), initializing `current_rlim`.
+                let current_rlim = unsafe { current_rlim.assume_init() };
+                return current_rlim.rlim_cur >= min_fds_rlim;
+            }
+        }
+        false
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = min_fds;
+        true
+    }
+}
+
+/// Sets the current process soft and hard file descriptor limit (`RLIMIT_NOFILE`) to `limit`.
+/// Returns `true` if `setrlimit` succeeded, or `false` otherwise.
+pub fn set_fd_limit(limit: u64) -> bool {
+    #[cfg(unix)]
+    {
+        let rlim = libc::rlimit {
+            rlim_cur: limit as libc::rlim_t,
+            rlim_max: limit as libc::rlim_t,
+        };
+        // SAFETY: `setrlimit` sets process RLIMIT_NOFILE limits using valid struct values.
+        let res = unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &rlim) };
+        res == 0
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = limit;
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

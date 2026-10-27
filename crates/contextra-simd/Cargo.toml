@@ -13,7 +13,7 @@ description = "Ring 0 SIMD distance kernels and runtime dispatch for Contextra (
 ring = "0"
 
 [dependencies]
-contextra-core = { workspace = true }
+contextra-types = { workspace = true }
 thiserror = { workspace = true }
 bytemuck = "1.25"
 tracing = { workspace = true }

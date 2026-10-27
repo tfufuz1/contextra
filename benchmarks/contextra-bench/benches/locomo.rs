@@ -22,24 +22,8 @@ fn get_fixture_path(relative: &str) -> PathBuf {
     PathBuf::from(relative)
 }
 
-#[allow(unsafe_code)]
 fn ensure_fd_limit(min_fds: u64) {
-    #[cfg(unix)]
-    {
-        use std::mem::MaybeUninit;
-        unsafe {
-            let mut rlim = MaybeUninit::<libc::rlimit>::uninit();
-            if libc::getrlimit(libc::RLIMIT_NOFILE, rlim.as_mut_ptr()) == 0 {
-                let mut rlim = rlim.assume_init();
-                let min_fds_rlim = min_fds as libc::rlim_t;
-                if rlim.rlim_cur < min_fds_rlim {
-                    let target = std::cmp::min(min_fds_rlim, rlim.rlim_max);
-                    rlim.rlim_cur = target;
-                    let _ = libc::setrlimit(libc::RLIMIT_NOFILE, &rlim);
-                }
-            }
-        }
-    }
+    contextra_sys::ensure_fd_limit(min_fds);
 }
 
 fn bench_locomo_eval(c: &mut Criterion) {

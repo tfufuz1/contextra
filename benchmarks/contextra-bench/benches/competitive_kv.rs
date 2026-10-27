@@ -495,40 +495,8 @@ const TARGET_FD_LIMIT: u64 = 65_536;
 /// Ensures the file descriptor limit (RLIMIT_NOFILE) is at least `min_fds`.
 /// If the soft limit is lower, it attempts to raise it up to `min_fds` or the hard limit.
 /// Returns `true` if the soft limit is at least `min_fds`, or `false` otherwise.
-#[allow(unsafe_code)]
 fn ensure_fd_limit(min_fds: u64) -> bool {
-    #[cfg(unix)]
-    {
-        use std::mem::MaybeUninit;
-        unsafe {
-            let mut rlim = MaybeUninit::<libc::rlimit>::uninit();
-            if libc::getrlimit(libc::RLIMIT_NOFILE, rlim.as_mut_ptr()) == 0 {
-                let mut rlim = rlim.assume_init();
-                let min_fds_rlim = min_fds as libc::rlim_t;
-                if rlim.rlim_cur < min_fds_rlim {
-                    let target = std::cmp::min(min_fds_rlim, rlim.rlim_max);
-                    rlim.rlim_cur = target;
-                    if libc::setrlimit(libc::RLIMIT_NOFILE, &rlim) != 0 {
-                        // setrlimit call failed
-                    }
-                }
-                let mut current_rlim = MaybeUninit::<libc::rlimit>::uninit();
-                if libc::getrlimit(libc::RLIMIT_NOFILE, current_rlim.as_mut_ptr()) == 0 {
-                    let current_rlim = current_rlim.assume_init();
-                    if current_rlim.rlim_cur >= min_fds_rlim {
-                        return true;
-                    } else {
-                        eprintln!(
-                            "[WARN] FD limit check: current soft limit {} is lower than required {} (hard limit: {}). Unable to raise soft limit.",
-                            current_rlim.rlim_cur, min_fds, current_rlim.rlim_max
-                        );
-                        return false;
-                    }
-                }
-            }
-        }
-    }
-    true
+    contextra_sys::ensure_fd_limit(min_fds)
 }
 
 // ---------------------------------------------------------------------------

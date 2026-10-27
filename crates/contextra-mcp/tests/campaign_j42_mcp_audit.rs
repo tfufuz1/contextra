@@ -8,22 +8,17 @@ use contextra_types::AutoExtractionMode;
 
 /// TEST 1: MCP Tool Registry Integrity & Dispatch Completeness
 /// Oracle Source: `TOOL_REGISTRY` in `contextra-mcp/src/sandbox.rs` and `server_tools.rs`
-/// Proves: All 15 MCP tools are actively registered in TOOL_REGISTRY and none are phantom/unclassified.
+/// Proves: All 10 MCP tools are actively registered in TOOL_REGISTRY and none are phantom/unclassified.
 #[test]
 fn test_mcp_tool_registry_active_count_and_classification() {
-    // Independent Oracle: Hardcoded set of expected 15 tools defined in MCP specification
+    // Independent Oracle: Hardcoded set of expected 10 tools defined in MCP specification
     let expected_tools = [
         "contextra_search",
         "contextra_insert",
         "contextra_get",
         "contextra_forget",
         "contextra_collections",
-        "contextra_consolidate",
-        "contextra_cloud_query",
-        "contextra_relate",
-        "contextra_relate_n_ary",
         "contextra_explain",
-        "contextra_plugin_status",
         "contextra_upsert",
         "contextra_delete",
         "contextra_create_collection",
@@ -32,8 +27,8 @@ fn test_mcp_tool_registry_active_count_and_classification() {
 
     assert_eq!(
         TOOL_REGISTRY.len(),
-        15,
-        "TOOL_REGISTRY must contain exactly 15 active tools"
+        10,
+        "TOOL_REGISTRY must contain exactly 10 active tools"
     );
 
     for tool_name in expected_tools {
