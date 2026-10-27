@@ -12,13 +12,13 @@ Normativ: SPEC §18.7 (INV-DOC-SINGLE-SOURCE-1) | Audit-Dateien: governance/ vs 
 | `gates.toml` | 12699 B, `f1aa13c00 (2026-10-26 16:19:04 +0100)` | 8812 B, `26d8d13ce (2026-10-26 14:48:31 +0100)` | Abweichend |
 | `key_purposes.toml` | 3446 B, `f1aa13c00 (2026-10-26 16:19:04 +0100)` | fehlt | Fehlt in .agents/governance/ |
 | `protected-paths.toml` | 3293 B, `05a6a9afe (2026-10-26 16:44:18 +0100)` | 2841 B, `26d8d13ce (2026-10-26 14:48:31 +0100)` | Abweichend |
-| `ratchet.toml` | 1909 B, `f8d2612a9 (2026-10-27 07:55:18 +0000)` | 223 B, `332c26958 (2026-10-26 13:56:03 +0100)` | Abweichend |
+| `ratchet.toml` | 2769 B, `489de8f65 (2026-10-27 09:59:36 +0000)` | 223 B, `332c26958 (2026-10-26 13:56:03 +0100)` | Abweichend |
 | `security_ports.toml` | 4145 B, `f1aa13c00 (2026-10-26 16:19:04 +0100)` | fehlt | Fehlt in .agents/governance/ |
 | `unsafe-safety-baseline.toml` | fehlt | 361 B, `332c26958 (2026-10-26 13:56:03 +0100)` | Fehlt in governance/ |
 | `verdict-required.toml` | fehlt | 1448 B, `332c26958 (2026-10-26 13:56:03 +0100)` | Fehlt in governance/ |
 
 ## 2. Tabelle B: Audit aller Pfadverweise auf governance/, .agents/governance/, .jules/
-Gesamtanzahl angemessener Fundstellen: 297
+Gesamtanzahl angemessener Fundstellen: 298
 Davon nicht existierend auf HEAD (existiert: nein): 170
 
 | Fundstelle | Pfadangabe | Existiert |
@@ -118,10 +118,13 @@ Davon nicht existierend auf HEAD (existiert: nein): 170
 | `xtask/src/claim.rs:759` | `.jules/claims.json` | existiert: nein |
 | `xtask/src/claim.rs:833` | `.jules/SESSION.md` | existiert: nein |
 | `xtask/src/context_pack.rs:94` | `.jules/claims.json` | existiert: nein |
-| `xtask/src/core/cmd.rs:24` | `governance/gates.toml` | existiert: ja |
-| `xtask/src/core/cmd.rs:147` | `governance/gates.toml` | existiert: ja |
-| `xtask/src/core/cmd.rs:201` | `governance/gates.toml` | existiert: ja |
-| `xtask/src/gates/gov/meta_gates.rs:73` | `governance/gates.toml` | existiert: ja |
+| `xtask/src/core/cmd.rs:24` | `governance/ratchet.toml` | existiert: ja |
+| `xtask/src/core/cmd.rs:56` | `governance/gates.toml` | existiert: ja |
+| `xtask/src/core/cmd.rs:184` | `governance/ratchet.toml` | existiert: ja |
+| `xtask/src/core/cmd.rs:205` | `governance/ratchet.toml` | existiert: ja |
+| `xtask/src/core/cmd.rs:300` | `governance/gates.toml` | existiert: ja |
+| `xtask/src/core/cmd.rs:413` | `governance/gates.toml` | existiert: ja |
+| `xtask/src/gates/gov/meta_gates.rs:74` | `governance/gates.toml` | existiert: ja |
 | `xtask/src/gen_prompter_data.rs:170` | `.jules/prompter-tiers.toml` | existiert: nein |
 | `xtask/src/gen_prompter_data.rs:171` | `.jules/prompter-tiers.toml` | existiert: nein |
 | `xtask/src/gen_prompter_data.rs:351` | `.jules/prompter-data.json` | existiert: nein |
@@ -232,10 +235,8 @@ Davon nicht existierend auf HEAD (existiert: nein): 170
 | `xtask/src/init_audit_fix.rs:137` | `.jules/AUDIT_INTAKE_PROTOCOL.md` | existiert: nein |
 | `xtask/src/jules_preflight.rs:151` | `.jules/claims.json` | existiert: nein |
 | `xtask/src/jules_submit_gate.rs:130` | `.jules/gate_ledger.json` | existiert: nein |
-| `xtask/src/main.rs:12` | `governance/gates.toml` | existiert: ja |
-| `xtask/src/main.rs:25` | `governance/gates.toml` | existiert: ja |
-| `xtask/src/main.rs:42` | `governance/gates.toml` | existiert: ja |
-| `xtask/src/main.rs:78` | `governance/gates.toml` | existiert: ja |
+| `xtask/src/main.rs:14` | `governance/gates.toml` | existiert: ja |
+| `xtask/src/main.rs:21` | `governance/gates.toml` | existiert: ja |
 | `xtask/src/session_history.rs:5` | `.agents/session_history.jsonl` | existiert: nein |
 | `xtask/src/session_history.rs:106` | `.agents/session_history.jsonl` | existiert: nein |
 | `xtask/src/session_history.rs:108` | `.agents/session_history.jsonl` | existiert: nein |
@@ -342,8 +343,8 @@ d8bbd8384 2026-10-25 21:17:12 +0000 refactor(xtask): xtask-Kern, Gate-Katalog, L
 ```
 **Inhaltlicher Diff (`diff -u governance/gates.toml .agents/governance/gates.toml`):**
 ```diff
---- governance/gates.toml	2026-10-27 08:21:37.531861605 +0000
-+++ .agents/governance/gates.toml	2026-10-27 08:21:36.951861611 +0000
+--- governance/gates.toml	2026-10-27 15:42:30.362120191 +0000
++++ .agents/governance/gates.toml	2026-10-27 15:42:29.746120198 +0000
 @@ -1,11 +1,3 @@
 -# governance/gates.toml — Single Source of Truth für alle Gates
 -# doc-stamp: 2026-10-26 | Normativ: docs/SPEC.md §17.3
@@ -512,11 +513,11 @@ d8bbd8384 2026-10-25 21:17:12 +0000 refactor(xtask): xtask-Kern, Gate-Katalog, L
 ### 3.1 `ratchet.toml`
 **Git-Historie `governance/ratchet.toml`:**
 ```text
+489de8f65 2026-10-27 09:59:36 +0000 feat(xtask): ensure accurate gate execution reporting and D-4 ratchet checks
 f8d2612a9 2026-10-27 07:55:18 +0000 WP-0.4(governance,xtask): Lint-Satz vervollstaendigt, Ratchet verifiziert
 f1aa13c00 2026-10-26 16:19:04 +0100 rules-gourvernace-git tools, gates, xtask
 332c26958 2026-10-26 13:56:03 +0100 .agents/ statt .jules/ meta-system umstrukturierung kl
 0304f9a18 2026-10-16 22:18:19 +0200 Zurückstellung auf Kompilierbaren Zustand vom 5.10.26
-f36e864f6 2026-10-16 17:42:36 +0000 fix: unify unwrap baseline and sync gates catalog
 ```
 **Git-Historie `.agents/governance/ratchet.toml`:**
 ```text
@@ -527,8 +528,8 @@ f36e864f6 2026-10-16 17:42:36 +0000 fix: unify unwrap baseline and sync gates ca
 ```
 **Inhaltlicher Diff (`diff -u governance/ratchet.toml .agents/governance/ratchet.toml`):**
 ```diff
---- governance/ratchet.toml	2026-10-27 08:21:37.531861605 +0000
-+++ .agents/governance/ratchet.toml	2026-10-27 08:21:36.951861611 +0000
+--- governance/ratchet.toml	2026-10-27 15:42:30.366120191 +0000
++++ .agents/governance/ratchet.toml	2026-10-27 15:42:29.746120198 +0000
 @@ -1,15 +1,3 @@
 -# governance/ratchet.toml — Ratchet-Baselines (dürfen nur sinken, nie steigen)
 -# doc-stamp: 2026-10-26 | Normativ: docs/SPEC.md §17, REQ-QA-005, PLAN.md WP 0.4
@@ -545,10 +546,51 @@ f36e864f6 2026-10-16 17:42:36 +0000 fix: unify unwrap baseline and sync gates ca
  unwrap_legacy_grep = 1175
  unwrap_exact = 502
  expect_exact = 242
-@@ -22,31 +10,3 @@
+@@ -22,72 +10,3 @@
  contextra-simd = 285
  contextra-sys = 30
  contextra-wire = 27
+-
+-# ── D-4: not_run_baseline (Gates, die in dieser Phase noch NOT RUN sein dürfen) ───
+-[not_run_baseline]
+-gates = [
+-    "security-ports",
+-    "key-purposes",
+-    "witness-mint",
+-    "deletion-types-once",
+-    "determinism",
+-    "fuzz-matrix",
+-    "fuzz-regression",
+-    "no-security-stub",
+-    "no-literal-secrets",
+-    "error-domain",
+-    "test-surface",
+-    "ring-dag",
+-    "ring0-async",
+-    "capabilities-consistency",
+-    "unsafe-inventory",
+-    "feature-matrix",
+-    "wired",
+-    "deletion-honesty",
+-    "doc-truth",
+-    "symbol-uniqueness",
+-    "code-lints",
+-    "ratchet",
+-    "protected-paths",
+-    "gate-weakening",
+-    "test-integrity",
+-    "scope-guard",
+-    "provenance",
+-    "claims-in-pr",
+-    "veto-guard",
+-    "adr-index",
+-    "sbom",
+-    "evidence-complete",
+-    "ci-hygiene",
+-    "panic-surface",
+-    "async-io",
+-    "doc-stamp"
+-]
 -
 -# ── Neue Baselines (PLAN.md WP 0.4, §6, §17) ─────────────────────────────────
 -# Jeder Wert ist die Obergrenze. Neue PRs dürfen sie senken, nie erhöhen.
@@ -597,8 +639,8 @@ f1aa13c00 2026-10-26 16:19:04 +0100 rules-gourvernace-git tools, gates, xtask
 ```
 **Inhaltlicher Diff (`diff -u governance/protected-paths.toml .agents/governance/protected-paths.toml`):**
 ```diff
---- governance/protected-paths.toml	2026-10-27 08:21:37.531861605 +0000
-+++ .agents/governance/protected-paths.toml	2026-10-27 08:21:36.951861611 +0000
+--- governance/protected-paths.toml	2026-10-27 15:42:30.366120191 +0000
++++ .agents/governance/protected-paths.toml	2026-10-27 15:42:29.746120198 +0000
 @@ -1,6 +1,5 @@
 -# governance/protected-paths.toml — Geschützte Pfade (REQ-GOV-002)
 -# doc-stamp: 2026-10-26 | Normativ: docs/SPEC.md §17, AGENTS.md §3
