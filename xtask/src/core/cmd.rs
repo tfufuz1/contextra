@@ -217,7 +217,7 @@ pub fn run_check(args: &[String]) -> i32 {
     }
 }
 
-fn run_gate_entry(
+pub fn run_gate_entry(
     name: &str,
     gate_entry: &crate::core::catalog::GateEntry,
     ctx: &Context,

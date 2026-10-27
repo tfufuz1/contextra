@@ -28,7 +28,37 @@ owner = "MP-01"
     fs::write(gov_dir.join("gates.toml"), gates_toml).unwrap();
 
     let catalog = Catalog::load_from_path(&gov_dir.join("gates.toml")).unwrap();
-    assert!(catalog.gates.contains_key("unregistered-builtin-test-gate"));
+    let gate_entry = catalog.gates.get("unregistered-builtin-test-gate").unwrap();
+
+    let ctx = xtask::core::ctx::Context {
+        root_dir: temp_dir.path().to_path_buf(),
+        commit_hash: "head123".to_string(),
+    };
+
+    let mut registered_map = std::collections::HashMap::new();
+    let mut raw_log = String::new();
+    let mut tests_run = 0;
+    let mut tests_skipped = 0;
+
+    let outcome = xtask::core::cmd::run_gate_entry(
+        "unregistered-builtin-test-gate",
+        gate_entry,
+        &ctx,
+        &mut registered_map,
+        &mut raw_log,
+        &mut tests_run,
+        &mut tests_skipped,
+    );
+
+    assert_eq!(outcome.exit_code(), 2);
+    assert!(
+        outcome.status_str().contains("NOT RUN"),
+        "Outcome status must contain NOT RUN"
+    );
+    assert!(
+        raw_log.contains("not registered"),
+        "Raw log must mention not registered"
+    );
 }
 
 #[test]
