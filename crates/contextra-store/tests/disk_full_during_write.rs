@@ -1,9 +1,10 @@
 #![cfg(feature = "fault-injection")]
 // FILE-CONTEXT: Integration test verifying clean rollback and absence of phantom entries on WAL write failure (disk full simulation). (TS: 2026-09-11)
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::wal::FAIL_APPEND_FOR_TX;
+use contextra_types::TxId;
 use std::sync::atomic::Ordering;
 use tempfile::tempdir;
 

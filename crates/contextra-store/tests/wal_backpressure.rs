@@ -1,7 +1,7 @@
 // Testpflicht AK-13 (docs/specs/CONTEXTRA_SPEC_v2.md)
 
-use contextra_core::TxId;
 use contextra_store::wal::{Wal, WalConfig, WalFlusherConfig, WalOp};
+use contextra_types::TxId;
 use std::sync::mpsc;
 use std::sync::Arc;
 use tempfile::TempDir;

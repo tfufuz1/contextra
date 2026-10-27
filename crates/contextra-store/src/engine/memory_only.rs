@@ -338,7 +338,10 @@ mod tests {
         // Roll back to tx1
         store.rollback_to_tx(tx1).await.unwrap();
 
-        assert_eq!(store.get(b"key_t1").await.unwrap(), Some(Bytes::from_static(b"v1")));
+        assert_eq!(
+            store.get(b"key_t1").await.unwrap(),
+            Some(Bytes::from_static(b"v1"))
+        );
         assert!(store.get(b"key_t2").await.unwrap().is_none());
     }
 
@@ -355,6 +358,9 @@ mod tests {
         store.flush().await.unwrap();
 
         let entries = std::fs::read_dir(&path).unwrap().count();
-        assert_eq!(entries, 0, "Directory must remain empty as zero disk I/O occurs");
+        assert_eq!(
+            entries, 0,
+            "Directory must remain empty as zero disk I/O occurs"
+        );
     }
 }

@@ -23,10 +23,14 @@ fn test_check_result_dropped_io_subcommand_workspace_passes() {
         .output()
         .expect("Failed to execute check-result-dropped-io");
 
-    assert!(
-        output.status.success(),
-        "check-result-dropped-io on workspace must exit 0, got stdout:\n{}\nstderr:\n{}",
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "check-result-dropped-io stub must exit 2, got stdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("NOT IMPLEMENTED: check-result-dropped-io")
     );
 }

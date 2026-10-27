@@ -1,6 +1,6 @@
 // ZWECK: Legacy HMAC key migration path, deobfuscation and integrity key status.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 
 use super::{PreparedBatch, Wal, WalEntry, WalOp};
@@ -184,10 +184,12 @@ impl Wal {
     }
 
     /// Exposes the HMAC integrity key for testing.
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn integrity_key_for_test(&self) -> Result<[u8; 32]> {
         self.get_integrity_key()
     }
 
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn legacy_integrity_key_for_test() -> [u8; 32] {
         match legacy_integrity_key() {
             Ok(key) => key,
@@ -412,7 +414,6 @@ impl Wal {
         Ok(())
     }
 
-    #[cfg(feature = "wal-integrity")]
     pub(crate) async fn load_or_create_wal_uuid(wal_path: &Path) -> Result<[u8; 16]> {
         let uuid_path = {
             let mut p = wal_path.as_os_str().to_os_string();

@@ -1,15 +1,4 @@
 // xtask entry-point — Contextra quality-gate runner | WP-X.2 2026-10-26
-//
-// Primary commands (also callable from `just`):
-//   check   — run all registered gates for the current phase
-//   gate    — interact with a single gate (check / explain / list)
-//   verify  — full workspace verification (pre-merge)
-//
-// Additional commands are dispatched via the legacy chain below.
-//
-// Flags:
-//   --help         Print this help text and exit
-//   --list-gates   List all gates from governance/gates.toml and exit
 
 use std::env;
 
@@ -27,6 +16,54 @@ fn print_help() {
     println!("Use --list-gates for a quick overview of all configured gates.");
 }
 
+<<<<<<< HEAD
+fn list_gates() -> i32 {
+    let ctx = xtask::core::ctx::Context::discover();
+    let catalog_path = ctx.root_dir.join("governance/gates.toml");
+    match xtask::core::catalog::Catalog::load_from_path(&catalog_path) {
+        Ok(catalog) => {
+            println!(
+                "=== Configured Gates (Active Phase: {}) ===",
+                catalog.active_phase
+            );
+            for name in &catalog.gate_order {
+                if let Some(gate) = catalog.gates.get(name) {
+                    println!("  {:<25} [{}] {}", name, gate.tier, gate.why);
+                }
+            }
+            0
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to load gate catalog: {}", e);
+            2
+        }
+    }
+=======
+fn legacy_dispatch(cmd: &str, args: &[String]) -> Result<(), String> {
+    let handlers: &[fn(&str, &[String]) -> Result<(), String>] = &[
+        xtask::legacy::arch::run_arch_command,
+        xtask::legacy::code::run_code_command,
+        xtask::legacy::gov::run_gov_command,
+        xtask::legacy::ratchet_supply::run_ratchet_supply_command,
+        xtask::legacy::session::run_session_command,
+        xtask::legacy::docs::run_docs_command,
+        xtask::legacy::tags::run_tags_command,
+        xtask::legacy::heavy::run_heavy_command,
+    ];
+
+    for handler in handlers {
+        let res = handler(cmd, args);
+        match res {
+            Ok(()) => return Ok(()),
+            Err(e) if e.starts_with("NOT IMPLEMENTED:") => return Err(e),
+            Err(_) => continue,
+        }
+    }
+
+    Err(format!("Unknown xtask command: {}", cmd))
+>>>>>>> 492c01e05 (fix(xtask): eliminate legacy command stubs and enforce stub ratchet)
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -38,15 +75,8 @@ fn main() {
                 std::process::exit(0);
             }
             "--list-gates" => {
-                let ctx = xtask::core::ctx::Context::discover();
-                let catalog_path = ctx.root_dir.join("governance/gates.toml");
-                if let Ok(catalog) = xtask::core::catalog::Catalog::load_from_path(&catalog_path) {
-                    println!("=== Configured Gates (Active Phase: {}) ===", catalog.active_phase);
-                    for (name, gate) in catalog.gates {
-                        println!("  {:<25} [{}] {}", name, gate.tier, gate.why);
-                    }
-                }
-                std::process::exit(0);
+                let code = list_gates();
+                std::process::exit(code);
             }
             _ => {}
         }
@@ -74,18 +104,8 @@ fn main() {
     }
 
     if cmd == "gate-list" {
-        let ctx = xtask::core::ctx::Context::discover();
-        let catalog_path = ctx.root_dir.join("governance/gates.toml");
-        if let Ok(catalog) = xtask::core::catalog::Catalog::load_from_path(&catalog_path) {
-            println!("=== Configured Gates (Active Phase: {}) ===", catalog.active_phase);
-            for (name, gate) in catalog.gates {
-                println!("  {:<25} [{}] {}", name, gate.tier, gate.why);
-            }
-            std::process::exit(0);
-        } else {
-            eprintln!("❌ Failed to load gate catalog");
-            std::process::exit(2);
-        }
+        let code = list_gates();
+        std::process::exit(code);
     }
 
     // ── Session / docs commands ───────────────────────────────────────────────
@@ -100,6 +120,10 @@ fn main() {
         };
         match res {
             Ok(()) => std::process::exit(0),
+            Err(e) if e.starts_with("NOT IMPLEMENTED:") => {
+                eprintln!("{}", e);
+                std::process::exit(2);
+            }
             Err(e) => {
                 eprintln!("❌ Error executing {}: {}", cmd, e);
                 std::process::exit(2);
@@ -108,21 +132,17 @@ fn main() {
     }
 
     // ── Legacy chain ─────────────────────────────────────────────────────────
-    let res = xtask::legacy::arch::run_arch_command(cmd, cmd_args)
-        .or_else(|_| xtask::legacy::code::run_code_command(cmd, cmd_args))
-        .or_else(|_| xtask::legacy::gov::run_gov_command(cmd, cmd_args))
-        .or_else(|_| xtask::legacy::ratchet_supply::run_ratchet_supply_command(cmd, cmd_args))
-        .or_else(|_| xtask::legacy::session::run_session_command(cmd, cmd_args))
-        .or_else(|_| xtask::legacy::docs::run_docs_command(cmd, cmd_args))
-        .or_else(|_| xtask::legacy::tags::run_tags_command(cmd, cmd_args))
-        .or_else(|_| xtask::legacy::heavy::run_heavy_command(cmd, cmd_args));
-
-    match res {
+    match legacy_dispatch(cmd, cmd_args) {
         Ok(()) => std::process::exit(0),
-        Err(_) => {
-            eprintln!("Unknown xtask command: {}", cmd);
+        Err(e) if e.starts_with("NOT IMPLEMENTED:") => {
+            eprintln!("{}", e);
+            std::process::exit(2);
+        }
+        Err(e) => {
+            eprintln!("{}", e);
             eprintln!("Run `cargo xtask --help` for a list of available commands.");
             eprintln!("Run `cargo xtask --list-gates` for all configured gates.");
+            eprintln!("Available commands:");
             std::process::exit(1);
         }
     }

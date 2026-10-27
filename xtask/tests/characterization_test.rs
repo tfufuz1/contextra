@@ -13,7 +13,7 @@ fn test_unknown_command_signature() {
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("Unknown xtask command: nonexistent-command-xyz"));
-    assert!(stderr.contains("Available commands:"));
+    assert!(stderr.contains("Run `cargo xtask --help` for a list of available commands."));
 }
 
 #[test]
@@ -23,7 +23,7 @@ fn test_legacy_dispatched_command_signature() {
         .output()
         .expect("failed to execute xtask");
 
-    assert_eq!(output.status.code(), Some(0));
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("=== Running xtask bench-trend ==="));
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("NOT IMPLEMENTED: bench-trend"));
 }

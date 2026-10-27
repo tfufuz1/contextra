@@ -9,7 +9,7 @@ default:
 
 # ── Core Dev-Loop (10 targets + mandated extras) ──────────────────────────────
 
-# Runs formatting, clippy and checks compilation (nix-develop aware)
+# Runs formatting, clippy, workspace check, and xtask check
 check:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -21,28 +21,32 @@ check:
     $RUNNER cargo fmt --all -- --check
     $RUNNER cargo clippy --all-targets -- -D warnings
     $RUNNER cargo check --all-targets --workspace
-    $RUNNER cargo xtask check-max-results-unbound
-    $RUNNER cargo xtask check-toctou-defaults
-    $RUNNER cargo xtask check-nan-hot-loop
-    $RUNNER cargo xtask check-result-dropped-io
-    if [ -f coverage.json ]; then
-        $RUNNER cargo xtask check-coverage-gate
-    fi
+    $RUNNER cargo xtask check
 
 # Runs the TDD Validation Loop (Red -> Green -> Refactor)
 test *ARGS:
     cargo test --locked {{ARGS}}
 
-# Executes all governance gates: ring-layering, panic-inventory, security-scan
+# Executes full workspace verification
 gates:
-    cargo xtask check-ring-layering --strict && cargo xtask panic-inventory && cargo xtask security-scan
+    cargo xtask verify
+
+# Alias for gates
+verify:
+    cargo xtask verify
 
 # Explains a single gate by name (reads governance/gates.toml)
 gate NAME:
     cargo xtask gate-explain {{NAME}}
 
-# Full pre-push pipeline: check → test → gates
-pre-push: check test gates
+# Full pre-push pipeline: check → test → verify (Verify-Rot lokal ist erwartet, solange NotRun-Menge nicht leer)
+pre-push:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Hinweis: Verify-Rot lokal ist erwartet, solange NotRun-Menge nicht leer."
+    just check
+    just test
+    just verify
 
 # Sync documentation from inline tags and cargo topology
 sync-docs:

@@ -1,5 +1,5 @@
 use super::*;
-use contextra_core::TxId;
+use contextra_types::TxId;
 use tempfile::tempdir;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;

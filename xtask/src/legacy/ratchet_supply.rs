@@ -1,5 +1,8 @@
+use super::common::not_implemented;
+
 pub fn run_ratchet_supply_command(cmd: &str, _args: &[String]) -> Result<(), String> {
     match cmd {
+<<<<<<< HEAD
         "check-vetoes" => {
             println!("=== Running xtask check-vetoes ===");
             Ok(())
@@ -48,6 +51,24 @@ pub fn run_ratchet_supply_command(cmd: &str, _args: &[String]) -> Result<(), Str
             println!("Tool attestation");
             Ok(())
         }
+        _ => Err(format!(
+            "Unknown command in ratchet_supply cluster: {}",
+            cmd
+        )),
+=======
+        "check-vetoes"
+        | "check-veto-deadlines"
+        | "check-adr-deadlines"
+        | "check-action-pinning"
+        | "security-scan"
+        | "hardcoded-secret"
+        | "gen-sbom"
+        | "reproducible-build"
+        | "reproducible-build-check"
+        | "workspace-verify"
+        | "env-validate"
+        | "env-attest" => not_implemented(cmd),
         _ => Err(format!("Unknown command in ratchet_supply cluster: {}", cmd)),
+>>>>>>> 492c01e05 (fix(xtask): eliminate legacy command stubs and enforce stub ratchet)
     }
 }

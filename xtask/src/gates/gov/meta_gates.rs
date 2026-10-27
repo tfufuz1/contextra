@@ -11,7 +11,8 @@ impl Gate for GateSelftestsGate {
             from_phase: "PH0".to_string(),
             kind: "builtin".to_string(),
             enforces: vec!["REQ-QA-008".to_string()],
-            why: "Führt selftest() aller registrierten Gates aus; rot wenn ein Gate keinen hat.".to_string(),
+            why: "Führt selftest() aller registrierten Gates aus; rot wenn ein Gate keinen hat."
+                .to_string(),
             owner: "MP-02".to_string(),
             cmd: None,
             toolchain: None,
@@ -87,7 +88,10 @@ impl Gate for CatalogSyncGate {
         for (name, entry) in &catalog.gates {
             if entry.kind == "builtin" && !registered_names.contains(name) {
                 return Outcome::Error {
-                    message: format!("Builtin gate '{}' in catalog not implemented by owner {}", name, entry.owner),
+                    message: format!(
+                        "Builtin gate '{}' in catalog not implemented by owner {}",
+                        name, entry.owner
+                    ),
                 };
             }
         }

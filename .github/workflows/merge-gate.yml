@@ -54,8 +54,8 @@ jobs:
             .
             xtask
 
-      - name: Check Duplicate Symbols Cross File
-        run: cargo run --manifest-path xtask/Cargo.toml -- check-duplicate-symbols-cross-file
+      - name: Check Workspace Gates
+        run: cargo xtask check
 
   flatbuffers-drift-gate:
     name: FlatBuffers Schema Drift Gate
@@ -77,8 +77,8 @@ jobs:
             .
             xtask
 
-      - name: FlatBuffers Schema Drift Gate
-        run: cargo xtask check-fbs-drift
+      - name: Check Workspace Gates
+        run: cargo xtask check
 
   marker-drift-gate:
     name: Capability Marker Drift Gate
@@ -100,8 +100,8 @@ jobs:
             .
             xtask
 
-      - name: Capability Marker Drift Gate
-        run: cargo xtask check-marker-drift
+      - name: Check Workspace Gates
+        run: cargo xtask check
 
   dependency-policy-gate:
     name: Dependency Policy Gate (cargo deny)
@@ -137,8 +137,8 @@ jobs:
             .
             xtask
 
-      - name: Phantom Commit Gate
-        run: cargo run -p xtask -- check-commit-diff-integrity --range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+      - name: Check Workspace Gates
+        run: cargo xtask check
 
   # WP-X.4 / L1-Fix 2026-10-26: contextra-graph ist Archiv-Crate (WP 2.1).
   # hyperedge-schema-merge wurde entfernt — blockierte jeden PR durch ein totes Crate.
@@ -251,14 +251,5 @@ jobs:
             .
             xtask
 
-      - name: Ring Layering Check
-        run: cargo xtask check-ring-layering --strict
-
-      - name: Unsafe Islands Check
-        run: cargo xtask check-unsafe-islands
-
-      - name: FFI Panic Boundary Check
-        run: cargo xtask check-ffi-panic-boundary
-
-      - name: Audit Verdict Independence Check
-        run: cargo xtask check-audit-verdict-independence
+      - name: Workspace Gates Check
+        run: cargo xtask check

@@ -3,9 +3,9 @@
 // INVARIANTEN:
 // - INV-KV-DELETE-1: Löschbeweis auf Key-Value-Seite ist ausschließlich für CryptoShred-Segmente möglich, niemals für TombstoneOnly.
 
-use contextra_core::ContextraError;
 use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
 use contextra_store::kv::{KvDeleteMode, KvSegmentConfig, KvSegmentManager};
+use contextra_types::ContextraError;
 use std::sync::Arc;
 
 #[test]

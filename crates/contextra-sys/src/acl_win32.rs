@@ -28,6 +28,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
     // SAFETY: OpenProcessToken accesses process handle and writes token_handle output pointer safely.
     let res = unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token_handle) };
     if res == 0 {
+        // SAFETY: GetLastError retrieves the Win32 error code for the current thread and has no side effects.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -74,6 +75,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
         )
     };
     if res == 0 {
+        // SAFETY: GetLastError retrieves the Win32 error code for the current thread and has no side effects.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -101,6 +103,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 
     // SAFETY: InitializeAcl initialises the allocated ACL buffer.
     if unsafe { InitializeAcl(p_acl, acl_size as u32, ACL_REVISION) } == 0 {
+        // SAFETY: GetLastError retrieves the Win32 error code for the current thread and has no side effects.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -110,6 +113,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 
     // SAFETY: AddAccessAllowedAce populates the initialized ACL for owner_sid.
     if unsafe { AddAccessAllowedAce(p_acl, ACL_REVISION, GENERIC_ALL, owner_sid) } == 0 {
+        // SAFETY: GetLastError retrieves the Win32 error code for the current thread and has no side effects.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,
@@ -217,6 +221,7 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     // SAFETY: GetSecurityDescriptorControl checks DACL inheritance protection.
     let status = unsafe { GetSecurityDescriptorControl(p_sec_desc, &mut control, &mut revision) };
     if status == 0 {
+        // SAFETY: GetLastError retrieves the Win32 error code for the current thread and has no side effects.
         let err = unsafe { GetLastError() };
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,

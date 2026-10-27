@@ -1,5 +1,9 @@
 use std::path::{Path, PathBuf};
 
+pub fn not_implemented(cmd: &str) -> Result<(), String> {
+    Err(format!("NOT IMPLEMENTED: {cmd}"))
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TagItem {
     pub file_path: String,
@@ -54,7 +58,10 @@ pub fn get_workspace_crates() -> Vec<CrateInfo> {
     Vec::new()
 }
 
-pub fn get_workspace_crates_from_root(_root_path: &Path, _caps: &CapabilitiesManifest) -> Vec<CrateInfo> {
+pub fn get_workspace_crates_from_root(
+    _root_path: &Path,
+    _caps: &CapabilitiesManifest,
+) -> Vec<CrateInfo> {
     Vec::new()
 }
 

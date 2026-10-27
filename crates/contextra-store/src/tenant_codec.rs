@@ -15,8 +15,9 @@
 
 use crate::lsm::LsmStorage;
 use bytes::Bytes;
-use contextra_core::{CollectionId, DocId, StorageStats, TenantId, TxId};
+use contextra_ports::StorageStats;
 use contextra_ports::{BoxFuture, Result, StorageEngine};
+use contextra_types::{CollectionId, DocId, TenantId, TxId};
 use std::ops::Bound;
 use std::sync::Arc;
 

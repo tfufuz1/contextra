@@ -1,5 +1,5 @@
-use contextra_core::{Result, TxId};
 use contextra_store::wal::{KeyManager, Wal, WalConfig, WalOp};
+use contextra_types::{Result, TxId};
 use tempfile::tempdir;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;

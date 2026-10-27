@@ -15,6 +15,8 @@ pub struct RatchetConfig {
     pub allow_attrs: u64,
     pub ignore_attrs: u64,
     pub forbid_unsafe_crates: u64,
+    #[serde(default)]
+    pub xtask_legacy_stub_count: u64,
     pub unsafe_blocks: BTreeMap<String, u64>,
 }
 
@@ -116,8 +118,40 @@ pub fn ratchet_count_legacy_unwrap(root: &str) -> u64 {
     count
 }
 
+pub fn ratchet_count_xtask_legacy_stubs(root: &str) -> u64 {
+    let legacy_dir = Path::new(root).join("xtask/src/legacy");
+    if !legacy_dir.exists() {
+        return 0;
+    }
+
+    let mut count = 0;
+    for entry in WalkDir::new(legacy_dir).into_iter().flatten() {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("rs") {
+            continue;
+        }
+
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        for line in content.lines() {
+            if line.contains("println!(\"===") || line.contains("println!(\"=== Running") {
+                count += 1;
+            }
+        }
+    }
+
+    count
+}
+
 pub fn ratchet_measure_repo(root: &str) -> RatchetConfig {
     let unwrap_legacy_grep = ratchet_count_legacy_unwrap(root);
+    let xtask_legacy_stub_count = ratchet_count_xtask_legacy_stubs(root);
 
     let mut unwrap_exact = 0;
     let mut expect_exact = 0;
@@ -249,6 +283,7 @@ pub fn ratchet_measure_repo(root: &str) -> RatchetConfig {
         allow_attrs,
         ignore_attrs,
         forbid_unsafe_crates,
+        xtask_legacy_stub_count,
         unsafe_blocks,
     }
 }
@@ -272,12 +307,13 @@ pub fn run_ratchet(args: &[String]) -> i32 {
             );
         } else {
             println!("=== Ratchet Metrics ===");
-            println!("  unwrap_legacy_grep: {}", measured.unwrap_legacy_grep);
-            println!("  unwrap_exact:       {}", measured.unwrap_exact);
-            println!("  expect_exact:       {}", measured.expect_exact);
-            println!("  allow_attrs:        {}", measured.allow_attrs);
-            println!("  ignore_attrs:       {}", measured.ignore_attrs);
-            println!("  forbid_unsafe_crates: {}", measured.forbid_unsafe_crates);
+            println!("  unwrap_legacy_grep:     {}", measured.unwrap_legacy_grep);
+            println!("  unwrap_exact:           {}", measured.unwrap_exact);
+            println!("  expect_exact:           {}", measured.expect_exact);
+            println!("  allow_attrs:            {}", measured.allow_attrs);
+            println!("  ignore_attrs:           {}", measured.ignore_attrs);
+            println!("  forbid_unsafe_crates:    {}", measured.forbid_unsafe_crates);
+            println!("  xtask_legacy_stub_count: {}", measured.xtask_legacy_stub_count);
             println!("  unsafe_blocks:");
             for (k, v) in &measured.unsafe_blocks {
                 println!("    {k}: {v}");
@@ -477,6 +513,13 @@ pub fn run_ratchet(args: &[String]) -> i32 {
                 baseline.forbid_unsafe_crates, measured.forbid_unsafe_crates
             ));
         }
+        if measured.xtask_legacy_stub_count > baseline.xtask_legacy_stub_count {
+            has_increases = true;
+            increase_details.push(format!(
+                "xtask_legacy_stub_count: {} -> {}",
+                baseline.xtask_legacy_stub_count, measured.xtask_legacy_stub_count
+            ));
+        }
         for (k, v) in &measured.unsafe_blocks {
             let base_v = baseline.unsafe_blocks.get(k).copied().unwrap_or(0);
             if *v > base_v {
@@ -543,6 +586,9 @@ pub fn run_ratchet(args: &[String]) -> i32 {
             forbid_unsafe_crates: measured
                 .forbid_unsafe_crates
                 .max(baseline.forbid_unsafe_crates),
+            xtask_legacy_stub_count: measured
+                .xtask_legacy_stub_count
+                .min(baseline.xtask_legacy_stub_count),
             unsafe_blocks: measured
                 .unsafe_blocks
                 .iter()
@@ -676,6 +722,16 @@ pub fn run_ratchet(args: &[String]) -> i32 {
                 measured.forbid_unsafe_crates, baseline.forbid_unsafe_crates
             ),
             "Stelle #![forbid(unsafe_code)] in den betroffenen Crates wieder her.",
+        ));
+    }
+    if measured.xtask_legacy_stub_count > baseline.xtask_legacy_stub_count {
+        violations.push((
+            "RATCHET-XTASK-LEGACY-STUBS",
+            format!(
+                "xtask_legacy_stub_count ({}) überschreitet Baseline ({})",
+                measured.xtask_legacy_stub_count, baseline.xtask_legacy_stub_count
+            ),
+            "Entferne neue xtask Legacy Stub Implementierungen.",
         ));
     }
     for (k, v) in &measured.unsafe_blocks {

@@ -5,10 +5,9 @@ use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
 use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp};
-use contextra_core::{
-    ContextraError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TxBuffer, TxId,
-    TOMBSTONE_BIT,
-};
+use contextra_mvcc::{SnapshotRegistry, TxBuffer};
+use contextra_ports::{ResourceBudget, ResourceTracker};
+use contextra_types::{ContextraError, Result, TxId, TOMBSTONE_BIT};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;

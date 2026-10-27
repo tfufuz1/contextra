@@ -3,7 +3,9 @@ use super::config::CompactionConfig;
 use super::merge_operator::MergeOperator;
 use crate::sstable::{BlockCache, SstableBuilder, SstableReader};
 use crate::wal::KeyManager;
-use contextra_core::{Result, SnapshotRegistry, StorageStats, TOMBSTONE_BIT};
+use contextra_mvcc::SnapshotRegistry;
+use contextra_ports::StorageStats;
+use contextra_types::{Result, TOMBSTONE_BIT};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 
@@ -17,7 +19,7 @@ pub struct CompactionEngine {
     pub(super) snapshot_registry: Arc<SnapshotRegistry>,
     block_cache: Arc<BlockCache>,
     key_manager: Option<Arc<KeyManager>>,
-    budget: Arc<contextra_core::ResourceTracker>,
+    budget: Arc<contextra_ports::ResourceTracker>,
     manifest: Option<Arc<crate::manifest::Manifest>>,
     compaction_counter: AtomicU64,
     pressure_rx: Option<tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>>,
@@ -34,7 +36,7 @@ impl CompactionEngine {
         snapshot_registry: Arc<SnapshotRegistry>,
         block_cache: Arc<BlockCache>,
         key_manager: Option<Arc<KeyManager>>,
-        budget: Arc<contextra_core::ResourceTracker>,
+        budget: Arc<contextra_ports::ResourceTracker>,
         manifest: Option<Arc<crate::manifest::Manifest>>,
     ) -> Self {
         let adaptive_planner: Option<Arc<dyn AdaptiveCompactionPlanner>> =
@@ -195,7 +197,7 @@ impl CompactionEngine {
                     limit_bytes,
                     limit_mb
                 );
-                return Err(contextra_core::ContextraError::MemoryBudgetExceeded {
+                return Err(contextra_types::ContextraError::MemoryBudgetExceeded {
                     used_mb,
                     limit_mb,
                 });
@@ -516,7 +518,7 @@ impl CompactionEngine {
         while let Some(item) = heap.pop() {
             if let Some(ct) = cancel_token {
                 if ct.is_cancelled() {
-                    return Err(contextra_core::ContextraError::Internal(
+                    return Err(contextra_types::ContextraError::Internal(
                         "Compaction cancelled during merge stream processing".into(),
                     ));
                 }
@@ -551,14 +553,14 @@ impl CompactionEngine {
                                 "Compaction aborted: backpressure wait timeout exceeded ({:?}) while memory budget exhausted",
                                 self.config.max_backpressure_wait
                             );
-                            return Err(contextra_core::ContextraError::MemoryBudgetExceeded {
+                            return Err(contextra_types::ContextraError::MemoryBudgetExceeded {
                                 used_mb,
                                 limit_mb,
                             });
                         }
                         if let Some(ct) = cancel_token {
                             if ct.is_cancelled() {
-                                return Err(contextra_core::ContextraError::Internal(
+                                return Err(contextra_types::ContextraError::Internal(
                                     "Compaction cancelled during memory budget wait".into(),
                                 ));
                             }
@@ -615,7 +617,7 @@ impl CompactionEngine {
                                     .unwrap_or(u64::MAX);
 
                             let merge_res = if timeout_nanos > 0 && elapsed_nanos > timeout_nanos {
-                                Err(contextra_core::ContextraError::Sandbox(
+                                Err(contextra_types::ContextraError::Sandbox(
                                     "Merge operator wall-clock timeout exceeded".into(),
                                 ))
                             } else {

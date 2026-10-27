@@ -1,7 +1,7 @@
 use super::*;
 #[cfg(feature = "encryption-at-rest")]
 use crate::wal::KeyManager;
-use contextra_core::TxId;
+use contextra_types::TxId;
 #[cfg(feature = "encryption-at-rest")]
 use std::sync::Arc;
 use tempfile::tempdir;
