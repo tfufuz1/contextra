@@ -76,7 +76,6 @@ impl contextra_ports::DriftStatusProvider for RouterDriftAdapter {
 pub struct RoutingHandle {
     pub router: Arc<contextra::router::DefaultRouterEngine>,
     pub calibrator: Arc<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>,
-    pub pid_controller: Arc<parking_lot::Mutex<contextra_adapt::PidController>>,
     pub _drift_adapter: Arc<dyn contextra_ports::DriftStatusProvider>,
 }
 
@@ -106,32 +105,15 @@ pub async fn setup_routing(
         contextra_rank::IsotonicCalibrator::with_defaults(),
     ));
 
-    let pid_controller = Arc::new(parking_lot::Mutex::new(
-        contextra_adapt::PidController::default(),
-    ));
-
     let drift_adapter: Arc<dyn contextra_ports::DriftStatusProvider> =
         Arc::new(RouterDriftAdapter(router.clone()));
     let router_weak = Arc::downgrade(&drift_adapter);
     db.set_router(router_weak);
     db.set_calibrator(Arc::downgrade(&calibrator));
-    db.set_pid_controller(Arc::downgrade(&pid_controller));
 
     Ok(Some(Arc::new(RoutingHandle {
         router,
         calibrator,
-        pid_controller,
         _drift_adapter: drift_adapter,
     })))
-}
-
-/// Conditionally sets up `KvBridgeAdapter` when feature `kv-bridge` is enabled.
-#[cfg(feature = "kv-bridge")]
-pub fn setup_kv_bridge(
-    _db: &Arc<Contextra>,
-) -> Option<Arc<contextra_infer_candle::KvBridgeAdapter>> {
-    tracing::info!(
-        "kv-bridge feature aktiv, aber keine Verschlüsselung konfiguriert — KvBridgeAdapter deaktiviert"
-    );
-    None
 }

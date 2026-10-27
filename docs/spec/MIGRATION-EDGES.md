@@ -45,15 +45,13 @@
 
 ## contextra-adapt
 
-| Dependent | Manifest | Art | Optional | Quellcode-Dateien (src / tests) | Top-10 Symbole | Zu erledigen in | Hinweis |
-|---|---|---|---|---|---|---|---|
-| contextra-db | ja | normal | nein | 3 / 1 (4) | PidController, RerankDeadline, RerankPidController, decay_controller, pid_latency_controller, new | WP 2.3 | - |
-| contextra-engine | nein | nein | nein | 3 / 0 (3) | PidController, default | WP 2.2 | **nur Quellcode** (keine Manifest-Kante) |
-| contextra-graph | ja | normal | nein | 1 / 0 (1) | ShadowDiscrepancy, ShadowSink | WP 2.1b | - |
-| contextra-mcp | ja | normal | nein | 1 / 0 (1) | PidController, default | WP 2.3 | - |
-| contextra-py | ja | normal | nein | 0 / 0 (0) | - | WP 2.3 | - |
-| contextra-rank | ja | dev | nein | 0 / 2 (2) | PidController | WP 2.3 | - |
-| contextra-router | ja | normal | nein | 4 / 3 (7) | BanditProfileState, FcTsArmSet, bandit, lyapunov, offpolicy, BanditError, RandomizedLoggingPolicy, FcTsError, FcTsRng, SplitMix64 | WP 2.1b | - |
+| Dependent | Art | Optional | Zu erledigen in |
+|---|---|---|---|
+| contextra-engine | normal | nein | WP 2.2 |
+| contextra-db | normal | nein | WP 2.3 |
+| contextra-mcp | normal | nein | ✅ erledigt (WP 2.3) |
+| contextra-py | normal | nein | WP 2.3 |
+| contextra-rank | dev | nein | WP 2.3 |
 
 **Maßnahme:** `AdaptiveController` durch feste Startwerte ersetzen: `efSearch = 64`, `exact_scan_max = 20_000`, Overfetch `3 / 6 / 12` (PLAN.md §7, WP 2.2 Schritt 3).
 
@@ -61,9 +59,9 @@
 
 ## contextra-agent
 
-| Dependent | Manifest | Art | Optional | Quellcode-Dateien (src / tests) | Top-10 Symbole | Zu erledigen in | Hinweis |
-|---|---|---|---|---|---|---|---|
-| contextra-mcp | ja | normal | ja | 0 / 0 (0) | - | WP 2.3 | - |
+| Dependent | Art | Optional | Zu erledigen in |
+|---|---|---|---|
+| contextra-mcp | normal | **ja** | ✅ erledigt (WP 2.3) |
 
 **Maßnahme:** Feature `agent-workflows` entfernen; optionale Kante aus `mcp/Cargo.toml` löschen.
 
@@ -115,10 +113,10 @@
 
 ## contextra-infer-ollama
 
-| Dependent | Manifest | Art | Optional | Quellcode-Dateien (src / tests) | Top-10 Symbole | Zu erledigen in | Hinweis |
-|---|---|---|---|---|---|---|---|
-| contextra | ja | normal | ja | 1 / 0 (1) | - | WP 2.3 | - |
-| contextra-mcp | ja | normal | ja | 1 / 0 (1) | new, OllamaConfig, with_config | WP 2.3 | - |
+| Dependent | Art | Optional | Zu erledigen in |
+|---|---|---|---|
+| contextra | normal | **ja** | WP 2.3 |
+| contextra-mcp | normal | **ja** | ✅ erledigt (WP 2.3) |
 
 **Maßnahme:** Feature `ollama` bleibt in Fassade, aber Kante nur noch über Feature-Gate.
 
@@ -126,13 +124,11 @@
 
 ## contextra-infer-onnx
 
-| Dependent | Manifest | Art | Optional | Quellcode-Dateien (src / tests) | Top-10 Symbole | Zu erledigen in | Hinweis |
-|---|---|---|---|---|---|---|---|
-| contextra | ja | normal | ja | 1 / 0 (1) | - | WP 2.3 | - |
-| contextra-bench | ja | normal | nein | 1 / 0 (1) | CrossEncoderReranker, RerankConfig | WP 2.1b | - |
-| contextra-engine | nein | nein | nein | 1 / 0 (1) | ensure_onnx_model_download, load | WP 2.2 | **nur Quellcode** (keine Manifest-Kante) |
-| contextra-infer-ollama | ja | dev | nein | 1 / 0 (1) | MAX_EMBED_BATCH_SIZE | WP 2.1b | - |
-| contextra-mcp | ja | normal | ja | 1 / 0 (1) | from_path | WP 2.3 | - |
+| Dependent | Art | Optional | Zu erledigen in |
+|---|---|---|---|
+| contextra | normal | **ja** | WP 2.3 |
+| contextra-mcp | normal | **ja** | ✅ erledigt (WP 2.3) |
+| contextra-bench | normal | nein | WP 2.1b |
 
 **Maßnahme:** Feature `onnx` bleibt in Fassade, aber Kante nur noch über Feature-Gate.
 
