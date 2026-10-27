@@ -23,6 +23,47 @@ contextra-simd = 285
 contextra-sys = 30
 contextra-wire = 27
 
+# ── D-4: not_run_baseline (Gates, die in dieser Phase noch NOT RUN sein dürfen) ───
+[not_run_baseline]
+gates = [
+    "security-ports",
+    "key-purposes",
+    "witness-mint",
+    "deletion-types-once",
+    "determinism",
+    "fuzz-matrix",
+    "fuzz-regression",
+    "no-security-stub",
+    "no-literal-secrets",
+    "error-domain",
+    "test-surface",
+    "ring-dag",
+    "ring0-async",
+    "capabilities-consistency",
+    "unsafe-inventory",
+    "feature-matrix",
+    "wired",
+    "deletion-honesty",
+    "doc-truth",
+    "symbol-uniqueness",
+    "code-lints",
+    "ratchet",
+    "protected-paths",
+    "gate-weakening",
+    "test-integrity",
+    "scope-guard",
+    "provenance",
+    "claims-in-pr",
+    "veto-guard",
+    "adr-index",
+    "sbom",
+    "evidence-complete",
+    "ci-hygiene",
+    "panic-surface",
+    "async-io",
+    "doc-stamp"
+]
+
 # ── Neue Baselines (PLAN.md WP 0.4, §6, §17) ─────────────────────────────────
 # Jeder Wert ist die Obergrenze. Neue PRs dürfen sie senken, nie erhöhen.
 [baselines]

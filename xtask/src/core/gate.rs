@@ -6,18 +6,42 @@ pub enum Outcome {
     Fail { reason: String },
     NotApplicable { reason: String },
     Error { message: String },
+    NotRun { reason: String },
+    NotDue { reason: String },
+    OtherTier { tier: String },
 }
 
 impl Outcome {
     pub fn is_pass_or_na(&self) -> bool {
-        matches!(self, Outcome::Pass | Outcome::NotApplicable { .. })
+        matches!(
+            self,
+            Outcome::Pass
+                | Outcome::NotApplicable { .. }
+                | Outcome::NotDue { .. }
+                | Outcome::OtherTier { .. }
+        )
     }
 
     pub fn exit_code(&self) -> i32 {
         match self {
-            Outcome::Pass | Outcome::NotApplicable { .. } => 0,
+            Outcome::Pass
+            | Outcome::NotApplicable { .. }
+            | Outcome::NotDue { .. }
+            | Outcome::OtherTier { .. } => 0,
             Outcome::Fail { .. } => 1,
-            Outcome::Error { .. } => 2,
+            Outcome::Error { .. } | Outcome::NotRun { .. } => 2,
+        }
+    }
+
+    pub fn status_str(&self) -> String {
+        match self {
+            Outcome::Pass => "PASS".to_string(),
+            Outcome::Fail { reason } => format!("FAIL ({})", reason),
+            Outcome::NotApplicable { reason } => format!("N/A ({})", reason),
+            Outcome::Error { message } => format!("ERROR ({})", message),
+            Outcome::NotRun { reason } => format!("NOT RUN ({})", reason),
+            Outcome::NotDue { reason } => format!("NOT DUE ({})", reason),
+            Outcome::OtherTier { tier } => format!("OTHER TIER ({})", tier),
         }
     }
 }

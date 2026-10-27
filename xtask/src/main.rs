@@ -1,15 +1,4 @@
 // xtask entry-point — Contextra quality-gate runner | WP-X.2 2026-10-26
-//
-// Primary commands (also callable from `just`):
-//   check   — run all registered gates for the current phase
-//   gate    — interact with a single gate (check / explain / list)
-//   verify  — full workspace verification (pre-merge)
-//
-// Additional commands are dispatched via the legacy chain below.
-//
-// Flags:
-//   --help         Print this help text and exit
-//   --list-gates   List all gates from governance/gates.toml and exit
 
 use std::env;
 
@@ -27,6 +16,29 @@ fn print_help() {
     println!("Use --list-gates for a quick overview of all configured gates.");
 }
 
+fn list_gates() -> i32 {
+    let ctx = xtask::core::ctx::Context::discover();
+    let catalog_path = ctx.root_dir.join("governance/gates.toml");
+    match xtask::core::catalog::Catalog::load_from_path(&catalog_path) {
+        Ok(catalog) => {
+            println!(
+                "=== Configured Gates (Active Phase: {}) ===",
+                catalog.active_phase
+            );
+            for name in &catalog.gate_order {
+                if let Some(gate) = catalog.gates.get(name) {
+                    println!("  {:<25} [{}] {}", name, gate.tier, gate.why);
+                }
+            }
+            0
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to load gate catalog: {}", e);
+            2
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -38,15 +50,8 @@ fn main() {
                 std::process::exit(0);
             }
             "--list-gates" => {
-                let ctx = xtask::core::ctx::Context::discover();
-                let catalog_path = ctx.root_dir.join("governance/gates.toml");
-                if let Ok(catalog) = xtask::core::catalog::Catalog::load_from_path(&catalog_path) {
-                    println!("=== Configured Gates (Active Phase: {}) ===", catalog.active_phase);
-                    for (name, gate) in catalog.gates {
-                        println!("  {:<25} [{}] {}", name, gate.tier, gate.why);
-                    }
-                }
-                std::process::exit(0);
+                let code = list_gates();
+                std::process::exit(code);
             }
             _ => {}
         }
@@ -74,18 +79,8 @@ fn main() {
     }
 
     if cmd == "gate-list" {
-        let ctx = xtask::core::ctx::Context::discover();
-        let catalog_path = ctx.root_dir.join("governance/gates.toml");
-        if let Ok(catalog) = xtask::core::catalog::Catalog::load_from_path(&catalog_path) {
-            println!("=== Configured Gates (Active Phase: {}) ===", catalog.active_phase);
-            for (name, gate) in catalog.gates {
-                println!("  {:<25} [{}] {}", name, gate.tier, gate.why);
-            }
-            std::process::exit(0);
-        } else {
-            eprintln!("❌ Failed to load gate catalog");
-            std::process::exit(2);
-        }
+        let code = list_gates();
+        std::process::exit(code);
     }
 
     // ── Session / docs commands ───────────────────────────────────────────────
@@ -123,6 +118,7 @@ fn main() {
             eprintln!("Unknown xtask command: {}", cmd);
             eprintln!("Run `cargo xtask --help` for a list of available commands.");
             eprintln!("Run `cargo xtask --list-gates` for all configured gates.");
+            eprintln!("Available commands:");
             std::process::exit(1);
         }
     }
