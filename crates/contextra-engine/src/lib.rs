@@ -5,9 +5,8 @@
 
 #![forbid(unsafe_code)]
 
-#[cfg(feature = "encryption-at-rest")]
 pub use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
 };
 
 #[cfg(not(feature = "encryption-at-rest"))]

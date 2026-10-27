@@ -782,7 +782,6 @@ impl Wal {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    #[cfg(any(test, feature = "test-hooks"))]
     pub fn legacy_key_used_for_test(&self) -> bool {
         self.legacy_key_used
             .load(std::sync::atomic::Ordering::Relaxed)

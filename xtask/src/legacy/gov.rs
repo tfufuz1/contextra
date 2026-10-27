@@ -93,39 +93,42 @@ pub fn run_gov_command(cmd: &str, args: &[String]) -> Result<(), String> {
             Ok(())
         }
         "gate-check" => {
-            let mut level = None;
-            let mut crate_name = None;
+            let mut level_str = None;
+            let mut crate_str = None;
             let mut i = 0;
             while i < args.len() {
-                if args[i] == "--level" && i + 1 < args.len() {
-                    level = Some(args[i + 1].as_str());
-                    i += 1;
-                } else if args[i] == "--crate" && i + 1 < args.len() {
-                    crate_name = Some(args[i + 1].as_str());
-                    i += 1;
+                if let Some(arg) = args.get(i) {
+                    if arg == "--level" {
+                        if let Some(val) = args.get(i + 1) {
+                            level_str = Some(val.clone());
+                            i += 1;
+                        }
+                    } else if arg == "--crate" {
+                        if let Some(val) = args.get(i + 1) {
+                            crate_str = Some(val.clone());
+                            i += 1;
+                        }
+                    }
                 }
                 i += 1;
             }
-
-            match level {
-                Some("0") => {
-                    if let Some(c) = crate_name {
-                        println!("Starte Gate-Check Level 0 für Crate {}", c);
-                        Ok(())
-                    } else {
-                        eprintln!("Fehler: Parameter --crate ist erforderlich für Level 0");
-                        Err("Fehler: Parameter --crate ist erforderlich für Level 0".to_string())
-                    }
+            let level = match level_str {
+                Some(l) => match crate::gate_check::GateLevel::from_str(&l) {
+                    Ok(lvl) => lvl,
+                    Err(e) => return Err(e),
+                },
+                None => return Err("Missing parameter --level <0..4>".to_string()),
+            };
+            let opts = crate::gate_check::GateCheckOptions {
+                level,
+                crate_name: crate_str,
+            };
+            match crate::gate_check::run(opts) {
+                Ok(report) => {
+                    println!("{:?}", report);
+                    Ok(())
                 }
-                Some("2") => {
-                    eprintln!("Gate 2 ist spezifiziert, aber noch nicht als automatisierte Prüfung hinterlegt.");
-                    Err("Gate 2 ist spezifiziert, aber noch nicht als automatisierte Prüfung hinterlegt.".to_string())
-                }
-                Some(_) => Ok(()),
-                None => {
-                    eprintln!("Missing parameter --level <0..4>");
-                    Err("Missing parameter --level <0..4>".to_string())
-                }
+                Err(e) => Err(format!("Gate Check FEHLGESCHLAGEN: {}", e)),
             }
         }
         _ => Err(format!("Unknown command in gov cluster: {}", cmd)),

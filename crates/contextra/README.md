@@ -30,8 +30,8 @@ Für Details zur Zielarchitektur, Ring-Struktur und den einzelnen Migrationsphas
 
 ## Feature-Ringe (Ring-Split)
 
-| Ring-Name | Enthaltene Features | Zielgruppe | Lizenzmodell |
+| Feature-Name | Enthaltene Features / Abhängigkeiten | Zielgruppe | Lizenzmodell |
 | --- | --- | --- | --- |
-| `fast` | `fast` | OSS-Adoption | Open Source (MIT/Apache-2.0) |
-| `sovereign` | `sovereign`, `contextra-crypto`, `contextra-privacy` | Kanzlei-Appliance | Open Source (MIT/Apache-2.0) |
-| `compliance` | `compliance`, `sovereign`, `audit-export`, `avv-generator` | Kommerziell | Trade-Secret / Kommerziell (`compliance`) |
+| `embedded` | Default (embedded local search) | OSS-Adoption | Open Source (MIT/Apache-2.0) |
+| `candle` | `contextra-infer-candle` | Local Candle Inference | Open Source (MIT/Apache-2.0) |
+| `compliance` | `audit-export`, `avv-generator` | Kommerziell | Trade-Secret / Kommerziell (`compliance`) |

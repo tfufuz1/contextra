@@ -1,6 +1,6 @@
 # Kanten-Inventar Archiv-Crates — WP 2.1
 
-<!-- doc-stamp: 9bf32c038 | Generiert: tools/generate_migration_edges.py -->
+<!-- doc-stamp: e2675209c | Generiert: tools/generate_migration_edges.py -->
 
 > **Zweck.** Dieses Dokument listet alle Kanten von aktiven Crates zu Archiv-Crates.
 > Es ist die Abarbeitungsliste für WP 2.2, WP 2.3 und WP 2.4.
@@ -23,7 +23,7 @@
 
 | Dependent | Manifest-Kanten | Quellcode-Dateien (src / tests / gesamt) | Archiv-Kanten | Ziel-WP |
 |---|---|---|---|---|
-| contextra | 4 | 8 / 9 / **17** | 4 | WP 2.3 |
+| contextra | 0 | 0 / 0 / **0** | 0 | WP 2.3 (erledigt) |
 | contextra-agent | 2 | 3 / 1 / **4** | 2 | WP 2.1b |
 | contextra-bench | 3 | 6 / 2 / **8** | 3 | WP 2.1b |
 | contextra-checkpoint | 1 | 2 / 1 / **3** | 1 | WP 2.3 |
@@ -112,7 +112,7 @@
 
 | Dependent | Manifest | Art | Optional | Quellcode-Dateien (src / tests) | Top-10 Symbole | Zu erledigen in | Hinweis |
 |---|---|---|---|---|---|---|---|
-| contextra | ja | normal | ja | 1 / 0 (1) | - | WP 2.3 | - |
+| contextra | nein | - | - | 0 / 0 (0) | - | WP 2.3 (erledigt) | Kante vollständig entfernt |
 
 **Maßnahme:** Feature `ollama` bleibt in Fassade, aber Kante nur noch über Feature-Gate.
 
@@ -122,7 +122,7 @@
 
 | Dependent | Manifest | Art | Optional | Quellcode-Dateien (src / tests) | Top-10 Symbole | Zu erledigen in | Hinweis |
 |---|---|---|---|---|---|---|---|
-| contextra | ja | normal | ja | 1 / 0 (1) | - | WP 2.3 | - |
+| contextra | nein | - | - | 0 / 0 (0) | - | WP 2.3 (erledigt) | Kante vollständig entfernt |
 | contextra-bench | ja | normal | nein | 1 / 0 (1) | CrossEncoderReranker, RerankConfig | WP 2.1b | - |
 | contextra-engine | nein | nein | nein | 1 / 0 (1) | ensure_onnx_model_download, load | WP 2.2 | **nur Quellcode** (keine Manifest-Kante) |
 | contextra-infer-ollama | ja | dev | nein | 1 / 0 (1) | MAX_EMBED_BATCH_SIZE | WP 2.1b | - |
@@ -145,7 +145,7 @@
 
 | Dependent | Manifest | Art | Optional | Quellcode-Dateien (src / tests) | Top-10 Symbole | Zu erledigen in | Hinweis |
 |---|---|---|---|---|---|---|---|
-| contextra | ja | normal | ja | 1 / 0 (1) | - | WP 2.3 | - |
+| contextra | nein | - | - | 0 / 0 (0) | - | WP 2.3 (erledigt) | Kante vollständig entfernt |
 | contextra-agent | ja | normal | nein | 2 / 0 (2) | Success, Rejected, DefaultRouterEngine, DecisionId | WP 2.1b | - |
 | contextra-py | ja | normal | nein | 0 / 0 (0) | - | WP 2.3 | - |
 | contextra-types | nein | nein | nein | 1 / 0 (1) | RoutingStrategy | WP 2.3 | **nur Quellcode** (keine Manifest-Kante) |
