@@ -12,8 +12,12 @@ description = "Deterministic test utilities, ManualClock, InMemoryStorageEngine,
 [package.metadata.contextra]
 ring = "tooling"
 
+[features]
+default = ["testkit"]
+testkit = []
+
 [dependencies]
-contextra-ports = { workspace = true }
+contextra-ports = { workspace = true, features = ["testkit"] }
 contextra-types = { workspace = true }
 bytes = { workspace = true }
 parking_lot = { workspace = true }

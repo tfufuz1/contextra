@@ -39,7 +39,37 @@ impl Gate for WitnessMintGate {
                 reason: "Spec name mismatch".to_string(),
             };
         }
-        Outcome::Pass
+
+        let temp = match tempfile::TempDir::new() {
+            Ok(t) => t,
+            Err(e) => {
+                return Outcome::Fail {
+                    reason: format!("Failed to create tempdir for selftest: {e}"),
+                };
+            }
+        };
+        let root = temp.path();
+
+        if let Err(e) = fs::create_dir_all(root.join("crates/contextra-engine/src")) {
+            return Outcome::Fail {
+                reason: format!("Failed to create dummy crate dir in selftest: {e}"),
+            };
+        }
+        if let Err(e) = fs::write(
+            root.join("crates/contextra-engine/src/bad.rs"),
+            "let w = LayerWitness { remaining_count: 0 };",
+        ) {
+            return Outcome::Fail {
+                reason: format!("Failed to write bad fixture in selftest: {e}"),
+            };
+        }
+
+        match scan_witness_mint(root) {
+            Outcome::Fail { reason } if reason.contains("LayerWitness") => Outcome::Pass,
+            _ => Outcome::Fail {
+                reason: "Selftest failed: scan_witness_mint failed to detect illegal LayerWitness instantiation in contextra-engine".to_string(),
+            },
+        }
     }
 }
 
@@ -51,10 +81,7 @@ pub fn scan_witness_mint(root: &Path) -> Outcome {
         return Outcome::Pass;
     }
 
-    for entry in WalkDir::new(&crates_dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
+    for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
         if !entry.file_type().is_file() {
             continue;
         }
@@ -71,9 +98,6 @@ pub fn scan_witness_mint(root: &Path) -> Outcome {
         // Allowed modules: contextra-ports/src/scanner, contextra-testkit
         if rel_path.contains("contextra-ports/src/scanner")
             || rel_path.contains("contextra-testkit")
-            || rel_path.contains("/tests/")
-            || rel_path.contains("/benches/")
-            || rel_path.contains("/examples/")
         {
             continue;
         }
@@ -90,6 +114,7 @@ pub fn scan_witness_mint(root: &Path) -> Outcome {
             if trimmed.contains("LayerWitness {")
                 || trimmed.contains("LayerWitness::new")
                 || trimmed.contains("issue_from_scanner")
+                || trimmed.contains("mint_witness_for_testkit")
             {
                 violations.push(format!(
                     "{}:{} - Direct instantiation of LayerWitness outside allowed modules: '{}'",
@@ -154,10 +179,7 @@ pub fn scan_deletion_types_once(root: &Path) -> Outcome {
         return Outcome::Pass;
     }
 
-    for entry in WalkDir::new(&crates_dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
+    for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
         if !entry.file_type().is_file() {
             continue;
         }
@@ -191,9 +213,12 @@ pub fn scan_deletion_types_once(root: &Path) -> Outcome {
             let line_num = idx + 1;
             let trimmed = line.trim();
 
-            if (trimmed.starts_with("pub enum DeletionLayer") || trimmed.starts_with("enum DeletionLayer"))
-                || (trimmed.starts_with("pub struct DeletionProof") || trimmed.starts_with("struct DeletionProof"))
-                || (trimmed.starts_with("pub struct LayerCleanupProof") || trimmed.starts_with("struct LayerCleanupProof"))
+            if (trimmed.starts_with("pub enum DeletionLayer")
+                || trimmed.starts_with("enum DeletionLayer"))
+                || (trimmed.starts_with("pub struct DeletionProof")
+                    || trimmed.starts_with("struct DeletionProof"))
+                || (trimmed.starts_with("pub struct LayerCleanupProof")
+                    || trimmed.starts_with("struct LayerCleanupProof"))
             {
                 violations.push(format!(
                     "{}:{} - Duplicate definition of canonical deletion type: '{}'",
@@ -292,10 +317,7 @@ pub fn scan_deletion_honesty(root: &Path) -> Outcome {
     // 2. Scan code for hardcoded zero counts or dummy proof verifications
     let crates_dir = root.join("crates");
     if crates_dir.exists() {
-        for entry in WalkDir::new(&crates_dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
+        for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
             if !entry.file_type().is_file() {
                 continue;
             }

@@ -353,7 +353,7 @@ impl DeletionProof {
     pub fn issue<'a>(
         ctx: &contextra_types::RequestContext,
         saga: &contextra_types::SagaRecord,
-        witnesses: &[contextra_types::LayerWitness],
+        witnesses: &[contextra_ports::scanner::LayerWitness],
         excluded: &[ExcludedScope],
         _custody: CustodyLevel,
         key: impl Into<SigningKeyHandle<'a>>,
@@ -966,8 +966,10 @@ mod tests {
 
     #[test]
     fn test_deletion_proof_issue_validation() {
+        use contextra_ports::scanner::ScanTechnique;
         use contextra_ports::SystemClock;
-        use contextra_types::{LayerWitness, RequestContext, SagaRecord, ScanMethod};
+        use contextra_testkit::mint_witness_for_tests;
+        use contextra_types::{RequestContext, SagaRecord};
 
         let clock = SystemClock::new();
         let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId(100));
@@ -975,12 +977,11 @@ mod tests {
         let hmac_key = b"secret_hmac_key_32_bytes_long!!";
 
         // 1. remaining > 0 -> Err
-        let w_remaining = vec![LayerWitness::issue_from_scanner(
+        let w_remaining = vec![mint_witness_for_tests(
             "LsmMemtable",
             10,
             2,
-            ScanMethod::Structural,
-            [0; 32],
+            ScanTechnique::Structural,
         )];
         let res1 = DeletionProof::issue(
             &ctx,
@@ -994,12 +995,11 @@ mod tests {
         assert!(res1.is_err(), "remaining > 0 MUST return Err");
 
         // 2. ScanMethod::NotMeasured -> Err
-        let w_not_measured = vec![LayerWitness::issue_from_scanner(
+        let w_not_measured = vec![mint_witness_for_tests(
             "LsmMemtable",
             0,
             0,
-            ScanMethod::NotMeasured("unmounted".to_string()),
-            [0; 32],
+            ScanTechnique::NotMeasured("unmounted".to_string()),
         )];
         let res2 = DeletionProof::issue(
             &ctx,
@@ -1014,14 +1014,8 @@ mod tests {
 
         // 3. Satisfied conditions -> Ok
         let w_valid = vec![
-            LayerWitness::issue_from_scanner("LsmMemtable", 10, 0, ScanMethod::Structural, [0; 32]),
-            LayerWitness::issue_from_scanner(
-                "HnswIndex",
-                0,
-                0,
-                ScanMethod::FeatureDisabled,
-                [0; 32],
-            ),
+            mint_witness_for_tests("LsmMemtable", 10, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("HnswIndex", 0, 0, ScanTechnique::FeatureDisabled),
         ];
         let res3 = DeletionProof::issue(
             &ctx,

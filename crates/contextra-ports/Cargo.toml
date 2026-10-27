@@ -12,8 +12,13 @@ description = "Canonical dyn-compatible port traits for Contextra subsystems"
 [package.metadata.contextra]
 ring = "0"
 
+[features]
+default = []
+testkit = []
+
 [dependencies]
 contextra-types = { workspace = true }
+blake3 = { workspace = true }
 futures-util = "0.3"
 bytes = { workspace = true }
 serde = { workspace = true }

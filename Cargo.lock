@@ -809,6 +809,7 @@ dependencies = [
  "blake3",
  "contextra-crypto",
  "contextra-ports",
+ "contextra-testkit",
  "contextra-types",
  "criterion",
  "ed25519-dalek",
@@ -1088,6 +1089,7 @@ name = "contextra-ports"
 version = "0.1.0"
 dependencies = [
  "ahash",
+ "blake3",
  "bytes",
  "contextra-types",
  "futures-util",
@@ -1313,8 +1315,8 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
- "contextra-core",
  "contextra-crypto",
+ "contextra-mvcc",
  "contextra-ports",
  "contextra-simd",
  "contextra-sys",

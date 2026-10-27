@@ -1,10 +1,10 @@
 // FILE-CONTEXT
-// ZWECK: Typsichere Restmessung und LayerWitness für physische Löschnachweise (§4.2, §20.5, INV-WITNESS-MINT-1).
-// INVARIANTEN: LayerWitness hat keinen öffentlichen Konstruktor außerhalb der Scanner (§7.3). Kein Default, kein Deserialize.
-// HOTSPOTS: [1-60]
+// ZWECK: Typsichere Restmessung und Basistypen für physische Löschnachweise (§4.2, §20.5, INV-WITNESS-MINT-1).
+// INVARIANTEN: LayerWitness liegt ausschließlich in contextra-ports::scanner.
+// HOTSPOTS: [1-40]
 
 #![forbid(unsafe_code)]
-//! LayerWitness and residual measurement types (§4.2, §20.5).
+//! Residual measurement and context types (§4.2, §20.5).
 
 use serde::Serialize;
 
@@ -17,80 +17,6 @@ pub enum ScanMethod {
     NotMeasured(String),
     /// Layer measurement is disabled due to feature configuration.
     FeatureDisabled,
-}
-
-/// Verified witness measurement issued by a storage layer scanner.
-///
-/// Under INV-WITNESS-MINT-1, `LayerWitness` instances may only be minted
-/// by authorized storage scanners (`store`, `vector`, `text`, etc.).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct LayerWitness {
-    layer: String,
-    scanned: u64,
-    remaining: u64,
-    method: ScanMethod,
-    digest: [u8; 32],
-}
-
-impl LayerWitness {
-    /// Internal crate constructor for scanner implementations within contextra-types.
-    pub(crate) fn issue_from_scanner_internal(
-        layer: impl Into<String>,
-        scanned: u64,
-        remaining: u64,
-        method: ScanMethod,
-        digest: [u8; 32],
-    ) -> Self {
-        Self {
-            layer: layer.into(),
-            scanned,
-            remaining,
-            method,
-            digest,
-        }
-    }
-
-    /// Gate entrypoint for authorized scanner implementations in storage crates (INV-WITNESS-MINT-1).
-    ///
-    /// # Gate-Stelle
-    /// This function is hidden from public documentation (`#[doc(hidden)]`) and serves as the audited
-    /// gate entrypoint for issuing `LayerWitness` measurements. Instantiation outside authorized
-    /// storage scanners is strictly prohibited by governance rules.
-    #[doc(hidden)]
-    pub fn issue_from_scanner(
-        layer: impl Into<String>,
-        scanned: u64,
-        remaining: u64,
-        method: ScanMethod,
-        digest: [u8; 32],
-    ) -> Self {
-        Self::issue_from_scanner_internal(layer, scanned, remaining, method, digest)
-    }
-
-    /// Returns the identifier of the scanned storage layer.
-    pub fn layer(&self) -> &str {
-        &self.layer
-    }
-
-    /// Returns the number of items/keys scanned during verification.
-    pub fn scanned(&self) -> u64 {
-        self.scanned
-    }
-
-    /// Returns the number of remaining live items/keys found.
-    pub fn remaining(&self) -> u64 {
-        self.remaining
-    }
-
-    /// Returns the scan methodology used.
-    pub fn method(&self) -> &ScanMethod {
-        &self.method
-    }
-
-    /// Returns the BLAKE3 digest of the scan state.
-    pub fn digest(&self) -> &[u8; 32] {
-        &self.digest
-    }
 }
 
 /// Request context containing tenant and transaction identity for deletion operations.
