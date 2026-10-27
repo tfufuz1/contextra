@@ -69,7 +69,10 @@ impl VerificationReport {
         out.push_str("=== VERIFICATION REPORT ===\n");
         for item in &self.items {
             let status = item.outcome.status_str();
-            out.push_str(&format!("{:<30} {:<30} ({} ms)\n", item.gate, status, item.duration_ms));
+            out.push_str(&format!(
+                "{:<30} {:<30} ({} ms)\n",
+                item.gate, status, item.duration_ms
+            ));
         }
         out.push_str("----------------------------\n");
         out.push_str(&format!(

@@ -110,7 +110,10 @@ pub fn run_check(args: &[String]) -> i32 {
 
         let outcome = if !is_due {
             Outcome::NotDue {
-                reason: format!("from_phase {} > active_phase {}", gate_entry.from_phase, catalog.active_phase),
+                reason: format!(
+                    "from_phase {} > active_phase {}",
+                    gate_entry.from_phase, catalog.active_phase
+                ),
             }
         } else if let Some(ref selected_tier) = requested_tier {
             if gate_entry.tier != *selected_tier {
@@ -147,7 +150,10 @@ pub fn run_check(args: &[String]) -> i32 {
         let record = EvidenceRecord {
             gate: name.clone(),
             cmd: gate_entry.cmd.clone().unwrap_or_default(),
-            toolchain: gate_entry.toolchain.clone().unwrap_or_else(|| "stable".to_string()),
+            toolchain: gate_entry
+                .toolchain
+                .clone()
+                .unwrap_or_else(|| "stable".to_string()),
             commit: ctx.commit_hash.clone(),
             exit_code: outcome.exit_code(),
             duration_ms,
@@ -228,7 +234,10 @@ fn run_gate_entry(
         } else {
             *raw_log = format!("Builtin gate '{}' not registered", name);
             Outcome::NotRun {
-                reason: format!("Builtin gate '{}' not implemented by owner {}", name, gate_entry.owner),
+                reason: format!(
+                    "Builtin gate '{}' not implemented by owner {}",
+                    name, gate_entry.owner
+                ),
             }
         }
     } else if gate_entry.kind == "cmd" {
@@ -250,7 +259,10 @@ fn run_gate_entry(
 
                 if exec_res.test_parse_error {
                     Outcome::Error {
-                        message: format!("Failed to parse test output counters for gate '{}'", name),
+                        message: format!(
+                            "Failed to parse test output counters for gate '{}'",
+                            name
+                        ),
                     }
                 } else if exec_res.exit_code == 0 {
                     Outcome::Pass
@@ -339,7 +351,10 @@ pub fn run_verify(args: &[String]) -> i32 {
     }
 
     if !missing_evidence.is_empty() {
-        eprintln!("❌ Missing evidence files for due gates: {:?}", missing_evidence);
+        eprintln!(
+            "❌ Missing evidence files for due gates: {:?}",
+            missing_evidence
+        );
     }
     if !invalid_commit.is_empty() {
         eprintln!("❌ Evidence commit != HEAD for gates: {:?}", invalid_commit);
@@ -354,7 +369,8 @@ pub fn run_verify(args: &[String]) -> i32 {
         }
     }
 
-    if check_code != 0 || !missing_evidence.is_empty() || !invalid_commit.is_empty() || has_not_run {
+    if check_code != 0 || !missing_evidence.is_empty() || !invalid_commit.is_empty() || has_not_run
+    {
         2
     } else {
         0
@@ -379,7 +395,10 @@ pub fn run_gate(args: &[String]) -> i32 {
         }
     }
 
-    eprintln!("❌ Gate '{}' not found in registered builtin gates", gate_name);
+    eprintln!(
+        "❌ Gate '{}' not found in registered builtin gates",
+        gate_name
+    );
     2
 }
 

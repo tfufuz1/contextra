@@ -39,17 +39,12 @@ pub struct ToolDefinition {
 /// | `contextra_get` | `DatabaseRead` | Retrieve a document by ID |
 /// | `contextra_collections` | `DatabaseRead` | List all collections |
 /// | `contextra_explain` | `DatabaseRead` | Retrieval explanation and provenance breakdown |
-/// | `contextra_plugin_status` | `DatabaseRead` | Active plugin status & rings |
 /// | `contextra_insert` | `DatabaseWrite` | Store document (auto-embedding, auto-chunking) |
 /// | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
 /// | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
 /// | `contextra_forget` | `DatabaseWrite` | Delete document or entire collection |
-/// | `contextra_relate` | `DatabaseWrite` | Create directed/bidirectional binary relationship |
-/// | `contextra_relate_n_ary` | `DatabaseWrite` | Create n-ary hyperedge relationship |
 /// | `contextra_create_collection` | `DatabaseWrite` | Create collection with DeploymentTier |
 /// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
-/// | `contextra_consolidate` | `DatabaseWrite` | Trigger synchronous memory consolidation pass |
-/// | `contextra_cloud_query` | `CloudEgress` | External cloud query under egress classification |
 pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_search",
@@ -116,77 +111,6 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
             "properties": {}
         }),
     },
-    // contextra_consolidate: Triggert synchrone/asynchrone Memory Consolidation (Erstellung von Tombstones,
-    // Synthese-Chunks und Graph-Anpassungen im Speicher/Disk-State).
-    // Aufgrund dieser realen Schreib- und Mutationswirkung eindeutig als DatabaseWrite klassifiziert.
-    ToolDefinition {
-        name: "contextra_consolidate",
-        category: ToolCategory::DatabaseWrite,
-        description: "Manual, synchronous trigger for an immediate memory consolidation pass (structural consolidation pass and optional synthesis) on the specified collection. Automatic background consolidation runs unaffected.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {
-                "collection": { "type": "string", "default": "default" }
-            }
-        }),
-    },
-    ToolDefinition {
-        name: "contextra_cloud_query",
-        category: ToolCategory::CloudEgress,
-        description: "Executes an external cloud query under egress classification check and automatic abstraction.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {
-                "query":       { "type": "string" },
-                "collection":  { "type": "string", "default": "default" },
-                "max_results": { "type": "integer", "default": 10 }
-            },
-            "required": ["query"]
-        }),
-    },
-    ToolDefinition {
-        name: "contextra_relate",
-        category: ToolCategory::DatabaseWrite,
-        description: "Create a directed or bidirectional binary relationship between two documents. Write permissions must be enabled.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {
-                "from":          { "type": "string" },
-                "to":            { "type": "string" },
-                "label":         { "type": "string" },
-                "collection":    { "type": "string", "default": "default" },
-                "bidirectional": { "type": "boolean", "default": false }
-            },
-            "required": ["from", "to", "label"]
-        }),
-    },
-    ToolDefinition {
-        name: "contextra_relate_n_ary",
-        category: ToolCategory::DatabaseWrite,
-        description: "Create an n-ary hyperedge graph relationship connecting multiple participants with assigned roles. Core Spec §6 feature. Write permissions must be enabled.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {
-                "predicate": { "type": "string" },
-                "participants": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "doc_id": { "type": "string" },
-                            "role":   { "type": "string" }
-                        },
-                        "required": ["doc_id", "role"]
-                    },
-                    "minItems": 2,
-                    "maxItems": 64
-                },
-                "source_doc_id": { "type": "string" },
-                "collection":    { "type": "string", "default": "default" }
-            },
-            "required": ["predicate", "participants"]
-        }),
-    },
     ToolDefinition {
         name: "contextra_explain",
         category: ToolCategory::DatabaseRead,
@@ -198,15 +122,6 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
                 "collection": { "type": "string", "default": "default" }
             },
             "required": ["id"]
-        }),
-    },
-    ToolDefinition {
-        name: "contextra_plugin_status",
-        category: ToolCategory::DatabaseRead,
-        description: "Get status of all active plugins with version, ring, and required feature ring.",
-        input_schema: || json!({
-            "type": "object",
-            "properties": {}
         }),
     },
     ToolDefinition {
@@ -546,41 +461,6 @@ mod tests {
 
     /// Deckt OPUS-0.4 ab: Cloud-Egress ("contextra_cloud_query") ist in eigener ToolCategory::CloudEgress
     /// und im Default-Zustand (allow_cloud_egress: false) gesperrt.
-    #[test]
-    fn test_cloud_egress_classification_and_policy() {
-        // 1. Classification check
-        assert_eq!(
-            McpSandbox::try_classify_method("contextra_cloud_query").unwrap(),
-            ToolCategory::CloudEgress
-        );
-        assert_eq!(
-            McpSandbox::try_classify_method("contextra_search").unwrap(),
-            ToolCategory::DatabaseRead
-        );
-
-        // 2. Default policy: allow_cloud_egress is false
-        let default_sandbox = McpSandbox::new(SandboxPolicy::default()).unwrap(); // unwrap
-        let default_res = default_sandbox.validate_tool_call("contextra_cloud_query", &Value::Null);
-        assert!(default_res.is_err());
-        let err_msg = default_res.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("Cloud-Egress gesperrt"),
-            "Expected 'Cloud-Egress gesperrt' in error message, got: {err_msg}"
-        );
-
-        // 3. Permitting policy: allow_cloud_egress is true
-        let policy = SandboxPolicy {
-            allow_db_reads: true,
-            allow_db_writes: false,
-            allow_code_execution: false,
-            allow_cloud_egress: true,
-            max_execution_ms: 5_000,
-        };
-        let permitting_sandbox = McpSandbox::new(policy).unwrap(); // unwrap
-        assert!(permitting_sandbox
-            .validate_tool_call("contextra_cloud_query", &Value::Null)
-            .is_ok());
-    }
 
     /// Deckt R-01 ab: Schreibzugriff ist im Default gesperrt (Read-Only Safety Policy).
     #[test]
@@ -615,9 +495,6 @@ mod tests {
             .is_err());
         assert!(sandbox
             .validate_tool_call("unknown_code_tool", &Value::Null)
-            .is_err());
-        assert!(sandbox
-            .validate_tool_call("contextra_cloud_query", &Value::Null)
             .is_err());
     }
 
@@ -781,12 +658,6 @@ mod tests {
         assert_eq!(
             McpSandbox::try_classify_method("contextra_explain").unwrap(),
             ToolCategory::DatabaseRead
-        );
-
-        // Assert consolidate is DatabaseWrite
-        assert_eq!(
-            McpSandbox::try_classify_method("contextra_consolidate").unwrap(),
-            ToolCategory::DatabaseWrite
         );
     }
 

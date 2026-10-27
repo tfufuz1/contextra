@@ -74,8 +74,13 @@ impl Catalog {
         let content = fs::read_to_string(path)
             .map_err(|e| format!("Failed to read gates catalog at {}: {}", path.display(), e))?;
 
-        let catalog_file: GatesCatalogFile = toml::from_str(&content)
-            .map_err(|e| format!("Failed to parse gates catalog TOML at {}: {}", path.display(), e))?;
+        let catalog_file: GatesCatalogFile = toml::from_str(&content).map_err(|e| {
+            format!(
+                "Failed to parse gates catalog TOML at {}: {}",
+                path.display(),
+                e
+            )
+        })?;
 
         // Validate active phase format
         parse_phase_level(&catalog_file.meta.active_phase)?;

@@ -21,7 +21,10 @@ fn list_gates() -> i32 {
     let catalog_path = ctx.root_dir.join("governance/gates.toml");
     match xtask::core::catalog::Catalog::load_from_path(&catalog_path) {
         Ok(catalog) => {
-            println!("=== Configured Gates (Active Phase: {}) ===", catalog.active_phase);
+            println!(
+                "=== Configured Gates (Active Phase: {}) ===",
+                catalog.active_phase
+            );
             for name in &catalog.gate_order {
                 if let Some(gate) = catalog.gates.get(name) {
                     println!("  {:<25} [{}] {}", name, gate.tier, gate.why);

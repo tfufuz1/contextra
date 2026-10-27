@@ -67,11 +67,7 @@ pub fn parse_test_counts(output: &str) -> Option<(u64, u64)> {
     None
 }
 
-pub fn run_cmd(
-    cmd_name: &str,
-    args: &[&str],
-    work_dir: &Path,
-) -> ExecResult {
+pub fn run_cmd(cmd_name: &str, args: &[&str], work_dir: &Path) -> ExecResult {
     let start = Instant::now();
     let output = Command::new(cmd_name)
         .args(args)
@@ -92,13 +88,14 @@ pub fn run_cmd(
             );
             let log_sha256 = blake3::hash(combined.as_bytes()).to_hex().to_string();
 
-            let (tests_run, tests_skipped, test_parse_error) = if let Some((r, s)) = parse_test_counts(&combined) {
-                (r, s, false)
-            } else if combined.contains("test result:") || combined.contains("running ") {
-                (zero_count, zero_count, true)
-            } else {
-                (zero_count, zero_count, false)
-            };
+            let (tests_run, tests_skipped, test_parse_error) =
+                if let Some((r, s)) = parse_test_counts(&combined) {
+                    (r, s, false)
+                } else if combined.contains("test result:") || combined.contains("running ") {
+                    (zero_count, zero_count, true)
+                } else {
+                    (zero_count, zero_count, false)
+                };
 
             ExecResult {
                 exit_code,

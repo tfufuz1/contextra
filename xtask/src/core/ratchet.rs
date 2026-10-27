@@ -15,8 +15,13 @@ pub struct Ratchet {
 
 impl Ratchet {
     pub fn load_from_path(path: &Path) -> Result<Self, String> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("Ratchet file missing or unreadable at {}: {}", path.display(), e))?;
+        let content = fs::read_to_string(path).map_err(|e| {
+            format!(
+                "Ratchet file missing or unreadable at {}: {}",
+                path.display(),
+                e
+            )
+        })?;
 
         let file: RatchetFile = toml::from_str(&content)
             .map_err(|e| format!("Failed to parse ratchet TOML at {}: {}", path.display(), e))?;

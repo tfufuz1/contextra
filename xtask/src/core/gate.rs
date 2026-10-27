@@ -15,13 +15,19 @@ impl Outcome {
     pub fn is_pass_or_na(&self) -> bool {
         matches!(
             self,
-            Outcome::Pass | Outcome::NotApplicable { .. } | Outcome::NotDue { .. } | Outcome::OtherTier { .. }
+            Outcome::Pass
+                | Outcome::NotApplicable { .. }
+                | Outcome::NotDue { .. }
+                | Outcome::OtherTier { .. }
         )
     }
 
     pub fn exit_code(&self) -> i32 {
         match self {
-            Outcome::Pass | Outcome::NotApplicable { .. } | Outcome::NotDue { .. } | Outcome::OtherTier { .. } => 0,
+            Outcome::Pass
+            | Outcome::NotApplicable { .. }
+            | Outcome::NotDue { .. }
+            | Outcome::OtherTier { .. } => 0,
             Outcome::Fail { .. } => 1,
             Outcome::Error { .. } | Outcome::NotRun { .. } => 2,
         }

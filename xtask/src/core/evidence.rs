@@ -34,28 +34,44 @@ pub fn save_evidence_with_log(
     record: &EvidenceRecord,
     raw_log: &str,
 ) -> Result<(), String> {
-    fs::create_dir_all(evidence_dir)
-        .map_err(|e| format!("Failed to create evidence dir {}: {}", evidence_dir.display(), e))?;
+    fs::create_dir_all(evidence_dir).map_err(|e| {
+        format!(
+            "Failed to create evidence dir {}: {}",
+            evidence_dir.display(),
+            e
+        )
+    })?;
 
     let file_path = evidence_dir.join(format!("{}.json", record.gate));
-    let json_bytes = serde_json::to_vec_pretty(record)
-        .map_err(|e| format!("Failed to serialize evidence record for {}: {}", record.gate, e))?;
+    let json_bytes = serde_json::to_vec_pretty(record).map_err(|e| {
+        format!(
+            "Failed to serialize evidence record for {}: {}",
+            record.gate, e
+        )
+    })?;
 
-    fs::write(&file_path, &json_bytes)
-        .map_err(|e| format!("Failed to write evidence record to {}: {}", file_path.display(), e))?;
+    fs::write(&file_path, &json_bytes).map_err(|e| {
+        format!(
+            "Failed to write evidence record to {}: {}",
+            file_path.display(),
+            e
+        )
+    })?;
 
     let log_path = evidence_dir.join(format!("{}.log", record.gate));
-    fs::write(&log_path, raw_log.as_bytes())
-        .map_err(|e| format!("Failed to write raw log file to {}: {}", log_path.display(), e))?;
+    fs::write(&log_path, raw_log.as_bytes()).map_err(|e| {
+        format!(
+            "Failed to write raw log file to {}: {}",
+            log_path.display(),
+            e
+        )
+    })?;
 
     update_index(evidence_dir)?;
     Ok(())
 }
 
-pub fn save_evidence(
-    evidence_dir: &Path,
-    record: &EvidenceRecord,
-) -> Result<(), String> {
+pub fn save_evidence(evidence_dir: &Path, record: &EvidenceRecord) -> Result<(), String> {
     save_evidence_with_log(evidence_dir, record, "")
 }
 
@@ -63,8 +79,13 @@ fn update_index(evidence_dir: &Path) -> Result<(), String> {
     let index_path = evidence_dir.join("index.json");
     let mut entries = Vec::new();
 
-    let read_dir = fs::read_dir(evidence_dir)
-        .map_err(|e| format!("Failed to read evidence dir {}: {}", evidence_dir.display(), e))?;
+    let read_dir = fs::read_dir(evidence_dir).map_err(|e| {
+        format!(
+            "Failed to read evidence dir {}: {}",
+            evidence_dir.display(),
+            e
+        )
+    })?;
 
     for entry in read_dir.flatten() {
         let path = entry.path();
@@ -109,8 +130,13 @@ fn update_index(evidence_dir: &Path) -> Result<(), String> {
     let index_bytes = serde_json::to_vec_pretty(&index)
         .map_err(|e| format!("Failed to serialize evidence index: {}", e))?;
 
-    fs::write(&index_path, index_bytes)
-        .map_err(|e| format!("Failed to write evidence index {}: {}", index_path.display(), e))?;
+    fs::write(&index_path, index_bytes).map_err(|e| {
+        format!(
+            "Failed to write evidence index {}: {}",
+            index_path.display(),
+            e
+        )
+    })?;
 
     Ok(())
 }
