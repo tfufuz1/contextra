@@ -99,7 +99,7 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für R
 3. **Zeit, Zufall, IDs nur über Ports** `Clock`, `Rng`, `IdGen` (P28). Verboten in Kernlogik: `Instant::now`, `SystemTime::now`, `thread_rng`, `std::env::var`, `HashMap/HashSet` <!-- doc-ref-ignore --> mit RandomState. Ausnahme: Schlüssel-/Salt-Material aus dem System-RNG.
 4. **Alles Persistente geht durch das WAL** (P24). Sicherheitszustand liegt ausschließlich in den fünf Sidecar-Logs (§7.9).
 5. **I/O nur über `Vfs`**; Commit = durabler Flush mit plattformgerechter Primitive (§7.7); `fsync`-Fehler werden propagiert, nie mit `let _ =` verworfen.
-6. **Unsafe-Inseln:** Unsafe nur in drei Inseln (`contextra-simd`, `contextra-sys`, `contextra-wire`), jeder Block mit `// SAFETY:` (P2).
+6. **Unsafe-Inseln (drei Inseln)** (`contextra-simd`, `contextra-sys`, `contextra-wire`), jeder Block mit `// SAFETY:` (P2).
 7. **Mandant kommt aus dem `RequestContext`**, nie aus Literalen, Defaults oder Nutzerparametern (INV-TENANT-1, VETO-F10).
 8. **Sicherheit ist kein Feature-Schalter.** Verschlüsselung, Messung und Löschbericht sind in jedem Build aktiv; kein `cfg(not(feature))`-Ersatz für Sicherheitscode (A1).
 9. **Messen vor Behaupten.** Ein Restbestand-Zähler entsteht nur aus einem Scanner der besitzenden Schicht; Konstanten oder Aufrufer-Werte sind nie Messung (§12.7, §12.10).
@@ -161,8 +161,8 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für R
 | `contextra-infer-onnx` | 952 | WP 2.1 | Archiviert (hinter `infer-candle`) |
 | `contextra-infer-ollama` | 1.661 | WP 2.1 | Archiviert |
 | `contextra-core` | 106 | WP 2.3 | Migrationsfassade → ersetzt durch `types`/`ports` (D-05) |
-| `vector/diskann` <!-- doc-ref-ignore --> | – | WP 2.1 | DiskANN kein v1.0-Ziel |
-| `rank` ohne `fusion/` <!-- doc-ref-ignore --> | ~1.263 | WP 2.1 | Kalibrierung/DiBuD/Drift → Archiv |
+| `vector/diskann` | – | WP 2.1 | DiskANN kein v1.0-Ziel | <!-- doc-ref-ignore -->
+| `rank` ohne `fusion/` | ~1.263 | WP 2.1 | Kalibrierung/DiBuD/Drift → Archiv | <!-- doc-ref-ignore -->
 
 **Archivierungsablauf (WP 2.1 → 2.1b):**
 1. `WP 2.1`: Tag `archiv/v0` <!-- doc-ref-ignore --> setzen, Crates aus `default-members` nehmen, Kanten-Inventar erstellen
@@ -270,4 +270,4 @@ Folgende Ports MÜSSEN in Produktion real implementiert sein. Null-/Test-/Accept
 | `.agents/jules/SESSION_BOOTSTRAP.md` | Jules Session-Ablauf (primärer Pfad) |
 | `.agents/jules/GITHUB_WORKFLOW.md` | GitHub-Konventionen für Jules |
 | `CLAUDE.md` | Claude / Antigravity Agent Guide |
-| `docs/decisions/` <!-- doc-ref-ignore --> | ADR-Index |
+| `docs/decisions/` | ADR-Index | <!-- doc-ref-ignore -->
