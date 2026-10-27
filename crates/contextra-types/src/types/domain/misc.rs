@@ -32,9 +32,11 @@ mod hex {
             )));
         }
         let mut bytes = [0u8; 32];
-        for i in 0..32 {
-            bytes[i] =
-                u8::from_str_radix(&s[i * 2..i * 2 + 2], 16).map_err(serde::de::Error::custom)?;
+        for (i, slot) in bytes.iter_mut().enumerate() {
+            let start = i * 2;
+            let end = start + 2;
+            let slice = s.get(start..end).ok_or_else(|| serde::de::Error::custom("invalid hex slice"))?;
+            *slot = u8::from_str_radix(slice, 16).map_err(serde::de::Error::custom)?;
         }
         Ok(bytes)
     }

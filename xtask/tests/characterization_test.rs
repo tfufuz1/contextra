@@ -13,7 +13,7 @@ fn test_unknown_command_signature() {
     assert_eq!(output.status.code(), Some(1));
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("Unknown xtask command: nonexistent-command-xyz"));
-    assert!(stderr.contains("Available commands:"));
+    assert!(stderr.contains("available commands"));
 }
 
 #[test]

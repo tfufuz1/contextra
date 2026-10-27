@@ -93,11 +93,42 @@ pub fn run_gov_command(cmd: &str, args: &[String]) -> Result<(), String> {
             Ok(())
         }
         "gate-check" => {
-            if args.is_empty() {
-                println!("Missing parameter --level <0..4>");
-                Err("Missing parameter".to_string())
-            } else {
-                Ok(())
+            let mut level_str = None;
+            let mut crate_str = None;
+            let mut i = 0;
+            while i < args.len() {
+                if let Some(arg) = args.get(i) {
+                    if arg == "--level" {
+                        if let Some(val) = args.get(i + 1) {
+                            level_str = Some(val.clone());
+                            i += 1;
+                        }
+                    } else if arg == "--crate" {
+                        if let Some(val) = args.get(i + 1) {
+                            crate_str = Some(val.clone());
+                            i += 1;
+                        }
+                    }
+                }
+                i += 1;
+            }
+            let level = match level_str {
+                Some(l) => match crate::gate_check::GateLevel::from_str(&l) {
+                    Ok(lvl) => lvl,
+                    Err(e) => return Err(e),
+                },
+                None => return Err("Missing parameter --level <0..4>".to_string()),
+            };
+            let opts = crate::gate_check::GateCheckOptions {
+                level,
+                crate_name: crate_str,
+            };
+            match crate::gate_check::run(opts) {
+                Ok(report) => {
+                    println!("{:?}", report);
+                    Ok(())
+                }
+                Err(e) => Err(format!("Gate Check FEHLGESCHLAGEN: {}", e)),
             }
         }
         _ => Err(format!("Unknown command in gov cluster: {}", cmd)),
