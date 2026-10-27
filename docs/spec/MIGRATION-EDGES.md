@@ -22,7 +22,7 @@
 |---|---|---|---|
 | contextra-engine | normal | nein | WP 2.2 |
 | contextra-db | normal | nein | WP 2.3 |
-| contextra-mcp | normal | nein | WP 2.3 |
+| contextra-mcp | normal | nein | ✅ erledigt (WP 2.3) |
 | contextra-py | normal | nein | WP 2.3 |
 | contextra-rank | dev | nein | WP 2.3 |
 
@@ -35,7 +35,7 @@
 
 | Dependent | Art | Optional | Zu erledigen in |
 |---|---|---|---|
-| contextra-mcp | normal | **ja** | WP 2.3 |
+| contextra-mcp | normal | **ja** | ✅ erledigt (WP 2.3) |
 
 **Maßnahme (WP 2.3):** Feature `agent-workflows` entfernen; optionale Kante aus `mcp/Cargo.toml` löschen.
 
@@ -89,7 +89,7 @@ PPR-Pfade im Hybrid-Planner) entfernen; Modalität als `modalities_unavailable` 
 | Dependent | Art | Optional | Zu erledigen in |
 |---|---|---|---|
 | contextra | normal | **ja** | WP 2.3 |
-| contextra-mcp | normal | **ja** | WP 2.3 |
+| contextra-mcp | normal | **ja** | ✅ erledigt (WP 2.3) |
 
 **Maßnahme (WP 2.3):** Feature `ollama` bleibt in Fassade, aber Kante nur noch über Feature-Gate.
 
@@ -100,7 +100,7 @@ PPR-Pfade im Hybrid-Planner) entfernen; Modalität als `modalities_unavailable` 
 | Dependent | Art | Optional | Zu erledigen in |
 |---|---|---|---|
 | contextra | normal | **ja** | WP 2.3 |
-| contextra-mcp | normal | **ja** | WP 2.3 |
+| contextra-mcp | normal | **ja** | ✅ erledigt (WP 2.3) |
 | contextra-bench | normal | nein | WP 2.1b |
 
 **Maßnahme (WP 2.3):** Feature `onnx` bleibt in Fassade, aber Kante nur noch über Feature-Gate.

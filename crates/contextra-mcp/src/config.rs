@@ -133,39 +133,6 @@ pub fn create_embedding_provider(
     candle_model_dir: Option<&Path>,
 ) -> Result<Arc<dyn EmbeddingProvider>, ContextraError> {
     match provider_type.to_lowercase().trim() {
-        #[cfg(feature = "ollama")]
-        "ollama" => {
-            let embedder = contextra_infer_ollama::OllamaEmbedder::new(ollama_url, embed_model);
-            Ok(Arc::new(embedder))
-        }
-        #[cfg(not(feature = "ollama"))]
-        "ollama" => {
-            let _ = (ollama_url, embed_model);
-            Err(ContextraError::CapabilityUnsupported {
-                capability: "ollama embedding backend".to_string(),
-                reason: "contextra-mcp was built without the 'ollama' feature".to_string(),
-            })
-        }
-        #[cfg(feature = "onnx")]
-        "onnx" => {
-            let path = onnx_model_path.ok_or_else(|| {
-                ContextraError::InvalidInput(
-                    "onnx_model_path is required when embedding provider is 'onnx'".to_string(),
-                )
-            })?;
-            let embedder = contextra_infer_onnx::OnnxEmbedder::from_path(path)?;
-            Ok(Arc::new(embedder))
-        }
-        #[cfg(not(feature = "onnx"))]
-        "onnx" => {
-            let _ = onnx_model_path;
-            Err(ContextraError::CapabilityUnsupported {
-                capability: "onnx".to_string(),
-                reason:
-                    "ONNX support is disabled in this build. Recompile with feature flag 'onnx'."
-                        .to_string(),
-            })
-        }
         #[cfg(feature = "candle")]
         "candle" => {
             let _ = (ollama_url, embed_model, onnx_model_path);
@@ -195,7 +162,7 @@ pub fn create_embedding_provider(
             Ok(Arc::new(embedder))
         }
         other => Err(ContextraError::InvalidInput(format!(
-            "Unknown embedding provider '{other}'. Expected 'ollama', 'onnx', 'candle', or 'mock'."
+            "Unknown embedding provider '{other}'. Expected 'candle' or 'mock'."
         ))),
     }
 }
@@ -278,24 +245,6 @@ pub fn create_llm_text_generator(
     candle_model_dir: Option<&Path>,
 ) -> Result<Arc<dyn LlmTextGenerator>, ContextraError> {
     match provider_type.to_lowercase().trim() {
-        #[cfg(feature = "ollama")]
-        "ollama" => {
-            let config = contextra_infer_ollama::OllamaConfig {
-                base_url: ollama_url.to_string(),
-                model: llm_model.to_string(),
-                ..Default::default()
-            };
-            let client = contextra_infer_ollama::OllamaClient::with_config(config);
-            Ok(Arc::new(client))
-        }
-        #[cfg(not(feature = "ollama"))]
-        "ollama" => {
-            let _ = (ollama_url, llm_model);
-            Err(ContextraError::CapabilityUnsupported {
-                capability: "ollama LLM backend".to_string(),
-                reason: "contextra-mcp was built without the 'ollama' feature".to_string(),
-            })
-        }
         #[cfg(feature = "candle")]
         "candle" => {
             let _ = (ollama_url, llm_model);
@@ -325,7 +274,7 @@ pub fn create_llm_text_generator(
             Ok(Arc::new(generator))
         }
         other => Err(ContextraError::InvalidInput(format!(
-            "Unknown LLM provider '{other}'. Expected 'ollama', 'candle', or 'mock'."
+            "Unknown LLM provider '{other}'. Expected 'candle' or 'mock'."
         ))),
     }
 }

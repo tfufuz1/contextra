@@ -1043,12 +1043,8 @@ name = "contextra-mcp"
 version = "0.1.0"
 dependencies = [
  "contextra",
- "contextra-adapt",
- "contextra-agent",
  "contextra-crypto",
  "contextra-infer-candle",
- "contextra-infer-ollama",
- "contextra-infer-onnx",
  "contextra-license",
  "contextra-ports",
  "contextra-privacy",
