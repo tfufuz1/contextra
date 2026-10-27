@@ -27,9 +27,9 @@ pub enum DurabilityConfigError {
     },
 }
 
-impl From<DurabilityConfigError> for contextra_core::ContextraError {
+impl From<DurabilityConfigError> for contextra_types::ContextraError {
     fn from(err: DurabilityConfigError) -> Self {
-        contextra_core::ContextraError::DurabilityConfig(err.to_string())
+        contextra_types::ContextraError::DurabilityConfig(err.to_string())
     }
 }
 

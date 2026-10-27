@@ -1217,7 +1217,6 @@ dependencies = [
  "ahash",
  "blake3",
  "bytes",
- "contextra-core",
  "contextra-crypto",
  "contextra-graph",
  "contextra-mvcc",

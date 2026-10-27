@@ -8,8 +8,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::io::{BufRead, BufReader, Read, Write};

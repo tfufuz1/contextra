@@ -1,6 +1,6 @@
 //! Merge Operator trait abstraction for two-way SSTable value merging (§4.12).
 
-use contextra_core::Result;
+use contextra_types::Result;
 
 /// Trait for merging two raw byte values (`existing_val` from older tier, `new_val` from newer tier)
 /// for the same key across different SSTable tiers.

@@ -1,7 +1,7 @@
-use contextra_core::{ContextraError, TxId};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::manifest::{Manifest, ManifestEntry};
 use contextra_store::wal::{Wal, WalEntry, WalOp, WAL_V3_HEADER};
+use contextra_types::{ContextraError, TxId};
 use tempfile::tempdir;
 use tokio::fs;
 

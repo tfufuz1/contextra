@@ -1,6 +1,6 @@
-use contextra_core::{ContextraError, Result};
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
+use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
 use super::{

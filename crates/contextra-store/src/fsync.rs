@@ -1,6 +1,6 @@
 //! Central module for file and directory synchronization operations.
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::Path;
 
 /// Performs fsync on a single file at `path`.
@@ -12,7 +12,10 @@ pub async fn sync_file(path: &Path) -> Result<()> {
     #[cfg(not(windows))]
     {
         let file = crate::wal::fs::File::open(path).await.map_err(|e| {
-            ContextraError::Storage(format!("File open failed for fsync on {}: {e}", path.display()))
+            ContextraError::Storage(format!(
+                "File open failed for fsync on {}: {e}",
+                path.display()
+            ))
         })?;
         file.sync_all().await.map_err(|e| {
             ContextraError::Storage(format!("File fsync failed for {}: {e}", path.display()))
@@ -88,11 +91,17 @@ mod tests {
     async fn test_sync_file_and_parent_dir_unix() {
         let dir = tempdir().expect("tempdir");
         let file_path = dir.path().join("test_file.txt");
-        tokio::fs::write(&file_path, b"test payload").await.expect("write");
+        tokio::fs::write(&file_path, b"test payload")
+            .await
+            .expect("write");
 
         sync_file(&file_path).await.expect("sync_file failed");
-        sync_parent_dir(&file_path).await.expect("sync_parent_dir failed");
-        fsync_parent_dir(&file_path).await.expect("fsync_parent_dir failed");
+        sync_parent_dir(&file_path)
+            .await
+            .expect("sync_parent_dir failed");
+        fsync_parent_dir(&file_path)
+            .await
+            .expect("fsync_parent_dir failed");
     }
 
     #[tokio::test]

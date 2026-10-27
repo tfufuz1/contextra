@@ -1,11 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_core::{
-    ContextraError, ResourceBudget, ResourceTracker, Result, SnapshotRegistry, TOMBSTONE_BIT,
-};
+use contextra_mvcc::SnapshotRegistry;
+use contextra_ports::{ResourceBudget, ResourceTracker};
 use contextra_store::compaction::{CompactionConfig, CompactionEngine, MergeOperator};
 use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
 use contextra_testkit::ManualClock;
+use contextra_types::{ContextraError, Result, TOMBSTONE_BIT};
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;

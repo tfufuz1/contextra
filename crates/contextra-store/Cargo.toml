@@ -21,10 +21,8 @@ windows-sys = { version = "0.61", features = [
 ] }
 
 [features]
-default = ["wal-integrity"]
-encryption-at-rest = ["wal-integrity"]
-wal-integrity = []
-deletion-proof = ["wal-integrity"]
+default = []
+test-hooks = []
 memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
@@ -36,7 +34,6 @@ legacy-wal-key = []
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }
-contextra-core = { workspace = true }
 contextra-mvcc = { workspace = true }
 ahash = { workspace = true }
 quick_cache = { version = "0.6", optional = true }
@@ -60,6 +57,7 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 
 
 [dev-dependencies]
+contextra-store = { path = ".", features = ["test-hooks"] }
 contextra-testkit = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-graph = { workspace = true }

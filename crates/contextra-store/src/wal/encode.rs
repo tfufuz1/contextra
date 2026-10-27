@@ -1,6 +1,5 @@
-use contextra_core::{ContextraError, Result, TxId};
-#[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::WalHmac;
+use contextra_types::{ContextraError, Result, TxId};
 
 use super::MAX_WAL_ENTRY_SIZE;
 
@@ -141,43 +140,35 @@ impl WalEntry {
         integrity_key: &[u8],
         prev_hmac: [u8; 32],
     ) -> Result<[u8; 32]> {
-        #[cfg(feature = "wal-integrity")]
-        {
-            let mut mac = WalHmac::new(integrity_key)?;
+        let mut mac = WalHmac::new(integrity_key)?;
 
-            // Hash Chaining: binding to the previous entry
-            mac.update(&prev_hmac);
-            mac.update(&seq_no.to_le_bytes());
+        // Hash Chaining: binding to the previous entry
+        mac.update(&prev_hmac);
+        mac.update(&seq_no.to_le_bytes());
 
-            // tx_id MUST come before op_type
-            let tx_id_bytes = op.tx_id().inner().to_le_bytes();
-            mac.update(&tx_id_bytes);
+        // tx_id MUST come before op_type
+        let tx_id_bytes = op.tx_id().inner().to_le_bytes();
+        mac.update(&tx_id_bytes);
 
-            match op {
-                WalOp::Put { key, value, .. } => {
-                    mac.update(&[0u8]); // op type
-                    mac.update(&(key.len() as u32).to_le_bytes());
-                    mac.update(key);
-                    mac.update(&(value.len() as u32).to_le_bytes());
-                    mac.update(value);
-                }
-                WalOp::Delete { key, .. } => {
-                    mac.update(&[1u8]); // op type
-                    mac.update(&(key.len() as u32).to_le_bytes());
-                    mac.update(key);
-                }
-                WalOp::TxEnd { committed, .. } => {
-                    mac.update(&[2u8]); // op type
-                    mac.update(&[*committed as u8]);
-                }
+        match op {
+            WalOp::Put { key, value, .. } => {
+                mac.update(&[0u8]); // op type
+                mac.update(&(key.len() as u32).to_le_bytes());
+                mac.update(key);
+                mac.update(&(value.len() as u32).to_le_bytes());
+                mac.update(value);
             }
-            Ok(mac.finalize())
+            WalOp::Delete { key, .. } => {
+                mac.update(&[1u8]); // op type
+                mac.update(&(key.len() as u32).to_le_bytes());
+                mac.update(key);
+            }
+            WalOp::TxEnd { committed, .. } => {
+                mac.update(&[2u8]); // op type
+                mac.update(&[*committed as u8]);
+            }
         }
-        #[cfg(not(feature = "wal-integrity"))]
-        {
-            let _ = (op, seq_no, integrity_key, prev_hmac);
-            Ok([0u8; 32])
-        }
+        Ok(mac.finalize())
     }
 
     /// Legacy V2 checksum calculation (without tx_id and length-prefixes in HMAC).
@@ -187,34 +178,26 @@ impl WalEntry {
         integrity_key: &[u8],
         prev_hmac: [u8; 32],
     ) -> Result<[u8; 32]> {
-        #[cfg(feature = "wal-integrity")]
-        {
-            let mut mac = WalHmac::new(integrity_key)?;
+        let mut mac = WalHmac::new(integrity_key)?;
 
-            mac.update(&prev_hmac);
-            mac.update(&seq_no.to_le_bytes());
-            match op {
-                WalOp::Put { key, value, .. } => {
-                    mac.update(&[0u8]);
-                    mac.update(key);
-                    mac.update(value);
-                }
-                WalOp::Delete { key, .. } => {
-                    mac.update(&[1u8]);
-                    mac.update(key);
-                }
-                WalOp::TxEnd { committed, .. } => {
-                    mac.update(&[2u8]);
-                    mac.update(&[*committed as u8]);
-                }
+        mac.update(&prev_hmac);
+        mac.update(&seq_no.to_le_bytes());
+        match op {
+            WalOp::Put { key, value, .. } => {
+                mac.update(&[0u8]);
+                mac.update(key);
+                mac.update(value);
             }
-            Ok(mac.finalize())
+            WalOp::Delete { key, .. } => {
+                mac.update(&[1u8]);
+                mac.update(key);
+            }
+            WalOp::TxEnd { committed, .. } => {
+                mac.update(&[2u8]);
+                mac.update(&[*committed as u8]);
+            }
         }
-        #[cfg(not(feature = "wal-integrity"))]
-        {
-            let _ = (op, seq_no, integrity_key, prev_hmac);
-            Ok([0u8; 32])
-        }
+        Ok(mac.finalize())
     }
 
     pub fn compute_checksum(

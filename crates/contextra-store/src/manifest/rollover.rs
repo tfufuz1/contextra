@@ -1,4 +1,4 @@
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use tokio::io::AsyncWriteExt;
 
 use super::core::Manifest;

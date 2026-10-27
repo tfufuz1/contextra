@@ -8,7 +8,7 @@ use super::io::pread_exact;
 use super::stream::SstableStream;
 use crate::wal::KeyManager;
 use bytes::Bytes;
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -780,7 +780,7 @@ impl SstableReader {
             start_idx -= 1;
         }
 
-        let max_seq_raw = max_seq & !contextra_core::TOMBSTONE_BIT;
+        let max_seq_raw = max_seq & !contextra_types::TOMBSTONE_BIT;
         let is_v3 = self.format_version >= 3;
 
         for idx in start_idx..self.index.len() {
@@ -877,9 +877,9 @@ impl SstableReader {
                             ));
                         }
 
-                        let raw_seq = seq_no & !contextra_core::TOMBSTONE_BIT;
+                        let raw_seq = seq_no & !contextra_types::TOMBSTONE_BIT;
                         if raw_seq <= max_seq_raw
-                            && (tx_id <= max_tx || tx_id >= contextra_core::TxId::INTERNAL_BASE)
+                            && (tx_id <= max_tx || tx_id >= contextra_types::TxId::INTERNAL_BASE)
                         {
                             let entry_val = block_data.slice(ep_val..end_val);
                             return Ok(Some((entry_val, seq_no, tx_id)));
