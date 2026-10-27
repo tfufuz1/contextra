@@ -1,12 +1,13 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing, clippy::cast_sign_loss)]
 // FILE-CONTEXT
 // STAND: 2026-09-16T00:00:00Z
 // ZWECK: Integrationstests, Fault-Injection und Nebenläufigkeitstests für FlatBuffers IPC (contextra-wire)
 // INVARIANTEN: Keine Panics bei beschädigten oder abgeschnittenen IPC-Puffern; thread-sicheres Deserialisieren.
 
 use contextra_wire::{
-    root_as_search_response, Embedding, EmbeddingArgs, ScoredDocument, ScoredDocumentArgs,
-    SearchResponse, SearchResponseArgs, VectorIndexUpdate, VectorIndexUpdateArgs,
+    root_as_search_response, Embedding, EmbeddingArgs, JsonRpcRequest, ScoredDocument,
+    ScoredDocumentArgs, SearchResponse, SearchResponseArgs, VectorIndexUpdate,
+    VectorIndexUpdateArgs,
 };
 use flatbuffers::FlatBufferBuilder;
 use std::sync::Arc;
@@ -269,6 +270,28 @@ fn test_concurrency_parallel_serialization() {
     for t in threads {
         t.join().expect("Thread panicked");
     }
+}
+
+#[test]
+fn test_jsonrpc_negative_and_corrupt_frames() {
+    // 1. Invalid version string
+    let bad_version_json = r#"{"jsonrpc": "1.0", "id": 1, "method": "test"}"#;
+    let req: JsonRpcRequest = serde_json::from_str(bad_version_json).expect("Deserialization succeeds");
+    let err = req.validate().expect_err("Validation must fail for version 1.0");
+    assert_eq!(err.code, -32600);
+
+    // 2. Missing method or whitespace-only method
+    let bad_method_json = r#"{"jsonrpc": "2.0", "id": 1, "method": "   "}"#;
+    let req: JsonRpcRequest = serde_json::from_str(bad_method_json).expect("Deserialization succeeds");
+    let err = req.validate().expect_err("Validation must fail for empty method");
+    assert_eq!(err.code, -32600);
+
+    // 3. Corrupted / truncated JSON payloads
+    let truncated_json = r#"{"jsonrpc": "2.0", "method": "#;
+    assert!(serde_json::from_str::<JsonRpcRequest>(truncated_json).is_err());
+
+    let garbage_json = "NOT_JSON_AT_ALL_4213";
+    assert!(serde_json::from_str::<JsonRpcRequest>(garbage_json).is_err());
 }
 
 #[test]

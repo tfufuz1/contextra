@@ -6,8 +6,7 @@
 
 //! Ring 0 Unsafe Island: Auto-generated FlatBuffers IPC bindings and zero-copy adapters for Contextra.
 
-#![allow(unsafe_code)]
-#![deny(unsafe_op_in_unsafe_fn)]
+#![deny(unsafe_code)]
 
 pub mod contextra_generated;
 

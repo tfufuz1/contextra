@@ -24,6 +24,27 @@ pub struct JsonRpcRequest {
     pub params: Value,
 }
 
+impl JsonRpcRequest {
+    /// Validiert, dass der Request die JSON-RPC 2.0 Spezifikation einhält (fail-closed).
+    pub fn validate(&self) -> Result<(), JsonRpcError> {
+        if self.jsonrpc != "2.0" {
+            return Err(JsonRpcError {
+                code: -32600,
+                message: format!("Invalid JSON-RPC protocol version: expected '2.0', got '{}'", self.jsonrpc),
+                data: None,
+            });
+        }
+        if self.method.trim().is_empty() {
+            return Err(JsonRpcError {
+                code: -32600,
+                message: "Invalid Request: method name must not be empty".into(),
+                data: None,
+            });
+        }
+        Ok(())
+    }
+}
+
 /// Ausgehende JSON-RPC 2.0 Nachricht.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcResponse {
@@ -78,6 +99,7 @@ impl JsonRpcResponse {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use serde_json::json;
@@ -131,6 +153,37 @@ mod tests {
         assert!(notif.id.is_none());
         assert_eq!(notif.method, "notify");
         assert_eq!(notif.params, json!(null));
+    }
+
+    #[test]
+    fn test_json_rpc_request_validation() {
+        let valid_req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(1)),
+            method: "ping".to_string(),
+            params: json!({}),
+        };
+        assert!(valid_req.validate().is_ok());
+
+        let invalid_version = JsonRpcRequest {
+            jsonrpc: "1.0".to_string(),
+            id: Some(json!(1)),
+            method: "ping".to_string(),
+            params: json!({}),
+        };
+        let err = invalid_version.validate().unwrap_err();
+        assert_eq!(err.code, -32600);
+        assert!(err.message.contains("Invalid JSON-RPC protocol version"));
+
+        let empty_method = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(1)),
+            method: "   ".to_string(),
+            params: json!({}),
+        };
+        let err = empty_method.validate().unwrap_err();
+        assert_eq!(err.code, -32600);
+        assert!(err.message.contains("method name must not be empty"));
     }
 
     #[test]
