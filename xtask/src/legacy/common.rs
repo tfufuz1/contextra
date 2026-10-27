@@ -54,7 +54,10 @@ pub fn get_workspace_crates() -> Vec<CrateInfo> {
     Vec::new()
 }
 
-pub fn get_workspace_crates_from_root(_root_path: &Path, _caps: &CapabilitiesManifest) -> Vec<CrateInfo> {
+pub fn get_workspace_crates_from_root(
+    _root_path: &Path,
+    _caps: &CapabilitiesManifest,
+) -> Vec<CrateInfo> {
     Vec::new()
 }
 

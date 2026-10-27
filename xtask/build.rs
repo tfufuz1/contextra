@@ -101,7 +101,8 @@ fn main() {
     harness_code.push_str("    }\n");
     harness_code.push_str("}\n\n");
 
-    harness_code.push_str("pub fn registered_commands() -> &'static [(&'static str, &'static str)] {\n");
+    harness_code
+        .push_str("pub fn registered_commands() -> &'static [(&'static str, &'static str)] {\n");
     harness_code.push_str("    &[\n");
     for (stem, summary) in &modules {
         let cmd_name = stem.replace('_', "-");

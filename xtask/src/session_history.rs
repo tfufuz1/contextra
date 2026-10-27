@@ -136,8 +136,8 @@ pub fn append_entry_with_config(
         }
     }
 
-    let serialized = serde_json::to_string(entry)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let serialized =
+        serde_json::to_string(entry).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     let mut file = OpenOptions::new().create(true).append(true).open(path)?;
 
     writeln!(file, "{}", serialized)?;
@@ -193,12 +193,10 @@ mod tests {
         let entry = SessionHistoryEntry::new("sess-1", "preflight").with_crate("xtask");
 
         let config = RotationConfig::default();
-        append_entry_with_config(&entry, &config, &log_path)
-            .expect("append must succeed in tests");
+        append_entry_with_config(&entry, &config, &log_path).expect("append must succeed in tests");
 
         assert!(log_path.exists());
-        let content =
-            fs::read_to_string(&log_path).expect("log file must be readable in tests");
+        let content = fs::read_to_string(&log_path).expect("log file must be readable in tests");
         let lines: Vec<&str> = content.lines().collect();
         assert_eq!(lines.len(), 1);
 
@@ -218,13 +216,10 @@ mod tests {
         let e1 = SessionHistoryEntry::new("sess-1", "claim").with_crate("contextra-store");
         let e2 = SessionHistoryEntry::new("sess-1", "preflight").with_crate("contextra-store");
 
-        append_entry_with_config(&e1, &config, &log_path)
-            .expect("append e1 must succeed in tests");
-        append_entry_with_config(&e2, &config, &log_path)
-            .expect("append e2 must succeed in tests");
+        append_entry_with_config(&e1, &config, &log_path).expect("append e1 must succeed in tests");
+        append_entry_with_config(&e2, &config, &log_path).expect("append e2 must succeed in tests");
 
-        let content =
-            fs::read_to_string(&log_path).expect("log file must be readable in tests");
+        let content = fs::read_to_string(&log_path).expect("log file must be readable in tests");
         let lines: Vec<&str> = content.lines().collect();
         assert_eq!(lines.len(), 2);
 
