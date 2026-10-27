@@ -5,9 +5,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use contextra_privacy::bulk_exfiltration_detector::{
-    BulkExfiltrationDetector, SessionId,
-};
+use contextra_privacy::bulk_exfiltration_detector::{BulkExfiltrationDetector, SessionId};
 use contextra_privacy::egress_gateway::{
     check_bulk_exfiltration, pii_vault_forces_crypto_shred, CloudResponseRehydrator,
 };

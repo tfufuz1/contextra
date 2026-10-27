@@ -5,7 +5,7 @@
 //! Arena Allocator for HNSW neighbor lists and O(1) Backlink management.
 
 use ahash::AHashMap;
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 

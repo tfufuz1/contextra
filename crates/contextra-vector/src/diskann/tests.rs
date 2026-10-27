@@ -12,7 +12,8 @@ mod tests {
         DISKANN_INTEGRITY_KEY, DISKANN_VERSION, PENDING_WAL_MAGIC, PENDING_WAL_VERSION,
     };
     use crate::diskann::types::{DiskAnnIndex, SearchCandidate};
-    use contextra_core::{ContextraError, DistanceMetric, DocId, Result, TxId, VectorIndex};
+    use contextra_ports::VectorIndex;
+    use contextra_types::{ContextraError, DistanceMetric, DocId, Result, TxId};
     use std::collections::HashSet;
     use std::path::PathBuf;
 

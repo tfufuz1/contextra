@@ -4,7 +4,7 @@
 // Lock hierarchy: write_mutex -> entry_point -> nodes / doc_to_node / deleted_nodes.
 
 use ahash::AHashSet;
-use contextra_core::{error::HnswDeletionError, ContextraError, DocId, Result};
+use contextra_types::{ContextraError, DocId, HnswDeletionError, Result};
 
 use super::batch::SearchContext;
 use super::types::{Candidate, HnswIndex};

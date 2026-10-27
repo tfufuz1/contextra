@@ -19,7 +19,8 @@
 // Gemäß der Spike-vor-Neubau-Regel ist die Implementierung von Teil B (ACORN-Stil Graph-Augmentierung)
 // damit VOLLSTÄNDIG GERECHTFERTIGT und ERFORDERLICH.
 
-use contextra_core::{DistanceMetric, DocId, ScoredDocument, VectorIndex};
+use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, ScoredDocument};
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::rngs::StdRng;

@@ -1,9 +1,7 @@
 #![forbid(unsafe_code)]
 //! Campaign J-27 AVV Test Suite — GDPR Art. 28 AVV Generator Technical Completeness
 
-use contextra_avv_generator::{
-    default_technical_measures, render_avv_markdown, AvvContext,
-};
+use contextra_avv_generator::{default_technical_measures, render_avv_markdown, AvvContext};
 use contextra_types::TenantId;
 
 // ── H11: Art. 28 DSGVO AVV Generator Technical Completeness ─────────────────────
@@ -23,13 +21,35 @@ fn test_h11_gdpr_art28_avv_generator_technical_completeness() {
 
     // Technical completeness check against Art. 28 Abs. 3 lit. a-h required sections:
     assert!(avv_md.contains("Vereinbarung zur Auftragsverarbeitung (AVV) gemäß Art. 28 DSGVO"));
-    assert!(avv_md.contains("## 1. Gegenstand und Dauer der Verarbeitung"), "Art. 28 lit. a");
-    assert!(avv_md.contains("## 2. Art und Zweck der Verarbeitung"), "Art. 28 lit. b");
-    assert!(avv_md.contains("## 3. Art der personenbezogenen Daten und Kategorien betroffener Personen"), "Art. 28 lit. c");
-    assert!(avv_md.contains("## 4. Pflichten und Rechte des Verantwortlichen"), "Art. 28 lit. d");
-    assert!(avv_md.contains("## 5. Technische und organisatorische Maßnahmen (TOM)"), "Art. 28 lit. f");
-    assert!(avv_md.contains("## 6. Unterauftragsverarbeiter"), "Art. 28 lit. g");
-    assert!(avv_md.contains("## 7. Löschung von Daten und SLA"), "Art. 28 lit. h");
+    assert!(
+        avv_md.contains("## 1. Gegenstand und Dauer der Verarbeitung"),
+        "Art. 28 lit. a"
+    );
+    assert!(
+        avv_md.contains("## 2. Art und Zweck der Verarbeitung"),
+        "Art. 28 lit. b"
+    );
+    assert!(
+        avv_md
+            .contains("## 3. Art der personenbezogenen Daten und Kategorien betroffener Personen"),
+        "Art. 28 lit. c"
+    );
+    assert!(
+        avv_md.contains("## 4. Pflichten und Rechte des Verantwortlichen"),
+        "Art. 28 lit. d"
+    );
+    assert!(
+        avv_md.contains("## 5. Technische und organisatorische Maßnahmen (TOM)"),
+        "Art. 28 lit. f"
+    );
+    assert!(
+        avv_md.contains("## 6. Unterauftragsverarbeiter"),
+        "Art. 28 lit. g"
+    );
+    assert!(
+        avv_md.contains("## 7. Löschung von Daten und SLA"),
+        "Art. 28 lit. h"
+    );
 
     // Verify claimed technical measures in default TOMs
     let measures = default_technical_measures();
@@ -46,14 +66,22 @@ fn test_h11_gdpr_art28_avv_generator_technical_completeness() {
     let workspace_root = std::path::Path::new(&manifest_dir).join("../..");
 
     // 1. Ed25519 DeletionProof: crates/contextra-crypto/src/deletion_proof.rs
-    assert!(workspace_root.join("crates/contextra-crypto/src/deletion_proof.rs").exists());
+    assert!(workspace_root
+        .join("crates/contextra-crypto/src/deletion_proof.rs")
+        .exists());
 
     // 2. Egress Gateway: crates/contextra-privacy/src/egress_gateway.rs
-    assert!(workspace_root.join("crates/contextra-privacy/src/egress_gateway.rs").exists());
+    assert!(workspace_root
+        .join("crates/contextra-privacy/src/egress_gateway.rs")
+        .exists());
 
     // 3. Multi-Tenant Isolation: crates/contextra-types/src/tenant_scope.rs
-    assert!(workspace_root.join("crates/contextra-types/src/tenant_scope.rs").exists());
+    assert!(workspace_root
+        .join("crates/contextra-types/src/tenant_scope.rs")
+        .exists());
 
     // 4. Encrypted KV-Cache: crates/contextra-crypto/src/crypto.rs
-    assert!(workspace_root.join("crates/contextra-crypto/src/crypto.rs").exists());
+    assert!(workspace_root
+        .join("crates/contextra-crypto/src/crypto.rs")
+        .exists());
 }

@@ -457,7 +457,10 @@ pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 
 #[cfg(target_arch = "x86_64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vnni")]
-pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
+pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
+    a: &[u8],
+    b: &[u8],
+) -> CosineSimilarityPartsU8 {
     let len = a.len().min(b.len());
     let mut i = 0;
 

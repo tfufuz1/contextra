@@ -5,7 +5,7 @@
 // HOTSPOTS: persistence/mmap.rs (MmapIndex::open)
 
 use super::{HnswHeader, NodeRecord};
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 #[derive(Clone)]
 /// A reader for memory-mapped HNSW indices.

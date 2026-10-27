@@ -4,9 +4,9 @@
 
 #![cfg(feature = "experimental-diskann")]
 
-use contextra_core::traits::VectorIndex;
 use contextra_core::types::{DistanceMetric, DocId, TxId};
-use contextra_core::ContextraError;
+use contextra_ports::VectorIndex;
+use contextra_types::ContextraError;
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::MmapIndex;

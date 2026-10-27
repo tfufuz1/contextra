@@ -4,7 +4,8 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_core::{DistanceMetric, DocId, TxId, VectorIndex};
+use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{AdaptiveEfPolicy, HnswConfig, HnswIndex};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};

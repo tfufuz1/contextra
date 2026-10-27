@@ -108,26 +108,32 @@ pub(crate) mod fs {
                         std::fs::metadata(std::env::current_dir().unwrap_or_default())
                             .map(|m| m.permissions())
                             .unwrap_or_else(|_| {
-                                std::fs::metadata(".").map(|m| m.permissions()).unwrap_or_else(|_| {
-                                    std::fs::metadata(std::env::temp_dir()).map(|m| m.permissions()).unwrap_or_else(|_| {
-                                        std::fs::metadata(std::env::current_exe().unwrap_or_default())
+                                std::fs::metadata(".")
+                                    .map(|m| m.permissions())
+                                    .unwrap_or_else(|_| {
+                                        std::fs::metadata(std::env::temp_dir())
                                             .map(|m| m.permissions())
                                             .unwrap_or_else(|_| {
-                                                let local_tmp = std::path::PathBuf::from("loom_local_perm.tmp");
-                                                let p2 = std::fs::File::create(&local_tmp)
-                                                    .and_then(|f| f.metadata())
-                                                    .map(|m| m.permissions());
-                                                let _ = std::fs::remove_file(local_tmp);
-                                                p2.unwrap_or_else(|_| {
-                                                    loop {
+                                                std::fs::metadata(
+                                                    std::env::current_exe().unwrap_or_default(),
+                                                )
+                                                .map(|m| m.permissions())
+                                                .unwrap_or_else(|_| {
+                                                    let local_tmp = std::path::PathBuf::from(
+                                                        "loom_local_perm.tmp",
+                                                    );
+                                                    let p2 = std::fs::File::create(&local_tmp)
+                                                        .and_then(|f| f.metadata())
+                                                        .map(|m| m.permissions());
+                                                    let _ = std::fs::remove_file(local_tmp);
+                                                    p2.unwrap_or_else(|_| loop {
                                                         if let Ok(m) = std::fs::metadata(".") {
                                                             return m.permissions();
                                                         }
-                                                    }
+                                                    })
                                                 })
                                             })
                                     })
-                                })
                             })
                     })
                 }

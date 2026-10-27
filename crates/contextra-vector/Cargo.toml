@@ -15,7 +15,7 @@ ring = "0"
 [dependencies]
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
-contextra-core = { workspace = true }
+contextra-mvcc = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-simd = { workspace = true }
 contextra-sys = { workspace = true }

@@ -29,7 +29,10 @@ fn test_no_test_hooks_in_release_api() {
                                 has_cfg = true;
                                 break;
                             }
-                            if !prev.starts_with("#[") && !prev.is_empty() && !prev.starts_with("//") {
+                            if !prev.starts_with("#[")
+                                && !prev.is_empty()
+                                && !prev.starts_with("//")
+                            {
                                 break;
                             }
                         }

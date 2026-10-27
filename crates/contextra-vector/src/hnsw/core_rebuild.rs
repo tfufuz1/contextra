@@ -2,7 +2,7 @@ use ahash::AHashSet;
 use roaring::RoaringTreemap;
 use std::sync::atomic::Ordering;
 
-use contextra_core::{ContextraError, DocId, Result};
+use contextra_types::{ContextraError, DocId, Result};
 
 use super::arena::HnswArena;
 use super::batch::{PreparedInsert, SearchContext};
@@ -103,7 +103,7 @@ impl HnswIndexCore {
                 } else {
                     guard = self.cold.quantizer.read();
                     guard.as_ref().ok_or_else(|| {
-                        contextra_core::ContextraError::Index("Quantizer not trained".into())
+                        contextra_types::ContextraError::Index("Quantizer not trained".into())
                     })?
                 };
                 if let Some(qq) = query_quantized {
@@ -131,7 +131,7 @@ impl HnswIndexCore {
             } else {
                 guard = self.cold.quantizer.read();
                 guard.as_ref().ok_or_else(|| {
-                    contextra_core::ContextraError::Index("Quantizer not trained".into())
+                    contextra_types::ContextraError::Index("Quantizer not trained".into())
                 })?
             };
             if let Some(qq) = query_quantized {
@@ -158,7 +158,7 @@ impl HnswIndexCore {
                 guard
                     .as_ref()
                     .ok_or_else(|| {
-                        contextra_core::ContextraError::Index("Quantizer not trained".into())
+                        contextra_types::ContextraError::Index("Quantizer not trained".into())
                     })?
                     .symmetric_dist(a, b, self.cold.config.distance_metric)
             }
@@ -844,7 +844,7 @@ impl HnswIndexCore {
 
         for change in delta_changes {
             match change {
-                contextra_core::SeqLogChange::Insert { doc_id, seq } => {
+                contextra_mvcc::SeqLogChange::Insert { doc_id, seq } => {
                     let vector_opt = {
                         let doc_map = self.hot.doc_to_node.read();
                         let mmap_count = self
@@ -885,7 +885,7 @@ impl HnswIndexCore {
                         new_index.inner.do_insert(doc_id, &f32_vec, seq)?;
                     }
                 }
-                contextra_core::SeqLogChange::Delete { doc_id, .. } => {
+                contextra_mvcc::SeqLogChange::Delete { doc_id, .. } => {
                     new_index.inner.do_delete(doc_id)?;
                 }
             }

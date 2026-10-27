@@ -90,7 +90,6 @@ async fn test_db_transaction_drop_triggers_cleanup() {
     assert!(results.unwrap().is_empty());
 }
 
-
 #[test]
 fn test_commit_intent_arc_serde_kompatibel_mit_vec() {
     let doc_ids_vec = vec![

@@ -21,7 +21,7 @@
 //! 5. Asymmetric Euclidean distance estimation:
 //!    $$d(q, x) = \sqrt{\max\left(0, \|q\|^2 + \|x\|^2 - 2 \langle q', \hat{x}' \rangle\right)}$$
 
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
 /// RaBitQ Quantizer with random orthogonal rotation and scalar metadata.
@@ -449,7 +449,9 @@ mod tests {
             } else {
                 // Correlated / near vector
                 let noise_scale = rng.gen_range(0.01..0.5);
-                q.iter().map(|&val| val + rng.gen_range(-noise_scale..noise_scale)).collect()
+                q.iter()
+                    .map(|&val| val + rng.gen_range(-noise_scale..noise_scale))
+                    .collect()
             };
 
             let exact_dist: f32 = q

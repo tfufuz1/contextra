@@ -1,7 +1,7 @@
 //! Proptest-Suite für ScalarQuantizer und compute_distance.
 //! Verifiziert mathematische Invarianten über zufällige Eingaben.
 
-use contextra_core::DistanceMetric;
+use contextra_types::DistanceMetric;
 use contextra_vector::distance::compute_distance;
 use proptest::prelude::*;
 

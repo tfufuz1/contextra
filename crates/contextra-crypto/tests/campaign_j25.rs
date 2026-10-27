@@ -93,7 +93,10 @@ fn test_h1_blake3_test_vector() {
     let expected_empty_hash =
         hex_decode("af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262");
     let actual_hash = blake3::hash(b"");
-    assert_eq!(actual_hash.as_bytes().as_slice(), expected_empty_hash.as_slice());
+    assert_eq!(
+        actual_hash.as_bytes().as_slice(),
+        expected_empty_hash.as_slice()
+    );
 }
 
 /// H1.5: HMAC-SHA256 (RFC 4231 Test Case 1)
@@ -165,7 +168,10 @@ fn test_h2_aead_bit_flipping_sampled_1mb_payload() {
         );
         sampled += 1;
     }
-    assert!(sampled >= 2000, "Must sample at least 2000 bit-flip positions (sampled: {sampled})");
+    assert!(
+        sampled >= 2000,
+        "Must sample at least 2000 bit-flip positions (sampled: {sampled})"
+    );
 }
 
 #[test]
@@ -228,8 +234,12 @@ fn test_h3_aes_gcm_siv_identical_plaintext_same_nonce_equality() {
     let cipher1 = Aes256GcmSiv::new_from_slice(&key).unwrap();
     let cipher2 = Aes256GcmSiv::new_from_slice(&key).unwrap();
 
-    let ct1 = cipher1.encrypt(Nonce::from_slice(&nonce_bytes), plaintext.as_ref()).unwrap();
-    let ct2 = cipher2.encrypt(Nonce::from_slice(&nonce_bytes), plaintext.as_ref()).unwrap();
+    let ct1 = cipher1
+        .encrypt(Nonce::from_slice(&nonce_bytes), plaintext.as_ref())
+        .unwrap();
+    let ct2 = cipher2
+        .encrypt(Nonce::from_slice(&nonce_bytes), plaintext.as_ref())
+        .unwrap();
 
     assert_eq!(
         ct1, ct2,
@@ -363,7 +373,10 @@ fn test_h6_emergency_wipe_zeroizes_key_manager() {
     km.emergency_wipe();
 
     let wiped_key = *km.inspect_key_bytes_for_test();
-    assert_eq!(wiped_key, [0u8; 32], "emergency_wipe MUST zeroize key bytes");
+    assert_eq!(
+        wiped_key, [0u8; 32],
+        "emergency_wipe MUST zeroize key bytes"
+    );
 }
 
 // ============================================================================

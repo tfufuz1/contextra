@@ -1,10 +1,9 @@
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
-use contextra_core::{
-    ContextraError, DistanceMetric, DocId, IndexOp, Result, ScoredDocument, TxId, VectorIndex,
-    VectorIndexStats,
-};
+use contextra_mvcc::IndexOp;
+use contextra_ports::{VectorIndex, VectorIndexStats};
+use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId};
 
 use super::batch::{BatchContext, SearchContext};
 use super::config::validate_vector;
@@ -40,11 +39,11 @@ impl VectorIndex for HnswIndex {
     }
 
     async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {
-        if k > contextra_core::MAX_SEARCH_K {
+        if k > contextra_types::MAX_SEARCH_K {
             return Err(ContextraError::invalid_input(format!(
                 "Requested k ({}) exceeds maximum allowed search limit ({})",
                 k,
-                contextra_core::MAX_SEARCH_K
+                contextra_types::MAX_SEARCH_K
             )));
         }
         if let Some(ref err) = self.inner.cold.validation_error {
@@ -139,7 +138,7 @@ impl VectorIndex for HnswIndex {
         let score = self.inner.connectivity_score();
         if score < self.inner.cold.config.rebuild_threshold {
             let deleted_ratio = (1.0 - score) * 100.0;
-            let err = contextra_core::ContextraError::HnswConnectivityDegraded { deleted_ratio };
+            let err = contextra_types::ContextraError::HnswConnectivityDegraded { deleted_ratio };
             tracing::warn!(
                 error = %err,
                 connectivity_score = score,

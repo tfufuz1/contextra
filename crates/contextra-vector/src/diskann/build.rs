@@ -10,7 +10,7 @@ use super::format::{
 };
 use super::types::{DiskAnnIndex, SearchCandidate};
 use crate::distance::compute_distance_trusted;
-use contextra_core::{ContextraError, DocId, Result};
+use contextra_types::{ContextraError, DocId, Result};
 #[cfg(not(feature = "docid-128"))]
 pub(crate) type TombstoneSet = roaring::RoaringTreemap;
 
