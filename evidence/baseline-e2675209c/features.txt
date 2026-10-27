@@ -1,0 +1,5277 @@
+warning: the --all-targets flag has been changed to --target=all
+0contextra v0.1.0 (/app/crates/contextra)
+1contextra-core feature "default" (command-line)
+2contextra-core v0.1.0 (/app/crates/contextra-core)
+3contextra-mvcc feature "default" (command-line)
+4contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)
+5ahash feature "default"
+6ahash v0.8.12
+7cfg-if feature "default"
+8cfg-if v1.0.4
+7getrandom feature "default"
+8getrandom v0.3.4
+9libc v0.2.189
+9r-efi v5.3.0
+9wasip2 v1.0.4+wasi-0.2.12
+10wit-bindgen v0.57.1
+9cfg-if feature "default" (*)
+7once_cell feature "alloc"
+8once_cell v1.21.4
+8once_cell feature "race"
+9once_cell v1.21.4
+7serde feature "default"
+8serde v1.0.229
+9serde_core feature "result"
+10serde_core v1.0.229
+11serde_derive feature "default"
+12serde_derive v1.0.229 (proc-macro)
+13proc-macro2 feature "proc-macro"
+14proc-macro2 v1.0.107
+15unicode-ident feature "default"
+16unicode-ident v1.0.24
+13quote feature "proc-macro"
+14quote v1.0.47
+15proc-macro2 v1.0.107 (*)
+14proc-macro2 feature "proc-macro" (*)
+13syn feature "clone-impls"
+14syn v3.0.4
+15proc-macro2 v1.0.107 (*)
+15quote v1.0.47 (*)
+15unicode-ident feature "default" (*)
+13syn feature "derive"
+14syn v3.0.4 (*)
+13syn feature "parsing"
+14syn v3.0.4 (*)
+13syn feature "printing"
+14syn v3.0.4 (*)
+13syn feature "proc-macro"
+14syn v3.0.4 (*)
+14proc-macro2 feature "proc-macro" (*)
+14quote feature "proc-macro" (*)
+9serde_derive feature "default" (*)
+8serde feature "std"
+9serde v1.0.229 (*)
+9serde_core feature "std"
+10serde_core v1.0.229 (*)
+7zerocopy feature "simd"
+8zerocopy v0.8.56
+9zerocopy-derive feature "default"
+10zerocopy-derive v0.8.56 (proc-macro)
+11proc-macro2 feature "default"
+12proc-macro2 v1.0.107 (*)
+12proc-macro2 feature "proc-macro" (*)
+11quote feature "default"
+12quote v1.0.47 (*)
+12quote feature "proc-macro" (*)
+11syn feature "default"
+12syn v2.0.119
+13proc-macro2 v1.0.107 (*)
+13quote v1.0.47 (*)
+13unicode-ident feature "default" (*)
+12syn feature "clone-impls"
+13syn v2.0.119 (*)
+12syn feature "derive"
+13syn v2.0.119 (*)
+12syn feature "parsing"
+13syn v2.0.119 (*)
+12syn feature "printing"
+13syn v2.0.119 (*)
+12syn feature "proc-macro"
+13syn v2.0.119 (*)
+13proc-macro2 feature "proc-macro" (*)
+13quote feature "proc-macro" (*)
+11syn feature "full"
+12syn v2.0.119 (*)
+7version_check feature "default"
+8version_check v0.9.5
+6ahash feature "runtime-rng"
+7ahash v0.8.12 (*)
+7ahash feature "getrandom"
+8ahash v0.8.12 (*)
+6ahash feature "std"
+7ahash v0.8.12 (*)
+5ahash feature "serde"
+6ahash v0.8.12 (*)
+5serde feature "default" (*)
+5serde feature "derive"
+6serde v1.0.229 (*)
+6serde feature "serde_derive"
+7serde v1.0.229 (*)
+5serde feature "rc"
+6serde v1.0.229 (*)
+6serde_core feature "rc"
+7serde_core v1.0.229 (*)
+5bytes feature "default"
+6bytes v1.12.1
+6bytes feature "std"
+7bytes v1.12.1
+5contextra-ports feature "default" (command-line)
+6contextra-ports v0.1.0 (/app/crates/contextra-ports)
+7ahash feature "default" (*)
+7ahash feature "serde" (*)
+7serde feature "default" (*)
+7serde feature "derive" (*)
+7serde feature "rc" (*)
+7bytes feature "default" (*)
+7contextra-types feature "default" (command-line)
+8contextra-types v0.1.0 (/app/crates/contextra-types)
+9ahash feature "default" (*)
+9ahash feature "serde" (*)
+9serde feature "default" (*)
+9serde feature "derive" (*)
+9serde feature "rc" (*)
+9bytes feature "default" (*)
+9bincode feature "default"
+10bincode v1.3.3
+11serde feature "default" (*)
+9blake3 feature "default"
+10blake3 v1.8.7
+11arrayvec v0.7.8
+11constant_time_eq v0.4.2
+11cfg-if feature "default" (*)
+11cpufeatures feature "default"
+12cpufeatures v0.3.1
+13libc v0.2.189
+11cc feature "default"
+12cc v1.4.4
+13find-msvc-tools feature "default"
+14find-msvc-tools v0.1.11
+13shlex feature "default"
+14shlex v2.0.1
+14shlex feature "std"
+15shlex v2.0.1
+10blake3 feature "std"
+11blake3 v1.8.7 (*)
+11constant_time_eq feature "std"
+12constant_time_eq v0.4.2
+9serde_json feature "default"
+10serde_json v1.0.151
+11memchr v2.8.3
+11serde v1.0.229 (*)
+11serde_core v1.0.229 (*)
+11itoa feature "default"
+12itoa v1.0.18
+11zmij feature "default"
+12zmij v1.0.23
+10serde_json feature "std"
+11serde_json v1.0.151 (*)
+11serde_core feature "std" (*)
+11memchr feature "std"
+12memchr v2.8.3
+12memchr feature "alloc"
+13memchr v2.8.3
+9sha2 feature "default"
+10sha2 v0.10.9
+11cfg-if feature "default" (*)
+11cpufeatures feature "default"
+12cpufeatures v0.2.17
+13libc v0.2.189
+11digest feature "default"
+12digest v0.10.7
+13subtle v2.6.1
+13block-buffer feature "default"
+14block-buffer v0.10.4
+15generic-array feature "default"
+16generic-array v0.14.7
+17typenum feature "default"
+18typenum v1.20.1
+17version_check feature "default" (*)
+13crypto-common feature "default"
+14crypto-common v0.1.7
+15generic-array feature "default" (*)
+15generic-array feature "more_lengths"
+16generic-array v0.14.7 (*)
+15typenum feature "default" (*)
+15rand_core feature "default"
+16rand_core v0.6.4
+17getrandom feature "default"
+18getrandom v0.2.17
+19libc v0.2.189
+19wasi v0.11.1+wasi-snapshot-preview1
+19cfg-if feature "default" (*)
+12digest feature "core-api"
+13digest v0.10.7 (*)
+13digest feature "block-buffer"
+14digest v0.10.7 (*)
+10sha2 feature "std"
+11sha2 v0.10.9 (*)
+11digest feature "std"
+12digest v0.10.7 (*)
+12digest feature "alloc"
+13digest v0.10.7 (*)
+12crypto-common feature "std"
+13crypto-common v0.1.7 (*)
+9thiserror feature "default"
+10thiserror v2.0.20
+11thiserror-impl feature "default"
+12thiserror-impl v2.0.20 (proc-macro)
+13proc-macro2 feature "default" (*)
+13quote feature "default" (*)
+13syn feature "default"
+14syn v3.0.4 (*)
+14syn feature "clone-impls" (*)
+14syn feature "derive" (*)
+14syn feature "parsing" (*)
+14syn feature "printing" (*)
+14syn feature "proc-macro" (*)
+10thiserror feature "std"
+11thiserror v2.0.20 (*)
+9proptest feature "default"
+10proptest v1.11.0
+11num-traits v0.2.19
+12libm feature "default"
+13libm v0.2.16
+13libm feature "arch"
+14libm v0.2.16
+12autocfg feature "default"
+13autocfg v1.5.1
+11rand_chacha v0.9.0
+12ppv-lite86 feature "simd"
+13ppv-lite86 v0.2.21
+14zerocopy feature "default"
+15zerocopy v0.8.56 (*)
+14zerocopy feature "simd" (*)
+12rand_core feature "default"
+13rand_core v0.9.5
+14getrandom feature "default" (*)
+11rusty-fork v0.3.1
+12fnv feature "default"
+13fnv v1.0.7
+13fnv feature "std"
+14fnv v1.0.7
+12quick-error feature "default"
+13quick-error v1.2.3
+12tempfile feature "default"
+13tempfile v3.27.0
+14getrandom v0.4.3
+15libc v0.2.189
+15r-efi v6.0.0
+15cfg-if feature "default" (*)
+14once_cell feature "std"
+15once_cell v1.21.4
+15once_cell feature "alloc" (*)
+14fastrand feature "default"
+15fastrand v2.5.0
+15fastrand feature "std"
+16fastrand v2.5.0
+16fastrand feature "alloc"
+17fastrand v2.5.0
+14rustix feature "default"
+15rustix v1.1.4
+16bitflags v2.13.1
+16errno v0.3.14
+17libc v0.2.189
+17windows-sys feature "Win32_Foundation"
+18windows-sys v0.61.2
+19windows-link v0.2.1
+18windows-sys feature "Win32"
+19windows-sys v0.61.2 (*)
+19windows-sys feature "Win32_Foundation" (*)
+17windows-sys feature "Win32_System_Diagnostics_Debug"
+18windows-sys v0.61.2 (*)
+18windows-sys feature "Win32_System_Diagnostics"
+19windows-sys v0.61.2 (*)
+19windows-sys feature "Win32_System"
+20windows-sys v0.61.2 (*)
+20windows-sys feature "Win32" (*)
+17windows-sys feature "default"
+18windows-sys v0.61.2 (*)
+16libc v0.2.189
+16windows-sys feature "Win32_Foundation" (*)
+16windows-sys feature "Win32_Networking_WinSock"
+17windows-sys v0.61.2 (*)
+17windows-sys feature "Win32_Networking"
+18windows-sys v0.61.2 (*)
+18windows-sys feature "Win32" (*)
+16windows-sys feature "default" (*)
+16linux-raw-sys feature "auxvec"
+17linux-raw-sys v0.12.1
+16linux-raw-sys feature "elf"
+17linux-raw-sys v0.12.1
+16linux-raw-sys feature "errno"
+17linux-raw-sys v0.12.1
+16linux-raw-sys feature "general"
+17linux-raw-sys v0.12.1
+16linux-raw-sys feature "ioctl"
+17linux-raw-sys v0.12.1
+16linux-raw-sys feature "no_std"
+17linux-raw-sys v0.12.1
+15rustix feature "std"
+16rustix v1.1.4 (*)
+16libc feature "std"
+17libc v0.2.189
+16bitflags feature "std"
+17bitflags v2.13.1
+16rustix feature "alloc"
+17rustix v1.1.4 (*)
+16errno feature "std"
+17errno v0.3.14 (*)
+17libc feature "std" (*)
+14rustix feature "fs"
+15rustix v1.1.4 (*)
+14windows-sys feature "Win32_Foundation" (*)
+14windows-sys feature "Win32_Storage_FileSystem"
+15windows-sys v0.61.2 (*)
+15windows-sys feature "Win32_Storage"
+16windows-sys v0.61.2 (*)
+16windows-sys feature "Win32" (*)
+14windows-sys feature "default" (*)
+13tempfile feature "getrandom"
+14tempfile v3.27.0 (*)
+12wait-timeout feature "default"
+13wait-timeout v0.2.1
+14libc feature "default"
+15libc v0.2.189
+15libc feature "std" (*)
+11bit-set feature "default"
+12bit-set v0.8.0
+13bit-vec v0.8.0
+12bit-set feature "std"
+13bit-set v0.8.0 (*)
+13bit-vec feature "std"
+14bit-vec v0.8.0
+11bit-vec feature "default"
+12bit-vec v0.8.0
+12bit-vec feature "std" (*)
+11bitflags feature "default"
+12bitflags v2.13.1
+11rand feature "alloc"
+12rand v0.9.5
+13rand_chacha v0.9.0 (*)
+13rand_core v0.9.5 (*)
+11rand_xorshift feature "default"
+12rand_xorshift v0.4.0
+13rand_core feature "default" (*)
+11regex-syntax feature "default"
+12regex-syntax v0.8.11
+12regex-syntax feature "std"
+13regex-syntax v0.8.11
+12regex-syntax feature "unicode"
+13regex-syntax v0.8.11
+13regex-syntax feature "unicode-age"
+14regex-syntax v0.8.11
+13regex-syntax feature "unicode-bool"
+14regex-syntax v0.8.11
+13regex-syntax feature "unicode-case"
+14regex-syntax v0.8.11
+13regex-syntax feature "unicode-gencat"
+14regex-syntax v0.8.11
+13regex-syntax feature "unicode-perl"
+14regex-syntax v0.8.11
+13regex-syntax feature "unicode-script"
+14regex-syntax v0.8.11
+13regex-syntax feature "unicode-segment"
+14regex-syntax v0.8.11
+11tempfile feature "default" (*)
+11unarray feature "default"
+12unarray v0.1.4
+10proptest feature "bit-set"
+11proptest v1.11.0 (*)
+10proptest feature "fork"
+11proptest v1.11.0 (*)
+11proptest feature "rusty-fork"
+12proptest v1.11.0 (*)
+11proptest feature "std"
+12proptest v1.11.0 (*)
+12proptest feature "regex-syntax"
+13proptest v1.11.0 (*)
+12num-traits feature "std"
+13num-traits v0.2.19 (*)
+12rand feature "os_rng"
+13rand v0.9.5 (*)
+13rand_core feature "os_rng"
+14rand_core v0.9.5 (*)
+12rand feature "std"
+13rand v0.9.5 (*)
+13rand feature "alloc" (*)
+13rand_chacha feature "std"
+14rand_chacha v0.9.0 (*)
+14ppv-lite86 feature "std"
+15ppv-lite86 v0.2.21 (*)
+14rand_core feature "std"
+15rand_core v0.9.5 (*)
+15getrandom feature "std"
+16getrandom v0.3.4 (*)
+13rand_core feature "std" (*)
+11proptest feature "tempfile"
+12proptest v1.11.0 (*)
+10proptest feature "std" (*)
+10proptest feature "timeout"
+11proptest v1.11.0 (*)
+11proptest feature "fork" (*)
+11proptest feature "rusty-fork" (*)
+11rusty-fork feature "timeout"
+12rusty-fork v0.3.1 (*)
+12rusty-fork feature "wait-timeout"
+13rusty-fork v0.3.1 (*)
+7serde_json feature "default" (*)
+7thiserror feature "default" (*)
+7futures-util feature "default"
+8futures-util v0.3.34
+9futures-core v0.3.34
+9futures-macro v0.3.34 (proc-macro)
+10proc-macro2 feature "default" (*)
+10quote feature "default" (*)
+10syn feature "default" (*)
+10syn feature "full"
+11syn v3.0.4 (*)
+9futures-sink v0.3.34
+9futures-task v0.3.34
+9slab v0.4.12
+9memchr feature "default"
+10memchr v2.8.3
+10memchr feature "std" (*)
+9futures-channel feature "std"
+10futures-channel v0.3.34
+11futures-core v0.3.34
+11futures-sink v0.3.34
+10futures-channel feature "alloc"
+11futures-channel v0.3.34 (*)
+11futures-core feature "alloc"
+12futures-core v0.3.34
+10futures-core feature "std"
+11futures-core v0.3.34
+11futures-core feature "alloc" (*)
+9futures-io feature "std"
+10futures-io v0.3.34
+9pin-project-lite feature "default"
+10pin-project-lite v0.2.17
+8futures-util feature "async-await"
+9futures-util v0.3.34 (*)
+8futures-util feature "async-await-macro"
+9futures-util v0.3.34 (*)
+9futures-util feature "async-await" (*)
+9futures-util feature "futures-macro"
+10futures-util v0.3.34 (*)
+8futures-util feature "std"
+9futures-util v0.3.34 (*)
+9futures-util feature "alloc"
+10futures-util v0.3.34 (*)
+10futures-util feature "slab"
+11futures-util v0.3.34 (*)
+10futures-core feature "alloc" (*)
+10futures-task feature "alloc"
+11futures-task v0.3.34
+9futures-util feature "slab" (*)
+9futures-core feature "std" (*)
+9futures-task feature "std"
+10futures-task v0.3.34
+10futures-task feature "alloc" (*)
+9slab feature "std"
+10slab v0.4.12
+7proptest feature "default" (*)
+7tokio feature "default"
+8tokio v1.53.1
+9mio v1.2.2
+10libc feature "default" (*)
+10windows-sys feature "Wdk_Foundation"
+11windows-sys v0.61.2 (*)
+11windows-sys feature "Wdk"
+12windows-sys v0.61.2 (*)
+12windows-sys feature "Win32_Foundation" (*)
+10windows-sys feature "Wdk_Storage_FileSystem"
+11windows-sys v0.61.2 (*)
+11windows-sys feature "Wdk_Storage"
+12windows-sys v0.61.2 (*)
+12windows-sys feature "Wdk" (*)
+10windows-sys feature "Wdk_System_IO"
+11windows-sys v0.61.2 (*)
+11windows-sys feature "Wdk_System"
+12windows-sys v0.61.2 (*)
+12windows-sys feature "Wdk" (*)
+10windows-sys feature "Win32_Foundation" (*)
+10windows-sys feature "Win32_Networking_WinSock" (*)
+10windows-sys feature "Win32_Security"
+11windows-sys v0.61.2 (*)
+11windows-sys feature "Win32" (*)
+10windows-sys feature "Win32_Storage_FileSystem" (*)
+10windows-sys feature "Win32_System_IO"
+11windows-sys v0.61.2 (*)
+11windows-sys feature "Win32_System" (*)
+10windows-sys feature "Win32_System_WindowsProgramming"
+11windows-sys v0.61.2 (*)
+11windows-sys feature "Win32_System" (*)
+10windows-sys feature "default" (*)
+10wasi feature "default"
+11wasi v0.11.1+wasi-snapshot-preview1
+11wasi feature "std"
+12wasi v0.11.1+wasi-snapshot-preview1
+9libc feature "default" (*)
+9bytes feature "default" (*)
+9windows-sys feature "default" (*)
+9pin-project-lite feature "default" (*)
+9mio feature "os-ext"
+10mio v1.2.2 (*)
+10windows-sys feature "Win32_Security" (*)
+10windows-sys feature "Win32_System_Pipes"
+11windows-sys v0.61.2 (*)
+11windows-sys feature "Win32_System" (*)
+10mio feature "os-poll"
+11mio v1.2.2 (*)
+9mio feature "os-poll" (*)
+9parking_lot feature "default"
+10parking_lot v0.12.5
+11lock_api feature "default"
+12lock_api v0.4.14
+13scopeguard v1.2.0
+12lock_api feature "atomic_usize"
+13lock_api v0.4.14 (*)
+11parking_lot_core feature "default"
+12parking_lot_core v0.9.12
+13cfg-if feature "default" (*)
+13libc feature "default" (*)
+13windows-link feature "default"
+14windows-link v0.2.1
+13redox_syscall feature "default"
+14redox_syscall v0.5.18
+15bitflags feature "default" (*)
+14redox_syscall feature "userspace"
+15redox_syscall v0.5.18 (*)
+13smallvec feature "default"
+14smallvec v1.15.2
+15serde v1.0.229 (*)
+9signal-hook-registry feature "default"
+10signal-hook-registry v1.4.8
+11libc feature "default" (*)
+11errno feature "default"
+12errno v0.3.14 (*)
+12errno feature "std" (*)
+9socket2 feature "all"
+10socket2 v0.6.5
+11libc feature "default" (*)
+11windows-sys feature "Win32_Foundation" (*)
+11windows-sys feature "Win32_Networking_WinSock" (*)
+11windows-sys feature "Win32_System_IO" (*)
+11windows-sys feature "Win32_System_Threading"
+12windows-sys v0.61.2 (*)
+12windows-sys feature "Win32_System" (*)
+11windows-sys feature "Win32_System_WindowsProgramming" (*)
+11windows-sys feature "default" (*)
+9socket2 feature "default"
+10socket2 v0.6.5 (*)
+9tokio-macros feature "default"
+10tokio-macros v2.7.2 (proc-macro)
+11proc-macro2 feature "default" (*)
+11quote feature "default" (*)
+11syn feature "default" (*)
+11syn feature "full" (*)
+7tokio feature "full"
+8tokio v1.53.1 (*)
+8tokio feature "fs"
+9tokio v1.53.1 (*)
+8tokio feature "io-std"
+9tokio v1.53.1 (*)
+8tokio feature "io-util"
+9tokio v1.53.1 (*)
+9tokio feature "bytes"
+10tokio v1.53.1 (*)
+8tokio feature "macros"
+9tokio v1.53.1 (*)
+9tokio feature "tokio-macros"
+10tokio v1.53.1 (*)
+8tokio feature "net"
+9tokio v1.53.1 (*)
+9windows-sys feature "Win32_Foundation" (*)
+9windows-sys feature "Win32_Security" (*)
+9windows-sys feature "Win32_Storage_FileSystem" (*)
+9windows-sys feature "Win32_System_Pipes" (*)
+9windows-sys feature "Win32_System_SystemServices"
+10windows-sys v0.61.2 (*)
+10windows-sys feature "Win32_System" (*)
+9tokio feature "libc"
+10tokio v1.53.1 (*)
+9tokio feature "mio"
+10tokio v1.53.1 (*)
+9tokio feature "socket2"
+10tokio v1.53.1 (*)
+9tokio feature "windows-sys"
+10tokio v1.53.1 (*)
+9mio feature "net"
+10mio v1.2.2 (*)
+9mio feature "os-ext" (*)
+9mio feature "os-poll" (*)
+8tokio feature "parking_lot"
+9tokio v1.53.1 (*)
+8tokio feature "process"
+9tokio v1.53.1 (*)
+9windows-sys feature "Win32_Foundation" (*)
+9windows-sys feature "Win32_System_Threading" (*)
+9windows-sys feature "Win32_System_WindowsProgramming" (*)
+9tokio feature "bytes" (*)
+9tokio feature "libc" (*)
+9tokio feature "mio" (*)
+9tokio feature "signal-hook-registry"
+10tokio v1.53.1 (*)
+9tokio feature "windows-sys" (*)
+9mio feature "net" (*)
+9mio feature "os-ext" (*)
+9mio feature "os-poll" (*)
+8tokio feature "rt"
+9tokio v1.53.1 (*)
+8tokio feature "rt-multi-thread"
+9tokio v1.53.1 (*)
+9tokio feature "rt" (*)
+8tokio feature "signal"
+9tokio v1.53.1 (*)
+9windows-sys feature "Win32_Foundation" (*)
+9windows-sys feature "Win32_System_Console"
+10windows-sys v0.61.2 (*)
+10windows-sys feature "Win32_System" (*)
+9tokio feature "libc" (*)
+9tokio feature "mio" (*)
+9tokio feature "signal-hook-registry" (*)
+9tokio feature "windows-sys" (*)
+9mio feature "net" (*)
+9mio feature "os-ext" (*)
+9mio feature "os-poll" (*)
+8tokio feature "sync"
+9tokio v1.53.1 (*)
+8tokio feature "time"
+9tokio v1.53.1 (*)
+7tokio feature "macros" (*)
+7tokio feature "rt" (*)
+5contextra-types feature "default" (command-line) (*)
+5thiserror feature "default" (*)
+5parking_lot feature "default" (*)
+5tracing feature "default"
+6tracing v0.1.44
+7tracing-core v0.1.36
+8once_cell feature "default"
+9once_cell v1.21.4
+9once_cell feature "std" (*)
+7pin-project-lite feature "default" (*)
+7tracing-attributes feature "default"
+8tracing-attributes v0.1.31 (proc-macro)
+9proc-macro2 feature "default" (*)
+9quote feature "default" (*)
+9syn feature "clone-impls" (*)
+9syn feature "extra-traits"
+10syn v2.0.119 (*)
+9syn feature "full" (*)
+9syn feature "parsing" (*)
+9syn feature "printing" (*)
+9syn feature "proc-macro" (*)
+9syn feature "visit-mut"
+10syn v2.0.119 (*)
+6tracing feature "attributes"
+7tracing v0.1.44 (*)
+7tracing feature "tracing-attributes"
+8tracing v0.1.44 (*)
+6tracing feature "std"
+7tracing v0.1.44 (*)
+7tracing-core feature "std"
+8tracing-core v0.1.36 (*)
+8tracing-core feature "once_cell"
+9tracing-core v0.1.36 (*)
+5loom feature "default"
+6loom v0.7.2
+7cfg-if feature "default" (*)
+7tracing feature "std" (*)
+7generator feature "default"
+8generator v0.8.9
+9cfg-if feature "default" (*)
+9libc feature "default" (*)
+9windows-link feature "default" (*)
+9log feature "default"
+10log v0.4.34
+9windows-result feature "default"
+10windows-result v0.4.1
+11windows-link v0.2.1
+10windows-result feature "std"
+11windows-result v0.4.1 (*)
+9cc feature "default" (*)
+9rustversion feature "default"
+10rustversion v1.0.23 (proc-macro)
+7scoped-tls feature "default"
+8scoped-tls v1.0.1
+7tracing-subscriber feature "default"
+8tracing-subscriber v0.3.23
+9tracing v0.1.44 (*)
+9tracing-core v0.1.36 (*)
+9once_cell feature "default" (*)
+9smallvec feature "default" (*)
+9regex-automata feature "std"
+10regex-automata v0.4.18
+11aho-corasick v1.1.5
+12memchr v2.8.3
+11memchr v2.8.3
+11regex-syntax v0.8.11
+10regex-syntax feature "std" (*)
+10memchr feature "std" (*)
+10aho-corasick feature "std"
+11aho-corasick v1.1.5 (*)
+11memchr feature "std" (*)
+10regex-automata feature "alloc"
+11regex-automata v0.4.18 (*)
+9matchers feature "default"
+10matchers v0.2.0
+11regex-automata feature "dfa-build"
+12regex-automata v0.4.18 (*)
+12regex-automata feature "dfa-search"
+13regex-automata v0.4.18 (*)
+12regex-automata feature "nfa-thompson"
+13regex-automata v0.4.18 (*)
+13regex-automata feature "alloc" (*)
+11regex-automata feature "dfa-search" (*)
+11regex-automata feature "syntax"
+12regex-automata v0.4.18 (*)
+12regex-automata feature "alloc" (*)
+9nu-ansi-term feature "default"
+10nu-ansi-term v0.50.3
+11windows-sys feature "Win32_Foundation" (*)
+11windows-sys feature "Win32_Security" (*)
+11windows-sys feature "Win32_Storage_FileSystem" (*)
+11windows-sys feature "Win32_System_Console" (*)
+11windows-sys feature "default" (*)
+10nu-ansi-term feature "std"
+11nu-ansi-term v0.50.3 (*)
+9sharded-slab feature "default"
+10sharded-slab v0.1.7
+11lazy_static feature "default"
+12lazy_static v1.5.0
+9thread_local feature "default"
+10thread_local v1.1.10
+11cfg-if feature "default" (*)
+9tracing-log feature "log-tracer"
+10tracing-log v0.2.0
+11once_cell feature "default" (*)
+11tracing-core feature "default"
+12tracing-core v0.1.36 (*)
+12tracing-core feature "std" (*)
+11log feature "default" (*)
+9tracing-log feature "std"
+10tracing-log v0.2.0 (*)
+10log feature "std"
+11log v0.4.34
+11log feature "alloc"
+12log v0.4.34
+8tracing-subscriber feature "ansi"
+9tracing-subscriber v0.3.23 (*)
+9tracing-subscriber feature "fmt"
+10tracing-subscriber v0.3.23 (*)
+10tracing-subscriber feature "registry"
+11tracing-subscriber v0.3.23 (*)
+11tracing-subscriber feature "sharded-slab"
+12tracing-subscriber v0.3.23 (*)
+11tracing-subscriber feature "std"
+12tracing-subscriber v0.3.23 (*)
+12tracing-core feature "std" (*)
+12tracing-subscriber feature "alloc"
+13tracing-subscriber v0.3.23 (*)
+11tracing-subscriber feature "thread_local"
+12tracing-subscriber v0.3.23 (*)
+10tracing-subscriber feature "std" (*)
+9tracing-subscriber feature "nu-ansi-term"
+10tracing-subscriber v0.3.23 (*)
+8tracing-subscriber feature "fmt" (*)
+8tracing-subscriber feature "smallvec"
+9tracing-subscriber v0.3.23 (*)
+8tracing-subscriber feature "std" (*)
+8tracing-subscriber feature "tracing-log"
+9tracing-subscriber v0.3.23 (*)
+7tracing-subscriber feature "env-filter"
+8tracing-subscriber v0.3.23 (*)
+8tracing-subscriber feature "matchers"
+9tracing-subscriber v0.3.23 (*)
+8tracing-subscriber feature "once_cell"
+9tracing-subscriber v0.3.23 (*)
+8tracing-subscriber feature "std" (*)
+8tracing-subscriber feature "thread_local" (*)
+8tracing-subscriber feature "tracing"
+9tracing-subscriber v0.3.23 (*)
+5proptest feature "default" (*)
+5tokio feature "default" (*)
+5tokio feature "full" (*)
+5tokio feature "macros" (*)
+5tokio feature "rt" (*)
+5contextra-testkit feature "default" (command-line)
+6contextra-testkit v0.1.0 (/app/crates/contextra-testkit)
+7bytes feature "default" (*)
+7contextra-ports feature "default" (command-line) (*)
+7contextra-types feature "default" (command-line) (*)
+7parking_lot feature "default" (*)
+7tracing feature "default" (*)
+7tempfile feature "default" (*)
+7tokio feature "default" (*)
+7tokio feature "full" (*)
+7tokio feature "macros" (*)
+7tokio feature "rt" (*)
+5criterion feature "async_tokio"
+6criterion v0.5.1
+7futures v0.3.34
+8futures-core v0.3.34
+8futures-executor v0.3.34
+9futures-core v0.3.34
+9futures-task v0.3.34
+9futures-util v0.3.34 (*)
+8futures-io v0.3.34
+8futures-sink v0.3.34
+8futures-task v0.3.34
+8futures-util feature "sink"
+9futures-util v0.3.34 (*)
+9futures-util feature "futures-sink"
+10futures-util v0.3.34 (*)
+8futures-channel feature "sink"
+9futures-channel v0.3.34 (*)
+9futures-channel feature "futures-sink"
+10futures-channel v0.3.34 (*)
+7once_cell feature "default" (*)
+7serde feature "default" (*)
+7serde_derive feature "default" (*)
+7num-traits feature "std" (*)
+7serde_json feature "default" (*)
+7tokio feature "rt" (*)
+7anes feature "default"
+8anes v0.1.6
+7cast feature "default"
+8cast v0.3.0
+7ciborium feature "default"
+8ciborium v0.2.2
+9serde feature "alloc"
+10serde v1.0.229 (*)
+10serde_core feature "alloc"
+11serde_core v1.0.229 (*)
+9serde feature "derive" (*)
+9ciborium-io feature "alloc"
+10ciborium-io v0.2.2
+9ciborium-io feature "default"
+10ciborium-io v0.2.2
+9ciborium-ll feature "default"
+10ciborium-ll v0.2.2
+11half v2.7.1
+12rand_distr v0.5.1
+13rand v0.9.5 (*)
+13num-traits feature "libm"
+14num-traits v0.2.19 (*)
+12cfg-if feature "default" (*)
+12zerocopy feature "derive"
+13zerocopy v0.8.56 (*)
+13zerocopy feature "zerocopy-derive"
+14zerocopy v0.8.56 (*)
+12zerocopy feature "simd" (*)
+12num-traits feature "libm" (*)
+12rand feature "thread_rng"
+13rand v0.9.5 (*)
+13rand feature "os_rng" (*)
+13rand feature "std" (*)
+13rand feature "std_rng"
+14rand v0.9.5 (*)
+12bytemuck feature "derive"
+13bytemuck v1.25.2
+14bytemuck_derive feature "default"
+15bytemuck_derive v1.12.0 (proc-macro)
+16proc-macro2 feature "default" (*)
+16quote feature "default" (*)
+16syn feature "default" (*)
+13bytemuck feature "bytemuck_derive"
+14bytemuck v1.25.2 (*)
+12crunchy feature "default"
+13crunchy v0.2.4
+13crunchy feature "limit_128"
+14crunchy v0.2.4
+11ciborium-io feature "default" (*)
+8ciborium feature "std"
+9ciborium v0.2.2 (*)
+9serde feature "std" (*)
+9ciborium-io feature "std"
+10ciborium-io v0.2.2
+10ciborium-io feature "alloc" (*)
+7clap feature "std"
+8clap v4.6.6
+9clap_builder v4.6.6
+10anstyle feature "default"
+11anstyle v1.0.14
+11anstyle feature "std"
+12anstyle v1.0.14
+10clap_lex feature "default"
+11clap_lex v1.1.0
+8clap_builder feature "std"
+9clap_builder v4.6.6 (*)
+9anstyle feature "std" (*)
+7criterion-plot feature "default"
+8criterion-plot v0.5.0
+9cast feature "default" (*)
+9itertools feature "default"
+10itertools v0.10.5
+11either v1.18.0
+10itertools feature "use_std"
+11itertools v0.10.5 (*)
+11itertools feature "use_alloc"
+12itertools v0.10.5 (*)
+11either feature "use_std"
+12either v1.18.0
+12either feature "std"
+13either v1.18.0
+7itertools feature "default" (*)
+7is-terminal feature "default"
+8is-terminal v0.4.17
+9libc feature "default" (*)
+9windows-sys feature "Win32_Foundation" (*)
+9windows-sys feature "Win32_Storage_FileSystem" (*)
+9windows-sys feature "Win32_System_Console" (*)
+9windows-sys feature "default" (*)
+9hermit-abi feature "default"
+10hermit-abi v0.5.2
+7oorandom feature "default"
+8oorandom v11.1.5
+7plotters feature "area_series"
+8plotters v0.3.7
+9num-traits feature "default"
+10num-traits v0.2.19 (*)
+10num-traits feature "std" (*)
+9plotters-backend feature "default"
+10plotters-backend v0.3.7
+9plotters-svg feature "default"
+10plotters-svg v0.3.7
+11plotters-backend feature "default" (*)
+9wasm-bindgen feature "default"
+10wasm-bindgen v0.2.127
+11once_cell v1.21.4
+11cfg-if feature "default" (*)
+11wasm-bindgen-macro feature "default"
+12wasm-bindgen-macro v0.2.127 (proc-macro)
+13quote feature "default" (*)
+13wasm-bindgen-macro-support feature "default"
+14wasm-bindgen-macro-support v0.2.127
+15proc-macro2 feature "default" (*)
+15quote feature "default" (*)
+15syn feature "default" (*)
+15syn feature "extra-traits" (*)
+15syn feature "full" (*)
+15syn feature "visit"
+16syn v2.0.119 (*)
+15syn feature "visit-mut" (*)
+15bumpalo feature "default"
+16bumpalo v3.20.3
+15wasm-bindgen-shared feature "default"
+16wasm-bindgen-shared v0.2.127
+17unicode-ident feature "default" (*)
+11wasm-bindgen-shared feature "default" (*)
+11rustversion feature "default" (*)
+10wasm-bindgen feature "std"
+11wasm-bindgen v0.2.127 (*)
+9web-sys feature "CanvasRenderingContext2d"
+10web-sys v0.3.104
+11js-sys v0.3.104
+12wasm-bindgen v0.2.127 (*)
+12cfg-if feature "default" (*)
+12futures-util feature "std" (*)
+11wasm-bindgen v0.2.127 (*)
+9web-sys feature "Document"
+10web-sys v0.3.104 (*)
+10web-sys feature "EventTarget"
+11web-sys v0.3.104 (*)
+10web-sys feature "Node"
+11web-sys v0.3.104 (*)
+11web-sys feature "EventTarget" (*)
+9web-sys feature "DomRect"
+10web-sys v0.3.104 (*)
+10web-sys feature "DomRectReadOnly"
+11web-sys v0.3.104 (*)
+9web-sys feature "Element"
+10web-sys v0.3.104 (*)
+10web-sys feature "EventTarget" (*)
+10web-sys feature "Node" (*)
+9web-sys feature "HtmlCanvasElement"
+10web-sys v0.3.104 (*)
+10web-sys feature "Element" (*)
+10web-sys feature "EventTarget" (*)
+10web-sys feature "HtmlElement"
+11web-sys v0.3.104 (*)
+11web-sys feature "Element" (*)
+11web-sys feature "EventTarget" (*)
+11web-sys feature "Node" (*)
+10web-sys feature "Node" (*)
+9web-sys feature "HtmlElement" (*)
+9web-sys feature "Node" (*)
+9web-sys feature "Window"
+10web-sys v0.3.104 (*)
+10web-sys feature "EventTarget" (*)
+9web-sys feature "default"
+10web-sys v0.3.104 (*)
+10web-sys feature "std"
+11web-sys v0.3.104 (*)
+11wasm-bindgen feature "std" (*)
+11js-sys feature "std"
+12js-sys v0.3.104 (*)
+12wasm-bindgen feature "std" (*)
+7plotters feature "line_series"
+8plotters v0.3.7 (*)
+7plotters feature "svg_backend"
+8plotters v0.3.7 (*)
+8plotters feature "plotters-svg"
+9plotters v0.3.7 (*)
+7rayon feature "default"
+8rayon v1.12.0
+9either v1.18.0
+9rayon-core feature "default"
+10rayon-core v1.13.0
+11crossbeam-deque feature "default"
+12crossbeam-deque v0.8.7
+13crossbeam-epoch v0.9.20
+14crossbeam-utils v0.8.22
+13crossbeam-utils v0.8.22
+12crossbeam-deque feature "std"
+13crossbeam-deque v0.8.7 (*)
+13crossbeam-epoch feature "std"
+14crossbeam-epoch v0.9.20 (*)
+14crossbeam-epoch feature "alloc"
+15crossbeam-epoch v0.9.20 (*)
+14crossbeam-utils feature "std"
+15crossbeam-utils v0.8.22
+13crossbeam-utils feature "std" (*)
+11crossbeam-utils feature "default"
+12crossbeam-utils v0.8.22
+12crossbeam-utils feature "std" (*)
+7regex feature "std"
+8regex v1.13.1
+9aho-corasick v1.1.5 (*)
+9memchr v2.8.3
+9regex-syntax v0.8.11
+9regex-automata feature "alloc" (*)
+9regex-automata feature "meta"
+10regex-automata v0.4.18 (*)
+10regex-automata feature "nfa-pikevm"
+11regex-automata v0.4.18 (*)
+11regex-automata feature "nfa-thompson" (*)
+10regex-automata feature "syntax" (*)
+9regex-automata feature "nfa-pikevm" (*)
+9regex-automata feature "syntax" (*)
+8regex-syntax feature "std" (*)
+8memchr feature "std" (*)
+8aho-corasick feature "std" (*)
+8regex-automata feature "std" (*)
+7tinytemplate feature "default"
+8tinytemplate v1.2.1
+9serde feature "default" (*)
+9serde_json feature "default" (*)
+7walkdir feature "default"
+8walkdir v2.5.0
+9same-file feature "default"
+10same-file v1.0.6
+11winapi-util feature "default"
+12winapi-util v0.1.11
+13windows-sys feature "Win32_Foundation" (*)
+13windows-sys feature "Win32_Storage_FileSystem" (*)
+13windows-sys feature "Win32_System_Console" (*)
+13windows-sys feature "Win32_System_SystemInformation"
+14windows-sys v0.61.2 (*)
+14windows-sys feature "Win32_System" (*)
+13windows-sys feature "default" (*)
+9winapi-util feature "default" (*)
+6criterion feature "async"
+7criterion v0.5.1 (*)
+7criterion feature "futures"
+8criterion v0.5.1 (*)
+6criterion feature "tokio"
+7criterion v0.5.1 (*)
+5criterion feature "default"
+6criterion v0.5.1 (*)
+6criterion feature "cargo_bench_support"
+7criterion v0.5.1 (*)
+6criterion feature "plotters"
+7criterion v0.5.1 (*)
+6criterion feature "rayon"
+7criterion v0.5.1 (*)
+5loom feature "default" (*)
+3contextra-ports feature "default" (command-line) (*)
+3contextra-types feature "default" (command-line) (*)
+3contextra-wire feature "default" (command-line)
+4contextra-wire v0.1.0 (/app/crates/contextra-wire)
+5serde feature "default" (*)
+5serde feature "derive" (*)
+5serde feature "rc" (*)
+5bytes feature "default" (*)
+5serde_json feature "default" (*)
+5flatbuffers feature "default"
+6flatbuffers v24.12.23
+7bitflags feature "default"
+8bitflags v1.3.2
+7rustc_version feature "default"
+8rustc_version v0.4.1
+9semver feature "default"
+10semver v1.0.28
+10semver feature "std"
+11semver v1.0.28
+6flatbuffers feature "std"
+7flatbuffers v24.12.23 (*)
+3proptest feature "default" (*)
+3tokio feature "default" (*)
+3tokio feature "full" (*)
+3tokio feature "macros" (*)
+3tokio feature "rt" (*)
+1serde feature "default" (*)
+1serde feature "derive" (*)
+1serde feature "rc" (*)
+1contextra-ports feature "default" (command-line) (*)
+1contextra-types feature "default" (command-line) (*)
+1serde_json feature "default" (*)
+1thiserror feature "default" (*)
+1tokio feature "default" (*)
+1tokio feature "full" (*)
+1contextra-db feature "default" (command-line)
+2contextra-db v0.1.0 (/app/crates/contextra-db)
+3ahash feature "default" (*)
+3ahash feature "serde" (*)
+3serde feature "default" (*)
+3serde feature "derive" (*)
+3serde feature "rc" (*)
+3bytes feature "default" (*)
+3contextra-ports feature "default" (command-line) (*)
+3contextra-types feature "default" (command-line) (*)
+3blake3 feature "default" (*)
+3serde_json feature "default" (*)
+3thiserror feature "default" (*)
+3tokio feature "default" (*)
+3tokio feature "full" (*)
+3parking_lot feature "default" (*)
+3tracing feature "default" (*)
+3contextra-adapt feature "default" (command-line)
+4contextra-adapt v0.1.0 (/app/crates/contextra-adapt)
+5serde feature "default" (*)
+5serde feature "derive" (*)
+5serde feature "rc" (*)
+5contextra-ports feature "default" (command-line) (*)
+5contextra-types feature "default" (command-line) (*)
+5blake3 feature "default" (*)
+5serde_json feature "default" (*)
+5thiserror feature "default" (*)
+5tracing feature "default" (*)
+5proptest feature "default" (*)
+4contextra-adapt feature "bandit-routing"
+5contextra-adapt v0.1.0 (/app/crates/contextra-adapt) (*)
+4contextra-adapt feature "flow-corrected-thompson"
+5contextra-adapt v0.1.0 (/app/crates/contextra-adapt) (*)
+5contextra-adapt feature "bandit-routing" (*)
+3contextra-checkpoint feature "default" (command-line)
+4contextra-checkpoint v0.1.0 (/app/crates/contextra-checkpoint)
+5contextra-core feature "default" (command-line) (*)
+5serde feature "default" (*)
+5serde feature "derive" (*)
+5serde feature "rc" (*)
+5bytes feature "default" (*)
+5contextra-ports feature "default" (command-line) (*)
+5contextra-types feature "default" (command-line) (*)
+5blake3 feature "default" (*)
+5serde_json feature "default" (*)
+5tokio feature "default" (*)
+5tokio feature "full" (*)
+5parking_lot feature "default" (*)
+5tracing feature "default" (*)
+5futures-executor feature "default"
+6futures-executor v0.3.34 (*)
+6futures-executor feature "std"
+7futures-executor v0.3.34 (*)
+7futures-util feature "std" (*)
+7futures-core feature "std" (*)
+7futures-task feature "std" (*)
+5dirs feature "default"
+6dirs v6.0.0
+7dirs-sys feature "default"
+8dirs-sys v0.5.0
+9redox_users v0.5.2
+10getrandom feature "default" (*)
+10getrandom feature "std"
+11getrandom v0.2.17 (*)
+10thiserror feature "default" (*)
+10libredox feature "call"
+11libredox v0.1.21
+12libc feature "default" (*)
+11libredox feature "base"
+12libredox v0.1.21 (*)
+12libredox feature "libc"
+13libredox v0.1.21 (*)
+10libredox feature "std"
+11libredox v0.1.21 (*)
+11libredox feature "base" (*)
+9libc feature "default" (*)
+9windows-sys feature "Win32_Foundation" (*)
+9windows-sys feature "Win32_Globalization"
+10windows-sys v0.61.2 (*)
+10windows-sys feature "Win32" (*)
+9windows-sys feature "Win32_System_Com"
+10windows-sys v0.61.2 (*)
+10windows-sys feature "Win32_System" (*)
+9windows-sys feature "Win32_UI_Shell"
+10windows-sys v0.61.2 (*)
+10windows-sys feature "Win32_UI"
+11windows-sys v0.61.2 (*)
+11windows-sys feature "Win32" (*)
+9windows-sys feature "default" (*)
+9option-ext feature "default"
+10option-ext v0.2.0
+5proptest feature "default" (*)
+5tempfile feature "default" (*)
+5serde_json feature "default" (*)
+5contextra-testkit feature "default" (command-line) (*)
+5criterion feature "async_tokio" (*)
+5criterion feature "default" (*)
+5contextra-store feature "default" (command-line)
+6contextra-store v0.1.0 (/app/crates/contextra-store)
+7contextra-mvcc feature "default" (command-line) (*)
+7ahash feature "default" (*)
+7ahash feature "serde" (*)
+7serde feature "default" (*)
+7serde feature "derive" (*)
+7serde feature "rc" (*)
+7bytes feature "default" (*)
+7contextra-ports feature "default" (command-line) (*)
+7contextra-types feature "default" (command-line) (*)
+7blake3 feature "default" (*)
+7windows-sys feature "Win32_Foundation" (*)
+7windows-sys feature "Win32_Security" (*)
+7windows-sys feature "Win32_Security_Authorization"
+8windows-sys v0.61.2 (*)
+8windows-sys feature "Win32_Security" (*)
+7windows-sys feature "Win32_System_Threading" (*)
+7windows-sys feature "default" (*)
+7thiserror feature "default" (*)
+7tokio feature "default" (*)
+7tokio feature "full" (*)
+7parking_lot feature "default" (*)
+7tracing feature "default" (*)
+7contextra-crypto feature "default" (command-line)
+8contextra-crypto v0.1.0 (/app/crates/contextra-crypto)
+9ahash feature "default" (*)
+9ahash feature "serde" (*)
+9serde feature "default" (*)
+9serde feature "derive" (*)
+9serde feature "rc" (*)
+9contextra-ports feature "default" (command-line) (*)
+9contextra-types feature "default" (command-line) (*)
+9bincode feature "default" (*)
+9blake3 feature "default" (*)
+9serde_json feature "default" (*)
+9sha2 feature "default" (*)
+9subtle feature "default"
+10subtle v2.6.1
+10subtle feature "i128"
+11subtle v2.6.1
+10subtle feature "std"
+11subtle v2.6.1
+9thiserror feature "default" (*)
+9parking_lot feature "default" (*)
+9tracing feature "default" (*)
+9regex feature "default"
+10regex v1.13.1 (*)
+10regex-syntax feature "default" (*)
+10regex feature "perf"
+11regex v1.13.1 (*)
+11regex feature "perf-backtrack"
+12regex v1.13.1 (*)
+12regex-automata feature "nfa-backtrack"
+13regex-automata v0.4.18 (*)
+13regex-automata feature "nfa-thompson" (*)
+11regex feature "perf-cache"
+12regex v1.13.1 (*)
+11regex feature "perf-dfa"
+12regex v1.13.1 (*)
+12regex-automata feature "hybrid"
+13regex-automata v0.4.18 (*)
+13regex-automata feature "alloc" (*)
+13regex-automata feature "nfa-thompson" (*)
+11regex feature "perf-inline"
+12regex v1.13.1 (*)
+12regex-automata feature "perf-inline"
+13regex-automata v0.4.18 (*)
+11regex feature "perf-literal"
+12regex v1.13.1 (*)
+12regex-automata feature "perf-literal"
+13regex-automata v0.4.18 (*)
+13regex-automata feature "perf-literal-multisubstring"
+14regex-automata v0.4.18 (*)
+13regex-automata feature "perf-literal-substring"
+14regex-automata v0.4.18 (*)
+14aho-corasick feature "perf-literal"
+15aho-corasick v1.1.5 (*)
+11regex feature "perf-onepass"
+12regex v1.13.1 (*)
+12regex-automata feature "dfa-onepass"
+13regex-automata v0.4.18 (*)
+13regex-automata feature "nfa-thompson" (*)
+10regex feature "std" (*)
+10regex feature "unicode"
+11regex v1.13.1 (*)
+11regex-syntax feature "unicode" (*)
+11regex feature "unicode-age"
+12regex v1.13.1 (*)
+12regex-syntax feature "unicode-age" (*)
+12regex-automata feature "unicode-age"
+13regex-automata v0.4.18 (*)
+13regex-syntax feature "unicode-age" (*)
+11regex feature "unicode-bool"
+12regex v1.13.1 (*)
+12regex-syntax feature "unicode-bool" (*)
+12regex-automata feature "unicode-bool"
+13regex-automata v0.4.18 (*)
+13regex-syntax feature "unicode-bool" (*)
+11regex feature "unicode-case"
+12regex v1.13.1 (*)
+12regex-syntax feature "unicode-case" (*)
+12regex-automata feature "unicode-case"
+13regex-automata v0.4.18 (*)
+13regex-syntax feature "unicode-case" (*)
+11regex feature "unicode-gencat"
+12regex v1.13.1 (*)
+12regex-syntax feature "unicode-gencat" (*)
+12regex-automata feature "unicode-gencat"
+13regex-automata v0.4.18 (*)
+13regex-syntax feature "unicode-gencat" (*)
+11regex feature "unicode-perl"
+12regex v1.13.1 (*)
+12regex-syntax feature "unicode-perl" (*)
+12regex-automata feature "unicode-perl"
+13regex-automata v0.4.18 (*)
+13regex-syntax feature "unicode-perl" (*)
+12regex-automata feature "unicode-word-boundary"
+13regex-automata v0.4.18 (*)
+11regex feature "unicode-script"
+12regex v1.13.1 (*)
+12regex-syntax feature "unicode-script" (*)
+12regex-automata feature "unicode-script"
+13regex-automata v0.4.18 (*)
+13regex-syntax feature "unicode-script" (*)
+11regex feature "unicode-segment"
+12regex v1.13.1 (*)
+12regex-syntax feature "unicode-segment" (*)
+12regex-automata feature "unicode-segment"
+13regex-automata v0.4.18 (*)
+13regex-syntax feature "unicode-segment" (*)
+11regex-automata feature "unicode"
+12regex-automata v0.4.18 (*)
+12regex-syntax feature "unicode" (*)
+12regex-automata feature "unicode-age" (*)
+12regex-automata feature "unicode-bool" (*)
+12regex-automata feature "unicode-case" (*)
+12regex-automata feature "unicode-gencat" (*)
+12regex-automata feature "unicode-perl" (*)
+12regex-automata feature "unicode-script" (*)
+12regex-automata feature "unicode-segment" (*)
+12regex-automata feature "unicode-word-boundary" (*)
+9aes-gcm-siv feature "default"
+10aes-gcm-siv v0.11.1
+11aead v0.5.2
+12generic-array v0.14.7 (*)
+12crypto-common feature "default" (*)
+11polyval v0.6.2
+12universal-hash v0.5.1
+13subtle v2.6.1
+13crypto-common feature "default" (*)
+12cfg-if feature "default" (*)
+12cpufeatures feature "default" (*)
+12opaque-debug feature "default"
+13opaque-debug v0.3.1
+11subtle v2.6.1
+11zeroize v1.9.0
+12zeroize_derive feature "default"
+13zeroize_derive v1.5.0 (proc-macro)
+14proc-macro2 feature "default" (*)
+14quote feature "default" (*)
+14syn feature "default" (*)
+14syn feature "extra-traits" (*)
+14syn feature "full" (*)
+14syn feature "visit" (*)
+11aes feature "default"
+12aes v0.8.4
+13cfg-if feature "default" (*)
+13cpufeatures feature "default" (*)
+13cipher feature "default"
+14cipher v0.4.4
+15crypto-common feature "default" (*)
+15inout feature "default"
+16inout v0.1.4
+17generic-array feature "default" (*)
+11cipher feature "default" (*)
+11ctr feature "default"
+12ctr v0.9.2
+13cipher feature "default" (*)
+10aes-gcm-siv feature "aes"
+11aes-gcm-siv v0.11.1 (*)
+10aes-gcm-siv feature "alloc"
+11aes-gcm-siv v0.11.1 (*)
+11aead feature "alloc"
+12aead v0.5.2 (*)
+10aes-gcm-siv feature "getrandom"
+11aes-gcm-siv v0.11.1 (*)
+11aead feature "getrandom"
+12aead v0.5.2 (*)
+12crypto-common feature "getrandom"
+13crypto-common v0.1.7 (*)
+13crypto-common feature "rand_core"
+14crypto-common v0.1.7 (*)
+13rand_core feature "getrandom"
+14rand_core v0.6.4 (*)
+12aead feature "rand_core"
+13aead v0.5.2 (*)
+13crypto-common feature "rand_core" (*)
+9zeroize feature "default"
+10zeroize v1.9.0 (*)
+10zeroize feature "alloc"
+11zeroize v1.9.0 (*)
+9zeroize feature "zeroize_derive"
+10zeroize v1.9.0 (*)
+9argon2 feature "alloc"
+10argon2 v0.5.3
+11blake2 v0.10.6
+12digest feature "default" (*)
+12digest feature "mac"
+13digest v0.10.7 (*)
+13digest feature "subtle"
+14digest v0.10.7 (*)
+11cpufeatures feature "default" (*)
+11base64ct feature "default"
+12base64ct v1.8.3
+11password-hash feature "default"
+12password-hash v0.5.0
+13rand_core v0.6.4 (*)
+13subtle v2.6.1
+13base64ct feature "default" (*)
+12password-hash feature "rand_core"
+13password-hash v0.5.0 (*)
+10argon2 feature "password-hash"
+11argon2 v0.5.3 (*)
+10password-hash feature "alloc"
+11password-hash v0.5.0 (*)
+11base64ct feature "alloc"
+12base64ct v1.8.3
+9ed25519-dalek feature "default"
+10ed25519-dalek v2.2.0
+11ed25519 v2.2.3
+12signature v2.2.0
+11rand_core v0.6.4 (*)
+11sha2 v0.10.9 (*)
+11subtle v2.6.1
+11zeroize v1.9.0 (*)
+11curve25519-dalek feature "digest"
+12curve25519-dalek v4.1.3
+13digest v0.10.7 (*)
+13fiat-crypto v0.2.9
+13subtle v2.6.1
+13zeroize v1.9.0 (*)
+13cfg-if feature "default" (*)
+13cpufeatures feature "default" (*)
+13curve25519-dalek-derive feature "default"
+14curve25519-dalek-derive v0.1.1 (proc-macro)
+15proc-macro2 feature "default" (*)
+15quote feature "default" (*)
+15syn feature "default" (*)
+15syn feature "full" (*)
+13rustc_version feature "default" (*)
+10ed25519-dalek feature "fast"
+11ed25519-dalek v2.2.0 (*)
+11curve25519-dalek feature "precomputed-tables"
+12curve25519-dalek v4.1.3 (*)
+10ed25519-dalek feature "std"
+11ed25519-dalek v2.2.0 (*)
+11sha2 feature "std" (*)
+11ed25519-dalek feature "alloc"
+12ed25519-dalek v2.2.0 (*)
+12zeroize feature "alloc" (*)
+12ed25519-dalek feature "zeroize"
+13ed25519-dalek v2.2.0 (*)
+12curve25519-dalek feature "alloc"
+13curve25519-dalek v4.1.3 (*)
+13zeroize feature "alloc" (*)
+12ed25519 feature "alloc"
+13ed25519 v2.2.3 (*)
+11ed25519 feature "std"
+12ed25519 v2.2.3 (*)
+12signature feature "std"
+13signature v2.2.0
+13signature feature "alloc"
+14signature v2.2.0
+10ed25519-dalek feature "zeroize" (*)
+9ed25519-dalek feature "rand_core"
+10ed25519-dalek v2.2.0 (*)
+9hkdf feature "default"
+10hkdf v0.12.4
+11hmac feature "default"
+12hmac v0.12.1
+13digest feature "default" (*)
+13digest feature "mac" (*)
+9hmac feature "default" (*)
+9lru feature "default"
+10lru v0.16.4
+11hashbrown feature "default"
+12hashbrown v0.16.1
+13equivalent v1.0.2
+13foldhash v0.2.0
+13serde v1.0.229 (*)
+13serde_core v1.0.229 (*)
+13allocator-api2 feature "alloc"
+14allocator-api2 v0.2.21
+12hashbrown feature "allocator-api2"
+13hashbrown v0.16.1 (*)
+12hashbrown feature "default-hasher"
+13hashbrown v0.16.1 (*)
+12hashbrown feature "equivalent"
+13hashbrown v0.16.1 (*)
+12hashbrown feature "inline-more"
+13hashbrown v0.16.1 (*)
+12hashbrown feature "raw-entry"
+13hashbrown v0.16.1 (*)
+10lru feature "hashbrown"
+11lru v0.16.4 (*)
+9rand feature "default"
+10rand v0.8.8
+11libc v0.2.189
+11rand_chacha v0.3.1
+12ppv-lite86 feature "simd" (*)
+12rand_core feature "default" (*)
+11rand_core feature "default" (*)
+10rand feature "std"
+11rand v0.8.8 (*)
+11rand_core feature "std"
+12rand_core v0.6.4 (*)
+12rand_core feature "alloc"
+13rand_core v0.6.4 (*)
+12rand_core feature "getrandom" (*)
+12getrandom feature "std" (*)
+11rand feature "alloc"
+12rand v0.8.8 (*)
+12rand_core feature "alloc" (*)
+11rand feature "getrandom"
+12rand v0.8.8 (*)
+12rand_core feature "getrandom" (*)
+11rand feature "libc"
+12rand v0.8.8 (*)
+11rand feature "rand_chacha"
+12rand v0.8.8 (*)
+11rand_chacha feature "std"
+12rand_chacha v0.3.1 (*)
+12ppv-lite86 feature "std" (*)
+10rand feature "std_rng"
+11rand v0.8.8 (*)
+11rand feature "rand_chacha" (*)
+9proptest feature "default" (*)
+9tempfile feature "default" (*)
+9tokio feature "default" (*)
+9tokio feature "full" (*)
+9tokio feature "test-util"
+10tokio v1.53.1 (*)
+10tokio feature "rt" (*)
+10tokio feature "sync" (*)
+10tokio feature "time" (*)
+9criterion feature "async_tokio" (*)
+9criterion feature "default" (*)
+9loom feature "default" (*)
+9contextra-crypto feature "default" (command-line) (*)
+9contextra-crypto feature "test-utils"
+10contextra-crypto v0.1.0 (/app/crates/contextra-crypto) (*)
+7lru feature "default" (*)
+7rand feature "default" (*)
+7crc32fast feature "default"
+8crc32fast v1.5.1
+9cfg-if feature "default" (*)
+8crc32fast feature "std"
+9crc32fast v1.5.1 (*)
+7contextra-sys feature "default" (command-line)
+8contextra-sys v0.1.0 (/app/crates/contextra-sys)
+9libc feature "default" (*)
+9windows-sys feature "Win32_Foundation" (*)
+9windows-sys feature "Win32_Security" (*)
+9windows-sys feature "Win32_Security_Authorization" (*)
+9windows-sys feature "Win32_Storage_FileSystem" (*)
+9windows-sys feature "Win32_System_Memory"
+10windows-sys v0.61.2 (*)
+10windows-sys feature "Win32_System" (*)
+9windows-sys feature "Win32_System_Threading" (*)
+9windows-sys feature "default" (*)
+9tracing feature "default" (*)
+9memmap2 feature "default"
+10memmap2 v0.9.11
+11libc feature "default" (*)
+11stable_deref_trait feature "default"
+12stable_deref_trait v1.2.1
+12stable_deref_trait feature "std"
+13stable_deref_trait v1.2.1
+13stable_deref_trait feature "alloc"
+14stable_deref_trait v1.2.1
+7memmap2 feature "default" (*)
+7tokio-util feature "default"
+8tokio-util v0.7.19
+9libc feature "default" (*)
+9bytes feature "default" (*)
+9futures-util feature "default" (*)
+9futures-core feature "default"
+10futures-core v0.3.34
+10futures-core feature "std" (*)
+9futures-sink feature "default"
+10futures-sink v0.3.34
+10futures-sink feature "std"
+11futures-sink v0.3.34
+11futures-sink feature "alloc"
+12futures-sink v0.3.34
+9pin-project-lite feature "default" (*)
+9tokio feature "default" (*)
+9tokio feature "sync" (*)
+7tokio-util feature "rt"
+8tokio-util v0.7.19 (*)
+8tokio feature "rt" (*)
+8tokio feature "sync" (*)
+8tokio-util feature "futures-util"
+9tokio-util v0.7.19 (*)
+7uuid feature "default"
+8uuid v1.26.0
+9getrandom feature "default"
+10getrandom v0.4.3 (*)
+8uuid feature "std"
+9uuid v1.26.0 (*)
+7uuid feature "v4"
+8uuid v1.26.0 (*)
+8uuid feature "rng"
+9uuid v1.26.0 (*)
+7libc feature "default" (*)
+7proptest feature "default" (*)
+7tempfile feature "default" (*)
+7serde_json feature "default" (*)
+7tokio feature "default" (*)
+7tokio feature "full" (*)
+7tokio feature "test-util" (*)
+7contextra-testkit feature "default" (command-line) (*)
+7criterion feature "async_tokio" (*)
+7criterion feature "default" (*)
+7futures feature "default"
+8futures v0.3.34 (*)
+8futures feature "async-await"
+9futures v0.3.34 (*)
+9futures-util feature "async-await" (*)
+9futures-util feature "async-await-macro" (*)
+8futures feature "executor"
+9futures v0.3.34 (*)
+9futures feature "futures-executor"
+10futures v0.3.34 (*)
+9futures feature "std"
+10futures v0.3.34 (*)
+10futures-util feature "channel"
+11futures-util v0.3.34 (*)
+11futures-util feature "futures-channel"
+12futures-util v0.3.34 (*)
+11futures-util feature "std" (*)
+10futures-util feature "io"
+11futures-util v0.3.34 (*)
+11futures-util feature "futures-io"
+12futures-util v0.3.34 (*)
+11futures-util feature "memchr"
+12futures-util v0.3.34 (*)
+11futures-util feature "std" (*)
+10futures-util feature "std" (*)
+10futures-core feature "std" (*)
+10futures-sink feature "std" (*)
+10futures-io feature "std" (*)
+10futures-task feature "std" (*)
+10futures feature "alloc"
+11futures v0.3.34 (*)
+11futures-util feature "alloc" (*)
+11futures-channel feature "alloc" (*)
+11futures-core feature "alloc" (*)
+11futures-sink feature "alloc" (*)
+11futures-task feature "alloc" (*)
+9futures-executor feature "std" (*)
+8futures feature "std" (*)
+7loom feature "default" (*)
+7contextra-store feature "default" (command-line) (*)
+7contextra-store feature "test-hooks"
+8contextra-store v0.1.0 (/app/crates/contextra-store) (*)
+7contextra-graph feature "default" (command-line)
+8contextra-graph v0.1.0 (/app/crates/contextra-graph)
+9ahash feature "default" (*)
+9ahash feature "serde" (*)
+9serde feature "default" (*)
+9serde feature "derive" (*)
+9serde feature "rc" (*)
+9contextra-ports feature "default" (command-line) (*)
+9contextra-types feature "default" (command-line) (*)
+9bincode feature "default" (*)
+9blake3 feature "default" (*)
+9serde_json feature "default" (*)
+9thiserror feature "default" (*)
+9parking_lot feature "default" (*)
+9tracing feature "default" (*)
+9contextra-adapt feature "default" (command-line) (*)
+9arc-swap feature "default"
+10arc-swap v1.9.2
+11rustversion feature "default" (*)
+9scc feature "default"
+10scc v2.4.0
+11sdd feature "default"
+12sdd v3.0.10
+9proptest feature "default" (*)
+9tempfile feature "default" (*)
+9tokio feature "default" (*)
+9tokio feature "full" (*)
+9tokio feature "test-util" (*)
+9contextra-testkit feature "default" (command-line) (*)
+9criterion feature "async_tokio" (*)
+9criterion feature "default" (*)
+9futures feature "default" (*)
+9tracing-subscriber feature "default" (*)
+9tracing-subscriber feature "env-filter" (*)
+9contextra-store feature "default" (command-line) (*)
+7contextra-sandbox feature "default" (command-line)
+8contextra-sandbox v0.1.0 (/app/crates/contextra-sandbox)
+9thiserror feature "default" (*)
+9tokio feature "default" (*)
+9tokio feature "full" (*)
+9tracing feature "default" (*)
+9zeroize feature "default" (*)
+9zeroize feature "zeroize_derive" (*)
+9anyhow feature "default"
+10anyhow v1.0.104
+10anyhow feature "std"
+11anyhow v1.0.104
+9wasmtime feature "async"
+10wasmtime v25.0.3
+11anyhow v1.0.104
+11hashbrown v0.14.5
+12ahash v0.8.12 (*)
+12serde v1.0.229 (*)
+11indexmap v2.14.1
+12equivalent v1.0.2
+12hashbrown v0.17.1
+12serde v1.0.229 (*)
+12serde_core v1.0.229 (*)
+11log v0.4.34
+11once_cell v1.21.4
+11wasmparser v0.217.1
+12ahash v0.8.12 (*)
+12indexmap v2.14.1 (*)
+12semver v1.0.28
+13serde v1.0.229 (*)
+13serde_core v1.0.229 (*)
+12serde feature "alloc" (*)
+12bitflags feature "default" (*)
+12hashbrown feature "ahash"
+13hashbrown v0.14.5 (*)
+11cfg-if feature "default" (*)
+11libc feature "default" (*)
+11serde feature "alloc" (*)
+11serde_derive feature "default" (*)
+11bitflags feature "default" (*)
+11libm feature "default" (*)
+11smallvec feature "default" (*)
+11smallvec feature "union"
+12smallvec v1.15.2 (*)
+11bumpalo feature "default" (*)
+11async-trait feature "default"
+12async-trait v0.1.92 (proc-macro)
+13proc-macro2 feature "default" (*)
+13quote feature "default" (*)
+13syn feature "clone-impls" (*)
+13syn feature "full" (*)
+13syn feature "parsing" (*)
+13syn feature "printing" (*)
+13syn feature "proc-macro" (*)
+13syn feature "visit-mut"
+14syn v3.0.4 (*)
+11mach2 feature "default"
+12mach2 v0.4.3
+13libc v0.2.189
+11memfd feature "default"
+12memfd v0.6.6
+13rustix feature "default" (*)
+13rustix feature "fs" (*)
+11object feature "elf"
+12object v0.36.7
+13crc32fast v1.5.1 (*)
+13indexmap v2.14.1 (*)
+13memchr v2.8.3
+13hashbrown feature "default-hasher"
+14hashbrown v0.15.5
+15foldhash v0.1.5
+11object feature "read_core"
+12object v0.36.7 (*)
+11paste feature "default"
+12paste v1.0.15 (proc-macro)
+11postcard feature "alloc"
+12postcard v1.1.3
+13cobs v0.3.0
+14thiserror v2.0.20 (*)
+13serde feature "derive" (*)
+12serde feature "alloc" (*)
+11psm feature "default"
+12psm v0.1.32
+13cc feature "default" (*)
+13ar_archive_writer feature "default"
+14ar_archive_writer v0.5.3
+15object feature "read"
+16object v0.39.1
+17memchr v2.8.3
+16object feature "archive"
+17object v0.39.1 (*)
+16object feature "coff"
+17object v0.39.1 (*)
+16object feature "elf"
+17object v0.39.1 (*)
+16object feature "macho"
+17object v0.39.1 (*)
+16object feature "pe"
+17object v0.39.1 (*)
+17object feature "coff" (*)
+16object feature "read_core"
+17object v0.39.1 (*)
+16object feature "xcoff"
+17object v0.39.1 (*)
+15object feature "std"
+16object v0.39.1 (*)
+16memchr feature "std"
+17memchr v2.8.3
+17memchr feature "alloc"
+18memchr v2.8.3
+11rustix feature "default"
+12rustix v0.38.44
+13bitflags v2.13.1
+13errno v0.3.14 (*)
+13libc v0.2.189
+13linux-raw-sys feature "elf"
+14linux-raw-sys v0.4.15
+13linux-raw-sys feature "errno"
+14linux-raw-sys v0.4.15
+13linux-raw-sys feature "general"
+14linux-raw-sys v0.4.15
+13linux-raw-sys feature "ioctl"
+14linux-raw-sys v0.4.15
+13linux-raw-sys feature "no_std"
+14linux-raw-sys v0.4.15
+13windows-sys feature "Win32_Foundation"
+14windows-sys v0.59.0
+15windows-targets feature "default"
+16windows-targets v0.52.6
+17windows_aarch64_gnullvm feature "default"
+18windows_aarch64_gnullvm v0.52.6
+17windows_aarch64_msvc feature "default"
+18windows_aarch64_msvc v0.52.6
+17windows_i686_gnu feature "default"
+18windows_i686_gnu v0.52.6
+17windows_i686_gnullvm feature "default"
+18windows_i686_gnullvm v0.52.6
+17windows_i686_msvc feature "default"
+18windows_i686_msvc v0.52.6
+17windows_x86_64_gnu feature "default"
+18windows_x86_64_gnu v0.52.6
+17windows_x86_64_gnullvm feature "default"
+18windows_x86_64_gnullvm v0.52.6
+17windows_x86_64_msvc feature "default"
+18windows_x86_64_msvc v0.52.6
+14windows-sys feature "Win32"
+15windows-sys v0.59.0 (*)
+15windows-sys feature "Win32_Foundation" (*)
+13windows-sys feature "Win32_NetworkManagement_IpHelper"
+14windows-sys v0.59.0 (*)
+14windows-sys feature "Win32_NetworkManagement"
+15windows-sys v0.59.0 (*)
+15windows-sys feature "Win32" (*)
+13windows-sys feature "Win32_Networking_WinSock"
+14windows-sys v0.59.0 (*)
+14windows-sys feature "Win32_Networking"
+15windows-sys v0.59.0 (*)
+15windows-sys feature "Win32" (*)
+13windows-sys feature "Win32_System_Threading"
+14windows-sys v0.59.0 (*)
+14windows-sys feature "Win32_System"
+15windows-sys v0.59.0 (*)
+15windows-sys feature "Win32" (*)
+13windows-sys feature "default"
+14windows-sys v0.59.0 (*)
+12rustix feature "std"
+13rustix v0.38.44 (*)
+13libc feature "std" (*)
+13bitflags feature "std" (*)
+13errno feature "std" (*)
+13rustix feature "alloc"
+14rustix v0.38.44 (*)
+13rustix feature "libc-extra-traits"
+14rustix v0.38.44 (*)
+14libc feature "extra_traits"
+15libc v0.2.189
+12rustix feature "use-libc-auxv"
+13rustix v0.38.44 (*)
+11sptr feature "default"
+12sptr v0.3.2
+11target-lexicon feature "default"
+12target-lexicon v0.12.16
+11wasmtime-asm-macros feature "default"
+12wasmtime-asm-macros v25.0.3
+13cfg-if feature "default" (*)
+11wasmtime-cranelift feature "default"
+12wasmtime-cranelift v25.0.3
+13anyhow v1.0.104
+13log v0.4.34
+13wasmparser v0.217.1 (*)
+13cfg-if feature "default" (*)
+13smallvec feature "default" (*)
+13smallvec feature "union" (*)
+13object feature "elf" (*)
+13object feature "read_core" (*)
+13object feature "std"
+14object v0.36.7 (*)
+14memchr feature "std" (*)
+13object feature "write"
+14object v0.36.7 (*)
+14object feature "coff"
+15object v0.36.7 (*)
+14object feature "elf" (*)
+14object feature "macho"
+15object v0.36.7 (*)
+14object feature "pe"
+15object v0.36.7 (*)
+15object feature "coff" (*)
+14object feature "write_std"
+15object v0.36.7 (*)
+15indexmap feature "std"
+16indexmap v2.14.1 (*)
+15object feature "std" (*)
+15object feature "write_core"
+16object v0.36.7 (*)
+15crc32fast feature "std" (*)
+14object feature "xcoff"
+15object v0.36.7 (*)
+13target-lexicon feature "default" (*)
+13cranelift-codegen feature "host-arch"
+14cranelift-codegen v0.112.3
+15log v0.4.34
+15smallvec feature "default" (*)
+15smallvec feature "union" (*)
+15bumpalo feature "default" (*)
+15hashbrown feature "raw"
+16hashbrown v0.14.5 (*)
+15target-lexicon feature "default" (*)
+15cranelift-bforest feature "default"
+16cranelift-bforest v0.112.3
+17cranelift-entity feature "default"
+18cranelift-entity v0.112.3
+19serde feature "alloc" (*)
+19serde_derive feature "default" (*)
+19cranelift-bitset feature "default"
+20cranelift-bitset v0.112.3
+21serde feature "alloc" (*)
+21serde_derive feature "default" (*)
+15cranelift-entity feature "default" (*)
+15cranelift-bitset feature "default" (*)
+15cranelift-codegen-shared feature "default"
+16cranelift-codegen-shared v0.112.3
+15cranelift-control feature "default"
+16cranelift-control v0.112.3
+17arbitrary feature "default"
+18arbitrary v1.4.2
+16cranelift-control feature "fuzz"
+17cranelift-control v0.112.3 (*)
+15gimli feature "read"
+16gimli v0.29.0
+17indexmap feature "default"
+18indexmap v2.14.1 (*)
+18indexmap feature "std" (*)
+16gimli feature "read-core"
+17gimli v0.29.0 (*)
+15gimli feature "std"
+16gimli v0.29.0 (*)
+15gimli feature "write"
+16gimli v0.29.0 (*)
+15regalloc2 feature "checker"
+16regalloc2 v0.10.2
+17log v0.4.34
+17rustc-hash v2.1.3
+17slice-group-by v0.3.1
+17smallvec feature "default" (*)
+17smallvec feature "union" (*)
+17hashbrown feature "ahash" (*)
+15regalloc2 feature "default"
+16regalloc2 v0.10.2 (*)
+16regalloc2 feature "std"
+17regalloc2 v0.10.2 (*)
+15rustc-hash feature "default"
+16rustc-hash v2.1.3
+16rustc-hash feature "std"
+17rustc-hash v2.1.3
+15cranelift-codegen-meta feature "default"
+16cranelift-codegen-meta v0.112.3
+17cranelift-codegen-shared feature "default" (*)
+15cranelift-isle feature "default"
+16cranelift-isle v0.112.3
+13cranelift-codegen feature "std"
+14cranelift-codegen v0.112.3 (*)
+13cranelift-codegen feature "unwind"
+14cranelift-codegen v0.112.3 (*)
+14cranelift-codegen feature "gimli"
+15cranelift-codegen v0.112.3 (*)
+13cranelift-entity feature "default" (*)
+13cranelift-control feature "default" (*)
+13gimli feature "read" (*)
+13gimli feature "std" (*)
+13cranelift-frontend feature "default"
+14cranelift-frontend v0.112.3
+15log v0.4.34
+15smallvec feature "default" (*)
+15smallvec feature "union" (*)
+15target-lexicon feature "default" (*)
+15cranelift-codegen feature "std" (*)
+15cranelift-codegen feature "unwind" (*)
+14cranelift-frontend feature "std"
+15cranelift-frontend v0.112.3 (*)
+15cranelift-codegen feature "std" (*)
+13cranelift-native feature "default"
+14cranelift-native v0.112.3
+15libc feature "default" (*)
+15target-lexicon feature "default" (*)
+15cranelift-codegen feature "std" (*)
+15cranelift-codegen feature "unwind" (*)
+14cranelift-native feature "std"
+15cranelift-native v0.112.3 (*)
+15cranelift-codegen feature "std" (*)
+13cranelift-wasm feature "default"
+14cranelift-wasm v0.112.3
+15log v0.4.34
+15smallvec feature "default" (*)
+15smallvec feature "union" (*)
+15wasmparser feature "validate"
+16wasmparser v0.217.1 (*)
+15cranelift-codegen feature "std" (*)
+15cranelift-codegen feature "unwind" (*)
+15cranelift-entity feature "default" (*)
+15cranelift-frontend feature "default" (*)
+15itertools feature "default"
+16itertools v0.12.1
+17either v1.18.0
+16itertools feature "use_std"
+17itertools v0.12.1 (*)
+17either feature "use_std" (*)
+17itertools feature "use_alloc"
+18itertools v0.12.1 (*)
+15wasmtime-types feature "default"
+16wasmtime-types v25.0.3
+17anyhow v1.0.104
+17serde feature "alloc" (*)
+17serde_derive feature "default" (*)
+17smallvec feature "default" (*)
+17smallvec feature "serde"
+18smallvec v1.15.2 (*)
+17smallvec feature "union" (*)
+17wasmparser feature "validate" (*)
+17cranelift-entity feature "default" (*)
+17cranelift-entity feature "enable-serde"
+18cranelift-entity v0.112.3 (*)
+18cranelift-entity feature "serde"
+19cranelift-entity v0.112.3 (*)
+18cranelift-entity feature "serde_derive"
+19cranelift-entity v0.112.3 (*)
+18cranelift-bitset feature "enable-serde"
+19cranelift-bitset v0.112.3 (*)
+14cranelift-wasm feature "std"
+15cranelift-wasm v0.112.3 (*)
+15cranelift-codegen feature "std" (*)
+15cranelift-frontend feature "std" (*)
+13thiserror feature "default"
+14thiserror v1.0.69
+15thiserror-impl feature "default"
+16thiserror-impl v1.0.69 (proc-macro)
+17proc-macro2 feature "default" (*)
+17quote feature "default" (*)
+17syn feature "default" (*)
+13wasmtime-environ feature "compile"
+14wasmtime-environ v25.0.3
+15anyhow v1.0.104
+15log v0.4.34
+15serde feature "alloc" (*)
+15serde_derive feature "default" (*)
+15indexmap feature "serde"
+16indexmap v2.14.1 (*)
+15object feature "elf" (*)
+15object feature "read_core" (*)
+15postcard feature "alloc" (*)
+15target-lexicon feature "default" (*)
+15wasmparser feature "features"
+16wasmparser v0.217.1 (*)
+15wasmparser feature "serde"
+16wasmparser v0.217.1 (*)
+16hashbrown feature "serde"
+17hashbrown v0.14.5 (*)
+16indexmap feature "serde" (*)
+16wasmparser feature "hashbrown"
+17wasmparser v0.217.1 (*)
+16wasmparser feature "indexmap"
+17wasmparser v0.217.1 (*)
+15wasmparser feature "validate" (*)
+15cranelift-entity feature "default" (*)
+15cranelift-bitset feature "default" (*)
+15cranelift-bitset feature "enable-serde" (*)
+15gimli feature "read" (*)
+15wasmtime-types feature "default" (*)
+15wasm-encoder feature "default"
+16wasm-encoder v0.217.1
+17leb128 feature "default"
+18leb128 v0.2.7
+15wasmprinter feature "default"
+16wasmprinter v0.217.1
+17anyhow feature "default" (*)
+17wasmparser feature "std"
+18wasmparser v0.217.1 (*)
+18indexmap feature "std" (*)
+18wasmparser feature "indexmap" (*)
+17termcolor feature "default"
+18termcolor v1.4.1
+19winapi-util feature "default" (*)
+14object feature "write_core" (*)
+14gimli feature "write" (*)
+14wasmtime-environ feature "std"
+15wasmtime-environ v25.0.3 (*)
+15anyhow feature "std" (*)
+15indexmap feature "std" (*)
+15object feature "std" (*)
+15wasmparser feature "std" (*)
+15wasmtime-types feature "std"
+16wasmtime-types v25.0.3 (*)
+16wasmparser feature "std" (*)
+13wasmtime-environ feature "default"
+14wasmtime-environ v25.0.3 (*)
+13wasmtime-versioned-export-macros feature "default"
+14wasmtime-versioned-export-macros v25.0.3 (proc-macro)
+15proc-macro2 feature "default" (*)
+15quote feature "default" (*)
+15syn feature "default" (*)
+15syn feature "full" (*)
+11wasmtime-environ feature "default" (*)
+11wasmtime-versioned-export-macros feature "default" (*)
+11wasmtime-fiber feature "default"
+12wasmtime-fiber v25.0.3
+13anyhow v1.0.104
+13cfg-if feature "default" (*)
+13rustix feature "default" (*)
+13rustix feature "mm"
+14rustix v0.38.44 (*)
+13rustix feature "param"
+14rustix v0.38.44 (*)
+14rustix feature "fs"
+15rustix v0.38.44 (*)
+13wasmtime-asm-macros feature "default" (*)
+13wasmtime-versioned-export-macros feature "default" (*)
+13windows-sys feature "Win32_Foundation"
+14windows-sys v0.52.0
+15windows-targets feature "default" (*)
+14windows-sys feature "Win32"
+15windows-sys v0.52.0 (*)
+13windows-sys feature "Win32_System_Threading"
+14windows-sys v0.52.0 (*)
+14windows-sys feature "Win32_System"
+15windows-sys v0.52.0 (*)
+15windows-sys feature "Win32" (*)
+13windows-sys feature "default"
+14windows-sys v0.52.0 (*)
+13cc feature "default" (*)
+13wasmtime-versioned-export-macros feature "default" (*)
+11windows-sys feature "Win32_Foundation" (*)
+11windows-sys feature "Win32_Security"
+12windows-sys v0.52.0 (*)
+12windows-sys feature "Win32" (*)
+11windows-sys feature "Win32_Storage_FileSystem"
+12windows-sys v0.52.0 (*)
+12windows-sys feature "Win32_Storage"
+13windows-sys v0.52.0 (*)
+13windows-sys feature "Win32" (*)
+11windows-sys feature "Win32_System_Diagnostics_Debug"
+12windows-sys v0.52.0 (*)
+12windows-sys feature "Win32_System_Diagnostics"
+13windows-sys v0.52.0 (*)
+13windows-sys feature "Win32_System" (*)
+11windows-sys feature "Win32_System_Kernel"
+12windows-sys v0.52.0 (*)
+12windows-sys feature "Win32_System" (*)
+11windows-sys feature "Win32_System_Memory"
+12windows-sys v0.52.0 (*)
+12windows-sys feature "Win32_System" (*)
+11windows-sys feature "Win32_System_SystemInformation"
+12windows-sys v0.52.0 (*)
+12windows-sys feature "Win32_System" (*)
+11windows-sys feature "default" (*)
+11wasmtime-jit-icache-coherence feature "default"
+12wasmtime-jit-icache-coherence v25.0.3
+13anyhow v1.0.104
+13cfg-if feature "default" (*)
+13libc feature "default" (*)
+13windows-sys feature "Win32_Foundation" (*)
+13windows-sys feature "Win32_System_Diagnostics_Debug" (*)
+13windows-sys feature "Win32_System_Threading" (*)
+13windows-sys feature "default" (*)
+11wasmtime-slab feature "default"
+12wasmtime-slab v25.0.3
+11cc feature "default" (*)
+11wasmtime-versioned-export-macros feature "default" (*)
+10wasmtime feature "runtime"
+11wasmtime v25.0.3 (*)
+11wasmtime feature "rustix"
+12wasmtime v25.0.3 (*)
+11rustix feature "mm" (*)
+10wasmtime feature "std"
+11wasmtime v25.0.3 (*)
+11once_cell feature "std" (*)
+11object feature "std" (*)
+11postcard feature "use-std"
+12postcard v1.1.3 (*)
+12serde feature "std" (*)
+12postcard feature "alloc" (*)
+11wasmtime-environ feature "std" (*)
+9wasmtime feature "cranelift"
+10wasmtime v25.0.3 (*)
+10wasmtime feature "std" (*)
+9tokio feature "default" (*)
+9tokio feature "full" (*)
+9tokio feature "test-util" (*)
+9wat feature "default"
+10wat v1.259.0
+11wast feature "wasm-module"
+12wast v259.0.0
+13leb128fmt v0.1.0
+13memchr feature "default" (*)
+13bumpalo feature "default" (*)
+13unicode-width feature "default"
+14unicode-width v0.2.2
+14unicode-width feature "cjk"
+15unicode-width v0.2.2
+13wasm-encoder feature "std"
+14wasm-encoder v0.259.0
+15leb128fmt v0.1.0
+10wat feature "component-model"
+11wat v1.259.0 (*)
+11wast feature "component-model"
+12wast v259.0.0 (*)
+12wast feature "wasm-module" (*)
+12wasm-encoder feature "component-model"
+13wasm-encoder v0.259.0 (*)
+7contextra-vector feature "default" (command-line)
+8contextra-vector v0.1.0 (/app/crates/contextra-vector)
+9contextra-core feature "default" (command-line) (*)
+9ahash feature "default" (*)
+9ahash feature "serde" (*)
+9serde feature "default" (*)
+9serde feature "derive" (*)
+9serde feature "rc" (*)
+9contextra-ports feature "default" (command-line) (*)
+9contextra-types feature "default" (command-line) (*)
+9subtle feature "default" (*)
+9parking_lot feature "default" (*)
+9tracing feature "default" (*)
+9contextra-crypto feature "default" (command-line) (*)
+9rand feature "default" (*)
+9contextra-sys feature "default" (command-line) (*)
+9memmap2 feature "default" (*)
+9contextra-simd feature "default" (command-line)
+10contextra-simd v0.1.0 (/app/crates/contextra-simd)
+11contextra-types feature "default" (command-line) (*)
+11thiserror feature "default" (*)
+11tracing feature "default" (*)
+11bytemuck feature "default"
+12bytemuck v1.25.2 (*)
+11proptest feature "default" (*)
+11criterion feature "default" (*)
+9roaring feature "default"
+10roaring v0.10.12
+11bytemuck feature "default" (*)
+11byteorder feature "default"
+12byteorder v1.5.0
+12byteorder feature "std"
+13byteorder v1.5.0
+10roaring feature "std"
+11roaring v0.10.12 (*)
+9bincode feature "default" (*)
+9proptest feature "default" (*)
+9tempfile feature "default" (*)
+9tokio feature "default" (*)
+9tokio feature "full" (*)
+9tokio feature "test-util" (*)
+9criterion feature "default" (*)
+9loom feature "default" (*)
+7redb feature "default"
+8redb v2.6.3
+9libc feature "default" (*)
+7toml feature "default"
+8toml v0.8.23
+9serde feature "default" (*)
+9serde_spanned feature "default"
+10serde_spanned v0.6.9
+11serde feature "default" (*)
+9serde_spanned feature "serde"
+10serde_spanned v0.6.9 (*)
+9toml_datetime feature "default"
+10toml_datetime v0.6.11
+11serde feature "default" (*)
+9toml_datetime feature "serde"
+10toml_datetime v0.6.11 (*)
+9toml_edit feature "serde"
+10toml_edit v0.22.27
+11serde feature "default" (*)
+11indexmap feature "default" (*)
+11indexmap feature "std" (*)
+11serde_spanned feature "default" (*)
+11serde_spanned feature "serde" (*)
+11toml_datetime feature "default" (*)
+11toml_write feature "default"
+12toml_write v0.1.2
+12toml_write feature "std"
+13toml_write v0.1.2
+13toml_write feature "alloc"
+14toml_write v0.1.2
+11winnow feature "default"
+12winnow v0.7.15
+12winnow feature "std"
+13winnow v0.7.15
+13winnow feature "alloc"
+14winnow v0.7.15
+10toml_datetime feature "serde" (*)
+8toml feature "display"
+9toml v0.8.23 (*)
+9toml_edit feature "display"
+10toml_edit v0.22.27 (*)
+8toml feature "parse"
+9toml v0.8.23 (*)
+9toml_edit feature "parse"
+10toml_edit v0.22.27 (*)
+3contextra-store feature "default" (command-line) (*)
+3contextra-crypto feature "default" (command-line) (*)
+3zeroize feature "default" (*)
+3zeroize feature "derive"
+4zeroize v1.9.0 (*)
+4zeroize feature "zeroize_derive" (*)
+3zeroize feature "zeroize_derive" (*)
+3contextra-graph feature "default" (command-line) (*)
+3contextra-sys feature "default" (command-line) (*)
+3contextra-vector feature "default" (command-line) (*)
+3tokio-util feature "default" (*)
+3tokio-util feature "rt" (*)
+3contextra-cognition feature "default" (command-line)
+4contextra-cognition v0.1.0 (/app/crates/contextra-cognition)
+5ahash feature "default" (*)
+5ahash feature "serde" (*)
+5serde feature "default" (*)
+5serde feature "derive" (*)
+5serde feature "rc" (*)
+5bytes feature "default" (*)
+5contextra-ports feature "default" (command-line) (*)
+5contextra-types feature "default" (command-line) (*)
+5blake3 feature "default" (*)
+5serde_json feature "default" (*)
+5thiserror feature "default" (*)
+5tokio feature "default" (*)
+5tokio feature "full" (*)
+5parking_lot feature "default" (*)
+5tracing feature "default" (*)
+5contextra-store feature "default" (command-line) (*)
+5contextra-graph feature "default" (command-line) (*)
+5contextra-vector feature "default" (command-line) (*)
+5tokio-util feature "default" (*)
+5tokio-util feature "rt" (*)
+5contextra-engine feature "default" (command-line)
+6contextra-engine v0.1.0 (/app/crates/contextra-engine)
+7contextra-mvcc feature "default" (command-line) (*)
+7ahash feature "default" (*)
+7ahash feature "serde" (*)
+7serde feature "default" (*)
+7serde feature "derive" (*)
+7serde feature "rc" (*)
+7bytes feature "default" (*)
+7contextra-ports feature "default" (command-line) (*)
+7contextra-types feature "default" (command-line) (*)
+7bincode feature "default" (*)
+7blake3 feature "default" (*)
+7serde_json feature "default" (*)
+7sha2 feature "default" (*)
+7thiserror feature "default" (*)
+7tokio feature "default" (*)
+7tokio feature "full" (*)
+7parking_lot feature "default" (*)
+7tracing feature "default" (*)
+7loom feature "default" (*)
+7contextra-adapt feature "default" (command-line) (*)
+7contextra-checkpoint feature "default" (command-line) (*)
+7contextra-store feature "default" (command-line) (*)
+7zeroize feature "default" (*)
+7zeroize feature "derive" (*)
+7zeroize feature "zeroize_derive" (*)
+7hmac feature "default" (*)
+7contextra-graph feature "default" (command-line) (*)
+7contextra-sys feature "default" (command-line) (*)
+7contextra-vector feature "default" (command-line) (*)
+7tokio-util feature "default" (*)
+7tokio-util feature "rt" (*)
+7contextra-infer-candle feature "default" (command-line)
+8contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)
+9serde feature "default" (*)
+9serde feature "derive" (*)
+9serde feature "rc" (*)
+9bytes feature "default" (*)
+9contextra-ports feature "default" (command-line) (*)
+9contextra-types feature "default" (command-line) (*)
+9sha2 feature "default" (*)
+9futures-util feature "default" (*)
+9tokio feature "default" (*)
+9tokio feature "full" (*)
+9parking_lot feature "default" (*)
+9tracing feature "default" (*)
+9half feature "default"
+10half v2.7.1 (*)
+10half feature "std"
+11half v2.7.1 (*)
+11half feature "alloc"
+12half v2.7.1 (*)
+9candle-core feature "default"
+10candle-core v0.11.0
+11zip v8.6.0
+12memchr feature "default" (*)
+12indexmap feature "default" (*)
+12crc32fast feature "default" (*)
+12typed-path feature "default"
+13typed-path v0.12.3
+13typed-path feature "std"
+14typed-path v0.12.3
+11libc feature "default" (*)
+11zerocopy feature "default" (*)
+11num-traits feature "default" (*)
+11libm feature "default" (*)
+11rand feature "default"
+12rand v0.9.5 (*)
+12rand feature "os_rng" (*)
+12rand feature "small_rng"
+13rand v0.9.5 (*)
+12rand feature "std" (*)
+12rand feature "std_rng" (*)
+12rand feature "thread_rng" (*)
+11thiserror feature "default" (*)
+11half feature "default" (*)
+11half feature "num-traits"
+12half v2.7.1 (*)
+11half feature "rand_distr"
+12half v2.7.1 (*)
+11half feature "use-intrinsics"
+12half v2.7.1 (*)
+11half feature "zerocopy"
+12half v2.7.1 (*)
+11rand_distr feature "default"
+12rand_distr v0.5.1 (*)
+12rand_distr feature "std"
+13rand_distr v0.5.1 (*)
+13rand feature "std" (*)
+13rand_distr feature "alloc"
+14rand_distr v0.5.1 (*)
+14rand feature "alloc" (*)
+11rayon feature "default" (*)
+11memmap2 feature "default" (*)
+11memmap2 feature "stable_deref_trait"
+12memmap2 v0.9.11 (*)
+11byteorder feature "default" (*)
+11candle-metal-kernels feature "default"
+12candle-metal-kernels v0.11.0
+13once_cell feature "default" (*)
+13thiserror feature "default" (*)
+13tracing feature "default" (*)
+13half feature "default" (*)
+13half feature "num-traits" (*)
+13half feature "rand_distr" (*)
+13half feature "use-intrinsics" (*)
+13block2 feature "alloc"
+14block2 v0.6.2
+15objc2 feature "std"
+16objc2 v0.6.4
+17objc2-encode v4.1.0
+16objc2 feature "alloc"
+17objc2 v0.6.4 (*)
+17objc2-encode feature "alloc"
+18objc2-encode v4.1.0
+16objc2-encode feature "std"
+17objc2-encode v4.1.0
+17objc2-encode feature "alloc" (*)
+13objc2 feature "default"
+14objc2 v0.6.4 (*)
+14objc2 feature "std" (*)
+13objc2-foundation feature "default"
+14objc2-foundation v0.3.2
+15libc v0.2.189
+15bitflags feature "std" (*)
+15block2 feature "alloc" (*)
+15objc2 feature "std" (*)
+15objc2-core-foundation feature "CFArray"
+16objc2-core-foundation v0.3.2
+17bitflags feature "std" (*)
+17objc2 feature "std" (*)
+15objc2-core-foundation feature "CFAttributedString"
+16objc2-core-foundation v0.3.2 (*)
+15objc2-core-foundation feature "CFCGTypes"
+16objc2-core-foundation v0.3.2 (*)
+15objc2-core-foundation feature "CFCalendar"
+16objc2-core-foundation v0.3.2 (*)
+16objc2-core-foundation feature "bitflags"
+17objc2-core-foundation v0.3.2 (*)
+15objc2-core-foundation feature "CFCharacterSet"
+16objc2-core-foundation v0.3.2 (*)
+15objc2-core-foundation feature "CFData"
+16objc2-core-foundation v0.3.2 (*)
+16objc2-core-foundation feature "bitflags" (*)
+15objc2-core-foundation feature "CFDate"
+16objc2-core-foundation v0.3.2 (*)
+16objc2-core-foundation feature "bitflags" (*)
+15objc2-core-foundation feature "CFDictionary"
+16objc2-core-foundation v0.3.2 (*)
+15objc2-core-foundation feature "CFError"
+16objc2-core-foundation v0.3.2 (*)
+15objc2-core-foundation feature "CFFileSecurity"
+16objc2-core-foundation v0.3.2 (*)
+16objc2-core-foundation feature "bitflags" (*)
+15objc2-core-foundation feature "CFLocale"
+16objc2-core-foundation v0.3.2 (*)
+15objc2-core-foundation feature "CFMachPort"
+16objc2-core-foundation v0.3.2 (*)
+15objc2-core-foundation feature "CFMessagePort"
+16objc2-core-foundation v0.3.2 (*)
+15objc2-core-foundation feature "CFRunLoop"
+16objc2-core-foundation v0.3.2 (*)
+16objc2-core-foundation feature "bitflags" (*)
+15objc2-core-foundation feature "CFSet"
+16objc2-core-foundation v0.3.2 (*)
+15objc2-core-foundation feature "CFStream"
+16objc2-core-foundation v0.3.2 (*)
+16objc2-core-foundation feature "bitflags" (*)
+15objc2-core-foundation feature "CFURL"
+16objc2-core-foundation v0.3.2 (*)
+16objc2-core-foundation feature "bitflags" (*)
+15objc2-core-foundation feature "objc2"
+16objc2-core-foundation v0.3.2 (*)
+14objc2-foundation feature "FoundationErrors"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "FoundationLegacySwiftCompatibility"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSAffineTransform"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSAppleEventDescriptor"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags"
+16objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSAppleEventManager"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSAppleScript"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSArchiver"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSArray"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSAttributedString"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSAutoreleasePool"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSBackgroundActivityScheduler"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSBundle"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSByteCountFormatter"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSByteOrder"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSCache"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSCalendar"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSCalendarDate"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSCharacterSet"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSClassDescription"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSCoder"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSComparisonPredicate"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSCompoundPredicate"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSConnection"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSData"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSDate"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSDateComponentsFormatter"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSDateFormatter"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSDateInterval"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSDateIntervalFormatter"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSDebug"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSDecimal"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSDecimalNumber"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSDictionary"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSDistantObject"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSDistributedLock"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSDistributedNotificationCenter"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSEnergyFormatter"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSEnumerator"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSError"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSException"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSExpression"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSExtensionContext"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSExtensionItem"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSExtensionRequestHandling"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSFileCoordinator"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSFileHandle"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSFileManager"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSFilePresenter"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSFileVersion"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSFileWrapper"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSFormatter"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSGarbageCollector"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSGeometry"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSHFSFileTypes"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSHTTPCookie"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSHTTPCookieStorage"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSHashTable"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSHost"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSISO8601DateFormatter"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSIndexPath"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSIndexSet"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSInflectionRule"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSInvocation"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSItemProvider"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSJSONSerialization"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSKeyValueCoding"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSKeyValueObserving"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSKeyValueSharedObservers"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSKeyedArchiver"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSLengthFormatter"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSLinguisticTagger"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSListFormatter"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSLocale"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSLocalizedNumberFormatRule"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSLock"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSMapTable"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSMassFormatter"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSMeasurement"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "NSUnit"
+16objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSMeasurementFormatter"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSMetadata"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSMetadataAttributes"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSMethodSignature"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSMorphology"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSNetServices"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSNotification"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSNotificationQueue"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSNull"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSNumberFormatter"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSObjCRuntime"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSObject"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSObjectScripting"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSOperation"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSOrderedCollectionChange"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSOrderedCollectionDifference"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSOrderedSet"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSOrthography"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSPathUtilities"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSPersonNameComponents"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSPersonNameComponentsFormatter"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSPointerArray"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSPointerFunctions"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSPort"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSPortCoder"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSPortMessage"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSPortNameServer"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSPredicate"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSProcessInfo"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSProgress"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSPropertyList"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSProtocolChecker"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSProxy"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSRange"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSRegularExpression"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSRelativeDateTimeFormatter"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSRunLoop"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScanner"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScriptClassDescription"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScriptCoercionHandler"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScriptCommand"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScriptCommandDescription"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScriptExecutionContext"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScriptKeyValueCoding"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScriptObjectSpecifiers"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScriptStandardSuiteCommands"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScriptSuiteRegistry"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSScriptWhoseTests"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSSet"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSSortDescriptor"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSSpellServer"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSStream"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSString"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSTask"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSTermOfAddress"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSTextCheckingResult"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSThread"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSTimeZone"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSTimer"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURL"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSURLAuthenticationChallenge"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLCache"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLConnection"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLCredential"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLCredentialStorage"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLDownload"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLError"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLHandle"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLProtectionSpace"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLProtocol"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLRequest"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLResponse"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSURLSession"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSUUID"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSUbiquitousKeyValueStore"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSUndoManager"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSUnit" (*)
+14objc2-foundation feature "NSUserActivity"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSUserDefaults"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSUserNotification"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSUserScriptTask"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSValue"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSValueTransformer"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSXMLDTD"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSXMLDTDNode"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSXMLDocument"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSXMLElement"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSXMLNode"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSXMLNodeOptions"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSXMLParser"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "NSXPCConnection"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "NSZone"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "bitflags" (*)
+14objc2-foundation feature "block2"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "libc"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "objc2-core-foundation"
+15objc2-foundation v0.3.2 (*)
+14objc2-foundation feature "std"
+15objc2-foundation v0.3.2 (*)
+15objc2-foundation feature "alloc"
+16objc2-foundation v0.3.2 (*)
+13objc2-metal feature "block2"
+14objc2-metal v0.3.2
+15bitflags feature "std" (*)
+15block2 feature "alloc" (*)
+15objc2 feature "std" (*)
+15objc2-foundation feature "alloc" (*)
+15objc2-core-foundation feature "CFDate" (*)
+15objc2-core-foundation feature "objc2" (*)
+15dispatch2 feature "alloc"
+16dispatch2 v0.3.1
+17bitflags feature "std" (*)
+17objc2 feature "std" (*)
+15dispatch2 feature "objc2"
+16dispatch2 v0.3.1 (*)
+13objc2-metal feature "default"
+14objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTL4AccelerationStructure"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4Archive"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4ArgumentTable"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4BinaryFunction"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4BinaryFunctionDescriptor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "bitflags"
+16objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTL4BufferRange"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTL4CommandAllocator"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4CommandBuffer"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4CommandEncoder"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTL4CommandQueue"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4CommitFeedback"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+14objc2-metal feature "MTL4Compiler"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-foundation feature "NSURL" (*)
+14objc2-metal feature "MTL4CompilerTask"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTL4ComputeCommandEncoder"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSRange" (*)
+14objc2-metal feature "MTL4ComputePipeline"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTL4Counters"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSData" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4FunctionDescriptor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTL4LibraryDescriptor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4LibraryFunctionDescriptor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4LinkingDescriptor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSDictionary" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4MachineLearningCommandEncoder"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTL4MachineLearningPipeline"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4MeshRenderPipeline"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTL4PipelineDataSetSerializer"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSData" (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSURL" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTL4PipelineState"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTL4RenderCommandEncoder"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTL4RenderPass"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTL4RenderPipeline"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTL4SpecializedFunctionDescriptor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTL4StitchedFunctionDescriptor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTL4TileRenderPipeline"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTLAccelerationStructure"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLAccelerationStructureCommandEncoder"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-metal feature "MTLAccelerationStructure" (*)
+14objc2-metal feature "MTLAccelerationStructureTypes"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLAllocation"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLArgument"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "MTLDataType"
+16objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLArgumentEncoder"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLBinaryArchive"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-foundation feature "NSURL" (*)
+14objc2-metal feature "MTLBlitCommandEncoder"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLBlitPass"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTLBuffer"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLCaptureManager"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-foundation feature "NSURL" (*)
+14objc2-metal feature "MTLCaptureScope"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLCommandBuffer"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSEnumerator" (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLCommandEncoder"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLCommandQueue"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLComputeCommandEncoder"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSRange" (*)
+14objc2-metal feature "MTLComputePass"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTLComputePipeline"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "MTLAllocation" (*)
+14objc2-metal feature "MTLCounters"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSData" (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLDataType" (*)
+14objc2-metal feature "MTLDefines"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLDepthStencil"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLDevice"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSBundle" (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-foundation feature "NSURL" (*)
+15objc2-metal feature "MTLGPUAddress"
+16objc2-metal v0.3.2 (*)
+15objc2-metal feature "MTLLibrary"
+16objc2-metal v0.3.2 (*)
+16objc2-foundation feature "NSArray" (*)
+16objc2-foundation feature "NSDictionary" (*)
+16objc2-foundation feature "NSError" (*)
+16objc2-foundation feature "NSObject" (*)
+16objc2-foundation feature "NSString" (*)
+15objc2-metal feature "MTLResource"
+16objc2-metal v0.3.2 (*)
+16objc2-foundation feature "NSString" (*)
+16objc2-metal feature "bitflags" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLDeviceCertification"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSNotification" (*)
+15objc2-foundation feature "NSProcessInfo" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLDrawable"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLDynamicLibrary"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-foundation feature "NSURL" (*)
+14objc2-metal feature "MTLEvent"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLFence"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLFunctionConstantValues"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLFunctionDescriptor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLFunctionHandle"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLFunctionLog"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSEnumerator" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-foundation feature "NSURL" (*)
+14objc2-metal feature "MTLFunctionStitching"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLGPUAddress" (*)
+14objc2-metal feature "MTLHeap"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLIOCommandBuffer"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLIOCommandQueue"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLIOCompressor"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLIndirectCommandBuffer"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLIndirectCommandEncoder"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLIntersectionFunctionTable"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLLibrary" (*)
+14objc2-metal feature "MTLLinkedFunctions"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSDictionary" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLLogState"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLParallelRenderCommandEncoder"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLPipeline"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTLPixelFormat"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLRasterizationRate"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-foundation feature "NSValue" (*)
+14objc2-metal feature "MTLRenderCommandEncoder"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLRenderPass"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLRenderPipeline"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "MTLAllocation" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLResidencySet"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSArray" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLResource" (*)
+14objc2-metal feature "MTLResourceStateCommandEncoder"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLResourceStatePass"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTLResourceViewPool"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLSampler"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+14objc2-metal feature "MTLStageInputOutputDescriptor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-metal feature "MTLArgument" (*)
+14objc2-metal feature "MTLTensor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSError" (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLTexture"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+15objc2-foundation feature "NSString" (*)
+15objc2-metal feature "bitflags" (*)
+14objc2-metal feature "MTLTextureViewPool"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLTypes"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "MTLVertexDescriptor"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+14objc2-metal feature "MTLVisibleFunctionTable"
+15objc2-metal v0.3.2 (*)
+15objc2-foundation feature "NSObject" (*)
+15objc2-foundation feature "NSRange" (*)
+14objc2-metal feature "bitflags" (*)
+14objc2-metal feature "block2" (*)
+14objc2-metal feature "dispatch2"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "objc2-core-foundation"
+15objc2-metal v0.3.2 (*)
+14objc2-metal feature "std"
+15objc2-metal v0.3.2 (*)
+15objc2-metal feature "alloc"
+16objc2-metal v0.3.2 (*)
+11objc2-foundation feature "default" (*)
+11objc2-metal feature "default" (*)
+11float8 feature "default"
+12float8 v0.7.0
+13half v2.7.1 (*)
+13rand_distr v0.5.1 (*)
+13num-traits feature "libm" (*)
+13rand feature "std" (*)
+13rand feature "std_rng" (*)
+13rand feature "thread_rng" (*)
+12float8 feature "std"
+13float8 v0.7.0 (*)
+13half feature "std" (*)
+11float8 feature "num-traits"
+12float8 v0.7.0 (*)
+11float8 feature "rand_distr"
+12float8 v0.7.0 (*)
+12float8 feature "std" (*)
+11gemm feature "default"
+12gemm v0.19.0
+13gemm-c32 v0.19.0
+14gemm-common v0.19.0
+15num-complex v0.4.6
+16num-traits feature "i128"
+17num-traits v0.2.19 (*)
+16bytemuck feature "default" (*)
+15num-traits v0.2.19 (*)
+15pulp v0.22.3
+16libm v0.2.16
+16pulp-wasm-simd-flag v0.1.1
+16raw-cpuid v11.6.0
+17bitflags feature "default" (*)
+16cfg-if feature "default" (*)
+16bytemuck feature "aarch64_simd"
+17bytemuck v1.25.2 (*)
+16bytemuck feature "default" (*)
+16bytemuck feature "wasm_simd"
+17bytemuck v1.25.2 (*)
+16paste feature "default" (*)
+16num-complex feature "bytemuck"
+17num-complex v0.4.6 (*)
+16reborrow feature "default"
+17reborrow v0.5.5
+16version_check feature "default" (*)
+15raw-cpuid v11.6.0 (*)
+15once_cell feature "alloc" (*)
+15once_cell feature "race" (*)
+15libm feature "default" (*)
+15half feature "bytemuck"
+16half v2.7.1 (*)
+15half feature "num-traits" (*)
+15bytemuck feature "default" (*)
+15rayon feature "default" (*)
+15paste feature "default" (*)
+15dyn-stack feature "alloc"
+16dyn-stack v0.13.2
+17bytemuck feature "default" (*)
+17dyn-stack-macros feature "default"
+18dyn-stack-macros v0.1.3 (proc-macro)
+15seq-macro feature "default"
+16seq-macro v0.3.6 (proc-macro)
+15sysctl feature "default"
+16sysctl v0.6.0
+17libc feature "default" (*)
+17bitflags feature "default" (*)
+17walkdir feature "default" (*)
+17thiserror feature "default" (*)
+17byteorder feature "default" (*)
+17enum-as-inner feature "default"
+18enum-as-inner v0.6.1 (proc-macro)
+19proc-macro2 feature "default" (*)
+19quote feature "default" (*)
+19syn feature "default" (*)
+19heck feature "default"
+20heck v0.5.0
+14num-complex v0.4.6 (*)
+14num-traits v0.2.19 (*)
+14raw-cpuid v11.6.0 (*)
+14paste feature "default" (*)
+14dyn-stack feature "alloc" (*)
+14seq-macro feature "default" (*)
+13gemm-c64 v0.19.0
+14gemm-common v0.19.0 (*)
+14num-complex v0.4.6 (*)
+14num-traits v0.2.19 (*)
+14raw-cpuid v11.6.0 (*)
+14paste feature "default" (*)
+14dyn-stack feature "alloc" (*)
+14seq-macro feature "default" (*)
+13gemm-common v0.19.0 (*)
+13gemm-f16 v0.19.0
+14gemm-f32 v0.19.0
+15gemm-common v0.19.0 (*)
+15num-complex v0.4.6 (*)
+15num-traits v0.2.19 (*)
+15raw-cpuid v11.6.0 (*)
+15paste feature "default" (*)
+15dyn-stack feature "alloc" (*)
+15seq-macro feature "default" (*)
+14num-complex v0.4.6 (*)
+14num-traits v0.2.19 (*)
+14raw-cpuid v11.6.0 (*)
+14half feature "bytemuck" (*)
+14half feature "num-traits" (*)
+14rayon feature "default" (*)
+14paste feature "default" (*)
+14dyn-stack feature "alloc" (*)
+14gemm-common feature "f16"
+15gemm-common v0.19.0 (*)
+15gemm-common feature "half"
+16gemm-common v0.19.0 (*)
+14seq-macro feature "default" (*)
+13gemm-f32 v0.19.0 (*)
+13gemm-f64 v0.19.0
+14gemm-common v0.19.0 (*)
+14num-complex v0.4.6 (*)
+14num-traits v0.2.19 (*)
+14raw-cpuid v11.6.0 (*)
+14paste feature "default" (*)
+14dyn-stack feature "alloc" (*)
+14seq-macro feature "default" (*)
+13num-complex v0.4.6 (*)
+13num-traits v0.2.19 (*)
+13raw-cpuid v11.6.0 (*)
+13paste feature "default" (*)
+13dyn-stack feature "alloc" (*)
+13seq-macro feature "default" (*)
+12gemm feature "f16"
+13gemm v0.19.0 (*)
+13gemm feature "gemm-f16"
+14gemm v0.19.0 (*)
+13gemm-common feature "f16" (*)
+12gemm feature "rayon"
+13gemm v0.19.0 (*)
+13gemm feature "std"
+14gemm v0.19.0 (*)
+14dyn-stack feature "std"
+15dyn-stack v0.13.2 (*)
+14gemm-c32 feature "std"
+15gemm-c32 v0.19.0 (*)
+15dyn-stack feature "std" (*)
+15gemm-common feature "std"
+16gemm-common v0.19.0 (*)
+16once_cell feature "std" (*)
+16dyn-stack feature "std" (*)
+16gemm-common feature "sysctl"
+17gemm-common v0.19.0 (*)
+16pulp feature "std"
+17pulp v0.22.3 (*)
+14gemm-common feature "std" (*)
+14gemm-c64 feature "std"
+15gemm-c64 v0.19.0 (*)
+15dyn-stack feature "std" (*)
+15gemm-common feature "std" (*)
+14gemm-f16 feature "std"
+15gemm-f16 v0.19.0 (*)
+15dyn-stack feature "std" (*)
+15gemm-common feature "std" (*)
+15gemm-f32 feature "std"
+16gemm-f32 v0.19.0 (*)
+16dyn-stack feature "std" (*)
+16gemm-common feature "std" (*)
+14gemm-f32 feature "std" (*)
+14gemm-f64 feature "std"
+15gemm-f64 v0.19.0 (*)
+15dyn-stack feature "std" (*)
+15gemm-common feature "std" (*)
+13gemm-c32 feature "rayon"
+14gemm-c32 v0.19.0 (*)
+14gemm-c32 feature "std" (*)
+14gemm-common feature "rayon"
+15gemm-common v0.19.0 (*)
+15gemm-common feature "std" (*)
+13gemm-common feature "rayon" (*)
+13gemm-c64 feature "rayon"
+14gemm-c64 v0.19.0 (*)
+14gemm-common feature "rayon" (*)
+14gemm-c64 feature "std" (*)
+13gemm-f16 feature "rayon"
+14gemm-f16 v0.19.0 (*)
+14gemm-common feature "rayon" (*)
+14gemm-f16 feature "std" (*)
+14gemm-f32 feature "rayon"
+15gemm-f32 v0.19.0 (*)
+15gemm-common feature "rayon" (*)
+15gemm-f32 feature "std" (*)
+13gemm-f32 feature "rayon" (*)
+13gemm-f64 feature "rayon"
+14gemm-f64 v0.19.0 (*)
+14gemm-common feature "rayon" (*)
+14gemm-f64 feature "std" (*)
+12gemm feature "std" (*)
+11gemm feature "wasm-simd128-enable"
+12gemm v0.19.0 (*)
+12gemm-common feature "wasm-simd128-enable"
+13gemm-common v0.19.0 (*)
+11num_cpus feature "default"
+12num_cpus v1.17.0
+13libc feature "default" (*)
+13hermit-abi feature "default" (*)
+11safetensors feature "default"
+12safetensors v0.8.0
+13libc feature "default" (*)
+13serde feature "alloc" (*)
+13serde feature "derive" (*)
+13tempfile feature "default" (*)
+13serde_json feature "alloc"
+14serde_json v1.0.151 (*)
+14serde_core feature "alloc" (*)
+13hashbrown feature "default" (*)
+13hashbrown feature "serde"
+14hashbrown v0.16.1 (*)
+12safetensors feature "std"
+13safetensors v0.8.0 (*)
+13serde feature "default" (*)
+13serde_json feature "default" (*)
+11tokenizers feature "onig"
+12tokenizers v0.22.2
+13esaxx-rs v0.1.10
+14cc feature "default" (*)
+13onig v6.5.3
+14onig_sys v69.9.3
+15cc feature "default" (*)
+15pkg-config feature "default"
+16pkg-config v0.3.34
+14libc feature "default" (*)
+14once_cell feature "default" (*)
+14bitflags feature "default" (*)
+13ahash feature "default" (*)
+13ahash feature "serde" (*)
+13getrandom feature "default" (*)
+13serde feature "default" (*)
+13serde feature "derive" (*)
+13rand feature "default" (*)
+13regex-syntax feature "default" (*)
+13serde_json feature "default" (*)
+13thiserror feature "default" (*)
+13rayon feature "default" (*)
+13regex feature "default" (*)
+13aho-corasick feature "default"
+14aho-corasick v1.1.5 (*)
+14aho-corasick feature "perf-literal" (*)
+14aho-corasick feature "std" (*)
+13log feature "default" (*)
+13paste feature "default" (*)
+13compact_str feature "default"
+14compact_str v0.9.1
+15cfg-if feature "default" (*)
+15serde feature "alloc" (*)
+15serde feature "derive" (*)
+15itoa feature "default" (*)
+15rustversion feature "default" (*)
+15castaway feature "alloc"
+16castaway v0.2.4
+17rustversion feature "default" (*)
+15ryu feature "default"
+16ryu v1.0.23
+15static_assertions feature "default"
+16static_assertions v1.1.0
+14compact_str feature "std"
+15compact_str v0.9.1 (*)
+13compact_str feature "serde"
+14compact_str v0.9.1 (*)
+13dary_heap feature "default"
+14dary_heap v0.3.9
+15serde feature "alloc" (*)
+13dary_heap feature "serde"
+14dary_heap v0.3.9 (*)
+13derive_builder feature "default"
+14derive_builder v0.20.2
+15derive_builder_macro feature "default"
+16derive_builder_macro v0.20.2 (proc-macro)
+17syn feature "default" (*)
+17syn feature "extra-traits" (*)
+17syn feature "full" (*)
+17derive_builder_core feature "default"
+18derive_builder_core v0.20.2
+19proc-macro2 feature "default" (*)
+19quote feature "default" (*)
+19syn feature "default" (*)
+19syn feature "extra-traits" (*)
+19syn feature "full" (*)
+19darling feature "default"
+20darling v0.20.11
+21darling_core feature "default"
+22darling_core v0.20.11
+23proc-macro2 feature "default" (*)
+23quote feature "default" (*)
+23syn feature "default" (*)
+23syn feature "extra-traits" (*)
+23syn feature "full" (*)
+23fnv feature "default" (*)
+23ident_case feature "default"
+24ident_case v1.0.1
+23strsim feature "default"
+24strsim v0.11.1
+21darling_macro feature "default"
+22darling_macro v0.20.11 (proc-macro)
+23quote feature "default" (*)
+23syn feature "default" (*)
+23darling_core feature "default" (*)
+20darling feature "suggestions"
+21darling v0.20.11 (*)
+21darling_core feature "suggestions"
+22darling_core v0.20.11 (*)
+22darling_core feature "strsim"
+23darling_core v0.20.11 (*)
+14derive_builder feature "std"
+15derive_builder v0.20.2 (*)
+15derive_builder_macro feature "lib_has_std"
+16derive_builder_macro v0.20.2 (proc-macro) (*)
+16derive_builder_core feature "lib_has_std"
+17derive_builder_core v0.20.2 (*)
+13itertools feature "default"
+14itertools v0.14.0
+15either v1.18.0
+14itertools feature "use_std"
+15itertools v0.14.0 (*)
+15either feature "use_std" (*)
+15itertools feature "use_alloc"
+16itertools v0.14.0 (*)
+13macro_rules_attribute feature "default"
+14macro_rules_attribute v0.2.3
+15macro_rules_attribute-proc_macro feature "default"
+16macro_rules_attribute-proc_macro v0.2.3 (proc-macro)
+15pastey feature "default"
+16pastey v0.2.3 (proc-macro)
+13monostate feature "default"
+14monostate v0.1.18
+15serde v1.0.229 (*)
+15serde_core v1.0.229 (*)
+15monostate-impl feature "default"
+16monostate-impl v0.1.18 (proc-macro)
+17proc-macro2 feature "default" (*)
+17quote feature "default" (*)
+17syn feature "parsing" (*)
+17syn feature "proc-macro" (*)
+13rayon-cond feature "default"
+14rayon-cond v0.4.0
+15either feature "default"
+16either v1.18.0
+16either feature "std" (*)
+15rayon feature "default" (*)
+15itertools feature "default" (*)
+13spm_precompiled feature "default"
+14spm_precompiled v0.1.4
+15serde feature "default" (*)
+15serde feature "derive" (*)
+15base64 feature "default"
+16base64 v0.13.1
+16base64 feature "std"
+17base64 v0.13.1
+15nom feature "default"
+16nom v7.1.3
+17memchr v2.8.3
+17minimal-lexical v0.2.1
+16nom feature "std"
+17nom v7.1.3 (*)
+17memchr feature "std" (*)
+17nom feature "alloc"
+18nom v7.1.3 (*)
+17minimal-lexical feature "std"
+18minimal-lexical v0.2.1
+15unicode-segmentation feature "default"
+16unicode-segmentation v1.13.3
+13unicode-segmentation feature "default" (*)
+13unicode-normalization-alignments feature "default"
+14unicode-normalization-alignments v0.1.12
+15smallvec feature "default" (*)
+13unicode_categories feature "default"
+14unicode_categories v0.1.1
+11yoke feature "default"
+12yoke v0.8.3
+13stable_deref_trait v1.2.1
+13yoke-derive v0.8.2 (proc-macro)
+14proc-macro2 feature "default" (*)
+14quote feature "default" (*)
+14syn feature "default" (*)
+14syn feature "fold"
+15syn v2.0.119 (*)
+14synstructure feature "default"
+15synstructure v0.13.2
+16proc-macro2 v1.0.107 (*)
+16quote v1.0.47 (*)
+16syn feature "clone-impls" (*)
+16syn feature "derive" (*)
+16syn feature "extra-traits" (*)
+16syn feature "parsing" (*)
+16syn feature "printing" (*)
+16syn feature "visit" (*)
+15synstructure feature "proc-macro"
+16synstructure v0.13.2 (*)
+16proc-macro2 feature "proc-macro" (*)
+16quote feature "proc-macro" (*)
+16syn feature "proc-macro" (*)
+13zerofrom v0.1.8
+14zerofrom-derive v0.1.7 (proc-macro)
+15proc-macro2 feature "default" (*)
+15quote feature "default" (*)
+15syn feature "default" (*)
+15syn feature "fold" (*)
+15synstructure feature "default" (*)
+12yoke feature "alloc"
+13yoke v0.8.3 (*)
+13stable_deref_trait feature "alloc" (*)
+13yoke feature "zerofrom"
+14yoke v0.8.3 (*)
+13zerofrom feature "alloc"
+14zerofrom v0.1.8 (*)
+12yoke feature "zerofrom" (*)
+11yoke feature "derive"
+12yoke v0.8.3 (*)
+12yoke feature "zerofrom" (*)
+12zerofrom feature "derive"
+13zerofrom v0.1.8 (*)
+9candle-core feature "metal"
+10candle-core v0.11.0 (*)
+9candle-nn feature "default"
+10candle-nn v0.11.0
+11libc feature "default" (*)
+11serde feature "default" (*)
+11serde feature "derive" (*)
+11num-traits feature "default" (*)
+11thiserror feature "default" (*)
+11half feature "default" (*)
+11half feature "num-traits" (*)
+11half feature "rand_distr" (*)
+11half feature "use-intrinsics" (*)
+11half feature "zerocopy" (*)
+11rayon feature "default" (*)
+11candle-core feature "default" (*)
+11candle-metal-kernels feature "default" (*)
+11objc2-metal feature "default" (*)
+11safetensors feature "default" (*)
+9candle-nn feature "metal"
+10candle-nn v0.11.0 (*)
+10candle-core feature "metal" (*)
+9candle-transformers feature "default"
+10candle-transformers v0.11.0
+11serde feature "default" (*)
+11serde feature "derive" (*)
+11num-traits feature "default" (*)
+11rand feature "default" (*)
+11serde_json feature "default" (*)
+11tracing feature "default" (*)
+11rayon feature "default" (*)
+11byteorder feature "default" (*)
+11candle-core feature "default" (*)
+11candle-nn feature "default" (*)
+11fancy-regex feature "default"
+12fancy-regex v0.18.0
+13bit-set v0.8.0 (*)
+13regex-syntax v0.8.11
+13regex-automata feature "alloc" (*)
+13regex-automata feature "dfa"
+14regex-automata v0.4.18 (*)
+14regex-automata feature "dfa-build" (*)
+14regex-automata feature "dfa-onepass" (*)
+14regex-automata feature "dfa-search" (*)
+13regex-automata feature "hybrid" (*)
+13regex-automata feature "meta" (*)
+13regex-automata feature "nfa"
+14regex-automata v0.4.18 (*)
+14regex-automata feature "nfa-backtrack" (*)
+14regex-automata feature "nfa-pikevm" (*)
+14regex-automata feature "nfa-thompson" (*)
+13regex-automata feature "syntax" (*)
+12fancy-regex feature "perf"
+13fancy-regex v0.18.0 (*)
+13regex-automata feature "perf"
+14regex-automata v0.4.18 (*)
+14regex-automata feature "perf-inline" (*)
+14regex-automata feature "perf-literal" (*)
+12fancy-regex feature "std"
+13fancy-regex v0.18.0 (*)
+13bit-set feature "std" (*)
+13regex-syntax feature "std" (*)
+13regex-automata feature "std" (*)
+12fancy-regex feature "unicode"
+13fancy-regex v0.18.0 (*)
+13regex-syntax feature "unicode" (*)
+13regex-automata feature "unicode" (*)
+12fancy-regex feature "variable-lookbehinds"
+13fancy-regex v0.18.0 (*)
+13regex-automata feature "dfa-search" (*)
+11serde_plain feature "default"
+12serde_plain v1.0.2
+13serde feature "default" (*)
+9candle-transformers feature "metal"
+10candle-transformers v0.11.0 (*)
+10candle-core feature "metal" (*)
+10candle-nn feature "metal" (*)
+9contextra-rank feature "default" (command-line)
+10contextra-rank v0.1.0 (/app/crates/contextra-rank)
+11ahash feature "default" (*)
+11ahash feature "serde" (*)
+11serde feature "default" (*)
+11serde feature "derive" (*)
+11serde feature "rc" (*)
+11contextra-ports feature "default" (command-line) (*)
+11contextra-types feature "default" (command-line) (*)
+11serde_json feature "default" (*)
+11thiserror feature "default" (*)
+11tracing feature "default" (*)
+11proptest feature "default" (*)
+11tokio feature "default" (*)
+11tokio feature "full" (*)
+11contextra-adapt feature "default" (command-line) (*)
+9tokenizers feature "default"
+10tokenizers v0.21.4
+11esaxx-rs v0.1.10 (*)
+11onig v6.5.3 (*)
+11ahash feature "default" (*)
+11ahash feature "serde" (*)
+11getrandom feature "default" (*)
+11serde feature "default" (*)
+11serde feature "derive" (*)
+11rand feature "default" (*)
+11regex-syntax feature "default" (*)
+11serde_json feature "default" (*)
+11thiserror feature "default" (*)
+11rayon feature "default" (*)
+11regex feature "default" (*)
+11aho-corasick feature "default" (*)
+11log feature "default" (*)
+11paste feature "default" (*)
+11compact_str feature "default" (*)
+11compact_str feature "serde" (*)
+11dary_heap feature "default" (*)
+11dary_heap feature "serde" (*)
+11derive_builder feature "default" (*)
+11itertools feature "default" (*)
+11macro_rules_attribute feature "default" (*)
+11monostate feature "default" (*)
+11rayon-cond feature "default" (*)
+11spm_precompiled feature "default" (*)
+11unicode-segmentation feature "default" (*)
+11unicode-normalization-alignments feature "default" (*)
+11unicode_categories feature "default" (*)
+11indicatif feature "default"
+12indicatif v0.17.11
+13unicode-width feature "default" (*)
+13console feature "ansi-parsing"
+14console v0.15.11
+15libc feature "default" (*)
+15once_cell feature "default" (*)
+15windows-sys feature "Win32_Foundation" (*)
+15windows-sys feature "Win32_Storage_FileSystem"
+16windows-sys v0.59.0 (*)
+16windows-sys feature "Win32_Storage"
+17windows-sys v0.59.0 (*)
+17windows-sys feature "Win32" (*)
+15windows-sys feature "Win32_System_Console"
+16windows-sys v0.59.0 (*)
+16windows-sys feature "Win32_System" (*)
+15windows-sys feature "Win32_UI_Input_KeyboardAndMouse"
+16windows-sys v0.59.0 (*)
+16windows-sys feature "Win32_UI_Input"
+17windows-sys v0.59.0 (*)
+17windows-sys feature "Win32_UI"
+18windows-sys v0.59.0 (*)
+18windows-sys feature "Win32" (*)
+15windows-sys feature "default" (*)
+15unicode-width feature "default" (*)
+15encode_unicode feature "default"
+16encode_unicode v1.0.0
+16encode_unicode feature "std"
+17encode_unicode v1.0.0
+13number_prefix feature "default"
+14number_prefix v0.4.0
+14number_prefix feature "std"
+15number_prefix v0.4.0
+13portable-atomic feature "default"
+14portable-atomic v1.15.0
+14portable-atomic feature "fallback"
+15portable-atomic v1.15.0
+13web-time feature "default"
+14web-time v1.1.0
+15wasm-bindgen v0.2.127 (*)
+15js-sys feature "default"
+16js-sys v0.3.104 (*)
+16js-sys feature "std" (*)
+16js-sys feature "unsafe-eval"
+17js-sys v0.3.104 (*)
+12indicatif feature "unicode-width"
+13indicatif v0.17.11 (*)
+12console feature "unicode-width"
+13console v0.15.11 (*)
+10tokenizers feature "esaxx_fast"
+11tokenizers v0.21.4 (*)
+11esaxx-rs feature "cpp"
+12esaxx-rs v0.1.10 (*)
+12esaxx-rs feature "cc"
+13esaxx-rs v0.1.10 (*)
+10tokenizers feature "onig"
+11tokenizers v0.21.4 (*)
+10tokenizers feature "progressbar"
+11tokenizers v0.21.4 (*)
+11tokenizers feature "indicatif"
+12tokenizers v0.21.4 (*)
+9proptest feature "default" (*)
+9tempfile feature "default" (*)
+9criterion feature "async_tokio" (*)
+9criterion feature "default" (*)
+9contextra-crypto feature "default" (command-line) (*)
+7contextra-rank feature "default" (command-line) (*)
+7contextra-kvcache feature "default" (command-line)
+8contextra-kvcache v0.1.0 (/app/crates/contextra-kvcache)
+9ahash feature "default" (*)
+9ahash feature "serde" (*)
+9serde feature "default" (*)
+9serde feature "derive" (*)
+9serde feature "rc" (*)
+9bytes feature "default" (*)
+9contextra-ports feature "default" (command-line) (*)
+9contextra-types feature "default" (command-line) (*)
+9bincode feature "default" (*)
+9blake3 feature "default" (*)
+9serde_json feature "default" (*)
+9parking_lot feature "default" (*)
+9tracing feature "default" (*)
+9contextra-crypto feature "default" (command-line) (*)
+9zeroize feature "default" (*)
+9zeroize feature "zeroize_derive" (*)
+9lru feature "default" (*)
+9proptest feature "default" (*)
+9tokio feature "default" (*)
+9tokio feature "full" (*)
+9tokio feature "test-util" (*)
+7contextra-text feature "default" (command-line)
+8contextra-text v0.1.0 (/app/crates/contextra-text)
+9serde feature "default" (*)
+9serde feature "derive" (*)
+9serde feature "rc" (*)
+9bytes feature "default" (*)
+9contextra-ports feature "default" (command-line) (*)
+9contextra-types feature "default" (command-line) (*)
+9bincode feature "default" (*)
+9serde_json feature "default" (*)
+9itoa feature "default" (*)
+9thiserror feature "default" (*)
+9parking_lot feature "default" (*)
+9tracing feature "default" (*)
+9regex feature "default" (*)
+9unicode-segmentation feature "default" (*)
+9proptest feature "default" (*)
+9tempfile feature "default" (*)
+9tokio feature "default" (*)
+9tokio feature "full" (*)
+9tokio feature "macros" (*)
+9tokio feature "test-util" (*)
+7contextra-core feature "default" (command-line) (*)
+7proptest feature "default" (*)
+7tempfile feature "default" (*)
+7tokio feature "default" (*)
+7tokio feature "full" (*)
+7tokio feature "test-util" (*)
+7contextra-testkit feature "default" (command-line) (*)
+7loom feature "default" (*)
+7contextra-crypto feature "default" (command-line) (*)
+7wat feature "default" (*)
+7contextra-vector feature "default" (command-line) (*)
+7contextra-vector feature "experimental-diskann"
+8contextra-vector v0.1.0 (/app/crates/contextra-vector) (*)
+5tempfile feature "default" (*)
+5tokio feature "default" (*)
+5tokio feature "full" (*)
+5tokio feature "test-util" (*)
+5contextra-testkit feature "default" (command-line) (*)
+5contextra-infer-candle feature "default" (command-line) (*)
+3contextra-engine feature "default" (command-line) (*)
+3contextra-rank feature "default" (command-line) (*)
+3contextra-text feature "default" (command-line) (*)
+3proptest feature "default" (*)
+3tempfile feature "default" (*)
+3tokio feature "default" (*)
+3tokio feature "full" (*)
+3tokio feature "test-util" (*)
+3criterion feature "async_tokio" (*)
+3criterion feature "default" (*)
+3criterion feature "html_reports"
+4criterion v0.5.1 (*)
+3ed25519-dalek feature "default" (*)
+3contextra-vector feature "default" (command-line) (*)
+3contextra-vector feature "experimental-diskann" (*)
+1contextra-store feature "default" (command-line) (*)
+1uuid feature "default" (*)
+1uuid feature "v4" (*)
+1contextra-infer-candle feature "default" (command-line) (*)
+1contextra-rank feature "default" (command-line) (*)
+1contextra-license feature "default" (command-line)
+2contextra-license v0.1.0 (/app/crates/contextra-license)
+3serde feature "default" (*)
+3serde feature "derive" (*)
+3serde feature "rc" (*)
+3contextra-ports feature "default" (command-line) (*)
+3contextra-types feature "default" (command-line) (*)
+3bincode feature "default" (*)
+3blake3 feature "default" (*)
+3thiserror feature "default" (*)
+3tracing feature "default" (*)
+3ed25519-dalek feature "default" (*)
+3ed25519-dalek feature "rand_core" (*)
+3rand feature "default" (*)
+1contextra-router feature "default" (command-line)
+2contextra-router v0.1.0 (/app/crates/contextra-router)
+3serde feature "default" (*)
+3serde feature "derive" (*)
+3serde feature "rc" (*)
+3contextra-ports feature "default" (command-line) (*)
+3contextra-types feature "default" (command-line) (*)
+3serde_json feature "default" (*)
+3thiserror feature "default" (*)
+3tokio feature "default" (*)
+3tokio feature "full" (*)
+3parking_lot feature "default" (*)
+3tracing feature "default" (*)
+3contextra-wire feature "default" (command-line) (*)
+3contextra-adapt feature "default" (command-line) (*)
+3arc-swap feature "default" (*)
+3contextra-privacy feature "default" (command-line)
+4contextra-privacy v0.1.0 (/app/crates/contextra-privacy)
+5serde feature "default" (*)
+5serde feature "derive" (*)
+5serde feature "rc" (*)
+5contextra-ports feature "default" (command-line) (*)
+5contextra-types feature "default" (command-line) (*)
+5blake3 feature "default" (*)
+5serde_json feature "default" (*)
+5thiserror feature "default" (*)
+5tokio feature "default" (*)
+5tokio feature "full" (*)
+5parking_lot feature "default" (*)
+5tracing feature "default" (*)
+5regex feature "default" (*)
+5zeroize feature "default" (*)
+5zeroize feature "zeroize_derive" (*)
+5rand feature "default" (*)
+5scc feature "default" (*)
+5tempfile feature "default" (*)
+5tokio feature "default" (*)
+5tokio feature "full" (*)
+5tokio feature "test-util" (*)
+5contextra-crypto feature "default" (command-line) (*)
+5contextra-crypto feature "test-utils" (*)
+3shlex feature "default"
+4shlex v1.3.0
+4shlex feature "std"
+5shlex v1.3.0
+3bytes feature "default" (*)
+3proptest feature "default" (*)
+3tempfile feature "default" (*)
+3criterion feature "async_tokio" (*)
+3criterion feature "default" (*)
+3tracing-subscriber feature "default" (*)
+3tracing-subscriber feature "env-filter" (*)
+3contextra-db feature "default" (command-line) (*)
+3contextra-graph feature "default" (command-line) (*)
+3contextra-vector feature "default" (command-line) (*)
+3contextra-text feature "default" (command-line) (*)
+1tempfile feature "default" (*)
+
+0contextra-adapt v0.1.0 (/app/crates/contextra-adapt) (*)
+
+0contextra-agent v0.1.0 (/app/crates/contextra-agent)
+1serde feature "default" (*)
+1serde feature "derive" (*)
+1serde feature "rc" (*)
+1bytes feature "default" (*)
+1contextra-ports feature "default" (command-line) (*)
+1contextra-types feature "default" (command-line) (*)
+1serde_json feature "default" (*)
+1tokio feature "default" (*)
+1tokio feature "full" (*)
+1tracing feature "default" (*)
+1contextra-db feature "default" (command-line) (*)
+1contextra-db feature "volatile-vault"
+2contextra-db v0.1.0 (/app/crates/contextra-db) (*)
+1contextra-checkpoint feature "default" (command-line) (*)
+1contextra-store feature "default" (command-line) (*)
+1contextra-graph feature "default" (command-line) (*)
+1tokio-util feature "default" (*)
+1tokio-util feature "rt" (*)
+1contextra-router feature "default" (command-line) (*)
+1tempfile feature "default" (*)
+1contextra-testkit feature "default" (command-line) (*)
+1tracing-subscriber feature "default" (*)
+1tracing-subscriber feature "env-filter" (*)
+1contextra-vector feature "default" (command-line) (*)
+1contextra-text feature "default" (command-line) (*)
+
+0contextra-audit-export v0.1.0 (/app/crates/contextra-audit-export)
+1serde feature "default" (*)
+1serde feature "derive" (*)
+1serde feature "rc" (*)
+1contextra-ports feature "default" (command-line) (*)
+1contextra-types feature "default" (command-line) (*)
+1serde_json feature "default" (*)
+1thiserror feature "default" (*)
+1tokio feature "default" (*)
+1tokio feature "full" (*)
+1tokio feature "macros" (*)
+1tokio feature "rt" (*)
+
+0contextra-avv-generator v0.1.0 (/app/crates/contextra-avv-generator)
+1serde feature "default" (*)
+1serde feature "derive" (*)
+1serde feature "rc" (*)
+1contextra-types feature "default" (command-line) (*)
+1thiserror feature "default" (*)
+
+0contextra-bench v0.1.0 (/app/benchmarks/contextra-bench)
+1contextra-core feature "default" (command-line) (*)
+1serde feature "default" (*)
+1serde feature "derive" (*)
+1serde feature "rc" (*)
+1tempfile feature "default" (*)
+1serde_json feature "default" (*)
+1tokio feature "default" (*)
+1tokio feature "full" (*)
+1tracing feature "default" (*)
+1tracing-subscriber feature "default" (*)
+1tracing-subscriber feature "env-filter" (*)
+1contextra-db feature "default" (command-line) (*)
+1contextra-store feature "default" (command-line) (*)
+1rand feature "default" (*)
+1contextra-graph feature "default" (command-line) (*)
+1anyhow feature "default" (*)
+1contextra-vector feature "default" (command-line) (*)
+1contextra-infer-candle feature "default" (command-line) (*)
+1contextra-text feature "default" (command-line) (*)
+1contextra-infer-onnx feature "default" (command-line)
+2contextra-infer-onnx v0.1.0 (/app/crates/contextra-infer-onnx)
+3serde feature "default" (*)
+3serde feature "derive" (*)
+3serde feature "rc" (*)
+3contextra-ports feature "default" (command-line) (*)
+3contextra-types feature "default" (command-line) (*)
+3tokio feature "default" (*)
+3tokio feature "full" (*)
+3parking_lot feature "default" (*)
+3tracing feature "default" (*)
+3contextra-rank feature "default" (command-line) (*)
+3proptest feature "default" (*)
+3tempfile feature "default" (*)
+3tokio feature "default" (*)
+3tokio feature "full" (*)
+3criterion feature "async_tokio" (*)
+3criterion feature "default" (*)
+1hdrhistogram feature "default"
+2hdrhistogram v7.6.0
+3num-traits feature "default" (*)
+3byteorder feature "default" (*)
+3base64 feature "default"
+4base64 v0.22.1
+4base64 feature "std"
+5base64 v0.22.1
+5base64 feature "alloc"
+6base64 v0.22.1
+3crossbeam-channel feature "default"
+4crossbeam-channel v0.5.17
+5crossbeam-utils v0.8.22
+4crossbeam-channel feature "std"
+5crossbeam-channel v0.5.17 (*)
+5crossbeam-utils feature "std" (*)
+3flate2 feature "default"
+4flate2 v1.1.10
+5crc32fast v1.5.1 (*)
+5miniz_oxide feature "default"
+6miniz_oxide v0.9.1
+7adler2 v2.0.1
+7simd-adler32 v0.3.10
+6miniz_oxide feature "with-alloc"
+7miniz_oxide v0.9.1 (*)
+5miniz_oxide feature "simd"
+6miniz_oxide v0.9.1 (*)
+6miniz_oxide feature "simd-adler32"
+7miniz_oxide v0.9.1 (*)
+4flate2 feature "runtime_detection"
+5flate2 v1.1.10 (*)
+5crc32fast feature "std" (*)
+4flate2 feature "rust_backend"
+5flate2 v1.1.10 (*)
+5flate2 feature "any_impl"
+6flate2 v1.1.10 (*)
+5flate2 feature "miniz_oxide"
+6flate2 v1.1.10 (*)
+6flate2 feature "any_impl" (*)
+3nom feature "default"
+4nom v8.0.0
+5memchr v2.8.3
+4nom feature "std"
+5nom v8.0.0 (*)
+5memchr feature "std" (*)
+5nom feature "alloc"
+6nom v8.0.0 (*)
+2hdrhistogram feature "serialization"
+3hdrhistogram v7.6.0 (*)
+2hdrhistogram feature "sync"
+3hdrhistogram v7.6.0 (*)
+1libc feature "default" (*)
+1criterion feature "async_tokio" (*)
+1criterion feature "default" (*)
+1contextra-sys feature "default" (command-line) (*)
+1redb feature "default" (*)
+1sled feature "default"
+2sled v0.34.7
+3libc feature "default" (*)
+3crossbeam-epoch feature "default"
+4crossbeam-epoch v0.9.20 (*)
+4crossbeam-epoch feature "std" (*)
+3crossbeam-utils feature "default" (*)
+3log feature "default" (*)
+3crc32fast feature "default" (*)
+3fs2 feature "default"
+4fs2 v0.4.3
+5libc feature "default" (*)
+5winapi feature "default"
+6winapi v0.3.9
+7winapi-i686-pc-windows-gnu feature "default"
+8winapi-i686-pc-windows-gnu v0.4.0
+7winapi-x86_64-pc-windows-gnu feature "default"
+8winapi-x86_64-pc-windows-gnu v0.4.0
+5winapi feature "fileapi"
+6winapi v0.3.9 (*)
+5winapi feature "handleapi"
+6winapi v0.3.9 (*)
+5winapi feature "processthreadsapi"
+6winapi v0.3.9 (*)
+5winapi feature "std"
+6winapi v0.3.9 (*)
+5winapi feature "winbase"
+6winapi v0.3.9 (*)
+5winapi feature "winerror"
+6winapi v0.3.9 (*)
+3fxhash feature "default"
+4fxhash v0.2.1
+5byteorder feature "default" (*)
+3parking_lot feature "default"
+4parking_lot v0.11.2
+5lock_api feature "default" (*)
+5instant feature "default"
+6instant v0.1.13
+7cfg-if feature "default" (*)
+5parking_lot_core feature "default"
+6parking_lot_core v0.8.6
+7cfg-if feature "default" (*)
+7libc feature "default" (*)
+7smallvec feature "default" (*)
+7winapi feature "default" (*)
+7winapi feature "errhandlingapi"
+8winapi v0.3.9 (*)
+7winapi feature "handleapi" (*)
+7winapi feature "minwindef"
+8winapi v0.3.9 (*)
+7winapi feature "ntstatus"
+8winapi v0.3.9 (*)
+7winapi feature "winbase" (*)
+7winapi feature "winerror" (*)
+7winapi feature "winnt"
+8winapi v0.3.9 (*)
+7instant feature "default" (*)
+7redox_syscall feature "default"
+8redox_syscall v0.2.16
+9bitflags feature "default" (*)
+2sled feature "no_metrics"
+3sled v0.34.7 (*)
+
+0contextra-checkpoint v0.1.0 (/app/crates/contextra-checkpoint) (*)
+
+0contextra-cognition v0.1.0 (/app/crates/contextra-cognition) (*)
+
+0contextra-core v0.1.0 (/app/crates/contextra-core) (*)
+
+0contextra-crypto v0.1.0 (/app/crates/contextra-crypto) (*)
+
+0contextra-db v0.1.0 (/app/crates/contextra-db) (*)
+
+0contextra-engine v0.1.0 (/app/crates/contextra-engine) (*)
+
+0contextra-graph v0.1.0 (/app/crates/contextra-graph) (*)
+
+0contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle) (*)
+
+0contextra-infer-ollama v0.1.0 (/app/crates/contextra-infer-ollama)
+1serde feature "default" (*)
+1serde feature "derive" (*)
+1serde feature "rc" (*)
+1contextra-ports feature "default" (command-line) (*)
+1contextra-types feature "default" (command-line) (*)
+1serde_json feature "default" (*)
+1futures-util feature "default" (*)
+1tokio feature "default" (*)
+1tokio feature "full" (*)
+1parking_lot feature "default" (*)
+1tracing feature "default" (*)
+1futures feature "default" (*)
+1regex feature "default" (*)
+1rand feature "default" (*)
+1contextra-rank feature "default" (command-line) (*)
+1quick-xml feature "default"
+2quick-xml v0.41.0
+3memchr feature "default" (*)
+1reqwest feature "json"
+2reqwest v0.12.28
+3futures-core v0.3.34
+3futures-util v0.3.34 (*)
+3serde feature "default" (*)
+3bytes feature "default" (*)
+3serde_json feature "default" (*)
+3pin-project-lite feature "default" (*)
+3tokio feature "net" (*)
+3tokio feature "time" (*)
+3wasm-bindgen feature "default" (*)
+3web-sys feature "AbortController"
+4web-sys v0.3.104 (*)
+3web-sys feature "AbortSignal"
+4web-sys v0.3.104 (*)
+4web-sys feature "EventTarget" (*)
+3web-sys feature "Blob"
+4web-sys v0.3.104 (*)
+3web-sys feature "BlobPropertyBag"
+4web-sys v0.3.104 (*)
+3web-sys feature "File"
+4web-sys v0.3.104 (*)
+4web-sys feature "Blob" (*)
+3web-sys feature "FormData"
+4web-sys v0.3.104 (*)
+3web-sys feature "Headers"
+4web-sys v0.3.104 (*)
+3web-sys feature "ReadableStream"
+4web-sys v0.3.104 (*)
+3web-sys feature "Request"
+4web-sys v0.3.104 (*)
+3web-sys feature "RequestCache"
+4web-sys v0.3.104 (*)
+3web-sys feature "RequestCredentials"
+4web-sys v0.3.104 (*)
+3web-sys feature "RequestInit"
+4web-sys v0.3.104 (*)
+3web-sys feature "RequestMode"
+4web-sys v0.3.104 (*)
+3web-sys feature "Response"
+4web-sys v0.3.104 (*)
+3web-sys feature "ServiceWorkerGlobalScope"
+4web-sys v0.3.104 (*)
+4web-sys feature "EventTarget" (*)
+4web-sys feature "WorkerGlobalScope"
+5web-sys v0.3.104 (*)
+5web-sys feature "EventTarget" (*)
+3web-sys feature "Window" (*)
+3web-sys feature "default" (*)
+3js-sys feature "default" (*)
+3log feature "default" (*)
+3tokio-util feature "io"
+4tokio-util v0.7.19 (*)
+3base64 feature "default" (*)
+3http feature "default"
+4http v1.5.0
+5bytes feature "default" (*)
+5itoa feature "default" (*)
+4http feature "std"
+5http v1.5.0 (*)
+3http-body feature "default"
+4http-body v1.1.0
+5bytes feature "default" (*)
+5http feature "default" (*)
+3http-body-util feature "default"
+4http-body-util v0.1.5
+5futures-core v0.3.34
+5bytes feature "default" (*)
+5pin-project-lite feature "default" (*)
+5http feature "default" (*)
+5http-body feature "default" (*)
+3hyper feature "client"
+4hyper v1.11.1
+5bytes feature "default" (*)
+5itoa feature "default" (*)
+5futures-channel feature "default"
+6futures-channel v0.3.34 (*)
+6futures-channel feature "std" (*)
+5futures-core feature "default" (*)
+5pin-project-lite feature "default" (*)
+5tokio feature "default" (*)
+5tokio feature "sync" (*)
+5smallvec feature "const_generics"
+6smallvec v1.15.2 (*)
+5smallvec feature "const_new"
+6smallvec v1.15.2 (*)
+6smallvec feature "const_generics" (*)
+5smallvec feature "default" (*)
+5http feature "default" (*)
+5http-body feature "default" (*)
+5atomic-waker feature "default"
+6atomic-waker v1.1.2
+5httparse feature "default"
+6httparse v1.10.1
+6httparse feature "std"
+7httparse v1.10.1
+5want feature "default"
+6want v0.3.1
+7try-lock feature "default"
+8try-lock v0.2.5
+3hyper feature "default"
+4hyper v1.11.1 (*)
+3hyper feature "http1"
+4hyper v1.11.1 (*)
+3hyper-rustls feature "http1"
+4hyper-rustls v0.27.9
+5hyper v1.11.1 (*)
+5rustls v0.23.43
+6subtle v2.6.1
+6once_cell feature "alloc" (*)
+6once_cell feature "race" (*)
+6zeroize feature "default" (*)
+6ring feature "default"
+7ring v0.17.14
+8cfg-if v1.0.4
+8libc v0.2.189
+8getrandom feature "default" (*)
+8windows-sys feature "Win32_Foundation" (*)
+8windows-sys feature "Win32_System_Threading" (*)
+8windows-sys feature "default" (*)
+8untrusted feature "default"
+9untrusted v0.9.0
+8cc v1.4.4 (*)
+7ring feature "alloc"
+8ring v0.17.14 (*)
+7ring feature "dev_urandom_fallback"
+8ring v0.17.14 (*)
+6rustls-pki-types feature "alloc"
+7rustls-pki-types v1.15.1
+8zeroize feature "default" (*)
+6rustls-pki-types feature "default"
+7rustls-pki-types v1.15.1 (*)
+7rustls-pki-types feature "alloc" (*)
+6rustls-webpki feature "alloc"
+7rustls-webpki v0.103.15
+8ring v0.17.14 (*)
+8rustls-pki-types v1.15.1 (*)
+8untrusted feature "default" (*)
+7ring feature "alloc" (*)
+7rustls-pki-types feature "alloc" (*)
+5tokio-rustls v0.26.4
+6tokio feature "default" (*)
+6rustls feature "std"
+7rustls v0.23.43 (*)
+7once_cell feature "std" (*)
+7rustls-pki-types feature "std"
+8rustls-pki-types v1.15.1 (*)
+8rustls-pki-types feature "alloc" (*)
+7rustls-webpki feature "std"
+8rustls-webpki v0.103.15 (*)
+8rustls-pki-types feature "std" (*)
+8rustls-webpki feature "alloc" (*)
+5tokio feature "default" (*)
+5http feature "default" (*)
+5hyper-util feature "client-legacy"
+6hyper-util v0.1.20
+7futures-util v0.3.34 (*)
+7tokio v1.53.1 (*)
+7libc feature "default" (*)
+7bytes feature "default" (*)
+7futures-channel feature "default" (*)
+7pin-project-lite feature "default" (*)
+7socket2 feature "all" (*)
+7socket2 feature "default" (*)
+7tracing feature "std" (*)
+7base64 feature "default" (*)
+7http feature "default" (*)
+7http-body feature "default" (*)
+7hyper feature "default" (*)
+7ipnet feature "default"
+8ipnet v2.12.1
+8ipnet feature "std"
+9ipnet v2.12.1
+7percent-encoding feature "default"
+8percent-encoding v2.3.2
+8percent-encoding feature "std"
+9percent-encoding v2.3.2
+9percent-encoding feature "alloc"
+10percent-encoding v2.3.2
+7tower-service feature "default"
+8tower-service v0.3.3
+6tokio feature "sync" (*)
+6hyper-util feature "client"
+7hyper-util v0.1.20 (*)
+7tokio feature "net" (*)
+7hyper feature "client" (*)
+7hyper-util feature "tokio"
+8hyper-util v0.1.20 (*)
+8tokio feature "rt" (*)
+8tokio feature "time" (*)
+8hyper-util feature "tokio" (*)
+6hyper-util feature "tokio" (*)
+5hyper-util feature "tokio" (*)
+5tower-service feature "default" (*)
+5webpki-roots feature "default"
+6webpki-roots v1.0.9
+7rustls-pki-types v1.15.1 (*)
+4hyper-util feature "http1"
+5hyper-util v0.1.20 (*)
+5hyper feature "http1" (*)
+3hyper-rustls feature "tls12"
+4hyper-rustls v0.27.9 (*)
+4rustls feature "tls12"
+5rustls v0.23.43 (*)
+4tokio-rustls feature "tls12"
+5tokio-rustls v0.26.4 (*)
+5rustls feature "tls12" (*)
+3hyper-util feature "client" (*)
+3hyper-util feature "client-legacy" (*)
+3hyper-util feature "client-proxy"
+4hyper-util v0.1.20 (*)
+4hyper-util feature "client" (*)
+3hyper-util feature "default"
+4hyper-util v0.1.20 (*)
+3hyper-util feature "http1" (*)
+3hyper-util feature "tokio" (*)
+3percent-encoding feature "default" (*)
+3tower-service feature "default" (*)
+3rustls feature "std" (*)
+3rustls feature "tls12" (*)
+3rustls-pki-types feature "default" (*)
+3rustls-pki-types feature "std" (*)
+3tokio-rustls feature "tls12" (*)
+3webpki-roots feature "default" (*)
+3serde_urlencoded feature "default"
+4serde_urlencoded v0.7.1
+5serde feature "default" (*)
+5itoa feature "default" (*)
+5ryu feature "default" (*)
+5form_urlencoded feature "default"
+6form_urlencoded v1.2.2
+7percent-encoding v2.3.2
+6form_urlencoded feature "std"
+7form_urlencoded v1.2.2 (*)
+7percent-encoding feature "std" (*)
+7form_urlencoded feature "alloc"
+8form_urlencoded v1.2.2 (*)
+8percent-encoding feature "alloc" (*)
+3sync_wrapper feature "default"
+4sync_wrapper v1.0.2
+5futures-core v0.3.34
+3sync_wrapper feature "futures"
+4sync_wrapper v1.0.2 (*)
+4sync_wrapper feature "futures-core"
+5sync_wrapper v1.0.2 (*)
+3tower feature "retry"
+4tower v0.5.3
+5futures-util feature "alloc" (*)
+5futures-core feature "default" (*)
+5pin-project-lite feature "default" (*)
+5tokio feature "default" (*)
+5tower-service feature "default" (*)
+5sync_wrapper feature "default" (*)
+5tower-layer feature "default"
+6tower-layer v0.3.3
+4tokio feature "time" (*)
+4tower feature "tokio"
+5tower v0.5.3 (*)
+4tower feature "util"
+5tower v0.5.3 (*)
+5tower feature "futures-core"
+6tower v0.5.3 (*)
+5tower feature "futures-util"
+6tower v0.5.3 (*)
+5tower feature "pin-project-lite"
+6tower v0.5.3 (*)
+5tower feature "sync_wrapper"
+6tower v0.5.3 (*)
+3tower feature "timeout"
+4tower v0.5.3 (*)
+4tokio feature "time" (*)
+4tower feature "pin-project-lite" (*)
+4tower feature "tokio" (*)
+3tower feature "util" (*)
+3tower-http feature "follow-redirect"
+4tower-http v0.6.11
+5futures-util v0.3.34 (*)
+5bytes feature "default" (*)
+5bitflags feature "default" (*)
+5pin-project-lite feature "default" (*)
+5http feature "default" (*)
+5http-body feature "default" (*)
+5tower-service feature "default" (*)
+5tower feature "default"
+6tower v0.5.3 (*)
+5tower-layer feature "default" (*)
+5url feature "default"
+6url v2.5.8
+7percent-encoding feature "alloc" (*)
+7form_urlencoded feature "alloc" (*)
+7idna feature "alloc"
+8idna v1.1.0
+9smallvec feature "const_generics" (*)
+9smallvec feature "default" (*)
+9idna_adapter feature "default"
+10idna_adapter v1.2.2
+11icu_normalizer v2.3.0
+12icu_collections v2.3.0
+13displaydoc v0.2.7 (proc-macro)
+14proc-macro2 feature "default" (*)
+14quote feature "default" (*)
+14syn feature "default" (*)
+13utf8_iter v1.0.4
+13yoke feature "derive" (*)
+13zerofrom feature "derive" (*)
+13potential_utf feature "zerovec"
+14potential_utf v0.1.6
+15zerovec v0.11.8
+16yoke v0.8.3 (*)
+16zerofrom v0.1.8 (*)
+16zerovec-derive v0.11.6 (proc-macro)
+17proc-macro2 feature "default" (*)
+17quote feature "default" (*)
+17syn feature "default" (*)
+17syn feature "extra-traits"
+18syn v3.0.4 (*)
+13zerovec feature "derive"
+14zerovec v0.11.8 (*)
+13zerovec feature "yoke"
+14zerovec v0.11.8 (*)
+12icu_normalizer_data v2.3.0
+12icu_provider v2.3.1
+13displaydoc v0.2.7 (proc-macro) (*)
+13icu_locale_core v2.3.0
+14displaydoc v0.2.7 (proc-macro) (*)
+14litemap v0.8.3
+14tinystr v0.8.4
+15displaydoc v0.2.7 (proc-macro) (*)
+15zerovec v0.11.8 (*)
+14writeable v0.6.4
+14zerovec v0.11.8 (*)
+13writeable v0.6.4
+13zerotrie v0.2.5
+14displaydoc v0.2.7 (proc-macro) (*)
+14zerofrom v0.1.8 (*)
+14yoke feature "derive" (*)
+13yoke feature "derive" (*)
+13zerofrom feature "derive" (*)
+13zerovec feature "derive" (*)
+12smallvec v1.15.2 (*)
+12zerovec v0.11.8 (*)
+11icu_properties v2.3.0
+12displaydoc v0.2.7 (proc-macro) (*)
+12icu_collections v2.3.0 (*)
+12icu_properties_data v2.3.0
+12icu_provider v2.3.1 (*)
+12zerovec feature "derive" (*)
+12zerovec feature "yoke" (*)
+12icu_locale_core feature "zerovec"
+13icu_locale_core v2.3.0 (*)
+13tinystr feature "zerovec"
+14tinystr v0.8.4 (*)
+12zerotrie feature "yoke"
+13zerotrie v0.2.5 (*)
+12zerotrie feature "zerofrom"
+13zerotrie v0.2.5 (*)
+9utf8_iter feature "default"
+10utf8_iter v1.0.4
+7idna feature "compiled_data"
+8idna v1.1.0 (*)
+8idna_adapter feature "compiled_data"
+9idna_adapter v1.2.2 (*)
+9icu_normalizer feature "compiled_data"
+10icu_normalizer v2.3.0 (*)
+10icu_provider feature "baked"
+11icu_provider v2.3.1 (*)
+9icu_properties feature "compiled_data"
+10icu_properties v2.3.0 (*)
+10icu_provider feature "baked" (*)
+6url feature "std"
+7url v2.5.8 (*)
+7percent-encoding feature "std" (*)
+7form_urlencoded feature "std" (*)
+7idna feature "std"
+8idna v1.1.0 (*)
+8idna feature "alloc" (*)
+4tower feature "util" (*)
+4tower-http feature "futures-util"
+5tower-http v0.6.11 (*)
+4tower-http feature "tower"
+5tower-http v0.6.11 (*)
+3url feature "default" (*)
+3wasm-bindgen-futures feature "default"
+4wasm-bindgen-futures v0.4.77
+5js-sys v0.3.104 (*)
+5wasm-bindgen v0.2.127 (*)
+4wasm-bindgen-futures feature "std"
+5wasm-bindgen-futures v0.4.77 (*)
+5wasm-bindgen feature "std" (*)
+5js-sys feature "std" (*)
+3wasm-streams feature "default"
+4wasm-streams v0.4.2
+5futures-util feature "default" (*)
+5futures-util feature "io" (*)
+5futures-util feature "sink" (*)
+5wasm-bindgen feature "default" (*)
+5web-sys feature "AbortSignal" (*)
+5web-sys feature "QueuingStrategy"
+6web-sys v0.3.104 (*)
+5web-sys feature "ReadableByteStreamController"
+6web-sys v0.3.104 (*)
+5web-sys feature "ReadableStream" (*)
+5web-sys feature "ReadableStreamByobReader"
+6web-sys v0.3.104 (*)
+5web-sys feature "ReadableStreamByobRequest"
+6web-sys v0.3.104 (*)
+5web-sys feature "ReadableStreamDefaultController"
+6web-sys v0.3.104 (*)
+5web-sys feature "ReadableStreamDefaultReader"
+6web-sys v0.3.104 (*)
+5web-sys feature "ReadableStreamGetReaderOptions"
+6web-sys v0.3.104 (*)
+5web-sys feature "ReadableStreamReadResult"
+6web-sys v0.3.104 (*)
+5web-sys feature "ReadableStreamReaderMode"
+6web-sys v0.3.104 (*)
+5web-sys feature "ReadableStreamType"
+6web-sys v0.3.104 (*)
+5web-sys feature "ReadableWritablePair"
+6web-sys v0.3.104 (*)
+5web-sys feature "StreamPipeOptions"
+6web-sys v0.3.104 (*)
+5web-sys feature "TransformStream"
+6web-sys v0.3.104 (*)
+5web-sys feature "TransformStreamDefaultController"
+6web-sys v0.3.104 (*)
+5web-sys feature "Transformer"
+6web-sys v0.3.104 (*)
+5web-sys feature "UnderlyingSink"
+6web-sys v0.3.104 (*)
+5web-sys feature "UnderlyingSource"
+6web-sys v0.3.104 (*)
+5web-sys feature "WritableStream"
+6web-sys v0.3.104 (*)
+5web-sys feature "WritableStreamDefaultController"
+6web-sys v0.3.104 (*)
+5web-sys feature "WritableStreamDefaultWriter"
+6web-sys v0.3.104 (*)
+5web-sys feature "default" (*)
+5js-sys feature "default" (*)
+5wasm-bindgen-futures feature "default" (*)
+1reqwest feature "rustls-tls"
+2reqwest v0.12.28 (*)
+2reqwest feature "rustls-tls-webpki-roots"
+3reqwest v0.12.28 (*)
+3reqwest feature "__rustls-ring"
+4reqwest v0.12.28 (*)
+4hyper-rustls feature "ring"
+5hyper-rustls v0.27.9 (*)
+5rustls feature "ring"
+6rustls v0.23.43 (*)
+6rustls-webpki feature "ring"
+7rustls-webpki v0.103.15 (*)
+4rustls feature "ring" (*)
+4tokio-rustls feature "ring"
+5tokio-rustls v0.26.4 (*)
+5rustls feature "ring" (*)
+3reqwest feature "rustls-tls-webpki-roots-no-provider"
+4reqwest v0.12.28 (*)
+4reqwest feature "__rustls"
+5reqwest v0.12.28 (*)
+5reqwest feature "__tls"
+6reqwest v0.12.28 (*)
+6tokio feature "io-util" (*)
+4hyper-rustls feature "webpki-tokio"
+5hyper-rustls v0.27.9 (*)
+5hyper-rustls feature "webpki-roots"
+6hyper-rustls v0.27.9 (*)
+1reqwest feature "stream"
+2reqwest v0.12.28 (*)
+2tokio feature "fs" (*)
+1proptest feature "default" (*)
+1contextra-infer-onnx feature "default" (command-line) (*)
+1tracing-test feature "default"
+2tracing-test v0.2.6
+3tracing-core feature "default" (*)
+3tracing-subscriber feature "default" (*)
+3tracing-subscriber feature "env-filter" (*)
+3tracing-test-macro feature "default"
+4tracing-test-macro v0.2.6 (proc-macro)
+5quote feature "default" (*)
+5syn feature "default" (*)
+5syn feature "full" (*)
+
+0contextra-infer-onnx v0.1.0 (/app/crates/contextra-infer-onnx) (*)
+
+0contextra-kvcache v0.1.0 (/app/crates/contextra-kvcache) (*)
+
+0contextra-license v0.1.0 (/app/crates/contextra-license) (*)
+
+0contextra-mcp v0.1.0 (/app/crates/contextra-mcp)
+1contextra feature "default" (command-line)
+2contextra v0.1.0 (/app/crates/contextra) (*)
+2contextra feature "candle"
+3contextra v0.1.0 (/app/crates/contextra) (*)
+3contextra feature "contextra-infer-candle"
+4contextra v0.1.0 (/app/crates/contextra) (*)
+2contextra feature "fast"
+3contextra v0.1.0 (/app/crates/contextra) (*)
+1contextra feature "router"
+2contextra v0.1.0 (/app/crates/contextra) (*)
+2contextra feature "contextra-rank"
+3contextra v0.1.0 (/app/crates/contextra) (*)
+2contextra feature "contextra-router"
+3contextra v0.1.0 (/app/crates/contextra) (*)
+1serde feature "default" (*)
+1serde feature "derive" (*)
+1serde feature "rc" (*)
+1contextra-ports feature "default" (command-line) (*)
+1contextra-types feature "default" (command-line) (*)
+1serde_json feature "default" (*)
+1thiserror feature "default" (*)
+1futures-util feature "default" (*)
+1tokio feature "default" (*)
+1tokio feature "full" (*)
+1parking_lot feature "default" (*)
+1tracing feature "default" (*)
+1tracing-subscriber feature "default" (*)
+1tracing-subscriber feature "env-filter" (*)
+1contextra-wire feature "default" (command-line) (*)
+1contextra-crypto feature "default" (command-line) (*)
+1zeroize feature "default" (*)
+1zeroize feature "zeroize_derive" (*)
+1rand feature "default" (*)
+1scc feature "default" (*)
+1tokio-util feature "codec"
+2tokio-util v0.7.19 (*)
+2tokio-util feature "libc"
+3tokio-util v0.7.19 (*)
+1tokio-util feature "default" (*)
+1contextra-rank feature "default" (command-line) (*)
+1contextra-license feature "default" (command-line) (*)
+1contextra-privacy feature "default" (command-line) (*)
+1unicode-normalization feature "default"
+2unicode-normalization v0.1.25
+3tinyvec feature "alloc"
+4tinyvec v1.12.0
+5tinyvec_macros feature "default"
+6tinyvec_macros v0.1.1
+4tinyvec feature "tinyvec_macros"
+5tinyvec v1.12.0 (*)
+3tinyvec feature "default"
+4tinyvec v1.12.0 (*)
+2unicode-normalization feature "std"
+3unicode-normalization v0.1.25 (*)
+1tempfile feature "default" (*)
+
+0contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc) (*)
+
+0contextra-ports v0.1.0 (/app/crates/contextra-ports) (*)
+
+0contextra-privacy v0.1.0 (/app/crates/contextra-privacy) (*)
+
+0contextra-py v0.1.0 (/app/crates/contextra-py)
+1contextra-core feature "default" (command-line) (*)
+1contextra-types feature "default" (command-line) (*)
+1serde_json feature "default" (*)
+1tokio feature "default" (*)
+1tokio feature "full" (*)
+1parking_lot feature "default" (*)
+1flatbuffers feature "default" (*)
+1contextra-db feature "default" (command-line) (*)
+1contextra-adapt feature "default" (command-line) (*)
+1contextra-store feature "default" (command-line) (*)
+1contextra-rank feature "default" (command-line) (*)
+1contextra-router feature "default" (command-line) (*)
+1numpy feature "default"
+2numpy v0.24.0
+3libc feature "default" (*)
+3num-traits feature "default" (*)
+3rustc-hash feature "default" (*)
+3num-complex feature "default"
+4num-complex v0.4.6 (*)
+4num-complex feature "std"
+5num-complex v0.4.6 (*)
+5num-traits feature "std" (*)
+3ndarray feature "default"
+4ndarray v0.15.6
+5num-complex v0.4.6 (*)
+5num-integer v0.1.47
+6num-traits feature "i128" (*)
+5num-traits v0.2.19 (*)
+5matrixmultiply feature "cgemm"
+6matrixmultiply v0.3.11
+7rawpointer feature "default"
+8rawpointer v0.2.1
+7autocfg feature "default" (*)
+5rawpointer feature "default" (*)
+4ndarray feature "std"
+5ndarray v0.15.6 (*)
+5num-traits feature "std" (*)
+5matrixmultiply feature "std"
+6matrixmultiply v0.3.11 (*)
+3num-integer feature "default"
+4num-integer v0.1.47 (*)
+4num-integer feature "std"
+5num-integer v0.1.47 (*)
+5num-traits feature "std" (*)
+3pyo3 feature "macros"
+4pyo3 v0.24.2
+5cfg-if feature "default" (*)
+5libc feature "default" (*)
+5once_cell feature "default" (*)
+5portable-atomic feature "default" (*)
+5indoc feature "default"
+6indoc v2.0.7 (proc-macro)
+7rustversion feature "default" (*)
+5inventory feature "default"
+6inventory v0.3.24
+7rustversion feature "default" (*)
+5memoffset feature "default"
+6memoffset v0.9.1
+7autocfg feature "default" (*)
+5pyo3-ffi feature "default"
+6pyo3-ffi v0.24.2
+7libc feature "default" (*)
+7pyo3-build-config feature "default"
+8pyo3-build-config v0.24.2
+9once_cell feature "default" (*)
+9target-lexicon feature "default"
+10target-lexicon v0.13.5
+9target-lexicon feature "default" (*)
+7pyo3-build-config feature "resolve-config"
+8pyo3-build-config v0.24.2 (*)
+5pyo3-macros feature "default"
+6pyo3-macros v0.24.2 (proc-macro)
+7proc-macro2 v1.0.107 (*)
+7quote feature "default" (*)
+7syn feature "default" (*)
+7syn feature "extra-traits" (*)
+7syn feature "full" (*)
+7pyo3-macros-backend feature "default"
+8pyo3-macros-backend v0.24.2
+9proc-macro2 v1.0.107 (*)
+9quote v1.0.47 (*)
+9syn feature "clone-impls" (*)
+9syn feature "derive" (*)
+9syn feature "extra-traits" (*)
+9syn feature "full" (*)
+9syn feature "parsing" (*)
+9syn feature "printing" (*)
+9heck feature "default" (*)
+9pyo3-build-config feature "default" (*)
+9pyo3-build-config feature "resolve-config" (*)
+9pyo3-build-config feature "default" (*)
+5unindent feature "default"
+6unindent v0.2.4
+5pyo3-build-config feature "default" (*)
+5pyo3-build-config feature "resolve-config" (*)
+4pyo3 feature "indoc"
+5pyo3 v0.24.2 (*)
+4pyo3 feature "pyo3-macros"
+5pyo3 v0.24.2 (*)
+4pyo3 feature "unindent"
+5pyo3 v0.24.2 (*)
+3pyo3-build-config feature "default" (*)
+3pyo3-build-config feature "resolve-config" (*)
+1pyo3 feature "abi3-py38"
+2pyo3 v0.24.2 (*)
+2pyo3 feature "abi3-py39"
+3pyo3 v0.24.2 (*)
+3pyo3 feature "abi3-py310"
+4pyo3 v0.24.2 (*)
+4pyo3 feature "abi3-py311"
+5pyo3 v0.24.2 (*)
+5pyo3 feature "abi3-py312"
+6pyo3 v0.24.2 (*)
+6pyo3 feature "abi3-py313"
+7pyo3 v0.24.2 (*)
+7pyo3 feature "abi3"
+8pyo3 v0.24.2 (*)
+8pyo3-build-config feature "abi3"
+9pyo3-build-config v0.24.2 (*)
+8pyo3-ffi feature "abi3"
+9pyo3-ffi v0.24.2 (*)
+9pyo3-build-config feature "abi3" (*)
+7pyo3-build-config feature "abi3-py313"
+8pyo3-build-config v0.24.2 (*)
+8pyo3-build-config feature "abi3" (*)
+7pyo3-ffi feature "abi3-py313"
+8pyo3-ffi v0.24.2 (*)
+8pyo3-build-config feature "abi3-py313" (*)
+8pyo3-ffi feature "abi3" (*)
+6pyo3-build-config feature "abi3-py312"
+7pyo3-build-config v0.24.2 (*)
+7pyo3-build-config feature "abi3-py313" (*)
+6pyo3-ffi feature "abi3-py312"
+7pyo3-ffi v0.24.2 (*)
+7pyo3-build-config feature "abi3-py312" (*)
+7pyo3-ffi feature "abi3-py313" (*)
+5pyo3-build-config feature "abi3-py311"
+6pyo3-build-config v0.24.2 (*)
+6pyo3-build-config feature "abi3-py312" (*)
+5pyo3-ffi feature "abi3-py311"
+6pyo3-ffi v0.24.2 (*)
+6pyo3-build-config feature "abi3-py311" (*)
+6pyo3-ffi feature "abi3-py312" (*)
+4pyo3-build-config feature "abi3-py310"
+5pyo3-build-config v0.24.2 (*)
+5pyo3-build-config feature "abi3-py311" (*)
+4pyo3-ffi feature "abi3-py310"
+5pyo3-ffi v0.24.2 (*)
+5pyo3-build-config feature "abi3-py310" (*)
+5pyo3-ffi feature "abi3-py311" (*)
+3pyo3-build-config feature "abi3-py39"
+4pyo3-build-config v0.24.2 (*)
+4pyo3-build-config feature "abi3-py310" (*)
+3pyo3-ffi feature "abi3-py39"
+4pyo3-ffi v0.24.2 (*)
+4pyo3-build-config feature "abi3-py39" (*)
+4pyo3-ffi feature "abi3-py310" (*)
+2pyo3-build-config feature "abi3-py38"
+3pyo3-build-config v0.24.2 (*)
+3pyo3-build-config feature "abi3-py39" (*)
+2pyo3-ffi feature "abi3-py38"
+3pyo3-ffi v0.24.2 (*)
+3pyo3-build-config feature "abi3-py38" (*)
+3pyo3-ffi feature "abi3-py39" (*)
+1pyo3 feature "default"
+2pyo3 v0.24.2 (*)
+2pyo3 feature "macros" (*)
+1pyo3 feature "extension-module"
+2pyo3 v0.24.2 (*)
+2pyo3-ffi feature "extension-module"
+3pyo3-ffi v0.24.2 (*)
+3pyo3-build-config feature "extension-module"
+4pyo3-build-config v0.24.2 (*)
+1pyo3 feature "multiple-pymethods"
+2pyo3 v0.24.2 (*)
+2pyo3 feature "inventory"
+3pyo3 v0.24.2 (*)
+2pyo3 feature "pyo3-macros" (*)
+2pyo3-macros feature "multiple-pymethods"
+3pyo3-macros v0.24.2 (proc-macro) (*)
+1pythonize feature "default"
+2pythonize v0.24.0
+3pyo3 v0.24.2 (*)
+3serde feature "std" (*)
+
+0contextra-rank v0.1.0 (/app/crates/contextra-rank) (*)
+
+0contextra-router v0.1.0 (/app/crates/contextra-router) (*)
+
+0contextra-sandbox v0.1.0 (/app/crates/contextra-sandbox) (*)
+
+0contextra-simd v0.1.0 (/app/crates/contextra-simd) (*)
+
+0contextra-store v0.1.0 (/app/crates/contextra-store) (*)
+
+0contextra-sys v0.1.0 (/app/crates/contextra-sys) (*)
+
+0contextra-testkit v0.1.0 (/app/crates/contextra-testkit) (*)
+
+0contextra-text v0.1.0 (/app/crates/contextra-text) (*)
+
+0contextra-types v0.1.0 (/app/crates/contextra-types) (*)
+
+0contextra-vector v0.1.0 (/app/crates/contextra-vector) (*)
+
+0contextra-wire v0.1.0 (/app/crates/contextra-wire) (*)
+
+0xtask v0.1.0 (/app/xtask)
+1serde feature "default" (*)
+1serde feature "derive" (*)
+1quote feature "default" (*)
+1blake3 feature "default" (*)
+1tempfile feature "default" (*)
+1serde_json feature "default" (*)
+1regex feature "default" (*)
+1walkdir feature "default" (*)
+1toml feature "default" (*)
+1cargo_metadata feature "default"
+2cargo_metadata v0.18.1
+3serde feature "default" (*)
+3serde feature "derive" (*)
+3serde_json feature "default" (*)
+3serde_json feature "unbounded_depth"
+4serde_json v1.0.151 (*)
+3semver feature "default"
+4semver v1.0.28 (*)
+4semver feature "std"
+5semver v1.0.28 (*)
+3semver feature "serde"
+4semver v1.0.28 (*)
+3thiserror feature "default" (*)
+3camino feature "default"
+4camino v1.2.6
+5serde_core feature "default"
+6serde_core v1.0.229 (*)
+6serde_core feature "result" (*)
+6serde_core feature "std" (*)
+3camino feature "serde1"
+4camino v1.2.6 (*)
+3cargo-platform feature "default"
+4cargo-platform v0.1.9
+5serde feature "default" (*)
+1chrono feature "default"
+2chrono v0.4.45
+3num-traits v0.2.19 (*)
+3windows-link feature "default" (*)
+3wasm-bindgen feature "default" (*)
+3js-sys feature "default" (*)
+3iana-time-zone feature "default"
+4iana-time-zone v0.1.65
+5wasm-bindgen feature "default" (*)
+5js-sys feature "default" (*)
+5log feature "default" (*)
+5android_system_properties feature "default"
+6android_system_properties v0.1.6
+7libc feature "default" (*)
+5core-foundation-sys feature "default"
+6core-foundation-sys v0.8.7
+6core-foundation-sys feature "link"
+7core-foundation-sys v0.8.7
+5iana-time-zone-haiku feature "default"
+6iana-time-zone-haiku v0.1.2
+7cc feature "default" (*)
+5windows-core feature "default"
+6windows-core v0.62.2
+7windows-implement v0.60.2 (proc-macro)
+8proc-macro2 v1.0.107 (*)
+8quote v1.0.47 (*)
+8syn feature "clone-impls" (*)
+8syn feature "full" (*)
+8syn feature "parsing" (*)
+8syn feature "printing" (*)
+8syn feature "proc-macro" (*)
+7windows-interface v0.59.3 (proc-macro)
+8proc-macro2 v1.0.107 (*)
+8quote v1.0.47 (*)
+8syn feature "clone-impls" (*)
+8syn feature "full" (*)
+8syn feature "parsing" (*)
+8syn feature "printing" (*)
+8syn feature "proc-macro" (*)
+7windows-link v0.2.1
+7windows-result v0.4.1 (*)
+7windows-strings v0.5.1
+8windows-link v0.2.1
+6windows-core feature "std"
+7windows-core v0.62.2 (*)
+7windows-result feature "std" (*)
+7windows-strings feature "std"
+8windows-strings v0.5.1 (*)
+3iana-time-zone feature "fallback"
+4iana-time-zone v0.1.65 (*)
+2chrono feature "clock"
+3chrono v0.4.45 (*)
+3chrono feature "iana-time-zone"
+4chrono v0.4.45 (*)
+3chrono feature "now"
+4chrono v0.4.45 (*)
+4chrono feature "std"
+5chrono v0.4.45 (*)
+5chrono feature "alloc"
+6chrono v0.4.45 (*)
+3chrono feature "winapi"
+4chrono v0.4.45 (*)
+4chrono feature "windows-link"
+5chrono v0.4.45 (*)
+2chrono feature "oldtime"
+3chrono v0.4.45 (*)
+2chrono feature "std" (*)
+2chrono feature "wasmbind"
+3chrono v0.4.45 (*)
+3chrono feature "js-sys"
+4chrono v0.4.45 (*)
+3chrono feature "wasm-bindgen"
+4chrono v0.4.45 (*)
+1globset feature "default"
+2globset v0.4.20
+3regex-syntax feature "std" (*)
+3aho-corasick feature "default" (*)
+3regex-automata feature "hybrid" (*)
+3regex-automata feature "meta" (*)
+3regex-automata feature "nfa" (*)
+3regex-automata feature "perf" (*)
+3regex-automata feature "std" (*)
+3regex-automata feature "syntax" (*)
+3log feature "default" (*)
+3bstr feature "std"
+4bstr v1.13.1
+5memchr v2.8.3
+4memchr feature "std" (*)
+4bstr feature "alloc"
+5bstr v1.13.1 (*)
+5memchr feature "alloc" (*)
+2globset feature "log"
+3globset v0.4.20 (*)
+1proc-macro2 feature "default"
+2proc-macro2 v1.0.107
+3unicode-ident feature "default" (*)
+2proc-macro2 feature "proc-macro"
+3proc-macro2 v1.0.107 (*)
+1proc-macro2 feature "span-locations"
+2proc-macro2 v1.0.107 (*)
+1syn feature "default"
+2syn v2.0.119
+3proc-macro2 v1.0.107 (*)
+3quote v1.0.47 (*)
+3unicode-ident feature "default" (*)
+2syn feature "clone-impls"
+3syn v2.0.119 (*)
+2syn feature "derive"
+3syn v2.0.119 (*)
+2syn feature "parsing"
+3syn v2.0.119 (*)
+2syn feature "printing"
+3syn v2.0.119 (*)
+2syn feature "proc-macro"
+3syn v2.0.119 (*)
+3quote feature "proc-macro" (*)
+3proc-macro2 feature "proc-macro" (*)
+1syn feature "extra-traits"
+2syn v2.0.119 (*)
+1syn feature "full"
+2syn v2.0.119 (*)
+1syn feature "visit"
+2syn v2.0.119 (*)

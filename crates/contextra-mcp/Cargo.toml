@@ -12,6 +12,9 @@ ring = "4"
 [features]
 default = []
 candle = ["dep:contextra-infer-candle"]
+kv-bridge = []
+onnx = []
+ollama = []
 test-utils = []
 
 [dependencies]

@@ -29,6 +29,7 @@ block-cache-v2 = ["dep:quick_cache"]
 sieve-cache = []
 docid-128 = ["contextra-types/docid-128"]
 legacy-wal-key = []
+encryption-at-rest = []
 
 [dependencies]
 contextra-types = { workspace = true }
@@ -59,6 +60,7 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 [dev-dependencies]
 contextra-store = { path = ".", features = ["test-hooks"] }
 contextra-testkit = { workspace = true }
+toml = "0.8"
 contextra-vector = { workspace = true }
 contextra-graph = { workspace = true }
 contextra-sandbox = { workspace = true }

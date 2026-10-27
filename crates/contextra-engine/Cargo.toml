@@ -25,7 +25,11 @@ blake3 = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-text = { workspace = true }
 contextra-checkpoint = { workspace = true }
+contextra-graph = { workspace = true }
 contextra-rank = { workspace = true }
+contextra-adapt = { workspace = true }
+contextra-kvcache = { workspace = true }
+contextra-infer-candle = { workspace = true }
 ahash = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
@@ -58,13 +62,13 @@ default = []
 onnx = []
 reranking = []
 # Assumes contextra-store has the encryption-at-rest feature (Aufgabe 7 / Spec §15.2)
-encryption-at-rest = ["dep:contextra-crypto", "contextra-store/encryption-at-rest"]
+encryption-at-rest = ["dep:contextra-crypto", ]
 bench = []
 sandbox = ["dep:contextra-sandbox"]
 experimental-diskann = ["contextra-vector/experimental-diskann"]
 background-maintenance = []
-graph-connectivity-health = []
-edge-reinforcement-learning = []
+graph-connectivity-health = ["contextra-graph/physio-percolation"]
+edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
 coherence-bonus-fusion = []
 adaptive-candidate-pool-sizing = []
 entity-extraction = []

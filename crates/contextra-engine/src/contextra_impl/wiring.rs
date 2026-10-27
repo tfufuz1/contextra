@@ -22,4 +22,11 @@ impl Contextra {
     ) {
         *self.calibrator.write() = Some(calibrator);
     }
+
+    pub fn set_pid_controller(
+        &self,
+        pid_controller: std::sync::Weak<parking_lot::Mutex<contextra_adapt::PidController>>,
+    ) {
+        *self.pid_controller.write() = Some(pid_controller);
+    }
 }
