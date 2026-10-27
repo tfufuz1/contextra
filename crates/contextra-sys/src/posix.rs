@@ -13,10 +13,7 @@ pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Resu
     let path_c = CString::new(path.as_os_str().as_bytes())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
 
-    // SAFETY:
-    // 1. `path_c` is a valid NUL-terminated C string.
-    // 2. `open`, `dup2`, and `close` are standard POSIX syscall wrappers.
-    // 3. `target_fd` is a valid file descriptor in the current process.
+    // SAFETY: path_c is a valid NUL-terminated C string, target_fd is a valid file descriptor in current process, and open/dup2/close are standard POSIX syscall wrappers.
     unsafe {
         let fd = libc::open(path_c.as_ptr(), flags);
         if fd < 0 {
