@@ -1,0 +1,12 @@
+Befehl: cargo fetch --locked
+rustc -V: rustc 1.89.0 (29483883e 2025-08-04)
+Commit-Hash: 53c7d51401d5b67ce3358d5729fabd5b1f85fd4f
+Exit-Code: 0
+Dauer in Sekunden: 1.22
+Anzahl ausgeführter Tests: 0
+Anzahl übersprungener Tests: 0
+SHA-256 des Rohprotokolls: b1f161f95cd13585999cda6f7875b542560deed59fab70063c5c6c22384bc259
+----------------------------------------
+=== STDOUT ===
+
+=== STDERR ===

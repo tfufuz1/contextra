@@ -1,0 +1,16 @@
+Befehl: cargo mutants
+rustc -V: rustc 1.89.0 (29483883e 2025-08-04)
+Commit-Hash: 53c7d51401d5b67ce3358d5729fabd5b1f85fd4f
+Exit-Code: 101
+Dauer in Sekunden: 0.09
+Anzahl ausgeführter Tests: 0
+Anzahl übersprungener Tests: 0
+SHA-256 des Rohprotokolls: c068a07a6f20fdbcff12cdcff88f4c6480da3fcf586c5d3f8950da411dd25411
+----------------------------------------
+=== STDOUT ===
+
+=== STDERR ===
+error: no such command: `mutants`
+
+help: view all installed commands with `cargo --list`
+help: find a package to install `mutants` with `cargo search cargo-mutants`

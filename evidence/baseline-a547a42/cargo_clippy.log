@@ -1,0 +1,147 @@
+Befehl: cargo clippy --workspace --all-targets --locked -- -D warnings
+rustc -V: rustc 1.89.0 (29483883e 2025-08-04)
+Commit-Hash: 53c7d51401d5b67ce3358d5729fabd5b1f85fd4f
+Exit-Code: 101
+Dauer in Sekunden: 13.24
+Anzahl ausgeführter Tests: 0
+Anzahl übersprungener Tests: 0
+SHA-256 des Rohprotokolls: 8f5cb2a7ad6718ae31c7ec8c62ad4ac84ef38b094fe352924bd04190b3f66a72
+----------------------------------------
+=== STDOUT ===
+
+=== STDERR ===
+    Checking contextra-types v0.1.0 (/app/crates/contextra-types)
+   Compiling contextra-wire v0.1.0 (/app/crates/contextra-wire)
+    Checking contextra-sys v0.1.0 (/app/crates/contextra-sys)
+    Checking cranelift-codegen v0.112.3
+    Checking wasmtime-types v25.0.3
+    Checking cobs v0.3.0
+    Checking termcolor v1.4.1
+    Checking leb128 v0.2.7
+   Compiling rustix v0.38.44
+    Checking wasm-encoder v0.217.1
+    Checking wasmprinter v0.217.1
+error: casting `f64` to `usize` may truncate the value
+   --> crates/contextra-types/src/types/budget.rs:179:45
+    |
+179 |             BudgetStrategy::Conservative => (self.limit as f64 * 0.8) as usize,
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+    = note: `-D clippy::cast-possible-truncation` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::cast_possible_truncation)]`
+
+error: casting `f64` to `usize` may lose the sign of the value
+   --> crates/contextra-types/src/types/budget.rs:179:45
+    |
+179 |             BudgetStrategy::Conservative => (self.limit as f64 * 0.8) as usize,
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+    = note: `-D clippy::cast-sign-loss` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::cast_sign_loss)]`
+
+error: casting `f64` to `usize` may truncate the value
+   --> crates/contextra-types/src/types/budget.rs:180:43
+    |
+180 |             BudgetStrategy::Aggressive => (self.limit as f64 * 0.95) as usize,
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+
+error: casting `f64` to `usize` may lose the sign of the value
+   --> crates/contextra-types/src/types/budget.rs:180:43
+    |
+180 |             BudgetStrategy::Aggressive => (self.limit as f64 * 0.95) as usize,
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+
+error: casting `f64` to `u64` may truncate the value
+   --> crates/contextra-types/src/types/budget.rs:431:30
+    |
+431 |         self.memory_used() < (self.budget.memory_limit as f64 * 0.95) as u64
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+
+error: casting `f64` to `u64` may lose the sign of the value
+   --> crates/contextra-types/src/types/budget.rs:431:30
+    |
+431 |         self.memory_used() < (self.budget.memory_limit as f64 * 0.95) as u64
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+
+error: casting `f64` to `u32` may truncate the value
+   --> crates/contextra-types/src/types/domain/document.rs:125:20
+    |
+125 |                 Ok((dist.clamp(0.0, 2.0) * 1_000_000.0) as u32)
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+
+error: casting `f64` to `u32` may lose the sign of the value
+   --> crates/contextra-types/src/types/domain/document.rs:125:20
+    |
+125 |                 Ok((dist.clamp(0.0, 2.0) * 1_000_000.0) as u32)
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+
+error: casting `i64` to `u64` may lose the sign of the value
+   --> crates/contextra-types/src/types/domain/document.rs:131:28
+    |
+131 |                     sum += (diff * diff) as u64;
+    |                            ^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+
+error: casting `f64` to `u32` may truncate the value
+   --> crates/contextra-types/src/types/domain/document.rs:135:20
+    |
+135 |                 Ok(dist_rounded.min(u32::MAX as f64) as u32)
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+
+error: casting `f64` to `u32` may lose the sign of the value
+   --> crates/contextra-types/src/types/domain/document.rs:135:20
+    |
+135 |                 Ok(dist_rounded.min(u32::MAX as f64) as u32)
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+
+error: casting `u64` to `u32` may truncate the value
+   --> crates/contextra-types/src/types/domain/document.rs:143:35
+    |
+143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;
+143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));
+    |
+
+error: indexing may panic
+  --> crates/contextra-types/src/types/domain/misc.rs:36:13
+   |
+36 |             bytes[i] =
+   |             ^^^^^^^^
+   |
+   = help: consider using `.get(n)` or `.get_mut(n)` instead
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#indexing_slicing
+   = note: requested on the command line with `-D clippy::indexing-slicing`
+
+    Checking postcard v1.1.3
+error: could not compile `contextra-types` (lib) due to 13 previous errors
+warning: build failed, waiting for other jobs to finish...
