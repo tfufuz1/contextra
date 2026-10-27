@@ -1,6 +1,7 @@
 use super::*;
-use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
 use contextra_ports::Rng;
+use contextra_ports::VectorIndex;
+use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
 use parking_lot::Mutex;
 
 fn test_config(dim: usize) -> HnswConfig {

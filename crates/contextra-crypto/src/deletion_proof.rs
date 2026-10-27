@@ -405,20 +405,18 @@ impl DeletionProof {
         let timestamp = clock.now_unix_nanos() / 1_000_000_000;
 
         match key.into() {
-            SigningKeyHandle::Ed25519(sk) => {
-                Self::create_full_v3(
-                    scope,
-                    Vec::new(),
-                    ctx.tx_id,
-                    Vec::new(),
-                    excluded.to_vec(),
-                    None,
-                    None,
-                    timestamp as i64,
-                    &[],
-                    sk,
-                )
-            }
+            SigningKeyHandle::Ed25519(sk) => Self::create_full_v3(
+                scope,
+                Vec::new(),
+                ctx.tx_id,
+                Vec::new(),
+                excluded.to_vec(),
+                None,
+                None,
+                timestamp as i64,
+                &[],
+                sk,
+            ),
             SigningKeyHandle::Hmac(hmac_key) => {
                 let scope_bytes = bincode::serialize(&scope)
                     .map_err(|e| ContextraError::Internal(e.to_string()))?;
@@ -1016,13 +1014,7 @@ mod tests {
 
         // 3. Satisfied conditions -> Ok
         let w_valid = vec![
-            LayerWitness::issue_from_scanner(
-                "LsmMemtable",
-                10,
-                0,
-                ScanMethod::Structural,
-                [0; 32],
-            ),
+            LayerWitness::issue_from_scanner("LsmMemtable", 10, 0, ScanMethod::Structural, [0; 32]),
             LayerWitness::issue_from_scanner(
                 "HnswIndex",
                 0,
@@ -1040,7 +1032,10 @@ mod tests {
             hmac_key.as_slice(),
             &clock,
         );
-        assert!(res3.is_ok(), "Satisfied witnesses MUST produce Ok(DeletionProof)");
+        assert!(
+            res3.is_ok(),
+            "Satisfied witnesses MUST produce Ok(DeletionProof)"
+        );
         let proof = res3.unwrap();
         assert_eq!(proof.covered_layers.len(), 2);
         assert!(proof.verify(hmac_key.as_slice()).unwrap());

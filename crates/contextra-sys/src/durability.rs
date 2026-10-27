@@ -88,9 +88,7 @@ pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
         let handle = file.as_raw_handle() as windows_sys::Win32::Foundation::HANDLE;
         let _ = metadata_changed;
         // SAFETY: `handle` is a valid OS file handle obtained from `std::fs::File::as_raw_handle()`.
-        let res = unsafe {
-            windows_sys::Win32::Storage::FileSystem::FlushFileBuffers(handle)
-        };
+        let res = unsafe { windows_sys::Win32::Storage::FileSystem::FlushFileBuffers(handle) };
         if res != 0 {
             Ok(())
         } else {

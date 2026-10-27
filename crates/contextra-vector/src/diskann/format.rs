@@ -3,7 +3,7 @@
 // INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
 // NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 pub(crate) const DISKANN_MAGIC: &[u8; 4] = b"DANN";
 pub(crate) const DISKANN_VERSION: u16 = 1;

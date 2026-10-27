@@ -165,9 +165,9 @@ mod loom_tests {
                 sorted_unique_shards(keys.iter().copied(), self.shard_count, &self.hasher);
             let mut guards = Vec::with_capacity(shard_indices.len());
             for idx in shard_indices {
-                let guard = self.shards[idx]
-                    .lock()
-                    .map_err(|_| contextra_types::ContextraError::Internal("Lock poisoned".to_string()))?;
+                let guard = self.shards[idx].lock().map_err(|_| {
+                    contextra_types::ContextraError::Internal("Lock poisoned".to_string())
+                })?;
                 guards.push(guard);
             }
             Ok(guards)

@@ -1,9 +1,10 @@
-use contextra_core::{ContextraError, DistanceMetric, DocId, TxId, VectorIndex};
+use contextra_ports::VectorIndex;
+use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use contextra_vector::persistence::MmapIndex;
 
 #[tokio::test]
-async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_core::Result<()> {
+async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_types::Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("test_docid_128.hnsw");
 
@@ -41,7 +42,7 @@ async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_core::Result<()> {
 }
 
 #[tokio::test]
-async fn test_docid_format_mismatch_detection() -> contextra_core::Result<()> {
+async fn test_docid_format_mismatch_detection() -> contextra_types::Result<()> {
     let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
     let path = temp_dir.path().join("mismatch.hnsw");
 

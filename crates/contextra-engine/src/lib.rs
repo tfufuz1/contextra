@@ -108,7 +108,6 @@ mod no_crypto_stubs {
         TxId(0)
     }
 
-
     impl DeletionProof {
         pub fn create(
             scope: DeletionScope,
@@ -248,6 +247,8 @@ pub use background_workers::{start_expiry_cleanup_worker, start_orphan_cleanup_w
 
 #[cfg(not(loom))]
 pub use collection::crud::MAX_SCAN_RESULTS;
+#[cfg(feature = "graph-connectivity-health")]
+pub use collection::maintenance::PercolationConfig;
 #[cfg(not(loom))]
 #[cfg(feature = "graph-connectivity-health")]
 pub use collection::maintenance::PercolationResult;
@@ -256,8 +257,6 @@ pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWe
 #[cfg(not(loom))]
 pub use collection::{Collection, CollectionConfig};
 pub use contextra_checkpoint;
-#[cfg(feature = "graph-connectivity-health")]
-pub use collection::maintenance::PercolationConfig;
 pub use contextra_text::Language;
 #[cfg(not(loom))]
 #[allow(deprecated)]

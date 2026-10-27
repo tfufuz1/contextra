@@ -85,7 +85,12 @@ impl AdaptiveDecayController {
     }
 
     #[inline]
-    pub fn should_evict(&self, base_score: f32, elapsed_tx: u64, inputs: &DecaySignalInputs) -> bool {
+    pub fn should_evict(
+        &self,
+        base_score: f32,
+        elapsed_tx: u64,
+        inputs: &DecaySignalInputs,
+    ) -> bool {
         self.effective_score(base_score, elapsed_tx, inputs) < self.config.eviction_threshold
     }
 }

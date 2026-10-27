@@ -251,7 +251,9 @@ fn test_s4_1000_pairs_equivalence_threshold() {
 fn test_simd_remainder_boundary_lengths_f32() {
     // Tests boundary vector lengths across SIMD chunk sizes (4, 8, 16, 32, 64)
     // to verify remainder loop handling for cosine, euclidean, and dot product distances.
-    let boundary_lengths = [0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129];
+    let boundary_lengths = [
+        0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129,
+    ];
 
     for &len in &boundary_lengths {
         let a: Vec<f32> = (0..len).map(|i| (i as f32) * 0.1 - 2.0).collect();
@@ -291,7 +293,11 @@ fn test_simd_remainder_boundary_lengths_f32() {
         let b_bytes: Vec<u8> = b.iter().flat_map(|x| x.to_le_bytes()).collect();
         let cos_bytes_scalar = cosine_distance_f32_bytes_scalar(&a, &b_bytes);
         let cos_bytes_dispatch = cosine_distance_f32_bytes(&a, &b_bytes).unwrap();
-        let cos_bytes_tol = 1e-4 * cos_bytes_scalar.abs().max(cos_bytes_dispatch.abs()).max(1.0);
+        let cos_bytes_tol = 1e-4
+            * cos_bytes_scalar
+                .abs()
+                .max(cos_bytes_dispatch.abs())
+                .max(1.0);
         assert!(
             (cos_bytes_scalar - cos_bytes_dispatch).abs() <= cos_bytes_tol,
             "Cosine f32_bytes remainder mismatch at len {len}"
@@ -299,7 +305,11 @@ fn test_simd_remainder_boundary_lengths_f32() {
 
         let euc_bytes_scalar = euclidean_distance_f32_bytes_scalar(&a, &b_bytes);
         let euc_bytes_dispatch = euclidean_distance_f32_bytes(&a, &b_bytes).unwrap();
-        let euc_bytes_tol = 1e-3 * euc_bytes_scalar.abs().max(euc_bytes_dispatch.abs()).max(1.0);
+        let euc_bytes_tol = 1e-3
+            * euc_bytes_scalar
+                .abs()
+                .max(euc_bytes_dispatch.abs())
+                .max(1.0);
         assert!(
             (euc_bytes_scalar - euc_bytes_dispatch).abs() <= euc_bytes_tol,
             "Euclidean f32_bytes remainder mismatch at len {len}"
@@ -307,7 +317,11 @@ fn test_simd_remainder_boundary_lengths_f32() {
 
         let dot_bytes_scalar = dot_product_f32_bytes_scalar(&a, &b_bytes);
         let dot_bytes_dispatch = dot_product_distance_f32_bytes(&a, &b_bytes).unwrap();
-        let dot_bytes_tol = 1e-3 * dot_bytes_scalar.abs().max(dot_bytes_dispatch.abs()).max(1.0);
+        let dot_bytes_tol = 1e-3
+            * dot_bytes_scalar
+                .abs()
+                .max(dot_bytes_dispatch.abs())
+                .max(1.0);
         assert!(
             (dot_bytes_scalar - dot_bytes_dispatch).abs() <= dot_bytes_tol,
             "Dot product f32_bytes remainder mismatch at len {len}"
@@ -317,7 +331,9 @@ fn test_simd_remainder_boundary_lengths_f32() {
 
 #[test]
 fn test_simd_remainder_boundary_lengths_u8() {
-    let boundary_lengths = [0, 1, 2, 3, 4, 7, 8, 15, 16, 31, 32, 33, 63, 64, 65, 127, 128];
+    let boundary_lengths = [
+        0, 1, 2, 3, 4, 7, 8, 15, 16, 31, 32, 33, 63, 64, 65, 127, 128,
+    ];
 
     for &len in &boundary_lengths {
         let a: Vec<u8> = (0..len).map(|i| (i * 7) as u8).collect();

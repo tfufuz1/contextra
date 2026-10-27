@@ -11,7 +11,7 @@ use super::format::{
     DISKANN_VERSION,
 };
 use super::types::{DiskAnnIndex, DiskAnnIndexInner};
-use contextra_core::{ContextraError, DocId, Result};
+use contextra_types::{ContextraError, DocId, Result};
 use std::sync::atomic::Ordering;
 
 impl DiskAnnIndex {
@@ -630,7 +630,7 @@ impl DiskAnnIndex {
 mod tests {
     use super::*;
     use crate::diskann::config::DiskAnnConfig;
-    use contextra_core::{DistanceMetric, DocId};
+    use contextra_types::{DistanceMetric, DocId};
 
     #[cfg(feature = "docid-128")]
     #[tokio::test]
@@ -657,10 +657,7 @@ mod tests {
         let doc1 = DocId::from(large_id1);
         let doc2 = DocId::from(large_id2);
 
-        let vectors = vec![
-            vec![1.0, 0.0, 0.0, 0.0],
-            vec![2.0, 0.0, 0.0, 0.0],
-        ];
+        let vectors = vec![vec![1.0, 0.0, 0.0, 0.0], vec![2.0, 0.0, 0.0, 0.0]];
         let ids = vec![doc1, doc2];
 
         index.build(&vectors, &ids).await?;

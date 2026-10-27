@@ -1,6 +1,6 @@
 #![cfg(feature = "experimental-rabitq")]
 
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 use contextra_vector::quantize_rabitq::RaBitQQuantizer;
 
 struct SplitMix64 {

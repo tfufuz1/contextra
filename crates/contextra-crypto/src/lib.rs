@@ -40,8 +40,8 @@ pub use audit_chain::{
 pub use crypto::KeyManager as CryptoKey;
 pub use crypto::KeyManager;
 pub use deletion_proof::{
-    CustodyLevel, DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope,
-    ExcludedScope, LayerCleanupProof, SigningKeyHandle,
+    CustodyLevel, DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
+    LayerCleanupProof, SigningKeyHandle,
 };
 pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};

@@ -66,7 +66,10 @@ async fn test_recovery_fd_exhaustion_regression() {
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     // Artificially lower FD limit to 64 to test recovery under tight file descriptor limits.
-    assert!(contextra_sys::set_fd_limit(64), "Failed to set RLIMIT_NOFILE");
+    assert!(
+        contextra_sys::set_fd_limit(64),
+        "Failed to set RLIMIT_NOFILE"
+    );
 
     let config = LsmConfig {
         path: db_path.clone(),

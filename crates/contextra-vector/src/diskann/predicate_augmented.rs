@@ -5,7 +5,7 @@
 //              Deterministische Sortierung (Score absteigend, DocId aufsteigend), Schranke MAX_SEARCH_K.
 
 use super::types::{DiskAnnIndex, SearchCandidate};
-use contextra_core::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
+use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashSet};
 
@@ -29,10 +29,10 @@ impl DiskAnnIndex {
         filter: &(dyn Fn(DocId) -> bool + Send + Sync),
         gamma: usize,
     ) -> Result<Vec<ScoredDocument>> {
-        if k == 0 || k > contextra_core::MAX_SEARCH_K {
+        if k == 0 || k > contextra_types::MAX_SEARCH_K {
             return Err(ContextraError::invalid_input(format!(
                 "Requested k ({k}) is invalid or exceeds maximum allowed search limit ({})",
-                contextra_core::MAX_SEARCH_K
+                contextra_types::MAX_SEARCH_K
             )));
         }
 
@@ -190,7 +190,8 @@ impl DiskAnnIndex {
 mod tests {
     use super::*;
     use crate::diskann::config::DiskAnnConfig;
-    use contextra_core::{DistanceMetric, DocId, VectorIndex};
+    use contextra_ports::VectorIndex;
+    use contextra_types::{DistanceMetric, DocId};
 
     #[tokio::test]
     async fn test_gamma_zero_regression_reduction() -> Result<()> {
