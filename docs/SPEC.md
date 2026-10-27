@@ -1,4 +1,4 @@
-# Contextra – Gesamtspezifikation 2.2 (eigenständige Fassung, Zielzustand v1.0)
+# Contextra – Gesamtspezifikation 2.3 (eigenständige Fassung, Zielzustand v1.0)
 
 > **Fassung 2.3 (Entwurf, Löschpfad überarbeitet):** Auf Basis von 2.2.1. **§12 ist vollständig durch die überarbeitete Löschspezifikation ersetzt** (zehn Löschschichten, Wirkungsklassen L/P/C*/C1–C3/M, Schlüsselvernichtung als Ebene B, Destroy-Protokoll, Epoch Seal, Zwei-Spuren-Backup, Berichtsformat V5). Alle davon abhängigen Stellen in §0 bis §11 und §13 bis §26 sind angepasst; die Änderungen stehen in §26.5. Rechtsfragen bleiben in §25.1 offen.
 
@@ -85,7 +85,7 @@ Dieses Dokument beschreibt den **Zielzustand v1.0** und den **Weg dorthin** (§2
 |Quelle|Stand|Stufe|
 |---|---|---|
 |Repo-Klon, HEAD `922f4098` (Merge PR #5287)|25.10.2026|gelesen|
-|Maschinelle Zählung und Messungen, Commit `c4f7299b6`, 84.864 Code-Zeilen; Spikes E1/E2|Einzelläufe|gemessen (einmalig)|
+|Maschinelle Zählung und Messungen, Commit `db68bdf74`, 125.348 Code-Zeilen gesamt (71.898 Kernprodukt); Spikes E1/E2|Einzelläufe|gemessen (einmalig)|
 |Heuristik-Scan (automatischer Prüf-Scanner), Lauf auf Commit `d11ea8cbd`, 42 Crates, 184 Kanten|älter als HEAD|Heuristik: liefert Prüfaufträge, keine Beweise|
 |Erneuter Klon, HEAD `8c6b470` (Merge PR #5298), 33 Crates|26.10.2026|gelesen (Stichproben: Stub, Mandanten-Hooks, Löschtests, Features, `unsafe`, Mock-Typen)|
 |Funktionsinventar, HEAD `8c6b470`, 5.034 Funktionen|maschinell|ausgewertet; Zeilen = Funktionsrümpfe inkl. Tests, **nicht** mit Code-Zeilen vergleichbar|
@@ -353,7 +353,7 @@ Budgets sind Obergrenzen in Code-Zeilen (§1.3), gemessen auf Commit `c4f7299b6`
 
 **Archiv** (Tag `archiv/v0`, aus dem Workspace), 25.981 Zeilen + `contextra-core` 106: `graph`, `cognition`, `adapt`, `kvcache`, `router`, `agent`, `infer-onnx`, `infer-ollama`, `vector/diskann`, `rank` ohne `fusion/`, `contextra-core` (Kompatibilitätsfassade, entfällt; keine neuen Abhängigkeiten darauf). Beschreibung: Anhang B.
 
-**Werkzeug-Crates:** `testkit` (Fixtures, Chaos-Harness, `FaultVfs`, `ManualClock`, Fake-Verwahrer; nur `dev-dependency`, nie in Release-/Default-Features), `xtask` (Gates; 31.991 Code-Zeilen, **Schutzpfad**; Zeilenziel erst nach Inventar, §17.9), `xtask-heavy` (Fuzz/Miri/Mutation/Chaos), `bench` (Suite, Baselines inkl. fremder Referenzen; 4.303 Zeilen; enthält `unsafe`; von Kernaussagen getrennt, §17.10).
+**Werkzeug-Crates:** `testkit` (Fixtures, Chaos-Harness, `FaultVfs`, `ManualClock`, Fake-Verwahrer; nur `dev-dependency`, nie in Release-/Default-Features), `xtask` (Gates; **Schutzpfad**; Zeilenziel setzt die Inventar-Auswertung, Evidenz `evidence/xtask-inventory/`, §17.3/§22), `xtask-heavy` (Fuzz/Miri/Mutation/Chaos), `bench` (Suite, Baselines inkl. fremder Referenzen; 4.303 Zeilen; enthält `unsafe`; von Kernaussagen getrennt, §17.10).
 
 ### 4.3 Zielstruktur der Kern-Crates (Module)
 
@@ -1863,7 +1863,7 @@ Jede Änderung beginnt mit einem fehlschlagenden Test, der die Anforderung oder 
 
 Jedes Gate ist eine Zeile in `governance/gates.toml` mit Name, Phase, Pflichtstatus (lokal oder CI), Risikoklasse, Besitzer und Fixture. Ein Gate, das nicht ausgeführt wurde, ist rot (INV-EVIDENCE-1). Ring-, Kanten- und Feature-Prüfungen laufen über `cargo metadata` mit aufgelösten Features (Regel „Compiler vor Heuristik“, EP11). Öffentliche API prüft `cargo public-api`.
 
-Die folgende Tabelle führt die Gates, die diese Spezifikation nennt. Die Spalte „Repo-Stand“ wurde am Klon `a547a42a3` geprüft (siehe §21).
+Die folgende Tabelle führt die Gates, die diese Spezifikation nennt. Der jeweilige Status wird dynamisch in den generierten Berichten erfasst (INV-DOC-SINGLE-SOURCE-1, siehe `cargo xtask verify`).
 
 | Gate (Spezifikation) | Prüft | Repo-Stand |
 |---|---|---|
@@ -1873,31 +1873,31 @@ Die folgende Tabelle führt die Gates, die diese Spezifikation nennt. Die Spalte
 | `feature-matrix` | Feature wirkt und ist getestet (REQ-ARCH-012/020) | vorhanden |
 | `public-api` | Oberfläche, Schlüssel nicht erreichbar (REQ-ARCH-014, INV-SCAN-1) | vorhanden |
 | `wired` | Verdrahtung und Selbsttest (P29, REQ-ARCH-010) | vorhanden |
-| `security-ports` | reale Implementierung je Sicherheitsport (INV-WIRING-2) | Gate vorhanden; **Datei `governance/security_ports.toml` fehlt** |
-| `key-purposes` | Zweckregister gegen Code (INV-KEYPURPOSE-1) | Gate vorhanden; **Datei `governance/key_purposes.toml` fehlt** |
+| `security-ports` | reale Implementierung je Sicherheitsport (INV-WIRING-2) | Gate im Katalog vorhanden (`governance/security_ports.toml` vorhanden) |
+| `key-purposes` | Zweckregister gegen Code (INV-KEYPURPOSE-1) | Gate im Katalog vorhanden (`governance/key_purposes.toml` vorhanden) |
 | `witness-mint` | `LayerWitness` nur in Scannern (INV-WITNESS-MINT-1) | vorhanden |
 | `deletion-types-once` | Löschtypen genau einmal (REQ-DEL-027) | vorhanden |
 | `deletion-honesty` | Außentexte gegen K1-Claims (INV-CLAIMS-1, REQ-DEL-035) | vorhanden |
-| `surface-coverage` | jede persistente Dateiklasse einer Löschschicht zugeordnet (INV-SURFACE-1, §12.4) | nicht vorhanden |
-| `claim-generator` | Außentexte nur aus Satzbibliothek, jeder Satz an Messwert gebunden (INV-CLAIM-BIND-1, AC-24) | nicht vorhanden |
+| `surface-coverage` | jede persistente Dateiklasse einer Löschschicht zugeordnet (INV-SURFACE-1, §12.4) | im Gate-Katalog vorhanden |
+| `claim-generator` | Außentexte nur aus Satzbibliothek, jeder Satz an Messwert gebunden (INV-CLAIM-BIND-1, AC-24) | im Gate-Katalog vorhanden |
 | `doc-truth` | Konstanten, Ringe, IDs gegen Code (INV-DOC-SINGLE-SOURCE-1) | vorhanden |
 | `symbol-uniqueness` | doppelt vergebene IDs und Symbole | vorhanden |
 | `determinism` / `ratchet` | P28, Ratchet-Baselines, Verbotsliste | vorhanden |
 | `format-registry` | jede Datei im Datenverzeichnis hat einen Registereintrag (§7.11) | Entsprechung `format-corpus`; Registerprüfung nicht geprüft |
-| `no-security-stub` | keine Sicherheitsstubs (A1) | nicht als Gate-Name vorhanden |
-| `inv-coverage` | jede INV mit Test (A8) | nicht als Gate-Name vorhanden |
-| `error-domain` | alle Fehler münden in `ContextraError` (A6) | nicht als Gate-Name vorhanden |
-| `doc-stamp` | Dokumentstempel und Single Source (A9) | nicht als Gate-Name vorhanden |
-| `loc-budget` | Code-Zeilenbudget nach `loc.py` (§1.3, §4.2) | Werkzeug `tools/loc.py` vorhanden; Gate nicht |
-| `boot-order` | Phasen B0–B9 in Reihenfolge (INV-BOOT-1) | nicht als Gate-Name vorhanden |
-| `async-io` | kein Blockieren im async-Kontext (REQ-ASYNC-2) | nicht als Gate-Name vorhanden |
-| `unbounded-spawn` | jede `spawn`-Stelle begrenzt (REQ-ASYNC-3) | nicht als Gate-Name vorhanden |
+| `no-security-stub` | keine Sicherheitsstubs (A1) | im Gate-Katalog vorhanden |
+| `inv-coverage` | jede INV mit Test (A8) | im Gate-Katalog vorhanden |
+| `error-domain` | alle Fehler münden in `ContextraError` (A6) | im Gate-Katalog vorhanden |
+| `doc-stamp` | Dokumentstempel und Single Source (A9) | im Gate-Katalog vorhanden |
+| `loc-budget` | Code-Zeilenbudget nach `loc.py` (§1.3, §4.2) | im Gate-Katalog vorhanden |
+| `boot-order` | Phasen B0–B9 in Reihenfolge (INV-BOOT-1) | im Gate-Katalog vorhanden |
+| `async-io` | kein Blockieren im async-Kontext (REQ-ASYNC-2) | im Gate-Katalog vorhanden |
+| `unbounded-spawn` | jede `spawn`-Stelle begrenzt (REQ-ASYNC-3) | im Gate-Katalog vorhanden |
 | `check-max-results-unbound` | `max_results` nie unbegrenzt (§11.4) | xtask-Modul vorhanden |
 | `check-recall-stability` | Recall-Stabilität (§11.9) | xtask-Modul vorhanden |
 | `check-nan-hot-loop` | NaN-Prüfung im Hot-Loop (§11.9) | xtask-Modul vorhanden |
 | `check-flatbuffers-drift` | Wire-Schema gegen generierten Code (§7.11) | xtask-Modul vorhanden |
-| `check-ring0-async-purity` | keine Async-Runtime in Ring 0 (P26, REQ-ASYNC-1) | xtask-Modul vorhanden (`ring0-async` im Gate-Katalog) |
-| `product-hull`, `module-removal` | Produkt baut ohne Rand-Module (§4.5) | nicht als Gate-Name vorhanden |
+| `ring0-async` | keine Async-Runtime in Ring 0 (P26, REQ-ASYNC-1) | im Gate-Katalog vorhanden |
+| `product-hull`, `module-removal` | Produkt baut ohne Rand-Module (§4.5) | `product-hull` im Gate-Katalog vorhanden |
 
 Weitere Gates des Repos ohne Entsprechung in dieser Tabelle (u. a. `merge-result-build`, `protected-paths`, `gate-weakening`, `test-integrity`, `scope-guard`, `provenance`, `claims-in-pr`, `veto-guard`, `adr-index`, `deny`, `audit`, `sbom`, `fuzz-matrix`, `fuzz-regression`, `miri`, `loom-inventory`, `mutation`, `chaos`, `bench-regression`, `platform-matrix`, `evidence-complete`, `gate-selftests`, `catalog-sync`, `ci-hygiene`) sind mit den Abschnitten §17.1, §18.2 und §18.4 abgedeckt.
 
@@ -2568,6 +2568,14 @@ Die Punkte sind offene Prüfaufträge an die Projektverantwortlichen, eine Facha
 
 Ergänzt: §13 bis §26, Anhang A, Anhang B. Die Ergänzung löst alle Verweise auf §13 bis §26 auf. Offen bleiben die in §25 geführten Punkte, die Zahlen in `budgets.toml` und der Inhalt der Arbeitspakete in Dokument B.
 
+### 26.5 Änderungen in Fassung 2.3 (Löschpfad)
+
+1. **§12 vollständig ersetzt** durch die überarbeitete Löschspezifikation (zehn Schichten, Klassen L/P/C\*/C1–C3/M, Schlüsselvernichtung als Ebene B mit Destroy-Protokoll und Epoch Seal, Fast-Path vor Hygiene, gestufte Siegel, Zwei-Spuren-Backup mit `ErasedSetMirror`, Mixed-Policy, Referenz-Hash statt Commitment, Berichtsformat V5, Satzbibliothek, Abnahmekriterien AC-1 bis AC-33).
+2. **Angepasst:** §0.2 Regel 9, §0.3, §0.5, §2.3, §2.4 (G1 bis G3), §2.6, §3.4 (sieben Invarianten verschärft oder geändert, neun neu), §4.2/§4.3, §5.2, §7.2, §7.4, §13.5, §13.8, §14.2, §15.1/§15.2/§15.5, §16, §17.3/§17.5, §18.6, §19 (Löschanforderungen), §20 (E26/E27 geändert, E44 bis E51 neu), §21 (U-39 bis U-42), §22 (WP L-1 bis L-13), §25 (P-21, P-22, O-34 bis O-41), Anhang A.
+3. **Nicht rückführbar (bewusst offen):** Inhalt von AC-7, AC-12, AC-14, AC-15 und der Entscheidungen E5 bis E14 usw. (§25.3).
+4. **Nicht am Code geprüft:** U-39 bis U-42 stammen aus dem Anhang und sind am Repository nicht verifiziert. Rechtsfundstellen mit ◐/○ sind vor Außennutzung im Volltext zu prüfen (P-14).
+5. **Zu klären vor Freigabe:** O-15 (Standard-Policy `Rewrite`), E44 (teilweise Rücknahme von E27), Aktivierung von K2/K3, Zählung der Invarianten und Anforderungen durch das Doc-Truth-Gate.
+
 ---
 
 ## Anhang A. Feature- und Crate-Katalog (`[R]`, `[E]`)
@@ -2608,14 +2616,4 @@ Die folgenden Crates und Module sind aus dem Workspace entfernt und stehen im Gi
 | `contextra-core` | 106 | Kompatibilitätsfassade, entfällt | REQ-ARCH-013 |
 
 Die Gesamtsumme der Archiv-Zeilen ist 25.981 (ohne `contextra-core`). Die Zeilenangaben je Modul sind in der Vorgängerfassung nicht getrennt ausgewiesen; sie bleiben offen, bis das Archiv geprüft ist.
-
----
-
-### 26.5 Änderungen in Fassung 2.3 (Löschpfad)
-
-1. **§12 vollständig ersetzt** durch die überarbeitete Löschspezifikation (zehn Schichten, Klassen L/P/C\*/C1–C3/M, Schlüsselvernichtung als Ebene B mit Destroy-Protokoll und Epoch Seal, Fast-Path vor Hygiene, gestufte Siegel, Zwei-Spuren-Backup mit `ErasedSetMirror`, Mixed-Policy, Referenz-Hash statt Commitment, Berichtsformat V5, Satzbibliothek, Abnahmekriterien AC-1 bis AC-33).
-2. **Angepasst:** §0.2 Regel 9, §0.3, §0.5, §2.3, §2.4 (G1 bis G3), §2.6, §3.4 (sieben Invarianten verschärft oder geändert, neun neu), §4.2/§4.3, §5.2, §7.2, §7.4, §13.5, §13.8, §14.2, §15.1/§15.2/§15.5, §16, §17.3/§17.5, §18.6, §19 (Löschanforderungen), §20 (E26/E27 geändert, E44 bis E51 neu), §21 (U-39 bis U-42), §22 (WP L-1 bis L-13), §25 (P-21, P-22, O-34 bis O-41), Anhang A.
-3. **Nicht rückführbar (bewusst offen):** Inhalt von AC-7, AC-12, AC-14, AC-15 und der Entscheidungen E5 bis E14 usw. (§25.3).
-4. **Nicht am Code geprüft:** U-39 bis U-42 stammen aus dem Anhang und sind am Repository nicht verifiziert. Rechtsfundstellen mit ◐/○ sind vor Außennutzung im Volltext zu prüfen (P-14).
-5. **Zu klären vor Freigabe:** O-15 (Standard-Policy `Rewrite`), E44 (teilweise Rücknahme von E27), Aktivierung von K2/K3, Zählung der Invarianten und Anforderungen durch das Doc-Truth-Gate.
 

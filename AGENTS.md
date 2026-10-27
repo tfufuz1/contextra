@@ -22,7 +22,7 @@ Quality Gates dürfen niemals durch Ausnahmen, Sonderregeln oder lokale Override
 
 > **Agenten-spezifische Anleitungen:**
 > - `@Jules` → lies Abschnitt 2a und folge `.agents/jules/SESSION_BOOTSTRAP.md`
-> - `Claude` / Antigravity → ignoriere Abschnitt 2a, lies stattdessen `CLAUDE.md`
+> - `Claude` / Antigravity → CLAUDE.md, danach AGENTS.md §2b, §3, §4
 > - Alle anderen Agenten → Abschnitt 2b reicht
 
 ---
@@ -81,7 +81,7 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für R
 
 ---
 
-## 3. Verifizieren, Rebase & Gate-Integrität (§27.5, §27.6, REQ-QA-010)
+## 3. Verifizieren, Rebase & Gate-Integrität (SPEC §18.2, §17.3 (Meta-Gate), REQ-QA-010)
 
 - „Fertig" bedeutet ausnahmslos: Alle relevanten Gates, Lints und Tests auf dem Merge-Ergebnis sind grün (REQ-QA-010).
 - **Rebase-Pflicht (hochfrequentierte Entwicklung):** Vor jedem PR zwingend `git fetch origin && git rebase origin/main` ausführen. Nach dem Rebase Gates erneut prüfen. Kein PR ohne sauberen Rebase auf main.
@@ -203,34 +203,7 @@ Folgende Ports MÜSSEN in Produktion real implementiert sein. Null-/Test-/Accept
 
 ## 8. Aktueller Implementierungsstatus (IST-Befunde)
 
-> Basierend auf PLAN.md §1 (Kernbefunde) und Commit `a547a42`.
-> Aktuelle Gates laufen auf main via CI.
-
-### 8.1 Kritische Sofort-Maßnahmen (Phase 0–1, bereits in Arbeit)
-
-| ID | Befund | Gate | WP |
-|----|--------|------|-----|
-| B-02 | Engine-Sicherheitsstub: `DeletionProof::verify → Ok(true)` | `no-security-stub` | WP 1.1 |
-| B-04 | MCP: Literal-Schlüssel `default_test_deletion_proof_key`, Mandanten-Fallback auf `SYSTEM` | `no-literal-secrets` | WP 1.2 |
-| B-07 | Schlüsselableitung per HKDF statt Argon2id (INV-KDF-1 verletzt) | `key-kdf` | WP 5.1 |
-| B-08 | Ports der Löschkette (`Vfs`, `LayerScanner` etc.) fehlen komplett | `security-ports` | WP 3.2 |
-| B-12 | HNSW: Slot-Wiederverwendung ohne Nullung (INV-HNSW-SLOT-1 verletzt) | `hnsw-slot` | WP 6.2 |
-| B-14 | Kern hängt hart am Rand (engine→graph, adapt, kvcache; INV-CORE-ISOLATION-1) | `ring-layering` | WP 2.x |
-| B-15 | `encryption-at-rest` als optionales Feature (A1 verletzt) | `no-security-stub` | WP 1.1 |
-
-### 8.2 Gate-Lage (Scan auf `a547a42`)
-
-| Gate | Status | Verstöße |
-|------|--------|----------|
-| `ring-layering` | 🔴 | 2 Fehler + 66 Warnungen |
-| `feature-consistency` | 🔴 | 24 |
-| `test-surface` | 🔴 | 18 |
-| `determinism` | 🔴 | 44 Zeitaufrufe (35 in aktiven Crates) |
-| `async-io` | 🔴 | 18 |
-| `unsafe-audit` | 🔴 | 5 SAFETY-Lücken |
-| `raw-carrier` | 🔴 | 2 |
-| `deletion-honesty` | 🟡 | grün (sieht Lücken nicht) |
-| `doc-stamp` | 🟡 | 7 Warnungen |
+Die aktuellen IST-Befunde und Messwerte stehen in der generierten Datei `docs/spec/IST-BEFUNDE.md` (geplant in PLAN WP 0.2) sowie in den Ausgaben von `cargo xtask verify`.
 
 ---
 
