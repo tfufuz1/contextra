@@ -29,9 +29,10 @@ pub struct EvidenceIndex {
     pub entries: Vec<EvidenceIndexEntry>,
 }
 
-pub fn save_evidence(
+pub fn save_evidence_with_log(
     evidence_dir: &Path,
     record: &EvidenceRecord,
+    raw_log: &str,
 ) -> Result<(), String> {
     fs::create_dir_all(evidence_dir)
         .map_err(|e| format!("Failed to create evidence dir {}: {}", evidence_dir.display(), e))?;
@@ -43,8 +44,19 @@ pub fn save_evidence(
     fs::write(&file_path, &json_bytes)
         .map_err(|e| format!("Failed to write evidence record to {}: {}", file_path.display(), e))?;
 
+    let log_path = evidence_dir.join(format!("{}.log", record.gate));
+    fs::write(&log_path, raw_log.as_bytes())
+        .map_err(|e| format!("Failed to write raw log file to {}: {}", log_path.display(), e))?;
+
     update_index(evidence_dir)?;
     Ok(())
+}
+
+pub fn save_evidence(
+    evidence_dir: &Path,
+    record: &EvidenceRecord,
+) -> Result<(), String> {
+    save_evidence_with_log(evidence_dir, record, "")
 }
 
 fn update_index(evidence_dir: &Path) -> Result<(), String> {

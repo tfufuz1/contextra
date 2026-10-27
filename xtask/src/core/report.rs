@@ -28,10 +28,21 @@ impl VerificationReport {
         let mut items = Vec::new();
 
         for (rec, outcome) in records {
+            // Outcome::NotDue and Outcome::OtherTier are not included in counted total/passed/failed/error totals.
+            if matches!(outcome, Outcome::NotDue { .. } | Outcome::OtherTier { .. }) {
+                items.push(ReportGateItem {
+                    gate: rec.gate.clone(),
+                    outcome: outcome.clone(),
+                    duration_ms: rec.duration_ms,
+                });
+                continue;
+            }
+
             match outcome {
                 Outcome::Pass | Outcome::NotApplicable { .. } => passed_gates += 1,
                 Outcome::Fail { .. } => failed_gates += 1,
-                Outcome::Error { .. } => error_gates += 1,
+                Outcome::Error { .. } | Outcome::NotRun { .. } => error_gates += 1,
+                Outcome::NotDue { .. } | Outcome::OtherTier { .. } => unreachable!(),
             }
             items.push(ReportGateItem {
                 gate: rec.gate.clone(),
@@ -40,11 +51,12 @@ impl VerificationReport {
             });
         }
 
+        let counted_total = passed_gates + failed_gates + error_gates;
         let overall_passed = failed_gates == 0 && error_gates == 0;
 
         VerificationReport {
             overall_passed,
-            total_gates: records.len(),
+            total_gates: counted_total,
             passed_gates,
             failed_gates,
             error_gates,
@@ -56,12 +68,7 @@ impl VerificationReport {
         let mut out = String::new();
         out.push_str("=== VERIFICATION REPORT ===\n");
         for item in &self.items {
-            let status = match &item.outcome {
-                Outcome::Pass => "PASS".to_string(),
-                Outcome::NotApplicable { reason } => format!("N/A ({})", reason),
-                Outcome::Fail { reason } => format!("FAIL ({})", reason),
-                Outcome::Error { message } => format!("ERROR ({})", message),
-            };
+            let status = item.outcome.status_str();
             out.push_str(&format!("{:<30} {:<30} ({} ms)\n", item.gate, status, item.duration_ms));
         }
         out.push_str("----------------------------\n");
