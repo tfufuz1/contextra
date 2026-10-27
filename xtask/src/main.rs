@@ -73,6 +73,17 @@ fn main() {
         std::process::exit(code);
     }
 
+    if cmd == "gate-check" {
+        let res = xtask::legacy::gov::run_gov_command(cmd, cmd_args);
+        match res {
+            Ok(()) => std::process::exit(0),
+            Err(e) => {
+                eprintln!("{}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
     if cmd == "gate-list" {
         let ctx = xtask::core::ctx::Context::discover();
         let catalog_path = ctx.root_dir.join("governance/gates.toml");

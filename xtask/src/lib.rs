@@ -8,6 +8,7 @@ pub mod check_duplicate_core_primitives;
 pub mod check_phantom_files;
 pub mod check_vetoes;
 pub mod core;
+pub mod gate_check;
 pub mod gates;
 pub mod generate_diagnostics;
 pub mod harness;

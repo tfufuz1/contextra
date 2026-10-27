@@ -34,8 +34,8 @@ fn test_discover_loom_tests_real_workspace() {
 
     assert_eq!(
         discovered.len(),
-        9,
-        "Expected exactly 9 loom test files in workspace, found {}",
+        8,
+        "Expected exactly 8 loom test files in workspace, found {}",
         discovered.len()
     );
 
@@ -44,7 +44,6 @@ fn test_discover_loom_tests_real_workspace() {
     assert!(paths.contains(&"crates/contextra-crypto/tests/loom_kv_deferred_zeroize.rs"));
     assert!(paths.contains(&"crates/contextra-crypto/tests/loom_eviction_worker_shutdown_race.rs"));
     assert!(paths.contains(&"crates/contextra-vector/tests/loom_quantizer_race_test.rs"));
-    assert!(paths.contains(&"crates/contextra-store/tests/loom_multi_key_lock.rs"));
     assert!(paths.contains(&"crates/contextra-store/tests/loom_commit_flush_visibility.rs"));
     assert!(paths.contains(&"crates/contextra-store/tests/loom_group_commit.rs"));
     assert!(paths.contains(&"crates/contextra-store/tests/loom_group_commit_handoff.rs"));

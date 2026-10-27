@@ -1,0 +1,5 @@
+title = "Geschützte Pfade (protected-paths)"
+what = "Dateien in geschützten Pfaden wurden ohne ADR-Trailer oder PR-Label modifiziert."
+why = "Geschützte Pfade betreffen CI/CD, Governance, Werkzeuge und Verfassung."
+fix = "Ergänze einen ADR-Trailer in der Commit-Nachricht und setze das PR-Label 'protected-path'."
+anti_fix = "Regel aufweichen oder Pfad aus protected-paths.toml entfernen."
