@@ -37,39 +37,29 @@ members = [
     "crates/contextra-license",
     "xtask",
 ]
-# Excluded from default-members per Spezifikation Section 0.5 / A.3 ("Pure Rust, kein Server"):
-# - contextra-sandbox: WASM boundary (opt-in sandbox)
-# - contextra-py: PyO3/NumPy FFI bindings
-# - contextra-infer-ollama: External process provider dependency
-# - contextra-infer-onnx: Native ONNX runtime C-library dependency
-# These crates remain in `members` and can be built explicitly via `cargo build -p <crate>`.
+# Excluded from default-members per PLAN §3 / capabilities.toml (Ring 0-4 Core Product):
+# - Archive Crates (WP 2.1): contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama, contextra-core
+# - Marginal/Experimental Crates: contextra-infer-candle, contextra-privacy, contextra-sandbox, contextra-py, contextra-license, contextra-audit-export, contextra-avv-generator
+# - Benchmarks & Tools: contextra-bench, xtask
+# These crates remain in `members` until physical removal (WP 2.1b) and can be built explicitly via `cargo build -p <crate>`.
 default-members = [
     "crates/contextra-wire",
     "crates/contextra-sys",
     "crates/contextra-simd",
-    "crates/contextra-core",
-    "crates/contextra-store",
-    "crates/contextra-vector",
-    "crates/contextra-db",
-    "crates/contextra-text",
-    "crates/contextra-checkpoint",
-    "crates/contextra-crypto",
-    "crates/contextra-privacy",
-    "crates/contextra-graph",
-    "crates/contextra-mcp",
-    "crates/contextra-agent",
-    "crates/contextra-router",
-    "crates/contextra-infer-candle",
-    "crates/contextra-testkit",
-    "crates/contextra",
     "crates/contextra-types",
     "crates/contextra-ports",
     "crates/contextra-mvcc",
-    "crates/contextra-adapt",
-    "crates/contextra-kvcache",
-    "crates/contextra-engine",
-    "crates/contextra-cognition",
+    "crates/contextra-crypto",
+    "crates/contextra-vector",
+    "crates/contextra-text",
     "crates/contextra-rank",
+    "crates/contextra-store",
+    "crates/contextra-checkpoint",
+    "crates/contextra-engine",
+    "crates/contextra-db",
+    "crates/contextra-mcp",
+    "crates/contextra",
+    "crates/contextra-testkit",
 ]
 
 [workspace.package]
