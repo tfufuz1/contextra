@@ -11,11 +11,17 @@ fn test_j41_tenant_id_u64_to_u32_truncation_oracle() {
 
     // Narrowing cast check
     let truncated = large_tenant_u64 as u32;
-    assert_eq!(truncated, 1, "Demonstrating that `as u32` silently truncates upper 32 bits");
+    assert_eq!(
+        truncated, 1,
+        "Demonstrating that `as u32` silently truncates upper 32 bits"
+    );
 
     // Safe conversion via u32::try_from
     let safe_conv = u32::try_from(large_tenant_u64);
-    assert!(safe_conv.is_err(), "u32::try_from must fail for values > u32::MAX");
+    assert!(
+        safe_conv.is_err(),
+        "u32::try_from must fail for values > u32::MAX"
+    );
 
     // TenantId::try_new with truncated vs full u64
     let tenant_res = TenantId::try_new(u64::from(truncated));

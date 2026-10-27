@@ -1,4 +1,4 @@
-use contextra_core::{ContextraError, Result};
+use contextra_types::{ContextraError, Result};
 
 /// Entry offset accessor supporting both 16-bit (legacy v0..v2) and 32-bit (v3+) block formats.
 pub fn get_entry_at_index(

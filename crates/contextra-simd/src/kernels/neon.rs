@@ -14,7 +14,7 @@ use std::arch::aarch64::*;
 #[cfg(target_arch = "aarch64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "neon")]
-pub unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -77,7 +77,7 @@ pub unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(target_arch = "aarch64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "neon")]
-pub unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 
@@ -120,7 +120,7 @@ pub unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(target_arch = "aarch64")]
 #[allow(unsafe_code)]
 #[target_feature(enable = "neon")]
-pub unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
+pub(crate) unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
     let mut i = 0;
 

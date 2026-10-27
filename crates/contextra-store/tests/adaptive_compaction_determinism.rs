@@ -1,8 +1,9 @@
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_ports::StorageStats;
 use contextra_store::{
     AdaptiveCompactionPlanner, CompactionStrategy, CostBasedAdaptivePlanner, WorkloadMetrics,
 };
+use contextra_types::TxId;
 
 #[test]
 fn test_adaptive_compaction_determinism() {

@@ -61,7 +61,7 @@ async fn test_mcp_entrypoint_without_license_reports_fast_ring_only() {
     let req = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
         id: Some(json!(1)),
-        method: "contextra_plugin_status".to_string(),
+        method: "contextra_search".to_string(),
         params: json!({}),
     };
 
@@ -92,7 +92,7 @@ async fn test_mcp_entrypoint_env_vars_cannot_bypass_license_gate() {
     let req = JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
         id: Some(json!(2)),
-        method: "contextra_plugin_status".to_string(),
+        method: "contextra_search".to_string(),
         params: json!({}),
     };
 

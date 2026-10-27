@@ -1,7 +1,7 @@
 pub use super::*;
-use contextra_core::{ContextraError, Result};
 #[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::crypto::KeyManager;
+use contextra_types::{ContextraError, Result};
 
 #[cfg(test)]
 mod encode_tests;

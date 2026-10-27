@@ -13,8 +13,6 @@ pub mod dispatch;
 pub mod kernels;
 
 pub use dispatch::*;
-#[cfg(target_arch = "aarch64")]
-pub use kernels::neon;
 pub use kernels::scalar::{
     cosine_distance_f32_bytes_scalar, cosine_distance_scalar, cosine_similarity_parts_f32_u8,
     cosine_similarity_parts_u8_scalar, dot_product_f32_bytes_scalar, dot_product_f32_u8,
@@ -22,14 +20,12 @@ pub use kernels::scalar::{
     euclidean_distance_scalar, euclidean_distance_sq_f32_u8, euclidean_distance_sq_u8_scalar,
     normalize_inplace, CosineSimilarityPartsF32U8, CosineSimilarityPartsU8,
 };
-#[cfg(target_arch = "x86_64")]
-pub use kernels::{avx2, avx512};
 
-use contextra_core::{ContextraError, DistanceMetric};
+use contextra_types::{ContextraError, DistanceMetric};
 
 /// Validates that a vector contains no NaN or Infinite values.
 #[inline]
-pub fn validate_vector(vec: &[f32]) -> contextra_core::Result<()> {
+pub fn validate_vector(vec: &[f32]) -> contextra_types::Result<()> {
     if vec.iter().any(|v| !v.is_finite()) {
         return Err(ContextraError::invalid_input(
             "NaN or Infinity detected in vector",
@@ -43,7 +39,7 @@ pub fn compute_distance(
     a: &[f32],
     b: &[f32],
     metric: DistanceMetric,
-) -> contextra_core::Result<f32> {
+) -> contextra_types::Result<f32> {
     validate_vector(a)?;
     validate_vector(b)?;
     compute_distance_trusted(a, b, metric)
@@ -54,7 +50,7 @@ pub fn compute_distance_trusted(
     a: &[f32],
     b: &[f32],
     metric: DistanceMetric,
-) -> contextra_core::Result<f32> {
+) -> contextra_types::Result<f32> {
     match metric {
         DistanceMetric::Cosine => cosine_distance(a, b),
         DistanceMetric::Euclidean => euclidean_distance(a, b),
@@ -68,7 +64,7 @@ pub fn compute_distance_f32_bytes_trusted(
     a: &[f32],
     b_bytes: &[u8],
     metric: DistanceMetric,
-) -> contextra_core::Result<f32> {
+) -> contextra_types::Result<f32> {
     match metric {
         DistanceMetric::Cosine => cosine_distance_f32_bytes(a, b_bytes),
         DistanceMetric::Euclidean => euclidean_distance_f32_bytes(a, b_bytes),

@@ -3,10 +3,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_core::TxId;
 use contextra_ports::{Clock, SystemClock};
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_store::wal::{Wal, WalEntry, WalOp, WAL_V3_HEADER};
+use contextra_types::TxId;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::fs;

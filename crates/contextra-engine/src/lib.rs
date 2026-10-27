@@ -108,20 +108,6 @@ mod no_crypto_stubs {
         TxId(0)
     }
 
-    #[derive(Debug, Clone, Default)]
-    pub struct TenantIsolatedKvStore;
-
-    impl TenantIsolatedKvStore {
-        pub fn new() -> Self {
-            Self
-        }
-
-        pub fn purge_tenant_segments(&self, _tenant: TenantId) {}
-
-        pub fn on_rollback(&self, _tenant: TenantId, _chunk_ids: &[u64]) {}
-
-        pub fn remove_tenant_segment(&self, _tenant: TenantId, _doc_id: contextra_types::DocId) {}
-    }
 
     impl DeletionProof {
         pub fn create(
@@ -232,8 +218,6 @@ pub mod filter;
 pub mod fusion;
 #[cfg(not(loom))]
 pub mod import;
-#[cfg(not(loom))]
-pub mod kv_cache_integration;
 #[cfg(not(loom))]
 pub mod metrics_names;
 #[cfg(not(loom))]
@@ -538,6 +522,7 @@ pub struct Contextra {
     calibrator: parking_lot::RwLock<
         Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
     >,
+    pid_controller: parking_lot::RwLock<Option<()>>,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
 }
 

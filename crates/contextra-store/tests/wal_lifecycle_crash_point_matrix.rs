@@ -4,11 +4,11 @@
 
 #![cfg(feature = "fault-injection")]
 
-use contextra_core::{ContextraError, TxId};
 use contextra_store::wal::{
     Wal, WalConfig, WalOp, WalVersion, FAIL_APPEND_FOR_TX, FAIL_TRUNCATE_ONCE,
 };
 use contextra_testkit::{FaultConfig, FaultVfs};
+use contextra_types::{ContextraError, TxId};
 use tempfile::TempDir;
 
 /// Number of fault time points tested per command type (at least 15 per task spec)

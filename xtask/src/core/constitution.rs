@@ -54,8 +54,13 @@ impl Constitution {
         let content = fs::read_to_string(path)
             .map_err(|e| format!("Failed to read constitution at {}: {}", path.display(), e))?;
 
-        let constitution: Constitution = toml::from_str(&content)
-            .map_err(|e| format!("Failed to parse constitution TOML at {}: {}", path.display(), e))?;
+        let constitution: Constitution = toml::from_str(&content).map_err(|e| {
+            format!(
+                "Failed to parse constitution TOML at {}: {}",
+                path.display(),
+                e
+            )
+        })?;
 
         let mut seen_ids = HashSet::new();
 

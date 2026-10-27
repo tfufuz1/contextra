@@ -3,7 +3,7 @@
 // INVARIANTEN: Zero-Panic, sicherer Fallback auf Skalar, wenn CPU-Features fehlen.
 
 use crate::kernels::*;
-use contextra_core::ContextraError;
+use contextra_types::ContextraError;
 
 #[inline]
 pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {

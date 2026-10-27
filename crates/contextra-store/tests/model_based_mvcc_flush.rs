@@ -6,9 +6,10 @@
 
 mod support;
 
-use contextra_core::{StorageEngine, TxId};
+use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_testkit::ReferenceModel;
+use contextra_types::TxId;
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
 use std::collections::HashMap;
