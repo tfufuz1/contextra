@@ -54,7 +54,10 @@ pub fn scan_no_security_stub(root: &Path) -> Outcome {
         return Outcome::Pass;
     }
 
-    for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(&crates_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         if !entry.file_type().is_file() {
             continue;
         }
@@ -129,9 +132,7 @@ impl Gate for NoLiteralSecretsGate {
             from_phase: "PH1".to_string(),
             kind: "builtin".to_string(),
             enforces: vec!["INV-TENANT-1".to_string(), "VETO-F10".to_string()],
-            why:
-                "Keine Literal-Schlüssel, Mandanten-Fallbacks oder Hardcoded-Secrets (SPEC §17.3)."
-                    .to_string(),
+            why: "Keine Literal-Schlüssel, Mandanten-Fallbacks oder Hardcoded-Secrets (SPEC §17.3).".to_string(),
             owner: "MP-04".to_string(),
             cmd: None,
             toolchain: None,
@@ -161,7 +162,10 @@ pub fn scan_no_literal_secrets(root: &Path) -> Outcome {
         return Outcome::Pass;
     }
 
-    for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(&crates_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         if !entry.file_type().is_file() {
             continue;
         }
@@ -492,7 +496,10 @@ pub fn scan_key_purposes(root: &Path) -> Outcome {
 
     let crates_dir = root.join("crates");
     if crates_dir.exists() {
-        for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(&crates_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -559,11 +566,7 @@ mod tests {
         let root = temp.path();
 
         fs::create_dir_all(root.join("crates/test-crate/src")).unwrap();
-        fs::write(
-            root.join("crates/test-crate/src/lib.rs"),
-            "pub fn ok() -> bool { true }",
-        )
-        .unwrap();
+        fs::write(root.join("crates/test-crate/src/lib.rs"), "pub fn ok() -> bool { true }").unwrap();
         assert_eq!(scan_no_security_stub(root), Outcome::Pass);
 
         fs::write(
@@ -614,11 +617,7 @@ mod tests {
         fs::create_dir_all(root.join("ports/tests")).unwrap();
 
         fs::write(root.join("governance/security_ports.toml"), toml_content).unwrap();
-        fs::write(
-            root.join("crates/contextra-crypto/src/kms/k1.rs"),
-            "pub struct K1Provider;",
-        )
-        .unwrap();
+        fs::write(root.join("crates/contextra-crypto/src/kms/k1.rs"), "pub struct K1Provider;").unwrap();
         fs::write(root.join("ports/tests/kms_wiring.rs"), "// test").unwrap();
 
         assert_eq!(scan_security_ports(root), Outcome::Pass);

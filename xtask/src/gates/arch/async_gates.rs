@@ -17,8 +17,7 @@ impl Gate for AsyncIoGate {
             from_phase: "PH0".to_string(),
             kind: "builtin".to_string(),
             enforces: vec!["REQ-ASYNC-2".to_string(), "P26".to_string()],
-            why: "Kein Blockieren im async-Kontext; keine Async-Runtime in Ring 0 (SPEC §17.3)."
-                .to_string(),
+            why: "Kein Blockieren im async-Kontext; keine Async-Runtime in Ring 0 (SPEC §17.3).".to_string(),
             owner: "MP-03".to_string(),
             cmd: None,
             toolchain: None,
@@ -93,7 +92,10 @@ pub fn scan_async_io(root: &Path) -> Outcome {
     // 2. Scan for blocking I/O calls directly inside async fn
     let crates_dir = root.join("crates");
     if crates_dir.exists() {
-        for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(&crates_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -168,16 +170,8 @@ mod tests {
         let root = temp.path();
 
         fs::create_dir_all(root.join("crates/contextra-types/src")).unwrap();
-        fs::write(
-            root.join("crates/contextra-types/src/lib.rs"),
-            "pub fn ok() {}",
-        )
-        .unwrap();
-        fs::write(
-            root.join("crates/contextra-types/Cargo.toml"),
-            "[package]\nname = \"contextra-types\"\n",
-        )
-        .unwrap();
+        fs::write(root.join("crates/contextra-types/src/lib.rs"), "pub fn ok() {}").unwrap();
+        fs::write(root.join("crates/contextra-types/Cargo.toml"), "[package]\nname = \"contextra-types\"\n").unwrap();
 
         assert_eq!(scan_async_io(root), Outcome::Pass);
 
