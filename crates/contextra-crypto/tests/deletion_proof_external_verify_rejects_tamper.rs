@@ -13,8 +13,7 @@ fn verify_external_accepts_valid_proof() {
         doc_id: DocId::new(42),
         tenant_id,
     };
-    let layer_proof =
-        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
+    let layer_proof = LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
 
     let proof = DeletionProof::create_v3(
         scope,
@@ -43,8 +42,7 @@ fn verify_external_rejects_tampered_timestamp() {
         doc_id: DocId::new(42),
         tenant_id,
     };
-    let layer_proof =
-        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
+    let layer_proof = LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
 
     let mut proof = DeletionProof::create_v3(
         scope,
@@ -77,8 +75,7 @@ fn verify_external_rejects_tampered_deleted_keys_hash() {
         doc_id: DocId::new(42),
         tenant_id,
     };
-    let layer_proof =
-        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
+    let layer_proof = LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
 
     let mut proof = DeletionProof::create_v3(
         scope,

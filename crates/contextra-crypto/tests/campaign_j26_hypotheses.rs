@@ -662,7 +662,8 @@ fn test_h6_deletion_proof_v3_validation_suite() {
                 contextra_crypto::deletion_proof::CustodyLevel::Local,
                 hmac_key.as_slice(),
                 &clock,
-            ).is_err(),
+            )
+            .is_err(),
             "DeletionProof::issue MUST reject remaining live entries > 0"
         );
     }

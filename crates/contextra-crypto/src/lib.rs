@@ -56,3 +56,8 @@ pub use kv_segment::{
 pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE};
 pub use revocation_log::{RevocationEntry, RevocationLog, RevocationTarget};
 pub use wal_completeness::verify_wal_chain_completeness;
+#[cfg(feature = "cloud-egress-guard")]
+pub use wal_crypto::CloudEgressGuard;
+pub use wal_crypto::{
+    EncryptedWal, IntegrityVerifier, KmsProvider, LocalKeyManagerKms, WalEntrySnapshot, WalHmac,
+};
