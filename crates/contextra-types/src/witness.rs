@@ -6,10 +6,10 @@
 #![forbid(unsafe_code)]
 //! Residual measurement and context types (§4.2, §20.5).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Scanner methodology applied during storage residue verification.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScanMethod {
     /// Direct structural scan of storage files, indices, or tables.
     Structural,
@@ -20,7 +20,7 @@ pub enum ScanMethod {
 }
 
 /// Request context containing tenant and transaction identity for deletion operations.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RequestContext {
     /// Tenant identifier for authorization and scope isolation.
     pub tenant_id: crate::TenantId,
@@ -36,7 +36,7 @@ impl RequestContext {
 }
 
 /// Saga record containing deletion tracking state and digests.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SagaRecord {
     /// BLAKE3 hash of deleted keys.
     pub deleted_keys_hash: [u8; 32],

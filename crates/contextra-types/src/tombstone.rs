@@ -65,9 +65,7 @@ mod tests {
             let bytes = SeqBitTombstone::make_tombstone(seq);
             assert_eq!(bytes.len(), 8);
 
-            let arr: [u8; 8] = [
-                bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-            ];
+            let arr: [u8; 8] = bytes.as_slice().try_into().expect("8 bytes");
             let encoded_seq = u64::from_le_bytes(arr);
             assert!(
                 SeqBitTombstone::is_tombstone(encoded_seq, 0),

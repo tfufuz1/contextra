@@ -7,6 +7,12 @@ use serde::{Deserialize, Serialize};
 ///
 /// INVARIANTE INV-TENANT-1: TenantId(0) ist SYSTEM-reserviert.
 /// `TenantId::try_new(0)` → Err. Keine Ausnahmen.
+///
+/// # Abgrenzung
+/// Dieser Typ `contextra_types::TenantId` ist der kanonische 64-Bit-Ganzzahl-Mandantenidentifikator
+/// in Ring 0 zur Durchsetzung der Mandantenisolation über LSM-Store, WAL und Indexe (INV-TENANT-1).
+/// Im Gegensatz dazu ist `contextra_privacy::processing_registry::TenantId` ein lokaler `String`-Alias
+/// für PII-Policy-Keying im Egress/Filter-Gateway.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct TenantId(pub u64);
@@ -22,6 +28,13 @@ impl TenantId {
     pub const INVALID: Self = Self(0);
 
     /// Const-Konstruktor.
+    ///
+    /// # Invariante INV-TENANT-1 & Deprecation
+    /// `TenantId::new` erlaubt die Erstellung von `TenantId(0)` ohne Laufzeit-Validierung.
+    /// Da `TenantId(0)` zwingend für den System-Kontext ([`TenantId::SYSTEM`]) reserviert ist,
+    /// umgeht `new()` die Invariante INV-TENANT-1.
+    /// Verwende stattdessen [`TenantId::try_new`] für Benutzermandanten oder [`TenantId::SYSTEM`]
+    /// für Systemtransaktionen.
     #[deprecated(
         since = "0.1.0",
         note = "Nutze TenantId::try_new() oder TenantId::SYSTEM — new() umgeht INV-TENANT-1 und wird in einer künftigen Version entfernt."
@@ -293,9 +306,15 @@ impl EntityId {
     }
 
     /// Creates an `EntityId` directly from a `DocId`.
-    #[allow(clippy::unnecessary_cast)]
+    #[cfg(not(feature = "docid-128"))]
     pub fn from_doc_id(doc_id: DocId) -> Self {
-        Self(doc_id.inner() as u64)
+        Self(doc_id.inner())
+    }
+
+    /// Creates an `EntityId` directly from a `DocId`.
+    #[cfg(feature = "docid-128")]
+    pub fn from_doc_id(doc_id: DocId) -> Self {
+        Self(doc_id.as_u64())
     }
 
     /// Derives an `EntityId` from a string key using the first 8 bytes of its BLAKE3 hash.
@@ -306,9 +325,22 @@ impl EntityId {
     /// # Infallible Fallback
     /// If you need the old infallible behaviour (parse-as-u64 or hash), use `EntityId::from(key)` directly.
     /// Prefer this fallible variant for consistency with `DocId` at API boundaries.
-    #[allow(clippy::unnecessary_cast)]
+    #[cfg(not(feature = "docid-128"))]
     pub fn from_key(key: &str) -> Result<Self> {
-        DocId::from_key(key).map(|d| Self(d.inner() as u64))
+        DocId::from_key(key).map(|d| Self(d.inner()))
+    }
+
+    /// Derives an `EntityId` from a string key using the first 8 bytes of its BLAKE3 hash.
+    ///
+    /// # Errors
+    /// Returns `ContextraError::InvalidInput` if `key` is empty, mirroring `DocId::from_key`.
+    ///
+    /// # Infallible Fallback
+    /// If you need the old infallible behaviour (parse-as-u64 or hash), use `EntityId::from(key)` directly.
+    /// Prefer this fallible variant for consistency with `DocId` at API boundaries.
+    #[cfg(feature = "docid-128")]
+    pub fn from_key(key: &str) -> Result<Self> {
+        DocId::from_key(key).map(|d| Self(d.as_u64()))
     }
 }
 

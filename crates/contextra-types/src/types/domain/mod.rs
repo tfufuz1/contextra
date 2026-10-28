@@ -19,11 +19,8 @@ mod document;
 mod ids;
 mod misc;
 
-pub use document::RerankResult;
-#[allow(ambiguous_glob_reexports)]
 pub use document::*;
 pub use ids::*;
-#[allow(ambiguous_glob_reexports)]
 pub use misc::*;
 
 #[cfg(test)]

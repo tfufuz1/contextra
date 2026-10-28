@@ -210,7 +210,7 @@ impl FusionWeights {
 }
 
 /// A chunk of context for LLM budget allocation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContextChunk {
     /// Document identifier associated with this chunk.
     pub doc_id: DocId,
@@ -268,7 +268,7 @@ impl ContextChunk {
 }
 
 /// An aggregated context window constrained by a token budget.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContextWindow {
     /// List of included context chunks.
     pub chunks: Vec<ContextChunk>,
@@ -291,6 +291,12 @@ impl std::fmt::Display for ContextWindow {
 }
 
 /// Individual retrieval signal (vector, text, graph) in multi-signal hybrid search.
+///
+/// # Abgrenzung
+/// Dieser Typ `contextra_types::Signal` beschreibt das ungewichtete Domänen-Enum der drei
+/// primären Suchkanäle (`Vector`, `Text`, `Graph`) für das Query-Interface systemweit.
+/// Im Gegensatz dazu ist `contextra_rank::fusion::types::Signal` eine interne Signal-Repräsentation
+/// der Rank-Engine zur Gewichtsmodulation und Z-Score/RRF-Kalibrierung.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Signal {
     /// Dense vector embedding search signal.
@@ -332,7 +338,6 @@ pub enum OnSignalFailure {
     Degrade,
 }
 
-pub use super::domain::RerankResult;
 
 /// Output of a query rewriter containing text, semantic, and graph anchor reformulations.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -392,7 +397,7 @@ pub struct ScoredEntry {
 }
 
 /// A unified query traversing multiple index signals.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HybridQuery {
     /// Optional full-text query string.
     pub text_query: Option<String>,
@@ -453,6 +458,13 @@ impl HybridQuery {
 }
 
 /// Builder for HybridQuery to improve DX.
+///
+/// # Abgrenzung
+/// `contextra_types::HybridQueryBuilder` ist ein speicherfreier, reiner Value-Builder in Ring 0,
+/// der eine unveränderliche `HybridQuery`-Value-Instanz erzeugt.
+/// Im Gegensatz dazu ist `contextra_engine::collection::query_builder::builder::HybridQueryBuilder`
+/// an eine aktive `Collection`-Instanz mit Storage- und Vektorindex-Handles gebunden und führt
+/// die Abfrage über `.execute()` direkt auf der Datenbank aus.
 #[derive(Default)]
 pub struct HybridQueryBuilder {
     text_query: Option<String>,
@@ -774,7 +786,7 @@ mod tests {
         let deser: ContextWindow = serde_json::from_str(&ser).unwrap(); // unwrap
         assert_eq!(deser.total_tokens, 1);
         assert_eq!(deser.chunks.len(), 1);
-        assert!(deser.chunks[0].contextual_prefix.is_none());
+        assert!(deser.chunks.first().expect("chunk").contextual_prefix.is_none());
     }
 
     #[test]

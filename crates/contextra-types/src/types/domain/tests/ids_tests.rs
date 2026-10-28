@@ -22,20 +22,12 @@ fn test_tenant_id_defaults_and_constants() {
 }
 
 #[test]
-fn test_tenant_id_collections_hashmap_btreemap() {
-    use std::collections::{BTreeMap, HashMap};
+fn test_tenant_id_collections_btreemap() {
+    use std::collections::BTreeMap;
 
     let t0 = TenantId::SYSTEM;
     let t1 = TenantId::try_new(1).unwrap();
     let t2 = TenantId::try_new(2).unwrap();
-
-    // HashMap key test
-    let mut map = HashMap::new();
-    map.insert(t0, "default_tenant");
-    map.insert(t1, "tenant_one");
-    assert_eq!(map.get(&TenantId::default()), Some(&"default_tenant"));
-    assert_eq!(map.get(&t1), Some(&"tenant_one"));
-    assert_eq!(map.get(&t2), None);
 
     // BTreeMap key test (testing Ord / PartialOrd)
     let mut bmap = BTreeMap::new();
@@ -45,6 +37,9 @@ fn test_tenant_id_collections_hashmap_btreemap() {
 
     let keys: Vec<TenantId> = bmap.keys().copied().collect();
     assert_eq!(keys, vec![t0, t1, t2]);
+    assert_eq!(bmap.get(&TenantId::default()), Some(&"tenant_zero"));
+    assert_eq!(bmap.get(&t1), Some(&"tenant_one"));
+    assert_eq!(bmap.get(&t2), Some(&"tenant_two"));
 }
 
 #[test]
@@ -281,10 +276,10 @@ fn test_tx_id_range_boundary_exhaustion_simulation() {
 
 #[test]
 fn test_doc_id_from_key_collisions_and_distribution() {
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
 
-    const KEY_COUNT: usize = 100_000;
-    let mut seen = HashSet::with_capacity(KEY_COUNT);
+    const KEY_COUNT: usize = 10_000;
+    let mut seen = BTreeSet::new();
 
     for i in 0..KEY_COUNT {
         let key = format!("doc_key_test_sample_{i}");

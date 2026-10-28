@@ -1019,7 +1019,10 @@ mod tests {
         );
         assert_eq!(dto.kind, "CustomKind");
         assert_eq!(dto.message, "Custom message");
-        assert_eq!(dto.details.expect("details present")["trace_id"], "12345"); // expect
+        assert_eq!(
+            dto.details.expect("details present").get("trace_id"),
+            Some(&serde_json::json!("12345"))
+        );
     }
 
     #[test]
