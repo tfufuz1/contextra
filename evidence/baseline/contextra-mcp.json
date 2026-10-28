@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-mcp",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 92.018,
+  "tests_total": 0,
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 8,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-mcp --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 28.598,
+      "stdout_snippet": "",
+      "stderr_snippet": "/lib.rs:350:5\n    |\n332 | pub struct Contextra {\n    |            --------- field in this struct\n...\n350 |     pid_controller: parking_lot::RwLock<Option<()>>,\n    |     ^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` on by default\n\nwarning: field `tenant_id` is never read\n   --> crates/contextra-engine/src/transaction/compensating_actions.rs:240:16\n    |\n238 | pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {\n    |            -------------------- field in this struct\n239 |     pub(super) collection: Collection<S, V>,\n240 |     pub(super) tenant_id: TenantId,\n    |                ^^^^^^^^^\n\n   Compiling contextra-cognition v0.1.0 (/app/crates/contextra-cognition)\nwarning: `contextra-engine` (lib) generated 3 warnings\n   Compiling contextra-db v0.1.0 (/app/crates/contextra-db)\n   Compiling contextra v0.1.0 (/app/crates/contextra)\n   Compiling contextra-mcp v0.1.0 (/app/crates/contextra-mcp)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 28.51s\n"
+    },
+    {
+      "command": "cargo test -p contextra-mcp --locked",
+      "exit_code": 124,
+      "duration_seconds": 60.023,
+      "stdout_snippet": "allowed_regardless_of_flag ... ok\ntest tests::test_search_validates_empty_or_oversized_query ... ok\ntest tests::test_tools_list_returns_all_tools ... ok\ntest tests::test_unknown_method_rejected_via_code_execution_fail_closed_path ... ok\ntest tests::test_unknown_method_returns_method_not_found ... ok\ntest tests::test_whitespace_collection_name_fallback_or_rejection ... ok\ntest tests::test_write_tool_rejected_when_read_only ... ok\ntest tests::test_write_tool_allowed_when_explicitly_enabled ... ok\n",
+      "stderr_snippet": "\n\nwarning: field `pid_controller` is never read\n   --> crates/contextra-engine/src/lib.rs:350:5\n    |\n332 | pub struct Contextra {\n    |            --------- field in this struct\n...\n350 |     pid_controller: parking_lot::RwLock<Option<()>>,\n    |     ^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` on by default\n\nwarning: field `tenant_id` is never read\n   --> crates/contextra-engine/src/transaction/compensating_actions.rs:240:16\n    |\n238 | pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {\n    |            -------------------- field in this struct\n239 |     pub(super) collection: Collection<S, V>,\n240 |     pub(super) tenant_id: TenantId,\n    |                ^^^^^^^^^\n\nwarning: `contextra-engine` (lib) generated 3 warnings\n   Compiling contextra-mcp v0.1.0 (/app/crates/contextra-mcp)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 44.64s\n     Running unittests src/lib.rs (target/debug/deps/contextra_mcp-02d6c8ea186018a4)\n\n[TIMEOUT after 60s]"
+    },
+    {
+      "command": "cargo clippy -p contextra-mcp --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 3.397,
+      "stdout_snippet": "",
+      "stderr_snippet": "    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\n    Checking tokio-util v0.7.19\n    Checking futures-executor v0.3.34\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

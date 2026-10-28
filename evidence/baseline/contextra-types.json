@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-types",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 14.581,
+  "tests_total": 127,
+  "tests_passed": 127,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 1,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-types --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 2.334,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling once_cell v1.21.4\n   Compiling ahash v0.8.12\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.26s\n"
+    },
+    {
+      "command": "cargo test -p contextra-types --locked",
+      "exit_code": 0,
+      "duration_seconds": 9.17,
+      "stdout_snippet": "ed; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 4 tests\ntest test_into_inner_checked_matching_tenant ... ok\ntest test_into_inner_checked_mismatched_tenant_does_not_leak_value ... ok\ntest test_tenant_scoped_new_and_tenant_id_getter ... ok\ntest test_map_preserves_tenant_id ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "   Compiling tempfile v3.27.0\n   Compiling ahash v0.8.12\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling rusty-fork v0.3.1\n   Compiling proptest v1.11.0\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.61s\n     Running unittests src/lib.rs (target/debug/deps/contextra_types-54ba8824bba98b81)\n     Running tests/campaign_r4_r10_oracle.rs (target/debug/deps/campaign_r4_r10_oracle-3f83ef07289ae5f4)\n     Running tests/tenant_scope_isolation.rs (target/debug/deps/tenant_scope_isolation-07f98eaeceb41276)\n   Doc-tests contextra_types\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-types --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 3.076,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

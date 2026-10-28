@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-cognition",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 52.584,
+  "tests_total": 92,
+  "tests_passed": 92,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 9,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-cognition --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 2.702,
+      "stdout_snippet": "",
+      "stderr_snippet": "essLayer,\n   |                   ^^^^^^\n   |\n   = note: `#[warn(unused_imports)]` on by default\n\nwarning: field `pid_controller` is never read\n   --> crates/contextra-engine/src/lib.rs:350:5\n    |\n332 | pub struct Contextra {\n    |            --------- field in this struct\n...\n350 |     pid_controller: parking_lot::RwLock<Option<()>>,\n    |     ^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` on by default\n\nwarning: field `tenant_id` is never read\n   --> crates/contextra-engine/src/transaction/compensating_actions.rs:240:16\n    |\n238 | pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {\n    |            -------------------- field in this struct\n239 |     pub(super) collection: Collection<S, V>,\n240 |     pub(super) tenant_id: TenantId,\n    |                ^^^^^^^^^\n\nwarning: `contextra-engine` (lib) generated 3 warnings\n   Compiling contextra-cognition v0.1.0 (/app/crates/contextra-cognition)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.59s\n"
+    },
+    {
+      "command": "cargo test -p contextra-cognition --locked",
+      "exit_code": 0,
+      "duration_seconds": 44.11,
+      "stdout_snippet": "red; 0 filtered out; finished in 0.22s\n\n\nrunning 4 tests\ntest test_budget_boundary_exceeded_skips_veto_and_continues ... ok\ntest test_classic_transitivity_veto_case ... ok\ntest test_negative_case_high_similarity_throughout ... ok\ntest test_p24_locality_bounded_runtime_on_large_graph ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "/grounding_validator_rich_path_test.rs (target/debug/deps/grounding_validator_rich_path_test-5ef055d579c72287)\n     Running tests/leanrag_aggregation.rs (target/debug/deps/leanrag_aggregation-6e941a8d3b85bba5)\n     Running tests/leanrag_stage3_wiring.rs (target/debug/deps/leanrag_stage3_wiring-6440c7b47298ecf4)\n     Running tests/leanrag_worker_opt_in.rs (target/debug/deps/leanrag_worker_opt_in-469e15e76dd4ff70)\n     Running tests/maintenance_config_defaults.rs (target/debug/deps/maintenance_config_defaults-b18cbf34ce37085b)\n     Running tests/pre_condensed_input_intake.rs (target/debug/deps/pre_condensed_input_intake-a7a14eedc5549c44)\n     Running tests/rng_seed_determinism.rs (target/debug/deps/rng_seed_determinism-aba0664c4036693a)\n     Running tests/semantic_aggregation_facade.rs (target/debug/deps/semantic_aggregation_facade-9cbbfda6fa7aa146)\n     Running tests/transitivity_veto_tests.rs (target/debug/deps/transitivity_veto_tests-59f22309cdce49d6)\n   Doc-tests contextra_cognition\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-cognition --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 5.771,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

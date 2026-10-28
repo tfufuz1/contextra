@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-infer-onnx",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 11.92,
+  "tests_total": 23,
+  "tests_passed": 23,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 0,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-infer-onnx --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 1.86,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling contextra-rank v0.1.0 (/app/crates/contextra-rank)\n   Compiling contextra-infer-onnx v0.1.0 (/app/crates/contextra-infer-onnx)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.78s\n"
+    },
+    {
+      "command": "cargo test -p contextra-infer-onnx --locked",
+      "exit_code": 0,
+      "duration_seconds": 7.65,
+      "stdout_snippet": "test reranker::tests::prop_platt_calibration_reduces_ece ... ok\n\ntest result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "   Compiling ahash v0.8.12\n   Compiling ciborium v0.2.2\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling criterion v0.5.1\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling contextra-rank v0.1.0 (/app/crates/contextra-rank)\n   Compiling contextra-infer-onnx v0.1.0 (/app/crates/contextra-infer-onnx)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.45s\n     Running unittests src/lib.rs (target/debug/deps/contextra_infer_onnx-3a72fe75efa98d4f)\n     Running tests/onnx_embedder_test.rs (target/debug/deps/onnx_embedder_test-5811b852d3873bc6)\n     Running tests/reranker_adversarial_test.rs (target/debug/deps/reranker_adversarial_test-e2925cc165579543)\n   Doc-tests contextra_infer_onnx\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-infer-onnx --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 2.41,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

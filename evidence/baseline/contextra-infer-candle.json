@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-infer-candle",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 106.956,
+  "tests_total": 0,
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 1,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-infer-candle --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 41.078,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling tokenizers v0.22.2\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling tokenizers v0.21.4\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling contextra-rank v0.1.0 (/app/crates/contextra-rank)\n   Compiling candle-core v0.11.0\n   Compiling candle-nn v0.11.0\n   Compiling candle-transformers v0.11.0\n   Compiling contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 40.95s\n"
+    },
+    {
+      "command": "cargo test -p contextra-infer-candle --locked",
+      "exit_code": 124,
+      "duration_seconds": 60.029,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling darling_core v0.20.11\n   Compiling zeroize v1.9.0\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling fancy-regex v0.18.0\n   Compiling curve25519-dalek v4.1.3\n   Compiling aes-gcm-siv v0.11.1\n   Compiling ed25519-dalek v2.2.0\n   Compiling contextra-rank v0.1.0 (/app/crates/contextra-rank)\n   Compiling proptest v1.11.0\n   Compiling criterion v0.5.1\n   Compiling darling_macro v0.20.11\n   Compiling darling v0.20.11\n   Compiling derive_builder_core v0.20.2\n   Compiling contextra-crypto v0.1.0 (/app/crates/contextra-crypto)\n   Compiling derive_builder_macro v0.20.2\n   Compiling derive_builder v0.20.2\n   Compiling tokenizers v0.22.2\n   Compiling tokenizers v0.21.4\n   Compiling candle-core v0.11.0\n   Compiling candle-nn v0.11.0\n   Compiling candle-transformers v0.11.0\n   Compiling contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)\n\n[TIMEOUT after 60s]"
+    },
+    {
+      "command": "cargo clippy -p contextra-infer-candle --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 5.848,
+      "stdout_snippet": "",
+      "stderr_snippet": "st-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\n    Checking gemm-f64 v0.19.0\n    Checking fancy-regex v0.18.0\n    Checking gemm v0.19.0\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

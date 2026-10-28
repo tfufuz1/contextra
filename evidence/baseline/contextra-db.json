@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-db",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 84.351,
+  "tests_total": 0,
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 14,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-db --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 25.637,
+      "stdout_snippet": "",
+      "stderr_snippet": "rn(unused_imports)]` on by default\n\nwarning: field `pid_controller` is never read\n   --> crates/contextra-engine/src/lib.rs:350:5\n    |\n332 | pub struct Contextra {\n    |            --------- field in this struct\n...\n350 |     pid_controller: parking_lot::RwLock<Option<()>>,\n    |     ^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` on by default\n\nwarning: field `tenant_id` is never read\n   --> crates/contextra-engine/src/transaction/compensating_actions.rs:240:16\n    |\n238 | pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {\n    |            -------------------- field in this struct\n239 |     pub(super) collection: Collection<S, V>,\n240 |     pub(super) tenant_id: TenantId,\n    |                ^^^^^^^^^\n\n   Compiling contextra-cognition v0.1.0 (/app/crates/contextra-cognition)\nwarning: `contextra-engine` (lib) generated 3 warnings\n   Compiling contextra-db v0.1.0 (/app/crates/contextra-db)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.54s\n"
+    },
+    {
+      "command": "cargo test -p contextra-db --locked",
+      "exit_code": 101,
+      "duration_seconds": 55.53,
+      "stdout_snippet": "",
+      "stderr_snippet": " item named `for_test` found for struct `LayerCleanupProof` in the current scope\n   --> crates/contextra-db/tests/deletion_proof_integration.rs:245:42\n    |\n245 |     let lsm_proof_2 = LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);\n    |                                          ^^^^^^^^ function or associated item not found in `LayerCleanupProof`\n\nerror[E0599]: no function or associated item named `for_test` found for struct `LayerCleanupProof` in the current scope\n   --> crates/contextra-db/tests/deletion_proof_integration.rs:246:46\n    |\n246 |     let sstable_proof_2 = LayerCleanupProof::for_test(DeletionLayer::SsTableAllLevels);\n    |                                              ^^^^^^^^ function or associated item not found in `LayerCleanupProof`\n\nFor more information about this error, try `rustc --explain E0599`.\nerror: could not compile `contextra-db` (test \"deletion_proof_integration\") due to 4 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-db --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 3.184,
+      "stdout_snippet": "",
+      "stderr_snippet": "py/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\n    Checking futures-channel v0.3.34\n    Checking futures-io v0.3.34\n    Checking regex v1.13.1\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

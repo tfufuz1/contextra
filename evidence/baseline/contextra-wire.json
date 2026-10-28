@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-wire",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "pass",
+  "overall_exit_code": 0,
+  "duration_seconds": 14.686,
+  "tests_total": 13,
+  "tests_passed": 13,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 0,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-wire --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 9.389,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling proc-macro2 v1.0.107\n   Compiling quote v1.0.47\n   Compiling serde_core v1.0.229\n   Compiling serde_json v1.0.151\n   Compiling serde v1.0.229\n   Compiling bitflags v1.3.2\n   Compiling flatbuffers v24.12.23\n   Compiling bytes v1.12.1\n   Compiling syn v3.0.4\n   Compiling serde_derive v1.0.229\n   Compiling contextra-wire v0.1.0 (/app/crates/contextra-wire)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.21s\n"
+    },
+    {
+      "command": "cargo test -p contextra-wire --locked",
+      "exit_code": 0,
+      "duration_seconds": 1.52,
+      "stdout_snippet": "fault_injection_and_corruption_no_panic ... ok\ntest test_scored_document_roundtrip_boundaries ... ok\ntest test_search_response_full_roundtrip ... ok\ntest test_vector_index_update_roundtrip ... ok\ntest test_shared_buffer_concurrency ... ok\ntest test_concurrency_parallel_serialization ... ok\n\ntest result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "   Compiling contextra-wire v0.1.0 (/app/crates/contextra-wire)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.32s\n     Running unittests src/lib.rs (target/debug/deps/contextra_wire-87c877814175996a)\n     Running tests/ipc_tests.rs (target/debug/deps/ipc_tests-1a9839bc30bca36c)\n   Doc-tests contextra_wire\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-wire --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "duration_seconds": 3.776,
+      "stdout_snippet": "",
+      "stderr_snippet": "    Checking serde_core v1.0.229\n   Compiling contextra-wire v0.1.0 (/app/crates/contextra-wire)\n    Checking memchr v2.8.3\n    Checking serde_json v1.0.151\n    Checking serde v1.0.229\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.63s\n"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-text",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 64.44,
+  "tests_total": 0,
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 0,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-text --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 1.952,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling contextra-text v0.1.0 (/app/crates/contextra-text)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.85s\n"
+    },
+    {
+      "command": "cargo test -p contextra-text --locked",
+      "exit_code": 124,
+      "duration_seconds": 60.019,
+      "stdout_snippet": "code ... ok\ntest tokenizer::tests::test_tokenizer_multibyte_slicing_boundaries ... ok\ntest tokenizer::tests::test_tokenizers_panic_free_edge_cases ... ok\ntest tokenizer::tests::test_trie_caching_performance_bug_txt_002 ... ok\ntest tokenizer::tests::test_url_email_protection_bug_txt_001 ... ok\ntest tokenizer::tests::tokenizer_never_panics ... ok\ntest wand::tests::test_block_max_wand_equivalence_and_pruning_performance ... ok\ntest inverted::tests::tx_tests::test_staged_stats_limit_exceeded ... ok\n",
+      "stderr_snippet": "   Compiling contextra-text v0.1.0 (/app/crates/contextra-text)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 18.23s\n     Running unittests src/lib.rs (target/debug/deps/contextra_text-66337af1e40223f6)\n\n[TIMEOUT after 60s]"
+    },
+    {
+      "command": "cargo clippy -p contextra-text --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 2.47,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

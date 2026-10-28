@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-bench",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 122.103,
+  "tests_total": 0,
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 9,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-bench --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 41.821,
+      "stdout_snippet": "",
+      "stderr_snippet": "ontroller` is never read\n   --> crates/contextra-engine/src/lib.rs:350:5\n    |\n332 | pub struct Contextra {\n    |            --------- field in this struct\n...\n350 |     pid_controller: parking_lot::RwLock<Option<()>>,\n    |     ^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` on by default\n\nwarning: field `tenant_id` is never read\n   --> crates/contextra-engine/src/transaction/compensating_actions.rs:240:16\n    |\n238 | pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {\n    |            -------------------- field in this struct\n239 |     pub(super) collection: Collection<S, V>,\n240 |     pub(super) tenant_id: TenantId,\n    |                ^^^^^^^^^\n\nwarning: `contextra-engine` (lib) generated 3 warnings\n   Compiling candle-transformers v0.11.0\n   Compiling contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)\n   Compiling contextra-bench v0.1.0 (/app/benchmarks/contextra-bench)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 41.71s\n"
+    },
+    {
+      "command": "cargo test -p contextra-bench --locked",
+      "exit_code": 124,
+      "duration_seconds": 60.039,
+      "stdout_snippet": "",
+      "stderr_snippet": "tion/compensating_actions.rs:240:16\n    |\n238 | pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {\n    |            -------------------- field in this struct\n239 |     pub(super) collection: Collection<S, V>,\n240 |     pub(super) tenant_id: TenantId,\n    |                ^^^^^^^^^\n\n   Compiling contextra-cognition v0.1.0 (/app/crates/contextra-cognition)\nwarning: `contextra-engine` (lib) generated 3 warnings\n   Compiling tokenizers v0.21.4\n   Compiling contextra-db v0.1.0 (/app/crates/contextra-db)\n   Compiling contextra-infer-onnx v0.1.0 (/app/crates/contextra-infer-onnx)\n   Compiling criterion-plot v0.5.0\n   Compiling plotters v0.3.7\n   Compiling ciborium v0.2.2\n   Compiling fxhash v0.2.1\n   Compiling tinytemplate v1.2.1\n   Compiling fs2 v0.4.3\n   Compiling criterion v0.5.1\n   Compiling sled v0.34.7\n   Compiling contextra-infer-candle v0.1.0 (/app/crates/contextra-infer-candle)\n   Compiling contextra-bench v0.1.0 (/app/benchmarks/contextra-bench)\n\n[TIMEOUT after 60s]"
+    },
+    {
+      "command": "cargo clippy -p contextra-bench --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 20.242,
+      "stdout_snippet": "",
+      "stderr_snippet": "ippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\n    Checking serde_plain v1.0.2\n    Checking tokenizers v0.21.4\n    Checking gemm-f32 v0.19.0\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

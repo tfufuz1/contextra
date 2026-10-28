@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-crypto",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 63.597,
+  "tests_total": 0,
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 1,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-crypto --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 0.434,
+      "stdout_snippet": "",
+      "stderr_snippet": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.36s\n"
+    },
+    {
+      "command": "cargo test -p contextra-crypto --locked",
+      "exit_code": 124,
+      "duration_seconds": 60.043,
+      "stdout_snippet": "_update_v3_length_prefix_prevents_partition_collision ... ok\ntest wal_crypto::tests::test_wal_hmac_anti_mirroring_reference_check ... ok\ntest wal_crypto::tests::test_wal_hmac_basic ... ok\ntest wal_crypto::tests::test_wal_hmac_empty_key ... ok\ntest wal_crypto::tests::test_wal_hmac_max_key_boundary ... ok\ntest wal_crypto::tests::test_wal_hmac_oversized_key ... ok\ntest crypto::tests::test_parallel_nonce_uniqueness ... ok\ntest crypto::tests::test_befund_1_nonce_uniqueness_and_envelope_format ... ok\n",
+      "stderr_snippet": "   Compiling futures-sink v0.3.34\n   Compiling futures-util v0.3.34\n   Compiling futures-channel v0.3.34\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling futures v0.3.34\n   Compiling criterion v0.5.1\n   Compiling contextra-crypto v0.1.0 (/app/crates/contextra-crypto)\n   Compiling contextra-testkit v0.1.0 (/app/crates/contextra-testkit)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 23.00s\n     Running unittests src/lib.rs (target/debug/deps/contextra_crypto-ce2efeb0a3aabfa3)\n\n[TIMEOUT after 60s]"
+    },
+    {
+      "command": "cargo clippy -p contextra-crypto --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 3.12,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

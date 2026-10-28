@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-graph",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 68.352,
+  "tests_total": 0,
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 1,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-graph --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 4.996,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling contextra-adapt v0.1.0 (/app/crates/contextra-adapt)\n   Compiling contextra-graph v0.1.0 (/app/crates/contextra-graph)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.92s\n"
+    },
+    {
+      "command": "cargo test -p contextra-graph --locked",
+      "exit_code": 124,
+      "duration_seconds": 60.033,
+      "stdout_snippet": " ok\ntest session_dag::tests::test_set_active_head_invalid_node_returns_error ... ok\ntest tl_hfd::lovasz::tests::test_lovasz_extension_basic ... ok\ntest tl_hfd::lovasz::tests::test_lovasz_extension_equal_x ... ok\ntest tl_hfd::lovasz::tests::test_lovasz_tie_breaker ... ok\ntest tl_hfd::lovasz::tests::test_truncation ... ok\ntest tl_hfd::params::tests::test_default_params_valid ... ok\ntest tl_hfd::params::tests::test_invalid_params ... ok\ntest session_dag::tests::test_path_to_head_depth_limit ... ok\n",
+      "stderr_snippet": "   Compiling futures-util v0.3.34\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling tinytemplate v1.2.1\n   Compiling tracing-subscriber v0.3.23\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling futures-executor v0.3.34\n   Compiling tokio-util v0.7.19\n   Compiling futures v0.3.34\n   Compiling criterion v0.5.1\n   Compiling contextra-crypto v0.1.0 (/app/crates/contextra-crypto)\n   Compiling contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)\n   Compiling contextra-adapt v0.1.0 (/app/crates/contextra-adapt)\n   Compiling contextra-store v0.1.0 (/app/crates/contextra-store)\n   Compiling contextra-testkit v0.1.0 (/app/crates/contextra-testkit)\n   Compiling contextra-graph v0.1.0 (/app/crates/contextra-graph)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 42.15s\n     Running unittests src/lib.rs (target/debug/deps/contextra_graph-daa10b21b00b2be3)\n\n[TIMEOUT after 60s]"
+    },
+    {
+      "command": "cargo clippy -p contextra-graph --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 3.323,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

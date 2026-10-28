@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-core",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 29.79,
+  "tests_total": 7,
+  "tests_passed": 7,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 1,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-core --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 11.177,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling syn v3.0.4\n   Compiling getrandom v0.3.4\n   Compiling slab v0.4.12\n   Compiling futures-core v0.3.34\n   Compiling futures-task v0.3.34\n   Compiling smallvec v1.15.2\n   Compiling scopeguard v1.2.0\n   Compiling lock_api v0.4.14\n   Compiling parking_lot_core v0.9.12\n   Compiling parking_lot v0.12.5\n   Compiling serde_derive v1.0.229\n   Compiling thiserror-impl v2.0.20\n   Compiling futures-macro v0.3.34\n   Compiling futures-util v0.3.34\n   Compiling thiserror v2.0.20\n   Compiling serde v1.0.229\n   Compiling bincode v1.3.3\n   Compiling ahash v0.8.12\n   Compiling contextra-wire v0.1.0 (/app/crates/contextra-wire)\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)\n   Compiling contextra-core v0.1.0 (/app/crates/contextra-core)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.08s\n"
+    },
+    {
+      "command": "cargo test -p contextra-core --locked",
+      "exit_code": 0,
+      "duration_seconds": 10.605,
+      "stdout_snippet": "0.00s\n\n\nrunning 5 tests\ntest test_distance_metric_nan_inf_prevention ... ok\ntest test_fusion_weights_nan_and_inf_prevention ... ok\ntest test_resource_tracker_edge_cases ... ok\ntest test_snapshot_registry_robustness_and_concurrency ... ok\ntest test_tx_buffer_orphan_reaper_concurrency ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "   Compiling ahash v0.8.12\n   Compiling num-traits v0.2.19\n   Compiling ppv-lite86 v0.2.21\n   Compiling errno v0.3.14\n   Compiling signal-hook-registry v1.4.8\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling tokio-macros v2.7.2\n   Compiling rand_chacha v0.9.0\n   Compiling socket2 v0.6.5\n   Compiling mio v1.2.2\n   Compiling proptest v1.11.0\n   Compiling tokio v1.53.1\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)\n   Compiling contextra-core v0.1.0 (/app/crates/contextra-core)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.30s\n     Running unittests src/lib.rs (target/debug/deps/contextra_core-b182bd3682a66074)\n     Running tests/integration_core.rs (target/debug/deps/integration_core-d5e0178ec1644e26)\n     Running tests/robustness.rs (target/debug/deps/robustness-bce799a4fc407744)\n   Doc-tests contextra_core\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-core --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 8.008,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

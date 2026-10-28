@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-sandbox",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 84.301,
+  "tests_total": 43,
+  "tests_passed": 43,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 1,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-sandbox --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 33.185,
+      "stdout_snippet": "",
+      "stderr_snippet": " v1.0.229\n   Compiling ahash v0.8.12\n   Compiling crc32fast v1.5.1\n   Compiling indexmap v2.14.1\n   Compiling smallvec v1.15.2\n   Compiling hashbrown v0.14.5\n   Compiling cranelift-bitset v0.112.3\n   Compiling gimli v0.29.0\n   Compiling object v0.36.7\n   Compiling cranelift-entity v0.112.3\n   Compiling cranelift-bforest v0.112.3\n   Compiling regalloc2 v0.10.2\n   Compiling wasmparser v0.217.1\n   Compiling postcard v1.1.3\n   Compiling parking_lot_core v0.9.12\n   Compiling parking_lot v0.12.5\n   Compiling cranelift-codegen v0.112.3\n   Compiling tokio v1.53.1\n   Compiling wasmtime-types v25.0.3\n   Compiling wasmprinter v0.217.1\n   Compiling wasmtime-environ v25.0.3\n   Compiling cranelift-frontend v0.112.3\n   Compiling cranelift-native v0.112.3\n   Compiling cranelift-wasm v0.112.3\n   Compiling wasmtime-cranelift v25.0.3\n   Compiling wasmtime v25.0.3\n   Compiling contextra-sandbox v0.1.0 (/app/crates/contextra-sandbox)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 33.10s\n"
+    },
+    {
+      "command": "cargo test -p contextra-sandbox --locked",
+      "exit_code": 0,
+      "duration_seconds": 27.619,
+      "stdout_snippet": "t test_wasi_args_sizes_get ... ok\ntest test_wasi_empty_input_eof ... ok\ntest test_wasi_output_limit_exceeded ... ok\ntest test_wasi_clock_time_get ... ok\ntest test_wasi_proc_exit_0_stops_execution ... ok\ntest test_wasi_proc_exit_nonzero_returns_error ... ok\ntest test_wasi_random_get ... ok\n\ntest result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "   Compiling object v0.36.7\n   Compiling leb128fmt v0.1.0\n   Compiling tokio v1.53.1\n   Compiling wasm-encoder v0.259.0\n   Compiling wast v259.0.0\n   Compiling wasmtime-environ v25.0.3\n   Compiling wasmtime-cranelift v25.0.3\n   Compiling wasmtime v25.0.3\n   Compiling wat v1.259.0\n   Compiling contextra-sandbox v0.1.0 (/app/crates/contextra-sandbox)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 26.91s\n     Running unittests src/lib.rs (target/debug/deps/contextra_sandbox-736dce7a81c89445)\n     Running tests/pure_merge_operator_capabilities_test.rs (target/debug/deps/pure_merge_operator_capabilities_test-694f221334400676)\n     Running tests/wasm_boundary_tests.rs (target/debug/deps/wasm_boundary_tests-22514fda44cae7e0)\n     Running tests/wasm_merge_function.rs (target/debug/deps/wasm_merge_function-d1461cce21473057)\n     Running tests/wasm_wasi_io.rs (target/debug/deps/wasm_wasi_io-ec36cbbd3e028be6)\n   Doc-tests contextra_sandbox\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-sandbox --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 23.45,
+      "stdout_snippet": "",
+      "stderr_snippet": "other jobs to finish...\nerror: use of a disallowed method `std::time::Instant::now`\n   --> crates/contextra-sandbox/src/executor.rs:598:28\n    |\n598 |             start_instant: std::time::Instant::now(),\n    |                            ^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: P28: Zeit nur \u00fcber Clock-Port. Verwende contextra_ports::clock::Clock.\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_methods\n\nerror: use of a disallowed method `std::time::Instant::now`\n   --> crates/contextra-sandbox/src/executor.rs:625:28\n    |\n625 |             start_instant: std::time::Instant::now(),\n    |                            ^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: P28: Zeit nur \u00fcber Clock-Port. Verwende contextra_ports::clock::Clock.\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_methods\n\nerror: could not compile `contextra-sandbox` (lib test) due to 33 previous errors\n"
+    }
+  ]
+}

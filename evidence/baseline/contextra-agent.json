@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-agent",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 67.325,
+  "tests_total": 0,
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 8,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-agent --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 4.138,
+      "stdout_snippet": "",
+      "stderr_snippet": "troller` is never read\n   --> crates/contextra-engine/src/lib.rs:350:5\n    |\n332 | pub struct Contextra {\n    |            --------- field in this struct\n...\n350 |     pid_controller: parking_lot::RwLock<Option<()>>,\n    |     ^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` on by default\n\nwarning: field `tenant_id` is never read\n   --> crates/contextra-engine/src/transaction/compensating_actions.rs:240:16\n    |\n238 | pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {\n    |            -------------------- field in this struct\n239 |     pub(super) collection: Collection<S, V>,\n240 |     pub(super) tenant_id: TenantId,\n    |                ^^^^^^^^^\n\nwarning: `contextra-engine` (lib) generated 3 warnings\n   Compiling contextra-db v0.1.0 (/app/crates/contextra-db)\n   Compiling contextra-router v0.1.0 (/app/crates/contextra-router)\n   Compiling contextra-agent v0.1.0 (/app/crates/contextra-agent)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.05s\n"
+    },
+    {
+      "command": "cargo test -p contextra-agent --locked",
+      "exit_code": 124,
+      "duration_seconds": 60.061,
+      "stdout_snippet": "",
+      "stderr_snippet": "orts)]` on by default\n\nwarning: field `pid_controller` is never read\n   --> crates/contextra-engine/src/lib.rs:350:5\n    |\n332 | pub struct Contextra {\n    |            --------- field in this struct\n...\n350 |     pid_controller: parking_lot::RwLock<Option<()>>,\n    |     ^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` on by default\n\nwarning: field `tenant_id` is never read\n   --> crates/contextra-engine/src/transaction/compensating_actions.rs:240:16\n    |\n238 | pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {\n    |            -------------------- field in this struct\n239 |     pub(super) collection: Collection<S, V>,\n240 |     pub(super) tenant_id: TenantId,\n    |                ^^^^^^^^^\n\n   Compiling contextra-cognition v0.1.0 (/app/crates/contextra-cognition)\nwarning: `contextra-engine` (lib) generated 3 warnings\n   Compiling contextra-db v0.1.0 (/app/crates/contextra-db)\n   Compiling contextra-agent v0.1.0 (/app/crates/contextra-agent)\n\n[TIMEOUT after 60s]"
+    },
+    {
+      "command": "cargo clippy -p contextra-agent --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 3.126,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

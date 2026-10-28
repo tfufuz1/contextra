@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-adapt",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 19.872,
+  "tests_total": 111,
+  "tests_passed": 110,
+  "tests_failed": 0,
+  "tests_ignored": 1,
+  "warnings_count": 2,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-adapt --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 3.366,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling ahash v0.8.12\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling contextra-adapt v0.1.0 (/app/crates/contextra-adapt)\nwarning: unused import: `LyapunovResult`\n --> crates/contextra-adapt/src/drift.rs:6:45\n  |\n6 | use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};\n  |                                             ^^^^^^^^^^^^^^\n  |\n  = note: `#[warn(unused_imports)]` on by default\n\nwarning: `contextra-adapt` (lib) generated 1 warning (run `cargo fix --lib -p contextra-adapt` to apply 1 suggestion)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.29s\n"
+    },
+    {
+      "command": "cargo test -p contextra-adapt --locked",
+      "exit_code": 0,
+      "duration_seconds": 14.074,
+      "stdout_snippet": "red; 0 filtered out; finished in 0.15s\n\n\nrunning 1 test\ntest test_sketched_projection_vs_sherman_morrison_score_correlation ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s\n\n\nrunning 1 test\ntest crates/contextra-adapt/src/flow_thompson.rs - flow_thompson::FlowCorrectedThompsonBandit::recompute_drift_rate_from_window (line 504) - compile fail ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s\n\n",
+      "stderr_snippet": "3491082a3)\n     Running tests/ips_requires_propensity.rs (target/debug/deps/ips_requires_propensity-3793a575d840fae2)\n     Running tests/pid_anti_windup_tests.rs (target/debug/deps/pid_anti_windup_tests-5c162b5f3a4487bb)\n     Running tests/pid_stability.rs (target/debug/deps/pid_stability-66a3d112563c0303)\n     Running tests/proptest_sherman_morrison_matrix_inverse_differential.rs (target/debug/deps/proptest_sherman_morrison_matrix_inverse_differential-f9191ade02fca5fe)\n     Running tests/rie_greedy_numerics.rs (target/debug/deps/rie_greedy_numerics-66bb31f9f759ef00)\n     Running tests/sketched_projection_config_validation.rs (target/debug/deps/sketched_projection_config_validation-cc45a3350195f42a)\n     Running tests/sketched_projection_determinism.rs (target/debug/deps/sketched_projection_determinism-cf75ca639a010387)\n     Running tests/sketched_projection_vs_sherman_morrison.rs (target/debug/deps/sketched_projection_vs_sherman_morrison-df7f19b91ff0af50)\n   Doc-tests contextra_adapt\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-adapt --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 2.432,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

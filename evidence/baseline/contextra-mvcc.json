@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-mvcc",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 52.496,
+  "tests_total": 78,
+  "tests_passed": 78,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 1,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-mvcc --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 0.539,
+      "stdout_snippet": "",
+      "stderr_snippet": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.45s\n"
+    },
+    {
+      "command": "cargo test -p contextra-mvcc --locked",
+      "exit_code": 0,
+      "duration_seconds": 49.327,
+      "stdout_snippet": " ok\ntest tx_buffer_byte_budget_freed_on_drain_discard_reap ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 2 tests\ntest prop_mvcc_visibility_explicit_boundary_cases ... ok\ntest prop_mvcc_visibility_matches_reference_10k ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "i.rs (target/debug/deps/campaign_j42_ssi-cb14b5e84e9eca4f)\n     Running tests/loom_snapshot_registry.rs (target/debug/deps/loom_snapshot_registry-3a64d98567521116)\n     Running tests/ssi_coarsening_proptest.rs (target/debug/deps/ssi_coarsening_proptest-af4aebf0cf0ffde8)\n     Running tests/ssi_determinism_proptest.rs (target/debug/deps/ssi_determinism_proptest-02b98683a348f260)\n     Running tests/ssi_forget_and_bounds.rs (target/debug/deps/ssi_forget_and_bounds-2cca34a3d49dab13)\n     Running tests/ssi_hardening.rs (target/debug/deps/ssi_hardening-03c89834a786c444)\n     Running tests/ssi_metrics_observability.rs (target/debug/deps/ssi_metrics_observability-230331f24100503d)\n     Running tests/ssi_write_skew.rs (target/debug/deps/ssi_write_skew-b5a244a1bd0e71b1)\n     Running tests/tx_buffer_byte_budget.rs (target/debug/deps/tx_buffer_byte_budget-d2faa53df89d166e)\n     Running tests/visibility_proptest.rs (target/debug/deps/visibility_proptest-cd185d8306fbef83)\n   Doc-tests contextra_mvcc\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-mvcc --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 2.629,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

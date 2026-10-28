@@ -1,0 +1,36 @@
+{
+  "crate": "xtask",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 95.703,
+  "tests_total": 189,
+  "tests_passed": 189,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 124,
+  "commands": [
+    {
+      "command": "cargo build -p xtask --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 0.367,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^^^^^^^\n\nwarning: function `loop_guard_check` is never used\n   --> /app/xtask/src/harness/loop_guard.rs:166:8\n    |\n166 | pub fn loop_guard_check(root: &Path, max_file_edits: u32) -> Result<(), String> {\n    |        ^^^^^^^^^^^^^^^^\n\nwarning: function `loop_guard_reset` is never used\n   --> /app/xtask/src/harness/loop_guard.rs:237:8\n    |\n237 | pub fn loop_guard_reset(root: &Path) -> Result<(), String> {\n    |        ^^^^^^^^^^^^^^^^\n\nwarning: function `run_loop_guard` is never used\n   --> /app/xtask/src/harness/loop_guard.rs:250:8\n    |\n250 | pub fn run_loop_guard(args: &[String]) -> i32 {\n    |        ^^^^^^^^^^^^^^\n\nwarning: function `wal_replay_is_applicable` is never used\n   --> /app/xtask/src/harness/wal_replay_verify.rs:369:8\n    |\n369 | pub fn wal_replay_is_applicable(root: &Path, base: &str, head: &str) -> bool {\n    |        ^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `xtask` (lib) generated 10 warnings\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.30s\n"
+    },
+    {
+      "command": "cargo test -p xtask --locked",
+      "exit_code": 124,
+      "duration_seconds": 60.055,
+      "stdout_snippet": "d out; finished in 10.94s\n\n\nrunning 3 tests\ntest test_env_attest_missing_required_tool ... ok\ntest test_env_attest_wrong_toolchain ... ok\ntest test_env_attest_pass ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s\n\n\nrunning 3 tests\ntest test_explain_list ... ok\ntest test_explain_known_gate ... ok\ntest test_explain_unknown_gate ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n\n\nrunning 1 test\n",
+      "stderr_snippet": " Disable this message with \"git config set advice.defaultBranchName false\"\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: will change to \"main\" in Git 3.0. To configure the initial branch name\nhint: to use in all of your new repositories, which will suppress this warning,\nhint: call:\nhint:\nhint: \tgit config --global init.defaultBranch <name>\nhint:\nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint:\nhint: \tgit branch -m <name>\nhint:\nhint: Disable this message with \"git config set advice.defaultBranchName false\"\n     Running tests/harness_env_attest_test.rs (target/debug/deps/harness_env_attest_test-493d39877606a002)\n     Running tests/harness_explain_test.rs (target/debug/deps/harness_explain_test-b31433891b80a6ec)\n     Running tests/harness_flake_report_test.rs (target/debug/deps/harness_flake_report_test-77b4267c3b9a69d6)\n\n[TIMEOUT after 60s]"
+    },
+    {
+      "command": "cargo clippy -p xtask --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 35.28,
+      "stdout_snippet": "",
+      "stderr_snippet": "methods)]`\n\nerror: use of a disallowed method `std::env::var`\n  --> xtask/build.rs:17:24\n   |\n17 |     let manifest_dir = std::env::var(\"CARGO_MANIFEST_DIR\").unwrap_or_else(|_| \".\".to_string());\n   |                        ^^^^^^^^^^^^^\n   |\n   = note: P28: Umgebungsvariablen nicht in Kernlogik.\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_methods\n\nerror: used `unwrap()` on an `Option` value\n  --> xtask/build.rs:87:24\n   |\n87 |         let path_str = harness_path.to_str().unwrap().replace('\\\\', \"/\");\n   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n   = note: if this value is `None`, it will panic\n   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used\n   = note: requested on the command line with `-D clippy::unwrap-used`\n\nerror: could not compile `xtask` (build script) due to 3 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}
