@@ -66,7 +66,8 @@ impl Gate for WitnessMintGate {
         }
         if scan_witness_mint(root) != Outcome::Pass {
             return Outcome::Fail {
-                reason: "Selftest failed: scan_witness_mint rejected legal LayerWitness in scanner".to_string(),
+                reason: "Selftest failed: scan_witness_mint rejected legal LayerWitness in scanner"
+                    .to_string(),
             };
         }
 

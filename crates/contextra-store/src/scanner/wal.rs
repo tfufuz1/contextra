@@ -9,7 +9,7 @@ use super::sstable::block_on_future;
 use crate::lsm::LsmStorage;
 use crate::tenant_codec::TenantKeyCodec;
 use crate::wal::{Wal, WalConfig, WalOp};
-use contextra_ports::scanner::{LayerScanner, ScanSession, WitnessLayer};
+use contextra_ports::scanner::{LayerScanner, ScanSession, ScanTechnique, WitnessLayer};
 use contextra_types::{RequestContext, Result, TxId};
 use std::sync::Arc;
 
@@ -71,6 +71,10 @@ impl LayerScanner for WalScanner {
         WitnessLayer::WalAllSegments
     }
 
+    fn technique(&self) -> ScanTechnique {
+        ScanTechnique::DecryptedViewScan
+    }
+
     fn scan_units(&self, session: &mut ScanSession, ctx: &RequestContext) -> Result<()> {
         self.run_positive_control(session);
 
@@ -94,10 +98,15 @@ impl LayerScanner for WalScanner {
                 }
             }
 
+            let mut max_seq = 0u64;
+
             for wal_path in wal_files {
                 if let Ok(wal) = Wal::open_read_only(&wal_path, None).await {
                     if let Ok(entries) = wal.replay().await {
                         for (seq, entry, _pos) in entries {
+                            if seq > max_seq {
+                                max_seq = seq;
+                            }
                             let key_bytes = match &entry.op {
                                 WalOp::Put { key, .. } => Some(key.as_slice()),
                                 WalOp::Delete { key, .. } => Some(key.as_slice()),
@@ -117,6 +126,8 @@ impl LayerScanner for WalScanner {
                     }
                 }
             }
+
+            session.set_wal_seq_after(max_seq);
         });
 
         Ok(())

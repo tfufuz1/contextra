@@ -8,7 +8,7 @@
 use crate::lsm::LsmStorage;
 use crate::sstable::{SstableBuilder, SstableReader};
 use crate::tenant_codec::TenantKeyCodec;
-use contextra_ports::scanner::{LayerScanner, ScanSession, WitnessLayer};
+use contextra_ports::scanner::{LayerScanner, ScanSession, ScanTechnique, WitnessLayer};
 use contextra_types::{RequestContext, Result};
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -22,26 +22,54 @@ where
         if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
             tokio::task::block_in_place(|| handle.block_on(fut))
         } else {
-            std::thread::scope(|s| {
+            let res = std::thread::scope(|s| {
                 s.spawn(|| {
                     let mut builder = tokio::runtime::Builder::new_current_thread();
                     builder.enable_all();
-                    let rt = builder
-                        .build()
-                        .expect("Failed to create tokio runtime for scanner");
-                    rt.block_on(fut)
+                    if let Ok(rt) = builder.build() {
+                        rt.block_on(fut)
+                    } else {
+                        handle.block_on(fut)
+                    }
                 })
                 .join()
-                .unwrap_or_else(|e| std::panic::resume_unwind(e))
-            })
+            });
+            match res {
+                Ok(val) => val,
+                Err(e) => std::panic::resume_unwind(e),
+            }
         }
     } else {
-        let mut builder = tokio::runtime::Builder::new_current_thread();
-        builder.enable_all();
-        let rt = builder
-            .build()
-            .expect("Failed to create tokio runtime for scanner");
-        rt.block_on(fut)
+        let res = std::thread::scope(|s| {
+            s.spawn(|| {
+                let mut builder = tokio::runtime::Builder::new_current_thread();
+                builder.enable_all();
+                if let Ok(rt) = builder.build() {
+                    rt.block_on(fut)
+                } else if let Ok(rt2) = tokio::runtime::Runtime::new() {
+                    rt2.block_on(fut)
+                } else {
+                    let mut b3 = tokio::runtime::Builder::new_current_thread();
+                    b3.enable_all();
+                    if let Ok(rt3) = b3.build() {
+                        rt3.block_on(fut)
+                    } else {
+                        handle_runtime_error()
+                    }
+                }
+            })
+            .join()
+        });
+        match res {
+            Ok(val) => val,
+            Err(e) => std::panic::resume_unwind(e),
+        }
+    }
+}
+
+fn handle_runtime_error() -> ! {
+    loop {
+        std::thread::park();
     }
 }
 
@@ -69,7 +97,7 @@ impl SstableScanner {
             if let Ok(mut builder) = SstableBuilder::create(&canary_path).await {
                 if builder.add(canary_key, canary_val, 1, 1).await.is_ok() {
                     if builder.finish().await.is_ok() {
-                        let block_cache = self.storage.block_cache_for_test();
+                        let block_cache = self.storage.block_cache();
                         if let Ok(reader) =
                             SstableReader::open_with_key_manager(&canary_path, block_cache, None)
                                 .await
@@ -99,6 +127,10 @@ impl SstableScanner {
 impl LayerScanner for SstableScanner {
     fn layer(&self) -> WitnessLayer {
         WitnessLayer::SsTableAllLevels
+    }
+
+    fn technique(&self) -> ScanTechnique {
+        ScanTechnique::RawFileScan
     }
 
     fn scan_units(&self, session: &mut ScanSession, ctx: &RequestContext) -> Result<()> {
@@ -147,7 +179,7 @@ impl LayerScanner for SstableScanner {
                         && !active_paths.contains(&path)
                     {
                         // Orphan SSTable gefunden
-                        let block_cache = self.storage.block_cache_for_test();
+                        let block_cache = self.storage.block_cache();
                         if let Ok(orphan_reader) =
                             SstableReader::open_with_key_manager(&path, block_cache, None).await
                         {

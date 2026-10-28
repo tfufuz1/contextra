@@ -10,7 +10,7 @@ use crate::lsm::LsmStorage;
 use crate::memtable::MemTable;
 use crate::tenant_codec::TenantKeyCodec;
 use bytes::Bytes;
-use contextra_ports::scanner::{LayerScanner, ScanSession, WitnessLayer};
+use contextra_ports::scanner::{LayerScanner, ScanSession, ScanTechnique, WitnessLayer};
 use contextra_types::{RequestContext, Result};
 use std::sync::Arc;
 
@@ -51,6 +51,10 @@ impl LayerScanner for MemtableScanner {
         WitnessLayer::LsmMemtable
     }
 
+    fn technique(&self) -> ScanTechnique {
+        ScanTechnique::IndexIntrospection
+    }
+
     fn scan_units(&self, session: &mut ScanSession, ctx: &RequestContext) -> Result<()> {
         // 1. Positivkontrolle ausführen
         self.run_positive_control(session);
@@ -60,9 +64,8 @@ impl LayerScanner for MemtableScanner {
         let target_prefix = codec.scan_prefix();
 
         // 3. Aktive und immutable Memtables erfassen
-        let (active_mt, immutable_mts) = block_on_future(async {
-            self.storage.memtables_for_scanner().await
-        });
+        let (active_mt, immutable_mts) =
+            block_on_future(async { self.storage.memtables_for_scanner().await });
 
         let mut all_mts = Vec::with_capacity(1 + immutable_mts.len());
         all_mts.push(active_mt);

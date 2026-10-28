@@ -437,7 +437,10 @@ impl LsmStorage {
         Vec<Arc<crate::memtable::MemTable>>,
     ) {
         let state = self.state.read().await;
-        (Arc::clone(&state.memtable), state.immutable_memtables.clone())
+        (
+            Arc::clone(&state.memtable),
+            state.immutable_memtables.clone(),
+        )
     }
 
     /// Returns a snapshot of currently open SSTable readers.
@@ -454,5 +457,15 @@ impl LsmStorage {
     /// Returns the data directory path.
     pub fn data_path(&self) -> &std::path::Path {
         &self.config.path
+    }
+
+    pub(crate) fn block_cache(&self) -> Arc<crate::sstable::BlockCache> {
+        Arc::clone(&self.block_cache)
+    }
+
+    pub(crate) fn sstables_rwlock(
+        &self,
+    ) -> Arc<tokio::sync::RwLock<Vec<Arc<crate::sstable::SstableReader>>>> {
+        Arc::clone(&self.sstables)
     }
 }

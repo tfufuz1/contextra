@@ -49,7 +49,7 @@ impl Purger for LsmPurger {
 
             // 3. SSTables filtern / neu schreiben ohne Target-Records
             let readers = self.storage.sstables_for_scanner().await;
-            let block_cache = self.storage.block_cache_for_test();
+            let block_cache = self.storage.block_cache();
 
             let mut new_readers = Vec::new();
             let mut sst_files_to_purge = Vec::new();
@@ -81,8 +81,12 @@ impl Purger for LsmPurger {
                             let _ = builder.add(&rk, &rv, rseq, 1).await;
                         }
                         if builder.finish().await.is_ok() {
-                            if let Ok(new_reader) =
-                                SstableReader::open_with_key_manager(&new_path, block_cache.clone(), None).await
+                            if let Ok(new_reader) = SstableReader::open_with_key_manager(
+                                &new_path,
+                                block_cache.clone(),
+                                None,
+                            )
+                            .await
                             {
                                 new_readers.push(Arc::new(new_reader));
                                 sst_files_to_purge.push(old_path.to_path_buf());
@@ -94,7 +98,7 @@ impl Purger for LsmPurger {
 
             // SSTables im Store aktualisieren
             {
-                let sst_arc = self.storage.sstables_for_test();
+                let sst_arc = self.storage.sstables_rwlock();
                 let mut sst_guard = sst_arc.write().await;
                 *sst_guard = new_readers;
             }
@@ -148,20 +152,40 @@ impl Purger for LsmPurger {
             for wal_path in wal_files {
                 if let Ok(wal) = Wal::open_read_only(&wal_path, None).await {
                     if let Ok(entries) = wal.replay().await {
-                        let has_target = entries.iter().any(|(_seq, entry, _pos)| match &entry.op {
-                            WalOp::Put { key, .. } | WalOp::Delete { key, .. } => key.starts_with(target_prefix),
-                            WalOp::TxEnd { .. } => false,
-                        });
+                        let has_target =
+                            entries.iter().any(|(_seq, entry, _pos)| match &entry.op {
+                                WalOp::Put { key, .. } | WalOp::Delete { key, .. } => {
+                                    key.starts_with(target_prefix)
+                                }
+                                WalOp::TxEnd { .. } => false,
+                            });
 
                         if has_target {
                             let retained_wal: Vec<_> = entries
                                 .into_iter()
                                 .filter_map(|(_seq, entry, _pos)| match entry.op {
-                                    WalOp::Put { key, value, tx_id } if !key.starts_with(target_prefix) => {
-                                        Some((WalOp::Put { key: key.clone(), value: value.clone(), tx_id }, entry.seq_no))
+                                    WalOp::Put { key, value, tx_id }
+                                        if !key.starts_with(target_prefix) =>
+                                    {
+                                        Some((
+                                            WalOp::Put {
+                                                key: key.clone(),
+                                                value: value.clone(),
+                                                tx_id,
+                                            },
+                                            entry.seq_no,
+                                        ))
                                     }
-                                    WalOp::Delete { key, tx_id } if !key.starts_with(target_prefix) => {
-                                        Some((WalOp::Delete { key: key.clone(), tx_id }, entry.seq_no))
+                                    WalOp::Delete { key, tx_id }
+                                        if !key.starts_with(target_prefix) =>
+                                    {
+                                        Some((
+                                            WalOp::Delete {
+                                                key: key.clone(),
+                                                tx_id,
+                                            },
+                                            entry.seq_no,
+                                        ))
                                     }
                                     WalOp::TxEnd { committed, tx_id } => {
                                         Some((WalOp::TxEnd { committed, tx_id }, entry.seq_no))
@@ -184,13 +208,12 @@ impl Purger for LsmPurger {
                             } else {
                                 // WAL neu schreiben ohne Target-Records
                                 let tmp_wal_path = wal_path.with_extension("purged.log");
-                                if let Ok(new_wal) = Wal::open_with_config(
-                                    &tmp_wal_path,
-                                    WalConfig::default(),
-                                )
-                                .await
+                                if let Ok(new_wal) =
+                                    Wal::open_with_config(&tmp_wal_path, WalConfig::default()).await
                                 {
-                                    if let Ok((batch, _)) = new_wal.prepare_batch(retained_wal).await {
+                                    if let Ok((batch, _)) =
+                                        new_wal.prepare_batch(retained_wal).await
+                                    {
                                         let _ = new_wal.append_batch(batch).await;
                                     }
 
