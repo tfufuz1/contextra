@@ -23,6 +23,7 @@ contextra-wire = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-privacy = { workspace = true }
+contextra-router = { workspace = true }
 contextra-infer-candle = { workspace = true, optional = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 rand = { workspace = true }

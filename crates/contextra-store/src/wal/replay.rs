@@ -4,9 +4,10 @@ use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
 use super::{
-    legacy_integrity_key, Wal, WalEntry, WalOp, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE,
-    WAL_V2_HEADER, WAL_V3_HEADER,
+    Wal, WalEntry, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
 };
+#[cfg(feature = "wal-integrity")]
+use super::{legacy_integrity_key, WalOp};
 
 pub type WalSeq = u64;
 
@@ -328,7 +329,7 @@ impl Wal {
         let integrity_key = self.get_integrity_key()?;
         #[cfg(feature = "wal-integrity")]
         let mut verifier = IntegrityVerifier::new(&integrity_key);
-        let mut using_legacy_key = false;
+        let mut _using_legacy_key = false;
 
         // Detect version from header
         if file_size >= 4 && slice_len >= 4 {

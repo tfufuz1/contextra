@@ -49,7 +49,7 @@ impl Purger for LsmPurger {
 
             // 3. SSTables filtern / neu schreiben ohne Target-Records
             let readers = self.storage.sstables_for_scanner().await;
-            let block_cache = self.storage.block_cache_for_test();
+            let block_cache = self.storage.block_cache();
 
             let mut new_readers = Vec::new();
             let mut sst_files_to_purge = Vec::new();
@@ -94,7 +94,7 @@ impl Purger for LsmPurger {
 
             // SSTables im Store aktualisieren
             {
-                let sst_arc = self.storage.sstables_for_test();
+                let sst_arc = self.storage.sstables_arc();
                 let mut sst_guard = sst_arc.write().await;
                 *sst_guard = new_readers;
             }
