@@ -63,30 +63,6 @@ volatile-vault = []
 # RESOLVED: AGT-DB-897f3a5c — Forward edge-reinforcement-learning feature to contextra-graph/edge-reinforcement-learning (TS: 2026-09-09T15:48:51Z) (SESSION: 2c31404a)
 edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
 
-[[bench]]
-name = "migration_benchmarks"
-path = "../../benchmarks/migration_benchmarks.rs"
-harness = false
-
-[[bench]]
-name = "scale_bench"
-path = "../../benchmarks/scale_bench.rs"
-harness = false
-
-[[bench]]
-name = "rrf_scale_bench"
-path = "../../benchmarks/rrf_scale_bench.rs"
-harness = false
-
-[[bench]]
-name = "competitive_bench"
-path = "../../benchmarks/competitive_bench.rs"
-harness = false
-
-[[bench]]
-name = "relate_bench"
-path = "../../benchmarks/relate_bench.rs"
-harness = false
 
 [[example]]
 name = "quickstart"

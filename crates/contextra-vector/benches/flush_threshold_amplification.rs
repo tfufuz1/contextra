@@ -8,7 +8,7 @@ use std::fs;
 use std::time::Instant;
 
 #[cfg(feature = "experimental-diskann")]
-use contextra_core::types::{DistanceMetric, DocId, TxId};
+use contextra_types::{DistanceMetric, DocId, TxId};
 #[cfg(feature = "experimental-diskann")]
 use contextra_ports::VectorIndex;
 #[cfg(feature = "experimental-diskann")]
