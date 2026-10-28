@@ -95,6 +95,21 @@ impl<S: StorageEngine> InvertedIndex<S> {
         self
     }
 
+    /// Accessor for underlying storage engine.
+    pub fn storage(&self) -> &Arc<S> {
+        &self.storage
+    }
+
+    /// Accessor for index storage prefix bytes.
+    pub fn prefix(&self) -> &[u8] {
+        &self.prefix
+    }
+
+    /// Accessor for single-writer commit lock.
+    pub fn commit_lock(&self) -> &parking_lot::Mutex<()> {
+        &self.commit_lock
+    }
+
     /// Loads index statistics from storage into the cache.
     pub async fn load_stats(&self) -> Result<()> {
         let meta_key = self.key("meta:stats");
