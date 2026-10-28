@@ -1,4 +1,4 @@
-use contextra_core::types::{DocId, TxId};
+use contextra_types::{DocId, TxId};
 use contextra_ports::VectorIndex;
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

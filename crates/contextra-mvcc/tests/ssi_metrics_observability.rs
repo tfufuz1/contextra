@@ -2,7 +2,7 @@
 
 use contextra_mvcc::SequenceLogSsiValidator;
 use contextra_mvcc::SnapshotRegistry;
-use contextra_ports::metrics::{MetricEvent, TestMetricsSink};
+use contextra_testkit::{MetricEvent, TestMetricsSink};
 use contextra_ports::MetricsSink;
 use parking_lot::RwLock;
 use std::sync::Arc;

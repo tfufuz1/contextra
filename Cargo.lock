@@ -1077,6 +1077,7 @@ dependencies = [
  "ahash",
  "bytes",
  "contextra-ports",
+ "contextra-testkit",
  "contextra-types",
  "criterion",
  "loom",
