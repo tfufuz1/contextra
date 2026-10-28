@@ -1,3 +1,5 @@
+<!-- doc-stamp: 2026-10-29 0796b40ed -->
+
 # Contextra
 
 > **Baukasten für lokale, datenschutzkonforme LLM- & RAG-Lösungen im europäischen Mittelstand**
@@ -14,7 +16,7 @@ Contextra ist nach einem unidirektionalen Ringmodell aufgebaut (**Ring 4 → Rin
 - **Ring 3 (Orchestrierung & Schutz):** `contextra-engine`, `contextra-db`, `contextra-privacy`, `contextra-cognition`, `contextra-router`, `contextra-agent`
 - **Ring 2 (Inferenz & Isolation):** `contextra-infer-candle`, `contextra-infer-onnx`, `contextra-infer-ollama`, `contextra-sandbox`
 - **Ring 1 (Persistenz):** `contextra-store`, `contextra-checkpoint`, `contextra-kvcache`
-- **Ring 0 (Fundament & Kerne):** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-rank`, `contextra-adapt`, `contextra-audit-export`, `contextra-avv-generator`
+- **Ring 0 (Fundament & Kerne):** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-rank`, `contextra-graph`, `contextra-adapt`, `contextra-audit-export`, `contextra-avv-generator`
 - **Unsafe-Inseln (Ring 0):** `contextra-simd`, `contextra-sys`, `contextra-wire`
 
 Die alleinige normative Quelle für Architektur und Invarianten ist [`docs/SPEC.md`](docs/SPEC.md).
@@ -60,7 +62,7 @@ cargo run -p xtask -- --list-gates
 ## Dokumentation & Spezifikation
 
 - [`docs/SPEC.md`](docs/SPEC.md) – Normative Gesamtspezifikation (Soll-Zustand, Invarianten, Baukasten-Modell)
-- [`docs/PLAN.md`](PLAN.md) – Umsetzungsplan (Phase 0 bis Phase 8)
+- [`docs/PLAN.md`](docs/PLAN.md) – Umsetzungsplan (Phase 0 bis Phase 8)
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) – Übersicht über Architektur, Ringe und Crate-Katalog
 - [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) – Bindende Verfassung
 - [`docs/VETOES.md`](docs/VETOES.md) – Bindende Vetos (VETO-F10, VETO-F02, VETO-OP03, VETO-NET1)

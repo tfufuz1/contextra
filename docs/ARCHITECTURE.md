@@ -1,4 +1,4 @@
-<!-- doc-stamp: 2026-10-28 1b8b790 -->
+<!-- doc-stamp: 2026-10-29 0796b40ed -->
 
 # Contextra – Architekturübersicht
 
@@ -7,7 +7,7 @@
 > **`docs/SPEC.md` (Gesamtspezifikation Fassung 3.0, Baukasten-Modell)**. Bei jedem Widerspruch zwischen dieser Datei
 > und `docs/SPEC.md` gilt `docs/SPEC.md`.
 >
-> Stand: **28.10.2026** | Basis: Gesamtspezifikation 3.0 + Umsetzungsplan 3.0 (HEAD 1b8b790)
+> Stand: **29.10.2026** | Basis: Gesamtspezifikation 3.0 + Umsetzungsplan 3.1 (HEAD 0796b40ed)
 
 ---
 
@@ -46,7 +46,6 @@ Ring 4 │ Fassade/Schnittstellen
 Ring 3 │ Orchestrierung
        │  [K] contextra-engine
        │  [K] contextra-db
-       │  [K] contextra-erasure (geplant, Ring 3)
        │  [M] contextra-privacy
        │  [M] contextra-cognition
        │  [M] contextra-router
@@ -83,6 +82,8 @@ Werkzeug (kein Ring)
 Legacy / Auslaufend
        │  contextra-core (Kompatibilitätsfassade, entfällt in WP 2.8)
 ```
+
+> **Soll vs. Ist Hinweis:** Die Zuordnung oben entspricht dem Baukasten-Modell der SPEC 3.0 / `capabilities.toml` (Soll). Im Ist-Stand existieren physikalisch alle 35 Crates im Workspace.
 
 ### Wirkung der Ringe
 

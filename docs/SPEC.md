@@ -2813,3 +2813,15 @@ Ein Tenant durchläuft die Zustände `Aktiv`, `Gesperrt` und `Gelöscht`.
 - **Aktiv → Gesperrt** (Kategorie `Admin`): keine Schreibzugriffe; Lesen nur für Betreiber mit Protokollierung; Schlüssel bleiben erhalten. Die Rückkehr nach `Aktiv` ist nur bei unveränderten Schlüsseln zulässig.
 - **Gesperrt → Gelöscht** (`erase_tenant`, Kategorie `Destructive`): Der Tenant wird im `ErasedSet` eingetragen, bevor die Saga beginnt (INV-BOOT-1). Jede Collection durchläuft die Saga nach §12.8.2 (Klassen L bis M). Je Scope entstehen die Siegel 1 bis 4.
 - **Gelöscht** ist endgültig. Die Tenant-ID wird nie wiederverwendet. Schreibversuche liefern `TenantErased` (final).
+
+---
+
+## 18. Offene Spezifikationsfragen
+
+Stand: **29.10.2026** | Gemäß Verfassung (`docs/CONSTITUTION.md`) und SPEC-Hierarchie. Inhalts-Soll-Anpassungen werden hier als Vorschläge festgehalten, ohne den normativen Rumpf zu modifizieren.
+
+| Datum | Stelle / Thema | Beobachtung / Ist-Stand im Repo | Vorschlag / Abklärung |
+|-------|----------------|---------------------------------|-----------------------|
+| 2026-10-29 | §4.2, §5 / Baukasten [M]-Module | SPEC/ADR-D01 definiert Rand-Crates als aktive Baukasten-Module [M]. PLAN v3.0 bezeichnete `cognition`, `graph`, `router`, `agent` historisch als Archiv-Crates. | PLAN & ARCHITECTURE auf Baukasten-Modell [M] nach ADR-D01 vereinheitlicht. |
+| 2026-10-29 | §4.6 / Unsafe-Inseln | `contextra-simd`, `contextra-sys`, `contextra-wire` deklarieren unsafe code. `capabilities.toml` führt `unsafe_island = true` für alle 3 Inseln. | Normative Erfassung in SPEC bestätigt. |
+| 2026-10-29 | §13.4 / Facade & Workspace | `cargo check --workspace` zeigt 35 Workspace-Mitglieder (`capabilities.toml`). 9 Mitglieder stehen auf `ci_class = 'pr-check-only'`. | CI-Klassifikation und Target-Spezifikation explizit im CI-Ablauf dokumentieren. |
