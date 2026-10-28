@@ -420,32 +420,32 @@ impl McpServer {
                     _ => None,
                 };
 
+                // Key preflight check: Fail BEFORE deletion if no key is configured
+                let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
+                    .key
+                    .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
+
+                let tenant_id = self.tenant_id.ok_or_else(|| {
+                    McpError::invalid_params("tenant_id not configured on server")
+                })?;
+
                 if let Some(id) = id_opt {
                     let col = self.db.collection(col_name).await.map_err(McpError::from)?;
                     col.delete(id).await.map_err(McpError::from)?;
 
-                    // Single document deletion in Contextra does not generate a DeletionProof.
-                    // In accordance with honesty rules, we return proof: null and proof_scope: "collection_only".
                     Ok(json!({
                         "ok": true,
+                        "deleted": true,
+                        "verified": false,
                         "collection": col_name,
                         "id": id,
                         "proof": null,
-                        "proof_scope": "collection_only"
+                        "reason": "Schichteigene Messung für Einzel-Dokument-Löschung nicht angebunden"
                     }))
                 } else {
-                    let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
-                        .key
-                        .ok_or_else(|| {
-                            McpError::invalid_params("deletion proof key not configured")
-                        })?;
-
-                    let tenant_id = contextra_types::TenantId::try_new(1)
-                        .unwrap_or(contextra_types::TenantId::SYSTEM);
-
                     let proof = self
                         .db
-                        .drop_collection(col_name, tenant_id, proof_key.as_bytes())
+                        .drop_collection(col_name, tenant_id, proof_key.trim().as_bytes())
                         .await
                         .map_err(McpError::from)?;
 
@@ -457,9 +457,12 @@ impl McpServer {
 
                     Ok(json!({
                         "ok": true,
+                        "deleted": true,
+                        "verified": true,
                         "collection": col_name,
                         "proof": proof_val,
-                        "proof_scope": "collection"
+                        "layers": ["LsmMemtable", "SsTableAllLevels"],
+                        "excluded": []
                     }))
                 }
             }
