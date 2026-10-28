@@ -6,7 +6,7 @@
 #![forbid(unsafe_code)]
 
 pub use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
+    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope,
 };
 use contextra_ports::license::LicenseGate;
 #[cfg(feature = "sandbox")]
@@ -349,7 +349,11 @@ pub struct Contextra {
     >,
     pid_controller: parking_lot::RwLock<Option<()>>,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
+    proof_key_provider:
+        parking_lot::RwLock<Option<Arc<dyn contextra_impl::erasure::ProofKeyProvider>>>,
 }
+
+pub use contextra_impl::erasure::{ErasureFailure, ErasureReport, LayerSummary, ProofKeyProvider};
 
 #[cfg(not(loom))]
 mod contextra_impl;
