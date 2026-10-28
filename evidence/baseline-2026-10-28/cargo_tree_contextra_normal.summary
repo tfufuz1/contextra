@@ -1,0 +1,1 @@
+cargo tree -p contextra --edges normal --locked: exit_code=0, duration=427ms

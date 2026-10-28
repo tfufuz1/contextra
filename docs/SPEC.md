@@ -956,6 +956,16 @@ Jedes Crate hat eine eigene SemVer-Version; `cargo-semver-checks` ist Pflicht f�
 
 ---
 
+## 17. Offene Spezifikationsfragen (Dokumentationsabgleich 28.10.2026)
+
+| Datum | Betroffene Stelle / Thema | Befund & Fragestellung | Vorschlag |
+|---|---|---|---|
+| 28.10.2026 | `contextra-sys` Modulimport / Compilability | Das Crate `contextra-sys` besitzt in `src/lib.rs` einen ungelösten Import `pub mod crypto_rng;`, während die Datei `src/crypto_rng.rs` am HEAD fehlt. Dadurch schlägt `cargo check --workspace` fehl. | `crypto_rng.rs` aus Paket-Restaurierung wiederherstellen oder Moduldeklaration in `lib.rs` entfernen. |
+| 28.10.2026 | `capabilities.toml` vs Ring-Modell | `capabilities.toml` deklariert z. B. `contextra-graph` und `contextra-adapt` als Ring 0, während SPEC §4.1 sie in höheren Rängen bzw. Randmodulen verortet. | `capabilities.toml` in WP 0.2/WP 2.1 vollständig an das Schema 3 der SPEC 3.0 anpassen. |
+| 28.10.2026 | `xtask` Doppeldeklaration | In `xtask/src/main.rs` existiert eine doppelte Match-Arm-Deklaration für `"check-commit-diff-integrity"`. | Duplikat im CLI-Dispatcher entfernen. |
+
+---
+
 ## Anhang A. Abbildung 2.4 → 3.0
 
 |2.4|3.0|

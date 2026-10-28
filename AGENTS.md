@@ -1,8 +1,8 @@
 # Contextra — Agenten-Betriebsanleitung (AGENTS.md)
 
-<!-- doc-stamp: 2026-10-26 | Spec-Fassung: 2.3 -->
+<!-- doc-stamp: 2026-10-28 1b8b790 | Spec-Fassung: 3.0 -->
 
-Stand: 2026-10-26 · Basis: Gesamtspezifikation Fassung 2.3 (`docs/SPEC.md`)
+Stand: 2026-10-28 · Basis: Gesamtspezifikation Fassung 3.0 (`docs/SPEC.md`)
 
 ---
 
@@ -11,12 +11,13 @@ Stand: 2026-10-26 · Basis: Gesamtspezifikation Fassung 2.3 (`docs/SPEC.md`)
 Diese Datei regelt die Arbeit aller autonomen Agenten im Repository.
 Bei Konflikten gilt zwingend folgende strikte Rangfolge:
 
-1. **Normative Gesamtspezifikation Fassung 2.3** (`docs/SPEC.md`; §0, §1) — einzige Quelle der Wahrheit
-2. **Vetos und Architekturprinzipien** (`docs/VETOES.md`; §3.1, §4.1)
-3. **Capabilities Manifest** (`capabilities.toml`; INV-DOC-SINGLE-SOURCE-1)
-4. **Governance Gate-Definitionen** (`governance/gates.toml`; §17.3, WP 0.4)
-5. **Agenten-Betriebsanleitung** (`AGENTS.md`)
-6. **Produktionscode und grüne Quality Gates** (REQ-QA-010)
+1. **Verfassung und Vetos** (`docs/CONSTITUTION.md`, `docs/VETOES.md`)
+2. **Normative Gesamtspezifikation Fassung 3.0** (`docs/SPEC.md`; §0, §1) — Baukasten-Modell
+3. **Umsetzungsplan** (`docs/PLAN.md`)
+4. **Capabilities Manifest** (`capabilities.toml`; INV-DOC-SINGLE-SOURCE-1)
+5. **Governance Gate-Definitionen** (`governance/gates.toml`; §17.3)
+6. **Agenten-Betriebsanleitung** (`AGENTS.md`)
+7. **Produktionscode und grüne Quality Gates** (REQ-QA-010)
 
 Quality Gates dürfen niemals durch Ausnahmen, Sonderregeln oder lokale Overrides geschwächt oder umgangen werden (REQ-QA-010).
 
@@ -52,7 +53,7 @@ cargo check --workspace
 2. Existenz von APIs, Dateien und Typen im Code prüfen (niemals aus dem Gedächtnis annehmen).
 3. Plan mit Dateiliste, WP-Nummer und Akzeptanzbefehlen erstellen.
 4. Kleinste mögliche Änderung durchführen (ein WP = ein PR = höchstens ein Crate-Schnitt, REQ-CHG-2).
-5. Gates lokal grün: `just check && just test && just sync-docs`
+5. Gates lokal grün: `cargo check --workspace` && `cargo test --workspace` && `cargo run -p xtask -- check`
 6. **Rebase auf origin/main** (`git fetch origin && git rebase origin/main`) — PFLICHT vor jedem PR.
 7. Gates nach Rebase erneut prüfen, dann PR erstellen, Issue schließen.
 
@@ -109,67 +110,52 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für R
 
 ---
 
-## 5. Crate-Übersicht und Status
+## 5. Baukasten-Crates [K] / [M] / [E] — Baukasten-Modell (SPEC §5)
 
-### 5.1 Kern-Crates [K] — aktiv zu entwickeln
+### 5.1 Kern-Crates [K]
 
 | Crate | Ring | Status | WP-Aufgabe |
 |-------|------|--------|------------|
-| `contextra-types` | 0 | aktiv | Löschtypen (10 Schichten), `RequestContext`, `ErasureId` |
-| `contextra-ports` | 0 | aktiv | Sicherheitsports: `Vfs`, `KmsProvider`, `LayerScanner`, `Purger` |
-| `contextra-sys` | 0 | aktiv | Durability-Primitive, SAFETY-Lücken schließen |
-| `contextra-simd` | 0 | aktiv | Kernel `pub(crate)`, `core`-Abhängigkeit entfernen |
-| `contextra-wire` | 0 | aktiv | `allow(unwrap)`-Scope auf generierte Dateien einschränken |
-| `contextra-mvcc` | 0 | aktiv | Zeitaufrufe (14) über `Clock`-Port |
-| `contextra-crypto` | 0 | aktiv | Keystore/KMS K0/K1, KeyTable, Bericht V5, I/O-frei |
-| `contextra-vector` | 0 | aktiv | Slot-Nullung, `VectorScanner`, DiskANN → Archiv |
-| `contextra-text` | 0 | aktiv | Panic entfernen, `TextScanner`, ArtKey-Segmente |
-| `contextra-rank` | 0 | aktiv | NUR `fusion/` <!-- doc-ref-ignore -->; Rest → Archiv |
-| `contextra-store` | 1 | aktiv | `Vfs`-Impl, Sidecars, `LsmScanner`, Purge-Kompaktion |
-| `contextra-checkpoint` | 1 | aktiv | Spur D/K, `CheckpointScanner`, `core`-Abhängigkeit entfernen |
-| `contextra-engine` | 3 | aktiv | Saga, Lesesperre, Boot B0–B9; Archiv-Crates entkoppeln |
-| `contextra-db` | 3 | aktiv | Entkopplung von `cognition`, `graph`, `adapt` |
-| `contextra-mcp` | 4 | aktiv | Drei Werkzeuge (`memory_remember`, `memory_recall`, `memory_forget`) |
-| `contextra` | 4 | aktiv | Composition Root, Boot B0–B9 |
+| `contextra-types` | 0 | aktiv | Grundlegende Typen, IDs, Fehlerklassen |
+| `contextra-ports` | 0 | aktiv | Port-Schnittstellen (Entkopplung) |
+| `contextra-sys` | 0 | aktiv | Unsafe-Insel; Systemnahe Bindings, Low-Level-I/O |
+| `contextra-simd` | 0 | aktiv | Unsafe-Insel; SIMD-Distanzkerne |
+| `contextra-wire` | 0 | aktiv | Unsafe-Insel; FlatBuffers Wire-Protokoll |
+| `contextra-mvcc` | 0 | aktiv | Snapshots, SSI, Sequenzen |
+| `contextra-crypto` | 0 | aktiv | AEAD, KDF, Signaturen, Löschbericht V5 |
+| `contextra-vector` | 0 | aktiv | HNSW, SQ8, ACL-Bitset |
+| `contextra-text` | 0 | aktiv | BM25, Tokenizer |
+| `contextra-rank` | 0 | aktiv | RRF-Fusion, Normalisierung |
+| `contextra-store` | 1 | aktiv | WAL, LSM, SSTables, Kompaktion |
+| `contextra-checkpoint` | 1 | aktiv | Persistent Checkpoint Engine |
+| `contextra-engine` | 3 | aktiv | Planner, Collections, Entkopplung von Rand-Crates |
+| `contextra-db` | 3 | aktiv | Main DB Abstraktion |
+| `contextra` | 4 | aktiv | Composition Root, öffentliche Facade |
 
-### 5.2 Rand-Crates [R] — optional, Release-Default aus
+### 5.2 Rand-Module [M] — Baukasten-Module mit Vertrag (SPEC §4.2, §5)
 
-| Crate | Ring | Aufgabe |
-|-------|------|---------|
-| `contextra-infer-candle` | 2 | Embedding-Backend (optional) |
-| `contextra-sandbox` | 2 | WASM-Isolation (optional) |
-| `contextra-privacy` | 3 | Egress-Gateway (optional) |
-| `contextra-py` | 4 | Python-Bindings (optional) |
+> **Gemäß SPEC 3.0 / ADR-D01 sind Inferenz-, Agenten- und Schutz-Crates aktive Baukasten-Module [M] mit isoliertem Vertrag, KEIN Archiv.**
 
-### 5.3 Experimentell [E]
+| Crate | Ring | Familie | Aufgabe / Entkopplungs-WP |
+|-------|------|---------|---------------------------|
+| `contextra-infer-candle` | 2 | F3 | Lokales GGUF Embedding- & Inferenz-Backend |
+| `contextra-infer-onnx` | 2 | F3 | ONNX Embedding- & Cross-Encoder-Backend (WP 2.7: Download aus) |
+| `contextra-infer-ollama` | 2 | F3 | Ollama Client (WP 2.7: Loopback-Default) |
+| `contextra-kvcache` | 1 | F3 | Quantisierter KV-Cache |
+| `contextra-adapt` | 0 | F3 | PID-Latenzregelung |
+| `contextra-graph` | 0 | F4 | CSR-Graph, PathGraphing (WP 2.2: entkoppeln von `engine`) |
+| `contextra-cognition` | 3 | F4 | Sleep-Cycle-Konsolidierung (WP 2.3: entkoppeln von `db`) |
+| `contextra-router` | 3 | F4 | Lyapunov Drift Control, Routing |
+| `contextra-agent` | 3 | F4 | Agent Execution Pipeline (WP 2.6: entkoppeln über Ports) |
+| `contextra-privacy` | 3 | F5 | PII-Filter, Egress-Gateway |
+| `contextra-mcp` | 4 | F5 | MCP-Server, stdio IPC (WP 2.7: Entkopplung) |
+| `contextra-py` | 4 | F5 | PyO3 Python-Bindings |
+| `contextra-sandbox` | 2 | F5 | WASM Execution Boundary |
 
-`contextra-license`, `contextra-audit-export`, `contextra-avv-generator`
+### 5.3 Experimentell [E] & Auslaufend
 
-### 5.4 Archiv [A] — TODO: Entfernung aus dem Workspace
-
-> **⚠️ Diese Crates werden gemäß PLAN.md Phase 2 (WP 2.1–2.1b) aus dem Workspace entfernt.**
-> **Kein neuer Code für diese Crates. Kein neues Abhängen von diesen Crates.**
-
-| Crate | LOC | TODO-WP | Grund |
-|-------|-----|---------|-------|
-| `contextra-graph` | 8.708 | WP 2.1 | Graph-Reasoning ist kein v1.0-Ziel (§2.3) |
-| `contextra-cognition` | 3.191 | WP 2.1 | Kognition/Konsolidierung kein v1.0-Ziel |
-| `contextra-adapt` | 2.193 | WP 2.1 | Online-Adaption kein v1.0-Ziel |
-| `contextra-kvcache` | 2.434 | WP 2.1 | KV-Cache kein v1.0-Ziel (M1 archiviert) |
-| `contextra-router` | 1.465 | WP 2.1 | Router/Agentenlaufzeit kein v1.0-Ziel |
-| `contextra-agent` | 2.413 | WP 2.1 | Agent-Workflow kein v1.0-Ziel |
-| `contextra-infer-onnx` | 952 | WP 2.1 | Archiviert (hinter `infer-candle`) |
-| `contextra-infer-ollama` | 1.661 | WP 2.1 | Archiviert |
-| `contextra-core` | 106 | WP 2.3 | Migrationsfassade → ersetzt durch `types`/`ports` (D-05) |
-| `vector/diskann` | – | WP 2.1 | DiskANN kein v1.0-Ziel | <!-- doc-ref-ignore -->
-| `rank` ohne `fusion/` | ~1.263 | WP 2.1 | Kalibrierung/DiBuD/Drift → Archiv | <!-- doc-ref-ignore -->
-
-**Archivierungsablauf (WP 2.1 → 2.1b):**
-1. `WP 2.1`: Tag `archiv/v0` <!-- doc-ref-ignore --> setzen, Crates aus `default-members` nehmen, Kanten-Inventar erstellen
-2. `WP 2.2`: `engine` entkoppeln (von `graph`, `adapt`, `kvcache`, `infer-candle`, `rank`)
-3. `WP 2.3`: `db`, `mcp`, `contextra` entkoppeln; `contextra-core` entfernen; Default `embedded`
-4. `WP 2.4`: Rand-Crates optional machen (nur über `optional = true` + Features)
-5. `WP 2.1b`: Physisches Entfernen aus dem Workspace (nach 2.2 + 2.3)
+- **Experimentell [E]:** `contextra-license`, `contextra-audit-export`, `contextra-avv-generator`
+- **Auslaufend:** `contextra-core` (WP 2.8: schrittweise Entfernung der Kompatibilitätsfassade)
 
 ---
 
