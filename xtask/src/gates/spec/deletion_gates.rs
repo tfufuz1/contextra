@@ -50,6 +50,27 @@ impl Gate for WitnessMintGate {
         };
         let root = temp.path();
 
+        // 1. Positive control: clean allowed module in contextra-ports/src/scanner
+        if let Err(e) = fs::create_dir_all(root.join("crates/contextra-ports/src/scanner")) {
+            return Outcome::Fail {
+                reason: format!("Failed to create scanner dir in selftest: {e}"),
+            };
+        }
+        if let Err(e) = fs::write(
+            root.join("crates/contextra-ports/src/scanner/mod.rs"),
+            "let w = LayerWitness { remaining_count: 0 };",
+        ) {
+            return Outcome::Fail {
+                reason: format!("Failed to write clean fixture in selftest: {e}"),
+            };
+        }
+        if scan_witness_mint(root) != Outcome::Pass {
+            return Outcome::Fail {
+                reason: "Selftest failed: scan_witness_mint rejected legal LayerWitness in scanner".to_string(),
+            };
+        }
+
+        // 2. Negative control: illegal module in contextra-engine
         if let Err(e) = fs::create_dir_all(root.join("crates/contextra-engine/src")) {
             return Outcome::Fail {
                 reason: format!("Failed to create dummy crate dir in selftest: {e}"),
