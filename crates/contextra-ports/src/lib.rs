@@ -61,6 +61,8 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
+/// Storage layer scanners and purgers (Vertrag V1, SPEC §12.7.4).
+pub mod scanner;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
@@ -85,6 +87,10 @@ pub use plugin::*;
 pub use query_rewriter::*;
 pub use reranker::*;
 pub use rng::*;
+pub use scanner::{
+    LayerScanner, LayerWitness, PurgeStats, Purger, ScanSession, ScanTarget, ScanTechnique,
+    WitnessLayer,
+};
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
@@ -108,6 +114,8 @@ mod dyn_safety {
     fn _assert_dyn_attention_exporter(_: Option<&dyn AttentionExporter>) {}
     fn _assert_dyn_reranker(_: Option<&dyn Reranker>) {}
     fn _assert_dyn_query_rewriter(_: Option<&dyn QueryRewriter>) {}
+    fn _assert_dyn_layer_scanner(_: Option<&dyn LayerScanner>) {}
+    fn _assert_dyn_purger(_: Option<&dyn Purger>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -125,15 +133,7 @@ mod dyn_safety {
         _assert_dyn_attention_exporter(None);
         _assert_dyn_reranker(None);
         _assert_dyn_query_rewriter(None);
+        _assert_dyn_layer_scanner(None);
+        _assert_dyn_purger(None);
     }
 }
-
-// =============================================================================
-// ÄNDERUNGSNOTIZ / CHANGELOG (v17 Teil 2.2 Cleanup)
-// =============================================================================
-// Bereinigung verwaister und überholter Port-Definitionen gemäß Spec v17 Teil 2.2:
-// - `DistanceCalculator`: Verwaister Trait, ersetzt durch `DistanceMetric::compute` in `contextra-types`.
-// - `MemoryLifecycleManager`: Verwaister Trait ohne Implementierung im Workspace.
-// - `StorageRead`: Überholt und konsolidiert im umfassenden `StorageEngine`-Trait in `storage.rs`.
-// - `StorageWrite`: Überholt und konsolidiert im umfassenden `StorageEngine`-Trait in `storage.rs`.
-// =============================================================================

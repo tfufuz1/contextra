@@ -22,7 +22,7 @@ pub mod tombstone;
 pub mod types;
 pub mod witness;
 
-pub use error::{ContextraError, Result};
+pub use error::{ContextraError, HnswDeletionError, Result};
 pub use error_dto::ContextraErrorDto;
 pub use model_fingerprint::ModelFingerprint;
 pub use retrieval_strategy::RetrievalStrategy;
@@ -30,4 +30,4 @@ pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use types::*;
-pub use witness::{LayerWitness, RequestContext, SagaRecord, ScanMethod};
+pub use witness::{RequestContext, SagaRecord, ScanMethod};
