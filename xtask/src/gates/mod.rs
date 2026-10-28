@@ -17,6 +17,8 @@ pub fn registered_gates() -> Vec<Box<dyn Gate>> {
         Box::new(spec::deletion_gates::WitnessMintGate),
         Box::new(spec::deletion_gates::DeletionTypesOnceGate),
         Box::new(spec::deletion_gates::DeletionHonestyGate),
+        Box::new(spec::deletion_gates::NoDummyProofGate),
+        Box::new(spec::deletion_gates::ScannerCoverageGate),
         Box::new(code::code_gates::DeterminismGate),
         Box::new(code::code_gates::PanicSurfaceGate),
         Box::new(code::code_gates::CodeLintsGate),
