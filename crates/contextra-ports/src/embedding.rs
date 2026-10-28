@@ -106,6 +106,9 @@ pub trait EmbeddingProvider: Send + Sync + 'static {
 }
 
 /// Abstraction for text generation / LLM engines.
+#[deprecated(
+    note = "Use LlmTextGenerator instead; TextGenerator is unbacked and replaced by LlmTextGenerator"
+)]
 pub trait TextGenerator: Send + Sync + 'static {
     /// Generates text response for a given prompt.
     fn generate_text<'a>(&'a self, prompt: &'a str) -> BoxFuture<'a, crate::Result<String>>;
