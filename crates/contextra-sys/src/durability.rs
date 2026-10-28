@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-10-27T15:00:00Z
+// STAND: 2026-10-28T00:00:00Z
 // ZWECK: Platform-aware low-level durability primitives for file and directory flushes (Ring 0 / SPEC 7.7)
 // INVARIANTEN: Zero panic; typed io::Error propagation; fail-closed on unsupported targets; EINTR handling
 // SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7 (INV-DURABILITY-PRIM-1)
@@ -204,6 +204,28 @@ mod tests {
     }
 
     #[test]
+    fn test_durable_flush_file_metadata_variations() -> std::io::Result<()> {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join(format!(
+            "contextra_sys_durability_meta_{}.bin",
+            std::process::id()
+        ));
+
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&file_path)?;
+
+        write_all_durable(&mut file, b"metadata variation test")?;
+        durable_flush_file(&file, false)?;
+        durable_flush_file(&file, true)?;
+
+        let _ = std::fs::remove_file(file_path);
+        Ok(())
+    }
+
+    #[test]
     fn test_durable_flush_dir() -> std::io::Result<()> {
         let temp_dir = std::env::temp_dir();
         let test_subdir = temp_dir.join(format!(
@@ -237,6 +259,23 @@ mod tests {
         let mut file = File::create(&file_path)?;
         write_all_durable(&mut file, &[])?;
         durable_flush_file(&file, false)?;
+
+        let _ = std::fs::remove_file(file_path);
+        Ok(())
+    }
+
+    #[test]
+    fn test_write_all_durable_chunked() -> std::io::Result<()> {
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join(format!(
+            "contextra_sys_chunk_test_{}.bin",
+            std::process::id()
+        ));
+
+        let mut file = File::create(&file_path)?;
+        let data = vec![0x37u8; 64 * 1024];
+        write_all_durable(&mut file, &data)?;
+        durable_flush_file(&file, true)?;
 
         let _ = std::fs::remove_file(file_path);
         Ok(())
