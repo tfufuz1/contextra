@@ -1,5 +1,5 @@
-use contextra_core::types::{DocId, TxId};
 use contextra_ports::VectorIndex;
+use contextra_types::{DocId, TxId};
 use contextra_vector::{HnswConfig, HnswIndex};
 
 #[tokio::test]

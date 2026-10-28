@@ -607,8 +607,7 @@ impl HnswIndex {
         Ok(())
     }
 
-    pub async fn save(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
-        let _lock = self.inner.hot.write_mutex.lock();
+    pub(super) fn save_internal(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
         let inner = &self.inner;
         let path_buf = path.as_ref().to_path_buf();
 
@@ -809,5 +808,14 @@ impl HnswIndex {
         }
 
         Ok(())
+    }
+
+    pub fn save_sync(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
+        let _lock = self.inner.hot.write_mutex.lock();
+        self.save_internal(path)
+    }
+
+    pub async fn save(&self, path: impl AsRef<std::path::Path>) -> Result<()> {
+        self.save_sync(path)
     }
 }
