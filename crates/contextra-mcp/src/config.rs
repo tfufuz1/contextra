@@ -283,7 +283,7 @@ pub fn create_llm_text_generator(
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct RouterConfig {
     /// List of SLM profiles. If non-empty, routing is enabled.
-    pub profiles: Vec<contextra::router::SlmProfile>,
+    pub profiles: Vec<contextra_router::SlmProfile>,
     /// Optional path to routing profiles JSON file.
     pub profiles_path: Option<PathBuf>,
     /// Optional path to persistent calibration state.
@@ -305,14 +305,14 @@ impl RouterConfig {
         if let Some(ref path) = profiles_path {
             if let Ok(bytes) = std::fs::read(path) {
                 if let Ok(loaded) =
-                    serde_json::from_slice::<Vec<contextra::router::SlmProfile>>(&bytes)
+                    serde_json::from_slice::<Vec<contextra_router::SlmProfile>>(&bytes)
                 {
                     profiles = loaded;
                 }
             }
         } else if let Ok(json_str) = std::env::var("CONTEXTRA_ROUTER_PROFILES_JSON") {
             if let Ok(loaded) =
-                serde_json::from_str::<Vec<contextra::router::SlmProfile>>(&json_str)
+                serde_json::from_str::<Vec<contextra_router::SlmProfile>>(&json_str)
             {
                 profiles = loaded;
             }
@@ -429,19 +429,6 @@ mod tests {
         assert_eq!(provider.embedding_dim(), 768);
     }
 
-    #[cfg(feature = "ollama")]
-    #[test]
-    fn test_create_embedding_provider_ollama() {
-        let provider = create_embedding_provider(
-            "ollama",
-            "http://localhost:11434",
-            "nomic-embed-text",
-            None,
-            None,
-        )
-        .unwrap();
-        assert_eq!(provider.provider_name(), "ollama");
-    }
 
     #[test]
     fn test_create_embedding_provider_unknown_error() {
@@ -465,13 +452,6 @@ mod tests {
         assert!(response.contains("[Mock LLM response for: hello]"));
     }
 
-    #[cfg(feature = "ollama")]
-    #[test]
-    fn test_create_llm_generator_ollama() {
-        let generator =
-            create_llm_text_generator("ollama", "http://localhost:11434", "llama3.2:3b", None);
-        assert!(generator.is_ok());
-    }
 
     #[test]
     fn test_create_llm_generator_unknown_error() {

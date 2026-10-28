@@ -976,7 +976,7 @@ async fn test_mcp_boot_with_routing_config() {
     let db = Arc::new(Contextra::open(tmp.path()).await.expect("open db"));
     let embedder = Arc::new(MockEmbedder { dimension: 768 });
 
-    let profile = contextra::router::SlmProfile::new(
+    let profile = contextra_router::SlmProfile::new(
         "test-profile",
         "http://localhost:11434",
         vec![1],

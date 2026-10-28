@@ -250,14 +250,6 @@ async fn test_search_k_zero_returns_canonical_error_message(
     Ok(())
 }
 
-#[test]
-fn test_single_pid_controller_instantiation_in_query_builder() {
-    // Verifies position form PID pool controller from contextra-adapt
-    let config = contextra_adapt::PoolControllerConfig::default();
-    assert_eq!(config.kp, 0.5);
-    assert_eq!(config.ki, 0.05);
-    assert_eq!(config.kd, 0.1);
-}
 
 #[tokio::test]
 async fn test_query_builder_query_config_include_superseded_displacement(

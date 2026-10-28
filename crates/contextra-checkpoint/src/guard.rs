@@ -682,7 +682,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_checkpoint_metrics_commit_duration() {
-        use contextra_ports::{MetricEvent, TestMetricsSink};
+        use contextra_testkit::{MetricEvent, TestMetricsSink};
 
         let storage = Arc::new(MockStorage::new());
         let metrics = Arc::new(TestMetricsSink::new());
@@ -716,7 +716,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_checkpoint_metrics_drop_rollback_duration() {
-        use contextra_ports::{MetricEvent, TestMetricsSink};
+        use contextra_testkit::{MetricEvent, TestMetricsSink};
 
         let storage = Arc::new(MockStorage::new());
         let metrics = Arc::new(TestMetricsSink::new());

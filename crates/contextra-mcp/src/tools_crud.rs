@@ -2,7 +2,6 @@ use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
 use contextra::collection_profile::DeploymentTier;
-use contextra_types::TenantId;
 use serde_json::{json, Value};
 
 impl McpServer {

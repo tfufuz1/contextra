@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 struct CollectionAdapter(Arc<contextra::Collection>);
 
-impl contextra::router::ports_local::HybridSearchProvider for CollectionAdapter {
+impl contextra_router::ports_local::HybridSearchProvider for CollectionAdapter {
     fn search_hybrid<'a>(
         &'a self,
         query_text: &'a str,
@@ -35,7 +35,7 @@ impl contextra::router::ports_local::HybridSearchProvider for CollectionAdapter 
 
 struct CommunityAdapter;
 
-impl contextra::router::ports_local::CommunityResolver for CommunityAdapter {
+impl contextra_router::ports_local::CommunityResolver for CommunityAdapter {
     fn get_community<'a>(
         &'a self,
         _entity_id: EntityId,
@@ -46,7 +46,7 @@ impl contextra::router::ports_local::CommunityResolver for CommunityAdapter {
 
 struct ContextPreparerAdapter;
 
-impl contextra::router::ports_local::ContextPreparer for ContextPreparerAdapter {
+impl contextra_router::ports_local::ContextPreparer for ContextPreparerAdapter {
     fn prepare_context(
         &self,
         chunks: Vec<ContextChunk>,
@@ -64,7 +64,7 @@ impl contextra::router::ports_local::ContextPreparer for ContextPreparerAdapter 
     }
 }
 
-struct RouterDriftAdapter(Arc<contextra::router::DefaultRouterEngine>);
+struct RouterDriftAdapter(Arc<contextra_router::DefaultRouterEngine>);
 
 impl contextra_ports::DriftStatusProvider for RouterDriftAdapter {
     fn overall_drift_status(&self) -> String {
@@ -74,7 +74,7 @@ impl contextra_ports::DriftStatusProvider for RouterDriftAdapter {
 
 /// Holds strong Arc references to routing and calibration components to maintain live Weak references in `Contextra`.
 pub struct RoutingHandle {
-    pub router: Arc<contextra::router::DefaultRouterEngine>,
+    pub router: Arc<contextra_router::DefaultRouterEngine>,
     pub calibrator: Arc<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>,
     pub _drift_adapter: Arc<dyn contextra_ports::DriftStatusProvider>,
 }
@@ -93,7 +93,7 @@ pub async fn setup_routing(
     let community_resolver = Arc::new(CommunityAdapter);
     let context_preparer = Arc::new(ContextPreparerAdapter);
 
-    let router = Arc::new(contextra::router::RouterEngine::new(
+    let router = Arc::new(contextra_router::RouterEngine::new(
         search_provider,
         community_resolver,
         context_preparer,
