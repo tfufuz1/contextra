@@ -1,8 +1,8 @@
-# Contextra – Implementierungsspezifikation IST → SOLL
+# Contextra – Implementierungsspezifikation IST → SOLL (Fassung 2.5)
 
-Stand 26.10.2026 · Basis-Commit `a547a42` (Merge PR #5302) · Ziel: Gesamtspezifikation 2.2/2.3 (Zielzustand v1.0) · Rolle: Principal Rust Engineer · **Fassung 2: Phasen 0–2 am Klon geprüft (Abschn. 0a), Phasen 3–9 ausgearbeitet (Abschn. 8–19).**
+Stand 27.10.2026 · Basis-Commit `a547a42` (Merge PR #5302) · Ziel: Gesamtspezifikation 2.5 (Zielzustand v1.0) · Rolle: Principal Rust Engineer · **Fassung 2.5: Aktualisiert auf das Ziel einer robusten, datenschutzkonformen und entkoppelten Rust-Bibliothek als Fundament für lokale LLM-Lösungen im Mittelstand in Deutschland und Europa.**
 
-> **Zweck.** Dieses Dokument plant die Umsetzung vom heutigen, überladenen Repository-Stand zum Zielzustand der Gesamtspezifikation (im Folgenden **Spec**). Es ist eine Arbeitsunterlage im Sinne von Spec §18.7: Es führt Status gegen einen benannten Commit, ändert aber keine Soll-Aussagen. Die Löschkette wird vollständig neu gestaltet.
+> **Zweck.** Dieses Dokument plant die schrittweise Transformation vom Repository-Stand zum Zielzustand der Gesamtspezifikation 2.5 (im Folgenden **Spec**). Kernfokus ist die Bereitstellung einer **entkoppelten, hochperformanten Rust-Bibliothek** für lokale LLM-/RAG-Systeme in europäischen Unternehmen. Alle Kern-Subsysteme (`vector`, `text`, `rank`, `store`, `crypto`, `mvcc`) werden konsequent modularisiert, damit jede Funktion **isoliert auditiert, verifiziert und leistunggetestet** werden kann. Die gesetzlich vorgeschriebene Multi-Layer-Löschkette bildet dabei einen verlässlichen, modular integrierten Baustein der Bibliothek.
 
 ---
 
@@ -109,8 +109,8 @@ Zeilen (Code-LOC) stammen aus dem Scan (`LOC Produktion`); sie weichen von den S
 
 | Crate | Ring | IST (LOC) | SOLL (Budget) | Wichtigste Aktionen |
 | --- | --- | --- | --- | --- |
-| `contextra-types` | 0 | 2.691 | 2.700 | Löschtypen (zehn Schichten), `ErasureId`, Referenz-Hash-Typen, `ReachedClass`, `Assumption`, `RequestContext` mit `CancelToken`/`Deadline`; `LayerWitness` privat |
-| `contextra-ports` | 0 | 1.408 | 1.500 | neue Sicherheitsports (WP 3.2); Ports archivierter Crates raus (`graph`, `graph_index`, `attention`, `kv_bridge_port`, `plugin`, `TextGenerator`, `query_rewriter` bleibt Rand) |
+| `contextra-types` | 0 | 2.691 | 2.700 | Entkoppelte Grundtypen für lokale LLM-Systeme, Löschtypen (zehn Schichten), `ErasureId`, Referenz-Hash-Typen, `ReachedClass`, `Assumption`, `RequestContext` mit `CancelToken`/`Deadline`; `LayerWitness` privat |
+| `contextra-ports` | 0 | 1.408 | 1.500 | Modulare Sicherheits- und Systemports (WP 3.2); Isolierte Schnittstellen für Vektor/Text/Store; Ports archivierter Crates raus (`graph`, `graph_index`, `attention`, `kv_bridge_port`, `plugin`, `TextGenerator`) |
 | `contextra-sys` | 0 | 428 | 450 | Durability-Primitive, `mlock`, `madvise`, Dateisperre; SAFETY-Lücken (3 Stellen) |
 | `contextra-simd` | 0 | 1.113 | 1.200 | Abhängigkeit von `contextra-core` entfernen; Kernel `pub(crate)`; SAFETY in den Benches; `allow(undocumented_unsafe_blocks)` entfernen |
 | `contextra-wire` | 0 | 1.194 | 200 + generiert | `allow(unwrap_used, expect_used, panic, undocumented_unsafe_blocks)` auf generierte Datei beschränken; Gate trennt generiert/handgeschrieben |
@@ -985,9 +985,14 @@ Die Gate-Tabelle in Abschn. 15 wird in `governance/gates.toml` vollständig gef�
 2. Crash-Matrix: alle Absturzpunkte aus §12.8.4 und §7.3.1 mit `FaultVfs`.
 3. Canary-Läufe: reproduzierbar, mit Positivkontrolle, Protokoll archiviert (§17.9).
 
-### WP 9.3 – Benchmarks und `budgets.toml`
+| WP 9.3 – Isolierte Benchmarks, Verifikation und `budgets.toml`
 
-`bench` (Ring Werkzeug) misst Recovery-Zeit je Tier (§16), Löschlatenz (Fast-Path), Recall-Stabilität und Re-Wrap-Kosten je Epoch Seal (O-24, O-40). Fremde Baselines sind Pflicht für Vergleichsaussagen (§16.3).
+`bench` (Ring Werkzeug) und die crafteigenen Benchmark-Suiten (`benches/` in `vector`, `text`, `store`, `crypto`, `mvcc`) messen isoliert:
+1. **Isoliertes LLM-Vector-Benchmarking:** HNSW-Vektorsuche TTC (Time-to-Context, p50/p99/p99.9), QPS und SQ8-Rescoring-Durchsatz in `contextra-vector`.
+2. **Isoliertes Text-Benchmarking:** BM25-Indizierungsrate und Block-Max-WAND-Anfrage-Latenz in `contextra-text`.
+3. **Isoliertes Store-Benchmarking:** LSM/WAL-Latenz und Purge-Kompaktionsrate in `contextra-store`.
+4. **Isoliertes Crypto- & Deletion-Benchmarking:** V5-Löschbericht-Erzeugung, Argon2id/KDF-Zeiten und Siegelung in `contextra-crypto`.
+5. **Isolierte Auditierung & Verifikation:** Automatische Verifikation aller `INV-*` Invarianten und Property-Tests (`proptest`) je Crate.
 
 ### WP 9.4 – Release-Kriterien und Review
 

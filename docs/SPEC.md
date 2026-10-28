@@ -1,4 +1,6 @@
-# Contextra – Gesamtspezifikation 2.4 (eigenständige Fassung, Zielzustand v1.0)
+# Contextra – Gesamtspezifikation 2.5 (eigenständige Fassung, Zielzustand v1.0)
+
+> **Fassung 2.5 (Zielzustand: Entkoppelte Rust-Bibliothek für lokale LLM-Lösungen):** Auf Basis von 2.4. Spezifiziert das finale Ziel des Projekts: Eine **robuste, datenschutzkonforme und entkoppelte Rust-Bibliothek als Fundament für lokale LLM-Lösungen im Mittelstand in Deutschland und Europa**. Die Kernkomponenten (Persistenz/WAL, MVCC, Vektorsuche HNSW, Volltext BM25, Hybrid-Ranking RRF, Kryptografie & DSGVO-Löschkette) sind strikt entkoppelt, um jede Funktion **isoliert auditieren, verifizieren und leistungstesten** zu können (§0.1, §2.1, §4.1, §16, §17). Die gesetzlich geforderte Löschkette und physikalische Löschung bilden dabei modulare Bausteine der Bibliothek.
 
 > **Fassung 2.4 (Entwurf, Löschpfad optimiert und quellenbereinigt):** Auf Basis von 2.3. Neu: Garantiebegriff als dreistufiger technischer Vertrag (§2.4a), Quellenbereinigung mit Begründungsbasis (§12.1.2a), KeyTable-Shards und ehrliche Flash-Härtung im Epoch Seal (§12.2.4), Planung, Koaleszenz, zweistufige Messung und Profile (§12.8.9), Heap-Canary (§12.7.11), Lösch-Mutationskatalog (§17.11), AC-34 bis AC-38; interne Widersprüche aus 2.3 sind behoben (§26.6).
 
@@ -6,7 +8,7 @@
 
 ```
 Dokument:  Normative, eigenständige Gesamtspezifikation, Implementierungsspezifikation und Meta-Plan
-Fassung:   2.4 (Entwurf, baut auf 2.3 auf)
+Fassung:   2.5 (Zielzustand: Entkoppelte Rust-Bibliothek für lokale LLM-Lösungen)
 Stand:     27.10.2026
 Status:    Entwurf zur Freigabe
 Ablage:    docs/SPEC.md (nach Freigabe)
@@ -22,7 +24,9 @@ Zielgruppe: Menschen und LLM-Agenten, die Contextra sofort und ohne weitere Unte
 
 ### 0.1 Was Contextra ist
 
-Contextra ist ein **lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rust** (Single-Node, ein Prozess hält ein Datenverzeichnis). Er **speichert** Dokumente (Schlüssel-Wert-Speicher mit einem Write-Ahead-Log als einziger Wahrheit), **findet** sie hybrid (Vektorsuche HNSW + Volltext BM25, Fusion per RRF, mandantengetrennt, Rechteprüfung vor der Distanzberechnung) und **löscht gemessen** (physische Bereinigung über sechs Datenschichten, Messung am Speicher, Löschbericht mit ausgewiesenen Grenzen). Zugänge: Rust-API (`contextra`, `contextra-db`) und MCP-Server (stdio) mit genau drei Agentenwerkzeugen. Zielgruppe des Produkts (Hypothese, §25): Berufsgeheimnisträger (Kanzleien, Steuerbüros, Praxen); KI-Agenten sind ein zweiter Zugang zum selben Kern.
+Contextra ist eine **robuste, datenschutzkonforme und entkoppelte Rust-Bibliothek als Fundament für lokale LLM-Lösungen im Mittelstand in Deutschland und Europa**. Die Bibliothek bietet einen lokalen, eingebetteten Wissens- und Gedächtnisspeicher in Rust (Single-Node, ein Prozess hält ein Datenverzeichnis). Sie **speichert** Dokumente (Schlüssel-Wert-Speicher mit einem Write-Ahead-Log als einziger Wahrheit), **findet** sie hybrid (Vektorsuche HNSW + Volltext BM25, Fusion per RRF, mandantengetrennt, Rechteprüfung vor der Distanzberechnung) und **löscht gemessen** (physische Bereinigung über Datenschichten, Messung am Speicher, signierter Löschbericht V5 mit ausgewiesenen Grenzen nach gesetzlichen Vorgaben).
+
+Die Architektur ist konsequent **modular und entkoppelt**: Jede Kernkomponente (`vector`, `text`, `rank`, `store`, `crypto`, `mvcc`) ist als eigenständiger Baustein isoliert von Monolithen auditierbar, verifizierbar und über dedizierte Performance-Tests benchmarkbar. Zugänge: Entkoppelte Rust-API (`contextra`, `contextra-db`) und optionaler MCP-Server (stdio) mit genau drei Agentenwerkzeugen. Hauptzielgruppe: Deutsche und europäische Unternehmen des Mittelstands sowie Berufsgeheimnisträger (Kanzleien, Steuerbüros, Praxen) für datenschutzkonforme, lokale Retrieval-Augmented Generation (RAG) und KI-Agenten.
 
 ### 0.2 Die zwölf Regeln für jede Änderung
 
@@ -114,11 +118,13 @@ Zeilenbudgets sind **Code-Zeilen** (ohne Leer-/Kommentarzeilen, ohne Tests) aus 
 
 ### 2.1 Definition
 
-**Contextra ist ein lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rust, der speichert, hybrid findet (Vektor + BM25 + Fusion, mandantengetrennt) und gemessen löscht.** Single-Node: ein Primärprozess hält ein Datenverzeichnis, weitere lokale Prozesse sprechen über IPC mit ihm. Kein Sharding, kein P2P, keine Replikation, kein Netz-Listener, keine Telemetrie nach außen.
+**Contextra ist eine robuste, datenschutzkonforme und entkoppelte Rust-Bibliothek als Fundament für lokale LLM-Lösungen im Mittelstand in Deutschland und Europa.** Sie stellt ein hochperformatives, einbettbares RAG- und Gedächtnis-Fundament bereit, das strukturiert speichert, hybrid findet (Vektorsuche HNSW + Volltext BM25 + RRF-Fusion, mandantengetrennt) und nach gesetzlichen Vorgaben (DSGVO/GDPR) gemessen löscht. Single-Node: ein Primärprozess hält ein Datenverzeichnis. Kein Sharding, kein P2P, keine Replikation, kein Netz-Listener, keine externe Telemetrie.
 
-**Designpunkt:** ≤ 10⁷ Vektoren und ≤ 10² Mandanten je Knoten. Aussagen darüber hinaus sind nicht belegt. **Arbeitsannahme (per Benchmark zu belegen):** Agentengedächtnis umfasst je Betroffenem 10³ bis 10⁶ Einträge; SQ8 mit exaktem Nachranking, sichere Standard-Kernel und Partitionierung je Betroffenem stützen sich darauf.
+**Entkopplung und isolierte Prüfbarkeit:** Sämtliche Subsysteme sind modular und lose über trait-basierte Ports (`ports`) gekoppelt. Dadurch lässt sich jede Funktion (z. B. HNSW-Vektorsuche, BM25-Tokenisierung/Block-Max-WAND, RRF-Rank-Fusion, LSM-Storage/WAL, SSI-Transaktionskontrolle, Crypto-Löschkette) **isoliert auditieren, verifizieren und leistungstesten** (Benchmarking), ohne monolithic runtime Overhead. Die gesetzlich geforderte Löschkette (physikalische Bereinigung + Crypto-Erase + Witness-Scanning) bildet einen wiederverwendbaren Baustein der Bibliothek.
 
-**Eigenschaften:** _Isoliert_ (Mandanten physisch getrennt: Schlüssel, Indexe, Dateien), _Deterministisch_ (gleicher Anfangszustand + gleiche WAL-Folge ⇒ gleicher Zustand; nichtdeterministische Quellen gehen nur als aufgezeichnete Werte ins WAL, INV-NONDET-1), _Zero-Overhead_ (Hot-Path generisch monomorphisiert), _Ehrlich_ (Aussagen nur aus Messung, INV-CLAIMS-1).
+**Designpunkt:** ≤ 10⁷ Vektoren und ≤ 10² Mandanten je Knoten. **Arbeitsannahme (per Benchmark zu belegen):** Lokale LLM-Anwendungen im Mittelstand umfassen 10³ bis 10⁶ Chunks/Dokumente je Mandant; SQ8 mit exaktem Nachranking, sichere Standard-Kernel und mandanteneigene Partitionierung stützen sich darauf.
+
+**Eigenschaften:** _Isoliert_ (Mandanten physisch getrennt: Schlüssel, Indexe, Dateien), _Deterministisch_ (gleicher Anfangszustand + gleiche WAL-Folge ⇒ gleicher Zustand; nichtdeterministische Quellen gehen nur als aufgezeichnete Werte ins WAL, INV-NONDET-1), _Zero-Overhead_ (Hot-Path generisch monomorphisiert), _Ehrlich_ (Aussagen nur aus Messung, INV-CLAIMS-1), _Modular_ (einzelne Crates als eigenständige Bausteine wiederverwendbar).
 
 ### 2.2 Produktmissionen und Entscheidung
 
@@ -2796,4 +2802,10 @@ Die Gesamtsumme der Archiv-Zeilen ist 25.981 (ohne `contextra-core`). Die Zeilen
 
 **Nicht geprüft in 2.4:** Die Rechtsfundstellen wurden nicht erneut am Primärtext geöffnet (P-14, O-46); die technischen Optimierungen sind Entwurf und brauchen Messläufe (O-42 bis O-45).
 
+### 26.7 Änderungen in Fassung 2.5 (Entkoppelte Rust-Bibliothek für lokale LLM-Lösungen)
+
+1. **Präzisierung des Projektziels:** Das normative Ziel wird scharfgestellt auf eine **robuste, datenschutzkonforme und entkoppelte Rust-Bibliothek als Fundament für lokale LLM-Lösungen im Mittelstand in Deutschland und Europa** (§0.1, §2.1).
+2. **Entkopplung & Isolierte Prüfbarkeit:** Alle Kernkomponenten (`vector`, `text`, `rank`, `store`, `crypto`, `mvcc`) sind modular als eigenständige Rust-Crates spezifiziert. Es wird sichergestellt, dass jedes Subsystem **isoliert auditiert, verifiziert und leistunggetestet** (Benchmarking via `benches/`) werden kann, ohne unverschlüsselte monolithische Abhängigkeiten.
+3. **Gesetzliche Löschkette als Bibliotheks-Baustein:** Die DSGVO/GDPR-konforme Multi-Layer-Löschkette (physikalische Löschung, Crypto-Erase, Witness-Scanning, signierte V5-Löschberichte) bildet einen wiederverwendbaren, auditierbaren Baustein innerhalb der entkoppelten Bibliothek (§2.1, §2.4, §12).
+4. **Clean Facade & Public API:** Die öffentlichen Fassaden `contextra` und `contextra-db` stellen eine schlanke, sichere Rust-Einbettungsschnittstelle für Mittelstands-RAG und lokale KI-Agenten zur Verfügung.
 
