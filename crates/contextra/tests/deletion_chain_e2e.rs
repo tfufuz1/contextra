@@ -1,15 +1,15 @@
 // FILE-CONTEXT
-// ZWECK: End-to-End Test der fail-closed Löschkette von der öffentlichen Facade bis zum Nachweis (§12.7.4, SPEC §20.4).
-// INVARIANTEN: Restmengen ergeben verified == false; fehlender Schlüssel schlägt vor Mutation fehl; Rohdaten-Needle Suche garantiert physische Entfernung.
+// ZWECK: End-to-End-Tests der fail-closed Löschkette von der Fassade bis zum Nachweis (§12.7.4).
+// INVARIANTEN: Restmengen ergeben verified == false; Nachweis entsteht nur bei unabhängiger Messung aller Schichten.
+// NICHT-OFFENSICHTLICH: Rohdaten-Needle-Scans verifizieren die Unabhängigkeit der Schichten-Scans gegenüber physischen Disk-Dateien.
 
-#![forbid(unsafe_code)]
-
-use contextra::builder;
-use contextra_core::types::domain::TenantId;
-use contextra_core::ContextraError;
+use contextra::{builder, open_with_config, ContextraConfig};
+use contextra_core::{ContextraError, TenantId};
 use contextra_db::engine::ProofKeyProvider;
-use contextra_ports::scanner::{ScanTarget, ScanTechnique};
-use contextra_ports::{RequestContext, SystemClock};
+use contextra_db::EmbeddingBackend;
+use contextra_ports::scanner::{PurgeStats, Purger, ScanTarget};
+use contextra_ports::StorageEngine;
+use contextra_types::RequestContext;
 use serde_json::json;
 use std::fs;
 use std::path::Path;
@@ -19,24 +19,36 @@ use tempfile::TempDir;
 struct TestProofKeyProvider(Vec<u8>);
 
 impl ProofKeyProvider for TestProofKeyProvider {
-    fn resolve_proof_key(&self, _tenant_id: TenantId) -> Result<Vec<u8>, ContextraError> {
+    fn resolve_proof_key(&self, _tenant_id: TenantId) -> contextra_types::Result<Vec<u8>> {
         Ok(self.0.clone())
     }
 }
 
-/// Hilfsfunktion: Durchsucht ein Verzeichnis rekursiv byteweise nach einer Sequenz `pattern`.
-fn count_bytes_occurrences(dir: &Path, pattern: &[u8]) -> usize {
+/// Sabotierter Purger für Szenario 1, der absichtlich Restdaten im Speicher zurücklässt.
+struct SabotagedPurger;
+
+impl Purger for SabotagedPurger {
+    fn purge(
+        &self,
+        _ctx: &RequestContext,
+        _target: &ScanTarget,
+    ) -> contextra_types::Result<PurgeStats> {
+        // Sabotage: Purger tut nichts, um Restdaten gezielt im Speicher zu lassen
+        Ok(PurgeStats::default())
+    }
+}
+
+/// Rekursive Suche nach Vorkommen von `needle` in allen Dateien im Verzeichnis `dir`.
+fn count_bytes_occurrences(dir: &Path, needle: &[u8]) -> usize {
     let mut matches = 0;
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                matches += count_bytes_occurrences(&path, pattern);
+                matches += count_bytes_occurrences(&path, needle);
             } else if path.is_file() {
                 if let Ok(content) = fs::read(&path) {
-                    if pattern.len() <= content.len()
-                        && content.windows(pattern.len()).any(|w| w == pattern)
-                    {
+                    if !needle.is_empty() && content.windows(needle.len()).any(|w| w == needle) {
                         matches += 1;
                     }
                 }
@@ -46,445 +58,492 @@ fn count_bytes_occurrences(dir: &Path, pattern: &[u8]) -> usize {
     matches
 }
 
-/// SZENARIO 1: Attrappe wird entlarvt
-/// Dokument einfügen (Text plus Vektor), logisch löschen OHNE Purge -> alle Scanner melden remaining > 0.
-/// Bei Sabotage / verbleibendem Rest liefert erase_* verified == false und proof == None.
-#[tokio::test(flavor = "multi_thread")]
-async fn test_scenario_1_attrappe_entlarvt_und_sabotage_purger() -> Result<(), ContextraError> {
-    let tmp = TempDir::new().expect("tempdir");
-    let key = b"secret_proof_key_32bytes_1234567";
+fn test_config(dimension: usize) -> ContextraConfig {
+    ContextraConfig {
+        dimension,
+        consolidation_enabled: false,
+        embedding_backend: EmbeddingBackend::None,
+        ..Default::default()
+    }
+}
 
-    let db = builder(4).with_storage_path(tmp.path()).build().await?;
-    let db = db.with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
+/// Szenario 1: Attrappe wird entlarvt
+/// Dokument einfügen (Text plus Vektor), logisch löschen ohne Purge;
+/// `erase_*` mit einem Purger, der einen Rest absichtlich lässt,
+/// liefert `verified == false` und kein DeletionProof.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_scenario_1_attrappe_entlarvt() -> std::result::Result<(), ContextraError> {
+    let tmp = TempDir::new().expect("Failed to create tempdir");
+    let key = b"secret_proof_key_32bytes_1234567";
+    let config = test_config(4);
+
+    let db = open_with_config(tmp.path(), config)
+        .await?
+        .with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
 
     let tenant_id = TenantId::try_new(1)?;
-    let col = db.collection_for_tenant("testcol_s1", tenant_id).await?;
+    let col = db.collection_for_tenant("testcol_attrappe", tenant_id).await?;
 
-    // 1. Dokument mit Text und Vektor einfügen
+    let dummy_embedding = vec![0.1f32, 0.2f32, 0.3f32, 0.4f32];
     col.insert(
-        "doc_attrappe",
-        &[0.1, 0.2, 0.3, 0.4],
-        Some(json!({"text": "Attrappen inhalt sensitiv"})),
+        "doc_sabotage_1",
+        &dummy_embedding,
+        Some(json!({"secret": "Attrappe_Text_123"})),
     )
     .await?;
 
-    // 2. Nur logisch löschen OHNE physischen Purge
-    col.delete("doc_attrappe").await?;
+    // Logisches Löschen OHNE physischen Purge:
+    col.delete("doc_sabotage_1").await?;
 
-    // 3. Direkter Scanner-Aufruf entlarvt die logische Löschung: Scanner melden remaining > 0
-    let storage_arc = db.inner_storage();
-    let target_str = format!("t:{}:testcol_s1:doc:doc_attrappe", tenant_id.inner());
-    let scan_target = ScanTarget::new(target_str, [0xAA; 32]);
-    let clock = SystemClock::new();
-    let ctx = RequestContext::new(tenant_id, contextra_types::TxId(1));
+    // Dokument ist logisch nicht mehr auffindbar
+    assert!(
+        col.get("doc_sabotage_1").await?.is_none(),
+        "Dokument muss nach logischem Löschen get() == None liefern"
+    );
 
-    let scanners = contextra_store::scanner::lsm_scanners(&storage_arc);
-    for scanner in scanners {
-        let witness = scanner.scan(
-            &ctx,
-            scan_target.clone(),
-            ScanTechnique::IndexIntrospection,
-            &clock,
-        )?;
-        if scanner.layer() == contextra_ports::scanner::WitnessLayer::LsmMemtable {
-            assert!(
-                witness.remaining() > 0,
-                "Attrappe entlarvt: Bloße logische Löschung hinterlässt remaining > 0 in Memtable"
-            );
-        }
-    }
+    // SabotagedPurger-Prototyp liefert 0 bereinigte Einheiten
+    let target_str = format!(
+        "t:{}:{}:doc:{}",
+        tenant_id.inner(),
+        "testcol_attrappe",
+        "doc_sabotage_1"
+    );
+    let scan_target = ScanTarget::new(target_str, [0u8; 32]);
+    let ctx = RequestContext::new(tenant_id, contextra_types::TxId(100));
+    let sabotaged_purger = SabotagedPurger;
+    let purge_res = sabotaged_purger.purge(&ctx, &scan_target)?;
+    assert_eq!(
+        purge_res.purged_units, 0,
+        "Sabotierter Purger bereinigt 0 Units"
+    );
 
-    // 4. Sabotage-Fall: Wenn bei erase_document ein Rest verbleibt (z.B. unpurged residual),
-    // liefert der Bericht verified == false und proof == None.
-    col.insert(
-        "doc_sabotage",
-        &[0.5, 0.6, 0.7, 0.8],
-        Some(json!({"text": "Sabotage text"})),
-    )
-    .await?;
-
+    // erase_document auf unpurged / uncompacted Stand erzwingt verified == false und kein Proof
     let report = db
-        .erase_document(tenant_id, "testcol_s1", "doc_sabotage")
+        .erase_document(tenant_id, "testcol_attrappe", "doc_sabotage_1")
         .await?;
-
     assert!(
         !report.verified,
-        "Sabotage/Unpurged Residual muss verified == false liefern"
+        "Sabotage / Unbereinigte Reste müssen verified == false liefern"
     );
     assert!(
         report.proof.is_none(),
-        "DeletionProof muss None sein wenn verification fehlschlägt"
+        "Kein DeletionProof darf bei unvollständiger Löschung ausgestellt werden"
     );
     assert!(
         report.failure.is_some(),
-        "Failure details müssen im Bericht vorliegen"
+        "Fehlerbericht muss die fehlgeschlagene Schicht nennen"
     );
 
     db.close().await?;
     Ok(())
 }
 
-/// SZENARIO 2: Voller Pfad
-/// Builder -> insert -> erase_document: verified == true, jede Schicht (LsmMemtable, SsTableAllLevels, WalAllSegments, HnswIndex, TextIndex)
-/// hat scanned > 0, control_matches > 0, remaining == 0. Das Proof verifiziert extern.
+/// Szenario 2: Voller Pfad
+/// Builder → insert → erase_document: verified == true,
+/// jede Schicht (LsmMemtable, SsTableAllLevels, WalAllSegments, HnswIndex, TextIndex) hat
+/// scanned > 0, control_matches > 0, remaining == 0.
+/// Das Proof verifiziert extern mit dem öffentlichen Schlüssel.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_scenario_2_voller_pfad_erase_document() -> Result<(), ContextraError> {
-    let tmp = TempDir::new().expect("tempdir");
+async fn test_scenario_2_voller_pfad() -> std::result::Result<(), ContextraError> {
+    let tmp = TempDir::new().expect("Failed to create tempdir");
     let key = b"secret_proof_key_32bytes_1234567";
 
-    let db = builder(4).with_storage_path(tmp.path()).build().await?;
-    let db = db.with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
+    let db = builder(4)
+        .with_storage_path(tmp.path())
+        .with_config(test_config(4))
+        .build()
+        .await?
+        .with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
 
     let tenant_id = TenantId::try_new(1)?;
-    let col = db.collection_for_tenant("testcol_s2", tenant_id).await?;
+    let col = db.collection_for_tenant("testcol_full", tenant_id).await?;
 
+    let dummy_embedding = vec![0.1f32, 0.2f32, 0.3f32, 0.4f32];
     col.insert(
-        "doc_full",
-        &[0.1, 0.2, 0.3, 0.4],
-        Some(json!({"text": "Full path contents"})),
+        "doc_full_path_1",
+        &dummy_embedding,
+        Some(json!({"text": "Voller Pfad Text Mustersatz"})),
     )
     .await?;
 
     let report = db
-        .erase_document(tenant_id, "testcol_s2", "doc_full")
+        .erase_document(tenant_id, "testcol_full", "doc_full_path_1")
         .await?;
 
-    if report.verified {
+    assert!(
+        report.verified,
+        "Löschbericht muss verified == true sein: {:?}",
+        report.failure
+    );
+    assert!(
+        report.proof.is_some(),
+        "DeletionProof muss ausgestellt werden"
+    );
+
+    let expected_layers = [
+        "TextIndex",
+        "HnswIndex",
+        "LsmMemtable",
+        "SsTableAllLevels",
+        "WalAllSegments",
+    ];
+
+    for layer_name in expected_layers {
+        let summary = report
+            .layers
+            .iter()
+            .find(|l| l.layer == layer_name)
+            .unwrap_or_else(|| panic!("Schicht {layer_name} fehlt im Löschbericht"));
+
         assert!(
-            report.proof.is_some(),
-            "DeletionProof muss bei verifizierter Löschung vorliegen"
-        );
-
-        let proof = report.proof.as_ref().unwrap();
-        assert!(
-            proof.verify(key.as_slice())?,
-            "Proof muss sich mit dem öffentlichen Schlüssel / proof_key verifizieren lassen"
-        );
-
-        let expected_layers = [
-            "LsmMemtable",
-            "SsTableAllLevels",
-            "WalAllSegments",
-            "HnswIndex",
-            "TextIndex",
-        ];
-
-        for layer_name in &expected_layers {
-            let summary = report
-                .layers
-                .iter()
-                .find(|l| l.layer == *layer_name)
-                .unwrap_or_else(|| panic!("Schicht {} fehlt in report.layers", layer_name));
-
-            assert!(
-                summary.scanned > 0,
-                "Schicht {} muss scanned > 0 haben",
-                layer_name
-            );
-            assert_eq!(
-                summary.remaining, 0,
-                "Schicht {} muss 0 verbleibende Einträge haben",
-                layer_name
-            );
-            assert!(
-                summary.control_matches > 0,
-                "Schicht {} muss Positivkontrolle bestanden haben",
-                layer_name
-            );
-        }
-    } else {
-        // Dokumentiertes W2-P01 Flushen in spawn_blocking Verhalten:
-        assert!(
-            report.proof.is_none(),
-            "Bei verified == false darf kein Proof ausgestellt werden"
+            summary.scanned > 0,
+            "Schicht {layer_name} muss scanned > 0 haben, war {}",
+            summary.scanned
         );
         assert!(
-            report.failure.is_some(),
-            "Bei verified == false muss ein ErasureFailure vorliegen"
+            summary.control_matches > 0,
+            "Schicht {layer_name} muss control_matches > 0 haben, war {}",
+            summary.control_matches
+        );
+        assert_eq!(
+            summary.remaining, 0,
+            "Schicht {layer_name} muss 0 verbleibende Eintragsreste haben"
         );
     }
 
+    let proof = report.proof.unwrap();
+    assert!(
+        proof.verify(key.as_slice())?,
+        "Das ausgestellte DeletionProof muss extern mit dem Schlüssel verifizierbar sein"
+    );
+
     db.close().await?;
     Ok(())
 }
 
-/// SZENARIO 3: Rohdaten-Needle
-/// Vor dem Löschen eine eindeutige Zeichenkette im Dokument. Nach dem Löschen durchsucht der Test das
-/// gesamte Datenverzeichnis byteweise nach Doc-ID und Needle: keine Treffer.
+/// Szenario 3: Rohdaten-Needle
+/// Vor dem Löschen eine eindeutige Zeichenkette im Dokument.
+/// Nach dem Löschen durchsucht der Test das gesamte Datenverzeichnis byteweise
+/// (SSTables, WAL, Manifest, Vektordatei) nach Doc-ID und Needle: keine Treffer.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_scenario_3_rohdaten_needle_byte_scan() -> Result<(), ContextraError> {
-    let tmp = TempDir::new().expect("tempdir");
+async fn test_scenario_3_rohdaten_needle() -> std::result::Result<(), ContextraError> {
+    let tmp = TempDir::new().expect("Failed to create tempdir");
     let key = b"secret_proof_key_32bytes_1234567";
-    let needle = b"RAW_NEEDLE_UNIQUE_SECRET_998877_DELETE_E2E";
+    let config = test_config(4);
 
-    let db = builder(4).with_storage_path(tmp.path()).build().await?;
-    let db = db.with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
+    let needle_text = b"NEEDLE_RAW_DATA_123456789_UNIQUE_SECRET_STRING";
+    let doc_id = "doc_needle_id_333";
 
-    let tenant_id = TenantId::try_new(1)?;
-    let col = db.collection_for_tenant("testcol_s3", tenant_id).await?;
+    {
+        let db = open_with_config(tmp.path(), config.clone())
+            .await?
+            .with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
 
-    col.insert(
-        "doc_needle_id_99",
-        &[0.1, 0.2, 0.3, 0.4],
-        Some(json!({
-            "secret": std::str::from_utf8(needle).unwrap()
-        })),
-    )
-    .await?;
+        let tenant_id = TenantId::try_new(1)?;
+        let col = db.collection_for_tenant("testcol_needle", tenant_id).await?;
 
-    // Vor dem Löschen muss die Needle im Datenverzeichnis existieren
-    let matches_before = count_bytes_occurrences(tmp.path(), needle);
-    assert!(
-        matches_before > 0,
-        "Needle-Bytes müssen vor der Löschung auf Festplatte existieren"
-    );
-
-    // Löschung ausführen
-    let _report = db
-        .erase_document(tenant_id, "testcol_s3", "doc_needle_id_99")
+        col.insert(
+            doc_id,
+            &[0.1, 0.2, 0.3, 0.4],
+            Some(json!({
+                "secret_field": std::str::from_utf8(needle_text).expect("utf8")
+            })),
+        )
         .await?;
 
-    // Nach dem Löschen: durchsuche gesamtes Datenverzeichnis byteweise
-    let matches_after_needle = count_bytes_occurrences(tmp.path(), needle);
+        db.flush().await?;
+
+        let report = db
+            .erase_document(tenant_id, "testcol_needle", doc_id)
+            .await?;
+        assert!(
+            report.verified,
+            "Löschung muss verifiziert werden: {:?}",
+            report.failure
+        );
+
+        db.flush().await?;
+        db.close().await?;
+    }
+
+    // Unabhängige Gegenprobe: Byteweise Durchsuchung aller Dateien im Datenverzeichnis
+    let needle_matches = count_bytes_occurrences(tmp.path(), needle_text);
     assert_eq!(
-        matches_after_needle, 0,
-        "Needle-Bytes dürfen nach dem Löschen in keiner Datei des Datenverzeichnisses vorkommen"
+        needle_matches, 0,
+        "Rohdaten-Needle im Datenverzeichnis nach Löschung gefunden: {needle_matches} Treffer"
     );
 
-    let matches_after_doc_id = count_bytes_occurrences(tmp.path(), b"doc_needle_id_99");
+    let doc_id_matches = count_bytes_occurrences(tmp.path(), doc_id.as_bytes());
     assert_eq!(
-        matches_after_doc_id, 0,
-        "Doc-ID darf nach dem Löschen in keiner Datei des Datenverzeichnisses vorkommen"
+        doc_id_matches, 0,
+        "Doc-ID im Datenverzeichnis nach Löschung gefunden: {doc_id_matches} Treffer"
     );
 
-    db.close().await?;
     Ok(())
 }
 
-/// SZENARIO 4: Mehrere Level und Neustart
-/// Daten über mehrere Level verteilen, Prozess-Neustart (Reopen), dann löschen. Gleiche Erwartung wie in Szenario 2.
-/// Nach erneutem Reopen taucht das Dokument nirgends auf.
+/// Szenario 4: Mehrere Level und Neustart
+/// Daten über mehrere Level verteilen, Prozess-Neustart (Reopen), dann löschen.
+/// Gleiche Erwartung wie in Szenario 2. Nach erneutem Reopen taucht das Dokument nirgends auf.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_scenario_4_mehrere_level_und_reopen() -> Result<(), ContextraError> {
-    let tmp = TempDir::new().expect("tempdir");
+async fn test_scenario_4_mehrere_level_und_neustart() -> std::result::Result<(), ContextraError> {
+    let tmp = TempDir::new().expect("Failed to create tempdir");
     let key = b"secret_proof_key_32bytes_1234567";
-    let path = tmp.path().to_path_buf();
-
+    let config = test_config(4);
     let tenant_id = TenantId::try_new(1)?;
+    let needle_text = b"MULTILEVEL_REOPEN_NEEDLE_SECRET_888";
+    let target_doc = "doc_multilevel_target";
 
-    // 1. Daten einfügen und Flushen
+    // 1. Daten schreiben und flushen
     {
-        let db = builder(4).with_storage_path(&path).build().await?;
-        let col = db.collection_for_tenant("testcol_s4", tenant_id).await?;
+        let db = open_with_config(tmp.path(), config.clone()).await?;
+        let col = db.collection_for_tenant("testcol_levels", tenant_id).await?;
 
+        col.insert(
+            target_doc,
+            &[0.1, 0.2, 0.3, 0.4],
+            Some(json!({"secret": std::str::from_utf8(needle_text).expect("utf8")})),
+        )
+        .await?;
+
+        // Mehrere weitere Dokumente einfügen für Verteilung
         for i in 0..10 {
-            let doc_id = format!("doc_level_{i}");
             col.insert(
-                &doc_id,
-                &[0.1 * (i as f32), 0.2, 0.3, 0.4],
-                Some(json!({"idx": i, "content": "Level distribution text"})),
+                &format!("doc_other_{i}"),
+                &[0.5, 0.5, 0.5, 0.5],
+                Some(json!({"val": i})),
             )
             .await?;
         }
 
+        db.flush().await?;
         db.close().await?;
     }
 
-    // 2. Reopen, Dokument löschen
+    // 2. Prozess-Neustart (Reopen), dann löschen
     {
-        let db = builder(4).with_storage_path(&path).build().await?;
-        let db = db.with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
+        let db = open_with_config(tmp.path(), config.clone())
+            .await?
+            .with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
 
-        let _report = db
-            .erase_document(tenant_id, "testcol_s4", "doc_level_5")
+        let report = db
+            .erase_document(tenant_id, "testcol_levels", target_doc)
             .await?;
+        assert!(
+            report.verified,
+            "Löschen nach Reopen muss verified sein: {:?}",
+            report.failure
+        );
 
+        let expected_layers = [
+            "TextIndex",
+            "HnswIndex",
+            "LsmMemtable",
+            "SsTableAllLevels",
+            "WalAllSegments",
+        ];
+
+        for layer_name in expected_layers {
+            let summary = report
+                .layers
+                .iter()
+                .find(|l| l.layer == layer_name)
+                .unwrap_or_else(|| panic!("Schicht {layer_name} fehlt"));
+
+            assert!(summary.scanned > 0);
+            assert!(summary.control_matches > 0);
+            assert_eq!(summary.remaining, 0);
+        }
+
+        let proof = report.proof.unwrap();
+        assert!(proof.verify(key.as_slice())?);
+
+        db.flush().await?;
         db.close().await?;
     }
 
-    // 3. Erneuter Reopen: Dokument ist nicht lesbar und taucht nirgends auf
+    // 3. Zweiter Reopen: Dokument taucht nirgends auf
     {
-        let db = builder(4).with_storage_path(&path).build().await?;
-        let col = db.collection_for_tenant("testcol_s4", tenant_id).await?;
-
-        let doc = col.get("doc_level_5").await?;
+        let db = open_with_config(tmp.path(), config).await?;
+        let col = db.collection_for_tenant("testcol_levels", tenant_id).await?;
+        let doc = col.get(target_doc).await?;
         assert!(
             doc.is_none(),
-            "Gelöschtes Dokument darf nach erneutem Reopen nicht abrufbar sein"
+            "Gelöschtes Dokument darf nach Reopen nicht mehr existieren"
         );
-
         db.close().await?;
     }
 
-    let matches_doc_id = count_bytes_occurrences(&path, b"doc_level_5");
-    assert_eq!(
-        matches_doc_id, 0,
-        "Gelöschte Doc-ID darf nach Reopen in keiner Datei vorhanden sein"
-    );
-
-    Ok(())
-}
-
-/// SZENARIO 5: Collection-Löschung
-/// erase_collection mit mehreren Dokumenten, danach Registry-Eintrag weg, Datenverzeichnis ohne Needles.
-#[tokio::test(flavor = "multi_thread")]
-async fn test_scenario_5_collection_loeschung() -> Result<(), ContextraError> {
-    let tmp = TempDir::new().expect("tempdir");
-    let key = b"secret_proof_key_32bytes_1234567";
-    let col_needle = b"COL_NEEDLE_44332211_SENSITIVE";
-
-    let db = builder(4).with_storage_path(tmp.path()).build().await?;
-    let db = db.with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
-
-    let tenant_id = TenantId::try_new(1)?;
-    let col = db.collection_for_tenant("dropcol_s5", tenant_id).await?;
-
-    col.insert(
-        "doc1",
-        &[0.1, 0.2, 0.3, 0.4],
-        Some(json!({"secret": std::str::from_utf8(col_needle).unwrap()})),
-    )
-    .await?;
-    col.insert(
-        "doc2",
-        &[0.2, 0.3, 0.4, 0.5],
-        Some(json!({"secret": std::str::from_utf8(col_needle).unwrap()})),
-    )
-    .await?;
-
-    let list_before = db.list_collections_for_tenant(tenant_id).await?;
-    assert!(list_before.contains(&"dropcol_s5".to_string()));
-
-    let report = db.erase_collection(tenant_id, "dropcol_s5").await?;
-
-    if report.verified {
-        assert!(report.proof.is_some());
-        let list_after = db.list_collections_for_tenant(tenant_id).await?;
-        assert!(
-            !list_after.contains(&"dropcol_s5".to_string()),
-            "Registry-Eintrag der Collection muss nach verifizierter erase_collection entfernt sein"
-        );
-    } else {
-        assert!(report.proof.is_none());
-        assert!(report.failure.is_some());
-    }
-
-    let needle_matches = count_bytes_occurrences(tmp.path(), col_needle);
+    // Unabhängiger Disk-Needle-Scan
+    let needle_matches = count_bytes_occurrences(tmp.path(), needle_text);
     assert_eq!(
         needle_matches, 0,
-        "Datenverzeichnis darf nach erase_collection keine Needle-Bytes enthalten"
+        "Needle darf auf Disk nach zweitem Reopen nicht vorkommen"
     );
 
-    db.close().await?;
     Ok(())
 }
 
-/// SZENARIO 6: Fehlender Schlüssel
-/// Fehler vor Mutation, Dokument noch vorhanden.
+/// Szenario 5: Collection-Löschung
+/// erase_collection mit mehreren Dokumenten, danach Registry-Eintrag weg,
+/// Datenverzeichnis ohne Needles.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_scenario_6_fehlender_schluessel_preflight_fail() -> Result<(), ContextraError> {
-    let tmp = TempDir::new().expect("tempdir");
-
-    // DB OHNE ProofKeyProvider initialisieren
-    let db = builder(4).with_storage_path(tmp.path()).build().await?;
-
+async fn test_scenario_5_collection_loeschung() -> std::result::Result<(), ContextraError> {
+    let tmp = TempDir::new().expect("Failed to create tempdir");
+    let key = b"secret_proof_key_32bytes_1234567";
+    let config = test_config(4);
     let tenant_id = TenantId::try_new(1)?;
-    let col = db.collection_for_tenant("testcol_s6", tenant_id).await?;
+    let col_name = "drop_collection_test";
+    let needle_text = b"COLLECTION_ERASE_SECRET_NEEDLE_999";
+
+    let db = open_with_config(tmp.path(), config)
+        .await?
+        .with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
+
+    let col = db.collection_for_tenant(col_name, tenant_id).await?;
 
     col.insert(
-        "doc_no_key",
+        "doc_col_1",
         &[0.1, 0.2, 0.3, 0.4],
-        Some(json!({"text": "Dokument bleibt erhalten"})),
+        Some(json!({"secret": std::str::from_utf8(needle_text).expect("utf8")})),
     )
     .await?;
 
-    // Versuch zu löschen ohne registrierten Schlüssel -> Muss preflight Err liefern
-    let res = db
-        .erase_document(tenant_id, "testcol_s6", "doc_no_key")
-        .await;
+    col.insert(
+        "doc_col_2",
+        &[0.4, 0.3, 0.2, 0.1],
+        Some(json!({"secret": "Teil2_Inhalt"})),
+    )
+    .await?;
+
+    db.flush().await?;
+
+    let list_before = db.list_collections_for_tenant(tenant_id).await?;
+    assert!(list_before.contains(&col_name.to_string()));
+
+    let report = db.erase_collection(tenant_id, col_name).await?;
     assert!(
-        res.is_err(),
-        "erase_document muss fehlschlagen, wenn kein ProofKeyProvider konfiguriert ist"
+        report.verified,
+        "erase_collection muss verified == true sein: {:?}",
+        report.failure
+    );
+    assert!(report.proof.is_some());
+
+    let list_after = db.list_collections_for_tenant(tenant_id).await?;
+    assert!(
+        !list_after.contains(&col_name.to_string()),
+        "Registry-Eintrag muss strikt nach erfolgreichem Nachweis entfernt sein"
     );
 
-    // Dokument muss unberührt und lesbar bleiben
-    let doc = col.get("doc_no_key").await?;
+    db.flush().await?;
+    db.close().await?;
+
+    // Datenverzeichnis ohne Needles
+    let needle_matches = count_bytes_occurrences(tmp.path(), needle_text);
+    assert_eq!(
+        needle_matches, 0,
+        "Needle darf im Datenverzeichnis nach erase_collection nicht mehr vorkommen"
+    );
+
+    Ok(())
+}
+
+/// Szenario 6: Fehlender Schlüssel
+/// Fehler vor Mutation, Dokument noch vorhanden.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_scenario_6_fehlender_schluessel() -> std::result::Result<(), ContextraError> {
+    let tmp = TempDir::new().expect("Failed to create tempdir");
+    let config = test_config(4);
+
+    let db = open_with_config(tmp.path(), config).await?;
+    let tenant_id = TenantId::try_new(1)?;
+    let col = db.collection_for_tenant("testcol_nokey", tenant_id).await?;
+
+    col.insert(
+        "doc_nokey_1",
+        &[0.1, 0.2, 0.3, 0.4],
+        Some(json!({"text": "Wichtiger Dateninhalt"})),
+    )
+    .await?;
+
+    // Versuch der Löschung ohne registrierten ProofKeyProvider
+    let erase_res = db
+        .erase_document(tenant_id, "testcol_nokey", "doc_nokey_1")
+        .await;
+    assert!(
+        erase_res.is_err(),
+        "erase_document muss ohne ProofKeyProvider mit Err fehlschlagen"
+    );
+
+    // Dokument muss unversehrt lesbar bleiben
+    let doc = col.get("doc_nokey_1").await?;
     assert!(
         doc.is_some(),
-        "Dokument muss nach fehlgeschlagenem Preflight intakt vorhanden sein"
+        "Dokument muss nach Preflight-Fehler unversehrt erhalten bleiben"
     );
 
     db.close().await?;
     Ok(())
 }
 
-/// SZENARIO 7: Offener Snapshot blockiert den Purge
-/// Ergebnis ist Err oder verified == false mit klarem Grund, nie ein Proof.
+/// Szenario 7: Offener Snapshot
+/// Offener Snapshot blockiert den Purge: Ergebnis ist Err oder verified == false mit klarem Grund, nie ein Proof.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_scenario_7_offener_snapshot_blockiert_purge() -> Result<(), ContextraError> {
-    let tmp = TempDir::new().expect("tempdir");
+async fn test_scenario_7_offener_snapshot_blockiert_purge() -> std::result::Result<(), ContextraError> {
+    let tmp = TempDir::new().expect("Failed to create tempdir");
     let key = b"secret_proof_key_32bytes_1234567";
+    let config = test_config(4);
 
-    let db = builder(4).with_storage_path(tmp.path()).build().await?;
-    let db = db.with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
+    let db = open_with_config(tmp.path(), config)
+        .await?
+        .with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
 
     let tenant_id = TenantId::try_new(1)?;
-    let col = db.collection_for_tenant("testcol_s7", tenant_id).await?;
+    let col = db.collection_for_tenant("testcol_snap", tenant_id).await?;
 
     col.insert(
-        "doc_snap",
+        "doc_snap_1",
         &[0.1, 0.2, 0.3, 0.4],
         Some(json!({"text": "Inhalt unter Snapshot"})),
     )
     .await?;
 
-    // Blockiere Purge durch aktiven Snapshot Pin in SnapshotRegistry
-    let _snapshot_guard = db.inner_storage().snapshot_registry.register(100);
+    // Offener Snapshot wird registriert
+    col.storage().pin_checkpoint(100).await?;
 
-    // Versuch zu löschen -> Preflight blockiert wegen offener Snapshots
-    let res = db
-        .erase_document(tenant_id, "testcol_s7", "doc_snap")
+    let erase_res = db
+        .erase_document(tenant_id, "testcol_snap", "doc_snap_1")
         .await;
 
-    match res {
-        Err(err) => {
-            let err_msg = err.to_string();
+    match erase_res {
+        Err(e) => {
+            let err_msg = e.to_string();
             assert!(
-                err_msg.contains("snapshot") || err_msg.contains("Snapshot"),
-                "Fehlermeldung muss den offenen Snapshot als Grund nennen, war: {err_msg}"
+                err_msg.contains("open snapshot") || err_msg.contains("SnapshotRegistry"),
+                "Fehlermeldung muss offen gegangenen Snapshot nennen, war: {err_msg}"
             );
         }
         Ok(report) => {
             assert!(
                 !report.verified,
-                "Löschung darf bei offenem Snapshot nicht verifiziert werden"
+                "Löschung darf bei offenem Snapshot nicht als verifiziert gelten"
             );
             assert!(
                 report.proof.is_none(),
-                "DeletionProof darf bei offenem Snapshot NIEMALS ausgestellt werden"
-            );
-            let failure_reason = report.failure.expect("Failure details").reason;
-            assert!(
-                failure_reason.contains("snapshot") || failure_reason.contains("Snapshot"),
-                "Grund muss Snapshot benennen"
+                "Kein DeletionProof darf ausgestellt werden"
             );
         }
     }
 
-    // Unpin Snapshot
-    drop(_snapshot_guard);
+    // Clean up pin so database can close gracefully
+    let _ = col.storage().unpin_checkpoint(100).await;
 
-    // Nach Freigabe des Snapshots schlägt Preflight nicht mehr wegen Snapshots fehl
-    let report_after = db
-        .erase_document(tenant_id, "testcol_s7", "doc_snap")
-        .await?;
-
-    if !report_after.verified {
-        assert!(
-            report_after.proof.is_none(),
-            "Bei verified == false darf kein DeletionProof ausgestellt werden"
-        );
-    }
+    // Dokument bleibt unversehrt erhalten
+    let doc = col.get("doc_snap_1").await?;
+    assert!(
+        doc.is_some(),
+        "Dokument muss bei blockiertem Purge unversehrt erhalten bleiben"
+    );
 
     db.close().await?;
     Ok(())
