@@ -105,11 +105,9 @@ gh issue comment <N> --body "❓ <Frage>"
 
 ```bash
 cargo fmt --all
-just check          # Format + Clippy
-just dag-check      # Ring-DAG-Integrität
-just debt-audit     # Tech-Debt-Ratchet
-just test           # Nextest
-just sync-docs      # WORKING_STATE.md, CHANGELOG
+cargo check --workspace
+cargo test --workspace
+cargo run -p xtask -- check
 ```
 
 ---
@@ -146,7 +144,7 @@ git rebase --abort
 
 ```bash
 # Gates müssen auf dem rebased Stand grün sein
-just check && just test
+cargo check --workspace && cargo test --workspace && cargo run -p xtask -- check
 ```
 
 > **Regel:** Schlägt ein Gate nach dem Rebase fehl, liegt ein echter Konflikt mit

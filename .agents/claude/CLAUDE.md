@@ -1,6 +1,6 @@
 # Contextra — Claude / Antigravity-Betriebsanleitung
 
-<!-- doc-stamp: 2026-10-26 | Spec-Fassung: 2.3 -->
+<!-- doc-stamp: 2026-10-28 1b8b790 | Spec-Fassung: 3.0 -->
 
 > Diese Datei gilt **ausschließlich** für Claude/Antigravity. Für Jules gilt `AGENTS.md §2a` + `.agents/jules/SESSION_BOOTSTRAP.md`.
 
@@ -32,7 +32,7 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart, 3 Minuten).
 1. Task lesen, Ziel verstehen, Quellen der Wahrheit identifizieren.
 2. APIs und Dateipfade im Code verifizieren — niemals aus dem Gedächtnis annehmen.
 3. Kleinste mögliche Änderung. Kein Over-Engineering.
-4. Verifizieren: Gates, Lints, Tests grün (`just check && just test`).
+4. Verifizieren: Gates, Lints, Tests grün (`cargo check --workspace` && `cargo test --workspace` && `cargo run -p xtask -- check`).
 5. PR-Text formulieren (mit WP-Nummer aus PLAN.md).
 
 ---
@@ -58,18 +58,18 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart, 3 Minuten).
 6. **Sicherheit kein Feature:** Kein `cfg(not(feature))` für Security-Typen (A1).
 7. **I/O über `Vfs`:** `fsync`-Fehler propagieren, nie mit `let _ =` wegwerfen (P24).
 8. **Gate-Integrität:** Gates, Lints, Ratchets niemals abschwächen oder umgehen (REQ-QA-010).
-9. **Keine Archiv-Crates bearbeiten:** `graph`, `cognition`, `adapt`, `kvcache`, `router`, `agent`, `infer-onnx`, `infer-ollama`, `core` → werden aus Workspace entfernt (PLAN WP 2.1).
+9. **Baukasten-Module [M] mit Vertrag:** `graph`, `cognition`, `adapt`, `kvcache`, `router`, `agent`, `infer-onnx`, `infer-ollama`, `privacy`, `mcp`, `py`, `sandbox` sind aktive Baukasten-Module mit isoliertem Vertrag (SPEC §4.2, §5).
 10. **Ein PR = ein WP:** Kein Crate-Schnitt über mehrere WPs in einem PR (REQ-CHG-2).
 
 ---
 
 ## Crate-Status kurz
 
-**Kern [K] — aktiv:** `types` · `ports` · `mvcc` · `crypto` · `vector` · `text` · `rank`(fusion/) · `store` · `checkpoint` · `engine` · `db` · `mcp` · `contextra`
+**Kern [K] — aktiv:** `types` · `ports` · `mvcc` · `crypto` · `vector` · `text` · `rank` · `store` · `checkpoint` · `engine` · `db` · `contextra`
 
-**Archiv [A] — NICHT bearbeiten:** `graph` · `cognition` · `adapt` · `kvcache` · `router` · `agent` · `infer-onnx` · `infer-ollama` · `core`
+**Rand-Module [M] — aktiv:** `infer-candle` · `infer-onnx` · `infer-ollama` · `kvcache` · `adapt` · `graph` · `cognition` · `router` · `agent` · `privacy` · `mcp` · `py` · `sandbox`
 
-**Rand [R] — optional:** `infer-candle` · `sandbox` · `privacy` · `py`
+**Auslaufend:** `contextra-core` (WP 2.8: schrittweise Entfernung der Kompatibilitätsfassade)
 
 ---
 
