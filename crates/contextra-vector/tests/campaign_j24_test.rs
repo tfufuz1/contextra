@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use std::f32;
 use std::fs;
 
-use contextra_core::types::{DistanceMetric, DocId, TxId};
 use contextra_ports::VectorIndex;
+use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::candidate_stream::VectorCandidateStream;
 use contextra_vector::compute_pool::ComputePool;
 #[cfg(feature = "experimental-diskann")]

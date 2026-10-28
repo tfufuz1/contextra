@@ -9,7 +9,12 @@
 pub mod adaptive_ef;
 pub mod arena;
 pub mod deletion;
+pub mod purge;
+pub mod scanner;
 pub mod sq8_bias;
+
+pub use purge::{hnsw_purger, HnswPurger};
+pub use scanner::{hnsw_scanner, HnswScanner};
 
 mod acorn_filtered;
 mod batch;
