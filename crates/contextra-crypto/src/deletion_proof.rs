@@ -25,10 +25,67 @@
 
 use crate::ed25519_proof::{DeletionProofError, SignatureVersion};
 use crate::error::CryptoError;
+use contextra_ports::scanner::{LayerWitness, WitnessLayer};
 use contextra_types::{
     error::HnswDeletionError, CollectionId, ContextraError, DocId, Result, TenantId, TxId,
 };
 use serde::{Deserialize, Serialize};
+
+/// Extension trait providing accessors for `LayerWitness` without mutating `contextra-ports`.
+pub trait LayerWitnessExt {
+    /// Extracts the `wal_seq_after` if layer is `WalAllSegments`, or `None`.
+    fn wal_seq_after(&self) -> Option<u64>;
+    /// Extracts the positive control check match count.
+    fn control_matches(&self) -> u64;
+}
+
+impl LayerWitnessExt for LayerWitness {
+    fn wal_seq_after(&self) -> Option<u64> {
+        if let WitnessLayer::WalAllSegments = self.witness_layer() {
+            Some(self.measured_at())
+        } else {
+            None
+        }
+    }
+
+    fn control_matches(&self) -> u64 {
+        if matches!(self.method(), contextra_types::ScanMethod::FeatureDisabled) {
+            0
+        } else {
+            1
+        }
+    }
+}
+
+/// Mappt `WitnessLayer` erschöpfend auf `DeletionLayer` ohne `_`-Zweig.
+pub fn map_witness_layer_to_deletion_layer(
+    layer: &WitnessLayer,
+    witness: &LayerWitness,
+) -> Result<DeletionLayer> {
+    match layer {
+        WitnessLayer::LsmMemtable => Ok(DeletionLayer::LsmMemtable),
+        WitnessLayer::SsTableAllLevels => Ok(DeletionLayer::SsTableAllLevels),
+        WitnessLayer::HnswIndex => Ok(DeletionLayer::HnswIndex),
+        WitnessLayer::WalAllSegments => {
+            let seq_after = witness.wal_seq_after().ok_or_else(|| {
+                ContextraError::Internal(
+                    "WalAllSegments witness missing mandatory wal_seq_after sequence number"
+                        .to_string(),
+                )
+            })?;
+            Ok(DeletionLayer::WalAllSegments { seq_after })
+        }
+        WitnessLayer::CsrGraph => Ok(DeletionLayer::CsrGraph),
+        WitnessLayer::KvCacheSegments => Ok(DeletionLayer::KvCacheSegments),
+        WitnessLayer::EmbeddingCache => Ok(DeletionLayer::EmbeddingCache),
+        WitnessLayer::Custom(s) => match s.as_str() {
+            "TextIndex" => Ok(DeletionLayer::TextIndex),
+            other => Err(ContextraError::Internal(format!(
+                "Unrecognized custom WitnessLayer: '{other}' cannot be mapped to DeletionLayer"
+            ))),
+        },
+    }
+}
 
 /// Attestation confirming synchronous neighborhood graph repair for vector deletions.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -234,7 +291,7 @@ impl LayerCleanupProof {
 
 /// Layer-explizite Coverage-Deklaration.
 /// Jeder Layer MUSS physisch bereinigt sein bevor er hier deklariert wird.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum DeletionLayer {
     /// In-memory memtable records cleared.
     LsmMemtable,
@@ -253,6 +310,80 @@ pub enum DeletionLayer {
     KvCacheSegments,
     /// In-memory vector embedding cache cleared.
     EmbeddingCache,
+    /// Full-text inverted index posting lists and tombstones purged.
+    TextIndex,
+}
+
+/// Uncovered layer explanation for scope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UncoveredLayer {
+    /// Layer that was not covered in measurement.
+    pub layer: DeletionLayer,
+    /// Justification why layer was not covered for the given scope.
+    pub reason: String,
+}
+
+mod scan_technique_serde {
+    use contextra_ports::scanner::ScanTechnique;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    #[derive(Serialize, Deserialize)]
+    enum ScanTechniqueSerde {
+        Structural,
+        DecryptedView,
+        IndexIntrospection,
+        NeedleScan,
+        NotMeasured(String),
+        FeatureDisabled,
+    }
+
+    pub fn serialize<S>(tech: &ScanTechnique, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let helper = match tech {
+            ScanTechnique::Structural => ScanTechniqueSerde::Structural,
+            ScanTechnique::DecryptedView => ScanTechniqueSerde::DecryptedView,
+            ScanTechnique::IndexIntrospection => ScanTechniqueSerde::IndexIntrospection,
+            ScanTechnique::NeedleScan => ScanTechniqueSerde::NeedleScan,
+            ScanTechnique::NotMeasured(r) => ScanTechniqueSerde::NotMeasured(r.clone()),
+            ScanTechnique::FeatureDisabled => ScanTechniqueSerde::FeatureDisabled,
+        };
+        helper.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<ScanTechnique, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let helper = ScanTechniqueSerde::deserialize(deserializer)?;
+        Ok(match helper {
+            ScanTechniqueSerde::Structural => ScanTechnique::Structural,
+            ScanTechniqueSerde::DecryptedView => ScanTechnique::DecryptedView,
+            ScanTechniqueSerde::IndexIntrospection => ScanTechnique::IndexIntrospection,
+            ScanTechniqueSerde::NeedleScan => ScanTechnique::NeedleScan,
+            ScanTechniqueSerde::NotMeasured(r) => ScanTechnique::NotMeasured(r),
+            ScanTechniqueSerde::FeatureDisabled => ScanTechnique::FeatureDisabled,
+        })
+    }
+}
+
+/// Measurement details for a single witnessed layer in V5 proof.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LayerWitnessMeasurement {
+    /// Layer that was measured.
+    pub layer: DeletionLayer,
+    /// Applied scan technique.
+    #[serde(with = "scan_technique_serde")]
+    pub technique: contextra_ports::scanner::ScanTechnique,
+    /// Number of units scanned during measurement.
+    pub scanned: u64,
+    /// Number of remaining live residual units (MUST be 0).
+    pub remaining: u64,
+    /// Number of passed positive control checks.
+    pub control_matches: u64,
+    /// BLAKE3 measurement digest.
+    pub digest: [u8; 32],
 }
 
 /// Explizite Nicht-Abdeckung — maschinenlesbar für Audit-Systeme.
@@ -334,9 +465,22 @@ pub struct DeletionProof {
     /// Verweis auf die Position (Index) des zugehörigen Audit-Chain-Eintrags.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub audit_chain_position: Option<u64>,
+    /// Custody level recorded during deletion proof generation.
+    #[serde(default = "default_custody_level")]
+    pub custody: CustodyLevel,
+    /// Detailed measurements per layer for V5 proofs.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub measurements: Vec<LayerWitnessMeasurement>,
+    /// Explicitly uncovered mandatory/optional layers with justification.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub uncovered_layers: Vec<UncoveredLayer>,
     /// Integritätswarnung für Legacy-Proofs (Version 1).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub integrity_warning: Option<String>,
+}
+
+const fn default_custody_level() -> CustodyLevel {
+    CustodyLevel::Local
 }
 
 const fn default_signature_version() -> u8 {
@@ -355,7 +499,7 @@ impl DeletionProof {
         saga: &contextra_types::SagaRecord,
         witnesses: &[contextra_ports::scanner::LayerWitness],
         excluded: &[ExcludedScope],
-        _custody: CustodyLevel,
+        custody: CustodyLevel,
         key: impl Into<SigningKeyHandle<'a>>,
         clock: &dyn contextra_ports::Clock,
     ) -> Result<Self> {
@@ -380,23 +524,123 @@ impl DeletionProof {
             }
         }
 
+        // 1. witnesses empty -> Err
+        if witnesses.is_empty() {
+            return Err(ContextraError::Internal(
+                "REQ-PRF-1 violation: witnesses list cannot be empty for deletion proof issuance"
+                    .to_string(),
+            ));
+        }
+
+        // 2. excluded empty -> Err (REQ-PRF-2)
+        if excluded.is_empty() {
+            return Err(ContextraError::Internal(
+                "REQ-PRF-2 violation: excluded scopes list cannot be empty".to_string(),
+            ));
+        }
+
+        use crate::deletion_proof::LayerWitnessExt;
+
         let mut covered_layers = Vec::new();
+        let mut measurements = Vec::new();
+        let mut seen_layers = std::collections::HashSet::new();
+
         for w in witnesses {
-            match w.layer() {
-                "LsmMemtable" => covered_layers.push(DeletionLayer::LsmMemtable),
-                "SsTableAllLevels" => covered_layers.push(DeletionLayer::SsTableAllLevels),
-                "HnswIndex" => covered_layers.push(DeletionLayer::HnswIndex),
-                "CsrGraph" => covered_layers.push(DeletionLayer::CsrGraph),
-                "KvCacheSegments" => covered_layers.push(DeletionLayer::KvCacheSegments),
-                "EmbeddingCache" => covered_layers.push(DeletionLayer::EmbeddingCache),
-                _ => {
-                    if w.layer().starts_with("WalAllSegments") {
-                        covered_layers.push(DeletionLayer::WalAllSegments { seq_after: 0 });
-                    } else {
-                        covered_layers.push(DeletionLayer::LsmMemtable);
-                    }
+            // Check for remaining > 0 -> Err
+            if w.remaining() > 0 {
+                return Err(ContextraError::Internal(format!(
+                    "INV-WITNESS-MINT-1 violation: layer '{}' has {} remaining live entries",
+                    w.layer(),
+                    w.remaining()
+                )));
+            }
+
+            // Check ScanMethod::NotMeasured -> Err
+            match w.method() {
+                contextra_types::ScanMethod::Structural
+                | contextra_types::ScanMethod::FeatureDisabled => {}
+                contextra_types::ScanMethod::NotMeasured(reason) => {
+                    return Err(ContextraError::Internal(format!(
+                        "INV-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
+                        w.layer(),
+                        reason
+                    )));
                 }
             }
+
+            // Check technique == ScanTechnique::NotMeasured / LogicalView for physical storage layers -> Err
+            match w.technique() {
+                contextra_ports::scanner::ScanTechnique::NotMeasured(reason) => {
+                    return Err(ContextraError::Internal(format!(
+                        "INV-WITNESS-MINT-1 violation: layer '{}' was not measured ({})",
+                        w.layer(),
+                        reason
+                    )));
+                }
+                _ => {}
+            }
+
+            let witness_layer = w.witness_layer().clone();
+
+            // Check for duplicate layers using WitnessLayer -> Err
+            if !seen_layers.insert(witness_layer.clone()) {
+                return Err(ContextraError::Internal(format!(
+                    "INV-WITNESS-MINT-1 violation: duplicate witness layer '{:?}' in witnesses list",
+                    witness_layer
+                )));
+            }
+
+            let mapped_layer = map_witness_layer_to_deletion_layer(&witness_layer, w)?;
+
+            covered_layers.push(mapped_layer.clone());
+
+            measurements.push(LayerWitnessMeasurement {
+                layer: mapped_layer,
+                technique: w.technique().clone(),
+                scanned: w.scanned(),
+                remaining: w.remaining(),
+                control_matches: w.control_matches(),
+                digest: *w.digest(),
+            });
+        }
+
+        // Check mandatory storage layers: LsmMemtable, SsTableAllLevels, WalAllSegments
+        let has_memtable = covered_layers.iter().any(|l| matches!(l, DeletionLayer::LsmMemtable));
+        let has_sstable = covered_layers.iter().any(|l| matches!(l, DeletionLayer::SsTableAllLevels));
+        let has_wal = covered_layers.iter().any(|l| matches!(l, DeletionLayer::WalAllSegments { .. }));
+
+        if !has_memtable {
+            return Err(ContextraError::Internal(
+                "INV-WITNESS-MINT-1 violation: mandatory layer LsmMemtable missing from witnesses"
+                    .to_string(),
+            ));
+        }
+        if !has_sstable {
+            return Err(ContextraError::Internal(
+                "INV-WITNESS-MINT-1 violation: mandatory layer SsTableAllLevels missing from witnesses"
+                    .to_string(),
+            ));
+        }
+        if !has_wal {
+            return Err(ContextraError::Internal(
+                "INV-WITNESS-MINT-1 violation: mandatory layer WalAllSegments missing from witnesses"
+                    .to_string(),
+            ));
+        }
+
+        // Optional layers HnswIndex and TextIndex, if not present in witnesses, add to uncovered_layers
+        let mut uncovered_layers = Vec::new();
+        if !covered_layers.iter().any(|l| matches!(l, DeletionLayer::HnswIndex)) {
+            uncovered_layers.push(UncoveredLayer {
+                layer: DeletionLayer::HnswIndex,
+                reason: "Scope does not contain vector HnswIndex data".to_string(),
+            });
+        }
+        if !covered_layers.iter().any(|l| matches!(l, DeletionLayer::TextIndex)) {
+            uncovered_layers.push(UncoveredLayer {
+                layer: DeletionLayer::TextIndex,
+                reason: "Scope does not contain full-text TextIndex data".to_string(),
+            });
         }
 
         let scope = DeletionScope::Tenant {
@@ -404,56 +648,43 @@ impl DeletionProof {
         };
         let timestamp = clock.now_unix_nanos() / 1_000_000_000;
 
+        let proof_stub = Self {
+            signature_version: SignatureVersion::V5.as_u8(),
+            scope,
+            deleted_keys_hash: saga.deleted_keys_hash,
+            deleted_after_tx: ctx.tx_id,
+            timestamp,
+            signature: Vec::new(),
+            covered_layers,
+            excluded_scopes: excluded.to_vec(),
+            graph_repair: Vec::new(),
+            wal_chain_receipt: None,
+            audit_chain_position: None,
+            custody,
+            measurements,
+            uncovered_layers,
+            integrity_warning: None,
+        };
+
+        let payload = proof_stub
+            .construct_v5_payload()
+            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+
+        let mut proof = proof_stub;
+
         match key.into() {
-            SigningKeyHandle::Ed25519(sk) => Self::create_full_v3(
-                scope,
-                Vec::new(),
-                ctx.tx_id,
-                Vec::new(),
-                excluded.to_vec(),
-                None,
-                None,
-                timestamp as i64,
-                &[],
-                sk,
-            ),
+            SigningKeyHandle::Ed25519(sk) => {
+                use ed25519_dalek::Signer;
+                let sig = sk.sign(&payload);
+                proof.signature = sig.to_bytes().to_vec();
+            }
             SigningKeyHandle::Hmac(hmac_key) => {
-                let scope_bytes = bincode::serialize(&scope)
-                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
-                let tx_bytes = ctx.tx_id.0.to_le_bytes();
-                let covered_layers_bytes = bincode::serialize(&covered_layers)
-                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
-                let excluded_scopes_bytes = bincode::serialize(excluded)
-                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
-
-                let signature = compute_hmac_sha256(
-                    hmac_key,
-                    &[
-                        &scope_bytes,
-                        &saga.deleted_keys_hash,
-                        &tx_bytes,
-                        &covered_layers_bytes,
-                        &excluded_scopes_bytes,
-                        &[],
-                    ],
-                )?;
-
-                Ok(Self {
-                    signature_version: SignatureVersion::V2.as_u8(),
-                    scope,
-                    deleted_keys_hash: saga.deleted_keys_hash,
-                    deleted_after_tx: ctx.tx_id,
-                    timestamp,
-                    signature: signature.to_vec(),
-                    covered_layers,
-                    excluded_scopes: excluded.to_vec(),
-                    graph_repair: Vec::new(),
-                    wal_chain_receipt: None,
-                    audit_chain_position: None,
-                    integrity_warning: None,
-                })
+                let sig = compute_hmac_sha256(hmac_key, &[&payload])?;
+                proof.signature = sig.to_vec();
             }
         }
+
+        Ok(proof)
     }
 
     /// Erstellt und signiert einen DeletionProof nach Layer-Bereinigung.
@@ -539,6 +770,9 @@ impl DeletionProof {
             graph_repair: Vec::new(),
             wal_chain_receipt,
             audit_chain_position: None,
+            custody: CustodyLevel::Local,
+            measurements: Vec::new(),
+            uncovered_layers: Vec::new(),
             integrity_warning: None,
         })
     }
@@ -668,6 +902,9 @@ impl DeletionProof {
             graph_repair: graph_repair.to_vec(),
             wal_chain_receipt,
             audit_chain_position,
+            custody: CustodyLevel::Local,
+            measurements: Vec::new(),
+            uncovered_layers: Vec::new(),
             integrity_warning: None,
         };
 
@@ -778,7 +1015,73 @@ impl DeletionProof {
 
                 Ok(verifying_key.verify(&payload, &sig).is_ok())
             }
+            SignatureVersion::V5 => {
+                let payload = self
+                    .construct_v5_payload()
+                    .map_err(|e| ContextraError::Internal(e.to_string()))?;
+
+                match key {
+                    VerificationKey::Ed25519(vk) => {
+                        use ed25519_dalek::Verifier;
+                        let sig = match ed25519_dalek::Signature::from_slice(&self.signature) {
+                            Ok(s) => s,
+                            Err(_) => return Ok(false),
+                        };
+                        Ok(vk.verify(&payload, &sig).is_ok())
+                    }
+                    VerificationKey::Hmac(hmac_key) => {
+                        let expected = compute_hmac_sha256(hmac_key, &[&payload])?;
+                        use subtle::ConstantTimeEq;
+                        Ok(expected.as_slice().ct_eq(&self.signature).into())
+                    }
+                }
+            }
         }
+    }
+
+    /// Helper to construct the signed payload for signature version 5.
+    fn construct_v5_payload(&self) -> std::result::Result<Vec<u8>, CryptoError> {
+        let version_bytes = [SignatureVersion::V5.as_u8()];
+        let scope_bytes =
+            bincode::serialize(&self.scope).map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
+        let timestamp_bytes = self.timestamp.to_le_bytes();
+        let custody_bytes =
+            bincode::serialize(&self.custody).map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let covered_layers_bytes = bincode::serialize(&self.covered_layers)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let measurements_bytes = bincode::serialize(&self.measurements)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let uncovered_bytes = bincode::serialize(&self.uncovered_layers)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        let excluded_scopes_bytes = bincode::serialize(&self.excluded_scopes)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
+
+        let mut payload = Vec::with_capacity(
+            version_bytes.len()
+                + scope_bytes.len()
+                + 32
+                + tx_bytes.len()
+                + timestamp_bytes.len()
+                + custody_bytes.len()
+                + covered_layers_bytes.len()
+                + measurements_bytes.len()
+                + uncovered_bytes.len()
+                + excluded_scopes_bytes.len(),
+        );
+
+        payload.extend_from_slice(&version_bytes);
+        payload.extend_from_slice(&scope_bytes);
+        payload.extend_from_slice(&self.deleted_keys_hash);
+        payload.extend_from_slice(&tx_bytes);
+        payload.extend_from_slice(&timestamp_bytes);
+        payload.extend_from_slice(&custody_bytes);
+        payload.extend_from_slice(&covered_layers_bytes);
+        payload.extend_from_slice(&measurements_bytes);
+        payload.extend_from_slice(&uncovered_bytes);
+        payload.extend_from_slice(&excluded_scopes_bytes);
+
+        Ok(payload)
     }
 
     /// Helper to construct the signed payload for signature version 3 (Ed25519).
@@ -871,11 +1174,11 @@ impl DeletionProof {
             .signature_version_typed()
             .map_err(|_| CryptoError::UnsupportedProofVersion(self.signature_version))?;
 
-        if version != SignatureVersion::V3 {
-            return Err(CryptoError::UnsupportedProofVersion(self.signature_version));
-        }
-
-        let payload = self.construct_v3_payload()?;
+        let payload = match version {
+            SignatureVersion::V3 => self.construct_v3_payload()?,
+            SignatureVersion::V5 => self.construct_v5_payload()?,
+            _ => return Err(CryptoError::UnsupportedProofVersion(self.signature_version)),
+        };
 
         use ed25519_dalek::Verifier;
         let sig = ed25519_dalek::Signature::from_slice(&self.signature)
@@ -899,6 +1202,14 @@ impl DeletionProof {
             let mut clone = self.clone();
             clone.integrity_warning = Some(
                 "covered_layers/excluded_scopes are not cryptographically signed in this legacy proof version"
+                    .to_string(),
+            );
+            serde_json::to_string_pretty(&clone)
+                .map_err(|e| ContextraError::Internal(e.to_string()))
+        } else if version == SignatureVersion::V2 || version == SignatureVersion::V3 {
+            let mut clone = self.clone();
+            clone.integrity_warning = Some(
+                "covered_layers/excluded_scopes are not bound to a verified witness measurement in this legacy proof version"
                     .to_string(),
             );
             serde_json::to_string_pretty(&clone)
@@ -976,7 +1287,36 @@ mod tests {
         let saga = SagaRecord::new([0xAA; 32]);
         let hmac_key = b"secret_hmac_key_32_bytes_long!!";
 
-        // 1. remaining > 0 -> Err
+        // 1. witnesses empty -> Err
+        let res_empty = DeletionProof::issue(
+            &ctx,
+            &saga,
+            &[],
+            &[ExcludedScope::LlmParameterMemory],
+            CustodyLevel::Local,
+            hmac_key.as_slice(),
+            &clock,
+        );
+        assert!(res_empty.is_err(), "empty witnesses MUST return Err");
+
+        // 2. excluded empty -> Err
+        let w_valid = vec![
+            mint_witness_for_tests("LsmMemtable", 10, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("SsTableAllLevels", 50, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("WalAllSegments", 100, 0, ScanTechnique::Structural),
+        ];
+        let res_no_excluded = DeletionProof::issue(
+            &ctx,
+            &saga,
+            &w_valid,
+            &[],
+            CustodyLevel::Local,
+            hmac_key.as_slice(),
+            &clock,
+        );
+        assert!(res_no_excluded.is_err(), "empty excluded MUST return Err");
+
+        // 3. remaining > 0 -> Err
         let w_remaining = vec![mint_witness_for_tests(
             "LsmMemtable",
             10,
@@ -987,14 +1327,14 @@ mod tests {
             &ctx,
             &saga,
             &w_remaining,
-            &[],
+            &[ExcludedScope::LlmParameterMemory],
             CustodyLevel::Local,
             hmac_key.as_slice(),
             &clock,
         );
         assert!(res1.is_err(), "remaining > 0 MUST return Err");
 
-        // 2. ScanMethod::NotMeasured -> Err
+        // 4. ScanMethod::NotMeasured -> Err
         let w_not_measured = vec![mint_witness_for_tests(
             "LsmMemtable",
             0,
@@ -1005,22 +1345,58 @@ mod tests {
             &ctx,
             &saga,
             &w_not_measured,
-            &[],
+            &[ExcludedScope::LlmParameterMemory],
             CustodyLevel::Local,
             hmac_key.as_slice(),
             &clock,
         );
         assert!(res2.is_err(), "NotMeasured MUST return Err");
 
-        // 3. Satisfied conditions -> Ok
-        let w_valid = vec![
+        // 5. Missing mandatory layer (SsTableAllLevels missing) -> Err
+        let w_missing_mandatory = vec![
             mint_witness_for_tests("LsmMemtable", 10, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("WalAllSegments", 100, 0, ScanTechnique::Structural),
+        ];
+        let res_missing = DeletionProof::issue(
+            &ctx,
+            &saga,
+            &w_missing_mandatory,
+            &[ExcludedScope::LlmParameterMemory],
+            CustodyLevel::Local,
+            hmac_key.as_slice(),
+            &clock,
+        );
+        assert!(res_missing.is_err(), "missing mandatory SsTableAllLevels MUST return Err");
+
+        // 6. Duplicate layer -> Err
+        let w_duplicate = vec![
+            mint_witness_for_tests("LsmMemtable", 10, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("LsmMemtable", 10, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("SsTableAllLevels", 50, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("WalAllSegments", 100, 0, ScanTechnique::Structural),
+        ];
+        let res_dup = DeletionProof::issue(
+            &ctx,
+            &saga,
+            &w_duplicate,
+            &[ExcludedScope::LlmParameterMemory],
+            CustodyLevel::Local,
+            hmac_key.as_slice(),
+            &clock,
+        );
+        assert!(res_dup.is_err(), "duplicate layer MUST return Err");
+
+        // 7. Satisfied conditions -> Ok(V5)
+        let w_valid_full = vec![
+            mint_witness_for_tests("LsmMemtable", 10, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("SsTableAllLevels", 50, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("WalAllSegments", 100, 0, ScanTechnique::Structural),
             mint_witness_for_tests("HnswIndex", 0, 0, ScanTechnique::FeatureDisabled),
         ];
         let res3 = DeletionProof::issue(
             &ctx,
             &saga,
-            &w_valid,
+            &w_valid_full,
             &[ExcludedScope::LlmParameterMemory],
             CustodyLevel::Local,
             hmac_key.as_slice(),
@@ -1028,11 +1404,69 @@ mod tests {
         );
         assert!(
             res3.is_ok(),
-            "Satisfied witnesses MUST produce Ok(DeletionProof)"
+            "Satisfied witnesses MUST produce Ok(DeletionProof), got {:?}",
+            res3.err()
         );
         let proof = res3.unwrap();
-        assert_eq!(proof.covered_layers.len(), 2);
+        assert_eq!(proof.signature_version, 5);
+        assert_eq!(proof.covered_layers.len(), 4);
         assert!(proof.verify(hmac_key.as_slice()).unwrap());
+    }
+
+    #[test]
+    fn test_v5_golden_json_serde_and_tamper_rejection() {
+        use contextra_ports::scanner::ScanTechnique;
+        use contextra_ports::SystemClock;
+        use contextra_testkit::mint_witness_for_tests;
+        use contextra_types::{RequestContext, SagaRecord};
+
+        let clock = SystemClock::new();
+        let ctx = RequestContext::new(TenantId::try_new(42).unwrap(), TxId(500));
+        let saga = SagaRecord::new([0x33; 32]);
+        let keypair = DeletionProofKeyPair::generate();
+
+        let witnesses = vec![
+            mint_witness_for_tests("LsmMemtable", 100, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("SsTableAllLevels", 500, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("WalAllSegments", 1000, 0, ScanTechnique::Structural),
+        ];
+
+        let proof = DeletionProof::issue(
+            &ctx,
+            &saga,
+            &witnesses,
+            &[
+                ExcludedScope::LlmParameterMemory,
+                ExcludedScope::ConsolidatedAndDistilled,
+            ],
+            CustodyLevel::Sovereign,
+            keypair.signing_key(),
+            &clock,
+        )
+        .expect("V5 issue must succeed");
+
+        assert_eq!(proof.signature_version, 5);
+        assert!(proof.verify(&keypair.verifying_key).unwrap());
+        assert!(proof.verify_external(&keypair.verifying_key).is_ok());
+
+        // Serde roundtrip
+        let json = serde_json::to_string_pretty(&proof).unwrap();
+        assert!(json.contains(r#""signature_version": 5"#));
+        assert!(json.contains(r#""custody": "Sovereign""#));
+        let de_proof: DeletionProof = serde_json::from_str(&json).unwrap();
+        assert_eq!(de_proof, proof);
+
+        // Tamper test: flip signature byte -> verify fails
+        let mut tampered_sig = proof.clone();
+        tampered_sig.signature[0] ^= 0xFF;
+        assert!(!tampered_sig.verify(&keypair.verifying_key).unwrap());
+        assert!(tampered_sig.verify_external(&keypair.verifying_key).is_err());
+
+        // Tamper test: flip measurement digest -> verify fails
+        let mut tampered_digest = proof.clone();
+        tampered_digest.measurements[0].digest[0] ^= 0xFF;
+        assert!(!tampered_digest.verify(&keypair.verifying_key).unwrap());
+        assert!(tampered_digest.verify_external(&keypair.verifying_key).is_err());
     }
 
     #[test]
@@ -1263,6 +1697,9 @@ mod tests {
             graph_repair: vec![],
             wal_chain_receipt: None,
             audit_chain_position: None,
+            custody: CustodyLevel::Local,
+            measurements: vec![],
+            uncovered_layers: vec![],
             integrity_warning: None,
         };
         assert_eq!(v1_proof.signature_version, 1);
@@ -1597,6 +2034,9 @@ mod tests {
             graph_repair: vec![],
             wal_chain_receipt: None,
             audit_chain_position: None,
+            custody: CustodyLevel::Local,
+            measurements: vec![],
+            uncovered_layers: vec![],
             integrity_warning: None,
         };
 
@@ -1656,6 +2096,9 @@ mod tests {
             graph_repair: vec![],
             wal_chain_receipt: None,
             audit_chain_position: None,
+            custody: CustodyLevel::Local,
+            measurements: vec![],
+            uncovered_layers: vec![],
             integrity_warning: None,
         };
 
@@ -1673,7 +2116,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deletion_proof_v2_audit_export_no_integrity_warning() {
+    fn test_deletion_proof_v2_v3_audit_export_integrity_warning() {
         let scope = DeletionScope::Tenant {
             tenant_id: TenantId::try_new(1).unwrap(),
         };
@@ -1692,8 +2135,8 @@ mod tests {
         assert_eq!(proof.signature_version, 2);
         let json = proof.export_for_audit().unwrap();
         assert!(
-            !json.contains("integrity_warning"),
-            "v2 export MUST NOT contain integrity_warning"
+            json.contains("integrity_warning"),
+            "v2 export MUST contain integrity_warning per step 5"
         );
     }
 
@@ -1896,6 +2339,9 @@ mod tests {
             graph_repair: vec![],
             wal_chain_receipt: None,
             audit_chain_position: None,
+            custody: CustodyLevel::Local,
+            measurements: vec![],
+            uncovered_layers: vec![],
             integrity_warning: None,
         };
         assert!(v1_proof.verify(&test_key()).unwrap());
