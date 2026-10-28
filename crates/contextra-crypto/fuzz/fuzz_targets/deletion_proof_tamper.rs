@@ -108,10 +108,45 @@ fuzz_target!(|input: DeletionProofTamperInput| {
         TxId::new(43),
         vec![v3_layer_proof],
         vec![ExcludedScope::LlmParameterMemory],
+        1700000000,
+        &[],
         keypair.signing_key(),
     ) {
         v3_proof.signature = input.random_signature_64.to_vec();
         let is_valid = v3_proof.verify(&keypair.verifying_key).unwrap_or(false);
         let _ = is_valid;
+    }
+
+    // 4. V5 Proof issue & verify fuzzing
+    use contextra_testkit::mint_witness_for_tests;
+    use contextra_ports::scanner::ScanTechnique;
+    use contextra_ports::SystemClock;
+    use contextra_types::{RequestContext, SagaRecord};
+
+    let clock = SystemClock::new();
+    let ctx = RequestContext::new(tenant_id, TxId::new(100));
+    let saga = SagaRecord::new([0xBB; 32]);
+    let witnesses = vec![
+        mint_witness_for_tests("LsmMemtable", 10, 0, ScanTechnique::Structural),
+        mint_witness_for_tests("SsTableAllLevels", 50, 0, ScanTechnique::Structural),
+        mint_witness_for_tests("WalAllSegments", 100, 0, ScanTechnique::Structural),
+    ];
+
+    if let Ok(mut v5_proof) = DeletionProof::issue(
+        &ctx,
+        &saga,
+        &witnesses,
+        &[ExcludedScope::LlmParameterMemory],
+        contextra_crypto::deletion_proof::CustodyLevel::Local,
+        keypair.signing_key(),
+        &clock,
+    ) {
+        let _ = v5_proof.verify(&keypair.verifying_key);
+        let _ = v5_proof.verify_external(&keypair.verifying_key);
+        let _ = v5_proof.export_for_audit();
+
+        v5_proof.signature = input.random_signature_64.to_vec();
+        let _ = v5_proof.verify(&keypair.verifying_key);
+        let _ = v5_proof.verify_external(&keypair.verifying_key);
     }
 });

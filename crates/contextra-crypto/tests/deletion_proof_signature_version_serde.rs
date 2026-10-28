@@ -40,6 +40,9 @@ fn test_deletion_proof_typed_signature_version_accessor() {
         graph_repair: vec![],
         wal_chain_receipt: None,
         audit_chain_position: None,
+        custody: contextra_crypto::deletion_proof::CustodyLevel::Local,
+        measurements: vec![],
+        uncovered_layers: vec![],
         integrity_warning: None,
     };
 
@@ -139,6 +142,47 @@ fn test_golden_json_v1_v2_v3_serde_roundtrip() {
         Ok(SignatureVersion::V3)
     );
     assert!(proof_v3_de.verify(&keypair.verifying_key).unwrap());
+
+    // Golden JSON V5
+    use contextra_ports::scanner::ScanTechnique;
+    use contextra_ports::SystemClock;
+    use contextra_testkit::mint_witness_for_tests;
+    use contextra_types::{RequestContext, SagaRecord};
+
+    let clock = SystemClock::new();
+    let ctx = RequestContext::new(tenant_id, TxId(50));
+    let saga = SagaRecord::new([0x55; 32]);
+    let witnesses = vec![
+        mint_witness_for_tests("LsmMemtable", 100, 0, ScanTechnique::Structural),
+        mint_witness_for_tests("SsTableAllLevels", 500, 0, ScanTechnique::Structural),
+        mint_witness_for_tests("WalAllSegments", 1000, 0, ScanTechnique::Structural),
+    ];
+
+    let proof_v5_orig = DeletionProof::issue(
+        &ctx,
+        &saga,
+        &witnesses,
+        &[
+            ExcludedScope::LlmParameterMemory,
+            ExcludedScope::ConsolidatedAndDistilled,
+        ],
+        contextra_crypto::deletion_proof::CustodyLevel::Sovereign,
+        keypair.signing_key(),
+        &clock,
+    )
+    .expect("V5 issue must succeed");
+
+    let json_v5 = serde_json::to_string_pretty(&proof_v5_orig).unwrap();
+    assert!(json_v5.contains(r#""signature_version": 5"#));
+    assert!(json_v5.contains(r#""custody": "Sovereign""#));
+    let proof_v5_de: DeletionProof = serde_json::from_str(&json_v5).unwrap();
+    assert_eq!(proof_v5_de.signature_version, 5);
+    assert_eq!(
+        proof_v5_de.signature_version_typed(),
+        Ok(SignatureVersion::V5)
+    );
+    assert!(proof_v5_de.verify(&keypair.verifying_key).unwrap());
+    assert!(proof_v5_de.verify_external(&keypair.verifying_key).is_ok());
 }
 
 #[test]
@@ -157,6 +201,9 @@ fn test_verify_rejects_unknown_versions_fail_closed() {
         graph_repair: vec![],
         wal_chain_receipt: None,
         audit_chain_position: None,
+        custody: contextra_crypto::deletion_proof::CustodyLevel::Local,
+        measurements: vec![],
+        uncovered_layers: vec![],
         integrity_warning: None,
     };
 

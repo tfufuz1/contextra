@@ -118,6 +118,8 @@ pub enum SignatureVersion {
     V2 = 2,
     /// Ed25519 asymmetric signature with length-prefixed key hashes (version 3)
     V3 = 3,
+    /// Verified witness measurement bound signature (version 5)
+    V5 = 5,
 }
 
 impl SignatureVersion {
@@ -141,6 +143,7 @@ impl TryFrom<u8> for SignatureVersion {
             1 => Ok(SignatureVersion::V1),
             2 => Ok(SignatureVersion::V2),
             3 => Ok(SignatureVersion::V3),
+            5 => Ok(SignatureVersion::V5),
             v => Err(DeletionProofError::UnsupportedVersion(v)),
         }
     }

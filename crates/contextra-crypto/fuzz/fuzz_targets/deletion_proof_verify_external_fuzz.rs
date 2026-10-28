@@ -78,10 +78,16 @@ fuzz_target!(|input: VerifyExternalFuzzInput| {
         scope,
         deleted_keys_hash: input.deleted_keys_hash,
         deleted_after_tx: TxId::new(input.deleted_after_tx),
+        timestamp: 1700000000,
         signature: input.signature,
         covered_layers,
         excluded_scopes,
+        graph_repair: Vec::new(),
         wal_chain_receipt: input.wal_chain_receipt,
+        audit_chain_position: None,
+        custody: contextra_crypto::deletion_proof::CustodyLevel::Local,
+        measurements: Vec::new(),
+        uncovered_layers: Vec::new(),
         integrity_warning: None,
     };
 
