@@ -25,6 +25,7 @@ impl SystemClock {
     /// Creates a new [`SystemClock`] using the current [`Instant`] as the monotonic baseline.
     pub fn new() -> Self {
         Self {
+            // DIRECT TIME CALL (1/3): Authorized baseline monotonic instant for SystemClock.
             start_instant: Instant::now(),
         }
     }
@@ -38,6 +39,7 @@ impl Default for SystemClock {
 
 impl Clock for SystemClock {
     fn now_unix_nanos(&self) -> u64 {
+        // DIRECT TIME CALL (2/3): Authorized OS wall-clock access encapsulated within SystemClock adapter.
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos() as u64)
@@ -45,6 +47,7 @@ impl Clock for SystemClock {
     }
 
     fn monotonic_nanos(&self) -> u64 {
+        // DIRECT TIME CALL (3/3): Authorized OS monotonic clock access encapsulated within SystemClock adapter.
         Instant::now()
             .saturating_duration_since(self.start_instant)
             .as_nanos() as u64

@@ -49,9 +49,3 @@ pub trait CheckpointCoordinator: Send + Sync + 'static {
     /// Lists all active checkpoints.
     fn list_named_checkpoints(&self) -> impl Future<Output = Result<Vec<Self::Meta>>> + Send;
 }
-
-/// Represents a point-in-time view of the database.
-pub trait Snapshot: Send + Sync {
-    /// Returns the sequence number for this snapshot.
-    fn seq_no(&self) -> u64;
-}
