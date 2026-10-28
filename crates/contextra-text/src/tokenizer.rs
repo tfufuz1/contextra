@@ -7,6 +7,7 @@
 
 //! Tokenizer using `unicode-segmentation`.
 
+use contextra_types::{ContextraError, Result};
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -14,22 +15,28 @@ use std::sync::OnceLock;
 use unicode_segmentation::UnicodeSegmentation;
 
 static STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
-static PROTECTED_REGEX: OnceLock<Regex> = OnceLock::new();
+static PROTECTED_REGEX: OnceLock<std::result::Result<Regex, String>> = OnceLock::new();
 static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>> = OnceLock::new();
 
-#[allow(clippy::panic)]
-fn get_protected_regex() -> &'static Regex {
-    PROTECTED_REGEX.get_or_init(|| {
-        if let Ok(re) =
-            Regex::new(r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
-        {
-            re
-        } else if let Ok(fallback) = Regex::new(r"$^") {
-            fallback
-        } else {
-            panic!("protected regex initialization failed")
-        }
+/// Compiles a protected regex pattern, returning a `ContextraError` on failure (fail-closed, E-1.1).
+pub fn compile_protected_regex(pattern: &str) -> Result<Regex> {
+    Regex::new(pattern).map_err(|e| {
+        ContextraError::Text(format!("Invalid protected regex pattern '{pattern}': {e}"))
     })
+}
+
+/// Retrieves the cached default protected regex for URLs and emails, or returns a `ContextraError` if initialization fails.
+pub fn get_protected_regex() -> Result<&'static Regex> {
+    let res = PROTECTED_REGEX.get_or_init(|| {
+        Regex::new(r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
+            .map_err(|e| e.to_string())
+    });
+    match res {
+        Ok(re) => Ok(re),
+        Err(msg) => Err(ContextraError::Text(format!(
+            "Protected regex initialization failed: {msg}"
+        ))),
+    }
 }
 
 fn get_shared_splitter() -> Arc<crate::morphology::GermanCompoundSplitter> {
@@ -57,7 +64,10 @@ enum TextSegment<'a> {
 }
 
 fn segment_text<'a>(text: &'a str) -> Vec<TextSegment<'a>> {
-    let re = get_protected_regex();
+    let re = match get_protected_regex() {
+        Ok(re) => re,
+        Err(_) => return vec![TextSegment::Regular(text)],
+    };
     let mut segments = Vec::new();
     let mut last_idx = 0;
 
@@ -284,6 +294,35 @@ mod tests {
             assert!(tokens.len() <= input.chars().count() + 1);
             let g_tokens = german_tok.tokenize(input);
             let _ = g_tokens;
+        }
+    }
+
+    #[test]
+    fn test_get_protected_regex_success() {
+        let res = get_protected_regex();
+        assert!(
+            res.is_ok(),
+            "Default protected regex must compile successfully"
+        );
+    }
+
+    #[test]
+    fn test_compile_protected_regex_invalid_pattern_returns_contextra_error() {
+        let invalid_pattern = "(?i)[a-z";
+        let res = compile_protected_regex(invalid_pattern);
+        assert!(
+            res.is_err(),
+            "Invalid regex pattern must return an Err, got: {:?}",
+            res
+        );
+        if let Err(ContextraError::Text(msg)) = res {
+            assert!(
+                msg.contains("Invalid protected regex pattern"),
+                "Expected invalid regex message, got: {}",
+                msg
+            );
+        } else {
+            unreachable!("Expected ContextraError::Text");
         }
     }
 

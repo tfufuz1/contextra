@@ -56,7 +56,7 @@ async fn test_veto_f02_guard_partial_rebuild_tombstone_pruning() {
     let mut data_rng = SimpleRng::new(8888);
     let mut dataset = Vec::with_capacity(num_vecs);
     for i in 1..=num_vecs {
-        let doc_id = DocId::new(i as u64);
+        let doc_id = DocId::from(i as u64);
         let vec = data_rng.next_unit_vector(dim);
         dataset.push((doc_id, vec));
     }
@@ -71,7 +71,7 @@ async fn test_veto_f02_guard_partial_rebuild_tombstone_pruning() {
     let tx2 = TxId::new(2);
     let deleted_doc_ids = [1u64, 2u64, 3u64, 4u64, 5u64];
     for &id_raw in &deleted_doc_ids {
-        idx.delete(tx2, DocId::new(id_raw)).await.expect("delete");
+        idx.delete(tx2, DocId::from(id_raw)).await.expect("delete");
     }
     idx.commit(tx2).await.expect("commit tx2");
 
@@ -90,7 +90,7 @@ async fn test_veto_f02_guard_partial_rebuild_tombstone_pruning() {
             for &del_id in &deleted_doc_ids {
                 assert_ne!(
                     r.doc_id,
-                    DocId::new(del_id),
+                    DocId::from(del_id),
                     "VETO-F02 Tombstone Pruning Failure: Deleted document {:?} returned in search results after rebuild_region!",
                     r.doc_id
                 );

@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
 #[cfg(feature = "experimental-diskann")]
+use contextra_ports::VectorIndex;
+#[cfg(feature = "experimental-diskann")]
 use contextra_types::{DocId, Result};
 #[cfg(feature = "experimental-diskann")]
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};

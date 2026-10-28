@@ -23,6 +23,7 @@ pub struct SystemClock {
 
 impl SystemClock {
     /// Creates a new [`SystemClock`] using the current [`Instant`] as the monotonic baseline.
+    #[allow(clippy::disallowed_methods)]
     pub fn new() -> Self {
         Self {
             start_instant: Instant::now(),
@@ -37,6 +38,7 @@ impl Default for SystemClock {
 }
 
 impl Clock for SystemClock {
+    #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
     fn now_unix_nanos(&self) -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -44,6 +46,7 @@ impl Clock for SystemClock {
             .unwrap_or(0)
     }
 
+    #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
     fn monotonic_nanos(&self) -> u64 {
         Instant::now()
             .saturating_duration_since(self.start_instant)

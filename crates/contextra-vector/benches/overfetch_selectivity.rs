@@ -26,7 +26,7 @@ fn bench_overfetch_selectivity(c: &mut Criterion) {
         let tx = TxId::new(1);
         let mut seed = 12345u64;
         for i in 1..=num_vecs {
-            let doc_id = DocId::new(i as u64);
+            let doc_id = DocId::from(i as u64);
             let vec: Vec<f32> = (0..dim)
                 .map(|_| {
                     seed = seed

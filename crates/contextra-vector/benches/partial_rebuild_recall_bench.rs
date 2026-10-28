@@ -42,7 +42,7 @@ fn brute_force_knn(
             .filter(|(idx, _)| !deleted_set.contains(&(*idx as u64)))
             .map(|(idx, v)| {
                 let dist = 1.0 - dot_product(query, v);
-                (DocId::new(idx as u64), dist)
+                (DocId::from(idx as u64), dist)
             })
             .collect();
 
@@ -104,7 +104,7 @@ fn bench_partial_rebuild_recall_curve(c: &mut Criterion) {
                             let tx = TxId::new(1);
                             for (i, v) in vectors.iter().enumerate() {
                                 index
-                                    .insert(tx, DocId::new(i as u64), v)
+                                    .insert(tx, DocId::from(i as u64), v)
                                     .await
                                     .expect("insert failed");
                             }
@@ -113,7 +113,7 @@ fn bench_partial_rebuild_recall_curve(c: &mut Criterion) {
                             let tx_del = TxId::new(2);
                             for &id in &tombstone_ids {
                                 index
-                                    .delete(tx_del, DocId::new(id))
+                                    .delete(tx_del, DocId::from(id))
                                     .await
                                     .expect("delete failed");
                             }

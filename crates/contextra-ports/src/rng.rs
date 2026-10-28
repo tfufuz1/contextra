@@ -89,8 +89,14 @@ impl Rng for SeededRng {
             let val = self.next_u64();
             let bytes = val.to_le_bytes();
             let len = dest.len().min(8);
-            dest[..len].copy_from_slice(&bytes[..len]);
-            dest = &mut dest[len..];
+            if let (Some(head), Some(src_slice)) = (dest.get_mut(..len), bytes.get(..len)) {
+                head.copy_from_slice(src_slice);
+            }
+            if let Some(tail) = dest.get_mut(len..) {
+                dest = tail;
+            } else {
+                break;
+            }
         }
     }
 

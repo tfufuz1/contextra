@@ -122,17 +122,23 @@ impl DistanceMetric {
                 let denom = norm_a.sqrt() * norm_b.sqrt();
                 let dist = if denom == 0.0 { 1.0 } else { 1.0 - dot / denom };
                 // Scale to u32 fixed-point (×1_000_000) for ranking
-                Ok((dist.clamp(0.0, 2.0) * 1_000_000.0) as u32)
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let scaled = (dist.clamp(0.0, 2.0) * 1_000_000.0) as u32;
+                Ok(scaled)
             }
             Self::Euclidean => {
                 let mut sum = 0u64;
                 for (&x, &y) in a.iter().zip(b.iter()) {
                     let diff = (x as i64) - (y as i64);
-                    sum += (diff * diff) as u64;
+                    #[allow(clippy::cast_sign_loss)]
+                    let diff_sq = (diff * diff) as u64;
+                    sum += diff_sq;
                 }
                 let dist_f64 = (sum as f64).sqrt();
                 let dist_rounded = dist_f64.round();
-                Ok(dist_rounded.min(u32::MAX as f64) as u32)
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let clamped = dist_rounded.min(u32::MAX as f64) as u32;
+                Ok(clamped)
             }
             Self::DotProduct => {
                 // Inverted dot product (u32::MAX - dot) so smaller distance = higher similarity.
@@ -140,6 +146,7 @@ impl DistanceMetric {
                 for (&x, &y) in a.iter().zip(b.iter()) {
                     dot += (x as u64) * (y as u64);
                 }
+                #[allow(clippy::cast_possible_truncation)]
                 let dot_clamped = dot.min(u32::MAX as u64) as u32;
                 Ok(u32::MAX - dot_clamped)
             }

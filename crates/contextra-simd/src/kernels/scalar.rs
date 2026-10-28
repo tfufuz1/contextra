@@ -2,6 +2,12 @@
 // ZWECK: Skalare Fallback-Implementierung der Distanzmetriken (f32, f32_bytes, u8, f32_u8).
 // INVARIANTEN: Mathematisch exakt und deterministisch; Null-Division-Schutz für Cosine.
 
+#![allow(
+    clippy::indexing_slicing,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation
+)]
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CosineSimilarityPartsU8 {
     pub dot: u32,

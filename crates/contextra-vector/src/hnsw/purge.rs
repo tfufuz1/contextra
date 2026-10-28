@@ -56,7 +56,7 @@ impl Purger for HnswPurger {
             let parsed_target = target
                 .target_id
                 .parse::<u64>()
-                .map(DocId::new)
+                .map(DocId::from)
                 .or_else(|_| DocId::from_key(&target.target_id));
 
             for (ram_idx, node) in nodes_read.iter().enumerate() {

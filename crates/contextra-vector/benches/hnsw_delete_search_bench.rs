@@ -1,5 +1,5 @@
-use contextra_types::{DocId, TxId};
 use contextra_ports::VectorIndex;
+use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
@@ -34,7 +34,7 @@ fn bench_hnsw_delete_search(c: &mut Criterion) {
 
         let tx = TxId::new(1);
         for (idx, vec) in vectors.iter().enumerate() {
-            let doc_id = DocId::new((idx + 1) as u64);
+            let doc_id = DocId::from((idx + 1) as u64);
             index.insert(tx, doc_id, vec).await.unwrap();
         }
         index.commit(tx).await.unwrap();
@@ -55,7 +55,7 @@ fn bench_hnsw_delete_search(c: &mut Criterion) {
 
         let tx1 = TxId::new(1);
         for (idx, vec) in vectors.iter().enumerate() {
-            let doc_id = DocId::new((idx + 1) as u64);
+            let doc_id = DocId::from((idx + 1) as u64);
             index.insert(tx1, doc_id, vec).await.unwrap();
         }
         index.commit(tx1).await.unwrap();
@@ -63,7 +63,7 @@ fn bench_hnsw_delete_search(c: &mut Criterion) {
         // Delete 30% of docs
         let tx2 = TxId::new(2);
         for idx in 1..=(num_docs * 30 / 100) {
-            index.delete(tx2, DocId::new(idx as u64)).await.unwrap();
+            index.delete(tx2, DocId::from(idx as u64)).await.unwrap();
         }
         index.commit(tx2).await.unwrap();
 

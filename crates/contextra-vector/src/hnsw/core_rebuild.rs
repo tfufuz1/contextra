@@ -1017,13 +1017,13 @@ mod tests {
             let index = HnswIndex::try_new_with_rng(config, rng)?;
 
             for i in 1..=20 {
-                let doc_id = DocId::new(i as u64);
+                let doc_id = DocId::from(i as u64);
                 let vec = vec![i as f32, (i * 2) as f32, (i * 3) as f32, (i * 4) as f32];
                 index.inner.do_insert(doc_id, &vec, i as u64)?;
             }
 
             for i in 1..=5 {
-                index.inner.do_delete(DocId::new(i as u64))?;
+                index.inner.do_delete(DocId::from(i as u64))?;
             }
 
             clock.advance_nanos(10_000_000_000);

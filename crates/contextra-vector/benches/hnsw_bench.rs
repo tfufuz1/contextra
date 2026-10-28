@@ -1,8 +1,8 @@
 // FILE-CONTEXT: v3 format, HOTSPOTS: [benches/hnsw_bench.rs]
 // Hot Path HNSW Insertion, Search, and Quantized Search Benchmarks for ADR-031 Regressions.
 
-use contextra_types::{DocId, TxId};
 use contextra_ports::VectorIndex;
+use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use rand::Rng;
@@ -41,7 +41,7 @@ fn bench_hnsw_hot_paths(c: &mut Criterion) {
 
                 for (idx, vec) in vectors.iter().enumerate() {
                     let tx = TxId::new(1);
-                    let doc_id = DocId::new((idx + 1) as u64);
+                    let doc_id = DocId::from((idx + 1) as u64);
                     index.insert(tx, doc_id, vec).await.expect("Insert failed");
                     index.commit(tx).await.expect("Commit failed");
                 }
@@ -64,7 +64,7 @@ fn bench_hnsw_hot_paths(c: &mut Criterion) {
 
         for (idx, vec) in vectors.iter().enumerate() {
             let tx = TxId::new(1);
-            let doc_id = DocId::new((idx + 1) as u64);
+            let doc_id = DocId::from((idx + 1) as u64);
             index.insert(tx, doc_id, vec).await.expect("Insert failed");
             index.commit(tx).await.expect("Commit failed");
         }

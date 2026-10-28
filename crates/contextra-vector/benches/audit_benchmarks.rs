@@ -2,8 +2,8 @@
 // ZWECK: Audit Benchmark Suite zur Ermittlung von Durchsatz, Speedup, Latenz-Perzentilen, Pareto-Front und RAM-Footprint
 // STAND: TS:2026-08-31T00:00:00Z
 
-use contextra_types::{DocId, TxId};
 use contextra_ports::VectorIndex;
+use contextra_types::{DocId, TxId};
 use contextra_vector::distance::*;
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use rand::Rng;
@@ -134,7 +134,7 @@ async fn main() {
         let vectors: Vec<Vec<f32>> = (0..n)
             .map(|_| (0..128).map(|_| rng.gen_range(-1.0..1.0)).collect())
             .collect();
-        let ids: Vec<DocId> = (1..=n).map(|i| DocId::new(i as u64)).collect();
+        let ids: Vec<DocId> = (1..=n).map(|i| DocId::from(i as u64)).collect();
 
         let config = HnswConfig {
             dimension: 128,
@@ -168,7 +168,7 @@ async fn main() {
     let vectors: Vec<Vec<f32>> = (0..n)
         .map(|_| (0..dim_p).map(|_| rng.gen_range(-1.0..1.0)).collect())
         .collect();
-    let ids: Vec<DocId> = (1..=n).map(|i| DocId::new(i as u64)).collect();
+    let ids: Vec<DocId> = (1..=n).map(|i| DocId::from(i as u64)).collect();
 
     let ef_search_values = [8, 16, 32, 64, 128, 256];
     println!("ef_search\tp50 (µs)\tp95 (µs)\tp99 (µs)\tRecall@10");
@@ -226,7 +226,7 @@ async fn main() {
         let vecs: Vec<Vec<f32>> = (0..n_m)
             .map(|_| (0..dim_m).map(|_| rng.gen_range(-1.0..1.0)).collect())
             .collect();
-        let ids_m: Vec<DocId> = (1..=n_m).map(|i| DocId::new(i as u64)).collect();
+        let ids_m: Vec<DocId> = (1..=n_m).map(|i| DocId::from(i as u64)).collect();
 
         // Unquantized HNSW
         let idx_f32 = HnswIndex::try_new(HnswConfig {
@@ -323,7 +323,7 @@ async fn main() {
         let tx = TxId::new(batch_idx as u64 + 1);
         for i in 0..batch_size {
             let idx = batch_idx * batch_size + i;
-            let doc_id = DocId::new((idx + 1) as u64);
+            let doc_id = DocId::from((idx + 1) as u64);
             base_index
                 .insert(tx, doc_id, &base_vectors[idx])
                 .await
@@ -374,7 +374,7 @@ async fn main() {
             handles.push(tokio::spawn(async move {
                 for i in start..end {
                     let tx = TxId::new(((t_idx * 100_000) + i + 100_000) as u64);
-                    let doc_id = DocId::new((50_000 + i + 1) as u64);
+                    let doc_id = DocId::from((50_000 + i + 1) as u64);
                     idx_ref.insert(tx, doc_id, &vecs[i]).await.unwrap();
                     idx_ref.commit(tx).await.unwrap();
                 }
@@ -469,7 +469,7 @@ async fn main() {
         writer_handles.push(tokio::spawn(async move {
             for i in start..end {
                 let tx = TxId::new(((w_idx * 100_000) + i + 200_000) as u64);
-                let doc_id = DocId::new((60_000 + i + 1) as u64);
+                let doc_id = DocId::from((60_000 + i + 1) as u64);
                 idx_ref.insert(tx, doc_id, &vecs[i]).await.unwrap();
                 idx_ref.commit(tx).await.unwrap();
             }
