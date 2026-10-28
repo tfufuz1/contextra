@@ -6,7 +6,8 @@
 
 //! PID Latency Controller & Latency Budget Guard.
 
-use std::time::Instant;
+use contextra_ports::{Clock, SystemClock};
+use std::sync::Arc;
 
 /// Konservativer Default für das P95-Latenzziel in Millisekunden (100ms).
 ///
@@ -147,30 +148,43 @@ impl PidLatencyController {
 
 /// Simple, panic-free latency budget guard for iterative multi-step search loops.
 #[derive(Debug, Clone)]
-pub struct LatencyBudgetGuard {
-    start: Instant,
+pub struct LatencyBudgetGuard<C: ?Sized + Clock = SystemClock> {
+    start_nanos: u64,
     budget_ms: f64,
+    clock: Arc<C>,
 }
 
-impl LatencyBudgetGuard {
-    /// Creates a new `LatencyBudgetGuard` with the given budget in milliseconds.
+impl LatencyBudgetGuard<SystemClock> {
+    /// Creates a new `LatencyBudgetGuard` with the given budget in milliseconds using `SystemClock`.
     pub fn new(budget_ms: f64) -> Self {
+        Self::new_with_clock(budget_ms, Arc::new(SystemClock::new()))
+    }
+}
+
+impl<C: ?Sized + Clock> LatencyBudgetGuard<C> {
+    /// Creates a new `LatencyBudgetGuard` with an injected [`Clock`] port for deterministic time tracking.
+    pub fn new_with_clock(budget_ms: f64, clock: Arc<C>) -> Self {
         let budget_ms = if budget_ms.is_finite() && budget_ms > 0.0 {
             budget_ms
         } else {
             DEFAULT_TARGET_LATENCY_MS
         };
 
-        #[allow(clippy::disallowed_methods)]
+        let start_nanos = clock.monotonic_nanos();
         Self {
-            start: Instant::now(),
+            start_nanos,
             budget_ms,
+            clock,
         }
     }
 
     /// Returns elapsed time in milliseconds since guard instantiation.
     pub fn elapsed_ms(&self) -> f64 {
-        self.start.elapsed().as_secs_f64() * 1000.0
+        let elapsed_nanos = self
+            .clock
+            .monotonic_nanos()
+            .saturating_sub(self.start_nanos);
+        elapsed_nanos as f64 / 1_000_000.0
     }
 
     /// Returns `true` if the elapsed time has exceeded the configured budget.

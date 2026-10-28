@@ -16,7 +16,7 @@
 //! ADR-016: TxId-Differenz statt SystemTime (deterministisch, replay-safe).
 
 /// Inputs for Adaptive Decay Controller (Cache-Eviction mit Time-Weighted Decay) aus bestehenden System-Metriken.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DecaySignalInputs {
     /// HNSW-Tombstone-Ratio ∈ [0,1]. Quelle: HnswIndex::tombstone_ratio().
     pub tombstone_ratio: f32,
@@ -42,7 +42,7 @@ impl Default for DecaySignalInputs {
 }
 
 /// Konfiguration für Adaptive Decay Controller (Cache-Eviction mit Time-Weighted Decay) (via MaintenanceConfig).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DecayControllerConfig {
     /// Verstärkungsfaktor κ. Default: 2.0.
     pub kappa: f32,
@@ -63,7 +63,7 @@ impl Default for DecayControllerConfig {
 }
 
 /// Adaptive Decay Controller für time-weighted Cache-Eviction.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AdaptiveDecayController {
     config: DecayControllerConfig,
 }
@@ -77,6 +77,11 @@ impl AdaptiveDecayController {
     /// Erstellt einen neuen `AdaptiveDecayController` mit Standardwerten.
     pub fn with_defaults() -> Self {
         Self::new(DecayControllerConfig::default())
+    }
+
+    /// Liefer eine Referenz auf die Konfiguration zurück.
+    pub fn config(&self) -> &DecayControllerConfig {
+        &self.config
     }
 
     /// Berechnet aktuelle Systemtemperatur T(t) ∈ [0,1].
@@ -205,5 +210,46 @@ mod tests {
         let inputs = DecaySignalInputs::default();
         // Frischer Chunk (elapsed_tx=0) → kein Evict
         assert!(!t.should_evict(1.0, 0, &inputs));
+    }
+
+    #[test]
+    fn test_engine_equivalence_and_accessors() {
+        let config = DecayControllerConfig {
+            kappa: 2.0,
+            base_half_life_tx: 10_000,
+            eviction_threshold: 0.01,
+        };
+        let controller = AdaptiveDecayController::new(config.clone());
+        assert_eq!(controller.config(), &config);
+
+        let inputs_default = DecaySignalInputs::default();
+        let temp = controller.system_temperature(&inputs_default);
+        // temp = 0.6 * 0.0 + 0.4 * 0.5 = 0.2
+        assert!((temp - 0.2).abs() < 1e-6);
+
+        let half_life = controller.effective_half_life(temp);
+        // half_life = 10_000 * (1 + 2 * (1 - 0.2)) = 10_000 * (1 + 1.6) = 26_000
+        assert!((half_life - 26_000.0).abs() < 1e-3);
+
+        let score_fresh = controller.effective_score(1.0, 0, &inputs_default);
+        assert!((score_fresh - 1.0).abs() < 1e-6);
+
+        let score_at_half_life = controller.effective_score(1.0, 26_000, &inputs_default);
+        assert!((score_at_half_life - 0.5).abs() < 1e-3);
+
+        let hot_inputs = DecaySignalInputs {
+            tombstone_ratio: 1.0,
+            query_load_inverse: 1.0,
+            ..Default::default()
+        };
+        let temp_hot = controller.system_temperature(&hot_inputs);
+        assert!((temp_hot - 1.0).abs() < 1e-6);
+
+        let half_life_hot = controller.effective_half_life(temp_hot);
+        assert!((half_life_hot - 10_000.0).abs() < 1e-3);
+
+        let score_hot_decayed = controller.effective_score(1.0, 100_000, &hot_inputs);
+        assert!(score_hot_decayed < config.eviction_threshold);
+        assert!(controller.should_evict(1.0, 100_000, &hot_inputs));
     }
 }
