@@ -18,7 +18,7 @@ pub use contextra_ports::VectorDeleteMode;
 pub use contextra_store::lsm::DurabilityMode;
 #[cfg(not(loom))]
 use contextra_store::LsmStorage;
-use contextra_types::{CollectionId, DocId, TenantId};
+use contextra_types::{DocId, TenantId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
