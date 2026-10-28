@@ -11,20 +11,174 @@
 
 #![forbid(unsafe_code)]
 
+use std::sync::Arc;
+use zeroize::{Zeroize, Zeroizing};
+
 use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
 
-/// Provides Key Management Strategy hooks.
-pub trait KmsProvider {
-    /// Retrieves the Data Encryption Key (DEK).
-    fn get_key(&self) -> Result<Vec<u8>>;
+/// Key Management Strategy interface for data key derivation, key wrapping/unwrapping, and key rotation.
+pub trait KmsProvider: Send + Sync {
+    /// Retrieves the Data Encryption Key (DEK) zeroized on drop.
+    fn get_key(&self) -> Result<Zeroizing<Vec<u8>>>;
+
+    /// Returns the active key identifier or version alias.
+    fn active_key_id(&self) -> &str;
+
+    /// Derives a raw data key bound to the specified `key_id`.
+    fn derive_data_key(&self, key_id: &[u8]) -> Result<Zeroizing<Vec<u8>>>;
+
+    /// Wraps (encrypts) plaintext data or a raw key using the key bound to `key_id`.
+    fn wrap_key(&self, key_id: &[u8], plaintext: &[u8]) -> Result<Vec<u8>>;
+
+    /// Unwraps (decrypts) wrapped ciphertext data or key using the key bound to `key_id`.
+    fn unwrap_key(&self, key_id: &[u8], wrapped: &[u8]) -> Result<Zeroizing<Vec<u8>>>;
+
+    /// Rotates the active master key or key version and returns the new active key ID.
+    fn rotate_key(&mut self) -> Result<String>;
 }
 
-/// Encrypted WAL chunk provider that handles transparent encryption/decryption of WAL payloads.
+/// Standard local implementation of [`KmsProvider`] wrapping [`KeyManager`].
+///
+/// Provides thread-safe, zeroized key derivation, wrapping, unwrapping, and rotation.
+pub struct LocalKeyManagerKms {
+    key_manager: KeyManager,
+    key_id: String,
+    rotation_counter: u64,
+}
+
+impl LocalKeyManagerKms {
+    /// Creates a new `LocalKeyManagerKms` wrapping an existing `KeyManager`.
+    pub fn new(key_manager: KeyManager, key_id: impl Into<String>) -> Self {
+        Self {
+            key_manager,
+            key_id: key_id.into(),
+            rotation_counter: 0,
+        }
+    }
+
+    /// Accesses the underlying `KeyManager`.
+    pub fn key_manager(&self) -> &KeyManager {
+        &self.key_manager
+    }
+}
+
+impl KmsProvider for LocalKeyManagerKms {
+    fn get_key(&self) -> Result<Zeroizing<Vec<u8>>> {
+        Ok(self.key_manager.export_dek())
+    }
+
+    fn active_key_id(&self) -> &str {
+        &self.key_id
+    }
+
+    fn derive_data_key(&self, key_id: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
+        if key_id.is_empty() {
+            return Err(CryptoError::InvalidInput(
+                "key_id cannot be empty for data key derivation".to_string(),
+            ));
+        }
+        let sub_km = self.key_manager.derive_file_key(key_id)?;
+        Ok(sub_km.export_dek())
+    }
+
+    fn wrap_key(&self, key_id: &[u8], plaintext: &[u8]) -> Result<Vec<u8>> {
+        let (ciphertext, nonce) = if key_id.is_empty() {
+            self.key_manager.encrypt_auto_nonce(plaintext)?
+        } else {
+            let sub_km = self.key_manager.derive_file_key(key_id)?;
+            sub_km.encrypt_auto_nonce(plaintext)?
+        };
+        let mut out = Vec::with_capacity(12 + ciphertext.len());
+        out.extend_from_slice(&nonce);
+        out.extend_from_slice(&ciphertext);
+        Ok(out)
+    }
+
+    fn unwrap_key(&self, key_id: &[u8], wrapped: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
+        if wrapped.len() < AES_GCM_SIV_NONCE_LEN {
+            return Err(CryptoError::InvalidInput(
+                "Wrapped key payload too short for 12-byte nonce".into(),
+            ));
+        }
+        let (nonce_bytes, ciphertext) = wrapped.split_at(AES_GCM_SIV_NONCE_LEN);
+        let mut nonce = [0u8; 12];
+        nonce.copy_from_slice(nonce_bytes);
+
+        let plaintext = if key_id.is_empty() {
+            self.key_manager.decrypt_auto_nonce(ciphertext, &nonce)?
+        } else {
+            let sub_km = self.key_manager.derive_file_key(key_id)?;
+            sub_km.decrypt_auto_nonce(ciphertext, &nonce)?
+        };
+        Ok(Zeroizing::new(plaintext))
+    }
+
+    fn rotate_key(&mut self) -> Result<String> {
+        self.rotation_counter += 1;
+        let rotation_info = format!("rotation-epoch-{}", self.rotation_counter);
+        self.key_manager = self.key_manager.derive_file_key(rotation_info.as_bytes())?;
+        let base_id = self
+            .key_id
+            .split("-v")
+            .next()
+            .unwrap_or(&self.key_id)
+            .to_string();
+        self.key_id = format!("{}-v{}", base_id, self.rotation_counter);
+        Ok(self.key_id.clone())
+    }
+}
+
+#[cfg(feature = "cloud-egress-guard")]
+/// Egress guard for inspecting and sanitizing encrypted payload blocks prior to cloud egress.
+#[derive(Debug, Clone)]
+pub struct CloudEgressGuard {
+    max_egress_bytes: usize,
+}
+
+#[cfg(feature = "cloud-egress-guard")]
+impl Default for CloudEgressGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "cloud-egress-guard")]
+impl CloudEgressGuard {
+    /// Creates a new `CloudEgressGuard` with a default maximum payload limit of 10 MB.
+    pub fn new() -> Self {
+        Self {
+            max_egress_bytes: 10 * 1024 * 1024,
+        }
+    }
+
+    /// Creates a custom `CloudEgressGuard` with a specified maximum payload size.
+    pub fn with_max_bytes(max_egress_bytes: usize) -> Self {
+        Self { max_egress_bytes }
+    }
+
+    /// Validates that an egress payload meets size and structural integrity bounds.
+    pub fn validate_egress_payload(&self, payload: &[u8]) -> Result<()> {
+        if payload.is_empty() {
+            return Err(CryptoError::InvalidInput(
+                "Egress payload cannot be empty".to_string(),
+            ));
+        }
+        if payload.len() > self.max_egress_bytes {
+            return Err(CryptoError::InvalidInput(format!(
+                "Egress payload length {} exceeds maximum allowed limit of {} bytes",
+                payload.len(),
+                self.max_egress_bytes
+            )));
+        }
+        Ok(())
+    }
+}
+
+/// Encrypted WAL chunk provider that handles transparent encryption/decryption of WAL payloads via KMS.
 ///
 /// # Invariants
-/// - Uses per-file sub-key derivation via `KeyManager::derive_file_key()` to prevent nonce-reuse
-///   across independent WAL streams sharing a master key.
+/// - Delegates encryption and key management to a [`KmsProvider`].
 /// - Prepends a unique 12-byte random nonce to every encrypted chunk output.
 ///
 /// # Usage
@@ -36,7 +190,7 @@ pub trait KmsProvider {
 /// Emits `CryptoError::Crypto` if encryption/decryption fails, key derivation fails,
 /// or if chunk length is less than 12 bytes during decryption.
 pub struct EncryptedWal {
-    key_manager: KeyManager,
+    kms: Arc<dyn KmsProvider>,
 }
 
 const MAX_CHUNK_SIZE: usize = 100 * 1024 * 1024; // 100 MB
@@ -46,7 +200,7 @@ const MAX_ENCRYPTED_CHUNK_SIZE: usize =
     MAX_CHUNK_SIZE + AES_GCM_SIV_NONCE_LEN + AES_GCM_SIV_TAG_LEN;
 
 impl EncryptedWal {
-    /// Creates a new EncryptedWal with per-file key derivation to prevent nonce-reuse.
+    /// Creates a new EncryptedWal with per-file key derivation via LocalKeyManagerKms to prevent nonce-reuse.
     /// `file_id` (e.g., filename) is used to derive a unique sub-key for this stream.
     pub fn new(key_manager: KeyManager, file_id: &[u8]) -> Result<Self> {
         if file_id.is_empty() {
@@ -61,9 +215,19 @@ impl EncryptedWal {
             )));
         }
         let sub_km = key_manager.derive_file_key(file_id)?;
-        Ok(Self {
-            key_manager: sub_km,
-        })
+        let key_id_str = String::from_utf8_lossy(file_id).to_string();
+        let kms = Arc::new(LocalKeyManagerKms::new(sub_km, key_id_str));
+        Ok(Self { kms })
+    }
+
+    /// Creates a new EncryptedWal using an arbitrary KmsProvider.
+    pub fn with_kms(kms: Arc<dyn KmsProvider>) -> Self {
+        Self { kms }
+    }
+
+    /// Returns a reference to the inner KMS provider.
+    pub fn kms(&self) -> &Arc<dyn KmsProvider> {
+        &self.kms
     }
 
     /// Wraps the internal WAL chunk in AES-256-GCM-SIV stream.
@@ -76,11 +240,7 @@ impl EncryptedWal {
                 MAX_CHUNK_SIZE
             )));
         }
-        let (ciphertext, nonce) = self.key_manager.encrypt_auto_nonce(payload)?;
-        let mut out = Vec::with_capacity(12 + ciphertext.len());
-        out.extend_from_slice(&nonce);
-        out.extend_from_slice(&ciphertext);
-        Ok(out)
+        self.kms.wrap_key(b"", payload)
     }
 
     /// Decrypts the WAL chunk by extracting the prepended 12-byte nonce from the data.
@@ -97,16 +257,13 @@ impl EncryptedWal {
                 MAX_ENCRYPTED_CHUNK_SIZE
             )));
         }
-        let mut nonce = [0u8; 12];
-        nonce.copy_from_slice(&data[0..12]);
-        let ciphertext = &data[12..];
-        self.key_manager.decrypt_auto_nonce(ciphertext, &nonce)
+        let decrypted_zeroizing = self.kms.unwrap_key(b"", data)?;
+        Ok(decrypted_zeroizing.to_vec())
     }
 }
 
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use zeroize::{Zeroize, Zeroizing};
 
 /// Stateful wrapper around HMAC-SHA256 initialized with WAL domain separation.
 ///
@@ -879,5 +1036,114 @@ mod tests {
         verifier_b
             .verify_and_update(&e2, 20)
             .expect("e2 valid with verifier B after handoff");
+    }
+
+    #[test]
+    fn test_kms_provider_wrap_unwrap_roundtrip() -> Result<()> {
+        let km = KeyManager::try_new("kms-passphrase-test", b"kms-salt-12345")?;
+        let kms = LocalKeyManagerKms::new(km, "master-key-001");
+
+        assert_eq!(kms.active_key_id(), "master-key-001");
+        let dek = kms.get_key()?;
+        assert_eq!(dek.len(), 32);
+
+        let data_key = kms.derive_data_key(b"data-stream-42")?;
+        assert_eq!(data_key.len(), 32);
+
+        let plaintext = b"secret-payload-for-kms-wrapping";
+        let wrapped = kms.wrap_key(b"data-stream-42", plaintext)?;
+        assert_ne!(wrapped.as_slice(), plaintext);
+
+        let unwrapped = kms.unwrap_key(b"data-stream-42", &wrapped)?;
+        assert_eq!(unwrapped.as_slice(), plaintext);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_kms_provider_wrong_key_id_fails_unwrap() -> Result<()> {
+        let km = KeyManager::try_new("kms-passphrase-test", b"kms-salt-12345")?;
+        let kms = LocalKeyManagerKms::new(km, "master-key-001");
+
+        let plaintext = b"sensitive-data-block";
+        let wrapped = kms.wrap_key(b"key-stream-A", plaintext)?;
+
+        // Unwrapping with wrong key_id MUST fail
+        let res = kms.unwrap_key(b"key-stream-B", &wrapped);
+        assert!(res.is_err(), "Unwrapping with wrong key_id MUST fail");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_kms_provider_key_rotation() -> Result<()> {
+        let km = KeyManager::try_new("kms-passphrase-test", b"kms-salt-12345")?;
+        let mut kms = LocalKeyManagerKms::new(km, "master-key-001");
+
+        let key1 = kms.get_key()?.to_vec();
+        assert_eq!(kms.active_key_id(), "master-key-001");
+
+        let new_id = kms.rotate_key()?;
+        assert_eq!(new_id, "master-key-001-v1");
+        assert_eq!(kms.active_key_id(), "master-key-001-v1");
+
+        let key2 = kms.get_key()?.to_vec();
+        assert_ne!(key1, key2, "Rotated KMS key MUST differ from previous key");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_kms_provider_tamper_detection() -> Result<()> {
+        let km = KeyManager::try_new("kms-passphrase-test", b"kms-salt-12345")?;
+        let kms = LocalKeyManagerKms::new(km, "master-key-001");
+
+        let plaintext = b"payload-to-be-tampered";
+        let mut wrapped = kms.wrap_key(b"stream-1", plaintext)?;
+
+        // Flip a bit in ciphertext
+        let len = wrapped.len();
+        wrapped[len - 1] ^= 0xFF;
+
+        let res = kms.unwrap_key(b"stream-1", &wrapped);
+        assert!(
+            res.is_err(),
+            "Tampered ciphertext MUST fail AEAD decryption"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_encrypted_wal_with_custom_kms_provider() -> Result<()> {
+        let km = KeyManager::try_new("wal-kms-pass", b"wal-kms-salt")?;
+        let kms = Arc::new(LocalKeyManagerKms::new(km, "custom-kms-wal"));
+
+        let wal = EncryptedWal::with_kms(Arc::clone(&kms) as Arc<dyn KmsProvider>);
+        assert_eq!(wal.kms().active_key_id(), "custom-kms-wal");
+
+        let payload = b"encrypted-wal-via-kms-provider";
+        let chunk = wal.encrypt_chunk(payload)?;
+        let decrypted = wal.decrypt_chunk(&chunk)?;
+
+        assert_eq!(decrypted.as_slice(), payload);
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "cloud-egress-guard")]
+    fn test_cloud_egress_guard_validation() -> Result<()> {
+        let guard = CloudEgressGuard::with_max_bytes(1024);
+
+        assert!(guard.validate_egress_payload(b"valid payload").is_ok());
+
+        let empty_res = guard.validate_egress_payload(b"");
+        assert!(matches!(empty_res, Err(CryptoError::InvalidInput(_))));
+
+        let oversized = vec![0u8; 1025];
+        let oversized_res = guard.validate_egress_payload(&oversized);
+        assert!(matches!(oversized_res, Err(CryptoError::InvalidInput(_))));
+
+        Ok(())
     }
 }

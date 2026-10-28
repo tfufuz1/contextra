@@ -59,8 +59,7 @@ fn test_create_v3_with_non_empty_graph_repair_for_hnsw_layer_succeeds() {
         tenant_id,
     };
 
-    let layer_proofs =
-        vec![LayerCleanupProof::for_test(DeletionLayer::HnswIndex)];
+    let layer_proofs = vec![LayerCleanupProof::for_test(DeletionLayer::HnswIndex)];
 
     let graph_repair = vec![GraphRepairAttestation {
         doc_id: DocId::new(42),
@@ -100,8 +99,7 @@ fn test_valid_signature_with_unknown_version_is_rejected_fail_closed() {
         tenant_id,
     };
 
-    let layer_proofs =
-        vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)];
+    let layer_proofs = vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)];
 
     // 1. Create a valid Ed25519 Version 3 proof
     let valid_v3_proof = DeletionProof::create_v3(

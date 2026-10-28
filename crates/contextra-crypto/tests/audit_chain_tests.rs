@@ -239,5 +239,8 @@ fn test_inv_deletion_1_physical_cleanup_enforced() {
         hmac_key.as_slice(),
         &clock,
     );
-    assert!(res.is_err(), "DeletionProof::issue MUST fail if witness has remaining > 0");
+    assert!(
+        res.is_err(),
+        "DeletionProof::issue MUST fail if witness has remaining > 0"
+    );
 }

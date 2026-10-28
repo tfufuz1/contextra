@@ -43,6 +43,7 @@ use rand::RngCore;
 use sha2::Sha256;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
+use zeroize::Zeroizing;
 
 /// Manager for encryption keys and block encryption.
 pub struct KeyManager {
@@ -387,6 +388,11 @@ impl KeyManager {
         self.key.emergency_wipe();
         self.cipher_cache.take();
         self.nonce_counter.store(0, Ordering::SeqCst);
+    }
+
+    /// Exports the 32-byte raw Data Encryption Key (DEK) wrapped in [`Zeroizing<Vec<u8>>`].
+    pub fn export_dek(&self) -> Zeroizing<Vec<u8>> {
+        Zeroizing::new(self.key.as_bytes().to_vec())
     }
 
     /// Provides access to the key bytes ONLY during testing.
