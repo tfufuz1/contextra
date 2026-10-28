@@ -3,7 +3,6 @@ use super::intent::CommitIntent;
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, DocId, Result, TxId};
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
 #[allow(dead_code)]
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {

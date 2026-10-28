@@ -251,8 +251,8 @@ fn test_scenario_3_deletion_proof_v3_creation_and_exhaustive_mutation_test() {
 
     let deleted_keys = vec![b"doc_key_1".to_vec(), b"doc_key_2".to_vec()];
     let cleanup_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0).unwrap(),
+        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+        LayerCleanupProof::for_test(DeletionLayer::SsTableAllLevels),
     ];
 
     let proof = DeletionProof::create_full_v3(
@@ -342,8 +342,8 @@ fn test_repro_bug_graph_repair_omitted_from_v3_signature() {
     };
 
     let cleanup_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+        LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
     ];
 
     let graph_repair = vec![GraphRepairAttestation {
@@ -390,13 +390,9 @@ fn test_scenario_4_independent_external_verification_and_tempfile() {
 
     let deleted_keys = vec![b"tenant_wide_key_a".to_vec(), b"tenant_wide_key_b".to_vec()];
     let cleanup_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(
-            DeletionLayer::WalAllSegments { seq_after: 100 },
-            0,
-        )
-        .unwrap(),
+        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+        LayerCleanupProof::for_test(DeletionLayer::SsTableAllLevels),
+        LayerCleanupProof::for_test(DeletionLayer::WalAllSegments { seq_after: 100 }),
     ];
 
     let proof = DeletionProof::create_full_v3(

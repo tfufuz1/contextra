@@ -44,6 +44,8 @@ gates = [
     "feature-matrix",
     "wired",
     "deletion-honesty",
+    "no-dummy-proof",
+    "scanner-coverage",
     "doc-truth",
     "symbol-uniqueness",
     "code-lints",

@@ -31,6 +31,8 @@ thiserror = { workspace = true }
 [dev-dependencies]
 contextra-crypto = { workspace = true }
 tempfile = { workspace = true }
+contextra-crypto = { workspace = true }
+contextra-testkit = { workspace = true }
 
 [features]
 default = ["embedded"]

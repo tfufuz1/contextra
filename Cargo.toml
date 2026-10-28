@@ -37,11 +37,8 @@ members = [
     "crates/contextra-license",
     "xtask",
 ]
-# Excluded from default-members per PLAN §3 / capabilities.toml (Ring 0-4 Core Product):
-# - Archive Crates (WP 2.1): contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama, contextra-core
-# - Marginal/Experimental Crates: contextra-infer-candle, contextra-privacy, contextra-sandbox, contextra-py, contextra-license, contextra-audit-export, contextra-avv-generator
-# - Benchmarks & Tools: contextra-bench, xtask
-# These crates remain in `members` until physical removal (WP 2.1b) and can be built explicitly via `cargo build -p <crate>`.
+# Restored archived crates to default-members:
+# contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama, contextra-core
 default-members = [
     "crates/contextra-wire",
     "crates/contextra-sys",
@@ -60,6 +57,15 @@ default-members = [
     "crates/contextra-mcp",
     "crates/contextra",
     "crates/contextra-testkit",
+    "crates/contextra-graph",
+    "crates/contextra-cognition",
+    "crates/contextra-adapt",
+    "crates/contextra-kvcache",
+    "crates/contextra-router",
+    "crates/contextra-agent",
+    "crates/contextra-infer-onnx",
+    "crates/contextra-infer-ollama",
+    "crates/contextra-core",
 ]
 
 [workspace.package]

@@ -45,6 +45,7 @@ tempfile = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 proptest = "1.4"
 contextra-vector = { workspace = true, features = ["experimental-diskann"] }
+contextra-testkit = { workspace = true }
 ed25519-dalek = "2"
 
 [features]
@@ -64,27 +65,27 @@ edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
 
 [[bench]]
 name = "migration_benchmarks"
-path = "../../benches/migration_benchmarks.rs"
+path = "../../benchmarks/migration_benchmarks.rs"
 harness = false
 
 [[bench]]
 name = "scale_bench"
-path = "../../benches/scale_bench.rs"
+path = "../../benchmarks/scale_bench.rs"
 harness = false
 
 [[bench]]
 name = "rrf_scale_bench"
-path = "../../benches/rrf_scale_bench.rs"
+path = "../../benchmarks/rrf_scale_bench.rs"
 harness = false
 
 [[bench]]
 name = "competitive_bench"
-path = "../../benches/competitive_bench.rs"
+path = "../../benchmarks/competitive_bench.rs"
 harness = false
 
 [[bench]]
 name = "relate_bench"
-path = "../../benches/relate_bench.rs"
+path = "../../benchmarks/relate_bench.rs"
 harness = false
 
 [[example]]

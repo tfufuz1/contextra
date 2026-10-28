@@ -100,7 +100,7 @@ fn test_golden_json_v1_v2_v3_serde_roundtrip() {
         scope.clone(),
         vec![b"key_a".to_vec()],
         TxId(20),
-        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()],
+        vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
         vec![ExcludedScope::LlmParameterMemory],
         b"hmac_key_32_bytes_long_secret!!",
     )
@@ -125,7 +125,7 @@ fn test_golden_json_v1_v2_v3_serde_roundtrip() {
         scope,
         vec![b"key_a".to_vec()],
         TxId(30),
-        vec![LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap()],
+        vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
         vec![ExcludedScope::LlmParameterMemory],
         1700000000,
         &[],
