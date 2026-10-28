@@ -361,8 +361,8 @@ async fn test_hnsw_rebuild_exponential_backoff_and_alarm() {
 
     drop(cnts);
 
-    // Wait for exponential backoff cooldown (400ms) to expire
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    // Wait for exponential backoff cooldown to expire
+    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
     // Rebuild after cooldown expires -> succeeds
     index

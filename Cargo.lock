@@ -1316,6 +1316,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "bincode",
+ "blake3",
  "contextra-crypto",
  "contextra-mvcc",
  "contextra-ports",
@@ -1334,6 +1335,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]

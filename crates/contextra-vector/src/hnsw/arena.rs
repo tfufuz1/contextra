@@ -293,6 +293,43 @@ impl HnswArena {
         false
     }
 
+    /// Zeroizes connection memory for a node slot across all layers, clears counts,
+    /// and then marks the node's slot as free in the free_list.
+    pub fn zeroize_and_free_node(&self, ram_idx: usize, max_layer: usize, m: usize) {
+        let offsets = self.offsets.read();
+        let count_offsets = self.count_offsets.read();
+        let mut counts = self.counts.write();
+        let mut arena = self.arena.write();
+
+        if ram_idx < offsets.len() && ram_idx < count_offsets.len() {
+            let node_offset = offsets[ram_idx];
+            let count_start = count_offsets[ram_idx];
+            let count_end = if ram_idx + 1 < count_offsets.len() {
+                count_offsets[ram_idx + 1]
+            } else {
+                counts.len()
+            };
+
+            for layer in 0..=max_layer {
+                if count_start + layer < count_end {
+                    let l_offset = Self::layer_offset(node_offset, layer, m);
+                    let layer_cap = if layer == 0 { m * 2 } else { m };
+                    if l_offset + layer_cap <= arena.len() {
+                        use zeroize::Zeroize;
+                        arena[l_offset..l_offset + layer_cap].zeroize();
+                    }
+                    counts[count_start + layer] = 0;
+                }
+            }
+        }
+        drop(offsets);
+        drop(count_offsets);
+        drop(counts);
+        drop(arena);
+
+        self.free_node(ram_idx);
+    }
+
     /// Marks a node's slot as free for future slot reuse.
     pub fn free_node(&self, ram_idx: usize) {
         let offsets = self.offsets.read();

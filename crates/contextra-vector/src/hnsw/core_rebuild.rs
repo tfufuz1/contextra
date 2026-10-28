@@ -26,6 +26,16 @@ fn set_last_rebuild_nanos(core: &HnswIndexCore, nanos: u64) {
     map.insert(key, nanos);
 }
 
+impl Drop for HnswIndexCore {
+    fn drop(&mut self) {
+        let key = self as *const _ as usize;
+        let mut guard = LAST_REBUILD_MAP.lock();
+        if let Some(map) = guard.as_mut() {
+            map.remove(&key);
+        }
+    }
+}
+
 fn default_clock() -> &'static contextra_ports::SystemClock {
     static CLOCK: std::sync::OnceLock<contextra_ports::SystemClock> = std::sync::OnceLock::new();
     CLOCK.get_or_init(contextra_ports::SystemClock::new)
