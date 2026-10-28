@@ -81,20 +81,6 @@ impl McpServer {
                     .await
                     .map_err(McpError::from)?;
 
-                #[cfg(feature = "kv-bridge")]
-                if let Some(ref bridge) = self.kv_bridge {
-                    for res in &results {
-                        let chunk_id = DocId::from_key(&res.id).map(|d| d.inner()).unwrap_or(0);
-                        let text = res
-                            .metadata
-                            .as_ref()
-                            .and_then(|m| m.get("text").or_else(|| m.get("content")))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("");
-                        let segment = contextra_ports::ContextSegment::new(chunk_id, text);
-                        bridge.consult_segment(&segment);
-                    }
-                }
 
                 let mut enriched_results = Vec::with_capacity(results.len());
                 for res in results {

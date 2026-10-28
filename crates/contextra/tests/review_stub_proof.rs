@@ -29,25 +29,10 @@ fn test_tdel_2_proof_with_remaining_items_must_fail() {
         res_verify
     );
 
-    // 3. DeletionProof::create mit einem LayerCleanupProof, der remaining_count > 0 hat, muss Err liefern
-    let scope = DeletionScope::Tenant {
-        tenant_id: TenantId::try_new(1).expect("valid tenant_id"),
-    };
-    let invalid_layer_proof = LayerCleanupProof {
-        layer: DeletionLayer::LsmMemtable,
-        remaining_count: 5,
-    };
-    let proof_res = DeletionProof::create(
-        scope,
-        vec![],
-        TxId::new(1),
-        vec![invalid_layer_proof],
-        vec![],
-        b"proof_key_32_bytes_1234567890123",
-    );
+    // 3. LayerCleanupProof::new_after_verified_empty mit remaining_count > 0 lässt sich gar nicht erst erzeugen
+    let layer_proof_err = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 5);
     assert!(
-        proof_res.is_err(),
-        "T-DEL-2: DeletionProof::create mit remaining_count > 0 in LayerCleanupProof muss Err liefern, lieferte aber {:?}",
-        proof_res
+        layer_proof_err.is_err(),
+        "T-DEL-2: LayerCleanupProof::new_after_verified_empty mit remaining_count > 0 muss Err liefern"
     );
 }

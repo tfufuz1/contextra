@@ -39,3 +39,4 @@ edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning", "c
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
 contextra-infer-candle = { workspace = true }
+contextra-testkit = { workspace = true }

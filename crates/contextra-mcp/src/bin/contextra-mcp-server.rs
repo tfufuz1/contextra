@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let path = std::path::PathBuf::from(val);
             if let Ok(bytes) = std::fs::read(&path) {
                 if let Ok(loaded) =
-                    serde_json::from_slice::<Vec<contextra::router::SlmProfile>>(&bytes)
+                    serde_json::from_slice::<Vec<contextra_router::SlmProfile>>(&bytes)
                 {
                     router_config.profiles = loaded;
                 }

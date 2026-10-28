@@ -261,6 +261,14 @@ impl LsmStorage {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
 
+    pub(crate) fn sstables_arc(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
+        Arc::clone(&self.sstables)
+    }
+
+    pub(crate) fn block_cache(&self) -> Arc<BlockCache> {
+        Arc::clone(&self.block_cache)
+    }
+
     #[doc(hidden)]
     #[cfg(any(test, feature = "test-hooks"))]
     pub fn sstables_for_test(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
