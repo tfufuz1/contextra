@@ -7,7 +7,7 @@ use crate::sandbox::{McpSandbox, SandboxPolicy};
 use crate::validation::is_write_allowed_by_env;
 use contextra::Contextra;
 use contextra_ports::EmbeddingProvider;
-use contextra_types::ContextraError;
+use contextra_types::{ContextraError, TenantId};
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{AsyncWriteExt, BufReader};
@@ -20,6 +20,7 @@ pub struct McpServer {
     pub egress_classifier: Arc<dyn EgressClassifier>,
     pub routing: Option<Arc<RoutingHandle>>,
     pub plugin_registry: Option<Arc<contextra_ports::plugin::PluginRegistry>>,
+    pub tenant_id: Option<TenantId>,
 }
 
 impl McpServer {
@@ -52,6 +53,7 @@ impl McpServer {
         embedder: Arc<dyn EmbeddingProvider>,
         sandbox: Arc<McpSandbox>,
     ) -> Self {
+        let tenant_id = TenantId::try_new(1).ok();
         Self {
             db,
             embedder,
@@ -60,7 +62,13 @@ impl McpServer {
             egress_classifier: Arc::new(DefaultEgressClassifier::default()),
             routing: None,
             plugin_registry: None,
+            tenant_id,
         }
+    }
+
+    pub fn with_tenant_id(mut self, tenant_id: Option<TenantId>) -> Self {
+        self.tenant_id = tenant_id;
+        self
     }
 
     pub fn with_injection_guard(mut self, injection_guard: Arc<PromptInjectionGuard>) -> Self {

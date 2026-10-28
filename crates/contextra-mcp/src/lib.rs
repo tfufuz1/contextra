@@ -12,10 +12,10 @@
 //! | `contextra_explain` | `DatabaseRead` | Provenance breakdown & retrieval explanation |
 //! | `contextra_insert` | `DatabaseWrite` | Store a document with auto-chunking & auto-embedding |
 //! | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
-//! | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
-//! | `contextra_forget` | `DatabaseWrite` | Delete document/collection with DeletionProof |
+//! | `contextra_delete` | `DatabaseWrite` | Delete single document without measured deletion proof |
+//! | `contextra_forget` | `DatabaseWrite` | Delete document (unverified) or drop collection (with verified proof) |
 //! | `contextra_create_collection` | `DatabaseWrite` | Create collection with specified DeploymentTier |
-//! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
+//! | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection and issue a verified DeletionProof |
 
 pub mod bulk_exfiltration_detector;
 pub mod config;

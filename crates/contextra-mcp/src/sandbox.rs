@@ -41,10 +41,10 @@ pub struct ToolDefinition {
 /// | `contextra_explain` | `DatabaseRead` | Retrieval explanation and provenance breakdown |
 /// | `contextra_insert` | `DatabaseWrite` | Store document (auto-embedding, auto-chunking) |
 /// | `contextra_upsert` | `DatabaseWrite` | Insert/update document idempotently by key |
-/// | `contextra_delete` | `DatabaseWrite` | Delete document & issue DeletionProof v3 |
-/// | `contextra_forget` | `DatabaseWrite` | Delete document or entire collection |
+/// | `contextra_delete` | `DatabaseWrite` | Delete document without measured proof |
+/// | `contextra_forget` | `DatabaseWrite` | Delete document or drop collection with verified DeletionProof |
 /// | `contextra_create_collection` | `DatabaseWrite` | Create collection with DeploymentTier |
-/// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection with DeletionProof |
+/// | `contextra_drop_collection` | `DatabaseWrite` | Delete entire collection and issue a verified DeletionProof |
 pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_search",
@@ -91,7 +91,7 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_forget",
         category: ToolCategory::DatabaseWrite,
-        description: "Delete a document or an entire collection with GDPR DeletionProof export.",
+        description: "Delete a document (unverified) or drop an entire collection (with verified DeletionProof export).",
         input_schema: || json!({
             "type": "object",
             "properties": {
@@ -143,7 +143,7 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_delete",
         category: ToolCategory::DatabaseWrite,
-        description: "Delete a document with HNSW neighborhood graph repair and issue a cryptographic DeletionProof.",
+        description: "Delete a single document without measured deletion proof.",
         input_schema: || json!({
             "type": "object",
             "properties": {
@@ -169,7 +169,7 @@ pub const TOOL_REGISTRY: &[ToolDefinition] = &[
     ToolDefinition {
         name: "contextra_drop_collection",
         category: ToolCategory::DatabaseWrite,
-        description: "Delete an entire collection and issue a collection-wide cryptographic DeletionProof.",
+        description: "Delete an entire collection and issue a verified collection-wide cryptographic DeletionProof.",
         input_schema: || json!({
             "type": "object",
             "properties": {
