@@ -13,15 +13,15 @@
 //! ## Ausführung
 //! `cargo run -p contextra-db --example verify_deletion_proof_external`
 
-#![allow(deprecated)]
-
 use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
-    LayerCleanupProof,
+    CustodyLevel, DeletionProof, DeletionProofKeyPair, ExcludedScope,
 };
 use contextra_crypto::CryptoError;
 use contextra_db::{Contextra, ContextraConfig};
-use contextra_types::{CollectionId, TenantId, TxId};
+use contextra_ports::scanner::ScanTechnique;
+use contextra_ports::SystemClock;
+use contextra_testkit::mint_witness_for_tests;
+use contextra_types::{RequestContext, SagaRecord, TenantId, TxId};
 use ed25519_dalek::VerifyingKey;
 use std::fs;
 use std::path::Path;
@@ -101,43 +101,32 @@ async fn run_operator_role(
         .drop_collection(col_name, tenant_id, proof_key_hmac)
         .await?;
 
-    // Erzeuge Ed25519-Löschnachweis (Version 3) für den externen Prüfer
-    let col_id = CollectionId::new(100);
-    let scope = DeletionScope::Collection {
-        collection_id: col_id,
-        tenant_id,
-    };
+    // Erzeuge Ed25519-Löschnachweis (Version 5 gemessen via Witnesses) für den externen Prüfer
+    let clock = SystemClock::new();
+    let req_ctx = RequestContext::new(tenant_id, TxId::new(105));
+    let saga = SagaRecord::new([0x42; 32]);
 
-    let layer_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)?,
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)?,
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)?,
+    let witnesses = vec![
+        mint_witness_for_tests("LsmMemtable", 10, 0, ScanTechnique::Structural),
+        mint_witness_for_tests("SsTableAllLevels", 50, 0, ScanTechnique::Structural),
+        mint_witness_for_tests("WalAllSegments", 100, 0, ScanTechnique::Structural),
+        mint_witness_for_tests("HnswIndex", 0, 0, ScanTechnique::FeatureDisabled),
     ];
 
-    let graph_repair = vec![contextra_crypto::deletion_proof::GraphRepairAttestation {
-        doc_id: contextra_types::DocId::new(101),
-        verified_no_ghost_pointers: true,
-        attested_at: 1700000000,
-    }];
-
-    let proof_v3 = DeletionProof::create_v3(
-        scope,
-        vec![
-            format!("__col:{col_name}:user_101").into_bytes(),
-            format!("__txt:{col_name}:user_101").into_bytes(),
-        ],
-        TxId::new(105),
-        layer_proofs,
-        vec![ExcludedScope::LlmParameterMemory],
-        1700000000,
-        &graph_repair,
+    let proof_v5 = DeletionProof::issue(
+        &req_ctx,
+        &saga,
+        &witnesses,
+        &[ExcludedScope::LlmParameterMemory],
+        CustodyLevel::Sovereign,
         keypair.signing_key(),
+        &clock,
     )?;
 
-    println!("  [Betreiber] Physische Löschung abgeschlossen. Ed25519 DeletionProof (v3) erzeugt.");
+    println!("  [Betreiber] Physische Löschung abgeschlossen. Ed25519 DeletionProof (v5) erzeugt.");
 
     // 5. "Veröffentlichen": DeletionProof & öffentlichen Schlüssel in Dateien schreiben
-    let proof_json = proof_v3.export_for_audit()?;
+    let proof_json = proof_v5.export_for_audit()?;
     fs::write(proof_file_path, &proof_json).expect("Failed to write proof file");
     fs::write(pubkey_file_path, &verifying_key_bytes).expect("Failed to write pubkey file");
 

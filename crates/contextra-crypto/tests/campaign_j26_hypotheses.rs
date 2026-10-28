@@ -577,8 +577,8 @@ fn test_h6_deletion_proof_v3_validation_suite() {
         attested_at: 1700000000,
     }];
     let cleanup_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+        LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
     ];
 
     let proof_x = DeletionProof::create_v3(
@@ -636,11 +636,36 @@ fn test_h6_deletion_proof_v3_validation_suite() {
         .verify_external(&keypair.verifying_key)
         .is_err());
 
-    // (e) LayerCleanupProof non-empty rejection
-    assert!(
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 5).is_err(),
-        "LayerCleanupProof MUST reject remaining live entries > 0"
-    );
+    // (e) LayerCleanupProof non-empty rejection via DeletionProof::issue
+    {
+        use contextra_ports::scanner::ScanTechnique;
+        use contextra_ports::SystemClock;
+        use contextra_testkit::mint_witness_for_tests;
+        use contextra_types::{RequestContext, SagaRecord};
+
+        let clock = SystemClock::new();
+        let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId(100));
+        let saga = SagaRecord::new([0xAA; 32]);
+        let hmac_key = b"secret_hmac_key_32_bytes_long!!";
+
+        let w_remaining = vec![
+            mint_witness_for_tests("LsmMemtable", 10, 5, ScanTechnique::Structural),
+            mint_witness_for_tests("SsTableAllLevels", 50, 0, ScanTechnique::Structural),
+            mint_witness_for_tests("WalAllSegments", 100, 0, ScanTechnique::Structural),
+        ];
+        assert!(
+            DeletionProof::issue(
+                &ctx,
+                &saga,
+                &w_remaining,
+                &[ExcludedScope::LlmParameterMemory],
+                contextra_crypto::deletion_proof::CustodyLevel::Local,
+                hmac_key.as_slice(),
+                &clock,
+            ).is_err(),
+            "DeletionProof::issue MUST reject remaining live entries > 0"
+        );
+    }
 
     // (f) WAL delete receipt compute & verify roundtrip + tampering
     let integrity_key = b"wal-integrity-key-32-bytes-ok!";
