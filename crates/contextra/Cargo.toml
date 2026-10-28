@@ -30,6 +30,8 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+contextra-crypto = { workspace = true }
+contextra-testkit = { workspace = true }
 
 [features]
 default = ["embedded"]

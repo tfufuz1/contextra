@@ -3,7 +3,7 @@
 //! Integration tests for GDPR Art. 17 DeletionProof generation during collection drop.
 
 use contextra_db::{Contextra, ContextraConfig};
-use contextra_engine::{DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof};
+use contextra_crypto::deletion_proof::{DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof};
 use contextra_ports::StorageEngine;
 use contextra_types::{CollectionId, DistanceMetric, TenantId, TxId};
 use serde_json::json;
@@ -228,17 +228,9 @@ async fn test_deleted_keys_hash_is_deterministic() {
         b"__col:test_col:\x00doc_c".to_vec(),
     ];
 
-    // LayerCleanupProof Erzeugung via verify_and_create:
-    let lsm_proof_1 = LayerCleanupProof::verify_and_create(
-        DeletionLayer::LsmMemtable,
-        || Ok(true), // Test-Stub, KEINE echte Verifikation
-    )
-    .expect("lsm proof 1");
-    let sstable_proof_1 = LayerCleanupProof::verify_and_create(
-        DeletionLayer::SsTableAllLevels,
-        || Ok(true), // Test-Stub, KEINE echte Verifikation
-    )
-    .expect("sstable proof 1");
+    // LayerCleanupProof Erzeugung via for_test:
+    let lsm_proof_1 = LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
+    let sstable_proof_1 = LayerCleanupProof::for_test(DeletionLayer::SsTableAllLevels);
 
     let proof_1 = DeletionProof::create(
         scope.clone(),
@@ -250,16 +242,8 @@ async fn test_deleted_keys_hash_is_deterministic() {
     )
     .expect("create proof 1");
 
-    let lsm_proof_2 = LayerCleanupProof::verify_and_create(
-        DeletionLayer::LsmMemtable,
-        || Ok(true), // Test-Stub, KEINE echte Verifikation
-    )
-    .expect("lsm proof 2");
-    let sstable_proof_2 = LayerCleanupProof::verify_and_create(
-        DeletionLayer::SsTableAllLevels,
-        || Ok(true), // Test-Stub, KEINE echte Verifikation
-    )
-    .expect("sstable proof 2");
+    let lsm_proof_2 = LayerCleanupProof::for_test(DeletionLayer::LsmMemtable);
+    let sstable_proof_2 = LayerCleanupProof::for_test(DeletionLayer::SsTableAllLevels);
 
     let proof_2 = DeletionProof::create(
         scope,

@@ -5,7 +5,7 @@
 #![forbid(unsafe_code)]
 
 use contextra_crypto::{
-    compute_record_commitment, AuditChain, DataClass, DeletionLayer, DeletionProof,
+    compute_record_commitment, AuditChain, CustodyLevel, DataClass, DeletionLayer, DeletionProof,
     DeletionProofKeyPair, DeletionScope, EncryptedCommitmentSalt, ExcludedScope, KeyManager,
     KeyRegistry, LayerCleanupProof,
 };

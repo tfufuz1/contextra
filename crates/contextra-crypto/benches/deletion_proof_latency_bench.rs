@@ -36,10 +36,8 @@ fn bench_deletion_proof_creation_latency(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(num_keys), &num_keys, |b, _| {
             b.iter(|| {
                 let cleanup_proofs = vec![
-                    Ok(LayerCleanupProof::for_test(DeletionLayer::LsmMemtable))
-                        .unwrap(),
-                    Ok(LayerCleanupProof::for_test(DeletionLayer::HnswIndex))
-                        .unwrap(),
+                    LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+                    LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
                 ];
                 DeletionProof::create_with_wal_receipt(
                     black_box(scope.clone()),
@@ -126,10 +124,8 @@ fn bench_deletion_proof_full_issuance_latency(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(num_keys), &num_keys, |b, _| {
             b.iter(|| {
                 let cleanup_proofs = vec![
-                    Ok(LayerCleanupProof::for_test(DeletionLayer::LsmMemtable))
-                        .unwrap(),
-                    Ok(LayerCleanupProof::for_test(DeletionLayer::HnswIndex))
-                        .unwrap(),
+                    LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+                    LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
                 ];
                 let proof = DeletionProof::create_with_wal_receipt(
                     black_box(scope.clone()),
