@@ -15,6 +15,8 @@
 
 mod index_struct;
 mod morph_index;
+pub mod purge;
+pub mod scanner;
 mod types;
 
 #[cfg(test)]
@@ -22,4 +24,6 @@ mod tests;
 
 pub use index_struct::InvertedIndex;
 pub use morph_index::BM25MorphIndex;
+pub use purge::{text_purger, TextPurger};
+pub use scanner::{text_scanner, ParsedTextTarget, TextScanner};
 pub use types::{Language, TextIndexMetadata};
