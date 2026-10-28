@@ -9,7 +9,6 @@
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
-#![allow(ambiguous_glob_reexports)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod error;

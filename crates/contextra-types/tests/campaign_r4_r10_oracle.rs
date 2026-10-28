@@ -26,11 +26,12 @@ fn test_tx_id_monotonicity_oracle() {
 }
 
 #[test]
-fn test_tenant_id_system_reservation_oracle() {
+fn test_tenant_id_system_reservation_oracle() -> Result<(), Box<dyn std::error::Error>> {
     // Oracle Source: System Specification invariant (TenantId(0) is reserved for SYSTEM)
     let sys_tenant = TenantId::SYSTEM;
-    let user_tenant = TenantId::try_new(1).unwrap();
+    let user_tenant = TenantId::try_new(1)?;
 
     assert_eq!(sys_tenant.inner(), 0);
     assert_ne!(sys_tenant, user_tenant);
+    Ok(())
 }
