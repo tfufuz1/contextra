@@ -1,7 +1,9 @@
 #![forbid(unsafe_code)]
 
 #[cfg(feature = "experimental-diskann")]
-use contextra_types::{DocId, Result};
+use contextra_ports::vector_index::VectorIndex;
+#[cfg(feature = "experimental-diskann")]
+use contextra_types::{ContextraError, DocId, Result, TxId};
 #[cfg(feature = "experimental-diskann")]
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnIndex};
 #[cfg(feature = "experimental-diskann")]
@@ -21,7 +23,7 @@ async fn test_diskann_docid128_tombstones_handling() -> Result<()> {
         ..Default::default()
     };
 
-    let index = DiskAnnIndex::try_new(config)?;
+    let index = DiskAnnIndex::try_new(config.clone())?;
 
     // Construct two 128-bit IDs that differ strictly in the upper 64 bits
     #[cfg(feature = "docid-128")]
@@ -45,12 +47,36 @@ async fn test_diskann_docid128_tombstones_handling() -> Result<()> {
     assert!(all_before.contains(&id2));
 
     // Delete id1 only
-    index.delete(contextra_types::TxId(1), id1).await?;
+    index.delete(TxId(1), id1).await?;
 
     let all_after = index.all_doc_ids().await?;
     assert_eq!(all_after.len(), 1);
     assert!(!all_after.contains(&id1));
     assert!(all_after.contains(&id2));
+
+    // Repeating delete on id1 returns NotFound (idempotent / already deleted)
+    let re_delete_res = index.delete(TxId(2), id1).await;
+    assert!(matches!(re_delete_res, Err(ContextraError::NotFound(_))));
+
+    // Deleting unknown ID returns NotFound
+    #[cfg(feature = "docid-128")]
+    let unknown_id = DocId::from(0x9_0000_0000_0000_0000_u128 | 999_u128);
+    #[cfg(not(feature = "docid-128"))]
+    let unknown_id = DocId::from(9999_u64);
+
+    let delete_unknown_res = index.delete(TxId(3), unknown_id).await;
+    assert!(matches!(delete_unknown_res, Err(ContextraError::NotFound(_))));
+
+    // Tombstone persistence after delta persist & reload
+    index.persist_delta().await?;
+
+    let reloaded_index = DiskAnnIndex::try_new(config)?;
+    reloaded_index.load().await?;
+
+    let all_reloaded = reloaded_index.all_doc_ids().await?;
+    assert_eq!(all_reloaded.len(), 1);
+    assert!(!all_reloaded.contains(&id1));
+    assert!(all_reloaded.contains(&id2));
 
     Ok(())
 }
