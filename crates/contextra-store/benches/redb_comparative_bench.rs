@@ -69,7 +69,8 @@ fn setup_redb_table(db: &Database) {
     let mut write_txn = db.begin_write().unwrap();
     write_txn.set_durability(Durability::Immediate);
     {
-        let _ = write_txn.open_table(REDB_TABLE).unwrap();
+        let mut tbl = write_txn.open_table(REDB_TABLE).unwrap();
+        drop(tbl);
     }
     write_txn.commit().unwrap();
 }

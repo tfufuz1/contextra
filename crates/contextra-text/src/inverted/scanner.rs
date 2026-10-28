@@ -166,10 +166,10 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
 
         // Clean up canary document from scratch namespace
         let scratch_c = scratch_index_arc.clone();
-        let _ = block_on_async(async move {
+        let _res_cleanup = block_on_async(async move {
             let tx_del = TxId::new(999_999_998);
             for (k, _) in raw_entries {
-                let _ = scratch_c.storage().delete(tx_del, &k).await;
+                let _res_del = scratch_c.storage().delete(tx_del, &k).await;
             }
             scratch_c.commit(tx_del).await
         });

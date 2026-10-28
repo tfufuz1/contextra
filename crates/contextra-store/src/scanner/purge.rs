@@ -45,7 +45,7 @@ impl Purger for LsmPurger {
 
         block_on_future(async {
             // 2. Erzwungener Flush der Memtables in SSTables
-            let _ = self.storage.flush().await;
+            let _res_flush = self.storage.flush().await;
 
             // 3. SSTables filtern / neu schreiben ohne Target-Records
             let readers = self.storage.sstables_for_scanner().await;
@@ -121,7 +121,7 @@ impl Purger for LsmPurger {
                 if let Ok(metadata) = tokio::fs::metadata(&old_path).await {
                     let len = metadata.len();
                     let zeros = vec![0u8; len as usize];
-                    let _ = tokio::fs::write(&old_path, zeros).await;
+                    let _res_w = tokio::fs::write(&old_path, zeros).await;
                     if tokio::fs::remove_file(&old_path).await.is_ok() {
                         bytes_freed += len;
                     }
@@ -173,7 +173,7 @@ impl Purger for LsmPurger {
                                 if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {
                                     let len = metadata.len();
                                     let zeros = vec![0u8; len as usize];
-                                    let _ = tokio::fs::write(&wal_path, zeros).await;
+                                    let _res_w = tokio::fs::write(&wal_path, zeros).await;
                                     let _ = tokio::fs::remove_file(&wal_path).await;
                                     bytes_freed += len;
                                 }
@@ -193,7 +193,7 @@ impl Purger for LsmPurger {
                                     if let Ok(metadata) = tokio::fs::metadata(&wal_path).await {
                                         let len = metadata.len();
                                         let zeros = vec![0u8; len as usize];
-                                        let _ = tokio::fs::write(&wal_path, zeros).await;
+                                        let _res_w = tokio::fs::write(&wal_path, zeros).await;
                                     }
                                     let _ = tokio::fs::rename(&tmp_wal_path, &wal_path).await;
                                 }

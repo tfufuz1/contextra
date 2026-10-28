@@ -87,7 +87,7 @@ async fn systematic_crash_at_every_wal_io_point() {
 
                     if let Ok(data) = tokio::fs::read(&wal_file).await {
                         let truncated = &data[..cutoff.min(data.len())];
-                        let _ = tokio::fs::write(&wal_file, truncated).await;
+                        let res_w = tokio::fs::write(&wal_file, truncated).await;
                     }
                 }
             }
@@ -189,7 +189,7 @@ async fn crash_exactly_at_fsync_after_commit_marker() {
         // Simulate crash right at or before the final commit marker byte alignment
         if data.len() > 4 {
             let partial = &data[..data.len().saturating_sub(4)];
-            let _ = tokio::fs::write(&wal_file, partial).await;
+            let res_w = tokio::fs::write(&wal_file, partial).await;
         }
     }
 

@@ -56,7 +56,7 @@ async fn test_k2_flush_swap_race_crash_recovery() {
 
     let (commit_res, flush_res) = tokio::join!(commit_task, flush_task);
     commit_res.unwrap().unwrap();
-    let _ = flush_res;
+    let res_f = flush_res;
 
     DELAY_APPEND_FOR_TX.store(0, Ordering::SeqCst);
     DELAY_APPEND_MS.store(0, Ordering::SeqCst);
@@ -102,7 +102,7 @@ async fn test_k2_k3_64_parallel_writers_with_repeated_flushes() {
     let flush_handle = tokio::spawn(async move {
         for _ in 0..10 {
             tokio::time::sleep(Duration::from_millis(5)).await;
-            let _ = st_flush.force_flush().await;
+            let res_f = st_flush.force_flush().await;
         }
     });
 
@@ -110,7 +110,7 @@ async fn test_k2_k3_64_parallel_writers_with_repeated_flushes() {
     for h in handles {
         expected_kvs.push(h.await.unwrap());
     }
-    let _ = flush_handle.await;
+    let res_h = flush_handle.await;
 
     drop(storage);
 

@@ -177,7 +177,8 @@ async fn test_h_snippet_with_embedded_instruction_isolated_in_untrusted_context(
     let gen = Arc::new(FakeGenerator::with_response("1. safe subquery"));
     let rewriter = LlmQueryRewriter::new(gen.clone());
 
-    let _ = rewriter.rewrite("my search", &[search_res]).await?;
+    let rewritten = rewriter.rewrite("my search", &[search_res]).await?;
+    drop(rewritten);
 
     let prompt = gen.captured_prompt().ok_or("prompt should be captured")?;
 

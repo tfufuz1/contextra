@@ -314,7 +314,7 @@ async fn test_path_rag_at_concurrent_mutations_isolation() {
         while writer_running.load(Ordering::SeqCst) {
             let tx = TxId::new(tx_counter);
             let next_e = EntityId::new(6000 + tx_counter);
-            let _ = writer_graph
+            let res_e = writer_graph
                 .add_entity(tx, Entity::new(next_e, "dyn", "Node"))
                 .await;
             let _ = GraphIndex::add_edge(
@@ -323,7 +323,7 @@ async fn test_path_rag_at_concurrent_mutations_isolation() {
                 Edge::new(e2, next_e, "rel").with_weight(0.8),
             )
             .await;
-            let _ = writer_graph.commit(tx).await;
+            let res_c = writer_graph.commit(tx).await;
             tx_counter += 1;
             tokio::task::yield_now().await;
         }
@@ -340,5 +340,5 @@ async fn test_path_rag_at_concurrent_mutations_isolation() {
     }
 
     running.store(false, Ordering::SeqCst);
-    let _ = writer_handle.await;
+    let res_wh = writer_handle.await;
 }

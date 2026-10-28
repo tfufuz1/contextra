@@ -138,7 +138,7 @@ async fn child_writer() {
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_millis(5)).await;
-            let _ = storage_flush.force_flush().await;
+            let res_f = storage_flush.force_flush().await;
         }
     });
 

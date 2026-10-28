@@ -103,7 +103,7 @@ async fn systematic_crash_at_every_checkpoint_io_point() {
 
                     if let Ok(data) = tokio::fs::read(&wal_file).await {
                         let truncated = &data[..cutoff.min(data.len())];
-                        let _ = tokio::fs::write(&wal_file, truncated).await;
+                        let res_w = tokio::fs::write(&wal_file, truncated).await;
                     }
                 }
             }

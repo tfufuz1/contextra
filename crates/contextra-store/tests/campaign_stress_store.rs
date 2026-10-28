@@ -215,7 +215,7 @@ async fn test_campaign_commit_rollback_flush_interleaving_32_tasks() {
                         }
                         _ => {
                             // Flush trigger
-                            let _ = s_clone.force_flush().await;
+                            let res_f = s_clone.force_flush().await;
                         }
                     }
                 }

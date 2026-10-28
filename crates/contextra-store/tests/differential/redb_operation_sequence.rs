@@ -149,9 +149,10 @@ async fn run_differential_with_config(
             .begin_write()
             .map_err(|e| TestCaseError::fail(e.to_string()))?;
         {
-            let _ = write_txn
+            let mut tbl = write_txn
                 .open_table(TABLE)
                 .map_err(|e| TestCaseError::fail(e.to_string()))?;
+            drop(tbl);
         }
         write_txn
             .commit()
@@ -407,9 +408,10 @@ async fn run_differential_large(ops: Vec<Op>) -> Result<(), TestCaseError> {
             .begin_write()
             .map_err(|e| TestCaseError::fail(e.to_string()))?;
         {
-            let _ = write_txn
+            let mut tbl = write_txn
                 .open_table(TABLE)
                 .map_err(|e| TestCaseError::fail(e.to_string()))?;
+            drop(tbl);
         }
         write_txn
             .commit()
@@ -686,9 +688,10 @@ async fn run_concurrent_differential(tasks_ops: Vec<Vec<SimpleOp>>) -> Result<()
             .begin_write()
             .map_err(|e| TestCaseError::fail(e.to_string()))?;
         {
-            let _ = write_txn
+            let mut tbl = write_txn
                 .open_table(TABLE)
                 .map_err(|e| TestCaseError::fail(e.to_string()))?;
+            drop(tbl);
         }
         write_txn
             .commit()
@@ -830,7 +833,8 @@ async fn differential_redb_concurrent_compaction_under_load() {
     {
         let write_txn = redb_db.begin_write().unwrap();
         {
-            let _ = write_txn.open_table(TABLE).unwrap();
+            let mut tbl = write_txn.open_table(TABLE).unwrap();
+            drop(tbl);
         }
         write_txn.commit().unwrap();
     }
@@ -913,7 +917,7 @@ async fn differential_redb_concurrent_compaction_under_load() {
                         let _ = st.get(&k).await;
                     }
                     Op::Flush => {
-                        let _ = st.force_flush().await;
+                        let res_f = st.force_flush().await;
                     }
                     Op::Compact => {
                         let _ = st.maybe_compact().await;
