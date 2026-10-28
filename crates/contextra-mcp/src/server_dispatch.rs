@@ -168,7 +168,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_forget",
-                            "description": "Delete a document or an entire collection with GDPR DeletionProof export.",
+                            "description": "Delete a document (unverified) or drop an entire collection (with verified DeletionProof export).",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -216,7 +216,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_delete",
-                            "description": "Delete a document with HNSW neighborhood graph repair and issue a cryptographic DeletionProof.",
+                            "description": "Delete a single document without measured deletion proof.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {
@@ -241,7 +241,7 @@ impl McpServer {
                         },
                         {
                             "name": "contextra_drop_collection",
-                            "description": "Delete an entire collection and issue a collection-wide cryptographic DeletionProof.",
+                            "description": "Delete an entire collection and issue a verified collection-wide cryptographic DeletionProof.",
                             "inputSchema": {
                                 "type": "object",
                                 "properties": {

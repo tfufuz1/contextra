@@ -274,9 +274,14 @@ async fn test_contextra_forget_single_doc() {
     let text = res_f["result"]["content"][0]["text"].as_str().unwrap();
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
     assert_eq!(json_res["ok"], true);
+    assert_eq!(json_res["deleted"], true);
+    assert_eq!(json_res["verified"], false);
     assert_eq!(json_res["id"], "forget_doc_1");
     assert_eq!(json_res["proof"], serde_json::Value::Null);
-    assert_eq!(json_res["proof_scope"], "collection_only");
+    assert_eq!(
+        json_res["reason"],
+        "Schichteigene Messung für Einzel-Dokument-Löschung nicht angebunden"
+    );
 
     // 4. Verify contextra_get returns null
     let get_req = make_request(
@@ -348,8 +353,9 @@ async fn test_contextra_forget_collection_with_proof() {
     let text = res_drop["result"]["content"][0]["text"].as_str().unwrap();
     let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
     assert_eq!(json_res["ok"], true);
+    assert_eq!(json_res["deleted"], true);
+    assert_eq!(json_res["verified"], true);
     assert_eq!(json_res["collection"], col_name);
-    assert_eq!(json_res["proof_scope"], "collection");
 
     let proof_val = &json_res["proof"];
     let proof: contextra_crypto::deletion_proof::DeletionProof =

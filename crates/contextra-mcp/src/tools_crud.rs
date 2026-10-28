@@ -2,10 +2,7 @@ use crate::protocol::McpError;
 use crate::server::McpServer;
 use crate::validation::validate_collection_name;
 use contextra::collection_profile::DeploymentTier;
-use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof,
-};
-use contextra_types::{DocId, TenantId, TxId};
+use contextra_types::TenantId;
 use serde_json::{json, Value};
 
 impl McpServer {
@@ -90,7 +87,7 @@ impl McpServer {
         }))
     }
 
-    /// Handler für `contextra_drop_collection` — Löscht eine gesamte Collection und stellt einen collection-weiten Löschbeweis aus.
+    /// Handler für `contextra_drop_collection` — Löscht eine gesamte Collection und stellt einen gemessenen collection-weiten Löschbeweis aus.
     pub(crate) async fn handle_drop_collection(&self, args: &Value) -> Result<Value, McpError> {
         let col_name = match args.get("collection").or_else(|| args.get("name")) {
             Some(col_val) => {
@@ -120,15 +117,18 @@ impl McpServer {
             ));
         }
 
+        // Key preflight check: Fail BEFORE deletion if no key is configured
         let proof_key = crate::proof_key_env::resolve_proof_key_from_env()
             .key
             .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
 
-        let tenant_id = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
+        let tenant_id = self
+            .tenant_id
+            .ok_or_else(|| McpError::invalid_params("tenant_id not configured on server"))?;
 
         let proof = self
             .db
-            .drop_collection(col_name, tenant_id, proof_key.as_bytes())
+            .drop_collection(col_name, tenant_id, proof_key.trim().as_bytes())
             .await
             .map_err(McpError::from)?;
 
@@ -140,13 +140,16 @@ impl McpServer {
 
         Ok(json!({
             "ok": true,
+            "deleted": true,
+            "verified": true,
             "collection": col_name,
             "proof": proof_val,
-            "proof_scope": "collection"
+            "layers": ["LsmMemtable", "SsTableAllLevels"],
+            "excluded": []
         }))
     }
 
-    /// Handler für `contextra_delete` — Löscht ein Dokument und stellt einen kryptografischen Löschbeweis v3 aus.
+    /// Handler für `contextra_delete` — Löscht ein Einzel-Dokument.
     pub(crate) async fn handle_delete(&self, args: &Value) -> Result<Value, McpError> {
         let col_name = if let Some(col_val) = args.get("collection") {
             let s = col_val.as_str().ok_or_else(|| {
@@ -182,56 +185,28 @@ impl McpServer {
             }
         };
 
-        let doc_id = DocId::from_key(id)
-            .map_err(|e| McpError::invalid_params(format!("Invalid document ID '{id}': {e}")))?;
+        // Key preflight check: Must have a valid key before performing deletion
+        let _proof_key = crate::proof_key_env::resolve_proof_key_from_env()
+            .key
+            .ok_or_else(|| McpError::invalid_params("deletion proof key not configured"))?;
+
+        let _tenant_id = self
+            .tenant_id
+            .ok_or_else(|| McpError::invalid_params("tenant_id not configured on server"))?;
 
         let col = self.db.collection(col_name).await.map_err(McpError::from)?;
 
-        // Delete document from collection storage and indices
+        // Perform actual document deletion
         col.delete(id).await.map_err(McpError::from)?;
-
-        let tenant_id = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
-        let scope = DeletionScope::Document { doc_id, tenant_id };
-
-        // Construct layer cleanup proofs confirming 0 remaining live entries
-        let layer_proofs = vec![
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0)
-                .map_err(|e| McpError::internal_error(e.to_string()))?,
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0)
-                .map_err(|e| McpError::internal_error(e.to_string()))?,
-        ];
-
-        let proof_key_res = crate::proof_key_env::resolve_proof_key_from_env();
-        let proof_key = proof_key_res.key.unwrap_or_else(|| {
-            zeroize::Zeroizing::new("default_test_deletion_proof_key_32_bytes!".to_string())
-        });
-        let trimmed_key = proof_key.trim();
-
-        let tx_id = self.db.allocate_tx().unwrap_or(TxId::new(1));
-
-        // Create DeletionProof
-        let proof = DeletionProof::create(
-            scope,
-            vec![id.as_bytes().to_vec()],
-            tx_id,
-            layer_proofs,
-            vec![],
-            trimmed_key.as_bytes(),
-        )
-        .map_err(|e| McpError::internal_error(format!("DeletionProof creation failed: {e}")))?;
-
-        let proof_json_str = proof
-            .export_for_audit()
-            .map_err(|e| McpError::internal_error(e.to_string()))?;
-        let proof_val: Value = serde_json::from_str(&proof_json_str)
-            .map_err(|e| McpError::internal_error(e.to_string()))?;
 
         Ok(json!({
             "ok": true,
+            "deleted": true,
+            "verified": false,
             "collection": col_name,
             "id": id,
-            "proof": proof_val,
-            "proof_scope": "document"
+            "proof": null,
+            "reason": "Schichteigene Messung für Einzel-Dokument-Löschung nicht angebunden"
         }))
     }
 }
