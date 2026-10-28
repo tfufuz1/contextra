@@ -69,7 +69,7 @@ impl SstableScanner {
             if let Ok(mut builder) = SstableBuilder::create(&canary_path).await {
                 if builder.add(canary_key, canary_val, 1, 1).await.is_ok() {
                     if builder.finish().await.is_ok() {
-                        let block_cache = self.storage.block_cache_for_test();
+                        let block_cache = self.storage.block_cache();
                         if let Ok(reader) =
                             SstableReader::open_with_key_manager(&canary_path, block_cache, None)
                                 .await
@@ -147,7 +147,7 @@ impl LayerScanner for SstableScanner {
                         && !active_paths.contains(&path)
                     {
                         // Orphan SSTable gefunden
-                        let block_cache = self.storage.block_cache_for_test();
+                        let block_cache = self.storage.block_cache();
                         if let Ok(orphan_reader) =
                             SstableReader::open_with_key_manager(&path, block_cache, None).await
                         {

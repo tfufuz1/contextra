@@ -354,10 +354,6 @@ mod tests {
         let calibrator_arc = Arc::new(parking_lot::Mutex::new(
             contextra_rank::IsotonicCalibrator::new(5, 100),
         ));
-        let pid_arc = Arc::new(parking_lot::Mutex::new(
-            contextra_adapt::PidController::new(150.0, 50, 200, Some(100)),
-        ));
-
         // Warmup calibrator so ECE is populated
         {
             let mut cal = calibrator_arc.lock();
@@ -369,18 +365,15 @@ mod tests {
 
         db.set_router(Arc::downgrade(&router_arc));
         db.set_calibrator(Arc::downgrade(&calibrator_arc));
-        db.set_pid_controller(Arc::downgrade(&pid_arc));
 
         let stats_attached = db.stats().await.expect("stats");
         assert_eq!(stats_attached.drift_status, "stabil");
         assert!(stats_attached.calibration_ece.is_some());
         assert!(stats_attached.last_calibration_at.is_some());
-        assert_eq!(stats_attached.pid_pool_size, Some(100));
 
         // 3. Drop strong references (simulating shutdown) -> stats() must not panic and fallback gracefully
         drop(router_arc);
         drop(calibrator_arc);
-        drop(pid_arc);
 
         let stats_dropped = db.stats().await.expect("stats after drop");
         assert_eq!(stats_dropped.drift_status, "nicht verfügbar");

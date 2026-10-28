@@ -204,10 +204,7 @@ async fn test_crash_kill_durability() {
     for iter in 1..=num_iters {
         let group_commit_micros: u64 = if rng.gen_bool(0.5) { 0 } else { 2000 };
 
-        #[cfg(feature = "encryption-at-rest")]
         let encrypted = rng.gen_bool(0.5);
-        #[cfg(not(feature = "encryption-at-rest"))]
-        let encrypted = false;
 
         let tmp_dir = TempDir::new().expect("create iteration temp directory");
         let target_ack: u64 = rng.gen_range(5..40);

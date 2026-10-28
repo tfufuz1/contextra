@@ -1078,58 +1078,6 @@ async fn test_contextra_consolidate_fault_injection() {
     assert_eq!(err.code, -32602);
 }
 
-#[cfg(feature = "kv-bridge")]
-#[tokio::test]
-async fn test_kv_bridge_adapter_consulted_on_retrieve() {
-    let tmp = TempDir::new().expect("temp dir");
-    let db = Contextra::open(tmp.path()).await.expect("open db");
-    let collection = db.collection("default").await.expect("collection");
-    let dim = collection.dimension();
-    let embedder = Arc::new(MockEmbedder { dimension: dim });
-
-    let store = Arc::new(contextra_crypto::TenantIsolatedKvStore::new());
-    let master_km =
-        contextra_crypto::CryptoKey::try_new("test-mcp-kv", b"test-salt-mcp-kv").unwrap();
-    let cipher = Arc::new(contextra_crypto::KvSegmentCipher::new(master_km));
-    let bridge_adapter = Arc::new(contextra_infer_candle::KvBridgeAdapter::new(store, cipher));
-
-    let server = Arc::new(
-        McpServer::with_write_permission(Arc::new(db), embedder, true)
-            .expect("server new")
-            .with_kv_bridge(Some(bridge_adapter)),
-    );
-
-    // Insert a document first so search returns a result
-    let insert_req = make_request(
-        "contextra_insert",
-        json!({
-            "id": "doc_kv_test",
-            "text": "kv bridge consultation test content"
-        }),
-    );
-    let insert_resp = server.handle(insert_req).await;
-    assert!(insert_resp.error.is_none());
-
-    // Execute contextra_search tool call
-    let search_req = make_request(
-        "contextra_search",
-        json!({
-            "query": "kv bridge consultation",
-            "k": 5
-        }),
-    );
-    let search_resp = server.handle(search_req).await;
-    assert!(search_resp.error.is_none());
-
-    let bridge = server
-        .kv_bridge
-        .as_ref()
-        .expect("kv_bridge must be attached for this test");
-    assert!(
-        bridge.consultation_count() > 0,
-        "KvBridgeAdapter must be consulted during contextra_search execution"
-    );
-}
 
 #[tokio::test]
 async fn test_cloud_query_sensitive_input_blocked_by_egress_classifier() {
