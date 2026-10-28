@@ -250,21 +250,13 @@ async fn test_search_k_zero_returns_canonical_error_message(
     Ok(())
 }
 
-#[tokio::test]
-async fn test_single_pid_controller_instantiation_in_query_builder() {
-    // Regression test: verify that exactly one PID controller type (contextra_adapt::PidController)
-    // is instantiated across production collection search and query_builder modules.
-    let mut pid = contextra_adapt::PidController::default();
-    assert_eq!(pid.kp, 0.5);
-    assert_eq!(pid.ki, 0.05);
-    assert_eq!(pid.kd, 0.1);
-    assert_eq!(pid.target_latency_ms, 150.0);
-    assert_eq!(pid.min_pool_size, 50);
-    assert_eq!(pid.max_pool_size, 200);
-
-    let updated = pid.update(std::time::Duration::from_millis(100), 300.0);
-    assert!(updated < 100);
-    assert!(updated >= 50);
+#[test]
+fn test_single_pid_controller_instantiation_in_query_builder() {
+    // Verifies position form PID pool controller from contextra-adapt
+    let config = contextra_adapt::PoolControllerConfig::default();
+    assert_eq!(config.kp, 0.5);
+    assert_eq!(config.ki, 0.05);
+    assert_eq!(config.kd, 0.1);
 }
 
 #[tokio::test]

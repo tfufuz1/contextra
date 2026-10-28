@@ -280,112 +280,40 @@ impl Contextra {
         tenant_id: TenantId,
         proof_key: &[u8],
     ) -> Result<DeletionProof> {
-        if name == "default" {
-            return Err(contextra_types::ContextraError::invalid_input(
-                "Cannot drop default collection",
-            ));
+        struct InlineKeyProvider(Vec<u8>);
+        impl contextra_impl::erasure::ProofKeyProvider for InlineKeyProvider {
+            fn resolve_proof_key(&self, _tenant_id: TenantId) -> Result<Vec<u8>> {
+                Ok(self.0.clone())
+            }
         }
 
-        let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
-            self.storage.clone(),
-            tenant_id,
-        );
+        let provider = Arc::new(InlineKeyProvider(proof_key.to_vec()));
+        let mut old_provider = self.proof_key_provider.write();
+        let prev = old_provider.take();
+        *old_provider = Some(provider);
+        drop(old_provider);
 
-        let col_data_prefix = format!("__col:{}:", name);
-        let txt_data_prefix = format!("__txt:{}:", name);
-        let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
+        let report = self.erase_collection(tenant_id, name).await;
 
-        let mut deleted_keys: Vec<Vec<u8>> = Vec::new();
-
-        let col_entries = tenant_storage
-            .scan_prefix(col_data_prefix.as_bytes())
-            .await?;
-        for (k, _) in col_entries {
-            deleted_keys.push(k);
+        if let Some(p) = prev {
+            *self.proof_key_provider.write() = Some(p);
         }
 
-        let txt_entries = tenant_storage
-            .scan_prefix(txt_data_prefix.as_bytes())
-            .await?;
-        for (k, _) in txt_entries {
-            deleted_keys.push(k);
+        let report = report?;
+        if report.verified {
+            report.proof.ok_or_else(|| {
+                contextra_types::ContextraError::Internal(
+                    "ErasureReport was verified but contained no DeletionProof".to_string(),
+                )
+            })
+        } else {
+            let reason = report
+                .failure
+                .map(|f| format!("{}: {}", f.layer, f.reason))
+                .unwrap_or_else(|| "Unknown erasure failure".to_string());
+            Err(contextra_types::ContextraError::Internal(format!(
+                "Collection deletion verification failed: {reason}"
+            )))
         }
-
-        deleted_keys.push(col_idx_key.clone());
-
-        let tx = self.allocate_tx()?;
-
-        tenant_storage
-            .delete_prefix(tx, col_data_prefix.as_bytes())
-            .await?;
-
-        tenant_storage
-            .delete_prefix(tx, txt_data_prefix.as_bytes())
-            .await?;
-
-        tenant_storage.delete(tx, &col_idx_key).await?;
-
-        tenant_storage.commit(tx).await?;
-
-        let remaining_col_data = tenant_storage
-            .scan_prefix(col_data_prefix.as_bytes())
-            .await?;
-        let remaining_txt_data = tenant_storage
-            .scan_prefix(txt_data_prefix.as_bytes())
-            .await?;
-
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(name.as_bytes());
-        let hash_bytes = hasher.finalize();
-        let col_id_u64 =
-            u64::from_le_bytes(hash_bytes.as_bytes()[0..8].try_into().unwrap_or([1; 8]));
-        let collection_id = CollectionId::try_new(col_id_u64).unwrap_or(CollectionId::new(1));
-
-        let scope = DeletionScope::Collection {
-            collection_id,
-            tenant_id,
-        };
-
-        let layer_proofs = vec![
-            LayerCleanupProof::new_after_verified_empty(
-                DeletionLayer::LsmMemtable,
-                remaining_col_data.len(),
-            ),
-            LayerCleanupProof::new_after_verified_empty(
-                DeletionLayer::SsTableAllLevels,
-                remaining_txt_data.len(),
-            ),
-        ]
-        .into_iter()
-        .collect::<Result<Vec<_>>>()
-        .map_err(|e| {
-            contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was physically sanitized and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
-                tx.inner()
-            ))
-        })?;
-
-        let proof = DeletionProof::create(
-            scope,
-            deleted_keys,
-            tx,
-            layer_proofs,
-            vec![],
-            proof_key,
-        )
-        .map_err(|e| {
-            contextra_types::ContextraError::Internal(format!(
-                "CRITICAL: Collection '{name}' was physically sanitized and committed at tx {}, but DeletionProof generation failed: {e}. Data is permanently deleted.",
-                tx.inner()
-            ))
-        })?;
-
-        self.collections.write().await.remove(name);
-        self.tenant_collections
-            .write()
-            .await
-            .remove(&(tenant_id, name.to_string()));
-
-        Ok(proof)
     }
 }
