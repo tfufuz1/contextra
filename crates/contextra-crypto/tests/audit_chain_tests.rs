@@ -186,8 +186,8 @@ fn test_deletion_proof_linked_to_audit_chain_position() {
     };
 
     let cleanup_proofs = vec![
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0).unwrap(),
+        LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+        LayerCleanupProof::for_test(DeletionLayer::SsTableAllLevels),
     ];
 
     let proof = DeletionProof::create_v3_with_audit_position(
@@ -214,13 +214,30 @@ fn test_deletion_proof_linked_to_audit_chain_position() {
 
 #[test]
 fn test_inv_deletion_1_physical_cleanup_enforced() {
-    // LayerCleanupProof fails if remaining live entries exist (> 0)
-    let incomplete_cleanup =
-        LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 1);
-    assert!(incomplete_cleanup.is_err());
+    use contextra_ports::scanner::ScanTechnique;
+    use contextra_ports::SystemClock;
+    use contextra_testkit::mint_witness_for_tests;
+    use contextra_types::{RequestContext, SagaRecord};
 
-    // Verification closure returning false fails
-    let failed_verification =
-        LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(false));
-    assert!(failed_verification.is_err());
+    let clock = SystemClock::new();
+    let ctx = RequestContext::new(TenantId::try_new(1).unwrap(), TxId(100));
+    let saga = SagaRecord::new([0xAA; 32]);
+    let hmac_key = b"secret_hmac_key_32_bytes_long!!";
+
+    // DeletionProof::issue fails if witness has remaining > 0
+    let w_remaining = vec![
+        mint_witness_for_tests("LsmMemtable", 10, 1, ScanTechnique::Structural),
+        mint_witness_for_tests("SsTableAllLevels", 50, 0, ScanTechnique::Structural),
+        mint_witness_for_tests("WalAllSegments", 100, 0, ScanTechnique::Structural),
+    ];
+    let res = DeletionProof::issue(
+        &ctx,
+        &saga,
+        &w_remaining,
+        &[ExcludedScope::LlmParameterMemory],
+        CustodyLevel::Local,
+        hmac_key.as_slice(),
+        &clock,
+    );
+    assert!(res.is_err(), "DeletionProof::issue MUST fail if witness has remaining > 0");
 }

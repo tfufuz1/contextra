@@ -2483,8 +2483,8 @@ Dieser Abschnitt hält den Befund fest, den Code und Repository zum Zeitpunkt de
 | U-06 | `supports_ssi_tracking` liefert konstant `true` | §8.1 | Methode in `crates/contextra-ports/src/storage.rs:87` vorhanden; Rumpf nicht gelesen | offen |
 | U-10 | `bincode` ist nicht exakt gepinnt | §12.7 (REQ-PRF-5) | `Cargo.toml:88`: `bincode = "1.3.3"` (Caret, kein `=`) | **offen, bestätigt** |
 | U-11 | Standard-Features der Fassade sind nicht `embedded` | §4.5 | `crates/contextra/Cargo.toml:38`: `default = ["fast", "candle"]` | **offen, bestätigt** |
-| U-21 | Sicherheitsstub `no_crypto_stubs` in der Engine | §12.7 (REQ-PRF-1) | `crates/contextra-engine/src/lib.rs:17` vorhanden | **offen, bestätigt** |
-| U-22 | Literal-Schlüssel für Löschberichte | §12.7 (REQ-PRF-4) | `crates/contextra-mcp/src/tools_crud.rs:206` vorhanden | **offen, bestätigt** |
+| U-21 | Sicherheitsstub `no_crypto_stubs` in der Engine | §12.7 (REQ-PRF-1) | `crates/contextra-engine/src/lib.rs:17` vorhanden | **erledigt (W4-P10)** |
+| U-22 | Literal-Schlüssel für Löschberichte | §12.7 (REQ-PRF-4) | `crates/contextra-mcp/src/tools_crud.rs:206` vorhanden | **erledigt (W4-P10)** |
 | U-23 | Fallback auf `TenantId::SYSTEM` | §12.8 (REQ-FGT-7) | `tools_crud.rs:127`, `:193`; `server_tools.rs:448` vorhanden | **offen, bestätigt** |
 | U-24 | Verworfener `fsync` im Compaction-Pfad | §12.8 (REQ-FGT-4) | `crates/contextra-store/src/lsm/ops/compaction.rs:211` propagiert jetzt mit `?` | **behoben** (Historie: Commit `04d02f8b7`) |
 | U-25 | Zeitabhängigkeit `Instant::now` in HNSW-Rebuild | §9.1 | keine Treffer in `crates/contextra-vector/src` | **behoben** (Historie: Commit `a07803c56`) |
@@ -2501,9 +2501,9 @@ Dieser Abschnitt hält den Befund fest, den Code und Repository zum Zeitpunkt de
 | U-36 | Entscheidungsdatei widerspricht der Spezifikation | §20 | `ENTSCHEIDUNGEN.csv` (E1–E8): E1 hält Crypto-Shredding (in 2.3 mit E44 als Ebene B wieder aufgenommen, Widerspruch damit teilweise aufgelöst); E5 nennt `contextra_forget` mit Alias `memory_forget` | **Widerspruch, offen** |
 | U-37 | Dummy-Beweise im Löschpfad (laut Repo-Entscheidung E5) | §12.7 | `contextra_delete` erzeugte laut Repo-Entscheidung E5 bisher ungeprüfte Dummy-Beweise (Restzahl 0) | Befund aus dem Repo, nicht geprüft |
 | U-39 | Berichtsformat | §12.7.5 | Im Repo existiert höchstens `SignatureVersion::V3`; ein V4 gibt es nicht, 2.2.1 ging irrtümlich davon aus (E26) | **offen, aus Anhang übernommen, am Code nicht geprüft** |
-| U-40 | `LayerWitness::issue_from_scanner` ist `pub` und nur per `#[doc(hidden)]` geschützt | §12.7.4 | jeder Crate kann einen Witness mit `remaining = 0` erzeugen | **offen, aus Anhang übernommen, am Code nicht geprüft** |
-| U-41 | `DeletionLayer`-Varianten im Code weichen ab | §12.4 | sieben Varianten (`LsmMemtable`, `SsTableAllLevels`, `HnswIndex`, `WalAllSegments`, `CsrGraph`, `KvCacheSegments`, `EmbeddingCache`); Abbildung auf zehn Schichten in WP L-1 | **offen, aus Anhang übernommen, am Code nicht geprüft** |
-| U-42 | `DeletionProof::issue` ignoriert den Parameter `_custody` | §12.7.5 | kein Bezug zu Klasse, Annahmen, Siegeln | **offen, aus Anhang übernommen, am Code nicht geprüft** |
+| U-40 | `LayerWitness::issue_from_scanner` ist `pub` und nur per `#[doc(hidden)]` geschützt | §12.7.4 | Gate `witness-mint` verhindert externe Erzeugung | **erledigt (W4-P10)** |
+| U-41 | `DeletionLayer`-Varianten im Code weichen ab | §12.4 | sieben Varianten (`LsmMemtable`, `SsTableAllLevels`, `HnswIndex`, `WalAllSegments`, `CsrGraph`, `KvCacheSegments`, `EmbeddingCache`); Abbildung auf zehn Schichten in WP L-1 | **teilweise erledigt (W4-P10)** |
+| U-42 | `DeletionProof::issue` ignoriert den Parameter `_custody` | §12.7.5 | CustodyLevel in V5-Payload eingebunden | **erledigt (W4-P10)** |
 
 **Befundlage.** Vier Befunde sind behoben, zwei wurden verschoben, der Rest ist offen oder widersprüchlich. Die behobenen Punkte stammen aus der Commit-Historie des Klons und sind nicht durch einen Gate-Lauf bestätigt (E1, §1.4).
 

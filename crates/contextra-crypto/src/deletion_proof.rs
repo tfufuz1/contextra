@@ -217,69 +217,20 @@ impl<'a> From<&'a ed25519_dalek::VerifyingKey> for VerificationKey<'a> {
 }
 
 /// Beweis, dass ein bestimmter DeletionLayer physisch bereinigt wurde.
-/// Kann NUR von den jeweiligen Bereinigungsfunktionen der Storage-Layer erzeugt werden
-/// (siehe `new_after_physical_cleanup`), niemals direkt frei durch Aufrufer von
-/// `DeletionProof::create()`.
+/// Typ wird für Abwärtskompatibilität und Bincode-Deserialisierung alter Nachweise vorgehalten.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LayerCleanupProof {
-    layer: DeletionLayer,
-    _private: (),
+    pub(crate) layer: DeletionLayer,
+    pub(crate) _private: (),
 }
 
 impl LayerCleanupProof {
-    /// Erzeugt einen Proof NUR, wenn `remaining_live_entries == 0` — also nur dann,
-    /// wenn der Aufrufer nachweislich (durch einen Re-Scan des betroffenen
-    /// Storage-Bereichs NACH der physischen Bereinigung) verifiziert hat, dass für
-    /// diesen Layer keine lebenden Einträge mehr existieren. Ein Proof für einen
-    /// Layer mit `remaining_live_entries > 0` ist ein Widerspruch zu INV-DELETION-1
-    /// und wird abgelehnt statt stillschweigend akzeptiert.
-    ///
-    /// # Errors
-    /// Gibt `ContextraError::Internal` zurück, wenn `remaining_live_entries != 0`.
-    #[deprecated(note = "Umstellung auf DeletionProof::issue, siehe P-19")]
-    pub fn new_after_verified_empty(
-        layer: DeletionLayer,
-        remaining_live_entries: usize,
-    ) -> Result<Self> {
-        if remaining_live_entries != 0 {
-            return Err(ContextraError::Internal(format!(
-                "INV-DELETION-1 violation: attempted to construct LayerCleanupProof for \
-                 layer {layer:?} but verification found {remaining_live_entries} \
-                 remaining live entries — physical cleanup is incomplete or was not \
-                 performed before proof construction"
-            )));
-        }
-        Ok(Self {
+    /// Erzeugt ein `LayerCleanupProof` ausschließlich für Tests.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn for_test(layer: DeletionLayer) -> Self {
+        Self {
             layer,
             _private: (),
-        })
-    }
-
-    /// Erzeugt einen Proof für `layer` NUR, wenn `verification` bestätigt,
-    /// dass die physische Bereinigung tatsächlich abgeschlossen ist.
-    ///
-    /// `verification` MUSS eine echte Post-Condition-Prüfung durchführen
-    /// (z. B. eine erneute Abfrage des betroffenen Storage-Layers, die
-    /// belegt, dass keine der zu löschenden Daten mehr vorhanden sind),
-    /// KEINE bloße Behauptung. Ein `Ok(false)`-Rückgabewert oder ein
-    /// `Err` aus `verification` führt zu einem `Err` hier — es wird in
-    /// diesem Fall NIEMALS ein Proof erzeugt (INV-DELETION-1).
-    #[deprecated(note = "Umstellung auf DeletionProof::issue, siehe P-19")]
-    pub fn verify_and_create<F>(layer: DeletionLayer, verification: F) -> Result<Self>
-    where
-        F: FnOnce() -> Result<bool>,
-    {
-        if verification()? {
-            Ok(Self {
-                layer,
-                _private: (),
-            })
-        } else {
-            Err(ContextraError::Internal(format!(
-                "INV-DELETION-1 violation: physical cleanup verification \
-                 failed for layer {layer:?} — refusing to create \
-                 LayerCleanupProof"
-            )))
         }
     }
 
@@ -1509,7 +1460,7 @@ mod tests {
             vec![b"k1".to_vec(), b"k2".to_vec()],
             TxId(100),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
@@ -1580,7 +1531,7 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(10),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             Some([0xABu8; 32]),
@@ -1668,7 +1619,7 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(10),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
@@ -1753,8 +1704,8 @@ mod tests {
             keys,
             TxId(100),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+                LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
@@ -1764,18 +1715,6 @@ mod tests {
         assert!(proof.verify(&test_key()).unwrap());
     }
 
-    #[test]
-    fn test_layer_cleanup_proof_rejects_nonzero_remaining_entries() {
-        let res = LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 3);
-        assert!(res.is_err());
-        match res {
-            Err(ContextraError::Internal(msg)) => {
-                assert!(msg.contains("INV-DELETION-1 violation"));
-                assert!(msg.contains("found 3 remaining live entries"));
-            }
-            _ => panic!("Expected ContextraError::Internal"),
-        }
-    }
 
     #[test]
     fn test_deletion_proof_wrong_key_fails_verify() {
@@ -1799,7 +1738,7 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(10),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
@@ -1916,10 +1855,9 @@ mod tests {
         };
 
         let cleanup_proofs = vec![
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::SsTableAllLevels, 0)
-                .unwrap(),
-            LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+            LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+            LayerCleanupProof::for_test(DeletionLayer::SsTableAllLevels),
+            LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
         ];
 
         let proof = DeletionProof::create(
@@ -1953,7 +1891,7 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(10),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
@@ -1981,7 +1919,7 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(10),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![
                 ExcludedScope::LlmParameterMemory,
@@ -2125,7 +2063,7 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(10),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
@@ -2181,7 +2119,7 @@ mod tests {
             vec![b"k42".to_vec()],
             TxId(100),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             Some(receipt),
@@ -2198,26 +2136,6 @@ mod tests {
         assert!(!tampered_proof.verify(&test_key()).unwrap());
     }
 
-    #[test]
-    fn test_layer_cleanup_proof_verify_and_create() {
-        // Success path: closure returns Ok(true)
-        let proof_ok = LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(true));
-        assert!(proof_ok.is_ok());
-        assert_eq!(proof_ok.unwrap().layer(), &DeletionLayer::HnswIndex);
-
-        // Verification failed path: closure returns Ok(false)
-        let proof_fail =
-            LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || Ok(false));
-        assert!(
-            matches!(proof_fail, Err(ContextraError::Internal(ref msg)) if msg.contains("verification failed"))
-        );
-
-        // Closure returns error
-        let proof_err = LayerCleanupProof::verify_and_create(DeletionLayer::HnswIndex, || {
-            Err(ContextraError::Internal("db error".to_string()))
-        });
-        assert!(matches!(proof_err, Err(ContextraError::Internal(ref msg)) if msg == "db error"));
-    }
 
     #[test]
     fn test_verify_external_v3_valid_and_invalid_keys() {
@@ -2231,7 +2149,7 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(100),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
@@ -2354,7 +2272,7 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(10),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
@@ -2371,7 +2289,7 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(10),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
@@ -2402,7 +2320,7 @@ mod tests {
             vec![b"k1".to_vec(), b"k2".to_vec()],
             TxId(100),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
@@ -2431,8 +2349,8 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(10),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::HnswIndex, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
+                LayerCleanupProof::for_test(DeletionLayer::HnswIndex),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
@@ -2467,7 +2385,7 @@ mod tests {
             vec![b"k1".to_vec()],
             TxId(10),
             vec![
-                LayerCleanupProof::new_after_verified_empty(DeletionLayer::LsmMemtable, 0).unwrap(),
+                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
             ],
             vec![ExcludedScope::LlmParameterMemory],
             Some([0xABu8; 32]),
