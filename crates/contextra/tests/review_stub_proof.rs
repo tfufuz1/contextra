@@ -2,8 +2,7 @@
 // ZWECK: Review-Test (T-DEL-2) für Stub-Löschbeweise in Contextra (Ring 4 / Engine).
 // INVARIANTEN: Prüft, dass Löschbeweise mit Restzahlen (> 0) zwingend als Err abgelehnt werden.
 
-use contextra_core::{TenantId, TxId};
-use contextra_db::engine::{DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof};
+use contextra_crypto::{DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof};
 
 /// T-DEL-2: Ein Beweis mit remaining_count > 0 muss Err liefern.
 /// Auf dem aktuellen Stand (no_crypto_stubs) verwirft `verify_and_create` das Ergebnis des Verifiers

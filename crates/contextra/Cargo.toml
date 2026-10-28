@@ -29,6 +29,7 @@ tokio = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+contextra-crypto = { workspace = true }
 tempfile = { workspace = true }
 
 [features]

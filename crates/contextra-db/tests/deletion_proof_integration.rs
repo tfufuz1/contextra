@@ -3,7 +3,7 @@
 //! Integration tests for GDPR Art. 17 DeletionProof generation during collection drop.
 
 use contextra_db::{Contextra, ContextraConfig};
-use contextra_engine::{DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof};
+use contextra_crypto::{DeletionLayer, DeletionProof, DeletionScope, LayerCleanupProof};
 use contextra_ports::StorageEngine;
 use contextra_types::{CollectionId, DistanceMetric, TenantId, TxId};
 use serde_json::json;
@@ -15,6 +15,7 @@ async fn setup_db(dim: usize) -> (Contextra, TempDir) {
         dimension: dim,
         max_elements: 1000,
         distance_metric: DistanceMetric::Cosine,
+        embedding_backend: contextra_db::EmbeddingBackend::None,
         ..Default::default()
     };
     let db = Contextra::open_with_config(tmp.path(), config)
