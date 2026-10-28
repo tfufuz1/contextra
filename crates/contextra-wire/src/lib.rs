@@ -7,26 +7,18 @@
 
 #![deny(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
 
-#[allow(
-    unsafe_code,
-    unused_imports,
-    clippy::all,
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    clippy::needless_lifetimes,
-    clippy::extra_unused_lifetimes,
-    clippy::doc_markdown,
-    clippy::derivable_impls,
-    clippy::missing_safety_doc,
-    clippy::wrong_self_convention
-)]
-pub mod contextra_generated;
+pub mod generated;
 
 pub mod adapter;
 pub mod jsonrpc;
+pub mod verification;
 
-pub use contextra_generated::contextra::ipc::*;
-pub use jsonrpc::{JsonRpcError, JsonRpcRequest, JsonRpcResponse};
+pub use adapter::*;
+pub use generated::contextra_generated;
+pub use generated::contextra_generated::contextra::ipc::*;
+pub use jsonrpc::*;
+pub use verification::*;
