@@ -1,20 +1,26 @@
-# Contextra – Gesamtspezifikation 3.0 (Baukasten-Fassung, Zielzustand v1.0)
+# Contextra – Gesamtspezifikation 3.1 (Baukasten-Fassung, Zielzustand v1.0)
 
 ```
 Dokument:   Normative Gesamtspezifikation (Architektur, Verhalten, Module, Prüfverträge)
-Fassung:    3.0 (Entwurf zur Freigabe), baut auf 2.4/2.5 auf und ersetzt deren Produktzuschnitt
+Fassung:    3.1 (Entwurf zur Freigabe); überarbeitet und erweitert 3.0 um die Baseline-, Metrik- und Scan-Befunde vom 28.10.2026
+            (U-15 bis U-27), Projektziele mit Messkriterien (§2.5), Wartbarkeitsregeln (§4.9), Crate-Review (§5.5) und
+            Schnittstellenvertrag samt Rechtsmatrix der Löschkette (§9.11, §9.12)
 Stand:      28.10.2026
-Belegbasis: Repo-Klon HEAD 52d3227f0 (flach, 28.10.2026 22:23; Vorfassung der Messung: e2f7573f2, Merge PR #5360);
+Belegbasis: **drei Commit-Stände** (siehe §1.2): (a) Repo-Klon HEAD 21a09ad (flach, 28.10.2026, statisch gelesen, E1);
+            (b) Baseline-Lauf auf Commit 8f8fa7cd (Toolchain 1.89.0, E2, nur Summaries und Metrik-Datei liegen vor);
+            (c) Skript-Scan auf Commit 52d3227 (statisch, Heuristik, E1);
             35 Workspace-Mitglieder (33 Crates unter `crates/`, `benchmarks/contextra-bench`, `xtask`)
 Ablage:     docs/SPEC.md
-Ersetzt:    SPEC 2.4/2.5 (Repo-Stand `docs/SPEC.md`: Produktzuschnitt, Archivierungsentscheidung, Kern-Definition); der
-            Löschpfad (alt §12) bleibt inhaltlich erhalten und wird in §9 als Baustein neu gefasst
+Ersetzt:    SPEC 3.0 (Entwurf) sowie SPEC 2.4/2.5 (Repo-Stand `docs/SPEC.md`: Produktzuschnitt, Archivierungsentscheidung, Kern-Definition); der
+            Löschpfad (alt §12) bleibt inhaltlich erhalten und wird in §9 als Baustein gefasst (3.1: mit Schnittstellenvertrag und Rechtsmatrix)
 Zielgruppe: Menschen und LLM-Agenten, die Contextra bauen, prüfen oder in ein KMU-Produkt einbetten
 ```
 
 > **Leitidee der Fassung 3.0.** Contextra ist **keine Komplettlösung** mehr, sondern eine **robuste, datenschutzkonforme und entkoppelte Rust-Bibliothek (Baukasten) als Fundament für lokale LLM-Lösungen im Mittelstand in Deutschland und Europa**. Jedes Modul MUSS **einzeln gebaut, auditiert, verifiziert und leistungsgemessen** werden können. Die gesetzlich begründete Löschung samt Löschkette ist ein **eigenständiger Baustein** dieses Baukastens, kein Gesamtversprechen des Systems.
 
 > **Selbständigkeit.** Dieses Dokument ist die einzige Quelle der Wahrheit für Architektur, Modulverträge, Konstanten, Gates und Plan. Jedes `§x` meint einen Abschnitt dieses Dokuments. Fehlt ein Detail, gilt: **nicht raten**, Fail-Closed wählen (INV-FAILCLOSED-1) und den Punkt in §16 melden. Der Umsetzungsplan steht in `PLAN.md` und darf dieser Spezifikation nicht widersprechen.
+
+> **Ergänzung 3.1 (28.10.2026).** Die Baseline zeigt: `cargo check -p <crate>` gelingt für alle 35 Mitglieder, aber `cargo check --workspace --all-targets`, `cargo clippy -D warnings` (33 von 35 rot) und die Testläufe (2 Compile-Fehler, 13 Timeouts im 45-s-Harness) sind **nicht grün**. Die Aussage „alle Crates kompilieren fehlerfrei“ gilt damit nur für den kleinsten Prüfumfang (§1.2a). Diese Fassung macht daraus Pflichten: **Baseline nach ADR-D11** (je Crate **und** Workspace, alle Targets), **eine Messquelle** (ADR-D12), **keine Doppeldefinitionen** (ADR-D13), **keine Test-Hooks in der Produktions-API** (ADR-D14), **Löschkette als entkoppelter Baustein mit Schnittstellenvertrag** (ADR-D15) und **Wartbarkeitsregeln als Gates** (ADR-D16, §4.9).
 
 ---
 
@@ -26,7 +32,7 @@ Contextra ist ein **Baukasten aus Rust-Crates** für lokale (On-Premise, ohne Cl
 
 Typische Einsatzfälle (Hypothesen, §16): Speisekarten- und Reservierungsassistent in der Gastronomie, lokaler Produktberater im Online-Shop, DSGVO-konforme Vor-Ort-Verarbeitung in Kommunen, Jobcentern und Agenturen, interne Wissensdatenbanken von KMU.
 
-### 0.2 Die vierzehn Regeln für jede Änderung
+### 0.2 Die sechzehn Regeln für jede Änderung
 
 1. **Ring und Klasse zuerst.** Jede Kante zeigt auf gleichen oder niedrigeren Ring (§4.1) **und** ist in `may_depend_on` des Crates deklariert (§4.4).
 2. **Jedes Crate ist ein Modul mit Vertrag.** Es hat ein Modul-Manifest, ein Evidence-Pack und ein isoliertes Prüfkommando (§7). Ein Crate ohne diese drei Dinge darf nicht höher als `experimental` stehen.
@@ -42,6 +48,8 @@ Typische Einsatzfälle (Hypothesen, §16): Speisekarten- und Reservierungsassist
 12. **Kein Netz ohne Erlaubnis.** Kein Crate öffnet ausgehende Netzverbindungen, außer es steht in der Egress-Tabelle (§10.6) und ist per Konfiguration freigeschaltet; Standard ist **nur Loopback**.
 13. **Eine Typfamilie je Konzept.** Löschtypen existieren nur in `crypto`/`ports`; Ports nur in `ports` (§6).
 14. **Ein PR = ein Arbeitspaket = höchstens ein Crate-Schnitt**; nach jedem Schnitt Build, Modul-Prüfung, Zeilenzählung (REQ-CHG-2).
+15. **Keine Test-Hooks, Mocks oder Fake-Beweise in der öffentlichen Produktions-API.** `*_for_test`, `Mock*`, `Fake*` und Panic-Auslöser liegen hinter `cfg(test)` oder `test-hooks`/`testkit` (§12.4, U-24).
+16. **Kein blockierendes I/O in `async`-Code.** Dateizugriff über `Vfs` oder `spawn_blocking`; kein `std::fs`/`std::thread::sleep` in `async fn` (U-23).
 
 ### 0.3 Karte: Konzept → Crate
 
@@ -101,8 +109,32 @@ Die alte Entscheidung E-Archiv („Graph/Kognition/Router/Agent ins Archiv“) i
 |Statische Kennzahlen (§5.2): eigener Zähler, nicht ausgerichtet am Gate `loc-budget`; Zeilen = nicht leere Nicht-Kommentarzeilen, Testcode (`tests/`, `#[cfg(test)]`, `*_tests.rs`) getrennt|E1, nicht vergleichbar mit Altwerten|
 |Abhängigkeitsgraph aus den Manifesten (Regex-Auswertung, `[dependencies]`/`[dev-dependencies]`)|E1|
 |`SYSTEMATIC_CRATE_AUDIT.md` (Fassung 2.3, 28.10.2026)|Hypothese (E0), in §1.3 gegen Code geprüft|
+|Baseline-Lauf 28.10.2026 (Commit 8f8fa7cd, Toolchain `cargo 1.89.0` / `rustc 1.89.0`): `BASELINE.md`, `per_crate_summary.json`, vier `*.summary`-Dateien, `archived_crate_dependencies.txt`, `env.txt`; **rohe Logs liegen nicht vor**|E2 (teilweise: Exit-Codes und Dauer; keine Logs, keine zweite Runner-Wiederholung)|
+|Metrik-Datei `metrics-2026-10-28.json` (je Mitglied: Ring, Reife, Zeilen, harte/optionale/Dev-Kanten, transitive Last, Panic-/Allow-/Unsafe-/Netz-/Zeitzähler; Messwerkzeug und Methode nicht dokumentiert)|E1 (Methode unbekannt)|
+|Skript-Scan `CONTEXTRA_SCAN_ERGEBNIS.md` (`contextra_scan.py` v2, Commit 52d3227, statisch, prüft gegen **ältere** Spezifikationsnummern)|E1, Heuristik (Prüfaufträge, keine Beweise)|
 
-**Nicht geprüft in dieser Fassung:** Kompilierung, Testsuite, Clippy, Miri, Fuzz, Benchmarks, CI-Stand. In der Prüfumgebung war die gepinnte Toolchain 1.89.0 nicht ladbar (Netzzugriff auf `static.rust-lang.org` gesperrt); der im Repo liegende Lauf `evidence/baseline-a547a42/` stammt von einem **älteren Commit** (dort rot: `contextra-engine` fand `contextra_graph` nicht) und belegt den heutigen HEAD **nicht**. Jede Zeile „Testergebnis: Pass“ des Audit-Berichts ist daher **unbelegt**, bis WP 0.1 (PLAN.md) die Baseline auf einem CI-Runner erzeugt.
+**Nicht geprüft in dieser Fassung:** Miri, Fuzz, Benchmarks, CI-Stand, Wiederholung der Baseline auf einem zweiten Runner (damit **kein E3**), vollständige Testläufe der 13 Crates mit Timeout. Der im Repo liegende Lauf `evidence/baseline-a547a42/` stammt von einem **älteren Commit** und belegt weder 8f8fa7cd noch den heutigen HEAD. **Der Commit 8f8fa7cd ist im flachen Klon nicht auflösbar** (`git cat-file` schlägt fehl); Befunde aus dem Baseline-Lauf wurden deshalb, soweit möglich, **statisch gegen den Klon-HEAD 21a09ad** geprüft und Abweichungen in §1.2a und §1.3 vermerkt. Jede Zahl trägt ihre Stufe; Zahlen aus drei Commit-Ständen werden **nicht** vermischt, bis WP 0.1 eine Baseline auf **einem** Commit erzeugt.
+
+### 1.2a Baseline-Ergebnis vom 28.10.2026 (E2, teilweise)
+
+|Lauf|Ergebnis|Aussage|
+|---|---|---|
+|`cargo check -p <crate> --locked` je Mitglied (35)|**35 von 35 Exit 0**, auch `xtask`|belegt nur Kompilierbarkeit der Bibliotheks-/Binär-Targets, **nicht** der Test-, Bench- und Beispiel-Targets|
+|Standalone-Builds (`contextra --no-default-features --features embedded`; `contextra-mcp`)|beide Exit 0 (65,5 s; 0,47 s)|0,47 s deutet auf einen Cache-Treffer, kein Kaltbau|
+|`cargo check --workspace --all-targets --locked`|**Exit 101** (42,5 s laut Summary, 45,4 s laut `BASELINE.md`)|mindestens ein Test-Target kompiliert nicht (U-15)|
+|`cargo clippy --workspace --all-targets --locked -- -D warnings`|**Exit 101**; je Crate **2 grün** (`wire`, `sys`), **33 rot**|Ursache nicht belegt (U-16)|
+|`cargo test -p <crate> --no-fail-fast` je Mitglied, Limit 45 s|20 grün (`py` ohne ausgeführte Tests), **2 rot** (`mvcc`, `crypto`: Test-Compilation), **13 Timeout**|Timeout ist **weder grün noch rot**, sondern unbekannt (U-17)|
+|`cargo test --workspace --locked --no-fail-fast`|Exit 101, 374.955 ms (≈ 6,2 min)|Log liegt nicht vor; Ergebnis je Test unbekannt|
+|Testzähler (nur erfolgreich ausgeführte Suites)|1.259 bestanden, 0 fehlgeschlagen, 2 ignoriert|**keine** Aussage über die 15 nicht ausgeführten Crates|
+|`cargo tree -p contextra` (normal, features)|Exit 0|Ausgabe liegt nicht vor; Metrik-Datei liefert die transitive Last (19)|
+
+**Grenzen dieser Baseline (verbindlich zu lesen).**
+
+1. **Drei Commit-Stände** (8f8fa7cd Baseline, 52d3227 Scan, 21a09ad Klon). Zahlen sind nur innerhalb eines Standes vergleichbar.
+2. **Die Ursachenaussagen in `BASELINE.md` sind Hypothesen (E0/E1), keine Messung.** Beispiele: Der Klon enthält `LayerCleanupProof` **nirgends als Definition**, und `deletion_proof_integration.rs` sowie `audit_chain_tests.rs` importieren den Typ aus `contextra_crypto`, **nicht** aus `contextra_engine`; `CustodyLevel` ist in `crypto/src/lib.rs` exportiert, die Baseline-Meldung „undeclared type CustodyLevel“ ist am Klon nicht nachvollziehbar; `MetricEvent`/`TestMetricsSink` liegen in `testkit/src/mocks.rs`, und `mvcc/tests/ssi_metrics_observability.rs` importiert sie dort (nicht aus `ports::metrics`). Entweder ist die Baseline auf einem anderen Stand entstanden oder die Meldungen wurden verkürzt; ohne Logs nicht entscheidbar.
+3. **Die Clippy-Dauer ist bei 31 Crates nahezu gleich (≈ 2,2 s)**; das spricht für einen frühen, gemeinsamen Abbruch, nicht für 33 unabhängige Lint-Haufen. „Unkonfigurierte Warnings“ ist unbelegt.
+4. **Die Kantenliste in `BASELINE.md` §7** stammt aus `rg` über `Cargo.toml` und **unterscheidet nicht** zwischen `[dependencies]` und `[dev-dependencies]`. Laut Metrik-Datei sind `store → graph`, `engine → core`, `rank → adapt`, `infer-ollama → infer-onnx` und `router → graph` **Dev-Kanten**, keine harten Kanten. Für die Entkopplung gilt die Metrik-Datei (sie bestätigt alle Ist-Werte aus §4.5).
+5. **Zeitangaben weichen zwischen `*.summary` und `BASELINE.md` ab** (Check 42.476 vs. 45.368 ms, Clippy 3.806 vs. 6.148 ms); Zeiten sind kein Beleg, Exit-Codes sind es.
 
 ### 1.3 Abweichungen zwischen Audit-Bericht und Code (Befunde U-01 bis U-14)
 
@@ -122,6 +154,19 @@ Die alte Entscheidung E-Archiv („Graph/Kognition/Router/Agent ins Archiv“) i
 |U-12|`xtask` „10/10, Quality Gates“|`xtask` hat 32.572 Code-Zeilen und ist damit **mehr als doppelt so groß wie `store`** (14.288); mindestens ein Teil der Prüfungen ist regex-basiert (z. B. `check_duplicate_core_primitives.rs`), daneben stehen Agenten-/Prozess-Prüfungen (`check_agents_*`, `jules_*`), die für die Bibliotheksqualität nicht zentral sind|Wartungsrisiko; Gate-Inventar, Meta-Tests und Rückbau nach Wirksamkeit; WP 3.6|
 |U-13|Modul-„Isolation“ nur für Normal-Abhängigkeiten gedacht|Dev-Kanten brechen die isolierte Testbarkeit (M2): `router` → `db`, `graph`, `text`, `vector`; `cognition` → `infer-candle`; `infer-ollama` → `infer-onnx`; `rank` → `adapt`; `checkpoint` → `store`; `infer-candle`, `privacy` → `crypto`; `agent` → `text`, `vector`; `store`/`crypto` haben Selbst-Dev-Kanten (Feature-Aktivierung, kein echter Zyklus). Echter Zyklus nur `graph` ↔ `store`|Dev-Kanten gelten für `module-isolation`; WP 2.10, 2.11|
 |U-14|Ein Baseline-Lauf liegt im Repo|`evidence/baseline-a547a42/` dokumentiert einen **roten** Build eines älteren Commits (`contextra-engine`: `contextra_graph` unaufgelöst); am heutigen HEAD hängt `engine` hart an `graph`, der Lauf ist damit **nicht übertragbar**|Als historisch kennzeichnen, neue Baseline; WP 0.1|
+|U-15|Baseline (BASELINE.md): „Workspace `--all-targets` schlägt fehl“|Drei Test-Targets kompilieren nicht bzw. sind gegen den Klon-Stand nicht erklärbar: `db/tests/deletion_proof_integration.rs` und `crypto/tests/audit_chain_tests.rs` importieren `LayerCleanupProof`, den der Klon **nirgends definiert**; `mvcc/tests/ssi_metrics_observability.rs` (Baseline: Import aus `ports::metrics`, Klon: Import aus `testkit`, dort definiert). Betroffen ist ausgerechnet der **Löschbericht-Test** (G2)|Kern-Garantie ohne lauffähige Integrationstests; Löschkette bleibt `experimental` bis WP 0.5|
+|U-16|„Clippy scheitert an unkonfigurierten Warnings“|33 von 35 Crates rot unter `-D warnings`; nahezu gleiche Dauer (≈ 2,2 s) spricht für gemeinsame Ursache (z. B. ein früh geprüftes Workspace-Lint oder eine gemeinsame Abhängigkeit); Ursache **nicht belegt**|Zielkriterium „Clippy grün“ (§2.5) verfehlt; WP 0.6 (Ursache zuerst, dann Behebung)|
+|U-17|Testläufe mit Limit 45 s je Crate|13 Crates im Timeout (`store`, `graph`, `vector`, `db`, `cognition`, `engine`, `text`, `infer-candle`, `mcp`, `contextra`, `agent`, `bench`, `xtask`), 2 Compile-Fehler (`mvcc`, `crypto`); Workspace-Lauf dauert ≈ 6,2 min; die Teststatistik (1.259 bestanden) deckt diese 15 Crates nicht ab|Timeout ≠ grün; Test-Laufzeitbudget je Crate nötig (W10); WP 0.7|
+|U-18|Kennzahlen aus einer Quelle|**Drei widersprüchliche Messungen**: Produktions-Panics (Scan: `store` 2 expect + 1 panic!, `text` 6 expect + 1 panic!, `db` 0; Metrik: `db` 8 expect + 2 panic, `store` 2 + 4, `text` 6 + 1, `vector` 1 unwrap, `wire` 16 unwrap im Generat; `ratchet.toml`: 1.175 / 502 / 242 Altwerte); Codezeilen (`types` 4.236 vs. 2.643, `store` 14.288 vs. 13.521); Zeitaufrufe (`store` 7 vs. 14)|Keine Zahl ist verbindlich, bis WP 0.4 eine AST-Messung liefert (ADR-D12)|
+|U-19|§4.4-Kantenregeln als erfüllt behandelt|Metrik-Datei (harte Kanten gegen §4.4 gerechnet, Details §5.5): `db` 10 von 13 direkten Kanten außerhalb Soll; `mcp` 5, `py` 6, `cognition` 3, `agent` 2, `engine` 2 (`graph`, `sys`), `checkpoint` (`core`), `vector` (`crypto`); Fassade `contextra` hängt **hart** an `license` (`[E]`, verletzt P30) und `core`; `router` hängt hart an `privacy`, `wire` (Soll: optional); optional: `infer-onnx` → `infer-candle`, `mcp` → `infer-candle`, `engine` → `sandbox`|Soll-Graph wird erst nach WP 2.2–2.8, 2.14 erreicht|
+|U-20|A2 „Eine Typfamilie je Konzept“|Scan: **35 Typnamen** in mehreren Dateien/Crates, darunter `DeletionProof` (`crypto`, `graph/cascade.rs`), **`TenantId`** (`types`, `privacy/processing_registry.rs`: VETO-F10-relevant), `KvSegment`, `EvictionWorker`, `SpillHandler`, `TenantIsolatedKvStore`, `EncryptedSegmentPayload` (`crypto` und `kvcache`: bestätigt U-11), `AdaptiveDecayController`/`DecayControllerConfig`/`DecaySignalInputs` (`adapt`, `engine`), `HyperEdgeId`/`RoleId`/`RoleBinding`/`GraphMutationError` (`graph`, `ports`), `EgressGuard` (`mcp`, `privacy`), `AvvContext` (`avv-generator`, `privacy`), `DriftDetector` (`adapt`, `rank`), `ConformalCalibrator` (`rank`, `router`), `DeletionProofKeyPair` doppelt in `crypto`|Wartungs- und Sicherheitsrisiko (zwei Wahrheiten); Gate `duplicate-types`, WP 2.13|
+|U-21|Regel 4 „Zeit nur über `Clock`“|Scan: **44 direkte Zeitaufrufe** in Produktion (`mvcc` 14 in **Ring 0**, `engine` 7, `store` 7, `kvcache` 3, `ports` 3, `router` 3, `checkpoint` 2, `sandbox` 2, `adapt`/`db`/`privacy` je 1); `clippy.toml` ohne `disallowed_methods`/`disallowed_types`. Ob die Stellen in `determinism-allow.toml` gedeckt sind, ist je Stelle zu prüfen|Determinismus (G6, T-DET-1) nicht durch Compiler erzwungen; WP 2.12|
+|U-22|Features „tot und doppelt löschen“, A1 „Sicherheit ist kein Feature-Schalter“|Scan: `store` nutzt `cfg(feature = "encryption-at-rest")` und `cfg(feature = "wal-integrity")` **ohne Definition im Manifest**: der dahinterliegende Code wird **nie kompiliert**; 21 definierte, im Code nicht genutzte Features (u. a. `compliance` der Fassade, `cloud-egress-guard` in `crypto`, mehrere in `db`, `adapt`, `graph`, `engine`; reine Weiterleitungen im Manifest sind als Fehlalarm zu prüfen)|Sicherheitsrelevant; WP 1.5 vor allen Architekturarbeiten|
+|U-23|Regel 6 „I/O nur über `Vfs`“, Async-Disziplin|Scan: 15 Stellen mit `std::fs`/`std::thread::sleep` in `async fn` (`store/wal`, `store/sstable/reader.rs`, `vector/diskann/build.rs`, `vector/hnsw/core_rebuild.rs`, `infer-onnx`, `mcp`-Binary)|Blockiert den Executor; verletzt Regel 16 und teilweise Regel 6; WP 1.7|
+|U-24|§12.4 Test-Hygiene|`py` exportiert `_trigger_panic_for_test` dreifach öffentlich; `store` hat `pub async fn simulate_wal_append_failure_for_test`; `mcp/config.rs` enthält `MockEmbedder`/`MockLlmGenerator` **ohne `cfg`** im Produktionscode; `LoomFile::flush/sync_all` und `LoomReadDir::next_entry` sind Konstanten-Stubs (loom-Hilfen, Feature-Zugehörigkeit prüfen); Fuzz-Target nutzt `mint_witness_for_tests`|Regel 15; WP 1.6|
+|U-25|EP3 „Wired-or-it-doesn't-exist“|Scan: Port-Traits **UNWIRED** (`TextGenerator`, `Snapshot`, `KmsProvider` in `crypto/wal_crypto.rs`), **NULL_ONLY** (`MetricsSink`, `ReplayProgressSink`, `EntityRecognizer`), **TEST_ONLY** (`KvBridgeStorage`, `PluginManifest`, `SemanticEmbedder`, `AgentTool`); 89 öffentliche Items ohne Verwendung (`unwired-pub`). Heuristik, je Fund zu prüfen; Sicherheitsports nur mit Null-Implementierung machen das Modul laut §7.5 `experimental`|`KmsProvider` ist Grundlage der Löschkette (§9.11); WP 3.4, 5.3|
+|U-26|§4.6 „unsafe nur in drei Inseln“|Bestätigt für Produktion. **Ausnahmen in Testcode:** `graph/tests/ppr_alloc_test.rs`, `text/tests/alloc_profiler.rs` (Allocator-Profiler mit `unsafe`); `wire`-Generat: 43 `unsafe`-Stellen ohne `// SAFETY:`; die Metrik zählt in `xtask` 39 `unsafe` (vermutlich Muster-Strings der Prüfungen, nicht Blöcke; AST-Messung klärt)|Regel 7 ist für Testcode zu präzisieren (§17, F-01); WP 1.4, 0.4|
+|U-27|M5/M8, Dokumentation|`capabilities.toml`: `may_depend_on` unvollständig (Scan: 68 Warnungen, u. a. fehlende `types`/`ports`-Kanten) und enthält noch `contextra-core`; 5 Produktionsdateien > 800 Zeilen (`store/sstable/reader.rs` 948, `crypto/deletion_proof.rs` 910, `graph/ppr.rs` 887, `vector/hnsw/core_rebuild.rs` 850, `store/wal/io.rs` 835); `ARCHITECTURE.md` trägt einen veralteten Commit-Stempel; Deprecation `TenantId::new` wird noch aufgerufen (`db/examples/verify_deletion_proof_external.rs:83`)|WP 0.2, 2.1, 3.8|
 
 Zählung (Nachmessung am HEAD 52d3227f0): `unsafe` nur in `simd` (310 Zeilen), `sys` (43), `wire` (45); `contextra_core`-Verwendungen und Allow-Zahlen sind **zeilenbasierte Handzählungen** (Allows außerhalb von `tests/`: 136 bis 158 je nach Muster) und werden durch den AST-Messbefehl aus WP 0.4 ersetzt. Die in der Vorfassung gemeldete `RING-LAYER-EXCEPTION` in `infer-ollama` ist am HEAD **nicht mehr auffindbar**. 33 Crates unter `crates/`, dazu `contextra-bench` und `xtask` = 35 Mitglieder; der Audit-Bericht zählt `xtask` und `bench` als „Crates“ mit.
 
@@ -183,6 +228,22 @@ Die Garantien G1–G7 der Fassung 2.4 bleiben bestehen, werden aber **dem Bauste
 ### 2.4 Nicht-Ziele v1.0
 
 Verteilter Betrieb, Replikation, Echtzeit-Audio, Windows für Server und MCP, ausgelieferte Schlüsselverwahrung K2/K3 (Port vorhanden), Löschbeweis als Rechtsnachweis, Dokumentformat-Parser im Kern, Telemetrie, eigene Modelltrainings, GPU-Pflicht. Wer sie benötigt, braucht einen ADR (§15).
+
+### 2.5 Projektziele und Messkriterien (neu in 3.1)
+
+Das Projektziel lautet: **eine robuste, datenschutzkonforme und entkoppelte Rust-Bibliothek als Fundament für lokale LLM-Lösungen im Mittelstand in Deutschland und Europa.** Jedes Wort ist hier ein prüfbares Kriterium, kein Anspruch:
+
+|Ziel|Definition|Messgröße (Gate / Test)|Ist am 28.10.2026 (Quelle)|
+|---|---|---|---|
+|**Robust**|Kein Absturz durch Eingaben; Zustand nach hartem Abbruch rekonstruierbar; Bau und Prüfung reproduzierbar|Produktions-Panics = 0 (`panic-inventory`); `check`, `clippy -D warnings`, `test` je Crate **und** `--workspace --all-targets` grün (ADR-D11); Crash-Matrix; Evidence-Pack|check je Crate 35/35; clippy 2/35; test 20/35 grün, 2 rot, 13 Timeout; Workspace `--all-targets` rot (§1.2a)|
+|**Datenschutzkonform**|Datenschutz ist Bauprinzip (Art. 25 DSGVO): Mandantentrennung, Netz aus, Datenminimierung, technisch begründete Löschung samt messbarem Nachweis, keine Telemetrie|T-TEN-1/2, T-EGR-1, T-DEL-*, `egress-inventory`, Rechtsmatrix (§9.12)|Löschtyp-Messung teilweise (5 von 10 Schichten), Löschintegrationstests nicht kompilierbar (U-15), `infer-onnx` mit Download (U-07), `TenantId`-Duplikat (U-20)|
+|**Entkoppelt**|Jedes Crate baut, testet, auditiert und misst sich mit seinen deklarierten Abhängigkeiten allein; Kopplung nur über Ports und `types`|`module-isolation`, `transitive-budget`, `no-cycles`, `may-depend-on`; Profile bestehen `profile-audit`|Ring-Richtung eingehalten, aber 10 Crates über Budget und 8 Crates (plus Fassade) mit harten Kanten außerhalb §4.4 (§5.5); 1 echter Dev-Zyklus (`graph` ↔ `store`)|
+|**Wartbar**|Änderungen bleiben lokal; Wahrheit steht an einer Stelle; Regeln sind Gates, nicht Konvention|Wartbarkeitsregeln W1–W11 (§4.9); `duplicate-types`; `file-size`; Ratchets|35 doppelt definierte Typnamen, 5 Dateien > 800 Zeilen, `xtask` 32.572 Zeilen (§1.3 U-20, U-27, U-12)|
+|**Zukunftsfähig**|Formate, APIs und Algorithmen sind versioniert und austauschbar; Rechts- und Plattformänderungen erzeugen Arbeit an einer Stelle|SemVer je Crate, Format-Register, Algorithmus-IDs (W5), Deprecation-Policy (W4), gepinnte Toolchain (W7)|Format-Register teilweise (WAL, SSTable, Löschbericht V1–V5); Algorithmus-IDs nicht durchgängig belegt|
+|**Ehrlich**|Berichte, README und Manifeste behaupten nie mehr als das Evidence-Pack|`claims-consistency`, INV-CLAIMS-1|Audit-Noten ungültig (U-01); Baseline-Ursachen als Hypothese gekennzeichnet (§1.2a)|
+
+**Nicht-Aussagen:** „rechtssicher“, „zertifiziert“, „produktionsreif“ (ohne `stable`), „vollständig entkoppelt“ (ohne `transitive-budget`-Beleg).
+
 
 ---
 
@@ -298,6 +359,7 @@ Jedes Crate MUSS in `capabilities.toml` (Pflichtfelder) und in `crates/<name>/MO
 |`kvcache`|`types`, `ports`, `crypto`|–|
 |`engine`|`types`, `ports`, `mvcc`, `crypto`, `store`, `vector`, `text`, `rank`, `checkpoint`|**`graph` nur über Port `RelationIndex`** (Ist: hart in `collection/relate.rs`); `sandbox` optional|
 |`db`|`types`, `ports`, `engine`|**kein** `cognition`, **kein** `adapt` (Ist: hart, Re-Exports und `execute_sleep_cycle`) – Verlagerung in `cognition`/Fassade|
+|`erasure` (neu)|`types`, `ports`, `crypto` (nur Berichts- und Schlüsseltypen)|**nicht** `engine`, `db`, `store`; alle Messung und Reinigung über Ports (§9.11); Verdrahtung nur in der Fassade|
 |`graph`|`types`, `ports`, `adapt`|Dev-Kante `store` entfernen (Zyklus `graph` ↔ `store`)|
 |`adapt`|`types`, `ports`|–|
 |`cognition`|`types`, `ports`, `graph` (optional), `adapt`|**nicht** `engine`/`store`/`vector` direkt: Zugriff über Ports `DocumentStore`, `VectorIndex`, `RelationIndex` (Ist: `engine`-Typen in `consolidation_executor.rs`)|
@@ -336,9 +398,12 @@ Jedes Crate MUSS in `capabilities.toml` (Pflichtfelder) und in `crates/<name>/MO
 |`vector`|6|5|`crypto`, `sys`|
 |`store`, `checkpoint`|5|5 / 4|`crypto`; `core`|
 |`router`|5|4|`privacy`, `wire`|
+|`erasure` (neu)|–|4|`types`, `ports`, `crypto` (+ `sys` transitiv)|
 |alle übrigen|≤ 3|≤ 3|–|
 
 Das Gate `transitive-budget` bricht, wenn ein Crate sein Budget überschreitet; Budgets dürfen nur sinken (Ratchet).
+
+**Beleg (3.1):** Die Metrik-Datei vom 28.10.2026 bestätigt alle Ist-Werte der Tabelle (`mcp` 22, `agent` 20, `py` 20, `contextra` 19, `db` 17, `cognition` 16, `engine` 15, `vector` 6, `store`/`checkpoint`/`router` 5). Über Budget liegen damit `mcp`, `agent`, `py`, `contextra`, `db`, `cognition`, `engine`, `vector`, `checkpoint`, `router` (10 Crates). Die **direkten** Kanten außerhalb §4.4 stehen in §5.5.
 
 ### 4.6 Unsafe-Inseln (genau drei)
 
@@ -355,6 +420,27 @@ Das Gate `transitive-budget` bricht, wenn ein Crate sein Budget überschreitet; 
 ### 4.8 Composition Root und Profile
 
 Die Fassade `contextra` ist der **einzige** Composition Root. Sie bietet `ContextraBuilder` und benannte **Profile** (§11), die Ports mit Implementierungen verdrahten. Ein Integrator kann den Composition Root **ersetzen** und Module direkt verdrahten; dafür muss jeder Port eine dokumentierte Referenzverdrahtung im `MODULE.md` haben.
+
+### 4.9 Wartbarkeits- und Zukunftsregeln W1–W11 (neu in 3.1)
+
+Wartbarkeit entsteht durch **wenige, maschinell erzwungene Regeln mit Ratchet** (Werte dürfen nur besser werden), nicht durch Sammelumbau. Jede Regel hat ein Gate; Startwerte stammen aus der Messung vom 28.10.2026.
+
+|ID|Regel|Gate / Nachweis|Startwert (Ist)|
+|---|---|---|---|
+|W1|**Dateigröße:** Produktionsdatei ≤ 800 Zeilen (generierter Code ausgenommen und ausgewiesen)|`file-size` (Ratchet)|5 Dateien darüber (U-27)|
+|W2|**Schmale öffentliche API:** Budget je Crate (M5); öffentliche Items ohne Verwendung außerhalb des Crates werden `pub(crate)` oder entfernt, außer sie stehen im `MODULE.md`-Vertrag|`public-api`, `unwired-pub` (Warnung bis Phase 6, danach rot)|89 unverdrahtete `pub`-Items (U-25)|
+|W3|**Erweiterbarkeit:** wachsende öffentliche Enums und Structs (Fehler, Schichten, Klassen, Berichtsfelder) tragen `#[non_exhaustive]`, damit eine neue Variante kein SemVer-Major erzwingt; bewusst geschlossene Typen (Wire-Layout) sind ausgenommen und markiert|`semver` (cargo-semver-checks), Review-Liste|nicht gemessen|
+|W4|**Deprecation-Policy:** `#[deprecated(since, note)]` mindestens ein Minor-Release vor Entfernung; Aufrufer im Workspace werden im selben PR migriert; `-D deprecated` im Workspace|`clippy-lintset`|`TenantId::new` noch aufgerufen (U-27)|
+|W5|**Formate und Algorithmen sind austauschbar:** jedes persistente oder signierte Format trägt Formatversion **und** Algorithmus-ID (AEAD, KDF, Hash, Signatur); unbekannte ID ⇒ Fail-Closed; Altformate werden gelesen und migriert oder abgelehnt, nie still falsch interpretiert. Post-Quanten-Verfahren sind kein Ziel v1.0, werden aber **nicht verbaut**|Format-Register (§8.2 Regel 4), Golden-Files|Löschbericht V1–V5 versioniert; übrige Formate je Register zu prüfen|
+|W6|**Eine Typfamilie je Konzept (A2):** kein öffentlicher Typname in zwei Crates ohne Registereintrag mit Frist|`duplicate-types` (AST)|35 Namen (U-20)|
+|W7|**Toolchain und MSRV:** Toolchain gepinnt (Ist: 1.89.0); `rust-version` je Crate = Pin; ein Toolchain-Wechsel ist ein eigener PR mit voller Baseline|`rust-toolchain.toml`, `fmt`, `clippy-lintset`|Pin vorhanden|
+|W8|**Abhängigkeitshygiene:** `default-features = false` für externe Crates, soweit möglich; neue Netz-, Krypto- oder `unsafe`-Abhängigkeit nur mit ADR; Lizenz und Herkunft je Abhängigkeit im SBOM|`deny`, `audit`, `sbom`, `egress-inventory`|`tokio full` (U-09)|
+|W9|**Dokumentation am Code:** `MODULE.md` ≤ 120 Zeilen je Crate, `//!`-Kopf mit Zweck und Invarianten je Datei (im Repo bereits üblich), Doctests für öffentliche Beispiele; Integrationsleitfäden deutsch, `rustdoc` einheitlich (Entscheidung E-3.8)|`doc-truth`, `claims-consistency`|0 von 33 `MODULE.md`|
+|W10|**Testlaufzeit und -isolation:** `cargo test -p <crate>` ≤ Budget (Startwert 120 s `quick`; langsame Tests hinter `slow-tests`/nextest-Profil); keine Uhr, kein Netz, keine Reihenfolgeabhängigkeit|`test-runtime-budget` (nightly), `test-integrity`|13 Crates > 45 s (U-17)|
+|W11|**Schnitt nach Änderungsgrund:** Crates über 10.000 Produktionszeilen (`xtask` 32.572, `store` 13.521) werden auf Teilung geprüft; Ergebnis ist eine begründete Schnittstudie (WP 3.9), **keine** Vorab-Entscheidung|Schnittstudie, ADR|—|
+
+**Zukunftsfähigkeit der Löschkette:** Rechtsauslegung, Fristen und Aufsichtspraxis ändern sich häufiger als Code. Deshalb enthalten Berichte `assumptions[]` und `residuals[]`, Fristen und Legal-Hold-Kataloge sind **Konfiguration, kein Code** (O-02), und die Rechtsmatrix (§9.12) macht sichtbar, welcher Baustein bei einer Rechtsänderung angefasst wird.
+
 
 ---
 
@@ -484,6 +570,59 @@ Die Steckbriefe fassen je Crate **Verantwortung**, **Befund am Code (E1)** und *
 ### 5.4 Entfallende Crates
 
 `contextra-core` (106 Code-Z.) ist eine Kompatibilitätsfassade mit Re-Exports von `types`, `ports`, `mvcc`, `wire`; sie hat **61 Vorkommen in 32 Dateien** im Workspace (zeilenbasierte Zählung). Sie entfällt in zwei Schritten: (1) als `deprecated` markieren, (2) Verwendungen auf direkte Crates umstellen, dann entfernen (ADR-D06, WP 2.8).
+
+### 5.5 Crate-Review: Wartbarkeit, Entkopplung, Baseline (neu in 3.1)
+
+Dieser Abschnitt prüft **jedes der 35 Mitglieder** gegen §4.4 (Kantenregeln), §4.5 (Budgets), §4.9 (Wartbarkeit) und die Baseline (§1.2a). Er ist **generiert** aus `metrics-2026-10-28.json` und `per_crate_summary.json` (beide E1/E2, Methode der Metrik-Datei unbekannt, U-18) und wird durch `cargo xtask gen-module-docs` (WP 3.1) abgelöst.
+
+**Lesehilfe.** *Prod-Z.* = Produktionszeilen laut Metrik-Datei (weichen von §5.2 ab, U-18). *Trans.* = harte transitive Workspace-Crates, Ist → Soll (fett = über Budget). *Hart außerhalb §4.4* = direkte, nicht optionale Normalkanten, die die Soll-Tabelle nicht nennt (`router` → `privacy`/`wire` gilt dort als „optional“ und wird in §5.5 nicht als Abweichung gezählt, steht aber in U-19). *Fremde Dev-Kanten* = Dev-Abhängigkeiten außer `testkit` und Selbstkante. *Panic* = `unwrap/expect/panic` laut Metrik, Wert für `wire` überwiegend Generat, für `xtask` unsicher (U-26). *check/clippy/test* = Ergebnis je Crate (`T/O` = Timeout 45 s, unbekannt).
+
+|Crate|Ring|Prod-Z.|Trans.|Hart außerhalb §4.4|Fremde Dev-Kanten|Panic u/e/p; allow|check|clippy|test|Maßnahmen (WP)|
+|---|:-:|--:|:-:|---|---|---|:-:|:-:|:-:|---|
+|`contextra-types`|0|2643|0|–|–|0/0/0; allow 1|grün|rot|grün|API einfrieren (W3); 1 `allow` registrieren (1.2); `TenantId`-Duplikat in `privacy` auflösen (2.13); Clippy-Ursache (0.6)|
+|`contextra-ports`|0|1679|1|–|–|0/0/0; allow 0|grün|rot|grün|Domänen-Ports auslagern (2.4); Duplikate `HyperEdgeId`/`RoleId`/`RoleBinding`/`GraphMutationError` (2.13); 3 Zeitaufrufe → `Clock` (2.12); `MetricsSink` nur Null-Impl. (3.4)|
+|`contextra-sys`|0|591|0|–|–|0/0/0; allow 0|grün|grün|grün|Referenz-Crate (check, clippy, test grün); `// SAFETY:` je Block belegen (3.2)|
+|`contextra-simd`|0|1114|1|–|–|0/0/0; allow 0|grün|rot|grün|Clippy-Ursache (0.6); Miri und Differential-Tests (6.1)|
+|`contextra-wire`|0|1530|0|–|–|16/0/0; allow 3|grün|grün|grün|Generat isolieren: 16 `unwrap`, 43 `unsafe` ohne `// SAFETY:` im Generat; `forbid` für Handcode (1.4)|
+|`contextra-testkit`|Tool|622|2|–|–|0/0/0; allow 0|grün|rot|grün|Doubles je Port und Konformitätssuiten (3.4); Clippy (0.6)|
+|`contextra-mvcc`|0|1585|2|–|–|0/0/0; allow 0|grün|rot|rot|Test-Target `ssi_metrics_observability.rs` klären (0.5); 14 Zeitaufrufe in Ring 0 → `Clock` (2.12); loom (4.4)|
+|`contextra-store`|1|13521|5 (Soll 5)|–|`vector`, `graph`, `sandbox`|0/2/4; allow 0|grün|rot|T/O|Timeout klären (0.7); undefinierte `cfg(feature)` (1.5); blockierendes I/O (1.7); Dev-Kanten (2.10); 2 `expect` + `panic!` (1.2); `_for_test` nicht öffentlich (1.6); Dateien > 800 Z. (W1)|
+|`contextra-checkpoint`|1|1630|**5 → 4**|`core`|`store`|0/0/0; allow 0|grün|rot|grün|`core` entfernen (2.8); Dev `store` → Port-Double (2.11); Konstanten-Stubs `hardlink_cloner` prüfen (1.6)|
+|`contextra-vector`|0|7878|**6 → 5**|`crypto`|–|1/0/0; allow 0|grün|rot|T/O|Timeout (0.7); `crypto` hinter Feature (2.10); blockierendes I/O in `diskann`/`core_rebuild` (1.7); 1 `unwrap` (1.2)|
+|`contextra-text`|0|2819|2|–|–|0/6/1; allow 1|grün|rot|T/O|Timeout (0.7); `panic!` im Tokenizer, 6 `expect` in `purge`/`scanner` (1.1, 1.2); Test-`unsafe` `alloc_profiler` (§17 F-01)|
+|`contextra-rank`|0|2972|2|–|`adapt`|0/0/0; allow 0|grün|rot|grün|Dev `adapt` entfernen (2.11); Duplikate `DriftDetector`, `ConformalCalibrator`, `BoundedTopK` (2.13)|
+|`contextra-engine`|3|9372|**15 → 11**|`sys`, `graph`|`core`, `vector`|0/0/0; allow 0|grün|rot|T/O|Timeout (0.7); `graph` über `RelationIndex` (2.2); `sys` entfernen (2.14); Duplikate `AdaptiveDecayController` u. a. (2.6, 2.13); 7 Zeitaufrufe (2.12)|
+|`contextra-db`|3|1011|**17 → 12**|`cognition`, `sys`, `crypto`, `store`, `vector`, `text`, `checkpoint`, `graph`, `rank`, `adapt`|`vector`|0/8/2; allow 0|grün|rot|T/O|Timeout (0.7); 10 von 13 Kanten außerhalb Soll (2.3, 2.14); Test-Target `deletion_proof_integration.rs` (0.5); 8 `expect` + 2 `panic` (1.2); `TenantId::new` migrieren (W4)|
+|`contextra-crypto`|0|3690|2|–|–|0/0/0; allow 1|grün|rot|rot|Test-Target `audit_chain_tests.rs` (0.5); KV-Teile samt Duplikaten → `kvcache` (2.5, 2.13); `KmsProvider` verdrahten (5.3); `deletion_proof.rs` 910 Z. (W1)|
+|`contextra-audit-export`|0|214|2|–|–|0/0/0; allow 0|grün|rot|grün|Formatvertrag, Golden-Files (6.5); Duplikat `AvvContext` (2.13)|
+|`contextra-avv-generator`|0|196|1|–|–|0/0/0; allow 0|grün|rot|grün|Vorlagen versionieren; juristische Prüfung (O-05); Duplikat `AvvContext` (2.13)|
+|`contextra-infer-candle`|2|2423|3|–|`crypto`|0/0/0; allow 0|grün|rot|T/O|Timeout (0.7); Dev `crypto` → Double (2.11); KV-Duplikate (2.5)|
+|`contextra-infer-onnx`|2|892|3|–|–|0/0/0; allow 0|grün|rot|grün|Download entfernen/freigabepflichtig, blockierendes `std::fs` (2.7, 1.7); optionale Kante `infer-candle` entfernen (2.14)|
+|`contextra-infer-ollama`|2|1684|3|–|`infer-onnx`|0/0/0; allow 0|grün|rot|grün|Loopback-Standard, 18 Netzstellen inventarisieren (2.7); Dev `infer-onnx` (2.11)|
+|`contextra-kvcache`|1|2191|3|–|–|0/0/0; allow 0|grün|rot|grün|KV-Typen aus `crypto` übernehmen (2.5); 3 Zeitaufrufe (2.12); Löschkaskade S10 (5.2)|
+|`contextra-adapt`|0|2193|2|–|–|0/0/0; allow 0|grün|rot|grün|`experimental`; Duplikat `AdaptiveDecayController` (2.13); Nutzen belegen oder zurückbauen (6.3)|
+|`contextra-graph`|0|7796|3|–|`store`|0/0/0; allow 0|grün|rot|T/O|Timeout (0.7); Dev `store` (Zyklus, 2.10); `DeletionProof`-Duplikat in `cascade.rs` (2.13, 5.1); Test-`unsafe` `ppr_alloc_test` (§17 F-01)|
+|`contextra-cognition`|3|3187|**16 → 6**|`engine`, `store`, `vector`|`infer-candle`|0/0/0; allow 0|grün|rot|T/O|Timeout (0.7); `engine`, `store`, `vector` über Ports (2.6); Dev `infer-candle` (2.11)|
+|`contextra-router`|3|1344|**5 → 4**|–|`db`, `vector`, `graph`, `text`|0/0/0; allow 0|grün|rot|grün|4 Dev-Kanten → Doubles (2.11); `privacy`, `wire` optional (2.14)|
+|`contextra-agent`|3|2415|**20 → 10**|`db`, `store`|`vector`, `text`|0/0/0; allow 0|grün|rot|T/O|Timeout (0.7); `db`, `store` entfernen (2.6); Dev `text`, `vector` (2.11)|
+|`contextra-privacy`|3|1331|2|–|`crypto`|0/0/0; allow 0|grün|rot|grün|`TenantId`-Duplikat (VETO-F10, 2.13); `EgressGuard`-Duplikat mit `mcp` (2.13); `EntityRecognizer` nur Null-Impl. (3.4)|
+|`contextra-mcp`|4|3111|**22 → 16**|`license`, `rank`, `crypto`, `privacy`, `router`|–|0/0/0; allow 0|grün|rot|T/O|Timeout (0.7); 5 harte Kanten (2.7, 2.14); Mock im Produktionscode (1.6); blockierendes `std::fs` im Binary (1.7)|
+|`contextra-py`|4|1415|**20 → 12**|`router`, `rank`, `adapt`, `core`, `store`, `db`|–|0/0/0; allow 0|grün|rot|grün|6 harte Kanten (2.7, 2.14); `_trigger_panic_for_test` nicht öffentlich (1.6)|
+|`contextra-sandbox`|2|1105|0|–|–|0/0/0; allow 0|grün|rot|grün|Clippy (0.6); 2 Zeitaufrufe (2.12); Escape-/Fuel-Tests (6.5)|
+|`contextra-license`|4|307|2|–|–|0/0/0; allow 0|grün|rot|grün|nicht mehr hart von Fassade und `mcp` ziehen (2.14)|
+|`contextra`|4|722|**19 → 14**|`core`, `license`|–|0/0/0; allow 0|grün|rot|T/O|Timeout (0.7); `core`, `license` nicht hart (2.8, 2.14); Feature `compliance` ungenutzt (2.9); Profile (3.7)|
+|`contextra-core`|0|106|4|–|–|0/0/0; allow 0|grün|rot|grün|entfällt (2.8)|
+|`contextra-bench`|–|4303|20|–|`sys`|0/0/0; allow 0|grün|rot|T/O|Timeout (0.7); nicht in `default-members`; Netz/Clock als Werkzeug einstufen|
+|`xtask`|–|32572|0|–|–|57/9/2; allow 4|grün|rot|T/O|Timeout (0.7); 32.572 Z., 57 `unwrap`/9 `expect`/2 `panic`; Rückbau und Budget (3.6); `unsafe`-Zählung klären (§17 F-01)|
+
+**Auswertung.**
+
+1. **Entkopplung:** 8 Crates haben harte Kanten außerhalb §4.4 (`db`, `mcp`, `py`, `cognition`, `agent`, `engine`, `checkpoint`, `vector`, dazu die Fassade mit `license`); 10 Crates liegen über ihrem Transitiv-Budget. Der größte Hebel ist `db` (10 von 13 direkten Kanten außerhalb Soll): wer `db` entkoppelt (WP 2.3, 2.14), senkt zugleich `agent`, `py` und `contextra`.
+2. **Qualität:** Nur `wire` und `sys` bestehen Clippy; die übrigen 33 sind rot bei **unbekannter** Ursache (U-16). Vor jeder Lint-Bereinigung wird die Ursache an den rohen Logs bestimmt (WP 0.6), sonst werden Symptome gejagt.
+3. **Robustheit:** Produktions-Panics und `allow`s sind in `db`, `store`, `text`, `vector` und `wire` (Generat) zu behandeln; `xtask` ist nicht Bibliothek, wird aber mit eigenem Budget geführt (WP 3.6).
+4. **Wartbarkeit:** Doppelte Typen (U-20) und fehlende `MODULE.md` (0 von 33) sind die größten, billig behebbaren Risiken für Folgearbeiten (auch durch LLM-Agenten).
+5. **Zukunftsfähigkeit:** Ring-0-Crates mit direkter Zeitnutzung (`mvcc`) und KV-Kryptografie in `crypto` widersprechen den Zielgrenzen; ihre Behebung ist Voraussetzung für deterministische Recovery-Tests (G6).
+
 
 ---
 
@@ -652,14 +791,14 @@ Technische Anforderungen leiten sich ab aus Art. 5 Abs. 1 lit. e und f (Speicher
 
 |Nr.|Baustein|Besitzer|Ist (E1)|Arbeitspaket|
 |---|---|---|---|---|
-|D1|Löschtypen (`DeletionLayer` zehn Varianten, `LayerWitness`, `ReachedClass`)|`types`/`ports`/`crypto`|`WitnessLayer` mit sieben Alt-Varianten; `DeletionLayer` in `crypto` vorhanden|WP 5.1|
-|D2|Schlüsselhierarchie: Keystore, KeyTable, `DocDek`, `ArtKey`, KEK-Epochen|`crypto` (Logik), `store` (Persistenz)|nicht gefunden (`KeyScanner`, `EffaceableKeySlot` fehlen)|WP 5.3|
+|D1|Löschtypen (`DeletionLayer` zehn Varianten, `LayerWitness`, `ReachedClass`)|`types`/`ports`/`crypto`|`WitnessLayer` mit sieben Alt-Varianten; `DeletionLayer` in `crypto` vorhanden; **zweiter `DeletionProof` in `graph/src/cascade.rs`** (U-20); `LayerCleanupProof` nirgends definiert, aber von zwei Tests importiert (U-15)|WP 5.1, 0.5|
+|D2|Schlüsselhierarchie: Keystore, KeyTable, `DocDek`, `ArtKey`, KEK-Epochen|`crypto` (Logik), `store` (Persistenz)|nicht gefunden (`KeyScanner`, `EffaceableKeySlot` fehlen); `KmsProvider` laut Scan **nicht verdrahtet** (U-25)|WP 5.3|
 |D3|Destroy-Protokoll D1–D6, Epoch Seal|`crypto` + `store`|nicht gefunden|WP 5.4|
 |D4|Scanner Ebene A/B je Schicht|`store`, `vector`, `text`, `checkpoint`, `kvcache`, `graph`, `engine`|Memtable, SSTable, WAL, HNSW, Text vorhanden; Blob, Cache, Checkpoint, Key, Lineage fehlen|WP 5.2|
 |D5|Purger je Schicht (`compact_range(scope)`, Slot-Nullung, Segment-Rewrite)|besitzende Crates|`Purger`-Port vorhanden; Implementierungen teilweise|WP 5.2|
 |D6|`ErasedSet`, Lesesperre, Key-Lock|`erasure` + Lesepfade|nicht gefunden|WP 5.5|
 |D7|Löschsaga (Zustandsmaschine, Journal, Recovery)|`erasure`|nicht gefunden|WP 5.5|
-|D8|Bericht `DeletionProof` V5, Siegel, Claim-Generator|`crypto` (Format), `erasure` (Bildung)|V5-Format im Code; Klassen-/Siegelbildung unklar (E0)|WP 5.6|
+|D8|Bericht `DeletionProof` V5, Siegel, Claim-Generator|`crypto` (Format), `erasure` (Bildung)|V5-Format im Code; Klassen-/Siegelbildung unklar (E0); Integrationstests `crypto/audit_chain_tests.rs` und `db/deletion_proof_integration.rs` **kompilieren nicht** (U-15)|WP 0.5, 5.6|
 |D9|Backup/Restore (Zwei-Spuren), Restore-Guard, `ErasedSetMirror`|`checkpoint`, `erasure`|`checkpoint` vorhanden, Guard fehlt|WP 5.7|
 |D10|Fristen, `RecipientLedger`, Legal Hold, Mixed-Policy|`erasure`|nicht gefunden|WP 5.8|
 |D11|Lösch-Mutationskatalog (G7), Abnahmekriterien AC|`testkit`, `xtask`|nicht gefunden|WP 5.9|
@@ -746,13 +885,86 @@ Nicht durch Contextra kontrollierbar und deshalb **ausgewiesen**, nie behauptet:
 |Teil|Reife Ist|Reife Ziel v1.0|Voraussetzung|
 |---|---|---|---|
 |Scanner-Port und vorhandene Scanner|`beta` (E1–E2)|`stable`|Differentialtests, Chaos|
-|`DeletionProof` V5 (Format, Verifikation)|`beta`|`stable`|Golden, Fuzz, externer Krypto-Review|
+|`DeletionProof` V5 (Format, Verifikation)|`beta` laut Manifest, **belegt nur E1**, solange die Integrationstests nicht kompilieren (U-15)|`stable`|Golden, Fuzz, externer Krypto-Review|
 |Schlüsselhierarchie, Destroy, Seal|`experimental` (nicht umgesetzt)|`beta` (v1.0), `stable` danach|WP 5.3–5.4|
 |Saga, `ErasedSet`, Lesesperre|`experimental` (nicht umgesetzt)|`beta`|WP 5.5|
 |Backup/Restore-Guard|`experimental`|`beta`|WP 5.7|
 |Gesamtbaustein „Löschkette“|**`experimental`**|`beta` mit Evidenz E3 je Teil|Phase 5 des PLAN.md|
 
 Bis Phase 5 abgeschlossen ist, DARF kein Produkt, README oder Bericht die Löschkette als „produktionsreif“ oder „rechtssicher“ bezeichnen (INV-CLAIMS-1).
+
+### 9.11 Schnittstellenvertrag und Entkopplung der Löschkette (neu in 3.1)
+
+Die Löschkette ist als **Bibliotheksbaustein** so geschnitten, dass sie ohne `engine`, `db` und `store` gebaut, geprüft und ersetzt werden kann (M1, M2, ADR-D15). Maßgeblich ist die **Richtung der Abhängigkeiten**:
+
+```
+            Fassade `contextra` (einziger Composition Root, EP7)
+     verdrahtet Scanner/Purger der Besitzer in den Koordinator
+                                  │
+   ┌──────────────────────────────┼─────────────────────────────────────────┐
+   │  `erasure` (Ring 3)          │   Besitzer-Crates (je Schicht)          │
+   │  Saga, ErasedSet, Bericht-   │   store    S1, S1b, S4(Teil), S7(Teil)  │
+   │  Bildung, Lesesperre-Port    │   vector   S2      text   S3            │
+   │  kennt NUR Ports + crypto-   │   engine   S4, S5  checkpoint  S6       │
+   │  Berichtstypen               │   crypto   S7      graph  S9  kvcache S10│
+   └───────────────┬──────────────┴──────────────┬──────────────────────────┘
+                   ▼                             ▼
+             `ports` (Verträge)  ◄───────  Besitzer implementieren Ports
+```
+
+**Entkopplungs-Invarianten des Bausteins**
+
+|ID|Invariante|Prüfung|
+|---|---|---|
+|E-1|`erasure` hängt nur von `types`, `ports`, `crypto`; nie von `engine`, `db`, `store`, `vector`, `text`, `graph`, `kvcache`|`may-depend-on`, `module-isolation`|
+|E-2|Messung und Reinigung einer Schicht liegen im Crate, das die Daten hält; `erasure` ruft nur `LayerScanner` und `Purger`|`ports-conformance`|
+|E-3|Die Lesesperre wirkt über `ErasedSetPort` in **jedem** Lesepfad der Besitzer; ein Lesepfad ohne Prüfung ist ein Mutationstest-Fall (T-DEL-15)|Mutationskatalog|
+|E-4|Das Berichtsformat (`DeletionProof` V5) liegt genau einmal in `crypto`; `graph` oder `engine` definieren keinen eigenen Beweistyp|`deletion-types-once`, `duplicate-types`|
+|E-5|Zeit, Zufall, IDs, Dateizugriff kommen über `Clock`, `Rng`, `IdGen`, `Vfs`, `DurableLog`; Schlüssel- und Salt-Material aus dem System-RNG|`determinism`, `result-dropped-on-io`|
+|E-6|Der Koordinator **lehnt den Start ab**, wenn eine Schicht, in der Daten liegen können, weder Scanner noch dokumentierten Ausschluss hat (INV-SURFACE-1, Fail-Closed)|Build-/Startfehler-Test|
+|E-7|Ein Profil ohne `erasure` (z. B. **Search**) behauptet nichts über Löschung; die Fassade stellt dann weder `forget` mit Berichtsanspruch noch `Frozen`-Semantik bereit|`profile-audit`, `claims-consistency`|
+
+**Verdrahtung (Pseudocode, nicht kompiliert; Namen sind Richtwerte, normativ sind E-1 bis E-7):**
+
+```text
+let erasure = ErasureBuilder::new(clock, id_gen, durable_log)
+    .layer(store.scanners(), store.purgers())      // S1, S1b
+    .layer(vector.scanner(), vector.purger())      // S2
+    .layer(text.scanner(),   text.purger())        // S3
+    .layer(cache_scanner,    cache_purger)         // S4
+    .layer(lineage_scanner,  lineage_purger)       // S5
+    .layer(checkpoint.scanner(), checkpoint.purger()) // S6
+    .layer(key_scanner,      key_purger)           // S7
+    .optional_layer(graph)                         // S9, nur wenn Modul gebunden
+    .optional_layer(kvcache)                       // S10, nur wenn Modul gebunden
+    .key_slot(effaceable_key_slot)                 // K0/K1 Software, K2/K3 Port
+    .erased_set(erased_set_port)
+    .build()?;   // Err, wenn Schicht ohne Scanner und ohne Ausschluss (E-6)
+```
+
+**Ist-Abgleich (E1):** Ports `LayerScanner` und `Purger` sowie fünf Scanner sind vorhanden (U-04); `erasure`, `ErasedSetPort`, `EffaceableKeySlot`, `DurableLog` fehlen; `DeletionProof` existiert doppelt (U-20); Löschintegrationstests kompilieren nicht (U-15); `KmsProvider` ist laut Scan unverdrahtet (U-25).
+
+### 9.12 Rechtsmatrix: gesetzliche Vorgabe → Baustein → Nachweis (neu in 3.1)
+
+Keine Rechtsberatung (§9.2, §9.9). Die Matrix zeigt, **welcher Baustein welche technische Anforderung trägt** und womit sie belegt wird; sie ist die Änderungsstelle, wenn sich Recht oder Aufsichtspraxis ändern (W-Zukunftsfähigkeit, §4.9). Maschinenlesbare Fassung: `docs/spec/legal-matrix.toml` (WP 5.10).
+
+|Vorgabe (DSGVO, sinngemäß)|Technische Anforderung|Baustein / Crate|Nachweis|Status|
+|---|---|---|---|---|
+|Art. 5 Abs. 1 lit. e Speicherbegrenzung|Aufbewahrung nur so lange nötig; Fristen durchsetzbar|Retention-Reaper (`engine`), Fristen und Legal Hold (`erasure`, D10)|T-RET-*, Zustandsübergangstests|Reaper vorhanden (Anhang C-11.6); Fristen offen|
+|Art. 5 Abs. 1 lit. f, Art. 32 Integrität, Vertraulichkeit|Verschlüsselung, Integrität, Mandantentrennung|`crypto`, `store` (WAL-HMAC), `privacy`, INV-TENANT-*|Krypto-Tests, T-TEN-1/2, externer Review (V8)|teilweise (`crypto` `beta`)|
+|Art. 5 Abs. 2, Art. 24 Rechenschaft|Nachweis der Maßnahmen|Evidence-Pack, `AuditChain`, `DeletionProof`|`evidence-pack`, Verifier-Fuzz|Format vorhanden, Integrationstest rot (U-15)|
+|Art. 17 Abs. 1 Löschung|technisch begründete Löschung aller Schichten|Saga (`erasure`), Scanner/Purger je Schicht, Destroy-Protokoll (D1–D6)|T-DEL-1/2/3/4/5, Mutationskatalog (T-DEL-15)|5 von 10 Schichten gemessen; Saga fehlt|
+|Art. 17 Abs. 2, Art. 19 Information von Empfängern|Empfänger dokumentieren und benachrichtigen können|`RecipientLedger` (D10)|Zustandstests; Bericht weist Empfänger aus|fehlt (WP 5.8)|
+|Art. 18 Einschränkung|Sperre ab Anordnung, auch in Export, `as_of`, Checkpoint|`ErasedSet`, Lesesperre (`Frozen`, `Restricted`)|T-DEL-7/8/9|fehlt (WP 5.5)|
+|Gesetzliche Aufbewahrungspflichten|Löschung weicht Aufbewahrung: `Restricted{basis, until}`|Legal-Hold-Mechanismus (D10); **Kataloge sind Rechtsfrage (O-02)**|Zustandsübergänge, Bericht `BeschränktAufbewahrt`|Mechanismus offen|
+|Art. 25 Datenschutz durch Technikgestaltung und Voreinstellung|sichere Standardwerte|Netz aus (VETO-NET1), Mandantentrennung, `default = []`, Fail-Closed|T-EGR-1, `egress-inventory`, `feature-matrix`|`infer-onnx` Download (U-07), `store`-cfg-Features (U-22)|
+|Art. 28 Auftragsverarbeitung|AVV-Unterlagen|`avv-generator`|Golden-Files; juristische Prüfung (O-05)|`experimental`|
+|Art. 30 Verzeichnis von Verarbeitungstätigkeiten|Verzeichnis erzeugen|`audit-export`|Formatvertrag, Golden-Files|`experimental`|
+|Art. 15, 20 Auskunft, Übertragbarkeit|Export der Daten einer betroffenen Person|**nicht Teil von v1.0** (Nicht-Ziel); Export-Baustein optional|ADR vor Aufnahme (§2.4)|offen|
+|Art. 33, 34 Meldung von Verletzungen|Erkennung und Meldung|**nicht Teil von v1.0**; Hooks über `Observer` (Integrator)|—|Nicht-Ziel|
+|VO (EU) 2024/1689 (KI-Verordnung)|Einordnung je Anwendungsfall|Integrator (O-06); Bausteine liefern Protokollierung und Budgets|—|offen|
+|VO (EU) 2024/2847 (Cyber Resilience Act)|Anforderungen an Produkte mit digitalen Elementen, Schwachstellenmanagement|SBOM, `cargo audit`, `deny`, Release-Prozess (§13.2); **Einordnung offen (O-11)**|—|offen|
+
 
 ---
 
@@ -855,6 +1067,15 @@ Für jedes Profil liefert das Repository ein **lauffähiges Beispiel** (`example
 |`ports-conformance`|jede Port-Implementierung besteht die Konformitätstests|pr|
 |`surface-coverage`|jede Dateiklasse hat eine Löschschicht (INV-SURFACE-1)|pr|
 |`profile-audit`|Profile bauen, laufen, halten Budget|merge|
+|`baseline-all-targets`|`cargo check --workspace --all-targets --locked` und `cargo test --workspace --no-run --locked` (ADR-D11)|pr|
+|`clippy-baseline`|`cargo clippy -p <crate> --all-targets --locked -- -D warnings` je Mitglied; Ergebnis je Crate im Protokoll|pr|
+|`duplicate-types`|kein öffentlicher Typname in zwei Crates ohne Registereintrag mit Frist (A2, W6)|pr|
+|`undefined-cfg-feature`|`cfg(feature = "x")` ohne Manifest-Definition ist ein Fehler (U-22); tote Features melden|pr|
+|`test-hooks-private`|keine öffentlichen `*_for_test`-Items und keine `Mock*`/`Fake*` in `src/` ohne `cfg(test)`/`test-hooks` (Regel 15)|pr|
+|`async-blocking-io`|kein `std::fs`/`std::thread::sleep` in `async fn` ohne `spawn_blocking`/`Vfs` (Regel 16)|pr|
+|`file-size`|Produktionsdatei ≤ 800 Zeilen, Ratchet (W1)|pr|
+|`measure-single-source`|Kennzahlen in Dokumenten stammen aus `cargo xtask metrics` (ADR-D12)|merge|
+|`test-runtime-budget`|`cargo test -p <crate>` ≤ Budget (W10)|nightly|
 
 ### 12.3 Pflichtprüfungen nach Crate-Klasse
 
@@ -905,6 +1126,9 @@ Jedes Crate hat eine eigene SemVer-Version; `cargo-semver-checks` ist Pflicht f�
 |Kriterium|Nachweis|
 |---|---|
 |Baseline grün (Build, Test, Clippy) auf CI für **alle** 35 Mitglieder|WP 0.1|
+|`cargo check --workspace --all-targets --locked` und `cargo clippy --workspace --all-targets --locked -- -D warnings` grün; kein Timeout in `cargo test -p <c>`|WP 0.5, 0.6, 0.7 (ADR-D11)|
+|Keine Doppeldefinition öffentlicher Typen ohne Registereintrag; keine Test-Hooks in der Produktions-API|`duplicate-types`, `test-hooks-private`|
+|Rechtsmatrix (§9.12) vollständig, jede Zeile mit Nachweis oder ausgewiesenem Nicht-Ziel|WP 5.10|
 |Kein Produktions-Panic und kein unregistriertes `allow`|`panic-inventory`, `allow-register`|
 |Soll-Graph (§4.5) erreicht, keine Zyklen|`transitive-budget`, `no-cycles`|
 |Egress-Tabelle eingehalten, ONNX-Download entfernt oder freigabepflichtig|`egress-inventory`, T-EGR-1|
@@ -936,6 +1160,12 @@ Jedes Crate hat eine eigene SemVer-Version; `cargo-semver-checks` ist Pflicht f�
 |ADR-D08|Reife nur aus Evidence-Pack; Audit-Berichte sind Hypothesen|U-01, U-02|–|
 |ADR-D09|`xtask` wird nach Wirksamkeit inventarisiert und zurückgebaut|U-12|–|
 |ADR-D10|`tokio` ohne `full`; Features je Crate minimal|Bauzeit, Angriffsfläche|–|
+|ADR-D11|**Baseline-Definition:** grün heißt `check`, `clippy -D warnings` und `test` je Crate **und** `--workspace --all-targets`; ein Timeout ist **rot**|U-15 bis U-17|–|
+|ADR-D12|Kennzahlen stammen aus **einer** AST-Messung (`cargo xtask metrics`); Handzählungen, Regex-Zähler und Altwerte sind historisch|U-18|–|
+|ADR-D13|Eine Typfamilie je Konzept wird per Gate `duplicate-types` erzwungen; Duplikate werden zusammengeführt oder umbenannt|U-20, A2|–|
+|ADR-D14|Test-Hooks, Mocks und Fake-Beweise gehören nie in die öffentliche Produktions-API|U-24|–|
+|ADR-D15|Löschkette: Orchestrierung in `erasure`, Messung in den besitzenden Crates, Berichtsformat in `crypto`, Verdrahtung nur in der Fassade; Algorithmus-IDs in Formaten|§9.11, W5|ADR-D04 (ergänzt)|
+|ADR-D16|Wartbarkeitsregeln W1–W11 als Gates mit Ratchet statt Sammelumbau|§4.9|–|
 
 ---
 
@@ -953,16 +1183,33 @@ Jedes Crate hat eine eigene SemVer-Version; `cargo-semver-checks` ist Pflicht f�
 |O-08|Welche `xtask`-Prüfungen sind wirksam (Mutations-/Selbsttest)?|WP 3.6|
 |O-09|Notwendigkeit von DiskANN/RaBitQ im Designpunkt ≤ 10⁷ Vektoren|Benchmark|
 |O-10|macOS und Windows als unterstützte Entwicklungs-/Edge-Plattformen|Technik|
+|O-11|Einordnung der Bibliothek und der Integrator-Produkte nach VO (EU) 2024/2847 (Cyber Resilience Act): Pflichten, Meldewege, Open-Source-Besonderheiten|externe Rechtsprüfung|
+|O-12|Reproduzierbarkeit der Baseline: Commit 8f8fa7cd im flachen Klon nicht auflösbar; Zielstand für die erneute Baseline festlegen|Technik (WP 0.1)|
+|O-13|Ursache der 33 Clippy-Fehlschläge (gemeinsamer Abbruch oder echte Lints) anhand der rohen Logs|Technik (WP 0.6)|
+|O-14|Welche Tests verursachen die 13 Timeouts (Fixture, echte Last, Deadlock)?|Technik (WP 0.7)|
+|O-15|Dokumentationssprache: `rustdoc` englisch oder deutsch; Integrationsleitfäden deutsch|Produkt (E-3.8)|
 
 ---
 
-## 17. Offene Spezifikationsfragen (Dokumentationsabgleich 28.10.2026)
+## 17. Offene Spezifikationsfragen (Dokumentationsabgleich 28.10.2026, Fassung 3.1)
 
-| Datum | Betroffene Stelle / Thema | Befund & Fragestellung | Vorschlag |
+### 17.1 Frühere Fragen (aus 3.0): Stand nach Prüfung des Klons
+
+|Thema|Frühere Aussage|Befund am Klon HEAD 21a09ad (E1) und Baseline|Ergebnis|
 |---|---|---|---|
-| 28.10.2026 | `contextra-sys` Modulimport / Compilability | Das Crate `contextra-sys` besitzt in `src/lib.rs` einen ungelösten Import `pub mod crypto_rng;`, während die Datei `src/crypto_rng.rs` am HEAD fehlt. Dadurch schlägt `cargo check --workspace` fehl. | `crypto_rng.rs` aus Paket-Restaurierung wiederherstellen oder Moduldeklaration in `lib.rs` entfernen. |
-| 28.10.2026 | `capabilities.toml` vs Ring-Modell | `capabilities.toml` deklariert z. B. `contextra-graph` und `contextra-adapt` als Ring 0, während SPEC §4.1 sie in höheren Rängen bzw. Randmodulen verortet. | `capabilities.toml` in WP 0.2/WP 2.1 vollständig an das Schema 3 der SPEC 3.0 anpassen. |
-| 28.10.2026 | `xtask` Doppeldeklaration | In `xtask/src/main.rs` existiert eine doppelte Match-Arm-Deklaration für `"check-commit-diff-integrity"`. | Duplikat im CLI-Dispatcher entfernen. |
+|`contextra-sys`: `pub mod crypto_rng;` ohne Datei|`cargo check --workspace` scheitere daran|`sys/src/lib.rs` enthält keine Deklaration `crypto_rng`, die Datei fehlt ebenfalls; Baseline: `cargo check -p contextra-sys` Exit 0, Clippy und Test grün|**erledigt/nicht mehr zutreffend**|
+|`capabilities.toml` vs. Ring-Modell (`graph`, `adapt` in Ring 0)|angeblicher Widerspruch zu §4.1|§4.1 führt `graph` und `adapt` **ebenfalls** in Ring 0; kein Widerspruch. Echte Lücke: `may_depend_on` unvollständig (68 Scan-Warnungen) und veraltet (`contextra-core`)|**umformuliert:** WP 0.2, 2.1|
+|`xtask`: doppelter Match-Arm `check-commit-diff-integrity`|doppelte Deklaration|Im Klon genau **0** Treffer in `xtask/src/main.rs`; Baseline: `xtask` check Exit 0|**erledigt/nicht reproduzierbar**|
+
+### 17.2 Neue Fragen
+
+|ID|Thema|Befund und Fragestellung|Vorschlag|
+|---|---|---|---|
+|F-01|`unsafe` in Testcode und Zählung in `xtask`|Test-Dateien in `graph` und `text` (Allocator-Profiler) enthalten `unsafe`; die Metrik zählt 39 `unsafe` in `xtask`. §4.6 verbietet `unsafe` außerhalb der Inseln, unterscheidet aber nicht zwischen Produktions- und Testcode|Regel präzisieren: Produktion nur Inseln; Testcode nur in `tests/` mit `// SAFETY:` und Eintrag in einem Register; `xtask` per AST messen|
+|F-02|Commit-Stände|Baseline (8f8fa7cd), Scan (52d3227), Klon (21a09ad) unterscheiden sich; Zahlen sind nicht addierbar|WP 0.1 erzeugt **eine** Baseline auf dem Zielstand und archiviert rohe Logs|
+|F-03|Scan-Skript gegen alte Spezifikation|`contextra_scan.py` prüft gegen Spezifikationsnummern von 2.x (z. B. „Spec §4.9.4“, „§7.1“) und liest Governance-Dateien an alten Pfaden; ohne Pfadkorrektur sind Gates „FEHLT“|Skript nicht als Gate verwenden; seine Prüfaufträge (U-20 bis U-25) werden durch AST-Gates in `xtask` ersetzt (WP 0.4, 3.6)|
+|F-04|Gate-Wirksamkeit|Scan meldet 7 blockierende Gates rot (u. a. `determinism` 44, `async-io` 15, `unsafe-audit` 3), während Baseline/`gates.toml` 58 Gates führt; Überlappung und Wirksamkeit unbekannt|WP 3.6 (Meta-Test je Gate)|
+|F-05|`KmsProvider` und Löschkette|Trait liegt in `crypto/wal_crypto.rs`, laut Scan ohne produktive Verdrahtung; §6.2 ordnet `KmsProvider` dem Sicherheits-Port-Katalog zu|Besitz klären (`ports` oder `crypto`), Verdrahtung in WP 5.3|
 
 ---
 
@@ -992,6 +1239,7 @@ Jedes Crate hat eine eigene SemVer-Version; `cargo-semver-checks` ist Pflicht f�
 |---|---|---|
 |2.4|27.10.2026|Löschpfad optimiert, Quellenbereinigung|
 |**3.0**|**28.10.2026**|Produktzuschnitt auf entkoppelten LLM-Baukasten; Modulvertrag und isolierte Prüfbarkeit; Befunde U-01–U-12 aus dem Abgleich Audit ↔ Code; ADR-D01–D10; Löschkette als Baustein (§9); Aufhebung der Archivierungsentscheidung; Nachmessung am HEAD 52d3227f0 (U-13, U-14, korrigierte Zahlen); Katalogtabelle §5.2; Pflichttests §12.5; Anhang C vollständig aus dem Repo-Stand übernommen|
+|**3.1**|**28.10.2026**|Baseline (E2, teilweise), Metrik-Datei und Scan eingearbeitet (§1.2a, U-15 bis U-27); Projektziele mit Messkriterien (§2.5); Regeln 15–16; Wartbarkeitsregeln W1–W11 (§4.9); `erasure` in §4.4/4.5; Crate-Review aller 35 Mitglieder (§5.5); Schnittstellenvertrag und Rechtsmatrix der Löschkette (§9.11, §9.12); neue Gates (§12.2); Release-Kriterien (§13.4); ADR-D11–D16; O-11–O-15; §17 neu gefasst (drei Altfragen geprüft: erledigt bzw. umformuliert)|
 
 ## Anhang C. Übernommener Detailtext aus Fassung 2.4/2.5 (nachrangig)
 
