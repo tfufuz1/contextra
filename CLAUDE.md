@@ -1,10 +1,10 @@
 # Contextra — Claude / Antigravity Agent Guide
 
-<!-- doc-stamp: 2026-10-26 | Normativ: AGENTS.md §1, docs/SPEC.md -->
+<!-- doc-stamp: 2026-10-28 1b8b790 | Normativ: CONSTITUTION.md, SPEC.md, AGENTS.md -->
 
 > [!IMPORTANT]
 > Claude und Antigravity: Lies AGENTS.md §2b (nicht §2a — das ist nur für Jules).
-> Normative Rangfolge: SPEC.md > VETOES.md > capabilities.toml > governance/gates.toml > AGENTS.md
+> Normative Rangfolge: CONSTITUTION.md > SPEC.md > PLAN.md > capabilities.toml > AGENTS.md
 
 ## Schnellstart für Claude/Antigravity
 
@@ -36,26 +36,26 @@ cat capabilities.toml
 | 11 | Eine Typfamilie je Konzept | symbol-uniqueness Gate |
 | 12 | Ein PR = ein WP | scope-guard Gate |
 
-## Archiv-Crates — NICHT anfassen (WP 2.1)
+## Baukasten-Module [M] (SPEC §4.2, §5)
 
 `contextra-graph`, `contextra-cognition`, `contextra-adapt`, `contextra-kvcache`,
 `contextra-router`, `contextra-agent`, `contextra-infer-onnx`, `contextra-infer-ollama`,
-`contextra-core`
+`contextra-privacy`, `contextra-mcp`, `contextra-py`, `contextra-sandbox`
 
-> [!CAUTION]
-> Kein neuer Code für Archiv-Crates. Kein neues Abhängen davon (AGENTS.md §5.4).
+> [!NOTE]
+> Gemäß SPEC 3.0 / ADR-D01 sind diese Crates Baukasten-Module [M] mit eigenem Vertrag und isoliertem Prüfauftrag, kein Archiv.
 
-## Gates (governance/gates.toml)
+## Gates (`cargo xtask`)
 
 ```bash
-# Alle Gates prüfen
-just gates
+# Alle aktiven Gates prüfen
+cargo run -p xtask -- check
 
-# Einzelnes Gate erklären
-just gate ring-dag
+# Einzelnes Gate prüfen
+cargo run -p xtask -- gate check --gate ring-dag
 
-# Pre-Push (entspricht merge-gate)
-just pre-push
+# Liste aller Gates
+cargo run -p xtask -- --list-gates
 ```
 
 ## Commit-Konventionen

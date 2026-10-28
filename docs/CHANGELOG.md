@@ -2,6 +2,14 @@
 
 > Automatisch generierter Read-Only Bericht aus allen Inline-Tags im Repo.
 
+## [Unreleased] - 2026-10-28
+
+### Docs
+- Meta-Dokumentation (`ARCHITECTURE.md`, `PLAN.md`, `SPEC.md`, `README.md`) an SPEC 3.0 und Baukasten-Architektur angeglichen.
+- Soll-Ist-Abweichungen und offene Spezifikationsfragen in `SPEC.md` dokumentiert.
+
+---
+
 | Zeitstempel | Crate/Datei | Typ | ID | Session | Status | Review-Pässe (unabhängig) | Beschreibung |
 |---|---|---|---|---|---|---|---|
 | `TS:2026-10-04 (Kampagne J-25)` | `crates/contextra-crypto/tests/campaign_j25.rs` | `FILE-CONTEXT` | `-` | `-` | `-` | `-` | Kampagne J-25: Kryptografische Compliance- & Compliance-Testsuite für contextra-crypto |

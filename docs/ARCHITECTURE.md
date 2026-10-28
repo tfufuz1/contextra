@@ -1,13 +1,13 @@
-<!-- doc-stamp: 2026-10-26 -->
+<!-- doc-stamp: 2026-10-28 1b8b790 -->
 
 # Contextra – Architekturübersicht
 
 > **Normative Quelle:** Dieses Dokument ist ein **Lese-Hilfsmittel** und kein normatives Dokument.
 > Die alleinige normative Quelle für Architektur, Verhalten, Konstanten, Ringe, Klassen und Kantenregeln ist
-> **`docs/SPEC.md` (Gesamtspezifikation Fassung 2.3, §4)**. Bei jedem Widerspruch zwischen dieser Datei
+> **`docs/SPEC.md` (Gesamtspezifikation Fassung 3.0, Baukasten-Modell)**. Bei jedem Widerspruch zwischen dieser Datei
 > und `docs/SPEC.md` gilt `docs/SPEC.md`.
 >
-> Stand: **26.10.2026** | Basis: Gesamtspezifikation 2.3 + Implementierungsplan 2 (Commit `a547a42`)
+> Stand: **28.10.2026** | Basis: Gesamtspezifikation 3.0 + Umsetzungsplan 3.0 (HEAD 1b8b790)
 
 ---
 
@@ -34,29 +34,34 @@ festgelegt (INV-DOC-SINGLE-SOURCE-1). Diese Datei ist die Single Source of Truth
 
 Der Datenfluss ist unidirektional: **Ring 4 → Ring 3 → Ring 2 → Ring 1 → Ring 0**.
 Eine Kante darf nur auf gleichen oder niedrigeren Ring zeigen (P1). Aufwärtskanten sind verboten (P5).
-`[K]`-Crates dürfen nie von `[R]`/`[E]`/`[A]`-Crates abhängen (P30, INV-CORE-ISOLATION-1).
+`[K]`-Crates dürfen nie von `[M]`/`[E]`-Crates abhängen (P30, INV-CORE-ISOLATION-1).
 
 ```
 Ring 4 │ Fassade/Schnittstellen
        │  [K] contextra (Composition Root)
-       │  [K] contextra-mcp
-       │  [R] contextra-py
+       │  [M] contextra-mcp
+       │  [M] contextra-py
        │  [E] contextra-license
-       │  [E] audit-export
-       │  [E] avv-generator
        │
 Ring 3 │ Orchestrierung
        │  [K] contextra-engine
        │  [K] contextra-db
-       │  [R] contextra-privacy
+       │  [K] contextra-erasure (geplant, Ring 3)
+       │  [M] contextra-privacy
+       │  [M] contextra-cognition
+       │  [M] contextra-router
+       │  [M] contextra-agent
        │
 Ring 2 │ Isolation / Inferenz
-       │  [R] contextra-infer-candle
-       │  [R] contextra-sandbox
+       │  [M] contextra-infer-candle
+       │  [M] contextra-infer-onnx
+       │  [M] contextra-infer-ollama
+       │  [M] contextra-sandbox
        │
 Ring 1 │ Persistenz
        │  [K] contextra-store
        │  [K] contextra-checkpoint
+       │  [M] contextra-kvcache
        │
 Ring 0 │ Fundament
        │  [K] contextra-types
@@ -65,16 +70,18 @@ Ring 0 │ Fundament
        │  [K] contextra-crypto
        │  [K] contextra-vector
        │  [K] contextra-text
-       │  [K] contextra-rank  (nur fusion/)
+       │  [K] contextra-rank
+       │  [M] contextra-graph
+       │  [M] contextra-adapt
+       │  [E] contextra-audit-export
+       │  [E] contextra-avv-generator
        │  Unsafe-Inseln: [K] contextra-simd · [K] contextra-sys · [K] contextra-wire
        │
 Werkzeug (kein Ring)
-       │  contextra-testkit · xtask · xtask-heavy · bench · *-fuzz
+       │  contextra-testkit · xtask · bench / contextra-bench · *-fuzz
        │
-[A] ARCHIV (Tag archiv/v0, aus dem Workspace zu entfernen — siehe §7)
-       │  contextra-graph · contextra-cognition · contextra-adapt · contextra-kvcache
-       │  contextra-router · contextra-agent · contextra-infer-onnx · contextra-infer-ollama
-       │  contextra-core · vector/diskann · rank ohne fusion/
+Legacy / Auslaufend
+       │  contextra-core (Kompatibilitätsfassade, entfällt in WP 2.8)
 ```
 
 ### Wirkung der Ringe
