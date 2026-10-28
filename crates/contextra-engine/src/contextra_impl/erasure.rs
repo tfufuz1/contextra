@@ -7,7 +7,7 @@
 
 use crate::*;
 use contextra_ports::scanner::{
-    LayerScanner, LayerWitness, Purger, ScanTarget, ScanTechnique, WitnessLayer,
+    LayerScanner, Purger, ScanTarget, ScanTechnique, WitnessLayer,
 };
 use contextra_ports::SystemClock;
 use contextra_types::{CollectionId, ContextraError, RequestContext, Result, SagaRecord, TenantId};

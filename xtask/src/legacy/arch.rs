@@ -1,4 +1,3 @@
-use super::common::*;
 
 pub fn run_arch_command(cmd: &str, _args: &[String]) -> Result<(), String> {
     match cmd {

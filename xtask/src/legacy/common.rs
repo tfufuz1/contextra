@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TagItem {
