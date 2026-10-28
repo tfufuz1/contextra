@@ -196,7 +196,37 @@ impl LyapunovDriftWatcher {
                 .unwrap_or(LyapunovResult::InsufficientData);
         }
 
-        // 1. 10-Bin Histogramm Approximation der Verteilungen
+        let d_t = self.compute_kl_divergence(current_scores);
+        self.divergence_history.push_back(d_t);
+
+        if self.divergence_history.len() > self.window_size + 1 {
+            self.divergence_history.pop_front();
+        }
+
+        if self.divergence_history.len() <= self.window_size {
+            let res = LyapunovResult::InsufficientData;
+            self.latest_result = Some(res.clone());
+            return res;
+        }
+
+        let lyapunov_exponent = self.compute_lyapunov_exponent();
+        let result = if lyapunov_exponent > 0.0 {
+            LyapunovResult::DriftDetected {
+                lyapunov_exponent,
+                reason: DriftReason {
+                    kl_divergence: d_t,
+                    lyapunov_exponent,
+                },
+            }
+        } else {
+            LyapunovResult::Stable { lyapunov_exponent }
+        };
+
+        self.latest_result = Some(result.clone());
+        result
+    }
+
+    fn compute_kl_divergence(&self, current_scores: &[f32]) -> f32 {
         let mut current_counts = [0usize; NUM_BINS];
         let mut baseline_counts = [0usize; NUM_BINS];
 
@@ -210,8 +240,6 @@ impl LyapunovDriftWatcher {
             baseline_counts[bin] += 1;
         }
 
-        // 2. KL-Divergenz D_t = KL(N_t || N_baseline) mit Laplace-1-Smoothing (Additive Smoothing)
-        // AI-TAG[RESOLVED][MINOR] Added per-bin contribution clipping (`MAX_BIN_KL_CONTRIBUTION = 10.0`) to prevent numerical instability during KL divergence calculations under extreme distribution shift. (ID: AGT-ROUTER-00808347) (TS: 2026-09-11T12:00:00Z) (SESSION: 21a8d3e8)
         let alpha = 1.0f32;
         let k = NUM_BINS as f32;
         let n_curr = current_scores.len() as f32;
@@ -224,31 +252,15 @@ impl LyapunovDriftWatcher {
             let bin_kl = p_i * (p_i / q_i).ln();
             d_t += bin_kl.min(MAX_BIN_KL_CONTRIBUTION);
         }
-        let d_t = if d_t.is_finite() {
-            // Hard-Clip bei 100.0: Für ein 10-Bin-Histogramm ist selbst bei stärkster
-            // Degeneration (ein Bin dominiert vollständig) die theoretisch sinnvolle KL-Divergenz
-            // im niedrigen zweistelligen Bereich. Werte > 100 sind ein Symptom für einen
-            // numerischen Randfall (z.B. extrem kleine Sample-Größen), nicht für echten Verteilungs-Drift,
-            // und würden den Lyapunov-Exponenten via log|D_t/D_{t-1}| künstlich verzerren.
+
+        if d_t.is_finite() {
             d_t.clamp(0.0, 100.0)
         } else {
             100.0
-        };
-
-        self.divergence_history.push_back(d_t);
-
-        if self.divergence_history.len() > self.window_size + 1 {
-            self.divergence_history.pop_front();
         }
+    }
 
-        // 3. Auswertung nach window_size Beobachtungs-Verhältnissen
-        if self.divergence_history.len() <= self.window_size {
-            let res = LyapunovResult::InsufficientData;
-            self.latest_result = Some(res.clone());
-            return res;
-        }
-
-        // 4. Diskrete Lyapunov-Exponent-Schätzung: λ_t = (1/w) * Σ log|D_{t-i+1}/D_{t-i}|
+    fn compute_lyapunov_exponent(&self) -> f32 {
         let w = self.window_size;
         let mut sum_log_ratio = 0.0f32;
 
@@ -265,22 +277,7 @@ impl LyapunovDriftWatcher {
             sum_log_ratio += ratio.ln();
         }
 
-        let lyapunov_exponent = sum_log_ratio / (w as f32);
-
-        let result = if lyapunov_exponent > 0.0 {
-            LyapunovResult::DriftDetected {
-                lyapunov_exponent,
-                reason: DriftReason {
-                    kl_divergence: d_t,
-                    lyapunov_exponent,
-                },
-            }
-        } else {
-            LyapunovResult::Stable { lyapunov_exponent }
-        };
-
-        self.latest_result = Some(result.clone());
-        result
+        sum_log_ratio / (w as f32)
     }
 }
 

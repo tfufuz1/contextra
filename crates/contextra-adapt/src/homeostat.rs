@@ -7,7 +7,8 @@
 //!
 //! NOTE: `RerankPidController` has been consolidated into `crate::PidController`.
 
-use std::time::{Duration, Instant};
+use contextra_ports::{Clock, SystemClock};
+use std::time::Duration;
 
 /// P95 Latency-feedback PID Controller for dynamically tuning candidate pool sizes.
 ///
@@ -95,22 +96,45 @@ impl RerankPidController {
 ///
 /// # Intended Integration Point
 /// Evaluated before or during candidate hydration and Cross-Encoder batch inference steps in `Collection::hybrid_search_reranked`.
-/// If `deadline_exceeded(started_at)` returns `true`, the search pipeline should immediately break out and return
+/// If `deadline_exceeded(started_at)` or `deadline_exceeded_nanos` returns `true`, the search pipeline should immediately break out and return
 /// the partially hydrated/reranked candidate results accumulated up to that point rather than blocking indefinitely.
-#[derive(Debug, Clone, Copy)]
-pub struct RerankDeadline {
+#[derive(Debug, Clone)]
+pub struct RerankDeadline<C: ?Sized + Clock = SystemClock> {
     /// Maximum time budget allowed for reranking operations.
     pub budget: Duration,
+    clock: std::sync::Arc<C>,
 }
 
-impl RerankDeadline {
+impl RerankDeadline<SystemClock> {
     /// Creates a new `RerankDeadline` with the specified duration budget.
     pub fn new(budget: Duration) -> Self {
-        Self { budget }
+        Self::new_with_clock(budget, std::sync::Arc::new(SystemClock::new()))
+    }
+}
+
+impl<C: ?Sized + Clock> RerankDeadline<C> {
+    /// Creates a new `RerankDeadline` with explicit `Clock` port injection.
+    pub fn new_with_clock(budget: Duration, clock: std::sync::Arc<C>) -> Self {
+        Self { budget, clock }
     }
 
-    /// Checks if the elapsed time since `started_at` equals or exceeds the deadline budget.
-    pub fn deadline_exceeded(&self, started_at: Instant) -> bool {
+    /// Returns current monotonic timestamp in nanoseconds from injected clock.
+    pub fn start_nanos(&self) -> u64 {
+        self.clock.monotonic_nanos()
+    }
+
+    /// Checks if elapsed nanoseconds since `started_at_nanos` equals or exceeds deadline budget.
+    pub fn deadline_exceeded_nanos(&self, started_at_nanos: u64) -> bool {
+        let elapsed_nanos = self
+            .clock
+            .monotonic_nanos()
+            .saturating_sub(started_at_nanos);
+        elapsed_nanos >= self.budget.as_nanos() as u64
+    }
+
+    /// Legacy helper using monotonic_nanos delta based on Instant baseline.
+    #[deprecated(since = "0.1.0", note = "Use deadline_exceeded_nanos with start_nanos")]
+    pub fn deadline_exceeded(&self, started_at: std::time::Instant) -> bool {
         started_at.elapsed() >= self.budget
     }
 }
@@ -197,12 +221,12 @@ mod tests {
     #[test]
     fn test_rerank_deadline_exceeded() {
         let deadline = RerankDeadline::new(Duration::from_millis(50));
-        let start = Instant::now();
+        let start_nanos = deadline.start_nanos();
 
-        assert!(!deadline.deadline_exceeded(start));
+        assert!(!deadline.deadline_exceeded_nanos(start_nanos));
 
         std::thread::sleep(Duration::from_millis(60));
 
-        assert!(deadline.deadline_exceeded(start));
+        assert!(deadline.deadline_exceeded_nanos(start_nanos));
     }
 }

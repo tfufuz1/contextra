@@ -168,12 +168,19 @@ mod tests {
         let propensities = policy.compute_propensities(1);
 
         assert_eq!(propensities.len(), 4);
-        // non-greedy actions get epsilon / 4 = 0.05
-        assert!((propensities[0] - 0.05).abs() < 1e-6);
-        // greedy action 1 gets 0.05 + 0.8 = 0.85
-        assert!((propensities[1] - 0.85).abs() < 1e-6);
-        assert!((propensities[2] - 0.05).abs() < 1e-6);
-        assert!((propensities[3] - 0.05).abs() < 1e-6);
+        if let (Some(&p0), Some(&p1), Some(&p2), Some(&p3)) = (
+            propensities.first(),
+            propensities.get(1),
+            propensities.get(2),
+            propensities.get(3),
+        ) {
+            assert!((p0 - 0.05).abs() < 1e-6);
+            assert!((p1 - 0.85).abs() < 1e-6);
+            assert!((p2 - 0.05).abs() < 1e-6);
+            assert!((p3 - 0.05).abs() < 1e-6);
+        } else {
+            panic!("Expected propensities length 4");
+        }
 
         // Sum of propensities must equal 1.0
         let sum: f32 = propensities.iter().sum();
@@ -278,12 +285,10 @@ mod tests {
                 } else {
                     0.0
                 }
+            } else if val < 0.2 {
+                1.0
             } else {
-                if val < 0.2 {
-                    1.0
-                } else {
-                    0.0
-                }
+                0.0
             };
 
             // Target policy always chooses action 0

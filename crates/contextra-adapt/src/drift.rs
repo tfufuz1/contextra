@@ -16,6 +16,12 @@ pub enum DriftSignal {
 }
 
 /// Generic interface for sequential O(1) drift detectors.
+///
+/// # Abgrenzung zu `contextra-rank::DriftDetector`
+/// `contextra-adapt::DriftDetector` ist ein O(1) sequentielles Online-Signal-Trait für synchrone
+/// Regler und Bandit-Policies in Ring 0. Es arbeitet direkt auf Skalaren (Scores/Rewards).
+/// Im Gegensatz dazu führt `contextra-rank::DriftDetector` höherstufige Verteilungs- und Ranking-Analysen
+/// auf gespeicherten Resultatlisten und Metrikserien durch.
 pub trait DriftDetector {
     /// Observes a reward or non-conformity score and returns the updated drift signal.
     fn observe(&mut self, reward: f32) -> DriftSignal;

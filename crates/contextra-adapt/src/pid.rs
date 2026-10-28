@@ -292,52 +292,56 @@ mod tests {
     fn test_high_latency_causes_monotonic_decrease_bounded_by_k_min() {
         let mut pid = PidController::new(150.0, 50, 200, Some(100));
         let dt = Duration::from_millis(100);
-        let mut prev_pool = pid.current_pool_size.unwrap();
+        if let Some(mut prev_pool) = pid.current_pool_size {
+            for _ in 0..10 {
+                let new_pool = pid.update(dt, 300.0);
+                assert!(
+                    new_pool <= prev_pool,
+                    "Pool size must monotonically decrease under high latency: prev={prev_pool}, new={new_pool}"
+                );
+                assert!(
+                    new_pool >= 50,
+                    "Pool size must never fall below hard floor k_min=50: got {new_pool}"
+                );
+                prev_pool = new_pool;
+            }
 
-        for _ in 0..10 {
-            let new_pool = pid.update(dt, 300.0);
-            assert!(
-                new_pool <= prev_pool,
-                "Pool size must monotonically decrease under high latency: prev={prev_pool}, new={new_pool}"
+            assert_eq!(
+                pid.current_pool_size,
+                Some(50),
+                "Pool size should settle at hard minimum k_min=50"
             );
-            assert!(
-                new_pool >= 50,
-                "Pool size must never fall below hard floor k_min=50: got {new_pool}"
-            );
-            prev_pool = new_pool;
+        } else {
+            panic!("Expected current_pool_size to be set");
         }
-
-        assert_eq!(
-            pid.current_pool_size,
-            Some(50),
-            "Pool size should settle at hard minimum k_min=50"
-        );
     }
 
     #[test]
     fn test_low_latency_causes_increase_bounded_by_k_max() {
         let mut pid = PidController::new(150.0, 50, 200, Some(100));
         let dt = Duration::from_millis(100);
-        let mut prev_pool = pid.current_pool_size.unwrap();
+        if let Some(mut prev_pool) = pid.current_pool_size {
+            for _ in 0..10 {
+                let new_pool = pid.update(dt, 50.0);
+                assert!(
+                    new_pool >= prev_pool,
+                    "Pool size must increase under low latency: prev={prev_pool}, new={new_pool}"
+                );
+                assert!(
+                    new_pool <= 200,
+                    "Pool size must never exceed k_max=200: got {new_pool}"
+                );
+                prev_pool = new_pool;
+            }
 
-        for _ in 0..10 {
-            let new_pool = pid.update(dt, 50.0);
-            assert!(
-                new_pool >= prev_pool,
-                "Pool size must increase under low latency: prev={prev_pool}, new={new_pool}"
+            assert_eq!(
+                pid.current_pool_size,
+                Some(200),
+                "Pool size should settle at maximum k_max=200"
             );
-            assert!(
-                new_pool <= 200,
-                "Pool size must never exceed k_max=200: got {new_pool}"
-            );
-            prev_pool = new_pool;
+        } else {
+            panic!("Expected current_pool_size to be set");
         }
-
-        assert_eq!(
-            pid.current_pool_size,
-            Some(200),
-            "Pool size should settle at maximum k_max=200"
-        );
     }
 
     #[test]
@@ -382,14 +386,16 @@ mod tests {
         let ref_integral = pid.integral;
         let ref_prev_error = pid.prev_error;
         let ref_current_pool_size = pid.current_pool_size;
-        let expected_pool = ref_current_pool_size.expect("current_pool_size should be set");
+        if let Some(expected_pool) = ref_current_pool_size {
+            let result = pid.update(dt, f32::NAN);
 
-        let result = pid.update(dt, f32::NAN);
-
-        assert_eq!(result, expected_pool);
-        assert_eq!(pid.integral, ref_integral);
-        assert_eq!(pid.prev_error, ref_prev_error);
-        assert_eq!(pid.current_pool_size, ref_current_pool_size);
+            assert_eq!(result, expected_pool);
+            assert_eq!(pid.integral, ref_integral);
+            assert_eq!(pid.prev_error, ref_prev_error);
+            assert_eq!(pid.current_pool_size, ref_current_pool_size);
+        } else {
+            panic!("Expected current_pool_size to be set");
+        }
     }
 
     macro_rules! assert_f32_near {
