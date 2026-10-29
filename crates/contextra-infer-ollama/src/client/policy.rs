@@ -9,6 +9,11 @@ use std::str::FromStr;
 pub trait EgressAuditSink: Send + Sync + std::fmt::Debug {
     /// Called when an egress check is performed for a remote (non-loopback) endpoint.
     fn audit_egress(&self, endpoint: &str, allowed: bool, reason: &str);
+
+    /// Returns `true` if this audit sink is a no-op sink (default).
+    fn is_noop(&self) -> bool {
+        false
+    }
 }
 
 /// Default no-op implementation of `EgressAuditSink`.
@@ -17,6 +22,10 @@ pub struct NoopEgressAuditSink;
 
 impl EgressAuditSink for NoopEgressAuditSink {
     fn audit_egress(&self, _endpoint: &str, _allowed: bool, _reason: &str) {}
+
+    fn is_noop(&self) -> bool {
+        true
+    }
 }
 
 /// Endpoint policy governing allowed egress destinations for Ollama requests.
@@ -125,7 +134,17 @@ impl EndpointPolicy {
             return Ok(());
         }
 
-        // 4. Remote egress check
+        // 4. Check whether audit sink is NoopEgressAuditSink for remote egress
+        if audit_sink.is_noop() {
+            let reason =
+                "AuditSinkRequired: Remote egress requires an explicit non-noop audit sink";
+            audit_sink.audit_egress(endpoint, false, reason);
+            return Err(ContextraError::PolicyViolation(format!(
+                "AuditSinkRequired: Remote egress to '{endpoint}' rejected because NoopEgressAuditSink is active"
+            )));
+        }
+
+        // 5. Remote egress check
         if !self.allow_remote {
             let reason = "Remote egress rejected: allow_remote is false";
             audit_sink.audit_egress(endpoint, false, reason);
