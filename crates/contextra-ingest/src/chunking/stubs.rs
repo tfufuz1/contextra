@@ -55,6 +55,9 @@ impl IrChunker for TabularChunker {
     }
 }
 
+#[path = "paged/mod.rs"]
+pub mod paged_impl;
+
 #[derive(Debug, Default)]
 pub struct PagedChunker;
 
@@ -69,6 +72,6 @@ impl IrChunker for PagedChunker {
         canon: &CanonicalText,
         cfg: &ChunkingConfig,
     ) -> Result<Vec<ChunkDraft>, IngestError> {
-        FallbackChunker.draft(ir, canon, cfg)
+        paged_impl::draft_paged(ir, canon, cfg)
     }
 }
