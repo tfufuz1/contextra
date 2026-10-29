@@ -63,6 +63,7 @@ impl ContextManager {
     /// Prepares a context window from retrieved chunks.
     ///
     /// Filters by relevance threshold, sorts by score, and truncates to budget.
+    #[allow(clippy::indexing_slicing)]
     pub fn prepare_context(&self, mut chunks: Vec<ContextChunk>) -> Result<ContextWindow> {
         // Filter by relevance threshold (retaining NaN chunks so total_cmp can order them safely without dropping)
         chunks.retain(|c| c.relevance.is_nan() || c.relevance >= self.relevance_threshold);
@@ -205,6 +206,7 @@ impl ContextManager {
         }
 
         // Mindestens 1, maximal sinnvoll deckeln
+        #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
         (tokens.ceil() as usize).max(1)
     }
 }
@@ -243,6 +245,13 @@ impl SpatialFence {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic
+)]
 mod tests {
     use super::*;
     use contextra_types::DocId;
@@ -422,6 +431,13 @@ mod tests {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic
+)]
 mod token_tests {
     use super::*;
     use contextra_types::DocId;

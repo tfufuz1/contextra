@@ -4,6 +4,7 @@
 
 use super::config::{calculate_rebuild_cooldown, OrphanCleanupBackoffConfig, OrphanCleanupIndex};
 use contextra_mvcc::tx_buffer::TxBuffer;
+use contextra_ports::Clock;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -30,7 +31,8 @@ pub fn start_orphan_cleanup_worker_with_config<
         let mut ticker = tokio::time::interval(interval);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-        let mut last_rebuild_attempt: Option<std::time::Instant> = None;
+        let clock = contextra_ports::SystemClock::new();
+        let mut last_rebuild_attempt_nanos: Option<u64> = None;
 
         tracing::info!(
             "Orphan cleanup worker started (timeout: {:?}, interval: {:?}, base_backoff: {:?})",
@@ -63,15 +65,18 @@ pub fn start_orphan_cleanup_worker_with_config<
                             backoff_config.max_delay,
                         );
 
-                        let is_on_cooldown = if let Some(last_attempt) = last_rebuild_attempt {
-                            last_attempt.elapsed() < cooldown
+                        let current_nanos = clock.monotonic_nanos();
+                        let is_on_cooldown = if let Some(last_nanos) = last_rebuild_attempt_nanos {
+                            let elapsed_nanos = current_nanos.saturating_sub(last_nanos);
+                            elapsed_nanos < cooldown.as_nanos() as u64
                         } else {
                             false
                         };
 
                         if is_on_cooldown {
-                            if let Some(last_attempt) = last_rebuild_attempt {
-                                let remaining = cooldown.saturating_sub(last_attempt.elapsed());
+                            if let Some(last_nanos) = last_rebuild_attempt_nanos {
+                                let elapsed = Duration::from_nanos(current_nanos.saturating_sub(last_nanos));
+                                let remaining = cooldown.saturating_sub(elapsed);
                                 tracing::debug!(
                                     failures = failures,
                                     cooldown_remaining_ms = remaining.as_millis(),
@@ -85,7 +90,7 @@ pub fn start_orphan_cleanup_worker_with_config<
                                 "HNSW index degraded — triggering automatic rebuild"
                             );
 
-                            last_rebuild_attempt = Some(std::time::Instant::now());
+                            last_rebuild_attempt_nanos = Some(clock.monotonic_nanos());
 
                             let rebuild_res = tokio::time::timeout(
                                 Duration::from_secs(120),
@@ -109,7 +114,7 @@ pub fn start_orphan_cleanup_worker_with_config<
 
                             if connectivity_restored {
                                 consecutive_failed_rebuilds.store(0, Ordering::Relaxed);
-                                last_rebuild_attempt = None;
+                                last_rebuild_attempt_nanos = None;
                                 tracing::info!("HNSW rebuild succeeded and index connectivity restored");
                             } else {
                                 let new_failures = consecutive_failed_rebuilds.fetch_add(1, Ordering::Relaxed) + 1;
@@ -129,7 +134,7 @@ pub fn start_orphan_cleanup_worker_with_config<
                         }
                     } else if consecutive_failed_rebuilds.load(Ordering::Relaxed) > 0 {
                         consecutive_failed_rebuilds.store(0, Ordering::Relaxed);
-                        last_rebuild_attempt = None;
+                        last_rebuild_attempt_nanos = None;
                         tracing::info!("HNSW index connectivity healthy, reset failed rebuild counter");
                     }
                 }

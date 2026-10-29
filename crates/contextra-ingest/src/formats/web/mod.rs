@@ -1,7 +1,11 @@
 // FILE-CONTEXT
-// ZWECK: Webdokument-Extractor Stub (Html, Xhtml, Epub) (WP M4).
-// INVARIANTEN: FILE-CONTEXT Kopf, DocumentExtractor-Impl mit UnsupportedFormat.
+// ZWECK: Webdokument-Extractor (Html, Xhtml, Epub) (WP M4).
+// INVARIANTEN: FILE-CONTEXT Kopf, DocumentExtractor-Impl.
 // STAND: TS:2026-10-31T00:00:00Z
+
+pub mod encoding;
+pub mod epub;
+pub mod html;
 
 use crate::error::IngestError;
 use crate::extractor::{DocumentExtractor, ExtractContext};
@@ -27,12 +31,19 @@ impl DocumentExtractor for WebExtractor {
     fn extract(
         &self,
         format: FormatId,
-        _input: &[u8],
-        _ctx: &ExtractContext<'_>,
+        input: &[u8],
+        ctx: &ExtractContext<'_>,
     ) -> Result<DocumentIr, IngestError> {
-        Err(IngestError::UnsupportedFormat {
-            format: Some(format),
-            reason: "noch nicht implementiert".into(),
-        })
+        match format {
+            FormatId::Html | FormatId::Xhtml => {
+                let decoded = encoding::decode_html_bytes(input);
+                html::extract_html(&decoded.text, format, ctx, decoded.is_guessed)
+            }
+            FormatId::Epub => epub::extract_epub(input, ctx),
+            _ => Err(IngestError::UnsupportedFormat {
+                format: Some(format),
+                reason: "Nicht unterstütztes Format in WebExtractor".into(),
+            }),
+        }
     }
 }

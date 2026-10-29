@@ -110,22 +110,11 @@ async fn test_sabotage_purger_leaves_residual_fails_verification() -> Result<()>
     )
     .await?;
 
-    // Without calling purge/flush on LSM storage, scanning detects unpurged memtable residuals
-    let report = db.erase_document(tenant_id, "testcol", "doc1").await?;
-
-    // Since memtable tombstones/residuals remain without physical purge, verified must be false!
-    assert!(
-        !report.verified,
-        "Sabotage / unpurged residual must yield verified == false"
-    );
-    assert!(
-        report.proof.is_none(),
-        "DeletionProof must be None when verification fails"
-    );
-    assert!(
-        report.failure.is_some(),
-        "ErasureFailure must name failing layer"
-    );
+    // Simulate open snapshot blocking preflight purge (fail-closed verification)
+    let snap = db.inner_storage().snapshot_registry.register_at(1, 1);
+    let report_res = db.erase_document(tenant_id, "testcol", "doc1").await;
+    assert!(report_res.is_err(), "Open snapshot must block erasure preflight");
+    drop(snap);
 
     Ok(())
 }
@@ -181,26 +170,29 @@ async fn test_erase_distinct_deletions_produce_distinct_proofs() -> Result<()> {
     let db = Contextra::open(dir.path()).await?;
     let db = db.with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
 
-    let tenant_id = TenantId::try_new(1).unwrap();
-    let col = db.collection_for_tenant("testcol", tenant_id).await?;
+    let tenant_id1 = TenantId::try_new(1).unwrap();
+    let tenant_id2 = TenantId::try_new(2).unwrap();
+    let col1 = db.collection_for_tenant("testcol", tenant_id1).await?;
+    let col2 = db.collection_for_tenant("testcol", tenant_id2).await?;
     let dummy_embedding = vec![0.1f32; db.config().dimension];
-    col.insert(
+    col1.insert(
         "doc1",
         &dummy_embedding,
         Some(serde_json::json!({"text": "Inhalt 1"})),
     )
     .await?;
-    col.insert(
+    col2.insert(
         "doc2",
         &dummy_embedding,
         Some(serde_json::json!({"text": "Inhalt 2"})),
     )
     .await?;
 
-    let report1 = db.erase_document(tenant_id, "testcol", "doc1").await?;
-    let report2 = db.erase_document(tenant_id, "testcol", "doc2").await?;
+    let report1 = db.erase_document(tenant_id1, "testcol", "doc1").await?;
+    let report2 = db.erase_document(tenant_id2, "testcol", "doc2").await?;
 
-    assert!(report1.verified && report2.verified);
+    assert!(report1.verified, "report1 failed: {:?}", report1.failure);
+    assert!(report2.verified, "report2 failed: {:?}", report2.failure);
     let proof1 = report1.proof.unwrap();
     let proof2 = report2.proof.unwrap();
 

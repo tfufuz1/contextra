@@ -569,6 +569,11 @@ impl LsmStorage {
 
         let ssi_max_tracked_keys = config.ssi_max_tracked_keys;
 
+        let default_ssi_val = Arc::new(
+            contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(ssi_max_tracked_keys)
+                .with_metrics_sink(Arc::clone(&metrics_sink_container)),
+        );
+
         let storage = Self {
             config,
             key_manager,
@@ -602,10 +607,9 @@ impl LsmStorage {
             pressure_rx,
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
-            ssi_validator: Arc::new(
-                contextra_mvcc::SequenceLogSsiValidator::new_with_bounds(ssi_max_tracked_keys)
-                    .with_metrics_sink(Arc::clone(&metrics_sink_container)),
-            ),
+            clock: parking_lot::RwLock::new(Arc::new(contextra_ports::SystemClock::new())),
+            ssi_validator: Arc::clone(&default_ssi_val) as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+            sequence_log_ssi_validator: Some(default_ssi_val),
             metrics_sink: metrics_sink_container,
         };
 

@@ -522,7 +522,11 @@ impl SignedLicenseGate {
 
     /// Evaluates Step 2: Presence check.
     pub fn check_step_2_presence(&self, ring: FeatureRing) -> Result<(), StepVerificationError> {
-        verify_step_2_presence(self.activation.as_ref(), self.license_payload.as_ref(), ring)
+        verify_step_2_presence(
+            self.activation.as_ref(),
+            self.license_payload.as_ref(),
+            ring,
+        )
     }
 
     /// Evaluates Step 3: Installation ID binding check.
@@ -605,8 +609,12 @@ impl LicenseGate for SignedLicenseGate {
         }
 
         // (2) Step 2: Missing activation check
-        verify_step_2_presence(self.activation.as_ref(), self.license_payload.as_ref(), ring)
-            .map_err(|e| e.into_license_error())?;
+        verify_step_2_presence(
+            self.activation.as_ref(),
+            self.license_payload.as_ref(),
+            ring,
+        )
+        .map_err(|e| e.into_license_error())?;
 
         // (3) Step 3: Installation ID hash mismatch check (constant time, fail-closed)
         verify_step_3_installation(
