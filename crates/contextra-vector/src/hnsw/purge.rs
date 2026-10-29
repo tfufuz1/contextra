@@ -69,10 +69,8 @@ impl Purger for HnswPurger {
                             == &target.target_hash
                 };
 
-                if matches_doc_id {
-                    if !targets_to_purge.iter().any(|(_, idx)| *idx == global_idx) {
-                        targets_to_purge.push((node.doc_id, global_idx));
-                    }
+                if matches_doc_id && !targets_to_purge.iter().any(|(_, idx)| *idx == global_idx) {
+                    targets_to_purge.push((node.doc_id, global_idx));
                 }
             }
 
