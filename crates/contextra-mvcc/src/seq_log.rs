@@ -8,7 +8,10 @@
 // NICHT-OFFENSICHTLICH: Compaction prunt Einträge erst wenn delete_seq < min_active_seqno.
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md (ADR-024)
 
-use std::time::{Duration, Instant};
+use std::sync::Arc;
+use std::time::Duration;
+
+use contextra_ports::{Clock, SystemClock};
 
 use crate::types::DocId;
 
@@ -82,13 +85,26 @@ impl SeqLogChange {
 }
 
 /// Helper structure managing sequence log tracking and visibility filtering for index implementations.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SequenceLog {
     entries: Vec<SeqLogEntry>,
-    pinned_snapshots: ahash::AHashMap<u64, Vec<Instant>>,
+    pinned_snapshots: ahash::AHashMap<u64, Vec<u64>>,
     compacted_below: Option<u64>,
     deletions: ahash::AHashMap<DocId, u64>,
     max_pin_duration: Duration,
+    clock: Arc<dyn Clock>,
+}
+
+impl std::fmt::Debug for SequenceLog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SequenceLog")
+            .field("entries", &self.entries)
+            .field("pinned_snapshots", &self.pinned_snapshots)
+            .field("compacted_below", &self.compacted_below)
+            .field("deletions", &self.deletions)
+            .field("max_pin_duration", &self.max_pin_duration)
+            .finish()
+    }
 }
 
 impl Default for SequenceLog {
@@ -98,15 +114,31 @@ impl Default for SequenceLog {
 }
 
 impl SequenceLog {
-    /// Creates a new empty sequence log with default max pin duration (5 minutes).
+    /// Creates a new empty sequence log with default max pin duration (5 minutes) and [`SystemClock`].
     pub fn new() -> Self {
+        Self::with_clock(Arc::new(SystemClock::new()))
+    }
+
+    /// Creates a new empty sequence log using the given [`Clock`] instance.
+    pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
         Self {
             entries: Vec::new(),
             pinned_snapshots: ahash::AHashMap::default(),
             compacted_below: None,
             deletions: ahash::AHashMap::default(),
             max_pin_duration: DEFAULT_MAX_PIN_DURATION,
+            clock,
         }
+    }
+
+    /// Returns the active [`Clock`] instance associated with this sequence log.
+    pub fn clock(&self) -> &Arc<dyn Clock> {
+        &self.clock
+    }
+
+    /// Sets the active [`Clock`] instance for this sequence log.
+    pub fn set_clock(&mut self, clock: Arc<dyn Clock>) {
+        self.clock = clock;
     }
 
     /// Sets a custom maximum pin duration for diagnostics and returns `self`.
@@ -127,13 +159,14 @@ impl SequenceLog {
 
     /// Pins a historical sequence number to prevent rebuild from purging soft-deleted nodes active at this snapshot.
     pub fn pin_snapshot(&mut self, seq_no: u64) {
-        self.pin_snapshot_at(seq_no, Instant::now());
+        let now_nanos = self.clock.monotonic_nanos();
+        self.pin_snapshot_at(seq_no, now_nanos);
     }
 
-    /// Pins a historical sequence number at a specific timestamp for deterministic testing and lease tracking.
-    pub fn pin_snapshot_at(&mut self, seq_no: u64, at: Instant) {
+    /// Pins a historical sequence number at a specific monotonic nanosecond timestamp `at_nanos` for deterministic testing and lease tracking.
+    pub fn pin_snapshot_at(&mut self, seq_no: u64, at_nanos: u64) {
         let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
-        self.pinned_snapshots.entry(seq_no).or_default().push(at);
+        self.pinned_snapshots.entry(seq_no).or_default().push(at_nanos);
     }
 
     /// Unpins a historical sequence number.
@@ -151,12 +184,13 @@ impl SequenceLog {
     }
 
     /// Returns all pinned sequence numbers whose active pin duration exceeds `max_pin_duration`
-    /// relative to the provided timestamp `now`.
-    pub fn expired_pins_at(&self, now: Instant) -> Vec<u64> {
+    /// relative to the provided monotonic timestamp `now_nanos`.
+    pub fn expired_pins_at(&self, now_nanos: u64) -> Vec<u64> {
+        let max_nanos = u64::try_from(self.max_pin_duration.as_nanos()).unwrap_or(u64::MAX);
         let mut expired = Vec::new();
         for (&seq_no, timestamps) in &self.pinned_snapshots {
             for &ts in timestamps {
-                if now.saturating_duration_since(ts) > self.max_pin_duration {
+                if now_nanos.saturating_sub(ts) > max_nanos {
                     expired.push(seq_no);
                     break;
                 }
@@ -168,24 +202,40 @@ impl SequenceLog {
 
     /// Returns all pinned sequence numbers whose active pin duration exceeds `max_pin_duration`.
     pub fn expired_pins(&self) -> Vec<u64> {
-        self.expired_pins_at(Instant::now())
+        self.expired_pins_at(self.clock.monotonic_nanos())
     }
 
-    /// Calculates the minimum sequence number currently pinned for snapshot retention at timestamp `now`.
+    /// Reaps and unpins all snapshot pins exceeding `max_pin_duration` relative to monotonic timestamp `now_nanos`, returning the expired sequence numbers.
+    pub fn reap_expired_pins_at(&mut self, now_nanos: u64) -> Vec<u64> {
+        let expired = self.expired_pins_at(now_nanos);
+        for &seq in &expired {
+            self.unpin_snapshot(seq);
+        }
+        expired
+    }
+
+    /// Reaps and unpins all snapshot pins exceeding `max_pin_duration`, returning the expired sequence numbers.
+    pub fn reap_expired_pins(&mut self) -> Vec<u64> {
+        let now_nanos = self.clock.monotonic_nanos();
+        self.reap_expired_pins_at(now_nanos)
+    }
+
+    /// Calculates the minimum sequence number currently pinned for snapshot retention at monotonic timestamp `now_nanos`.
     /// Returns `None` if no snapshot sequence numbers are pinned.
     ///
     /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
-    pub fn min_retention_seq_at(&self, now: Instant) -> Option<u64> {
+    pub fn min_retention_seq_at(&self, now_nanos: u64) -> Option<u64> {
         let min_seq = self.pinned_snapshots.keys().copied().min();
         if let Some(seq) = min_seq {
             if let Some(timestamps) = self.pinned_snapshots.get(&seq) {
+                let max_nanos = u64::try_from(self.max_pin_duration.as_nanos()).unwrap_or(u64::MAX);
                 for &ts in timestamps {
-                    let duration = now.saturating_duration_since(ts);
-                    if duration > self.max_pin_duration {
+                    let duration_nanos = now_nanos.saturating_sub(ts);
+                    if duration_nanos > max_nanos {
                         tracing::warn!(
                             seq_no = seq,
                             max_pin_duration = ?self.max_pin_duration,
-                            elapsed = ?duration,
+                            elapsed_nanos = duration_nanos,
                             "Snapshot pin active beyond max duration"
                         );
                         break;
@@ -201,7 +251,7 @@ impl SequenceLog {
     ///
     /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
     pub fn min_retention_seq(&self) -> Option<u64> {
-        self.min_retention_seq_at(Instant::now())
+        self.min_retention_seq_at(self.clock.monotonic_nanos())
     }
 
     /// Returns the deletion sequence number of the given document, if currently soft-deleted.
@@ -321,6 +371,7 @@ impl SequenceLog {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
+    use contextra_testkit::ManualClock;
 
     #[test]
     fn test_seq_log_entry_is_visible_o1() {
@@ -547,36 +598,37 @@ mod tests {
 
     #[test]
     fn test_sequence_log_pin_ttl_and_expiration() {
-        let mut log = SequenceLog::new().with_max_pin_duration(Duration::from_secs(10));
+        let clock = Arc::new(ManualClock::new(100_000_000_000));
+        let mut log = SequenceLog::with_clock(clock.clone()).with_max_pin_duration(Duration::from_secs(10));
         assert_eq!(log.max_pin_duration(), Duration::from_secs(10));
 
-        let now = Instant::now();
-        let past_5s = now.checked_sub(Duration::from_secs(5)).unwrap_or(now);
-        let past_15s = now.checked_sub(Duration::from_secs(15)).unwrap_or(now);
+        let start_nanos = clock.now_nanos();
+        let past_5s_nanos = start_nanos.saturating_sub(5_000_000_000);
+        let past_15s_nanos = start_nanos.saturating_sub(15_000_000_000);
 
         // Pin seq 100 at past_5s (not expired)
-        log.pin_snapshot_at(100, past_5s);
-        // Pin seq 200 at past_15s (expired relative to now)
-        log.pin_snapshot_at(200, past_15s);
+        log.pin_snapshot_at(100, past_5s_nanos);
+        // Pin seq 200 at past_15s (expired relative to current clock)
+        log.pin_snapshot_at(200, past_15s_nanos);
 
-        let expired = log.expired_pins_at(now);
+        let expired = log.expired_pins();
         assert_eq!(expired, vec![200]);
 
         // Pin seq 200 a second time at past_5s (now has 2 pins: 1 expired, 1 active)
-        log.pin_snapshot_at(200, past_5s);
+        log.pin_snapshot_at(200, past_5s_nanos);
         assert_eq!(log.min_retention_seq(), Some(100));
 
-        // expired_pins_at should still report 200 because at least one pin on seq 200 is expired
-        assert_eq!(log.expired_pins_at(now), vec![200]);
+        // expired_pins should still report 200 because at least one pin on seq 200 is expired
+        assert_eq!(log.expired_pins(), vec![200]);
 
         // Unpin newest pin on 200 (pops past_5s pin)
         log.unpin_snapshot(200);
-        // past_15s pin remains for seq 200, so seq 200 is still reported as expired relative to now
-        assert_eq!(log.expired_pins_at(now), vec![200]);
+        // past_15s pin remains for seq 200, so seq 200 is still reported as expired
+        assert_eq!(log.expired_pins(), vec![200]);
 
         // Unpin second pin on 200 (pops past_15s pin) -> no pins left for seq 200
         log.unpin_snapshot(200);
-        assert_eq!(log.expired_pins_at(now), Vec::<u64>::new());
+        assert_eq!(log.expired_pins(), Vec::<u64>::new());
         assert_eq!(log.min_retention_seq(), Some(100));
 
         // Unpin seq 100 -> no pins left
@@ -586,34 +638,41 @@ mod tests {
 
     #[test]
     fn test_sequence_log_pin_ttl_custom_duration() {
-        let mut log = SequenceLog::new();
+        let clock = Arc::new(ManualClock::new(1_000_000_000));
+        let mut log = SequenceLog::with_clock(clock.clone());
         assert_eq!(log.max_pin_duration(), DEFAULT_MAX_PIN_DURATION);
 
         log.set_max_pin_duration(Duration::from_millis(50));
         assert_eq!(log.max_pin_duration(), Duration::from_millis(50));
 
-        let now = Instant::now();
-        let past_100ms = now.checked_sub(Duration::from_millis(100)).unwrap_or(now);
+        let now_nanos = clock.now_nanos();
+        let past_100ms_nanos = now_nanos.saturating_sub(100_000_000);
 
-        log.pin_snapshot_at(42, past_100ms);
-        assert_eq!(log.expired_pins_at(now), vec![42]);
+        log.pin_snapshot_at(42, past_100ms_nanos);
+        assert_eq!(log.expired_pins_at(now_nanos), vec![42]);
 
-        // The pin is NOT automatically removed or forcibly unpinned
+        // The pin is NOT automatically removed or forcibly unpinned by expired_pins
         assert_eq!(log.min_retention_seq(), Some(42));
-        assert_eq!(log.expired_pins_at(now), vec![42]);
+        assert_eq!(log.expired_pins(), vec![42]);
+
+        // Calling reap_expired_pins explicitly unpins expired sequence numbers
+        let reaped = log.reap_expired_pins();
+        assert_eq!(reaped, vec![42]);
+        assert_eq!(log.min_retention_seq(), None);
     }
 
     #[test]
     fn test_sequence_log_zero_panic_time_arithmetic() {
-        let mut log = SequenceLog::new();
-        let now = Instant::now();
-        let future = now.checked_add(Duration::from_secs(100)).unwrap_or(now);
+        let clock = Arc::new(ManualClock::new(100_000_000));
+        let mut log = SequenceLog::with_clock(clock.clone());
+        let now_nanos = clock.now_nanos();
+        let future_nanos = now_nanos + 100_000_000_000;
 
         // Pin in the future (clock skew edge case)
-        log.pin_snapshot_at(50, future);
+        log.pin_snapshot_at(50, future_nanos);
 
-        // Checking expired pins with 'now' should handle saturating duration without panic
-        let expired = log.expired_pins_at(now);
+        // Checking expired pins with current clock should handle saturating duration without panic
+        let expired = log.expired_pins();
         assert!(expired.is_empty());
 
         assert_eq!(log.min_retention_seq(), Some(50));

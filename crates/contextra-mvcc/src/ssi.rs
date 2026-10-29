@@ -20,12 +20,13 @@ use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
 use crate::snapshot::SnapshotRegistry;
 use crate::types::{DocId, TxId};
 use ahash::AHashMap;
+use contextra_ports::{Clock, SystemClock};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::hash::Hasher;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Default maximum tracked committed write keys in [`SequenceLogSsiValidator`] (1,000,000 keys).
 pub const DEFAULT_MAX_TRACKED_COMMIT_KEYS: usize = 1_000_000;
@@ -36,7 +37,7 @@ pub const DEFAULT_MAX_TRACKED_COMMIT_KEYS: usize = 1_000_000;
 /// Memory consumption per transaction grows linearly $O(R + P)$ with the number of read keys $R$ and range prefixes $P$,
 /// where each entry retains a key/prefix byte vector (`Vec<u8>`) and an 8-byte (`u64`) snapshot sequence number.
 /// High read-volume transactions should limit or monitor read-set size to avoid unbounded memory growth.
-/// Use [`crate::tx_buffer::try_register_read`] with [`crate::tx_buffer::DEFAULT_MAX_READ_SET_KEYS`] to enforce bounded limits.
+/// Use [`crate::tx_buffer::TxBuffer::try_register_read`] with [`crate::tx_buffer::DEFAULT_MAX_READ_SET_KEYS`] to enforce bounded limits.
 ///
 /// # Range Reads & Phantom Protection
 /// SSI protects point reads directly via recorded keys. Range scans (e.g. prefix scans) MUST call
@@ -239,12 +240,18 @@ fn coarsen_keys_to_prefixes(keys: &[Vec<u8>], max_prefixes: usize) -> Vec<Vec<u8
         if chunk.is_empty() {
             continue;
         }
-        let mut lcp = chunk[0].clone();
-        for k in &chunk[1..] {
-            let common_len = lcp.iter().zip(k.iter()).take_while(|(a, b)| a == b).count();
-            lcp.truncate(common_len);
-            if lcp.is_empty() {
-                break;
+        let mut lcp = if let Some(first) = chunk.first() {
+            first.clone()
+        } else {
+            continue;
+        };
+        if let Some(rest) = chunk.get(1..) {
+            for k in rest {
+                let common_len = lcp.iter().zip(k.iter()).take_while(|(a, b)| a == b).count();
+                lcp.truncate(common_len);
+                if lcp.is_empty() {
+                    break;
+                }
             }
         }
         if !prefixes.contains(&lcp) {
@@ -338,12 +345,10 @@ impl CommittedWrites {
 
         for chunk in seqs.chunks(2) {
             if chunk.len() == 2 {
-                let s1 = chunk[0];
-                let s2 = chunk[1];
-
-                if let (Some(b1), Some(b2)) =
-                    (self.seq_index.remove(&s1), self.seq_index.remove(&s2))
-                {
+                if let (Some(&s1), Some(&s2)) = (chunk.first(), chunk.get(1)) {
+                    if let (Some(b1), Some(b2)) =
+                        (self.seq_index.remove(&s1), self.seq_index.remove(&s2))
+                    {
                     let mut prefixes = Vec::new();
                     let mut total_keys = 0;
 
@@ -368,15 +373,16 @@ impl CommittedWrites {
                         }
                     }
 
-                    let coarsened_prefixes = coarsen_keys_to_prefixes(&prefixes, 2);
-                    self.seq_index.insert(
-                        s2,
-                        SeqBucket::Coarsened {
-                            prefixes: coarsened_prefixes,
-                            original_key_count: total_keys,
-                        },
-                    );
-                    merged_count += 1;
+                        let coarsened_prefixes = coarsen_keys_to_prefixes(&prefixes, 2);
+                        self.seq_index.insert(
+                            s2,
+                            SeqBucket::Coarsened {
+                                prefixes: coarsened_prefixes,
+                                original_key_count: total_keys,
+                            },
+                        );
+                        merged_count += 1;
+                    }
                 }
             }
         }
@@ -482,14 +488,8 @@ pub struct SequenceLogSsiValidator {
     pruned_through: Arc<AtomicU64>,
     max_tracked_keys: usize,
     max_pin_duration: Duration,
-    /// Metrics sink container for observability reporting (v17 Teil 2.2 & Teil 4.3 B-16).
-    ///
-    /// # Architecture Decision & Invariant (Hot-Swap Consistency)
-    /// Uses `Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>` rather than a direct `Arc<dyn MetricsSink>`
-    /// to maintain hot-swap consistency with the `LsmStorage` engine pattern in `contextra-store`.
-    /// When an operator swaps the global metrics sink at runtime via `set_metrics_sink()`, the validator
-    /// dynamically reads the active sink on each check rather than staying bound to an obsolete instance.
     metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>>,
+    clock: Arc<dyn Clock>,
 }
 
 impl std::fmt::Debug for SequenceLogSsiValidator {
@@ -513,13 +513,18 @@ impl Default for SequenceLogSsiValidator {
 }
 
 impl SequenceLogSsiValidator {
-    /// Creates a new [`SequenceLogSsiValidator`] with default maximum commit key capacity (1,000,000 keys).
+    /// Creates a new [`SequenceLogSsiValidator`] with default maximum commit key capacity (1,000,000 keys) and [`SystemClock`].
     pub fn new() -> Self {
         Self::new_with_bounds(DEFAULT_MAX_TRACKED_COMMIT_KEYS)
     }
 
     /// Creates a new [`SequenceLogSsiValidator`] with specified maximum commit key bounds `max_tracked_keys`.
     pub fn new_with_bounds(max_tracked_keys: usize) -> Self {
+        Self::new_with_clock_and_bounds(Arc::new(SystemClock::new()), max_tracked_keys)
+    }
+
+    /// Creates a new [`SequenceLogSsiValidator`] with a custom [`Clock`] and specified maximum commit key capacity.
+    pub fn new_with_clock_and_bounds(clock: Arc<dyn Clock>, max_tracked_keys: usize) -> Self {
         Self {
             committed_writes: Arc::new(RwLock::new(CommittedWrites::default())),
             sequence_log: None,
@@ -528,7 +533,24 @@ impl SequenceLogSsiValidator {
             max_tracked_keys,
             max_pin_duration: DEFAULT_MAX_PIN_DURATION,
             metrics_sink: None,
+            clock,
         }
+    }
+
+    /// Attaches a custom [`Clock`] implementation to this validator.
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// Sets the active [`Clock`] instance for this validator.
+    pub fn set_clock(&mut self, clock: Arc<dyn Clock>) {
+        self.clock = clock;
+    }
+
+    /// Returns the active [`Clock`] instance associated with this validator.
+    pub fn clock(&self) -> &Arc<dyn Clock> {
+        &self.clock
     }
 
     /// Creates a new [`SequenceLogSsiValidator`] attached to an existing [`SequenceLog`].
@@ -541,6 +563,7 @@ impl SequenceLogSsiValidator {
             max_tracked_keys: DEFAULT_MAX_TRACKED_COMMIT_KEYS,
             max_pin_duration: DEFAULT_MAX_PIN_DURATION,
             metrics_sink: None,
+            clock: Arc::new(SystemClock::new()),
         }
     }
 
@@ -556,12 +579,6 @@ impl SequenceLogSsiValidator {
     }
 
     /// Attaches a metrics sink container to this validator for observability reporting.
-    ///
-    /// # Architecture Decision & Invariant (v17 Teil 2.2 & Teil 4.3 B-16)
-    /// Accepts an `Arc<parking_lot::RwLock<Arc<dyn MetricsSink>>>` rather than a direct `Arc<dyn MetricsSink>`
-    /// to maintain hot-swap consistency with the `LsmStorage` engine pattern in `contextra-store`.
-    /// When an operator swaps the global metrics sink at runtime via `set_metrics_sink()`, the validator
-    /// dynamically reads the active sink on each check rather than staying bound to an obsolete instance.
     pub fn with_metrics_sink(
         mut self,
         sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
@@ -585,13 +602,6 @@ impl SequenceLogSsiValidator {
     }
 
     /// Prunes tracked committed writes with `commit_seq <= bound_seq`.
-    ///
-    /// Atomically updates `pruned_through` watermark monotonically under the `committed_writes` write lock.
-    /// Returns the number of entries removed.
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` compaction workers compute `bound_seq` as `min(min_read_snapshot(), min_active_seqno())`
-    /// to ensure pruned keys can no longer conflict with any active or future transaction.
     pub fn prune_through(&self, bound_seq: u64) -> usize {
         let bound_seq = bound_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
@@ -601,13 +611,6 @@ impl SequenceLogSsiValidator {
     }
 
     /// Removes all committed key registrations with `commit_seq >= first_seq`.
-    ///
-    /// Used when WAL append or commit execution fails after keys were registered conservatively.
-    /// Returns the number of entries removed in $O(K_{\text{removed}})$ time using the sequence index.
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` invokes `forget_from(first_seq)` during WAL append or commit execution rollbacks
-    /// to strip conservatively registered candidate keys. Earlier valid commits at `old_seq < first_seq` are restored.
     pub fn forget_from(&self, first_seq: u64) -> usize {
         let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
@@ -645,6 +648,8 @@ impl SequenceLogSsiValidator {
             }
         }
 
+        let now_nanos = self.clock.monotonic_nanos();
+
         if let Some(ref sink_lock) = self.metrics_sink {
             let sink = sink_lock.read().clone();
             let ratio = initial_len as f64 / self.max_tracked_keys as f64;
@@ -652,7 +657,7 @@ impl SequenceLogSsiValidator {
 
             if reached_threshold {
                 if let Some(ref blocker) =
-                    self.diagnose_pruning_blocker_internal(writes, Instant::now())
+                    self.diagnose_pruning_blocker_internal(writes, now_nanos)
                 {
                     sink.record_gauge(
                         "mvcc_ssi_coarsened_buckets_total",
@@ -671,7 +676,7 @@ impl SequenceLogSsiValidator {
         }
 
         if writes.len() >= threshold {
-            if let Some(blocker) = self.diagnose_pruning_blocker_internal(writes, Instant::now()) {
+            if let Some(blocker) = self.diagnose_pruning_blocker_internal(writes, now_nanos) {
                 tracing::warn!(
                     min_unpruned_seq = blocker.min_unpruned_seq,
                     pruned_through_seq = blocker.pruned_through_seq,
@@ -690,19 +695,19 @@ impl SequenceLogSsiValidator {
 
     /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning in this validator.
     pub fn diagnose_pruning_blocker(&self) -> Option<PruningBlockerInfo> {
-        self.diagnose_pruning_blocker_at(Instant::now())
+        self.diagnose_pruning_blocker_at(self.clock.monotonic_nanos())
     }
 
-    /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning relative to timestamp `now`.
-    pub fn diagnose_pruning_blocker_at(&self, now: Instant) -> Option<PruningBlockerInfo> {
+    /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning relative to monotonic timestamp `now_nanos`.
+    pub fn diagnose_pruning_blocker_at(&self, now_nanos: u64) -> Option<PruningBlockerInfo> {
         let writes = self.committed_writes.read();
-        self.diagnose_pruning_blocker_internal(&writes, now)
+        self.diagnose_pruning_blocker_internal(&writes, now_nanos)
     }
 
     fn diagnose_pruning_blocker_internal(
         &self,
         writes: &CommittedWrites,
-        now: Instant,
+        now_nanos: u64,
     ) -> Option<PruningBlockerInfo> {
         let min_unpruned_seq = writes.seq_index.keys().copied().next()?;
         let total_seq_buckets = writes.seq_index.len();
@@ -715,7 +720,7 @@ impl SequenceLogSsiValidator {
         let longest_pin = self
             .snapshot_registry
             .as_ref()
-            .and_then(|reg| reg.longest_active_pin_at(now));
+            .and_then(|reg| reg.longest_active_pin_at(now_nanos));
 
         let longest_active_snapshot_seq = longest_pin.map(|(seq, _)| seq);
         let longest_pin_duration = longest_pin.map(|(_, dur)| dur);
@@ -735,10 +740,6 @@ impl SequenceLogSsiValidator {
     }
 
     /// Records a committed write for `key` at sequence number `commit_seq`.
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` assumes strict monotonic `commit_seq` assignment serialized by `commit_mutex`.
-    /// Registering keys must reflect durably committed WAL/engine sequence numbers.
     pub fn record_commit_key(&self, key: &[u8], commit_seq: u64) {
         let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
@@ -760,34 +761,15 @@ impl SequenceLogSsiValidator {
         self.check_and_coarsen_if_needed(&mut writes);
     }
 
-    /// Validates `read_set` against `committed_writes` map and `sequence_log`.
-    fn validate_internal(
+    /// Validates point reads against committed write keys and coarsened prefix buckets.
+    fn validate_point_reads(
         &self,
         committed_writes: &CommittedWrites,
         tx_id: TxId,
-        read_set: &ReadSet,
+        entries: &[(&Vec<u8>, &u64)],
+        pruned_through: u64,
     ) -> Result<()> {
-        if read_set.is_empty() {
-            return Ok(());
-        }
-
-        // Fail-closed check if commit key capacity limit is reached or exceeded
-        if committed_writes.len() >= self.max_tracked_keys {
-            return Err(ContextraError::Conflict(format!(
-                "Serializable isolation validation failed for TxId({}): commit key capacity limit reached ({} >= {})",
-                tx_id.inner(),
-                committed_writes.len(),
-                self.max_tracked_keys
-            )));
-        }
-
-        let pruned_through = self.pruned_through.load(Ordering::SeqCst);
-
-        // Sort read keys deterministically by key bytes to guarantee reproducible validation order
-        let mut entries: Vec<(&Vec<u8>, &u64)> = read_set.iter().collect();
-        entries.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
-
-        for (key, &snapshot_seq) in entries {
+        for &(key, &snapshot_seq) in entries {
             if snapshot_seq < pruned_through {
                 return Err(ContextraError::Conflict(format!(
                     "Serializable isolation violation for TxId({}): snapshot too old (snapshot_seq {} < pruned_through {}) for key '{:?}'",
@@ -798,7 +780,6 @@ impl SequenceLogSsiValidator {
                 )));
             }
 
-            // 1. Direct key commit sequence check & coarsened bucket prefix check
             if let Some(commit_seq) = committed_writes.get(key) {
                 if commit_seq > snapshot_seq {
                     return Err(ContextraError::Conflict(format!(
@@ -830,31 +811,47 @@ impl SequenceLogSsiValidator {
                 }
             }
 
-            // 2. SequenceLog entry check if attached
-            if let Some(ref seq_log_lock) = self.sequence_log {
-                let seq_log = seq_log_lock.read();
-                let doc_id = derive_doc_id_for_key(key);
+            self.validate_sequence_log_for_key(tx_id, key, snapshot_seq)?;
+        }
+        Ok(())
+    }
 
-                let changes = seq_log.changes_since(snapshot_seq);
-                for change in changes {
-                    if change.doc_id() == doc_id && change.seq() > snapshot_seq {
-                        return Err(ContextraError::Conflict(format!(
-                            "Serializable isolation violation for TxId({}): doc_id {} modified at seq {} > snapshot_seq {}",
-                            tx_id.inner(),
-                            doc_id,
-                            change.seq(),
-                            snapshot_seq
-                        )));
-                    }
+    /// Validates `SequenceLog` entries for a point read key.
+    fn validate_sequence_log_for_key(
+        &self,
+        tx_id: TxId,
+        key: &[u8],
+        snapshot_seq: u64,
+    ) -> Result<()> {
+        if let Some(ref seq_log_lock) = self.sequence_log {
+            let seq_log = seq_log_lock.read();
+            let doc_id = derive_doc_id_for_key(key);
+
+            let changes = seq_log.changes_since(snapshot_seq);
+            for change in changes {
+                if change.doc_id() == doc_id && change.seq() > snapshot_seq {
+                    return Err(ContextraError::Conflict(format!(
+                        "Serializable isolation violation for TxId({}): doc_id {} modified at seq {} > snapshot_seq {}",
+                        tx_id.inner(),
+                        doc_id,
+                        change.seq(),
+                        snapshot_seq
+                    )));
                 }
             }
         }
+        Ok(())
+    }
 
-        // Range scan phantom protection checks
-        let mut prefixes: Vec<(&Vec<u8>, &u64)> = read_set.prefixes_iter().collect();
-        prefixes.sort_unstable_by(|(p1, _), (p2, _)| p1.cmp(p2));
-
-        for (prefix, &snapshot_seq) in prefixes {
+    /// Validates range scan prefix reads against committed writes and coarsened prefix buckets for phantom protection.
+    fn validate_range_reads(
+        &self,
+        committed_writes: &CommittedWrites,
+        tx_id: TxId,
+        prefixes: &[(&Vec<u8>, &u64)],
+        pruned_through: u64,
+    ) -> Result<()> {
+        for &(prefix, &snapshot_seq) in prefixes {
             if snapshot_seq < pruned_through {
                 return Err(ContextraError::Conflict(format!(
                     "Serializable isolation violation for TxId({}): snapshot too old (snapshot_seq {} < pruned_through {}) for range prefix '{:?}'",
@@ -901,6 +898,40 @@ impl SequenceLogSsiValidator {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Validates `read_set` against `committed_writes` map and `sequence_log`.
+    fn validate_internal(
+        &self,
+        committed_writes: &CommittedWrites,
+        tx_id: TxId,
+        read_set: &ReadSet,
+    ) -> Result<()> {
+        if read_set.is_empty() {
+            return Ok(());
+        }
+
+        if committed_writes.len() >= self.max_tracked_keys {
+            return Err(ContextraError::Conflict(format!(
+                "Serializable isolation validation failed for TxId({}): commit key capacity limit reached ({} >= {})",
+                tx_id.inner(),
+                committed_writes.len(),
+                self.max_tracked_keys
+            )));
+        }
+
+        let pruned_through = self.pruned_through.load(Ordering::SeqCst);
+
+        let mut entries: Vec<(&Vec<u8>, &u64)> = read_set.iter().collect();
+        entries.sort_unstable_by(|(k1, _), (k2, _)| k1.cmp(k2));
+
+        self.validate_point_reads(committed_writes, tx_id, &entries, pruned_through)?;
+
+        let mut prefixes: Vec<(&Vec<u8>, &u64)> = read_set.prefixes_iter().collect();
+        prefixes.sort_unstable_by(|(p1, _), (p2, _)| p1.cmp(p2));
+
+        self.validate_range_reads(committed_writes, tx_id, &prefixes, pruned_through)?;
 
         Ok(())
     }
@@ -1004,6 +1035,23 @@ mod tests {
 
         // Record a commit for key1 at seq 11 (> snapshot_seq 10)
         validator.record_commit_key(b"key1", 11);
+
+        let res = validator.validate(tx, &rs);
+        assert!(res.is_err());
+        assert!(matches!(res, Err(ContextraError::Conflict(_))));
+    }
+
+    #[test]
+    fn test_validator_batch_commit_keys() {
+        let validator = SequenceLogSsiValidator::new();
+        let tx = TxId::new(5);
+
+        let mut rs = ReadSet::new();
+        rs.record_read(b"key_a".to_vec(), 10);
+        rs.record_read(b"key_b".to_vec(), 10);
+
+        let keys = vec![b"key_a".as_slice(), b"key_b".as_slice()];
+        validator.record_commit_keys(keys, 15);
 
         let res = validator.validate(tx, &rs);
         assert!(res.is_err());

@@ -16,11 +16,12 @@
 // RAII-PATTERN: Drop deregistriert automatisch. unwrap_or(u64::MAX) ist KORREKT.
 
 use crate::types::TOMBSTONE_BIT;
+use contextra_ports::{Clock, SystemClock};
 use parking_lot::Mutex;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Registry for active read snapshots.
 ///
@@ -36,10 +37,19 @@ use std::time::{Duration, Instant};
 ///   a lock. It establishes a release-acquire ordering guarantee between registration/deregistration
 ///   state changes and reader threads (such as LSM compaction workers), preventing instruction
 ///   reordering across the atomic synchronization boundary.
-#[derive(Debug)]
 pub struct SnapshotRegistry {
-    active: Mutex<BTreeMap<u64, Vec<Instant>>>,
+    active: Mutex<BTreeMap<u64, Vec<u64>>>,
     min_active_seqno: AtomicU64,
+    clock: Arc<dyn Clock>,
+}
+
+impl std::fmt::Debug for SnapshotRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SnapshotRegistry")
+            .field("active", &self.active)
+            .field("min_active_seqno", &self.min_active_seqno)
+            .finish()
+    }
 }
 
 impl Default for SnapshotRegistry {
@@ -49,30 +59,42 @@ impl Default for SnapshotRegistry {
 }
 
 impl SnapshotRegistry {
-    /// Creates a new empty SnapshotRegistry.
+    /// Creates a new empty SnapshotRegistry with default [`SystemClock`].
     pub fn new() -> Self {
+        Self::with_clock(Arc::new(SystemClock::new()))
+    }
+
+    /// Creates a new empty SnapshotRegistry using the specified [`Clock`] instance.
+    pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
         Self {
             active: Mutex::new(BTreeMap::new()),
             min_active_seqno: AtomicU64::new(u64::MAX),
+            clock,
         }
+    }
+
+    /// Returns the active [`Clock`] instance attached to this registry.
+    pub fn clock(&self) -> &Arc<dyn Clock> {
+        &self.clock
     }
 
     /// Registers a read snapshot. Returns an RAII guard that
     /// automatically deregisters on drop.
     pub fn register(self: &Arc<Self>, seq_no: u64) -> SnapshotGuard {
-        self.register_at(seq_no, Instant::now())
+        let now_nanos = self.clock.monotonic_nanos();
+        self.register_at(seq_no, now_nanos)
     }
 
-    /// Registers a read snapshot at a specific creation timestamp `at`.
-    pub fn register_at(self: &Arc<Self>, seq_no: u64, at: Instant) -> SnapshotGuard {
+    /// Registers a read snapshot at a specific creation monotonic nanoseconds timestamp `at_nanos`.
+    pub fn register_at(self: &Arc<Self>, seq_no: u64, at_nanos: u64) -> SnapshotGuard {
         let seq_no = seq_no & !TOMBSTONE_BIT;
         let mut active = self.active.lock();
-        active.entry(seq_no).or_default().push(at);
+        active.entry(seq_no).or_default().push(at_nanos);
         self.update_min(&active);
         SnapshotGuard {
             registry: self.clone(),
             seq_no,
-            created_at: Some(at),
+            created_at: Some(at_nanos),
         }
     }
 
@@ -81,7 +103,6 @@ impl SnapshotRegistry {
     /// Uses `Ordering::Acquire` to synchronize with `Ordering::Release` writes in `update_min`.
     /// This allows reader threads (e.g., compaction processes) to safely query the minimum
     /// active snapshot sequence without acquiring the `active` mutex lock.
-    /// Returns the minimum active sequence number (`u64::MAX` if none).
     ///
     /// # INVARIANT (contextra-store Integration)
     /// `contextra-store` compaction workers query `min_active_seqno()` using lock-free Acquire ordering
@@ -94,14 +115,15 @@ impl SnapshotRegistry {
 
     /// Persistent pin of a sequence number to prevent GC (SAOS Checkpoint).
     pub fn pin(&self, seq_no: u64) {
-        self.pin_at(seq_no, Instant::now());
+        let now_nanos = self.clock.monotonic_nanos();
+        self.pin_at(seq_no, now_nanos);
     }
 
-    /// Persistent pin of a sequence number at a specific timestamp `at`.
-    pub fn pin_at(&self, seq_no: u64, at: Instant) {
+    /// Persistent pin of a sequence number at a specific monotonic nanoseconds timestamp `at_nanos`.
+    pub fn pin_at(&self, seq_no: u64, at_nanos: u64) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
         let mut active = self.active.lock();
-        active.entry(seq_no).or_default().push(at);
+        active.entry(seq_no).or_default().push(at_nanos);
         self.update_min(&active);
     }
 
@@ -114,7 +136,7 @@ impl SnapshotRegistry {
         self.release_at(seq_no, None);
     }
 
-    pub(crate) fn release_at(&self, seq_no: u64, created_at: Option<Instant>) {
+    pub(crate) fn release_at(&self, seq_no: u64, created_at: Option<u64>) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
         let mut active = self.active.lock();
         if let Some(timestamps) = active.get_mut(&seq_no) {
@@ -136,15 +158,15 @@ impl SnapshotRegistry {
         self.update_min(&active);
     }
 
-    /// Identifies which active snapshot sequence number has been held the longest relative to `now`,
+    /// Identifies which active snapshot sequence number has been held the longest relative to `now_nanos`,
     /// returning `Some((seq_no, duration))` or `None` if no snapshots are currently active.
-    pub fn longest_active_pin_at(&self, now: Instant) -> Option<(u64, Duration)> {
+    pub fn longest_active_pin_at(&self, now_nanos: u64) -> Option<(u64, Duration)> {
         let active = self.active.lock();
         let mut longest: Option<(u64, Duration)> = None;
 
         for (&seq_no, timestamps) in active.iter() {
             for &ts in timestamps {
-                let duration = now.saturating_duration_since(ts);
+                let duration = Duration::from_nanos(now_nanos.saturating_sub(ts));
                 match longest {
                     None => longest = Some((seq_no, duration)),
                     Some((_, max_duration)) if duration > max_duration => {
@@ -161,10 +183,47 @@ impl SnapshotRegistry {
     /// Identifies which active snapshot sequence number has been held the longest,
     /// returning `Some((seq_no, duration))` or `None` if no snapshots are currently active.
     pub fn longest_active_pin(&self) -> Option<(u64, Duration)> {
-        self.longest_active_pin_at(Instant::now())
+        self.longest_active_pin_at(self.clock.monotonic_nanos())
     }
 
-    fn update_min(&self, active: &BTreeMap<u64, Vec<Instant>>) {
+    /// Reaps and removes active snapshot pins older than `max_pin_duration` relative to `now_nanos`.
+    pub fn reap_expired_pins_at(&self, max_pin_duration: Duration, now_nanos: u64) -> Vec<u64> {
+        let max_nanos = u64::try_from(max_pin_duration.as_nanos()).unwrap_or(u64::MAX);
+        let mut expired_seqs = Vec::new();
+        let mut active = self.active.lock();
+
+        let mut seqs_to_remove = Vec::new();
+        for (&seq_no, timestamps) in active.iter_mut() {
+            timestamps.retain(|&ts| {
+                if now_nanos.saturating_sub(ts) > max_nanos {
+                    expired_seqs.push(seq_no);
+                    false
+                } else {
+                    true
+                }
+            });
+            if timestamps.is_empty() {
+                seqs_to_remove.push(seq_no);
+            }
+        }
+
+        for seq in seqs_to_remove {
+            active.remove(&seq);
+        }
+
+        self.update_min(&active);
+        expired_seqs.sort_unstable();
+        expired_seqs.dedup();
+        expired_seqs
+    }
+
+    /// Reaps and removes active snapshot pins older than `max_pin_duration`.
+    pub fn reap_expired_pins(&self, max_pin_duration: Duration) -> Vec<u64> {
+        let now_nanos = self.clock.monotonic_nanos();
+        self.reap_expired_pins_at(max_pin_duration, now_nanos)
+    }
+
+    fn update_min(&self, active: &BTreeMap<u64, Vec<u64>>) {
         // SAFETY: u64::MAX is the correct default when no snapshots are active.
         // It allows the LSM compaction to garbage collect ALL tombstones, as
         // all existing records will have seq_no < u64::MAX.
@@ -181,7 +240,7 @@ impl SnapshotRegistry {
 pub struct SnapshotGuard {
     registry: Arc<SnapshotRegistry>,
     seq_no: u64,
-    created_at: Option<Instant>,
+    created_at: Option<u64>,
 }
 
 impl SnapshotGuard {
@@ -201,6 +260,7 @@ impl Drop for SnapshotGuard {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
+    use contextra_testkit::ManualClock;
     use proptest::prop_assert_eq;
 
     // INTENT: Snapshot-Registry Lifecycle verified by 5 unit tests.
@@ -314,6 +374,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_snapshot_registry_reap_expired_pins() {
+        let clock = Arc::new(ManualClock::new(10_000_000_000));
+        let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
+
+        registry.pin(100);
+        assert_eq!(registry.min_active_seqno(), 100);
+
+        // Advance clock by 10 seconds
+        clock.advance(Duration::from_secs(10));
+
+        // Pin 200 at t = 10s
+        registry.pin(200);
+        assert_eq!(registry.min_active_seqno(), 100);
+
+        // Advance clock by 295s (total elapsed for pin 100: 305s > 300s max_pin_duration)
+        clock.advance(Duration::from_secs(295));
+
+        // Reap expired pins with 300s limit
+        let reaped = registry.reap_expired_pins(Duration::from_secs(300));
+        assert_eq!(reaped, vec![100]);
+        assert_eq!(registry.min_active_seqno(), 200);
+    }
+
     proptest::proptest! {
         #[test]
         fn prop_snapshot_registry_min_active(
@@ -365,7 +449,9 @@ mod tests {
             active_seqs.sort_unstable();
 
             // Verify initial state
-            prop_assert_eq!(registry.min_active_seqno(), active_seqs[0]);
+            if let Some(&first_seq) = active_seqs.first() {
+                prop_assert_eq!(registry.min_active_seqno(), first_seq);
+            }
 
             // Drop guards one-by-one using the seed to pick which to drop
             let mut remaining_indices: Vec<usize> = (0..guards.len()).collect();
@@ -377,8 +463,14 @@ mod tests {
                 let guard_idx = remaining_indices.remove(idx_in_remaining);
 
                 // Drop the guard
-                let seq_val = guards[guard_idx].as_ref().unwrap().seq_no(); // #[cfg(test)]
-                guards[guard_idx] = None;
+                let seq_val = if let Some(g) = guards.get(guard_idx).and_then(|opt| opt.as_ref()) {
+                    g.seq_no()
+                } else {
+                    continue;
+                };
+                if let Some(guard_slot) = guards.get_mut(guard_idx) {
+                    *guard_slot = None;
+                }
 
                 // Remove from reference (one occurrence only)
                 if let Some(pos) = active_seqs.iter().position(|&s| s == seq_val) {

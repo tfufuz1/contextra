@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_types::{ContextraError, TxId};
 
@@ -34,9 +36,10 @@ fn committed_writes_bounded() {
     let validator = SequenceLogSsiValidator::new_with_bounds(max_keys);
 
     for i in 0..1_000_000 {
-        validator.record_commit_key(format!("key_{i}").as_bytes(), i as u64 + 1);
+        let seq = u64::try_from(i).expect("valid u64") + 1;
+        validator.record_commit_key(format!("key_{i}").as_bytes(), seq);
         if (i + 1) % 5 == 0 {
-            let removed = validator.prune_through((i + 1) as u64);
+            let removed = validator.prune_through(seq);
             assert!(removed > 0);
         }
     }
