@@ -2,9 +2,43 @@
 
 # Contextra
 
-> **Baukasten für lokale, datenschutzkonforme LLM- & RAG-Lösungen im europäischen Mittelstand**
+> **Baukasten für lokale LLM- & RAG-Lösungen im europäischen Mittelstand (lokaler Betrieb ohne Cloud-Zwang)**
 
-Contextra ist eine in Rust geschriebene Bibliothek (Single-Node, eingebettet), die als kompakter Baukasten aus entkoppelten Crates strukturiert ist. Sie ermöglicht lokales Wissens- und Speichermanagement ohne Cloud-Zwang, hybride Suche (Vektor + BM25) und eine technisch begründete, messbare Löschkette nach DSGVO.
+Contextra ist eine in Rust geschriebene Bibliothek (Single-Node, eingebettet), die als kompakter Baukasten aus entkoppelten Crates strukturiert ist. Sie ermöglicht lokales Wissens- und Speichermanagement ohne Cloud-Zwang, hybride Suche (Vektor + BM25) und Bausteine, die Datenschutzanforderungen technisch unterstützen.
+
+---
+
+## Status der Löschkette
+
+Die Löschkette befindet sich im Entwicklungsstatus **experimental** ([`docs/SPEC.md`](docs/SPEC.md) §9.10).
+
+Aktuell werden durch Layer-Scanner messtechnisch fünf Schichten erfasst (`crates/contextra-engine/src/contextra_impl/erasure.rs`):
+- `LsmMemtable` (Memtable)
+- `SsTableAllLevels` (SSTables)
+- `WalAllSegments` (Write-Ahead Log)
+- `TextIndex` (BM25 Text-Index)
+- `HnswIndex` (Vektor-Index)
+
+Noch nicht umgesetzt sind:
+- Schlüsselvernichtung und Schlüsselhierarchie
+- Lesesperre (`ErasedSet`)
+- Löschsaga
+- Backup-Guard
+- Empfängerregister (`RecipientLedger`)
+
+---
+
+## Grenzen der Löschung
+
+Folgende Bereiche sind nicht durch Contextra kontrollierbar und bilden explizite Ausschlüsse ([`docs/SPEC.md`](docs/SPEC.md) §9.9, C-12.20):
+- Externe Sicherungen des Betreibers
+- Datenträger-Firmware (Flash-Speicher, Wear-Leveling, Überprovisionierung)
+- Prozessspeicher, Auslagerungsdateien (Swap) und Core-Dumps außerhalb des gehärteten Prozesses
+- Kopien und übermittelte Daten bei Dritten
+- Modellparameter
+- Host-Prompt-Historien und Verläufe
+
+Das Ergebnis ist ein technischer Befund über das lokale Datenverzeichnis, keine Rechtsauskunft und keine Zertifizierung. Weitere Details befinden sich in [`docs/SPEC.md`](docs/SPEC.md) §9.
 
 ---
 
