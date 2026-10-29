@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-py",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 34.881,
+  "tests_total": 0,
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 5,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-py --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 29.45,
+      "stdout_snippet": "",
+      "stderr_snippet": "n<()>>,\n    |     ^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` on by default\n\nwarning: field `tenant_id` is never read\n   --> crates/contextra-engine/src/transaction/compensating_actions.rs:240:16\n    |\n238 | pub struct CompensateHnswAction<S: StorageEngine, V: VectorIndex> {\n    |            -------------------- field in this struct\n239 |     pub(super) collection: Collection<S, V>,\n240 |     pub(super) tenant_id: TenantId,\n    |                ^^^^^^^^^\n\nwarning: `contextra-engine` (lib) generated 3 warnings\n   Compiling contextra-db v0.1.0 (/app/crates/contextra-db)\n   Compiling pyo3-macros-backend v0.24.2\n   Compiling pyo3-ffi v0.24.2\n   Compiling pyo3 v0.24.2\n   Compiling num-complex v0.4.6\n   Compiling num-integer v0.1.47\n   Compiling numpy v0.24.0\n   Compiling ndarray v0.15.6\n   Compiling pyo3-macros v0.24.2\n   Compiling pythonize v0.24.0\n   Compiling contextra-py v0.1.0 (/app/crates/contextra-py)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.35s\n"
+    },
+    {
+      "command": "cargo test -p contextra-py --locked",
+      "exit_code": 0,
+      "duration_seconds": 0.343,
+      "stdout_snippet": "",
+      "stderr_snippet": "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-py --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 5.088,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

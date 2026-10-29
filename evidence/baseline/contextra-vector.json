@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-vector",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 74.242,
+  "tests_total": 101,
+  "tests_passed": 101,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 5,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-vector --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 5.212,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling contextra-simd v0.1.0 (/app/crates/contextra-simd)\n   Compiling contextra-mvcc v0.1.0 (/app/crates/contextra-mvcc)\n   Compiling contextra-crypto v0.1.0 (/app/crates/contextra-crypto)\n   Compiling contextra-vector v0.1.0 (/app/crates/contextra-vector)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.12s\n"
+    },
+    {
+      "command": "cargo test -p contextra-vector --locked",
+      "exit_code": 124,
+      "duration_seconds": 60.01,
+      "stdout_snippet": "st_h9_compute_pool_saturation_and_panic_safety ... ok\n\ntest result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s\n\n\nrunning 2 tests\ntest test_j41_docid_u128_truncation_oracle ... ok\ntest test_j41_neighbor_count_u8_truncation_oracle ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 3 tests\ntest proof_deleted_nodes_lock_hoisted_before_loop ... ok\ntest proof_no_deadlock_concurrent_delete_search ... ok\n",
+      "stderr_snippet": "ed `test` profile [unoptimized + debuginfo] target(s) in 49.27s\n     Running unittests src/lib.rs (target/debug/deps/contextra_vector-9a1d6be4ee167ee8)\n     Running tests/acorn_hnsw_differential.rs (target/debug/deps/acorn_hnsw_differential-28d1ddbedd3deb63)\n     Running tests/acorn_naive_recall.rs (target/debug/deps/acorn_naive_recall-e185be27a341f145)\n     Running tests/adaptive_ef_recall.rs (target/debug/deps/adaptive_ef_recall-d458d312c4cf8a46)\n     Running tests/campaign_hnsw_backoff.rs (target/debug/deps/campaign_hnsw_backoff-6d3b9c54b11f4777)\n     Running tests/campaign_j23_vector_index.rs (target/debug/deps/campaign_j23_vector_index-897170668c930083)\n     Running tests/campaign_j24_test.rs (target/debug/deps/campaign_j24_test-6ff4d7c764b022e1)\n     Running tests/campaign_j41_vector.rs (target/debug/deps/campaign_j41_vector-32797ba98f2ab566)\n     Running tests/deleted_nodes_lock_contention.rs (target/debug/deps/deleted_nodes_lock_contention-f51ec50dad1d5cf0)\n\n[TIMEOUT after 60s]"
+    },
+    {
+      "command": "cargo clippy -p contextra-vector --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 9.02,
+      "stdout_snippet": "",
+      "stderr_snippet": "t_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\n    Checking rand_chacha v0.9.0\n    Checking scoped-tls v1.0.1\n    Checking tokio v1.53.1\n    Checking proptest v1.11.0\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

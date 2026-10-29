@@ -513,11 +513,33 @@ impl FlowCorrectedThompsonBandit {
             return;
         }
 
+        let (ztz, zte) = self.build_drift_regression_system();
+        let mut delta = solve_conjugate_gradient(&ztz, &zte, d);
+
+        if delta.iter().any(|&v| !v.is_finite()) {
+            tracing::warn!("FC-TS drift rate recomputation produced non-finite values; keeping existing drift rate");
+            return;
+        }
+
+        let norm_sq = delta.iter().map(|&v| v * v).sum::<f32>();
+        let norm = norm_sq.sqrt();
+
+        if norm > self.config.max_drift_norm && norm > 1e-8 {
+            let scale = self.config.max_drift_norm / norm;
+            for v in delta.iter_mut() {
+                *v *= scale;
+            }
+        }
+
+        self.drift_rate = delta;
+    }
+
+    fn build_drift_regression_system(&self) -> (Vec<f32>, Vec<f32>) {
+        let d = self.config.dim;
         let cap = self.config.window_capacity;
         let rho = self.config.drift_ridge;
         let current_t = self.time_step;
 
-        // 1. Z^T Z Matrix (d x d) und Z^T e Vektor (d) aufbauen
         let mut ztz = vec![0.0f32; d * d];
         for i in 0..d {
             ztz[i * d + i] = rho;
@@ -537,14 +559,12 @@ impl FlowCorrectedThompsonBandit {
 
             let dt_s = current_t.saturating_sub(t_s) as f32;
 
-            // Residuum e_s = r_s - ⟨μ, x_s⟩
             let mut mu_dot_x = 0.0f32;
             for i in 0..d {
                 mu_dot_x += self.mu[i] * x_s[i];
             }
             let e_s = r_s - mu_dot_x;
 
-            // Feature z_s = dt_s * x_s
             for i in 0..d {
                 let zi = dt_s * x_s[i];
                 zte[i] += zi * e_s;
@@ -555,72 +575,58 @@ impl FlowCorrectedThompsonBandit {
             }
         }
 
-        // 2. Conjugate Gradient Solver für (Z^T Z + \rho I) \delta = Z^T e
-        let mut delta = vec![0.0f32; d];
-        let mut r = zte.clone();
-        let mut p = r.clone();
-        let mut r_sq = r.iter().map(|&v| v * v).sum::<f32>();
-
-        if r_sq >= 1e-12 {
-            for _ in 0..d {
-                // Ap = ztz * p
-                let mut ap = vec![0.0f32; d];
-                for i in 0..d {
-                    let row = &ztz[i * d..(i + 1) * d];
-                    let mut sum = 0.0f32;
-                    for j in 0..d {
-                        sum += row[j] * p[j];
-                    }
-                    ap[i] = sum;
-                }
-
-                let p_ap = p
-                    .iter()
-                    .zip(ap.iter())
-                    .map(|(&pi, &api)| pi * api)
-                    .sum::<f32>();
-                if p_ap <= 1e-12 || !p_ap.is_finite() {
-                    break;
-                }
-
-                let alpha = r_sq / p_ap;
-                for i in 0..d {
-                    delta[i] += alpha * p[i];
-                    r[i] -= alpha * ap[i];
-                }
-
-                let r_sq_new = r.iter().map(|&v| v * v).sum::<f32>();
-                if r_sq_new < 1e-10 || !r_sq_new.is_finite() {
-                    break;
-                }
-
-                let beta = r_sq_new / r_sq;
-                r_sq = r_sq_new;
-
-                for i in 0..d {
-                    p[i] = r[i] + beta * p[i];
-                }
-            }
-        }
-
-        // 3. Finitheits-Prüfung und Klemmen der Drift-Rate
-        if delta.iter().any(|&v| !v.is_finite()) {
-            tracing::warn!("FC-TS drift rate recomputation produced non-finite values; keeping existing drift rate");
-            return;
-        }
-
-        let norm_sq = delta.iter().map(|&v| v * v).sum::<f32>();
-        let norm = norm_sq.sqrt();
-
-        if norm > self.config.max_drift_norm && norm > 1e-8 {
-            let scale = self.config.max_drift_norm / norm;
-            for v in delta.iter_mut() {
-                *v *= scale;
-            }
-        }
-
-        self.drift_rate = delta;
+        (ztz, zte)
     }
+}
+
+fn solve_conjugate_gradient(ztz: &[f32], zte: &[f32], d: usize) -> Vec<f32> {
+    let mut delta = vec![0.0f32; d];
+    let mut r = zte.to_vec();
+    let mut p = r.clone();
+    let mut r_sq = r.iter().map(|&v| v * v).sum::<f32>();
+
+    if r_sq >= 1e-12 {
+        for _ in 0..d {
+            let mut ap = vec![0.0f32; d];
+            for i in 0..d {
+                let row = &ztz[i * d..(i + 1) * d];
+                let mut sum = 0.0f32;
+                for j in 0..d {
+                    sum += row[j] * p[j];
+                }
+                ap[i] = sum;
+            }
+
+            let p_ap = p
+                .iter()
+                .zip(ap.iter())
+                .map(|(&pi, &api)| pi * api)
+                .sum::<f32>();
+            if p_ap <= 1e-12 || !p_ap.is_finite() {
+                break;
+            }
+
+            let alpha = r_sq / p_ap;
+            for i in 0..d {
+                delta[i] += alpha * p[i];
+                r[i] -= alpha * ap[i];
+            }
+
+            let r_sq_new = r.iter().map(|&v| v * v).sum::<f32>();
+            if r_sq_new < 1e-10 || !r_sq_new.is_finite() {
+                break;
+            }
+
+            let beta = r_sq_new / r_sq;
+            r_sq = r_sq_new;
+
+            for i in 0..d {
+                p[i] = r[i] + beta * p[i];
+            }
+        }
+    }
+
+    delta
 }
 
 /// Referenzpolitik basierend auf Diagonal-Approximation für Off-Policy-Evaluation (§B.3.2).
@@ -639,6 +645,17 @@ impl DiagonalApproximationBandit {
     }
 
     /// Erstellt eine `DiagonalApproximationBandit`-Referenzpolitik aus Strategie-Propensitäts-Paaren.
+    ///
+    /// ```
+    /// use contextra_adapt::flow_thompson::DiagonalApproximationBandit;
+    /// use contextra_types::RetrievalStrategy;
+    ///
+    /// let bandit = DiagonalApproximationBandit::from_pairs([
+    ///     (RetrievalStrategy::Vector, 0.7),
+    ///     (RetrievalStrategy::Text, 0.3),
+    /// ]);
+    /// assert_eq!(bandit.propensity(RetrievalStrategy::Vector), 0.7);
+    /// ```
     pub fn from_pairs(
         pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
     ) -> Self {
@@ -695,6 +712,17 @@ impl FcTsSamplingDistribution {
     }
 
     /// Erstellt eine `FcTsSamplingDistribution`-Instanz aus Strategie-Wahrscheinlichkeits-Paaren.
+    ///
+    /// ```
+    /// use contextra_adapt::flow_thompson::FcTsSamplingDistribution;
+    /// use contextra_types::RetrievalStrategy;
+    ///
+    /// let dist = FcTsSamplingDistribution::from_pairs([
+    ///     (RetrievalStrategy::Hybrid, 0.8),
+    ///     (RetrievalStrategy::Graph, 0.2),
+    /// ]);
+    /// assert_eq!(dist.probability(RetrievalStrategy::Hybrid), 0.8);
+    /// ```
     pub fn from_pairs(
         pairs: impl IntoIterator<Item = (contextra_types::RetrievalStrategy, f32)>,
     ) -> Self {

@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-sys",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "pass",
+  "overall_exit_code": 0,
+  "duration_seconds": 8.58,
+  "tests_total": 10,
+  "tests_passed": 10,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 0,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-sys --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 6.629,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling quote v1.0.47\n   Compiling once_cell v1.21.4\n   Compiling pin-project-lite v0.2.17\n   Compiling libc v0.2.189\n   Compiling tracing-core v0.1.36\n   Compiling syn v2.0.119\n   Compiling memmap2 v0.9.11\n   Compiling tracing-attributes v0.1.31\n   Compiling tracing v0.1.44\n   Compiling contextra-sys v0.1.0 (/app/crates/contextra-sys)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.55s\n"
+    },
+    {
+      "command": "cargo test -p contextra-sys --locked",
+      "exit_code": 0,
+      "duration_seconds": 0.891,
+      "stdout_snippet": "lity::tests::test_write_all_durable_empty_buffer ... ok\ntest vault::tests::test_locked_regions_disabled ... ok\ntest vault::tests::test_locked_regions_lifecycle ... ok\ntest durability::tests::test_write_all_durable_and_flush_file ... ok\ntest durability::tests::test_durable_flush_dir ... ok\n\ntest result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "   Compiling contextra-sys v0.1.0 (/app/crates/contextra-sys)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.75s\n     Running unittests src/lib.rs (target/debug/deps/contextra_sys-34153a52ef833bdc)\n   Doc-tests contextra_sys\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-sys --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "duration_seconds": 1.06,
+      "stdout_snippet": "",
+      "stderr_snippet": "    Checking tracing-core v0.1.36\n    Checking memmap2 v0.9.11\n    Checking tracing v0.1.44\n    Checking contextra-sys v0.1.0 (/app/crates/contextra-sys)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.94s\n"
+    }
+  ]
+}

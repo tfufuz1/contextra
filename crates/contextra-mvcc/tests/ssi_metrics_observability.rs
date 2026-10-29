@@ -6,7 +6,6 @@ use contextra_ports::MetricsSink;
 use contextra_testkit::{MetricEvent, TestMetricsSink};
 use parking_lot::RwLock;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 #[test]
 fn test_ssi_metrics_observability_threshold_and_coarsening() {
@@ -21,7 +20,7 @@ fn test_ssi_metrics_observability_threshold_and_coarsening() {
     // Commit 17 distinct keys to exceed the 80% threshold (17 / 20 = 85%)
     for i in 1..=17 {
         let key = format!("user_key_{i:02}");
-        validator.record_commit_key(key.as_bytes(), i as u64);
+        validator.record_commit_key(key.as_bytes(), u64::try_from(i).expect("valid u64"));
     }
 
     let events = test_sink.events();
@@ -60,20 +59,23 @@ fn test_ssi_metrics_observability_long_pin_duration() {
     let sink_container: Arc<RwLock<Arc<dyn MetricsSink>>> =
         Arc::new(RwLock::new(test_sink.clone() as Arc<dyn MetricsSink>));
 
-    let registry = Arc::new(SnapshotRegistry::new());
-    let now = Instant::now();
-    let past_350s = now.checked_sub(Duration::from_secs(350)).unwrap_or(now);
-    let _guard = registry.register_at(42, past_350s);
+    let clock = Arc::new(ManualClock::new(500_000_000_000));
+    let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
+
+    let now_nanos = clock.now_nanos();
+    let past_350s_nanos = now_nanos.saturating_sub(350_000_000_000);
+    let _guard = registry.register_at(42, past_350s_nanos);
 
     let max_keys = 20;
     let validator = SequenceLogSsiValidator::new_with_bounds(max_keys)
+        .with_clock(clock.clone())
         .with_snapshot_registry(registry)
         .with_metrics_sink(sink_container);
 
     // Commit 17 distinct keys to exceed threshold
     for i in 1..=17 {
         let key = format!("data_key_{i:02}");
-        validator.record_commit_key(key.as_bytes(), i as u64);
+        validator.record_commit_key(key.as_bytes(), u64::try_from(i).expect("valid u64"));
     }
 
     let events = test_sink.events();
@@ -133,7 +135,7 @@ fn test_ssi_metrics_observability_hot_swap_consistency() {
         "sink2 must receive metric events recorded after hot-swap"
     );
     assert!(matches!(
-        &events_sink2[0],
+        events_sink2.first().unwrap(),
         MetricEvent::Gauge { name, .. } if name == "mvcc_ssi_commit_register_utilization_ratio"
     ));
 }

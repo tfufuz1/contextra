@@ -31,34 +31,36 @@ fn test_h10_gdpr_art30_processing_registry_and_canary_leak_check(
     );
 
     // 2. Markdown rendering determinism & Art. 30 lit. a-g technical completeness check
-    let md1 = render_register_markdown(&entries)?;
-    let md2 = render_register_markdown(&entries)?;
+    let md1 = render_register_markdown(&entries, "2026-10-28")?;
+    let md2 = render_register_markdown(&entries, "2026-10-28")?;
     assert_eq!(md1, md2, "Markdown rendering must be 100% deterministic");
 
     assert!(md1.contains("# Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO)"));
-    assert!(md1.contains("Zweck"), "Art. 30 lit. b: Purpose present");
     assert!(
-        md1.contains("Datenkategorien"),
-        "Art. 30 lit. c: Data categories present"
+        md1.contains("Verantwortlicher / Kontakt"),
+        "Art. 30 lit. a: Controller present"
     );
-
-    // BEFUND H10: contextra-audit-export's ProcessingRegisterEntry omits Art. 30 (1) lit. a (controller/processor name),
-    // lit. c (subject categories), lit. d (recipients), lit. e (third country transfers),
-    // lit. f (retention periods), and lit. g (TOMs)!
-    let has_lit_a_controller = md1.contains("Verantwortlicher");
-    let has_lit_d_recipients = md1.contains("Empfänger");
-    let has_lit_e_third_country = md1.contains("Drittland");
-    let has_lit_f_retention = md1.contains("Löschfrist");
-    let has_lit_g_toms = md1.contains("Technische und organisatorische Maßnahmen");
-
-    if !has_lit_a_controller
-        || !has_lit_d_recipients
-        || !has_lit_e_third_country
-        || !has_lit_f_retention
-        || !has_lit_g_toms
-    {
-        eprintln!("H10 CONFIRMED: contextra-audit-export Art. 30 register lacks statutory fields lit. a, d, e, f, g!");
-    }
+    assert!(
+        md1.contains("Zweck der Verarbeitung"),
+        "Art. 30 lit. b: Purpose present"
+    );
+    assert!(
+        md1.contains("Betroffene / Datenkategorien"),
+        "Art. 30 lit. c: Data subjects and categories present"
+    );
+    assert!(
+        md1.contains("Empfänger"),
+        "Art. 30 lit. d: Recipients present"
+    );
+    assert!(
+        md1.contains("Drittland & Garantien"),
+        "Art. 30 lit. e: Third country transfers present"
+    );
+    assert!(
+        md1.contains("Löschfristen"),
+        "Art. 30 lit. f: Retention periods present"
+    );
+    assert!(md1.contains("TOM (Art. 32)"), "Art. 30 lit. g: TOM present");
 
     // 3. Canary secret non-leakage check
     let canary_secret = "CANARY-SECRET-1234-DONT-LEAK";
@@ -87,8 +89,8 @@ fn test_h10_gdpr_art30_processing_registry_and_canary_leak_check(
     assert!(bsi_md.contains("Argon2id"));
 
     // Verify mapped code paths exist
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let workspace_root = std::path::Path::new(&manifest_dir).join("../..");
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let workspace_root = std::path::Path::new(manifest_dir).join("../..");
 
     for entry in &bsi_table {
         let full_path = workspace_root.join(&entry.code_location);

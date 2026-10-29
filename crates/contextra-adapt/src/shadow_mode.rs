@@ -78,40 +78,49 @@ mod tests {
         }
 
         let config = FcTsConfig::default();
-        let arm0_a = FlowCorrectedThompsonBandit::new(config.clone()).unwrap();
-        let arm1_a = FlowCorrectedThompsonBandit::new(config.clone()).unwrap();
-        let arm_set_baseline = FcTsArmSet {
-            arms: vec![arm0_a, arm1_a],
-        };
+        if let (Ok(arm0_a), Ok(arm1_a), Ok(arm0_b), Ok(arm1_b)) = (
+            FlowCorrectedThompsonBandit::new(config.clone()),
+            FlowCorrectedThompsonBandit::new(config.clone()),
+            FlowCorrectedThompsonBandit::new(config.clone()),
+            FlowCorrectedThompsonBandit::new(config.clone()),
+        ) {
+            let arm_set_baseline = FcTsArmSet {
+                arms: vec![arm0_a, arm1_a],
+            };
 
-        let recording_sink = Arc::new(MockRecordingSink::default());
+            let recording_sink = Arc::new(MockRecordingSink::default());
 
-        let arm0_b = FlowCorrectedThompsonBandit::new(config.clone()).unwrap();
-        let arm1_b = FlowCorrectedThompsonBandit::new(config.clone()).unwrap();
-        let arm_set_shadow = FcTsArmSet {
-            arms: vec![arm0_b, arm1_b],
+            let arm_set_shadow = FcTsArmSet {
+                arms: vec![arm0_b, arm1_b],
+            }
+            .with_shadow_sink(recording_sink.clone());
+
+            let mut rng_a = SplitMix64::new(999);
+            let mut rng_b = SplitMix64::new(999);
+            let ctx = vec![0.5f32; config.dim];
+
+            for _ in 0..50 {
+                if let (Ok(selected_baseline), Ok(selected_shadow)) = (
+                    arm_set_baseline.select_arm(&ctx, &mut rng_a),
+                    arm_set_shadow.select_arm(&ctx, &mut rng_b),
+                ) {
+                    assert_eq!(
+                        selected_baseline, selected_shadow,
+                        "Non-influence invariant violated: shadow mode changed selected arm"
+                    );
+                } else {
+                    panic!("Selection failed in test");
+                }
+            }
+
+            let count = recording_sink
+                .discrepancies
+                .lock()
+                .map(|r| r.len())
+                .unwrap_or(0);
+            assert_eq!(count, 50);
+        } else {
+            panic!("Bandit initialization failed");
         }
-        .with_shadow_sink(recording_sink.clone());
-
-        let mut rng_a = SplitMix64::new(999);
-        let mut rng_b = SplitMix64::new(999);
-        let ctx = vec![0.5f32; config.dim];
-
-        for _ in 0..50 {
-            let selected_baseline = arm_set_baseline
-                .select_arm(&ctx, &mut rng_a)
-                .expect("selection ok");
-            let selected_shadow = arm_set_shadow
-                .select_arm(&ctx, &mut rng_b)
-                .expect("selection ok");
-
-            assert_eq!(
-                selected_baseline, selected_shadow,
-                "Non-influence invariant violated: shadow mode changed selected arm"
-            );
-        }
-
-        let recorded = recording_sink.discrepancies.lock().unwrap();
-        assert_eq!(recorded.len(), 50);
     }
 }

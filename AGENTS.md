@@ -1,8 +1,8 @@
 # Contextra — Agenten-Betriebsanleitung (AGENTS.md)
 
-<!-- doc-stamp: 2026-10-28 1b8b790 | Spec-Fassung: 3.0 -->
+<!-- doc-stamp: 2026-10-29 0796b40ed | Spec-Fassung: 3.0 -->
 
-Stand: 2026-10-28 · Basis: Gesamtspezifikation Fassung 3.0 (`docs/SPEC.md`)
+Stand: 2026-10-29 · Basis: Gesamtspezifikation Fassung 3.0 (`docs/SPEC.md`)
 
 ---
 

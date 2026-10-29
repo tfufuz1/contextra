@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-router",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 33.946,
+  "tests_total": 98,
+  "tests_passed": 98,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 4,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-router --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 2.055,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling contextra-adapt v0.1.0 (/app/crates/contextra-adapt)\n   Compiling contextra-router v0.1.0 (/app/crates/contextra-router)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.97s\n"
+    },
+    {
+      "command": "cargo test -p contextra-router --locked",
+      "exit_code": 0,
+      "duration_seconds": 29.544,
+      "stdout_snippet": "ng_and_discard ... ok\ntest test_valid_propensity_accepted ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "    ^^^^^^^^^\n\n   Compiling contextra-cognition v0.1.0 (/app/crates/contextra-cognition)\nwarning: `contextra-engine` (lib) generated 3 warnings\n   Compiling contextra-db v0.1.0 (/app/crates/contextra-db)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 28.41s\n     Running unittests src/lib.rs (target/debug/deps/contextra_router-c5ad6fed880322fb)\n     Running tests/arm_registry_five_arms.rs (target/debug/deps/arm_registry_five_arms-28883972dd689b5d)\n     Running tests/bandit_latency.rs (target/debug/deps/bandit_latency-24c3a9ce1bbeb31f)\n     Running tests/fc_ts_dispatch_test.rs (target/debug/deps/fc_ts_dispatch_test-9d8701da88dcffee)\n     Running tests/ips_requires_propensity.rs (target/debug/deps/ips_requires_propensity-eb321bd4824e16d2)\n     Running tests/regret_monotonicity.rs (target/debug/deps/regret_monotonicity-d40e5a322a47e715)\n     Running tests/router_bandit_dispatch.rs (target/debug/deps/router_bandit_dispatch-c31a4f4a9bdd59f6)\n   Doc-tests contextra_router\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-router --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 2.347,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

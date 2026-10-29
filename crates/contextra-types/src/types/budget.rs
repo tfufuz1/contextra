@@ -176,8 +176,8 @@ impl TokenBudget {
     /// Calculates the effective token limit based on strategy.
     pub fn effective_limit(&self) -> usize {
         match self.strategy {
-            BudgetStrategy::Conservative => (self.limit as f64 * 0.8) as usize,
-            BudgetStrategy::Aggressive => (self.limit as f64 * 0.95) as usize,
+            BudgetStrategy::Conservative => self.limit.saturating_mul(4) / 5,
+            BudgetStrategy::Aggressive => self.limit.saturating_mul(19) / 20,
             BudgetStrategy::Exact(n) => n,
         }
     }
@@ -428,7 +428,8 @@ impl ResourceTracker {
 
     /// Returns true if memory usage is below 95% of the limit.
     pub fn has_memory_capacity(&self) -> bool {
-        self.memory_used() < (self.budget.memory_limit as f64 * 0.95) as u64
+        let threshold = self.budget.memory_limit.saturating_mul(95) / 100;
+        self.memory_used() < threshold
     }
 }
 

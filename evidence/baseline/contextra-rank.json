@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-rank",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 9.915,
+  "tests_total": 61,
+  "tests_passed": 61,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 0,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-rank --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 2.103,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling contextra-rank v0.1.0 (/app/crates/contextra-rank)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.02s\n"
+    },
+    {
+      "command": "cargo test -p contextra-rank --locked",
+      "exit_code": 0,
+      "duration_seconds": 5.496,
+      "stdout_snippet": "st result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 3 tests\ntest test_score_normalized_fallback_empty_signal_list ... ok\ntest test_score_normalized_fallback_constant_scores ... ok\ntest test_score_normalized_fallback_non_finite_scores ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "fceda7e5544ee)\n     Running tests/conformal_tests.rs (target/debug/deps/conformal_tests-066ff1c0a0254761)\n     Running tests/dibud_equivalence.rs (target/debug/deps/dibud_equivalence-6828960ce9bd28ee)\n     Running tests/dibud_requires_streaming_channels.rs (target/debug/deps/dibud_requires_streaming_channels-b722322b56df27b7)\n     Running tests/global_fusion_community_aware.rs (target/debug/deps/global_fusion_community_aware-58f338d24ed5367f)\n     Running tests/global_shadow_mode_discrepancy.rs (target/debug/deps/global_shadow_mode_discrepancy-4ceb703e60abeec0)\n     Running tests/isotonic_mutation_hardening_test.rs (target/debug/deps/isotonic_mutation_hardening_test-e354169f56f3957f)\n     Running tests/rank_tests.rs (target/debug/deps/rank_tests-eecfc01f2cce23cb)\n     Running tests/rrf_reference.rs (target/debug/deps/rrf_reference-54c0461ddcf077f5)\n     Running tests/score_normalized_fallback.rs (target/debug/deps/score_normalized_fallback-e239a3d04276f5eb)\n   Doc-tests contextra_rank\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-rank --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 2.316,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

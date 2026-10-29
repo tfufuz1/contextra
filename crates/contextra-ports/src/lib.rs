@@ -69,6 +69,8 @@ pub mod storage;
 pub mod text_index;
 /// Vector retrieval and HNSW indexing traits.
 pub mod vector_index;
+/// Virtual File System (VFS) port interface and contracts.
+pub mod vfs;
 
 pub use attention::*;
 pub use checkpoint::*;
@@ -94,6 +96,15 @@ pub use scanner::{
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
+pub use vfs::*;
+
+/// Generic contract tests for port implementers.
+#[cfg(feature = "contract-tests")]
+pub mod contract_tests;
+
+pub use metrics::{
+    HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricSnapshot, NoopMetricsSink,
+};
 
 #[cfg(test)]
 mod dyn_safety {
@@ -116,6 +127,7 @@ mod dyn_safety {
     fn _assert_dyn_query_rewriter(_: Option<&dyn QueryRewriter>) {}
     fn _assert_dyn_layer_scanner(_: Option<&dyn LayerScanner>) {}
     fn _assert_dyn_purger(_: Option<&dyn Purger>) {}
+    fn _assert_dyn_vfs(_: Option<&dyn Vfs>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -135,5 +147,6 @@ mod dyn_safety {
         _assert_dyn_query_rewriter(None);
         _assert_dyn_layer_scanner(None);
         _assert_dyn_purger(None);
+        _assert_dyn_vfs(None);
     }
 }

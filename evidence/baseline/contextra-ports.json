@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-ports",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 16.749,
+  "tests_total": 46,
+  "tests_passed": 46,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 0,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-ports --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 3.429,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling ahash v0.8.12\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.34s\n"
+    },
+    {
+      "command": "cargo test -p contextra-ports --locked",
+      "exit_code": 0,
+      "duration_seconds": 8.671,
+      "stdout_snippet": "2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s\n\n\nrunning 3 tests\ntest crates/contextra-ports/src/scanner/mod.rs - scanner::LayerScanner (line 27) - compile fail ... ok\ntest crates/contextra-ports/src/scanner/mod.rs - scanner::LayerScanner (line 40) - compile fail ... ok\ntest crates/contextra-ports/src/scanner/mod.rs - scanner::LayerScanner (line 48) - compile fail ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s\n\n",
+      "stderr_snippet": "   Compiling ahash v0.8.12\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.84s\n     Running unittests src/lib.rs (target/debug/deps/contextra_ports-af6e999531603c58)\n     Running tests/plugin_registry_dependency_cycle.rs (target/debug/deps/plugin_registry_dependency_cycle-94db47bfd2303f8e)\n   Doc-tests contextra_ports\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-ports --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 4.648,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

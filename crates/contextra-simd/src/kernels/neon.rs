@@ -12,7 +12,6 @@ use std::arch::aarch64::*;
 /// - The caller must ensure that the CPU supports `aarch64` NEON instructions.
 /// - Slices `a` and `b` must have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "aarch64")]
-#[allow(unsafe_code)]
 #[target_feature(enable = "neon")]
 pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
@@ -26,33 +25,32 @@ pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let mut norm_b_v = unsafe { vdupq_n_f32(0.0) };
 
     while i + 4 <= len {
-        // SAFETY: `i + 4 <= len` guarantees `a.as_ptr().add(i)` is valid for reading 4 contiguous `f32` elements.
-        let va = unsafe { vld1q_f32(a.as_ptr().add(i)) };
-        // SAFETY: `i + 4 <= len` guarantees `b.as_ptr().add(i)` is valid for reading 4 contiguous `f32` elements.
-        let vb = unsafe { vld1q_f32(b.as_ptr().add(i)) };
+        // SAFETY:
+        // 1. Feature: Target feature `neon` is enabled via function attribute.
+        // 2. Length/Tail: `i + 4 <= len` where `len == a.len() == b.len()` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)` are valid for reading 4 contiguous `f32` elements.
+        // 3. Alignment: `vld1q_f32` handles unaligned float pointer reads safely.
+        let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };
 
-        // SAFETY: NEON multiply-accumulate on valid 128-bit float vectors.
+        // SAFETY: Target feature `neon` is enabled and vector registers are valid `float32x4_t`.
         dot_v = unsafe { vfmaq_f32(dot_v, va, vb) };
-        // SAFETY: NEON multiply-accumulate on valid 128-bit float vectors.
+        // SAFETY: Target feature `neon` is enabled and vector registers are valid `float32x4_t`.
         norm_a_v = unsafe { vfmaq_f32(norm_a_v, va, va) };
-        // SAFETY: NEON multiply-accumulate on valid 128-bit float vectors.
+        // SAFETY: Target feature `neon` is enabled and vector registers are valid `float32x4_t`.
         norm_b_v = unsafe { vfmaq_f32(norm_b_v, vb, vb) };
 
         i += 4;
     }
 
-    // SAFETY: NEON vector reduction adding across 4 lanes of a valid 128-bit float register.
+    // SAFETY: Target feature `neon` is enabled and vector registers are valid `float32x4_t`.
     let mut dot = unsafe { vaddvq_f32(dot_v) };
-    // SAFETY: NEON vector reduction adding across 4 lanes of a valid 128-bit float register.
+    // SAFETY: Target feature `neon` is enabled and vector registers are valid `float32x4_t`.
     let mut norm_a = unsafe { vaddvq_f32(norm_a_v) };
-    // SAFETY: NEON vector reduction adding across 4 lanes of a valid 128-bit float register.
+    // SAFETY: Target feature `neon` is enabled and vector registers are valid `float32x4_t`.
     let mut norm_b = unsafe { vaddvq_f32(norm_b_v) };
 
     while i < len {
-        // SAFETY: Loop condition `i < len` guarantees index `i` is within bounds of slice `a`.
-        let x = unsafe { *a.get_unchecked(i) };
-        // SAFETY: Loop condition `i < len` guarantees index `i` is within bounds of slice `b` (given `a.len() == b.len()`).
-        let y = unsafe { *b.get_unchecked(i) };
+        // SAFETY: Loop condition `i < len` guarantees index `i` is within bounds of slice `a` and `b` (`a.len() == b.len()`).
+        let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };
         dot += x * y;
         norm_a += x * x;
         norm_b += y * y;
@@ -75,7 +73,6 @@ pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
 /// - The caller must ensure that the CPU supports `aarch64` NEON instructions.
 /// - Slices `a` and `b` must have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "aarch64")]
-#[allow(unsafe_code)]
 #[target_feature(enable = "neon")]
 pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
@@ -85,25 +82,27 @@ pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
     let mut sum_v = unsafe { vdupq_n_f32(0.0) };
 
     while i + 4 <= len {
-        // SAFETY: `i + 4 <= len` guarantees `a.as_ptr().add(i)` is valid for reading 4 contiguous `f32` elements.
-        let va = unsafe { vld1q_f32(a.as_ptr().add(i)) };
-        // SAFETY: `i + 4 <= len` guarantees `b.as_ptr().add(i)` is valid for reading 4 contiguous `f32` elements.
-        let vb = unsafe { vld1q_f32(b.as_ptr().add(i)) };
-        // SAFETY: NEON vector subtract on valid 128-bit float vectors.
+        // SAFETY:
+        // 1. Feature: Target feature `neon` is enabled via function attribute.
+        // 2. Length/Tail: `i + 4 <= len` where `len == a.len() == b.len()` guarantees 4 readable contiguous `f32` elements.
+        // 3. Alignment: `vld1q_f32` handles unaligned float pointer reads safely.
+        let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };
+        // SAFETY: Target feature `neon` is enabled and registers are valid `float32x4_t`.
         let diff = unsafe { vsubq_f32(va, vb) };
 
-        // SAFETY: NEON multiply-accumulate on valid 128-bit float vectors.
+        // SAFETY: Target feature `neon` is enabled and registers are valid `float32x4_t`.
         sum_v = unsafe { vfmaq_f32(sum_v, diff, diff) };
 
         i += 4;
     }
 
-    // SAFETY: NEON vector reduction adding across 4 lanes of a valid 128-bit float register.
+    // SAFETY: Target feature `neon` is enabled and register is valid `float32x4_t`.
     let mut sum = unsafe { vaddvq_f32(sum_v) };
 
     while i < len {
         // SAFETY: Loop condition `i < len` guarantees index `i` is within bounds of slices `a` and `b` (`a.len() == b.len()`).
-        let diff = unsafe { *a.get_unchecked(i) - *b.get_unchecked(i) };
+        let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };
+        let diff = x - y;
         sum += diff * diff;
         i += 1;
     }
@@ -118,7 +117,6 @@ pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
 /// - The caller must ensure that the CPU supports `aarch64` NEON instructions.
 /// - Slices `a` and `b` must have equal lengths (`a.len() == b.len()`).
 #[cfg(target_arch = "aarch64")]
-#[allow(unsafe_code)]
 #[target_feature(enable = "neon")]
 pub(crate) unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
     let len = a.len();
@@ -128,23 +126,25 @@ pub(crate) unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
     let mut dot_v = unsafe { vdupq_n_f32(0.0) };
 
     while i + 4 <= len {
-        // SAFETY: `i + 4 <= len` guarantees `a.as_ptr().add(i)` is valid for reading 4 contiguous `f32` elements.
-        let va = unsafe { vld1q_f32(a.as_ptr().add(i)) };
-        // SAFETY: `i + 4 <= len` guarantees `b.as_ptr().add(i)` is valid for reading 4 contiguous `f32` elements.
-        let vb = unsafe { vld1q_f32(b.as_ptr().add(i)) };
+        // SAFETY:
+        // 1. Feature: Target feature `neon` is enabled via function attribute.
+        // 2. Length/Tail: `i + 4 <= len` where `len == a.len() == b.len()` guarantees 4 readable contiguous `f32` elements.
+        // 3. Alignment: `vld1q_f32` handles unaligned float pointer reads safely.
+        let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };
 
-        // SAFETY: NEON multiply-accumulate on valid 128-bit float vectors.
+        // SAFETY: Target feature `neon` is enabled and registers are valid `float32x4_t`.
         dot_v = unsafe { vfmaq_f32(dot_v, va, vb) };
 
         i += 4;
     }
 
-    // SAFETY: NEON vector reduction adding across 4 lanes of a valid 128-bit float register.
+    // SAFETY: Target feature `neon` is enabled and register is valid `float32x4_t`.
     let mut dot = unsafe { vaddvq_f32(dot_v) };
 
     while i < len {
         // SAFETY: Loop condition `i < len` guarantees index `i` is within bounds of slices `a` and `b` (`a.len() == b.len()`).
-        dot += unsafe { *a.get_unchecked(i) * *b.get_unchecked(i) };
+        let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };
+        dot += x * y;
         i += 1;
     }
 

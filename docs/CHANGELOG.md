@@ -2,7 +2,7 @@
 
 > Automatisch generierter Read-Only Bericht aus allen Inline-Tags im Repo.
 
-## [Unreleased] - 2026-10-28
+## [Unreleased] - 2026-10-29
 
 ### Docs
 - Meta-Dokumentation (`ARCHITECTURE.md`, `PLAN.md`, `SPEC.md`, `README.md`) an SPEC 3.0 und Baukasten-Architektur angeglichen.

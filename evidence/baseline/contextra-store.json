@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-store",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 74.332,
+  "tests_total": 0,
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 7,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-store --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 0.364,
+      "stdout_snippet": "",
+      "stderr_snippet": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.29s\n"
+    },
+    {
+      "command": "cargo test -p contextra-store --locked",
+      "exit_code": 124,
+      "duration_seconds": 60.053,
+      "stdout_snippet": "_crash ... ok\ntest wal::tests::io_tests::test_wal_crash_consistency_write_without_fsync ... ok\ntest wal::tests::io_tests::test_wal_direct_append_batch_fsync_discipline ... ok\ntest wal::tests::io_tests::test_wal_rotate_and_seal_readonly_guarantee ... ok\ntest wal::tests::io_tests::test_wal_rotate_seal_crash_mid_rename ... ok\ntest wal::tests::io_tests::test_truncate_size_visible_atomically_with_file_state ... ok\ntest lsm::tests::mvcc_tests::test_flush_during_active_snapshot_isolation_stress ... ok\n",
+      "stderr_snippet": "          ^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: enum `SimpleOp` is never used\n   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:642:6\n    |\n642 | enum SimpleOp {\n    |      ^^^^^^^^\n\nwarning: function `task_op_strategy` is never used\n   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:649:4\n    |\n649 | fn task_op_strategy(prefix: u8) -> impl Strategy<Value = SimpleOp> {\n    |    ^^^^^^^^^^^^^^^^\n\nwarning: function `run_concurrent_differential` is never used\n   --> crates/contextra-store/tests/differential/redb_operation_sequence.rs:664:10\n    |\n664 | async fn run_concurrent_differential(tasks_ops: Vec<Vec<SimpleOp>>) -> Result<(), TestCaseError> {\n    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `contextra-store` (test \"differential_redb\") generated 5 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.43s\n     Running unittests src/lib.rs (target/debug/deps/contextra_store-0a344ed6321bf493)\n\n[TIMEOUT after 60s]"
+    },
+    {
+      "command": "cargo clippy -p contextra-store --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 13.913,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

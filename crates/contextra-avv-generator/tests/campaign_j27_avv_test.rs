@@ -7,7 +7,8 @@ use contextra_types::TenantId;
 // ── H11: Art. 28 DSGVO AVV Generator Technical Completeness ─────────────────────
 
 #[test]
-fn test_h11_gdpr_art28_avv_generator_technical_completeness() {
+fn test_h11_gdpr_art28_avv_generator_technical_completeness(
+) -> Result<(), Box<dyn std::error::Error>> {
     let ctx = AvvContext {
         controller_name: "Kanzlei Dr. Mustermann & Partner".to_string(),
         processor_name: "Contextra AI Operating System Systems GmbH".to_string(),
@@ -15,9 +16,11 @@ fn test_h11_gdpr_art28_avv_generator_technical_completeness() {
         technical_measures: default_technical_measures(),
         subprocessors: vec!["AWS EU-Central-1 (Frankfurt)".to_string()],
         deletion_sla_days: 14,
+        contract_date: None,
+        subprocessors_allowed: None,
     };
 
-    let avv_md = render_avv_markdown(&ctx).expect("AVV markdown rendering succeeds");
+    let avv_md = render_avv_markdown(&ctx)?;
 
     // Technical completeness check against Art. 28 Abs. 3 lit. a-h required sections:
     assert!(avv_md.contains("Vereinbarung zur Auftragsverarbeitung (AVV) gemäß Art. 28 DSGVO"));
@@ -39,15 +42,15 @@ fn test_h11_gdpr_art28_avv_generator_technical_completeness() {
         "Art. 28 lit. d"
     );
     assert!(
-        avv_md.contains("## 5. Technische und organisatorische Maßnahmen (TOM)"),
+        avv_md.contains("## 6. Technische und organisatorische Maßnahmen (TOM)"),
         "Art. 28 lit. f"
     );
     assert!(
-        avv_md.contains("## 6. Unterauftragsverarbeiter"),
+        avv_md.contains("## 7. Unterauftragsverarbeiter"),
         "Art. 28 lit. g"
     );
     assert!(
-        avv_md.contains("## 7. Löschung von Daten und SLA"),
+        avv_md.contains("## 8. Löschung von Daten und SLA"),
         "Art. 28 lit. h"
     );
 
@@ -62,8 +65,8 @@ fn test_h11_gdpr_art28_avv_generator_technical_completeness() {
     assert!(measure_names.contains(&"Verschlüsselte Segmente im KV-Cache"));
 
     // Code verification of claimed technical guarantees from workspace root
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let workspace_root = std::path::Path::new(&manifest_dir).join("../..");
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let workspace_root = std::path::Path::new(manifest_dir).join("../..");
 
     // 1. Ed25519 DeletionProof: crates/contextra-crypto/src/deletion_proof.rs
     assert!(workspace_root
@@ -84,4 +87,6 @@ fn test_h11_gdpr_art28_avv_generator_technical_completeness() {
     assert!(workspace_root
         .join("crates/contextra-crypto/src/crypto.rs")
         .exists());
+
+    Ok(())
 }

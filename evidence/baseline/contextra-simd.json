@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-simd",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 40.294,
+  "tests_total": 15,
+  "tests_passed": 15,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 1,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-simd --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 9.476,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling typenum v1.20.1\n   Compiling syn v3.0.4\n   Compiling getrandom v0.3.4\n   Compiling zerocopy v0.8.56\n   Compiling cpufeatures v0.2.17\n   Compiling bytemuck v1.25.2\n   Compiling generic-array v0.14.7\n   Compiling crypto-common v0.1.7\n   Compiling block-buffer v0.10.4\n   Compiling digest v0.10.7\n   Compiling sha2 v0.10.9\n   Compiling serde_derive v1.0.229\n   Compiling thiserror-impl v2.0.20\n   Compiling thiserror v2.0.20\n   Compiling serde v1.0.229\n   Compiling bincode v1.3.3\n   Compiling ahash v0.8.12\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling contextra-simd v0.1.0 (/app/crates/contextra-simd)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.39s\n"
+    },
+    {
+      "command": "cargo test -p contextra-simd --locked",
+      "exit_code": 0,
+      "duration_seconds": 22.688,
+      "stdout_snippet": "\ntest simd_vs_scalar_euclidean_sq_u8 ... ok\ntest test_simd_remainder_boundary_lengths_f32 ... ok\ntest test_simd_remainder_boundary_lengths_u8 ... ok\ntest simd_vs_scalar_euclidean_f32 ... ok\ntest simd_vs_scalar_euclidean_f32_bytes ... ok\ntest test_s4_1000_pairs_equivalence_threshold ... ok\n\ntest result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.41s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "piling tracing v0.1.44\n   Compiling tinytemplate v1.2.1\n   Compiling zerocopy v0.8.56\n   Compiling clap v4.6.6\n   Compiling rayon v1.12.0\n   Compiling plotters v0.3.7\n   Compiling rand v0.9.5\n   Compiling rand_xorshift v0.4.0\n   Compiling is-terminal v0.4.17\n   Compiling anes v0.1.6\n   Compiling unarray v0.1.4\n   Compiling oorandom v11.1.5\n   Compiling half v2.7.1\n   Compiling ahash v0.8.12\n   Compiling ppv-lite86 v0.2.21\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling ciborium-ll v0.2.2\n   Compiling rand_chacha v0.9.0\n   Compiling ciborium v0.2.2\n   Compiling proptest v1.11.0\n   Compiling criterion v0.5.1\n   Compiling contextra-simd v0.1.0 (/app/crates/contextra-simd)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.11s\n     Running unittests src/lib.rs (target/debug/deps/contextra_simd-9e0e7983b9ecd6fd)\n     Running tests/simd_cross_validation.rs (target/debug/deps/simd_cross_validation-132beeeb3ca6ed27)\n   Doc-tests contextra_simd\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-simd --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 8.13,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

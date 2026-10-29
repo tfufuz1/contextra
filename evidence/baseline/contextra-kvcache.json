@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-kvcache",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 18.095,
+  "tests_total": 70,
+  "tests_passed": 70,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 1,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-kvcache --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 1.46,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling contextra-kvcache v0.1.0 (/app/crates/contextra-kvcache)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.37s\n"
+    },
+    {
+      "command": "cargo test -p contextra-kvcache --locked",
+      "exit_code": 0,
+      "duration_seconds": 13.532,
+      "stdout_snippet": "\ntest test_tenant_isolation_prefix_radix_tree ... ok\ntest test_tenant_isolation_emergency_wipe ... ok\ntest test_tenant_isolation_direct_lookup_and_segments ... ok\ntest test_tenant_isolation_eviction_and_fair_recycling ... ok\ntest test_tenant_isolation_rollback_no_cross_tenant_impact ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "ing.rs (target/debug/deps/eviction_segment_mapping-df97692c8fc230f6)\n     Running tests/eviction_with_attention_exporter.rs (target/debug/deps/eviction_with_attention_exporter-85d612dff2568cff)\n     Running tests/golden_greedy_decode.rs (target/debug/deps/golden_greedy_decode-0530476c715d7c50)\n     Running tests/kivi_aead_order_enforced.rs (target/debug/deps/kivi_aead_order_enforced-5229132757128c6a)\n     Running tests/kivi_quantize_dequantize_roundtrip.rs (target/debug/deps/kivi_quantize_dequantize_roundtrip-7a62896999951e54)\n     Running tests/prefix_store_port.rs (target/debug/deps/prefix_store_port-90a4a49dac084109)\n     Running tests/scratchpad_invalidation_isolation.rs (target/debug/deps/scratchpad_invalidation_isolation-27e2409077ed6649)\n     Running tests/store_default_attention_source.rs (target/debug/deps/store_default_attention_source-fb3a8da86041630e)\n     Running tests/tenant_isolation.rs (target/debug/deps/tenant_isolation-0944bd22c6c2e9b1)\n   Doc-tests contextra_kvcache\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-kvcache --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 3.103,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

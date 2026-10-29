@@ -1,6 +1,6 @@
 # Contextra — Claude / Antigravity-Betriebsanleitung
 
-<!-- doc-stamp: 2026-10-28 1b8b790 | Spec-Fassung: 3.0 -->
+<!-- doc-stamp: 2026-10-29 0796b40ed | Spec-Fassung: 3.0 -->
 
 > Diese Datei gilt **ausschließlich** für Claude/Antigravity. Für Jules gilt `AGENTS.md §2a` + `.agents/jules/SESSION_BOOTSTRAP.md`.
 

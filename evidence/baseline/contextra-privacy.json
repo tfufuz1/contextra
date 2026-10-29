@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-privacy",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 10.772,
+  "tests_total": 74,
+  "tests_passed": 74,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 0,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-privacy --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 0.31,
+      "stdout_snippet": "",
+      "stderr_snippet": "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.24s\n"
+    },
+    {
+      "command": "cargo test -p contextra-privacy --locked",
+      "exit_code": 0,
+      "duration_seconds": 7.975,
+      "stdout_snippet": "ored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 4 tests\ntest test_key_manager_derive_kv_key_scoped_isolation ... ok\ntest test_egress_vault_sanitize_scoped_isolation ... ok\ntest test_egress_vault_classify_scoped_isolation ... ok\ntest test_egress_gateway_scoped_isolation ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "  Compiling contextra-crypto v0.1.0 (/app/crates/contextra-crypto)\n   Compiling contextra-privacy v0.1.0 (/app/crates/contextra-privacy)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.80s\n     Running unittests src/lib.rs (target/debug/deps/contextra_privacy-21fabc83c92564f2)\n     Running tests/audit_trace_tests.rs (target/debug/deps/audit_trace_tests-6194fbbe86136c92)\n     Running tests/campaign_cov_privacy_egress.rs (target/debug/deps/campaign_cov_privacy_egress-a619f73fbd297b00)\n     Running tests/campaign_j27_privacy_test.rs (target/debug/deps/campaign_j27_privacy_test-654af8950a4908e3)\n     Running tests/context_edit_audit_chain.rs (target/debug/deps/context_edit_audit_chain-e915c79843ca8df9)\n     Running tests/pii_vault_forces_crypto_shred.rs (target/debug/deps/pii_vault_forces_crypto_shred-3d4aa8d52dd52052)\n     Running tests/tenant_scoped_egress_isolation.rs (target/debug/deps/tenant_scoped_egress_isolation-90c35228cddbeea5)\n   Doc-tests contextra_privacy\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-privacy --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 2.486,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

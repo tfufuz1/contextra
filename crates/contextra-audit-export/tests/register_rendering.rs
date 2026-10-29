@@ -29,21 +29,21 @@ fn test_markdown_rendering_data_rows() -> Result<(), Box<dyn std::error::Error>>
     let entries = source.collect_entries(tenant_id)?;
     assert_eq!(entries.len(), 2);
 
-    let markdown_output = render_register_markdown(&entries)?;
+    let markdown_output = render_register_markdown(&entries, "2026-10-28")?;
     assert!(markdown_output.contains("# Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO)"));
 
-    // Count data rows (lines starting with '|') excluding header and separator rows.
+    // Count table lines starting with '|'
     let table_lines: Vec<&str> = markdown_output
         .lines()
         .filter(|line| line.starts_with('|'))
         .collect();
 
-    // Table lines must be 2 header/separator lines + 2 data rows = 4 table lines
+    // Table lines: 1 header row + 1 separator row + 2 data rows = 4 table lines
     assert_eq!(table_lines.len(), 4);
 
     let data_rows: Vec<&&str> = table_lines
         .iter()
-        .filter(|line| !line.contains("---") && !line.contains("Mandant"))
+        .filter(|line| !line.contains("---") && !line.contains("| Mandant |"))
         .collect();
 
     assert_eq!(data_rows.len(), entries.len());
@@ -61,7 +61,7 @@ fn test_empty_entries_rendering() -> Result<(), Box<dyn std::error::Error>> {
     let deserialized: Vec<ProcessingRegisterEntry> = serde_json::from_str(&json_output)?;
     assert!(deserialized.is_empty());
 
-    let markdown_output = render_register_markdown(&empty_entries)?;
+    let markdown_output = render_register_markdown(&empty_entries, "2026-10-28")?;
     assert!(markdown_output.contains("# Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO)"));
 
     let table_lines: Vec<&str> = markdown_output
@@ -74,7 +74,7 @@ fn test_empty_entries_rendering() -> Result<(), Box<dyn std::error::Error>> {
 
     let data_rows: Vec<&&str> = table_lines
         .iter()
-        .filter(|line| !line.contains("---") && !line.contains("Mandant"))
+        .filter(|line| !line.contains("---") && !line.contains("| Mandant |"))
         .collect();
 
     assert_eq!(data_rows.len(), 0);

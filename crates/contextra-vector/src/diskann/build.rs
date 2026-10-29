@@ -97,14 +97,13 @@ impl DiskAnnIndex {
         Ok(pruned)
     }
 
-    /// Appends a tombstone record to `tombstone.wal` with HMAC-SHA256 integrity protection.
+    /// Synchronous blocking helper to append a tombstone record to `tombstone.wal`.
     ///
-    /// # Binary Format
-    /// - File Header (written on new/empty file creation): `[TWAL: 4 bytes] [version=1: 1 byte]`
-    /// - Entry Layout:
-    ///   - `id`: `u64` LE (8 bytes)
-    ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes`)
-    pub(crate) async fn append_to_tombstone_wal(path: &std::path::Path, id: DocId) -> Result<()> {
+    /// Aufrufer wählt spawn_blocking.
+    pub(crate) fn append_to_tombstone_wal_blocking(
+        path: &std::path::Path,
+        id: DocId,
+    ) -> Result<()> {
         use std::io::Write;
 
         let is_new = match std::fs::metadata(path) {
@@ -134,6 +133,17 @@ impl DiskAnnIndex {
         file.write_all(&computed_hmac).map_err(ContextraError::Io)?;
         file.sync_all().map_err(ContextraError::Io)?;
         Ok(())
+    }
+
+    /// Appends a tombstone record to `tombstone.wal` with HMAC-SHA256 integrity protection.
+    ///
+    /// # Binary Format
+    /// - File Header (written on new/empty file creation): `[TWAL: 4 bytes] [version=1: 1 byte]`
+    /// - Entry Layout:
+    ///   - `id`: `u64` LE (8 bytes)
+    ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes`)
+    pub(crate) async fn append_to_tombstone_wal(path: &std::path::Path, id: DocId) -> Result<()> {
+        Self::append_to_tombstone_wal_blocking(path, id)
     }
 
     /// Reads and verifies uncommitted tombstone entries from `tombstone.wal`.
@@ -227,16 +237,10 @@ impl DiskAnnIndex {
         Ok(bitset)
     }
 
-    /// Appends a vector insertion record to `pending.wal` with HMAC-SHA256 integrity protection.
+    /// Synchronous blocking helper to append a vector insertion record to `pending.wal`.
     ///
-    /// # Binary Format
-    /// - File Header (written on new/empty file creation): `[PWAL: 4 bytes] [version=1: 1 byte]`
-    /// - Entry Layout:
-    ///   - `id`: `u64` LE (8 bytes)
-    ///   - `dim`: `u32` LE (4 bytes)
-    ///   - `embedding`: `[f32 LE; dim]` (`dim * 4` bytes)
-    ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes || dim_bytes || embedding_bytes`)
-    pub(crate) async fn append_to_pending_wal(
+    /// Aufrufer wählt spawn_blocking.
+    pub(crate) fn append_to_pending_wal_blocking(
         path: &std::path::Path,
         id: DocId,
         embedding: &[f32],
@@ -281,6 +285,23 @@ impl DiskAnnIndex {
         file.write_all(&computed_hmac).map_err(ContextraError::Io)?;
         file.sync_all().map_err(ContextraError::Io)?;
         Ok(())
+    }
+
+    /// Appends a vector insertion record to `pending.wal` with HMAC-SHA256 integrity protection.
+    ///
+    /// # Binary Format
+    /// - File Header (written on new/empty file creation): `[PWAL: 4 bytes] [version=1: 1 byte]`
+    /// - Entry Layout:
+    ///   - `id`: `u64` LE (8 bytes)
+    ///   - `dim`: `u32` LE (4 bytes)
+    ///   - `embedding`: `[f32 LE; dim]` (`dim * 4` bytes)
+    ///   - `hmac`: `[u8; 32]` (32-byte HMAC-SHA256 computed over `id_bytes || dim_bytes || embedding_bytes`)
+    pub(crate) async fn append_to_pending_wal(
+        path: &std::path::Path,
+        id: DocId,
+        embedding: &[f32],
+    ) -> Result<()> {
+        Self::append_to_pending_wal_blocking(path, id, embedding)
     }
 
     /// Reads and verifies uncommitted vector entries from `pending.wal`.
@@ -750,6 +771,7 @@ impl DiskAnnIndex {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "docid-128")]
     use super::*;
 
     #[cfg(feature = "docid-128")]

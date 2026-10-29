@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-checkpoint",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 33.739,
+  "tests_total": 105,
+  "tests_passed": 105,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 0,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-checkpoint --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 2.05,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling futures-executor v0.3.34\n   Compiling contextra-checkpoint v0.1.0 (/app/crates/contextra-checkpoint)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.97s\n"
+    },
+    {
+      "command": "cargo test -p contextra-checkpoint --locked",
+      "exit_code": 0,
+      "duration_seconds": 29.192,
+      "stdout_snippet": "d; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s\n\n\nrunning 3 tests\ntest test_txid_regression_collision_check_returns_hard_error ... ok\ntest test_crash_recovery_reconstructs_highest_txid_when_meta_missing_or_corrupt ... ok\ntest test_txid_monotonicity_across_process_restart ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "deps/clock_determinism-f8ef84e1eedd8238)\n     Running tests/concurrency.rs (target/debug/deps/concurrency-f6419c4f0b8a35e3)\n     Running tests/error_paths_and_boundaries.rs (target/debug/deps/error_paths_and_boundaries-3d9a16bd869eedfd)\n     Running tests/guard_exit_paths.rs (target/debug/deps/guard_exit_paths-5f18b2204fac5fde)\n     Running tests/guard_proptest.rs (target/debug/deps/guard_proptest-ed40caed79475ede)\n     Running tests/hardlink_cloner_tests.rs (target/debug/deps/hardlink_cloner_tests-f03e38a8eb4e3d62)\n     Running tests/id_gen_determinism_test.rs (target/debug/deps/id_gen_determinism_test-b8f1ce42d363aacc)\n     Running tests/manifest_fault_injection.rs (target/debug/deps/manifest_fault_injection-2a6015cea7546b2c)\n     Running tests/time_travel_correctness.rs (target/debug/deps/time_travel_correctness-26848226d65fd0a2)\n     Running tests/txid_monotonicity_and_recovery.rs (target/debug/deps/txid_monotonicity_and_recovery-b0feca5a84dfdc49)\n   Doc-tests contextra_checkpoint\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-checkpoint --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 2.496,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

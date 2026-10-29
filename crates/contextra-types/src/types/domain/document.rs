@@ -98,6 +98,7 @@ impl DistanceMetric {
     //          bzw. f64 (Cosine) und sättigen per .min(u32::MAX as u64). Kein Overflow möglich.
     //          Regressionstest: test_distance_metrics_u8_overflow (100_000 Elemente à 255).
     // ID: AGT-CORE-001
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn compute_u8(&self, a: &[u8], b: &[u8]) -> Result<u32> {
         if a.len() != b.len() {
             return Err(ContextraError::invalid_input(
@@ -113,34 +114,42 @@ impl DistanceMetric {
                 let mut norm_a = 0f64;
                 let mut norm_b = 0f64;
                 for (&x, &y) in a.iter().zip(b.iter()) {
-                    let xf = x as f64;
-                    let yf = y as f64;
+                    let xf = f64::from(x);
+                    let yf = f64::from(y);
                     dot += xf * yf;
                     norm_a += xf * xf;
                     norm_b += yf * yf;
                 }
                 let denom = norm_a.sqrt() * norm_b.sqrt();
                 let dist = if denom == 0.0 { 1.0 } else { 1.0 - dot / denom };
-                // Scale to u32 fixed-point (×1_000_000) for ranking
-                Ok((dist.clamp(0.0, 2.0) * 1_000_000.0) as u32)
+                let scaled = (dist.clamp(0.0, 2.0) * 1_000_000.0).round();
+                let uval = if scaled <= 0.0 {
+                    0u32
+                } else if scaled >= 2_000_000.0 {
+                    2_000_000u32
+                } else {
+                    scaled as u32
+                };
+                Ok(uval)
             }
             Self::Euclidean => {
                 let mut sum = 0u64;
                 for (&x, &y) in a.iter().zip(b.iter()) {
-                    let diff = (x as i64) - (y as i64);
-                    sum += (diff * diff) as u64;
+                    let diff = i64::from(x) - i64::from(y);
+                    let sq = diff.unsigned_abs();
+                    sum += sq * sq;
                 }
-                let dist_f64 = (sum as f64).sqrt();
-                let dist_rounded = dist_f64.round();
-                Ok(dist_rounded.min(u32::MAX as f64) as u32)
+                let dist_u64 = sum.isqrt();
+                let dist_u32 = u32::try_from(dist_u64).unwrap_or(u32::MAX);
+                Ok(dist_u32)
             }
             Self::DotProduct => {
                 // Inverted dot product (u32::MAX - dot) so smaller distance = higher similarity.
                 let mut dot = 0u64;
                 for (&x, &y) in a.iter().zip(b.iter()) {
-                    dot += (x as u64) * (y as u64);
+                    dot += u64::from(x) * u64::from(y);
                 }
-                let dot_clamped = dot.min(u32::MAX as u64) as u32;
+                let dot_clamped = u32::try_from(dot.min(u64::from(u32::MAX))).unwrap_or(u32::MAX);
                 Ok(u32::MAX - dot_clamped)
             }
         }

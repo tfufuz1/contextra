@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-testkit",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 6.331,
+  "tests_total": 11,
+  "tests_passed": 11,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 0,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-testkit --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 1.916,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling contextra-testkit v0.1.0 (/app/crates/contextra-testkit)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.83s\n"
+    },
+    {
+      "command": "cargo test -p contextra-testkit --locked",
+      "exit_code": 0,
+      "duration_seconds": 2.272,
+      "stdout_snippet": "lock::tests::test_manual_clock_set ... ok\ntest mocks::tests::test_embedding_provider_batch_and_blanket_trait ... ok\ntest mocks::tests::test_test_metrics_sink ... ok\ntest mocks::tests::test_mock_embedder_methods ... ok\ntest reference_model::tests::test_reference_model_mvcc_isolation ... ok\n\ntest result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "   Compiling contextra-testkit v0.1.0 (/app/crates/contextra-testkit)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.11s\n     Running unittests src/lib.rs (target/debug/deps/contextra_testkit-2cefd5e3a371c715)\n   Doc-tests contextra_testkit\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-testkit --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 2.143,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

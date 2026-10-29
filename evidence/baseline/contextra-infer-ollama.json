@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-infer-ollama",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 57.908,
+  "tests_total": 104,
+  "tests_passed": 103,
+  "tests_failed": 0,
+  "tests_ignored": 1,
+  "warnings_count": 1,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-infer-ollama --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 29.753,
+      "stdout_snippet": "",
+      "stderr_snippet": "  Compiling base64 v0.22.1\n   Compiling ipnet v2.12.1\n   Compiling tower-layer v0.3.3\n   Compiling tower v0.5.3\n   Compiling hyper-util v0.1.20\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling url v2.5.8\n   Compiling tokio-rustls v0.26.4\n   Compiling webpki-roots v1.0.9\n   Compiling ryu v1.0.23\n   Compiling bitflags v2.13.1\n   Compiling regex-automata v0.4.18\n   Compiling tower-http v0.6.11\n   Compiling serde_urlencoded v0.7.1\n   Compiling hyper-rustls v0.27.9\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling tokio-util v0.7.19\n   Compiling futures-executor v0.3.34\n   Compiling http-body-util v0.1.5\n   Compiling reqwest v0.12.28\n   Compiling futures v0.3.34\n   Compiling contextra-rank v0.1.0 (/app/crates/contextra-rank)\n   Compiling regex v1.13.1\n   Compiling quick-xml v0.41.0\n   Compiling contextra-infer-ollama v0.1.0 (/app/crates/contextra-infer-ollama)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.61s\n"
+    },
+    {
+      "command": "cargo test -p contextra-infer-ollama --locked",
+      "exit_code": 0,
+      "duration_seconds": 21.649,
+      "stdout_snippet": "nse ... ok\ntest campaign_stub_success_200 ... ok\ntest campaign_stub_timeout ... ok\ntest campaign_stub_server_500_error ... ok\ntest campaign_stub_huge_response ... ok\n\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s\n\n\nrunning 1 test\ntest crates/contextra-infer-ollama/src/context_prefixer.rs - context_prefixer::ContextPrefixEngine (line 48) - compile ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s\n\n",
+      "stderr_snippet": "acing v0.1.44\n   Compiling ahash v0.8.12\n   Compiling tower-http v0.6.11\n   Compiling rand_chacha v0.9.0\n   Compiling hyper-util v0.1.20\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling tracing-subscriber v0.3.23\n   Compiling tracing-test-macro v0.2.6\n   Compiling proptest v1.11.0\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling hyper-rustls v0.27.9\n   Compiling reqwest v0.12.28\n   Compiling contextra-rank v0.1.0 (/app/crates/contextra-rank)\n   Compiling tracing-test v0.2.6\n   Compiling contextra-infer-onnx v0.1.0 (/app/crates/contextra-infer-onnx)\n   Compiling contextra-infer-ollama v0.1.0 (/app/crates/contextra-infer-ollama)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.84s\n     Running unittests src/lib.rs (target/debug/deps/contextra_infer_ollama-b2bc29b94079193d)\n     Running tests/campaign_stub_ollama.rs (target/debug/deps/campaign_stub_ollama-064cc1d55cac5699)\n   Doc-tests contextra_infer_ollama\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-infer-ollama --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 6.506,
+      "stdout_snippet": "",
+      "stderr_snippet": "^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\nwarning: build failed, waiting for other jobs to finish...\n"
+    }
+  ]
+}

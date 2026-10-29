@@ -1,0 +1,36 @@
+{
+  "crate": "contextra-audit-export",
+  "commit": "1b8b79005f918c275d0a58d4cc0a4fe835730f66",
+  "toolchain": "rustc 1.89.0 (29483883e 2025-08-04)",
+  "status": "fail",
+  "overall_exit_code": 101,
+  "duration_seconds": 8.916,
+  "tests_total": 6,
+  "tests_passed": 6,
+  "tests_failed": 0,
+  "tests_ignored": 0,
+  "warnings_count": 0,
+  "commands": [
+    {
+      "command": "cargo build -p contextra-audit-export --no-default-features --locked",
+      "exit_code": 0,
+      "duration_seconds": 1.844,
+      "stdout_snippet": "",
+      "stderr_snippet": "   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling contextra-audit-export v0.1.0 (/app/crates/contextra-audit-export)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.76s\n"
+    },
+    {
+      "command": "cargo test -p contextra-audit-export --locked",
+      "exit_code": 0,
+      "duration_seconds": 4.399,
+      "stdout_snippet": "processing_registry_and_canary_leak_check ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 3 tests\ntest test_empty_entries_rendering ... ok\ntest test_markdown_rendering_data_rows ... ok\ntest test_json_rendering_roundtrip ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+      "stderr_snippet": "   Compiling ahash v0.8.12\n   Compiling contextra-types v0.1.0 (/app/crates/contextra-types)\n   Compiling contextra-ports v0.1.0 (/app/crates/contextra-ports)\n   Compiling contextra-audit-export v0.1.0 (/app/crates/contextra-audit-export)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.21s\n     Running unittests src/lib.rs (target/debug/deps/contextra_audit_export-6cd0796afcbeda69)\n     Running tests/campaign_j27_compliance_test.rs (target/debug/deps/campaign_j27_compliance_test-9858230ea85a0661)\n     Running tests/register_rendering.rs (target/debug/deps/register_rendering-d94609e6af9c9e0f)\n   Doc-tests contextra_audit_export\n"
+    },
+    {
+      "command": "cargo clippy -p contextra-audit-export --all-targets --locked -- -D warnings",
+      "exit_code": 101,
+      "duration_seconds": 2.672,
+      "stdout_snippet": "",
+      "stderr_snippet": "32)\n    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss\n\nerror: casting `u64` to `u32` may truncate the value\n   --> crates/contextra-types/src/types/domain/document.rs:143:35\n    |\n143 |                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation\nhelp: ... or use `try_from` and handle the error accordingly\n    |\n143 -                 let dot_clamped = dot.min(u32::MAX as u64) as u32;\n143 +                 let dot_clamped = u32::try_from(dot.min(u32::MAX as u64));\n    |\n\nerror: could not compile `contextra-types` (lib) due to 12 previous errors\n"
+    }
+  ]
+}

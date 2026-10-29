@@ -59,3 +59,7 @@ path = "tests/campaign_cov_ssi_coarsening.rs"
 [[test]]
 name = "campaign_cov_tx_buffer_reap"
 path = "tests/campaign_cov_tx_buffer_reap.rs"
+
+[[test]]
+name = "isolation_tests"
+path = "tests/isolation_tests.rs"
