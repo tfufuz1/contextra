@@ -132,7 +132,7 @@ fn test_commitment_shredding_and_dictionary_attack_resilience() {
     );
 
     // 3. Shred the salt key in registry
-    assert!(registry.revoke_subkey(group_id));
+    assert!(registry.revoke_subkey(group_id).unwrap());
 
     // Decryption of salt now fails because sub-key is destroyed
     assert!(enc_salt.decrypt(&registry).is_err());

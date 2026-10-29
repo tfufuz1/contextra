@@ -33,11 +33,10 @@ fn test_ed25519_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
 }
 
 // ---------------------------------------------------------------------------
-// H1: KeyRegistry revocation does not write to RevocationLog (Split-Brain)
+// H1: KeyRegistry revocation writes atomically to RevocationLog (SEC-03/K3)
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "SEC-03/K3: KeyRegistry::revoke_group deletes key in RAM but does not write to RevocationLog"]
 fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     let tmp_file = NamedTempFile::new().expect("create temp file");
     let log_path = tmp_file.path().to_path_buf();
@@ -60,8 +59,15 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     assert!(registry.is_group_active(group_id));
 
     // Revoke group in registry
-    let revoked = registry.revoke_group(group_id);
+    let revoked = registry.revoke_group(group_id).expect("revoke group");
     assert!(revoked, "revoke_group must return true for active group");
+
+    // RevocationLog MUST now contain 1 entry
+    assert_eq!(
+        rev_log.len(),
+        1,
+        "RevocationLog MUST be updated on revoke_group"
+    );
 
     // In RAM, group is revoked
     assert!(registry.is_group_revoked(group_id));
@@ -75,9 +81,7 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     );
     let new_registry = KeyRegistry::new().with_revocation_log(reloaded_log.clone());
 
-    // EXPECTATION: The revocation SHOULD be reconstructed from the log after crash.
-    // DEFECT: KeyRegistry::revoke_group never calls revocation_log.append(), so log is empty
-    // and new_registry thinks group 999 is NOT revoked!
+    // The revocation MUST be reconstructed from the log after crash.
     assert!(
         new_registry.is_group_revoked(group_id),
         "Group 999 MUST be recognized as revoked after reload from RevocationLog"
@@ -85,7 +89,7 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
 }
 
 #[test]
-fn test_h1_demonstrate_decoupling_between_registry_and_revocation_log() {
+fn test_h1_demonstrate_coupling_between_registry_and_revocation_log() {
     let tmp_file = NamedTempFile::new().expect("create temp file");
     let log_path = tmp_file.path().to_path_buf();
     let (sk, vk) = test_ed25519_keypair();
@@ -100,13 +104,52 @@ fn test_h1_demonstrate_decoupling_between_registry_and_revocation_log() {
     let group_id = 888;
 
     let _subkey = registry.get_or_derive(&km, group_id).expect("derive");
-    registry.revoke_group(group_id);
+    registry.revoke_group(group_id).expect("revoke_group");
 
-    // DEMONSTRATION OF DEFECT: rev_log.len() remains 0 because revoke_group did not call rev_log.append()
+    // FIX SEC-03 VERIFIED: rev_log.len() is 1 because revoke_group calls rev_log.append()
     assert_eq!(
         rev_log.len(),
-        0,
-        "BEFUND H1: KeyRegistry::revoke_group does NOT append to RevocationLog"
+        1,
+        "FIX SEC-03: KeyRegistry::revoke_group DOES append to RevocationLog"
+    );
+}
+
+#[test]
+fn test_sec03_revoke_group_log_failure_atomicity_and_idempotency() {
+    let clock = Arc::new(SystemClock::new());
+    let (_sk, vk) = test_ed25519_keypair();
+    // Create an in-memory RevocationLog WITHOUT a signing key (so append() will fail)
+    let log_no_sk = Arc::new(RevocationLog::new_in_memory(clock, None, vk));
+
+    let km = KeyManager::try_new("test-passphrase-atomic", b"salt-atomic").expect("keymanager");
+    let registry = KeyRegistry::new().with_revocation_log(log_no_sk);
+    let group_id = 777;
+
+    let _subkey = registry.get_or_derive(&km, group_id).expect("derive");
+    assert!(registry.is_group_active(group_id));
+
+    // 1. Logging failure MUST propagate error and NOT revoke key in RAM
+    let res = registry.revoke_group(group_id);
+    assert!(
+        res.is_err(),
+        "revoke_group MUST fail if logging to RevocationLog fails"
+    );
+    assert!(
+        registry.is_group_active(group_id),
+        "Group MUST remain active in RAM if log append fails"
+    );
+
+    // 2. Double revocation idempotency check (without failing log)
+    let registry_ok = KeyRegistry::new();
+    let _subkey = registry_ok.get_or_derive(&km, group_id).expect("derive");
+
+    assert!(
+        registry_ok.revoke_group(group_id).expect("first revoke"),
+        "First revocation MUST return Ok(true)"
+    );
+    assert!(
+        !registry_ok.revoke_group(group_id).expect("second revoke"),
+        "Second revocation MUST return Ok(false) (idempotent)"
     );
 }
 
@@ -139,7 +182,7 @@ fn test_h2_revocation_cascade_isolation_and_resurrection_prevention() {
         .expect("encrypt 2_2");
 
     // 1. Revoke group 1
-    assert!(registry.revoke_group(group_1));
+    assert!(registry.revoke_group(group_1).expect("revoke_group"));
 
     // Verify group 1 status flags
     assert!(registry.is_group_revoked(group_1));
@@ -323,12 +366,13 @@ fn test_h3_revocation_log_tamper_matrix() {
 }
 
 // ---------------------------------------------------------------------------
-// H4: AuditChain Backup Rollback Replay & Tampering Matrix
+// H4: AuditChain Backup Rollback Protection & External Head Anchor (SEC-01/K1)
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "SEC-01/K1: AuditChain::verify_chain accepts rolled-back backup state (lack of external head anchor)"]
 fn test_h4_audit_chain_backup_rollback_vulnerability() {
+    use contextra_crypto::audit_chain::AuditHeadAnchor;
+
     let (sk, vk) = test_ed25519_keypair();
     let mut chain = AuditChain::new();
 
@@ -348,7 +392,7 @@ fn test_h4_audit_chain_backup_rollback_vulnerability() {
 
     // Capture backup state at entry 10
     let backup_at_10 = chain.clone();
-    let head_sig_10 = backup_at_10.sign_head(&sk).expect("sign head 10");
+    let _head_sig_10 = backup_at_10.sign_head(&sk).expect("sign head 10");
 
     // Continue chain up to entry 20
     for i in 11..=20 {
@@ -364,26 +408,88 @@ fn test_h4_audit_chain_backup_rollback_vulnerability() {
             .expect("append");
     }
 
+    // External system creates head anchor at entry 20 (index 19, head_hash = chain.head_hash())
+    let current_head_sig = chain.sign_head(&sk).expect("sign head 20");
+    let external_anchor = AuditHeadAnchor::with_signature(
+        current_head_sig.chain_index,
+        current_head_sig.head_hash,
+        current_head_sig.clone(),
+    );
+
     // Attacker rolls back chain to backup_at_10
     let rolled_back_chain = backup_at_10;
 
-    // EXPECTATION: Rollback should be detectable via an external anchor (e.g. system state counter).
-    // DEFECT: Without an external anchor, verify_chain and verify_head_signature BOTH return true for the old backup!
+    // 1. Internal verify_chain alone STILL succeeds on backup_at_10 (as documented in warning)
     assert!(
         rolled_back_chain.verify_chain().expect("verify"),
         "Rolled back chain internally satisfies Blake3 hash linkage"
     );
+
+    // 2. Rollback detection via external head anchor: verify_chain_with_anchor MUST fail!
     assert!(
-        AuditChain::verify_head_signature(&head_sig_10, &vk).expect("verify sig"),
-        "Head signature for backup at 10 is cryptographically valid"
+        !rolled_back_chain
+            .verify_chain_with_anchor(&external_anchor, Some(&vk))
+            .expect("verify with anchor"),
+        "FIX SEC-01 VERIFIED: verify_chain_with_anchor rejects rolled-back chain shorter than anchor seq_no"
     );
 
-    // This assertion fails if there is no external state anchor tracking chain length >= 20
-    assert_eq!(
-        rolled_back_chain.len(),
-        20,
-        "BEFUND H4: Rolled-back chain cannot be distinguished from current head without external anchor"
+    // 3. Current full chain MUST pass verification with the external anchor
+    assert!(
+        chain
+            .verify_chain_with_anchor(&external_anchor, Some(&vk))
+            .expect("verify current chain"),
+        "Current full chain MUST verify successfully with external head anchor"
     );
+}
+
+#[test]
+fn test_sec01_audit_chain_manipulated_anchor_negative_tests() {
+    use contextra_crypto::audit_chain::AuditHeadAnchor;
+
+    let (sk, vk) = test_ed25519_keypair();
+    let mut chain = AuditChain::new();
+
+    for i in 1..=5 {
+        chain
+            .append(
+                "schema_v1",
+                [0x11; 32],
+                DataClass::Internal,
+                DocId(i),
+                TxId(i),
+                None,
+            )
+            .expect("append");
+    }
+
+    let head_sig = chain.sign_head(&sk).expect("sign head");
+    let valid_anchor =
+        AuditHeadAnchor::with_signature(head_sig.chain_index, head_sig.head_hash, head_sig.clone());
+
+    // Valid anchor passes
+    assert!(chain
+        .verify_chain_with_anchor(&valid_anchor, Some(&vk))
+        .expect("valid anchor"));
+
+    // Case 1: Wrong seq_no (higher than chain length)
+    let bad_seq_anchor = AuditHeadAnchor::new(10, head_sig.head_hash);
+    assert!(!chain
+        .verify_chain_with_anchor(&bad_seq_anchor, None)
+        .expect("bad seq"));
+
+    // Case 2: Wrong head_hash
+    let mut wrong_hash = head_sig.head_hash;
+    wrong_hash[0] ^= 0xFF;
+    let bad_hash_anchor = AuditHeadAnchor::new(head_sig.chain_index, wrong_hash);
+    assert!(!chain
+        .verify_chain_with_anchor(&bad_hash_anchor, None)
+        .expect("bad hash"));
+
+    // Case 3: Wrong signature key
+    let (_wrong_sk, wrong_vk) = test_ed25519_keypair();
+    assert!(!chain
+        .verify_chain_with_anchor(&valid_anchor, Some(&wrong_vk))
+        .expect("wrong vk"));
 }
 
 #[test]
@@ -523,7 +629,7 @@ fn test_h5_record_commitment_binding_hiding_and_encrypted_salt() {
     assert!(tampered_enc_salt.decrypt(&registry).is_err());
 
     // Revoked group destroys decryption
-    registry.revoke_group(group_id);
+    registry.revoke_group(group_id).expect("revoke_group");
     assert!(
         enc_salt.decrypt(&registry).is_err(),
         "Decryption of salt MUST fail after key shredding"
@@ -559,6 +665,7 @@ fn test_h6_deletion_proof_v3_validation_suite() {
             1 => assert_eq!(typed, Ok(SignatureVersion::V1)),
             2 => assert_eq!(typed, Ok(SignatureVersion::V2)),
             3 => assert_eq!(typed, Ok(SignatureVersion::V3)),
+            5 => assert_eq!(typed, Ok(SignatureVersion::V5)),
             v => assert_eq!(
                 typed,
                 Err(contextra_crypto::ed25519_proof::DeletionProofError::UnsupportedVersion(v))
@@ -714,7 +821,7 @@ fn test_h9_post_revocation_read_path_and_emergency_wipe() {
     assert_eq!(dec, b"Confidential Plaintext");
 
     // Action: Revoke group
-    assert!(registry.revoke_group(group_id));
+    assert!(registry.revoke_group(group_id).expect("revoke_group"));
 
     // Post-revocation: decrypt_with_group MUST fail fail-closed with KeyRevoked
     let dec_res = registry.decrypt_with_group(group_id, &ct, &nonce);
