@@ -964,7 +964,6 @@ dependencies = [
 name = "contextra-infer-ollama"
 version = "0.1.0"
 dependencies = [
- "contextra-infer-onnx",
  "contextra-ports",
  "contextra-rank",
  "contextra-types",
