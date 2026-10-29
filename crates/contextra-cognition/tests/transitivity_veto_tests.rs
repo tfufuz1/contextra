@@ -1,3 +1,15 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic,
+    clippy::unnecessary_cast,
+    clippy::disallowed_methods,
+    clippy::approx_constant,
+    clippy::unreachable
+)]
+
 // FILE-CONTEXT
 // ZWECK: Tests für Transitivity Veto Inspektion, Orchestrierung & Budget-Steuerung.
 // INVARIANTEN: P24-Lokalitätsnachweis; Zero-Panic; Budget-Grenzprüfung.
