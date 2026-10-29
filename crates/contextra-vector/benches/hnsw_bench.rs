@@ -1,8 +1,8 @@
 // FILE-CONTEXT: v3 format, HOTSPOTS: [benches/hnsw_bench.rs]
 // Hot Path HNSW Insertion, Search, and Quantized Search Benchmarks for ADR-031 Regressions.
 
-use contextra_types::{DocId, TxId};
 use contextra_ports::VectorIndex;
+use contextra_types::{DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use rand::Rng;

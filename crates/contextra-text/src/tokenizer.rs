@@ -20,8 +20,9 @@ static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>>
 
 /// Compiles a protected regex pattern, returning a `ContextraError` on failure (fail-closed, E-1.1).
 pub fn compile_protected_regex(pattern: &str) -> Result<Regex> {
-    Regex::new(pattern)
-        .map_err(|e| ContextraError::Text(format!("Invalid protected regex pattern '{pattern}': {e}")))
+    Regex::new(pattern).map_err(|e| {
+        ContextraError::Text(format!("Invalid protected regex pattern '{pattern}': {e}"))
+    })
 }
 
 /// Retrieves the cached default protected regex for URLs and emails, or returns a `ContextraError` if initialization fails.
@@ -299,7 +300,10 @@ mod tests {
     #[test]
     fn test_get_protected_regex_success() {
         let res = get_protected_regex();
-        assert!(res.is_ok(), "Default protected regex must compile successfully");
+        assert!(
+            res.is_ok(),
+            "Default protected regex must compile successfully"
+        );
     }
 
     #[test]

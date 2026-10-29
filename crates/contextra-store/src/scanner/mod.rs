@@ -38,7 +38,10 @@ pub fn lsm_purgers(storage: &Arc<LsmStorage>) -> Vec<Arc<dyn Purger>> {
 
 /// Hilfsfunktion: Prüft, ob ein Byte-Schlüssel zu einem `ScanTarget` passt.
 #[allow(dead_code)]
-pub(crate) fn key_matches_target(key: &[u8], target: &contextra_ports::scanner::ScanTarget) -> bool {
+pub(crate) fn key_matches_target(
+    key: &[u8],
+    target: &contextra_ports::scanner::ScanTarget,
+) -> bool {
     let tid = target.target_id.as_bytes();
     if key.starts_with(tid) {
         return true;

@@ -85,10 +85,7 @@ fn test_long_lived_snapshot_pin_blocker_alarm() {
     // Record keys to trigger coarsening check / diagnostic check
     for i in 1..=10 {
         let key = format!("data:{i:02}");
-        validator.record_commit_key(
-            key.as_bytes(),
-            50 + u64::try_from(i).expect("valid u64"),
-        );
+        validator.record_commit_key(key.as_bytes(), 50 + u64::try_from(i).expect("valid u64"));
     }
 
     // Query pruning blocker diagnostics

@@ -1,7 +1,6 @@
 //! Integration test verifying that KV CryptoShred mode provides instant, unrecoverable
 //! deletion via sub-key destruction without physical byte overwrite.
 
-
 use contextra_crypto::{CryptoKey, KeyRegistry};
 
 #[test]

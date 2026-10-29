@@ -6,9 +6,7 @@
 #![forbid(unsafe_code)]
 
 use crate::*;
-use contextra_ports::scanner::{
-    LayerScanner, Purger, ScanTarget, ScanTechnique, WitnessLayer,
-};
+use contextra_ports::scanner::{LayerScanner, Purger, ScanTarget, ScanTechnique, WitnessLayer};
 use contextra_ports::SystemClock;
 use contextra_types::{CollectionId, ContextraError, RequestContext, Result, SagaRecord, TenantId};
 use serde::{Deserialize, Serialize};
@@ -113,9 +111,7 @@ impl Contextra {
             }
         };
         if proof_key.is_empty() {
-            return Err(ContextraError::invalid_input(
-                "Resolved proof key is empty",
-            ));
+            return Err(ContextraError::invalid_input("Resolved proof key is empty"));
         }
 
         // Snapshot-Check: Wenn ein aktiver Snapshot existiert, schlägt der Purge fehl. Vor Mutation abweisen!
@@ -162,23 +158,35 @@ impl Contextra {
             let lsm_purgers = contextra_store::scanner::lsm_purgers(&storage_arc);
 
             if let Err(e) = text_purger.purge(&ctx_clone, &target_clone) {
-                return (false, Some(("TextIndex".to_string(), format!("Text purger failed: {e}"))));
+                return (
+                    false,
+                    Some(("TextIndex".to_string(), format!("Text purger failed: {e}"))),
+                );
             }
 
             if let Err(e) = hnsw_purger.purge(&ctx_clone, &target_clone) {
-                return (false, Some(("HnswIndex".to_string(), format!("HNSW purger failed: {e}"))));
+                return (
+                    false,
+                    Some(("HnswIndex".to_string(), format!("HNSW purger failed: {e}"))),
+                );
             }
 
             for purger in &lsm_purgers {
                 if let Err(e) = purger.purge(&ctx_clone, &target_clone) {
-                    return (false, Some(("LsmPurger".to_string(), format!("LSM purger failed: {e}"))));
+                    return (
+                        false,
+                        Some(("LsmPurger".to_string(), format!("LSM purger failed: {e}"))),
+                    );
                 }
             }
             (true, None)
-        }).await.map_err(|e| ContextraError::Internal(format!("Purge task panicked: {e}")))?;
+        })
+        .await
+        .map_err(|e| ContextraError::Internal(format!("Purge task panicked: {e}")))?;
 
         if !purgers_ok {
-            let (layer, reason) = purge_err.unwrap_or(("Unknown".to_string(), "Purge failed".to_string()));
+            let (layer, reason) =
+                purge_err.unwrap_or(("Unknown".to_string(), "Purge failed".to_string()));
             return Ok(ErasureReport {
                 verified: false,
                 proof: None,
@@ -256,7 +264,9 @@ impl Contextra {
             }
 
             (witnesses, summaries, first_failure)
-        }).await.map_err(|e| ContextraError::Internal(format!("Scan task panicked: {e}")))?;
+        })
+        .await
+        .map_err(|e| ContextraError::Internal(format!("Scan task panicked: {e}")))?;
 
         let (witnesses, summaries, first_failure) = scan_result;
 
@@ -299,11 +309,7 @@ impl Contextra {
     }
 
     /// Löscht eine gesamte Collection fail-closed aus allen Schichten und erzeugt einen [`ErasureReport`].
-    pub async fn erase_collection(
-        &self,
-        tenant_id: TenantId,
-        name: &str,
-    ) -> Result<ErasureReport> {
+    pub async fn erase_collection(&self, tenant_id: TenantId, name: &str) -> Result<ErasureReport> {
         if name == "default" {
             return Err(ContextraError::invalid_input(
                 "Cannot drop default collection",
@@ -320,9 +326,7 @@ impl Contextra {
             }
         };
         if proof_key.is_empty() {
-            return Err(ContextraError::invalid_input(
-                "Resolved proof key is empty",
-            ));
+            return Err(ContextraError::invalid_input("Resolved proof key is empty"));
         }
 
         if self.storage.snapshot_registry.min_active_seqno() != u64::MAX {
@@ -351,7 +355,10 @@ impl Contextra {
         let txt_data_prefix = format!("__txt:{}:", name);
         let col_idx_key = [b"__col_idx:\x00", name.as_bytes()].concat();
 
-        if let Err(e) = tenant_storage.delete_prefix(tx_id, col_data_prefix.as_bytes()).await {
+        if let Err(e) = tenant_storage
+            .delete_prefix(tx_id, col_data_prefix.as_bytes())
+            .await
+        {
             return Ok(ErasureReport {
                 verified: false,
                 proof: None,
@@ -362,7 +369,10 @@ impl Contextra {
                 }),
             });
         }
-        if let Err(e) = tenant_storage.delete_prefix(tx_id, txt_data_prefix.as_bytes()).await {
+        if let Err(e) = tenant_storage
+            .delete_prefix(tx_id, txt_data_prefix.as_bytes())
+            .await
+        {
             return Ok(ErasureReport {
                 verified: false,
                 proof: None,
@@ -399,25 +409,40 @@ impl Contextra {
             let lsm_purgers = contextra_store::scanner::lsm_purgers(&storage_arc);
 
             if let Err(e) = text_purger.purge(&ctx_clone, &target_clone) {
-                return (false, Some(("TextIndex".to_string(), format!("Text purger failed: {e}"))));
+                return (
+                    false,
+                    Some(("TextIndex".to_string(), format!("Text purger failed: {e}"))),
+                );
             }
 
             if let Err(e) = hnsw_purger.purge(&ctx_clone, &target_clone) {
-                return (false, Some(("HnswIndex".to_string(), format!("HNSW purger failed: {e}"))));
+                return (
+                    false,
+                    Some(("HnswIndex".to_string(), format!("HNSW purger failed: {e}"))),
+                );
             }
 
             for purger in &lsm_purgers {
                 if let Err(e) = purger.purge(&ctx_clone, &target_clone) {
-                    return (false, Some(("LsmPurger".to_string(), format!("LSM purger failed: {e}"))));
+                    return (
+                        false,
+                        Some(("LsmPurger".to_string(), format!("LSM purger failed: {e}"))),
+                    );
                 }
             }
             (true, None)
-        }).await.map_err(|e| ContextraError::Internal(format!("Purge task panicked: {e}")))?;
+        })
+        .await
+        .map_err(|e| ContextraError::Internal(format!("Purge task panicked: {e}")))?;
 
         if !purgers_ok {
-            let (layer, reason) = purge_err.unwrap_or(("Unknown".to_string(), "Purge failed".to_string()));
-            let pending_status_bytes = serde_json::to_vec(&CollectionStatus::PendingPurge).unwrap_or_default();
-            let _ = tenant_storage.put(tx_id, &col_idx_key, &pending_status_bytes).await;
+            let (layer, reason) =
+                purge_err.unwrap_or(("Unknown".to_string(), "Purge failed".to_string()));
+            let pending_status_bytes =
+                serde_json::to_vec(&CollectionStatus::PendingPurge).unwrap_or_default();
+            let _ = tenant_storage
+                .put(tx_id, &col_idx_key, &pending_status_bytes)
+                .await;
             let _ = tenant_storage.commit(tx_id).await;
 
             return Ok(ErasureReport {
@@ -497,13 +522,18 @@ impl Contextra {
             }
 
             (witnesses, summaries, first_failure)
-        }).await.map_err(|e| ContextraError::Internal(format!("Scan task panicked: {e}")))?;
+        })
+        .await
+        .map_err(|e| ContextraError::Internal(format!("Scan task panicked: {e}")))?;
 
         let (witnesses, summaries, first_failure) = scan_result;
 
         if let Some(failure) = first_failure {
-            let pending_status_bytes = serde_json::to_vec(&CollectionStatus::PendingPurge).unwrap_or_default();
-            let _ = tenant_storage.put(tx_id, &col_idx_key, &pending_status_bytes).await;
+            let pending_status_bytes =
+                serde_json::to_vec(&CollectionStatus::PendingPurge).unwrap_or_default();
+            let _ = tenant_storage
+                .put(tx_id, &col_idx_key, &pending_status_bytes)
+                .await;
             let _ = tenant_storage.commit(tx_id).await;
 
             return Ok(ErasureReport {
@@ -527,8 +557,11 @@ impl Contextra {
         ) {
             Ok(p) => p,
             Err(e) => {
-                let pending_status_bytes = serde_json::to_vec(&CollectionStatus::PendingPurge).unwrap_or_default();
-                let _ = tenant_storage.put(tx_id, &col_idx_key, &pending_status_bytes).await;
+                let pending_status_bytes =
+                    serde_json::to_vec(&CollectionStatus::PendingPurge).unwrap_or_default();
+                let _ = tenant_storage
+                    .put(tx_id, &col_idx_key, &pending_status_bytes)
+                    .await;
                 let _ = tenant_storage.commit(tx_id).await;
 
                 return Ok(ErasureReport {
