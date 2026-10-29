@@ -397,7 +397,10 @@ fn test_llm_from_dir_missing_tokenizer() {
             assert!(path.contains("tokenizer.json"));
             assert!(reason.contains("missing"));
         }
-        Err(err) => panic!("Expected ContextraError::ModelLoad for missing tokenizer, got Err({:?})", err),
+        Err(err) => panic!(
+            "Expected ContextraError::ModelLoad for missing tokenizer, got Err({:?})",
+            err
+        ),
         Ok(_) => panic!("Expected ContextraError::ModelLoad for missing tokenizer, got Ok"),
     }
 }
@@ -428,7 +431,10 @@ fn test_llm_from_dir_empty_tokenizer() {
         Err(ContextraError::ModelLoad { reason, .. }) => {
             assert!(reason.contains("empty"));
         }
-        Err(err) => panic!("Expected ContextraError::ModelLoad for empty tokenizer, got Err({:?})", err),
+        Err(err) => panic!(
+            "Expected ContextraError::ModelLoad for empty tokenizer, got Err({:?})",
+            err
+        ),
         Ok(_) => panic!("Expected ContextraError::ModelLoad for empty tokenizer, got Ok"),
     }
 }
@@ -457,7 +463,10 @@ fn test_llm_from_dir_missing_gguf() {
         Err(ContextraError::ModelLoad { reason, .. }) => {
             assert!(reason.contains("No GGUF model file found"));
         }
-        Err(err) => panic!("Expected ContextraError::ModelLoad for missing GGUF file, got Err({:?})", err),
+        Err(err) => panic!(
+            "Expected ContextraError::ModelLoad for missing GGUF file, got Err({:?})",
+            err
+        ),
         Ok(_) => panic!("Expected ContextraError::ModelLoad for missing GGUF file, got Ok"),
     }
 }
@@ -485,9 +494,15 @@ fn test_llm_from_dir_corrupt_gguf() {
     );
     match res {
         Err(ContextraError::ModelLoad { reason, .. }) => {
-            assert!(reason.contains("Failed to compute fingerprint") || reason.contains("Failed to load"));
+            assert!(
+                reason.contains("Failed to compute fingerprint")
+                    || reason.contains("Failed to load")
+            );
         }
-        Err(err) => panic!("Expected ContextraError::ModelLoad for corrupt GGUF file, got Err({:?})", err),
+        Err(err) => panic!(
+            "Expected ContextraError::ModelLoad for corrupt GGUF file, got Err({:?})",
+            err
+        ),
         Ok(_) => panic!("Expected ContextraError::ModelLoad for corrupt GGUF file, got Ok"),
     }
 }

@@ -343,7 +343,10 @@ impl CandleLlmClient {
         if !model_dir.exists() {
             return Err(ContextraError::ModelLoad {
                 path: model_dir.display().to_string(),
-                reason: format!("Candle model directory does not exist: {}", model_dir.display()),
+                reason: format!(
+                    "Candle model directory does not exist: {}",
+                    model_dir.display()
+                ),
             });
         }
 
@@ -361,7 +364,10 @@ impl CandleLlmClient {
         let tokenizer = tokenizers::Tokenizer::from_file(&tokenizer_path).map_err(|e| {
             ContextraError::ModelLoad {
                 path: tokenizer_path.display().to_string(),
-                reason: format!("Failed to load tokenizer from {}: {e}", tokenizer_path.display()),
+                reason: format!(
+                    "Failed to load tokenizer from {}: {e}",
+                    tokenizer_path.display()
+                ),
             }
         })?;
 
@@ -376,11 +382,12 @@ impl CandleLlmClient {
         let gguf_path = if default_gguf.exists() {
             default_gguf
         } else {
-            let entries = std::fs::read_dir(model_dir).map_err(|e| {
-                ContextraError::ModelLoad {
-                    path: model_dir.display().to_string(),
-                    reason: format!("Failed to read model directory {}: {e}", model_dir.display()),
-                }
+            let entries = std::fs::read_dir(model_dir).map_err(|e| ContextraError::ModelLoad {
+                path: model_dir.display().to_string(),
+                reason: format!(
+                    "Failed to read model directory {}: {e}",
+                    model_dir.display()
+                ),
             })?;
 
             let mut gguf_found = None;
@@ -394,14 +401,20 @@ impl CandleLlmClient {
 
             gguf_found.ok_or_else(|| ContextraError::ModelLoad {
                 path: model_dir.display().to_string(),
-                reason: format!("No GGUF model file found in model directory: {}", model_dir.display()),
+                reason: format!(
+                    "No GGUF model file found in model directory: {}",
+                    model_dir.display()
+                ),
             })?
         };
 
         let fingerprint = crate::model_registry::compute_fingerprint(&gguf_path, &quantization)
             .map_err(|e| ContextraError::ModelLoad {
                 path: gguf_path.display().to_string(),
-                reason: format!("Failed to compute fingerprint for model {}: {e}", gguf_path.display()),
+                reason: format!(
+                    "Failed to compute fingerprint for model {}: {e}",
+                    gguf_path.display()
+                ),
             })?;
 
         if fingerprint.hash == [0u8; 32] {
