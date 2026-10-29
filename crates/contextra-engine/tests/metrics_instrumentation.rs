@@ -1,4 +1,6 @@
-use contextra_engine::metrics_names::{COMMIT_LATENCY, REBUILD_DURATION};
+use contextra_engine::metrics_names::{
+    COMMIT_LATENCY, INSERT_LATENCY, REBUILD_DURATION, SEARCH_LATENCY_TEXT, SEARCH_LATENCY_VECTOR,
+};
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_ports::MetricsSink;
 use contextra_testkit::{MetricEvent, TestMetricsSink};
@@ -58,6 +60,75 @@ async fn test_insert_emits_commit_latency_metric() -> contextra_types::Result<()
             labels.iter().any(|(k, v)| k == "status" && v == "success"),
             "Expected status=success label"
         );
+    }
+
+    let insert_latency_event = events.iter().find(|e| match e {
+        MetricEvent::Histogram { name, .. } => name == INSERT_LATENCY,
+        _ => false,
+    });
+    assert!(
+        insert_latency_event.is_some(),
+        "Expected insert.latency histogram metric to be recorded on insert"
+    );
+
+    db.close().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_search_emits_signal_latency_metrics_without_pii() -> contextra_types::Result<()> {
+    let dir = tempdir().unwrap();
+    let test_sink = Arc::new(TestMetricsSink::new());
+
+    let config = ContextraConfig {
+        dimension: 4,
+        metrics_sink: Some(test_sink.clone() as Arc<dyn MetricsSink>),
+        ..Default::default()
+    };
+
+    let db = Contextra::open_with_config(dir.path(), config).await?;
+    let collection = db.collection("test_search_metrics").await?;
+
+    let secret_prompt = "TOP_SECRET_PROMPT_DO_NOT_LEAK";
+    let vector = vec![0.1, 0.2, 0.3, 0.4];
+
+    collection.insert("doc-secret", &vector, Some(serde_json::json!({"text": secret_prompt}))).await?;
+
+    let _res = collection
+        .query()
+        .text(secret_prompt)
+        .vector(&vector)
+        .k(5)
+        .execute()
+        .await?;
+
+    let events = test_sink.events();
+
+    let has_vec_lat = events.iter().any(|e| match e {
+        MetricEvent::Histogram { name, .. } => name == SEARCH_LATENCY_VECTOR,
+        _ => false,
+    });
+    assert!(has_vec_lat, "Expected search.latency.vector metric");
+
+    let has_text_lat = events.iter().any(|e| match e {
+        MetricEvent::Histogram { name, .. } => name == SEARCH_LATENCY_TEXT,
+        _ => false,
+    });
+    assert!(has_text_lat, "Expected search.latency.text metric");
+
+    // Verify no secret prompt or document content appears in any event labels
+    for event in &events {
+        let labels = match event {
+            MetricEvent::Counter { labels, .. }
+            | MetricEvent::Gauge { labels, .. }
+            | MetricEvent::Histogram { labels, .. } => labels,
+        };
+        for (k, v) in labels {
+            assert!(
+                !k.contains(secret_prompt) && !v.contains(secret_prompt),
+                "Label ({k}={v}) contains secret prompt content!"
+            );
+        }
     }
 
     db.close().await?;
