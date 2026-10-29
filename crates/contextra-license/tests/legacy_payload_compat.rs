@@ -1,4 +1,9 @@
-#![allow(clippy::expect_used, clippy::unwrap_used)]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::cast_sign_loss,
+    clippy::indexing_slicing
+)]
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -6,6 +11,7 @@ use std::sync::Arc;
 use bincode::Options;
 use contextra_license::{
     FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedLicenseGate,
+    SignedLicenseOptions,
 };
 use contextra_ports::clock::Clock;
 use contextra_types::TenantId;
@@ -18,7 +24,7 @@ struct TestClock {
 
 impl Clock for TestClock {
     fn now_unix_nanos(&self) -> u64 {
-        (self.now_unix_secs * 1_000_000_000) as u64
+        (self.now_unix_secs.max(0) as u64) * 1_000_000_000
     }
 
     fn monotonic_nanos(&self) -> u64 {
@@ -42,7 +48,7 @@ struct LegacyPayloadSchema {
 }
 
 #[test]
-fn test_legacy_payload_roundtrip_deserialization() {
+fn test_legacy_payload_roundtrip_deserialization_with_flag() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
     let clock = Arc::new(TestClock {
         now_unix_secs: 1000,
@@ -61,16 +67,52 @@ fn test_legacy_payload_roundtrip_deserialization() {
         .expect("serialization succeeds");
     let signature = signing_key.sign(&legacy_bytes).to_bytes();
 
-    let gate = SignedLicenseGate::from_signed_payload_with_clock(
+    let opts = SignedLicenseOptions {
+        allow_legacy: true,
+        ..Default::default()
+    };
+
+    let gate = SignedLicenseGate::from_signed_payload_with_clock_and_opts(
         &legacy_bytes,
         &signature,
         verifying_key,
         clock,
+        opts,
     )
-    .expect("gate accepts legacy payload");
+    .expect("gate accepts legacy payload when flag is set");
 
     assert_eq!(gate.license_payload().unwrap().installation_id_hash, None);
     assert_eq!(gate.check_ring(FeatureRing::Sovereign), Ok(()));
+}
+
+#[test]
+fn test_legacy_payload_rejected_without_flag() {
+    let (signing_key, verifying_key) = generate_deterministic_keypair();
+    let clock = Arc::new(TestClock {
+        now_unix_secs: 1000,
+    });
+
+    let legacy = LegacyPayloadSchema {
+        tenant_id: TenantId::SYSTEM,
+        allowed_rings: vec![FeatureRing::Sovereign],
+        expires_at: Some(2000),
+        feature_flags: BTreeMap::new(),
+    };
+
+    let bincode_opts = bincode::options().with_fixint_encoding();
+    let legacy_bytes = bincode_opts
+        .serialize(&legacy)
+        .expect("serialization succeeds");
+    let signature = signing_key.sign(&legacy_bytes).to_bytes();
+
+    let res = SignedLicenseGate::from_signed_payload_with_clock(
+        &legacy_bytes,
+        &signature,
+        verifying_key,
+        clock,
+    );
+
+    assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
 #[test]
