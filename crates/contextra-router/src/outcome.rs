@@ -1,8 +1,8 @@
 // FILE-CONTEXT
-// STAND: 2026-09-10T19:16:25Z (SESSION: 3f3e4637)
+// STAND: 2026-10-29
 // ZWECK: Outcome-Typen und DecisionId-Identifier für konformale Router-Kalibrierung.
 // INVARIANTEN: DecisionId-Monotonie via AtomicU64; Non-Conformity-Scores in [0.0, 1.0].
-// SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md, rules/tag_taxonomy.md
+// SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md
 
 //! Outcome types and decision tracking identifiers for router calibration.
 
@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Eindeutige ID einer Routing-Entscheidung.
 /// Wird von route() zurückgegeben und von record_outcome() konsumiert.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct DecisionId(u64);
 
 impl DecisionId {
@@ -66,7 +66,6 @@ pub enum RoutingOutcome {
 
 impl RoutingOutcome {
     /// Non-Conformity-Score: 0.0 = perfekt, 1.0 = komplett falsch.
-    /// Diese Werte sind Expertenschätzungen und sollten durch A/B-Tests kalibriert werden.
     pub fn non_conformity_score(&self) -> f32 {
         match self {
             RoutingOutcome::Success => 0.0,
@@ -80,7 +79,7 @@ impl RoutingOutcome {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
     use std::sync::Arc;
 
     #[test]
@@ -119,7 +118,7 @@ mod tests {
             }));
         }
 
-        let mut all_ids = HashSet::new();
+        let mut all_ids = BTreeSet::new();
         for handle in handles {
             let thread_ids = handle.join().expect("thread join ok");
             for id in thread_ids {

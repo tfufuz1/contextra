@@ -6,7 +6,9 @@
 
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
-use crate::metrics_names::{record_histogram_safe, REBUILD_DURATION};
+use crate::metrics_names::{
+    record_counter_safe, record_histogram_safe, REBUILD_DURATION, REAPER_DOCS_REAPED,
+};
 use contextra_graph::{detect_communities, CommunityAssignment, CommunityDetectionConfig};
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, DocId, EntityId, Result, TxId, EXPIRY_METADATA_KEY};
@@ -134,16 +136,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(count)
     }
 
-    /// Veraltete Alias-Methode für `evict_decayed_chunks`.
-    #[deprecated(note = "use evict_decayed_chunks instead")]
-    pub async fn reap_by_thermostat(
-        &self,
-        decay_controller: &AdaptiveDecayController,
-        max_per_tick: usize,
-    ) -> Result<usize> {
-        self.evict_decayed_chunks(decay_controller, max_per_tick)
-            .await
-    }
 
     /// Repairs the index by re-syncing with the storage.
     ///
@@ -170,20 +162,50 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     async fn repair_internal(&self) -> Result<()> {
         let _guard = self.consolidation_guard.lock().await;
-        let mut repair_count = 0;
         let docs = self.storage.scan_prefix(&self.prefix).await?;
-        // FIND-DB-004: Use doc_to_node map directly for O(1) lookup per DocId,
-        // instead of iterating all nodes via all_doc_ids() which is O(N).
         let indexed_ids: std::collections::HashSet<DocId> =
             self.index.all_doc_ids().await?.into_iter().collect();
 
         tracing::info!("Starting integrity repair for collection '{}'", self.name);
-        let start_time = std::time::Instant::now();
+        let start_nanos = self.clock().monotonic_nanos();
 
-        // 1. Scan for pending transaction intents (2-Phase Commit Recovery — FIND-DB-005)
+        let repair_count = self
+            .recover_pending_transaction_intents(&indexed_ids)
+            .await?;
+
+        self.fallback_scan_missing_text_index_documents(docs)
+            .await?;
+
+        let elapsed = std::time::Duration::from_nanos(
+            self.clock().monotonic_nanos().saturating_sub(start_nanos),
+        );
+        if repair_count > 0 {
+            tracing::info!(
+                "Repaired {} missing documents in collection '{}' in {:?}",
+                repair_count,
+                self.name,
+                elapsed
+            );
+        } else {
+            tracing::debug!(
+                "Integrity check passed for collection '{}' in {:?}",
+                self.name,
+                elapsed
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Scans and resolves pending 2-phase commit transaction intents during crash recovery.
+    async fn recover_pending_transaction_intents(
+        &self,
+        indexed_ids: &std::collections::HashSet<DocId>,
+    ) -> Result<usize> {
         let intent_prefix = self.namespaced_key(&[], 3);
         let intents = self.storage.scan_prefix(&intent_prefix).await?;
         let recovery_tx = self.allocate_tx()?;
+        let mut repair_count = 0;
         let mut recovered_any = false;
         let mut recovered_text = false;
         let mut recovered_graph = false;
@@ -203,12 +225,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         target_id,
                         base_tx: _,
                     } => {
-                        // Crash Recovery during Consolidation Pass (INV-CONSOLIDATE-2)
-                        // If target_id was committed to storage, ensure it is re-synced to index.
-                        // If target_id was not yet committed, consolidation aborted; delete the intent.
                         let target_doc_key =
                             self.namespaced_key(&target_id.inner().to_le_bytes(), 1);
-                        // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
                         if self.storage.get(&target_doc_key).await?.is_some() {
                             (Arc::new(vec![target_id]), true, false)
                         } else {
@@ -240,7 +258,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if any_doc_in_storage {
                     for &doc_id in doc_ids.iter() {
                         let doc_key = self.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-                        // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
                         if let Some(val) = self.storage.get(&doc_key).await? {
                             let meta_id = serde_json::from_slice::<StoredDocumentMeta>(&val)
                                 .map(|m| m.id)
@@ -249,7 +266,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                             let mut stored_doc = None;
                             if let Some(ref id_str) = meta_id {
                                 let user_key = self.namespaced_key(id_str.as_bytes(), 0);
-                                // SSI: nicht tx-gebunden — Reparaturlauf für Intent-/Crash-Wiederherstellung
                                 if let Some(user_val) = self.storage.get(&user_key).await? {
                                     if let Ok(stored) =
                                         serde_json::from_slice::<StoredDocument>(&user_val)
@@ -315,7 +331,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                         }
                     }
                 } else {
-                    // Storage commit NEVER completed! Compensate index entries.
                     for &doc_id in doc_ids.iter() {
                         if let Err(e) = self.index.delete(recovery_tx, doc_id).await {
                             tracing::warn!(?doc_id, error = %e, "Konnte verwaisten Vektor-Index-Eintrag bei Recovery nicht löschen");
@@ -344,7 +359,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     }
                 }
 
-                // Cleanup recovered intent
                 if let Err(e) = self.storage.delete(recovery_tx, &intent_key).await {
                     tracing::warn!(key = ?intent_key, "Konnte wiederhergestellte TxIntent nicht löschen: {e}");
                 }
@@ -363,13 +377,19 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             self.storage.commit(recovery_tx).await?;
         }
 
-        // 2. Fallback: Full scan for documents missing from index (FIND-DB-004: Parallel Batching)
+        Ok(repair_count)
+    }
+
+    /// Performs fallback scan across collection storage prefix for missing text index entries.
+    async fn fallback_scan_missing_text_index_documents(
+        &self,
+        docs: Vec<(Vec<u8>, Vec<u8>)>,
+    ) -> Result<()> {
         let fallback_tx = self.allocate_tx()?;
         let fallback_any = false;
         let mut fallback_text = false;
 
         for (namespaced_key, value) in docs {
-            // Only process user data (key_type 0)
             if self.name != "default" {
                 if namespaced_key.get(self.prefix.len()) != Some(&0) {
                     continue;
@@ -392,7 +412,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             let doc_id = DocId::from_key(&stored.id)?;
 
-            // Ensure text index coverage
             if let Some(text) = extract_text(&stored.metadata) {
                 if let Ok(bm25_res) = self.text_index.search_bm25(&text, 1, None).await {
                     if !bm25_res.iter().any(|(id, _)| *id == doc_id) {
@@ -410,21 +429,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
         if fallback_text {
             self.text_index.commit(fallback_tx).await?;
-        }
-
-        if repair_count > 0 {
-            tracing::info!(
-                "Repaired {} missing documents in collection '{}' in {:?}",
-                repair_count,
-                self.name,
-                start_time.elapsed()
-            );
-        } else {
-            tracing::debug!(
-                "Integrity check passed for collection '{}' in {:?}",
-                self.name,
-                start_time.elapsed()
-            );
         }
 
         Ok(())
@@ -515,6 +519,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     "Expiry cleanup failed to delete document"
                 );
             }
+        }
+
+        if count > 0 {
+            record_counter_safe(self.metrics_sink().as_ref(), REAPER_DOCS_REAPED, count as u64, &[]);
         }
 
         if count > 0 && self.index.is_rebuild_required() {
@@ -647,14 +655,13 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
 
+        if count > 0 {
+            record_counter_safe(self.metrics_sink().as_ref(), REAPER_DOCS_REAPED, count as u64, &[]);
+        }
+
         Ok(count)
     }
 
-    /// Deprecated legacy alias for `trigger_expiry_cleanup`.
-    #[deprecated(note = "use trigger_expiry_cleanup instead")]
-    pub async fn trigger_reaper(&self) -> Result<usize> {
-        self.trigger_expiry_cleanup().await
-    }
 
     /// Aktualisiert den Importance-Score sowie die Provenance (Modell-ID) in den Metadaten.
     ///

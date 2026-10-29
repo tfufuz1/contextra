@@ -1,0 +1,15 @@
+
+From: att@example.com
+Subject: Attachment
+Content-Type: multipart/mixed; boundary="BOUNDARY"
+
+--BOUNDARY
+Content-Type: text/plain
+
+Hello
+--BOUNDARY
+Content-Type: text/plain; name="note.txt"
+Content-Disposition: attachment; filename="note.txt"
+
+Attached note
+--BOUNDARY--

@@ -47,7 +47,19 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         if let Some(delay_ms) = delay_ms {
             let rx_opt = self.pressure_rx.read().clone();
             if let Some(ref rx) = rx_opt {
-                if rx.borrow().pressure_level == contextra_store::PressureLevel::Critical {
+                let level = rx.borrow().pressure_level;
+                let level_val = match level {
+                    contextra_store::PressureLevel::Normal => 0.0,
+                    contextra_store::PressureLevel::Elevated => 1.0,
+                    contextra_store::PressureLevel::Critical => 2.0,
+                };
+                crate::metrics_names::record_gauge_safe(
+                    self.metrics_sink().as_ref(),
+                    crate::metrics_names::BACKPRESSURE_LEVEL,
+                    level_val,
+                    &[],
+                );
+                if level == contextra_store::PressureLevel::Critical {
                     let backpressure_delay = std::time::Duration::from_millis(delay_ms);
                     tracing::warn!(
                         "Insert backpressure active (Critical pressure level); delaying {}ms",

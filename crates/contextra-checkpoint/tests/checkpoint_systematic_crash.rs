@@ -1,3 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::indexing_slicing,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::await_holding_lock
+)]
 // ANCHOR[TEST:CHK-005] STATUS:DONE (TS:2026-09-25T00:00:00Z)
 // OPTION (b) DECISION & RATIONALE:
 // 1. Vorab-Recherche Resultat: `contextra-testkit` provides `InMemoryStorageEngine` (Option a),

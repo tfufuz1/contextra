@@ -12,8 +12,6 @@
 
 use crate::context::{validate_node_id, validate_task_id};
 use contextra_db::Collection;
-#[cfg(any(test, feature = "test-utils"))]
-use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
 use contextra_store::LsmStorage;
 use contextra_types::Result;
@@ -23,13 +21,20 @@ use std::sync::Arc;
 /// Single immutable record of an agent step execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditEntry {
+    /// Task identifier associated with this audit entry.
     pub task_id: String,
+    /// Step sequence index within the task workflow.
     pub step_count: u64,
+    /// Node identifier executed at this step.
     pub node_id: String,
+    /// Tokens consumed by executing this step.
     pub tokens_consumed: usize,
+    /// Step execution payload output.
     pub payload: serde_json::Value,
+    /// Optional error description if the step failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Optional storage transaction ID associated with this step.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tx_id: Option<contextra_types::TxId>,
 }
@@ -37,7 +42,9 @@ pub struct AuditEntry {
 /// Summary statistics for legacy audit entry migration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct MigrationStats {
+    /// Number of legacy entries successfully migrated.
     pub migrated: usize,
+    /// Number of legacy entries that failed migration.
     pub failed: usize,
 }
 
@@ -83,6 +90,7 @@ pub fn validate_audit_payload_and_error(
 }
 
 impl<S: StorageEngine> AuditLog<S> {
+    /// Constructs a new [`AuditLog`] wrapping a collection reference.
     pub fn new(collection: Arc<Collection<S>>) -> Self {
         Self { collection }
     }
@@ -133,6 +141,61 @@ impl<S: StorageEngine> AuditLog<S> {
     }
 }
 
+async fn migrate_single_legacy_audit_entry<S: StorageEngine, V: contextra_ports::VectorIndex>(
+    collection: &Collection<S, V>,
+    key: &str,
+    val: &serde_json::Value,
+) -> Result<bool> {
+    let obj = match val.as_object() {
+        Some(o) if o.contains_key("embedding") => o,
+        _ => return Ok(false),
+    };
+
+    let entry_val = obj.get("metadata").cloned().unwrap_or_else(|| val.clone());
+    let doc_id = contextra_types::DocId::from_key(key).map_err(|err| {
+        tracing::error!(key = %key, error = %err, "Failed to generate DocId from key during migration");
+        err
+    })?;
+
+    let tx = collection.allocate_tx().map_err(|err| {
+        tracing::error!(key = %key, error = %err, "Failed to allocate transaction during migration");
+        err
+    })?;
+
+    if let Err(err) = collection.vector_index().delete(tx, doc_id).await {
+        tracing::error!(doc_id = ?doc_id, key = %key, error = %err, "Failed to delete zero-vector");
+        let _ = collection.storage().rollback(tx).await;
+        return Err(err);
+    }
+
+    if let Err(err) = collection.vector_index().commit(tx).await {
+        tracing::error!(doc_id = ?doc_id, key = %key, error = %err, "Failed to commit vector index deletion");
+        let _ = collection.storage().rollback(tx).await;
+        return Err(err);
+    }
+
+    let doc_key = collection.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+    if let Err(err) = collection.storage().delete(tx, &doc_key).await {
+        tracing::error!(doc_id = ?doc_id, key = %key, error = %err, "Failed to delete doc_key mapping");
+        let _ = collection.storage().rollback(tx).await;
+        return Err(err);
+    }
+
+    if let Err(err) = collection.put_kv(key, &entry_val).await {
+        tracing::error!(key = %key, error = %err, "Failed to save pure KV entry");
+        let _ = collection.storage().rollback(tx).await;
+        return Err(err);
+    }
+
+    if let Err(err) = collection.storage().commit(tx).await {
+        tracing::error!(key = %key, error = %err, "Failed to commit storage transaction");
+        let _ = collection.storage().rollback(tx).await;
+        return Err(err);
+    }
+
+    Ok(true)
+}
+
 /// Migrates legacy zero-vector audit entries from the HNSW vector index and doc_key mappings
 /// into the direct LSM KV store format (`put_kv`).
 ///
@@ -148,112 +211,10 @@ pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: contextra_ports::
             continue;
         }
 
-        // Check if value was stored in legacy StoredDocument format (contains "embedding" field)
-        if let Some(obj) = val.as_object() {
-            if obj.contains_key("embedding") {
-                // Extract audit entry payload from metadata
-                let entry_val = obj.get("metadata").cloned().unwrap_or(val.clone());
-
-                let doc_id = match contextra_types::DocId::from_key(&key) {
-                    Ok(id) => id,
-                    Err(err) => {
-                        tracing::error!(
-                            key = %key,
-                            error = %err,
-                            "Failed to generate DocId from key during audit entry migration"
-                        );
-                        stats.failed += 1;
-                        continue;
-                    }
-                };
-
-                let tx = match collection.allocate_tx() {
-                    Ok(tx_id) => tx_id,
-                    Err(err) => {
-                        tracing::error!(
-                            key = %key,
-                            error = %err,
-                            "Failed to allocate transaction during audit entry migration"
-                        );
-                        stats.failed += 1;
-                        continue;
-                    }
-                };
-
-                // Remove from HNSW vector index
-                if let Err(err) = collection.vector_index().delete(tx, doc_id).await {
-                    tracing::error!(
-                        doc_id = ?doc_id,
-                        key = %key,
-                        error = %err,
-                        "Failed to delete zero-vector entry from vector index during migration"
-                    );
-                    if let Err(rollback_err) = collection.storage().rollback(tx).await {
-                        tracing::error!(error = %rollback_err, "Failed to rollback transaction during migration");
-                    }
-                    stats.failed += 1;
-                    continue;
-                }
-
-                if let Err(err) = collection.vector_index().commit(tx).await {
-                    tracing::error!(
-                        doc_id = ?doc_id,
-                        key = %key,
-                        error = %err,
-                        "Failed to commit vector index deletion during migration"
-                    );
-                    if let Err(rollback_err) = collection.storage().rollback(tx).await {
-                        tracing::error!(error = %rollback_err, "Failed to rollback transaction during migration");
-                    }
-                    stats.failed += 1;
-                    continue;
-                }
-
-                // Delete legacy doc_key (key_type=1) mapping
-                let doc_key = collection.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-                if let Err(err) = collection.storage().delete(tx, &doc_key).await {
-                    tracing::error!(
-                        doc_id = ?doc_id,
-                        key = %key,
-                        error = %err,
-                        "Failed to delete doc_key mapping during migration"
-                    );
-                    if let Err(rollback_err) = collection.storage().rollback(tx).await {
-                        tracing::error!(error = %rollback_err, "Failed to rollback transaction during migration");
-                    }
-                    stats.failed += 1;
-                    continue;
-                }
-
-                // Save pure KV entry
-                if let Err(err) = collection.put_kv(&key, &entry_val).await {
-                    tracing::error!(
-                        key = %key,
-                        error = %err,
-                        "Failed to save pure KV entry during migration"
-                    );
-                    if let Err(rollback_err) = collection.storage().rollback(tx).await {
-                        tracing::error!(error = %rollback_err, "Failed to rollback transaction during migration");
-                    }
-                    stats.failed += 1;
-                    continue;
-                }
-
-                if let Err(err) = collection.storage().commit(tx).await {
-                    tracing::error!(
-                        key = %key,
-                        error = %err,
-                        "Failed to commit storage transaction during migration"
-                    );
-                    if let Err(rollback_err) = collection.storage().rollback(tx).await {
-                        tracing::error!(error = %rollback_err, "Failed to rollback transaction during migration");
-                    }
-                    stats.failed += 1;
-                    continue;
-                }
-
-                stats.migrated += 1;
-            }
+        match migrate_single_legacy_audit_entry(collection, &key, &val).await {
+            Ok(true) => stats.migrated += 1,
+            Ok(false) => {}
+            Err(_) => stats.failed += 1,
         }
     }
 
@@ -268,9 +229,11 @@ pub async fn migrate_legacy_audit_entries<S: StorageEngine, V: contextra_ports::
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use contextra_graph::CsrGraph;
+    use contextra_testkit::InMemoryStorageEngine;
     use contextra_vector::{HnswConfig, HnswIndex};
 
     #[tokio::test]
@@ -531,6 +494,7 @@ mod tests {
 
         storage.put(tx, &user_key, &data).await?;
         storage.put(tx, &doc_key, &data).await?;
+        storage.commit(tx).await?;
 
         let stats = migrate_legacy_audit_entries(&collection).await?;
         assert_eq!(stats.migrated, 1);
@@ -545,185 +509,5 @@ mod tests {
             );
         }
         Ok(())
-    }
-}
-
-/// Minimal in-memory implementation of [`StorageEngine`] backed by a thread-safe map.
-/// Useful for testing and fast mock storage.
-#[cfg(any(test, feature = "test-utils"))]
-#[derive(Debug, Default)]
-pub struct InMemoryStorageEngine {
-    data: std::sync::Mutex<std::collections::HashMap<Vec<u8>, Vec<u8>>>,
-}
-
-#[cfg(any(test, feature = "test-utils"))]
-impl InMemoryStorageEngine {
-    pub fn new() -> Self {
-        Self {
-            data: std::sync::Mutex::new(std::collections::HashMap::new()),
-        }
-    }
-}
-
-#[cfg(any(test, feature = "test-utils"))]
-impl StorageEngine for InMemoryStorageEngine {
-    fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-        Box::pin(async move {
-            let guard = self.data.lock().map_err(|e| {
-                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
-            })?;
-            Ok(guard.get(key).cloned().map(bytes::Bytes::from))
-        })
-    }
-
-    fn get_at_seq<'a>(
-        &'a self,
-        key: &'a [u8],
-        _seq: u64,
-    ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-        Box::pin(async move { self.get(key).await })
-    }
-
-    fn put<'a>(
-        &'a self,
-        _tx_id: contextra_types::TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move {
-            let mut guard = self.data.lock().map_err(|e| {
-                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
-            })?;
-            guard.insert(key.to_vec(), value.to_vec());
-            Ok(())
-        })
-    }
-
-    fn put_if_absent<'a>(
-        &'a self,
-        _tx_id: contextra_types::TxId,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, Result<bool>> {
-        Box::pin(async move {
-            let mut guard = self.data.lock().map_err(|e| {
-                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
-            })?;
-            if guard.contains_key(key) {
-                Ok(false)
-            } else {
-                guard.insert(key.to_vec(), value.to_vec());
-                Ok(true)
-            }
-        })
-    }
-
-    fn delete<'a>(
-        &'a self,
-        _tx_id: contextra_types::TxId,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move {
-            let mut guard = self.data.lock().map_err(|e| {
-                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
-            })?;
-            guard.remove(key);
-            Ok(())
-        })
-    }
-
-    fn commit<'a>(&'a self, _tx_id: contextra_types::TxId) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-
-    fn rollback<'a>(&'a self, _tx_id: contextra_types::TxId) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-
-    fn rollback_to_tx<'a>(&'a self, _tx_id: contextra_types::TxId) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-
-    fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<contextra_ports::StorageStats>> {
-        Box::pin(async move {
-            Ok(contextra_ports::StorageStats {
-                num_segments: 0,
-                total_size_bytes: 0,
-                memtable_size_bytes: 0,
-            })
-        })
-    }
-
-    fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
-        Box::pin(async move { Ok(0) })
-    }
-
-    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<contextra_types::TxId>> {
-        Box::pin(async move { Ok(contextra_types::TxId::new(0)) })
-    }
-
-    fn pin_checkpoint<'a>(&'a self, _seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-
-    fn unpin_checkpoint<'a>(&'a self, _seq_no: u64) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move { Ok(()) })
-    }
-
-    fn scan_prefix<'a>(
-        &'a self,
-        prefix: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move {
-            let guard = self.data.lock().map_err(|e| {
-                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
-            })?;
-            let entries = guard
-                .iter()
-                .filter(|(k, _)| k.starts_with(prefix))
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-            Ok(entries)
-        })
-    }
-
-    fn scan<'a>(
-        &'a self,
-        start: std::ops::Bound<&'a [u8]>,
-        end: std::ops::Bound<&'a [u8]>,
-        // RESOLVED: AGT-AGENT-bf5c7019 — Limit parameter is actively used in entries.truncate(lim) in InMemoryStorageEngine::scan. (TS: 2026-09-11T14:41:11Z)
-        limit: Option<usize>,
-    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-        Box::pin(async move {
-            let guard = self.data.lock().map_err(|e| {
-                contextra_types::ContextraError::Internal(format!("Lock poisoned: {e}"))
-            })?;
-            let mut entries: Vec<(Vec<u8>, Vec<u8>)> = guard
-                .iter()
-                .filter(|(k, _)| {
-                    let s_ok = match start {
-                        std::ops::Bound::Included(s) => k.as_slice() >= s,
-                        std::ops::Bound::Excluded(s) => k.as_slice() > s,
-                        std::ops::Bound::Unbounded => true,
-                    };
-                    let e_ok = match end {
-                        std::ops::Bound::Included(e) => k.as_slice() <= e,
-                        std::ops::Bound::Excluded(e) => k.as_slice() < e,
-                        std::ops::Bound::Unbounded => true,
-                    };
-                    s_ok && e_ok
-                })
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-            entries.sort_by(|a, b| a.0.cmp(&b.0));
-            if let Some(lim) = limit {
-                entries.truncate(lim);
-            }
-            Ok(entries)
-        })
     }
 }

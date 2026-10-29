@@ -10,6 +10,7 @@ use tempfile::TempDir;
 
 const TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("diff_table");
 
+#[allow(dead_code)]
 fn get_rss_bytes() -> usize {
     if let Ok(statm) = std::fs::read_to_string("/proc/self/statm") {
         let parts: Vec<&str> = statm.split_whitespace().collect();

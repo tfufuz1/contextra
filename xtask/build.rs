@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods, clippy::unwrap_used)]
 //! Build script for `xtask` crate.
 //!
 //! Scans `src/gates/<cluster>/*.rs` and generates module imports and registry dispatch logic.
@@ -7,9 +8,14 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+// Build script needs Cargo-injected build environment variables (OUT_DIR, CARGO_MANIFEST_DIR).
+// RING-LAYER-EXCEPTION: ADR-098 / P28 exception for build.rs reading Cargo build environment variables.
+#[allow(clippy::disallowed_methods)]
 fn main() {
     println!("cargo:rerun-if-changed=src/gates");
     println!("cargo:rerun-if-changed=src/harness");
+    println!("cargo:rerun-if-env-changed=OUT_DIR");
+    println!("cargo:rerun-if-env-changed=CARGO_MANIFEST_DIR");
 
     let out_dir = match std::env::var_os("OUT_DIR") {
         Some(dir) => PathBuf::from(dir),

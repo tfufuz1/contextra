@@ -95,7 +95,7 @@ pub struct CheckpointGuard<S: contextra_ports::StorageEngine> {
     pub(crate) skipped_rollbacks: Arc<AtomicU64>,
     pub(crate) clock: Arc<dyn contextra_ports::Clock>,
     pub(crate) metrics_sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
-    pub(crate) created_at: std::time::Instant,
+    pub(crate) created_at_nanos: u64,
 }
 
 impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
@@ -168,6 +168,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         skipped_rollbacks: Arc<AtomicU64>,
         clock: Arc<dyn contextra_ports::Clock>,
     ) -> Self {
+        let created_at_nanos = clock.monotonic_nanos();
         Self {
             checkpoint: Some(checkpoint),
             storage,
@@ -176,7 +177,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
             skipped_rollbacks,
             clock,
             metrics_sink: None,
-            created_at: std::time::Instant::now(),
+            created_at_nanos,
         }
     }
 
@@ -251,7 +252,11 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
             .take()
             .ok_or_else(|| ContextraError::Internal("Checkpoint already consumed".into()))?;
         if let Some(ref sink) = self.metrics_sink {
-            let elapsed = self.created_at.elapsed().as_secs_f64();
+            let elapsed_nanos = self
+                .clock
+                .monotonic_nanos()
+                .saturating_sub(self.created_at_nanos);
+            let elapsed = elapsed_nanos as f64 / 1_000_000_000.0;
             sink.record_histogram(
                 "checkpoint_duration_seconds",
                 elapsed,
@@ -278,7 +283,11 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
     pub async fn rollback(mut self) -> Result<()> {
         if let Some(cp) = self.checkpoint.take() {
             if let Some(ref sink) = self.metrics_sink {
-                let elapsed = self.created_at.elapsed().as_secs_f64();
+                let elapsed_nanos = self
+                    .clock
+                    .monotonic_nanos()
+                    .saturating_sub(self.created_at_nanos);
+                let elapsed = elapsed_nanos as f64 / 1_000_000_000.0;
                 sink.record_histogram(
                     "checkpoint_duration_seconds",
                     elapsed,
@@ -326,7 +335,11 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
             .ok_or_else(|| ContextraError::Internal("Checkpoint already consumed".into()))?;
 
         if let Some(ref sink) = self.metrics_sink {
-            let elapsed = self.created_at.elapsed().as_secs_f64();
+            let elapsed_nanos = self
+                .clock
+                .monotonic_nanos()
+                .saturating_sub(self.created_at_nanos);
+            let elapsed = elapsed_nanos as f64 / 1_000_000_000.0;
             sink.record_histogram(
                 "checkpoint_duration_seconds",
                 elapsed,
@@ -361,7 +374,11 @@ impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
     fn drop(&mut self) {
         if let Some(mut cp) = self.checkpoint.take() {
             if let Some(ref sink) = self.metrics_sink {
-                let elapsed = self.created_at.elapsed().as_secs_f64();
+                let elapsed_nanos = self
+                    .clock
+                    .monotonic_nanos()
+                    .saturating_sub(self.created_at_nanos);
+                let elapsed = elapsed_nanos as f64 / 1_000_000_000.0;
                 sink.record_histogram(
                     "checkpoint_duration_seconds",
                     elapsed,
@@ -381,7 +398,14 @@ impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::disallowed_types,
+    clippy::disallowed_methods
+)]
 mod tests {
     use super::*;
     use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
@@ -644,7 +668,7 @@ mod tests {
             skipped_rollbacks: Arc::new(AtomicU64::new(0)),
             clock: clock.clone(),
             metrics_sink: None,
-            created_at: std::time::Instant::now(),
+            created_at_nanos: clock.monotonic_nanos(),
         };
         assert!(matches!(
             consumed_guard.checkpoint(),
@@ -659,7 +683,7 @@ mod tests {
             skipped_rollbacks: Arc::new(AtomicU64::new(0)),
             clock: clock.clone(),
             metrics_sink: None,
-            created_at: std::time::Instant::now(),
+            created_at_nanos: clock.monotonic_nanos(),
         };
         assert!(matches!(
             consumed_guard2.commit(),
@@ -672,9 +696,9 @@ mod tests {
             namespace: "test".to_string(),
             orphan_registry: Arc::new(InstanceOrphanRegistry::new("")),
             skipped_rollbacks: Arc::new(AtomicU64::new(0)),
-            clock,
+            clock: clock.clone(),
             metrics_sink: None,
-            created_at: std::time::Instant::now(),
+            created_at_nanos: clock.monotonic_nanos(),
         };
         let res = consumed_guard3.rollback().await;
         assert!(matches!(res, Err(ContextraError::Internal(_))));

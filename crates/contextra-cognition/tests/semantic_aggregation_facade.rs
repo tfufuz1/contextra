@@ -1,3 +1,15 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic,
+    clippy::unnecessary_cast,
+    clippy::disallowed_methods,
+    clippy::approx_constant,
+    clippy::unreachable
+)]
+
 use contextra_cognition::aggregation_phase::AggregationConfig;
 use contextra_cognition::consolidate_semantic_hyperedges;
 use contextra_engine::collection::Collection;

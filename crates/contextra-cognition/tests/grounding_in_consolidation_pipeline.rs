@@ -1,3 +1,15 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic,
+    clippy::unnecessary_cast,
+    clippy::disallowed_methods,
+    clippy::approx_constant,
+    clippy::unreachable
+)]
+
 use contextra_cognition::consolidation_executor::execute_background_consolidation_with_rich_validator;
 use contextra_cognition::memory_consolidation::{
     compute_community_hash, run_structural_synthesis_pass, CommunityStabilityTracker,
@@ -75,7 +87,7 @@ async fn test_grounding_validation_pass_and_fail_modes() {
     let comm_hash = compute_community_hash(&members);
     let stable_communities = vec![(comm_hash, members)];
 
-    let mut source_texts = std::collections::HashMap::new();
+    let mut source_texts = ahash::AHashMap::new();
     source_texts.insert(DocId::new(10), "Source text 1".to_string());
     source_texts.insert(DocId::new(20), "Source text 2".to_string());
 

@@ -30,7 +30,7 @@ impl ManualClock {
 
     /// Advances the clock by the given duration.
     pub fn advance(&self, duration: Duration) {
-        let delta = duration.as_nanos() as u64;
+        let delta = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
         self.nanos.fetch_add(delta, Ordering::SeqCst);
     }
 

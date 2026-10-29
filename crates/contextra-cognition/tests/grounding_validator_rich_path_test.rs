@@ -1,3 +1,15 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic,
+    clippy::unnecessary_cast,
+    clippy::disallowed_methods,
+    clippy::approx_constant,
+    clippy::unreachable
+)]
+
 use contextra_cognition::consolidation_executor::execute_background_consolidation_with_rich_validator;
 use contextra_cognition::memory_consolidation::{
     CommunityStabilityTracker, ConsolidationConfig, SynthesisConfig,

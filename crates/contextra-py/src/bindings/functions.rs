@@ -104,11 +104,12 @@ pub(crate) fn trigger_panic_helper(
 /// that panics occurring within Rust core operations are caught and mapped to `PyRuntimeError`.
 ///
 /// # Scope
-/// Internal test hook only (`#[doc(hidden)]`).
+/// Internal test hook only (`#[doc(hidden)]`), gated behind `test-hooks` feature.
 ///
 /// # Risks
 /// Explicitly triggers a panic payload unwind via `std::panic::resume_unwind`.
 #[doc(hidden)]
+#[cfg(feature = "test-hooks")]
 #[pyfunction]
 #[pyo3(signature = (message=None))]
 pub fn _trigger_panic_for_test(py: Python<'_>, message: Option<String>) -> PyResult<()> {

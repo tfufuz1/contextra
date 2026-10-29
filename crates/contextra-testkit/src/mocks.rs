@@ -187,7 +187,7 @@ mod tests {
         let embedder = MockEmbedder::new(2);
         let batch_res = EmbeddingProvider::embed_batch(&embedder, &["a", "b"]).await?;
         assert_eq!(batch_res.len(), 2);
-        assert_eq!(batch_res[0], vec![0.1, 0.1]);
+        assert_eq!(batch_res.first(), Some(&vec![0.1, 0.1]));
 
         let engine: &dyn TextEmbeddingEngine = &embedder;
         let single = engine.embed("text").await?;
@@ -208,28 +208,28 @@ mod tests {
         let events = sink.events();
         assert_eq!(events.len(), 3);
         assert_eq!(
-            events[0],
-            MetricEvent::Counter {
+            events.first(),
+            Some(&MetricEvent::Counter {
                 name: "c1".to_string(),
                 value: 5,
                 labels: vec![("env".to_string(), "test".to_string())],
-            }
+            })
         );
         assert_eq!(
-            events[1],
-            MetricEvent::Gauge {
+            events.get(1),
+            Some(&MetricEvent::Gauge {
                 name: "g1".to_string(),
                 value: 1.5,
                 labels: vec![],
-            }
+            })
         );
         assert_eq!(
-            events[2],
-            MetricEvent::Histogram {
+            events.get(2),
+            Some(&MetricEvent::Histogram {
                 name: "h1".to_string(),
                 value: 0.02,
                 labels: vec![("op".to_string(), "commit".to_string())],
-            }
+            })
         );
 
         sink.clear();

@@ -38,29 +38,49 @@ pub struct StepDeadLetter {
     pub failed_at_secs: u64,
 }
 
+/// Specific failure reason category recorded when an agent step is moved to the Dead-Letter Queue.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DeadLetterReason {
     /// Tool hat nicht innerhalb des Timeouts geantwortet
-    Timeout { timeout_ms: u64 },
+    Timeout {
+        /// Execution timeout limit in milliseconds.
+        timeout_ms: u64,
+    },
     /// Budget erschöpft bevor der Schritt starten konnte
-    BudgetExhausted { available: usize, required: usize },
+    BudgetExhausted {
+        /// Available token budget at time of failure.
+        available: usize,
+        /// Required token budget for the step execution.
+        required: usize,
+    },
     /// Tool hat einen nicht-retriable Fehler zurückgegeben
-    ToolError { message: String },
+    ToolError {
+        /// Error message describing the tool failure.
+        message: String,
+    },
     /// Maximale Retry-Anzahl für diesen Schritt erreicht
-    MaxRetriesExceeded { attempts: u32 },
+    MaxRetriesExceeded {
+        /// Total number of attempts executed before exhausting retries.
+        attempts: u32,
+    },
 }
 
 /// The explicit result of an agent step execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepResult {
+    /// Unique identifier of the node that produced this step result.
     pub node_id: String,
+    /// JSON output payload produced by the step execution.
     pub output: serde_json::Value,
+    /// Number of tokens consumed by executing this step.
     pub tokens_consumed: usize,
     /// Identifier condition of the next edge transition if dictated dynamically.
     pub next_edge: Option<String>,
 }
 
+/// Core interface implemented by all executable tools participating in agent workflows.
 pub trait AgentTool: Send + Sync {
+    /// Returns the unique name identifier of this tool.
     fn name(&self) -> &str;
 
     /// Returns the estimated token cost of executing this tool with the given input.
@@ -70,6 +90,7 @@ pub trait AgentTool: Send + Sync {
         0
     }
 
+    /// Executes the tool asynchronously within the given [`AgentContext`].
     fn execute<'a>(
         &'a self,
         ctx: &'a AgentContext,

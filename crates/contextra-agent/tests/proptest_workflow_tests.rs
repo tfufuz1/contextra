@@ -1,3 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 // FILE-CONTEXT Header (Format v3)
 // ZWECK: Property-based testing for contextra-agent structural invariants (StateGraph, AgentContext, BackgroundEvent).
 // INVARIANTEN: Property tests verify boundary constraints and state consistency independently without mirroring production validation formulas.

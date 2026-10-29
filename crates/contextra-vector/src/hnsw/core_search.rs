@@ -152,10 +152,9 @@ impl HnswIndexCore {
         }
         #[cfg(feature = "partial-index-rebuild")]
         if layer == 0 && !visited_node_ids.is_empty() {
-            self.cold
-                .traversal_tracker
-                .write()
-                .record_traversal(visited_node_ids);
+            if let Some(ref tracker) = self.cold.traversal_tracker {
+                tracker.write().record_traversal(visited_node_ids);
+            }
         }
 
         let mut vec = results.into_vec();

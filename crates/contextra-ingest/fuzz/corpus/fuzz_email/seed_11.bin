@@ -1,0 +1,8 @@
+From: nested@example.com
+Subject: Nested
+Content-Type: message/rfc822
+
+From: inner@example.com
+Subject: Inner
+
+Inner body

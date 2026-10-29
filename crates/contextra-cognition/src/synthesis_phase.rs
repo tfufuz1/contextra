@@ -97,6 +97,12 @@ pub async fn run_synthesis_pass(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first
+)]
 mod tests {
     use super::*;
     use contextra_ports::BoxFuture;

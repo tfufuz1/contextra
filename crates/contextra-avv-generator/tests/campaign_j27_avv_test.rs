@@ -7,6 +7,7 @@ use contextra_types::TenantId;
 // ── H11: Art. 28 DSGVO AVV Generator Technical Completeness ─────────────────────
 
 #[test]
+#[allow(clippy::expect_used, clippy::disallowed_methods)]
 fn test_h11_gdpr_art28_avv_generator_technical_completeness(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ctx = AvvContext {
@@ -68,9 +69,9 @@ fn test_h11_gdpr_art28_avv_generator_technical_completeness(
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let workspace_root = std::path::Path::new(manifest_dir).join("../..");
 
-    // 1. Ed25519 DeletionProof: crates/contextra-crypto/src/deletion_proof.rs
+    // 1. Ed25519 DeletionProof: crates/contextra-crypto/src/deletion_proof
     assert!(workspace_root
-        .join("crates/contextra-crypto/src/deletion_proof.rs")
+        .join("crates/contextra-crypto/src/deletion_proof")
         .exists());
 
     // 2. Egress Gateway: crates/contextra-privacy/src/egress_gateway.rs

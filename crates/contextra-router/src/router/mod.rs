@@ -1,9 +1,8 @@
 // FILE-CONTEXT
-// STAND: 2026-09-10T19:16:25Z (SESSION: 3f3e4637)
+// STAND: 2026-10-29
 // ZWECK: Haupt-Routing-Engine für Hybrid-Search-Kontext auf SLM-Profile.
 // INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload, NaN-Safety bei Distanz-Eingaben.
-// NICHT-OFFENSICHTLICH: EntityId::from_doc_id Vermeidung von String-Rehashing; Bounded Pending Map.
-// SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md, rules/tag_taxonomy.md
+// SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md
 
 //! Core routing engine for matching hybrid search context to SLM profiles.
 
@@ -11,6 +10,7 @@ use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
 use crate::outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
 use crate::profile::{ProfileCalibrationState, SlmProfile};
 use arc_swap::ArcSwap;
+use contextra_ports::clock::{Clock, SystemClock};
 use contextra_ports::{
     CommunityResolver, ContextPreparer, DriftStatusProvider as LocalDriftStatusProvider,
     HybridSearchProvider,
@@ -18,9 +18,9 @@ use contextra_ports::{
 use contextra_types::{ContextChunk, ContextWindow, ContextraError, EntityId, Result};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[cfg(feature = "bandit-routing")]
 use crate::routing_strategy::RoutingStrategy;
@@ -39,7 +39,7 @@ pub(crate) struct PendingBanditDecision {
     pub profile_name: String,
     pub action_idx: u32,
     pub propensity: f32,
-    pub created: Instant,
+    pub created_nanos: u64,
 }
 
 #[cfg(feature = "bandit-routing")]
@@ -74,9 +74,6 @@ impl BanditExploration {
 }
 
 /// Minimum calibration samples before conformal quantiles are considered reliable.
-/// Statistical basis: ≥100 samples required for α=0.1 coverage guarantee per
-/// Venn & Gammerman (2005). At 30 samples the quantile interval is too wide
-/// to provide meaningful routing signal — the router behaves as a random router.
 pub(crate) const CALIBRATION_WARMUP_WINDOW: u32 = 100;
 
 /// Maximale TTL für ausstehende Routing-Entscheidungen bevor sie bereinigt werden.
@@ -118,63 +115,29 @@ pub struct RoutingDecision {
 }
 
 /// Inner state for `RouterEngine` holding active profiles, calibration states, and Lyapunov drift watchers.
-///
-/// Atomic state swap via `ArcSwap`: profiles, calibration, and watchers
-/// are always seen as a consistent unit by all readers.
 #[derive(Clone)]
 pub struct RouterState {
     pub profiles: Vec<SlmProfile>,
-    pub calibration: HashMap<String, ProfileCalibrationState>,
-    pub lyapunov_watchers: HashMap<String, LyapunovDriftWatcher>,
+    pub calibration: BTreeMap<String, ProfileCalibrationState>,
+    pub lyapunov_watchers: BTreeMap<String, LyapunovDriftWatcher>,
 }
 
-/// Router engine that routes queries to optimal SLM backends based on community assignment and search scores.
-///
-/// # Concurrency & Lock Architecture
-/// `RouterEngine` utilizes a deliberate dual-state architecture:
-/// 1. **`state: ArcSwap<RouterState>`**: Stores active SLM profiles, conformal calibration states,
-///    and Lyapunov drift watchers as a single, atomically swapped unit. Readers acquire lock-free
-///    snapshots via `state.load()` / `state.load_full()`, ensuring atomic consistency across hot-reloads,
-///    routing decisions, and conformal updates without blocking concurrent queries.
-/// 2. **`pending_decisions: RwLock<HashMap<DecisionId, (String, Instant)>>`**: Maintained in a separate
-///    `parking_lot::RwLock` specifically to decouple transient decision tracking from core router state.
-///
-/// ### Design Rationale & Safety
-/// Keeping `pending_decisions` outside of `RouterState` is a deliberate, audited architectural decision:
-/// - **Contention Avoidance**: `pending_decisions` experiences high-frequency write activity (insertions on every
-///   routing call, removals on `record_outcome`, periodic pruning in `evict_stale_decisions`). If `pending_decisions`
-///   were included inside `RouterState`, every decision track write would require allocating and cloning the entire
-///   `RouterState` (profiles, calibration maps, Lyapunov score windows) to perform an `ArcSwap::store` or `rcu`.
-/// - **Isolation of Concerns**: Transient pending decision metadata is completely decoupled from statistical
-///   calibration and profile routing consistency. Decisions stored in `pending_decisions` are read/written
-///   independently per `DecisionId` and do not affect the atomic snapshot guarantees of `RouterState`.
-/// - **Concurrency Safety**: This separation presents **zero concurrency risk**. Routing queries read `RouterState`
-///   lock-free and briefly acquire a write lock on `pending_decisions` solely to record decision IDs.
-///
-/// Type-Alias for Backward-Compatibility.
 pub type DefaultRouterEngine = RouterEngine;
 
 pub struct RouterEngine {
     pub(crate) search_provider: Arc<dyn HybridSearchProvider>,
     pub(crate) community_resolver: Arc<dyn CommunityResolver>,
     pub(crate) context_preparer: Arc<dyn ContextPreparer>,
-    /// Atomic state snapshot via `ArcSwap`: active profiles, conformal calibration, and Lyapunov drift
-    /// watchers are maintained together as an immutable, atomically replaceable snapshot.
+    pub(crate) clock: Arc<dyn Clock>,
     pub(crate) state: ArcSwap<RouterState>,
-    /// Intentionally kept in a separate `RwLock` outside of `RouterState`.
-    ///
-    /// **Rationale**: High-frequency writes (decision insertion, `record_outcome` removal, stale eviction)
-    /// would trigger full `RouterState` clones if held within `ArcSwap`. Separating `pending_decisions`
-    /// eliminates state-cloning overhead while keeping transient outcome tracking isolated from core
-    /// routing calibration consistency.
-    pub(crate) pending_decisions: RwLock<HashMap<DecisionId, (String, Instant)>>,
+    pub(crate) pending_decisions: RwLock<BTreeMap<DecisionId, (String, u64)>>,
     pub(crate) decision_ids: DecisionIdGenerator,
     #[cfg(feature = "bandit-routing")]
     pub(crate) routing_strategy: RoutingStrategy,
     #[cfg(feature = "bandit-routing")]
     pub(crate) bandit_exploration: BanditExploration,
     #[cfg(feature = "bandit-routing")]
-    pub(crate) pending_bandit: RwLock<HashMap<DecisionId, PendingBanditDecision>>,
+    pub(crate) pending_bandit: RwLock<BTreeMap<DecisionId, PendingBanditDecision>>,
 }
 
 pub(crate) const COMMUNITY_RELEVANCE_BOOST: f32 = 1.2;
@@ -246,7 +209,7 @@ pub(crate) fn compute_profile_score(
 pub(crate) fn compute_profile_scores(
     profiles: &[SlmProfile],
     chunks: &[(ContextChunk, Option<u64>)],
-) -> HashMap<usize, f32> {
+) -> BTreeMap<usize, f32> {
     profiles
         .iter()
         .enumerate()
@@ -282,7 +245,7 @@ pub(crate) fn select_profile_from_chunks(
         ));
     }
 
-    let mut profile_scores: HashMap<usize, f32> = HashMap::new();
+    let mut profile_scores: BTreeMap<usize, f32> = BTreeMap::new();
     let mut any_community_matched = false;
 
     for (idx, profile) in profiles.iter().enumerate() {
