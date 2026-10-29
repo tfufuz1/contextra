@@ -147,6 +147,9 @@ impl BulkExfiltrationDetector {
 
     /// Registers `payload_len` bytes for `session` and evaluates whether the volume limit
     /// in the current sliding time window was exceeded.
+    ///
+    /// Thread-safe for concurrent MCP requests across multiple sessions or tasks.
+    #[allow(clippy::disallowed_methods)] // ADR-098: Monotonic sliding window timestamp in BulkExfiltrationDetector
     pub fn record_and_check(
         &self,
         session: SessionId,

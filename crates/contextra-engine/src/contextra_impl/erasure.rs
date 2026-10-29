@@ -208,6 +208,15 @@ impl Contextra {
             let lsm_scanners = contextra_store::scanner::lsm_scanners(&storage_arc);
 
             let mut all_scanners: Vec<(String, Arc<dyn LayerScanner>, ScanTechnique)> = Vec::new();
+            for scanner in lsm_scanners {
+                let tech = match scanner.layer() {
+                    WitnessLayer::LsmMemtable => ScanTechnique::IndexIntrospection,
+                    WitnessLayer::SsTableAllLevels => ScanTechnique::Structural,
+                    WitnessLayer::WalAllSegments => ScanTechnique::DecryptedView,
+                    _ => ScanTechnique::Structural,
+                };
+                all_scanners.push((scanner.layer().as_str().to_string(), scanner, tech));
+            }
             all_scanners.push((
                 "TextIndex".to_string(),
                 text_scanner,
@@ -218,15 +227,6 @@ impl Contextra {
                 hnsw_scanner,
                 ScanTechnique::IndexIntrospection,
             ));
-            for scanner in lsm_scanners {
-                let tech = match scanner.layer() {
-                    WitnessLayer::LsmMemtable => ScanTechnique::IndexIntrospection,
-                    WitnessLayer::SsTableAllLevels => ScanTechnique::Structural,
-                    WitnessLayer::WalAllSegments => ScanTechnique::DecryptedView,
-                    _ => ScanTechnique::Structural,
-                };
-                all_scanners.push((scanner.layer().as_str().to_string(), scanner, tech));
-            }
 
             let mut witnesses = Vec::new();
             let mut summaries = Vec::new();
@@ -466,6 +466,15 @@ impl Contextra {
             let lsm_scanners = contextra_store::scanner::lsm_scanners(&storage_arc);
 
             let mut all_scanners: Vec<(String, Arc<dyn LayerScanner>, ScanTechnique)> = Vec::new();
+            for scanner in lsm_scanners {
+                let tech = match scanner.layer() {
+                    WitnessLayer::LsmMemtable => ScanTechnique::IndexIntrospection,
+                    WitnessLayer::SsTableAllLevels => ScanTechnique::Structural,
+                    WitnessLayer::WalAllSegments => ScanTechnique::DecryptedView,
+                    _ => ScanTechnique::Structural,
+                };
+                all_scanners.push((scanner.layer().as_str().to_string(), scanner, tech));
+            }
             all_scanners.push((
                 "TextIndex".to_string(),
                 text_scanner,
@@ -476,15 +485,6 @@ impl Contextra {
                 hnsw_scanner,
                 ScanTechnique::IndexIntrospection,
             ));
-            for scanner in lsm_scanners {
-                let tech = match scanner.layer() {
-                    WitnessLayer::LsmMemtable => ScanTechnique::IndexIntrospection,
-                    WitnessLayer::SsTableAllLevels => ScanTechnique::Structural,
-                    WitnessLayer::WalAllSegments => ScanTechnique::DecryptedView,
-                    _ => ScanTechnique::Structural,
-                };
-                all_scanners.push((scanner.layer().as_str().to_string(), scanner, tech));
-            }
 
             let mut witnesses = Vec::new();
             let mut summaries = Vec::new();

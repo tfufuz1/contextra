@@ -1,4 +1,5 @@
 // FILE-CONTEXT
+// STAND: 2026-10-29
 // ZWECK: Outcome-Recording, Kalibrierungs- und Drift-Statistiken für RouterEngine.
 // INVARIANTEN: Conformal recalibration & Bounded pending decisions eviction.
 
@@ -12,7 +13,7 @@ impl RouterEngine {
     }
 
     /// Gibt aktuelle Kalibrierungsstatistik für alle Profile zurück.
-    pub fn calibration_stats(&self) -> HashMap<String, ProfileCalibrationState> {
+    pub fn calibration_stats(&self) -> BTreeMap<String, ProfileCalibrationState> {
         self.state.load().calibration.clone()
     }
 
@@ -38,7 +39,6 @@ impl RouterEngine {
     }
 
     /// Gives a human-readable summary string of Lyapunov drift status across active profile watchers.
-    /// Priority order: "kritisch" > "warnung" > "stabil" > "unbekannt".
     pub fn overall_drift_status(&self) -> String {
         let state = self.state.load();
         if state.lyapunov_watchers.is_empty() {
@@ -79,32 +79,28 @@ impl RouterEngine {
     }
 
     pub(super) fn evict_stale_decisions(&self) {
-        let now = Instant::now();
-        let cutoff = now.checked_sub(PENDING_DECISION_TTL);
+        let now_nanos = self.clock.monotonic_nanos();
+        let ttl_nanos = PENDING_DECISION_TTL.as_secs().saturating_mul(1_000_000_000);
         let mut map = self.pending_decisions.write();
         if map.len() >= MAX_PENDING_DECISIONS {
-            if let Some(cutoff) = cutoff {
-                map.retain(|_, (_, ts)| *ts > cutoff);
-            }
+            let sample_ts = map.values().next().map(|(_, ts)| *ts).unwrap_or(0);
+            eprintln!("EVICTING: len={}, now={}, sample_ts={}, diff={}, ttl={}", map.len(), now_nanos, sample_ts, now_nanos.saturating_sub(sample_ts), ttl_nanos);
+            map.retain(|_, (_, ts)| now_nanos.saturating_sub(*ts) <= ttl_nanos);
         }
 
         #[cfg(feature = "bandit-routing")]
         {
             let mut bandit_map = self.pending_bandit.write();
             if bandit_map.len() >= MAX_PENDING_DECISIONS {
-                if let Some(cutoff) = cutoff {
-                    bandit_map.retain(|_, decision| decision.created > cutoff);
-                }
+                bandit_map.retain(|_, decision| {
+                    now_nanos.saturating_sub(decision.created_nanos) <= ttl_nanos
+                });
             }
         }
     }
 
     /// Muss vom Aufrufer (Agent-Loop) nach Abschluss des SLM-Aufrufs aufgerufen werden.
-    /// Liefert das tatsächliche Ergebnis zurück und trainiert die Kalibrierung
-    /// mit einem echten Ground-Truth-Signal.
-    ///
-    /// Gibt true zurück wenn die Decision gefunden und verarbeitet wurde,
-    /// false wenn die DecisionId unbekannt ist (z.B. nach Restart).
+    /// Liefert das tatsächliche Ergebnis zurück und trainiert die Kalibrierung.
     pub fn record_outcome(&self, decision_id: DecisionId, outcome: RoutingOutcome) -> bool {
         let profile_name = match self.pending_decisions.write().remove(&decision_id) {
             Some((name, _ts)) => name,
@@ -184,8 +180,7 @@ impl RouterEngine {
         true
     }
 
-    /// Anzahl offener (noch nicht mit record_outcome() abgeschlossener) Decisions.
-    /// Sollte in normaler Laufzeit nahe 0 bleiben.
+    /// Anzahl offener Decisions.
     pub fn pending_decision_count(&self) -> usize {
         self.pending_decisions.read().len()
     }

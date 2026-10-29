@@ -1,10 +1,216 @@
 // FILE-CONTEXT
+// STAND: 2026-10-29
 // ZWECK: Kern-Routing-Dispatch und Kaskaden-/Bandit-Profilauswahl für RouterEngine.
 // INVARIANTEN: Atomare Snapshot-Sicherheit via ArcSwap, NaN-Safety bei Distanz-Eingaben.
 
 use super::*;
 
+pub(crate) type SelectionResult = (
+    SlmProfile,
+    Option<ConfidenceMetrics>,
+    Option<(u32, f32)>,
+);
+
 impl RouterEngine {
+    /// Fetches search results and resolves graph communities for each result chunk.
+    async fn fetch_and_enrich_chunks(
+        &self,
+        query_embedding: &[f32],
+        query_text: &str,
+    ) -> Result<Vec<(ContextChunk, Option<u64>)>> {
+        let search_chunks = self
+            .search_provider
+            .search_hybrid(query_text, query_embedding, 10)
+            .await?;
+
+        if search_chunks.is_empty() {
+            return Err(ContextraError::NotFound(
+                "Keine relevanten Suchergebnisse für Routing gefunden".to_string(),
+            ));
+        }
+
+        let mut chunks = Vec::with_capacity(search_chunks.len());
+        for chunk in search_chunks {
+            let eid = EntityId::from_doc_id(chunk.doc_id);
+            let comm_id = self
+                .community_resolver
+                .get_community(eid)
+                .await
+                .ok()
+                .flatten();
+            chunks.push((chunk, comm_id));
+        }
+
+        Ok(chunks)
+    }
+
+    /// Constructs ConfidenceMetrics for a selected profile.
+    fn build_confidence_metrics(
+        state: &ProfileCalibrationState,
+        best_score: f32,
+        confidence_ratio: f32,
+        non_conformity: f32,
+    ) -> ConfidenceMetrics {
+        let calibrated = state.conformal.window_total >= CALIBRATION_WARMUP_WINDOW as u64;
+        ConfidenceMetrics {
+            score_lower: if calibrated {
+                Some(best_score * (1.0 - state.conformal.alpha))
+            } else {
+                None
+            },
+            score_upper: if calibrated {
+                Some(best_score * (1.0 + state.conformal.alpha))
+            } else {
+                None
+            },
+            calibrated,
+            quantile_threshold: state.conformal.quantile_threshold,
+            non_conformity_score: non_conformity,
+            selection_margin: confidence_ratio,
+        }
+    }
+
+    /// Evaluates profile candidate selection and updates calibration confidence stats.
+    fn calculate_routing_selection(
+        &self,
+        profiles: &[SlmProfile],
+        chunks: &[(ContextChunk, Option<u64>)],
+        _query_embedding: &[f32],
+        cal: &mut BTreeMap<String, ProfileCalibrationState>,
+    ) -> Result<SelectionResult> {
+        let effective_profiles: Vec<SlmProfile> = profiles
+            .iter()
+            .map(|p| {
+                let mut ep = p.clone();
+                if let Some(state) = cal.get_mut(&p.name) {
+                    state.check_and_invalidate_fingerprint(p.fingerprint.as_ref());
+                    if state.is_calibrated(p.fingerprint.as_ref()) {
+                        ep.min_relevance_score = state.calibrated_min_score;
+                    }
+                }
+                ep
+            })
+            .collect();
+
+        #[cfg(feature = "bandit-routing")]
+        let bandit_selection = if matches!(self.routing_strategy, RoutingStrategy::ContextualBandit)
+        {
+            self.select_profile_bandit(chunks, &effective_profiles, _query_embedding)
+        } else {
+            None
+        };
+        #[cfg(not(feature = "bandit-routing"))]
+        let bandit_selection: Option<(usize, SlmProfile, u32, f32)> = None;
+
+        let (selected_idx, selected_profile, is_bandit) =
+            if let Some((idx, profile, action_idx, propensity)) = bandit_selection {
+                (idx, profile, Some((action_idx, propensity)))
+            } else {
+                let (idx, profile, _) =
+                    self.select_profile_cascade(chunks, &effective_profiles, cal)?;
+                (idx, profile, None)
+            };
+
+        let profile_scores = compute_profile_scores(profiles, chunks);
+        let best_score = profile_scores.get(&selected_idx).copied().unwrap_or(0.0);
+        let second_best = profile_scores
+            .iter()
+            .filter(|(idx, _)| **idx != selected_idx)
+            .map(|(_, s)| *s)
+            .fold(0.0f32, f32::max);
+
+        let confidence_ratio: f32 = if second_best > 0.0 {
+            best_score / second_best
+        } else {
+            2.0
+        };
+
+        let non_conformity = if best_score > 0.0 {
+            (1.0 / confidence_ratio.max(f32::EPSILON)).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+
+        if let Some(state) = cal.get_mut(&selected_profile.name) {
+            state.times_selected += 1;
+            state.cumulative_confidence += f64::from(confidence_ratio);
+        }
+
+        let metrics = cal
+            .get(&selected_profile.name)
+            .map(|state| Self::build_confidence_metrics(state, best_score, confidence_ratio, non_conformity));
+
+        Ok((selected_profile, metrics, is_bandit))
+    }
+
+    /// Records pending decision entry into pending_decisions and pending_bandit.
+    fn record_pending_decision(
+        &self,
+        decision_id: DecisionId,
+        selected_profile_name: &str,
+        _query_embedding: &[f32],
+        _is_bandit: Option<(u32, f32)>,
+        now_nanos: u64,
+    ) {
+        self.pending_decisions
+            .write()
+            .insert(decision_id, (selected_profile_name.to_string(), now_nanos));
+
+        #[cfg(feature = "bandit-routing")]
+        if let Some((action_idx, propensity)) = _is_bandit {
+            self.pending_bandit.write().insert(
+                decision_id,
+                PendingBanditDecision {
+                    context: _query_embedding.to_vec(),
+                    profile_name: selected_profile_name.to_string(),
+                    action_idx,
+                    propensity,
+                    created_nanos: now_nanos,
+                },
+            );
+        }
+    }
+
+    /// Updates Lyapunov drift watchers for the selected profile and handles drift side effects.
+    fn update_lyapunov_drift(
+        watchers: &mut BTreeMap<String, LyapunovDriftWatcher>,
+        selected_profile_name: &str,
+        _profiles: &mut [SlmProfile],
+        non_conformity_score: f32,
+    ) -> Option<LyapunovResult> {
+        let watcher = watchers.get_mut(selected_profile_name)?;
+        watcher.observe_score(non_conformity_score);
+        let res = watcher.analyze();
+
+        if let LyapunovResult::DriftDetected {
+            lyapunov_exponent,
+            ref reason,
+        } = res
+        {
+            tracing::warn!(
+                profile = %selected_profile_name,
+                lambda = lyapunov_exponent,
+                kl_divergence = reason.kl_divergence,
+                "Lyapunov drift detected — calibration may be stale"
+            );
+
+            #[cfg(feature = "bandit-routing")]
+            {
+                let k_drift = (1.0 + lyapunov_exponent.max(0.0)).clamp(1.5, 4.0);
+                if let Some(profile_state) = _profiles.iter_mut().find(|p| p.name == selected_profile_name) {
+                    if let Some(ref mut bstate) = profile_state.bandit_state {
+                        bstate.on_drift_detected(k_drift);
+                    }
+                }
+            }
+        }
+
+        match res {
+            LyapunovResult::InsufficientData => None,
+            status => Some(status),
+        }
+    }
+
     /// Routes a query with embedding and text to the best matching SLM profile.
     #[allow(deprecated)]
     pub async fn route(
@@ -20,7 +226,6 @@ impl RouterEngine {
             ));
         }
 
-        // Snapshot state atomically via ArcSwap to guarantee caller consistency during hot-reloads
         let state_snap = self.state.load_full();
         let profiles = state_snap.profiles.clone();
 
@@ -30,205 +235,46 @@ impl RouterEngine {
             ));
         }
 
-        // 1. Perform hybrid search with standard fusion weights
-        let search_chunks = self
-            .search_provider
-            .search_hybrid(query_text, query_embedding, 10)
+        let chunks = self
+            .fetch_and_enrich_chunks(query_embedding, query_text)
             .await?;
 
-        if search_chunks.is_empty() {
-            return Err(ContextraError::NotFound(
-                "Keine relevanten Suchergebnisse für Routing gefunden".to_string(),
-            ));
-        }
-
-        // 2. Identify communities and score candidate profiles
-        let mut chunks: Vec<(ContextChunk, Option<u64>)> = Vec::new();
-
-        for chunk in search_chunks {
-            let eid = EntityId::from_doc_id(chunk.doc_id);
-            let comm_id = self
-                .community_resolver
-                .get_community(eid)
-                .await
-                .ok()
-                .flatten();
-            chunks.push((chunk, comm_id));
-        }
-
-        // 3. Perform profile selection, scoring, calibration tracking, and confidence metric generation
-        // using an updated state snapshot swapped atomically via ArcSwap.
         let current_state = self.state.load_full();
         let mut new_state = (*current_state).clone();
 
-        let (selected_profile, confidence_metrics, _is_bandit_decision) = {
-            let cal = &mut new_state.calibration;
-
-            // 1. Derive effective profiles using calibrated_min_score from calibration state
-            let effective_profiles: Vec<SlmProfile> = profiles
-                .iter()
-                .map(|p| {
-                    let mut ep = p.clone();
-                    if let Some(state) = cal.get_mut(&p.name) {
-                        state.check_and_invalidate_fingerprint(p.fingerprint.as_ref());
-                        if state.is_calibrated(p.fingerprint.as_ref()) {
-                            ep.min_relevance_score = state.calibrated_min_score;
-                        }
-                    }
-                    ep
-                })
-                .collect();
-
-            // 2. Profile Selection: Bandit (opt-in) or Cascade (default)
-            #[cfg(feature = "bandit-routing")]
-            let bandit_selection =
-                if matches!(self.routing_strategy, RoutingStrategy::ContextualBandit) {
-                    self.select_profile_bandit(&chunks, &effective_profiles, query_embedding)
-                } else {
-                    None
-                };
-            #[cfg(not(feature = "bandit-routing"))]
-            let bandit_selection: Option<(usize, SlmProfile, u32, f32)> = None;
-
-            let (selected_idx, selected_profile, is_bandit_decision) =
-                if let Some((idx, profile, action_idx, propensity)) = bandit_selection {
-                    (idx, profile, Some((action_idx, propensity)))
-                } else {
-                    let (idx, profile, _) =
-                        self.select_profile_cascade(&chunks, &effective_profiles, cal)?;
-                    (idx, profile, None)
-                };
-
-            let profile_scores = compute_profile_scores(&profiles, &chunks);
-            let best_score = profile_scores.get(&selected_idx).copied().unwrap_or(0.0);
-            let second_best = profile_scores
-                .iter()
-                .filter(|(idx, _)| **idx != selected_idx)
-                .map(|(_, s)| *s)
-                .fold(0.0f32, f32::max);
-
-            let confidence_ratio = if second_best > 0.0 {
-                (best_score / second_best) as f64
-            } else {
-                2.0 // Single candidate -> high confidence
-            };
-
-            let non_conformity = if best_score > 0.0 {
-                (1.0 / confidence_ratio as f32).clamp(0.0, 1.0)
-            } else {
-                1.0
-            };
-
-            if let Some(state) = cal.get_mut(&selected_profile.name) {
-                state.times_selected += 1;
-                state.cumulative_confidence += confidence_ratio;
-            }
-
-            // 4. Construct ConfidenceMetrics from updated state
-            let metrics = cal.get(&selected_profile.name).map(|state| {
-                let calibrated = state.conformal.window_total >= CALIBRATION_WARMUP_WINDOW as u64;
-                if !calibrated {
-                    tracing::info!(
-                        profile = %selected_profile.name,
-                        samples = state.conformal.window_total,
-                        required = CALIBRATION_WARMUP_WINDOW,
-                        "Router in random-fallback mode: calibration not yet reliable"
-                    );
-                }
-                ConfidenceMetrics {
-                    score_lower: if calibrated {
-                        Some(best_score * (1.0 - state.conformal.alpha))
-                    } else {
-                        None
-                    },
-                    score_upper: if calibrated {
-                        Some(best_score * (1.0 + state.conformal.alpha))
-                    } else {
-                        None
-                    },
-                    calibrated,
-                    quantile_threshold: state.conformal.quantile_threshold,
-                    non_conformity_score: non_conformity,
-                    selection_margin: confidence_ratio as f32,
-                }
-            });
-
-            (selected_profile, metrics, is_bandit_decision)
-        };
+        let (selected_profile, confidence_metrics, is_bandit_decision) = self
+            .calculate_routing_selection(
+                &profiles,
+                &chunks,
+                query_embedding,
+                &mut new_state.calibration,
+            )?;
 
         let decision_id = self.decision_ids.next();
-        self.pending_decisions
-            .write()
-            .insert(decision_id, (selected_profile.name.clone(), Instant::now()));
+        let now_nanos = self.clock.monotonic_nanos();
+        self.record_pending_decision(
+            decision_id,
+            &selected_profile.name,
+            query_embedding,
+            is_bandit_decision,
+            now_nanos,
+        );
 
-        #[cfg(feature = "bandit-routing")]
-        if let Some((action_idx, propensity)) = _is_bandit_decision {
-            self.pending_bandit.write().insert(
-                decision_id,
-                PendingBanditDecision {
-                    context: query_embedding.to_vec(),
-                    profile_name: selected_profile.name.clone(),
-                    action_idx,
-                    propensity,
-                    created: Instant::now(),
-                },
-            );
-        }
-
-        // 4. Construct ContextWindow using ContextManager tailored to selected_profile.token_budget and min_relevance_score
-        let raw_chunks: Vec<ContextChunk> = chunks.into_iter().map(|(c, _)| c).collect();
-
-        // 5. Update Lyapunov Drift Watcher with non-conformity score
         let non_conformity_score = confidence_metrics
             .as_ref()
             .map(|m| m.non_conformity_score)
             .unwrap_or(1.0);
 
-        let drift_status = {
-            let watchers = &mut new_state.lyapunov_watchers;
-            if let Some(watcher) = watchers.get_mut(&selected_profile.name) {
-                watcher.observe_score(non_conformity_score);
-                let res = watcher.analyze();
+        let drift_status = Self::update_lyapunov_drift(
+            &mut new_state.lyapunov_watchers,
+            &selected_profile.name,
+            &mut new_state.profiles,
+            non_conformity_score,
+        );
 
-                if let LyapunovResult::DriftDetected {
-                    lyapunov_exponent,
-                    ref reason,
-                } = res
-                {
-                    tracing::warn!(
-                        profile = %selected_profile.name,
-                        lambda = lyapunov_exponent,
-                        kl_divergence = reason.kl_divergence,
-                        "Lyapunov drift detected — conformal calibration may be stale"
-                    );
-
-                    #[cfg(feature = "bandit-routing")]
-                    {
-                        let k_drift = (1.0 + lyapunov_exponent.max(0.0)).clamp(1.5, 4.0);
-                        if let Some(profile_state) = new_state
-                            .profiles
-                            .iter_mut()
-                            .find(|p| p.name == selected_profile.name)
-                        {
-                            if let Some(ref mut bstate) = profile_state.bandit_state {
-                                bstate.on_drift_detected(k_drift);
-                            }
-                        }
-                    }
-                }
-
-                match res {
-                    LyapunovResult::InsufficientData => None,
-                    status => Some(status),
-                }
-            } else {
-                None
-            }
-        };
-
-        // Store updated state atomically via ArcSwap
         self.state.store(Arc::new(new_state));
 
+        let raw_chunks: Vec<ContextChunk> = chunks.into_iter().map(|(c, _)| c).collect();
         let context_window = self.context_preparer.prepare_context(
             raw_chunks,
             &selected_profile.token_budget,
@@ -244,28 +290,12 @@ impl RouterEngine {
         })
     }
 
-    /// Kalibriertes Kaskaden-Routing.
-    ///
-    /// Algorithmus:
-    /// 1. Sortiere Profile absteigend nach min_relevance_score (präzisestes zuerst).
-    /// 2. Für jedes Profil in dieser Reihenfolge:
-    ///    - Berechne Aggregat-Score der Chunks (existing logic)
-    ///    - Hole ConformalCalibrator für dieses Profil aus self.calibration
-    ///    - Prüfe: score >= calibrator.quantile_threshold (oder profile.min_relevance_score)
-    ///      JA: Dieses Profil nehmen, ConfidenceMetrics::Calibrated
-    ///      NEIN: Weiter zum nächsten Profil (Kaskade)
-    /// 3. Falls kein Profil den kalibrierten Schwellenwert erfüllt:
-    ///    - Nehme das letzte (geringstes min_relevance_score) als sicheren Fallback
-    ///    - ConfidenceMetrics::Uncalibrated, tracing::warn! ausgeben
-    ///
-    /// # Returns
-    /// (profil_index, SlmProfile, ConfidenceMetrics)
-    pub(crate) fn select_profile_cascade(
+    /// Filters profiles matching community rules and sorts candidates descending by threshold score.
+    fn filter_and_sort_cascade_candidates(
         &self,
         chunks: &[(ContextChunk, Option<u64>)],
         profiles: &[SlmProfile],
-        calibration: &mut HashMap<String, ProfileCalibrationState>,
-    ) -> Result<(usize, SlmProfile, ConfidenceMetrics)> {
+    ) -> Result<Vec<(usize, SlmProfile)>> {
         if chunks.is_empty() {
             return Err(ContextraError::NotFound(
                 "Keine gültigen Chunks aus Suchergebnissen ermittelbar".to_string(),
@@ -287,9 +317,7 @@ impl RouterEngine {
             ));
         }
 
-        // Filter profiles by community match eligibility.
-        // A profile is eligible if its domain_communities is empty, OR if at least one chunk matches one of its domain_communities.
-        let eligible_profiles: Vec<(usize, &SlmProfile)> = profiles
+        let eligible: Vec<(usize, SlmProfile)> = profiles
             .iter()
             .enumerate()
             .filter(|(_, profile)| {
@@ -298,18 +326,17 @@ impl RouterEngine {
                         comm_id.is_some_and(|cid| profile.domain_communities.contains(&cid))
                     })
             })
+            .map(|(idx, profile)| (idx, profile.clone()))
             .collect();
 
-        if eligible_profiles.is_empty() {
+        if eligible.is_empty() {
             return Err(ContextraError::NotFound(
                 "Kein SLM-Profil entspricht der Community-Zuordnung".to_string(),
             ));
         }
 
-        // 1. Sort eligible profile indices descending by min_relevance_score (most precise first).
-        // Tie-breaking: when min_relevance_scores are equal, candidate score descending, then lower original index.
-        let mut sorted_profiles = eligible_profiles.clone();
-        sorted_profiles.sort_by(|(idx_a, a), (idx_b, b)| {
+        let mut sorted = eligible;
+        sorted.sort_by(|(idx_a, a), (idx_b, b)| {
             b.min_relevance_score
                 .total_cmp(&a.min_relevance_score)
                 .then_with(|| {
@@ -319,8 +346,17 @@ impl RouterEngine {
                 })
         });
 
-        // 2. Cascade evaluation in descending min_relevance_score order
-        for &(orig_idx, profile) in &sorted_profiles {
+        Ok(sorted)
+    }
+
+    /// Evaluates cascade profiles against calibrated thresholds.
+    fn evaluate_cascade_thresholds(
+        &self,
+        sorted_profiles: &[(usize, SlmProfile)],
+        chunks: &[(ContextChunk, Option<u64>)],
+        calibration: &mut BTreeMap<String, ProfileCalibrationState>,
+    ) -> Option<(usize, SlmProfile, ConfidenceMetrics)> {
+        for (orig_idx, profile) in sorted_profiles {
             let score = compute_profile_score(profile, chunks);
             let state = calibration.get_mut(&profile.name);
 
@@ -364,27 +400,29 @@ impl RouterEngine {
                     non_conformity_score: non_conformity,
                     selection_margin,
                 };
-                return Ok((orig_idx, profile.clone(), confidence));
+                return Some((*orig_idx, profile.clone(), confidence));
             }
         }
+        None
+    }
 
-        // Während der Warmup-Periode (calibrated == false) wird bewusst konservativ geroutet:
-        // das ressourcenschonendste Profil wird gewählt, um Kostenrisiken bei fehlender
-        // statistischer Absicherung zu minimieren.
-        let &(fallback_idx, fallback_profile) =
-            match eligible_profiles.iter().min_by(|(idx_a, a), (idx_b, b)| {
+    /// Evaluates lowest-cost fallback when no cascade profile meets the threshold.
+    fn evaluate_cascade_fallback(
+        &self,
+        eligible: &[(usize, SlmProfile)],
+        chunks: &[(ContextChunk, Option<u64>)],
+        calibration: &BTreeMap<String, ProfileCalibrationState>,
+    ) -> Result<(usize, SlmProfile, ConfidenceMetrics)> {
+        let &(fallback_idx, ref fallback_profile) = eligible
+            .iter()
+            .min_by(|(idx_a, a), (idx_b, b)| {
                 a.estimated_cost()
                     .total_cmp(&b.estimated_cost())
                     .then_with(|| a.min_relevance_score.total_cmp(&b.min_relevance_score))
                     .then_with(|| idx_a.cmp(idx_b))
-            }) {
-                Some(p) => p,
-                None => {
-                    return Err(ContextraError::NotFound(
-                        "Keine SLM-Profile konfiguriert".to_string(),
-                    ));
-                }
-            };
+            })
+            .ok_or_else(|| ContextraError::NotFound("Keine SLM-Profile konfiguriert".to_string()))?;
+
         let fallback_score = compute_profile_score(fallback_profile, chunks);
         let state = calibration.get(&fallback_profile.name);
         let (q_threshold, alpha, is_calibrated) = match state {
@@ -405,7 +443,7 @@ impl RouterEngine {
 
         tracing::warn!(
             profile = %fallback_profile.name,
-            "Kaskaden-Fallback: Kein Profil über Schwellenwert, nutze Profil mit niedrigstem min_relevance_score"
+            "Kaskaden-Fallback: Kein Profil über Schwellenwert"
         );
 
         let confidence = ConfidenceMetrics {
@@ -428,57 +466,36 @@ impl RouterEngine {
         Ok((fallback_idx, fallback_profile.clone(), confidence))
     }
 
-    #[cfg(feature = "bandit-routing")]
-    /// Contextual Bandit Profilauswahl via LinUCB / Sherman-Morrison (§13.2, §8.5, AK-15).
-    ///
-    /// Algorithmus:
-    /// 1. Filter eligible profiles based on community matching (identical eligibility to cascade).
-    /// 2. For each eligible profile, evaluate bandit_state.score(x = query_embedding, cost = estimated_cost(), is_cloud).
-    /// 3. Fail-safe: If any eligible profile has bandit_state == None or returns BanditError/NaN,
-    ///    issue tracing::warn! and return None (falling back to Cascade without panic).
-    /// 4. Greedy choice = profile with highest score (total_cmp, tie-breaker smallest original index).
-    /// 5. Randomized logging policy with clamped epsilon (max(epsilon, 0.01 * K).min(1.0)) for propensity >= 0.01 guarantee.
-    /// 6. Return Some((selected_orig_idx, selected_profile, action_idx, propensity)).
-    pub(crate) fn select_profile_bandit(
+    /// Kalibriertes Kaskaden-Routing.
+    pub(crate) fn select_profile_cascade(
         &self,
         chunks: &[(ContextChunk, Option<u64>)],
         profiles: &[SlmProfile],
+        calibration: &mut BTreeMap<String, ProfileCalibrationState>,
+    ) -> Result<(usize, SlmProfile, ConfidenceMetrics)> {
+        let sorted_candidates = self.filter_and_sort_cascade_candidates(chunks, profiles)?;
+
+        if let Some(selected) =
+            self.evaluate_cascade_thresholds(&sorted_candidates, chunks, calibration)
+        {
+            return Ok(selected);
+        }
+
+        self.evaluate_cascade_fallback(&sorted_candidates, chunks, calibration)
+    }
+
+    #[cfg(feature = "bandit-routing")]
+    /// Evaluates bandit scores for eligible profiles.
+    fn evaluate_bandit_profile_scores(
+        &self,
+        eligible_profiles: &[(usize, &SlmProfile)],
         query_embedding: &[f32],
-    ) -> Option<(usize, SlmProfile, u32, f32)> {
-        use contextra_adapt::offpolicy::RandomizedLoggingPolicy;
+    ) -> Option<Vec<(usize, SlmProfile, f32)>> {
+        let mut profile_scores = Vec::with_capacity(eligible_profiles.len());
 
-        if profiles.is_empty() || chunks.is_empty() {
-            return None;
-        }
-
-        // Filter profiles by community match eligibility (matching select_profile_cascade logic)
-        let eligible_profiles: Vec<(usize, &SlmProfile)> = profiles
-            .iter()
-            .enumerate()
-            .filter(|(_, profile)| {
-                profile.domain_communities.is_empty()
-                    || chunks.iter().any(|(_, comm_id)| {
-                        comm_id.is_some_and(|cid| profile.domain_communities.contains(&cid))
-                    })
-            })
-            .collect();
-
-        if eligible_profiles.is_empty() {
-            return None;
-        }
-
-        let num_actions = eligible_profiles.len() as u32;
-
-        // Evaluate scores for each eligible profile
-        let mut profile_scores: Vec<(usize, &SlmProfile, f32)> =
-            Vec::with_capacity(eligible_profiles.len());
-
-        for &(orig_idx, profile) in &eligible_profiles {
+        for &(orig_idx, profile) in eligible_profiles {
             let Some(ref bstate) = profile.bandit_state else {
-                tracing::warn!(
-                    profile = %profile.name,
-                    "Bandit-Dispatch Fallback auf Cascade: Profil besitzt keinen bandit_state"
-                );
+                tracing::warn!(profile = %profile.name, "Bandit-Fallback: Profil besitzt keinen bandit_state");
                 return None;
             };
 
@@ -490,7 +507,7 @@ impl RouterEngine {
             let cost = profile.estimated_cost();
             match bstate.score(query_embedding, cost, is_cloud) {
                 Ok(score) if score.is_finite() => {
-                    profile_scores.push((orig_idx, profile, score));
+                    profile_scores.push((orig_idx, profile.clone(), score));
                 }
                 Ok(non_finite) => {
                     tracing::warn!(
@@ -512,40 +529,77 @@ impl RouterEngine {
             }
         }
 
-        // Greedy choice: action index in 0..num_actions with highest score
+        Some(profile_scores)
+    }
+
+    #[cfg(feature = "bandit-routing")]
+    /// Selects bandit action using randomized logging policy.
+    fn choose_bandit_action(
+        &self,
+        profile_scores: &[(usize, SlmProfile, f32)],
+        num_actions: u32,
+    ) -> (usize, SlmProfile, u32, f32) {
+        use contextra_adapt::offpolicy::RandomizedLoggingPolicy;
+
         let greedy_action_idx = profile_scores
             .iter()
             .enumerate()
-            .max_by(
-                |(_, (orig_idx_a, _, score_a)), (_, (orig_idx_b, _, score_b))| {
-                    score_a
-                        .total_cmp(score_b)
-                        .then_with(|| orig_idx_b.cmp(orig_idx_a))
-                },
-            )
+            .max_by(|(_, (idx_a, _, score_a)), (_, (idx_b, _, score_b))| {
+                score_a
+                    .total_cmp(score_b)
+                    .then_with(|| idx_b.cmp(idx_a))
+            })
             .map(|(action_idx, _)| action_idx as u32)
             .unwrap_or(0);
 
-        // Clamp epsilon to guarantee propensity >= 0.01 per action (AK-15, Spec §8.5)
-        // Since uniform exploration distributes epsilon / K across K actions,
-        // we require epsilon / K >= 0.01 => epsilon >= 0.01 * K
-        let base_epsilon = self.bandit_exploration.epsilon;
         let min_epsilon = 0.01 * (num_actions as f32);
-        let clamped_epsilon = base_epsilon.max(min_epsilon).min(1.0);
+        let clamped_epsilon = self.bandit_exploration.epsilon.max(min_epsilon).min(1.0);
 
         let logging_policy = RandomizedLoggingPolicy::new(clamped_epsilon, num_actions);
         let sample = self.bandit_exploration.next_sample();
         let (selected_action_idx, propensity) =
             logging_policy.select_action(greedy_action_idx, sample);
 
-        let selected_action_usize = (selected_action_idx as usize).min(profile_scores.len() - 1);
-        let (orig_idx, selected_profile, _score) = profile_scores[selected_action_usize];
+        let selected_usize = (selected_action_idx as usize).min(profile_scores.len() - 1);
+        let (orig_idx, ref selected_profile, _) = profile_scores[selected_usize];
 
-        Some((
+        (
             orig_idx,
             selected_profile.clone(),
             selected_action_idx,
             propensity,
-        ))
+        )
+    }
+
+    #[cfg(feature = "bandit-routing")]
+    /// Contextual Bandit Profilauswahl via LinUCB / Sherman-Morrison (§13.2, §8.5, AK-15).
+    pub(crate) fn select_profile_bandit(
+        &self,
+        chunks: &[(ContextChunk, Option<u64>)],
+        profiles: &[SlmProfile],
+        query_embedding: &[f32],
+    ) -> Option<(usize, SlmProfile, u32, f32)> {
+        if profiles.is_empty() || chunks.is_empty() {
+            return None;
+        }
+
+        let eligible_profiles: Vec<(usize, &SlmProfile)> = profiles
+            .iter()
+            .enumerate()
+            .filter(|(_, profile)| {
+                profile.domain_communities.is_empty()
+                    || chunks.iter().any(|(_, comm_id)| {
+                        comm_id.is_some_and(|cid| profile.domain_communities.contains(&cid))
+                    })
+            })
+            .collect();
+
+        if eligible_profiles.is_empty() {
+            return None;
+        }
+
+        let num_actions = eligible_profiles.len() as u32;
+        let profile_scores = self.evaluate_bandit_profile_scores(&eligible_profiles, query_embedding)?;
+        Some(self.choose_bandit_action(&profile_scores, num_actions))
     }
 }

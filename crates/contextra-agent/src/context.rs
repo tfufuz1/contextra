@@ -14,7 +14,7 @@ use contextra_db::{Collection, Contextra};
 use contextra_store::LsmStorage;
 use contextra_types::error::{CacheDirective, StepId};
 use contextra_types::{ContextraError, Result, TokenBudget};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 
 /// Maximum allowed length in bytes for task IDs and node IDs.
@@ -70,27 +70,38 @@ pub fn validate_node_id(node_id: &str) -> Result<()> {
 /// Operational status of an agent workflow.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AgentStatus {
+    /// Agent workflow has been initialized but is not actively running.
     Idle,
+    /// Agent workflow is actively executing graph step transitions.
     Running,
+    /// Agent workflow reached a terminal `End` node successfully.
     Completed,
+    /// Agent workflow encountered an unrecoverable step or system failure.
     Failed,
 }
 
 /// Operational context spanning the entire workflow execution.
 pub struct AgentContext {
+    /// Unique task identifier for this agent workflow run.
     pub task_id: String,
+    /// Active graph node identifier currently being evaluated.
     pub current_node: String,
+    /// Total number of workflow steps completed so far.
     pub step_count: u64,
+    /// Contextra DB handle providing collection storage.
     pub db: Arc<Contextra>,
+    /// State storage collection where workflow history and audit traces are persisted.
     pub state_collection: Arc<Collection<LsmStorage>>,
+    /// Token budget manager enforcing execution cost limits.
     pub budget: TokenBudget,
+    /// Active operational status of the workflow execution.
     pub status: AgentStatus,
     /// Active cache directive for the current workflow step.
     pub current_cache_directive: CacheDirective,
     /// History of cache directives set per step ID.
-    pub step_directives: HashMap<u64, CacheDirective>,
+    pub step_directives: BTreeMap<u64, CacheDirective>,
     /// Accumulates results and state transfers between steps.
-    pub memory: HashMap<String, serde_json::Value>,
+    pub memory: BTreeMap<String, serde_json::Value>,
     /// History of attached background telemetry events.
     pub events: VecDeque<crate::event_source::BackgroundEvent>,
     /// Offene Routing-Entscheidung, deren Ergebnis nach Tool-Ausführung zurückgemeldet werden soll.
@@ -138,8 +149,8 @@ impl AgentContext {
             budget,
             status: AgentStatus::Idle,
             current_cache_directive: CacheDirective::Auto,
-            step_directives: HashMap::new(),
-            memory: HashMap::new(),
+            step_directives: BTreeMap::new(),
+            memory: BTreeMap::new(),
             events: VecDeque::new(),
             pending_routing_decision: None,
             clm_scratchpad: None,
@@ -260,8 +271,35 @@ impl AgentEngine {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::cast_sign_loss,
+    clippy::disallowed_methods,
+    clippy::unreachable,
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation
+)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_agent_context_cache_directives() {
+        let ctx_stub = AgentEngine::new();
+        let step_id = StepId::new(42);
+
+        let system_dir = ctx_stub.directive_for_step("system_prompt_node", step_id);
+        assert!(matches!(system_dir, CacheDirective::Pin { ttl: None }));
+
+        let transient_dir = ctx_stub.directive_for_step("reasoning_step", step_id);
+        assert!(matches!(
+            transient_dir,
+            CacheDirective::ReleaseAfterStep { .. }
+        ));
+
+        let default_dir = ctx_stub.directive_for_step("standard_step", step_id);
+        assert_eq!(default_dir, CacheDirective::Auto);
+    }
 
     #[tokio::test]
     async fn test_agent_context_with_clm_scratchpad() -> contextra_types::Result<()> {

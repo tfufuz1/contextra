@@ -46,7 +46,12 @@ impl Default for EntityExtractionConfig {
     }
 }
 
-/// Fallback / Dummy LLM Generator fuer reine RuleBased Extraktion ohne externes LLM.
+/// Fallback / Dummy LLM Generator fuer reine RuleBased Extraktion oder fehlende LLM-Inferenz.
+///
+/// **Verhalten bei fehlendem Generator:**
+/// Wenn kein externer LLM-Generator konfiguriert ist, gibt dieser Fallback-Generator eine leere
+/// JSON-Extraktionsantwort (`"[]"`) zurück. Die Entitätsextraktion überspringt dann definiert die
+/// LLM-basierte Extraktion ohne Fehler und erzeugt keine ungültigen oder stillschweigend falschen Ergebnisse.
 #[derive(Debug, Clone)]
 struct NoopLlmGenerator;
 
@@ -295,5 +300,24 @@ pub(crate) async fn auto_extract_and_relate<S: StorageEngine, V: VectorIndex>(
     {
         let _ = (collection, doc_id, text, generator, extractor_mode);
         Ok(0)
+    }
+}
+
+#[cfg(test)]
+mod auto_extraction_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_noop_llm_generator_behavior_defined_skip() {
+        let generator = NoopLlmGenerator;
+        let response = generator.generate("extract entities").await.expect("generate should succeed");
+        assert_eq!(response, "[]", "NoopLlmGenerator must return empty json array");
+    }
+
+    #[test]
+    fn test_auto_extraction_config_builder_methods() {
+        let config = AutoExtractionConfig::new(AutoExtractionMode::Disabled)
+            .with_mode(AutoExtractionMode::Enabled);
+        assert!(config.is_enabled());
     }
 }

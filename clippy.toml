@@ -1,5 +1,5 @@
 # clippy.toml — Workspace-Root Clippy-Konfiguration
-# doc-stamp: 2026-10-26 | Normativ: SPEC §0.2, §17.3, PLAN.md WP 0.4 (K-13)
+# doc-stamp: 2026-10-29 | Normativ: SPEC §0.2, §17.3, PLAN.md WP 0.4 (K-13)
 #
 # WICHTIG: Diese Datei wird von cargo clippy automatisch geladen.
 # Die ausführliche, dokumentierte Version liegt in governance/clippy.toml.
@@ -31,6 +31,7 @@ path = "rand::thread_rng"
 reason = "P28: Zufall nur über Rng-Port. Ausnahme: Schlüssel/Salt/Nonce (ADR-098)."
 allow-invalid = true
 
+# ── P28-Verbotsliste ──────────────────────────────────────────────────────────
 [[disallowed-methods]]
 path = "std::env::var"
 reason = "P28: Umgebungsvariablen nicht in Kernlogik."

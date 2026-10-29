@@ -2,6 +2,7 @@ use contextra_engine::collection::{Collection, StoredDocumentMeta};
 use contextra_engine::transaction::CommitIntent;
 use contextra_ports::{LlmTextGenerator, StorageEngine, VectorIndex};
 use contextra_types::{ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId};
+use std::sync::Arc;
 
 use super::compactor::ContextCompactor;
 use super::types::CompactionStrategy;
@@ -189,8 +190,11 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
         }
 
         // 3. Generate summary via LLM
-        let compactor =
-            ContextCompactor::new(TokenBudget::new(8192, 0), CompactionStrategy::Summarize);
+        let compactor = ContextCompactor::new_with_rng(
+            TokenBudget::new(8192, 0),
+            CompactionStrategy::Summarize,
+            Arc::new(contextra_ports::SeededRng::from_entropy()),
+        );
         let default_tenant = TenantId::try_new(1).unwrap_or(TenantId::SYSTEM);
         let compacted = compactor
             .consolidate_via_llm(default_tenant, &chunks, generator, "default")

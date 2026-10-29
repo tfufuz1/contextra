@@ -46,8 +46,10 @@ pub struct DeadLetterQueue {
 }
 
 impl DeadLetterQueue {
+    /// LSM key prefix used to isolate DLQ records.
     pub const PREFIX: &'static [u8] = b"dlq:";
 
+    /// Constructs a new [`DeadLetterQueue`] backed by the provided storage engine.
     pub fn new(storage: Arc<dyn StorageEngine>) -> Self {
         Self {
             storage,
@@ -56,11 +58,13 @@ impl DeadLetterQueue {
         }
     }
 
+    /// Attaches a metrics sink for DLQ gauge telemetry (Builder pattern).
     pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
         self.metrics_sink = Some(sink);
         self
     }
 
+    /// Helper constructor creating a [`DeadLetterQueue`] with an explicit metrics sink.
     pub fn new_with_metrics(
         storage: Arc<dyn StorageEngine>,
         sink: Arc<dyn contextra_ports::MetricsSink>,
@@ -77,6 +81,7 @@ impl DeadLetterQueue {
         Ok(letters.len())
     }
 
+    /// Pushes a failed step record to the persistent Dead-Letter Queue.
     pub async fn push(&self, letter: &StepDeadLetter) -> Result<()> {
         let key = format!(
             "dlq:{}:{}:{}",
@@ -102,6 +107,7 @@ impl DeadLetterQueue {
         Ok(())
     }
 
+    /// Reads and removes all dead-letter records atomically from storage.
     pub async fn drain(&self) -> Result<Vec<StepDeadLetter>> {
         let entries = self.storage.scan_prefix(Self::PREFIX).await?;
         let mut letters = Vec::with_capacity(entries.len());
@@ -137,6 +143,7 @@ impl DeadLetterQueue {
         Ok(letters)
     }
 
+    /// Lists all current dead-letter records without removing them.
     pub async fn list(&self) -> Result<Vec<StepDeadLetter>> {
         let entries = self.storage.scan_prefix(Self::PREFIX).await?;
         let mut letters = Vec::with_capacity(entries.len());
@@ -218,6 +225,7 @@ impl DeadLetterQueue {
         Ok(false)
     }
 
+    /// Allocates a unique sequence transaction ID for DLQ storage mutations.
     pub async fn allocate_tx(&self) -> Result<TxId> {
         let counter = self
             .next_tx
@@ -234,10 +242,11 @@ impl DeadLetterQueue {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::audit::InMemoryStorageEngine;
     use crate::step::DeadLetterReason;
+    use contextra_testkit::InMemoryStorageEngine;
 
     #[tokio::test]
     async fn test_dlq_push_list_drain() -> Result<()> {
@@ -384,6 +393,17 @@ mod tests {
             }
         );
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_dlq_new_with_metrics_constructor() -> Result<()> {
+        use contextra_testkit::TestMetricsSink;
+        let storage = Arc::new(InMemoryStorageEngine::new());
+        let metrics = Arc::new(TestMetricsSink::new());
+        let dlq = DeadLetterQueue::new_with_metrics(storage, metrics);
+        let list = dlq.list().await?;
+        assert!(list.is_empty());
         Ok(())
     }
 }

@@ -79,6 +79,31 @@ impl StorageEngine for InMemoryStorageEngine {
         })
     }
 
+    fn put_if_absent<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> BoxFuture<'a, Result<bool>> {
+        Box::pin(async move {
+            let mut staged = self.staged.write();
+            let data = self.data.read();
+            if data.contains_key(key) {
+                return Ok(false);
+            }
+            if let Some(ops) = staged.get(&tx_id) {
+                if ops.contains_key(key) {
+                    return Ok(false);
+                }
+            }
+            staged
+                .entry(tx_id)
+                .or_default()
+                .insert(key.to_vec(), StagedOp::Put(value.to_vec()));
+            Ok(true)
+        })
+    }
+
     fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let mut staged = self.staged.write();
@@ -174,6 +199,27 @@ impl StorageEngine for InMemoryStorageEngine {
             for (key, (val, _)) in data.range(prefix.to_vec()..) {
                 if key.starts_with(prefix) {
                     results.push((key.clone(), val.clone()));
+                } else {
+                    break;
+                }
+            }
+            Ok(results)
+        })
+    }
+
+    fn scan_prefix_at<'a>(
+        &'a self,
+        prefix: &'a [u8],
+        seq_no: u64,
+    ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
+        Box::pin(async move {
+            let data = self.data.read();
+            let mut results = Vec::new();
+            for (key, (val, item_seq)) in data.range(prefix.to_vec()..) {
+                if key.starts_with(prefix) {
+                    if *item_seq <= seq_no {
+                        results.push((key.clone(), val.clone()));
+                    }
                 } else {
                     break;
                 }

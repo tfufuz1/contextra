@@ -5,7 +5,7 @@
 
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
@@ -34,7 +34,7 @@ impl EntityRecognizer for NoOpRecognizer {
 /// Material and mappings are zeroized upon drop.
 pub struct SurrogateVault {
     session_salt: [u8; 16],
-    map: Mutex<HashMap<String, String>>,
+    map: Mutex<BTreeMap<String, String>>,
 }
 
 impl std::fmt::Debug for SurrogateVault {
@@ -51,7 +51,7 @@ impl SurrogateVault {
     pub fn new(session_salt: [u8; 16]) -> Self {
         Self {
             session_salt,
-            map: Mutex::new(HashMap::new()),
+            map: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -122,7 +122,8 @@ impl Drop for SurrogateVault {
     fn drop(&mut self) {
         self.session_salt.zeroize();
         if let Ok(mut guard) = self.map.lock() {
-            for (mut k, mut v) in guard.drain() {
+            let old_map = std::mem::take(&mut *guard);
+            for (mut k, mut v) in old_map {
                 k.zeroize();
                 v.zeroize();
             }
@@ -276,13 +277,16 @@ pub async fn classify_layer1_arc(
         let matches = set_cloned.matches(text);
         if matches.matched_any() {
             if let Some(first_idx) = matches.iter().next() {
-                let cp = &patterns_cloned[first_idx];
-                tracing::warn!(
-                    rule_id = %cp.name,
-                    pattern = %cp.regex.as_str(),
-                    "Egress DLP sensitive pattern match detected"
-                );
-                return EgressClassification::Block(BlockReason::SensitivePattern(cp.name.clone()));
+                if let Some(cp) = patterns_cloned.get(first_idx) {
+                    tracing::warn!(
+                        rule_id = %cp.name,
+                        pattern = %cp.regex.as_str(),
+                        "Egress DLP sensitive pattern match detected"
+                    );
+                    return EgressClassification::Block(BlockReason::SensitivePattern(
+                        cp.name.clone(),
+                    ));
+                }
             }
         }
         EgressClassification::Allow

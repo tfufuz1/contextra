@@ -45,7 +45,7 @@ impl Purger for LsmPurger {
 
         block_on_future(async {
             // 2. Erzwungener Flush der Memtables in SSTables
-            let _ = self.storage.flush().await;
+            self.storage.flush().await?;
 
             // 3. SSTables filtern / neu schreiben ohne Target-Records
             let readers = self.storage.sstables_for_scanner().await;

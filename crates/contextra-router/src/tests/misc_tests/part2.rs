@@ -1,3 +1,13 @@
+#![allow(
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    deprecated
+)]
 use super::super::fixtures::*;
 use crate::{DecisionId, DecisionIdGenerator, RoutingOutcome, SlmProfile};
 use contextra_db::{Contextra, ContextraConfig};
@@ -55,12 +65,12 @@ fn test_confidence_metrics_serde() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_serde_helpers_sorted_u64_set() -> Result<(), Box<dyn std::error::Error>> {
     use crate::serde_helpers::sorted_u64_set;
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
 
     #[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
     struct TestContainer {
         #[serde(with = "sorted_u64_set")]
-        set: HashSet<u64>,
+        set: BTreeSet<u64>,
     }
 
     let container = TestContainer {
@@ -309,7 +319,7 @@ async fn test_pending_decisions_evicted_after_ttl() -> Result<(), Box<dyn std::e
 
     // Fill pending_decisions with MAX_PENDING_DECISIONS stale entries older than TTL (300s)
     let stale_timestamp =
-        std::time::Instant::now() - (PENDING_DECISION_TTL + std::time::Duration::from_secs(10));
+        router.clock.monotonic_nanos().saturating_sub(PENDING_DECISION_TTL.as_secs().saturating_mul(1_000_000_000) + 10_000_000_000);
     {
         let mut map = router.pending_decisions.write();
         for _ in 0..MAX_PENDING_DECISIONS {
@@ -365,7 +375,7 @@ async fn test_pending_decisions_max_capacity_enforced() -> Result<(), Box<dyn st
 
     // Fill pending_decisions with MAX_PENDING_DECISIONS + 1 stale entries without record_outcome
     let stale_timestamp =
-        std::time::Instant::now() - (PENDING_DECISION_TTL + std::time::Duration::from_secs(10));
+        router.clock.monotonic_nanos().saturating_sub(PENDING_DECISION_TTL.as_secs().saturating_mul(1_000_000_000) + 10_000_000_000);
     {
         let mut map = router.pending_decisions.write();
         for _ in 0..=(MAX_PENDING_DECISIONS) {
@@ -392,7 +402,7 @@ fn test_cascade_confidence_uses_conformal_alpha() -> Result<(), Box<dyn std::err
     use crate::profile::ProfileCalibrationState;
     use crate::router::COMMUNITY_RELEVANCE_BOOST;
     use contextra_types::{ConfigFingerprint, ContextChunk, DocId};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     let fp = ConfigFingerprint::new("model1", "Q4_K_M", "prompt", 0.7);
     let profile = SlmProfile::new(
@@ -420,7 +430,7 @@ fn test_cascade_confidence_uses_conformal_alpha() -> Result<(), Box<dyn std::err
     cal_state.conformal.window_total = 100; // calibrated
     cal_state.last_calibrated_fingerprint = Some(fp);
 
-    let mut calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
+    let mut calibration: BTreeMap<String, ProfileCalibrationState> = BTreeMap::new();
     calibration.insert("alpha-slm".to_string(), cal_state);
 
     let chunk = ContextChunk {
@@ -460,7 +470,7 @@ fn test_cascade_confidence_uses_conformal_alpha() -> Result<(), Box<dyn std::err
 fn test_cascade_non_conformity_score_not_zero() -> Result<(), Box<dyn std::error::Error>> {
     use crate::profile::ProfileCalibrationState;
     use contextra_types::{ContextChunk, DocId};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     let profile = SlmProfile::new(
         "nc-slm",
@@ -483,7 +493,7 @@ fn test_cascade_non_conformity_score_not_zero() -> Result<(), Box<dyn std::error
 
     let mut cal_state = ProfileCalibrationState::new(0.1);
     cal_state.conformal.quantile_threshold = 0.8; // higher than score
-    let mut calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
+    let mut calibration: BTreeMap<String, ProfileCalibrationState> = BTreeMap::new();
     calibration.insert("nc-slm".to_string(), cal_state);
 
     let chunk = ContextChunk {
@@ -562,9 +572,9 @@ fn test_quantization_level_default_and_try_new() {
 
 #[test]
 fn test_conformal_calibrator_empirical_rate_and_reset() {
-    use crate::profile::ConformalCalibrator;
+    use crate::profile::ProfileCalibrator;
 
-    let mut cal = ConformalCalibrator::default();
+    let mut cal = ProfileCalibrator::default();
     assert_eq!(cal.empirical_error_rate(), 0.0);
 
     cal.update(0.9);

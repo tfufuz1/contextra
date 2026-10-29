@@ -17,7 +17,6 @@ pub enum ArmRegistryError {
 
 impl Default for ArmRegistry {
     fn default() -> Self {
-        // Feste, deterministische Reihenfolge (Determinismus-Invariante, §3.2 Punkt 3).
         Self {
             arms: [
                 RetrievalStrategy::Vector,
@@ -43,10 +42,6 @@ impl ArmRegistry {
     }
 
     /// Liefert den Arm-Index (0..=4) für die gegebene `RetrievalStrategy`.
-    ///
-    /// Die Implementierung verwendet ein `match` über alle bekannten Varianten mit einem
-    /// sicheren Fallback für das von Rust bei Crate-übergreifenden `#[non_exhaustive]` Enums
-    /// erzwungene Wildcard-Pattern (`_`), um die Zero-Panic-Doktrin (P7) strikt einzuhalten.
     pub fn arm_for(&self, strategy: RetrievalStrategy) -> u32 {
         match strategy {
             RetrievalStrategy::Vector => 0,
@@ -60,6 +55,7 @@ impl ArmRegistry {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -78,7 +74,7 @@ mod tests {
         ];
 
         for (expected_arm, &strategy) in strategies.iter().enumerate() {
-            let arm = expected_arm as u32;
+            let arm = u32::try_from(expected_arm).unwrap_or(0);
             let mapped_strategy = registry
                 .strategy_for(arm)
                 .unwrap_or(RetrievalStrategy::Vector);
