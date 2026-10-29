@@ -9,17 +9,13 @@ async fn test_empty_and_whitespace_query() {
     let client = OllamaClient::new("http://127.0.0.1:11434");
     let rewriter = OllamaQueryRewriter::new(client, OllamaQueryRewriterConfig::default());
 
-    let res_empty = rewriter
-        .rewrite_structured("", &[])
-        .await;
+    let res_empty = rewriter.rewrite_structured("", &[]).await;
     assert!(res_empty.is_ok());
     if let Ok(vec) = res_empty {
         assert!(vec.is_empty());
     }
 
-    let res_ws = rewriter
-        .rewrite_structured("   \n\t  ", &[])
-        .await;
+    let res_ws = rewriter.rewrite_structured("   \n\t  ", &[]).await;
     assert!(res_ws.is_ok());
     if let Ok(vec) = res_ws {
         assert!(vec.is_empty());
@@ -35,9 +31,7 @@ async fn test_overlong_query_and_unicode_safety() {
     };
     let rewriter = OllamaQueryRewriter::new(client, config);
 
-    let results = rewriter
-        .rewrite_structured("Präfix-🚀-Test", &[])
-        .await;
+    let results = rewriter.rewrite_structured("Präfix-🚀-Test", &[]).await;
     assert!(results.is_ok());
     if let Ok(res) = results {
         let output = res.first().expect("expected 1 output");
