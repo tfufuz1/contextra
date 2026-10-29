@@ -264,6 +264,12 @@ fn render_block(kind: &BlockKind, out: &mut String) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::panic
+    )]
     use super::*;
     use crate::format::FormatId;
     use crate::ir::Locator;
