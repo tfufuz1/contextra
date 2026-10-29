@@ -35,22 +35,35 @@ pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
     Ok(cleaned)
 }
 
-/// Recovers or reconciles any pending transaction intents found in storage.
+/// Recovers or reconciles any pending transaction intents found in storage upon engine startup.
 ///
 /// For each pending intent:
 /// - If storage records exist for the transaction's doc_ids, the storage commit succeeded.
 ///   Recovery preserves the committed transaction and updates the intent marker to `Committed`.
 /// - If storage records do NOT exist, storage commit never completed. Recovery compensates
 ///   any leftover index entries via compensating actions and updates the intent to `Aborted`.
-#[allow(dead_code)]
 pub async fn recover_pending_intents<S: StorageEngine>(
     storage: &S,
     next_tx: &std::sync::atomic::AtomicU64,
 ) -> Result<usize> {
-    let orphaned_keys = storage.scan_prefix(b"__tx_intent:").await?;
+    let mut intent_entries = storage.scan_prefix(b"__tx_intent:").await?;
+    let col_idx_prefix = b"__col_idx:\x00";
+    if let Ok(col_entries) = storage.scan_prefix(col_idx_prefix).await {
+        for (k, _) in col_entries {
+            let name_bytes = &k[col_idx_prefix.len()..];
+            if let Ok(name) = String::from_utf8(name_bytes.to_vec()) {
+                let mut ns_prefix = format!("__col:{}:", name).into_bytes();
+                ns_prefix.push(3);
+                if let Ok(ns_entries) = storage.scan_prefix(&ns_prefix).await {
+                    intent_entries.extend(ns_entries);
+                }
+            }
+        }
+    }
+
     let mut recovered = 0usize;
 
-    for (intent_key, value) in orphaned_keys {
+    for (intent_key, value) in intent_entries {
         let intent: CommitIntent = match serde_json::from_slice(&value) {
             Ok(i) => i,
             Err(_) => continue,
@@ -59,8 +72,25 @@ pub async fn recover_pending_intents<S: StorageEngine>(
         if let CommitIntent::Pending { doc_ids, .. } = intent {
             let mut storage_committed = false;
             for &doc_id in doc_ids.iter() {
-                let doc_key = format!("__docid:{}", doc_id.inner());
-                if storage.get(doc_key.as_bytes()).await?.is_some() {
+                let doc_key = if intent_key.starts_with(b"__tx_intent:") {
+                    let mut k = Vec::with_capacity(8 + 8);
+                    k.extend_from_slice(b"__docid:");
+                    k.extend_from_slice(&doc_id.inner().to_le_bytes());
+                    k
+                } else if intent_key.starts_with(b"__col:") {
+                    if let Some(pos) = intent_key.windows(1).position(|w| w == &[3]) {
+                        let mut k = intent_key[..pos].to_vec();
+                        k.push(1);
+                        k.extend_from_slice(&doc_id.inner().to_le_bytes());
+                        k
+                    } else {
+                        continue;
+                    }
+                } else {
+                    continue;
+                };
+
+                if storage.get(&doc_key).await?.is_some() {
                     storage_committed = true;
                     break;
                 }

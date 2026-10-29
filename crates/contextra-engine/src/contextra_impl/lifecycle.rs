@@ -146,6 +146,10 @@ impl Contextra {
                 .await?;
         tracing::debug!(cleaned_intents, "Orphaned consolidation cleanup on startup");
 
+        let recovered_intents =
+            transaction::recover_pending_intents(db.storage.as_ref(), &db.next_tx).await?;
+        tracing::debug!(recovered_intents, "Recovered pending intents on startup");
+
         db.repair_on_open().await?;
 
         db.init_embedding_backend(&config.embedding_backend).await?;
