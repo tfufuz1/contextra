@@ -6,12 +6,10 @@
 //! the cloning process to prevent LSM compaction or garbage collection from removing
 //! SSTables during the clone operation.
 //!
-//! # Windows Capacity Limit Notice
-//! On Windows, `CreateHardLink` is NTFS-exclusive and restricted to a maximum of **1023 hard links**
-//! per file on a given volume. This is a known OS-level capacity limit. Cross-filesystem hardlinks
-//! or volume limit overflows will return an explicit [`ContextraError::CrossDeviceLink`].
-//! Fallback to a full byte-for-byte copy is intentionally NOT implemented in this subsystem
-//! (backlog item C.4.1).
+//! # Copy-on-Write and File Copy Fallback
+//! Hardlinks are preferred for O(1) instantaneous Copy-on-Write SSTable clones. If hardlinks fail
+//! (e.g. across mount points / filesystems, Windows NTFS link limit, or unsupported filesystems),
+//! cloning gracefully falls back to full byte-for-byte file copying (`fs::copy`).
 
 #![allow(unexpected_cfgs)]
 
@@ -20,7 +18,7 @@
 // ZWECK: Hardlink-Cloner für Agent-Forking und SSTable CoW-Klone.
 // INVARIANTEN: Zero-Panic, Async-I/O via tokio::fs, SnapshotRegistry-Pinning während Klonen.
 
-use contextra_core::SnapshotRegistry;
+use contextra_mvcc::SnapshotRegistry;
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -56,6 +54,10 @@ mod fs {
         _to: Q,
     ) -> std::io::Result<()> {
         Ok(())
+    }
+
+    pub async fn copy<P: AsRef<Path>, Q: AsRef<Path>>(_from: P, _to: Q) -> std::io::Result<u64> {
+        Ok(0)
     }
 
     pub struct LoomReadDir;
@@ -165,13 +167,21 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
                         }
 
                         if let Err(io_err) = fs::hard_link(&path, &target_path).await {
-                            if is_cross_device_error(&io_err) {
-                                return Err(ContextraError::cross_device_link(
-                                    path.to_string_lossy(),
-                                    target_path.to_string_lossy(),
-                                ));
-                            } else {
-                                return Err(ContextraError::Io(io_err));
+                            tracing::warn!(
+                                source = %path.display(),
+                                target = %target_path.display(),
+                                error = %io_err,
+                                "Hardlink creation failed; falling back to byte-for-byte file copy"
+                            );
+                            if let Err(copy_err) = fs::copy(&path, &target_path).await {
+                                if is_cross_device_error(&io_err) {
+                                    return Err(ContextraError::cross_device_link(
+                                        path.to_string_lossy(),
+                                        target_path.to_string_lossy(),
+                                    ));
+                                } else {
+                                    return Err(ContextraError::Io(copy_err));
+                                }
                             }
                         }
 
