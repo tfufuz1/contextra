@@ -43,7 +43,10 @@ struct ContentMatch {
 /// Formaterkennung anhand von Inhalts-Bytes (max 64 KiB) und Hinweisen.
 pub fn detect(bytes: &[u8], hints: &DetectHints<'_>) -> Result<Detection, IngestError> {
     let analyze_len = bytes.len().min(MAX_DETECT_BYTES);
-    let data = bytes.get(..analyze_len).unwrap_or(bytes);
+    let data = match bytes.get(..analyze_len) {
+        Some(slice) => slice,
+        None => bytes,
+    };
 
     let (hint_fmt, is_from_ext) = resolve_hint_format(hints);
     let content_match = detect_content_format(data, hint_fmt);
@@ -222,6 +225,14 @@ fn is_gzip(data: &[u8]) -> bool {
     data.starts_with(&[0x1f, 0x8b])
 }
 
+#[inline]
+fn byte_at(slice: &[u8], idx: usize) -> u8 {
+    match slice.get(idx) {
+        Some(&b) => b,
+        None => 0,
+    }
+}
+
 /// Untersucht ZIP-Lokaldateiheader ohne Entpacken.
 fn inspect_zip_container(data: &[u8]) -> Option<(FormatId, &'static str)> {
     let mut offset = 0usize;
@@ -235,23 +246,24 @@ fn inspect_zip_container(data: &[u8]) -> Option<(FormatId, &'static str)> {
             break;
         }
 
-        let comp_method =
-            u16::from_le_bytes([*header.get(8).unwrap_or(&0), *header.get(9).unwrap_or(&0)]);
-        let comp_size = usize::try_from(u32::from_le_bytes([
-            *header.get(18).unwrap_or(&0),
-            *header.get(19).unwrap_or(&0),
-            *header.get(20).unwrap_or(&0),
-            *header.get(21).unwrap_or(&0),
-        ]))
-        .unwrap_or(0);
+        let comp_method = u16::from_le_bytes([byte_at(header, 8), byte_at(header, 9)]);
+        let comp_size = match usize::try_from(u32::from_le_bytes([
+            byte_at(header, 18),
+            byte_at(header, 19),
+            byte_at(header, 20),
+            byte_at(header, 21),
+        ])) {
+            Ok(s) => s,
+            Err(_) => 0,
+        };
 
         let fn_len = usize::from(u16::from_le_bytes([
-            *header.get(26).unwrap_or(&0),
-            *header.get(27).unwrap_or(&0),
+            byte_at(header, 26),
+            byte_at(header, 27),
         ]));
         let extra_len = usize::from(u16::from_le_bytes([
-            *header.get(28).unwrap_or(&0),
-            *header.get(29).unwrap_or(&0),
+            byte_at(header, 28),
+            byte_at(header, 29),
         ]));
 
         let fn_start = offset.saturating_add(30);
@@ -369,14 +381,20 @@ fn detect_text_heuristics(data: &[u8]) -> Option<ContentMatch> {
     // 1. UTF-16 LE/BE BOM Dekodierung
     let (text_str, has_bom) = if data.starts_with(&[0xff, 0xfe]) {
         // UTF-16 LE BOM
-        let decoded = decode_utf16_le(data.get(2..)?);
+        let decoded = decode_utf16_le(match data.get(2..) {
+            Some(s) => s,
+            None => return None,
+        });
         if decoded.is_empty() {
             return None;
         }
         (decoded, true)
     } else if data.starts_with(&[0xfe, 0xff]) {
         // UTF-16 BE BOM
-        let decoded = decode_utf16_be(data.get(2..)?);
+        let decoded = decode_utf16_be(match data.get(2..) {
+            Some(s) => s,
+            None => return None,
+        });
         if decoded.is_empty() {
             return None;
         }
@@ -384,7 +402,10 @@ fn detect_text_heuristics(data: &[u8]) -> Option<ContentMatch> {
     } else {
         // UTF-8
         let text_data = if data.starts_with(&[0xef, 0xbb, 0xbf]) {
-            data.get(3..).unwrap_or(data)
+            match data.get(3..) {
+                Some(s) => s,
+                None => data,
+            }
         } else {
             data
         };
@@ -396,9 +417,12 @@ fn detect_text_heuristics(data: &[u8]) -> Option<ContentMatch> {
                 if valid_len < 16 {
                     return None;
                 }
-                match std::str::from_utf8(text_data.get(..valid_len)?) {
-                    Ok(s) => (s.to_string(), false),
-                    Err(_) => return None,
+                match text_data.get(..valid_len) {
+                    Some(valid_slice) => match std::str::from_utf8(valid_slice) {
+                        Ok(s) => (s.to_string(), false),
+                        Err(_) => return None,
+                    },
+                    None => return None,
                 }
             }
         }
@@ -501,10 +525,15 @@ fn decode_utf16_le(bytes: &[u8]) -> String {
     let u16s: Vec<u16> = bytes
         .chunks_exact(2)
         .map(|c| {
-            u16::from_le_bytes([
-                c.get(0).copied().unwrap_or(0),
-                c.get(1).copied().unwrap_or(0),
-            ])
+            let b0 = match c.get(0) {
+                Some(&b) => b,
+                None => 0,
+            };
+            let b1 = match c.get(1) {
+                Some(&b) => b,
+                None => 0,
+            };
+            u16::from_le_bytes([b0, b1])
         })
         .collect();
     String::from_utf16_lossy(&u16s)
@@ -514,10 +543,15 @@ fn decode_utf16_be(bytes: &[u8]) -> String {
     let u16s: Vec<u16> = bytes
         .chunks_exact(2)
         .map(|c| {
-            u16::from_be_bytes([
-                c.get(0).copied().unwrap_or(0),
-                c.get(1).copied().unwrap_or(0),
-            ])
+            let b0 = match c.get(0) {
+                Some(&b) => b,
+                None => 0,
+            };
+            let b1 = match c.get(1) {
+                Some(&b) => b,
+                None => 0,
+            };
+            u16::from_be_bytes([b0, b1])
         })
         .collect();
     String::from_utf16_lossy(&u16s)
@@ -633,12 +667,6 @@ const ALL_FORMATS: &[FormatId] = &[
 
 #[cfg(test)]
 mod tests {
-    #![allow(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        clippy::indexing_slicing,
-        clippy::panic
-    )]
     use super::*;
 
     #[test]
@@ -648,7 +676,10 @@ mod tests {
             mime: Some("application/pdf"),
         };
         let bytes = b"%PDF-1.7\n%...";
-        let det = detect(bytes, &hints).unwrap();
+        let det = match detect(bytes, &hints) {
+            Ok(d) => d,
+            Err(e) => panic!("Detection failed: {e:?}"),
+        };
         assert_eq!(det.format, FormatId::Pdf);
         assert_eq!(det.confidence, Confidence::High);
     }
@@ -657,7 +688,10 @@ mod tests {
     fn test_detect_rtf_no_hints() {
         let hints = DetectHints::default();
         let bytes = b"{\\rtf1\\ansi\\deff0}";
-        let det = detect(bytes, &hints).unwrap();
+        let det = match detect(bytes, &hints) {
+            Ok(d) => d,
+            Err(e) => panic!("Detection failed: {e:?}"),
+        };
         assert_eq!(det.format, FormatId::Rtf);
         assert_eq!(det.confidence, Confidence::Medium);
     }
@@ -674,7 +708,10 @@ mod tests {
         zip_bytes.extend_from_slice(&0u16.to_le_bytes());
         zip_bytes.extend_from_slice(b"word/doc.xml");
 
-        let det = detect(&zip_bytes, &hints).unwrap();
+        let det = match detect(&zip_bytes, &hints) {
+            Ok(d) => d,
+            Err(e) => panic!("Detection failed: {e:?}"),
+        };
         assert_eq!(det.format, FormatId::Docx);
         assert_eq!(det.confidence, Confidence::Medium);
         assert!(det.reason.contains("override"));
@@ -687,14 +724,20 @@ mod tests {
             filename: Some("doc.pdf"),
             mime: None,
         };
-        let det = detect(&gz_bytes, &hints).unwrap();
+        let det = match detect(&gz_bytes, &hints) {
+            Ok(d) => d,
+            Err(e) => panic!("Detection failed: {e:?}"),
+        };
         assert_eq!(det.format, FormatId::Pdf);
 
         let mut utf16_bytes = vec![0xff, 0xfe];
         for c in "# Title\n[link](http://x.y)".encode_utf16() {
             utf16_bytes.extend_from_slice(&c.to_le_bytes());
         }
-        let det_u16 = detect(&utf16_bytes, &DetectHints::default()).unwrap();
+        let det_u16 = match detect(&utf16_bytes, &DetectHints::default()) {
+            Ok(d) => d,
+            Err(e) => panic!("Detection failed: {e:?}"),
+        };
         assert_eq!(det_u16.format, FormatId::Markdown);
     }
 }

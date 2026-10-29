@@ -55,6 +55,16 @@ impl IrChunker for TabularChunker {
     }
 }
 
+#[path = "email/mod.rs"]
+mod email_impl;
+
+pub use email_impl::EmailChunker;
+
+#[path = "structured/mod.rs"]
+mod structured_impl;
+
+pub use structured_impl::StructuredChunker;
+
 #[derive(Debug, Default)]
 pub struct PagedChunker;
 
