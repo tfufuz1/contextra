@@ -197,6 +197,18 @@ ci_class = 'pr'
 spec = ['A2', '0', '4', '9']
 test = "cargo test -p contextra-kvcache --locked"
 
+[crates.contextra-ingest]
+ring = 'Ring 4'
+maturity = 'experimental'
+description = 'Dokumentformat-Extraktoren und strukturbewusstes Chunking (Adapter außerhalb des Kerns, SPEC C-10.3)'
+capabilities = ['document-extraction', 'structure-aware-chunking']
+path = "crates/contextra-ingest"
+unsafe_island = false
+may_depend_on = ['contextra-engine', 'contextra-types']
+ci_class = 'pr'
+spec = ['0', '4', '10', '11']
+test = "cargo test -p contextra-ingest --locked"
+
 [crates.contextra-license]
 ring = 'Ring 4'
 maturity = 'experimental'
