@@ -1,0 +1,172 @@
+# Maschinenlesbare Rechtsmatrix (WP 5.10)
+# Zweck: Abbildung gesetzlicher Vorgaben (DSGVO, KI-VO, CRA) auf technische Anforderungen, Bausteine, Tests und Status.
+#
+# WICHTIGE HINWEISE UND DISCLAIMER:
+# - Dies ist KEINE Rechtsauskunft und KEINE Zertifizierung.
+# - Quelle der Wahrheit bei Abweichung ist SPEC §9.12.
+#
+# AENDERUNGSVERFAHREN:
+# Bei Rechtsänderung oder neuer Aufsichtspraxis:
+# 1. Betroffene Zeile identifizieren oder neue Zeile anlegen.
+# 2. Issue/Ticket erstellen und betroffenen Baustein/Crate sowie Test anpassen.
+# 3. Status und Notiz in dieser Datei aktualisieren.
+
+[[eintrag]]
+id = "LM-001"
+vorgabe = "Art. 5 Abs. 1 lit. e Speicherbegrenzung"
+anforderung = "Aufbewahrung nur so lange nötig; Fristen durchsetzbar"
+baustein = "Retention-Reaper (contextra-engine), Fristen und Legal Hold (contextra-erasure, D10)"
+test = ["crates/contextra-engine/tests/decay_and_expiry.rs::test_expiry_reaper_cleans_expired_working_memory"]
+status = "teilweise"
+rechtsfrage = ["O-02", "O-41"]
+quelle = "SPEC §9.12"
+notiz = "Retention-Reaper in engine vorhanden, aber automatische Fristen und Legal Hold (erasure D10) sind noch offen (WP 5.8). O-41: Definition in Arbeit (docs/SPEC.md, separater PR)."
+
+[[eintrag]]
+id = "LM-002"
+vorgabe = "Art. 5 Abs. 1 lit. f, Art. 32 Integrität, Vertraulichkeit"
+anforderung = "Verschlüsselung, Integrität, Mandantentrennung"
+baustein = "contextra-crypto, contextra-store (WAL-HMAC), contextra-privacy, INV-TENANT-*"
+test = [
+  "crates/contextra-crypto/src/crypto.rs::test_encrypt_decrypt_roundtrip",
+  "crates/contextra-engine/tests/invariant_tenant_isolation.rs::test_tenant_isolation_cross_tenant_document_and_collection_operations"
+]
+status = "teilweise"
+rechtsfrage = []
+quelle = "SPEC §9.12"
+notiz = "Verschlüsselung und Mandantentrennung grundlegend umgesetzt (contextra-crypto in beta), aber externe Krypto-Audits (V8) stehen noch aus."
+
+[[eintrag]]
+id = "LM-003"
+vorgabe = "Art. 5 Abs. 2, Art. 24 Rechenschaft"
+anforderung = "Nachweis der Maßnahmen"
+baustein = "Evidence-Pack, AuditChain, DeletionProof (contextra-crypto)"
+test = ["crates/contextra-crypto/src/deletion_proof/mod.rs::test_v3_create_and_verify_external_roundtrip"]
+status = "teilweise"
+rechtsfrage = []
+quelle = "SPEC §9.12"
+notiz = "Berichtsformat und AuditChain sind vorhanden, aber Integrationstests waren fehlerhaft/rot (U-15) und Evidence-Packs sind noch unvollständig."
+
+[[eintrag]]
+id = "LM-004"
+vorgabe = "Art. 17 Abs. 1 Löschung"
+anforderung = "technisch begründete Löschung aller Schichten"
+baustein = "Saga (contextra-erasure), Scanner/Purger je Schicht, Destroy-Protokoll (D1–D6)"
+test = ["crates/contextra-store/src/scanner/tests.rs::test_purge_clears_remaining_residuals"]
+status = "teilweise"
+rechtsfrage = ["O-01", "O-04"]
+quelle = "SPEC §9.12"
+notiz = "5 von 10 Schichten gemessen; Saga und vollständige Schlüsselvernichtung D1-D6 fehlen noch."
+
+[[eintrag]]
+id = "LM-005"
+vorgabe = "Art. 17 Abs. 2, Art. 19 Information von Empfängern"
+anforderung = "Empfänger dokumentieren und benachrichtigen können"
+baustein = "RecipientLedger (contextra-erasure, D10)"
+test = []
+status = "offen"
+rechtsfrage = ["O-43"]
+quelle = "SPEC §9.12"
+notiz = "Baustein RecipientLedger fehlt komplett (WP 5.8). O-43: Definition in Arbeit (docs/SPEC.md, separater PR)."
+
+[[eintrag]]
+id = "LM-006"
+vorgabe = "Art. 18 Einschränkung"
+anforderung = "Sperre ab Anordnung, auch in Export, as_of, Checkpoint"
+baustein = "ErasedSet, Lesesperre (Frozen, Restricted) (contextra-erasure)"
+test = []
+status = "offen"
+rechtsfrage = []
+quelle = "SPEC §9.12"
+notiz = "Lesesperre und ErasedSet-Mechanismus fehlen noch (WP 5.5)."
+
+[[eintrag]]
+id = "LM-007"
+vorgabe = "Gesetzliche Aufbewahrungspflichten"
+anforderung = "Löschung weicht Aufbewahrung: Restricted{basis, until}"
+baustein = "Legal-Hold-Mechanismus (contextra-erasure, D10)"
+test = []
+status = "offen"
+rechtsfrage = ["O-02"]
+quelle = "SPEC §9.12"
+notiz = "Legal-Hold-Mechanismus offen. Kataloge und Fristen sind Rechtsfrage O-02."
+
+[[eintrag]]
+id = "LM-008"
+vorgabe = "Art. 25 Datenschutz durch Technikgestaltung und Voreinstellung"
+anforderung = "sichere Standardwerte"
+baustein = "Netz aus (VETO-NET1), Mandantentrennung, default = [], Fail-Closed (contextra-privacy, contextra-sandbox)"
+test = [
+  "crates/contextra-privacy/tests/tenant_scoped_egress_isolation.rs::test_egress_gateway_scoped_isolation",
+  "crates/contextra-sandbox/src/capabilities.rs::test_wasm_capabilities_default_cloud_egress_is_false"
+]
+status = "teilweise"
+rechtsfrage = []
+quelle = "SPEC §9.12"
+notiz = "Sandbox und Egress Gateway sind standardmäßig geschlossen, aber infer-onnx Download (U-07) und store-cfg-Features (U-22) müssen nachgearbeitet werden."
+
+[[eintrag]]
+id = "LM-009"
+vorgabe = "Art. 28 Auftragsverarbeitung"
+anforderung = "AVV-Unterlagen"
+baustein = "contextra-avv-generator"
+test = ["crates/contextra-avv-generator/tests/avv_rendering.rs::test_render_avv_markdown_contains_required_sections"]
+status = "teilweise"
+rechtsfrage = ["O-05"]
+quelle = "SPEC §9.12"
+notiz = "AVV-Generator Crate ist im Status experimental vorhanden und wird getestet, juristische Prüfung O-05 steht aus."
+
+[[eintrag]]
+id = "LM-010"
+vorgabe = "Art. 30 Verzeichnis von Verarbeitungstätigkeiten"
+anforderung = "Verzeichnis erzeugen"
+baustein = "contextra-audit-export"
+test = ["crates/contextra-audit-export/tests/golden_file_test.rs::test_golden_file_json_export"]
+status = "teilweise"
+rechtsfrage = []
+quelle = "SPEC §9.12"
+notiz = "Audit-Export Crate ist im Status experimental vorhanden und wird getestet."
+
+[[eintrag]]
+id = "LM-011"
+vorgabe = "Art. 15, 20 Auskunft, Übertragbarkeit"
+anforderung = "Export der Daten einer betroffenen Person"
+baustein = "Nicht Teil von v1.0 (Nicht-Ziel); Export-Baustein optional"
+test = []
+status = "nicht-ziel"
+rechtsfrage = ["O-42"]
+quelle = "SPEC §9.12"
+notiz = "Nicht Teil von v1.0. O-42: Definition in Arbeit (docs/SPEC.md, separater PR)."
+
+[[eintrag]]
+id = "LM-012"
+vorgabe = "Art. 33, 34 Meldung von Verletzungen"
+anforderung = "Erkennung und Meldung"
+baustein = "Nicht Teil von v1.0; Hooks über Observer (Integrator)"
+test = []
+status = "nicht-ziel"
+rechtsfrage = []
+quelle = "SPEC §9.12"
+notiz = "Nicht Teil von v1.0. Hooks über Observer stehen dem Integrator zur Verfügung."
+
+[[eintrag]]
+id = "LM-013"
+vorgabe = "VO (EU) 2024/1689 (KI-Verordnung)"
+anforderung = "Einordnung je Anwendungsfall"
+baustein = "Integrator; Bausteine liefern Protokollierung und Budgets"
+test = []
+status = "offen"
+rechtsfrage = ["O-06"]
+quelle = "SPEC §9.12"
+notiz = "Einordnung je Anwendungsfall obliegt dem Integrator (O-06)."
+
+[[eintrag]]
+id = "LM-014"
+vorgabe = "VO (EU) 2024/2847 (Cyber Resilience Act)"
+anforderung = "Anforderungen an Produkte mit digitalen Elementen, Schwachstellenmanagement"
+baustein = "SBOM, cargo audit, deny, Release-Prozess (§13.2)"
+test = []
+status = "offen"
+rechtsfrage = ["O-11"]
+quelle = "SPEC §9.12"
+notiz = "Schwachstellenmanagement-Prozesse (cargo audit/deny) existieren, rechtliche Einordnung O-11 ist offen."
