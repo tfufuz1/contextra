@@ -1262,12 +1262,11 @@ name = "contextra-py"
 version = "0.1.0"
 dependencies = [
  "contextra-adapt",
- "contextra-core",
  "contextra-db",
  "contextra-rank",
- "contextra-router",
  "contextra-store",
  "contextra-types",
+ "contextra-wire",
  "flatbuffers",
  "numpy",
  "parking_lot 0.12.5",

@@ -151,9 +151,9 @@ macro_rules! contextra_crud_methods {
                     let meta_str = r.metadata.map(|m| m.to_string()).unwrap_or_default();
                     let meta_off = builder.create_string(&meta_str);
 
-                    let doc_res = contextra_core::ipc::ScoredDocument::create(
+                    let doc_res = contextra_wire::ScoredDocument::create(
                         &mut builder,
-                        &contextra_core::ipc::ScoredDocumentArgs {
+                        &contextra_wire::ScoredDocumentArgs {
                             id: Some(id_off),
                             score: r.score,
                             metadata: Some(meta_off),
@@ -164,9 +164,9 @@ macro_rules! contextra_crud_methods {
                 }
 
                 let results_vec_off = builder.create_vector(&res_offsets);
-                let response = contextra_core::ipc::SearchResponse::create(
+                let response = contextra_wire::SearchResponse::create(
                     &mut builder,
-                    &contextra_core::ipc::SearchResponseArgs {
+                    &contextra_wire::SearchResponseArgs {
                         results: Some(results_vec_off),
                         total_hits: res_offsets.len() as u32,
                         processing_time_ms: 0.0,
@@ -200,7 +200,7 @@ macro_rules! contextra_crud_methods {
                 }
                 let weights = match (vector_weight, text_weight, graph_weight) {
                     (Some(v), Some(t), Some(g)) => {
-                        Some(contextra_core::FusionWeights::new(v, t, g)
+                        Some(contextra_rank::FusionWeights::new(v, t, g)
                             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?)
                     }
                     (None, None, None) => None,
@@ -246,7 +246,7 @@ macro_rules! contextra_crud_methods {
                 }
                 let weights = match (vector_weight, text_weight, graph_weight) {
                     (Some(v), Some(t), Some(g)) => {
-                        Some(contextra_core::FusionWeights::new(v, t, g)
+                        Some(contextra_rank::FusionWeights::new(v, t, g)
                             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?)
                     }
                     (None, None, None) => None,
@@ -274,9 +274,9 @@ macro_rules! contextra_crud_methods {
                     let meta_str = r.metadata.map(|m| m.to_string()).unwrap_or_default();
                     let meta_off = builder.create_string(&meta_str);
 
-                    let doc_res = contextra_core::ipc::ScoredDocument::create(
+                    let doc_res = contextra_wire::ScoredDocument::create(
                         &mut builder,
-                        &contextra_core::ipc::ScoredDocumentArgs {
+                        &contextra_wire::ScoredDocumentArgs {
                             id: Some(id_off),
                             score: r.score,
                             metadata: Some(meta_off),
@@ -287,9 +287,9 @@ macro_rules! contextra_crud_methods {
                 }
 
                 let results_vec_off = builder.create_vector(&res_offsets);
-                let response = contextra_core::ipc::SearchResponse::create(
+                let response = contextra_wire::SearchResponse::create(
                     &mut builder,
-                    &contextra_core::ipc::SearchResponseArgs {
+                    &contextra_wire::SearchResponseArgs {
                         results: Some(results_vec_off),
                         total_hits: res_offsets.len() as u32,
                         processing_time_ms: 0.0,

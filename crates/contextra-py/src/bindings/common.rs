@@ -11,6 +11,9 @@ use crate::bindings::search_result::PySearchResult;
 // ─── Custom Exceptions ──────────────────────────────────────────────────────
 
 pyo3::create_exception!(_contextra, ContextraError, pyo3::exceptions::PyException);
+pyo3::create_exception!(_contextra, TenantError, ContextraError);
+pyo3::create_exception!(_contextra, NotFoundError, ContextraError);
+pyo3::create_exception!(_contextra, IntegrityError, ContextraError);
 pyo3::create_exception!(_contextra, ContextraIOError, PyIOError);
 pyo3::create_exception!(_contextra, ContextraIndexError, PyIndexError);
 pyo3::create_exception!(_contextra, ContextraValueError, PyValueError);
@@ -318,14 +321,15 @@ pub fn results_to_py(
 }
 
 /// Maps a ContextraError into a structured Python PyErr with `kind`, `message`, and `details` attributes.
-pub fn contextra_err(e: contextra_core::ContextraError) -> PyErr {
-    let dto = contextra_core::ContextraErrorDto::from(&e);
+pub fn contextra_err(e: contextra_types::ContextraError) -> PyErr {
+    let dto = contextra_types::ContextraErrorDto::from(&e);
     Python::with_gil(|py| {
         let py_err = match dto.kind.as_str() {
-            "NotFound" => PyKeyError::new_err(dto.message.clone()),
+            "NotFound" => NotFoundError::new_err(dto.message.clone()),
             "Conflict" | "Transaction" | "TransactionTimeout" => {
-                PyRuntimeError::new_err(dto.message.clone())
+                IntegrityError::new_err(dto.message.clone())
             }
+            "NamespaceViolation" | "TenantMismatch" => TenantError::new_err(dto.message.clone()),
             "PolicyViolation"
             | "NamespaceViolation"
             | "Sandbox"

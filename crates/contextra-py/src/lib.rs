@@ -57,6 +57,7 @@ fn _contextra(_py: Python<'_>, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult
     m.add("_runtime_state", Py::new(_py, state)?)?;
 
     m.add_function(wrap_pyfunction!(open, m)?)?;
+    #[cfg(feature = "test-hooks")]
     m.add_function(wrap_pyfunction!(_trigger_panic_for_test, m)?)?;
     m.add_class::<PyContextra>()?;
     m.add_class::<PyCollection>()?;
@@ -68,6 +69,9 @@ fn _contextra(_py: Python<'_>, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult
 
     // Exceptions
     m.add("ContextraError", _py.get_type::<ContextraError>())?;
+    m.add("TenantError", _py.get_type::<TenantError>())?;
+    m.add("NotFoundError", _py.get_type::<NotFoundError>())?;
+    m.add("IntegrityError", _py.get_type::<IntegrityError>())?;
     m.add("ContextraIOError", _py.get_type::<ContextraIOError>())?;
     m.add("ContextraIndexError", _py.get_type::<ContextraIndexError>())?;
     m.add("ContextraValueError", _py.get_type::<ContextraValueError>())?;
