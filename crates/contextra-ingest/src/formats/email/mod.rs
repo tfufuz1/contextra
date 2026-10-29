@@ -1,7 +1,11 @@
 // FILE-CONTEXT
-// ZWECK: E-Mail Extractor Stub (Eml, Mbox) (WP M4).
-// INVARIANTEN: FILE-CONTEXT Kopf, DocumentExtractor-Impl mit UnsupportedFormat.
+// ZWECK: E-Mail Extractor (Eml und Mbox) (WP M4).
+// INVARIANTEN: FILE-CONTEXT Kopf, DocumentExtractor-Impl mit Zero-Panic Garantien.
 // STAND: TS:2026-10-31T00:00:00Z
+
+pub mod eml;
+pub mod html;
+pub mod mbox;
 
 use crate::error::IngestError;
 use crate::extractor::{DocumentExtractor, ExtractContext};
@@ -30,9 +34,13 @@ impl DocumentExtractor for EmailExtractor {
         _input: &[u8],
         _ctx: &ExtractContext<'_>,
     ) -> Result<DocumentIr, IngestError> {
-        Err(IngestError::UnsupportedFormat {
-            format: Some(format),
-            reason: "noch nicht implementiert".into(),
-        })
+        match format {
+            FormatId::Eml => eml::extract_eml(_input, _ctx, None),
+            FormatId::Mbox => mbox::extract_mbox(_input, _ctx),
+            _ => Err(IngestError::UnsupportedFormat {
+                format: Some(format),
+                reason: "E-Mail Extractor unterstützt nur Eml und Mbox".into(),
+            }),
+        }
     }
 }
