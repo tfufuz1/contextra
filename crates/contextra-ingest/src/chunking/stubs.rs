@@ -79,6 +79,6 @@ impl IrChunker for PagedChunker {
         canon: &CanonicalText,
         cfg: &ChunkingConfig,
     ) -> Result<Vec<ChunkDraft>, IngestError> {
-        FallbackChunker.draft(ir, canon, cfg)
+        paged_impl::draft_paged(ir, canon, cfg)
     }
 }

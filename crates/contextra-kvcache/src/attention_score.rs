@@ -36,11 +36,29 @@ pub trait AttentionScoreSource: Send + Sync {
 }
 
 /// Default implementation that provides no attention scores (pure LRU behavior).
+///
+/// # Fallback-Verhalten
+///
+/// Wenn kein Attention-Signal verfügbar ist (oder [`NullAttentionScoreSource`] verwendet wird),
+/// erfolgt die Eviction streng deterministisch nach dem LRU-Prinzip (älteste Zugriffszeit zuerst).
+/// Es werden keinerlei Zufalls- oder stochastische Entscheidungen getroffen.
+///
+/// Im Betrieb wird bei jeder Eviction-Bewertung ohne Attention-Signal eine
+/// `tracing::warn!`-Meldung ausgegeben, um das Fehlen des Attention-Signals im Monitoring zu signalisieren.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct NullAttentionScoreSource;
 
 impl AttentionScoreSource for NullAttentionScoreSource {
     fn importance_score(&self, _segment_id: u64) -> Option<f32> {
+        None
+    }
+
+    fn importance_score_for_tenant(&self, tenant_id: TenantId, segment_id: u64) -> Option<f32> {
+        tracing::warn!(
+            tenant_id = ?tenant_id,
+            segment_id = segment_id,
+            "Evicting/ranking KV-cache segment without attention score (NullAttentionScoreSource fallback to LRU)"
+        );
         None
     }
 }
@@ -112,7 +130,7 @@ pub fn rank_for_eviction_weighted_for_tenant(
         })
         .collect();
 
-    // // NAN-CHECK-OK: Eviction candidate ranking filters non-finite scores before compute
+    // NAN-CHECK-OK: Eviction candidate ranking filters non-finite scores before compute
     let valid_scores: Vec<f32> = raw_scores
         .iter()
         .filter_map(|(_, _, s)| *s)
@@ -127,6 +145,11 @@ pub fn rank_for_eviction_weighted_for_tenant(
             .fold(f32::NEG_INFINITY, f32::max);
         (min_s, max_s)
     } else {
+        tracing::warn!(
+            tenant_id = ?tenant_id,
+            candidate_count = candidates.len(),
+            "Eviction ranking performed without attention scores: falling back to deterministic LRU order"
+        );
         (0.0, 0.0)
     };
 

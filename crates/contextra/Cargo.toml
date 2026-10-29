@@ -27,8 +27,11 @@ contextra-infer-candle = { workspace = true, optional = true }
 contextra-rank = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 
 [dev-dependencies]
+tracing-subscriber = { workspace = true }
 tempfile = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-testkit = { workspace = true }

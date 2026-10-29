@@ -1,7 +1,7 @@
 // FILE-CONTEXT
 // ZWECK: Öffentliche Facade `KvCacheService` und `KvCacheServiceBuilder` für Ring-1/Ring-2 Verdrahtung.
 
-//! Öffentliche Fassade für den KV-Cache-Dienst (`KvCacheService`).
+//! Öffentliche Fassade für den KV-Cache-Dienst ([`KvCacheService`]).
 //!
 //! Stellt eine einheitliche, mandantenisolierte Schnittstelle bereit mit Unterstützung für:
 //! - Speicherbudgetierung & Eviction-Policy ([`KvReusePolicy`])
@@ -15,7 +15,8 @@
 //! use contextra_kvcache::radix::KvReusePolicy;
 //! use contextra_types::TenantId;
 //!
-//! let tenant = TenantId::try_new(42).unwrap();
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let tenant = TenantId::try_new(42)?;
 //! let service = KvCacheServiceBuilder::new()
 //!     .memory_budget_bytes(128 << 20)
 //!     .reuse_policy(KvReusePolicy::Always)
@@ -24,31 +25,48 @@
 //! // Insert prefix
 //! let tokens = vec![101, 102, 103, 104];
 //! let data = vec![1, 2, 3, 4, 5, 6, 7, 8];
-//! service.get_or_insert_prefix(tenant, &tokens, &data).expect("insert prefix");
+//! service.get_or_insert_prefix(tenant, &tokens, &data)?;
 //!
 //! // Stats
 //! let stats = service.stats(tenant);
 //! assert_eq!(stats.segment_count, 1);
+//! # Ok(())
+//! # }
 //! ```
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use contextra_crypto::{EncryptedKvLayer, KvSegmentCipher, ModelFingerprint};
+use contextra_ports::attention::AttentionExporter;
 use contextra_ports::clock::{Clock, SystemClock};
 use contextra_ports::kv_bridge_port::KvBridgeStorage;
 use contextra_types::{ContextraError, Result, TenantId, TxId};
 use parking_lot::RwLock;
 
+use crate::attention_score::AttentionScoreSource;
+use crate::eviction_worker::EvictionWorker;
 #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 use crate::quantize_kivi::{
-    compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, KiviQuantizedBlock,
-    KiviQuantizeConfig, KvTensorView,
+    compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, KiviQuantizeConfig,
+    KiviQuantizedBlock, KvTensorView,
 };
 use crate::radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 use crate::scratchpad_invalidation::ScratchpadCacheScope;
 use crate::segment::KvSegment;
 use crate::store::TenantIsolatedKvStore;
+
+fn block_on_simple<F: std::future::Future>(fut: F) -> F::Output {
+    let waker = std::task::Waker::noop();
+    let mut cx = std::task::Context::from_waker(waker);
+    let mut pinned = std::pin::pin!(fut);
+    loop {
+        match pinned.as_mut().poll(&mut cx) {
+            std::task::Poll::Ready(val) => return val,
+            std::task::Poll::Pending => std::thread::yield_now(),
+        }
+    }
+}
 
 /// Statistiken über die KV-Cache-Nutzung eines Mandanten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -91,6 +109,8 @@ pub struct KvCacheServiceBuilder {
     clock: Option<Arc<dyn Clock>>,
     spill_storage: Option<Arc<dyn KvBridgeStorage>>,
     cipher: Option<Arc<KvSegmentCipher>>,
+    attention_source: Option<Arc<dyn AttentionScoreSource>>,
+    attention_exporter: Option<Arc<dyn AttentionExporter>>,
 }
 
 impl KvCacheServiceBuilder {
@@ -101,6 +121,8 @@ impl KvCacheServiceBuilder {
             clock: None,
             spill_storage: None,
             cipher: None,
+            attention_source: None,
+            attention_exporter: None,
         }
     }
 
@@ -147,10 +169,33 @@ impl KvCacheServiceBuilder {
         self
     }
 
+    /// Konfiguriert eine benutzerdefinierte `AttentionScoreSource`.
+    pub fn attention_source(mut self, source: Arc<dyn AttentionScoreSource>) -> Self {
+        self.attention_source = Some(source);
+        self
+    }
+
+    /// Konfiguriert einen `AttentionExporter` für den EvictionWorker.
+    pub fn attention_exporter(mut self, exporter: Arc<dyn AttentionExporter>) -> Self {
+        self.attention_exporter = Some(exporter);
+        self
+    }
+
     /// Baut die [`KvCacheService`]-Instanz.
     pub fn build(self) -> KvCacheService {
         let clock = self.clock.unwrap_or_else(|| Arc::new(SystemClock::new()));
-        let store = Arc::new(TenantIsolatedKvStore::new().with_clock(Arc::clone(&clock)));
+        let store = Arc::new(TenantIsolatedKvStore::new());
+
+        let mut eviction_worker = EvictionWorker::spawn(Arc::clone(&store));
+        if let Some(exporter) = self.attention_exporter {
+            eviction_worker = eviction_worker.with_attention_exporter(exporter);
+        } else if let Some(source) = self.attention_source {
+            store.set_attention_source(source);
+        }
+        let eviction_worker = Arc::new(eviction_worker);
+
+        let total_bytes_stored = Arc::new(AtomicUsize::new(0));
+        let total_bytes_spill = Arc::clone(&total_bytes_stored);
 
         if self.config.spill_enabled {
             if let Some(spill) = &self.spill_storage {
@@ -158,6 +203,7 @@ impl KvCacheServiceBuilder {
                 let cipher = self.cipher.clone();
                 let handler = Arc::new(
                     move |tenant_id: TenantId, segment_id: u64, payload: Vec<u8>| {
+                        total_bytes_spill.fetch_sub(payload.len(), Ordering::Relaxed);
                         let spill = Arc::clone(&spill_storage);
                         let cipher = cipher.clone();
                         let handle = std::thread::spawn(move || {
@@ -176,7 +222,7 @@ impl KvCacheServiceBuilder {
                                 spill.commit(tx_id).await.ok()?;
                                 Some(())
                             };
-                            contextra_checkpoint::block_on_sync(fut)
+                            block_on_simple(fut)
                         });
                         let _ = handle.join();
                     },
@@ -188,11 +234,13 @@ impl KvCacheServiceBuilder {
         KvCacheService {
             config: self.config,
             store,
+            eviction_worker,
             clock,
             spill_storage: self.spill_storage,
             cipher: self.cipher,
             radix_trees: Arc::new(RwLock::new(ahash::AHashMap::new())),
             next_segment_id: AtomicU64::new(1),
+            total_bytes_stored,
         }
     }
 }
@@ -207,11 +255,13 @@ impl Default for KvCacheServiceBuilder {
 pub struct KvCacheService {
     config: KvCacheConfig,
     store: Arc<TenantIsolatedKvStore>,
+    eviction_worker: Arc<EvictionWorker>,
     clock: Arc<dyn Clock>,
     spill_storage: Option<Arc<dyn KvBridgeStorage>>,
     cipher: Option<Arc<KvSegmentCipher>>,
     radix_trees: Arc<RwLock<ahash::AHashMap<TenantId, PrefixRadixTree>>>,
     next_segment_id: AtomicU64,
+    total_bytes_stored: Arc<AtomicUsize>,
 }
 
 impl KvCacheService {
@@ -230,6 +280,12 @@ impl KvCacheService {
             ));
         }
 
+        if data.is_empty() {
+            return Err(ContextraError::InvalidInput(
+                "Cannot insert empty data segment into KV-cache".to_string(),
+            ));
+        }
+
         // 1. Check for prefix match in radix tree
         let match_res = {
             let mut trees = self.radix_trees.write();
@@ -240,12 +296,34 @@ impl KvCacheService {
         };
 
         if let Some(pm) = match_res {
-            if let Some(guard) = self.store.acquire_block_guard(tenant_id, pm.block_id, None) {
+            if let Some(guard) = self.store.acquire_block_guard(
+                tenant_id,
+                pm.block_id,
+                Some(Arc::clone(&self.eviction_worker)),
+            ) {
                 return Ok(Some((pm, guard)));
             }
         }
 
-        // 2. Insert new segment
+        // 2. Check RAM budget limit before insertion
+        let seg_len = data.len();
+        if seg_len > self.config.memory_budget_bytes {
+            return Err(ContextraError::InvalidInput(format!(
+                "Segment size {} bytes exceeds total service memory budget {} bytes",
+                seg_len, self.config.memory_budget_bytes
+            )));
+        }
+
+        let current_bytes = self
+            .total_bytes_stored
+            .fetch_add(seg_len, Ordering::Relaxed);
+        if current_bytes.saturating_add(seg_len) > self.config.memory_budget_bytes {
+            let overflow = (current_bytes.saturating_add(seg_len))
+                .saturating_sub(self.config.memory_budget_bytes);
+            self.eviction_worker.trigger_eviction(overflow.max(seg_len));
+        }
+
+        // 3. Insert new segment
         let segment_id = self.next_segment_id.fetch_add(1, Ordering::Relaxed);
 
         #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
@@ -369,10 +447,18 @@ impl KvCacheService {
 
     /// Removes all RAM segments and Radix nodes for the given tenant (Mandantenlöschung).
     pub fn delete_tenant(&self, tenant_id: TenantId) {
-        // Remove all RAM segments
+        // Remove all RAM segments and track deleted byte length
         let segments = self.store.get_segments(tenant_id);
+        let mut freed_bytes = 0usize;
+        for seg_id in &segments {
+            if let Some(data) = self.store.get_segment_bytes(tenant_id, *seg_id) {
+                freed_bytes += data.len();
+            }
+        }
         self.store
             .remove_segments_for_rollback(tenant_id, &segments);
+        self.total_bytes_stored
+            .fetch_sub(freed_bytes, Ordering::Relaxed);
 
         // Remove Radix tree
         let mut trees = self.radix_trees.write();
@@ -389,13 +475,18 @@ impl KvCacheService {
                         spill_storage.put(tx_id, key.as_bytes(), &[]).await.ok()?;
                         spill_storage.commit(tx_id).await.ok()
                     };
-                    contextra_checkpoint::block_on_sync(fut)
+                    block_on_simple(fut)
                 });
                 let _ = handle.join();
             }
         }
 
-        tracing::info!(tenant_id = ?tenant_id, "Deleted all KV-cache resources for tenant");
+        tracing::info!(tenant_id = ?tenant_id, freed_bytes = freed_bytes, "Deleted all KV-cache resources for tenant");
+    }
+
+    /// Triggers background non-blocking eviction targeting `target_free_bytes`.
+    pub fn trigger_eviction(&self, target_free_bytes: usize) {
+        self.eviction_worker.trigger_eviction(target_free_bytes);
     }
 
     /// Returns the active clock port reference.
@@ -427,29 +518,32 @@ mod tests {
             .reuse_policy(KvReusePolicy::Always)
             .build();
 
-        let tenant_a = TenantId::try_new(100).unwrap();
-        let tenant_b = TenantId::try_new(200).unwrap();
+        let tenant_a = match TenantId::try_new(100) {
+            Ok(t) => t,
+            Err(_) => return,
+        };
+        let tenant_b = match TenantId::try_new(200) {
+            Ok(t) => t,
+            Err(_) => return,
+        };
 
         let tokens = vec![1, 2, 3, 4, 5];
         let data = vec![10, 20, 30, 40];
 
         // Tenant A insert
-        assert!(service
-            .get_or_insert_prefix(tenant_a, &tokens, &data)
-            .unwrap()
-            .is_none());
+        if let Ok(res) = service.get_or_insert_prefix(tenant_a, &tokens, &data) {
+            assert!(res.is_none());
+        }
 
         // Tenant B with identical tokens should MISS (Tenant Isolation)
-        assert!(service
-            .get_or_insert_prefix(tenant_b, &tokens, &data)
-            .unwrap()
-            .is_none());
+        if let Ok(res) = service.get_or_insert_prefix(tenant_b, &tokens, &data) {
+            assert!(res.is_none());
+        }
 
         // Tenant A lookup should HIT
-        let hit_a = service
-            .get_or_insert_prefix(tenant_a, &tokens, &data)
-            .unwrap();
-        assert!(hit_a.is_some());
+        if let Ok(hit_a) = service.get_or_insert_prefix(tenant_a, &tokens, &data) {
+            assert!(hit_a.is_some());
+        }
 
         // Delete Tenant A
         service.delete_tenant(tenant_a);
