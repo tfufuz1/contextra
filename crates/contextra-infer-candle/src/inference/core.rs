@@ -341,42 +341,48 @@ impl CandleLlmClient {
         quantization: crate::model_registry::CandleQuantization,
     ) -> Result<Self> {
         if !model_dir.exists() {
-            return Err(ContextraError::InvalidInput(format!(
-                "Candle model directory does not exist: {}",
-                model_dir.display()
-            )));
+            return Err(ContextraError::ModelLoad {
+                path: model_dir.display().to_string(),
+                reason: format!("Candle model directory does not exist: {}", model_dir.display()),
+            });
         }
 
         let tokenizer_path = model_dir.join("tokenizer.json");
-        let tokenizer = if tokenizer_path.exists() {
-            tokenizers::Tokenizer::from_file(&tokenizer_path).map_err(|e| {
-                ContextraError::InvalidInput(format!(
-                    "Failed to load tokenizer from {}: {e}",
-                    tokenizer_path.display()
-                ))
-            })?
-        } else {
-            let tokenizer_bytes = r#"{
-                "version": "1.0",
-                "truncation": null,
-                "padding": null,
-                "added_tokens": [],
-                "normalizer": null,
-                "pre_tokenizer": null,
-                "post_processor": null,
-                "decoder": null,
-                "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
-            }"#;
-            tokenizers::Tokenizer::from_bytes(tokenizer_bytes.as_bytes()).map_err(|e| {
-                ContextraError::Internal(format!("Failed to parse default tokenizer: {e}"))
-            })?
-        };
+        if !tokenizer_path.exists() {
+            return Err(ContextraError::ModelLoad {
+                path: tokenizer_path.display().to_string(),
+                reason: format!(
+                    "Tokenizer file 'tokenizer.json' missing in model directory: {}",
+                    model_dir.display()
+                ),
+            });
+        }
 
-        let gguf_path = model_dir.join("model.gguf");
-        let fingerprint = if gguf_path.exists() {
-            crate::model_registry::compute_fingerprint(&gguf_path, &quantization)?
-        // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
-        } else if let Ok(entries) = std::fs::read_dir(model_dir) {
+        let tokenizer = tokenizers::Tokenizer::from_file(&tokenizer_path).map_err(|e| {
+            ContextraError::ModelLoad {
+                path: tokenizer_path.display().to_string(),
+                reason: format!("Failed to load tokenizer from {}: {e}", tokenizer_path.display()),
+            }
+        })?;
+
+        if tokenizer.get_vocab_size(true) == 0 {
+            return Err(ContextraError::ModelLoad {
+                path: tokenizer_path.display().to_string(),
+                reason: "Tokenizer vocabulary is empty".to_string(),
+            });
+        }
+
+        let default_gguf = model_dir.join("model.gguf");
+        let gguf_path = if default_gguf.exists() {
+            default_gguf
+        } else {
+            let entries = std::fs::read_dir(model_dir).map_err(|e| {
+                ContextraError::ModelLoad {
+                    path: model_dir.display().to_string(),
+                    reason: format!("Failed to read model directory {}: {e}", model_dir.display()),
+                }
+            })?;
+
             let mut gguf_found = None;
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -385,52 +391,38 @@ impl CandleLlmClient {
                     break;
                 }
             }
-            if let Some(path) = gguf_found {
-                crate::model_registry::compute_fingerprint(&path, &quantization)?
-            } else {
-                crate::model_registry::ModelFingerprint {
-                    hash: [0u8; 32],
-                    model_id: model_dir
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("unknown")
-                        .to_string(),
-                    quantization: quantization.to_string(),
-                }
-            }
-        } else {
-            crate::model_registry::ModelFingerprint {
-                hash: [0u8; 32],
-                model_id: model_dir
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("unknown")
-                    .to_string(),
-                quantization: quantization.to_string(),
-            }
+
+            gguf_found.ok_or_else(|| ContextraError::ModelLoad {
+                path: model_dir.display().to_string(),
+                reason: format!("No GGUF model file found in model directory: {}", model_dir.display()),
+            })?
         };
 
-        let gguf_file_path = if gguf_path.exists() {
-            Some(gguf_path)
-        // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
-        } else if let Ok(entries) = std::fs::read_dir(model_dir) {
-            entries
-                .flatten()
-                .map(|e| e.path())
-                .find(|p| p.extension().and_then(|s| s.to_str()) == Some("gguf"))
-        } else {
-            None
-        };
+        let fingerprint = crate::model_registry::compute_fingerprint(&gguf_path, &quantization)
+            .map_err(|e| ContextraError::ModelLoad {
+                path: gguf_path.display().to_string(),
+                reason: format!("Failed to compute fingerprint for model {}: {e}", gguf_path.display()),
+            })?;
+
+        if fingerprint.hash == [0u8; 32] {
+            return Err(ContextraError::ModelLoad {
+                path: gguf_path.display().to_string(),
+                reason: format!(
+                    "Computed model fingerprint hash is all zeros for model {}",
+                    gguf_path.display()
+                ),
+            });
+        }
 
         let device = Device::Cpu;
-        let model: Box<dyn CandleModelInner + Send> = if let Some(path) = gguf_file_path {
-            Box::new(QuantizedLlamaModel::load(&path, &device)?)
-        } else {
-            // Fallback for empty/mock test directories or directories without GGUF weight binaries
-            Box::new(DefaultCandleLlmModel)
-        };
+        let model = QuantizedLlamaModel::load(&gguf_path, &device).map_err(|e| {
+            ContextraError::ModelLoad {
+                path: gguf_path.display().to_string(),
+                reason: format!("Failed to load quantized GGUF Llama model weights: {e}"),
+            }
+        })?;
 
-        Ok(Self::new(device, model, fingerprint, tokenizer))
+        Ok(Self::new(device, Box::new(model), fingerprint, tokenizer))
     }
 }
 
@@ -788,8 +780,10 @@ impl CandleModelInner for QuantizedLlamaModel {
 }
 
 /// Default inner Candle LLM mock model for unit tests when binary weights are absent.
+#[cfg(any(test, feature = "test-utils"))]
 pub struct DefaultCandleLlmModel;
 
+#[cfg(any(test, feature = "test-utils"))]
 impl CandleModelInner for DefaultCandleLlmModel {
     fn generate(
         &mut self,
