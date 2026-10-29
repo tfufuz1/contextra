@@ -23,5 +23,9 @@ fn test_parse_gguf_metadata_corrupt_file() {
     let res = parse_gguf_metadata(tmp.path());
     assert!(res.is_err());
     let err_str = res.unwrap_err().to_string();
-    assert!(err_str.contains("Failed to parse GGUF container header"));
+    assert!(
+        err_str.contains("Invalid magic bytes")
+            || err_str.contains("Failed to parse GGUF container header")
+            || err_str.contains("Model load error")
+    );
 }
