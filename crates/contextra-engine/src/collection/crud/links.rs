@@ -23,39 +23,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .lock_keys_sorted([from_str.as_str(), to_str.as_str()])
             .await;
 
-        // Prevent cycles for ALL relation types: if `to` transitively reaches `from`
-        // via the same relation, adding `from -> to` creates a cycle.
-        // For Supersedes, cycles cause post-RRF displacement of all docs in the cycle (BL-1).
-        // For Associates/DerivedFrom/Elaborates, cycles cause unbounded BFS queue growth
-        // in traverse_links (P0 audit fix).
-        {
-            let mut visited = std::collections::HashSet::new();
-            let mut queue = std::collections::VecDeque::new();
-            visited.insert(to);
-            queue.push_back(to);
-
-            let mut steps = 0u32;
-            const MAX_BFS_STEPS: u32 = 1000;
-            while let Some(curr) = queue.pop_front() {
-                steps += 1;
-                if steps > MAX_BFS_STEPS {
-                    break;
-                }
-                if curr == from {
-                    return Err(contextra_types::ContextraError::InvalidInput(format!(
-                        "Cyclic {:?} relation detected: document {:?} transitively reaches {:?}",
-                        relation, to, from
-                    )));
-                }
-                let links = self.get_links(curr).await?;
-                for link in links {
-                    // Only follow edges of the same relation type to detect typed cycles
-                    if link.relation == relation && visited.insert(link.target) {
-                        queue.push_back(link.target);
-                    }
-                }
-            }
-        }
+        self.check_link_cycle(from, to, relation).await?;
 
         let tx = self.allocate_tx()?;
         let doc_key = self.namespaced_key(&from.inner().to_le_bytes(), 1);
@@ -65,72 +33,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .get_at_seq_tracked(tx, &doc_key, u64::MAX)
             .await?
         {
-            let mut doc_id_str = None;
-            let mut updated_links = false;
+            let (doc_id_str, updated_links) =
+                self.update_metadata_links(tx, &doc_key, &bytes, to, relation).await?;
 
-            // Determine which struct it was saved as
-            if let Ok(mut meta) = serde_json::from_slice::<StoredDocumentMeta>(&bytes) {
-                doc_id_str = Some(meta.id.clone());
-                let meta_obj = meta.metadata.get_or_insert_with(|| serde_json::json!({}));
-                if let Some(obj) = meta_obj.as_object_mut() {
-                    let mut links: Vec<contextra_types::domain::MemoryLink> = obj
-                        .get("links")
-                        .and_then(|v| serde_json::from_value(v.clone()).ok())
-                        .unwrap_or_default();
-
-                    // Check if link already exists to avoid duplicates
-                    if !links
-                        .iter()
-                        .any(|l| l.target == to && l.relation == relation)
-                    {
-                        links.push(contextra_types::domain::MemoryLink {
-                            target: to,
-                            relation,
-                            created_at_tx: tx,
-                        });
-
-                        let links_val = serde_json::to_value(links).map_err(|e| {
-                            contextra_types::ContextraError::Serialization(e.to_string())
-                        })?;
-                        obj.insert("links".to_string(), links_val);
-                        obj.insert("updated_at_tx".to_string(), serde_json::json!(tx.inner()));
-                        let updated_bytes = serde_json::to_vec(&meta)?;
-                        self.storage.put(tx, &doc_key, &updated_bytes).await?;
-                        updated_links = true;
-                    }
-                }
-            } else if let Ok(mut full) = serde_json::from_slice::<StoredDocument>(&bytes) {
-                doc_id_str = Some(full.id.clone());
-                let full_obj = full.metadata.get_or_insert_with(|| serde_json::json!({}));
-                if let Some(obj) = full_obj.as_object_mut() {
-                    let mut links: Vec<contextra_types::domain::MemoryLink> = obj
-                        .get("links")
-                        .and_then(|v| serde_json::from_value(v.clone()).ok())
-                        .unwrap_or_default();
-
-                    if !links
-                        .iter()
-                        .any(|l| l.target == to && l.relation == relation)
-                    {
-                        links.push(contextra_types::domain::MemoryLink {
-                            target: to,
-                            relation,
-                            created_at_tx: tx,
-                        });
-
-                        let links_val = serde_json::to_value(links).map_err(|e| {
-                            contextra_types::ContextraError::Serialization(e.to_string())
-                        })?;
-                        obj.insert("links".to_string(), links_val);
-                        obj.insert("updated_at_tx".to_string(), serde_json::json!(tx.inner()));
-                        let updated_bytes = serde_json::to_vec(&full)?;
-                        self.storage.put(tx, &doc_key, &updated_bytes).await?;
-                        updated_links = true;
-                    }
-                }
-            }
-
-            // Also update user_key (key_type=0) if links were updated and string id is known
             if updated_links {
                 if let Some(ref id_str) = doc_id_str {
                     let user_key = self.namespaced_key(id_str.as_bytes(), 0);
@@ -173,9 +78,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     }
                 }
 
-                // INVARIANT INV-GRAPH-PROV-1: Graph tombstone MUST precede LSM commit
-                // for Supersedes links. CSR is rebuilt from LSM on startup — tombstone state is recovered
-                // transitively.
                 if relation == contextra_types::domain::LinkRelation::Supersedes {
                     contextra_graph::cascade_invalidate_edges_for_superseded_doc(
                         &self.graph_index,
@@ -185,12 +87,121 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     .await?;
                 }
 
-                // Commit transaction to persist the link updates and edge tombstones atomically
                 self.storage.commit(tx).await?;
             }
         }
 
         Ok(())
+    }
+
+    /// BFS cycle check to prevent self-referential or transitive cycles along relation links.
+    async fn check_link_cycle(
+        &self,
+        from: DocId,
+        to: DocId,
+        relation: contextra_types::domain::LinkRelation,
+    ) -> Result<()> {
+        let mut visited = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        visited.insert(to);
+        queue.push_back(to);
+
+        let mut steps = 0u32;
+        const MAX_BFS_STEPS: u32 = 1000;
+        while let Some(curr) = queue.pop_front() {
+            steps += 1;
+            if steps > MAX_BFS_STEPS {
+                break;
+            }
+            if curr == from {
+                return Err(contextra_types::ContextraError::InvalidInput(format!(
+                    "Cyclic {:?} relation detected: document {:?} transitively reaches {:?}",
+                    relation, to, from
+                )));
+            }
+            let links = self.get_links(curr).await?;
+            for link in links {
+                if link.relation == relation && visited.insert(link.target) {
+                    queue.push_back(link.target);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Appends memory link to stored document metadata/full struct.
+    async fn update_metadata_links(
+        &self,
+        tx: contextra_types::TxId,
+        doc_key: &[u8],
+        bytes: &[u8],
+        to: DocId,
+        relation: contextra_types::domain::LinkRelation,
+    ) -> Result<(Option<String>, bool)> {
+        let mut doc_id_str = None;
+        let mut updated_links = false;
+
+        if let Ok(mut meta) = serde_json::from_slice::<StoredDocumentMeta>(bytes) {
+            doc_id_str = Some(meta.id.clone());
+            let meta_obj = meta.metadata.get_or_insert_with(|| serde_json::json!({}));
+            if let Some(obj) = meta_obj.as_object_mut() {
+                let mut links: Vec<contextra_types::domain::MemoryLink> = obj
+                    .get("links")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+
+                if !links
+                    .iter()
+                    .any(|l| l.target == to && l.relation == relation)
+                {
+                    links.push(contextra_types::domain::MemoryLink {
+                        target: to,
+                        relation,
+                        created_at_tx: tx,
+                    });
+
+                    let links_val = serde_json::to_value(links).map_err(|e| {
+                        contextra_types::ContextraError::Serialization(e.to_string())
+                    })?;
+                    obj.insert("links".to_string(), links_val);
+                    obj.insert("updated_at_tx".to_string(), serde_json::json!(tx.inner()));
+                    let updated_bytes = serde_json::to_vec(&meta)?;
+                    self.storage.put(tx, doc_key, &updated_bytes).await?;
+                    updated_links = true;
+                }
+            }
+        } else if let Ok(mut full) = serde_json::from_slice::<StoredDocument>(bytes) {
+            doc_id_str = Some(full.id.clone());
+            let full_obj = full.metadata.get_or_insert_with(|| serde_json::json!({}));
+            if let Some(obj) = full_obj.as_object_mut() {
+                let mut links: Vec<contextra_types::domain::MemoryLink> = obj
+                    .get("links")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+
+                if !links
+                    .iter()
+                    .any(|l| l.target == to && l.relation == relation)
+                {
+                    links.push(contextra_types::domain::MemoryLink {
+                        target: to,
+                        relation,
+                        created_at_tx: tx,
+                    });
+
+                    let links_val = serde_json::to_value(links).map_err(|e| {
+                        contextra_types::ContextraError::Serialization(e.to_string())
+                    })?;
+                    obj.insert("links".to_string(), links_val);
+                    obj.insert("updated_at_tx".to_string(), serde_json::json!(tx.inner()));
+                    let updated_bytes = serde_json::to_vec(&full)?;
+                    self.storage.put(tx, doc_key, &updated_bytes).await?;
+                    updated_links = true;
+                }
+            }
+        }
+
+        Ok((doc_id_str, updated_links))
     }
 
     /// Retrieves all links for a given document.
