@@ -31,6 +31,7 @@ pub mod check_commit_diff_integrity;
 pub mod check_duplicate_core_primitives;
 pub mod check_duplicate_symbols_cross_file;
 pub mod check_mutation_score_gate;
+pub mod check_orphan_files;
 pub mod check_phantom_files;
 pub mod check_ring0_async_purity;
 pub mod check_ring_capabilities_consistency;

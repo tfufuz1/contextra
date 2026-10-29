@@ -1,0 +1,1148 @@
+# governance/orphan-allowlist.toml — Whitelist for orphan .rs files
+# Mandatory fields for every entry: path, reason, owner, expires (YYYY-MM-DD)
+
+[[orphan]]
+path = "crates/contextra-agent/src/engine/condition.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-agent/src/engine/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-checkpoint/src/guard/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J3"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-checkpoint/src/meta/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J3"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-checkpoint/src/orphan/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J3"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-checkpoint/src/store/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J3"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/community/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_index/mod.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_index/mutations.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_index/traversal.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_persist.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_read/communities.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_read/mod.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_read/pagerank.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_read/path_rag.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_write/edge_mutation.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_write/entity.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_write/hyperedge.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_write/mod.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/graph_write/tombstone.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/inner/compaction.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/inner/estimate.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/inner/mod.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/inner/reinforcement.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/path_graph.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/tests/basic_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/tests/bitemporal_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/tests/graph_index_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/tests/mutation_sequence_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/tests/persistence_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/types.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-graph/src/csr/visibility.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-candle/src/inference/config.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-candle/src/inference/core.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-candle/src/inference/prefix_reuse.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-candle/src/inference/quantized_llama.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-candle/src/inference/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-candle/src/inference/traits.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-ollama/src/client/circuit_breaker.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-ollama/src/client/config.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-ollama/src/client/core.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-ollama/src/client/errors.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-ollama/src/client/policy.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-ollama/src/client/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-ollama/src/client/trait_impls.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-ollama/src/client/validation.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-ollama/src/client/wire.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-infer-ollama/src/query_rewriter.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J11"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-ingest/src/chunking/email/mod.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-ingest/src/chunking/structured/mod.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-kvcache/src/adapters.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J1"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-kvcache/src/service.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "J1"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-mcp/src/prompt_injection/audit.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-mcp/src/prompt_injection/guard.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-mcp/src/prompt_injection/policy.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-mcp/src/prompt_injection/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/bandit_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/fixtures.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/id_gen_determinism_test.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/latency_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/misc_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/misc_tests/part1.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/misc_tests/part2.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/routing_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/routing_tests/dispatch.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/routing_tests/engine_part1.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-router/src/tests/routing_tests/engine_part2.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/compaction/adaptive.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/compaction/config.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/compaction/engine.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/compaction/merge_operator.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/compaction/retention.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/compaction/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/compaction/tests/advanced.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/compaction/tests/basic.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/sstable/block_cache.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/sstable/block_search.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/sstable/bloom.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/sstable/builder.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/sstable/io.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/sstable/reader.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/sstable/reader_ext.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/sstable/stream.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-store/src/sstable/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/inverted/index_struct.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/inverted/morph_index.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/inverted/purge.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/inverted/scanner.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/inverted/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/inverted/tests/mock.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/inverted/tests/search_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/inverted/tests/tx_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/inverted/types.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/morphology/compound_splitter.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/morphology/metrics.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/morphology/passthrough.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/morphology/stopwords.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/morphology/tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-text/src/morphology/trie.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/budget.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/domain/document.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/domain/ids.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/domain/misc.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/domain/mod.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/domain/tests/doc_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/domain/tests/ids_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/domain/tests/misc_tests.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/domain/tests/mod.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/filter.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/importance.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "crates/contextra-types/src/types/saos.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_action_pinning.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_agents_freshness.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_agents_integrity.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_audit_duplication.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_audit_tool_evidence.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_audit_verdict_independence.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_commit_messages.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_compile.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_coverage_gate.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_doc_references.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_duplicate_intent.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_duplicate_symbols.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_ffi_panic_boundary.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_flatbuffers_drift.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_jules_context_freshness.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_manifest_completeness.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_max_results_unbound.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_module_reachability.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_nan_validation_in_hot_loop.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_orphan_modules.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_placeholder_refs.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_recall_stability.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_result_dropped_on_io.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_toc_integrity.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_toctou_trait_defaults.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/check_workflow_commands.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/gates/check_crate_references.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/gates/debt_audit.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/gen_arch_docs.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/gen_feature_catalog.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/gen_prompter_data.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/generate_adr.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/generators/mod.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/generators/sbom.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/blast_radius.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/can_merge.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/claims_in_pr.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/codeowners_coverage.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/dependency_gate.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/determinism_check.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/diff_budget.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/doc_truth.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/env_attest.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/explain.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/flake_report.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/fuzz_smoke.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/gate_weakening.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/gates_catalog_sync.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/jules.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/jules_dispatch.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/ledger.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/lock_audit.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/loop_guard.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/mutants_diff.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/plan_lint.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/postmortem.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/protected_paths.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/ratchet.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/registry_check.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/risk.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/scope_guard.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/session_report.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/symbol_exists.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/task_card.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/test_integrity.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/unsafe_audit.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/verdict.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/harness/wal_replay_verify.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/init_audit_fix.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/jules_preflight.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/jules_submit_gate.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/lint_unsafe_slice_bounds.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/migrate_docid_128.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/post_merge_report.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/proof/bench_trend.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/proof/forensic_test.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/proof/mod.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/record_mutation_score.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"
+
+[[orphan]]
+path = "xtask/src/validate_pr_checklist.rs"
+reason = "Existing orphan file pending cleanup/integration"
+owner = "MP-05"
+expires = "2026-11-28"

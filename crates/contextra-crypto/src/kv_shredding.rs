@@ -15,9 +15,9 @@ use aes_gcm_siv::{
     aead::{Aead, KeyInit},
     Aes256GcmSiv, Nonce,
 };
+use ahash::{AHashMap, AHashSet};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -96,7 +96,7 @@ struct GroupEntry {
     kek: GroupKek,
     wrapped_kek: Vec<u8>,
     kek_nonce: [u8; 12],
-    record_deks: HashMap<u64, RecordDekEntry>,
+    record_deks: AHashMap<u64, RecordDekEntry>,
 }
 
 /// Derives or retrieves a random sub-key (Group KEK) for a shred group via `KeyRegistry`.
@@ -111,8 +111,8 @@ pub fn derive_subkey(
 /// In-memory thread-safe registry for envelope KV crypto-shredding keys.
 #[derive(Debug, Default)]
 pub struct KeyRegistry {
-    groups: RwLock<HashMap<u64, GroupEntry>>,
-    revoked_groups: RwLock<HashSet<u64>>,
+    groups: RwLock<AHashMap<u64, GroupEntry>>,
+    revoked_groups: RwLock<AHashSet<u64>>,
     pub revocation_log: Option<std::sync::Arc<RevocationLog>>,
 }
 
@@ -120,14 +120,31 @@ impl KeyRegistry {
     /// Creates a new empty `KeyRegistry`.
     pub fn new() -> Self {
         Self {
-            groups: RwLock::new(HashMap::new()),
-            revoked_groups: RwLock::new(HashSet::new()),
+            groups: RwLock::new(AHashMap::new()),
+            revoked_groups: RwLock::new(AHashSet::new()),
             revocation_log: None,
         }
     }
 
-    /// Attaches an optional `RevocationLog` to check for persisted key/group revocations.
+    /// Attaches an optional `RevocationLog` to check for persisted key/group revocations,
+    /// syncing any previously logged revocations into `revoked_groups` and purging RAM keys.
     pub fn with_revocation_log(mut self, log: std::sync::Arc<RevocationLog>) -> Self {
+        if let Ok(mut revoked_guard) = self.revoked_groups.write() {
+            if let Ok(mut groups_guard) = self.groups.write() {
+                for target in log.revoked_targets() {
+                    if let RevocationTarget::Group(group_id) = target {
+                        revoked_guard.insert(group_id);
+                        if let Some(mut entry) = groups_guard.remove(&group_id) {
+                            entry.kek.0.zeroize();
+                            entry.wrapped_kek.zeroize();
+                            for (_, mut rec) in entry.record_deks.drain() {
+                                rec.wrapped_dek.zeroize();
+                            }
+                        }
+                    }
+                }
+            }
+        }
         self.revocation_log = Some(log);
         self
     }
@@ -215,7 +232,7 @@ impl KeyRegistry {
             kek: GroupKek(kek_bytes),
             wrapped_kek,
             kek_nonce,
-            record_deks: HashMap::new(),
+            record_deks: AHashMap::new(),
         };
 
         write_guard.insert(group_id, entry);
@@ -223,35 +240,55 @@ impl KeyRegistry {
     }
 
     /// Revokes (destroys) the Group KEK for `group_id` (Group Deletion / Group Crypto-Shredding).
-    /// Returns `true` if the group was active and is now revoked.
-    pub fn revoke_group(&self, group_id: u64) -> bool {
-        let mut revoked_guard = match self.revoked_groups.write() {
-            Ok(g) => g,
-            Err(_) => return false,
-        };
+    ///
+    /// # Crash Semantics & Atomic Logging
+    /// 1. If a `RevocationLog` is configured, the revocation is written to durable log storage FIRST.
+    ///    If logging fails, the key in RAM is NOT revoked or modified, and the error is returned.
+    /// 2. If logging succeeds (or if no log is attached), key material is zeroized and purged from RAM,
+    ///    and `group_id` is recorded in `revoked_groups`.
+    /// 3. Crash recovery semantics: Should a crash occur between durable log append and RAM zeroization,
+    ///    recovery via `with_revocation_log` at startup reloads the log and idempotently completes
+    ///    the revocation (purging RAM keys and updating revoked group tracking).
+    pub fn revoke_group(&self, group_id: u64) -> Result<bool> {
+        if self.is_group_revoked(group_id) {
+            return Ok(false);
+        }
+
+        // Step 1: Durable log write first if RevocationLog is present
+        if let Some(ref log) = self.revocation_log {
+            log.append(RevocationTarget::Group(group_id))?;
+        }
+
+        // Step 2: Update RAM state & zeroize key material
+        let mut revoked_guard = self
+            .revoked_groups
+            .write()
+            .map_err(|_| CryptoError::Crypto("KeyRegistry write lock poisoned".to_string()))?;
 
         if revoked_guard.contains(&group_id) {
-            return false;
+            return Ok(false);
         }
 
         revoked_guard.insert(group_id);
 
-        if let Ok(mut groups_guard) = self.groups.write() {
-            if let Some(mut entry) = groups_guard.remove(&group_id) {
-                entry.kek.0.zeroize();
-                entry.wrapped_kek.zeroize();
-                for (_, mut rec) in entry.record_deks.drain() {
-                    rec.wrapped_dek.zeroize();
-                }
-                return true;
+        let mut groups_guard = self
+            .groups
+            .write()
+            .map_err(|_| CryptoError::Crypto("KeyRegistry write lock poisoned".to_string()))?;
+
+        if let Some(mut entry) = groups_guard.remove(&group_id) {
+            entry.kek.0.zeroize();
+            entry.wrapped_kek.zeroize();
+            for (_, mut rec) in entry.record_deks.drain() {
+                rec.wrapped_dek.zeroize();
             }
         }
 
-        true
+        Ok(true)
     }
 
     /// Revokes (destroys) the Group KEK for `group_id` in O(1). Alias for `revoke_group`.
-    pub fn revoke_subkey(&self, group_id: u64) -> bool {
+    pub fn revoke_subkey(&self, group_id: u64) -> Result<bool> {
         self.revoke_group(group_id)
     }
 
@@ -537,7 +574,7 @@ mod tests {
         assert!(registry.is_group_active(group_id));
 
         // Revoke entire group (Group Deletion)
-        let revoked = registry.revoke_group(group_id);
+        let revoked = registry.revoke_group(group_id).expect("revoke_group");
         assert!(revoked, "Group 100 revocation must succeed");
         assert!(!registry.is_group_active(group_id));
 

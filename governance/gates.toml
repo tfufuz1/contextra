@@ -159,6 +159,16 @@ why = "Verhindert Namenskonflikte bei Symbolen."
 owner = "MP-04"
 
 [[gate]]
+name = "orphan-files"
+aliases = ["check-orphan-files"]
+tier = "pr"
+from_phase = "PH0"
+kind = "builtin"
+enforces = ["REQ-QA-005", "INV-WIRING-2"]
+why = "Stellt sicher, dass jede .rs-Datei im Workspace von einem Modulbaum erreicht wird oder in governance/orphan-allowlist.toml eingetragen ist."
+owner = "MP-05"
+
+[[gate]]
 name = "code-lints"
 tier = "pr"
 from_phase = "PH0"

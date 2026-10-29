@@ -12,7 +12,7 @@ pub fn generate_avv_draft(ctx: &contextra_avv_generator::AvvContext) -> String {
 }
 
 #[cfg(test)]
-#[allow(deprecated)]
+#[allow(deprecated, clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 

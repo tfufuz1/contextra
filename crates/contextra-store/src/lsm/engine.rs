@@ -489,12 +489,6 @@ impl LsmStorage {
         self.sstables.read().await.clone()
     }
 
-    /// Returns a reference to the active WAL.
-    #[allow(dead_code)]
-    pub(crate) async fn wal_for_scanner(&self) -> Arc<crate::wal::Wal> {
-        self.wal.read().await.clone()
-    }
-
     /// Returns the data directory path.
     pub fn data_path(&self) -> &std::path::Path {
         &self.config.path

@@ -310,7 +310,7 @@ impl Gate for DeletionHonestyGate {
         };
         let root = temp.path();
 
-        // Positive control
+        // Positive control: clean doc
         if let Err(e) = fs::write(root.join("README.md"), "# Contextra") {
             return Outcome::Fail {
                 reason: format!("Failed to write README.md in selftest: {e}"),
@@ -322,12 +322,113 @@ impl Gate for DeletionHonestyGate {
             };
         }
 
-        // Negative control: fake proof in tool response
+        // Positive control: exempted file containing new phrases must NOT trigger a violation
+        if let Err(e) = fs::write(
+            root.join("docs/SPEC.md"),
+            "DSGVO-konform, Art.-17-konform, unwiederbringlich, Löschzertifikat, Löschung nach Art. 17, rechtskonform, rechtssicher",
+        ) {
+            return Outcome::Fail {
+                reason: format!("Failed to write docs/SPEC.md in selftest: {e}"),
+            };
+        }
+        if scan_deletion_honesty(root) != Outcome::Pass {
+            return Outcome::Fail {
+                reason: "Selftest failed: scan_deletion_honesty triggered violation on new phrases in exempted docs/SPEC.md".to_string(),
+            };
+        }
+        let _ = fs::remove_file(root.join("docs/SPEC.md"));
+
+        // Positive control: "kryptografisch gelöscht" WITH custody / assumption MUST pass
+        if let Err(e) = fs::write(
+            root.join("README.md"),
+            "Das Dokument ist kryptografisch gelöscht unter Annahme A-FLASH mit Custody K1.",
+        ) {
+            return Outcome::Fail {
+                reason: format!("Failed to write README.md in selftest: {e}"),
+            };
+        }
+        if scan_deletion_honesty(root) != Outcome::Pass {
+            return Outcome::Fail {
+                reason: "Selftest failed: scan_deletion_honesty rejected 'kryptografisch gelöscht' with valid custody/assumption".to_string(),
+            };
+        }
+
+        // Positive control: line with <!-- claim-ignore --> MUST pass
+        if let Err(e) = fs::write(
+            root.join("README.md"),
+            "100 % gelöscht <!-- claim-ignore -->",
+        ) {
+            return Outcome::Fail {
+                reason: format!("Failed to write README.md in selftest: {e}"),
+            };
+        }
+        if scan_deletion_honesty(root) != Outcome::Pass {
+            return Outcome::Fail {
+                reason:
+                    "Selftest failed: scan_deletion_honesty failed to respect <!-- claim-ignore -->"
+                        .to_string(),
+            };
+        }
+
+        // Negative control test cases for each new prohibited phrase:
+        let test_cases = [
+            ("100 % gelöscht", "100 % gelöscht"),
+            ("unwiederbringlich", "unwiederbringlich"),
+            ("DSGVO-konform", "DSGVO-konform"),
+            ("Art.-17-konform", "Art.-17-konform"),
+            ("rechtskonform gelöscht", "rechtskonform gelöscht"),
+            ("rechtskonform", "rechtskonform"),
+            ("rechtssicher", "rechtssicher"),
+            ("Löschzertifikat", "Löschzertifikat"),
+            ("Löschung nach Art. 17", "Löschung nach Art. 17"),
+            ("kryptografisch gelöscht", "kryptografisch gelöscht"),
+        ];
+
+        for (phrase_name, payload) in test_cases {
+            if let Err(e) = fs::write(root.join("README.md"), payload) {
+                return Outcome::Fail {
+                    reason: format!("Failed to write test payload for {phrase_name}: {e}"),
+                };
+            }
+            match scan_deletion_honesty(root) {
+                Outcome::Fail { reason }
+                    if reason.contains(phrase_name)
+                        || reason.contains(&payload.to_lowercase())
+                        || reason.contains("kryptografisch") => {}
+                res => {
+                    return Outcome::Fail {
+                        reason: format!("Selftest failed: scan_deletion_honesty failed to detect forbidden phrase '{phrase_name}' (got {:?}", res),
+                    };
+                }
+            }
+        }
+
+        // Negative control: string literal in MCP non-test source file
         if let Err(e) = fs::create_dir_all(root.join("crates/contextra-mcp/src")) {
             return Outcome::Fail {
                 reason: format!("Failed to create dummy mcp dir in selftest: {e}"),
             };
         }
+        if let Err(e) = fs::write(
+            root.join("crates/contextra-mcp/src/bad_mcp_phrase.rs"),
+            "let s = \"DSGVO-konform\";",
+        ) {
+            return Outcome::Fail {
+                reason: format!("Failed to write bad MCP phrase fixture in selftest: {e}"),
+            };
+        }
+        match scan_deletion_honesty(root) {
+            Outcome::Fail { reason }
+                if reason.contains("DSGVO-konform") || reason.contains("dsgvo konform") => {}
+            _ => {
+                return Outcome::Fail {
+                    reason: "Selftest failed: scan_deletion_honesty failed to detect prohibited phrase in MCP source string literal".to_string(),
+                };
+            }
+        }
+        let _ = fs::remove_file(root.join("crates/contextra-mcp/src/bad_mcp_phrase.rs"));
+
+        // Negative control: fake proof in tool response
         if let Err(e) = fs::write(
             root.join("crates/contextra-mcp/src/bad_tool.rs"),
             "json!({ \"proof\": dummy_proof })",
@@ -346,12 +447,64 @@ impl Gate for DeletionHonestyGate {
     }
 }
 
+/// Normalizes claim text for deletion honesty checks:
+/// - converts to lowercase
+/// - collapses spaces before `%` ("100 %" -> "100%")
+/// - standardizes article 17 citations ("art.-17", "art. 17", "art.17" -> "art 17")
+/// - converts hyphens to spaces ("dsgvo-konform" -> "dsgvo konform")
+/// - collapses multiple whitespace sequences
+fn normalize_claim_text(text: &str) -> String {
+    let lower = text.to_lowercase();
+    let norm = lower.replace(" %", "%");
+    let norm = norm
+        .replace("art.-17", "art 17")
+        .replace("art. 17", "art 17")
+        .replace("art.17", "art 17");
+    let norm = norm.replace('-', " ");
+    norm.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn is_excluded_from_new_phrases(rel_path: &str) -> bool {
+    rel_path == "docs/SPEC.md"
+        || rel_path == "docs/PLAN.md"
+        || rel_path.starts_with("docs/decisions/")
+        || rel_path.starts_with("docs/analysis/")
+        || rel_path.starts_with("docs/spec/")
+}
+
+fn is_target_for_new_phrases(rel_path: &str) -> bool {
+    if is_excluded_from_new_phrases(rel_path) {
+        return false;
+    }
+    if rel_path == "README.md"
+        || rel_path == "AGENTS.md"
+        || rel_path == "CLAUDE.md"
+        || rel_path == "docs/ARCHITECTURE.md"
+        || rel_path == "docs/SECURITY.md"
+        || rel_path == "docs/CONTRIBUTING.md"
+    {
+        return true;
+    }
+    if rel_path.starts_with("crates/") && rel_path.ends_with("README.md") {
+        return true;
+    }
+    if rel_path.starts_with("crates/contextra-mcp/src/")
+        && rel_path.ends_with(".rs")
+        && !rel_path.contains("/tests/")
+        && !rel_path.contains("/benches/")
+        && !rel_path.contains("/examples/")
+    {
+        return true;
+    }
+    false
+}
+
 pub fn scan_deletion_honesty(root: &Path) -> Outcome {
     let mut violations = Vec::new();
 
-    // 1. Scan external docs (README, AGENTS.md, etc.) for unmeasured absolute claims
-    let docs = ["README.md", "AGENTS.md", "docs/SPEC.md"];
-    for doc in docs {
+    // 1. Legacy phrase scan (README.md, AGENTS.md, docs/SPEC.md)
+    let legacy_docs = ["README.md", "AGENTS.md", "docs/SPEC.md"];
+    for doc in legacy_docs {
         let path = root.join(doc);
         if !path.exists() {
             continue;
@@ -381,8 +534,115 @@ pub fn scan_deletion_honesty(root: &Path) -> Outcome {
         }
     }
 
-    // 2. Scan code for hardcoded zero counts, dummy proof verifications, and ungrounded tool proofs
+    // 2. New expanded phrases scan (README.md, AGENTS.md, CLAUDE.md, docs/ARCHITECTURE.md, docs/SECURITY.md, docs/CONTRIBUTING.md, crates/*/README.md, crates/contextra-mcp/src/*.rs)
+    // EXCLUDING docs/SPEC.md, docs/PLAN.md, docs/decisions/**, docs/analysis/**, docs/spec/**
+    let mut files_to_scan = Vec::new();
+    let fixed_docs = [
+        "README.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "docs/ARCHITECTURE.md",
+        "docs/SECURITY.md",
+        "docs/CONTRIBUTING.md",
+    ];
+    for doc in fixed_docs {
+        let path = root.join(doc);
+        if path.exists() {
+            files_to_scan.push((doc.to_string(), path));
+        }
+    }
+
     let crates_dir = root.join("crates");
+    if crates_dir.exists() {
+        for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let path = entry.path();
+            let rel_path = match path.strip_prefix(root) {
+                Ok(p) => p.to_string_lossy().to_string().replace('\\', "/"),
+                Err(_) => path.to_string_lossy().to_string().replace('\\', "/"),
+            };
+
+            if is_target_for_new_phrases(&rel_path) && !fixed_docs.contains(&rel_path.as_str()) {
+                files_to_scan.push((rel_path, path.to_path_buf()));
+            }
+        }
+    }
+
+    for (rel_path, path) in files_to_scan {
+        let content = match fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        for (idx, line) in content.lines().enumerate() {
+            let line_num = idx + 1;
+            let trimmed = line.trim();
+
+            if trimmed.contains("<!-- claim-ignore -->") {
+                continue;
+            }
+
+            let norm = normalize_claim_text(line);
+
+            if norm.contains("unwiederbringlich") {
+                violations.push(format!(
+                    "{}:{} - Prohibited claim 'unwiederbringlich' found in doc/code: '{}'",
+                    rel_path, line_num, trimmed
+                ));
+            } else if norm.contains("dsgvo konform") {
+                violations.push(format!(
+                    "{}:{} - Prohibited claim 'DSGVO-konform' found in doc/code: '{}'",
+                    rel_path, line_num, trimmed
+                ));
+            } else if norm.contains("art 17 konform") {
+                violations.push(format!(
+                    "{}:{} - Prohibited claim 'Art.-17-konform' found in doc/code: '{}'",
+                    rel_path, line_num, trimmed
+                ));
+            } else if norm.contains("löschung nach art 17") {
+                violations.push(format!(
+                    "{}:{} - Prohibited claim 'Löschung nach Art. 17' found in doc/code: '{}'",
+                    rel_path, line_num, trimmed
+                ));
+            } else if norm.contains("löschzertifikat") {
+                violations.push(format!(
+                    "{}:{} - Prohibited claim 'Löschzertifikat' found in doc/code: '{}'",
+                    rel_path, line_num, trimmed
+                ));
+            } else if norm.contains("rechtskonform") || norm.contains("rechtssicher") {
+                violations.push(format!(
+                    "{}:{} - Prohibited legal claim ('rechtskonform' / 'rechtssicher') found in doc/code: '{}'",
+                    rel_path, line_num, trimmed
+                ));
+            } else if norm.contains("100% gelöscht") {
+                violations.push(format!(
+                    "{}:{} - Prohibited claim '100% gelöscht' found in doc/code: '{}'",
+                    rel_path, line_num, trimmed
+                ));
+            } else if norm.contains("kryptografisch gelöscht") {
+                // Heuristic: "kryptografisch gelöscht" is only a violation if the same line does NOT mention any custody or assumption
+                // Search terms: "Annahme", "A-FLASH", "Custody", "K1", "K2", "K3", "C1"
+                let line_lower = line.to_lowercase();
+                let has_custody_or_assumption = line_lower.contains("annahme")
+                    || line_lower.contains("a-flash")
+                    || line_lower.contains("custody")
+                    || line_lower.contains("k1")
+                    || line_lower.contains("k2")
+                    || line_lower.contains("k3")
+                    || line_lower.contains("c1");
+                if !has_custody_or_assumption {
+                    violations.push(format!(
+                        "{}:{} - Prohibited claim 'kryptografisch gelöscht' without custody or assumption found in doc/code: '{}'",
+                        rel_path, line_num, trimmed
+                    ));
+                }
+            }
+        }
+    }
+
+    // 3. Scan code for hardcoded zero counts, dummy proof verifications, and ungrounded tool proofs
     if crates_dir.exists() {
         for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
             if !entry.file_type().is_file() {

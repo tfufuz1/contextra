@@ -14,7 +14,7 @@ use contextra_privacy::egress_gateway::{
     CloudQueryRequest, DefaultEgressGuard, EgressGateway, EgressGuardCheck,
 };
 use contextra_privacy::egress_vault::{
-    BlockReason, BoxFuture, EgressClassification, EgressClassifier, EntityRecognizer,
+    BlockReason, BoxFuture, EgressClassification, EgressClassifier,
     SurrogateVault,
 };
 use contextra_privacy::entity_recognizer::{Gazetteer, RuleBasedEntityRecognizer};
@@ -380,11 +380,17 @@ fn test_recognizer_ipv6_invalid_colons_negative() {
 #[test]
 fn test_recognizer_plz_valid_positive() {
     let recognizer = RuleBasedEntityRecognizer::new();
-    let text = "Standort 10115 Berlin Mitte";
+    let text = "Standort PLZ 10115 in Deutschland";
     let results = recognizer.recognize(text);
     assert_eq!(results.len(), 1);
     assert_eq!(&text[results[0].0.clone()], "10115");
     assert_eq!(results[0].1, "PLZ");
+
+    let text_ort = "Standort 10115 Berlin Mitte";
+    let results_ort = recognizer.recognize(text_ort);
+    assert_eq!(results_ort.len(), 1);
+    assert_eq!(&text_ort[results_ort[0].0.clone()], "10115 Berlin Mitte");
+    assert_eq!(results_ort[0].1, "PLZ_ORT");
 }
 
 #[test]

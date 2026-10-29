@@ -12,16 +12,12 @@
 //! 5. Hard process crash simulation (dropping handle without explicit `.close()`) & restart state verification.
 //! 6. Independent external verification of exported proof via python script `docs/verification/verify_export.py` (valid and tampered).
 //!
-//! BUG REPORT:
-//! Step 5 triggers a real bug in production code `crates/contextra-store/src/lsm/ops/write.rs:307`.
-//! When `IndexOp` operations are staged during transaction commit, `WalOp::TxEnd` is pushed to `wal_ops`
-//! with `last_seq` (the sequence number of the preceding `Put` or `Delete` op) rather than allocating a new
-//! monotonic sequence number.
-//! Consequently, when a database instance is terminated without clean flush/shutdown (`drop(db)` without `.close()`),
-//! opening the database triggers `Wal::replay()`, where `IntegrityVerifier::verify_and_update_v3` rejects the
-//! duplicate sequence number:
-//! `WalCorruption { offset: 118, reason: "Duplicate or non-monotonic sequence number 1 (last: 1)" }`.
-//! Per HARTE REGELN #3, this test and minimal repro are marked with `#[ignore = "BUG: ..."]` and documented.
+//! WAL SEQUENCE NUMBER RECOVERY STATUS:
+//! Previously, `WalOp::TxEnd` shared the sequence number of the preceding operation, causing
+//! `WalCorruption` duplicate sequence errors on recovery after an unflushed termination (`drop(db)` without `.close()`).
+//! This bug in `crates/contextra-store/src/lsm/ops/write.rs:307` is resolved by allocating a dedicated
+//! monotonic sequence number for `WalOp::TxEnd` via `storage.next_seq_no.fetch_add(1)`.
+//! Verified end-to-end via `test_repro_wal_duplicate_seq_no_on_unflushed_restart`.
 
 use contextra_crypto::deletion_proof::DeletionProof;
 use contextra_db::{Contextra, ContextraConfig};
@@ -467,16 +463,10 @@ async fn test_e2e_compliance_scenario() {
     println!("Total Measured Duration: {:.2?}", elapsed);
 }
 
-/// Minimal Repro Test for the WAL replay duplicate sequence number bug (HARTE REGELN #3).
+/// Regression Test: Verifies WAL replay and restart recovery after an unflushed termination (`drop(db)` without `.close()`).
 ///
-/// BUG DETAILS:
-/// Location: `crates/contextra-store/src/lsm/ops/write.rs:307`
-/// Cause: When committing a transaction, `WalOp::TxEnd` is pushed to `wal_ops` using `last_seq`
-/// (the sequence number of the preceding `Put` or `Delete` op) rather than allocating a new
-/// sequence number (`storage.next_seq_no.fetch_add(1)`).
-/// Effect: Upon database restart after an un-flushed crash (`drop(db)` without `.close()`), WAL replay
-/// attempts to verify sequence monotonicity in `IntegrityVerifier::verify_and_update_v3`, which fails
-/// with `CryptoError::WalCorruption { reason: "Duplicate or non-monotonic sequence number 1 (last: 1)" }`.
+/// Ensures `WalOp::TxEnd` allocates a distinct, monotonic sequence number in `crates/contextra-store/src/lsm/ops/write.rs:307`
+/// and that database state reopens successfully without `WalCorruption` duplicate sequence number errors.
 #[tokio::test]
 async fn test_repro_wal_duplicate_seq_no_on_unflushed_restart() {
     let tmp = TempDir::new().expect("tempdir");

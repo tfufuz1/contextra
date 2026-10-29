@@ -20,6 +20,7 @@ use crate::error::{CryptoError, Result};
 use crate::kv_shredding::KeyRegistry;
 use contextra_types::{DocId, TxId};
 use serde::{Deserialize, Serialize};
+use subtle::ConstantTimeEq;
 
 /// Datenklassifikation für Audit-Einträge (keine Freitext-Strings).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -109,6 +110,41 @@ pub struct AuditChainHeadSignature {
     pub head_hash: [u8; 32],
     /// Ed25519-Signatur (64 Bytes).
     pub signature: Vec<u8>,
+}
+
+/// Externer Kopf-Anker zur Rollback-Erkennung für die Audit-Hash-Kette.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuditHeadAnchor {
+    /// Sequenznummer / Kettenindex des extern verankerten Kettenkopfs.
+    pub seq_no: u64,
+    /// Blake3-Hash des Kettenkopfs an der Position `seq_no`.
+    pub head_hash: [u8; 32],
+    /// Optionale Ed25519-Signatur über (seq_no || head_hash).
+    pub head_signature: Option<AuditChainHeadSignature>,
+}
+
+impl AuditHeadAnchor {
+    /// Erstellt einen neuen nicht signierten `AuditHeadAnchor`.
+    pub fn new(seq_no: u64, head_hash: [u8; 32]) -> Self {
+        Self {
+            seq_no,
+            head_hash,
+            head_signature: None,
+        }
+    }
+
+    /// Erstellt einen neuen signierten `AuditHeadAnchor`.
+    pub fn with_signature(
+        seq_no: u64,
+        head_hash: [u8; 32],
+        head_signature: AuditChainHeadSignature,
+    ) -> Self {
+        Self {
+            seq_no,
+            head_hash,
+            head_signature: Some(head_signature),
+        }
+    }
 }
 
 /// Verschlüsselter Salt-Wert für ein Record-Commitment.
@@ -284,8 +320,14 @@ impl AuditChain {
     }
 
     /// Verifiziert die vollständige Kette auf Integrität.
-    /// Prüft für jeden Eintrag, ob `prev_hash` dem `entry_hash` des Vorgängers entspricht
-    /// und ob `entry_hash` korrekt berechnet wurde.
+    ///
+    /// # Warnhinweis / Security Warning
+    /// Diese Methode prüft lediglich die **interne kryptographische Hash-Verkettung**
+    /// der vorliegenden Kette. Sie bietet **keinen Schutz gegen Rollback-Angriffe**
+    /// (Replay alter Backup-Zustände), da ein Angreifer eine früher signierte oder valide
+    /// Teilkette vorlegen kann. Für echten Rollback-Schutz (SEC-01/K1) muss
+    /// [`AuditChain::verify_chain_with_anchor`] mit einem externen `AuditHeadAnchor`
+    /// verwendet werden.
     pub fn verify_chain(&self) -> Result<bool> {
         let mut expected_prev = [0u8; 32];
 
@@ -325,5 +367,47 @@ impl AuditChain {
         }
 
         Ok(true)
+    }
+
+    /// Verifiziert die Kette gegen einen externen Kopf-Anker ([`AuditHeadAnchor`]).
+    ///
+    /// Schlägt fehl (`Ok(false)`), wenn:
+    /// 1. Die Kette kürzer ist als vom Anker gefordert (`len() < anchor.seq_no + 1`).
+    /// 2. Der Hash an der Ankerposition `anchor.seq_no` nicht konstant-zeitlich mit `anchor.head_hash` übereinstimmt.
+    /// 3. Eine optionale Anker-Signatur nicht gegen den bereitgestellten `verifying_key` verifiziert werden kann.
+    /// 4. Die interne Hash-Ketten-Struktur bis zum Ankerpunkt ungültig ist.
+    pub fn verify_chain_with_anchor(
+        &self,
+        anchor: &AuditHeadAnchor,
+        verifying_key: Option<&ed25519_dalek::VerifyingKey>,
+    ) -> Result<bool> {
+        // Rollback-Prüfung: Kette muss mindestens bis zum Anker-Index gefüllt sein
+        let anchor_idx = anchor.seq_no as usize;
+        if self.entries.len() <= anchor_idx {
+            return Ok(false);
+        }
+
+        // Konstant-zeitlicher Hash-Vergleich des Eintrags an der Anker-Position
+        let target_entry = &self.entries[anchor_idx];
+        if target_entry.entry_hash.ct_eq(&anchor.head_hash).unwrap_u8() != 1 {
+            return Ok(false);
+        }
+
+        // Falls Anker eine Signatur enthält, verifiziere diese
+        if let Some(ref sig) = anchor.head_signature {
+            if sig.chain_index != anchor.seq_no
+                || sig.head_hash.ct_eq(&anchor.head_hash).unwrap_u8() != 1
+            {
+                return Ok(false);
+            }
+            if let Some(vk) = verifying_key {
+                if !Self::verify_head_signature(sig, vk)? {
+                    return Ok(false);
+                }
+            }
+        }
+
+        // Verifiziere die Kette selbst
+        self.verify_chain()
     }
 }
