@@ -4,7 +4,10 @@
 
 #![allow(clippy::unwrap_used, clippy::panic)]
 
-use super::config::{PlattScaledSigmoid, RerankConfig, RerankResult, MAX_CANDIDATES};
+use super::config::{
+    OnnxConfig, OnnxRerankerBuilder, PlattScaledSigmoid, RerankConfig, RerankResult,
+    MAX_CANDIDATES,
+};
 use super::cross_encoder::CrossEncoderReranker;
 #[cfg(feature = "onnx")]
 use super::onnx::OnnxReranker;
@@ -339,11 +342,12 @@ fn test_calibration_extreme_logits_and_non_finite_inputs() {
     let val_min_pos = reranker.calibrate(f32::MIN_POSITIVE);
     assert!((val_min_pos - 0.5).abs() < 1e-4);
 
+    // PlattScaler::transform treats non-finite logits (Inf, -Inf, NaN) fail-closed returning 0.5
     let val_neg_inf = reranker.calibrate(f32::NEG_INFINITY);
-    assert_eq!(val_neg_inf, 0.0);
+    assert_eq!(val_neg_inf, 0.5);
 
     let val_pos_inf = reranker.calibrate(f32::INFINITY);
-    assert_eq!(val_pos_inf, 1.0);
+    assert_eq!(val_pos_inf, 0.5);
 
     let val_nan = reranker.calibrate(f32::NAN);
     assert_eq!(val_nan, 0.5);
@@ -505,6 +509,40 @@ proptest! {
     }
 }
 
+#[test]
+fn test_onnx_config_and_builder_validations() -> Result<(), Box<dyn std::error::Error>> {
+    use tempfile::tempdir;
+
+    let dir = tempdir()?;
+    let model_path = dir.path().join("model.onnx");
+    let tokenizer_path = dir.path().join("tokenizer.json");
+
+    std::fs::File::create(&model_path)?;
+    std::fs::File::create(&tokenizer_path)?;
+
+    // Valid builder & config
+    let config = OnnxConfig::new(&model_path, &tokenizer_path);
+    assert!(config.validate().is_ok());
+
+    // Passthrough configuration test
+    let passthrough_reranker = CrossEncoderReranker::passthrough_with_config(config.inner.clone());
+    assert_eq!(passthrough_reranker.config().batch_size, 8);
+
+    // Invalid batch_size = 0
+    let invalid_batch = OnnxRerankerBuilder::new(&model_path, &tokenizer_path).batch_size(0);
+    assert!(invalid_batch.build().is_err());
+
+    // Invalid max_sequence_length = 0
+    let invalid_len = OnnxRerankerBuilder::new(&model_path, &tokenizer_path).max_sequence_length(0);
+    assert!(invalid_len.build().is_err());
+
+    // Invalid threads = 0
+    let invalid_threads = OnnxRerankerBuilder::new(&model_path, &tokenizer_path).intra_op_threads(0);
+    assert!(invalid_threads.build().is_err());
+
+    Ok(())
+}
+
 #[cfg(feature = "onnx")]
 #[test]
 fn test_cross_encoder_missing_paths() -> Result<(), Box<dyn std::error::Error>> {
@@ -518,6 +556,8 @@ fn test_cross_encoder_missing_paths() -> Result<(), Box<dyn std::error::Error>> 
         tokenizer_path,
         max_length: 128,
         batch_size: 4,
+        intra_op_threads: 1,
+        inter_op_threads: 1,
         calibration: PlattScaledSigmoid::identity(),
         calibration_warmup: 50,
         rerank_deadline_ms: Some(500),

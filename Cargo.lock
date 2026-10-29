@@ -987,7 +987,6 @@ dependencies = [
 name = "contextra-infer-onnx"
 version = "0.1.0"
 dependencies = [
- "contextra-infer-candle",
  "contextra-ports",
  "contextra-rank",
  "contextra-types",
@@ -998,6 +997,7 @@ dependencies = [
  "proptest",
  "reqwest",
  "serde",
+ "sha2",
  "tempfile",
  "tokenizers 0.19.1",
  "tokio",
