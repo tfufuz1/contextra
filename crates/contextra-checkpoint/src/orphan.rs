@@ -9,27 +9,6 @@ use std::sync::Arc;
 /// Type alias for sequence numbers managed as pinned checkpoint identifiers.
 pub type PinId = u64;
 
-/// Report summarizing recovered orphaned sequence pins and rolled-back orphaned checkpoints.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RecoveryReport {
-    /// List of sequence pin IDs successfully recovered and unpinned.
-    pub recovered_pins: Vec<PinId>,
-    /// List of orphaned transaction IDs successfully recovered and rolled back.
-    pub recovered_checkpoints: Vec<TxId>,
-}
-
-impl RecoveryReport {
-    /// Returns true if no orphans were present or recovered.
-    pub fn is_empty(&self) -> bool {
-        self.recovered_pins.is_empty() && self.recovered_checkpoints.is_empty()
-    }
-
-    /// Returns total count of recovered pin and checkpoint items.
-    pub fn total_recovered(&self) -> usize {
-        self.recovered_pins.len() + self.recovered_checkpoints.len()
-    }
-}
-
 /// Deprecated global orphan functions are no-ops without static mutable state (Spec §3 P29).
 /// All production code uses instance-bound [`InstanceOrphanRegistry`] instances.
 fn warn_deprecated_global_orphan_path() {
@@ -79,6 +58,9 @@ pub(crate) fn clock_timestamp_ms(clock: &dyn contextra_ports::Clock) -> u64 {
 }
 
 fn orphan_pin_file_path() -> std::path::PathBuf {
+    if let Ok(p) = std::env::var("CONTEXTRA_ORPHAN_PIN_PATH") {
+        return std::path::PathBuf::from(p);
+    }
     default_data_dir().join("contextra_orphaned_pins.json")
 }
 
@@ -152,6 +134,9 @@ impl OrphanRegistry {
 }
 
 fn orphan_file_path() -> std::path::PathBuf {
+    if let Ok(p) = std::env::var("CONTEXTRA_ORPHAN_PATH") {
+        return std::path::PathBuf::from(p);
+    }
     default_data_dir().join("contextra_orphaned_checkpoints.json")
 }
 
@@ -291,7 +276,7 @@ impl InstanceOrphanRegistry {
     /// Registers a pinned sequence number orphan in-memory without blocking disk I/O.
     ///
     /// # Crash-Safety & RAII Drop Semantics
-    /// This method is called synchronously from [`crate::PinGuard`]. It strictly performs
+    /// This method is called synchronously from [`PinGuard::drop`]. It strictly performs
     /// in-memory mutations (`Mutex<Vec<...>>`) and flags the registry as dirty without triggering
     /// synchronous disk I/O on Tokio worker threads. Unpersisted orphans remain in memory and are
     /// persisted during piggyback flushes (e.g., explicit unpin, commit, rollback) or graceful shutdown.
@@ -314,7 +299,7 @@ impl InstanceOrphanRegistry {
     /// Registers an orphaned checkpoint in-memory without blocking disk I/O.
     ///
     /// # Crash-Safety & RAII Drop Semantics
-    /// This method is called synchronously from [`crate::CheckpointGuard`]. It strictly performs
+    /// This method is called synchronously from [`CheckpointGuard::drop`]. It strictly performs
     /// in-memory mutations (`Mutex<Vec<...>>`) and flags the registry as dirty without triggering
     /// synchronous disk I/O on Tokio worker threads. Unpersisted orphans remain in memory and are
     /// persisted during piggyback flushes (e.g., explicit unpin, commit, rollback) or graceful shutdown.
@@ -505,14 +490,7 @@ pub fn orphaned_checkpoint_count() -> usize {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    clippy::disallowed_types,
-    clippy::disallowed_methods
-)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
 

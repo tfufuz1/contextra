@@ -1,5 +1,5 @@
 # Contextra — Feature-Veto-Register (VETOES.md)
-<!-- doc-stamp: 2026-10-29 10cc17922 | Spec-Fassung: 3.0 -->
+<!-- doc-stamp: 2026-10-26 | Spec-Fassung: 2.3 | WP: 0.3 -->
 <!--
   WP 0.3 — 2026-10-26:
   - VETO-F02: conditionally_accepted → bestätigt (Überprüfungsfrist 2026-10-07 abgelaufen;

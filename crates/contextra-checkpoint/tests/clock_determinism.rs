@@ -1,14 +1,3 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::disallowed_methods,
-    clippy::disallowed_types,
-    clippy::indexing_slicing,
-    clippy::cast_sign_loss,
-    clippy::cast_possible_truncation,
-    clippy::await_holding_lock
-)]
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore, PinGuard};
 use contextra_testkit::{InMemoryStorageEngine, ManualClock};
 use contextra_types::TxId;

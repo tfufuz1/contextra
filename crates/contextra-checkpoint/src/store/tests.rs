@@ -1,20 +1,13 @@
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    clippy::disallowed_types,
-    clippy::disallowed_methods
-)]
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use super::*;
 use crate::orphan::pending_rollback_count;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use parking_lot::Mutex;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 struct MockStorage {
-    data: Mutex<BTreeMap<Vec<u8>, Vec<u8>>>,
+    data: Mutex<HashMap<Vec<u8>, Vec<u8>>>,
     pinned: Mutex<HashSet<u64>>,
     fail_on_put: Mutex<Option<Vec<u8>>>,
     rolled_back_tx: Mutex<Vec<TxId>>,
@@ -23,7 +16,7 @@ struct MockStorage {
 impl MockStorage {
     fn new() -> Self {
         Self {
-            data: Mutex::new(BTreeMap::new()),
+            data: Mutex::new(HashMap::new()),
             pinned: Mutex::new(HashSet::new()),
             fail_on_put: Mutex::new(None),
             rolled_back_tx: Mutex::new(Vec::new()),

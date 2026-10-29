@@ -30,15 +30,7 @@ pub struct CheckpointMeta {
 }
 
 impl CheckpointMeta {
-    /// Converts metadata into a [`WorkflowState`].
-    /// Retained taking `&self` for backwards compatibility with external caller crates (ADR-011).
-    #[allow(clippy::wrong_self_convention)]
     pub fn into_workflow_state(&self) -> WorkflowState {
-        self.to_workflow_state()
-    }
-
-    /// Converts metadata into a [`WorkflowState`].
-    pub fn to_workflow_state(&self) -> WorkflowState {
         WorkflowState {
             tx: self.tx_id,
             graph_hash: *blake3::hash(format!("seq-{}", self.seq_no).as_bytes()).as_bytes(),
@@ -56,14 +48,7 @@ pub struct StateCheckpoint {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    clippy::indexing_slicing,
-    clippy::disallowed_types,
-    clippy::disallowed_methods
-)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
 

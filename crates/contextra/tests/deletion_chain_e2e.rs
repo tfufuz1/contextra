@@ -172,11 +172,6 @@ async fn test_scenario_2_voller_pfad() -> std::result::Result<(), ContextraError
         .erase_document(tenant_id, "testcol_full", "doc_full_path_1")
         .await?;
 
-    eprintln!("=== SCENARIO 2 REPORT ===");
-    eprintln!("verified: {}", report.verified);
-    eprintln!("failure: {:?}", report.failure);
-    eprintln!("layers: {:#?}", report.layers);
-
     assert!(
         report.verified,
         "Löschbericht muss verified == true sein: {:?}",
@@ -265,10 +260,6 @@ async fn test_scenario_3_rohdaten_needle() -> std::result::Result<(), ContextraE
         let report = db
             .erase_document(tenant_id, "testcol_needle", doc_id)
             .await?;
-        eprintln!("=== SCENARIO 3 REPORT ===");
-        eprintln!("verified: {}", report.verified);
-        eprintln!("failure: {:?}", report.failure);
-        eprintln!("layers: {:#?}", report.layers);
         assert!(
             report.verified,
             "Löschung muss verifiziert werden: {:?}",
@@ -344,10 +335,6 @@ async fn test_scenario_4_mehrere_level_und_neustart() -> std::result::Result<(),
         let report = db
             .erase_document(tenant_id, "testcol_levels", target_doc)
             .await?;
-        eprintln!("=== SCENARIO 4 REPORT ===");
-        eprintln!("verified: {}", report.verified);
-        eprintln!("failure: {:?}", report.failure);
-        eprintln!("layers: {:#?}", report.layers);
         assert!(
             report.verified,
             "Löschen nach Reopen muss verified sein: {:?}",
@@ -443,10 +430,6 @@ async fn test_scenario_5_collection_loeschung() -> std::result::Result<(), Conte
     assert!(list_before.contains(&col_name.to_string()));
 
     let report = db.erase_collection(tenant_id, col_name).await?;
-    eprintln!("=== SCENARIO 5 REPORT ===");
-    eprintln!("verified: {}", report.verified);
-    eprintln!("failure: {:?}", report.failure);
-    eprintln!("layers: {:#?}", report.layers);
     assert!(
         report.verified,
         "erase_collection muss verified == true sein: {:?}",

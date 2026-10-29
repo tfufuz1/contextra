@@ -1,6 +1,6 @@
 # Contextra — Claude / Antigravity Agent Guide
 
-<!-- doc-stamp: 2026-10-29 10cc17922 | Normativ: CONSTITUTION.md, SPEC.md, AGENTS.md -->
+<!-- doc-stamp: 2026-10-29 0796b40ed | Normativ: CONSTITUTION.md, SPEC.md, AGENTS.md -->
 
 > [!IMPORTANT]
 > Claude und Antigravity: Lies AGENTS.md §2b (nicht §2a — das ist nur für Jules).

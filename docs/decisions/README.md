@@ -1,29 +1,20 @@
-# Architecture Decision Records (ADR) Index
+# Architecture Decision Records (ADR Index)
 
-Dieses Verzeichnis enthält alle Architecture Decision Records (ADRs) des Contextra-Projekts.
+Index aller Architecture Decision Records (ADRs) im Projekt Contextra.
 
-## Status-Definitionen
-- **Proposed**: Vorschlag eingereicht, wartet auf Review und Maintainer-Freigabe.
-- **Accepted**: Entscheid akzeptiert und normativ gültig.
-- **Deprecated**: Durch eine spätere Entscheidung ersetzt oder veraltet.
-- **Rejected**: Vorschlag abgelehnt.
+## Index
 
-## ADR-Index
-
-| ID | Titel | Status | Datum | Relevante Komponenten |
+| Nr. | Titel | Dateiname | Status | Datum |
 |---|---|---|---|---|
-| ADR-0001 | Gemessene Löschung: Scanner-Vertrag v1 | Accepted | 2026-10-12 | `contextra-store`, `contextra-engine` |
-| ADR-0002 | Contextra Ingest Adapter Crate | Accepted | 2026-10-24 | `contextra-ingest` |
-| ADR-0077 | HNSW-Löschung per Tombstone + Slot-Nullung (VETO-F02) | Proposed — benötigt Maintainer-Freigabe | 2026-10-29 | `contextra-vector`, `capabilities.toml` |
-| ADR-0098 | Determinismus-Ausnahmen für Kryptoschlüssel & Salt | Proposed — benötigt Maintainer-Freigabe | 2026-10-29 | `contextra-store`, `contextra-crypto` |
-| ADR-0099 | VETO-OP03: Kein Echtzeit-Audio/STT-Streaming im Kern | Proposed — benötigt Maintainer-Freigabe | 2026-10-29 | `contextra-core`, `contextra-engine` |
-
----
-
-## Entscheidungsunterlagen & Governance-Analysen
-
-| Dokument | Thema | Status |
-|---|---|---|
-| [`0003-archiv-crates-befoerderung.md`](0003-archiv-crates-befoerderung.md) | Entscheidungsvorlage Beförderung vs. Abbau archivierter Crates mit Fan-in > 0 | Proposed |
-| [`0004-agents-claude-section-5-4-amendment.md`](0004-agents-claude-section-5-4-amendment.md) | Formulierungsentwurf für AGENTS.md / CLAUDE.md §5.4 Änderung | Proposed |
-| [`0005-panic-measurement-model.md`](0005-panic-measurement-model.md) | Panic-Messmodell: Analyse der drei Kennzahlen & Empfehlung | Proposed |
+| ADR-0001 | Gemessene Löschung & Scanner-Vertrag v1 | [`0001-gemessene-loeschung-scanner-vertrag-v1.md`](0001-gemessene-loeschung-scanner-vertrag-v1.md) | Accepted | 2026-10-26 |
+| ADR-0002 | Adapter-Crate `contextra-ingest` für Format-Extraktion & Chunking | [`0002-contextra-ingest-adapter-crate.md`](0002-contextra-ingest-adapter-crate.md) | Accepted | 2026-10-31 |
+| ADR-D01 | Aktive Baukasten-Module statt Workspace-Entfernung | In SPEC §15 (`docs/SPEC.md`) | Accepted | 2026-10-28 |
+| ADR-D02 | Öffentlicher Baukasten-Zugang für [M]-Module | In SPEC §15 (`docs/SPEC.md`) | Accepted | 2026-10-28 |
+| ADR-D03 | Entkopplung über Port-Schnittstellen | In SPEC §15 (`docs/SPEC.md`) | Accepted | 2026-10-28 |
+| ADR-D04 | Neues Ring-3-Crate `contextra-erasure` für Löschsaga | In SPEC §15 (`docs/SPEC.md`) | Accepted | 2026-10-28 |
+| ADR-D05 | Domänen-Ports in besitzende Crates verlegen | In SPEC §15 (`docs/SPEC.md`) | Accepted | 2026-10-28 |
+| ADR-D06 | Entfall der Kompatibilitätsfassade `contextra-core` | In SPEC §15 (`docs/SPEC.md`) | Accepted | 2026-10-28 |
+| ADR-D07 | Standardmäßiges Offline-Egress-Gateway | In SPEC §15 (`docs/SPEC.md`) | Accepted | 2026-10-28 |
+| ADR-D08 | Reifebewertung ausschließlich via Evidence-Packs | In SPEC §15 (`docs/SPEC.md`) | Accepted | 2026-10-28 |
+| ADR-D09 | Systematische Wirksamkeitsprüfung und Rückbau von `xtask` | In SPEC §15 (`docs/SPEC.md`) | Accepted | 2026-10-28 |
+| ADR-D10 | Minimal-Features für `tokio` und Workspace-Crates | In SPEC §15 (`docs/SPEC.md`) | Accepted | 2026-10-28 |

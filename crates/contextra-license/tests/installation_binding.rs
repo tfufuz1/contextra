@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use contextra_license::{
-    FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedLicenseGate, SignedLicenseOptions,
+    FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedLicenseGate,
 };
 use contextra_ports::clock::Clock;
 use contextra_types::TenantId;
@@ -199,7 +199,7 @@ fn test_mismatched_installation_id_returns_not_activated() {
     );
 }
 
-/// (5) Payload without installation_id_hash (legacy bytes) requires allow_legacy option
+/// (5) Payload without installation_id_hash (legacy bytes) behaves as before
 #[test]
 fn test_legacy_payload_bytes_without_installation_id_hash() {
     #[derive(Serialize, Deserialize)]
@@ -226,17 +226,11 @@ fn test_legacy_payload_bytes_without_installation_id_hash() {
         now_unix_secs: 1700000000,
     });
 
-    let opts = SignedLicenseOptions {
-        allow_legacy: true,
-        ..Default::default()
-    };
-
-    let gate = SignedLicenseGate::from_signed_payload_with_clock_and_opts(
+    let gate = SignedLicenseGate::from_signed_payload_with_clock(
         &legacy_bytes,
         &signature,
         verifying_key,
         clock,
-        opts,
     )
     .expect("legacy gate creation succeeds");
 

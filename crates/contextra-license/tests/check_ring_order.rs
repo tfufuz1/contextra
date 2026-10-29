@@ -1,9 +1,4 @@
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::cast_sign_loss,
-    clippy::indexing_slicing
-)]
+#![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::sync::Arc;
 
@@ -19,7 +14,7 @@ struct TestClock {
 
 impl Clock for TestClock {
     fn now_unix_nanos(&self) -> u64 {
-        (self.now_unix_secs.max(0) as u64) * 1_000_000_000
+        (self.now_unix_secs * 1_000_000_000) as u64
     }
 
     fn monotonic_nanos(&self) -> u64 {

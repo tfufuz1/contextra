@@ -4,15 +4,13 @@ use crate::hardlink_cloner::{
 };
 use crate::manifest::CheckpointManifest;
 use crate::meta::{validate_identifier, CheckpointMeta, StateCheckpoint};
-use crate::orphan::{
-    clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan, RecoveryReport,
-};
-use contextra_mvcc::SnapshotRegistry;
+use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinId, PinnedSeqNoOrphan};
+use contextra_core::SnapshotRegistry;
 use contextra_ports::BoxFuture;
 use contextra_types::{ContextraError, Result, TxId, WorkflowState};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -52,8 +50,8 @@ pub trait CheckpointRegistry: contextra_ports::Checkpoint + Send + Sync {
 /// erfolgen strikt atomar.
 #[derive(Debug, Default)]
 struct CheckpointIndex {
-    by_seq: BTreeMap<u64, CheckpointMeta>,
-    by_name: BTreeMap<String, u64>,
+    by_seq: HashMap<u64, CheckpointMeta>,
+    by_name: HashMap<String, u64>,
 }
 
 impl CheckpointIndex {
@@ -109,65 +107,6 @@ struct TxCounterMeta {
 
 const TX_BATCH_SIZE: u64 = 100;
 
-async fn determine_tx_counter_bounds<S: contextra_ports::StorageEngine>(
-    storage: &Arc<S>,
-    namespace: &str,
-) -> Result<(u64, u64)> {
-    let prefix = format!("{namespace}:checkpoint:");
-    let entries = storage.scan_prefix(prefix.as_bytes()).await?;
-    let mut scanned_max_raw: Option<u64> = None;
-
-    for (_key, value_bytes) in entries {
-        let meta_tx =
-            if let Ok(manifest) = serde_json::from_slice::<CheckpointManifest>(&value_bytes) {
-                Some(manifest.meta.tx_id)
-            } else if let Ok(meta) = serde_json::from_slice::<CheckpointMeta>(&value_bytes) {
-                Some(meta.tx_id)
-            } else {
-                None
-            };
-
-        if let Some(tx) = meta_tx {
-            if tx.inner() >= TxId::INTERNAL_BASE {
-                let raw = tx.inner() - TxId::INTERNAL_BASE;
-                scanned_max_raw = Some(scanned_max_raw.map_or(raw, |m| m.max(raw)));
-            }
-        }
-    }
-
-    if let Ok(last_tx) = storage.last_tx_id().await {
-        if last_tx.inner() >= TxId::INTERNAL_BASE {
-            let raw = last_tx.inner() - TxId::INTERNAL_BASE;
-            scanned_max_raw = Some(scanned_max_raw.map_or(raw, |m| m.max(raw)));
-        }
-    }
-
-    let counter_key = format!("{namespace}:checkpoint:__sys_tx_counter__");
-    let persisted_val: Option<u64> = match storage.get(counter_key.as_bytes()).await {
-        Ok(Some(bytes)) => serde_json::from_slice::<TxCounterMeta>(&bytes)
-            .map(|m| m.high_water_mark)
-            .ok(),
-        _ => None,
-    };
-
-    if let (Some(persisted), Some(scanned)) = (persisted_val, scanned_max_raw) {
-        if persisted < scanned {
-            return Err(ContextraError::Internal(format!(
-                "TxId collision / regression detected in namespace '{namespace}': \
-                 persisted tx_counter HWM ({persisted}) is strictly less than highest tx_id found in store ({scanned})"
-            )));
-        }
-    }
-
-    let start_raw = match (persisted_val, scanned_max_raw) {
-        (Some(p), _) => p + 1,
-        (None, Some(s)) => s + 1,
-        (None, None) => 0,
-    };
-    let initial_hwm = persisted_val.unwrap_or_else(|| scanned_max_raw.unwrap_or(0));
-    Ok((start_raw, initial_hwm))
-}
-
 async fn persist_hwm_internal<S: contextra_ports::StorageEngine>(
     storage: &Arc<S>,
     namespace: &str,
@@ -219,33 +158,6 @@ pub struct PersistentCheckpointStore<S: contextra_ports::StorageEngine> {
 }
 
 impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
-    /// Öffnet einen PersistentCheckpointStore und führt eine vollständige Orphan-Recovery für Pins und Checkpoints durch.
-    pub async fn open_and_recover(
-        storage: Arc<S>,
-        namespace: impl Into<String>,
-    ) -> Result<(Self, RecoveryReport)> {
-        let ns = namespace.into();
-        let orphan_path = std::path::PathBuf::from(format!("{ns}_orphaned_checkpoints.json"));
-        let orphan_registry = Arc::new(InstanceOrphanRegistry::new(&orphan_path));
-        Self::open_and_recover_with_orphan_registry(storage, ns, orphan_registry).await
-    }
-
-    /// Öffnet einen PersistentCheckpointStore mit einer spezifischen instanzgebundenen Orphan Registry und führt Orphan-Recovery durch.
-    pub async fn open_and_recover_with_orphan_registry(
-        storage: Arc<S>,
-        namespace: impl Into<String>,
-        orphan_registry: Arc<InstanceOrphanRegistry>,
-    ) -> Result<(Self, RecoveryReport)> {
-        let store = Self::open_with_orphan_registry(storage, namespace, orphan_registry).await?;
-        let recovered_pins = store.recover_orphaned_pins().await?;
-        let recovered_checkpoints = store.recover_orphaned_checkpoints().await?;
-        let report = RecoveryReport {
-            recovered_pins,
-            recovered_checkpoints,
-        };
-        Ok((store, report))
-    }
-
     /// Öffnet einen PersistentCheckpointStore asynchron mit Rekonstruktion und Monotonie-Garantie.
     pub async fn open(storage: Arc<S>, namespace: impl Into<String>) -> Result<Self> {
         let ns = namespace.into();
@@ -261,7 +173,74 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         orphan_registry: Arc<InstanceOrphanRegistry>,
     ) -> Result<Self> {
         let namespace = namespace.into();
-        let (start_raw, initial_hwm) = determine_tx_counter_bounds(&storage, &namespace).await?;
+
+        // 1. Scan store for highest existing TxId under namespace
+        let prefix = format!("{namespace}:checkpoint:");
+        let entries = storage.scan_prefix(prefix.as_bytes()).await?;
+        let mut scanned_max_raw: Option<u64> = None;
+
+        for (_key, value_bytes) in entries {
+            let meta_tx =
+                if let Ok(manifest) = serde_json::from_slice::<CheckpointManifest>(&value_bytes) {
+                    Some(manifest.meta.tx_id)
+                } else if let Ok(meta) = serde_json::from_slice::<CheckpointMeta>(&value_bytes) {
+                    Some(meta.tx_id)
+                } else {
+                    None
+                };
+
+            if let Some(tx) = meta_tx {
+                if tx.inner() >= TxId::INTERNAL_BASE {
+                    let raw = tx.inner() - TxId::INTERNAL_BASE;
+                    scanned_max_raw = Some(scanned_max_raw.map_or(raw, |m| m.max(raw)));
+                }
+            }
+        }
+
+        if let Ok(last_tx) = storage.last_tx_id().await {
+            if last_tx.inner() >= TxId::INTERNAL_BASE {
+                let raw = last_tx.inner() - TxId::INTERNAL_BASE;
+                scanned_max_raw = Some(scanned_max_raw.map_or(raw, |m| m.max(raw)));
+            }
+        }
+
+        // 2. Read persisted counter metadata
+        let counter_key = format!("{namespace}:checkpoint:__sys_tx_counter__");
+        let persisted_val: Option<u64> = match storage.get(counter_key.as_bytes()).await {
+            Ok(Some(bytes)) => serde_json::from_slice::<TxCounterMeta>(&bytes)
+                .map(|m| m.high_water_mark)
+                .ok(),
+            _ => None,
+        };
+
+        // 3. Consistency check: if persisted value exists and is LESS THAN scanned max raw -> Hard Error (Requirement 4)
+        if let (Some(persisted), Some(scanned)) = (persisted_val, scanned_max_raw) {
+            if persisted < scanned {
+                return Err(ContextraError::Internal(format!(
+                    "TxId collision / regression detected in namespace '{namespace}': \
+                     persisted tx_counter HWM ({persisted}) is strictly less than highest tx_id found in store ({scanned})"
+                )));
+            }
+        }
+
+        // 4. Determine initial start_raw
+        let start_raw = match (persisted_val, scanned_max_raw) {
+            (Some(p), _) => p + 1,
+            (None, Some(s)) => s + 1,
+            (None, None) => 0,
+        };
+
+        let initial_hwm = persisted_val.unwrap_or_else(|| scanned_max_raw.unwrap_or(0));
+
+        // 5. Recover orphaned sequence pins on startup (ADR-052)
+        let orphans = orphan_registry.get_orphan_pins();
+        for orphan in orphans {
+            if let Err(e) = storage.unpin_checkpoint(orphan.seq_no).await {
+                tracing::warn!(pin_id = orphan.seq_no, error = %e, "Failed to unpin orphaned pin during store startup recovery");
+            } else {
+                orphan_registry.clear_orphan_pin(orphan.seq_no);
+            }
+        }
 
         let checkpoint_counter = Arc::new(AtomicU64::new(0));
         let skipped_rollbacks = Arc::new(AtomicU64::new(0));
@@ -448,7 +427,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         tx_id: TxId,
         metadata: serde_json::Value,
     ) -> Result<CheckpointMeta> {
-        let start_nanos = self.clock.monotonic_nanos();
+        let start = std::time::Instant::now();
         validate_identifier("Checkpoint name", name)?;
         validate_identifier("Collection ID", collection_id)?;
 
@@ -463,47 +442,10 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
 
         let _guard = self.write_lock.lock().await;
 
+        // Lade alten Checkpoint (für späteres Unpin)
         let old_checkpoint = self.get_checkpoint_internal(name).await?;
 
-        self.save_checkpoint_with_pin_guard(&meta, seq_no, start_nanos)
-            .await?;
-
-        if let Some(old) = old_checkpoint {
-            if old.seq_no != seq_no {
-                if let Err(e) = self.storage.unpin_checkpoint(old.seq_no).await {
-                    tracing::warn!(
-                        old_seq = old.seq_no,
-                        "Konnte alten Checkpoint nicht entpinnen: {e}"
-                    );
-                }
-                self.index.write().remove_by_seq(old.seq_no);
-            }
-        }
-
-        self.index.write().insert(meta.clone());
-        self.record_duration_metric(start_nanos, "commit");
-
-        Ok(meta)
-    }
-
-    fn record_duration_metric(&self, start_nanos: u64, status: &'static str) {
-        if let Some(ref sink) = self.metrics_sink {
-            let elapsed_nanos = self.clock.monotonic_nanos().saturating_sub(start_nanos);
-            let elapsed = elapsed_nanos as f64 / 1_000_000_000.0;
-            sink.record_histogram(
-                "checkpoint_duration_seconds",
-                elapsed,
-                &[("status", status)],
-            );
-        }
-    }
-
-    async fn save_checkpoint_with_pin_guard(
-        &self,
-        meta: &CheckpointMeta,
-        seq_no: u64,
-        start_nanos: u64,
-    ) -> Result<()> {
+        // 1. Pin new checkpoint's seq_no (MUST happen BEFORE storage.save())
         let pin_guard = PinGuard::pin(
             Arc::clone(&self.storage),
             seq_no,
@@ -511,6 +453,7 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
         )
         .await?;
 
+        // 2. storage.save() the new checkpoint (RAII PinGuard will unpin on drop/panic or explicit unpin on error)
         if let Err(e) = self.save_checkpoint_internal(meta.clone()).await {
             if let Err(unpin_err) = pin_guard.unpin().await {
                 tracing::warn!(
@@ -518,12 +461,51 @@ impl<S: contextra_ports::StorageEngine> PersistentCheckpointStore<S> {
                     "Failed to unpin new checkpoint after save failure: {unpin_err}"
                 );
             }
-            self.record_duration_metric(start_nanos, "rollback");
+            if let Some(ref sink) = self.metrics_sink {
+                let elapsed = start.elapsed().as_secs_f64();
+                sink.record_histogram(
+                    "checkpoint_duration_seconds",
+                    elapsed,
+                    &[("status", "rollback")],
+                );
+            }
             return Err(e);
         }
 
+        // 3. Save succeeded: defuse pin_guard so seq_no remains pinned
         pin_guard.defuse();
-        Ok(())
+
+        // 4. If save() succeeds: unpin the old checkpoint's seq_no
+        if let Some(old) = old_checkpoint {
+            if old.seq_no != seq_no {
+                if let Err(e) = self.storage.unpin_checkpoint(old.seq_no).await {
+                    // INTENTIONAL: Unpin of the old checkpoint failed. This is non-fatal —
+                    // the old seq_no remains pinned, delaying SSTable GC but not causing
+                    // data loss. The orphaned pin will clear when the collection is reopened
+                    // or when the old checkpoint is explicitly dropped.
+                    tracing::warn!(
+                        old_seq = old.seq_no,
+                        "Konnte alten Checkpoint nicht entpinnen: {e}"
+                    );
+                }
+                // Alten Checkpoint aus Cache entfernen
+                self.index.write().remove_by_seq(old.seq_no);
+            }
+        }
+
+        // 5. Update the stored checkpoint reference
+        self.index.write().insert(meta.clone());
+
+        if let Some(ref sink) = self.metrics_sink {
+            let elapsed = start.elapsed().as_secs_f64();
+            sink.record_histogram(
+                "checkpoint_duration_seconds",
+                elapsed,
+                &[("status", "commit")],
+            );
+        }
+
+        Ok(meta)
     }
 
     /// Deletes a persistent checkpoint by name.
