@@ -250,7 +250,6 @@ async fn test_search_k_zero_returns_canonical_error_message(
     Ok(())
 }
 
-
 #[tokio::test]
 async fn test_query_builder_query_config_include_superseded_displacement(
 ) -> contextra_types::Result<()> {

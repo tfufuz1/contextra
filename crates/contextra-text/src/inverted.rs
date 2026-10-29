@@ -24,6 +24,6 @@ mod tests;
 
 pub use index_struct::InvertedIndex;
 pub use morph_index::BM25MorphIndex;
-pub use purge::{text_purger, TextPurger};
+pub use purge::{text_purger, PurgeReport, TextPurger};
 pub use scanner::{text_scanner, ParsedTextTarget, TextScanner};
 pub use types::{Language, TextIndexMetadata};

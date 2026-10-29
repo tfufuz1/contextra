@@ -60,9 +60,8 @@ impl LayerScanner for MemtableScanner {
         let target_prefix = codec.scan_prefix();
 
         // 3. Aktive und immutable Memtables erfassen
-        let (active_mt, immutable_mts) = block_on_future(async {
-            self.storage.memtables_for_scanner().await
-        });
+        let (active_mt, immutable_mts) =
+            block_on_future(async { self.storage.memtables_for_scanner().await });
 
         let mut all_mts = Vec::with_capacity(1 + immutable_mts.len());
         all_mts.push(active_mt);

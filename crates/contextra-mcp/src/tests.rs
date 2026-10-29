@@ -1078,7 +1078,6 @@ async fn test_contextra_consolidate_fault_injection() {
     assert_eq!(err.code, -32602);
 }
 
-
 #[tokio::test]
 async fn test_cloud_query_sensitive_input_blocked_by_egress_classifier() {
     let (server, _tmp) = create_mock_server().await;
