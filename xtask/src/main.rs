@@ -120,6 +120,17 @@ fn main() {
         }
     }
 
+    if cmd == "check-orphan-files" {
+        let res = xtask::legacy::code::run_code_command(cmd, cmd_args);
+        match res {
+            Ok(()) => std::process::exit(0),
+            Err(e) => {
+                eprintln!("{}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
     // ── Legacy chain ─────────────────────────────────────────────────────────
     let res = xtask::legacy::arch::run_arch_command(cmd, cmd_args)
         .or_else(|_| xtask::legacy::code::run_code_command(cmd, cmd_args))

@@ -364,7 +364,9 @@ impl Gate for DeletionHonestyGate {
         }
         if scan_deletion_honesty(root) != Outcome::Pass {
             return Outcome::Fail {
-                reason: "Selftest failed: scan_deletion_honesty failed to respect <!-- claim-ignore -->".to_string(),
+                reason:
+                    "Selftest failed: scan_deletion_honesty failed to respect <!-- claim-ignore -->"
+                        .to_string(),
             };
         }
 
@@ -389,7 +391,10 @@ impl Gate for DeletionHonestyGate {
                 };
             }
             match scan_deletion_honesty(root) {
-                Outcome::Fail { reason } if reason.contains(phrase_name) || reason.contains(&payload.to_lowercase()) || reason.contains("kryptografisch") => {}
+                Outcome::Fail { reason }
+                    if reason.contains(phrase_name)
+                        || reason.contains(&payload.to_lowercase())
+                        || reason.contains("kryptografisch") => {}
                 res => {
                     return Outcome::Fail {
                         reason: format!("Selftest failed: scan_deletion_honesty failed to detect forbidden phrase '{phrase_name}' (got {:?}", res),
@@ -413,7 +418,8 @@ impl Gate for DeletionHonestyGate {
             };
         }
         match scan_deletion_honesty(root) {
-            Outcome::Fail { reason } if reason.contains("DSGVO-konform") || reason.contains("dsgvo konform") => {}
+            Outcome::Fail { reason }
+                if reason.contains("DSGVO-konform") || reason.contains("dsgvo konform") => {}
             _ => {
                 return Outcome::Fail {
                     reason: "Selftest failed: scan_deletion_honesty failed to detect prohibited phrase in MCP source string literal".to_string(),
