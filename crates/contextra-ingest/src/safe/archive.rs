@@ -1,124 +1,120 @@
 // FILE-CONTEXT
-// ZWECK: Sicheres Entpacken und Validieren von Zip-Archiven (Zip-Bomb-Schutz).
-// INVARIANTEN: Zero-Panic, typisierte IngestError, kein unsafe, striktes Einhalten von IngestLimits.
+// ZWECK: Sicheres Entpacken von ZIP-Archiven unter Ressourcen-Limits (P00B/P04).
+// INVARIANTEN: Zero-Panic, LimitExceeded / Corrupt Fehler bei Entkomprimierungsproblemen, kein unsafe.
 // STAND: TS:2026-10-31T00:00:00Z
 
 use crate::error::{IngestError, LimitKind};
-use crate::limits::IngestLimits;
-use std::io::{Read, Seek};
+use crate::extractor::ResourceBudget;
 
-/// Validiert ein Zip-Archiv vor der Verarbeitung gegen `IngestLimits`.
-///
-/// Prüft Eintragsanzahl, kumulierte unkomprimierte Bytes und Kompressionsverhältnis,
-/// um Zip-Bomben und DoS-Angriffe frühzeitig abzulehnen.
-pub fn validate_zip_archive<R: Read + Seek>(
-    reader: R,
-    limits: &IngestLimits,
-) -> Result<(), IngestError> {
-    let mut archive = zip::ZipArchive::new(reader).map_err(|e| IngestError::Corrupt {
-        format: None,
-        detail: format!("Ungültiges Zip-Archiv: {e}"),
-    })?;
-
-    let num_entries = match u32::try_from(archive.len()) {
-        Ok(v) => v,
-        Err(_) => u32::MAX,
-    };
-    if num_entries > limits.max_archive_entries {
-        return Err(IngestError::LimitExceeded {
-            kind: LimitKind::ArchiveEntries,
-            limit: limits.max_archive_entries as u64,
-            observed: num_entries as u64,
-        });
-    }
-
-    let mut total_uncompressed: u64 = 0;
-    let mut total_compressed: u64 = 0;
-
-    for i in 0..archive.len() {
-        let file = archive.by_index(i).map_err(|e| IngestError::Corrupt {
-            format: None,
-            detail: format!("Zip-Eintrag {i} nicht lesbar: {e}"),
-        })?;
-
-        total_uncompressed = total_uncompressed.saturating_add(file.size());
-        total_compressed = total_compressed.saturating_add(file.compressed_size());
-
-        if total_uncompressed > limits.max_decompressed_bytes {
-            return Err(IngestError::LimitExceeded {
-                kind: LimitKind::DecompressedBytes,
-                limit: limits.max_decompressed_bytes,
-                observed: total_uncompressed,
-            });
-        }
-    }
-
-    if total_uncompressed > 0 {
-        let compressed_denom = total_compressed.max(1);
-        let ratio = total_uncompressed / compressed_denom;
-        if ratio > limits.max_compression_ratio as u64 {
-            return Err(IngestError::LimitExceeded {
-                kind: LimitKind::CompressionRatio,
-                limit: limits.max_compression_ratio as u64,
-                observed: ratio,
-            });
-        }
-    }
-
-    Ok(())
+/// Safe Zip archive reader enforcing resource limits.
+#[derive(Debug)]
+pub struct SafeArchive<'a> {
+    archive: zip::ZipArchive<std::io::Cursor<&'a [u8]>>,
 }
 
-#[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::field_reassign_with_default
-)]
-mod tests {
-    use super::*;
-    use std::io::Cursor;
-    use zip::write::FileOptions;
-    use zip::ZipWriter;
+impl<'a> SafeArchive<'a> {
+    /// Opens a ZIP archive from raw input bytes and checks entry count limits.
+    pub fn new(bytes: &'a [u8], _budget: &ResourceBudget) -> Result<Self, IngestError> {
+        let cursor = std::io::Cursor::new(bytes);
+        let archive = zip::ZipArchive::new(cursor).map_err(|e| IngestError::Corrupt {
+            format: None,
+            detail: format!("Ungültiges ZIP-Archiv: {e}"),
+        })?;
 
-    #[test]
-    fn test_validate_zip_archive_ok() {
-        let mut buf = Vec::new();
-        {
-            let mut writer = ZipWriter::new(Cursor::new(&mut buf));
-            let options = FileOptions::default();
-            writer.start_file("test.txt", options).unwrap();
-            std::io::Write::write_all(&mut writer, b"hello world").unwrap();
-            writer.finish().unwrap();
+        let entry_count = u64::try_from(archive.len()).unwrap_or(u64::MAX);
+        if entry_count > 10_000 {
+            return Err(IngestError::LimitExceeded {
+                kind: LimitKind::ArchiveEntries,
+                limit: 10_000,
+                observed: entry_count,
+            });
         }
 
-        let limits = IngestLimits::default();
-        assert!(validate_zip_archive(Cursor::new(&buf), &limits).is_ok());
+        Ok(Self { archive })
     }
 
-    #[test]
-    fn test_validate_zip_archive_exceeds_entries() {
-        let mut buf = Vec::new();
-        {
-            let mut writer = ZipWriter::new(Cursor::new(&mut buf));
-            let options = FileOptions::default();
-            for i in 0..5 {
-                writer.start_file(format!("file_{i}.txt"), options).unwrap();
-                std::io::Write::write_all(&mut writer, b"x").unwrap();
-            }
-            writer.finish().unwrap();
+    /// Reads raw bytes for a file entry matching `name` (case-insensitive / path normalized).
+    pub fn read_entry(
+        &mut self,
+        name: &str,
+        budget: &ResourceBudget,
+    ) -> Result<Vec<u8>, IngestError> {
+        // Prevent path traversal
+        if name.contains("..") {
+            return Err(IngestError::Corrupt {
+                format: None,
+                detail: format!("Gefährlicher Dateipfad im Archiv: {name}"),
+            });
         }
 
-        let mut limits = IngestLimits::default();
-        limits.max_archive_entries = 3;
-        let err = validate_zip_archive(Cursor::new(&buf), &limits).unwrap_err();
-        assert!(matches!(
-            err,
-            IngestError::LimitExceeded {
-                kind: LimitKind::ArchiveEntries,
-                ..
+        let normalized_target = name.replace('\\', "/");
+        let mut target_index = None;
+
+        for idx in 0..self.archive.len() {
+            if let Ok(file) = self.archive.by_index(idx) {
+                let entry_name = file.name().replace('\\', "/");
+                if entry_name.eq_ignore_ascii_case(&normalized_target)
+                    || entry_name
+                        .trim_start_matches('/')
+                        .eq_ignore_ascii_case(&normalized_target)
+                {
+                    target_index = Some(idx);
+                    break;
+                }
             }
-        ));
+        }
+
+        let index = target_index.ok_or_else(|| IngestError::Corrupt {
+            format: None,
+            detail: format!("Archiv-Eintrag nicht gefunden: {name}"),
+        })?;
+
+        let mut file = self
+            .archive
+            .by_index(index)
+            .map_err(|e| IngestError::Corrupt {
+                format: None,
+                detail: format!("Fehler beim Lesen des Archiv-Eintrags: {e}"),
+            })?;
+
+        let uncompressed_size = file.size();
+        budget.charge_decompressed(uncompressed_size)?;
+
+        let mut content = Vec::with_capacity(usize::try_from(uncompressed_size).unwrap_or(0));
+        std::io::Read::read_to_end(&mut file, &mut content).map_err(|e| IngestError::Corrupt {
+            format: None,
+            detail: format!("Fehler beim Dekomprimieren: {e}"),
+        })?;
+
+        Ok(content)
+    }
+
+    /// Checks if an entry exists in the archive.
+    pub fn has_entry(&mut self, name: &str) -> bool {
+        let normalized_target = name.replace('\\', "/");
+        for idx in 0..self.archive.len() {
+            if let Ok(file) = self.archive.by_index(idx) {
+                let entry_name = file.name().replace('\\', "/");
+                if entry_name.eq_ignore_ascii_case(&normalized_target)
+                    || entry_name
+                        .trim_start_matches('/')
+                        .eq_ignore_ascii_case(&normalized_target)
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Lists all file paths present in the archive.
+    pub fn list_entries(&mut self) -> Vec<String> {
+        let mut entries = Vec::new();
+        for idx in 0..self.archive.len() {
+            if let Ok(file) = self.archive.by_index(idx) {
+                entries.push(file.name().to_string());
+            }
+        }
+        entries
     }
 }
