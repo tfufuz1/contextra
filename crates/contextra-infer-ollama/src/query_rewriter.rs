@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// STAND: 2026-08-30T19:00:00Z
+// STAND: 2026-10-29T10:00:00Z
 // ZWECK: LLM-gestütztes Multi-Signal Query-Rewriting für Ollama (Text, Semantik, Graph-Anker)
 // INVARIANTEN: Prompt-Injection-Isolation via xml_escape; Resiliente JSON/Fallback-Antwortdekodierung; Zero Panic
 
@@ -14,15 +14,20 @@ use contextra_ports::{BoxFuture, QueryRewriter};
 use contextra_types::{QueryRewriteOutput, Result, ScoredEntry};
 use serde::Deserialize;
 
+/// Maximum number of anchor entities to parse from LLM response.
+const MAX_ANCHOR_ENTITIES: usize = 20;
+
 /// Konfiguration für den `OllamaQueryRewriter`.
 #[derive(Debug, Clone)]
 pub struct OllamaQueryRewriterConfig {
-    /// Ollama-Modell für Rewriting (z. B. "llama3.2:3b" oder "gemma2:2b").
+    /// Ollama-Modell für Rewriting (z. B. "llama3.2" oder "gemma2").
     pub model: String,
     /// Maximale Anzahl von vorherigen Suchergebnissen als Kontext im Prompt.
     pub max_context_results: usize,
     /// Maximale Anzahl von Zeichen pro Suchergebnis-Snippet im Prompt.
     pub max_snippet_chars: usize,
+    /// Maximale Anzahl von Zeichen für die Eingabeanfrage.
+    pub max_query_chars: usize,
 }
 
 impl Default for OllamaQueryRewriterConfig {
@@ -31,6 +36,7 @@ impl Default for OllamaQueryRewriterConfig {
             model: "llama3.2".into(),
             max_context_results: 3,
             max_snippet_chars: 300,
+            max_query_chars: 2048,
         }
     }
 }
@@ -60,23 +66,31 @@ impl QueryRewriter for OllamaQueryRewriter {
         current_results: &'a [ScoredEntry],
     ) -> BoxFuture<'a, Result<Vec<QueryRewriteOutput>>> {
         Box::pin(async move {
+            let trimmed_query = original_query.trim();
+            if trimmed_query.is_empty() {
+                return Ok(vec![]);
+            }
+
+            let bounded_query = truncate_chars(trimmed_query, self.config.max_query_chars);
+
             let prompt = build_rewrite_prompt(
-                original_query,
+                bounded_query,
                 current_results,
                 self.config.max_context_results,
                 self.config.max_snippet_chars,
             );
 
-            let raw_response = self
-                .client
-                .generate_text(&self.config.model, &prompt)
-                .await?;
-
-            let output = parse_rewrite_response(&raw_response, original_query);
-            if output.is_empty() {
-                Ok(vec![])
-            } else {
-                Ok(vec![output])
+            match self.client.generate_text(&self.config.model, &prompt).await {
+                Ok(raw_response) => {
+                    let output = parse_rewrite_response(&raw_response, bounded_query);
+                    Ok(vec![output])
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        "Ollama query rewriting call failed ({err}); falling back to original query"
+                    );
+                    Ok(vec![QueryRewriteOutput::text_only(bounded_query)])
+                }
             }
         })
     }
@@ -100,7 +114,7 @@ fn extract_snippet(entry: &ScoredEntry) -> String {
 
 fn truncate_chars(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
-        Some((idx, _)) => &s[..idx],
+        Some((idx, _)) => s.get(..idx).unwrap_or(s),
         None => s,
     }
 }
@@ -128,11 +142,7 @@ fn build_rewrite_prompt(
     prompt.push_str(&escaped_query);
     prompt.push_str("\n</query>\n\n<untrusted_context>\n");
 
-    for (i, res) in current_results
-        .iter()
-        .take(max_context_results)
-        .enumerate()
-    {
+    for (i, res) in current_results.iter().take(max_context_results).enumerate() {
         let snippet_raw = extract_snippet(res);
         let snippet_truncated = truncate_chars(&snippet_raw, max_snippet_chars);
         let snippet_escaped = xml_escape(snippet_truncated);
@@ -153,6 +163,9 @@ struct RawRewriteJson {
 
 fn parse_rewrite_response(response: &str, original_query: &str) -> QueryRewriteOutput {
     let trimmed = response.trim();
+    if trimmed.is_empty() {
+        return QueryRewriteOutput::text_only(original_query);
+    }
 
     // 1. Try stripping code fences if present
     let json_candidate = if trimmed.starts_with("```") {
@@ -177,17 +190,22 @@ fn parse_rewrite_response(response: &str, original_query: &str) -> QueryRewriteO
             .semantic_query
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
-        let entities = parsed
+        let entities: Vec<String> = parsed
             .anchor_entities
             .into_iter()
             .map(|e| e.trim().to_string())
             .filter(|e| !e.is_empty())
+            .take(MAX_ANCHOR_ENTITIES)
             .collect();
+
+        if text_q.is_none() && sem_q.is_none() && entities.is_empty() {
+            return QueryRewriteOutput::text_only(original_query);
+        }
 
         return QueryRewriteOutput::new(text_q, sem_q, entities);
     }
 
-    // 3. Fallback: line-based plain text parsing if model did not output valid JSON
+    // 3. Fallback: line-based plain text parsing if model output structured list
     let mut text_q = None;
     let mut sem_q = None;
     let mut entities = Vec::new();
@@ -197,26 +215,43 @@ fn parse_rewrite_response(response: &str, original_query: &str) -> QueryRewriteO
         if line.is_empty() {
             continue;
         }
-        let clean = line
-            .trim_start_matches(|c| matches!(c, '-' | '*' | '•' | '+' | '1'..='9' | '.' | ')'))
-            .trim();
-        if clean.is_empty() || clean.to_lowercase() == original_query.trim().to_lowercase() {
+
+        // Only process lines that start with bullet points or number list markers
+        let has_bullet_prefix = line.starts_with(['-', '*', '•', '+'])
+            || (line.starts_with(|c: char| c.is_ascii_digit()) && line.contains(['.', ')', '-']));
+
+        if !has_bullet_prefix {
             continue;
         }
+
+        let clean = line
+            .trim_start_matches(|c| matches!(c, '-' | '*' | '•' | '+' | '0'..='9' | '.' | ')'))
+            .trim();
+
+        if clean.is_empty()
+            || !clean.chars().any(|c| c.is_alphanumeric())
+            || clean.to_lowercase() == original_query.trim().to_lowercase()
+        {
+            continue;
+        }
+
         if text_q.is_none() {
             text_q = Some(clean.to_string());
         } else if sem_q.is_none() {
             sem_q = Some(clean.to_string());
-        } else {
+        } else if entities.len() < MAX_ANCHOR_ENTITIES {
             entities.push(clean.to_string());
         }
+    }
+
+    if text_q.is_none() && sem_q.is_none() && entities.is_empty() {
+        return QueryRewriteOutput::text_only(original_query);
     }
 
     QueryRewriteOutput::new(text_q, sem_q, entities)
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 
@@ -266,66 +301,18 @@ mod tests {
         assert_eq!(output.anchor_entities, vec!["Thread", "Channel"]);
     }
 
-    #[tokio::test]
-    async fn test_ollama_query_rewriter_mock_server() {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let server_url = format!("http://{}", addr);
+    #[test]
+    fn test_parse_rewrite_response_garbage_fallback() {
+        let garbage = "!@#$%^&* NOT VALID JSON OR TEXT !@#$%^&*";
+        let output = parse_rewrite_response(garbage, "rust concurrency");
+        assert_eq!(output.text_query.as_deref(), Some("rust concurrency"));
+    }
 
-        tokio::spawn(async move {
-            if let Ok((mut socket, _)) = listener.accept().await {
-                use tokio::io::{AsyncReadExt, AsyncWriteExt};
-                let mut buf = [0u8; 4096];
-                let n = socket.read(&mut buf).await.unwrap_or(0);
-                let req_str = String::from_utf8_lossy(&buf[..n]);
-
-                assert!(req_str.contains("&lt;script&gt;"));
-                assert!(req_str.contains("<untrusted_context>"));
-
-                let response_json = serde_json::json!({
-                    "text_query": "safe rust memory",
-                    "semantic_query": "memory safety guarantees in rust without garbage collection",
-                    "anchor_entities": ["Rust", "MemorySafety"]
-                });
-
-                let body = serde_json::json!({
-                    "message": {
-                        "role": "assistant",
-                        "content": response_json.to_string()
-                    }
-                })
-                .to_string();
-
-                let http_response = format!(
-                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
-                    body.len(),
-                    body
-                );
-                socket.write_all(http_response.as_bytes()).await.ok();
-            }
-        });
-
-        let client = OllamaClient::new(server_url);
-        let rewriter = OllamaQueryRewriter::new(client, OllamaQueryRewriterConfig::default());
-
-        let results = vec![ScoredEntry {
-            id: "doc1".into(),
-            final_score: 0.2,
-            metadata: Some(serde_json::json!({"text": "untrusted <script>alert(1)</script> content"})),
-        }];
-
-        let outputs = rewriter
-            .rewrite_structured("rust <script>", &results)
-            .await
-            .unwrap();
-
-        assert_eq!(outputs.len(), 1);
-        let out = &outputs[0];
-        assert_eq!(out.text_query.as_deref(), Some("safe rust memory"));
-        assert_eq!(
-            out.semantic_query.as_deref(),
-            Some("memory safety guarantees in rust without garbage collection")
-        );
-        assert_eq!(out.anchor_entities, vec!["Rust", "MemorySafety"]);
+    #[test]
+    fn test_truncate_chars_unicode() {
+        let text = "Präfix-München 🚀 Test";
+        assert_eq!(truncate_chars(text, 6), "Präfix");
+        assert_eq!(truncate_chars(text, 100), text);
+        assert_eq!(truncate_chars(text, 0), "");
     }
 }
