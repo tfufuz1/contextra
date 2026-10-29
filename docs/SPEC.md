@@ -878,7 +878,7 @@ Jeder Löschbaustein MUSS einzeln prüfbar sein:
 
 ### 9.9 Ehrliche Grenzen (im Bericht verpflichtend)
 
-Nicht durch Contextra kontrollierbar und deshalb **ausgewiesen**, nie behauptet: externe Sicherungen des Betreibers, Datenträger-Firmware (A-FLASH, Wear-Leveling, Überprovisionierung), Cloud-/Anbieter-Replikation, Host-Prompt-Historien, Daten bereits an Dritte übermittelt, Auslagerung (Swap) und Core-Dumps außerhalb des gehärteten Prozesses. Das Ergebnis ist ein **technischer Befund über das lokale Datenverzeichnis**, kein Rechtsnachweis und keine Zertifizierung. Externe Zertifizierung (z. B. nach Medienlöschvorgaben) ist Aufgabe des Betreibers (O-04).
+Nicht durch Contextra kontrollierbar und deshalb **ausgewiesen**, nie behauptet: externe Sicherungen des Betreibers, Datenträger-Firmware (A-FLASH, Wear-Leveling, Überprovisionierung), Cloud-/Anbieter-Replikation, Host-Prompt-Historien, Daten bereits an Dritte übermittelt, Auslagerung (Swap) und Core-Dumps außerhalb des gehärteten Prozesses. Das Ergebnis ist ein **technischer Befund über das lokale Datenverzeichnis**, kein Rechtsnachweis und keine Zertifizierung. Externe Zertifizierung (z. B. nach Medienlöschvorgaben) ist Aufgabe des Betreibers (O-04). Contextra findet Erwähnungen einer Person in Dokumenten ohne Zuordnung (subject_ref) nicht selbst; der Verantwortliche muss solche Dokumente für einen Löschantrag selbst identifizieren. Verweis auf ADR-0007 (Proposed).
 
 ### 9.10 Reife der Löschkette
 
@@ -1188,6 +1188,30 @@ Jedes Crate hat eine eigene SemVer-Version; `cargo-semver-checks` ist Pflicht f�
 |O-13|Ursache der 33 Clippy-Fehlschläge (gemeinsamer Abbruch oder echte Lints) anhand der rohen Logs|Technik (WP 0.6)|
 |O-14|Welche Tests verursachen die 13 Timeouts (Fixture, echte Last, Deadlock)?|Technik (WP 0.7)|
 |O-15|Dokumentationssprache: `rustdoc` englisch oder deutsch; Integrationsleitfäden deutsch|Produkt (E-3.8)|
+|O-41|Dauer von Einschränkung und Aufbewahrung, Rechtsfrage|externe Rechtsprüfung|
+|O-42|Betroffenen-Erkennung in Freitext, nicht Teil von v1.0|externe Rechtsprüfung|
+|O-43|Zweckbindung und Rechtsgrundlage für ErasedSet, Referenz-Hashes, Berichte|externe Rechtsprüfung|
+
+### 16.1 Prüfpunkte-Register (P-xx)
+
+| ID | Gegenstand | Verwendungsstellen | Zuständigkeit | Status |
+|---|---|---|---|---|
+| P-01 | Anerkennung von Schlüsselvernichtung als Löschung | C-12.1.1, C-12.1.3 (T2) | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-02 | Chiffrat ohne Schlüssel als Anonymisierung / Nicht-Personenbezug | C-12.1.1, C-12.1.3 (T2), C-12.1.2, C-12.17.4 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-03 | A-RAM (Klartext/Schlüssel in Swap, Dumps, Hibernation) | C-12.5.2, C-12.18 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-05 | Embeddings und Vektorbytes vorsorglich personenbezogen | C-12.1.2, C-12.4 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-06 | Fristen / Lebensdauer von Schlüssel-Backups (`key_backup_max_age`, `erased_set_retention`) | C-12.1.2, C-12.10, C-15.5 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-07 | Aufbewahrung und Rechtsgrundlage des Löschberichts (`report_retention`, `erased_set_retention`) | C-12.7.10, C-12.10, C-15.5 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-09 | Trennung des Archivs vom aktiven Retrieval-Index bei Aufbewahrungspflicht | C-12.1.2, C-12.8.6 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-11 | Hygienefrist (`purge_rebuild_max_days`, `checkpoint_hold`, `partial_alarm_after`) | C-12.4, C-12.19.1, C-15.5 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-12 | Empfänger-Verzeichnis (`RecipientLedger`, Art. 17 Abs. 2, Art. 19) | C-12.19.2 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-13 | Krypto-Agilität (REQ-DEL-028, Algorithmen- und Formatkennung) | C-12.2.9 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-14 | Quellenprüfung (Prüfung von Primärquellen vor Übernahme in Außentexte) | C-12.1.2 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-15 | Haltefrist für Checkpoints unter Restricted (`checkpoint_hold`) | C-15.5 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-16 | Fristobergrenzen und Rechtsprüfung (`erased_set_retention`) | C-12.10, C-15.5 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-18 | Anbieterattest C3 (Prüfpflicht des Verantwortlichen bei externem KMS) | C-12.5.1 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-19 | Zulässigkeit von Verzögerungen (Alarme und Eskalation) | C-12.19.1, C-15.5 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
+| P-22 | Aufbewahrungspflichten (`Restricted` je Datum) | C-12.1.2 | externe Rechtsprüfung | Definition aus 2.4 nicht rekonstruierbar, Maintainer-Bestätigung erforderlich |
 
 ---
 
@@ -1240,6 +1264,7 @@ Jedes Crate hat eine eigene SemVer-Version; `cargo-semver-checks` ist Pflicht f�
 |2.4|27.10.2026|Löschpfad optimiert, Quellenbereinigung|
 |**3.0**|**28.10.2026**|Produktzuschnitt auf entkoppelten LLM-Baukasten; Modulvertrag und isolierte Prüfbarkeit; Befunde U-01–U-12 aus dem Abgleich Audit ↔ Code; ADR-D01–D10; Löschkette als Baustein (§9); Aufhebung der Archivierungsentscheidung; Nachmessung am HEAD 52d3227f0 (U-13, U-14, korrigierte Zahlen); Katalogtabelle §5.2; Pflichttests §12.5; Anhang C vollständig aus dem Repo-Stand übernommen|
 |**3.1**|**28.10.2026**|Baseline (E2, teilweise), Metrik-Datei und Scan eingearbeitet (§1.2a, U-15 bis U-27); Projektziele mit Messkriterien (§2.5); Regeln 15–16; Wartbarkeitsregeln W1–W11 (§4.9); `erasure` in §4.4/4.5; Crate-Review aller 35 Mitglieder (§5.5); Schnittstellenvertrag und Rechtsmatrix der Löschkette (§9.11, §9.12); neue Gates (§12.2); Release-Kriterien (§13.4); ADR-D11–D16; O-11–O-15; §17 neu gefasst (drei Altfragen geprüft: erledigt bzw. umformuliert)|
+|**3.1.1**|**29.10.2026**|Referenzabgleich Löschkette: Abgleichsbericht `docs/analysis/LOESCHKETTE_REFERENZABGLEICH_2026-10-29.md` angelegt; Prüfpunkte-Register (§16.1) eingeführt und alte Verweise auf Paragraf 25 Punkt 1 ersetzt; O-12-Kollision durch Einführung von O-41 behoben; Pflicht-Ausschluss SubjectDiscoveryNotPerformed (O-42) in §9.9, C-12.15, C-12.20 aufgenommen; Hinweis zu Zweckbindung und Rechtsgrundlage für ErasedSet/Berichte (O-43) in C-12.10 ergänzt.|
 
 ## Anhang C. Übernommener Detailtext aus Fassung 2.4/2.5 (nachrangig)
 
@@ -1701,7 +1726,7 @@ Retention-Reaper/`MemoryType`-Ort (§11.6), BM25-Morphologie für deutsche Kompo
 
 #### C-12.1 Rechtlicher und fachlicher Rahmen (keine Rechtsberatung)
 
-> **Rechtshinweis.** Technische Spezifikation, keine Rechtsberatung. **Software kann eine Rechtswirkung weder herbeiführen noch garantieren.** Sie kann den technischen Zustand herstellen, den die vertretenen Rechtsauffassungen verlangen, diesen Zustand messen und belegen und ehrlich benennen, was sie nicht erreicht. Die rechtliche Bewertung trägt der Verantwortliche. Punkte „P-xx“ (§25.1) sind vor jeder Außenkommunikation fachanwaltlich zu prüfen. Das Ziel „rechtlich nicht anfechtbar“ wird deshalb **technisch** als „unter jeder plausiblen Auffassung bedient, gemessen, mit benannten Annahmen“ operationalisiert (§12.1.3).
+> **Rechtshinweis.** Technische Spezifikation, keine Rechtsberatung. **Software kann eine Rechtswirkung weder herbeiführen noch garantieren.** Sie kann den technischen Zustand herstellen, den die vertretenen Rechtsauffassungen verlangen, diesen Zustand messen und belegen und ehrlich benennen, was sie nicht erreicht. Die rechtliche Bewertung trägt der Verantwortliche. Punkte „P-xx“ (§16.1) sind vor jeder Außenkommunikation fachanwaltlich zu prüfen. Das Ziel „rechtlich nicht anfechtbar“ wird deshalb **technisch** als „unter jeder plausiblen Auffassung bedient, gemessen, mit benannten Annahmen“ operationalisiert (§12.1.3).
 
 **Belegstärke:** **[R]** verbindliches Recht · **[B]** Behördenauslegung (EDPB, DSK, Landesbehörden, Standard-Datenschutzmodell, nicht bindend) · **[P]** Fachliteratur/Praxis/Norm · **✔** an der Primärquelle geprüft · **◐** nur Sekundärquelle · **○** allgemeiner Kenntnisstand · **⚠** umstritten/offen.
 
@@ -1772,7 +1797,7 @@ Contextra MUSS gleichzeitig unter allen plausiblen Auffassungen bestehen. Die Ma
 |T1 Strenge Vernichtung|alle Kopien im Einflussbereich physisch entfernt (SDM, EDPB Rn. 50, 63)|Klasse **M**: P plus Hygiene (physische Kompaktion, WAL-Scrub, Checkpoint-Rewrite, Index-Neuaufbau)|Flash-Reste, externe Backups (ausgewiesen)|
 |T2 Unkenntlichmachung|niemand ist mit vertretbarem Aufwand zur Identifizierung in der Lage (SDM, DSB, OLG Dresden 4 U 292/25, Entwurf 02/2026)|Klasse **C** plus Restmetadaten-Selbsttest (§12.7.6) plus Perspektivenmatrix|Aufwandsbewertung ist Rechtsfrage (P-01, P-02)|
 |T3 Cryptographic Erase|NIST-Bedingungen, ISO/IEC 27040 (EDPB Rn. 51 analog)|C2/C3 mit CE-Traceability; C1 mit Annahme A-FLASH|Hardware-Restrisiko bei K1|
-|T4 Einschränkung/Aufbewahrung|Art. 18, Art. 17 Abs. 3 (CEF Issue 4)|Klasse **L**, `Restricted`, Legal Hold|Dauer ist Rechtsfrage (O-12)|
+|T4 Einschränkung/Aufbewahrung|Art. 18, Art. 17 Abs. 3 (CEF Issue 4)|Klasse **L**, `Restricted`, Legal Hold|Dauer ist Rechtsfrage (O-41)|
 |T5 Backups|Löschungen nachverfolgen und beim Restore umsetzen (CEF Issue 6, BayLfD 12.5)|Zwei-Spuren-Backup, Restore-Guard, `ErasedSetMirror` (§12.17)|Externe Backups, die Contextra nicht sieht|
 
 ##### C-12.1.4 Perspektivenmatrix
@@ -2301,7 +2326,7 @@ Differenzbedingung: Der zweistufige Befund und der volle Rohscan liefern auf den
 5. Sidecars enthalten keine Nutzinhalte und keine Schlüssel.
 6. `erased_set_retention ≥ key_backup_max_age + Sicherheitszuschlag` (Startwert insgesamt 90 Tage; Obergrenze nach Rechtsprüfung P-06, P-07, P-16; die 365 Tage der Fassung 2.2.1 sind nicht mehr nötig, weil nur Schlüssel-Backups eine Rücksicherung gelöschter Inhalte ermöglichen). In `EnterpriseRegulated` Pflichtwert ohne Standard; nie unbegrenzt.
 
-Kipptest: Will der Eigentümer auch die Referenz-Epochen streichen, werden `ErasedSet`-Einträge nach `erased_set_retention` per atomarem Rewrite entfernt (O-17); der Restore-Guard verliert dann die Wiedererkennung und `restore_unguarded` wird ausgewiesen.
+Kipptest: Will der Eigentümer auch die Referenz-Epochen streichen, werden `ErasedSet`-Einträge nach `erased_set_retention` per atomarem Rewrite entfernt (O-17); der Restore-Guard verliert dann die Wiedererkennung und `restore_unguarded` wird ausgewiesen. Der Verantwortliche muss Zweck und Rechtsgrundlage dieser Datenhaltung dokumentieren und im Verzeichnis (Art. 30) führen; Bewertung ist Rechtsfrage (P-Register). Verweis auf ADR-0008 (Proposed).
 
 #### C-12.11 Claim-Taxonomie und Außenformulierung
 
@@ -2396,7 +2421,7 @@ Löschtypen existieren genau einmal (Kantenregel 5, Gate `deletion-types-once`).
 |Padding und Re-Wrap kosten Platz und Zeit|Padmé ≤ 12 %, Re-Wrap O(Schlüssel); Budgets in `budgets.toml` (O-24, O-40)|
 |Ablauf der Referenzschlüssel schwächt den Restore-Guard|Horizont bezieht sich nur auf Schlüssel-Backups (§12.9)|
 |Fehlbedienung (irrtümliche Löschung)|Karenz `erasure_grace`, Forget-Guard (§13.3), `Unfreeze` bis D3|
-|Rechtswertung offen|kein Produkttext ohne fachkundige Freigabe (§25.1)|
+|Rechtswertung offen|kein Produkttext ohne fachkundige Freigabe (§16.1)|
 
 **Löschinventar (`doctor`, REQ-DEL-037).** Die Software erzwingt keine Löschfristen, macht ihr Fehlen aber sichtbar. `doctor` weist je Collection ohne Nutzinhalte aus: (1) ob eine Löschfrist/`RetentionPolicy` gesetzt ist (nein = Warnung); (2) Verwahrungsstufe K0/K1/K2/K3; (3) Anteil `LegacyUnkeyed`; (4) interne Checkpoints (Anzahl, ältester, Policy); (5) `erased_set_retention`, `key_backup_max_age`, `kek_epoch_len`, Alter des letzten Seal, Alter der ältesten Schlüssel-Backups, Konsistenz; (6) offene `Partial`-Sagas mit Alter und ausstehender Schicht; (7) `ErasedSetMirror`-Zustand; (8) Härtungslücken (§12.18); (9) offene Residuale (`R-GRAPH`, `R-KEKEPOCH`) mit Frist. Das Inventar ist Beobachtung, keine Rechtsaussage.
 
@@ -2404,7 +2429,7 @@ Löschtypen existieren genau einmal (Kantenregel 5, Gate `deletion-types-once`).
 
 **Einheit.** Eine Betroffenen-Einheit ist die kleinste Menge von Records, die ohne Kollateralverlust für einen Betroffenen gelöscht werden kann. Standard: ein Dokument mit genau einem Betroffenen.
 
-**Referenzen.** Jedes Dokument trägt `subjects: [subject_ref]`; `subject_ref` ist eine zufällige ID mit Mindestentropie (§12.10), vergeben vom Aufrufer (oder durch eine optionale Erkennung `[R]`). Ohne Angabe gilt das Dokument als Einheit des Aufrufers.
+**Referenzen.** Jedes Dokument trägt `subjects: [subject_ref]`; `subject_ref` ist eine zufällige ID mit Mindestentropie (§12.10), vergeben vom Aufrufer (oder durch eine optionale Erkennung `[R]`). Ohne Angabe gilt das Dokument als Einheit des Aufrufers. Contextra findet Erwähnungen einer Person in Dokumenten ohne Zuordnung (subject_ref) nicht selbst; der Verantwortliche muss solche Dokumente für einen Löschantrag selbst identifizieren. Verweis auf ADR-0007 (Proposed).
 
 **Mehrfachbezug.** Ein Dokument mit mehreren Betroffenen wird in Segmente zerlegt; jedes Segment erhält die Menge seiner Betroffenen; Segmente mit gleicher Menge teilen einen DocDek. Bei Löschung für Betroffenen A:
 
@@ -2502,7 +2527,8 @@ Je Dokument führt Contextra ein Register der Ausleitungen (Export, Egress-Kanal
 - `HostHistories`: Host-Verläufe (A-HOSTHIST);
 - `DerivedOutsideLineage`: Ableitungen außerhalb der Lineage (vom Betreiber angelegte Exporte);
 - `FilesystemSnapshots`: Dateisystem-Snapshots und Journale;
-- `ActiveSnapshot{ids}` (§12.5.5).
+- `ActiveSnapshot{ids}` (§12.5.5);
+- `SubjectDiscoveryNotPerformed`: Contextra findet Erwähnungen einer Person in Dokumenten ohne Zuordnung (subject_ref) nicht selbst; der Verantwortliche muss solche Dokumente für einen Löschantrag selbst identifizieren. Verweis auf ADR-0007 (Proposed).
 
 (Der Ausschluss `KeyMaterialBackups` der Fassung 2.2.1 entfällt: Schlüssel-Backups sind Spur K und erfasst; Schlüsselkopien **außerhalb** von Spur K stehen unter `ExternalBackups`.)
 
