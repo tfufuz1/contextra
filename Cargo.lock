@@ -1047,6 +1047,8 @@ dependencies = [
  "contextra",
  "contextra-crypto",
  "contextra-infer-candle",
+ "contextra-infer-ollama",
+ "contextra-infer-onnx",
  "contextra-license",
  "contextra-ports",
  "contextra-privacy",
