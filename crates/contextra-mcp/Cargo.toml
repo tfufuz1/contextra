@@ -5,6 +5,7 @@ workspace = true
 name = "contextra-mcp"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [package.metadata.contextra]
 ring = "4"
@@ -12,6 +13,8 @@ ring = "4"
 [features]
 default = []
 candle = ["dep:contextra-infer-candle"]
+ollama = ["dep:contextra-infer-ollama"]
+onnx = ["dep:contextra-infer-onnx"]
 test-utils = []
 
 [dependencies]
@@ -25,6 +28,8 @@ contextra-crypto = { workspace = true }
 contextra-privacy = { workspace = true }
 contextra-router = { workspace = true }
 contextra-infer-candle = { workspace = true, optional = true }
+contextra-infer-ollama = { workspace = true, optional = true }
+contextra-infer-onnx = { workspace = true, optional = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 rand = { workspace = true }
 parking_lot = { workspace = true }

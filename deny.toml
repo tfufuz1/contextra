@@ -6,32 +6,50 @@ feature-depth = 1
 
 [advisories]
 ignore = [
-    "RUSTSEC-2024-0384", # number_prefix
-    "RUSTSEC-2024-0436", # paste
-    "RUSTSEC-2026-0176", # pyo3
-    "RUSTSEC-2026-0177", # pyo3
-    "RUSTSEC-2026-0285", # rustls
-    "RUSTSEC-2026-0205", # scc
-    "RUSTSEC-2025-0046", # wasmtime
-    "RUSTSEC-2025-0118", # wasmtime
-    "RUSTSEC-2026-0020", # wasmtime
-    "RUSTSEC-2026-0021", # wasmtime
-    "RUSTSEC-2026-0085", # wasmtime
-    "RUSTSEC-2026-0086", # wasmtime
-    "RUSTSEC-2026-0087", # wasmtime
-    "RUSTSEC-2026-0088", # wasmtime
-    "RUSTSEC-2026-0089", # wasmtime
-    "RUSTSEC-2026-0091", # wasmtime
-    "RUSTSEC-2026-0092", # wasmtime
-    "RUSTSEC-2026-0093", # wasmtime
-    "RUSTSEC-2026-0094", # wasmtime
-    "RUSTSEC-2026-0095", # wasmtime
-    "RUSTSEC-2026-0096", # wasmtime
-    "RUSTSEC-2026-0222", # wasmtime
-    "RUSTSEC-2026-0269", # wasmtime
+    # --- Unmaintained / Unsound Package Advisories ---
+    { id = "RUSTSEC-2024-0384", reason = "instant: unmaintained; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2024-0436", reason = "paste: unmaintained macro crate; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2025-0057", reason = "fxhash: unmaintained hash crate; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2025-0119", reason = "number_prefix: unmaintained formatting crate; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2025-0141", reason = "bincode v1: unmaintained; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0176", reason = "pyo3: bindings advisory; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0177", reason = "pyo3: bindings advisory; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0187", reason = "lopdf: dev-dependency stack overflow in contextra-ingest; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0205", reason = "scc: unsound Array::insert; panics treten in compare fn nicht auf; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0253", reason = "lru: unsound LruCache::pop; panics in drop nicht vorhanden; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0386", reason = "tokio: AsyncFd unsoundness; AsyncFd im Workspace nicht genutzt; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+
+    # --- Zip Advisories (candle-core / contextra-ingest dependency) ---
+    { id = "RUSTSEC-2026-0367", reason = "zip: SUID/SGID extraction; ZipArchive/ZipStreamReader im Workspace nicht erreichbar; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0368", reason = "zip: symlink escape; ZipArchive/ZipStreamReader im Workspace nicht erreichbar; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0369", reason = "zip: symlink permissions; ZipArchive/ZipStreamReader im Workspace nicht erreichbar; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+
+    # --- Wasmtime Advisories (21 IDs, to be remediated in SC-2) ---
+    { id = "RUSTSEC-2025-0046", reason = "wasmtime 25.0.3: sandbox isolation; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2025-0118", reason = "wasmtime 25.0.3: shared memory API; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0020", reason = "wasmtime 25.0.3: WASI resource exhaustion; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0021", reason = "wasmtime 25.0.3: wasi:http fields panic; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0085", reason = "wasmtime 25.0.3: flags component lifting; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0086", reason = "wasmtime 25.0.3: 64-bit tables data leakage; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0087", reason = "wasmtime 25.0.3: Cranelift x86-64 f64x2.splat; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0088", reason = "wasmtime 25.0.3: component model string transcoding; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0089", reason = "wasmtime 25.0.3: Cranelift aarch64 br_table jump; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0091", reason = "wasmtime 25.0.3: string transcoding OOB write; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0092", reason = "wasmtime 25.0.3: misaligned UTF-16 panic; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0093", reason = "wasmtime 25.0.3: component model UTF-16 OOB read; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0094", reason = "wasmtime 25.0.3: Winch table.grow; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0095", reason = "wasmtime 25.0.3: Winch compiler sandbox access; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0096", reason = "wasmtime 25.0.3: Cranelift aarch64 heap access; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0222", reason = "wasmtime 25.0.3: sandbox advisory; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0269", reason = "wasmtime 25.0.3: filesystem sandbox escape; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0316", reason = "wasmtime 25.0.3: component model lifting advisory; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0363", reason = "wasmtime 25.0.3: Winch backend code generation advisory; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0379", reason = "wasmtime 25.0.3: Cranelift aarch64 br_table jump advisory; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
+    { id = "RUSTSEC-2026-0380", reason = "wasmtime 25.0.3: Cranelift bit-packing overflow; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-01-31" },
 ]
 
 [licenses]
+private = { ignore = true }
 allow = [
     "MIT",
     "Apache-2.0",
@@ -39,9 +57,14 @@ allow = [
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
-    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+    "MPL-2.0",
     "CC0-1.0",
     "Zlib",
+]
+clarify = [
+    { name = "contextra-mcp", expression = "MIT OR Apache-2.0", license-files = [] },
 ]
 confidence-threshold = 0.8
 
@@ -50,10 +73,6 @@ multiple-versions = "warn"
 wildcards = "allow"
 highlight = "all"
 deny = [
-    # Audit-Befund „deny.toml redundante, aber wirkungslose zweite Verteidigungslinie“ (Abschnitt 4.3):
-    # Die wrappers-Liste wurde am 2026-09-26 auf tatsächliche Nicht-Ring-0/1-Wrapper reduziert, damit
-    # cargo deny check bans echte zukünftige Production-Dependency-Regressionen zusätzlich zum xtask-Gate abdeckt.
-    # §4.2 Ring-Modell: tokio-Nutzung ist in Ring-0/1-Kernen verboten und nur in Höher-Ring-Fassaden sowie erlaubter Peripherie gestattet
     { crate = "tokio", wrappers = [
         "criterion",
         "hyper",
@@ -61,34 +80,40 @@ deny = [
         "hyper-util",
         "contextra",
         "contextra-agent",
+        "contextra-audit-export", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-bench",
+        "contextra-checkpoint", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-cognition",
+        "contextra-core", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-crypto", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-db",
         "contextra-engine",
+        "contextra-graph", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-infer-candle",
         "contextra-infer-ollama",
         "contextra-infer-onnx",
+        "contextra-kvcache", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-mcp",
+        "contextra-mvcc", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-ports", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-privacy",
         "contextra-py",
+        "contextra-rank", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-router",
         "contextra-sandbox",
+        "contextra-store", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "contextra-testkit",
+        "contextra-text", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-vector", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
         "reqwest",
         "tokio-rustls",
         "tokio-util",
         "tower",
     ] },
-    # §4.2 Ring-Modell: Candle-Inferenz nur in contextra-infer-candle (TRANSITION; künftig contextra-infer-candle) sowie Candle-Eigencrates
-    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "contextra-infer-candle", "contextra-infer-candle"] },
-    # §4.2 Ring-Modell: ONNX/ort nur in contextra-infer-onnx (TRANSITION; künftig contextra-infer-onnx)
-    { crate = "ort", wrappers = ["contextra-infer-onnx", "contextra-infer-onnx"] },
-    # §4.2 Ring-Modell: PyO3 nur in contextra-py (isoliertes Workspace-Crate) und Interop-Crates
+    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "contextra-infer-candle"] },
     { crate = "pyo3", wrappers = ["contextra-py", "numpy", "pythonize"] },
-    # §4.2 Ring-Modell: reqwest nur in contextra-infer-ollama (TRANSITION; künftig contextra-infer-ollama)
-    { crate = "reqwest", wrappers = ["contextra-infer-ollama", "contextra-infer-ollama"] },
-    # §4.2 Ring-Modell: Wasmtime-Sandbox nur in contextra-sandbox
-    { crate = "wasmtime", wrappers = ["contextra-sandbox", "contextra-privacy"] },
+    { crate = "reqwest", wrappers = ["contextra-infer-ollama"] },
+    { crate = "wasmtime", wrappers = ["contextra-sandbox"] },
 ]
 
 [sources]

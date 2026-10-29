@@ -1,29 +1,15 @@
 //! F-03: Co-Occurrence- und Traversal-basierte Kantenverstärkung (Edge Weight Reinforcement Learning).
-//! Zwei unabhängige Signale pro Kante: (1) Verstärkung bei gemeinsamer Aktivierung
-//! zweier Knoten in einer Retrieval-Session (Co-Occurrence-Reinforcement, mit passivem Zerfall),
-//! (2) Verstärkung bei Pfad-Traversal mit längenabhängigem Reward und Zeit-Verdunstung
-//! (Traversal-Reinforcement, analog zu Trail-Reinforcement in Pfadfindungs-Algorithmen).
-//!
-//! FEATURE-FLAG: `edge-reinforcement-learning`
-//! KEIN neuer Index — nur zwei f32-Felder pro Kante.
-//! Update erfolgt asynchron NACH dem Retrieval, nie während.
 
-use crate::csr::Edge;
+use crate::csr::CsrEdge;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EdgeReinforcementConfig {
-    /// Co-occurrence reinforcement rate η. Default: 0.01.
     pub eta: f32,
-    /// Passiver Kantenzerfall δ. Default: 0.001.
     pub delta: f32,
-    /// Maximale Gesamtgewicht pro Knoten W_max. Default: 10.0.
     pub w_max: f32,
-    /// Traversal-Verdunstungsrate (Zeit-Decay) ρ. Default: 0.05.
     pub rho: f32,
-    /// Belohnungskonstante Q. Default: 1.0.
     pub q: f32,
-    /// Mischkoeffizient α (Co-Occurrence- vs. Traversal-Signal). Default: 0.5.
     pub alpha: f32,
 }
 
@@ -53,11 +39,10 @@ mod tests {
 
     #[test]
     fn test_cooccurrence_reinforcement_decay() {
-        let mut edge = Edge::new(EntityId::new(1), 1.0);
+        let mut edge = CsrEdge::new(EntityId::new(1), 1.0);
         edge.cooccurrence_weight = 1.0;
         let config = EdgeReinforcementConfig::default();
 
-        // After N updates without co-activation (co_activation = 0.0), cooccurrence_weight decays towards 0
         for _ in 0..1000 {
             apply_cooccurrence_reinforcement(&mut edge, 0.0, &config);
         }
@@ -68,8 +53,8 @@ mod tests {
     #[test]
     fn test_weight_normalization_caps_w_max() {
         let mut edges = vec![
-            Edge::new(EntityId::new(1), 1.0),
-            Edge::new(EntityId::new(2), 1.0),
+            CsrEdge::new(EntityId::new(1), 1.0),
+            CsrEdge::new(EntityId::new(2), 1.0),
         ];
         edges[0].cooccurrence_weight = 8.0;
         edges[1].cooccurrence_weight = 8.0;
@@ -85,11 +70,10 @@ mod tests {
 
     #[test]
     fn test_traversal_reinforcement_evaporation() {
-        let mut edge = Edge::new(EntityId::new(1), 1.0);
+        let mut edge = CsrEdge::new(EntityId::new(1), 1.0);
         edge.traversal_weight = 1.0;
         let config = EdgeReinforcementConfig::default();
 
-        // Path length 0 -> no reinforcement, pure evaporation
         let initial_traversal = edge.traversal_weight;
         apply_traversal_reinforcement(&mut edge, 0, &config);
         assert!(edge.traversal_weight < initial_traversal);
@@ -106,24 +90,23 @@ mod tests {
     #[test]
     fn test_apply_weight_normalization_zero_and_below_max() {
         let mut edges = vec![
-            Edge::new(EntityId::new(1), 1.0),
-            Edge::new(EntityId::new(2), 1.0),
+            CsrEdge::new(EntityId::new(1), 1.0),
+            CsrEdge::new(EntityId::new(2), 1.0),
         ];
         edges[0].cooccurrence_weight = 2.0;
         edges[1].cooccurrence_weight = 3.0;
 
-        // sum_w = 5.0 <= w_max (10.0), so weights remain unchanged
         apply_weight_normalization(&mut edges, 10.0);
         assert_eq!(edges[0].cooccurrence_weight, 2.0);
         assert_eq!(edges[1].cooccurrence_weight, 3.0);
 
-        let mut empty_edges: Vec<Edge> = vec![];
-        apply_weight_normalization(&mut empty_edges, 10.0); // should not panic
+        let mut empty_edges: Vec<CsrEdge> = vec![];
+        apply_weight_normalization(&mut empty_edges, 10.0);
     }
 
     #[test]
     fn test_cooccurrence_reinforcement_triggers_normalization() {
-        let mut edge = Edge::new(EntityId::new(1), 1.0);
+        let mut edge = CsrEdge::new(EntityId::new(1), 1.0);
         edge.cooccurrence_weight = 9.9;
         let config = EdgeReinforcementConfig {
             eta: 1.0,
@@ -131,22 +114,18 @@ mod tests {
             ..Default::default()
         };
 
-        // co_activation = 1.0 -> delta = 1.0 - 0.001*9.9 = 0.9901 -> new weight = 10.8901 > w_max (10.0)
         let needs_norm = apply_cooccurrence_reinforcement(&mut edge, 1.0, &config);
         assert!(needs_norm);
     }
 }
 
-/// Berechnet das Gesamt-Kantengewicht für eine Kante.
 #[inline]
 pub fn compute_edge_weight(cooccurrence_weight: f32, traversal_weight: f32, alpha: f32) -> f32 {
     alpha * cooccurrence_weight + (1.0 - alpha) * traversal_weight
 }
 
-/// Führt Co-Occurrence-Verstärkung durch und prüft Normalisierungs-Invariante.
-/// Gibt `true` zurück wenn Gewichtsnormalisierung nötig war.
 pub fn apply_cooccurrence_reinforcement(
-    edge: &mut Edge,
+    edge: &mut CsrEdge,
     co_activation: f32,
     config: &EdgeReinforcementConfig,
 ) -> bool {
@@ -155,9 +134,8 @@ pub fn apply_cooccurrence_reinforcement(
     edge.cooccurrence_weight > config.w_max
 }
 
-/// Führt Traversal-Verstärkung durch (Evaporation + Verstärkung).
 pub fn apply_traversal_reinforcement(
-    edge: &mut Edge,
+    edge: &mut CsrEdge,
     path_length: usize,
     config: &EdgeReinforcementConfig,
 ) {
@@ -169,8 +147,7 @@ pub fn apply_traversal_reinforcement(
     edge.traversal_weight = ((1.0 - config.rho) * edge.traversal_weight + reinforcement).max(0.0);
 }
 
-/// Gewichtsnormalisierung: wenn Σ_j w_ij > W_max, skaliere alle Kanten von i proportional.
-pub fn apply_weight_normalization(outgoing_edges: &mut [Edge], w_max: f32) {
+pub fn apply_weight_normalization(outgoing_edges: &mut [CsrEdge], w_max: f32) {
     let sum_w: f32 = outgoing_edges.iter().map(|e| e.cooccurrence_weight).sum();
     if sum_w > w_max && sum_w > 0.0 {
         let scale = w_max / sum_w;

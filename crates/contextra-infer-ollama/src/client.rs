@@ -5,9 +5,11 @@
 // NICHT-OFFENSICHTLICH: Client-Fehler 4xx (400, 404) niemals retrien; Automatischer Fallback auf sequentielles Embedding falls /api/embed fehlt
 // HOTSPOTS: embed, try_embed_batch, generate_text, chat_with_rag_streaming
 
+mod circuit_breaker;
 mod config;
 mod core;
 mod errors;
+pub mod policy;
 mod trait_impls;
 mod validation;
 mod wire;
@@ -16,10 +18,12 @@ mod wire;
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests;
 
+pub use circuit_breaker::CircuitBreaker;
 pub use config::*;
-pub use core::OllamaClient;
 #[cfg(test)]
 #[allow(unused_imports)]
 pub(crate) use core::{parse_prompt_template, retry_jitter, ParsedPrompt};
+pub use core::{read_response_bytes, read_response_text, OllamaClient};
 pub use errors::*;
+pub use policy::*;
 pub use validation::*;

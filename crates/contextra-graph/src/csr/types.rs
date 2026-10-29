@@ -16,7 +16,7 @@ pub enum EdgeType {
 
 /// Edge structure in CSR graph representation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Edge {
+pub struct CsrEdge {
     pub target: EntityId,
     pub weight: f32,
     pub edge_type: EdgeType,
@@ -26,7 +26,7 @@ pub struct Edge {
     pub traversal_weight: f32, // τ_ij, initialisiert mit 0.0
 }
 
-impl Edge {
+impl CsrEdge {
     pub fn new(target: EntityId, weight: f32) -> Self {
         Self {
             target,
@@ -65,13 +65,11 @@ pub const MAX_TRAVERSAL_HOPS: u8 = 3;
 
 /// Maximum visited nodes limit during BFS traversal to prevent intermediate hub-node memory explosion.
 pub const MAX_VISITED_NODES: usize = 10_000;
+
 #[derive(Debug, Clone)]
 pub struct CsrGraphConfig {
-    /// Rebuild threshold: max number of uncompacted pending edges in delta buffer before triggering an automatic full CSR rebuild.
     pub rebuild_threshold: usize,
-    /// Max compaction peak memory limit in MB (IP-08). Compaction will be deferred if current graph memory + rebuild allocation exceeds this threshold.
     pub max_compaction_peak_memory_mb: Option<usize>,
-    /// Optional global ResourceTracker handle for cross-crate memory budget coupling (IP-08).
     pub resource_tracker: Option<Arc<ResourceTracker>>,
 }
 
@@ -85,10 +83,8 @@ impl Default for CsrGraphConfig {
     }
 }
 
-/// Internal contiguous index for CSR arrays.
 pub(crate) type InternalIndex = usize;
 
-/// Internal representation of an edge payload.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct EdgePayload {
     pub(crate) target: InternalIndex,
@@ -100,7 +96,6 @@ pub(crate) struct EdgePayload {
     pub(crate) source_doc_id: Option<DocId>,
 }
 
-/// Staging representation of an edge before index allocation at commit time.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct StagedEdgePayload {
     pub(crate) target: EntityId,

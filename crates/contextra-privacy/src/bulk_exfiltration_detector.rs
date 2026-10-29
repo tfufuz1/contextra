@@ -3,13 +3,15 @@
 // INVARIANTEN: Zero-Panic Doctrine: Keinem `.unwrap()` oder `.expect()` in Production Code.
 //              Fail-Closed Semantik bei Uhrzeitanomalien oder Fehlerzuständen.
 //              Thread-safe Sliding-Window-Zähler pro Session ohne Lock-Kontention via `scc::HashMap`.
+//              Zeitstempel ausschließlich über den Clock-Port aus contextra-ports (INV-EGRESS-AUDIT-1).
 
+use contextra_ports::{Clock, SystemClock};
 use parking_lot::Mutex;
 use scc::HashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// Session identifier for grouping egress rate-limiting buckets.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -43,7 +45,7 @@ pub enum BulkExfiltrationOutcome {
 
 #[derive(Debug)]
 struct SlidingWindowCounter {
-    records: VecDeque<(Instant, usize)>,
+    records: VecDeque<(u64, usize)>,
     current_total: usize,
 }
 
@@ -55,25 +57,22 @@ impl SlidingWindowCounter {
         }
     }
 
-    /// Prunes expired records outside `window` relative to `now`.
+    /// Prunes expired records outside `window_nanos` relative to `now_nanos`.
     ///
-    /// Handles timestamp clock anomalies by checking `checked_duration_since`.
+    /// Handles timestamp clock anomalies by checking `now_nanos < timestamp_nanos`.
     /// Returns `false` if a clock anomaly (e.g. non-monotonic time regression) is detected.
-    fn prune_and_sum(&mut self, now: Instant, window: Duration) -> bool {
-        while let Some(&(timestamp, bytes)) = self.records.front() {
-            match now.checked_duration_since(timestamp) {
-                Some(elapsed) => {
-                    if elapsed > window {
-                        self.records.pop_front();
-                        self.current_total = self.current_total.saturating_sub(bytes);
-                    } else {
-                        break;
-                    }
-                }
-                None => {
-                    // Fail-Closed: Monotonic clock anomaly detected (now < timestamp)
-                    return false;
-                }
+    fn prune_and_sum(&mut self, now_nanos: u64, window_nanos: u64) -> bool {
+        while let Some(&(timestamp_nanos, bytes)) = self.records.front() {
+            if now_nanos < timestamp_nanos {
+                // Fail-Closed: Monotonic clock anomaly detected (time travel)
+                return false;
+            }
+            let elapsed = now_nanos.saturating_sub(timestamp_nanos);
+            if elapsed > window_nanos {
+                self.records.pop_front();
+                self.current_total = self.current_total.saturating_sub(bytes);
+            } else {
+                break;
             }
         }
         true
@@ -84,10 +83,10 @@ impl SlidingWindowCounter {
         &mut self,
         payload_len: usize,
         max_bytes_per_window: usize,
-        window: Duration,
-        now: Instant,
+        window_nanos: u64,
+        now_nanos: u64,
     ) -> BulkExfiltrationOutcome {
-        if !self.prune_and_sum(now, window) {
+        if !self.prune_and_sum(now_nanos, window_nanos) {
             // Clock anomaly fail-closed block
             return BulkExfiltrationOutcome::Block {
                 window_bytes: usize::MAX, // UNBOUNDED-OK: sentinel value representing clock anomaly block
@@ -102,7 +101,7 @@ impl SlidingWindowCounter {
                 limit: max_bytes_per_window,
             }
         } else {
-            self.records.push_back((now, payload_len));
+            self.records.push_back((now_nanos, payload_len));
             self.current_total = prospective_total;
             BulkExfiltrationOutcome::Allow
         }
@@ -113,6 +112,7 @@ impl SlidingWindowCounter {
 pub struct BulkExfiltrationDetector {
     pub max_bytes_per_window: usize,
     pub window: Duration,
+    clock: Arc<dyn Clock>,
     sessions: HashMap<SessionId, Arc<Mutex<SlidingWindowCounter>>>,
 }
 
@@ -128,9 +128,19 @@ impl std::fmt::Debug for BulkExfiltrationDetector {
 impl BulkExfiltrationDetector {
     /// Creates a new `BulkExfiltrationDetector` configured with `max_bytes_per_window` and `window` duration.
     pub fn new(max_bytes_per_window: usize, window: Duration) -> Self {
+        Self::with_clock(max_bytes_per_window, window, Arc::new(SystemClock::new()))
+    }
+
+    /// Creates a new `BulkExfiltrationDetector` configured with custom `Clock`.
+    pub fn with_clock(
+        max_bytes_per_window: usize,
+        window: Duration,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
         Self {
             max_bytes_per_window,
             window,
+            clock,
             sessions: HashMap::new(),
         }
     }
@@ -145,15 +155,25 @@ impl BulkExfiltrationDetector {
         session: SessionId,
         payload_len: usize,
     ) -> BulkExfiltrationOutcome {
-        self.record_and_check_at(session, payload_len, Instant::now())
+        self.record_and_check_with_clock(session, payload_len, self.clock.as_ref())
     }
 
-    /// Internal deterministic helper accepting explicit `now` time instant for testability.
-    fn record_and_check_at(
+    /// Registers `payload_len` bytes for `session` using an explicit `Clock` implementation.
+    pub fn record_and_check_with_clock(
         &self,
         session: SessionId,
         payload_len: usize,
-        now: Instant,
+        clock: &dyn Clock,
+    ) -> BulkExfiltrationOutcome {
+        self.record_and_check_at_nanos(session, payload_len, clock.monotonic_nanos())
+    }
+
+    /// Internal deterministic helper accepting explicit timestamp in monotonic nanoseconds for testability.
+    pub fn record_and_check_at_nanos(
+        &self,
+        session: SessionId,
+        payload_len: usize,
+        now_nanos: u64,
     ) -> BulkExfiltrationOutcome {
         let entry_arc = self
             .sessions
@@ -162,8 +182,14 @@ impl BulkExfiltrationDetector {
             .get()
             .clone();
 
+        let window_nanos = u64::try_from(self.window.as_nanos()).unwrap_or(u64::MAX);
         let mut counter = entry_arc.lock();
-        counter.record_and_check(payload_len, self.max_bytes_per_window, self.window, now)
+        counter.record_and_check(
+            payload_len,
+            self.max_bytes_per_window,
+            window_nanos,
+            now_nanos,
+        )
     }
 }
 
@@ -171,6 +197,7 @@ impl BulkExfiltrationDetector {
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
+    use contextra_testkit::ManualClock;
     use std::sync::Arc;
 
     #[test]
@@ -204,15 +231,16 @@ mod tests {
 
     #[test]
     fn test_sliding_window_expiry_resets_volume() {
-        let detector = BulkExfiltrationDetector::new(1000, Duration::from_secs(10));
+        let clock = Arc::new(ManualClock::new(100_000_000));
+        let detector =
+            BulkExfiltrationDetector::with_clock(1000, Duration::from_secs(10), clock.clone());
         let session = SessionId::from("session_1");
-        let start_time = Instant::now();
 
-        let out1 = detector.record_and_check_at(session.clone(), 800, start_time);
+        let out1 = detector.record_and_check(session.clone(), 800);
         assert_eq!(out1, BulkExfiltrationOutcome::Allow);
 
-        let out2 =
-            detector.record_and_check_at(session.clone(), 400, start_time + Duration::from_secs(5));
+        clock.advance(Duration::from_secs(5));
+        let out2 = detector.record_and_check(session.clone(), 400);
         assert_eq!(
             out2,
             BulkExfiltrationOutcome::Block {
@@ -221,11 +249,8 @@ mod tests {
             }
         );
 
-        let out3 = detector.record_and_check_at(
-            session.clone(),
-            500,
-            start_time + Duration::from_secs(11),
-        );
+        clock.advance(Duration::from_secs(6));
+        let out3 = detector.record_and_check(session.clone(), 500);
         assert_eq!(out3, BulkExfiltrationOutcome::Allow);
     }
 
@@ -289,12 +314,10 @@ mod tests {
     fn test_time_regression_fails_closed() {
         let detector = BulkExfiltrationDetector::new(1000, Duration::from_secs(10));
         let session = SessionId::from("time_travel_session");
-        let now = Instant::now();
 
-        detector.record_and_check_at(session.clone(), 100, now);
+        detector.record_and_check_at_nanos(session.clone(), 100, 100_000);
 
-        let earlier = now - Duration::from_secs(1);
-        let outcome = detector.record_and_check_at(session, 100, earlier);
+        let outcome = detector.record_and_check_at_nanos(session, 100, 50_000);
 
         assert!(matches!(outcome, BulkExfiltrationOutcome::Block { .. }));
     }

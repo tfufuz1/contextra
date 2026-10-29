@@ -55,7 +55,8 @@ async fn test_wasm_merge_function_counter_sum() -> TestResult {
     let result_bytes = merge_fn.merge(&existing, &new).await?;
     assert_eq!(result_bytes.len(), 8);
 
-    let sum = u64::from_le_bytes(result_bytes[..8].try_into()?);
+    let slice = result_bytes.get(..8).ok_or("Invalid output slice")?;
+    let sum = u64::from_le_bytes(slice.try_into()?);
     assert_eq!(sum, 3u64);
 
     Ok(())
@@ -151,7 +152,8 @@ async fn test_wasm_merge_function_clock_access_denied() -> TestResult {
     let merge_fn = WasmMergeFunction::new(wasm_bytes)?;
 
     let output_bytes = merge_fn.merge(b"a", b"b").await?;
-    let errno = i32::from_le_bytes(output_bytes[0..4].try_into()?);
+    let slice = output_bytes.get(0..4).ok_or("Invalid output slice")?;
+    let errno = i32::from_le_bytes(slice.try_into()?);
 
     assert_eq!(
         errno, 2,

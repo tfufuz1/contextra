@@ -16,6 +16,7 @@ ring = "3"
 # Y.6.2, Clock-Injektion für P28-konforme Hash-Trace-Erzeugung
 contextra-ports = { workspace = true }
 contextra-types = { workspace = true }
+contextra-avv-generator = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -29,6 +30,8 @@ blake3 = { workspace = true }
 regex = { workspace = true }
 
 [dev-dependencies]
+bincode = { workspace = true }
 contextra-crypto = { workspace = true, features = ["test-utils"] }
+contextra-testkit = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }

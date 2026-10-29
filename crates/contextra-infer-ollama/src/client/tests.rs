@@ -529,7 +529,7 @@ async fn test_chat_with_rag_streaming_http_error() {
 
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("Ollama-Chat-Anfrage fehlgeschlagen"));
+    assert!(err_msg.contains("Ollama chat request failed"));
     assert!(err_msg.contains("500"));
     assert!(err_msg.contains("Internal Server Error"));
 }

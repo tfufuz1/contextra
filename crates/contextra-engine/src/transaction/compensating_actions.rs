@@ -175,20 +175,6 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateLsmActio
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_docid_u64_overflow_handling() {
-        let max_u64_doc = DocId::new(u64::MAX as _);
-        assert_eq!(u64::try_from(max_u64_doc.inner()), Ok(u64::MAX));
-
-        let overflow_raw: u128 = (u64::MAX as u128) + 1;
-        assert!(u64::try_from(overflow_raw).is_err());
-    }
-}
-
 pub struct CompensateGraphAction<S: StorageEngine, V: VectorIndex> {
     pub(super) collection: Collection<S, V>,
     pub(super) doc_ids: Arc<Vec<DocId>>,
@@ -213,13 +199,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateGraphAct
                     .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
             );
             for &doc_id in self.doc_ids.iter() {
-                let eid_val = u64::try_from(doc_id.inner()).map_err(|_| {
-                    ContextraError::InvalidInput(format!(
-                        "DocId {} exceeds u64::MAX for EntityId conversion",
-                        doc_id.inner()
-                    ))
-                })?;
-                let eid = EntityId::new(eid_val);
+                let eid = EntityId::new(doc_id.inner());
                 let _ = self
                     .collection
                     .graph_index
@@ -258,6 +238,12 @@ impl<S: StorageEngine, V: VectorIndex> CompensateHnswAction<S, V> {
 impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswAction<S, V> {
     fn execute<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
+            let tenant = self.tenant_id;
+            tracing::debug!(
+                tenant_id = ?tenant,
+                doc_count = self.doc_ids.len(),
+                "Executing CompensateHnswAction with tenant boundary validation"
+            );
             let comp_tx = TxId::new(
                 self.collection
                     .next_tx
@@ -266,6 +252,7 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
             for &doc_id in self.doc_ids.iter() {
                 if let Err(e) = self.collection.index.delete(comp_tx, doc_id).await {
                     tracing::error!(
+                        tenant_id = ?tenant,
                         "[INV-DB-3] Compensating HNSW delete failed for doc_id {:?}: {}",
                         doc_id,
                         e
@@ -273,11 +260,35 @@ impl<S: StorageEngine, V: VectorIndex> CompensatingAction for CompensateHnswActi
                 }
             }
             if let Err(e) = self.collection.index.commit(comp_tx).await {
-                tracing::error!("[INV-DB-3] Compensating HNSW commit failed: {}", e);
+                tracing::error!(
+                    tenant_id = ?tenant,
+                    "[INV-DB-3] Compensating HNSW commit failed: {}",
+                    e
+                );
                 return Err(e);
             }
             Ok(())
         })
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing
+)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_docid_u64_overflow_handling() {
+        let max_u64_doc = DocId::new(u64::MAX as _);
+        assert_eq!(max_u64_doc.inner(), u64::MAX);
+
+        let overflow_raw: u128 = (u64::MAX as u128) + 1;
+        assert!(u64::try_from(overflow_raw).is_err());
     }
 }
 

@@ -45,6 +45,11 @@ impl WasmMergeFunction {
         )
     }
 
+    /// Creates a new `WasmMergeFunction` with strict `pure()` capabilities (no stdout/stderr/FS/net/clock/PRNG).
+    pub fn new_pure(wasm_bytes: impl Into<Arc<[u8]>>) -> Result<Self, SandboxError> {
+        Self::new_with_capabilities(wasm_bytes, MergeOperatorCapabilities::pure())
+    }
+
     /// Creates a new `WasmMergeFunction` with custom capability limits (e.g. `max_fuel` or `max_wall_clock_ms`).
     pub fn new_with_capabilities(
         wasm_bytes: impl Into<Arc<[u8]>>,
