@@ -25,6 +25,7 @@ check:
     $RUNNER cargo xtask check-toctou-defaults
     $RUNNER cargo xtask check-nan-hot-loop
     $RUNNER cargo xtask check-result-dropped-io
+    $RUNNER cargo xtask check-orphan-files
     if [ -f coverage.json ]; then
         $RUNNER cargo xtask check-coverage-gate
     fi
