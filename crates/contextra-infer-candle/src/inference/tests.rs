@@ -5,7 +5,7 @@ use candle_core::Device;
 use contextra_ports::{LlmTextGenerator, LlmTextGeneratorStreaming};
 #[cfg(feature = "kv-bridge")]
 use contextra_types::TenantId;
-use contextra_types::{ConfigFingerprint, Result};
+use contextra_types::{ConfigFingerprint, ContextraError, Result};
 use std::sync::Arc;
 
 struct MockCandleModel {
@@ -380,17 +380,131 @@ fn test_llm_from_dir_nonexistent() {
         std::path::Path::new("/nonexistent/model/dir"),
         crate::model_registry::CandleQuantization::Q4KM,
     );
-    assert!(res.is_err());
+    assert!(matches!(res, Err(ContextraError::ModelLoad { .. })));
 }
 
 #[test]
-fn test_llm_from_dir_valid_temp_dir() {
+fn test_llm_from_dir_missing_tokenizer() {
     let temp_dir = tempfile::tempdir().unwrap();
+    std::fs::write(temp_dir.path().join("model.gguf"), b"NOT_A_VALID_GGUF").unwrap();
+
     let res = CandleLlmClient::from_dir(
         temp_dir.path(),
         crate::model_registry::CandleQuantization::Q4KM,
     );
-    assert!(res.is_ok());
+    match res {
+        Err(ContextraError::ModelLoad { path, reason }) => {
+            assert!(path.contains("tokenizer.json"));
+            assert!(reason.contains("missing"));
+        }
+        Err(err) => panic!(
+            "Expected ContextraError::ModelLoad for missing tokenizer, got Err({:?})",
+            err
+        ),
+        Ok(_) => panic!("Expected ContextraError::ModelLoad for missing tokenizer, got Ok"),
+    }
+}
+
+#[test]
+fn test_llm_from_dir_empty_tokenizer() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    std::fs::write(temp_dir.path().join("model.gguf"), b"NOT_A_VALID_GGUF").unwrap();
+
+    let empty_tok_json = r#"{
+        "version": "1.0",
+        "truncation": null,
+        "padding": null,
+        "added_tokens": [],
+        "normalizer": null,
+        "pre_tokenizer": null,
+        "post_processor": null,
+        "decoder": null,
+        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": {}, "merges": [] }
+    }"#;
+    std::fs::write(temp_dir.path().join("tokenizer.json"), empty_tok_json).unwrap();
+
+    let res = CandleLlmClient::from_dir(
+        temp_dir.path(),
+        crate::model_registry::CandleQuantization::Q4KM,
+    );
+    match res {
+        Err(ContextraError::ModelLoad { reason, .. }) => {
+            assert!(reason.contains("empty"));
+        }
+        Err(err) => panic!(
+            "Expected ContextraError::ModelLoad for empty tokenizer, got Err({:?})",
+            err
+        ),
+        Ok(_) => panic!("Expected ContextraError::ModelLoad for empty tokenizer, got Ok"),
+    }
+}
+
+#[test]
+fn test_llm_from_dir_missing_gguf() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let valid_tok_json = r#"{
+        "version": "1.0",
+        "truncation": null,
+        "padding": null,
+        "added_tokens": [],
+        "normalizer": null,
+        "pre_tokenizer": null,
+        "post_processor": null,
+        "decoder": null,
+        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": { "a": 0 }, "merges": [] }
+    }"#;
+    std::fs::write(temp_dir.path().join("tokenizer.json"), valid_tok_json).unwrap();
+
+    let res = CandleLlmClient::from_dir(
+        temp_dir.path(),
+        crate::model_registry::CandleQuantization::Q4KM,
+    );
+    match res {
+        Err(ContextraError::ModelLoad { reason, .. }) => {
+            assert!(reason.contains("No GGUF model file found"));
+        }
+        Err(err) => panic!(
+            "Expected ContextraError::ModelLoad for missing GGUF file, got Err({:?})",
+            err
+        ),
+        Ok(_) => panic!("Expected ContextraError::ModelLoad for missing GGUF file, got Ok"),
+    }
+}
+
+#[test]
+fn test_llm_from_dir_corrupt_gguf() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let valid_tok_json = r#"{
+        "version": "1.0",
+        "truncation": null,
+        "padding": null,
+        "added_tokens": [],
+        "normalizer": null,
+        "pre_tokenizer": null,
+        "post_processor": null,
+        "decoder": null,
+        "model": { "type": "BPE", "dropout": null, "unk_token": null, "continuing_subword_prefix": null, "end_of_word_suffix": null, "fuse_unk": false, "vocab": { "a": 0 }, "merges": [] }
+    }"#;
+    std::fs::write(temp_dir.path().join("tokenizer.json"), valid_tok_json).unwrap();
+    std::fs::write(temp_dir.path().join("model.gguf"), b"CORRUPT_HEADER_BYTES").unwrap();
+
+    let res = CandleLlmClient::from_dir(
+        temp_dir.path(),
+        crate::model_registry::CandleQuantization::Q4KM,
+    );
+    match res {
+        Err(ContextraError::ModelLoad { reason, .. }) => {
+            assert!(
+                reason.contains("Failed to compute fingerprint")
+                    || reason.contains("Failed to load")
+            );
+        }
+        Err(err) => panic!(
+            "Expected ContextraError::ModelLoad for corrupt GGUF file, got Err({:?})",
+            err
+        ),
+        Ok(_) => panic!("Expected ContextraError::ModelLoad for corrupt GGUF file, got Ok"),
+    }
 }
 
 #[tokio::test]
