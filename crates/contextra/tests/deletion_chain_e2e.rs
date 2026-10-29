@@ -82,7 +82,9 @@ async fn test_scenario_1_attrappe_entlarvt() -> std::result::Result<(), Contextr
         .with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
 
     let tenant_id = TenantId::try_new(1)?;
-    let col = db.collection_for_tenant("testcol_attrappe", tenant_id).await?;
+    let col = db
+        .collection_for_tenant("testcol_attrappe", tenant_id)
+        .await?;
 
     let dummy_embedding = vec![0.1f32, 0.2f32, 0.3f32, 0.4f32];
     col.insert(
@@ -240,7 +242,9 @@ async fn test_scenario_3_rohdaten_needle() -> std::result::Result<(), ContextraE
             .with_proof_key_provider(Arc::new(TestProofKeyProvider(key.to_vec())));
 
         let tenant_id = TenantId::try_new(1)?;
-        let col = db.collection_for_tenant("testcol_needle", tenant_id).await?;
+        let col = db
+            .collection_for_tenant("testcol_needle", tenant_id)
+            .await?;
 
         col.insert(
             doc_id,
@@ -297,7 +301,9 @@ async fn test_scenario_4_mehrere_level_und_neustart() -> std::result::Result<(),
     // 1. Daten schreiben und flushen
     {
         let db = open_with_config(tmp.path(), config.clone()).await?;
-        let col = db.collection_for_tenant("testcol_levels", tenant_id).await?;
+        let col = db
+            .collection_for_tenant("testcol_levels", tenant_id)
+            .await?;
 
         col.insert(
             target_doc,
@@ -365,7 +371,9 @@ async fn test_scenario_4_mehrere_level_und_neustart() -> std::result::Result<(),
     // 3. Zweiter Reopen: Dokument taucht nirgends auf
     {
         let db = open_with_config(tmp.path(), config).await?;
-        let col = db.collection_for_tenant("testcol_levels", tenant_id).await?;
+        let col = db
+            .collection_for_tenant("testcol_levels", tenant_id)
+            .await?;
         let doc = col.get(target_doc).await?;
         assert!(
             doc.is_none(),
@@ -489,7 +497,8 @@ async fn test_scenario_6_fehlender_schluessel() -> std::result::Result<(), Conte
 /// Szenario 7: Offener Snapshot
 /// Offener Snapshot blockiert den Purge: Ergebnis ist Err oder verified == false mit klarem Grund, nie ein Proof.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_scenario_7_offener_snapshot_blockiert_purge() -> std::result::Result<(), ContextraError> {
+async fn test_scenario_7_offener_snapshot_blockiert_purge(
+) -> std::result::Result<(), ContextraError> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
     let key = b"secret_proof_key_32bytes_1234567";
     let config = test_config(4);

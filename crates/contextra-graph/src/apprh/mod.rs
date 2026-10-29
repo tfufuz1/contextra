@@ -95,3 +95,50 @@ impl CsrGraph {
         shadow_compare_forward_push_vs_apprh(self, seeds, ppr, apprh_params, top_k)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::csr::CsrGraph;
+    use contextra_types::Entity;
+
+    #[tokio::test]
+    async fn test_apprh_diffusion_and_shadow_compare_diagnostic_paths() {
+        let graph = std::sync::Arc::new(CsrGraph::new());
+        let e1 = EntityId::new(1);
+        let e2 = EntityId::new(2);
+
+        graph
+            .insert_entity_direct(Entity::new(e1, "Node1", "Type"))
+            .unwrap();
+        graph
+            .insert_entity_direct(Entity::new(e2, "Node2", "Type"))
+            .unwrap();
+        graph.insert_edge_direct(e1, e2, 1.0).await.unwrap();
+
+        let apprh_params = ApprhParams {
+            ppr: PprParams::default(),
+            hyperedge_decay_factor: 0.8,
+            max_iterations: 100,
+        };
+
+        // Test graph.apprh_diffusion
+        let res = graph.apprh_diffusion(&[e1], &apprh_params);
+        assert!(
+            res.is_ok(),
+            "apprh_diffusion diagnostic call should succeed"
+        );
+        let scores = res.unwrap();
+        assert!(scores.contains_key(&e1));
+
+        // Test graph.apprh_shadow_compare
+        let ppr_params = PprParams::default();
+        let shadow_res = graph.apprh_shadow_compare(&[e1], &ppr_params, &apprh_params, 5);
+        assert!(
+            shadow_res.is_ok(),
+            "apprh_shadow_compare diagnostic call should succeed"
+        );
+        let comparison = shadow_res.unwrap();
+        assert!(comparison.top_k_overlap >= 0.0 && comparison.top_k_overlap <= 1.0);
+    }
+}

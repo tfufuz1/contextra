@@ -445,7 +445,10 @@ impl LsmStorage {
         Vec<Arc<crate::memtable::MemTable>>,
     ) {
         let state = self.state.read().await;
-        (Arc::clone(&state.memtable), state.immutable_memtables.clone())
+        (
+            Arc::clone(&state.memtable),
+            state.immutable_memtables.clone(),
+        )
     }
 
     /// Returns a snapshot of currently open SSTable readers.

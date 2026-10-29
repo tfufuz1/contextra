@@ -8,6 +8,11 @@ use contextra_types::EntityId;
 use std::collections::HashMap;
 
 /// Konfiguration für den Perkolations-Gesundheitsmonitor.
+///
+/// # Abgrenzung zu `contextra-cognition`
+/// Diese Konfiguration steuert den lokalen Perkolations-Gesundheitsmonitor (`physio-percolation`)
+/// auf CSR-Graph-Ebene. Sie unterscheidet sich von der kognitiven Wartungskonfiguration in
+/// `contextra-cognition`, welche systemweite Sleep-Cycle-Intervalle und Konsolidierungs-Trigger orchestriert.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PercolationConfig {
     /// Kritischer Perkolationsschwellenwert θ_perc. Default: 0.7.

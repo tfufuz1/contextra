@@ -31,8 +31,14 @@ async fn test_logical_deletion_without_purge_shows_remaining() {
     let tenant_id = TenantId::try_new(1).unwrap();
     let codec = TenantKeyCodec::new(tenant_id);
 
-    let key1 = codec.encode_chunk_key(&contextra_types::CollectionId(1), contextra_types::DocId(101));
-    let key2 = codec.encode_chunk_key(&contextra_types::CollectionId(1), contextra_types::DocId(102));
+    let key1 = codec.encode_chunk_key(
+        &contextra_types::CollectionId(1),
+        contextra_types::DocId(101),
+    );
+    let key2 = codec.encode_chunk_key(
+        &contextra_types::CollectionId(1),
+        contextra_types::DocId(102),
+    );
 
     let tx = TxId(100);
     storage.put(tx, &key1, b"val1").await.unwrap();
@@ -44,7 +50,10 @@ async fn test_logical_deletion_without_purge_shows_remaining() {
 
     // Logical delete
     let tx_del = TxId(101);
-    storage.delete_prefix(tx_del, codec.scan_prefix()).await.unwrap();
+    storage
+        .delete_prefix(tx_del, codec.scan_prefix())
+        .await
+        .unwrap();
     storage.commit(tx_del).await.unwrap();
 
     // Scanners run without physical purge
@@ -53,7 +62,7 @@ async fn test_logical_deletion_without_purge_shows_remaining() {
 
     let scanners = lsm_scanners(&storage);
     let sstable_scanner = &scanners[1]; // SsTableAllLevels
-    let wal_scanner = &scanners[2];     // WalAllSegments
+    let wal_scanner = &scanners[2]; // WalAllSegments
 
     let witness_sst = sstable_scanner
         .scan(&ctx, target.clone(), ScanTechnique::Structural, &clock)
@@ -88,14 +97,19 @@ async fn test_purge_clears_remaining_residuals() {
     storage.flush().await.unwrap();
 
     let tx_del = TxId(11);
-    storage.delete_prefix(tx_del, codec.scan_prefix()).await.unwrap();
+    storage
+        .delete_prefix(tx_del, codec.scan_prefix())
+        .await
+        .unwrap();
     storage.commit(tx_del).await.unwrap();
 
     let ctx = RequestContext::new(tenant_id, TxId(50));
     let target = ScanTarget::new(format!("t:{}:", tenant_id.inner()), [0xBB; 32]);
 
     let purgers = lsm_purgers(&storage);
-    purgers[0].purge(&ctx, &target).expect("purge should succeed");
+    purgers[0]
+        .purge(&ctx, &target)
+        .expect("purge should succeed");
 
     let scanners = lsm_scanners(&storage);
 
@@ -127,7 +141,10 @@ async fn test_sabotage_unremoved_orphan_file_detected_by_scanner() {
 
     // Create an unremoved orphan file in data path
     let orphan_path = storage.data_path().join("orphan_sabotage.sst");
-    let key = codec.encode_chunk_key(&contextra_types::CollectionId(1), contextra_types::DocId(999));
+    let key = codec.encode_chunk_key(
+        &contextra_types::CollectionId(1),
+        contextra_types::DocId(999),
+    );
 
     // Build transient SSTable file
     let mut builder = crate::sstable::SstableBuilder::create(&orphan_path)
@@ -185,7 +202,8 @@ async fn test_multi_level_sstable_and_wal_only_purge() {
     let codec = TenantKeyCodec::new(tenant_id);
 
     // 1. Put data only in WAL (unflushed)
-    let key_wal = codec.encode_chunk_key(&contextra_types::CollectionId(1), contextra_types::DocId(1));
+    let key_wal =
+        codec.encode_chunk_key(&contextra_types::CollectionId(1), contextra_types::DocId(1));
     let tx1 = TxId(1);
     storage.put(tx1, &key_wal, b"wal_data").await.unwrap();
     storage.commit(tx1).await.unwrap();

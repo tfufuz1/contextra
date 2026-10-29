@@ -55,16 +55,30 @@ async fn test_hyperedge_persistence_survives_restart() {
             .unwrap(),
         );
 
-        let graph = CsrGraph::with_storage(storage.clone());
+        let graph = Arc::new(CsrGraph::with_storage(storage.clone()));
         graph.insert_hyperedge(he1.clone());
         graph.insert_hyperedge(he2.clone());
 
         let tx = TxId::new(1);
         for edge in [&he1, &he2] {
-            let key = format!("{}{}", HYPEREDGE_PREFIX, edge.id.inner());
-            let bytes = edge.serialize().unwrap();
-            storage.put(tx, key.as_bytes(), &bytes).await.unwrap();
+            graph.persist_hyperedge(tx, edge).await.unwrap();
         }
+
+        let e1 = EntityId::new(3001);
+        let e2 = EntityId::new(3002);
+        graph
+            .insert_edge_direct_with_bitemporal_validity(
+                e1,
+                e2,
+                1.0,
+                Some(tx),
+                None,
+                Some(100),
+                Some(200),
+                Some(doc_oracle),
+            )
+            .await
+            .unwrap();
 
         storage.commit(tx).await.unwrap();
 

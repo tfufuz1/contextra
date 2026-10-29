@@ -2,8 +2,8 @@
 // ZWECK: Audit Benchmark Suite zur Ermittlung von Durchsatz, Speedup, Latenz-Perzentilen, Pareto-Front und RAM-Footprint
 // STAND: TS:2026-08-31T00:00:00Z
 
-use contextra_types::{DocId, TxId};
 use contextra_ports::VectorIndex;
+use contextra_types::{DocId, TxId};
 use contextra_vector::distance::*;
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
 use rand::Rng;

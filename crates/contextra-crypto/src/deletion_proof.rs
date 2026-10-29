@@ -556,9 +556,15 @@ impl DeletionProof {
         }
 
         // Check mandatory storage layers: LsmMemtable, SsTableAllLevels, WalAllSegments
-        let has_memtable = covered_layers.iter().any(|l| matches!(l, DeletionLayer::LsmMemtable));
-        let has_sstable = covered_layers.iter().any(|l| matches!(l, DeletionLayer::SsTableAllLevels));
-        let has_wal = covered_layers.iter().any(|l| matches!(l, DeletionLayer::WalAllSegments { .. }));
+        let has_memtable = covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::LsmMemtable));
+        let has_sstable = covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::SsTableAllLevels));
+        let has_wal = covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::WalAllSegments { .. }));
 
         if !has_memtable {
             return Err(ContextraError::Internal(
@@ -581,13 +587,19 @@ impl DeletionProof {
 
         // Optional layers HnswIndex and TextIndex, if not present in witnesses, add to uncovered_layers
         let mut uncovered_layers = Vec::new();
-        if !covered_layers.iter().any(|l| matches!(l, DeletionLayer::HnswIndex)) {
+        if !covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::HnswIndex))
+        {
             uncovered_layers.push(UncoveredLayer {
                 layer: DeletionLayer::HnswIndex,
                 reason: "Scope does not contain vector HnswIndex data".to_string(),
             });
         }
-        if !covered_layers.iter().any(|l| matches!(l, DeletionLayer::TextIndex)) {
+        if !covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::TextIndex))
+        {
             uncovered_layers.push(UncoveredLayer {
                 layer: DeletionLayer::TextIndex,
                 reason: "Scope does not contain full-text TextIndex data".to_string(),
@@ -1317,7 +1329,10 @@ mod tests {
             hmac_key.as_slice(),
             &clock,
         );
-        assert!(res_missing.is_err(), "missing mandatory SsTableAllLevels MUST return Err");
+        assert!(
+            res_missing.is_err(),
+            "missing mandatory SsTableAllLevels MUST return Err"
+        );
 
         // 6. Duplicate layer -> Err
         let w_duplicate = vec![
@@ -1411,13 +1426,17 @@ mod tests {
         let mut tampered_sig = proof.clone();
         tampered_sig.signature[0] ^= 0xFF;
         assert!(!tampered_sig.verify(&keypair.verifying_key).unwrap());
-        assert!(tampered_sig.verify_external(&keypair.verifying_key).is_err());
+        assert!(tampered_sig
+            .verify_external(&keypair.verifying_key)
+            .is_err());
 
         // Tamper test: flip measurement digest -> verify fails
         let mut tampered_digest = proof.clone();
         tampered_digest.measurements[0].digest[0] ^= 0xFF;
         assert!(!tampered_digest.verify(&keypair.verifying_key).unwrap());
-        assert!(tampered_digest.verify_external(&keypair.verifying_key).is_err());
+        assert!(tampered_digest
+            .verify_external(&keypair.verifying_key)
+            .is_err());
     }
 
     #[test]
@@ -1459,9 +1478,7 @@ mod tests {
             scope,
             vec![b"k1".to_vec(), b"k2".to_vec()],
             TxId(100),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
             &[],
@@ -1530,9 +1547,7 @@ mod tests {
             scope,
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             Some([0xABu8; 32]),
             1700000000,
@@ -1618,9 +1633,7 @@ mod tests {
             scope.clone(),
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
         )
@@ -1715,7 +1728,6 @@ mod tests {
         assert!(proof.verify(&test_key()).unwrap());
     }
 
-
     #[test]
     fn test_deletion_proof_wrong_key_fails_verify() {
         let scope = DeletionScope::Tenant {
@@ -1737,9 +1749,7 @@ mod tests {
             scope,
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
         )
@@ -1890,9 +1900,7 @@ mod tests {
             scope,
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
         )
@@ -1918,9 +1926,7 @@ mod tests {
             scope,
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![
                 ExcludedScope::LlmParameterMemory,
                 ExcludedScope::ConsolidatedAndDistilled,
@@ -2062,9 +2068,7 @@ mod tests {
             scope,
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
         )
@@ -2118,9 +2122,7 @@ mod tests {
             scope,
             vec![b"k42".to_vec()],
             TxId(100),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             Some(receipt),
             &test_key(),
@@ -2136,7 +2138,6 @@ mod tests {
         assert!(!tampered_proof.verify(&test_key()).unwrap());
     }
 
-
     #[test]
     fn test_verify_external_v3_valid_and_invalid_keys() {
         let keypair = DeletionProofKeyPair::generate();
@@ -2148,9 +2149,7 @@ mod tests {
             scope,
             vec![b"k1".to_vec()],
             TxId(100),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
             &[],
@@ -2271,9 +2270,7 @@ mod tests {
             scope.clone(),
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             &test_key(),
         )
@@ -2288,9 +2285,7 @@ mod tests {
             scope,
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
             &[],
@@ -2319,9 +2314,7 @@ mod tests {
             scope,
             vec![b"k1".to_vec(), b"k2".to_vec()],
             TxId(100),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             1700000000,
             &[],
@@ -2384,9 +2377,7 @@ mod tests {
             scope,
             vec![b"k1".to_vec()],
             TxId(10),
-            vec![
-                LayerCleanupProof::for_test(DeletionLayer::LsmMemtable),
-            ],
+            vec![LayerCleanupProof::for_test(DeletionLayer::LsmMemtable)],
             vec![ExcludedScope::LlmParameterMemory],
             Some([0xABu8; 32]),
             1700000000,
