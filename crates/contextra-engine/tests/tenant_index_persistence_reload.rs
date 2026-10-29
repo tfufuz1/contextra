@@ -1,4 +1,5 @@
 #![cfg(not(loom))]
+#![allow(deprecated)]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_types::TenantId;
 use tempfile::tempdir;

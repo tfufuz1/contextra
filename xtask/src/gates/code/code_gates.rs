@@ -18,6 +18,7 @@ pub struct DeterminismGate;
 struct DeterminismAllowEntry {
     path: String,
     pattern: String,
+    #[allow(dead_code)]
     reason: String,
     adr: String,
 }

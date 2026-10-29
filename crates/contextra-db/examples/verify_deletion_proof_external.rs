@@ -58,6 +58,7 @@ fn verify_external(proof: &DeletionProof, verifying_key: &VerifyingKey) -> Resul
 // =========================================================================
 
 /// Simuliert die Betreiber-Rolle: Erzeugt Daten, führt Löschung durch und erzeugt Löschnachweis.
+#[allow(deprecated)]
 async fn run_operator_role(
     proof_file_path: &Path,
     pubkey_file_path: &Path,

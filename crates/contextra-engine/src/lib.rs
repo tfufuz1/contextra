@@ -347,7 +347,7 @@ pub struct Contextra {
     calibrator: parking_lot::RwLock<
         Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
     >,
-    pid_controller: parking_lot::RwLock<Option<()>>,
+    _pid_controller: parking_lot::RwLock<Option<()>>,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
     proof_key_provider:
         parking_lot::RwLock<Option<Arc<dyn contextra_impl::erasure::ProofKeyProvider>>>,

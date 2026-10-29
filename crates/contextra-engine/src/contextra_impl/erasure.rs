@@ -6,7 +6,7 @@
 #![forbid(unsafe_code)]
 
 use crate::*;
-use contextra_ports::scanner::{LayerScanner, Purger, ScanTarget, ScanTechnique, WitnessLayer};
+use contextra_ports::scanner::{LayerScanner, ScanTarget, ScanTechnique, WitnessLayer};
 use contextra_ports::SystemClock;
 use contextra_types::{CollectionId, ContextraError, RequestContext, Result, SagaRecord, TenantId};
 use serde::{Deserialize, Serialize};

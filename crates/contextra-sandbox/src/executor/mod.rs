@@ -74,6 +74,7 @@ impl WasmExecutor {
     /// - Fuel-Budget: CPU-Limit (deterministisch), verhindert Endlosschleifen
     /// - Wall-Clock-Timeout: Verhindert IO-waiting über Zeithorizont
     /// - Frische Store+Instance: kein Zustandsüberlauf zwischen Aufrufen
+    #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
     pub async fn execute(
         &self,
         wasm_bytes: &[u8],
