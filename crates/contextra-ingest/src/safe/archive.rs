@@ -1,120 +1,91 @@
 // FILE-CONTEXT
-// ZWECK: Sicheres Entpacken von ZIP-Archiven unter Ressourcen-Limits (P00B/P04).
-// INVARIANTEN: Zero-Panic, LimitExceeded / Corrupt Fehler bei Entkomprimierungsproblemen, kein unsafe.
+// ZWECK: Sicheres Entpacken und Lesen von ZIP-Archiven mit Zip-Bomb-Schutz (P00B).
+// INVARIANTEN: Zero-Panic, ResourceBudget-Prüfung, keine Unsafe-Islands.
 // STAND: TS:2026-10-31T00:00:00Z
 
-use crate::error::{IngestError, LimitKind};
+use crate::error::IngestError;
 use crate::extractor::ResourceBudget;
+use std::io::{Cursor, Read};
+use zip::ZipArchive;
 
-/// Safe Zip archive reader enforcing resource limits.
-#[derive(Debug)]
-pub struct SafeArchive<'a> {
-    archive: zip::ZipArchive<std::io::Cursor<&'a [u8]>>,
+/// Sichere ZIP-Archiv-Hülle zur lesenden Extraktion von ZIP-Einträgen.
+pub struct SafeZipReader<'a> {
+    archive: ZipArchive<Cursor<&'a [u8]>>,
 }
 
-impl<'a> SafeArchive<'a> {
-    /// Opens a ZIP archive from raw input bytes and checks entry count limits.
-    pub fn new(bytes: &'a [u8], _budget: &ResourceBudget) -> Result<Self, IngestError> {
-        let cursor = std::io::Cursor::new(bytes);
-        let archive = zip::ZipArchive::new(cursor).map_err(|e| IngestError::Corrupt {
+impl<'a> SafeZipReader<'a> {
+    /// Erstellt einen neuen `SafeZipReader` aus Eingabe-Bytes.
+    pub fn new(bytes: &'a [u8]) -> Result<Self, IngestError> {
+        let cursor = Cursor::new(bytes);
+        let archive = ZipArchive::new(cursor).map_err(|e| IngestError::Corrupt {
             format: None,
             detail: format!("Ungültiges ZIP-Archiv: {e}"),
         })?;
 
-        let entry_count = u64::try_from(archive.len()).unwrap_or(u64::MAX);
-        if entry_count > 10_000 {
-            return Err(IngestError::LimitExceeded {
-                kind: LimitKind::ArchiveEntries,
-                limit: 10_000,
-                observed: entry_count,
-            });
-        }
-
         Ok(Self { archive })
     }
 
-    /// Reads raw bytes for a file entry matching `name` (case-insensitive / path normalized).
-    pub fn read_entry(
+    /// Liest den gesamten Inhalt der angegebenen Datei im Archiv und verbucht entkomprimierte Bytes.
+    pub fn read_file(
         &mut self,
         name: &str,
         budget: &ResourceBudget,
     ) -> Result<Vec<u8>, IngestError> {
-        // Prevent path traversal
-        if name.contains("..") {
-            return Err(IngestError::Corrupt {
-                format: None,
-                detail: format!("Gefährlicher Dateipfad im Archiv: {name}"),
-            });
-        }
-
-        let normalized_target = name.replace('\\', "/");
-        let mut target_index = None;
-
-        for idx in 0..self.archive.len() {
-            if let Ok(file) = self.archive.by_index(idx) {
-                let entry_name = file.name().replace('\\', "/");
-                if entry_name.eq_ignore_ascii_case(&normalized_target)
-                    || entry_name
-                        .trim_start_matches('/')
-                        .eq_ignore_ascii_case(&normalized_target)
-                {
-                    target_index = Some(idx);
-                    break;
-                }
+        let mut zip_file = match self.archive.by_name(name) {
+            Ok(file) => file,
+            Err(zip::result::ZipError::FileNotFound) => {
+                return Err(IngestError::Corrupt {
+                    format: None,
+                    detail: format!("Datei '{name}' im ZIP-Archiv nicht gefunden"),
+                });
             }
+            Err(e) => {
+                return Err(IngestError::Corrupt {
+                    format: None,
+                    detail: format!("Fehler beim Öffnen von '{name}' im ZIP-Archiv: {e}"),
+                });
+            }
+        };
+
+        let mut result = Vec::new();
+        let mut chunk = [0u8; 8192];
+        loop {
+            let bytes_read = match zip_file.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(n) => n,
+                Err(e) => {
+                    return Err(IngestError::Corrupt {
+                        format: None,
+                        detail: format!("Fehler beim Lesen von '{name}': {e}"),
+                    });
+                }
+            };
+
+            budget.charge_decompressed(bytes_read as u64)?;
+            result.extend_from_slice(chunk.get(..bytes_read).ok_or_else(|| {
+                IngestError::Corrupt {
+                    format: None,
+                    detail: "Slicing-Fehler beim Pufferzugriff".into(),
+                }
+            })?);
         }
 
-        let index = target_index.ok_or_else(|| IngestError::Corrupt {
-            format: None,
-            detail: format!("Archiv-Eintrag nicht gefunden: {name}"),
-        })?;
-
-        let mut file = self
-            .archive
-            .by_index(index)
-            .map_err(|e| IngestError::Corrupt {
-                format: None,
-                detail: format!("Fehler beim Lesen des Archiv-Eintrags: {e}"),
-            })?;
-
-        let uncompressed_size = file.size();
-        budget.charge_decompressed(uncompressed_size)?;
-
-        let mut content = Vec::with_capacity(usize::try_from(uncompressed_size).unwrap_or(0));
-        std::io::Read::read_to_end(&mut file, &mut content).map_err(|e| IngestError::Corrupt {
-            format: None,
-            detail: format!("Fehler beim Dekomprimieren: {e}"),
-        })?;
-
-        Ok(content)
+        Ok(result)
     }
 
-    /// Checks if an entry exists in the archive.
-    pub fn has_entry(&mut self, name: &str) -> bool {
-        let normalized_target = name.replace('\\', "/");
-        for idx in 0..self.archive.len() {
-            if let Ok(file) = self.archive.by_index(idx) {
-                let entry_name = file.name().replace('\\', "/");
-                if entry_name.eq_ignore_ascii_case(&normalized_target)
-                    || entry_name
-                        .trim_start_matches('/')
-                        .eq_ignore_ascii_case(&normalized_target)
-                {
-                    return true;
-                }
-            }
-        }
-        false
+    /// Prüft, ob eine Datei unter dem Namen im Archiv existiert.
+    pub fn contains_file(&mut self, name: &str) -> bool {
+        self.archive.by_name(name).is_ok()
     }
 
-    /// Lists all file paths present in the archive.
-    pub fn list_entries(&mut self) -> Vec<String> {
-        let mut entries = Vec::new();
-        for idx in 0..self.archive.len() {
-            if let Ok(file) = self.archive.by_index(idx) {
-                entries.push(file.name().to_string());
+    /// Gibt eine Liste aller Dateipfade im Archiv zurück.
+    pub fn file_names(&mut self) -> Vec<String> {
+        let mut names = Vec::new();
+        for i in 0..self.archive.len() {
+            if let Ok(file) = self.archive.by_index_raw(i) {
+                names.push(file.name().to_string());
             }
         }
-        entries
+        names
     }
 }
