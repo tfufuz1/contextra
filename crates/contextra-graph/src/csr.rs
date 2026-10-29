@@ -15,7 +15,7 @@ mod tests;
 pub use graph_write::CsrGraph;
 pub use inner::{GraphInner, MemoryEstimate};
 pub use types::{
-    CsrGraphConfig, Edge, EdgeType, PersistedEdgePayload, MAX_TRAVERSAL_HOPS, MAX_VISITED_NODES,
+    CsrEdge, CsrGraphConfig, EdgeType, PersistedEdgePayload, MAX_TRAVERSAL_HOPS, MAX_VISITED_NODES,
     SCORE_DECAY,
 };
 pub use visibility::{
