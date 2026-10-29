@@ -52,14 +52,16 @@ fn test_platt_scaler_extreme_finite_logits_monotonicity() {
     let probs: Vec<f32> = logits.iter().map(|&l| scaler.predict(l)).collect();
 
     for w in probs.windows(2) {
-        assert!(
-            w[0] <= w[1] + 1e-6,
-            "PlattScaler output must be monotonically non-decreasing"
-        );
-        assert!(
-            (0.0..=1.0).contains(&w[0]),
-            "PlattScaler output must be within [0, 1]"
-        );
+        if let (Some(&w0), Some(&w1)) = (w.first(), w.get(1)) {
+            assert!(
+                w0 <= w1 + 1e-6,
+                "PlattScaler output must be monotonically non-decreasing"
+            );
+            assert!(
+                (0.0..=1.0).contains(&w0),
+                "PlattScaler output must be within [0, 1]"
+            );
+        }
     }
 }
 

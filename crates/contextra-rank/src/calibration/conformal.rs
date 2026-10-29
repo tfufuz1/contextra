@@ -11,23 +11,23 @@ use thiserror::Error;
 pub enum ConformalError {
     /// Target miscoverage level `alpha` is not finite or outside (0.0, 1.0).
     #[error("Invalid target miscoverage alpha: {0} (must be finite and in (0.0, 1.0))")]
-    InvalidAlpha(f32),
+    Alpha(f32),
 
     /// Propensity weight is not finite or not strictly positive (> 0.0).
     #[error("Invalid propensity weight: {0} (must be finite and strictly positive > 0.0)")]
-    InvalidPropensityWeight(f32),
+    PropensityWeight(f32),
 
     /// Non-conformity score is not finite (NaN or Infinity).
     #[error("Invalid non-conformity score: {0} (must be finite)")]
-    InvalidNonConformityScore(f32),
+    NonConformityScore(f32),
 
     /// Threshold value is not finite (NaN or Infinity).
     #[error("Invalid threshold: {0} (must be finite)")]
-    InvalidThreshold(f32),
+    Threshold(f32),
 
     /// Learning rate is not finite or not strictly positive (> 0.0).
     #[error("Invalid learning rate: {0} (must be finite and strictly positive > 0.0)")]
-    InvalidLearningRate(f32),
+    LearningRate(f32),
 }
 
 /// Trait for deterministic, online conformal calibration and threshold estimation.
@@ -100,13 +100,13 @@ impl AdaptiveConformalCalibrator {
         learning_rate: f32,
     ) -> Result<Self, ConformalError> {
         if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
-            return Err(ConformalError::InvalidAlpha(alpha));
+            return Err(ConformalError::Alpha(alpha));
         }
         if !initial_threshold.is_finite() {
-            return Err(ConformalError::InvalidThreshold(initial_threshold));
+            return Err(ConformalError::Threshold(initial_threshold));
         }
         if !learning_rate.is_finite() || learning_rate <= 0.0 {
-            return Err(ConformalError::InvalidLearningRate(learning_rate));
+            return Err(ConformalError::LearningRate(learning_rate));
         }
 
         Ok(Self {
@@ -127,13 +127,13 @@ impl AdaptiveConformalCalibrator {
         max_threshold: f32,
     ) -> Result<Self, ConformalError> {
         if !min_threshold.is_finite() {
-            return Err(ConformalError::InvalidThreshold(min_threshold));
+            return Err(ConformalError::Threshold(min_threshold));
         }
         if !max_threshold.is_finite() {
-            return Err(ConformalError::InvalidThreshold(max_threshold));
+            return Err(ConformalError::Threshold(max_threshold));
         }
         if min_threshold > max_threshold {
-            return Err(ConformalError::InvalidThreshold(min_threshold));
+            return Err(ConformalError::Threshold(min_threshold));
         }
         self.min_threshold = min_threshold;
         self.max_threshold = max_threshold;
@@ -181,12 +181,10 @@ impl ConformalCalibrator for AdaptiveConformalCalibrator {
     ) -> Result<bool, ConformalError> {
         // Zero-Panic Invariants: Validate all inputs before touching state
         if !propensity_weight.is_finite() || propensity_weight <= 0.0 {
-            return Err(ConformalError::InvalidPropensityWeight(propensity_weight));
+            return Err(ConformalError::PropensityWeight(propensity_weight));
         }
         if !non_conformity_score.is_finite() {
-            return Err(ConformalError::InvalidNonConformityScore(
-                non_conformity_score,
-            ));
+            return Err(ConformalError::NonConformityScore(non_conformity_score));
         }
 
         let step = if non_conformity_score > self.threshold {
@@ -196,7 +194,7 @@ impl ConformalCalibrator for AdaptiveConformalCalibrator {
         };
 
         if !step.is_finite() {
-            return Err(ConformalError::InvalidPropensityWeight(propensity_weight));
+            return Err(ConformalError::PropensityWeight(propensity_weight));
         }
 
         let raw_next = self.threshold + step;

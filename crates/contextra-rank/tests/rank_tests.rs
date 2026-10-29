@@ -53,9 +53,11 @@ mod tests {
 
         let fused = reciprocal_rank_fusion(vec![set1, set2], 10);
         assert_eq!(fused.len(), 2);
-        assert_eq!(fused[0].id, "doc_both");
-        assert_eq!(fused[1].id, "doc_single");
-        assert!(fused[0].score > fused[1].score);
+        if let (Some(f0), Some(f1)) = (fused.first(), fused.get(1)) {
+            assert_eq!(f0.id, "doc_both");
+            assert_eq!(f1.id, "doc_single");
+            assert!(f0.score > f1.score);
+        }
     }
 
     #[test]
@@ -306,20 +308,17 @@ mod tests {
         let beta = 1.0;
         let modulated_weights = modulate_and_renormalize_weights(&sets, Some(&contexts), beta);
 
-        let w_a = modulated_weights[0];
-        let w_b = modulated_weights[1];
+        if let (Some(&w_a), Some(&w_b)) = (modulated_weights.first(), modulated_weights.get(1)) {
+            let total_weight = w_a + w_b;
+            assert!(
+                (total_weight - 2.0).abs() < 0.001,
+                "Weight sum invariant violated: {total_weight}"
+            );
 
-        // Verify total weight sum is preserved (sum = 2.0, within [0.999, 1.001] factor)
-        let total_weight = w_a + w_b;
-        assert!(
-            (total_weight - 2.0).abs() < 0.001,
-            "Weight sum invariant violated: {total_weight}"
-        );
-
-        // Signal B has a much larger margin, so after modulation and renormalization, w_B > w_A
-        assert!(
-            w_b > w_a,
-            "Expected Signal B weight ({w_b}) to be strictly greater than Signal A weight ({w_a})"
-        );
+            assert!(
+                w_b > w_a,
+                "Expected Signal B weight ({w_b}) to be strictly greater than Signal A weight ({w_a})"
+            );
+        }
     }
 }

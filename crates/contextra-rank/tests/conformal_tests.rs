@@ -136,8 +136,8 @@ fn test_conformal_zero_panic_invalid_inputs() {
     for bad_w in invalid_weights {
         let res = cal.update(0.5, bad_w);
         assert!(
-            matches!(res, Err(ConformalError::InvalidPropensityWeight(w)) if w.to_bits() == bad_w.to_bits() || bad_w <= 0.0),
-            "Expected InvalidPropensityWeight for weight {bad_w}, got {res:?}"
+            matches!(res, Err(ConformalError::PropensityWeight(w)) if w.to_bits() == bad_w.to_bits() || bad_w <= 0.0),
+            "Expected PropensityWeight for weight {bad_w}, got {res:?}"
         );
         // Ensure threshold state was NOT modified
         assert_eq!(cal.threshold(), initial_threshold);
@@ -149,8 +149,8 @@ fn test_conformal_zero_panic_invalid_inputs() {
     for bad_score in invalid_scores {
         let res = cal.update(bad_score, 1.0);
         assert!(
-            matches!(res, Err(ConformalError::InvalidNonConformityScore(_))),
-            "Expected InvalidNonConformityScore for score {bad_score}, got {res:?}"
+            matches!(res, Err(ConformalError::NonConformityScore(_))),
+            "Expected NonConformityScore for score {bad_score}, got {res:?}"
         );
         assert_eq!(cal.threshold(), initial_threshold);
     }
@@ -160,8 +160,8 @@ fn test_conformal_zero_panic_invalid_inputs() {
     for bad_alpha in invalid_alphas {
         let res = AdaptiveConformalCalibrator::new(bad_alpha);
         assert!(
-            matches!(res, Err(ConformalError::InvalidAlpha(_))),
-            "Expected InvalidAlpha for alpha {bad_alpha}, got {res:?}"
+            matches!(res, Err(ConformalError::Alpha(_))),
+            "Expected Alpha for alpha {bad_alpha}, got {res:?}"
         );
     }
 }

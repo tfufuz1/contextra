@@ -41,7 +41,7 @@ fn test_pava_duplicate_raw_score_deterministic_pooling() {
     for (idx, &query) in test_queries.iter().enumerate() {
         let prob_a = cal_a.calibrated_probability(query).unwrap();
         let prob_b = cal_b.calibrated_probability(query).unwrap();
-        let expected = expected_probs[idx];
+        let expected = expected_probs.get(idx).copied().unwrap_or(0.0);
 
         assert_eq!(
             prob_a, prob_b,

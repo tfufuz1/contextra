@@ -56,9 +56,14 @@ pub struct DriftDetector {
 impl DriftDetector {
     /// Creates a new `DriftDetector` with window size and sensitivity threshold.
     pub fn new(window_size: usize, threshold: f32) -> Self {
+        let thresh = if threshold.is_finite() {
+            threshold.abs()
+        } else {
+            0.15
+        };
         Self {
             window_size: window_size.max(5),
-            threshold: threshold.abs(),
+            threshold: thresh,
             baseline_mean: None,
             recent_scores: VecDeque::with_capacity(window_size),
         }
