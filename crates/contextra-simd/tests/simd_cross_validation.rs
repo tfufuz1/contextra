@@ -1,3 +1,11 @@
+// ADR-002 / SPEC §27: Test assertions and test dataset casts
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+#![allow(clippy::indexing_slicing)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_sign_loss)]
+// ADR-002 / SPEC §27: Test assertions and test dataset casts
+
 use contextra_simd::dispatch::{
     cosine_distance, cosine_distance_f32_bytes, cosine_similarity_parts_u8, dot_product_distance,
     dot_product_distance_f32_bytes, dot_product_u8, euclidean_distance,
@@ -23,7 +31,7 @@ proptest! {
         let b = &b[..n];
 
         let scalar = cosine_distance_scalar(a, b);
-        let dispatch = cosine_distance(a, b).unwrap();
+        let dispatch = cosine_distance(a, b).expect("valid distance calculation");
         let diff = (scalar - dispatch).abs();
         let tol = 1e-4 * scalar.abs().max(dispatch.abs()).max(1.0);
         prop_assert!(
@@ -44,7 +52,7 @@ proptest! {
         let b = &b[..n];
 
         let scalar = euclidean_distance_scalar(a, b);
-        let dispatch = euclidean_distance(a, b).unwrap();
+        let dispatch = euclidean_distance(a, b).expect("valid distance calculation");
         let diff = (scalar - dispatch).abs();
         let tol = 1e-3 * scalar.abs().max(dispatch.abs()).max(1.0);
         prop_assert!(
@@ -65,7 +73,7 @@ proptest! {
         let b = &b[..n];
 
         let scalar = dot_product_scalar(a, b);
-        let dispatch = dot_product_distance(a, b).unwrap();
+        let dispatch = dot_product_distance(a, b).expect("valid distance calculation");
         let diff = (scalar - dispatch).abs();
         let tol = 1e-3 * scalar.abs().max(dispatch.abs()).max(1.0);
         prop_assert!(
@@ -86,7 +94,7 @@ proptest! {
         let b_bytes: Vec<u8> = b[..n].iter().flat_map(|x| x.to_le_bytes()).collect();
 
         let scalar = cosine_distance_f32_bytes_scalar(a, &b_bytes);
-        let dispatch = cosine_distance_f32_bytes(a, &b_bytes).unwrap();
+        let dispatch = cosine_distance_f32_bytes(a, &b_bytes).expect("valid distance calculation");
         let diff = (scalar - dispatch).abs();
         let tol = 1e-4 * scalar.abs().max(dispatch.abs()).max(1.0);
         prop_assert!(
@@ -107,7 +115,7 @@ proptest! {
         let b_bytes: Vec<u8> = b[..n].iter().flat_map(|x| x.to_le_bytes()).collect();
 
         let scalar = euclidean_distance_f32_bytes_scalar(a, &b_bytes);
-        let dispatch = euclidean_distance_f32_bytes(a, &b_bytes).unwrap();
+        let dispatch = euclidean_distance_f32_bytes(a, &b_bytes).expect("valid distance calculation");
         let diff = (scalar - dispatch).abs();
         let tol = 1e-3 * scalar.abs().max(dispatch.abs()).max(1.0);
         prop_assert!(
@@ -128,7 +136,7 @@ proptest! {
         let b_bytes: Vec<u8> = b[..n].iter().flat_map(|x| x.to_le_bytes()).collect();
 
         let scalar = dot_product_f32_bytes_scalar(a, &b_bytes);
-        let dispatch = dot_product_distance_f32_bytes(a, &b_bytes).unwrap();
+        let dispatch = dot_product_distance_f32_bytes(a, &b_bytes).expect("valid distance calculation");
         let diff = (scalar - dispatch).abs();
         let tol = 1e-3 * scalar.abs().max(dispatch.abs()).max(1.0);
         prop_assert!(
@@ -149,7 +157,7 @@ proptest! {
         let b = &b[..n];
 
         let scalar = dot_product_u8_scalar(a, b);
-        let dispatch = dot_product_u8(a, b).unwrap();
+        let dispatch = dot_product_u8(a, b).expect("valid distance calculation");
         prop_assert_eq!(
             scalar, dispatch,
             "Dot product u8 mismatch at dim {}: scalar={}, dispatch={}",
@@ -168,7 +176,7 @@ proptest! {
         let b = &b[..n];
 
         let scalar = euclidean_distance_sq_u8_scalar(a, b);
-        let dispatch = euclidean_distance_sq_u8(a, b).unwrap();
+        let dispatch = euclidean_distance_sq_u8(a, b).expect("valid distance calculation");
         prop_assert_eq!(
             scalar, dispatch,
             "Euclidean sq u8 mismatch at dim {}: scalar={}, dispatch={}",
@@ -187,7 +195,7 @@ proptest! {
         let b = &b[..n];
 
         let scalar = cosine_similarity_parts_u8_scalar(a, b);
-        let dispatch = cosine_similarity_parts_u8(a, b).unwrap();
+        let dispatch = cosine_similarity_parts_u8(a, b).expect("valid distance calculation");
         prop_assert_eq!(
             scalar, dispatch,
             "Cosine similarity parts u8 mismatch at dim {}: scalar={:?}, dispatch={:?}",
@@ -215,17 +223,17 @@ fn test_s4_1000_pairs_equivalence_threshold() {
                 .collect();
 
             let cos_s = cosine_distance_scalar(&a, &b);
-            let cos_d = cosine_distance(&a, &b).unwrap();
+            let cos_d = cosine_distance(&a, &b).expect("valid distance calculation");
             let cos_diff = (cos_s - cos_d).abs();
             max_cos_diff = max_cos_diff.max(cos_diff);
 
             let euc_s = euclidean_distance_scalar(&a, &b);
-            let euc_d = euclidean_distance(&a, &b).unwrap();
+            let euc_d = euclidean_distance(&a, &b).expect("valid distance calculation");
             let euc_diff = (euc_s - euc_d).abs();
             max_euc_diff = max_euc_diff.max(euc_diff);
 
             let dot_s = dot_product_scalar(&a, &b);
-            let dot_d = dot_product_distance(&a, &b).unwrap();
+            let dot_d = dot_product_distance(&a, &b).expect("valid distance calculation");
             let dot_diff = (dot_s - dot_d).abs();
             max_dot_diff = max_dot_diff.max(dot_diff);
         }
@@ -261,7 +269,7 @@ fn test_simd_remainder_boundary_lengths_f32() {
 
         // Cosine distance
         let cos_scalar = cosine_distance_scalar(&a, &b);
-        let cos_dispatch = cosine_distance(&a, &b).unwrap();
+        let cos_dispatch = cosine_distance(&a, &b).expect("valid distance calculation");
         let cos_diff = (cos_scalar - cos_dispatch).abs();
         let cos_tol = 1e-4 * cos_scalar.abs().max(cos_dispatch.abs()).max(1.0);
         assert!(
@@ -271,7 +279,7 @@ fn test_simd_remainder_boundary_lengths_f32() {
 
         // Euclidean distance
         let euc_scalar = euclidean_distance_scalar(&a, &b);
-        let euc_dispatch = euclidean_distance(&a, &b).unwrap();
+        let euc_dispatch = euclidean_distance(&a, &b).expect("valid distance calculation");
         let euc_diff = (euc_scalar - euc_dispatch).abs();
         let euc_tol = 1e-3 * euc_scalar.abs().max(euc_dispatch.abs()).max(1.0);
         assert!(
@@ -281,7 +289,7 @@ fn test_simd_remainder_boundary_lengths_f32() {
 
         // Dot product distance
         let dot_scalar = dot_product_scalar(&a, &b);
-        let dot_dispatch = dot_product_distance(&a, &b).unwrap();
+        let dot_dispatch = dot_product_distance(&a, &b).expect("valid distance calculation");
         let dot_diff = (dot_scalar - dot_dispatch).abs();
         let dot_tol = 1e-3 * dot_scalar.abs().max(dot_dispatch.abs()).max(1.0);
         assert!(
@@ -292,7 +300,8 @@ fn test_simd_remainder_boundary_lengths_f32() {
         // f32_bytes variants
         let b_bytes: Vec<u8> = b.iter().flat_map(|x| x.to_le_bytes()).collect();
         let cos_bytes_scalar = cosine_distance_f32_bytes_scalar(&a, &b_bytes);
-        let cos_bytes_dispatch = cosine_distance_f32_bytes(&a, &b_bytes).unwrap();
+        let cos_bytes_dispatch =
+            cosine_distance_f32_bytes(&a, &b_bytes).expect("valid distance calculation");
         let cos_bytes_tol = 1e-4
             * cos_bytes_scalar
                 .abs()
@@ -304,7 +313,8 @@ fn test_simd_remainder_boundary_lengths_f32() {
         );
 
         let euc_bytes_scalar = euclidean_distance_f32_bytes_scalar(&a, &b_bytes);
-        let euc_bytes_dispatch = euclidean_distance_f32_bytes(&a, &b_bytes).unwrap();
+        let euc_bytes_dispatch =
+            euclidean_distance_f32_bytes(&a, &b_bytes).expect("valid distance calculation");
         let euc_bytes_tol = 1e-3
             * euc_bytes_scalar
                 .abs()
@@ -316,7 +326,8 @@ fn test_simd_remainder_boundary_lengths_f32() {
         );
 
         let dot_bytes_scalar = dot_product_f32_bytes_scalar(&a, &b_bytes);
-        let dot_bytes_dispatch = dot_product_distance_f32_bytes(&a, &b_bytes).unwrap();
+        let dot_bytes_dispatch =
+            dot_product_distance_f32_bytes(&a, &b_bytes).expect("valid distance calculation");
         let dot_bytes_tol = 1e-3
             * dot_bytes_scalar
                 .abs()
@@ -340,21 +351,21 @@ fn test_simd_remainder_boundary_lengths_u8() {
         let b: Vec<u8> = (0..len).map(|i| (i * 13) as u8).collect();
 
         let dot_s = dot_product_u8_scalar(&a, &b);
-        let dot_d = dot_product_u8(&a, &b).unwrap();
+        let dot_d = dot_product_u8(&a, &b).expect("valid distance calculation");
         assert_eq!(
             dot_s, dot_d,
             "Dot product u8 remainder mismatch at len {len}"
         );
 
         let euc_s = euclidean_distance_sq_u8_scalar(&a, &b);
-        let euc_d = euclidean_distance_sq_u8(&a, &b).unwrap();
+        let euc_d = euclidean_distance_sq_u8(&a, &b).expect("valid distance calculation");
         assert_eq!(
             euc_s, euc_d,
             "Euclidean sq u8 remainder mismatch at len {len}"
         );
 
         let cos_s = cosine_similarity_parts_u8_scalar(&a, &b);
-        let cos_d = cosine_similarity_parts_u8(&a, &b).unwrap();
+        let cos_d = cosine_similarity_parts_u8(&a, &b).expect("valid distance calculation");
         assert_eq!(
             cos_s, cos_d,
             "Cosine similarity parts u8 remainder mismatch at len {len}"
@@ -368,9 +379,18 @@ fn test_s1_zero_vector_and_l2_norm() {
     let v = vec![1.0f32; 128];
 
     assert_eq!(cosine_distance_scalar(&zero, &zero), 1.0);
-    assert_eq!(cosine_distance(&zero, &zero).unwrap(), 1.0);
-    assert_eq!(cosine_distance(&zero, &v).unwrap(), 1.0);
-    assert_eq!(cosine_distance(&v, &zero).unwrap(), 1.0);
+    assert_eq!(
+        cosine_distance(&zero, &zero).expect("valid distance calculation"),
+        1.0
+    );
+    assert_eq!(
+        cosine_distance(&zero, &v).expect("valid distance calculation"),
+        1.0
+    );
+    assert_eq!(
+        cosine_distance(&v, &zero).expect("valid distance calculation"),
+        1.0
+    );
 }
 
 #[test]
@@ -378,18 +398,21 @@ fn test_s2_l2_distance_correctness() {
     let a = vec![3.0f32, 0.0];
     let b = vec![0.0f32, 4.0];
     assert_eq!(euclidean_distance_scalar(&a, &b), 5.0);
-    assert_eq!(euclidean_distance(&a, &b).unwrap(), 5.0);
+    assert_eq!(
+        euclidean_distance(&a, &b).expect("valid distance calculation"),
+        5.0
+    );
 }
 
 #[test]
 fn test_s3_overflow_behavior() {
     let norm_a = vec![1.0f32 / (4096.0f32.sqrt()); 4096];
     let norm_b = vec![1.0f32 / (4096.0f32.sqrt()); 4096];
-    let dot = dot_product_distance(&norm_a, &norm_b).unwrap();
+    let dot = dot_product_distance(&norm_a, &norm_b).expect("valid distance calculation");
     assert!(!dot.is_nan() && !dot.is_infinite());
 
     let huge_a = vec![1e20f32; 128];
     let huge_b = vec![1e20f32; 128];
-    let huge_dot = dot_product_distance(&huge_a, &huge_b).unwrap();
+    let huge_dot = dot_product_distance(&huge_a, &huge_b).expect("valid distance calculation");
     assert!(huge_dot.is_infinite());
 }
