@@ -13,7 +13,9 @@ pub mod importance;
 pub mod model_info;
 
 pub use client::{
-    build_rag_prompt, xml_escape, OllamaClient, OllamaConfig, DEFAULT_BASE_URL, DEFAULT_EMBED_MODEL,
+    build_rag_prompt, read_response_bytes, read_response_text, xml_escape, CircuitBreaker,
+    EgressAuditSink, EndpointPolicy, NoopEgressAuditSink, OllamaClient, OllamaConfig,
+    DEFAULT_BASE_URL, DEFAULT_EMBED_MODEL,
 };
 pub use context_prefixer::{ContextPrefixConfig, ContextPrefixEngine, ContextPrefixer};
 pub use embedding::OllamaEmbedder;
