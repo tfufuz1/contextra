@@ -1,0 +1,38 @@
+crates/contextra/Cargo.toml:13:contextra-core = { workspace = true }
+crates/contextra-store/Cargo.toml:63:contextra-graph = { workspace = true }
+crates/contextra-router/Cargo.toml:5:name = "contextra-router"
+crates/contextra-router/Cargo.toml:18:flow-corrected-thompson = ["contextra-adapt/flow-corrected-thompson"]
+crates/contextra-router/Cargo.toml:25:contextra-adapt = { workspace = true }
+crates/contextra-router/Cargo.toml:39:contextra-graph = { workspace = true }
+crates/contextra-py/Cargo.toml:30:# VERLETZUNG: contextra-py importiert contextra-db, contextra-router und contextra-rank gegen die DAG-Invariante.
+crates/contextra-py/Cargo.toml:34:contextra-router = { workspace = true }
+crates/contextra-py/Cargo.toml:36:contextra-adapt = { workspace = true }
+crates/contextra-py/Cargo.toml:38:contextra-core = { workspace = true }
+crates/contextra-infer-ollama/Cargo.toml:5:name = "contextra-infer-ollama"
+crates/contextra-rank/Cargo.toml:28:contextra-adapt.workspace = true
+crates/contextra-mcp/Cargo.toml:15:ollama = ["dep:contextra-infer-ollama"]
+crates/contextra-mcp/Cargo.toml:16:onnx = ["dep:contextra-infer-onnx"]
+crates/contextra-mcp/Cargo.toml:28:contextra-router = { workspace = true }
+crates/contextra-mcp/Cargo.toml:30:contextra-infer-ollama = { workspace = true, optional = true }
+crates/contextra-mcp/Cargo.toml:31:contextra-infer-onnx = { workspace = true, optional = true }
+crates/contextra-kvcache/Cargo.toml:5:name = "contextra-kvcache"
+crates/contextra-db/Cargo.toml:17:contextra-cognition = { workspace = true }
+crates/contextra-db/Cargo.toml:28:contextra-graph = { workspace = true }
+crates/contextra-db/Cargo.toml:30:contextra-adapt = { workspace = true }
+crates/contextra-db/Cargo.toml:59:graph-connectivity-health = ["contextra-graph/physio-percolation"]
+crates/contextra-db/Cargo.toml:63:# RESOLVED: AGT-DB-897f3a5c — Forward edge-reinforcement-learning feature to contextra-graph/edge-reinforcement-learning (TS: 2026-09-09T15:48:51Z) (SESSION: 2c31404a)
+crates/contextra-db/Cargo.toml:64:edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning"]
+crates/contextra-infer-onnx/Cargo.toml:5:name = "contextra-infer-onnx"
+crates/contextra-engine/Cargo.toml:29:contextra-graph = { workspace = true }
+crates/contextra-engine/Cargo.toml:47:contextra-core = { workspace = true }
+crates/contextra-graph/Cargo.toml:5:name = "contextra-graph"
+crates/contextra-graph/Cargo.toml:31:contextra-adapt = { workspace = true }
+crates/contextra-adapt/Cargo.toml:2:name = "contextra-adapt"
+crates/contextra-cognition/Cargo.toml:5:name = "contextra-cognition"
+crates/contextra-cognition/Cargo.toml:21:contextra-graph = { workspace = true }
+crates/contextra-cognition/Cargo.toml:35:graph-connectivity-health = ["contextra-graph/physio-percolation", "contextra-engine/graph-connectivity-health"]
+crates/contextra-cognition/Cargo.toml:36:edge-reinforcement-learning = ["contextra-graph/edge-reinforcement-learning", "contextra-engine/edge-reinforcement-learning"]
+crates/contextra-agent/Cargo.toml:5:name = "contextra-agent"
+crates/contextra-agent/Cargo.toml:24:contextra-graph      = { workspace = true }
+crates/contextra-agent/Cargo.toml:27:contextra-router     = { workspace = true }
+crates/contextra-core/Cargo.toml:5:name = "contextra-core"
