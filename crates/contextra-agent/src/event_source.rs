@@ -14,7 +14,7 @@ use contextra_db::Collection;
 use contextra_ports::{BoxFuture, StorageEngine};
 use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -24,8 +24,11 @@ pub const MAX_EVENT_SOURCE_CAPACITY: usize = 10_000;
 /// Background telemetry/trigger event delivered to the agent context.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BackgroundEvent {
+    /// Payload associated with the background telemetry event.
     pub payload: serde_json::Value,
+    /// Origin identifier of the event producer.
     pub source: String,
+    /// Storage sequence number at which this event was observed.
     pub observed_at_seq: u64,
 }
 
@@ -62,6 +65,7 @@ impl BackgroundEvent {
         })
     }
 
+    /// Legacy constructor for `BackgroundEvent` (deprecated).
     #[deprecated(note = "Use try_new instead to handle validation errors without panicking")]
     pub fn new(
         payload: serde_json::Value,
@@ -121,6 +125,7 @@ pub struct PollingDocumentEventSource<S: StorageEngine> {
 }
 
 impl<S: StorageEngine> PollingDocumentEventSource<S> {
+    /// Creates a new `PollingDocumentEventSource` watching the specified collection.
     pub fn new(collection: Arc<Collection<S>>, poll_interval: Duration) -> Self {
         Self::with_capacity(collection, poll_interval, MAX_PENDING_EVENTS_CAPACITY)
     }
@@ -140,11 +145,13 @@ impl<S: StorageEngine> PollingDocumentEventSource<S> {
         }
     }
 
+    /// Configures the initial last seen sequence number (Builder pattern).
     pub fn with_last_seen_seq(mut self, last_seen_seq: u64) -> Self {
         self.last_seen_seq = last_seen_seq;
         self
     }
 
+    /// Returns the configured polling interval duration.
     pub fn poll_interval(&self) -> Duration {
         self.poll_interval
     }
@@ -167,7 +174,7 @@ impl<S: StorageEngine> EventSource for PollingDocumentEventSource<S> {
                     .scan_prefix_at(&prefix, current_seq)
                     .await?;
 
-                let previous_entries: HashMap<Vec<u8>, Vec<u8>> = if self.last_seen_seq > 0 {
+                let previous_entries: BTreeMap<Vec<u8>, Vec<u8>> = if self.last_seen_seq > 0 {
                     self.collection
                         .storage()
                         .scan_prefix_at(&prefix, self.last_seen_seq)
@@ -175,7 +182,7 @@ impl<S: StorageEngine> EventSource for PollingDocumentEventSource<S> {
                         .into_iter()
                         .collect()
                 } else {
-                    HashMap::new()
+                    BTreeMap::new()
                 };
 
                 for (key, val) in current_entries {

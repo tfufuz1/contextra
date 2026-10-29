@@ -1,3 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 // Contract tests for WP-5.3 Acceptance Criteria.
 //
 // AC-1: Checkpoint before every step

@@ -1,7 +1,17 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 // FILE-CONTEXT
 // ZWECK: Serde-Kompatibilitätstests für WorkflowEdge (Lesen alter JSONs ohne goal, Roundtrip neuer JSONs mit goal).
 // INVARIANTEN: 100% Abwärtskompatibilität beim Deserialisieren alter Edge-Formate.
-
 #![forbid(unsafe_code)]
 
 use contextra_agent::{GoalCondition, WorkflowEdge};

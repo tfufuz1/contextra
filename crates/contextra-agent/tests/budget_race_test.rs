@@ -1,3 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 // FILE-CONTEXT Header (Format v3)
 // ZWECK: Test token budget concurrency and RMW race condition in contextra-agent workflow steps.
 // INVARIANTEN: Verifies sequential vs concurrent TokenBudget consumption limits.

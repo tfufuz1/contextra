@@ -1,3 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 use contextra_agent::context::{AgentContext, AgentEngine};
 use contextra_types::error::{CacheDirective, StepId};
 use contextra_types::TokenBudget;

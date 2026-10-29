@@ -9,7 +9,7 @@
 //!
 //! Implements the core execution loop: checkpoint → execute → commit → audit → resolve-next.
 
-use crate::context::{validate_node_id, AgentContext, MAX_ID_LEN};
+use crate::context::{validate_node_id, AgentContext};
 use crate::dlq::DeadLetterQueue;
 use crate::graph::{AgentNode, NodeType, StateGraph};
 use crate::step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};
@@ -19,24 +19,30 @@ use contextra_checkpoint::{
 use contextra_ports::{Clock, StorageEngine, SystemClock};
 use contextra_store::LsmStorage;
 use contextra_types::{ContextraError, Result};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Reason for exiting `OrchestratorEngine::run_event_loop`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventLoopExitReason {
+    /// Workflow event loop was terminated due to a cancellation request.
     Shutdown,
+    /// Workflow event loop exited because the underlying event source was exhausted.
     SourceExhausted,
 }
 
 /// Maximum allowed steps in a single workflow execution to prevent unbounded loops.
 pub const MAX_WORKFLOW_STEPS: u64 = 10_000;
 
-/// Async executor engine applying nodes in Sequence.
+/// Async executor engine applying nodes in sequence.
 pub struct OrchestratorEngine {
-    pub tools: HashMap<String, Box<dyn AgentTool>>,
+    /// Registry managing tool manifests, availability, and authorization checks.
+    pub registry: crate::tools::ToolRegistry,
+    /// Store managing workflow state checkpoint persistence and restoration.
     pub checkpoint_store: Arc<dyn CheckpointRegistry>,
+    /// Optional queue for recording failed workflow steps for post-mortem analysis.
     pub dead_letter_queue: Option<DeadLetterQueue>,
+    /// Clock port for deterministic time management.
     pub clock: Arc<dyn Clock>,
 }
 
@@ -45,7 +51,7 @@ impl OrchestratorEngine {
     pub fn try_new(storage: Arc<LsmStorage>) -> Result<Self> {
         let checkpoint_store = PersistentCheckpointStore::new(storage.clone(), "agent")?;
         Ok(Self {
-            tools: HashMap::new(),
+            registry: crate::tools::ToolRegistry::new(),
             checkpoint_store: Arc::new(checkpoint_store),
             dead_letter_queue: Some(DeadLetterQueue::new(storage)),
             clock: Arc::new(SystemClock::new()),
@@ -71,6 +77,7 @@ impl OrchestratorEngine {
         Self::try_new(db.inner_storage())
     }
 
+    /// Constructs a new [`OrchestratorEngine`] from LSM storage (legacy constructor).
     #[deprecated(note = "Use try_new instead to handle initialization errors without panicking")]
     pub fn new(storage: Arc<LsmStorage>) -> Self {
         struct FallbackRegistry;
@@ -117,7 +124,7 @@ impl OrchestratorEngine {
         Self::try_new(storage.clone()).unwrap_or_else(|e| {
             tracing::error!("Failed to initialize OrchestratorEngine: {}", e);
             Self {
-                tools: HashMap::new(),
+                registry: crate::tools::ToolRegistry::new(),
                 checkpoint_store: Arc::new(FallbackRegistry),
                 dead_letter_queue: Some(DeadLetterQueue::new(storage)),
                 clock: Arc::new(SystemClock::new()),
@@ -136,26 +143,16 @@ impl OrchestratorEngine {
 
     /// Attempts to register an agent tool with boundary validation on the tool name.
     pub fn try_register_tool(&mut self, tool: Box<dyn AgentTool>) -> Result<()> {
-        let name = tool.name();
-        if name.is_empty() {
-            return Err(ContextraError::InvalidInput(
-                "Tool name cannot be empty".to_string(),
-            ));
-        }
-        if name.len() > MAX_ID_LEN {
-            return Err(ContextraError::InvalidInput(format!(
-                "Tool name length {} exceeds maximum allowed length of {}",
-                name.len(),
-                MAX_ID_LEN
-            )));
-        }
-        if name.contains('\0') {
-            return Err(ContextraError::InvalidInput(
-                "Tool name cannot contain null bytes".to_string(),
-            ));
-        }
-        self.tools.insert(name.to_string(), tool);
-        Ok(())
+        self.registry.register_tool(tool)
+    }
+
+    /// Registers an agent tool with an explicit declarative [`ToolManifest`](crate::tools::ToolManifest).
+    pub fn try_register_tool_with_manifest(
+        &mut self,
+        manifest: crate::tools::ToolManifest,
+        tool: Box<dyn AgentTool>,
+    ) -> Result<()> {
+        self.registry.register(manifest, tool)
     }
 
     /// Recovers all registered/persisted orphaned sequence pins and checkpoints.
@@ -165,6 +162,7 @@ impl OrchestratorEngine {
         Ok(())
     }
 
+    /// Runs the persistent workflow execution loop for a given [`AgentContext`] and [`StateGraph`].
     pub async fn run(&self, ctx: &mut AgentContext, graph: &StateGraph) -> Result<()> {
         ctx.status = crate::context::AgentStatus::Running;
         let res = self.run_internal(ctx, graph).await;
@@ -174,8 +172,282 @@ impl OrchestratorEngine {
         res
     }
 
+    async fn execute_tool_with_retries(
+        &self,
+        ctx: &AgentContext,
+        node: &AgentNode,
+        handler_name: &str,
+        input: &serde_json::Value,
+        estimated_cost: usize,
+        tx_id: contextra_types::TxId,
+    ) -> Result<StepResult> {
+        let manifest = self.registry.authorize(ctx, handler_name)?;
+        let tool = self.registry.get_tool(handler_name).ok_or_else(|| {
+            ContextraError::Internal(format!("Tool {handler_name} not registered"))
+        })?;
+
+        let timeout_duration = std::time::Duration::from_millis(manifest.timeout_ms);
+        let max_attempts = if manifest.is_retriable {
+            manifest.max_retries + 1
+        } else {
+            1
+        };
+        let mut execution_res = Err(ContextraError::Internal(format!(
+            "Tool {handler_name} failed without execution"
+        )));
+
+        for attempt in 0..max_attempts {
+            if attempt > 0 {
+                if ctx.budget.available() == 0 {
+                    execution_res = Err(ContextraError::MemoryBudgetExceeded {
+                        used_mb: ctx.budget.consumed() as u64,
+                        limit_mb: ctx.budget.limit as u64,
+                    });
+                    if let Some(ref dlq) = self.dead_letter_queue {
+                        let letter = StepDeadLetter {
+                            session_id: ctx.task_id.clone(),
+                            node_id: node.id.clone(),
+                            step_index: ctx.step_count,
+                            tx_id: Some(tx_id),
+                            failure_reason: DeadLetterReason::BudgetExhausted {
+                                available: 0,
+                                required: estimated_cost,
+                            },
+                            input: input.clone(),
+                            attempt,
+                            failed_at_secs: self.now_secs(),
+                        };
+                        let _ = dlq.push(&letter).await;
+                    }
+                    break;
+                }
+
+                let wait_ms = 100u64 * (1u64 << attempt.min(4));
+                tokio::time::sleep(std::time::Duration::from_millis(wait_ms)).await;
+            }
+
+            let execute_future = tool.execute(ctx, input.clone());
+
+            match tokio::time::timeout(timeout_duration, execute_future).await {
+                Ok(Ok(result)) => {
+                    execution_res = Ok(result);
+                    break;
+                }
+                Ok(Err(e)) => {
+                    let err_msg = e.to_string();
+                    execution_res = Err(e);
+                    if !manifest.is_retriable {
+                        if let Some(ref dlq) = self.dead_letter_queue {
+                            let letter = StepDeadLetter {
+                                session_id: ctx.task_id.clone(),
+                                node_id: node.id.clone(),
+                                step_index: ctx.step_count,
+                                tx_id: Some(tx_id),
+                                failure_reason: DeadLetterReason::ToolError { message: err_msg },
+                                input: input.clone(),
+                                attempt,
+                                failed_at_secs: self.now_secs(),
+                            };
+                            let _ = dlq.push(&letter).await;
+                        }
+                        break;
+                    } else if attempt + 1 == max_attempts {
+                        if let Some(ref dlq) = self.dead_letter_queue {
+                            let letter = StepDeadLetter {
+                                session_id: ctx.task_id.clone(),
+                                node_id: node.id.clone(),
+                                step_index: ctx.step_count,
+                                tx_id: Some(tx_id),
+                                failure_reason: DeadLetterReason::MaxRetriesExceeded {
+                                    attempts: max_attempts,
+                                },
+                                input: input.clone(),
+                                attempt,
+                                failed_at_secs: self.now_secs(),
+                            };
+                            let _ = dlq.push(&letter).await;
+                        }
+                    }
+                }
+                Err(_elapsed) => {
+                    let timeout_err = ContextraError::Timeout {
+                        operation: format!("tool:{handler_name}"),
+                        timeout_ms: manifest.timeout_ms,
+                    };
+                    execution_res = Err(timeout_err);
+
+                    if let Some(ref dlq) = self.dead_letter_queue {
+                        let letter = StepDeadLetter {
+                            session_id: ctx.task_id.clone(),
+                            node_id: node.id.clone(),
+                            step_index: ctx.step_count,
+                            tx_id: Some(tx_id),
+                            failure_reason: DeadLetterReason::Timeout {
+                                timeout_ms: manifest.timeout_ms,
+                            },
+                            input: input.clone(),
+                            attempt,
+                            failed_at_secs: self.now_secs(),
+                        };
+                        let _ = dlq.push(&letter).await;
+                    }
+
+                    if !manifest.is_retriable {
+                        break;
+                    }
+                }
+            }
+        }
+
+        execution_res
+    }
+
+    async fn execute_start_or_task_step(
+        &self,
+        ctx: &mut AgentContext,
+        graph: &StateGraph,
+        node: &AgentNode,
+    ) -> Result<()> {
+        let tx_id = ctx.db.inner_storage().last_tx_id().await?;
+        let guard = if let Some(orphan_reg) = self.checkpoint_store.orphan_registry() {
+            CheckpointGuard::for_agent_step_with_registry(
+                ctx.db.inner_storage(),
+                tx_id,
+                orphan_reg.clone(),
+            )
+            .await?
+        } else {
+            CheckpointGuard::for_agent_step(ctx.db.inner_storage(), tx_id).await?
+        };
+        self.checkpoint(ctx).await?;
+
+        let input = ctx
+            .memory
+            .get("last_output")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+
+        let estimated_cost = if node.node_type != NodeType::Start {
+            node.handler
+                .as_ref()
+                .and_then(|h| self.registry.get_tool(h))
+                .map_or(0, |t| t.estimated_cost(&input))
+        } else {
+            0
+        };
+
+        let reservation = if node.node_type != NodeType::Start && estimated_cost > 0 {
+            match ctx.budget.reserve(estimated_cost) {
+                Ok(res) => Some(res),
+                Err(err) => {
+                    if let Some(ref dlq) = self.dead_letter_queue {
+                        let letter = StepDeadLetter {
+                            session_id: ctx.task_id.clone(),
+                            node_id: node.id.clone(),
+                            step_index: ctx.step_count,
+                            tx_id: Some(tx_id),
+                            failure_reason: DeadLetterReason::BudgetExhausted {
+                                available: ctx.budget.available(),
+                                required: estimated_cost,
+                            },
+                            input: input.clone(),
+                            attempt: 0,
+                            failed_at_secs: self.now_secs(),
+                        };
+                        let _ = dlq.push(&letter).await;
+                    }
+                    self.audit_log_failure(ctx, &err.to_string()).await?;
+                    return Err(err);
+                }
+            }
+        } else {
+            None
+        };
+
+        let result_res = if let Some(handler_name) = &node.handler {
+            self.execute_tool_with_retries(ctx, node, handler_name, &input, estimated_cost, tx_id)
+                .await
+        } else if node.node_type == NodeType::Start {
+            Ok(StepResult {
+                node_id: node.id.clone(),
+                output: serde_json::Value::Null,
+                tokens_consumed: 0,
+                next_edge: None,
+            })
+        } else {
+            Err(ContextraError::Internal(format!(
+                "Task Node {} lacks handler",
+                node.id
+            )))
+        };
+
+        if let Some((router, decision_id)) = ctx.pending_routing_decision.take() {
+            let outcome = match &result_res {
+                Ok(_) => contextra_router::RoutingOutcome::Success,
+                Err(err) => contextra_router::RoutingOutcome::Rejected {
+                    reason: Some(err.to_string()),
+                },
+            };
+            router.record_outcome(decision_id, outcome);
+        }
+
+        let result = match result_res {
+            Ok(res) => {
+                if let Some(res_guard) = reservation {
+                    res_guard.settle();
+                    if res.tokens_consumed > estimated_cost {
+                        ctx.budget.consume(res.tokens_consumed - estimated_cost);
+                    } else if estimated_cost > res.tokens_consumed {
+                        ctx.budget.refund(estimated_cost - res.tokens_consumed);
+                    }
+                } else if res.tokens_consumed > 0 {
+                    ctx.budget.consume(res.tokens_consumed);
+                }
+                ctx.memory
+                    .insert("last_output".to_string(), res.output.clone());
+                res
+            }
+            Err(err) => {
+                self.audit_log_failure(ctx, &err.to_string()).await?;
+                return Err(err);
+            }
+        };
+
+        self.audit_log(ctx, &result).await?;
+        self.commit_step(ctx, &result).await?;
+
+        let outgoing_edge = match self.resolve_outgoing_edge(graph, &ctx.current_node, &result) {
+            Some(edge) => edge,
+            None => {
+                let err =
+                    ContextraError::Internal(format!("Dead end at node {}", ctx.current_node));
+                self.audit_log_failure(ctx, &err.to_string()).await?;
+                return Err(err);
+            }
+        };
+
+        if outgoing_edge.has_condition() && outgoing_edge.evaluate_condition(&result) {
+            if let Some(ref mut scratchpad) = ctx.clm_scratchpad {
+                let checkpoint = scratchpad.checkpoint_and_reset()?;
+                tracing::info!(
+                    task_id = %ctx.task_id,
+                    completed_subgoal = checkpoint.completed_subgoal_index,
+                    chunks_purged = checkpoint.purge_receipt.chunks_purged,
+                    "CLM Scratchpad checkpointed and reset on goal condition match"
+                );
+                ctx.latest_scratchpad_checkpoint = Some(checkpoint);
+            }
+        }
+
+        let next_node = self.resolve_next_node(graph, &ctx.current_node, &result)?;
+        ctx.current_node = next_node;
+        ctx.step_count += 1;
+
+        guard.commit()?;
+        Ok(())
+    }
+
     async fn run_internal(&self, ctx: &mut AgentContext, graph: &StateGraph) -> Result<()> {
-        // Startup orphan recovery MUST execute before first agent step (Befund A.3)
         self.recover_orphans().await?;
 
         loop {
@@ -197,309 +469,13 @@ impl OrchestratorEngine {
             match node.node_type {
                 NodeType::End => {
                     ctx.status = crate::context::AgentStatus::Completed;
-                    // Persist final state before last checkpoint (FIND-SAOS-001)
                     self.persist_final_state(ctx).await?;
-                    ctx.db.inner_storage().flush().await?; // Ensure durability
+                    ctx.db.inner_storage().flush().await?;
                     self.checkpoint(ctx).await?;
                     return Ok(());
                 }
                 NodeType::Start | NodeType::Task => {
-                    // 1. Checkpoint BEFORE execution (AC-1) with RAII CheckpointGuard
-                    let tx_id = ctx.db.inner_storage().last_tx_id().await?;
-                    let guard = if let Some(orphan_reg) = self.checkpoint_store.orphan_registry() {
-                        CheckpointGuard::for_agent_step_with_registry(
-                            ctx.db.inner_storage(),
-                            tx_id,
-                            orphan_reg.clone(),
-                        )
-                        .await?
-                    } else {
-                        CheckpointGuard::for_agent_step(ctx.db.inner_storage(), tx_id).await?
-                    };
-                    self.checkpoint(ctx).await?;
-
-                    // Prepare step input
-                    let input = ctx
-                        .memory
-                        .get("last_output")
-                        .cloned()
-                        .unwrap_or(serde_json::Value::Null);
-
-                    // PRE-CHECK & ATOMIC RESERVATION vor Ausführung: Reserve budget strictly before tool execution
-                    let estimated_cost = if node.node_type != NodeType::Start {
-                        if let Some(handler_name) = &node.handler {
-                            if let Some(tool) = self.tools.get(handler_name) {
-                                tool.estimated_cost(&input)
-                            } else {
-                                0
-                            }
-                        } else {
-                            0
-                        }
-                    } else {
-                        0
-                    };
-
-                    let reservation = if node.node_type != NodeType::Start && estimated_cost > 0 {
-                        match ctx.budget.reserve(estimated_cost) {
-                            Ok(res) => Some(res),
-                            Err(err) => {
-                                if let Some(ref dlq) = self.dead_letter_queue {
-                                    let letter = StepDeadLetter {
-                                        session_id: ctx.task_id.clone(),
-                                        node_id: node.id.clone(),
-                                        step_index: ctx.step_count,
-                                        tx_id: Some(tx_id),
-                                        failure_reason: DeadLetterReason::BudgetExhausted {
-                                            available: ctx.budget.available(),
-                                            required: estimated_cost,
-                                        },
-                                        input: input.clone(),
-                                        attempt: 0,
-                                        failed_at_secs: self.now_secs(),
-                                    };
-                                    if let Err(e) = dlq.push(&letter).await {
-                                        tracing::error!("DLQ push failed: {}", e);
-                                    }
-                                }
-                                self.audit_log_failure(ctx, &err.to_string()).await?;
-                                return Err(err);
-                            }
-                        }
-                    } else {
-                        None
-                    };
-
-                    // 2. Resolve handler (Optional for Start nodes)
-                    let result_res = if let Some(handler_name) = &node.handler {
-                        if let Some(tool) = self.tools.get(handler_name) {
-                            let timeout_duration =
-                                std::time::Duration::from_millis(tool.timeout_ms());
-                            let max_attempts = if tool.is_retriable() {
-                                tool.max_retries() + 1
-                            } else {
-                                1
-                            };
-                            let mut execution_res = Err(ContextraError::Internal(format!(
-                                "Tool {} failed without execution",
-                                handler_name
-                            )));
-
-                            'retry: for attempt in 0..max_attempts {
-                                if attempt > 0 {
-                                    // Verify budget availability before retry attempt
-                                    if ctx.budget.available() == 0 {
-                                        execution_res = Err(ContextraError::MemoryBudgetExceeded {
-                                            used_mb: ctx.budget.consumed() as u64,
-                                            limit_mb: ctx.budget.limit as u64,
-                                        });
-                                        if let Some(ref dlq) = self.dead_letter_queue {
-                                            let letter = StepDeadLetter {
-                                                session_id: ctx.task_id.clone(),
-                                                node_id: node.id.clone(),
-                                                step_index: ctx.step_count,
-                                                tx_id: Some(tx_id),
-                                                failure_reason: DeadLetterReason::BudgetExhausted {
-                                                    available: 0,
-                                                    required: estimated_cost,
-                                                },
-                                                input: input.clone(),
-                                                attempt,
-                                                failed_at_secs: self.now_secs(),
-                                            };
-                                            if let Err(dlq_err) = dlq.push(&letter).await {
-                                                tracing::error!(
-                                                    "DLQ push failed on retry budget exhaustion: {}",
-                                                    dlq_err
-                                                );
-                                            }
-                                        }
-                                        break 'retry;
-                                    }
-
-                                    let wait_ms = 100u64 * (1u64 << attempt.min(4));
-                                    tokio::time::sleep(std::time::Duration::from_millis(wait_ms))
-                                        .await;
-                                }
-
-                                let execute_future = tool.execute(ctx, input.clone());
-
-                                match tokio::time::timeout(timeout_duration, execute_future).await {
-                                    Ok(Ok(result)) => {
-                                        execution_res = Ok(result);
-                                        break 'retry;
-                                    }
-                                    Ok(Err(e)) => {
-                                        let err_msg: String = e.to_string();
-                                        execution_res = Err(e);
-                                        if !tool.is_retriable() {
-                                            if let Some(ref dlq) = self.dead_letter_queue {
-                                                let letter = StepDeadLetter {
-                                                    session_id: ctx.task_id.clone(),
-                                                    node_id: node.id.clone(),
-                                                    step_index: ctx.step_count,
-                                                    tx_id: Some(tx_id),
-                                                    failure_reason: DeadLetterReason::ToolError {
-                                                        message: err_msg,
-                                                    },
-                                                    input: input.clone(),
-                                                    attempt,
-                                                    failed_at_secs: self.now_secs(),
-                                                };
-                                                if let Err(dlq_err) = dlq.push(&letter).await {
-                                                    tracing::error!("DLQ push failed: {}", dlq_err);
-                                                }
-                                            }
-                                            break 'retry;
-                                        } else if attempt + 1 == max_attempts {
-                                            if let Some(ref dlq) = self.dead_letter_queue {
-                                                let letter = StepDeadLetter {
-                                                    session_id: ctx.task_id.clone(),
-                                                    node_id: node.id.clone(),
-                                                    step_index: ctx.step_count,
-                                                    tx_id: Some(tx_id),
-                                                    failure_reason:
-                                                        DeadLetterReason::MaxRetriesExceeded {
-                                                            attempts: max_attempts,
-                                                        },
-                                                    input: input.clone(),
-                                                    attempt,
-                                                    failed_at_secs: self.now_secs(),
-                                                };
-                                                if let Err(dlq_err) = dlq.push(&letter).await {
-                                                    tracing::error!("DLQ push failed: {}", dlq_err);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    Err(_elapsed) => {
-                                        let timeout_err = ContextraError::Timeout {
-                                            operation: format!("tool:{}", handler_name),
-                                            timeout_ms: tool.timeout_ms(),
-                                        };
-                                        execution_res = Err(timeout_err);
-
-                                        if let Some(ref dlq) = self.dead_letter_queue {
-                                            let letter = StepDeadLetter {
-                                                session_id: ctx.task_id.clone(),
-                                                node_id: node.id.clone(),
-                                                step_index: ctx.step_count,
-                                                tx_id: Some(tx_id),
-                                                failure_reason: DeadLetterReason::Timeout {
-                                                    timeout_ms: tool.timeout_ms(),
-                                                },
-                                                input: input.clone(),
-                                                attempt,
-                                                failed_at_secs: self.now_secs(),
-                                            };
-                                            if let Err(dlq_err) = dlq.push(&letter).await {
-                                                tracing::error!("DLQ push failed: {}", dlq_err);
-                                            }
-                                        }
-
-                                        if !tool.is_retriable() {
-                                            break 'retry;
-                                        }
-                                    }
-                                }
-                            }
-                            execution_res
-                        } else {
-                            Err(ContextraError::Internal(format!(
-                                "Tool {} not registered",
-                                handler_name
-                            )))
-                        }
-                    } else if node.node_type == NodeType::Start {
-                        // Pass-through result for start nodes without handlers
-                        Ok(StepResult {
-                            node_id: node.id.clone(),
-                            output: serde_json::Value::Null,
-                            tokens_consumed: 0,
-                            next_edge: None,
-                        })
-                    } else {
-                        Err(ContextraError::Internal(format!(
-                            "Task Node {} lacks handler",
-                            node.id
-                        )))
-                    };
-
-                    if let Some((router, decision_id)) = ctx.pending_routing_decision.take() {
-                        let outcome = match &result_res {
-                            Ok(_) => contextra_router::RoutingOutcome::Success,
-                            Err(err) => contextra_router::RoutingOutcome::Rejected {
-                                reason: Some(err.to_string()),
-                            },
-                        };
-                        router.record_outcome(decision_id, outcome);
-                    }
-
-                    let result = match result_res {
-                        Ok(res) => {
-                            // Settle RAII reservation and reconcile actual tokens consumed
-                            if let Some(res_guard) = reservation {
-                                res_guard.settle();
-                                if res.tokens_consumed > estimated_cost {
-                                    ctx.budget.consume(res.tokens_consumed - estimated_cost);
-                                } else if estimated_cost > res.tokens_consumed {
-                                    ctx.budget.refund(estimated_cost - res.tokens_consumed);
-                                }
-                            } else if res.tokens_consumed > 0 {
-                                ctx.budget.consume(res.tokens_consumed);
-                            }
-                            ctx.memory
-                                .insert("last_output".to_string(), res.output.clone());
-                            res
-                        }
-                        Err(err) => {
-                            // On execution failure, reservation is dropped without settle(),
-                            // which automatically refunds estimated_cost via RAII Drop guard.
-                            self.audit_log_failure(ctx, &err.to_string()).await?;
-                            return Err(err);
-                        }
-                    };
-
-                    // 3. Audit log (AC-3) - Audit trail is source of truth for "what was attempted".
-                    // Executed before commit_step so a failure here leaves state uncommitted for clean retry.
-                    self.audit_log(ctx, &result).await?;
-
-                    // 4. Atomic commit to LSM - Source of truth for "what was accepted".
-                    self.commit_step(ctx, &result).await?;
-
-                    // 6. Resolve next edge
-                    let outgoing_edge =
-                        match self.resolve_outgoing_edge(graph, &ctx.current_node, &result) {
-                            Some(edge) => edge,
-                            None => {
-                                let err = ContextraError::Internal(format!(
-                                    "Dead end at node {}",
-                                    ctx.current_node
-                                ));
-                                self.audit_log_failure(ctx, &err.to_string()).await?;
-                                return Err(err);
-                            }
-                        };
-
-                    if outgoing_edge.has_condition() && outgoing_edge.evaluate_condition(&result) {
-                        if let Some(ref mut scratchpad) = ctx.clm_scratchpad {
-                            let checkpoint = scratchpad.checkpoint_and_reset()?;
-                            tracing::info!(
-                                task_id = %ctx.task_id,
-                                completed_subgoal = checkpoint.completed_subgoal_index,
-                                chunks_purged = checkpoint.purge_receipt.chunks_purged,
-                                "CLM Scratchpad checkpointed and reset on goal condition match"
-                            );
-                            ctx.latest_scratchpad_checkpoint = Some(checkpoint);
-                        }
-                    }
-
-                    let next_node = self.resolve_next_node(graph, &ctx.current_node, &result)?;
-                    ctx.current_node = next_node;
-                    ctx.step_count += 1;
-
-                    // 7. Step completed successfully: commit CheckpointGuard RAII guard
-                    guard.commit()?;
+                    self.execute_start_or_task_step(ctx, graph, node).await?;
                 }
                 NodeType::Decision => {
                     let next = match self.evaluate_decision(graph, node, ctx) {
@@ -515,40 +491,30 @@ impl OrchestratorEngine {
         }
     }
 
-    /// Setzt den AgentContext auf einen früheren Checkpoint zurück (AC-2).
-    ///
-    /// # Adressierung von Checkpoints
-    /// Das `identifier`-Argument unterstützt folgende Adressierungsformate:
-    /// - `"step:<N>"`: Explizite Adressierung nach Schrittnummer (z. B. `"step:1"`).
-    /// - `"node:<name>"`: Explizite Adressierung nach Node-Name (z. B. `"node:1"` oder `"node:step_a"`).
-    ///
-    /// **Fallback (Abwärtskompatibilität):**
-    /// Falls kein Präfix (`step:` oder `node:`) angegeben ist:
-    /// - Wenn `identifier` als `u64` geparst werden kann, wird es als Schrittnummer interpretiert.
-    /// - Andernfalls wird es als Node-Name interpretiert.
-    pub async fn replay_from(&self, ctx: &mut AgentContext, identifier: &str) -> Result<()> {
-        validate_node_id(identifier)?;
-
-        let checkpoints = self.checkpoint_store.list_checkpoints().await?;
-
-        let checkpoint = checkpoints
+    fn find_matching_checkpoint<'a>(
+        &self,
+        checkpoints: &'a [CheckpointMeta],
+        task_id: &str,
+        identifier: &str,
+    ) -> Result<&'a CheckpointMeta> {
+        checkpoints
             .iter()
             .rfind(|c| {
-                if !c.name.starts_with(&format!("task:{}:", ctx.task_id)) {
+                if !c.name.starts_with(&format!("task:{task_id}:")) {
                     return false;
                 }
                 if let Some(step_str) = identifier.strip_prefix("step:") {
                     if let Ok(step) = step_str.parse::<u64>() {
-                        return c.name.contains(&format!(":step:{}:", step));
+                        return c.name.contains(&format!(":step:{step}:"));
                     }
                 }
                 if let Some(node_name) = identifier.strip_prefix("node:") {
-                    return c.name.ends_with(&format!(":node:{}", node_name));
+                    return c.name.ends_with(&format!(":node:{node_name}"));
                 }
                 if let Ok(step) = identifier.parse::<u64>() {
-                    c.name.contains(&format!(":step:{}:", step))
+                    c.name.contains(&format!(":step:{step}:"))
                 } else {
-                    c.name.ends_with(&format!(":node:{}", identifier))
+                    c.name.ends_with(&format!(":node:{identifier}"))
                 }
             })
             .ok_or_else(|| {
@@ -560,19 +526,20 @@ impl OrchestratorEngine {
 
                 let extra_hint = if let Some(num) = parsed_num {
                     format!(
-                        " Konnte keinen Checkpoint für Schritt {} finden. Falls ein Node mit dem Namen '{}' gemeint war, nutze das Format 'node:{}' zur expliziten Adressierung.",
-                        num, num, num
+                        " Konnte keinen Checkpoint für Schritt {num} finden. Falls ein Node mit dem Namen '{num}' gemeint war, nutze das Format 'node:{num}' zur expliziten Adressierung."
                     )
                 } else {
                     String::new()
                 };
 
                 ContextraError::Internal(format!(
-                    "Checkpoint '{}' für Task '{}' nicht gefunden.{}",
-                    identifier, ctx.task_id, extra_hint
+                    "Checkpoint '{identifier}' für Task '{task_id}' nicht gefunden.{extra_hint}"
                 ))
-            })?;
+            })
+    }
 
+    #[allow(clippy::cast_possible_truncation)]
+    fn restore_context_state_from_meta(&self, ctx: &mut AgentContext, checkpoint: &CheckpointMeta) {
         if let Some(node) = checkpoint
             .metadata
             .get("current_node")
@@ -588,7 +555,7 @@ impl OrchestratorEngine {
             ctx.step_count = step;
         }
         if let Some(memory) = checkpoint.metadata.get("memory").and_then(|v| {
-            serde_json::from_value::<HashMap<String, serde_json::Value>>(v.clone()).ok()
+            serde_json::from_value::<BTreeMap<String, serde_json::Value>>(v.clone()).ok()
         }) {
             ctx.memory = memory;
         }
@@ -625,12 +592,30 @@ impl OrchestratorEngine {
                 "Checkpoint metadata does not contain budget state; proceeding with default/current budget."
             );
         }
+    }
 
+    /// Setzt den AgentContext auf einen früheren Checkpoint zurück (AC-2).
+    ///
+    /// # Adressierung von Checkpoints
+    /// Das `identifier`-Argument unterstützt folgende Adressierungsformate:
+    /// - `"step:<N>"`: Explizite Adressierung nach Schrittnummer (z. B. `"step:1"`).
+    /// - `"node:<name>"`: Explizite Adressierung nach Node-Name (z. B. `"node:1"` oder `"node:step_a"`).
+    ///
+    /// **Fallback (Abwärtskompatibilität):**
+    /// Falls kein Präfix (`step:` oder `node:`) angegeben ist:
+    /// - Wenn `identifier` als `u64` geparst werden kann, wird es als Schrittnummer interpretiert.
+    /// - Andernfalls wird es als Node-Name interpretiert.
+    pub async fn replay_from(&self, ctx: &mut AgentContext, identifier: &str) -> Result<()> {
+        validate_node_id(identifier)?;
+        let checkpoints = self.checkpoint_store.list_checkpoints().await?;
+        let checkpoint = self.find_matching_checkpoint(&checkpoints, &ctx.task_id, identifier)?;
+        self.restore_context_state_from_meta(ctx, checkpoint);
         self.checkpoint_store
-            .restore(&checkpoint.into_workflow_state())
+            .restore(&checkpoint.clone().into_workflow_state())
             .await
     }
 
+    /// Persists a workflow execution state checkpoint for the active context step.
     pub async fn checkpoint(&self, ctx: &AgentContext) -> Result<()> {
         let checkpoint_name = format!(
             "task:{}:step:{}:node:{}",
@@ -778,7 +763,9 @@ impl OrchestratorEngine {
         let edges = graph
             .edges
             .iter()
-            .filter(|e| e.from == current_node)
+            .filter(|e| {
+                e.from == current_node && (!e.has_condition() || e.evaluate_condition(result))
+            })
             .collect::<Vec<_>>();
 
         if edges.is_empty() {
