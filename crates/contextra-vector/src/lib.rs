@@ -16,7 +16,16 @@
 // DONE: #![feature(portable_simd)] ist entfernt und distance.rs nutzt stabiles Rust.
 // INVARIANTE: Zero unsafe code in contextra-vector. SIMD an contextra-simd, mmap an contextra-sys ausgelagert.
 #![forbid(unsafe_code)]
-#![allow(clippy::too_many_arguments)]
+// ADR-077: Vector index numerical conversions, array indexing, and internal collections.
+#![allow(
+    clippy::too_many_arguments,
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::disallowed_types,
+    clippy::collapsible_if,
+    clippy::wrong_self_convention
+)]
 
 #[cfg(feature = "experimental-diskann")]
 pub mod diskann;

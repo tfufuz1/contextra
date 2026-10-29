@@ -187,7 +187,7 @@ pub struct HnswColdCore {
     pub last_rebuild_instant: Mutex<Option<std::time::Instant>>,
     pub consecutive_rapid_rebuilds: AtomicU32,
     #[cfg(feature = "partial-index-rebuild")]
-    pub traversal_tracker: RwLock<crate::partial_rebuild::TraversalTracker>,
+    pub traversal_tracker: Option<RwLock<crate::partial_rebuild::TraversalTracker>>,
     #[cfg(test)]
     pub fault_injection_insert_target: AtomicU64,
     #[cfg(test)]
@@ -257,9 +257,13 @@ impl HnswIndex {
                     last_rebuild_instant: Mutex::new(None),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
-                    traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
-                        partial_rebuild_config,
-                    )),
+                    traversal_tracker: if partial_rebuild_config.traversal_window > 0 {
+                        Some(RwLock::new(crate::partial_rebuild::TraversalTracker::new(
+                            partial_rebuild_config,
+                        )))
+                    } else {
+                        None
+                    },
                     #[cfg(test)]
                     fault_injection_insert_target: AtomicU64::new(0),
                     #[cfg(test)]
@@ -271,7 +275,7 @@ impl HnswIndex {
 
     /// Creates a new HNSW index, validating configuration upfront.
     ///
-    /// Uses an internal, non-cryptographic, reproducible default RNG seeded with [`DEFAULT_LAYER_SEED`].
+    /// Uses an internal, non-cryptographic, reproducible default RNG seeded with `DEFAULT_LAYER_SEED`.
     pub fn try_new(config: HnswConfig) -> Result<Self> {
         let rng = std::sync::Arc::new(contextra_ports::SeededRng::new(DEFAULT_LAYER_SEED));
         Self::try_new_with_rng(config, rng)
@@ -325,9 +329,13 @@ impl HnswIndex {
                     last_rebuild_instant: Mutex::new(None),
                     consecutive_rapid_rebuilds: AtomicU32::new(0),
                     #[cfg(feature = "partial-index-rebuild")]
-                    traversal_tracker: RwLock::new(crate::partial_rebuild::TraversalTracker::new(
-                        partial_rebuild_config,
-                    )),
+                    traversal_tracker: if partial_rebuild_config.traversal_window > 0 {
+                        Some(RwLock::new(crate::partial_rebuild::TraversalTracker::new(
+                            partial_rebuild_config,
+                        )))
+                    } else {
+                        None
+                    },
                     #[cfg(test)]
                     fault_injection_insert_target: AtomicU64::new(0),
                     #[cfg(test)]
@@ -415,8 +423,11 @@ impl HnswIndex {
 
     #[cfg(feature = "partial-index-rebuild")]
     pub fn check_and_trigger_partial_rebuild(&self) {
+        let Some(ref tracker_lock) = self.inner.cold.traversal_tracker else {
+            return;
+        };
         let global_tombstone_ratio = self.deleted_ratio() as f32;
-        let tracker = self.inner.cold.traversal_tracker.read();
+        let tracker = tracker_lock.read();
 
         let mut tombstone_map = ahash::AHashMap::new();
         let total_nodes = self.inner.hot.nodes.read().len();
