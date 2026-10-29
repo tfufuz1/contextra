@@ -209,7 +209,9 @@ fn hex_encode_32(bytes: &[u8; 32]) -> String {
     let mut s = String::with_capacity(64);
     for b in bytes {
         use std::fmt::Write;
-        let _ = write!(s, "{:02x}", b);
+        if write!(s, "{:02x}", b).is_err() {
+            break;
+        }
     }
     s
 }
