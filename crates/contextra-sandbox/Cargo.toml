@@ -12,7 +12,7 @@ description = "WASM Execution Boundary for Contextra MCP CodeExecution Permissio
 ring = "2"
 
 [dependencies]
-wasmtime = { version = "25", default-features = false, features = ["async", "cranelift"] }
+wasmtime = { version = "36.0.19", default-features = false, features = ["async", "cranelift"] }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 anyhow = "1"
 thiserror = { workspace = true }

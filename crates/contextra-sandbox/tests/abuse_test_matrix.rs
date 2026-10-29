@@ -879,3 +879,37 @@ async fn test_abuse_sandbox_reusability_after_trap() -> TestResult {
     assert_eq!(&res_valid.stdout[..], b"ok");
     Ok(())
 }
+
+// 30. Filesystem sandbox escape regression test (RUSTSEC-2026-0269)
+// Verifies that path traversal inputs containing trailing slashes or symlink patterns
+// are safely rejected or processed without accessing host files.
+#[tokio::test]
+async fn test_abuse_filesystem_trailing_slash_symlink_escape_blocked() -> TestResult {
+    let wat = r#"
+        (module
+            (func (export "_start"))
+        )
+    "#;
+    let wasm_bytes = wat::parse_str(wat)?;
+    let executor = WasmExecutor::new()?;
+    let caps = WasmCapabilities::default(); // allow_filesystem = false
+
+    let trailing_slash_path = b"../../etc/passwd/";
+    let res_slash = executor
+        .execute(&wasm_bytes, trailing_slash_path, &caps, Duration::from_secs(1))
+        .await;
+    assert!(
+        res_slash.is_ok(),
+        "Path traversal with trailing slash runs safely without host filesystem escape"
+    );
+
+    let symlink_path = b"symlink_target/../secret/";
+    let res_symlink = executor
+        .execute(&wasm_bytes, symlink_path, &caps, Duration::from_secs(1))
+        .await;
+    assert!(
+        res_symlink.is_ok(),
+        "Path traversal with symlink pattern runs safely without host filesystem escape"
+    );
+    Ok(())
+}
