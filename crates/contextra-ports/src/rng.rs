@@ -84,6 +84,7 @@ impl Rng for SeededRng {
         z ^ (z >> 31)
     }
 
+    #[allow(clippy::indexing_slicing)]
     fn fill_bytes(&self, mut dest: &mut [u8]) {
         while !dest.is_empty() {
             let val = self.next_u64();
