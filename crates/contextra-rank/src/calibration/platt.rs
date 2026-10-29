@@ -17,8 +17,11 @@ impl Default for PlattScaler {
 }
 
 impl PlattScaler {
-    /// Creates a new `PlattScaler` with specified parameters `a` and `b`.
+    /// Creates a new `PlattScaler` with specified parameters `a` and `b`. Falls back to identity if non-finite.
     pub fn new(a: f32, b: f32) -> Self {
+        if !a.is_finite() || !b.is_finite() {
+            return Self::identity();
+        }
         Self {
             a,
             b,
@@ -62,10 +65,13 @@ impl PlattScaler {
 
     /// Applies Platt Scaling `sigmoid(A * logit + B)`.
     pub fn transform(&self, logit: f32) -> f32 {
-        if logit.is_nan() {
+        if !logit.is_finite() {
             return 0.5;
         }
         let z = self.a * logit + self.b;
+        if !z.is_finite() {
+            return 0.5;
+        }
         1.0 / (1.0 + (-z).exp())
     }
 

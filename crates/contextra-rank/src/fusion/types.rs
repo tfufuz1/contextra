@@ -2,13 +2,24 @@ use ahash::AHashMap;
 use contextra_types::{ContextChunk, ContextraError, DocId, MemoryLink};
 use serde::{Deserialize, Serialize};
 
+fn map_is_empty<K, V, S>(m: &ahash::AHashMap<K, V, S>) -> bool {
+    m.is_empty()
+}
+
+// ADR-098 (Token-Schätzung für ContextChunk: f64 -> usize Konvertierung)
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 pub(super) fn estimate_tokens(text: &str) -> usize {
     if text.is_empty() {
         return 0;
     }
     let words = text.split_whitespace().count();
     let chars = text.chars().count();
-    ((words as f64 * 1.3).max(chars as f64 / 4.0)).ceil() as usize
+    let est = (words as f64 * 1.3).max(chars as f64 / 4.0).ceil();
+    if est.is_finite() && est >= 0.0 {
+        usize::try_from(est.clamp(0.0, usize::MAX as f64) as u64).unwrap_or(0)
+    } else {
+        0
+    }
 }
 
 impl TryFrom<SearchResult> for ContextChunk {
@@ -64,7 +75,7 @@ pub struct ProvenanceRecord {
     pub rerank_score: Option<f32>,
 
     /// Per-signal rank map.
-    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "map_is_empty")]
     pub signal_ranks: AHashMap<String, u32>,
 
     /// Source collection name.
@@ -76,7 +87,7 @@ pub struct ProvenanceRecord {
     pub index_type: Option<String>,
 
     /// Per-signal contribution details.
-    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    #[serde(default, skip_serializing_if = "map_is_empty")]
     pub signal_contributions: AHashMap<String, SignalContribution>,
 
     /// Resonance coherence bonus value.
@@ -89,7 +100,8 @@ impl ProvenanceRecord {
     pub fn synthesized_from(source_doc_ids: &[contextra_types::DocId]) -> Self {
         let mut signal_ranks = AHashMap::new();
         for (idx, id) in source_doc_ids.iter().enumerate() {
-            signal_ranks.insert(id.0.to_string(), (idx + 1) as u32);
+            let rank_u32 = u32::try_from(idx.saturating_add(1)).unwrap_or(u32::MAX);
+            signal_ranks.insert(id.0.to_string(), rank_u32);
         }
         ProvenanceRecord {
             index_type: Some("consolidated".to_string()),
@@ -131,6 +143,12 @@ pub struct SearchResult {
 pub type FusedScore = SearchResult;
 
 /// Query retrieval signal identifier.
+///
+/// # Abgrenzung
+/// Dieser Typ (`contextra_rank::fusion::Signal`) bezeichnet die spezifische Suchsignal-Art
+/// (z. B. `Vector`, `Text`, `Graph`) innerhalb von Suchberichten (`SearchReport`) der Fusion.
+/// Er unterscheidet sich von `contextra_types::Signal`, welches temporale bzw. System-Signale
+/// repräsentiert.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Signal {
     /// Dense vector similarity signal.

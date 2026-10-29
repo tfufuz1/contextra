@@ -66,5 +66,7 @@ fn test_platt_scaler_migration_snapshot() {
     for &p in &probs {
         assert!((0.0..=1.0).contains(&p));
     }
-    assert!(probs[0] < probs[1] && probs[1] < probs[2]);
+    if let (Some(&p0), Some(&p1), Some(&p2)) = (probs.first(), probs.get(1), probs.get(2)) {
+        assert!(p0 < p1 && p1 < p2);
+    }
 }

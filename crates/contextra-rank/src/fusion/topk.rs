@@ -7,6 +7,12 @@ pub(super) fn cmp_scores(a: f32, b: f32) -> std::cmp::Ordering {
 }
 
 /// Size-bounded min-heap for Top-K candidate selection during Reciprocal Rank Fusion.
+///
+/// # Abgrenzung
+/// Dieser Typ (`contextra_rank::fusion::BoundedTopK`) dient als größenbeschränkter Min-Heap
+/// zur Akkumulation der K besten Kandidaten während der Multi-Signal-Fusion (RRF / Score-Normalisierung).
+/// Er ist zu unterscheiden von `contextra_text::wand::BoundedTopK`, welcher speziell für den
+/// WAND-Algorithmus zur Trefferbeschränkung bei der Invertierten-Index-Suche eingesetzt wird.
 pub struct BoundedTopK<T> {
     heap: std::collections::BinaryHeap<T>,
     capacity: usize,
