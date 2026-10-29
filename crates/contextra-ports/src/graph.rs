@@ -114,6 +114,10 @@ pub enum GraphMutationError {
         found: usize,
     },
 
+    /// Specified hyperedge ID already exists.
+    #[error("Duplicate hyperedge ID: {0}")]
+    DuplicateHyperEdgeId(HyperEdgeId),
+
     /// Specified hyperedge ID was not found.
     #[error("Hyperedge not found: {0}")]
     HyperedgeNotFound(u64),
