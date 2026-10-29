@@ -27,18 +27,85 @@ impl std::fmt::Debug for ContextCompactor {
     }
 }
 
+fn build_consolidated_chunk_from_summary(
+    summary_text: String,
+    chunks: &[ContextChunk],
+    source_doc_ids: &[DocId],
+) -> ContextChunk {
+    let estimated_tokens = crate::context::ContextManager::estimate_tokens(&summary_text);
+
+    let mut combined_metadata = serde_json::Map::new();
+    combined_metadata.insert("llm_summarized".to_string(), serde_json::Value::Bool(true));
+    combined_metadata.insert(
+        "source_doc_count".to_string(),
+        serde_json::Value::Number(chunks.len().into()),
+    );
+
+    let prov = ProvenanceRecord::synthesized_from(source_doc_ids);
+    if let Ok(prov_val) = serde_json::to_value(&prov) {
+        combined_metadata.insert("provenance".to_string(), prov_val);
+    }
+
+    let synthesized_doc_id = {
+        let key = chunks
+            .iter()
+            .map(|c| c.doc_id.inner().to_string())
+            .collect::<Vec<_>>()
+            .join(":");
+        DocId::from_key(&format!("contextra:consolidated:{key}")).unwrap_or_else(|_| {
+            chunks
+                .first()
+                .map(|c| c.doc_id)
+                .unwrap_or_else(|| DocId::new(0))
+        })
+    };
+
+    let max_relevance = chunks.iter().fold(0.0f32, |max, c| max.max(c.relevance));
+
+    ContextChunk {
+        doc_id: synthesized_doc_id,
+        content: summary_text,
+        relevance: max_relevance,
+        token_count: estimated_tokens,
+        metadata: Some(serde_json::Value::Object(combined_metadata)),
+        contextual_prefix: None,
+        links: Vec::new(),
+    }
+}
+
 impl ContextCompactor {
-    /// Creates a new `ContextCompactor` with given `TokenBudget` and `CompactionStrategy`.
-    pub fn new(budget: TokenBudget, strategy: CompactionStrategy) -> Self {
-        // Default: SeededRng mit fester Konstante. Der Composition Root soll per with_rng einen Entropie-Seed setzen.
+    /// Creates a new `ContextCompactor` with given `TokenBudget`, `CompactionStrategy`, and `Arc<dyn Rng>`.
+    ///
+    /// # DOKUMENTATION / HINWEIS
+    /// Der übergebene RNG dient ausschließlich für nicht-kryptographische Aufgaben wie Backoff-Jitter,
+    /// Permutationen und Clustering. Er DARF NICHT für die Generierung von Schlüsseln, Salzen,
+    /// Tokens oder kryptographischem Material verwendet werden.
+    pub fn new_with_rng(
+        budget: TokenBudget,
+        strategy: CompactionStrategy,
+        rng: Arc<dyn Rng>,
+    ) -> Self {
         Self {
             budget,
             strategy,
-            rng: Arc::new(SeededRng::new(0x434F_4E54_5854_5241)),
+            rng,
         }
     }
 
+    /// Creates a new `ContextCompactor` with given `TokenBudget` and `CompactionStrategy`.
+    ///
+    /// # DOKUMENTATION / HINWEIS
+    /// Nutzt `SeededRng::from_entropy()` zur Vermeidung konstanter Seeds im Produktionscode.
+    /// Der übergebene oder genutzte RNG ist NICHT kryptographisch und darf nicht für Schlüssel oder Salze genutzt werden.
+    #[deprecated(note = "use ContextCompactor::new_with_rng to explicitly inject an Arc<dyn Rng>")]
+    pub fn new(budget: TokenBudget, strategy: CompactionStrategy) -> Self {
+        Self::new_with_rng(budget, strategy, Arc::new(SeededRng::from_entropy()))
+    }
+
     /// Setzt den Zufallszahlengenerator für Backoff-Jitter.
+    ///
+    /// # DOKUMENTATION / HINWEIS
+    /// Der übergebene RNG ist NICHT kryptographisch und darf nicht für Schlüssel oder Salze genutzt werden.
     pub fn with_rng(mut self, rng: Arc<dyn Rng>) -> Self {
         self.rng = rng;
         self
@@ -55,9 +122,13 @@ impl ContextCompactor {
         let mut retained = Vec::new();
         let mut status_tokens = Vec::new();
 
-        // Sortierung: Tool-Outputs ans Ende (werden zuerst kompaktiert)
         let mut sorted = chunks;
         sorted.sort_by(|a, b| {
+            let a_pinned = Self::is_pinned(a);
+            let b_pinned = Self::is_pinned(b);
+            if a_pinned != b_pinned {
+                return b_pinned.cmp(&a_pinned);
+            }
             let a_tool = Self::is_tool_output(a);
             let b_tool = Self::is_tool_output(b);
             match (a_tool, b_tool) {
@@ -77,7 +148,6 @@ impl ContextCompactor {
                 tokens_used += chunk_tokens;
                 retained.push(chunk);
             } else {
-                // Kompaktierung
                 match self.strategy {
                     CompactionStrategy::StatusToken => {
                         let summary = Self::generate_status_token(&chunk);
@@ -87,12 +157,8 @@ impl ContextCompactor {
                             replaced_doc_ids: vec![chunk.doc_id],
                         });
                     }
-                    CompactionStrategy::Truncate => {
-                        // Chunk wird verworfen
-                    }
+                    CompactionStrategy::Truncate => {}
                     CompactionStrategy::Summarize | CompactionStrategy::LlmSummarize { .. } => {
-                        // Synchronous fallback in compact(): Status-Token.
-                        // For full async LLM summarization, call consolidate_via_llm().
                         let summary = Self::generate_status_token(&chunk);
                         status_tokens.push(StatusToken {
                             summary,
@@ -113,7 +179,6 @@ impl ContextCompactor {
         }
     }
 
-    // AI-TAG[SMELL][MINOR][RESOLVED] Async LLM-Summarization for context compaction (ID: AGT-DB-004) (TS:2026-08-28T00:00:00Z)
     /// Consolidates multiple context chunks into a single summarized chunk using an external LLM via Ollama.
     ///
     /// Preserves strict provenance tracking in `source_doc_ids`. If the LLM call fails, the error is
@@ -134,16 +199,7 @@ impl ContextCompactor {
             });
         }
 
-        let mut source_doc_ids = Vec::with_capacity(chunks.len());
-        let mut prompt_content = String::new();
-
-        for chunk in chunks {
-            source_doc_ids.push(chunk.doc_id);
-            prompt_content.push_str(&format!(
-                "- Chunk [DocId: {}]: {}\n",
-                chunk.doc_id.0, chunk.content
-            ));
-        }
+        let source_doc_ids: Vec<DocId> = chunks.iter().map(|c| c.doc_id).collect();
 
         let segments: Vec<ContextSegment> = chunks
             .iter()
@@ -156,44 +212,8 @@ impl ContextCompactor {
             .collect();
 
         let summary_text = generator.generate_with_context(tenant, &segments).await?;
-
-        let estimated_tokens = crate::context::ContextManager::estimate_tokens(&summary_text);
-
-        // Combine metadata if present
-        let mut combined_metadata = serde_json::Map::new();
-        combined_metadata.insert("llm_summarized".to_string(), serde_json::Value::Bool(true));
-        combined_metadata.insert(
-            "source_doc_count".to_string(),
-            serde_json::Value::Number(chunks.len().into()),
-        );
-
-        let prov = ProvenanceRecord::synthesized_from(&source_doc_ids);
-        if let Ok(prov_val) = serde_json::to_value(&prov) {
-            combined_metadata.insert("provenance".to_string(), prov_val);
-        }
-
-        // Generate a distinct deterministic DocId from the combination of source doc_ids
-        let synthesized_doc_id = {
-            let key = chunks
-                .iter()
-                .map(|c| c.doc_id.inner().to_string())
-                .collect::<Vec<_>>()
-                .join(":");
-            DocId::from_key(&format!("contextra:consolidated:{key}")).unwrap_or(chunks[0].doc_id)
-        };
-
-        let max_relevance = chunks.iter().fold(0.0f32, |max, c| max.max(c.relevance));
-
-        let consolidated_chunk = ContextChunk {
-            doc_id: synthesized_doc_id,
-            content: summary_text,
-            relevance: max_relevance,
-            token_count: estimated_tokens,
-            metadata: Some(serde_json::Value::Object(combined_metadata)),
-            contextual_prefix: None,
-            links: Vec::new(),
-        };
-
+        let consolidated_chunk =
+            build_consolidated_chunk_from_summary(summary_text, chunks, &source_doc_ids);
         let tokens_used = consolidated_chunk.combined_token_count();
 
         Ok(CompactedContext {
@@ -202,6 +222,15 @@ impl ContextCompactor {
             tokens_used,
             source_doc_ids,
         })
+    }
+
+    fn is_pinned(chunk: &ContextChunk) -> bool {
+        chunk
+            .metadata
+            .as_ref()
+            .and_then(|m| m.get("pinned").or_else(|| m.get("is_pinned")))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
     }
 
     fn is_tool_output(chunk: &ContextChunk) -> bool {
@@ -222,18 +251,11 @@ impl ContextCompactor {
 
     /// Führt eine Konsolidierung durch und wiederholt bei OCC-Konflikten automatisch.
     ///
-    /// # Parameter
-    /// - `collection`: die Ziel-Collection
-    /// - `source_doc_ids`: DocIds der zu konsolidierenden Dokumente
-    /// - `target_doc_id`: Ziel-DocId für das konsolidierte Dokument
-    /// - `generator`: LLM-Provider für die Zusammenfassung
-    /// - `max_retries`: maximale Wiederholungsanzahl bei OCC-Konflikten (empfohlen: 3)
-    ///
-    /// # OCC-Retry-Protokoll
-    /// Bei einem Konflikt ruft refresh() die veränderten DocIds ab.
-    /// Falls nur ein Teil der Source-Dokumente geändert wurde, wird nur dieser Teil
-    /// neu zusammengefasst (delta re-summarization).
-    /// Exponentieller Backoff: 10ms → 20ms → 40ms (jitter: 0..=10 ms)
+    /// # DOKUMENTATION / HINWEIS
+    /// Der genutzte RNG ist NICHT kryptographisch und darf nicht für Schlüssel oder Salze genutzt werden.
+    #[deprecated(
+        note = "use consolidate_with_retry_with_rng directly with an explicit Rng instance"
+    )]
     pub async fn consolidate_with_retry<S, V, G>(
         collection: &Collection<S, V>,
         source_doc_ids: &[DocId],
@@ -246,19 +268,23 @@ impl ContextCompactor {
         V: VectorIndex,
         G: LlmTextGenerator + ?Sized,
     {
-        let default_rng = SeededRng::new(0x434F_4E54_5854_5241);
+        let entropy_rng = SeededRng::from_entropy();
         Self::consolidate_with_retry_with_rng(
             collection,
             source_doc_ids,
             target_doc_id,
             generator,
             max_retries,
-            &default_rng,
+            &entropy_rng,
         )
         .await
     }
 
     /// Führt eine Konsolidierung durch und wiederholt bei OCC-Konflikten automatisch mit einem konfigurierbaren RNG.
+    ///
+    /// # DOKUMENTATION / HINWEIS
+    /// Der übergebene RNG dient ausschließlich für Backoff-Jitter und ist NICHT kryptographisch.
+    /// Er DARF NICHT für Schlüssel, Salze oder Sicherheits-Tokens verwendet werden.
     pub async fn consolidate_with_retry_with_rng<S, V, G>(
         collection: &Collection<S, V>,
         source_doc_ids: &[DocId],
@@ -291,7 +317,6 @@ impl ContextCompactor {
                         changed_docs = ?changed,
                         "OCC-Konflikt bei Konsolidierung — retry"
                     );
-                    // Exponentieller Backoff mit Jitter
                     let base_ms = 10u64 * (1u64 << attempt.min(6));
                     let jitter_ms: u64 = rng.next_u64() % 11;
                     tokio::time::sleep(std::time::Duration::from_millis(base_ms + jitter_ms)).await;

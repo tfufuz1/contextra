@@ -23,6 +23,7 @@ pub struct SystemClock {
 
 impl SystemClock {
     /// Creates a new [`SystemClock`] using the current [`Instant`] as the monotonic baseline.
+    #[allow(clippy::disallowed_methods)]
     pub fn new() -> Self {
         Self {
             // DIRECT TIME CALL (1/3): Authorized baseline monotonic instant for SystemClock.
@@ -38,6 +39,7 @@ impl Default for SystemClock {
 }
 
 impl Clock for SystemClock {
+    #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
     fn now_unix_nanos(&self) -> u64 {
         // DIRECT TIME CALL (2/3): Authorized OS wall-clock access encapsulated within SystemClock adapter.
         SystemTime::now()
@@ -46,6 +48,7 @@ impl Clock for SystemClock {
             .unwrap_or(0)
     }
 
+    #[allow(clippy::disallowed_methods, clippy::cast_possible_truncation)]
     fn monotonic_nanos(&self) -> u64 {
         // DIRECT TIME CALL (3/3): Authorized OS monotonic clock access encapsulated within SystemClock adapter.
         Instant::now()

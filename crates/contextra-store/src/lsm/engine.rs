@@ -60,7 +60,9 @@ pub struct LsmStorage {
     pub(super) pressure_rx: tokio::sync::watch::Receiver<crate::system_pressure::SystemPressure>,
     pub(super) intent_locks: std::sync::Mutex<HashMap<Vec<u8>, TxId>>,
     pub(super) observer_registry: ObserverRegistry,
-    pub ssi_validator: Arc<contextra_mvcc::SequenceLogSsiValidator>,
+    pub(super) clock: parking_lot::RwLock<Arc<dyn contextra_ports::Clock>>,
+    pub ssi_validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+    pub(super) sequence_log_ssi_validator: Option<Arc<contextra_mvcc::SequenceLogSsiValidator>>,
     pub(super) metrics_sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
 }
 
@@ -118,21 +120,21 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-hooks"))]
+    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
     pub async fn simulate_wal_append_failure_for_test(&self) {
         #[cfg(feature = "fault-injection")]
         crate::wal::FAIL_APPEND_FOR_TX.store(u64::MAX, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-hooks"))]
+    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
     pub async fn simulate_wal_append_failure_for_tx_for_test(&self, _tx_id: u64) {
         #[cfg(feature = "fault-injection")]
         crate::wal::FAIL_APPEND_FOR_TX.store(_tx_id, std::sync::atomic::Ordering::SeqCst);
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-hooks"))]
+    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
     pub async fn restore_wal_file_handle_for_test(&self) {
         #[cfg(feature = "fault-injection")]
         crate::wal::FAIL_APPEND_FOR_TX.store(0, std::sync::atomic::Ordering::SeqCst);
@@ -185,9 +187,39 @@ impl LsmStorage {
         self
     }
 
-    /// Sets the injected clock port for deterministic observer latency evaluation (P28).
+    /// Returns the currently configured clock port.
+    pub fn clock(&self) -> Arc<dyn contextra_ports::Clock> {
+        self.clock.read().clone()
+    }
+
+    /// Sets the injected clock port for deterministic execution timing (P28).
     pub fn set_clock(&self, clock: Arc<dyn contextra_ports::Clock>) {
+        *self.clock.write() = Arc::clone(&clock);
         self.observer_registry.set_clock(clock);
+    }
+
+    /// Configures the clock port fluently on `self` and returns `self`.
+    pub fn with_clock(self, clock: Arc<dyn contextra_ports::Clock>) -> Self {
+        self.set_clock(clock);
+        self
+    }
+
+    /// Sets or replaces the [`SsiValidator`] port for transaction conflict detection.
+    pub fn set_ssi_validator(
+        &mut self,
+        validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+    ) {
+        self.ssi_validator = validator;
+        self.sequence_log_ssi_validator = None;
+    }
+
+    /// Configures the [`SsiValidator`] fluently on `self` and returns `self`.
+    pub fn with_ssi_validator(
+        mut self,
+        validator: Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+    ) -> Self {
+        self.set_ssi_validator(validator);
+        self
     }
 
     /// Performs a tracked read for transaction `tx_id`.
@@ -256,7 +288,8 @@ impl LsmStorage {
     }
 
     /// Returns the current `next_seq_no` value for testing verification.
-    #[cfg(any(test, feature = "test-hooks"))]
+    #[doc(hidden)]
+    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
     pub fn next_seq_no_for_test(&self) -> u64 {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
@@ -270,31 +303,31 @@ impl LsmStorage {
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-hooks"))]
+    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
     pub fn sstables_for_test(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
         Arc::clone(&self.sstables)
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-hooks"))]
+    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
     pub fn block_cache_for_test(&self) -> Arc<BlockCache> {
         Arc::clone(&self.block_cache)
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-hooks"))]
+    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
     pub fn budget_for_test(&self) -> Arc<ResourceTracker> {
         Arc::clone(&self.budget)
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-hooks"))]
+    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
     pub fn manifest_for_test(&self) -> Arc<crate::manifest::Manifest> {
         Arc::clone(&self.manifest)
     }
 
     #[doc(hidden)]
-    #[cfg(any(test, feature = "test-hooks"))]
+    #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
     pub async fn maybe_compact_for_test(&self) -> Result<bool> {
         self.compaction_engine
             .maybe_compact(&self.sstables, &self.config.path)

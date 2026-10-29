@@ -2,9 +2,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use contextra_mvcc::{ReadSet, SsiValidator};
 use contextra_ports::StorageEngine;
 use contextra_store::{tenant_codec::TenantScopedStorage, LsmConfig, LsmStorage};
-use contextra_types::{ContextraError, TenantId, TxId};
+use contextra_types::{ContextraError, Result, TenantId, TxId};
 use std::sync::Arc;
 use tempfile::TempDir;
 
@@ -104,5 +105,40 @@ async fn test_ssi_scan_prefix_tracked_via_tenant_scoped_storage() {
         matches!(res, Err(ContextraError::Conflict(_))),
         "Expected Conflict on TenantScopedStorage scan_prefix_tracked, got: {:?}",
         res
+    );
+}
+
+struct ForcedConflictValidator;
+
+impl SsiValidator for ForcedConflictValidator {
+    fn validate(&self, _tx_id: TxId, _read_set: &ReadSet) -> Result<()> {
+        Err(ContextraError::Conflict(
+            "Forced conflict from fake validator".into(),
+        ))
+    }
+}
+
+#[tokio::test]
+async fn test_ssi_validator_fake_forces_commit_conflict_failure() {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let fake_validator = Arc::new(ForcedConflictValidator);
+    let storage = LsmStorage::new(config)
+        .await
+        .expect("storage init")
+        .with_ssi_validator(fake_validator);
+
+    let tx = TxId::new(1);
+    let _ = storage.get_tracked(tx, b"key1").await.expect("get_tracked");
+    storage.put(tx, b"key1", b"val1").await.expect("put");
+
+    let commit_res = storage.commit(tx).await;
+    assert!(
+        matches!(commit_res, Err(ContextraError::Conflict(ref msg)) if msg.contains("Forced conflict")),
+        "Commit must fail with ContextraError::Conflict when fake SsiValidator rejects ReadSet: {:?}",
+        commit_res
     );
 }
