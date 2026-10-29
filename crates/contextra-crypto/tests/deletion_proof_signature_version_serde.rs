@@ -120,7 +120,7 @@ fn test_golden_json_v1_v2_v3_serde_roundtrip() {
 
     // Golden JSON V3
     let mut rng = rand::rngs::OsRng;
-    let keypair = DeletionProofKeyPair::generate(&mut rng);
+    let keypair = DeletionProofKeyPair::generate_with_rng(&mut rng);
     let proof_v3_orig = DeletionProof::create_v3(
         scope,
         vec![b"key_a".to_vec()],

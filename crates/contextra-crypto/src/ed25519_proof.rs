@@ -12,6 +12,7 @@
 
 use rand::RngCore;
 use thiserror::Error;
+use zeroize::ZeroizeOnDrop;
 
 pub use crate::deletion_proof::hash_deleted_keys_length_prefixed;
 
@@ -32,20 +33,38 @@ pub enum DeletionProofError {
 }
 
 /// Schlüsselpaar für Ed25519-Löschbeweise.
-#[derive(Debug)]
+///
+/// Signierschlüssel wird bei Drop automatisch zeroisiert (`ZeroizeOnDrop`).
+#[derive(Debug, ZeroizeOnDrop)]
 pub struct DeletionProofKeyPair {
     /// Privater Signierschlüssel.
     pub signing_key: ed25519_dalek::SigningKey,
     /// Öffentlicher Verifikationsschlüssel.
+    #[zeroize(skip)]
     pub verifying_key: ed25519_dalek::VerifyingKey,
 }
 
 impl DeletionProofKeyPair {
+    /// Generiert ein neues Ed25519-Schlüsselpaar unter Nutzung des System-RNGs (`OsRng`).
+    pub fn generate() -> Self {
+        let mut rng = rand::rngs::OsRng;
+        Self::generate_with_rng(&mut rng)
+    }
+
     /// Generiert ein neues Ed25519-Schlüsselpaar unter Nutzung eines injizierten Zufallsgenerators.
-    pub fn generate(rng: &mut impl RngCore) -> Self {
+    pub fn generate_with_rng(rng: &mut impl RngCore) -> Self {
         let mut secret_bytes = [0u8; 32];
         rng.fill_bytes(&mut secret_bytes);
         let signing_key = ed25519_dalek::SigningKey::from_bytes(&secret_bytes);
+        let verifying_key = signing_key.verifying_key();
+        Self {
+            signing_key,
+            verifying_key,
+        }
+    }
+
+    /// Erzeugt ein `DeletionProofKeyPair` aus einem bestehenden Signierschlüssel.
+    pub fn from_signing_key(signing_key: ed25519_dalek::SigningKey) -> Self {
         let verifying_key = signing_key.verifying_key();
         Self {
             signing_key,
@@ -108,8 +127,6 @@ pub fn verify_deletion_proof_v3(
 ///
 /// Referenz: Befund v17 Teil 10.1 & INVARIANTE INV-DELETION-1 (die physische Bereinigungsreihenfolge bleibt
 /// unverändert, die Versions-Validierung wird gehärtet).
-/// AI-TAG[TODO][RESOLVED] (TS: 2026-09-27T00:00:00Z) (SESSION: welle4-p17): In `deletion_proof.rs` das `pub signature_version: u8` Feld
-/// über TryFrom<u8> und `signature_version_typed()` konvertieren und in `verify()` absichern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignatureVersion {
     /// HMAC-SHA256 legacy scope-only signature (version 1)
@@ -143,7 +160,6 @@ impl TryFrom<u8> for SignatureVersion {
             1 => Ok(SignatureVersion::V1),
             2 => Ok(SignatureVersion::V2),
             3 => Ok(SignatureVersion::V3),
-            5 => Ok(SignatureVersion::V5),
             v => Err(DeletionProofError::UnsupportedVersion(v)),
         }
     }
@@ -158,7 +174,7 @@ mod tests {
     #[test]
     fn test_keypair_generation_and_bytes() {
         let mut rng = StdRng::seed_from_u64(42);
-        let keypair = DeletionProofKeyPair::generate(&mut rng);
+        let keypair = DeletionProofKeyPair::generate_with_rng(&mut rng);
         let vk_bytes = keypair.verifying_key_bytes();
 
         assert_eq!(vk_bytes, keypair.verifying_key.to_bytes());
@@ -166,12 +182,18 @@ mod tests {
             keypair.signing_key().verifying_key(),
             *keypair.verifying_key()
         );
+
+        let os_keypair = DeletionProofKeyPair::generate();
+        assert_eq!(
+            os_keypair.signing_key().verifying_key(),
+            *os_keypair.verifying_key()
+        );
     }
 
     #[test]
     fn test_v3_sign_and_verify_roundtrip() {
         let mut rng = StdRng::seed_from_u64(100);
-        let keypair = DeletionProofKeyPair::generate(&mut rng);
+        let keypair = DeletionProofKeyPair::generate_with_rng(&mut rng);
         let payload = b"canonical_deletion_proof_payload_v3";
 
         let signature = sign_deletion_proof_v3(&keypair, payload);
@@ -184,7 +206,7 @@ mod tests {
     #[test]
     fn test_v3_tampered_payload_fails_verification() {
         let mut rng = StdRng::seed_from_u64(101);
-        let keypair = DeletionProofKeyPair::generate(&mut rng);
+        let keypair = DeletionProofKeyPair::generate_with_rng(&mut rng);
         let payload = b"canonical_deletion_proof_payload_v3";
 
         let signature = sign_deletion_proof_v3(&keypair, payload);
