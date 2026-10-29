@@ -2,9 +2,16 @@
 // ZWECK: Handgeschriebener, regex-freier RuleBasedEntityRecognizer für PII (E-Mail, IBAN, Phone, CC, Steuer-ID, IP, PLZ, Kennzeichen, Gazetteer).
 // INVARIANTEN: Zero Panic, no unsafe code, strict fail-closed, byte-boundary safe character mapping on original text.
 
-use crate::egress_vault::EntityRecognizer;
+use crate::egress_vault::{EntityRecognizer, MAX_CLASSIFY_PAYLOAD_BYTES};
+use crate::error::EgressError;
 use std::collections::BTreeSet;
 use std::ops::Range;
+
+/// Default maximum input length in bytes for entity recognition (65,536 bytes).
+pub const DEFAULT_MAX_INPUT_LENGTH: usize = MAX_CLASSIFY_PAYLOAD_BYTES;
+
+/// Alias for `RuleBasedEntityRecognizer` to serve as standard rule-based pattern recognizer.
+pub type PatternRecognizer = RuleBasedEntityRecognizer;
 
 /// Extension point for custom term, name, or company recognition lists.
 #[derive(Debug, Clone, Default)]
@@ -36,23 +43,45 @@ impl Gazetteer {
 
 /// A rule-based entity recognizer without regex dependencies.
 ///
-/// Detects PII categories: EMAIL, IBAN, PHONE, CREDIT_CARD, STEUER_ID, IPV4, IPV6, PLZ, LICENSE_PLATE, GAZETTEER.
-#[derive(Debug, Clone, Default)]
+/// Detects PII categories: EMAIL, IBAN, BIC, PHONE, CREDIT_CARD, STEUER_ID, IPV4, IPV6, PLZ, PLZ_ORT, LICENSE_PLATE, GAZETTEER.
+#[derive(Debug, Clone)]
 pub struct RuleBasedEntityRecognizer {
     gazetteer: Gazetteer,
+    max_input_length: usize,
+}
+
+impl Default for RuleBasedEntityRecognizer {
+    fn default() -> Self {
+        Self {
+            gazetteer: Gazetteer::default(),
+            max_input_length: DEFAULT_MAX_INPUT_LENGTH,
+        }
+    }
 }
 
 impl RuleBasedEntityRecognizer {
-    /// Creates a new `RuleBasedEntityRecognizer` with no gazetteer terms.
+    /// Creates a new `RuleBasedEntityRecognizer` with default max input length limit and no gazetteer terms.
     pub fn new() -> Self {
-        Self {
-            gazetteer: Gazetteer::new(),
-        }
+        Self::default()
     }
 
     /// Creates a new `RuleBasedEntityRecognizer` with the specified gazetteer.
     pub fn with_gazetteer(gazetteer: Gazetteer) -> Self {
-        Self { gazetteer }
+        Self {
+            gazetteer,
+            max_input_length: DEFAULT_MAX_INPUT_LENGTH,
+        }
+    }
+
+    /// Configures maximum input length limit in bytes for input size bounding.
+    pub fn with_max_input_length(mut self, limit: usize) -> Self {
+        self.max_input_length = limit;
+        self
+    }
+
+    /// Returns the maximum input length limit in bytes.
+    pub fn max_input_length(&self) -> usize {
+        self.max_input_length
     }
 
     /// Builder method to add a gazetteer term.
@@ -60,11 +89,37 @@ impl RuleBasedEntityRecognizer {
         self.gazetteer.add_term(term);
         self
     }
+
+    /// Recognizes entities in `text` and returns byte ranges and category labels.
+    pub fn recognize(&self, text: &str) -> Vec<(Range<usize>, String)> {
+        EntityRecognizer::recognize(self, text)
+    }
+
+    /// Recognizes entities in `text` returning an explicit `EgressError::InvalidParams` if `text` exceeds `max_input_length`.
+    pub fn recognize_bounded(&self, text: &str) -> Result<Vec<(Range<usize>, String)>, EgressError> {
+        if text.len() > self.max_input_length {
+            return Err(EgressError::invalid_params(format!(
+                "Payload size exceeds limit: {} > {}",
+                text.len(),
+                self.max_input_length
+            )));
+        }
+        Ok(self.recognize(text))
+    }
 }
 
 impl EntityRecognizer for RuleBasedEntityRecognizer {
     fn recognize(&self, text: &str) -> Vec<(Range<usize>, String)> {
         if text.is_empty() {
+            return Vec::new();
+        }
+
+        if text.len() > self.max_input_length {
+            tracing::warn!(
+                length = text.len(),
+                limit = self.max_input_length,
+                "Input text length exceeds max_input_length limit, skipping entity recognition"
+            );
             return Vec::new();
         }
 
@@ -76,6 +131,7 @@ impl EntityRecognizer for RuleBasedEntityRecognizer {
         // Step 2: Run detectors on normalized view and map spans back to raw byte ranges
         detect_emails(&norm, &mut results);
         detect_ibans(&norm, &mut results);
+        detect_bics(&norm, &mut results);
         detect_credit_cards(&norm, &mut results);
         detect_steuer_ids(&norm, &mut results);
         detect_phone_numbers(&norm, &mut results);
@@ -748,7 +804,196 @@ fn detect_ip_addresses(norm: &Normalizer, results: &mut Vec<(Range<usize>, Strin
     }
 }
 
-/// Detects German PLZ (5-digit) and German license plates (e.g. B-MW 1234).
+/// Detects BIC / SWIFT codes (ISO 9362: 8 or 11 alphanumeric characters).
+fn detect_bics(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
+    let len = norm.len();
+    let mut i = 0;
+
+    while i < len {
+        let prev_ok = i == 0
+            || match norm.get_char(i.saturating_sub(1)) {
+                Some(c) => !c.is_ascii_alphanumeric(),
+                None => true,
+            };
+
+        if prev_ok {
+            // Check first 6 chars are uppercase ASCII letters
+            let mut all_letters = true;
+            for k in 0..6 {
+                match norm.get_char(i + k) {
+                    Some(c) if c.is_ascii_uppercase() => {}
+                    _ => {
+                        all_letters = false;
+                        break;
+                    }
+                }
+            }
+
+            if all_letters {
+                // Check chars 6..8 are uppercase ASCII alphanumeric
+                let mut loc_ok = true;
+                for k in 6..8 {
+                    match norm.get_char(i + k) {
+                        Some(c) if c.is_ascii_uppercase() || c.is_ascii_digit() => {}
+                        _ => {
+                            loc_ok = false;
+                            break;
+                        }
+                    }
+                }
+
+                if loc_ok {
+                    // Check if char 8..11 are branch code (3 alphanumeric)
+                    let mut branch_len = 0;
+                    for k in 8..11 {
+                        match norm.get_char(i + k) {
+                            Some(c) if c.is_ascii_uppercase() || c.is_ascii_digit() => {
+                                branch_len += 1;
+                            }
+                            _ => break,
+                        }
+                    }
+
+                    let bic_char_len = if branch_len == 3 { 11 } else { 8 };
+                    let next_ok = match norm.get_char(i + bic_char_len) {
+                        Some(c) => !c.is_ascii_alphanumeric(),
+                        None => true,
+                    };
+
+                    if next_ok {
+                        if let Some(byte_range) = norm.char_span_to_byte_range(i, i + bic_char_len) {
+                            results.push((byte_range, "BIC".to_string()));
+                            i += bic_char_len;
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        i += 1;
+    }
+}
+
+fn is_german_city_start_char(c: char) -> bool {
+    c.is_ascii_uppercase() || matches!(c, 'Ä' | 'Ö' | 'Ü')
+}
+
+/// Scans a bounded German city name (1 to 3 words) following a 5-digit PLZ without swallowing surrounding text.
+fn scan_city_name_after_plz(norm: &Normalizer, start_char_idx: usize) -> Option<usize> {
+    let len = norm.len();
+    let mut curr = start_char_idx;
+
+    // 1. Skip 1 or 2 spaces/tabs
+    let mut space_count = 0;
+    while curr < len && matches!(norm.get_char(curr), Some(' ' | '\t')) {
+        space_count += 1;
+        curr += 1;
+    }
+    if space_count == 0 || space_count > 2 || curr >= len {
+        return None;
+    }
+
+    // 2. First city word must start with an uppercase letter or German umlaut
+    let first_char = norm.get_char(curr)?;
+    if !is_german_city_start_char(first_char) {
+        return None;
+    }
+
+    // Read first city word
+    let word1_start = curr;
+    while curr < len {
+        if let Some(c) = norm.get_char(curr) {
+            if c.is_alphabetic() || c == '-' {
+                curr += 1;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+    let word1_len = curr - word1_start;
+    if word1_len == 0 {
+        return None;
+    }
+
+    let mut city_end = curr;
+
+    // 3. Check for optional 2nd word
+    if curr < len && norm.get_char(curr) == Some(' ') {
+        let next_idx = curr + 1;
+        if next_idx < len {
+            let mut w2_curr = next_idx;
+            let mut w2_chars = Vec::new();
+            while w2_curr < len {
+                if let Some(c) = norm.get_char(w2_curr) {
+                    if c.is_alphabetic() || c == '-' {
+                        w2_chars.push(c);
+                        w2_curr += 1;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            if !w2_chars.is_empty() {
+                let w2_str: String = w2_chars.iter().collect();
+                let is_capitalized = w2_chars.first().is_some_and(|&c| is_german_city_start_char(c));
+                let is_connector = matches!(
+                    w2_str.to_lowercase().as_str(),
+                    "am" | "an" | "der" | "dem" | "im" | "in"
+                );
+
+                if is_capitalized || is_connector {
+                    city_end = w2_curr;
+                    curr = w2_curr;
+
+                    // 4. Check for optional 3rd word
+                    if curr < len && norm.get_char(curr) == Some(' ') {
+                        let w3_start = curr + 1;
+                        let mut w3_curr = w3_start;
+                        let mut w3_chars = Vec::new();
+                        while w3_curr < len {
+                            if let Some(c) = norm.get_char(w3_curr) {
+                                if c.is_alphabetic() || c == '-' {
+                                    w3_chars.push(c);
+                                    w3_curr += 1;
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+
+                        if !w3_chars.is_empty() {
+                            let is_w3_cap = w3_chars.first().is_some_and(|&c| is_german_city_start_char(c));
+                            if is_w3_cap {
+                                city_end = w3_curr;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let next_ok = match norm.get_char(city_end) {
+        Some(c) => !c.is_alphanumeric(),
+        None => true,
+    };
+
+    if next_ok && city_end > start_char_idx {
+        Some(city_end)
+    } else {
+        None
+    }
+}
+
+/// Detects German PLZ (5-digit), German PLZ + Ort (e.g. 10115 Berlin), and German license plates (e.g. B-MW 1234).
 fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<(Range<usize>, String)>) {
     let len = norm.len();
     let mut i = 0;
@@ -770,6 +1015,15 @@ fn detect_plz_and_license_plates(norm: &Normalizer, results: &mut Vec<(Range<usi
                 }
 
                 if scan_idx - i == 5 {
+                    // Check for optional city name (Ort) following PLZ
+                    if let Some(city_end_idx) = scan_city_name_after_plz(norm, scan_idx) {
+                        if let Some(byte_range) = norm.char_span_to_byte_range(i, city_end_idx) {
+                            results.push((byte_range, "PLZ_ORT".to_string()));
+                            i = city_end_idx;
+                            continue;
+                        }
+                    }
+
                     let next_ok = match norm.get_char(scan_idx) {
                         Some(c) => !c.is_ascii_alphanumeric(),
                         None => true,

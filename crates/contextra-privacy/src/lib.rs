@@ -34,15 +34,19 @@ pub use egress_guard::{
     EgressGuard, TextSearchEngine, TextSearchResult, DEFAULT_EGRESS_GUARD_MIN_BYTES,
     DEFAULT_EGRESS_GUARD_THRESHOLD, DEFAULT_EGRESS_GUARD_TIMEOUT,
 };
+#[allow(deprecated)]
+pub use egress_vault::NoOpRecognizer;
 pub use egress_vault::{
     BlockReason, BoxFuture, CompiledPattern, EgressClassification, EgressClassifier, EgressVault,
-    EgressVaultError, EntityRecognizer, NoOpRecognizer, PolicyCategory, SurrogateVault,
+    EgressVaultError, EntityRecognizer, PolicyCategory, SurrogateVault,
     MAX_CLASSIFY_PAYLOAD_BYTES,
 };
-pub use entity_recognizer::{Gazetteer, RuleBasedEntityRecognizer};
+pub use entity_recognizer::{
+    Gazetteer, PatternRecognizer, RuleBasedEntityRecognizer, DEFAULT_MAX_INPUT_LENGTH,
+};
 pub use error::EgressError;
 pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 pub use processing_registry::{
-    generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistryExport,
-    ProcessorRole,
+    generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistry,
+    ProcessingRegistryExport, ProcessorRole,
 };

@@ -22,6 +22,7 @@ fn make_sample_record(tenant_u64: u64, name: &str, purpose: &str) -> ProcessingA
         activity_name: name.to_string(),
         controller_or_processor_role: ProcessorRole::Controller,
         purpose: purpose.to_string(),
+        legal_basis: "Art. 6 Abs. 1 lit. f DSGVO".to_string(),
         data_categories: vec!["E-Mail".to_string(), "Kundennummer".to_string()],
         data_subject_categories: vec!["Bestandskunden".to_string()],
         recipients: vec!["Rechenzentrum GmbH".to_string()],
@@ -32,6 +33,8 @@ fn make_sample_record(tenant_u64: u64, name: &str, purpose: &str) -> ProcessingA
             "TLS 1.3".to_string(),
         ],
         tenant_id: TenantId::try_new(tenant_u64).unwrap_or(TenantId::SYSTEM),
+        version: 1,
+        created_at_unix_secs: 1_700_000_000,
     }
 }
 
@@ -73,6 +76,7 @@ fn test_03_registry_golden_json_format() {
         activity_name: "Auskunfts-Dienst".to_string(),
         controller_or_processor_role: ProcessorRole::Processor,
         purpose: "Art. 15 DSGVO Bearbeitung".to_string(),
+        legal_basis: "Art. 6 Abs. 1 lit. c DSGVO".to_string(),
         data_categories: vec!["Stammdaten".to_string()],
         data_subject_categories: vec!["Betroffene".to_string()],
         recipients: vec!["Datenschutzbeauftragter".to_string()],
@@ -80,6 +84,8 @@ fn test_03_registry_golden_json_format() {
         retention_period: "3 Jahre".to_string(),
         technical_and_organizational_measures: vec!["AES-256".to_string()],
         tenant_id: TenantId::try_new(42).unwrap(),
+        version: 1,
+        created_at_unix_secs: 1_700_000_000,
     };
     let export = generate_registry(&[rec]);
 

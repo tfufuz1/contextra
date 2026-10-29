@@ -132,3 +132,27 @@ async fn test_audit_trace_empty_and_max_boundary_no_panic() -> Result<(), Box<dy
     assert_ne!(trace_over, [0u8; 32]);
     Ok(())
 }
+
+#[tokio::test]
+async fn test_audit_trace_contains_zero_raw_pii_or_plaintext() -> Result<(), Box<dyn std::error::Error>> {
+    let raw_email = "super_secret_user@example.com";
+    let raw_iban = "DE89370400440532013000";
+    let raw_steuer_id = "86095742116";
+
+    let sensitive_payload = format!("Nutzer {raw_email} Konto {raw_iban} Steuer-ID {raw_steuer_id}");
+
+    let trace_bytes = compute_audit_trace(&sensitive_payload, "R-001", 1_700_000_000);
+    assert_eq!(trace_bytes.len(), 32);
+
+    let lossy_trace = String::from_utf8_lossy(&trace_bytes);
+    let hex_trace: String = trace_bytes.iter().map(|b| format!("{b:02x}")).collect();
+
+    assert!(!lossy_trace.contains(raw_email));
+    assert!(!lossy_trace.contains(raw_iban));
+    assert!(!lossy_trace.contains(raw_steuer_id));
+    assert!(!hex_trace.contains(raw_email));
+    assert!(!hex_trace.contains(raw_iban));
+    assert!(!hex_trace.contains(raw_steuer_id));
+
+    Ok(())
+}
