@@ -23,7 +23,8 @@ mod onnx;
 mod tests;
 
 pub use config::{
-    OnnxConfig, OnnxRerankerBuilder, PlattScaledSigmoid, RerankConfig, RerankResult, MAX_CANDIDATES,
+    OnnxConfig, OnnxRerankerBuilder, PlattScaledSigmoid, RerankConfig, RerankResult,
+    MAX_CANDIDATES,
 };
 pub use cross_encoder::CrossEncoderReranker;
 

@@ -5,7 +5,8 @@
 #![allow(clippy::unwrap_used, clippy::panic)]
 
 use super::config::{
-    OnnxConfig, OnnxRerankerBuilder, PlattScaledSigmoid, RerankConfig, RerankResult, MAX_CANDIDATES,
+    OnnxConfig, OnnxRerankerBuilder, PlattScaledSigmoid, RerankConfig, RerankResult,
+    MAX_CANDIDATES,
 };
 use super::cross_encoder::CrossEncoderReranker;
 #[cfg(feature = "onnx")]
@@ -536,8 +537,7 @@ fn test_onnx_config_and_builder_validations() -> Result<(), Box<dyn std::error::
     assert!(invalid_len.build().is_err());
 
     // Invalid threads = 0
-    let invalid_threads =
-        OnnxRerankerBuilder::new(&model_path, &tokenizer_path).intra_op_threads(0);
+    let invalid_threads = OnnxRerankerBuilder::new(&model_path, &tokenizer_path).intra_op_threads(0);
     assert!(invalid_threads.build().is_err());
 
     Ok(())

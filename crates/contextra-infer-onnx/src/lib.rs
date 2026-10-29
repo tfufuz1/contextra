@@ -211,11 +211,7 @@ async fn download_onnx_file_secured(
     })?;
 
     let host = url_parsed.host_str().unwrap_or("");
-    if !options
-        .allowed_hosts
-        .iter()
-        .any(|h| h.eq_ignore_ascii_case(host))
-    {
+    if !options.allowed_hosts.iter().any(|h| h.eq_ignore_ascii_case(host)) {
         return Err(ContextraError::InvalidInput(format!(
             "Download von Host '{host}' verweigert: Nicht in der Allowlist {:?}",
             options.allowed_hosts
@@ -266,8 +262,7 @@ async fn download_onnx_file_secured(
     if bytes.len() > options.max_file_size_bytes {
         return Err(ContextraError::InvalidInput(format!(
             "Empfangene Datei {file_name} überschreitet Größenlimit ({} > max {} bytes)",
-            bytes.len(),
-            options.max_file_size_bytes
+            bytes.len(), options.max_file_size_bytes
         )));
     }
 
@@ -348,6 +343,7 @@ pub async fn ensure_onnx_model_download(
             .to_string(),
     })
 }
+
 
 /// Conservative default. Override via `TextEmbedderConfig::max_batch_size`.
 /// At 1536D × 512 × f32 = ~3 MB input tensor; safe within 128 MB memory budgets.
@@ -1014,14 +1010,9 @@ mod tests {
             allow_download: true,
             ..Default::default()
         };
-        let res =
-            ensure_onnx_model_download_with_options("nomic-embed-text", Some(&cache_dir), opts)
-                .await;
+        let res = ensure_onnx_model_download_with_options("nomic-embed-text", Some(&cache_dir), opts).await;
         assert!(res.is_err());
-        assert!(res
-            .unwrap_err()
-            .to_string()
-            .contains("missing expected_model_sha256"));
+        assert!(res.unwrap_err().to_string().contains("missing expected_model_sha256"));
 
         // 2. Disallowed host => fails
         let opts_host = ModelDownloadOptions {
@@ -1030,17 +1021,9 @@ mod tests {
             expected_model_sha256: Some("1234".to_string()),
             ..Default::default()
         };
-        let res_host = ensure_onnx_model_download_with_options(
-            "nomic-embed-text",
-            Some(&cache_dir),
-            opts_host,
-        )
-        .await;
+        let res_host = ensure_onnx_model_download_with_options("nomic-embed-text", Some(&cache_dir), opts_host).await;
         assert!(res_host.is_err());
-        assert!(res_host
-            .unwrap_err()
-            .to_string()
-            .contains("Nicht in der Allowlist"));
+        assert!(res_host.unwrap_err().to_string().contains("Nicht in der Allowlist"));
     }
 
     #[tokio::test]

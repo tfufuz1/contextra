@@ -313,14 +313,12 @@ pub fn create_embedding_provider(
         #[cfg(feature = "onnx")]
         "onnx" => {
             let embedder = if let Some(path) = onnx_model_path {
-                contextra_infer_onnx::OnnxEmbedder::from_path(path).map_err(|e| {
-                    ContextraError::Internal(format!("Failed to load ONNX model: {e}"))
-                })?
+                contextra_infer_onnx::OnnxEmbedder::from_path(path)
+                    .map_err(|e| ContextraError::Internal(format!("Failed to load ONNX model: {e}")))?
             } else {
                 let cache_dir = contextra_infer_onnx::default_model_cache_dir("nomic-embed-text");
-                contextra_infer_onnx::OnnxEmbedder::load(&cache_dir).map_err(|e| {
-                    ContextraError::Internal(format!("Failed to load ONNX model from cache: {e}"))
-                })?
+                contextra_infer_onnx::OnnxEmbedder::load(&cache_dir)
+                    .map_err(|e| ContextraError::Internal(format!("Failed to load ONNX model from cache: {e}")))?
             };
             Ok(Arc::new(embedder))
         }
@@ -554,7 +552,11 @@ impl MockEmbedder {
 #[cfg(any(test, feature = "test-utils"))]
 impl std::fmt::Display for MockEmbedder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MockEmbedder(dim={}, TEST_ONLY=true)", self.dimension)
+        write!(
+            f,
+            "MockEmbedder(dim={}, TEST_ONLY=true)",
+            self.dimension
+        )
     }
 }
 
@@ -677,7 +679,12 @@ mod tests {
 
     #[test]
     fn test_create_llm_generator_no_provider_error() {
-        let res = create_llm_text_generator(None, "http://localhost:11434", "llama3.2:3b", None);
+        let res = create_llm_text_generator(
+            None,
+            "http://localhost:11434",
+            "llama3.2:3b",
+            None,
+        );
         assert!(res.is_err());
         let err = res.err().unwrap();
         assert!(matches!(err, ContextraError::InvalidInput(_)));
@@ -762,8 +769,7 @@ mod tests {
         let res = verify_embedding_provider(&mock, Some(1536));
         assert!(res.is_err());
         let err_msg = res.err().unwrap().to_string();
-        assert!(err_msg
-            .contains("Dimension 768 stimmt nicht mit erwarteter Indexdimension 1536 überein"));
+        assert!(err_msg.contains("Dimension 768 stimmt nicht mit erwarteter Indexdimension 1536 überein"));
     }
 
     #[test]
@@ -852,7 +858,10 @@ mod tests {
         );
         assert!(res.is_err());
         let err = res.err().unwrap();
-        assert!(matches!(err, ContextraError::CapabilityUnsupported { .. }));
+        assert!(matches!(
+            err,
+            ContextraError::CapabilityUnsupported { .. }
+        ));
         let msg = err.to_string();
         assert!(msg.contains("Provider 'candle' ist nicht einkompiliert"));
     }
@@ -883,7 +892,10 @@ mod tests {
         );
         assert!(res.is_err());
         let err = res.err().unwrap();
-        assert!(matches!(err, ContextraError::CapabilityUnsupported { .. }));
+        assert!(matches!(
+            err,
+            ContextraError::CapabilityUnsupported { .. }
+        ));
         let msg = err.to_string();
         assert!(msg.contains("Provider 'ollama' ist nicht einkompiliert"));
     }
@@ -900,7 +912,10 @@ mod tests {
         );
         assert!(res.is_err());
         let err = res.err().unwrap();
-        assert!(matches!(err, ContextraError::CapabilityUnsupported { .. }));
+        assert!(matches!(
+            err,
+            ContextraError::CapabilityUnsupported { .. }
+        ));
         let msg = err.to_string();
         assert!(msg.contains("Provider 'onnx' ist nicht einkompiliert"));
     }
