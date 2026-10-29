@@ -65,7 +65,10 @@ async fn test_diskann_docid128_tombstones_handling() -> Result<()> {
     let unknown_id = DocId::from(9999_u64);
 
     let delete_unknown_res = index.delete(TxId(3), unknown_id).await;
-    assert!(matches!(delete_unknown_res, Err(ContextraError::NotFound(_))));
+    assert!(matches!(
+        delete_unknown_res,
+        Err(ContextraError::NotFound(_))
+    ));
 
     // Tombstone persistence after delta persist & reload
     index.persist_delta().await?;
