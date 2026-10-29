@@ -136,12 +136,9 @@ fn test_batch_commit_single_rcu_publish_and_atomic_rollback() {
     let collision_res =
         graph.commit_super_edge_batch(&[HyperEdgeId::new(4)], vec![colliding_edge], TxId::new(101));
 
-    assert_eq!(
-        collision_res,
-        Err(GraphMutationError::DuplicateHyperEdgeId(HyperEdgeId::new(
-            10
-        ))),
-        "Must return DuplicateHyperEdgeId error"
+    assert!(
+        matches!(collision_res, Err(GraphMutationError::Internal(ref msg)) if msg.contains("Duplicate hyperedge ID")),
+        "Must return Duplicate hyperedge ID error"
     );
 
     // Verify H4 was NOT tombstoned (all-or-nothing semantics: no mutations applied)

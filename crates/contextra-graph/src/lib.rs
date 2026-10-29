@@ -62,10 +62,11 @@ pub use apprh::{
     ApprhShadowComparison, DefaultApprhFlipGate,
 };
 pub use arc_slice::ArcSlice;
+#[allow(deprecated)]
 pub use cascade::{
     cascade_invalidate_edges_for_superseded_doc, cascade_invalidate_hyperedges_for_superseded_doc,
-    CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket, DeletionProof,
-    GraphGarbageCollection, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
+    CascadeDeletionRecord, CascadeInvalidationReport, CascadeReport, CascadeStatus, CascadeTicket,
+    DeletionProof, GraphGarbageCollection, HyperedgeCascadeReport, MAX_HYPEREDGE_CASCADE_FANOUT,
 };
 pub use community::{
     detect_communities, CommunityAssignment, CommunityDetectionConfig, StarExpansionIterator,

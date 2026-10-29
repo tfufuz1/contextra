@@ -51,3 +51,45 @@ impl CsrGraph {
         tl_hfd_local(self, seeds, params)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::csr::CsrGraph;
+    use contextra_types::Entity;
+
+    #[tokio::test]
+    async fn test_thresholded_local_hfd_diagnostic_path() {
+        let graph = std::sync::Arc::new(CsrGraph::new());
+
+        let e1 = EntityId::new(10);
+        let e2 = EntityId::new(20);
+
+        graph
+            .insert_entity_direct(Entity::new(e1, "E1", "Type"))
+            .unwrap();
+        graph
+            .insert_entity_direct(Entity::new(e2, "E2", "Type"))
+            .unwrap();
+
+        let he = crate::hyperedge::HyperEdge::new(
+            crate::hyperedge::HyperEdgeId::new(1),
+            crate::csr::EdgeType::Default,
+            vec![
+                crate::hyperedge::RoleBinding::new(crate::hyperedge::RoleId::new(1), e1),
+                crate::hyperedge::RoleBinding::new(crate::hyperedge::RoleId::new(2), e2),
+            ],
+            1.0,
+        );
+        graph.insert_hyperedge_direct(he);
+
+        let params = TlHfdParams::default();
+        let res = graph.thresholded_local_hfd(&[e1], &params);
+        assert!(
+            res.is_ok(),
+            "thresholded_local_hfd diagnostic call should succeed"
+        );
+        let scores = res.unwrap();
+        assert!(scores.contains_key(&e1));
+    }
+}

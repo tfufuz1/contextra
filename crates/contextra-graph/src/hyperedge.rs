@@ -32,87 +32,8 @@ pub fn star_weight(weight: f32, cardinality: usize) -> f32 {
     }
 }
 
-/// Eindeutiger Identifikator für eine Hyperkante.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
-)]
-#[repr(transparent)]
-pub struct HyperEdgeId(pub u64);
-
-impl HyperEdgeId {
-    /// Erstellt eine neue `HyperEdgeId`.
-    #[inline]
-    pub const fn new(id: u64) -> Self {
-        Self(id)
-    }
-
-    /// Gibt den zugrundeliegenden `u64`-Wert zurück.
-    #[inline]
-    pub const fn inner(self) -> u64 {
-        self.0
-    }
-}
-
-impl From<u64> for HyperEdgeId {
-    fn from(id: u64) -> Self {
-        Self(id)
-    }
-}
-
-impl std::fmt::Display for HyperEdgeId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "HyperEdgeId({})", self.0)
-    }
-}
-
-/// Identifikator für die Rolle eines Teilnehmers in einer Hyperkante.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
-)]
-#[repr(transparent)]
-pub struct RoleId(pub u32);
-
-impl RoleId {
-    /// Erstellt eine neue `RoleId`.
-    #[inline]
-    pub const fn new(id: u32) -> Self {
-        Self(id)
-    }
-
-    /// Gibt den zugrundeliegenden `u32`-Wert zurück.
-    #[inline]
-    pub const fn inner(self) -> u32 {
-        self.0
-    }
-}
-
-impl From<u32> for RoleId {
-    fn from(id: u32) -> Self {
-        Self(id)
-    }
-}
-
-impl std::fmt::Display for RoleId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RoleId({})", self.0)
-    }
-}
-
-/// Bindung einer Entity an eine spezifische Rolle innerhalb einer Hyperkante.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct RoleBinding {
-    /// Die Rolle der Entity in der Hyperkante.
-    pub role: RoleId,
-    /// Die gebundene Entity.
-    pub entity: EntityId,
-}
-
-impl RoleBinding {
-    /// Erstellt eine neue `RoleBinding`.
-    pub fn new(role: RoleId, entity: EntityId) -> Self {
-        Self { role, entity }
-    }
-}
+// Re-export core hyperedge identity and binding types from single source of truth in `contextra_ports`.
+pub use contextra_ports::graph::{HyperEdgeId, RoleBinding, RoleId};
 
 /// Eine n-äre Hyperkante zur Verbindung von 2 oder mehr Entitäten mit spezifischen Rollen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -358,6 +279,12 @@ pub fn sort_dedup_entities(entities: &[EntityId]) -> Vec<EntityId> {
 }
 
 /// Guard zur Erzwingung kanonischer Lock-Reihenfolge über mehrere Entitäten (H2 / §5.1.2).
+///
+/// # Abgrenzung zu `contextra-cognition`
+/// Dieser Guard im CSR-Graph-Subsystem dient ausschließlich der lock-freien / deadlock-freien
+/// Akquisition von Entitätsmengen bei der Hyperkanten-Konsolidierung (H2 / §5.1.2).
+/// Er unterscheidet sich von `ConsolidationNodesGuard` in `contextra-cognition`, welcher
+/// den kognitiven Sleep-Cycle und Multi-Knoten-Re-Consolidations auf Transaktionsebene steuert.
 ///
 /// Stellt sicher, dass Entitäts-IDs vor dem Erwerb mehrerer Schlösser deterministisch
 /// sortiert und dedupliziert werden (`sort_dedup_entities`), um Deadlocks (Lock Order Inversions)

@@ -79,13 +79,17 @@ pub enum CascadeStatus {
     Failed,
 }
 
-/// Proof of edge / hyperedge deletion during cascade invalidation (§6.8).
+/// Record of edge / hyperedge deletion during cascade invalidation (§6.8).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct DeletionProof {
+pub struct CascadeDeletionRecord {
     pub doc_id: DocId,
     pub tombstoned_count: usize,
     pub wal_seq: u64,
 }
+
+/// Deprecated alias for [`CascadeDeletionRecord`] to maintain backward compatibility.
+#[deprecated(note = "Use CascadeDeletionRecord instead")]
+pub type DeletionProof = CascadeDeletionRecord;
 
 /// Ticket tracking persistent cascade invalidation status (§6.8).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -93,7 +97,7 @@ pub struct CascadeTicket {
     pub id: u64,
     pub doc_id: DocId,
     pub status: CascadeStatus,
-    pub proof: Option<DeletionProof>,
+    pub proof: Option<CascadeDeletionRecord>,
 }
 
 /// Garbage collection trait for sweeping orphaned hyperedge references (Anhang B §B.5.1.7).
