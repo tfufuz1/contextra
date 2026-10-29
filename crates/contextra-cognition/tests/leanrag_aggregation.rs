@@ -1,5 +1,17 @@
 //! Integrationstests für LeanRAG Aggregation Phase (Consolidation Stage 3).
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic,
+    clippy::unnecessary_cast,
+    clippy::disallowed_methods,
+    clippy::approx_constant,
+    clippy::unreachable
+)]
+
 use contextra_cognition::aggregation_phase::{
     check_compaction_budget, run_aggregation_pass, AggregationConfig, AggregationEdge,
     AggregationNode, SuperEdgeDraft, SuperEdgeSink,

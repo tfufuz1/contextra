@@ -21,8 +21,8 @@ use contextra_mvcc::SsiValidator;
 use contextra_testkit::ManualClock;
 use contextra_types::{ContextraError, DocId, TxId, TOMBSTONE_BIT};
 use parking_lot::RwLock;
-use std::sync::Barrier;
 use std::sync::Arc;
+use std::sync::Barrier;
 use std::time::Duration;
 
 // --- 1. Write-Skew Protection Tests ---
@@ -47,9 +47,7 @@ fn test_isolation_write_skew_classic_bank_account() {
 
     // Tx1 validates and records its commit to A at seq 11
     let keys1 = vec![b"account:A".as_slice()];
-    assert!(validator
-        .validate_and_record(tx1, &rs1, keys1, 11)
-        .is_ok());
+    assert!(validator.validate_and_record(tx1, &rs1, keys1, 11).is_ok());
 
     // Tx2 attempts to validate its read set at seq 12 -> MUST fail write-skew validation because A was mutated at seq 11 > 10
     let res2 = validator.validate(tx2, &rs2);
@@ -78,9 +76,7 @@ fn test_isolation_write_skew_overlapping_reads_disjoint_writes() {
 
     // Tx1 validates read set and records key1 at seq 21
     let keys1 = vec![b"key1".as_slice()];
-    assert!(validator
-        .validate_and_record(tx1, &rs1, keys1, 21)
-        .is_ok());
+    assert!(validator.validate_and_record(tx1, &rs1, keys1, 21).is_ok());
 
     // Tx2 attempts to validate at seq 22 -> conflicts because key1 was modified after snap_seq 20
     let res2 = validator.validate(tx2, &rs2);
@@ -101,15 +97,11 @@ fn test_isolation_write_skew_non_overlapping_read_sets_succeed() {
 
     // Tx1 validates and commits "alpha" at seq 101
     let keys1 = vec![b"alpha".as_slice()];
-    assert!(validator
-        .validate_and_record(tx1, &rs1, keys1, 101)
-        .is_ok());
+    assert!(validator.validate_and_record(tx1, &rs1, keys1, 101).is_ok());
 
     // Tx2 validates and commits "beta" at seq 102 -> non-overlapping read/write set succeeds
     let keys2 = vec![b"beta".as_slice()];
-    assert!(validator
-        .validate_and_record(tx2, &rs2, keys2, 102)
-        .is_ok());
+    assert!(validator.validate_and_record(tx2, &rs2, keys2, 102).is_ok());
 }
 
 // --- 2. Lost-Update Protection Tests ---
@@ -130,9 +122,7 @@ fn test_isolation_lost_update_concurrent_counter_increment() {
 
     // Tx1 updates global_counter and commits at seq 51
     let keys1 = vec![b"global_counter".as_slice()];
-    assert!(validator
-        .validate_and_record(tx1, &rs1, keys1, 51)
-        .is_ok());
+    assert!(validator.validate_and_record(tx1, &rs1, keys1, 51).is_ok());
 
     // Tx2 attempts to commit global_counter -> lost-update detected
     let res2 = validator.validate(tx2, &rs2);
@@ -157,9 +147,7 @@ fn test_isolation_lost_update_atomic_validate_and_record() {
 
     // Atomic validate_and_record for Tx1
     let keys1 = vec![b"shared_resource".as_slice()];
-    assert!(validator
-        .validate_and_record(tx1, &rs1, keys1, 11)
-        .is_ok());
+    assert!(validator.validate_and_record(tx1, &rs1, keys1, 11).is_ok());
 
     // Tx2 attempting validate_and_record fails and leaves no write keys recorded
     let keys2 = vec![b"tx2_side_effect".as_slice()];

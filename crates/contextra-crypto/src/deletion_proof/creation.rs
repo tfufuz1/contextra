@@ -113,9 +113,15 @@ impl DeletionProof {
             });
         }
 
-        let has_memtable = covered_layers.iter().any(|l| matches!(l, DeletionLayer::LsmMemtable));
-        let has_sstable = covered_layers.iter().any(|l| matches!(l, DeletionLayer::SsTableAllLevels));
-        let has_wal = covered_layers.iter().any(|l| matches!(l, DeletionLayer::WalAllSegments { .. }));
+        let has_memtable = covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::LsmMemtable));
+        let has_sstable = covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::SsTableAllLevels));
+        let has_wal = covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::WalAllSegments { .. }));
 
         if !has_memtable {
             return Err(ContextraError::Internal(
@@ -137,13 +143,19 @@ impl DeletionProof {
         }
 
         let mut uncovered_layers = Vec::new();
-        if !covered_layers.iter().any(|l| matches!(l, DeletionLayer::HnswIndex)) {
+        if !covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::HnswIndex))
+        {
             uncovered_layers.push(UncoveredLayer {
                 layer: DeletionLayer::HnswIndex,
                 reason: "Scope does not contain vector HnswIndex data".to_string(),
             });
         }
-        if !covered_layers.iter().any(|l| matches!(l, DeletionLayer::TextIndex)) {
+        if !covered_layers
+            .iter()
+            .any(|l| matches!(l, DeletionLayer::TextIndex))
+        {
             uncovered_layers.push(UncoveredLayer {
                 layer: DeletionLayer::TextIndex,
                 reason: "Scope does not contain full-text TextIndex data".to_string(),

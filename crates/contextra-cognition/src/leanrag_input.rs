@@ -5,11 +5,11 @@
 //! Extraktion von LeanRAG-Eingabedaten ([`AggregationNode`], [`AggregationEdge`]) aus einer [`Collection`].
 
 use crate::aggregation_phase::{AggregationEdge, AggregationNode};
+use ahash::{AHashMap, AHashSet};
 use contextra_engine::collection::Collection;
 use contextra_graph::hyperedge::HyperEdgeId;
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, EntityId};
-use std::collections::{HashMap, HashSet};
 
 /// Standardmäßige Obergrenze für die Anzahl extrahierter Knoten im LeanRAG-Input.
 pub const DEFAULT_MAX_LEANRAG_NODES: usize = 10_000;
@@ -47,7 +47,7 @@ pub fn build_leanrag_inputs<S: StorageEngine, V: VectorIndex>(
     let graph = collection.graph_index();
 
     // 1. Eindeutige Knoten aus turns sammeln, die im Graphen existieren
-    let mut turn_nodes: HashMap<EntityId, Vec<f32>> = HashMap::new();
+    let mut turn_nodes: AHashMap<EntityId, Vec<f32>> = AHashMap::new();
     for (doc_id, embedding) in turns {
         let entity = EntityId::from_doc_id(*doc_id);
         if graph.entity_exists(entity) {
@@ -72,10 +72,10 @@ pub fn build_leanrag_inputs<S: StorageEngine, V: VectorIndex>(
         nodes.truncate(max_nodes);
     }
 
-    let node_entities: HashSet<EntityId> = nodes.iter().map(|n| n.entity).collect();
+    let node_entities: AHashSet<EntityId> = nodes.iter().map(|n| n.entity).collect();
 
     // 2. Kanten sammeln
-    let mut raw_edge_ids = HashSet::new();
+    let mut raw_edge_ids = AHashSet::new();
     for node in &nodes {
         for edge_id in graph.hyperedges_for_entity(node.entity) {
             raw_edge_ids.insert(edge_id);

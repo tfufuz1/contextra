@@ -370,9 +370,10 @@ impl<T: Clone> TxBuffer<T> {
         max_keys: usize,
     ) -> Result<()> {
         let shard_idx = self.shard_idx(tx);
-        let shard_lock = self.shards.get(shard_idx).ok_or_else(|| {
-            ContextraError::Storage("Shard index out of bounds".to_string())
-        })?;
+        let shard_lock = self
+            .shards
+            .get(shard_idx)
+            .ok_or_else(|| ContextraError::Storage("Shard index out of bounds".to_string()))?;
         let mut shard = shard_lock.write();
         let rs = shard.read_sets.entry(tx).or_default();
 
@@ -435,9 +436,10 @@ impl<T: Clone> TxBuffer<T> {
     {
         let op_bytes = op.estimated_bytes();
         let shard_idx = self.shard_idx(tx);
-        let shard_lock = self.shards.get(shard_idx).ok_or_else(|| {
-            ContextraError::Storage("Shard index out of bounds".to_string())
-        })?;
+        let shard_lock = self
+            .shards
+            .get(shard_idx)
+            .ok_or_else(|| ContextraError::Storage("Shard index out of bounds".to_string()))?;
         let mut shard = shard_lock.write();
 
         let curr_tx_bytes = *shard.staged_bytes.entry(tx).or_insert(0);
@@ -486,9 +488,10 @@ impl<T: Clone> TxBuffer<T> {
         let total_op_bytes: usize = ops_vec.iter().map(|op| op.estimated_bytes()).sum();
 
         let shard_idx = self.shard_idx(tx);
-        let shard_lock = self.shards.get(shard_idx).ok_or_else(|| {
-            ContextraError::Storage("Shard index out of bounds".to_string())
-        })?;
+        let shard_lock = self
+            .shards
+            .get(shard_idx)
+            .ok_or_else(|| ContextraError::Storage("Shard index out of bounds".to_string()))?;
         let mut shard = shard_lock.write();
 
         let curr_tx_bytes = *shard.staged_bytes.entry(tx).or_insert(0);

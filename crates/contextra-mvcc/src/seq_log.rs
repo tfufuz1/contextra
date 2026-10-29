@@ -166,7 +166,10 @@ impl SequenceLog {
     /// Pins a historical sequence number at a specific monotonic nanosecond timestamp `at_nanos` for deterministic testing and lease tracking.
     pub fn pin_snapshot_at(&mut self, seq_no: u64, at_nanos: u64) {
         let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
-        self.pinned_snapshots.entry(seq_no).or_default().push(at_nanos);
+        self.pinned_snapshots
+            .entry(seq_no)
+            .or_default()
+            .push(at_nanos);
     }
 
     /// Unpins a historical sequence number.
@@ -599,7 +602,8 @@ mod tests {
     #[test]
     fn test_sequence_log_pin_ttl_and_expiration() {
         let clock = Arc::new(ManualClock::new(100_000_000_000));
-        let mut log = SequenceLog::with_clock(clock.clone()).with_max_pin_duration(Duration::from_secs(10));
+        let mut log =
+            SequenceLog::with_clock(clock.clone()).with_max_pin_duration(Duration::from_secs(10));
         assert_eq!(log.max_pin_duration(), Duration::from_secs(10));
 
         let start_nanos = clock.now_nanos();
