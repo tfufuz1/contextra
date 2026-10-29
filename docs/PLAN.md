@@ -73,17 +73,17 @@ Der Code ist **weiter und zugleich weniger belegt**, als der Audit-Bericht vom 2
 
 |Phase|Ziel|WPs|Abnahme (Kern)|Voraussetzung|Aufwand|
 |---|---|---|---|---|---|
-|**0 Baseline und Wahrheit**|belegter Ist-Stand je Crate **und** Workspace; ehrliche Reife; eine Messquelle|0.1 – 0.7|`--all-targets` grün; Clippy-Ursache belegt; kein Test-Timeout; Baseline-Protokoll E2; `claims-consistency` grün|–|M–L|
+|**0 Baseline und Wahrheit**|belegter Ist-Stand je Crate **und** Workspace; ehrliche Reife; eine Messquelle|0.1 – 0.9|`--all-targets` grün; Clippy-Ursache belegt; kein Test-Timeout; Baseline-Protokoll E2; `claims-consistency` grün|–|M–L|
 |**1 Sofortschäden**|keine Produktions-Panics; Allow-Register; keine toten Sicherheits-`cfg`; keine Test-Hooks in der API; kein blockierendes I/O|1.1 – 1.7|`panic-inventory` Produktion = 0 (`text`, `wire`); `undefined-cfg-feature`, `test-hooks-private`, `async-blocking-io` grün|0.1, 0.5|M|
 |**2 Entkopplung**|Soll-Graph (SPEC §4.4/§4.5), keine Zyklen, Netz „aus“|2.1 – 2.14|`transitive-budget`, `no-cycles`, `egress-inventory`, `duplicate-types`, `determinism` grün|0.1, 1.x|XL|
 |**3 Modul-Infrastruktur**|isolierte Prüfung, Evidence-Pack, Benchmarks je Crate|3.1 – 3.9|`module-audit <crate>` läuft für alle Crates; Wartbarkeitsregeln W1–W11 als Gates|2.1|L–XL|
 |**4 Persistenz-Fundament**|`DurableLog`, Format-Register, Crash-Matrix je Modul|4.1 – 4.4|Crash-Matrix grün; `DurableLog` implementiert|3.2|L|
-|**5 Löschkette**|Baustein nach SPEC §9 bis `beta`|5.1 – 5.10|AC-Matrix, Mutationskatalog, Chaos, Rechtsmatrix|2.4, 3.x, 4.x|XL|
+|**5 Löschkette**|Baustein nach SPEC §9 bis `beta`|5.1 – 5.11|AC-Matrix, Mutationskatalog, Chaos, Rechtsmatrix|2.4, 3.x, 4.x|XL|
 |**6 Modul-Härtung F1–F5**|Zielreife je Modul (Fuzz, Differential, Bench)|6.1 – 6.5|Evidence-Pack E3 je Modul|3.x|XL|
 |**7 Profile, Beispiele, Doku**|Search, Local-RAG, Agent, Compliance lauffähig und geprüft|7.1 – 7.5|`profile-audit` grün|6.x (teilweise)|L|
 |**8 Abnahme und Release**|Release-Kriterien SPEC §13.4|8.1 – 8.3|alle Kriterien grün; externer Review|alle|M–L|
 
-**Kritischer Pfad:** 0.5 → 0.1 → 2.1 → 3.2 → 4.2 → 5.1 → 5.3 → 5.4 → 5.5 → 5.6 → 8.x (0.5 zuerst: ohne lauffähige Löschbericht-Tests ist G2 unbelegt). **Parallel möglich:** Phase 1 neben Phase 0; Phase 2 (unabhängige Entkopplungen 2.2/2.3/2.5/2.8/2.10 je Crate); Phase 6 je Modulfamilie; Phase 7 je Profil, sobald dessen Module `beta` erreichen.
+**Kritischer Pfad:** 0.5 → 0.1 → 2.1 → 3.2 → 4.2 → 5.1 → 5.3 → 5.4 → 5.5 → 5.6 → 8.x (0.5 zuerst: ohne lauffähige Löschbericht-Tests ist G2 unbelegt; Verschlüsselung ab dem ersten Schreibvorgang [WP 5.3] ist zwingende Release-Voraussetzung für echte Nutzerdaten, Entscheidung ADR-0006 Proposed, O-41 Proposed/offen). **Parallel möglich:** Phase 1 neben Phase 0; Phase 2 (unabhängige Entkopplungen 2.2/2.3/2.5/2.8/2.10 je Crate); Phase 6 je Modulfamilie; Phase 7 je Profil, sobald dessen Module `beta` erreichen.
 
 ---
 
@@ -184,6 +184,33 @@ Der Code ist **weiter und zugleich weniger belegt**, als der Audit-Bericht vom 2
 5. Gate `test-runtime-budget` (nightly).
 
 **Abnahme:** kein Crate im Timeout; Statistik für alle Mitglieder; ursächliche Tests benannt. **Aufwand:** M.
+
+### WP 0.8 – Report-Zusammenfassung in erase_document ehrlich machen
+
+**Ziel:** Ehrlichmachung der Report-Zusammenfassung in `erase_document` in `crates/contextra-engine/src/contextra_impl/erasure.rs`.
+
+**Schnitt:** `crates/contextra-engine/src/contextra_impl/erasure.rs`.
+
+**Aufgaben**
+
+1. Positivkontroll-Feld aus dem Witness lesen statt pauschale Zusammenfassungen zu erzeugen.
+2. Dokumentation und Konstante für bisher ungemessene Schichten präzisieren.
+3. Test `erasure_report_honesty` als Positivkontrolle implementieren.
+
+**Abnahme:** Test `erasure_report_honesty` ist grün. **Aufwand:** S. **Voraussetzung:** 0.5.
+
+### WP 0.9 – Gate deletion-honesty an SPEC C-12.11 angleichen
+
+**Ziel:** Angleichung des Qualitätsgates `deletion-honesty` an SPEC C-12.11 (Maintainer-Aufgabe, geschützter Pfad `xtask/`).
+
+**Schnitt:** `xtask/` (`deletion-honesty` Gate).
+
+**Aufgaben**
+
+1. Prüflogik in `xtask` für Phrasen- und Claim-Kriterien nach SPEC C-12.11 schärfen.
+2. Selbsttests für jede einzelne Prüfphrase bereitstellen.
+
+**Abnahme:** Selbsttest je Phrase grün. **Aufwand:** S. **Voraussetzung:** 0.8.
 
 ---
 
@@ -557,6 +584,9 @@ Jeder Scanner besteht: Positivkontrolle, Negativkontrolle, **Differenz gegen ein
 
 **Abnahme:** je Schicht Scanner **und** Purger; Differenztest grün; Vorher/Nachher-Test mit `FaultVfs`-Abbrüchen. **Aufwand:** XL (teilbar je Schicht, ein PR je Schicht).
 
+> **Release-Voraussetzung (zwingend für Produktiveinsatz):**
+> Voraussetzung für jedes Release, das echte Nutzerdaten dauerhaft speichert: Verschlüsselung ab dem ersten Schreibvorgang (WP 5.3), sonst nur Custody K0 mit deutlichem Hinweis oder kein Release (Entscheidung ADR-0006 Proposed, O-41 Proposed/offen). Bestand ohne DocDek gilt als LegacyUnkeyed (höchstens Klasse P).
+
 ### WP 5.3 – Schlüsselhierarchie (D2)
 
 **Aufgaben:** Keystore (`MFKS`), `KeyTable` mit Shards, `DocDek` je Betroffenen-Einheit, `ArtKey` je Artefakt, KEK-Epochen; Port `EffaceableKeySlot` (K0/K1 Software-Schlüssel; K2/K3 nur Port, SPEC §2.4); Record-Verschlüsselung unter dem `DocDek` im WAL-/LSM-/Blob-Pfad (`store`); Schlüsselmaterial nur `Zeroizing`; Constant-Time-Vergleiche; `KeyScanner` aus WP 5.2.
@@ -564,6 +594,20 @@ Jeder Scanner besteht: Positivkontrolle, Negativkontrolle, **Differenz gegen ein
 **Zusatz (3.1):** `KmsProvider` (Trait in `crypto/wal_crypto.rs`, laut Scan unverdrahtet) wird verdrahtet, sein Besitz geklärt (SPEC §17 F-05); eine Null- oder Test-Implementierung allein macht `crypto` `experimental` (SPEC §7.5).
 
 **Abnahme:** Konformitätstest `EffaceableKeySlot`; Zeroize-Test per Prozessspeichersonde (`testkit`, `/proc/self/mem`); kein Schlüsselbyte in Logs oder `Debug`. **Aufwand:** L. **Voraussetzung:** 4.2.
+
+### WP 5.3b – Spike S-K2: nicht exportierbarer Schlüsselspeicher (TPM/HSM) für Klasse C2
+
+**Ziel:** Erforschung und Bereitstellung von nicht exportierbarer Schlüsselverwahrung (TPM/HSM) zur Erreichung von Löschklasse C2 unter Ersetzung der Annahme A-FLASH bei Software-Schlüsseln (K1).
+
+**Schnitt:** `crates/contextra-crypto/`, `crates/contextra-ports/`.
+
+**Aufgaben**
+
+1. Integration/Spike für Hardware-gebundene Schlüssel-Slots (TPM 2.0 / PKCS#11 / HSM) untersuchen und umsetzen.
+2. Port `EffaceableKeySlot` für hardwaregestützte Slots erweitern bzw. anbinden.
+3. Klare Signalisierung von `CapabilityUnsupported` statt unvollständiger Stubs, wenn kein Hardware-Slot vorhanden ist.
+
+**Abnahme:** Konformitätssuite `EffaceableKeySlot` besteht; `CapabilityUnsupported` wird korrekt zurückgegeben, wenn Hardware-Slots fehlen (keine Stubs). **Aufwand:** M. **Voraussetzung:** 5.3.
 
 ### WP 5.4 – Destroy-Protokoll D1–D6 und Epoch Seal (D3)
 
@@ -598,9 +642,9 @@ Jeder Scanner besteht: Positivkontrolle, Negativkontrolle, **Differenz gegen ein
 
 ### WP 5.8 – Fristen, Empfänger, Legal Hold (D10)
 
-**Aufgaben:** `RecipientLedger` (Art. 17 Abs. 2, Art. 19), Fristen mit Standard und Obergrenzen (kalibrierbar, Anhang C-12), Legal Hold und Mixed-Policy ⇒ `Restricted{basis, until}`; **Aufbewahrungsfristen und Legal-Hold-Katalog sind Rechtsfrage (O-02)**: Contextra liefert den Mechanismus, **keine** Standardwerte mit Rechtsanspruch.
+**Aufgaben:** `RecipientLedger` (Art. 17 Abs. 2, Art. 19), Fristen mit Standard und Obergrenzen (kalibrierbar, Anhang C-12), Legal Hold und Mixed-Policy ⇒ `Restricted{basis, until}`; **Aufbewahrungsfristen und Legal-Hold-Katalog sind Rechtsfrage (O-02)**: Contextra liefert den Mechanismus, **keine** Standardwerte mit Rechtsanspruch. Contextra bietet **keine Erkennung von Betroffenen in Freitext**; verpflichtender Ausschluss `SubjectDiscoveryNotPerformed` in Bericht und `doctor export-concept` (Verweis ADR-0007 Proposed, O-42 Proposed/offen).
 
-**Abnahme:** Zustandsübergänge `Frozen → Restricted → Deleted` getestet; Bericht weist `BeschränktAufbewahrt` korrekt aus. **Aufwand:** M.
+**Abnahme:** Zustandsübergänge `Frozen → Restricted → Deleted` getestet; Bericht weist `BeschränktAufbewahrt` sowie Pflicht-Ausschluss `SubjectDiscoveryNotPerformed` korrekt aus. **Aufwand:** M.
 
 ### WP 5.9 – Lösch-Mutationskatalog und Abnahme (D11, G7)
 
@@ -620,6 +664,19 @@ Jeder Scanner besteht: Positivkontrolle, Negativkontrolle, **Differenz gegen ein
 4. Änderungsverfahren: Rechtsänderung ⇒ Zeile, Ticket, betroffener Baustein, Test; Fristen und Legal-Hold-Kataloge bleiben **Konfiguration** (O-02).
 
 **Abnahme:** Gate grün; jede Zeile hat Test oder ausgewiesenes Nicht-Ziel. **Aufwand:** S–M. **Voraussetzung:** 5.8 (für Fristzeilen), sonst Status `offen`.
+
+### WP 5.11 – Dokumentation von Zweck und Rechtsgrundlage in doctor export-concept
+
+**Ziel:** Dokumentation von Zweck und Rechtsgrundlage für `ErasedSet`, Referenz-Hashes und Löschberichte als Vorlage in `doctor export-concept` (Verweis O-43 Proposed/offen, ADR-0008 Proposed).
+
+**Schnitt:** `docs/`, `crates/contextra/` (`doctor export-concept` Vorlagen).
+
+**Aufgaben**
+
+1. Dokumentation von Verarbeitungszweck und Rechtsgrundlage für die Speicherung von `ErasedSet`, Hash-Referenzen und Löschberichten erstellen.
+2. Integration der Vorlagen in das Werkzeug `doctor export-concept`.
+
+**Abnahme:** `doctor export-concept` gibt korrekte Dokumentationsvorlagen für `ErasedSet`, Referenz-Hashes und Berichte aus. **Aufwand:** S. **Voraussetzung:** 5.8, 5.10.
 
 ---
 
@@ -771,6 +828,7 @@ Rechts- und Marktfragen (O-01 bis O-06) sind **nicht** durch Entwicklung lösbar
 |R14|Timeouts werden als grün gelesen|Unentdeckte Testfehler in 13 Crates|Timeout = rot (ADR-D11); WP 0.7|
 |R15|Zusammenführen doppelter Typen bricht Formate oder Löschbericht|Datenverlust, ungültige Berichte|Golden-Files V1–V5 vor Zusammenführung; ein Typ je PR (WP 2.13)|
 |R16|Rechts- und Regulierungsänderungen (Aufsichtspraxis, KI-Verordnung, Cyber Resilience Act)|Bausteine veralten|Rechtsmatrix (WP 5.10); Fristen und Kataloge als Konfiguration; O-06, O-11|
+|R17|Release mit Nutzerdaten vor Verschlüsselung (WP 5.3) verhindert Klasse C für Bestandsdaten|Nachträgliche Herabstufung aller Bestandsdaten auf Klasse P|Release-Sperre für Nutzerdaten vor WP 5.3; Erzeugung unter DocDek ab Tag 1 erzwingen (ADR-0006 Proposed, O-41 Proposed/offen)|
 
 ---
 
@@ -833,3 +891,4 @@ Rechts- und Marktfragen (O-01 bis O-06) sind **nicht** durch Entwicklung lösbar
 |2.5|27.10.2026|Phasenplan „Kern schließen, Rest archivieren“|
 |**3.0**|**28.10.2026**|Baukasten-Zuschnitt; Phase 3 (Modulwerkzeug), Phase 6 (Härtung je Familie), Phase 7 (Profile); Löschkette als Baustein (Phase 5, neues Crate `erasure`); WP 2.11 (Dev-Kanten); Nachmessung am HEAD 52d3227; Archivierungsentscheidung aufgehoben|
 |**3.1**|**28.10.2026**|Baseline (E2, teilweise), Metrik-Datei und Scan eingearbeitet (U-15 bis U-27); WP 0.5–0.7 (defekte Tests, Clippy-Ursache, Testlaufzeit), 1.5–1.7 (cfg-Features, Test-Hooks, blockierendes I/O), 2.12–2.14 (Clock, Doppeldefinitionen, Restkanten), 3.8–3.9 (Wartbarkeit, Schnittstudie), 5.10 (Rechtsmatrix); Leitplanken 7–10; Gate-Plan, Testmatrix, Entscheidungen E-0.5/E-1.5/E-2.14/E-3.8, Risiken R12–R16, Definition of Done und nächste Schritte angepasst|
+|**3.2**|**29.10.2026**|Ergänzung der WPs 0.8 (erase_document Ehrlichkeit), 0.9 (Gate deletion-honesty C-12.11), Release-Voraussetzung Verschlüsselung vor Nutzerdaten (ADR-0006 Proposed, O-41 Proposed/offen), 5.3b (Spike S-K2 TPM/HSM), 5.8 (Betroffenen-Erkennung Ausschluss SubjectDiscoveryNotPerformed, ADR-0007 Proposed, O-42 Proposed/offen), 5.11 (Dokumentationsvorlagen doctor export-concept, ADR-0008 Proposed, O-43 Proposed/offen) und Risiko R17.|
