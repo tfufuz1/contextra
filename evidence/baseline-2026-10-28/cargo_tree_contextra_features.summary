@@ -1,1 +1,3 @@
-cargo tree -p contextra -e features --locked: exit_code=0, duration=342ms
+CMD: cargo tree -p contextra -e features --locked
+EXIT_CODE: 0
+DURATION_MS: 369

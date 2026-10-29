@@ -509,5 +509,13 @@
   "standalone_contextra_mcp": {
     "code": 0,
     "duration_ms": 474
+  },
+  "_standalone_build_contextra_embedded": {
+    "exit_code": 0,
+    "duration_ms": 23575
+  },
+  "_standalone_build_contextra_mcp": {
+    "exit_code": 0,
+    "duration_ms": 30449
   }
 }
