@@ -218,11 +218,6 @@ impl GraphCollectionMutation for CsrGraph {
                 GraphMutationError::HyperedgeNotFound(id) => {
                     contextra_ports::graph::GraphMutationError::HyperedgeNotFound(id)
                 }
-                GraphMutationError::DuplicateHyperEdgeId(id) => {
-                    contextra_ports::graph::GraphMutationError::Internal(format!(
-                        "Duplicate hyperedge ID detected during batch commit: {id}"
-                    ))
-                }
                 GraphMutationError::InvalidWeight { weight, reason } => {
                     contextra_ports::graph::GraphMutationError::InvalidWeight { weight, reason }
                 }
