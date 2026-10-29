@@ -1,3 +1,5 @@
+<!-- doc-stamp: 2026-10-29 10cc17922 -->
+
 # Contextra — Chronologischer Tag- & Review-Bericht
 
 > Automatisch generierter Read-Only Bericht aus allen Inline-Tags im Repo.

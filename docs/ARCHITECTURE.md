@@ -1,4 +1,4 @@
-<!-- doc-stamp: 2026-10-29 0796b40ed -->
+<!-- doc-stamp: 2026-10-29 10cc17922 -->
 
 # Contextra – Architekturübersicht
 
