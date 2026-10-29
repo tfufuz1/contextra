@@ -1,7 +1,7 @@
 # Contextra Workspace Build & Test Baseline (2026-10-28)
 
 **Datum:** 2026-10-28
-**Commit:** `8f8fa7cd5e2ea133eeb31b4212293449eb2cbee3`
+**Commit:** `78274ec899fd14a5d1d8e36ca0767ba60d7b40b3`
 **Toolchain:** `cargo 1.89.0 (c24e10642 2025-06-23)`, `rustc 1.89.0 (29483883e 2025-08-04)`
 **Scope:** Reaktivierung / Beleg der Build- & Test-Baseline gemäß PLAN WP 0.1
 
@@ -11,11 +11,11 @@
 
 | Befehl | Exit-Code | Dauer | Raw-Log |
 |---|---|---|---|
-| `cargo check --workspace --all-targets --locked` | 101 | 45368 ms | [cargo_check_workspace.log](cargo_check_workspace.log) |
-| `cargo clippy --workspace --all-targets --locked -- -D warnings` | 101 | 6148 ms | [cargo_clippy_workspace.log](cargo_clippy_workspace.log) |
+| `cargo check --workspace --all-targets --locked` | 0 | 3097 ms | [cargo_check_workspace.log](cargo_check_workspace.log) |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | 101 | 2896 ms | [cargo_clippy_workspace.log](cargo_clippy_workspace.log) |
 | `cargo test --workspace --locked --no-fail-fast` | 101 | 374955 ms | [cargo_test_workspace.log](cargo_test_workspace.log) |
-| `cargo tree -p contextra --edges normal --locked` | 0 | 944 ms | [cargo_tree_contextra_normal.log](cargo_tree_contextra_normal.log) |
-| `cargo tree -p contextra -e features --locked` | 0 | 372 ms | [cargo_tree_contextra_features.log](cargo_tree_contextra_features.log) |
+| `cargo tree -p contextra --edges normal --locked` | 0 | 1378 ms | [cargo_tree_contextra_normal.log](cargo_tree_contextra_normal.log) |
+| `cargo tree -p contextra -e features --locked` | 0 | 369 ms | [cargo_tree_contextra_features.log](cargo_tree_contextra_features.log) |
 
 ---
 
@@ -23,11 +23,11 @@
 
 Die Aussage **„35 Crates kompilieren fehlerfrei"** aus `SYSTEMATIC_CRATE_AUDIT.md` wird wie folgt bewertet:
 - **BESTÄTIGT für `cargo check -p <crate> --locked`**: Alle 35 Crates im Workspace (inkl. `xtask`) bestehen `cargo check -p <crate>` mit Exit-Code 0.
-- **BESTÄTIGT für Standalone Build Target 1**: `cargo build -p contextra --no-default-features --features embedded --locked` schließt erfolgreich ab (Exit-Code 0, 65.5s).
-- **BESTÄTIGT für Standalone Build Target 2**: `cargo build -p contextra-mcp --locked` schließt erfolgreich ab (Exit-Code 0, 0.4s).
-- **WIDERLEGT für `cargo check --workspace --all-targets`**: Workspace-wide `--all-targets` schlägt fehl (Exit-Code 101), da Integrationstests (`crates/contextra-db/tests/deletion_proof_integration.rs`) einen ungültigen Import enthalten (`LayerCleanupProof`).
+- **BESTÄTIGT für `cargo check --workspace --all-targets --locked`**: Workspace-wide `--all-targets` besteht fehlerfrei (Exit-Code 0).
+- **BESTÄTIGT für Standalone Build Target 1**: `cargo build -p contextra --no-default-features --features embedded --locked` schließt erfolgreich ab (Exit-Code 0, 23.5s).
+- **BESTÄTIGT für Standalone Build Target 2**: `cargo build -p contextra-mcp --locked` schließt erfolgreich ab (Exit-Code 0, 30.4s).
 - **WIDERLEGT für `cargo clippy --workspace --all-targets --locked -- -D warnings`**: Schlägt bei 33 von 35 Crates fehl due to unkonfigurierten Warnings (Exit-Code 101). Nur `contextra-wire` und `contextra-sys` bestehen Clippy fehlerfrei.
-- **WIDERLEGT für Crate-spezifische Test-Compilations (`cargo test -p <crate>`)**: `contextra-mvcc` und `contextra-crypto` scheitern beim Kompilieren ihrer Integrationstests.
+- **WIDERLEGT für globale Test-Ausführung (`cargo test --workspace`)**: Workspace-weite Testläufe schlagen mit Exit-Code 101 fehl bzw. laufen in Timeouts bei langlaufenden End-to-End Integrationstests (z. B. `tests/deletion_e2e.rs`).
 
 ---
 
@@ -72,8 +72,8 @@ Die Aussage **„35 Crates kompilieren fehlerfrei"** aus `SYSTEMATIC_CRATE_AUDIT
 | **xtask** | Grün (0) | Rot (101) | Timeout (>45s per-crate execution) |
 
 ### Standalone Build Targets
-- `cargo build -p contextra --no-default-features --features embedded --locked`: **Grün (0)** (Dauer: 65,527 ms)
-- `cargo build -p contextra-mcp --locked`: **Grün (0)** (Dauer: 474 ms)
+- `cargo build -p contextra --no-default-features --features embedded --locked`: **Grün (0)** (Dauer: 23,575 ms)
+- `cargo build -p contextra-mcp --locked`: **Grün (0)** (Dauer: 30,449 ms)
 
 ---
 
@@ -87,15 +87,15 @@ Die Aussage **„35 Crates kompilieren fehlerfrei"** aus `SYSTEMATIC_CRATE_AUDIT
 
 ## 5. Die häufigsten Fehlerursachen (Top Error Causes)
 
-1. **`crates/contextra-db/tests/deletion_proof_integration.rs:6:69`**
-   `error[E0432]: unresolved import contextra_engine::LayerCleanupProof`
-   *(Ursachenklasse: Missing Re-export / Structural Drift – `LayerCleanupProof` liegt in `contextra_crypto` statt `contextra_engine`)*
-2. **`crates/contextra-crypto/tests/audit_chain_tests.rs`**
+1. **`crates/contextra-crypto/tests/audit_chain_tests.rs`**
    `error[E0433]: failed to resolve: use of undeclared type CustodyLevel`
    *(Ursachenklasse: Type Refactoring Drift – Missing import or type migration)*
-3. **`crates/contextra-mvcc/tests/ssi_metrics_observability.rs`**
+2. **`crates/contextra-mvcc/tests/ssi_metrics_observability.rs`**
    `error[E0432]: unresolved imports contextra_ports::metrics::MetricEvent, contextra_ports::metrics::TestMetricsSink`
    *(Ursachenklasse: Module/Feature Removal in `contextra-ports`)*
+3. **`tests/deletion_chain_e2e.rs` / `tests/deletion_e2e.rs`**
+   `test result: FAILED / hang`
+   *(Ursachenklasse: Integration Test Drift / Long-running compaction test timeout)*
 4. **`crates/*/src/*.rs` (33 Crates)**
    `clippy warnings treated as errors (-D warnings)`
    *(Ursachenklasse: Missing workspace/crate-level clippy suppressions or unaddressed lints)*
@@ -104,9 +104,10 @@ Die Aussage **„35 Crates kompilieren fehlerfrei"** aus `SYSTEMATIC_CRATE_AUDIT
 
 ## 6. Liste defekter Test-Targets & Abfänge
 
-- `crates/contextra-db/tests/deletion_proof_integration.rs` (Workspace `--all-targets` Check-Blocker)
 - `crates/contextra-crypto/tests/audit_chain_tests.rs` (Crate-Test Compilation Error)
 - `crates/contextra-mvcc/tests/ssi_metrics_observability.rs` (Crate-Test Compilation Error)
+- `tests/deletion_chain_e2e.rs` (Integration Test Failures)
+- `tests/deletion_e2e.rs` (Integration Test Hang)
 
 ---
 
