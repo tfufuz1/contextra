@@ -27,7 +27,7 @@ use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use ahash::AHashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -119,7 +119,7 @@ pub struct RevocationLog {
     verifying_key: VerifyingKey,
     clock: Arc<dyn Clock>,
     entries: RwLock<Vec<RevocationEntry>>,
-    revoked_targets: RwLock<HashSet<RevocationTarget>>,
+    revoked_targets: RwLock<AHashSet<RevocationTarget>>,
 }
 
 impl RevocationLog {
@@ -135,7 +135,7 @@ impl RevocationLog {
             verifying_key,
             clock,
             entries: RwLock::new(Vec::new()),
-            revoked_targets: RwLock::new(HashSet::new()),
+            revoked_targets: RwLock::new(AHashSet::new()),
         }
     }
 
@@ -152,7 +152,7 @@ impl RevocationLog {
     ) -> Result<Self> {
         let path_buf = path.as_ref().to_path_buf();
         let mut entries = Vec::new();
-        let mut revoked_targets = HashSet::new();
+        let mut revoked_targets = AHashSet::new();
 
         if path_buf.exists() {
             let mut file = File::open(&path_buf).map_err(|e| {
@@ -287,6 +287,11 @@ impl RevocationLog {
         }
 
         Ok(new_entry)
+    }
+
+    /// Gibt eine Kopie aller aktuell im Log widerrufenen Targets zurück.
+    pub fn revoked_targets(&self) -> AHashSet<RevocationTarget> {
+        self.revoked_targets.read().clone()
     }
 
     /// Prüft, ob ein gegebenes Target (KEK, DEK, Group oder Record) widerrufen wurde.
