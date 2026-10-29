@@ -22,7 +22,10 @@ mod onnx;
 #[cfg(test)]
 mod tests;
 
-pub use config::{PlattScaledSigmoid, RerankConfig, RerankResult, MAX_CANDIDATES};
+pub use config::{
+    OnnxConfig, OnnxRerankerBuilder, PlattScaledSigmoid, RerankConfig, RerankResult,
+    MAX_CANDIDATES,
+};
 pub use cross_encoder::CrossEncoderReranker;
 
 // REVIEW-PASS[1/2] STATUS:PASS (TS: 2026-09-04T11:42:28Z) (SESSION: 3e5150c8) PRÜFER-KONTEXT: FRESH - Verified CrossEncoderReranker passthrough fallback, candidate limit bounds, and zero-unsafe invariants.

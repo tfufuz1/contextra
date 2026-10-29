@@ -22,7 +22,7 @@
 #[cfg(feature = "onnx")]
 use std::sync::Arc;
 
-#[cfg(any(feature = "onnx", feature = "candle-backend"))]
+#[cfg(feature = "onnx")]
 use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider};
 #[cfg(feature = "onnx")]
 use contextra_types::{ContextraError, Result};
@@ -40,22 +40,68 @@ use std::path::{Path, PathBuf};
 
 /// Returns the default local cache directory for ONNX embedding models (`~/.contextra/models/<model_name>`).
 pub fn default_model_cache_dir(model_name: &str) -> PathBuf {
-    if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
-        PathBuf::from(home)
-            .join(".contextra")
-            .join("models")
-            .join(model_name)
-    } else {
-        PathBuf::from(".contextra").join("models").join(model_name)
+    #[allow(clippy::disallowed_methods)]
+    {
+        if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
+            PathBuf::from(home)
+                .join(".contextra")
+                .join("models")
+                .join(model_name)
+        } else {
+            PathBuf::from(".contextra").join("models").join(model_name)
+        }
+    }
+}
+
+/// Security policies and configuration for downloading ONNX model artifacts over the network.
+///
+/// Download is **DISABLED** by default (`allow_download = false`) to enforce offline-first operation.
+#[derive(Debug, Clone)]
+pub struct ModelDownloadOptions {
+    /// Allow downloading missing model files over network. Default: false.
+    pub allow_download: bool,
+    /// List of allowed hostnames for downloading models (e.g., `"huggingface.co"`).
+    pub allowed_hosts: Vec<String>,
+    /// Expected SHA-256 hex string for `model.onnx`. Mandatory if `allow_download` is true.
+    pub expected_model_sha256: Option<String>,
+    /// Expected SHA-256 hex string for `tokenizer.json`. Mandatory if `allow_download` is true.
+    pub expected_tokenizer_sha256: Option<String>,
+    /// Maximum allowed file size in bytes (default: 1,073,741,824 = 1 GiB).
+    pub max_file_size_bytes: usize,
+}
+
+impl Default for ModelDownloadOptions {
+    fn default() -> Self {
+        Self {
+            allow_download: false,
+            allowed_hosts: vec!["huggingface.co".to_string()],
+            expected_model_sha256: None,
+            expected_tokenizer_sha256: None,
+            max_file_size_bytes: 1_073_741_824,
+        }
     }
 }
 
 /// Ensures the ONNX embedding model files (`model.onnx` and `tokenizer.json`) exist locally in `cache_dir`
-/// (or `~/.contextra/models/<model_name>`). If missing, downloads them automatically.
+/// (or `~/.contextra/models/<model_name>`).
+///
+/// **Offline-First Contract**: Network downloads are strictly disabled by default. Callers must explicitly
+/// configure [`ModelDownloadOptions`] with `allow_download = true` AND provide expected SHA-256 checksums to enable downloads.
 #[cfg(feature = "onnx")]
 pub async fn ensure_onnx_model_download(
     model_name: &str,
     cache_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    ensure_onnx_model_download_with_options(model_name, cache_dir, ModelDownloadOptions::default())
+        .await
+}
+
+/// Ensures the ONNX embedding model files exist locally using custom [`ModelDownloadOptions`].
+#[cfg(feature = "onnx")]
+pub async fn ensure_onnx_model_download_with_options(
+    model_name: &str,
+    cache_dir: Option<&Path>,
+    options: ModelDownloadOptions,
 ) -> Result<PathBuf> {
     let target_dir = match cache_dir {
         Some(dir) => dir.join(model_name),
@@ -65,23 +111,27 @@ pub async fn ensure_onnx_model_download(
     let model_file = target_dir.join("model.onnx");
     let tokenizer_file = target_dir.join("tokenizer.json");
 
-    if model_file.exists() && tokenizer_file.exists() {
+    let model_exists = path_exists_async(&model_file).await?;
+    let tokenizer_exists = path_exists_async(&tokenizer_file).await?;
+
+    if model_exists && tokenizer_exists {
         return Ok(target_dir);
     }
 
-    // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
-    std::fs::create_dir_all(&target_dir).map_err(|e| {
-        ContextraError::Internal(format!(
-            "Konnte Modellspeicherverzeichnis {:?} nicht erstellen: {}",
-            target_dir, e
-        ))
-    })?;
+    if !options.allow_download {
+        return Err(ContextraError::InvalidInput(format!(
+            "Modell-Dateien für '{model_name}' fehlen in {:?} und Downloads sind deaktiviert (offline-first). \
+             Setze allow_download = true oder installiere 'model.onnx' und 'tokenizer.json' manuell.",
+            target_dir
+        )));
+    }
 
-    println!("Lade Standard-Embedding-Modell herunter (~270MB, einmalig)...");
+    create_dir_all_async(&target_dir).await?;
+
     info!(
         model_name,
         target_dir = ?target_dir,
-        "Lade Standard-Embedding-Modell herunter (~270MB, einmalig)..."
+        "Lade ONNX-Modell herunter..."
     );
 
     let (model_url, tokenizer_url) = match model_name {
@@ -101,17 +151,38 @@ pub async fn ensure_onnx_model_download(
         .build()
         .map_err(|e| ContextraError::Internal(e.to_string()))?;
 
-    if !model_file.exists() {
-        download_onnx_file(&client, model_url, &model_file, "model.onnx", &target_dir).await?;
+    if !model_exists {
+        let expected_sha256 = options.expected_model_sha256.as_deref().ok_or_else(|| {
+            ContextraError::InvalidInput(format!(
+                "Download von model.onnx verweigert: missing expected_model_sha256. Prüfsumme ist zwingend erforderlich."
+            ))
+        })?;
+        download_onnx_file_secured(
+            &client,
+            model_url,
+            &model_file,
+            "model.onnx",
+            &target_dir,
+            &options,
+            expected_sha256,
+        )
+        .await?;
     }
 
-    if !tokenizer_file.exists() {
-        download_onnx_file(
+    if !tokenizer_exists {
+        let expected_sha256 = options.expected_tokenizer_sha256.as_deref().ok_or_else(|| {
+            ContextraError::InvalidInput(format!(
+                "Download von tokenizer.json verweigert: missing expected_tokenizer_sha256. Prüfsumme ist zwingend erforderlich."
+            ))
+        })?;
+        download_onnx_file_secured(
             &client,
             tokenizer_url,
             &tokenizer_file,
             "tokenizer.json",
             &target_dir,
+            &options,
+            expected_sha256,
         )
         .await?;
     }
@@ -120,15 +191,34 @@ pub async fn ensure_onnx_model_download(
 }
 
 #[cfg(feature = "onnx")]
-async fn download_onnx_file(
+async fn download_onnx_file_secured(
     client: &reqwest::Client,
-    url: &str,
+    url_str: &str,
     dest_path: &Path,
     file_name: &str,
     target_dir: &Path,
+    options: &ModelDownloadOptions,
+    expected_sha256_hex: &str,
 ) -> Result<()> {
-    let tmp_path = dest_path.with_extension("tmp");
-    let response = client.get(url).send().await.map_err(|e| {
+    if !url_str.starts_with("https://") {
+        return Err(ContextraError::InvalidInput(format!(
+            "Download-URL '{url_str}' verstoßen gegen HTTPS-Zwang: Nur HTTPS-Verbindungen erlaubt."
+        )));
+    }
+
+    let url_parsed = reqwest::Url::parse(url_str).map_err(|e| {
+        ContextraError::InvalidInput(format!("Ungültige Download-URL '{url_str}': {e}"))
+    })?;
+
+    let host = url_parsed.host_str().unwrap_or("");
+    if !options.allowed_hosts.iter().any(|h| h.eq_ignore_ascii_case(host)) {
+        return Err(ContextraError::InvalidInput(format!(
+            "Download von Host '{host}' verweigert: Nicht in der Allowlist {:?}",
+            options.allowed_hosts
+        )));
+    }
+
+    let response = client.get(url_str).send().await.map_err(|e| {
         ContextraError::model_load(
             target_dir.display().to_string(),
             format!(
@@ -142,12 +232,21 @@ async fn download_onnx_file(
         return Err(ContextraError::model_load(
             target_dir.display().to_string(),
             format!(
-                "HTTP-Fehler {} beim Download von {file_name} aus {url}. \
+                "HTTP-Fehler {} beim Download von {file_name} aus {url_str}. \
                  Manuelle Installation in {target_dir:?} erforderlich.",
                 response.status(),
                 target_dir = target_dir.display()
             ),
         ));
+    }
+
+    if let Some(content_length) = response.content_length() {
+        if content_length > options.max_file_size_bytes as u64 {
+            return Err(ContextraError::InvalidInput(format!(
+                "Download von {file_name} überschreitet Größenlimit ({} > max {} bytes)",
+                content_length, options.max_file_size_bytes
+            )));
+        }
     }
 
     let bytes = response.bytes().await.map_err(|e| {
@@ -160,19 +259,77 @@ async fn download_onnx_file(
         )
     })?;
 
-    // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
-    std::fs::write(&tmp_path, &bytes).map_err(|e| {
-        ContextraError::Internal(format!(
-            "Konnte temporäre Datei {tmp_path:?} nicht schreiben: {e}"
-        ))
-    })?;
+    if bytes.len() > options.max_file_size_bytes {
+        return Err(ContextraError::InvalidInput(format!(
+            "Empfangene Datei {file_name} überschreitet Größenlimit ({} > max {} bytes)",
+            bytes.len(), options.max_file_size_bytes
+        )));
+    }
 
-    // STARTUP-ONLY: kein Hot-Path, spawn_blocking nicht erforderlich
-    std::fs::rename(&tmp_path, dest_path).map_err(|e| {
-        ContextraError::Internal(format!("Konnte {dest_path:?} nicht speichern: {e}"))
-    })?;
+    // SHA-256 Prüfsummen-Validierung
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    let actual_sha256 = format!("{:x}", hasher.finalize());
 
-    Ok(())
+    if !actual_sha256.eq_ignore_ascii_case(expected_sha256_hex.trim()) {
+        return Err(ContextraError::InvalidInput(format!(
+            "Prüfsummen-Fehler bei {file_name}: Erwartet SHA-256 '{expected_sha256_hex}', erhalten '{actual_sha256}'."
+        )));
+    }
+
+    // Atomares Schreiben: tmp-Datei -> fsync -> rename
+    let dest_path_buf = dest_path.to_path_buf();
+    tokio::task::spawn_blocking(move || -> Result<()> {
+        let tmp_path = dest_path_buf.with_extension("tmp");
+        use std::io::Write;
+        let mut f = std::fs::File::create(&tmp_path).map_err(|e| {
+            ContextraError::Internal(format!(
+                "Konnte temporäre Datei {tmp_path:?} nicht erstellen: {e}"
+            ))
+        })?;
+        f.write_all(&bytes).map_err(|e| {
+            ContextraError::Internal(format!(
+                "Konnte Daten in temporäre Datei {tmp_path:?} nicht schreiben: {e}"
+            ))
+        })?;
+        f.sync_all().map_err(|e| {
+            ContextraError::Internal(format!(
+                "fsync auf temporäre Datei {tmp_path:?} fehlgeschlagen: {e}"
+            ))
+        })?;
+        drop(f);
+
+        std::fs::rename(&tmp_path, &dest_path_buf).map_err(|e| {
+            ContextraError::Internal(format!("Konnte {dest_path_buf:?} nicht speichern: {e}"))
+        })?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| ContextraError::Internal(format!("spawn_blocking join: {e}")))?
+}
+
+#[cfg(feature = "onnx")]
+async fn path_exists_async(path: &Path) -> Result<bool> {
+    let p = path.to_path_buf();
+    tokio::task::spawn_blocking(move || p.exists())
+        .await
+        .map_err(|e| ContextraError::Internal(format!("spawn_blocking join: {e}")))
+}
+
+#[cfg(feature = "onnx")]
+async fn create_dir_all_async(dir: &Path) -> Result<()> {
+    let d = dir.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        std::fs::create_dir_all(&d).map_err(|e| {
+            ContextraError::Internal(format!(
+                "Konnte Modellspeicherverzeichnis {:?} nicht erstellen: {}",
+                d, e
+            ))
+        })
+    })
+    .await
+    .map_err(|e| ContextraError::Internal(format!("spawn_blocking join: {e}")))?
 }
 
 #[cfg(not(feature = "onnx"))]
@@ -187,16 +344,6 @@ pub async fn ensure_onnx_model_download(
     })
 }
 
-#[cfg(feature = "candle-backend")]
-pub use contextra_infer_candle::CandleEmbedClient;
-
-#[cfg(feature = "candle-backend")]
-/// Creates a trait object `Box<dyn EmbeddingProvider>` wrapping a `CandleEmbedClient`.
-pub fn create_candle_embedder(
-    client: CandleEmbedClient,
-) -> Box<dyn contextra_ports::EmbeddingProvider> {
-    Box::new(client)
-}
 
 /// Conservative default. Override via `TextEmbedderConfig::max_batch_size`.
 /// At 1536D × 512 × f32 = ~3 MB input tensor; safe within 128 MB memory budgets.
@@ -835,6 +982,48 @@ mod tests {
             panic!("Expected InvalidInput error for oversized embed batch");
         }
         Ok(())
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "onnx")]
+    async fn test_model_download_offline_by_default() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cache_dir = tmp.path().join("models");
+
+        // Download disabled by default => returns InvalidInput error asking to enable download
+        let res = ensure_onnx_model_download("nomic-embed-text", Some(&cache_dir)).await;
+        assert!(res.is_err());
+        if let Err(err) = res {
+            assert!(matches!(err, ContextraError::InvalidInput(_)));
+            assert!(err.to_string().contains("offline-first"));
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "onnx")]
+    async fn test_model_download_options_secured_checks() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cache_dir = tmp.path().join("models");
+
+        // 1. Missing checksum => fails
+        let opts = ModelDownloadOptions {
+            allow_download: true,
+            ..Default::default()
+        };
+        let res = ensure_onnx_model_download_with_options("nomic-embed-text", Some(&cache_dir), opts).await;
+        assert!(res.is_err());
+        assert!(res.unwrap_err().to_string().contains("missing expected_model_sha256"));
+
+        // 2. Disallowed host => fails
+        let opts_host = ModelDownloadOptions {
+            allow_download: true,
+            allowed_hosts: vec!["internal.only".to_string()],
+            expected_model_sha256: Some("1234".to_string()),
+            ..Default::default()
+        };
+        let res_host = ensure_onnx_model_download_with_options("nomic-embed-text", Some(&cache_dir), opts_host).await;
+        assert!(res_host.is_err());
+        assert!(res_host.unwrap_err().to_string().contains("Nicht in der Allowlist"));
     }
 
     #[tokio::test]

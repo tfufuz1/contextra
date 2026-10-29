@@ -6,7 +6,8 @@ use contextra_ports::{BoxFuture, Reranker};
 use contextra_rank::PlattScaler;
 use contextra_types::{ConfigFingerprint, ContextraError, RerankResult};
 
-use super::config::{RerankConfig, MAX_CANDIDATES};
+use super::config::{OnnxConfig, OnnxRerankerBuilder, RerankConfig, MAX_CANDIDATES};
+use std::path::Path;
 
 #[cfg(feature = "onnx")]
 use super::onnx::OnnxReranker;
@@ -118,6 +119,21 @@ impl CrossEncoderReranker {
         self._config.calibration = calibration.clone();
         *self.fitted_calibration.write() = calibration;
         self
+    }
+
+    /// Creates a builder for `CrossEncoderReranker`.
+    pub fn builder(
+        model_path: impl AsRef<Path>,
+        tokenizer_path: impl AsRef<Path>,
+    ) -> OnnxRerankerBuilder {
+        OnnxRerankerBuilder::new(model_path, tokenizer_path)
+    }
+
+    /// Creates a `CrossEncoderReranker` from an `OnnxConfig`.
+    /// Performs upfront parameter and path validation.
+    pub fn from_config(config: OnnxConfig) -> Result<Self, ContextraError> {
+        config.validate()?;
+        Self::new(config.inner)
     }
 
     /// Erstellt einen neuen CrossEncoderReranker.
