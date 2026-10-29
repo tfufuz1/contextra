@@ -17,7 +17,7 @@ use contextra_crypto::deletion_proof::{
     CustodyLevel, DeletionProof, DeletionProofKeyPair, ExcludedScope,
 };
 use contextra_crypto::CryptoError;
-use contextra_db::{Contextra, ContextraConfig};
+use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend};
 use contextra_ports::scanner::ScanTechnique;
 use contextra_ports::SystemClock;
 use contextra_testkit::mint_witness_for_tests;
@@ -74,14 +74,15 @@ async fn run_operator_role(
     let db_dir = TempDir::new().expect("Failed to create temp db dir");
     let config = ContextraConfig {
         dimension: 4,
+        embedding_backend: EmbeddingBackend::None,
         ..Default::default()
     };
     let db = Contextra::open_with_config(db_dir.path(), config).await?;
 
     // 3. Collection anlegen und sensitive Kundendaten (PII) einfügen
     let col_name = "gdpr_user_pii";
-    let tenant_id = TenantId::new(42);
-    let col = db.collection(col_name).await?;
+    let tenant_id = TenantId::try_new(42)?;
+    let col = db.collection_for_tenant(col_name, tenant_id).await?;
 
     col.insert(
         "user_101",

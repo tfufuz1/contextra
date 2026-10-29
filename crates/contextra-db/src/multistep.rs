@@ -47,6 +47,7 @@ impl Default for MultiStepConfig {
 /// Ergebnis einer Multi-Step-Suche mit Audit-Informationen.
 #[derive(Debug, Default)]
 pub struct MultiStepResult {
+    /// Die fusionierten Suchergebnisse der Multi-Step-Suche.
     pub results: Vec<SearchResult>,
     /// Anzahl der tatsächlich durchgeführten Runden.
     pub rounds_executed: usize,
@@ -70,6 +71,7 @@ pub struct MultiStepEngine<S: StorageEngine> {
 }
 
 impl<S: StorageEngine> MultiStepEngine<S> {
+    /// Erzeugt eine neue `MultiStepEngine` für eine geladene [`Collection`].
     pub fn new(collection: Arc<Collection<S>>, config: MultiStepConfig) -> Self {
         let pid = PidController::new(config.latency_budget_ms as f32, 50, 200, Some(100));
         Self {
