@@ -12,8 +12,9 @@ use crate::goal_condition::{parse_legacy_condition_string, GoalCondition};
 use crate::step::StepResult;
 use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
+/// Type alias for node identifiers in the state graph.
 pub type NodeId = String;
 
 /// Maximum allowed length in bytes for descriptions and conditions.
@@ -22,17 +23,24 @@ pub const MAX_TEXT_LEN: usize = 65_536;
 /// Type of node within the declarative agent state graph.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeType {
+    /// Initial workflow entry point node.
     Start,
+    /// Operational task step executing a registered tool handler.
     Task,
+    /// Conditional branching node evaluating context conditions.
     Decision,
+    /// Terminal workflow exit node.
     End,
 }
 
 /// Represents a single specialized node in the workflow.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentNode {
+    /// Unique identifier of the node.
     pub id: NodeId,
+    /// Text description of the node's task or role.
     pub description: String,
+    /// Functional type category of the node.
     pub node_type: NodeType,
     /// Registered name of the tool/function to execute, if applicable.
     pub handler: Option<String>,
@@ -41,10 +49,13 @@ pub struct AgentNode {
 /// Represents a conditional transition between two graph nodes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WorkflowEdge {
+    /// Origin node identifier of the transition.
     pub from: NodeId,
+    /// Target node identifier of the transition.
     pub to: NodeId,
     /// Legacy text-based condition string (maintained for 100% backward compatibility).
     pub condition: Option<String>,
+    /// Transition evaluation priority order (higher priority evaluated first).
     pub priority: u8,
     /// Structured GoalCondition for deterministic evaluation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -58,7 +69,7 @@ impl WorkflowEdge {
             || self
                 .condition
                 .as_ref()
-                .map_or(false, |c| !c.trim().is_empty())
+                .is_some_and(|c| !c.trim().is_empty())
     }
 
     /// Evaluates whether this edge's condition/goal is satisfied against a [`StepResult`].
@@ -100,11 +111,14 @@ impl WorkflowEdge {
 /// Core declarative structure routing autonomous agent steps.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct StateGraph {
-    pub nodes: HashMap<NodeId, AgentNode>,
+    /// Map of node identifiers to workflow nodes.
+    pub nodes: BTreeMap<NodeId, AgentNode>,
+    /// List of directional conditional transition edges.
     pub edges: Vec<WorkflowEdge>,
 }
 
 impl StateGraph {
+    /// Creates a new empty [`StateGraph`].
     pub fn new() -> Self {
         Self::default()
     }
@@ -252,6 +266,7 @@ impl StateGraph {
         }
     }
 
+    /// Looks up a node by its identifier.
     pub fn get_node(&self, id: &str) -> Option<&AgentNode> {
         self.nodes.get(id)
     }

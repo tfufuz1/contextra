@@ -70,6 +70,7 @@
 // REVIEW-PASS[2/2] STATUS:PASS (ID: AGT-AGENT-266186df) (TS: 2026-09-09T12:36:33Z) (SESSION: 3db4fa31)
 
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 #![allow(async_fn_in_trait)]
 
 pub mod audit;
@@ -82,6 +83,7 @@ pub mod event_source;
 pub mod goal_condition;
 pub mod graph;
 pub mod step;
+pub mod tools;
 
 pub use budget::{BudgetStrategy, Reservation, TokenBudget};
 pub use clm_scratchpad::{
@@ -96,3 +98,4 @@ pub use event_source::{BackgroundEvent, EventSource, PollingDocumentEventSource,
 pub use goal_condition::{parse_legacy_condition_string, GoalCondition};
 pub use graph::{AgentNode, NodeType, StateGraph, WorkflowEdge};
 pub use step::{AgentTool, DeadLetterReason, StepDeadLetter, StepResult};
+pub use tools::{RetrieveTool, ToolManifest, ToolRegistry};

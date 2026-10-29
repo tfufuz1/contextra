@@ -29,15 +29,21 @@ use std::sync::Arc;
 /// Audit-Datensatz für Scratchpad-Kontextänderungen und Resets.
 #[derive(Debug, Clone)]
 pub struct ContextEditAuditRecord {
+    /// Tenant identifier executing the scratchpad edit.
     pub tenant_id: TenantId,
+    /// Task identifier associated with the scratchpad edit.
     pub task_id: String,
+    /// Name of the edit operation performed.
     pub operation: String,
+    /// Current subgoal sequence index.
     pub subgoal_index: u64,
+    /// UNIX timestamp in nanoseconds when the edit occurred.
     pub timestamp_nanos: u64,
 }
 
 /// Lokaler Trait für Audit-Benachrichtigungen bei Scratchpad-Änderungen.
 pub trait ContextEditAuditSink: Send + Sync {
+    /// Records a scratchpad edit operation audit entry.
     fn record_edit(&self, record: ContextEditAuditRecord);
 }
 
@@ -56,12 +62,14 @@ pub struct CountingContextEditAuditSink {
 }
 
 impl CountingContextEditAuditSink {
+    /// Constructs a new `CountingContextEditAuditSink`.
     pub fn new() -> Self {
         Self {
             count: AtomicU64::new(0),
         }
     }
 
+    /// Returns the accumulated count of recorded edit operations.
     pub fn count(&self) -> u64 {
         self.count.load(Ordering::Relaxed)
     }
@@ -75,6 +83,7 @@ impl ContextEditAuditSink for CountingContextEditAuditSink {
 
 /// Lokaler Trait zur Cache-Invalidierung des Scratchpad-Scopes bei Resets.
 pub trait ScratchpadCacheInvalidator: Send + Sync {
+    /// Invalidates cache entries associated with a scratchpad subgoal scope.
     fn invalidate_scratchpad_scope(&self, tenant_id: TenantId, task_id: &str, subgoal_index: u64);
 }
 
@@ -99,12 +108,14 @@ pub struct CountingScratchpadCacheInvalidator {
 }
 
 impl CountingScratchpadCacheInvalidator {
+    /// Constructs a new `CountingScratchpadCacheInvalidator`.
     pub fn new() -> Self {
         Self {
             count: AtomicU64::new(0),
         }
     }
 
+    /// Returns the accumulated count of invalidation calls.
     pub fn count(&self) -> u64 {
         self.count.load(Ordering::Relaxed)
     }
@@ -297,16 +308,8 @@ impl ClmScratchpad {
         &self.pinned_regions
     }
 
-    /// Wendet eine Bearbeitungs-Operation ([`ScratchpadEditOp`]) auf das Scratchpad an.
-    ///
-    /// # Fehler
-    /// Liefert `ContextraError::InvalidInput` falls:
-    /// - Versucht wird, eine gepinnte Region zu verändern oder mit einem Chunk zu überschreiben,
-    /// - Ein anzusprechendes Label nicht existiert,
-    /// - Die Kapazität des Vaults überschritten wird.
-    pub fn apply_edit(&mut self, op: ScratchpadEditOp, captured_tx: TxId) -> Result<()> {
-        // Governance check: Edit darf keine gepinnte Region adressieren
-        match &op {
+    fn validate_edit_against_pinned(&self, op: &ScratchpadEditOp) -> Result<()> {
+        match op {
             ScratchpadEditOp::Append {
                 label: Some(lbl), ..
             } => {
@@ -340,92 +343,124 @@ impl ClmScratchpad {
             }
             _ => {}
         }
+        Ok(())
+    }
+
+    fn apply_append_op(
+        &mut self,
+        content: Vec<u8>,
+        label: Option<String>,
+        captured_tx: TxId,
+    ) -> Result<()> {
+        let doc_id = DocId::new(self.next_chunk_id);
+        self.next_chunk_id += 1;
+
+        let mut chunk = VaultChunk::new(doc_id, content, SignalModality::TextInput, captured_tx);
+        if let Some(lbl) = label {
+            chunk = chunk.with_label(lbl);
+        }
+
+        let chunk_to_ingest = clone_chunk(&chunk);
+        self.vault.ingest(chunk_to_ingest).map_err(|e| {
+            ContextraError::InvalidInput(format!(
+                "Scratchpad-Kapazität beim Anhängen überschritten: {e}"
+            ))
+        })?;
+
+        self.chunks.push(chunk);
+        Ok(())
+    }
+
+    #[allow(clippy::indexing_slicing)]
+    fn apply_replace_op(
+        &mut self,
+        chunk_label: &str,
+        new_content: Vec<u8>,
+        captured_tx: TxId,
+    ) -> Result<()> {
+        let idx = self
+            .chunks
+            .iter()
+            .position(|c| c.label.as_deref() == Some(chunk_label))
+            .ok_or_else(|| {
+                ContextraError::InvalidInput(format!(
+                    "Chunk mit Label '{chunk_label}' für Replace nicht gefunden"
+                ))
+            })?;
+
+        let mut candidate_chunks: Vec<VaultChunk> = self.chunks.iter().map(clone_chunk).collect();
+        candidate_chunks[idx].content = new_content;
+        candidate_chunks[idx].captured_tx = captured_tx.inner();
+
+        let mut test_vault = VolatileContextVault::open(self.config.clone());
+        for chunk in &candidate_chunks {
+            test_vault.ingest(clone_chunk(chunk)).map_err(|e| {
+                ContextraError::InvalidInput(format!(
+                    "Scratchpad-Kapazität bei Replace überschritten: {e}"
+                ))
+            })?;
+        }
+
+        self.chunks = candidate_chunks;
+        let old_vault = std::mem::replace(&mut self.vault, test_vault);
+        let _ = old_vault.purge();
+        Ok(())
+    }
+
+    fn apply_remove_op(&mut self, chunk_label: &str) -> Result<()> {
+        let idx = self
+            .chunks
+            .iter()
+            .position(|c| c.label.as_deref() == Some(chunk_label))
+            .ok_or_else(|| {
+                ContextraError::InvalidInput(format!(
+                    "Chunk mit Label '{chunk_label}' für Remove nicht gefunden"
+                ))
+            })?;
+
+        let mut candidate_chunks: Vec<VaultChunk> = self.chunks.iter().map(clone_chunk).collect();
+        candidate_chunks.remove(idx);
+
+        let mut test_vault = VolatileContextVault::open(self.config.clone());
+        for chunk in &candidate_chunks {
+            test_vault.ingest(clone_chunk(chunk)).map_err(|e| {
+                ContextraError::InvalidInput(format!(
+                    "Scratchpad-Kapazität bei Remove überschritten: {e}"
+                ))
+            })?;
+        }
+
+        self.chunks = candidate_chunks;
+        let old_vault = std::mem::replace(&mut self.vault, test_vault);
+        let _ = old_vault.purge();
+        Ok(())
+    }
+
+    /// Wendet eine Bearbeitungs-Operation ([`ScratchpadEditOp`]) auf das Scratchpad an.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::InvalidInput` falls:
+    /// - Versucht wird, eine gepinnte Region zu verändern oder mit einem Chunk zu überschreiben,
+    /// - Ein anzusprechendes Label nicht existiert,
+    /// - Die Kapazität des Vaults überschritten wird.
+    pub fn apply_edit(&mut self, op: ScratchpadEditOp, captured_tx: TxId) -> Result<()> {
+        self.validate_edit_against_pinned(&op)?;
 
         match op {
             ScratchpadEditOp::Append { content, label } => {
-                let doc_id = DocId::new(self.next_chunk_id);
-                self.next_chunk_id += 1;
-
-                let mut chunk =
-                    VaultChunk::new(doc_id, content, SignalModality::TextInput, captured_tx);
-                if let Some(lbl) = label {
-                    chunk = chunk.with_label(lbl);
-                }
-
-                // Ingest in den bestehenden Vault
-                let chunk_to_ingest = clone_chunk(&chunk);
-                self.vault.ingest(chunk_to_ingest).map_err(|e| {
-                    ContextraError::InvalidInput(format!(
-                        "Scratchpad-Kapazität beim Anhängen überschritten: {e}"
-                    ))
-                })?;
-
-                self.chunks.push(chunk);
+                self.apply_append_op(content, label, captured_tx)?;
             }
             ScratchpadEditOp::Replace {
                 chunk_label,
                 new_content,
             } => {
-                let idx = self
-                    .chunks
-                    .iter()
-                    .position(|c| c.label.as_deref() == Some(&chunk_label))
-                    .ok_or_else(|| {
-                        ContextraError::InvalidInput(format!(
-                            "Chunk mit Label '{chunk_label}' für Replace nicht gefunden"
-                        ))
-                    })?;
-
-                let mut candidate_chunks: Vec<VaultChunk> =
-                    self.chunks.iter().map(clone_chunk).collect();
-                candidate_chunks[idx].content = new_content;
-                candidate_chunks[idx].captured_tx = captured_tx.inner();
-
-                let mut test_vault = VolatileContextVault::open(self.config.clone());
-                for chunk in &candidate_chunks {
-                    test_vault.ingest(clone_chunk(chunk)).map_err(|e| {
-                        ContextraError::InvalidInput(format!(
-                            "Scratchpad-Kapazität bei Replace überschritten: {e}"
-                        ))
-                    })?;
-                }
-
-                // Transaktionssicher austauschen: alter Vault wird purged
-                self.chunks = candidate_chunks;
-                let old_vault = std::mem::replace(&mut self.vault, test_vault);
-                let _ = old_vault.purge();
+                self.apply_replace_op(&chunk_label, new_content, captured_tx)?;
             }
             ScratchpadEditOp::Remove { chunk_label } => {
-                let idx = self
-                    .chunks
-                    .iter()
-                    .position(|c| c.label.as_deref() == Some(&chunk_label))
-                    .ok_or_else(|| {
-                        ContextraError::InvalidInput(format!(
-                            "Chunk mit Label '{chunk_label}' für Remove nicht gefunden"
-                        ))
-                    })?;
-
-                let mut candidate_chunks: Vec<VaultChunk> =
-                    self.chunks.iter().map(clone_chunk).collect();
-                candidate_chunks.remove(idx);
-
-                let mut test_vault = VolatileContextVault::open(self.config.clone());
-                for chunk in &candidate_chunks {
-                    test_vault.ingest(clone_chunk(chunk)).map_err(|e| {
-                        ContextraError::InvalidInput(format!(
-                            "Scratchpad-Kapazität bei Remove überschritten: {e}"
-                        ))
-                    })?;
-                }
-
-                self.chunks = candidate_chunks;
-                let old_vault = std::mem::replace(&mut self.vault, test_vault);
-                let _ = old_vault.purge();
+                self.apply_remove_op(&chunk_label)?;
             }
         }
 
-        // Audit-Meldung für die Bearbeitung
         self.audit_sink.record_edit(ContextEditAuditRecord {
             tenant_id: self.tenant_id,
             task_id: self.task_id.clone(),
@@ -483,8 +518,41 @@ impl ClmScratchpad {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_scratchpad_builders_and_sinks() -> Result<()> {
+        let config = VaultConfig {
+            max_capacity_bytes: 1024,
+            attempt_mlock: false,
+        };
+        let tenant = TenantId::try_new(99).unwrap();
+        let audit_sink = Arc::new(CountingContextEditAuditSink::new());
+        let cache_inv = Arc::new(CountingScratchpadCacheInvalidator::new());
+
+        let mut pad = ClmScratchpad::new("task-builder".to_string(), config)
+            .with_tenant_id(tenant)
+            .with_clock(Arc::new(SystemClock::new()))
+            .with_audit_sink(audit_sink.clone())
+            .with_cache_invalidator(cache_inv.clone());
+
+        assert_eq!(pad.tenant_id(), tenant);
+        pad.apply_edit(
+            ScratchpadEditOp::Append {
+                content: b"test builder".to_vec(),
+                label: None,
+            },
+            TxId(1),
+        )?;
+
+        assert_eq!(audit_sink.count(), 1);
+        let _ = pad.checkpoint_and_reset()?;
+        assert_eq!(audit_sink.count(), 2);
+        assert_eq!(cache_inv.count(), 1);
+        Ok(())
+    }
 
     #[test]
     fn test_scratchpad_apply_edit_all_variants() -> Result<()> {
