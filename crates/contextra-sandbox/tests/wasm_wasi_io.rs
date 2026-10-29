@@ -248,7 +248,8 @@ async fn test_wasi_clock_time_get() -> TestResult {
     let output_allowed = executor
         .execute(&wasm_bytes, b"", &caps_allowed, Duration::from_secs(1))
         .await?;
-    let errno_allowed = i32::from_le_bytes(output_allowed.stdout[0..4].try_into()?);
+    let slice_allowed = output_allowed.stdout.get(0..4).ok_or("slice failed")?;
+    let errno_allowed = i32::from_le_bytes(slice_allowed.try_into()?);
     assert_eq!(errno_allowed, 0, "Expected clock_time_get to succeed (0)");
 
     // Case 2: allow_clock = false -> errno 2 (ERRNO_ACCES)
@@ -259,7 +260,8 @@ async fn test_wasi_clock_time_get() -> TestResult {
     let output_denied = executor
         .execute(&wasm_bytes, b"", &caps_denied, Duration::from_secs(1))
         .await?;
-    let errno_denied = i32::from_le_bytes(output_denied.stdout[0..4].try_into()?);
+    let slice_denied = output_denied.stdout.get(0..4).ok_or("slice failed")?;
+    let errno_denied = i32::from_le_bytes(slice_denied.try_into()?);
     assert_eq!(
         errno_denied, 2,
         "Expected clock_time_get to return ERRNO_ACCES (2) when disabled"
@@ -310,13 +312,15 @@ async fn test_wasi_random_get() -> TestResult {
         .execute(&wasm_bytes, b"", &caps_seeded, Duration::from_secs(1))
         .await?;
 
-    let errno1 = i32::from_le_bytes(out1.stdout[0..4].try_into()?);
-    let errno2 = i32::from_le_bytes(out2.stdout[0..4].try_into()?);
+    let s1 = out1.stdout.get(0..4).ok_or("slice failed")?;
+    let s2 = out2.stdout.get(0..4).ok_or("slice failed")?;
+    let errno1 = i32::from_le_bytes(s1.try_into()?);
+    let errno2 = i32::from_le_bytes(s2.try_into()?);
     assert_eq!(errno1, 0);
     assert_eq!(errno2, 0);
     assert_eq!(
-        &out1.stdout[4..20],
-        &out2.stdout[4..20],
+        out1.stdout.get(4..20),
+        out2.stdout.get(4..20),
         "Seeded random_get outputs must match"
     );
 
@@ -328,7 +332,8 @@ async fn test_wasi_random_get() -> TestResult {
     let out_unseeded = executor
         .execute(&wasm_bytes, b"", &caps_unseeded, Duration::from_secs(1))
         .await?;
-    let errno_nosys = i32::from_le_bytes(out_unseeded.stdout[0..4].try_into()?);
+    let s_nosys = out_unseeded.stdout.get(0..4).ok_or("slice failed")?;
+    let errno_nosys = i32::from_le_bytes(s_nosys.try_into()?);
     assert_eq!(
         errno_nosys, 52,
         "Expected random_get without seed to return ERRNO_NOSYS (52)"
@@ -366,8 +371,10 @@ async fn test_wasi_args_sizes_get() -> TestResult {
         .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
         .await?;
 
-    let argc = u32::from_le_bytes(output.stdout[0..4].try_into()?);
-    let buf_size = u32::from_le_bytes(output.stdout[4..8].try_into()?);
+    let s_argc = output.stdout.get(0..4).ok_or("slice failed")?;
+    let s_buf = output.stdout.get(4..8).ok_or("slice failed")?;
+    let argc = u32::from_le_bytes(s_argc.try_into()?);
+    let buf_size = u32::from_le_bytes(s_buf.try_into()?);
 
     assert_eq!(argc, 0, "Expected argc = 0");
     assert_eq!(buf_size, 0, "Expected argv_buf_size = 0");

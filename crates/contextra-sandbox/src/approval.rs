@@ -154,6 +154,14 @@ impl ApprovalRequest {
             });
         }
 
+        tracing::info!(
+            request_id = %self.request_id,
+            risk = ?self.risk,
+            capabilities = %self.requested_capabilities_summary,
+            approved_by = %approved_by,
+            "Approval request approved"
+        );
+
         self.status = ApprovalStatus::Approved {
             approved_by,
             approved_at_unix_ms: now_unix_ms,
@@ -185,6 +193,15 @@ impl ApprovalRequest {
             });
         }
 
+        tracing::info!(
+            request_id = %self.request_id,
+            risk = ?self.risk,
+            capabilities = %self.requested_capabilities_summary,
+            rejected_by = %rejected_by,
+            reason = %reason,
+            "Approval request rejected"
+        );
+
         self.status = ApprovalStatus::Rejected {
             rejected_by,
             reason,
@@ -202,10 +219,26 @@ impl ApprovalRequest {
             });
         }
 
+        tracing::info!(
+            request_id = %self.request_id,
+            risk = ?self.risk,
+            capabilities = %self.requested_capabilities_summary,
+            "Approval request expired"
+        );
+
         self.status = ApprovalStatus::Expired {
             expired_at_unix_ms: now_unix_ms,
         };
         Ok(self)
+    }
+
+    /// Checks if request is expired and transitions to `Expired` if pending.
+    pub fn check_and_expire(self, now_unix_ms: u64) -> Result<Self, ApprovalTransitionError> {
+        if self.status == ApprovalStatus::Pending && self.is_expired(now_unix_ms) {
+            self.expire(now_unix_ms)
+        } else {
+            Ok(self)
+        }
     }
 
     /// Determines whether this execution requires human approval before proceeding.
@@ -468,6 +501,24 @@ mod tests {
             req_custom.requested_capabilities_summary,
             "max_memory_pages: 64, allow_network: true"
         );
+    }
+
+    #[test]
+    fn test_expire_transition_and_check_and_expire() -> Result<(), ApprovalTransitionError> {
+        let caps = WasmCapabilities::default();
+        let request = ApprovalRequest::new("req-expire".to_string(), &caps, 1000, 500);
+
+        let unexpired = request.clone().check_and_expire(1200)?;
+        assert_eq!(unexpired.status, ApprovalStatus::Pending);
+
+        let expired = request.check_and_expire(1600)?;
+        assert_eq!(
+            expired.status,
+            ApprovalStatus::Expired {
+                expired_at_unix_ms: 1600
+            }
+        );
+        Ok(())
     }
 
     #[test]

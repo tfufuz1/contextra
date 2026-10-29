@@ -349,29 +349,29 @@ impl CommittedWrites {
                     if let (Some(b1), Some(b2)) =
                         (self.seq_index.remove(&s1), self.seq_index.remove(&s2))
                     {
-                    let mut prefixes = Vec::new();
-                    let mut total_keys = 0;
+                        let mut prefixes = Vec::new();
+                        let mut total_keys = 0;
 
-                    for (b, seq) in [(b1, s1), (b2, s2)] {
-                        match b {
-                            SeqBucket::Exact(keys) => {
-                                for k in &keys {
-                                    if self.keys.get(k) == Some(&seq) {
-                                        self.keys.remove(k);
+                        for (b, seq) in [(b1, s1), (b2, s2)] {
+                            match b {
+                                SeqBucket::Exact(keys) => {
+                                    for k in &keys {
+                                        if self.keys.get(k) == Some(&seq) {
+                                            self.keys.remove(k);
+                                        }
                                     }
+                                    total_keys += keys.len();
+                                    prefixes.extend(coarsen_keys_to_prefixes(&keys, 2));
                                 }
-                                total_keys += keys.len();
-                                prefixes.extend(coarsen_keys_to_prefixes(&keys, 2));
-                            }
-                            SeqBucket::Coarsened {
-                                prefixes: p,
-                                original_key_count,
-                            } => {
-                                total_keys += original_key_count;
-                                prefixes.extend(p);
+                                SeqBucket::Coarsened {
+                                    prefixes: p,
+                                    original_key_count,
+                                } => {
+                                    total_keys += original_key_count;
+                                    prefixes.extend(p);
+                                }
                             }
                         }
-                    }
 
                         let coarsened_prefixes = coarsen_keys_to_prefixes(&prefixes, 2);
                         self.seq_index.insert(
@@ -656,8 +656,7 @@ impl SequenceLogSsiValidator {
             sink.record_gauge("mvcc_ssi_commit_register_utilization_ratio", ratio, &[]);
 
             if reached_threshold {
-                if let Some(ref blocker) =
-                    self.diagnose_pruning_blocker_internal(writes, now_nanos)
+                if let Some(ref blocker) = self.diagnose_pruning_blocker_internal(writes, now_nanos)
                 {
                     sink.record_gauge(
                         "mvcc_ssi_coarsened_buckets_total",
