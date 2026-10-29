@@ -394,9 +394,8 @@ fn test_sketched_bandit_feature_gated_initialization() {
     #[cfg(feature = "sketched-bandit")]
     {
         let mut state = BanditProfileState::cold_start(4, 0.5);
-        state.implementation = contextra_adapt::BanditImplementation::SketchedProjection {
-            projected_dim: 2,
-        };
+        state.implementation =
+            contextra_adapt::BanditImplementation::SketchedProjection { projected_dim: 2 };
         assert!(state.ensure_sketched_state(2).is_ok());
         let x = vec![1.0f32; 4];
         let score = state.score(&x, 0.0, false);
