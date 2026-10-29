@@ -13,6 +13,7 @@ pub mod guarded_payload;
 pub mod processing_registry;
 
 pub use audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
+#[allow(deprecated)]
 pub use avv_generator::{generate_avv_draft, AvvContext};
 pub use bulk_exfiltration_detector::{
     BulkExfiltrationDetector, BulkExfiltrationOutcome, SessionId,
@@ -39,5 +40,5 @@ pub use error::EgressError;
 pub use guarded_payload::{GuardedPayload, Sanitized, Unsanitized};
 pub use processing_registry::{
     generate_registry, render_markdown, ProcessingActivityRecord, ProcessingRegistryExport,
-    ProcessorRole, TenantId,
+    ProcessorRole,
 };

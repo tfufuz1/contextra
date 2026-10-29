@@ -2,11 +2,18 @@
 //!
 //! Dieses Modul modelliert und generiert ein Verzeichnis von Verarbeitungstätigkeiten gemäß Art. 30 Abs. 1 DSGVO.
 //!
-//! ### Hinweis zur Abhängigkeit `TenantId`:
-//! `contextra-privacy` verwendet in diesem Modul den lokalen Typ-Alias `pub type TenantId = String;` anstelle
-//! einer Abhängigkeit zu `contextra-types`, um den Abhängigkeitsbaum schlank zu halten und den Scope
-//! der Crate-Konfiguration zu wahren.
+//! ### Kanonischer Mandanten-Typ:
+//! Dieses Modul nutzt ausschließlich den kanonischen Domain-Typ [`contextra_types::TenantId`] (`u64`) zur
+//! Gewährleistung von systemweiter Mandantentrennung und Isolation.
+//!
+//! ### Migrationspfad für bestehende Register (Legacy String-TenantId):
+//! In früheren Entwicklungsständen wurde der Mandant als `String` (z. B. `"tenant-123"`) gespeichert.
+//! Zur Migration bestehender JSON- oder Datenbank-Exporte können numerische IDs extrahiert werden
+//! (z. B. `"tenant-123"` -> `123u64`) und über `TenantId::try_new(id)` instanziiert werden.
 
+use crate::egress_guard::{TextSearchEngine, TextSearchResult};
+use crate::egress_vault::BoxFuture;
+use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
 
 /// Rolle bezüglich der Verarbeitungstätigkeit gemäß DSGVO.
@@ -29,9 +36,6 @@ impl ProcessorRole {
     }
 }
 
-/// Identifikator eines Mandanten im System.
-pub type TenantId = String;
-
 /// Ein Datensatz einer Verarbeitungstätigkeit gemäß Art. 30 Abs. 1 DSGVO.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessingActivityRecord {
@@ -53,7 +57,7 @@ pub struct ProcessingActivityRecord {
     pub retention_period: String,
     /// Allgemeine Beschreibung der technischen und organisatorischen Maßnahmen (TOMs).
     pub technical_and_organizational_measures: Vec<String>,
-    /// Mandanten-Identifikator.
+    /// Kanonischer Mandanten-Identifikator ([`TenantId`]).
     pub tenant_id: TenantId,
 }
 
@@ -62,6 +66,91 @@ pub struct ProcessingActivityRecord {
 pub struct ProcessingRegistryExport {
     /// Liste der erfassten Verarbeitungstätigkeiten.
     pub records: Vec<ProcessingActivityRecord>,
+}
+
+impl ProcessingRegistryExport {
+    /// Erstellt eine neue Export-Instanz mit den angegebenen Datensätzen.
+    pub fn new(records: Vec<ProcessingActivityRecord>) -> Self {
+        Self { records }
+    }
+
+    /// Filtert alle Verarbeitungstätigkeiten nach der angegebenen Mandanten-ID (Art. 15 DSGVO Auskunftsersuchen).
+    ///
+    /// Garantiert strikte Mandantentrennung bei Auskunftsersuchen, sodass nur Datensätze des Zielmandanten
+    /// zurückgegeben werden.
+    pub fn filter_by_tenant(&self, tenant_id: TenantId) -> Self {
+        let records = self
+            .records
+            .iter()
+            .filter(|r| r.tenant_id == tenant_id)
+            .cloned()
+            .collect();
+        Self { records }
+    }
+}
+
+impl TextSearchEngine for ProcessingRegistryExport {
+    /// Führt eine Volltext-Suche über das Verzeichnis von Verarbeitungstätigkeiten durch (Art. 15 DSGVO).
+    fn search_text<'a>(
+        &'a self,
+        text: &'a str,
+        limit: usize,
+    ) -> BoxFuture<'a, Result<Vec<TextSearchResult>, String>> {
+        Box::pin(async move {
+            let query = text.trim().to_lowercase();
+            if query.is_empty() {
+                return Ok(Vec::new());
+            }
+
+            let mut matches = Vec::new();
+            for (idx, record) in self.records.iter().enumerate() {
+                let mut score = 0.0f32;
+                if record.activity_name.to_lowercase().contains(&query) {
+                    score += 0.5;
+                }
+                if record.purpose.to_lowercase().contains(&query) {
+                    score += 0.3;
+                }
+                if record
+                    .data_categories
+                    .iter()
+                    .any(|cat| cat.to_lowercase().contains(&query))
+                {
+                    score += 0.4;
+                }
+                if record
+                    .data_subject_categories
+                    .iter()
+                    .any(|sub| sub.to_lowercase().contains(&query))
+                {
+                    score += 0.4;
+                }
+                if record
+                    .recipients
+                    .iter()
+                    .any(|rec| rec.to_lowercase().contains(&query))
+                {
+                    score += 0.2;
+                }
+
+                if score > 0.0 {
+                    matches.push((idx, score));
+                }
+            }
+
+            matches.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            let results = matches
+                .into_iter()
+                .take(limit)
+                .map(|(idx, score)| TextSearchResult {
+                    id: format!("record-{}", idx),
+                    score: score.min(1.0),
+                })
+                .collect();
+
+            Ok(results)
+        })
+    }
 }
 
 /// Erzeugt aus einer Reihe von Datensätzen eine strukturierte Export-Repräsentation.
@@ -90,7 +179,8 @@ pub fn render_markdown(export: &ProcessingRegistryExport) -> String {
     out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
 
     for record in &export.records {
-        let tenant = sanitize_markdown_cell(&record.tenant_id);
+        let tenant_str = record.tenant_id.to_string();
+        let tenant = sanitize_markdown_cell(&tenant_str);
         let name = sanitize_markdown_cell(&record.activity_name);
         let role = sanitize_markdown_cell(record.controller_or_processor_role.as_str());
         let purpose = sanitize_markdown_cell(&record.purpose);
@@ -139,7 +229,7 @@ pub fn render_markdown(export: &ProcessingRegistryExport) -> String {
 mod tests {
     use super::*;
 
-    fn create_sample_record() -> ProcessingActivityRecord {
+    fn create_sample_record(tenant_id: u64) -> ProcessingActivityRecord {
         ProcessingActivityRecord {
             activity_name: "Kundendaten-Analyse".to_string(),
             controller_or_processor_role: ProcessorRole::Controller,
@@ -153,7 +243,7 @@ mod tests {
                 "Verschlüsselung at rest".to_string(),
                 "TLS 1.3".to_string(),
             ],
-            tenant_id: "tenant-123".to_string(),
+            tenant_id: TenantId::try_new(tenant_id).unwrap_or(TenantId::SYSTEM),
         }
     }
 
@@ -165,44 +255,68 @@ mod tests {
         let md = render_markdown(&export);
         assert!(md.contains("# Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO)"));
         assert!(md.contains("| Mandant | Bezeichnung | Rolle | Zweck | Datenkategorien | Betroffene | Empfänger | Drittlandtransfers | Löschfrist | TOMs |"));
-        // Header title + blank line + table header + separator = 4 lines total
         let lines: Vec<&str> = md.trim().lines().collect();
         assert_eq!(lines.len(), 4);
     }
 
     #[test]
     fn test_single_record() {
-        let rec = create_sample_record();
+        let rec = create_sample_record(123);
         let export = generate_registry(std::slice::from_ref(&rec));
         assert_eq!(export.records.len(), 1);
 
         let md = render_markdown(&export);
-        assert!(md.contains("| tenant-123 | Kundendaten-Analyse | Verantwortlicher | Bereitstellung von Kontext-Suchen | E-Mail, IP-Adresse | Kunden, Endnutzer | Hosting-Provider | Keine | 30 Tage nach Kündigung | Verschlüsselung at rest, TLS 1.3 |"));
+        assert!(md.contains("| TenantId(123) | Kundendaten-Analyse | Verantwortlicher | Bereitstellung von Kontext-Suchen | E-Mail, IP-Adresse | Kunden, Endnutzer | Hosting-Provider | Keine | 30 Tage nach Kündigung | Verschlüsselung at rest, TLS 1.3 |"));
     }
 
     #[test]
     fn test_multiple_records_with_special_characters_and_escaping() {
-        let mut rec1 = create_sample_record();
+        let mut rec1 = create_sample_record(123);
         rec1.activity_name = "Verarbeitung | mit | Pipes".to_string();
         rec1.purpose = "Zeilenumordnung\nund | Mehrzeiler".to_string();
 
-        let mut rec2 = create_sample_record();
-        rec2.tenant_id = "tenant-456".to_string();
+        let mut rec2 = create_sample_record(456);
         rec2.controller_or_processor_role = ProcessorRole::Processor;
         rec2.third_country_transfers = vec!["USA (EU-US Data Privacy Framework)".to_string()];
 
         let export = generate_registry(&[rec1, rec2]);
         let md = render_markdown(&export);
 
-        // Check escaping of pipe symbol
         assert!(md.contains("Verarbeitung \\| mit \\| Pipes"));
         assert!(md.contains("Zeilenumordnung<br/>und \\| Mehrzeiler"));
         assert!(md.contains("Auftragsverarbeiter"));
         assert!(md.contains("USA (EU-US Data Privacy Framework)"));
 
-        // Ensure each record creates exactly 1 table row (no stray unescaped newlines in rows)
         let lines: Vec<&str> = md.trim().lines().collect();
-        // 4 header setup lines + 2 data rows = 6 lines total
         assert_eq!(lines.len(), 6);
+    }
+
+    #[tokio::test]
+    async fn test_text_search_engine_and_tenant_filter_art15() {
+        let rec1 = create_sample_record(100);
+        let mut rec2 = create_sample_record(200);
+        rec2.activity_name = "Gehaltsabrechnung".to_string();
+        rec2.data_categories = vec!["Bankverbindung".to_string(), "Steuer-ID".to_string()];
+
+        let export = generate_registry(&[rec1, rec2]);
+
+        // Search text across all tenants
+        let results = export.search_text("Bankverbindung", 10).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "record-1");
+
+        // Filter by tenant 100 for Art. 15 request
+        let tenant100_export = export.filter_by_tenant(TenantId::try_new(100).unwrap());
+        assert_eq!(tenant100_export.records.len(), 1);
+        assert_eq!(
+            tenant100_export.records[0].tenant_id,
+            TenantId::try_new(100).unwrap()
+        );
+
+        let tenant100_results = tenant100_export
+            .search_text("Bankverbindung", 10)
+            .await
+            .unwrap();
+        assert!(tenant100_results.is_empty());
     }
 }

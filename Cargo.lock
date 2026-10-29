@@ -1237,9 +1237,12 @@ dependencies = [
 name = "contextra-privacy"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "blake3",
+ "contextra-avv-generator",
  "contextra-crypto",
  "contextra-ports",
+ "contextra-testkit",
  "contextra-types",
  "parking_lot 0.12.5",
  "rand 0.8.8",
