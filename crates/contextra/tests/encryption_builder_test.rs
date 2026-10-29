@@ -1,6 +1,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra::{builder, ContextraConfig, ContextraConfigExt, ContextraError, EncryptionMode};
+use contextra::{
+    builder, ContextraBuilder, ContextraConfig, ContextraConfigExt, ContextraError, EncryptionMode,
+};
+use std::sync::{Arc, Mutex};
+use tracing_subscriber::layer::SubscriberExt;
 use zeroize::Zeroizing;
 
 #[tokio::test]
@@ -57,6 +61,51 @@ async fn test_explicit_unencrypted_mode_building() -> Result<(), Box<dyn std::er
 
     let db = builder.build().await?;
     assert_eq!(db.len().await?, 0);
+
+    let _ = std::fs::remove_dir_all(&tmp_path);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_implicit_unencrypted_mode_warning() -> Result<(), Box<dyn std::error::Error>> {
+    #[derive(Clone, Default)]
+    struct StringWriter(Arc<Mutex<Vec<u8>>>);
+    impl std::io::Write for StringWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let logs = StringWriter::default();
+    let logs_clone = logs.clone();
+    let subscriber = tracing_subscriber::fmt::layer()
+        .with_writer(move || logs_clone.clone())
+        .with_ansi(false);
+    let dispatch = tracing::Dispatch::new(tracing_subscriber::registry().with(subscriber));
+
+    let tmp_path =
+        std::env::temp_dir().join(format!("contextra_implicit_test_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp_path);
+
+    {
+        let _guard = tracing::dispatcher::set_default(&dispatch);
+        let db = ContextraBuilder::new(4)
+            .with_storage_path(&tmp_path)
+            .build()
+            .await?;
+        assert_eq!(db.len().await?, 0);
+    }
+
+    let output = String::from_utf8(logs.0.lock().unwrap().clone())?;
+    assert!(
+        output.contains("implicit unencrypted mode"),
+        "Expected warning log for implicit unencrypted mode, got: {}",
+        output
+    );
 
     let _ = std::fs::remove_dir_all(&tmp_path);
     Ok(())
