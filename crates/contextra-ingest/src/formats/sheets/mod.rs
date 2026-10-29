@@ -1,7 +1,10 @@
 // FILE-CONTEXT
-// ZWECK: Tabellen- & Spreadsheet-Extractor Stub (Xlsx, Xls, Xlsb, Ods, Csv, Tsv) (WP M4).
-// INVARIANTEN: FILE-CONTEXT Kopf, DocumentExtractor-Impl mit UnsupportedFormat.
+// ZWECK: Tabellen- & Spreadsheet-Extractor (Xlsx, Xls, Xlsb, Ods, Csv, Tsv).
+// INVARIANTEN: Zero-Panic, typisierte IngestError, kein unsafe, defensive Budgetierung.
 // STAND: TS:2026-10-31T00:00:00Z
+
+pub mod csv_fmt;
+pub mod excel;
 
 use crate::error::IngestError;
 use crate::extractor::{DocumentExtractor, ExtractContext};
@@ -34,12 +37,21 @@ impl DocumentExtractor for SheetsExtractor {
     fn extract(
         &self,
         format: FormatId,
-        _input: &[u8],
-        _ctx: &ExtractContext<'_>,
+        input: &[u8],
+        ctx: &ExtractContext<'_>,
     ) -> Result<DocumentIr, IngestError> {
-        Err(IngestError::UnsupportedFormat {
-            format: Some(format),
-            reason: "noch nicht implementiert".into(),
-        })
+        match format {
+            FormatId::Csv | FormatId::Tsv => csv_fmt::extract_csv_tsv(format, input, ctx),
+            FormatId::Xlsx | FormatId::Xls | FormatId::Xlsb | FormatId::Ods => {
+                excel::extract_excel(format, input, ctx)
+            }
+            _ => Err(IngestError::UnsupportedFormat {
+                format: Some(format),
+                reason: format!(
+                    "Format {:?} wird von SheetsExtractor nicht unterstützt",
+                    format
+                ),
+            }),
+        }
     }
 }
