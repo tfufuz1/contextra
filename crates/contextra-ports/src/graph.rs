@@ -117,6 +117,9 @@ pub enum GraphMutationError {
     /// Specified hyperedge ID was not found.
     #[error("Hyperedge not found: {0}")]
     HyperedgeNotFound(u64),
+    #[error("Duplicate hyperedge ID: {0}")]
+    /// Duplicate hyperedge ID.
+    DuplicateHyperEdgeId(HyperEdgeId),
 
     /// Invalid hyperedge weight.
     #[error("Invalid hyperedge weight {weight}: {reason}")]
