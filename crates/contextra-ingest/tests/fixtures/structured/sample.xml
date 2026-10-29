@@ -1,0 +1,12 @@
+<root>
+  <title>Golden Dataset</title>
+  <kunden_überschrift>Musterkunde ÄÖÜäöüß</kunden_überschrift>
+  <adresse>
+    <plz>12345</plz>
+    <stadt>Berlin</stadt>
+  </adresse>
+  <bestellungen>
+    <pos>1</pos>
+    <produkt>Laptop</produkt>
+  </bestellungen>
+</root>
