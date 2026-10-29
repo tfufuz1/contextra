@@ -337,7 +337,7 @@ async fn test_router_engine_persisted_calibration_loading() {
 
     let p1 = SlmProfile::new("p1", "http://ep1", vec![1], TokenBudget::default(), 0.5);
 
-    let mut initial_map = std::collections::HashMap::new();
+    let mut initial_map = std::collections::BTreeMap::new();
     let mut p1_state = crate::profile::ProfileCalibrationState::new(0.5);
     p1_state.times_selected = 42;
     initial_map.insert("p1".to_string(), p1_state);
@@ -493,7 +493,7 @@ async fn test_select_profile_cascade_error_branches_and_fallback(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::profile::ProfileCalibrationState;
     use contextra_types::{ContextChunk, DocId};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     let dir = tempfile::tempdir()?;
     let config = ContextraConfig {
@@ -520,7 +520,7 @@ async fn test_select_profile_cascade_error_branches_and_fallback(
     let profiles = vec![profile1.clone(), profile2.clone()];
     let router = create_test_router(collection, profiles.clone(), None);
 
-    let mut calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
+    let mut calibration: BTreeMap<String, ProfileCalibrationState> = BTreeMap::new();
     calibration.insert("p1".to_string(), ProfileCalibrationState::new(0.9));
     calibration.insert("p2".to_string(), ProfileCalibrationState::new(0.8));
 
@@ -617,7 +617,7 @@ async fn test_router_engine_additional_coverage_paths() -> contextra_types::Resu
             id,
             (
                 "p1".to_string(),
-                std::time::Instant::now() - std::time::Duration::from_secs(600),
+                router.clock.monotonic_nanos().saturating_sub(600_000_000_000),
             ),
         );
     }
@@ -631,11 +631,11 @@ async fn test_router_engine_additional_coverage_paths() -> contextra_types::Resu
     router
         .pending_decisions
         .write()
-        .insert(dec_id, ("p1".to_string(), std::time::Instant::now()));
+        .insert(dec_id, ("p1".to_string(), router.clock.monotonic_nanos()));
     assert!(router.record_outcome(dec_id, crate::RoutingOutcome::Success));
 
     // 4. Cascade selection margin with 0 quantile_threshold
-    let mut cal_map = std::collections::HashMap::new();
+    let mut cal_map = std::collections::BTreeMap::new();
     let mut p_zero = SlmProfile::new(
         "p_zero",
         "http://localhost:0000",
