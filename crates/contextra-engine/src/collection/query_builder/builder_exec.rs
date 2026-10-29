@@ -37,9 +37,47 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             return Ok((Vec::new(), crate::fusion::SearchReport::default()));
         }
 
-        let _has_reranker = self.reranker.is_some();
+        let hybrid_query = self.build_hybrid_query_config(k);
 
-        let fusion_weights = self.weights.unwrap_or_default();
+        let seq_no = if let Some(s) = self.seq {
+            s
+        } else {
+            self.collection.snapshot_seq().await?
+        };
+
+        if self.hard_scope.is_some() {
+            return Err(contextra_types::ContextraError::capability_unsupported(
+                "acorn_hard_boundary",
+                "ACORN hard-boundary scoping requires execute_with_scope() on a vector index implementing FilteredIndex",
+            ));
+        }
+
+        #[allow(deprecated)]
+        let (results, report) = self
+            .collection
+            .hybrid_search_with_query_and_report_at(
+                &hybrid_query,
+                seq_no,
+                self.on_signal_failure,
+                self.metrics.as_deref(),
+            )
+            .await?;
+
+        let results = self.apply_post_rrf_filters(results);
+
+        if let Some(reranker) = self.reranker {
+            let reranked = self.apply_reranker_stage(reranker, results, k).await?;
+            return Ok((reranked, report));
+        }
+
+        let mut final_results = results;
+        final_results.truncate(k);
+        Ok((final_results, report))
+    }
+
+    /// Builds the internal [`contextra_types::HybridQuery`] configuration from builder state.
+    fn build_hybrid_query_config(&self, k: usize) -> contextra_types::HybridQuery {
+        let fusion_weights = self.weights.clone().unwrap_or_default();
         let fusion_strategy = self
             .fusion_strategy
             .or_else(|| {
@@ -49,9 +87,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             })
             .unwrap_or_default();
 
-        // Calculate candidate pool limits according to requirements:
-        // Base candidate pool size is user wish multiplier * k (default multiplier = 10).
-        // Enforce pool bounds [50, 200].
         let raw_mult = self
             .rerank_pool_multiplier
             .unwrap_or(super::builder::DEFAULT_RERANK_POOL_MULTIPLIER);
@@ -71,7 +106,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             .rerank_pool_max
             .map_or(base_pool, |max_val| base_pool.min(max_val).clamp(50, 200));
 
-        let hybrid_query = contextra_types::HybridQuery {
+        contextra_types::HybridQuery {
             text_query: self.text.clone(),
             vector_query: self.vector.clone(),
             graph_start_node: self
@@ -93,35 +128,14 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             include_provenance: self.include_provenance,
             rerank_pool_multiplier: self.rerank_pool_multiplier,
             rerank_pool_max: Some(effective_pool_max),
-            has_reranker: _has_reranker,
+            has_reranker: self.reranker.is_some(),
             on_signal_failure: self.on_signal_failure,
             k,
-        };
-
-        let seq_no = if let Some(s) = self.seq {
-            s
-        } else {
-            self.collection.snapshot_seq().await?
-        };
-
-        if self.hard_scope.is_some() {
-            return Err(contextra_types::ContextraError::capability_unsupported(
-                "acorn_hard_boundary",
-                "ACORN hard-boundary scoping requires execute_with_scope() on a vector index implementing FilteredIndex",
-            ));
         }
+    }
 
-        #[allow(deprecated)]
-        let (mut results, report) = self
-            .collection
-            .hybrid_search_with_query_and_report_at(
-                &hybrid_query,
-                seq_no,
-                self.on_signal_failure,
-                self.metrics.as_deref(),
-            )
-            .await?;
-
+    /// Applies post-RRF metadata, memory-type, custom predicate, and bi-temporal validity filters.
+    fn apply_post_rrf_filters(&self, mut results: Vec<crate::SearchResult>) -> Vec<crate::SearchResult> {
         if let Some(ref filter_expr) = self.filter {
             results.retain(|res| {
                 let meta_ref = res.metadata.as_ref().unwrap_or(&serde_json::Value::Null);
@@ -148,148 +162,156 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             results = filtered;
         }
 
-        // Post-RRF Bi-temporal Validity Filtering (ADR-033 / ADR-038)
-        // Executed NACH RRF-Fusion and VOR CrossEncoder Reranking to ensure high efficiency
-        // (expensive CrossEncoder reranker is only invoked on temporally valid candidates).
         if let Some(as_of) = self.as_of_timestamp {
-            results = crate::temporal_filter::apply_temporal_validity_filter_at(results, as_of);
+            crate::temporal_filter::apply_temporal_validity_filter_at(results, as_of)
         } else if self.query_timestamp.is_some() || self.current_tx.is_some() {
             let ctx = self
                 .current_tx
                 .unwrap_or(contextra_types::TxId::new(u64::MAX));
-            results = crate::temporal_filter::apply_temporal_validity_filter(
+            crate::temporal_filter::apply_temporal_validity_filter(
                 results,
                 ctx,
                 self.query_timestamp,
-            );
+            )
+        } else {
+            results
+        }
+    }
+
+    /// Applies cross-encoder reranking to filtered candidate search results.
+    async fn apply_reranker_stage(
+        &self,
+        reranker: &'a dyn contextra_ports::Reranker,
+        mut results: Vec<crate::SearchResult>,
+        k: usize,
+    ) -> Result<Vec<crate::SearchResult>> {
+        let text_str = self.text.as_deref().unwrap_or("");
+        if results.is_empty() || text_str.is_empty() {
+            results.truncate(k);
+            return Ok(results);
         }
 
-        if let Some(reranker) = self.reranker {
-            // RESOLVED: AGT-DB-8ddf8937 (TS: 2026-09-10T00:00:00Z SESSION: 8ddf8937)
-            // Explicitly bind query text for Cross-Encoder reranking
-            let text_str = self.text.as_deref().unwrap_or("");
-            if !results.is_empty() && !text_str.is_empty() {
-                let start_time = std::time::Instant::now();
+        let start_nanos = self.collection.clock().monotonic_nanos();
+        let candidate_texts: Vec<String> = results
+            .iter()
+            .map(|r| {
+                r.metadata
+                    .as_ref()
+                    .and_then(|m| m.get("text").or_else(|| m.get("content")))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&r.id)
+                    .to_string()
+            })
+            .collect();
 
-                let candidate_texts: Vec<String> = results
-                    .iter()
-                    .map(|r| {
-                        r.metadata
-                            .as_ref()
-                            .and_then(|m| m.get("text").or_else(|| m.get("content")))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or(&r.id)
-                            .to_string()
-                    })
-                    .collect();
+        let deadline_ms = reranker.rerank_deadline_ms().unwrap_or(500);
+        let rerank_deadline = std::time::Duration::from_millis(deadline_ms);
 
-                let deadline_ms = reranker.rerank_deadline_ms().unwrap_or(500);
-                let rerank_deadline = std::time::Duration::from_millis(deadline_ms);
+        let chunk_size = if candidate_texts.len() <= 10 { 1 } else { 10 };
+        let mut accumulated_ranked: Vec<contextra_types::RerankResult> = Vec::new();
 
-                let chunk_size = if candidate_texts.len() <= 10 { 1 } else { 10 };
-                let mut accumulated_ranked: Vec<contextra_types::RerankResult> = Vec::new();
+        for (chunk_idx, chunk) in candidate_texts.chunks(chunk_size).enumerate() {
+            let elapsed_nanos = self
+                .collection
+                .clock()
+                .monotonic_nanos()
+                .saturating_sub(start_nanos);
+            let elapsed = std::time::Duration::from_nanos(elapsed_nanos);
+            if elapsed >= rerank_deadline {
+                tracing::warn!(
+                    deadline_ms = rerank_deadline.as_millis(),
+                    "Reranker deadline reached before evaluating all candidates — executing Anytime-Rerank fallback"
+                );
+                break;
+            }
+            let remaining = rerank_deadline - elapsed;
+            let start_candidate_idx = chunk_idx * chunk_size;
 
-                for (chunk_idx, chunk) in candidate_texts.chunks(chunk_size).enumerate() {
-                    let elapsed = start_time.elapsed();
-                    if elapsed >= rerank_deadline {
-                        tracing::warn!(
-                            deadline_ms = rerank_deadline.as_millis(),
-                            "Reranker deadline reached before evaluating all candidates — executing Anytime-Rerank fallback"
-                        );
-                        break;
-                    }
-                    let remaining = rerank_deadline - elapsed;
-                    let start_candidate_idx = chunk_idx * chunk_size;
+            let rerank_res =
+                tokio::time::timeout(remaining, reranker.rerank(text_str, chunk)).await;
 
-                    let rerank_res =
-                        tokio::time::timeout(remaining, reranker.rerank(text_str, chunk)).await;
-
-                    match rerank_res {
-                        Ok(Ok(ranked_chunk)) => {
-                            for r in ranked_chunk {
-                                accumulated_ranked.push(contextra_types::RerankResult {
-                                    index: r.index,
-                                    original_index: start_candidate_idx + r.original_index,
-                                    score: r.score,
-                                    calibrated_score: r.calibrated_score,
-                                });
-                            }
-                        }
-                        Ok(Err(e)) => {
-                            tracing::warn!("Reranking chunk failed: {e}");
-                            break;
-                        }
-                        Err(_) => {
-                            tracing::warn!(
-                                deadline_ms = rerank_deadline.as_millis(),
-                                "Reranker deadline exceeded during chunk evaluation — executing Anytime-Rerank fallback"
-                            );
-                            break;
-                        }
+            match rerank_res {
+                Ok(Ok(ranked_chunk)) => {
+                    for r in ranked_chunk {
+                        accumulated_ranked.push(contextra_types::RerankResult {
+                            index: r.index,
+                            original_index: start_candidate_idx + r.original_index,
+                            score: r.score,
+                            calibrated_score: r.calibrated_score,
+                        });
                     }
                 }
-
-                let _elapsed = start_time.elapsed();
-                #[cfg(feature = "adaptive-candidate-pool-sizing")]
-                if let Some(ref pid) = self.pid_controller {
-                    pid.lock().update(_elapsed, _elapsed.as_millis() as f32);
+                Ok(Err(e)) => {
+                    tracing::warn!("Reranking chunk failed: {e}");
+                    break;
                 }
-
-                if !accumulated_ranked.is_empty() {
-                    // Sort evaluated candidates by score descending
-                    accumulated_ranked.sort_by(|a, b| {
-                        b.score
-                            .partial_cmp(&a.score)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    });
-
-                    // Implizites Calibration-Feedback (k=5 als Relevanz-Cutoff)
-                    reranker.record_implicit_feedback(&accumulated_ranked, 5.min(k));
-
-                    let mut evaluated_indices = std::collections::HashSet::new();
-                    let mut final_results = Vec::with_capacity(k);
-
-                    for r in accumulated_ranked {
-                        evaluated_indices.insert(r.original_index);
-                        if let Some(mut result) = results.get(r.original_index).cloned() {
-                            if let Some(meta) = result.metadata.as_mut() {
-                                if let Some(obj) = meta.as_object_mut() {
-                                    obj.insert("ce_score".to_string(), serde_json::json!(r.score));
-                                }
-                            } else {
-                                result.metadata = Some(serde_json::json!({ "ce_score": r.score }));
-                            }
-                            result.score = r.score;
-                            if let Some(p) = result.provenance.as_mut() {
-                                p.rerank_score = Some(r.score);
-                            }
-                            final_results.push(result);
-                        }
-                    }
-
-                    // Append unevaluated candidates in their original fusion order
-                    for (idx, res) in results.into_iter().enumerate() {
-                        if !evaluated_indices.contains(&idx) {
-                            final_results.push(res);
-                        }
-                    }
-
-                    final_results.truncate(k);
-                    tracing::debug!(
-                        "Anytime reranking applied: {} candidates",
-                        final_results.len()
+                Err(_) => {
+                    tracing::warn!(
+                        deadline_ms = rerank_deadline.as_millis(),
+                        "Reranker deadline exceeded during chunk evaluation — executing Anytime-Rerank fallback"
                     );
-                    return Ok((final_results, report));
-                } else {
-                    // Complete timeout before any candidate completed: fallback to original fusion results
-                    results.truncate(k);
-                    return Ok((results, report));
+                    break;
                 }
             }
         }
 
-        results.truncate(k);
-        Ok((results, report))
+        let _elapsed = std::time::Duration::from_nanos(
+            self.collection
+                .clock()
+                .monotonic_nanos()
+                .saturating_sub(start_nanos),
+        );
+        #[cfg(feature = "adaptive-candidate-pool-sizing")]
+        if let Some(ref pid) = self.pid_controller {
+            pid.lock().update(_elapsed, _elapsed.as_millis() as f32);
+        }
+
+        if !accumulated_ranked.is_empty() {
+            accumulated_ranked.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            reranker.record_implicit_feedback(&accumulated_ranked, 5.min(k));
+
+            let mut evaluated_indices = std::collections::HashSet::new();
+            let mut final_results = Vec::with_capacity(k);
+
+            for r in accumulated_ranked {
+                evaluated_indices.insert(r.original_index);
+                if let Some(mut result) = results.get(r.original_index).cloned() {
+                    if let Some(meta) = result.metadata.as_mut() {
+                        if let Some(obj) = meta.as_object_mut() {
+                            obj.insert("ce_score".to_string(), serde_json::json!(r.score));
+                        }
+                    } else {
+                        result.metadata = Some(serde_json::json!({ "ce_score": r.score }));
+                    }
+                    result.score = r.score;
+                    if let Some(p) = result.provenance.as_mut() {
+                        p.rerank_score = Some(r.score);
+                    }
+                    final_results.push(result);
+                }
+            }
+
+            for (idx, res) in results.into_iter().enumerate() {
+                if !evaluated_indices.contains(&idx) {
+                    final_results.push(res);
+                }
+            }
+
+            final_results.truncate(k);
+            tracing::debug!(
+                "Anytime reranking applied: {} candidates",
+                final_results.len()
+            );
+            Ok(final_results)
+        } else {
+            results.truncate(k);
+            Ok(results)
+        }
     }
 }
 
@@ -335,12 +357,29 @@ where
             self.collection.snapshot_seq().await?
         };
 
+        let results = self.hydrate_acorn_search_results(acorn_tuples, seq_no).await?;
+        let results = self.apply_post_rrf_filters(results);
+
+        if let Some(reranker) = self.reranker {
+            return self.apply_reranker_stage(reranker, results, k).await;
+        }
+
+        let mut final_results = results;
+        final_results.truncate(k);
+        Ok(final_results)
+    }
+
+    /// Hydrates search results from ACORN DocId tuples at a snapshot sequence.
+    async fn hydrate_acorn_search_results(
+        &self,
+        acorn_tuples: Vec<(DocId, f32)>,
+        seq_no: u64,
+    ) -> Result<Vec<crate::SearchResult>> {
         let mut results = Vec::with_capacity(acorn_tuples.len());
         for (doc_id, score) in acorn_tuples {
             let doc_key = self
                 .collection
                 .namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-            // SSI: nicht tx-gebunden — Hydrierung von ACORN-Suchergebnissen am Snapshot
             if let Some(bytes) = self
                 .collection
                 .storage()
@@ -371,93 +410,6 @@ where
                 });
             }
         }
-
-        if let Some(ref filter_expr) = self.filter {
-            results.retain(|res| {
-                let meta_ref = res.metadata.as_ref().unwrap_or(&serde_json::Value::Null);
-                filter_expr.evaluate(meta_ref)
-            });
-        }
-
-        if let Some(ref memory_types) = self.memory_type_filter {
-            results.retain(|res| {
-                let mt = crate::filter::extract_memory_type(&res.metadata);
-                memory_types.contains(&mt)
-            });
-        }
-
-        if let Some(ref filter_fn) = self.filter_fn {
-            let mut filtered = Vec::with_capacity(results.len());
-            for res in results {
-                if let Ok(doc_id) = DocId::from_key(&res.id) {
-                    if filter_fn(doc_id) {
-                        filtered.push(res);
-                    }
-                }
-            }
-            results = filtered;
-        }
-
-        if let Some(as_of) = self.as_of_timestamp {
-            results = crate::temporal_filter::apply_temporal_validity_filter_at(results, as_of);
-        } else if self.query_timestamp.is_some() || self.current_tx.is_some() {
-            let ctx = self
-                .current_tx
-                .unwrap_or(contextra_types::TxId::new(u64::MAX));
-            results = crate::temporal_filter::apply_temporal_validity_filter(
-                results,
-                ctx,
-                self.query_timestamp,
-            );
-        }
-
-        if let Some(reranker) = self.reranker {
-            let text_str = self.text.as_deref().unwrap_or("");
-            if !results.is_empty() && !text_str.is_empty() {
-                let candidate_texts: Vec<String> = results
-                    .iter()
-                    .map(|r| {
-                        r.metadata
-                            .as_ref()
-                            .and_then(|m| m.get("text").or_else(|| m.get("content")))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or(&r.id)
-                            .to_string()
-                    })
-                    .collect();
-
-                let deadline_ms = reranker.rerank_deadline_ms().unwrap_or(500);
-                let rerank_deadline = std::time::Duration::from_millis(deadline_ms);
-
-                if let Ok(Ok(ranked)) = tokio::time::timeout(
-                    rerank_deadline,
-                    reranker.rerank(text_str, &candidate_texts),
-                )
-                .await
-                {
-                    let mut reranked_results = Vec::with_capacity(k);
-                    for r in ranked.into_iter().take(k) {
-                        if let Some(mut result) = results.get(r.original_index).cloned() {
-                            if let Some(meta) = result.metadata.as_mut() {
-                                if let Some(obj) = meta.as_object_mut() {
-                                    obj.insert("ce_score".to_string(), serde_json::json!(r.score));
-                                }
-                            } else {
-                                result.metadata = Some(serde_json::json!({ "ce_score": r.score }));
-                            }
-                            result.score = r.score;
-                            if let Some(p) = result.provenance.as_mut() {
-                                p.rerank_score = Some(r.score);
-                            }
-                            reranked_results.push(result);
-                        }
-                    }
-                    return Ok(reranked_results);
-                }
-            }
-        }
-
-        results.truncate(k);
         Ok(results)
     }
 }

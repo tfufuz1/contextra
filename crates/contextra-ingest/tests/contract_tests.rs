@@ -335,7 +335,7 @@ fn test_contract_8_stubs_return_unsupported_and_fuzz_support_panics_free() {
         filename: None,
     };
 
-    let err = reg.extract(FormatId::Docx, b"dummy", &ctx).unwrap_err();
+    let err = reg.extract(FormatId::Pptx, b"dummy", &ctx).unwrap_err();
     assert!(matches!(err, IngestError::UnsupportedFormat { .. }));
 
     // Fuzz support muss für beliebige Bytes panikfrei sein

@@ -10,8 +10,7 @@ use std::sync::Arc;
 
 use bincode::Options;
 use contextra_license::{
-    FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedLicenseGate,
-    SignedLicenseOptions,
+    FeatureRing, LicenseError, LicenseGate, LicensePayload, SignedLicenseGate, SignedLicenseOptions,
 };
 use contextra_ports::clock::Clock;
 use contextra_types::TenantId;

@@ -10,8 +10,8 @@
 
 use crate::aggregation_phase::{AggregationConfig, AggregationNode};
 use crate::memory_consolidation::{cosine_similarity, detect_near_duplicates};
+use ahash::{AHashMap, AHashSet};
 use contextra_types::{DocId, EntityId};
-use std::collections::HashSet;
 
 /// Reine, synchrone Funktion, die für drei `AggregationNode`-Kandidaten (A, B, C)
 /// und einen Ähnlichkeits-Schwellenwert prüft, ob eine transitive Verkettung
@@ -47,36 +47,19 @@ pub fn validate_transitivity_veto(
     true
 }
 
-/// Orchestrierungsfunktion für die Transitivitätsprüfung unter Einhaltung der P24-Lokalität.
-///
-/// **Ablauf**:
-/// (a) Nutzt zuerst `detect_near_duplicates`, um eine vorgefilterte, kleine Kandidatenmenge zu erhalten.
-/// (b) Prüft die Größe/Speicherbedarf der Kandidatenmenge gegen `AggregationConfig.max_compaction_peak_memory_mb`.
-///     Bei Überschreitung wird die Transitivitätsprüfung für diesen Batch mit einer `tracing::warn!`-Meldung
-///     übersprungen (kein Abbrechen der Konsolidierung).
-/// (c) Führt erst dann `validate_transitivity_veto`-Aufrufe ausschließlich innerhalb der vorgefilterten,
-///     budgetbegrenzten Menge durch.
-pub fn filter_candidates_with_transitivity_veto(
+fn build_candidate_nodes(
+    raw_pairs: &[(DocId, DocId)],
     turns: &[(DocId, Vec<f32>)],
-    threshold: f32,
     agg_cfg: &AggregationConfig,
-) -> Vec<(DocId, DocId)> {
-    // (a) Vorgefilterte Kandidatenpaare aus detect_near_duplicates beziehen
-    let raw_pairs = detect_near_duplicates(turns, threshold);
-    if raw_pairs.is_empty() {
-        return Vec::new();
-    }
-
-    // Eindeutige Kandidaten-DocIds aus den Rohpaaren extrahieren
-    let mut candidate_ids_set = HashSet::new();
-    for (older, newer) in &raw_pairs {
+) -> Option<Vec<AggregationNode>> {
+    let mut candidate_ids_set = AHashSet::new();
+    for (older, newer) in raw_pairs {
         candidate_ids_set.insert(*older);
         candidate_ids_set.insert(*newer);
     }
 
     let candidate_count = candidate_ids_set.len();
-    let turn_map: std::collections::HashMap<DocId, &Vec<f32>> =
-        turns.iter().map(|(id, emb)| (*id, emb)).collect();
+    let turn_map: AHashMap<DocId, &Vec<f32>> = turns.iter().map(|(id, emb)| (*id, emb)).collect();
 
     let mut candidate_nodes = Vec::with_capacity(candidate_count);
     for doc_id in &candidate_ids_set {
@@ -89,7 +72,6 @@ pub fn filter_candidates_with_transitivity_veto(
         }
     }
 
-    // (b) Budget-Prüfung gegen AggregationConfig.max_compaction_peak_memory_mb
     let dim = candidate_nodes
         .first()
         .map(|n| n.embedding.len())
@@ -105,10 +87,36 @@ pub fn filter_candidates_with_transitivity_veto(
             limit_mb = agg_cfg.max_compaction_peak_memory_mb,
             "Transitivity check skipped: prefiltered candidate set memory budget exceeded"
         );
-        return raw_pairs;
+        return None;
     }
 
-    // (c) Paarweise validate_transitivity_veto-Aufrufe ausschließlich innerhalb der vorgefilterten Menge
+    Some(candidate_nodes)
+}
+
+/// Orchestrierungsfunktion für die Transitivitätsprüfung unter Einhaltung der P24-Lokalität.
+///
+/// **Ablauf**:
+/// (a) Nutzt zuerst `detect_near_duplicates`, um eine vorgefilterte, kleine Kandidatenmenge zu erhalten.
+/// (b) Prüft die Größe/Speicherbedarf der Kandidatenmenge gegen `AggregationConfig.max_compaction_peak_memory_mb`.
+///     Bei Überschreitung wird die Transitivitätsprüfung für diesen Batch mit einer `tracing::warn!`-Meldung
+///     übersprungen (kein Abbrechen der Konsolidierung).
+/// (c) Führt erst dann `validate_transitivity_veto`-Aufrufe ausschließlich innerhalb der vorgefilterten,
+///     budgetbegrenzten Menge durch.
+pub fn filter_candidates_with_transitivity_veto(
+    turns: &[(DocId, Vec<f32>)],
+    threshold: f32,
+    agg_cfg: &AggregationConfig,
+) -> Vec<(DocId, DocId)> {
+    let raw_pairs = detect_near_duplicates(turns, threshold);
+    if raw_pairs.is_empty() {
+        return Vec::new();
+    }
+
+    let candidate_nodes = match build_candidate_nodes(&raw_pairs, turns, agg_cfg) {
+        Some(nodes) => nodes,
+        None => return raw_pairs,
+    };
+
     let mut filtered_pairs = Vec::with_capacity(raw_pairs.len());
 
     for (older_id, newer_id) in raw_pairs {

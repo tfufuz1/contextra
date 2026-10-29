@@ -95,6 +95,10 @@ pub enum GraphMutationError {
     #[error("Lock acquisition timed out: {0}")]
     LockAcquisitionTimeout(String),
 
+    /// Duplicate hyperedge ID provided.
+    #[error("Duplicate hyperedge ID: {0}")]
+    DuplicateHyperEdgeId(HyperEdgeId),
+
     /// Provided role binding is invalid.
     #[error("Invalid role binding: {0}")]
     RoleBindingInvalid(String),
@@ -114,9 +118,20 @@ pub enum GraphMutationError {
         found: usize,
     },
 
+    /// Specified hyperedge ID already exists.
+    #[error("Duplicate hyperedge ID: {0}")]
+    DuplicateHyperEdgeId(HyperEdgeId),
+
     /// Specified hyperedge ID was not found.
     #[error("Hyperedge not found: {0}")]
     HyperedgeNotFound(u64),
+    #[error("Duplicate hyperedge ID: {0}")]
+    /// Duplicate hyperedge ID.
+    DuplicateHyperEdgeId(HyperEdgeId),
+
+    /// Duplicate hyperedge ID provided.
+    #[error("Duplicate hyperedge ID: {0}")]
+    DuplicateHyperEdgeId(HyperEdgeId),
 
     /// Invalid hyperedge weight.
     #[error("Invalid hyperedge weight {weight}: {reason}")]
