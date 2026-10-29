@@ -46,12 +46,8 @@ fn test_copied_activation_to_foreign_host_fails() {
     });
 
     // Activation generated for Host A
-    let activation_host_a = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        host_a_id,
-        2000,
-        &signing_key,
-    );
+    let activation_host_a =
+        SignedActivation::create_signed(FeatureRing::Sovereign, host_a_id, 2000, &signing_key);
 
     // Copying activation record to Host B (which has local installation ID host_b_id)
     let gate_host_b =
