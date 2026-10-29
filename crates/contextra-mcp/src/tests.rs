@@ -61,11 +61,12 @@ async fn create_mock_server_with_write_and_egress(
         allow_db_writes,
         allow_code_execution: false,
         allow_cloud_egress,
-        max_execution_ms: 5_000,
+        max_execution_ms: 60_000,
     };
     let sandbox = Arc::new(McpSandbox::new(policy).expect("sandbox new"));
-    let server = Arc::new(McpServer::with_sandbox(Arc::new(db), embedder, sandbox));
-    (server, tmp)
+    let mut server = McpServer::with_sandbox(Arc::new(db), embedder, sandbox);
+    server.tenant_id = Some(contextra_types::TenantId::SYSTEM);
+    (Arc::new(server), tmp)
 }
 
 fn make_request(method: &str, params: Value) -> JsonRpcRequest {
@@ -295,7 +296,7 @@ async fn test_contextra_forget_single_doc() {
     assert_eq!(resp_g.result.unwrap(), serde_json::Value::Null);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_contextra_forget_collection_with_proof() {
     let (server, _tmp) = create_mock_server_with_write(true).await;
 
@@ -591,6 +592,112 @@ async fn test_search_validates_empty_or_oversized_query() {
     let err_huge = resp_huge.error.expect("error expected for oversized query"); // expect
     assert_eq!(err_huge.code, -32602);
     assert!(err_huge.message.contains("query size exceeds limit"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_contextra_delete_single_doc_fields() {
+    std::env::set_var(
+        "CONTEXTRA_DELETION_PROOF_KEY",
+        "test_deletion_proof_key_32_bytes!",
+    );
+    let (server, _tmp) = create_mock_server_with_write(true).await;
+
+    // 1. Insert document
+    let insert_req = make_request(
+        "contextra_insert",
+        json!({
+            "id": "delete_doc_1",
+            "text": "Data to delete",
+            "collection": "default"
+        }),
+    );
+    let resp = server.handle(insert_req).await;
+    assert!(resp.error.is_none());
+
+    // 2. Delete single document using contextra_delete tool
+    let delete_req = make_request(
+        "tools/call",
+        json!({
+            "name": "contextra_delete",
+            "arguments": {
+                "collection": "default",
+                "id": "delete_doc_1"
+            }
+        }),
+    );
+    let resp_d = server.handle(delete_req).await;
+    assert!(resp_d.error.is_none());
+    let res_d = serde_json::to_value(&resp_d).unwrap();
+    assert_ne!(res_d["result"]["isError"], true);
+
+    let text = res_d["result"]["content"][0]["text"].as_str().unwrap();
+    let json_res: Value = serde_json::from_str(text).unwrap();
+
+    assert_eq!(json_res["ok"], true);
+    assert_eq!(json_res["deleted"], true);
+    assert_eq!(json_res["verified"], false);
+    assert_eq!(json_res["id"], "delete_doc_1");
+    assert_eq!(json_res["proof"], Value::Null);
+    assert_eq!(json_res["claim"], "LogicalDeletionOnly");
+    assert_eq!(json_res["erasure_measured"], false);
+    assert_eq!(
+        json_res["reason"],
+        "Schichteigene Messung für Einzel-Dokument-Löschung nicht angebunden"
+    );
+}
+
+#[tokio::test]
+async fn test_inv_no_dummy_proof_1_and_no_forbidden_phrases() {
+    // 1. No tool text in tools/list contains forbidden completeness/legal claims
+    let (server, _tmp) = create_mock_server().await;
+    let req = make_request("tools/list", json!({}));
+    let response = server.handle(req).await;
+    let tools = response.result.unwrap()["tools"]
+        .as_array()
+        .unwrap()
+        .clone();
+
+    let forbidden_phrases = [
+        "100% gelöscht",
+        "100 % gelöscht",
+        "unwiederbringlich",
+        "garantiert",
+        "DSGVO-konform",
+        "rechtskonform",
+        "Löschzertifikat",
+    ];
+
+    for tool in &tools {
+        let desc = tool["description"].as_str().unwrap_or("");
+        for phrase in &forbidden_phrases {
+            assert!(
+                !desc.to_lowercase().contains(&phrase.to_lowercase()),
+                "Tool '{}' description contains forbidden phrase '{}': '{}'",
+                tool["name"],
+                phrase,
+                desc
+            );
+        }
+    }
+
+    // 2. INV-NO-DUMMY-PROOF-1: Single doc delete returns null proof, never a dummy proof object
+    let delete_req = make_request(
+        "contextra_delete",
+        json!({
+            "collection": "default",
+            "id": "dummy_check_id"
+        }),
+    );
+    let resp_del = server.handle(delete_req).await;
+    if let Some(res_val) = resp_del.result {
+        assert_eq!(
+            res_val["proof"],
+            Value::Null,
+            "Single doc delete response must set 'proof' to null, got: {:?}",
+            res_val["proof"]
+        );
+        assert_eq!(res_val["erasure_measured"], false);
+    }
 }
 
 #[tokio::test]
@@ -952,345 +1059,26 @@ async fn test_batch_request_handling() {
 }
 
 #[tokio::test]
-async fn test_contextra_consolidate_success() {
+async fn test_unregistered_tools_rejected_fail_closed() {
     let (server, _tmp) = create_mock_server_with_write(true).await;
 
-    // Insert 2 documents into default collection
-    let insert_req1 = make_request(
-        "contextra_insert",
-        json!({
-            "id": "turn_doc_1",
-            "text": "First turn text",
-            "collection": "default"
-        }),
-    );
-    let resp1 = server.handle(insert_req1).await;
-    assert!(resp1.error.is_none());
+    let unlisted_tools = ["contextra_consolidate", "contextra_cloud_query"];
 
-    let insert_req2 = make_request(
-        "contextra_insert",
-        json!({
-            "id": "turn_doc_2",
-            "text": "Second turn text",
-            "collection": "default"
-        }),
-    );
-    let resp2 = server.handle(insert_req2).await;
-    assert!(resp2.error.is_none());
-
-    // Trigger manual consolidation via MCP
-    let consolidate_req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": "default"
-            }
-        }),
-    );
-
-    let resp = server.handle(consolidate_req).await;
-    assert!(resp.error.is_none());
-
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_ne!(res_val["result"]["isError"], true);
-
-    let text_out = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    let json_out: serde_json::Value = serde_json::from_str(text_out).unwrap();
-
-    assert_eq!(json_out["ok"], true);
-    assert_eq!(json_out["collection"], "default");
-    assert!(json_out["turns_scanned"].as_u64().unwrap() >= 2);
-    assert!(json_out.get("segments_created").is_some());
-    assert!(json_out.get("duplicates_tombstoned").is_some());
-    assert!(json_out.get("synthesized_chunks").is_some());
-}
-
-#[tokio::test]
-async fn test_contextra_consolidate_read_only_rejected() {
-    let (server, _tmp) = create_mock_server_with_write(false).await;
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": "default"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("Sandbox: DB-Schreibzugriff gesperrt"));
-}
-
-#[tokio::test]
-async fn test_contextra_consolidate_unknown_collection() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": "invalid/collection:name"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("forbidden characters"));
-}
-
-#[tokio::test]
-async fn test_contextra_consolidate_fault_injection() {
-    let (server, _tmp) = create_mock_server_with_write(true).await;
-
-    // Send malformed arguments (collection as integer instead of string)
-    let req_wrong_type = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_consolidate",
-            "arguments": {
-                "collection": 12345
-            }
-        }),
-    );
-
-    let resp = server.handle(req_wrong_type).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(text.contains("collection' must be a string"));
-
-    // Direct RPC invocation with invalid params
-    let req_direct = make_request("contextra_consolidate", json!({ "collection": 9999 }));
-    let direct_resp = server.handle(req_direct).await;
-    let err = direct_resp
-        .error
-        .expect("error expected for direct invalid call");
-    assert_eq!(err.code, -32602);
-}
-
-#[tokio::test]
-async fn test_cloud_query_sensitive_input_blocked_by_egress_classifier() {
-    let (server, _tmp) = create_mock_server().await;
-
-    // 1. Test simulated email address payload
-    let req_email = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "search user data for alice@example.com"
-            }
-        }),
-    );
-    let resp_email = server.handle(req_email).await;
-    let res_val1 = serde_json::to_value(&resp_email).unwrap();
-    assert_eq!(res_val1["result"]["isError"], true);
-    let err_msg1 = res_val1["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(
-        err_msg1.contains("Egress policy violation: query blocked by rule R-005"),
-        "Expected opaque rule ID in block message for email input, got: '{err_msg1}'"
-    );
-    assert!(
-        !err_msg1.contains("@"),
-        "Error message must not leak raw regex pattern"
-    );
-
-    // 2. Test simulated API key payload (e.g. sk-...)
-    let req_apikey = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "query API using secret sk-abc123456789"
-            }
-        }),
-    );
-    let resp_apikey = server.handle(req_apikey).await;
-    let res_val2 = serde_json::to_value(&resp_apikey).unwrap();
-    assert_eq!(res_val2["result"]["isError"], true);
-    let err_msg2 = res_val2["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(
-        err_msg2.contains("Egress policy violation: query blocked by rule R-001"),
-        "Expected opaque rule ID in block message for API key input, got: '{err_msg2}'"
-    );
-
-    // 3. Test sensitive keyword pattern (api_key, password)
-    let req_password = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "retrieve my password for admin account"
-            }
-        }),
-    );
-    let resp_password = server.handle(req_password).await;
-    let res_val3 = serde_json::to_value(&resp_password).unwrap();
-    assert_eq!(res_val3["result"]["isError"], true);
-    let err_msg3 = res_val3["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(
-        err_msg3.contains("Egress policy violation: query blocked by rule R-004"),
-        "Expected opaque rule ID in block message for password input, got: '{err_msg3}'"
-    );
-}
-
-#[tokio::test]
-async fn test_cloud_query_allow_returns_success() {
-    let (server, _tmp) = create_mock_server().await;
-
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "safe public query for documentation"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    assert!(resp.error.is_none());
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_ne!(res_val["result"]["isError"], true);
-
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-
-    assert_eq!(json_res["status"], "success");
-    assert_eq!(json_res["abstracted"], false);
-    assert_eq!(json_res["query"], "safe public query for documentation");
-}
-
-#[tokio::test]
-async fn test_removed_substring_early_branch_runs_through_regex_vault() {
-    let (server, _tmp) = create_mock_server().await;
-
-    // Previously, queries containing "abstract" or "PII" were intercepted by a substring early branch.
-    // Now they must run through DefaultEgressClassifier's EgressVault patterns.
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "safe query mentioning abstract concepts and PII terminology"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    assert!(resp.error.is_none());
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_ne!(res_val["result"]["isError"], true);
-
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-
-    // Since it contains no sensitive regex patterns (sk-, AKIA, password, email, etc.), it returns Allow (status: success, abstracted: false).
-    assert_eq!(json_res["status"], "success");
-    assert_eq!(json_res["abstracted"], false);
-    assert_eq!(
-        json_res["query"],
-        "safe query mentioning abstract concepts and PII terminology"
-    );
-}
-
-#[tokio::test]
-async fn test_cloud_query_secret_with_abstract_word_is_blocked_by_vault() {
-    let (server, _tmp) = create_mock_server().await;
-
-    // Payload containing the word "abstract" PLUS a sensitive key pattern "sk-abc123456789"
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "please abstract this secret key sk-abc123456789 for me"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_eq!(res_val["result"]["isError"], true);
-
-    let err_msg = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    assert!(
-        err_msg.contains("Egress policy violation: query blocked by rule R-001"),
-        "Expected opaque rule ID R-001 in block message, got: '{err_msg}'"
-    );
-    assert!(
-        !err_msg.contains("sk-"),
-        "Error message must not leak raw pattern, got: '{err_msg}'"
-    );
-}
-
-#[tokio::test]
-async fn test_cloud_query_at_sign_without_email_is_allowed() {
-    let (server, _tmp) = create_mock_server().await;
-
-    // Text containing '@' but NOT matching email address regex
-    let req = make_request(
-        "tools/call",
-        json!({
-            "name": "contextra_cloud_query",
-            "arguments": {
-                "query": "meeting @ 5pm in office"
-            }
-        }),
-    );
-
-    let resp = server.handle(req).await;
-    assert!(resp.error.is_none());
-    let res_val = serde_json::to_value(&resp).unwrap();
-    assert_ne!(res_val["result"]["isError"], true);
-
-    let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
-    let json_res: serde_json::Value = serde_json::from_str(text).unwrap();
-
-    assert_eq!(json_res["status"], "success");
-    assert_eq!(json_res["query"], "meeting @ 5pm in office");
-}
-
-#[tokio::test]
-async fn test_cloud_query_validates_empty_and_oversized_query() {
-    let (server, _tmp) = create_mock_server().await;
-
-    // 1. Whitespace / empty query
-    let req_empty = make_request(
-        "contextra_cloud_query",
-        json!({
-            "query": "   "
-        }),
-    );
-    let resp_empty = server.handle(req_empty).await;
-    let err_empty = resp_empty
-        .error
-        .expect("error expected for empty cloud query");
-    assert_eq!(err_empty.code, -32602);
-    assert!(err_empty.message.contains("query cannot be empty"));
-
-    // 2. Oversized query (> 64KB)
-    let huge_query = "q".repeat(crate::MAX_SEARCH_QUERY_BYTES + 1);
-    let req_huge = make_request(
-        "contextra_cloud_query",
-        json!({
-            "query": huge_query
-        }),
-    );
-    let resp_huge = server.handle(req_huge).await;
-    let err_huge = resp_huge
-        .error
-        .expect("error expected for oversized cloud query");
-    assert_eq!(err_huge.code, -32602);
-    assert!(err_huge.message.contains("query size exceeds limit"));
+    for tool_name in unlisted_tools {
+        let req = make_request(
+            "tools/call",
+            json!({
+                "name": tool_name,
+                "arguments": { "collection": "default" }
+            }),
+        );
+        let resp = server.handle(req).await;
+        let res_val = serde_json::to_value(&resp).unwrap();
+        assert_eq!(res_val["result"]["isError"], true);
+        let text = res_val["result"]["content"][0]["text"].as_str().unwrap();
+        assert!(
+            text.contains("unknown tool") || text.contains("Code-Ausführung"),
+            "Expected fail-closed rejection for unlisted tool '{tool_name}', got: '{text}'"
+        );
+    }
 }

@@ -137,15 +137,37 @@ impl McpServer {
         let proof_val: Value = serde_json::from_str(&proof_json_str)
             .map_err(|e| McpError::internal_error(e.to_string()))?;
 
-        Ok(json!({
+        let layers = proof_val
+            .get("covered_layers")
+            .cloned()
+            .unwrap_or_else(|| json!(["LsmMemtable", "SsTableAllLevels"]));
+        let excluded = proof_val
+            .get("excluded_scopes")
+            .or_else(|| proof_val.get("excluded"))
+            .cloned()
+            .unwrap_or_else(|| json!([]));
+
+        let mut res = json!({
             "ok": true,
             "deleted": true,
             "verified": true,
             "collection": col_name,
             "proof": proof_val,
-            "layers": ["LsmMemtable", "SsTableAllLevels"],
-            "excluded": []
-        }))
+            "layers": layers,
+            "excluded": excluded,
+            "erasure_measured": true,
+        });
+
+        if let Some(claim_val) = proof_val
+            .get("claim")
+            .or_else(|| proof_val.get("claim_class"))
+        {
+            if let Some(obj) = res.as_object_mut() {
+                obj.insert("claim".to_string(), claim_val.clone());
+            }
+        }
+
+        Ok(res)
     }
 
     /// Handler für `contextra_delete` — Löscht ein Einzel-Dokument.
@@ -205,7 +227,9 @@ impl McpServer {
             "collection": col_name,
             "id": id,
             "proof": null,
-            "reason": "Schichteigene Messung für Einzel-Dokument-Löschung nicht angebunden"
+            "reason": "Schichteigene Messung für Einzel-Dokument-Löschung nicht angebunden",
+            "claim": "LogicalDeletionOnly",
+            "erasure_measured": false
         }))
     }
 }

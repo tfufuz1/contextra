@@ -350,7 +350,6 @@ pub struct Contextra {
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
     proof_key_provider:
         parking_lot::RwLock<Option<Arc<dyn contextra_impl::erasure::ProofKeyProvider>>>,
-    pub(crate) _pid_controller: parking_lot::RwLock<Option<()>>,
 }
 
 pub use contextra_impl::erasure::{
