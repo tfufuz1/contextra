@@ -1,7 +1,6 @@
 //! Integration tests for codeowners-coverage harness command.
 
-#[path = "../src/harness/codeowners_coverage.rs"]
-mod codeowners_coverage;
+use xtask::harness::codeowners_coverage;
 
 use std::fs;
 use tempfile::tempdir;

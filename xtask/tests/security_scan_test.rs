@@ -1,11 +1,8 @@
 //! Tests for security_scan module.
 
-#[path = "../src/security_scan.rs"]
-mod security_scan;
-
-use security_scan::{run_security_scan_in_root, SecurityPattern};
 use std::fs;
 use tempfile::tempdir;
+use xtask::security_scan::{run_security_scan_in_root, SecurityPattern};
 
 #[test]
 fn test_security_scan_synthetic_fixture() {

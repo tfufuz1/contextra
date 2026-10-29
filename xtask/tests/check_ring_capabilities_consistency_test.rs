@@ -1,14 +1,8 @@
 //! Tests for check_ring_capabilities_consistency module.
 
-#[path = "../src/check_ring_layering.rs"]
-mod check_ring_layering;
-
-#[path = "../src/check_ring_capabilities_consistency.rs"]
-mod check_ring_capabilities_consistency;
-
-use check_ring_capabilities_consistency::run_check_ring_capabilities_consistency_in_root;
 use std::fs;
 use tempfile::tempdir;
+use xtask::check_ring_capabilities_consistency::run_check_ring_capabilities_consistency_in_root;
 
 #[test]
 fn test_ring_capabilities_consistency_against_repo() {

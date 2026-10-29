@@ -70,8 +70,8 @@ pub fn scan_determinism(root: &Path) -> Outcome {
                     for entry in &parsed.allow {
                         if entry.adr.trim().is_empty() {
                             violations.push(format!(
-                                "governance/determinism-allow.toml: Entry for '{}' ({}) missing required ADR reference",
-                                entry.path, entry.pattern
+                                "governance/determinism-allow.toml: Entry for '{}' ({}) missing required ADR reference (reason: {})",
+                                entry.path, entry.pattern, entry.reason
                             ));
                         }
                     }

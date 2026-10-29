@@ -249,6 +249,6 @@ pub fn run_audit_integrity_check(
     since_days: Option<u32>,
     fail_on_contradicted: bool,
 ) -> Result<Vec<AuditFixGap>, String> {
-    let root = xtask::find_root_dir();
+    let root = crate::find_root_dir();
     run_audit_integrity_check_impl(&root, since_days, fail_on_contradicted)
 }

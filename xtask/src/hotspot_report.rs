@@ -134,6 +134,6 @@ pub fn run_hotspot_report(
     top_n: usize,
     fail_on_critical: bool,
 ) -> Result<Vec<FileHotspot>, String> {
-    let root = xtask::find_root_dir();
+    let root = crate::find_root_dir();
     run_hotspot_report_impl(&root, since_days, top_n, fail_on_critical)
 }

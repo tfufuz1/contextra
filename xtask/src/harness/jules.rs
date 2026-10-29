@@ -5,9 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-#[allow(clippy::duplicate_mod)]
-#[path = "loop_guard.rs"]
-mod loop_guard;
+use super::loop_guard;
 
 #[derive(Debug, Deserialize)]
 pub struct JulesFacadeStep {

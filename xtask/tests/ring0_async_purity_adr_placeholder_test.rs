@@ -1,29 +1,6 @@
-use std::path::PathBuf;
-
-#[allow(dead_code)]
-pub struct CrateInfo {
-    pub name: String,
-}
-
-#[allow(dead_code)]
-pub fn find_root_dir() -> PathBuf {
-    PathBuf::from(".")
-}
-
-#[allow(dead_code)]
-pub fn get_workspace_crates() -> Vec<CrateInfo> {
-    Vec::new()
-}
-
-#[path = "../src/check_ring_layering.rs"]
-mod check_ring_layering;
-
-#[path = "../src/check_ring0_async_purity.rs"]
-mod check_ring0_async_purity;
-
-use check_ring0_async_purity::load_allowlist;
 use std::fs;
 use tempfile::NamedTempFile;
+use xtask::check_ring0_async_purity::load_allowlist;
 
 #[test]
 fn test_load_allowlist_rejects_adr_todo_placeholder() {

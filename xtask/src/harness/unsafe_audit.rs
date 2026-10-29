@@ -82,6 +82,64 @@ pub fn unsafe_audit_get_islands_and_crates(
     Ok((islands, all_crates))
 }
 
+#[derive(Debug, serde::Deserialize, Default)]
+struct UnsafeGeneratedExceptionsFile {
+    #[serde(default)]
+    files: Vec<String>,
+}
+
+#[derive(Debug, serde::Deserialize, Default)]
+struct UnsafeGeneratedConfig {
+    #[serde(default)]
+    unsafe_generated_exceptions: UnsafeGeneratedExceptionsFile,
+}
+
+pub fn load_generated_exceptions(root: &Path) -> std::collections::HashSet<String> {
+    let mut set = std::collections::HashSet::new();
+    let config_dir = root.join("xtask/config");
+    if config_dir.exists() {
+        if let Ok(entries) = fs::read_dir(&config_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("toml") {
+                    if let Ok(content) = fs::read_to_string(&path) {
+                        if let Ok(parsed) = toml::from_str::<UnsafeGeneratedConfig>(&content) {
+                            for f in parsed.unsafe_generated_exceptions.files {
+                                set.insert(f.replace('\\', "/"));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    set
+}
+
+pub fn is_generated_file(
+    file_path: &Path,
+    rel_path: &str,
+    exceptions: &std::collections::HashSet<String>,
+) -> bool {
+    let norm_rel = rel_path.replace('\\', "/");
+    if exceptions.contains(&norm_rel) {
+        return true;
+    }
+    if let Ok(content) = fs::read_to_string(file_path) {
+        let first_lines: Vec<&str> = content.lines().take(10).collect();
+        for line in first_lines {
+            if line.contains("@generated")
+                || line.contains("FlatBuffers compiler")
+                || line.contains("flatc")
+                || line.contains("automatically generated")
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 pub fn unsafe_audit_scan_file(
     file_path: &Path,
     rel_path: &str,
@@ -89,6 +147,31 @@ pub fn unsafe_audit_scan_file(
     findings: &mut Vec<UnsafeAuditFinding>,
     unsafe_counts: &mut BTreeMap<String, usize>,
     missing_safety_counts: &mut BTreeMap<String, usize>,
+) {
+    let exceptions = std::collections::HashSet::new();
+    let mut exempt_count = 0;
+    unsafe_audit_scan_file_with_exceptions(
+        file_path,
+        rel_path,
+        is_island,
+        findings,
+        unsafe_counts,
+        missing_safety_counts,
+        &exceptions,
+        &mut exempt_count,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn unsafe_audit_scan_file_with_exceptions(
+    file_path: &Path,
+    rel_path: &str,
+    is_island: bool,
+    findings: &mut Vec<UnsafeAuditFinding>,
+    unsafe_counts: &mut BTreeMap<String, usize>,
+    missing_safety_counts: &mut BTreeMap<String, usize>,
+    exceptions: &std::collections::HashSet<String>,
+    exempt_generated_count: &mut usize,
 ) {
     let content = match fs::read_to_string(file_path) {
         Ok(c) => c,
@@ -137,6 +220,11 @@ pub fn unsafe_audit_scan_file(
             }
         }
     } else {
+        let is_gen = is_generated_file(file_path, rel_path, exceptions);
+        if is_gen {
+            *exempt_generated_count += 1;
+        }
+
         let mut missing_safety = 0;
         let mut unsafe_sites = 0;
 
@@ -145,17 +233,19 @@ pub fn unsafe_audit_scan_file(
             if (trimmed.contains("unsafe ") || trimmed == "unsafe") && !trimmed.starts_with("//") {
                 unsafe_sites += 1;
 
-                let mut has_safety_comment = false;
-                let lookback = idx.saturating_sub(3);
-                for prev in &lines[lookback..idx] {
-                    if prev.contains("SAFETY:") || prev.contains("# Safety") {
-                        has_safety_comment = true;
-                        break;
+                if !is_gen {
+                    let mut has_safety_comment = false;
+                    let lookback = idx.saturating_sub(3);
+                    for prev in &lines[lookback..idx] {
+                        if prev.contains("SAFETY:") || prev.contains("# Safety") {
+                            has_safety_comment = true;
+                            break;
+                        }
                     }
-                }
 
-                if !has_safety_comment {
-                    missing_safety += 1;
+                    if !has_safety_comment {
+                        missing_safety += 1;
+                    }
                 }
             }
         }
@@ -216,6 +306,8 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
         }
     };
 
+    let exceptions = load_generated_exceptions(&root);
+    let mut exempt_generated_count = 0;
     let mut findings = Vec::new();
     let mut unsafe_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut missing_safety_counts: BTreeMap<String, usize> = BTreeMap::new();
@@ -238,13 +330,15 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
                     Ok(p) => p.to_string_lossy().to_string(),
                     Err(_) => entry.path().to_string_lossy().to_string(),
                 };
-                unsafe_audit_scan_file(
+                unsafe_audit_scan_file_with_exceptions(
                     entry.path(),
                     &rel,
                     crate_info.is_island,
                     &mut findings,
                     &mut unsafe_counts,
                     &mut missing_safety_counts,
+                    &exceptions,
+                    &mut exempt_generated_count,
                 );
             }
         }
@@ -354,9 +448,10 @@ pub fn run_unsafe_audit(args: &[String]) -> i32 {
     let has_errors = findings.iter().any(|f| f.severity == "error");
     let status = if has_errors { "fail" } else { "pass" };
     let summary = format!(
-        "Unsafe audit completed for {} islands: {} findings",
+        "Unsafe audit completed for {} islands: {} findings ({} generierte Dateien ausgenommen)",
         islands.len(),
-        findings.len()
+        findings.len(),
+        exempt_generated_count
     );
 
     let output = UnsafeAuditOutput {

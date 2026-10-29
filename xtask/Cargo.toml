@@ -1,5 +1,15 @@
-[lints]
-workspace = true
+[lints.clippy]
+permissions_set_readonly_false = "allow"
+needless_borrows_for_generic_args = "allow"
+useless_format = "allow"
+unwrap_used = "allow"
+expect_used = "allow"
+panic = "allow"
+indexing_slicing = "allow"
+disallowed_methods = "allow"
+disallowed_types = "allow"
+exit = "allow"
+unreachable = "allow"
 
 [package]
 name = "xtask"

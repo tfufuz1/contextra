@@ -1,11 +1,8 @@
-#[path = "../src/check_duplicate_symbols_cross_file.rs"]
-mod check_duplicate_symbols_cross_file;
-
-use check_duplicate_symbols_cross_file::{
-    scan_directory_for_cross_file_duplicates, scan_workspace_for_cross_file_duplicates,
-};
 use std::fs;
 use tempfile::tempdir;
+use xtask::check_duplicate_symbols_cross_file::{
+    scan_directory_for_cross_file_duplicates, scan_workspace_for_cross_file_duplicates,
+};
 
 #[test]
 fn test_same_directory_duplicate_trait_detected() {

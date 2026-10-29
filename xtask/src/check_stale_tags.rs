@@ -361,7 +361,7 @@ pub fn check_stale_tags_impl(
 }
 
 pub fn run_check_stale_tags(threshold_days: i64, strict: bool) -> Result<(), String> {
-    let root = xtask::find_root_dir();
+    let root = crate::find_root_dir();
     let now = Utc::now();
     check_stale_tags_impl(&root, threshold_days, strict, now).map(|_| ())
 }
