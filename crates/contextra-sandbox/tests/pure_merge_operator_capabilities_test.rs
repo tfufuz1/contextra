@@ -40,7 +40,8 @@ async fn test_pure_merge_operator_denies_clock_access() -> TestResult {
         .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
         .await?;
 
-    let errno = i32::from_le_bytes(output.stdout[0..4].try_into()?);
+    let slice = output.stdout.get(0..4).ok_or("Invalid output slice")?;
+    let errno = i32::from_le_bytes(slice.try_into()?);
     assert_eq!(
         errno, 2,
         "Expected ERRNO_ACCES (2) for clock_time_get under pure capabilities"
@@ -94,7 +95,8 @@ async fn test_pure_merge_operator_denies_random_access() -> TestResult {
         .execute(&wasm_bytes, b"", &caps, Duration::from_secs(1))
         .await?;
 
-    let errno = i32::from_le_bytes(output.stdout[0..4].try_into()?);
+    let slice = output.stdout.get(0..4).ok_or("Invalid output slice")?;
+    let errno = i32::from_le_bytes(slice.try_into()?);
     assert_eq!(
         errno, 52,
         "Expected ERRNO_NOSYS (52) for random_get under pure capabilities"

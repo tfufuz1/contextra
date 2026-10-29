@@ -18,7 +18,8 @@ pub fn derive_deletion_proof_key_for_tenant(
     let hk = Hkdf::<Sha256>::new(Some(DELETION_PROOF_KEY_PURPOSE), master_key);
     let mut okm = [0u8; 32];
     let info = tenant_id.as_u64().to_be_bytes();
-    hk.expand(&info, &mut okm)
-        .map_err(|e| contextra_types::ContextraError::Internal(format!("HKDF expand failed: {e}")))?;
+    hk.expand(&info, &mut okm).map_err(|e| {
+        contextra_types::ContextraError::Internal(format!("HKDF expand failed: {e}"))
+    })?;
     Ok(okm)
 }

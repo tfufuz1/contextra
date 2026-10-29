@@ -44,6 +44,8 @@ pub struct WasmCapabilities {
     pub max_stdin_bytes: usize,
     /// Seed für deterministisches `random_get`. Default: `None` (`random_get` liefert `NOSYS`).
     pub random_seed: Option<u64>,
+    /// Max. Host-Aufrufe. Default: 10_000.
+    pub max_host_calls: u32,
 }
 
 impl Default for WasmCapabilities {
@@ -55,7 +57,7 @@ impl Default for WasmCapabilities {
             max_fuel: 10_000_000,
             allow_filesystem: false,
             allow_network: false,
-            allow_clock: true,
+            allow_clock: false, // Default-deny clock access (INV-SBX-4)
             allow_cloud_egress: false,
             max_wall_clock_ms: 5_000,
             max_module_size_bytes: 10 * 1024 * 1024, // 10 MB
@@ -63,6 +65,7 @@ impl Default for WasmCapabilities {
             max_output_bytes: 1024 * 1024, // 1 MB
             max_stdin_bytes: 1024 * 1024,  // 1 MB
             random_seed: None,
+            max_host_calls: 10_000,
         }
     }
 }
@@ -108,6 +111,7 @@ impl MergeOperatorCapabilities {
             max_output_bytes: 1024 * 1024,
             max_stdin_bytes: 1024 * 1024,
             random_seed: None,
+            max_host_calls: 10_000,
         }
     }
 
@@ -176,6 +180,11 @@ mod tests {
             !caps.allow_cloud_egress,
             "allow_cloud_egress MUST default to false (Least Privilege)"
         );
+        assert!(
+            !caps.allow_clock,
+            "allow_clock MUST default to false (Least Privilege)"
+        );
         assert_eq!(caps.max_wall_clock_ms, 5_000);
+        assert_eq!(caps.max_host_calls, 10_000);
     }
 }
