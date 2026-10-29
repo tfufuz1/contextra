@@ -424,7 +424,7 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
     }
 
     // SAFETY: Target feature `avx512f` is enabled and `sum_v` is a valid `__m512i` vector register.
-    let mut sum = unsafe { hsum512_epi32_avx512(sum_v) }.cast_unsigned();
+    let mut sum = u32::from_ne_bytes(unsafe { hsum512_epi32_avx512(sum_v) }.to_ne_bytes());
 
     while i < len {
         // SAFETY: `i < len` where `len = min(a.len(), b.len())` guarantees `i` is within bounds.
@@ -490,7 +490,7 @@ pub(crate) unsafe fn euclidean_distance_sq_u8_avx512(a: &[u8], b: &[u8]) -> u32 
     }
 
     // SAFETY: Target feature `avx512f` is enabled and `sum_v` is a valid `__m512i` vector register.
-    let mut sum = unsafe { hsum512_epi32_avx512(sum_v) }.cast_unsigned();
+    let mut sum = u32::from_ne_bytes(unsafe { hsum512_epi32_avx512(sum_v) }.to_ne_bytes());
 
     while i < len {
         // SAFETY: `i < len` where `len = min(a.len(), b.len())` guarantees `i` is within bounds.
@@ -548,9 +548,9 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx512(
     // SAFETY: Target feature `avx512f` is enabled and vector registers are valid `__m512i`.
     let (mut dot, mut norm_a_sq, mut norm_b_sq) = unsafe {
         (
-            hsum512_epi32_avx512(dot_v).cast_unsigned(),
-            hsum512_epi32_avx512(norm_a_v).cast_unsigned(),
-            hsum512_epi32_avx512(norm_b_v).cast_unsigned(),
+            u32::from_ne_bytes(hsum512_epi32_avx512(dot_v).to_ne_bytes()),
+            u32::from_ne_bytes(hsum512_epi32_avx512(norm_a_v).to_ne_bytes()),
+            u32::from_ne_bytes(hsum512_epi32_avx512(norm_b_v).to_ne_bytes()),
         )
     };
 

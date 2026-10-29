@@ -168,6 +168,7 @@ pub trait GraphCollectionMutation: Send + Sync + 'static {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};

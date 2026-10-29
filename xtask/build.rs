@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods, clippy::unwrap_used)]
 //! Build script for `xtask` crate.
 //!
 //! Scans `src/gates/<cluster>/*.rs` and generates module imports and registry dispatch logic.
@@ -89,10 +90,7 @@ fn main() {
             .join("src")
             .join("harness")
             .join(format!("{}.rs", stem));
-        let path_str = match harness_path.to_str() {
-            Some(s) => s.replace('\\', "/"),
-            None => continue,
-        };
+        let path_str = harness_path.to_str().unwrap_or_default().replace('\\', "/");
         harness_code.push_str(&format!("#[path = \"{}\"]\nmod {};\n\n", path_str, stem));
     }
 

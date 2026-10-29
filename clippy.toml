@@ -17,22 +17,19 @@ too-many-arguments-threshold = 7
 # API-Stabilität
 avoid-breaking-exported-api = false
 
-# ── Vorbereitung Welle 2 Clock-Migration (Ausnahme-Metrik Stand 2026-10-28) ───
-# Folgende Ausnahmen benötigen aktuell noch Refactorings auf den Clock-Port:
-# mvcc: 14, store: 14, engine: 7, kvcache: 3, ports: 3, router: 3, adapt: 1, privacy: 1, db: 1
-# Aktivierung der strikten Lints erfolgt nach Abschluss der Clock-Migration in Welle 2.
-#
-# [[disallowed-methods]]
-# path = "std::time::Instant::now"
-# reason = "P28: Zeit nur über Clock-Port (Aktivierung in Welle 2)."
-#
-# [[disallowed-methods]]
-# path = "std::time::SystemTime::now"
-# reason = "P28: Zeit nur über Clock-Port (Aktivierung in Welle 2)."
-#
-# [[disallowed-methods]]
-# path = "rand::thread_rng"
-# reason = "P28: Zufall nur über Rng-Port (Aktivierung in Welle 2)."
+# ── P28-Verbotsliste ──────────────────────────────────────────────────────────
+[[disallowed-methods]]
+path = "std::time::Instant::now"
+reason = "P28: Zeit nur über Clock-Port. Verwende contextra_ports::clock::Clock."
+
+[[disallowed-methods]]
+path = "std::time::SystemTime::now"
+reason = "P28: Zeit nur über Clock-Port. Verwende contextra_ports::clock::Clock."
+
+[[disallowed-methods]]
+path = "rand::thread_rng"
+reason = "P28: Zufall nur über Rng-Port. Ausnahme: Schlüssel/Salt/Nonce (ADR-098)."
+allow-invalid = true
 
 # ── P28-Verbotsliste ──────────────────────────────────────────────────────────
 [[disallowed-methods]]
