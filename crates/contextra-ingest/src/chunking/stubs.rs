@@ -38,6 +38,9 @@ impl IrChunker for ProseChunker {
     }
 }
 
+#[path = "tabular/mod.rs"]
+mod tabular_impl;
+
 #[derive(Debug, Default)]
 pub struct TabularChunker;
 
@@ -52,7 +55,7 @@ impl IrChunker for TabularChunker {
         canon: &CanonicalText,
         cfg: &ChunkingConfig,
     ) -> Result<Vec<ChunkDraft>, IngestError> {
-        FallbackChunker.draft(ir, canon, cfg)
+        tabular_impl::draft_tabular(ir, canon, cfg)
     }
 }
 
