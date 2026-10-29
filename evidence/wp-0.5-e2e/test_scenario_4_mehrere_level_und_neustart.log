@@ -1,0 +1,115 @@
+warning: unused import: `Purger`
+ --> crates/contextra-engine/src/contextra_impl/erasure.rs:9:46
+  |
+9 | use contextra_ports::scanner::{LayerScanner, Purger, ScanTarget, ScanTechnique, WitnessLayer};
+  |                                              ^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: field `pid_controller` is never read
+   --> crates/contextra-engine/src/lib.rs:350:5
+    |
+332 | pub struct Contextra {
+    |            --------- field in this struct
+...
+350 |     pid_controller: parking_lot::RwLock<Option<()>>,
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `contextra-engine` (lib) generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.42s
+     Running tests/deletion_chain_e2e.rs (target/debug/deps/deletion_chain_e2e-5c421eb9af052408)
+
+running 1 test
+test test_scenario_4_mehrere_level_und_neustart ... === SCENARIO 4 REPORT ===
+verified: false
+failure: Some(ErasureFailure { layer: "HnswIndex", reason: "Layer has 11 residual live entries" })
+layers: [
+    LayerSummary {
+        layer: "TextIndex",
+        technique: "IndexIntrospection",
+        scanned: 1,
+        remaining: 0,
+        control_matches: 1,
+    },
+    LayerSummary {
+        layer: "HnswIndex",
+        technique: "IndexIntrospection",
+        scanned: 22,
+        remaining: 11,
+        control_matches: 1,
+    },
+    LayerSummary {
+        layer: "LsmMemtable",
+        technique: "IndexIntrospection",
+        scanned: 12,
+        remaining: 11,
+        control_matches: 1,
+    },
+    LayerSummary {
+        layer: "SsTableAllLevels",
+        technique: "Structural",
+        scanned: 1,
+        remaining: 0,
+        control_matches: 1,
+    },
+    LayerSummary {
+        layer: "WalAllSegments",
+        technique: "DecryptedView",
+        scanned: 12,
+        remaining: 11,
+        control_matches: 1,
+    },
+]
+
+thread 'test_scenario_4_mehrere_level_und_neustart' panicked at crates/contextra/tests/deletion_chain_e2e.rs:351:9:
+Löschen nach Reopen muss verified sein: Some(ErasureFailure { layer: "HnswIndex", reason: "Layer has 11 residual live entries" })
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/panicking.rs:75:14
+   2: deletion_chain_e2e::test_scenario_4_mehrere_level_und_neustart::{{closure}}
+             at ./tests/deletion_chain_e2e.rs:351:9
+   3: <core::pin::Pin<P> as core::future::future::Future>::poll
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/future/future.rs:124:9
+   4: tokio::runtime::park::CachedParkThread::block_on::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/park.rs:284:71
+   5: tokio::task::coop::with_budget
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/task/coop/mod.rs:167:5
+   6: tokio::task::coop::budget
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/task/coop/mod.rs:133:5
+   7: tokio::runtime::park::CachedParkThread::block_on
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/park.rs:284:31
+   8: tokio::runtime::context::blocking::BlockingRegionGuard::block_on
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context/blocking.rs:66:14
+   9: tokio::runtime::scheduler::multi_thread::MultiThread::block_on::{{closure}}
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/multi_thread/mod.rs:92:22
+  10: tokio::runtime::context::runtime::enter_runtime
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/context/runtime.rs:65:16
+  11: tokio::runtime::scheduler::multi_thread::MultiThread::block_on
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/scheduler/multi_thread/mod.rs:91:9
+  12: tokio::runtime::runtime::Runtime::block_on_inner
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/runtime.rs:376:50
+  13: tokio::runtime::runtime::Runtime::block_on
+             at /home/jules/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.53.1/src/runtime/runtime.rs:343:18
+  14: deletion_chain_e2e::test_scenario_4_mehrere_level_und_neustart
+             at ./tests/deletion_chain_e2e.rs:405:7
+  15: deletion_chain_e2e::test_scenario_4_mehrere_level_und_neustart::{{closure}}
+             at ./tests/deletion_chain_e2e.rs:302:58
+  16: core::ops::function::FnOnce::call_once
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
+  17: core::ops::function::FnOnce::call_once
+             at /rustc/29483883eed69d5fb4db01964cdf2af4d86e9cb2/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    test_scenario_4_mehrere_level_und_neustart
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.83s
+
+error: test failed, to rerun pass `-p contextra --test deletion_chain_e2e`

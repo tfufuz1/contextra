@@ -11,13 +11,74 @@ pub use ed25519_dalek::VerifyingKey;
 use ed25519_dalek::{Signature, Signer, Verifier};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+/// Maximum allowed payload size in bytes (64 KiB) for license verification to prevent memory/CPU DoS.
+pub const MAX_PAYLOAD_BYTES: usize = 65_536;
+
+/// Constant-time 32-byte equality comparison to prevent timing attacks when comparing hashes or secrets.
 #[inline]
-fn constant_time_eq_32(a: &[u8; 32], b: &[u8; 32]) -> bool {
+pub fn constant_time_eq_32(a: &[u8; 32], b: &[u8; 32]) -> bool {
     let mut res = 0u8;
-    for i in 0..32 {
-        res |= a[i] ^ b[i];
+    for (x, y) in a.iter().zip(b.iter()) {
+        res |= x ^ y;
     }
     res == 0
+}
+
+/// Options for signed payload verification and legacy compatibility.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SignedLicenseOptions {
+    /// Whether fallback to legacy payload schema (without installation ID hash) is permitted.
+    pub allow_legacy: bool,
+    /// Maximum allowed payload size in bytes.
+    pub max_payload_bytes: usize,
+}
+
+impl Default for SignedLicenseOptions {
+    fn default() -> Self {
+        Self {
+            allow_legacy: false,
+            max_payload_bytes: MAX_PAYLOAD_BYTES,
+        }
+    }
+}
+
+/// Specific step error during step-by-step license activation verification.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum StepVerificationError {
+    /// Step 2: Activation or license payload is missing.
+    #[error("activation or license payload missing for ring {0:?}")]
+    MissingActivation(FeatureRing),
+    /// Step 3: Local installation ID hash mismatch.
+    #[error("installation ID hash mismatch for ring {0:?}")]
+    InstallationMismatch(FeatureRing),
+    /// Step 4: Signature verification failed or missing verifying key.
+    #[error("activation signature verification failed")]
+    InvalidSignature,
+    /// Step 5: Activation expired.
+    #[error("activation expired at {expires_at} (current time: {current_time})")]
+    Expired {
+        /// Timestamp when the activation expired.
+        expires_at: i64,
+        /// Current clock Unix timestamp in seconds.
+        current_time: i64,
+    },
+    /// Step 6: Requested ring is not granted by the activation or payload.
+    #[error("ring {0:?} is not permitted by activation")]
+    RingNotPermitted(FeatureRing),
+}
+
+impl StepVerificationError {
+    /// Maps internal step error to canonical public `LicenseError`.
+    /// Does not expose raw machine hardware details or internal state.
+    pub fn into_license_error(self) -> LicenseError {
+        match self {
+            Self::MissingActivation(ring) => LicenseError::NotActivated(ring),
+            Self::InstallationMismatch(ring) => LicenseError::NotActivated(ring),
+            Self::InvalidSignature => LicenseError::InvalidSignature,
+            Self::Expired { expires_at, .. } => LicenseError::Expired(expires_at),
+            Self::RingNotPermitted(ring) => LicenseError::NotActivated(ring),
+        }
+    }
 }
 
 mod bytes_64 {
@@ -161,6 +222,136 @@ impl From<LegacyLicensePayload> for LicensePayload {
     }
 }
 
+// ============================================================================
+// Seven Verification Steps (Fail-Closed Sequence)
+// ============================================================================
+
+/// Step 1: Fast ring bypass check (INV-LICENSE-2).
+/// Ring Fast returns `true` unconditionally, allowing remaining steps to be bypassed.
+pub fn verify_step_1_fast_ring(ring: FeatureRing) -> bool {
+    ring == FeatureRing::Fast
+}
+
+/// Step 2: Presence check verifying that an activation record or license payload exists.
+pub fn verify_step_2_presence(
+    activation: Option<&SignedActivation>,
+    payload: Option<&LicensePayload>,
+    ring: FeatureRing,
+) -> Result<(), StepVerificationError> {
+    if activation.is_none() && payload.is_none() {
+        return Err(StepVerificationError::MissingActivation(ring));
+    }
+    Ok(())
+}
+
+/// Step 3: Local installation ID hash mismatch check (constant time, fail-closed without leaking details).
+pub fn verify_step_3_installation(
+    activation: Option<&SignedActivation>,
+    payload: Option<&LicensePayload>,
+    local_installation_id: Option<&[u8; 32]>,
+    ring: FeatureRing,
+) -> Result<(), StepVerificationError> {
+    if let Some(act) = activation {
+        match local_installation_id {
+            Some(local_hash) if constant_time_eq_32(local_hash, &act.installation_id_hash) => {
+                Ok(())
+            }
+            _ => Err(StepVerificationError::InstallationMismatch(ring)),
+        }
+    } else if let Some(pld) = payload {
+        if let Some(ref expected_hash) = pld.installation_id_hash {
+            match local_installation_id {
+                Some(local_hash) if constant_time_eq_32(local_hash, expected_hash) => Ok(()),
+                _ => Err(StepVerificationError::InstallationMismatch(ring)),
+            }
+        } else {
+            tracing::warn!(
+                "LicensePayload has no installation_id_hash (legacy payload); skipping installation ID check"
+            );
+            Ok(())
+        }
+    } else {
+        Err(StepVerificationError::MissingActivation(ring))
+    }
+}
+
+/// Step 4: Cryptographic signature verification check.
+pub fn verify_step_4_signature(
+    activation: Option<&SignedActivation>,
+    payload: Option<&LicensePayload>,
+    verifying_key: Option<&VerifyingKey>,
+) -> Result<(), StepVerificationError> {
+    if let Some(act) = activation {
+        let sig_valid = match verifying_key {
+            Some(vk) => act.verify_signature(vk),
+            None => false,
+        };
+        if !sig_valid {
+            return Err(StepVerificationError::InvalidSignature);
+        }
+    } else if payload.is_some() && verifying_key.is_none() {
+        return Err(StepVerificationError::InvalidSignature);
+    }
+    // Note: For license_payload, signature verification was performed during constructor `from_signed_payload_with_clock_and_opts`.
+    Ok(())
+}
+
+/// Step 5: Expiration check using clock port (P28).
+/// Returns `Err(StepVerificationError::Expired)` if `current_time >= expires_at`.
+///
+/// # Monotonicity Note
+/// System wall clock timestamps (`Clock::now_unix_nanos()`) are subject to non-monotonic clock adjustments
+/// (e.g. NTP synchronization or manual system clock rollbacks). In air-gapped / offline enterprise builds,
+/// time monotonicity should be anchored via hardware RTC or monotonic system reference timers where available.
+pub fn verify_step_5_expiration(
+    activation: Option<&SignedActivation>,
+    payload: Option<&LicensePayload>,
+    clock: &dyn Clock,
+) -> Result<(), StepVerificationError> {
+    let expires_at = if let Some(act) = activation {
+        act.expires_at_unix
+    } else if let Some(pld) = payload {
+        pld.expires_at.unwrap_or(i64::MAX)
+    } else {
+        i64::MAX
+    };
+
+    let now_secs = (clock.now_unix_nanos() / 1_000_000_000) as i64;
+    if now_secs >= expires_at {
+        return Err(StepVerificationError::Expired {
+            expires_at,
+            current_time: now_secs,
+        });
+    }
+
+    Ok(())
+}
+
+/// Step 6: Ring level requirement check (explicit allowed_rings / ring matching, no automatic hierarchy).
+pub fn verify_step_6_ring_permission(
+    activation: Option<&SignedActivation>,
+    payload: Option<&LicensePayload>,
+    requested_ring: FeatureRing,
+) -> Result<(), StepVerificationError> {
+    if let Some(act) = activation {
+        if act.ring != requested_ring {
+            return Err(StepVerificationError::RingNotPermitted(requested_ring));
+        }
+    } else if let Some(pld) = payload {
+        if !pld.allowed_rings.contains(&requested_ring) {
+            return Err(StepVerificationError::RingNotPermitted(requested_ring));
+        }
+    } else {
+        return Err(StepVerificationError::MissingActivation(requested_ring));
+    }
+    Ok(())
+}
+
+/// Step 7: Final verification step confirmation.
+pub fn verify_step_7_success() -> Result<(), StepVerificationError> {
+    Ok(())
+}
+
 /// Cryptographic license gate verifying Ed25519 signatures over activation records ([`SignedActivation`])
 /// or legacy [`LicensePayload`].
 #[derive(Clone)]
@@ -216,7 +407,7 @@ impl SignedLicenseGate {
     }
 
     /// Constructs a [`SignedLicenseGate`] by verifying an Ed25519 signature over `payload_bytes`
-    /// using standard system wall-clock.
+    /// using standard system wall-clock and strict verification options.
     ///
     /// # Errors
     /// Returns [`LicenseError::InvalidSignature`] if signature verification or payload deserialization fails.
@@ -225,11 +416,12 @@ impl SignedLicenseGate {
         signature: &[u8; 64],
         verifying_key: VerifyingKey,
     ) -> Result<Self, LicenseError> {
-        Self::from_signed_payload_with_clock(
+        Self::from_signed_payload_with_clock_and_opts(
             payload_bytes,
             signature,
             verifying_key,
             Arc::new(SystemClock::new()),
+            SignedLicenseOptions::default(),
         )
     }
 
@@ -243,6 +435,31 @@ impl SignedLicenseGate {
         verifying_key: VerifyingKey,
         clock: Arc<dyn Clock>,
     ) -> Result<Self, LicenseError> {
+        Self::from_signed_payload_with_clock_and_opts(
+            payload_bytes,
+            signature,
+            verifying_key,
+            clock,
+            SignedLicenseOptions::default(),
+        )
+    }
+
+    /// Constructs a [`SignedLicenseGate`] with explicit verification options and injected [`Clock`].
+    ///
+    /// # Errors
+    /// Returns [`LicenseError::InvalidSignature`] if payload exceeds `max_payload_bytes`, signature verification fails,
+    /// or payload deserialization fails (and legacy schema is not explicitly permitted).
+    pub fn from_signed_payload_with_clock_and_opts(
+        payload_bytes: &[u8],
+        signature: &[u8; 64],
+        verifying_key: VerifyingKey,
+        clock: Arc<dyn Clock>,
+        options: SignedLicenseOptions,
+    ) -> Result<Self, LicenseError> {
+        if payload_bytes.len() > options.max_payload_bytes {
+            return Err(LicenseError::InvalidSignature);
+        }
+
         let sig = Signature::from_bytes(signature);
         verifying_key
             .verify(payload_bytes, &sig)
@@ -262,14 +479,16 @@ impl SignedLicenseGate {
             });
         }
 
-        if let Ok(legacy) = bincode_opts.deserialize::<LegacyLicensePayload>(payload_bytes) {
-            return Ok(Self {
-                verifying_key: Some(verifying_key),
-                activation: None,
-                license_payload: Some(legacy.into()),
-                local_installation_id: None,
-                clock,
-            });
+        if options.allow_legacy {
+            if let Ok(legacy) = bincode_opts.deserialize::<LegacyLicensePayload>(payload_bytes) {
+                return Ok(Self {
+                    verifying_key: Some(verifying_key),
+                    activation: None,
+                    license_payload: Some(legacy.into()),
+                    local_installation_id: None,
+                    clock,
+                });
+            }
         }
 
         Err(LicenseError::InvalidSignature)
@@ -294,6 +513,64 @@ impl SignedLicenseGate {
     /// Returns a reference to the public Ed25519 verifying key, if present.
     pub fn verifying_key(&self) -> Option<&VerifyingKey> {
         self.verifying_key.as_ref()
+    }
+
+    /// Evaluates Step 1: Fast Ring Bypass check.
+    pub fn check_step_1_fast_ring(&self, ring: FeatureRing) -> bool {
+        verify_step_1_fast_ring(ring)
+    }
+
+    /// Evaluates Step 2: Presence check.
+    pub fn check_step_2_presence(&self, ring: FeatureRing) -> Result<(), StepVerificationError> {
+        verify_step_2_presence(self.activation.as_ref(), self.license_payload.as_ref(), ring)
+    }
+
+    /// Evaluates Step 3: Installation ID binding check.
+    pub fn check_step_3_installation(
+        &self,
+        ring: FeatureRing,
+    ) -> Result<(), StepVerificationError> {
+        verify_step_3_installation(
+            self.activation.as_ref(),
+            self.license_payload.as_ref(),
+            self.local_installation_id.as_ref(),
+            ring,
+        )
+    }
+
+    /// Evaluates Step 4: Cryptographic signature check.
+    pub fn check_step_4_signature(&self) -> Result<(), StepVerificationError> {
+        verify_step_4_signature(
+            self.activation.as_ref(),
+            self.license_payload.as_ref(),
+            self.verifying_key.as_ref(),
+        )
+    }
+
+    /// Evaluates Step 5: Expiration check.
+    pub fn check_step_5_expiration(&self) -> Result<(), StepVerificationError> {
+        verify_step_5_expiration(
+            self.activation.as_ref(),
+            self.license_payload.as_ref(),
+            self.clock.as_ref(),
+        )
+    }
+
+    /// Evaluates Step 6: Ring permission check.
+    pub fn check_step_6_ring_permission(
+        &self,
+        ring: FeatureRing,
+    ) -> Result<(), StepVerificationError> {
+        verify_step_6_ring_permission(
+            self.activation.as_ref(),
+            self.license_payload.as_ref(),
+            ring,
+        )
+    }
+
+    /// Evaluates Step 7: Final success check.
+    pub fn check_step_7_success(&self) -> Result<(), StepVerificationError> {
+        verify_step_7_success()
     }
 
     /// Generates a valid signed payload, signature, and verifying key bytes for testing purposes.
@@ -323,76 +600,48 @@ impl SignedLicenseGate {
 impl LicenseGate for SignedLicenseGate {
     fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError> {
         // (1) Step 1: Fast Ring Bypass - INVARIANTE INV-LICENSE-2
-        // Ring Fast always returns Ok unconditionally, even with corrupt, missing, or expired activation.
-        if ring == FeatureRing::Fast {
+        if verify_step_1_fast_ring(ring) {
             return Ok(());
         }
 
         // (2) Step 2: Missing activation check
-        if self.activation.is_none() && self.license_payload.is_none() {
-            return Err(LicenseError::NotActivated(ring));
-        }
+        verify_step_2_presence(self.activation.as_ref(), self.license_payload.as_ref(), ring)
+            .map_err(|e| e.into_license_error())?;
 
-        // (3) Step 3: Installation ID hash mismatch check (constant time, fail-closed without leaking details)
-        if let Some(ref act) = self.activation {
-            match self.local_installation_id {
-                Some(local_hash) if constant_time_eq_32(&local_hash, &act.installation_id_hash) => {
-                }
-                _ => return Err(LicenseError::NotActivated(ring)),
-            }
-        } else if let Some(ref payload) = self.license_payload {
-            if let Some(ref expected_hash) = payload.installation_id_hash {
-                match self.local_installation_id {
-                    Some(local_hash) if constant_time_eq_32(&local_hash, expected_hash) => {}
-                    _ => return Err(LicenseError::NotActivated(ring)),
-                }
-            } else {
-                tracing::warn!(
-                    "LicensePayload has no installation_id_hash (legacy payload); skipping installation ID check"
-                );
-            }
-        }
+        // (3) Step 3: Installation ID hash mismatch check (constant time, fail-closed)
+        verify_step_3_installation(
+            self.activation.as_ref(),
+            self.license_payload.as_ref(),
+            self.local_installation_id.as_ref(),
+            ring,
+        )
+        .map_err(|e| e.into_license_error())?;
 
         // (4) Step 4: Invalid signature check
-        if let Some(ref act) = self.activation {
-            let sig_valid = match &self.verifying_key {
-                Some(vk) => act.verify_signature(vk),
-                None => false,
-            };
-            if !sig_valid {
-                return Err(LicenseError::InvalidSignature);
-            }
-        } else if self.license_payload.is_some() && self.verifying_key.is_none() {
-            return Err(LicenseError::InvalidSignature);
-        }
-        // Note: For license_payload, signature verification was performed during `from_signed_payload_with_clock`.
+        verify_step_4_signature(
+            self.activation.as_ref(),
+            self.license_payload.as_ref(),
+            self.verifying_key.as_ref(),
+        )
+        .map_err(|e| e.into_license_error())?;
 
         // (5) Step 5: Expiration check using clock port (P28)
-        let expires_at = if let Some(ref act) = self.activation {
-            act.expires_at_unix
-        } else if let Some(ref payload) = self.license_payload {
-            payload.expires_at.unwrap_or(i64::MAX)
-        } else {
-            i64::MAX
-        };
+        verify_step_5_expiration(
+            self.activation.as_ref(),
+            self.license_payload.as_ref(),
+            self.clock.as_ref(),
+        )
+        .map_err(|e| e.into_license_error())?;
 
-        let now_secs = (self.clock.now_unix_nanos() / 1_000_000_000) as i64;
-        if now_secs >= expires_at {
-            return Err(LicenseError::Expired(expires_at));
-        }
+        // (6) Step 6: Ring level requirement check
+        verify_step_6_ring_permission(
+            self.activation.as_ref(),
+            self.license_payload.as_ref(),
+            ring,
+        )
+        .map_err(|e| e.into_license_error())?;
 
-        // (6) Step 6: Ring level requirement check (explicit allowed_rings / ring matching, no automatic hierarchy)
-        if let Some(ref act) = self.activation {
-            if act.ring != ring {
-                return Err(LicenseError::NotActivated(ring));
-            }
-        } else if let Some(ref payload) = self.license_payload {
-            if !payload.allowed_rings.contains(&ring) {
-                return Err(LicenseError::NotActivated(ring));
-            }
-        }
-
-        // (7) Step 7: Success
-        Ok(())
+        // (7) Step 7: Success confirmation
+        verify_step_7_success().map_err(|e| e.into_license_error())
     }
 }
