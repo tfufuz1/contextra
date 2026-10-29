@@ -84,7 +84,7 @@ fn bench_router_engine(c: &mut Criterion) {
             let eid = EntityId::from_key(&key).unwrap();
             let tx = db.allocate_tx().unwrap();
             let comm_key = format!("__graph:community:{}", eid.inner()).into_bytes();
-            let comm_id = (i as u64) % 5 + 1;
+            let comm_id = u64::try_from(i.max(0)).unwrap_or(0) % 5 + 1;
             db.inner_storage()
                 .put(tx, &comm_key, &serde_json::to_vec(&comm_id).unwrap())
                 .await

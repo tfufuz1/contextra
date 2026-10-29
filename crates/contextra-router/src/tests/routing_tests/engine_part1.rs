@@ -1,3 +1,13 @@
+#![allow(
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    deprecated
+)]
 use super::super::fixtures::*;
 use crate::{RouterEngine, SlmProfile};
 use contextra_db::{Contextra, ContextraConfig};
