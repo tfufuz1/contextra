@@ -67,6 +67,7 @@ pub(crate) fn retry_jitter(rng: &dyn Rng) -> Duration {
 pub struct OllamaClient {
     pub(crate) config: OllamaConfig,
     pub(crate) client: reqwest::Client,
+    pub(crate) client_build_error: Option<String>,
     pub(crate) rng: Arc<dyn Rng>,
     pub(crate) clock: Arc<dyn Clock>,
     pub(crate) audit_sink: Arc<dyn EgressAuditSink>,
@@ -78,6 +79,7 @@ impl std::fmt::Debug for OllamaClient {
         f.debug_struct("OllamaClient")
             .field("config", &self.config)
             .field("client", &self.client)
+            .field("client_build_error", &self.client_build_error)
             .field("rng", &"Arc<dyn Rng>")
             .field("clock", &"Arc<dyn Clock>")
             .field("audit_sink", &"Arc<dyn EgressAuditSink>")
@@ -88,6 +90,9 @@ impl std::fmt::Debug for OllamaClient {
 
 impl OllamaClient {
     /// Creates a new `OllamaClient` with the specified base URL and default timeout config.
+    ///
+    /// Note: Intended for local development and testing. For production remote egress,
+    /// consider `try_with_config` with an explicit audit sink.
     pub fn new(base_url: impl Into<String>) -> Self {
         let config = OllamaConfig {
             base_url: base_url.into(),
@@ -97,11 +102,15 @@ impl OllamaClient {
     }
 
     /// Creates a new `OllamaClient` with custom configuration parameters.
+    ///
+    /// Note: Intended for local development and testing. If building the underlying HTTP client fails,
+    /// the error state is saved internally and subsequent requests will fail-closed.
     pub fn with_config(config: OllamaConfig) -> Self {
         if let Err(e) = validate_model_name(&config.model) {
             tracing::warn!(model = %config.model, error = %e, "OllamaConfig contains invalid model name");
         }
-        let client = match reqwest::Client::builder()
+
+        let (client, client_build_error) = match reqwest::Client::builder()
             .timeout(config.request_timeout)
             .connect_timeout(config.connect_timeout)
             .read_timeout(config.read_timeout)
@@ -109,12 +118,11 @@ impl OllamaClient {
             .pool_max_idle_per_host(8)
             .build()
         {
-            Ok(c) => c,
+            Ok(c) => (c, None),
             Err(e) => {
-                tracing::warn!(
-                    "Failed to build HTTP client with timeouts: {e}, falling back to default"
-                );
-                reqwest::Client::new()
+                let err_msg = format!("Failed to build HTTP client with config: {e}");
+                tracing::error!("{}", err_msg);
+                (reqwest::Client::default(), Some(err_msg))
             }
         };
 
@@ -129,11 +137,54 @@ impl OllamaClient {
         Self {
             config,
             client,
+            client_build_error,
             rng,
             clock,
             audit_sink,
             circuit_breaker,
         }
+    }
+
+    /// Creates a fallible `OllamaClient` with custom configuration parameters and a mandatory audit sink.
+    ///
+    /// Returns an error immediately if building the HTTP client fails.
+    pub fn try_with_config(
+        config: OllamaConfig,
+        audit_sink: Arc<dyn EgressAuditSink>,
+    ) -> Result<Self> {
+        if let Err(e) = validate_model_name(&config.model) {
+            tracing::warn!(model = %config.model, error = %e, "OllamaConfig contains invalid model name");
+        }
+
+        let client = reqwest::Client::builder()
+            .timeout(config.request_timeout)
+            .connect_timeout(config.connect_timeout)
+            .read_timeout(config.read_timeout)
+            .redirect(reqwest::redirect::Policy::none())
+            .pool_max_idle_per_host(8)
+            .build()
+            .map_err(|e| {
+                ContextraError::Io(std::io::Error::other(format!(
+                    "HTTP client construction failed: {e}"
+                )))
+            })?;
+
+        let rng: Arc<dyn Rng> = Arc::new(SeededRng::from_entropy());
+        let clock: Arc<dyn Clock> = Arc::new(SystemClock::new());
+        let circuit_breaker = Arc::new(CircuitBreaker::new(
+            config.failure_threshold,
+            config.circuit_reset_timeout,
+        ));
+
+        Ok(Self {
+            config,
+            client,
+            client_build_error: None,
+            rng,
+            clock,
+            audit_sink,
+            circuit_breaker,
+        })
     }
 
     /// Sets a custom random number generator for retry jitter computation.
@@ -156,6 +207,11 @@ impl OllamaClient {
 
     /// Pre-request policy and circuit breaker validation.
     fn prepare_request(&self) -> Result<()> {
+        if let Some(ref build_err) = self.client_build_error {
+            return Err(ContextraError::Io(std::io::Error::other(format!(
+                "Client construction failed: {build_err}"
+            ))));
+        }
         self.config
             .policy
             .check_endpoint(self.base_url(), self.audit_sink.as_ref())?;

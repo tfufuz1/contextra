@@ -1,3 +1,5 @@
+#![allow(clippy::indexing_slicing, clippy::field_reassign_with_default)]
+
 use super::*;
 use crate::embedding::OllamaEmbedder;
 use contextra_ports::TextEmbeddingEngine;
@@ -1653,4 +1655,85 @@ fn test_with_rng_builder() {
     let val2 = retry_jitter(&ref_rng);
 
     assert_eq!(val1, val2);
+}
+
+#[tokio::test]
+async fn test_client_build_error_fails_closed() {
+    let mut client = OllamaClient::new("http://localhost:11434");
+    client.client_build_error = Some("Simulated client construction failure".to_string());
+
+    let res = client.embed("nomic-embed-text", "hello").await;
+    assert!(res.is_err());
+    let err_msg = res.unwrap_err().to_string();
+    assert!(err_msg.contains("Client construction failed: Simulated client construction failure"));
+}
+
+#[derive(Debug, Default)]
+struct TestAuditSink {
+    events: std::sync::Arc<parking_lot::Mutex<Vec<(String, bool, String)>>>,
+}
+
+impl EgressAuditSink for TestAuditSink {
+    fn audit_egress(&self, endpoint: &str, allowed: bool, reason: &str) {
+        self.events
+            .lock()
+            .push((endpoint.to_string(), allowed, reason.to_string()));
+    }
+}
+
+#[tokio::test]
+async fn test_remote_egress_requires_explicit_audit_sink() {
+    let mut policy = EndpointPolicy::default();
+    policy.allow_remote = true;
+    policy.allowed_remote_hosts = vec!["remote.ollama.server".to_string()];
+    let config = OllamaConfig {
+        base_url: "http://remote.ollama.server:11434".to_string(),
+        policy,
+        ..Default::default()
+    };
+
+    // With NoopEgressAuditSink (default) -> remote egress must fail
+    let client = OllamaClient::with_config(config.clone());
+    let res = client.embed("nomic-embed-text", "test").await;
+    assert!(res.is_err());
+    let err_msg = res.unwrap_err().to_string();
+    assert!(err_msg.contains("AuditSinkRequired"));
+
+    // With custom TestAuditSink -> allowed by policy
+    let audit_sink = std::sync::Arc::new(TestAuditSink::default());
+    let client_audited = client.with_audit_sink(audit_sink.clone());
+
+    // Fails due to unreachable host, but policy check passes and logs event!
+    let _ = client_audited.embed("nomic-embed-text", "test").await;
+    let events = audit_sink.events.lock();
+    if let Some(event) = events.first() {
+        assert_eq!(event.0, "http://remote.ollama.server:11434");
+        assert!(event.1); // allowed = true
+        assert_eq!(event.2, "Approved by allowlist");
+    } else {
+        panic!("Expected at least one audit event");
+    }
+}
+
+#[tokio::test]
+async fn test_loopback_allowed_with_noop_audit_sink() {
+    let config = OllamaConfig {
+        base_url: "http://127.0.0.1:11434".to_string(),
+        ..Default::default()
+    };
+
+    let client = OllamaClient::with_config(config);
+    let policy_res = client
+        .config()
+        .policy
+        .check_endpoint(client.base_url(), client.audit_sink.as_ref());
+    assert!(policy_res.is_ok());
+}
+
+#[tokio::test]
+async fn test_try_with_config_constructor() {
+    let audit_sink = std::sync::Arc::new(TestAuditSink::default());
+    let config = OllamaConfig::default();
+    let client_res = OllamaClient::try_with_config(config, audit_sink);
+    assert!(client_res.is_ok());
 }
