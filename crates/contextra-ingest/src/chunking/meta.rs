@@ -109,7 +109,7 @@ mod hex {
         let mut s = String::with_capacity(bytes.len() * 2);
         for &b in bytes {
             use std::fmt::Write;
-            let _ = write!(s, "{:02x}", b);
+            write!(&mut s, "{:02x}", b).expect("writing to String cannot fail");
         }
         s
     }

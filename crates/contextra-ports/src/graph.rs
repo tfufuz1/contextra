@@ -133,6 +133,10 @@ pub enum GraphMutationError {
     #[error("Duplicate hyperedge ID: {0}")]
     DuplicateHyperEdgeId(HyperEdgeId),
 
+    /// Duplicate hyperedge ID provided.
+    #[error("Duplicate hyperedge ID: {0}")]
+    DuplicateHyperEdgeId(HyperEdgeId),
+
     /// Invalid hyperedge weight.
     #[error("Invalid hyperedge weight {weight}: {reason}")]
     InvalidWeight {

@@ -11,14 +11,10 @@ use crate::error::IngestError;
 use crate::format::ChunkStrategy;
 use crate::ir::DocumentIr;
 
-#[path = "structured/mod.rs"]
-pub mod structured_impl;
+#[path = "prose/mod.rs"]
+pub mod prose_impl;
 
-#[path = "email/mod.rs"]
-pub mod email_impl;
-
-pub use email_impl::EmailChunker;
-pub use structured_impl::StructuredChunker;
+pub use prose_impl::*;
 
 #[derive(Debug, Default)]
 pub struct ProseChunker;
@@ -34,7 +30,7 @@ impl IrChunker for ProseChunker {
         canon: &CanonicalText,
         cfg: &ChunkingConfig,
     ) -> Result<Vec<ChunkDraft>, IngestError> {
-        FallbackChunker.draft(ir, canon, cfg)
+        prose_impl::draft_prose(ir, canon, cfg)
     }
 }
 
