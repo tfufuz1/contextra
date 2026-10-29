@@ -51,10 +51,8 @@ mod tests {
         let res = proof.verify_external(&keypair.verifying_key);
         assert!(res.is_ok());
 
-        let v_res = DeletionProofVerifier::verify_standalone(
-            &proof,
-            &keypair.verifying_key_bytes(),
-        );
+        let v_res =
+            DeletionProofVerifier::verify_standalone(&proof, &keypair.verifying_key_bytes());
         assert!(v_res.is_valid);
     }
 }

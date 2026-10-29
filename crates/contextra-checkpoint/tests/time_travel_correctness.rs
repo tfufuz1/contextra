@@ -1,4 +1,15 @@
-#![allow(clippy::type_complexity)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::indexing_slicing,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::await_holding_lock,
+    clippy::type_complexity
+)]
 
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
