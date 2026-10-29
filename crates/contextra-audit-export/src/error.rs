@@ -9,11 +9,18 @@ pub enum AuditExportError {
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
 
+    /// Missing mandatory field required by GDPR Article 30.
+    #[error("Missing mandatory field: {field}")]
+    MissingField {
+        /// Name of the missing or empty field.
+        field: String,
+    },
+
     /// Failure during register data collection.
     #[error("Source collection error: {0}")]
     SourceCollection(String),
 
-    /// Requested tenant identifier is invalid or missing.
-    #[error("Invalid tenant ID: {0}")]
+    /// Requested tenant identifier is invalid or missing: {0}.
+    #[error("Requested tenant identifier is invalid or missing: {0}")]
     InvalidTenant(String),
 }
