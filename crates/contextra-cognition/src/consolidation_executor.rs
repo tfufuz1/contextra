@@ -17,6 +17,7 @@ use crate::memory_consolidation::{
     CommunityStabilityTracker, ConsolidationConfig, ConsolidationPhaseResult, SynthesisConfig,
     SynthesisPhaseResult,
 };
+use ahash::{AHashMap, AHashSet};
 use contextra_engine::collection::{Collection, StoredDocument, StoredDocumentMeta};
 use contextra_engine::decay_controller::AdaptiveDecayController;
 use contextra_graph::{detect_communities, CommunityDetectionConfig};
@@ -24,7 +25,6 @@ use contextra_ports::{
     GroundingValidator, LlmTextGenerator, ResponseGroundingValidator, StorageEngine, VectorIndex,
 };
 use contextra_types::{DocId, Result};
-use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -57,64 +57,11 @@ impl Drop for ConsolidationLockGuard {
     }
 }
 
-/// Führt den Structural Consolidation Pass aus UND wendet die Ergebnisse an (Tombstones, Graph-Cascade).
-///
-/// Gibt das `ConsolidationPhaseResult` zurück.
-pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
+async fn apply_duplicate_tombstones<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
-    turns: &[(DocId, Vec<f32>)],
-    config: &ConsolidationConfig,
-) -> Result<ConsolidationPhaseResult> {
-    if turns.is_empty() {
-        return Ok(ConsolidationPhaseResult {
-            segments_created: 0,
-            duplicates_tombstoned: Vec::new(),
-            cascade_edge_tombstones_needed: Vec::new(),
-            cascade_errors: Vec::new(),
-        });
-    }
-
-    // Erwerbe ConsolidationNodesGuard per try_acquire(), um parallele Durchläufe auf derselben Collection
-    // zu verhindern und geordnete Kaskaden-Invalidierung zu erzwingen (ADR-081)
-    let guard = match crate::consolidation_locks::ConsolidationNodesGuard::try_acquire(collection) {
-        Some(guard) => guard,
-        None => {
-            tracing::warn!(
-                collection = %collection.name(),
-                "Konsolidierungsdurchlauf übersprungen — anderer Pfad aktiv (H-19-Schutz)"
-            );
-            return Ok(ConsolidationPhaseResult {
-                segments_created: 0,
-                duplicates_tombstoned: Vec::new(),
-                cascade_edge_tombstones_needed: Vec::new(),
-                cascade_errors: Vec::new(),
-            });
-        }
-    };
-
-    // Klone Eingabe-Daten für den blocking Thread.
-    // Konsolidierung läuft selten (alle N Minuten) — der Clone-Overhead ist vernachlässigbar
-    // gegenüber dem Gewinn: async Worker-Threads werden für latenz-kritische Ops freigegeben.
-    let turns_owned: Vec<(DocId, Vec<f32>)> = turns.to_vec();
-    let config_owned = config.clone();
-
-    let mut result = tokio::task::spawn_blocking(move || {
-        // run_consolidation_pass ist vollständig synchron (kein Async, kein I/O).
-        // Im blocking Thread: kein `await` nötig und erlaubt.
-        run_consolidation_pass(&turns_owned, &config_owned)
-    })
-    .await
-    .map_err(|join_err| {
-        // JoinError tritt auf bei Task-Panic — gemäß Zero-Panic-Doctrine nicht erwartet,
-        // aber explizit behandeln statt unwrap().
-        contextra_types::ContextraError::Internal(format!(
-            "Consolidation compute task panicked: {}",
-            join_err
-        ))
-    })?;
-
-    // Tombstones auf echte Collection anwenden
-    for doc_id in &result.duplicates_tombstoned {
+    duplicates: &[DocId],
+) {
+    for doc_id in duplicates {
         let doc_key = collection.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
         let user_id = match collection.storage().get(&doc_key).await {
             Ok(Some(val)) => match serde_json::from_slice::<StoredDocumentMeta>(&val) {
@@ -143,8 +90,56 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
             }
         }
     }
+}
 
-    // Kaskadierende Graph-Edge-Tombstones für supersedete Dokumente kanonisch geordnet anwenden (INV-GRAPH-PROV-1)
+/// Führt den Structural Consolidation Pass aus UND wendet die Ergebnisse an (Tombstones, Graph-Cascade).
+///
+/// Gibt das `ConsolidationPhaseResult` zurück.
+pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
+    collection: &Collection<S, V>,
+    turns: &[(DocId, Vec<f32>)],
+    config: &ConsolidationConfig,
+) -> Result<ConsolidationPhaseResult> {
+    if turns.is_empty() {
+        return Ok(ConsolidationPhaseResult {
+            segments_created: 0,
+            duplicates_tombstoned: Vec::new(),
+            cascade_edge_tombstones_needed: Vec::new(),
+            cascade_errors: Vec::new(),
+        });
+    }
+
+    let guard = match crate::consolidation_locks::ConsolidationNodesGuard::try_acquire(collection) {
+        Some(guard) => guard,
+        None => {
+            tracing::warn!(
+                collection = %collection.name(),
+                "Konsolidierungsdurchlauf übersprungen — anderer Pfad aktiv (H-19-Schutz)"
+            );
+            return Ok(ConsolidationPhaseResult {
+                segments_created: 0,
+                duplicates_tombstoned: Vec::new(),
+                cascade_edge_tombstones_needed: Vec::new(),
+                cascade_errors: Vec::new(),
+            });
+        }
+    };
+
+    let turns_owned: Vec<(DocId, Vec<f32>)> = turns.to_vec();
+    let config_owned = config.clone();
+
+    let mut result =
+        tokio::task::spawn_blocking(move || run_consolidation_pass(&turns_owned, &config_owned))
+            .await
+            .map_err(|join_err| {
+                contextra_types::ContextraError::Internal(format!(
+                    "Consolidation compute task panicked: {}",
+                    join_err
+                ))
+            })?;
+
+    apply_duplicate_tombstones(collection, &result.duplicates_tombstoned).await;
+
     if !result.cascade_edge_tombstones_needed.is_empty() {
         let tx = collection.allocate_tx()?;
         let (_reports, errors) = guard
@@ -238,6 +233,102 @@ pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>(
     .await
 }
 
+async fn build_stable_community_list<S: StorageEngine, V: VectorIndex>(
+    collection: &Collection<S, V>,
+    synth_cfg: &SynthesisConfig,
+    tracker: &mut CommunityStabilityTracker,
+) -> Result<Vec<(u64, Vec<DocId>)>> {
+    let assignments = detect_communities(
+        &collection.graph_index(),
+        &CommunityDetectionConfig::default(),
+    )
+    .await?;
+
+    let mut comm_map: AHashMap<u64, Vec<DocId>> = AHashMap::new();
+    for assignment in assignments {
+        let doc_id = DocId::new(assignment.entity_id.inner());
+        comm_map
+            .entry(assignment.community_id)
+            .or_default()
+            .push(doc_id);
+    }
+
+    let mut currently_observed = AHashSet::new();
+    let mut stable_communities = Vec::new();
+
+    for (_comm_id, members) in comm_map {
+        let comm_hash = compute_community_hash(&members);
+        currently_observed.insert(comm_hash);
+        let count = tracker.observe(comm_hash);
+        if count >= synth_cfg.stability_cycles_required {
+            stable_communities.push((comm_hash, members));
+        }
+    }
+
+    tracker.reset_if_absent(&currently_observed);
+    Ok(stable_communities)
+}
+
+async fn fetch_community_source_texts<S: StorageEngine, V: VectorIndex>(
+    collection: &Collection<S, V>,
+    stable_communities: &[(u64, Vec<DocId>)],
+) -> AHashMap<DocId, String> {
+    let mut source_texts: AHashMap<DocId, String> = AHashMap::new();
+    for (_comm_hash, members) in stable_communities {
+        for doc_id in members {
+            if source_texts.contains_key(doc_id) {
+                continue;
+            }
+            let doc_key = collection.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
+            if let Ok(Some(val)) = collection.storage().get(&doc_key).await {
+                if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
+                    if let Ok(Some(doc)) = collection.get(&meta.id).await {
+                        if let Some(meta_val) = doc.metadata {
+                            if let Some(text_val) = meta_val.get("text").and_then(|v| v.as_str()) {
+                                source_texts.insert(*doc_id, text_val.to_string());
+                                continue;
+                            }
+                        }
+                        source_texts.insert(*doc_id, meta.id.clone());
+                        continue;
+                    }
+                }
+            }
+            source_texts.insert(*doc_id, doc_id.inner().to_string());
+        }
+    }
+    source_texts
+}
+
+async fn persist_synthesized_meta_chunks<S: StorageEngine, V: VectorIndex>(
+    collection: &Collection<S, V>,
+    synth_res: &SynthesisPhaseResult,
+) {
+    for (idx, meta_chunk) in synth_res.synthesized.iter().enumerate() {
+        let chunk_id = format!("rem_synth_{}_{}", meta_chunk.source_community_hash, idx);
+        let source_ids_json: Vec<u64> = meta_chunk
+            .abstracts_from
+            .iter()
+            .map(|id| id.inner())
+            .collect();
+        let metadata = serde_json::json!({
+            "rem_synthesized": true,
+            "source_community_hash": meta_chunk.source_community_hash,
+            "source_doc_ids": source_ids_json,
+            "model_id": meta_chunk.llm_model_id,
+            "text": meta_chunk.content,
+        });
+
+        if let Err(e) = collection
+            .insert_text_only(&chunk_id, &meta_chunk.content, Some(metadata.clone()))
+            .await
+        {
+            tracing::debug!(chunk_id = %chunk_id, error = %e, "insert_text_only failed; storing synthesized chunk via put_kv");
+            let _ = collection.put_kv(&chunk_id, &metadata).await;
+        }
+    }
+}
+
 /// Führt die vollständige Hintergrund-Konsolidierung mit Unterstützung für `rich_validator` (`GroundingValidator`) aus.
 ///
 /// 1. Structural Consolidation Pass: Segmentierung & Near-Duplicate Tombstoning.
@@ -262,25 +353,6 @@ pub async fn execute_background_consolidation_with_rich_validator<
         execute_consolidation_pass(collection, turns, consolidation_config).await?;
 
     let synthesis_result = if let (Some(synth_cfg), Some(llm_gen)) = (synthesis_config, llm) {
-        let assignments = detect_communities(
-            &collection.graph_index(),
-            &CommunityDetectionConfig::default(),
-        )
-        .await?;
-
-        // Group entities by community_id
-        let mut comm_map: HashMap<u64, Vec<DocId>> = HashMap::new();
-        for assignment in assignments {
-            let doc_id = DocId::new(assignment.entity_id.inner());
-            comm_map
-                .entry(assignment.community_id)
-                .or_default()
-                .push(doc_id);
-        }
-
-        let mut currently_observed = HashSet::new();
-        let mut stable_communities = Vec::new();
-
         let mut local_tracker;
         let tracker = match stability_tracker {
             Some(t) => t,
@@ -290,48 +362,10 @@ pub async fn execute_background_consolidation_with_rich_validator<
             }
         };
 
-        for (_comm_id, members) in comm_map {
-            let comm_hash = compute_community_hash(&members);
-            currently_observed.insert(comm_hash);
-            let count = tracker.observe(comm_hash);
-            if count >= synth_cfg.stability_cycles_required {
-                stable_communities.push((comm_hash, members));
-            }
-        }
+        let stable_communities =
+            build_stable_community_list(collection, synth_cfg, tracker).await?;
+        let source_texts = fetch_community_source_texts(collection, &stable_communities).await;
 
-        tracker.reset_if_absent(&currently_observed);
-
-        // Fetch source texts for all members in stable_communities
-        let mut source_texts: HashMap<DocId, String> = HashMap::new();
-        for (_comm_hash, members) in &stable_communities {
-            for doc_id in members {
-                if source_texts.contains_key(doc_id) {
-                    continue;
-                }
-                let doc_key = collection.namespaced_key(&doc_id.inner().to_le_bytes(), 1);
-                if let Ok(Some(val)) = collection.storage().get(&doc_key).await {
-                    if let Ok(meta) = serde_json::from_slice::<StoredDocumentMeta>(&val) {
-                        if let Ok(Some(doc)) = collection.get(&meta.id).await {
-                            if let Some(meta_val) = doc.metadata {
-                                if let Some(text_val) =
-                                    meta_val.get("text").and_then(|v| v.as_str())
-                                {
-                                    source_texts.insert(*doc_id, text_val.to_string());
-                                    continue;
-                                }
-                            }
-                            source_texts.insert(*doc_id, meta.id.clone());
-                            continue;
-                        }
-                    }
-                }
-                source_texts.insert(*doc_id, doc_id.inner().to_string());
-            }
-        }
-
-        // Structural Consolidation Pass über stabile Communities ausführen.
-        // HINWEIS: WENN ein `rich_validator` (GroundingValidator) übergeben wird, wird dieser bevorzugt
-        // über GroundingValidatorAdapter adaptiert, sodass Isotonic-Kalibrierung & PolicyViolation-Abstention greifen.
         let adapter;
         let effective_validator: Option<&dyn ResponseGroundingValidator> =
             if let Some(rv) = rich_validator {
@@ -350,29 +384,7 @@ pub async fn execute_background_consolidation_with_rich_validator<
         )
         .await?;
 
-        for (idx, meta_chunk) in synth_res.synthesized.iter().enumerate() {
-            let chunk_id = format!("rem_synth_{}_{}", meta_chunk.source_community_hash, idx);
-            let source_ids_json: Vec<u64> = meta_chunk
-                .abstracts_from
-                .iter()
-                .map(|id| id.inner())
-                .collect();
-            let metadata = serde_json::json!({
-                "rem_synthesized": true,
-                "source_community_hash": meta_chunk.source_community_hash,
-                "source_doc_ids": source_ids_json,
-                "model_id": meta_chunk.llm_model_id,
-                "text": meta_chunk.content,
-            });
-
-            if let Err(e) = collection
-                .insert_text_only(&chunk_id, &meta_chunk.content, Some(metadata.clone()))
-                .await
-            {
-                tracing::debug!(chunk_id = %chunk_id, error = %e, "insert_text_only failed; storing synthesized chunk via put_kv");
-                let _ = collection.put_kv(&chunk_id, &metadata).await;
-            }
-        }
+        persist_synthesized_meta_chunks(collection, &synth_res).await;
 
         Some(synth_res)
     } else {
@@ -576,12 +588,115 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
         }
     }
 
+    async fn scan_collection_turns(&self) -> Result<Vec<(DocId, Vec<f32>)>> {
+        let user_key_prefix = self.collection.user_key_prefix();
+        let entries = self
+            .collection
+            .storage()
+            .scan_prefix(&user_key_prefix)
+            .await?;
+
+        let mut turns: Vec<(DocId, Vec<f32>)> = Vec::new();
+        for (k, v) in &entries {
+            if self.collection.name() == "default" && k.starts_with(b"__") {
+                continue;
+            }
+            if let Ok(stored) = serde_json::from_slice::<StoredDocument>(v) {
+                if let Ok(doc_id) = DocId::from_key(&stored.id) {
+                    turns.push((doc_id, stored.embedding));
+                }
+            }
+        }
+        Ok(turns)
+    }
+
+    fn spawn_leanrag_blocking_task(
+        &self,
+        cfg: &AggregationConfig,
+        llm_arc: &Arc<dyn LlmTextGenerator>,
+        inputs: &crate::leanrag_input::LeanRagInputs,
+        wal_tx: contextra_types::TxId,
+    ) {
+        let collection_clone = self.collection.clone();
+        let cfg_clone = cfg.clone();
+        let llm_clone = llm_arc.clone();
+        let stability_tracker_clone = self.stability_tracker.clone();
+        let nodes = inputs.nodes.clone();
+        let edges = inputs.edges.clone();
+
+        tokio::task::spawn_blocking(move || {
+            let handle = tokio::runtime::Handle::current();
+            let mut tracker_g = stability_tracker_clone.blocking_lock();
+            handle.block_on(async {
+                if let Err(stage_err) = execute_leanrag_aggregation_stage(
+                    collection_clone.as_ref(),
+                    &nodes,
+                    &edges,
+                    &cfg_clone,
+                    llm_clone.as_ref(),
+                    &mut tracker_g,
+                    wal_tx,
+                )
+                .await
+                {
+                    tracing::error!(
+                        collection = %collection_clone.name(),
+                        error = %stage_err,
+                        "LeanRAG stage 3 execution failed"
+                    );
+                }
+            })
+        });
+    }
+
+    async fn execute_leanrag_stage_if_configured(&self, turns: &[(DocId, Vec<f32>)]) {
+        if let (Some(ref cfg), Some(ref llm_arc)) = (&self.leanrag, &self.llm) {
+            if let Err(val_err) = cfg.validate() {
+                tracing::warn!(
+                    collection = %self.collection.name(),
+                    error = %val_err,
+                    "LeanRAG config validation failed; skipping stage 3"
+                );
+                return;
+            }
+
+            let graph = self.collection.graph_index();
+            let peak_bytes = graph.estimate_compaction_peak_bytes();
+            if let Err(budget_err) = check_compaction_budget(peak_bytes, cfg) {
+                tracing::warn!(
+                    collection = %self.collection.name(),
+                    error = %budget_err,
+                    "LeanRAG compaction budget exceeded; skipping stage 3"
+                );
+                return;
+            }
+
+            let inputs =
+                build_leanrag_inputs(self.collection.as_ref(), turns, DEFAULT_MAX_LEANRAG_NODES);
+
+            if inputs.nodes.is_empty() || inputs.edges.is_empty() {
+                return;
+            }
+
+            match self.collection.allocate_tx() {
+                Ok(wal_tx) => {
+                    self.spawn_leanrag_blocking_task(cfg, llm_arc, &inputs, wal_tx);
+                }
+                Err(tx_err) => {
+                    tracing::error!(
+                        collection = %self.collection.name(),
+                        error = %tx_err,
+                        "Failed to allocate TxId for LeanRAG stage 3"
+                    );
+                }
+            }
+        }
+    }
+
     /// Führt einen einzelnen Konsolidierungszyklus aus.
     pub async fn run_cycle(
         &self,
     ) -> Result<(ConsolidationPhaseResult, Option<SynthesisPhaseResult>)> {
-        // P14-Compliance: Koordination zwischen ConsolidationEngine und MaintenanceScheduler.
-        // Versuche das Konsolidierungs-Lock atomic zu erwerben. Bei Konflikt überspringe diesen Lauf.
         let _guard =
             match ConsolidationLockGuard::try_acquire(&self.collection.consolidation_in_progress())
             {
@@ -603,36 +718,7 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
                 }
             };
 
-        // 1. Turns chronologisch aus der Collection lesen
-        let user_key_prefix = self.collection.user_key_prefix();
-        let entries = match self
-            .collection
-            .storage()
-            .scan_prefix(&user_key_prefix)
-            .await
-        {
-            Ok(e) => e,
-            Err(err) => {
-                tracing::error!(
-                    collection = %self.collection.name(),
-                    error = %err,
-                    "ConsolidationEngine: scan_prefix failed"
-                );
-                return Err(err);
-            }
-        };
-
-        let mut turns: Vec<(DocId, Vec<f32>)> = Vec::new();
-        for (k, v) in entries {
-            if self.collection.name() == "default" && k.starts_with(b"__") {
-                continue;
-            }
-            if let Ok(stored) = serde_json::from_slice::<StoredDocument>(&v) {
-                if let Ok(doc_id) = DocId::from_key(&stored.id) {
-                    turns.push((doc_id, stored.embedding));
-                }
-            }
-        }
+        let turns = self.scan_collection_turns().await?;
 
         if turns.is_empty() {
             return Ok((
@@ -673,9 +759,8 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
             )
             .await?;
 
-        // APM-Datenverlust-Bei-Absturz:
-        // Synthetisierte Summaries wurden bereits in execute_background_consolidation erzeugt & persistiert.
-        // Erst NACH dem Bestätigen der Summaries wird der Decay Controller angewendet.
+        drop(tracker_guard);
+
         if synthesis_res.is_some() {
             let decay_controller = AdaptiveDecayController::with_defaults();
             let _ = self
@@ -684,95 +769,20 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> ConsolidationEngine<S
                 .await;
         }
 
-        // LeanRAG Stage 3 (Opt-in): NUR wenn leanrag.is_some() UND self.llm.is_some()
-        if let (Some(ref cfg), Some(ref llm_arc)) = (&self.leanrag, &self.llm) {
-            if let Err(val_err) = cfg.validate() {
-                tracing::warn!(
-                    collection = %self.collection.name(),
-                    error = %val_err,
-                    "LeanRAG config validation failed; skipping stage 3"
-                );
-            } else {
-                let graph = self.collection.graph_index();
-                let peak_bytes = graph.estimate_compaction_peak_bytes();
-                if let Err(budget_err) = check_compaction_budget(peak_bytes, cfg) {
-                    tracing::warn!(
-                        collection = %self.collection.name(),
-                        error = %budget_err,
-                        "LeanRAG compaction budget exceeded; skipping stage 3"
-                    );
-                } else {
-                    let inputs = build_leanrag_inputs(
-                        self.collection.as_ref(),
-                        &turns,
-                        DEFAULT_MAX_LEANRAG_NODES,
-                    );
-
-                    if !inputs.nodes.is_empty() && !inputs.edges.is_empty() {
-                        match self.collection.allocate_tx() {
-                            Ok(wal_tx) => {
-                                // Drop tracker_guard so stability_tracker can be locked in spawn_blocking
-                                drop(tracker_guard);
-
-                                let collection_clone = self.collection.clone();
-                                let cfg_clone = cfg.clone();
-                                let llm_clone = llm_arc.clone();
-                                let stability_tracker_clone = self.stability_tracker.clone();
-
-                                let join_res = tokio::task::spawn_blocking(move || {
-                                    let handle = tokio::runtime::Handle::current();
-                                    let mut tracker_g = stability_tracker_clone.blocking_lock();
-                                    handle.block_on(async {
-                                        execute_leanrag_aggregation_stage(
-                                            collection_clone.as_ref(),
-                                            &inputs.nodes,
-                                            &inputs.edges,
-                                            &cfg_clone,
-                                            llm_clone.as_ref(),
-                                            &mut tracker_g,
-                                            wal_tx,
-                                        )
-                                        .await
-                                    })
-                                })
-                                .await;
-
-                                match join_res {
-                                    Ok(Err(stage_err)) => {
-                                        tracing::error!(
-                                            collection = %self.collection.name(),
-                                            error = %stage_err,
-                                            "LeanRAG stage 3 execution failed"
-                                        );
-                                    }
-                                    Err(join_err) => {
-                                        tracing::error!(
-                                            collection = %self.collection.name(),
-                                            error = %join_err,
-                                            "LeanRAG stage 3 task panicked or cancelled"
-                                        );
-                                    }
-                                    Ok(Ok(_)) => {}
-                                }
-                            }
-                            Err(tx_err) => {
-                                tracing::error!(
-                                    collection = %self.collection.name(),
-                                    error = %tx_err,
-                                    "Failed to allocate TxId for LeanRAG stage 3"
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        self.execute_leanrag_stage_if_configured(&turns).await;
 
         Ok((consolidation_res, synthesis_res))
     }
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic
+)]
 mod tests {
     use super::*;
     use contextra_graph::CsrGraph;

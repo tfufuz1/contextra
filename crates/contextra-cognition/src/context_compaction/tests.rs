@@ -1,8 +1,17 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::unreachable
+)]
+
 use super::*;
 use contextra_engine::collection::Collection;
 use contextra_engine::transaction::CommitIntent;
 use contextra_engine::ProvenanceRecord;
 use contextra_graph::CsrGraph;
+use contextra_ports::SeededRng;
 use contextra_ports::{BoxFuture, LlmTextGenerator, StorageEngine, StorageStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextChunk, ContextraError, DocId, Result, TenantId, TokenBudget, TxId};
@@ -30,7 +39,11 @@ fn make_chunk(id: u64, content: &str, relevance: f32, is_tool: bool) -> ContextC
 #[test]
 fn test_compactor_within_budget() {
     let budget = TokenBudget::new(100, 0);
-    let compactor = ContextCompactor::new(budget, CompactionStrategy::StatusToken);
+    let compactor = ContextCompactor::new_with_rng(
+        budget,
+        CompactionStrategy::StatusToken,
+        Arc::new(SeededRng::new(42)),
+    );
 
     let chunks = vec![
         make_chunk(1, "chunk 1", 0.9, false),
@@ -46,7 +59,11 @@ fn test_compactor_within_budget() {
 #[test]
 fn test_compactor_tool_output_compacted_first() {
     let budget = TokenBudget::new(20, 0);
-    let compactor = ContextCompactor::new(budget, CompactionStrategy::StatusToken);
+    let compactor = ContextCompactor::new_with_rng(
+        budget,
+        CompactionStrategy::StatusToken,
+        Arc::new(SeededRng::new(42)),
+    );
 
     let chunks = vec![
         make_chunk(1, "tool output data 12345", 0.95, true), // 22 bytes, tool output
@@ -68,7 +85,11 @@ fn test_compactor_tool_output_compacted_first() {
 #[test]
 fn test_compactor_truncate_strategy() {
     let budget = TokenBudget::new(10, 0);
-    let compactor = ContextCompactor::new(budget, CompactionStrategy::Truncate);
+    let compactor = ContextCompactor::new_with_rng(
+        budget,
+        CompactionStrategy::Truncate,
+        Arc::new(SeededRng::new(42)),
+    );
 
     let chunks = vec![
         make_chunk(1, "small", 0.9, false),            // 5 bytes
@@ -84,7 +105,11 @@ fn test_compactor_truncate_strategy() {
 #[test]
 fn test_compactor_summarize_strategy_fallback() {
     let budget = TokenBudget::new(10, 0);
-    let compactor = ContextCompactor::new(budget, CompactionStrategy::Summarize);
+    let compactor = ContextCompactor::new_with_rng(
+        budget,
+        CompactionStrategy::Summarize,
+        Arc::new(SeededRng::new(42)),
+    );
 
     let chunks = vec![
         make_chunk(1, "small", 0.9, false),
@@ -103,7 +128,11 @@ fn test_compactor_summarize_strategy_fallback() {
 #[test]
 fn test_compact_with_contextual_prefix_respects_budget() {
     let budget = TokenBudget::new(20, 0); // 20 tokens available
-    let compactor = ContextCompactor::new(budget, CompactionStrategy::Truncate);
+    let compactor = ContextCompactor::new_with_rng(
+        budget,
+        CompactionStrategy::Truncate,
+        Arc::new(SeededRng::new(42)),
+    );
 
     // Chunk: token_count=10, prefix adds ~5 tokens → combined=15
     let chunk = ContextChunk {
@@ -139,11 +168,12 @@ impl LlmTextGenerator for UnreachableLlmGenerator {
 #[tokio::test]
 async fn test_consolidate_via_llm_error_propagation_on_unreachable_client() {
     let budget = TokenBudget::new(100, 0);
-    let compactor = ContextCompactor::new(
+    let compactor = ContextCompactor::new_with_rng(
         budget,
         CompactionStrategy::LlmSummarize {
             max_input_chunks: 5,
         },
+        Arc::new(SeededRng::new(42)),
     );
 
     let dead_llm = UnreachableLlmGenerator;
@@ -164,7 +194,11 @@ async fn test_consolidate_via_llm_error_propagation_on_unreachable_client() {
 #[tokio::test]
 async fn test_consolidate_via_llm_provenance_and_empty() {
     let budget = TokenBudget::new(100, 0);
-    let compactor = ContextCompactor::new(budget, CompactionStrategy::Summarize);
+    let compactor = ContextCompactor::new_with_rng(
+        budget,
+        CompactionStrategy::Summarize,
+        Arc::new(SeededRng::new(42)),
+    );
     let dead_llm = UnreachableLlmGenerator;
 
     // Empty chunks slice test
@@ -188,7 +222,11 @@ impl LlmTextGenerator for MockLlmGenerator {
 #[tokio::test]
 async fn test_consolidate_via_llm_provenance_3_source_docs() {
     let budget = TokenBudget::new(1000, 0);
-    let compactor = ContextCompactor::new(budget, CompactionStrategy::Summarize);
+    let compactor = ContextCompactor::new_with_rng(
+        budget,
+        CompactionStrategy::Summarize,
+        Arc::new(SeededRng::new(42)),
+    );
     let mock_llm = MockLlmGenerator;
 
     let chunks = vec![
@@ -230,7 +268,11 @@ async fn test_consolidate_via_llm_provenance_3_source_docs() {
 #[test]
 fn test_compact_empty_chunks_returns_empty_compacted_context() {
     let budget = TokenBudget::new(100, 0);
-    let compactor = ContextCompactor::new(budget, CompactionStrategy::Truncate);
+    let compactor = ContextCompactor::new_with_rng(
+        budget,
+        CompactionStrategy::Truncate,
+        Arc::new(SeededRng::new(42)),
+    );
     let result = compactor.compact(vec![]);
     assert!(result.retained_chunks.is_empty());
     assert!(result.status_tokens.is_empty());
@@ -459,7 +501,7 @@ fn test_compactor_with_rng_builder() {
 
     let budget = TokenBudget::new(100, 0);
     let rng = Arc::new(SeededRng::new(12345));
-    let compactor = ContextCompactor::new(budget, CompactionStrategy::Truncate).with_rng(rng);
+    let compactor = ContextCompactor::new_with_rng(budget, CompactionStrategy::Truncate, rng);
 
     assert_eq!(compactor.compact(vec![]).tokens_used, 0);
 }
@@ -577,7 +619,7 @@ async fn test_concurrent_mutation_aborts_consolidation() -> Result<()> {
         ContextraError::StaleRead(msg) => {
             assert!(msg.contains("OCC conflict"));
         }
-        other => panic!("Expected StaleRead error, got: {:?}", other),
+        other => unreachable!("Expected StaleRead error, got: {:?}", other),
     }
 
     let doc1 = col.get("source_1").await?;

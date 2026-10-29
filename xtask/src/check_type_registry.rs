@@ -3,7 +3,8 @@ use serde::Serialize;
 use std::fs;
 use std::path::Path;
 
-use crate::{compute_crate_layers, find_root_dir, get_workspace_crates};
+use crate::find_root_dir;
+use crate::legacy::common::get_workspace_crates;
 
 /// Ein Treffer im Code oder in der TYPE_REGISTRY.md.
 #[derive(Debug, Serialize)]
@@ -31,15 +32,34 @@ pub struct TypeCheckResult {
 /// Gibt ein maschinenlesbares JSON-Ergebnis auf stdout aus.
 /// Exit-Semantik: `true` = keine Kollision, `false` = potenzielle Kollision.
 pub fn run_check_type_registry(type_name: &str) -> bool {
+    let root = find_root_dir();
+    run_check_type_registry_in_root(&root, type_name)
+}
+
+pub fn run_check_type_registry_in_root(root: &Path, type_name: &str) -> bool {
     if type_name.trim().is_empty() {
         eprintln!("Verwendung: cargo xtask check-type-registry <TypName>");
         return false;
     }
 
-    let root = find_root_dir();
-    let result = check_type_registry(&root, type_name);
+    let registry_path = root.join("docs").join("TYPE_REGISTRY.md");
+    if !registry_path.exists() {
+        eprintln!("❌ FAIL: Registry-Datei docs/TYPE_REGISTRY.md fehlt!");
+        let result = TypeCheckResult {
+            query: type_name.to_string(),
+            registry_hit: false,
+            registry_entries: Vec::new(),
+            code_hits: Vec::new(),
+            recommendation: "FAIL: Registry file docs/TYPE_REGISTRY.md is missing!".to_string(),
+        };
+        if let Ok(json) = serde_json::to_string_pretty(&result) {
+            println!("{}", json);
+        }
+        return false;
+    }
 
-    // JSON-Ausgabe
+    let result = check_type_registry(root, type_name);
+
     if let Ok(json) = serde_json::to_string_pretty(&result) {
         println!("{}", json);
     }
@@ -78,6 +98,11 @@ pub fn check_type_registry(root: &Path, type_name: &str) -> TypeCheckResult {
 
     // 1. TYPE_REGISTRY.md durchsuchen
     let registry_path = root.join("docs").join("TYPE_REGISTRY.md");
+    if !registry_path.exists() {
+        result.recommendation = "FAIL: Missing registry file docs/TYPE_REGISTRY.md".to_string();
+        return result;
+    }
+
     if let Ok(content) = fs::read_to_string(&registry_path) {
         for line in content.lines() {
             if line.contains(type_name) {
@@ -93,11 +118,16 @@ pub fn check_type_registry(root: &Path, type_name: &str) -> TypeCheckResult {
         r"(?:pub(?:\([^)]*\))?\s+)?(?:struct|enum|trait|type)\s+{}\b",
         regex::escape(type_name)
     );
-    let code_re = Regex::new(&pattern).unwrap();
+    let code_re = match Regex::new(&pattern) {
+        Ok(re) => re,
+        Err(e) => {
+            result.recommendation = format!("Regex compilation failed: {}", e);
+            return result;
+        }
+    };
 
     // Layer-Map aufbauen
-    let mut crates = get_workspace_crates();
-    let _ = compute_crate_layers(&mut crates);
+    let crates = get_workspace_crates();
     let layer_map: std::collections::HashMap<String, u8> =
         crates.iter().map(|c| (c.name.clone(), c.layer)).collect();
 
@@ -186,6 +216,7 @@ fn extract_crate_from_path(path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn test_extract_crate_from_path() {
@@ -201,6 +232,39 @@ mod tests {
     }
 
     #[test]
+    fn test_check_type_registry_missing_file_fails() {
+        let temp = tempdir().unwrap();
+        let root = temp.path();
+
+        // No docs/TYPE_REGISTRY.md in root
+        let res = run_check_type_registry_in_root(root, "TenantId");
+        assert!(
+            !res,
+            "Missing docs/TYPE_REGISTRY.md MUST return false (FAIL)"
+        );
+
+        let check_res = check_type_registry(root, "TenantId");
+        assert!(check_res
+            .recommendation
+            .contains("FAIL: Missing registry file"));
+    }
+
+    #[test]
+    fn test_check_type_registry_present_file_succeeds() {
+        let temp = tempdir().unwrap();
+        let root = temp.path();
+
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(root.join("docs/TYPE_REGISTRY.md"), "# Type Registry\n").unwrap();
+
+        let res = run_check_type_registry_in_root(root, "ZzNewUniqueTypeXx");
+        assert!(
+            res,
+            "Present TYPE_REGISTRY.md with no collisions MUST return true (PASS)"
+        );
+    }
+
+    #[test]
     fn test_check_type_registry_empty_type_name() {
         let root = crate::find_root_dir();
         let result = check_type_registry(&root, "");
@@ -212,8 +276,12 @@ mod tests {
 
     #[test]
     fn test_check_type_registry_nonexistent() {
-        let root = crate::find_root_dir();
-        let result = check_type_registry(&root, "ZzNonExistentTypeXx42");
+        let temp = tempdir().unwrap();
+        let root = temp.path();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(root.join("docs/TYPE_REGISTRY.md"), "# Type Registry\n").unwrap();
+
+        let result = check_type_registry(root, "ZzNonExistentTypeXx42");
         assert!(!result.registry_hit);
         assert!(result.code_hits.is_empty());
         assert!(result.recommendation.contains("existiert weder"));
@@ -221,10 +289,16 @@ mod tests {
 
     #[test]
     fn test_check_type_registry_known_type() {
-        let root = crate::find_root_dir();
-        // TenantId ist bekanntermaßen in contextra-core definiert
-        let result = check_type_registry(&root, "TenantId");
-        // Sollte mindestens im Code gefunden werden
+        let temp = tempdir().unwrap();
+        let root = temp.path();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(
+            root.join("docs/TYPE_REGISTRY.md"),
+            "TenantId - tenant identifier\n",
+        )
+        .unwrap();
+
+        let result = check_type_registry(root, "TenantId");
         assert!(
             result.registry_hit || !result.code_hits.is_empty(),
             "TenantId sollte in TYPE_REGISTRY.md oder im Code existieren"

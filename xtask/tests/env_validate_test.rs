@@ -25,10 +25,7 @@ pub fn find_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
-#[path = "../src/env_validate.rs"]
-mod env_validate;
-
-use env_validate::{run_env_validate, ToolStatus};
+use xtask::env_validate::{run_env_validate, ToolStatus};
 
 #[test]
 fn test_run_env_validate_returns_checked_tools() {

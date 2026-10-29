@@ -1,3 +1,13 @@
+#![allow(
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::cast_possible_truncation,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    deprecated
+)]
 use super::super::fixtures::*;
 use crate::{RoutingOutcome, SlmProfile};
 use contextra_db::{Contextra, ContextraConfig};
@@ -351,7 +361,7 @@ fn test_slm_profile_validation_extended() {
 fn test_cascade_hit() {
     use crate::profile::ProfileCalibrationState;
     use contextra_types::{ContextChunk, DocId};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     let profile_high = SlmProfile::new(
         "high-slm",
@@ -393,7 +403,7 @@ fn test_cascade_hit() {
     let collection = rt.block_on(db.collection("default")).unwrap();
 
     let router = create_test_router(collection, profiles.clone(), None);
-    let calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
+    let calibration: BTreeMap<String, ProfileCalibrationState> = BTreeMap::new();
 
     // Chunk score: 0.5 (with community 1 match: 0.5 * 1.2 = 0.6)
     // 0.6 >= mid threshold (0.5), but < high threshold (0.8)
@@ -422,7 +432,7 @@ fn test_cascade_hit() {
 fn test_cascade_fallthrough() {
     use crate::profile::ProfileCalibrationState;
     use contextra_types::{ContextChunk, DocId};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     let profile_high = SlmProfile::new(
         "high-slm",
@@ -460,7 +470,7 @@ fn test_cascade_fallthrough() {
     let collection = rt.block_on(db.collection("default")).unwrap();
 
     let router = create_test_router(collection, profiles.clone(), None);
-    let calibration: HashMap<String, ProfileCalibrationState> = HashMap::new();
+    let calibration: BTreeMap<String, ProfileCalibrationState> = BTreeMap::new();
 
     // Chunk score = 0.1 (0.1 * 1.2 = 0.12) < low threshold (0.5) -> falls through to last profile
     let chunk = ContextChunk {
@@ -927,8 +937,8 @@ async fn test_cascade_determinism() {
 
 #[test]
 fn test_conformal_calibrator_default_and_reset_window() {
-    use crate::profile::ConformalCalibrator;
-    let mut cal = ConformalCalibrator::default();
+    use crate::profile::ProfileCalibrator;
+    let mut cal = ProfileCalibrator::default();
     assert_eq!(cal.alpha, 0.05);
     assert_eq!(cal.gamma, 0.01);
     assert_eq!(cal.quantile_threshold, 0.5);

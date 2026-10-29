@@ -28,13 +28,7 @@ pub fn find_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
-#[path = "../src/claim.rs"]
-mod claim;
-
-#[path = "../src/session_init.rs"]
-mod session_init;
-
-use session_init::{generate_session_hash, run_session_init};
+use xtask::session_init::{generate_session_hash, run_session_init};
 
 #[test]
 fn test_generate_session_hash_length() {

@@ -1,14 +1,16 @@
 // FILE-CONTEXT
 // STAND: 2026-08-30T18:54:39Z (SESSION: ed7b7b38)
 // ZWECK: `TextEmbeddingEngine`-Implementierung für Ollama Embedding API
-// INVARIANTEN: Validiert Embedding-Dimensionen gegen `known_dimension`; `embed_batch` delegiert an native Ollama batch /api/embed
-// NICHT-OFFENSICHTLICH: Mismatch bei Embedding-Dimensionen liefert `ContextraError::Index` um Re-Indexing zu fordern
+// INVARIANTEN: Validiert Embedding-Dimensionen beim ersten Aufruf und sperrt diese fest gegen spätere Abweichungen
+// NICHT-OFFENSICHTLICH: Mismatch bei Embedding-Dimensionen liefert `EmbeddingError::ComputationFailed` um stille Index-Korruption zu verhindern
 // HOTSPOTS: embed, embed_batch
 
 use crate::client::{OllamaClient, OllamaConfig, DEFAULT_BASE_URL, DEFAULT_EMBED_MODEL};
 use crate::model_info::known_dimension;
 use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider};
 use contextra_types::ContextraError;
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 /// Implementation of `TextEmbeddingEngine` using Ollama's HTTP API.
 #[derive(Clone, Debug)]
@@ -17,6 +19,7 @@ pub struct OllamaEmbedder {
     model: String,
     concurrency: usize,
     expected_dimension: Option<usize>,
+    observed_dimension: Arc<Mutex<Option<usize>>>,
 }
 
 impl OllamaEmbedder {
@@ -34,6 +37,7 @@ impl OllamaEmbedder {
             model: model_str,
             concurrency: 8,
             expected_dimension,
+            observed_dimension: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -45,6 +49,7 @@ impl OllamaEmbedder {
             model,
             concurrency: 8,
             expected_dimension,
+            observed_dimension: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -69,6 +74,37 @@ impl OllamaEmbedder {
     pub fn model(&self) -> &str {
         &self.model
     }
+
+    fn check_and_lock_dimension(&self, dim: usize) -> std::result::Result<(), EmbeddingError> {
+        let mut lock = self.observed_dimension.lock();
+        match *lock {
+            None => {
+                if let Some(expected_dim) = self.expected_dimension {
+                    if dim != expected_dim {
+                        return Err(EmbeddingError::ComputationFailed(format!(
+                            "Ollama returned embedding of dimension {} but expected {}. Model '{}' may have changed. Rebuild the HNSW index.",
+                            dim,
+                            expected_dim,
+                            self.model
+                        )));
+                    }
+                }
+                *lock = Some(dim);
+                Ok(())
+            }
+            Some(observed_dim) => {
+                if dim != observed_dim {
+                    return Err(EmbeddingError::ComputationFailed(format!(
+                        "Ollama embedding dimension mismatch: previously observed {}, but got {} on subsequent call for model '{}'. Silent index corruption prevented.",
+                        observed_dim,
+                        dim,
+                        self.model
+                    )));
+                }
+                Ok(())
+            }
+        }
+    }
 }
 
 impl EmbeddingProvider for OllamaEmbedder {
@@ -92,22 +128,17 @@ impl EmbeddingProvider for OllamaEmbedder {
                     other => EmbeddingError::ComputationFailed(other.to_string()),
                 })?;
 
-            if let Some(expected_dim) = self.expected_dimension {
-                if vec.len() != expected_dim {
-                    return Err(EmbeddingError::ComputationFailed(format!(
-                        "Ollama returned embedding of dimension {} but expected {}. Model '{}' may have changed. Rebuild the HNSW index.",
-                        vec.len(),
-                        expected_dim,
-                        self.model
-                    )));
-                }
-            }
+            self.check_and_lock_dimension(vec.len())?;
             Ok(vec)
         })
     }
 
     fn embedding_dim(&self) -> usize {
-        self.expected_dimension.unwrap_or(0)
+        if let Some(exp) = self.expected_dimension {
+            exp
+        } else {
+            (*self.observed_dimension.lock()).unwrap_or_default()
+        }
     }
 
     fn embed_batch<'a>(
@@ -130,17 +161,8 @@ impl EmbeddingProvider for OllamaEmbedder {
                         other => EmbeddingError::ComputationFailed(other.to_string()),
                     })?;
 
-            if let Some(expected_dim) = self.expected_dimension {
-                for vec in &output {
-                    if vec.len() != expected_dim {
-                        return Err(EmbeddingError::ComputationFailed(format!(
-                            "Ollama returned embedding of dimension {} but expected {}. Model '{}' may have changed. Rebuild the HNSW index.",
-                            vec.len(),
-                            expected_dim,
-                            self.model
-                        )));
-                    }
-                }
+            for vec in &output {
+                self.check_and_lock_dimension(vec.len())?;
             }
 
             Ok(output)
@@ -175,24 +197,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_embed_batch_empty() {
-        // OllamaClient mit nicht-erreichbarer URL
-        let client = OllamaClient::new("http://127.0.0.1:1"); // Closed port
-                                                              // embed_batch([]) soll sofort Ok(vec![]) zurückgeben ohne Netzwerk-Call
+        let client = OllamaClient::new("http://127.0.0.1:1");
         let embedder = OllamaEmbedder {
             client,
             model: "test".into(),
             concurrency: 4,
             expected_dimension: None,
+            observed_dimension: Arc::new(Mutex::new(None)),
         };
-        let result = embedder.embed_batch(&[]).await.unwrap(); // unwrap allowed
+        let result = embedder.embed_batch(&[]).await.unwrap();
         assert!(result.is_empty());
     }
 
     #[tokio::test]
     async fn test_dimension_validation_mismatch_returns_index_error() {
         use contextra_ports::TextEmbeddingEngine;
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap(); // unwrap
-        let addr = listener.local_addr().unwrap(); // unwrap
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
         let server_url = format!("http://{}", addr);
 
         tokio::spawn(async move {
@@ -225,6 +246,62 @@ mod tests {
                 assert!(msg.contains("Model 'nomic-embed-text' may have changed"));
             }
             _ => panic!("Expected ContextraError::Internal, got {:?}", err),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dynamic_dimension_locking_and_subsequent_mismatch_guard() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server_url = format!("http://{}", addr);
+        let call_count = Arc::new(AtomicU32::new(0));
+        let count_clone = call_count.clone();
+
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let cnt = count_clone.fetch_add(1, Ordering::SeqCst);
+
+                let embedding = if cnt == 0 {
+                    vec![0.1, 0.2, 0.3, 0.4] // 4 dims on first call
+                } else {
+                    vec![0.1, 0.2] // 2 dims on second call
+                };
+
+                let body = serde_json::json!({ "embedding": embedding }).to_string();
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                    body.len(),
+                    body
+                );
+                socket.write_all(response.as_bytes()).await.ok();
+            }
+        });
+
+        // Create embedder for unknown model without expected dimension
+        let embedder = OllamaEmbedder::new(server_url, "custom-unknown-model");
+        assert_eq!(embedder.embedding_dim(), 0);
+
+        // First call locks dimension to 4
+        let res1 = embedder.embed("first call").await;
+        assert!(res1.is_ok());
+        assert_eq!(res1.unwrap().len(), 4);
+        assert_eq!(embedder.embedding_dim(), 4);
+
+        // Second call with 2 dims MUST fail with dimension mismatch error
+        let res2 = embedder.embed("second call").await;
+        assert!(res2.is_err());
+        let err = res2.unwrap_err();
+        match err {
+            EmbeddingError::ComputationFailed(msg) => {
+                assert!(msg.contains("previously observed 4, but got 2"));
+                assert!(msg.contains("Silent index corruption prevented"));
+            }
+            _ => panic!("Expected ComputationFailed, got {:?}", err),
         }
     }
 
@@ -273,7 +350,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_embedding_provider_error_mapping_and_batch_dimension_mismatch() {
-        let dead_embedder = OllamaEmbedder::new("http://127.0.0.1:1", "test-model");
+        let dead_config = OllamaConfig {
+            base_url: "http://127.0.0.1:1".into(),
+            failure_threshold: 100, // High threshold to prevent tripping breaker during dead port test
+            ..Default::default()
+        };
+        let dead_embedder = OllamaEmbedder::with_config(dead_config);
         let single_err = dead_embedder.embed("hello").await.unwrap_err();
         assert!(matches!(single_err, EmbeddingError::ComputationFailed(_)));
 

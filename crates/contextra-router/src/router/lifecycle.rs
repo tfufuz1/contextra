@@ -1,4 +1,5 @@
 // FILE-CONTEXT
+// STAND: 2026-10-29
 // ZWECK: Konstruktions- und Profilverwaltungs-Methoden (Hot-Reload) für RouterEngine.
 // INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload via ArcSwap.
 
@@ -13,7 +14,7 @@ impl RouterEngine {
         profiles: Vec<SlmProfile>,
         calibration_store_path: Option<std::path::PathBuf>,
     ) -> Self {
-        let mut calibration: HashMap<String, ProfileCalibrationState> = profiles
+        let mut calibration: BTreeMap<String, ProfileCalibrationState> = profiles
             .iter()
             .map(|p| {
                 (
@@ -23,7 +24,7 @@ impl RouterEngine {
             })
             .collect();
 
-        let lyapunov_watchers: HashMap<String, LyapunovDriftWatcher> = profiles
+        let lyapunov_watchers: BTreeMap<String, LyapunovDriftWatcher> = profiles
             .iter()
             .map(|p| (p.name.clone(), LyapunovDriftWatcher::default()))
             .collect();
@@ -31,14 +32,12 @@ impl RouterEngine {
         if let Some(ref path) = calibration_store_path {
             if let Ok(bytes) = std::fs::read(path) {
                 if let Ok(persisted) =
-                    serde_json::from_slice::<HashMap<String, ProfileCalibrationState>>(&bytes)
+                    serde_json::from_slice::<BTreeMap<String, ProfileCalibrationState>>(&bytes)
                 {
-                    // Merge persisted state into defaults (persisted wins for known profiles)
                     for (name, state) in persisted {
                         if calibration.contains_key(&name) {
                             calibration.insert(name, state);
                         }
-                        // Unknown profiles (removed from config) are silently dropped
                     }
                 }
             }
@@ -54,19 +53,26 @@ impl RouterEngine {
             search_provider,
             community_resolver,
             context_preparer,
+            clock: Arc::new(SystemClock::new()),
             state: ArcSwap::from(Arc::new(router_state)),
-            pending_decisions: RwLock::new(HashMap::new()),
+            pending_decisions: RwLock::new(BTreeMap::new()),
             decision_ids: DecisionIdGenerator::new(0),
             #[cfg(feature = "bandit-routing")]
             routing_strategy: RoutingStrategy::Cascade,
             #[cfg(feature = "bandit-routing")]
             bandit_exploration: BanditExploration::new(0.1, 0x1234_5678_9abc_def0),
             #[cfg(feature = "bandit-routing")]
-            pending_bandit: RwLock::new(HashMap::new()),
+            pending_bandit: RwLock::new(BTreeMap::new()),
         }
     }
 
-    /// Konfiguriert den Startwert des instanzgebundenen DecisionIdGenerators.
+    /// Configures a custom Clock implementation for deterministic testing.
+    pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    /// Configures the initial decision ID counter value.
     pub fn with_initial_decision_id(mut self, start: u64) -> Self {
         self.decision_ids = DecisionIdGenerator::new(start);
         self
@@ -109,7 +115,7 @@ impl RouterEngine {
     pub fn update_profiles(&self, new_profiles: Vec<SlmProfile>) {
         let current = self.state.load_full();
         let mut old_cal = current.calibration.clone();
-        let new_cal: HashMap<String, ProfileCalibrationState> = new_profiles
+        let new_cal: BTreeMap<String, ProfileCalibrationState> = new_profiles
             .iter()
             .map(|p| {
                 let mut state = old_cal
@@ -121,7 +127,7 @@ impl RouterEngine {
             .collect();
 
         let mut old_watchers = current.lyapunov_watchers.clone();
-        let new_watchers: HashMap<String, LyapunovDriftWatcher> = new_profiles
+        let new_watchers: BTreeMap<String, LyapunovDriftWatcher> = new_profiles
             .iter()
             .map(|p| {
                 let watcher = old_watchers.remove(&p.name).unwrap_or_default();

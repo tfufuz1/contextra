@@ -76,7 +76,11 @@ impl LayerScanner for MemtableScanner {
                 hasher.update(&seq_no.to_le_bytes());
                 let unit_hash: [u8; 32] = *hasher.finalize().as_bytes();
 
-                let is_residual = key.starts_with(target_prefix);
+                let is_canary = key.starts_with(b"t:canary:")
+                    || key
+                        .windows(b":scratch_canary_pctl:".len())
+                        .any(|w| w == b":scratch_canary_pctl:");
+                let is_residual = key.starts_with(target_prefix) && !is_canary;
                 session.record_unit(unit_hash, is_residual);
             }
         }

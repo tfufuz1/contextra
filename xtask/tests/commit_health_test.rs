@@ -1,22 +1,10 @@
 //! Integration test for `commit_health`
 
-#[path = "../src/shell_commit_audit.rs"]
-mod shell_commit_audit;
-
-#[path = "../src/audit_integrity_check.rs"]
-mod audit_integrity_check;
-
-#[path = "../src/hotspot_report.rs"]
-mod hotspot_report;
-
-#[path = "../src/commit_health.rs"]
-mod commit_health;
-
-use commit_health::run_commit_health_impl;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use tempfile::tempdir;
+use xtask::commit_health::run_commit_health_impl;
 
 fn run_git_env(dir: &Path, args: &[&str], envs: &[(&str, &str)]) {
     let mut cmd = Command::new("git");

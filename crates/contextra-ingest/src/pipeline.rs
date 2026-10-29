@@ -111,6 +111,12 @@ pub fn ingest(
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::panic
+    )]
     use super::*;
     use crate::extractor::DocumentExtractor;
     use crate::ir::{BlockKind, DocumentIr};

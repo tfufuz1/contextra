@@ -1,7 +1,17 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::disallowed_types,
+    clippy::disallowed_methods,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss
+)]
 // FILE-CONTEXT
 // ZWECK: Tests für CLM Scratchpad Reset-Flow, RAM-Zeroization, Audit-/Invalidierungscounter und PinnedRegion.
 // INVARIANTEN: RAM nach Reset geleert (0 Bytes), PurgeReceipt vorhanden, Audit/Invalidator genau 1, PinnedRegion unverändert.
-
 #![forbid(unsafe_code)]
 
 use contextra_agent::{

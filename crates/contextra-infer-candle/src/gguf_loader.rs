@@ -157,8 +157,8 @@ fn validate_string<R: Read>(r: &mut R, file_len: u64) -> Result<u64, ContextraEr
     while read_bytes < len {
         let remaining = len - read_bytes;
         let to_read_u64 = remaining.min(dummy.len() as u64);
-        let to_read = usize::try_from(to_read_u64)
-            .map_err(|e| ContextraError::Internal(e.to_string()))?;
+        let to_read =
+            usize::try_from(to_read_u64).map_err(|e| ContextraError::Internal(e.to_string()))?;
         let target_slice = dummy
             .get_mut(..to_read)
             .ok_or_else(|| ContextraError::Internal("Slice bounds error".into()))?;

@@ -17,23 +17,27 @@ fn get_context_value<'a>(
     // 2. Dot-notation path in memory (e.g. "output.status")
     if key.contains('.') {
         let parts: Vec<&str> = key.split('.').collect();
-        if let Some(mut current) = ctx.memory.get(parts[0]) {
-            let mut found = true;
-            for part in &parts[1..] {
-                if let serde_json::Value::Object(map) = current {
-                    if let Some(next_val) = map.get(*part) {
-                        current = next_val;
-                    } else {
-                        found = false;
-                        break;
+        if let Some(&first_part) = parts.first() {
+            if let Some(mut current) = ctx.memory.get(first_part) {
+                let mut found = true;
+                if let Some(rest) = parts.get(1..) {
+                    for part in rest {
+                        if let serde_json::Value::Object(map) = current {
+                            if let Some(next_val) = map.get(*part) {
+                                current = next_val;
+                            } else {
+                                found = false;
+                                break;
+                            }
+                        } else {
+                            found = false;
+                            break;
+                        }
                     }
-                } else {
-                    found = false;
-                    break;
                 }
-            }
-            if found {
-                return Some(std::borrow::Cow::Borrowed(current));
+                if found {
+                    return Some(std::borrow::Cow::Borrowed(current));
+                }
             }
         }
     }

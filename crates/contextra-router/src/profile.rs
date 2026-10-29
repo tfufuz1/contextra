@@ -1,15 +1,14 @@
 // FILE-CONTEXT
-// STAND: 2026-09-10T19:16:25Z (SESSION: 3f3e4637)
+// STAND: 2026-10-29
 // ZWECK: SLM-Profildefinitionen und konformale Quantil-Kalibrierung (Gibbs & Candès).
 // INVARIANTEN: INV-ROUTER-1 (quantile_threshold in [0.0, 1.0]), INV-P8-1 (Fingerprint-Invalidation).
-// NICHT-OFFENSICHTLICH: Fast O(1) HashSet Community-Filter + deterministische JSON-Sortierung.
-// SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md, rules/tag_taxonomy.md
+// SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md
 
 //! Profile definition for Small Language Models (SLMs) in Contextra Router.
 
 use contextra_types::{ConfigFingerprint, ContextraError, Result, TokenBudget};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 /// Quantization level of the underlying model execution path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -31,7 +30,7 @@ pub struct SlmProfile {
     pub mcp_endpoint: String,
     /// Set of graph community IDs this SLM is domain-responsible for.
     #[serde(with = "serde_sorted_u64_set")]
-    pub domain_communities: HashSet<u64>,
+    pub domain_communities: BTreeSet<u64>,
     /// Token budget configuration for prompt context trimming.
     pub token_budget: TokenBudget,
     /// Minimum relevance threshold score required for routing candidates.
@@ -150,20 +149,13 @@ impl SlmProfile {
     }
 }
 
-/// Conformal-inspirierte Kalibrierung (Coverage-Garantie erst mit record_outcome()).
+/// Profile-Kalibrierung (Coverage-Garantie erst mit record_outcome()).
 /// Basierend auf quantile-basierter Schwellenwert-Adaption (Gibbs & Candès, 2021).
 ///
-/// The threshold `quantile_threshold` is updated via:
-///   q_{t+1} = q_t + gamma * (alpha - I(s_t > q_t))
-///
-/// This guarantees that the empirical error rate converges to `alpha`
-/// regardless of the distribution shift in local SLM confidence scores when ground-truth outcomes are recorded.
-///
-/// # Invariants
-/// - INV-ROUTER-1: `quantile_threshold` is always in `[0.0, 1.0]`.
-/// - INV-ROUTER-2: Given identical seed + query history, routing is deterministic.
+/// Abgrenzung: Umbenannt von `ConformalCalibrator` zu `ProfileCalibrator`, um eine
+/// Kollision mit `contextra_rank::ConformalCalibrator` zu vermeiden.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ConformalCalibrator {
+pub struct ProfileCalibrator {
     /// Target error rate (e.g., 0.05 for 95% coverage).
     pub alpha: f32,
     /// Adaptation rate for online quantile updates.
@@ -177,7 +169,13 @@ pub struct ConformalCalibrator {
     pub window_total: u64,
 }
 
-impl Default for ConformalCalibrator {
+#[deprecated(
+    since = "0.1.0",
+    note = "Renamed to ProfileCalibrator to avoid namespace collision with contextra_rank::ConformalCalibrator"
+)]
+pub type ConformalCalibrator = ProfileCalibrator;
+
+impl Default for ProfileCalibrator {
     fn default() -> Self {
         Self {
             alpha: 0.05,
@@ -189,8 +187,8 @@ impl Default for ConformalCalibrator {
     }
 }
 
-impl ConformalCalibrator {
-    /// Creates a new `ConformalCalibrator` with specified error tolerance and adaptation rate.
+impl ProfileCalibrator {
+    /// Creates a new `ProfileCalibrator` with specified error tolerance and adaptation rate.
     pub fn new(alpha: f32, gamma: f32, initial_threshold: f32) -> Self {
         Self {
             alpha: alpha.clamp(0.001, 0.5),
@@ -202,11 +200,6 @@ impl ConformalCalibrator {
     }
 
     /// Updates the conformal threshold based on a non-conformity score.
-    ///
-    /// The non-conformity score `s_t` measures how "surprising" the routing outcome was.
-    /// Higher scores indicate that the local SLM failed to handle the query adequately.
-    ///
-    /// Returns `true` if the threshold was adjusted.
     pub fn update(&mut self, non_conformity_score: f32) -> bool {
         self.window_total += 1;
 
@@ -218,12 +211,7 @@ impl ConformalCalibrator {
         };
 
         let old_threshold = self.quantile_threshold;
-        // Gibbs & Candes (2021) online quantile calibration:
-        // When error occurs (s_t > q_t), increase threshold by gamma * (1 - alpha).
-        // When no error (s_t <= q_t), decrease threshold by gamma * alpha.
-        // Equilibrium: E[indicator - alpha] = 0 => P(s_t > q_t) = alpha.
         self.quantile_threshold += self.gamma * (indicator - self.alpha);
-        // INV-ROUTER-1: clamp to [0.0, 1.0]
         self.quantile_threshold = self.quantile_threshold.clamp(0.0, 1.0);
 
         (self.quantile_threshold - old_threshold).abs() > f32::EPSILON
@@ -259,7 +247,7 @@ pub struct ProfileCalibrationState {
     /// Ursprünglicher min_relevance_score aus der Konfiguration.
     pub original_min_score: f32,
     /// Conformal calibrator for distribution-free threshold adaptation.
-    pub conformal: ConformalCalibrator,
+    pub conformal: ProfileCalibrator,
     /// Configuration fingerprint under which calibration statistics were gathered.
     #[serde(default)]
     pub last_calibrated_fingerprint: Option<ConfigFingerprint>,
@@ -272,7 +260,7 @@ impl Default for ProfileCalibrationState {
             cumulative_confidence: 1.0,
             calibrated_min_score: 0.5,
             original_min_score: 0.5,
-            conformal: ConformalCalibrator::default(),
+            conformal: ProfileCalibrator::default(),
             last_calibrated_fingerprint: None,
         }
     }
@@ -285,13 +273,12 @@ impl ProfileCalibrationState {
             cumulative_confidence: 1.0,
             calibrated_min_score: original_min_score,
             original_min_score,
-            conformal: ConformalCalibrator::new(0.05, 0.01, original_min_score),
+            conformal: ProfileCalibrator::new(0.05, 0.01, original_min_score),
             last_calibrated_fingerprint: None,
         }
     }
 
     /// Checks active fingerprint against recorded calibration fingerprint.
-    /// Invalidates calibration stats immediately if active fingerprint is None or changed.
     pub fn check_and_invalidate_fingerprint(&mut self, active_fp: Option<&ConfigFingerprint>) {
         let Some(active_fp) = active_fp else {
             if self.last_calibrated_fingerprint.is_some() || self.conformal.window_total > 0 {
@@ -306,7 +293,7 @@ impl ProfileCalibrationState {
                 // Fingerprint matches active execution configuration
             }
             _ => {
-                // Configuration shift detected (or initial sample under new fingerprint)
+                // Configuration shift detected
                 self.reset();
                 self.last_calibrated_fingerprint = Some(active_fp.clone());
             }
@@ -333,13 +320,9 @@ impl ProfileCalibrationState {
     }
 
     /// Recalibrates using the conformal calibrator.
-    /// The non_conformity_score represents how poorly the SLM handled the last query.
-    /// Returns true if the calibrated_min_score was adjusted.
     pub fn recalibrate_conformal(&mut self, non_conformity_score: f32) -> bool {
         let adjusted = self.conformal.update(non_conformity_score);
         if adjusted {
-            // Derive calibrated_min_score from conformal threshold,
-            // bounded by [original * 0.5, original * 2.0]
             let lower = self.original_min_score * 0.5;
             let upper = self.original_min_score * 2.0;
             self.calibrated_min_score = self.conformal.quantile_threshold.clamp(lower, upper);
@@ -352,56 +335,50 @@ impl ProfileCalibrationState {
         self.times_selected = 0;
         self.cumulative_confidence = 1.0;
         self.calibrated_min_score = self.original_min_score;
-        self.conformal = ConformalCalibrator::new(0.05, 0.01, self.original_min_score);
+        self.conformal = ProfileCalibrator::new(0.05, 0.01, self.original_min_score);
         self.last_calibrated_fingerprint = None;
     }
 }
 
 mod serde_sorted_u64_set {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
 
-    pub fn serialize<S: Serializer>(set: &HashSet<u64>, s: S) -> Result<S::Ok, S::Error> {
-        let mut v: Vec<u64> = set.iter().copied().collect();
-        v.sort_unstable();
+    pub fn serialize<S: Serializer>(set: &BTreeSet<u64>, s: S) -> Result<S::Ok, S::Error> {
+        let v: Vec<u64> = set.iter().copied().collect();
         v.serialize(s)
     }
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<HashSet<u64>, D::Error> {
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<BTreeSet<u64>, D::Error> {
         Vec::<u64>::deserialize(d).map(|v| v.into_iter().collect())
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing, clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_conformal_calibrator_invariants() {
-        // INV-ROUTER-1: quantile_threshold remains strictly in [0.0, 1.0]
-        let mut cal = ConformalCalibrator::new(0.05, 0.05, 0.5);
+    fn test_profile_calibrator_invariants() {
+        let mut cal = ProfileCalibrator::new(0.05, 0.05, 0.5);
 
-        // Extreme error inputs
         for _ in 0..100 {
-            cal.update(1.0); // Extreme non-conformity -> threshold increases
+            cal.update(1.0);
             assert!(cal.quantile_threshold >= 0.0 && cal.quantile_threshold <= 1.0);
         }
 
-        // Extreme non-error inputs
         for _ in 0..100 {
-            cal.update(0.0); // Zero non-conformity -> threshold decreases
+            cal.update(0.0);
             assert!(cal.quantile_threshold >= 0.0 && cal.quantile_threshold <= 1.0);
         }
     }
 
     #[test]
-    fn test_conformal_calibrator_coverage_guarantee() {
-        // Test empirical coverage with Gibbs & Candes quantile adaptation
-        let alpha = 0.10; // 90% target coverage
+    fn test_profile_calibrator_coverage_guarantee() {
+        let alpha = 0.10;
         let gamma = 0.01;
-        let mut cal = ConformalCalibrator::new(alpha, gamma, 0.5);
+        let mut cal = ProfileCalibrator::new(alpha, gamma, 0.5);
 
-        // Deterministic pseudo-random simulation (INV-ROUTER-2)
-        // Simulate 10,000 requests where error occurs when score > 0.6
         let mut lcg = 123456789u64;
         for _ in 0..10_000 {
             lcg = lcg
@@ -412,11 +389,7 @@ mod tests {
         }
 
         let empirical = cal.empirical_error_rate();
-        // Empirical error rate should converge around alpha (0.10) within +/- 0.05 tolerance
-        assert!(
-            (empirical - alpha).abs() < 0.05,
-            "Empirical error rate {empirical} deviated too far from target alpha {alpha}"
-        );
+        assert!((empirical - alpha).abs() < 0.05);
     }
 
     #[test]
@@ -424,7 +397,6 @@ mod tests {
         let mut state = ProfileCalibrationState::new(0.6);
         assert_eq!(state.calibrated_min_score, 0.6);
 
-        // Update with non-conformity score
         let adjusted = state.recalibrate_conformal(0.8);
         assert!(adjusted);
         assert!(state.calibrated_min_score >= 0.3 && state.calibrated_min_score <= 1.2);
@@ -433,7 +405,7 @@ mod tests {
     #[test]
     fn test_domain_communities_contains_is_o1(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let communities: HashSet<u64> = (1..=1000).collect();
+        let communities: BTreeSet<u64> = (1..=1000).collect();
         let profile = SlmProfile::new(
             "test-slm",
             "http://localhost:8000/mcp",
@@ -442,14 +414,12 @@ mod tests {
             0.1,
         );
 
-        // Assert .contains(&target_id) returns correct bool
         assert!(profile.domain_communities.contains(&500));
         assert!(profile.domain_communities.contains(&1));
         assert!(profile.domain_communities.contains(&1000));
         assert!(!profile.domain_communities.contains(&0));
         assert!(!profile.domain_communities.contains(&1001));
 
-        // Assert JSON serialization produces sorted array
         let json_str = serde_json::to_string(&profile)?;
         let json_val: serde_json::Value = serde_json::from_str(&json_str)?;
 
@@ -462,7 +432,6 @@ mod tests {
         let actual_arr: Vec<u64> = arr.iter().filter_map(|v| v.as_u64()).collect();
         assert_eq!(actual_arr, expected_sorted);
 
-        // Round-trip deserialization
         let deserialized: SlmProfile = serde_json::from_str(&json_str)?;
         assert_eq!(deserialized, profile);
 
@@ -481,7 +450,7 @@ mod tests {
         let raw_json = serde_json::to_string(&profile_orig)?;
 
         let profile: SlmProfile = serde_json::from_str(&raw_json)?;
-        let expected_set: HashSet<u64> = [1, 2, 3].into_iter().collect();
+        let expected_set: BTreeSet<u64> = [1, 2, 3].into_iter().collect();
         assert_eq!(profile.domain_communities, expected_set);
 
         Ok(())

@@ -102,6 +102,7 @@ pub fn dot_product_scalar(a: &[f32], b: &[f32]) -> f32 {
 ///
 /// $O(N)$ time, $O(1)$ space where $N = a.len()$.
 #[inline]
+#[allow(clippy::indexing_slicing)]
 pub fn cosine_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
     let mut dot = 0.0f32;
     let mut norm_a = 0.0f32;
@@ -137,6 +138,7 @@ pub fn cosine_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
 ///
 /// $O(N)$ time, $O(1)$ space where $N = a.len()$.
 #[inline]
+#[allow(clippy::indexing_slicing)]
 pub fn euclidean_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
     let mut sum = 0.0f32;
     for (i, &x) in a.iter().enumerate() {
@@ -161,6 +163,7 @@ pub fn euclidean_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
 ///
 /// $O(N)$ time, $O(1)$ space where $N = a.len()$.
 #[inline]
+#[allow(clippy::indexing_slicing)]
 pub fn dot_product_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
     let mut dot = 0.0f32;
     for (i, &x) in a.iter().enumerate() {

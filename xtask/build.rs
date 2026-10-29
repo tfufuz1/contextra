@@ -1,13 +1,21 @@
+#![allow(clippy::disallowed_methods, clippy::unwrap_used)]
 //! Build script for `xtask` crate.
 //!
 //! Scans `src/gates/<cluster>/*.rs` and generates module imports and registry dispatch logic.
 
+#![allow(clippy::disallowed_methods)]
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
+// Build script needs Cargo-injected build environment variables (OUT_DIR, CARGO_MANIFEST_DIR).
+// RING-LAYER-EXCEPTION: ADR-098 / P28 exception for build.rs reading Cargo build environment variables.
+#[allow(clippy::disallowed_methods)]
 fn main() {
     println!("cargo:rerun-if-changed=src/gates");
     println!("cargo:rerun-if-changed=src/harness");
+    println!("cargo:rerun-if-env-changed=OUT_DIR");
+    println!("cargo:rerun-if-env-changed=CARGO_MANIFEST_DIR");
 
     let out_dir = match std::env::var_os("OUT_DIR") {
         Some(dir) => PathBuf::from(dir),
@@ -84,8 +92,11 @@ fn main() {
             .join("src")
             .join("harness")
             .join(format!("{}.rs", stem));
-        let path_str = harness_path.to_str().unwrap().replace('\\', "/");
-        harness_code.push_str(&format!("#[path = \"{}\"]\nmod {};\n\n", path_str, stem));
+        let path_str = harness_path.to_str().unwrap_or_default().replace('\\', "/");
+        harness_code.push_str(&format!(
+            "#[path = \"{}\"]\npub mod {};\n\n",
+            path_str, stem
+        ));
     }
 
     harness_code.push_str("pub fn dispatch(cmd: &str, _args: &[String]) -> Option<i32> {\n");

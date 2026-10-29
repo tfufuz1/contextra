@@ -162,7 +162,7 @@ pub fn truncate_prefix(s: &str, max_tokens: usize, max_chars: usize) -> String {
     // Step 1: Truncate by estimated token/word boundary
     let words: Vec<&str> = trimmed.split_whitespace().collect();
     let word_bounded = if words.len() > max_tokens {
-        words[..max_tokens].join(" ")
+        words.get(..max_tokens).unwrap_or(&words).join(" ")
     } else {
         trimmed.to_string()
     };

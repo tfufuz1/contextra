@@ -1,13 +1,10 @@
 //! Integration test for `audit_integrity_check`
 
-#[path = "../src/audit_integrity_check.rs"]
-mod audit_integrity_check;
-
-use audit_integrity_check::{run_audit_integrity_check_impl, GapSeverity};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use tempfile::tempdir;
+use xtask::audit_integrity_check::{run_audit_integrity_check_impl, GapSeverity};
 
 fn run_git_env(dir: &Path, args: &[&str], envs: &[(&str, &str)]) {
     let mut cmd = Command::new("git");

@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 use super::*;
 use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_types::TokenBudget;
@@ -185,7 +187,8 @@ async fn test_try_register_tool_boundary_validations() {
 #[tokio::test]
 async fn test_orchestrator_recover_orphans_succeeds() {
     let (ctx, _tmp) = create_dummy_context().await;
-    let orchestrator = OrchestratorEngine::try_from_db(&ctx.db).expect("engine try_from_db");
+    #[allow(deprecated)]
+    let orchestrator = OrchestratorEngine::from_db(&ctx.db);
     assert!(orchestrator.recover_orphans().await.is_ok());
 }
 

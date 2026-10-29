@@ -1,3 +1,5 @@
+<!-- doc-stamp: 2026-10-29 10cc17922 -->
+
 # Contextra — Project Constitution
 
 > **On-Demand Governance**

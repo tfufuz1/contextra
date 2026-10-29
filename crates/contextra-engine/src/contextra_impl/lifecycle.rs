@@ -134,7 +134,7 @@ impl Contextra {
             orphan_registry,
             router: parking_lot::RwLock::new(None),
             calibrator: parking_lot::RwLock::new(None),
-            pid_controller: parking_lot::RwLock::new(None),
+            _pid_controller: parking_lot::RwLock::new(None),
             metrics_sink: parking_lot::RwLock::new(metrics_sink),
             proof_key_provider: parking_lot::RwLock::new(None),
         };

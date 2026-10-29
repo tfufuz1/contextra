@@ -4,7 +4,7 @@
 // INVARIANTEN: Zero real data corruption, deterministic fault triggers based on operation count.
 
 use parking_lot::RwLock;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -26,7 +26,7 @@ pub struct FaultConfig {
 /// Simulated in-memory file system with deterministic fault injection capabilities.
 #[derive(Debug, Clone, Default)]
 pub struct FaultVfs {
-    files: Arc<RwLock<HashMap<PathBuf, Vec<u8>>>>,
+    files: Arc<RwLock<BTreeMap<PathBuf, Vec<u8>>>>,
     read_count: Arc<AtomicUsize>,
     write_count: Arc<AtomicUsize>,
     sync_count: Arc<AtomicUsize>,

@@ -28,13 +28,8 @@ pub fn find_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
-#[path = "../src/claim.rs"]
-mod claim;
-
-#[path = "../src/context_pack.rs"]
-mod context_pack;
-
-use context_pack::{run_context_pack, scan_critical_tags};
+use xtask::claim;
+use xtask::context_pack::{run_context_pack, scan_critical_tags};
 
 #[test]
 fn test_scan_critical_tags_filtering() {

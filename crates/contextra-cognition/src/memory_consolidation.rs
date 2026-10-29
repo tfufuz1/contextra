@@ -19,9 +19,9 @@
 //! - `synthesis_phase::run_synthesis_pass()` in `synthesis_phase.rs` ist der LLM-basierte Generative Synthesis Pass über Segmenten (erzeugt `SynthesizedChunk`s via `SegmentSynthesizer`-Trait).
 
 use crate::context_compaction::{CompactedContext, ContextCompactor};
+use ahash::{AHashMap, AHashSet};
 use contextra_ports::{LlmTextGenerator, ResponseGroundingValidator};
 use contextra_types::{ContextChunk, DocId, TxId};
-use std::collections::HashSet;
 
 /// Konfiguration für den Structural Consolidation Pass.
 #[derive(Debug, Clone)]
@@ -202,10 +202,16 @@ pub fn group_turns_into_segments(
     }
 
     // Pass 2: Backward-Merge — erstes Segment zu klein → in NÄCHSTES mergen
-    if merged.len() >= 2 && merged[0].turns.len() < config.min_turns_per_segment {
-        let first = merged.remove(0);
-        for (id, emb) in first.turns {
-            merged[0].add_turn(id, emb);
+    if merged.len() >= 2 {
+        if let Some(first_len) = merged.first().map(|s| s.turns.len()) {
+            if first_len < config.min_turns_per_segment {
+                let first = merged.remove(0);
+                if let Some(second) = merged.first_mut() {
+                    for (id, emb) in first.turns {
+                        second.add_turn(id, emb);
+                    }
+                }
+            }
         }
     }
 
@@ -238,8 +244,14 @@ pub fn detect_near_duplicates(turns: &[(DocId, Vec<f32>)], threshold: f32) -> Ve
 
     for i in 0..n {
         for j in (i + 1)..n {
-            let (doc_id_i, emb_i) = &turns[i];
-            let (doc_id_j, emb_j) = &turns[j];
+            let (doc_id_i, emb_i) = match turns.get(i) {
+                Some(pair) => pair,
+                None => continue,
+            };
+            let (doc_id_j, emb_j) = match turns.get(j) {
+                Some(pair) => pair,
+                None => continue,
+            };
 
             if doc_id_i == doc_id_j {
                 continue;
@@ -282,7 +294,7 @@ pub fn run_consolidation_pass(
     let mut duplicates = Vec::new();
 
     // Map von DocId -> Vec<f32> für schnellen Zugriff per Segment
-    let turn_map: std::collections::HashMap<DocId, Vec<f32>> = turns.iter().cloned().collect();
+    let turn_map: AHashMap<DocId, Vec<f32>> = turns.iter().cloned().collect();
 
     for segment in &segments {
         let segment_turns: Vec<(DocId, Vec<f32>)> = segment
@@ -341,13 +353,13 @@ impl Default for SynthesisConfig {
 /// Verfolgt die Stabilität von Graph-Communities über aufeinanderfolgende Zyklen hinweg.
 #[derive(Debug, Clone, Default)]
 pub struct CommunityStabilityTracker {
-    history: std::collections::HashMap<u64, u32>,
+    history: AHashMap<u64, u32>,
 }
 
 impl CommunityStabilityTracker {
     pub fn new() -> Self {
         Self {
-            history: std::collections::HashMap::new(),
+            history: AHashMap::new(),
         }
     }
 
@@ -359,7 +371,7 @@ impl CommunityStabilityTracker {
     }
 
     /// Setzt nicht mehr beobachtete Communities zurück/entfernt sie aus der Historie.
-    pub fn reset_if_absent(&mut self, currently_observed: &std::collections::HashSet<u64>) {
+    pub fn reset_if_absent(&mut self, currently_observed: &AHashSet<u64>) {
         self.history
             .retain(|hash, _| currently_observed.contains(hash));
     }
@@ -403,12 +415,135 @@ pub fn compute_community_hash(member_doc_ids: &[DocId]) -> u64 {
     u64::from_le_bytes(hash_bytes)
 }
 
+fn build_community_synthesis_prompt(
+    members: &[DocId],
+    source_texts: &AHashMap<DocId, String>,
+) -> (String, Vec<DocId>) {
+    let mut prompt_builder = String::from(
+        "Synthesize the following related memory chunks into a single cohesive abstract context:\n",
+    );
+    let mut valid_doc_ids = Vec::new();
+
+    for doc_id in members {
+        if let Some(text) = source_texts.get(doc_id) {
+            prompt_builder.push_str(&format!("- [DocId {}]: {}\n", doc_id.inner(), text));
+            valid_doc_ids.push(*doc_id);
+        }
+    }
+
+    if valid_doc_ids.is_empty() {
+        valid_doc_ids = members.to_vec();
+        for doc_id in members {
+            prompt_builder.push_str(&format!("- [DocId {}]\n", doc_id.inner()));
+        }
+    }
+
+    (prompt_builder, valid_doc_ids)
+}
+
+fn check_grounding_score(
+    generated_text: &str,
+    valid_doc_ids: &[DocId],
+    source_texts: &AHashMap<DocId, String>,
+    threshold: f32,
+    validator: Option<&dyn ResponseGroundingValidator>,
+    comm_hash: u64,
+) -> bool {
+    if let Some(val) = validator {
+        let source_str_refs: Vec<&str> = valid_doc_ids
+            .iter()
+            .filter_map(|id| source_texts.get(id).map(|s| s.as_str()))
+            .collect();
+        match val.score_grounding(generated_text, &source_str_refs) {
+            Ok(score) => {
+                if score < threshold {
+                    tracing::warn!(
+                        community_hash = comm_hash,
+                        score = score,
+                        threshold = threshold,
+                        "Generative Synthesis: Grounding-Score unter Schwelle — Chunk verworfen"
+                    );
+                    return false;
+                }
+                true
+            }
+            Err(e) => {
+                tracing::warn!(
+                    community_hash = comm_hash,
+                    error = %e,
+                    "Generative Synthesis: Grounding-Score Berechnung fehlgeschlagen — Chunk verworfen"
+                );
+                false
+            }
+        }
+    } else {
+        tracing::warn!(
+            community_hash = comm_hash,
+            threshold = threshold,
+            "Grounding validation required (min_grounding_score = {}), but no GroundingValidator provided; discarding ungrounded synthesis to protect episodic memory",
+            threshold
+        );
+        false
+    }
+}
+
+async fn synthesize_single_community(
+    comm_hash: u64,
+    members: &[DocId],
+    source_texts: &AHashMap<DocId, String>,
+    llm: &dyn LlmTextGenerator,
+    config: &SynthesisConfig,
+    validator: Option<&dyn ResponseGroundingValidator>,
+) -> Option<MetaChunk> {
+    let (prompt_builder, valid_doc_ids) = build_community_synthesis_prompt(members, source_texts);
+
+    if valid_doc_ids.is_empty() {
+        return None;
+    }
+
+    match llm.generate(&prompt_builder).await {
+        Ok(generated_text) => {
+            if let Some(threshold) = config.min_grounding_score {
+                if !check_grounding_score(
+                    &generated_text,
+                    &valid_doc_ids,
+                    source_texts,
+                    threshold,
+                    validator,
+                    comm_hash,
+                ) {
+                    return None;
+                }
+            }
+
+            let n = valid_doc_ids.len();
+            let content = format!("[SYNTHESIZED FROM {} SOURCES] {}", n, generated_text);
+
+            Some(MetaChunk {
+                content,
+                abstracts_from: valid_doc_ids,
+                source_community_hash: comm_hash,
+                created_at_tx: TxId::new(0),
+                llm_model_id: "llm-generator".to_string(),
+            })
+        }
+        Err(e) => {
+            tracing::error!(
+                community_hash = comm_hash,
+                error = %e,
+                "Generative synthesis pass community LLM synthesis failed; skipping community"
+            );
+            None
+        }
+    }
+}
+
 /// Dies ist der DETERMINISTISCHE, LLM-FREIE Structural Consolidation Pass. Für den LLM-basierten Generative Synthesis Pass siehe `synthesis_phase::run_synthesis_pass()`.
 ///
 /// Führt den Generative Synthesis Pass (generative Wissenssynthese) über stabile Graph-Communities aus.
 pub async fn run_structural_synthesis_pass(
     stable_communities: &[(u64, Vec<DocId>)],
-    source_texts: &std::collections::HashMap<DocId, String>,
+    source_texts: &AHashMap<DocId, String>,
     llm: &dyn LlmTextGenerator,
     config: &SynthesisConfig,
     validator: Option<&dyn ResponseGroundingValidator>,
@@ -420,7 +555,6 @@ pub async fn run_structural_synthesis_pass(
         });
     }
 
-    // 1. Filtere nach min_community_size
     let qualified: Vec<&(u64, Vec<DocId>)> = stable_communities
         .iter()
         .filter(|(_, members)| members.len() >= config.min_community_size)
@@ -433,99 +567,19 @@ pub async fn run_structural_synthesis_pass(
         });
     }
 
-    // 2. Begrenze LLM-Aufrufe auf max_llm_calls_per_cycle
     let limit = config.max_llm_calls_per_cycle as usize;
-    let (to_process, deferred) = if qualified.len() > limit {
-        (&qualified[..limit], &qualified[limit..])
-    } else {
-        (&qualified[..], &[][..])
-    };
+    let split_idx = limit.min(qualified.len());
+    let (to_process, deferred) = qualified.split_at(split_idx);
 
     let deferred_community_hashes: Vec<u64> = deferred.iter().map(|(hash, _)| *hash).collect();
     let mut synthesized = Vec::new();
 
     for &(comm_hash, members) in to_process {
-        let mut prompt_builder = String::from(
-            "Synthesize the following related memory chunks into a single cohesive abstract context:\n",
-        );
-        let mut valid_doc_ids = Vec::new();
-
-        for doc_id in members {
-            if let Some(text) = source_texts.get(doc_id) {
-                prompt_builder.push_str(&format!("- [DocId {}]: {}\n", doc_id.inner(), text));
-                valid_doc_ids.push(*doc_id);
-            }
-        }
-
-        if valid_doc_ids.is_empty() {
-            valid_doc_ids = members.clone();
-            for doc_id in members {
-                prompt_builder.push_str(&format!("- [DocId {}]\n", doc_id.inner()));
-            }
-        }
-
-        if valid_doc_ids.is_empty() {
-            continue;
-        }
-
-        match llm.generate(&prompt_builder).await {
-            Ok(generated_text) => {
-                if let Some(threshold) = config.min_grounding_score {
-                    if let Some(val) = validator {
-                        let source_str_refs: Vec<&str> = valid_doc_ids
-                            .iter()
-                            .filter_map(|id| source_texts.get(id).map(|s| s.as_str()))
-                            .collect();
-                        match val.score_grounding(&generated_text, &source_str_refs) {
-                            Ok(score) => {
-                                if score < threshold {
-                                    tracing::warn!(
-                                        community_hash = comm_hash,
-                                        score = score,
-                                        threshold = threshold,
-                                        "Generative Synthesis: Grounding-Score unter Schwelle — Chunk verworfen"
-                                    );
-                                    continue;
-                                }
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    community_hash = comm_hash,
-                                    error = %e,
-                                    "Generative Synthesis: Grounding-Score Berechnung fehlgeschlagen — Chunk verworfen"
-                                );
-                                continue;
-                            }
-                        }
-                    } else {
-                        tracing::warn!(
-                            community_hash = comm_hash,
-                            threshold = threshold,
-                            "Grounding validation required (min_grounding_score = {}), but no GroundingValidator provided; discarding ungrounded synthesis to protect episodic memory",
-                            threshold
-                        );
-                        continue;
-                    }
-                }
-
-                let n = valid_doc_ids.len();
-                let content = format!("[SYNTHESIZED FROM {} SOURCES] {}", n, generated_text);
-
-                synthesized.push(MetaChunk {
-                    content,
-                    abstracts_from: valid_doc_ids,
-                    source_community_hash: *comm_hash,
-                    created_at_tx: TxId::new(0),
-                    llm_model_id: "llm-generator".to_string(),
-                });
-            }
-            Err(e) => {
-                tracing::error!(
-                    community_hash = comm_hash,
-                    error = %e,
-                    "Generative synthesis pass community LLM synthesis failed; skipping community"
-                );
-            }
+        if let Some(chunk) =
+            synthesize_single_community(*comm_hash, members, source_texts, llm, config, validator)
+                .await
+        {
+            synthesized.push(chunk);
         }
     }
 
@@ -554,6 +608,120 @@ pub struct PreCondensedInput {
     pub provenance: Vec<DocId>,
 }
 
+fn validate_pre_condensed_input_bounds(
+    target_tenant_id: &contextra_types::TenantId,
+    input: &PreCondensedInput,
+) -> contextra_types::Result<()> {
+    if &input.tenant_id != target_tenant_id {
+        return Err(contextra_types::ContextraError::PolicyViolation(format!(
+            "VETO-F10: Tenant boundary violation. Input tenant_id '{}' does not match target tenant_id '{}'",
+            input.tenant_id,
+            target_tenant_id
+        )));
+    }
+
+    if input.text_digest.len() > MAX_PRE_CONDENSED_DIGEST_LEN {
+        return Err(contextra_types::ContextraError::InvalidInput(format!(
+            "PreCondensedInput text_digest length {} exceeds limit {}",
+            input.text_digest.len(),
+            MAX_PRE_CONDENSED_DIGEST_LEN
+        )));
+    }
+
+    if input.source_label.len() > MAX_PRE_CONDENSED_LABEL_LEN {
+        return Err(contextra_types::ContextraError::InvalidInput(format!(
+            "PreCondensedInput source_label length {} exceeds limit {}",
+            input.source_label.len(),
+            MAX_PRE_CONDENSED_LABEL_LEN
+        )));
+    }
+
+    if input.provenance.len() > MAX_PRE_CONDENSED_PROVENANCE_COUNT {
+        return Err(contextra_types::ContextraError::InvalidInput(format!(
+            "PreCondensedInput provenance count {} exceeds limit {}",
+            input.provenance.len(),
+            MAX_PRE_CONDENSED_PROVENANCE_COUNT
+        )));
+    }
+
+    Ok(())
+}
+
+fn process_pre_condensed_input_node(
+    input: &PreCondensedInput,
+    validator: Option<&dyn ResponseGroundingValidator>,
+    min_grounding_score: Option<f32>,
+) -> Option<TurnSegment> {
+    if let Some(threshold) = min_grounding_score {
+        if let Some(val) = validator {
+            let source_ref = [input.source_label.as_str()];
+            match val.score_grounding(&input.text_digest, &source_ref) {
+                Ok(score) => {
+                    if score < threshold {
+                        tracing::warn!(
+                            tenant_id = %input.tenant_id,
+                            label = %input.source_label,
+                            score = score,
+                            threshold = threshold,
+                            "PreCondensedInput grounding score below threshold — input rejected"
+                        );
+                        return None;
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        tenant_id = %input.tenant_id,
+                        error = %e,
+                        "PreCondensedInput grounding evaluation failed — input rejected"
+                    );
+                    return None;
+                }
+            }
+        } else {
+            tracing::warn!(
+                tenant_id = %input.tenant_id,
+                threshold = threshold,
+                "PreCondensedInput grounding check required (min_grounding_score = {}), but no validator provided — input rejected",
+                threshold
+            );
+            return None;
+        }
+    }
+
+    let hash = blake3::hash(input.text_digest.as_bytes());
+    let hash_bytes = hash.as_bytes();
+    let mut representative_embedding = vec![0.0f32; 4];
+    for (i, val) in representative_embedding.iter_mut().enumerate().take(4) {
+        if let (
+            Some(&b0),
+            Some(&b1),
+            Some(&b2),
+            Some(&b3),
+            Some(&b4),
+            Some(&b5),
+            Some(&b6),
+            Some(&b7),
+        ) = (
+            hash_bytes.get(i * 2),
+            hash_bytes.get(i * 2 + 1),
+            hash_bytes.get(i * 2 + 2),
+            hash_bytes.get(i * 2 + 3),
+            hash_bytes.get(i * 2 + 4),
+            hash_bytes.get(i * 2 + 5),
+            hash_bytes.get(i * 2 + 6),
+            hash_bytes.get(i * 2 + 7),
+        ) {
+            let chunk_val = u64::from_le_bytes([b0, b1, b2, b3, b4, b5, b6, b7]);
+            *val = (chunk_val as f32) / (u64::MAX as f32);
+        }
+    }
+
+    Some(TurnSegment {
+        turn_ids: input.provenance.clone(),
+        representative_embedding,
+    })
+}
+
 /// Ingests one or more pre-condensed inputs as nodes into the memory consolidation pipeline.
 ///
 /// # Requirements & Invariants
@@ -572,42 +740,10 @@ pub fn intake_pre_condensed_inputs(
         return Ok(Vec::new());
     }
 
-    // 1. Strict Tenant Boundary Check (VETO-F10) & Bounds Validation
     for input in inputs {
-        if &input.tenant_id != target_tenant_id {
-            return Err(contextra_types::ContextraError::PolicyViolation(format!(
-                "VETO-F10: Tenant boundary violation. Input tenant_id '{}' does not match target tenant_id '{}'",
-                input.tenant_id,
-                target_tenant_id
-            )));
-        }
-
-        if input.text_digest.len() > MAX_PRE_CONDENSED_DIGEST_LEN {
-            return Err(contextra_types::ContextraError::InvalidInput(format!(
-                "PreCondensedInput text_digest length {} exceeds limit {}",
-                input.text_digest.len(),
-                MAX_PRE_CONDENSED_DIGEST_LEN
-            )));
-        }
-
-        if input.source_label.len() > MAX_PRE_CONDENSED_LABEL_LEN {
-            return Err(contextra_types::ContextraError::InvalidInput(format!(
-                "PreCondensedInput source_label length {} exceeds limit {}",
-                input.source_label.len(),
-                MAX_PRE_CONDENSED_LABEL_LEN
-            )));
-        }
-
-        if input.provenance.len() > MAX_PRE_CONDENSED_PROVENANCE_COUNT {
-            return Err(contextra_types::ContextraError::InvalidInput(format!(
-                "PreCondensedInput provenance count {} exceeds limit {}",
-                input.provenance.len(),
-                MAX_PRE_CONDENSED_PROVENANCE_COUNT
-            )));
-        }
+        validate_pre_condensed_input_bounds(target_tenant_id, input)?;
     }
 
-    // 2. Deterministic Sorting: by tenant_id, then text_digest, then source_label
     let mut sorted_inputs = inputs.to_vec();
     sorted_inputs.sort_unstable_by(|a, b| {
         a.tenant_id
@@ -616,68 +752,13 @@ pub fn intake_pre_condensed_inputs(
             .then_with(|| a.source_label.cmp(&b.source_label))
     });
 
-    // 3. Grounding Check & Node Intake
     let mut segments = Vec::new();
-
-    for input in sorted_inputs {
-        if let Some(threshold) = min_grounding_score {
-            if let Some(val) = validator {
-                let source_ref = [input.source_label.as_str()];
-                match val.score_grounding(&input.text_digest, &source_ref) {
-                    Ok(score) => {
-                        if score < threshold {
-                            tracing::warn!(
-                                tenant_id = %input.tenant_id,
-                                label = %input.source_label,
-                                score = score,
-                                threshold = threshold,
-                                "PreCondensedInput grounding score below threshold — input rejected"
-                            );
-                            continue;
-                        }
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            tenant_id = %input.tenant_id,
-                            error = %e,
-                            "PreCondensedInput grounding evaluation failed — input rejected"
-                        );
-                        continue;
-                    }
-                }
-            } else {
-                tracing::warn!(
-                    tenant_id = %input.tenant_id,
-                    threshold = threshold,
-                    "PreCondensedInput grounding check required (min_grounding_score = {}), but no validator provided — input rejected",
-                    threshold
-                );
-                continue;
-            }
+    for input in &sorted_inputs {
+        if let Some(segment) =
+            process_pre_condensed_input_node(input, validator, min_grounding_score)
+        {
+            segments.push(segment);
         }
-
-        // Calculate deterministic representative embedding from Blake3 hash of text_digest
-        let hash = blake3::hash(input.text_digest.as_bytes());
-        let hash_bytes = hash.as_bytes();
-        let mut representative_embedding = vec![0.0f32; 4];
-        for i in 0..4 {
-            let chunk_val = u64::from_le_bytes([
-                hash_bytes[i * 2],
-                hash_bytes[i * 2 + 1],
-                hash_bytes[i * 2 + 2],
-                hash_bytes[i * 2 + 3],
-                hash_bytes[i * 2 + 4],
-                hash_bytes[i * 2 + 5],
-                hash_bytes[i * 2 + 6],
-                hash_bytes[i * 2 + 7],
-            ]);
-            representative_embedding[i] = (chunk_val as f32) / (u64::MAX as f32);
-        }
-
-        segments.push(TurnSegment {
-            turn_ids: input.provenance.clone(),
-            representative_embedding,
-        });
     }
 
     Ok(segments)
@@ -691,7 +772,7 @@ pub fn compact_segment_via_context_compactor(
     compactor: &ContextCompactor,
     chunks: &[ContextChunk],
 ) -> CompactedContext {
-    let turn_set: HashSet<DocId> = segment.turn_ids.iter().copied().collect();
+    let turn_set: AHashSet<DocId> = segment.turn_ids.iter().copied().collect();
     let segment_chunks: Vec<ContextChunk> = chunks
         .iter()
         .filter(|c| turn_set.contains(&c.doc_id))
@@ -702,6 +783,12 @@ pub fn compact_segment_via_context_compactor(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first
+)]
 mod tests {
     use super::*;
 
@@ -734,8 +821,8 @@ mod tests {
             2,
             "10 turns with 2 distinct clusters must produce exactly 2 segments"
         );
-        assert_eq!(segments[0].turn_ids.len(), 5);
-        assert_eq!(segments[1].turn_ids.len(), 5);
+        assert_eq!(segments.get(0).map(|s| s.turn_ids.len()), Some(5));
+        assert_eq!(segments.get(1).map(|s| s.turn_ids.len()), Some(5));
     }
 
     #[test]
@@ -746,7 +833,7 @@ mod tests {
 
         let pairs = detect_near_duplicates(&turns, 0.95);
         assert_eq!(pairs.len(), 1);
-        let (older, newer) = pairs[0];
+        let (older, newer) = *pairs.get(0).expect("pair expected");
         assert_eq!(
             older,
             DocId::new(10),
@@ -824,7 +911,7 @@ mod tests {
             1,
             "Segment under min_turns_per_segment must be merged into neighboring segment"
         );
-        assert_eq!(segments[0].turn_ids.len(), 6);
+        assert_eq!(segments.get(0).map(|s| s.turn_ids.len()), Some(6));
     }
 
     #[test]
@@ -926,7 +1013,7 @@ mod tests {
         let members = vec![DocId::new(1), DocId::new(2), DocId::new(3)];
         let hash = compute_community_hash(&members);
         let stable_communities = vec![(hash, members)];
-        let source_texts = std::collections::HashMap::new();
+        let source_texts = ahash::AHashMap::new();
 
         let res =
             run_structural_synthesis_pass(&stable_communities, &source_texts, &llm, &config, None)
@@ -949,7 +1036,7 @@ mod tests {
 
         assert_eq!(tracker.observe(hash_b), 1);
 
-        let mut observed = std::collections::HashSet::new();
+        let mut observed = ahash::AHashSet::new();
         observed.insert(hash_a);
 
         tracker.reset_if_absent(&observed);
@@ -980,7 +1067,7 @@ mod tests {
             stable_communities.push((hash, members));
         }
 
-        let source_texts = std::collections::HashMap::new();
+        let source_texts = ahash::AHashMap::new();
 
         let res =
             run_structural_synthesis_pass(&stable_communities, &source_texts, &llm, &config, None)
@@ -1015,7 +1102,7 @@ mod tests {
         let hash = compute_community_hash(&members);
         let stable_communities = vec![(hash, members.clone())];
 
-        let mut source_texts = std::collections::HashMap::new();
+        let mut source_texts = ahash::AHashMap::new();
         source_texts.insert(DocId::new(10), "Text A".to_string());
         source_texts.insert(DocId::new(20), "Text B".to_string());
         source_texts.insert(DocId::new(30), "Text C".to_string());
@@ -1026,7 +1113,7 @@ mod tests {
                 .expect("run_synthesis_pass should succeed");
 
         assert_eq!(res.synthesized.len(), 1);
-        let chunk = &res.synthesized[0];
+        let chunk = res.synthesized.get(0).expect("synthesized chunk expected");
         assert_eq!(chunk.abstracts_from.len(), 3);
         assert!(
             chunk.content.starts_with("[SYNTHESIZED FROM 3 SOURCES] "),
@@ -1058,7 +1145,7 @@ mod tests {
             (compute_community_hash(&members_3), members_3),
         ];
 
-        let source_texts = std::collections::HashMap::new();
+        let source_texts = ahash::AHashMap::new();
 
         let res =
             run_structural_synthesis_pass(&stable_communities, &source_texts, &llm, &config, None)
@@ -1101,7 +1188,7 @@ mod tests {
         let hash = compute_community_hash(&members);
         let stable_communities = vec![(hash, members)];
 
-        let mut source_texts = std::collections::HashMap::new();
+        let mut source_texts = ahash::AHashMap::new();
         source_texts.insert(DocId::new(10), "The sky is blue.".to_string());
         source_texts.insert(DocId::new(20), "Grass is green.".to_string());
 

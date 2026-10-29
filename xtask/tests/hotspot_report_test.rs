@@ -1,13 +1,10 @@
 //! Integration test for `hotspot_report`
 
-#[path = "../src/hotspot_report.rs"]
-mod hotspot_report;
-
-use hotspot_report::{run_hotspot_report_impl, HotspotRisk};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use tempfile::tempdir;
+use xtask::hotspot_report::{run_hotspot_report_impl, HotspotRisk};
 
 fn run_git(dir: &Path, args: &[&str]) {
     let output = Command::new("git")

@@ -223,7 +223,9 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             .min_read_snapshot()
             .unwrap_or(u64::MAX)
             .min(storage.snapshot_registry.min_active_seqno());
-        storage.ssi_validator.prune_through(prune_bound);
+        if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
+            seq_val.prune_through(prune_bound);
+        }
 
         tracing::info!("Flushed memtable to SSTable: {} bytes", bytes_freed);
         Ok(())

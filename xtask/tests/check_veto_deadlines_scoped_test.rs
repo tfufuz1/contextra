@@ -2,18 +2,9 @@
 
 use chrono::{TimeZone, Utc};
 use std::fs;
-use std::path::PathBuf;
 use tempfile::tempdir;
 
-#[allow(dead_code)]
-pub fn find_root_dir() -> PathBuf {
-    PathBuf::from(".")
-}
-
-#[path = "../src/veto_deadline_gate.rs"]
-mod veto_deadline_gate;
-
-use veto_deadline_gate::check_veto_deadlines_from_content_scoped;
+use xtask::veto_deadline_gate::check_veto_deadlines_from_content_scoped;
 
 #[test]
 fn test_veto_deadline_in_5_days_warning_exit0() {

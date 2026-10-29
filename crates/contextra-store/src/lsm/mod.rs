@@ -74,7 +74,7 @@ pub(super) use std::path::PathBuf;
 pub(super) use std::sync::atomic::Ordering;
 
 pub mod config;
-mod engine;
+pub(crate) mod engine;
 mod guard;
 pub mod observer;
 mod validate;

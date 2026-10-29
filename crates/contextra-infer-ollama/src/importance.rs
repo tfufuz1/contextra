@@ -69,7 +69,9 @@ pub async fn score_importance_batch(
                 chunks.len()
             ],
             |mut acc, (i, assessment)| {
-                acc[i] = assessment;
+                if let Some(slot) = acc.get_mut(i) {
+                    *slot = assessment;
+                }
                 acc
             },
         )

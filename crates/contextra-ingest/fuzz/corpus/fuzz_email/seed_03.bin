@@ -1,0 +1,5 @@
+From: html@example.com
+Subject: HTML Mail
+Content-Type: text/html
+
+<html><body><script>alert(1)</script><p>Text</p></body></html>

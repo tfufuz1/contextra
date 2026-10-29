@@ -374,7 +374,7 @@ impl VectorIndex for HnswIndex {
     /// ## Invariant (v17 K-02 / SSI-Determinism & Pin-first):
     /// This method pins the sequence log via [`SnapshotPinGuard`] and applies `is_visible(doc_id, seq_no)`
     /// filtering over all candidates. Searches executed concurrently with background index rebuilds
-    /// ([`HnswIndexCore::rebuild`]) yield identical document results as pre-rebuild
+    /// ([`super::types::HnswIndexCore::rebuild`]) yield identical document results as pre-rebuild
     /// searches at the same pinned sequence number, regardless of rebuild progress or graph swaps.
     ///
     /// Verified by integration tests `crates/contextra-vector/tests/k02_snapshot_rebuild_determinism.rs` and
