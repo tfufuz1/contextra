@@ -48,13 +48,7 @@ fn test_working_state_has_no_volatile_fields() {
     );
 }
 
-#[path = "../src/claim.rs"]
-mod claim;
-
-#[path = "../src/session_init.rs"]
-mod session_init;
-
-use session_init::run_session_init;
+use xtask::session_init::run_session_init;
 
 #[test]
 fn test_session_init_has_continuity_fields() {

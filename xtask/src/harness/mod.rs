@@ -2,6 +2,9 @@
 
 include!(concat!(env!("OUT_DIR"), "/harness_generated.rs"));
 
+pub use self::loop_guard::*;
+pub use self::wal_replay_verify::*;
+
 /// Dispatches a subcommand to either builtin harness commands (`harness-list`, `harness-help`)
 /// or generated harness modules.
 pub fn dispatch_with_builtin(cmd: &str, args: &[String]) -> Option<i32> {

@@ -1,8 +1,8 @@
 use super::super::*;
 use crate::csr::CsrGraph;
-use std::collections::HashSet;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 struct LogCaptureLayer(std::sync::Arc<std::sync::Mutex<Vec<String>>>);

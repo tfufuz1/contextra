@@ -1,5 +1,4 @@
-#[path = "../src/harness/lock_audit.rs"]
-mod lock_audit;
+use xtask::harness::lock_audit;
 
 use std::fs;
 use tempfile::TempDir;

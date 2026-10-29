@@ -1,7 +1,6 @@
 //! Integration tests for registry-check harness command.
 
-#[path = "../src/harness/registry_check.rs"]
-mod registry_check;
+use xtask::harness::registry_check;
 
 use std::fs;
 use std::process::Command;

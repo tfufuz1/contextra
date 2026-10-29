@@ -1,17 +1,5 @@
 use chrono::{TimeZone, Utc};
-use std::path::PathBuf;
-
-#[allow(dead_code)]
-pub fn find_root_dir() -> PathBuf {
-    PathBuf::from(".")
-}
-
-#[path = "../src/veto_deadline_gate.rs"]
-mod veto_deadline_gate;
-
-use veto_deadline_gate::{
-    check_veto_deadlines_from_content, parse_veto_deadlines, VetoDeadlineEntry,
-};
+use xtask::veto_deadline_gate::{check_veto_deadlines_from_content, parse_veto_deadlines};
 
 const TEST_VETOES_FIXTURE: &str = r#"# Contextra — Feature-Veto-Register (VETOES.md)
 

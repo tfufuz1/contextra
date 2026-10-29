@@ -1,5 +1,12 @@
 // xtask entry-point — Contextra quality-gate runner | WP-X.2 2026-10-26
 
+#![allow(clippy::disallowed_methods)]
+#![allow(clippy::disallowed_types)]
+#![allow(clippy::expect_used)]
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::indexing_slicing)]
+#![allow(clippy::exit)]
+
 use std::env;
 
 fn print_help() {

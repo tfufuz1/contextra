@@ -1,4 +1,4 @@
-pub fn run_session_command(cmd: &str, args: &[String]) -> Result<(), String> {
+pub fn run_session_command(cmd: &str, _args: &[String]) -> Result<(), String> {
     match cmd {
         "jules-preflight" => {
             println!("=== Running xtask jules-preflight ===");
@@ -33,8 +33,12 @@ pub fn run_session_command(cmd: &str, args: &[String]) -> Result<(), String> {
             Ok(())
         }
         "loop-guard" => {
-            println!("Loop guard");
-            Ok(())
+            let code = crate::harness::loop_guard::run_loop_guard(_args);
+            if code == 0 {
+                Ok(())
+            } else {
+                Err(format!("loop-guard exited with code {}", code))
+            }
         }
         "ledger" => {
             println!("Ledger");

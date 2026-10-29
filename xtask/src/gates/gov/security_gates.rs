@@ -231,10 +231,10 @@ struct SecurityPortEntry {
     name: String,
     #[serde(rename = "crate", default)]
     krate: String,
-    #[serde(default)]
-    trait_path: String,
-    #[serde(default)]
-    class: String,
+    #[serde(default, rename = "trait_path")]
+    _trait_path: String,
+    #[serde(default, rename = "class")]
+    _class: String,
     #[serde(default)]
     prod_impl: String,
     #[serde(default)]

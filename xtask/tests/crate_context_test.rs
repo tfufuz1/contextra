@@ -28,10 +28,7 @@ pub fn find_root_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
-#[path = "../src/crate_context.rs"]
-mod crate_context;
-
-use crate_context::{run_crate_context, CrateContextData, OutputFormat};
+use xtask::crate_context::{run_crate_context, CrateContextData, OutputFormat};
 
 #[test]
 fn test_run_crate_context_markdown_and_json() {

@@ -170,6 +170,6 @@ pub fn run_commit_health_impl(
 }
 
 pub fn run_commit_health(since_days: u32, output: Option<&Path>) -> Result<String, String> {
-    let root = xtask::find_root_dir();
+    let root = crate::find_root_dir();
     run_commit_health_impl(&root, since_days, output)
 }

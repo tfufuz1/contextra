@@ -9,40 +9,16 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
-/// Dummy find_root_dir to satisfy module internal references in test context.
-pub fn find_root_dir() -> PathBuf {
-    std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-}
-
-#[path = "../../src/harness/protected_paths.rs"]
-mod protected_paths;
-
-#[path = "../../src/harness/gate_weakening.rs"]
-mod gate_weakening;
-
-#[path = "../../src/harness/determinism_check.rs"]
-mod determinism_check;
-
-#[path = "../../src/check_unsafe_islands.rs"]
-mod check_unsafe_islands;
-
-#[path = "../../src/harness/scope_guard.rs"]
-mod scope_guard;
-
-#[path = "../../src/harness/test_integrity.rs"]
-mod test_integrity;
-
-#[path = "../../src/harness/symbol_exists.rs"]
-mod symbol_exists;
-
-#[path = "../../src/harness/ratchet.rs"]
-mod ratchet;
-
-#[path = "../../src/check_ring_layering.rs"]
-mod check_ring_layering;
-
-#[path = "../../src/panic_inventory.rs"]
-mod panic_inventory;
+use xtask::check_ring_layering;
+use xtask::check_unsafe_islands;
+use xtask::harness::determinism_check;
+use xtask::harness::gate_weakening;
+use xtask::harness::protected_paths;
+use xtask::harness::ratchet;
+use xtask::harness::scope_guard;
+use xtask::harness::symbol_exists;
+use xtask::harness::test_integrity;
+use xtask::panic_inventory;
 
 /// Helper to create an isolated temporary Git repository for canary testing.
 fn create_temp_repo() -> TempDir {

@@ -1,16 +1,10 @@
 //! Integration test for `tag_health`
 
-#[path = "../src/check_stale_tags.rs"]
-mod check_stale_tags;
-
-#[path = "../src/tag_health.rs"]
-mod tag_health;
-
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use tag_health::{run_tag_health_impl, TagHealthConcern};
 use tempfile::tempdir;
+use xtask::tag_health::{run_tag_health_impl, TagHealthConcern};
 
 fn run_git_env(dir: &Path, args: &[&str], envs: &[(&str, &str)]) {
     let mut cmd = Command::new("git");

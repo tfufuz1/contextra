@@ -179,6 +179,6 @@ pub fn run_shell_commit_audit(
     since_days: Option<u32>,
     fail_on_count: Option<usize>,
 ) -> Result<ShellCommitReport, String> {
-    let root = xtask::find_root_dir();
+    let root = crate::find_root_dir();
     run_shell_commit_audit_impl(&root, since_days, fail_on_count)
 }
