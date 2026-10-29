@@ -115,7 +115,11 @@ impl DeletionProofVerifier {
     ) -> VerificationResult {
         let verifying_key = match ed25519_dalek::VerifyingKey::from_bytes(verifying_key_bytes) {
             Ok(vk) => vk,
-            Err(e) => return VerificationResult::failure(VerificationErrorReason::InvalidKey(e.to_string())),
+            Err(e) => {
+                return VerificationResult::failure(VerificationErrorReason::InvalidKey(
+                    e.to_string(),
+                ))
+            }
         };
 
         if let Err(e) = proof.verify_external(&verifying_key) {
@@ -160,7 +164,11 @@ impl DeletionProofVerifier {
 
         let verifying_key = match ed25519_dalek::VerifyingKey::from_bytes(verifying_key_bytes) {
             Ok(vk) => vk,
-            Err(e) => return VerificationResult::failure(VerificationErrorReason::InvalidKey(e.to_string())),
+            Err(e) => {
+                return VerificationResult::failure(VerificationErrorReason::InvalidKey(
+                    e.to_string(),
+                ))
+            }
         };
 
         match chain.verify_chain() {
@@ -191,13 +199,16 @@ impl DeletionProofVerifier {
             });
         }
 
-        match crate::audit_chain::AuditChain::verify_head_signature(head_signature, &verifying_key) {
+        match crate::audit_chain::AuditChain::verify_head_signature(head_signature, &verifying_key)
+        {
             Ok(true) => VerificationResult::success(),
             Ok(false) => VerificationResult::failure(VerificationErrorReason::HeadMismatch {
                 expected_head_hash: head_signature.head_hash,
                 actual_head_hash: actual_last_hash,
             }),
-            Err(e) => VerificationResult::failure(VerificationErrorReason::InvalidSignature(e.to_string())),
+            Err(e) => VerificationResult::failure(VerificationErrorReason::InvalidSignature(
+                e.to_string(),
+            )),
         }
     }
 }

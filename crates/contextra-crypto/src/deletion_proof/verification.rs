@@ -13,7 +13,9 @@ use subtle::ConstantTimeEq;
 
 impl DeletionProof {
     /// Typed accessor for the signature version.
-    pub fn signature_version_typed(&self) -> std::result::Result<SignatureVersion, DeletionProofError> {
+    pub fn signature_version_typed(
+        &self,
+    ) -> std::result::Result<SignatureVersion, DeletionProofError> {
         SignatureVersion::try_from(self.signature_version)
     }
 
@@ -38,10 +40,8 @@ impl DeletionProof {
                 let scope_bytes = bincode::serialize(&self.scope)
                     .map_err(|e| ContextraError::Internal(e.to_string()))?;
                 let tx_bytes = self.deleted_after_tx.0.to_le_bytes();
-                let expected = compute_hmac_sha256(
-                    k,
-                    &[&scope_bytes, &self.deleted_keys_hash, &tx_bytes],
-                )?;
+                let expected =
+                    compute_hmac_sha256(k, &[&scope_bytes, &self.deleted_keys_hash, &tx_bytes])?;
                 Ok(bool::from(self.signature.ct_eq(&expected)))
             }
             (SignatureVersion::V2, VerificationKey::Hmac(k)) => {

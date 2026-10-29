@@ -17,7 +17,7 @@
 //!   Eine Warnung wird via `tracing::warn!` ausgegeben.
 
 use contextra_sys::LockedRegions;
-use contextra_types::{DocId, TxId};
+use contextra_types::{DocId, TenantId, TxId};
 use std::time::Instant;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -100,10 +100,18 @@ pub struct PurgeReceipt {
 }
 
 /// Quittung nach erfolgreichem commit_to_storage().
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitReceipt {
+    /// Anzahl geschriebener Chunks.
     pub chunks_committed: usize,
+    /// Bytes, die in Storage übergeben wurden.
     pub bytes_committed: usize,
+    /// Mandant (TenantId), unter dem der Commit erfolgte.
+    pub tenant_id: TenantId,
+    /// Transaktions- / Sequenznummer (TxId) des Commits.
+    pub tx_id: TxId,
+    /// Optionaler Verweis auf den zugehörigen Löschnachweis (z. B. Proof-Hash / URN).
+    pub deletion_proof_reference: Option<String>,
 }
 
 /// Fehler des VolatileContextVault.
@@ -258,6 +266,38 @@ impl VolatileContextVault {
     /// oder Limit erreicht), oder falls die Plattform kein Speicher-Locking unterstützt.
     pub fn is_memory_locked(&self) -> bool {
         self.is_memory_locked
+    }
+
+    /// Transferiert alle Chunks aus dem Vault zur dauerhaften Speicherung und erzeugt ein [`CommitReceipt`].
+    ///
+    /// Konsumiert den Vault-Inhalt und gibt die extrahierten Chunks zusammen mit dem
+    /// Quittungsnachweis zurück, der Mandant, Sequenznummer/TxId und Löschbeweis-Verweis enthält.
+    pub fn commit(
+        mut self,
+        tenant_id: TenantId,
+        tx_id: TxId,
+        deletion_proof_reference: Option<impl Into<String>>,
+    ) -> Result<(Vec<VaultChunk>, CommitReceipt), VaultError> {
+        if self.consumed {
+            return Err(VaultError::AlreadyConsumed);
+        }
+
+        let chunks_committed = self.chunks.len();
+        let bytes_committed = self.current_bytes;
+        let chunks = std::mem::take(&mut self.chunks);
+
+        self.mlock_regions.unlock_all();
+        self.consumed = true;
+
+        let receipt = CommitReceipt {
+            chunks_committed,
+            bytes_committed,
+            tenant_id,
+            tx_id,
+            deletion_proof_reference: deletion_proof_reference.map(|r| r.into()),
+        };
+
+        Ok((chunks, receipt))
     }
 
     /// Lesezugriff auf Chunks (für User-Preview vor Commit/Purge-Entscheidung).
@@ -447,5 +487,36 @@ mod tests {
         assert!(vault.is_memory_locked());
         vault.ingest(make_chunk(1, b"")).unwrap();
         assert!(vault.is_memory_locked());
+    }
+
+    /// Commit erzeugt CommitReceipt mit Mandant, Sequenznummer und Löschbeweis-Referenz.
+    #[test]
+    fn test_commit_generates_receipt_with_metadata() {
+        let mut vault = VolatileContextVault::open(VaultConfig {
+            attempt_mlock: false,
+            ..Default::default()
+        });
+        vault
+            .ingest(make_chunk(10, b"sensitive payload 1"))
+            .unwrap();
+        vault
+            .ingest(make_chunk(11, b"sensitive payload 2"))
+            .unwrap();
+
+        let tenant_id = TenantId::try_new(42).unwrap();
+        let tx_id = TxId::new(1001);
+        let proof_ref = "urn:contextra:proof:v5:tenant:42:tx:1001";
+
+        let (chunks, receipt) = vault.commit(tenant_id, tx_id, Some(proof_ref)).unwrap();
+
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(receipt.chunks_committed, 2);
+        assert_eq!(
+            receipt.bytes_committed,
+            b"sensitive payload 1".len() + b"sensitive payload 2".len()
+        );
+        assert_eq!(receipt.tenant_id, tenant_id);
+        assert_eq!(receipt.tx_id, tx_id);
+        assert_eq!(receipt.deletion_proof_reference.as_deref(), Some(proof_ref));
     }
 }
