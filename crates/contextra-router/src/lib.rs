@@ -49,7 +49,8 @@ pub use contextra_adapt::{DriftReason, LyapunovDriftWatcher, LyapunovResult};
 pub use contextra_adapt::{OffPolicyEvaluator, OffPolicyStats};
 pub use dispatch::dispatch_to_slm;
 pub use outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
-pub use profile::SlmProfile;
+#[allow(deprecated)]
+pub use profile::{ConformalCalibrator, ProfileCalibrator, SlmProfile};
 pub use router::{DefaultRouterEngine, RouterEngine, RoutingDecision};
 
 #[cfg(feature = "bandit-routing")]
@@ -66,5 +67,3 @@ pub use fc_ts_dispatch::{deterministic_fc_ts_rng, select_profile_fc_ts, FcTsDisp
 pub use routing_strategy::RoutingStrategy;
 #[cfg(feature = "cloud-egress-guard")]
 pub use transport::Transport;
-
-// REVIEW-PASS[1/2] (TS: 2026-09-16T16:17:21Z) (SESSION: cec8b8e9) (PRÜFER-KONTEXT: FRESH)

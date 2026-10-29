@@ -83,11 +83,15 @@ impl wasmtime::ResourceLimiter for SandboxState {
 
     fn table_growing(
         &mut self,
-        _current: u32,
-        desired: u32,
-        _max: Option<u32>,
+        _current: usize,
+        desired: usize,
+        _max: Option<usize>,
     ) -> anyhow::Result<bool> {
         // INV-SBX-2: Enforce strict ceiling on table elements
-        Ok(desired <= self.max_table_entries)
+        let desired_entries = match u32::try_from(desired) {
+            Ok(d) => d,
+            Err(_) => return Ok(false),
+        };
+        Ok(desired_entries <= self.max_table_entries)
     }
 }

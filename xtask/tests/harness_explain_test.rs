@@ -1,7 +1,6 @@
 // xtask/tests/harness_explain_test.rs
 
-#[path = "../src/harness/explain.rs"]
-mod explain;
+use xtask::harness::explain;
 
 fn get_repo_root() -> std::path::PathBuf {
     if let Ok(output) = std::process::Command::new("git")

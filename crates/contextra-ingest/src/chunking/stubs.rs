@@ -1,6 +1,6 @@
 // FILE-CONTEXT
-// ZWECK: Stubs für spezifische Chunking-Strategien (Prose, Tabular, Paged, Structured, Email) (WP M3/M4).
-// INVARIANTEN: Zero-Panic, Delegierung an FallbackChunker.
+// ZWECK: Stubs und Anbindung spezifischer Chunking-Strategien (WP M3/M4 / WP-ING-15).
+// INVARIANTEN: Zero-Panic, Delegierung an Strategie-Modul oder FallbackChunker.
 // STAND: TS:2026-10-31T00:00:00Z
 
 use crate::canonical::CanonicalText;
@@ -34,6 +34,9 @@ impl IrChunker for ProseChunker {
     }
 }
 
+#[path = "tabular/mod.rs"]
+mod tabular_impl;
+
 #[derive(Debug, Default)]
 pub struct TabularChunker;
 
@@ -48,7 +51,7 @@ impl IrChunker for TabularChunker {
         canon: &CanonicalText,
         cfg: &ChunkingConfig,
     ) -> Result<Vec<ChunkDraft>, IngestError> {
-        FallbackChunker.draft(ir, canon, cfg)
+        tabular_impl::draft_tabular(ir, canon, cfg)
     }
 }
 
@@ -58,42 +61,6 @@ pub struct PagedChunker;
 impl IrChunker for PagedChunker {
     fn strategy(&self) -> ChunkStrategy {
         ChunkStrategy::Paged
-    }
-
-    fn draft(
-        &self,
-        ir: &DocumentIr,
-        canon: &CanonicalText,
-        cfg: &ChunkingConfig,
-    ) -> Result<Vec<ChunkDraft>, IngestError> {
-        FallbackChunker.draft(ir, canon, cfg)
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct StructuredChunker;
-
-impl IrChunker for StructuredChunker {
-    fn strategy(&self) -> ChunkStrategy {
-        ChunkStrategy::Structured
-    }
-
-    fn draft(
-        &self,
-        ir: &DocumentIr,
-        canon: &CanonicalText,
-        cfg: &ChunkingConfig,
-    ) -> Result<Vec<ChunkDraft>, IngestError> {
-        FallbackChunker.draft(ir, canon, cfg)
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct EmailChunker;
-
-impl IrChunker for EmailChunker {
-    fn strategy(&self) -> ChunkStrategy {
-        ChunkStrategy::Email
     }
 
     fn draft(

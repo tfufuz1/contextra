@@ -113,21 +113,7 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
         })
     }
 
-    /// Führt einen einzelnen sequenziellen Maintenance-Tick durch (ADR-079).
-    pub async fn run_tick(&self) {
-        tracing::debug!(collection = %self.collection.name(), "MaintenanceScheduler tick started");
-
-        // Step a: WAL-Intent schreiben
-        if let Err(err) = write_tick_intent_with_clock(&self.collection, self.clock.as_ref()).await
-        {
-            tracing::error!(
-                collection = %self.collection.name(),
-                error = %err,
-                "MaintenanceScheduler: Failed to write tick start WAL intent"
-            );
-        }
-
-        // Step b: F-01 Decay Controller Update / Eviction
+    async fn tick_decay_eviction(&self) {
         if self.config.decay_enabled {
             let decay_controller = AdaptiveDecayController::new(self.config.decay_config.clone());
             match self
@@ -136,7 +122,11 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
                 .await
             {
                 Ok(n) if n > 0 => {
-                    tracing::info!(collection = %self.collection.name(), evicted = n, "MaintenanceScheduler: DecayController evicted chunks");
+                    tracing::info!(
+                        collection = %self.collection.name(),
+                        evicted = n,
+                        "MaintenanceScheduler: DecayController evicted chunks"
+                    );
                 }
                 Ok(_) => {}
                 Err(err) => {
@@ -148,10 +138,9 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
                 }
             }
         }
+    }
 
-        // Step c: F-03 Edge-Reinforcement Flush (edge-reinforcement-learning)
-        // Wendet alle gepufferten Co-Occurrence- und Traversal-Signale aus
-        // dem letzten Scheduler-Takt auf den CSR-Graphen an.
+    fn tick_edge_reinforcement(&self) {
         #[cfg(feature = "edge-reinforcement-learning")]
         if let Some(ref buffer) = self.edge_reinforcement_buffer {
             let graph = self.collection.graph_index();
@@ -161,8 +150,9 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
                 "MaintenanceScheduler: F-03 Edge-Reinforcement Flush abgeschlossen"
             );
         }
+    }
 
-        // Step d: F-06 Perkolation
+    async fn tick_percolation_check(&self) {
         if self.config.percolation_enabled && self.active_agent_sessions() == 0 {
             #[cfg(feature = "graph-connectivity-health")]
             {
@@ -190,17 +180,10 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
                 }
             }
         }
+    }
 
-        // ARCHITEKTUR-ENTSCHEIDUNG (siehe ADR-079 in DECISIONS.md):
-        // F-11 (LyapunovDriftWatcher.update()) ist bewusst NICHT hier im periodischen Tick enthalten.
-        // F-11 ist stattdessen reaktionsschnell & event-driven direkt nach jeder Routing-Entscheidung
-        // in `crates/contextra-router/src/router/` integriert. Eine Auslagerung in diesen 60s-Tick
-        // wäre eine architektonische Regression der Drift-Reaktionszeit.
-
-        // Step f: Consolidation-Trigger
+    async fn tick_background_consolidation(&self) {
         if self.config.background_consolidation_enabled && self.active_agent_sessions() == 0 {
-            // P14-Compliance: Koordination zwischen ConsolidationEngine und MaintenanceScheduler.
-            // Versuche das Konsolidierungs-Lock atomic zu erwerben. Bei Konflikt überspringe diesen Lauf.
             let _guard = match ConsolidationLockGuard::try_acquire(
                 &self.collection.consolidation_in_progress(),
             ) {
@@ -271,8 +254,26 @@ impl<S: StorageEngine + 'static, V: VectorIndex + 'static> MaintenanceScheduler<
                 }
             }
         }
+    }
 
-        // Step g: WAL-Intent als abgeschlossen markieren
+    /// Führt einen einzelnen sequenziellen Maintenance-Tick durch (ADR-079).
+    pub async fn run_tick(&self) {
+        tracing::debug!(collection = %self.collection.name(), "MaintenanceScheduler tick started");
+
+        if let Err(err) = write_tick_intent_with_clock(&self.collection, self.clock.as_ref()).await
+        {
+            tracing::error!(
+                collection = %self.collection.name(),
+                error = %err,
+                "MaintenanceScheduler: Failed to write tick start WAL intent"
+            );
+        }
+
+        self.tick_decay_eviction().await;
+        self.tick_edge_reinforcement();
+        self.tick_percolation_check().await;
+        self.tick_background_consolidation().await;
+
         if let Err(err) =
             complete_tick_intent_with_clock(&self.collection, self.clock.as_ref()).await
         {
@@ -336,6 +337,12 @@ async fn complete_tick_intent_with_clock<S: StorageEngine, V: VectorIndex>(
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first
+)]
 mod tests {
     use super::*;
     use contextra_graph::CsrGraph;
@@ -398,8 +405,12 @@ mod tests {
         let prefix = b"__maintenance_intent:tick".to_vec();
         let entries = col.storage().scan_prefix(&prefix).await.unwrap();
         assert!(!entries.is_empty(), "WAL intent key should exist");
-        let val: serde_json::Value = serde_json::from_slice(&entries[0].1).unwrap();
-        assert_eq!(val["status"], "completed");
+        let entry = entries.get(0).expect("entry expected");
+        let val: serde_json::Value = serde_json::from_slice(&entry.1).unwrap();
+        assert_eq!(
+            val.get("status").and_then(|v| v.as_str()),
+            Some("completed")
+        );
     }
 
     #[tokio::test]
@@ -518,8 +529,15 @@ mod tests {
         let prefix = b"__maintenance_intent:tick".to_vec();
         let entries = col.storage().scan_prefix(&prefix).await.unwrap();
         assert!(!entries.is_empty(), "WAL intent key should exist");
-        let val: serde_json::Value = serde_json::from_slice(&entries[0].1).unwrap();
-        assert_eq!(val["status"], "completed");
-        assert_eq!(val["timestamp_ms"], 1_700_000_000_000u64);
+        let entry = entries.get(0).expect("entry expected");
+        let val: serde_json::Value = serde_json::from_slice(&entry.1).unwrap();
+        assert_eq!(
+            val.get("status").and_then(|v| v.as_str()),
+            Some("completed")
+        );
+        assert_eq!(
+            val.get("timestamp_ms").and_then(|v| v.as_u64()),
+            Some(1_700_000_000_000u64)
+        );
     }
 }

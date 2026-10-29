@@ -1,14 +1,11 @@
 //! Integration tests for `check_stale_tags` `until=YYYY-MM-DD` expiration functionality.
 
-#[path = "../src/check_stale_tags.rs"]
-mod check_stale_tags;
-
-use check_stale_tags::{check_stale_tags_impl, TAG_UNTIL_MANDATORY_CUTOFF_DATE};
 use chrono::{DateTime, Utc};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use tempfile::tempdir;
+use xtask::check_stale_tags::{check_stale_tags_impl, TAG_UNTIL_MANDATORY_CUTOFF_DATE};
 
 fn run_git_env(dir: &Path, args: &[&str], envs: &[(&str, &str)]) {
     let mut cmd = Command::new("git");

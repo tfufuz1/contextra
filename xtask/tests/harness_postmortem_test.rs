@@ -1,7 +1,6 @@
 // xtask/tests/harness_postmortem_test.rs
 
-#[path = "../src/harness/postmortem.rs"]
-mod postmortem;
+use xtask::harness::postmortem;
 
 fn get_repo_root() -> std::path::PathBuf {
     if let Ok(output) = std::process::Command::new("git")

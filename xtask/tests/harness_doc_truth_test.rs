@@ -1,7 +1,6 @@
 // Contextra — Test for Harness doc_truth
 
-#[path = "../src/harness/doc_truth.rs"]
-mod doc_truth;
+use xtask::harness::doc_truth;
 
 use std::fs;
 use std::process::Command;

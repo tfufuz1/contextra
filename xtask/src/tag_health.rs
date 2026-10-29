@@ -164,6 +164,6 @@ pub fn run_tag_health_impl(
 }
 
 pub fn run_tag_health(threshold_days: i64) -> Result<Vec<TagHealthFinding>, String> {
-    let root = xtask::find_root_dir();
+    let root = crate::find_root_dir();
     run_tag_health_impl(&root, threshold_days)
 }

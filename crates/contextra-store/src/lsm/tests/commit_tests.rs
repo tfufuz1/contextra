@@ -1,6 +1,33 @@
 use super::*;
+use contextra_testkit::ManualClock;
 use std::sync::atomic::Ordering;
 use tempfile::TempDir;
+
+#[tokio::test]
+async fn test_clock_port_integration_with_manual_clock() {
+    let tmp = TempDir::new().expect("temp dir");
+    let clock = Arc::new(ManualClock::new(100_000));
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::new(config)
+        .await
+        .expect("create storage")
+        .with_clock(Arc::clone(&clock) as Arc<dyn contextra_ports::Clock>);
+
+    assert_eq!(storage.clock().now_unix_nanos(), 100_000);
+
+    clock.advance(Duration::from_nanos(50_000));
+    assert_eq!(storage.clock().now_unix_nanos(), 150_000);
+
+    let tx = TxId::new(1);
+    storage.put(tx, b"clock_key", b"clock_val").await.unwrap();
+    storage.commit(tx).await.unwrap();
+
+    let val = storage.get(b"clock_key").await.unwrap();
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"clock_val")));
+}
 
 #[tokio::test]
 async fn test_put_get_roundtrip() {

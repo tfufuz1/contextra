@@ -1,5 +1,4 @@
-#[path = "../src/bench_compile.rs"]
-mod bench_compile;
+use xtask::bench_compile;
 
 use std::fs;
 use tempfile::TempDir;

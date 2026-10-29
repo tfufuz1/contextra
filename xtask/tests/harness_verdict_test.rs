@@ -1,5 +1,4 @@
-#[path = "../src/harness/verdict.rs"]
-mod verdict;
+use xtask::harness::verdict;
 
 use std::fs;
 use tempfile::tempdir;

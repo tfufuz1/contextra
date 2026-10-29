@@ -8,10 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-#[path = "../harness/scope_guard.rs"]
-mod scope_guard;
-
-use scope_guard::{
+use crate::harness::scope_guard::{
     scope_guard_find_card_id, scope_guard_matches_glob, scope_guard_resolve_card_path,
     ScopeGuardCard,
 };

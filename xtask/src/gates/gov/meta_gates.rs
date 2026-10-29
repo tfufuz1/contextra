@@ -19,7 +19,7 @@ impl Gate for GateSelftestsGate {
         }
     }
 
-    fn run(&self, ctx: &Context) -> Outcome {
+    fn run(&self, _ctx: &Context) -> Outcome {
         let gates = crate::gates::registered_gates();
         if gates.is_empty() {
             return Outcome::Pass;

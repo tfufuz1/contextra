@@ -1,13 +1,10 @@
 //! Integration test for `shell_commit_audit`
 
-#[path = "../src/shell_commit_audit.rs"]
-mod shell_commit_audit;
-
-use shell_commit_audit::run_shell_commit_audit_impl;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use tempfile::tempdir;
+use xtask::shell_commit_audit::run_shell_commit_audit_impl;
 
 fn run_git(dir: &Path, args: &[&str]) {
     let output = Command::new("git")

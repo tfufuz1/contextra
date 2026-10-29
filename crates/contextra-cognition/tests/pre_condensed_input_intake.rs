@@ -1,3 +1,16 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic,
+    clippy::unnecessary_cast,
+    clippy::disallowed_methods,
+    clippy::approx_constant,
+    clippy::unreachable,
+    clippy::cloned_ref_to_slice_refs
+)]
+
 use contextra_cognition::memory_consolidation::{
     intake_pre_condensed_inputs, PreCondensedInput, MAX_PRE_CONDENSED_DIGEST_LEN,
     MAX_PRE_CONDENSED_LABEL_LEN, MAX_PRE_CONDENSED_PROVENANCE_COUNT,

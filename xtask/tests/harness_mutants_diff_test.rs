@@ -1,5 +1,4 @@
-#[path = "../src/harness/mutants_diff.rs"]
-mod mutants_diff;
+use xtask::harness::mutants_diff;
 
 use std::fs;
 use tempfile::TempDir;

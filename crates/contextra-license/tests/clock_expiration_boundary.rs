@@ -54,21 +54,14 @@ fn test_expiration_exact_boundary_conditions() {
     let local_id = [10u8; 32];
     let expires_at = 1_700_000_000i64;
 
-    let activation = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        local_id,
-        expires_at,
-        &signing_key,
-    );
+    let activation =
+        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, expires_at, &signing_key);
 
     let clock = Arc::new(AdjustableClock::new(1_600_000_000));
 
-    let gate = SignedLicenseGate::from_activation_with_clock(
-        activation,
-        verifying_key,
-        clock.clone(),
-    )
-    .with_local_installation_id(local_id);
+    let gate =
+        SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock.clone())
+            .with_local_installation_id(local_id);
 
     // 1 second before expiration -> Ok(())
     clock.set_secs(expires_at - 1);
@@ -104,12 +97,9 @@ fn test_clock_drift_and_skew_tolerance() {
 
     let clock = Arc::new(AdjustableClock::new(1_900_000_000));
 
-    let gate = SignedLicenseGate::from_activation_with_clock(
-        activation,
-        verifying_key,
-        clock.clone(),
-    )
-    .with_local_installation_id(local_id);
+    let gate =
+        SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock.clone())
+            .with_local_installation_id(local_id);
 
     // Positive clock skew (+300 seconds) still valid if well before expires_at
     clock.set_secs(1_900_000_000 + 300);
@@ -129,21 +119,14 @@ fn test_system_clock_rollback_behavior() {
     let local_id = [30u8; 32];
     let expires_at = 1_800_000_000i64;
 
-    let activation = SignedActivation::create_signed(
-        FeatureRing::Sovereign,
-        local_id,
-        expires_at,
-        &signing_key,
-    );
+    let activation =
+        SignedActivation::create_signed(FeatureRing::Sovereign, local_id, expires_at, &signing_key);
 
     let clock = Arc::new(AdjustableClock::new(1_800_000_005)); // Initially past expiration
 
-    let gate = SignedLicenseGate::from_activation_with_clock(
-        activation,
-        verifying_key,
-        clock.clone(),
-    )
-    .with_local_installation_id(local_id);
+    let gate =
+        SignedLicenseGate::from_activation_with_clock(activation, verifying_key, clock.clone())
+            .with_local_installation_id(local_id);
 
     // Initially expired
     assert_eq!(

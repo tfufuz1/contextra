@@ -1,4 +1,4 @@
-pub fn run_docs_command(cmd: &str, args: &[String]) -> Result<(), String> {
+pub fn run_docs_command(cmd: &str, _args: &[String]) -> Result<(), String> {
     match cmd {
         "sync-docs" => {
             println!("=== Running xtask sync-docs ===");

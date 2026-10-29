@@ -1,7 +1,6 @@
 //! Integration test for gate_weakening harness module.
 
-#[path = "../src/harness/gate_weakening.rs"]
-mod gate_weakening;
+use xtask::harness::gate_weakening;
 
 use std::fs;
 use std::process::Command;
