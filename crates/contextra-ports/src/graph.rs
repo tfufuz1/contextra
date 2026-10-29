@@ -95,6 +95,10 @@ pub enum GraphMutationError {
     #[error("Lock acquisition timed out: {0}")]
     LockAcquisitionTimeout(String),
 
+    /// Duplicate hyperedge ID provided.
+    #[error("Duplicate hyperedge ID: {0}")]
+    DuplicateHyperEdgeId(HyperEdgeId),
+
     /// Provided role binding is invalid.
     #[error("Invalid role binding: {0}")]
     RoleBindingInvalid(String),
@@ -153,6 +157,7 @@ pub trait GraphCollectionMutation: Send + Sync + 'static {
 }
 
 #[cfg(test)]
+#[allow(clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};

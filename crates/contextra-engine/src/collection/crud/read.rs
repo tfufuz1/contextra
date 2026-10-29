@@ -178,45 +178,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             Some(n) => n,
         };
 
-        use std::ops::Bound;
-
-        let start_ns = match start {
-            Bound::Included(b) => Bound::Included(self.namespaced_key(b, 0)),
-            Bound::Excluded(b) => Bound::Excluded(self.namespaced_key(b, 0)),
-            Bound::Unbounded => {
-                if self.name == "default" {
-                    Bound::Unbounded
-                } else {
-                    let mut b = self.prefix.clone();
-                    b.push(0);
-                    Bound::Included(b)
-                }
-            }
-        };
-
-        let end_ns = match end {
-            Bound::Included(b) => Bound::Included(self.namespaced_key(b, 0)),
-            Bound::Excluded(b) => Bound::Excluded(self.namespaced_key(b, 0)),
-            Bound::Unbounded => {
-                if self.name == "default" {
-                    Bound::Unbounded
-                } else {
-                    let mut b = self.prefix.clone();
-                    b.push(1);
-                    Bound::Excluded(b)
-                }
-            }
-        };
+        let (start_ns, end_ns) = self.build_namespaced_scan_bounds(start, end);
 
         let start_bytes = match &start_ns {
-            Bound::Included(v) => Bound::Included(v.as_slice()),
-            Bound::Excluded(v) => Bound::Excluded(v.as_slice()),
-            Bound::Unbounded => Bound::Unbounded,
+            std::ops::Bound::Included(v) => std::ops::Bound::Included(v.as_slice()),
+            std::ops::Bound::Excluded(v) => std::ops::Bound::Excluded(v.as_slice()),
+            std::ops::Bound::Unbounded => std::ops::Bound::Unbounded,
         };
         let end_bytes = match &end_ns {
-            Bound::Included(v) => Bound::Included(v.as_slice()),
-            Bound::Excluded(v) => Bound::Excluded(v.as_slice()),
-            Bound::Unbounded => Bound::Unbounded,
+            std::ops::Bound::Included(v) => std::ops::Bound::Included(v.as_slice()),
+            std::ops::Bound::Excluded(v) => std::ops::Bound::Excluded(v.as_slice()),
+            std::ops::Bound::Unbounded => std::ops::Bound::Unbounded,
         };
 
         let mut results = Vec::new();
@@ -265,6 +237,48 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         Ok(results)
+    }
+
+    /// Helper converting user slice bounds into collection-namespaced byte vector bounds.
+    fn build_namespaced_scan_bounds(
+        &self,
+        start: std::ops::Bound<&[u8]>,
+        end: std::ops::Bound<&[u8]>,
+    ) -> (
+        std::ops::Bound<Vec<u8>>,
+        std::ops::Bound<Vec<u8>>,
+    ) {
+        use std::ops::Bound;
+
+        let start_ns = match start {
+            Bound::Included(b) => Bound::Included(self.namespaced_key(b, 0)),
+            Bound::Excluded(b) => Bound::Excluded(self.namespaced_key(b, 0)),
+            Bound::Unbounded => {
+                if self.name == "default" {
+                    Bound::Unbounded
+                } else {
+                    let mut b = self.prefix.clone();
+                    b.push(0);
+                    Bound::Included(b)
+                }
+            }
+        };
+
+        let end_ns = match end {
+            Bound::Included(b) => Bound::Included(self.namespaced_key(b, 0)),
+            Bound::Excluded(b) => Bound::Excluded(self.namespaced_key(b, 0)),
+            Bound::Unbounded => {
+                if self.name == "default" {
+                    Bound::Unbounded
+                } else {
+                    let mut b = self.prefix.clone();
+                    b.push(1);
+                    Bound::Excluded(b)
+                }
+            }
+        };
+
+        (start_ns, end_ns)
     }
 
     /// Fetches a document by user ID and tracks the read in the active transaction's `ReadSet`.

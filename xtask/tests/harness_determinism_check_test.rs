@@ -1,5 +1,4 @@
-#[path = "../src/harness/determinism_check.rs"]
-mod determinism_check;
+use xtask::harness::determinism_check;
 
 use std::fs;
 use tempfile::TempDir;

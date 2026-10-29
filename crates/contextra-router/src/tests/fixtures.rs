@@ -1,8 +1,39 @@
 use crate::{RouterEngine, SlmProfile};
 use contextra_db::{Collection, ContextManager};
+use contextra_ports::clock::Clock;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{ContextChunk, ContextWindow, EntityId, Result, TokenBudget, TxId};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+
+#[derive(Debug, Default)]
+pub(crate) struct TestClock {
+    pub(crate) nanos: AtomicU64,
+}
+
+impl TestClock {
+    pub(crate) fn new(initial_nanos: u64) -> Self {
+        Self {
+            nanos: AtomicU64::new(initial_nanos),
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn advance(&self, duration: std::time::Duration) {
+        let nanos = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
+        self.nanos.fetch_add(nanos, Ordering::Relaxed);
+    }
+}
+
+impl Clock for TestClock {
+    fn now_unix_nanos(&self) -> u64 {
+        self.nanos.load(Ordering::Relaxed)
+    }
+
+    fn monotonic_nanos(&self) -> u64 {
+        self.nanos.load(Ordering::Relaxed)
+    }
+}
 
 pub(crate) struct MockStorageEngine;
 
@@ -143,6 +174,7 @@ pub(crate) fn create_test_router<S: StorageEngine + 'static>(
         profiles,
         calibration_store_path,
     )
+    .with_clock(Arc::new(TestClock::new(1_000_000_000_000)))
 }
 
 pub(crate) fn try_create_test_router<S: StorageEngine + 'static>(
@@ -152,13 +184,14 @@ pub(crate) fn try_create_test_router<S: StorageEngine + 'static>(
 ) -> Result<RouterEngine> {
     let adapter = Arc::new(CollectionAdapter::new(collection));
     let preparer = Arc::new(TestContextPreparer);
-    RouterEngine::try_new(
+    let router = RouterEngine::try_new(
         adapter.clone(),
         adapter,
         preparer,
         profiles,
         calibration_store_path,
-    )
+    )?;
+    Ok(router.with_clock(Arc::new(TestClock::new(1_000_000_000_000))))
 }
 
 #[derive(Clone)]

@@ -155,6 +155,7 @@ pub trait KvPrefixStore: Send + Sync + 'static {
 }
 
 #[cfg(test)]
+#[allow(clippy::disallowed_types, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use std::collections::HashMap;

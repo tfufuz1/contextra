@@ -1,3 +1,15 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic,
+    clippy::unnecessary_cast,
+    clippy::disallowed_methods,
+    clippy::approx_constant,
+    clippy::unreachable
+)]
+
 use contextra_cognition::aggregation_phase::AggregationConfig;
 use contextra_cognition::consolidation_executor::ConsolidationEngine;
 use contextra_cognition::leanrag_input::build_leanrag_inputs;
@@ -233,7 +245,13 @@ async fn test_opt_in_leanrag_stage_creates_superedge() {
     assert!(res.is_ok(), "run_cycle should succeed with opt-in leanrag");
 
     let graph = col.graph_index();
-    let max_id = graph.max_hyperedge_id();
+    let mut max_id = graph.max_hyperedge_id();
+    let start_time = std::time::Instant::now();
+    while max_id <= 4 && start_time.elapsed() < Duration::from_secs(2) {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        max_id = graph.max_hyperedge_id();
+    }
+
     assert!(
         max_id > 4,
         "Superedge should be created with hyperedge ID > 4"

@@ -1,12 +1,9 @@
-#[path = "../src/generate_markers.rs"]
-mod generate_markers;
-
-use generate_markers::{
+use std::fs;
+use tempfile::tempdir;
+use xtask::generate_markers::{
     load_capabilities_from_file, render_marker_table, run_check_marker_drift, run_generate_markers,
     Capabilities,
 };
-use std::fs;
-use tempfile::tempdir;
 
 #[test]
 fn test_render_marker_table_synthetic_fixture() {

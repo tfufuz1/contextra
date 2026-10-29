@@ -1,6 +1,9 @@
+#![allow(clippy::disallowed_methods, clippy::unwrap_used)]
 //! Build script for `xtask` crate.
 //!
 //! Scans `src/gates/<cluster>/*.rs` and generates module imports and registry dispatch logic.
+
+#![allow(clippy::disallowed_methods)]
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -89,11 +92,11 @@ fn main() {
             .join("src")
             .join("harness")
             .join(format!("{}.rs", stem));
-        let path_str = match harness_path.to_str() {
-            Some(s) => s.replace('\\', "/"),
-            None => continue,
-        };
-        harness_code.push_str(&format!("#[path = \"{}\"]\nmod {};\n\n", path_str, stem));
+        let path_str = harness_path.to_str().unwrap_or_default().replace('\\', "/");
+        harness_code.push_str(&format!(
+            "#[path = \"{}\"]\npub mod {};\n\n",
+            path_str, stem
+        ));
     }
 
     harness_code.push_str("pub fn dispatch(cmd: &str, _args: &[String]) -> Option<i32> {\n");

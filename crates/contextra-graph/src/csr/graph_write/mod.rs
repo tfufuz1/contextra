@@ -224,6 +224,11 @@ impl GraphCollectionMutation for CsrGraph {
                 GraphMutationError::Internal(msg) => {
                     contextra_ports::graph::GraphMutationError::Internal(msg)
                 }
+                GraphMutationError::DuplicateHyperEdgeId(id) => {
+                    contextra_ports::graph::GraphMutationError::DuplicateHyperEdgeId(
+                        contextra_ports::graph::HyperEdgeId::new(id.inner()),
+                    )
+                }
             })?;
 
         Ok(contextra_ports::graph::HyperEdgeId::new(

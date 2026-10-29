@@ -6,6 +6,7 @@ use super::{OutputLimitExceededError, ERRNO_BADF, ERRNO_INVAL, ERRNO_SUCCESS};
 use crate::executor::SandboxState;
 use wasmtime::{Caller, Linker};
 
+#[allow(clippy::indexing_slicing)]
 pub(crate) fn register_fd(linker: &mut Linker<SandboxState>) -> Result<(), anyhow::Error> {
     // fd_read (fd 0 = stdin)
     linker.func_wrap(

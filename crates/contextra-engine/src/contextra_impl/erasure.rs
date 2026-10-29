@@ -6,7 +6,8 @@
 #![forbid(unsafe_code)]
 
 use crate::*;
-use contextra_ports::scanner::{LayerScanner, Purger, ScanTarget, ScanTechnique, WitnessLayer};
+use contextra_crypto::deletion_proof::LayerWitnessExt;
+use contextra_ports::scanner::{LayerScanner, LayerWitness, ScanTarget, ScanTechnique, WitnessLayer};
 use contextra_ports::SystemClock;
 use contextra_types::{CollectionId, ContextraError, RequestContext, Result, SagaRecord, TenantId};
 use serde::{Deserialize, Serialize};
@@ -52,10 +53,37 @@ pub struct ErasureFailure {
     pub reason: String,
 }
 
+/// Schichten, die in `erase_document` und `erase_collection` derzeit NICHT gemessen werden (SPEC §9.4, §9.10).
+pub const UNMEASURED_ERASURE_LAYERS: &[&str] = &[
+    "S1b Blob",
+    "S4 Caches",
+    "S5 Lineage",
+    "S6 Checkpoints",
+    "S7 Schlüsselmaterial",
+    "S9 Graph",
+    "S10 KV-Cache",
+];
+
+/// Erstellt ein [`LayerSummary`] aus einem [`LayerWitness`] unter Verwendung der tatsächlichen Messwerte.
+pub fn summary_from_witness(layer_name: String, witness: &LayerWitness) -> LayerSummary {
+    LayerSummary {
+        layer: layer_name,
+        technique: format!("{:?}", witness.technique()),
+        scanned: witness.scanned(),
+        remaining: witness.remaining(),
+        control_matches: witness.control_matches(),
+    }
+}
+
 /// Comprehensive erasure verification report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErasureReport {
-    /// Whether all layers were verifiably purged with zero residual entries.
+    /// Gibt an, ob alle tatsächlich gemessenen Schichten verifizierbar ohne Restbestände bereinigt wurden.
+    ///
+    /// **Hinweis zur Verifikation (SPEC §9.4, §9.10):**
+    /// Dieser Wert bezieht sich ausschließlich auf die in `erase_document` bzw. `erase_collection`
+    /// tatsächlich gemessenen Schichten (LSM-Memtable, SSTable, WAL, TextIndex, HnswIndex).
+    /// Er enthält **keine** Aussage über derzeit ungemessene Schichten ([`UNMEASURED_ERASURE_LAYERS`]).
     pub verified: bool,
     /// Cryptographic DeletionProof issued iff verified == true.
     pub proof: Option<DeletionProof>,
@@ -208,6 +236,15 @@ impl Contextra {
             let lsm_scanners = contextra_store::scanner::lsm_scanners(&storage_arc);
 
             let mut all_scanners: Vec<(String, Arc<dyn LayerScanner>, ScanTechnique)> = Vec::new();
+            for scanner in lsm_scanners {
+                let tech = match scanner.layer() {
+                    WitnessLayer::LsmMemtable => ScanTechnique::IndexIntrospection,
+                    WitnessLayer::SsTableAllLevels => ScanTechnique::Structural,
+                    WitnessLayer::WalAllSegments => ScanTechnique::DecryptedView,
+                    _ => ScanTechnique::Structural,
+                };
+                all_scanners.push((scanner.layer().as_str().to_string(), scanner, tech));
+            }
             all_scanners.push((
                 "TextIndex".to_string(),
                 text_scanner,
@@ -218,15 +255,6 @@ impl Contextra {
                 hnsw_scanner,
                 ScanTechnique::IndexIntrospection,
             ));
-            for scanner in lsm_scanners {
-                let tech = match scanner.layer() {
-                    WitnessLayer::LsmMemtable => ScanTechnique::IndexIntrospection,
-                    WitnessLayer::SsTableAllLevels => ScanTechnique::Structural,
-                    WitnessLayer::WalAllSegments => ScanTechnique::DecryptedView,
-                    _ => ScanTechnique::Structural,
-                };
-                all_scanners.push((scanner.layer().as_str().to_string(), scanner, tech));
-            }
 
             let mut witnesses = Vec::new();
             let mut summaries = Vec::new();
@@ -236,13 +264,7 @@ impl Contextra {
                 match scanner.scan(&ctx_clone, target_clone.clone(), technique.clone(), &clock) {
                     Ok(witness) => {
                         let remaining = witness.remaining();
-                        summaries.push(LayerSummary {
-                            layer: name.clone(),
-                            technique: format!("{:?}", witness.technique()),
-                            scanned: witness.scanned(),
-                            remaining,
-                            control_matches: witness.scanned().min(1),
-                        });
+                        summaries.push(summary_from_witness(name.clone(), &witness));
 
                         if remaining > 0 && first_failure.is_none() {
                             first_failure = Some(ErasureFailure {
@@ -466,6 +488,15 @@ impl Contextra {
             let lsm_scanners = contextra_store::scanner::lsm_scanners(&storage_arc);
 
             let mut all_scanners: Vec<(String, Arc<dyn LayerScanner>, ScanTechnique)> = Vec::new();
+            for scanner in lsm_scanners {
+                let tech = match scanner.layer() {
+                    WitnessLayer::LsmMemtable => ScanTechnique::IndexIntrospection,
+                    WitnessLayer::SsTableAllLevels => ScanTechnique::Structural,
+                    WitnessLayer::WalAllSegments => ScanTechnique::DecryptedView,
+                    _ => ScanTechnique::Structural,
+                };
+                all_scanners.push((scanner.layer().as_str().to_string(), scanner, tech));
+            }
             all_scanners.push((
                 "TextIndex".to_string(),
                 text_scanner,
@@ -476,15 +507,6 @@ impl Contextra {
                 hnsw_scanner,
                 ScanTechnique::IndexIntrospection,
             ));
-            for scanner in lsm_scanners {
-                let tech = match scanner.layer() {
-                    WitnessLayer::LsmMemtable => ScanTechnique::IndexIntrospection,
-                    WitnessLayer::SsTableAllLevels => ScanTechnique::Structural,
-                    WitnessLayer::WalAllSegments => ScanTechnique::DecryptedView,
-                    _ => ScanTechnique::Structural,
-                };
-                all_scanners.push((scanner.layer().as_str().to_string(), scanner, tech));
-            }
 
             let mut witnesses = Vec::new();
             let mut summaries = Vec::new();
@@ -494,13 +516,7 @@ impl Contextra {
                 match scanner.scan(&ctx_clone, target_clone.clone(), technique, &clock) {
                     Ok(witness) => {
                         let remaining = witness.remaining();
-                        summaries.push(LayerSummary {
-                            layer: layer_name.clone(),
-                            technique: format!("{:?}", witness.technique()),
-                            scanned: witness.scanned(),
-                            remaining,
-                            control_matches: witness.scanned().min(1),
-                        });
+                        summaries.push(summary_from_witness(layer_name.clone(), &witness));
 
                         if remaining > 0 && first_failure.is_none() {
                             first_failure = Some(ErasureFailure {

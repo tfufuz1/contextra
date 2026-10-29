@@ -1,17 +1,8 @@
 //! Tests for workspace_verify module.
 
-#[path = "../src/feature_matrix.rs"]
-mod feature_matrix;
-#[path = "../src/panic_inventory.rs"]
-mod panic_inventory;
-#[path = "../src/security_scan.rs"]
-mod security_scan;
-#[path = "../src/workspace_verify.rs"]
-mod workspace_verify;
-
 use std::fs;
 use tempfile::tempdir;
-use workspace_verify::{
+use xtask::workspace_verify::{
     get_bottom_up_crate_order_from_metadata, run_workspace_verify_in_root, VerifyMode,
     WorkspaceVerifyConfig,
 };

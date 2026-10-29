@@ -14,6 +14,9 @@ Dieses Verzeichnis enthält alle Architecture Decision Records (ADRs) des Contex
 |---|---|---|---|---|
 | ADR-0001 | Gemessene Löschung: Scanner-Vertrag v1 | Accepted | 2026-10-12 | `contextra-store`, `contextra-engine` |
 | ADR-0002 | Contextra Ingest Adapter Crate | Accepted | 2026-10-24 | `contextra-ingest` |
+| ADR-0006 | Release-Regel: Verschlüsselung ab dem ersten Schreibvorgang | Proposed — benötigt Maintainer-Freigabe | 2026-10-29 | `contextra-crypto`, `contextra-store`, `contextra-engine` |
+| ADR-0007 | Betroffenen-Erkennung: Contextra erkennt Personen in Freitext nicht | Proposed — benötigt Maintainer-Freigabe | 2026-10-29 | `contextra-engine`, `contextra-crypto`, `contextra-privacy` |
+| ADR-0008 | Zweckbindung und Rechtsgrundlage für ErasedSet, Referenz-Hashes und Berichte | Proposed — benötigt Maintainer-Freigabe | 2026-10-29 | `contextra-crypto`, `contextra-engine`, `contextra-avv-generator` |
 | ADR-0077 | HNSW-Löschung per Tombstone + Slot-Nullung (VETO-F02) | Proposed — benötigt Maintainer-Freigabe | 2026-10-29 | `contextra-vector`, `capabilities.toml` |
 | ADR-0098 | Determinismus-Ausnahmen für Kryptoschlüssel & Salt | Proposed — benötigt Maintainer-Freigabe | 2026-10-29 | `contextra-store`, `contextra-crypto` |
 | ADR-0099 | VETO-OP03: Kein Echtzeit-Audio/STT-Streaming im Kern | Proposed — benötigt Maintainer-Freigabe | 2026-10-29 | `contextra-core`, `contextra-engine` |

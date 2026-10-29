@@ -1,3 +1,15 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::get_first,
+    clippy::panic,
+    clippy::unnecessary_cast,
+    clippy::disallowed_methods,
+    clippy::approx_constant,
+    clippy::unreachable
+)]
+
 use contextra_cognition::aggregation_phase::{
     run_aggregation_pass, AggregationConfig, AggregationEdge, AggregationNode, SuperEdgeDraft,
     SuperEdgeSink,
@@ -85,8 +97,8 @@ fn test_context_compactor_seed_determinism() {
     let rng2 = Arc::new(SeededRng::new(12345));
 
     let compactor1 =
-        ContextCompactor::new(budget.clone(), CompactionStrategy::Truncate).with_rng(rng1);
-    let compactor2 = ContextCompactor::new(budget, CompactionStrategy::Truncate).with_rng(rng2);
+        ContextCompactor::new_with_rng(budget.clone(), CompactionStrategy::Truncate, rng1);
+    let compactor2 = ContextCompactor::new_with_rng(budget, CompactionStrategy::Truncate, rng2);
 
     let chunks = vec![
         ContextChunk {

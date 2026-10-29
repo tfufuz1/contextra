@@ -1,69 +1,127 @@
 // FILE-CONTEXT
-// ZWECK: Contextra Database Strangler Shell / Re-export Facade (Layer 3).
-// INVARIANTEN: Backward compatibility for all public types; re-exports from contextra-engine and contextra-cognition.
+// ZWECK: Contextra Database Facade & Integration Hub (Ring 3).
+// INVARIANTEN: Abwärtskompatibilität für bestehende Pfade via prelude/advanced; Forbid unsafe code.
 
 #![forbid(unsafe_code)]
 
-pub use contextra_cognition as cognition;
-pub use contextra_engine as engine;
+//! # Contextra DB — Facade & Integrationstest-Hub
+//!
+//! `contextra-db` bildet die benutzerfreundliche Hauptfassade (Ring 3) für Anwendungen,
+//! welche die Contextra-Datenbankbibliothek als eingebettete Engine nutzen.
+//!
+//! ## Architekturübersicht: Welche Schicht gehört wozu?
+//!
+//! Contextra ist als geschichteter Baukasten (Layered Toolkit) konzipiert:
+//!
+//! - **Ring 0 — Fundament & Hardware-Isolation (`contextra-store`, `contextra-sys`, `contextra-wire`)**:
+//!   Verwaltet LSM-Storage, WAL, Speicher-Locks, Zero-Copy-IPC sowie direkte I/O- und Durabilitätssicherungen.
+//! - **Ring 1 — Fachspezifische Indizes (`contextra-vector`, `contextra-text`, `contextra-graph`, `contextra-crypto`)**:
+//!   Implementiert Vektorsuche (HNSW), BM25-Textsuche, Graph-CSR-Strukturen und DSGVO-Art.-17-Löschbeweise.
+//! - **Ring 2 — Adaption & Kognitive Orchestrierung (`contextra-engine`, `contextra-adapt`, `contextra-cognition`)**:
+//!   Kombiniert Multi-Signal-Fusion (RRF), dynamische Schwellenwert-Anpassung, Memory Consolidation,
+//!   Turn-Segmentierung und Schlafzyklen-Synthese.
+//! - **Ring 3 — Fassade & Haupt-API (`contextra-db`)**:
+//!   Bündelt alle Subsysteme in eine konsistente, typ- und mandanten-sichere API ([`Contextra`], [`Collection`]).
+//!
+//! ## API-Strukturierung: `prelude` vs. `advanced`
+//!
+//! - **[`prelude`]**: Die empfohlene, stabile Kern-API für reguläre Datenbankoperationen (Einfügen, Suchen, Löschen, Multi-Step).
+//! - **[`advanced`]**: Erweiterte Steuerungselemente und fortgeschrittene Subsystem-Schnittstellen aus `adapt`, `cognition` und `graph`.
 
-// Re-exports from contextra-engine
-#[allow(deprecated)]
-pub use contextra_engine::MetadataFilter;
-pub use contextra_engine::{
-    background_workers, chunker, collection, export, filter, import, temporal_filter, transaction,
-};
-pub use contextra_engine::{
-    CommunityDetectionConfig, Contextra, ContextraConfig, ContextraStats, DbStats, Document,
-    EmbeddingBackend, ExportCollectionV1, ExportDocumentV1, ExportMemoryV1, ExportRelationV1,
-    HybridQueryBuilder, ImportSummary, Language, ProvenanceRecord, SearchResult, SearchStrategy,
-    SignalContribution, SignalWeights, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
-};
+/// Stabile Kern-API für den alltäglichen Einsatz.
+pub mod prelude {
+    pub use contextra_engine::collection::{self, Collection, CollectionConfig};
+    pub use contextra_engine::{
+        Contextra, ContextraConfig, ContextraStats, DbStats, Document, EmbeddingBackend,
+        HybridQueryBuilder, Language, ProvenanceRecord, SearchResult, SearchStrategy,
+        SignalContribution, SignalWeights,
+    };
+    pub use contextra_types::{DistanceMetric, DocId, RequestContext, TenantId, TxId};
 
-#[cfg(feature = "graph-connectivity-health")]
-pub use contextra_engine::collection::maintenance::PercolationResult;
-#[cfg(feature = "sandbox")]
-pub use contextra_engine::SandboxBridge;
+    pub use crate::multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
 
-// Re-exports from contextra-cognition
-#[allow(deprecated)]
-pub use contextra_cognition::execute_sleep_cycle;
-pub use contextra_cognition::{
-    cleanup_orphaned_consolidation_intents, compact_segment_via_context_compactor,
-    compute_community_hash, detect_near_duplicates, execute_background_consolidation,
-    execute_consolidation_pass, group_turns_into_segments, run_consolidation_pass,
-    run_synthesis_pass, CommunityStabilityTracker, CompactedContext, CompactionStrategy,
-    ConsolidationConfig, ConsolidationEngine, ConsolidationNodesGuard, ConsolidationPhaseResult,
-    ConsolidationSession, ContextCompactor, ContextManager, MaintenanceConfig,
-    MaintenanceScheduler, MetaChunk, SpatialFence, StatusToken, SynthesisConfig,
-    SynthesisPhaseResult, TurnSegment,
-};
+    #[cfg(feature = "volatile-vault")]
+    pub use crate::volatile_vault::{
+        CommitReceipt, PurgeReceipt, SignalModality, VaultChunk, VaultChunkMetadata, VaultConfig,
+        VaultError, VolatileContextVault,
+    };
+}
 
+/// Erweiterte Experten-Schnittstellen aus Adaption, Kognition und Graph-Maintenance.
+pub mod advanced {
+    pub use crate::decay_controller::{
+        AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs,
+    };
+    pub use crate::homeostat::RerankDeadline;
+    #[allow(deprecated)]
+    pub use crate::homeostat::RerankPidController;
+    pub use crate::pid_latency_controller::{
+        LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS, MAX_SCALING_FACTOR,
+        MIN_SCALING_FACTOR,
+    };
+
+    pub use contextra_cognition as cognition;
+    pub use contextra_cognition::{
+        cleanup_orphaned_consolidation_intents, compact_segment_via_context_compactor,
+        compute_community_hash, detect_near_duplicates, execute_background_consolidation,
+        execute_consolidation_pass, group_turns_into_segments, run_consolidation_pass,
+        run_synthesis_pass, CommunityStabilityTracker, CompactedContext, CompactionStrategy,
+        ConsolidationConfig, ConsolidationEngine, ConsolidationNodesGuard,
+        ConsolidationPhaseResult, ConsolidationSession, ContextCompactor, ContextManager,
+        MaintenanceConfig, MaintenanceScheduler, MetaChunk, SpatialFence, StatusToken,
+        SynthesisConfig, SynthesisPhaseResult, TurnSegment,
+    };
+    pub use contextra_engine as engine;
+    pub use contextra_engine::{
+        background_workers, chunker, export, filter, import, temporal_filter, transaction,
+        CommunityDetectionConfig, ExportCollectionV1, ExportDocumentV1, ExportMemoryV1,
+        ExportRelationV1, ImportSummary, MAX_SCAN_RESULTS, SCHEMA_VERSION_V1,
+    };
+
+    #[cfg(feature = "graph-connectivity-health")]
+    pub use contextra_engine::collection::maintenance::PercolationResult;
+    #[cfg(feature = "sandbox")]
+    pub use contextra_engine::SandboxBridge;
+}
+
+// Abwärtskompatible Re-Exports auf Root-Ebene (bestehender Code kompiliert nahtlos weiter)
+pub use advanced::*;
+pub use prelude::*;
+
+/// Kontext-Verwaltung und Konversationshistorie.
 pub mod context {
     pub use contextra_cognition::context::*;
 }
+/// Kontext-Kompaktierung und Chunk-Zusammenfassung.
 pub mod context_compaction {
     pub use contextra_cognition::context_compaction::*;
 }
+/// Speicher-Konsolidierung und Wissens-Synthese.
 pub mod memory_consolidation {
     pub use contextra_cognition::memory_consolidation::*;
 }
+/// Synthese-Phase für konsolidierte Wissenssegmente.
 pub mod synthesis_phase {
     pub use contextra_cognition::synthesis_phase::*;
 }
+/// Ausführung von Konsolidierungs-Passes.
 pub mod consolidation_executor {
     pub use contextra_cognition::consolidation_executor::*;
 }
+/// Locks und Synchronisation für Konsolidierung.
 pub mod consolidation_locks {
     pub use contextra_cognition::consolidation_locks::*;
 }
+/// Scheduler für periodische Hintergrundwartung.
 pub mod maintenance_scheduler {
     pub use contextra_cognition::maintenance_scheduler::*;
 }
+/// Konfiguration für Wartungszyklen.
 pub mod maintenance_config {
     pub use contextra_cognition::maintenance_config::*;
 }
 
+/// Veraltetes Reaper-Modul.
 #[deprecated(note = "use background_workers instead")]
 pub mod reaper {
     pub use contextra_engine::background_workers::*;
@@ -73,12 +131,16 @@ pub mod reaper {
 pub use contextra_cognition::start_consolidation_reaper;
 
 // mod Collection is used via pub mod collection
+/// Adaptiver Decay-Controller für zeitliche Relevanz-Abwertung.
 pub mod decay_controller {
     pub use contextra_adapt::decay_controller::*;
 }
 pub use contextra_engine::fusion;
+/// Homeostat-Modul für PID-Kandidatenpool-Regulierung.
 pub mod homeostat;
+/// Iteratives Multi-Step Retrieval mit Query Rewriting.
 pub mod multistep;
+/// PID-Regler zur Einhaltung von Latenzbudgets.
 pub mod pid_latency_controller {
     pub use contextra_adapt::pid_latency_controller::*;
 }

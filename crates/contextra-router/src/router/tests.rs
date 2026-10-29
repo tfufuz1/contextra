@@ -2,7 +2,14 @@
 // ZWECK: Unit-Tests für RouterEngine.
 // INVARIANTEN: Instanz-Unabhängigkeit von DecisionIdGeneratoren, Kalibrierungs-Resets.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation,
+    clippy::disallowed_methods,
+    clippy::disallowed_types
+)]
 
 use super::*;
 use contextra_types::TokenBudget;
@@ -74,12 +81,12 @@ async fn test_calibration_stats_initial_state(
         crate::tests::tests::create_test_router(collection, vec![profile1, profile2], None);
     let stats = router.calibration_stats();
     assert_eq!(stats.len(), 2);
-    assert_eq!(stats["p1"].times_selected, 0);
-    assert_eq!(stats["p1"].calibrated_min_score, 0.5);
-    assert_eq!(stats["p1"].original_min_score, 0.5);
-    assert_eq!(stats["p2"].times_selected, 0);
-    assert_eq!(stats["p2"].calibrated_min_score, 0.8);
-    assert_eq!(stats["p2"].original_min_score, 0.8);
+    assert_eq!(stats.get("p1").map(|s| s.times_selected), Some(0));
+    assert_eq!(stats.get("p1").map(|s| s.calibrated_min_score), Some(0.5));
+    assert_eq!(stats.get("p1").map(|s| s.original_min_score), Some(0.5));
+    assert_eq!(stats.get("p2").map(|s| s.times_selected), Some(0));
+    assert_eq!(stats.get("p2").map(|s| s.calibrated_min_score), Some(0.8));
+    assert_eq!(stats.get("p2").map(|s| s.original_min_score), Some(0.8));
     Ok(())
 }
 
@@ -123,10 +130,10 @@ async fn test_reset_calibration_per_profile() -> std::result::Result<(), Box<dyn
         }
         router.state.store(Arc::new(new_state));
     }
-    assert_eq!(router.calibration_stats()["p1"].times_selected, 5);
+    assert_eq!(router.calibration_stats().get("p1").map(|s| s.times_selected), Some(5));
 
     router.reset_calibration("p1");
-    assert_eq!(router.calibration_stats()["p1"].times_selected, 0);
+    assert_eq!(router.calibration_stats().get("p1").map(|s| s.times_selected), Some(0));
     Ok(())
 }
 
@@ -154,7 +161,10 @@ fn test_pending_bandit_eviction_unit() {
         );
 
         let router = crate::tests::tests::create_test_router(collection, vec![profile], None);
-        let old_time = Instant::now() - Duration::from_secs(400);
+        let old_time_nanos = router
+            .clock
+            .monotonic_nanos()
+            .saturating_sub(400_000_000_000);
 
         {
             let mut map = router.pending_bandit.write();
@@ -166,7 +176,7 @@ fn test_pending_bandit_eviction_unit() {
                         profile_name: "p1".to_string(),
                         action_idx: 0,
                         propensity: 0.5,
-                        created: old_time,
+                        created_nanos: old_time_nanos,
                     },
                 );
             }
