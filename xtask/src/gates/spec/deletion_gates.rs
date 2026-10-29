@@ -68,7 +68,8 @@ impl Gate for WitnessMintGate {
         }
         if scan_witness_mint(root) != Outcome::Pass {
             return Outcome::Fail {
-                reason: "Selftest failed: scan_witness_mint rejected legal LayerWitness in scanner".to_string(),
+                reason: "Selftest failed: scan_witness_mint rejected legal LayerWitness in scanner"
+                    .to_string(),
             };
         }
 
@@ -675,7 +676,8 @@ impl Gate for ScannerCoverageGate {
 
         if scan_scanner_coverage(root) != Outcome::Pass {
             return Outcome::Fail {
-                reason: "Selftest failed: scan_scanner_coverage rejected complete scanner coverage".to_string(),
+                reason: "Selftest failed: scan_scanner_coverage rejected complete scanner coverage"
+                    .to_string(),
             };
         }
 
@@ -684,7 +686,10 @@ impl Gate for ScannerCoverageGate {
             impl LayerScanner for MemtableScanner { fn witness_layer(&self) -> WitnessLayer { WitnessLayer::LsmMemtable } }
             impl LayerScanner for SstableScanner { fn witness_layer(&self) -> WitnessLayer { WitnessLayer::SsTableAllLevels } }
         "#;
-        if let Err(e) = fs::write(root.join("crates/contextra-store/src/scanner/mod.rs"), incomplete_code) {
+        if let Err(e) = fs::write(
+            root.join("crates/contextra-store/src/scanner/mod.rs"),
+            incomplete_code,
+        ) {
             return Outcome::Fail {
                 reason: format!("Failed to write incomplete fixture in selftest: {e}"),
             };
@@ -870,7 +875,11 @@ mod tests {
         let incomplete = r#"
             impl LayerScanner for MemtableScanner { fn witness_layer(&self) -> WitnessLayer { WitnessLayer::LsmMemtable } }
         "#;
-        fs::write(root.join("crates/contextra-store/src/scanner/mod.rs"), incomplete).unwrap();
+        fs::write(
+            root.join("crates/contextra-store/src/scanner/mod.rs"),
+            incomplete,
+        )
+        .unwrap();
 
         match scan_scanner_coverage(root) {
             Outcome::Fail { reason } => assert!(reason.contains("SsTableAllLevels")),

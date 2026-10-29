@@ -187,7 +187,11 @@ impl TermCursor {
         let blocks = self.posting_list.blocks();
         let mut block_idx = self.cursor / BLOCK_SIZE;
 
-        while block_idx < blocks.len() && blocks[block_idx].max_doc_id < target_doc_id {
+        while block_idx < blocks.len()
+            && blocks
+                .get(block_idx)
+                .map_or(false, |b| b.max_doc_id < target_doc_id)
+        {
             block_idx += 1;
         }
 
@@ -200,10 +204,11 @@ impl TermCursor {
         self.cursor = new_cursor_start.max(self.cursor);
 
         // Binary search within current block / remaining postings
-        let slice = &postings[self.cursor..];
-        match slice.binary_search_by_key(&target_doc_id, |p| p.doc_id) {
-            Ok(offset) => self.cursor += offset,
-            Err(offset) => self.cursor += offset,
+        if let Some(slice) = postings.get(self.cursor..) {
+            match slice.binary_search_by_key(&target_doc_id, |p| p.doc_id) {
+                Ok(offset) => self.cursor += offset,
+                Err(offset) => self.cursor += offset,
+            }
         }
     }
 }
@@ -216,6 +221,7 @@ pub struct WandSearchResult {
 }
 
 /// Executes Block-Max WAND traversal over resident posting lists.
+// ADR-0015: Block-Max WAND query search signature requires storage, index, and query parameters.
 #[allow(clippy::too_many_arguments)]
 pub async fn block_max_wand_search<S: StorageEngine>(
     storage: &S,
@@ -243,7 +249,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
     };
 
     let is_latest = max_seq.is_none() || max_seq == Some(u64::MAX);
-    let total_docs_u32 = (total_docs as u32).max(1);
+    let total_docs_u32 = u32::try_from(total_docs).unwrap_or(u32::MAX).max(1);
 
     let mut doc_len_cache: HashMap<DocId, Option<u32>> = HashMap::new();
     let mut tbs_cache: HashMap<Vec<u8>, bool> = HashMap::new();
@@ -269,11 +275,15 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 // Construct batch posting list key by replacing "pl:" with "plb:" and stripping trailing ":"
                 let mut batch_key = Vec::with_capacity(prefix.len() + 1);
                 if let Some(pos) = prefix.windows(3).position(|w| w == b"pl:") {
-                    batch_key.extend_from_slice(&prefix[..pos]);
+                    if let Some(prefix_sub) = prefix.get(..pos) {
+                        batch_key.extend_from_slice(prefix_sub);
+                    }
                     batch_key.extend_from_slice(b"plb:");
-                    let remaining = &prefix[pos + 3..];
+                    let remaining = prefix.get(pos.saturating_add(3)..).unwrap_or(&[]);
                     if remaining.ends_with(b":") {
-                        batch_key.extend_from_slice(&remaining[..remaining.len() - 1]);
+                        if let Some(rem_sub) = remaining.get(..remaining.len().saturating_sub(1)) {
+                            batch_key.extend_from_slice(rem_sub);
+                        }
                     } else {
                         batch_key.extend_from_slice(remaining);
                     }
@@ -293,7 +303,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                         let raw_entries = storage.scan_prefix_at(&prefix, u64::MAX).await?;
                         let mut postings = Vec::with_capacity(raw_entries.len());
                         for (key, val_bytes) in raw_entries {
-                            let suffix_bytes = &key[prefix.len()..];
+                            let suffix_bytes = key.get(prefix.len()..).unwrap_or(&[]);
                             if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
                                 #[cfg(not(feature = "docid-128"))]
                                 let parsed_doc_id = suffix.parse::<u64>().ok();
@@ -303,13 +313,18 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if val_bytes.len() == 4 {
                                         let doc_id = DocId::new(doc_id_raw);
-                                        let tf = u32::from_le_bytes(
-                                            (&val_bytes[..4]).try_into().map_err(|_| {
+                                        let tf_bytes = val_bytes.get(..4).ok_or_else(|| {
+                                            ContextraError::Storage(
+                                                "Invalid val_bytes length".into(),
+                                            )
+                                        })?;
+                                        let tf = u32::from_le_bytes(tf_bytes.try_into().map_err(
+                                            |_| {
                                                 ContextraError::Storage(
                                                     "Invalid posting tf length".into(),
                                                 )
-                                            })?,
-                                        );
+                                            },
+                                        )?);
                                         let dl_key = doc_len_key_helper(doc_id.inner().into());
                                         let doc_len = match storage.get(&dl_key).await? {
                                             Some(dl_bytes) if dl_bytes.len() == 4 => {
@@ -348,21 +363,23 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 if let Ok(key_str) = std::str::from_utf8(tbs_key) {
                     if key_str.ends_with(&term_suffix) {
                         // Extract doc_id from tombstone key: {prefix}tbs:{doc_id}:{term}
-                        let suffix = &tbs_key[tbs_global_prefix.len()..];
+                        let suffix = tbs_key.get(tbs_global_prefix.len()..).unwrap_or(&[]);
                         if let Some(colon_pos) = suffix.iter().position(|&b| b == b':') {
-                            if let Ok(doc_id_str) = std::str::from_utf8(&suffix[..colon_pos]) {
-                                #[cfg(not(feature = "docid-128"))]
-                                let parsed_doc_id = doc_id_str.parse::<u64>().ok();
-                                #[cfg(feature = "docid-128")]
-                                let parsed_doc_id = doc_id_str.parse::<u128>().ok();
+                            if let Some(doc_bytes) = suffix.get(..colon_pos) {
+                                if let Ok(doc_id_str) = std::str::from_utf8(doc_bytes) {
+                                    #[cfg(not(feature = "docid-128"))]
+                                    let parsed_doc_id = doc_id_str.parse::<u64>().ok();
+                                    #[cfg(feature = "docid-128")]
+                                    let parsed_doc_id = doc_id_str.parse::<u128>().ok();
 
-                                if let Some(doc_id_raw) = parsed_doc_id {
-                                    if list
-                                        .as_slice()
-                                        .binary_search_by_key(&doc_id_raw, |p| p.doc_id)
-                                        .is_ok()
-                                    {
-                                        term_tbs_count += 1;
+                                    if let Some(doc_id_raw) = parsed_doc_id {
+                                        if list
+                                            .as_slice()
+                                            .binary_search_by_key(&doc_id_raw, |p| p.doc_id)
+                                            .is_ok()
+                                        {
+                                            term_tbs_count += 1;
+                                        }
                                     }
                                 }
                             }
@@ -371,7 +388,9 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                 }
             }
 
-            let effective_df = (list.len() as u32).saturating_sub(term_tbs_count);
+            let effective_df = u32::try_from(list.len())
+                .unwrap_or(u32::MAX)
+                .saturating_sub(term_tbs_count);
 
             if effective_df > 0 {
                 cursors.push(TermCursor::new(

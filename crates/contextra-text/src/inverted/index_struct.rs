@@ -66,7 +66,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         };
 
         let tokenizer: Arc<dyn Tokenizer> = match language {
-            Language::German => Arc::new(GermanMorphTokenizer::new()),
+            Language::German => Arc::new(GermanMorphTokenizer::try_new().unwrap_or_default()),
             Language::English | Language::Custom => Arc::new(DefaultTokenizer),
         };
 

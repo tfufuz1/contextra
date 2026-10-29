@@ -65,30 +65,7 @@ fn block_on_async<F: std::future::Future + Send + 'static>(f: F) -> F::Output
 where
     F::Output: Send + 'static,
 {
-    match tokio::runtime::Handle::try_current() {
-        Ok(handle) => {
-            if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
-                tokio::task::block_in_place(|| handle.block_on(f))
-            } else {
-                std::thread::spawn(move || {
-                    let rt = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()
-                        .expect("Failed to build temporary Tokio runtime");
-                    rt.block_on(f)
-                })
-                .join()
-                .expect("Thread panicked while executing block_on_async")
-            }
-        }
-        Err(_) => {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("Failed to build temporary Tokio runtime");
-            rt.block_on(f)
-        }
-    }
+    futures::executor::block_on(f)
 }
 
 /// Scanner implementation for `WitnessLayer::TextIndex`.

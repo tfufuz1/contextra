@@ -78,7 +78,10 @@ pub fn scan_determinism(root: &Path) -> Outcome {
                 }
                 Err(e) => {
                     return Outcome::Error {
-                        message: format!("Failed to parse governance/determinism-allow.toml: {}", e),
+                        message: format!(
+                            "Failed to parse governance/determinism-allow.toml: {}",
+                            e
+                        ),
                     };
                 }
             },
@@ -113,11 +116,26 @@ pub fn scan_determinism(root: &Path) -> Outcome {
     ];
 
     let forbidden_patterns = [
-        ("SystemTime::now", "SystemTime::now() calls non-deterministic clock source"),
-        ("Instant::now", "Instant::now() calls non-deterministic clock source"),
-        ("thread_rng", "rand::thread_rng() uses unseeded thread-local random generator"),
-        ("rand::random", "rand::random() uses unseeded random generation"),
-        ("Uuid::new_v4", "Uuid::new_v4() generates random UUIDs breaking determinism"),
+        (
+            "SystemTime::now",
+            "SystemTime::now() calls non-deterministic clock source",
+        ),
+        (
+            "Instant::now",
+            "Instant::now() calls non-deterministic clock source",
+        ),
+        (
+            "thread_rng",
+            "rand::thread_rng() uses unseeded thread-local random generator",
+        ),
+        (
+            "rand::random",
+            "rand::random() uses unseeded random generation",
+        ),
+        (
+            "Uuid::new_v4",
+            "Uuid::new_v4() generates random UUIDs breaking determinism",
+        ),
     ];
 
     for crate_name in &ring01_crates {
@@ -126,10 +144,7 @@ pub fn scan_determinism(root: &Path) -> Outcome {
             continue;
         }
 
-        for entry in WalkDir::new(&crate_path)
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
+        for entry in WalkDir::new(&crate_path).into_iter().filter_map(|e| e.ok()) {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -229,10 +244,7 @@ pub fn scan_panic_surface(root: &Path) -> Outcome {
 
     let crates_dir = root.join("crates");
     if crates_dir.exists() {
-        for entry in WalkDir::new(&crates_dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
+        for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -310,7 +322,8 @@ impl Gate for CodeLintsGate {
             from_phase: "PH0".to_string(),
             kind: "builtin".to_string(),
             enforces: vec!["INV-IO-1".to_string(), "INV-FAILCLOSED-1".to_string()],
-            why: "Prüft Code-Richtlinien bezüglich I/O und Fail-Closed über Clippy-/rustc-Ausgabe.".to_string(),
+            why: "Prüft Code-Richtlinien bezüglich I/O und Fail-Closed über Clippy-/rustc-Ausgabe."
+                .to_string(),
             owner: "MP-05".to_string(),
             cmd: None,
             toolchain: None,
@@ -338,10 +351,7 @@ pub fn scan_code_lints(root: &Path) -> Outcome {
 
     let crates_dir = root.join("crates");
     if crates_dir.exists() {
-        for entry in WalkDir::new(&crates_dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
+        for entry in WalkDir::new(&crates_dir).into_iter().filter_map(|e| e.ok()) {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -416,7 +426,11 @@ mod tests {
         let root = temp.path();
 
         fs::create_dir_all(root.join("crates/contextra-vector/src")).unwrap();
-        fs::write(root.join("crates/contextra-vector/src/lib.rs"), "pub fn ok() {}").unwrap();
+        fs::write(
+            root.join("crates/contextra-vector/src/lib.rs"),
+            "pub fn ok() {}",
+        )
+        .unwrap();
 
         assert_eq!(scan_determinism(root), Outcome::Pass);
 

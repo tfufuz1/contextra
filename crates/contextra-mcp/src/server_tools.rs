@@ -81,7 +81,6 @@ impl McpServer {
                     .await
                     .map_err(McpError::from)?;
 
-
                 let mut enriched_results = Vec::with_capacity(results.len());
                 for res in results {
                     let mut val = serde_json::to_value(&res).map_err(|e| {

@@ -20,8 +20,9 @@ static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>>
 
 /// Compiles a protected regex pattern, returning a `ContextraError` on failure (fail-closed, E-1.1).
 pub fn compile_protected_regex(pattern: &str) -> Result<Regex> {
-    Regex::new(pattern)
-        .map_err(|e| ContextraError::Text(format!("Invalid protected regex pattern '{pattern}': {e}")))
+    Regex::new(pattern).map_err(|e| {
+        ContextraError::Text(format!("Invalid protected regex pattern '{pattern}': {e}"))
+    })
 }
 
 /// Retrieves the cached default protected regex for URLs and emails, or returns a `ContextraError` if initialization fails.
@@ -124,6 +125,31 @@ pub trait Tokenizer: Send + Sync {
 /// Default tokenizer using Unicode word boundaries and generic stopwords.
 pub struct DefaultTokenizer;
 
+impl DefaultTokenizer {
+    /// Constructs a `DefaultTokenizer`, validating configuration and protected regex initialization.
+    pub fn try_new() -> Result<Self> {
+        let _ = get_stopwords();
+        let _ = get_protected_regex()?;
+        Ok(Self)
+    }
+
+    /// Constructs a `DefaultTokenizer`.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use DefaultTokenizer::try_new() instead for fallible initialization"
+    )]
+    pub fn new() -> Self {
+        Self::try_new().unwrap_or(Self)
+    }
+}
+
+impl Default for DefaultTokenizer {
+    fn default() -> Self {
+        #[allow(deprecated)]
+        Self::new()
+    }
+}
+
 impl Tokenizer for DefaultTokenizer {
     fn tokenize(&self, text: &str) -> Vec<String> {
         let stopwords = get_stopwords();
@@ -155,15 +181,29 @@ pub struct GermanMorphTokenizer {
 }
 
 impl GermanMorphTokenizer {
-    pub fn new() -> Self {
-        Self {
+    /// Fallibly creates a new `GermanMorphTokenizer`.
+    pub fn try_new() -> Result<Self> {
+        let _ = get_protected_regex()?;
+        Ok(Self {
             splitter: get_shared_splitter(),
-        }
+        })
+    }
+
+    /// Creates a new `GermanMorphTokenizer` using default shared splitter.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use GermanMorphTokenizer::try_new() instead for fallible initialization"
+    )]
+    pub fn new() -> Self {
+        Self::try_new().unwrap_or_else(|_| Self {
+            splitter: get_shared_splitter(),
+        })
     }
 }
 
 impl Default for GermanMorphTokenizer {
     fn default() -> Self {
+        #[allow(deprecated)]
         Self::new()
     }
 }
@@ -297,9 +337,18 @@ mod tests {
     }
 
     #[test]
+    fn test_try_new_constructors_succeed() {
+        assert!(DefaultTokenizer::try_new().is_ok());
+        assert!(GermanMorphTokenizer::try_new().is_ok());
+    }
+
+    #[test]
     fn test_get_protected_regex_success() {
         let res = get_protected_regex();
-        assert!(res.is_ok(), "Default protected regex must compile successfully");
+        assert!(
+            res.is_ok(),
+            "Default protected regex must compile successfully"
+        );
     }
 
     #[test]
