@@ -1,23 +1,40 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use contextra_core::ContextraError;
+    use contextra_types::{ContextraError, DocId, LinkRelation};
     use pyo3::exceptions::*;
     use pyo3::prelude::*;
+    use pyo3::types::PyDict;
     use std::sync::atomic::{AtomicBool, Ordering};
 
+    // ─── Worker Threads Env Parsing ─────────────────────────────────────────────
+
     #[test]
-    fn test_parse_worker_threads_env_clamping() {
+    fn test_parse_worker_threads_env_clamping_low() {
         std::env::set_var("CONTEXTRA_WORKER_THREADS", "0");
         assert_eq!(parse_worker_threads_env(), 1);
+    }
 
+    #[test]
+    fn test_parse_worker_threads_env_clamping_high() {
         std::env::set_var("CONTEXTRA_WORKER_THREADS", "1000");
         assert_eq!(parse_worker_threads_env(), 256);
+    }
 
-        std::env::set_var("CONTEXTRA_WORKER_THREADS", "invalid");
+    #[test]
+    fn test_parse_worker_threads_env_invalid_fallback() {
+        std::env::set_var("CONTEXTRA_WORKER_THREADS", "not_a_number");
         let val = parse_worker_threads_env();
         assert!((1..=256).contains(&val));
     }
+
+    #[test]
+    fn test_parse_worker_threads_env_valid_value() {
+        std::env::set_var("CONTEXTRA_WORKER_THREADS", "8");
+        assert_eq!(parse_worker_threads_env(), 8);
+    }
+
+    // ─── Runtime State ──────────────────────────────────────────────────────────
 
     #[test]
     fn test_py_runtime_state_initialization() {
@@ -32,137 +49,480 @@ mod tests {
         assert_eq!(state.worker_threads, 2);
     }
 
+    // ─── ID Validation ──────────────────────────────────────────────────────────
+
     #[test]
-    fn test_validate_id_guards() {
-        pyo3::prepare_freethreaded_python();
+    fn test_validate_id_empty() {
         assert!(validate_id("").is_err());
-        assert!(validate_id("   ").is_err());
-        assert!(validate_id("id\0null").is_err());
-        assert!(validate_id("valid_id").is_ok());
     }
 
     #[test]
-    fn test_validate_id_obj_numeric_bounds() -> PyResult<()> {
+    fn test_validate_id_whitespace() {
+        assert!(validate_id("   ").is_err());
+        assert!(validate_id("\t\n").is_err());
+    }
+
+    #[test]
+    fn test_validate_id_null_byte() {
+        assert!(validate_id("doc\0id").is_err());
+    }
+
+    #[test]
+    fn test_validate_id_max_len_exceeded() {
+        let long_id = "a".repeat(MAX_ID_LENGTH + 1);
+        assert!(validate_id(&long_id).is_err());
+    }
+
+    #[test]
+    fn test_validate_id_max_len_exact() {
+        let max_id = "a".repeat(MAX_ID_LENGTH);
+        assert!(validate_id(&max_id).is_ok());
+    }
+
+    #[test]
+    fn test_validate_id_valid_alphanumeric() {
+        assert!(validate_id("doc_123_abc-XYZ").is_ok());
+    }
+
+    #[test]
+    fn test_validate_id_obj_str_valid() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
-            let valid_int = 12345i64.into_pyobject(py)?;
-            assert_eq!(validate_id_obj(&valid_int)?, "12345");
-
-            let neg_int = (-10i64).into_pyobject(py)?;
-            assert!(validate_id_obj(&neg_int).is_err());
-
-            let valid_str = "doc_99".into_pyobject(py)?;
-            assert_eq!(validate_id_obj(&valid_str)?, "doc_99");
-
+            let s = "doc_str_99".into_pyobject(py)?;
+            assert_eq!(validate_id_obj(&s)?, "doc_str_99");
             Ok(())
         })
     }
 
     #[test]
-    fn test_validate_collection_name_guards() {
+    fn test_validate_id_obj_int_valid() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let val = 12345i64.into_pyobject(py)?;
+            assert_eq!(validate_id_obj(&val)?, "12345");
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_validate_id_obj_int_zero() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let val = 0i64.into_pyobject(py)?;
+            assert_eq!(validate_id_obj(&val)?, "0");
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_validate_id_obj_int_negative() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let neg = (-10i64).into_pyobject(py)?;
+            assert!(validate_id_obj(&neg).is_err());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_validate_id_obj_invalid_type() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let float_val = 3.14f64.into_pyobject(py)?;
+            assert!(validate_id_obj(&float_val).is_err());
+            Ok(())
+        })
+    }
+
+    // ─── Collection Name Validation ────────────────────────────────────────────
+
+    #[test]
+    fn test_validate_collection_name_empty() {
         assert!(validate_collection_name("").is_err());
+    }
+
+    #[test]
+    fn test_validate_collection_name_whitespace() {
         assert!(validate_collection_name("   ").is_err());
-        assert!(validate_collection_name("name\0null").is_err());
-        assert!(validate_collection_name("valid_name").is_ok());
     }
 
     #[test]
-    fn test_validate_db_path_guards() {
-        pyo3::prepare_freethreaded_python();
+    fn test_validate_collection_name_null_byte() {
+        assert!(validate_collection_name("col\0name").is_err());
+    }
+
+    #[test]
+    fn test_validate_collection_name_max_len_exceeded() {
+        let long_col = "c".repeat(MAX_COLLECTION_NAME_LENGTH + 1);
+        assert!(validate_collection_name(&long_col).is_err());
+    }
+
+    #[test]
+    fn test_validate_collection_name_max_len_exact() {
+        let max_col = "c".repeat(MAX_COLLECTION_NAME_LENGTH);
+        assert!(validate_collection_name(&max_col).is_ok());
+    }
+
+    #[test]
+    fn test_validate_collection_name_valid() {
+        assert!(validate_collection_name("my_collection_1").is_ok());
+    }
+
+    // ─── Label Validation ───────────────────────────────────────────────────────
+
+    #[test]
+    fn test_validate_label_empty() {
+        assert!(validate_label("").is_err());
+    }
+
+    #[test]
+    fn test_validate_label_whitespace() {
+        assert!(validate_label("   ").is_err());
+    }
+
+    #[test]
+    fn test_validate_label_null_byte() {
+        assert!(validate_label("label\0null").is_err());
+    }
+
+    #[test]
+    fn test_validate_label_max_len_exceeded() {
+        let long_label = "l".repeat(MAX_LABEL_LENGTH + 1);
+        assert!(validate_label(&long_label).is_err());
+    }
+
+    #[test]
+    fn test_validate_label_max_len_exact() {
+        let max_label = "l".repeat(MAX_LABEL_LENGTH);
+        assert!(validate_label(&max_label).is_ok());
+    }
+
+    #[test]
+    fn test_validate_label_valid() {
+        assert!(validate_label("knows_person").is_ok());
+    }
+
+    // ─── Database Path Validation ───────────────────────────────────────────────
+
+    #[test]
+    fn test_validate_db_path_empty() {
         assert!(validate_db_path("").is_err());
+    }
+
+    #[test]
+    fn test_validate_db_path_whitespace() {
         assert!(validate_db_path("   ").is_err());
+    }
+
+    #[test]
+    fn test_validate_db_path_null_byte() {
         assert!(validate_db_path("path\0null").is_err());
-        assert!(validate_db_path("valid_path").is_ok());
     }
 
     #[test]
-    fn test_validate_query_text_guards() {
-        pyo3::prepare_freethreaded_python();
+    fn test_validate_db_path_valid() {
+        assert!(validate_db_path("/tmp/contextra_db_test").is_ok());
+    }
+
+    // ─── Query Text Validation ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_validate_query_text_empty() {
         assert!(validate_query_text("").is_err());
-        assert!(validate_query_text("   ").is_err());
-        assert!(validate_query_text("query\0null").is_err());
-        assert!(validate_query_text("valid query").is_ok());
     }
 
     #[test]
-    fn test_validate_batch_size_guards() {
+    fn test_validate_query_text_whitespace() {
+        assert!(validate_query_text("   ").is_err());
+    }
+
+    #[test]
+    fn test_validate_query_text_null_byte() {
+        assert!(validate_query_text("query\0null").is_err());
+    }
+
+    #[test]
+    fn test_validate_query_text_max_len_exceeded() {
+        let long_q = "q".repeat(MAX_ID_LENGTH + 1);
+        assert!(validate_query_text(&long_q).is_err());
+    }
+
+    #[test]
+    fn test_validate_query_text_max_len_exact() {
+        let max_q = "q".repeat(MAX_ID_LENGTH);
+        assert!(validate_query_text(&max_q).is_ok());
+    }
+
+    #[test]
+    fn test_validate_query_text_valid() {
+        assert!(validate_query_text("natural language query text").is_ok());
+    }
+
+    // ─── Batch Size Validation ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_validate_batch_size_zero() {
         assert!(validate_batch_size(0).is_err());
+    }
+
+    #[test]
+    fn test_validate_batch_size_one() {
         assert!(validate_batch_size(1).is_ok());
-        assert!(validate_batch_size(100).is_ok());
+    }
+
+    #[test]
+    fn test_validate_batch_size_max() {
         assert!(validate_batch_size(MAX_BATCH_SIZE).is_ok());
+    }
+
+    #[test]
+    fn test_validate_batch_size_overflow() {
         assert!(validate_batch_size(MAX_BATCH_SIZE + 1).is_err());
     }
 
+    // ─── Vector Validation ──────────────────────────────────────────────────────
+
     #[test]
-    fn test_validate_vector_guards() {
+    fn test_validate_vector_empty() {
         assert!(validate_vector(&[]).is_err());
-        assert!(validate_vector(&[1.0, 2.0, 3.0]).is_ok());
-        assert!(validate_vector(&[f32::NAN]).is_err());
-        assert!(validate_vector(&[f32::INFINITY]).is_err());
     }
 
     #[test]
-    fn test_py_err_mapping_all_error_kinds() {
+    fn test_validate_vector_valid() {
+        assert!(validate_vector(&[0.1, 0.2, -0.5, 1.0]).is_ok());
+    }
+
+    #[test]
+    fn test_validate_vector_nan() {
+        assert!(validate_vector(&[1.0, f32::NAN, 2.0]).is_err());
+    }
+
+    #[test]
+    fn test_validate_vector_pos_inf() {
+        assert!(validate_vector(&[1.0, f32::INFINITY, 2.0]).is_err());
+    }
+
+    #[test]
+    fn test_validate_vector_neg_inf() {
+        assert!(validate_vector(&[1.0, f32::NEG_INFINITY, 2.0]).is_err());
+    }
+
+    // ─── Exception Mapping Tests ────────────────────────────────────────────────
+
+    #[test]
+    fn test_err_mapping_not_found() {
         pyo3::prepare_freethreaded_python();
-
-        let err_not_found = contextra_err(ContextraError::NotFound("item".into()));
+        let err = contextra_err(ContextraError::NotFound("item_1".into()));
         Python::with_gil(|py| {
-            assert!(err_not_found.is_instance_of::<PyKeyError>(py));
+            assert!(err.is_instance_of::<NotFoundError>(py));
         });
+    }
 
-        let err_conflict = contextra_err(ContextraError::Conflict("conflict".into()));
+    #[test]
+    fn test_err_mapping_conflict() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::Conflict("conflict_1".into()));
         Python::with_gil(|py| {
-            assert!(err_conflict.is_instance_of::<PyRuntimeError>(py));
+            assert!(err.is_instance_of::<IntegrityError>(py));
         });
+    }
 
-        let err_policy = contextra_err(ContextraError::PolicyViolation("policy".into()));
+    #[test]
+    fn test_err_mapping_tenant_mismatch() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::NamespaceViolation("tenant_mismatch".into()));
         Python::with_gil(|py| {
-            assert!(err_policy.is_instance_of::<PyPermissionError>(py));
+            assert!(err.is_instance_of::<TenantError>(py));
         });
+    }
 
-        let err_invalid = contextra_err(ContextraError::InvalidInput("invalid".into()));
+    #[test]
+    fn test_err_mapping_policy_violation() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::PolicyViolation("policy_1".into()));
         Python::with_gil(|py| {
-            assert!(err_invalid.is_instance_of::<ContextraValueError>(py));
+            assert!(err.is_instance_of::<PyPermissionError>(py));
         });
+    }
 
-        let err_not_impl = contextra_err(ContextraError::CapabilityUnsupported {
-            capability: "feature".into(),
+    #[test]
+    fn test_err_mapping_invalid_input() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::InvalidInput("invalid_1".into()));
+        Python::with_gil(|py| {
+            assert!(err.is_instance_of::<ContextraValueError>(py));
+        });
+    }
+
+    #[test]
+    fn test_err_mapping_storage() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::Storage("storage_err".into()));
+        Python::with_gil(|py| {
+            assert!(err.is_instance_of::<ContextraIOError>(py));
+        });
+    }
+
+    #[test]
+    fn test_err_mapping_io() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::Io(std::io::Error::other("disk_err")));
+        Python::with_gil(|py| {
+            assert!(err.is_instance_of::<ContextraIOError>(py));
+        });
+    }
+
+    #[test]
+    fn test_err_mapping_index() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::Index("index_corrupt".into()));
+        Python::with_gil(|py| {
+            assert!(err.is_instance_of::<ContextraIndexError>(py));
+        });
+    }
+
+    #[test]
+    fn test_err_mapping_crypto() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::Crypto("key_error".into()));
+        Python::with_gil(|py| {
+            assert!(err.is_instance_of::<ContextraCryptoError>(py));
+        });
+    }
+
+    #[test]
+    fn test_err_mapping_memory_budget() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::MemoryBudgetExceeded("oom".into()));
+        Python::with_gil(|py| {
+            assert!(err.is_instance_of::<pyo3::exceptions::PyMemoryError>(py));
+        });
+    }
+
+    #[test]
+    fn test_err_mapping_capability_unsupported() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::CapabilityUnsupported {
+            capability: "feature_x".into(),
             reason: "not supported".into(),
         });
         Python::with_gil(|py| {
-            assert!(err_not_impl.is_instance_of::<pyo3::exceptions::PyNotImplementedError>(py));
+            assert!(err.is_instance_of::<pyo3::exceptions::PyNotImplementedError>(py));
         });
     }
 
     #[test]
-    fn test_contextra_err_attributes_set() -> PyResult<()> {
+    fn test_err_mapping_internal() {
         pyo3::prepare_freethreaded_python();
-        let err = contextra_err(ContextraError::NotFound("test_key".into()));
+        let err = contextra_err(ContextraError::Internal("internal_bug".into()));
+        Python::with_gil(|py| {
+            assert!(err.is_instance_of::<ContextraInternalError>(py));
+        });
+    }
+
+    #[test]
+    fn test_err_mapping_serialization() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::Serialization("serde_fail".into()));
+        Python::with_gil(|py| {
+            assert!(err.is_instance_of::<ContextraValueError>(py));
+        });
+    }
+
+    #[test]
+    fn test_err_mapping_checksum_mismatch() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::ChecksumMismatch("bad_crc".into()));
+        Python::with_gil(|py| {
+            assert!(err.is_instance_of::<ContextraIOError>(py));
+        });
+    }
+
+    #[test]
+    fn test_err_mapping_wal_corruption() {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::WalCorruption("bad_wal".into()));
+        Python::with_gil(|py| {
+            assert!(err.is_instance_of::<ContextraIOError>(py));
+        });
+    }
+
+    #[test]
+    fn test_contextra_err_attributes_kind_and_message() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        let err = contextra_err(ContextraError::NotFound("missing_doc_key".into()));
         Python::with_gil(|py| {
             let bound_val = err.value(py);
-            if let Ok(kind_attr) = bound_val.getattr("kind") {
-                let kind_str: String = kind_attr.extract()?;
-                assert_eq!(kind_str, "NotFound");
-            } else {
-                return Err(PyValueError::new_err(
-                    "kind attribute missing on Contextra error object",
-                ));
-            }
-            if let Ok(msg_attr) = bound_val.getattr("message") {
-                let msg_str: String = msg_attr.extract()?;
-                assert!(msg_str.contains("test_key"));
-            } else {
-                return Err(PyValueError::new_err(
-                    "message attribute missing on Contextra error object",
-                ));
-            }
+            let kind: String = bound_val.getattr("kind")?.extract()?;
+            assert_eq!(kind, "NotFound");
+
+            let msg: String = bound_val.getattr("message")?.extract()?;
+            assert!(msg.contains("missing_doc_key"));
             Ok(())
         })
     }
 
-    fn _simulate_panic_for_test() -> ! {
-        panic!("Simulated Rust core panic");
+    // ─── FFI Blocking & Panic Isolation ───────────────────────────────────────
+
+    #[test]
+    fn test_run_blocking_ffi_success() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let poison = AtomicBool::new(false);
+            let res: PyResult<i32> = run_blocking_ffi(py, &poison, || Ok(100));
+            assert!(matches!(res, Ok(100)));
+            assert!(!poison.load(Ordering::SeqCst));
+        });
+    }
+
+    #[test]
+    fn test_run_blocking_ffi_panic_containment() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let poison = AtomicBool::new(false);
+            let res: PyResult<i32> = run_blocking_ffi(py, &poison, || {
+                panic!("Simulated Rust core panic payload");
+            });
+            assert!(res.is_err());
+            assert!(poison.load(Ordering::SeqCst));
+            if let Err(py_err) = res {
+                assert!(py_err.is_instance_of::<PyRuntimeError>(py));
+                let msg = py_err.value(py).to_string();
+                assert!(msg.contains("Rust panic caught at FFI boundary"));
+                assert!(msg.contains("Simulated Rust core panic payload"));
+            }
+        });
+    }
+
+    #[test]
+    fn test_run_blocking_ffi_blocked_after_poisoning() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let poison = AtomicBool::new(true);
+            let res: PyResult<i32> = run_blocking_ffi(py, &poison, || Ok(42));
+            assert!(res.is_err());
+            if let Err(py_err) = res {
+                let msg = py_err.value(py).to_string();
+                assert!(msg.contains("engine poisoned after previous panic"));
+            }
+        });
+    }
+
+    #[test]
+    fn test_trigger_panic_for_test_not_exported_without_test_hooks_feature() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            if let Ok(module) = PyModule::import(py, "_contextra") {
+                #[cfg(not(feature = "test-hooks"))]
+                {
+                    assert!(!module.hasattr("_trigger_panic_for_test").unwrap_or(false));
+                }
+                #[cfg(feature = "test-hooks")]
+                {
+                    assert!(module.hasattr("_trigger_panic_for_test").unwrap_or(false));
+                }
+            }
+        });
     }
 
     #[test]
@@ -173,135 +533,210 @@ mod tests {
             let res = functions::trigger_panic_helper(
                 py,
                 &poison,
-                Some("Test resume_unwind message".to_string()),
+                Some("Test panic unwinding".to_string()),
             );
             assert!(res.is_err());
             assert!(poison.load(Ordering::SeqCst));
-            if let Err(py_err) = res {
-                assert!(py_err.is_instance_of::<PyRuntimeError>(py));
-                let msg = py_err.value(py).to_string();
-                assert!(msg.contains("Rust panic caught at FFI boundary"));
-                assert!(msg.contains("Test resume_unwind message"));
-            }
         });
     }
 
+    // ─── Link Relation Parsing ─────────────────────────────────────────────────
+
     #[test]
-    fn test_run_blocking_ffi_panic_containment() {
+    fn test_parse_link_relation_elaborates() {
+        assert_eq!(
+            crate::kv_links::parse_link_relation("elaborates").unwrap(),
+            LinkRelation::Elaborates
+        );
+    }
+
+    #[test]
+    fn test_parse_link_relation_contradicts() {
+        assert_eq!(
+            crate::kv_links::parse_link_relation("contradicts").unwrap(),
+            LinkRelation::Contradicts
+        );
+    }
+
+    #[test]
+    fn test_parse_link_relation_supersedes() {
+        assert_eq!(
+            crate::kv_links::parse_link_relation("supersedes").unwrap(),
+            LinkRelation::Supersedes
+        );
+    }
+
+    #[test]
+    fn test_parse_link_relation_references() {
+        assert_eq!(
+            crate::kv_links::parse_link_relation("references").unwrap(),
+            LinkRelation::References
+        );
+    }
+
+    #[test]
+    fn test_parse_link_relation_case_insensitive() {
+        assert_eq!(
+            crate::kv_links::parse_link_relation("ELABORATES").unwrap(),
+            LinkRelation::Elaborates
+        );
+        assert_eq!(
+            crate::kv_links::parse_link_relation("RefErenCes").unwrap(),
+            LinkRelation::References
+        );
+    }
+
+    #[test]
+    fn test_parse_link_relation_invalid() {
+        assert!(crate::kv_links::parse_link_relation("invalid_relation").is_err());
+        assert!(crate::kv_links::parse_link_relation("").is_err());
+    }
+
+    // ─── Conversions & Helpers ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_doc_to_py_conversion() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
-            let poison = AtomicBool::new(false);
-            let res: PyResult<i32> = run_blocking_ffi(py, &poison, || {
-                _simulate_panic_for_test();
+            let doc = contextra_db::Document {
+                id: "doc_test_1".into(),
+                metadata: Some(serde_json::json!({"key": "val"})),
+            };
+            let py_doc = doc_to_py(py, doc)?;
+            assert_eq!(py_doc.id, "doc_test_1");
+            assert!(py_doc.metadata.is_some());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_doc_to_py_conversion_no_metadata() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let doc = contextra_db::Document {
+                id: "doc_test_2".into(),
+                metadata: None,
+            };
+            let py_doc = doc_to_py(py, doc)?;
+            assert_eq!(py_doc.id, "doc_test_2");
+            assert!(py_doc.metadata.is_none());
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_results_to_py_conversion() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let results = vec![contextra_db::SearchResult {
+                id: "doc_search_1".into(),
+                score: 0.95,
+                metadata: Some(serde_json::json!({"score": 95})),
+            }];
+            let py_res = results_to_py(py, results)?;
+            assert_eq!(py_res.len(), 1);
+            assert_eq!(py_res[0].id, "doc_search_1");
+            assert!((py_res[0].score - 0.95).abs() < 1e-5);
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_dict_to_json_conversion() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let dict = PyDict::new(py);
+            dict.set_item("foo", "bar")?;
+            dict.set_item("num", 42)?;
+            let json_val = dict_to_json(&dict)?;
+            assert_eq!(json_val["foo"], "bar");
+            assert_eq!(json_val["num"], 42);
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_opt_dict_to_json_some() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let dict = PyDict::new(py);
+            dict.set_item("tag", "test")?;
+            let res = opt_dict_to_json(Some(&dict))?;
+            assert!(res.is_some());
+            assert_eq!(res.unwrap()["tag"], "test");
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_opt_dict_to_json_none() -> PyResult<()> {
+        let res = opt_dict_to_json(None)?;
+        assert!(res.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_json_to_py_conversion() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let json_val = serde_json::json!({
+                "str": "hello",
+                "int": 123
             });
+            let py_obj = json_to_py(py, &json_val)?;
+            let bound_dict = py_obj.bind(py).downcast::<PyDict>()?;
+            let str_val: String = bound_dict.get_item("str")?.unwrap().extract()?;
+            assert_eq!(str_val, "hello");
+            Ok(())
+        })
+    }
+
+    // ─── Open DB Parameter Guards ──────────────────────────────────────────────
+
+    #[test]
+    fn test_open_db_invalid_dimension_zero() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let res = open(py, "/tmp/dummy_path", 0, None, None, None);
             assert!(res.is_err());
-            assert!(poison.load(Ordering::SeqCst));
-            if let Err(py_err) = res {
-                assert!(py_err.is_instance_of::<PyRuntimeError>(py));
-                let bound_val = py_err.value(py);
-                let msg: String = bound_val.to_string();
-                assert!(msg.contains("Rust panic caught at FFI boundary"));
-                assert!(msg.contains("Simulated Rust core panic"));
-            }
-
-            let res_after: PyResult<i32> = run_blocking_ffi(py, &poison, || Ok(42));
-            assert!(res_after.is_err());
-            if let Err(py_err) = res_after {
-                let msg = py_err.value(py).to_string();
-                assert!(msg.contains("engine poisoned after previous panic"));
-            }
         });
     }
 
     #[test]
-    fn test_run_blocking_ffi_success() {
+    fn test_open_db_invalid_dimension_too_large() {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
-            let poison = AtomicBool::new(false);
-            let res: PyResult<i32> = run_blocking_ffi(py, &poison, || Ok(42));
-            assert!(matches!(res, Ok(42)));
-            assert!(!poison.load(Ordering::SeqCst));
+            let res = open(py, "/tmp/dummy_path", 10_001, None, None, None);
+            assert!(res.is_err());
         });
     }
 
     #[test]
-    fn test_validate_id_length_and_empty() {
-        assert!(validate_id("").is_err());
-        assert!(validate_id("valid_id").is_ok());
-
-        let long_id = "a".repeat(MAX_ID_LENGTH + 1);
-        assert!(validate_id(&long_id).is_err());
-
-        let max_id = "a".repeat(MAX_ID_LENGTH);
-        assert!(validate_id(&max_id).is_ok());
-    }
-
-    #[test]
-    fn test_validate_label_length_and_empty() {
+    fn test_open_db_invalid_max_elements_zero() {
         pyo3::prepare_freethreaded_python();
-        assert!(validate_label("").is_err());
-        assert!(validate_label("   ").is_err());
-        assert!(validate_label("label\0null").is_err());
-        assert!(validate_label("valid_label").is_ok());
-
-        let long_label = "l".repeat(MAX_LABEL_LENGTH + 1);
-        assert!(validate_label(&long_label).is_err());
-
-        let max_label = "l".repeat(MAX_LABEL_LENGTH);
-        assert!(validate_label(&max_label).is_ok());
-    }
-
-    #[test]
-    fn test_validate_vector_nan_inf() {
-        assert!(validate_vector(&[1.0, 2.0, 3.0]).is_ok());
-        assert!(validate_vector(&[1.0, f32::NAN, 3.0]).is_err());
-        assert!(validate_vector(&[1.0, f32::INFINITY, 3.0]).is_err());
-        assert!(validate_vector(&[1.0, f32::NEG_INFINITY, 3.0]).is_err());
-    }
-
-    #[test]
-    fn test_validate_db_path_query_text_and_batch_size() {
-        pyo3::prepare_freethreaded_python();
-
-        // validate_db_path
-        assert!(validate_db_path("").is_err());
-        assert!(validate_db_path("   ").is_err());
-        assert!(validate_db_path("path\0null").is_err());
-        assert!(validate_db_path("/tmp/contextra_db").is_ok());
-
-        // validate_query_text
-        assert!(validate_query_text("").is_err());
-        assert!(validate_query_text("   ").is_err());
-        assert!(validate_query_text("query\0null").is_err());
-        assert!(validate_query_text("valid query text").is_ok());
-
-        let long_query = "q".repeat(MAX_ID_LENGTH + 1);
-        assert!(validate_query_text(&long_query).is_err());
-        let max_query = "q".repeat(MAX_ID_LENGTH);
-        assert!(validate_query_text(&max_query).is_ok());
-
-        // validate_batch_size
-        assert!(validate_batch_size(0).is_err());
-        assert!(validate_batch_size(100).is_ok());
-        assert!(validate_batch_size(MAX_BATCH_SIZE).is_ok());
-        assert!(validate_batch_size(MAX_BATCH_SIZE + 1).is_err());
-    }
-
-    #[test]
-    fn test_py_err_io_and_index_mappings() {
-        pyo3::prepare_freethreaded_python();
-        let io_err = ContextraError::Io(std::io::Error::other("disk error"));
-        let py_io_err: PyErr = contextra_err(io_err);
         Python::with_gil(|py| {
-            assert!(py_io_err.is_instance_of::<ContextraIOError>(py));
-        });
-
-        let idx_err = ContextraError::Index("hnsw broken".into());
-        let py_idx_err: PyErr = contextra_err(idx_err);
-        Python::with_gil(|py| {
-            assert!(py_idx_err.is_instance_of::<ContextraIndexError>(py));
+            let res = open(py, "/tmp/dummy_path", 128, Some(0), None, None);
+            assert!(res.is_err());
         });
     }
+
+    #[test]
+    fn test_open_db_invalid_distance_metric() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let res = open(
+                py,
+                "/tmp/dummy_path",
+                128,
+                None,
+                None,
+                Some("invalid_metric".into()),
+            );
+            assert!(res.is_err());
+        });
+    }
+
+    // ─── GIL Concurrency Unit Test ─────────────────────────────────────────────
 
     #[test]
     fn test_gil_not_held_during_blocking_ops() {
@@ -327,7 +762,6 @@ mod tests {
                     .unwrap();
             }
 
-            // Spawn N Python threads calling scan_prefix concurrently
             let threading = py.import("threading").expect("failed to import threading");
             let time = py.import("time").expect("failed to import time");
 

@@ -16,7 +16,7 @@ ring = "4"
 [lib]
 name = "_contextra"
 crate-type = ["cdylib", "rlib"]
-test = false
+test = true
 doctest = false
 
 [dependencies]
@@ -31,11 +31,10 @@ tokio = { workspace = true }
 # RECHTFERTIGUNG: Als High-Level Python-Bridge (Layer 3) benötigt contextra-py Zugriff
 # auf die orchestrating Facade in contextra-db sowie Routing- und Kalibrierungskomponenten. Dies ist eine beabsichtigte Ausnahme
 # vom Sovereign Core DAG, da Bindings per Definition an der Grenze zum Nutzer stehen.
-contextra-router = { workspace = true }
 contextra-rank = { workspace = true }
 contextra-adapt = { workspace = true }
 parking_lot = { workspace = true }
-contextra-core = { workspace = true }
+contextra-wire = { workspace = true }
 contextra-store = { workspace = true }
 contextra-db = { workspace = true }
 flatbuffers = { workspace = true }
@@ -45,3 +44,4 @@ pythonize = "0.24"
 [features]
 default = []
 docid-128 = ["contextra-types/docid-128"]
+test-hooks = []
