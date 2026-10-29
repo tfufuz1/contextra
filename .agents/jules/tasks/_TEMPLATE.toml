@@ -2,16 +2,18 @@
 # ID Format: T-YYYY-NNNN
 id        = "T-2026-0001"
 title     = "Kurzer, prägnanter Titel der Aufgabe"
-crate     = "contextra-core"
+crate     = "contextra-types"
+wp        = "WP-0.0"      # e.g. WP-0.4a
+spec_refs = ["§0.2"]      # Normative SPEC Abschnitte
 tier      = 1            # 1, 2, 3 (muss zu prompter-tiers.toml passen)
 risk      = "none"       # sec | crash | simd | utf8 | fusion | concurrency | calib | none
 goal      = "Präzise Beschreibung des angestrebten Zielzustands"
 non_goals = ["Was explizit nicht getan werden soll", "Kein Refactoring fremder Module"]
-scope     = ["crates/contextra-core/src/**"]
-forbidden = ["xtask/**", ".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+scope     = ["crates/contextra-types/src/**"]
+forbidden = ["xtask/**", ".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".agents/jules/setup/**"]
 invariants = ["Zero-Panic", "Single Error Root"]
 acceptance = [
-  "cargo test -p contextra-core",
+  "cargo test -p contextra-types",
   "just check"
 ]
 evidence_required = ["Neuer Test, der die Funktionalität absichert"]

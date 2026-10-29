@@ -34,3 +34,28 @@ required = false
 name = "cargo-deny"
 version_cmd = ["cargo", "deny", "--version"]
 required = false
+
+[[tool]]
+name = "cargo-audit"
+version_cmd = ["cargo", "audit", "--version"]
+required = false
+
+[[tool]]
+name = "cargo-public-api"
+version_cmd = ["cargo", "public-api", "--version"]
+required = false
+
+[[tool]]
+name = "cargo-mutants"
+version_cmd = ["cargo", "mutants", "--version"]
+required = false
+
+[[tool]]
+name = "cargo-semver-checks"
+version_cmd = ["cargo", "semver-checks", "--version"]
+required = false
+
+[[tool]]
+name = "cargo-fuzz"
+version_cmd = ["cargo", "fuzz", "--version"]
+required = false

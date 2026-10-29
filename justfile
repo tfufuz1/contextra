@@ -19,8 +19,8 @@ check:
         RUNNER=""
     fi
     $RUNNER cargo fmt --all -- --check
-    $RUNNER cargo clippy --all-targets -- -D warnings
-    $RUNNER cargo check --all-targets --workspace
+    $RUNNER cargo clippy --all-targets --locked -- -D warnings
+    $RUNNER cargo check --all-targets --workspace --locked
     $RUNNER cargo xtask check-max-results-unbound
     $RUNNER cargo xtask check-toctou-defaults
     $RUNNER cargo xtask check-nan-hot-loop
@@ -30,13 +30,17 @@ check:
         $RUNNER cargo xtask check-coverage-gate
     fi
 
+# ADR-D11 Workspace baseline compilation and test-dryrun
+baseline:
+    cargo check --workspace --all-targets --locked && cargo test --workspace --no-run --locked
+
 # Runs the TDD Validation Loop (Red -> Green -> Refactor)
 test *ARGS:
     cargo test --locked {{ARGS}}
 
 # Executes all governance gates: ring-layering, panic-inventory, security-scan
 gates:
-    cargo xtask check-ring-layering --strict && cargo xtask panic-inventory && cargo xtask security-scan
+    cargo --locked xtask check-ring-layering --strict && cargo --locked xtask panic-inventory && cargo --locked xtask security-scan
 
 # Explains a single gate by name (reads governance/gates.toml)
 gate NAME:
@@ -51,7 +55,7 @@ sync-docs:
 
 # Check + test a single crate
 crate CRATE:
-    cargo check -p {{CRATE}} && cargo test -p {{CRATE}} --locked
+    cargo check -p {{CRATE}} --no-default-features --locked && cargo check -p {{CRATE}} --locked && cargo test -p {{CRATE}} --locked
 
 # Run a single crate's tests under Loom (concurrency model checker)
 loom CRATE:

@@ -1,8 +1,8 @@
 # Contextra — Agenten-Betriebsanleitung (AGENTS.md)
 
-<!-- doc-stamp: 2026-10-29 10cc17922 | Spec-Fassung: 3.0 -->
+<!-- doc-stamp: 2026-10-29 10cc17922 | Spec-Fassung: 3.1 -->
 
-Stand: 2026-10-29 · Basis: Gesamtspezifikation Fassung 3.0 (`docs/SPEC.md`)
+Stand: 2026-10-29 · Basis: Gesamtspezifikation Fassung 3.1 (`docs/SPEC.md`)
 
 ---
 
@@ -12,7 +12,7 @@ Diese Datei regelt die Arbeit aller autonomen Agenten im Repository.
 Bei Konflikten gilt zwingend folgende strikte Rangfolge:
 
 1. **Verfassung und Vetos** (`docs/CONSTITUTION.md`, `docs/VETOES.md`)
-2. **Normative Gesamtspezifikation Fassung 3.0** (`docs/SPEC.md`; §0, §1) — Baukasten-Modell
+2. **Normative Gesamtspezifikation Fassung 3.1** (`docs/SPEC.md`; §0, §1) — Baukasten-Modell
 3. **Umsetzungsplan** (`docs/PLAN.md`)
 4. **Capabilities Manifest** (`capabilities.toml`; INV-DOC-SINGLE-SOURCE-1)
 5. **Governance Gate-Definitionen** (`governance/gates.toml`; §17.3)
@@ -40,8 +40,8 @@ cat .agents/jules/context/SESSION_START.md
 gh issue list --state open --label "jules" --json number,title,body,milestone
 gh issue view <N>
 
-# 3. Build-Grundlage prüfen
-cargo check --workspace
+# 3. Build-Grundlage prüfen (ADR-D11 / SPEC §0.2)
+cargo check --workspace --all-targets --locked
 ```
 
 > Vollständiger Ablauf: `.agents/jules/SESSION_BOOTSTRAP.md`
@@ -53,7 +53,7 @@ cargo check --workspace
 2. Existenz von APIs, Dateien und Typen im Code prüfen (niemals aus dem Gedächtnis annehmen).
 3. Plan mit Dateiliste, WP-Nummer und Akzeptanzbefehlen erstellen.
 4. Kleinste mögliche Änderung durchführen (ein WP = ein PR = höchstens ein Crate-Schnitt, REQ-CHG-2).
-5. Gates lokal grün: `cargo check --workspace` && `cargo test --workspace` && `cargo run -p xtask -- check`
+5. Gates lokal grün: `cargo check -p <crate> --no-default-features --locked` && `cargo check -p <crate> --locked` && `cargo test -p <crate> --locked` (oder `just crate <crate>`) sowie `just check` / `just baseline`.
 6. **Rebase auf origin/main** (`git fetch origin && git rebase origin/main`) — PFLICHT vor jedem PR.
 7. Gates nach Rebase erneut prüfen, dann PR erstellen, Issue schließen.
 
@@ -75,7 +75,7 @@ In Pull Requests kann Jules durch Kommentare aktiviert werden:
 ## 2b. Start — Alle anderen Agenten
 
 ```bash
-cargo check --workspace
+cargo check --workspace --all-targets --locked
 ```
 
 Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für Ring/Klassen-Zuordnung prüfen.
@@ -91,22 +91,26 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für R
 
 ---
 
-## 4. Die zwölf Regeln für jede Änderung (SPEC §0.2)
+## 4. Die sechzehn Regeln für jede Änderung (SPEC §0.2)
 
-> Diese Regeln sind normativ. Verletzungen sind Gate-Fehler.
+> Diese Kurzreferenz verweist auf die normativen Definitionen in SPEC §0.2 (INV-DOC-SINGLE-SOURCE-1).
 
-1. **Ring und Klasse zuerst.** Jede Kante zeigt auf gleichen oder niedrigeren Ring (§4.1 P1/P5); Kern `[K]` hängt nie von Rand `[R]`/Experimentell `[E]`/Archiv `[A]` ab (P30).
-2. **Kein Panic in Produktion.** Kein `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, `assert!`, `process::exit`, ungeprüftes Indexieren (P7). Fehler sind typisiert (`ContextraError`, §13.6).
-3. **Zeit, Zufall, IDs nur über Ports** `Clock`, `Rng`, `IdGen` (P28). Verboten in Kernlogik: `Instant::now`, `SystemTime::now`, `thread_rng`, `std::env::var`, `HashMap/HashSet` <!-- doc-ref-ignore --> mit RandomState. Ausnahme: Schlüssel-/Salt-Material aus dem System-RNG.
-4. **Alles Persistente geht durch das WAL** (P24). Sicherheitszustand liegt ausschließlich in den fünf Sidecar-Logs (§7.9).
-5. **I/O nur über `Vfs`**; Commit = durabler Flush mit plattformgerechter Primitive (§7.7); `fsync`-Fehler werden propagiert, nie mit `let _ =` verworfen.
-6. **Unsafe-Inseln (drei Inseln)** (`contextra-simd`, `contextra-sys`, `contextra-wire`), jeder Block mit `// SAFETY:` (P2).
-7. **Mandant kommt aus dem `RequestContext`**, nie aus Literalen, Defaults oder Nutzerparametern (INV-TENANT-1, VETO-F10).
-8. **Sicherheit ist kein Feature-Schalter.** Verschlüsselung, Messung und Löschbericht sind in jedem Build aktiv; kein `cfg(not(feature))`-Ersatz für Sicherheitscode (A1).
-9. **Messen vor Behaupten.** Ein Restbestand-Zähler entsteht nur aus einem Scanner der besitzenden Schicht; Konstanten oder Aufrufer-Werte sind nie Messung (§12.7, §12.10).
-10. **Fail-Closed.** Unbekannter Zustand, unbekannte Formatversion, fehlender Sicherheitsport, gebrochene Kette: Ablehnung mit benanntem Grund, nie Raten (INV-FAILCLOSED-1).
-11. **Eine Typfamilie je Konzept.** Löschtypen existieren nur in `crypto`/`ports`; Ports nur in `ports` (A2, §5).
-12. **Ein PR = ein Arbeitspaket (WP) = höchstens ein Crate-Schnitt**; nach jedem Schnitt Build, Löschtest, Zeilenzählung (REQ-CHG-2).
+1. **Ring und Klasse zuerst.** Kante nur auf gleichen/niedrigeren Ring (§4.1) und in `may_depend_on` (§4.4). Kern [K] hängt nie von Rand/Experim./Archiv ab (P30).
+2. **Jedes Crate ein Modul mit Vertrag.** Modul-Manifest, Evidence-Pack, isoliertes Prüfkommando (§7).
+3. **Kein Panic in Produktion.** Kein `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, ungeprüftes Indexieren (P7, §3.2).
+4. **Zeit, Zufall, IDs nur über Ports** `Clock`, `Rng`, `IdGen` (P28). Ausnahme: Krypto-Schlüssel/-Salts aus System-RNG.
+5. **Alles Persistente geht durch WAL** (P24). Zustand liegt nur in Sidecar-Logs und Keystore (§8.5).
+6. **I/O nur über `Vfs`**; `fsync`-Fehler werden propagiert, nie mit `let _ =` verworfen.
+7. **Unsafe-Inseln (drei Inseln)** (`simd`, `sys`, `wire`), jeder Block mit `// SAFETY:` (P2, §4.6).
+8. **Mandant aus RequestContext**, nie aus Literalen, Defaults oder Nutzerparametern (INV-TENANT-1).
+9. **Sicherheit ist kein Feature-Schalter.** Krypto, Messung, Bericht immer aktiv; kein `cfg(not(feature))` für Sicherheit (A1).
+10. **Messen vor Behaupten.** Restbestand-Zähler entsteht nur aus Scanner der besitzenden Schicht (INV-CLAIMS-1).
+11. **Fail-Closed.** Unbekannter Zustand, Formatversion, fehlender Port: Ablehnung mit Grund.
+12. **Kein Netz ohne Erlaubnis.** Ausgehender Verkehr nur laut Egress-Tabelle (§10.6), Default nur Loopback.
+13. **Eine Typfamilie je Konzept.** Löschtypen nur in `crypto`/`ports`; Ports nur in `ports` (§6).
+14. **Ein PR = ein WP = höchstens ein Crate-Schnitt**; danach Build, Modulprüfkommando, Zeilenzählung (REQ-CHG-2).
+15. **Keine Test-Hooks in öffentlicher Produktions-API.** `*_for_test`, `Mock*`, `Fake*` hinter `cfg(test)` oder `test-hooks`/`testkit` (§12.4).
+16. **Kein blockierendes I/O in `async`.** Dateizugriff über `Vfs` oder `spawn_blocking`; kein `std::fs`/`std::thread::sleep` in `async fn`.
 
 ---
 
@@ -134,7 +138,7 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für R
 
 ### 5.2 Rand-Module [M] — Baukasten-Module mit Vertrag (SPEC §4.2, §5)
 
-> **Gemäß SPEC 3.0 / ADR-D01 sind Inferenz-, Agenten- und Schutz-Crates aktive Baukasten-Module [M] mit isoliertem Vertrag, KEIN Archiv.**
+> **Gemäß SPEC 3.1 / ADR-D01 sind Inferenz-, Agenten- und Schutz-Crates aktive Baukasten-Module [M] mit isoliertem Vertrag, KEIN Archiv.**
 
 | Crate | Ring | Familie | Aufgabe / Entkopplungs-WP |
 |-------|------|---------|---------------------------|
@@ -187,36 +191,11 @@ Folgende Ports MÜSSEN in Produktion real implementiert sein. Null-/Test-/Accept
 
 ---
 
-## 8. Aktueller Implementierungsstatus (IST-Befunde)
+## 8. Aktueller Implementierungsstatus & Gate-Lage
 
-> Basierend auf PLAN.md §1 (Kernbefunde) und Commit `a547a42`.
-> Aktuelle Gates laufen auf main via CI.
+Gemäß **ADR-D12 / SPEC §1.3** stammen alle verbindlichen Metriken, Zähler und Gate-Befunde aus `cargo xtask metrics` bzw. den dokumentierten Baselines unter `evidence/baseline-*`. Das Repository führt keine unüberprüften manuellen Altwerte im Dokumententext.
 
-### 8.1 Kritische Sofort-Maßnahmen (Phase 0–1, bereits in Arbeit)
-
-| ID | Befund | Gate | WP |
-|----|--------|------|-----|
-| B-02 | Engine-Sicherheitsstub: `DeletionProof::verify → Ok(true)` | `no-security-stub` | WP 1.1 |
-| B-04 | MCP: Literal-Schlüssel `default_test_deletion_proof_key`, Mandanten-Fallback auf `SYSTEM` | `no-literal-secrets` | WP 1.2 |
-| B-07 | Schlüsselableitung per HKDF statt Argon2id (INV-KDF-1 verletzt) | `key-kdf` | WP 5.1 |
-| B-08 | Ports der Löschkette (`Vfs`, `LayerScanner` etc.) fehlen komplett | `security-ports` | WP 3.2 |
-| B-12 | HNSW: Slot-Wiederverwendung ohne Nullung (INV-HNSW-SLOT-1 verletzt) | `hnsw-slot` | WP 6.2 |
-| B-14 | Kern hängt hart am Rand (engine→graph, adapt, kvcache; INV-CORE-ISOLATION-1) | `ring-layering` | WP 2.x |
-| B-15 | `encryption-at-rest` als optionales Feature (A1 verletzt) | `no-security-stub` | WP 1.1 |
-
-### 8.2 Gate-Lage (Scan auf `a547a42`)
-
-| Gate | Status | Verstöße |
-|------|--------|----------|
-| `ring-layering` | 🔴 | 2 Fehler + 66 Warnungen |
-| `feature-consistency` | 🔴 | 24 |
-| `test-surface` | 🔴 | 18 |
-| `determinism` | 🔴 | 44 Zeitaufrufe (35 in aktiven Crates) |
-| `async-io` | 🔴 | 18 |
-| `unsafe-audit` | 🔴 | 5 SAFETY-Lücken |
-| `raw-carrier` | 🔴 | 2 |
-| `deletion-honesty` | 🟡 | grün (sieht Lücken nicht) |
-| `doc-stamp` | 🟡 | 7 Warnungen |
+Automatisierte Audits und Entwicklungs-Gates werden per CI sowie lokal über `just check`, `just baseline` und `cargo xtask check` validiert.
 
 ---
 
