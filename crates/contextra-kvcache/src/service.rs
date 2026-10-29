@@ -48,8 +48,8 @@ use crate::attention_score::AttentionScoreSource;
 use crate::eviction_worker::EvictionWorker;
 #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 use crate::quantize_kivi::{
-    compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, KiviQuantizedBlock,
-    KiviQuantizeConfig, KvTensorView,
+    compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, KiviQuantizeConfig,
+    KiviQuantizedBlock, KvTensorView,
 };
 use crate::radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
 use crate::scratchpad_invalidation::ScratchpadCacheScope;
@@ -314,9 +314,12 @@ impl KvCacheService {
             )));
         }
 
-        let current_bytes = self.total_bytes_stored.fetch_add(seg_len, Ordering::Relaxed);
+        let current_bytes = self
+            .total_bytes_stored
+            .fetch_add(seg_len, Ordering::Relaxed);
         if current_bytes.saturating_add(seg_len) > self.config.memory_budget_bytes {
-            let overflow = (current_bytes.saturating_add(seg_len)).saturating_sub(self.config.memory_budget_bytes);
+            let overflow = (current_bytes.saturating_add(seg_len))
+                .saturating_sub(self.config.memory_budget_bytes);
             self.eviction_worker.trigger_eviction(overflow.max(seg_len));
         }
 
@@ -454,7 +457,8 @@ impl KvCacheService {
         }
         self.store
             .remove_segments_for_rollback(tenant_id, &segments);
-        self.total_bytes_stored.fetch_sub(freed_bytes, Ordering::Relaxed);
+        self.total_bytes_stored
+            .fetch_sub(freed_bytes, Ordering::Relaxed);
 
         // Remove Radix tree
         let mut trees = self.radix_trees.write();

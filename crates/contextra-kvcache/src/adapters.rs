@@ -54,7 +54,12 @@ impl KvBridgeStorage for StorageEngineKvBridge {
         Box::pin(async move { self.engine.get(key).await })
     }
 
-    fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, ContextraResult<()>> {
+    fn put<'a>(
+        &'a self,
+        tx_id: TxId,
+        key: &'a [u8],
+        value: &'a [u8],
+    ) -> BoxFuture<'a, ContextraResult<()>> {
         Box::pin(async move { self.engine.put(tx_id, key, value).await })
     }
 
