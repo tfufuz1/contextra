@@ -38,7 +38,10 @@ fn test_negative_fixture_no_security_stub() {
         Outcome::Fail { reason } => {
             assert!(reason.contains("Security stub"));
         }
-        other => panic!("Expected Outcome::Fail for no-security-stub, got {:?}", other),
+        other => panic!(
+            "Expected Outcome::Fail for no-security-stub, got {:?}",
+            other
+        ),
     }
 }
 
@@ -59,7 +62,10 @@ fn test_negative_fixture_no_literal_secrets() {
         Outcome::Fail { reason } => {
             assert!(reason.contains("Hardcoded literal proof key"));
         }
-        other => panic!("Expected Outcome::Fail for no-literal-secrets, got {:?}", other),
+        other => panic!(
+            "Expected Outcome::Fail for no-literal-secrets, got {:?}",
+            other
+        ),
     }
 }
 
@@ -167,7 +173,10 @@ fn test_negative_fixture_deletion_types_once() {
         Outcome::Fail { reason } => {
             assert!(reason.contains("Duplicate definition"));
         }
-        other => panic!("Expected Outcome::Fail for deletion-types-once, got {:?}", other),
+        other => panic!(
+            "Expected Outcome::Fail for deletion-types-once, got {:?}",
+            other
+        ),
     }
 }
 
@@ -176,7 +185,8 @@ fn test_negative_fixture_deletion_honesty() {
     let temp = create_test_root();
     let root = temp.path();
 
-    let doc_claim = "# Contextra README\nDas System garantiert 100% gelöscht und ist DSGVO-konform.\n";
+    let doc_claim =
+        "# Contextra README\nDas System garantiert 100% gelöscht und ist DSGVO-konform.\n";
     let doc_path = root.join("README.md");
     fs::write(&doc_path, doc_claim).unwrap();
 
@@ -185,7 +195,10 @@ fn test_negative_fixture_deletion_honesty() {
         Outcome::Fail { reason } => {
             assert!(reason.contains("100% gelöscht"));
         }
-        other => panic!("Expected Outcome::Fail for deletion-honesty, got {:?}", other),
+        other => panic!(
+            "Expected Outcome::Fail for deletion-honesty, got {:?}",
+            other
+        ),
     }
 }
 

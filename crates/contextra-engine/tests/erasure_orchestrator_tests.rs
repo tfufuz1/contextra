@@ -26,15 +26,22 @@ async fn test_erase_document_e2e_verified() -> Result<()> {
     let col = db.collection_for_tenant("testcol", tenant_id).await?;
 
     let dummy_embedding = vec![0.1f32; db.config().dimension];
-    col.insert("doc1", &dummy_embedding, Some(serde_json::json!({"text": "Sicherer Inhalt"})))
-        .await?;
+    col.insert(
+        "doc1",
+        &dummy_embedding,
+        Some(serde_json::json!({"text": "Sicherer Inhalt"})),
+    )
+    .await?;
 
     let report = db.erase_document(tenant_id, "testcol", "doc1").await?;
 
     if !report.verified {
         panic!("report.verified was false: {:?}", report.failure);
     }
-    assert!(report.proof.is_some(), "DeletionProof must be issued on verified erasure");
+    assert!(
+        report.proof.is_some(),
+        "DeletionProof must be issued on verified erasure"
+    );
     let proof = report.proof.unwrap();
     assert!(
         proof.verify(key.as_slice()).unwrap(),
@@ -42,7 +49,11 @@ async fn test_erase_document_e2e_verified() -> Result<()> {
     );
 
     for layer in &report.layers {
-        assert_eq!(layer.remaining, 0, "Layer {} must have 0 remaining entries", layer.layer);
+        assert_eq!(
+            layer.remaining, 0,
+            "Layer {} must have 0 remaining entries",
+            layer.layer
+        );
     }
 
     Ok(())
@@ -57,16 +68,26 @@ async fn test_erase_document_missing_key_preflight_fails_before_mutation() -> Re
     let col = db.collection_for_tenant("testcol", tenant_id).await?;
 
     let dummy_embedding = vec![0.1f32; db.config().dimension];
-    col.insert("doc1", &dummy_embedding, Some(serde_json::json!({"text": "Sicherer Inhalt"})))
-        .await?;
+    col.insert(
+        "doc1",
+        &dummy_embedding,
+        Some(serde_json::json!({"text": "Sicherer Inhalt"})),
+    )
+    .await?;
 
     // Attempt erase without registering a ProofKeyProvider -> must return Err
     let res = db.erase_document(tenant_id, "testcol", "doc1").await;
-    assert!(res.is_err(), "erase_document must fail preflight if key provider missing");
+    assert!(
+        res.is_err(),
+        "erase_document must fail preflight if key provider missing"
+    );
 
     // Verify document is still readable
     let doc = col.get("doc1").await?;
-    assert!(doc.is_some(), "Document must remain intact after preflight failure");
+    assert!(
+        doc.is_some(),
+        "Document must remain intact after preflight failure"
+    );
 
     Ok(())
 }
@@ -82,16 +103,29 @@ async fn test_sabotage_purger_leaves_residual_fails_verification() -> Result<()>
     let col = db.collection_for_tenant("testcol", tenant_id).await?;
 
     let dummy_embedding = vec![0.1f32; db.config().dimension];
-    col.insert("doc1", &dummy_embedding, Some(serde_json::json!({"text": "Sicherer Inhalt"})))
-        .await?;
+    col.insert(
+        "doc1",
+        &dummy_embedding,
+        Some(serde_json::json!({"text": "Sicherer Inhalt"})),
+    )
+    .await?;
 
     // Without calling purge/flush on LSM storage, scanning detects unpurged memtable residuals
     let report = db.erase_document(tenant_id, "testcol", "doc1").await?;
 
     // Since memtable tombstones/residuals remain without physical purge, verified must be false!
-    assert!(!report.verified, "Sabotage / unpurged residual must yield verified == false");
-    assert!(report.proof.is_none(), "DeletionProof must be None when verification fails");
-    assert!(report.failure.is_some(), "ErasureFailure must name failing layer");
+    assert!(
+        !report.verified,
+        "Sabotage / unpurged residual must yield verified == false"
+    );
+    assert!(
+        report.proof.is_none(),
+        "DeletionProof must be None when verification fails"
+    );
+    assert!(
+        report.failure.is_some(),
+        "ErasureFailure must name failing layer"
+    );
 
     Ok(())
 }
@@ -106,15 +140,28 @@ async fn test_erase_collection_e2e_and_registry_timing() -> Result<()> {
     let tenant_id = TenantId::try_new(1).unwrap();
     let col = db.collection_for_tenant("dropcol", tenant_id).await?;
     let dummy_embedding = vec![0.1f32; db.config().dimension];
-    col.insert("doc1", &dummy_embedding, Some(serde_json::json!({"text": "Text 1"}))).await?;
-    col.insert("doc2", &dummy_embedding, Some(serde_json::json!({"text": "Text 2"}))).await?;
+    col.insert(
+        "doc1",
+        &dummy_embedding,
+        Some(serde_json::json!({"text": "Text 1"})),
+    )
+    .await?;
+    col.insert(
+        "doc2",
+        &dummy_embedding,
+        Some(serde_json::json!({"text": "Text 2"})),
+    )
+    .await?;
 
     let list_before = db.list_collections_for_tenant(tenant_id).await?;
     assert!(list_before.contains(&"dropcol".to_string()));
 
     let report = db.erase_collection(tenant_id, "dropcol").await?;
     if !report.verified {
-        panic!("report.verified was false in erase_collection: {:?}", report.failure);
+        panic!(
+            "report.verified was false in erase_collection: {:?}",
+            report.failure
+        );
     }
     assert!(report.proof.is_some());
 
@@ -137,8 +184,18 @@ async fn test_erase_distinct_deletions_produce_distinct_proofs() -> Result<()> {
     let tenant_id = TenantId::try_new(1).unwrap();
     let col = db.collection_for_tenant("testcol", tenant_id).await?;
     let dummy_embedding = vec![0.1f32; db.config().dimension];
-    col.insert("doc1", &dummy_embedding, Some(serde_json::json!({"text": "Inhalt 1"}))).await?;
-    col.insert("doc2", &dummy_embedding, Some(serde_json::json!({"text": "Inhalt 2"}))).await?;
+    col.insert(
+        "doc1",
+        &dummy_embedding,
+        Some(serde_json::json!({"text": "Inhalt 1"})),
+    )
+    .await?;
+    col.insert(
+        "doc2",
+        &dummy_embedding,
+        Some(serde_json::json!({"text": "Inhalt 2"})),
+    )
+    .await?;
 
     let report1 = db.erase_document(tenant_id, "testcol", "doc1").await?;
     let report2 = db.erase_document(tenant_id, "testcol", "doc2").await?;

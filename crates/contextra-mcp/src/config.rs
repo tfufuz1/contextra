@@ -311,8 +311,7 @@ impl RouterConfig {
                 }
             }
         } else if let Ok(json_str) = std::env::var("CONTEXTRA_ROUTER_PROFILES_JSON") {
-            if let Ok(loaded) =
-                serde_json::from_str::<Vec<contextra_router::SlmProfile>>(&json_str)
+            if let Ok(loaded) = serde_json::from_str::<Vec<contextra_router::SlmProfile>>(&json_str)
             {
                 profiles = loaded;
             }
@@ -429,7 +428,6 @@ mod tests {
         assert_eq!(provider.embedding_dim(), 768);
     }
 
-
     #[test]
     fn test_create_embedding_provider_unknown_error() {
         let res = create_embedding_provider(
@@ -451,7 +449,6 @@ mod tests {
         let response = rt.block_on(generator.generate("hello")).unwrap();
         assert!(response.contains("[Mock LLM response for: hello]"));
     }
-
 
     #[test]
     fn test_create_llm_generator_unknown_error() {
