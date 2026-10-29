@@ -11,7 +11,7 @@ pub mod performance_profile;
 pub mod query_rewriter;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
-pub use builder::ContextraBuilder;
+pub use builder::{ContextraBuilder, ContextraConfigExt, EncryptionMode};
 pub use contextra_core::error::ContextraError;
 pub use contextra_core::types::domain::{DocId, ScoredDocument};
 pub use contextra_core::DistanceMetric;
