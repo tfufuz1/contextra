@@ -338,7 +338,6 @@ pub enum OnSignalFailure {
     Degrade,
 }
 
-
 /// Output of a query rewriter containing text, semantic, and graph anchor reformulations.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct QueryRewriteOutput {
@@ -786,7 +785,12 @@ mod tests {
         let deser: ContextWindow = serde_json::from_str(&ser).unwrap(); // unwrap
         assert_eq!(deser.total_tokens, 1);
         assert_eq!(deser.chunks.len(), 1);
-        assert!(deser.chunks.first().expect("chunk").contextual_prefix.is_none());
+        assert!(deser
+            .chunks
+            .first()
+            .expect("chunk")
+            .contextual_prefix
+            .is_none());
     }
 
     #[test]
