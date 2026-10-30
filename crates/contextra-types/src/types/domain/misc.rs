@@ -159,8 +159,6 @@ impl Entity {
 /// Dieser Typ `contextra_types::Edge` ist die domänenzentrierte Hyperedge-Repräsentation in Ring 0
 /// mit Entitäts-IDs, Beziehungslabel, Quell-Dokumenten-ID und bitemporalen Gültigkeitsachsen
 /// (`tx_valid_from`/`tx_valid_to`, `business_valid_from`/`business_valid_to`).
-/// Im Gegensatz dazu ist `contextra_graph::csr::types::Edge` (bzw. `CsrEdge`) ein speicherkompakter
-/// Adjazenz-Eintrag der CSR-Graphengine für hochperformante SIMD-Traversierungen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Edge {
     /// Source entity identifier.
@@ -350,16 +348,10 @@ impl MemoryType {
 
 /// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 ///
-/// # Ring Architecture
-/// Defined in `contextra-types` (Ring 0) to avoid dependency on `contextra-graph` (Ring 1).
-/// Graph algorithms in `contextra-graph` map this configuration to `contextra_graph::TlHfdParams`.
-///
 /// # Abgrenzung
 /// Dieser Typ `contextra_types::TlHfdParams` ist die Ring-0-Konfigurationsstruktur
 /// (`sigma`, `delta`, `gamma`, `max_iterations`, `max_top_k_expansion`, `max_hyperedge_sort_size`),
 /// die über API-Parameter und JSON-Optionen übergeben wird.
-/// Im Gegensatz dazu ist `contextra_graph::tl_hfd::params::TlHfdParams` die Graph-Engine-Spezifische
-/// Parameterstruktur in Ring 1 mit Ausführungs- und Diffusionsmatrix-Validierungen.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct TlHfdParams {
     /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
@@ -565,13 +557,6 @@ impl AutoExtractionMode {
 
 impl Default for AutoExtractionMode {
     fn default() -> Self {
-        #[cfg(not(feature = "auto-extraction-opt-out"))]
-        {
-            Self::Enabled
-        }
-        #[cfg(feature = "auto-extraction-opt-out")]
-        {
-            Self::Disabled
-        }
+        Self::Enabled
     }
 }

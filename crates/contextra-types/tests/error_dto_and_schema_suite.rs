@@ -68,9 +68,9 @@ fn test_hnsw_deletion_error_variants() {
         "Verification failed: 5 remaining ghost pointers found"
     );
 
-    let contextra_err: ContextraError = err_node.into();
+    let domain_err: ContextraError = err_node.into();
     assert!(matches!(
-        contextra_err,
+        domain_err,
         ContextraError::GraphRepairFailed(_)
     ));
 }

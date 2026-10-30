@@ -212,14 +212,6 @@ pub enum ContextraError {
     #[error("Sandbox error: {0}")]
     Sandbox(String),
 
-    /// Sandbox memory limit breach.
-    #[error("Memory limit exceeded in sandbox: {0}")]
-    MemoryLimitExceeded(String),
-
-    /// Sandbox execution timeout breach.
-    #[error("Timeout exceeded in sandbox: {0}")]
-    SandboxTimeout(String),
-
     /// General operation execution timeout breach.
     #[error("Operation timed out: {operation} (limit: {timeout_ms}ms)")]
     Timeout {
@@ -472,7 +464,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn contextra_error_display_no_panic() {
+    fn test_error_display_no_panic() {
         let variants = [
             ContextraError::Internal("test".into()),
             ContextraError::InvalidInput("test".into()),
@@ -506,8 +498,6 @@ mod tests {
                 limit_mb: 5,
             },
             ContextraError::Sandbox("test".into()),
-            ContextraError::MemoryLimitExceeded("test".into()),
-            ContextraError::SandboxTimeout("test".into()),
             ContextraError::Serialization("test".into()),
             ContextraError::Crypto("test".into()),
             ContextraError::CheckpointNotFound,
@@ -676,14 +666,6 @@ mod tests {
         assert_eq!(
             ContextraError::Sandbox("test".into()).to_string(),
             "Sandbox error: test"
-        );
-        assert_eq!(
-            ContextraError::MemoryLimitExceeded("test".into()).to_string(),
-            "Memory limit exceeded in sandbox: test"
-        );
-        assert_eq!(
-            ContextraError::SandboxTimeout("test".into()).to_string(),
-            "Timeout exceeded in sandbox: test"
         );
 
         // Infrastructure

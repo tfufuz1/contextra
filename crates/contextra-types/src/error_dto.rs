@@ -199,16 +199,6 @@ impl From<&ContextraError> for ContextraErrorDto {
                 message: msg.clone(),
                 details: None,
             },
-            ContextraError::MemoryLimitExceeded(msg) => Self {
-                kind: "MemoryLimitExceeded".to_string(),
-                message: msg.clone(),
-                details: None,
-            },
-            ContextraError::SandboxTimeout(msg) => Self {
-                kind: "SandboxTimeout".to_string(),
-                message: msg.clone(),
-                details: None,
-            },
             ContextraError::Timeout {
                 operation,
                 timeout_ms,
@@ -431,14 +421,6 @@ mod tests {
                 "MemoryBudgetExceeded",
             ),
             (ContextraError::Sandbox("test".into()), "Sandbox"),
-            (
-                ContextraError::MemoryLimitExceeded("test".into()),
-                "MemoryLimitExceeded",
-            ),
-            (
-                ContextraError::SandboxTimeout("test".into()),
-                "SandboxTimeout",
-            ),
             (
                 ContextraError::Timeout {
                     operation: "tool:test".into(),

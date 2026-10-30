@@ -18,6 +18,7 @@ pub mod retrieval_strategy;
 pub mod schema;
 pub mod tenant_scope;
 pub mod tombstone;
+pub mod topk;
 pub mod types;
 pub mod witness;
 
@@ -28,5 +29,6 @@ pub use retrieval_strategy::RetrievalStrategy;
 pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
+pub use topk::BoundedTopK;
 pub use types::*;
 pub use witness::{RequestContext, SagaRecord, ScanMethod};

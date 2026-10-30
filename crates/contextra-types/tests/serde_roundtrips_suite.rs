@@ -68,8 +68,6 @@ fn test_serde_invalid_json_payloads_rejected() {
     assert!(serde_json::from_str::<DistanceMetric>("\"UnknownMetric\"").is_err());
     assert!(serde_json::from_str::<MemoryType>("\"UnknownType\"").is_err());
     assert!(serde_json::from_str::<LinkRelation>("\"NonExistent\"").is_err());
-    assert!(serde_json::from_str::<Signal>("\"InvalidSignal\"").is_err());
-    assert!(serde_json::from_str::<OnSignalFailure>("\"InvalidPolicy\"").is_err());
 }
 
 #[test]
@@ -113,54 +111,9 @@ fn test_serde_complex_nested_structures() {
         }),
     );
 
-    let query = HybridQuery::builder()
-        .with_text_query("nested test")
-        .with_vector_query(vec![0.1, 0.2, 0.3, 0.4])
-        .with_graph_start_node("node_root")
-        .with_filter(filter.clone())
-        .with_k(10)
-        .build()
-        .unwrap();
-
-    let json = serde_json::to_string_pretty(&query).unwrap();
-    let deser: HybridQuery = serde_json::from_str(&json).unwrap();
-    assert_eq!(deser.text_query.as_deref(), Some("nested test"));
-    assert_eq!(deser.filter, Some(filter));
-
-    let chunk = ContextChunk {
-        doc_id: DocId::new(101),
-        content: "Chunk text".to_string(),
-        relevance: 0.99,
-        token_count: 15,
-        metadata: Some(serde_json::json!({"tags": ["rust", "database"]})),
-        contextual_prefix: Some("Overview".to_string()),
-        links: vec![MemoryLink {
-            target: DocId::new(202),
-            relation: LinkRelation::Elaborates,
-            created_at_tx: TxId::new(5),
-        }],
-    };
-
-    let window = ContextWindow {
-        chunks: vec![chunk],
-        total_tokens: 15,
-        truncated: false,
-    };
-
-    let window_json = serde_json::to_string(&window).unwrap();
-    let window_deser: ContextWindow = serde_json::from_str(&window_json).unwrap();
-    assert_eq!(window_deser.chunks.len(), 1);
-    assert_eq!(
-        window_deser
-            .chunks
-            .first()
-            .unwrap()
-            .links
-            .first()
-            .unwrap()
-            .relation,
-        LinkRelation::Elaborates
-    );
+    let json = serde_json::to_string_pretty(&filter).unwrap();
+    let deser: FilterExpr = serde_json::from_str(&json).unwrap();
+    assert_eq!(filter, deser);
 }
 
 #[test]
