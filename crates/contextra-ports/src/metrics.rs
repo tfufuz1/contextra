@@ -6,7 +6,6 @@
 //! - Backpressure level (`lsm_backpressure_level`)
 //! - Search latency per signal
 //! - Rebuild duration (HNSW)
-//! - Checkpoint duration & DLQ depth
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
