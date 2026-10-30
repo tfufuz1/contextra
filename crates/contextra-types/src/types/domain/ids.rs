@@ -11,8 +11,6 @@ use serde::{Deserialize, Serialize};
 /// # Abgrenzung
 /// Dieser Typ `contextra_types::TenantId` ist der kanonische 64-Bit-Ganzzahl-Mandantenidentifikator
 /// in Ring 0 zur Durchsetzung der Mandantenisolation über LSM-Store, WAL und Indexe (INV-TENANT-1).
-/// Im Gegensatz dazu ist `contextra_privacy::processing_registry::TenantId` ein lokaler `String`-Alias
-/// für PII-Policy-Keying im Egress/Filter-Gateway.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct TenantId(pub u64);

@@ -16,7 +16,7 @@ members = [
     "crates/contextra",
     "crates/contextra-testkit",
     "benchmarks/contextra-bench",
-    "xtask",
+    "tests/arch",
 ]
 default-members = [
     "crates/contextra-types",
@@ -82,7 +82,6 @@ contextra-sys = { path = "crates/contextra-sys" }
 contextra-simd = { path = "crates/contextra-simd" }
 contextra-store = { path = "crates/contextra-store" }
 contextra-vector = { path = "crates/contextra-vector" }
-contextra-index = { package = "contextra-vector", path = "crates/contextra-vector" } # <!-- crate-ref-ignore -->
 contextra-db = { path = "crates/contextra-db" }
 contextra-text = { path = "crates/contextra-text" }
 contextra-crypto = { path = "crates/contextra-crypto" }
@@ -109,28 +108,10 @@ mail-parser = "0.9"
 yaml-rust2 = "0.9"
 toml = "0.8"
 
-# ── Archived Zone ──────────────────────────────────────────────────────────────
-# contextra-cluster, contextra-sandbox, contextra-saos-agent wurden in Phase 0 ausgelagert. <!-- crate-ref-ignore -->
-# contextra-embed    → ONNX-Embeddings (wird via Feature-Flag optional) <!-- crate-ref-ignore -->
-
-# 🧊 Frozen Zone — external deps for future reactivation
-# openraft = { version = "0.9", features = ["storage-v2", "serde"] }
-# tonic = { version = "0.12", features = ["tls"] }
-# prost = "0.13"
-#
-# Embedding & ML (activate with contextra-infer-onnx feature)
-# ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "tls-rustls", "copy-dylibs", "api-24"] }
-# hf-hub = { version = "0.3", default-features = false }
-# tokenizers = "0.19"
-# ndarray = "0.15"
-#
-# Network
-# reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-
 [workspace.lints.rust]
 unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
-unexpected_cfgs = { level = "deny", check-cfg = ['cfg(loom)', 'cfg(feature, values("onnx"))'] }
+unexpected_cfgs = { level = "deny", check-cfg = ['cfg(loom)'] }
 
 [workspace.lints.clippy]
 undocumented_unsafe_blocks = "deny"
