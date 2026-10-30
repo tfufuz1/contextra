@@ -1,6 +1,0 @@
-# Configuration for generated file exceptions in unsafe-audit
-[unsafe_generated_exceptions]
-files = [
-    "crates/contextra-wire/src/contextra_generated.rs",
-    "crates/contextra-wire/src/generated.rs"
-]
