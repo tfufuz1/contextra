@@ -401,22 +401,24 @@ pub(crate) unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
     unsafe { _mm_cvtss_f32(v32) }
 }
 
-/// Calculates dot product between two byte vectors using AVX-512 VNNI instructions.
+/// Calculates dot product between two byte vectors using AVX-512 instructions.
 ///
 /// # Safety
-/// Caller must ensure that target CPU supports `avx512f`, `avx512bw`, and `avx512vnni` instruction set extensions.
+/// Caller must ensure that target CPU supports `avx512f` and `avx512bw` instruction set extensions.
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx512f", enable = "avx512bw", enable = "avx512vnni")]
+#[target_feature(enable = "avx512f", enable = "avx512bw")]
 pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
     let len = a.len().min(b.len());
     let mut i = 0;
 
     // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
     let mut sum_v = unsafe { _mm512_setzero_si512() };
+    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
+    let zero = unsafe { _mm512_setzero_si512() };
 
     while i + 64 <= len {
         // SAFETY:
-        // 1. Feature: Target features `avx512f`, `avx512bw`, `avx512vnni` are enabled via function attribute.
+        // 1. Feature: Target features `avx512f` and `avx512bw` are enabled via function attribute.
         // 2. Length/Tail: `i + 64 <= len` guarantees 64 readable `u8` elements in `a` and `b`.
         // 3. Alignment: `_mm512_loadu_si512` handles unaligned byte loads safely.
         // SAFETY: 3. Alignment: `_mm512_loadu_si512` handles unaligned byte loads safely.
@@ -427,8 +429,24 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
             )
         };
 
-        // SAFETY: Target feature `avx512vnni` is enabled and registers are valid `__m512i`.
-        sum_v = unsafe { _mm512_dpbusd_epi32(sum_v, va, vb) };
+        // SAFETY: Target feature `avx512bw` is enabled and registers are valid `__m512i`.
+        let va_lo = unsafe { _mm512_unpacklo_epi8(va, zero) };
+        // SAFETY: Target feature `avx512bw` is enabled and registers are valid `__m512i`.
+        let vb_lo = unsafe { _mm512_unpacklo_epi8(vb, zero) };
+        // SAFETY: Target feature `avx512bw` is enabled and registers are valid `__m512i`.
+        let prod_lo = unsafe { _mm512_madd_epi16(va_lo, vb_lo) };
+
+        // SAFETY: Target feature `avx512bw` is enabled and registers are valid `__m512i`.
+        let va_hi = unsafe { _mm512_unpackhi_epi8(va, zero) };
+        // SAFETY: Target feature `avx512bw` is enabled and registers are valid `__m512i`.
+        let vb_hi = unsafe { _mm512_unpackhi_epi8(vb, zero) };
+        // SAFETY: Target feature `avx512bw` is enabled and registers are valid `__m512i`.
+        let prod_hi = unsafe { _mm512_madd_epi16(va_hi, vb_hi) };
+
+        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512i`.
+        sum_v = unsafe { _mm512_add_epi32(sum_v, prod_lo) };
+        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512i`.
+        sum_v = unsafe { _mm512_add_epi32(sum_v, prod_hi) };
 
         i += 64;
     }
