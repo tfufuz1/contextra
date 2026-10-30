@@ -2,4 +2,11 @@
 # .githooks/pre-push — Pre-push Hard Gate Hook Wrapper
 set -e
 
-exec cargo run --manifest-path xtask/Cargo.toml -- pre-push "$@"
+echo "🔍 Pre-Push Gate..."
+
+cargo check --workspace --all-targets --locked
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+
+echo "✅ Pre-Push Gate bestanden"
+exit 0

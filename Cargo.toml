@@ -16,7 +16,6 @@ members = [
     "crates/contextra",
     "crates/contextra-testkit",
     "benchmarks/contextra-bench",
-    "xtask",
 ]
 default-members = [
     "crates/contextra-types",

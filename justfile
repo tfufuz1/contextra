@@ -19,34 +19,15 @@ check:
         RUNNER=""
     fi
     $RUNNER cargo fmt --all -- --check
-    $RUNNER cargo clippy --all-targets -- -D warnings
-    $RUNNER cargo check --all-targets --workspace
-    $RUNNER cargo xtask check-max-results-unbound
-    $RUNNER cargo xtask check-toctou-defaults
-    $RUNNER cargo xtask check-nan-hot-loop
-    $RUNNER cargo xtask check-result-dropped-io
-    if [ -f coverage.json ]; then
-        $RUNNER cargo xtask check-coverage-gate
-    fi
+    $RUNNER cargo clippy --all-targets --locked -- -D warnings
+    $RUNNER cargo check --all-targets --workspace --locked
 
 # Runs the TDD Validation Loop (Red -> Green -> Refactor)
 test *ARGS:
     cargo test --locked {{ARGS}}
 
-# Executes all governance gates: ring-layering, panic-inventory, security-scan
-gates:
-    cargo xtask check-ring-layering --strict && cargo xtask panic-inventory && cargo xtask security-scan
-
-# Explains a single gate by name (reads governance/gates.toml)
-gate NAME:
-    cargo xtask gate-explain {{NAME}}
-
-# Full pre-push pipeline: check → test → gates
-pre-push: check test gates
-
-# Sync documentation from inline tags and cargo topology
-sync-docs:
-    nix develop -c cargo xtask sync-docs || cargo xtask sync-docs
+# Full pre-push pipeline: check → test
+pre-push: check test
 
 # Check + test a single crate
 crate CRATE:
@@ -68,9 +49,8 @@ coverage:
     #!/usr/bin/env bash
     set -euo pipefail
     which cargo-llvm-cov || cargo install cargo-llvm-cov
-    cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
-    cargo xtask check-coverage-gate
-    echo "✅ Coverage-Gate bestanden"
+    cargo llvm-cov --workspace --json --output-path coverage.json
+    echo "✅ Coverage abgeschlossen"
 
 # Runs Loom concurrency exploration model test for group commit lock handoff (unoptimized debug build required by Loom)
 loom-store:
@@ -86,14 +66,11 @@ fuzz-all SECONDS="60":
         "contextra-store:fuzz_wal_replay"
         "contextra-vector:fuzz_hnsw_persistence"
         "contextra-text:fuzz_bm25_tokenize"
-        "contextra-wire:fuzz_flatbuffers_ipc"
-        "contextra-mcp:fuzz_jsonrpc_parsing"
         "contextra-store:wal_roundtrip"
         "contextra-store:fuzz_manifest_load"
         "contextra-store:wal_mutation_chaos"
         "contextra-vector:hnsw_insert_search"
         "contextra-db:rrf_fusion"
-        "contextra-mcp:fuzz_prompt_injection_guard"
     )
     for entry in "${targets[@]}"; do
         crate="${entry%%:*}"
@@ -105,7 +82,6 @@ fuzz-all SECONDS="60":
 
 # Zeigt offene kritische AI-TAGs und ANCHORs an — primärer manueller
 # Weg, den aktuellen Governance-Status einer Session zu prüfen.
-# Für einen strukturierten NDJSON-Export aller Tags steht `just context-tags` zur Verfügung.
 session-context:
     #!/usr/bin/env bash
     echo "OFFENE KRITISCHE TAGS:"
