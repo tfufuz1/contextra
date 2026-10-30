@@ -61,6 +61,7 @@ impl LockedRegions {
         for byte in slice.iter_mut() {
             // SAFETY: `byte` is a valid, aligned mutable reference to a u8 in `slice`.
             // Volatile write guarantees write is not optimized away by compiler passes.
+            // SAFETY: Volatile write guarantees write is not optimized away by compiler passes.
             unsafe {
                 std::ptr::write_volatile(byte, 0);
             }

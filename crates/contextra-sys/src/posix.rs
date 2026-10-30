@@ -22,6 +22,7 @@ pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Resu
 
     // SAFETY: `path_c` is a valid NUL-terminated C string, `target_fd` is a valid open file descriptor,
     // and `libc::open`, `libc::dup2`, and `libc::close` are standard POSIX syscall wrappers.
+    // SAFETY: and `libc::open`, `libc::dup2`, and `libc::close` are standard POSIX syscall wrappers.
     unsafe {
         let fd = libc::open(path_c.as_ptr(), flags);
         if fd < 0 {

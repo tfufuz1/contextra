@@ -20,7 +20,7 @@ pub const DEFAULT_MAX_PIN_DURATION: Duration = Duration::from_secs(300);
 
 /// Versioned sequence log entry for snapshot isolation (`_at` family).
 ///
-/// **Memory Overhead**: Each entry is 24 bytes (8 bytes `DocId` + 8 bytes `insert_seq` + 8 bytes `delete_seq: Option<u64>`).
+/// **Memory Overhead**: Each entry holds a [`DocId`], an `insert_seq` (`u64`), and an optional `delete_seq` (`Option<u64>`).
 /// Entries where `delete_seq` is below `min_active_seqno` can be pruned via `compact`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SeqLogEntry {

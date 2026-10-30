@@ -29,6 +29,7 @@ pub(crate) unsafe fn cosine_distance_neon(a: &[f32], b: &[f32]) -> f32 {
         // 1. Feature: Target feature `neon` is enabled via function attribute.
         // 2. Length/Tail: `i + 4 <= len` where `len == a.len() == b.len()` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)` are valid for reading 4 contiguous `f32` elements.
         // 3. Alignment: `vld1q_f32` handles unaligned float pointer reads safely.
+        // SAFETY: 3. Alignment: `vld1q_f32` handles unaligned float pointer reads safely.
         let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };
 
         // SAFETY: Target feature `neon` is enabled and vector registers are valid `float32x4_t`.
@@ -86,6 +87,7 @@ pub(crate) unsafe fn euclidean_distance_neon(a: &[f32], b: &[f32]) -> f32 {
         // 1. Feature: Target feature `neon` is enabled via function attribute.
         // 2. Length/Tail: `i + 4 <= len` where `len == a.len() == b.len()` guarantees 4 readable contiguous `f32` elements.
         // 3. Alignment: `vld1q_f32` handles unaligned float pointer reads safely.
+        // SAFETY: 3. Alignment: `vld1q_f32` handles unaligned float pointer reads safely.
         let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };
         // SAFETY: Target feature `neon` is enabled and registers are valid `float32x4_t`.
         let diff = unsafe { vsubq_f32(va, vb) };
@@ -130,6 +132,7 @@ pub(crate) unsafe fn dot_product_neon(a: &[f32], b: &[f32]) -> f32 {
         // 1. Feature: Target feature `neon` is enabled via function attribute.
         // 2. Length/Tail: `i + 4 <= len` where `len == a.len() == b.len()` guarantees 4 readable contiguous `f32` elements.
         // 3. Alignment: `vld1q_f32` handles unaligned float pointer reads safely.
+        // SAFETY: 3. Alignment: `vld1q_f32` handles unaligned float pointer reads safely.
         let (va, vb) = unsafe { (vld1q_f32(a.as_ptr().add(i)), vld1q_f32(b.as_ptr().add(i))) };
 
         // SAFETY: Target feature `neon` is enabled and registers are valid `float32x4_t`.

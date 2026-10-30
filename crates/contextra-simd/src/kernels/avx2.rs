@@ -31,6 +31,7 @@ pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
         // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
         // 2. Length/Tail: `i + 8 <= len` where `len == a.len() == b.len()` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)` are valid for reading 8 contiguous `f32` elements.
         // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory addresses safely.
+        // SAFETY: 3. Alignment: `_mm256_loadu_ps` handles unaligned memory addresses safely.
         let (va, vb) = unsafe {
             (
                 _mm256_loadu_ps(a.as_ptr().add(i)),
@@ -60,6 +61,7 @@ pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     while i < len {
         // SAFETY:
         // 1. Length/Tail: `i < len` where `len == a.len() == b.len()` guarantees `i` is within bounds of slices `a` and `b`.
+        // SAFETY: 1. Length/Tail: `i < len` where `len == a.len() == b.len()` guarantees `i` is within bounds of slices `a` and `b`.
         let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };
         dot += x * y;
         norm_a += x * x;
@@ -96,6 +98,7 @@ pub(crate) unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
         // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
         // 2. Length/Tail: `i + 8 <= len` where `len == a.len() == b.len()` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)` point to 8 readable `f32` elements.
         // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory addresses safely.
+        // SAFETY: 3. Alignment: `_mm256_loadu_ps` handles unaligned memory addresses safely.
         let (va, vb) = unsafe {
             (
                 _mm256_loadu_ps(a.as_ptr().add(i)),
@@ -145,6 +148,7 @@ pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
         // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
         // 2. Length/Tail: `i + 8 <= len` where `len == a.len() == b.len()` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)` point to 8 readable `f32` elements.
         // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory addresses safely.
+        // SAFETY: 3. Alignment: `_mm256_loadu_ps` handles unaligned memory addresses safely.
         let (va, vb) = unsafe {
             (
                 _mm256_loadu_ps(a.as_ptr().add(i)),
@@ -195,6 +199,7 @@ pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -
         // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
         // 2. Length/Tail: `i + 8 <= len` and `b_bytes.len() >= a.len() * 4` guarantee `a.as_ptr().add(i)` and `b_bytes.as_ptr().add(i * 4)` point to readable memory for 8 `f32`s (32 bytes).
         // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory loads safely.
+        // SAFETY: 3. Alignment: `_mm256_loadu_ps` handles unaligned memory loads safely.
         let (va, vb) = unsafe {
             (
                 _mm256_loadu_ps(a.as_ptr().add(i)),
@@ -225,6 +230,7 @@ pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -
         // SAFETY:
         // 1. Length/Tail: `i < len` and `b_bytes.len() >= a.len() * 4` guarantee indices are within bounds of `a` and `b_bytes`.
         // 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
+        // SAFETY: 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
         let (x, b_val) = unsafe {
             (
                 *a.get_unchecked(i),
@@ -271,6 +277,7 @@ pub(crate) unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]
         // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
         // 2. Length/Tail: `i + 8 <= len` and `b_bytes.len() >= a.len() * 4` guarantee `a.as_ptr().add(i)` and `b_bytes.as_ptr().add(i * 4)` point to readable memory for 8 `f32`s (32 bytes).
         // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory loads safely.
+        // SAFETY: 3. Alignment: `_mm256_loadu_ps` handles unaligned memory loads safely.
         let (va, vb) = unsafe {
             (
                 _mm256_loadu_ps(a.as_ptr().add(i)),
@@ -293,6 +300,7 @@ pub(crate) unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]
         // SAFETY:
         // 1. Length/Tail: `i < len` and `b_bytes.len() >= a.len() * 4` guarantee indices are within bounds.
         // 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
+        // SAFETY: 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
         let (x, b_val) = unsafe {
             (
                 *a.get_unchecked(i),
@@ -332,6 +340,7 @@ pub(crate) unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f3
         // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
         // 2. Length/Tail: `i + 8 <= len` and `b_bytes.len() >= a.len() * 4` guarantee readable memory.
         // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory loads safely.
+        // SAFETY: 3. Alignment: `_mm256_loadu_ps` handles unaligned memory loads safely.
         let (va, vb) = unsafe {
             (
                 _mm256_loadu_ps(a.as_ptr().add(i)),
@@ -352,6 +361,7 @@ pub(crate) unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f3
         // SAFETY:
         // 1. Length/Tail: `i < len` and `b_bytes.len() >= a.len() * 4` guarantee indices are within bounds.
         // 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
+        // SAFETY: 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
         let (x, b_val) = unsafe {
             (
                 *a.get_unchecked(i),
@@ -411,6 +421,7 @@ pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
         // 1. Feature: Target feature `avx2` is enabled via function attribute.
         // 2. Length/Tail: `i + 32 <= len` where `len = min(a.len(), b.len())` guarantees 32 readable `u8` elements.
         // 3. Alignment: `_mm256_loadu_si256` handles unaligned byte loads safely.
+        // SAFETY: 3. Alignment: `_mm256_loadu_si256` handles unaligned byte loads safely.
         let (va, vb) = unsafe {
             (
                 _mm256_loadu_si256(a.as_ptr().add(i) as *const __m256i),
@@ -473,6 +484,7 @@ pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
         // 1. Feature: Target feature `avx2` is enabled via function attribute.
         // 2. Length/Tail: `i + 32 <= len` guarantees 32 readable `u8` elements in `a` and `b`.
         // 3. Alignment: `_mm256_loadu_si256` handles unaligned byte loads safely.
+        // SAFETY: 3. Alignment: `_mm256_loadu_si256` handles unaligned byte loads safely.
         let (va, vb) = unsafe {
             (
                 _mm256_loadu_si256(a.as_ptr().add(i) as *const __m256i),
@@ -547,6 +559,7 @@ pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(
         // 1. Feature: Target feature `avx2` is enabled via function attribute.
         // 2. Length/Tail: `i + 32 <= len` guarantees 32 readable `u8` elements in `a` and `b`.
         // 3. Alignment: `_mm256_loadu_si256` handles unaligned byte loads safely.
+        // SAFETY: 3. Alignment: `_mm256_loadu_si256` handles unaligned byte loads safely.
         let (va, vb) = unsafe {
             (
                 _mm256_loadu_si256(a.as_ptr().add(i) as *const __m256i),
