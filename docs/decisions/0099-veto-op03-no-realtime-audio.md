@@ -1,5 +1,7 @@
 # ADR-0099: VETO-OP03 — Kein Echtzeit-Audio/STT-Streaming im Kern
 
+> **Status-Update 30.10.2026:** Gültig (VETO-OP03).
+
 - **Status:** Proposed — benötigt Maintainer-Freigabe
 - **Datum:** 2026-10-29
 - **Autoren:** Architecture Governance Team

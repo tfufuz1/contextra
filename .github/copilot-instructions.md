@@ -1,25 +1,35 @@
-@AGENTS.md
+# Copilot-Anweisungen für Contextra
 
-# GitHub Copilot — Spezifische Regeln (Stand: 2026-10-26)
+<!-- doc-stamp: 2026-10-30 | Normativ: docs/SPEC.md Fassung 4.0 -->
 
-> Normative Quelle: `docs/SPEC.md` (Fassung 1.2). Diese Datei ergänzt nur Copilot-spezifisches.
+Contextra ist eine eingebettete Rust-Bibliothek für hybride Suche (HNSW und BM25) mit Mandantentrennung und Verschlüsselung im Ruhezustand. Der Scope ist auf Kern v1 reduziert.
 
-## Completion-Richtlinien (SPEC §0.2)
-- Kein `.unwrap()`, `.expect()`, `panic!()` außerhalb von `#[cfg(test)]` (Regel 2 / P7)
-- `unsafe` NUR in den drei Inseln `contextra-simd`, `contextra-sys`, `contextra-wire` — stets mit `// SAFETY:` (Regel 6 / P2)
-- Kein `Instant::now()`, `SystemTime::now()`, `thread_rng()` in Kernlogik — Port `Clock`/`Rng`/`IdGen` verwenden (Regel 3 / P28)
-- Kein `std::env::var` in Kernlogik (A5)
-- Mandant nur aus `RequestContext`, nie aus Literalen (Regel 7 / INV-TENANT-1)
-- Fehler als `Result<_, ContextraError>` propagieren, kein `let _ =` auf I/O (Regel 2)
-- DAG-Schichtgrenzen einhalten: Abhängigkeiten nur zu gleichem oder niedrigerem Ring (Regel 1 / P1/P5)
+**Build-Status:** Nicht grün. Siehe `docs/PLAN.md` Phase R0. Vorschläge, die einen bestehenden Verweis auf eine entfernte Crate fortführen, sind falsch.
 
-## Archivierte Crates (NICHT bearbeiten — werden aus Workspace entfernt, PLAN WP 2.1)
-- `contextra-graph`, `contextra-cognition`, `contextra-adapt`, `contextra-kvcache`
-- `contextra-router`, `contextra-agent`, `contextra-infer-onnx`, `contextra-infer-ollama`
-- `contextra-core` (Migrationsfassade, wird durch `types`/`ports` ersetzt)
+## Regeln
 
-## Aktive Crates (Kern [K])
-`types` · `ports` · `mvcc` · `crypto` · `vector` · `text` · `rank` (fusion/) · `store` · `checkpoint` · `engine` · `db` · `mcp` · `contextra`
+- `unsafe` nur in `contextra-sys` und `contextra-simd`, jeweils mit `// SAFETY:`. Alle anderen Crates: `#![forbid(unsafe_code)]`.
+- Keine `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!` oder ungeprüftes Indexieren in Produktionscode.
+- Zeit, Zufall und IDs nur über `Clock`, `Rng`, `IdGen` aus `contextra-ports`.
+- I/O nur über `Vfs`. `fsync`-Fehler mit `?` propagieren.
+- Mandant immer aus `RequestContext`, nie als Literal oder Default.
+- Verschlüsselung ist nicht optional. Kein `cfg(feature)`-Schalter für Sicherheitscode.
+- Keine Doppeldefinitionen öffentlicher Typen. Kanonische Definition vor dem Hinzufügen suchen.
 
-## Sicherheitsports (INV-WIRING-2) — müssen immer real implementiert sein
-`KmsProvider`, `Vfs`, `DurableLog`, `ErasureJournal`, `LayerScanner`, `Purger`
+## Ringe
+
+| Ring | Crates |
+|---|---|
+| 0 | `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-simd`, `contextra-mvcc`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-rank` |
+| 1 | `contextra-store` |
+| 2 | `contextra-engine` |
+| 3 | `contextra-db` |
+| 4 | `contextra` |
+
+Abhängigkeiten zeigen nur auf gleichen oder niedrigeren Ring.
+
+## Nicht vorschlagen
+
+Diese Crates sind entfernt und dürfen nicht neu angelegt oder referenziert werden: `contextra-graph`, `contextra-cognition`, `contextra-adapt`, `contextra-kvcache`, `contextra-router`, `contextra-agent`, `contextra-infer-*`, `contextra-mcp`, `contextra-py`, `contextra-privacy`, `contextra-ingest`, `contextra-sandbox`, `contextra-wire`, `contextra-checkpoint`, `contextra-license`, `contextra-audit-export`, `contextra-avv-generator`, `contextra-core`.
+
+Der Befehl `cargo xtask` existiert nicht mehr.

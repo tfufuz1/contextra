@@ -1,5 +1,7 @@
 # AGENTS.md — `contextra-ports`
 
+> **Status 30.10.2026 (Reduktion):** Dieses Crate gehört zum Kern v1. Ring und Abhängigkeiten stimmen mit `docs/SPEC.md` §4 überein. Verweise auf entfernte Crates oder Funktionen sind veraltet. Mehrere Ports (`graph`, `attention`, `plugin`, `license`, `checkpoint`, `scanner`) bedienen nur entfernte Crates (SPEC §6). Maßgeblich ist der Quelltext. Bereinigung: `docs/PLAN.md` Phase R0 bis R3.
+
 ## 1. Rolle
 `contextra-ports` definiert sämtliche abstrakten Port-Schnittstellen und Trait-Definitionen zur sauberen Entkopplung von Kern und Außenwelt.
 

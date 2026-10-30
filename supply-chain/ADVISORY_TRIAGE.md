@@ -1,5 +1,7 @@
 # Supply-Chain Advisory Triage — Contextra Workspace
 
+> **Historisches Dokument (Stand vor Reduktion, 30.10.2026).** Beschreibt den Vorzustand bis Commit `3c1f144fa`. Nicht normativ. Maßgeblich: `docs/SPEC.md` und `docs/PLAN.md` (Fassung 4.0).
+
 Stand: 2026-10-29
 Governance-Ref: SPEC §4.9 (W8), ADR-D10, EP16
 

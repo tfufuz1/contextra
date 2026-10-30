@@ -1,5 +1,7 @@
 # contextra-rank
 
+> **Status 30.10.2026 (Reduktion):** Dieses Crate gehört zum Kern v1. Ring und Abhängigkeiten stimmen mit `docs/SPEC.md` §4 überein. Verweise auf entfernte Crates oder Funktionen sind veraltet. Modul `dibud` ist deklariert, der Kopfkommentar verweist auf entfernte Kognition. Maßgeblich ist der Quelltext. Bereinigung: `docs/PLAN.md` Phase R0 bis R3.
+
 Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen.
 
 Normativitätsklasse: **Rand `[R]`** (Ring 0, `experimental`; §6.1, §6.9, §12, `capabilities.toml`).

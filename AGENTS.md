@@ -1,259 +1,189 @@
-# Contextra — Agenten-Betriebsanleitung (AGENTS.md)
+# Contextra – Agenten-Betriebsanleitung (AGENTS.md)
 
-<!-- doc-stamp: 2026-10-29 10cc17922 | Spec-Fassung: 3.0 -->
+<!-- doc-stamp: 2026-10-30 | Basis: docs/SPEC.md Fassung 4.0 -->
 
-Stand: 2026-10-29 · Basis: Gesamtspezifikation Fassung 3.0 (`docs/SPEC.md`)
+Stand: 30.10.2026 · Basis: Gesamtspezifikation Fassung 4.0 (`docs/SPEC.md`) · Umsetzungsplan 4.0 (`docs/PLAN.md`)
 
 ---
 
 ## 1. Geltungsbereich und Rangfolge der Informationsquellen
 
-Diese Datei regelt die Arbeit aller autonomen Agenten im Repository.
-Bei Konflikten gilt zwingend folgende strikte Rangfolge:
+Diese Datei regelt die Arbeit aller autonomen Agenten im Repository. Bei Konflikten gilt diese Rangfolge:
 
-1. **Verfassung und Vetos** (`docs/CONSTITUTION.md`, `docs/VETOES.md`)
-2. **Normative Gesamtspezifikation Fassung 3.0** (`docs/SPEC.md`; §0, §1) — Baukasten-Modell
-3. **Umsetzungsplan** (`docs/PLAN.md`)
-4. **Capabilities Manifest** (`capabilities.toml`; INV-DOC-SINGLE-SOURCE-1)
-5. **Governance Gate-Definitionen** (`governance/gates.toml`; §17.3)
-6. **Agenten-Betriebsanleitung** (`AGENTS.md`)
-7. **Produktionscode und grüne Quality Gates** (REQ-QA-010)
+1. **Verfassung und Vetos**: `docs/CONSTITUTION.md`, `docs/VETOES.md`
+2. **Gesamtspezifikation Fassung 4.0**: `docs/SPEC.md` (insbesondere §2 bis §4 und §16)
+3. **Umsetzungsplan Fassung 4.0**: `docs/PLAN.md`
+4. **Quelltext und Manifeste**: `Cargo.toml`, `crates/*/Cargo.toml`, `crates/*/src`
+5. **Governance-Dateien**: `capabilities.toml`, `governance/*.toml` (Angleichung in PLAN R2)
+6. **Agenten-Betriebsanleitung**: diese Datei
 
 Quality Gates dürfen niemals durch Ausnahmen, Sonderregeln oder lokale Overrides geschwächt oder umgangen werden (REQ-QA-010).
 
 > **Agenten-spezifische Anleitungen:**
-> - `@Jules` → lies Abschnitt 2a und folge `.agents/jules/SESSION_BOOTSTRAP.md`
-> - `Claude` / Antigravity → ignoriere Abschnitt 2a, lies stattdessen `CLAUDE.md`
-> - Alle anderen Agenten → Abschnitt 2b reicht
+> - `Claude` / Antigravity: Abschnitt 2 lesen, danach `CLAUDE.md`.
+> - Alle anderen Agenten: Abschnitt 2 reicht.
+> - `@Jules`: Abschnitt 2a und `.agents/jules/SESSION_BOOTSTRAP.md`. Die Jules-Infrastruktur ist an Pfade gebunden, die die Reduktion teilweise entfernt hat. Vor Nutzung Abschnitt 8 lesen.
 
 ---
 
-## 2a. Start — @Jules
+## 2. Start
 
-> **Nur für Jules. Alle anderen Agenten: diesen Abschnitt überspringen.**
+### 2.1 Build-Status vor jeder Arbeit prüfen
+
+Stand 30.10.2026 ist der Build **nicht grün** (SPEC §16, B1 bis B4). Vor jeder Änderung:
 
 ```bash
-# 1. Vorgefertigten Kontext lesen (durch refresh-context.sh beim Task-Start erzeugt)
-cat .agents/jules/context/SESSION_START.md
-
-# 2. Konkreten Task von GitHub holen
-gh issue list --state open --label "jules" --json number,title,body,milestone
-gh issue view <N>
-
-# 3. Build-Grundlage prüfen
-cargo check --workspace
+cargo metadata --no-deps --format-version 1 > /dev/null   # Workspace lädt?
+cargo check --workspace --all-targets                    # Kompiliert?
 ```
 
-> Vollständiger Ablauf: `.agents/jules/SESSION_BOOTSTRAP.md`
-> GitHub-Konventionen (Labels, Protokollpflicht): `.agents/jules/GITHUB_WORKFLOW.md`
+Schlägt einer der Befehle fehl, ist die Aufgabe nur dann zulässig, wenn sie zu Phase R0 gehört (`docs/PLAN.md` §2). Andere Arbeit wird bis zum grünen Build zurückgestellt.
 
-### @Jules — Ablauf je Task
+### 2.2 Lesereihenfolge
 
-1. **GitHub-Issue lesen** (`gh issue view <N>`) — Task, Akzeptanzkriterien, WP-Nummer, Scope.
-2. Existenz von APIs, Dateien und Typen im Code prüfen (niemals aus dem Gedächtnis annehmen).
-3. Plan mit Dateiliste, WP-Nummer und Akzeptanzbefehlen erstellen.
-4. Kleinste mögliche Änderung durchführen (ein WP = ein PR = höchstens ein Crate-Schnitt, REQ-CHG-2).
-5. Gates lokal grün: `cargo check --workspace` && `cargo test --workspace` && `cargo run -p xtask -- check`
-6. **Rebase auf origin/main** (`git fetch origin && git rebase origin/main`) — PFLICHT vor jedem PR.
-7. Gates nach Rebase erneut prüfen, dann PR erstellen, Issue schließen.
+1. `docs/SPEC.md`, §0 (Schnellstart) und §3 (Regeln)
+2. `docs/PLAN.md`, die Phase, zu der die Aufgabe gehört
+3. Den Crate-Ordner der Aufgabe und dessen `AGENTS.md`
 
-### @Jules — CI/CD Fixer
+### 2.3 Ablauf je Aufgabe
 
-In Pull Requests kann Jules durch Kommentare aktiviert werden:
+1. Aufgabe einem Arbeitspaket (WP) aus `docs/PLAN.md` zuordnen. Ohne Zuordnung: nachfragen.
+2. Existenz von APIs, Dateien und Typen im Code prüfen. Nichts aus dem Gedächtnis annehmen.
+3. Kleinste mögliche Änderung durchführen. Ein WP = ein PR = höchstens ein Crate-Schnitt (Regel 12).
+4. Lokal prüfen: `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (ab R0).
+5. Dokumentation im selben PR anpassen, wenn sich Ist-Zustand, Ring, Abhängigkeit oder Befund ändert.
 
-```
-@jules fix-ci           → Jules analysiert fehlgeschlagene CI-Jobs und öffnet Fix-PR
-@jules check-gates      → Jules führt alle Gates und meldet Befunde als Issue-Kommentar
-@jules recheck          → Jules wiederholt den Submit-Gate-Check
-```
+### 2.4 Gate-Status
 
-> **Wichtig:** Jules ändert niemals Gates, Lints, Ratchets oder den Toolchain-Pin, um Rot zu beseitigen.
-> Jules behebt die Ursache — nicht das Symptom.
+Der Gate-Runner `cargo xtask` wurde mit Commit `068261abd` entfernt. Die Gates in `governance/gates.toml` sind derzeit nicht ausführbar. Bis zur Entscheidung D-R2 gelten die `cargo`-Befehle aus 2.3 als Mindestprüfung. Befehle wie `cargo xtask check` aus älteren Dokumenten sind ungültig.
 
 ---
 
-## 2b. Start — Alle anderen Agenten
+## 3. Verifizieren, Rebase und Gate-Integrität
 
-```bash
-cargo check --workspace
-```
-
-Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für Ring/Klassen-Zuordnung prüfen.
-
----
-
-## 3. Verifizieren, Rebase & Gate-Integrität (§27.5, §27.6, REQ-QA-010)
-
-- „Fertig" bedeutet ausnahmslos: Alle relevanten Gates, Lints und Tests auf dem Merge-Ergebnis sind grün (REQ-QA-010).
-- **Rebase-Pflicht (hochfrequentierte Entwicklung):** Vor jedem PR zwingend `git fetch origin && git rebase origin/main` ausführen. Nach dem Rebase Gates erneut prüfen. Kein PR ohne sauberen Rebase auf main.
-- Es ist streng verboten, Gates, Lints, Ratchets oder den Toolchain-Pin einzuschränken, abzuschwächen oder durch Ausnahmen zu umgehen (REQ-QA-010).
-- **Geschützte Pfade:** `.github/**`, `xtask/**`, `justfile`, `rust-toolchain.toml`, `deny.toml`, `capabilities.toml`, `AGENTS.md`, `.agents/jules/setup/**`, `governance/**`.
+- „Fertig“ heißt: Alle relevanten Prüfungen auf dem Merge-Ergebnis sind grün (REQ-QA-010).
+- **Rebase-Pflicht:** Vor jedem PR `git fetch origin && git rebase origin/main`. Danach Prüfungen erneut ausführen.
+- Es ist verboten, Lints, Gates, Ratchets oder den Toolchain-Pin abzuschwächen oder durch Ausnahmen zu umgehen. Das gilt auch für `#[allow(...)]`-Erweiterungen auf Modulebene ohne ADR.
+- **Geschützte Pfade:** `.github/**`, `justfile`, `rust-toolchain.toml`, `deny.toml`, `capabilities.toml`, `AGENTS.md`, `CLAUDE.md`, `governance/**`, `tests/layering.rs`, `tests/unsafe_islands.rs`.
 
 ---
 
-## 4. Die zwölf Regeln für jede Änderung (SPEC §0.2)
+## 4. Die zwölf Regeln für jede Änderung (SPEC §3.2)
 
-> Diese Regeln sind normativ. Verletzungen sind Gate-Fehler.
+Diese Regeln sind normativ. Verletzungen sind Fehler.
 
-1. **Ring und Klasse zuerst.** Jede Kante zeigt auf gleichen oder niedrigeren Ring (§4.1 P1/P5); Kern `[K]` hängt nie von Rand `[R]`/Experimentell `[E]`/Archiv `[A]` ab (P30).
-2. **Kein Panic in Produktion.** Kein `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, `assert!`, `process::exit`, ungeprüftes Indexieren (P7). Fehler sind typisiert (`ContextraError`, §13.6).
-3. **Zeit, Zufall, IDs nur über Ports** `Clock`, `Rng`, `IdGen` (P28). Verboten in Kernlogik: `Instant::now`, `SystemTime::now`, `thread_rng`, `std::env::var`, `HashMap/HashSet` <!-- doc-ref-ignore --> mit RandomState. Ausnahme: Schlüssel-/Salt-Material aus dem System-RNG.
-4. **Alles Persistente geht durch das WAL** (P24). Sicherheitszustand liegt ausschließlich in den fünf Sidecar-Logs (§7.9).
-5. **I/O nur über `Vfs`**; Commit = durabler Flush mit plattformgerechter Primitive (§7.7); `fsync`-Fehler werden propagiert, nie mit `let _ =` verworfen.
-6. **Unsafe-Inseln (drei Inseln)** (`contextra-simd`, `contextra-sys`, `contextra-wire`), jeder Block mit `// SAFETY:` (P2).
-7. **Mandant kommt aus dem `RequestContext`**, nie aus Literalen, Defaults oder Nutzerparametern (INV-TENANT-1, VETO-F10).
-8. **Sicherheit ist kein Feature-Schalter.** Verschlüsselung, Messung und Löschbericht sind in jedem Build aktiv; kein `cfg(not(feature))`-Ersatz für Sicherheitscode (A1).
-9. **Messen vor Behaupten.** Ein Restbestand-Zähler entsteht nur aus einem Scanner der besitzenden Schicht; Konstanten oder Aufrufer-Werte sind nie Messung (§12.7, §12.10).
-10. **Fail-Closed.** Unbekannter Zustand, unbekannte Formatversion, fehlender Sicherheitsport, gebrochene Kette: Ablehnung mit benanntem Grund, nie Raten (INV-FAILCLOSED-1).
-11. **Eine Typfamilie je Konzept.** Löschtypen existieren nur in `crypto`/`ports`; Ports nur in `ports` (A2, §5).
-12. **Ein PR = ein Arbeitspaket (WP) = höchstens ein Crate-Schnitt**; nach jedem Schnitt Build, Löschtest, Zeilenzählung (REQ-CHG-2).
-
----
-
-## 5. Baukasten-Crates [K] / [M] / [E] — Baukasten-Modell (SPEC §5)
-
-### 5.1 Kern-Crates [K]
-
-| Crate | Ring | Status | WP-Aufgabe |
-|-------|------|--------|------------|
-| `contextra-types` | 0 | aktiv | Grundlegende Typen, IDs, Fehlerklassen |
-| `contextra-ports` | 0 | aktiv | Port-Schnittstellen (Entkopplung) |
-| `contextra-sys` | 0 | aktiv | Unsafe-Insel; Systemnahe Bindings, Low-Level-I/O |
-| `contextra-simd` | 0 | aktiv | Unsafe-Insel; SIMD-Distanzkerne |
-| `contextra-wire` | 0 | aktiv | Unsafe-Insel; FlatBuffers Wire-Protokoll |
-| `contextra-mvcc` | 0 | aktiv | Snapshots, SSI, Sequenzen |
-| `contextra-crypto` | 0 | aktiv | AEAD, KDF, Signaturen, Löschbericht V5 |
-| `contextra-vector` | 0 | aktiv | HNSW, SQ8, ACL-Bitset |
-| `contextra-text` | 0 | aktiv | BM25, Tokenizer |
-| `contextra-rank` | 0 | aktiv | RRF-Fusion, Normalisierung |
-| `contextra-store` | 1 | aktiv | WAL, LSM, SSTables, Kompaktion |
-| `contextra-checkpoint` | 1 | aktiv | Persistent Checkpoint Engine |
-| `contextra-engine` | 3 | aktiv | Planner, Collections, Entkopplung von Rand-Crates |
-| `contextra-db` | 3 | aktiv | Main DB Abstraktion |
-| `contextra` | 4 | aktiv | Composition Root, öffentliche Facade |
-
-### 5.2 Rand-Module [M] — Baukasten-Module mit Vertrag (SPEC §4.2, §5)
-
-> **Gemäß SPEC 3.0 / ADR-D01 sind Inferenz-, Agenten- und Schutz-Crates aktive Baukasten-Module [M] mit isoliertem Vertrag, KEIN Archiv.**
-
-| Crate | Ring | Familie | Aufgabe / Entkopplungs-WP |
-|-------|------|---------|---------------------------|
-| `contextra-infer-candle` | 2 | F3 | Lokales GGUF Embedding- & Inferenz-Backend |
-| `contextra-infer-onnx` | 2 | F3 | ONNX Embedding- & Cross-Encoder-Backend (WP 2.7: Download aus) |
-| `contextra-infer-ollama` | 2 | F3 | Ollama Client (WP 2.7: Loopback-Default) |
-| `contextra-kvcache` | 1 | F3 | Quantisierter KV-Cache |
-| `contextra-adapt` | 0 | F3 | PID-Latenzregelung |
-| `contextra-graph` | 0 | F4 | CSR-Graph, PathGraphing (WP 2.2: entkoppeln von `engine`) |
-| `contextra-cognition` | 3 | F4 | Sleep-Cycle-Konsolidierung (WP 2.3: entkoppeln von `db`) |
-| `contextra-router` | 3 | F4 | Lyapunov Drift Control, Routing |
-| `contextra-agent` | 3 | F4 | Agent Execution Pipeline (WP 2.6: entkoppeln über Ports) |
-| `contextra-privacy` | 3 | F5 | PII-Filter, Egress-Gateway |
-| `contextra-mcp` | 4 | F5 | MCP-Server, stdio IPC (WP 2.7: Entkopplung) |
-| `contextra-py` | 4 | F5 | PyO3 Python-Bindings |
-| `contextra-sandbox` | 2 | F5 | WASM Execution Boundary |
-
-### 5.3 Experimentell [E] & Auslaufend
-
-- **Experimentell [E]:** `contextra-license`, `contextra-audit-export`, `contextra-avv-generator`
-- **Auslaufend:** `contextra-core` (WP 2.8: schrittweise Entfernung der Kompatibilitätsfassade)
+1. **Ring und Klasse zuerst.** Abhängigkeiten zeigen nur auf gleichen oder niedrigeren Ring (SPEC §4.1). Die Ringzuordnung steht in SPEC §4, nicht in einzelnen Dateien.
+2. **Kein Panic in Produktion.** Kein `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, `unreachable!`, `process::exit`, ungeprüftes Indexieren. Fehler sind typisiert (`ContextraError`).
+3. **Zeit, Zufall und IDs nur über Ports** (`Clock`, `Rng`, `IdGen`). Verboten in Kernlogik: `Instant::now`, `SystemTime::now`, `thread_rng`, `std::env::var`, `HashMap`/`HashSet` mit zufälligem Hash, sofern die Reihenfolge nach außen sichtbar ist. Ausnahme: Schlüssel- und Salt-Material aus dem System-RNG.
+4. **Persistentes läuft über das WAL.** Sicherheitszustand wird über WAL und Manifest persistiert.
+5. **I/O nur über `Vfs`.** Commit ist ein durabler Flush. `fsync`-Fehler werden propagiert, nie mit `let _ =` verworfen.
+6. **Unsafe nur in zwei Inseln:** `contextra-sys` und `contextra-simd`. Jeder Block mit `// SAFETY:`. Alle anderen Crates haben `#![forbid(unsafe_code)]`.
+7. **Mandant kommt aus dem `RequestContext`**, nie aus Literalen, Defaults oder Nutzerparametern (VETO-F10).
+8. **Sicherheit ist kein Feature-Schalter.** Verschlüsselung und Integritätsprüfung sind in jedem Build aktiv. Kein `cfg(feature)`-Ersatz für Sicherheitscode.
+9. **Messen vor Behaupten.** Löschaussagen und Leistungsangaben brauchen Messung oder Test.
+10. **Fail-Closed.** Unbekannter Zustand, unbekannte Formatversion, gebrochene Kette: Ablehnung mit benanntem Grund, nie Raten.
+11. **Eine Typfamilie je Konzept.** Keine Doppeldefinitionen öffentlicher Typen.
+12. **Ein PR = ein Arbeitspaket.** Höchstens ein Crate-Schnitt.
 
 ---
 
-## 6. Veto-Register (SPEC §3.1, VETOES.md)
+## 5. Crates
+
+### 5.1 Verbliebene Crates (Kern v1)
+
+| Crate | Ring | Klasse | Kurzbeschreibung |
+|---|---|---|---|
+| `contextra-types` | 0 | [K] | Typen, IDs, Budgets, Filter, Fehler |
+| `contextra-ports` | 0 | [K] | Trait-Verträge |
+| `contextra-sys` | 0 | [K] (U) | Systemnahe Schicht, FFI-Insel |
+| `contextra-simd` | 0 | [K] (U) | SIMD-Distanzkerne |
+| `contextra-mvcc` | 0 | [K] | MVCC, SSI |
+| `contextra-crypto` | 0 | [K] | Verschlüsselung, Schlüsselableitung, WAL-Integrität |
+| `contextra-vector` | 0 | [K] | HNSW, SQ8, partieller Rebuild |
+| `contextra-text` | 0 | [K] | BM25, Tokenizer, Morphologie |
+| `contextra-rank` | 0 | [K] | Fusion, Kalibrierung, Drift |
+| `contextra-store` | 1 | [K] | LSM-Speicher, WAL, SSTable, Kompaktion |
+| `contextra-engine` | 2 | [K] | Collections, Hybridsuche, Transaktionen |
+| `contextra-db` | 3 | [K] | Anwendungs-API (`prelude`, `advanced`) |
+| `contextra` | 4 | [K] | Composition Root, öffentliche Fassade |
+| `contextra-testkit` | Tooling | [T] | Testwerkzeuge |
+| `contextra-bench` | Tooling | [T] | Benchmarks (`benchmarks/`) |
+
+### 5.2 Entfernte Crates (nicht im Workspace)
+
+Entfernt in der Reduktion vom 30.10.2026. Wiederherstellung nur über Git (`git checkout 3c1f144fa -- <Pfad>`) und nur über einen Plan nach SPEC §5.2 und PLAN R6.
+
+`contextra-adapt`, `contextra-agent`, `contextra-audit-export`, `contextra-avv-generator`, `contextra-checkpoint`, `contextra-cognition`, `contextra-core`, `contextra-graph`, `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-infer-onnx`, `contextra-ingest`, `contextra-kvcache`, `contextra-license`, `contextra-mcp`, `contextra-privacy`, `contextra-py`, `contextra-router`, `contextra-sandbox`, `contextra-wire`.
+
+**Nicht neu anlegen:** Keine Stubs oder Platzhalter-Crates für entfernte Bausteine. Ein Stub mit Standardimplementierung verletzt Regel 8 und den Grundsatz „Messen vor Behaupten“.
+
+---
+
+## 6. Veto-Register (SPEC §3.1, `docs/VETOES.md`)
 
 | Veto | Status | Regel |
-|------|--------|-------|
-| **VETO-F10** — Keine mandantenübergreifenden Datenflüsse | `permanent_rejected` | Kein Cache, Index, Embedding, Statistik oder Audit-Eintrag überschreitet Tenant-Grenzen. Tenant kommt aus der Transaktion, nie aus Nutzerparametern. |
-| **VETO-F02** — HNSW-Löschung nur per Tombstone+Slot-Nullung+Rebuild | `bestätigt` | Kein Rewiring der Nachbarn. Slot-Nummern werden erst nach Rebuild-Abschluss wiederverwendet. |
-| **VETO-OP03** — Kein Echtzeit-Audio/STT | `bestätigt (geschlossen)` | Kein Audio-Streaming im Kern. |
-| **Single-Node-Doktrin** | `permanent` | Kein Sharding, kein P2P, keine verteilte Replikation. |
+|---|---|---|
+| **VETO-F10**: Keine mandantenübergreifenden Datenflüsse | permanent abgelehnt | Kein Cache, Index, Embedding, Statistik oder Audit-Eintrag überschreitet Mandantengrenzen. |
+| **VETO-F02**: HNSW-Löschung nur per Tombstone, Slot-Nullung und Rebuild | bestätigt | Kein Rewiring der Nachbarn. Slots werden erst nach Rebuild wiederverwendet. |
+| **VETO-OP03**: Kein Echtzeit-Audio und kein STT | bestätigt, geschlossen | Kein Audio-Streaming im Kern. |
+| **Single-Node-Doktrin** | permanent | Kein Sharding, kein P2P, keine verteilte Replikation. |
 
 ---
 
-## 7. Sicherheitsports (INV-WIRING-2)
+## 7. Sicherheitsports (Ist-Stand)
 
-Folgende Ports MÜSSEN in Produktion real implementiert sein. Null-/Test-/Accept-All-Implementierungen als Standard sind unzulässig:
+Die Port-Liste aus Fassung 3.1 (`KmsProvider`, `DurableLog`, `ErasureJournal`, `LayerScanner`, `Purger`, `EffaceableKeySlot`, `ErasedSetMirror`) bezieht sich auf die entfernte Löschkette und ist **nicht mehr verpflichtend**.
 
-| Port | Crate | Pflicht-Impl | WP |
-|------|-------|-------------|-----|
-| `KmsProvider` | `ports` | `crypto::kms::K1Provider` | WP 5.1 |
-| `Vfs` | `ports` | `store::vfs::StdVfs` | WP 4.1 |
-| `DurableLog` | `ports` | `store::sidecar::DurableLogImpl` | WP 4.2 |
-| `ErasureJournal` | `ports` | `store::sidecar::ErasureJournalImpl` | WP 4.2 |
-| `LayerScanner` | `ports` | je Schicht (WP 6.x) | WP 6.1–6.7 |
-| `Purger` | `ports` | `store::compaction::RangePurger` | WP 6.1 |
-| `EffaceableKeySlot` | `ports` | K2/K3: `CapabilityUnsupported` (D-10) | WP 5.1 |
-| `ErasedSetMirror` | `ports` | `engine::erasure::MirrorImpl` | WP 7.3 |
+Verpflichtend in v1 bleibt: `Vfs` (Regel 5) und die Determinismus-Ports `Clock`, `Rng`, `IdGen` (Regel 3). Konkrete Implementierungen liegen in `contextra-store` bzw. `contextra-sys`. Null-, Test- oder Accept-All-Implementierungen dürfen nicht als Standard in den Produktpfad.
 
 ---
 
-## 8. Aktueller Implementierungsstatus (IST-Befunde)
+## 8. Hinweise für Jules und andere autonome Agenten
 
-> Basierend auf PLAN.md §1 (Kernbefunde) und Commit `a547a42`.
-> Aktuelle Gates laufen auf main via CI.
+Die Dateien unter `.agents/jules/` beschreiben einen Ablauf mit `gh`-Issues, `cargo xtask` und einer Gate-Matrix aus dem Vorzustand. Diese Teile sind **nicht aktuell**:
 
-### 8.1 Kritische Sofort-Maßnahmen (Phase 0–1, bereits in Arbeit)
+- Alle Verweise auf `cargo xtask` sind ungültig (Befund B1).
+- Routinen wie `unsafe-pruefung`, `unwrap-allow-abbau` und `dependency-hygiene` verweisen auf entfernte Crates.
+- Die Session-Bootstrap-Datei referenziert Kontext-Dateien, die in dieser Revision nicht erzeugt werden.
 
-| ID | Befund | Gate | WP |
-|----|--------|------|-----|
-| B-02 | Engine-Sicherheitsstub: `DeletionProof::verify → Ok(true)` | `no-security-stub` | WP 1.1 |
-| B-04 | MCP: Literal-Schlüssel `default_test_deletion_proof_key`, Mandanten-Fallback auf `SYSTEM` | `no-literal-secrets` | WP 1.2 |
-| B-07 | Schlüsselableitung per HKDF statt Argon2id (INV-KDF-1 verletzt) | `key-kdf` | WP 5.1 |
-| B-08 | Ports der Löschkette (`Vfs`, `LayerScanner` etc.) fehlen komplett | `security-ports` | WP 3.2 |
-| B-12 | HNSW: Slot-Wiederverwendung ohne Nullung (INV-HNSW-SLOT-1 verletzt) | `hnsw-slot` | WP 6.2 |
-| B-14 | Kern hängt hart am Rand (engine→graph, adapt, kvcache; INV-CORE-ISOLATION-1) | `ring-layering` | WP 2.x |
-| B-15 | `encryption-at-rest` als optionales Feature (A1 verletzt) | `no-security-stub` | WP 1.1 |
+Bis `.agents/jules/` in Phase R3 bereinigt ist, gilt für alle Agenten: **Diese Datei und `docs/SPEC.md` haben Vorrang vor den Jules-Dokumenten.**
 
-### 8.2 Gate-Lage (Scan auf `a547a42`)
-
-| Gate | Status | Verstöße |
-|------|--------|----------|
-| `ring-layering` | 🔴 | 2 Fehler + 66 Warnungen |
-| `feature-consistency` | 🔴 | 24 |
-| `test-surface` | 🔴 | 18 |
-| `determinism` | 🔴 | 44 Zeitaufrufe (35 in aktiven Crates) |
-| `async-io` | 🔴 | 18 |
-| `unsafe-audit` | 🔴 | 5 SAFETY-Lücken |
-| `raw-carrier` | 🔴 | 2 |
-| `deletion-honesty` | 🟡 | grün (sieht Lücken nicht) |
-| `doc-stamp` | 🟡 | 7 Warnungen |
+Keine Agenten-Aktion darf Gates, Lints oder den Toolchain-Pin ändern, um einen roten Build grün zu machen. Die Ursache wird behoben, nicht das Symptom.
 
 ---
 
-## 9. Nicht-Ziele v1.0 (SPEC §2.3)
+## 9. Nicht-Ziele v1 (SPEC §2.3)
 
-**Diese Fähigkeiten sind in v1.0 NICHT implementiert** und dürfen nicht hinzugefügt werden ohne ADR:
+Diese Fähigkeiten sind in v1 **nicht** implementiert und dürfen ohne ADR nicht hinzugefügt werden:
 
-- Graph-Reasoning, Kognition/Konsolidierung
-- Router/Agentenlaufzeit, Online-Adaption
-- KV-Cache-Verwaltung, DiskANN/RaBitQ
-- Windows für Server und MCP (Best-Effort, keine Garantieplattform)
+- Graph-Reasoning, Konsolidierung über Schlafzyklen, Kognition
+- Router, Agenten-Laufzeit, Online-Adaption
+- Inferenz-Backends (Candle, ONNX, Ollama), KV-Cache-Verwaltung
+- MCP-Server, Python-Bindings, WASM-Sandbox
+- Dokumenten-Ingestion, PII-Filter, Egress-Gateway
+- DiskANN
 - Verteilter Betrieb (kein Sharding, kein P2P)
-- Echtzeit-Audio/STT (VETO-OP03)
-- Löschbeweis als Rechtsnachweis
-- Python-Wheels in v1.0
-- Schlüsselverwahrung K2/K3 als ausgelieferte Stufe (Port vorhanden, `CapabilityUnsupported`)
+- Echtzeit-Audio und STT (VETO-OP03)
+- Löschbeweis als Rechtsnachweis (SPEC §9)
+- Windows als Garantieplattform
+
+**Offen:** RaBitQ ist im Code vorhanden, widerspricht aber diesem Katalog. Entscheidung D-R4.
 
 ---
 
 ## 10. Referenzen
 
 | Dokument | Zweck |
-|----------|-------|
-| `docs/SPEC.md` | **Einzige normative Quelle** für Architektur, Verhalten, Konstanten, Tests, Gates, Plan |
-| `docs/PLAN.md` | Implementierungsplan IST→SOLL, Arbeitspakete (WP 0.1–9.4) |
-| `docs/ARCHITECTURE.md` | Lese-Hilfsmittel (nicht normativ; normativ ist SPEC §4) |
-| `capabilities.toml` | Single Source of Truth für Ring, Klasse, Reifegrad je Crate |
-| `docs/VETOES.md` | Veto-Register (VETO-F02, VETO-F10, VETO-OP03) |
+|---|---|
+| `docs/SPEC.md` | Normative Gesamtspezifikation 4.0 |
+| `docs/PLAN.md` | Umsetzungsplan 4.0, Phasen R0 bis R6 |
+| `docs/ARCHITECTURE.md` | Architekturübersicht (nicht normativ) |
+| `docs/VETOES.md` | Vetos |
 | `docs/CONSTITUTION.md` | Grundlegende Governance-Prinzipien |
-| `governance/gates.toml` | Gate-Katalog — Single Source of Truth aller Gate-Definitionen (§17.3) |
-| `governance/ratchet.toml` | Qualitäts-Baselines (dürfen nur sinken, REQ-QA-005) |
-| `governance/security_ports.toml` | Pflicht-Sicherheitsports (INV-WIRING-2, WP 0.4) |
-| `governance/key_purposes.toml` | Schlüssel-Zweckbindung HKDF (INV-KEYPURPOSE-1, §12.3) |
-| `governance/clippy.toml` | Workspace-Clippy: P28-Verbotsliste (disallowed-methods/-types) |
-| `governance/determinism-allow.toml` | Erlaubte Determinismus-Ausnahmen (ADR-098) |
-| `governance/protected-paths.toml` | Geschützte Pfade (REQ-GOV-002, §18.2) |
-| `.agents/jules/SESSION_BOOTSTRAP.md` | Jules Session-Ablauf (primärer Pfad) |
-| `.agents/jules/GITHUB_WORKFLOW.md` | GitHub-Konventionen für Jules |
-| `CLAUDE.md` | Claude / Antigravity Agent Guide |
-| `docs/decisions/` | ADR-Index | <!-- doc-ref-ignore -->
+| `docs/TYPE_REGISTRY.md` | Doppeldefinitionen öffentlicher Typen |
+| `capabilities.toml` | Ring- und Reifegrad-Zuordnung (Angleichung in R2) |
+| `governance/gates.toml` | Gate-Katalog (Angleichung in R2) |
+| `governance/ratchet.toml` | Qualitäts-Baselines (nach R0 neu zu setzen) |
+| `governance/protected-paths.toml` | Geschützte Pfade |
+| `CLAUDE.md` | Arbeitsregeln für Claude und Antigravity |
+| `docs/decisions/` | ADR-Index (Status einzelner ADRs in PLAN R3.4) |

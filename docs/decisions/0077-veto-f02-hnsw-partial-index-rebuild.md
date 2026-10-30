@@ -1,5 +1,7 @@
 # ADR-0077: HNSW-Löschung per Tombstone + Slot-Nullung (VETO-F02)
 
+> **Status-Update 30.10.2026:** Gültig. Umsetzung in `contextra-vector` bleibt maßgeblich (VETO-F02).
+
 - **Status:** Proposed — benötigt Maintainer-Freigabe
 - **Datum:** 2026-10-29
 - **Autoren:** Architecture Governance Team

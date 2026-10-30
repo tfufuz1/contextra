@@ -1,3 +1,5 @@
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+
 1. Führe `cargo xtask jules start --card <card>` aus. Lies NUR das erzeugte CONTEXT_PACK.md und die Crate-AGENTS.md. <!-- harness:planned -->
 2. Verifiziere jedes Symbol mit `cargo xtask symbol-exists <path>` bevor du es benutzt. <!-- harness:planned -->
 3. Ändere ausschließlich Dateien im `scope` der Karte. Alles andere: unter „Out-of-scope Findings" im PR melden.

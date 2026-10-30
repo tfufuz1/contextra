@@ -1,5 +1,7 @@
 # Decision Proposal: Änderungsvorschlag für AGENTS.md und CLAUDE.md §5.4
 
+> **Status-Update 30.10.2026:** Historisch. Abschnitt 5.4 ist in `AGENTS.md` Fassung 4.0 nicht mehr enthalten.
+
 - **Status:** Proposed — erfordert Verfassungs-/Governance-Freigabe
 - **Datum:** 2026-10-29
 

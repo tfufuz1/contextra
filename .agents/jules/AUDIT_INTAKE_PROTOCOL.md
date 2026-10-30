@@ -1,5 +1,7 @@
 # Contextra — Audit Intake Verification Protocol (`AUDIT_INTAKE_PROTOCOL.md`)
 
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+
 > **Regel (AGENTS.md §4)**: Jeder Befund ("Finding") aus einem extern zugelieferten Audit-Dokument, Prompt oder Review-Bericht MUSS vor der Implementierung am AKTUELLEN Quellcode verifiziert werden.
 
 ---

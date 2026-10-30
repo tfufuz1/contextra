@@ -1,5 +1,7 @@
 # Architecture Decision Records (ADR) Index
 
+> **Historisches Dokument (Stand vor Reduktion, 30.10.2026).** Beschreibt den Vorzustand bis Commit `3c1f144fa`. Nicht normativ. Maßgeblich: `docs/SPEC.md` und `docs/PLAN.md` (Fassung 4.0).
+
 Dieses Verzeichnis enthält alle Architecture Decision Records (ADRs) des Contextra-Projekts.
 
 ## Status-Definitionen

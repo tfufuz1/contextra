@@ -1,4 +1,6 @@
 # Contextra — Jules Session Bootstrap
+
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 > Maschinenausführbare Checkliste. Jede Session beginnt mit GitHub, nicht mit statischen Dateien.
 >
 > **Prinzip:** GitHub = agiler Kontext (Tasks, Reviews, CI). Statische Dateien = unveränderliche Regeln.

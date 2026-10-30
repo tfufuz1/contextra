@@ -1,5 +1,7 @@
 # Kanten-Inventar Archiv-Crates — WP 2.1
 
+> **Historisches Dokument (Stand vor Reduktion, 30.10.2026).** Beschreibt den Vorzustand bis Commit `3c1f144fa`. Nicht normativ. Maßgeblich: `docs/SPEC.md` und `docs/PLAN.md` (Fassung 4.0).
+
 <!-- doc-stamp: e2675209c | Generiert: tools/generate_migration_edges.py -->
 
 > **Zweck.** Dieses Dokument listet alle Kanten von aktiven Crates zu Archiv-Crates.

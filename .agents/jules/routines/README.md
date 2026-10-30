@@ -1,5 +1,7 @@
 # Routinen-Verzeichnis (`.jules/routines/`)
 
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+
 ## Zweck
 Dieses Verzeichnis enthält die standardisierten, maschinenlesbaren Prozessbeschreibungen für alle wiederkehrenden Routine-Aufgaben im Repository gemäß Architekturdokument §9.2 und §9.3.
 

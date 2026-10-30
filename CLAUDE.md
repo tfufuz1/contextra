@@ -1,91 +1,75 @@
-# Contextra — Claude / Antigravity Agent Guide
+# Contextra – Claude / Antigravity Agent Guide
 
-<!-- doc-stamp: 2026-10-29 10cc17922 | Normativ: CONSTITUTION.md, SPEC.md, AGENTS.md -->
+<!-- doc-stamp: 2026-10-30 | Normativ: docs/CONSTITUTION.md, docs/SPEC.md (4.0), AGENTS.md -->
 
 > [!IMPORTANT]
-> Claude und Antigravity: Lies AGENTS.md §2b (nicht §2a — das ist nur für Jules).
-> Normative Rangfolge: CONSTITUTION.md > SPEC.md > PLAN.md > capabilities.toml > AGENTS.md
+> Build-Status (30.10.2026): **nicht grün.** Vor jeder Änderung prüfen, ob die Aufgabe zu Phase R0 in `docs/PLAN.md` gehört. Andere Arbeit wird bis zum grünen Build zurückgestellt.
+>
+> Rangfolge: CONSTITUTION > SPEC > PLAN > Quelltext > `capabilities.toml` und `governance/` > AGENTS.md > CLAUDE.md
 
-## Schnellstart für Claude/Antigravity
-
-```bash
-# 1. Build-Grundlage prüfen (AGENTS.md §2b)
-cargo check --workspace
-
-# 2. SPEC §0 lesen (LLM-Schnellstart)
-# Datei: docs/SPEC.md — Abschnitt §0
-
-# 3. Ring/Klassen-Zuordnung prüfen
-cat capabilities.toml
-```
-
-## Die 12 Regeln (AGENTS.md §4) — Kurzreferenz
-
-| # | Regel | Verletzung = Gate-Fehler |
-|---|-------|--------------------------|
-| 1 | Ring und Klasse zuerst | ring-dag Gate |
-| 2 | Kein Panic in Produktion | panic-surface Gate |
-| 3 | Zeit/Zufall/IDs nur über Ports | determinism Gate |
-| 4 | Alles Persistente geht durch WAL | deletion-honesty Gate |
-| 5 | I/O nur über `Vfs` | security-ports Gate |
-| 6 | Unsafe nur in 3 Inseln | unsafe-inventory Gate |
-| 7 | Mandant aus RequestContext | no-literal-secrets Gate |
-| 8 | Sicherheit kein Feature-Schalter | no-security-stub Gate |
-| 9 | Messen vor Behaupten | deletion-honesty Gate |
-| 10 | Fail-Closed | code-lints Gate |
-| 11 | Eine Typfamilie je Konzept | symbol-uniqueness Gate |
-| 12 | Ein PR = ein WP | scope-guard Gate |
-
-## Baukasten-Module [M] (SPEC §4.2, §5)
-
-`contextra-graph`, `contextra-cognition`, `contextra-adapt`, `contextra-kvcache`,
-`contextra-router`, `contextra-agent`, `contextra-infer-onnx`, `contextra-infer-ollama`,
-`contextra-privacy`, `contextra-mcp`, `contextra-py`, `contextra-sandbox`
-
-> [!NOTE]
-> Gemäß SPEC 3.0 / ADR-D01 sind diese Crates Baukasten-Module [M] mit eigenem Vertrag und isoliertem Prüfauftrag, kein Archiv.
-
-## Gates (`cargo xtask`)
+## Schnellstart
 
 ```bash
-# Alle aktiven Gates prüfen
-cargo run -p xtask -- check
+# 1. Workspace lädt?
+cargo metadata --no-deps --format-version 1 > /dev/null
 
-# Einzelnes Gate prüfen
-cargo run -p xtask -- gate check --gate ring-dag
+# 2. Kompiliert?
+cargo check --workspace --all-targets
 
-# Liste aller Gates
-cargo run -p xtask -- --list-gates
+# 3. Ringe und Abhängigkeiten
+#    docs/SPEC.md §4.1 und §4.2
 ```
+
+Der Befehl `cargo xtask` existiert seit Commit `068261abd` nicht mehr. Befehle aus älteren Dokumenten sind ungültig.
+
+## Die zwölf Regeln (SPEC §3.2, Kurzreferenz)
+
+| # | Regel | Prüfung (Ist, 30.10.2026) |
+|---|---|---|
+| 1 | Ring und Klasse zuerst | `tests/layering.rs` (Angleichung R2) |
+| 2 | Kein Panic in Produktion | Clippy-Lints `unwrap_used`, `expect_used`, `panic`, `indexing_slicing` |
+| 3 | Zeit, Zufall, IDs nur über Ports | Review |
+| 4 | Persistentes läuft über das WAL | Tests in `contextra-store` |
+| 5 | I/O nur über `Vfs`; `fsync`-Fehler propagieren | Review, Clippy (R1) |
+| 6 | Unsafe nur in `contextra-sys` und `contextra-simd` | `tests/unsafe_islands.rs` |
+| 7 | Mandant aus `RequestContext` | `contextra/tests/tenant_isolation_facade.rs` |
+| 8 | Sicherheit ist kein Feature-Schalter | Test im Default-Build (R0.6) |
+| 9 | Messen vor Behaupten | `contextra-bench` |
+| 10 | Fail-Closed | Recovery-Tests in `contextra-store` |
+| 11 | Eine Typfamilie je Konzept | Doppeltyp-Prüfung (R1.3) |
+| 12 | Ein PR = ein Arbeitspaket | Review |
+
+## Crates (Kern v1)
+
+`contextra-types`, `contextra-ports`, `contextra-sys` (U), `contextra-simd` (U), `contextra-mvcc`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-rank` (Ring 0) · `contextra-store` (Ring 1) · `contextra-engine` (Ring 2) · `contextra-db` (Ring 3) · `contextra` (Ring 4) · `contextra-testkit`, `contextra-bench` (Tooling)
+
+Entfernte Crates (`contextra-graph`, `contextra-adapt`, `contextra-cognition`, `contextra-router`, `contextra-agent`, `contextra-infer-*`, `contextra-mcp`, `contextra-py`, `contextra-privacy`, `contextra-ingest`, `contextra-kvcache`, `contextra-sandbox`, `contextra-wire`, `contextra-checkpoint`, `contextra-license`, `contextra-audit-export`, `contextra-avv-generator`, `contextra-core`): nicht anlegen, nicht referenzieren. Siehe SPEC §5.2.
 
 ## Commit-Konventionen
 
 ```
-WP-x.y(crate): Kurze Beschreibung
+WP-R0.3(contextra-engine): Residuen aus relate.rs entfernen
 
-- Was geändert und warum (SPEC §x.y)
-- Gate-Status vorher → nachher
-
-Gates: ring-layering=🟢 no-security-stub=🔴→🟡
-Closes: #<issue>
+- Was geändert und warum (PLAN §2, SPEC §16 B2)
+- Prüfstatus vorher → nachher (cargo check -p <crate>)
 ```
 
 ## Branch-Naming
 
 ```
-wp/x.y-kurzbeschreibung       # z.B. wp/2.1-archive-graph
-fix/gate-name-beschreibung    # z.B. fix/ring-layering-engine-dep
+wp/r0.3-engine-residuen      # Arbeitspaket aus PLAN.md
+fix/build-xtask-member       # Fehlerbehebung außerhalb eines WP
 ```
 
-## Governance-Referenzen
+## Governance-Dateien
 
-| Datei | Zweck |
-|-------|-------|
-| `governance/gates.toml` | Gate-Katalog — Single Source of Truth (50+ Gates) |
-| `governance/ratchet.toml` | Qualitäts-Baselines (dürfen nur sinken, REQ-QA-005) |
-| `governance/security_ports.toml` | Pflicht-Sicherheitsports (INV-WIRING-2) |
-| `governance/key_purposes.toml` | HKDF-Labels und Schlüssel-Zweckbindung (INV-KEYPURPOSE-1) |
-| `governance/clippy.toml` | P28-Verbotsliste (disallowed-methods/-types) |
-| `governance/determinism-allow.toml` | Erlaubte Nicht-Determinismus-Ausnahmen (ADR-098) |
-| `governance/protected-paths.toml` | Geschützte Pfade (REQ-GOV-002) |
-| `governance/README.md` | Übersicht und Konsumenten-Dokumentation |
+| Datei | Zweck | Stand |
+|---|---|---|
+| `governance/gates.toml` | Gate-Katalog | Enthält Gates für entfernte Komponenten, Angleichung in R2 |
+| `governance/ratchet.toml` | Qualitäts-Baselines (nur sinkend) | Nach R0 neu setzen |
+| `governance/security_ports.toml` | Sicherheitsports | Angleichung in R2 |
+| `governance/key_purposes.toml` | Schlüssel-Zweckbindung | Entfernte Zwecke streichen (R2) |
+| `governance/clippy.toml` | Verbotsliste | Gültig |
+| `governance/determinism-allow.toml` | Erlaubte Ausnahmen | Gültig, Pfade prüfen |
+| `governance/protected-paths.toml` | Geschützte Pfade | `xtask/**` entfernen (R2) |
+| `capabilities.toml` | Ring- und Reifegrad-Manifest | 98 Verweise auf Entferntes, Neuerzeugung in R2 |

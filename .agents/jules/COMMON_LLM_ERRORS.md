@@ -1,4 +1,6 @@
 # Contextra — Häufige LLM-Fehler & Korrekturen
+
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 > Destilliert aus Session-Audits. Bei Unsicherheit: diese Datei zuerst prüfen.
 
 ## FEHLER-KLASSE 1: API-Halluzination

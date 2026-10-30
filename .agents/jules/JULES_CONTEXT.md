@@ -1,4 +1,6 @@
 # Contextra — Jules Agent Context
+
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 > Version: 3.1 | Stand: 2026-10-26 | Permanent Ambient Context für Jules Sessions (Spezifikation v9)
 >
 > ⚠️ **FRISCHEGARANTIE**: Diese Datei regelt ausschließlich die Session-Prozessführung für Jules.

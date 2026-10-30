@@ -1,5 +1,7 @@
 # Decision Proposal: Panic-Messmodell für den Contextra Workspace
 
+> **Status-Update 30.10.2026:** Gültig. Prüfung gegen Regel 2 (SPEC §3.2) ausstehend.
+
 - **Status:** Proposed
 - **Datum:** 2026-10-29
 - **Betroffene Komponenten:** `governance/ratchet.toml`, `xtask`, `docs/VETOES.md`

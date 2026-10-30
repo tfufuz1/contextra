@@ -1,5 +1,7 @@
 # Fuzzing infrastructure for `contextra-crypto`
 
+> **Status 30.10.2026 (Reduktion):** Dieses Crate gehört zum Kern v1. Ring und Abhängigkeiten stimmen mit `docs/SPEC.md` §4 überein. Verweise auf entfernte Crates oder Funktionen sind veraltet. Feature-Verweise ohne Deklaration (`encryption-at-rest`, `wal-integrity`; SPEC §16, B4) und Restverweise auf entfernte Löschbeweis-Module (B2). Maßgeblich ist der Quelltext. Bereinigung: `docs/PLAN.md` Phase R0 bis R3.
+
 This directory contains `cargo-fuzz` targets for `contextra-crypto`.
 
 ## Targets

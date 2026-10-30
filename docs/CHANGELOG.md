@@ -4,6 +4,22 @@
 
 > Automatisch generierter Read-Only Bericht aus allen Inline-Tags im Repo.
 
+## [Reduktion] - 2026-10-30
+
+### Changed
+- Repository auf Kern v1 reduziert (Commit `ed402e21a`). Entfernt: `contextra-graph`, `-adapt`, `-agent`, `-cognition`, `-infer-*`, `-ingest`, `-mcp`, `-privacy`, `-wire`, `-checkpoint`, `-audit-export`, `-avv-generator`, `-kvcache`, `-router`, `-sandbox`, `-py`, `-license`, `-core`; `xtask/` (Commit `068261abd`).
+- `docs/SPEC.md` auf Fassung 4.0 (Reduktionsfassung), `docs/PLAN.md` auf Fassung 4.0 (Phasen R0 bis R6).
+- Ringmodell an Ist-Abhängigkeiten angepasst; `contextra-engine` von Ring 3 nach Ring 2 (Vorschlag D-R3).
+- Löschkette aus dem Scope v1 genommen (D-R5). ADR-0001, 0006, 0007, 0008 ausgesetzt.
+- Dokumentation (`README.md`, `AGENTS.md`, `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/CONTRIBUTING.md`, `docs/TYPE_REGISTRY.md`, `.github/copilot-instructions.md`, `.github/pull_request_template.md`) an den Ist-Stand angeglichen.
+
+### Known issues
+- Workspace-Mitglied `xtask` fehlt; Quelltext referenziert entfernte Crates; Feature-Flags sind teils nicht deklariert. Build ist nicht grün (SPEC §16, B1 bis B4).
+- Gate-Runner entfernt; Gates nicht ausführbar (D-R2).
+- Restore-Tag `pre-reduction-1.0` existiert nicht; maßgeblich ist `3c1f144fa` (D-R6).
+
+---
+
 ## [Unreleased] - 2026-10-29
 
 ### Docs

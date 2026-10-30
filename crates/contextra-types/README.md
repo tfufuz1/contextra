@@ -1,5 +1,7 @@
 # contextra-types
 
+> **Status 30.10.2026 (Reduktion):** Dieses Crate gehört zum Kern v1. Ring und Abhängigkeiten stimmen mit `docs/SPEC.md` §4 überein. Verweise auf entfernte Crates oder Funktionen sind veraltet. Restmodul `types/saos.rs` stammt aus dem entfernten Agenten-Kontext (SPEC §16, B7). Maßgeblich ist der Quelltext. Bereinigung: `docs/PLAN.md` Phase R0 bis R3.
+
 Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen).
 
 Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, `capabilities.toml`).

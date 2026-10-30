@@ -1,4 +1,6 @@
 # AUDIT REPORT: GOVERNANCE UND HARNESS PFADSTRUKTUR
+
+> **Historisches Dokument (Stand vor Reduktion, 30.10.2026).** Beschreibt den Vorzustand bis Commit `3c1f144fa`. Nicht normativ. Maßgeblich: `docs/SPEC.md` und `docs/PLAN.md` (Fassung 4.0).
 Normativ: SPEC §18.7 (INV-DOC-SINGLE-SOURCE-1) | Audit-Dateien: governance/ vs .agents/governance/
 
 ## 1. Tabelle A: Governance-Dateien Inventar

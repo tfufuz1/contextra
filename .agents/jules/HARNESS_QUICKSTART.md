@@ -1,5 +1,7 @@
 # Harness Quickstart
 
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+
 Dieses Dokument beschreibt die Benutzung der schlanken 5-Phasen-Fassade für Jules-Sessions.
 
 ## Die 5 Phasenbefehle

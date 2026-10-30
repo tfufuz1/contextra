@@ -1,5 +1,7 @@
 # ADR 0008: Zweckbindung und Rechtsgrundlage für ErasedSet, Referenz-Hashes und Berichte
 
+> **Status-Update 30.10.2026:** Ausgesetzt (D-R5). `ErasedSet` ist entfernt.
+
 - **Status**: Proposed — benötigt Maintainer-Freigabe
 - **Datum**: 2026-10-29
 - **Kontext**: Datenhaltung für Nachweis- und Sperrzwecke ist selbst personenbezogen (EDPB Rn. 52, SPEC C-12.7.10, SPEC C-12.10)

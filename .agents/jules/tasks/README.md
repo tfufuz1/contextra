@@ -1,5 +1,7 @@
 # Task-Karten in Contextra
 
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+
 Eine Task-Karte beschreibt ein isoliertes, maschinell prüfbares Arbeitspaket für Jules. Sie verhindert vage Aufträge und setzt klare Scope- und Budgetgrenzen.
 
 ## Drei Beispiele guter Task-Karten

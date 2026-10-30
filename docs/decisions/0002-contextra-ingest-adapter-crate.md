@@ -1,5 +1,7 @@
 # ADR 0002: Adapter-Crate `contextra-ingest` für Format-Extraktion & Chunking
 
+> **Status-Update 30.10.2026:** Überholt. Das Crate `contextra-ingest` ist entfernt (SPEC §5.2).
+
 ## Status
 Accepted
 

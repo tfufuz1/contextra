@@ -1,65 +1,55 @@
-# Contributing to Contextra
+# Beitragen zu Contextra
 
-Vielen Dank für dein Interesse, zu Contextra beizutragen! Dieses Dokument bündelt alle Richtlinien für Entwicklerinnen und Entwickler. Es basiert auf der Normativen Gesamtspezifikation (Fassung 1.2; §27, §28).
+<!-- doc-stamp: 2026-10-30 | Normativ: docs/SPEC.md Fassung 4.0, AGENTS.md, CLAUDE.md -->
 
-## 1. Governance & Rangfolge (§28.0)
+Vielen Dank für Ihr Interesse. Dieses Dokument beschreibt, wie Änderungen in den Kern von Contextra eingebracht werden.
 
-Bei allen Beiträgen gilt die verbindliche Quell- und Entscheidungs-Rangfolge (§28.1):
-1. **Spezifikation 1.2** (`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`, §0, §1)
-2. **Vetos & Prinzipien** (§4.1, §5.0, P1–P30)
-3. **Crate-Inventar & Reifegrade** (`capabilities.toml`)
-4. **Agenten-Betriebsanleitung** (`AGENTS.md`)
-5. **Quellcode & grüne Gates**
+---
 
-Es ist verboten, Qualitäts-Gates, Lints oder Toolchain-Pins durch Ausnahmen abzuschwächen (REQ-QA-010).
+## 1. Voraussetzungen
 
-## 2. Kurzeinstieg (Setup & Build)
+- Rust-Toolchain laut `rust-toolchain.toml` (MSRV 1.89).
+- Optional: `nix develop` mit `flake.nix` für eine reproduzierbare Umgebung.
+- Kenntnis von `docs/SPEC.md` §3 (Regeln) und §4 (Ringe).
 
-### Voraussetzungen
-- **Rust Toolchain:** Stable Rust (1.80+) mit `cargo` und `rustfmt`.
-- **Just Task Runner:** `just` für Entwicklungsbefehle.
+## 2. Ablauf
 
-### Grundprinzipien & Invarianten
-- **Single-Node & Air-Gap (§1, §4.1):** Keine Laufzeit-Annahmen über Cloud-Dienste; lokale Inferenz via Candle (`[R]`, §15) oder Ollama (`[R]`, §15).
-- **Zero-Panic-Doktrin (§3, §27.6):** Produktionscode darf im regulären Pfad niemals `panic!`, `.unwrap()` oder `.expect()` enthalten (`Result<T, E>` mit `ContextraError` nutzen).
-- **Safe Rust & Ring-Schichtenreinheit (§6.0, §6.10):** `#![forbid(unsafe_code)]` in allen Crates außerhalb der 3 Unsafe-Inseln (`contextra-simd`, `contextra-sys`, `contextra-wire`; §6.7). Abhängigkeiten fließen strikt unidirektional von Ring 4/3 nach Ring 0 (§6.10).
-- **Governance & Entwicklungsprozess (§28):** Änderungen an Vetos oder Invarianten benötigen eine ADR (`docs/decisions/`). Merges laufen serialisiert über eine Merge-Queue, die das Merge-Ergebnis testet (§28.2).
-- **Löschaussagen & Transparenz (INV-CLAIMS-1):** Aussagen zur Löschung folgen zwingend der Außenformulierung (§4.3, §20.12). Werbe- oder Pauschalaussagen zur Löschwirkung oder Rechtskonformität sind unzulässig (§4.3, §20.12).
+1. Aufgabe einem Arbeitspaket (WP) aus `docs/PLAN.md` zuordnen. Fehlt ein WP, bitte zuerst ein Issue mit Begründung anlegen.
+2. Branch nach Schema `wp/<nummer>-<kurzbeschreibung>` anlegen, z. B. `wp/r0.3-engine-residuen`.
+3. Änderung so klein wie möglich halten. Ein PR umfasst ein Arbeitspaket und höchstens einen Crate-Schnitt.
+4. Lokal prüfen:
 
-### Local Build & Verification Commands
 ```bash
-cargo check --workspace                 # Kompilierbarkeit prüfen
-just check                              # Clippy-Warnungen als Fehler behandeln
-cargo check --examples                  # Examples prüfen
-just dag-check                          # Ring-Schichtenarchitektur (DAG) verifizieren (§6.10)
-cargo xtask jules-preflight             # Preflight Verification Gate
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
 
-## 3. Wie beigetragen wird (PR-Ablauf & Branching)
+5. Dokumentation im selben PR anpassen, wenn sich Ring, Abhängigkeiten, Befunde oder Scope ändern.
+6. Vor dem PR auf den aktuellen Hauptzweig rebasen: `git fetch origin && git rebase origin/main`. Danach die Prüfungen erneut ausführen.
 
-1. **Branching & Arbeitsablauf:** Erstelle einen Feature-Branch für deine Änderungen. Halte Diffs minimal und fokussiert (Minimal-Diff-Prinzip).
-2. **Preflight Checks:** Führe vor jedem PR `cargo xtask jules-preflight` aus. Alle Gates müssen lokal grün sein (§27.6).
-3. **Pull Request:** Reiche den PR ein. Stelle sicher, dass Commit-Nachrichten präzise sind und Invarianten (§5) nicht verletzt werden.
-4. **Lizenzierung:** Beiträge stehen unter der [MIT License](LICENSE-MIT) und der [Apache License 2.0](LICENSE-APACHE).
+## 3. Verbindliche Regeln
 
-## 3. Testregeln & Qualitätssicherung (§27)
+- Kein `unwrap`, `expect`, `panic!` oder ungeprüftes Indexieren in Produktionscode (Clippy-Lints im Workspace).
+- `unsafe` nur in `contextra-sys` und `contextra-simd`, jeder Block mit `// SAFETY:`.
+- Zeit, Zufall und IDs nur über die Ports `Clock`, `Rng`, `IdGen`.
+- `fsync`-Fehler werden mit `?` propagiert, nie mit `let _ =` verworfen.
+- Keine Lint-Ausnahmen auf Modulebene ohne ADR.
+- Keine Stubs oder Platzhalter-Implementierungen für Sicherheitsfunktionen.
 
-### Testregeln & -kategorien (§27.1–§27.5)
-- **Anti-Mirroring-Prinzip:** Assertions müssen mit unabhängig ermittelten Referenzwerten arbeiten (kein Wiederholen der Formel im Test).
-- **Pflichtabdeckung:** Jeder PR muss Tests für folgende Szenarien enthalten:
-  1. *Happy Path*, 2. *Leere Eingaben*, 3. *Einzelne Elemente*, 4. *Grenzwerte* (`u64::MAX`, `f32::INFINITY`), 5. *Fehlerpfade* (Dimension-Mismatches, korrupte Bytes), 6. *Concurrency* (Sperren & Atomics; INV-LOCK-ORDER-1).
-- **Proptests & Mutation-Check:** Proptests für SIMD/Skalar-Gegenüberstellungen. Vor Freigabe prüfen: *Schlägt ein Test fehl, wenn ein Operator im Produktionscode umgekehrt wird?*
-- **Hermetic Feature Gate Check:** `cargo check -p <crate> --no-default-features` prüft fehlende Default-Feature-Lecks.
-- **Allowances:** `.unwrap()` und `.expect()` sind ausschließlich in Test-Code (`#[cfg(test)]`) erlaubt.
+## 4. Commit-Nachrichten
 
-### Tests ausführen
-```bash
-cargo test --workspace                  # Alle Workspace-Tests
+```
+WP-R0.3(contextra-engine): Kurze Beschreibung
+
+- Was geändert und warum (PLAN §, SPEC §)
+- Prüfstatus vorher → nachher
 ```
 
-## 5. Weiterführende Dokumente
+## 5. Fragen zum Scope
 
-- **Systemarchitektur & Ring-Modell:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
-- **Agenten-Betriebsanleitung:** [`AGENTS.md`](AGENTS.md)
-- **Governance & Entwicklungsprozess:** [`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`](docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md) (§28)
-- **Normative Spezifikation:** [`docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md`](docs/spec/CONTEXTRA_SPEZIFIKATION_v15.md)
+Fragen, ob eine Funktion in v1 gehört, werden über einen Entwurf für einen ADR geklärt. Die Liste der Nicht-Ziele steht in `docs/SPEC.md` §2.3.
+
+## 6. Lizenz
+
+Beiträge werden unter der Doppellizenz MIT oder Apache-2.0 des Projekts aufgenommen.

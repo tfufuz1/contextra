@@ -1,5 +1,7 @@
 # Decision Proposal: Status der als „Archiv“ markierten Crates mit Fan-in > 0
 
+> **Status-Update 30.10.2026:** Überholt durch die Reduktion (D-R1, SPEC §15).
+
 - **Status:** Proposed — Entscheidungsvorlage für Architekten und Maintainer
 - **Datum:** 2026-10-29
 - **Betroffene Crates:** `contextra-graph`, `contextra-cognition`, `contextra-adapt`, `contextra-router`, `contextra-agent`, `contextra-kvcache`, `contextra-infer-onnx`, `contextra-infer-ollama`

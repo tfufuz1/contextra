@@ -1,5 +1,7 @@
 # Residuen nach Reduktion
 
+> **Status 30.10.2026:** Bericht vor der Bereinigung. Der Restore-Tag `pre-reduction-1.0` existiert nicht. Maßgeblich ist Commit `3c1f144fa` (`git checkout 3c1f144fa -- <Pfad>`). Die Eingabedatei `REDUCTION_PROMPTS.md` fehlt im Repository. Bearbeitung in `docs/PLAN.md` Phase R0 und R1.
+
 Treffer = Referenzen auf entfernte Crates, Module, Features in verbleibendem Code.
 Eingabe für die Prompts P1–P6 (`REDUCTION_PROMPTS.md`).
 

@@ -1,5 +1,7 @@
 # ADR-0098: Determinismus-Ausnahmen für Krypoto-Schlüssel und Salt-Generierung
 
+> **Status-Update 30.10.2026:** Gültig. Verweise auf entfernte Crates bei Gelegenheit prüfen (PLAN R3.2).
+
 - **Status:** Proposed — benötigt Maintainer-Freigabe
 - **Datum:** 2026-10-29
 - **Autoren:** Architecture Governance Team

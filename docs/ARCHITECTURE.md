@@ -1,352 +1,200 @@
-<!-- doc-stamp: 2026-10-29 10cc17922 -->
-
 # Contextra – Architekturübersicht
 
-> **Normative Quelle:** Dieses Dokument ist ein **Lese-Hilfsmittel** und kein normatives Dokument.
-> Die alleinige normative Quelle für Architektur, Verhalten, Konstanten, Ringe, Klassen und Kantenregeln ist
-> **`docs/SPEC.md` (Gesamtspezifikation Fassung 3.0, Baukasten-Modell)**. Bei jedem Widerspruch zwischen dieser Datei
-> und `docs/SPEC.md` gilt `docs/SPEC.md`.
->
-> Stand: **29.10.2026** | Basis: Gesamtspezifikation 3.0 + Umsetzungsplan 3.1 (HEAD 0796b40ed)
+<!-- doc-stamp: 2026-10-30 | Nicht normativ. Normativ: docs/SPEC.md Fassung 4.0 -->
+
+Dieses Dokument beschreibt den **Ist-Zustand nach der Reduktion vom 30.10.2026**. Es erklärt, wie die verbleibenden Crates zusammenhängen. Verbindlich sind die Regeln in `docs/SPEC.md` (§4 Ringmodell, §3 Regeln). Bei Abweichungen gilt die SPEC.
 
 ---
 
-## 1. Einleitung
+## 1. Überblick
 
-Contextra ist ein **lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rust** (Single-Node,
-ein Prozess hält ein Datenverzeichnis). Er speichert Dokumente, findet sie hybrid (Vektor + BM25 +
-RRF-Fusion, mandantengetrennt) und löscht gemessen (physische Bereinigung über sechs Datenschichten,
-Messung am Speicher, Löschbericht mit ausgewiesenen Grenzen).
+Contextra ist eine eingebettete Rust-Bibliothek für lokale Such- und Speicheraufgaben. Sie kombiniert:
 
-Dieses Dokument beschreibt:
-- das **Ring-Modell** mit allen Crates und ihren Klassen
-- den **Crate-Katalog** mit LOC-Budget, Unsafe-Markierung und Umbauaufgaben
-- die **Kantenregeln** (Ring-Disziplin P1/P5/P30)
-- die **Unsafe-Inseln** (exakt drei)
-- die **TODO-Liste** für ausstehende Archivierungs-Arbeitspakete (Phase 2)
+- einen **LSM-Speicher** mit Write-Ahead-Log, MemTable, SSTables und Kompaktion,
+- **MVCC-Transaktionen** mit Serializable-Snapshot-Isolation,
+- einen **HNSW-Vektorindex** mit SIMD-Distanzen,
+- einen **BM25-Textindex** mit deutscher Morphologie,
+- eine **Fusion** der Ranglisten mit Kalibrierung,
+- **Mandantentrennung** und **Verschlüsselung at rest**.
 
-Die Zuordnung von Ring und Klasse je Crate ist maschinenlesbar in [`capabilities.toml`](../capabilities.toml)
-festgelegt (INV-DOC-SINGLE-SOURCE-1). Diese Datei ist die Single Source of Truth für Gates und Skripte.
+Alles läuft in einem Prozess auf einem Rechner. Es gibt keinen Netzwerkdienst.
 
 ---
 
-## 2. Ring-Modell (SPEC.md §4.1)
+## 2. Ringe und Abhängigkeiten
 
-Der Datenfluss ist unidirektional: **Ring 4 → Ring 3 → Ring 2 → Ring 1 → Ring 0**.
-Eine Kante darf nur auf gleichen oder niedrigeren Ring zeigen (P1). Aufwärtskanten sind verboten (P5).
-`[K]`-Crates dürfen nie von `[M]`/`[E]`-Crates abhängen (P30, INV-CORE-ISOLATION-1).
+```mermaid
+flowchart BT
+    types[contextra-types]
+    ports[contextra-ports]
+    sys[contextra-sys · U]
+    simd[contextra-simd · U]
+    mvcc[contextra-mvcc]
+    crypto[contextra-crypto]
+    vector[contextra-vector]
+    text[contextra-text]
+    rank[contextra-rank]
+    store[contextra-store]
+    engine[contextra-engine]
+    db[contextra-db]
+    ctx[contextra]
+    testkit[contextra-testkit · Tooling]
 
+    ports --> types
+    simd --> types
+    mvcc --> ports
+    mvcc --> types
+    crypto --> ports
+    crypto --> types
+    text --> ports
+    text --> types
+    vector --> crypto
+    vector --> mvcc
+    vector --> ports
+    vector --> simd
+    vector --> sys
+    vector --> types
+    store --> crypto
+    store --> mvcc
+    store --> ports
+    store --> sys
+    store --> types
+    engine --> crypto
+    engine --> mvcc
+    engine --> ports
+    engine --> rank
+    engine --> store
+    engine --> sys
+    engine --> text
+    engine --> types
+    engine --> vector
+    db --> engine
+    db --> rank
+    db --> store
+    db --> text
+    db --> vector
+    db --> crypto
+    db --> ports
+    db --> sys
+    db --> types
+    ctx --> db
+    ctx --> crypto
+    ctx --> ports
+    ctx --> rank
+    ctx --> store
+    ctx --> types
+    testkit --> ports
+    testkit --> types
 ```
-Ring 4 │ Fassade/Schnittstellen
-       │  [K] contextra (Composition Root)
-       │  [M] contextra-mcp
-       │  [M] contextra-py
-       │  [E] contextra-license
-       │
-Ring 3 │ Orchestrierung
-       │  [K] contextra-engine
-       │  [K] contextra-db
-       │  [M] contextra-privacy
-       │  [M] contextra-cognition
-       │  [M] contextra-router
-       │  [M] contextra-agent
-       │
-Ring 2 │ Isolation / Inferenz
-       │  [M] contextra-infer-candle
-       │  [M] contextra-infer-onnx
-       │  [M] contextra-infer-ollama
-       │  [M] contextra-sandbox
-       │
-Ring 1 │ Persistenz
-       │  [K] contextra-store
-       │  [K] contextra-checkpoint
-       │  [M] contextra-kvcache
-       │
-Ring 0 │ Fundament
-       │  [K] contextra-types
-       │  [K] contextra-ports
-       │  [K] contextra-mvcc
-       │  [K] contextra-crypto
-       │  [K] contextra-vector
-       │  [K] contextra-text
-       │  [K] contextra-rank
-       │  [M] contextra-graph
-       │  [M] contextra-adapt
-       │  [E] contextra-audit-export
-       │  [E] contextra-avv-generator
-       │  Unsafe-Inseln: [K] contextra-simd · [K] contextra-sys · [K] contextra-wire
-       │
-Werkzeug (kein Ring)
-       │  contextra-testkit · xtask · bench / contextra-bench · *-fuzz
-       │
-Legacy / Auslaufend
-       │  contextra-core (Kompatibilitätsfassade, entfällt in WP 2.8)
-```
 
-> **Soll vs. Ist Hinweis:** Die Zuordnung oben entspricht dem Baukasten-Modell der SPEC 3.0 / `capabilities.toml` (Soll). Im Ist-Stand existieren physikalisch alle 35 Crates im Workspace.
+(U) = Unsafe-Insel. Der Graph stammt aus den `[dependencies]` der Manifeste (Stand 30.10.2026).
 
-### Wirkung der Ringe
-
-Das Ring-Gate erlaubt jede **Abwärtskante**. Ein Ringverstoß liegt vor, wenn eine Kante aufwärts
-zeigt. Jedoch ist auch jede Abwärtskante `[K] → [R]/[E]/[A]` ein **Klassenverstoß** (P30), der
-über `may_depend_on` in `capabilities.toml` und das Klassen-Gate durchgesetzt wird.
-
----
-
-## 3. Normativitätsklassen
-
-| Kürzel | Klasse       | Bedeutung |
-|--------|-------------|-----------|
-| `[K]`  | **Kern**    | Gilt uneingeschränkt für v1.0; alle Gates und Garantien gelten vollständig. |
-| `[R]`  | **Rand**    | Gilt nur bei aktiviertem Feature (Release-Default **aus**); darf Kern-Garantien nie schwächen. |
-| `[E]`  | **Experimentell** | Nicht normativ; kein Bestandteil des Versprechens. |
-| `[A]`  | **Archiv**  | Aus dem Workspace entfernt (Tag `archiv/v0`), nicht normativ (SPEC.md Anhang B). |
-
-Zielreife: `[K]` → `stable` (erst bei Evidenzstufe E4), `[R]`/`[E]` → `experimental` (SPEC.md §4.1).
-
----
-
-## 4. Crate-Katalog mit LOC-Budget
-
-Budgets sind **Code-Zeilen** (ohne Leer-/Kommentarzeilen, ohne Tests, Werkzeug `loc.py`,
-SPEC.md §1.3). Sie dürfen nur sinken, außer eine Phasenabnahme nennt ausdrücklich Zuwachs.
-IST-Werte stammen aus Commit `c4f7299b6` (SPEC.md §4.2) bzw. Scan-Commit `a547a42` (PLAN.md §3.1).
-
-### 4.1 Ring 0 – Fundament
-
-| Crate | Ring | Kl. | Unsafe | IST (LOC) | Budget v1.0 | Umbauaufgaben |
-|---|---|---|---|---|---|---|
-| `contextra-types` | 0 | K | nein | 2.611 | 2.700 | `RequestContext`, `LayerWitness`-Grundtypen, `ModelIdentity`, IDs, Fehlerklassen |
-| `contextra-ports` | 0 | K | nein | 1.526 | 1.500 | Ports archivierter Crates entfernen, Mocks raus |
-| `contextra-sys` | 0 | K | **ja** | 428 | 450 | Unsafe-Insel; SAFETY-Lücken schließen; Durability-Primitive, `mlock`, `madvise`, Dateisperren |
-| `contextra-simd` | 0 | K | **ja** | 1.113 | 1.200 | Unsafe-Insel; Kernel `pub(crate)`, SAFETY, Miri; Abhängigkeit von `core` entfernen |
-| `contextra-wire` | 0 | K | **ja** | 190 (+1.201 gen.) | 200 | Unsafe-Insel; Lint-`allow` auf generierte Datei beschränken |
-| `contextra-mvcc` | 0 | K | nein | 1.585 | 1.600 | Zeitaufrufe (14) über `Clock`; SSI-Nachweis (T-SSI-1) |
-| `contextra-crypto` | 0 | K | nein | 2.992 | 3.200 | AEAD, KDF, Signaturen, `KmsProvider`-Impl (K0/K1), Löschbericht V5, `EffaceableKeySlot`; I/O-frei |
-| `contextra-vector` | 0 | K | nein | 6.701 | 6.800 | HNSW, SQ8, ACL-Bitset; DiskANN ins Archiv; `async` entfernen (Ratchet); `VectorScanner` |
-| `contextra-text` | 0 | K | nein | 2.329 | 2.400 | BM25, Block-Max-WAND; Panic in `tokenizer.rs:30` entfernen; `TextScanner` |
-| `contextra-rank` | 0 | K (reklass.) | nein | 1.709 (`fusion/`) | 1.750 | **Nur `fusion/`** behalten (RRF, Normalisierung, Explain); Rest ins Archiv |
-
-### 4.2 Ring 1 – Persistenz
-
-| Crate | Ring | Kl. | Unsafe | IST (LOC) | Budget v1.0 | Umbauaufgaben |
-|---|---|---|---|---|---|---|
-| `contextra-store` | 1 | K | nein | 13.066 | 13.400 | `Vfs`-Impl, `DurableLog`-Impl, Sidecars, Record-Umschlag, Purge-Kompaktion, `LsmScanner`; `core`-Abhängigkeit entfernen |
-| `contextra-checkpoint` | 1 | K | nein | 1.630 | 1.700 | Spur D/K, Restore-Guard, `CheckpointScanner`; `core`-Abhängigkeit entfernen |
-
-### 4.3 Ring 2 – Isolation / Inferenz (Rand)
-
-| Crate | Ring | Kl. | Unsafe | IST (LOC) | Budget v1.0 | Umbauaufgaben |
-|---|---|---|---|---|---|---|
-| `contextra-infer-candle` | 2 | R | nein | 2.660 | 2.660 | Embedding-Backend; optional; im Release-Default aus |
-| `contextra-sandbox` | 2 | R | nein | 1.105 | 1.105 | WASM-Isolierung; optional; im Release-Default aus |
-
-### 4.4 Ring 3 – Orchestrierung
-
-| Crate | Ring | Kl. | Unsafe | IST (LOC) | Budget v1.0 | Umbauaufgaben |
-|---|---|---|---|---|---|---|
-| `contextra-engine` | 3 | K | nein | 10.114 | 8.500 Ziel / 10.200 Grenze | Entkopplung von Archiv-Crates; Saga, Lesesperre, Boot; Stub-Löschung |
-| `contextra-db` | 3 | K | nein | 585 | 600 | Entkopplung von `cognition`, `graph`, `adapt`; keine eigene Logik |
-| `contextra-privacy` | 3 | R | nein | 1.331 | 1.331 | Egress-Filterung; optional; im Release-Default aus |
-
-### 4.5 Ring 4 – Fassade / Schnittstellen
-
-| Crate | Ring | Kl. | Unsafe | IST (LOC) | Budget v1.0 | Umbauaufgaben |
-|---|---|---|---|---|---|---|
-| `contextra` | 4 | K | nein | 729 | 800 | Composition Root, Boot B0–B9, Default `embedded`; Rand nur optional |
-| `contextra-mcp` | 4 | K | nein | 3.314 | 3.400 | Drei Werkzeuge (`memory_remember`, `memory_recall`, `memory_forget`), Pipeline, IPC |
-| `contextra-py` | 4 | R | nein | 1.426 | 1.426 | PyO3-Bindings; optional |
-| `contextra-license` | 4 | E | nein | 307 | 307 | Lizenzprüfung; experimentell |
-| `contextra-audit-export` | 4 | E | nein | 214 | 214 | Audit-Log-Export; experimentell |
-| `contextra-avv-generator` | 4 | E | nein | 196 | 196 | AVV-Generator Art. 28 DSGVO; experimentell |
-
-### 4.6 Werkzeug-Crates (kein Ring, kein Produktionscode)
-
-| Crate | Aufgabe |
-|---|---|
-| `contextra-testkit` | Fixtures, Chaos-Harness, `FaultVfs`, `ManualClock`, Fake-Verwahrer; nur `dev-dependency` |
-| `xtask` | Gates, CI-Skripte (31.991 Zeilen; **Schutzpfad**, keine Kürzung ohne Inventar) |
-| `xtask-heavy` | Fuzz, Miri, Mutation, Chaos |
-| `bench` / `*-fuzz` | Benchmarks und Fuzz-Targets |
-
----
-
-## 5. Archiv-Crates
-
-<!-- TODO(WP-2.1): Archiv-Tag `archiv/v0` auf den Stand nach WP 1.x setzen und folgende Crates
-     aus dem Workspace entfernen. Diese Crates sind NICHT mehr Teil von Contextra v1.0.
-     Kein anderes Crate darf neu von ihnen abhängen. -->
-
-Die folgenden Crates werden per Git-Tag `archiv/v0` archiviert und danach aus dem Workspace entfernt
-(PLAN.md §3.2, D-04). Gemeinsam umfassen sie ca. 25.000 LOC Produktionscode.
-
-| Crate | LOC (Scan) | Grund der Archivierung |
+| Ring | Crates | Regel |
 |---|---|---|
-| `contextra-graph` | 8.708 | Graph-Reasoning ist kein Ziel v1.0 (SPEC.md §2.3) |
-| `contextra-cognition` | 3.191 | Kognition/Konsolidierung ist kein Ziel v1.0 |
-| `contextra-adapt` | 2.193 | Online-Adaption ist kein Ziel v1.0 |
-| `contextra-kvcache` | 2.434 | Persistenter Prefix-Cache (M1) archiviert (SPEC.md §2.2) |
-| `contextra-router` | 1.465 | Router/Agentenlaufzeit ist kein Ziel v1.0 |
-| `contextra-agent` | 2.413 | Agent-Pipeline ist kein Ziel v1.0 |
-| `contextra-infer-onnx` | 952 | ONNX-Backend wird nicht ausgeliefert |
-| `contextra-infer-ollama` | 1.661 | Ollama-Backend wird nicht ausgeliefert |
-| `contextra-core` | 106 | Nur Kompatibilitätsfassade; entfällt (D-05) |
-| `vector/diskann` | – | DiskANN ist kein Ziel v1.0 (§2.3) |
-| `rank` ohne `fusion/` | ~1.263 | Kalibrierung, DiBuD, Drift: nicht Teil von Kern-`rank` |
-
-> **Ist-Zustand (26.10.2026):** Alle oben genannten Crates befinden sich noch im Workspace
-> (`Cargo.toml`). Die Archivierung beginnt mit WP 2.1 (nach Abschluss von Phase 1).
+| 0 | `types`, `ports`, `sys`, `simd`, `mvcc`, `crypto`, `vector`, `text`, `rank` | Keine Abhängigkeit auf Ring 1 oder höher |
+| 1 | `store` | Nur Ring 0 |
+| 2 | `engine` | Ring 0 und 1 |
+| 3 | `db` | Ring 0 bis 2 |
+| 4 | `contextra` | Alle, aber nur Fassaden-Typen durchreichen |
+| Tooling | `testkit`, `bench` | Darf alles, wird nur als Dev-Abhängigkeit eingebunden |
 
 ---
 
-## 6. Unsafe-Inseln (exakt drei)
+## 3. Die Schichten im Einzelnen
 
-Nur die folgenden drei Crates dürfen `unsafe`-Code im Produktionspfad enthalten (SPEC.md §4.6, P2):
+### 3.1 Fundament (Ring 0)
 
-| Insel | Crate | Aufgabe |
-|---|---|---|
-| `simd` | `contextra-simd` | SIMD-beschleunigte Distanzberechnungen (AVX-512 > AVX2 > NEON > skalar) |
-| `sys` | `contextra-sys` | Systemnahe Bindings, Low-Level-I/O, Durability-Primitive (`fdatasync`, `F_FULLFSYNC`) |
-| `wire` | `contextra-wire` | FlatBuffers Wire-Protokolle, Zero-Copy-Deserialisierung |
+- **`contextra-types`**: Kanonische Typen: `DocId`, `TenantId`, `TxId`, `RequestContext`, `DistanceMetric`, Budgets, Filter, Fehlertyp `ContextraError`.
+- **`contextra-ports`**: Trait-Verträge. Zeit (`Clock`), Zufall (`Rng`), IDs (`IdGen`), Dateisystem (`Vfs`), Speicher (`StorageEngine`-Ports), Indizes (`VectorIndex`, `TextIndex`).
+- **`contextra-sys`** (Unsafe-Insel): `mmap`, `mlock`, POSIX-Aufrufe, Dauerhaftigkeits-Primitive (`fsync`-Varianten), Vault, Windows-ACL.
+- **`contextra-simd`** (Unsafe-Insel): Distanzkerne mit Laufzeit-Dispatch auf die verfügbare CPU-Erweiterung.
+- **`contextra-mvcc`**: Sequenzlog, Snapshot-Registry mit RAII-Lease, Transaktionspuffer, SSI-Validierung.
+- **`contextra-crypto`**: AEAD-Blockverschlüsselung, HKDF, WAL-Verschlüsselung, Audit-Kette, Anti-Tamper. Schlüsselmaterial wird beim Verwerfen gelöscht.
+- **`contextra-vector`**: HNSW, SQ8-Quantisierung, partieller Rebuild, gefilterte Suche.
+- **`contextra-text`**: BM25, invertierter Index, WAND-Top-K, Tokenizer, Stoppwörter, Komposita-Zerlegung, Domänenwörterbücher (Recht, Medizin).
+- **`contextra-rank`**: Fusion, isotone und Platt-Kalibrierung, Drift-Erkennung, Erklärbarkeit.
 
-**Regeln für alle Inseln:**
-1. Die Insel exponiert ausschließlich eine **sichere** öffentliche API.
-2. Jeder `unsafe`-Block trägt `// SAFETY:` mit Begründung.
-3. Miri- und Property-Tests gegen eine sichere Referenzimplementierung.
-4. **Alle anderen Crates** setzen `#![forbid(unsafe_code)]`; workspaceweit gilt `unsafe_code = "deny"`.
-5. Generierter Code folgt P2; Generator und Version sind gepinnt; Ausgabe in der CI reproduzierbar.
-6. Das Gate weist generierten und handgeschriebenen `unsafe`-Code getrennt aus.
+### 3.2 Persistenz (Ring 1)
 
----
+**`contextra-store`** ist ein LSM-Baum.
 
-## 7. Kantenregeln (Ring-Disziplin)
+- **WAL**: Anfügen, HMAC-Verkettung, CRC32, Replay. Jeder Commit ist durch einen Flush gesichert.
+- **MemTable**: Skip-Liste mit Sequenznummern. Tombstones für Löschungen.
+- **SSTable**: Blöcke mit Bloom-Filter, Index, CRC32 und Kompression. Block-Cache.
+- **Manifest**: Transaktionale Liste der SSTable-Generationen.
+- **Kompaktion**: Hintergrundprozess, der SSTables zusammenführt und Tombstones physisch entfernt.
+- **`tenant_codec`**: Schlüssel-Präfixe pro Mandant.
 
-### P1 – Ring-Disziplin
-Kanten (normal und build) zeigen ausschließlich auf gleichen oder niedrigeren Ring.
+### 3.3 Orchestrierung (Ring 2)
 
-### P5 – DAG-Integrität
-Keine Aufwärtskanten, keine Zyklen (normal + build, **mit aufgelösten Features**).
-Dev-Aufwärtskanten nur als in `capabilities.toml` deklarierte Ausnahme.
+**`contextra-engine`** verbindet Speicher, Indizes und Transaktionen zu Collections.
 
-### P30 – Kern-Isolation
-`[K]`-Crates hängen weder normal noch build (im Release-Default-Feature-Set) von `[R]`/`[E]`/`[A]`-Crates ab.
-Rand-Fähigkeiten erreichen den Kern ausschließlich über Ports, die die Fassade injiziert.
+- **Collections**: Dokumente mit Mandant, Metadaten und Indexeinträgen.
+- **Query-Builder**: Baut eine hybride Suchanfrage aus Vektor- und Textteil, Filtern und Gewichten.
+- **Chunker**: Zerlegt Text in Abschnitte, Fenster oder Blöcke.
+- **Hintergrundarbeiter**: Kompaktion, Wartung (Feature `background-maintenance`).
+- **Öffnen**: `repair_on_open` prüft und repariert den Zustand, bevor Anfragen angenommen werden.
 
-### Erlaubte Abhängigkeiten (strikt, SPEC.md §4.4)
+### 3.4 Fassade (Ring 3 und 4)
 
-| Crate | darf abhängen von |
-|---|---|
-| `types` | – |
-| `ports` | `types` |
-| `sys`, `simd` | `types` (nur falls nötig) |
-| `wire` | `types` |
-| `mvcc` | `types`, `ports` |
-| `crypto` | `types`, `ports`, `sys` |
-| `vector` | `types`, `ports`, `simd` |
-| `text` | `types`, `ports` |
-| `rank` | `types`, `ports` |
-| `store` | `types`, `ports`, `mvcc`, `crypto`, `sys`, `wire` |
-| `checkpoint` | `types`, `ports`, `crypto` |
-| `engine` | `types`, `ports`, `mvcc`, `crypto`, `store`, `vector`, `text`, `rank`, `checkpoint` |
-| `db` | `types`, `ports`, `engine` |
-| `mcp` | `types`, `ports`, `wire`, `db`, `contextra` (nur Fassaden-API) |
-| `contextra` | alle; `[R]`/`[E]` nur als `optional = true` |
-
-Vollständige Regeln und verbotene Kanten: SPEC.md §4.4.
+- **`contextra-db`** (Ring 3): Prelude mit der stabilen Kern-API (`Contextra`, `Collection`, `SearchResult`, `EmbeddingBackend`). Modul `advanced` für erweiterte Schnittstellen.
+- **`contextra`** (Ring 4): Composition Root mit `builder`, `open` und `open_with_config`. Verdrahtet die Ports mit den konkreten Implementierungen.
 
 ---
 
-## 8. Reifegrad-Kriterien (SPEC.md §4.1)
+## 4. Datenpfade
 
-`maturity = stable` setzt voraus:
-1. Alle Sicherheits-Ports des Crates sind produktiv verdrahtet (INV-WIRING-2).
-2. Alle Gates (SPEC.md §17.3) sind grün.
-3. Fuzz-, loom- und Miri-Abdeckung nach SPEC.md §17.1.
-
-Ein Crate mit ausschließlich Null-/Test-Implementierungen seiner Sicherheits-Ports gilt als `experimentell`.
-
----
-
-## 9. Crate-Konzept-Karte (SPEC.md §0.3)
-
-| Konzept | Crate (Ring) | Modul / Ort |
-|---|---|---|
-| IDs, Fehlerklassen, `RequestContext`, `LayerWitness`-Grundtypen | `types` (0) | – |
-| Alle Traits (Ports) | `ports` (0) | SPEC.md §5 |
-| Snapshots, SSI, Sequenzen | `mvcc` (0) | SPEC.md §8 |
-| AEAD, KDF, Signatur, `KmsProvider`-Impl, Löschbericht, AuditChain, RevocationLog | `crypto` (0) | SPEC.md §12 |
-| HNSW, SQ8, ACL-Bitset | `vector` (0) | SPEC.md §9 |
-| BM25, Analyzer, Block-Max-WAND | `text` (0) | SPEC.md §10 |
-| RRF-Fusion, Normalisierung, Provenienz/Explain | `rank` (0, nur `fusion/`) | SPEC.md §11.5 |
-| SIMD-Kernel / OS-Primitive / Wire-Layout | `simd` / `sys` / `wire` (0, Unsafe-Inseln) | SPEC.md §4.6 |
-| WAL, Memtable, SSTable, Manifest, Kompaktion, `Vfs`, Journal | `store` (1) | SPEC.md §7 |
-| Interne Checkpoints, Restore-Guard | `checkpoint` (1) | SPEC.md §12.9, §12.17, §13.8 |
-| Planner, Chunking, Löschsaga, Epoch Seal, Lesesperre, Startsequenz | `engine` (3) | SPEC.md §11, §12.8, §12.2.4 |
-| Collections, Transaktionen, Embedded-API | `db` (3) | SPEC.md §13.9 |
-| MCP-Server, IPC-Proxy, CLI | `mcp` (4) | SPEC.md §13 |
-| Composition Root, öffentliche Rust-API | `contextra` (4) | SPEC.md §13.4 |
-
----
-
-## 10. Locking-Disziplin
-
-Vollständige, geordnete Sperrenhierarchie; keine Sperr-Guards über `.await`
-(INV-LOCK-ORDER-1, `clippy::await_holding_lock = deny`). Details: SPEC.md §8.
-
----
-
-## 11. TODO-Liste: Archivierungs-Arbeitspakete (PLAN.md Phase 2)
-
-<!-- Diese Arbeitspakete sind noch offen und müssen in der angegebenen Reihenfolge abgearbeitet werden. -->
+### 4.1 Schreiben
 
 ```
-TODO(WP-2.1): Archiv-Tag `archiv/v0` auf Stand nach WP 1.x setzen.
-              Folgende Crates werden zuerst aus `default-members` entfernt, nach Entkopplung
-              aus dem Workspace:
-              - contextra-graph
-              - contextra-cognition
-              - contextra-adapt
-              - contextra-kvcache
-              - contextra-router
-              - contextra-agent
-              - contextra-infer-onnx
-              - contextra-infer-ollama
-              - contextra-core
-              - vector/diskann
-              - rank ohne fusion/
-              Vorher MIGRATION-EDGES.md aus `cargo metadata` erzeugen.
-
-TODO(WP-2.2): `contextra-engine` von Graph/Adapt/KVCache/InferCandle entkoppeln.
-              Je Kante ein Commit, `cargo check` nach jedem Schritt.
-              Betroffene Module: kv_cache_integration/, extraction/, background_workers/,
-              collection/search/hybrid/, collection/maintenance.rs, etc.
-
-TODO(WP-2.3): `contextra-db`, `contextra-mcp`, `contextra` entkoppeln;
-              `contextra-core` vollständig entfernen (286 Dateien referenzieren `contextra_core`
-              — Migrationsskript mit Prüfung je Crate erforderlich).
-              Default-Feature auf `embedded` setzen.
-
-TODO(WP-2.4): Rand-Crates optional machen; Brücken über Ports sicherstellen.
-              `contextra` darf Rand-Crates nur über `optional = true` einbinden.
-
-TODO(WP-2.5): `capabilities.toml` auf Klassen (`class`-Feld) und strikte `may_depend_on`
-              umstellen (WP 3.6 der Spec). Alle 66 nicht deklarierten Kanten bereinigen;
-              Warnungen = Fehler setzen.
+Client → Collection (engine) → TxBuffer (mvcc)
+       → WAL (store)         → MemTable (store)
+       → Index-Update        (vector: HNSW · text: BM25)
+       → Commit (SSI-Prüfung in mvcc)
+       → später: SSTable (store) → Kompaktion (store)
 ```
+
+Die Reihenfolge ist fest: Was persistent werden soll, geht zuerst über das WAL (Regel 4). Ein Commit gilt erst nach erfolgreichem Flush. Fehler beim Flush werden propagiert, nie verschluckt (Regel 5).
+
+### 4.2 Hybride Suche
+
+```
+Anfrage (engine, Query-Builder)
+  ├─ Vektorsuche   (vector: HNSW, SIMD-Distanz, Filter)
+  ├─ Textsuche     (text: BM25, WAND)
+  └─ Fusion        (rank: RRF, Kalibrierung)
+→ Ergebnisliste mit Erklärung (rank::explain)
+```
+
+Mandantenfilter greifen vor der Indexabfrage, nicht danach (VETO-F10).
+
+### 4.3 Löschen
+
+Löschen setzt einen Tombstone im Speicher. Der Index markiert den Eintrag. Physisch entfernt wird er bei der Kompaktion (Speicher) bzw. beim Rebuild (HNSW, VETO-F02). Die Zusicherungen dazu stehen in `docs/SPEC.md` §9.
 
 ---
 
-## 12. Referenzen
+## 5. Querschnittsthemen
 
-| Dokument | Zweck |
-|---|---|
-| [`docs/SPEC.md`](SPEC.md) | **Einzige normative Quelle** für alle Architektur-, Verhaltens- und Gate-Aussagen |
-| [`capabilities.toml`](../capabilities.toml) | Single Source of Truth für Ring, Klasse, Reifegrad je Crate (INV-DOC-SINGLE-SOURCE-1) |
-| [`AGENTS.md`](../AGENTS.md) | Agenten-Betriebsanleitung und Rangfolge der Informationsquellen |
-| [`docs/PLAN.md`](PLAN.md) | Implementierungsplan IST → SOLL (Arbeitsunterlage, nicht normativ) |
+- **Mandanten**: Der Mandant kommt aus dem `RequestContext` und wird in jeder Schicht als Schlüsselpräfix oder Filter geführt.
+- **Fehler**: Ein gemeinsamer Fehlertyp (`ContextraError`, definiert in `contextra-types`). Keine `unwrap`-Abkürzungen (Clippy-Lint in Workspace, Regel 2).
+- **Zeit und Zufall**: Nur über `Clock`, `Rng`, `IdGen`. Tests verwenden `ManualClock` aus `contextra-testkit`.
+- **Unsafe**: Ausschließlich in `contextra-sys` und `contextra-simd`. Jeder Block trägt `// SAFETY:`.
+- **Telemetrie**: Über die Ports `metrics` und `observability`. Keine eigene Ausgabeschicht.
 
-> [!IMPORTANT]
-> Verweise auf frühere Dokumente wie `CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`,
-> `GESAMTSPEZIFIKATION.md`, `CONTEXTRA_SPEZIFIKATION.md` oder `spec/CONTEXTRA_FINALE_PRODUKTSPEZIFIKATION.md`
-> sind **obsolet**. Diese Fassungen sind durch SPEC.md Fassung 2.3 vollständig ersetzt
-> und dürfen nicht mehr herangezogen werden (SPEC.md §1.1).
+---
+
+## 6. Tests und Benchmarks
+
+- Unit- und Integrationstests je Crate unter `crates/<name>/tests/`.
+- Workspace-Tests unter `tests/`: Ringregeln (`layering.rs`), Unsafe-Inseln (`unsafe_islands.rs`).
+- Testwerkzeuge in `contextra-testkit`: deterministische Uhr, In-Memory-Speicher, fehlerinjizierendes Dateisystem (`FaultVfs`), Referenzmodell, Konformitätssuiten.
+- Benchmarks in `benchmarks/contextra-bench`: ANN-Benchmarks, BEIR, Pfad-RAG, Regressions-Gate.
+
+---
+
+## 7. Was in dieser Architektur fehlt
+
+Die Reduktion hat folgende Bereiche aus dem Vorzustand entfernt: Inferenz-Backends, Agenten-Laufzeit, Router, Graph-Index und Konsolidierung, MCP- und Python-Schnittstellen, Dokumenten-Ingestion, PII-Filter, KV-Cache, DiskANN und die Löschkette. Details und Wiederherstellungspunkt stehen in `docs/SPEC.md` §5.2.
+
+Wenn Teile davon zurückkehren sollen, geschieht das über einen eigenen Plan (`docs/PLAN.md` Phase R6), nicht durch Wiederherstellen einzelner Dateien.

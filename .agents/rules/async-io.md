@@ -1,5 +1,7 @@
 # Governance Rule: Asynchrones I/O & Non-Blocking Bounds (`rules/async-io.md`)
 
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+
 ## Gilt für
 - `crates/contextra-engine`
 - `crates/contextra-ports`

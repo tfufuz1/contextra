@@ -1,5 +1,7 @@
 # governance/ — Single Source of Truth für Gates & Policies
 
+> **Status 30.10.2026:** Gate-Katalog enthält Gates für entfernte Komponenten. Angleichung in `docs/PLAN.md` Phase R2.
+
 <!-- doc-stamp: 2026-10-26 | Normativ: docs/SPEC.md §17, §18.2, AGENTS.md §3 -->
 
 > [!IMPORTANT]
@@ -48,8 +50,8 @@ SPEC §17.3 verwendet teilweise andere Namen als der Gate-Katalog:
 
 ## Konsumenten
 
-- `cargo xtask` — liest gates.toml, ratchet.toml, security_ports.toml, key_purposes.toml
-- `justfile` gates/pre-push — delegiert an xtask
+- `cargo xtask` — **entfernt** (Commit `068261abd`). Die Auswertung von `gates.toml`, `ratchet.toml`, `security_ports.toml` und `key_purposes.toml` ist ungeklärt (D-R2 in `docs/SPEC.md` §15).
+- `justfile` — Ziel nach PLAN R2.4: direkte `cargo`-Befehle statt Delegation an `xtask`
 - `.github/workflows/merge-gate.yml` — blockierend, liest gates.toml
 - `.github/workflows/deep-gates.yml` — nicht blockierend
 - `clippy.toml` → wird von `cargo clippy` im Workspace-Root konsumiert

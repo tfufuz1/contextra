@@ -1,5 +1,7 @@
 # Baseline Tooling (`tools/baseline/`)
 
+> **Historisches Dokument (Stand vor Reduktion, 30.10.2026).** Beschreibt den Vorzustand bis Commit `3c1f144fa`. Nicht normativ. Maßgeblich: `docs/SPEC.md` und `docs/PLAN.md` (Fassung 4.0).
+
 This directory contains the reproducible baseline execution tool `run_baseline.py` for the Contextra Rust workspace (35 workspace members).
 
 ## Overview

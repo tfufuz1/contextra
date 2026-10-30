@@ -1,5 +1,7 @@
 # AGENTS.md — `contextra-rank`
 
+> **Status 30.10.2026 (Reduktion):** Dieses Crate gehört zum Kern v1. Ring und Abhängigkeiten stimmen mit `docs/SPEC.md` §4 überein. Verweise auf entfernte Crates oder Funktionen sind veraltet. Modul `dibud` ist deklariert, der Kopfkommentar verweist auf entfernte Kognition. Maßgeblich ist der Quelltext. Bereinigung: `docs/PLAN.md` Phase R0 bis R3.
+
 ## 1. Rolle
 `contextra-rank` bietet Score-Kalibrierung (Platt, Isotonisch, Conformal) und Ergebnis-Anreicherungen zur Verfeinerung von Retrieval-Rankings.
 

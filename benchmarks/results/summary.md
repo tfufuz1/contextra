@@ -1,5 +1,7 @@
 # Contextra — Retrieval Accuracy Benchmark Report
 
+> **Historisches Dokument (Stand vor Reduktion, 30.10.2026).** Beschreibt den Vorzustand bis Commit `3c1f144fa`. Nicht normativ. Maßgeblich: `docs/SPEC.md` und `docs/PLAN.md` (Fassung 4.0).
+
 **Stand / Zeitstempel**: `2026-09-03T10:00:00Z`
 **Testkorpus**: 50 Dokument-Chunks, 10 Testabfragen
 

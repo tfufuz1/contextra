@@ -1,5 +1,7 @@
 # Jules System & Context Diagnostics Log (`.jules/JULES_LOG.md`)
 
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+
 Dieses Dokument bietet eine vollständige, präzise und transparente Analyse der Funktionsweise von Google-Jules (Google Gemini-basierter Software Engineering Agent) in diesem Repository (`contextra`), die Umgebungs- und Git-Kapazitäten innerhalb der VM Sandbox, eine vollständige Checkliste aller Git-Befehle, eine Analyse der Repository-Analyseskripte (`/docs/GITHUB_ANALYSE.md`, `/docs/GITHUB_HISTORY.md`, `.jules/JULES_LOG_2.md`) sowie einen umfassenden Optimierungsplan für die Contextra-Entwicklung mit Google-Jules.
 
 ---

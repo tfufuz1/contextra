@@ -1,5 +1,7 @@
 # ADR 0006: Release-Regel: Verschlüsselung ab dem ersten Schreibvorgang
 
+> **Status-Update 30.10.2026:** Ausgesetzt (D-R5). Bezieht sich auf die Löschkette.
+
 - **Status**: Proposed — benötigt Maintainer-Freigabe
 - **Datum**: 2026-10-29
 - **Kontext**: NIST-Vorbedingung für Cryptographic Erase (SPEC LA-15), LegacyUnkeyed-Deckel (SPEC C-12.2.5 Nr. 7)

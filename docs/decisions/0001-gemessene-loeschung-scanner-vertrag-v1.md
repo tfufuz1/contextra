@@ -1,5 +1,7 @@
 # ADR 0001: Gemessene Löschung, Scanner-Vertrag V1, Ausschlüsse
 
+> **Status-Update 30.10.2026:** Ausgesetzt (D-R5). Die Scanner-Verträge gehören zur entfernten Löschkette.
+
 - **Status**: Akzeptiert
 - **Datum**: 2026-10-28
 - **Kontext**: Welle 4 - Löschkette W4-P10, SPEC §12.7 ("Erledigung & Konsolidierung der gemessenen Löschung")

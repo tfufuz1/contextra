@@ -1,5 +1,7 @@
 # Scheduled Proactive Audit & Mutation Testing Rotation
 
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+
 This document describes the automated weekly proactive audit pipeline and mutation testing rotation configured in `.github/workflows/scheduled-audit.yml`.
 
 ---

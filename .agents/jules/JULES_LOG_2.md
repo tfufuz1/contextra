@@ -1,5 +1,7 @@
 # Jules Entwicklungsumgebung & System-Kontext Analyse
 
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+
 Dieses Dokument dient als umfassende Protokollierung und Analyse der Funktionsweise, Kontextrepräsentation, Datei-Einlesemechanismen und Qualitätsstandards von Jules (Google-Jules) im Repository **Contextra**.
 
 ---

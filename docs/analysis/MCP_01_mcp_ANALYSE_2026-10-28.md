@@ -2,6 +2,8 @@
 
 # KERNPROTOKOLL K2: UNABHÄNGIGES AUDIT-PROTOKOLL — MCP_01_mcp
 
+> **Historisches Dokument (Stand vor Reduktion, 30.10.2026).** Beschreibt den Vorzustand bis Commit `3c1f144fa`. Nicht normativ. Maßgeblich: `docs/SPEC.md` und `docs/PLAN.md` (Fassung 4.0).
+
 ## 1. Kurzfassung
 - **Gesamtrisiko:** Mittel (Score S1/LOGIK durch Build-Blockade in Abhängigkeit `contextra-store` und VETO-F10 Mandantenisolation-Verstoß).
 - **Reifestufe (K.8):** **R2** (Deklariert: `stable` in `capabilities.toml`).

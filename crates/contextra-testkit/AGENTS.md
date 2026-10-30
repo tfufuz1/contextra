@@ -1,5 +1,7 @@
 # AGENTS.md — `contextra-testkit`
 
+> **Status 30.10.2026 (Reduktion):** Dieses Crate gehört zum Kern v1. Ring und Abhängigkeiten stimmen mit `docs/SPEC.md` §4 überein. Verweise auf entfernte Crates oder Funktionen sind veraltet. Enthält einen Graph-Index-Testdouble, der zur entfernten Graph-Crate gehört (SPEC §7). Maßgeblich ist der Quelltext. Bereinigung: `docs/PLAN.md` Phase R0 bis R3.
+
 ## 1. Rolle
 `contextra-testkit` stellt Test-Mocks, In-Memory Reference Stores und Injektions-Fixtures ausschließlich für Testumgebungen bereit.
 

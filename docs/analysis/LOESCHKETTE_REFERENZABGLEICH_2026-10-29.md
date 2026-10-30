@@ -1,5 +1,7 @@
 # Abgleichsbericht: Referenzen und Kennungen der Löschkette
 
+> **Historisches Dokument (Stand vor Reduktion, 30.10.2026).** Beschreibt den Vorzustand bis Commit `3c1f144fa`. Nicht normativ. Maßgeblich: `docs/SPEC.md` und `docs/PLAN.md` (Fassung 4.0).
+
 **Datum:** 2026-10-29
 **Repository:** `tfufuz1/contextra`
 **Prüfgegenstand:** `docs/SPEC.md` und `docs/PLAN.md`

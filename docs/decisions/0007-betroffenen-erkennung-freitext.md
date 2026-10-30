@@ -1,5 +1,7 @@
 # ADR 0007: Betroffenen-Erkennung: Contextra erkennt Personen in Freitext nicht
 
+> **Status-Update 30.10.2026:** Ausgesetzt (D-R5). Bezieht sich auf die entfernte Extraktion.
+
 - **Status**: Proposed — benötigt Maintainer-Freigabe
 - **Datum**: 2026-10-29
 - **Kontext**: Löschung über `subject_ref` des Aufrufers (SPEC C-12.15), optionale Erkennung in SPEC [R] vorgesehen
