@@ -59,18 +59,10 @@ pub use export::{
 pub use import::ImportSummary;
 
 #[cfg(not(loom))]
-#[cfg(feature = "background-maintenance")]
-pub use background_workers::start_decay_cleanup_worker;
-#[cfg(not(loom))]
 pub use background_workers::{start_expiry_cleanup_worker, start_orphan_cleanup_worker};
 
 #[cfg(not(loom))]
 pub use collection::crud::MAX_SCAN_RESULTS;
-#[cfg(feature = "graph-connectivity-health")]
-pub use collection::maintenance::PercolationConfig;
-#[cfg(not(loom))]
-#[cfg(feature = "graph-connectivity-health")]
-pub use collection::maintenance::PercolationResult;
 #[cfg(not(loom))]
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
 #[cfg(not(loom))]
