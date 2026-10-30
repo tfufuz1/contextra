@@ -24,7 +24,7 @@ reciprocal_rank_fusion(result_sets, max_results)
 // ❌ HALLUZINATION — SessionPool öffentlich zugreifen:
 let pool = SessionPool::new(config)?;
 
-// ✅ KORREKT — SessionPool ist pub(crate) in contextra-infer-onnx:
+// ✅ KORREKT — SessionPool ist pub(crate):
 // Aus externem Crate nicht direkt nutzbar. CrossEncoderReranker
 // hält seinen eigenen internen Pool.
 ```
@@ -40,11 +40,11 @@ grep -n "pub fn <METHODE_NAME>" crates/<crate>/src/*.rs
 
 **Bekannte Duplikations-Risiken**:
 ```
-ContextChunk     → contextra-core/src/types/saos.rs (NICHT neu anlegen!)
-SearchResult     → contextra-core/src/types/ (NICHT neu anlegen!)
-TxId             → contextra-core/src/types/ (Newtype u64, NICHT redefinen!)
-DocId            → contextra-core/src/types/ (Blake3-Hash, NICHT redefinen!)
-ContextraError     → contextra-core/src/error.rs (EINZIGE Error-Enum)
+ContextChunk     → contextra-types/src/ (NICHT neu anlegen!)
+SearchResult     → contextra-types/src/ (NICHT neu anlegen!)
+TxId             → contextra-types/src/ (Newtype u64, NICHT redefinen!)
+DocId            → contextra-types/src/ (Blake3-Hash, NICHT redefinen!)
+ContextraError     → contextra-types/src/error.rs (EINZIGE Error-Enum)
 CheckpointGuard  → contextra-store/src/checkpoint.rs (NICHT mit PersistentCheckpointStore verwechseln!)
 ```
 
@@ -81,8 +81,8 @@ collection.insert(key, doc).await?;
 **Symptom**: Agent importiert ein Crate aus einer höheren Schicht.
 
 ```toml
-# ❌ FALSCH — contextra-core importiert contextra-db (Layer 2 in Layer 0):
-# In crates/contextra-core/Cargo.toml:
+# ❌ FALSCH — contextra-types importiert contextra-db (Layer 2 in Layer 0):
+# In crates/contextra-types/Cargo.toml:
 contextra-db = { path = "../contextra-db" }  # ARCH-BRUCH!
 
 # ❌ FALSCH — contextra-store importiert contextra-vector (Layer 1 → Layer 1 Peer):
@@ -91,7 +91,7 @@ contextra-vector = { path = "../contextra-vector" }  # LAYER-PEER-BRUCH!
 
 **Heilmittel**: Vor jeder `Cargo.toml`-Änderung:
 ```bash
-just dag-check
+cargo check --workspace
 ```
 
 ## FEHLER-KLASSE 5: TxId-Missbrauch
@@ -125,7 +125,6 @@ unsafe { ptr::copy_nonoverlapping(src, dst, len) }
 **unsafe ist NUR erlaubt in Unsafe-Inseln** (AGENTS.md §6, capabilities.toml):
 - `crates/contextra-simd`
 - `crates/contextra-sys`
-- `crates/contextra-wire`
 - `crates/contextra-crypto`
 
 ## FEHLER-KLASSE 7: Test-Mirroring
@@ -167,11 +166,11 @@ assert!((result - 1.41421356_f32).abs() < 1e-4);
 
 ```markdown
 <!-- ❌ FALSCH — Agent bewertet Status ohne CI-Beweis: -->
-| `contextra-mcp` | 🟢 Clean |
+| `contextra-db` | 🟢 Clean |
 
 <!-- ✅ KORREKT — Status NUR aus CI: -->
-<!-- Status-Indikatoren werden AUSSCHLIESSLICH durch cargo xtask sync-docs
-     aus CI-Ergebnissen gesetzt. Niemals manuell auf 🟢 setzen. -->
+<!-- Status-Indikatoren werden AUSSCHLIESSLICH aus CI-Ergebnissen gesetzt.
+     Niemals manuell auf 🟢 setzen. -->
 ```
 
 ## FEHLER-KLASSE 11: Lock-Guard über .await halten
@@ -188,17 +187,17 @@ let collection = { state.db.read().collection("test")?.clone() };
 collection.search(...).await?;
 ```
 
-## FEHLER-KLASSE 12: Feature-Gate-Vergessen (onnx)
+## FEHLER-KLASSE 12: Feature-Gate-Vergessen
 
-**Symptom**: Agent verwendet Code aus `contextra-infer-onnx` ohne Feature-Flag.
+**Symptom**: Agent verwendet optionalen Code ohne Feature-Flag.
 
 ```rust
 // ❌ FALSCH:
-use contextra_embed::TextEmbedder; // Bricht Builds ohne onnx-Feature!
+use contextra_types::TextEmbedder;
 
 // ✅ KORREKT:
-#[cfg(feature = "onnx")]
-use contextra_embed::TextEmbedder;
+#[cfg(feature = "embed")]
+use contextra_types::TextEmbedder;
 ```
 
 ## FEHLER-KLASSE 13: Modul-Pfad-Halluzination

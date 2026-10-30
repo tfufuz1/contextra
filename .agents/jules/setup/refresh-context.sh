@@ -89,13 +89,6 @@ MILESTONES=$(gh_or_api \
   "milestones?state=open" \
   '.[] | "- M\(.number) \(.title) (\(.open_issues) open)"')
 
-# ── C) xtask context-pack (Claims, Tag-Inventar) ──────────────────────────────
-XT=(cargo run -q --manifest-path xtask/Cargo.toml --)
-CONTEXT_PACK=$("${XT[@]}" context-pack 2>/dev/null) || CONTEXT_PACK=""
-
-# ── D) Preflight (Gate-Status) ────────────────────────────────────────────────
-PREFLIGHT=$("${XT[@]}" jules-preflight --fast 2>/dev/null) || PREFLIGHT=""
-
 # ── E) Ein einziges, maximales Einstiegsdokument ──────────────────────────────
 {
   echo "# SESSION_START — $(date -u '+%F %T UTC')"
@@ -107,9 +100,9 @@ PREFLIGHT=$("${XT[@]}" jules-preflight --fast 2>/dev/null) || PREFLIGHT=""
   # ── Pflicht-Kurzregeln (Regeln stehen in AGENTS.md — hier nur Stop-Signale) ─
   echo "## ⚠️ Unveränderliche Regeln (Details: AGENTS.md, VETOES.md, capabilities.toml)"
   echo "- Rangfolge: docs/SPEC.md > VETOES.md > capabilities.toml > AGENTS.md"
-  echo "- Geschützte Pfade (NIE ändern): .github/** xtask/** justfile rust-toolchain.toml deny.toml capabilities.toml AGENTS.md .agents/jules/setup/**"
+  echo "- Geschützte Pfade (NIE ändern): .github/** justfile rust-toolchain.toml deny.toml capabilities.toml AGENTS.md .agents/jules/setup/**"
   echo "- Zero-Panic: kein unwrap()/expect()/panic!() in Produktionspfaden (§3)"
-  echo "- Unsafe nur in: contextra-simd, contextra-sys, contextra-wire"
+  echo "- Unsafe nur in: contextra-simd, contextra-sys"
   echo "- Vetos prüfen: VETOES.md F-NN vor jeder Feature-Arbeit"
   echo
 
@@ -180,24 +173,10 @@ PREFLIGHT=$("${XT[@]}" jules-preflight --fast 2>/dev/null) || PREFLIGHT=""
     echo
   fi
 
-  # ── Claims / Context-Pack ─────────────────────────────────────────────────
-  if [ -n "$CONTEXT_PACK" ]; then
-    echo "## 🏷️ Aktive Claims"
-    echo "$CONTEXT_PACK" | sed -n '/## Active Claims/,/##/p' | head -20
-    echo
-  fi
-
   # ── WORKING_STATE ─────────────────────────────────────────────────────────
   if [ -f WORKING_STATE.md ]; then
     echo "## 🗂️ WORKING_STATE (Kopf)"
     head -40 WORKING_STATE.md
-    echo
-  fi
-
-  # ── Preflight ─────────────────────────────────────────────────────────────
-  if [ -n "$PREFLIGHT" ]; then
-    echo "## 🚦 Preflight Gate-Status"
-    echo "$PREFLIGHT" | tail -25
     echo
   fi
 
@@ -217,8 +196,7 @@ PREFLIGHT=$("${XT[@]}" jules-preflight --fast 2>/dev/null) || PREFLIGHT=""
   # ── Session-Ende ──────────────────────────────────────────────────────────
   echo
   echo "## ✅ Session-Ende (VOR Submit)"
-  echo "cargo fmt --all && just check && just dag-check && just test && just sync-docs"
-  echo "cargo xtask jules-submit-gate --crate <CRATE>"
+  echo "cargo fmt --check && cargo check --workspace && cargo clippy --workspace && cargo test --workspace && cargo deny check"
 
 } > "$CTX/SESSION_START.md"
 

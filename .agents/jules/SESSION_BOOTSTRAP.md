@@ -101,13 +101,16 @@ gh issue comment <N> --body "❓ <Frage>"
 
 ---
 
-## Schritt 5 — Session-Ende: Gates
+## Schritt 5 — Session-Ende: Validierungen
+
+`cargo xtask` wurde in Reduktion 1.0 entfernt. Nutze nur standardisierte Cargo-Befehle:
 
 ```bash
-cargo fmt --all
+cargo fmt --check
 cargo check --workspace
+cargo clippy --workspace --all-targets
 cargo test --workspace
-cargo run -p xtask -- check
+cargo deny check
 ```
 
 ---
@@ -140,23 +143,22 @@ git rebase --abort
 # → dann: gh issue comment <N> --body "⚠️ Rebase-Konflikt in <Dateien> — Maintainer bitte merge/rebase klären"
 ```
 
-**Nach erfolgreichem Rebase — Gates ERNEUT laufen lassen:**
+**Nach erfolgreichem Rebase — Validierungen ERNEUT laufen lassen:**
 
 ```bash
-# Gates müssen auf dem rebased Stand grün sein
-cargo check --workspace && cargo test --workspace && cargo run -p xtask -- check
+# Validierungen müssen auf dem rebased Stand grün sein
+cargo fmt --check && cargo check --workspace && cargo clippy --workspace && cargo test --workspace && cargo deny check
 ```
 
-> **Regel:** Schlägt ein Gate nach dem Rebase fehl, liegt ein echter Konflikt mit
-> Änderungen auf main vor. Fix durchführen, dann Gate erneut prüfen — KEIN skip.
+> **Regel:** Schlägt ein Check nach dem Rebase fehl, liegt ein echter Konflikt mit
+> Änderungen auf main vor. Fix durchführen, dann Check erneut prüfen — KEIN skip.
 
 ---
 
-## Schritt 7 — Pre-Submit Gate (BLOCKIEREND)
+## Schritt 7 — Pre-Submit (BLOCKIEREND)
 
 ```bash
-cargo xtask jules-submit-gate --crate <DEIN-CRATE>
-# Kein submit() vor ✅ SUBMIT GATE BESTANDEN.
+cargo fmt --check && cargo check --workspace && cargo clippy --workspace && cargo test --workspace && cargo deny check
 ```
 
 ```bash

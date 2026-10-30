@@ -28,7 +28,7 @@ cat capabilities.toml
 | 3 | Zeit/Zufall/IDs nur über Ports | determinism Gate |
 | 4 | Alles Persistente geht durch WAL | deletion-honesty Gate |
 | 5 | I/O nur über `Vfs` | security-ports Gate |
-| 6 | Unsafe nur in 3 Inseln | unsafe-inventory Gate |
+| 6 | Unsafe nur in 2 Inseln | unsafe-inventory Gate |
 | 7 | Mandant aus RequestContext | no-literal-secrets Gate |
 | 8 | Sicherheit kein Feature-Schalter | no-security-stub Gate |
 | 9 | Messen vor Behaupten | deletion-honesty Gate |
@@ -36,26 +36,28 @@ cat capabilities.toml
 | 11 | Eine Typfamilie je Konzept | symbol-uniqueness Gate |
 | 12 | Ein PR = ein WP | scope-guard Gate |
 
-## Baukasten-Module [M] (SPEC §4.2, §5)
+## Baukasten-Crates (Reduktion 1.0)
 
-`contextra-graph`, `contextra-cognition`, `contextra-adapt`, `contextra-kvcache`,
-`contextra-router`, `contextra-agent`, `contextra-infer-onnx`, `contextra-infer-ollama`,
-`contextra-privacy`, `contextra-mcp`, `contextra-py`, `contextra-sandbox`
+Das Repository wurde auf 14 Crates unter `crates/` reduziert:
+`contextra`, `contextra-crypto`, `contextra-db`, `contextra-engine`, `contextra-mvcc`,
+`contextra-ports`, `contextra-rank`, `contextra-simd`, `contextra-store`, `contextra-sys`,
+`contextra-testkit`, `contextra-text`, `contextra-types`, `contextra-vector`.
 
-> [!NOTE]
-> Gemäß SPEC 3.0 / ADR-D01 sind diese Crates Baukasten-Module [M] mit eigenem Vertrag und isoliertem Prüfauftrag, kein Archiv.
+Entfernte Crates (`graph`, `cognition`, `adapt`, `kvcache`, `router`, `agent`, `infer-*`,
+`sandbox`, `py`, `license`, `core`, `ingest`, `mcp`, `wire`, `checkpoint`, `privacy`,
+`audit-export`, `avv-generator`) liegen in der Git-Historie (Tag `snapshot/pre-cut` bzw.
+Commit `eb10652f`) und werden nicht neu angelegt.
 
-## Gates (`cargo xtask`)
+## Validierung (Cargo statt xtask)
+
+`cargo xtask` wurde entfernt. Validierungen erfolgen ausschließlich über standardisierte Cargo-Befehle:
 
 ```bash
-# Alle aktiven Gates prüfen
-cargo run -p xtask -- check
-
-# Einzelnes Gate prüfen
-cargo run -p xtask -- gate check --gate ring-dag
-
-# Liste aller Gates
-cargo run -p xtask -- --list-gates
+cargo fmt --check
+cargo check --workspace
+cargo clippy --workspace --all-targets
+cargo test --workspace
+cargo deny check
 ```
 
 ## Commit-Konventionen
@@ -64,24 +66,23 @@ cargo run -p xtask -- --list-gates
 WP-x.y(crate): Kurze Beschreibung
 
 - Was geändert und warum (SPEC §x.y)
-- Gate-Status vorher → nachher
+- Validation-Status vorher → nachher
 
-Gates: ring-layering=🟢 no-security-stub=🔴→🟡
 Closes: #<issue>
 ```
 
 ## Branch-Naming
 
 ```
-wp/x.y-kurzbeschreibung       # z.B. wp/2.1-archive-graph
-fix/gate-name-beschreibung    # z.B. fix/ring-layering-engine-dep
+wp/x.y-kurzbeschreibung       # z.B. wp/2.1-refactor
+fix/beschreibung              # z.B. fix/engine-dep
 ```
 
 ## Governance-Referenzen
 
 | Datei | Zweck |
 |-------|-------|
-| `governance/gates.toml` | Gate-Katalog — Single Source of Truth (50+ Gates) |
+| `governance/gates.toml` | Gate-Katalog — Single Source of Truth |
 | `governance/ratchet.toml` | Qualitäts-Baselines (dürfen nur sinken, REQ-QA-005) |
 | `governance/security_ports.toml` | Pflicht-Sicherheitsports (INV-WIRING-2) |
 | `governance/key_purposes.toml` | HKDF-Labels und Schlüssel-Zweckbindung (INV-KEYPURPOSE-1) |

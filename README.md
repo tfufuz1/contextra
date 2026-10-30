@@ -8,23 +8,26 @@ Contextra ist eine in Rust geschriebene Bibliothek (Single-Node, eingebettet), d
 
 ---
 
-## Status der Löschkette
+## Reduktion 1.0
 
-Die Löschkette befindet sich im Entwicklungsstatus **experimental** ([`docs/SPEC.md`](docs/SPEC.md) §9.10).
+Das Repository wurde auf 14 Crates unter `crates/` reduziert (`contextra`, `contextra-crypto`, `contextra-db`, `contextra-engine`, `contextra-mvcc`, `contextra-ports`, `contextra-rank`, `contextra-simd`, `contextra-store`, `contextra-sys`, `contextra-testkit`, `contextra-text`, `contextra-types`, `contextra-vector`).
+Entfernte Crates (`graph`, `cognition`, `adapt`, `kvcache`, `router`, `agent`, `infer-*`, `sandbox`, `py`, `license`, `core`, `ingest`, `mcp`, `wire`, `checkpoint`, `privacy`, `audit-export`, `avv-generator`) liegen in der Git-Historie (Tag `snapshot/pre-cut` bzw. Commit `eb10652f`) und werden nicht neu angelegt.
+`cargo xtask` wurde entfernt; Validierungen erfolgen ausschließlich über standardisierte Cargo-Befehle (`cargo fmt`, `cargo check`, `cargo clippy`, `cargo test`, `cargo deny`).
 
-Aktuell werden durch Layer-Scanner messtechnisch fünf Schichten erfasst (`crates/contextra-engine/src/contextra_impl/erasure.rs`):
+---
+
+## Status der Löschkette (nicht Teil von 1.0)
+
+Die erweiterte Löschkette befindet sich im Entwicklungsstatus **experimental** und ist **nicht Teil von 1.0**.
+
+Aktuell erfasst die Grundstruktur der Schichten-Löschung:
 - `LsmMemtable` (Memtable)
 - `SsTableAllLevels` (SSTables)
 - `WalAllSegments` (Write-Ahead Log)
 - `TextIndex` (BM25 Text-Index)
 - `HnswIndex` (Vektor-Index)
 
-Noch nicht umgesetzt sind:
-- Schlüsselvernichtung und Schlüsselhierarchie
-- Lesesperre (`ErasedSet`)
-- Löschsaga
-- Backup-Guard
-- Empfängerregister (`RecipientLedger`)
+Erweiterte Löschkettenfunktionen (wie automatisierte Schlüsselvernichtung, Repertoire-Saga oder Recipient-Ledger) sind nicht Teil von 1.0.
 
 ---
 
@@ -44,14 +47,13 @@ Das Ergebnis ist ein technischer Befund über das lokale Datenverzeichnis, keine
 
 ## Architektur & Ringmodell
 
-Contextra ist nach einem unidirektionalen Ringmodell aufgebaut (**Ring 4 → Ring 3 → Ring 2 → Ring 1 → Ring 0**):
+Contextra ist nach einem unidirektionalen Ringmodell aufgebaut (**Ring 4 → Ring 3 → Ring 1 → Ring 0**):
 
-- **Ring 4 (Fassade & Schnittstellen):** `contextra` (Composition Root), `contextra-mcp`, `contextra-py`, `contextra-license`
-- **Ring 3 (Orchestrierung & Schutz):** `contextra-engine`, `contextra-db`, `contextra-privacy`, `contextra-cognition`, `contextra-router`, `contextra-agent`
-- **Ring 2 (Inferenz & Isolation):** `contextra-infer-candle`, `contextra-infer-onnx`, `contextra-infer-ollama`, `contextra-sandbox`
-- **Ring 1 (Persistenz):** `contextra-store`, `contextra-checkpoint`, `contextra-kvcache`
-- **Ring 0 (Fundament & Kerne):** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-rank`, `contextra-graph`, `contextra-adapt`, `contextra-audit-export`, `contextra-avv-generator`
-- **Unsafe-Inseln (Ring 0):** `contextra-simd`, `contextra-sys`, `contextra-wire`
+- **Ring 4 (Fassade & Schnittstellen):** `contextra` (Composition Root)
+- **Ring 3 (Orchestrierung & DB-Schicht):** `contextra-engine`, `contextra-db`
+- **Ring 1 (Persistenz):** `contextra-store`
+- **Ring 0 (Fundament & Kerne):** `contextra-types`, `contextra-ports`, `contextra-mvcc`, `contextra-crypto`, `contextra-vector`, `contextra-text`, `contextra-rank`, `contextra-testkit`
+- **Unsafe-Inseln (Ring 0):** `contextra-simd`, `contextra-sys`
 
 Die alleinige normative Quelle für Architektur und Invarianten ist [`docs/SPEC.md`](docs/SPEC.md).
 
@@ -59,36 +61,29 @@ Die alleinige normative Quelle für Architektur und Invarianten ist [`docs/SPEC.
 
 ## Verifizierung & Build-Befehle
 
-Alle Validierungen und Quality Gates werden über Cargo und `cargo xtask` ausgeführt.
+Alle Validierungen erfolgen über standardisierte Cargo-Befehle (`cargo xtask` wurde entfernt).
 
 ### Grundlegende Befehle
 
 ```bash
-# Gesamten Workspace prüfen
-cargo check --workspace --locked
+# Code-Formatierung prüfen
+cargo fmt --check
 
-# Alle Tests ausführen
-cargo test --workspace --locked
+# Gesamten Workspace prüfen
+cargo check --workspace
 
 # Clippy Lints prüfen
-cargo clippy --workspace --all-targets --locked
+cargo clippy --workspace --all-targets
+
+# Alle Tests ausführen
+cargo test --workspace
+
+# Abhängigkeiten und Lizenzen prüfen
+cargo deny check
 
 # Spezifisches Crate isoliert testen
-cargo test -p contextra-types --locked
-cargo test -p contextra-store --locked
-```
-
-### Quality Gates (`cargo xtask`)
-
-```bash
-# Alle aktiven Qualitäts-Gates prüfen
-cargo run -p xtask -- check
-
-# Einzelnes Gate ausführen (z. B. ring-dag)
-cargo run -p xtask -- gate check --gate ring-dag
-
-# Übersicht aller konfigurierten Gates anzeigen
-cargo run -p xtask -- --list-gates
+cargo test -p contextra-types
+cargo test -p contextra-store
 ```
 
 ---

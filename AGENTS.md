@@ -53,7 +53,7 @@ cargo check --workspace
 2. Existenz von APIs, Dateien und Typen im Code prüfen (niemals aus dem Gedächtnis annehmen).
 3. Plan mit Dateiliste, WP-Nummer und Akzeptanzbefehlen erstellen.
 4. Kleinste mögliche Änderung durchführen (ein WP = ein PR = höchstens ein Crate-Schnitt, REQ-CHG-2).
-5. Gates lokal grün: `cargo check --workspace` && `cargo test --workspace` && `cargo run -p xtask -- check`
+5. Gates lokal grün: `cargo fmt --check && cargo check --workspace && cargo clippy --workspace && cargo test --workspace && cargo deny check`
 6. **Rebase auf origin/main** (`git fetch origin && git rebase origin/main`) — PFLICHT vor jedem PR.
 7. Gates nach Rebase erneut prüfen, dann PR erstellen, Issue schließen.
 
@@ -87,7 +87,7 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für R
 - „Fertig" bedeutet ausnahmslos: Alle relevanten Gates, Lints und Tests auf dem Merge-Ergebnis sind grün (REQ-QA-010).
 - **Rebase-Pflicht (hochfrequentierte Entwicklung):** Vor jedem PR zwingend `git fetch origin && git rebase origin/main` ausführen. Nach dem Rebase Gates erneut prüfen. Kein PR ohne sauberen Rebase auf main.
 - Es ist streng verboten, Gates, Lints, Ratchets oder den Toolchain-Pin einzuschränken, abzuschwächen oder durch Ausnahmen zu umgehen (REQ-QA-010).
-- **Geschützte Pfade:** `.github/**`, `xtask/**`, `justfile`, `rust-toolchain.toml`, `deny.toml`, `capabilities.toml`, `AGENTS.md`, `.agents/jules/setup/**`, `governance/**`.
+- **Geschützte Pfade:** `.github/**`, `justfile`, `rust-toolchain.toml`, `deny.toml`, `capabilities.toml`, `AGENTS.md`, `.agents/jules/setup/**`, `governance/**`.
 
 ---
 
@@ -100,7 +100,7 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für R
 3. **Zeit, Zufall, IDs nur über Ports** `Clock`, `Rng`, `IdGen` (P28). Verboten in Kernlogik: `Instant::now`, `SystemTime::now`, `thread_rng`, `std::env::var`, `HashMap/HashSet` <!-- doc-ref-ignore --> mit RandomState. Ausnahme: Schlüssel-/Salt-Material aus dem System-RNG.
 4. **Alles Persistente geht durch das WAL** (P24). Sicherheitszustand liegt ausschließlich in den fünf Sidecar-Logs (§7.9).
 5. **I/O nur über `Vfs`**; Commit = durabler Flush mit plattformgerechter Primitive (§7.7); `fsync`-Fehler werden propagiert, nie mit `let _ =` verworfen.
-6. **Unsafe-Inseln (drei Inseln)** (`contextra-simd`, `contextra-sys`, `contextra-wire`), jeder Block mit `// SAFETY:` (P2).
+6. **Unsafe-Inseln** (`contextra-simd`, `contextra-sys`), jeder Block mit `// SAFETY:` (P2).
 7. **Mandant kommt aus dem `RequestContext`**, nie aus Literalen, Defaults oder Nutzerparametern (INV-TENANT-1, VETO-F10).
 8. **Sicherheit ist kein Feature-Schalter.** Verschlüsselung, Messung und Löschbericht sind in jedem Build aktiv; kein `cfg(not(feature))`-Ersatz für Sicherheitscode (A1).
 9. **Messen vor Behaupten.** Ein Restbestand-Zähler entsteht nur aus einem Scanner der besitzenden Schicht; Konstanten oder Aufrufer-Werte sind nie Messung (§12.7, §12.10).
@@ -110,52 +110,32 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart) und `capabilities.toml` für R
 
 ---
 
-## 5. Baukasten-Crates [K] / [M] / [E] — Baukasten-Modell (SPEC §5)
+## 5. Baukasten-Crates — Baukasten-Modell (SPEC §5)
 
-### 5.1 Kern-Crates [K]
+### Reduktion 1.0
 
-| Crate | Ring | Status | WP-Aufgabe |
-|-------|------|--------|------------|
+Das Repository wurde auf 14 Crates unter `crates/` reduziert (`contextra`, `contextra-crypto`, `contextra-db`, `contextra-engine`, `contextra-mvcc`, `contextra-ports`, `contextra-rank`, `contextra-simd`, `contextra-store`, `contextra-sys`, `contextra-testkit`, `contextra-text`, `contextra-types`, `contextra-vector`).
+Entfernte Crates (`graph`, `cognition`, `adapt`, `kvcache`, `router`, `agent`, `infer-*`, `sandbox`, `py`, `license`, `core`, `ingest`, `mcp`, `wire`, `checkpoint`, `privacy`, `audit-export`, `avv-generator`) liegen in der Git-Historie (Tag `snapshot/pre-cut` bzw. Commit `eb10652f`) und werden nicht neu angelegt.
+`cargo xtask` wurde entfernt; Validierungen erfolgen ausschließlich über standardisierte Cargo-Befehle (`cargo fmt`, `cargo check`, `cargo clippy`, `cargo test`, `cargo deny`).
+
+### 5.1 Verbliebene 14 Crates
+
+| Crate | Ring | Status | Aufgabe |
+|-------|------|--------|---------|
 | `contextra-types` | 0 | aktiv | Grundlegende Typen, IDs, Fehlerklassen |
 | `contextra-ports` | 0 | aktiv | Port-Schnittstellen (Entkopplung) |
 | `contextra-sys` | 0 | aktiv | Unsafe-Insel; Systemnahe Bindings, Low-Level-I/O |
 | `contextra-simd` | 0 | aktiv | Unsafe-Insel; SIMD-Distanzkerne |
-| `contextra-wire` | 0 | aktiv | Unsafe-Insel; FlatBuffers Wire-Protokoll |
 | `contextra-mvcc` | 0 | aktiv | Snapshots, SSI, Sequenzen |
-| `contextra-crypto` | 0 | aktiv | AEAD, KDF, Signaturen, Löschbericht V5 |
+| `contextra-crypto` | 0 | aktiv | AEAD, KDF, Signaturen |
 | `contextra-vector` | 0 | aktiv | HNSW, SQ8, ACL-Bitset |
 | `contextra-text` | 0 | aktiv | BM25, Tokenizer |
 | `contextra-rank` | 0 | aktiv | RRF-Fusion, Normalisierung |
+| `contextra-testkit` | 0 | aktiv | Testkit-Infrastruktur |
 | `contextra-store` | 1 | aktiv | WAL, LSM, SSTables, Kompaktion |
-| `contextra-checkpoint` | 1 | aktiv | Persistent Checkpoint Engine |
-| `contextra-engine` | 3 | aktiv | Planner, Collections, Entkopplung von Rand-Crates |
+| `contextra-engine` | 3 | aktiv | Planner, Collections |
 | `contextra-db` | 3 | aktiv | Main DB Abstraktion |
 | `contextra` | 4 | aktiv | Composition Root, öffentliche Facade |
-
-### 5.2 Rand-Module [M] — Baukasten-Module mit Vertrag (SPEC §4.2, §5)
-
-> **Gemäß SPEC 3.0 / ADR-D01 sind Inferenz-, Agenten- und Schutz-Crates aktive Baukasten-Module [M] mit isoliertem Vertrag, KEIN Archiv.**
-
-| Crate | Ring | Familie | Aufgabe / Entkopplungs-WP |
-|-------|------|---------|---------------------------|
-| `contextra-infer-candle` | 2 | F3 | Lokales GGUF Embedding- & Inferenz-Backend |
-| `contextra-infer-onnx` | 2 | F3 | ONNX Embedding- & Cross-Encoder-Backend (WP 2.7: Download aus) |
-| `contextra-infer-ollama` | 2 | F3 | Ollama Client (WP 2.7: Loopback-Default) |
-| `contextra-kvcache` | 1 | F3 | Quantisierter KV-Cache |
-| `contextra-adapt` | 0 | F3 | PID-Latenzregelung |
-| `contextra-graph` | 0 | F4 | CSR-Graph, PathGraphing (WP 2.2: entkoppeln von `engine`) |
-| `contextra-cognition` | 3 | F4 | Sleep-Cycle-Konsolidierung (WP 2.3: entkoppeln von `db`) |
-| `contextra-router` | 3 | F4 | Lyapunov Drift Control, Routing |
-| `contextra-agent` | 3 | F4 | Agent Execution Pipeline (WP 2.6: entkoppeln über Ports) |
-| `contextra-privacy` | 3 | F5 | PII-Filter, Egress-Gateway |
-| `contextra-mcp` | 4 | F5 | MCP-Server, stdio IPC (WP 2.7: Entkopplung) |
-| `contextra-py` | 4 | F5 | PyO3 Python-Bindings |
-| `contextra-sandbox` | 2 | F5 | WASM Execution Boundary |
-
-### 5.3 Experimentell [E] & Auslaufend
-
-- **Experimentell [E]:** `contextra-license`, `contextra-audit-export`, `contextra-avv-generator`
-- **Auslaufend:** `contextra-core` (WP 2.8: schrittweise Entfernung der Kompatibilitätsfassade)
 
 ---
 
@@ -190,33 +170,7 @@ Folgende Ports MÜSSEN in Produktion real implementiert sein. Null-/Test-/Accept
 ## 8. Aktueller Implementierungsstatus (IST-Befunde)
 
 > Basierend auf PLAN.md §1 (Kernbefunde) und Commit `a547a42`.
-> Aktuelle Gates laufen auf main via CI.
-
-### 8.1 Kritische Sofort-Maßnahmen (Phase 0–1, bereits in Arbeit)
-
-| ID | Befund | Gate | WP |
-|----|--------|------|-----|
-| B-02 | Engine-Sicherheitsstub: `DeletionProof::verify → Ok(true)` | `no-security-stub` | WP 1.1 |
-| B-04 | MCP: Literal-Schlüssel `default_test_deletion_proof_key`, Mandanten-Fallback auf `SYSTEM` | `no-literal-secrets` | WP 1.2 |
-| B-07 | Schlüsselableitung per HKDF statt Argon2id (INV-KDF-1 verletzt) | `key-kdf` | WP 5.1 |
-| B-08 | Ports der Löschkette (`Vfs`, `LayerScanner` etc.) fehlen komplett | `security-ports` | WP 3.2 |
-| B-12 | HNSW: Slot-Wiederverwendung ohne Nullung (INV-HNSW-SLOT-1 verletzt) | `hnsw-slot` | WP 6.2 |
-| B-14 | Kern hängt hart am Rand (engine→graph, adapt, kvcache; INV-CORE-ISOLATION-1) | `ring-layering` | WP 2.x |
-| B-15 | `encryption-at-rest` als optionales Feature (A1 verletzt) | `no-security-stub` | WP 1.1 |
-
-### 8.2 Gate-Lage (Scan auf `a547a42`)
-
-| Gate | Status | Verstöße |
-|------|--------|----------|
-| `ring-layering` | 🔴 | 2 Fehler + 66 Warnungen |
-| `feature-consistency` | 🔴 | 24 |
-| `test-surface` | 🔴 | 18 |
-| `determinism` | 🔴 | 44 Zeitaufrufe (35 in aktiven Crates) |
-| `async-io` | 🔴 | 18 |
-| `unsafe-audit` | 🔴 | 5 SAFETY-Lücken |
-| `raw-carrier` | 🔴 | 2 |
-| `deletion-honesty` | 🟡 | grün (sieht Lücken nicht) |
-| `doc-stamp` | 🟡 | 7 Warnungen |
+> Aktuelle Validation-Checks laufen auf main via CI.
 
 ---
 
