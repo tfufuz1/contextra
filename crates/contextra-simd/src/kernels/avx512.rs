@@ -439,7 +439,7 @@ pub(crate) unsafe fn dot_product_u8_avx512vnni(a: &[u8], b: &[u8]) -> u32 {
     while i < len {
         // SAFETY: `i < len` where `len = min(a.len(), b.len())` guarantees `i` is within bounds.
         let (x, y) = unsafe { (*a.get_unchecked(i) as u32, *b.get_unchecked(i) as u32) };
-        sum += x * y;
+        sum = sum.wrapping_add(x * y);
         i += 1;
     }
 
