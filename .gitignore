@@ -69,3 +69,4 @@ results/
 /.jules/local/
 .agents/jules/session.env
 .agents/jules/gate_ledger.json
+evidence/

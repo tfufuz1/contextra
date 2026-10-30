@@ -27,8 +27,6 @@
     clippy::wrong_self_convention
 )]
 
-#[cfg(feature = "experimental-diskann")]
-pub mod diskann;
 pub mod distance;
 pub mod hnsw;
 pub mod persistence;
@@ -44,8 +42,6 @@ pub mod quantize_rabitq;
 
 pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SIZE};
 pub use compute_pool::ComputePool;
-#[cfg(feature = "experimental-diskann")]
-pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 pub use hnsw::{
     hnsw_purger, hnsw_scanner, HnswConfig, HnswIndex, HnswPurger, HnswScanner, RebuildStatus,
 };

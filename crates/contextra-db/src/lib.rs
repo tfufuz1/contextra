@@ -136,10 +136,6 @@ pub mod decay_controller {
     pub use contextra_adapt::decay_controller::*;
 }
 pub use contextra_engine::fusion;
-/// Homeostat-Modul für PID-Kandidatenpool-Regulierung.
-pub mod homeostat;
-/// Iteratives Multi-Step Retrieval mit Query Rewriting.
-pub mod multistep;
 /// PID-Regler zur Einhaltung von Latenzbudgets.
 pub mod pid_latency_controller {
     pub use contextra_adapt::pid_latency_controller::*;
@@ -154,10 +150,6 @@ pub use volatile_vault::{
 };
 
 pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
-pub use homeostat::RerankDeadline;
-#[allow(deprecated)]
-pub use homeostat::RerankPidController;
-pub use multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
 pub use pid_latency_controller::{
     LatencyBudgetGuard, PidLatencyController, DEFAULT_TARGET_LATENCY_MS, MAX_SCALING_FACTOR,
     MIN_SCALING_FACTOR,

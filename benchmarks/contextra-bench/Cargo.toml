@@ -30,14 +30,10 @@ name = "scale-100k"
 path = "src/bin/scale_100k.rs"
 
 [dependencies]
-contextra-core = { workspace = true }
 contextra-store = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-text = { workspace = true }
-contextra-graph = { workspace = true }
 contextra-db = { workspace = true }
-contextra-infer-onnx = { workspace = true }
-contextra-infer-candle = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -52,14 +48,6 @@ rand = { workspace = true }
 name = "competitive_kv"
 harness = false
 
-[[bench]]
-name = "locomo"
-harness = false
-
-[[bench]]
-name = "long_mem_eval"
-harness = false
-
 [dev-dependencies]
 contextra-sys = { workspace = true }
 criterion = { workspace = true }
@@ -70,4 +58,3 @@ sled = "0.34"
 [features]
 default = []
 external-benchmarks = []
-onnx-bench = ["contextra-infer-onnx/onnx", "contextra-db/reranking"]

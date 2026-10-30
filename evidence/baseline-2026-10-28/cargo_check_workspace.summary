@@ -1,3 +1,0 @@
-CMD: cargo check --workspace --all-targets --locked
-EXIT_CODE: 0
-DURATION_MS: 3097
