@@ -1,3 +1,6 @@
+//! Integrationstests für SignedLicenseGate über den LicenseGate-Port.
+//! Testet End-to-End-Szenarien mit echten Ed25519-Schlüsselpaaren für erlaubte und gesperrte Ringe.
+
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::collections::BTreeMap;
@@ -32,6 +35,8 @@ fn generate_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     (signing_key, verifying_key)
 }
 
+// ANCHOR[contextra-license:TEST-GATE-VALID-SOVEREIGN]
+// Prüft erfolgreiche Freigabe des Sovereign-Rings bei gültiger Signatur und passender Lizenz.
 #[test]
 fn test_valid_signature_allowed_ring_sovereign() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -62,6 +67,8 @@ fn test_valid_signature_allowed_ring_sovereign() {
     assert_eq!(gate.check_ring(FeatureRing::Sovereign), Ok(()));
 }
 
+// ANCHOR[contextra-license:TEST-GATE-MISSING-COMPLIANCE]
+// Prüft Abweisung des Compliance-Rings, wenn dieser in der signierten Lizenz nicht enthalten ist.
 #[test]
 fn test_valid_signature_missing_ring_compliance() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -95,6 +102,8 @@ fn test_valid_signature_missing_ring_compliance() {
     );
 }
 
+// ANCHOR[contextra-license:TEST-GATE-INVALID-SIG-REJECTED]
+// Prüft Abweisung des Zugriffs bei manipulierter Signatur.
 #[test]
 fn test_invalid_signature_rejected() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -118,6 +127,8 @@ fn test_invalid_signature_rejected() {
     assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
+// ANCHOR[contextra-license:TEST-GATE-EXPIRED-REJECTED]
+// Prüft Abweisung des Zugriffs bei abgelaufener Lizenz.
 #[test]
 fn test_expired_license() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -153,6 +164,8 @@ fn test_expired_license() {
     );
 }
 
+// ANCHOR[contextra-license:TEST-GATE-FAST-RING-ALWAYS-OK]
+// Prüft Invariante INV-LICENSE-2: Fast-Ring ist selbst bei abgelaufener Lizenz immer erlaubt.
 #[test]
 fn test_inv_license_2_fast_ring_always_allowed() {
     let (signing_key, verifying_key) = generate_keypair();

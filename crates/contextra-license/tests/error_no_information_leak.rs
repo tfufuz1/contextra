@@ -1,7 +1,12 @@
+//! Verifikation des Schutzes vor Informationslecks bei Lizenzprüffehlern.
+//! Stellt sicher, dass Fehlermeldungen keine Maschinen-Hashes oder sensiblen Host-Daten preisgeben.
+
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use contextra_license::{FeatureRing, LicenseError, LicenseGate, SignedLicenseGate};
 
+// ANCHOR[contextra-license:TEST-ERROR-NO-INFO-LEAK]
+// Prüft, dass LicenseError::NotActivated keinerlei interne Hash-Werte oder Pfade im Display-String ausgibt.
 #[test]
 fn test_not_activated_error_formatting_contains_no_hashes_or_local_ids() {
     let gate = SignedLicenseGate::no_activation();
