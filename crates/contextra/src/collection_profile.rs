@@ -2,20 +2,56 @@
 // ZWECK: CollectionProfile & DeploymentTier Presets for Contextra (Spec B.1.8, AP-P0-05)
 // INVARIANTEN: INV-COLLECTION-PROFILE-1, INV-COLLECTION-PROFILE-2
 
+//! # Modul: CollectionProfile & DeploymentTier Presets (Ring 4)
+//!
+//! Dieses Modul definiert standardisierte Betriebs-Profile (`CollectionProfile`) und
+//! Voreinstellungen (`DeploymentTier`) für Dokumentensammlungen (Collections).
+//!
+//! ## Ring-Zugehörigkeit & Zweck
+//! - **Ring 4 (Fassade)**: Bietet übergeordnete Konfigurationsbündel für typische
+//!   Betriebsumgebungen an, von ressourcenbeschränkten Edge-Geräten bis zu hochgradig
+//!   regulierten Unternehmensumgebungen (DSGVO, Compliance).
+//!
+//! ## Wichtigste Typen & Konstanten
+//! - [`DEFAULT_AUTO_EXTRACTION_MODE`]: Standardmodus für automatische Entitäten-Extraktion via LLM.
+//! - [`ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT`]: Abweichender Default für regulierte Umgebungen.
+//! - [`LsmTuning`]: Feineinstellung für LSM-Speicherstrukturen (Memtable, RAM, Group-Commit).
+//! - [`CollectionProfile`]: Kombiniert Performance, KV-Löschmodus, LSM-Tuning und Extraktionsmodus.
+//! - [`DeploymentTier`]: Enumeration vordefinierter Betriebsstufen (`EdgeMinimal`, `PowerUserLocal`,
+//!   `EnterpriseShared`, `EnterpriseRegulated`).
+//!
+//! ## Invarianten
+//! - **INV-COLLECTION-PROFILE-1**: Wenn kryptografische Löschnachweise (DeletionProof) aktiv sind,
+//!   darf `kv_delete_mode` nicht auf `TombstoneOnly` stehen, da reine Tombstones keinen kryptografischen
+//!   Löschbeweis (Crypto-Shredding) erbringen können.
+//! - **INV-COLLECTION-PROFILE-2**: Alle Voreinstellungen in `DeploymentTier` müssen bei Aufruf von `resolve()`
+//!   stets valide sein (`validate().is_ok()`).
+
+
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
 pub use contextra_core::types::domain::AutoExtractionMode;
 use contextra_ports::license::LicenseGate;
 use contextra_store::kv::delete_mode::KvDeleteMode;
 
-/// Default auto extraction mode for standard deployment tiers.
+// ANCHOR[contextra:PRF-001]
+/// Standardmodus für die automatische LLM-gestützte Metadaten-/Entitäten-Extraktion bei Standard-Tiers.
+///
+/// Standardmäßig aktiviert (`AutoExtractionMode::Enabled`).
 pub const DEFAULT_AUTO_EXTRACTION_MODE: AutoExtractionMode = AutoExtractionMode::Enabled;
 
+// ANCHOR[contextra:PRF-002]
+/// Standardmodus für `EnterpriseRegulated`.
+///
 /// In EnterpriseRegulated wird kein Dokumenttext automatisch an ein Extraktions-LLM
-/// gegeben, solange der Betreiber es nicht ausdrücklich aktiviert (Datenminimierung);
+/// gegeben, solange der Betreiber es nicht ausdrücklich aktiviert (Datenminimierung gemäß Art. 5 DSGVO);
 /// explizite Aktivierung pro Collection bleibt möglich.
 pub const ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT: AutoExtractionMode =
     AutoExtractionMode::Disabled;
 
+// ANCHOR[contextra:PRF-003]
+/// Feineinstellungsparameter für die LSM-Speicher-Engine (Log-Structured Merge-Tree).
+///
+/// Regelt Speicherbudgets und Flush-Frequenzen, um Systemressourcen optimal auf die Hardware abzustimmen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LsmTuning {
     pub memtable_size_limit: u64,
@@ -24,6 +60,10 @@ pub struct LsmTuning {
     pub block_cache_shards: u16,
 }
 
+// ANCHOR[contextra:PRF-004]
+/// Vollständiges Profil zur Konfiguration einer Collection.
+///
+/// Bündelt Performance-, Persistenz- und Datenschutzaspekte für eine Sammlung.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CollectionProfile {
     pub performance: PerformanceProfile,
@@ -32,6 +72,8 @@ pub struct CollectionProfile {
     pub auto_extraction: AutoExtractionMode,
 }
 
+// ANCHOR[contextra:PRF-005]
+/// Mögliche Fehler bei der Validierung eines `CollectionProfile`.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum CollectionProfileError {
     #[error("performance profile invalid: {0}")]
@@ -41,6 +83,15 @@ pub enum CollectionProfileError {
 }
 
 impl CollectionProfile {
+    // ANCHOR[contextra:PRF-006]
+    /// Validiert die interne Konsistenz des Profils.
+    ///
+    /// # Ablauf von `validate`:
+    /// 1. Performance-Profil auflösen und dessen Konfiguration prüfen (`resolved.validate()`).
+    /// 2. Prüfen, ob `deletion_proof_active` mit `KvDeleteMode::TombstoneOnly` kombiniert wurde (Invariante INV-COLLECTION-PROFILE-1).
+    ///
+    /// # Fehler
+    /// Gibt [`CollectionProfileError::KvDeleteMismatch`] zurück, falls Löschnachweise aktiv sind, aber nur Tombstones konfiguriert wurden.
     pub fn validate(&self) -> Result<(), CollectionProfileError> {
         let resolved = self.performance.resolve();
         resolved.validate()?;
@@ -50,6 +101,11 @@ impl CollectionProfile {
         Ok(())
     }
 
+    // ANCHOR[contextra:PRF-007]
+    /// Validiert das Profil zusätzlich gegen ein Lizenzgate.
+    ///
+    /// Stellt sicher, dass das Profil intern konsistent ist und der geforderte Feature-Ring
+    /// durch die Lizenz abgedeckt ist.
     pub fn validate_with_license(
         &self,
         gate: &dyn LicenseGate,
@@ -61,6 +117,8 @@ impl CollectionProfile {
     }
 }
 
+// ANCHOR[contextra:PRF-008]
+/// Vordefinierte Betriebsstufen (Deployment Tiers) für typische Anwendungsszenarien.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum DeploymentTier {
@@ -71,6 +129,10 @@ pub enum DeploymentTier {
 }
 
 impl DeploymentTier {
+    // ANCHOR[contextra:PRF-009]
+    /// Löst die Betriebsstufe in ein konkretes, vorkonfiguriertes [`CollectionProfile`] auf.
+    ///
+    /// Garantiert stets ein konsistentes Profil gemäß Invariante INV-COLLECTION-PROFILE-2.
     pub fn resolve(self) -> CollectionProfile {
         match self {
             Self::EdgeMinimal => CollectionProfile {

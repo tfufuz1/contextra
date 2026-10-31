@@ -1,5 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+//! # Integrationstest: `license_gate_always_enforced`
+//!
+//! Prüft, dass Lizenzprüfungen für privilegierte Feature-Ringe (`Sovereign`)
+//! unter allen Umständen erzwungen werden und nicht durch Standardwerte umgangen werden können.
+
+
 use contextra::builder::ContextraBuilder;
 use contextra::performance_profile::{PerformanceProfile, VectorDeleteMode};
 use contextra_core::error::ContextraError;
@@ -7,6 +13,8 @@ use contextra_license::SignedLicenseGate;
 use contextra_ports::license::FeatureRing;
 use contextra_store::lsm::config::DurabilityMode;
 
+// ANCHOR[contextra:TEST-LGA-001]
+// Stellt sicher, dass contextra::open ohne explizites Lizenzgate niemals die Sovereign-Rechte (DeletionProof) vergibt.
 #[tokio::test]
 async fn open_without_gate_never_grants_sovereign() {
     let tmp_path = std::env::temp_dir().join(format!(
@@ -25,6 +33,8 @@ async fn open_without_gate_never_grants_sovereign() {
     let _ = std::fs::remove_dir_all(&tmp_path);
 }
 
+// ANCHOR[contextra:TEST-LGA-002]
+// Verifiziert, dass das Compliance-Profil ohne signierte Lizenz mit einem PolicyViolation-Fehler fehlschlägt.
 #[tokio::test]
 async fn compliance_profile_without_signed_license_returns_error() {
     let tmp_path = std::env::temp_dir().join(format!(
@@ -58,6 +68,8 @@ async fn compliance_profile_without_signed_license_returns_error() {
     let _ = std::fs::remove_dir_all(&tmp_path);
 }
 
+// ANCHOR[contextra:TEST-LGA-003]
+// Prüft, dass eine kryptografisch gültige Ed25519-Lizenz das Compliance-Profil erfolgreich freischaltet.
 #[tokio::test]
 async fn compliance_profile_with_valid_signed_license_activates_deletion_proof() {
     let tmp_path = std::env::temp_dir().join(format!(
@@ -94,6 +106,8 @@ async fn compliance_profile_with_valid_signed_license_activates_deletion_proof()
     let _ = std::fs::remove_dir_all(&tmp_path);
 }
 
+// ANCHOR[contextra:TEST-LGA-004]
+// Verifiziert, dass abgelaufene Zeitstempel in einer signierten Lizenz abgewiesen werden.
 #[tokio::test]
 async fn expired_signature_rejected() {
     let tmp_path = std::env::temp_dir().join(format!(
@@ -135,6 +149,8 @@ async fn expired_signature_rejected() {
     let _ = std::fs::remove_dir_all(&tmp_path);
 }
 
+// ANCHOR[contextra:TEST-LGA-005]
+// Stellt sicher, dass manipulierte Lizenz-Signaturen zuverlässig erkannt und abgewiesen werden.
 #[tokio::test]
 async fn tampered_signature_rejected() {
     let tmp_path = std::env::temp_dir().join(format!(
@@ -176,6 +192,8 @@ async fn tampered_signature_rejected() {
     let _ = std::fs::remove_dir_all(&tmp_path);
 }
 
+// ANCHOR[contextra:TEST-LGA-006]
+// Prüft, dass widersprüchliche manuelle Konfigurationen gegenüber Profilvorgaben zu einem Richtlinienfehler führen.
 #[tokio::test]
 async fn explicit_conflicting_user_value_to_profile_returns_policy_violation() {
     let tmp_path = std::env::temp_dir().join(format!(
