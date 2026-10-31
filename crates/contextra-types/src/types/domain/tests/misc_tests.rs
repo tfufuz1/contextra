@@ -7,6 +7,7 @@ use crate::types::domain::*;
 use proptest::{prop_assert, prop_assert_eq};
 
 #[test]
+/// Prüft die Hex-Serialisierung und -Deserialisierung des `WorkflowState`-Graph-Hashes.
 fn test_workflow_state_hex_serde_roundtrip() {
     let hash = *blake3::hash(b"test_graph_hash_state").as_bytes();
     let state = WorkflowState {
@@ -24,11 +25,13 @@ fn test_workflow_state_hex_serde_roundtrip() {
 }
 
 #[test]
+/// Prüft den reservierten Schlüssel für TTL-Sequenzmetadaten.
 fn test_expiry_metadata_key_constant() {
     assert_eq!(EXPIRY_METADATA_KEY, "__expires_at_seq");
 }
 
 #[test]
+/// Verifiziert die JSON-Roundtrip-Serialisierung aller Domänen-Identifikatoren.
 fn test_serialization_roundtrips() {
     // TenantId & CollectionId
     let t = TenantId::try_new(10).unwrap();
@@ -61,6 +64,7 @@ fn test_serialization_roundtrips() {
 }
 
 #[test]
+/// Testet Konstruktion, bitemporale Gültigkeit und Serialisierung von `Entity` und `Edge`.
 fn test_entity_and_edge() {
     let mut entity = Entity::new(EntityId::new(1), "node1", "typeA");
     entity
@@ -118,6 +122,7 @@ fn test_entity_and_edge() {
 }
 
 #[test]
+/// Prüft Validierungslogik bei der falliblen Konstruktion (`try_new`) von `Entity` und `Edge`.
 fn test_entity_and_edge_try_new_validation() {
     assert!(Entity::try_new(EntityId::new(1), "", "Person").is_err());
     assert!(Entity::try_new(EntityId::new(1), "Alice", "   ").is_err());
@@ -132,6 +137,7 @@ fn test_entity_and_edge_try_new_validation() {
 }
 
 #[test]
+/// Prüft Standardwerte, TTLs und Serde-Rückwärtskompatibilität für `MemoryType`.
 fn test_memory_type_defaults_and_serde() {
     assert_eq!(MemoryType::default(), MemoryType::Semantic);
     assert_eq!(MemoryType::Working.default_ttl_tx(), Some(50_000));
@@ -164,6 +170,7 @@ fn test_memory_type_defaults_and_serde() {
 }
 
 proptest::proptest! {
+        /// Property-Test: DocId übersteht beliebige u64-Werte im JSON-Roundtrip.
     fn prop_docid_serialization(id in proptest::num::u64::ANY) {
         let doc = DocId::from(id);
         let ser = serde_json::to_string(&doc).unwrap(); // unwrap
@@ -171,20 +178,24 @@ proptest::proptest! {
         prop_assert_eq!(doc, deser);
     }
 
+        /// Property-Test: DocId::from_key ist strikt deterministisch.
     fn doc_id_from_key_deterministic(s in "[a-zA-Z0-9_\\-]{1,256}") {
         let id1 = DocId::from_key(&s).unwrap(); // unwrap
         let id2 = DocId::from_key(&s).unwrap(); // unwrap
         prop_assert_eq!(id1, id2);
     }
 
+        /// Property-Test: DocId::from_key panikt niemals für beliebige Eingabestrings.
     fn doc_id_from_key_never_panics(s in ".*") {
         let _ = DocId::from_key(&s);
     }
 
+        /// Property-Test: DocId::from_key gibt für leere Schlüssel immer Err zurück.
     fn doc_id_empty_key_is_err(_ in "") {
         prop_assert!(DocId::from_key("").is_err());
     }
 
+        /// Property-Test: TxId übersteht beliebige u64-Werte im JSON-Roundtrip.
     fn prop_txid_serialization(id in proptest::num::u64::ANY) {
         let tx = TxId::new(id);
         let ser = serde_json::to_string(&tx).unwrap(); // unwrap
@@ -192,6 +203,7 @@ proptest::proptest! {
         prop_assert_eq!(tx, deser);
     }
 
+        /// Property-Test: EntityId übersteht beliebige u64-Werte im JSON-Roundtrip.
     fn prop_entityid_serialization(id in proptest::num::u64::ANY) {
         let ent = EntityId::new(id);
         let ser = serde_json::to_string(&ent).unwrap(); // unwrap
@@ -209,6 +221,7 @@ proptest::proptest! {
 // BEFUND: Independent review pass confirmed uniform hash distribution.
 // Benchmark & Collision Test suite for DocId::from_key 64-bit BLAKE3 hash truncation
 #[test]
+/// Prüft, dass leere Namen und Typen bei `Entity::try_new` zuverlässig abgewiesen werden.
 fn test_entity_try_new_invalid_inputs() {
     let res_empty_name = Entity::try_new(EntityId::new(1), "", "Person");
     assert!(
@@ -222,6 +235,7 @@ fn test_entity_try_new_invalid_inputs() {
 }
 
 #[test]
+/// Prüft, dass leere Labels, NaN, unendliche und negative Kantengewichte bei `Edge::try_new` abgewiesen werden.
 fn test_edge_try_new_invalid_inputs() {
     let e1 = EntityId::new(1);
     let e2 = EntityId::new(2);

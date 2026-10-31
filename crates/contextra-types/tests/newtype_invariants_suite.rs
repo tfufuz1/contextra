@@ -25,6 +25,7 @@ use std::hash::{Hash, Hasher};
 
 proptest! {
     #[test]
+        /// Property-Test: DocId::from_key verhält sich für beliebige Strings deterministisch und fehlerfrei.
     fn prop_doc_id_from_key_properties(s in "\\PC*") {
         let res = DocId::from_key(&s);
         if s.is_empty() {
@@ -46,6 +47,7 @@ proptest! {
     }
 
     #[test]
+        /// Property-Test: EntityId::from_key und From<&str> sind deterministisch und konsistent.
     fn prop_entity_id_from_key_properties(s in "\\PC*") {
         let res = EntityId::from_key(&s);
         if s.is_empty() {
@@ -67,6 +69,7 @@ proptest! {
     }
 
     #[test]
+        /// Property-Test: TxId-Ordnung und Hashing stimmen exakt mit der primitiven u64-Ordnung überein.
     fn prop_tx_id_ordering_and_display(a in proptest::num::u64::ANY, b in proptest::num::u64::ANY) {
         let tx_a = TxId::new(a);
         let tx_b = TxId::new(b);
@@ -88,6 +91,7 @@ proptest! {
     }
 
     #[test]
+        /// Property-Test: CollectionId::try_new weist 0 zuverlässig ab und kapselt alle anderen u64-Werte.
     fn prop_collection_id_invariants(id in proptest::num::u64::ANY) {
         let res = CollectionId::try_new(id);
         if id == 0 {
@@ -102,6 +106,7 @@ proptest! {
     }
 
     #[test]
+        /// Property-Test: ImportanceScore::new klemmt beliebige f32-Werte sicher auf [0.0, 1.0].
     fn prop_importance_score_clamping(raw in proptest::num::f32::ANY) {
         let score = ImportanceScore::new(raw);
         if raw.is_nan() {
@@ -113,6 +118,7 @@ proptest! {
     }
 
     #[test]
+        /// Property-Test: Token-Verbrauch und Rückerstattungen bleiben im Budget konsistent.
     fn prop_token_budget_consumption(
         max_t in 1_000usize..1_000_000,
         res_t in 0usize..500,
@@ -139,6 +145,7 @@ proptest! {
 // ═════════════════════════════════════════════════════════════════════════════
 
 #[test]
+/// Prüft Konstruktion und Validierung von `Entity` auf leere Namen und Typen.
 fn test_entity_construction_and_validation() {
     let e_ok = Entity::try_new(EntityId::new(10), "Valid Name", "ValidType").unwrap();
     assert_eq!(e_ok.id, EntityId::new(10));
@@ -152,6 +159,7 @@ fn test_entity_construction_and_validation() {
 }
 
 #[test]
+/// Prüft Konstruktion, Builder-Methoden und Validierungsregeln von `Edge`.
 fn test_edge_construction_and_builder_chain() {
     let edge_ok = Edge::try_new(EntityId::new(1), EntityId::new(2), "RELATES_TO", 1.5).unwrap();
     assert_eq!(edge_ok.from, EntityId::new(1));
@@ -186,6 +194,7 @@ fn test_edge_construction_and_builder_chain() {
 }
 
 #[test]
+/// Prüft Textkombination und Tokenzählung bei `ContextChunk` mit und ohne Kontextpräfix.
 fn test_context_chunk_text_and_token_methods() {
     let chunk_no_prefix = ContextChunk {
         doc_id: DocId::new(1),
@@ -223,6 +232,7 @@ fn test_context_chunk_text_and_token_methods() {
 }
 
 #[test]
+/// Prüft Methoden und Leerheitsprüfungen von `QueryRewriteOutput`.
 fn test_query_rewrite_output_methods() {
     let empty_rewrite = QueryRewriteOutput::default();
     assert!(empty_rewrite.is_empty());
@@ -242,6 +252,7 @@ fn test_query_rewrite_output_methods() {
 }
 
 #[test]
+/// Prüft Schemaversionen und die Bytegrößen von `DocIdWidth`.
 fn test_schema_versions_and_doc_id_width() {
     let width_default = DocIdWidth::current();
     #[cfg(not(feature = "docid-128"))]
@@ -263,6 +274,7 @@ fn test_schema_versions_and_doc_id_width() {
 }
 
 #[test]
+/// Prüft Metadaten-Schlüssel und Standard-TTLs für `MemoryType`.
 fn test_memory_type_helpers() {
     assert_eq!(MemoryType::Episodic.as_metadata_key(), "episodic");
     assert_eq!(MemoryType::Semantic.as_metadata_key(), "semantic");
@@ -278,6 +290,7 @@ fn test_memory_type_helpers() {
 }
 
 #[test]
+/// Prüft alle spezialisierten Konstruktor-Helfer von `ContextraError`.
 fn test_all_error_variant_constructors_and_helpers() {
     let err_limit = ContextraError::limit_exceeded(100, "scan");
     assert!(matches!(
@@ -363,6 +376,7 @@ fn test_all_error_variant_constructors_and_helpers() {
 }
 
 #[test]
+/// Prüft Schritt-IDs (`StepId`) und die Formatierung aller Retrieval-Strategien.
 fn test_retrieval_strategy_and_step_id() {
     let s = StepId::new(1001);
     assert_eq!(s.inner(), 1001);

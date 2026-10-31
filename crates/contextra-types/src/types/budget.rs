@@ -1,4 +1,16 @@
-//! Resource budget management for Contextra.
+//! Ressourcen- und Token-Budgetverwaltung für Contextra.
+//!
+//! # Architektur-Rolle: Ring 0 (Budget- und Backpressure-Management)
+//!
+//! Dieses Modul überwacht und steuert den Ressourcenverbrauch:
+//! - `TokenBudget`: Atomares Tracking und RAII-Reservierung (`Reservation`) von LLM-Tokens
+//!   zur Vermeidung von Obergrenzenüberschreitungen und Double-Spending.
+//! - `ResourceTracker`: Speicherüberwachung (RAM) mit automatischem Backpressure-Signal
+//!   (`has_memory_capacity`), wenn die 95%-Grenze erreicht wird.
+//!
+//! # Invarianten
+//! - Atomare Zähler mit `Ordering::Acquire`, `Ordering::Release` und `compare_exchange_weak`.
+//! - Sättigende Subtraktion (`saturating_sub`) verhindert Underflow-Wrapping bei Speicherfreigaben.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
@@ -23,6 +35,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 /// Strategie für Token-Budget-Management.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-types:BUDGET-STRAT]
 pub enum BudgetStrategy {
     /// Konservativ: 80% des Limits als sicherer Puffer (Standard)
     Conservative,
@@ -34,6 +47,7 @@ pub enum BudgetStrategy {
 
 /// Token budget configuration for LLM context management.
 #[derive(Debug)]
+// ANCHOR[contextra-types:BUDGET-TOKEN]
 pub struct TokenBudget {
     /// Maximum total token limit.
     pub limit: usize,
@@ -113,6 +127,7 @@ impl<'de> Deserialize<'de> for TokenBudget {
 
 /// RAII reservation structure for guaranteed atomicity & drop-refund against double-spend.
 #[derive(Debug)]
+// ANCHOR[contextra-types:BUDGET-RESERVE]
 pub struct Reservation<'a> {
     budget: &'a TokenBudget,
     amount: usize,
@@ -322,6 +337,7 @@ impl Default for TokenBudget {
 
 /// Resource budget for memory management.
 #[derive(Debug, Clone, Copy)]
+// ANCHOR[contextra-types:BUDGET-RESOURCE]
 pub struct ResourceBudget {
     /// Maximum allowed memory usage in bytes.
     pub memory_limit: u64,
@@ -337,6 +353,7 @@ impl Default for ResourceBudget {
 
 /// Tracks resource usage against a budget.
 #[derive(Debug)]
+// ANCHOR[contextra-types:BUDGET-TRACKER]
 pub struct ResourceTracker {
     /// The configured budget.
     budget: ResourceBudget,

@@ -13,6 +13,7 @@ use contextra_types::*;
 use proptest::prelude::*;
 
 #[test]
+/// Prüft Eindeutigkeit von Modell-Fingerabdrücken bei abweichenden Hashes, Modellen oder Quantisierungen.
 fn test_model_fingerprint_hash_uniqueness_and_equality() {
     let hash1 = [0x01u8; 32];
     let hash2 = [0x02u8; 32];
@@ -32,6 +33,7 @@ fn test_model_fingerprint_hash_uniqueness_and_equality() {
 }
 
 #[test]
+/// Prüft Textdarstellung und JSON-Roundtrip aller Varianten von `RetrievalStrategy`.
 fn test_retrieval_strategy_variants_and_display() {
     let v = RetrievalStrategy::Vector;
     let t = RetrievalStrategy::Text;
@@ -56,6 +58,7 @@ fn test_retrieval_strategy_variants_and_display() {
 }
 
 #[test]
+/// Prüft Cache-Direktiven-Varianten und deren JSON-Serialisierung.
 fn test_cache_directive_variants_and_serde() {
     let auto = CacheDirective::Auto;
     let never = CacheDirective::NeverCache;
@@ -75,6 +78,7 @@ fn test_cache_directive_variants_and_serde() {
 }
 
 #[test]
+/// Prüft Konstruktion und Extraktion von Werten aus `ConfigFingerprint`.
 fn test_config_fingerprint_builder_and_extractors() {
     let fp =
         ConfigFingerprint::new("model_a", "Q8_0", "template_content", 0.7).with_threshold(0.85);
@@ -92,6 +96,7 @@ fn test_config_fingerprint_builder_and_extractors() {
 }
 
 #[test]
+/// Prüft verschachtelte Token-Reservierungen und die selektive Rückerstattung beim Verwerfen.
 fn test_token_budget_reservations_and_concurrent_drops() {
     let budget = TokenBudget::new(2000, 200);
 
@@ -113,6 +118,7 @@ fn test_token_budget_reservations_and_concurrent_drops() {
 }
 
 #[test]
+/// Prüft die Speicherbudgetierung und Backpressure-Signalisierung im `ResourceTracker`.
 fn test_resource_tracker_and_budget_backpressure() {
     let res_budget = ResourceBudget {
         memory_limit: 10 * 1024 * 1024, // 10MB
@@ -135,6 +141,7 @@ fn test_resource_tracker_and_budget_backpressure() {
 
 proptest! {
     #[test]
+        /// Property-Test: Bit-exakter Erhalt von Temperatur und Schwellenwerten in `ConfigFingerprint`.
     fn prop_config_fingerprint_bit_exact_floats(temp in proptest::num::f32::ANY, thresh in proptest::num::f32::ANY) {
         let fp = ConfigFingerprint::new("m", "q", "t", temp).with_threshold(thresh);
         if !temp.is_nan() {
@@ -146,6 +153,7 @@ proptest! {
     }
 
     #[test]
+        /// Property-Test: Vollständiger Serde-Roundtrip für `ModelFingerprint`.
     fn prop_model_fingerprint_serde_roundtrip(hash in prop::array::uniform32(proptest::num::u8::ANY), model in "\\PC*", quant in "\\PC*") {
         let fp = ModelFingerprint::new(hash, model.clone(), quant.clone());
         let json = serde_json::to_string(&fp).unwrap();
