@@ -1,3 +1,8 @@
+//! # Integrationstest: `proptest_wal_hmac_v2_collision.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `proptest_wal_hmac_v2_collision`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 #![allow(deprecated)]
 
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot, WalHmac};

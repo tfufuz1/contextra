@@ -1,3 +1,8 @@
+//! # Integrationstest: `campaign_j26_hypotheses.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_j26_hypotheses`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Campaign J-26 hypothesis test suite for crypto compliance, revocation logs, audit chains, commitments, and deletion proofs.
 // INVARIANTEN: Zero-Panic doctrine in non-test code, fail-closed revocation checks, length-prefixed deletion proof hashes, and Blake3 audit chain integrity.

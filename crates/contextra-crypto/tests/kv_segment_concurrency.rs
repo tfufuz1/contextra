@@ -1,3 +1,8 @@
+//! # Integrationstest: `kv_segment_concurrency.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `kv_segment_concurrency`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Concurrency Stress Test für TenantIsolatedKvStore und EvictionWorker unter hoher Parallellast.
 // STAND: TS:2026-09-09T16:15:00Z (SESSION: dafac391)

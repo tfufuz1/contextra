@@ -1,3 +1,11 @@
+//! # Ed25519-Signaturpfade für Beweise (`ed25519_proof.rs`)
+//!
+//! Asymmetrische Signaturerstellung und -prüfung mittels Ed25519 nach RFC 8032.
+//!
+//! ## Invarianten
+//! - Verwendet `ed25519_dalek::VerifyingKey::verify_strict`, um Signatur-Malleability auszuschließen.
+//! - Private Schlüssel verbleiben ausschließlich im Speicher der signierenden Instanz.
+
 // FILE-CONTEXT
 // ZWECK: Standalone Ed25519 asymmetric signature creation and external verification for deletion proofs (version 3).
 // INVARIANTEN: Zero dependency on internal Contextra state in verification path — runnable by third parties with only public key, payload, and signature.

@@ -7,7 +7,7 @@
 //! Versionierter KDF-Header und Argon2id-Schlüsselableitung für `contextra-crypto`.
 //!
 //! # Geplante Migration
-//! AI-NOTE[KDF-MIGRATION][OPEN] AGT-CRYPTO-002: Geplante Migration für Aufrufer in `contextra-store` (`recovery.rs` / LSM-Recovery):
+//! AI-NOTE\[KDF-MIGRATION\]\[OPEN\] AGT-CRYPTO-002: Geplante Migration für Aufrufer in `contextra-store` (`recovery.rs` / LSM-Recovery):
 //! 1. Beim Erstellen eines neuen verschlüsselten Datenverzeichnisses wird ein `KdfHeader` generiert und als
 //!    `kdf_header.bin` im Metadaten-Verzeichnis abgelegt.
 //! 2. Beim Öffnen / Recovery wird geprüft, ob `kdf_header.bin` existiert.
@@ -34,12 +34,16 @@ pub const MIN_SALT_LEN: usize = 16;
 
 /// OWASP Mindestanforderungen für Argon2id
 pub const MIN_M_COST_KIB: u32 = 19456; // ~19 MiB
+/// Minimale Anzahl an Iterationen (Zeitkosten) für Argon2id gemäß OWASP.
 pub const MIN_T_COST: u32 = 2;
+/// Minimaler Parallelitätsgrad für Argon2id gemäß OWASP.
 pub const MIN_P_COST: u32 = 1;
 
 /// OWASP Standardempfehlungen für Argon2id
 pub const DEFAULT_M_COST_KIB: u32 = 65536; // 64 MiB
+/// Standard-Zeitkosten (Iterationen) für Argon2id.
 pub const DEFAULT_T_COST: u32 = 3;
+/// Standard-Parallelitätsgrad für Argon2id.
 pub const DEFAULT_P_COST: u32 = 1;
 
 /// Konfiguration der Argon2id KDF-Kostenparameter.
@@ -98,6 +102,24 @@ impl KdfParams {
 
 /// Versionierter KDF-Header, der alle Parameter und den Salt für die Argon2id-Ableitung speichert.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-crypto:KDF-001]
+/// Versionierter KDF-Metadaten-Header zur deterministischen Reproduktion von Schlüsseln.
+///
+/// Speichert die Argon2id-Kostenparameter (m_cost, t_cost, p_cost) und den Salt,
+/// um verschlüsselte Datenbankdateien auch nach Server-Neustarts mit identischen
+/// Parametern entsperren zu können.
+///
+/// ### Binär-Layout (Big-Endian):
+/// | Offset | Länge | Feld | Beschreibung |
+/// |---|---|---|---|
+/// | 0..4 | 4B | Magic | "MFKD" (Contextra Key Derivation) |
+/// | 4 | 1B | Version | Versionsnummer (aktuell 1) |
+/// | 5 | 1B | KDF-ID | 1 = Argon2id |
+/// | 6..10 | 4B | m_cost_kib | Speicherkosten in KiB (>= 19456) |
+/// | 10..14 | 4B | t_cost | Iterationen / Zeitkosten (>= 2) |
+/// | 14..18 | 4B | p_cost | Parallelitätsgrad (>= 1) |
+/// | 18..22 | 4B | salt_len | Länge des Salts in Bytes |
+/// | 22.. | variable | Salt | Kryptographischer Salt (>= 16B) |
 pub struct KdfHeader {
     pub version: u8,
     pub kdf_id: u8,
@@ -252,6 +274,14 @@ impl KdfHeader {
 pub struct DerivedKey(pub [u8; 32]);
 
 /// Leitet einen 256-Bit (32 Byte) Schlüssel aus einer Passphrase und einem `KdfHeader` via Argon2id ab.
+// ANCHOR[contextra-crypto:KDF-002]
+/// Leitet einen kryptographisch starken Schlüssel mittels Argon2id aus einer Passphrase ab.
+///
+/// # Ablauf der Argon2id-Schlüsselableitung:
+/// 1. Passphrase und Salt auf Mindestlänge prüfen.
+/// 2. Kostenparameter gegen OWASP-Mindestgrenzen validieren.
+/// 3. Argon2id-Instanz initialisieren und 32-Byte-Schlüssel ableiten.
+/// 4. Temporäre Puffer löschen und Ergebnis im geschützten KeyManager kapseln.
 pub fn derive_key_argon2id(passphrase: &str, header: &KdfHeader) -> Result<DerivedKey> {
     if passphrase.is_empty() {
         return Err(CryptoError::InvalidInput(

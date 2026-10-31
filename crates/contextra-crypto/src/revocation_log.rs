@@ -1,3 +1,11 @@
+//! # Schlüssel-Widerrufs-Log (`revocation_log.rs`)
+//!
+//! Protokolliert widerrufene und geschredderte Schlüsselgruppen persistent und manipulationssicher.
+//!
+//! ## Invarianten
+//! - Einmal widerrufene Schlüsselgruppen können niemals wiederhergestellt oder reaktiviert werden.
+//! - Bei Erkennung von Manipulationen am Log versagt das System fail-closed.
+
 // FILE-CONTEXT
 // ZWECK: Persistierter, Ed25519-signierter, manipulationssicherer Append-Only Widerrufslog (v17 Teil 16.1).
 // INVARIANTEN: Monotone Sequence Numbers (0, 1, ...). Tamper-proof SHA-256 Hash-Verkettung. Ed25519 Signatur-Verifikation pro Eintrag.
@@ -111,6 +119,8 @@ pub fn compute_entry_hash(
 }
 
 /// Thread-sicherer, persistierter, Ed25519-signierter Widerrufslog.
+// ANCHOR[contextra-crypto:REV-001]
+/// Persistentes Protokoll über widerrufene Schlüsselgruppen.
 pub struct RevocationLog {
     storage: Option<(Arc<dyn Vfs>, PathBuf)>,
     signing_key: Option<SigningKey>,

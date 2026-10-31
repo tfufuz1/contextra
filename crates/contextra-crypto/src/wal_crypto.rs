@@ -1,3 +1,14 @@
+//! # WAL-Kryptographie und Integritätsprüfung (`wal_crypto.rs`)
+//!
+//! Stellt Verschlüsselung und HMAC-Kettenvalidierung für das Write-Ahead-Log (WAL) bereit.
+//!
+//! ## Invarianten
+//! - **Längenpräfixe (V3):** Zur Vermeidung von Partitionskollisionen werden Schlüssel- und
+//!   Wertlängen strikt als 4-Byte Little-Endian kodiert.
+//! - **HMAC-Kette:** Jeder WAL-Eintrag verkettet den Hash des vorherigen Eintrags,
+//!   sodass Löschungen oder Vertauschungen sofort erkannt werden.
+//! - **KMS-Wrapping:** Dateischlüssel werden per Key Management Service (KMS) geschützt gewrappt.
+
 // FILE-CONTEXT
 // ZWECK: Transparent encrypted WAL chunk provider and constant-time HMAC-SHA256 integrity verifier.
 // INVARIANTEN: EncryptedWal prepends 12-byte nonce to ciphertext. IntegrityVerifier checks sequence HMAC chain in constant time.
@@ -298,10 +309,12 @@ impl WalHmac {
         Ok(Self { mac })
     }
 
+    /// Führt neue Daten in die laufende HMAC-Berechnung ein.
     pub fn update(&mut self, data: &[u8]) {
         self.mac.update(data);
     }
 
+    /// Schließt die HMAC-Berechnung ab und liefert den 32-Byte-Digest.
     pub fn finalize(self) -> [u8; 32] {
         self.mac.finalize().into_bytes().into()
     }
@@ -474,6 +487,7 @@ impl IntegrityVerifier {
     #[deprecated(
         note = "Nur für Legacy-Replay von WalVersion::V2-Bestandsdateien. Nicht für neue WAL-Segmente verwenden — siehe Doc-Kommentar. Audit-Referenz: F2."
     )]
+    /// Verifiziert und aktualisiert die HMAC-Kette im V2-Format (Rückwärtskompatibilität).
     pub fn verify_and_update_v2(&mut self, entry: &WalEntrySnapshot, offset: u64) -> Result<()> {
         if entry.op_type > 2 {
             return Err(CryptoError::wal_corruption(

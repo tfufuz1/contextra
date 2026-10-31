@@ -1,3 +1,6 @@
+//! # Standalone-Verifier (`deletion_proof/verifier.rs`)
+//!
+//! Ermöglicht externen Prüfern und Datenschutzbeauftragten die Offline-Validierung ohne DB-Zugriff.
 // FILE-CONTEXT
 // ZWECK: Public facade for third-party DeletionProof and AuditChain verification without DB access.
 // INVARIANTEN: Zero DB state requirement; structured error reporting with explicit failure reasons.

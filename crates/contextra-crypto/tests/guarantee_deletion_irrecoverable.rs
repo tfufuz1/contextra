@@ -1,3 +1,8 @@
+//! # Integrationstest: `guarantee_deletion_irrecoverable.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `guarantee_deletion_irrecoverable`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Unabhängiger Funktionsnachweis für Garantie 2b: Löschung ist nicht rückholbar und der Nachweis ist extern prüfbar.
 // INVARIANTEN: INV-DELETION-1 (Proof-Erstellung erst nach physikalischer Bereinigung), AES-256 KEK-Vernichtung, Ed25519 V3 Audit-Verifikation.

@@ -1,3 +1,11 @@
+//! # Audit-Kette (`audit_chain.rs`)
+//!
+//! Unveränderliches, kryptographisch verkettetes Audit-Protokoll für sicherheitsrelevante Aktionen.
+//!
+//! ## Invarianten
+//! - Jeder Eintrag enthält den Hash seines Vorgängers (Hash-Chain).
+//! - Rollback-Schutz durch externe Anker-Validierung (Anchor Verification).
+
 // FILE-CONTEXT
 // ZWECK: Cryptographic Blake3 audit hash chain with periodic Ed25519 signatures and encrypted commitments.
 // INVARIANTEN: Audit chain entries strictly exclude personal data. Chain links are linked via Blake3 hashes.
@@ -41,6 +49,8 @@ pub enum DataClass {
 
 /// Einzelner Eintrag in der Audit-Hash-Kette.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-crypto:AUDIT-001]
+/// Einzelner Eintrag in der manipulationssicheren BLAKE3-Audit-Hash-Kette.
 pub struct AuditChainEntry {
     /// Fortlaufender Index in der Audit-Kette (0-basiert).
     pub index: u64,
@@ -103,6 +113,8 @@ impl AuditChainEntry {
 
 /// Periodisch erzeugte Ed25519-Signatur über den aktuellen Kettenkopf.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-crypto:AUDIT-004]
+/// Periodisch erzeugte Ed25519-Signatur über den aktuellen Kettenkopf.
 pub struct AuditChainHeadSignature {
     /// Index des signierten Kettenkopfs.
     pub chain_index: u64,
@@ -190,6 +202,8 @@ pub fn compute_record_commitment(salt: &[u8], attr: &[u8]) -> [u8; 32] {
 
 /// Manipulationssichere Blake3-Hash-Kette für Audit-Einträge.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-crypto:AUDIT-002]
+/// Manipulationssichere Audit-Kette mit BLAKE3-Hash-Verkettung.
 pub struct AuditChain {
     /// Öffentlicher Zugriff auf die Liste der Ketten-Einträge für Prüfungen/Tests.
     pub entries: Vec<AuditChainEntry>,

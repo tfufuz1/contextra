@@ -1,3 +1,8 @@
+//! # Integrationstest: `ed25519_proof_external_verify.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `ed25519_proof_external_verify`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Integration tests for external verification of Ed25519 deletion proofs (version 3).
 // INVARIANTEN: Zero internal state required for verification. Injected deterministic RNGs only.
