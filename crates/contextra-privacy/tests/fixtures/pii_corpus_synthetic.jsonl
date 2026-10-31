@@ -1,0 +1,600 @@
+{"id": "email_pos_01", "category": "EMAIL", "type": "positive", "text": "Kontakt: max.mustermann@example.com im Profil", "spans": [{"start": 9, "end": 35, "category": "EMAIL"}]}
+{"id": "email_pos_02", "category": "EMAIL", "type": "positive", "text": "Please email alice.smith@example.org for details", "spans": [{"start": 13, "end": 36, "category": "EMAIL"}]}
+{"id": "email_pos_03", "category": "EMAIL", "type": "positive", "text": "Anfrage an support@sub.example.net senden", "spans": [{"start": 11, "end": 34, "category": "EMAIL"}]}
+{"id": "email_pos_04", "category": "EMAIL", "type": "positive", "text": "Developer user+test@example.com created a ticket", "spans": [{"start": 10, "end": 31, "category": "EMAIL"}]}
+{"id": "email_pos_05", "category": "EMAIL", "type": "positive", "text": "Schreiben Sie an info@beispiel-firma.de heute", "spans": [{"start": 17, "end": 39, "category": "EMAIL"}]}
+{"id": "email_pos_06", "category": "EMAIL", "type": "positive", "text": "Billing at invoice-dept@example.co.uk please", "spans": [{"start": 11, "end": 37, "category": "EMAIL"}]}
+{"id": "email_pos_07", "category": "EMAIL", "type": "positive", "text": "Erika erika_musterfrau@example.edu registriert", "spans": [{"start": 6, "end": 34, "category": "EMAIL"}]}
+{"id": "email_pos_08", "category": "EMAIL", "type": "positive", "text": "Admin account: root@mail.internal.example.org", "spans": [{"start": 15, "end": 45, "category": "EMAIL"}]}
+{"id": "email_pos_09", "category": "EMAIL", "type": "positive", "text": "Feedback to feedback%survey@example.com received", "spans": [{"start": 12, "end": 39, "category": "EMAIL"}]}
+{"id": "email_pos_10", "category": "EMAIL", "type": "positive", "text": "Sales contact sales.eu@example.eu ready", "spans": [{"start": 14, "end": 33, "category": "EMAIL"}]}
+{"id": "email_pos_11", "category": "EMAIL", "type": "positive", "text": "Customer service customer.care@example.info online", "spans": [{"start": 17, "end": 43, "category": "EMAIL"}]}
+{"id": "email_pos_12", "category": "EMAIL", "type": "positive", "text": "Kontaktperson: hans.schmidt@beispiel.biz gelistet", "spans": [{"start": 15, "end": 40, "category": "EMAIL"}]}
+{"id": "email_pos_13", "category": "EMAIL", "type": "positive", "text": "Direct mail to ceo@example.ac.at confirmed", "spans": [{"start": 15, "end": 32, "category": "EMAIL"}]}
+{"id": "email_pos_14", "category": "EMAIL", "type": "positive", "text": "Notification from alerts@monitor.example.ch sent", "spans": [{"start": 18, "end": 43, "category": "EMAIL"}]}
+{"id": "email_pos_15", "category": "EMAIL", "type": "positive", "text": "Forwarding to archive.2026@example.nl done", "spans": [{"start": 14, "end": 37, "category": "EMAIL"}]}
+{"id": "email_pos_16", "category": "EMAIL", "type": "positive", "text": "Press team: press@example.fr available", "spans": [{"start": 12, "end": 28, "category": "EMAIL"}]}
+{"id": "email_pos_17", "category": "EMAIL", "type": "positive", "text": "Security issues to cert@security.example.org", "spans": [{"start": 19, "end": 44, "category": "EMAIL"}]}
+{"id": "email_pos_18", "category": "EMAIL", "type": "positive", "text": "Job inquiry: jobs_tech@example.tech open", "spans": [{"start": 13, "end": 35, "category": "EMAIL"}]}
+{"id": "email_pos_19", "category": "EMAIL", "type": "positive", "text": "Inquiry to contact.us@my-example.de answered", "spans": [{"start": 11, "end": 35, "category": "EMAIL"}]}
+{"id": "email_pos_20", "category": "EMAIL", "type": "positive", "text": "Poststelle post@musterstadt.example.gov.pl aktiv", "spans": [{"start": 11, "end": 42, "category": "EMAIL"}]}
+{"id": "email_pos_21", "category": "EMAIL", "type": "positive", "text": "Internal tester qa.bot.01@testing.example.io started", "spans": [{"start": 16, "end": 44, "category": "EMAIL"}]}
+{"id": "email_pos_22", "category": "EMAIL", "type": "positive", "text": "Legal inquiry legal-dept@compliance.example.com", "spans": [{"start": 14, "end": 47, "category": "EMAIL"}]}
+{"id": "email_pos_23", "category": "EMAIL", "type": "positive", "text": "Emergency helpdesk help.line@care.example.ca", "spans": [{"start": 19, "end": 44, "category": "EMAIL"}]}
+{"id": "email_pos_24", "category": "EMAIL", "type": "positive", "text": "Project lead dev-lead@alpha.example.co.nz", "spans": [{"start": 13, "end": 41, "category": "EMAIL"}]}
+{"id": "email_pos_25", "category": "EMAIL", "type": "positive", "text": "Audit officer audit@finance.example.de notified", "spans": [{"start": 14, "end": 38, "category": "EMAIL"}]}
+{"id": "email_neg_01", "category": "EMAIL", "type": "negative", "text": "Benutzername user.example.com ohne At-Symbol", "spans": []}
+{"id": "email_neg_02", "category": "EMAIL", "type": "negative", "text": "Missing local part: @example.com in message", "spans": []}
+{"id": "email_neg_03", "category": "EMAIL", "type": "negative", "text": "Ungueltige Domain user@ (ohne Domainname)", "spans": []}
+{"id": "email_neg_04", "category": "EMAIL", "type": "negative", "text": "Short TLD user@example.x is invalid", "spans": []}
+{"id": "email_neg_05", "category": "EMAIL", "type": "negative", "text": "Missing dot in domain user@examplecom here", "spans": []}
+{"id": "email_neg_06", "category": "EMAIL", "type": "negative", "text": "Trailing space user @example.com is invalid", "spans": []}
+{"id": "email_neg_07", "category": "EMAIL", "type": "negative", "text": "Invalid domain @com in text", "spans": []}
+{"id": "email_neg_08", "category": "EMAIL", "type": "negative", "text": "Just a website https://example.com/index.html", "spans": []}
+{"id": "email_neg_09", "category": "EMAIL", "type": "negative", "text": "Docker tag contextra/privacy:v1.0.0 released", "spans": []}
+{"id": "email_neg_10", "category": "EMAIL", "type": "negative", "text": "Semantic version v2.1.3-beta.1 published", "spans": []}
+{"id": "email_neg_11", "category": "EMAIL", "type": "negative", "text": "Product ID PROD-998234-AX in catalogue", "spans": []}
+{"id": "email_neg_12", "category": "EMAIL", "type": "negative", "text": "Order number ORD-2026-10-29 confirmed", "spans": []}
+{"id": "email_neg_13", "category": "EMAIL", "type": "negative", "text": "Git commit hash 641dc4bda referenced", "spans": []}
+{"id": "email_neg_14", "category": "EMAIL", "type": "negative", "text": "Date of birth 1990-05-15 in form", "spans": []}
+{"id": "email_neg_15", "category": "EMAIL", "type": "negative", "text": "Timestamp 1700000000 recorded", "spans": []}
+{"id": "email_neg_16", "category": "EMAIL", "type": "negative", "text": "Mathematical formula a @ b = c mod 97", "spans": []}
+{"id": "email_neg_17", "category": "EMAIL", "type": "negative", "text": "Social media handle @acme_corp on platform", "spans": []}
+{"id": "email_neg_18", "category": "EMAIL", "type": "negative", "text": "File extension image.png or document.pdf", "spans": []}
+{"id": "email_neg_19", "category": "EMAIL", "type": "negative", "text": "Package name @scoped/package-name installed", "spans": []}
+{"id": "email_neg_20", "category": "EMAIL", "type": "negative", "text": "Matrix room #contextra:example.org identifier", "spans": []}
+{"id": "email_neg_21", "category": "EMAIL", "type": "negative", "text": "Command line flag --user=admin@example is not raw", "spans": []}
+{"id": "email_neg_22", "category": "EMAIL", "type": "negative", "text": "Relative path ../fixtures/test.jsonl loaded", "spans": []}
+{"id": "email_neg_23", "category": "EMAIL", "type": "negative", "text": "Hexadecimal colour #AABBCC in stylesheet", "spans": []}
+{"id": "email_neg_24", "category": "EMAIL", "type": "negative", "text": "Error code ERR_EMAIL_NOT_FOUND returned", "spans": []}
+{"id": "email_neg_25", "category": "EMAIL", "type": "negative", "text": "Log trace [DEBUG] email parser initialized", "spans": []}
+{"id": "iban_pos_01", "category": "IBAN", "type": "positive", "text": "Ueberweisung an DE89370400440532013000 ausfuehren", "spans": [{"start": 16, "end": 38, "category": "IBAN"}]}
+{"id": "iban_pos_02", "category": "IBAN", "type": "positive", "text": "Konto AT921904300234567890 pruefen", "spans": [{"start": 6, "end": 26, "category": "IBAN"}]}
+{"id": "iban_pos_03", "category": "IBAN", "type": "positive", "text": "Schweizer IBAN CH9300762011623852957 vorhanden", "spans": [{"start": 15, "end": 36, "category": "IBAN"}]}
+{"id": "iban_pos_04", "category": "IBAN", "type": "positive", "text": "Compte FR1420041010050500013M02606 valide", "spans": [{"start": 7, "end": 34, "category": "IBAN"}]}
+{"id": "iban_pos_05", "category": "IBAN", "type": "positive", "text": "Account NL91ABNA0417164300 registered", "spans": [{"start": 8, "end": 26, "category": "IBAN"}]}
+{"id": "iban_pos_06", "category": "IBAN", "type": "positive", "text": "Bank GB29NWBK60161331926819 verified", "spans": [{"start": 5, "end": 27, "category": "IBAN"}]}
+{"id": "iban_pos_07", "category": "IBAN", "type": "positive", "text": "Conto IT60X0542811101000000123456 attivo", "spans": [{"start": 6, "end": 33, "category": "IBAN"}]}
+{"id": "iban_pos_08", "category": "IBAN", "type": "positive", "text": "IBAN: DE89 3704 0044 0532 0130 00 buchen", "spans": [{"start": 6, "end": 33, "category": "IBAN"}]}
+{"id": "iban_pos_09", "category": "IBAN", "type": "positive", "text": "Format: CH93 0076 2011 6238 5295 7 geprueft", "spans": [{"start": 8, "end": 34, "category": "IBAN"}]}
+{"id": "iban_pos_10", "category": "IBAN", "type": "positive", "text": "Konto AT92 1904 3002 3456 7890 verifiziert", "spans": [{"start": 6, "end": 30, "category": "IBAN"}]}
+{"id": "iban_pos_11", "category": "IBAN", "type": "positive", "text": "Bankkonto DE05370401440532013007 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_12", "category": "IBAN", "type": "positive", "text": "Bankkonto DE18370402440532013014 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_13", "category": "IBAN", "type": "positive", "text": "Bankkonto DE31370403440532013021 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_14", "category": "IBAN", "type": "positive", "text": "Bankkonto DE44370404440532013028 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_15", "category": "IBAN", "type": "positive", "text": "Bankkonto DE57370405440532013035 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_16", "category": "IBAN", "type": "positive", "text": "Bankkonto DE70370406440532013042 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_17", "category": "IBAN", "type": "positive", "text": "Bankkonto DE83370407440532013049 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_18", "category": "IBAN", "type": "positive", "text": "Bankkonto DE96370408440532013056 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_19", "category": "IBAN", "type": "positive", "text": "Bankkonto DE12370409440532013063 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_20", "category": "IBAN", "type": "positive", "text": "Bankkonto DE25370410440532013070 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_21", "category": "IBAN", "type": "positive", "text": "Bankkonto DE38370411440532013077 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_22", "category": "IBAN", "type": "positive", "text": "Bankkonto DE51370412440532013084 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_23", "category": "IBAN", "type": "positive", "text": "Bankkonto DE64370413440532013091 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_24", "category": "IBAN", "type": "positive", "text": "Bankkonto DE77370414440532013098 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_pos_25", "category": "IBAN", "type": "positive", "text": "Bankkonto DE90370415440532013105 im Register hinterlegt", "spans": [{"start": 10, "end": 32, "category": "IBAN"}]}
+{"id": "iban_neg_01", "category": "IBAN", "type": "negative", "text": "Falsche Pruefsumme DE00370400440532013000 ablehnen", "spans": []}
+{"id": "iban_neg_02", "category": "IBAN", "type": "negative", "text": "Falsche Pruefziffer DE88370400440532013000 ungueltig", "spans": []}
+{"id": "iban_neg_03", "category": "IBAN", "type": "negative", "text": "Zu kurz DE893704004405320130 (nur 20 Stellen)", "spans": []}
+{"id": "iban_neg_04", "category": "IBAN", "type": "negative", "text": "Zu lang DE8937040044053201300099 (24 Stellen fuer DE)", "spans": []}
+{"id": "iban_neg_05", "category": "IBAN", "type": "negative", "text": "Ungueltiger Laendercode XX89370400440532013000", "spans": []}
+{"id": "iban_neg_06", "category": "IBAN", "type": "negative", "text": "Zahlen am Anfang 89DE370400440532013000", "spans": []}
+{"id": "iban_neg_07", "category": "IBAN", "type": "negative", "text": "Kleinbuchstaben de89370400440532013000 werden ignoriert", "spans": []}
+{"id": "iban_neg_08", "category": "IBAN", "type": "negative", "text": "Bestellnummer DE-99887766554433221100 ist keine IBAN", "spans": []}
+{"id": "iban_neg_09", "category": "IBAN", "type": "negative", "text": "Produktcode DE37040044053201 ohne Pruefziffer", "spans": []}
+{"id": "iban_neg_10", "category": "IBAN", "type": "negative", "text": "Seriennummer AT001904300234567890 Pruefsumme 00 falsch", "spans": []}
+{"id": "iban_neg_11", "category": "IBAN", "type": "negative", "text": "CH0000762011623852957 ungueltige Schweizer Pruefziffer", "spans": []}
+{"id": "iban_neg_12", "category": "IBAN", "type": "negative", "text": "Versionsbezeichnung DE.89.3704.0044 im System", "spans": []}
+{"id": "iban_neg_13", "category": "IBAN", "type": "negative", "text": "Datum 2026-10-30 keine Kontonummer", "spans": []}
+{"id": "iban_neg_14", "category": "IBAN", "type": "negative", "text": "Ganzzahlige Sequenz 12345678901234567890", "spans": []}
+{"id": "iban_neg_15", "category": "IBAN", "type": "negative", "text": "Zufallsfolge ABCDEFGHIJKLMNOPQRSTUV", "spans": []}
+{"id": "iban_neg_16", "category": "IBAN", "type": "negative", "text": "Rechnungsnummer RE-2026-DE-893704", "spans": []}
+{"id": "iban_neg_17", "category": "IBAN", "type": "negative", "text": "BLZ 37040044 ohne Laenderpraefix", "spans": []}
+{"id": "iban_neg_18", "category": "IBAN", "type": "negative", "text": "Lizenzschluessel DE89-3704-0044-0532", "spans": []}
+{"id": "iban_neg_19", "category": "IBAN", "type": "negative", "text": "Fehlercode ERR-IBAN-DE89-CHECKSUM", "spans": []}
+{"id": "iban_neg_20", "category": "IBAN", "type": "negative", "text": "MAC-Adresse 00:1A:2B:3C:4D:5E", "spans": []}
+{"id": "iban_neg_21", "category": "IBAN", "type": "negative", "text": "UUID 123e4567-e89b-12d3-a456-426614174000", "spans": []}
+{"id": "iban_neg_22", "category": "IBAN", "type": "negative", "text": "Pruefwert DE98000000000000000000 abgelehnt", "spans": []}
+{"id": "iban_neg_23", "category": "IBAN", "type": "negative", "text": "Alpha AT991904300234567890 checksum fail", "spans": []}
+{"id": "iban_neg_24", "category": "IBAN", "type": "negative", "text": "Swiss CH0100762011623852957 checksum fail", "spans": []}
+{"id": "iban_neg_25", "category": "IBAN", "type": "negative", "text": "French FR9920041010050500013M02606 checksum fail", "spans": []}
+{"id": "bic_pos_01", "category": "BIC", "type": "positive", "text": "BIC Code DEUTDED1800 verarbeiten", "spans": [{"start": 9, "end": 20, "category": "BIC"}]}
+{"id": "bic_pos_02", "category": "BIC", "type": "positive", "text": "Bank BIC DEUTDED1 verwenden", "spans": [{"start": 9, "end": 17, "category": "BIC"}]}
+{"id": "bic_pos_03", "category": "BIC", "type": "positive", "text": "Swift GENODED1M01 eingetragen", "spans": [{"start": 6, "end": 17, "category": "BIC"}]}
+{"id": "bic_pos_04", "category": "BIC", "type": "positive", "text": "Routing via GENODED1 veranlasst", "spans": [{"start": 12, "end": 20, "category": "BIC"}]}
+{"id": "bic_pos_05", "category": "BIC", "type": "positive", "text": "Empfaengerbank COBADEFFXXX bestaetigt", "spans": [{"start": 15, "end": 26, "category": "BIC"}]}
+{"id": "bic_pos_06", "category": "BIC", "type": "positive", "text": "Zentralbank MARKDEF1100 hinterlegt", "spans": [{"start": 12, "end": 23, "category": "BIC"}]}
+{"id": "bic_pos_07", "category": "BIC", "type": "positive", "text": "Bank code BYLADEM1001 registered", "spans": [{"start": 10, "end": 21, "category": "BIC"}]}
+{"id": "bic_pos_08", "category": "BIC", "type": "positive", "text": "Swift code SOLADED1XXX checked", "spans": [{"start": 11, "end": 22, "category": "BIC"}]}
+{"id": "bic_pos_09", "category": "BIC", "type": "positive", "text": "Foreign bank BNPAFRPPXXX matched", "spans": [{"start": 13, "end": 24, "category": "BIC"}]}
+{"id": "bic_pos_10", "category": "BIC", "type": "positive", "text": "UK bank NWBKGB2LXXX verified", "spans": [{"start": 8, "end": 19, "category": "BIC"}]}
+{"id": "bic_pos_11", "category": "BIC", "type": "positive", "text": "Swiss swift UBSWCHZH80A active", "spans": [{"start": 12, "end": 23, "category": "BIC"}]}
+{"id": "bic_pos_12", "category": "BIC", "type": "positive", "text": "Austrian BIC RZBAATWWXXX noted", "spans": [{"start": 13, "end": 24, "category": "BIC"}]}
+{"id": "bic_pos_13", "category": "BIC", "type": "positive", "text": "Bank identifier DRESDEFFXXX valid", "spans": [{"start": 16, "end": 27, "category": "BIC"}]}
+{"id": "bic_pos_14", "category": "BIC", "type": "positive", "text": "Swift code HYVEDEMMXXX listed", "spans": [{"start": 11, "end": 22, "category": "BIC"}]}
+{"id": "bic_pos_15", "category": "BIC", "type": "positive", "text": "Italian bank UNCRITM1XXX routed", "spans": [{"start": 13, "end": 24, "category": "BIC"}]}
+{"id": "bic_pos_16", "category": "BIC", "type": "positive", "text": "Dutch swift INGBNL2AXXX resolved", "spans": [{"start": 12, "end": 23, "category": "BIC"}]}
+{"id": "bic_pos_17", "category": "BIC", "type": "positive", "text": "Branch BIC DEUTDEDBFRA for Frankfurt", "spans": [{"start": 11, "end": 22, "category": "BIC"}]}
+{"id": "bic_pos_18", "category": "BIC", "type": "positive", "text": "Head office BIC DEUTDEDBXXX recorded", "spans": [{"start": 16, "end": 27, "category": "BIC"}]}
+{"id": "bic_pos_19", "category": "BIC", "type": "positive", "text": "Bank code CHASCY2NXXX cleared", "spans": [{"start": 10, "end": 21, "category": "BIC"}]}
+{"id": "bic_pos_20", "category": "BIC", "type": "positive", "text": "Swift identifier CITIGB2LXXX passed", "spans": [{"start": 17, "end": 28, "category": "BIC"}]}
+{"id": "bic_pos_21", "category": "BIC", "type": "positive", "text": "Local BIC GENODED1HAM for Hamburg", "spans": [{"start": 10, "end": 21, "category": "BIC"}]}
+{"id": "bic_pos_22", "category": "BIC", "type": "positive", "text": "Regional BIC BYLADEM1NUE for Nuremberg", "spans": [{"start": 13, "end": 24, "category": "BIC"}]}
+{"id": "bic_pos_23", "category": "BIC", "type": "positive", "text": "Short BIC DABAIE2D noted", "spans": [{"start": 10, "end": 18, "category": "BIC"}]}
+{"id": "bic_pos_24", "category": "BIC", "type": "positive", "text": "Short swift BELABE22 checked", "spans": [{"start": 12, "end": 20, "category": "BIC"}]}
+{"id": "bic_pos_25", "category": "BIC", "type": "positive", "text": "Short identifier ESSEFIHH approved", "spans": [{"start": 17, "end": 25, "category": "BIC"}]}
+{"id": "bic_neg_01", "category": "BIC", "type": "negative", "text": "Code DEUT1234 ist zu kurz und Ziffern im Laendercode", "spans": []}
+{"id": "bic_neg_02", "category": "BIC", "type": "negative", "text": "Kleinbuchstaben deutded1800 sind ungueltig", "spans": []}
+{"id": "bic_neg_03", "category": "BIC", "type": "negative", "text": "Falsche Laenge DEUTDEDE (nur 8 Buchstaben ohne Location)", "spans": []}
+{"id": "bic_neg_04", "category": "BIC", "type": "negative", "text": "Ziffern am Anfang 1234DED1800 unzulaessig", "spans": []}
+{"id": "bic_neg_05", "category": "BIC", "type": "negative", "text": "Sonderzeichen DEUT-DED1 ungueltig", "spans": []}
+{"id": "bic_neg_06", "category": "BIC", "type": "negative", "text": "Zu lang DEUTDED1800XXXX (15 Zeichen)", "spans": []}
+{"id": "bic_neg_07", "category": "BIC", "type": "negative", "text": "Nur 7 Zeichen DEUTDED unvollstaendig", "spans": []}
+{"id": "bic_neg_08", "category": "BIC", "type": "negative", "text": "Nur 9 Zeichen DEUTDED18 ungueltig", "spans": []}
+{"id": "bic_neg_09", "category": "BIC", "type": "negative", "text": "Nur 10 Zeichen DEUTDED180 ungueltig", "spans": []}
+{"id": "bic_neg_10", "category": "BIC", "type": "negative", "text": "Wort IDENTIFIER ist kein BIC", "spans": []}
+{"id": "bic_neg_11", "category": "BIC", "type": "negative", "text": "Bestellnummer ORD-DEUTDED-99", "spans": []}
+{"id": "bic_neg_12", "category": "BIC", "type": "negative", "text": "Produktname DEUTSCHLAND2026", "spans": []}
+{"id": "bic_neg_13", "category": "BIC", "type": "negative", "text": "Dateiname export_de_final.csv", "spans": []}
+{"id": "bic_neg_14", "category": "BIC", "type": "negative", "text": "Variable const BIC_LEN = 11;", "spans": []}
+{"id": "bic_neg_15", "category": "BIC", "type": "negative", "text": "Methodenaufruf validate_bic();", "spans": []}
+{"id": "bic_neg_16", "category": "BIC", "type": "negative", "text": "UUID aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "spans": []}
+{"id": "bic_neg_17", "category": "BIC", "type": "negative", "text": "Git sha 66b16cbf3df5d866767cd321ce4998ea6be528a6", "spans": []}
+{"id": "bic_neg_18", "category": "BIC", "type": "negative", "text": "Fehlermeldung BIC_NOT_FOUND_EXCEPTION", "spans": []}
+{"id": "bic_neg_19", "category": "BIC", "type": "negative", "text": "String ABCDEF1 ungueltig", "spans": []}
+{"id": "bic_neg_20", "category": "BIC", "type": "negative", "text": "String ABCDEF1234 ungueltig", "spans": []}
+{"id": "bic_neg_21", "category": "BIC", "type": "negative", "text": "String ABCDE123 ungueltig", "spans": []}
+{"id": "bic_neg_22", "category": "BIC", "type": "negative", "text": "String ABCDEF12A ungueltig", "spans": []}
+{"id": "bic_neg_23", "category": "BIC", "type": "negative", "text": "String ABCDEF12AB ungueltig", "spans": []}
+{"id": "bic_neg_24", "category": "BIC", "type": "negative", "text": "String ABCDEF12ABCD ungueltig", "spans": []}
+{"id": "bic_neg_25", "category": "BIC", "type": "negative", "text": "String ABC123DEF ungueltig", "spans": []}
+{"id": "credit_card_pos_01", "category": "CREDIT_CARD", "type": "positive", "text": "Zahlung mit 4532820011223344 bestaetigen.", "spans": [{"start": 12, "end": 28, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_02", "category": "CREDIT_CARD", "type": "positive", "text": "Karte: 5412 7512 3456 7898 verwendet", "spans": [{"start": 7, "end": 26, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_03", "category": "CREDIT_CARD", "type": "positive", "text": "Amex: 3782-822463-10005 verarbeiten", "spans": [{"start": 6, "end": 23, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_04", "category": "CREDIT_CARD", "type": "positive", "text": "Standard Visa 4111111111111111 gebucht", "spans": [{"start": 14, "end": 30, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_05", "category": "CREDIT_CARD", "type": "positive", "text": "Spaced Visa 4111 1111 1111 1111 angegeben", "spans": [{"start": 12, "end": 31, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_06", "category": "CREDIT_CARD", "type": "positive", "text": "Stripe test 4242424242424242 genutzt", "spans": [{"start": 12, "end": 28, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_07", "category": "CREDIT_CARD", "type": "positive", "text": "Stripe spaced 4242 4242 4242 4242 erfasst", "spans": [{"start": 14, "end": 33, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_08", "category": "CREDIT_CARD", "type": "positive", "text": "Mastercard 5105105105105100 registriert", "spans": [{"start": 11, "end": 27, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_09", "category": "CREDIT_CARD", "type": "positive", "text": "Mastercard spaced 5105 1051 0510 5100 gespeichert", "spans": [{"start": 18, "end": 37, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_10", "category": "CREDIT_CARD", "type": "positive", "text": "Amex card 371449635398431 charged", "spans": [{"start": 10, "end": 25, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_11", "category": "CREDIT_CARD", "type": "positive", "text": "Amex hyphen 3714-496353-98431 accepted", "spans": [{"start": 12, "end": 29, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_12", "category": "CREDIT_CARD", "type": "positive", "text": "Discover card 6011000990139424 processed", "spans": [{"start": 14, "end": 30, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_13", "category": "CREDIT_CARD", "type": "positive", "text": "Discover spaced 6011 0009 9013 9424 billed", "spans": [{"start": 16, "end": 35, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_14", "category": "CREDIT_CARD", "type": "positive", "text": "Card 4532-8200-1122-3344 hyphenated", "spans": [{"start": 5, "end": 24, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_15", "category": "CREDIT_CARD", "type": "positive", "text": "Visa card 4012888888881881 paid", "spans": [{"start": 10, "end": 26, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_16", "category": "CREDIT_CARD", "type": "positive", "text": "Diners 30569309025904 confirmed", "spans": [{"start": 7, "end": 21, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_17", "category": "CREDIT_CARD", "type": "positive", "text": "Card number 4222222222222 valid", "spans": [{"start": 12, "end": 25, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_18", "category": "CREDIT_CARD", "type": "positive", "text": "Card 4556737586899855 authorized", "spans": [{"start": 5, "end": 21, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_19", "category": "CREDIT_CARD", "type": "positive", "text": "Card 5555555555554444 completed", "spans": [{"start": 5, "end": 21, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_20", "category": "CREDIT_CARD", "type": "positive", "text": "Card 5555 5555 5555 4444 invoiced", "spans": [{"start": 5, "end": 24, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_21", "category": "CREDIT_CARD", "type": "positive", "text": "Card 378282246310005 verified", "spans": [{"start": 5, "end": 20, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_22", "category": "CREDIT_CARD", "type": "positive", "text": "Kreditkarte 4532820000011239 autorisiert", "spans": [{"start": 12, "end": 28, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_23", "category": "CREDIT_CARD", "type": "positive", "text": "Kreditkarte 4532820000021238 autorisiert", "spans": [{"start": 12, "end": 28, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_24", "category": "CREDIT_CARD", "type": "positive", "text": "Kreditkarte 4532820000031237 autorisiert", "spans": [{"start": 12, "end": 28, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_pos_25", "category": "CREDIT_CARD", "type": "positive", "text": "Kreditkarte 4532820000041236 autorisiert", "spans": [{"start": 12, "end": 28, "category": "CREDIT_CARD"}]}
+{"id": "credit_card_neg_01", "category": "CREDIT_CARD", "type": "negative", "text": "Ungueltige Karte: 4532820011223345 sollte fehlschlagen", "spans": []}
+{"id": "credit_card_neg_02", "category": "CREDIT_CARD", "type": "negative", "text": "Zahlung 123456789012 (12 Stellen zu kurz)", "spans": []}
+{"id": "credit_card_neg_03", "category": "CREDIT_CARD", "type": "negative", "text": "Kartennummer 4111111111111112 Pruefsumme falsch", "spans": []}
+{"id": "credit_card_neg_04", "category": "CREDIT_CARD", "type": "negative", "text": "Nummer 4242424242424243 Luhn verletzt", "spans": []}
+{"id": "credit_card_neg_05", "category": "CREDIT_CARD", "type": "negative", "text": "Amex 3782-822463-10006 ungueltige Endziffer", "spans": []}
+{"id": "credit_card_neg_06", "category": "CREDIT_CARD", "type": "negative", "text": "Folge 1111222233334444 ungueltig", "spans": []}
+{"id": "credit_card_neg_07", "category": "CREDIT_CARD", "type": "negative", "text": "Ziffernfolge 9999888877776666 ungueltig", "spans": []}
+{"id": "credit_card_neg_08", "category": "CREDIT_CARD", "type": "negative", "text": "Bestellnummer ORD-4532-8200-99", "spans": []}
+{"id": "credit_card_neg_09", "category": "CREDIT_CARD", "type": "negative", "text": "Datumsbereich 2026-10-29 bis 2026-11-05", "spans": []}
+{"id": "credit_card_neg_10", "category": "CREDIT_CARD", "type": "negative", "text": "Seriennummer SN-9876543210123456", "spans": []}
+{"id": "credit_card_neg_11", "category": "CREDIT_CARD", "type": "negative", "text": "UUID 00000000-0000-0000-0000-000000000000", "spans": []}
+{"id": "credit_card_neg_12", "category": "CREDIT_CARD", "type": "negative", "text": "EAN Barcode 4006381333931", "spans": []}
+{"id": "credit_card_neg_13", "category": "CREDIT_CARD", "type": "negative", "text": "ISBN Nummer 978-3-16-148410-0", "spans": []}
+{"id": "credit_card_neg_14", "category": "CREDIT_CARD", "type": "negative", "text": "Rechnungsbetrag 12345,67 EUR", "spans": []}
+{"id": "credit_card_neg_15", "category": "CREDIT_CARD", "type": "negative", "text": "Timestamp 1700000000000", "spans": []}
+{"id": "credit_card_neg_16", "category": "CREDIT_CARD", "type": "negative", "text": "Laenge 20 Stellen: 12345678901234567890", "spans": []}
+{"id": "credit_card_neg_17", "category": "CREDIT_CARD", "type": "negative", "text": "Buchstaben mix 4532ABCD11223344", "spans": []}
+{"id": "credit_card_neg_18", "category": "CREDIT_CARD", "type": "negative", "text": "Hash digest e3b0c44298fc1c149afbf4c8996fb924", "spans": []}
+{"id": "credit_card_neg_19", "category": "CREDIT_CARD", "type": "negative", "text": "Versionsnummer 1.2.3.4.5.6", "spans": []}
+{"id": "credit_card_neg_20", "category": "CREDIT_CARD", "type": "negative", "text": "Ungueltig 4000123456789010", "spans": []}
+{"id": "credit_card_neg_21", "category": "CREDIT_CARD", "type": "negative", "text": "Ungueltig 5100123456789011", "spans": []}
+{"id": "credit_card_neg_22", "category": "CREDIT_CARD", "type": "negative", "text": "Ungueltig 370012345678901", "spans": []}
+{"id": "credit_card_neg_23", "category": "CREDIT_CARD", "type": "negative", "text": "Ungueltig 6011123456789013", "spans": []}
+{"id": "credit_card_neg_24", "category": "CREDIT_CARD", "type": "negative", "text": "Ungueltig 4999123456789017", "spans": []}
+{"id": "credit_card_neg_25", "category": "CREDIT_CARD", "type": "negative", "text": "Ungueltig 5555123456789019", "spans": []}
+{"id": "steuer_id_pos_01", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 63459718722 im Bescheid erfasst.", "spans": [{"start": 29, "end": 40, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_02", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 27529 348108 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_03", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 84720/641395 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_04", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 42637865092 im Bescheid erfasst.", "spans": [{"start": 29, "end": 40, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_05", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 56238 024710 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_06", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 24118/596034 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_07", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 12731469509 im Bescheid erfasst.", "spans": [{"start": 29, "end": 40, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_08", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 84963 715427 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_09", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 38267/450012 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_10", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 37108364595 im Bescheid erfasst.", "spans": [{"start": 29, "end": 40, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_11", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 12504 980678 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_12", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 60532/746810 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_13", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 23398564015 im Bescheid erfasst.", "spans": [{"start": 29, "end": 40, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_14", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 20796 851456 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_15", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 40258/639186 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_16", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 26103914789 im Bescheid erfasst.", "spans": [{"start": 29, "end": 40, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_17", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 64295 734017 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_18", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 13525/094875 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_19", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 41728085935 im Bescheid erfasst.", "spans": [{"start": 29, "end": 40, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_20", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 85974 091328 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_21", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 28435/196572 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_22", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 40369782217 im Bescheid erfasst.", "spans": [{"start": 29, "end": 40, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_23", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 59341 278861 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_24", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 20589/641390 im Bescheid erfasst.", "spans": [{"start": 29, "end": 41, "category": "STEUER_ID"}]}
+{"id": "steuer_id_pos_25", "category": "STEUER_ID", "type": "positive", "text": "Steuer-Identifikationsnummer 24530461977 im Bescheid erfasst.", "spans": [{"start": 29, "end": 40, "category": "STEUER_ID"}]}
+{"id": "steuer_id_neg_01", "category": "STEUER_ID", "type": "negative", "text": "Falsche Steuer-ID: 86095742130 ablehnen", "spans": []}
+{"id": "steuer_id_neg_02", "category": "STEUER_ID", "type": "negative", "text": "Ungueltig: 06095742139 beginnt mit Null", "spans": []}
+{"id": "steuer_id_neg_03", "category": "STEUER_ID", "type": "negative", "text": "Ungueltig: 12345678901 verteilung falsch", "spans": []}
+{"id": "steuer_id_neg_04", "category": "STEUER_ID", "type": "negative", "text": "Zu kurz 8609574211 (nur 10 Ziffern)", "spans": []}
+{"id": "steuer_id_neg_05", "category": "STEUER_ID", "type": "negative", "text": "Zu lang 860957421169 (12 Ziffern)", "spans": []}
+{"id": "steuer_id_neg_06", "category": "STEUER_ID", "type": "negative", "text": "Ziffer 4x vorhanden: 11112345678", "spans": []}
+{"id": "steuer_id_neg_07", "category": "STEUER_ID", "type": "negative", "text": "Pruefziffer falsch: 86095742117", "spans": []}
+{"id": "steuer_id_neg_08", "category": "STEUER_ID", "type": "negative", "text": "Pruefziffer falsch: 26954371828", "spans": []}
+{"id": "steuer_id_neg_09", "category": "STEUER_ID", "type": "negative", "text": "Pruefziffer falsch: 47052368912", "spans": []}
+{"id": "steuer_id_neg_10", "category": "STEUER_ID", "type": "negative", "text": "Pruefziffer falsch: 65924713825", "spans": []}
+{"id": "steuer_id_neg_11", "category": "STEUER_ID", "type": "negative", "text": "Beginnt mit Null: 01234567890", "spans": []}
+{"id": "steuer_id_neg_12", "category": "STEUER_ID", "type": "negative", "text": "Beginnt mit Null: 08609574211", "spans": []}
+{"id": "steuer_id_neg_13", "category": "STEUER_ID", "type": "negative", "text": "Buchstaben enthalten: 8609574211A", "spans": []}
+{"id": "steuer_id_neg_14", "category": "STEUER_ID", "type": "negative", "text": "Bestellnummer 8609-5742-11", "spans": []}
+{"id": "steuer_id_neg_15", "category": "STEUER_ID", "type": "negative", "text": "Rechnungsnummer RE-86095742", "spans": []}
+{"id": "steuer_id_neg_16", "category": "STEUER_ID", "type": "negative", "text": "Datumsangabe 20261029120", "spans": []}
+{"id": "steuer_id_neg_17", "category": "STEUER_ID", "type": "negative", "text": "Unix Timestamp 1700000000", "spans": []}
+{"id": "steuer_id_neg_18", "category": "STEUER_ID", "type": "negative", "text": "Versionsnummer 1.2.3.4", "spans": []}
+{"id": "steuer_id_neg_19", "category": "STEUER_ID", "type": "negative", "text": "Portnummer 8080 oder 443", "spans": []}
+{"id": "steuer_id_neg_20", "category": "STEUER_ID", "type": "negative", "text": "Fehlercode ERR_STEUER_ID_99", "spans": []}
+{"id": "steuer_id_neg_21", "category": "STEUER_ID", "type": "negative", "text": "Ungueltig 22222222222", "spans": []}
+{"id": "steuer_id_neg_22", "category": "STEUER_ID", "type": "negative", "text": "Ungueltig 33333333333", "spans": []}
+{"id": "steuer_id_neg_23", "category": "STEUER_ID", "type": "negative", "text": "Ungueltig 44444444444", "spans": []}
+{"id": "steuer_id_neg_24", "category": "STEUER_ID", "type": "negative", "text": "Ungueltig 55555555555", "spans": []}
+{"id": "steuer_id_neg_25", "category": "STEUER_ID", "type": "negative", "text": "Ungueltig 66666666666", "spans": []}
+{"id": "phone_pos_01", "category": "PHONE", "type": "positive", "text": "Rufen Sie +49 170 1234567 an fuer Rueckfragen.", "spans": [{"start": 10, "end": 25, "category": "PHONE"}]}
+{"id": "phone_pos_02", "category": "PHONE", "type": "positive", "text": "Telefon: 0049 30 98765432 im Buero", "spans": [{"start": 9, "end": 25, "category": "PHONE"}]}
+{"id": "phone_pos_03", "category": "PHONE", "type": "positive", "text": "Mobil: 0170/1234567 direkt erreichen", "spans": [{"start": 7, "end": 19, "category": "PHONE"}]}
+{"id": "phone_pos_04", "category": "PHONE", "type": "positive", "text": "Tel: (089) 1234-5678 Notfallnummer", "spans": [{"start": 5, "end": 20, "category": "PHONE"}]}
+{"id": "phone_pos_05", "category": "PHONE", "type": "positive", "text": "Hotline +49 (0) 30 123456 besetzt", "spans": [{"start": 8, "end": 25, "category": "PHONE"}]}
+{"id": "phone_pos_06", "category": "PHONE", "type": "positive", "text": "Office phone: +1 555 123 4567 available", "spans": [{"start": 14, "end": 29, "category": "PHONE"}]}
+{"id": "phone_pos_07", "category": "PHONE", "type": "positive", "text": "UK phone +44 20 7946 0991 ring back", "spans": [{"start": 9, "end": 25, "category": "PHONE"}]}
+{"id": "phone_pos_08", "category": "PHONE", "type": "positive", "text": "France phone +33 1 42 68 55 00 called", "spans": [{"start": 13, "end": 30, "category": "PHONE"}]}
+{"id": "phone_pos_09", "category": "PHONE", "type": "positive", "text": "Swiss phone +41 44 668 18 00 reachable", "spans": [{"start": 12, "end": 28, "category": "PHONE"}]}
+{"id": "phone_pos_10", "category": "PHONE", "type": "positive", "text": "Austria phone +43 1 515 43 0 active", "spans": [{"start": 14, "end": 28, "category": "PHONE"}]}
+{"id": "phone_pos_11", "category": "PHONE", "type": "positive", "text": "Festnetz 030/12345678 durchwaehlen", "spans": [{"start": 9, "end": 21, "category": "PHONE"}]}
+{"id": "phone_pos_12", "category": "PHONE", "type": "positive", "text": "Zentrale 040-98765432 anrufen", "spans": [{"start": 9, "end": 21, "category": "PHONE"}]}
+{"id": "phone_pos_13", "category": "PHONE", "type": "positive", "text": "Faxanschluss: 089 9876543 bereit", "spans": [{"start": 14, "end": 25, "category": "PHONE"}]}
+{"id": "phone_pos_14", "category": "PHONE", "type": "positive", "text": "Mobilnummer 0151 12345678 erreichbar", "spans": [{"start": 12, "end": 25, "category": "PHONE"}]}
+{"id": "phone_pos_15", "category": "PHONE", "type": "positive", "text": "Support: +49-89-1234567-89 rund um die Uhr", "spans": [{"start": 9, "end": 26, "category": "PHONE"}]}
+{"id": "phone_pos_16", "category": "PHONE", "type": "positive", "text": "Kundendienst (030) 99887766 aktiv", "spans": [{"start": 13, "end": 27, "category": "PHONE"}]}
+{"id": "phone_pos_17", "category": "PHONE", "type": "positive", "text": "Direktwahl 069 123456789 waehlen", "spans": [{"start": 11, "end": 24, "category": "PHONE"}]}
+{"id": "phone_pos_18", "category": "PHONE", "type": "positive", "text": "Notrufnummer +49 112 000000 intern", "spans": [{"start": 13, "end": 27, "category": "PHONE"}]}
+{"id": "phone_pos_19", "category": "PHONE", "type": "positive", "text": "Dispatch +49 800 1122334 gebuehrenfrei", "spans": [{"start": 9, "end": 24, "category": "PHONE"}]}
+{"id": "phone_pos_20", "category": "PHONE", "type": "positive", "text": "Service line 0800-1234567 kostenlos", "spans": [{"start": 13, "end": 25, "category": "PHONE"}]}
+{"id": "phone_pos_21", "category": "PHONE", "type": "positive", "text": "Handy 0160 9988776 kontaktieren", "spans": [{"start": 6, "end": 18, "category": "PHONE"}]}
+{"id": "phone_pos_22", "category": "PHONE", "type": "positive", "text": "Phone: +493012345678 direct", "spans": [{"start": 7, "end": 20, "category": "PHONE"}]}
+{"id": "phone_pos_23", "category": "PHONE", "type": "positive", "text": "Call 00498912345678 today", "spans": [{"start": 5, "end": 19, "category": "PHONE"}]}
+{"id": "phone_pos_24", "category": "PHONE", "type": "positive", "text": "Local line (0221) 123456 Cologne", "spans": [{"start": 11, "end": 24, "category": "PHONE"}]}
+{"id": "phone_pos_25", "category": "PHONE", "type": "positive", "text": "Contact +49 211 1234567 Duesseldorf", "spans": [{"start": 8, "end": 23, "category": "PHONE"}]}
+{"id": "phone_neg_01", "category": "PHONE", "type": "negative", "text": "Nummer 0123 ist zu kurz fuer Telefonnummer", "spans": []}
+{"id": "phone_neg_02", "category": "PHONE", "type": "negative", "text": "Code ABC017012345 ist keine Telefonnummer", "spans": []}
+{"id": "phone_neg_03", "category": "PHONE", "type": "negative", "text": "Zu kurz: +49 12 (nur 4 Ziffern)", "spans": []}
+{"id": "phone_neg_04", "category": "PHONE", "type": "negative", "text": "Zu lang: +49 1234567890123456 (17 Ziffern)", "spans": []}
+{"id": "phone_neg_05", "category": "PHONE", "type": "negative", "text": "Keine Ziffern: +++ --- ///", "spans": []}
+{"id": "phone_neg_06", "category": "PHONE", "type": "negative", "text": "Rechnungsnummer RE-2026-001", "spans": []}
+{"id": "phone_neg_07", "category": "PHONE", "type": "negative", "text": "Uhrzeit 14:30 Uhr", "spans": []}
+{"id": "phone_neg_08", "category": "PHONE", "type": "negative", "text": "Datum 2026-10-29 im Kalender", "spans": []}
+{"id": "phone_neg_09", "category": "PHONE", "type": "negative", "text": "Preis 19,99 EUR inkl. MwSt.", "spans": []}
+{"id": "phone_neg_10", "category": "PHONE", "type": "negative", "text": "Bestellmenge 1000 Stueck", "spans": []}
+{"id": "phone_neg_11", "category": "PHONE", "type": "negative", "text": "Temperatur +25 Grad Celsius", "spans": []}
+{"id": "phone_neg_12", "category": "PHONE", "type": "negative", "text": "Geokoordinate 52.520008", "spans": []}
+{"id": "phone_neg_13", "category": "PHONE", "type": "negative", "text": "HTTP Status 200 OK", "spans": []}
+{"id": "phone_neg_14", "category": "PHONE", "type": "negative", "text": "Port 8080 offen", "spans": []}
+{"id": "phone_neg_15", "category": "PHONE", "type": "negative", "text": "Versionsnummer v1.2.3", "spans": []}
+{"id": "phone_neg_16", "category": "PHONE", "type": "negative", "text": "Git SHA 641dc4bda", "spans": []}
+{"id": "phone_neg_17", "category": "PHONE", "type": "negative", "text": "UUID 12345678-1234-1234-1234-123456789abc", "spans": []}
+{"id": "phone_neg_18", "category": "PHONE", "type": "negative", "text": "Zufallszahl 987654321 ohne Praefix", "spans": []}
+{"id": "phone_neg_19", "category": "PHONE", "type": "negative", "text": "Formatfehler +49-ABC-123456", "spans": []}
+{"id": "phone_neg_20", "category": "PHONE", "type": "negative", "text": "Zaehlerstand 1234567", "spans": []}
+{"id": "phone_neg_21", "category": "PHONE", "type": "negative", "text": "Kundennummer KD-998877", "spans": []}
+{"id": "phone_neg_22", "category": "PHONE", "type": "negative", "text": "Artikelnummer ART-112233", "spans": []}
+{"id": "phone_neg_23", "category": "PHONE", "type": "negative", "text": "Ticket ID TKT-554433", "spans": []}
+{"id": "phone_neg_24", "category": "PHONE", "type": "negative", "text": "Code snippet int x = 0;", "spans": []}
+{"id": "phone_neg_25", "category": "PHONE", "type": "negative", "text": "Statuscode OK_200", "spans": []}
+{"id": "ipv4_pos_01", "category": "IPV4", "type": "positive", "text": "Server-IP 192.168.1.254 ist erreichbar", "spans": [{"start": 10, "end": 23, "category": "IPV4"}]}
+{"id": "ipv4_pos_02", "category": "IPV4", "type": "positive", "text": "Gateway 10.0.0.1 konfiguriert", "spans": [{"start": 8, "end": 16, "category": "IPV4"}]}
+{"id": "ipv4_pos_03", "category": "IPV4", "type": "positive", "text": "DNS server 8.8.8.8 used", "spans": [{"start": 11, "end": 18, "category": "IPV4"}]}
+{"id": "ipv4_pos_04", "category": "IPV4", "type": "positive", "text": "Secondary DNS 8.8.4.4 active", "spans": [{"start": 14, "end": 21, "category": "IPV4"}]}
+{"id": "ipv4_pos_05", "category": "IPV4", "type": "positive", "text": "Cloudflare DNS 1.1.1.1 queried", "spans": [{"start": 15, "end": 22, "category": "IPV4"}]}
+{"id": "ipv4_pos_06", "category": "IPV4", "type": "positive", "text": "Localhost 127.0.0.1 bound", "spans": [{"start": 10, "end": 19, "category": "IPV4"}]}
+{"id": "ipv4_pos_07", "category": "IPV4", "type": "positive", "text": "Test IP 192.0.2.1 reserved RFC 5737", "spans": [{"start": 8, "end": 17, "category": "IPV4"}]}
+{"id": "ipv4_pos_08", "category": "IPV4", "type": "positive", "text": "Benchmark net 198.51.100.42 tested", "spans": [{"start": 14, "end": 27, "category": "IPV4"}]}
+{"id": "ipv4_pos_09", "category": "IPV4", "type": "positive", "text": "Documentation net 203.0.113.199 assigned", "spans": [{"start": 18, "end": 31, "category": "IPV4"}]}
+{"id": "ipv4_pos_10", "category": "IPV4", "type": "positive", "text": "Subnet mask 255.255.255.0 set", "spans": [{"start": 12, "end": 25, "category": "IPV4"}]}
+{"id": "ipv4_pos_11", "category": "IPV4", "type": "positive", "text": "Broadcast 255.255.255.255 received", "spans": [{"start": 10, "end": 25, "category": "IPV4"}]}
+{"id": "ipv4_pos_12", "category": "IPV4", "type": "positive", "text": "Zero network 0.0.0.0 listening", "spans": [{"start": 13, "end": 20, "category": "IPV4"}]}
+{"id": "ipv4_pos_13", "category": "IPV4", "type": "positive", "text": "Host 172.16.0.5 started", "spans": [{"start": 5, "end": 15, "category": "IPV4"}]}
+{"id": "ipv4_pos_14", "category": "IPV4", "type": "positive", "text": "Docker IP 172.17.0.2 assigned", "spans": [{"start": 10, "end": 20, "category": "IPV4"}]}
+{"id": "ipv4_pos_15", "category": "IPV4", "type": "positive", "text": "VPN endpoint 10.8.0.1 connected", "spans": [{"start": 13, "end": 21, "category": "IPV4"}]}
+{"id": "ipv4_pos_16", "category": "IPV4", "type": "positive", "text": "Office router 192.168.0.1 ready", "spans": [{"start": 14, "end": 25, "category": "IPV4"}]}
+{"id": "ipv4_pos_17", "category": "IPV4", "type": "positive", "text": "Switch IP 192.168.1.1 online", "spans": [{"start": 10, "end": 21, "category": "IPV4"}]}
+{"id": "ipv4_pos_18", "category": "IPV4", "type": "positive", "text": "Camera feed 192.168.2.50 streaming", "spans": [{"start": 12, "end": 24, "category": "IPV4"}]}
+{"id": "ipv4_pos_19", "category": "IPV4", "type": "positive", "text": "Printer address 10.20.30.40 printed", "spans": [{"start": 16, "end": 27, "category": "IPV4"}]}
+{"id": "ipv4_pos_20", "category": "IPV4", "type": "positive", "text": "Proxy server 192.0.2.254 forwarded", "spans": [{"start": 13, "end": 24, "category": "IPV4"}]}
+{"id": "ipv4_pos_21", "category": "IPV4", "type": "positive", "text": "Public probe 198.51.100.1 verified", "spans": [{"start": 13, "end": 25, "category": "IPV4"}]}
+{"id": "ipv4_pos_22", "category": "IPV4", "type": "positive", "text": "Edge node 203.0.113.10 deployed", "spans": [{"start": 10, "end": 22, "category": "IPV4"}]}
+{"id": "ipv4_pos_23", "category": "IPV4", "type": "positive", "text": "Cluster master 10.100.1.1 healthy", "spans": [{"start": 15, "end": 25, "category": "IPV4"}]}
+{"id": "ipv4_pos_24", "category": "IPV4", "type": "positive", "text": "Worker node 10.100.1.2 running", "spans": [{"start": 12, "end": 22, "category": "IPV4"}]}
+{"id": "ipv4_pos_25", "category": "IPV4", "type": "positive", "text": "Bastion host 192.0.2.99 secured", "spans": [{"start": 13, "end": 23, "category": "IPV4"}]}
+{"id": "ipv4_neg_01", "category": "IPV4", "type": "negative", "text": "Ungueltige IP 256.100.0.1 ignorieren", "spans": []}
+{"id": "ipv4_neg_02", "category": "IPV4", "type": "negative", "text": "Oktett ueberlauf 192.168.1.300 ungueltig", "spans": []}
+{"id": "ipv4_neg_03", "category": "IPV4", "type": "negative", "text": "Zu viele Oktette 192.168.1.1.1 Fehler", "spans": []}
+{"id": "ipv4_neg_04", "category": "IPV4", "type": "negative", "text": "Zu wenige Oktette 192.168.1 unvollstaendig", "spans": []}
+{"id": "ipv4_neg_05", "category": "IPV4", "type": "negative", "text": "Nur zwei Zahlen 10.1 ist keine IP", "spans": []}
+{"id": "ipv4_neg_06", "category": "IPV4", "type": "negative", "text": "Versionsnummer 1.2.3 released", "spans": []}
+{"id": "ipv4_neg_07", "category": "IPV4", "type": "negative", "text": "Versionsnummer 2.0.0.alpha unpassend", "spans": []}
+{"id": "ipv4_neg_08", "category": "IPV4", "type": "negative", "text": "Datum 2026.10.30 mit Punkten", "spans": []}
+{"id": "ipv4_neg_09", "category": "IPV4", "type": "negative", "text": "Geldbetrag 1.234.567 Euro", "spans": []}
+{"id": "ipv4_neg_10", "category": "IPV4", "type": "negative", "text": "Buchstaben im Oktett 192.168.1.1a", "spans": []}
+{"id": "ipv4_neg_11", "category": "IPV4", "type": "negative", "text": "Führende Punkte .192.168.1.1", "spans": []}
+{"id": "ipv4_neg_12", "category": "IPV4", "type": "negative", "text": "Doppelte Punkte 192..168.1.1", "spans": []}
+{"id": "ipv4_neg_13", "category": "IPV4", "type": "negative", "text": "Negative Zahlen -192.168.1.1", "spans": []}
+{"id": "ipv4_neg_14", "category": "IPV4", "type": "negative", "text": "Leerzeichen 192. 168. 1. 1", "spans": []}
+{"id": "ipv4_neg_15", "category": "IPV4", "type": "negative", "text": "Portnummer :8080 am Ende", "spans": []}
+{"id": "ipv4_neg_16", "category": "IPV4", "type": "negative", "text": "Hexadezimalwert 0x7F000001", "spans": []}
+{"id": "ipv4_neg_17", "category": "IPV4", "type": "negative", "text": "Ungueltige Zahl 999.999.999.999", "spans": []}
+{"id": "ipv4_neg_18", "category": "IPV4", "type": "negative", "text": "Wert 300.200.100.50 overflow", "spans": []}
+{"id": "ipv4_neg_19", "category": "IPV4", "type": "negative", "text": "Wert 10.500.1.1 overflow", "spans": []}
+{"id": "ipv4_neg_20", "category": "IPV4", "type": "negative", "text": "Wert 1.2.3.400 overflow", "spans": []}
+{"id": "ipv4_neg_21", "category": "IPV4", "type": "negative", "text": "String a.b.c.d kein digit", "spans": []}
+{"id": "ipv4_neg_22", "category": "IPV4", "type": "negative", "text": "String 12.34.56 kein viertes", "spans": []}
+{"id": "ipv4_neg_23", "category": "IPV4", "type": "negative", "text": "String 1.2.3. kein letztes", "spans": []}
+{"id": "ipv4_neg_24", "category": "IPV4", "type": "negative", "text": "String .1.2.3 kein erstes", "spans": []}
+{"id": "ipv4_neg_25", "category": "IPV4", "type": "negative", "text": "String 0.0.0 kein viertes", "spans": []}
+{"id": "ipv6_pos_01", "category": "IPV6", "type": "positive", "text": "Adresse 2001:db8:85a3::8a2e:370:7334 konfiguriert", "spans": [{"start": 8, "end": 36, "category": "IPV6"}]}
+{"id": "ipv6_pos_02", "category": "IPV6", "type": "positive", "text": "Loopback ::1 gebunden", "spans": [{"start": 9, "end": 12, "category": "IPV6"}]}
+{"id": "ipv6_pos_03", "category": "IPV6", "type": "positive", "text": "Documentation prefix 2001:db8::1 used", "spans": [{"start": 21, "end": 32, "category": "IPV6"}]}
+{"id": "ipv6_pos_04", "category": "IPV6", "type": "positive", "text": "Link-local fe80::1 detected", "spans": [{"start": 11, "end": 18, "category": "IPV6"}]}
+{"id": "ipv6_pos_05", "category": "IPV6", "type": "positive", "text": "Address 2001:db8::2 assigned", "spans": [{"start": 8, "end": 19, "category": "IPV6"}]}
+{"id": "ipv6_pos_06", "category": "IPV6", "type": "positive", "text": "Node fe80::8a2e:370:7334 active", "spans": [{"start": 5, "end": 24, "category": "IPV6"}]}
+{"id": "ipv6_pos_07", "category": "IPV6", "type": "positive", "text": "Gateway 2001:db8:a::1 online", "spans": [{"start": 8, "end": 21, "category": "IPV6"}]}
+{"id": "ipv6_pos_08", "category": "IPV6", "type": "positive", "text": "DNS server 2001:4860:4860::8888 resolved", "spans": [{"start": 11, "end": 31, "category": "IPV6"}]}
+{"id": "ipv6_pos_09", "category": "IPV6", "type": "positive", "text": "Secondary DNS 2001:4860:4860::8844 reachable", "spans": [{"start": 14, "end": 34, "category": "IPV6"}]}
+{"id": "ipv6_pos_10", "category": "IPV6", "type": "positive", "text": "Cloudflare v6 2606:4700:4700::1111 queried", "spans": [{"start": 14, "end": 34, "category": "IPV6"}]}
+{"id": "ipv6_pos_11", "category": "IPV6", "type": "positive", "text": "Full form 2001:0db8:0000:0000:0000:0000:0000:0001 test", "spans": [{"start": 10, "end": 49, "category": "IPV6"}]}
+{"id": "ipv6_pos_12", "category": "IPV6", "type": "positive", "text": "Multicast ff02::1 pinged", "spans": [{"start": 10, "end": 17, "category": "IPV6"}]}
+{"id": "ipv6_pos_13", "category": "IPV6", "type": "positive", "text": "Router ff02::2 announced", "spans": [{"start": 7, "end": 14, "category": "IPV6"}]}
+{"id": "ipv6_pos_14", "category": "IPV6", "type": "positive", "text": "Subnet 2001:db8:1234::1 connected", "spans": [{"start": 7, "end": 23, "category": "IPV6"}]}
+{"id": "ipv6_pos_15", "category": "IPV6", "type": "positive", "text": "Host 2001:db8:cafe:babe::1 ready", "spans": [{"start": 5, "end": 26, "category": "IPV6"}]}
+{"id": "ipv6_pos_16", "category": "IPV6", "type": "positive", "text": "Server 2001:db8:dead:beef::42 listed", "spans": [{"start": 7, "end": 29, "category": "IPV6"}]}
+{"id": "ipv6_pos_17", "category": "IPV6", "type": "positive", "text": "V6 node 2001:db8:1:2:3:4:5:6 routed", "spans": [{"start": 8, "end": 28, "category": "IPV6"}]}
+{"id": "ipv6_pos_18", "category": "IPV6", "type": "positive", "text": "Unique local fd00::1 configured", "spans": [{"start": 13, "end": 20, "category": "IPV6"}]}
+{"id": "ipv6_pos_19", "category": "IPV6", "type": "positive", "text": "Cluster v6 fd00:cafe::2 started", "spans": [{"start": 11, "end": 23, "category": "IPV6"}]}
+{"id": "ipv6_pos_20", "category": "IPV6", "type": "positive", "text": "VPN endpoint fd12:3456:789a::1 secured", "spans": [{"start": 13, "end": 30, "category": "IPV6"}]}
+{"id": "ipv6_pos_21", "category": "IPV6", "type": "positive", "text": "Target 2001:db8:ffff::1 probed", "spans": [{"start": 7, "end": 23, "category": "IPV6"}]}
+{"id": "ipv6_pos_22", "category": "IPV6", "type": "positive", "text": "Backup v6 2001:db8:aaaa::bbbb sync", "spans": [{"start": 10, "end": 29, "category": "IPV6"}]}
+{"id": "ipv6_pos_23", "category": "IPV6", "type": "positive", "text": "Interface fe80::abcd:ef01 up", "spans": [{"start": 10, "end": 25, "category": "IPV6"}]}
+{"id": "ipv6_pos_24", "category": "IPV6", "type": "positive", "text": "Site local fec0::1 legacy", "spans": [{"start": 11, "end": 18, "category": "IPV6"}]}
+{"id": "ipv6_pos_25", "category": "IPV6", "type": "positive", "text": "Test host 2001:db8::9999 verified", "spans": [{"start": 10, "end": 24, "category": "IPV6"}]}
+{"id": "ipv6_neg_01", "category": "IPV6", "type": "negative", "text": "Ungueltig: 1234:5678 nur ein Doppelpunkt ist keine IPv6", "spans": []}
+{"id": "ipv6_neg_02", "category": "IPV6", "type": "negative", "text": "Keine Hex-Ziffern xxxx:yyyy::zzzz ungueltig", "spans": []}
+{"id": "ipv6_neg_03", "category": "IPV6", "type": "negative", "text": "Ungueltige Zeichen 2001:db8:xyz::1", "spans": []}
+{"id": "ipv6_neg_04", "category": "IPV6", "type": "negative", "text": "Zu viele Doppelpunkte :::::::: ungueltig", "spans": []}
+{"id": "ipv6_neg_05", "category": "IPV6", "type": "negative", "text": "Zu lange Hex-Gruppe 2001:db8:12345::1 Fehler", "spans": []}
+{"id": "ipv6_neg_06", "category": "IPV6", "type": "negative", "text": "Einfacher Doppelpunkt key: value im Dokument", "spans": []}
+{"id": "ipv6_neg_07", "category": "IPV6", "type": "negative", "text": "Uhrzeit 12:00 mittags", "spans": []}
+{"id": "ipv6_neg_08", "category": "IPV6", "type": "negative", "text": "Bibelvers Johannes 3:16 im Text", "spans": []}
+{"id": "ipv6_neg_09", "category": "IPV6", "type": "negative", "text": "Verhaeltnis 16:9 Breitbildformat", "spans": []}
+{"id": "ipv6_neg_10", "category": "IPV6", "type": "negative", "text": "Dateiname test:file:name.txt", "spans": []}
+{"id": "ipv6_neg_11", "category": "IPV6", "type": "negative", "text": "Bestellnummer ORD:2026:10", "spans": []}
+{"id": "ipv6_neg_12", "category": "IPV6", "type": "negative", "text": "Log Level [ERROR:404] not found", "spans": []}
+{"id": "ipv6_neg_13", "category": "IPV6", "type": "negative", "text": "JSON String {\"key\": \"value\"}", "spans": []}
+{"id": "ipv6_neg_14", "category": "IPV6", "type": "negative", "text": "CSS Property margin: 10px;", "spans": []}
+{"id": "ipv6_neg_15", "category": "IPV6", "type": "negative", "text": "C++ Namespace std::vector::size", "spans": []}
+{"id": "ipv6_neg_16", "category": "IPV6", "type": "negative", "text": "Klasse MyClass::MethodName", "spans": []}
+{"id": "ipv6_neg_17", "category": "IPV6", "type": "negative", "text": "Protokoll https://", "spans": []}
+{"id": "ipv6_neg_18", "category": "IPV6", "type": "negative", "text": "Protokoll ftp://", "spans": []}
+{"id": "ipv6_neg_19", "category": "IPV6", "type": "negative", "text": "Label case_1:", "spans": []}
+{"id": "ipv6_neg_20", "category": "IPV6", "type": "negative", "text": "Zeitdauer 45:12 Spielzeit", "spans": []}
+{"id": "ipv6_neg_21", "category": "IPV6", "type": "negative", "text": "Uhrzeit 09:15 Vormittag", "spans": []}
+{"id": "ipv6_neg_22", "category": "IPV6", "type": "negative", "text": "Uhrzeit 18:45 Feierabend", "spans": []}
+{"id": "ipv6_neg_23", "category": "IPV6", "type": "negative", "text": "Port mapping 8080:80 Docker", "spans": []}
+{"id": "ipv6_neg_24", "category": "IPV6", "type": "negative", "text": "Volume binding /data:/var/data", "spans": []}
+{"id": "ipv6_neg_25", "category": "IPV6", "type": "negative", "text": "Syntax error token:at:line", "spans": []}
+{"id": "plz_pos_01", "category": "PLZ", "type": "positive", "text": "Standort PLZ 10115 in Deutschland", "spans": [{"start": 13, "end": 18, "category": "PLZ"}]}
+{"id": "plz_pos_02", "category": "PLZ", "type": "positive", "text": "Postleitzahl 80331 im Adressfeld", "spans": [{"start": 13, "end": 18, "category": "PLZ"}]}
+{"id": "plz_pos_03", "category": "PLZ", "type": "positive", "text": "Bezirk mit PLZ 60311 verzeichnet", "spans": [{"start": 15, "end": 20, "category": "PLZ"}]}
+{"id": "plz_pos_04", "category": "PLZ", "type": "positive", "text": "Postleitzahl 50667 im Formular", "spans": [{"start": 13, "end": 18, "category": "PLZ"}]}
+{"id": "plz_pos_05", "category": "PLZ", "type": "positive", "text": "Zustellbezirk 70173 hinterlegt", "spans": [{"start": 14, "end": 19, "category": "PLZ"}]}
+{"id": "plz_pos_06", "category": "PLZ", "type": "positive", "text": "Kennung PLZ 01067 erfasst", "spans": [{"start": 12, "end": 17, "category": "PLZ"}]}
+{"id": "plz_pos_07", "category": "PLZ", "type": "positive", "text": "Postfach bei 30159 registriert", "spans": [{"start": 13, "end": 18, "category": "PLZ"}]}
+{"id": "plz_pos_08", "category": "PLZ", "type": "positive", "text": "Vorwahlbereich 40213 vermerkt", "spans": [{"start": 15, "end": 20, "category": "PLZ"}]}
+{"id": "plz_pos_09", "category": "PLZ", "type": "positive", "text": "PLZ 90403 im Verzeichnis", "spans": [{"start": 4, "end": 9, "category": "PLZ"}]}
+{"id": "plz_pos_10", "category": "PLZ", "type": "positive", "text": "PLZ 44135 fuer Zustellung", "spans": [{"start": 4, "end": 9, "category": "PLZ"}]}
+{"id": "plz_pos_11", "category": "PLZ", "type": "positive", "text": "Standort PLZ 28195 angegeben", "spans": [{"start": 13, "end": 18, "category": "PLZ"}]}
+{"id": "plz_pos_12", "category": "PLZ", "type": "positive", "text": "Gebiet 45127 markiert", "spans": [{"start": 7, "end": 12, "category": "PLZ"}]}
+{"id": "plz_pos_13", "category": "PLZ", "type": "positive", "text": "Eintrag PLZ 39104 geprueft", "spans": [{"start": 12, "end": 17, "category": "PLZ"}]}
+{"id": "plz_pos_14", "category": "PLZ", "type": "positive", "text": "PLZ 99084 im Register", "spans": [{"start": 4, "end": 9, "category": "PLZ"}]}
+{"id": "plz_pos_15", "category": "PLZ", "type": "positive", "text": "PLZ-Nummer 66111 gueltig", "spans": [{"start": 11, "end": 16, "category": "PLZ"}]}
+{"id": "plz_pos_16", "category": "PLZ", "type": "positive", "text": "Code 65183 fuer Sendung", "spans": [{"start": 5, "end": 10, "category": "PLZ"}]}
+{"id": "plz_pos_17", "category": "PLZ", "type": "positive", "text": "Zustellung an 14467 adressiert", "spans": [{"start": 14, "end": 19, "category": "PLZ"}]}
+{"id": "plz_pos_18", "category": "PLZ", "type": "positive", "text": "PLZ 18055 an der Ostsee", "spans": [{"start": 4, "end": 9, "category": "PLZ"}]}
+{"id": "plz_pos_19", "category": "PLZ", "type": "positive", "text": "Postbezirk 24103 ausgewaehlt", "spans": [{"start": 11, "end": 16, "category": "PLZ"}]}
+{"id": "plz_pos_20", "category": "PLZ", "type": "positive", "text": "Verteilung nach 33602 organisiert", "spans": [{"start": 16, "end": 21, "category": "PLZ"}]}
+{"id": "plz_pos_21", "category": "PLZ", "type": "positive", "text": "PLZ 86150 in Bayern", "spans": [{"start": 4, "end": 9, "category": "PLZ"}]}
+{"id": "plz_pos_22", "category": "PLZ", "type": "positive", "text": "PLZ 76133 im Sueden", "spans": [{"start": 4, "end": 9, "category": "PLZ"}]}
+{"id": "plz_pos_23", "category": "PLZ", "type": "positive", "text": "PLZ 79098 im Schwarzwald", "spans": [{"start": 4, "end": 9, "category": "PLZ"}]}
+{"id": "plz_pos_24", "category": "PLZ", "type": "positive", "text": "PLZ 55116 in Rheinland-Pfalz", "spans": [{"start": 4, "end": 9, "category": "PLZ"}]}
+{"id": "plz_pos_25", "category": "PLZ", "type": "positive", "text": "PLZ 93047 an der Donau", "spans": [{"start": 4, "end": 9, "category": "PLZ"}]}
+{"id": "plz_neg_01", "category": "PLZ", "type": "negative", "text": "Code 123456 ist 6 Stellen (keine PLZ)", "spans": []}
+{"id": "plz_neg_02", "category": "PLZ", "type": "negative", "text": "Zahl 1234 ist nur 4 Stellen", "spans": []}
+{"id": "plz_neg_03", "category": "PLZ", "type": "negative", "text": "Code 123 ist nur 3 Stellen", "spans": []}
+{"id": "plz_neg_04", "category": "PLZ", "type": "negative", "text": "Nummer 12 nur 2 Stellen", "spans": []}
+{"id": "plz_neg_05", "category": "PLZ", "type": "negative", "text": "Einzelne Ziffer 5", "spans": []}
+{"id": "plz_neg_06", "category": "PLZ", "type": "negative", "text": "Datum 2026-10-29", "spans": []}
+{"id": "plz_neg_07", "category": "PLZ", "type": "negative", "text": "Jahr 2026", "spans": []}
+{"id": "plz_neg_08", "category": "PLZ", "type": "negative", "text": "Bestellnummer ORD-10115-AX", "spans": []}
+{"id": "plz_neg_09", "category": "PLZ", "type": "negative", "text": "Temperatur 25 Grad", "spans": []}
+{"id": "plz_neg_10", "category": "PLZ", "type": "negative", "text": "Uhrzeit 14:30 Uhr", "spans": []}
+{"id": "plz_neg_11", "category": "PLZ", "type": "negative", "text": "Versionsnummer 1.2.3", "spans": []}
+{"id": "plz_neg_12", "category": "PLZ", "type": "negative", "text": "Guthaben 101,15 Euro", "spans": []}
+{"id": "plz_neg_13", "category": "PLZ", "type": "negative", "text": "Rechnungsnummer RE-998877", "spans": []}
+{"id": "plz_neg_14", "category": "PLZ", "type": "negative", "text": "Rabattcode SAVE20", "spans": []}
+{"id": "plz_neg_15", "category": "PLZ", "type": "negative", "text": "Ticketnummer #12345", "spans": []}
+{"id": "plz_neg_16", "category": "PLZ", "type": "negative", "text": "Hausnummer 42a", "spans": []}
+{"id": "plz_neg_17", "category": "PLZ", "type": "negative", "text": "Ziffernfolge 999999 zu lang", "spans": []}
+{"id": "plz_neg_18", "category": "PLZ", "type": "negative", "text": "Ziffernfolge 111111 zu lang", "spans": []}
+{"id": "plz_neg_19", "category": "PLZ", "type": "negative", "text": "Ziffernfolge 8888 zu kurz", "spans": []}
+{"id": "plz_neg_20", "category": "PLZ", "type": "negative", "text": "Ziffernfolge 777 zu kurz", "spans": []}
+{"id": "plz_neg_21", "category": "PLZ", "type": "negative", "text": "Ziffernfolge 66 zu kurz", "spans": []}
+{"id": "plz_neg_22", "category": "PLZ", "type": "negative", "text": "Code ABC12345 alphanumerisch", "spans": []}
+{"id": "plz_neg_23", "category": "PLZ", "type": "negative", "text": "Code 12345XYZ alphanumerisch", "spans": []}
+{"id": "plz_neg_24", "category": "PLZ", "type": "negative", "text": "Hex 0x10115 Prefix", "spans": []}
+{"id": "plz_neg_25", "category": "PLZ", "type": "negative", "text": "Rechnung 1234567", "spans": []}
+{"id": "plz_ort_pos_01", "category": "PLZ_ORT", "type": "positive", "text": "Standort 10115 Berlin Mitte besucht", "spans": [{"start": 9, "end": 27, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_02", "category": "PLZ_ORT", "type": "positive", "text": "Adresse 80331 Muenchen Zentrum notiert", "spans": [{"start": 8, "end": 30, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_03", "category": "PLZ_ORT", "type": "positive", "text": "Hauptsitz in 60311 Frankfurt am Main gegruendet", "spans": [{"start": 13, "end": 36, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_04", "category": "PLZ_ORT", "type": "positive", "text": "Niederlassung 50667 Koeln Altstadt eroeffnet", "spans": [{"start": 14, "end": 34, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_05", "category": "PLZ_ORT", "type": "positive", "text": "Buero in 70173 Stuttgart Mitte gemietet", "spans": [{"start": 9, "end": 30, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_06", "category": "PLZ_ORT", "type": "positive", "text": "Filiale in 20095 Hamburg Altstadt aktiv", "spans": [{"start": 11, "end": 33, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_07", "category": "PLZ_ORT", "type": "positive", "text": "Werk in 01067 Dresden Neustadt gebaut", "spans": [{"start": 8, "end": 30, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_08", "category": "PLZ_ORT", "type": "positive", "text": "Lager in 30159 Hannover Mitte eingerichtet", "spans": [{"start": 9, "end": 29, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_09", "category": "PLZ_ORT", "type": "positive", "text": "Kanzlei in 40213 Duesseldorf Altstadt bekannt", "spans": [{"start": 11, "end": 37, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_10", "category": "PLZ_ORT", "type": "positive", "text": "Praxis in 90403 Nuernberg Mitte gelegen", "spans": [{"start": 10, "end": 31, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_11", "category": "PLZ_ORT", "type": "positive", "text": "Wohnsitz 44135 Dortmund Nord gemeldet", "spans": [{"start": 9, "end": 28, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_12", "category": "PLZ_ORT", "type": "positive", "text": "Zweigstelle 28195 Bremen Mitte bezogen", "spans": [{"start": 12, "end": 30, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_13", "category": "PLZ_ORT", "type": "positive", "text": "Center 45127 Essen Stadtkern erreicht", "spans": [{"start": 7, "end": 28, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_14", "category": "PLZ_ORT", "type": "positive", "text": "Standort 39104 Magdeburg Altstadt gewaehlt", "spans": [{"start": 9, "end": 33, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_15", "category": "PLZ_ORT", "type": "positive", "text": "Niederlassung 99084 Erfurt Altstadt aufgebaut", "spans": [{"start": 14, "end": 35, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_16", "category": "PLZ_ORT", "type": "positive", "text": "Konto bei 66111 Saarbruecken Mitte gefuehrt", "spans": [{"start": 10, "end": 34, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_17", "category": "PLZ_ORT", "type": "positive", "text": "Buero 65183 Wiesbaden Mitte renoviert", "spans": [{"start": 6, "end": 27, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_18", "category": "PLZ_ORT", "type": "positive", "text": "Archiv 14467 Potsdam West gepflegt", "spans": [{"start": 7, "end": 25, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_19", "category": "PLZ_ORT", "type": "positive", "text": "Depot 18055 Rostock Stadtmitte beliefert", "spans": [{"start": 6, "end": 30, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_20", "category": "PLZ_ORT", "type": "positive", "text": "Campus 24103 Kiel Vorstadt verlegt", "spans": [{"start": 7, "end": 26, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_21", "category": "PLZ_ORT", "type": "positive", "text": "Gelaende 33602 Bielefeld Mitte erworben", "spans": [{"start": 9, "end": 30, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_22", "category": "PLZ_ORT", "type": "positive", "text": "Zentrum 86150 Augsburg Innenstadt geplant", "spans": [{"start": 8, "end": 33, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_23", "category": "PLZ_ORT", "type": "positive", "text": "Halle 76133 Karlsruhe West vermietet", "spans": [{"start": 6, "end": 26, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_24", "category": "PLZ_ORT", "type": "positive", "text": "Institut 79098 Freiburg Neuburg gegruendet", "spans": [{"start": 9, "end": 31, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_pos_25", "category": "PLZ_ORT", "type": "positive", "text": "Agentur 55116 Mainz Altstadt beauftragt", "spans": [{"start": 8, "end": 28, "category": "PLZ_ORT"}]}
+{"id": "plz_ort_neg_01", "category": "PLZ_ORT", "type": "negative", "text": "PLZ 10115 in Deutschland (kein Stadtname direkt folgend)", "spans": []}
+{"id": "plz_ort_neg_02", "category": "PLZ_ORT", "type": "negative", "text": "Postleitzahl 80331 im Text", "spans": []}
+{"id": "plz_ort_neg_03", "category": "PLZ_ORT", "type": "negative", "text": "Code 12345 und dann kleinbuchstaben", "spans": []}
+{"id": "plz_ort_neg_04", "category": "PLZ_ORT", "type": "negative", "text": "Zahl 12345 berlin mit kleinem b", "spans": []}
+{"id": "plz_ort_neg_05", "category": "PLZ_ORT", "type": "negative", "text": "Nummer 99999 kein ort angegeben", "spans": []}
+{"id": "plz_ort_neg_06", "category": "PLZ_ORT", "type": "negative", "text": "Datum 2026-10-30 Berlin", "spans": []}
+{"id": "plz_ort_neg_07", "category": "PLZ_ORT", "type": "negative", "text": "Bestellnummer ORD-10115-BERLIN", "spans": []}
+{"id": "plz_ort_neg_08", "category": "PLZ_ORT", "type": "negative", "text": "Uhrzeit 14:30 Muenchen", "spans": []}
+{"id": "plz_ort_neg_09", "category": "PLZ_ORT", "type": "negative", "text": "Geldsumme 50000 Euro", "spans": []}
+{"id": "plz_ort_neg_10", "category": "PLZ_ORT", "type": "negative", "text": "Versionsnummer 10.1.15 Release", "spans": []}
+{"id": "plz_ort_neg_11", "category": "PLZ_ORT", "type": "negative", "text": "Hausnummer 10115 ist zu hoch", "spans": []}
+{"id": "plz_ort_neg_12", "category": "PLZ_ORT", "type": "negative", "text": "Text nur Stadt Berlin ohne PLZ", "spans": []}
+{"id": "plz_ort_neg_13", "category": "PLZ_ORT", "type": "negative", "text": "Text nur Stadt Muenchen ohne PLZ", "spans": []}
+{"id": "plz_ort_neg_14", "category": "PLZ_ORT", "type": "negative", "text": "Text nur Stadt Hamburg ohne PLZ", "spans": []}
+{"id": "plz_ort_neg_15", "category": "PLZ_ORT", "type": "negative", "text": "Text nur Stadt Koeln ohne PLZ", "spans": []}
+{"id": "plz_ort_neg_16", "category": "PLZ_ORT", "type": "negative", "text": "Text nur Stadt Frankfurt ohne PLZ", "spans": []}
+{"id": "plz_ort_neg_17", "category": "PLZ_ORT", "type": "negative", "text": "Ort Leipzig ohne PLZ", "spans": []}
+{"id": "plz_ort_neg_18", "category": "PLZ_ORT", "type": "negative", "text": "Ort Dresden ohne Vorwahl", "spans": []}
+{"id": "plz_ort_neg_19", "category": "PLZ_ORT", "type": "negative", "text": "Ort Hannover allein", "spans": []}
+{"id": "plz_ort_neg_20", "category": "PLZ_ORT", "type": "negative", "text": "Ort Nuernberg allein", "spans": []}
+{"id": "plz_ort_neg_21", "category": "PLZ_ORT", "type": "negative", "text": "Ort Stuttgart allein", "spans": []}
+{"id": "plz_ort_neg_22", "category": "PLZ_ORT", "type": "negative", "text": "Ort Duesseldorf allein", "spans": []}
+{"id": "plz_ort_neg_23", "category": "PLZ_ORT", "type": "negative", "text": "Ort Dortmund allein", "spans": []}
+{"id": "plz_ort_neg_24", "category": "PLZ_ORT", "type": "negative", "text": "Ort Essen allein", "spans": []}
+{"id": "plz_ort_neg_25", "category": "PLZ_ORT", "type": "negative", "text": "Ort Bremen allein", "spans": []}
+{"id": "license_plate_pos_01", "category": "LICENSE_PLATE", "type": "positive", "text": "Fahrzeug B-MW 1234 geparkt.", "spans": [{"start": 9, "end": 18, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_02", "category": "LICENSE_PLATE", "type": "positive", "text": "Auto mit M-AB 123 gesichtet", "spans": [{"start": 9, "end": 17, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_03", "category": "LICENSE_PLATE", "type": "positive", "text": "Wagen HH-CD 4567 gemeldet", "spans": [{"start": 6, "end": 16, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_04", "category": "LICENSE_PLATE", "type": "positive", "text": "Kennzeichen K-XY 99 zugelassen", "spans": [{"start": 12, "end": 19, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_05", "category": "LICENSE_PLATE", "type": "positive", "text": "Fahrzeug F-AB 12 im Hof", "spans": [{"start": 9, "end": 16, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_06", "category": "LICENSE_PLATE", "type": "positive", "text": "LKW S-ZZ 9876 unterwegs", "spans": [{"start": 4, "end": 13, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_07", "category": "LICENSE_PLATE", "type": "positive", "text": "PKW B-A 1 registriert", "spans": [{"start": 4, "end": 9, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_08", "category": "LICENSE_PLATE", "type": "positive", "text": "Kfz M-X 555 erfasst", "spans": [{"start": 4, "end": 11, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_09", "category": "LICENSE_PLATE", "type": "positive", "text": "Kennzeichen HH-Z 9999 eingetragen", "spans": [{"start": 12, "end": 21, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_10", "category": "LICENSE_PLATE", "type": "positive", "text": "Wagen DD-AA 1234 kontrolliert", "spans": [{"start": 6, "end": 16, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_11", "category": "LICENSE_PLATE", "type": "positive", "text": "Nummernschild N-BC 789 geprueft", "spans": [{"start": 14, "end": 22, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_12", "category": "LICENSE_PLATE", "type": "positive", "text": "Fahrzeug DO-XY 456 angehalten", "spans": [{"start": 9, "end": 18, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_13", "category": "LICENSE_PLATE", "type": "positive", "text": "Auto LE-AB 123 geblitzt", "spans": [{"start": 5, "end": 14, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_14", "category": "LICENSE_PLATE", "type": "positive", "text": "PKW WI-CD 999 abgestellt", "spans": [{"start": 4, "end": 13, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_15", "category": "LICENSE_PLATE", "type": "positive", "text": "Kennzeichen MZ-EF 4321 notiert", "spans": [{"start": 12, "end": 22, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_16", "category": "LICENSE_PLATE", "type": "positive", "text": "Kfz SB-GH 888 gewaschen", "spans": [{"start": 4, "end": 13, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_17", "category": "LICENSE_PLATE", "type": "positive", "text": "Wagen H-IJ 77 versichert", "spans": [{"start": 6, "end": 13, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_18", "category": "LICENSE_PLATE", "type": "positive", "text": "Auto HB-KL 654 repariert", "spans": [{"start": 5, "end": 14, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_19", "category": "LICENSE_PLATE", "type": "positive", "text": "Kennzeichen MD-MN 321 umgemeldet", "spans": [{"start": 12, "end": 21, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_20", "category": "LICENSE_PLATE", "type": "positive", "text": "PKW EF-OP 222 getankt", "spans": [{"start": 4, "end": 13, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_21", "category": "LICENSE_PLATE", "type": "positive", "text": "Fahrzeug KL-QR 1111 verkauft", "spans": [{"start": 9, "end": 19, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_22", "category": "LICENSE_PLATE", "type": "positive", "text": "Kfz RO-ST 444 geparkt", "spans": [{"start": 4, "end": 13, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_23", "category": "LICENSE_PLATE", "type": "positive", "text": "LKW BA-UV 55 beladen", "spans": [{"start": 4, "end": 12, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_24", "category": "LICENSE_PLATE", "type": "positive", "text": "Auto gap GAP-WX 999 im Schnee", "spans": [{"start": 9, "end": 19, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_pos_25", "category": "LICENSE_PLATE", "type": "positive", "text": "Wagen DEG-YZ 123 auf Autobahn", "spans": [{"start": 6, "end": 16, "category": "LICENSE_PLATE"}]}
+{"id": "license_plate_neg_01", "category": "LICENSE_PLATE", "type": "negative", "text": "Kein Kennzeichen: ABCDE-12345 zu viele Buchstaben", "spans": []}
+{"id": "license_plate_neg_02", "category": "LICENSE_PLATE", "type": "negative", "text": "Kleinbuchstaben b-mw 1234 ungueltig", "spans": []}
+{"id": "license_plate_neg_03", "category": "LICENSE_PLATE", "type": "negative", "text": "Ziffern zu lang B-MW 12345 (5 Ziffern)", "spans": []}
+{"id": "license_plate_neg_04", "category": "LICENSE_PLATE", "type": "negative", "text": "Ohne Trenner BMW1234 kein Kennzeichen", "spans": []}
+{"id": "license_plate_neg_05", "category": "LICENSE_PLATE", "type": "negative", "text": "Falscher Trenner B.MW.1234 ungueltig", "spans": []}
+{"id": "license_plate_neg_06", "category": "LICENSE_PLATE", "type": "negative", "text": "Mittelteil zu lang B-ABC 1234", "spans": []}
+{"id": "license_plate_neg_07", "category": "LICENSE_PLATE", "type": "negative", "text": "Ortsteil zu lang ABCD-AB 123", "spans": []}
+{"id": "license_plate_neg_08", "category": "LICENSE_PLATE", "type": "negative", "text": "Keine Ziffern B-MW kein Kennzeichen", "spans": []}
+{"id": "license_plate_neg_09", "category": "LICENSE_PLATE", "type": "negative", "text": "Datum 2026-10-29", "spans": []}
+{"id": "license_plate_neg_10", "category": "LICENSE_PLATE", "type": "negative", "text": "Bestellnummer ORD-AB-1234", "spans": []}
+{"id": "license_plate_neg_11", "category": "LICENSE_PLATE", "type": "negative", "text": "Rechnungsnummer RE-XY-99", "spans": []}
+{"id": "license_plate_neg_12", "category": "LICENSE_PLATE", "type": "negative", "text": "Versionsnummer v1-2-34", "spans": []}
+{"id": "license_plate_neg_13", "category": "LICENSE_PLATE", "type": "negative", "text": "Produktcode PROD-1234", "spans": []}
+{"id": "license_plate_neg_14", "category": "LICENSE_PLATE", "type": "negative", "text": "Preisschild 19,99 EUR", "spans": []}
+{"id": "license_plate_neg_15", "category": "LICENSE_PLATE", "type": "negative", "text": "Uhrzeit 12:34:56", "spans": []}
+{"id": "license_plate_neg_16", "category": "LICENSE_PLATE", "type": "negative", "text": "Modellbezeichnung BMW-320i", "spans": []}
+{"id": "license_plate_neg_17", "category": "LICENSE_PLATE", "type": "negative", "text": "Modellbezeichnung AUDI-A4", "spans": []}
+{"id": "license_plate_neg_18", "category": "LICENSE_PLATE", "type": "negative", "text": "Code AB-1234 ohne Mittelteil", "spans": []}
+{"id": "license_plate_neg_19", "category": "LICENSE_PLATE", "type": "negative", "text": "Code B-1234 ohne Buchstaben", "spans": []}
+{"id": "license_plate_neg_20", "category": "LICENSE_PLATE", "type": "negative", "text": "Code M-1 ohne Buchstaben", "spans": []}
+{"id": "license_plate_neg_21", "category": "LICENSE_PLATE", "type": "negative", "text": "Code HH-123 ohne Buchstaben", "spans": []}
+{"id": "license_plate_neg_22", "category": "LICENSE_PLATE", "type": "negative", "text": "Kennung DE-BY-01", "spans": []}
+{"id": "license_plate_neg_23", "category": "LICENSE_PLATE", "type": "negative", "text": "Kuerzel ISO-3166-1", "spans": []}
+{"id": "license_plate_neg_24", "category": "LICENSE_PLATE", "type": "negative", "text": "Norm DIN-EN-ISO", "spans": []}
+{"id": "license_plate_neg_25", "category": "LICENSE_PLATE", "type": "negative", "text": "Status CODE-200-OK", "spans": []}
+{"id": "gazetteer_pos_01", "category": "GAZETTEER", "type": "positive", "text": "Vertrag mit Acme Corp unterzeichnet.", "spans": [{"start": 12, "end": 21, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_02", "category": "GAZETTEER", "type": "positive", "text": "Lieferung an Globex Corporation bestaetigt.", "spans": [{"start": 13, "end": 31, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_03", "category": "GAZETTEER", "type": "positive", "text": "Audit bei Initech LLC durchgefuehrt.", "spans": [{"start": 10, "end": 21, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_04", "category": "GAZETTEER", "type": "positive", "text": "Forschung von Umbrella Pharmaceuticals finanziert.", "spans": [{"start": 14, "end": 38, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_05", "category": "GAZETTEER", "type": "positive", "text": "Aktien von Wayne Enterprises erworben.", "spans": [{"start": 11, "end": 28, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_06", "category": "GAZETTEER", "type": "positive", "text": "Projekt mit Stark Industries gestartet.", "spans": [{"start": 12, "end": 28, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_07", "category": "GAZETTEER", "type": "positive", "text": "Server von Cyberdyne Systems gewartet.", "spans": [{"start": 11, "end": 28, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_08", "category": "GAZETTEER", "type": "positive", "text": "Produkt von Soylent Corp geliefert.", "spans": [{"start": 12, "end": 24, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_09", "category": "GAZETTEER", "type": "positive", "text": "Klage gegen Hooli Inc eingereicht.", "spans": [{"start": 12, "end": 21, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_10", "category": "GAZETTEER", "type": "positive", "text": "Software von Pied Piper installiert.", "spans": [{"start": 13, "end": 23, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_11", "category": "GAZETTEER", "type": "positive", "text": "Labor von Massive Dynamic besichtigt.", "spans": [{"start": 10, "end": 25, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_12", "category": "GAZETTEER", "type": "positive", "text": "Test bei Aperture Science bestanden.", "spans": [{"start": 9, "end": 25, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_13", "category": "GAZETTEER", "type": "positive", "text": "Einrichtung Black Mesa geschlossen.", "spans": [{"start": 12, "end": 22, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_14", "category": "GAZETTEER", "type": "positive", "text": "Frachter von Weyland-Yutani gestrandet.", "spans": [{"start": 13, "end": 27, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_15", "category": "GAZETTEER", "type": "positive", "text": "Replikant von Tyrell Corporation entwickelt.", "spans": [{"start": 14, "end": 32, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_16", "category": "GAZETTEER", "type": "positive", "text": "Kleinbuchstaben acme corp im text erkannt.", "spans": [{"start": 16, "end": 25, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_17", "category": "GAZETTEER", "type": "positive", "text": "Case globex corporation gemeldet.", "spans": [{"start": 5, "end": 23, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_18", "category": "GAZETTEER", "type": "positive", "text": "Partner initech llc kontaktiert.", "spans": [{"start": 8, "end": 19, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_19", "category": "GAZETTEER", "type": "positive", "text": "Firma umbrella pharmaceuticals gelistet.", "spans": [{"start": 6, "end": 30, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_20", "category": "GAZETTEER", "type": "positive", "text": "Konzern wayne enterprises analysiert.", "spans": [{"start": 8, "end": 25, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_21", "category": "GAZETTEER", "type": "positive", "text": "Kunde stark industries zufrieden.", "spans": [{"start": 6, "end": 22, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_22", "category": "GAZETTEER", "type": "positive", "text": "System cyberdyne systems online.", "spans": [{"start": 7, "end": 24, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_23", "category": "GAZETTEER", "type": "positive", "text": "Hersteller soylent corp zertifiziert.", "spans": [{"start": 11, "end": 23, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_24", "category": "GAZETTEER", "type": "positive", "text": "Dienst hooli inc gebucht.", "spans": [{"start": 7, "end": 16, "category": "GAZETTEER"}]}
+{"id": "gazetteer_pos_25", "category": "GAZETTEER", "type": "positive", "text": "App pied piper aktualisiert.", "spans": [{"start": 4, "end": 14, "category": "GAZETTEER"}]}
+{"id": "gazetteer_neg_01", "category": "GAZETTEER", "type": "negative", "text": "Allgemeine Firma ohne Treffer im Text", "spans": []}
+{"id": "gazetteer_neg_02", "category": "GAZETTEER", "type": "negative", "text": "Unternehmen Mueller GmbH nicht im Gazetteer", "spans": []}
+{"id": "gazetteer_neg_03", "category": "GAZETTEER", "type": "negative", "text": "Firma Schmidt & Partner ungelistet", "spans": []}
+{"id": "gazetteer_neg_04", "category": "GAZETTEER", "type": "negative", "text": "Start-up AlphaBeta nicht registriert", "spans": []}
+{"id": "gazetteer_neg_05", "category": "GAZETTEER", "type": "negative", "text": "Teilwort AcmeeCorp ist kein Treffer", "spans": []}
+{"id": "gazetteer_neg_06", "category": "GAZETTEER", "type": "negative", "text": "Zusammengeschrieben InitechLLC ungueltig", "spans": []}
+{"id": "gazetteer_neg_07", "category": "GAZETTEER", "type": "negative", "text": "Anderer Name GlobexGlobal Corp", "spans": []}
+{"id": "gazetteer_neg_08", "category": "GAZETTEER", "type": "negative", "text": "Substantiv DynamicMassive vertauscht", "spans": []}
+{"id": "gazetteer_neg_09", "category": "GAZETTEER", "type": "negative", "text": "Datum 2026-10-30", "spans": []}
+{"id": "gazetteer_neg_10", "category": "GAZETTEER", "type": "negative", "text": "Uhrzeit 14:30", "spans": []}
+{"id": "gazetteer_neg_11", "category": "GAZETTEER", "type": "negative", "text": "Versionsnummer 1.0.0", "spans": []}
+{"id": "gazetteer_neg_12", "category": "GAZETTEER", "type": "negative", "text": "Bestellnummer ORD-998877", "spans": []}
+{"id": "gazetteer_neg_13", "category": "GAZETTEER", "type": "negative", "text": "Rechnungsnummer RE-12345", "spans": []}
+{"id": "gazetteer_neg_14", "category": "GAZETTEER", "type": "negative", "text": "Firma Musterfirma AG", "spans": []}
+{"id": "gazetteer_neg_15", "category": "GAZETTEER", "type": "negative", "text": "Konzern Beispiel holding", "spans": []}
+{"id": "gazetteer_neg_16", "category": "GAZETTEER", "type": "negative", "text": "GmbH Testgesellschaft mbH", "spans": []}
+{"id": "gazetteer_neg_17", "category": "GAZETTEER", "type": "negative", "text": "Agentur Kreativbuero", "spans": []}
+{"id": "gazetteer_neg_18", "category": "GAZETTEER", "type": "negative", "text": "Consulting Beratungshaus", "spans": []}
+{"id": "gazetteer_neg_19", "category": "GAZETTEER", "type": "negative", "text": "Logistik Spedition Mueller", "spans": []}
+{"id": "gazetteer_neg_20", "category": "GAZETTEER", "type": "negative", "text": "Handel Supermarkt Nord", "spans": []}
+{"id": "gazetteer_neg_21", "category": "GAZETTEER", "type": "negative", "text": "Verlag Buchdruckerei", "spans": []}
+{"id": "gazetteer_neg_22", "category": "GAZETTEER", "type": "negative", "text": "Medien Funkhaus", "spans": []}
+{"id": "gazetteer_neg_23", "category": "GAZETTEER", "type": "negative", "text": "Bauunternehmen Maurer & Sohn", "spans": []}
+{"id": "gazetteer_neg_24", "category": "GAZETTEER", "type": "negative", "text": "Handwerk Schreinerei Holz", "spans": []}
+{"id": "gazetteer_neg_25", "category": "GAZETTEER", "type": "negative", "text": "Fehlermeldung ENTITY_NOT_FOUND", "spans": []}
