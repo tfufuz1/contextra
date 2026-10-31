@@ -16,6 +16,8 @@ use contextra_db::prelude::*;
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-E2E_TENANT_DELETION_PROOF-01-TEST_E2E_MULTI_TENANT_DELETION_PROOF_PERSISTENCE_ISOLATION]
+// Testet die Funktionalität von `test_e2e_multi_tenant_deletion_proof_persistence_isolation`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_e2e_multi_tenant_deletion_proof_persistence_isolation() -> contextra_types::Result<()>
 {

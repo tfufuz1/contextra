@@ -1,7 +1,13 @@
+//! # Backpressure- und Überlastschutz-Tests
+//!
+//! Testet das Verhalten der Datenbank unter hoher Last und die Aktivierung von Gegendruck-Mechanismen.
+//!
 use contextra_db::{CollectionConfig, Contextra, ContextraConfig};
 use contextra_store::{PressureLevel, SystemPressure};
 use std::time::{Duration, Instant};
 
+// ANCHOR[contextra-db:TEST-BACKPRESSURE_TEST-01-TEST_INSERT_BACKPRESSURE_WHEN_PRESSURE_CRITICAL]
+// Testet die Funktionalität von `test_insert_backpressure_when_pressure_critical`.
 #[tokio::test]
 async fn test_insert_backpressure_when_pressure_critical() {
     let tmp = tempfile::TempDir::new().expect("temp dir");

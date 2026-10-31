@@ -1,10 +1,16 @@
 #![allow(deprecated)]
+//! # Zettelkasten-Verlinkungstests
+//!
+//! Validiert das bidirektionale Verlinken und Navigieren im agentischen Zettelkasten-Netzwerk.
+//!
 
 use contextra_db::Contextra;
 use contextra_types::HybridQuery;
 use contextra_types::{DocId, LinkRelation, TxId};
 use tempfile::tempdir;
 
+// ANCHOR[contextra-db:TEST-ZETTELKASTEN_LINKS_TEST-01-TEST_ZETTELKASTEN_MEMORY_LINKS_AND_TRAVERSAL]
+// Testet die Funktionalität von `test_zettelkasten_memory_links_and_traversal`.
 #[tokio::test]
 async fn test_zettelkasten_memory_links_and_traversal() {
     let dir = tempdir().unwrap();
@@ -77,6 +83,8 @@ async fn test_zettelkasten_memory_links_and_traversal() {
     assert_eq!(traversed_depth3, vec![(doc2_id, 1), (doc3_id, 2)]);
 }
 
+// ANCHOR[contextra-db:TEST-ZETTELKASTEN_LINKS_TEST-02-TEST_SUPERSEDES_DISPLACEMENT_LOGIC]
+// Testet die Funktionalität von `test_supersedes_displacement_logic`.
 #[tokio::test]
 async fn test_supersedes_displacement_logic() {
     let dir = tempdir().unwrap();
@@ -149,6 +157,8 @@ async fn test_supersedes_displacement_logic() {
     assert!(ids_all.contains(&"doc-old".to_string()));
 }
 
+// ANCHOR[contextra-db:TEST-ZETTELKASTEN_LINKS_TEST-03-TEST_TXID_BOUNDARY_HARDENING]
+// Testet die Funktionalität von `test_txid_boundary_hardening`.
 #[tokio::test]
 async fn test_txid_boundary_hardening() {
     let dir = tempdir().unwrap();
@@ -169,6 +179,8 @@ async fn test_txid_boundary_hardening() {
     assert!(!TxId::new(TxId::MAX_COLLECTION_SEQUENCE + 1).is_valid_origin());
 }
 
+// ANCHOR[contextra-db:TEST-ZETTELKASTEN_LINKS_TEST-04-TEST_SUPERSEDES_CYCLE_PREVENTION]
+// Testet die Funktionalität von `test_supersedes_cycle_prevention`.
 #[tokio::test]
 async fn test_supersedes_cycle_prevention() {
     let dir = tempdir().unwrap();
@@ -217,6 +229,8 @@ async fn test_supersedes_cycle_prevention() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-ZETTELKASTEN_LINKS_TEST-05-TEST_RELATION_CYCLE_DOES_NOT_HANG]
+// Testet die Funktionalität von `test_relation_cycle_does_not_hang`.
 #[tokio::test]
 async fn test_relation_cycle_does_not_hang() {
     use std::time::Duration;

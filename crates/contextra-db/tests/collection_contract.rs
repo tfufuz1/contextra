@@ -9,6 +9,8 @@ use serde_json::json;
 use std::ops::Bound;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-COLLECTION_CONTRACT-01-SETUP_DB]
+// Testet die Funktionalität von `setup_db`.
 async fn setup_db(dim: usize) -> (Contextra, TempDir) {
     let tmp = TempDir::new().expect("Failed to create temp dir");
     let config = ContextraConfig {
@@ -23,6 +25,8 @@ async fn setup_db(dim: usize) -> (Contextra, TempDir) {
     (db, tmp)
 }
 
+// ANCHOR[contextra-db:TEST-COLLECTION_CONTRACT-02-TEST_COLLECTION_INSERT_MANY_ATOMIC]
+// Testet die Funktionalität von `test_collection_insert_many_atomic`.
 #[tokio::test]
 async fn test_collection_insert_many_atomic() {
     let (db, _tmp) = setup_db(3).await;
@@ -47,6 +51,8 @@ async fn test_collection_insert_many_atomic() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-COLLECTION_CONTRACT-03-TEST_COLLECTION_UPSERT_MANY]
+// Testet die Funktionalität von `test_collection_upsert_many`.
 #[tokio::test]
 async fn test_collection_upsert_many() {
     let (db, _tmp) = setup_db(3).await;
@@ -76,6 +82,8 @@ async fn test_collection_upsert_many() {
     assert!(d1.metadata.unwrap()["updated"].as_bool().unwrap());
 }
 
+// ANCHOR[contextra-db:TEST-COLLECTION_CONTRACT-04-TEST_COLLECTION_SCAN_RANGE_ISOLATION]
+// Testet die Funktionalität von `test_collection_scan_range_isolation`.
 #[tokio::test]
 async fn test_collection_scan_range_isolation() {
     let (db, _tmp) = setup_db(3).await;
@@ -119,6 +127,8 @@ async fn test_collection_scan_range_isolation() {
     assert_eq!(results_b[0].1["metadata"]["from"], "b");
 }
 
+// ANCHOR[contextra-db:TEST-COLLECTION_CONTRACT-05-TEST_COLLECTION_SCAN_PREFIX_ISOLATION]
+// Testet die Funktionalität von `test_collection_scan_prefix_isolation`.
 #[tokio::test]
 async fn test_collection_scan_prefix_isolation() {
     let (db, _tmp) = setup_db(3).await;

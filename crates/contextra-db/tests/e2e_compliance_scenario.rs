@@ -35,10 +35,14 @@ struct TestRng {
 }
 
 impl TestRng {
+    // ANCHOR[contextra-db:TEST-E2E_COMPLIANCE_SCENARIO-01-NEW]
+    // Testet die Funktionalität von `new`.
     fn new(seed: u64) -> Self {
         Self { state: seed }
     }
 
+    // ANCHOR[contextra-db:TEST-E2E_COMPLIANCE_SCENARIO-02-NEXT_U64]
+    // Testet die Funktionalität von `next_u64`.
     fn next_u64(&mut self) -> u64 {
         self.state = self
             .state
@@ -47,10 +51,14 @@ impl TestRng {
         self.state
     }
 
+    // ANCHOR[contextra-db:TEST-E2E_COMPLIANCE_SCENARIO-03-NEXT_F32]
+    // Testet die Funktionalität von `next_f32`.
     fn next_f32(&mut self) -> f32 {
         ((self.next_u64() >> 32) as f32) / (u32::MAX as f32)
     }
 
+    // ANCHOR[contextra-db:TEST-E2E_COMPLIANCE_SCENARIO-04-NEXT_4D_VECTOR]
+    // Testet die Funktionalität von `next_4d_vector`.
     fn next_4d_vector(&mut self) -> [f32; 4] {
         let mut vec = [
             self.next_f32() * 2.0 - 1.0,
@@ -83,6 +91,8 @@ fn cosine_similarity(a: &[f32; 4], b: &[f32; 4]) -> f32 {
     }
 }
 
+// ANCHOR[contextra-db:TEST-E2E_COMPLIANCE_SCENARIO-05-BRUTE_FORCE_TOP_K]
+// Testet die Funktionalität von `brute_force_top_k`.
 fn brute_force_top_k(query: &[f32; 4], dataset: &[(String, [f32; 4])], k: usize) -> Vec<String> {
     let mut scored: Vec<(String, f32)> = dataset
         .iter()
@@ -94,6 +104,8 @@ fn brute_force_top_k(query: &[f32; 4], dataset: &[(String, [f32; 4])], k: usize)
     scored.into_iter().take(k).map(|(id, _)| id).collect()
 }
 
+// ANCHOR[contextra-db:TEST-E2E_COMPLIANCE_SCENARIO-06-TEST_E2E_COMPLIANCE_SCENARIO]
+// Testet die Funktionalität von `test_e2e_compliance_scenario`.
 #[tokio::test]
 async fn test_e2e_compliance_scenario() {
     let start_time = std::time::Instant::now();
@@ -503,6 +515,8 @@ async fn test_repro_wal_duplicate_seq_no_on_unflushed_restart() {
 
 // Hex encoding helper module
 mod hex {
+    // ANCHOR[contextra-db:TEST-E2E_COMPLIANCE_SCENARIO-07-ENCODE]
+    // Testet die Funktionalität von `encode`.
     pub fn encode(data: &[u8]) -> String {
         data.iter().map(|b| format!("{:02x}", b)).collect()
     }

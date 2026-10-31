@@ -1,3 +1,7 @@
+//! # Randfälle bei Multi-Signal-Fusion
+//!
+//! Testet extreme Eingaben, leere Teillisten und Score-Grenzwerte in der RRF-Fusion.
+//!
 // FILE-CONTEXT
 // STAND: 2026-08-29T18:30:00Z
 // ZWECK: Standalone Randfall- & Mutation-Testsuite für Reciprocal Rank Fusion (fusion.rs).
@@ -428,6 +432,8 @@ fn test_k_parameter_zero_boundary_permitted() {
     assert_eq!(contrib.rrf_contribution, 1.0);
 }
 
+// ANCHOR[contextra-db:TEST-FUSION_EDGE_CASES_TEST-01-TEST_K_PARAMETER_MINIMAL_POSITIVE_BOUNDARY]
+// Testet die Funktionalität von `test_k_parameter_minimal_positive_boundary`.
 #[test]
 fn test_k_parameter_minimal_positive_boundary() {
     let k_min = 0.001f32;
@@ -591,6 +597,8 @@ fn test_replicator_weight_sum_invariant_concrete_configs() {
 }
 
 proptest! {
+    // ANCHOR[contextra-db:TEST-FUSION_EDGE_CASES_TEST-02-PROP_REPLICATOR_WEIGHT_SUM_INVARIANT_PRESERVED_THROUGH_FUSION]
+    // Testet die Funktionalität von `prop_replicator_weight_sum_invariant_preserved_through_fusion`.
     #[test]
     fn prop_replicator_weight_sum_invariant_preserved_through_fusion(
         raw_w1 in 0.01f32..10.0f32,

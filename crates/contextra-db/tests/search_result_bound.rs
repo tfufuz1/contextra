@@ -1,3 +1,7 @@
+//! # Schranken für Suchergebnisse
+//!
+//! Verifiziert die strikte Einhaltung des Parameters k und oberer Limits bei Suchanfragen.
+//!
 use contextra_db::{Collection, Language};
 use contextra_graph::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
@@ -9,6 +13,8 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-SEARCH_RESULT_BOUND-01-CREATE_TEST_COLLECTION]
+// Testet die Funktionalität von `create_test_collection`.
 async fn create_test_collection(
     name: &str,
     dimension: usize,
@@ -43,6 +49,8 @@ async fn create_test_collection(
     (col, dir)
 }
 
+// ANCHOR[contextra-db:TEST-SEARCH_RESULT_BOUND-02-READ_SEARCH_RS]
+// Testet die Funktionalität von `read_search_rs`.
 #[allow(dead_code)] // Candidate search.rs path locator utility for db test suite
 fn read_search_rs() -> String {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
@@ -61,6 +69,8 @@ fn read_search_rs() -> String {
     panic!("Failed to read search.rs from candidate paths: {:?}", paths);
 }
 
+// ANCHOR[contextra-db:TEST-SEARCH_RESULT_BOUND-03-PROOF_SEARCH_NEVER_EXCEEDS_K]
+// Testet die Funktionalität von `proof_search_never_exceeds_k`.
 #[tokio::test]
 async fn proof_search_never_exceeds_k() {
     let (collection, _dir) = create_test_collection("test_bound_k", 4).await;
@@ -128,6 +138,8 @@ async fn proof_search_never_exceeds_k() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-SEARCH_RESULT_BOUND-04-PROOF_SEARCH_RETURNS_NONZERO_RESULTS_FOR_MATCHING_QUERY]
+// Testet die Funktionalität von `proof_search_returns_nonzero_results_for_matching_query`.
 #[tokio::test]
 async fn proof_search_returns_nonzero_results_for_matching_query() {
     let (collection, _dir) = create_test_collection("test_matching", 4).await;
@@ -162,6 +174,8 @@ async fn proof_search_returns_nonzero_results_for_matching_query() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-SEARCH_RESULT_BOUND-05-PROOF_SEARCH_WITH_K_ZERO_RETURNS_EMPTY]
+// Testet die Funktionalität von `proof_search_with_k_zero_returns_empty`.
 #[tokio::test]
 async fn proof_search_with_k_zero_returns_empty() {
     let (collection, _dir) = create_test_collection("test_k_zero", 4).await;
@@ -191,6 +205,8 @@ async fn proof_search_with_k_zero_returns_empty() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-SEARCH_RESULT_BOUND-06-PROOF_USIZE_MAX_REMOVED_FROM_SEARCH_PATH]
+// Testet die Funktionalität von `proof_usize_max_removed_from_search_path`.
 #[test]
 fn proof_usize_max_removed_from_search_path() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());

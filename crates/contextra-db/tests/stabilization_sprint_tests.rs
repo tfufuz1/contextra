@@ -1,9 +1,15 @@
+//! # Stabilisierungs-Sprint-Tests
+//!
+//! Umfassende Regressionstests für stabilisierte Systemkomponenten.
+//!
 use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use contextra_types::FusionWeights;
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-STABILIZATION_SPRINT_TESTS-01-TEST_ALLOCATE_TX_CONCURRENT_MONOTONICITY]
+// Testet die Funktionalität von `test_allocate_tx_concurrent_monotonicity`.
 #[tokio::test]
 async fn test_allocate_tx_concurrent_monotonicity() {
     let tmp = TempDir::new().expect("temp dir");
@@ -43,6 +49,8 @@ async fn test_allocate_tx_concurrent_monotonicity() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-STABILIZATION_SPRINT_TESTS-02-TEST_CONCURRENT_INSERTS_TOCTOU_SAFETY]
+// Testet die Funktionalität von `test_concurrent_inserts_toctou_safety`.
 #[tokio::test]
 async fn test_concurrent_inserts_toctou_safety() {
     let tmp = TempDir::new().expect("temp dir");
@@ -88,6 +96,8 @@ async fn test_concurrent_inserts_toctou_safety() {
     }
 }
 
+// ANCHOR[contextra-db:TEST-STABILIZATION_SPRINT_TESTS-03-TEST_HYBRID_SEARCH_USES_ALL_SIGNALS_AND_WEIGHTS]
+// Testet die Funktionalität von `test_hybrid_search_uses_all_signals_and_weights`.
 #[tokio::test]
 #[allow(deprecated)]
 async fn test_hybrid_search_uses_all_signals_and_weights() {

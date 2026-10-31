@@ -1,3 +1,7 @@
+//! # Textindex-Integrationstests
+//!
+//! Testet die Integration des BM25-Volltextindexes mit Speicherung und Tokenisierung.
+//!
 use contextra_ports::{StorageEngine, TextIndex};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_text::inverted::InvertedIndex;
@@ -5,6 +9,8 @@ use contextra_types::{DocId, TxId};
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-TEXT_INTEGRATION-01-TEST_INVERTED_INDEX_PERSISTENCE]
+// Testet die Funktionalität von `test_inverted_index_persistence`.
 #[tokio::test]
 async fn test_inverted_index_persistence() {
     let tmp = TempDir::new().expect("failed to create temp dir");

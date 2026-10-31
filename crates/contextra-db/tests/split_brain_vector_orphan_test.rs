@@ -21,17 +21,23 @@ pub struct GroundTruth {
 }
 
 impl GroundTruth {
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-01-NEW]
+    // Testet die Funktionalität von `new`.
     pub fn new() -> Self {
         Self {
             docs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-02-INSERT]
+    // Testet die Funktionalität von `insert`.
     pub fn insert(&self, id: String, vector: Vec<f32>) {
         let mut map = self.docs.lock().unwrap();
         map.insert(id, (vector, true));
     }
 
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-03-MARK_DELETED]
+    // Testet die Funktionalität von `mark_deleted`.
     pub fn mark_deleted(&self, id: &str) {
         let mut map = self.docs.lock().unwrap();
         if let Some(entry) = map.get_mut(id) {
@@ -39,6 +45,8 @@ impl GroundTruth {
         }
     }
 
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-04-MARK_ACTIVE]
+    // Testet die Funktionalität von `mark_active`.
     pub fn mark_active(&self, id: &str) {
         let mut map = self.docs.lock().unwrap();
         if let Some(entry) = map.get_mut(id) {
@@ -46,6 +54,8 @@ impl GroundTruth {
         }
     }
 
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-05-IS_ACTIVE]
+    // Testet die Funktionalität von `is_active`.
     pub fn is_active(&self, id: &str) -> bool {
         let map = self.docs.lock().unwrap();
         map.get(id).map(|(_, active)| *active).unwrap_or(false)
@@ -330,6 +340,8 @@ enum Op {
     Delete { id: u32 },
 }
 
+// ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-06-OP_STRATEGY]
+// Testet die Funktionalität von `op_strategy`.
 fn op_strategy() -> impl Strategy<Value = Vec<Op>> {
     let vec_strat = prop::collection::vec(-1.0f32..1.0f32, 4);
     let op_strat = prop_oneof![
@@ -346,6 +358,8 @@ fn op_strategy() -> impl Strategy<Value = Vec<Op>> {
 // MUST exist in LSM storage (verified via independent GroundTruth map).
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(20))]
+    // ANCHOR[contextra-db:TEST-SPLIT_BRAIN_VECTOR_ORPHAN_TEST-07-PROP_NO_DANGLING_SEARCH_RESULT_UNDER_RANDOM_INSERT_DELETE_SEQUENCE]
+    // Testet die Funktionalität von `prop_no_dangling_search_result_under_random_insert_delete_sequence`.
     #[test]
     fn prop_no_dangling_search_result_under_random_insert_delete_sequence(ops in op_strategy()) {
         let rt = tokio::runtime::Builder::new_multi_thread()

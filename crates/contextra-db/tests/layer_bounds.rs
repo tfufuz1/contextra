@@ -1,3 +1,7 @@
+//! # Schichtgrenzen-Prüfungen
+//!
+//! Validiert Architektur- und Ringgrenzen zwischen den Subsystemen.
+//!
 use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use serde_json::json;
 use tempfile::TempDir;

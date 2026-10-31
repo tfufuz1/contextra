@@ -3,6 +3,27 @@
 // INVARIANTEN: RRF-Fusion über alle Runden; Abbruch bei Erreichen des Qualitätsschwellenwerts; Candidate Pool PID-reguliert in [50, 200].
 // STAND: TS:2026-09-12T00:00:00Z
 
+//! Multi-Step Iterative Retrieval Engine für komplexe Abfragen in KI-Agenten.
+//!
+//! # Architektur & Ring-Zugehörigkeit
+//! Dieses Modul gehört zu `contextra-db` (Ring 3, Fassade) und implementiert ein
+//! iteratives Abfragemuster (Retrieval-Augmented Generation / Agentic Search).
+//!
+//! # Funktionsweise für Entwickler
+//! Komplexe Fragen können oft nicht in einem einzigen Suchdurchgang beantwortet werden.
+//! Die Multi-Step-Engine arbeitet wie folgt:
+//! 1. **Runde 1**: Standard-Hybrid-Suche (Vektor + BM25-Volltext) mit der Originalanfrage.
+//! 2. **Qualitätsprüfung**: Es wird geprüft, ob genügend Treffer den Schwellenwert
+//!    [`MultiStepConfig::quality_threshold`] überschreiten.
+//! 3. **Runde 2..N**: Falls die Qualität unzureichend ist, generiert ein [`QueryRewriter`]
+//!    automatisierte Teilfragen (Sub-Queries).
+//! 4. **Multi-Signal-Abfragen**: Für Sub-Queries können neue Textanfragen, Vektoreinbettungen
+//!    (via [`TextEmbeddingEngine`]) oder Wissensgraph-Knoten ([`EntityId`]) abgefragt werden.
+//! 5. **RRF-Fusion**: Alle Zwischenergebnisse werden mittels RRF (Reciprocal Rank Fusion)
+//!    zu einer finalen Rangliste kombiniert.
+//! 6. **PID-Latenzschutz**: Ein PID-Regler steuert die Kandidatenpoolgröße und bricht
+//!    bei Überschreitung des Zeitbudgets ([`LatencyBudgetGuard`]) geordnet ab (Fail-Safe).
+
 use crate::pid_latency_controller::{LatencyBudgetGuard, DEFAULT_TARGET_LATENCY_MS};
 use crate::{Collection, SearchResult};
 use contextra_adapt::PidController;
@@ -11,28 +32,37 @@ use contextra_ports::{Clock, QueryRewriteOutput, StorageEngine, SystemClock, Tex
 use contextra_types::{EntityId, Result, ScoredEntry};
 use std::sync::Arc;
 
-/// Default maximum number of sub-queries generated per round (N=3).
+// ANCHOR[contextra-db:MULTISTEP-001]
+/// Standardmäßige Obergrenze für generierte Teilfragen pro Iterationsrunde (N=3).
+/// Verhindert kombinatorische Explosion und hält Latenzschranken ein.
 pub const DEFAULT_MAX_SUB_QUERIES: usize = 3;
 
-/// Default candidate pool expansion multiplier for pre-reranking retrieval.
+// ANCHOR[contextra-db:MULTISTEP-002]
+/// Standardmäßiger Multiplikator zur Vergrößerung des Kandidatenpools vor dem Re-Ranking.
+/// Verdoppelt die Trefferanzahl (2 * k), um genügend Recall vor Filtern zu sichern.
 pub const DEFAULT_RERANK_POOL_MULTIPLIER: usize = 2;
 
-/// Konfiguration für Multi-Step Retrieval.
+// ANCHOR[contextra-db:MULTISTEP-003]
+/// Konfiguration für das mehrstufige iterative Multi-Step Retrieval.
+///
+/// Steuert die Abbruchbedingungen, Qualitätsanforderungen und Zeitbudgets.
 #[derive(Debug, Clone)]
 pub struct MultiStepConfig {
-    /// Maximale Iterationsrunden (Standard: 3).
+    /// Maximale Anzahl an Iterationsrunden (Standard: 3).
     pub max_rounds: usize,
-    /// Mindest-Score-Schwellenwert: unter diesem Wert gilt Runde als unzureichend.
+    /// Mindest-Score-Schwellenwert (0.0 bis 1.0): Liegen die Scores darunter,
+    /// wird eine weitere Reformulierungsrunde initiiert.
     pub quality_threshold: f32,
-    /// Minimale Anzahl an Treffern die den Threshold überschreiten müssen.
+    /// Minimale Anzahl an Treffern, die mindestens `quality_threshold` erreichen müssen.
     pub min_quality_hits: usize,
-    /// Maximale Latenz in Millisekunden für den Multi-Step-Zyklus (Standard: 100.0 ms).
+    /// Maximales Latenzbudget in Millisekunden für den gesamten Multi-Step-Zyklus (Standard: 100.0 ms).
     pub latency_budget_ms: f64,
-    /// Kandidatenpool-Multiplikator für Pre-Reranking Retrieval (Standard: 2).
+    /// Multiplikator zur Vergrößerung des Kandidatenpools vor der Fusionierung (Standard: 2).
     pub rerank_pool_multiplier: usize,
 }
 
 impl Default for MultiStepConfig {
+    /// Erzeugt Standardwerte: 3 Runden, Schwellenwert 0.5, 2 Qualitätstreffer, 100 ms Budget.
     fn default() -> Self {
         Self {
             max_rounds: 3,
@@ -44,25 +74,28 @@ impl Default for MultiStepConfig {
     }
 }
 
-/// Ergebnis einer Multi-Step-Suche mit Audit-Informationen.
+// ANCHOR[contextra-db:MULTISTEP-004]
+/// Ergebnis einer mehrstufigen Suche inklusive vollständiger Audit- und Nachvollziehbarkeitsdaten.
 #[derive(Debug, Default)]
 pub struct MultiStepResult {
-    /// Die fusionierten Suchergebnisse der Multi-Step-Suche.
+    /// Die fusionierten Gesamtsuchergebnisse nach RRF (Reciprocal Rank Fusion).
     pub results: Vec<SearchResult>,
-    /// Anzahl der tatsächlich durchgeführten Runden.
+    /// Anzahl der tatsächlich durchlaufenen Iterationsrunden (1 bis max_rounds).
     pub rounds_executed: usize,
-    /// Queries die in den Folgerunden verwendet wurden.
+    /// Textuelle Teilfragen (Sub-Queries), die in den Folgerunden ausgeführt wurden.
     pub sub_queries: Vec<String>,
-    /// Multi-signal query reformulations generated in rounds 2..N.
+    /// Strukturierte Multi-Signal-Reformulierungen (Text, Semantik, Graph) der Runden 2..N.
     pub sub_rewrites: Vec<QueryRewriteOutput>,
-    /// Dense vector embeddings computed for semantic sub-queries in rounds 2..N.
+    /// Berechnete dichte Vektoreinbettungen (Dense Embeddings) für semantische Sub-Queries.
     pub sub_vectors: Vec<Vec<f32>>,
 }
 
-/// Multi-Step Retrieval Engine.
+// ANCHOR[contextra-db:MULTISTEP-005]
+/// Multi-Step Retrieval Engine für iterative Abfragen.
 ///
-/// Implementiert iteratives Query-Rewriting für komplexe Agenten-Abfragen.
-/// Erfordert ein `QueryRewriter`-Trait für LLM-basiertes Rewriting.
+/// Bietet adaptive, mehrstufige Retrieval-Zyklen auf einer zugrundeliegenden [`Collection`].
+/// Nutzt einen optionalen [`QueryRewriter`] für LLM-basierte Anfrage-Reformulierungen
+/// sowie einen internen PID-Regler zur dynamischen Latenzkontrolle.
 pub struct MultiStepEngine<S: StorageEngine> {
     collection: Arc<Collection<S>>,
     config: MultiStepConfig,
@@ -71,7 +104,15 @@ pub struct MultiStepEngine<S: StorageEngine> {
 }
 
 impl<S: StorageEngine> MultiStepEngine<S> {
-    /// Erzeugt eine neue `MultiStepEngine` für eine geladene [`Collection`].
+    // ANCHOR[contextra-db:MULTISTEP-006]
+    /// Erzeugt eine neue `MultiStepEngine` für eine gegebene [`Collection`].
+    ///
+    /// # Parameter
+    /// - `collection`: Die Contextra-Kollektion, auf der gesucht wird.
+    /// - `config`: Multi-Step-Konfiguration mit Budget- und Qualitätsschranken.
+    ///
+    /// # Nebenwirkungen & Ports
+    /// Initialisiert den PID-Controller und bindet standardmäßig die Systemuhr ([`SystemClock`]) ein.
     pub fn new(collection: Arc<Collection<S>>, config: MultiStepConfig) -> Self {
         let pid = PidController::new(config.latency_budget_ms as f32, 50, 200, Some(100));
         Self {
@@ -82,17 +123,25 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         }
     }
 
-    /// Setzt einen benutzerdefinierten `Clock`-Port für deterministische Tests.
+    // ANCHOR[contextra-db:MULTISTEP-007]
+    /// Überschreibt den Zeit-Port mit einem benutzerdefinierten [`Clock`]-Port.
+    ///
+    /// # Zweck
+    /// Ermöglicht deterministische Tests ohne Abhängigkeit von realer Wanduhr-Zeit
+    /// (gemäß Regel 3 aus CLAUDE.md: Zeit nur über Ports).
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
         self
     }
 
-    /// Führt iterative Hybrid-Suche durch.
+    // ANCHOR[contextra-db:MULTISTEP-008]
+    /// Führt eine iterative Hybrid-Suche ohne separaten Vektor-Embedder durch.
     ///
-    /// Runde 1: Standard-Hybrid-Suche mit `original_query`.
-    /// Runde 2–N: Falls Qualität unzureichend, QueryRewriter generiert Sub-Queries.
-    /// Ergebnisse werden via RRF über alle Runden fusioniert.
+    /// # Ablauf
+    /// 1. Runde 1: Standard-Hybrid-Suche mit Originalanfrage und Originalvektor.
+    /// 2. Qualitätsprüfung: Genügen die Treffer den Kriterien in [`MultiStepConfig`]?
+    /// 3. Folgerunden: Generierung von Sub-Queries via [`QueryRewriter`].
+    /// 4. RRF-Fusion: Zusammenführung aller Teilergebnisse.
     pub async fn search(
         &self,
         original_query: &str,
@@ -104,7 +153,26 @@ impl<S: StorageEngine> MultiStepEngine<S> {
             .await
     }
 
-    /// Führt iterative multi-signale Hybrid-Suche mit Embedder für semantische Sub-Queries durch.
+    // ANCHOR[contextra-db:MULTISTEP-009]
+    /// Führt eine iterative multi-signale Hybrid-Suche mit Vektor-Embedder durch.
+    ///
+    /// # Ablauf im Detail:
+    /// 1. Eingabeprüfung & Schranke: `k` wird gegen `MAX_SEARCH_K` begrenzt.
+    /// 2. Zeitwächter initialisieren: `LatencyBudgetGuard` überwacht das Millisekunden-Budget.
+    /// 3. Runde 1:
+    ///    - PID-Kandidatenpool ermitteln (geklemmt zwischen 50 und 200).
+    ///    - Hybride Ausführung auf der Collection (Text + Vektor).
+    ///    - Dauer messen und PID-Regler mit tatsächlicher Latenz aktualisieren.
+    /// 4. Abbruchprüfung: Falls Qualität ausreicht oder kein Rewriter vorhanden ist,
+    ///    direkt via Reciprocal Rank Fusion (RRF) fusionieren und zurückkehren.
+    /// 5. Runden 2..N:
+    ///    - Prüfen, ob Latenzbudget erschöpft ist; falls ja, mit Teilergebnissen abbrechen.
+    ///    - Bisherige Treffer an `rewriter.rewrite_structured()` übergeben (mit Restzeit-Timeout).
+    ///    - Für jede generierte Teilfrage: Textsuche, optionale Vektor-Neueinbettung
+    ///      über `embedder` und Graph-Anchor-Einschränkung ausführen.
+    ///    - Ergebnisse deduplizieren und zur Rundenliste hinzufügen.
+    ///    - Prüfen, ob Qualitätsschwelle erreicht ist.
+    /// 6. RRF-Fusion: Alle Ergebnismengen über RRF kombinieren.
     pub async fn search_with_embedder(
         &self,
         original_query: &str,
@@ -349,6 +417,10 @@ impl<S: StorageEngine> MultiStepEngine<S> {
         })
     }
 
+    // ANCHOR[contextra-db:MULTISTEP-010]
+    /// Prüft, ob die aktuellen Suchergebnisse die Qualitätsanforderungen erfüllen.
+    ///
+    /// Zählt Treffer mit Score >= `quality_threshold` und vergleicht mit `min_quality_hits`.
     fn quality_sufficient(&self, results: &[SearchResult]) -> bool {
         let high_quality = results
             .iter()
@@ -358,6 +430,8 @@ impl<S: StorageEngine> MultiStepEngine<S> {
     }
 }
 
+// ANCHOR[contextra-db:MULTISTEP-011]
+/// Dedupliziert Suchergebnisse nach Dokumenten-ID unter Beibehaltung der Reihenfolge.
 fn deduplicate_search_results(results: Vec<SearchResult>) -> Vec<SearchResult> {
     let mut seen = std::collections::HashSet::new();
     let mut deduped = Vec::with_capacity(results.len());
@@ -380,6 +454,7 @@ mod tests {
 
     use contextra_ports::BoxFuture;
 
+    // Test-Rewriter, der vordefinierte Sub-Queries zurückgibt.
     struct DummyRewriter {
         responses: std::sync::Mutex<Vec<Vec<String>>>,
     }
@@ -401,6 +476,7 @@ mod tests {
         }
     }
 
+    // Hilfsfunktion: Erzeugt eine Test-Kollektion mit In-Memory/TempDir-LSM und HNSW.
     async fn create_test_collection() -> Arc<Collection<LsmStorage>> {
         let dir = tempdir().expect("tempdir"); // expect
         let lsm_config = LsmConfig {
@@ -429,6 +505,7 @@ mod tests {
         Arc::new(col)
     }
 
+    // Prüft, dass bei ausreichender Qualität in Runde 1 keine weiteren Runden gestartet werden.
     #[tokio::test]
     async fn test_multistep_single_round_sufficient() {
         let col = create_test_collection().await;
@@ -470,6 +547,7 @@ mod tests {
         assert!(!result.results.is_empty());
     }
 
+    // Prüft, dass bei zu geringer Qualität in Runde 1 eine Reformulierung via Rewriter ausgelöst wird.
     #[tokio::test]
     async fn test_multistep_query_rewriting_triggers() {
         let col = create_test_collection().await;
@@ -507,6 +585,7 @@ mod tests {
         assert!(!result.results.is_empty());
     }
 
+    // Prüft das Verhalten, wenn kein QueryRewriter bereitgestellt wird (nur 1 Runde).
     #[tokio::test]
     async fn test_multistep_no_rewriter_provided() {
         let col = create_test_collection().await;
@@ -522,6 +601,7 @@ mod tests {
         assert!(result.sub_queries.is_empty());
     }
 
+    // Prüft, dass Sub-Queries bei Bedarf auch nur BM25-Volltext verwenden.
     #[tokio::test]
     async fn test_multistep_subquery_uses_bm25_only() {
         let col = create_test_collection().await;
@@ -556,6 +636,7 @@ mod tests {
         assert!(!result.results.is_empty());
     }
 
+    // Test-Rewriter, der absichtlich Fehler meldet.
     struct FailingRewriter;
 
     impl QueryRewriter for FailingRewriter {
@@ -572,6 +653,7 @@ mod tests {
         }
     }
 
+    // Prüft, dass bei überschrittenem Latenzbudget Teilergebnisse ohne Abbruch zurückgegeben werden.
     #[tokio::test]
     async fn test_multistep_latency_budget_exceeded_returns_partial_result() {
         let col = create_test_collection().await;
@@ -608,6 +690,7 @@ mod tests {
         assert!(!result.results.is_empty());
     }
 
+    // Prüft, dass ein scheiternder Rewriter auf die Originalquery zurückfällt und keinen Absturz verursacht.
     #[tokio::test]
     async fn test_multistep_failing_rewriter_gracefully_stops() {
         let col = create_test_collection().await;
@@ -638,6 +721,7 @@ mod tests {
         assert_eq!(result.sub_queries, vec!["rust", "rust"]);
     }
 
+    // Test-Rewriter mit künstlicher Verzögerung.
     struct SlowRewriter;
 
     impl QueryRewriter for SlowRewriter {
@@ -653,6 +737,7 @@ mod tests {
         }
     }
 
+    // Prüft die Latenzbudget-Schranke bei langsamem Rewriting.
     #[tokio::test]
     async fn test_multistep_latency_budget_guard_exceeded() {
         let col = create_test_collection().await;
@@ -683,6 +768,7 @@ mod tests {
         assert!(!result.results.is_empty());
     }
 
+    // Prüft Latenzbudget-Erschöpfung auf einer leeren Datenbank.
     #[tokio::test]
     async fn test_multistep_latency_budget_exhaustion_on_empty_db() {
         let col = create_test_collection().await;

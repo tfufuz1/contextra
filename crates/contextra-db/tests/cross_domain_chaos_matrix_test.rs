@@ -24,10 +24,14 @@ use tempfile::TempDir;
 struct SimpleRng(u64);
 
 impl SimpleRng {
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-01-SEED_FROM_U64]
+    // Testet die Funktionalität von `seed_from_u64`.
     fn seed_from_u64(seed: u64) -> Self {
         Self(if seed == 0 { 0x9E3779B97F4A7C15 } else { seed })
     }
 
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-02-NEXT_U64]
+    // Testet die Funktionalität von `next_u64`.
     fn next_u64(&mut self) -> u64 {
         let mut x = self.0;
         x ^= x << 13;
@@ -37,6 +41,8 @@ impl SimpleRng {
         x
     }
 
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-03-GEN_RANGE_U64]
+    // Testet die Funktionalität von `gen_range_u64`.
     fn gen_range_u64(&mut self, min: u64, max: u64) -> u64 {
         if min >= max {
             return min;
@@ -72,20 +78,28 @@ struct MockCandleEmbedder {
 }
 
 impl MockCandleEmbedder {
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-04-NEW]
+    // Testet die Funktionalität von `new`.
     fn new(dim: usize, latency: Duration) -> Self {
         Self { dim, latency }
     }
 }
 
 impl EmbeddingProvider for MockCandleEmbedder {
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-05-PROVIDER_NAME]
+    // Testet die Funktionalität von `provider_name`.
     fn provider_name(&self) -> &str {
         "candle-mock"
     }
 
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-06-EMBEDDING_DIM]
+    // Testet die Funktionalität von `embedding_dim`.
     fn embedding_dim(&self) -> usize {
         self.dim
     }
 
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-07-EMBED]
+    // Testet die Funktionalität von `embed`.
     fn embed<'a>(
         &'a self,
         text: &'a str,
@@ -115,6 +129,8 @@ impl EmbeddingProvider for MockCandleEmbedder {
         })
     }
 
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-08-EMBED_BATCH]
+    // Testet die Funktionalität von `embed_batch`.
     fn embed_batch<'a>(
         &'a self,
         texts: &'a [&'a str],
@@ -156,6 +172,8 @@ struct GroundTruth {
 }
 
 impl GroundTruth {
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-09-NEW]
+    // Testet die Funktionalität von `new`.
     fn new() -> Self {
         Self {
             attempted: Arc::new(parking_lot::Mutex::new(HashSet::new())),
@@ -163,10 +181,14 @@ impl GroundTruth {
         }
     }
 
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-10-RECORD_ATTEMPT]
+    // Testet die Funktionalität von `record_attempt`.
     fn record_attempt(&self, doc_id: &str) {
         self.attempted.lock().insert(doc_id.to_string());
     }
 
+    // ANCHOR[contextra-db:TEST-CROSS_DOMAIN_CHAOS_MATRIX_TEST-11-RECORD_COMMIT]
+    // Testet die Funktionalität von `record_commit`.
     fn record_commit(&self, doc_id: &str) {
         self.committed.lock().insert(doc_id.to_string());
     }

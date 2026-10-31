@@ -1,3 +1,7 @@
+//! # Recall-Tests bei Truncation-Filtern
+//!
+//! Testet die Trefferqualität bei dynamischer Kürzung von Suchergebnislisten.
+//!
 use contextra_db::{Collection, Language};
 use contextra_graph::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
@@ -8,6 +12,8 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-TRUNCATION_FILTER_RECALL_TEST-01-CREATE_LARGE_TEST_COLLECTION]
+// Testet die Funktionalität von `create_large_test_collection`.
 async fn create_large_test_collection(
     name: &str,
     total_docs: usize,
@@ -84,6 +90,8 @@ async fn create_large_test_collection(
     (col, dir)
 }
 
+// ANCHOR[contextra-db:TEST-TRUNCATION_FILTER_RECALL_TEST-02-TEST_SEARCH_WITH_FILTER_EXPR_RECALL_10K_SELECTIVE]
+// Testet die Funktionalität von `test_search_with_filter_expr_recall_10k_selective`.
 #[tokio::test]
 async fn test_search_with_filter_expr_recall_10k_selective() {
     let total_docs = 10_000;
@@ -122,6 +130,8 @@ async fn test_search_with_filter_expr_recall_10k_selective() {
     }
 }
 
+// ANCHOR[contextra-db:TEST-TRUNCATION_FILTER_RECALL_TEST-03-TEST_HYBRID_SEARCH_WITH_QUERY_RECALL_10K_SELECTIVE]
+// Testet die Funktionalität von `test_hybrid_search_with_query_recall_10k_selective`.
 #[tokio::test]
 async fn test_hybrid_search_with_query_recall_10k_selective() {
     let total_docs = 10_000;
@@ -185,6 +195,8 @@ async fn test_hybrid_search_with_query_recall_10k_selective() {
     }
 }
 
+// ANCHOR[contextra-db:TEST-TRUNCATION_FILTER_RECALL_TEST-04-TEST_UNSELECTIVE_FILTER_PERFORMANCE_REGRESSION]
+// Testet die Funktionalität von `test_unselective_filter_performance_regression`.
 #[tokio::test]
 async fn test_unselective_filter_performance_regression() {
     let total_docs = 10_000;
@@ -230,6 +242,8 @@ async fn test_unselective_filter_performance_regression() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-TRUNCATION_FILTER_RECALL_TEST-05-TEST_MEMORY_TYPE_FILTER_RECALL]
+// Testet die Funktionalität von `test_memory_type_filter_recall`.
 #[tokio::test]
 async fn test_memory_type_filter_recall() {
     use contextra_types::MemoryType;

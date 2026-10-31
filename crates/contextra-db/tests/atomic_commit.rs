@@ -1,8 +1,14 @@
 #![allow(deprecated)]
+//! # Atomare Rollback- und Commit-Prüfung
+//!
+//! Verifiziert atomare Rollbacks bei Transaktions- und Commit-Fehlern über alle Schichten.
+//!
 
 use contextra_db::{Contextra, ContextraConfig};
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-ATOMIC_COMMIT-01-TEST_COLLECTION_ATOMIC_ROLLBACK_ON_ERROR]
+// Testet die Funktionalität von `test_collection_atomic_rollback_on_error`.
 #[tokio::test]
 async fn test_collection_atomic_rollback_on_error() {
     let tmp = TempDir::new().unwrap();
@@ -42,6 +48,8 @@ async fn test_collection_atomic_rollback_on_error() {
     assert_eq!(results[0].id, "doc1");
 }
 
+// ANCHOR[contextra-db:TEST-ATOMIC_COMMIT-02-TEST_4_INDEX_ATOMIC_ROLLBACK_ON_VECTOR_FAILURE]
+// Testet die Funktionalität von `test_4_index_atomic_rollback_on_vector_failure`.
 #[tokio::test]
 async fn test_4_index_atomic_rollback_on_vector_failure() {
     use contextra_types::EntityId;

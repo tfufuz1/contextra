@@ -1,10 +1,16 @@
 #![allow(deprecated)]
+//! # Kaskadierende Grabsteine bei Dokument-Ersetzung
+//!
+//! Prüft das Setzen von MVCC-Tombstones bei Dokument-Updates mit Supersedes-Relation.
+//!
 
 use contextra_db::Contextra;
 use contextra_graph::PathRAGEngine;
 use contextra_types::{DocId, EntityId, LinkRelation};
 use tempfile::tempdir;
 
+// ANCHOR[contextra-db:TEST-SUPERSEDES_CASCADING_TOMBSTONE_TEST-01-TEST_SUPERSEDES_TRIGGERS_EDGE_TOMBSTONE]
+// Testet die Funktionalität von `test_supersedes_triggers_edge_tombstone`.
 #[tokio::test]
 async fn test_supersedes_triggers_edge_tombstone() {
     let dir = tempdir().unwrap();
@@ -67,6 +73,8 @@ async fn test_supersedes_triggers_edge_tombstone() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-SUPERSEDES_CASCADING_TOMBSTONE_TEST-02-TEST_PATHRAG_IGNORES_SUPERSEDED_EDGES]
+// Testet die Funktionalität von `test_pathrag_ignores_superseded_edges`.
 #[tokio::test]
 async fn test_pathrag_ignores_superseded_edges() {
     let dir = tempdir().unwrap();
@@ -133,6 +141,8 @@ async fn test_pathrag_ignores_superseded_edges() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-SUPERSEDES_CASCADING_TOMBSTONE_TEST-03-TEST_SUPERSEDES_TOMBSTONE_RETAINED_AFTER_DB_REOPEN]
+// Testet die Funktionalität von `test_supersedes_tombstone_retained_after_db_reopen`.
 #[tokio::test]
 async fn test_supersedes_tombstone_retained_after_db_reopen() {
     let dir = tempdir().unwrap();
