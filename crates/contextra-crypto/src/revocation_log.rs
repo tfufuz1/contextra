@@ -23,13 +23,11 @@
 
 use crate::error::{CryptoError, Result};
 use ahash::AHashSet;
-use contextra_ports::Clock;
+use contextra_ports::{Clock, Vfs};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -114,7 +112,7 @@ pub fn compute_entry_hash(
 
 /// Thread-sicherer, persistierter, Ed25519-signierter Widerrufslog.
 pub struct RevocationLog {
-    file_path: Option<PathBuf>,
+    storage: Option<(Arc<dyn Vfs>, PathBuf)>,
     signing_key: Option<SigningKey>,
     verifying_key: VerifyingKey,
     clock: Arc<dyn Clock>,
@@ -130,7 +128,7 @@ impl RevocationLog {
         verifying_key: VerifyingKey,
     ) -> Self {
         Self {
-            file_path: None,
+            storage: None,
             signing_key,
             verifying_key,
             clock,
@@ -139,12 +137,13 @@ impl RevocationLog {
         }
     }
 
-    /// Öffnet einen bestehenden Widerrufslog oder erzeugt einen neuen unter `path`.
+    /// Öffnet einen bestehenden Widerrufslog oder erzeugt einen neuen unter `path` über den Vfs-Port.
     ///
     /// Beim Öffnen einer bestehenden Datei wird die komplette Hash-Kette sowie jede
     /// Ed25519-Signatur anhand von `verifying_key` verifiziert.
     /// Bei Integritätsverletzungen bricht das Öffnen mit `CryptoError::IntegrityViolation` ab.
     pub fn open_or_create(
+        vfs: Arc<dyn Vfs>,
         path: impl AsRef<Path>,
         clock: Arc<dyn Clock>,
         signing_key: Option<SigningKey>,
@@ -154,14 +153,10 @@ impl RevocationLog {
         let mut entries = Vec::new();
         let mut revoked_targets = AHashSet::new();
 
-        if path_buf.exists() {
-            let mut file = File::open(&path_buf).map_err(|e| {
-                CryptoError::Crypto(format!("Failed to open revocation log file: {e}"))
-            })?;
-            let mut contents = Vec::new();
-            file.read_to_end(&mut contents).map_err(|e| {
-                CryptoError::Crypto(format!("Failed to read revocation log file: {e}"))
-            })?;
+        let exists = vfs.exists(&path_buf).map_err(CryptoError::Storage)?;
+
+        if exists {
+            let contents = vfs.read(&path_buf).map_err(CryptoError::Storage)?;
 
             if !contents.is_empty() {
                 let parsed_entries: Vec<RevocationEntry> =
@@ -177,7 +172,7 @@ impl RevocationLog {
         }
 
         Ok(Self {
-            file_path: Some(path_buf),
+            storage: Some((vfs, path_buf)),
             signing_key,
             verifying_key,
             clock,
@@ -261,30 +256,24 @@ impl RevocationLog {
             signature: signature_bytes,
         };
 
-        entries_guard.push(new_entry.clone());
-        revoked_guard.insert(target);
+        // Fall 1: Persistenter Log über VFS.
+        // Crash-Konsistenz / Fail-Closed: Zuerst den neuen Gesamtzustand serialisieren
+        // und via `write_atomic` auf Platte schreiben. Erst bei Erfolg In-Memory-Zustand updaten.
+        if let Some((ref vfs, ref path)) = self.storage {
+            let mut persisted_entries = entries_guard.clone();
+            persisted_entries.push(new_entry.clone());
 
-        if let Some(ref path) = self.file_path {
-            let serialized = bincode::serialize(&*entries_guard).map_err(|e| {
+            let serialized = bincode::serialize(&persisted_entries).map_err(|e| {
                 CryptoError::Crypto(format!("Failed to serialize revocation log: {e}"))
             })?;
 
-            let mut file = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(path)
-                .map_err(|e| {
-                    CryptoError::Crypto(format!("Failed to write revocation log file: {e}"))
-                })?;
-
-            file.write_all(&serialized).map_err(|e| {
-                CryptoError::Crypto(format!("Failed to flush revocation log file: {e}"))
-            })?;
-            file.flush().map_err(|e| {
-                CryptoError::Crypto(format!("Failed to sync revocation log file: {e}"))
-            })?;
+            vfs.write_atomic(path, &serialized)
+                .map_err(CryptoError::Storage)?;
         }
+
+        // Erst NACH erfolgreicher Persistierung (oder wenn rein in-memory):
+        entries_guard.push(new_entry.clone());
+        revoked_guard.insert(target);
 
         Ok(new_entry)
     }
@@ -314,7 +303,7 @@ impl RevocationLog {
 impl std::fmt::Debug for RevocationLog {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RevocationLog")
-            .field("file_path", &self.file_path)
+            .field("storage_path", &self.storage.as_ref().map(|(_, p)| p))
             .field("verifying_key", &self.verifying_key)
             .field("entries_count", &self.entries.read().len())
             .finish()
@@ -327,9 +316,72 @@ mod tests {
     use crate::crypto::KeyManager;
     use crate::kv_shredding::KeyRegistry;
     use contextra_ports::SystemClock;
+    use contextra_testkit::FaultVfs;
     use ed25519_dalek::SigningKey;
     use rand::rngs::OsRng;
-    use tempfile::NamedTempFile;
+    use std::io::ErrorKind;
+
+    struct TestVfs {
+        inner: FaultVfs,
+    }
+
+    impl TestVfs {
+        fn new() -> Self {
+            Self {
+                inner: FaultVfs::new(),
+            }
+        }
+    }
+
+    impl Vfs for TestVfs {
+        fn read(&self, path: &Path) -> contextra_ports::Result<Vec<u8>> {
+            self.inner.read_file(path).map_err(|e| {
+                if e.kind() == ErrorKind::NotFound {
+                    contextra_types::ContextraError::NotFound(path.display().to_string())
+                } else {
+                    contextra_types::ContextraError::Io(e)
+                }
+            })
+        }
+
+        fn write_atomic(&self, path: &Path, data: &[u8]) -> contextra_ports::Result<()> {
+            self.inner
+                .write_file(path, data)
+                .map_err(contextra_types::ContextraError::Io)
+        }
+
+        fn create_dir_all(&self, _path: &Path) -> contextra_ports::Result<()> {
+            Ok(())
+        }
+
+        fn remove_file(&self, path: &Path) -> contextra_ports::Result<()> {
+            let _ = path;
+            Ok(())
+        }
+
+        fn exists(&self, path: &Path) -> contextra_ports::Result<bool> {
+            match self.inner.read_file(path) {
+                Ok(_) => Ok(true),
+                Err(e) if e.kind() == ErrorKind::NotFound => Ok(false),
+                Err(e) => Err(contextra_types::ContextraError::Io(e)),
+            }
+        }
+
+        fn len(&self, path: &Path) -> contextra_ports::Result<u64> {
+            let data = self.read(path)?;
+            Ok(data.len() as u64)
+        }
+
+        fn list_dir(&self, _path: &Path) -> contextra_ports::Result<Vec<String>> {
+            Ok(Vec::new())
+        }
+
+        fn sync_dir(&self, _path: &Path) -> contextra_ports::Result<()> {
+            self.inner
+                .sync()
+                .map_err(contextra_types::ContextraError::Io)
+        }
+    }
 
     fn test_keypair() -> (SigningKey, VerifyingKey) {
         let sk = SigningKey::generate(&mut OsRng);
@@ -363,8 +415,8 @@ mod tests {
 
     #[test]
     fn test_persistence_and_simulated_restart() -> Result<()> {
-        let tmp_file = NamedTempFile::new().map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        let log_path = tmp_file.path().to_path_buf();
+        let vfs: Arc<dyn Vfs> = Arc::new(TestVfs::new());
+        let log_path = PathBuf::from("/revocation.log");
         let (sk, vk) = test_keypair();
         let clock = Arc::new(SystemClock::new());
 
@@ -372,7 +424,8 @@ mod tests {
         let group_target = RevocationTarget::Group(1001);
 
         {
-            let log1 = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk)?;
+            let log1 =
+                RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), Some(sk), vk)?;
             log1.append(kek_target.clone())?;
             log1.append(group_target.clone())?;
             assert_eq!(log1.len(), 2);
@@ -380,7 +433,7 @@ mod tests {
         }
 
         // Simulate process restart by reopening log file
-        let log2 = RevocationLog::open_or_create(&log_path, clock, None, vk)?;
+        let log2 = RevocationLog::open_or_create(vfs, &log_path, clock, None, vk)?;
         assert_eq!(log2.len(), 2);
         assert!(log2.is_revoked(&kek_target));
         assert!(log2.is_revoked(&group_target));
@@ -424,27 +477,30 @@ mod tests {
 
     #[test]
     fn test_persisted_log_tamper_detection_fails_open() -> Result<()> {
-        let tmp_file = NamedTempFile::new().map_err(|e| CryptoError::Crypto(e.to_string()))?;
-        let log_path = tmp_file.path().to_path_buf();
+        let vfs: Arc<dyn Vfs> = Arc::new(TestVfs::new());
+        let log_path = PathBuf::from("/revocation.log");
         let (sk, vk) = test_keypair();
         let clock = Arc::new(SystemClock::new());
 
         {
-            let log = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk)?;
+            let log =
+                RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), Some(sk), vk)?;
             log.append(RevocationTarget::Group(1))?;
             log.append(RevocationTarget::Group(2))?;
         }
 
-        // Tamper with 1 byte in the file
-        let mut raw_bytes =
-            std::fs::read(&log_path).map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        // Tamper with 1 byte in the file via Vfs
+        let mut raw_bytes = vfs
+            .read(&log_path)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
         assert!(!raw_bytes.is_empty());
         let last_idx = raw_bytes.len() - 1;
         raw_bytes[last_idx] ^= 0xFF; // Flip bits of last byte
-        std::fs::write(&log_path, &raw_bytes).map_err(|e| CryptoError::Crypto(e.to_string()))?;
+        vfs.write_atomic(&log_path, &raw_bytes)
+            .map_err(|e| CryptoError::Crypto(e.to_string()))?;
 
         // Attempting to open tampered file MUST fail with IntegrityViolation
-        let open_res = RevocationLog::open_or_create(&log_path, clock, None, vk);
+        let open_res = RevocationLog::open_or_create(vfs, &log_path, clock, None, vk);
         assert!(
             matches!(open_res, Err(CryptoError::IntegrityViolation)),
             "Opening tampered log file MUST return CryptoError::IntegrityViolation"
