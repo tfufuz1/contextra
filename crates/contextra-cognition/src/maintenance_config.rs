@@ -1,3 +1,16 @@
+//! # Wartungskonfiguration (`maintenance_config.rs`)
+//!
+//! Dieses Modul definiert die Konfigurationsparameter für den [`MaintenanceScheduler`].
+//! Es aggregiert Steuerwerte für Verfall (Decay Controller), Kantenverstärkung (Edge Reinforcement),
+//! Perkolationsgesundheit (Percolation Health), Replikatordynamik und Gedächtniskonsolidierung.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ring 3). Bindet Konfigurationen aus `contextra-engine` und `contextra-graph` ein.
+//!
+//! ## Invarianten
+//! - **Keine Duplikation (P10):** Wiederverwendung bestehender Konfigurationsobjekte (DecayControllerConfig, PercolationConfig).
+//! - **Sichere Defaults:** Konservative Standardwerte für autonome Hintergrund-Ticks.
+
 // FILE-CONTEXT
 // ZWECK: Konfiguration des MaintenanceSchedulers für Background-Maintenance-Layer.
 // INVARIANTEN: P10: Wiederverwendung bestehender Konfigurationsobjekte (DecayControllerConfig, PercolationConfig) ohne Duplikation.
@@ -10,6 +23,8 @@ use contextra_graph::percolation::PercolationConfig;
 
 #[cfg(not(feature = "graph-connectivity-health"))]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-cognition:CFG-001]
+/// Fallback-Konfiguration für Perkolationsprüfungen.
 pub struct PercolationConfig {
     pub critical_threshold: f32,
     pub rebonding_similarity: f32,
@@ -29,6 +44,8 @@ impl Default for PercolationConfig {
 
 /// Zentrale Konfiguration für den `MaintenanceScheduler` (§10.2).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-cognition:CFG-002]
+/// Zentrale Konfiguration für den MaintenanceScheduler (§10.2).
 pub struct MaintenanceConfig {
     /// Intervall zwischen Ticks in Sekunden. Default: 60s.
     pub tick_interval_secs: u64,

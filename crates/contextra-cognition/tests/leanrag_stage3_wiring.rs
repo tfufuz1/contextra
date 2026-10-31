@@ -1,3 +1,8 @@
+//! # Integrationstest: LeanRAG Stage 3 Verdrahtung (`tests/leanrag_stage3_wiring.rs`)
+//!
+//! Validiert die Ausführung von `execute_leanrag_aggregation_stage` und
+//! das persistente Schreiben von synthetischen Super-Hyperkanten in den `CsrGraph`.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -66,6 +71,8 @@ async fn create_test_collection(
     Some((col, dir))
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-070]
+// Prüft Testfall `test_execute_leanrag_aggregation_stage_creates_superedge_in_csr_graph`.
 #[tokio::test]
 async fn test_execute_leanrag_aggregation_stage_creates_superedge_in_csr_graph() {
     let (collection, _dir) = match create_test_collection().await {

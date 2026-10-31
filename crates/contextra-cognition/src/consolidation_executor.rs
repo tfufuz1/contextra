@@ -1,3 +1,26 @@
+//! # Konsolidierungs-Ausführer (`consolidation_executor.rs`)
+//!
+//! Koordiniert die Ausführung der Konsolidierungsläufe und wendet Änderungen
+//! (Tombstones, Graph-Invalidierungen, synthetisierte Chunks) auf eine [`Collection`] an.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ring 3). Koordiniert Speicher-, Vektor- und Graphoperationen
+//! über Port- und Crate-Schnittstellen.
+//!
+//! ## Hauptkomponenten
+//! - [`ConsolidationLockGuard`]: RAII-Sperre zur Verhinderung paralleler Konsolidierungsläufe.
+//! - [`ConsolidationEngine`]: Hintergrund-Task zur periodischen Konsolidierung.
+//! - [`execute_consolidation_pass`]: Führt den rein strukturellen Konsolidierungslauf aus.
+//! - [`execute_background_consolidation`]: Führt strukturellen Pass und generative Synthese aus.
+//! - [`execute_leanrag_aggregation_stage`]: Führt die LeanRAG Stage-3-Hyperkantenaggregation aus.
+//!
+//! ## Invarianten
+//! - **Exklusivität:** Pro Collection darf stets nur ein Konsolidierungslauf aktiv sein
+//!   (`consolidation_in_progress`-Flag).
+//! - **Kaskaden-Sicherheit:** Ungültig gewordene Kanten werden geordnet invalidiert.
+//! - **Zero-Panic:** Blockierende CPU-intensive Aufgaben werden in `spawn_blocking` ausgelagert,
+//!   um den Tokio-Worker-Thread nicht zu blockieren.
+
 // FILE-CONTEXT
 // ZWECK: Verbindet Structural Consolidation Pass-Ergebnisse mit der Collection-Mutation-API.
 // INVARIANTEN: Nur Structural Consolidation Pass (rein strukturell) hier. Keine LLM-Calls. Keine direkte Abhängigkeit zu contextra-graph (P1-DAG-Integrität).
@@ -31,6 +54,8 @@ use std::sync::Arc;
 /// RAII Guard zur Koordination des Konsolidierungslaufs.
 /// Stellt sicher, dass das `consolidation_in_progress`-Flag bei Beendigung oder Panic
 /// stets panic-sicher auf `false` zurückgesetzt wird.
+// ANCHOR[contextra-cognition:EXEC-001]
+/// RAII-Guard zur Absicherung gegen parallele Konsolidierungsläufe.
 pub struct ConsolidationLockGuard {
     flag: Arc<AtomicBool>,
 }
@@ -95,6 +120,8 @@ async fn apply_duplicate_tombstones<S: StorageEngine, V: VectorIndex>(
 /// Führt den Structural Consolidation Pass aus UND wendet die Ergebnisse an (Tombstones, Graph-Cascade).
 ///
 /// Gibt das `ConsolidationPhaseResult` zurück.
+// ANCHOR[contextra-cognition:EXEC-002]
+/// Führt den Structural Pass aus und wendet Änderungen auf die Collection an.
 pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     turns: &[(DocId, Vec<f32>)],
@@ -159,6 +186,8 @@ pub async fn execute_consolidation_pass<S: StorageEngine, V: VectorIndex>(
 ///
 /// Adapter, der einen `GroundingValidator` (mit kalibrierter GroundingAssessment- und PolicyViolation-Semantik)
 /// an das `ResponseGroundingValidator`-Trait anpasst.
+// ANCHOR[contextra-cognition:EXEC-003]
+/// Adapter für GroundingValidator auf ResponseGroundingValidator.
 pub struct GroundingValidatorAdapter<'a>(pub &'a dyn GroundingValidator);
 
 impl<'a> ResponseGroundingValidator for GroundingValidatorAdapter<'a> {
@@ -211,6 +240,8 @@ impl<'a> ResponseGroundingValidator for GroundingValidatorAdapter<'a> {
 
 /// Führt die vollständige Hintergrund-Konsolidierung aus.
 /// Abwärtskompatibler Wrapper um [`execute_background_consolidation_with_rich_validator`].
+// ANCHOR[contextra-cognition:EXEC-004]
+/// Führt die vollständige Hintergrund-Konsolidierung aus.
 pub async fn execute_background_consolidation<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     turns: &[(DocId, Vec<f32>)],
@@ -336,6 +367,8 @@ async fn persist_synthesized_meta_chunks<S: StorageEngine, V: VectorIndex>(
 ///    Synthetisierte MetaChunks werden in die Collection eingefügt.
 ///    WENN `rich_validator` angegeben ist, wird dessen kalibrierte Grounding-/PolicyViolation-Semantik bevorzugt.
 #[allow(clippy::too_many_arguments)]
+// ANCHOR[contextra-cognition:EXEC-005]
+/// Führt Hintergrund-Konsolidierung mit Unterstützung für Rich-Grounding-Validatoren aus.
 pub async fn execute_background_consolidation_with_rich_validator<
     S: StorageEngine,
     V: VectorIndex,
@@ -396,6 +429,8 @@ pub async fn execute_background_consolidation_with_rich_validator<
 
 /// Führt die Stage-3-Aggregation (LeanRAG) aus und wendet Kanten-Tombstones und Super-Hyperkanten
 /// atomar über [`CsrGraphSuperEdgeSink`] an.
+// ANCHOR[contextra-cognition:EXEC-006]
+/// Führt die LeanRAG Stage 3 Aggregation aus.
 pub async fn execute_leanrag_aggregation_stage<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     nodes: &[AggregationNode],
@@ -412,6 +447,8 @@ pub async fn execute_leanrag_aggregation_stage<S: StorageEngine, V: VectorIndex>
 
 /// Deprecated legacy wrapper for `execute_background_consolidation`.
 #[deprecated(note = "use execute_background_consolidation instead")]
+// ANCHOR[contextra-cognition:EXEC-007]
+/// Veralteter Wrapper für execute_background_consolidation.
 pub async fn execute_sleep_cycle<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     turns: &[(DocId, Vec<f32>)],
@@ -433,6 +470,8 @@ pub async fn execute_sleep_cycle<S: StorageEngine, V: VectorIndex>(
 }
 
 /// Starts a background task for periodic consolidation.
+// ANCHOR[contextra-cognition:EXEC-008]
+/// Startet einen Hintergrund-Worker für periodische Konsolidierung.
 pub fn start_consolidation_worker<S: StorageEngine + 'static, V: VectorIndex + 'static>(
     collection: Arc<Collection<S, V>>,
     consolidation_config: ConsolidationConfig,
@@ -453,6 +492,8 @@ pub fn start_consolidation_worker<S: StorageEngine + 'static, V: VectorIndex + '
 /// Deprecated legacy alias for `start_consolidation_worker`.
 #[deprecated(note = "use start_consolidation_worker instead")]
 #[allow(deprecated)]
+// ANCHOR[contextra-cognition:EXEC-009]
+/// Veralteter Alias für start_consolidation_worker.
 pub fn start_consolidation_reaper<S: StorageEngine + 'static, V: VectorIndex + 'static>(
     collection: Arc<Collection<S, V>>,
     consolidation_config: ConsolidationConfig,
@@ -470,6 +511,8 @@ pub fn start_consolidation_reaper<S: StorageEngine + 'static, V: VectorIndex + '
 }
 
 /// Tokio-Background-Task Engine für periodische Speicher-Konsolidierung und Wissenssynthese.
+// ANCHOR[contextra-cognition:EXEC-010]
+/// Engine für periodische Hintergrund-Konsolidierung und Wissenssynthese.
 pub struct ConsolidationEngine<S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex> {
     collection: Arc<Collection<S, V>>,
     llm: Option<Arc<dyn LlmTextGenerator>>,
@@ -860,6 +903,8 @@ mod tests {
         (col, dir)
     }
 
+// ANCHOR[contextra-cognition:TEST-CONSOLID-040]
+// Prüft Testfall `test_consolidation_engine_concurrency_no_deadlock`.
     #[tokio::test]
     async fn test_consolidation_engine_concurrency_no_deadlock() {
         let (col, _dir) = create_test_collection().await;
@@ -911,6 +956,8 @@ mod tests {
         assert_eq!(col.len().await, 20);
     }
 
+// ANCHOR[contextra-cognition:TEST-CONSOLID-041]
+// Prüft Testfall `test_consolidation_engine_fault_injection_resume`.
     #[tokio::test]
     async fn test_consolidation_engine_fault_injection_resume() {
         let (col, _dir) = create_test_collection().await;
@@ -993,6 +1040,8 @@ mod tests {
         cancel_token.cancel();
     }
 
+// ANCHOR[contextra-cognition:TEST-CONSOLID-042]
+// Prüft Testfall `test_execute_consolidation_pass_skips_when_guard_locked`.
     #[tokio::test]
     async fn test_execute_consolidation_pass_skips_when_guard_locked() {
         let (col, _dir) = create_test_collection().await;
@@ -1016,6 +1065,8 @@ mod tests {
         assert!(phase_res.duplicates_tombstoned.is_empty());
     }
 
+// ANCHOR[contextra-cognition:TEST-CONSOLID-043]
+// Prüft Testfall `test_consolidation_nodes_guard_deadlock_regression`.
     #[tokio::test]
     async fn test_consolidation_nodes_guard_deadlock_regression() {
         let (col, _dir) = create_test_collection().await;
@@ -1074,6 +1125,8 @@ mod tests {
     ///
     /// Wenn dieser Test unter `#[tokio::test]` läuft und spawn_blocking korrekt ist,
     /// darf der blocking Thread nicht den Tokio-Runtime blockieren.
+// ANCHOR[contextra-cognition:TEST-CONSOLID-044]
+// Prüft Testfall `test_spawn_blocking_consolidation_does_not_block_runtime`.
     #[tokio::test]
     async fn test_spawn_blocking_consolidation_does_not_block_runtime() {
         use tokio::time::timeout;

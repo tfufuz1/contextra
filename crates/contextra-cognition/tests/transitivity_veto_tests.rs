@@ -1,3 +1,8 @@
+//! # Integrationstest: Transitivitäts-Veto (`tests/transitivity_veto_tests.rs`)
+//!
+//! Prüft die Vermeidung fehlerhafter Duplikatverschmelzungen durch transitive
+//! Ähnlichkeitsketten, die Einhaltung der P24-Lokalität und das Überspringen bei Budgetüberschreitung.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -23,6 +28,8 @@ use contextra_cognition::transitivity_veto::{
 use contextra_types::{DocId, EntityId};
 use std::time::Instant;
 
+// ANCHOR[contextra-cognition:TEST-TRANSITI-089]
+// Prüft Testfall `test_classic_transitivity_veto_case`.
 #[test]
 fn test_classic_transitivity_veto_case() {
     // A ≈ B, B ≈ C, A ≉ C
@@ -73,6 +80,8 @@ fn test_classic_transitivity_veto_case() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TRANSITI-090]
+// Prüft Testfall `test_negative_case_high_similarity_throughout`.
 #[test]
 fn test_negative_case_high_similarity_throughout() {
     // A ≈ B ≈ C with high pairwise similarity across all pairs
@@ -119,6 +128,8 @@ fn test_negative_case_high_similarity_throughout() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TRANSITI-091]
+// Prüft Testfall `test_budget_boundary_exceeded_skips_veto_and_continues`.
 #[test]
 fn test_budget_boundary_exceeded_skips_veto_and_continues() {
     let emb_a = vec![1.0f32, 0.0, 0.0, 0.0];
@@ -164,6 +175,8 @@ fn test_budget_boundary_exceeded_skips_veto_and_continues() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TRANSITI-092]
+// Prüft Testfall `test_p24_locality_bounded_runtime_on_large_graph`.
 #[test]
 fn test_p24_locality_bounded_runtime_on_large_graph() {
     let mut turns = Vec::new();

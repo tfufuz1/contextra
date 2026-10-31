@@ -1,3 +1,8 @@
+//! # Integrationstest: LeanRAG Worker Opt-in (`tests/leanrag_worker_opt_in.rs`)
+//!
+//! Validiert die optionale Aktivierung der LeanRAG Stage-3-Aggregation
+//! in der `ConsolidationEngine`, Superkanten-Generierung, Fehlerisolation und Budgetprüfungen.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -173,6 +178,8 @@ async fn setup_test_graph_data(col: &Collection<LsmStorage, HnswIndex>) {
 }
 
 /// Test (a): Default Engine (ohne with_leanrag) ruft Stage 3 nicht auf.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-071]
+// Prüft Testfall `test_default_engine_skips_leanrag_stage`.
 #[tokio::test]
 async fn test_default_engine_skips_leanrag_stage() {
     let (col, _dir) = create_test_collection().await;
@@ -211,6 +218,8 @@ async fn test_default_engine_skips_leanrag_stage() {
 }
 
 /// Test (b): Engine mit with_leanrag + LLM führt Stage 3 aus und erzeugt Superkante.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-072]
+// Prüft Testfall `test_opt_in_leanrag_stage_creates_superedge`.
 #[tokio::test]
 async fn test_opt_in_leanrag_stage_creates_superedge() {
     let (col, _dir) = create_test_collection().await;
@@ -268,6 +277,8 @@ async fn test_opt_in_leanrag_stage_creates_superedge() {
 }
 
 /// Test (c): with_leanrag ohne LLM führt keine Stage 3 aus und gibt keinen Fehler zurück.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-073]
+// Prüft Testfall `test_opt_in_leanrag_without_llm_skips_stage`.
 #[tokio::test]
 async fn test_opt_in_leanrag_without_llm_skips_stage() {
     let (col, _dir) = create_test_collection().await;
@@ -308,6 +319,8 @@ async fn test_opt_in_leanrag_without_llm_skips_stage() {
 }
 
 /// Test (d): build_leanrag_inputs ist deterministisch und respektiert max_nodes.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-074]
+// Prüft Testfall `test_build_leanrag_inputs_determinism_and_max_nodes`.
 #[tokio::test]
 async fn test_build_leanrag_inputs_determinism_and_max_nodes() {
     let (col, _dir) = create_test_collection().await;
@@ -341,6 +354,8 @@ async fn test_build_leanrag_inputs_determinism_and_max_nodes() {
 }
 
 /// Test (e): Stage-Fehler (LLM schlägt fehl) -> run_cycle liefert weiterhin Ok.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-075]
+// Prüft Testfall `test_stage_error_does_not_fail_run_cycle`.
 #[tokio::test]
 async fn test_stage_error_does_not_fail_run_cycle() {
     let (col, _dir) = create_test_collection().await;
@@ -381,6 +396,8 @@ async fn test_stage_error_does_not_fail_run_cycle() {
 }
 
 /// Test (f): Speicherbudget 0 MB wird von validate() abgelehnt / Stage übersprungen, kein Panic.
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-076]
+// Prüft Testfall `test_invalid_config_or_zero_budget_skipped_gracefully`.
 #[tokio::test]
 async fn test_invalid_config_or_zero_budget_skipped_gracefully() {
     let (col, _dir) = create_test_collection().await;
