@@ -4,6 +4,17 @@
 // NICHT-OFFENSICHTLICH: Scans read both LSM storage keys and in-memory ResidentPostingIndex entries directly.
 // HOTSPOTS: scan_units, run_positive_control
 
+//! Speicher- und RAM-Scanner für den Textindex zur Verifikation physischer Löschungen.
+//!
+//! # Ring-Zuordnung
+//! Ring 0 (Kern).
+//!
+//! # Funktionsweise & Positivkontrolle
+//! Implementiert den [`LayerScanner`]-Port für `WitnessLayer::TextIndex`.
+//! Scannt sowohl LSM-Speicherschlüssel als auch RAM-Einträge im [`crate::posting_list::ResidentPostingIndex`].
+//! Vor jedem Scan wird zwingend eine Positivkontrolle mit einem temporären Kanarienvogel-Dokument
+//! durchgeführt, um Fehlalarme (False Negatives) auszuschließen.
+
 use crate::inverted::index_struct::InvertedIndex;
 use crate::posting_list::PostingList;
 use contextra_ports::scanner::{LayerScanner, ScanSession, ScanTarget, WitnessLayer};
@@ -11,7 +22,8 @@ use contextra_ports::{StorageEngine, TextIndex};
 use contextra_types::{ContextraError, DocId, RequestContext, Result, TxId};
 use std::sync::Arc;
 
-/// Parsed target type for text index scanner.
+// ANCHOR[contextra-text:SCAN-001]
+/// Geparstes Zielobjekt (Dokument-ID oder Kollektion) für den Scanner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsedTextTarget {
     Document(DocId),
@@ -68,14 +80,16 @@ where
     futures::executor::block_on(f)
 }
 
-/// Scanner implementation for `WitnessLayer::TextIndex`.
+// ANCHOR[contextra-text:SCAN-002]
+/// Scanner zur Feststellung verbleibender Restdaten im Textindex.
 pub struct TextScanner<S: StorageEngine + 'static> {
     index: Arc<InvertedIndex<S>>,
     target: Arc<parking_lot::Mutex<Option<ScanTarget>>>,
 }
 
 impl<S: StorageEngine + 'static> TextScanner<S> {
-    /// Creates a new `TextScanner` for the given index.
+    // ANCHOR[contextra-text:SCAN-003]
+    /// Erzeugt einen neuen `TextScanner` für den übergebenen invertierten Index.
     pub fn new(index: Arc<InvertedIndex<S>>) -> Self {
         Self {
             index,
@@ -83,7 +97,8 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
         }
     }
 
-    /// Creates a new `TextScanner` with an explicit target.
+    // ANCHOR[contextra-text:SCAN-004]
+    /// Erzeugt einen neuen `TextScanner` mit vorab konfiguriertem Scan-Ziel.
     pub fn new_with_target(index: Arc<InvertedIndex<S>>, target: ScanTarget) -> Self {
         Self {
             index,
@@ -91,18 +106,21 @@ impl<S: StorageEngine + 'static> TextScanner<S> {
         }
     }
 
-    /// Configures the scan target on this scanner.
+    // ANCHOR[contextra-text:SCAN-005]
+    /// Konfiguriert das Scan-Ziel im Builder-Muster.
     pub fn with_target(self, target: ScanTarget) -> Self {
         *self.target.lock() = Some(target);
         self
     }
 
-    /// Sets the scan target.
+    // ANCHOR[contextra-text:SCAN-006]
+    /// Weist dem Scanner ein neues Zielobjekt zu.
     pub fn set_target(&self, target: ScanTarget) {
         *self.target.lock() = Some(target);
     }
 
-    /// Executes the positive control canary check.
+    // ANCHOR[contextra-text:SCAN-007]
+    // Positivkontrolle: Schreibt temporär ein Kanarienvogel-Dokument, prüft dessen Erkennung im Scan und löscht es wieder.
     fn run_positive_control(&self, session: &mut ScanSession) -> Result<()> {
         let canary_ns = "scratch_canary_pctl";
         let canary_doc_id = DocId::from(999_999_999u64);
@@ -267,7 +285,8 @@ impl<S: StorageEngine + 'static> LayerScanner for TextScanner<S> {
     }
 }
 
-/// Factory function to construct a `LayerScanner` for text index.
+// ANCHOR[contextra-text:SCAN-008]
+/// Erzeugt eine instanziierte Implementierung des [`LayerScanner`]-Ports für den Textindex.
 pub fn text_scanner<S: StorageEngine + 'static>(
     index: Arc<InvertedIndex<S>>,
 ) -> Arc<dyn LayerScanner> {

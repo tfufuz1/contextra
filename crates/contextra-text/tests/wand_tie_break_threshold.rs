@@ -1,3 +1,8 @@
+//! Testsuite `wand_tie_break_threshold.rs` für contextra-text.
+//!
+//! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
+
 // FILE-CONTEXT: WAND Tie-Break & Threshold Boundary Test (tests/wand_tie_break_threshold.rs).
 // ZWECK: Verifiziert, dass WAND bei Score-Gleichstand an der k-ten Abbruchschwelle deterministisch nach aufsteigender DocId sortiert, exakt mit dem Brute-Force-Referenzergebnis uebereinstimmt und keine Dokumente durch accum_max_score > threshold faelschlich verwirft.
 
@@ -126,6 +131,8 @@ impl StorageEngine for MockStorage {
     }
 }
 
+// ANCHOR[contextra-text:TEST-193]
+// Testfall `test_wand_tie_break_at_threshold_boundary`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
     let storage = std::sync::Arc::new(MockStorage::new());
@@ -202,6 +209,8 @@ async fn test_wand_tie_break_at_threshold_boundary() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-194]
+// Testfall `test_wand_tie_break_heterogeneous_scores_threshold_boundary`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_wand_tie_break_heterogeneous_scores_threshold_boundary() -> Result<()> {
     let storage = std::sync::Arc::new(MockStorage::new());
