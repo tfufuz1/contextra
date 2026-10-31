@@ -3,6 +3,12 @@
 // ZWECK: Integration tests for KV-Bridge fail-open behavior, fingerprint mismatches, GASP grounding, and backpressure saturation.
 // INVARIANTEN: Zero panic policy on cache errors; fail-open fallback to prefill; zero unsafe code.
 
+//! Integrationstests für KV-Bridge-Fail-Open-Verhalten, GASP-Grounding und Stresstests unter Last.
+//!
+//! # Zweck
+//! Stellt sicher, dass Cache-Fehler niemals die Inferenz unterbrechen und Backpressure-Sättigung stabil bleibt.
+
+// ANCHOR[contextra-infer-candle:TEST-KV-BRIDGE-AND-STRESS]
 #[cfg(feature = "kv-bridge")]
 mod tests {
     use candle_core::Device;

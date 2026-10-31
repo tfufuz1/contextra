@@ -1,5 +1,6 @@
 #![cfg(feature = "kv-bridge")]
 
+// ANCHOR[contextra-infer-candle:TEST-KV-BRIDGE-TENANT-KEY-SEP]
 //! Verification test for KV-Bridge tenant key separation: Data encrypted under Tenant A key cannot be read under Tenant B.
 
 use contextra_crypto::{CryptoKey, KvSegmentCipher, TenantIsolatedKvStore};
