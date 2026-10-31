@@ -868,6 +868,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 // ANCHOR[contextra-engine:COL-PER-870]
 /// Dokumentation für `PercolationResult` im Rahmen der Collection- und Suchabstraktion.
 #[cfg(feature = "graph-connectivity-health")]
+pub use contextra_graph::percolation::PercolationConfig;
+
+#[cfg(feature = "graph-connectivity-health")]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PercolationResult {
     pub health: Option<f32>,

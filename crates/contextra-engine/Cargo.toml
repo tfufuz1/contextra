@@ -20,6 +20,8 @@ contextra-mvcc = { workspace = true }
 bytes = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-sandbox = { workspace = true, optional = true }
+contextra-infer-onnx = { workspace = true, optional = true }
+contextra-adapt = { workspace = true, optional = true }
 contextra-store = { workspace = true }
 blake3 = { workspace = true }
 contextra-vector = { workspace = true }
@@ -44,7 +46,6 @@ sha2 = "0.10"
 loom = "0.7"
 
 [dev-dependencies]
-contextra-core = { workspace = true }
 contextra-testkit = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 tempfile = { workspace = true }
@@ -55,13 +56,13 @@ contextra-vector = { workspace = true, features = ["experimental-diskann"] }
 
 [features]
 default = []
-onnx = []
+onnx = ["dep:contextra-infer-onnx", "contextra-infer-onnx/onnx"]
 reranking = []
 sandbox = ["dep:contextra-sandbox"]
 experimental-diskann = ["contextra-vector/experimental-diskann"]
 background-maintenance = []
-graph-connectivity-health = []
+graph-connectivity-health = ["contextra-graph/graph-connectivity-health"]
 edge-reinforcement-learning = []
-adaptive-candidate-pool-sizing = []
+adaptive-candidate-pool-sizing = ["dep:contextra-adapt"]
 entity-extraction = []
 auto-extraction-opt-out = []
