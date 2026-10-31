@@ -1,7 +1,14 @@
+// ANCHOR[contextra-mvcc:TEST-SSI-WRITE-SKEW-ROOT]
+//! # Write-Skew Isolations- und Konflikttests
+//!
+//! Demonstriert die klassische Write-Skew-Anomalie und stellt sicher, dass der
+//! SSI-Validator die zweite Transaktion deterministisch abbricht.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{ContextraError, SequenceLogSsiValidator, SsiValidator, TxBuffer, TxId};
 
+// Prüft die Erkennung und Abweisung des klassischen Write-Skews bei überkreuzten Lese- und Schreibzugriffen.
 #[test]
 fn test_classic_write_skew_conflict_detected() {
     let validator = SequenceLogSsiValidator::new();
@@ -55,6 +62,7 @@ fn test_classic_write_skew_conflict_detected() {
     }
 }
 
+// Prüft, dass disjunkte Lese- und Schreibmengen ohne Fehlalarm erfolgreich committen.
 #[test]
 fn test_disjoint_read_write_sets_succeed() {
     let validator = SequenceLogSsiValidator::new();

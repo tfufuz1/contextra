@@ -1,3 +1,6 @@
+//! Prüfung der kryptografischen Signaturabdeckung aller Felder in SignedActivation.
+//! Verifiziert, dass Änderungen an ring, installation_id_hash oder expires_at_unix die Signatur ungültig machen.
+
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use contextra_license::{FeatureRing, SignedActivation};
@@ -10,6 +13,8 @@ fn generate_deterministic_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey)
     (signing_key, verifying_key)
 }
 
+// ANCHOR[contextra-license:TEST-SIG-COVERS-RING]
+// Prüft, dass Modifikationen am FeatureRing die Signaturprüfung brechen.
 #[test]
 fn test_signature_covers_ring() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -25,6 +30,8 @@ fn test_signature_covers_ring() {
     assert!(!act.verify_signature(&verifying_key));
 }
 
+// ANCHOR[contextra-license:TEST-SIG-COVERS-INSTALLATION-ID]
+// Prüft, dass Änderungen am installation_id_hash die Signaturprüfung ungültig machen.
 #[test]
 fn test_signature_covers_installation_id_hash() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -40,6 +47,8 @@ fn test_signature_covers_installation_id_hash() {
     assert!(!act.verify_signature(&verifying_key));
 }
 
+// ANCHOR[contextra-license:TEST-SIG-COVERS-EXPIRES-AT]
+// Prüft, dass Manipulationen am Ablaufzeitstempel die Signaturprüfung brechen.
 #[test]
 fn test_signature_covers_expires_at_unix() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();

@@ -1,5 +1,11 @@
+//! # Testsuite: p03_health_state_tests.rs
+//!
+//! Zweck: Zustandsautomaten-Tests für `HealthState` und `AtomicHealthState` (§18.4, `INV-POISON-1`).
+
 use contextra_durable_fs::{AtomicHealthState, HealthEvent, HealthState};
 
+// ANCHOR[contextra-durable-fs:TEST-HEALTH-INITIAL-HEALTHY]
+/// Verifiziert den initialen Betriebszustand Healthy.
 #[test]
 fn test_p03_health_state_initial_state_is_healthy() {
     let state = HealthState::default();
@@ -11,6 +17,8 @@ fn test_p03_health_state_initial_state_is_healthy() {
     assert_eq!(atomic.load(), HealthState::Healthy);
 }
 
+// ANCHOR[contextra-durable-fs:TEST-HEALTH-FSYNC-POISON]
+/// Prüft den Zustandsübergang zu Poisoned bei fsync-Fehlern.
 #[test]
 fn test_p03_health_state_fsync_error_transitions_to_poisoned() {
     let state = HealthState::Healthy;
@@ -20,6 +28,8 @@ fn test_p03_health_state_fsync_error_transitions_to_poisoned() {
     assert!(next.is_poisoned());
 }
 
+// ANCHOR[contextra-durable-fs:TEST-HEALTH-ENOSPC-READONLY]
+/// Prüft den Übergang zu ReadOnly bei Speicherplatzmangel.
 #[test]
 fn test_p03_health_state_enospc_transitions_to_readonly() {
     let state = HealthState::Healthy;
@@ -29,6 +39,8 @@ fn test_p03_health_state_enospc_transitions_to_readonly() {
     assert!(!next.is_poisoned());
 }
 
+// ANCHOR[contextra-durable-fs:TEST-HEALTH-READ-DEGRADED]
+/// Prüft den Übergang zu Degraded bei Leseprüfsummenfehlern.
 #[test]
 fn test_p03_health_state_read_checksum_warning_transitions_to_degraded() {
     let state = HealthState::Healthy;
@@ -38,6 +50,8 @@ fn test_p03_health_state_read_checksum_warning_transitions_to_degraded() {
     assert!(!next.is_poisoned());
 }
 
+// ANCHOR[contextra-durable-fs:TEST-HEALTH-POISONED-TERMINAL]
+/// Prüft die Invariante INV-POISON-1: Poisoned ist ein Endzustand.
 #[test]
 fn test_p03_health_state_poisoned_never_returns_automatically() {
     let state = HealthState::Poisoned;
@@ -51,6 +65,8 @@ fn test_p03_health_state_poisoned_never_returns_automatically() {
     assert_eq!(next3, HealthState::Poisoned);
 }
 
+// ANCHOR[contextra-durable-fs:TEST-HEALTH-ATOMIC-CONCURRENT]
+/// Prüft nebenläufige atomare Zustandsübergänge via AtomicHealthState.
 #[test]
 fn test_p03_atomic_health_state_concurrent_transitions() {
     let atomic = AtomicHealthState::new();

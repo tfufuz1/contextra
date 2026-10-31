@@ -1,6 +1,12 @@
+//! # Testsuite: basic.rs
+//!
+//! Zweck: Basistests für atomares Ersetzen (`atomic_replace`) und dauerhaftes Löschen (`durable_remove`).
+
 use contextra_durable_fs::{atomic_replace, durable_remove};
 use tempfile::tempdir;
 
+// ANCHOR[contextra-durable-fs:TEST-BASIC-ATOMIC-REPLACE]
+/// Prüft, dass `atomic_replace` neue Dateien anlegt und bestehende Dateien atomar überschreibt.
 #[test]
 fn test_atomic_replace_writes_and_overwrites() -> std::io::Result<()> {
     let dir = tempdir()?;
@@ -19,6 +25,8 @@ fn test_atomic_replace_writes_and_overwrites() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-BASIC-DURABLE-REMOVE]
+/// Prüft, dass `durable_remove` existierende Dateien dauerhaft entfernt und bei fehlenden Pfaden NotFound meldet.
 #[test]
 fn test_durable_remove_success_and_not_found() -> std::io::Result<()> {
     let dir = tempdir()?;

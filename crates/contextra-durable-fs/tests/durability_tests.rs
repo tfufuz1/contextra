@@ -1,7 +1,13 @@
+//! # Testsuite: durability_tests.rs
+//!
+//! Zweck: Durability-Tests für Handle-Poisoning (`INV-FSYNC-1`), `DirLock`-Dateisystemprüfungen und `atomic_replace`.
+
 use contextra_durable_fs::{atomic_replace, DirLock, DurableHandle, LockMode};
 use contextra_sys::{FlushKind, FsClass};
 use std::fs::File;
 
+// ANCHOR[contextra-durable-fs:TEST-DUR-HANDLE-POISON]
+/// Prüft, dass ein vergiftetes DurableHandle weitere Lese- und Schreibzugriffe fail-closed abweist.
 #[test]
 fn test_durable_handle_poisoning_on_failure() -> std::io::Result<()> {
     let temp_dir = std::env::temp_dir();
@@ -29,6 +35,8 @@ fn test_durable_handle_poisoning_on_failure() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-DUR-ATOMIC-REPLACE-PROP]
+/// Prüft die atomare Konsistenz und Inhaltsintegrität bei wiederholtem atomic_replace.
 #[test]
 fn test_atomic_replace_property_consistency() -> std::io::Result<()> {
     let temp_dir = std::env::temp_dir();
@@ -52,6 +60,8 @@ fn test_atomic_replace_property_consistency() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-DUR-DIRLOCK-CLOUD-SYNC]
+/// Prüft die Abweisung unsicherer Dateisystemklassen bei DirLock und den Override via MemoryOnly.
 #[test]
 fn test_dirlock_cloud_sync_rejection_and_memory_only_override() -> std::io::Result<()> {
     let temp_dir = std::env::temp_dir();

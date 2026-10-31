@@ -1,3 +1,13 @@
+//! Robustheits- und Nebenläufigkeitstests für `contextra-core`.
+//!
+//! # Zweck dieser Test-Suite
+//! Validiert die Ausfallsicherheit und Invarianten der Kernkomponenten unter extremen
+//! Bedingungen und Nebenläufigkeit (Multithreading):
+//! - Schutz vor ungültigen Fließkommawerten (`NaN`, `Infinity`) in `FusionWeights` und `DistanceMetric`.
+//! - Thread-Sicherheit der `SnapshotRegistry` bei paralleler Registrierung und Deregistrierung.
+//! - Grenzwertverhalten des `ResourceTracker` bei Speicherüberschreitung und Unterlauf.
+//! - Nebenläufiges Reaping verwaister Transaktionen im `TxBuffer` unter Last.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_core::{
@@ -8,6 +18,13 @@ use contextra_core::{
 use std::sync::Arc;
 use std::time::Duration;
 
+// ANCHOR[contextra-core:TEST-ROB-001]
+/// Prüft, dass `FusionWeights` bei der Initialisierung Fließkomma-Anomalien (`NaN`, `Infinity`) ablehnt (Fail-Closed).
+///
+/// # Ablauf von `test_fusion_weights_nan_and_inf_prevention`:
+/// 1. Versuch, `FusionWeights` mit `f32::NAN` zu erzeugen -> muss fehlschlagen (`Err`).
+/// 2. Versuch, `FusionWeights` mit `-f32::NAN` zu erzeugen -> muss fehlschlagen (`Err`).
+/// 3. Versuch, `FusionWeights` mit `f32::INFINITY` zu erzeugen -> muss fehlschlagen (`Err`).
 #[test]
 fn test_fusion_weights_nan_and_inf_prevention() {
     // Expose the NaN vulnerability: FusionWeights should not allow NaN weights.
@@ -28,6 +45,14 @@ fn test_fusion_weights_nan_and_inf_prevention() {
     );
 }
 
+// ANCHOR[contextra-core:TEST-ROB-002]
+/// Prüft, dass Vektordistanzberechnungen (`Cosine`, `Euclidean`, `DotProduct`) bei ungültigen Eingaben (`NaN`, `Infinity`) abbrechen.
+///
+/// # Ablauf von `test_distance_metric_nan_inf_prevention`:
+/// 1. `DistanceMetric::Cosine` mit `NaN` in Eingabevektor ausführen -> muss `Err` liefern.
+/// 2. `DistanceMetric::Cosine` mit `Infinity` in Eingabevektor ausführen -> muss `Err` liefern.
+/// 3. `DistanceMetric::Euclidean` mit `NaN` ausführen -> muss `Err` liefern.
+/// 4. `DistanceMetric::DotProduct` mit `NaN` ausführen -> muss `Err` liefern.
 #[test]
 fn test_distance_metric_nan_inf_prevention() {
     let metric = DistanceMetric::Cosine;
@@ -71,6 +96,15 @@ fn test_distance_metric_nan_inf_prevention() {
     );
 }
 
+// ANCHOR[contextra-core:TEST-ROB-003]
+/// Prüft die Thread-Sicherheit und Konsistenz von `SnapshotRegistry` unter hoher paralleler Last.
+///
+/// # Ablauf von `test_snapshot_registry_robustness_and_concurrency`:
+/// 1. `SnapshotRegistry` in einem `Arc` initialisieren.
+/// 2. 10 parallele Threads starten, die jeweils 1.000 Snapshots mit monoton steigenden Sequenznummern registrieren und sofort freigeben.
+/// 3. Während der Ausführung validieren, dass `min_active_seqno()` stets kleiner oder gleich der registrierten Sequenznummer ist.
+/// 4. Auf Beendigung aller Threads warten (`join`).
+/// 5. Verifizieren, dass nach Beendigung aller Guards das Wasserzeichen wieder auf `u64::MAX` zurückgesetzt ist.
 #[test]
 fn test_snapshot_registry_robustness_and_concurrency() {
     let registry = Arc::new(SnapshotRegistry::new());
@@ -97,6 +131,14 @@ fn test_snapshot_registry_robustness_and_concurrency() {
     assert_eq!(registry.min_active_seqno(), u64::MAX);
 }
 
+// ANCHOR[contextra-core:TEST-ROB-004]
+/// Prüft das Verhalten von `ResourceTracker` bei extremen Werten und Budgetüberschreitungen.
+///
+/// # Ablauf von `test_resource_tracker_edge_cases`:
+/// 1. Tracker mit Speicherbudget von 1000 Bytes erstellen.
+/// 2. Versuch, `u64::MAX` Bytes zu allozieren -> muss mit Fehler abgewiesen werden (Überlaufschutz).
+/// 3. Versuch, 1001 Bytes (Budgetüberschreitung) zu allozieren -> muss mit Fehler abgewiesen werden.
+/// 4. Freigabe von `u64::MAX` Bytes ausführen -> saturierender Schutz verhindert Unterlauf, Verbrauch bleibt 0.
 #[test]
 fn test_resource_tracker_edge_cases() {
     let budget = ResourceBudget { memory_limit: 1000 };
@@ -111,6 +153,15 @@ fn test_resource_tracker_edge_cases() {
     assert_eq!(tracker.memory_used(), 0);
 }
 
+// ANCHOR[contextra-core:TEST-ROB-005]
+/// Prüft das nebenläufige Bereinigen verwaister Transaktionen (`reap_orphans`) im `TxBuffer` unter Schreiblast.
+///
+/// # Ablauf von `test_tx_buffer_orphan_reaper_concurrency`:
+/// 1. `TxBuffer` mit kurzem Timeout (5 ms) konfigurieren.
+/// 2. 5 Writer-Threads starten, die Transaktionen beginnen und Index-Operationen stagen, aber nicht committen.
+/// 3. Parallel einen Reaper-Thread starten, der periodisch `reap_orphans()` aufruft.
+/// 4. Auf Beendigung aller Writer- und Reaper-Threads warten.
+/// 5. Nach einer Ruhepause einen finalen Reaper-Lauf ausführen und prüfen, dass alle verwaisten Transaktionen bereinigt wurden (`is_empty() == true`).
 #[test]
 fn test_tx_buffer_orphan_reaper_concurrency() {
     let buffer = Arc::new(TxBuffer::<String>::new_with_config(
