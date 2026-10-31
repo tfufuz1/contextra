@@ -1,3 +1,10 @@
+//! # Eigenschaftsbasierte Tests (Proptest) für SSI-Coarsening
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Beweist die mathematische Invariante von 0 % False Negatives über probabilistisch generierte
+//! Schlüsselmengen und Transaktionsabläufe gegen ein unbegrenztes Referenzmodell.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{ReadSet, SequenceLogSsiValidator, SsiValidator, TxId};
@@ -6,6 +13,8 @@ use proptest::prelude::*;
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(50))]
 
+    // ANCHOR[contextra-mvcc:TEST-PROP-COARSEN-001]
+    /// Proptest: Beweist, dass wenn der Referenz-Validator einen Konflikt meldet, der vergröberte Validator dies garantiert ebenfalls tut.
     #[test]
     fn prop_ssi_coarsening_zero_false_negatives(
         commit_keys in proptest::collection::vec("[a-z]{3}:[0-9]{3}", 20..100),

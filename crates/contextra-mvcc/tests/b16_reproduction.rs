@@ -1,7 +1,19 @@
+//! # B-16 Reproduktions- und Verifikationstests für contextra-mvcc
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Verifiziert die Behebung des Befunds B-16:
+//! - Vermeidung von Totalausfällen bei voller Commit-Schlüssel-Kapazität durch Vergröberung (Coarsening).
+//! - Sicherstellung von 0 % False Negatives bei Write-Skew-Erkennung.
+//! - Alarmierung bei langlebigen Snapshot-Pins.
+//! - Fail-Closed Durchsetzung alter Snapshots nach Pruning.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{ReadSet, SequenceLogSsiValidator, SsiValidator, TxId};
 
+// ANCHOR[contextra-mvcc:TEST-B16-001]
+/// Verifiziert, dass bei Erreichen der Kapazitätsgrenze nicht-kollidierende Transaktionen weiterhin committen können.
 #[test]
 fn test_b16_reproduction_capacity_total_outage_resolved() {
     let max_keys = 100;
@@ -27,6 +39,8 @@ fn test_b16_reproduction_capacity_total_outage_resolved() {
     );
 }
 
+// ANCHOR[contextra-mvcc:TEST-B16-002]
+/// Prüft die mathematische Invariante von 0 % False Negatives nach Vergröberung von Schlüsseln.
 #[test]
 fn test_b16_coarsening_prevents_false_negatives() {
     let max_keys = 10;
@@ -62,6 +76,8 @@ fn test_b16_coarsening_prevents_false_negatives() {
     assert!(validator.validate(tx_ok, &rs_ok).is_ok());
 }
 
+// ANCHOR[contextra-mvcc:TEST-B16-003]
+/// Verifiziert die Diagnose-Alarmierung, wenn ein Snapshot über 300s gehalten wird und das Pruning blockiert.
 #[test]
 fn test_long_lived_snapshot_pin_blocker_alarm() {
     use contextra_mvcc::SnapshotRegistry;
@@ -101,6 +117,8 @@ fn test_long_lived_snapshot_pin_blocker_alarm() {
     );
 }
 
+// ANCHOR[contextra-mvcc:TEST-B16-004]
+/// Prüft, dass Fail-Closed-Verhalten auch nach Vergröberung aktiv bleibt (`snapshot_seq < pruned_through`).
 #[test]
 fn test_fail_closed_snapshot_pruned_still_enforced_after_coarsening() {
     let validator = SequenceLogSsiValidator::new_with_bounds(10);

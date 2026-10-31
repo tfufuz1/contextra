@@ -1,7 +1,17 @@
+//! # Byte-Budget-Tests für den TxBuffer
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Prüft die strikte Einhaltung von Speicherbegrenzungen im TxBuffer:
+//! - Fehler bei Überschreitung des Pro-Transaktions-Byte-Budgets.
+//! - Zuverlässige Rückbuchung des belegten Speichers bei `drain`, `discard` und `reap`.
+
 use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer, TxBufferConfig, STAGING_ENTRY_OVERHEAD_BYTES};
 use contextra_types::{ContextraError, DocId, TxId};
 use std::time::Duration;
 
+// ANCHOR[contextra-mvcc:TEST-BUDGET-001]
+/// Verifiziert, dass `stage()` einen Fehler liefert, sobald das konfigurierte Byte-Budget einer Transaktion überschritten wird.
 #[test]
 fn tx_buffer_byte_budget_exceeded() {
     assert_eq!(STAGING_ENTRY_OVERHEAD_BYTES, 32);
@@ -38,6 +48,8 @@ fn tx_buffer_byte_budget_exceeded() {
     assert!(matches!(res2, Err(ContextraError::Storage(_))));
 }
 
+// ANCHOR[contextra-mvcc:TEST-BUDGET-002]
+/// Prüft, dass belegter Staging-Speicher bei `drain` und `discard` global exakt freigegeben wird.
 #[test]
 fn tx_buffer_byte_budget_freed_on_drain_discard_reap() {
     let config = TxBufferConfig {

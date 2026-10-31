@@ -1,11 +1,26 @@
-//! Serializable Snapshot Isolation (SSI) read-set tracking and conflict validation.
+//! # SSI — Serializable Snapshot Isolation & Konflikt-Validierung
 //!
-//! # Architecture Role (Ring 0)
+//! **Ring:** Ring 0 (Transaktionsisolation & Speicherkern)
+//! **Klasse:** Kern `[K]`
 //!
-//! Provides in-memory SSI conflict detection for transactions:
-//! - [`ReadSet`]: Tracks read keys, range prefixes, and their snapshot sequence numbers per transaction.
-//! - [`SsiValidator`]: Trait for checking concurrent write conflicts against a transaction's `ReadSet`.
-//! - [`SequenceLogSsiValidator`]: Reference validator implementation using MVCC sequence tracking.
+//! ## Zweck & Architektur-Rolle
+//!
+//! Dieses Modul implementiert Serializable Snapshot Isolation (SSI) zur Verhinderung von
+//! Anomalien wie *Write-Skew* und *Phantoms*, die unter reinem Snapshot Isolation (SI) auftreten können.
+//!
+//! ### Funktionsweise (Write-Skew-Erkennung)
+//! 1. Während einer Transaktion werden alle gelesenen Schlüssel und Suchpräfixe im [`ReadSet`]
+//!    zusammen mit der jeweiligen Snapshot-Sequenznummer registriert.
+//! 2. Beim Commit-Versuch prüft der [`SsiValidator`] (bzw. [`SequenceLogSsiValidator`]), ob
+//!    eine andere Transaktion seit dem Snapshot-Zeitpunkt Schreibzugriffe auf diese Schlüssel
+//!    oder übereinstimmende Präfixe erfolgreich committet hat.
+//! 3. Falls ja, wird der Commit atomar abgebrochen (`Err(ContextraError::Conflict)`).
+//!
+//! ### Coarsening & Fail-Closed Schutz (B-16)
+//! Um bei hoher Last Speichererschöpfung zu verhindern, fasst der Validator ab 80 % Kapazität
+//! ältere Schlüssel in gemeinsame Präfix-Buckets zusammen (*Coarsening*). Dies garantiert
+//! **0 % False Negatives** (echte Konflikte werden garantiert erkannt), wobei konservativ
+//! False Positives in Kauf genommen werden (Fail-Closed).
 
 // FILE-CONTEXT
 // STAND: 2026-09-28T00:00:00Z
@@ -28,29 +43,27 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Default maximum tracked committed write keys in [`SequenceLogSsiValidator`] (1,000,000 keys).
+// ANCHOR[contextra-mvcc:SSI-001]
+/// Standard-Obergrenze für nachverfolgte Commit-Schlüssel im [`SequenceLogSsiValidator`] (1.000.000 Schlüssel).
 pub const DEFAULT_MAX_TRACKED_COMMIT_KEYS: usize = 1_000_000;
 
-/// Tracked read keys, range prefixes, and their snapshot sequence numbers for Serializable Snapshot Isolation (SSI).
+// ANCHOR[contextra-mvcc:SSI-002]
+/// Erfasst Lesezugriffe (Einzelschlüssel und Scan-Präfixe) und deren Snapshot-Sequenznummern.
 ///
-/// # Memory Overhead & Risk Analysis
-/// Memory consumption per transaction grows linearly $O(R + P)$ with the number of read keys $R$ and range prefixes $P$,
-/// where each entry retains a key/prefix byte vector (`Vec<u8>`) and an 8-byte (`u64`) snapshot sequence number.
-/// High read-volume transactions should limit or monitor read-set size to avoid unbounded memory growth.
-/// Use [`crate::tx_buffer::TxBuffer::try_register_read`] with [`crate::tx_buffer::DEFAULT_MAX_READ_SET_KEYS`] to enforce bounded limits.
-///
-/// # Range Reads & Phantom Protection
-/// SSI protects point reads directly via recorded keys. Range scans (e.g. prefix scans) MUST call
-/// [`ReadSet::record_prefix`] to enable phantom protection against concurrent key insertions matching the prefix.
+/// Dient als Nachweis der Lese-Historie einer Transaktion zur Write-Skew- und Phantomerkennung.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReadSet {
+    /// Einzeln gelesene Schlüssel und ihre Snapshot-Sequenznummer.
     keys: AHashMap<Vec<u8>, u64>,
+    /// Gelesene Präfixe (Bereichsabfragen) und ihre Snapshot-Sequenznummer.
     prefixes: AHashMap<Vec<u8>, u64>,
+    /// Minimaler Snapshot-Sequenzwert über alle registrierten Leseoperationen.
     min_snapshot_seq: Option<u64>,
 }
 
 impl ReadSet {
-    /// Creates a new empty [`ReadSet`].
+    // ANCHOR[contextra-mvcc:SSI-003]
+    /// Erstellt ein neues, leeres [`ReadSet`].
     pub fn new() -> Self {
         Self {
             keys: AHashMap::default(),
@@ -59,10 +72,11 @@ impl ReadSet {
         }
     }
 
-    /// Records a read operation for `key` at snapshot sequence `snapshot_seq`.
+    // ANCHOR[contextra-mvcc:SSI-004]
+    /// Registriert das Lesen eines Einzelschlüssels zur Snapshot-Sequenznummer `snapshot_seq`.
     ///
-    /// If the key was previously recorded in the same transaction, the lowest (earliest)
-    /// snapshot sequence number is preserved to enforce strict isolation boundaries.
+    /// Wurde der Schlüssel zuvor in derselben Transaktion gelesen, bleibt die frühere (kleinere)
+    /// Sequenznummer erhalten, um strikte Isolationsgrenzen zu wahren.
     pub fn record_read(&mut self, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
         let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
         let k = key.into();
@@ -81,10 +95,11 @@ impl ReadSet {
         );
     }
 
-    /// Records a range prefix read operation at `snapshot_seq` for phantom protection.
+    // ANCHOR[contextra-mvcc:SSI-005]
+    /// Registriert einen Präfix-Scan zur Snapshot-Sequenznummer `snapshot_seq`.
     ///
-    /// SSI protects point reads directly; range scans are protected against phantoms
-    /// only when `record_prefix` is explicitly called.
+    /// Notwendig für Phantomschutz: Verhindert, dass eine parallele Transaktion
+    /// neue Schlüssel einfügt, die in dieses Suchpräfix fallen würden.
     pub fn record_prefix(&mut self, prefix: impl Into<Vec<u8>>, snapshot_seq: u64) {
         let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
         let p = prefix.into();
@@ -103,79 +118,85 @@ impl ReadSet {
         );
     }
 
-    /// Alias for [`ReadSet::record_read`].
+    // ANCHOR[contextra-mvcc:SSI-006]
+    /// Alias für [`ReadSet::record_read`].
     pub fn register_read(&mut self, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
         self.record_read(key, snapshot_seq);
     }
 
-    /// Returns the snapshot sequence number recorded for `key`, if present.
+    // ANCHOR[contextra-mvcc:SSI-007]
+    /// Liefert die Snapshot-Sequenznummer, zu der `key` gelesen wurde.
     pub fn get(&self, key: &[u8]) -> Option<u64> {
         self.keys.get(key).copied()
     }
 
-    /// Returns `true` if no read keys or range prefixes are tracked in this set.
+    // ANCHOR[contextra-mvcc:SSI-008]
+    /// Gibt `true` zurück, wenn weder Schlüssel noch Präfixe erfasst sind.
     pub fn is_empty(&self) -> bool {
         self.keys.is_empty() && self.prefixes.is_empty()
     }
 
-    /// Returns the total number of read keys and range prefixes tracked in this set.
+    // ANCHOR[contextra-mvcc:SSI-009]
+    /// Gibt die Gesamtanzahl der individuell erfassten Leseschlüssel und Bereichspräfixe zurück.
     pub fn len(&self) -> usize {
         self.keys.len() + self.prefixes.len()
     }
 
-    /// Clears all tracked read keys, range prefixes, and resets the cached minimum snapshot sequence.
+    // ANCHOR[contextra-mvcc:SSI-010]
+    /// Leert alle erfassten Schlüssel und Präfixe und setzt das Sequenzminimum zurück.
     pub fn clear(&mut self) {
         self.keys.clear();
         self.prefixes.clear();
         self.min_snapshot_seq = None;
     }
 
-    /// Returns the lowest snapshot sequence number recorded across all read keys and prefixes in this set,
-    /// or `None` if the set is empty.
+    // ANCHOR[contextra-mvcc:SSI-011]
+    /// Liefert die kleinste Snapshot-Sequenznummer über alle registrierten Leseoperationen.
     pub fn min_snapshot_seq(&self) -> Option<u64> {
         self.min_snapshot_seq
     }
 
-    /// Returns an iterator over tracked read keys and their snapshot sequence numbers.
+    // ANCHOR[contextra-mvcc:SSI-012]
+    /// Liefert einen Iterator über alle gelesenen Einzelschlüssel und deren Sequenznummer.
     pub fn iter(&self) -> impl Iterator<Item = (&Vec<u8>, &u64)> {
         self.keys.iter()
     }
 
-    /// Returns an iterator over tracked range prefixes and their snapshot sequence numbers.
+    // ANCHOR[contextra-mvcc:SSI-013]
+    /// Liefert einen Iterator über alle Bereichspräfixe und deren Sequenznummer.
     pub fn prefixes_iter(&self) -> impl Iterator<Item = (&Vec<u8>, &u64)> {
         self.prefixes.iter()
     }
 
-    /// Returns the inner map of read keys to snapshot sequence numbers.
+    // ANCHOR[contextra-mvcc:SSI-014]
+    /// Liefert eine Referenz auf die interne Schlüssel-Map.
     pub fn keys_map(&self) -> &AHashMap<Vec<u8>, u64> {
         &self.keys
     }
 
-    /// Returns the inner map of range prefixes to snapshot sequence numbers.
+    // ANCHOR[contextra-mvcc:SSI-015]
+    /// Liefert eine Referenz auf die interne Präfix-Map.
     pub fn prefixes_map(&self) -> &AHashMap<Vec<u8>, u64> {
         &self.prefixes
     }
 }
 
-/// Trait for Serializable Snapshot Isolation (SSI) validation.
+// ANCHOR[contextra-mvcc:SSI-016]
+/// Trait für Serializable Snapshot Isolation (SSI) Validierungs-Komponenten.
 ///
-/// Implementations evaluate whether concurrent committed write transactions have mutated
-/// any keys in the transaction's [`ReadSet`] after the snapshot sequence numbers recorded
-/// when those keys were read.
+/// Prüft, ob konkurrierende Schreibtransaktionen Einträge aus dem [`ReadSet`]
+/// verändert haben, nachdem der Snapshot der Transaktion erstellt wurde.
 pub trait SsiValidator {
-    /// Validates the [`ReadSet`] for transaction `tx_id`.
+    /// Validiert das [`ReadSet`] einer Transaktion `tx_id`.
     ///
-    /// # Errors
-    /// Returns `Err(ContextraError::Conflict(...))` if a key in `read_set` was committed by a
-    /// concurrent transaction at a sequence number strictly greater than the key's snapshot sequence number.
-    ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` assumes serializable commit validation ordering (e.g. via `commit_mutex` or engine pipeline)
-    /// during `validate` and `record_commit_key` calls to guarantee atomic, write-skew-free commits.
+    /// # Fehlerfälle
+    /// Liefert `Err(ContextraError::Conflict(...))`, falls ein Schlüssel modifiziert wurde
+    /// oder der Snapshot älter als der Pruning-Wasserstand ist.
     fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()>;
 }
 
-/// Represents a sequence bucket storing either exact committed write keys or coarsened prefix summaries.
+// ANCHOR[contextra-mvcc:SSI-017]
+/// Sequenz-Bucket im Validator: Hält entweder exakte Schlüssel oder vergröberte Präfixe.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum SeqBucket {
     Exact(Vec<Vec<u8>>),
@@ -185,43 +206,45 @@ enum SeqBucket {
     },
 }
 
-/// Diagnostic information identifying an unreleased snapshot or sequence that blocks pruning in [`SequenceLogSsiValidator`].
+// ANCHOR[contextra-mvcc:SSI-018]
+/// Diagnose-Informationen über blockierte Pruning-Grenzen im SSI-Validator.
+///
+/// Ermöglicht dem Systembetreiber festzustellen, welche langlebigen Transaktionen
+/// oder Snapshots die Bereinigung alter Commit-Schlüssel im Speicher blockieren.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PruningBlockerInfo {
-    /// The lowest sequence number currently unpruned in the validator register.
+    /// Niedrigste unbereinigte Sequenznummer im Register.
     pub min_unpruned_seq: u64,
-    /// The current `pruned_through` watermark sequence number.
+    /// Aktueller Pruning-Wasserstand (`pruned_through`).
     pub pruned_through_seq: u64,
-    /// Total tracked committed keys currently retained.
+    /// Anzahl aktuell gehaltener Commit-Schlüssel.
     pub tracked_commit_keys: usize,
-    /// Total sequence buckets currently retained.
+    /// Gesamtanzahl der Sequenz-Buckets.
     pub total_seq_buckets: usize,
-    /// Number of coarsened sequence buckets.
+    /// Anzahl der vergröberten (coarsened) Buckets.
     pub coarsened_seq_buckets: usize,
-    /// Configured maximum tracked keys capacity limit.
+    /// Konfigurierte Maximalkapazität an Schlüsseln.
     pub max_tracked_keys: usize,
-    /// Sequence number of the longest active snapshot pinning sequence, if any.
+    /// Sequenznummer des am längsten offenen Snapshots (falls vorhanden).
     pub longest_active_snapshot_seq: Option<u64>,
-    /// Pin duration of the longest active snapshot, if any.
+    /// Haltedauer des ältesten Snapshots (falls vorhanden).
     pub longest_pin_duration: Option<Duration>,
-    /// True if the longest active snapshot pin duration exceeds `max_pin_duration` (e.g. 300s).
+    /// Gibt an, ob der älteste Pin die Maximallaufzeit überschritten hat.
     pub is_pin_expired: bool,
 }
 
-/// Coarsens exact committed key lists into prefix summaries (e.g. LCP extraction).
+// ANCHOR[contextra-mvcc:SSI-019]
+/// Fasst exakte Commit-Schlüssellisten durch LCP-Extraktion (Longest Common Prefix) zusammen.
 ///
-/// # Architecture Decision & Invariant (B-16 / INV-MVCC-SSI-1)
-/// To prevent total outage when `DEFAULT_MAX_TRACKED_COMMIT_KEYS` capacity is reached (finding B-16),
-/// individual exact keys in older sequence buckets are coarsened into prefix summaries.
+/// # Architektur-Entscheidung & Invariante (B-16 / INV-MVCC-SSI-1)
+/// Um einen Totalausfall des Transaktionssystems bei Erreichen der Schlüsselobergrenze zu verhindern,
+/// werden ältere Buckets in gemeinsame Präfixe vergröbert.
 ///
-/// ## Soundness Invariant (0% False Negatives)
-/// Coarsening guarantees that no real write-skew conflict is ever missed:
-/// - Every original key $k$ in a coarsened bucket starts with at least one extracted prefix $p$.
-/// - Any point read or range prefix read that would have conflicted with $k$ is guaranteed to overlap
-///   with $p$.
-/// - False positives may occur (a commit may be conservatively flagged as a conflict), but false
-///   negatives are mathematically impossible.
-/// - Fail-closed protection remains intact under `INV-MVCC-SSI-1`.
+/// ## Soundness-Garantie (0 % False Negatives)
+/// Vergröberung garantiert, dass kein echter Write-Skew-Konflikt übersehen wird:
+/// - Jeder Originalschlüssel $k$ beginnt mit mindestens einem extrahierten Präfix $p$.
+/// - Jeder Lesezugriff, der mit $k$ kollidieren würde, überlappt garantiert mit $p$.
+/// - Konservative False Positives sind möglich, False Negatives sind mathematisch ausgeschlossen.
 fn coarsen_keys_to_prefixes(keys: &[Vec<u8>], max_prefixes: usize) -> Vec<Vec<u8>> {
     if keys.is_empty() {
         return Vec::new();
@@ -262,6 +285,8 @@ fn coarsen_keys_to_prefixes(keys: &[Vec<u8>], max_prefixes: usize) -> Vec<Vec<u8
     prefixes
 }
 
+// ANCHOR[contextra-mvcc:SSI-020]
+/// In-Memory-Commit-Verzeichnis zur Verwaltung committeter Schreibschlüssel und Sequenz-Buckets.
 #[derive(Debug, Default)]
 struct CommittedWrites {
     keys: AHashMap<Vec<u8>, u64>,
@@ -269,10 +294,14 @@ struct CommittedWrites {
 }
 
 impl CommittedWrites {
+    // ANCHOR[contextra-mvcc:SSI-021]
+    /// Liefert die Anzahl der exakt vorgehaltenen Einzelschlüssel plus vergröberte Präfixe.
     fn tracked_count(&self) -> usize {
         self.keys.len() + self.coarsened_prefix_count()
     }
 
+    // ANCHOR[contextra-mvcc:SSI-022]
+    /// Liefert die Gesamtanzahl der extrahierten Präfixe über alle vergröberten Buckets.
     fn coarsened_prefix_count(&self) -> usize {
         let mut count = 0;
         for bucket in self.seq_index.values() {
@@ -283,6 +312,8 @@ impl CommittedWrites {
         count
     }
 
+    // ANCHOR[contextra-mvcc:SSI-023]
+    /// Trägt einen committeten Schlüssel zur Sequenznummer `commit_seq` ein.
     fn insert(&mut self, key: Vec<u8>, commit_seq: u64) {
         let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
         self.keys.insert(key.clone(), commit_seq);
@@ -306,6 +337,8 @@ impl CommittedWrites {
         }
     }
 
+    // ANCHOR[contextra-mvcc:SSI-024]
+    /// Vergröbert exakte Buckets in Präfixe, um Speicher freizugeben.
     fn coarsen_oldest_buckets(&mut self) -> usize {
         let mut coarsened_count = 0;
         let seqs: Vec<u64> = self.seq_index.keys().copied().collect();
@@ -335,6 +368,8 @@ impl CommittedWrites {
         coarsened_count
     }
 
+    // ANCHOR[contextra-mvcc:SSI-025]
+    /// Führt benachbarte vergröberte Buckets zusammen, um Bucket-Overhead zu reduzieren.
     fn merge_adjacent_buckets(&mut self) -> usize {
         if self.seq_index.len() < 2 {
             return 0;
@@ -390,6 +425,8 @@ impl CommittedWrites {
         merged_count
     }
 
+    // ANCHOR[contextra-mvcc:SSI-026]
+    /// Entfernt alle Schlüssel ab Sequenznummer `first_seq` (z. B. nach fehlgeschlagenen Batch-Commits).
     fn remove_from_seq(&mut self, first_seq: u64) -> usize {
         let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;
         let mut removed = 0;
@@ -434,6 +471,8 @@ impl CommittedWrites {
         removed
     }
 
+    // ANCHOR[contextra-mvcc:SSI-027]
+    /// Bereinigt (prunt) Einträge mit `commit_seq <= bound_seq`.
     fn prune_through(&mut self, bound_seq: u64) -> usize {
         let bound_seq = bound_seq & !crate::types::TOMBSTONE_BIT;
         let mut removed = 0;
@@ -464,31 +503,43 @@ impl CommittedWrites {
         removed
     }
 
+    // ANCHOR[contextra-mvcc:SSI-028]
+    /// Berechnet die effektive Belegung (exakte Schlüssel + vergröberte Präfixe).
     fn len(&self) -> usize {
         self.tracked_count()
     }
 
+    // ANCHOR[contextra-mvcc:SSI-029]
+    /// Liefert die Commit-Sequenznummer für einen exakten Schlüssel.
     fn get(&self, key: &[u8]) -> Option<u64> {
         self.keys.get(key).copied()
     }
 }
 
-/// Reference implementation of [`SsiValidator`] backed by MVCC [`SequenceLog`] and committed key tracking.
+// ANCHOR[contextra-mvcc:SSI-030]
+/// Referenz-Implementierung des [`SsiValidator`] basierend auf In-Memory-Commit-Tracking und optionalem [`SequenceLog`].
 ///
-/// Operates strictly in-memory without disk I/O or external storage dependencies.
+/// Arbeitet rein im Speicher ohne Festplatten-I/O oder externe Abhängigkeiten.
 ///
-/// # INVARIANT (INV-MVCC-SSI-1)
-/// Conflict resolution is strictly data-driven (sequence number comparison) and deterministic.
-/// Given identical commit sequences and read-sets, repeated executions yield identical outcomes.
+/// # Invariante (INV-MVCC-SSI-1)
+/// Die Konflikterkennung ist rein datengetrieben und deterministisch über Sequenznummernvergleiche.
 #[derive(Clone)]
 pub struct SequenceLogSsiValidator {
+    /// Durch `RwLock` geschützte Tabelle committeter Schreibzugriffe.
     committed_writes: Arc<RwLock<CommittedWrites>>,
+    /// Optionales Sequenzlog für Dokumentänderungs-Prüfungen.
     sequence_log: Option<Arc<RwLock<SequenceLog>>>,
+    /// Optionale Snapshot-Registry für Langlebigkeits-Diagnosen.
     snapshot_registry: Option<Arc<SnapshotRegistry>>,
+    /// Atomarer Wasserstand für bereits bereinigte Sequenznummern (`pruned_through`).
     pruned_through: Arc<AtomicU64>,
+    /// Obergrenze für nachverfolgte Schlüssel im Arbeitsspeicher.
     max_tracked_keys: usize,
+    /// Maximale Haltezeit für Snapshots vor Alarmierung.
     max_pin_duration: Duration,
+    /// Optionaler Metrik-Port für Observability (Monitoring).
     metrics_sink: Option<Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>>,
+    /// Deterministischer Zeit-Port.
     clock: Arc<dyn Clock>,
 }
 
@@ -513,17 +564,20 @@ impl Default for SequenceLogSsiValidator {
 }
 
 impl SequenceLogSsiValidator {
-    /// Creates a new [`SequenceLogSsiValidator`] with default maximum commit key capacity (1,000,000 keys) and [`SystemClock`].
+    // ANCHOR[contextra-mvcc:SSI-031]
+    /// Erstellt einen neuen [`SequenceLogSsiValidator`] mit Standard-Kapazität (1.000.000 Schlüssel) und [`SystemClock`].
     pub fn new() -> Self {
         Self::new_with_bounds(DEFAULT_MAX_TRACKED_COMMIT_KEYS)
     }
 
-    /// Creates a new [`SequenceLogSsiValidator`] with specified maximum commit key bounds `max_tracked_keys`.
+    // ANCHOR[contextra-mvcc:SSI-032]
+    /// Erstellt einen neuen Validator mit benutzerdefinierter Kapazitätsobergrenze `max_tracked_keys`.
     pub fn new_with_bounds(max_tracked_keys: usize) -> Self {
         Self::new_with_clock_and_bounds(Arc::new(SystemClock::new()), max_tracked_keys)
     }
 
-    /// Creates a new [`SequenceLogSsiValidator`] with a custom [`Clock`] and specified maximum commit key capacity.
+    // ANCHOR[contextra-mvcc:SSI-033]
+    /// Erstellt einen neuen Validator mit benutzerdefiniertem [`Clock`]-Port und Kapazitätsgrenze.
     pub fn new_with_clock_and_bounds(clock: Arc<dyn Clock>, max_tracked_keys: usize) -> Self {
         Self {
             committed_writes: Arc::new(RwLock::new(CommittedWrites::default())),
@@ -537,23 +591,27 @@ impl SequenceLogSsiValidator {
         }
     }
 
-    /// Attaches a custom [`Clock`] implementation to this validator.
+    // ANCHOR[contextra-mvcc:SSI-034]
+    /// Verbindet eine benutzerdefinierte [`Clock`] mit diesem Validator (Builder-Muster).
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
         self
     }
 
-    /// Sets the active [`Clock`] instance for this validator.
+    // ANCHOR[contextra-mvcc:SSI-035]
+    /// Konfiguriert den aktiven [`Clock`]-Port für diesen Validator.
     pub fn set_clock(&mut self, clock: Arc<dyn Clock>) {
         self.clock = clock;
     }
 
-    /// Returns the active [`Clock`] instance associated with this validator.
+    // ANCHOR[contextra-mvcc:SSI-036]
+    /// Liefert den aktiven [`Clock`]-Port dieses Validators.
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
     }
 
-    /// Creates a new [`SequenceLogSsiValidator`] attached to an existing [`SequenceLog`].
+    // ANCHOR[contextra-mvcc:SSI-037]
+    /// Erstellt einen Validator, der mit einem [`SequenceLog`] für Dokumentprüfungen verknüpft ist.
     pub fn with_sequence_log(seq_log: Arc<RwLock<SequenceLog>>) -> Self {
         Self {
             committed_writes: Arc::new(RwLock::new(CommittedWrites::default())),
@@ -567,18 +625,21 @@ impl SequenceLogSsiValidator {
         }
     }
 
-    /// Attaches an active [`SnapshotRegistry`] to this validator for active snapshot pin duration tracking.
+    // ANCHOR[contextra-mvcc:SSI-038]
+    /// Verknüpft eine [`SnapshotRegistry`] zur Erkennung langlebiger Snapshot-Pins (Builder-Muster).
     pub fn with_snapshot_registry(mut self, registry: Arc<SnapshotRegistry>) -> Self {
         self.snapshot_registry = Some(registry);
         self
     }
 
-    /// Attaches an active [`SnapshotRegistry`] to this validator for active snapshot pin duration tracking.
+    // ANCHOR[contextra-mvcc:SSI-039]
+    /// Setzt die verknüpfte [`SnapshotRegistry`].
     pub fn set_snapshot_registry(&mut self, registry: Arc<SnapshotRegistry>) {
         self.snapshot_registry = Some(registry);
     }
 
-    /// Attaches a metrics sink container to this validator for observability reporting.
+    // ANCHOR[contextra-mvcc:SSI-040]
+    /// Bindet einen Metrik-Port für Observability an (Builder-Muster).
     pub fn with_metrics_sink(
         mut self,
         sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
@@ -587,7 +648,8 @@ impl SequenceLogSsiValidator {
         self
     }
 
-    /// Sets or updates the metrics sink container attached to this validator.
+    // ANCHOR[contextra-mvcc:SSI-041]
+    /// Konfiguriert den Metrik-Port im laufenden Betrieb.
     pub fn set_metrics_sink(
         &mut self,
         sink: Arc<parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>>,
@@ -595,13 +657,15 @@ impl SequenceLogSsiValidator {
         self.metrics_sink = Some(sink);
     }
 
-    /// Sets a custom maximum pin duration before diagnostic alarms are triggered for unreleased snapshots.
+    // ANCHOR[contextra-mvcc:SSI-042]
+    /// Konfiguriert die maximale Pin-Dauer vor Alarmauslösung (Builder-Muster).
     pub fn with_max_pin_duration(mut self, duration: Duration) -> Self {
         self.max_pin_duration = duration;
         self
     }
 
-    /// Prunes tracked committed writes with `commit_seq <= bound_seq`.
+    // ANCHOR[contextra-mvcc:SSI-043]
+    /// Bereinigt (prunt) Einträge mit `commit_seq <= bound_seq` und hebt den Wasserstand atomar an.
     pub fn prune_through(&self, bound_seq: u64) -> usize {
         let bound_seq = bound_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
@@ -610,29 +674,34 @@ impl SequenceLogSsiValidator {
         removed
     }
 
-    /// Removes all committed key registrations with `commit_seq >= first_seq`.
+    // ANCHOR[contextra-mvcc:SSI-044]
+    /// Entfernt alle Commit-Einträge ab Sequenznummer `first_seq` (Rollback-Support).
     pub fn forget_from(&self, first_seq: u64) -> usize {
         let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         writes.remove_from_seq(first_seq)
     }
 
-    /// Returns the current `pruned_through` watermark sequence number.
+    // ANCHOR[contextra-mvcc:SSI-045]
+    /// Liefert den aktuellen Pruning-Wasserstand.
     pub fn pruned_through(&self) -> u64 {
         self.pruned_through.load(Ordering::SeqCst)
     }
 
-    /// Returns the number of committed keys currently tracked.
+    // ANCHOR[contextra-mvcc:SSI-046]
+    /// Liefert die Anzahl aktuell erfasster Commit-Schlüssel.
     pub fn tracked_commit_keys(&self) -> usize {
         self.committed_writes.read().len()
     }
 
-    /// Returns the configured maximum commit key tracking limit.
+    // ANCHOR[contextra-mvcc:SSI-047]
+    /// Liefert die konfigurierte Obergrenze an Commit-Schlüsseln.
     pub fn max_tracked_keys(&self) -> usize {
         self.max_tracked_keys
     }
 
-    /// Checks register capacity utilization and triggers coarsening or diagnostic warnings if threshold is reached.
+    // ANCHOR[contextra-mvcc:SSI-048]
+    /// Prüft die Belegung des Commit-Registers und leitet ab 80 % Füllstand Vergröberung (Coarsening) ein.
     fn check_and_coarsen_if_needed(&self, writes: &mut CommittedWrites) {
         let threshold = (self.max_tracked_keys * 80) / 100;
         let initial_len = writes.len();
@@ -692,17 +761,21 @@ impl SequenceLogSsiValidator {
         }
     }
 
-    /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning in this validator.
+    // ANCHOR[contextra-mvcc:SSI-049]
+    /// Liefert Diagnoseinformationen darüber, welcher Snapshot oder welche Sequenz das Pruning blockiert.
     pub fn diagnose_pruning_blocker(&self) -> Option<PruningBlockerInfo> {
         self.diagnose_pruning_blocker_at(self.clock.monotonic_nanos())
     }
 
-    /// Diagnoses which unpruned sequence or active snapshot is currently blocking pruning relative to monotonic timestamp `now_nanos`.
+    // ANCHOR[contextra-mvcc:SSI-050]
+    /// Diagnostiziert Pruning-Blocker bezogen auf den Zeitstempel `now_nanos`.
     pub fn diagnose_pruning_blocker_at(&self, now_nanos: u64) -> Option<PruningBlockerInfo> {
         let writes = self.committed_writes.read();
         self.diagnose_pruning_blocker_internal(&writes, now_nanos)
     }
 
+    // ANCHOR[contextra-mvcc:SSI-051]
+    /// Interne Diagnose-Auswertung unter gehaltener Lesesperre auf `committed_writes`.
     fn diagnose_pruning_blocker_internal(
         &self,
         writes: &CommittedWrites,
@@ -738,7 +811,8 @@ impl SequenceLogSsiValidator {
         })
     }
 
-    /// Records a committed write for `key` at sequence number `commit_seq`.
+    // ANCHOR[contextra-mvcc:SSI-052]
+    /// Registriert einen committeten Schreibschlüssel zur Sequenznummer `commit_seq`.
     pub fn record_commit_key(&self, key: &[u8], commit_seq: u64) {
         let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
@@ -746,7 +820,8 @@ impl SequenceLogSsiValidator {
         self.check_and_coarsen_if_needed(&mut writes);
     }
 
-    /// Records committed writes for multiple keys at sequence number `commit_seq`.
+    // ANCHOR[contextra-mvcc:SSI-053]
+    /// Registriert mehrere committete Schreibschlüssel als atomare Batch-Operation.
     pub fn record_commit_keys<'a>(
         &self,
         keys: impl IntoIterator<Item = &'a [u8]>,
@@ -760,7 +835,14 @@ impl SequenceLogSsiValidator {
         self.check_and_coarsen_if_needed(&mut writes);
     }
 
-    /// Validates point reads against committed write keys and coarsened prefix buckets.
+    // ANCHOR[contextra-mvcc:SSI-054]
+    /// Validiert Punkt-Leseoperationen gegen committete Schreibschlüssel und vergröberte Buckets.
+    ///
+    /// # Ablauf
+    /// 1. Fail-Closed Check: Ist `snapshot_seq < pruned_through`, wurde die Historie bereits bereinigt -> Konflikt.
+    /// 2. Exakter Treffer: Wurde der Schlüssel committet und ist `commit_seq > snapshot_seq` -> Konflikt.
+    /// 3. Vergröberter Treffer: Beginnt der Schlüssel mit einem vergröberten Präfix und `commit_seq > snapshot_seq` -> Konflikt.
+    /// 4. Prüfung gegen optionales `SequenceLog`.
     fn validate_point_reads(
         &self,
         committed_writes: &CommittedWrites,
@@ -815,7 +897,8 @@ impl SequenceLogSsiValidator {
         Ok(())
     }
 
-    /// Validates `SequenceLog` entries for a point read key.
+    // ANCHOR[contextra-mvcc:SSI-055]
+    /// Validiert Dokumentänderungen im optionalen `SequenceLog` für einen Einzelschlüssel.
     fn validate_sequence_log_for_key(
         &self,
         tx_id: TxId,
@@ -842,7 +925,13 @@ impl SequenceLogSsiValidator {
         Ok(())
     }
 
-    /// Validates range scan prefix reads against committed writes and coarsened prefix buckets for phantom protection.
+    // ANCHOR[contextra-mvcc:SSI-056]
+    /// Validiert Bereichsscans (Präfixe) gegen committete Schlüssel zur Erkennung von Phantomen.
+    ///
+    /// # Ablauf
+    /// 1. Fail-Closed Check gegen `pruned_through`.
+    /// 2. Prüfung aller committeten Schlüssel, die mit dem Scan-Präfix beginnen.
+    /// 3. Prüfung überlappender vergröberter Präfix-Buckets.
     fn validate_range_reads(
         &self,
         committed_writes: &CommittedWrites,
@@ -900,7 +989,10 @@ impl SequenceLogSsiValidator {
         Ok(())
     }
 
-    /// Validates `read_set` against `committed_writes` map and `sequence_log`.
+    // ANCHOR[contextra-mvcc:SSI-057]
+    /// Interne SSI-Validierungslogik für Punkt- und Bereichslesevorgänge.
+    ///
+    /// Sortiert Schlüssel und Präfixe vor der Validierung deterministisch.
     fn validate_internal(
         &self,
         committed_writes: &CommittedWrites,
@@ -935,7 +1027,11 @@ impl SequenceLogSsiValidator {
         Ok(())
     }
 
-    /// Atomically validates `read_set` and records `write_keys` at `commit_seq` under a single write lock.
+    // ANCHOR[contextra-mvcc:SSI-058]
+    /// Atomare Validierung und Registrierung: Validiert das `read_set` und trägt `write_keys`
+    /// unter einer einzigen exklusiven Schreibsperre ein.
+    ///
+    /// Verhindert Lost Updates und Race Conditions zwischen Validierung und Commit-Registrierung.
     pub fn validate_and_record<'a>(
         &self,
         tx_id: TxId,
@@ -956,12 +1052,16 @@ impl SequenceLogSsiValidator {
 }
 
 impl SsiValidator for SequenceLogSsiValidator {
+    // ANCHOR[contextra-mvcc:SSI-059]
+    /// Führt die Validierung unter gehaltener Lesesperre durch.
     fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()> {
         let committed_writes = self.committed_writes.read();
         self.validate_internal(&committed_writes, tx_id, read_set)
     }
 }
 
+// ANCHOR[contextra-mvcc:SSI-060]
+/// Leitet deterministisch eine `DocId` aus einem Byte-Schlüssel ab (UTF-8-Parsing oder Fallback-Hash).
 fn derive_doc_id_for_key(key: &[u8]) -> DocId {
     if let Ok(s) = std::str::from_utf8(key) {
         if let Ok(doc_id) = DocId::from_key(s) {

@@ -1,10 +1,17 @@
+//! # Eigenschaftsbasierte Tests (Proptest) für MVCC-Sichtbarkeit
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Beweist die Korrektheit der Sichtbarkeitsformel (`SeqLogEntry::is_visible` und `SequenceLog::is_visible`)
+//! über 10.000 generierte Testfälle gegen eine mathematische Referenz-Implementierung.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{DocId, SeqLogEntry, SequenceLog};
 use proptest::prelude::*;
 
-/// Trivial reference implementation of the MVCC visibility formula:
-/// visible(e, as_of) <==> e.insert_seq <= as_of AND (e.delete_seq == None OR e.delete_seq > as_of)
+// ANCHOR[contextra-mvcc:TEST-PROP-VIS-001]
+/// Mathematische Referenz-Implementierung der MVCC-Sichtbarkeitsformel.
 fn reference_visibility(insert_seq: u64, delete_seq: Option<u64>, as_of: u64) -> bool {
     insert_seq <= as_of && delete_seq.is_none_or(|del| del > as_of)
 }
@@ -12,6 +19,8 @@ fn reference_visibility(insert_seq: u64, delete_seq: Option<u64>, as_of: u64) ->
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10_000))]
 
+    // ANCHOR[contextra-mvcc:TEST-PROP-VIS-002]
+    /// Proptest: 10.000 Fälle vergleichen `SeqLogEntry::is_visible` und `SequenceLog::is_visible` mit der Referenzfunktion.
     #[test]
     fn prop_mvcc_visibility_matches_reference_10k(
         insert_seq in 0..10_000u64,
@@ -61,7 +70,8 @@ proptest! {
         }
     }
 
-    /// Explicit boundary testing: as_of == insert_seq, as_of == delete_seq, delete_seq == None
+    // ANCHOR[contextra-mvcc:TEST-PROP-VIS-003]
+    /// Proptest: Gezielte Grenzfallprüfung für `as_of == insert_seq` und `as_of == delete_seq`.
     #[test]
     fn prop_mvcc_visibility_explicit_boundary_cases(
         seq_a in 0..5_000u64,

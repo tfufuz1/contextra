@@ -1,8 +1,19 @@
+//! # Tests für forget_from, Kapazitätsgrenzen und Phantomschutz
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Verifiziert:
+//! - Rollback-Verhalten via `forget_from`.
+//! - Bounded-Commit-Writes-Verhalten bei Kapazitätsgrenzen.
+//! - Phantomschutz über Bereichsscan-Präfixe (`record_prefix`).
+
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_types::{ContextraError, TxId};
 
+// ANCHOR[contextra-mvcc:TEST-FB-001]
+/// Testet, dass `forget_from` Schlüssel eines fehlgeschlagenen Batches rückstandsfrei entfernt.
 #[test]
 fn forget_from_removes_keys_of_failed_batch() {
     let validator = SequenceLogSsiValidator::new();
@@ -30,6 +41,8 @@ fn forget_from_removes_keys_of_failed_batch() {
     assert!(validator.validate(tx1, &rs2).is_ok());
 }
 
+// ANCHOR[contextra-mvcc:TEST-FB-002]
+/// Prüft das Verhalten bei begrenzter Schlüsselkapazität und Fail-Closed-Verhalten bei Kapazitätserschöpfung.
 #[test]
 fn committed_writes_bounded() {
     let max_keys = 5;
@@ -58,6 +71,8 @@ fn committed_writes_bounded() {
     assert!(matches!(res, Err(ContextraError::Conflict(_))));
 }
 
+// ANCHOR[contextra-mvcc:TEST-FB-003]
+/// Testet die Phantomerkennung: Commits, die ein im ReadSet registriertes Präfix matchen, lösen Konflikte aus.
 #[test]
 fn phantom_prefix_conflict() {
     let validator = SequenceLogSsiValidator::new();

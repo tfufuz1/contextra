@@ -1,7 +1,11 @@
 #![allow(unexpected_cfgs)]
 
-//! Loom concurrency model test for `SnapshotRegistry` in `contextra-mvcc`.
-//! Execution: `RUSTFLAGS="--cfg loom" cargo test -p contextra-mvcc --test loom_snapshot_registry -- --nocapture`
+//! # Nebenläufigkeitsmodell- und Stresstests für die SnapshotRegistry
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Verifiziert die Synchronisations-Invariante von `SnapshotRegistry` unter Loom-Modellprüfung
+//! sowie in einem Multithread-Stresstest ohne Loom.
 
 #[cfg(loom)]
 mod loom_tests {
@@ -125,6 +129,8 @@ mod normal_tests {
     use std::sync::Arc;
     use std::thread;
 
+    // ANCHOR[contextra-mvcc:TEST-LOOM-001]
+    /// Führt einen parallelen Stresstest über 4 Threads durch und prüft, dass `min_active_seqno` stets korrekt bleibt.
     #[test]
     fn test_concurrent_snapshot_registry_stress() {
         let registry = Arc::new(SnapshotRegistry::new());

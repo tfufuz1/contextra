@@ -1,3 +1,10 @@
+//! # Test für begrenztes Orphan-Reaping im TxBuffer
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Prüft, dass `reap_orphans_bounded_at` exakt maximal `max` verwaiste Transaktionen
+//! bereinigt und nicht-abgelaufene bzw. restliche Transaktionen intakt lässt.
+
 // FILE-CONTEXT
 // ZWECK: Campaign coverage test for TxBuffer reap_orphans_bounded and deterministic time injection.
 // INVARIANTEN: reap_orphans_bounded caps reaped orphan count to max and leaves remaining unexpired/unreaped transactions intact.
@@ -11,6 +18,8 @@ use contextra_types::TxId;
 use std::sync::Arc;
 use std::time::Duration;
 
+// ANCHOR[contextra-mvcc:TEST-COV-REAP-001]
+/// Testet das beschränkte Bereinigen verwaister Transaktionen in Batches mit deterministischer Uhr.
 #[test]
 fn test_tx_buffer_reap_orphans_bounded_exact_capping_and_time_injection() {
     let clock = Arc::new(ManualClock::new(100_000_000_000));

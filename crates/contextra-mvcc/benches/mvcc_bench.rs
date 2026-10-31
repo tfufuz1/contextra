@@ -1,3 +1,12 @@
+//! # Benchmarks für contextra-mvcc
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Misst die Latenz und Skalierbarkeit zentraler Concurrency-Control-Operationen:
+//! - Lock-freies Auslesen der minimal aktiven Sequenznummer (`min_active_seqno`) unter variierender Snapshot-Dichte.
+//! - Registrierung und Freigabe von RAII-Snapshot-Guards (`register_and_drop`).
+//! - O(1)-Sichtbarkeitsprüfung von Sequenzlog-Einträgen (`is_visible`).
+
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use contextra_mvcc::{SeqLogEntry, SnapshotRegistry};
@@ -5,6 +14,8 @@ use contextra_types::DocId;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 
+// ANCHOR[contextra-mvcc:BENCH-001]
+/// Benchmark für das lock-freie Auslesen von `min_active_seqno` bei 10, 1.000 und 100.000 aktiven Snapshots.
 fn bench_snapshot_registry_min_active(c: &mut Criterion) {
     let mut group = c.benchmark_group("snapshot_registry_min_active");
 
@@ -26,6 +37,8 @@ fn bench_snapshot_registry_min_active(c: &mut Criterion) {
     group.finish();
 }
 
+// ANCHOR[contextra-mvcc:BENCH-002]
+/// Benchmark für die Registrierung und den sofortigen Drop eines `SnapshotGuard`.
 fn bench_snapshot_registry_register_drop(c: &mut Criterion) {
     let mut group = c.benchmark_group("snapshot_registry_register_drop");
 
@@ -51,6 +64,8 @@ fn bench_snapshot_registry_register_drop(c: &mut Criterion) {
     group.finish();
 }
 
+// ANCHOR[contextra-mvcc:BENCH-003]
+/// Benchmark für die O(1)-Sichtbarkeitsprüfung `SeqLogEntry::is_visible`.
 fn bench_seq_log_entry_is_visible(c: &mut Criterion) {
     let doc_id = DocId::from_key("bench_doc").expect("valid doc id");
     let entry = SeqLogEntry {

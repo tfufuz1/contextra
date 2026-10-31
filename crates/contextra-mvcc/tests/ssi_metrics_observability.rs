@@ -1,3 +1,12 @@
+//! # Observability- und Metrik-Tests für SSI
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Prüft die Ausgabe von Telemetriedaten an den `MetricsSink`-Port:
+//! - Auslastungsverhältnis (`utilization_ratio`) und vergröberte Buckets.
+//! - Haltedauer des ältesten Snapshot-Pins.
+//! - Konsistenz beim dynamischen Austausch (Hot-Swap) des Metrik-Ports.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::SequenceLogSsiValidator;
@@ -7,6 +16,8 @@ use contextra_testkit::{ManualClock, MetricEvent, TestMetricsSink};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
+// ANCHOR[contextra-mvcc:TEST-METRIC-001]
+/// Verifiziert, dass beim Überschreiten des 80 %-Schwellenwerts die passenden Gauge-Metriken generiert werden.
 #[test]
 fn test_ssi_metrics_observability_threshold_and_coarsening() {
     let test_sink = Arc::new(TestMetricsSink::new());
@@ -53,6 +64,8 @@ fn test_ssi_metrics_observability_threshold_and_coarsening() {
     );
 }
 
+// ANCHOR[contextra-mvcc:TEST-METRIC-002]
+/// Prüft das Erfassen der Haltedauer des ältesten Snapshot-Pins als Gauge-Metrik.
 #[test]
 fn test_ssi_metrics_observability_long_pin_duration() {
     let test_sink = Arc::new(TestMetricsSink::new());
@@ -93,6 +106,8 @@ fn test_ssi_metrics_observability_long_pin_duration() {
     );
 }
 
+// ANCHOR[contextra-mvcc:TEST-METRIC-003]
+/// Verifiziert die nahtlose Übergabe von Telemetriedaten beim Hot-Swap des `MetricsSink`-Containers.
 #[test]
 fn test_ssi_metrics_observability_hot_swap_consistency() {
     let sink1 = Arc::new(TestMetricsSink::new());

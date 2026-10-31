@@ -1,6 +1,19 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-//! Comprehensive, deterministic isolation and concurrency tests for `contextra-mvcc`.
+//! # Umfassende Transaktionsisolations- und Nebenläufigkeitstests
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Prüft alle zentralen Isolationsgarantien deterministisch:
+//! 1. Write-Skew-Schutz (klassisches Bankkonto-Szenario).
+//! 2. Lost-Update-Schutz (Verhinderung verlorener Updates bei Zählern).
+//! 3. Phantomschutz über Bereichsscan-Präfixe.
+//! 4. Unabbrechbarkeit reiner Lese-Snapshots (Read-Only Snapshots).
+//! 5. Lease- und Pin-Ablaufprüfung mit `ManualClock`.
+//! 6. SnapshotRegistry-Lebenszyklus, Drop-Reihenfolgen und Min-Active-Tracking.
+//! 7. SequenceLog-Grenzwerte, Tombstone-Maskierung und Kompaktierung.
+//! 8. Multithread-Nebenläufigkeit mit Barriers.
+//! 9. TxBuffer-Budgets (Operations- und Byte-Limits) sowie Orphan-Reaping.
 //!
 //! # Verified Behaviors:
 //! 1. Write-Skew Protection (classic bank balance invariant).
@@ -27,6 +40,8 @@ use std::time::Duration;
 
 // --- 1. Write-Skew Protection Tests ---
 
+// ANCHOR[contextra-mvcc:TEST-ISO-001]
+/// Klassischer Write-Skew-Test: Zwei Transaktionen lesen Guthaben beider Konten und buchen gegenseitig ab.
 #[test]
 fn test_isolation_write_skew_classic_bank_account() {
     // Invariant: Account_A + Account_B >= 0. Initial balances: A = 100, B = 100.
@@ -57,6 +72,8 @@ fn test_isolation_write_skew_classic_bank_account() {
     );
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-002]
+/// Prüft Write-Skew bei überlappenden ReadSets und disjunkten Schreibzielen.
 #[test]
 fn test_isolation_write_skew_overlapping_reads_disjoint_writes() {
     let validator = SequenceLogSsiValidator::new();
@@ -83,6 +100,8 @@ fn test_isolation_write_skew_overlapping_reads_disjoint_writes() {
     assert!(matches!(res2, Err(ContextraError::Conflict(_))));
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-003]
+/// Verifiziert, dass Transaktionen mit völlig disjunkten ReadSets gleichzeitig erfolgreich committen.
 #[test]
 fn test_isolation_write_skew_non_overlapping_read_sets_succeed() {
     let validator = SequenceLogSsiValidator::new();
@@ -106,6 +125,8 @@ fn test_isolation_write_skew_non_overlapping_read_sets_succeed() {
 
 // --- 2. Lost-Update Protection Tests ---
 
+// ANCHOR[contextra-mvcc:TEST-ISO-004]
+/// Prüft Lost-Update-Erkennung bei konkurrierenden Inkrementierungen desselben Zählerschlüssels.
 #[test]
 fn test_isolation_lost_update_concurrent_counter_increment() {
     let validator = SequenceLogSsiValidator::new();
@@ -132,6 +153,8 @@ fn test_isolation_lost_update_concurrent_counter_increment() {
     );
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-005]
+/// Testet die atomare Validierung und Registrierung (`validate_and_record`) gegen Race Conditions.
 #[test]
 fn test_isolation_lost_update_atomic_validate_and_record() {
     let validator = SequenceLogSsiValidator::new();
@@ -162,6 +185,8 @@ fn test_isolation_lost_update_atomic_validate_and_record() {
 
 // --- 3. Phantom Protection Tests ---
 
+// ANCHOR[contextra-mvcc:TEST-ISO-006]
+/// Verifiziert Phantomschutz: Einfügen eines Schlüssels unter ein gescanntes Präfix bricht Transaktion ab.
 #[test]
 fn test_isolation_phantom_read_prefix_match_conflicts() {
     let validator = SequenceLogSsiValidator::new();
@@ -183,6 +208,8 @@ fn test_isolation_phantom_read_prefix_match_conflicts() {
     );
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-007]
+/// Bestätigt, dass Einfügungen außerhalb des gescannten Präfixes keinen Phantomkonflikt auslösen.
 #[test]
 fn test_isolation_phantom_read_unrelated_prefix_succeeds() {
     let validator = SequenceLogSsiValidator::new();
@@ -199,6 +226,8 @@ fn test_isolation_phantom_read_unrelated_prefix_succeeds() {
     assert!(validator.validate(tx_scan, &rs_scan).is_ok());
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-008]
+/// Prüft Phantomschutz bei mehreren registrierten Präfixen in einer einzigen Transaktion.
 #[test]
 fn test_isolation_phantom_read_multiple_range_prefixes() {
     let validator = SequenceLogSsiValidator::new();
@@ -218,6 +247,8 @@ fn test_isolation_phantom_read_multiple_range_prefixes() {
 
 // --- 4. Read-Only Snapshot Isolation Preservation Tests ---
 
+// ANCHOR[contextra-mvcc:TEST-ISO-009]
+/// Garantiert, dass reine Lese-Transaktionen niemals durch spätere Schreibtransaktionen abgebrochen werden.
 #[test]
 fn test_isolation_read_only_snapshot_never_aborted_by_writes() {
     let validator = SequenceLogSsiValidator::new();
@@ -237,6 +268,8 @@ fn test_isolation_read_only_snapshot_never_aborted_by_writes() {
     assert!(validator.validate(tx_ro, &rs_ro).is_ok());
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-010]
+/// Prüft, dass ein leeres ReadSet stets konfliktfrei validiert wird.
 #[test]
 fn test_isolation_read_only_snapshot_empty_read_set_always_valid() {
     let validator = SequenceLogSsiValidator::new();
@@ -255,6 +288,8 @@ fn test_isolation_read_only_snapshot_empty_read_set_always_valid() {
 
 // --- 5. Pin Expiration & Reaping with ManualClock Tests ---
 
+// ANCHOR[contextra-mvcc:TEST-ISO-011]
+/// Verifiziert das Erkennen abgelaufener Pins im SequenceLog mittels ManualClock.
 #[test]
 fn test_isolation_pin_expiration_sequence_log_manual_clock() {
     let clock = Arc::new(ManualClock::new(1_000_000_000));
@@ -280,6 +315,8 @@ fn test_isolation_pin_expiration_sequence_log_manual_clock() {
     assert_eq!(log.min_retention_seq(), None);
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-012]
+/// Verifiziert das automatische Reaping abgelaufener Pins in der SnapshotRegistry.
 #[test]
 fn test_isolation_pin_expiration_snapshot_registry_manual_clock() {
     let clock = Arc::new(ManualClock::new(10_000_000_000));
@@ -298,6 +335,8 @@ fn test_isolation_pin_expiration_snapshot_registry_manual_clock() {
     assert_eq!(registry.min_active_seqno(), u64::MAX);
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-013]
+/// Prüft die Diagnose des ältesten aktiven Snapshot-Pins über `longest_active_pin_at`.
 #[test]
 fn test_isolation_longest_active_pin_diagnostics_manual_clock() {
     let clock = Arc::new(ManualClock::new(1_000_000_000));
@@ -321,6 +360,8 @@ fn test_isolation_longest_active_pin_diagnostics_manual_clock() {
 
 // --- 6. SnapshotRegistry Lifecycle Tests ---
 
+// ANCHOR[contextra-mvcc:TEST-ISO-014]
+/// Verifiziert korrekte Neuberechnung von `min_active_seqno` beim Droppen von Guards in beliebiger Reihenfolge.
 #[test]
 fn test_isolation_snapshot_registry_out_of_order_guard_drop() {
     let registry = Arc::new(SnapshotRegistry::new());
@@ -344,6 +385,8 @@ fn test_isolation_snapshot_registry_out_of_order_guard_drop() {
     assert_eq!(registry.min_active_seqno(), u64::MAX);
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-015]
+/// Prüft das Reference-Counting bei mehrfacher Registrierung derselben Sequenznummer.
 #[test]
 fn test_isolation_snapshot_registry_ref_counting_same_seq() {
     let registry = Arc::new(SnapshotRegistry::new());
@@ -364,6 +407,8 @@ fn test_isolation_snapshot_registry_ref_counting_same_seq() {
 
 // --- 7. SequenceLog Boundary, Tombstone & Compaction Tests ---
 
+// ANCHOR[contextra-mvcc:TEST-ISO-016]
+/// Verifiziert das Maskieren des TOMBSTONE_BIT bei Einfügungen und Sichtbarkeitsprüfungen im SequenceLog.
 #[test]
 fn test_isolation_seq_log_tombstone_bit_masking() {
     let mut log = SequenceLog::new();
@@ -378,6 +423,8 @@ fn test_isolation_seq_log_tombstone_bit_masking() {
     assert!(!log.is_visible(doc, 99));
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-017]
+/// Testet Randfälle von Sequenznummern (z. B. 0 und u64::MAX) im SequenceLog.
 #[test]
 fn test_isolation_seq_log_boundary_seq_numbers() {
     let mut log = SequenceLog::new();
@@ -392,6 +439,8 @@ fn test_isolation_seq_log_boundary_seq_numbers() {
     assert!(!log.is_visible(doc, u64::MAX - 1));
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-018]
+/// Prüft, dass Kompaktierung aktive Versionen oberhalb von `min_active_seqno` sicher bewahrt.
 #[test]
 fn test_isolation_seq_log_compaction_retains_active_versions() {
     let mut log = SequenceLog::new();
@@ -415,6 +464,8 @@ fn test_isolation_seq_log_compaction_retains_active_versions() {
 
 // --- 8. Multi-Threaded Concurrency Tests ---
 
+// ANCHOR[contextra-mvcc:TEST-ISO-019]
+/// Multithread-Stresstest für parallele Registrierung und Freigabe in der SnapshotRegistry.
 #[test]
 fn test_isolation_multithreaded_snapshot_registry_concurrency() {
     let registry = Arc::new(SnapshotRegistry::new());
@@ -444,6 +495,8 @@ fn test_isolation_multithreaded_snapshot_registry_concurrency() {
     assert_eq!(registry.min_active_seqno(), u64::MAX);
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-020]
+/// Multithread-Test für gleichzeitige Validierungen und Commits im SSI-Validator.
 #[test]
 fn test_isolation_multithreaded_ssi_validator_concurrent_commits() {
     let validator = Arc::new(SequenceLogSsiValidator::new());
@@ -470,6 +523,8 @@ fn test_isolation_multithreaded_ssi_validator_concurrent_commits() {
     assert_eq!(validator.tracked_commit_keys(), num_threads);
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-021]
+/// Prüft paralleles Staging über mehrere Shards hinweg ohne Datenverlust oder Deadlocks.
 #[test]
 fn test_isolation_multithreaded_tx_buffer_sharded_concurrency() {
     let buffer = Arc::new(TxBuffer::<usize>::new_with_config(
@@ -510,6 +565,8 @@ fn test_isolation_multithreaded_tx_buffer_sharded_concurrency() {
 
 // --- 9. TxBuffer Capacity, Budget & Orphan Reaping Tests ---
 
+// ANCHOR[contextra-mvcc:TEST-ISO-022]
+/// Verifiziert das Durchsetzen der maximalen Operationsgrenze pro Transaktion im TxBuffer.
 #[test]
 fn test_isolation_tx_buffer_bounded_ops_limit() {
     let config = TxBufferConfig {
@@ -543,6 +600,8 @@ fn test_isolation_tx_buffer_bounded_ops_limit() {
     assert!(matches!(res, Err(ContextraError::Transaction(_))));
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-023]
+/// Verifiziert die Durchsetzung des Byte-Budgets pro Transaktion im TxBuffer.
 #[test]
 fn test_isolation_tx_buffer_tx_staged_bytes_budget() {
     let config = TxBufferConfig {
@@ -565,6 +624,8 @@ fn test_isolation_tx_buffer_tx_staged_bytes_budget() {
     assert!(matches!(res, Err(ContextraError::Storage(_))));
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-024]
+/// Prüft zeitgesteuertes Orphan-Reaping im TxBuffer via ManualClock.
 #[test]
 fn test_isolation_tx_buffer_orphan_reaping_manual_clock() {
     let clock = Arc::new(ManualClock::new(10_000_000_000));
@@ -590,6 +651,8 @@ fn test_isolation_tx_buffer_orphan_reaping_manual_clock() {
     assert!(!buffer.has_tx(tx1));
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-025]
+/// Verifiziert die Nachverfolgung der minimalen Snapshot-Sequenznummer im ReadSet.
 #[test]
 fn test_isolation_read_set_min_snapshot_seq_tracking() {
     let mut rs = ReadSet::new();
@@ -605,6 +668,8 @@ fn test_isolation_read_set_min_snapshot_seq_tracking() {
     assert_eq!(rs.min_snapshot_seq(), None);
 }
 
+// ANCHOR[contextra-mvcc:TEST-ISO-026]
+/// Prüft Konflikterkennung über das angebundene SequenceLog im SSI-Validator.
 #[test]
 fn test_isolation_ssi_validator_with_sequence_log_conflict() {
     let seq_log = Arc::new(RwLock::new(SequenceLog::new()));

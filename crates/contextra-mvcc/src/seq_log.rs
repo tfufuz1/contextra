@@ -1,4 +1,23 @@
-//! Shared versioned sequence log for snapshot-isolated index searches (`_at` family).
+//! # SequenceLog — Versionsbasiertes Sequenzlog für Snapshot-Sichten
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//! **Klasse:** Kern `[K]`
+//!
+//! ## Zweck & Architektur-Rolle
+//!
+//! Dieses Modul implementiert ein leichtgewichtiges, chronologisches Sequenzlog für Dokumentoperationen.
+//! Es dient insbesondere Vektor- und Volltextindizes (`_at`-Suchmethoden) dazu, historische Sichtbarkeiten
+//! von Dokumenten zu einem bestimmten Sequenzzeitpunkt (`as_of`) zu ermitteln, ohne den Hauptspeicher-Index
+//! physisch duplizieren zu müssen.
+//!
+//! ### Sichtbarkeitsregel (Visibility Rule)
+//! Ein Dokument ist zum Zeitpunkt `as_of` genau dann sichtbar, wenn:
+//! `insert_seq <= as_of` UND (`delete_seq` ist `None` ODER `delete_seq > as_of`).
+//!
+//! ### Tombstone-Bit-Maskierung
+//! Sequenznummern können systemweit mit dem höchstwertigen Bit (`TOMBSTONE_BIT`, Bit 63) als Löschung
+//! gekennzeichnet sein. Sämtliche Methoden in diesem Modul maskieren dieses Bit strikt heraus (`& !TOMBSTONE_BIT`),
+//! um Vergleiche rein auf den arithmetischen Sequenzzählern durchzuführen.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
@@ -15,33 +34,43 @@ use contextra_ports::{Clock, SystemClock};
 
 use crate::types::DocId;
 
-/// Default maximum pin duration (5 minutes) before diagnostic warnings are issued for expired pins.
+// ANCHOR[contextra-mvcc:SEQ-001]
+/// Standard-Maximaldauer für Snapshot-Pins (5 Minuten), bevor Diagnose-Warnungen für abgelaufene Pins ausgelöst werden.
+// NOTE: 5 Minuten verhindern, dass vergessene Transaktions-Pins unbemerkt die Speicherbereinigung blockieren.
 pub const DEFAULT_MAX_PIN_DURATION: Duration = Duration::from_secs(300);
 
-/// Versioned sequence log entry for snapshot isolation (`_at` family).
+// ANCHOR[contextra-mvcc:SEQ-002]
+/// Versionsbasierter Eintrag im Sequenzlog für Snapshot-Isolation (`_at`-Familie).
 ///
-/// **Memory Overhead**: Each entry is 24 bytes (8 bytes `DocId` + 8 bytes `insert_seq` + 8 bytes `delete_seq: Option<u64>`).
-/// Entries where `delete_seq` is below `min_active_seqno` can be pruned via `compact`.
+/// **Speicher-Overhead**: Jeder Eintrag belegt exakt 24 Bytes (8 Bytes `DocId` + 8 Bytes `insert_seq` + 8 Bytes `delete_seq: Option<u64>`).
+/// Einträge, deren `delete_seq` kleiner als die minimal aktive Sequenznummer (`min_active_seqno`) ist, können über `compact()` sicher entfernt werden.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SeqLogEntry {
-    /// Document ID.
+    /// Eindeutige Dokument-ID (64-Bit-Bezeichner).
     pub doc_id: DocId,
-    /// Sequence number at which this document entry was inserted.
+    /// Sequenznummer, zu der dieser Dokumenteintrag eingefügt wurde.
     pub insert_seq: u64,
-    /// Sequence number at which this document entry was deleted (if deleted).
+    /// Sequenznummer, zu der dieser Dokumenteintrag gelöscht wurde (`None`, falls aktiv).
     pub delete_seq: Option<u64>,
 }
 
 impl SeqLogEntry {
-    /// Returns `true` if this log entry is visible at snapshot sequence number `as_of`.
+    // ANCHOR[contextra-mvcc:SEQ-003]
+    /// Prüft, ob dieser Log-Eintrag zum Snapshot-Sequenzzeitpunkt `as_of` sichtbar ist.
     ///
-    /// # Visibility Rule
-    /// An entry is visible if `insert_seq <= as_of` AND (`delete_seq` is `None` OR `delete_seq > as_of`).
+    /// # Ablauf
+    /// 1. Maskiere das `TOMBSTONE_BIT` aus `as_of`, `insert_seq` und optional `delete_seq` heraus.
+    /// 2. Prüfe, ob die Einfügesequenz kleiner oder gleich dem Abfragezeitpunkt ist (`insert_seq <= as_of`).
+    /// 3. Prüfe, ob keine Löschung vorliegt oder diese erst nach `as_of` stattfand (`delete_seq.is_none_or(|del| del > as_of)`).
     ///
-    /// # Complexity
-    /// $O(1)$ allocation-free, loop-free check using at most two integer comparisons.
+    /// # Komplexität
+    /// $O(1)$ allokationsfreie und schleifenfreie Prüfung über maximal zwei Integer-Vergleiche.
+    ///
+    /// # Parameter
+    /// - `as_of`: Der historische Snapshot-Sequenzzeitpunkt.
     #[inline]
     pub fn is_visible(&self, as_of: u64) -> bool {
+        // NOTE: Tombstone-Bit wird maskiert, um reine Versionsnummern zu vergleichen.
         let as_of = as_of & !crate::types::TOMBSTONE_BIT;
         let insert_seq = self.insert_seq & !crate::types::TOMBSTONE_BIT;
         let delete_seq = self.delete_seq.map(|d| d & !crate::types::TOMBSTONE_BIT);
@@ -49,34 +78,37 @@ impl SeqLogEntry {
     }
 }
 
-/// Represents a historical sequence log change (insert or delete) for delta replaying.
+// ANCHOR[contextra-mvcc:SEQ-004]
+/// Repräsentiert eine historische Änderung (Einfügung oder Löschung) zur Rekonstruktion von Deltas.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SeqLogChange {
-    /// A document insertion at a specific sequence number.
+    /// Einfügung eines Dokuments zu einer bestimmten Sequenznummer.
     Insert {
-        /// Document ID.
+        /// Dokument-ID des neu eingefügten Dokuments.
         doc_id: DocId,
-        /// Sequence number of the insert.
+        /// Sequenznummer des Einfügevorgangs.
         seq: u64,
     },
-    /// A document deletion at a specific sequence number.
+    /// Löschung eines Dokuments zu einer bestimmten Sequenznummer.
     Delete {
-        /// Document ID.
+        /// Dokument-ID des gelöschten Dokuments.
         doc_id: DocId,
-        /// Sequence number of the delete.
+        /// Sequenznummer des Löschvorgangs.
         seq: u64,
     },
 }
 
 impl SeqLogChange {
-    /// Returns the sequence number associated with this change.
+    // ANCHOR[contextra-mvcc:SEQ-005]
+    /// Gibt die mit dieser Änderung verbundene Sequenznummer zurück.
     pub fn seq(&self) -> u64 {
         match self {
             Self::Insert { seq, .. } | Self::Delete { seq, .. } => *seq,
         }
     }
 
-    /// Returns the document ID associated with this change.
+    // ANCHOR[contextra-mvcc:SEQ-006]
+    /// Gibt die Dokument-ID zurück, auf die sich diese Änderung bezieht.
     pub fn doc_id(&self) -> DocId {
         match self {
             Self::Insert { doc_id, .. } | Self::Delete { doc_id, .. } => *doc_id,
@@ -84,14 +116,24 @@ impl SeqLogChange {
     }
 }
 
-/// Helper structure managing sequence log tracking and visibility filtering for index implementations.
+// ANCHOR[contextra-mvcc:SEQ-007]
+/// Verwaltungskomponente für das Sequenzlog und Sichtbarkeitsfilterung von Indizes.
+///
+/// Hält chronologische Versionseinträge vor, verwaltet temporäre Snapshot-Pins zur Verhinderung
+/// voreiliger Kompaktierung und bietet Delta-Abfragen über `changes_since()`.
 #[derive(Clone)]
 pub struct SequenceLog {
+    /// Chronologische Liste aller Versionseinträge.
     entries: Vec<SeqLogEntry>,
+    /// Gepinnte Sequenznummern mit ihren Erstellungs-Zeitstempeln (Nanosekunden) für Lease-Tracking.
     pinned_snapshots: ahash::AHashMap<u64, Vec<u64>>,
+    /// Untere Grenze bisheriger Kompaktierungen (`None`, wenn noch nie kompaktiert).
     compacted_below: Option<u64>,
+    /// Aktive Soft-Deletes: Zuordnung von `DocId` zu ihrer Löschsequenznummer.
     deletions: ahash::AHashMap<DocId, u64>,
+    /// Maximale Haltezeit für Pins vor Ausgabe von Warnungen oder Reaping.
     max_pin_duration: Duration,
+    /// Zeit-Port für deterministische Zeitabfragen (Regel 3 aus CLAUDE.md).
     clock: Arc<dyn Clock>,
 }
 
@@ -114,12 +156,16 @@ impl Default for SequenceLog {
 }
 
 impl SequenceLog {
-    /// Creates a new empty sequence log with default max pin duration (5 minutes) and [`SystemClock`].
+    // ANCHOR[contextra-mvcc:SEQ-008]
+    /// Erstellt ein neues, leeres Sequenzlog mit Standard-Pin-Dauer (5 Minuten) und [`SystemClock`].
     pub fn new() -> Self {
         Self::with_clock(Arc::new(SystemClock::new()))
     }
 
-    /// Creates a new empty sequence log using the given [`Clock`] instance.
+    // ANCHOR[contextra-mvcc:SEQ-009]
+    /// Erstellt ein neues, leeres Sequenzlog unter Verwendung der übergebenen [`Clock`]-Instanz.
+    ///
+    /// Dies ermöglicht deterministische Zeitsteuerung in Tests via Mock-Uhren.
     pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
         Self {
             entries: Vec::new(),
@@ -131,39 +177,51 @@ impl SequenceLog {
         }
     }
 
-    /// Returns the active [`Clock`] instance associated with this sequence log.
+    // ANCHOR[contextra-mvcc:SEQ-010]
+    /// Gibt eine Referenz auf den aktuell konfigurierten [`Clock`]-Port zurück.
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
     }
 
-    /// Sets the active [`Clock`] instance for this sequence log.
+    // ANCHOR[contextra-mvcc:SEQ-011]
+    /// Ersetzt den aktiven [`Clock`]-Port dieses Sequenzlogs.
     pub fn set_clock(&mut self, clock: Arc<dyn Clock>) {
         self.clock = clock;
     }
 
-    /// Sets a custom maximum pin duration for diagnostics and returns `self`.
+    // ANCHOR[contextra-mvcc:SEQ-012]
+    /// Setzt eine benutzerdefinierte maximale Pin-Dauer für Diagnose-Warnungen (Builder-Muster).
     pub fn with_max_pin_duration(mut self, duration: Duration) -> Self {
         self.max_pin_duration = duration;
         self
     }
 
-    /// Sets a custom maximum pin duration for diagnostics.
+    // ANCHOR[contextra-mvcc:SEQ-013]
+    /// Konfiguriert die maximale Pin-Dauer für Diagnose-Warnungen im laufenden Betrieb.
     pub fn set_max_pin_duration(&mut self, duration: Duration) {
         self.max_pin_duration = duration;
     }
 
-    /// Returns the configured maximum pin duration.
+    // ANCHOR[contextra-mvcc:SEQ-014]
+    /// Liefert die aktuell konfigurierte maximale Pin-Dauer zurück.
     pub fn max_pin_duration(&self) -> Duration {
         self.max_pin_duration
     }
 
-    /// Pins a historical sequence number to prevent rebuild from purging soft-deleted nodes active at this snapshot.
+    // ANCHOR[contextra-mvcc:SEQ-015]
+    /// Pinnt eine historische Sequenznummer, um zu verhindern, dass GC/Kompaktierung
+    /// gelöschte Knoten entfernt, die in diesem Snapshot noch sichtbar sein müssen.
+    ///
+    /// Fragt den Zeitstempel über die interne Uhr ab.
     pub fn pin_snapshot(&mut self, seq_no: u64) {
         let now_nanos = self.clock.monotonic_nanos();
         self.pin_snapshot_at(seq_no, now_nanos);
     }
 
-    /// Pins a historical sequence number at a specific monotonic nanosecond timestamp `at_nanos` for deterministic testing and lease tracking.
+    // ANCHOR[contextra-mvcc:SEQ-016]
+    /// Pinnt eine Sequenznummer zu einem expliziten monotonen Nanosekunden-Zeitstempel `at_nanos`.
+    ///
+    /// Ermöglicht deterministische Lease-Verwaltung und Zeittests.
     pub fn pin_snapshot_at(&mut self, seq_no: u64, at_nanos: u64) {
         let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
         self.pinned_snapshots
@@ -172,7 +230,11 @@ impl SequenceLog {
             .push(at_nanos);
     }
 
-    /// Unpins a historical sequence number.
+    // ANCHOR[contextra-mvcc:SEQ-017]
+    /// Gibt einen zuvor gepinnten Snapshot wieder frei.
+    ///
+    /// Existierten mehrere Pins für dieselbe Sequenznummer (z. B. verschachtelte Transaktionen),
+    /// wird der jüngste Pin entfernt. Erst wenn keine Pins mehr vorhanden sind, wird der Eintrag gelöscht.
     pub fn unpin_snapshot(&mut self, seq_no: u64) {
         let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
         if let std::collections::hash_map::Entry::Occupied(mut entry) =
@@ -186,8 +248,11 @@ impl SequenceLog {
         }
     }
 
-    /// Returns all pinned sequence numbers whose active pin duration exceeds `max_pin_duration`
-    /// relative to the provided monotonic timestamp `now_nanos`.
+    // ANCHOR[contextra-mvcc:SEQ-018]
+    /// Liefert alle gepinnten Sequenznummern zurück, deren aktive Haltedauer bezogen auf
+    /// `now_nanos` die konfigurierte Grenze `max_pin_duration` überschreitet.
+    ///
+    /// Die Liste wird sortiert zurückgegeben.
     pub fn expired_pins_at(&self, now_nanos: u64) -> Vec<u64> {
         let max_nanos = u64::try_from(self.max_pin_duration.as_nanos()).unwrap_or(u64::MAX);
         let mut expired = Vec::new();
@@ -203,12 +268,16 @@ impl SequenceLog {
         expired
     }
 
-    /// Returns all pinned sequence numbers whose active pin duration exceeds `max_pin_duration`.
+    // ANCHOR[contextra-mvcc:SEQ-019]
+    /// Ermittelt alle gepinnten Sequenznummern, deren Haltedauer die Maximallaufzeit überschreitet,
+    /// basierend auf der aktuellen Uhrzeit des `Clock`-Ports.
     pub fn expired_pins(&self) -> Vec<u64> {
         self.expired_pins_at(self.clock.monotonic_nanos())
     }
 
-    /// Reaps and unpins all snapshot pins exceeding `max_pin_duration` relative to monotonic timestamp `now_nanos`, returning the expired sequence numbers.
+    // ANCHOR[contextra-mvcc:SEQ-020]
+    /// Entfernt alle abgelaufenen Snapshot-Pins bezogen auf den Nanosekunden-Zeitstempel `now_nanos`
+    /// und gibt deren Sequenznummern zurück.
     pub fn reap_expired_pins_at(&mut self, now_nanos: u64) -> Vec<u64> {
         let expired = self.expired_pins_at(now_nanos);
         for &seq in &expired {
@@ -217,16 +286,18 @@ impl SequenceLog {
         expired
     }
 
-    /// Reaps and unpins all snapshot pins exceeding `max_pin_duration`, returning the expired sequence numbers.
+    // ANCHOR[contextra-mvcc:SEQ-021]
+    /// Entfernt alle abgelaufenen Snapshot-Pins und gibt die betroffenen Sequenznummern zurück.
     pub fn reap_expired_pins(&mut self) -> Vec<u64> {
         let now_nanos = self.clock.monotonic_nanos();
         self.reap_expired_pins_at(now_nanos)
     }
 
-    /// Calculates the minimum sequence number currently pinned for snapshot retention at monotonic timestamp `now_nanos`.
-    /// Returns `None` if no snapshot sequence numbers are pinned.
+    // ANCHOR[contextra-mvcc:SEQ-022]
+    /// Berechnet die kleinste aktuell gepinnte Sequenznummer bezogen auf `now_nanos`.
     ///
-    /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
+    /// Liefert `None`, wenn derzeit keine Snapshots gepinnt sind.
+    /// Gibt eine Tracing-Warnung aus, falls ein Pin die Maximallaufzeit überschritten hat.
     pub fn min_retention_seq_at(&self, now_nanos: u64) -> Option<u64> {
         let min_seq = self.pinned_snapshots.keys().copied().min();
         if let Some(seq) = min_seq {
@@ -249,20 +320,27 @@ impl SequenceLog {
         min_seq
     }
 
-    /// Calculates the minimum sequence number currently pinned for snapshot retention.
-    /// Returns `None` if no snapshot sequence numbers are pinned.
-    ///
-    /// If an active pin exceeds `max_pin_duration`, a diagnostic warning is emitted.
+    // ANCHOR[contextra-mvcc:SEQ-023]
+    /// Berechnet die minimale Retentions-Sequenznummer zur aktuellen Zeit des `Clock`-Ports.
     pub fn min_retention_seq(&self) -> Option<u64> {
         self.min_retention_seq_at(self.clock.monotonic_nanos())
     }
 
-    /// Returns the deletion sequence number of the given document, if currently soft-deleted.
+    // ANCHOR[contextra-mvcc:SEQ-024]
+    /// Liefert die Löschsequenznummer eines Dokuments, falls es aktuell soft-deleted ist.
     pub fn deletion_seq(&self, doc_id: DocId) -> Option<u64> {
         self.deletions.get(&doc_id).copied()
     }
 
-    /// Records an insert operation at the given sequence number `seq`.
+    // ANCHOR[contextra-mvcc:SEQ-025]
+    /// Protokolliert das Einfügen eines Dokuments zur Sequenznummer `seq`.
+    ///
+    /// # Ablauf
+    /// 1. Maskiere das Tombstone-Bit aus `seq`.
+    /// 2. Falls für diese Dokument-ID ein aktiver Eintrag ohne Löschsequenz existierte,
+    ///    wird dessen `delete_seq` auf `seq` gesetzt (Überschreiben/Update-Semantik).
+    /// 3. Entferne das Dokument aus der Tabelle der aktiven Löschungen (`deletions`).
+    /// 4. Hänge den neuen Versionseintrag mit `delete_seq = None` an das Log an.
     pub fn record_insert(&mut self, doc_id: DocId, seq: u64) {
         let seq = seq & !crate::types::TOMBSTONE_BIT;
         if let Some(entry) = self
@@ -280,7 +358,13 @@ impl SequenceLog {
         });
     }
 
-    /// Records a delete operation at the given sequence number `seq`.
+    // ANCHOR[contextra-mvcc:SEQ-026]
+    /// Protokolliert das Löschen eines Dokuments zur Sequenznummer `seq`.
+    ///
+    /// # Ablauf
+    /// 1. Maskiere das Tombstone-Bit aus `seq`.
+    /// 2. Suche rückwärts nach dem jüngsten offenen Eintrag dieses Dokuments (`delete_seq.is_none()`).
+    /// 3. Setze dessen `delete_seq` auf `seq` und hinterlege die Löschung in `deletions`.
     pub fn record_delete(&mut self, doc_id: DocId, seq: u64) {
         let seq = seq & !crate::types::TOMBSTONE_BIT;
         if let Some(entry) = self
@@ -293,7 +377,11 @@ impl SequenceLog {
         }
     }
 
-    /// Checks if `doc_id` was inserted at or before `seq_no` and not deleted at or before `seq_no`.
+    // ANCHOR[contextra-mvcc:SEQ-027]
+    /// Prüft, ob ein Dokument zu einer bestimmten Sequenznummer `seq_no` im Index sichtbar ist.
+    ///
+    /// Gibt `true` zurück, falls das Dokument zu oder vor `seq_no` eingefügt und nicht
+    /// zu oder vor `seq_no` gelöscht wurde.
     pub fn is_visible(&self, doc_id: DocId, seq_no: u64) -> bool {
         let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
         let mut inserted = false;
@@ -313,7 +401,11 @@ impl SequenceLog {
         inserted && !deleted
     }
 
-    /// Compacts log entries where deletion sequence number is strictly less than `min_active_seqno`.
+    // ANCHOR[contextra-mvcc:SEQ-028]
+    /// Kompaktiert das Log: Entfernt Einträge, deren Löschsequenznummer strikt kleiner als `min_active_seqno` ist.
+    ///
+    /// Einträge, die vor der minimal aktiven Snapshot-Sequenznummer gelöscht wurden,
+    /// können von keinem lebenden Snapshot mehr gesehen werden und werden freigegeben.
     pub fn compact(&mut self, min_active_seqno: u64) {
         let min_active_seqno = min_active_seqno & !crate::types::TOMBSTONE_BIT;
         self.compacted_below = Some(
@@ -332,18 +424,23 @@ impl SequenceLog {
             .retain(|_, &mut del_seq| (del_seq & !crate::types::TOMBSTONE_BIT) >= min_active_seqno);
     }
 
-    /// Returns the number of entries in the sequence log.
+    // ANCHOR[contextra-mvcc:SEQ-029]
+    /// Liefert die Gesamtzahl der gespeicherten Log-Einträge.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
-    /// Returns true if the sequence log is empty.
+    // ANCHOR[contextra-mvcc:SEQ-030]
+    /// Prüft, ob das Sequenzlog leer ist.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
-    /// Returns all sequence log changes that occurred strictly after `snapshot_seq`,
-    /// ordered chronologically by sequence number.
+    // ANCHOR[contextra-mvcc:SEQ-031]
+    /// Liefert alle Änderungen zurück, die strikt nach `snapshot_seq` stattfanden.
+    ///
+    /// Das Ergebnis ist chronologisch aufsteigend nach der Sequenznummer sortiert.
+    /// Dient der inkrementellen Nachführung von Indizes (Delta Replay).
     pub fn changes_since(&self, snapshot_seq: u64) -> Vec<SeqLogChange> {
         let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
         let mut changes = Vec::new();

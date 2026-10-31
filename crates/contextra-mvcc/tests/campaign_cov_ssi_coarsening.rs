@@ -1,3 +1,10 @@
+//! # Test für SSI-Coarsening und Pruning-Blocker-Diagnostik
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Prüft die automatische Vergröberung (Coarsening) ab 80 % Kapazitätsauslastung
+//! und die Diagnose blockierender Snapshots.
+
 // FILE-CONTEXT
 // ZWECK: Campaign coverage test for SequenceLogSsiValidator coarsening and pruning blocker diagnostics.
 // INVARIANTEN: Coarsening occurs at 80% capacity limit without false negatives for write-skew detection.
@@ -11,6 +18,8 @@ use contextra_mvcc::SsiValidator;
 use contextra_types::TxId;
 use std::sync::Arc;
 
+// ANCHOR[contextra-mvcc:TEST-COV-COARSEN-001]
+/// Testet, dass Coarsening ausgelöst wird und `diagnose_pruning_blocker` den aktiven Blocker liefert.
 #[test]
 fn test_ssi_coarsening_trigger_and_diagnose_pruning_blocker() {
     let registry = Arc::new(SnapshotRegistry::new());

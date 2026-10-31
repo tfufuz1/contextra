@@ -1,8 +1,18 @@
+//! # Eigenschaftsbasierte Tests (Proptest) für SSI-Determinismus
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Beweist die Invariante INV-MVCC-SSI-1: Die Konfliktauflösung im SSI-Validator
+//! ist 100 % deterministisch. Bei identischen Transaktionsereignissen liefern
+//! zwei unabhängige Simulationsläufe exakt identische Validierungsresultate.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{ReadSet, SequenceLogSsiValidator, SsiValidator, TxId};
 use proptest::prelude::*;
 
+// ANCHOR[contextra-mvcc:TEST-PROP-DET-001]
+/// Simuliertes Transaktionsereignis für die Determinismus-Prüfung.
 #[derive(Debug, Clone)]
 enum TxEvent {
     RecordRead {
@@ -19,6 +29,8 @@ enum TxEvent {
     },
 }
 
+// ANCHOR[contextra-mvcc:TEST-PROP-DET-002]
+/// Führt eine Ereignisfolge deterministisch auf einem frischen Validator aus und sammelt Validierungsergebnisse.
 fn simulate_sequence(keys: &[Vec<u8>], events: &[TxEvent]) -> Vec<(u64, Result<(), String>)> {
     let validator = SequenceLogSsiValidator::new();
     let mut tx_read_sets = ahash::AHashMap::<u64, ReadSet>::default();
@@ -68,6 +80,8 @@ fn simulate_sequence(keys: &[Vec<u8>], events: &[TxEvent]) -> Vec<(u64, Result<(
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
 
+    // ANCHOR[contextra-mvcc:TEST-PROP-DET-003]
+    /// Proptest: Beweist 100 % identische Validierungsausgänge bei wiederholter Ausführung derselben Ereignisfolge.
     #[test]
     fn prop_ssi_validation_is_100_percent_deterministic(
         seed_keys in proptest::collection::vec(proptest::collection::vec(0..255u8, 1..16), 1..10),

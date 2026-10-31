@@ -1,7 +1,16 @@
+//! # Write-Skew-Erkennungstests für contextra-mvcc
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Prüft die klassische Erkennung und Verhinderung von Write-Skew-Anomalien
+//! sowie die konfliktfreie Ausführung disjunkter Transaktionen.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{ContextraError, SequenceLogSsiValidator, SsiValidator, TxBuffer, TxId};
 
+// ANCHOR[contextra-mvcc:TEST-WS-001]
+/// Simuliert zwei überkreuzende Schreibtransaktionen und prüft, dass die zweite Transaktion wegen Write-Skew abgebrochen wird.
 #[test]
 fn test_classic_write_skew_conflict_detected() {
     let validator = SequenceLogSsiValidator::new();
@@ -55,6 +64,8 @@ fn test_classic_write_skew_conflict_detected() {
     }
 }
 
+// ANCHOR[contextra-mvcc:TEST-WS-002]
+/// Bestätigt, dass Transaktionen mit völlig disjunkten Lese- und Schreibmengen parallel committen können.
 #[test]
 fn test_disjoint_read_write_sets_succeed() {
     let validator = SequenceLogSsiValidator::new();

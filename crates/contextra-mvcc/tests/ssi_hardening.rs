@@ -1,4 +1,13 @@
-//! Hardening and concurrency tests for Serializable Snapshot Isolation (SSI) pruning, limits, and watermarks.
+//! # SSI-Härtungs- und Wasserstandstests
+//!
+//! **Ring:** Ring 0 (Transaktionsisolation)
+//!
+//! Prüft Robustheit und Invarianten des SSI-Subsystems:
+//! - Atomizität von `validate_and_record` unter hoher Nebenläufigkeit.
+//! - Mechanik von `prune_through` und atomare Wasserstandsnachführung.
+//! - Fail-Closed-Verhalten bei Lesezugriffen unterhalb des Wasserstands.
+//! - Shard-übergreifende Minimum-Ermittlung im TxBuffer.
+//! - Äquivalenz-Proptest oberhalb des Pruning-Wasserstands.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -9,6 +18,8 @@ use contextra_mvcc::types::TxId;
 use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
+// ANCHOR[contextra-mvcc:TEST-HARD-001]
+/// Stresstest über 500 Durchläufe: Beweist, dass `validate_and_record` niemals beiden Parteien eines Write-Skews Erfolg meldet.
 #[test]
 fn test_validate_and_record_atomicity() {
     for _ in 0..500 {
@@ -49,6 +60,8 @@ fn test_validate_and_record_atomicity() {
     }
 }
 
+// ANCHOR[contextra-mvcc:TEST-HARD-002]
+/// Verifiziert, dass `prune_through` committete Einträge bis zur Grenze sauber freigibt.
 #[test]
 fn test_prune_through_mechanics() {
     let validator = SequenceLogSsiValidator::new();
@@ -70,6 +83,8 @@ fn test_prune_through_mechanics() {
     assert_eq!(validator.pruned_through(), 20);
 }
 
+// ANCHOR[contextra-mvcc:TEST-HARD-003]
+/// Prüft, dass Snapshots älter als `pruned_through` strikt fail-closed als Konflikt abgebrochen werden.
 #[test]
 fn test_fail_closed_validation() {
     let validator = SequenceLogSsiValidator::new();
@@ -96,6 +111,8 @@ fn test_fail_closed_validation() {
     assert!(res_valid.is_ok());
 }
 
+// ANCHOR[contextra-mvcc:TEST-HARD-004]
+/// Prüft die korrekte Ermittlung der kleinsten Snapshot-Sequenznummer über mehrere Shards hinweg.
 #[test]
 fn test_min_read_snapshot_across_shards() {
     let buffer = TxBuffer::<String>::new_with_config(64, Duration::from_secs(30));
@@ -119,6 +136,8 @@ fn test_min_read_snapshot_across_shards() {
     assert_eq!(buffer.min_read_snapshot(), None);
 }
 
+// ANCHOR[contextra-mvcc:TEST-HARD-005]
+/// Verifiziert das Durchsetzen von `max_keys` bei neuen Lese-Einträgen sowie die Erlaubnis von Updates bestehender Keys.
 #[test]
 fn test_try_register_read_limit_and_updates() {
     let buffer = TxBuffer::<String>::new();
@@ -146,6 +165,8 @@ fn test_try_register_read_limit_and_updates() {
 }
 
 proptest::proptest! {
+    // ANCHOR[contextra-mvcc:TEST-HARD-006]
+    /// Proptest: Beweist die exakte Verhaltens-Äquivalenz zwischen unbereinigtem und bereinigtem Validator für alle Abfragen oberhalb des Wasserstands.
     #[test]
     fn prop_prune_equivalence_above_watermark(
         commits in proptest::collection::vec((proptest::collection::vec(0..255u8, 1..8), 1..100u64), 1..30),
