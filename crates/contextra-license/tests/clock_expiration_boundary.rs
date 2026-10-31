@@ -1,3 +1,6 @@
+//! Prüfung von Ablaufzeitpunkten, Zeitdrift und Verhalten bei Uhrzeit-Rollbacks über den Clock-Port (P28).
+//! Verifiziert die exakten Grenzwertbedingungen der Lizenzgültigkeit.
+
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -48,6 +51,8 @@ fn generate_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     (signing_key, verifying_key)
 }
 
+// ANCHOR[contextra-license:TEST-CLOCK-EXPIRATION-BOUNDARY]
+// Prüft exakte Sekundengrenzen: Gültig bis t-1, abgelaufen ab t (current_time >= expires_at).
 #[test]
 fn test_expiration_exact_boundary_conditions() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -82,6 +87,8 @@ fn test_expiration_exact_boundary_conditions() {
     );
 }
 
+// ANCHOR[contextra-license:TEST-CLOCK-DRIFT-SKEW]
+// Prüft das Verhalten des Lizenz-Gates bei simulierter Zeitdrift über den injizierten Clock-Port.
 #[test]
 fn test_clock_drift_and_skew_tolerance() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -113,6 +120,8 @@ fn test_clock_drift_and_skew_tolerance() {
     );
 }
 
+// ANCHOR[contextra-license:TEST-CLOCK-ROLLBACK]
+// Prüft das Verhalten bei Zurückdrehen der Uhrzeit (Rollback) im Zusammenspiel mit dem Clock-Port.
 #[test]
 fn test_system_clock_rollback_behavior() {
     let (signing_key, verifying_key) = generate_keypair();

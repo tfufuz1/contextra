@@ -1,3 +1,7 @@
+//! Prüfung der Reihenfolge und Hierarchieunabhängigkeit der 7 Verifikationsschritte.
+//! Stellt sicher, dass das Fail-Closed-Verfahren exakt der spezifizierten Reihenfolge folgt
+//! und keine impliziten Berechtigungsübertragungen zwischen Feature-Ringen stattfinden.
+
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -35,6 +39,8 @@ fn generate_deterministic_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey)
 }
 
 /// Step 1: Fast ring returns Ok unconditionally even if activation is missing, hash mismatch, signature corrupted, or expired.
+// ANCHOR[contextra-license:TEST-ORDER-STEP-1]
+// Prüft, dass der Fast-Ring (INV-LICENSE-2) immer sofort freigegeben wird, selbst ohne Aktivierungsdaten.
 #[test]
 fn test_order_step_1_fast_ring_bypass() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -77,6 +83,8 @@ fn test_order_step_1_fast_ring_bypass() {
     assert_eq!(gate_foreign.check_ring(FeatureRing::Fast), Ok(()));
 }
 
+// ANCHOR[contextra-license:TEST-RING-SEMANTICS-NO-HIERARCHY]
+// Prüft, dass die Freischaltung des Compliance-Rings nicht implizit den Sovereign-Ring freischaltet (keine Vererbung).
 #[test]
 fn test_ring_semantics_compliance_does_not_unlock_sovereign_and_open_fast_gate() {
     use contextra_license::OpenFastGate;
@@ -116,6 +124,8 @@ fn test_ring_semantics_compliance_does_not_unlock_sovereign_and_open_fast_gate()
 }
 
 /// Step 2: Missing activation returns NotActivated before hash/sig/expiration/ring checks.
+// ANCHOR[contextra-license:TEST-ORDER-STEP-2]
+// Prüft, dass Schritt 2 fehlschlägt (NotActivated), wenn für geschützte Ringe keine Aktivierung vorliegt.
 #[test]
 fn test_order_step_2_missing_activation() {
     let gate = SignedLicenseGate::no_activation();
@@ -126,6 +136,8 @@ fn test_order_step_2_missing_activation() {
 }
 
 /// Step 3: Installation hash mismatch returns NotActivated before signature check (Step 4).
+// ANCHOR[contextra-license:TEST-ORDER-STEP-3]
+// Prüft, dass ein abweichender Installations-ID-Hash in Schritt 3 scheitert, bevor die Signatur geprüft wird.
 #[test]
 fn test_order_step_3_hash_mismatch_before_signature_check() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -149,6 +161,8 @@ fn test_order_step_3_hash_mismatch_before_signature_check() {
 }
 
 /// Step 4: Invalid signature returns InvalidSignature before expiration check (Step 5).
+// ANCHOR[contextra-license:TEST-ORDER-STEP-4]
+// Prüft, dass eine manipulierte Signatur in Schritt 4 scheitert, noch bevor das Ablaufdatum ausgewertet wird.
 #[test]
 fn test_order_step_4_signature_check_before_expiration() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -175,6 +189,8 @@ fn test_order_step_4_signature_check_before_expiration() {
 }
 
 /// Step 5: Expired activation returns Expired before ring level check (Step 6).
+// ANCHOR[contextra-license:TEST-ORDER-STEP-5]
+// Prüft, dass eine abgelaufene Lizenz in Schritt 5 abgewiesen wird, bevor die Ring-Berechtigung geprüft wird.
 #[test]
 fn test_order_step_5_expiration_before_ring_level_check() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -202,6 +218,8 @@ fn test_order_step_5_expiration_before_ring_level_check() {
 }
 
 /// Step 6: Ring requirement check returns NotActivated when activation ring != requested ring.
+// ANCHOR[contextra-license:TEST-ORDER-STEP-6]
+// Prüft, dass Schritt 6 fehlschlägt, wenn die Lizenz zwar gültig ist, aber den angeforderten Ring nicht enthält.
 #[test]
 fn test_order_step_6_ring_mismatch() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -223,6 +241,8 @@ fn test_order_step_6_ring_mismatch() {
 }
 
 /// Step 7: Valid activation returns Ok.
+// ANCHOR[contextra-license:TEST-ORDER-STEP-7]
+// Prüft den erfolgreichen Durchlauf aller 7 Schritte bei vollständig valider Lizenzierung.
 #[test]
 fn test_order_step_7_success() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();

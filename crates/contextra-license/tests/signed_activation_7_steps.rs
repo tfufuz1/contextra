@@ -1,3 +1,6 @@
+//! Unit-Tests für die individuellen Funktionen der 7 Verifikationsschritte (verify_step_1 bis verify_step_7).
+//! Verifiziert jeden Teilschritt isoliert auf korrekte Rückgabewerte und Fehlertypen.
+
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::sync::Arc;
@@ -32,6 +35,8 @@ fn generate_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
 }
 
 /// Prüfstufe 1: Fast-Ring ohne jede Aktivierung ist Ok (INV-LICENSE-2)
+// ANCHOR[contextra-license:TEST-STEPS-STEP-1-OK]
+// Prüft, dass verify_step_1_fast_ring für Fast true und sonst false liefert.
 #[test]
 fn test_step_1_fast_ring_without_any_activation_is_ok() {
     let gate = SignedLicenseGate::no_activation();
@@ -39,6 +44,8 @@ fn test_step_1_fast_ring_without_any_activation_is_ok() {
 }
 
 /// Prüfstufe 2: Fehlende Aktivierung für Sovereign/Compliance ist NotActivated
+// ANCHOR[contextra-license:TEST-STEPS-STEP-2-MISSING]
+// Prüft, dass verify_step_2_presence bei fehlenden Daten MissingActivation zurückgibt.
 #[test]
 fn test_step_2_missing_activation_returns_not_activated() {
     let gate = SignedLicenseGate::no_activation();
@@ -53,6 +60,8 @@ fn test_step_2_missing_activation_returns_not_activated() {
 }
 
 /// Prüfstufe 3: Falscher installation_id_hash ist NotActivated (nicht InvalidSignature)
+// ANCHOR[contextra-license:TEST-STEPS-STEP-3-MISMATCH]
+// Prüft, dass verify_step_3_installation bei falschem Hash InstallationMismatch liefert.
 #[test]
 fn test_step_3_mismatched_installation_id_returns_not_activated_before_signature_check() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -79,6 +88,8 @@ fn test_step_3_mismatched_installation_id_returns_not_activated_before_signature
 }
 
 /// Prüfstufe 4: Manipulierte Signatur ist InvalidSignature
+// ANCHOR[contextra-license:TEST-STEPS-STEP-4-TAMPERED]
+// Prüft, dass verify_step_4_signature bei manipulierter Signatur InvalidSignature meldet.
 #[test]
 fn test_step_4_tampered_signature_returns_invalid_signature() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -102,6 +113,8 @@ fn test_step_4_tampered_signature_returns_invalid_signature() {
 }
 
 /// Prüfstufe 5: Abgelaufene Aktivierung ist Expired
+// ANCHOR[contextra-license:TEST-STEPS-STEP-5-EXPIRED]
+// Prüft, dass verify_step_5_expiration bei abgelaufener Zeit Expired zurückgibt.
 #[test]
 fn test_step_5_expired_activation_returns_expired() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -129,6 +142,8 @@ fn test_step_5_expired_activation_returns_expired() {
 }
 
 /// Prüfstufe 6: Zu niedriger aktivierter Ring ist NotActivated ohne automatische Höherstufung
+// ANCHOR[contextra-license:TEST-STEPS-STEP-6-INSUFFICIENT]
+// Prüft, dass verify_step_6_ring_permission bei falschem Ring RingNotPermitted meldet.
 #[test]
 fn test_step_6_insufficient_activated_ring_returns_not_activated() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -152,6 +167,8 @@ fn test_step_6_insufficient_activated_ring_returns_not_activated() {
 }
 
 /// Prüfstufe 7: Vollständig korrekte Aktivierung ist Ok
+// ANCHOR[contextra-license:TEST-STEPS-STEP-7-SUCCESS]
+// Prüft, dass verify_step_7_success immer Ok(()) liefert.
 #[test]
 fn test_step_7_fully_valid_activation_returns_ok() {
     let (signing_key, verifying_key) = generate_keypair();

@@ -1,3 +1,6 @@
+//! Prüfung der Rückwärtskompatibilität für ältere Lizenz-Payloads (LegacyLicensePayload).
+//! Verifiziert die sichere Deserialisierung alter Formate nur bei explizit gesetztem Flag allow_legacy.
+
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -46,6 +49,8 @@ struct LegacyPayloadSchema {
     feature_flags: BTreeMap<String, bool>,
 }
 
+// ANCHOR[contextra-license:TEST-LEGACY-ROUNDTRIP-WITH-FLAG]
+// Prüft erfolgreiche Deserialisierung von Legacy-Payloads bei aktiviertem allow_legacy: true.
 #[test]
 fn test_legacy_payload_roundtrip_deserialization_with_flag() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -84,6 +89,8 @@ fn test_legacy_payload_roundtrip_deserialization_with_flag() {
     assert_eq!(gate.check_ring(FeatureRing::Sovereign), Ok(()));
 }
 
+// ANCHOR[contextra-license:TEST-LEGACY-REJECTED-WITHOUT-FLAG]
+// Prüft strikte Ablehnung von Legacy-Payloads, wenn allow_legacy standardmäßig false ist.
 #[test]
 fn test_legacy_payload_rejected_without_flag() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -114,6 +121,8 @@ fn test_legacy_payload_rejected_without_flag() {
     assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
+// ANCHOR[contextra-license:TEST-LEGACY-NEW-PAYLOAD-ROUNDTRIP]
+// Prüft reguläres Roundtrip-Verhalten des modernen Payload-Schemas mit Installations-Hash.
 #[test]
 fn test_new_payload_roundtrip_deserialization() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -152,6 +161,8 @@ fn test_new_payload_roundtrip_deserialization() {
     assert_eq!(gate.check_ring(FeatureRing::Sovereign), Ok(()));
 }
 
+// ANCHOR[contextra-license:TEST-LEGACY-CORRUPTED-NOT-ACCEPTED]
+// Prüft, dass ein beschädigter neuer Payload nicht fälschlicherweise als Legacy interpretiert wird.
 #[test]
 fn test_corrupted_new_payload_not_accepted_as_legacy() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();

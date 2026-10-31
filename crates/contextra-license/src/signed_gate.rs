@@ -1,4 +1,18 @@
-//! Cryptographic signed license gate implementation (§10.2, §14.6, §15).
+//! Kryptografisch signierte Lizenz-Gate-Implementierung (§10.2, §14.6, §15).
+//!
+//! Dieses Modul implementiert die Offline-Verifikation von Lizenzen und Feature-Ringen.
+//! Es ermöglicht Contextra-Knoten, erweiterte Funktionen (z. B. Sovereign- oder Compliance-Ring)
+//! ohne bestehende Internet- oder Cloud-Verbindung abzusichern.
+//!
+//! # Architektur & Schutzziele
+//! - **Offline-Verifikation:** Prüfung ausschließlich über asymmetrische Ed25519-Signaturen
+//!   und kryptografische BLAKE3-Hashes (REQ-LIC-001). Keine externen Netzwerkaufrufe.
+//! - **Hardware- & Installations-Bindung:** Lizenzen können an eine konkrete Maschine oder
+//!   Installation gebunden werden (`installation_id_hash`). Ein Kopieren auf fremde Hosts schlägt fehl.
+//! - **Deterministische Zeitprüfung:** Zeitabfragen erfolgen strikt über den [`Clock`]-Port
+//!   (Regel 3: Ports für Zeit, Zufall und IDs). Dies erlaubt deterministische Tests sowie Schutz vor Replay.
+//! - **Fail-Closed Prinzip:** Tritt ein Fehler, eine fehlende Aktivierung oder ein ungültiger Hash auf,
+//!   wird der Zugriff verweigert (`Err(LicenseError::...)`). Nur der freie `Fast`-Ring ist immer freigeschaltet (INV-LICENSE-2).
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -11,10 +25,26 @@ pub use ed25519_dalek::VerifyingKey;
 use ed25519_dalek::{Signature, Signer, Verifier};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// Maximum allowed payload size in bytes (64 KiB) for license verification to prevent memory/CPU DoS.
+// ANCHOR[contextra-license:CONST-MAX-PAYLOAD]
+/// Maximale zulässige Payload-Größe in Bytes (64 KiB) für die Lizenzverifikation.
+///
+/// **Zweck:** Schutz vor Speicher- und CPU-Erschöpfungsangriffen (Denial of Service)
+/// durch übergroße oder manipulierte Nutzlasten bei der Deserialisierung.
 pub const MAX_PAYLOAD_BYTES: usize = 65_536;
 
-/// Constant-time 32-byte equality comparison to prevent timing attacks when comparing hashes or secrets.
+// ANCHOR[contextra-license:FN-CONSTANT-TIME-EQ]
+/// Vergleicht zwei 32-Byte-Arrays in konstanter Laufzeit (Constant-Time).
+///
+/// **Zweck:** Verhindert Seitenkanal-Angriffe (Timing Attacks) beim Prüfen von kryptografischen
+/// Hashes oder geheimen Schlüsseln, indem alle Bytes unabhängig von früheren Diskrepanzen
+/// bitweise verknüpft werden.
+///
+/// **Ablauf:**
+/// 1. Iteriert über alle 32 Bytes beider Slices synchron.
+/// 2. Bitweises XOR (`^`) akkumuliert Unterschiede in einer Hilfsvariablen via OR (`|=`).
+/// 3. Gibt `true` genau dann zurück, wenn das Gesamtergebnis 0 ist (alle Bytes identisch).
+///
+/// **Nebenwirkungen:** Keine (reine CPU-Operation im Stack).
 #[inline]
 pub fn constant_time_eq_32(a: &[u8; 32], b: &[u8; 32]) -> bool {
     let mut res = 0u8;
@@ -24,16 +54,21 @@ pub fn constant_time_eq_32(a: &[u8; 32], b: &[u8; 32]) -> bool {
     res == 0
 }
 
-/// Options for signed payload verification and legacy compatibility.
+// ANCHOR[contextra-license:STRUCT-OPTIONS]
+/// Konfigurationsoptionen für die Prüfung signierter Payloads und Rückwärtskompatibilität.
+///
+/// Ermöglicht es, die maximale Nutzlastgröße anzupassen oder alte Payload-Schemata
+/// ohne Installations-ID-Hash explizit zuzulassen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SignedLicenseOptions {
-    /// Whether fallback to legacy payload schema (without installation ID hash) is permitted.
+    /// Gibt an, ob der Fallback auf das Legacy-Schema (ohne Installations-Hash) erlaubt ist.
     pub allow_legacy: bool,
-    /// Maximum allowed payload size in bytes.
+    /// Obergrenze für die Größe des serialisierten Payloads in Bytes.
     pub max_payload_bytes: usize,
 }
 
 impl Default for SignedLicenseOptions {
+    /// Standardoptionen: Strikter Modus (kein Legacy erlaubt) und 64 KiB Obergrenze.
     fn default() -> Self {
         Self {
             allow_legacy: false,
@@ -42,34 +77,42 @@ impl Default for SignedLicenseOptions {
     }
 }
 
-/// Specific step error during step-by-step license activation verification.
+// ANCHOR[contextra-license:ENUM-STEP-ERROR]
+/// Detaillierte Fehlerursache während der 7-stufigen Lizenz- und Aktivierungsprüfung.
+///
+/// **Zweck:** Ermöglicht intern eine präzise Diagnose, welcher Schritt fehlgeschlagen ist,
+/// wird jedoch über [`StepVerificationError::into_license_error`] in standardisierte,
+/// informationsleck-freie [`LicenseError`]-Varianten überführt.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum StepVerificationError {
-    /// Step 2: Activation or license payload is missing.
+    /// Schritt 2: Weder ein Aktivierungsdatensatz noch ein Lizenz-Payload ist vorhanden.
     #[error("activation or license payload missing for ring {0:?}")]
     MissingActivation(FeatureRing),
-    /// Step 3: Local installation ID hash mismatch.
+    /// Schritt 3: Der Hash der lokalen Installation stimmt nicht mit der Lizenz überein.
     #[error("installation ID hash mismatch for ring {0:?}")]
     InstallationMismatch(FeatureRing),
-    /// Step 4: Signature verification failed or missing verifying key.
+    /// Schritt 4: Die kryptografische Ed25519-Signatur ist ungültig oder der öffentliche Schlüssel fehlt.
     #[error("activation signature verification failed")]
     InvalidSignature,
-    /// Step 5: Activation expired.
+    /// Schritt 5: Die Lizenz ist zeitlich abgelaufen (`current_time >= expires_at`).
     #[error("activation expired at {expires_at} (current time: {current_time})")]
     Expired {
-        /// Timestamp when the activation expired.
+        /// Unix-Zeitstempel (in Sekunden), an dem die Lizenz ablief.
         expires_at: i64,
-        /// Current clock Unix timestamp in seconds.
+        /// Aktuelle System- bzw. Port-Zeit in Sekunden.
         current_time: i64,
     },
-    /// Step 6: Requested ring is not granted by the activation or payload.
+    /// Schritt 6: Der angeforderte Feature-Ring ist in der Lizenz nicht freigeschaltet.
     #[error("ring {0:?} is not permitted by activation")]
     RingNotPermitted(FeatureRing),
 }
 
 impl StepVerificationError {
-    /// Maps internal step error to canonical public `LicenseError`.
-    /// Does not expose raw machine hardware details or internal state.
+    // ANCHOR[contextra-license:FN-STEP-ERROR-CONV]
+    /// Überführt den internen Schrittfehler in den kanonischen [`LicenseError`].
+    ///
+    /// **Garantie gegen Informationslecks:** Hardware-Hashes, Maschinendaten oder genaue
+    /// Abweichungen werden nicht nach außen propagiert, um Angreifern keine Hinweise zu liefern.
     pub fn into_license_error(self) -> LicenseError {
         match self {
             Self::MissingActivation(ring) => LicenseError::NotActivated(ring),
@@ -81,9 +124,12 @@ impl StepVerificationError {
     }
 }
 
+// ANCHOR[contextra-license:MOD-BYTES64]
+/// Hilfsmodul für die Serde-Serialisierung und -Deserialisierung von 64-Byte-Arrays (Signaturen).
 mod bytes_64 {
     use super::*;
 
+    /// Serialisiert ein 64-Byte-Array als rohe Bytefolge.
     pub fn serialize<S>(bytes: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -91,6 +137,7 @@ mod bytes_64 {
         serializer.serialize_bytes(bytes)
     }
 
+    /// Deserialisiert eine Bytefolge und prüft strikt auf exakt 64 Bytes Länge.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 64], D::Error>
     where
         D: Deserializer<'de>,
@@ -102,23 +149,30 @@ mod bytes_64 {
     }
 }
 
-/// Signed activation record binding a feature ring activation to a specific machine/deployment installation hash (§10.2, §15).
+// ANCHOR[contextra-license:STRUCT-SIGNED-ACTIVATION]
+/// Signierter Aktivierungsdatensatz zur Bindung eines Feature-Rings an eine Maschinenidentität (§10.2, §15).
+///
+/// Verbindet kryptografisch den freizuschaltenden Feature-Ring, einen 32-Byte-BLAKE3-Hash
+/// der Zielinstallation und ein Ablaufdatum mit einer Ed25519-Signatur.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignedActivation {
-    /// Activated feature ring.
+    /// Der freizuschaltende Feature-Ring (z. B. `FeatureRing::Sovereign`).
     pub ring: FeatureRing,
-    /// 32-byte hash of the target local installation identity.
+    /// 32-Byte-BLAKE3-Hash der Ziel-Installationskennung.
     pub installation_id_hash: [u8; 32],
-    /// Expiration Unix timestamp in seconds.
+    /// Ablaufdatum als Unix-Zeitstempel in Sekunden.
     pub expires_at_unix: i64,
-    /// Ed25519 signature over `(ring, installation_id_hash, expires_at_unix)`.
+    /// 64-Byte-Ed25519-Signatur über das Tupel `(ring, installation_id_hash, expires_at_unix)`.
     #[serde(with = "bytes_64")]
     pub signature: [u8; 64],
 }
 
 impl SignedActivation {
-    /// Computes the binary byte representation of the activation data fields
-    /// `(ring, installation_id_hash, expires_at_unix)` used for Ed25519 signing and verification.
+    // ANCHOR[contextra-license:FN-ACTIVATION-PAYLOAD-BYTES]
+    /// Berechnet die binäre Repräsentation der Aktivierungsfelder zur Signaturerstellung/-prüfung.
+    ///
+    /// **Ablauf:** Serialisiert das Tripel `(ring, installation_id_hash, expires_at_unix)` mittels Bincode.
+    /// Schlägt die Serialisierung fehl, wird ein leerer Vektor zurückgegeben.
     pub fn payload_bytes(
         ring: FeatureRing,
         installation_id_hash: [u8; 32],
@@ -127,7 +181,13 @@ impl SignedActivation {
         bincode::serialize(&(ring, installation_id_hash, expires_at_unix)).unwrap_or_default()
     }
 
-    /// Creates a signed activation record given data fields and an Ed25519 signing key.
+    // ANCHOR[contextra-license:FN-ACTIVATION-CREATE-SIGNED]
+    /// Erstellt und signiert einen neuen Aktivierungsdatensatz mit dem privaten Ed25519-Schlüssel.
+    ///
+    /// **Ablauf:**
+    /// 1. Berechnet die Bytefolge via [`Self::payload_bytes`].
+    /// 2. Signiert die Bytes mit dem übergebenen `signing_key`.
+    /// 3. Gibt die vollständige Instanz von [`SignedActivation`] zurück.
     pub fn create_signed(
         ring: FeatureRing,
         installation_id_hash: [u8; 32],
@@ -144,7 +204,10 @@ impl SignedActivation {
         }
     }
 
-    /// Verifies whether the Ed25519 signature on this activation record is valid for the given verifying key.
+    // ANCHOR[contextra-license:FN-ACTIVATION-VERIFY-SIG]
+    /// Verifiziert die Ed25519-Signatur dieses Datensatzes anhand des öffentlichen Schlüssels.
+    ///
+    /// **Rückgabe:** `true` genau dann, wenn die Signatur gültig ist und den Daten entspricht.
     pub fn verify_signature(&self, verifying_key: &VerifyingKey) -> bool {
         let payload =
             Self::payload_bytes(self.ring, self.installation_id_hash, self.expires_at_unix);
@@ -153,15 +216,23 @@ impl SignedActivation {
     }
 }
 
-/// Determines or generates a deterministic local installation ID hash (`[u8; 32]`).
+// ANCHOR[contextra-license:FN-DERIVE-INSTALLATION-ID]
+/// Ermittelt oder erzeugt deterministisch den 32-Byte-BLAKE3-Hash der lokalen Installation.
 ///
 /// # Status
-/// **VORLÄUFIG, BIS ZUR SCHRIFTLICHEN ENTSCHEIDUNG** (Spec Teil 15, "Offene Entscheidungen").
+/// **VORLÄUFIG, BIS ZUR SCHRIFTLICHEN ENTSCHEIDUNG** (Spec Teil 15, „Offene Entscheidungen“).
 ///
-/// This implementation computes a stable 32-byte installation hash. If a persistent storage path is
-/// provided, it attempts to read or persist a machine-bound installation identifier (`installation.id`)
-/// and hashes its contents with BLAKE3. If no path is provided, it derives a deterministic fallback
-/// installation hash based on machine environment seeds.
+/// **Ablauf:**
+/// 1. Falls ein Speicherpfad (`storage_path`) übergeben wird:
+///    - Versucht, eine Datei namens `installation.id` darin zu lesen. Ist der Inhalt nicht leer,
+///      wird dessen BLAKE3-Hash zurückgegeben.
+///    - Existiert die Datei nicht, wird eine neue ID (`inst-<hex-hash-des-pfads>`) generiert,
+///      in die Datei geschrieben und ihr Hash zurückgegeben.
+/// 2. Falls kein Pfad angegeben ist:
+///    - Nutzt einen festen Fallback-Seed (`b"CONTEXTRA_DEFAULT_LOCAL_INSTALLATION_ID_v1"`),
+///      um einen deterministischen Hash abzuleiten.
+///
+/// **Nebenwirkungen:** Dateisystem-I/O (Lesen/Schreiben), falls ein Pfad angegeben ist.
 pub fn derive_local_installation_id_hash(storage_path: Option<&std::path::Path>) -> [u8; 32] {
     if let Some(path) = storage_path {
         let id_file = path.join("installation.id");
@@ -185,23 +256,27 @@ pub fn derive_local_installation_id_hash(storage_path: Option<&std::path::Path>)
     *blake3::hash(FALLBACK_SEED).as_bytes()
 }
 
-/// License payload containing tenant binding, granted feature rings, optional expiration timestamp,
-/// arbitrary feature flags, and optional installation ID hash (legacy schema).
+// ANCHOR[contextra-license:STRUCT-LICENSE-PAYLOAD]
+/// Strukturierter Lizenznutzlast-Datensatz (Payload).
+///
+/// Enthält Mandantenbindung ([`TenantId`]), freigeschaltete Feature-Ringe, optionales Ablaufdatum,
+/// benutzerdefinierte Feature-Flags und einen optionalen Installations-ID-Hash.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LicensePayload {
-    /// Tenant identity bound to this license.
+    /// Mandantenidentität, an die diese Lizenz gebunden ist.
     pub tenant_id: TenantId,
-    /// List of feature rings activated by this license.
+    /// Liste aller durch diese Lizenz freigeschalteten Feature-Ringe.
     pub allowed_rings: Vec<FeatureRing>,
-    /// Optional Unix timestamp (in seconds) after which the license expires.
+    /// Optionaler Unix-Zeitstempel (in Sekunden), an dem die Lizenz abläuft (`None` = unbegrenzt).
     pub expires_at: Option<i64>,
-    /// Arbitrary key-value feature flags.
+    /// Zusätzliche Feature-Flags als Schlüssel-Wert-Paare.
     pub feature_flags: BTreeMap<String, bool>,
-    /// Optional 32-byte hash of a local machine or instance installation ID.
+    /// Optionaler 32-Byte-Hash der lokalen Installations- oder Maschinenkennung.
     pub installation_id_hash: Option<[u8; 32]>,
 }
 
-/// Legacy payload schema without `installation_id_hash` for backwards compatibility with bincode 1.x.
+// ANCHOR[contextra-license:STRUCT-LEGACY-PAYLOAD]
+/// Altes Lizenz-Payload-Schema ohne `installation_id_hash` zur Rückwärtskompatibilität.
 #[derive(Deserialize)]
 struct LegacyLicensePayload {
     tenant_id: TenantId,
@@ -211,6 +286,7 @@ struct LegacyLicensePayload {
 }
 
 impl From<LegacyLicensePayload> for LicensePayload {
+    /// Konvertiert ein Legacy-Payload in das moderne Schema mit `installation_id_hash: None`.
     fn from(legacy: LegacyLicensePayload) -> Self {
         Self {
             tenant_id: legacy.tenant_id,
@@ -223,16 +299,24 @@ impl From<LegacyLicensePayload> for LicensePayload {
 }
 
 // ============================================================================
-// Seven Verification Steps (Fail-Closed Sequence)
+// Sieben Verifikationsschritte (Fail-Closed Sequenz)
 // ============================================================================
 
-/// Step 1: Fast ring bypass check (INV-LICENSE-2).
-/// Ring Fast returns `true` unconditionally, allowing remaining steps to be bypassed.
+// ANCHOR[contextra-license:STEP-1-FAST-RING]
+/// Schritt 1: Prüfung auf Fast-Ring-Bypass (Invariante INV-LICENSE-2).
+///
+/// **Garantie:** Der freie Standard-Ring `FeatureRing::Fast` benötigt niemals eine Lizenz
+/// und darf nicht blockiert werden. Gibt `true` zurück, wenn alle weiteren Prüfungen übersprungen werden können.
 pub fn verify_step_1_fast_ring(ring: FeatureRing) -> bool {
     ring == FeatureRing::Fast
 }
 
-/// Step 2: Presence check verifying that an activation record or license payload exists.
+// ANCHOR[contextra-license:STEP-2-PRESENCE]
+/// Schritt 2: Vorhandenseinsprüfung von Aktivierungsdatensatz oder Lizenzpayload.
+///
+/// **Vorbedingung:** Schritt 1 war `false` (Ring ist nicht `Fast`).
+/// **Fehler:** Gibt [`StepVerificationError::MissingActivation`] zurück, falls weder
+/// ein [`SignedActivation`] noch ein [`LicensePayload`] übergeben wurde.
 pub fn verify_step_2_presence(
     activation: Option<&SignedActivation>,
     payload: Option<&LicensePayload>,
@@ -244,7 +328,16 @@ pub fn verify_step_2_presence(
     Ok(())
 }
 
-/// Step 3: Local installation ID hash mismatch check (constant time, fail-closed without leaking details).
+// ANCHOR[contextra-license:STEP-3-INSTALLATION]
+/// Schritt 3: Prüfung auf Übereinstimmung der lokalen Installations-ID.
+///
+/// Vergleicht den Hash der aktuellen Maschinenumgebung in konstanter Zeit mit dem in der Lizenz
+/// hinterlegten Hash ([`constant_time_eq_32`]).
+///
+/// **Fehler:**
+/// - Gibt [`StepVerificationError::InstallationMismatch`] zurück, wenn die Hashes nicht übereinstimmen
+///   oder die lokale ID fehlt.
+/// - Bei Legacy-Payloads ohne `installation_id_hash` wird eine Warnung protokolliert und die Prüfung toleriert.
 pub fn verify_step_3_installation(
     activation: Option<&SignedActivation>,
     payload: Option<&LicensePayload>,
@@ -265,6 +358,7 @@ pub fn verify_step_3_installation(
                 _ => Err(StepVerificationError::InstallationMismatch(ring)),
             }
         } else {
+            // NOTE: Legacy-Lizenzen enthalten keine Hardware-Bindung; zur Rückwärtskompatibilität überspringen.
             tracing::warn!(
                 "LicensePayload has no installation_id_hash (legacy payload); skipping installation ID check"
             );
@@ -275,7 +369,14 @@ pub fn verify_step_3_installation(
     }
 }
 
-/// Step 4: Cryptographic signature verification check.
+// ANCHOR[contextra-license:STEP-4-SIGNATURE]
+/// Schritt 4: Kryptografische Ed25519-Signaturprüfung.
+///
+/// Prüft, ob der Aktivierungsdatensatz mit dem angegebenen öffentlichen Schlüssel (`verifying_key`)
+/// gültig signiert wurde.
+///
+/// **Fehler:** Gibt [`StepVerificationError::InvalidSignature`] zurück, falls kein Schlüssel
+/// vorhanden ist oder die Signaturprüfung fehlschlägt.
 pub fn verify_step_4_signature(
     activation: Option<&SignedActivation>,
     payload: Option<&LicensePayload>,
@@ -292,17 +393,20 @@ pub fn verify_step_4_signature(
     } else if payload.is_some() && verifying_key.is_none() {
         return Err(StepVerificationError::InvalidSignature);
     }
-    // Note: For license_payload, signature verification was performed during constructor `from_signed_payload_with_clock_and_opts`.
+    // NOTE: Für LicensePayload wurde die Signatur bereits im Konstruktor geprüft.
     Ok(())
 }
 
-/// Step 5: Expiration check using clock port (P28).
-/// Returns `Err(StepVerificationError::Expired)` if `current_time >= expires_at`.
+// ANCHOR[contextra-license:STEP-5-EXPIRATION]
+/// Schritt 5: Ablaufdatumsprüfung über den Zeit-Port ([`Clock`]).
 ///
-/// # Monotonicity Note
-/// System wall clock timestamps (`Clock::now_unix_nanos()`) are subject to non-monotonic clock adjustments
-/// (e.g. NTP synchronization or manual system clock rollbacks). In air-gapped / offline enterprise builds,
-/// time monotonicity should be anchored via hardware RTC or monotonic system reference timers where available.
+/// Liest die aktuelle Zeit über `clock.now_unix_nanos()` (Regel 3: kein direkter OS-Zugriff).
+///
+/// **Fehler:** Gibt [`StepVerificationError::Expired`] zurück, falls `current_time >= expires_at`.
+///
+/// # Monotonie-Hinweis
+/// Wanduhren (`SystemClock`) können z. B. durch NTP-Sprünge zurückgestellt werden. In Offline-Deployments
+/// muss eine vertrauenswürdige Zeitquelle gewählt werden.
 pub fn verify_step_5_expiration(
     activation: Option<&SignedActivation>,
     payload: Option<&LicensePayload>,
@@ -327,7 +431,13 @@ pub fn verify_step_5_expiration(
     Ok(())
 }
 
-/// Step 6: Ring level requirement check (explicit allowed_rings / ring matching, no automatic hierarchy).
+// ANCHOR[contextra-license:STEP-6-RING-PERMISSION]
+/// Schritt 6: Prüfung der Ring-Berechtigung.
+///
+/// Prüft, ob der konkret angeforderte Feature-Ring in der Lizenz enthalten ist.
+/// Es gibt keine automatische implizite Ring-Hierarchie; jeder Ring muss explizit erlaubt sein.
+///
+/// **Fehler:** Gibt [`StepVerificationError::RingNotPermitted`] zurück, wenn der Ring fehlt.
 pub fn verify_step_6_ring_permission(
     activation: Option<&SignedActivation>,
     payload: Option<&LicensePayload>,
@@ -347,13 +457,19 @@ pub fn verify_step_6_ring_permission(
     Ok(())
 }
 
-/// Step 7: Final verification step confirmation.
+// ANCHOR[contextra-license:STEP-7-SUCCESS]
+/// Schritt 7: Bestätigung des erfolgreichen Verifikationsabschlusses.
+///
+/// Dient als finaler Schlusspunkt der 7-stufigen Verifikationskette.
 pub fn verify_step_7_success() -> Result<(), StepVerificationError> {
     Ok(())
 }
 
-/// Cryptographic license gate verifying Ed25519 signatures over activation records ([`SignedActivation`])
-/// or legacy [`LicensePayload`].
+// ANCHOR[contextra-license:STRUCT-SIGNED-LICENSE-GATE]
+/// Kryptografisches Lizenz-Gate zur Durchsetzung von Feature-Ringen.
+///
+/// Verifiziert Ed25519-Signaturen über Aktivierungsdatensätze ([`SignedActivation`])
+/// oder signierte Payloads ([`LicensePayload`]) und implementiert den [`LicenseGate`]-Port.
 #[derive(Clone)]
 pub struct SignedLicenseGate {
     verifying_key: Option<VerifyingKey>,
@@ -375,7 +491,8 @@ impl std::fmt::Debug for SignedLicenseGate {
 }
 
 impl SignedLicenseGate {
-    /// Constructs a [`SignedLicenseGate`] without any active activation record.
+    // ANCHOR[contextra-license:GATE-NO-ACTIVATION]
+    /// Erzeugt ein leeres Gate ohne aktive Lizenz (nur der `Fast`-Ring ist freigeschaltet).
     pub fn no_activation() -> Self {
         Self {
             verifying_key: None,
@@ -386,12 +503,15 @@ impl SignedLicenseGate {
         }
     }
 
-    /// Constructs a [`SignedLicenseGate`] from a [`SignedActivation`].
+    // ANCHOR[contextra-license:GATE-FROM-ACTIVATION]
+    /// Konstruiert ein Gate aus einem [`SignedActivation`]-Datensatz und dem öffentlichen Ed25519-Schlüssel.
+    /// Nutzt standardmäßig die [`SystemClock`].
     pub fn from_activation(activation: SignedActivation, verifying_key: VerifyingKey) -> Self {
         Self::from_activation_with_clock(activation, verifying_key, Arc::new(SystemClock::new()))
     }
 
-    /// Constructs a [`SignedLicenseGate`] from a [`SignedActivation`] with an injected [`Clock`].
+    // ANCHOR[contextra-license:GATE-FROM-ACTIVATION-CLOCK]
+    /// Konstruiert ein Gate aus einem [`SignedActivation`]-Datensatz mit injiziertem [`Clock`]-Port.
     pub fn from_activation_with_clock(
         activation: SignedActivation,
         verifying_key: VerifyingKey,
@@ -406,11 +526,11 @@ impl SignedLicenseGate {
         }
     }
 
-    /// Constructs a [`SignedLicenseGate`] by verifying an Ed25519 signature over `payload_bytes`
-    /// using standard system wall-clock and strict verification options.
+    // ANCHOR[contextra-license:GATE-FROM-SIGNED-PAYLOAD]
+    /// Konstruiert ein Gate durch Signaturprüfung eines Roh-Payloads mit Standardeinstellungen.
     ///
-    /// # Errors
-    /// Returns [`LicenseError::InvalidSignature`] if signature verification or payload deserialization fails.
+    /// # Fehler
+    /// Gibt [`LicenseError::InvalidSignature`] zurück, falls Signatur ungültig oder Deserialisierung fehlschlägt.
     pub fn from_signed_payload(
         payload_bytes: &[u8],
         signature: &[u8; 64],
@@ -425,10 +545,8 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Constructs a [`SignedLicenseGate`] with an injected [`Clock`] instance for deterministic testing (P28).
-    ///
-    /// # Errors
-    /// Returns [`LicenseError::InvalidSignature`] if signature verification or payload deserialization fails.
+    // ANCHOR[contextra-license:GATE-FROM-SIGNED-PAYLOAD-CLOCK]
+    /// Konstruiert ein Gate aus signierten Payload-Bytes mit injiziertem [`Clock`]-Port.
     pub fn from_signed_payload_with_clock(
         payload_bytes: &[u8],
         signature: &[u8; 64],
@@ -444,11 +562,15 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Constructs a [`SignedLicenseGate`] with explicit verification options and injected [`Clock`].
+    // ANCHOR[contextra-license:GATE-FROM-SIGNED-PAYLOAD-OPTS]
+    /// Konstruiert ein Gate aus signierten Payload-Bytes mit Optionen und Zeit-Port.
     ///
-    /// # Errors
-    /// Returns [`LicenseError::InvalidSignature`] if payload exceeds `max_payload_bytes`, signature verification fails,
-    /// or payload deserialization fails (and legacy schema is not explicitly permitted).
+    /// **Ablauf:**
+    /// 1. Prüft, ob `payload_bytes` die Obergrenze `options.max_payload_bytes` überschreitet.
+    /// 2. Verifiziert die Ed25519-Signatur über die Bytes mit `verifying_key`.
+    /// 3. Deserialisiert die Bytes strikt mit Bincode (Trailing Bytes werden abgelehnt).
+    /// 4. Falls Deserialisierung fehlschlägt und `allow_legacy` aktiv ist, versucht Fallback auf Legacy-Schema.
+    /// 5. Gibt die initialisierte Instanz zurück oder [`LicenseError::InvalidSignature`].
     pub fn from_signed_payload_with_clock_and_opts(
         payload_bytes: &[u8],
         signature: &[u8; 64],
@@ -494,33 +616,36 @@ impl SignedLicenseGate {
         Err(LicenseError::InvalidSignature)
     }
 
-    /// Binds a local installation ID hash (e.g. BLAKE3 hash of machine ID or MAC address) to this gate instance.
+    // ANCHOR[contextra-license:GATE-WITH-LOCAL-ID]
+    /// Bindet einen lokalen 32-Byte-Installations-Hash an diese Gate-Instanz.
     pub fn with_local_installation_id(mut self, id_hash: [u8; 32]) -> Self {
         self.local_installation_id = Some(id_hash);
         self
     }
 
-    /// Returns a reference to the verified [`LicensePayload`], if present.
+    // ANCHOR[contextra-license:GATE-GETTERS]
+    /// Gibt eine Referenz auf das geprüfte [`LicensePayload`] zurück, falls vorhanden.
     pub fn license_payload(&self) -> Option<&LicensePayload> {
         self.license_payload.as_ref()
     }
 
-    /// Returns a reference to the verified [`SignedActivation`], if present.
+    /// Gibt eine Referenz auf den geprüften [`SignedActivation`]-Datensatz zurück, falls vorhanden.
     pub fn activation(&self) -> Option<&SignedActivation> {
         self.activation.as_ref()
     }
 
-    /// Returns a reference to the public Ed25519 verifying key, if present.
+    /// Gibt eine Referenz auf den öffentlichen Ed25519-Schlüssel zurück, falls hinterlegt.
     pub fn verifying_key(&self) -> Option<&VerifyingKey> {
         self.verifying_key.as_ref()
     }
 
-    /// Evaluates Step 1: Fast Ring Bypass check.
+    // ANCHOR[contextra-license:GATE-STEP-CHECKS]
+    /// Führt Schritt 1 (Fast Ring Bypass) auf dieser Instanz aus.
     pub fn check_step_1_fast_ring(&self, ring: FeatureRing) -> bool {
         verify_step_1_fast_ring(ring)
     }
 
-    /// Evaluates Step 2: Presence check.
+    /// Führt Schritt 2 (Vorhandenseinsprüfung) auf dieser Instanz aus.
     pub fn check_step_2_presence(&self, ring: FeatureRing) -> Result<(), StepVerificationError> {
         verify_step_2_presence(
             self.activation.as_ref(),
@@ -529,7 +654,7 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Evaluates Step 3: Installation ID binding check.
+    /// Führt Schritt 3 (Installationsbindung) auf dieser Instanz aus.
     pub fn check_step_3_installation(
         &self,
         ring: FeatureRing,
@@ -542,7 +667,7 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Evaluates Step 4: Cryptographic signature check.
+    /// Führt Schritt 4 (Signaturprüfung) auf dieser Instanz aus.
     pub fn check_step_4_signature(&self) -> Result<(), StepVerificationError> {
         verify_step_4_signature(
             self.activation.as_ref(),
@@ -551,7 +676,7 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Evaluates Step 5: Expiration check.
+    /// Führt Schritt 5 (Ablaufprüfung via Zeit-Port) auf dieser Instanz aus.
     pub fn check_step_5_expiration(&self) -> Result<(), StepVerificationError> {
         verify_step_5_expiration(
             self.activation.as_ref(),
@@ -560,7 +685,7 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Evaluates Step 6: Ring permission check.
+    /// Führt Schritt 6 (Ring-Berechtigung) auf dieser Instanz aus.
     pub fn check_step_6_ring_permission(
         &self,
         ring: FeatureRing,
@@ -572,12 +697,13 @@ impl SignedLicenseGate {
         )
     }
 
-    /// Evaluates Step 7: Final success check.
+    /// Führt Schritt 7 (Erfolgsbestätigung) auf dieser Instanz aus.
     pub fn check_step_7_success(&self) -> Result<(), StepVerificationError> {
         verify_step_7_success()
     }
 
-    /// Generates a valid signed payload, signature, and verifying key bytes for testing purposes.
+    // ANCHOR[contextra-license:GATE-CREATE-TEST-PAYLOAD]
+    /// Erzeugt Testdaten (Payload-Bytes, Signatur und Verifying-Key-Bytes) für Unit- und Integrationstests.
     pub fn create_test_signed_payload(
         rings: Vec<FeatureRing>,
         expires_at: Option<i64>,
@@ -601,7 +727,20 @@ impl SignedLicenseGate {
     }
 }
 
+// ANCHOR[contextra-license:IMPL-LICENSE-GATE]
 impl LicenseGate for SignedLicenseGate {
+    /// Überprüft, ob der angeforderte Feature-Ring nach dem 7-stufigen Fail-Closed-Verfahren freigeschaltet ist.
+    ///
+    /// **Ablauf:**
+    /// 1. **Schritt 1:** Fast Ring Bypass (INV-LICENSE-2). Ist `ring == FeatureRing::Fast`, sofort `Ok(())`.
+    /// 2. **Schritt 2:** Prüfen, ob Aktivierung oder Payload vorhanden ist.
+    /// 3. **Schritt 3:** Prüfen der lokalen Installations-ID in konstanter Zeit ([`constant_time_eq_32`]).
+    /// 4. **Schritt 4:** Kryptografische Prüfung der Ed25519-Signatur.
+    /// 5. **Schritt 5:** Prüfung des Ablaufdatums gegen den [`Clock`]-Port.
+    /// 6. **Schritt 6:** Prüfung, ob der Ring in den erlaubten Ringen enthalten ist.
+    /// 7. **Schritt 7:** Bestätigung und Rückgabe von `Ok(())`.
+    ///
+    /// Scheitert irgendein Schritt ab Schritt 2, bricht die Prüfung sofort fail-closed ab.
     fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError> {
         // (1) Step 1: Fast Ring Bypass - INVARIANTE INV-LICENSE-2
         if verify_step_1_fast_ring(ring) {
