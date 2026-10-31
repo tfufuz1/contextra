@@ -1,3 +1,14 @@
+// FILE-CONTEXT
+// STAND: 2026-10-31
+// ZWECK: Criterion Benchmark für lokale ONNX Text-Embeddings (Ring 2).
+
+//! # Benchmark `embed_bench`
+//!
+//! Misst den Durchsatz und die Latenz von `TextEmbedder::embed_async` bei 100 aufeinanderfolgenden
+//! Embedding-Aufrufen mittels Criterion.
+//!
+//! Falls keine Testmodelle unter `tests/data` hinterlegt sind, wird der Benchmark übersprungen.
+
 #[cfg(feature = "onnx")]
 use contextra_infer_onnx::TextEmbedder;
 #[cfg(feature = "onnx")]
@@ -7,6 +18,8 @@ use std::path::PathBuf;
 #[cfg(feature = "onnx")]
 use tokio::runtime::Runtime;
 
+// ANCHOR[contextra-infer-onnx:BENCH-EMBED-FN]
+/// Führt den Durchsatz-Benchmark für 100 asynchrone Embedding-Aufrufe aus.
 #[cfg(feature = "onnx")]
 fn bench_embed(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
@@ -40,5 +53,6 @@ criterion_group!(benches, bench_embed);
 #[cfg(feature = "onnx")]
 criterion_main!(benches);
 
+/// Leerer Eintrittspunkt, falls das Feature `onnx` nicht aktiv ist.
 #[cfg(not(feature = "onnx"))]
 fn main() {}

@@ -1,6 +1,14 @@
 // FILE-CONTEXT
-// STAND: 2026-09-15T16:10:40Z (SESSION: ec33599e)
-// ZWECK: Unit-Tests für Cross-Encoder Reranker.
+// STAND: 2026-10-31
+// ZWECK: Unit- und Proptests für Cross-Encoder Reranker und PlattScaler-Kalibrierung (Ring 2).
+
+//! # Unit- und Proptests für den Cross-Encoder Reranker
+//!
+//! Testet:
+//! - Passthrough- und Fallback-Verhalten bei deaktiviertem ONNX-Feature.
+//! - PlattScaler-Fitting und Reduktion des Expected Calibration Error (ECE).
+//! - Batching, Grenzwerte, Extreme Logits und Nebenläufigkeit.
+//! - Invalidierung von Kalibrierungen bei Modellwechsel (INV-CAL-2).
 
 #![allow(clippy::unwrap_used, clippy::panic)]
 
@@ -14,6 +22,8 @@ use super::onnx::OnnxReranker;
 use contextra_rank::PlattScaler;
 use contextra_types::{ConfigFingerprint, ContextraError};
 
+// ANCHOR[contextra-infer-onnx:TEST-PASSTHROUGH-ORDER]
+/// Prüft, dass der Passthrough-Fallback die übergebene Kandidatenreihenfolge beibehält.
 #[tokio::test]
 async fn test_rerank_passthrough_preserves_order() {
     let config = RerankConfig::default();
@@ -24,6 +34,8 @@ async fn test_rerank_passthrough_preserves_order() {
     }
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-EMPTY-CANDIDATES]
+/// Prüft, dass eine leere Kandidatenliste ohne Fehler eine leere Ergebnisliste liefert.
 #[tokio::test]
 async fn test_rerank_empty_candidates() {
     let config = RerankConfig::default();
@@ -33,6 +45,8 @@ async fn test_rerank_empty_candidates() {
     }
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-SORTED-DESCENDING]
+/// Prüft, dass Reranking-Ergebnisse stets absteigend nach Score sortiert sind.
 #[tokio::test]
 async fn test_rerank_sorted_by_score_descending() {
     let config = RerankConfig::default();
@@ -45,6 +59,8 @@ async fn test_rerank_sorted_by_score_descending() {
     }
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-OVERSIZED-BATCH]
+/// Prüft, dass Batches über `MAX_CANDIDATES` mit `InvalidInput` abgewiesen werden.
 #[tokio::test]
 async fn test_rerank_oversized_candidate_batch_rejected() {
     let config = RerankConfig::default();
@@ -61,6 +77,8 @@ async fn test_rerank_oversized_candidate_batch_rejected() {
     }
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-CONCURRENT-RERANK]
+/// Prüft parallele Rerank-Anfragen auf Thread-Sicherheit und Freiheit von Panics.
 #[tokio::test]
 async fn test_concurrent_rerank_load_no_panic() {
     use std::sync::Arc;
@@ -91,6 +109,8 @@ async fn test_concurrent_rerank_load_no_panic() {
 }
 
 #[cfg(feature = "onnx")]
+// ANCHOR[contextra-infer-onnx:TEST-EXTRACT-SCORES]
+/// Prüft die korrekte Score-Extraktion für 1D- und 2D-Ausgabetensoren.
 #[test]
 fn test_extract_scores_1d_and_2d() -> Result<(), Box<dyn std::error::Error>> {
     // 1D tensor [batch_size = 2]
@@ -120,6 +140,8 @@ fn test_extract_scores_1d_and_2d() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-PLATT-IDENTITY]
+/// Prüft, dass die unkalibrierte Identitäts-Sigmoid der Standard-Sigmoid-Funktion entspricht.
 #[test]
 fn test_platt_scaled_sigmoid_identity_matches_uncalibrated_sigmoid() {
     let identity = PlattScaledSigmoid::identity();
@@ -137,6 +159,8 @@ fn test_platt_scaled_sigmoid_identity_matches_uncalibrated_sigmoid() {
     }
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-PLATT-FIT-SEPARABLE]
+/// Prüft das Platt-Scaling-Fitting auf einem linear separierbaren Datensatz.
 #[test]
 fn test_platt_scaled_sigmoid_fit_separable_dataset() {
     // Dataset with modest logits (-1.0 to 1.0) where uncalibrated sigmoid is soft (0.27 to 0.73)
@@ -173,6 +197,8 @@ fn test_platt_scaled_sigmoid_fit_separable_dataset() {
     assert!(fitted.transform(logit_neg) < 0.20);
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-PLATT-FIT-NOISY]
+/// Prüft die Robustheit des Platt-Scaling-Fittings bei Rauschen und NaN-Werten.
 #[test]
 fn test_platt_scaled_sigmoid_fit_noisy_unseparable_and_nan() {
     // Test 1: Empty observations
@@ -211,6 +237,8 @@ fn test_platt_scaled_sigmoid_fit_noisy_unseparable_and_nan() {
     );
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-IMPLICIT-FEEDBACK]
+/// Prüft, dass implizites Feedback die Top-K Kandidaten als relevant markiert.
 #[test]
 fn test_record_implicit_feedback_top_k_marked_relevant() {
     let reranker = CrossEncoderReranker::passthrough();
@@ -250,6 +278,8 @@ fn test_record_implicit_feedback_top_k_marked_relevant() {
     assert_eq!(buf[2], (-0.5, false));
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-CALIBRATION-WARMUP]
+/// Prüft, dass `is_calibrated()` nach Erreichen der Warmup-Schwelle true liefert.
 #[test]
 fn test_calibration_is_calibrated_after_warmup() {
     let reranker = CrossEncoderReranker::passthrough();
@@ -265,6 +295,8 @@ fn test_calibration_is_calibrated_after_warmup() {
     assert!(reranker.is_calibrated());
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-CALIBRATION-NOT-IDENTITY]
+/// Prüft, dass ein gefitteter PlattScaler nicht mehr die Identitätstransformation ist.
 #[test]
 fn test_calibration_fitted_platt_not_identity() {
     let reranker = CrossEncoderReranker::passthrough();
@@ -278,6 +310,8 @@ fn test_calibration_fitted_platt_not_identity() {
     assert!(!reranker.fitted_calibration().is_identity());
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-PASSTHROUGH-SKIPS-FEEDBACK]
+/// Prüft, dass im Passthrough-Modus kein implizites Feedback im Puffer akkumuliert wird.
 #[test]
 fn test_implicit_feedback_passthrough_skipped() {
     let reranker = CrossEncoderReranker::passthrough();
@@ -300,6 +334,8 @@ fn test_implicit_feedback_passthrough_skipped() {
     assert!(!reranker.is_calibrated());
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-BUILDER-CONFIG]
+/// Prüft das Setzen von Kalibrierungsparametern über den Builder.
 #[test]
 fn test_platt_scaled_sigmoid_config_and_reranker_builder() {
     let cal = PlattScaledSigmoid::new(1.5, -0.2);
@@ -312,6 +348,8 @@ fn test_platt_scaled_sigmoid_config_and_reranker_builder() {
     assert_eq!(reranker.fitted_calibration(), cal);
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-EXACT-BOUNDARY]
+/// Prüft exakt 1 Kandidaten und genau `MAX_CANDIDATES` Kandidaten.
 #[tokio::test]
 async fn test_rerank_exact_boundary_candidates() -> Result<(), Box<dyn std::error::Error>> {
     let reranker = CrossEncoderReranker::passthrough();
@@ -330,6 +368,8 @@ async fn test_rerank_exact_boundary_candidates() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-EXTREME-LOGITS]
+/// Prüft Kalibrierungs-Transformationen bei extremen Logits (+/-1000, NaN, Inf).
 #[test]
 fn test_calibration_extreme_logits_and_non_finite_inputs() {
     let reranker = CrossEncoderReranker::passthrough();
@@ -358,6 +398,8 @@ fn test_calibration_extreme_logits_and_non_finite_inputs() {
     assert_eq!(reranker.calibration_observation_count(), 3);
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-CALIBRATION-INVALIDATION]
+/// Prüft den gesamten Lifecycle: Observationen -> Fitting -> Invalidation bei Modellwechsel (INV-CAL-2).
 #[test]
 fn test_cross_encoder_online_calibration_and_invalidation() {
     let config = RerankConfig::default();
@@ -428,6 +470,8 @@ fn compute_ece(probs_and_labels: &[(f32, bool)], num_bins: usize) -> f32 {
     ece
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-ECE-REDUCTION]
+/// Prüft die Reduktion des Expected Calibration Error (ECE) durch Platt-Scaling.
 #[test]
 fn test_ece_reduction_after_platt_calibration() {
     let reranker = CrossEncoderReranker::passthrough();
@@ -467,6 +511,8 @@ fn test_ece_reduction_after_platt_calibration() {
     );
 }
 
+// ANCHOR[contextra-infer-onnx:PROP-ECE-REDUCTION]
+// NOTE: Eigenschaftsbasierter Test (Proptest): Platt-Scaling verschlechtert den ECE bei separierbaren Daten nicht.
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(50))]
     #[test]
@@ -508,6 +554,8 @@ proptest! {
     }
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-CONFIG-VALIDATIONS]
+/// Prüft Grenz- und Fehlerfälle bei der Konfigurations-Validierung.
 #[test]
 fn test_onnx_config_and_builder_validations() -> Result<(), Box<dyn std::error::Error>> {
     use tempfile::tempdir;
@@ -544,6 +592,8 @@ fn test_onnx_config_and_builder_validations() -> Result<(), Box<dyn std::error::
 }
 
 #[cfg(feature = "onnx")]
+// ANCHOR[contextra-infer-onnx:TEST-MISSING-PATHS]
+/// Prüft, dass fehlende Modelldateien zu einem Validierungsfehler führen.
 #[test]
 fn test_cross_encoder_missing_paths() -> Result<(), Box<dyn std::error::Error>> {
     use tempfile::tempdir;
