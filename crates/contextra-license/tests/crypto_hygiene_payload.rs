@@ -1,3 +1,6 @@
+//! Prüfung der kryptografischen Hygiene, Constant-Time-Vergleiche und Nutzlast-Obergrenzen (MAX_PAYLOAD_BYTES).
+//! Verhindert Timing-Angriffe und Denial-of-Service durch manipulierte Payloads.
+
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -37,6 +40,8 @@ fn generate_deterministic_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey)
     (signing_key, verifying_key)
 }
 
+// ANCHOR[contextra-license:TEST-CRYPTO-CT-MATCH]
+// Prüft, dass constant_time_eq_32 bei identischen 32-Byte-Arrays true liefert.
 #[test]
 fn test_constant_time_eq_32_matching() {
     let a = [0xAA; 32];
@@ -44,6 +49,8 @@ fn test_constant_time_eq_32_matching() {
     assert!(constant_time_eq_32(&a, &b));
 }
 
+// ANCHOR[contextra-license:TEST-CRYPTO-CT-MISMATCH-SINGLE]
+// Prüft, dass constant_time_eq_32 bei einer Abweichung in einem einzelnen Byte false liefert.
 #[test]
 fn test_constant_time_eq_32_mismatch_single_byte() {
     let a = [0xAA; 32];
@@ -52,6 +59,8 @@ fn test_constant_time_eq_32_mismatch_single_byte() {
     assert!(!constant_time_eq_32(&a, &b));
 }
 
+// ANCHOR[contextra-license:TEST-CRYPTO-CT-MISMATCH-ALL]
+// Prüft, dass constant_time_eq_32 bei vollständig unterschiedlichen Byte-Arrays false liefert.
 #[test]
 fn test_constant_time_eq_32_mismatch_all_bytes() {
     let a = [0x00; 32];
@@ -59,6 +68,8 @@ fn test_constant_time_eq_32_mismatch_all_bytes() {
     assert!(!constant_time_eq_32(&a, &b));
 }
 
+// ANCHOR[contextra-license:TEST-CRYPTO-MAX-BYTES-EXCEEDED]
+// Prüft, dass Payloads, die 64 KiB überschreiten, sofort mit InvalidSignature abgewiesen werden.
 #[test]
 fn test_payload_exceeding_max_bytes_fails() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -79,6 +90,8 @@ fn test_payload_exceeding_max_bytes_fails() {
     assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
+// ANCHOR[contextra-license:TEST-CRYPTO-CUSTOM-MAX-BYTES]
+// Prüft konfigurierbare Payload-Größenlimits über SignedLicenseOptions.
 #[test]
 fn test_custom_max_payload_bytes_limit() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();
@@ -114,6 +127,8 @@ fn test_custom_max_payload_bytes_limit() {
     assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
+// ANCHOR[contextra-license:TEST-CRYPTO-REJECT-TRAILING-BYTES]
+// Prüft, dass Bincode-Deserialisierung mit angehängten überflüssigen Bytes (Trailing Garbage) fehlschlägt.
 #[test]
 fn test_canonical_serialization_rejects_trailing_garbage() {
     let (signing_key, verifying_key) = generate_deterministic_keypair();

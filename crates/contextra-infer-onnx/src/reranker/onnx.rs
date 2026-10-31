@@ -1,6 +1,16 @@
 // FILE-CONTEXT
-// STAND: 2026-09-15T16:10:40Z (SESSION: ec33599e)
-// ZWECK: Real ONNX Runtime Cross-Encoder Inferenz-Backend.
+// STAND: 2026-10-31
+// ZWECK: Real ONNX Runtime Cross-Encoder Inferenz-Backend (Ring 2).
+// SAFETY: Mutex-Sperren ohne Poisoning, Inferenz ausschließlich im spawn_blocking Threadpool.
+
+//! # ONNX Runtime Backend für Cross-Encoder
+//!
+//! Dieses Modul implementiert die tatsächliche Inferenz mittels der ONNX Runtime (`ort`).
+//! Es handhabt:
+//! - Tokenisierung von `(Query, Candidate)`-Textpaaren inklusive Attention-Masken und Type-IDs.
+//! - Dynamisches Batching zur optimalen CPU-/SIMD-Auslastung.
+//! - Ausführung des Transformer-Forward-Passes in einem isolierten Blocking-Thread.
+//! - Extraktion der Logits (1-Kanal oder 2-Kanal Softmax) und anschließende Platt-Scaling-Kalibrierung.
 
 #[cfg(feature = "onnx")]
 use contextra_rank::PlattScaler;
@@ -28,6 +38,11 @@ use super::config::{PlattScaledSigmoid, RerankConfig, RerankResult};
 // accounts for fundamental differences in model signatures and execution profiles:
 // Cross-Encoder reranking operates on `(query, document)` sequence pairs requiring
 // custom dynamic batching, whereas `TextEmbedder` executes single-text embeddings.
+
+// ANCHOR[contextra-infer-onnx:ONNX-RERANKER-STRUCT]
+/// Privates Backend für Cross-Encoder-Inferenz über ONNX Runtime.
+///
+/// Hält eine geteilte ONNX-Session und einen HuggingFace-Tokenizer.
 #[cfg(feature = "onnx")]
 pub(super) struct OnnxReranker {
     config: RerankConfig,
@@ -39,7 +54,12 @@ pub(super) struct OnnxReranker {
 
 #[cfg(feature = "onnx")]
 impl OnnxReranker {
-    /// Erstellt eine neue `OnnxReranker`-Instanz.
+    // ANCHOR[contextra-infer-onnx:ONNX-RERANKER-NEW]
+    /// Erstellt eine neue `OnnxReranker`-Instanz und lädt Tokenizer sowie Modelldatei.
+    ///
+    /// # Fehlerfälle
+    /// - [`ContextraError::InvalidInput`]: Modelldatei oder Tokenizer existieren nicht auf dem Dateisystem.
+    /// - [`ContextraError::Internal`]: Fehler beim Parsen des Tokenizers oder der ONNX-Session.
     pub(super) fn new(config: RerankConfig) -> Result<Self, ContextraError> {
         if !config.model_path.exists() {
             return Err(ContextraError::InvalidInput(format!(
@@ -75,7 +95,15 @@ impl OnnxReranker {
         })
     }
 
-    /// Rerankt Kandidaten für eine Abfrage.
+    // ANCHOR[contextra-infer-onnx:ONNX-RERANKER-RERANK]
+    /// Berechnet Relevanz-Scores für alle übergebenen Kandidatendokumente bezüglich einer Abfrage.
+    ///
+    /// # Ablauf
+    /// 1. Kandidatenliste prüfen (bei leerer Liste sofort `Ok(vec![])`).
+    /// 2. Textpaare `(query, candidate)` erzeugen.
+    /// 3. Inferenz via `tokio::task::spawn_blocking` an den Blocking-Threadpool übergeben.
+    /// 4. In Batches tokenisieren, Forward-Pass ausführen und Wahrscheinlichkeiten kalibrieren.
+    /// 5. Ergebnisse absteigend nach berechnetem Score sortieren.
     pub(super) async fn rerank(
         &self,
         query: &str,
@@ -129,6 +157,8 @@ impl OnnxReranker {
         Ok(results)
     }
 
+    // ANCHOR[contextra-infer-onnx:SCORE-PAIRS-BLOCKING]
+    /// Teilt die Textpaare in Chunks der konfigurierten `batch_size` auf und berechnet blockierend deren Scores.
     fn score_pairs_blocking(
         session: &std::sync::Arc<parking_lot::Mutex<ort::session::Session>>,
         tokenizer: &Tokenizer,
@@ -153,6 +183,16 @@ impl OnnxReranker {
         Ok(all_scores)
     }
 
+    // ANCHOR[contextra-infer-onnx:SCORE-BATCH]
+    /// Tokenisiert einen einzelnen Batch von Paaren, führt die ONNX-Inferenz aus und extrahiert kalibrierte Scores.
+    ///
+    /// # Ablauf
+    /// 1. Jedes Paar `(Query, Candidate)` mittels Tokenizer kodieren.
+    /// 2. Falls Tokenanzahl > `max_length`: Trunkiere auf `max_length` und logge Warnung.
+    /// 3. Maximale Sequenzlänge im Batch ermitteln und flache Eingabearrays mit Padding (`0`) füllen.
+    /// 4. ORT-Tensoren erzeugen (`input_ids`, `attention_mask`, `token_type_ids`).
+    /// 5. ONNX-Session-Mutex sperren und Inferenz starten.
+    /// 6. Logits aus den Modellausgaben extrahieren und via PlattScaler kalibrieren.
     fn score_batch(
         session: &std::sync::Arc<parking_lot::Mutex<ort::session::Session>>,
         tokenizer: &Tokenizer,
@@ -261,6 +301,8 @@ impl OnnxReranker {
         result
     }
 
+    // ANCHOR[contextra-infer-onnx:EXTRACT-SCORES-TEST]
+    /// Hilfsfunktion für Unittests zur Validierung der Score-Extraktion ohne Kalibrierung.
     #[cfg(test)]
     pub(super) fn extract_scores_from_tensor(
         shape: &[i64],
@@ -282,6 +324,14 @@ impl OnnxReranker {
         )
     }
 
+    // ANCHOR[contextra-infer-onnx:EXTRACT-SCORES-CALIBRATED]
+    /// Extrahiert die Scores aus dem ORT-Ausgabetensor und wendet die Platt-Scaling-Kalibrierung an.
+    ///
+    /// Unterstützt verschiedene Ausgabe-Dimensionen:
+    /// - 1D Tensor `[batch_size]`: Einzelne Logits direkt transformieren.
+    /// - 2D Tensor `[batch_size, 1]`: Einzelne Logits pro Zeile transformieren.
+    /// - 2D Tensor `[batch_size, 2]`: Klassifikations-Logits `[irrelevant, relevant]` -> Differenz `l1 - l0`.
+    /// - 2D Tensor `[batch_size, N]`: Erste Spalte als primäres Signal verwenden.
     fn extract_scores_from_tensor_calibrated(
         shape: &[i64],
         data: &[f32],

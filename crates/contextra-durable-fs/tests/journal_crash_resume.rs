@@ -1,3 +1,7 @@
+//! # Testsuite: journal_crash_resume.rs
+//!
+//! Zweck: Crash-Resumption-Tests für das `PendingDeleteJournal` und Sicherheitsüberprüfungen.
+
 // FILE-CONTEXT
 // STAND: 2026-10-12
 // ZWECK: Integrationstests für PendingDeleteJournal Crash-Resumption und scrub_if_safe Hardlink-Sicherheitsprüfungen (AP-12, ADR-10).
@@ -9,6 +13,8 @@ use std::fs::File;
 use std::io::Write;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-durable-fs:TEST-JOURNAL-CRASH-RESUME]
+/// Prüft die idempotente Wiederaufnahme und Abarbeitung des Journals nach simuliertem Abbruch.
 #[test]
 fn test_journal_process_crash_resume_idempotency() -> std::io::Result<()> {
     let dir = tempdir()?;
@@ -64,6 +70,8 @@ fn test_journal_process_crash_resume_idempotency() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-JOURNAL-SCRUB-HARDLINK]
+/// Prüft die Sicherheitsverweigerung bei Hardlinks und den Erhalt der verknüpften Datei.
 #[test]
 fn test_scrub_if_safe_hardlink_refusal_and_safety() -> std::io::Result<()> {
     let dir = tempdir()?;
@@ -91,6 +99,8 @@ fn test_scrub_if_safe_hardlink_refusal_and_safety() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-JOURNAL-REMOVE-PARENT-FSYNC]
+/// Prüft die Synchronisation des Elternverzeichnisses bei durable_remove.
 #[test]
 fn test_durable_remove_parent_dir_fsync() -> std::io::Result<()> {
     let dir = tempdir()?;

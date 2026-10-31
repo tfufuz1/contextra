@@ -1,3 +1,6 @@
+//! Negativ-Matrix-Tests und Konstruktor-Prüfungen für SignedLicenseGate und SignedActivation.
+//! Testet systematisch ungültige Signaturen, verfälschte Schlüssel, leere Payloads und Grenzwertverletzungen.
+
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -37,6 +40,8 @@ fn generate_keypair(seed_byte: u8) -> (SigningKey, ed25519_dalek::VerifyingKey) 
     (signing_key, verifying_key)
 }
 
+// ANCHOR[contextra-license:TEST-NEG-CONSTRUCTOR-SYSTEM-CLOCK]
+// Prüft, dass from_activation die Systemuhr verwendet und gültige Aktivierungen akzeptiert.
 #[test]
 fn test_from_activation_constructor_uses_system_clock() {
     let (signing_key, verifying_key) = generate_keypair(1);
@@ -57,6 +62,8 @@ fn test_from_activation_constructor_uses_system_clock() {
     assert_eq!(gate.check_ring(FeatureRing::Sovereign), Ok(()));
 }
 
+// ANCHOR[contextra-license:TEST-NEG-1-MANIPULATED-SIG]
+// Negativtest 1: Prüfung, dass manipulierte Signaturbytes abgewiesen werden.
 #[test]
 fn test_negative_1_manipulated_signature_rejected() {
     let (signing_key, verifying_key) = generate_keypair(2);
@@ -79,6 +86,8 @@ fn test_negative_1_manipulated_signature_rejected() {
     );
 }
 
+// ANCHOR[contextra-license:TEST-NEG-2-WRONG-KEY]
+// Negativtest 2: Prüfung, dass ein falscher VerifyingKey zur Ablehnung führt.
 #[test]
 fn test_negative_2_wrong_verifying_key_rejected() {
     let (signing_key_a, _) = generate_keypair(3);
@@ -101,6 +110,8 @@ fn test_negative_2_wrong_verifying_key_rejected() {
     );
 }
 
+// ANCHOR[contextra-license:TEST-NEG-3-EXPIRED-ACTIVATION]
+// Negativtest 3: Prüfung, dass eine zeitlich abgelaufene Aktivierung abgewiesen wird.
 #[test]
 fn test_negative_3_expired_activation_rejected() {
     let (signing_key, verifying_key) = generate_keypair(5);
@@ -121,6 +132,8 @@ fn test_negative_3_expired_activation_rejected() {
     );
 }
 
+// ANCHOR[contextra-license:TEST-NEG-4-WRONG-RING]
+// Negativtest 4: Prüfung, dass eine Aktivierung für einen abweichenden Ring abgelehnt wird.
 #[test]
 fn test_negative_4_wrong_ring_product_id_rejected() {
     let (signing_key, verifying_key) = generate_keypair(6);
@@ -143,6 +156,8 @@ fn test_negative_4_wrong_ring_product_id_rejected() {
     );
 }
 
+// ANCHOR[contextra-license:TEST-NEG-5-WRONG-INSTALLATION-ID]
+// Negativtest 5: Prüfung, dass eine unpassende Installations-ID abgewiesen wird.
 #[test]
 fn test_negative_5_wrong_installation_id_rejected() {
     let (signing_key, verifying_key) = generate_keypair(7);
@@ -164,6 +179,8 @@ fn test_negative_5_wrong_installation_id_rejected() {
     );
 }
 
+// ANCHOR[contextra-license:TEST-NEG-6-TRUNCATED-BYTES]
+// Negativtest 6: Prüfung, dass abgeschnittene Payload-Bytes abgelehnt werden.
 #[test]
 fn test_negative_6_truncated_payload_bytes_rejected() {
     let (signing_key, verifying_key) = generate_keypair(8);
@@ -193,6 +210,8 @@ fn test_negative_6_truncated_payload_bytes_rejected() {
     assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
+// ANCHOR[contextra-license:TEST-NEG-7-EMPTY-BYTES]
+// Negativtest 7: Prüfung, dass leere Payload-Bytefolgen abgewiesen werden.
 #[test]
 fn test_negative_7_empty_payload_bytes_rejected() {
     let (signing_key, verifying_key) = generate_keypair(9);
@@ -213,6 +232,8 @@ fn test_negative_7_empty_payload_bytes_rejected() {
     assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
+// ANCHOR[contextra-license:TEST-NEG-8-LEGACY-WITHOUT-FLAG]
+// Negativtest 8: Prüfung, dass Legacy-Payloads ohne Freischalt-Option abgewiesen werden.
 #[test]
 fn test_negative_8_legacy_payload_without_flag_rejected() {
     let (signing_key, verifying_key) = generate_keypair(10);
@@ -241,6 +262,8 @@ fn test_negative_8_legacy_payload_without_flag_rejected() {
     assert_eq!(res.err(), Some(LicenseError::InvalidSignature));
 }
 
+// ANCHOR[contextra-license:TEST-NEG-9-LEGACY-WITH-FLAG]
+// Negativtest 9: Prüfung, dass Legacy-Payloads mit gesetztem allow_legacy akzeptiert werden.
 #[test]
 fn test_negative_9_legacy_payload_with_flag_permitted() {
     let (signing_key, verifying_key) = generate_keypair(11);
@@ -275,6 +298,8 @@ fn test_negative_9_legacy_payload_with_flag_permitted() {
     assert_eq!(gate.check_ring(FeatureRing::Sovereign), Ok(()));
 }
 
+// ANCHOR[contextra-license:TEST-NEG-10-MISSING-ACTIVATION]
+// Negativtest 10: Prüfung des Fail-Closed-Verhaltens eines leeren Gates (no_activation).
 #[test]
 fn test_negative_10_missing_activation_or_payload_gate() {
     let gate = SignedLicenseGate::no_activation();

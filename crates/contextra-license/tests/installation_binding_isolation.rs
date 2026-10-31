@@ -1,3 +1,6 @@
+//! Prüfung der Isolierung und Portabilitätssperre bei Installationsbindungen sowie Hash-Stabilität.
+//! Verifiziert, dass kopierte Aktivierungsdateien auf Fremdsystemen unbrauchbar sind.
+
 #![allow(
     clippy::expect_used,
     clippy::unwrap_used,
@@ -35,6 +38,8 @@ fn generate_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     (signing_key, verifying_key)
 }
 
+// ANCHOR[contextra-license:TEST-ISOLATION-COPIED-FAILS]
+// Prüft, dass das Kopieren eines Aktivierungsdatensatzes auf einen fremden Host fehlschlägt.
 #[test]
 fn test_copied_activation_to_foreign_host_fails() {
     let (signing_key, verifying_key) = generate_keypair();
@@ -66,6 +71,8 @@ fn test_copied_activation_to_foreign_host_fails() {
     assert!(!err_fmt.contains("BB"));
 }
 
+// ANCHOR[contextra-license:TEST-ISOLATION-NO-RAW-HASH-LEAK]
+// Prüft, dass Fehlerkonvertierung bei Installations-Mismatch keine Roh-Hashes offenlegt.
 #[test]
 fn test_installation_mismatch_step_error_conversion_leaks_no_raw_hash() {
     let step_err = StepVerificationError::InstallationMismatch(FeatureRing::Compliance);
@@ -78,6 +85,8 @@ fn test_installation_mismatch_step_error_conversion_leaks_no_raw_hash() {
     assert!(!display_str.contains("hardware"));
 }
 
+// ANCHOR[contextra-license:TEST-ISOLATION-HASH-STABILITY]
+// Prüft die deterministische Stabilität von derive_local_installation_id_hash über wiederholte Aufrufe.
 #[test]
 fn test_derive_local_installation_id_hash_stability() {
     let tmp_dir = std::env::temp_dir().join(format!(

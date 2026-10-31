@@ -1,8 +1,40 @@
+//! # Wiederverwendbare CRUD- und Batch-Makros (`crud_macros`)
+//!
+//! Dieses Modul definiert deklarative Makros (`contextra_crud_methods!` und `contextra_batch_methods!`),
+//! welche die gemeinsamen CRUD- (Create, Read, Update, Delete), Such-, Relations- und Scan-Methoden
+//! für `PyContextra` (Default-Collection-Fassade) und `PyCollection` generieren.
+//!
+//! ## Ring-Zugehörigkeit
+//! Ring 4 (FFI-Boundary / Bindings).
+//!
+//! ## Warum Makros?
+//! Die Python-Klassen `PyContextra` und `PyCollection` bieten identische Methoden für
+//! Dokumenten-Operationen (`insert`, `get`, `update`, `upsert`, `delete`, `search`, `hybrid_search`, etc.).
+//! Durch die Makrogenerierung wird Code-Duplizierung vermieden und sichergestellt, dass
+//! Validierung, GIL-Freigabe (`py.allow_threads`) und Fehlerübersetzung (`contextra_err`)
+//! überall absolut einheitlich greifen.
+
 // ─── Macro: Shared CRUD Methods ─────────────────────────────────────────────
 //
 // This macro generates the common CRUD, search, and scan methods that are
 // shared between PyContextra (default collection facade) and PyCollection.
 
+// ANCHOR[contextra-py:MACRO-001]
+/// Generiert synchrone Python-CRUD-, Such- und Scan-Methoden für den angegebenen Struct-Typ.
+///
+/// # Implementierte Methoden
+/// - `insert(id, vector, metadata=None)`: Dokument mit Vektor einfügen.
+/// - `get(id)`: Dokument nach ID abrufen.
+/// - `update(id, vector, metadata=None)`: Dokument aktualisieren.
+/// - `upsert(id, vector, metadata=None)`: Dokument einfügen oder aktualisieren.
+/// - `delete(id)`: Dokument löschen.
+/// - `search(vector, k)`: K-NN-Vektorsuche über den HNSW-Index.
+/// - `search_fb(vector, k)`: Vektorsuche mit FlatBuffers-Rückgabe (`PyBytes`).
+/// - `hybrid_search(text, vector, k, ...)`: Kombinierte Suche (BM25 + Vektor + Graph).
+/// - `hybrid_search_fb(...)`: Hybridsuche mit FlatBuffers-Rückgabe.
+/// - `relate(from, to, label)`: Bidirektionale Graph-Kante erstellen.
+/// - `scan_prefix(prefix="", limit=None)`: Präfix-Scan über Schlüssel.
+/// - `scan(start=None, end=None, limit=None)`: Bounded/Unbounded Range-Scan über Schlüssel.
 #[macro_export]
 macro_rules! contextra_crud_methods {
     ($struct_type:ty) => {
@@ -382,6 +414,15 @@ macro_rules! contextra_crud_methods {
 
 // ─── Macro: Batch Methods ───────────────────────────────────────────────────
 
+// ANCHOR[contextra-py:MACRO-002]
+/// Generiert synchrone Python-Massenoperationen (`insert_many`, `upsert_many`) für Batch-Transaktionen.
+///
+/// # Implementierte Methoden
+/// - `insert_many(docs)`: Fügt eine Liste von `(id, vector, metadata)` atomar ein.
+/// - `upsert_many(docs)`: Führt Upserts für eine Liste atomar durch.
+///
+/// # Validierung
+/// Prüft `validate_batch_size` (<= 10.000) sowie Vektor- und ID-Schranken jedes Eintrags.
 #[macro_export]
 macro_rules! contextra_batch_methods {
     ($struct_type:ty) => {

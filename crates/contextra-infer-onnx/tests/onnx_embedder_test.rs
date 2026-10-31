@@ -1,3 +1,15 @@
+// FILE-CONTEXT
+// STAND: 2026-10-31
+// ZWECK: Integrationstests für OnnxEmbedder mit Fixture-Modellen (Ring 2).
+
+//! # Integrationstests für `OnnxEmbedder`
+//!
+//! Überprüft das Verhalten des Embedders unter realer ONNX Runtime:
+//! - Gültige Inferenz mit Modell-Fixtures.
+//! - Fehlerbehandlung bei Überschreitung der maximalen Sequenzlänge.
+//! - Single-Session-Garantie (kein wiederholtes Neuladen der Session).
+//! - Nebenläufige Zugriffe und Mutex-Contention ohne Deadlocks oder Abstürze.
+
 #![cfg(feature = "onnx")]
 
 use contextra_infer_onnx::{OnnxEmbedder, TextEmbedderConfig};
@@ -5,6 +17,8 @@ use contextra_ports::{EmbeddingError, EmbeddingProvider};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+// ANCHOR[contextra-infer-onnx:TEST-FIXTURE-PATH]
+/// Ermittelt den Pfad zur Test-Modelldatei unter `tests/fixtures/model.onnx`.
 fn fixture_path() -> PathBuf {
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     p.push("tests");
@@ -13,8 +27,11 @@ fn fixture_path() -> PathBuf {
     p
 }
 
+/// Mutex zur Serialisierung von Fixture-Inferenz-Tests, um Überlastung zu verhindern.
 static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+// ANCHOR[contextra-infer-onnx:TEST-EMBEDDER-FIXTURE]
+/// Prüft, dass eine valide Texteingabe ein nicht-leeres und endliches Vektor-Embedding erzeugt.
 #[tokio::test]
 #[allow(clippy::await_holding_lock)]
 async fn test_onnx_embedder_fixture_inference() {
@@ -44,6 +61,8 @@ async fn test_onnx_embedder_fixture_inference() {
     );
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-EMBEDDER-INPUT-TOO-LONG]
+/// Prüft, dass Eingaben, die `max_sequence_length` überschreiten, mit `EmbeddingError::InputTooLong` abgewiesen werden.
 #[tokio::test]
 #[allow(clippy::await_holding_lock)]
 async fn test_onnx_embedder_input_too_long() {
@@ -76,6 +95,8 @@ async fn test_onnx_embedder_input_too_long() {
     }
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-SINGLE-SESSION-LOAD]
+/// Prüft, dass mehrfache Inferenz-Aufrufe keine weiteren Ladevorgänge der ONNX-Session auslösen.
 #[tokio::test]
 #[allow(clippy::await_holding_lock)]
 async fn test_single_session_load_across_multiple_embed_calls() {
@@ -109,6 +130,8 @@ async fn test_single_session_load_across_multiple_embed_calls() {
     );
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-CONCURRENT-EMBED-MUTEX]
+/// Prüft das Verhalten unter hoher Nebenläufigkeit (20 gleichzeitige Tasks teilen denselben Embedder).
 #[tokio::test]
 #[allow(clippy::await_holding_lock)]
 async fn test_concurrent_embed_async_mutex_contention() {

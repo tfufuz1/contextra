@@ -1,21 +1,37 @@
 #![deny(dead_code)]
 // FILE-CONTEXT
-// STAND: 2026-09-15T16:10:40Z (SESSION: ec33599e)
-// ZWECK: In-process ONNX Embedding Engine (Layer 3 im 5-Schichten-DAG).
+// STAND: 2026-10-31
+// ZWECK: In-process ONNX Embedding Engine und Cross-Encoder-Reranker (Ring 2).
 // INVARIANTEN: Default-Build ohne ONNX hat leere Feature-Flags (ADR-005, Pure-Rust-USP).
 // NICHT-OFFENSICHTLICH: Threading via tokio::task::spawn_blocking zur Vermeidung von Executor-Starvation.
-// SIEHE AUCH: crates/contextra-embed/AGENTS.md, rules/dependencies.md
+// SIEHE AUCH: crates/contextra-infer-onnx/AGENTS.md, rules/dependencies.md
 
-//! contextra-embed — In-process text embeddings using ONNX Runtime.
+//! # Crate `contextra-infer-onnx`
 //!
-//! This crate provides a high-level API for generating vector embeddings from text
-//! without requiring external API calls. It uses the `ort` crate for ONNX Runtime
-//! and `tokenizers` for text preprocessing.
+//! **Ring & Klasse:** Ring 2 (Flüchtige Abhängigkeit / Rand `[R]`).
+//! **Status:** Archiv-Status laut `CLAUDE.md` / SPEC §5.2 („ENTFERNT“), wird jedoch im Workspace geführt
+//! und optional von `contextra-mcp` (über das Feature `onnx`) eingebunden.
 //!
-//! All ONNX-related functionality is gated behind the `onnx` feature flag.
+//! ## Zweck & Architekturrolle
+//! Dieses Crate stellt eine lokale, In-Process-Inferenz-Engine für Text-Embeddings und
+//! Cross-Encoder-Reranking basierend auf der **ONNX Runtime** (`ort`) und HuggingFace-Tokenizern bereit.
+//! Dadurch können hochqualitative Vektor-Einbettungen und semantische Umsortierungen vollkommen
+//! offline und ohne externe Server-Aufrufe (wie z. B. Ollama oder Cloud-APIs) berechnet werden.
 //!
-//! Backpressure contract: `max_concurrent_embeddings` limits `spawn_blocking` calls.
-//! Callers will experience back-pressure (await on permit acquire) rather than Tokio thread pool exhaustion.
+//! ## Einbindung und Abhängigkeiten
+//! - **Eingehend:** Wird optional von `contextra-mcp` (Feature `onnx`) eingebunden.
+//! - **Ausgehend (normal):**
+//!   - `contextra-ports`: Definiert Schnittstellen wie `EmbeddingProvider` und `Reranker`.
+//!   - `contextra-rank`: Liefert Kalibrierungsmodelle (`PlattScaler`) für Reranking-Wahrscheinlichkeiten.
+//!   - `contextra-types`: Stellt gemeinsame Fehlertypen (`ContextraError`) und Datenstrukturen bereit.
+//!   - `tokio`, `parking_lot`, `serde`, `tracing`.
+//!   - Optional (über Feature `onnx`): `ort`, `tokenizers`, `ndarray`, `reqwest`, `sha2`.
+//!
+//! ## Wichtige Invarianten
+//! 1. **Zero Unsafe:** `#![forbid(unsafe_code)]` wird strikt auf Crate-Ebene erzwungen.
+//! 2. **Offline-First:** Netzwerk-Downloads sind standardmäßig deaktiviert (`allow_download = false`).
+//! 3. **Non-Starvation:** Da Inferenz-Berechnungen CPU-intensiv und blockierend sind, werden sie
+//!    konsequent über `tokio::task::spawn_blocking` ausgeführt und über Semaphoren gedrosselt (Backpressure).
 
 #![forbid(unsafe_code)]
 
@@ -33,12 +49,23 @@ use tokenizers::Tokenizer;
 #[cfg(feature = "onnx")]
 use tracing::{debug, info, warn};
 
+// ANCHOR[contextra-infer-onnx:MOD-RERANKER]
+/// Submodul für Cross-Encoder Reranking zur Präzisionsverbesserung nach initialer Suche.
 pub mod reranker;
 pub use reranker::{CrossEncoderReranker, PlattScaledSigmoid, RerankConfig, RerankResult};
 
 use std::path::{Path, PathBuf};
 
 /// Returns the default local cache directory for ONNX embedding models (`~/.contextra/models/<model_name>`).
+// ANCHOR[contextra-infer-onnx:CACHE-DIR-001]
+/// Liefert das standardmäßige lokale Cache-Verzeichnis für ONNX-Embedding-Modelle.
+///
+/// Standardpfad: `~/.contextra/models/<model_name>`
+///
+/// # Ablauf
+/// 1. Umgebungsvariablen `HOME` bzw. `USERPROFILE` prüfen.
+/// 2. Falls vorhanden, Pfad als `$HOME/.contextra/models/<model_name>` konstruieren.
+/// 3. Fallback auf `.contextra/models/<model_name>`.
 pub fn default_model_cache_dir(model_name: &str) -> PathBuf {
     #[allow(clippy::disallowed_methods)]
     {
@@ -57,6 +84,10 @@ pub fn default_model_cache_dir(model_name: &str) -> PathBuf {
 ///
 /// Download is **DISABLED** by default (`allow_download = false`) to enforce offline-first operation.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-infer-onnx:DOWNLOAD-OPTS-001]
+/// Sicherheitsrichtlinien und Konfigurationsparameter für das Herunterladen von ONNX-Modellartefakten.
+///
+/// Gemäß Offline-First-Doktrin standardmäßig deaktiviert (`allow_download = false`).
 pub struct ModelDownloadOptions {
     /// Allow downloading missing model files over network. Default: false.
     pub allow_download: bool,
@@ -88,6 +119,9 @@ impl Default for ModelDownloadOptions {
 /// **Offline-First Contract**: Network downloads are strictly disabled by default. Callers must explicitly
 /// configure [`ModelDownloadOptions`] with `allow_download = true` AND provide expected SHA-256 checksums to enable downloads.
 #[cfg(feature = "onnx")]
+// ANCHOR[contextra-infer-onnx:ENSURE-DOWNLOAD-001]
+/// Stellt sicher, dass die ONNX-Modelldateien (`model.onnx` und `tokenizer.json`) lokal existieren.
+/// Nutzt die Standardoptionen von [`ModelDownloadOptions`].
 pub async fn ensure_onnx_model_download(
     model_name: &str,
     cache_dir: Option<&Path>,
@@ -98,6 +132,16 @@ pub async fn ensure_onnx_model_download(
 
 /// Ensures the ONNX embedding model files exist locally using custom [`ModelDownloadOptions`].
 #[cfg(feature = "onnx")]
+// ANCHOR[contextra-infer-onnx:ENSURE-DOWNLOAD-WITH-OPTS-001]
+/// Stellt sicher, dass die ONNX-Modelldateien lokal existieren, unter Verwendung benutzerdefinierter [`ModelDownloadOptions`].
+///
+/// # Ablauf
+/// 1. Zielpfad ermitteln (`cache_dir` oder Standard-Cacheverzeichnis).
+/// 2. Asynchron prüfen, ob `model.onnx` und `tokenizer.json` bereits existieren.
+/// 3. Falls beide existieren: Sofortige Rückgabe des Verzeichnisses (`Ok(target_dir)`).
+/// 4. Falls Dateien fehlen und `options.allow_download == false`: Abbruch mit `InvalidInput`.
+/// 5. Zielverzeichnis über `spawn_blocking` anlegen.
+/// 6. Download via `download_onnx_file_secured` mit SHA-256 Validierung ausführen.
 pub async fn ensure_onnx_model_download_with_options(
     model_name: &str,
     cache_dir: Option<&Path>,
@@ -191,6 +235,8 @@ pub async fn ensure_onnx_model_download_with_options(
 }
 
 #[cfg(feature = "onnx")]
+// ANCHOR[contextra-infer-onnx:SECURED-DOWNLOAD-001]
+/// Lädt eine Datei sicher per HTTPS herunter, verifiziert SHA-256 und schreibt atomar via tmp + rename.
 async fn download_onnx_file_secured(
     client: &reqwest::Client,
     url_str: &str,
@@ -315,6 +361,8 @@ async fn download_onnx_file_secured(
 }
 
 #[cfg(feature = "onnx")]
+// ANCHOR[contextra-infer-onnx:PATH-EXISTS-ASYNC-001]
+/// Prüft blockierungsfrei über `tokio::task::spawn_blocking`, ob ein Pfad existiert.
 async fn path_exists_async(path: &Path) -> Result<bool> {
     let p = path.to_path_buf();
     tokio::task::spawn_blocking(move || p.exists())
@@ -323,6 +371,8 @@ async fn path_exists_async(path: &Path) -> Result<bool> {
 }
 
 #[cfg(feature = "onnx")]
+// ANCHOR[contextra-infer-onnx:CREATE-DIR-ASYNC-001]
+/// Erstellt rekursiv Verzeichnisse im Hintergrundthread via `spawn_blocking`.
 async fn create_dir_all_async(dir: &Path) -> Result<()> {
     let d = dir.to_path_buf();
     tokio::task::spawn_blocking(move || {
@@ -338,6 +388,9 @@ async fn create_dir_all_async(dir: &Path) -> Result<()> {
 }
 
 #[cfg(not(feature = "onnx"))]
+// ANCHOR[contextra-infer-onnx:ENSURE-DOWNLOAD-FALLBACK-001]
+/// Stellt sicher, dass die ONNX-Modelldateien (`model.onnx` und `tokenizer.json`) lokal existieren.
+/// Nutzt die Standardoptionen von [`ModelDownloadOptions`].
 pub async fn ensure_onnx_model_download(
     _model_name: &str,
     _cache_dir: Option<&Path>,
@@ -351,11 +404,15 @@ pub async fn ensure_onnx_model_download(
 
 /// Conservative default. Override via `TextEmbedderConfig::max_batch_size`.
 /// At 1536D × 512 × f32 = ~3 MB input tensor; safe within 128 MB memory budgets.
+// ANCHOR[contextra-infer-onnx:MAX-EMBED-BATCH-SIZE-001]
+/// Standard-Obergrenze für Batch-Embedding-Anfragen (512 Texte).
 pub const MAX_EMBED_BATCH_SIZE: usize = 512;
 
 /// Configuration settings for the text embedder.
 #[cfg(feature = "onnx")]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-infer-onnx:CONFIG-STRUCT-001]
+/// Konfigurationsparameter für den [`TextEmbedder`].
 pub struct TextEmbedderConfig {
     /// Maximum number of tokens per text sequence (default: 512).
     pub max_sequence_length: usize,
@@ -387,6 +444,8 @@ impl Default for TextEmbedderConfig {
 #[cfg(feature = "onnx")]
 impl TextEmbedderConfig {
     /// Validates configuration parameters.
+    // ANCHOR[contextra-infer-onnx:CONFIG-VALIDATE-001]
+    /// Validiert die Konfigurationswerte auf Konsistenz und Grenzwerte.
     pub fn validate(&self) -> Result<()> {
         if self.pool_size != 1 {
             return Err(ContextraError::InvalidInput(format!(
@@ -405,6 +464,8 @@ impl TextEmbedderConfig {
 }
 
 #[cfg(feature = "onnx")]
+// ANCHOR[contextra-infer-onnx:TYPE-ALIAS-ONNX-EMBEDDER]
+/// Typalias für [`TextEmbedder`] zur Wahrung von Kompatibilität mit `contextra-mcp`.
 pub type OnnxEmbedder = TextEmbedder;
 
 /// Handles text tokenization and ONNX model inference.
@@ -414,6 +475,8 @@ pub type OnnxEmbedder = TextEmbedder;
 /// limits the number of concurrent inference operations.
 #[cfg(feature = "onnx")]
 #[derive(Clone)]
+// ANCHOR[contextra-infer-onnx:TEXT-EMBEDDER-STRUCT]
+/// Führt Text-Tokenisierung und ONNX-Modell-Inferenz im Prozess aus.
 pub struct TextEmbedder {
     /// Shared ONNX session (thread-safe via `Arc<Mutex>`).
     session: Arc<parking_lot::Mutex<ort::session::Session>>,
@@ -441,10 +504,14 @@ impl std::fmt::Debug for TextEmbedder {
 
 #[cfg(feature = "onnx")]
 impl EmbeddingProvider for TextEmbedder {
+    // ANCHOR[contextra-infer-onnx:PROVIDER-NAME-001]
+    /// Kennung des Providers: `"onnx"`.
     fn provider_name(&self) -> &str {
         "onnx"
     }
 
+    // ANCHOR[contextra-infer-onnx:EMBED-TRAIT-001]
+    /// Asynchroner Embedding-Aufruf über das `EmbeddingProvider`-Trait aus `contextra-ports`.
     fn embed<'a>(
         &'a self,
         text: &'a str,
@@ -474,10 +541,14 @@ impl EmbeddingProvider for TextEmbedder {
         })
     }
 
+    // ANCHOR[contextra-infer-onnx:EMBED-DIM-001]
+    /// Gibt die konfigurierte Ausgabedimension zurück, oder `0` falls nicht gesetzt.
     fn embedding_dim(&self) -> usize {
         self.expected_dim.unwrap_or(0)
     }
 
+    // ANCHOR[contextra-infer-onnx:EMBED-BATCH-TRAIT-001]
+    /// Verarbeitet mehrere Texte im Batch mit parallelen Tasks und sequentiellem Fallback.
     fn embed_batch<'a>(
         &'a self,
         texts: &'a [&'a str],
@@ -531,6 +602,8 @@ impl EmbeddingProvider for TextEmbedder {
 #[cfg(feature = "onnx")]
 impl TextEmbedder {
     /// Creates a new embedder from a model file or model directory path.
+    // ANCHOR[contextra-infer-onnx:FROM-PATH-001]
+    /// Erstellt einen Embedder aus einer Modelldatei oder einem Modellverzeichnis.
     pub fn from_path(model_path: impl AsRef<Path>) -> Result<Self> {
         let path = model_path.as_ref();
         let dir = if path.is_file() {
@@ -542,6 +615,8 @@ impl TextEmbedder {
     }
 
     /// Creates a new embedder from a model directory. Alias for `load`.
+    // ANCHOR[contextra-infer-onnx:NEW-EMBEDDER-001]
+    /// Erstellt einen neuen Embedder aus einem Modellverzeichnis (Alias für [`TextEmbedder::load`]).
     pub fn new(model_dir: impl AsRef<Path>) -> Result<Self> {
         Self::load(model_dir)
     }
@@ -549,11 +624,15 @@ impl TextEmbedder {
     /// Creates a new embedder by loading a tokenizer and ONNX model path from the specified directory.
     ///
     /// The directory should contain `model.onnx` and `tokenizer.json`.
+    // ANCHOR[contextra-infer-onnx:LOAD-EMBEDDER-001]
+    /// Lädt Modell und Tokenizer aus dem angegebenen Verzeichnis mit Standardkonfiguration.
     pub fn load(model_dir: impl AsRef<Path>) -> Result<Self> {
         Self::load_with_config(model_dir, TextEmbedderConfig::default())
     }
 
     /// Creates a new embedder with a custom configuration.
+    // ANCHOR[contextra-infer-onnx:LOAD-WITH-CONFIG-001]
+    /// Lädt Modell und Tokenizer mit einer benutzerdefinierten Konfiguration.
     pub fn load_with_config(
         model_dir: impl AsRef<Path>,
         config: TextEmbedderConfig,
@@ -604,12 +683,16 @@ impl TextEmbedder {
 
     /// Returns the number of times an ONNX session has been loaded by this embedder instance.
     #[doc(hidden)]
+    // ANCHOR[contextra-infer-onnx:SESSION-LOAD-COUNT-001]
+    /// Gibt zurück, wie oft eine ONNX-Session geladen wurde.
     pub fn session_load_count(&self) -> usize {
         self.session_load_count
             .load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Sets the expected embedding output dimension for post-inference validation.
+    // ANCHOR[contextra-infer-onnx:WITH-EXPECTED-DIM-001]
+    /// Konfiguriert die erwartete Dimension des Ausgabeverktors zur Validierung nach Inferenz.
     pub fn with_expected_dimension(mut self, dim: usize) -> Self {
         self.expected_dim = Some(dim);
         self
@@ -619,6 +702,8 @@ impl TextEmbedder {
     ///
     /// Acquires a semaphore permit to limit concurrent inference operations,
     /// then offloads the blocking ONNX computation to Tokio's blocking thread pool.
+    // ANCHOR[contextra-infer-onnx:EMBED-ASYNC-001]
+    /// Berechnet die Vektor-Einbettung (Embedding) für einen Text asynchron unter Einhaltung von Backpressure.
     pub async fn embed_async(&self, text: &str) -> Result<Vec<f32>> {
         if self.semaphore.available_permits() == 0 {
             warn!("Embedding backpressure active: max_concurrent_embeddings reached");
@@ -658,6 +743,8 @@ impl TextEmbedder {
     /// Performs tokenization, ONNX forward pass, mean pooling, and L2 normalization.
     ///
     /// This is a synchronous function intended to run inside `spawn_blocking`.
+    // ANCHOR[contextra-infer-onnx:RUN-INFERENCE-001]
+    /// Synchroner Kern der Text-Inferenz: Tokenisierung, Forward-Pass, Mean-Pooling und L2-Normalisierung.
     fn run_inference(
         session: &mut ort::session::Session,
         tokenizer: &Tokenizer,
@@ -777,6 +864,8 @@ impl TextEmbedder {
 }
 
 #[cfg(test)]
+// ANCHOR[contextra-infer-onnx:MOD-TESTS-001]
+/// Modultests für Embedder-Konfiguration, Validierung, Fehlerfälle und Mock-Engines.
 mod tests {
     #![allow(clippy::unwrap_used)]
 
@@ -792,6 +881,7 @@ mod tests {
 
     #[cfg(feature = "onnx")]
     #[test]
+    /// Prüft, dass das Laden bei fehlenden Dateien mit `InvalidInput` fehlschlägt.
     fn test_text_embedder_load_missing_files() -> std::result::Result<(), Box<dyn std::error::Error>>
     {
         let dir = tempdir()?;
@@ -813,6 +903,7 @@ mod tests {
 
     #[cfg(feature = "onnx")]
     #[test]
+    /// Prüft die Standardwerte von `TextEmbedderConfig`.
     fn test_text_embedder_config_default() {
         let cfg = TextEmbedderConfig::default();
         assert_eq!(cfg.max_sequence_length, 512);
@@ -824,6 +915,7 @@ mod tests {
 
     #[cfg(feature = "onnx")]
     #[test]
+    /// Prüft ungültige Konfigurationswerte (`pool_size > 1` oder `max_concurrent_embeddings == 0`).
     fn test_text_embedder_config_validation() {
         let mut cfg = TextEmbedderConfig::default();
         cfg.pool_size = 2;
@@ -843,6 +935,7 @@ mod tests {
 
     #[cfg(feature = "onnx")]
     #[test]
+    /// Prüft, dass korrupte Modelldateien zu einem Ladefehler führen.
     fn test_text_embedder_load_invalid_content(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         use std::io::Write;
@@ -863,6 +956,7 @@ mod tests {
     }
 
     #[test]
+    /// Prüft, dass Debug-Formatierung auf Fehlern nicht panickt.
     fn test_formatting_safety() {
         use contextra_types::ContextraError;
         // Verify that Debug formatting on ContextraError doesn't panic
@@ -872,6 +966,7 @@ mod tests {
     }
 
     #[test]
+    /// Prüft die korrekte Pfadauflösung des Modell-Cache-Verzeichnisses.
     fn test_default_model_cache_dir_resolution() {
         let dir = default_model_cache_dir("nomic-embed-text");
         assert!(dir.to_string_lossy().contains("nomic-embed-text"));
@@ -880,6 +975,7 @@ mod tests {
 
     #[cfg(feature = "onnx")]
     #[tokio::test]
+    /// Prüft, dass bereits gecachte Modelle sofort zurückgegeben werden.
     async fn test_ensure_onnx_model_download_cached_returns_immediately() {
         let tmp = tempfile::tempdir().unwrap();
         let cache_dir = tmp.path().join("models");
@@ -895,6 +991,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// Prüft die Ausführung einer Mock-Embedding-Engine.
     async fn test_mock_embedding_engine() -> std::result::Result<(), Box<dyn std::error::Error>> {
         use contextra_ports::{BoxFuture, TextEmbeddingEngine};
         use contextra_types::Result;
@@ -913,6 +1010,7 @@ mod tests {
     }
 
     #[tokio::test]
+    /// Prüft Reihenfolge und Fehlerweiterleitung bei Batch-Embeddings.
     async fn test_embed_batch_ordering_and_fallback(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         use contextra_ports::{BoxFuture, TextEmbeddingEngine};
@@ -960,6 +1058,7 @@ mod tests {
 
     #[cfg(feature = "onnx")]
     #[tokio::test]
+    /// Prüft, dass übergroße Batches das Limit nicht überschreiten dürfen.
     async fn test_embed_batch_oversized_limit(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         use contextra_ports::EmbeddingProvider;
@@ -990,6 +1089,7 @@ mod tests {
 
     #[tokio::test]
     #[cfg(feature = "onnx")]
+    /// Prüft, dass Downloads standardmäßig deaktiviert sind.
     async fn test_model_download_offline_by_default() {
         let tmp = tempfile::tempdir().unwrap();
         let cache_dir = tmp.path().join("models");
@@ -1005,6 +1105,7 @@ mod tests {
 
     #[tokio::test]
     #[cfg(feature = "onnx")]
+    /// Prüft Sicherheitsanforderungen (Prüfsummenpflicht und Host-Allowlist) beim Download.
     async fn test_model_download_options_secured_checks() {
         let tmp = tempfile::tempdir().unwrap();
         let cache_dir = tmp.path().join("models");
@@ -1045,6 +1146,7 @@ mod tests {
 
     #[tokio::test]
     #[cfg(not(feature = "onnx"))]
+    /// Prüft, dass ohne das Feature `onnx` ein CapabilityUnsupported-Fehler zurückgegeben wird.
     async fn test_ensure_onnx_model_download_disabled_feature() {
         let res = ensure_onnx_model_download("nomic-embed-text", None).await;
         assert!(res.is_err());

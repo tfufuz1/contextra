@@ -1,3 +1,16 @@
+//! # Freistehende FFI-Funktionen (`functions`)
+//!
+//! Dieses Modul exportiert freistehende Funktionen für den Python-Namespace,
+//! allen voran die zentrale Einstiegsfunktion `open()`.
+//!
+//! ## Ring-Zugehörigkeit
+//! Ring 4 (FFI-Boundary / Bindings).
+//!
+//! ## Funktionen
+//! - `open(path, ...)`: Öffnet oder erstellt eine Contextra-Datenbank auf der Festplatte.
+//! - `trigger_panic_helper` / `_trigger_panic_for_test`: Interne Testhooks zur Absicherung
+//!   der FFI-Panikgrenze (ADR-N04).
+
 use contextra_db::{Contextra, ContextraConfig};
 use pyo3::prelude::*;
 use std::sync::atomic::AtomicBool;
@@ -7,16 +20,27 @@ use crate::bindings::common::*;
 use crate::bindings::db::PyContextra;
 use crate::bindings::runtime_state::get_runtime;
 
-/// Opens or creates a Contextra database at the given path.
+// ANCHOR[contextra-py:FN-001]
+/// Öffnet oder erstellt eine Contextra-Datenbank am angegebenen Dateipfad.
 ///
-/// Default `dimension` is 768 to align with `ContextraConfig::default().dimension` in `contextra-db`
-/// (matching `nomic-embed-text`, the default ONNX embedding model).
+/// # Parameter
+/// - `path`: Dateipfad zum Datenbankverzeichnis (wird validiert, keine Null-Bytes).
+/// - `dimension`: Vektordimension (Standard: 768, passend für Standardmodelle wie `nomic-embed-text`; Schranke [1, 10000]).
+/// - `max_elements`: Optionale Obergrenze für Elemente im HNSW-Index (> 0).
+/// - `encryption_passphrase`: Optionale Passphrase zur transparenten Verschlüsselung der Datenbank.
+/// - `distance_metric`: Distanzmetrik für Vektoren ("cosine", "euclidean"/"l2", "dot"/"dotproduct").
 ///
-/// Supports Python context manager protocol:
-/// ```python
-/// with contextra.open("./data") as db:
-///     db.insert("doc1", vector, {"key": "value"})
-/// ```
+/// # Ablauf in Schritten:
+/// 1. Pfad und Vektordimension prüfen (`validate_db_path`, Bounds-Check).
+/// 2. Tokio-Runtime für den aktuellen Interpreter abrufen (`get_runtime`).
+/// 3. Datenbank-Konfiguration (`ContextraConfig`) mit Dimension, Passphrase und Metrik befüllen.
+/// 4. Atomares Vergiftungsflag (`poisoned`) initialisieren.
+/// 5. Asynchron `Contextra::open_with_config` unter GIL-Release und Panic-Schutz aufrufen.
+/// 6. `PyContextra`-Handle erzeugen und an Python zurückgeben.
+///
+/// # Fehlerfälle
+/// - `PyValueError` bei ungültigem Pfad, Dimension außerhalb [1, 10000] oder unbekannter Metrik.
+/// - `ContextraIOError` / `ContextraError` bei Dateisystem- oder Speicherfehlern.
 #[pyfunction]
 #[pyo3(signature = (path, dimension=768, max_elements=None, encryption_passphrase=None, distance_metric=None))]
 pub fn open(
@@ -75,16 +99,14 @@ pub fn open(
     Ok(PyContextra::new(Arc::new(db), rt, worker_threads, poisoned))
 }
 
-/// Internal helper function to trigger an unwinding panic inside `run_blocking_ffi` for testing FFI panic isolation.
+// ANCHOR[contextra-py:FN-002]
+/// Interner Hilfsaufruf zum gezielten Auslösen eines Panics innerhalb von `run_blocking_ffi`.
 ///
-/// # Intention
-/// Serves exclusively as a test hook for verifying Python FFI panic boundary isolation (`run_blocking_ffi` / `catch_unwind`).
+/// # Zweck
+/// Dient rein als Testhook zur Verifikation der FFI-Panik-Isolation (`catch_unwind`).
 ///
-/// # Scope
-/// Internal test helper, restricted to `_trigger_panic_for_test` for integration and Python test suites.
-///
-/// # Risks
-/// Triggers panic unwinding. If called outside `run_blocking_ffi` or `catch_unwind`, it will abort or unwind across FFI boundaries.
+/// # Panics
+/// Löst bewusst einen Panic-Unwind via `std::panic::resume_unwind` aus.
 #[doc(hidden)]
 pub(crate) fn trigger_panic_helper(
     py: Python<'_>,
@@ -97,17 +119,12 @@ pub(crate) fn trigger_panic_helper(
     })
 }
 
-/// Internal Python binding function for testing FFI panic isolation.
+// ANCHOR[contextra-py:FN-003]
+/// Python-Funktion zum Testen der Panik-Isolation (nur bei Feature `test-hooks`).
 ///
-/// # Intention
-/// Exposed to Python test suite (`tests/test_panic_isolation.py` and `tests/test_panic_to_pyerr.py`) to verify
-/// that panics occurring within Rust core operations are caught and mapped to `PyRuntimeError`.
-///
-/// # Scope
-/// Internal test hook only (`#[doc(hidden)]`), gated behind `test-hooks` feature.
-///
-/// # Risks
-/// Explicitly triggers a panic payload unwind via `std::panic::resume_unwind`.
+/// # Zweck
+/// Wird von der Python-Testsuite aufgerufen, um zu verifizieren, dass ein Rust-Panic
+/// sauber als `PyRuntimeError` im Python-Interpreter ankommt.
 #[doc(hidden)]
 #[cfg(feature = "test-hooks")]
 #[pyfunction]

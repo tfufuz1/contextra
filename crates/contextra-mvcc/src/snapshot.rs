@@ -1,7 +1,24 @@
-//! SnapshotRegistry for MVCC-safe reads.
+// ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-ROOT]
+//! # Snapshot-Registry (`SnapshotRegistry`) für MVCC-sichere Leseoperationen
 //!
-//! Manages active read snapshots and computes the minimum active
-//! sequence number to prevent premature tombstone GC.
+//! Die `SnapshotRegistry` verwaltet alle aktuell aktiven Lese-Snapshots (Schnappschüsse)
+//! und berechnet atomar die minimal aktive Sequenznummer (`min_active_seqno`).
+//!
+//! ## Warum ist das essenziell? (GC-Schutz)
+//! In einem MVCC-System erzeugen Löschungen sogenannte Tombstones (Grabsteine).
+//! Der Garbage-Collector (LSM Compaction) darf Tombstones und ältere Datenversionen erst dann
+//! physisch von der Festplatte entfernen, wenn kein aktiver Leser mehr existiert,
+//! dessen Snapshot-Sequenznummer vor oder bei dieser Änderung liegt.
+//! Solange ein [`SnapshotGuard`] existiert, garantiert die Registry, dass `min_active_seqno`
+//! nicht über dessen `seq_no` ansteigt.
+//!
+//! ## Synchronisations- und Speicherarchitektur
+//! - **Schreiber über Mutex**: Änderungen an den aktiven Snapshots erfordern den `active`-Mutex.
+//!   Da Snapshot-Registrierungen kurz sind, bleibt die Lock-Haltedauer minimal.
+//! - **Lock-freie Leser via AtomicU64 (Acquire/Release)**: Leser wie die LSM-Kompaktierung fragen
+//!   `min_active_seqno()` extrem häufig ab. Dies geschieht vollständig lock-frei mittels
+//!   `AtomicU64::load(Ordering::Acquire)`. Die Registry aktualisiert diesen Wert nach jeder
+//!   Änderung mittels `AtomicU64::store(..., Ordering::Release)`.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
@@ -23,20 +40,15 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Registry for active read snapshots.
+// ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-STRUCT]
+/// Zentrale Registrierung für aktive Lese-Snapshots im System.
 ///
-/// ### Synchronization & Memory Ordering Strategy
-/// - **Single-Writer Exclusivity via Mutex**: All modifications to active snapshot reference
-///   counts (`register`, `pin`, `release`) acquire the `self.active` `parking_lot::Mutex`.
-///   This guarantees serialized state transitions and single-writer updates to `min_active_seqno`.
-/// - **Lock-Free Reads with Acquire/Release**: Reads of `min_active_seqno()` perform a lockless
-///   atomic load using `Ordering::Acquire`. Updates in `update_min()` store the calculated minimum
-///   using `Ordering::Release`.
-/// - **Sufficiency**: `Ordering::Release` on writes paired with `Ordering::Acquire` on reads is
-///   the minimum safe memory ordering for single-writer, many-reader scenarios without holding
-///   a lock. It establishes a release-acquire ordering guarantee between registration/deregistration
-///   state changes and reader threads (such as LSM compaction workers), preventing instruction
-///   reordering across the atomic synchronization boundary.
+/// ### Synchronisationsstrategie:
+/// - `active`: Ein sortierter `BTreeMap`, geschützt durch einen `parking_lot::Mutex`.
+///   Schlüssel ist die Snapshot-Sequenznummer; Wert ist eine Liste von Nanosekunden-Zeitstempeln
+///   aller Guards, die diesen Snapshot halten (Referenzzählung).
+/// - `min_active_seqno`: Atomarer 64-Bit-Ganzzahlwert für lock-freies Auslesen durch Hintergrund-Threads.
+/// - `clock`: Zeitport zur Erfassung der Haltedauer aktiver Snapshots.
 pub struct SnapshotRegistry {
     active: Mutex<BTreeMap<u64, Vec<u64>>>,
     min_active_seqno: AtomicU64,
@@ -59,12 +71,13 @@ impl Default for SnapshotRegistry {
 }
 
 impl SnapshotRegistry {
-    /// Creates a new empty SnapshotRegistry with default [`SystemClock`].
+    // ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-NEW]
+    /// Erstellt eine neue, leere Snapshot-Registry mit Standard-[`SystemClock`].
     pub fn new() -> Self {
         Self::with_clock(Arc::new(SystemClock::new()))
     }
 
-    /// Creates a new empty SnapshotRegistry using the specified [`Clock`] instance.
+    /// Erstellt eine neue Snapshot-Registry mit benutzerdefiniertem [`Clock`]-Port (für Tests).
     pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
         Self {
             active: Mutex::new(BTreeMap::new()),
@@ -73,19 +86,33 @@ impl SnapshotRegistry {
         }
     }
 
-    /// Returns the active [`Clock`] instance attached to this registry.
+    /// Liefert eine Referenz auf den aktiven Zeitport ([`Clock`]).
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
     }
 
-    /// Registers a read snapshot. Returns an RAII guard that
-    /// automatically deregisters on drop.
+    // ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-REGISTER]
+    /// Registriert einen Lese-Snapshot und liefert einen RAII-Guard ([`SnapshotGuard`]) zurück.
+    ///
+    /// Sobald der Guard den Gültigkeitsbereich verlässt (Drop), wird der Snapshot
+    /// automatisch deregistriert.
+    ///
+    /// ### Ablauf:
+    /// 1. Zeitstempel über die Systemuhr erfassen.
+    /// 2. Delegieren an [`SnapshotRegistry::register_at`].
     pub fn register(self: &Arc<Self>, seq_no: u64) -> SnapshotGuard {
         let now_nanos = self.clock.monotonic_nanos();
         self.register_at(seq_no, now_nanos)
     }
 
-    /// Registers a read snapshot at a specific creation monotonic nanoseconds timestamp `at_nanos`.
+    /// Registriert einen Snapshot mit explizitem Zeitstempel (für deterministische Tests).
+    ///
+    /// ### Ablauf:
+    /// 1. Tombstone-Bit aus der Sequenznummer entfernen.
+    /// 2. Mutex auf `active` sperren.
+    /// 3. Zeitstempel in die Liste für `seq_no` eintragen.
+    /// 4. Minimalen aktiven Wasserstand via `update_min` atomar aktualisieren.
+    /// 5. RAII-Guard erzeugen und zurückgeben.
     pub fn register_at(self: &Arc<Self>, seq_no: u64, at_nanos: u64) -> SnapshotGuard {
         let seq_no = seq_no & !TOMBSTONE_BIT;
         let mut active = self.active.lock();
@@ -98,28 +125,32 @@ impl SnapshotRegistry {
         }
     }
 
-    /// Returns the minimum active sequence number (`u64::MAX` if none).
+    // ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-MIN-ACTIVE]
+    /// Liefert die kleinste Sequenznummer aller derzeit aktiven Snapshots (`u64::MAX`, falls keine aktiv).
     ///
-    /// Uses `Ordering::Acquire` to synchronize with `Ordering::Release` writes in `update_min`.
-    /// This allows reader threads (e.g., compaction processes) to safely query the minimum
-    /// active snapshot sequence without acquiring the `active` mutex lock.
+    /// ### Nebenläufigkeit:
+    /// Vollständig sperr- und allokationsfrei über atomares Laden mit `Ordering::Acquire`.
+    /// Synchronisiert mit dem `Ordering::Release`-Speichern in `update_min`.
     ///
-    /// # INVARIANT (contextra-store Integration)
-    /// `contextra-store` compaction workers query `min_active_seqno()` using lock-free Acquire ordering
-    /// to determine tombstone GC floors. The minimum sequence number will never exceed the creation sequence
-    /// of any live `SnapshotGuard` or active pin.
+    /// ### Invariante:
+    /// Der zurückgegebene Wert ist kleiner oder gleich der Sequenznummer jedes existierenden
+    /// aktiven `SnapshotGuard`. Die LSM-Kompaktierung nutzt dies als untere Löschgrenze.
     #[inline]
     pub fn min_active_seqno(&self) -> u64 {
         self.min_active_seqno.load(Ordering::Acquire)
     }
 
-    /// Persistent pin of a sequence number to prevent GC (SAOS Checkpoint).
+    // ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-PIN]
+    /// Dauerhaftes Pinnen einer Sequenznummer (z. B. für SAOS Checkpoints oder Backups),
+    /// ohne einen RAII-Guard zu halten.
+    ///
+    /// Muss manuell über [`SnapshotRegistry::unpin`] wieder freigegeben werden.
     pub fn pin(&self, seq_no: u64) {
         let now_nanos = self.clock.monotonic_nanos();
         self.pin_at(seq_no, now_nanos);
     }
 
-    /// Persistent pin of a sequence number at a specific monotonic nanoseconds timestamp `at_nanos`.
+    /// Pinnt eine Sequenznummer zu einem spezifischen Zeitstempel.
     pub fn pin_at(&self, seq_no: u64, at_nanos: u64) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
         let mut active = self.active.lock();
@@ -127,15 +158,23 @@ impl SnapshotRegistry {
         self.update_min(&active);
     }
 
-    /// Removes a persistent pin.
+    // ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-UNPIN]
+    /// Hebt einen dauerhaften Pin auf und bereinigt den minimal aktiven Wasserstand.
     pub fn unpin(&self, seq_no: u64) {
         self.release(seq_no);
     }
 
+    // Interne Freigabe ohne Zeitstempelabgleich.
     pub(crate) fn release(&self, seq_no: u64) {
         self.release_at(seq_no, None);
     }
 
+    // Interne Freigabe einer Registrierung unter Berücksichtigung des spezifischen Erstellungs-Zeitstempels.
+    // Ablauf:
+    // 1. Tombstone-Bit ausmaskieren.
+    // 2. Zeitstempel aus dem Vektor entfernen (wenn gefunden swap_remove, sonst pop).
+    // 3. Ist der Vektor für die Sequenznummer leer, Schlüssel aus der BTreeMap löschen.
+    // 4. Minimalaktiven Wasserstand neu berechnen und atomar veröffentlichen.
     pub(crate) fn release_at(&self, seq_no: u64, created_at: Option<u64>) {
         let seq_no = seq_no & !TOMBSTONE_BIT;
         let mut active = self.active.lock();
@@ -153,13 +192,16 @@ impl SnapshotRegistry {
                 active.remove(&seq_no);
             }
         } else {
-            // Unpinning or releasing an un-tracked sequence number is a no-op (§2 Zero-Panic).
+            // NOTE: Unpinning oder Releasing einer ungetrackten Sequenznummer ist ein No-op (Regel 2: Zero-Panic).
         }
         self.update_min(&active);
     }
 
-    /// Identifies which active snapshot sequence number has been held the longest relative to `now_nanos`,
-    /// returning `Some((seq_no, duration))` or `None` if no snapshots are currently active.
+    // ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-LONGEST-PIN]
+    /// Findet den am längsten aktiven Snapshot bezüglich des Nanosekunden-Zeitstempels `now_nanos`.
+    ///
+    /// Liefert `Some((seq_no, duration))` oder `None`, falls aktuell keine Snapshots aktiv sind.
+    /// Dient der Diagnose von "hängenden" Lese-Transaktionen, die die Garbage Collection blockieren.
     pub fn longest_active_pin_at(&self, now_nanos: u64) -> Option<(u64, Duration)> {
         let active = self.active.lock();
         let mut longest: Option<(u64, Duration)> = None;
@@ -180,13 +222,20 @@ impl SnapshotRegistry {
         longest
     }
 
-    /// Identifies which active snapshot sequence number has been held the longest,
-    /// returning `Some((seq_no, duration))` or `None` if no snapshots are currently active.
+    /// Findet den am längsten aktiven Snapshot bezogen auf die aktuelle Systemuhr.
     pub fn longest_active_pin(&self) -> Option<(u64, Duration)> {
         self.longest_active_pin_at(self.clock.monotonic_nanos())
     }
 
-    /// Reaps and removes active snapshot pins older than `max_pin_duration` relative to `now_nanos`.
+    // ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-REAP-EXPIRED]
+    /// Bereinigt und entfernt alle aktiven Snapshot-Pins, die älter als `max_pin_duration` sind.
+    ///
+    /// ### Ablauf:
+    /// 1. Berechne Schwellenwert in Nanosekunden.
+    /// 2. Iteriere über alle aktiven Snapshots und entferne überalterte Zeitstempel.
+    /// 3. Entferne leere Einträge vollständig aus der Map.
+    /// 4. Aktualisiere `min_active_seqno` atomar.
+    /// 5. Gib die sortierte, deduplizierte Liste aller entfernten Sequenznummern zurück.
     pub fn reap_expired_pins_at(&self, max_pin_duration: Duration, now_nanos: u64) -> Vec<u64> {
         let max_nanos = u64::try_from(max_pin_duration.as_nanos()).unwrap_or(u64::MAX);
         let mut expired_seqs = Vec::new();
@@ -217,26 +266,27 @@ impl SnapshotRegistry {
         expired_seqs
     }
 
-    /// Reaps and removes active snapshot pins older than `max_pin_duration`.
+    /// Bereinigt alle überalterten Snapshot-Pins bezogen auf die aktuelle Uhrzeit.
     pub fn reap_expired_pins(&self, max_pin_duration: Duration) -> Vec<u64> {
         let now_nanos = self.clock.monotonic_nanos();
         self.reap_expired_pins_at(max_pin_duration, now_nanos)
     }
 
+    // Aktualisiert die atomare minimale Sequenznummer.
+    // NOTE: u64::MAX ist der korrekte Standardwert, wenn keine Snapshots aktiv sind.
+    // Dadurch darf die LSM-Compaction ALLE Tombstones aufräumen, da alle Datensätze seq_no < u64::MAX haben.
+    // Ordering::Release stellt sicher, dass alle Vorab-Änderungen an der Datenstruktur für Leser sichtbar werden.
     fn update_min(&self, active: &BTreeMap<u64, Vec<u64>>) {
-        // SAFETY: u64::MAX is the correct default when no snapshots are active.
-        // It allows the LSM compaction to garbage collect ALL tombstones, as
-        // all existing records will have seq_no < u64::MAX.
-        //
-        // Memory Ordering: Ordering::Release is required to publish all snapshot state updates
-        // made under the `active` mutex lock to concurrent readers calling `min_active_seqno()`
-        // with Ordering::Acquire.
         let min = active.keys().next().copied().unwrap_or(u64::MAX);
         self.min_active_seqno.store(min, Ordering::Release);
     }
 }
 
-/// RAII Guard for an active snapshot.
+// ANCHOR[contextra-mvcc:SNAPSHOT-GUARD]
+/// RAII-Guard (Resource Acquisition Is Initialization) für einen aktiven Lese-Snapshot.
+///
+/// Hält einen Snapshot in der [`SnapshotRegistry`] gepinnt, solange die Instanz existiert.
+/// Beim Verlassen des Gültigkeitsbereichs (`Drop`) wird der Snapshot automatisch deregistriert.
 pub struct SnapshotGuard {
     registry: Arc<SnapshotRegistry>,
     seq_no: u64,
@@ -244,13 +294,14 @@ pub struct SnapshotGuard {
 }
 
 impl SnapshotGuard {
-    /// Returns the sequence number pinned by this snapshot guard.
+    /// Liefert die Sequenznummer, die durch diesen Guard geschützt wird.
     pub fn seq_no(&self) -> u64 {
         self.seq_no
     }
 }
 
 impl Drop for SnapshotGuard {
+    // Automatische Deregistrierung beim Droppen des Guards.
     fn drop(&mut self) {
         self.registry.release_at(self.seq_no, self.created_at);
     }
@@ -263,7 +314,7 @@ mod tests {
     use contextra_testkit::ManualClock;
     use proptest::prop_assert_eq;
 
-    // INTENT: Snapshot-Registry Lifecycle verified by 5 unit tests.
+    // Prüft den Basis-Lebenszyklus eines SnapshotGuards: Registrierung, Minimum-Berechnung und automatisches Zurücksetzen beim Drop.
     #[test]
     fn test_snapshot_registry_basic() {
         let registry = Arc::new(SnapshotRegistry::new());
@@ -277,6 +328,7 @@ mod tests {
         assert_eq!(registry.min_active_seqno(), u64::MAX);
     }
 
+    // Prüft die korrekte Bestimmung der minimal aktiven Sequenznummer bei mehreren parallelen Snapshots.
     #[test]
     fn test_multiple_snapshots_min_calc() {
         let registry = Arc::new(SnapshotRegistry::new());
@@ -290,6 +342,7 @@ mod tests {
         assert_eq!(registry.min_active_seqno(), 200);
     }
 
+    // Prüft das manuelle Pinnen und Entpinnen von Snapshots in Kombination mit RAII-Guards.
     #[test]
     fn test_pin_unpin() {
         let registry = Arc::new(SnapshotRegistry::new());
@@ -306,6 +359,7 @@ mod tests {
         assert_eq!(registry.min_active_seqno(), u64::MAX);
     }
 
+    // Prüft, dass gesetzte Tombstone-Bits in Sequenznummern bei der Registrierung transparent maskiert werden.
     #[test]
     fn test_seq_no_tombstone_masking() {
         let registry = Arc::new(SnapshotRegistry::new());
@@ -317,6 +371,7 @@ mod tests {
         assert_eq!(registry.min_active_seqno(), 100);
     }
 
+    // Prüft die Referenzzählung bei mehrfacher Registrierung derselben Sequenznummer.
     #[test]
     fn test_ref_counting() {
         let registry = Arc::new(SnapshotRegistry::new());
@@ -332,6 +387,7 @@ mod tests {
         assert_eq!(registry.min_active_seqno(), u64::MAX);
     }
 
+    // Prüft, dass das Entpinnen einer nie registrierten Sequenznummer fehlertolerant ohne Panic ignoriert wird.
     #[test]
     fn test_unpin_unknown_seq_no_does_not_panic() {
         let registry = Arc::new(SnapshotRegistry::new());
@@ -340,6 +396,7 @@ mod tests {
         assert_eq!(registry.min_active_seqno(), u64::MAX);
     }
 
+    // Prüft die Panic-Freiheit der Snapshot-Registry bei unerwarteten Freigabe-Aufrufen.
     #[test]
     fn test_snapshot_panic_free_safety() {
         let registry = Arc::new(SnapshotRegistry::new());
@@ -349,6 +406,7 @@ mod tests {
         assert_eq!(registry.min_active_seqno(), u64::MAX);
     }
 
+    // Prüft Doppelregistrierung und sequentiellen Drop zweier Guards auf gleicher Sequenznummer.
     #[test]
     fn test_double_registration_and_sequential_drop() {
         let registry = Arc::new(SnapshotRegistry::new());
@@ -374,6 +432,7 @@ mod tests {
         );
     }
 
+    // Prüft das automatische Bereinigen überalterter Pins nach Ablauf der maximalen Haltedauer.
     #[test]
     fn test_snapshot_registry_reap_expired_pins() {
         let clock = Arc::new(ManualClock::new(10_000_000_000));
@@ -399,6 +458,7 @@ mod tests {
     }
 
     proptest::proptest! {
+        // Eigenschaftstest: Verifiziert die minimale aktive Sequenznummer über zufällige Registrierungen.
         #[test]
         fn prop_snapshot_registry_min_active(
             seqs in proptest::collection::vec(0..1000u64, 1..50)
@@ -430,6 +490,7 @@ mod tests {
         /// # Anti-Mirroring
         /// Expected min is computed by maintaining an independent sorted list
         /// of remaining sequence numbers, not by calling SnapshotRegistry methods.
+        // Eigenschaftstest: Stresstest für Registrierung und Deregistrierung in zufälliger Reihenfolge gegen ein unabhängiges Modell.
         #[test]
         fn prop_snapshot_register_unregister_stress(
             seqs in proptest::collection::vec(0..5000u64, 2..80),
@@ -494,6 +555,7 @@ mod tests {
         ///
         /// # Anti-Mirroring
         /// Reference min is maintained in an independent BTreeMap<u64, usize>.
+        // Eigenschaftstest: Prüft die korrekte Koexistenz von persistenten Pins und RAII-Guards.
         #[test]
         fn prop_snapshot_pin_unpin_interleaving(
             pin_seqs in proptest::collection::vec(0..500u64, 1..20),
