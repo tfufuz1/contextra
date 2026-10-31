@@ -1,4 +1,11 @@
-//! Deterministic tests for adaptive controllers, PID regulators, bandits, Lyapunov watchers, and shadow mode.
+//! # Deterministische Eigenschafts- und Konvergenztests für Regler
+//!
+//! Überprüft Konvergenzeigenschaften, Schrittantworten und Invarianten aller
+//! adaptiven Controller in `contextra-adapt`:
+//! - PID-Controller und Anti-Windup-Schranken
+//! - Catoni M-Schätzer Einflussfunktionen
+//! - LinUCB- und FC-TS-Bandit-Konvergenz auf synthetischen Umgebungen
+//! - Shadow-Mode-Nichtbeeinflussungsinvariante
 
 use contextra_adapt::flow_thompson::{
     FcTsArmSet, FcTsConfig, FcTsRng, FlowCorrectedThompsonBandit, SplitMix64,
