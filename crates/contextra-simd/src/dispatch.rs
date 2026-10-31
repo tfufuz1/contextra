@@ -2,9 +2,29 @@
 // ZWECK: Runtime Hardware Feature Detection & Dispatcher.
 // INVARIANTEN: Zero-Panic, sicherer Fallback auf Skalar, wenn CPU-Features fehlen.
 
+//! # Modul `dispatch`
+//!
+//! **Ring-Zugehörigkeit:** Ring 0 (Unsafe-Insel).
+//!
+//! **Zweck:**
+//! Laufzeit-Erkennung von Hardware-Eigenschaften (CPU Feature Detection) und dynamische Weiterleitung (Dispatch)
+//! an den optimalen Kernel.
+//!
+//! **Funktionsweise:**
+//! 1. Bei jedem Funktionsaufruf werden mittels Compiler-Makros (`is_x86_feature_detected!`,
+//!    `is_aarch64_feature_detected!`) die verfügbaren Prozessorbefehle abgefragt.
+//! 2. Es wird die höchstwertige verfügbare Vektorebene gewählt:
+//!    - x86_64: AVX-512 (falls `avx512f` bzw. `avx512vnni`) -> AVX2+FMA -> Skalarer Fallback.
+//!    - AArch64: NEON -> Skalarer Fallback.
+//! 3. Sämtliche Vorbedingungen (z. B. identische Vektorlängen, Puffergrößen bei Bytes) werden
+//!    vor dem Betreten von `unsafe`-Blöcken strikt validiert.
+//! 4. Für Testläufe und Benchmarks existiert ein Thread-lokaler Überschreibungsmechanismus
+//!    (SimdPathOverride), um gezielt einzelne Pfade zu isolieren.
+
 use crate::kernels::*;
 use contextra_types::ContextraError;
 
+// ANCHOR[contextra-simd:DISP-OVERRIDE-ENUM]
 /// SIMD path override options for testing purposes.
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,18 +44,21 @@ std::thread_local! {
     static OVERRIDE_PATH: std::cell::Cell<Option<SimdPathOverride>> = const { std::cell::Cell::new(None) };
 }
 
+// ANCHOR[contextra-simd:DISP-SET-OVERRIDE]
 /// Sets thread-local SIMD dispatch path override for testing.
 #[cfg(test)]
 pub fn set_dispatch_override(path: Option<SimdPathOverride>) {
     OVERRIDE_PATH.with(|p| p.set(path));
 }
 
+// ANCHOR[contextra-simd:DISP-GET-OVERRIDE]
 /// Retrieves the current thread-local SIMD dispatch path override.
 #[cfg(test)]
 pub fn get_dispatch_override() -> Option<SimdPathOverride> {
     OVERRIDE_PATH.with(|p| p.get())
 }
 
+// ANCHOR[contextra-simd:DISP-COSINE-F32]
 /// Computes cosine distance ($1.0 - \text{cosine\_similarity}$) between two `f32` vectors.
 ///
 /// Dynamically dispatches to AVX-512, AVX2+FMA, or NEON based on runtime CPU feature detection,
@@ -119,6 +142,7 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     Ok(scalar::cosine_distance_scalar(a, b))
 }
 
+// ANCHOR[contextra-simd:DISP-EUCLIDEAN-F32]
 /// Computes Euclidean distance ($\|a - b\|_2$) between two `f32` vectors.
 ///
 /// Dynamically dispatches to AVX-512, AVX2+FMA, or NEON based on runtime CPU feature detection,
@@ -201,6 +225,7 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
     Ok(scalar::euclidean_distance_scalar(a, b))
 }
 
+// ANCHOR[contextra-simd:DISP-DOT-F32]
 /// Computes dot product distance (negated dot product $-a \cdot b$) between two `f32` vectors.
 ///
 /// Dynamically dispatches to AVX-512, AVX2+FMA, or NEON based on runtime CPU feature detection,
@@ -283,6 +308,7 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError>
     Ok(scalar::dot_product_scalar(a, b))
 }
 
+// ANCHOR[contextra-simd:DISP-COSINE-F32-BYTES]
 /// Computes cosine distance between an `f32` slice and raw little-endian `f32` byte slice.
 ///
 /// Dynamically dispatches to AVX-512 or AVX2+FMA based on runtime CPU feature detection,
@@ -354,6 +380,7 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Conte
     Ok(scalar::cosine_distance_f32_bytes_scalar(a, b_bytes))
 }
 
+// ANCHOR[contextra-simd:DISP-EUCLIDEAN-F32-BYTES]
 /// Computes Euclidean distance between an `f32` slice and raw little-endian `f32` byte slice.
 ///
 /// Dynamically dispatches to AVX-512 or AVX2+FMA based on runtime CPU feature detection,
@@ -425,6 +452,7 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Co
     Ok(scalar::euclidean_distance_f32_bytes_scalar(a, b_bytes))
 }
 
+// ANCHOR[contextra-simd:DISP-DOT-F32-BYTES]
 /// Computes dot product distance between an `f32` slice and raw little-endian `f32` byte slice.
 ///
 /// Dynamically dispatches to AVX-512 or AVX2+FMA based on runtime CPU feature detection,
@@ -496,6 +524,7 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
     Ok(scalar::dot_product_f32_bytes_scalar(a, b_bytes))
 }
 
+// ANCHOR[contextra-simd:DISP-DOT-U8]
 /// Computes integer dot product between two `u8` byte slices.
 ///
 /// Dynamically dispatches to AVX-512 VNNI (`dpbusd`) or AVX2 (`madd_epi16`),
@@ -570,6 +599,7 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
     Ok(scalar::dot_product_u8_scalar(a, b))
 }
 
+// ANCHOR[contextra-simd:DISP-EUCLIDEAN-SQ-U8]
 /// Computes squared Euclidean distance ($\|a - b\|_2^2$) between two `u8` byte slices.
 ///
 /// Dynamically dispatches to AVX-512 or AVX2 SIMD implementations,
@@ -639,6 +669,7 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
     Ok(scalar::euclidean_distance_sq_u8_scalar(a, b))
 }
 
+// ANCHOR[contextra-simd:DISP-COSINE-PARTS-U8]
 /// Computes cosine similarity component parts (dot product, norm_a_sq, norm_b_sq) for two `u8` byte slices.
 ///
 /// Dynamically dispatches to AVX-512 VNNI or AVX2 SIMD implementations,
