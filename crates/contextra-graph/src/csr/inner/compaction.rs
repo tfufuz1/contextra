@@ -1,9 +1,23 @@
+//! Modul `compaction` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_types::{DocId, EntityId, TxId};
 
 use super::super::types::{EdgePayload, InternalIndex};
 use super::GraphInner;
 
 impl GraphInner {
+    // ANCHOR[contextra-graph:GET_OR_CREAT-0154]
+    /// Funktion `get_or_create_index` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn get_or_create_index(&mut self, id: EntityId) -> InternalIndex {
         if let Some(&idx) = self.id_map.get(&id) {
             idx
@@ -17,6 +31,15 @@ impl GraphInner {
     }
 
     #[inline]
+    // ANCHOR[contextra-graph:ADD_TO_OUT_W-0155]
+    /// Funktion `add_to_out_weight_sum` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn add_to_out_weight_sum(&mut self, node_idx: usize, weight: f32) {
         if weight > 0.0 {
             let num_nodes = self.reverse_map.len();
@@ -29,6 +52,15 @@ impl GraphInner {
         }
     }
 
+    // ANCHOR[contextra-graph:RECOMPUTE_NO-0156]
+    /// Funktion `recompute_node_out_weight_sum` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn recompute_node_out_weight_sum(&mut self, node_idx: usize) {
         let num_nodes = self.reverse_map.len();
         if node_idx >= num_nodes {
@@ -172,6 +204,15 @@ impl GraphInner {
         }
     }
 
+    // ANCHOR[contextra-graph:COMPACT-0157]
+    /// Funktion `compact` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn compact(&mut self) {
         let num_nodes = self.reverse_map.len();
 

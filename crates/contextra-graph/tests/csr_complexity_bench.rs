@@ -1,3 +1,8 @@
+//! Modul `csr_complexity_bench` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use contextra_ports::GraphIndex;
 use contextra_types::{Entity, EntityId};

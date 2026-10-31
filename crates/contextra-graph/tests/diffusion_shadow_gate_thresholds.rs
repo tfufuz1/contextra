@@ -11,6 +11,7 @@ use contextra_graph::tl_hfd::shadow::{
 };
 use contextra_types::EntityId;
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_tl_hfd_gate_threshold_boundaries() {
     let gate = TlHfdFlipGate;
@@ -52,6 +53,7 @@ fn test_tl_hfd_gate_threshold_boundaries() {
     assert!(gate.should_flip(&report_exact_boundary));
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_apprh_gate_monitor_consecutive_passes_boundary() {
     let config = ApprhGateMonitorConfig {

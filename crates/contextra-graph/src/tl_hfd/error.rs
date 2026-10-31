@@ -4,6 +4,7 @@ use thiserror::Error;
 
 /// Error type for TL-HFD operations and parameter validations.
 #[derive(Error, Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:TLHFDERROR-0367]
 pub enum TlHfdError {
     /// Invalid parameter value provided to TL-HFD.
     #[error("Invalid parameter: {0}")]

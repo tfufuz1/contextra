@@ -14,6 +14,7 @@ use std::collections::HashMap;
 /// auf CSR-Graph-Ebene. Sie unterscheidet sich von der kognitiven Wartungskonfiguration in
 /// `contextra-cognition`, welche systemweite Sleep-Cycle-Intervalle und Konsolidierungs-Trigger orchestriert.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-graph:PERCOLATIONC-0277]
 pub struct PercolationConfig {
     /// Kritischer Perkolationsschwellenwert θ_perc. Default: 0.7.
     pub critical_threshold: f32,
@@ -36,6 +37,7 @@ impl Default for PercolationConfig {
 /// Berechnet aktuelle Perkolations-Gesundheit φ(t).
 ///
 /// Gibt `None` zurück wenn zu wenige Knoten vorhanden (< 10) — Perkolation nicht sinnvoll.
+// ANCHOR[contextra-graph:COMPUTE_PERC-0278]
 pub fn compute_percolation_health(
     active_node_count: usize,
     active_edge_count: usize, // nach Tombstone-Abzug
@@ -48,6 +50,7 @@ pub fn compute_percolation_health(
 }
 
 /// Prüft ob Re-Bonding-Pass ausgelöst werden soll.
+// ANCHOR[contextra-graph:SHOULD_TRIGG-0279]
 pub fn should_trigger_rebonding(health: f32, config: &PercolationConfig) -> bool {
     health < config.critical_threshold
 }
@@ -73,6 +76,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 
 /// Findet Kandidaten-Paare für Re-Bonding.
 /// Gibt `(EntityId, EntityId, similarity)`-Tupel zurück, sortiert absteigend nach Similarity.
+// ANCHOR[contextra-graph:FIND_REBONDI-0280]
 pub async fn find_rebonding_candidates<G: contextra_ports::GraphIndex>(
     graph: &G,
     embeddings: &HashMap<EntityId, Vec<f32>>,
@@ -149,6 +153,7 @@ mod tests {
     use contextra_types::{Entity, TxId};
     use std::sync::Arc;
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_percolation_health_full_graph() {
         // Vollständig verbundener Graph mit N=10 Knoten hat N*(N-1) = 90 gerichtete Kanten
@@ -162,6 +167,7 @@ mod tests {
         assert!(phi > 1.0, "Expected health >> 1.0, got {phi}");
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_percolation_health_empty_graph() {
         let n_nodes = 10;
@@ -172,6 +178,7 @@ mod tests {
         assert_eq!(phi, 0.0);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_percolation_should_trigger_below_threshold() {
         let config = PercolationConfig::default(); // critical_threshold = 0.7
@@ -179,6 +186,7 @@ mod tests {
         assert!(should_trigger_rebonding(0.69, &config));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_percolation_no_trigger_above_threshold() {
         let config = PercolationConfig::default(); // critical_threshold = 0.7
@@ -186,6 +194,7 @@ mod tests {
         assert!(!should_trigger_rebonding(0.85, &config));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_percolation_skips_too_small_graphs() {
         assert!(compute_percolation_health(0, 0).is_none());
@@ -242,6 +251,7 @@ mod tests {
         assert!(*sim > config.rebonding_similarity);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_cosine_similarity_edge_cases() {
         // Mismatched vector lengths -> 0.0
@@ -292,6 +302,7 @@ mod tests {
         assert_eq!(candidates.len(), 1);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_percolation_config_serde_roundtrip() {
         let config = PercolationConfig {

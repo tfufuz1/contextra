@@ -79,6 +79,7 @@ impl PathGraph for MockGraph {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_selector_shadow_always_returns_forward_push() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -117,6 +118,7 @@ fn test_selector_shadow_always_returns_forward_push() -> Result<(), Box<dyn std:
     Ok(())
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_selector_readiness_does_not_auto_promote() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -153,6 +155,7 @@ fn test_selector_readiness_does_not_auto_promote() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_selector_explicit_promotion_yields_apprh() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -187,6 +190,7 @@ fn test_selector_explicit_promotion_yields_apprh() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_selector_outlier_causes_hysteresis_demotion() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -229,6 +233,7 @@ fn test_selector_outlier_causes_hysteresis_demotion() -> Result<(), Box<dyn std:
     Ok(())
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_selector_deterministic_sampling() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();

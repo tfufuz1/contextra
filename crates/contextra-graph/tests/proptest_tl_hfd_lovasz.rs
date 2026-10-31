@@ -72,6 +72,7 @@ proptest! {
     /// 1. prop_lovasz_extension_is_nonnegative
     /// For arbitrary participant lists with >= 2 nodes and arbitrary finite x-values,
     /// compute_lovasz_extension yields f_e(x) >= 0.0.
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_lovasz_extension_is_nonnegative(
         (participants, x_vals) in arb_hypergraph_2_to_15(),
@@ -84,6 +85,7 @@ proptest! {
     /// 2. prop_lovasz_extension_matches_bruteforce_reference
     /// For hypergraphs with < 15 nodes (2..=15), compute_lovasz_extension(...).0 matches
     /// independent bruteforce_lovasz within a numerical tolerance of 1e-5.
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_lovasz_extension_matches_bruteforce_reference(
         (participants, x_vals) in arb_hypergraph_2_to_15(),
@@ -104,6 +106,7 @@ proptest! {
     /// 3. prop_lovasz_extension_max_min_are_distinct_or_none
     /// Invariant: If f_e(x) > 0.0, then u_max and u_min must both be Some(...) and pairwise distinct.
     /// If f_e(x) == 0.0, both must be None.
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_lovasz_extension_max_min_are_distinct_or_none(
         (participants, x_vals) in arb_hypergraph_2_to_15(),
@@ -141,6 +144,7 @@ proptest! {
     /// proves that:
     /// (a) The result always contains the participant with the global minimum x-value (tie-breaker: smallest EntityId).
     /// (b) All other returned participants belong to the top max_sort_size global largest x-values.
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_truncate_participants_preserves_min_and_top_k(
         (participants, x_vals, max_sort_size) in arb_truncate_input(),
@@ -200,6 +204,7 @@ proptest! {
     /// 5. prop_truncate_participants_result_length_bounded
     /// The result length is bounded by participants.len(), and when participants.len() > max_sort_size,
     /// length is strictly max_sort_size or max_sort_size + 1.
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_truncate_participants_result_length_bounded(
         (participants, x_vals, max_sort_size) in arb_truncate_bounds_input(),
@@ -247,6 +252,7 @@ proptest! {
 ///   the global min node u_min, both u_max and u_min remain present in the truncated set.
 /// - Consequently, the edge cut cost f_e(x) = max_u x_u - min_u x_u is preserved identically,
 ///   giving an f_e delta = |f_e_full - f_e_trunc| = 0.0 <= 1e-5.
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_audit_f3_regression_15_node_hypergraph_truncation_cutoff() {
     let num_nodes = 15;

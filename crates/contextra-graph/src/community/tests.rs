@@ -1,3 +1,8 @@
+//! Modul `tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
@@ -266,6 +271,7 @@ impl tracing::field::Visit for StringVisitor {
 }
 
 proptest::proptest! {
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_community_detection_never_panics(
         node_count in 1usize..50,
@@ -299,6 +305,7 @@ proptest::proptest! {
         res?;
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_community_detection_every_node_assigned(
         node_count in 1usize..30,
@@ -434,6 +441,7 @@ async fn detect_communities_CASE_single_node() {
     assert_eq!(assignments[0].community_id, id.inner());
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 #[allow(non_snake_case)]
 fn serialization_roundtrip_CASE_community_config_and_assignment() {
@@ -465,6 +473,7 @@ fn serialization_roundtrip_CASE_community_config_and_assignment() {
     assert_eq!(assignment, deserialized_assignment);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 #[allow(non_snake_case)]
 fn test_hyperedges_included_flag_default_is_false() {
@@ -627,6 +636,7 @@ async fn test_star_expansion_iterator_and_community_detection() {
     assert_eq!(comm_2_h, comm_3_h);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 #[allow(non_snake_case)]
 fn test_hyperedges_included_serde_backwards_compatibility() {

@@ -27,30 +27,68 @@ use std::sync::Arc;
 /// let tree = SessionBranchTree::new("a".into(), "b".into());
 /// let _ = tree.edges.read(); // Field `edges` is private
 /// ```
+// ANCHOR[contextra-graph:NODESGUARD-0333]
 pub struct NodesGuard<'a> {
     tree: &'a SessionBranchTree,
     _nodes_guard: RwLockReadGuard<'a, HashMap<NodeIdx, AgentStateNode>>,
 }
 
 impl<'a> NodesGuard<'a> {
+    // ANCHOR[contextra-graph:NODES-0334]
+    /// Funktion `nodes` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn nodes(&self) -> &HashMap<NodeIdx, AgentStateNode> {
         &self._nodes_guard
     }
 
     /// Erwirbt den edges-Lock. Kann NUR aufgerufen werden, wenn bereits ein NodesGuard existiert
     /// -> Lock-Reihenfolge ist durch die Typsignatur erzwungen, nicht nur dokumentiert.
+    // ANCHOR[contextra-graph:EDGES-0335]
     pub fn edges(&self) -> RwLockReadGuard<'_, Vec<DagEdge>> {
         self.tree.edges.read()
     }
 
+    // ANCHOR[contextra-graph:EDGES_WRITE-0336]
+    /// Funktion `edges_write` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn edges_write(&self) -> RwLockWriteGuard<'_, Vec<DagEdge>> {
         self.tree.edges.write()
     }
 
+    // ANCHOR[contextra-graph:ACTIVE_HEAD-0337]
+    /// Funktion `active_head` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn active_head(&self) -> RwLockReadGuard<'_, NodeIdx> {
         self.tree.active_head.read()
     }
 
+    // ANCHOR[contextra-graph:ACTIVE_HEAD_-0338]
+    /// Funktion `active_head_write` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn active_head_write(&self) -> RwLockWriteGuard<'_, NodeIdx> {
         self.tree.active_head.write()
     }
@@ -58,42 +96,99 @@ impl<'a> NodesGuard<'a> {
 
 /// Exklusiver Schreib-Guard, der NUR erhalten werden kann, nachdem der `nodes`-Schreiblock bereits gehalten wird.
 /// Erzwingt die Lock-Reihenfolge nodes -> edges/active_head zur Compile-Zeit.
+// ANCHOR[contextra-graph:NODESWRITEGU-0339]
 pub struct NodesWriteGuard<'a> {
     tree: &'a SessionBranchTree,
     _nodes_guard: RwLockWriteGuard<'a, HashMap<NodeIdx, AgentStateNode>>,
 }
 
 impl<'a> NodesWriteGuard<'a> {
+    // ANCHOR[contextra-graph:NODES-0340]
+    /// Funktion `nodes` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn nodes(&self) -> &HashMap<NodeIdx, AgentStateNode> {
         &self._nodes_guard
     }
 
+    // ANCHOR[contextra-graph:NODES_MUT-0341]
+    /// Funktion `nodes_mut` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn nodes_mut(&mut self) -> &mut HashMap<NodeIdx, AgentStateNode> {
         &mut self._nodes_guard
     }
 
+    // ANCHOR[contextra-graph:EDGES-0342]
+    /// Funktion `edges` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn edges(&self) -> RwLockReadGuard<'_, Vec<DagEdge>> {
         self.tree.edges.read()
     }
 
+    // ANCHOR[contextra-graph:EDGES_WRITE-0343]
+    /// Funktion `edges_write` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn edges_write(&self) -> RwLockWriteGuard<'_, Vec<DagEdge>> {
         self.tree.edges.write()
     }
 
+    // ANCHOR[contextra-graph:ACTIVE_HEAD-0344]
+    /// Funktion `active_head` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn active_head(&self) -> RwLockReadGuard<'_, NodeIdx> {
         self.tree.active_head.read()
     }
 
+    // ANCHOR[contextra-graph:ACTIVE_HEAD_-0345]
+    /// Funktion `active_head_write` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn active_head_write(&self) -> RwLockWriteGuard<'_, NodeIdx> {
         self.tree.active_head.write()
     }
 }
 
 /// Index of a node in the Session-DAG.
+// ANCHOR[contextra-graph:NODEIDX-0346]
 pub type NodeIdx = u64;
 
 /// State of an agent step in the conversation DAG.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+// ANCHOR[contextra-graph:AGENTSTATENO-0347]
 pub struct AgentStateNode {
     pub step_id: NodeIdx,
     /// LLM prompt of this step.
@@ -110,6 +205,7 @@ pub struct AgentStateNode {
 
 /// Directed edge in the DAG: parent -> child.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+// ANCHOR[contextra-graph:DAGEDGE-0348]
 pub struct DagEdge {
     pub parent: NodeIdx,
     pub child: NodeIdx,
@@ -118,13 +214,16 @@ pub struct DagEdge {
 }
 
 /// Maximum allowed byte size for prompt/response strings (10 MB).
+// ANCHOR[contextra-graph:MAX_DAG_STRI-0349]
 pub const MAX_DAG_STRING_BYTES: usize = 10 * 1024 * 1024;
 
 /// Maximale Pfadtiefe in einem SessionDag (Schutz vor Zyklen und Tiefenexplosion).
+// ANCHOR[contextra-graph:MAX_DAG_TRAV-0350]
 pub const MAX_DAG_TRAVERSAL_DEPTH: usize = 10_000;
 
 /// Options for creating or branching a new step in the Session-DAG.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-graph:SESSIONDAGST-0351]
 pub struct SessionDagStepOptions<'a> {
     pub prompt: String,
     pub response: String,
@@ -139,6 +238,7 @@ pub struct SessionDagStepOptions<'a> {
 /// - Directed Acyclic Graph: parent must exist before branch creation
 /// - `active_head` always points to an existing node
 /// - Node IDs are monotonically increasing (`AtomicU64`)
+// ANCHOR[contextra-graph:SESSIONBRANC-0352]
 pub struct SessionBranchTree {
     nodes: RwLock<HashMap<NodeIdx, AgentStateNode>>,
     edges: RwLock<Vec<DagEdge>>,
@@ -148,6 +248,7 @@ pub struct SessionBranchTree {
 
 impl SessionBranchTree {
     /// Creates a new DAG with a root node (step_id 0).
+    // ANCHOR[contextra-graph:NEW-0353]
     pub fn new(root_prompt: String, root_response: String) -> Self {
         let root = AgentStateNode {
             step_id: 0,
@@ -170,6 +271,7 @@ impl SessionBranchTree {
 
     /// Einziger öffentlicher Einstiegspunkt, um nodes zu lesen/sperren — ersetzt jeden direkten
     /// Zugriff auf `self.nodes` von außerhalb des Moduls.
+    // ANCHOR[contextra-graph:LOCK_NODES-0354]
     pub fn lock_nodes(&self) -> NodesGuard<'_> {
         let guard = self.nodes.read();
         NodesGuard {
@@ -179,6 +281,7 @@ impl SessionBranchTree {
     }
 
     /// Einziger öffentlicher Einstiegspunkt für exklusiven Schreibzugriff auf nodes.
+    // ANCHOR[contextra-graph:LOCK_NODES_W-0355]
     pub fn lock_nodes_write(&self) -> NodesWriteGuard<'_> {
         let guard = self.nodes.write();
         NodesWriteGuard {
@@ -239,6 +342,7 @@ impl SessionBranchTree {
     }
 
     /// Appends a step to the current active head node atomically under a single write lock.
+    // ANCHOR[contextra-graph:APPEND_STEP-0356]
     pub fn append_step(
         &self,
         prompt: String,
@@ -269,6 +373,7 @@ impl SessionBranchTree {
     ///
     /// # Errors
     /// Returns `Err(ContextraError::InvalidInput)` if `parent_node` does not exist in the DAG.
+    // ANCHOR[contextra-graph:BRANCH_FROM-0357]
     pub fn branch_from(
         &self,
         parent_node: NodeIdx,
@@ -293,6 +398,7 @@ impl SessionBranchTree {
     }
 
     /// Sets the active head to an existing node.
+    // ANCHOR[contextra-graph:SET_ACTIVE_H-0358]
     pub fn set_active_head(&self, node_idx: NodeIdx) -> Result<()> {
         let nodes = self.lock_nodes_write();
         if nodes.nodes().contains_key(&node_idx) {
@@ -308,6 +414,7 @@ impl SessionBranchTree {
     }
 
     /// Reconstructs the linear conversation path from root to current active head.
+    // ANCHOR[contextra-graph:PATH_TO_HEAD-0359]
     pub fn path_to_head(&self) -> Vec<AgentStateNode> {
         let nodes_guard = self.lock_nodes();
         let nodes = nodes_guard.nodes();
@@ -348,6 +455,7 @@ impl SessionBranchTree {
     }
 
     /// Returns all direct children of a given node.
+    // ANCHOR[contextra-graph:CHILDREN_OF-0360]
     pub fn children_of(&self, node_idx: NodeIdx) -> Vec<NodeIdx> {
         let nodes = self.lock_nodes();
         let edges = nodes.edges();
@@ -359,6 +467,7 @@ impl SessionBranchTree {
     }
 
     /// Returns the active head node index.
+    // ANCHOR[contextra-graph:ACTIVE_HEAD-0361]
     pub fn active_head(&self) -> NodeIdx {
         let nodes = self.lock_nodes();
         let head = *nodes.active_head();
@@ -366,16 +475,19 @@ impl SessionBranchTree {
     }
 
     /// Returns the total number of nodes in the DAG.
+    // ANCHOR[contextra-graph:NODE_COUNT-0362]
     pub fn node_count(&self) -> usize {
         self.lock_nodes().nodes().len()
     }
 
     /// Retrieves a reference to a specific node by index if it exists.
+    // ANCHOR[contextra-graph:GET_NODE-0363]
     pub fn get_node(&self, node_idx: NodeIdx) -> Option<AgentStateNode> {
         self.lock_nodes().nodes().get(&node_idx).cloned()
     }
 
     /// Persists all nodes, edges, active head, and next_id of the Session-DAG to the storage engine under the given namespace prefix.
+    // ANCHOR[contextra-graph:SAVE-0364]
     pub async fn save<S: StorageEngine + ?Sized>(
         &self,
         storage: &S,
@@ -424,6 +536,7 @@ impl SessionBranchTree {
     }
 
     /// Loads and reconstructs a `SessionBranchTree` from storage for the specified namespace.
+    // ANCHOR[contextra-graph:LOAD-0365]
     pub async fn load<S: StorageEngine + ?Sized>(storage: &S, namespace: &str) -> Result<Self> {
         let prefix_str = format!("__session_dag:{namespace}:");
         let prefix_bytes = prefix_str.as_bytes();
@@ -485,6 +598,7 @@ mod tests {
     // Ein direkter Aufruf wie `dag.edges.read()` oder `dag.active_head.read()` von außerhalb oder ohne
     // `lock_nodes()` scheitert an der Sichtbarkeit der Felder (private).
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_dag_root_creation() {
         let dag = SessionBranchTree::new("Hello".into(), "Hi there!".into());
@@ -500,6 +614,7 @@ mod tests {
         assert!(!path[0].compacted);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_linear_append() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
@@ -531,6 +646,7 @@ mod tests {
         assert_eq!(path[2].step_id, 2);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_session_dag_branch_from_arbitrary_node() {
         let dag = SessionBranchTree::new("Root".into(), "Root Resp".into());
@@ -582,6 +698,7 @@ mod tests {
         assert_eq!(children, vec![2, 3]);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_invalid_parent_branching_fails() {
         let dag = SessionBranchTree::new("Root".into(), "Root Resp".into());
@@ -590,6 +707,7 @@ mod tests {
         assert!(matches!(res.unwrap_err(), ContextraError::InvalidInput(_)));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_set_active_head() {
         let dag = SessionBranchTree::new("Root".into(), "Root Resp".into());
@@ -682,6 +800,7 @@ mod tests {
         assert_eq!(children, vec![branch1]);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     #[allow(non_snake_case)]
     fn append_step_CASE_oversized_prompt_returns_invalid_input() {
@@ -693,6 +812,7 @@ mod tests {
         assert!(matches!(res.unwrap_err(), ContextraError::InvalidInput(_)));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     #[allow(non_snake_case)]
     fn get_node_CASE_existent_and_nonexistent() {
@@ -710,6 +830,7 @@ mod tests {
         assert!(dag.get_node(999).is_none());
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     #[allow(non_snake_case)]
     fn children_of_CASE_leaf_node_returns_empty() {
@@ -728,6 +849,7 @@ mod tests {
         assert!(children.is_empty(), "Leaf node must have zero children");
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     #[allow(non_snake_case)]
     fn new_CASE_empty_and_unicode_strings() {
@@ -800,6 +922,7 @@ mod tests {
         );
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     #[allow(non_snake_case)]
     fn serialization_roundtrip_CASE_agent_state_node_and_dag_edge() {
@@ -827,6 +950,7 @@ mod tests {
         assert_eq!(edge, deserialized_edge);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_path_to_head_detects_cycle() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
@@ -869,6 +993,7 @@ mod tests {
         assert!(!path.is_empty());
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_path_to_head_depth_limit() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
@@ -898,6 +1023,7 @@ mod tests {
         assert_eq!(path.len(), MAX_DAG_TRAVERSAL_DEPTH);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_set_active_head_invalid_node_returns_error() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
@@ -906,6 +1032,7 @@ mod tests {
         assert!(matches!(res.unwrap_err(), ContextraError::InvalidInput(_)));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_append_step_sequential() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());

@@ -1,3 +1,8 @@
+//! Modul `mutation_sequence_tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Entity, EntityId, TxId};

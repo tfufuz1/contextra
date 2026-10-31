@@ -1,3 +1,8 @@
+//! Modul `cascade` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 // FILE-CONTEXT
 // ZWECK: Cascading-Invalidation (Supersedes-Chunk -> Graph-Kanten-Tombstone)
 // INVARIANTEN: Jede tombstonierte Kante erhaelt einen Provenienz-Eintrag mit WAL-Seq (INV-GRAPH-PROV-1).
@@ -8,13 +13,16 @@ use contextra_types::{DocId, EntityId, Result, TxId};
 
 /// Maximum number of hyperedges processed synchronously per cascade invalidation run
 /// to bound latency spikes. Any remaining hyperedges are returned in `deferred`.
+// ANCHOR[contextra-graph:MAX_HYPEREDG-0048]
 pub const MAX_HYPEREDGE_CASCADE_FANOUT: usize = 1_000;
 
 /// Default fan-out limit for hyperedge cascade invalidation per document (§6.8).
+// ANCHOR[contextra-graph:DEFAULT_HYPE-0049]
 pub const DEFAULT_HYPEREDGE_CASCADE_FANOUT_LIMIT: usize = MAX_HYPEREDGE_CASCADE_FANOUT;
 
 /// Report summarizing the cascade invalidation of graph edges derived from a superseded document.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-graph:CASCADEINVAL-0050]
 pub struct CascadeInvalidationReport {
     /// Number of edges tombstoned as a result of the superseded document.
     pub tombstoned_edge_count: usize,
@@ -28,6 +36,7 @@ pub struct CascadeInvalidationReport {
 ///
 /// INVARIANTE: Jede hier tombstonierte Kante erhält einen Provenienz-Eintrag
 /// mit der WAL-Sequenznummer dieses Aufrufs (INV-GRAPH-PROV-1).
+// ANCHOR[contextra-graph:CASCADE_INVA-0051]
 pub async fn cascade_invalidate_edges_for_superseded_doc(
     graph: &CsrGraph,
     superseded_doc_id: DocId,
@@ -64,10 +73,12 @@ pub async fn cascade_invalidate_edges_for_superseded_doc(
 }
 
 /// LSM-Key-Präfix für die persistent cascade queue (§6.6 / §6.8).
+// ANCHOR[contextra-graph:CASCADE_QUEU-0052]
 pub const CASCADE_QUEUE_PREFIX: &str = "__graph:cascade_queue:";
 
 /// Status tracking for a cascade invalidation ticket (§6.8).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-graph:CASCADESTATU-0053]
 pub enum CascadeStatus {
     /// Invalidation task is queued and pending.
     Pending,
@@ -81,6 +92,7 @@ pub enum CascadeStatus {
 
 /// Record of edge / hyperedge deletion during cascade invalidation (§6.8).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-graph:CASCADEDELET-0054]
 pub struct CascadeDeletionRecord {
     pub doc_id: DocId,
     pub tombstoned_count: usize,
@@ -89,10 +101,12 @@ pub struct CascadeDeletionRecord {
 
 /// Deprecated alias for [`CascadeDeletionRecord`] to maintain backward compatibility.
 #[deprecated(note = "Use CascadeDeletionRecord instead")]
+// ANCHOR[contextra-graph:DELETIONPROO-0055]
 pub type DeletionProof = CascadeDeletionRecord;
 
 /// Ticket tracking persistent cascade invalidation status (§6.8).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-graph:CASCADETICKE-0056]
 pub struct CascadeTicket {
     pub id: u64,
     pub doc_id: DocId,
@@ -101,6 +115,7 @@ pub struct CascadeTicket {
 }
 
 /// Garbage collection trait for sweeping orphaned hyperedge references (Anhang B §B.5.1.7).
+// ANCHOR[contextra-graph:GRAPHGARBAGE-0057]
 pub trait GraphGarbageCollection {
     /// Sweeps orphaned hyperedges whose participants no longer exist or are fully tombstoned.
     fn sweep_orphans(&self, wal_tx: TxId) -> Result<usize>;
@@ -142,6 +157,7 @@ impl GraphGarbageCollection for CsrGraph {
 
 /// Report summarizing the cascade invalidation of hyperedges derived from a superseded document.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-graph:HYPEREDGECAS-0058]
 pub struct HyperedgeCascadeReport {
     /// Hyperedges tombstoned synchronously in this cascade run (up to MAX_HYPEREDGE_CASCADE_FANOUT).
     pub invalidated: Vec<crate::hyperedge::HyperEdgeId>,
@@ -152,6 +168,7 @@ pub struct HyperedgeCascadeReport {
 }
 
 /// Alias for [`HyperedgeCascadeReport`] (§6.8 specification alignment).
+// ANCHOR[contextra-graph:CASCADEREPOR-0059]
 pub type CascadeReport = HyperedgeCascadeReport;
 
 /// Cascade invalidates hyperedges derived from `superseded_doc_id` with fan-out protection.
@@ -170,6 +187,7 @@ pub type CascadeReport = HyperedgeCascadeReport;
 /// # Crash Recovery Rationale
 /// Nach einem Absturz darf nie ein Kind tombstoniert, aber sein Vorfahre noch lebendig sein,
 /// weil der Vorfahre danach nicht mehr auffindbar wäre.
+// ANCHOR[contextra-graph:TOPOLOGICAL_-0060]
 pub fn topological_sort_hyperedge_closure(
     graph: &CsrGraph,
     closure_nodes: &[crate::hyperedge::HyperEdgeId],
@@ -244,6 +262,7 @@ pub fn topological_sort_hyperedge_closure(
 ///
 /// INVARIANTE: Jede hier tombstonierte Hyperkante erhält einen Provenienz-Eintrag
 /// mit der WAL-Sequenznummer dieses Aufrufs (INV-GRAPH-PROV-1).
+// ANCHOR[contextra-graph:CASCADE_INVA-0061]
 pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
     graph: &CsrGraph,
     superseded_doc_id: DocId,
@@ -362,6 +381,7 @@ pub async fn cascade_invalidate_hyperedges_for_superseded_doc(
 /// - `Ok(())` if zero active hyperedges directly or transitively reference `target_doc_id`.
 /// - `Err(ContextraError::InvalidInput)` if any active hyperedge or child hyperedge retains
 ///   a reference to `target_doc_id`.
+// ANCHOR[contextra-graph:VERIFY_DOC_H-0062]
 pub fn verify_doc_hyperedge_deletion_completeness(
     graph: &CsrGraph,
     target_doc_id: DocId,
@@ -1015,6 +1035,7 @@ mod tests {
         );
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_verify_deletion_completeness_cycle_termination() {
         let graph = CsrGraph::new();

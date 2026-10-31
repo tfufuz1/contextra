@@ -10,10 +10,12 @@ use std::collections::BTreeMap;
 use thiserror::Error;
 
 /// Maximum allowed participants in a hyperedge candidate (Combinatorial explosion guard, P5).
+// ANCHOR[contextra-graph:MAX_RELATE_P-0249]
 pub const MAX_RELATE_PARTICIPANTS: usize = 64;
 
 /// A candidate hyperedge derived from document co-occurrence.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-graph:HYPEREDGECAN-0250]
 pub struct HyperEdgeCandidate {
     /// Canonical sorted list of participating entity IDs.
     pub participants: Vec<EntityId>,
@@ -25,6 +27,7 @@ pub struct HyperEdgeCandidate {
 
 /// A candidate hyperedge after LLM semantic validation.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:VALIDATEDHYP-0251]
 pub struct ValidatedHyperEdgeCandidate {
     /// The underlying co-occurrence candidate.
     pub candidate: HyperEdgeCandidate,
@@ -38,6 +41,7 @@ pub struct ValidatedHyperEdgeCandidate {
 
 /// Errors specific to hyperedge suggestion and validation.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-graph:HYPEREDGESUG-0252]
 pub enum HyperedgeSuggestError {
     /// Candidate count exceeds the maximum LLM calls allowed per cycle.
     #[error("LLM validation budget exceeded: {0} candidates exceed limit")]
@@ -59,6 +63,7 @@ impl From<HyperedgeSuggestError> for GraphMutationError {
 /// are discarded (not truncated) to protect against combinatorial explosion.
 ///
 /// Output candidates are sorted deterministically in ascending lexicographical order of `participants`.
+// ANCHOR[contextra-graph:COMPUTE_CO_O-0253]
 pub fn compute_co_occurrence_candidates(
     entities_per_document: &[(DocId, Vec<EntityId>)],
     min_co_occurrence: usize,
@@ -110,6 +115,7 @@ pub fn compute_co_occurrence_candidates(
 /// # Budget Guard
 /// If `candidates.len() > max_llm_calls_per_cycle`, returns `Err(GraphMutationError)`
 /// wrapping `HyperedgeSuggestError::LlmValidationBudgetExceeded`.
+// ANCHOR[contextra-graph:VALIDATE_CAN-0254]
 pub async fn validate_candidates_with_llm(
     candidates: &[HyperEdgeCandidate],
     entity_labels: &dyn Fn(EntityId) -> Option<String>,

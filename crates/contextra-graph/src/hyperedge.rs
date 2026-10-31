@@ -14,9 +14,11 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 /// LSM-Key-Präfix für Hyperkanten.
+// ANCHOR[contextra-graph:HYPEREDGE_PR-0218]
 pub const HYPEREDGE_PREFIX: &str = "__graph:hyperedge:";
 
 /// LSM-Key-Präfix für Hyperkanten-Index nach Entity.
+// ANCHOR[contextra-graph:HYPEREDGE_BY-0219]
 pub const HYPEREDGE_BY_ENTITY_PREFIX: &str = "__graph:hyperedge_by_entity:";
 
 /// Berechnet das Kantengewicht in der Stern-Expansion nach Konvention K (§6.6 H6).
@@ -24,6 +26,7 @@ pub const HYPEREDGE_BY_ENTITY_PREFIX: &str = "__graph:hyperedge_by_entity:";
 /// Formula: `w_star = 2 * w / (|e| - 1)` for hyperedge weight `w` and cardinality `|e| >= 2`.
 /// Note: Reverting or altering this weight convention would require explicit PO decision per §14 #6.
 #[inline]
+// ANCHOR[contextra-graph:STAR_WEIGHT-0220]
 pub fn star_weight(weight: f32, cardinality: usize) -> f32 {
     if cardinality < 2 {
         weight
@@ -37,6 +40,7 @@ pub use contextra_ports::graph::{HyperEdgeId, RoleBinding, RoleId};
 
 /// Eine n-äre Hyperkante zur Verbindung von 2 oder mehr Entitäten mit spezifischen Rollen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:HYPEREDGE-0221]
 pub struct HyperEdge {
     /// Eindeutige ID der Hyperkante.
     pub id: HyperEdgeId,
@@ -89,6 +93,7 @@ struct LegacyHyperEdgeV1 {
 
 impl HyperEdge {
     /// Erstellt eine neue `HyperEdge`.
+    // ANCHOR[contextra-graph:NEW-0222]
     pub fn new(
         id: HyperEdgeId,
         predicate: EdgeType,
@@ -110,6 +115,7 @@ impl HyperEdge {
     }
 
     /// Setzt die Transaktionsgültigkeit der Hyperkante.
+    // ANCHOR[contextra-graph:WITH_TX_VALI-0223]
     pub fn with_tx_validity(mut self, valid_from: Option<TxId>, valid_to: Option<TxId>) -> Self {
         self.tx_valid_from = valid_from;
         self.tx_valid_to = valid_to;
@@ -117,6 +123,7 @@ impl HyperEdge {
     }
 
     /// Setzt die fachliche Gültigkeit der Hyperkante.
+    // ANCHOR[contextra-graph:WITH_BUSINES-0224]
     pub fn with_business_validity(
         mut self,
         valid_from: Option<i64>,
@@ -128,6 +135,7 @@ impl HyperEdge {
     }
 
     /// Setzt die Quell-Dokument-ID der Hyperkante.
+    // ANCHOR[contextra-graph:WITH_SOURCE_-0225]
     pub fn with_source_doc_id(mut self, source_doc_id: Option<DocId>) -> Self {
         self.source_doc_id = source_doc_id;
         self
@@ -136,6 +144,7 @@ impl HyperEdge {
     /// Setzt die untergeordneten Hyperkanten-IDs (LeanRAG Super-Kanten).
     ///
     /// Sortiert und dedupliziert die IDs deterministisch und entfernt eine etwaige Selbstreferenz.
+    // ANCHOR[contextra-graph:WITH_CHILD_E-0226]
     pub fn with_child_edge_ids(mut self, ids: impl Into<Arc<[HyperEdgeId]>>) -> Self {
         let mut vec: Vec<HyperEdgeId> = ids
             .into()
@@ -155,6 +164,7 @@ impl HyperEdge {
     /// - Mindestens 2 Teilnehmer (`participants.len() >= 2`), sonst degeneriert zur binären Edge.
     /// - Endliches, nicht-negatives Gewicht (`0.0 <= weight`).
     /// - `child_edge_ids` darf nicht die eigene `id` enthalten.
+    // ANCHOR[contextra-graph:VALIDATE-0227]
     pub fn validate(&self) -> std::result::Result<(), GraphMutationError> {
         if self.participants.len() < 2 {
             return Err(GraphMutationError::InsufficientParticipants {
@@ -178,6 +188,7 @@ impl HyperEdge {
     }
 
     /// Serialisiert die Hyperkante via `bincode`.
+    // ANCHOR[contextra-graph:SERIALIZE-0228]
     pub fn serialize(&self) -> Result<Vec<u8>> {
         bincode::serialize(self).map_err(|e| {
             ContextraError::Internal(format!("Failed to serialize hyperedge {}: {e}", self.id))
@@ -185,6 +196,7 @@ impl HyperEdge {
     }
 
     /// Deserialisiert eine Hyperkante aus einem `bincode`-Byte-Slice.
+    // ANCHOR[contextra-graph:DESERIALIZE-0229]
     pub fn deserialize(bytes: &[u8]) -> Result<Self> {
         if let Ok(edge) = bincode::deserialize::<Self>(bytes) {
             return Ok(edge);
@@ -207,6 +219,7 @@ impl HyperEdge {
     }
 
     /// Erstellt eine Zero-Copy-Teilsicht (`HyperEdgeView`) auf diese Hyperkante.
+    // ANCHOR[contextra-graph:VIEW-0230]
     pub fn view(&self) -> HyperEdgeView<'_> {
         HyperEdgeView::new(self)
     }
@@ -214,6 +227,7 @@ impl HyperEdge {
 
 /// Zero-Copy read-only view of a [`HyperEdge`] backed by [`ArcSlice<RoleBinding>`].
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:HYPEREDGEVIE-0231]
 pub struct HyperEdgeView<'a> {
     pub edge: &'a HyperEdge,
     pub participants: ArcSlice<RoleBinding>,
@@ -221,6 +235,7 @@ pub struct HyperEdgeView<'a> {
 
 impl<'a> HyperEdgeView<'a> {
     /// Creates a new `HyperEdgeView` for the given hyperedge.
+    // ANCHOR[contextra-graph:NEW-0232]
     pub fn new(edge: &'a HyperEdge) -> Self {
         Self {
             edge,
@@ -229,6 +244,7 @@ impl<'a> HyperEdgeView<'a> {
     }
 
     /// Creates a sub-view of participants without copying.
+    // ANCHOR[contextra-graph:SLICE_PARTIC-0233]
     pub fn slice_participants(
         &self,
         range: impl std::ops::RangeBounds<usize>,
@@ -251,6 +267,7 @@ impl<'a> Deref for HyperEdgeView<'a> {
 /// Maps role names (`&str`) to numeric [`RoleId`]s and vice versa.
 /// Uses lock-free/concurrent [`scc::HashMap`] for both forward and backward lookups
 /// to ensure high-throughput concurrent access without global lock contention.
+// ANCHOR[contextra-graph:ROLEINTERNER-0234]
 pub struct RoleInterner {
     forward: HashMap<String, RoleId>,
     backward: HashMap<RoleId, String>,
@@ -268,6 +285,7 @@ impl Default for RoleInterner {
 /// Erzwingt eine totale Ordnung zur Vermeidung von Lock-Order-Inversionen und
 /// Deadlocks beim Belegen mehrerer Entitäts-Sperren (H2 / §5.1.2).
 #[inline]
+// ANCHOR[contextra-graph:SORT_DEDUP_E-0235]
 pub fn sort_dedup_entities(entities: &[EntityId]) -> Vec<EntityId> {
     if entities.is_empty() {
         return Vec::new();
@@ -290,6 +308,7 @@ pub fn sort_dedup_entities(entities: &[EntityId]) -> Vec<EntityId> {
 /// sortiert und dedupliziert werden (`sort_dedup_entities`), um Deadlocks (Lock Order Inversions)
 /// bei überlappenden Knotenmengen zu verhindern.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-graph:CONSOLIDATIO-0236]
 pub struct ConsolidationNodesGuard {
     entities: Vec<EntityId>,
 }
@@ -297,6 +316,7 @@ pub struct ConsolidationNodesGuard {
 impl ConsolidationNodesGuard {
     /// Erstellt einen neuen `ConsolidationNodesGuard` durch kanonische Sortierung
     /// und Deduplizierung der übergebenen `EntityId`s.
+    // ANCHOR[contextra-graph:ACQUIRE-0237]
     pub fn acquire(entities: &[EntityId]) -> Self {
         let sorted = sort_dedup_entities(entities);
         Self { entities: sorted }
@@ -306,6 +326,7 @@ impl ConsolidationNodesGuard {
     ///
     /// Gibt `Ok(ConsolidationNodesGuard)` zurück mit kanonisch sortierter und deduplizierter
     /// Knoten-Sequenz zur deadlock-freien Konsolidierungsausführung.
+    // ANCHOR[contextra-graph:TRY_ACQUIRE-0238]
     pub fn try_acquire(entities: &[EntityId]) -> std::result::Result<Self, GraphMutationError> {
         let sorted = sort_dedup_entities(entities);
         Ok(Self { entities: sorted })
@@ -313,11 +334,13 @@ impl ConsolidationNodesGuard {
 
     /// Gibt die kanonisch sortierten und deduplizierten Entitäts-IDs zurück.
     #[inline]
+    // ANCHOR[contextra-graph:ENTITIES-0239]
     pub fn entities(&self) -> &[EntityId] {
         &self.entities
     }
 
     /// Führt eine Closure über die kanonisch sortierten Entitäts-IDs aus.
+    // ANCHOR[contextra-graph:WITH_ENTITIE-0240]
     pub fn with_entities<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&[EntityId]) -> R,
@@ -328,6 +351,7 @@ impl ConsolidationNodesGuard {
 
 impl RoleInterner {
     /// Erstellt einen neuen, leeren [`RoleInterner`].
+    // ANCHOR[contextra-graph:NEW-0241]
     pub fn new() -> Self {
         Self {
             forward: HashMap::new(),
@@ -340,6 +364,7 @@ impl RoleInterner {
     ///
     /// Falls der Rollenname bereits interniert wurde, wird die bestehende [`RoleId`] zurückgegeben.
     /// Neue Allokationen finden nur beim Einfügen von zuvor ungesehenen Strings statt.
+    // ANCHOR[contextra-graph:GET_OR_INTER-0242]
     pub fn get_or_intern(&self, name: &str) -> RoleId {
         if let Some(id) = self.forward.read(name, |_, id| *id) {
             return id;
@@ -360,6 +385,7 @@ impl RoleInterner {
     /// Löst eine [`RoleId`] im Lesepfad zero-copy über eine Closure auf.
     ///
     /// Es entsteht keine neue String-Allokation pro Aufruf im Lesepfad.
+    // ANCHOR[contextra-graph:RESOLVE-0243]
     pub fn resolve<F, R>(&self, id: RoleId, f: F) -> Option<R>
     where
         F: FnOnce(&str) -> R,
@@ -368,26 +394,31 @@ impl RoleInterner {
     }
 
     /// Löst eine [`RoleId`] in ein owned `String` auf.
+    // ANCHOR[contextra-graph:RESOLVE_STRI-0244]
     pub fn resolve_string(&self, id: RoleId) -> Option<String> {
         self.backward.read(&id, |_, name| name.clone())
     }
 
     /// Prüft, ob ein Rollenname im Interner vorhanden ist.
+    // ANCHOR[contextra-graph:CONTAINS_ROL-0245]
     pub fn contains_role(&self, name: &str) -> bool {
         self.forward.contains(name)
     }
 
     /// Prüft, ob eine [`RoleId`] im Interner vorhanden ist.
+    // ANCHOR[contextra-graph:CONTAINS_ID-0246]
     pub fn contains_id(&self, id: RoleId) -> bool {
         self.backward.contains(&id)
     }
 
     /// Gibt die Anzahl der internierten Rollen zurück.
+    // ANCHOR[contextra-graph:LEN-0247]
     pub fn len(&self) -> usize {
         self.forward.len()
     }
 
     /// Gibt `true` zurück, falls der Interner leer ist.
+    // ANCHOR[contextra-graph:IS_EMPTY-0248]
     pub fn is_empty(&self) -> bool {
         self.forward.is_empty()
     }
@@ -397,6 +428,7 @@ impl RoleInterner {
 mod tests {
     use super::*;
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_hyperedge_id_methods_and_traits() {
         let id1 = HyperEdgeId::new(42);
@@ -409,6 +441,7 @@ mod tests {
         assert!(set.contains(&HyperEdgeId::new(42)));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_role_id_methods_and_traits() {
         let role1 = RoleId::new(7);
@@ -421,6 +454,7 @@ mod tests {
         assert!(set.contains(&RoleId::new(7)));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_hyperedge_bincode_serialization_roundtrip() {
         let edge = HyperEdge::new(
@@ -444,6 +478,7 @@ mod tests {
         assert_eq!(edge, deserialized);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_hyperedge_legacy_deserialization_fallback() {
         // Construct legacy byte layout (without child_edge_ids)
@@ -473,6 +508,7 @@ mod tests {
         assert!(deserialized.child_edge_ids.is_empty());
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_with_child_edge_ids_sorting_dedup_and_self_removal() {
         let edge_id = HyperEdgeId::new(10);
@@ -509,6 +545,7 @@ mod tests {
         assert!(invalid_edge.validate().is_err());
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_validation_insufficient_participants() {
         // 0 participants
@@ -539,6 +576,7 @@ mod tests {
         ));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_validation_valid_participants() {
         let edge2 = HyperEdge::new(
@@ -566,6 +604,7 @@ mod tests {
         assert!(edge_n.validate().is_ok());
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_validation_invalid_weights() {
         let valid_bindings = vec![
@@ -607,12 +646,14 @@ mod tests {
         ));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_hyperedge_prefix_constants() {
         assert_eq!(HYPEREDGE_PREFIX, "__graph:hyperedge:");
         assert_eq!(HYPEREDGE_BY_ENTITY_PREFIX, "__graph:hyperedge_by_entity:");
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_role_interner_basic_operations() {
         let interner = RoleInterner::new();
@@ -650,6 +691,7 @@ mod tests {
         assert_eq!(interner.resolve_string(RoleId::new(999)), None);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_role_interner_concurrent_access() {
         use std::sync::Arc;
@@ -674,6 +716,7 @@ mod tests {
         assert_eq!(interner.len(), 3);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_sort_dedup_entities_canonical_order() {
         let e1 = EntityId::new(100);
@@ -690,6 +733,7 @@ mod tests {
         );
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_consolidation_nodes_guard_try_acquire() {
         let e1 = EntityId::new(500);
@@ -709,6 +753,7 @@ mod tests {
         );
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_concurrent_consolidation_nodes_guard_deadlock_freedom() {
         let num_threads = 10;

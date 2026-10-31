@@ -20,6 +20,7 @@ use super::types::{
 
 impl CsrGraph {
     /// Persistiert eine einzelne Entity in den übergebenen Storage.
+    // ANCHOR[contextra-graph:PERSIST_ENTI-0096]
     pub async fn persist_entity<S: StorageEngine + ?Sized>(
         &self,
         storage: &S,
@@ -33,6 +34,7 @@ impl CsrGraph {
     }
 
     /// Persistiert eine einzelne Edge in den übergebenen Storage.
+    // ANCHOR[contextra-graph:PERSIST_EDGE-0097]
     pub async fn persist_edge<S: StorageEngine + ?Sized>(
         &self,
         storage: &S,
@@ -54,6 +56,7 @@ impl CsrGraph {
     }
 
     /// Löscht eine einzelne Edge aus dem übergebenen Storage.
+    // ANCHOR[contextra-graph:DELETE_EDGE_-0098]
     pub async fn delete_edge_persistence<S: StorageEngine + ?Sized>(
         &self,
         storage: &S,
@@ -72,6 +75,7 @@ impl CsrGraph {
     }
 
     /// Lädt den kompletten Graph-Zustand aus dem Storage (beim Startup).
+    // ANCHOR[contextra-graph:LOAD_FROM_ST-0099]
     pub async fn load_from_storage<S: StorageEngine + ?Sized>(storage: &S) -> Result<Self> {
         let graph = Self::new();
 

@@ -15,9 +15,11 @@ use contextra_types::{DocId, EntityId, PprConfig, Result, MAX_SEARCH_K};
 use std::collections::{HashSet, VecDeque};
 
 /// Default batch size for candidate retrieval (Spec §21.2).
+// ANCHOR[contextra-graph:DEFAULT_PPR_-0314]
 pub const DEFAULT_PPR_STREAM_BATCH_SIZE: usize = 16;
 
 /// On-demand loading async candidate stream for Personalized PageRank search.
+// ANCHOR[contextra-graph:PPRCANDIDATE-0315]
 pub struct PprCandidateStream<'a, G: GraphIndex + ?Sized> {
     graph: &'a G,
     seeds: Vec<EntityId>,
@@ -30,6 +32,7 @@ pub struct PprCandidateStream<'a, G: GraphIndex + ?Sized> {
 
 impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
     /// Creates a new candidate stream for Personalized PageRank starting from `seeds`.
+    // ANCHOR[contextra-graph:NEW-0316]
     pub fn new(graph: &'a G, seeds: impl Into<Vec<EntityId>>, config: PprConfig) -> Self {
         Self {
             graph,
@@ -43,12 +46,14 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
     }
 
     /// Sets a custom batch size (minimum 1).
+    // ANCHOR[contextra-graph:WITH_BATCH_S-0317]
     pub fn with_batch_size(mut self, n: usize) -> Self {
         self.batch_size = n.max(1);
         self
     }
 
     /// Specifies whether seed entities themselves should be excluded from the yielded candidate stream.
+    // ANCHOR[contextra-graph:WITH_EXCLUDE-0318]
     pub fn with_exclude_seeds(mut self, exclude: bool) -> Self {
         self.exclude_seeds = exclude;
         self
@@ -56,6 +61,7 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
 
     /// Fetches the next batch of candidate entity-score pairs (up to `batch_size`).
     /// Returns an empty `Vec` when exhausted.
+    // ANCHOR[contextra-graph:NEXT_BATCH-0319]
     pub async fn next_batch(&mut self) -> Result<Vec<(EntityId, f32)>> {
         let batch_size = self.batch_size;
         let ranked = self.ensure_calculated().await?;
@@ -72,6 +78,7 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
 
     /// Fetches the next single candidate entity ID.
     /// Returns `Ok(None)` when exhausted.
+    // ANCHOR[contextra-graph:NEXT_ENTITY-0320]
     pub async fn next_entity(&mut self) -> Result<Option<EntityId>> {
         let ranked = self.ensure_calculated().await?;
         if let Some((eid, _score)) = ranked.pop_front() {
@@ -84,6 +91,7 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
 
     /// Fetches the next batch of resolved [`DocId`]s (up to `batch_size`).
     /// Entities for which `resolve` returns `None` are skipped.
+    // ANCHOR[contextra-graph:NEXT_BATCH_D-0321]
     pub async fn next_batch_docs<F>(&mut self, mut resolve: F) -> Result<Vec<DocId>>
     where
         F: FnMut(EntityId) -> Option<DocId>,
@@ -105,11 +113,13 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
     }
 
     /// Returns the total number of items yielded so far.
+    // ANCHOR[contextra-graph:YIELDED-0322]
     pub fn yielded(&self) -> usize {
         self.yielded
     }
 
     /// Returns whether the candidate stream is exhausted.
+    // ANCHOR[contextra-graph:IS_EXHAUSTED-0323]
     pub fn is_exhausted(&self) -> bool {
         match &self.ranked {
             Some(ranked) => ranked.is_empty(),
@@ -118,6 +128,7 @@ impl<'a, G: GraphIndex + ?Sized> PprCandidateStream<'a, G> {
     }
 
     /// Returns the maximum depth limit for candidate retrieval (`MAX_SEARCH_K`).
+    // ANCHOR[contextra-graph:FN-0324]
     pub const fn max_depth() -> usize {
         MAX_SEARCH_K
     }

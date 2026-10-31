@@ -1,3 +1,8 @@
+//! Modul `mod` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 pub mod edge_mutation;
 pub mod entity;
 pub mod hyperedge;
@@ -17,6 +22,15 @@ use contextra_types::{DocId, EntityId};
 use super::inner::{GraphInner, InnerWriteGuard, MemoryEstimate};
 use super::types::CsrGraphConfig;
 
+// ANCHOR[contextra-graph:CSRGRAPH-0135]
+/// Struktur `CsrGraph` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub struct CsrGraph {
     pub config: CsrGraphConfig,
     pub inner: Arc<ArcSwap<GraphInner>>,
@@ -29,10 +43,28 @@ pub struct CsrGraph {
 }
 
 impl CsrGraph {
+    // ANCHOR[contextra-graph:NEW-0136]
+    /// Funktion `new` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn new() -> Self {
         Self::with_config(CsrGraphConfig::default())
     }
 
+    // ANCHOR[contextra-graph:WITH_CONFIG-0137]
+    /// Funktion `with_config` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn with_config(config: CsrGraphConfig) -> Self {
         let initial = Arc::new(GraphInner::new());
         Self {
@@ -47,10 +79,28 @@ impl CsrGraph {
         }
     }
 
+    // ANCHOR[contextra-graph:WITH_STORAGE-0138]
+    /// Funktion `with_storage` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn with_storage(storage: Arc<dyn StorageEngine>) -> Self {
         Self::with_config_and_storage(CsrGraphConfig::default(), storage)
     }
 
+    // ANCHOR[contextra-graph:WITH_CONFIG_-0139]
+    /// Funktion `with_config_and_storage` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn with_config_and_storage(
         config: CsrGraphConfig,
         storage: Arc<dyn StorageEngine>,
@@ -68,6 +118,15 @@ impl CsrGraph {
         }
     }
 
+    // ANCHOR[contextra-graph:WITH_CONSIST-0140]
+    /// Funktion `with_consistency_enforcer` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn with_consistency_enforcer(suppression_threshold: u32) -> Self {
         let initial = Arc::new(GraphInner::new());
         Self {
@@ -84,10 +143,28 @@ impl CsrGraph {
         }
     }
 
+    // ANCHOR[contextra-graph:INNER_READ-0141]
+    /// Funktion `inner_read` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn inner_read(&self) -> arc_swap::Guard<Arc<GraphInner>> {
         self.inner.load()
     }
 
+    // ANCHOR[contextra-graph:INNER_WRITE-0142]
+    /// Funktion `inner_write` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn inner_write(&self) -> InnerWriteGuard<'_> {
         InnerWriteGuard {
             guard: self.write_state.lock(),
@@ -95,34 +172,97 @@ impl CsrGraph {
         }
     }
 
+    // ANCHOR[contextra-graph:SET_STORAGE-0143]
+    /// Funktion `set_storage` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn set_storage(&mut self, storage: Arc<dyn StorageEngine>) {
         self.storage = Some(storage);
     }
 
+    // ANCHOR[contextra-graph:STORAGE-0144]
+    /// Funktion `storage` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn storage(&self) -> Option<Arc<dyn StorageEngine>> {
         self.storage.clone()
     }
 
+    // ANCHOR[contextra-graph:ESTIMATE_MEM-0145]
+    /// Funktion `estimate_memory` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn estimate_memory(&self, presized: bool) -> MemoryEstimate {
         let inner = self.inner_read();
         (*inner).estimate_memory(presized)
     }
 
+    // ANCHOR[contextra-graph:ESTIMATE_MEM-0146]
+    /// Funktion `estimate_memory_bytes` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn estimate_memory_bytes(&self) -> usize {
         let inner = self.inner_read();
         (*inner).estimate_memory_bytes()
     }
 
+    // ANCHOR[contextra-graph:ESTIMATE_COM-0147]
+    /// Funktion `estimate_compaction_peak_bytes` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn estimate_compaction_peak_bytes(&self) -> usize {
         let inner = self.inner_read();
         (*inner).estimate_compaction_peak_bytes()
     }
 
+    // ANCHOR[contextra-graph:GET_SOURCE_D-0148]
+    /// Funktion `get_source_doc_id` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn get_source_doc_id(&self, index: usize) -> Option<DocId> {
         let inner = self.inner_read();
         inner.source_doc_id_at(index)
     }
 
+    // ANCHOR[contextra-graph:SOURCE_DOC_I-0149]
+    /// Funktion `source_doc_id_at` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn source_doc_id_at(&self, from: EntityId, to: EntityId) -> Option<DocId> {
         let inner = self.inner_read();
 
@@ -158,6 +298,15 @@ impl CsrGraph {
         None
     }
 
+    // ANCHOR[contextra-graph:EDGES_FOR_DO-0150]
+    /// Funktion `edges_for_doc` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn edges_for_doc(&self, doc_id: DocId) -> Vec<(EntityId, EntityId)> {
         let inner = self.inner_read();
         let mut edges: HashSet<(EntityId, EntityId)> =

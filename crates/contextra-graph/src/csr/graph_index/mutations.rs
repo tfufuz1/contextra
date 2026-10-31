@@ -1,3 +1,8 @@
+//! Modul `mutations` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use std::sync::atomic::Ordering;
 
 use crate::consistency_enforcement::EdgeAssertion;
@@ -78,6 +83,15 @@ impl GraphIndexExt for CsrGraph {
     }
 }
 
+// ANCHOR[contextra-graph:ADD_ENTITY_I-0090]
+/// Funktion `add_entity_impl` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn add_entity_impl<'a>(
     graph: &'a CsrGraph,
     tx: TxId,
@@ -99,6 +113,15 @@ pub(crate) fn add_entity_impl<'a>(
     })
 }
 
+// ANCHOR[contextra-graph:ADD_EDGE_IMP-0091]
+/// Funktion `add_edge_impl` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn add_edge_impl<'a>(
     graph: &'a CsrGraph,
     tx: TxId,
@@ -177,6 +200,15 @@ pub(crate) fn add_edge_impl<'a>(
     })
 }
 
+// ANCHOR[contextra-graph:COMMIT_IMPL-0092]
+/// Funktion `commit_impl` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn commit_impl<'a>(graph: &'a CsrGraph, tx: TxId) -> BoxFuture<'a, Result<()>> {
     Box::pin(async move {
         validate_tx_id_heuristic(tx, "commit");
@@ -195,6 +227,15 @@ pub(crate) fn commit_impl<'a>(graph: &'a CsrGraph, tx: TxId) -> BoxFuture<'a, Re
     })
 }
 
+// ANCHOR[contextra-graph:REMOVE_EDGE_-0093]
+/// Funktion `remove_edge_impl` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn remove_edge_impl<'a>(
     graph: &'a CsrGraph,
     tx: TxId,

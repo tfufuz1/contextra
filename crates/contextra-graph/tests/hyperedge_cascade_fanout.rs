@@ -1,3 +1,8 @@
+//! Modul `hyperedge_cascade_fanout` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::cascade::{
     cascade_invalidate_hyperedges_for_superseded_doc, MAX_HYPEREDGE_CASCADE_FANOUT,
 };

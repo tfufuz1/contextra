@@ -1,3 +1,8 @@
+//! Modul `graph_collection_mutation_trait_test` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::CsrGraph;
 use contextra_ports::graph::{
     GraphCollectionMutation, GraphMutationError, HyperEdgeId, RoleBinding, RoleId,
@@ -5,6 +10,7 @@ use contextra_ports::graph::{
 use contextra_types::{DocId, EntityId};
 use std::sync::Arc;
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_csr_graph_collection_mutation_via_dyn_trait() {
     let graph = Arc::new(CsrGraph::new());

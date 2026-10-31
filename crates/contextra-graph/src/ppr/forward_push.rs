@@ -1,9 +1,23 @@
+//! Modul `forward_push` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::dense::{collect_valid_seeds, compute_out_weight_sums};
 use super::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprConfig};
 use std::collections::BTreeMap;
 
+// ANCHOR[contextra-graph:PUSH_MASS_TO-0297]
+/// Funktion `push_mass_to_neighbors` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn push_mass_to_neighbors(
     inner: &GraphInner,
     u: usize,
@@ -193,6 +207,15 @@ fn extract_push_results(
     results
 }
 
+// ANCHOR[contextra-graph:FORWARD_PUSH-0298]
+/// Funktion `forward_push_ppr` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn forward_push_ppr(
     inner: &GraphInner,
     seed_nodes: &[EntityId],

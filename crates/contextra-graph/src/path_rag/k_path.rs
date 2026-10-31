@@ -11,6 +11,7 @@ use std::collections::{BinaryHeap, HashMap};
 
 /// Configuration parameters for [`KPathDiffusion`].
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-graph:KPATHCONFIG-0256]
 pub struct KPathConfig {
     /// Target number of paths to discover.
     pub k: usize,
@@ -32,6 +33,7 @@ impl Default for KPathConfig {
 
 /// Result returned by [`KPathDiffusion::find_k_paths`].
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+// ANCHOR[contextra-graph:KPATHRESULT-0257]
 pub struct KPathResult {
     /// Up to `k` discovered paths between source and target.
     pub paths: Vec<Vec<EntityId>>,
@@ -40,6 +42,7 @@ pub struct KPathResult {
 }
 
 /// Trait for budgeted k-path diffusion search over entity graphs.
+// ANCHOR[contextra-graph:KPATHDIFFUSI-0258]
 pub trait KPathDiffusion: Send + Sync {
     /// Discovers up to `k` paths between `source` and `target` bounded by `config`.
     ///

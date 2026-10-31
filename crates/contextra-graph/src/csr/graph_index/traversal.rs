@@ -1,3 +1,8 @@
+//! Modul `traversal` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use std::collections::{HashMap, VecDeque};
 
 use contextra_ports::BoxFuture;
@@ -8,6 +13,15 @@ use super::super::inner::GraphInner;
 use super::super::types::{InternalIndex, MAX_TRAVERSAL_HOPS, MAX_VISITED_NODES, SCORE_DECAY};
 use super::super::visibility::is_edge_visible_bitemporal;
 
+// ANCHOR[contextra-graph:TRAVERSE_AT_-0094]
+/// Funktion `traverse_at_bitemporal_impl` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn traverse_at_bitemporal_impl<'a>(
     graph: &'a CsrGraph,
     start: EntityId,
@@ -36,6 +50,15 @@ pub(crate) fn traverse_at_bitemporal_impl<'a>(
     })
 }
 
+// ANCHOR[contextra-graph:TRAVERSE_IMP-0095]
+/// Funktion `traverse_impl` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn traverse_impl<'a>(
     graph: &'a CsrGraph,
     start: EntityId,

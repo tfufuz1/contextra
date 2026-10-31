@@ -1,8 +1,22 @@
+//! Modul `pagerank` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::super::graph_write::CsrGraph;
 use contextra_types::EntityId;
 use std::collections::{HashMap, HashSet};
 
 impl CsrGraph {
+    // ANCHOR[contextra-graph:PAGERANK-0110]
+    /// Funktion `pagerank` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn pagerank(
         &self,
         damping_factor: f32,
@@ -83,6 +97,15 @@ impl CsrGraph {
         result
     }
 
+    // ANCHOR[contextra-graph:GET_DELETED_-0111]
+    /// Funktion `get_deleted_node_indices` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn get_deleted_node_indices(&self) -> HashSet<usize> {
         if self.storage.is_none() {
             return HashSet::new();
@@ -100,10 +123,28 @@ impl CsrGraph {
         deleted_indices
     }
 
+    // ANCHOR[contextra-graph:DELETED_VIEW-0112]
+    /// Funktion `deleted_view` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn deleted_view(&self) -> crate::DeletedView {
         crate::DeletedView::from_nodes(self.get_deleted_node_indices().await)
     }
 
+    // ANCHOR[contextra-graph:PERSONALIZED-0113]
+    /// Funktion `personalized_page_rank_with_context_async` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn personalized_page_rank_with_context_async(
         &self,
         seed_nodes: &[EntityId],

@@ -1,8 +1,14 @@
+//! Modul `star_expansion_equals_clique` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::csr::EdgeType;
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::EntityId;
 
 /// Helper function computing Convention K star expansion weight: w_star = 2w / (|e| - 1)
+// ANCHOR[contextra-graph:STAR_WEIGHT_-0381]
 pub fn star_weight_convention_k(hyperedge_weight: f32, cardinality: usize) -> f32 {
     if cardinality < 2 {
         0.0
@@ -11,6 +17,7 @@ pub fn star_weight_convention_k(hyperedge_weight: f32, cardinality: usize) -> f3
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_star_expansion_equals_clique_schur_complement() {
     let participants = vec![

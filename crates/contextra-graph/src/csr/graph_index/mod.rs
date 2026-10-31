@@ -1,3 +1,8 @@
+//! Modul `mod` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 pub mod mutations;
 pub mod traversal;
 
@@ -11,6 +16,15 @@ use super::inner::GraphInner;
 use super::types::MAX_TRAVERSAL_HOPS;
 use super::visibility::is_suspicious_tx_id;
 
+// ANCHOR[contextra-graph:COLLECT_ENTI-0088]
+/// Funktion `collect_entity_incident_edges` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn collect_entity_incident_edges(
     inner: &GraphInner,
     idx: usize,
@@ -64,6 +78,15 @@ pub(crate) fn collect_entity_incident_edges(
     (outgoing, incoming)
 }
 
+// ANCHOR[contextra-graph:VALIDATE_TRA-0089]
+/// Funktion `validate_traversal_params` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn validate_traversal_params(max_hops: usize) -> Result<()> {
     if max_hops > 100 {
         return Err(ContextraError::InvalidInput(format!(

@@ -1,3 +1,8 @@
+//! Modul `mod` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 pub mod compaction;
 pub mod estimate;
 pub mod reinforcement;
@@ -15,6 +20,15 @@ use super::types::{EdgePayload, InternalIndex, StagedEdgePayload};
 pub use estimate::MemoryEstimate;
 
 #[derive(Clone)]
+// ANCHOR[contextra-graph:GRAPHINNER-0163]
+/// Struktur `GraphInner` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub struct GraphInner {
     pub(crate) id_map: HashMap<EntityId, InternalIndex>,
     pub(crate) reverse_map: Vec<EntityId>,
@@ -52,6 +66,15 @@ pub struct GraphInner {
 }
 
 #[inline]
+// ANCHOR[contextra-graph:SENTINEL_ENT-0164]
+/// Funktion `sentinel_entity` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn sentinel_entity() -> Entity {
     Entity::new(EntityId::new(0), "", "")
 }
@@ -63,6 +86,15 @@ impl Default for GraphInner {
 }
 
 impl GraphInner {
+    // ANCHOR[contextra-graph:NEW-0165]
+    /// Funktion `new` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn new() -> Self {
         Self {
             id_map: HashMap::new(),
@@ -97,11 +129,29 @@ impl GraphInner {
     }
 
     #[inline]
+    // ANCHOR[contextra-graph:ENTITY_AT-0166]
+    /// Funktion `entity_at` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn entity_at(&self, idx: usize) -> Option<&Entity> {
         self.entities.get(idx).filter(|e| e.id != EntityId::new(0))
     }
 
     #[inline]
+    // ANCHOR[contextra-graph:TX_VALID_FRO-0167]
+    /// Funktion `tx_valid_from_at` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn tx_valid_from_at(&self, idx: usize) -> Option<TxId> {
         self.tx_valid_froms
             .get(idx)
@@ -110,6 +160,15 @@ impl GraphInner {
     }
 
     #[inline]
+    // ANCHOR[contextra-graph:TX_VALID_TO_-0168]
+    /// Funktion `tx_valid_to_at` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn tx_valid_to_at(&self, idx: usize) -> Option<TxId> {
         self.tx_valid_tos
             .get(idx)
@@ -118,6 +177,15 @@ impl GraphInner {
     }
 
     #[inline]
+    // ANCHOR[contextra-graph:BUSINESS_VAL-0169]
+    /// Funktion `business_valid_from_at` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn business_valid_from_at(&self, idx: usize) -> Option<i64> {
         self.business_valid_froms
             .get(idx)
@@ -126,6 +194,15 @@ impl GraphInner {
     }
 
     #[inline]
+    // ANCHOR[contextra-graph:BUSINESS_VAL-0170]
+    /// Funktion `business_valid_to_at` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn business_valid_to_at(&self, idx: usize) -> Option<i64> {
         self.business_valid_tos
             .get(idx)
@@ -134,6 +211,15 @@ impl GraphInner {
     }
 
     #[inline]
+    // ANCHOR[contextra-graph:SOURCE_DOC_I-0171]
+    /// Funktion `source_doc_id_at` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn source_doc_id_at(&self, idx: usize) -> Option<DocId> {
         self.source_doc_ids
             .get(idx)
@@ -142,6 +228,15 @@ impl GraphInner {
     }
 }
 
+// ANCHOR[contextra-graph:INNERWRITEGU-0172]
+/// Struktur `InnerWriteGuard` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) struct InnerWriteGuard<'a> {
     pub(crate) guard: parking_lot::MutexGuard<'a, GraphInner>,
     pub(crate) arc_swap: &'a ArcSwap<GraphInner>,

@@ -1,3 +1,8 @@
+//! Modul `persistence_tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::super::*;
 use crate::csr::types::CsrGraphConfig;
 use crate::csr::visibility::is_edge_visible;
@@ -524,6 +529,7 @@ async fn test_traverse_at_time_unbounded_validity() {
 }
 
 proptest::proptest! {
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_add_edge_rollback_no_index_growth(
         edge_specs in proptest::collection::vec((1u64..1000, 1001u64..2000), 10..100)
@@ -549,6 +555,7 @@ proptest::proptest! {
         res?;
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_edge_visible_monotone(
         vf in 0u64..100,
@@ -562,6 +569,7 @@ proptest::proptest! {
         proptest::prop_assert_eq!(visible, expected);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_traverse_at_time_never_panics(
         node_count in 1..=15usize,
@@ -598,6 +606,7 @@ proptest::proptest! {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn prop_csr_graph_traverse_at_consistency() {
     use proptest::prelude::*;

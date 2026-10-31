@@ -9,6 +9,7 @@ use contextra_types::EntityId;
 use std::cmp::Ordering;
 
 /// Formal default-flip gate trait evaluating whether APPRH can replace ForwardPush as default.
+// ANCHOR[contextra-graph:APPRHFLIPGAT-0033]
 pub trait ApprhFlipGate {
     /// Evaluates whether APPRH meets default flip criteria.
     fn should_flip(&self, report: &ApprhShadowComparison) -> bool;
@@ -16,6 +17,7 @@ pub trait ApprhFlipGate {
 
 /// Standard default flip gate evaluator for APPRH.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+// ANCHOR[contextra-graph:DEFAULTAPPRH-0034]
 pub struct DefaultApprhFlipGate;
 
 impl ApprhFlipGate for DefaultApprhFlipGate {
@@ -26,6 +28,7 @@ impl ApprhFlipGate for DefaultApprhFlipGate {
 
 /// Result structure of shadow mode comparison between Forward-Push PPR and APPRH.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:APPRHSHADOWC-0035]
 pub struct ApprhShadowComparison {
     /// Maximum absolute score difference across top-k union nodes.
     pub max_abs_diff: f32,
@@ -47,6 +50,7 @@ pub struct ApprhShadowComparison {
 ///
 /// # Errors
 /// Returns [`ApprhError`] if APPRH execution fails.
+// ANCHOR[contextra-graph:SHADOW_COMPA-0036]
 pub fn shadow_compare_forward_push_vs_apprh<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -112,6 +116,15 @@ pub fn shadow_compare_forward_push_vs_apprh<G: PathGraph>(
     })
 }
 
+// ANCHOR[contextra-graph:NORMALIZE_AN-0037]
+/// Funktion `normalize_and_sort` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn normalize_and_sort(map: &ahash::AHashMap<EntityId, f32>) -> Vec<(EntityId, f32)> {
     let mut entries: Vec<(EntityId, f32)> = map.iter().map(|(&id, &val)| (id, val)).collect();
     // Sort strictly by EntityId to ensure IEEE-754 floating point summation order is 100% deterministic

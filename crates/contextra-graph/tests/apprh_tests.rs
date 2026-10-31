@@ -84,6 +84,7 @@ impl PathGraph for MockGraph {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_apprh_determinism_and_seed_permutations() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -123,6 +124,7 @@ fn test_apprh_determinism_and_seed_permutations() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_apprh_convergence_sum_and_finiteness() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -160,6 +162,7 @@ fn test_apprh_convergence_sum_and_finiteness() -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_p24_locality_bounded_visited_set() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -186,6 +189,7 @@ fn test_p24_locality_bounded_visited_set() -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_apprh_parameter_validation() {
     let g = MockGraph::new();
@@ -228,6 +232,7 @@ fn test_apprh_parameter_validation() {
     ));
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_apprh_shadow_mode_comparison() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();

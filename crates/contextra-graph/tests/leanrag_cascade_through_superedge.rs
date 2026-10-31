@@ -1,3 +1,8 @@
+//! Modul `leanrag_cascade_through_superedge` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 #![allow(clippy::unwrap_used)]
 
 use contextra_graph::cascade::cascade_invalidate_hyperedges_for_superseded_doc;
@@ -314,6 +319,7 @@ async fn test_leanrag_cascade_topological_ancestor_before_child_order() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_leanrag_legacy_bincode_deserialization() {
     let edge_id = HyperEdgeId::new(42);

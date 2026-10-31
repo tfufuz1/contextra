@@ -1,14 +1,56 @@
+//! Modul `types` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_types::{DocId, EntityId, ResourceTracker, TxId};
 use serde::{Deserialize, Serialize};
 
+// ANCHOR[contextra-graph:GRAPH_ENTITY-0178]
+/// Konstante `GRAPH_ENTITY_PREFIX` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) const GRAPH_ENTITY_PREFIX: &[u8] = b"__graph:entity:";
+// ANCHOR[contextra-graph:GRAPH_EDGE_P-0179]
+/// Konstante `GRAPH_EDGE_PREFIX` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) const GRAPH_EDGE_PREFIX: &[u8] = b"__graph:edge:";
+// ANCHOR[contextra-graph:GRAPH_ENTITY-0180]
+/// Konstante `GRAPH_ENTITY_DELETED_PREFIX` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) const GRAPH_ENTITY_DELETED_PREFIX: &[u8] = b"graph:entity:deleted:";
+// ANCHOR[contextra-graph:GRAPH_COMMUN-0181]
+/// Konstante `GRAPH_COMMUNITY_PREFIX` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) const GRAPH_COMMUNITY_PREFIX: &[u8] = b"__graph:community:";
 
 /// Edge type representation for CSR edges.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+// ANCHOR[contextra-graph:EDGETYPE-0182]
 pub enum EdgeType {
     #[default]
     Default,
@@ -16,6 +58,7 @@ pub enum EdgeType {
 
 /// Edge structure in CSR graph representation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:CSREDGE-0183]
 pub struct CsrEdge {
     pub target: EntityId,
     pub weight: f32,
@@ -27,6 +70,15 @@ pub struct CsrEdge {
 }
 
 impl CsrEdge {
+    // ANCHOR[contextra-graph:NEW-0184]
+    /// Funktion `new` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn new(target: EntityId, weight: f32) -> Self {
         Self {
             target,
@@ -43,6 +95,7 @@ use std::sync::Arc;
 
 /// Persisted edge payload format for storage.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:PERSISTEDEDG-0185]
 pub struct PersistedEdgePayload {
     pub weight: f32,
     #[serde(default, alias = "valid_from")]
@@ -58,15 +111,27 @@ pub struct PersistedEdgePayload {
 }
 
 /// Score decay factor per hop (0.7^hop).
+// ANCHOR[contextra-graph:SCORE_DECAY-0186]
 pub const SCORE_DECAY: f32 = 0.7;
 
 /// Maximum traversal depth.
+// ANCHOR[contextra-graph:MAX_TRAVERSA-0187]
 pub const MAX_TRAVERSAL_HOPS: u8 = 3;
 
 /// Maximum visited nodes limit during BFS traversal to prevent intermediate hub-node memory explosion.
+// ANCHOR[contextra-graph:MAX_VISITED_-0188]
 pub const MAX_VISITED_NODES: usize = 10_000;
 
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-graph:CSRGRAPHCONF-0189]
+/// Struktur `CsrGraphConfig` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub struct CsrGraphConfig {
     pub rebuild_threshold: usize,
     pub max_compaction_peak_memory_mb: Option<usize>,
@@ -83,9 +148,27 @@ impl Default for CsrGraphConfig {
     }
 }
 
+// ANCHOR[contextra-graph:INTERNALINDE-0190]
+/// Typalias `InternalIndex` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) type InternalIndex = usize;
 
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:EDGEPAYLOAD-0191]
+/// Struktur `EdgePayload` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) struct EdgePayload {
     pub(crate) target: InternalIndex,
     pub(crate) weight: f32,
@@ -97,6 +180,15 @@ pub(crate) struct EdgePayload {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:STAGEDEDGEPA-0192]
+/// Struktur `StagedEdgePayload` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) struct StagedEdgePayload {
     pub(crate) target: EntityId,
     pub(crate) weight: f32,

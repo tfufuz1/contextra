@@ -1,3 +1,8 @@
+//! Modul `hyperedge` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::CsrGraph;
 use crate::error::GraphMutationError;
 use contextra_types::{DocId, EntityId, Result, TxId};
@@ -33,6 +38,15 @@ fn dfs_upward_cascade(
 }
 
 impl CsrGraph {
+    // ANCHOR[contextra-graph:ENQUEUE_CASC-0122]
+    /// Funktion `enqueue_cascade_deferred` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn enqueue_cascade_deferred(
         &self,
         doc_id: DocId,
@@ -44,10 +58,28 @@ impl CsrGraph {
         }
     }
 
+    // ANCHOR[contextra-graph:PENDING_CASC-0123]
+    /// Funktion `pending_cascade_queue_len` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn pending_cascade_queue_len(&self) -> usize {
         self.cascade_queue.lock().len()
     }
 
+    // ANCHOR[contextra-graph:PROCESS_CASC-0124]
+    /// Funktion `process_cascade_queue` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn process_cascade_queue(&self, batch_size: usize, wal_tx: TxId) -> Result<usize> {
         let mut items = Vec::new();
         {
@@ -95,6 +127,15 @@ impl CsrGraph {
         Ok(tombstoned_count)
     }
 
+    // ANCHOR[contextra-graph:RELATE_N_ARY-0125]
+    /// Funktion `relate_n_ary` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn relate_n_ary(
         &self,
         id: crate::hyperedge::HyperEdgeId,
@@ -117,6 +158,15 @@ impl CsrGraph {
         Ok(hyperedge)
     }
 
+    // ANCHOR[contextra-graph:PERSIST_HYPE-0126]
+    /// Funktion `persist_hyperedge` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn persist_hyperedge(
         &self,
         tx: TxId,
@@ -144,6 +194,15 @@ impl CsrGraph {
         Ok(())
     }
 
+    // ANCHOR[contextra-graph:INSERT_HYPER-0127]
+    /// Funktion `insert_hyperedge_direct` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn insert_hyperedge_direct(&self, hyperedge: crate::hyperedge::HyperEdge) {
         let hyperedge_arc = Arc::new(hyperedge);
         let mut inner = self.inner_write();
@@ -172,6 +231,15 @@ impl CsrGraph {
         inner.hyperedges.insert(hyperedge_id, hyperedge_arc);
     }
 
+    // ANCHOR[contextra-graph:PARENT_HYPER-0128]
+    /// Funktion `parent_hyperedges_of` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn parent_hyperedges_of(
         &self,
         child: crate::hyperedge::HyperEdgeId,
@@ -196,6 +264,15 @@ impl CsrGraph {
         parents
     }
 
+    // ANCHOR[contextra-graph:HYPEREDGES_F-0129]
+    /// Funktion `hyperedges_for_doc` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn hyperedges_for_doc(&self, doc_id: DocId) -> Vec<crate::hyperedge::HyperEdgeId> {
         let inner = self.inner_read();
         inner
@@ -215,6 +292,15 @@ impl CsrGraph {
             .unwrap_or_default()
     }
 
+    // ANCHOR[contextra-graph:MAX_HYPEREDG-0130]
+    /// Funktion `max_hyperedge_id` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn max_hyperedge_id(&self) -> u64 {
         let inner = self.inner_read();
         inner
@@ -225,6 +311,15 @@ impl CsrGraph {
             .unwrap_or(0)
     }
 
+    // ANCHOR[contextra-graph:GET_HYPEREDG-0131]
+    /// Funktion `get_hyperedge` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn get_hyperedge(
         &self,
         id: crate::hyperedge::HyperEdgeId,
@@ -237,6 +332,15 @@ impl CsrGraph {
             .cloned()
     }
 
+    // ANCHOR[contextra-graph:HYPEREDGES_F-0132]
+    /// Funktion `hyperedges_for_entity` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn hyperedges_for_entity(&self, entity_id: EntityId) -> Vec<crate::hyperedge::HyperEdgeId> {
         let inner = self.inner_read();
         inner
@@ -339,6 +443,15 @@ impl CsrGraph {
         }
     }
 
+    // ANCHOR[contextra-graph:COMMIT_SUPER-0133]
+    /// Funktion `commit_super_edge_batch` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn commit_super_edge_batch(
         &self,
         tombstone_ids: &[crate::hyperedge::HyperEdgeId],
@@ -362,6 +475,15 @@ impl CsrGraph {
         Ok(())
     }
 
+    // ANCHOR[contextra-graph:INSERT_HYPER-0134]
+    /// Funktion `insert_hyperedge` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn insert_hyperedge(&self, edge: crate::hyperedge::HyperEdge) {
         self.insert_hyperedge_direct(edge);
     }

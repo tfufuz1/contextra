@@ -1,3 +1,8 @@
+//! Modul `mod` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 pub mod communities;
 pub mod pagerank;
 pub mod path_rag;
@@ -8,6 +13,15 @@ use contextra_types::{EntityId, Result, TxId};
 use super::graph_write::CsrGraph;
 
 impl CsrGraph {
+    // ANCHOR[contextra-graph:COMPACT-0102]
+    /// Funktion `compact` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn compact(&self) {
         let snapshot = self.inner.load();
         let num_nodes = snapshot.reverse_map.len();
@@ -31,6 +45,15 @@ impl CsrGraph {
         }
     }
 
+    // ANCHOR[contextra-graph:COMPACT_ASYN-0103]
+    /// Funktion `compact_async` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn compact_async(&self) -> Result<()> {
         let snapshot = self.inner.load();
         let num_nodes = snapshot.reverse_map.len();
@@ -70,6 +93,15 @@ impl CsrGraph {
         Ok(())
     }
 
+    // ANCHOR[contextra-graph:NEIGHBORS-0104]
+    /// Funktion `neighbors` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn neighbors(&self, start: EntityId) -> Result<Vec<EntityId>> {
         let inner = self.inner_read();
         let start_idx = match inner.id_map.get(&start) {
@@ -119,6 +151,15 @@ impl CsrGraph {
         Ok(neighbors)
     }
 
+    // ANCHOR[contextra-graph:ENTITY_COUNT-0105]
+    /// Funktion `entity_count` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn entity_count(&self) -> usize {
         self.inner_read()
             .entities
@@ -127,6 +168,15 @@ impl CsrGraph {
             .count()
     }
 
+    // ANCHOR[contextra-graph:ENTITY_EXIST-0106]
+    /// Funktion `entity_exists` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn entity_exists(&self, id: EntityId) -> bool {
         let inner = self.inner_read();
         if let Some(&idx) = inner.id_map.get(&id) {
@@ -136,6 +186,15 @@ impl CsrGraph {
         }
     }
 
+    // ANCHOR[contextra-graph:IS_ENTITY_DE-0107]
+    /// Funktion `is_entity_deleted` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn is_entity_deleted(&self, entity: EntityId) -> bool {
         if let Some(storage) = &self.storage {
             let key = format!("graph:entity:deleted:{}", entity.0);
@@ -144,6 +203,15 @@ impl CsrGraph {
         false
     }
 
+    // ANCHOR[contextra-graph:EDGE_COUNT-0108]
+    /// Funktion `edge_count` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn edge_count(&self) -> usize {
         let inner = self.inner_read();
         inner.targets.len()
@@ -151,6 +219,15 @@ impl CsrGraph {
             + inner.staged_edges.values().map(|v| v.len()).sum::<usize>()
     }
 
+    // ANCHOR[contextra-graph:REMOVE_ENTIT-0109]
+    /// Funktion `remove_entity` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn remove_entity(&self, tx: TxId, entity: EntityId) -> Result<()> {
         GraphIndexExt::remove_entity(self, tx, entity).await
     }

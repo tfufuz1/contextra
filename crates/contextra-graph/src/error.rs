@@ -8,6 +8,7 @@ mod tests {
     use super::*;
     use contextra_types::ContextraError;
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_graph_mutation_error_display_and_conversion() {
         let err1 = GraphMutationError::InsufficientParticipants {

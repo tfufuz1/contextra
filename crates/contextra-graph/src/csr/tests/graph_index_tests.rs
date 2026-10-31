@@ -1,3 +1,8 @@
+//! Modul `graph_index_tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::super::*;
 use super::basic_tests::setup_test_graph;
 use crate::csr::types::{CsrGraphConfig, PersistedEdgePayload, MAX_VISITED_NODES};
@@ -250,6 +255,7 @@ async fn pagerank_CASE_empty_graph_and_isolated_node() {
     assert!((rank - 1.0).abs() < 1e-4);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 #[allow(non_snake_case)]
 fn serialization_roundtrip_CASE_persisted_edge_payload() {
@@ -276,6 +282,7 @@ fn serialization_roundtrip_CASE_persisted_edge_payload() {
 }
 
 proptest::proptest! {
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_csr_offset_array_structural_consistency(
         node_count in 1..=30usize,
@@ -652,6 +659,7 @@ async fn test_csr_is_entity_deleted_returns_false_for_live_entity() {
     assert!(!graph.is_entity_deleted(entity_live).await);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 #[cfg(feature = "edge-reinforcement-learning")]
 fn test_edge_store_invalidated_after_compact() {

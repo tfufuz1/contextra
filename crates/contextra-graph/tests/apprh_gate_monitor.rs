@@ -93,6 +93,7 @@ fn make_sample_report(
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_gate_monitor_streak_logic_and_production_readiness() {
     let config = ApprhGateMonitorConfig {
@@ -123,6 +124,7 @@ fn test_gate_monitor_streak_logic_and_production_readiness() {
     assert_eq!(snap.last_overlap, Some(0.90));
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_gate_monitor_outlier_resets_streak_hysteresis() {
     let config = ApprhGateMonitorConfig {
@@ -166,6 +168,7 @@ fn test_gate_monitor_outlier_resets_streak_hysteresis() {
     assert_eq!(monitor.snapshot().current_streak, 3);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_gate_monitor_window_bounds_and_snapshot() {
     let config = ApprhGateMonitorConfig {
@@ -210,6 +213,7 @@ fn test_gate_monitor_window_bounds_and_snapshot() {
     assert_eq!(snap2.last_overlap, Some(0.99));
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_gate_monitor_invalid_configuration() {
     let err_zero_window = ApprhGateMonitorConfig {
@@ -240,6 +244,7 @@ fn test_gate_monitor_invalid_configuration() {
     ));
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_gate_monitor_reset() {
     let config = ApprhGateMonitorConfig {
@@ -267,6 +272,7 @@ fn test_gate_monitor_reset() {
     assert!(!snap.production_ready);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_gate_monitor_concurrency() {
     let config = ApprhGateMonitorConfig {
@@ -302,6 +308,7 @@ fn test_gate_monitor_concurrency() {
     assert!(snap.production_ready);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_gate_monitor_integration_with_real_shadow_comparison(
 ) -> Result<(), Box<dyn std::error::Error>> {

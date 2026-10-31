@@ -1,3 +1,8 @@
+//! Modul `bitemporal_tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::super::*;
 use crate::csr::inner::GraphInner;
 use crate::csr::types::{CsrGraphConfig, EdgeType};
@@ -308,6 +313,7 @@ async fn test_source_doc_id_provenance_and_compact_isolation() {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_hyperedge_insertion_and_lookup() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -333,6 +339,7 @@ fn test_hyperedge_insertion_and_lookup() {
     assert_eq!(e2_hes, vec![he_id]);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_hyperedge_multiple_participants() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -361,6 +368,7 @@ fn test_hyperedge_multiple_participants() {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_entity_multiple_hyperedges() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -397,6 +405,7 @@ fn test_entity_multiple_hyperedges() {
     assert!(hes.contains(&HyperEdgeId(2)));
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_hyperedge_nonexistent_entity() {
     use crate::hyperedge::HyperEdgeId;
@@ -411,6 +420,7 @@ fn test_hyperedge_nonexistent_entity() {
     assert!(he.is_none());
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_hyperedge_memory_estimation() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};

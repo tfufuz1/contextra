@@ -109,6 +109,7 @@ async fn stress_session_dag_deadlock_freedom() {
 ///
 /// Dieser Test existiert um zu dokumentieren dass der Compile-Zeit-Schutz
 /// durch das Typsystem aktiv ist — er kompiliert genau deshalb fehlerfrei.
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_nodes_guard_compile_time_guarantee_documented() {
     // NodesGuard kann nicht erzeugt werden ohne korrekten Lock-Erwerb.

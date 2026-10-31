@@ -25,6 +25,7 @@ use std::collections::HashMap;
 
 /// Configuration for Leiden Community Detection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:COMMUNITYDET-0063]
 pub struct CommunityDetectionConfig {
     /// Maximum number of propagation / modularity optimization iterations.
     pub max_iterations: u32,
@@ -38,6 +39,15 @@ pub struct CommunityDetectionConfig {
 /// Künstlicher bipartiter Knoten für eine Hyperkante in der Stern-Expansion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 
+// ANCHOR[contextra-graph:VIRTUALHYPER-0064]
+/// Struktur `VirtualHyperedgeNode` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub struct VirtualHyperedgeNode {
     /// ID der zugrundeliegenden Hyperkante.
     pub hyperedge_id: crate::hyperedge::HyperEdgeId,
@@ -45,6 +55,7 @@ pub struct VirtualHyperedgeNode {
 
 impl VirtualHyperedgeNode {
     /// Creates a new `VirtualHyperedgeNode`.
+    // ANCHOR[contextra-graph:NEW-0065]
     pub fn new(hyperedge_id: u64) -> Self {
         Self {
             hyperedge_id: crate::hyperedge::HyperEdgeId::new(hyperedge_id),
@@ -59,6 +70,7 @@ impl VirtualHyperedgeNode {
 /// # Ring-0 Zero-Copy Invariante (HK-05)
 /// `StarExpansionIterator` klont keine `HyperEdge`-Instanzen, sondern iteriert
 /// referenzbasiert über die in `Arc<GraphInner>` gespeicherten Hyperkanten.
+// ANCHOR[contextra-graph:STAREXPANSIO-0066]
 pub struct StarExpansionIterator {
     inner: arc_swap::Guard<std::sync::Arc<crate::csr::inner::GraphInner>>,
     hyperedge_keys: Vec<crate::hyperedge::HyperEdgeId>,
@@ -68,6 +80,7 @@ pub struct StarExpansionIterator {
 
 impl StarExpansionIterator {
     /// Erstellt einen neuen `StarExpansionIterator` für den gegebenen CsrGraph.
+    // ANCHOR[contextra-graph:NEW-0067]
     pub fn new(graph: &CsrGraph) -> Self {
         let inner = graph.inner_read();
         let mut hyperedge_keys: Vec<crate::hyperedge::HyperEdgeId> = inner
@@ -87,6 +100,7 @@ impl StarExpansionIterator {
     }
 
     /// Liest das nächste Element inkl. Kantengewicht (Konvention K: `2w/(|e|-1)`).
+    // ANCHOR[contextra-graph:NEXT_WITH_WE-0068]
     pub fn next_with_weight(&mut self) -> Option<(EntityId, VirtualHyperedgeNode, f32)> {
         while self.current_hyperedge_idx < self.hyperedge_keys.len() {
             let key = self.hyperedge_keys[self.current_hyperedge_idx];
@@ -130,6 +144,7 @@ impl Default for CommunityDetectionConfig {
 
 /// Represents the assignment of an entity to a detected community.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:COMMUNITYASS-0069]
 pub struct CommunityAssignment {
     /// Entity ID.
     pub entity_id: EntityId,
@@ -201,6 +216,7 @@ impl SimpleRng {
 /// If `config.max_iterations` is reached without full convergence, the function returns
 /// the best-effort intermediate community assignments (no `Err`) and logs a `tracing::warn!` message
 /// containing `max_iterations` and `unstable_nodes` (the count of node changes in the final iteration).
+// ANCHOR[contextra-graph:DETECT_COMMU-0070]
 pub async fn detect_communities(
     graph: &CsrGraph,
     config: &CommunityDetectionConfig,

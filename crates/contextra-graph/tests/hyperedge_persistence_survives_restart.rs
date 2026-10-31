@@ -1,3 +1,8 @@
+//! Modul `hyperedge_persistence_survives_restart` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 #![expect(clippy::unwrap_used)]
 
 use contextra_graph::csr::{CsrGraph, EdgeType};

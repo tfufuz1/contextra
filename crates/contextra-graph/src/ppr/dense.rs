@@ -1,8 +1,22 @@
+//! Modul `dense` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprConfig};
 use std::collections::HashSet;
 
+// ANCHOR[contextra-graph:COLLECT_VALI-0293]
+/// Funktion `collect_valid_seeds` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn collect_valid_seeds(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
@@ -99,6 +113,15 @@ fn compute_node_out_weight_sum(
     sum
 }
 
+// ANCHOR[contextra-graph:COMPUTE_OUT_-0294]
+/// Funktion `compute_out_weight_sums` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn compute_out_weight_sums(
     inner: &GraphInner,
     n: usize,
@@ -135,6 +158,15 @@ pub(crate) fn compute_out_weight_sums(
     }
 }
 
+// ANCHOR[contextra-graph:DISTRIBUTE_D-0295]
+/// Funktion `distribute_dense_ranks` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn distribute_dense_ranks(
     inner: &GraphInner,
     n: usize,
@@ -362,6 +394,15 @@ fn extract_dense_results(
     results
 }
 
+// ANCHOR[contextra-graph:COMPUTE_PPR_-0296]
+/// Funktion `compute_ppr_dense` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn compute_ppr_dense(
     inner: &GraphInner,
     seed_nodes: &[EntityId],

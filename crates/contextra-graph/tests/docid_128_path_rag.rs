@@ -1,3 +1,8 @@
+//! Modul `docid_128_path_rag` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::path_rag::{GraphPath, PathGraph, PathRAGEngine};
 use contextra_types::{DocId, EntityId};
 use std::collections::HashMap;
@@ -13,6 +18,7 @@ impl PathGraph for DummyGraph {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_path_rag_to_rrf_signal_docid_conversion_and_sorting() {
     let engine = PathRAGEngine::new(DummyGraph, 4, 0.1);

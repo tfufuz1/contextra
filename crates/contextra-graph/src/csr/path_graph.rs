@@ -1,3 +1,8 @@
+//! Modul `path_graph` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use std::sync::Arc;
 
 use contextra_types::EntityId;

@@ -22,10 +22,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Identifikator für eine Kante im CSR-Graphen.
+// ANCHOR[contextra-graph:EDGEID-0071]
 pub type EdgeId = (EntityId, EntityId);
 
 /// Eintrag für ein gelerntes Konfliktmuster (Constraint-Violation-Signatur).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:CONFLICTPATT-0072]
 pub struct ConflictPattern {
     /// Blake3-Hash über die normalisierte (subject, predicate, object)-Tripel-Signatur der widersprüchlichen Aussage.
     pub pattern_hash: [u8; 32],
@@ -41,6 +43,7 @@ pub struct ConflictPattern {
 
 /// Abstrakte Aussage über eine Kante für die semantische Widerspruchsprävention.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:EDGEASSERTIO-0073]
 pub struct EdgeAssertion {
     /// Subjekt-Knoten der Aussage.
     pub subject: NodeIdx,
@@ -52,6 +55,7 @@ pub struct EdgeAssertion {
 
 impl EdgeAssertion {
     /// Berechnet den Blake3-Pattern-Hash über (subject, predicate_hash, object_repr).
+    // ANCHOR[contextra-graph:PATTERN_HASH-0074]
     pub fn pattern_hash(&self) -> [u8; 32] {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&self.subject.to_le_bytes());
@@ -62,6 +66,7 @@ impl EdgeAssertion {
 }
 
 /// Trait für modulare Widerspruchserkennungs-Strategien.
+// ANCHOR[contextra-graph:CONTRADICTIO-0075]
 pub trait ContradictionDetector {
     /// Prüft, ob zwei Aussagen im Widerspruch zueinander stehen.
     fn conflicts(&self, a: &EdgeAssertion, b: &EdgeAssertion) -> bool;
@@ -71,6 +76,7 @@ pub trait ContradictionDetector {
 /// Ein Widerspruch liegt vor, wenn Subjekt und Prädikats-Hash identisch sind,
 /// die Objekt-Repräsentation jedoch unterschiedlich ist.
 #[derive(Debug, Clone, Copy, Default)]
+// ANCHOR[contextra-graph:EXACTPREDICA-0076]
 pub struct ExactPredicateConflictDetector;
 
 impl ContradictionDetector for ExactPredicateConflictDetector {
@@ -83,6 +89,7 @@ impl ContradictionDetector for ExactPredicateConflictDetector {
 
 /// Consistency-Enforcement-Register zur Verwaltung registrierter Konfliktmuster.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-graph:CONSISTENCYE-0077]
 pub struct ConsistencyEnforcer {
     patterns: HashMap<[u8; 32], ConflictPattern>,
     suppression_threshold: u32,
@@ -90,9 +97,11 @@ pub struct ConsistencyEnforcer {
 
 impl ConsistencyEnforcer {
     /// Standard-Schwellenwert für die Unterdrückung (3 gegenseitige Detektionen).
+    // ANCHOR[contextra-graph:DEFAULT_SUPP-0078]
     pub const DEFAULT_SUPPRESSION_THRESHOLD: u32 = 3;
 
     /// Erstellt einen neuen ConsistencyEnforcer mit konfigurierbarem Schwellenwert.
+    // ANCHOR[contextra-graph:NEW-0079]
     pub fn new(suppression_threshold: u32) -> Self {
         Self {
             patterns: HashMap::new(),
@@ -102,6 +111,7 @@ impl ConsistencyEnforcer {
 
     /// Prüft eine Kanten-Aussage vor dem Einfügen, registriert das Widerspruchsmuster
     /// und gibt den Konfliktmuster-Eintrag zurück.
+    // ANCHOR[contextra-graph:CHECK_BEFORE-0080]
     pub fn check_before_insert(&mut self, assertion: &EdgeAssertion) -> Option<ConflictPattern> {
         let pattern = assertion.pattern_hash();
         let cp = self.record_contradiction(pattern, TxId::new(0));
@@ -110,6 +120,7 @@ impl ConsistencyEnforcer {
 
     /// Bewertet mit Hilfe des übergebenen [`ContradictionDetector`]s, ob zwei Kanten-Aussagen
     /// einen semantischen Widerspruch darstellen.
+    // ANCHOR[contextra-graph:DETECT_CONTR-0081]
     pub fn detect_contradiction<D: ContradictionDetector>(
         &self,
         detector: &D,
@@ -123,6 +134,7 @@ impl ConsistencyEnforcer {
     ///
     /// Erhöht `contradiction_count` und setzt `suppressed = true`, sobald der Zähler
     /// den `suppression_threshold` erreicht oder überschreitet.
+    // ANCHOR[contextra-graph:RECORD_CONTR-0082]
     pub fn record_contradiction(
         &mut self,
         pattern_hash: [u8; 32],
@@ -150,6 +162,7 @@ impl ConsistencyEnforcer {
     }
 
     /// Prüft, ob ein gegebenes Muster unterdrückt wird (`suppressed == true`).
+    // ANCHOR[contextra-graph:IS_SUPPRESSE-0083]
     pub fn is_suppressed(&self, pattern_hash: [u8; 32]) -> bool {
         self.patterns
             .get(&pattern_hash)
@@ -157,16 +170,19 @@ impl ConsistencyEnforcer {
     }
 
     /// Gibt einen Iterator über alle aktuell aktiven (unterdrückenden) Konfliktmuster zurück.
+    // ANCHOR[contextra-graph:ACTIVE_PATTE-0084]
     pub fn active_patterns(&self) -> impl Iterator<Item = &ConflictPattern> {
         self.patterns.values().filter(|cp| cp.suppressed)
     }
 
     /// Gibt ein registriertes Konfliktmuster zu einem Muster-Hash zurück, falls vorhanden.
+    // ANCHOR[contextra-graph:GET_PATTERN-0085]
     pub fn get_pattern(&self, pattern_hash: &[u8; 32]) -> Option<&ConflictPattern> {
         self.patterns.get(pattern_hash)
     }
 
     /// Gibt die konfigurierte Unterdrückungsschwelle zurück.
+    // ANCHOR[contextra-graph:SUPPRESSION_-0086]
     pub fn suppression_threshold(&self) -> u32 {
         self.suppression_threshold
     }
@@ -178,6 +194,7 @@ impl ConsistencyEnforcer {
     ///
     /// HINWEIS: Dies ist eine Passthrough-Funktion. Die Ausführung des Tombstoning (z. B. via
     /// `CsrGraph::remove_edge()`) obliegt ausschließlich dem Aufrufer (Trennung von Erkennung und Wirkung).
+    // ANCHOR[contextra-graph:SUGGEST_TOMB-0087]
     pub fn suggest_tombstone_candidates(
         &self,
         csr_edges_matching_pattern: &[EdgeId],
@@ -196,6 +213,7 @@ impl Default for ConsistencyEnforcer {
 mod tests {
     use super::*;
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_first_contradiction() {
         let mut enforcer = ConsistencyEnforcer::new(3);
@@ -210,6 +228,7 @@ mod tests {
         assert!(!enforcer.is_suppressed(hash));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_three_repeated_contradictions_suppresses_pattern() {
         let mut enforcer = ConsistencyEnforcer::new(3);
@@ -229,6 +248,7 @@ mod tests {
         assert!(enforcer.is_suppressed(hash));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_independent_pattern_hash_counting_no_cross_contamination() {
         let mut enforcer = ConsistencyEnforcer::new(3);
@@ -257,6 +277,7 @@ mod tests {
         assert!(!enforcer.is_suppressed(hash2));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_exact_predicate_conflict_detector() {
         let detector = ExactPredicateConflictDetector;
@@ -302,6 +323,7 @@ mod tests {
         assert!(!detector.conflicts(&a, &b_different_predicate));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_active_patterns_and_suggest_tombstones() {
         let mut enforcer = ConsistencyEnforcer::default();
@@ -326,6 +348,7 @@ mod tests {
         assert_eq!(suggestions, candidate_edges);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_check_before_insert() {
         let mut enforcer = ConsistencyEnforcer::new(1);
@@ -344,6 +367,7 @@ mod tests {
         assert!(enforcer.is_suppressed(assertion.pattern_hash()));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_zero_threshold_suppresses_immediately() {
         let mut enforcer = ConsistencyEnforcer::new(0);
@@ -353,6 +377,7 @@ mod tests {
         assert!(enforcer.is_suppressed(hash));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_get_pattern_nonexistent() {
         let enforcer = ConsistencyEnforcer::default();
@@ -365,6 +390,7 @@ mod tests {
         );
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_detect_contradiction_delegate() {
         let enforcer = ConsistencyEnforcer::default();
@@ -384,6 +410,7 @@ mod tests {
         assert!(enforcer.detect_contradiction(&detector, &a, &b));
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_conflict_pattern_and_edge_assertion_serde_roundtrip() {
         let cp = ConflictPattern {
@@ -412,6 +439,7 @@ mod tests {
         assert_eq!(assertion, deserialized_assertion);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_edge_assertion_empty_object_repr() {
         let assertion_empty = EdgeAssertion {
@@ -432,6 +460,7 @@ mod tests {
         assert_ne!(hash1, hash2);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_consistency_enforcer_bincode_serde_roundtrip() {
         let mut enforcer = ConsistencyEnforcer::new(2);

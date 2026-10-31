@@ -1,9 +1,23 @@
+//! Modul `tombstone` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{EntityId, Result, TxId};
 use std::collections::HashSet;
 
 impl CsrGraph {
+    // ANCHOR[contextra-graph:TOMBSTONE_ED-0151]
+    /// Funktion `tombstone_edge` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn tombstone_edge(
         &self,
         edge_id: crate::consistency_enforcement::EdgeId,
@@ -16,6 +30,15 @@ impl CsrGraph {
     }
 
     #[allow(clippy::type_complexity)]
+    // ANCHOR[contextra-graph:TOMBSTONE_ED-0152]
+    /// Funktion `tombstone_edges_direct` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn tombstone_edges_direct(
         &self,
         edges: &[(EntityId, EntityId)],
@@ -63,6 +86,15 @@ impl CsrGraph {
         Ok((newly_tombstoned.len(), newly_tombstoned, affected_node_ids))
     }
 
+    // ANCHOR[contextra-graph:TOMBSTONE_HY-0153]
+    /// Funktion `tombstone_hyperedge` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn tombstone_hyperedge(&self, id: crate::hyperedge::HyperEdgeId, wal_tx: TxId) -> bool {
         let mut inner = self.inner_write();
         let inner_ptr = &mut *inner;

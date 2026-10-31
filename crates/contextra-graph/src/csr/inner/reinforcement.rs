@@ -1,3 +1,8 @@
+//! Modul `reinforcement` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 #[cfg(feature = "edge-reinforcement-learning")]
 use contextra_types::EntityId;
 
@@ -8,6 +13,15 @@ use super::GraphInner;
 
 #[cfg(feature = "edge-reinforcement-learning")]
 impl GraphInner {
+    // ANCHOR[contextra-graph:FIND_EDGE_MU-0173]
+    /// Funktion `find_edge_mut_by_entities` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn find_edge_mut_by_entities(
         &mut self,
         from: EntityId,
@@ -67,10 +81,28 @@ impl GraphInner {
             .find(|e| e.target == to)
     }
 
+    // ANCHOR[contextra-graph:ALL_ENTITY_I-0174]
+    /// Funktion `all_entity_ids` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn all_entity_ids(&self) -> Vec<EntityId> {
         self.reverse_map.clone()
     }
 
+    // ANCHOR[contextra-graph:OUTGOING_EDG-0175]
+    /// Funktion `outgoing_edges_mut` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn outgoing_edges_mut(&mut self, entity_id: EntityId) -> &mut [CsrEdge] {
         if let Some(from_idx) = self.id_map.get(&entity_id).copied() {
             let mut target_ids = Vec::new();
@@ -107,6 +139,15 @@ impl GraphInner {
             .unwrap_or(&mut [])
     }
 
+    // ANCHOR[contextra-graph:SYNC_EDGE_RE-0176]
+    /// Funktion `sync_edge_reinforcement_weights` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn sync_edge_reinforcement_weights(
         &mut self,
         config: &crate::edge_reinforcement::EdgeReinforcementConfig,

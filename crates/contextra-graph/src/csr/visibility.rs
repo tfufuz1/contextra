@@ -1,3 +1,8 @@
+//! Modul `visibility` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_types::TxId;
 
 /// Untere Schranke für Wall-Clock-abgeleitete TxId-Heuristik.
@@ -8,6 +13,7 @@ use contextra_types::TxId;
 /// TxId-Origin-Invariant (AGT-GRAPH-001).
 ///
 /// Wert gewählt als `1_400_000_000 * 1_000_000_000` (1. Jan 2014 UTC in ns).
+// ANCHOR[contextra-graph:WALLCLOCK_TX-0193]
 pub const WALLCLOCK_TX_HEURISTIC_MIN: u64 = 1_400_000_000_000_000_000;
 
 /// Prüft, ob `tx` aus einem verdächtigen (wall-clock-ähnlichen) Bereich stammt.
@@ -28,6 +34,7 @@ pub const WALLCLOCK_TX_HEURISTIC_MIN: u64 = 1_400_000_000_000_000_000;
 /// ANWEISUNG: Bei verdächtigen TxIds => tracing::warn! loggen. In Debug-Builds schlägt debug_assert! fehl.
 /// ID: AGT-GRAPH-001
 #[inline]
+// ANCHOR[contextra-graph:IS_SUSPICIOU-0194]
 pub fn is_suspicious_tx_id(tx: TxId) -> bool {
     let v = tx.inner();
     v == 0 || (WALLCLOCK_TX_HEURISTIC_MIN..TxId::INTERNAL_BASE).contains(&v)
@@ -35,6 +42,7 @@ pub fn is_suspicious_tx_id(tx: TxId) -> bool {
 
 /// Prüft ob eine Kante bezogen auf die Transaktionszeit (MVCC / Systemzeit) zum Zeitpunkt `as_of` sichtbar ist.
 #[inline]
+// ANCHOR[contextra-graph:IS_EDGE_VISI-0195]
 pub fn is_edge_visible(
     tx_valid_from: Option<TxId>,
     tx_valid_to: Option<TxId>,
@@ -45,6 +53,7 @@ pub fn is_edge_visible(
 
 /// Prüft ob eine Kante bezogen auf die Businesszeit zum Zeitpunkt `business_as_of` gültig ist.
 #[inline]
+// ANCHOR[contextra-graph:IS_EDGE_VISI-0196]
 pub fn is_edge_visible_business(
     business_valid_from: Option<i64>,
     business_valid_to: Option<i64>,
@@ -59,6 +68,7 @@ pub fn is_edge_visible_business(
 /// Business-Zeit wird nur ausgewertet, wenn `business_as_of` angegeben ist UND mindestens
 /// ein Business-Zeit-Feld (`business_valid_from` oder `business_valid_to`) auf der Kante gesetzt ist.
 #[inline]
+// ANCHOR[contextra-graph:IS_EDGE_VISI-0197]
 pub fn is_edge_visible_bitemporal(
     tx_valid_from: Option<TxId>,
     tx_valid_to: Option<TxId>,

@@ -8,6 +8,7 @@ use crate::path_rag::PprParams;
 /// # Complexity
 /// Time complexity of parameter validation is $O(1)$.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:APPRHPARAMS-0020]
 pub struct ApprhParams {
     /// Base PPR parameters ($\alpha$ teleport, $\epsilon$ convergence threshold).
     pub ppr: PprParams,
@@ -35,6 +36,7 @@ impl ApprhParams {
     ///
     /// # Complexity
     /// Time complexity $O(1)$.
+    // ANCHOR[contextra-graph:VALIDATE-0021]
     pub fn validate(&self) -> Result<(), ApprhError> {
         if !self.ppr.alpha.is_finite() || self.ppr.alpha <= 0.0 || self.ppr.alpha >= 1.0 {
             return Err(ApprhError::InvalidParameter(format!(
@@ -71,12 +73,14 @@ impl ApprhParams {
 mod tests {
     use super::*;
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_default_params_valid() {
         let params = ApprhParams::default();
         assert!(params.validate().is_ok());
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_invalid_params() {
         let p = ApprhParams {

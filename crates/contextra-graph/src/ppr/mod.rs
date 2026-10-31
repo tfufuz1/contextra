@@ -1,3 +1,8 @@
+//! Modul `mod` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 pub mod cost;
 pub mod dense;
 pub mod forward_push;
@@ -12,6 +17,15 @@ pub use self::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprAlgorithm, PprConfig};
 
+// ANCHOR[contextra-graph:COMPUTE_PPR-0299]
+/// Funktion `compute_ppr` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn compute_ppr(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
@@ -23,6 +37,15 @@ pub(crate) fn compute_ppr(
 }
 
 #[cfg(feature = "apprh-diffusion")]
+// ANCHOR[contextra-graph:COMPUTE_PPR_-0300]
+/// Funktion `compute_ppr_with_apprh_selector` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub fn compute_ppr_with_apprh_selector(
     inner: &GraphInner,
     seed_nodes: &[EntityId],
@@ -61,6 +84,15 @@ pub fn compute_ppr_with_apprh_selector(
     }
 }
 
+// ANCHOR[contextra-graph:SELECT_AUTO_-0301]
+/// Funktion `select_auto_ppr_algorithm` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn select_auto_ppr_algorithm(
     inner: &GraphInner,
     seed_count: usize,
@@ -167,6 +199,15 @@ fn execute_tl_hfd(
     }
 }
 
+// ANCHOR[contextra-graph:COMPUTE_PPR_-0302]
+/// Funktion `compute_ppr_with_context` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn compute_ppr_with_context(
     inner: &GraphInner,
     seed_nodes: &[EntityId],

@@ -31,6 +31,7 @@ use contextra_types::EntityId;
 ///
 /// # Complexity
 /// Time complexity bounded by push budget $O(1 / (\alpha \cdot \epsilon))$, independent of total graph size.
+// ANCHOR[contextra-graph:APPRH_LOCAL-0016]
 pub fn apprh_local<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -46,6 +47,7 @@ pub fn apprh_local<G: PathGraph>(
 ///
 /// # Errors
 /// Returns [`contextra_types::ContextraError::InvalidInput`] if `hyperedge_decay_factor` is non-finite or outside `(0.0, 1.0]`.
+// ANCHOR[contextra-graph:FORWARD_PUSH-0017]
 pub fn forward_push_apprh<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -76,6 +78,7 @@ impl CsrGraph {
     ///
     /// # Invariants
     /// Runs exclusively in shadow mode unless feature-flag activated. Bit-identical determinism.
+    // ANCHOR[contextra-graph:APPRH_DIFFUS-0018]
     pub fn apprh_diffusion(
         &self,
         seeds: &[EntityId],
@@ -85,6 +88,7 @@ impl CsrGraph {
     }
 
     /// Computes shadow comparison between Forward-Push PPR and APPRH on CsrGraph.
+    // ANCHOR[contextra-graph:APPRH_SHADOW-0019]
     pub fn apprh_shadow_compare(
         &self,
         seeds: &[EntityId],

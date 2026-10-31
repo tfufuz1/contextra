@@ -1,3 +1,8 @@
+//! Modul `budgeted_k_path_hub_entity` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 #![cfg(feature = "k-path-diffusion")]
 
 use contextra_graph::path_rag::k_path::{KPathConfig, KPathDiffusion};
@@ -54,6 +59,7 @@ impl PathGraph for SyntheticHubGraph {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_budgeted_k_path_hub_entity_high_fanout_exhaustion() {
     let source = EntityId::new(10);
@@ -90,6 +96,7 @@ fn test_budgeted_k_path_hub_entity_high_fanout_exhaustion() {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_budgeted_k_path_within_budget_success() {
     let source = EntityId::new(10);
@@ -124,6 +131,7 @@ fn test_budgeted_k_path_within_budget_success() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_budgeted_k_path_edge_cases() {
     let source = EntityId::new(1);

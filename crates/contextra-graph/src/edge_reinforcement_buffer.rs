@@ -25,6 +25,7 @@ use parking_lot::Mutex;
 /// Ein gepufferter Co-Occurrence-Update: zwei ko-aktivierte Entitäten.
 #[cfg(feature = "edge-reinforcement-learning")]
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-graph:COOCCURRENCE-0203]
 pub struct CooccurrenceSignal {
     pub from: EntityId,
     pub to: EntityId,
@@ -34,6 +35,7 @@ pub struct CooccurrenceSignal {
 /// Ein gepufferter Traversal-Update: eine traversierte Kante mit Pfadlänge.
 #[cfg(feature = "edge-reinforcement-learning")]
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-graph:TRAVERSALSIG-0204]
 pub struct TraversalSignal {
     pub from: EntityId,
     pub to: EntityId,
@@ -47,6 +49,7 @@ pub struct TraversalSignal {
 /// via `flush_to_graph`.
 #[cfg(feature = "edge-reinforcement-learning")]
 #[derive(Debug, Default)]
+// ANCHOR[contextra-graph:EDGEREINFORC-0205]
 pub struct EdgeReinforcementBuffer {
     cooccurrence: Mutex<Vec<CooccurrenceSignal>>,
     traversal: Mutex<Vec<TraversalSignal>>,
@@ -54,12 +57,22 @@ pub struct EdgeReinforcementBuffer {
 
 #[cfg(feature = "edge-reinforcement-learning")]
 impl EdgeReinforcementBuffer {
+    // ANCHOR[contextra-graph:NEW-0206]
+    /// Funktion `new` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Fügt ein Co-Occurrence-Signal hinzu (ko-aktivierte Entitäten in derselben
     /// Retrieval-Session). Kann von mehreren Threads gleichzeitig aufgerufen werden.
+    // ANCHOR[contextra-graph:PUSH_COOCCUR-0207]
     pub fn push_cooccurrence(&self, from: EntityId, to: EntityId, co_activation: f32) {
         self.cooccurrence.lock().push(CooccurrenceSignal {
             from,
@@ -69,6 +82,7 @@ impl EdgeReinforcementBuffer {
     }
 
     /// Fügt ein Traversal-Signal hinzu (traversierte Kante mit Pfadlänge).
+    // ANCHOR[contextra-graph:PUSH_TRAVERS-0208]
     pub fn push_traversal(&self, from: EntityId, to: EntityId, path_length: usize) {
         self.traversal.lock().push(TraversalSignal {
             from,
@@ -78,11 +92,13 @@ impl EdgeReinforcementBuffer {
     }
 
     /// Gibt die Anzahl der gepufferten Co-Occurrence-Signale zurück (für Monitoring).
+    // ANCHOR[contextra-graph:COOCCURRENCE-0209]
     pub fn cooccurrence_count(&self) -> usize {
         self.cooccurrence.lock().len()
     }
 
     /// Gibt die Anzahl der gepufferten Traversal-Signale zurück (für Monitoring).
+    // ANCHOR[contextra-graph:TRAVERSAL_CO-0210]
     pub fn traversal_count(&self) -> usize {
         self.traversal.lock().len()
     }
@@ -91,6 +107,7 @@ impl EdgeReinforcementBuffer {
     ///
     /// Wird ausschließlich vom `MaintenanceScheduler::run_tick()` aufgerufen.
     /// Nach Abschluss sind `cooccurrence` und `traversal` leer.
+    // ANCHOR[contextra-graph:FLUSH_TO_GRA-0211]
     pub fn flush_to_graph(&self, graph: &CsrGraph, config: &EdgeReinforcementConfig) {
         use crate::edge_reinforcement::{
             apply_cooccurrence_reinforcement, apply_traversal_reinforcement,
@@ -142,6 +159,7 @@ mod tests {
     use super::*;
     use contextra_types::EntityId;
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_push_and_count() {
         let buf = EdgeReinforcementBuffer::new();
@@ -151,6 +169,7 @@ mod tests {
         assert_eq!(buf.traversal_count(), 1);
     }
 
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_flush_empties_buffer() {
         // Smoke-Test: flush auf einem leeren CsrGraph darf nicht paniken.

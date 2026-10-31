@@ -1,8 +1,22 @@
+//! Modul `path_rag` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::super::graph_write::CsrGraph;
 use ahash::AHashMap;
 use contextra_types::{EntityId, Result, TxId};
 
 impl CsrGraph {
+    // ANCHOR[contextra-graph:PATH_RAG_AT-0114]
+    /// Funktion `path_rag_at` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn path_rag_at<'a>(
         &'a self,
         start_nodes: &'a [EntityId],

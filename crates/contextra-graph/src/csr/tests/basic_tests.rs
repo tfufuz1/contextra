@@ -1,3 +1,8 @@
+//! Modul `basic_tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::super::*;
 use crate::csr::types::CsrGraphConfig;
 use crate::csr::visibility::is_suspicious_tx_id;
@@ -5,6 +10,15 @@ use contextra_ports::GraphIndex;
 use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, TxId};
 use std::sync::Arc;
 
+// ANCHOR[contextra-graph:SETUP_TEST_G-0177]
+/// Funktion `setup_test_graph` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(super) async fn setup_test_graph() -> CsrGraph {
     let graph = CsrGraph::new();
     let tx = TxId::new(1);

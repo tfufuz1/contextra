@@ -1,3 +1,8 @@
+//! Modul `hyperedge_compact_race` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 #![expect(clippy::unwrap_used)]
 
 use contextra_graph::csr::{CsrGraph, EdgeType};
@@ -9,6 +14,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::thread;
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_hyperedge_compact_race() {
     let graph = Arc::new(CsrGraph::new());

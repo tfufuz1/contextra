@@ -1,3 +1,8 @@
+//! Modul `algo_tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
@@ -748,6 +753,7 @@ async fn test_ppr_hyperedge_expansion_dense_and_forward_push() {
 }
 
 proptest::proptest! {
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_ppr_rank_mass_conservation(
         node_count in 1..=20usize,

@@ -1,3 +1,8 @@
+//! Modul `community_hyperedges_included_flag` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::community::{detect_communities, CommunityDetectionConfig};
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};

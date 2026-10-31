@@ -1,3 +1,8 @@
+//! Modul `hyperedge_suggest` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::{
     compute_co_occurrence_candidates, validate_candidates_with_llm, GraphMutationError,
     HyperEdgeCandidate, MAX_RELATE_PARTICIPANTS,
@@ -32,6 +37,7 @@ impl LlmTextGenerator for MockTextGenerator {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_co_occurrence_counting_is_deterministic_on_input_permutation() {
     let doc1 = DocId::from_key("doc-1").unwrap();
@@ -76,6 +82,7 @@ fn test_co_occurrence_counting_is_deterministic_on_input_permutation() {
     assert_eq!(candidates1[1].source_doc_ids, expected_docs_1_3);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_combinations_below_min_co_occurrence_filtered_out() {
     let doc1 = DocId::from_key("doc-1").unwrap();
@@ -98,6 +105,7 @@ fn test_combinations_below_min_co_occurrence_filtered_out() {
     assert!(filtered_candidates.is_empty());
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_combinations_exceeding_max_relate_participants_discarded_not_truncated() {
     let doc1 = DocId::from_key("doc-huge").unwrap();

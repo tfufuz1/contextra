@@ -1,3 +1,8 @@
+//! Modul `tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::*;
 
 // Einfacher Test-Graph
@@ -38,6 +43,7 @@ impl PathGraph for TestGraph {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_find_path_direct_edge() {
     let a = EntityId::new(1);
@@ -49,6 +55,7 @@ fn test_find_path_direct_edge() {
     assert!((path.confidence - 0.9).abs() < 1e-6);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_find_path_multi_hop() {
     let a = EntityId::new(1);
@@ -65,6 +72,7 @@ fn test_find_path_multi_hop() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_find_path_same_node() {
     let a = EntityId::new(1);
@@ -75,6 +83,7 @@ fn test_find_path_same_node() {
     assert_eq!(path.edge_weights.len(), 0);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_find_path_unreachable_returns_none() {
     let a = EntityId::new(1);
@@ -84,6 +93,7 @@ fn test_find_path_unreachable_returns_none() {
     assert!(engine.find_path(a, b).is_none());
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_sufficiency_gate_filters_low_confidence() {
     let engine = PathRAGEngine::new(TestGraph::new(vec![]), 4, 0.5);
@@ -101,6 +111,7 @@ fn test_sufficiency_gate_filters_low_confidence() {
     assert!(engine.sufficiency_check(&high_conf));
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_find_all_paths_multi_hop() {
     let a = EntityId::new(1);
@@ -112,6 +123,7 @@ fn test_find_all_paths_multi_hop() {
     assert_eq!(paths.len(), 2);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_rrf_signal_filters_by_sufficiency() {
     let engine = PathRAGEngine::new(TestGraph::new(vec![]), 4, 0.5);
@@ -134,6 +146,7 @@ fn test_rrf_signal_filters_by_sufficiency() {
     assert_eq!(signal[0].0, DocId(2));
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_default_sufficiency_threshold_meets_minimum_bound() {
     // REGRESSION TEST (ADR-067 / arXiv:2506.00610):
@@ -154,6 +167,7 @@ fn test_default_sufficiency_threshold_meets_minimum_bound() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_find_path_zero_max_hops() {
     let a = EntityId::new(1);
@@ -167,6 +181,7 @@ fn test_find_path_zero_max_hops() {
     assert!(same_path.is_some());
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_to_rrf_signal_empty_paths() {
     let engine = PathRAGEngine::with_defaults(TestGraph::new(vec![]));
@@ -233,6 +248,7 @@ impl PathGraph for TestGraphWithHyperedges {
     }
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_hyperedge_expansion_disabled_by_default() {
     let a = EntityId::new(1);
@@ -256,6 +272,7 @@ fn test_hyperedge_expansion_disabled_by_default() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_hyperedge_expansion_enabled_finds_path_via_hyperedge_only() {
     // AK-2 test: Path exclusively over hyperedge
@@ -292,6 +309,7 @@ fn test_hyperedge_expansion_enabled_finds_path_via_hyperedge_only() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_hyperedge_weight_discount_applied_correctly() {
     let a = EntityId::new(1);
@@ -333,6 +351,7 @@ fn test_hyperedge_weight_discount_applied_correctly() {
     assert!((path2.confidence - 0.50).abs() < 1e-5);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_sufficiency_gate_filters_low_confidence_virtual_neighbors() {
     let a = EntityId::new(1);
@@ -365,6 +384,7 @@ fn test_sufficiency_gate_filters_low_confidence_virtual_neighbors() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_self_referencing_hyperedge_no_infinite_loop() {
     let a = EntityId::new(1);
@@ -395,6 +415,7 @@ fn test_self_referencing_hyperedge_no_infinite_loop() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_fusion_and_signalkind_non_modification_contract() {
     // Contract test ensuring no modification to fusion.rs or SignalKind enum
@@ -411,6 +432,7 @@ fn test_fusion_and_signalkind_non_modification_contract() {
     assert_eq!(rrf[0].0, DocId(42));
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_path_rag_engine_with_real_csr_graph_hyperedges() {
     use crate::csr::CsrGraph;
@@ -446,6 +468,7 @@ fn test_path_rag_engine_with_real_csr_graph_hyperedges() {
     assert!((path.confidence - 0.85).abs() < 1e-5);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_ppr_params_defaults() {
     let params = PprParams::default();
@@ -454,6 +477,7 @@ fn test_ppr_params_defaults() {
     assert_eq!(params.hyperedge_decay, 0.85);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_forward_push_ppr_empty_seeds() {
     let graph = TestGraph::new(vec![]);
@@ -462,6 +486,7 @@ fn test_forward_push_ppr_empty_seeds() {
     assert!(res.is_empty());
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_forward_push_ppr_binary_graph() {
     let a = EntityId::new(1);
@@ -474,6 +499,7 @@ fn test_forward_push_ppr_binary_graph() {
     assert!(*scores.get(&a).unwrap() > 0.0);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_forward_push_ppr_hyperedge_expansion_and_decay() {
     let a = EntityId::new(1);
@@ -527,6 +553,7 @@ fn test_forward_push_ppr_hyperedge_expansion_and_decay() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_forward_push_ppr_self_participant_filtered() {
     let a = EntityId::new(1);

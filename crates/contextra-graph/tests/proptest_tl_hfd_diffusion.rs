@@ -123,6 +123,7 @@ proptest! {
 
     /// Property: Minimum Lovász objective value F*(t) = min_{1..t} F(x_k) across subgradient descent iterations
     /// is monotonically non-increasing across max_iterations from 1 to 20 (within 1e-4 tolerance).
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_tl_hfd_diffusion_objective_is_monotonically_non_increasing(
         num_nodes in 3..=12usize,
@@ -188,6 +189,7 @@ proptest! {
     /// For binary graphs (edge size 2), f_e(x) = |x_u - x_v|.
     /// Computes naive projected subgradient descent completely independently without using diffusion.rs or lovasz.rs code,
     /// proving that run_diffusion normalized objective is no worse than 1.5x of the reference objective.
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn prop_tl_hfd_diffusion_matches_bruteforce_reference_small_graph(
         num_nodes in 3..=10usize,
@@ -271,6 +273,7 @@ proptest! {
 
 /// Regression test: verifying that max_hyperedge_sort_size cutoff (e.g. 2) on a large hyperedge (> 10 participants)
 /// maintains objective value within defined tolerance compared to full participant sorting during full diffusion.
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_regression_max_hyperedge_sort_size_cutoff_in_full_diffusion() {
     let mut graph = SyntheticGraph::new();

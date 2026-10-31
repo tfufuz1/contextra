@@ -1,8 +1,14 @@
+//! Modul `hyperedge_memory_budget` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::csr::{CsrGraph, EdgeType};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::EntityId;
 use std::sync::Arc;
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_capacity_based_memory_budgeting() {
     let graph = CsrGraph::new();
@@ -54,6 +60,7 @@ fn test_capacity_based_memory_budgeting() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_hyperedge_role_bindings_payload_sharing() {
     let graph = CsrGraph::new();

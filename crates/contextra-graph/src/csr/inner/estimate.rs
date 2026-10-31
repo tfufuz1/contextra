@@ -1,3 +1,8 @@
+//! Modul `estimate` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -7,6 +12,15 @@ use super::super::types::EdgePayload;
 use super::GraphInner;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// ANCHOR[contextra-graph:MEMORYESTIMA-0158]
+/// Struktur `MemoryEstimate` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub struct MemoryEstimate {
     pub shared_payload_bytes: usize,
     pub private_bytes: usize,
@@ -14,6 +28,15 @@ pub struct MemoryEstimate {
 
 impl MemoryEstimate {
     #[inline]
+    // ANCHOR[contextra-graph:TOTAL_BYTES-0159]
+    /// Funktion `total_bytes` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn total_bytes(&self) -> usize {
         self.shared_payload_bytes + self.private_bytes
     }
@@ -219,6 +242,15 @@ impl GraphInner {
         p
     }
 
+    // ANCHOR[contextra-graph:ESTIMATE_MEM-0160]
+    /// Funktion `estimate_memory` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn estimate_memory(&self, presized: bool) -> MemoryEstimate {
         let private = self.estimate_primary_tables_memory(presized)
             + self.estimate_csr_vectors_memory(presized)
@@ -239,10 +271,28 @@ impl GraphInner {
         }
     }
 
+    // ANCHOR[contextra-graph:ESTIMATE_MEM-0161]
+    /// Funktion `estimate_memory_bytes` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn estimate_memory_bytes(&self) -> usize {
         self.estimate_memory(false).total_bytes()
     }
 
+    // ANCHOR[contextra-graph:ESTIMATE_COM-0162]
+    /// Funktion `estimate_compaction_peak_bytes` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub(crate) fn estimate_compaction_peak_bytes(&self) -> usize {
         let current = self.estimate_memory(false);
         let rebuild_private = self.estimate_memory(true).private_bytes;

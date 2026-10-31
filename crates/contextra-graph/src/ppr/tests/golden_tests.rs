@@ -1,3 +1,8 @@
+//! Modul `golden_tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use crate::csr::{CsrGraph, GraphInner};
 use crate::ppr::{compute_ppr, DeletedView};
 use contextra_types::{Entity, EntityId, PprConfig};

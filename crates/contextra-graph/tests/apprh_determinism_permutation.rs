@@ -97,6 +97,7 @@ impl PathGraph for ConcreteGraph {
 }
 
 proptest! {
+    // Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
     #[test]
     fn test_apprh_bit_identical_permutation_invariance(
         seed_id in 1u64..10u64,

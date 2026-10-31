@@ -1,3 +1,8 @@
+//! Modul `context_tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
@@ -344,6 +349,7 @@ async fn test_ppr_phantom_node_no_rank_mass() {
     );
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_deleted_view_methods() {
     let empty_view = DeletedView::empty();

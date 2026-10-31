@@ -1,9 +1,23 @@
+//! Modul `communities` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::super::graph_write::CsrGraph;
 use super::super::types::GRAPH_COMMUNITY_PREFIX;
 use contextra_types::{EntityId, Result};
 use std::collections::HashMap;
 
 impl CsrGraph {
+    // ANCHOR[contextra-graph:SET_COMMUNIT-0100]
+    /// Funktion `set_communities_batch` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn set_communities_batch(&self, assignments: &[crate::CommunityAssignment]) {
         let mut inner = self.inner_write();
         for a in assignments {
@@ -12,6 +26,15 @@ impl CsrGraph {
         inner.communities_loaded = true;
     }
 
+    // ANCHOR[contextra-graph:GET_COMMUNIT-0101]
+    /// Funktion `get_communities_batch` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn get_communities_batch(
         &self,
         entity_ids: &[EntityId],

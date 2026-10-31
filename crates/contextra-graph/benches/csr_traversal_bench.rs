@@ -1,3 +1,8 @@
+//! Modul `csr_traversal_bench` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{DocId, Entity, EntityId, TxId};
@@ -6,6 +11,15 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 // Helper trait to support benchmark invocation syntax `graph.bfs(...)` and `graph.get_neighbors(...)`
+// ANCHOR[contextra-graph:CSRGRAPHBENC-0001]
+/// Trait `CsrGraphBenchExt` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub trait CsrGraphBenchExt {
     #[allow(clippy::type_complexity)]
     fn bfs(

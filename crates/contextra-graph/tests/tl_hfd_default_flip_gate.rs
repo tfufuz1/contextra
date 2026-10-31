@@ -1,8 +1,14 @@
+//! Modul `tl_hfd_default_flip_gate` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::{
     DefaultFlipGate, ShadowDiscrepancyReport, TlHfdFlipGate, MIN_AGREEMENT_THRESHOLD,
     MIN_SHADOW_SAMPLES,
 };
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_default_flip_gate_threshold_constants() {
     assert_eq!(MIN_SHADOW_SAMPLES, 10_000);
@@ -18,6 +24,7 @@ struct TestCase {
     expected_flip: bool,
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_tl_hfd_default_flip_gate_table() {
     let gate = TlHfdFlipGate;
@@ -171,6 +178,7 @@ fn test_tl_hfd_default_flip_gate_table() {
 struct CustomFlipGate;
 impl DefaultFlipGate for CustomFlipGate {}
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_custom_gate_trait_implementation() {
     let custom_gate = CustomFlipGate;

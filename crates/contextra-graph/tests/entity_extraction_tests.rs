@@ -1,3 +1,8 @@
+//! Modul `entity_extraction_tests` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 // FILE-CONTEXT
 // ZWECK: Integrations- und Evaluationstests für die regelbasierte Entitäts- und Relations-Extraktion in contextra-graph.
 
@@ -7,6 +12,7 @@ use contextra_graph::entity_extraction::{
 };
 use contextra_types::DocId;
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_rule_based_entity_extractor_sample_cases() {
     let extractor = RuleBasedEntityExtractor::new(0.50);
@@ -51,6 +57,7 @@ fn test_rule_based_entity_extractor_sample_cases() {
     assert_eq!(r5[0].relation_type, "LEADS");
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_confidence_filtering() {
     let extractor = RuleBasedEntityExtractor::new(0.82);
@@ -65,6 +72,7 @@ fn test_confidence_filtering() {
     assert_eq!(res_high.len(), 1);
 }
 
+// Prüft das korrekte Verhalten und die Invarianten in diesem Testszenario.
 #[test]
 fn test_ingest_extracted_relations_to_graph() {
     let graph = CsrGraph::new();

@@ -1,3 +1,8 @@
+//! Modul `edge_mutation` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use super::super::types::EdgePayload;
 use super::CsrGraph;
 use crate::consistency_enforcement::EdgeAssertion;
@@ -39,6 +44,15 @@ impl CsrGraph {
     }
 
     #[allow(clippy::too_many_arguments)]
+    // ANCHOR[contextra-graph:ADD_EDGE-0115]
+    /// Funktion `add_edge` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn add_edge(
         self: &Arc<Self>,
         from: EntityId,
@@ -101,6 +115,15 @@ impl CsrGraph {
         Ok(())
     }
 
+    // ANCHOR[contextra-graph:INSERT_EDGE_-0116]
+    /// Funktion `insert_edge_direct` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn insert_edge_direct(
         self: &Arc<Self>,
         from: EntityId,
@@ -111,6 +134,15 @@ impl CsrGraph {
             .await
     }
 
+    // ANCHOR[contextra-graph:INSERT_EDGE_-0117]
+    /// Funktion `insert_edge_direct_with_validity` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn insert_edge_direct_with_validity(
         self: &Arc<Self>,
         from: EntityId,
@@ -135,6 +167,15 @@ impl CsrGraph {
     }
 
     #[allow(clippy::too_many_arguments)]
+    // ANCHOR[contextra-graph:INSERT_EDGE_-0118]
+    /// Funktion `insert_edge_direct_with_bitemporal_validity` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub async fn insert_edge_direct_with_bitemporal_validity(
         self: &Arc<Self>,
         from: EntityId,
@@ -162,6 +203,15 @@ impl CsrGraph {
     }
 
     #[allow(clippy::too_many_arguments)]
+    // ANCHOR[contextra-graph:LOAD_EDGE_DI-0119]
+    /// Funktion `load_edge_direct` für die Graphverarbeitung.
+    ///
+    /// # Zweck
+    /// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+    ///
+    /// # Ablauf
+    /// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+    /// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
     pub fn load_edge_direct(
         &self,
         from: EntityId,

@@ -27,6 +27,7 @@ use contextra_types::EntityId;
 ///
 /// # Complexity
 /// Time complexity $O(\text{iterations} \cdot k \cdot |\text{Seeds}| \cdot \text{max\_edge\_size})$.
+// ANCHOR[contextra-graph:TL_HFD_LOCAL-0370]
 pub fn tl_hfd_local<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],
@@ -43,6 +44,7 @@ impl CsrGraph {
     ///
     /// # Complexity
     /// Time complexity $O(\text{iterations} \cdot k \cdot |\text{Seeds}| \cdot \text{max\_edge\_size})$.
+    // ANCHOR[contextra-graph:THRESHOLDED_-0371]
     pub fn thresholded_local_hfd(
         &self,
         seeds: &[EntityId],

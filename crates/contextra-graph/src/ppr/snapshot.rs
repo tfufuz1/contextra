@@ -1,3 +1,8 @@
+//! Modul `snapshot` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use crate::csr::types::{EdgePayload, InternalIndex};
 use crate::csr::visibility::is_edge_visible_bitemporal;
 use crate::csr::GraphInner;
@@ -89,6 +94,15 @@ fn populate_snapshot_hyperedges(inner: &GraphInner, snapshot: &mut GraphInner, a
     }
 }
 
+// ANCHOR[contextra-graph:COMPUTE_PPR_-0304]
+/// Funktion `compute_ppr_at` für die Graphverarbeitung.
+///
+/// # Zweck
+/// Kapselt Funktionalität im Ring 0 (Graph) ohne externe I/O-Seiteneffekte.
+///
+/// # Ablauf
+/// 1. Parameter und Vorbedingungen im MVCC-/CSR-Graphkontext validieren.
+/// 2. Speichereffiziente Berechnung oder Datenzugriff durchführen.
 pub(crate) fn compute_ppr_at(
     inner: &GraphInner,
     seed_nodes: &[EntityId],

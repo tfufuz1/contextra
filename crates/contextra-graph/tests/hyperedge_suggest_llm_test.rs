@@ -1,3 +1,8 @@
+//! Modul `hyperedge_suggest_llm_test` im Ring 0 (Graph-Subsystem) von Contextra.
+//!
+//! Stellt Kernkomponenten für Graphtraversierung, CSR-Repräsentationen und
+//! Analysemethoden bereit. Wird von Integrationsschichten und Algorithmenmodulen verwendet.
+
 use contextra_graph::{validate_candidates_with_llm, GraphMutationError, HyperEdgeCandidate};
 use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::{DocId, EntityId};
