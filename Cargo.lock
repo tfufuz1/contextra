@@ -692,7 +692,6 @@ version = "0.1.0"
 dependencies = [
  "contextra-audit-export",
  "contextra-avv-generator",
- "contextra-core",
  "contextra-crypto",
  "contextra-db",
  "contextra-infer-candle",
@@ -750,6 +749,13 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "contextra-arch-tests"
+version = "0.1.0"
+dependencies = [
+ "toml",
 ]
 
 [[package]]
@@ -942,10 +948,11 @@ dependencies = [
  "bincode",
  "blake3",
  "bytes",
+ "contextra-adapt",
  "contextra-checkpoint",
- "contextra-core",
  "contextra-crypto",
  "contextra-graph",
+ "contextra-infer-onnx",
  "contextra-mvcc",
  "contextra-ports",
  "contextra-rank",

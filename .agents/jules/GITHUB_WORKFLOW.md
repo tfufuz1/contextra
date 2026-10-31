@@ -1,6 +1,6 @@
 # GitHub als agiler Kontext — Konventionen & Protokoll
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 
 > **Prinzip:** GitHub-Issues = Task-Karten. GitHub-Milestones = Sprints.
 > GitHub-PRs = Reviews und Merge-Geschichte. GitHub-Actions = CI-Signale.
@@ -106,10 +106,7 @@ git rebase origin/main
 # 2. Gates nach Rebase erneut prüfen (Rebase kann neue Fehler einbringen)
 just check && just test
 
-# 3. Submit Gate
-cargo xtask jules-submit-gate --crate <CRATE>
-
-# 4. PR erstellen und Issue schließen
+# 3. PR erstellen und Issue schließen
 gh pr create \
   --title "<verb>(<scope>): <was>" \
   --body "Closes #<N>\n\n## Was\n<Beschreibung>\n\n## Getestet\n\`cargo nextest run -p <crate>\`"

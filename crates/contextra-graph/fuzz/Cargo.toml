@@ -1,0 +1,28 @@
+[package]
+name = "contextra-graph-fuzz" # <!-- crate-ref-ignore -->
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1.4", features = ["derive"] }
+bincode = "1.3"
+serde = { version = "1.0", features = ["derive"] }
+bytes = "1"
+parking_lot = "0.12"
+tokio = { version = "1", features = ["rt", "macros"] }
+contextra-types = { path = "../../contextra-types" }
+contextra-ports = { path = "../../contextra-ports" }
+contextra-graph = { path = ".." }
+
+[[bin]]
+name = "fuzz_graph_persist"
+path = "fuzz_targets/fuzz_graph_persist.rs"
+test = false
+doc = false

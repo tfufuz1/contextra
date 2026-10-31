@@ -1,0 +1,327 @@
+//! # Eviction-Worker und Notfall-Bereinigung
+//!
+//! ANCHOR[contextra-kvcache:EVICT-001]
+//!
+//! Dieses Modul trennt strikt zwischen zwei Eviction-Pfaden (Speicherverdrängung):
+//!
+//! 1. **[`EvictionWorker`]**: Für den regelmäßigen Hot-Path (z. B. Trigger bei VRAM > 80%).
+//!    Arbeitet auf einem **dedizierten OS-Thread** via `std::sync::mpsc`. Reicht
+//!    Löschbefehle asynchron ein, damit synchrone `Zeroize`-Operationen NIEMALS
+//!    den Tokio-Async-Executor blockieren.
+//!
+//! 2. **[`emergency_wipe()`]**: Für seltene Notfall-Löschungen (z. B. Prozess-Shutdown,
+//!    Sicherheits-Alarm). Synchron, blockierend, garantiert vor Rückkehr
+//!    vollständig abgeschlossen — bewusst anders als der reguläre Worker-Pfad.
+
+use super::attention_score::{AttentionScoreSource, NullAttentionScoreSource};
+use super::store::TenantIsolatedKvStore;
+use contextra_ports::{AttentionExporter, RequestId};
+use contextra_types::TenantId;
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use std::sync::mpsc;
+use std::sync::Arc;
+
+enum EvictionCommand {
+    EvictLru { target_free_bytes: usize },
+    BlockReleased { block_id: u64 },
+    Shutdown,
+}
+
+/// Adapter: Übersetzt die anfragezentrierte Schnittstelle [`AttentionExporter`] (Ring 2)
+/// in die segmentzentrierte Schnittstelle [`AttentionScoreSource`] (Ring 1).
+struct ExporterBackedScoreSource {
+    exporter: Arc<dyn AttentionExporter>,
+    segment_map: RwLock<HashMap<(TenantId, u64), RequestId>>,
+}
+
+impl ExporterBackedScoreSource {
+    fn new(exporter: Arc<dyn AttentionExporter>) -> Self {
+        Self {
+            exporter,
+            segment_map: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
+impl AttentionScoreSource for ExporterBackedScoreSource {
+    fn importance_score(&self, segment_id: u64) -> Option<f32> {
+        self.importance_score_for_tenant(TenantId::SYSTEM, segment_id)
+    }
+
+    fn importance_score_for_tenant(&self, tenant_id: TenantId, segment_id: u64) -> Option<f32> {
+        let request_id = {
+            let map = self.segment_map.read();
+            map.get(&(tenant_id, segment_id)).copied()
+        }
+        .unwrap_or(RequestId(segment_id));
+
+        // Note: Read lock is dropped before calling external exporter
+        let weights = self.exporter.export_attention_weights(request_id)?;
+        if weights.is_empty() {
+            return None;
+        }
+
+        let sum: f32 = weights.iter().copied().sum();
+        Some(sum / weights.len() as f32)
+    }
+
+    fn register_segment(&self, tenant_id: TenantId, segment_id: u64, request_id: RequestId) {
+        self.segment_map
+            .write()
+            .insert((tenant_id, segment_id), request_id);
+    }
+
+    fn unregister_segment(&self, tenant_id: TenantId, segment_id: u64) {
+        self.segment_map.write().remove(&(tenant_id, segment_id));
+    }
+}
+
+// ANCHOR[contextra-kvcache:EVICT-002]
+/// Asynchroner Hintergrund-Worker für die KV-Cache-Verdrängung.
+///
+/// Läuft auf einem eigenständigen Betriebssystem-Thread, um die Tokio-Worker-Threads
+/// nicht durch aufwendige Speicherfreigaben und Zeroize-Routinen zu belasten.
+pub struct EvictionWorker {
+    attention_source: Arc<RwLock<Arc<dyn AttentionScoreSource>>>,
+    sender: parking_lot::Mutex<mpsc::Sender<EvictionCommand>>,
+    handle: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>,
+    store: Arc<TenantIsolatedKvStore>,
+}
+
+impl EvictionWorker {
+    /// Spawnt den Eviction-Worker auf einem dedizierten OS-Thread.
+    ///
+    /// # Ablauf
+    /// 1. Initialisiert Standard-[`NullAttentionScoreSource`].
+    /// 2. Erzeugt einen MPSC-Kanal für Verdrängungsbefehle.
+    /// 3. Startet einen benannten Thread `kv-eviction-worker`.
+    /// 4. Verarbeitet eingehende Befehle in einer Schleife bis zum Shutdown.
+    pub fn spawn(store: Arc<TenantIsolatedKvStore>) -> Self {
+        let attention_source = Arc::new(RwLock::new(
+            Arc::new(NullAttentionScoreSource) as Arc<dyn AttentionScoreSource>
+        ));
+        let worker_source = Arc::clone(&attention_source);
+
+        let worker_store = Arc::clone(&store);
+        let (sender, receiver) = mpsc::channel::<EvictionCommand>();
+        let handle_opt = std::thread::Builder::new()
+            .name("kv-eviction-worker".into())
+            .spawn(move || {
+                while let Ok(cmd) = receiver.recv() {
+                    match cmd {
+                        EvictionCommand::EvictLru { target_free_bytes } => {
+                            let source = worker_source.read().clone();
+                            let freed = worker_store.evict_fair(target_free_bytes, source.as_ref());
+                            tracing::debug!(
+                                freed_bytes = freed,
+                                "KV eviction worker: LRU evict done"
+                            );
+                        }
+                        EvictionCommand::BlockReleased { block_id } => {
+                            tracing::debug!(
+                                block_id = block_id,
+                                "KV eviction worker: block released from active guard"
+                            );
+                        }
+                        EvictionCommand::Shutdown => break,
+                    }
+                }
+            })
+            .map_err(|e| {
+                tracing::error!(error = %e, "failed to spawn kv-eviction-worker thread");
+                e
+            })
+            .ok();
+
+        Self {
+            attention_source,
+            sender: parking_lot::Mutex::new(sender),
+            handle: parking_lot::Mutex::new(handle_opt),
+            store,
+        }
+    }
+
+    /// Builder-Methode zur Injektion eines echten Attention-Backends via [`AttentionExporter`].
+    pub fn with_attention_exporter(self, exporter: Arc<dyn AttentionExporter>) -> Self {
+        let adapter: Arc<dyn AttentionScoreSource> =
+            Arc::new(ExporterBackedScoreSource::new(exporter));
+        *self.attention_source.write() = Arc::clone(&adapter);
+        self.store.set_attention_source(Arc::clone(&adapter));
+        self
+    }
+
+    /// Registriert eine Zuordnung von `(tenant_id, segment_id)` zu einer `request_id`.
+    pub fn register_segment_request(
+        &self,
+        tenant_id: TenantId,
+        segment_id: u64,
+        request_id: RequestId,
+    ) {
+        self.attention_source
+            .read()
+            .register_segment(tenant_id, segment_id, request_id);
+    }
+
+    /// Entfernt die Zuordnung für `(tenant_id, segment_id)`.
+    pub fn unregister_segment_request(&self, tenant_id: TenantId, segment_id: u64) {
+        self.attention_source
+            .read()
+            .unregister_segment(tenant_id, segment_id);
+    }
+
+    /// Liefert die aktuell konfigurierte [`AttentionScoreSource`].
+    pub fn attention_source(&self) -> Arc<dyn AttentionScoreSource> {
+        self.attention_source.read().clone()
+    }
+
+    /// Löst nicht-blockierend eine Verdrängung im Hintergrund aus.
+    ///
+    /// Sendet den Auftrag über den MPSC-Kanal an den Worker-Thread und kehrt sofort zurück.
+    pub fn trigger_eviction(&self, target_free_bytes: usize) {
+        let _ = self
+            .sender
+            .lock()
+            .send(EvictionCommand::EvictLru { target_free_bytes });
+    }
+
+    /// Benachrichtigt den EvictionWorker, dass eine Block-Referenz freigegeben wurde.
+    pub fn notify_block_released(&self, block_id: u64) {
+        let _ = self
+            .sender
+            .lock()
+            .send(EvictionCommand::BlockReleased { block_id });
+    }
+
+    /// Beendet den Worker-Thread geordnet und wartet auf dessen Abschluss (Join).
+    pub fn shutdown(&self) {
+        let _ = self.sender.lock().send(EvictionCommand::Shutdown);
+        if let Some(handle) = self.handle.lock().take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl Drop for EvictionWorker {
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
+
+// ANCHOR[contextra-kvcache:EVICT-003]
+/// Synchroner Notfall-Wipe für sofortige Speicherlöschung.
+///
+/// Löscht blockierend alle Segmente im Store synchron aus dem RAM und stellt
+/// sicher, dass alle vertraulichen Tensordaten mittels Zeroize überschrieben sind,
+/// bevor die Funktion zurückkehrt.
+pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
+    store.clear_all();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::segment::KvSegment;
+    use contextra_types::TenantId;
+    use std::time::Duration;
+
+    // Prüft, dass der Aufruf von trigger_eviction den aufrufenden Thread nicht blockiert.
+    #[test]
+    fn test_eviction_worker_nonblocking_trigger() {
+        let store = Arc::new(TenantIsolatedKvStore::new());
+        let tenant = TenantId::try_new(1).unwrap();
+        store.insert_segment(tenant, KvSegment::new(tenant, 1, vec![0x11; 512]));
+        store.insert_segment(tenant, KvSegment::new(tenant, 2, vec![0x22; 512]));
+
+        let worker = EvictionWorker::spawn(Arc::clone(&store));
+
+        let start = std::time::Instant::now();
+        worker.trigger_eviction(500);
+        let elapsed = start.elapsed();
+
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "trigger_eviction must be non-blocking"
+        );
+
+        let mut freed = false;
+        for _ in 0..100 {
+            std::thread::sleep(Duration::from_millis(10));
+            if store.get_tenant_segment_len(tenant) == 1 {
+                freed = true;
+                break;
+            }
+        }
+
+        assert!(freed, "Worker should have evicted 1 segment in background");
+        assert_eq!(store.get_segments(tenant), vec![2]);
+    }
+
+    // Prüft, dass der Worker nach LRU-Ordnung und nicht nach FIFO (First In First Out) verdrängt.
+    #[test]
+    fn test_lru_eviction_order_not_fifo() {
+        let store = Arc::new(TenantIsolatedKvStore::new());
+        let tenant = TenantId::try_new(1).unwrap();
+
+        store.insert_segment(tenant, KvSegment::new(tenant, 10, vec![0x11; 512]));
+        std::thread::sleep(Duration::from_millis(1));
+        store.insert_segment(tenant, KvSegment::new(tenant, 20, vec![0x22; 512]));
+        std::thread::sleep(Duration::from_millis(1));
+        store.insert_segment(tenant, KvSegment::new(tenant, 30, vec![0x33; 512]));
+
+        let _ = store.get_segment_bytes(tenant, 10);
+
+        let worker = EvictionWorker::spawn(Arc::clone(&store));
+
+        worker.trigger_eviction(500);
+
+        let mut freed = false;
+        for _ in 0..100 {
+            std::thread::sleep(Duration::from_millis(10));
+            if store.get_tenant_segment_len(tenant) == 2 {
+                freed = true;
+                break;
+            }
+        }
+
+        assert!(freed, "Worker should have evicted 1 segment");
+
+        let remaining_ids = store.get_segments(tenant);
+
+        assert!(
+            remaining_ids.contains(&10),
+            "Segment A (most recently used) must NOT be evicted"
+        );
+        assert!(
+            !remaining_ids.contains(&20),
+            "Segment B (least recently used) must be evicted"
+        );
+        assert!(remaining_ids.contains(&30), "Segment C must be retained");
+    }
+
+    // Prüft, dass emergency_wipe synchron und sofort alle Segmente tilgt.
+    #[test]
+    fn test_emergency_wipe_synchronous_completion() {
+        let store = TenantIsolatedKvStore::new();
+        let tenant = TenantId::try_new(1).unwrap();
+        store.insert_segment(tenant, KvSegment::new(tenant, 1, vec![0x11; 512]));
+        store.insert_segment(tenant, KvSegment::new(tenant, 2, vec![0x22; 512]));
+
+        assert_eq!(store.get_tenant_segment_len(tenant), 2);
+
+        emergency_wipe(&store);
+
+        assert_eq!(
+            store.get_tenant_segment_len(tenant),
+            0,
+            "emergency_wipe must immediately clear all segments"
+        );
+    }
+
+    // Prüft, dass EvictionWorker thread-sicher ist (Send + Sync implementiert).
+    #[test]
+    fn test_eviction_worker_is_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<EvictionWorker>();
+    }
+}

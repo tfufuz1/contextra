@@ -1,6 +1,6 @@
 # Task-Karten in Contextra
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 
 Eine Task-Karte beschreibt ein isoliertes, maschinell prüfbares Arbeitspaket für Jules. Sie verhindert vage Aufträge und setzt klare Scope- und Budgetgrenzen.
 
@@ -16,7 +16,7 @@ risk      = "crash"
 goal      = "Ersetze ignoriertes fsync in wal/flusher.rs durch fehlerfortpflanzendes Result."
 non_goals = ["Keine Änderungen am CompactionEngine", "Keine neuen Dependencies"]
 scope     = ["crates/contextra-store/src/wal/flusher.rs", "crates/contextra-store/tests/wal_*.rs"]
-forbidden = ["xtask/**", ".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+forbidden = [".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
 invariants = ["INV-WAL-POISON-EXPLICIT", "Zero-Panic"]
 acceptance = [
   "cargo test -p contextra-store --test wal_lifecycle_crash_point_matrix"
@@ -39,7 +39,7 @@ risk      = "simd"
 goal      = "Expliziten Slices-Längencheck vor SIMD-Dot-Product einfügen."
 non_goals = ["Keine ungesicherten Memory-Layouts"]
 scope     = ["crates/contextra-simd/src/lib.rs"]
-forbidden = ["xtask/**", ".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+forbidden = [".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
 invariants = ["Zero-Panic", "Unsafe Islands Only"]
 acceptance = [
   "cargo test -p contextra-simd"
@@ -62,7 +62,7 @@ risk      = "none"
 goal      = "Aktualisiere Doc-Comments in domain/mod.rs bezüglich Fehlercodes."
 non_goals = ["Keine API-Code-Änderungen"]
 scope     = ["crates/contextra-types/src/types/domain/mod.rs"]
-forbidden = ["xtask/**", ".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
+forbidden = [".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
 invariants = ["Single Error Root"]
 acceptance = [
   "cargo test -p contextra-types"

@@ -31,5 +31,3 @@ Abhängigkeiten zeigen nur auf gleichen oder niedrigeren Ring.
 ## Nicht vorschlagen
 
 Diese Crates sind entfernt und dürfen nicht neu angelegt oder referenziert werden: `contextra-graph`, `contextra-cognition`, `contextra-adapt`, `contextra-kvcache`, `contextra-router`, `contextra-agent`, `contextra-infer-*`, `contextra-mcp`, `contextra-py`, `contextra-privacy`, `contextra-ingest`, `contextra-sandbox`, `contextra-wire`, `contextra-checkpoint`, `contextra-license`, `contextra-audit-export`, `contextra-avv-generator`, `contextra-core`.
-
-Der Befehl `cargo xtask` existiert nicht mehr.

@@ -7,10 +7,6 @@ glob = ".github/**"
 reason = "CI/CD Workflows und GitHub-Konfigurationen steuern Build- und Gate-Pipelines."
 
 [[protected]]
-glob = "xtask/**"
-reason = "Xtask-Module erzwingen Security- und Governance-Gates im Repository."
-
-[[protected]]
 glob = "justfile"
 reason = "Zentraler Task-Runner definiert Entwickler- und CI-Befehle."
 
@@ -75,10 +71,6 @@ glob = "sgconfig.yml"
 reason = "Ast-Grep / Static Analysis Regeln."
 
 [[protected]]
-glob = "xtask/registry.toml"
-reason = "Registry-Konfiguration der Xtask-Gates."
-
-[[protected]]
 glob = "tests/layering.rs"
 reason = "Validierung der Ring-Architektur & Import-Schichten-Grenzen."
 
@@ -89,10 +81,6 @@ reason = "Überprüfung aller genehmigten Unsafe-Blöcke/Inseln im Workspace."
 [[protected]]
 glob = "rules/**"
 reason = "Architektur- und Sicherheitsregeln für Agenten und Entwicklung."
-
-[[protected]]
-glob = ".agents/jules/harness-phases.toml"
-reason = "Phasen-Konfiguration des Harness Test-Runners."
 
 [[protected]]
 glob = ".agents/jules/prompter-tiers.toml"

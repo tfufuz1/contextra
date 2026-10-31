@@ -390,7 +390,7 @@ def workspace_crates(root: Path) -> list[str]:
     except Exception as e:
         print(f"[warn] cargo metadata fehlgeschlagen ({e}); nutze Verzeichnisnamen", file=sys.stderr)
         names = sorted(p.name for p in (root / "crates").iterdir() if p.is_dir())
-        return names + ["xtask", "contextra-bench"]
+        return names + ["contextra-bench"]
 
 
 def nextest_ok() -> bool:
@@ -496,14 +496,6 @@ def build_plan(root: Path, args) -> list[Step]:
         S.append(Step("2-tests", "python_bindings_pytest", ["python3", "-m", "pytest", "-q", str(py / "tests")],
                       requires=["python3"], note="setzt installierte Bindings voraus (maturin develop)"))
 
-    # --- 3: Projekt-Gates --------------------------------------------------------------------
-    if sel_all:
-        S += [
-            Step("3-gates", "xtask_gate_liste", cargo + ["run", "-q", "-p", "xtask", "--", "--list-gates"], timeout=900),
-            Step("3-gates", "xtask_check_compile", cargo + ["run", "-q", "-p", "xtask", "--", "check-compile"], timeout=1800),
-            Step("3-gates", "xtask_check_alle", cargo + ["run", "-q", "-p", "xtask", "--", "check", "--json"], timeout=7200,
-                 note="alle Gates aus governance/gates.toml"),
-        ]
 
     # --- 4: Benchmarks -----------------------------------------------------------------------
     if not args.quick and not args.produkt:

@@ -9,7 +9,7 @@
 # Vorheriges Schema (v1): unwrap_legacy_grep, [unsafe_blocks] — bleibt für
 # Kompatibilität erhalten. Neue Felder kommen unter [baselines].
 
-# ── Legacy-Zähler (xtask-kompatibel, NICHT entfernen) ─────────────────────────
+# ── Legacy-Zähler (NICHT entfernen) ─────────────────────────
 unwrap_legacy_grep = 1175
 unwrap_exact = 502
 expect_exact = 242

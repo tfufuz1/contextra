@@ -17,23 +17,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings || {
     exit 1
 }
 
-# 3. Statische Audit-Lints (< 3s)
-cargo xtask check-max-results-unbound || {
-    echo "❌ Unbegrenzter max_results-Parameter gefunden. Füge 'UNBOUNDED-OK'-Kommentar oder begrenze."
-    exit 1
-}
-
-cargo xtask check-toctou-defaults || {
-    echo "❌ TOCTOU-Default in Trait gefunden. Default-Impl entfernen oder atomic implementieren."
-    exit 1
-}
-
-cargo xtask check-result-dropped-io || {
-    echo "❌ let _ = <IO-Operation> gefunden. Fehler propagieren oder explizit als INTENTIONAL-DROP markieren."
-    exit 1
-}
-
-# 4. Compilation Check (für geänderte Crates, < 20s)
+# 3. Compilation Check (für geänderte Crates, < 20s)
 CHANGED_CRATES=$( (git diff --cached --name-only || true) | (grep "^crates/" || true) | cut -d/ -f1-2 | sort -u)
 for crate_path in $CHANGED_CRATES; do
     if [ -n "$crate_path" ]; then

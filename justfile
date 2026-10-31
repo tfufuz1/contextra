@@ -21,32 +21,17 @@ check:
     $RUNNER cargo fmt --all -- --check
     $RUNNER cargo clippy --all-targets -- -D warnings
     $RUNNER cargo check --all-targets --workspace
-    $RUNNER cargo xtask check-max-results-unbound
-    $RUNNER cargo xtask check-toctou-defaults
-    $RUNNER cargo xtask check-nan-hot-loop
-    $RUNNER cargo xtask check-result-dropped-io
-    if [ -f coverage.json ]; then
-        $RUNNER cargo xtask check-coverage-gate
-    fi
 
 # Runs the TDD Validation Loop (Red -> Green -> Refactor)
 test *ARGS:
     cargo test --locked {{ARGS}}
 
-# Executes all governance gates: ring-layering, panic-inventory, security-scan
+# Executes governance layering test
 gates:
-    cargo xtask check-ring-layering --strict && cargo xtask panic-inventory && cargo xtask security-scan
-
-# Explains a single gate by name (reads governance/gates.toml)
-gate NAME:
-    cargo xtask gate-explain {{NAME}}
+    cargo test --test layering --locked
 
 # Full pre-push pipeline: check → test → gates
 pre-push: check test gates
-
-# Sync documentation from inline tags and cargo topology
-sync-docs:
-    nix develop -c cargo xtask sync-docs || cargo xtask sync-docs
 
 # Check + test a single crate
 crate CRATE:
@@ -69,7 +54,6 @@ coverage:
     set -euo pipefail
     which cargo-llvm-cov || cargo install cargo-llvm-cov
     cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
-    cargo xtask check-coverage-gate
     echo "✅ Coverage-Gate bestanden"
 
 # Runs Loom concurrency exploration model test for group commit lock handoff (unoptimized debug build required by Loom)

@@ -31,8 +31,6 @@ Dauerhafte Dateisystem-Operationen und synchrone Disk-Flushes (`fsync`/`fdatasyn
 
 ```bash
 cargo test -p contextra-durable-fs
-cargo xtask check-agents-integrity
-cargo xtask check-unsafe-islands
 ```
 
 ## 7. Bekannte Lücken / SOLL

@@ -1,0 +1,20 @@
+{
+  "model": "Gemini 3.8 Flash (High)",
+  "artifactReviewPolicy": "always-proceed",
+  "toolPermission": "always-proceed",
+  "permissions": {
+    "allow": [
+      "command(cargo metadata)",
+      "command(cargo check)",
+      "command(cargo test)",
+      "command(cargo clippy)",
+      "command(cargo fmt)",
+      "command(git status)",
+      "command(git diff)",
+      "command(git log)",
+      "command(ls)",
+      "command(bash .agents/skills/contextra-doctor/scripts/doctor.sh)",
+      "command(bash .agents/skills/contextra-invariants-gate/scripts/check_invariants.sh)"
+    ]
+  }
+}

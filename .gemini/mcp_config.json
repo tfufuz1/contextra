@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "contextra": {
+      "command": "cargo",
+      "args": [
+        "run",
+        "-p",
+        "contextra-mcp",
+        "--bin",
+        "contextra-mcp-server"
+      ],
+      "env": {
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}

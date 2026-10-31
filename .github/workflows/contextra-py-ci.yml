@@ -8,7 +8,6 @@
 # 2. Test Suite (`cargo test`)
 # 3. Linting (`cargo clippy -D warnings`)
 # 4. Dependency Security & Licenses (`cargo deny`)
-# 5. FFI Panic Boundary Gate (`xtask check-ffi-panic-boundary`)
 
 name: contextra-py CI (Full Gate Stack)
 
@@ -57,7 +56,4 @@ jobs:
         with:
           manifest-path: crates/contextra-py/Cargo.toml
           command: check advisories bans licenses sources
-
-      - name: FFI Panic Boundary Check
-        run: cargo run -p xtask -- check-ffi-panic-boundary
 

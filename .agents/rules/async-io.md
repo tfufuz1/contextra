@@ -1,6 +1,6 @@
 # Governance Rule: Asynchrones I/O & Non-Blocking Bounds (`rules/async-io.md`)
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 
 ## Gilt für
 - `crates/contextra-engine`
@@ -9,7 +9,7 @@
 - Ring 0 Crate Async-Purity
 
 ## Pflichtregeln
-1. **Ring 0 Async-Reinheit**: Ring-0-Crates (z.B. `contextra-types`, `contextra-ports`, `contextra-adapt`) dürfen keine direkten Abhängigkeiten zu Asynchronous Runtimes wie `tokio` aufweisen, sofern diese nicht explizit in `xtask/ring0-async-exceptions.toml` mit gültiger ADR-Referenz genehmigt sind (Quelle: `xtask/src/check_ring0_async_purity.rs`).
+1. **Ring 0 Async-Reinheit**: Ring-0-Crates (z.B. `contextra-types`, `contextra-ports`, `contextra-adapt`) dürfen keine direkten Abhängigkeiten zu Asynchronous Runtimes wie `tokio` aufweisen (SPEC §0.2 P26).
 2. **Blocking Storage Trait Partitioning**: Speicher-Interfaces sind strikt in synchrone Lese-Pfade (`StorageRead`) und asynchrone Schreib-Pfade (`StorageWrite` via `BoxFuture`) getrennt (Quelle: `crates/contextra-ports/src/storage.rs`).
 3. **No Thread Starvation in CPU Heavy Tasks**: Intensive Rechenoperationen (z.B. ONNX-Inferenz) in async Handlern müssen zwingend auf Blocking-Threadpools entladen werden via `tokio::task::spawn_blocking` (Quelle: `crates/contextra-infer-onnx/src/embedder.rs`).
 
@@ -20,5 +20,3 @@
 
 ## Verweise
 - `crates/contextra-ports/src/storage.rs`
-- `xtask/src/check_ring0_async_purity.rs`
-- `xtask/ring0-async-exceptions.toml`

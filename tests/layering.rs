@@ -80,7 +80,7 @@ impl Ring {
             "contextra" | "contextra-mcp" | "contextra-py" => Some(Ring::Ring4),
 
             // Tooling
-            "contextra-testkit" | "xtask" | "contextra-bench" => Some(Ring::Tooling),
+            "contextra-testkit" | "contextra-bench" => Some(Ring::Tooling),
 
             _ => None,
         }

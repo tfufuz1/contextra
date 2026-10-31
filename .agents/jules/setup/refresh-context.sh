@@ -89,12 +89,8 @@ MILESTONES=$(gh_or_api \
   "milestones?state=open" \
   '.[] | "- M\(.number) \(.title) (\(.open_issues) open)"')
 
-# ── C) xtask context-pack (Claims, Tag-Inventar) ──────────────────────────────
-XT=(cargo run -q --manifest-path xtask/Cargo.toml --)
-CONTEXT_PACK=$("${XT[@]}" context-pack 2>/dev/null) || CONTEXT_PACK=""
-
-# ── D) Preflight (Gate-Status) ────────────────────────────────────────────────
-PREFLIGHT=$("${XT[@]}" jules-preflight --fast 2>/dev/null) || PREFLIGHT=""
+CONTEXT_PACK=""
+PREFLIGHT=""
 
 # ── E) Ein einziges, maximales Einstiegsdokument ──────────────────────────────
 {
@@ -107,7 +103,7 @@ PREFLIGHT=$("${XT[@]}" jules-preflight --fast 2>/dev/null) || PREFLIGHT=""
   # ── Pflicht-Kurzregeln (Regeln stehen in AGENTS.md — hier nur Stop-Signale) ─
   echo "## ⚠️ Unveränderliche Regeln (Details: AGENTS.md, VETOES.md, capabilities.toml)"
   echo "- Rangfolge: docs/SPEC.md > VETOES.md > capabilities.toml > AGENTS.md"
-  echo "- Geschützte Pfade (NIE ändern): .github/** xtask/** justfile rust-toolchain.toml deny.toml capabilities.toml AGENTS.md .agents/jules/setup/**"
+  echo "- Geschützte Pfade (NIE ändern): .github/** justfile rust-toolchain.toml deny.toml capabilities.toml AGENTS.md .agents/jules/setup/**"
   echo "- Zero-Panic: kein unwrap()/expect()/panic!() in Produktionspfaden (§3)"
   echo "- Unsafe nur in: contextra-simd, contextra-sys, contextra-wire"
   echo "- Vetos prüfen: VETOES.md F-NN vor jeder Feature-Arbeit"
@@ -217,8 +213,7 @@ PREFLIGHT=$("${XT[@]}" jules-preflight --fast 2>/dev/null) || PREFLIGHT=""
   # ── Session-Ende ──────────────────────────────────────────────────────────
   echo
   echo "## ✅ Session-Ende (VOR Submit)"
-  echo "cargo fmt --all && just check && just dag-check && just test && just sync-docs"
-  echo "cargo xtask jules-submit-gate --crate <CRATE>"
+  echo "cargo fmt --all && just check && just test"
 
 } > "$CTX/SESSION_START.md"
 

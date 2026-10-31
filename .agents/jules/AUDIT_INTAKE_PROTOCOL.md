@@ -1,6 +1,6 @@
 # Contextra — Audit Intake Verification Protocol (`AUDIT_INTAKE_PROTOCOL.md`)
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 
 > **Regel (AGENTS.md §4)**: Jeder Befund ("Finding") aus einem extern zugelieferten Audit-Dokument, Prompt oder Review-Bericht MUSS vor der Implementierung am AKTUELLEN Quellcode verifiziert werden.
 
@@ -52,7 +52,7 @@ Vor jeder Aussage „Invariante X ist erfüllt, weil Typ/Funktion Y existiert un
 ## 🏗️ Feature-Flag-vollständige Ring-Layering-Analyse
 
 Bei Prüfungen der Schichten-Architektur und Ring-Layering-Integrität reichen Analysen auf Basis von Default-Feature-Abhängigkeiten nicht aus, da optionale Abhängigkeiten (z. B. hinter `optional = true`-Flags) Architektur-Verstöße verdecken können.
-Ring-Layering-Prüfungen MÜSSEN zwingend `cargo metadata --all-features` bzw. eine äquivalente Feature-Flag-vollständige Analyse verwenden. Der Gate-Check `check-ring-layering-full` (ausführbar via `cargo xtask check-ring-layering-full`) gilt als verbindliches Werkzeug dafür.
+Ring-Layering-Prüfungen MÜSSEN zwingend `cargo metadata --all-features` bzw. eine äquivalente Feature-Flag-vollständige Analyse verwenden. Der Integrationstest `tests/layering.rs` gilt als verbindliches Werkzeug dafür.
 
 ---
 

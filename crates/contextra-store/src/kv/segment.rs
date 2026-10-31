@@ -149,10 +149,13 @@ impl KvSegmentManager {
     /// Under `CryptoShred`, revokes (destroys) the subkey for `group_id` in `KeyRegistry` in O(1) time.
     /// The physical ciphertext remains intact on disk, but becomes information-theoretically unrecoverable.
     /// Under `TombstoneOnly`, subkey revocation is a no-op (LSM tombstones are used instead).
-    pub fn delete_segment(&self, group_id: u64) -> bool {
+    pub fn delete_segment(&self, group_id: u64) -> Result<bool, ContextraError> {
         match self.config.delete_mode {
-            KvDeleteMode::CryptoShred => self.registry.revoke_subkey(group_id),
-            KvDeleteMode::TombstoneOnly => false,
+            KvDeleteMode::CryptoShred => self
+                .registry
+                .revoke_subkey(group_id)
+                .map_err(|e| ContextraError::Crypto(e.to_string())),
+            KvDeleteMode::TombstoneOnly => Ok(false),
         }
     }
 

@@ -1,6 +1,6 @@
 # Contextra — Häufige LLM-Fehler & Korrekturen
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 > Destilliert aus Session-Audits. Bei Unsicherheit: diese Datei zuerst prüfen.
 
 ## FEHLER-KLASSE 1: API-Halluzination
@@ -172,8 +172,8 @@ assert!((result - 1.41421356_f32).abs() < 1e-4);
 | `contextra-mcp` | 🟢 Clean |
 
 <!-- ✅ KORREKT — Status NUR aus CI: -->
-<!-- Status-Indikatoren werden AUSSCHLIESSLICH durch cargo xtask sync-docs
-     aus CI-Ergebnissen gesetzt. Niemals manuell auf 🟢 setzen. -->
+<!-- Status-Indikatoren werden AUSSCHLIESSLICH aus CI-Ergebnissen gesetzt.
+     Niemals manuell auf 🟢 setzen. -->
 ```
 
 ## FEHLER-KLASSE 11: Lock-Guard über .await halten

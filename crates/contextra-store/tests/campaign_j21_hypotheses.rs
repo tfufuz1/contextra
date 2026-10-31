@@ -301,7 +301,7 @@ fn test_h4_kv_segment_deletion_proof_state_binding() {
     assert_eq!(read_back, b"secret_data");
 
     // Delete segment (crypto shred)
-    let revoked = mgr_shred.delete_segment(group_id);
+    let revoked = mgr_shred.delete_segment(group_id).expect("delete_segment failed");
     assert!(revoked, "Subkey revocation must return true");
 
     // Proof after shredding -> key is inactive, so deletion proof is true (deleted)

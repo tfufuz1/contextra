@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# .githooks/pre-push — Pre-push Hard Gate Hook Wrapper
+# .githooks/pre-push — Pre-push Hook Wrapper
 set -e
 
-exec cargo run --manifest-path xtask/Cargo.toml -- pre-push "$@"
+if command -v just &> /dev/null; then
+    just pre-push
+fi

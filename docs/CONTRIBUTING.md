@@ -1,55 +1,75 @@
 # Beitragen zu Contextra
 
-<!-- doc-stamp: 2026-10-30 | Normativ: docs/SPEC.md Fassung 4.0, AGENTS.md, CLAUDE.md -->
+<!-- doc-stamp: 2026-10-31 | Normativ: docs/SPEC.md Fassung 2.4, PLAN.md -->
 
-Vielen Dank für Ihr Interesse. Dieses Dokument beschreibt, wie Änderungen in den Kern von Contextra eingebracht werden.
+Vielen Dank für Ihr Interesse an der Entwicklung von Contextra. Dieses Dokument beschreibt die verbindlichen Richtlinien, Qualitätsstandards und Entwicklungsabläufe für alle Beitragenden und Implementierer.
 
 ---
 
 ## 1. Voraussetzungen
 
-- Rust-Toolchain laut `rust-toolchain.toml` (MSRV 1.89).
-- Optional: `nix develop` mit `flake.nix` für eine reproduzierbare Umgebung.
-- Kenntnis von `docs/SPEC.md` §3 (Regeln) und §4 (Ringe).
+- **Rust-Toolchain:** Version 1.89+ laut [`rust-toolchain.toml`](../rust-toolchain.toml) (Edition 2021).
+- **Entwicklungsumgebung:** Optional `nix develop` mit [`flake.nix`](../flake.nix) für deterministische Systembibliotheken.
+- **Workflow-Runner:** [`just`](../justfile) für vereinfachte Dev-Loops.
+- **Normative Pflichtlektüre:** [`docs/SPEC.md`](SPEC.md) (Architektur, Invarianten) und [`PLAN.md`](../PLAN.md) (Roadmap, Stufen 0–3).
 
-## 2. Ablauf
+---
 
-1. Aufgabe einem Arbeitspaket (WP) aus `docs/PLAN.md` zuordnen. Fehlt ein WP, bitte zuerst ein Issue mit Begründung anlegen.
-2. Branch nach Schema `wp/<nummer>-<kurzbeschreibung>` anlegen, z. B. `wp/r0.3-engine-residuen`.
-3. Änderung so klein wie möglich halten. Ein PR umfasst ein Arbeitspaket und höchstens einen Crate-Schnitt.
-4. Lokal prüfen:
+## 2. Entwicklungsablauf (TDD & Stufenplan)
+
+1. **Arbeitspaket zuordnen:**
+   Jede Änderung muss einem konkreten Arbeitspaket aus [`PLAN.md`](../PLAN.md) entsprechen:
+   - **Stufe 0:** Bau wiederherstellen (Fehler B-01 bis B-12).
+   - **Stufe 1:** Datenschutz- und Löschaussagen absichern (S-01 bis S-04, D-01 bis D-06, E0 bis E2).
+   - **Stufe 2:** Härtung vor erstem Release (S-05 bis S-19, E3 bis E12).
+   - **Stufe 3:** Scope-Bereinigung und Hygiene (Einfrieren nicht-benötigter Crates).
+2. **Branch erstellen:**
+   Schema: `wp/<nummer>-<kurzbeschreibung>`, z. B. `wp/0.1-segment-error-propagation`.
+3. **Test-First (TDD):**
+   Fehlerbehebungen und neue Funktionalität beginnen immer mit einem fehlschlagenden (roten) Unit- oder Integrationstest.
+4. **Lokale Verifikation:**
+   Vor jedem Push muss die Validierung lokal sauber durchlaufen:
 
 ```bash
+# Mit just
+just check
+just test
+just gates
+
+# Oder mit reinem Cargo
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo check --workspace
+cargo test --locked --workspace
+cargo test --test layering --locked
 ```
 
-5. Dokumentation im selben PR anpassen, wenn sich Ring, Abhängigkeiten, Befunde oder Scope ändern.
-6. Vor dem PR auf den aktuellen Hauptzweig rebasen: `git fetch origin && git rebase origin/main`. Danach die Prüfungen erneut ausführen.
+5. **Dokumentations-Synchronisation:**
+   Ändern sich Signaturen, Invarianten, Crate-Klassen oder Ringe, MÜSSEN die relevanten Dokumente (`docs/SPEC.md`, `PLAN.md`, `capabilities.toml`, `docs/ARCHITECTURE.md`) im selben Commit bzw. PR aktualisiert werden.
 
-## 3. Verbindliche Regeln
+---
 
-- Kein `unwrap`, `expect`, `panic!` oder ungeprüftes Indexieren in Produktionscode (Clippy-Lints im Workspace).
-- `unsafe` nur in `contextra-sys` und `contextra-simd`, jeder Block mit `// SAFETY:`.
-- Zeit, Zufall und IDs nur über die Ports `Clock`, `Rng`, `IdGen`.
-- `fsync`-Fehler werden mit `?` propagiert, nie mit `let _ =` verworfen.
-- Keine Lint-Ausnahmen auf Modulebene ohne ADR.
-- Keine Stubs oder Platzhalter-Implementierungen für Sicherheitsfunktionen.
+## 3. Verbindliche Architektur- und Code-Regeln
 
-## 4. Commit-Nachrichten
+- **Zero Panic (P7):** Absolutes Verbot von `unwrap()`, `expect()`, `panic!`, `todo!`, `unimplemented!`, `unreachable!` und ungeprüftem Array-Indexieren (`[i]`) im Produktionscode. Alle Fehler müssen als typisierte `Result<T, ContextraError>` zurückgegeben werden.
+- **Unsafe-Beschränkung:** `unsafe` ist strikt auf die drei Inseln `contextra-sys`, `contextra-simd` und `contextra-wire` beschränkt. Jeder Block benötigt zwingend einen fundierten `// SAFETY:`-Beweiskommentar.
+- **P28 Determinismus:** Keine direkten Aufrufe von `std::time::Instant::now()`, `SystemTime::now()` oder `thread_rng()` im Kerncode. Zeit, Zufall und IDs werden ausnahmslos über die Ports `Clock`, `Rng` und `IdGen` bereitgestellt.
+- **Fail-Closed & Fehlerpropagation:** Dateisystem- und I/O-Fehler dürfen niemals ignoriert (`let _ =`) oder als Standardwert maskiert werden. Alle Fehler müssen via `?` propagiert werden.
+- **Mandanten-Isolation (VETO-F10):** Jede Abfrage erzwingt die `TenantId` aus dem `RequestContext`. Literale, Standardmandanten oder mandantenübergreifende Caches sind unzulässig.
+- **Keine Fake-Implementierungen:** Stubs, Mocks oder No-Op-Typen für Sicherheitsfunktionen (wie Null-KMS oder Null-PII-Filter) sind im Produktionscode verboten und gehören nach `contextra-testkit`.
 
+---
+
+## 4. Commit-Konventionen
+
+Commit-Nachrichten sollten prägnant sein und bei Architekturänderungen die entsprechenden Trailer enthalten:
+
+```gitcommit
+feat(store): propagate deletion error in delete_segment
+
+Behebt B-01: delete_segment gibt nun Result<bool, ContextraError>
+zurück und schluckt keine Krypto-Revocation-Fehler mehr.
+
+WP: 0.1
+SPEC: §12.2.4
 ```
-WP-R0.3(contextra-engine): Kurze Beschreibung
-
-- Was geändert und warum (PLAN §, SPEC §)
-- Prüfstatus vorher → nachher
-```
-
-## 5. Fragen zum Scope
-
-Fragen, ob eine Funktion in v1 gehört, werden über einen Entwurf für einen ADR geklärt. Die Liste der Nicht-Ziele steht in `docs/SPEC.md` §2.3.
-
-## 6. Lizenz
-
-Beiträge werden unter der Doppellizenz MIT oder Apache-2.0 des Projekts aufgenommen.

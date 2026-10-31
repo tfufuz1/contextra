@@ -18,10 +18,10 @@ Before creating a release, ensure all checks pass and versions are synchronized:
      cargo test -p contextra-py
      cd crates/contextra-py && ./run_tests.sh
      ```
-   - Run workspace checks:
+   - Ensure all quality gates pass:
      ```bash
-     cargo run -p xtask -- check-consistency
-     cargo run -p xtask -- check-jules-context-freshness
+     cargo check --workspace
+     cargo clippy --workspace --all-targets --locked -- -D warnings
      ```
 
 ---

@@ -1,14 +1,11 @@
 # Routine: Drift-Wächter
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 
 - **Takt**: Täglich
 - **Ziel**: Früherkennung von Doku-, Typ- und Registrierungs-Drifts im Repository.
 - **Eingaben**:
-  - `cargo run --manifest-path xtask/Cargo.toml -- sync-docs --check`
-  - `cargo run --manifest-path xtask/Cargo.toml -- check-agents-freshness`
-  - `cargo run --manifest-path xtask/Cargo.toml -- check-jules-context-freshness`
-  - `cargo run --manifest-path xtask/Cargo.toml -- check-flatbuffers-drift` <!-- harness:planned -->
+  - `git diff --check`
 - **Harte Grenzen**: Max. 15 Dateien / 1 Crate pro PR. Scope-Globs: `docs/**`, `capabilities.toml`, `AGENTS.md`.
 - **Stopp-Bedingungen**: Bei manuell geänderten generierten Dateien ohne Quellcode-Anpassung.
 - **Ergebnisformat**: PR mit aktualisierten Doku-Artefakten oder GitHub Issue bei unklaren Quellcode-Drifts.

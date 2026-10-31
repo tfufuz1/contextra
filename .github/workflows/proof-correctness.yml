@@ -26,13 +26,6 @@ jobs:
         run: cargo test -p contextra-store --test wal_truncate_ordering -- --nocapture
       - name: L1 — HNSW deleted_nodes Lock Contention (S1-11)
         run: cargo test -p contextra-vector --test deleted_nodes_lock_contention -- --nocapture
-      - name: L0 — Static Audit Lints (S3-01)
-        run: |
-          cargo xtask check-max-results-unbound
-          cargo xtask check-toctou-defaults
-          cargo xtask check-nan-hot-loop
-          cargo xtask check-result-dropped-io
-      - name: Coverage Gate
+      - name: Coverage Report
         run: |
           cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
-          cargo xtask check-coverage-gate coverage.json

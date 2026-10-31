@@ -1,6 +1,6 @@
 # Contextra — Jules Agent Context
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 > Version: 3.1 | Stand: 2026-10-26 | Permanent Ambient Context für Jules Sessions (Spezifikation v9)
 >
 > ⚠️ **FRISCHEGARANTIE**: Diese Datei regelt ausschließlich die Session-Prozessführung für Jules.
@@ -54,5 +54,5 @@ Vollständige Liste und Verbindlichkeit aller Architektur-Entscheidungen: siehe 
 
 ## ✅ Existierende Typen & API-Disziplin
 
-- **Existierende Typen**: Die Übersicht aller bereits verifizierten Ring-0 Typen befindet sich in `docs/TYPE_REGISTRY.md`. Vor jeder Neuimplementierung `cargo xtask check-type-registry <Typname>` ausführen.
+- **Existierende Typen**: Die Übersicht aller bereits verifizierten Ring-0 Typen befindet sich in `docs/TYPE_REGISTRY.md`. Vor jeder Neuimplementierung die Typübersicht prüfen.
 - **Kritische Implementierungs-Muster**: Details zu `TxId`-Allokation, `fsync`-Fehlerbehandlung, `unsafe`-Einschränkungen und HMAC-Keys sind zentral in `AGENTS.md` unter **"Non-Obvious Decisions"** hinterlegt.

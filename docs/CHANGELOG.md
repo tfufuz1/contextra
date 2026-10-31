@@ -13,7 +13,7 @@
 - `docs/analysis/BEFUNDE_2026-10-31.md` mit Befehlen zur Reproduktion.
 
 ### Known issues
-- Build nicht verifiziert. `xtask` im Workspace ohne Verzeichnis.
+- Build nicht verifiziert.
 - Feature `onnx` und `adaptive-candidate-pool-sizing` ohne deklarierte Abhängigkeit.
 - `contextra-vector` führt Dateisystem-I/O in Ring 0 aus.
 - `contextra-durable-fs` ohne Eintrag in `capabilities.toml`.

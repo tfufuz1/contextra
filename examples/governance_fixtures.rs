@@ -1,7 +1,7 @@
 //! Example/Demo governance fixtures for reference and testing outside of active crates.
 //!
 //! Note: These review-pass entries use sample session hashes (b8e4f1a2, c9f5e2b3) and are placed
-//! outside of `crates/` so they are not scanned as real governance evidence by xtask.
+//! outside of `crates/` so they are not scanned as real governance evidence.
 
 // ANCHOR[DEBT:CORE-INLINE-001] STATUS:DONE (ID: AGT-CORE-a3f29c1d) (TS:2026-08-29T09:14:07Z) (SESSION: a3f29c1d)
 // REVIEW-PASS[1/2] STATUS:PASS (ID: AGT-CORE-a3f29c1d) (TS: 2026-08-29T10:00:00Z) (SESSION: b8e4f1a2)

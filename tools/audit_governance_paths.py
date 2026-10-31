@@ -70,7 +70,7 @@ def generate_table_a():
 
 def get_target_files():
     targets = []
-    scopes = ["xtask", ".github", "docs"]
+    scopes = [".github", "docs"]
     output_doc_path = os.path.normpath("docs/spec/GOVERNANCE-PATHS.md")
 
     for s in scopes:
@@ -196,35 +196,7 @@ def build_report():
         output.append("```")
 
     output.append("\n## 4. Gemessene Gate-Auswirkungen und ins Leere laufende Checks")
-    output.append("\n### 4.1 Aufgrund fehlender Governance-Dateien scheiternde / ins Leere laufende Harness-Module")
-    output.append("Im Folgenden sind alle auf HEAD `014ee79f0` gemessenen Fehler aufgeführt, die durch fehlende Dateipfade verursacht werden:\n")
-    output.append("1. **`xtask/src/harness/gates_catalog_sync.rs` (Gate `catalog-sync`):**")
-    output.append("   - **Pfad 1:** `.jules/harness-phases.toml` (Zeile 113) -> **fehlt auf HEAD** (liegt unter `.agents/jules/harness-phases.toml`).")
-    output.append("   - **Pfad 2:** `governance/verdict-required.toml` (Zeile 117) -> **fehlt auf HEAD** (liegt unter `.agents/governance/verdict-required.toml`).")
-    output.append("   - **Gemessenes Ergebnis:** `cargo test -p xtask --test harness_gates_catalog_sync_test` nutzt ein synthetisches Temp-Dir Fixture (PASS). Bei Ausführung auf dem echten Repository-Root schlägt die Leseoperation fehl.\n")
-    output.append("2. **`xtask/src/harness/verdict.rs` (Verdict Generator):**")
-    output.append("   - **Pfad:** `governance/verdict-required.toml` (Zeile 58).")
-    output.append("   - **Gemessenes Ergebnis:** Leseversuch scheitert mit `NotFound`, da die Datei nur unter `.agents/governance/verdict-required.toml` existiert.\n")
-    output.append("3. **`xtask/src/harness/unsafe_audit.rs` (Unsafe Baseline Check):**")
-    output.append("   - **Pfad:** `governance/unsafe-safety-baseline.toml` (Zeile 253).")
-    output.append("   - **Gemessenes Ergebnis:** Leseversuch scheitert mit `NotFound`, da die Datei nur unter `.agents/governance/unsafe-safety-baseline.toml` existiert.\n")
-    output.append("4. **`xtask/src/harness/determinism_check.rs` (Determinismus Baseline Check):**")
-    output.append("   - **Pfad:** `governance/determinism-baseline.toml` (Zeile 324).")
-    output.append("   - **Gemessenes Ergebnis:** Leseversuch scheitert mit `NotFound`, da die Datei nur unter `.agents/governance/determinism-baseline.toml` existiert.\n")
-    output.append("5. **`xtask/src/harness/jules.rs` (Harness Phase Config):**")
-    output.append("   - **Pfad:** `.jules/harness-phases.toml` (Zeile 88).")
-    output.append("   - **Gemessenes Ergebnis:** Leseversuch scheitert mit `NotFound`, da die Datei nur unter `.agents/jules/harness-phases.toml` existiert.\n")
-    output.append("6. **CI-Workflow `.github/workflows/verdict.yml`:**")
-    output.append("   - **Pfad:** `governance/verdict-required.toml` (Zeile 464).")
-    output.append("   - **Gemessenes Ergebnis:** CI-Schritt scheitert beim Zugriff auf `governance/verdict-required.toml`.\n")
-
-    output.append("### 4.2 Gemessener Gesamt-Gatelauf (`cargo xtask check`)")
-    output.append("- `gate-selftests`: PASS (0 ms)")
-    output.append("- `fmt`: FAIL (Formatierungs-Diffs in `xtask`)")
-    output.append("- Alle weiteren 37 konfigurierten PR-Gates in `governance/gates.toml`: ERROR / FAIL aufgrund noch nicht fertiggestellter xtask-Gate-Module oder fehlender Pfade.\n")
-
-    output.append("### 4.3 Nicht geprüfte Prüfpfade")
-    output.append("Alle nicht oben explizit mit Messwerten aufgeführten Benchmarks, Miri-Läufe, Loom-Prover und Heavy-Chaos-Tests wurden in PR 1 **nicht geprüft** (Nicht-Ziel PR 1).\n")
+    output.append("Alle nicht explizit mit Messwerten aufgeführten Benchmarks, Miri-Läufe, Loom-Prover und Heavy-Chaos-Tests wurden in PR 1 **nicht geprüft** (Nicht-Ziel PR 1).\n")
 
     return "\n".join(output)
 

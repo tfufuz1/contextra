@@ -31,7 +31,6 @@
 
 # Build & Infrastruktur & Governance Tooling
 /.github/                              @contextra/build-infra
-/xtask/                                @contextra/build-infra
 /governance/                           @contextra/build-infra
 /justfile                              @contextra/build-infra
 /rust-toolchain.toml                   @contextra/build-infra

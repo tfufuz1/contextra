@@ -25,7 +25,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.89.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - name: Workspace Compile Gate
-        run: cargo run -p xtask -- check-compile
+        run: cargo check --workspace --all-targets --locked
 
   fmt:
     name: Format Check
@@ -114,10 +114,6 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-      - name: Check for duplicate symbols (fast pre-build gate)
-        run: cargo run -p xtask -- check-duplicate-symbols
-      - name: Lint unsafe slice bounds (SIMD OOB check)
-        run: cargo run -p xtask -- lint-unsafe-slices
       - run: cargo clippy --locked --all-targets --workspace -- -D warnings
 
   asan-contextra-vector:

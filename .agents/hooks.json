@@ -1,0 +1,10 @@
+{
+  "contextra-init": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "./.agents/hooks/session_start.sh"
+      }
+    ]
+  }
+}

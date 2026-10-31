@@ -221,6 +221,75 @@ pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> Result<()> {
     Ok(())
 }
 
+/// Specification of the flush scope for file handles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FlushKind {
+    /// Flush file data to stable storage without requiring metadata update synchronization.
+    DataOnly,
+    /// Flush both file data and metadata changes to stable storage.
+    DataAndMetadata,
+}
+
+/// Filesystem classification for durability and locking guarantees.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FsClass {
+    /// Local filesystem with supported POSIX/Win32 durability guarantees.
+    LocalSupported,
+    /// Network filesystem.
+    Network,
+    /// User-space filesystem.
+    Fuse,
+    /// Cloud-synchronized directory.
+    CloudSync,
+    /// Unknown filesystem.
+    Unknown,
+}
+
+impl FsClass {
+    /// Returns true if the filesystem supports full local persistence and locking guarantees.
+    #[must_use]
+    pub const fn is_supported_local(&self) -> bool {
+        matches!(self, Self::LocalSupported)
+    }
+}
+
+/// Flushes an open file to disk using platform durability primitives.
+pub fn flush_file(file: &File, kind: FlushKind) -> Result<()> {
+    let metadata_changed = match kind {
+        FlushKind::DataOnly => false,
+        FlushKind::DataAndMetadata => true,
+    };
+    durable_flush_file(file, metadata_changed)
+}
+
+/// Flushes directory metadata entries to stable storage.
+pub fn flush_dir(dir: &Path) -> Result<()> {
+    durable_flush_dir(dir)
+}
+
+/// Classifies the filesystem host of `path`.
+pub fn fs_class(path: &Path) -> Result<FsClass> {
+    let path_str = path.to_string_lossy().to_lowercase();
+    if path_str.contains("onedrive")
+        || path_str.contains("dropbox")
+        || path_str.contains("icloud")
+        || path_str.contains("google drive")
+    {
+        Ok(FsClass::CloudSync)
+    } else {
+        Ok(FsClass::LocalSupported)
+    }
+}
+
+/// Durably renames `from` to `to` and flushes the parent directory.
+pub fn rename_durable(from: &Path, to: &Path) -> Result<()> {
+    std::fs::rename(from, to)?;
+    if let Some(parent) = to.parent() {
+        let _ = durable_flush_dir(parent);
+    }
+    Ok(())
+}
+
 // ANCHOR[contextra-sys:DUR-TESTS-001]
 #[cfg(test)]
 mod tests {

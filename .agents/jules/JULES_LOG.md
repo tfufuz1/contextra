@@ -1,6 +1,6 @@
 # Jules System & Context Diagnostics Log (`.jules/JULES_LOG.md`)
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 
 Dieses Dokument bietet eine vollständige, präzise und transparente Analyse der Funktionsweise von Google-Jules (Google Gemini-basierter Software Engineering Agent) in diesem Repository (`contextra`), die Umgebungs- und Git-Kapazitäten innerhalb der VM Sandbox, eine vollständige Checkliste aller Git-Befehle, eine Analyse der Repository-Analyseskripte (`/docs/GITHUB_ANALYSE.md`, `/docs/GITHUB_HISTORY.md`, `.jules/JULES_LOG_2.md`) sowie einen umfassenden Optimierungsplan für die Contextra-Entwicklung mit Google-Jules.
 
@@ -77,7 +77,7 @@ Google-Jules läuft in einer abgesicherten Linux-VM-Sandbox. Folgende Git-Funkti
 
 ### C. Kann Jules alte Commits in der VM korrigieren?
 - **Ja, innerhalb des eigenen Feature-Branches:** Jules kann mittels `git commit --amend`, `git reset` oder `git rebase` alte Commits lokal in der VM korrigieren und aufräumen, bevor der finale Branch per `submit` eingereicht wird.
-- **Auf `main`:** Da `main` geschützt ist und Änderungen per Pull Request (Squash Merge) integriert werden, nimmt Jules Korrekturen auf seinem Branch vor, testet diese mit `cargo xtask` und stellt sicher, dass keine fehlerhaften Commits gemerged werden.
+- **Auf `main`:** Da `main` geschützt ist und Änderungen per Pull Request (Squash Merge) integriert werden, nimmt Jules Korrekturen auf seinem Branch vor, testet diese mit `just check && just test` und stellt sicher, dass keine fehlerhaften Commits gemerged werden.
 
 ---
 
@@ -104,29 +104,21 @@ git commit --amend -m "feat(...): ..."  # Letzten Commit lokal anpassen/korrigie
 git reset --soft HEAD~1                 # Letzten Commit auflösen, Code behalten
 
 # 5. PRE-SUBMIT VERIFIKATION (PFLICHT VOR SUBMIT)
-cargo xtask jules-preflight             # Vollständige Gate- & Test-Suite ausführen
-cargo xtask check-jules-context-freshness # Doku-Freshness prüfen
+just check                              # Workspace-Check, Clippy, Format
+just test                               # Test-Suite ausführen
 ```
 
 ---
 
-## 4. Analyse der Skripte & Dokumente (`GITHUB_ANALYSE.md`, `GITHUB_HISTORY.md`, `.jules/JULES_LOG_2.md`)
+## 4. Analyse der Dokumente (`GITHUB_ANALYSE.md`, `GITHUB_HISTORY.md`, `.jules/JULES_LOG_2.md`)
 
-Die Analyse der Dokumente zeigt deutliche Schwachstellen in Multi-Agenten-Workflows sowie vorhandene Werkzeuge zur Lösung:
+Die Analyse der Dokumente zeigt deutliche Schwachstellen in Multi-Agenten-Workflows:
 
 1. **Anti-Muster aus `docs/GITHUB_ANALYSE.md`**:
    - *Parallel-Implementierungen:* 3 Agenten erstellten innerhalb 1 Stunde 3 Varianten derselben Kalibrierungs-Funktion (#1627, #1634, #1645), was zu Compile-Breaks auf `main` führte.
    - *Duplicate Titles & Mass Deletions:* Identische Commit-Titel für völlig verschiedene PRs mit versehentlicher Löschung tausender Zeilen.
    - *Status Thrashing:* `STATUS:DONE`-Tags wurden widerrufen und von neuen Sessions wiederholt neu aufgerollt.
    - *Branch Proliferation:* >81 offene Remote-Branches ohne zentrales Claiming.
-
-2. **Skript-Unterstützung durch `xtask` (`xtask/src/`)**:
-   Contextra besitzt bereits hochentwickelte Rust-Skripte zur Repository-Analyse:
-   - `jules_preflight.rs`: Führt `check_no_active_claim_conflict`, `check-consistency`, `check-vetoes` und DAG-Checks aus.
-   - `check_commit_messages.rs`: Verhindert `Shell-Commit` und ungültige/leere Commit-Nachrichten.
-   - `check_duplicate_intent.rs` (Gate 12): Erkennt doppelte PR-Intents und verhindert parallele Arbeit an demselben Feature.
-   - `check_jules_context_freshness.rs` (Gate 10): Validiert die Frische der Dokumentation gegenüber `DECISIONS.md`.
-   - `claim.rs`: Ermöglicht aktives Claiming von Crates via GitHub Issues oder `.jules/claims.json`.
 
 ---
 
@@ -135,17 +127,17 @@ Die Analyse der Dokumente zeigt deutliche Schwachstellen in Multi-Agenten-Workfl
 Um die Entwicklung in Contextra zu optimieren, werden folgende 5 Säulen durchgesetzt:
 
 ### Säule 1: Strikte Pre-Submit Pipeline & Context Verification
-- Vor jedem Commit/Submit führt Jules `git status` und `cargo xtask jules-preflight` aus.
+- Vor jedem Commit/Submit führt Jules `git status` und `just check && just test` aus.
 - Keine ungeprüften Commits oder "Shell-Commit"-Titel.
 
 ### Säule 2: Aktives Crate-Claiming gegen Parallel-Agenten-Kollisionen
-- Vor Beginn einer Aufgabe prüft Jules mit `cargo xtask claim` oder `check_no_active_claim_conflict`, ob ein anderes Team/Agent an demselben Crate arbeitet.
+- Vor Beginn einer Aufgabe prüft Jules, ob ein anderes Team/Agent an demselben Crate arbeitet.
 
 ### Säule 3: Lokale Commit-Sanierung in der VM
 - Fehlerhafte lokale Entwürfe werden in der VM via `git commit --amend` oder `git reset` bereinigt, bevor sie eingereicht werden.
 
 ### Säule 4: Automatische Dokumentations-Synchronisation (SSOT)
-- Nach jeder Architektur- oder Code-Änderung wird `cargo xtask check-jules-context-freshness` ausgeführt, um Drift zwischen Quellcode und Spezifikationen zu verhindern.
+- Nach jeder Architektur- oder Code-Änderung wird die Dokumentation geprüft, um Drift zwischen Quellcode und Spezifikationen zu verhindern.
 
 ### Säule 5: Transparente Log- & Session-Führung
 - Fortlaufende Aktualisierung von `.jules/JULES_LOG.md` und Injektion wichtiger Invarianten in den Persistent Memory Store.

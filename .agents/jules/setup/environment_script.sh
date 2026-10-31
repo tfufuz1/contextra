@@ -143,9 +143,6 @@ step "[7/7] Invarianten-Report"
 grep -q axum crates/contextra-mcp/Cargo.toml 2>/dev/null && warn "ADR-010 verletzt: axum in contextra-mcp" || ok "ADR-010: kein axum in contextra-mcp"
 OPEN=$(grep -rn 'AI-TAG\[[A-Z]*\]\[\(CRITICAL\|BLOCKER\)\]' crates/ --include='*.rs' 2>/dev/null | grep -vc RESOLVED)
 echo "  ℹ️  Offene CRITICAL/BLOCKER-Tags: ${OPEN:-0} (Ziel: 0)"
-if cargo run -q --manifest-path xtask/Cargo.toml -- harness-list 2>/dev/null | grep -q env-attest; then
-  cargo run -q --manifest-path xtask/Cargo.toml -- env-attest 2>&1 | tail -n 15 || warn "env-attest meldet Abweichungen"
-else warn "xtask env-attest (noch) nicht registriert"; fi
 
 # Kontext einmalig erzeugen (wird bei Task-Start erneut aktualisiert)
 [ -f .agents/jules/setup/refresh-context.sh ] && bash .agents/jules/setup/refresh-context.sh || warn "refresh-context.sh fehlt"

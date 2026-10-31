@@ -39,7 +39,10 @@ pub mod vault;
 // ANCHOR[contextra-sys:LIB-REEXPORT-001]
 // Öffentliche Re-Exports für ergonomischen Direktzugriff durch übergeordnete Ringe (z. B. contextra-store, contextra-engine).
 pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
-pub use durability::{durable_flush_dir, durable_flush_file, write_all_durable};
+pub use durability::{
+    durable_flush_dir, durable_flush_file, flush_dir, flush_file, fs_class, rename_durable,
+    write_all_durable, FlushKind, FsClass,
+};
 pub use mlock::{mem_lock, mem_lock_with_policy, mem_unlock, MemLockPolicy};
 pub use mmap::mmap_readonly;
 pub use posix::{ensure_fd_limit, reopen_and_dup2, set_fd_limit};

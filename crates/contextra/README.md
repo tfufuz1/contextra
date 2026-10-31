@@ -1,37 +1,33 @@
 # contextra
 
-Haupt-Library Facade für Endanwender.
+> **Haupt-Bibliotheksfassade und einzige Composition Root für Endanwender**
+>
+> Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; SPEC §4, `capabilities.toml`).
 
-Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; §6.0, `capabilities.toml`).
+---
 
+## Zweck & Rolle im System
 
-`contextra` ist die primäre Fassade und Composition Root des Contextra Cognitive OS (Ring 4).
+`contextra` ist die primäre Fassade und die einzige **Composition Root** des Gesamtsystems (Ring 4). Sie stellt den zentralen Einstiegspunkt und das Builder-Muster (`ContextraBuilder`) für Anwendungen bereit, um Speicher-Engines, Vektor- und Textindizes, Krypto-Verwaltung und Inferenzanbindungen sauber und sicher zu instanziieren.
 
-## Zweck
+## Ring-Zugehörigkeit & Sicherheitsgarantien
 
-Stellt den zentralen Einstiegspunkt und Builder-Muster (`ContextraBuilder`) für Rust-Anwendungen bereit. Dient als einzige Composition Root des Systems, um Backends, Memory Engines, Privatsphäre-Filter und Inferenz-Anbindungen sauber zu verbinden.
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 4 (Ränder / Composition Root)
-- **Status:** 🟡 In Migration / Shell (Fassade)
+- **Ring:** Ring 4 (Fassade / Composition Root)
+- **Status:** `stable` / Primäre Schnittstelle
 - **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
+- **Zero Panic:** Alle öffentlichen APIs geben `Result<T, ContextraError>` zurück.
+- **Fail-Closed:** Fehlerhafte Konfigurationen oder fehlende Schlüssel verhindern den Start.
 
 ## Öffentliche API-Übersicht
 
-In Phase 1b des Migrationsplans wird die Fassade kontinuierlich erweitert. Momentan stellt `contextra` grundlegende Module und Builder-Typen bereit:
+- **Composition Root / Builder:** `ContextraBuilder` zur sicheren Assemblierung aller Subsysteme.
+- **Konfiguration:** `ContextraConfig`, `StorageConfig`, `SecurityConfig`.
+- **Datenbank-Zugriff:** Re-Exports der Sammlungs- und Transaktionsverwaltung aus `contextra-db`.
+- **Löschpfad:** Initiierung von physischem Purge und Crypto-Shredding über die `ErasureSaga`.
 
-- **Composition Root / Builder:** `ContextraBuilder`
-- **Konfiguration:** `ContextraConfig`
+## Weiterführende Dokumentation
 
-## Architektur & Verweise
-
-Für Details zur Zielarchitektur, Ring-Struktur und den einzelnen Migrationsphasen siehe [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §A2 / §4.2 im Repository-Root.
-
-## Feature-Ringe (Ring-Split)
-
-| Feature-Name | Enthaltene Features / Abhängigkeiten | Zielgruppe | Lizenzmodell |
-| --- | --- | --- | --- |
-| `embedded` | Default (embedded local search) | OSS-Adoption | Open Source (MIT/Apache-2.0) |
-| `candle` | `contextra-infer-candle` | Local Candle Inference | Open Source (MIT/Apache-2.0) |
-| `compliance` | `audit-export`, `avv-generator` | Kommerziell | Trade-Secret / Kommerziell (`compliance`) |
+- 📖 [Gesamtspezifikation (SPEC.md)](../../docs/SPEC.md)
+- 📋 [Implementierungsplan (PLAN.md)](../../PLAN.md)
+- 🏗️ [Architektur & Schichtenmodell](../../docs/ARCHITECTURE.md)
+- 🛠️ [Kompilieranleitung für Implementierer](../../docs/COMPILATION.md)

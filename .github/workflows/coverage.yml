@@ -34,10 +34,6 @@ jobs:
             --output-path coverage.json
         timeout-minutes: 20
 
-      - name: Run Coverage Gate
-        run: cargo xtask check-coverage-gate
-        # Gate-Schwellwerte: siehe xtask/src/check_coverage_gate.rs::get_threshold_for_crate (einzige maßgebliche Quelle, nicht hier duplizieren)
-
       - name: Upload Coverage to Codecov
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4

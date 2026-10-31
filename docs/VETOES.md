@@ -1,60 +1,63 @@
 # Contextra — Feature-Veto-Register (VETOES.md)
-<!-- doc-stamp: 2026-10-29 10cc17922 | Spec-Fassung: 3.0 -->
-<!--
-  WP 0.3 — 2026-10-26:
-  - VETO-F02: conditionally_accepted → bestätigt (Überprüfungsfrist 2026-10-07 abgelaufen;
-    Tombstone+Slot-Nullung+Rebuild bleibt die einzige zulässige Löschstrategie — AGENTS.md §6)
-  - VETO-OP03: conditionally_accepted → bestätigt (kein Audio-Streaming in v1.0 — SPEC §2.3)
-  - VETO-F10 und VETO-ADR: unverändert permanent_rejected
--->
 
-## VETO-F02
+<!-- doc-stamp: 2026-10-31 | Spec-Fassung: 2.4 | Normativ -->
 
-feature_id: F-02
-status: bestätigt
-confirmed_at: "2026-10-26"
-was: conditionally_accepted
-conditional_review_was_due: "2026-10-07"
-adr_ref: docs/decisions/ADR-077-produktvision-pypi-library-fokus-und.md
-affected_paths: ["crates/contextra-vector/", "crates/contextra-store/"]
-keywords: ["partial hnsw rebuild", "nucleation", "rebuild_region", "F-02"]
-reason: >
-  Kein partielles HNSW-Rewiring oder Teilgraph-Rebuilding (F-02) durchführen wegen
-  Recall-Kollaps und RwLock-Contention. Zulässig ist ausschließlich:
-  Tombstone-Pruning + Slot-Nullung + vollständiger Rebuild (AGENTS.md §6, INV-HNSW-SLOT-1).
-  Slot-Nummern werden erst nach Rebuild-Abschluss wiederverwendet.
-  Überprüfungsfrist 2026-10-07 ist abgelaufen — Befund B-12 (WP 6.2) bestätigt die Notwendigkeit.
+> **Normativer Status:** Dieses Dokument ist nach [`docs/SPEC.md`](SPEC.md) die zweithöchste normative Quelle des Repositories (Rang 2). Hier festgehaltene Vetos dürfen unter keinen Umständen ohne formales Architecture Decision Record (ADR) und Freigabe durch die Core Maintainer aufgehoben oder umgangen werden.
 
-## VETO-F10
+---
 
-feature_id: F-10
-status: permanent_rejected
-keywords: ["cross-tenant", "osmotic knowledge exchange", "tenant knowledge sharing", "F-10"]
-reason: >
-  Keine mandantenübergreifenden Datenflüsse, Knowledge-Sharing oder Cross-Tenant-Aggregationen
-  (F-10) herstellen. Mandantenisolation (TenantId) ist absolut zur Wahrung von
-  DSGVO-Löschgarantien und KV-Cache-Sicherheit. Tenant kommt aus der Transaktion,
-  nie aus Nutzerparametern (INV-TENANT-1, SPEC §3 P-Mandant).
+## VETO-F02: Kein partielles HNSW-Rewiring
 
-## VETO-OP03
+- **Feature-ID:** F-02
+- **Status:** Bestätigt (`permanent_enforced`)
+- **Betroffene Pfade:** `crates/contextra-vector/`, `crates/contextra-store/`
+- **Schlüsselbegriffe:** `partial hnsw rebuild`, `nucleation`, `rebuild_region`, `F-02`
+- **Begründung:** Partielles Rewiring oder lokales Re-Graphing im HNSW-Index führt zu Recall-Kollaps, Deadlocks und extremer RwLock-Contention. Zulässige Strategie ist ausschließlich: **Tombstone-Pruning + Slot-Nullung + vollständiger Rebuild** (INV-HNSW-SLOT-1). Slot-Nummern dürfen erst nach Abschluss des vollständigen Rebuilds wiederverwendet werden.
 
-feature_id: OP-03
-status: bestätigt
-confirmed_at: "2026-10-26"
-was: conditionally_accepted
-conditional_review_was_due: "2026-10-07"
-adr_ref: docs/decisions/ADR-077-produktvision-pypi-library-fokus-und.md
-keywords: ["voice assistant", "speech-to-text", "realtime-audio", "jarvis", "OP-03"]
-reason: >
-  Keine Realtime-Audio-, Speech-to-Text-, Voice- oder Jarvis-Assistenten-Funktionen (OP-03)
-  integrieren. Audio-Streaming gehört nicht zum bi-temporalen Speichersubstrat.
-  Kein Audio-Streaming im Kern (SPEC §2.3 Nicht-Ziele v1.0).
-  Überprüfungsfrist 2026-10-07 abgelaufen — v1.0-Scope bestätigt kein Audio.
+---
 
-## VETO-ADR
+## VETO-F10: Absolute Mandantentrennung (Zero Cross-Tenant)
 
-feature_id: VETO-UMGEHUNG
-status: permanent_rejected
-keywords: ["veto bypass", "isolation bypass", "bypass veto"]
-reason: >
-  Keine Veto-Sperren oder Isolationsgrenzen ohne explizites ADR unter docs/decisions/ umgehen.
+- **Feature-ID:** F-10
+- **Status:** Dauerhaft abgelehnt (`permanent_rejected`)
+- **Betroffene Pfade:** Alle Crates (insb. `contextra-db`, `contextra-engine`, `contextra-mcp`)
+- **Schlüsselbegriffe:** `cross-tenant`, `osmotic knowledge exchange`, `tenant knowledge sharing`, `F-10`
+- **Begründung:** Jeglicher mandantenübergreifende Datenfluss, Wissensaustausch oder Cross-Tenant-Index-Sharing ist verboten. Die Mandantenisolation (`TenantId`) ist absolut zur Wahrung von Art. 17 DSGVO und vertraglichen Geheimhaltungspflichten. `TenantId` stammt unveränderlich aus dem `RequestContext`, niemals aus Nutzereingaben oder Parametern (INV-TENANT-1, SPEC §3 P-Mandant).
+
+---
+
+## VETO-OP03: Kein Audio-, Voice- oder Speech-Streaming
+
+- **Feature-ID:** OP-03
+- **Status:** Bestätigt (`permanent_enforced`)
+- **Betroffene Pfade:** Gesamter Kern
+- **Schlüsselbegriffe:** `voice assistant`, `speech-to-text`, `realtime-audio`, `jarvis`, `OP-03`
+- **Begründung:** Realtime-Audio, STT/TTS oder Sprachassistenten-Schnittstellen gehören nicht zum Funktionsumfang eines lokalen Wissens- und Speichersubstrats (SPEC §2.3 Nicht-Ziele v1.0).
+
+---
+
+## VETO-SN01: Single-Node-Doktrin (Kein P2P, kein Sharding)
+
+- **Feature-ID:** SN-01
+- **Status:** Dauerhaft bestätigt (`permanent_enforced`)
+- **Betroffene Pfade:** `contextra-store`, `contextra-engine`, `contextra-core`
+- **Schlüsselbegriffe:** `distributed consensus`, `raft`, `p2p`, `sharding`, `replication`
+- **Begründung:** Contextra ist ein lokaler, eingebetteter Single-Node-Speicher. Ein einziger Primärprozess besitzt und sperrt das lokale Datenverzeichnis. Verteilte Konsensprotokolle, P2P-Netzwerke oder Cluster-Sharding im Kern erhöhen die Angriffsfläche und untergraben die lokale Löschverifizierbarkeit.
+
+---
+
+## VETO-FAILCLOSED: Keine stillen Fallbacks bei Sicherheitsfehlern
+
+- **Feature-ID:** FC-01
+- **Status:** Dauerhaft bestätigt (`permanent_enforced`)
+- **Betroffene Pfade:** Alle Schichten
+- **Schlüsselbegriffe:** `silent fallback`, `unwrap_or_default`, `ignore error`, `FC-01`
+- **Begründung:** Kryptografische Fehler, fehlende Schlüssel, gebrochene Prüfsummen oder unzureichende Berechtigungen MÜSSEN zu einem sofortigen, expliziten Fehler (`ContextraError`) führen. Es ist strengstens verboten, bei Krypto-Fehlern unverschlüsselte Fallbacks zu wählen oder Löschfehler still zu ignorieren (INV-FAILCLOSED-1).
+
+---
+
+## VETO-ADR: Verbot der Veto-Umgehung
+
+- **Feature-ID:** VETO-UMGEHUNG
+- **Status:** Dauerhaft abgelehnt (`permanent_rejected`)
+- **Begründung:** Kein Veto darf durch modulinterne Hacks, unautorisierte Abkürzungen oder Refactorings umgangen werden. Jede Änderung erfordert ein formelles ADR unter `docs/decisions/`.

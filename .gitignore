@@ -1,7 +1,6 @@
 target/
 **/target/
 target/evidence
-target/xtask
 *.swp
 *.swo
 .idea/

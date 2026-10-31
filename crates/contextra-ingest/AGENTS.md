@@ -23,7 +23,7 @@
 6 Revier-Treue: nur das eigene Revier ändern; Cargo.toml, Cargo.lock, lib.rs, registry.rs, fuzz/Cargo.toml und geschützte Pfade gehören P00A/P00B; Bedarf darüber hinaus => PR-Abschnitt "Out-of-scope Findings".
 7 Wartbarkeit: Dateien <= 800 Zeilen, #[non_exhaustive] auf öffentlichen Enums/Structs, FILE-CONTEXT-Kopf, kein Typname doppelt im Workspace (vorher grep), Doku deutsch, Bezeichner englisch.
 8 Test-First; Fixtures klein und im Test per Code erzeugt; keine echten personenbezogenen Daten.
-9 Gates vor PR: cargo fmt --all · cargo clippy -p contextra-ingest --all-targets --all-features --locked -- -D warnings · cargo test -p contextra-ingest --all-features --locked · cargo run -p xtask -- check; dann git fetch origin && git rebase origin/main und Gates erneut. Gates/Lints/Baselines nie anfassen.
+9 Gates vor PR: cargo fmt --all · cargo clippy -p contextra-ingest --all-targets --all-features --locked -- -D warnings · cargo test -p contextra-ingest --all-features --locked; dann git fetch origin && git rebase origin/main und Gates erneut. Gates/Lints/Baselines nie anfassen.
 10 Branch wp/ingest-<kürzel>, Commit "WP-ING-<kürzel>(contextra-ingest): …", ein PR.
 
 ## 5. Implementierte & konsumierte Ports

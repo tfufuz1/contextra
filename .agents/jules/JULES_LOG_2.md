@@ -1,6 +1,6 @@
 # Jules Entwicklungsumgebung & System-Kontext Analyse
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 
 Dieses Dokument dient als umfassende Protokollierung und Analyse der Funktionsweise, Kontextrepräsentation, Datei-Einlesemechanismen und Qualitätsstandards von Jules (Google-Jules) im Repository **Contextra**.
 
@@ -85,7 +85,7 @@ Aus der Analyse der bisherigen Commits, Audits und PRs lassen sich folgende hist
 
 1. **Unsynchronisierte Kontext-Dateien (`JULES_CONTEXT.md` vs. `WORKING_STATE.md`)**:
    - *Problem*: Statische Dokumente veralten schnell, wenn Commits ohne Doku-Update gemerged werden.
-   - *Lösung*: Einführung des CI Gate 10 (`cargo run -p xtask -- check-jules-context-freshness`) und automatische Generierung via `just sync-docs`.
+   - *Lösung*: Automatische Überprüfung in CI.
 2. **Panic-Risiken durch `.unwrap()` / `.expect()`**:
    - *Problem*: In Production-Code führten `.unwrap()` Aufrufe zu FFI- oder Thread-Panics.
    - *Lösung*: Die `.unwrap-baseline.json` Überwachung stellt sicher, dass kein neuer Production-Code `.unwrap()` verwendet. Fehler werden strikt über `ContextraError` und `?` propagiert.
@@ -107,8 +107,7 @@ Um künftig doppelte Arbeiten, Prompt-Thrashing und unnötige Kontext-Aufblähun
 - **Autogenerierte Zustandsdateien**: `WORKING_STATE.md` und `CHANGELOG.md` sollten immer per `just sync-docs` generiert werden, um manuelle Doku-Abweichungen zu verhindern.
 
 ### B. Klare, maschinenlesbare CI-Gates & Commands
-- **Xtask-Harness**: Bündelung aller Prüfungen in `cargo xtask` (z. B. `jules-preflight`, `check-duplicate-symbols`, `check-vetoes`).
-- **Justfile als Einstieg**: Alle wiederkehrenden Befehle (`just check`, `just test`, `just dag-check`, `just sync-docs`) bieten eine einheitliche Schnittstelle, die Jules über `run_in_bash_session` ausführen kann.
+- **Justfile als Einstieg**: Alle wiederkehrenden Befehle (`just check`, `just test`, `just gates`) bieten eine einheitliche Schnittstelle, die Jules über `run_in_bash_session` ausführen kann.
 
 ### C. Standardisiertes In-File Tagging
 - **Verwendung von `AI-TAG` und `ANCHOR`**:

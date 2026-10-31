@@ -1,0 +1,206 @@
+# SOLL-Zuordnung der Crates – abgeleitet aus „Contextra V1 – Globale Schnittstellenspezifikation“
+# §2.2 (Zuordnung Kern/Enterprise/Labor/gestrichen), §4.1 (Ringe), §4.2 (Regeln R1–R8)
+# und „Neukonzeption der Löschkette“ §14.
+#
+# zone:  core | enterprise | labs | delete
+# ring:  0..5 (nur Kern)
+# Eintrag mit rename_to  = Bestandsname, der umbenannt wird; Eintrag mit renamed_from = Zielname.
+# Eintrag mit new = true  = existiert noch nicht (scaffold); deps = interne SOLL-Abhängigkeiten.
+# Passe diese Datei an, wenn eine Entscheidung (z. B. simd, db-Merge) anders fällt – alle Werkzeuge lesen sie.
+
+[meta]
+spec = "Contextra V1 Schnittstellenspezifikation §2.2/§4; Neukonzeption Löschkette §14"
+
+[rules]
+unsafe_allowed = ["contextra-sys"]                                  # R3
+network_allowed = ["contextra-embed-ollama", "contextra-infer-ollama"]  # R7
+network_tokens = ["TcpStream", "TcpListener", "UdpSocket", "reqwest", "ureq", "hyper"]
+network_dep_names = ["reqwest", "ureq", "hyper"]
+tokio_free_rings = [0, 1, 2]                                        # R4 (Ring 0..2 ohne tokio unter [dependencies])
+fs_ring_min = 1                                                     # R5 gilt für Ring 1..3
+fs_ring_max = 3
+fs_adapters = ["contextra-store", "contextra-sys", "contextra-keys", "contextra-durable-fs"]
+
+[wording]
+# Verbotene Aussagen (Rechtssynthese §8.4/§12, Prüfbericht §10.6). Regex, ohne Beachtung der Groß-/Kleinschreibung.
+# Zeile mit `wording-ignore` wird übersprungen.
+forbidden = [
+  "informationstheoretisch\\w*",
+  "DSGVO[- ]konform\\w*",
+  "GDPR[- ]compliant",
+  "erfüllt\\s+(?:automatisch\\s+)?Art\\.?\\s*17",
+  "garantiert\\w*\\s+(?:gelöscht|Löschung|DSGVO|Datenschutz|irreversibel|unwiederbringlich|vergessen)",
+  "unwiederbringlich\\s+gelöscht",
+  "guaranteed\\s+(?:deletion|erasure)",
+]
+
+# ------------------------------------------------------------------ Kern
+[crate.contextra-types]
+zone = "core"
+ring = 0
+purpose = "Werttypen, Fehler, Klassen, Zustandsmaschine step"
+[crate.contextra-ports]
+zone = "core"
+ring = 0
+purpose = "Alle Erweiterungsschnittstellen (Traits)"
+[crate.contextra-sys]
+zone = "core"
+ring = 0
+purpose = "Einzige unsafe-Insel: mlock, Härtung, Dateirechte"
+
+[crate.contextra-crypto]
+zone = "core"
+ring = 1
+purpose = "Primitive, Sealed, Hash-Kette"
+[crate.contextra-keys]
+zone = "core"
+ring = 1
+new = true
+purpose = "Schlüsselhierarchie, Ledger, KeyVault (FileVault)"
+deps = ["contextra-types", "contextra-ports", "contextra-crypto", "contextra-sys"]
+[crate.contextra-store]
+zone = "core"
+ring = 1
+purpose = "KvStore-Adapter (redb), Slot-Katalog, StdVfs"
+
+[crate.contextra-vector]
+zone = "core"
+ring = 2
+purpose = "HNSW mit Filter, Exakt-Scan, Slot-Nullung"
+[crate.contextra-text]
+zone = "core"
+ring = 2
+purpose = "BM25, deutsche Morphologie, blinde Terme"
+[crate.contextra-rank]
+zone = "core"
+ring = 2
+purpose = "Fusion (RRF, gewichtet)"
+[crate.contextra-ingest]
+zone = "core"
+ring = 2
+purpose = "Extraktion, Chunking, Limits, Worker-Prozess"
+[crate.contextra-privacy]
+zone = "core"
+ring = 2
+purpose = "PII-Muster mit Prüfziffern, Egress-Policy"
+[crate.contextra-infer-ollama]
+zone = "core"
+ring = 2
+rename_to = "contextra-embed-ollama"
+purpose = "Embedding-Adapter lokaler Ollama-Dienst"
+[crate.contextra-embed-ollama]
+zone = "core"
+ring = 2
+renamed_from = "contextra-infer-ollama"
+purpose = "Embedding-Adapter lokaler Ollama-Dienst"
+
+[crate.contextra-engine]
+zone = "core"
+ring = 3
+purpose = "Eraser, LiveMask, Katalog, Epochen-Worker, Wiederanlauf"
+[crate.contextra-audit-export]
+zone = "core"
+ring = 3
+rename_to = "contextra-compliance"
+purpose = "Verarbeitungsverzeichnis, TOM-Bericht"
+[crate.contextra-compliance]
+zone = "core"
+ring = 3
+renamed_from = "contextra-audit-export"
+purpose = "Verarbeitungsverzeichnis, TOM-Bericht, Berichtsrenderer"
+
+[crate.contextra]
+zone = "core"
+ring = 4
+purpose = "Fassade und Composition Root"
+[crate.contextra-db]
+zone = "core"
+ring = 4
+merge_into = "contextra"
+purpose = "Legacy-Fassade, wird mit contextra zusammengeführt"
+[crate.contextra-mcp]
+zone = "core"
+ring = 4
+purpose = "MCP-Server (Binary)"
+[crate.contextra-py]
+zone = "core"
+ring = 4
+purpose = "Python-Bindings"
+[crate.contextra-cli]
+zone = "core"
+ring = 4
+new = true
+bin = true
+purpose = "Kommandozeile contextra"
+deps = ["contextra", "contextra-compliance", "contextra-verify"]
+[crate.contextra-verify]
+zone = "core"
+ring = 4
+new = true
+purpose = "Eigenständiger Prüfer für Löschberichte und Audit-Ketten (nur types + Ed25519)"
+deps = ["contextra-types"]
+
+[crate.contextra-testkit]
+zone = "core"
+ring = 5
+purpose = "Konformitätssuiten, FaultVfs, deterministische Uhr"
+
+# ------------------------------------------------------------------ Enterprise
+[crate.contextra-avv-generator]
+zone = "enterprise"
+purpose = "AVV-Rendering (nur bei Hosting durch den Integrator)"
+[crate.contextra-license]
+zone = "enterprise"
+purpose = "Lizenzprüfung (gehört nicht in eine MIT/Apache-Bibliothek)"
+[crate.contextra-infer-onnx]
+zone = "enterprise"
+purpose = "In-Process-Inferenz (ort ist Release Candidate)"
+[crate.contextra-infer-candle]
+zone = "enterprise"
+purpose = "Candle-Inferenz"
+[crate.contextra-sandbox]
+zone = "enterprise"
+purpose = "wasmtime-Sandbox"
+
+# ------------------------------------------------------------------ Labor
+[crate.contextra-graph]
+zone = "labs"
+purpose = "GraphRAG"
+[crate.contextra-cognition]
+zone = "labs"
+purpose = "Forschung"
+[crate.contextra-adapt]
+zone = "labs"
+purpose = "Forschung (PID/Bandit)"
+[crate.contextra-router]
+zone = "labs"
+purpose = "Routing"
+[crate.contextra-agent]
+zone = "labs"
+purpose = "Agenten-Laufzeit"
+[crate.contextra-simd]
+zone = "labs"
+purpose = "Handgeschriebene SIMD-Kernel (u8 nachweislich falsch); Kern nutzt sichere portable Kernel"
+
+# ------------------------------------------------------------------ Streichen
+[crate.contextra-mvcc]
+zone = "delete"
+purpose = "Ein Schreiber; Basistypen (TxId, Sequenznummern) wandern nach types"
+[crate.contextra-checkpoint]
+zone = "delete"
+purpose = "Time-Travel widerspricht Löschpflicht"
+[crate.contextra-wire]
+zone = "delete"
+purpose = "FlatBuffers; 45–47 unsafe im generierten Code"
+[crate.contextra-kvcache]
+zone = "delete"
+purpose = "KV-Cache ohne Nutzen (Tensor war Textstring)"
+[crate.contextra-durable-fs]
+zone = "delete"
+purpose = "Nicht kompilierbar, ohne Nutzer"
+[crate.contextra-core]
+zone = "delete"
+purpose = "Deprecated Fassade"
+[crate.contextra-bench]
+zone = "delete"
+purpose = "Altbestand; Benchmarks wandern nach benches/"

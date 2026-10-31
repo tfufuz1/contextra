@@ -180,8 +180,7 @@ impl PendingDeleteJournal {
         let mut buffer = String::new();
         for path in &self.entries {
             buffer.push_str(&path.to_string_lossy());
-            buffer.push('
-');
+            buffer.push('\n');
         }
         match atomic_replace(&self.journal_path, buffer.as_bytes()) {
             Ok(()) => Ok(()),

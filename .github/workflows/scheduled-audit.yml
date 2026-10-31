@@ -56,13 +56,11 @@ tier      = 1
 risk      = "sec"
 goal      = "Proaktive Analyse der Commits der letzten 7 Tage auf Race Conditions, unwrap-Regressions, Silent Failures und DAG-Grenzverletzungen."
 non_goals = ["Refactoring ausserhalb verifizierter Befunde", "Stilles Ignorieren nicht verifizierter Findings"]
-scope     = ["crates/**", "xtask/**"]
+scope     = ["crates/**"]
 forbidden = ["capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
 invariants = ["Zero-Panic", "P28 Determinismus", "Audit Intake Protocol"]
 acceptance = [
-  "cargo test --workspace --locked",
-  "cargo xtask check-ring-layering",
-  "cargo xtask panic-inventory"
+  "cargo test --workspace --locked"
 ]
 evidence_required = ["Verifizierte Befunde mit Test oder Entkraeftungsbegruendung im PR-Text"]
 
@@ -94,7 +92,7 @@ EOF
             WICHTIG:
             - Befolge `.jules/AUDIT_INTAKE_PROTOCOL.md` — verifiziere JEDEN Fund gegen den AKTUELLEN Code, bevor du etwas änderst.
             - Führe `git show <sha>` aus, um Commit-Änderungen zu untersuchen.
-            - Verwende `cargo xtask panic-inventory` zur unwrap/expect-Prüfung.
+            - Verwende `cargo test` zur Prüfung.
           delete-branch: true
 
   trigger-mutation-testing:

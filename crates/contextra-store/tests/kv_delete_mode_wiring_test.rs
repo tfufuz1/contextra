@@ -41,7 +41,7 @@ fn test_crypto_shred_revoke_subkey_read_fails() {
     assert_eq!(read_back.as_slice(), plaintext);
 
     // Revoke subkey directly or via manager
-    let revoked = manager.delete_segment(group_id);
+    let revoked = manager.delete_segment(group_id).expect("delete_segment failed");
     assert!(revoked, "subkey must be revoked");
 
     // Key is no longer active
@@ -112,7 +112,7 @@ fn test_default_config_crypto_shred_end_to_end() {
     assert!(!proof_before);
 
     // 3. Delete segment
-    let deleted = manager.delete_segment(group_id);
+    let deleted = manager.delete_segment(group_id).expect("delete_segment failed");
     assert!(deleted, "delete segment must return true");
 
     // Deletion proof after delete should report revoked (true)

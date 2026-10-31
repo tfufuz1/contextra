@@ -1,39 +1,31 @@
 # Harness Quickstart
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 
 Dieses Dokument beschreibt die Benutzung der schlanken 5-Phasen-Fassade für Jules-Sessions.
 
-## Die 5 Phasenbefehle
+## Entwickler-Workflows
 
-1. **`cargo xtask jules start --card <karte>`**
-   Initialisiert die Umgebung (`env-attest` <!-- harness:planned -->), prüft die Task-Karte (`task-card lint`), setzt den Claim (`claim`) und schnürt das Kontext-Paket (`context-pack`).
-2. **`cargo xtask jules check`**
-   Prüft Syntax, Formatierung (`cargo fmt --check`), Lints (`cargo clippy`), Scope (`scope-guard` <!-- harness:planned -->), Geschützte Pfade (`protected-paths` <!-- harness:planned -->) und Duplikate (`check-duplicate-symbols`).
-3. **`cargo xtask jules verify`**
-   Führt die Akzeptanz-Tests aus und prüft Architektur-Gates (`check-dag`, `check-ring-layering`, `check-vetoes`, `determinism-check` <!-- harness:planned -->).
-4. **`cargo xtask jules submit`**
-   Führt Verifikation und Submit-Gates durch (`gate-weakening` <!-- harness:planned -->, `test-integrity` <!-- harness:planned -->, `diff-budget` <!-- harness:planned -->, `session-report` <!-- harness:planned -->).
-5. **`cargo xtask jules stop --reason <grund>`**
-   Beendet die Session und stoppt den Loop Guard (`loop-guard stop` <!-- harness:planned -->).
+1. **`just check`**
+   Prüft Syntax, Formatierung (`cargo fmt --check`), Lints (`cargo clippy`) und Workspace-Kompilierung.
+2. **`just test`**
+   Führt die Test-Suite aus.
+3. **`just gates`**
+   Führt Architektur- und Layering-Tests aus (`tests/layering.rs`).
+4. **`just pre-push`**
+   Führt den vollständigen Pre-Push-Check aus (`check test gates`).
 
-## Beispielablauf mit einer Task-Karte
+## Beispielablauf
 
 ```bash
-# 1. Neue Karte erstellen
-cargo xtask task-card new --crate contextra-store --title "WAL fsync error propagation"
+# 1. Formatierung und Lints prüfen
+just check
 
-# 2. Session starten
-cargo xtask jules start --card .jules/tasks/T-2026-0001.toml
+# 2. Tests ausführen
+just test
 
-# 3. Während der Arbeit Prüfungen ausführen
-cargo xtask jules check
-
-# 4. Nach Implementierung und Test-Fix Verifikation
-cargo xtask jules verify
-
-# 5. Abschluss und PR-Vorbereitung
-cargo xtask jules submit
+# 3. Layering & Architektur prüfen
+just gates
 ```
 
 ## Exit-Codes

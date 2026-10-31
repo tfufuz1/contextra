@@ -1,6 +1,6 @@
 # Contextra — Claude / Antigravity-Betriebsanleitung
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 
 <!-- doc-stamp: 2026-10-29 0796b40ed | Spec-Fassung: 3.0 -->
 
@@ -34,7 +34,7 @@ Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart, 3 Minuten).
 1. Task lesen, Ziel verstehen, Quellen der Wahrheit identifizieren.
 2. APIs und Dateipfade im Code verifizieren — niemals aus dem Gedächtnis annehmen.
 3. Kleinste mögliche Änderung. Kein Over-Engineering.
-4. Verifizieren: Gates, Lints, Tests grün (`cargo check --workspace` && `cargo test --workspace` && `cargo run -p xtask -- check`).
+4. Verifizieren: Gates, Lints, Tests grün (`cargo check --workspace` && `cargo test --workspace`).
 5. PR-Text formulieren (mit WP-Nummer aus PLAN.md).
 
 ---

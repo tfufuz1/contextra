@@ -1,6 +1,6 @@
 # Contextra — Jules Session Bootstrap
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates, `cargo xtask` oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
 > Maschinenausführbare Checkliste. Jede Session beginnt mit GitHub, nicht mit statischen Dateien.
 >
 > **Prinzip:** GitHub = agiler Kontext (Tasks, Reviews, CI). Statische Dateien = unveränderliche Regeln.
@@ -109,7 +109,6 @@ gh issue comment <N> --body "❓ <Frage>"
 cargo fmt --all
 cargo check --workspace
 cargo test --workspace
-cargo run -p xtask -- check
 ```
 
 ---
@@ -146,7 +145,7 @@ git rebase --abort
 
 ```bash
 # Gates müssen auf dem rebased Stand grün sein
-cargo check --workspace && cargo test --workspace && cargo run -p xtask -- check
+cargo check --workspace && cargo test --workspace
 ```
 
 > **Regel:** Schlägt ein Gate nach dem Rebase fehl, liegt ein echter Konflikt mit
@@ -154,11 +153,11 @@ cargo check --workspace && cargo test --workspace && cargo run -p xtask -- check
 
 ---
 
-## Schritt 7 — Pre-Submit Gate (BLOCKIEREND)
+## Schritt 7 — Pre-Submit Prüfung (BLOCKIEREND)
 
 ```bash
-cargo xtask jules-submit-gate --crate <DEIN-CRATE>
-# Kein submit() vor ✅ SUBMIT GATE BESTANDEN.
+just check && just test
+# Kein submit() vor erfolgreichem Durchlauf.
 ```
 
 ```bash
