@@ -4,7 +4,19 @@
 // INVARIANTEN: Sendet ausschließlich ContextWindow (keine ungetrimmten Rohergebnisse).
 // SIEHE AUCH: docs/decisions/ADR-010-mcp-transport.md, rules/tag_taxonomy.md
 
-//! Client-side MCP dispatch mechanism for sending routed context to SLM endpoints.
+//! # Client-seitiger MCP-Dispatch-Mechanismus
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Ausführung von Aufrufen an Small Language Models (SLM) über das Model Context Protocol (MCP)
+//! mittels Stdio JSON-RPC 2.0 (ADR-010).
+//!
+//! **Sicherheits-Invariante:**
+//! Sendet ausschließlich das im Vorfeld vorbereitete, getrimmte und budgetierte `ContextWindow`.
+//! Es werden niemals ungetrimmte Rohergebnisse aus den Speicherschichten an das Modell übertragen.
+//!
+//! **Abhängigkeiten:**
+//! - Upstream: `contextra_types`, `contextra_wire`, `tokio::process::Command`.
+//! - Downstream: Agent-Ausführungsschichten in `contextra-agent`.
 
 use crate::router::RoutingDecision;
 use contextra_types::{ContextraError, Result};
@@ -17,6 +29,8 @@ use tokio::process::Command;
 /// Teilt einen Endpoint-String sicher in Programm + Argumente auf.
 /// Unterstützt einfache Anführungszeichen: 'arg with spaces'.
 /// Gibt Err bei leerem String oder nicht-geschlossenen Anführungszeichen zurück.
+// ANCHOR[contextra-router:DSP-001]
+/// Teilt einen Endpoint-String sicher in Programm und Argumente auf (unterstützt Single-Quotes).
 fn split_endpoint(s: &str) -> Result<(String, Vec<String>)> {
     let mut parts: Vec<String> = Vec::new();
     let mut current = String::new();
@@ -58,6 +72,29 @@ fn split_endpoint(s: &str) -> Result<(String, Vec<String>)> {
 ///
 /// Sends ONLY the tailored [`contextra_types::ContextWindow`] (not raw full search results)
 /// to the executable or script specified in `decision.profile.mcp_endpoint`.
+// ANCHOR[contextra-router:DSP-002]
+/// Führt den MCP-Aufruf an das in der Routing-Entscheidung ausgewählte SLM aus.
+///
+/// # Ablauf
+/// 1. Überprüfung des Transport-Kanals (aktuell Stdio JSON-RPC 2.0).
+/// 2. MCP-Endpunkt zerlegen (`split_endpoint`) und Subprozess spawnen.
+/// 3. JSON-RPC 2.0 Request (`tools/call` oder `generate`) serialisieren und auf Stdin schreiben.
+/// 4. Antwortzeile von Stdout asynchron einlesen und deserialisieren.
+/// 5. Validierung des JSON-RPC-Ergebnisses und Rückgabe des Antworttexts.
+///
+/// # Vorbedingungen
+/// - `decision.profile.mcp_endpoint` muss ein gültiges ausführbares Programm spezifizieren.
+/// - Das System muss Prozess-Spawns erlauben.
+///
+/// # Nachbedingungen
+/// Liefert die vom SLM generierte Antwort als String zurück.
+///
+/// # Fehler
+/// - [`ContextraError::InvalidInput`]: Ungültiger Endpunkt-String.
+/// - [`ContextraError`]: Fehler beim Prozess-Spawn, Pipe-I/O oder Protokollfehler.
+///
+/// # Nebenwirkungen
+/// Spawnt einen lokalen Betriebssystem-Prozess (I/O).
 pub async fn dispatch_to_slm(decision: &RoutingDecision) -> Result<String> {
     let endpoint = decision.profile.mcp_endpoint.trim();
     if endpoint.is_empty() {

@@ -1,3 +1,9 @@
+//! # Latenz- und Performance-Tests für Routing-Pfade
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Latenz- und Performance-Tests für Routing-Pfade.
+
+// ANCHOR[contextra-router:TST-LAT-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
