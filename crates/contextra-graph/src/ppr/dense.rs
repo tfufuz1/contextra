@@ -1,3 +1,9 @@
+// ANCHOR[contextra-graph:SRC-PPR-DENSE-001]
+//! Dichte Matrix-/Vektorberechnung für personalisierten PageRank (PPR).
+//!
+//! # Zweck
+//! Bietet klassische Matrixmultiplikation für kleine oder dicht vernetzte Teilgraphen.
+
 use super::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
 use contextra_types::{EntityId, PprConfig};

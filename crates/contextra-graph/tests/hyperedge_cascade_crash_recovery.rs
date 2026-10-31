@@ -1,3 +1,8 @@
+//! Crash-Recovery-Test für unterbrochene Hyperkanten-Kaskaden.
+//!
+//! # Zweck
+//! Simuliert Prozessabbrüche während einer Kaskaden-Invalidierung und verifiziert die Konsistenz nach Wiederanlauf.
+
 #![expect(clippy::unwrap_used)]
 
 use contextra_graph::cascade::{
@@ -14,6 +19,7 @@ use std::path::Path;
 use std::sync::Arc;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-graph:TESTS-HYPEREDGE-CASCADE-CRASH-RECOVERY-001]
 #[tokio::test]
 async fn test_hyperedge_cascade_crash_recovery() {
     let dir = tempdir().unwrap();

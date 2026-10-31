@@ -7,6 +7,7 @@ use super::error::TlHfdError;
 /// # Complexity
 /// Time complexity of parameter validation is $O(1)$.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-001]
 pub struct TlHfdParams {
     /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
     pub sigma: f32,
@@ -43,6 +44,7 @@ impl TlHfdParams {
     ///
     /// # Complexity
     /// Time complexity $O(1)$.
+// ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-002]
     pub fn validate(&self) -> Result<(), TlHfdError> {
         if !self.sigma.is_finite() || self.sigma <= 0.0 {
             return Err(TlHfdError::InvalidParameter(format!(
@@ -88,12 +90,14 @@ impl TlHfdParams {
 mod tests {
     use super::*;
 
+// ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-003]
     #[test]
     fn test_default_params_valid() {
         let params = TlHfdParams::default();
         assert!(params.validate().is_ok());
     }
 
+// ANCHOR[contextra-graph:SRC-TL-HFD-PARAMS-004]
     #[test]
     fn test_invalid_params() {
         let p = TlHfdParams {

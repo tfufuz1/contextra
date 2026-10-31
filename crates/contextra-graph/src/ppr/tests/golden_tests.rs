@@ -1,3 +1,8 @@
+//! Golden-Master-Tests mit deterministischen Referenzergebnissen für PPR.
+//!
+//! # Zweck
+//! Erkennt schleichende numerische Drift oder Regressionen in Diffusionswerten.
+
 use crate::csr::{CsrGraph, GraphInner};
 use crate::ppr::{compute_ppr, DeletedView};
 use contextra_types::{Entity, EntityId, PprConfig};
@@ -7,6 +12,7 @@ fn create_entity(id: u64) -> Entity {
     Entity::new(EntityId::new(id), "label", "type")
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-GOLDEN-TESTS-001]
 #[tokio::test]
 async fn test_golden_ppr_chain_star_clusters_sinks() {
     // 1. Chain Graph: 1 -> 2 -> 3 -> 4
@@ -230,6 +236,7 @@ async fn test_golden_ppr_chain_star_clusters_sinks() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-GOLDEN-TESTS-002]
 #[tokio::test]
 async fn test_ppr_edge_cases_handling() {
     let g = Arc::new(CsrGraph::new());

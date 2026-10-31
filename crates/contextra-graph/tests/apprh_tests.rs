@@ -84,6 +84,7 @@ impl PathGraph for MockGraph {
     }
 }
 
+// ANCHOR[contextra-graph:TESTS-APPRH-TESTS-001]
 #[test]
 fn test_apprh_determinism_and_seed_permutations() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -123,6 +124,7 @@ fn test_apprh_determinism_and_seed_permutations() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-APPRH-TESTS-002]
 #[test]
 fn test_apprh_convergence_sum_and_finiteness() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -160,6 +162,7 @@ fn test_apprh_convergence_sum_and_finiteness() -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-APPRH-TESTS-003]
 #[test]
 fn test_p24_locality_bounded_visited_set() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -186,6 +189,7 @@ fn test_p24_locality_bounded_visited_set() -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-APPRH-TESTS-004]
 #[test]
 fn test_apprh_parameter_validation() {
     let g = MockGraph::new();
@@ -228,6 +232,7 @@ fn test_apprh_parameter_validation() {
     ));
 }
 
+// ANCHOR[contextra-graph:TESTS-APPRH-TESTS-005]
 #[test]
 fn test_apprh_shadow_mode_comparison() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();

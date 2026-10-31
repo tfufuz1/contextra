@@ -1,3 +1,9 @@
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-PAGERANK-001]
+//! PageRank-Berechnungsroutinen auf dem inneren CSR-Graphzustand.
+//!
+//! # Zweck
+//! Führt personalisierte PageRank-Analysen für Graph-Traversal-Signale durch.
+
 use super::super::graph_write::CsrGraph;
 use contextra_types::EntityId;
 use std::collections::{HashMap, HashSet};

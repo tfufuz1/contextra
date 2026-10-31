@@ -1,3 +1,8 @@
+//! Lese- und Inspektionsoperationen auf dem CSR-Graphen.
+//!
+//! # Zweck
+//! Bündelt Nachbarschaftsabfragen, PageRank-Evaluation und Pfadfindungszugriffe.
+
 pub mod communities;
 pub mod pagerank;
 pub mod path_rag;
@@ -8,6 +13,7 @@ use contextra_types::{EntityId, Result, TxId};
 use super::graph_write::CsrGraph;
 
 impl CsrGraph {
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-MOD-001]
     pub fn compact(&self) {
         let snapshot = self.inner.load();
         let num_nodes = snapshot.reverse_map.len();
@@ -119,6 +125,7 @@ impl CsrGraph {
         Ok(neighbors)
     }
 
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-MOD-002]
     pub fn entity_count(&self) -> usize {
         self.inner_read()
             .entities
@@ -127,6 +134,7 @@ impl CsrGraph {
             .count()
     }
 
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-MOD-003]
     pub fn entity_exists(&self, id: EntityId) -> bool {
         let inner = self.inner_read();
         if let Some(&idx) = inner.id_map.get(&id) {
@@ -144,6 +152,7 @@ impl CsrGraph {
         false
     }
 
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-MOD-004]
     pub fn edge_count(&self) -> usize {
         let inner = self.inner_read();
         inner.targets.len()

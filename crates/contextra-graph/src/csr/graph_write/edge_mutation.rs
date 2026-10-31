@@ -1,3 +1,8 @@
+//! Kantenmutationen, Re-Inserts und Kantengewicht-Modifikationen im CSR-Graphen.
+//!
+//! # Zweck
+//! Führt Kantenaktualisierungen durch und pflegt Adjazenzvektoren sowie Inverted Lists.
+
 use super::super::types::EdgePayload;
 use super::CsrGraph;
 use crate::consistency_enforcement::EdgeAssertion;
@@ -162,6 +167,7 @@ impl CsrGraph {
     }
 
     #[allow(clippy::too_many_arguments)]
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-WRITE-EDGE-MUTATION-001]
     pub fn load_edge_direct(
         &self,
         from: EntityId,

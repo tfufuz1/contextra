@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 /// CSR Graph structural statistics used for PPR cost estimation.
 #[derive(Debug, Clone, Copy, PartialEq)]
+// ANCHOR[contextra-graph:SRC-PPR-COST-001]
 pub struct GraphStats {
     /// Number of active/committed nodes |V|.
     pub node_count: usize,
@@ -17,6 +18,7 @@ pub struct GraphStats {
 
 impl GraphStats {
     /// Creates a new `GraphStats` from explicit counts.
+// ANCHOR[contextra-graph:SRC-PPR-COST-002]
     pub fn new(node_count: usize, edge_count: usize) -> Self {
         let avg_degree = if node_count > 0 {
             edge_count as f64 / node_count as f64
@@ -33,6 +35,7 @@ impl GraphStats {
 
 /// Cost estimate for PPR evaluation algorithms in estimated edge access units.
 #[derive(Debug, Clone, Copy, PartialEq)]
+// ANCHOR[contextra-graph:SRC-PPR-COST-003]
 pub struct PprCostEstimate {
     /// Estimated edge accesses for Andersen-Chung-Lang ForwardPush: $O(1 / (\epsilon \cdot \alpha))$.
     pub forward_push: f64,
@@ -44,6 +47,7 @@ impl PprCostEstimate {
     /// Selects the cheapest algorithm based on estimated cost.
     ///
     /// Tie-break rule: If `forward_push == power_iteration`, `ForwardPush` is deterministically chosen.
+// ANCHOR[contextra-graph:SRC-PPR-COST-004]
     pub fn cheapest_strategy(&self) -> PprAlgorithm {
         if self.forward_push <= self.power_iteration {
             PprAlgorithm::ForwardPush
@@ -55,6 +59,7 @@ impl PprCostEstimate {
 
 /// A sample recording estimated cost vs measured edge access counters (operations count, no wall-clock time).
 #[derive(Debug, Clone, Copy, PartialEq)]
+// ANCHOR[contextra-graph:SRC-PPR-COST-005]
 pub struct PprCostSample {
     /// Algorithm evaluated.
     pub algorithm: PprAlgorithm,
@@ -67,23 +72,27 @@ pub struct PprCostSample {
 /// ShadowMode calibrator that collects `PprCostSample` observations and derives
 /// a recommended cost threshold multiplier without automatically applying it.
 #[derive(Debug, Clone, Default)]
+// ANCHOR[contextra-graph:SRC-PPR-COST-006]
 pub struct PprCostCalibrator {
     samples: Arc<Mutex<Vec<PprCostSample>>>,
 }
 
 impl PprCostCalibrator {
     /// Creates a new empty `PprCostCalibrator`.
+// ANCHOR[contextra-graph:SRC-PPR-COST-007]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Records a new calibration sample comparing estimated cost vs measured edge accesses.
+// ANCHOR[contextra-graph:SRC-PPR-COST-008]
     pub fn record(&self, sample: PprCostSample) {
         let mut guard = self.samples.lock();
         guard.push(sample);
     }
 
     /// Returns the total number of recorded calibration samples.
+// ANCHOR[contextra-graph:SRC-PPR-COST-009]
     pub fn sample_count(&self) -> usize {
         self.samples.lock().len()
     }
@@ -92,6 +101,7 @@ impl PprCostCalibrator {
     ///
     /// Returns `None` if no samples have been recorded.
     /// DOES NOT automatically apply the recommended factor.
+// ANCHOR[contextra-graph:SRC-PPR-COST-010]
     pub fn recommended_multiplier(&self) -> Option<f64> {
         let guard = self.samples.lock();
         if guard.is_empty() {
@@ -117,6 +127,7 @@ impl PprCostCalibrator {
     }
 
     /// Clears all recorded samples.
+// ANCHOR[contextra-graph:SRC-PPR-COST-011]
     pub fn clear(&self) {
         self.samples.lock().clear();
     }
@@ -127,6 +138,7 @@ impl PprCostCalibrator {
 /// # Fallback
 /// If `stats` is `None` or `stats.node_count == 0`, uses the spec fallback threshold:
 /// `seed_count <= 100 => ForwardPush`, otherwise `DensePowerIteration`.
+// ANCHOR[contextra-graph:SRC-PPR-COST-012]
 pub fn estimate_ppr_cost(
     stats: Option<&GraphStats>,
     seed_count: usize,
@@ -186,6 +198,7 @@ pub fn estimate_ppr_cost(
 mod tests {
     use super::*;
 
+// ANCHOR[contextra-graph:SRC-PPR-COST-013]
     #[test]
     fn test_estimate_ppr_cost_tie_break_prefers_forward_push() {
         let estimate = PprCostEstimate {
@@ -195,6 +208,7 @@ mod tests {
         assert_eq!(estimate.cheapest_strategy(), PprAlgorithm::ForwardPush);
     }
 
+// ANCHOR[contextra-graph:SRC-PPR-COST-014]
     #[test]
     fn test_fallback_when_stats_none() {
         let config = PprConfig::default();
@@ -205,6 +219,7 @@ mod tests {
         assert_eq!(choice_large, PprAlgorithm::DensePowerIteration);
     }
 
+// ANCHOR[contextra-graph:SRC-PPR-COST-015]
     #[test]
     fn test_cost_estimation_sparse_vs_dense() {
         let config = PprConfig::default();
@@ -220,6 +235,7 @@ mod tests {
         assert_eq!(choice_large, PprAlgorithm::ForwardPush);
     }
 
+// ANCHOR[contextra-graph:SRC-PPR-COST-016]
     #[test]
     fn test_ppr_cost_calibrator() {
         let calibrator = PprCostCalibrator::new();

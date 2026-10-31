@@ -1,8 +1,14 @@
+//! Pfadbasierte Relevanzsuche (Path-RAG) auf dem CSR-Graphen.
+//!
+//! # Zweck
+//! Identifiziert erklärende Pfade zwischen Entitäten für Retrieval-Augmented Generation.
+
 use super::super::graph_write::CsrGraph;
 use ahash::AHashMap;
 use contextra_types::{EntityId, Result, TxId};
 
 impl CsrGraph {
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-PATH-RAG-001]
     pub fn path_rag_at<'a>(
         &'a self,
         start_nodes: &'a [EntityId],

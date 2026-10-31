@@ -10,10 +10,12 @@ use std::collections::BTreeMap;
 use thiserror::Error;
 
 /// Maximum allowed participants in a hyperedge candidate (Combinatorial explosion guard, P5).
+// ANCHOR[contextra-graph:SRC-HYPEREDGE-SUGGEST-001]
 pub const MAX_RELATE_PARTICIPANTS: usize = 64;
 
 /// A candidate hyperedge derived from document co-occurrence.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-graph:SRC-HYPEREDGE-SUGGEST-002]
 pub struct HyperEdgeCandidate {
     /// Canonical sorted list of participating entity IDs.
     pub participants: Vec<EntityId>,
@@ -25,6 +27,7 @@ pub struct HyperEdgeCandidate {
 
 /// A candidate hyperedge after LLM semantic validation.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:SRC-HYPEREDGE-SUGGEST-003]
 pub struct ValidatedHyperEdgeCandidate {
     /// The underlying co-occurrence candidate.
     pub candidate: HyperEdgeCandidate,
@@ -38,6 +41,7 @@ pub struct ValidatedHyperEdgeCandidate {
 
 /// Errors specific to hyperedge suggestion and validation.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-graph:SRC-HYPEREDGE-SUGGEST-004]
 pub enum HyperedgeSuggestError {
     /// Candidate count exceeds the maximum LLM calls allowed per cycle.
     #[error("LLM validation budget exceeded: {0} candidates exceed limit")]
@@ -59,6 +63,7 @@ impl From<HyperedgeSuggestError> for GraphMutationError {
 /// are discarded (not truncated) to protect against combinatorial explosion.
 ///
 /// Output candidates are sorted deterministically in ascending lexicographical order of `participants`.
+// ANCHOR[contextra-graph:SRC-HYPEREDGE-SUGGEST-005]
 pub fn compute_co_occurrence_candidates(
     entities_per_document: &[(DocId, Vec<EntityId>)],
     min_co_occurrence: usize,

@@ -1,3 +1,9 @@
+// ANCHOR[contextra-graph:SRC-PPR-SNAPSHOT-001]
+//! Snapshot-Isolation und historische Abfragen für PPR-Berechnungen.
+//!
+//! # Zweck
+//! Ermöglicht reproduzierbare PageRank-Berechnungen auf historischen Transaktionsständen.
+
 use crate::csr::types::{EdgePayload, InternalIndex};
 use crate::csr::visibility::is_edge_visible_bitemporal;
 use crate::csr::GraphInner;

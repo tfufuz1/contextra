@@ -1,3 +1,10 @@
+// ANCHOR[contextra-graph:BENCHES-BINARY-EDGE-REGRESSION-001]
+//! Benchmark zur Performancemessung von binären Kanten im Vergleich zu Hyperkanten.
+//!
+//! # Zweck
+//! Misst Latenzen und Durchsatz bei Graph-Mutationen unter Verwendung von n-ären Hyperkanten
+//! und Standard-Adjazenzkanten zur Erkennung von Laufzeitregressionen.
+
 use contextra_graph::csr::{CsrGraph, CsrGraphConfig};
 use contextra_graph::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
 use contextra_types::{Entity, EntityId};

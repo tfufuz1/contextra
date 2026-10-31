@@ -4,6 +4,7 @@ use thiserror::Error;
 
 /// Error type for APPRH operations and parameter validations.
 #[derive(Error, Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:SRC-APPRH-ERROR-001]
 pub enum ApprhError {
     /// Invalid parameter value provided to APPRH.
     #[error("Invalid parameter: {0}")]
