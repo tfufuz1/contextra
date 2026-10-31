@@ -1,3 +1,9 @@
+//! # Integrationstest: Tests für korpusweite Community-basierte Leiden-Cluster-Fusion
+//!
+//! **Crate:** `contextra-rank`
+//!
+//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use contextra_rank::{GlobalFusionConfig, GlobalFusionStrategy, SearchResult};
 use contextra_types::ContextraError;
@@ -14,6 +20,7 @@ fn make_search_result(id: &str, score: f32, community_id: Option<u64>) -> Search
     }
 }
 
+// ANCHOR[contextra-rank:GLOB-TEST-001]
 #[test]
 fn test_global_fusion_community_aware_rrf() {
     let config = GlobalFusionConfig {
@@ -70,6 +77,7 @@ fn test_global_fusion_community_aware_rrf() {
     }
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_global_fusion_max_community_nodes_cap() {
     let config = GlobalFusionConfig {
@@ -91,6 +99,7 @@ fn test_global_fusion_max_community_nodes_cap() {
     assert_eq!(fused.len(), 2);
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_global_fusion_empty_community_index_degrades_gracefully() {
     let strategy = GlobalFusionStrategy::default();

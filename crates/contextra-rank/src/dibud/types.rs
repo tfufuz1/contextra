@@ -1,4 +1,9 @@
-//! Types for DiBud (Dynamic Budgeted RRF) fusion.
+//! # DiBud-Typen (`dibud::types`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Definiert Budget-Spezifikationen, Kanal-Identifikatoren und Ergebnisstrukturen
+//! für die budgetierte Streaming-Rangfusion.
 
 use contextra_types::{ContextraError, DocId};
 use serde::{Deserialize, Serialize};
@@ -8,6 +13,8 @@ use serde::{Deserialize, Serialize};
 /// Order of variants is defined such that `Vector < Text < Graph`, matching
 /// the tie-breaking priority requirement `Graph > Text > Vector`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+// ANCHOR[contextra-rank:DIBUD-001]
+/// Identifiziert die durch DiBud budgetierten Retrieval-Kanäle.
 pub enum BudgetedChannel {
     /// Vector (semantic) search channel (index 0).
     Vector = 0,
@@ -38,6 +45,8 @@ impl BudgetedChannel {
 
 /// Dynamic budget configuration for DiBud fusion.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-rank:DIBUD-002]
+/// Ressourcen- und Abbruchbudget für die Streaming-Rangfusion.
 pub struct FusionBudget {
     /// Maximum total channel access budget (reads).
     pub max_total_accesses: usize,
@@ -106,6 +115,8 @@ impl FusionBudget {
 
 /// Final outcome of a DiBud fusion execution.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-rank:DIBUD-003]
+/// Endergebnis der DiBud-Fusion inklusive zertifiziertem Präfix.
 pub struct DiBudOutcome {
     /// Ranked candidate document IDs sorted descending by lower bound $F^-(x)$ (tie-breaking by ascending `DocId`).
     pub ranked: Vec<DocId>,

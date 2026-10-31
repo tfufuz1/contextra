@@ -25,7 +25,9 @@ fn make_doc_with_community(id: &str, score: f32, community_id: u64) -> SearchRes
     }
 }
 
+// ANCHOR[contextra-rank:FUS-TEST-001]
 proptest! {
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_mrrf_weights_renormalized(
         w1 in 0.1f32..10.0f32,
@@ -92,6 +94,7 @@ proptest! {
         }
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_score_normalized_minmax_clamping(
         s1 in 0.0f32..100.0f32,
@@ -129,6 +132,7 @@ proptest! {
         }
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_global_fusion_strategy_community_cap(
         max_comm_nodes in 1usize..20usize,
@@ -155,6 +159,7 @@ proptest! {
     }
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_hybrid_strategies_rrf_and_score_normalized_mix() {
     let set1 = vec![
@@ -214,6 +219,7 @@ fn test_hybrid_strategies_rrf_and_score_normalized_mix() {
     assert!(fused.iter().all(|r| r.score.is_finite()));
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_provenance_builder_synthesized_from_records() {
     let builder = ProvenanceBuilder::new(60.0)
@@ -233,6 +239,7 @@ fn test_provenance_builder_synthesized_from_records() {
     assert_eq!(prov.index_type.as_deref(), Some("hybrid"));
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_resonance_config_boosting_behavior() {
     let cfg = ResonanceConfig {

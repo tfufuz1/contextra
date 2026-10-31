@@ -1,3 +1,10 @@
+//! # Reziproke Rangfusion (RRF) & mRRF (`rrf`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Dieses Modul implementiert die reziproke Rangfusion (RRF = Reciprocal Rank Fusion)
+//! sowie die margin-modulierte Variante (mRRF = Margin-Modulated RRF).
+
 use super::normalized::score_normalized_fusion_with_options;
 use super::provenance::ProvenanceBuilder;
 use super::resonance::{apply_resonance_bonus, ResonanceConfig};
@@ -13,6 +20,8 @@ pub use contextra_types::FusionStrategy;
 ///
 /// Returns $x / (1 + |x|)$, bounded in $(-1.0, 1.0)$ for all finite $x$.
 /// Returns `0.0` if $x$ is non-finite (`NaN` or `Infinity`).
+// ANCHOR[contextra-rank:RRF-001]
+/// Glatte, beschränkte Einflussfunktion $g(x) = \frac{x}{1 + |x|}$.
 pub fn g(x: f32) -> f32 {
     if !x.is_finite() {
         return 0.0;
@@ -21,6 +30,8 @@ pub fn g(x: f32) -> f32 {
 }
 
 /// Fuses multiple sets of ranked search results into a single ranked list using Reciprocal Rank Fusion (RRF).
+// ANCHOR[contextra-rank:RRF-002]
+/// Führt mehrere ungewichtete Signal-Ergebnislisten mittels Standard-RRF ($k=60$) zusammen.
 pub fn reciprocal_rank_fusion(
     result_sets: Vec<Vec<SearchResult>>,
     max_results: usize,
@@ -69,6 +80,8 @@ pub(super) fn merge_metadata_ref(
 }
 
 /// Weighted Reciprocal Rank Fusion with default signal metadata priority (`VectorFirst`).
+// ANCHOR[contextra-rank:RRF-003]
+/// Gewichtete reziproke Rangfusion (Weighted RRF) mit Standard-Metadatenpriorität.
 pub fn weighted_reciprocal_rank_fusion(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
@@ -83,6 +96,8 @@ pub fn weighted_reciprocal_rank_fusion(
 }
 
 /// Weighted Reciprocal Rank Fusion with explicit metadata merge priority.
+// ANCHOR[contextra-rank:RRF-004]
+/// Gewichtete reziproke Rangfusion mit expliziter Metadaten-Zusammenführungspriorität.
 pub fn weighted_reciprocal_rank_fusion_with_priority(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
@@ -95,6 +110,8 @@ pub fn weighted_reciprocal_rank_fusion_with_priority(
 /// $m_s = S_1 - S_2$ (when signal is calibrated AND `drift_status` is `Stable` and $\ge 2$ candidates exist).
 /// $w_s' = w_s \times (1 + g(\beta \times m_s))$.
 /// Renormalizes modulated weights to maintain sum equal to original weight sum (preserving weight norm in [0.999, 1.001]).
+// ANCHOR[contextra-rank:RRF-005]
+/// Moduliert Signalgewichte anhand der Margin-Differenz (mRRF) und renormalisiert sie.
 pub fn modulate_and_renormalize_weights(
     result_sets: &[(String, Vec<SearchResult>, f32)],
     calibration_contexts: Option<&[SignalCalibrationContext]>,
@@ -172,6 +189,8 @@ pub fn modulate_and_renormalize_weights(
 }
 
 /// Weighted Reciprocal Rank Fusion with options.
+// ANCHOR[contextra-rank:RRF-006]
+/// Vollständig konfigurierbare gewichtete Rangfusion mit Resonanz- und Provenance-Optionen.
 pub fn weighted_reciprocal_rank_fusion_with_options(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
@@ -532,6 +551,8 @@ fn accumulate_mrrf_scores<'a>(
 }
 
 /// Weighted Reciprocal Rank Fusion with mRRF margin-based calibration weight modulation.
+// ANCHOR[contextra-rank:RRF-007]
+/// Gewichtete Rangfusion mit margin-basierter mRRF-Gewichtsmodulation.
 pub fn weighted_reciprocal_rank_fusion_mrrf(
     mut result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
@@ -751,6 +772,8 @@ fn evaluate_effective_signal_strategies(
 }
 
 /// Fuses search result sets using per-signal fusion strategies (`SignalFusionStrategies`).
+// ANCHOR[contextra-rank:RRF-008]
+/// Führt Teilergebnisse mit individuellen Strategien je Signalart zusammen.
 pub fn fuse_search_results_with_signal_strategies(
     mut result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
@@ -831,6 +854,8 @@ pub fn fuse_search_results_with_signal_strategies(
 }
 
 /// Fuses search result sets using the specified `FusionStrategy`.
+// ANCHOR[contextra-rank:RRF-009]
+/// Universeller Einstiegspunkt zur Signal-Fusion basierend auf einer globalen `FusionStrategy`.
 pub fn fuse_search_results_with_strategy(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
