@@ -1,4 +1,20 @@
-//! Memory Importance scoring and Recency-Decay functionality.
+//! Gedächtnis-Relevanzbewertung (Importance Scoring) und zeitlicher Verfall (Recency Decay).
+//!
+//! # Architektur-Rolle: Ring 0 (Kognitive Gewichtung)
+//!
+//! In Agenten- und Gedächtnissystemen veralten episodische Informationen mit der Zeit,
+//! während semantische Fakten stabil bleiben sollen (ADR-025).
+//!
+//! Dieses Modul implementiert:
+//! - `ImportanceScore`: Normalisierter Wichtigkeits-Score `[0.0, 1.0]`.
+//! - `DecayFunction`: Mathematische Verfallsfunktionen (exponentiell nach Transaktionen,
+//!   Stufenfunktion oder exponentiell nach echter Wanduhrzeit).
+//! - `MemoryImportance`: Kombinierter Container zur Berechnung des effektiven Scores
+//!   (`base_score * decay_factor`).
+//!
+//! # Invarianten
+//! - `ImportanceScore` ist strikt auf `[0.0, 1.0]` begrenzt. `NaN` wird sicher zu `0.0`.
+//! - Reine, nebenwirkungsfreie Berechnungen ohne Panics (Zero-Panic-Garantie).
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
@@ -17,6 +33,7 @@ use serde::{Deserialize, Serialize};
 
 /// Scores the importance of a memory item on a normalized scale of `0.0` to `1.0`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:IMP-SCORE]
 pub struct ImportanceScore(f32);
 
 impl ImportanceScore {
@@ -47,6 +64,7 @@ impl Default for ImportanceScore {
 /// Recency-decay mathematical function for episodic relevance.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-types:IMP-DECAY]
 pub enum DecayFunction {
     /// No recency decay (factor remains 1.0).
     #[default]
@@ -164,6 +182,7 @@ impl DecayFunction {
 
 /// Tracks the importance score and decay parameters of a document.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:IMP-MEM]
 pub struct MemoryImportance {
     /// Base LLM or heuristic evaluation score.
     pub base_score: ImportanceScore,

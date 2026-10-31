@@ -12,6 +12,7 @@ use contextra_types::filter::FilterExpr;
 use serde_json::json;
 
 #[test]
+/// Prüft exakte Gleichheits- (`Eq`) und Ungleichheitsoperatoren (`Ne`) gegen Metadaten.
 fn test_filter_equality_and_inequality_operators() {
     let meta = json!({
         "status": "active",
@@ -47,6 +48,7 @@ fn test_filter_equality_and_inequality_operators() {
 }
 
 #[test]
+/// Prüft numerische Vergleichsoperatoren (`Gt`, `Gte`, `Lt`, `Lte`) auf Ganz- und Fließkommawerten.
 fn test_filter_numeric_comparisons() {
     let meta = json!({
         "count": 50,
@@ -91,6 +93,7 @@ fn test_filter_numeric_comparisons() {
 }
 
 #[test]
+/// Prüft Mengen- (`In`, `NotIn`) und Existenzoperatoren (`Exists`) sowie Array-Enthaltensein.
 fn test_filter_set_and_contains_operators() {
     let meta = json!({
         "environment": "production",
@@ -135,6 +138,7 @@ fn test_filter_set_and_contains_operators() {
 }
 
 #[test]
+/// Prüft logische Verknüpfungen mit `And`, `Or` und Negation (`Not`).
 fn test_filter_logical_combinators_and_not() {
     let meta = json!({
         "env": "prod",
@@ -174,6 +178,7 @@ fn test_filter_logical_combinators_and_not() {
 }
 
 #[test]
+/// Prüft das Auswertungsverhalten bei `null`-Werten und nicht existierenden Feldern.
 fn test_filter_null_and_missing_field_evaluations() {
     let meta = json!({
         "present": "value",

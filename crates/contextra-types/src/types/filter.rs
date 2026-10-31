@@ -1,4 +1,13 @@
-//! Metadata filter expression DSL and evaluation engine.
+//! Metadaten-Filterausdruck-DSL und In-Memory-Evaluierungs-Engine.
+//!
+//! # Architektur-Rolle: Ring 0 (Prädikaten-Auswertung)
+//!
+//! Bei der Vektor-, Text- oder Hybridsuche müssen Dokumente häufig nach Metadaten
+//! vor- oder nachgefiltert werden (z. B. Mandant, Kategorie, Datum, Preis, Tags).
+//!
+//! Dieses Modul stellt mit `FilterExpr` einen abstrakten Syntaxbaum (AST) bereit,
+//! der relationale (`Eq`, `Ne`, `Gt`, `Gte`, `Lt`, `Lte`, `In`, `NotIn`, `Exists`)
+//! und logische Operatoren (`And`, `Or`, `Not`) rein im Speicher gegen `serde_json::Value` auswertet.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
@@ -13,6 +22,7 @@ use serde::{Deserialize, Serialize};
 /// Metadata filter expressions for pre/post filtering.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-types:FILTER-EXPR]
 pub enum FilterExpr {
     /// Exact match: field == value
     Eq {

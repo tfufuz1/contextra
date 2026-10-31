@@ -1,3 +1,16 @@
+//! Restmessung und Kontexttypen für physische Löschnachweise (§4.2, §20.5).
+//!
+//! # Zweck & Architektur-Rolle: Ring 0
+//!
+//! Für DSGVO-/Compliance-konforme Löschnachweise (Deletion Proofs) muss nachgewiesen werden,
+//! dass gelöschte Daten weder im LSM-Tree, noch im WAL oder in Vektor-/Text-Indizes
+//! als Geisterdaten verbleiben.
+//!
+//! Dieses Modul definiert:
+//! - `ScanMethod`: Angewandte Methodik bei der Restprüfung der Speicherschichten.
+//! - `RequestContext`: Autorisierungskontext mit `TenantId` und `TxId`.
+//! - `SagaRecord`: Transaktions-Hash-Zusammenfassung für Lösch-Sagas.
+
 // FILE-CONTEXT
 // ZWECK: Typsichere Restmessung und Basistypen für physische Löschnachweise (§4.2, §20.5, INV-WITNESS-MINT-1).
 // INVARIANTEN: LayerWitness liegt ausschließlich in contextra-ports::scanner.
@@ -10,6 +23,7 @@ use serde::{Deserialize, Serialize};
 
 /// Scanner methodology applied during storage residue verification.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:WIT-001]
 pub enum ScanMethod {
     /// Direct structural scan of storage files, indices, or tables.
     Structural,
@@ -21,6 +35,7 @@ pub enum ScanMethod {
 
 /// Request context containing tenant and transaction identity for deletion operations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:WIT-002]
 pub struct RequestContext {
     /// Tenant identifier for authorization and scope isolation.
     pub tenant_id: crate::TenantId,
@@ -37,6 +52,7 @@ impl RequestContext {
 
 /// Saga record containing deletion tracking state and digests.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:WIT-003]
 pub struct SagaRecord {
     /// BLAKE3 hash of deleted keys.
     pub deleted_keys_hash: [u8; 32],

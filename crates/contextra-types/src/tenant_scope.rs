@@ -1,4 +1,11 @@
-//! Type-level tenant scope binding and enforcement primitives.
+//! Typbasierte Bindung und Durchsetzung von Mandantengrenzen (Tenant Scope Enforcement).
+//!
+//! # Zweck & Architektur-Rolle: Ring 0
+//!
+//! Strikte Mandantenisolation (Tenant Isolation) ist ein Kernprinzip von Contextra.
+//! Dieses Modul stellt Typen bereit, die Daten untrennbar an eine Mandanten-ID (`TenantId`)
+//! koppeln, sodass ein Zugriff oder Entpacken auf Compile- und Laufzeitebene nur bei
+//! Übereinstimmung mit dem autorisierten Mandanten gelingt (Vermeidung von Datenlecks).
 
 use crate::TenantId;
 use thiserror::Error;
@@ -8,6 +15,7 @@ use thiserror::Error;
 /// Macht es auf Typ-Ebene unmöglich, einen Wert ohne explizite Tenant-Zuordnung
 /// aus einem Scope heraus- oder in einen falschen Scope hineinzureichen.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-types:TS-001]
 pub struct TenantScoped<T> {
     tenant_id: TenantId,
     value: T,
@@ -50,6 +58,7 @@ impl<T> TenantScoped<T> {
 
 /// Errors raised when attempting an illegal or mismatched tenant scope unpacking operation.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+// ANCHOR[contextra-types:TS-002]
 pub enum TenantScopeViolation {
     /// Raised when unpacking a `TenantScoped<T>` value with an expected `TenantId` that differs
     /// from the value's actual bound `TenantId`.

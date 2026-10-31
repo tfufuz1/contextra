@@ -1,4 +1,16 @@
-//! Error types for `Contextra`.
+//! Fehlertypen für `Contextra`.
+//!
+//! # Architektur-Rolle: Ring 0 (Kanonische Fehlerdefinition)
+//!
+//! Dieses Modul stellt das zentrale `ContextraError`-Enum bereit.
+//! In Übereinstimmung mit dem Zero-Panic-Prinzip werden Fehler strukturiert modelliert
+//! und über den `?`-Operator im System propagiert.
+//!
+//! # Invarianten
+//! - Einzige Fehler-Enum: Im gesamten Workspace dient `ContextraError` als systemweiter Fehlertyp.
+//! - Abwärtskompatibilität: Durch `#[non_exhaustive]` können neue Varianten ergänzt werden,
+//!   ohne Downstream-Gleichheitsprüfungen (`match`) zu brechen.
+//! - Keine Panics: Alle Hilfs- und Konvertierungsmethoden sind panic-frei.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T21:51:46Z (SESSION: a43b7682)
@@ -17,6 +29,7 @@ use thiserror::Error;
 
 /// Errors that can occur during HNSW graph deletion and repair operations.
 #[derive(Error, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-types:ERR-001]
 pub enum HnswDeletionError {
     /// Target node with doc_id not found in graph.
     #[error("Node for doc_id {0:?} not found in HNSW index")]
@@ -39,6 +52,7 @@ pub enum HnswDeletionError {
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ERR-002]
 pub struct StepId(pub u64);
 
 impl StepId {
@@ -67,6 +81,7 @@ impl From<u64> for StepId {
 
 /// Declarative agent directive controlling segment caching, pinning, and eviction lifecycle.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-types:ERR-003]
 pub enum CacheDirective {
     /// Segment is explicitly pinned in memory until TTL expiration or explicit release.
     Pin {
@@ -91,6 +106,7 @@ impl Default for CacheDirective {
 }
 
 /// Convenience alias for `Result<T, ContextraError>`.
+// ANCHOR[contextra-types:ERR-004]
 pub type Result<T> = std::result::Result<T, ContextraError>;
 
 /// Unified error type for all `Contextra` operations across the entire workspace.
@@ -104,6 +120,7 @@ pub type Result<T> = std::result::Result<T, ContextraError>;
 /// New variants are appended strictly to the bottom of the enum to preserve binary and FFI compatibility.
 #[derive(Error, Debug)]
 #[non_exhaustive]
+// ANCHOR[contextra-types:ERR-005]
 pub enum ContextraError {
     // ═══ Core & Logic ═══
     /// Internal engine logic error.

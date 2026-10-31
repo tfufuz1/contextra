@@ -1,3 +1,16 @@
+//! Identifikatoren: `DocId`, `EntityId`, `TxId`, `TenantId`, `CollectionId`.
+//!
+//! # Architektur-Rolle: Ring 0 (Typensichere Newtypes)
+//!
+//! Alle Primärschlüssel und logischen Referenzen sind als Newtypes modelliert.
+//! Dies verhindert das versehentliche Verwechseln von Roh-Ganzzahlen (z. B. Übergabe einer `TxId`
+//! an eine Funktion, die eine `DocId` erwartet).
+//!
+//! # Invarianten
+//! - INV-TENANT-1: `TenantId(0)` ist zwingend für das System reserviert (`TenantId::SYSTEM`).
+//! - AGT-GRAPH-001: `TxId` unterscheidet strikt zwischen regulären Collection-Transaktionen
+//!   (`[1, MAX_COLLECTION_SEQUENCE]`) und internen System-Transaktionen (`[INTERNAL_BASE, u64::MAX]`).
+
 use crate::error::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +28,7 @@ use serde::{Deserialize, Serialize};
 /// für PII-Policy-Keying im Egress/Filter-Gateway.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ID-TENANT]
 pub struct TenantId(pub u64);
 
 impl TenantId {
@@ -97,6 +111,7 @@ impl std::fmt::Display for TenantId {
 /// Internal collection identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ID-COLLECTION]
 pub struct CollectionId(pub u64);
 
 impl CollectionId {
@@ -154,6 +169,7 @@ impl std::fmt::Display for CollectionId {
 #[cfg(not(feature = "docid-128"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ID-DOC]
 pub struct DocId(pub u64);
 
 #[cfg(feature = "docid-128")]
@@ -278,6 +294,7 @@ impl std::fmt::Display for DocId {
 /// Internal entity identifier for graph nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ID-ENTITY]
 pub struct EntityId(pub u64);
 
 impl EntityId {
@@ -394,6 +411,7 @@ impl std::fmt::Display for EntityId {
 /// Transaction identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ID-TX]
 pub struct TxId(pub u64);
 
 impl TxId {
