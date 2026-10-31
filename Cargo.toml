@@ -37,7 +37,6 @@ members = [
     "crates/contextra-avv-generator",
     "crates/contextra-license",
     "crates/contextra-ingest",
-    "xtask",
 ]
 # Restored archived crates to default-members:
 # contextra-graph, contextra-cognition, contextra-adapt, contextra-kvcache, contextra-router, contextra-agent, contextra-infer-onnx, contextra-infer-ollama, contextra-core
