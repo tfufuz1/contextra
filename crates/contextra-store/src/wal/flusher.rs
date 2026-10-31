@@ -278,6 +278,12 @@ impl Wal {
                             }
                         }
 
+                        if acks.iter().all(|a| a.is_closed()) {
+                            // All waiting callers cancelled/timed out before physical write.
+                            // Discard this batch to maintain atomicity and prevent phantom commits.
+                            continue;
+                        }
+
                         let size_before = size.load(std::sync::atomic::Ordering::Acquire);
                         let write_header = !header_written
                             .load(std::sync::atomic::Ordering::Acquire)
