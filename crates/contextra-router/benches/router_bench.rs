@@ -1,3 +1,9 @@
+//! # Benchmark für den Durchsatz der RouterEngine
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Benchmark für den Durchsatz der RouterEngine.
+
+// ANCHOR[contextra-router:BN-ROUT-001]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, dead_code)]
 
 use contextra_db::{Collection, Contextra, ContextraConfig};
@@ -196,5 +202,7 @@ fn bench_router_engine(c: &mut Criterion) {
     drop(db);
 }
 
+// ANCHOR[contextra-router:BN-ROUT-CRIT]
+// Benchmark-Gruppe für Performance- und Regressionsmessungen.
 criterion_group!(benches, bench_router_engine);
 criterion_main!(benches);

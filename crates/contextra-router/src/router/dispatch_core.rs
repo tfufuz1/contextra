@@ -1,3 +1,20 @@
+//! # Kern-Routing-Dispatch und Kaskaden-/Bandit-Profilauswahl
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Ausführung der Profilauswahl-Kaskade (`route()`), Kontext-Anreicherung über Hybrid-Suche
+//! und Graph-Communities sowie multi-kriterielle Filterung nach Token-Budgets und Konfidenz-Schwellwerten.
+//!
+//! **Ablauf einer Routing-Entscheidung:**
+//! 1. Hybrid-Suche ausführen und gefundene Chunks mit Graph-Community-IDs anreichern.
+//! 2. Aktuellen Router-Snapshot atomar aus dem `ArcSwap` laden.
+//! 3. Geeignetes Profil nach gewählter Strategie bestimmen (Cascade oder Bandit).
+//! 4. Kontextfenster mit dem Token-Budget des gewählten Profils präparieren.
+//! 5. Monotone `DecisionId` vergeben und Drift-Wächter aktualisieren.
+//!
+//! **Abhängigkeiten:**
+//! - Upstream: `contextra_types`, `contextra_ports`, `contextra_adapt`.
+//! - Downstream: `RouterEngine`.
+
 // FILE-CONTEXT
 // STAND: 2026-10-29
 // ZWECK: Kern-Routing-Dispatch und Kaskaden-/Bandit-Profilauswahl für RouterEngine.
@@ -213,6 +230,28 @@ impl RouterEngine {
 
     /// Routes a query with embedding and text to the best matching SLM profile.
     #[allow(deprecated)]
+    // ANCHOR[contextra-router:CORE-001]
+    /// Führt eine vollständige Routing-Entscheidung für die übergebene Anfrage aus.
+    ///
+    /// # Ablauf
+    /// 1. Suchergebnisse via `search_provider` abrufen und mit Graph-Communities anreichern.
+    /// 2. Snapshot des Zustands atomar aus `ArcSwap` laden.
+    /// 3. Passendes Modellprofil anhand der konfigurierten Routing-Strategie selektieren.
+    /// 4. Kontextfenster gemäß dem Token-Budget des gewählten Profils zuschneiden.
+    /// 5. Eindeutige `DecisionId` generieren und Entscheidung zurückliefern.
+    ///
+    /// # Vorbedingungen
+    /// Mindestens ein konfiguriertes Profil im System vorhanden.
+    ///
+    /// # Nachbedingungen
+    /// Liefert eine valide [`RoutingDecision`] mit passendem Kontextfenster.
+    ///
+    /// # Fehler
+    /// - [`ContextraError::NotFound`]: Wenn keine Suchtreffer vorhanden sind.
+    /// - [`ContextraError::Internal`]: Wenn kein Profil die Kriterien erfüllt.
+    ///
+    /// # Nebenwirkungen
+    /// I/O-Zugriffe über Ports (Suche, Community-Auflösung) und Inkrement des ID-Generators.
     pub async fn route(
         &self,
         query_embedding: &[f32],

@@ -4,7 +4,24 @@
 // INVARIANTEN: INV-ROUTER-1 (quantile_threshold in [0.0, 1.0]), INV-P8-1 (Fingerprint-Invalidation).
 // SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md
 
-//! Profile definition for Small Language Models (SLMs) in Contextra Router.
+//! # SLM-Profildefinitionen und konformale Quantil-Kalibrierung (Gibbs & Candès)
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Definition von Modelleigenschaften ([`SlmProfile`]), Schwellwertkalibrierungen
+//! ([`ProfileCalibrator`], [`ConformalCalibrator`]) und Nachverfolgung dynamischer Zustände ([`ProfileCalibrationState`]).
+//!
+//! **Hintergrund:**
+//! Jedes Modell verfügt über spezifische Begrenzungen (Token-Budget, Domänen-Tags) und ein Fehlerniveau.
+//! Mittels adaptiver Quantil-Kalibrierung nach Gibbs & Candès (Conformal Prediction) passt der Router
+//! die Akzeptanzschwellen dynamisch an, um statistische Fehlergarantien (z. B. Fehlerrate <= alpha) einzuhalten.
+//!
+//! **Kritische Invarianten:**
+//! - `INV-ROUTER-1`: `quantile_threshold` liegt stets in `[0.0, 1.0]`.
+//! - `INV-P8-1`: Ändert sich der Konfigurations-Fingerprint eines Modells, MUSS die Kalibrierung invalidiert werden.
+//!
+//! **Abhängigkeiten:**
+//! - Upstream: `contextra_types::{ConfigFingerprint, ContextraError, Result, TokenBudget}`, `serde`.
+//! - Downstream: [`crate::router::RouterEngine`], [`crate::dispatch`].
 
 use contextra_types::{ConfigFingerprint, ContextraError, Result, TokenBudget};
 use serde::{Deserialize, Serialize};
@@ -13,6 +30,8 @@ use std::collections::BTreeSet;
 /// Quantization level of the underlying model execution path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[allow(non_camel_case_types)]
+// ANCHOR[contextra-router:PRF-001]
+/// Quantisierungsstufe des Modells (z. B. F16, Q8_0, Q4_K_M).
 pub enum QuantizationLevel {
     F16,
     Q8_0,
@@ -23,6 +42,8 @@ pub enum QuantizationLevel {
 
 /// Represents a Small Language Model (SLM) target and its domain expertise parameters.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-router:PRF-002]
+/// Repräsentiert das Profil eines Small Language Models (SLM) mit Token-Budget und Domänen-Zuständigkeiten.
 pub struct SlmProfile {
     /// Identifier name of the SLM (e.g. "coding-slm", "docs-slm").
     pub name: String,
@@ -60,6 +81,15 @@ pub struct SlmProfile {
 
 impl SlmProfile {
     /// Creates a new `SlmProfile`.
+    // ANCHOR[contextra-router:PRF-003]
+    /// Erzeugt ein neues `SlmProfile` mit Standardwerten.
+    ///
+    /// # Ablauf
+    /// 1. Belegung aller Pflichtfelder (Name, Endpunkt, Communities, Budget, Mindestscore).
+    /// 2. Initialisierung von Fingerprint und Bandit-Zustand auf `None`.
+    ///
+    /// # Vorbedingungen
+    /// Gültige Parameter (Name nicht leer, Score in [0.0, 1.0]).
     pub fn new(
         name: impl Into<String>,
         mcp_endpoint: impl Into<String>,
@@ -83,12 +113,16 @@ impl SlmProfile {
     }
 
     /// Builder method to attach a specific `ConfigFingerprint` to this profile.
+    // ANCHOR[contextra-router:PRF-004]
+    /// Weist dem Profil einen Konfigurations-Fingerprint zu (P8-Pflicht).
     pub fn with_fingerprint(mut self, fingerprint: ConfigFingerprint) -> Self {
         self.fingerprint = Some(fingerprint);
         self
     }
 
     /// Builder method to attach an explicit resource cost estimate to this profile.
+    // ANCHOR[contextra-router:PRF-005]
+    /// Weist dem Profil geschätzte Ressourcenkosten zu.
     pub fn with_resource_cost_estimate(mut self, resource_cost_estimate: f32) -> Self {
         self.resource_cost_estimate = resource_cost_estimate;
         self
@@ -96,6 +130,8 @@ impl SlmProfile {
 
     /// Returns the effective estimated cost for resource-aware fallback routing.
     /// If `resource_cost_estimate` is > 0.0, returns it; otherwise falls back to `token_budget.limit as f32`.
+    // ANCHOR[contextra-router:PRF-006]
+    /// Liefert die geschätzten Kosten des Profils (Fallback auf `token_budget.limit`).
     pub fn estimated_cost(&self) -> f32 {
         if self.resource_cost_estimate > 0.0 {
             self.resource_cost_estimate
@@ -105,6 +141,15 @@ impl SlmProfile {
     }
 
     /// Validates `SlmProfile` parameters.
+    // ANCHOR[contextra-router:PRF-007]
+    /// Validiert alle Invarianten des Profils.
+    ///
+    /// # Invarianten
+    /// - Name darf nicht leer sein.
+    /// - MCP-Endpunkt darf nicht leer sein.
+    /// - `min_relevance_score` muss in `[0.0, 1.0]` liegen.
+    /// - `token_budget` muss gültig sein (`limit > 0`, `reserve < limit`).
+    /// - `resource_cost_estimate` darf nicht negativ oder NaN sein.
     pub fn validate(&self) -> Result<()> {
         if self.name.trim().is_empty() {
             return Err(ContextraError::InvalidInput(
@@ -130,6 +175,8 @@ impl SlmProfile {
     }
 
     /// Creates and validates a new `SlmProfile`.
+    // ANCHOR[contextra-router:PRF-008]
+    /// Erzeugt ein neues `SlmProfile` und validiert es sofort strikt.
     pub fn try_new(
         name: impl Into<String>,
         mcp_endpoint: impl Into<String>,
@@ -155,6 +202,8 @@ impl SlmProfile {
 /// Abgrenzung: Umbenannt von `ConformalCalibrator` zu `ProfileCalibrator`, um eine
 /// Kollision mit `contextra_rank::ConformalCalibrator` zu vermeiden.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-router:PRF-009]
+/// Konformaler Kalibrator nach Gibbs & Candès zur dynamischen Schwellwertanpassung.
 pub struct ProfileCalibrator {
     /// Target error rate (e.g., 0.05 for 95% coverage).
     pub alpha: f32,
@@ -173,8 +222,11 @@ pub struct ProfileCalibrator {
     since = "0.1.0",
     note = "Renamed to ProfileCalibrator to avoid namespace collision with contextra_rank::ConformalCalibrator"
 )]
+// ANCHOR[contextra-router:PRF-010]
+/// Typ-Alias für `ProfileCalibrator` gemäß Spec-Namenskonvention.
 pub type ConformalCalibrator = ProfileCalibrator;
 
+// ANCHOR[contextra-router:PRF-011]
 impl Default for ProfileCalibrator {
     fn default() -> Self {
         Self {
@@ -189,6 +241,8 @@ impl Default for ProfileCalibrator {
 
 impl ProfileCalibrator {
     /// Creates a new `ProfileCalibrator` with specified error tolerance and adaptation rate.
+    // ANCHOR[contextra-router:PRF-012]
+    /// Erstellt einen neuen `ProfileCalibrator` mit Fehlertoleranz `alpha`, Schrittweite `gamma` und Startschwelle.
     pub fn new(alpha: f32, gamma: f32, initial_threshold: f32) -> Self {
         Self {
             alpha: alpha.clamp(0.001, 0.5),
@@ -200,6 +254,16 @@ impl ProfileCalibrator {
     }
 
     /// Updates the conformal threshold based on a non-conformity score.
+    // ANCHOR[contextra-router:PRF-013]
+    /// Aktualisiert den Quantils-Schwellwert basierend auf einem beobachteten Non-Conformity-Score.
+    ///
+    /// # Ablauf
+    /// 1. Fehlerprüfung: War der Score größer als die bisherige Schwelle?
+    /// 2. Anpassung der Schwelle mit Schrittweite `gamma` und Fehlerniveau `alpha`.
+    /// 3. Clamping der neuen Schwelle auf das Intervall `[0.0, 1.0]` (INV-ROUTER-1).
+    ///
+    /// # Rückgabe
+    /// `true`, wenn die Vorhersage fehlerhaft war (Score > Schwelle).
     pub fn update(&mut self, non_conformity_score: f32) -> bool {
         self.window_total += 1;
 
@@ -218,6 +282,8 @@ impl ProfileCalibrator {
     }
 
     /// Returns the current empirical error rate.
+    // ANCHOR[contextra-router:PRF-014]
+    /// Berechnet die empirische Fehlerrate im aktuellen Beobachtungsfenster.
     pub fn empirical_error_rate(&self) -> f32 {
         if self.window_total == 0 {
             return 0.0;
@@ -226,6 +292,8 @@ impl ProfileCalibrator {
     }
 
     /// Resets statistics while preserving the current calibrated threshold.
+    // ANCHOR[contextra-router:PRF-015]
+    /// Setzt die Fensterzähler für Fehler und Gesamtzahl zurück.
     pub fn reset_window(&mut self) {
         self.window_errors = 0;
         self.window_total = 0;
@@ -235,6 +303,8 @@ impl ProfileCalibrator {
 /// Laufzeit-Kalibrierungsstatistik für ein SLM-Profil.
 /// Wird von RouterEngine verwaltet und nicht vom Aufrufer gesetzt.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-router:PRF-016]
+/// Laufzeit-Zustand der Kalibrierung eines Profils inklusive Auswahlhäufigkeit und Konfidenz.
 pub struct ProfileCalibrationState {
     /// Gesamtzahl der Routing-Entscheidungen für dieses Profil.
     pub times_selected: u64,
@@ -267,6 +337,8 @@ impl Default for ProfileCalibrationState {
 }
 
 impl ProfileCalibrationState {
+    // ANCHOR[contextra-router:PRF-017]
+    /// Erzeugt einen neuen Initialzustand für die Kalibrierung eines Profils.
     pub fn new(original_min_score: f32) -> Self {
         Self {
             times_selected: 0,
@@ -279,6 +351,8 @@ impl ProfileCalibrationState {
     }
 
     /// Checks active fingerprint against recorded calibration fingerprint.
+    // ANCHOR[contextra-router:PRF-018]
+    /// Prüft, ob der aktive Konfigurations-Fingerprint abweicht, und setzt bei Diskrepanz die Kalibrierung zurück (INV-P8-1).
     pub fn check_and_invalidate_fingerprint(&mut self, active_fp: Option<&ConfigFingerprint>) {
         let Some(active_fp) = active_fp else {
             if self.last_calibrated_fingerprint.is_some() || self.conformal.window_total > 0 {
@@ -301,6 +375,8 @@ impl ProfileCalibrationState {
     }
 
     /// Returns whether calibration is valid and active for the given active fingerprint.
+    // ANCHOR[contextra-router:PRF-019]
+    /// Prüft, ob das Profil kalibriert und der Fingerprint noch valide ist.
     pub fn is_calibrated(&self, active_fp: Option<&ConfigFingerprint>) -> bool {
         let Some(active_fp) = active_fp else {
             return false;
@@ -312,6 +388,8 @@ impl ProfileCalibrationState {
     }
 
     /// Durchschnittliche Konfidenz über alle bisherigen Entscheidungen.
+    // ANCHOR[contextra-router:PRF-020]
+    /// Liefert die durchschnittliche Konfidenz über alle Auswahlen.
     pub fn average_confidence(&self) -> f64 {
         if self.times_selected == 0 {
             return 1.0;
@@ -320,6 +398,8 @@ impl ProfileCalibrationState {
     }
 
     /// Recalibrates using the conformal calibrator.
+    // ANCHOR[contextra-router:PRF-021]
+    /// Führt eine Neukalibrierung anhand des beobachteten Non-Conformity-Scores durch.
     pub fn recalibrate_conformal(&mut self, non_conformity_score: f32) -> bool {
         let adjusted = self.conformal.update(non_conformity_score);
         if adjusted {
@@ -331,6 +411,8 @@ impl ProfileCalibrationState {
     }
 
     /// Setzt Kalibrierungsstate vollständig zurück.
+    // ANCHOR[contextra-router:PRF-022]
+    /// Setzt alle Kalibrierungsstatistiken auf die Ausgangswerte zurück.
     pub fn reset(&mut self) {
         self.times_selected = 0;
         self.cumulative_confidence = 1.0;

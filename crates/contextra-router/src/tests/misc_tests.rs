@@ -1,3 +1,9 @@
+//! # Verschiedene zusätzliche Tests und Hilfstests
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Verschiedene zusätzliche Tests und Hilfstests.
+
+// ANCHOR[contextra-router:TST-MSC-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,

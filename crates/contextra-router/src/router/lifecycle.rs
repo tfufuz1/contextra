@@ -1,3 +1,13 @@
+//! # Lebenszyklus- und Konfigurationsmethoden der RouterEngine
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Initialisierung, Builder-Methoden und atomare Hot-Reload-Aktualisierung von Profilen.
+//!
+//! **Nebenläufigkeit bei Updates:**
+//! `update_profiles` erzeugt einen neuen `RouterState`-Snapshot und tauscht diesen
+//! atomar über `ArcSwap` aus. Laufende Routing-Anfragen lesen entweder den alten
+//! oder den neuen Snapshot vollständig und unterbrechungsfrei (Lock-Free Read).
+
 // FILE-CONTEXT
 // STAND: 2026-10-29
 // ZWECK: Konstruktions- und Profilverwaltungs-Methoden (Hot-Reload) für RouterEngine.
@@ -7,6 +17,8 @@ use super::*;
 
 impl RouterEngine {
     /// Creates a new `RouterEngine` instance from decoupled ports.
+    // ANCHOR[contextra-router:LCF-001]
+    /// Erzeugt eine neue `RouterEngine` mit Standardeinstellungen.
     pub fn new(
         search_provider: Arc<dyn HybridSearchProvider>,
         community_resolver: Arc<dyn CommunityResolver>,
@@ -67,12 +79,16 @@ impl RouterEngine {
     }
 
     /// Configures a custom Clock implementation for deterministic testing.
+    // ANCHOR[contextra-router:LCF-002]
+    /// Injiziert eine benutzerdefinierte System-Uhr (Port-Entwurf für Tests).
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
         self
     }
 
     /// Configures the initial decision ID counter value.
+    // ANCHOR[contextra-router:LCF-003]
+    /// Setzt den Startwert für monotone Entscheidungs-IDs.
     pub fn with_initial_decision_id(mut self, start: u64) -> Self {
         self.decision_ids = DecisionIdGenerator::new(start);
         self
@@ -80,6 +96,8 @@ impl RouterEngine {
 
     #[cfg(feature = "bandit-routing")]
     /// Builder-Methode zur Konfiguration der Routing-Strategie und Bandit-Exploration.
+    // ANCHOR[contextra-router:LCF-004]
+    /// Konfiguriert die Routing-Strategie (Cascade oder Bandit).
     pub fn with_routing_strategy(
         mut self,
         strategy: RoutingStrategy,
@@ -92,6 +110,8 @@ impl RouterEngine {
     }
 
     /// Validates all profiles and creates a new `RouterEngine` instance.
+    // ANCHOR[contextra-router:LCF-005]
+    /// Erzeugt eine neue `RouterEngine` und validiert alle übergebenen Profile.
     pub fn try_new(
         search_provider: Arc<dyn HybridSearchProvider>,
         community_resolver: Arc<dyn CommunityResolver>,
@@ -112,6 +132,8 @@ impl RouterEngine {
     }
 
     /// Dynamically updates configured SLM profiles at runtime (Hot-Reload).
+    // ANCHOR[contextra-router:LCF-006]
+    /// Aktualisiert die Profile im laufenden Betrieb atomar (Hot-Reload via ArcSwap).
     pub fn update_profiles(&self, new_profiles: Vec<SlmProfile>) {
         let current = self.state.load_full();
         let mut old_cal = current.calibration.clone();
@@ -145,6 +167,8 @@ impl RouterEngine {
     }
 
     /// Validates all profiles and updates configured SLM profiles at runtime (Hot-Reload).
+    // ANCHOR[contextra-router:LCF-007]
+    /// Aktualisiert Profile atomar nach vorheriger strikter Validierung.
     pub fn try_update_profiles(&self, new_profiles: Vec<SlmProfile>) -> Result<()> {
         for p in &new_profiles {
             p.validate()?;
@@ -154,6 +178,8 @@ impl RouterEngine {
     }
 
     /// Returns a copy of the active SLM profiles.
+    // ANCHOR[contextra-router:LCF-008]
+    /// Liefert eine Momentaufnahme der aktuell aktiven Profile.
     pub fn profiles(&self) -> Vec<SlmProfile> {
         self.state.load().profiles.clone()
     }

@@ -1,8 +1,16 @@
+//! # Integrationstest: Flow-Corrected Thompson Sampling Dispatch
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Integrationstest: Flow-Corrected Thompson Sampling Dispatch.
+
+// ANCHOR[contextra-router:IT-FCTS-001]
 #![cfg(feature = "flow-corrected-thompson")]
 
 use contextra_adapt::{FcTsArmSet, FcTsConfig, FlowCorrectedThompsonBandit};
 use contextra_router::{deterministic_fc_ts_rng, select_profile_fc_ts, FcTsDispatchError};
 
+// ANCHOR[contextra-router:IT-FCTS-T01]
+// Test `test_fc_ts_dispatch_determinism`: Prüft das erwartete Verhalten und Invarianten für integrationstest: flow-corrected thompson sampling dispatch.
 #[test]
 fn test_fc_ts_dispatch_determinism() {
     let cfg = FcTsConfig {
@@ -32,6 +40,8 @@ fn test_fc_ts_dispatch_determinism() {
     assert_eq!(name1, profile_names[idx1]);
 }
 
+// ANCHOR[contextra-router:IT-FCTS-T02]
+// Test `test_fc_ts_dispatch_seed_variation`: Prüft das erwartete Verhalten und Invarianten für integrationstest: flow-corrected thompson sampling dispatch.
 #[test]
 fn test_fc_ts_dispatch_seed_variation() {
     let cfg = FcTsConfig {
@@ -57,6 +67,8 @@ fn test_fc_ts_dispatch_seed_variation() {
     }
 }
 
+// ANCHOR[contextra-router:IT-FCTS-T03]
+// Test `test_fc_ts_dispatch_profile_arm_mismatch`: Prüft das erwartete Verhalten und Invarianten für integrationstest: flow-corrected thompson sampling dispatch.
 #[test]
 fn test_fc_ts_dispatch_profile_arm_mismatch() {
     let cfg = FcTsConfig {
@@ -82,6 +94,8 @@ fn test_fc_ts_dispatch_profile_arm_mismatch() {
     }
 }
 
+// ANCHOR[contextra-router:IT-FCTS-T04]
+// Test `test_fc_ts_dispatch_empty_arm_set`: Prüft das erwartete Verhalten und Invarianten für integrationstest: flow-corrected thompson sampling dispatch.
 #[test]
 fn test_fc_ts_dispatch_empty_arm_set() {
     let arm_set = FcTsArmSet { arms: vec![] };

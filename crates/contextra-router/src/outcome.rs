@@ -4,60 +4,109 @@
 // INVARIANTEN: DecisionId-Monotonie via AtomicU64; Non-Conformity-Scores in [0.0, 1.0].
 // SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md
 
-//! Outcome types and decision tracking identifiers for router calibration.
+//! # Outcome-Typen und Entscheidungs-Tracking für Router-Kalibrierung
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Eindeutige Nachverfolgung von Routing-Entscheidungen über instanzgebundene [`DecisionId`]s
+//! und Protokollierung des tatsächlichen Ergebnisses ([`RoutingOutcome`]) nach erfolgter Modell-Generierung.
+//!
+//! **Hintergrund:**
+//! Um Conformal Prediction (konforme Fehlerkalibrierung) zu betreiben, muss jede Entscheidung mit ihrem
+//! späteren Ausgang (Erfolg, Eskalation oder Ablehnung) verknüpft werden. Der Non-Conformity-Score
+//! quantifiziert hierbei den Fehlergrad im Bereich `[0.0, 1.0]`.
+//!
+//! **Abhängigkeiten:**
+//! - Upstream: `serde`, `std::sync::atomic::AtomicU64`.
+//! - Downstream: [`crate::router::RouterEngine`], Feedback-Loops in `contextra-agent`.
 
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+// ANCHOR[contextra-router:OUT-001]
 /// Eindeutige ID einer Routing-Entscheidung.
-/// Wird von route() zurückgegeben und von record_outcome() konsumiert.
+///
+/// Wird von `RouterEngine::route()` erzeugt und vergeben und später von
+/// `RouterEngine::record_outcome()` konsumiert, um das Feedback dem richtigen
+/// Modellprofil zuzuordnen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct DecisionId(u64);
 
 impl DecisionId {
-    /// Erzeugt eine `DecisionId` aus einem Rohwert.
+    // ANCHOR[contextra-router:OUT-002]
+    /// Erzeugt eine [`DecisionId`] aus einem rohen 64-Bit-Ganzzahlwert.
+    ///
+    /// # Parameter
+    /// - `raw`: Rohwert der ID.
     pub const fn from_raw(raw: u64) -> Self {
         DecisionId(raw)
     }
 
-    /// Liefert den zugrundeliegenden `u64`-Wert der `DecisionId`.
+    // ANCHOR[contextra-router:OUT-003]
+    /// Liefert den zugrundeliegenden `u64`-Wert der [`DecisionId`].
     pub const fn inner(self) -> u64 {
         self.0
     }
 }
 
-/// Instanzgebundener Generator für monoton steigende `DecisionId`s (Spec §3 P29).
+// ANCHOR[contextra-router:OUT-004]
+/// Instanzgebundener Generator für monoton steigende [`DecisionId`]s (Spec §3 P29).
+///
+/// Garantiert Thread-Sicherheit über atomare Inkrement-Operationen ohne globale Sperren.
 #[derive(Debug)]
 pub struct DecisionIdGenerator {
     next: AtomicU64,
 }
 
 impl DecisionIdGenerator {
+    // ANCHOR[contextra-router:OUT-005]
     /// Erstellt einen neuen Generator mit dem angegebenen Startwert.
+    ///
+    /// # Parameter
+    /// - `start`: Anfangswert für die Sequenz (meist 0).
     pub fn new(start: u64) -> Self {
         Self {
             next: AtomicU64::new(start),
         }
     }
 
-    /// Erzeugt die nächste monotone `DecisionId`.
+    // ANCHOR[contextra-router:OUT-006]
+    /// Erzeugt die nächste monotone [`DecisionId`].
+    ///
+    /// # Ablauf
+    /// 1. Atomares Inkrement des Zählers mittels `fetch_add` mit `Ordering::Relaxed`.
+    /// 2. Kapselung des alten Werts in einer `DecisionId`.
+    ///
+    /// # Vorbedingungen
+    /// Keine.
+    ///
+    /// # Nachbedingungen
+    /// Liefert eine innerhalb dieser Generator-Instanz strikt monotone ID zurück.
+    ///
+    /// # Nebenwirkungen
+    /// Erhöht den internen Zählerzustand.
+    // NOTE: Relaxed ordering genügt, da es sich um einen reinen Sequenzzähler ohne Synchronisationspflicht für andere Speicherstellen handelt.
     pub fn next(&self) -> DecisionId {
         DecisionId::from_raw(self.next.fetch_add(1, Ordering::Relaxed))
     }
 }
 
 impl Default for DecisionIdGenerator {
+    // ANCHOR[contextra-router:OUT-007]
+    /// Standardkonstruktor: Startet die Zählung bei 0.
     fn default() -> Self {
         Self::new(0)
     }
 }
 
+// ANCHOR[contextra-router:OUT-008]
 /// Tatsächliches Ergebnis einer getroffenen Routing-Entscheidung.
-/// Wird vom Agent-Orchestrator NACH dem SLM-Aufruf geliefert.
+///
+/// Wird vom Agent-Orchestrator oder Evaluator NACH dem SLM-Aufruf an den Router zurückgemeldet.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RoutingOutcome {
     /// SLM hat die Anfrage vollständig und korrekt beantwortet.
     Success,
+    /// SLM-Antwort war unzureichend — Eskalation zu einem größeren Modell war nötig.
     /// SLM-Antwort war unzureichend — Eskalation zu größerem Modell war nötig.
     Escalated { escalated_to: String },
     /// Nachgelagerter Evaluator/Judge hat die SLM-Antwort als falsch markiert.
@@ -65,7 +114,16 @@ pub enum RoutingOutcome {
 }
 
 impl RoutingOutcome {
-    /// Non-Conformity-Score: 0.0 = perfekt, 1.0 = komplett falsch.
+    // ANCHOR[contextra-router:OUT-009]
+    /// Berechnet den Non-Conformity-Score: 0.0 = perfekt konform, 1.0 = maximal non-konform / fehlerhaft.
+    ///
+    /// # Werte
+    /// - [`RoutingOutcome::Success`] => `0.0`
+    /// - [`RoutingOutcome::Escalated`] => `0.7`
+    /// - [`RoutingOutcome::Rejected`] => `1.0`
+    ///
+    /// # Nachbedingungen
+    /// Der Score liegt garantiert im Intervall `[0.0, 1.0]`.
     pub fn non_conformity_score(&self) -> f32 {
         match self {
             RoutingOutcome::Success => 0.0,
@@ -82,6 +140,8 @@ mod tests {
     use std::collections::BTreeSet;
     use std::sync::Arc;
 
+    // ANCHOR[contextra-router:OUT-T01]
+    // Prüft, dass unabhängige Generator-Instanzen eigene Zähler führen und sich nicht gegenseitig beeinflussen.
     #[test]
     fn test_decision_id_generator_instance_independence() {
         let gen_a = DecisionIdGenerator::new(0);
@@ -100,6 +160,8 @@ mod tests {
         assert_eq!(id_b1.inner(), 1);
     }
 
+    // ANCHOR[contextra-router:OUT-T02]
+    // Prüft die nebenläufige Eindeutigkeit erzeugter IDs über mehrere Threads hinweg (keine Kollisionen).
     #[test]
     fn test_decision_id_generator_concurrency() {
         let gen = Arc::new(DecisionIdGenerator::new(0));
