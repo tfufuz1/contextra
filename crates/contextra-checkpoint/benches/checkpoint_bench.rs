@@ -6,6 +6,10 @@
     clippy::disallowed_types,
     clippy::disallowed_methods
 )]
+//! # Benchmarks für das Checkpoint-Subsystem
+//!
+//! Misst Durchsatz und Latenz von Checkpoint-Erstellung, Laden, Guard-Rollback und nebenläufiger Erzeugung.
+
 
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
