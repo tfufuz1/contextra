@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** Collection-Abstraktion: Bündelt LSM-Speicher, Vektor-, Text- und Graph-Indizes.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Sammlung/Collection-Namespace Verwaltung und gemeinsame Hilfsfunktionen.
 // INVARIANTEN: Strikte Isolation durch Präfixe; doc_keys (key_type=1) halten nur Metadaten (keine Vektoren).
@@ -66,6 +73,8 @@ impl Default for CollectionConfig {
     }
 }
 
+// ANCHOR[contextra-engine:COL-STO-077]
+/// Dokumentation für `StoredDocument` im Rahmen der Collection- und Suchabstraktion.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StoredDocument {
     pub id: String,

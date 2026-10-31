@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** Dokument-Segmentierung und Chunker-Subsystem für Fließtexte und Abschnitte.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Hauptmodul des Markdown-Chunkers (WP-7.1 / Teil 6.12 Ingestion Chunking Spezifikation).
 // INVARIANTEN: Re-exportiert exakt alle bisherigen öffentlichen Typen und Funktionen.

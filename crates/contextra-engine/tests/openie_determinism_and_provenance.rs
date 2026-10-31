@@ -1,3 +1,9 @@
+//! # Integrationstest: openie determinism and provenance
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Determinismus- & Provenienztests fuer OpenIE Tripel-Extraktion und edge.source_doc_id-Kaskade.
@@ -50,6 +56,8 @@ impl LlmTextGenerator for DeterministicMockLlm {
     }
 }
 
+// ANCHOR[contextra-engine:TST28-001]
+/// Testblock zur Überprüfung von `test_openie_extraction_determinism`.
 /// Test A: Gleicher Eingabetext + gleicher Generator + gleiches Modell-Fingerprint
 /// => Identische extrahierte Tripel bei zwei unabhängigen Aufrufen.
 #[tokio::test]
@@ -95,6 +103,8 @@ async fn test_openie_extraction_determinism() {
     );
 }
 
+// ANCHOR[contextra-engine:TST28-002]
+/// Testblock zur Überprüfung von `test_openie_edge_provenance_source_doc_id`.
 /// Test B: nach `auto_extract_and_relate` fuer ein Dokument `doc_id` traegt jede daraus
 /// erzeugte Kante `source_doc_id == Some(DocId::from_key(doc_id))`.
 #[tokio::test]
@@ -152,6 +162,8 @@ async fn test_openie_edge_provenance_source_doc_id() {
     }
 }
 
+// ANCHOR[contextra-engine:TST28-003]
+/// Testblock zur Überprüfung von `test_openie_deletion_orphan_simulation`.
 /// Test C: Loeschsimulation — nach Entfernen des Quelldokuments ist die zugehoerige Kante
 /// über `source_doc_id` auffindbar und als „verwaist" markierbar.
 #[tokio::test]

@@ -1,3 +1,10 @@
+//! # Modul: tests.rs
+//!
+//! **Zweck:** Unit-Tests für Hintergrund-Worker und periodische Ausführungszyklen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Unit-Tests für background_workers Submodule.
 

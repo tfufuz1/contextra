@@ -1,3 +1,10 @@
+//! # Modul: lib.rs
+//!
+//! **Zweck:** Zentrale Facade und Orchestrierung der Contextra-Engine (Ring 2).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
+
 // FILE-CONTEXT
 // ZWECK: Contextra Core Engine Orchestrator & Facade (Layer 3 - Engine).
 // INVARIANTEN: Monoton steigende TxId-Allokation; Reparaturgarantie beim Öffnen (repair_on_open); Strikte Isolation von Namespaces.
@@ -90,6 +97,8 @@ pub use filter::MetadataFilter;
 
 #[cfg(not(loom))]
 #[allow(clippy::type_complexity)]
+// ANCHOR[contextra-engine:LCH-001]
+/// Funktions-Typdefinition zum Starten von Wissenskonsolidierungs-Workern.
 pub type ConsolidationLauncher = Arc<
     dyn Fn(
             Arc<Collection<LsmStorage>>,
@@ -101,7 +110,8 @@ pub type ConsolidationLauncher = Arc<
         + Sync,
 >;
 
-/// Registers a consolidation worker launcher function (deprecated: set on `ContextraConfig` instead).
+// ANCHOR[contextra-engine:LCH-002]
+/// Registriert eine Konsolidierungs-Launcher-Funktion (deprecated: via `ContextraConfig` setzen).
 #[cfg(not(loom))]
 #[deprecated(
     note = "Instanzgebundenen Launcher via ContextraConfig::with_consolidation_launcher setzen (P29)"
@@ -128,12 +138,16 @@ pub use fusion::{ProvenanceRecord, SearchResult, SignalContribution};
 
 #[cfg(not(loom))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-engine:DOC-001]
+/// Repräsentiert ein Dokument mit eindeutiger ID, Text, Vektoreinbettung und Metadaten.
 pub struct Document {
     pub id: String,
     pub metadata: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-engine:STA-001]
+/// Aggregierte Betriebs- und Belegungsstatistiken der Engine.
 pub struct ContextraStats {
     pub drift_status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -148,9 +162,13 @@ pub struct ContextraStats {
 }
 
 pub use contextra_ports::DriftStatusProvider;
+// ANCHOR[contextra-engine:STA-002]
+/// Alias für `ContextraStats` zur Abwärtskompatibilität.
 pub type DbStats = ContextraStats;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-engine:CMD-001]
+/// Konfiguration für Community-Erkennungs- und Graph-Clustering-Algorithmen.
 pub struct CommunityDetectionConfig {
     pub auto_trigger_threshold: u64,
 }
@@ -164,6 +182,8 @@ impl Default for CommunityDetectionConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-engine:EMB-001]
+/// Wählbares Backend zur Berechnung von Text-Embeddings.
 pub enum EmbeddingBackend {
     Onnx {
         model_name: String,
@@ -193,6 +213,8 @@ pub enum TenantPolicy {
 
 #[cfg(not(loom))]
 #[derive(Clone)]
+// ANCHOR[contextra-engine:CFG-001]
+/// Globale Konfiguration für die Contextra-Engine-Initialisierung.
 pub struct ContextraConfig {
     pub dimension: usize,
     pub max_elements: usize,
@@ -238,16 +260,22 @@ pub struct ContextraConfig {
 
 #[cfg(not(loom))]
 impl ContextraConfig {
+    // ANCHOR[contextra-engine:BLD-003]
+    /// Konfiguriert den optionalen Konsolidierungs-Launcher auf dem Builder.
     pub fn with_consolidation_launcher(mut self, launcher: ConsolidationLauncher) -> Self {
         self.consolidation_launcher = Some(launcher);
         self
     }
 
+    // ANCHOR[contextra-engine:BLD-004]
+    /// Konfiguriert die Mandantenisolations- und Zugriffspolicy.
     pub fn with_tenant_policy(mut self, policy: TenantPolicy) -> Self {
         self.tenant_policy = policy;
         self
     }
 
+    // ANCHOR[contextra-engine:BLD-005]
+    /// Konfiguriert die Metrik-Senke zur Erfassung von Systemmetriken.
     pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
         self.metrics_sink = Some(sink);
         self
@@ -323,12 +351,16 @@ impl Default for ContextraConfig {
 }
 
 #[cfg(not(loom))]
+// ANCHOR[contextra-engine:TCM-001]
+/// Typdefinition für die mandantenisolierte Collection-Verwaltung.
 pub type TenantCollectionMap = ahash::AHashMap<
     (TenantId, String),
     Arc<Collection<contextra_store::tenant_codec::TenantScopedStorage<Arc<LsmStorage>>>>,
 >;
 
 #[cfg(not(loom))]
+// ANCHOR[contextra-engine:CTX-001]
+/// Zentraler Orchestrator und Einstiegspunkt der Contextra-Engine.
 pub struct Contextra {
     storage: Arc<LsmStorage>,
     next_tx: Arc<AtomicU64>,
@@ -365,6 +397,8 @@ pub use serde_json::json;
 
 #[cfg(not(loom))]
 impl Contextra {
+    // ANCHOR[contextra-engine:STR-001]
+    /// Gibt den zugrundeliegenden LSM-Speicher zurück (intern/verborgen).
     #[doc(hidden)]
     pub fn inner_storage(&self) -> Arc<LsmStorage> {
         self.storage.clone()
@@ -381,6 +415,8 @@ impl Contextra {
     }
 }
 
+// ANCHOR[contextra-engine:SND-001]
+/// Brücke zur sicheren Ausführung von sandboxed Operatoren (z.B. Wasm).
 #[cfg(feature = "sandbox")]
 pub trait SandboxBridge: Send + Sync {
     fn db_search<'a>(

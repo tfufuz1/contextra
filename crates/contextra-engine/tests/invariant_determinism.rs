@@ -1,3 +1,9 @@
+//! # Integrationstest: invariant determinism
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig, SearchResult};
 use serde_json::json;
@@ -50,6 +56,8 @@ async fn run_sequence(
     Ok((search_results, kv_result))
 }
 
+// ANCHOR[contextra-engine:TST21-001]
+/// Testblock zur Überprüfung von `test_determinism_p28_identical_sequence_produces_bit_identical_output`.
 #[tokio::test]
 async fn test_determinism_p28_identical_sequence_produces_bit_identical_output(
 ) -> contextra_types::Result<()> {

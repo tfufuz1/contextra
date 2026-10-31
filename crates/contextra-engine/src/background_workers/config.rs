@@ -1,3 +1,10 @@
+//! # Modul: config.rs
+//!
+//! **Zweck:** Konfiguration der Hintergrund-Worker-Intervalle und Schwellenwerte.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Konfiguration und Trait für Orphan-Cleanup-Backoff und HNSW-Index-Rebuild.
 // INVARIANTEN: Berechnet exponentielle Cooldown-Zeiten für Rebuild-Versuche.

@@ -1,3 +1,10 @@
+//! # Modul: read_tests.rs
+//!
+//! **Zweck:** Tests für Punktabfragen und MVCC-Lesepfade.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::fixtures::*;
 
 #[tokio::test]

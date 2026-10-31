@@ -1,3 +1,10 @@
+//! # Modul: delete.rs
+//!
+//! **Zweck:** Logische und physische Löschpfade für Einzeldokumente.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use crate::collection::Collection;
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, EntityId, Result};
@@ -25,6 +32,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
     }
 
+    // ANCHOR[contextra-engine:COL-DEL-035]
+    /// Dokumentation für `delete_op` im Rahmen der Collection- und Suchabstraktion.
     pub async fn delete_op(
         &self,
         db_tx: &mut crate::transaction::DbTransaction<S, V>,

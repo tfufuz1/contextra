@@ -1,3 +1,10 @@
+//! # Modul: insert.rs
+//!
+//! **Zweck:** Einfügepfad für Dokumente mit automatischer Text-, Vektor- und Graph-Indizierung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::auto_extraction::auto_extract_and_relate;
 use super::internal::{validate_doc_id, validate_embedding};
 use crate::collection::{
@@ -264,6 +271,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(())
     }
 
+    // ANCHOR[contextra-engine:COL-CHE-274]
+    /// Dokumentation für `check_doc_id_collision_tracked` im Rahmen der Collection- und Suchabstraktion.
     pub(crate) async fn check_doc_id_collision_tracked(
         &self,
         tx: TxId,
@@ -291,6 +300,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(())
     }
 
+    // ANCHOR[contextra-engine:COL-INS-301]
+    /// Dokumentation für `insert_op` im Rahmen der Collection- und Suchabstraktion.
     pub async fn insert_op(
         &self,
         db_tx: &crate::transaction::DbTransaction<S, V>,

@@ -1,3 +1,10 @@
+//! # Modul: links.rs
+//!
+//! **Zweck:** Verwaltung von Hyperlinks und Kanten zwischen Dokumenten.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use crate::collection::{Collection, StoredDocument, StoredDocumentMeta};
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, Result};

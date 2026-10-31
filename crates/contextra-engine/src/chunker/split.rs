@@ -1,3 +1,10 @@
+//! # Modul: split.rs
+//!
+//! **Zweck:** Niedrigstufige Texttrennungs- und Split-Algorithmen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Aufspaltung übergroßer Abschnitte unter Erhalt atomarer Blöcke und Syntax-Fences.
 // INVARIANTEN: Codeblock-Fences und Tabellenköpfe werden bei Aufspaltung in Teil-Chunks wiederholt.
@@ -9,6 +16,8 @@ use super::estimate::estimate_tokens;
 use super::sections::RawSection;
 use super::windows::chunk_text_with_overlap;
 
+// ANCHOR[contextra-engine:SPL-001]
+/// Teilt einen Rohabschnitt in atomare Chunks.
 pub(crate) fn split_raw_section(
     sec: RawSection,
     hard_limit: usize,

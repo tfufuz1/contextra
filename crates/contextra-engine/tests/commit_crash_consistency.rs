@@ -1,3 +1,9 @@
+//! # Integrationstest: commit crash consistency
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Targeted crash simulation tests for multi-index 2-Phase Commit consistency.
@@ -221,6 +227,8 @@ async fn create_faulty_collection() -> (
     (col, storage)
 }
 
+// ANCHOR[contextra-engine:TST08-001]
+/// Testblock zur Überprüfung von `test_storage_commit_failure_leaves_no_orphaned_index_entries`.
 /// Test that if storage commit fails (Phase b), index staging is aborted/rolled back,
 /// leaving zero orphaned index entries.
 #[tokio::test]
@@ -272,6 +280,8 @@ async fn test_storage_commit_failure_leaves_no_orphaned_index_entries() -> Resul
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST08-002]
+/// Testblock zur Überprüfung von `test_crash_after_storage_commit_recovers_indices_from_storage`.
 /// Test that if crash occurs after storage commit but before index commit,
 /// recovery (`repair()`) forward-populates the index entries from storage, ensuring consistency.
 #[tokio::test]

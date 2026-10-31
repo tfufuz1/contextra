@@ -1,8 +1,17 @@
+//! # Modul: diagnostics.rs
+//!
+//! **Zweck:** Systemdiagnose, Integritätsprüfungen und Metrikerfassung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 use crate::*;
 use contextra_types::Result;
 use std::sync::Arc;
 
 impl Contextra {
+    // ANCHOR[contextra-engine:STA-014]
+    /// Dokumentation für `stats` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn stats(&self) -> Result<ContextraStats> {
         let default_col = self.default_col().await?;
@@ -42,12 +51,16 @@ impl Contextra {
         })
     }
 
+    // ANCHOR[contextra-engine:FLU-053]
+    /// Dokumentation für `flush` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn flush(&self) -> Result<()> {
         self.storage.flush().await?;
         Ok(())
     }
 
+    // ANCHOR[contextra-engine:DIA-003]
+    /// Liefert Zugriff auf die Registry verwaister Knoten.
     pub fn orphan_registry(&self) -> &Arc<contextra_checkpoint::InstanceOrphanRegistry> {
         &self.orphan_registry
     }

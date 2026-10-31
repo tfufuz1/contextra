@@ -1,3 +1,10 @@
+//! # Modul: query.rs
+//!
+//! **Zweck:** Strukturierte HybridQuery-Definition und Validierung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Hybrid-Familie Submodule für Query-basierte Suche.
 

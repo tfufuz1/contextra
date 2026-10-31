@@ -1,3 +1,10 @@
+//! # Modul: basic.rs
+//!
+//! **Zweck:** Basissuchfunktionen über einzelne Signalpfade.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Einfache Suchvarianten (search, search_with_filter, search_with_filter_expr, search_text) für Collection.
 

@@ -1,3 +1,10 @@
+//! # Modul: builder.rs
+//!
+//! **Zweck:** QueryBuilder-Hauptklasse mit Methodenverkettung für Filter und Gewichte.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::strategy::SearchStrategy;
 use super::Collection;
 #[allow(deprecated)]

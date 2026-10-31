@@ -1,3 +1,10 @@
+//! # Modul: decay_controller.rs
+//!
+//! **Zweck:** Decay-Controller zur zeitlichen Abwertung und Bereinigung von Wissenselementen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
+
 // FILE-CONTEXT
 // ZWECK: Adaptive Decay Controller — WP 2.2: Typen aus contextra-adapt hierher kopiert (archiviert).
 // INVARIANTEN: Identische Logik wie contextra-adapt/src/decay_controller.rs (ADR-016).
@@ -53,25 +60,35 @@ pub struct AdaptiveDecayController {
 }
 
 impl AdaptiveDecayController {
+    // ANCHOR[contextra-engine:DEC-001]
+    /// Erstellt eine neue Instanz des `AdaptiveDecayController` mit der gegebenen Konfiguration.
     pub fn new(config: DecayControllerConfig) -> Self {
         Self { config }
     }
 
+    // ANCHOR[contextra-engine:DEC-002]
+    /// Initialisiert den Controller mit den Standardwerten der Spezifikation.
     pub fn with_defaults() -> Self {
         Self::new(DecayControllerConfig::default())
     }
 
+    // ANCHOR[contextra-engine:DEC-003]
+    /// Berechnet die aktuelle Systemtemperatur basierend auf Tombstone-Verhältnis und Abfragelast.
     #[inline]
     pub fn system_temperature(&self, inputs: &DecaySignalInputs) -> f32 {
         (inputs.w_tombstone * inputs.tombstone_ratio + inputs.w_query * inputs.query_load_inverse)
             .clamp(0.0, 1.0)
     }
 
+    // ANCHOR[contextra-engine:DEC-004]
+    /// Berechnet die temperaturangepasste effektive Halbwertszeit in Transaktionszyklen.
     #[inline]
     pub fn effective_half_life(&self, temperature: f32) -> f32 {
         self.config.base_half_life_tx as f32 * (1.0 + self.config.kappa * (1.0 - temperature))
     }
 
+    // ANCHOR[contextra-engine:DEC-005]
+    /// Berechnet den aktuellen abgewerteten Score eines Objekts unter Berücksichtigung von Alter und Systemtemperatur.
     pub fn effective_score(
         &self,
         base_score: f32,
@@ -84,6 +101,8 @@ impl AdaptiveDecayController {
         base_score * decay_exponent.exp().max(0.0)
     }
 
+    // ANCHOR[contextra-engine:DEC-006]
+    /// Prüft, ob ein Eintrag aufgrund seines verfallenen Scores unter den Eviktions-Schwellenwert gefallen ist.
     #[inline]
     pub fn should_evict(
         &self,

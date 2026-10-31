@@ -1,3 +1,10 @@
+//! # Modul: estimate.rs
+//!
+//! **Zweck:** Heuristische Token- und Zeichengrößen-Schätzung für Chunks.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Heuristische Token-Schätzung für Fließtext, Codeblöcke und Tabellen.
 // INVARIANTEN: Deterministisches BPE-Verhältnis (4 Zeichen pro Token Grundwert).

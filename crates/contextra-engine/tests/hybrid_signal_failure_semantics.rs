@@ -1,3 +1,9 @@
+//! # Integrationstest: hybrid signal failure semantics
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::fusion::{Signal, SignalFailurePolicy};
 use contextra_engine::{Collection, DistanceMetric, Language};
@@ -9,6 +15,8 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST20-001]
+/// Testblock zur Überprüfung von `create_test_collection`.
 async fn create_test_collection(name: &str) -> (Collection<LsmStorage, HnswIndex>, TempDir) {
     let dir = TempDir::new().unwrap();
     let lsm_config = LsmConfig {
@@ -36,6 +44,8 @@ async fn create_test_collection(name: &str) -> (Collection<LsmStorage, HnswIndex
     (col, dir)
 }
 
+// ANCHOR[contextra-engine:TST20-002]
+/// Testblock zur Überprüfung von `test_signal_failure_fail_policy_returns_error`.
 #[tokio::test]
 async fn test_signal_failure_fail_policy_returns_error() {
     let (col, _dir) = create_test_collection("fail_policy_col").await;
@@ -72,6 +82,8 @@ async fn test_signal_failure_fail_policy_returns_error() {
     );
 }
 
+// ANCHOR[contextra-engine:TST20-003]
+/// Testblock zur Überprüfung von `test_signal_failure_degrade_policy_delivers_partial_results_with_report`.
 #[tokio::test]
 async fn test_signal_failure_degrade_policy_delivers_partial_results_with_report() {
     let (col, _dir) = create_test_collection("degrade_policy_col").await;

@@ -1,3 +1,10 @@
+//! # Modul: kv.rs
+//!
+//! **Zweck:** Direkter Key-Value-Zugriff auf den LSM-Speicher der Collection.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::internal::validate_doc_id;
 use crate::collection::Collection;
 use contextra_ports::{StorageEngine, VectorIndex};

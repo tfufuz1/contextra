@@ -1,3 +1,10 @@
+//! # Modul: relate.rs
+//!
+//! **Zweck:** Graph-Relationen und Verknüpfungen zwischen Dokumenten innerhalb einer Collection.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::{crud::validate_doc_id, Collection};
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, Result};

@@ -1,3 +1,9 @@
+//! # Integrationstest: query builder scope acorn
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use std::collections::BTreeSet;
 use std::sync::atomic::AtomicU64;
@@ -162,6 +168,8 @@ async fn create_standard_collection(name: &str) -> (Collection<LsmStorage, HnswI
     (col, dir)
 }
 
+// ANCHOR[contextra-engine:TST30-001]
+/// Testblock zur Überprüfung von `test_acorn_hard_boundary_scoping_returns_only_allowed_doc_ids`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_acorn_hard_boundary_scoping_returns_only_allowed_doc_ids() {
     let (col, _dir) = create_mock_collection("test_acorn_scoping").await;
@@ -213,6 +221,8 @@ async fn test_acorn_hard_boundary_scoping_returns_only_allowed_doc_ids() {
     }
 }
 
+// ANCHOR[contextra-engine:TST30-002]
+/// Testblock zur Überprüfung von `test_query_builder_without_scope_preserves_standard_execution`.
 #[tokio::test]
 async fn test_query_builder_without_scope_preserves_standard_execution() {
     let (col, _dir) = create_standard_collection("test_no_scope_regression").await;
@@ -236,6 +246,8 @@ async fn test_query_builder_without_scope_preserves_standard_execution() {
     assert_eq!(results[0].id, "doc-1");
 }
 
+// ANCHOR[contextra-engine:TST30-003]
+/// Testblock zur Überprüfung von `test_scope_with_unsupported_index_returns_capability_error`.
 #[tokio::test]
 async fn test_scope_with_unsupported_index_returns_capability_error() {
     let (col, _dir) = create_standard_collection("test_unsupported_scope").await;

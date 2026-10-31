@@ -1,3 +1,9 @@
+//! # Integrationstest: tx recovery and erasure
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 #![allow(
     clippy::unwrap_used,
@@ -53,6 +59,8 @@ async fn assert_index_doc_count_invariant<S: StorageEngine, V: contextra_ports::
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST39-001]
+/// Testblock zur Überprüfung von `test_tx_no_orphaned_intents_after_commit_and_rollback`.
 #[tokio::test]
 async fn test_tx_no_orphaned_intents_after_commit_and_rollback() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -105,6 +113,8 @@ async fn test_tx_no_orphaned_intents_after_commit_and_rollback() -> contextra_ty
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST39-002]
+/// Testblock zur Überprüfung von `test_tx_erasure_across_all_indices`.
 #[tokio::test]
 async fn test_tx_erasure_across_all_indices() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -149,6 +159,8 @@ async fn test_tx_erasure_across_all_indices() -> contextra_types::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST39-003]
+/// Testblock zur Überprüfung von `test_tx_erasure_tombstone_consistency`.
 #[tokio::test]
 async fn test_tx_erasure_tombstone_consistency() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -191,6 +203,8 @@ async fn test_tx_erasure_tombstone_consistency() -> contextra_types::Result<()> 
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST39-004]
+/// Testblock zur Überprüfung von `test_tx_tenant_isolation_during_rollback`.
 #[tokio::test]
 async fn test_tx_tenant_isolation_during_rollback() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -238,6 +252,8 @@ async fn test_tx_tenant_isolation_during_rollback() -> contextra_types::Result<(
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST39-005]
+/// Testblock zur Überprüfung von `test_tx_multi_document_rollback`.
 #[tokio::test]
 async fn test_tx_multi_document_rollback() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");
@@ -277,6 +293,8 @@ async fn test_tx_multi_document_rollback() -> contextra_types::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST39-006]
+/// Testblock zur Überprüfung von `test_tx_idempotency_of_compensation_and_recovery`.
 #[tokio::test]
 async fn test_tx_idempotency_of_compensation_and_recovery() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create tempdir");

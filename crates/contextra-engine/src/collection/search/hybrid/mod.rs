@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** Hybride Multi-Signal-Suche mit paralleler Signalerfassung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Hybrid-Familie (hybrid_search, hybrid_search_reranked, hybrid_search_with_weights, hybrid_search_with_strategy, traverse_links, filter_by_importance) für Collection.
 
@@ -30,6 +37,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// k_pool=20 → Recall@5=0.458; k_pool=100 → Recall@5=0.888 (Qualitätsknie).
     pub const DEFAULT_MIN_RERANK_CANDIDATES: usize = 100;
 
+    // ANCHOR[contextra-engine:COL-HYB-043]
+    /// Dokumentation für `hybrid_search_reranked` im Rahmen der Collection- und Suchabstraktion.
     #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, text, vector, reranker, anchor_entities))]

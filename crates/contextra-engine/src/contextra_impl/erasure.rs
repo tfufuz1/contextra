@@ -1,3 +1,10 @@
+//! # Modul: erasure.rs
+//!
+//! **Zweck:** Fail-Closed ErasureOrchestrator für gemessene Löschungen (DeletionProof-Saga).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 // FILE-CONTEXT
 // ZWECK: Orchestrierung der fail-closed Datenlöschung (ErasureOrchestrator, SPEC §12.7.4).
 // INVARIANTEN: DeletionProof entsteht ausschließlich nach unabhängiger LayerWitness-Messung aller Schichten. Fehler nach erster Mutation ergeben Ok(ErasureReport { verified: false, proof: None, ... }).
