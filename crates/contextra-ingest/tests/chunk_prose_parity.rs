@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `chunk_prose_parity.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Paritätstests zwischen ProseChunker und MarkdownChunker (Engine) (WP M3 / SPEC C-11.7).
 // INVARIANTEN: Dieselbe Wortfolge (split_whitespace), passende Breadcrumbs/Heading-Levels.
@@ -15,6 +21,8 @@ use contextra_ingest::format::FormatId;
 use contextra_ingest::ir::{BlockKind, DocumentIr, Locator};
 use contextra_types::DocId;
 
+// ANCHOR[contextra-ingest:TST-0325]
+// Testet die Funktionsfaehigkeit von `test_prose_chunker_engine_parity_fixtures`.
 #[test]
 fn test_prose_chunker_engine_parity_fixtures() {
     let fixtures = fixtures::get_prose_fixtures();

@@ -1,3 +1,14 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: XML-Streaming-Parser für ODT-Inhalte (content.xml / office:body) und Flat ODF.
 // INVARIANTEN: Zero-Panic, DoS-Schutz für Tabellenwiederholungen, Policy-Filterung für versteckten Text.

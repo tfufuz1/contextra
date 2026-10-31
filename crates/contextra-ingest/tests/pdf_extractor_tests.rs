@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `pdf_extractor_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Integrationstests für PdfExtractor (WP ING-08).
 // INVARIANTEN: #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)],
@@ -144,6 +150,8 @@ fn create_test_pdf(
     buffer
 }
 
+// ANCHOR[contextra-ingest:TST-0397]
+// Testet die Funktionsfaehigkeit von `test_pdf_extractor_basic_multi_page`.
 #[test]
 fn test_pdf_extractor_basic_multi_page() {
     let pdf_bytes = create_test_pdf(
@@ -186,6 +194,8 @@ fn test_pdf_extractor_basic_multi_page() {
     assert_eq!(pages, vec![1, 2]);
 }
 
+// ANCHOR[contextra-ingest:TST-0398]
+// Testet die Funktionsfaehigkeit von `test_pdf_extractor_headers_footers_policy`.
 #[test]
 fn test_pdf_extractor_headers_footers_policy() {
     let pages_text = vec![
@@ -249,6 +259,8 @@ fn test_pdf_extractor_headers_footers_policy() {
     assert_eq!(header_notes, vec!["Kopfzeile Firma"]);
 }
 
+// ANCHOR[contextra-ingest:TST-0399]
+// Testet die Funktionsfaehigkeit von `test_pdf_extractor_no_extractable_text`.
 #[test]
 fn test_pdf_extractor_no_extractable_text() {
     let pdf_bytes = create_test_pdf(&["", "   "], None, None, false);
@@ -278,6 +290,8 @@ fn test_pdf_extractor_no_extractable_text() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0400]
+// Testet die Funktionsfaehigkeit von `test_pdf_extractor_corrupt_bytes`.
 #[test]
 fn test_pdf_extractor_corrupt_bytes() {
     let corrupt_bytes = b"%PDF-1.4 corrupt content bad xref table %EOF";

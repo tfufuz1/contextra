@@ -1,3 +1,10 @@
+//! E-Mail-spezifisches Chunking fuer Header, Body und Anhaenge.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: EmailChunker für E-Mail-Nachrichten und Anhänge (EML, MBOX, MSG) (WP M4 / WP-ING-15).
 // INVARIANTEN: Zero-Panic, deterministisch, keine nachrichtenübergreifende Bündelung.
@@ -16,6 +23,8 @@ use std::ops::Range;
 
 /// Chunker für E-Mail-Formate (EML, MBOX, MSG).
 #[derive(Debug, Default)]
+// ANCHOR[contextra-ingest:CHK-0211]
+// struct `EmailChunker` fuer E-Mail-spezifisches Chunking fuer Header, Body und Anhaenge.
 pub struct EmailChunker;
 
 impl IrChunker for EmailChunker {

@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `docx_test.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -40,6 +46,8 @@ fn run_docx_extract(
     contextra_ingest::extractor::DocumentExtractor::extract(&extractor, FormatId::Docx, bytes, &ctx)
 }
 
+// ANCHOR[contextra-ingest:TST-0357]
+// Testet die Funktionsfaehigkeit von `test_docx_heading_hierarchy_german_and_english`.
 #[test]
 fn test_docx_heading_hierarchy_german_and_english() {
     let doc_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -93,6 +101,8 @@ fn test_docx_heading_hierarchy_german_and_english() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0358]
+// Testet die Funktionsfaehigkeit von `test_docx_bullet_and_numbered_lists`.
 #[test]
 fn test_docx_bullet_and_numbered_lists() {
     let doc_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -133,6 +143,8 @@ fn test_docx_bullet_and_numbered_lists() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0359]
+// Testet die Funktionsfaehigkeit von `test_docx_table_with_gridspan_and_vmerge`.
 #[test]
 fn test_docx_table_with_gridspan_and_vmerge() {
     let doc_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -169,6 +181,8 @@ fn test_docx_table_with_gridspan_and_vmerge() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0360]
+// Testet die Funktionsfaehigkeit von `test_docx_footnotes_and_comments_policy`.
 #[test]
 fn test_docx_footnotes_and_comments_policy() {
     let doc_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -224,6 +238,8 @@ fn test_docx_footnotes_and_comments_policy() {
     )));
 }
 
+// ANCHOR[contextra-ingest:TST-0361]
+// Testet die Funktionsfaehigkeit von `test_docx_tracked_deletions_policy`.
 #[test]
 fn test_docx_tracked_deletions_policy() {
     let doc_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -255,6 +271,8 @@ fn test_docx_tracked_deletions_policy() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0362]
+// Testet die Funktionsfaehigkeit von `test_docx_vanish_prompt_injection_filter`.
 #[test]
 fn test_docx_vanish_prompt_injection_filter() {
     let doc_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -283,6 +301,8 @@ fn test_docx_vanish_prompt_injection_filter() {
     assert_eq!(ir.warnings[0].code, WarningCode::HiddenContentSkipped);
 }
 
+// ANCHOR[contextra-ingest:TST-0363]
+// Testet die Funktionsfaehigkeit von `test_docx_alternate_content_no_duplication`.
 #[test]
 fn test_docx_alternate_content_no_duplication() {
     let doc_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -310,6 +330,8 @@ fn test_docx_alternate_content_no_duplication() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0364]
+// Testet die Funktionsfaehigkeit von `test_docx_zip_bomb_limit_exceeded`.
 #[test]
 fn test_docx_zip_bomb_limit_exceeded() {
     let mut limits = IngestLimits::default();
@@ -326,6 +348,8 @@ fn test_docx_zip_bomb_limit_exceeded() {
     assert!(matches!(err, IngestError::LimitExceeded { .. }));
 }
 
+// ANCHOR[contextra-ingest:TST-0365]
+// Testet die Funktionsfaehigkeit von `test_docx_xxe_dtd_corrupt_error`.
 #[test]
 fn test_docx_xxe_dtd_corrupt_error() {
     let doc_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -343,6 +367,8 @@ fn test_docx_xxe_dtd_corrupt_error() {
     assert!(matches!(err, IngestError::Corrupt { .. }));
 }
 
+// ANCHOR[contextra-ingest:TST-0366]
+// Testet die Funktionsfaehigkeit von `test_docx_truncated_corrupt_error`.
 #[test]
 fn test_docx_truncated_corrupt_error() {
     let doc_xml = r#"<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Valid</w:t></w:r></w:p></w:body></w:document>"#;
@@ -355,6 +381,8 @@ fn test_docx_truncated_corrupt_error() {
     assert!(matches!(err, IngestError::Corrupt { .. }));
 }
 
+// ANCHOR[contextra-ingest:TST-0367]
+// Testet die Funktionsfaehigkeit von `test_generate_fuzz_seeds`.
 #[test]
 fn test_generate_fuzz_seeds() {
     use std::fs;
@@ -416,6 +444,8 @@ fn test_generate_fuzz_seeds() {
     let _ = fs::write(corpus_dir.join("seed11_truncated.docx"), b11);
 }
 
+// ANCHOR[contextra-ingest:TST-0368]
+// Testet die Funktionsfaehigkeit von `test_docx_throughput_smoke_5mb`.
 #[test]
 fn test_docx_throughput_smoke_5mb() {
     let mut large_doc = String::from(

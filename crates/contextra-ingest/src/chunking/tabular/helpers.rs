@@ -1,3 +1,10 @@
+//! Hilfsfunktionen fuer Tabellenaggregation und Header-Wiederholung.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Hilfsfunktionen für Spaltenbuchstaben (A–XFD) und A1-Range-Berechnung (WP-ING-13).
 // INVARIANTEN: Zero-Panic, deterministisch, reine Ganzzahlarithmetik.
@@ -5,6 +12,8 @@
 
 /// Konvertiert einen 0-basierten Spaltenindex in Excel-Spaltenbuchstaben (A, B, ..., Z, AA, ..., XFD).
 /// Maximal unterstützter Spaltenindex in Excel ist 16383 (XFD).
+// ANCHOR[contextra-ingest:CHK-0239]
+// fn `col_to_letter` fuer Hilfsfunktionen fuer Tabellenaggregation und Header-Wiederholung.
 pub fn col_to_letter(mut col: u32) -> String {
     let mut result = String::new();
     loop {
@@ -23,6 +32,8 @@ pub fn col_to_letter(mut col: u32) -> String {
 /// Formatiert den A1-Zellbereich aus `Table.origin`, Header-Anzahl, aktiven Spalten
 /// und den 1-basierten Datenzeilen (first, last).
 /// Beispiel: origin = (5, 3) [D6], header_rows = 1, active_cols = 0..3, data_rows = (1, 36) => "D6:F42"
+// ANCHOR[contextra-ingest:CHK-0240]
+// fn `format_a1_range` fuer Hilfsfunktionen fuer Tabellenaggregation und Header-Wiederholung.
 pub fn format_a1_range(
     origin: (u32, u32),
     header_rows: u8,

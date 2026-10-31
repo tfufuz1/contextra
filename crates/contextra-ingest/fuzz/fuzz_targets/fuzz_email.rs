@@ -1,3 +1,9 @@
+//! Fuzzing-Target: `fuzz_email.rs`
+//!
+//! # Zweck & Invariante
+//! Ueberprueft die Zero-Panic-Invariante von `contextra-ingest` gegenueber
+//! beliebig manipulierten, bösartigen oder unerwarteten Bytefolgen via LibFuzzer.
+//!
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
@@ -12,3 +18,6 @@ fuzz_target!(|data: &[u8]| {
     };
     contextra_ingest::fuzz_support::run(fmt, payload);
 });
+
+// ANCHOR[contextra-ingest:FUZZ-0453]
+// Fuzzing-Target-Definition fuer fuzz_email.rs.

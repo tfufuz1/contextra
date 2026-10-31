@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `chunk_email_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Akzeptanz- und Proptests für EmailChunker (WP-ING-15).
 // INVARIANTEN: Zero-Panic in Produktion, Test-First, Lints eingehalten.
@@ -17,6 +23,8 @@ use contextra_ingest::format::FormatId;
 use contextra_ingest::ir::{BlockKind, Boundary, DocumentIr, Locator, MessageHeader, Table};
 use proptest::prelude::*;
 
+// ANCHOR[contextra-ingest:TST-0301]
+// Testet die Funktionsfaehigkeit von `test_email_3_messages_isolation`.
 #[test]
 fn test_email_3_messages_isolation() {
     let mut ir = DocumentIr::new(FormatId::Mbox);
@@ -56,6 +64,8 @@ fn test_email_3_messages_isolation() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0302]
+// Testet die Funktionsfaehigkeit von `test_email_quoted_replies_toggle`.
 #[test]
 fn test_email_quoted_replies_toggle() {
     let mut ir = DocumentIr::new(FormatId::Eml);
@@ -106,6 +116,8 @@ fn test_email_quoted_replies_toggle() {
     assert!(drafts_quoted[0].text.contains("Bob wrote"));
 }
 
+// ANCHOR[contextra-ingest:TST-0303]
+// Testet die Funktionsfaehigkeit von `test_email_60000_char_body_window_split`.
 #[test]
 fn test_email_60000_char_body_window_split() {
     let mut ir = DocumentIr::new(FormatId::Eml);
@@ -135,6 +147,8 @@ fn test_email_60000_char_body_window_split() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0304]
+// Testet die Funktionsfaehigkeit von `test_email_attachments_table_and_prose`.
 #[test]
 fn test_email_attachments_table_and_prose() {
     let mut ir = DocumentIr::new(FormatId::Eml);
@@ -214,6 +228,8 @@ fn test_email_attachments_table_and_prose() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0305]
+// Testet die Funktionsfaehigkeit von `test_email_empty_message_header_only`.
 #[test]
 fn test_email_empty_message_header_only() {
     let mut ir = DocumentIr::new(FormatId::Eml);
@@ -237,6 +253,8 @@ fn test_email_empty_message_header_only() {
 }
 
 proptest! {
+// ANCHOR[contextra-ingest:TST-0306]
+// Testet die Funktionsfaehigkeit von `prop_email_chunker_determinism_and_spans`.
     #[test]
     fn prop_email_chunker_determinism_and_spans(
         subj in ".*",

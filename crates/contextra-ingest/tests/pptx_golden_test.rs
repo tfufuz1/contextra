@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `pptx_golden_test.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Golden-Tests für PPTX-Extraktion (PresentationML, Folienreihenfolge, Formen, Notizen, Limits) (WP-ING-05).
 // INVARIANTEN: Zero-Panic, Test-First, dynamische Zip-Generierung im Code.
@@ -241,6 +247,8 @@ fn build_golden_pptx() -> Vec<u8> {
     res.into_inner()
 }
 
+// ANCHOR[contextra-ingest:TST-0401]
+// Testet die Funktionsfaehigkeit von `test_pptx_golden_extraction_order_shapes_table_notes_and_hidden`.
 #[test]
 fn test_pptx_golden_extraction_order_shapes_table_notes_and_hidden() {
     let pptx_bytes = build_golden_pptx();
@@ -337,6 +345,8 @@ fn test_pptx_golden_extraction_order_shapes_table_notes_and_hidden() {
         .any(|w| w.code == WarningCode::HiddenContentSkipped));
 }
 
+// ANCHOR[contextra-ingest:TST-0402]
+// Testet die Funktionsfaehigkeit von `test_pptx_hidden_slide_included_when_policy_enabled`.
 #[test]
 fn test_pptx_hidden_slide_included_when_policy_enabled() {
     let pptx_bytes = build_golden_pptx();
@@ -372,6 +382,8 @@ fn test_pptx_hidden_slide_included_when_policy_enabled() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0403]
+// Testet die Funktionsfaehigkeit von `test_pptx_corrupt_xml_and_zip_bomb_limits`.
 #[test]
 fn test_pptx_corrupt_xml_and_zip_bomb_limits() {
     let reg = ExtractorRegistry::with_defaults();
@@ -420,6 +432,8 @@ fn test_pptx_corrupt_xml_and_zip_bomb_limits() {
     ));
 }
 
+// ANCHOR[contextra-ingest:TST-0404]
+// Testet die Funktionsfaehigkeit von `test_fuzz_seeds_generation`.
 #[test]
 fn test_fuzz_seeds_generation() {
     let corpus_dir = Path::new("fuzz/corpus/fuzz_pptx");

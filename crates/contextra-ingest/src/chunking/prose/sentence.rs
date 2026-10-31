@@ -1,3 +1,10 @@
+//! Satzgrenzen-Erkennung (Sentence Boundary Detection) fuer Textzerlegung.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Satzsegmentierung für übergroße Absätze mit Abkürzungsbehandlung (de/en) (WP M3 / SPEC C-11.7).
 // INVARIANTEN: Zero-Panic, UTF-8-sicher, keine Satzteilung bei bekannten Abkürzungen.
@@ -16,12 +23,16 @@ const ABBREVIATIONS: &[&str] = &[
 
 /// Repräsentiert einen Satz innerhalb eines Textes mit dessen Byte-Span.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-ingest:CHK-0228]
+// struct `SentenceSpan` fuer Satzgrenzen-Erkennung (Sentence Boundary Detection) fuer Textzerlegung.
 pub struct SentenceSpan {
     pub text: String,
     pub span: Range<usize>,
 }
 
 /// Zerlegt einen Text unter Berücksichtigung von Abkürzungen in Sätze.
+// ANCHOR[contextra-ingest:CHK-0229]
+// fn `split_sentences` fuer Satzgrenzen-Erkennung (Sentence Boundary Detection) fuer Textzerlegung.
 pub fn split_sentences(text: &str, base_offset: usize) -> Vec<SentenceSpan> {
     if text.is_empty() {
         return Vec::new();
