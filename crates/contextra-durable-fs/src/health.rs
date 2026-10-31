@@ -1,3 +1,21 @@
+//! # Health-Status und Zustandsautomat für Speichersysteme
+//!
+//! Zweck: Implementierung eines Fail-Closed-Zustandsautomaten ([`HealthState`]) und
+//! eines threadsicheren atomaren Wrappers ([`AtomicHealthState`]) zur Überwachung
+//! der Integrität des Speichersubstrats gemäß Spezifikation §18.4.
+//!
+//! Ring-Zugehörigkeit: Ring 0 (Basisinfrastruktur / Fail-Closed-Zustandsverwaltung).
+//! Wird genutzt von: [`crate::PendingDeleteJournal`] und übergeordneten Speicher-Crates.
+//! Wichtigste Typen:
+//! - [`HealthState`]: Die vier diskreten Betriebszustände (`Healthy`, `Degraded`, `ReadOnly`, `Poisoned`).
+//! - [`HealthEvent`]: Ereignisse, die Statusübergänge auslösen (`FsyncFailure`, `Enospc`, `ReadChecksumWarning`, `Recovered`).
+//! - [`AtomicHealthState`]: Lock-freie atomare Speicherung für nebenläufigen Zugriff via Compare-and-Swap.
+//!
+//! Invarianten:
+//! - `INV-POISON-1`: Einmal im Zustand `Poisoned` (vergiftet durch Flush-/fsync-Fehler), kann dieser Zustand
+//!   während der Prozesslaufzeit niemals wieder verlassen werden (dauerhaft fail-closed).
+//! - Nebenläufigkeit: Lock-freier CAS-Loop (`compare_exchange_weak`) mit `AcqRel`/`Acquire`-Ordnung.
+
 // FILE-CONTEXT
 // STAND: 2026-10-12
 // ZWECK: Fail-Closed HealthState Zustandsautomat fuer Durability Substrat (§18.4).
@@ -5,45 +23,64 @@
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
-/// Health status classification of the storage subsystem (§18.4).
+// ANCHOR[contextra-durable-fs:HEALTH-STATE-001]
+/// Einstufung des Systemzustands für das Speichersubstrat (§18.4).
 ///
-/// ## Transition Table & Rules
+/// Definiert einen deterministischen Zustandsübergang bei Hardware- oder I/O-Ereignissen.
 ///
-/// | Initial State | Trigger / Event | Target State | Permanent? | Action Required |
-/// |--------------|-----------------|--------------|------------|-----------------|
-/// | `Healthy`    | Read Error / Checksum Warning | `Degraded` | No | Scrubbing / Retry |
-/// | `Healthy`    | Disk Full (`ENOSPC`) | `ReadOnly` | No | Cleanup / Space Release |
-/// | Any          | `fsync` / Flush Write Failure | `Poisoned` | Yes | Full Restart + Recovery |
-/// | `Degraded`   | `fsync` / Flush Write Failure | `Poisoned` | Yes | Full Restart + Recovery |
-/// | `ReadOnly`   | `fsync` / Flush Write Failure | `Poisoned` | Yes | Full Restart + Recovery |
-/// | `Poisoned`   | Any Event | `Poisoned` | Yes | Fail-closed write rejection |
+/// ## Übergangstabelle (Transition Table)
+///
+/// | Ausgangszustand | Auslösendes Ereignis ([`HealthEvent`]) | Zielzustand | Dauerhaft? | Erforderliche Maßnahme |
+/// |----------------|--------------------------------------|-------------|------------|------------------------|
+/// | `Healthy`      | Lesefehler / Prüfsummen-Warnung      | `Degraded`  | Nein       | Scrubbing / Wiederholung |
+/// | `Healthy`      | Speicher voll (`ENOSPC`)             | `ReadOnly`  | Nein       | Speicherfreigabe / Löschen |
+/// | Beliebig       | Flush / `fsync`-Schreibfehler        | `Poisoned`  | Ja         | Prozessneustart + Recovery |
+/// | `Degraded`     | Flush / `fsync`-Schreibfehler        | `Poisoned`  | Ja         | Prozessneustart + Recovery |
+/// | `ReadOnly`     | Flush / `fsync`-Schreibfehler        | `Poisoned`  | Ja         | Prozessneustart + Recovery |
+/// | `Poisoned`     | Jedes Ereignis                       | `Poisoned`  | Ja         | Schreiboperationen strikt abweisen |
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(u8)]
 pub enum HealthState {
-    /// Normal operational health with full read/write capabilities.
+    /// Normaler Betriebszustand mit vollständigen Lese- und Schreibfähigkeiten.
     #[default]
     Healthy = 0,
-    /// Non-fatal read errors or checksum warnings encountered; write allowed, reads degraded.
+    /// Nicht-fatale Lesefehler oder Prüfsummenabweichungen aufgetreten; Schreiben erlaubt, Lesen eingeschränkt.
     Degraded = 1,
-    /// Storage target out of disk space (`ENOSPC`); write/commit rejected, read allowed.
+    /// Speichermedium voll (`ENOSPC`); Schreib- und Commit-Operationen abgewiesen, Lesen weiterhin gestattet.
     ReadOnly = 2,
-    /// Fatal storage flush error (`fsync` failure); all writes rejected. Requires full restart.
+    /// Fataler Flush- oder `fsync`-Fehler; alle Schreibzugriffe verboten. Erfordert vollständigen Neustart und WAL-Recovery.
     Poisoned = 3,
 }
 
 impl HealthState {
-    /// Creates a new default [`HealthState`] initialized to `Healthy`.
+    // ANCHOR[contextra-durable-fs:HEALTH-STATE-NEW]
+    /// Erzeugt einen neuen [`HealthState`] im Ausgangszustand `Healthy`.
     #[must_use]
     pub const fn new() -> Self {
         Self::Healthy
     }
 
-    /// Evaluates state transition based on incoming system event or error.
+    // ANCHOR[contextra-durable-fs:HEALTH-STATE-TRANSITION]
+    /// Berechnet den Folgezustand basierend auf einem eingehenden [`HealthEvent`].
     ///
-    /// Once in `Poisoned`, transitions to any non-Poisoned state are strictly forbidden.
+    /// Ablauf:
+    /// 1. Prüfen, ob der Zustand bereits `Poisoned` ist.
+    /// 2. Falls `Poisoned`, verbleibt das System zwingend in `Poisoned` (Invariante `INV-POISON-1`).
+    /// 3. Andernfalls Zuordnung gemäß Übergangstabelle:
+    ///    - `FsyncFailure` -> `Poisoned`
+    ///    - `Enospc` -> `ReadOnly`
+    ///    - `ReadChecksumWarning` -> `Degraded` (außer wenn bereits `ReadOnly`)
+    ///    - `Recovered` -> `Healthy`
+    ///
+    /// Vorbedingungen:
+    /// - Keine.
+    ///
+    /// Nachbedingungen:
+    /// - Ein `Poisoned`-Zustand wird niemals degradiert oder geheilt.
     #[must_use]
     pub fn transition(self, event: HealthEvent) -> Self {
+        // NOTE: Ein vergifteter Zustand darf zur Vermeidung von Datenkorruption niemals verlassen werden.
         if self == Self::Poisoned {
             return Self::Poisoned;
         }
@@ -62,33 +99,47 @@ impl HealthState {
         }
     }
 
-    /// Returns `true` if state allows mutation/write operations.
+    // ANCHOR[contextra-durable-fs:HEALTH-STATE-ALLOWS-WRITES]
+    /// Gibt an, ob im aktuellen Zustand mutierende Schreiboperationen zulässig sind.
+    ///
+    /// Rückgabewert:
+    /// - `true` für `Healthy` und `Degraded`.
+    /// - `false` für `ReadOnly` (Speicher voll) und `Poisoned` (Hardware/Sync-Fehler).
     #[must_use]
     pub fn allows_writes(self) -> bool {
         matches!(self, Self::Healthy | Self::Degraded)
     }
 
-    /// Returns `true` if handle is permanently poisoned.
+    // ANCHOR[contextra-durable-fs:HEALTH-STATE-IS-POISONED]
+    /// Prüft, ob das Speichersubstrat dauerhaft vergiftet (`Poisoned`) ist.
+    ///
+    /// Rückgabewert:
+    /// - `true`, falls der Zustand `Poisoned` ist.
     #[must_use]
     pub fn is_poisoned(self) -> bool {
         matches!(self, Self::Poisoned)
     }
 }
 
-/// Triggers and health events driving state transitions.
+// ANCHOR[contextra-durable-fs:HEALTH-EVENT-001]
+/// Ereignisse und Auslöser für Statusübergänge im Speichersystem.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HealthEvent {
-    /// Failure during `fsync` or synchronous disk flush.
+    /// Fataler Ausfall während eines synchronen Festplatten-Flushes (`fsync`).
     FsyncFailure,
-    /// Storage device out of space (`ENOSPC`).
+    /// Speichermedium meldet fehlenden Speicherplatz (`ENOSPC` = Error No Space).
     Enospc,
-    /// Non-fatal read error or checksum verification warning.
+    /// Nicht-fataler Lesefehler oder Warnung bei der Block-Prüfsummenverifikation.
     ReadChecksumWarning,
-    /// Manual explicit recovery signal (e.g. upon process restart recovery).
+    /// Explizites Wiederherstellungssignal (z. B. nach erfolgreicher Crash-Recovery beim Neustart).
     Recovered,
 }
 
-/// Atomic thread-safe wrapper holding current [`HealthState`].
+// ANCHOR[contextra-durable-fs:ATOMIC-HEALTH-STATE-001]
+/// Threadsicherer, atomarer Wrapper für den aktuellen [`HealthState`].
+///
+/// Ermöglicht nebenläufigen Threads das unterbrechungsfreie Lesen und
+/// konsistente Aktualisieren des Systemzustands ohne Mutex-Sperren.
 #[derive(Debug)]
 pub struct AtomicHealthState {
     state: AtomicU8,
@@ -101,7 +152,8 @@ impl Default for AtomicHealthState {
 }
 
 impl AtomicHealthState {
-    /// Creates a new atomic state initialized to `Healthy`.
+    // ANCHOR[contextra-durable-fs:ATOMIC-HEALTH-STATE-NEW]
+    /// Initialisiert eine neue atomare Zustandsverwaltung im Startzustand `Healthy`.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -109,18 +161,34 @@ impl AtomicHealthState {
         }
     }
 
-    /// Retrieves current [`HealthState`].
+    // ANCHOR[contextra-durable-fs:ATOMIC-HEALTH-STATE-LOAD]
+    /// Liest den aktuellen [`HealthState`] mit `Acquire`-Speicherordnung aus.
+    ///
+    /// Nachbedingungen:
+    /// - Garantiert, dass nachfolgende Leseoperationen im aufrufenden Thread
+    ///   die Speicheränderungen sehen, die vor dem Setzen des Zustands erfolgten.
     #[must_use]
     pub fn load(&self) -> HealthState {
         match self.state.load(Ordering::Acquire) {
             0 => HealthState::Healthy,
             1 => HealthState::Degraded,
             2 => HealthState::ReadOnly,
+            // NOTE: Alle unbekannten oder höheren Werte werden sicherheitshalber als Poisoned interpretiert (Fail-Closed).
             _ => HealthState::Poisoned,
         }
     }
 
-    /// Triggers a state transition atomically.
+    // ANCHOR[contextra-durable-fs:ATOMIC-HEALTH-STATE-RECORD-EVENT]
+    /// Führt einen atomaren Zustandsübergang anhand eines [`HealthEvent`] aus.
+    ///
+    /// Ablauf:
+    /// 1. Aktuellen Zustand atomar laden.
+    /// 2. Folgezustand über [`HealthState::transition`] berechnen.
+    /// 3. Mittels `compare_exchange_weak` (CAS) versuchen, den neuen Zustand zu schreiben.
+    /// 4. Bei Kollision mit anderem Thread: Schleife mit dem tatsächlichen aktuellen Zustand wiederholen.
+    ///
+    /// Nebenläufigkeit:
+    /// - Verwendet lock-freie CAS-Schleife mit `Ordering::AcqRel` bei Erfolg und `Ordering::Acquire` bei Fehlschlag.
     pub fn record_event(&self, event: HealthEvent) -> HealthState {
         let mut current = self.load();
         loop {

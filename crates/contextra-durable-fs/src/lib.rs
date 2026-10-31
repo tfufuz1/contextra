@@ -2,38 +2,44 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![warn(missing_docs)]
 
-//! Durable filesystem operations and synchronous directory sync utilities for Contextra.
+//! # Dauerhafte Dateisystem-Operationen und synchrone Disk-Flushes (`contextra-durable-fs`)
 //!
-//! Provides cross-platform durable file persistence contracts:
-//! - [`sync_dir`]: Synchronizes directory metadata entries to stable storage.
-//! - [`atomic_replace`]: Atomically replaces a target file with data and directory sync.
-//! - [`durable_remove`]: Removes a target file and synchronizes the parent directory.
-//! - [`scrub_and_remove`]: Overwrites file contents with zeros before durable removal.
-//! - [`scrub_if_safe`]: Safely scrubs file contents with safety checks (CoW, hardlinks, reader active).
-//! - [`DurableHandle`]: File handle wrapper enforcing fsync poisoning semantics (INV-FSYNC-1).
-//! - [`DirLock`]: Directory lock guard enforcing filesystem classification rules (§7.3.1).
-//! - [`FaultInjector`]: Trait providing injection points for storage faults (write, fsync, rename, dir-sync).
+//! Zweck: Bereitstellung von betriebssystemübergreifenden Hilfsfunktionen für atomares Ersetzen,
+//! dauerhaftes Löschen und synchrone Verzeichnis- und Datei-Flushes (`fsync`/`fdatasync`).
 //!
-//! ## Invariants
+//! Ring-Zugehörigkeit: Ring 0 (Basisinfrastruktur / OS-Abstraktion; in `Cargo.toml` als `ring = "0"` annotiert).
+//! Wird eingebunden von: Derzeit keinen anderen Crates direkt (Stand SPEC 4.1 Ist-Zustand).
+//! Abhängigkeiten: [`contextra-sys`] (Plattform-Durability-Primitive und Dateisystem-Klassifikation).
 //!
-//! - `INV-FSYNC-1`: File handles ([`DurableHandle`]) are poisoned upon any fsync or write failure,
-//!   preventing further flush or write attempts on corrupted handles.
-//! - `INV-ENOSPC-1`: Disk-full (`ENOSPC`) and storage I/O errors across write, fsync, rename,
-//!   and directory sync are fail-closed and deterministically propagated as [`std::io::Error`] without panics.
+//! Wichtigste bereitgestellte Komponenten:
+//! - [`sync_dir`]: Flusht Verzeichnis-Metadaten auf die physische Festplatte.
+//! - [`atomic_replace`]: Ersetzt eine Datei atomar über temporäre Zwischendatei, `fsync` und Verzeichnis-Sync.
+//! - [`durable_remove`]: Löscht eine Datei und flusht das Elternverzeichnis dauerhaft.
+//! - [`scrub_and_remove`]: Überschreibt Dateien vor dem Löschen mit Nullen.
+//! - [`DurableHandle`]: Kapselt [`File`] und vergiftet sich dauerhaft bei I/O- oder `fsync`-Fehlern (`INV-FSYNC-1`).
+//! - [`DirLock`]: Verzeichnis-Sperre mit Dateisystem-Validierung (verbietet Locking auf Netzlaufwerken / FUSE).
+//! - [`FaultInjector`]: Trait für deterministische Fehlerinjektion in Persistenzpfaden.
+//!
+//! ## Invarianten
+//!
+//! - `INV-FSYNC-1`: Dateihandles ([`DurableHandle`]) werden bei jeglichem Schreib- oder Flush-Fehler sofort
+//!   vergiftet (`is_poisoned = true`), um nachfolgende fehlerhafte Schreiboperationen strikt abzuweisen (Fail-Closed).
+//! - `INV-ENOSPC-1`: Speichermangel (`ENOSPC`) sowie sonstige I/O-Fehler werden deterministisch als [`std::io::Error`]
+//!   propagiert; keine `panic!`, `unwrap()` oder `expect()` in Produktionspfaden.
 
-/// Fail-closed health state tracking for storage operations (§18.4).
+/// Fail-Closed-Zustandsverfolgung für Speichersysteme (§18.4).
 pub mod health;
 
-/// Fault injection hooks for durable filesystem operations.
+/// Fehlerinjektions-Schnittstelle zur Simulation von Hardware- und Dateisystemausfällen.
 pub mod fault_injector;
 
-/// Pending delete journal tracking files scheduled for removal across crashes.
+/// Crash-sicheres Journal für ausstehende Datei-Löschaufträge.
 pub mod journal;
 
-/// Scrubbing utilities and safety check policies.
+/// Sicheres Überschreiben (Scrubbing) und Schutzmechanismen vor dem Löschen.
 pub mod scrub;
 
-/// Virtual File System (VFS) abstraction interface.
+/// Abstraktion eines virtuellen Dateisystems (VFS) für entkoppeltes I/O und Testbarkeit.
 pub mod vfs;
 
 pub use contextra_sys::FlushKind;
@@ -51,15 +57,25 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// Atomarer Zähler zur Generierung eindeutiger temporärer Dateinamen für [`atomic_replace`].
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-/// Marker type representing a handle poisoned by an fsync error.
+// ANCHOR[contextra-durable-fs:POISONED-HANDLE-001]
+/// Markierungstyp zur Kennzeichnung eines durch `fsync`- oder Schreibfehler vergifteten Handles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PoisonedHandle;
 
-/// A wrapper around [`File`] that poisons the handle upon an fsync failure (INV-FSYNC-1).
+// ANCHOR[contextra-durable-fs:DURABLE-HANDLE-001]
+/// Ein Wrapper um [`File`], der das Handle bei einem `fsync`- oder Schreibfehler dauerhaft vergiftet (`INV-FSYNC-1`).
 ///
-/// Ensures no further flush or write attempts occur on a corrupted or errored handle.
+/// Verhindert, dass nach einem fehlgeschlagenen Hardware-Sync weitere Schreiboperationen auf
+/// einem potenziell inkonsistenten Dateideskriptor ausgeführt werden.
+///
+/// Vorbedingungen:
+/// - Die übergebene Datei muss ein gültiges, offenes Dateihandle sein.
+///
+/// Nachbedingungen:
+/// - Sobald ein Flush fehlschlägt, wechselt `is_poisoned` auf `true` und alle Folgeaufrufe scheitern sofort.
 #[derive(Debug)]
 pub struct DurableHandle<F: FaultInjector = NoFault> {
     file: Option<File>,
@@ -69,14 +85,16 @@ pub struct DurableHandle<F: FaultInjector = NoFault> {
 }
 
 impl DurableHandle<NoFault> {
-    /// Wraps an open [`File`] into a new [`DurableHandle`] with default no-op fault injector.
+    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-NEW]
+    /// Kapselt eine geöffnete [`File`] in ein neues [`DurableHandle`] mit standardmäßigem Null-Kosten-Injektor ([`NoFault`]).
     pub fn new(file: File) -> Self {
         Self::new_with_injector(file, NoFault)
     }
 }
 
 impl<F: FaultInjector> DurableHandle<F> {
-    /// Wraps an open [`File`] with a custom [`FaultInjector`].
+    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-NEW-WITH-INJECTOR]
+    /// Kapselt eine geöffnete [`File`] mit einem benutzerdefinierten [`FaultInjector`].
     pub fn new_with_injector(file: File, injector: F) -> Self {
         Self {
             file: Some(file),
@@ -86,7 +104,8 @@ impl<F: FaultInjector> DurableHandle<F> {
         }
     }
 
-    /// Wraps an open [`File`] associated with `path` and a custom [`FaultInjector`].
+    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-NEW-WITH-PATH-AND-INJECTOR]
+    /// Kapselt eine geöffnete [`File`] mit zugehörigem Pfad und benutzerdefiniertem [`FaultInjector`].
     pub fn new_with_path_and_injector(file: File, path: PathBuf, injector: F) -> Self {
         Self {
             file: Some(file),
@@ -96,15 +115,24 @@ impl<F: FaultInjector> DurableHandle<F> {
         }
     }
 
-    /// Returns `true` if this handle has been poisoned due to a flush failure.
+    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-IS-POISONED]
+    /// Prüft, ob dieses Handle aufgrund eines vorangegangenen Flush-Fehlers vergiftet ist.
     #[must_use]
     pub fn is_poisoned(&self) -> bool {
         self.is_poisoned
     }
 
-    /// Flushes file contents using platform durability primitives and executes fault injection hooks.
+    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-FLUSH]
+    /// Flusht Dateiinhalte mittels Plattform-Primitiven auf die Festplatte und führt Fehlerinjektions-Hooks aus.
     ///
-    /// If the operation or fault hook fails, the handle becomes poisoned and subsequent calls fail immediately (INV-FSYNC-1).
+    /// Ablauf von `flush`:
+    /// 1. Prüfen, ob das Handle bereits vergiftet ist (`is_poisoned == true`). Falls ja, sofortiger Fehlerabbruch.
+    /// 2. Prüfen, ob die zugrundeliegende Datei vorhanden ist.
+    /// 3. Fehlerinjektor-Hook `on_fsync` aufrufen. Scheitert dieser, Handle vergiften und Fehler melden.
+    /// 4. Betriebssystem-Flush via [`flush_file`] ausführen. Scheitert dieser, Handle vergiften (`INV-FSYNC-1`).
+    ///
+    /// Fehlerfälle:
+    /// - Liefert `Err(std::io::Error)`, wenn das Handle vergiftet ist oder die Synchronisation fehlschlägt.
     pub fn flush(&mut self, kind: FlushKind) -> std::io::Result<()> {
         if self.is_poisoned {
             return Err(std::io::Error::other(
@@ -129,7 +157,8 @@ impl<F: FaultInjector> DurableHandle<F> {
         }
     }
 
-    /// Returns a reference to the underlying [`File`], or `None` if poisoned.
+    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-GET-REF]
+    /// Liefert eine unveränderliche Referenz auf die zugrundeliegende Datei, oder `None`, falls das Handle vergiftet ist.
     #[must_use]
     pub fn get_ref(&self) -> Option<&File> {
         if self.is_poisoned {
@@ -139,7 +168,8 @@ impl<F: FaultInjector> DurableHandle<F> {
         }
     }
 
-    /// Returns a mutable reference to the underlying [`File`], or `None` if poisoned.
+    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-GET-MUT]
+    /// Liefert eine veränderliche Referenz auf die zugrundeliegende Datei, oder `None`, falls das Handle vergiftet ist.
     pub fn get_mut(&mut self) -> Option<&mut File> {
         if self.is_poisoned {
             None
@@ -148,13 +178,16 @@ impl<F: FaultInjector> DurableHandle<F> {
         }
     }
 
-    /// Explicitly poisons this handle.
+    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-POISON]
+    /// Vergiftet dieses Handle explizit manuell (z. B. bei erkannten Prüfsummenfehlern).
     pub fn poison(&mut self) {
         self.is_poisoned = true;
     }
 }
 
 impl<F: FaultInjector> Write for DurableHandle<F> {
+    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-WRITE]
+    /// Schreibt Daten in die Datei, sofern das Handle nicht vergiftet ist.
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         if self.is_poisoned {
             return Err(std::io::Error::other(
@@ -171,22 +204,28 @@ impl<F: FaultInjector> Write for DurableHandle<F> {
         file.write(buf)
     }
 
+    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-WRITE-FLUSH]
+    /// Führt einen vollständigen Daten- und Metadaten-Flush durch.
     fn flush(&mut self) -> std::io::Result<()> {
         DurableHandle::flush(self, FlushKind::DataAndMetadata)
     }
 }
 
-/// Locking mode for directory lock acquisition (§7.3.1).
+// ANCHOR[contextra-durable-fs:LOCK-MODE-001]
+/// Sperrmodus für Verzeichnissperren gemäß Spezifikation §7.3.1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LockMode {
-    /// Standard directory lock requiring local supported filesystem guarantees.
+    /// Standard-Sperre: Erfordert ein unterstütztes lokales Dateisystem (verhindert unsichere Netzlaufwerke).
     #[default]
     Normal,
-    /// Memory-only directory lock mode bypassing filesystem persistence checks.
+    /// Reiner In-Memory-Modus: Umgeht Dateisystemprüfungen (z. B. für reine Speichertests).
     MemoryOnly,
 }
 
-/// Directory lock guard holding lock file ownership and enforcing filesystem safety.
+// ANCHOR[contextra-durable-fs:DIR-LOCK-001]
+/// RAII-Guard (Resource Acquisition Is Initialization) für eine Verzeichnissperre (`.dirlock`).
+///
+/// Hält die Sperrdatei im Zielordner geöffnet und entfernt sie automatisch bei Verlassen des Gültigkeitsbereichs (`Drop`).
 #[derive(Debug)]
 pub struct DirLock {
     lock_path: PathBuf,
@@ -195,10 +234,18 @@ pub struct DirLock {
 }
 
 impl DirLock {
-    /// Acquires a lock on `dir` according to `mode`.
+    // ANCHOR[contextra-durable-fs:DIR-LOCK-ACQUIRE]
+    /// Erwirbt eine Sperre auf `dir` im angegebenen [`LockMode`].
     ///
-    /// Rejects persistent locks on unsupported filesystems (`Network`, `Fuse`, `CloudSync`, `Unknown`)
-    /// unless `mode == LockMode::MemoryOnly`. Error messages omit path payloads (INV-LOG-1).
+    /// Ablauf:
+    /// 1. Dateisystemklasse über [`fs_class`] ermitteln.
+    /// 2. Im Modus [`LockMode::Normal`]: Prüfen, ob es sich um ein unterstütztes lokales Dateisystem handelt.
+    ///    Netzwerklaufwerke (`FsClass::Network`), FUSE (`FsClass::Fuse`) und Cloud-Sync-Ordner werden abgewiesen.
+    /// 3. Lock-Datei `.dirlock` im Zielordner anlegen/öffnen.
+    /// 4. [`DirLock`]-Instanz zurückgeben.
+    ///
+    /// Fehlerfälle:
+    /// - Liefert `Err(ErrorKind::Unsupported)`, wenn das Dateisystem nicht unterstützt wird (INV-LOG-1: Pfade werden in Fehlermeldungen weggelassen).
     pub fn acquire(dir: &Path, mode: LockMode) -> std::io::Result<Self> {
         let class = fs_class(dir)?;
 
@@ -240,7 +287,8 @@ impl DirLock {
         })
     }
 
-    /// Returns the [`LockMode`] of this lock.
+    // ANCHOR[contextra-durable-fs:DIR-LOCK-MODE]
+    /// Liefert den aktiven [`LockMode`] dieser Verzeichnissperre.
     #[must_use]
     pub fn mode(&self) -> LockMode {
         self.mode
@@ -248,6 +296,7 @@ impl DirLock {
 }
 
 impl Drop for DirLock {
+    // NOTE: Beim Verlassen des Bereichs wird die Sperrdatei im Normal-Modus geschlossen und gelöscht.
     fn drop(&mut self) {
         if self.mode == LockMode::Normal {
             let _file = self._file.take();
@@ -257,17 +306,24 @@ impl Drop for DirLock {
     }
 }
 
-/// Synchronizes a directory and its metadata entries to stable storage using a default no-op fault injector.
+// ANCHOR[contextra-durable-fs:SYNC-DIR-001]
+/// Synchronisiert die Verzeichnismetadaten eines Ordners mit Standard-Injektor [`NoFault`] auf die Festplatte.
 pub fn sync_dir(dir: &Path) -> std::io::Result<()> {
     sync_dir_with_injector(dir, &NoFault)
 }
 
-/// Synchronizes a directory and its metadata entries to stable storage with a custom [`FaultInjector`].
+// ANCHOR[contextra-durable-fs:SYNC-DIR-WITH-INJECTOR]
+/// Synchronisiert die Verzeichnismetadaten eines Ordners mit benutzerdefiniertem [`FaultInjector`].
+///
+/// Ablauf:
+/// 1. `injector.on_dir_fsync(dir)` aufrufen.
+/// 2. Verzeichnis per [`flush_dir`] synchronisieren.
 pub fn sync_dir_with_injector<F: FaultInjector>(dir: &Path, injector: &F) -> std::io::Result<()> {
     injector.on_dir_fsync(dir)?;
     flush_dir(dir)
 }
 
+/// RAII-Guard zum automatischen Löschen temporärer Zwischendateien bei Fehlern oder Panics.
 struct TmpFileGuard<'a>(&'a Path);
 
 impl<'a> Drop for TmpFileGuard<'a> {
@@ -276,12 +332,27 @@ impl<'a> Drop for TmpFileGuard<'a> {
     }
 }
 
-/// Atomically replaces the file at `path` with `bytes` and flushes parent directory using default no-op fault injector.
+// ANCHOR[contextra-durable-fs:ATOMIC-REPLACE-001]
+/// Ersetzt den Inhalt der Datei unter `path` atomar mit `bytes` unter Verwendung des Standardinjektors [`NoFault`].
 pub fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     atomic_replace_with_injector(path, bytes, &NoFault)
 }
 
-/// Atomically replaces the file at `path` with `bytes` and flushes parent directory with a custom [`FaultInjector`].
+// ANCHOR[contextra-durable-fs:ATOMIC-REPLACE-WITH-INJECTOR]
+/// Ersetzt den Inhalt der Datei unter `path` atomar mit `bytes` unter Verwendung eines [`FaultInjector`].
+///
+/// Ablauf von `atomic_replace`:
+/// 1. Elternverzeichnis von `path` ermitteln. Schlägt fehl mit `InvalidInput`, falls kein Elternordner existiert.
+/// 2. Eindeutigen temporären Dateinamen im selben Ordner erzeugen (`.<stem>.tmp.<pid>.<count>`).
+/// 3. Temporäre Datei exklusiv anlegen (`create_new(true)`) und mit `TmpFileGuard` absichern.
+/// 4. Datenblöcke schreiben (`injector.on_write` und `write_all`).
+/// 5. Datei synchronisieren (`injector.on_fsync` und [`flush_file`]).
+/// 6. Datei schließen und atomar auf Zielpfad umbenennen (`injector.on_rename` und [`rename_durable`]).
+/// 7. Elternverzeichnis synchronisieren (`injector.on_dir_fsync`), damit der Verzeichniseintrag stabil ist.
+/// 8. `TmpFileGuard` vergessen (`mem::forget`), da die Datei erfolgreich finalisiert wurde.
+///
+/// Fehlerfälle:
+/// - Bricht bei Schreib-, Sync- oder Umbenennungsfehlern sofort ab; die temporäre Datei wird via Drop gelöscht.
 pub fn atomic_replace_with_injector<F: FaultInjector>(
     path: &Path,
     bytes: &[u8],
@@ -330,12 +401,20 @@ pub fn atomic_replace_with_injector<F: FaultInjector>(
     Ok(())
 }
 
-/// Durably removes a file at `path` and synchronizes the parent directory using default no-op fault injector.
+// ANCHOR[contextra-durable-fs:DURABLE-REMOVE-001]
+/// Entfernt eine Datei dauerhaft und flusht das Elternverzeichnis mit Standardinjektor [`NoFault`].
 pub fn durable_remove(path: &Path) -> std::io::Result<()> {
     durable_remove_with_injector(path, &NoFault)
 }
 
-/// Durably removes a file at `path` and synchronizes the parent directory with a custom [`FaultInjector`].
+// ANCHOR[contextra-durable-fs:DURABLE-REMOVE-WITH-INJECTOR]
+/// Entfernt eine Datei dauerhaft und flusht das Elternverzeichnis mit benutzerdefiniertem [`FaultInjector`].
+///
+/// Ablauf:
+/// 1. Elternverzeichnis ermitteln.
+/// 2. Datei aus dem Dateisystem löschen (`remove_file`).
+/// 3. Verzeichnis-Sync-Hook aufrufen (`injector.on_dir_fsync`).
+/// 4. Elternverzeichnis mit [`flush_dir`] auf Festplatte synchronisieren.
 pub fn durable_remove_with_injector<F: FaultInjector>(
     path: &Path,
     injector: &F,
@@ -353,19 +432,29 @@ pub fn durable_remove_with_injector<F: FaultInjector>(
     Ok(())
 }
 
-/// Receipt returned upon successfully scrubbing and durably removing a file.
+// ANCHOR[contextra-durable-fs:SCRUB-RECEIPT-001]
+/// Quittung nach erfolgreichem Überschreiben und dauerhaftem Entfernen einer Datei.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScrubReceipt {
-    /// Total number of bytes overwritten with zeros prior to removal.
+    /// Gesamtanzahl der vor dem Löschen mit Nullen überschriebenen Bytes.
     pub bytes_scrubbed: u64,
 }
 
-/// Overwrites file contents with zeros and durably removes the file using default no-op fault injector.
+// ANCHOR[contextra-durable-fs:SCRUB-AND-REMOVE-001]
+/// Überschreibt eine Datei vollständig mit Nullen und entfernt sie dauerhaft (mit [`NoFault`]).
 pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
     scrub_and_remove_with_injector(path, &NoFault)
 }
 
-/// Overwrites file contents with zeros and durably removes the file with a custom [`FaultInjector`].
+// ANCHOR[contextra-durable-fs:SCRUB-AND-REMOVE-WITH-INJECTOR]
+/// Überschreibt eine Datei mit Nullen und entfernt sie dauerhaft unter Verwendung eines [`FaultInjector`].
+///
+/// Ablauf:
+/// 1. Metadaten prüfen: Symlinks und Verzeichnisse werden abgewiesen.
+/// 2. Datei öffnen und in 64-KiB-Schritten mit Nullen überschreiben (`injector.on_write`).
+/// 3. Datei per `injector.on_fsync` und [`flush_file`] auf Festplatte synchronisieren.
+/// 4. Datei dauerhaft entfernen und Elternverzeichnis flushen ([`durable_remove_with_injector`]).
+/// 5. [`ScrubReceipt`] mit der Anzahl der überschriebenen Bytes zurückgeben.
 pub fn scrub_and_remove_with_injector<F: FaultInjector>(
     path: &Path,
     injector: &F,

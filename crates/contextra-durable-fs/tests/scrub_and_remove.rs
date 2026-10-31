@@ -1,3 +1,7 @@
+//! # Testsuite: scrub_and_remove.rs
+//!
+//! Zweck: Tests für das Überschreiben mit Nullen und physische Entfernen (`scrub_and_remove`).
+
 use contextra_durable_fs::{scrub_and_remove, ScrubReceipt};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
@@ -37,6 +41,8 @@ impl Drop for TestDir {
     }
 }
 
+// ANCHOR[contextra-durable-fs:TEST-SCRUB-HARDLINK-OVERWRITE]
+/// Prüft das Überschreiben und Entfernen von Dateien bei einfachen Hardlinks.
 #[test]
 fn test_scrub_and_remove_hardlink_overwrite() -> std::io::Result<()> {
     let dir = TestDir::new()?;
@@ -64,6 +70,8 @@ fn test_scrub_and_remove_hardlink_overwrite() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-SCRUB-LARGE-UNALIGNED]
+/// Prüft das Scrubbing großer, nicht block-ausgerichteter Dateien.
 #[test]
 fn test_scrub_and_remove_large_unaligned_file() -> std::io::Result<()> {
     let dir = TestDir::new()?;
@@ -81,6 +89,8 @@ fn test_scrub_and_remove_large_unaligned_file() -> std::io::Result<()> {
 }
 
 #[cfg(unix)]
+// ANCHOR[contextra-durable-fs:TEST-SCRUB-SYMLINK-REJECTED]
+/// Prüft, dass Symlinks beim Scrubbing sicher abgewiesen werden.
 #[test]
 fn test_scrub_and_remove_symlink_rejected() -> std::io::Result<()> {
     let dir = TestDir::new()?;
@@ -104,6 +114,8 @@ fn test_scrub_and_remove_symlink_rejected() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-SCRUB-NOT-FOUND]
+/// Prüft die Fehlerbehandlung bei nicht existierenden Pfaden.
 #[test]
 fn test_scrub_and_remove_not_found() -> std::io::Result<()> {
     let dir = TestDir::new()?;
@@ -118,6 +130,8 @@ fn test_scrub_and_remove_not_found() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-SCRUB-EMPTY-FILE]
+/// Prüft das Bereinigen und Entfernen leerer Dateien (0 Bytes).
 #[test]
 fn test_scrub_and_remove_empty_file() -> std::io::Result<()> {
     let dir = TestDir::new()?;
