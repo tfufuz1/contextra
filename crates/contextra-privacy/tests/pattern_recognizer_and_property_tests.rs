@@ -1,3 +1,4 @@
+//! Eigenschafts- und Vektortests für den regelbasierten Entitäten-Erkenner.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -17,6 +18,8 @@ use contextra_privacy::{EgressVault, PatternRecognizer};
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-001]
+// Prüft: Prüft synthetische IBAN-Testvektoren mit Modulo-97-Validierung.
 fn test_iban_mod_97_valid_and_invalid_synthetic_vectors() {
     let recognizer = PatternRecognizer::new();
 
@@ -40,6 +43,8 @@ fn test_iban_mod_97_valid_and_invalid_synthetic_vectors() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-002]
+// Prüft: Prüft synthetische BIC/SWIFT-Vektoren auf ISO-Konformität.
 fn test_bic_valid_and_invalid_synthetic_vectors() {
     let recognizer = PatternRecognizer::new();
 
@@ -68,6 +73,8 @@ fn test_bic_valid_and_invalid_synthetic_vectors() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-004]
+// Prüft: Prüft deutsche Steuer-ID-Vektoren inklusive Ziffernhäufigkeit und Prüfziffer.
 fn test_steuer_id_valid_and_invalid_synthetic_vectors() {
     let recognizer = PatternRecognizer::new();
 
@@ -94,6 +101,8 @@ fn test_steuer_id_valid_and_invalid_synthetic_vectors() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-003]
+// Prüft: Prüft Kreditkarten-Prüfsummen mittels Luhn-Algorithmus.
 fn test_credit_card_luhn_valid_and_invalid_synthetic_vectors() {
     let recognizer = PatternRecognizer::new();
 
@@ -115,6 +124,8 @@ fn test_credit_card_luhn_valid_and_invalid_synthetic_vectors() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-005]
+// Prüft: Prüft die Erkennung von Postleitzahlen und Ortszusätzen.
 fn test_plz_and_plz_ort_detection() {
     let recognizer = PatternRecognizer::new();
 
@@ -141,6 +152,8 @@ fn test_plz_and_plz_ort_detection() {
 }
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-006]
+// Prüft: Stellt sicher, dass nachfolgende Satzteile nicht versehentlich in Ortsnamen geschluckt werden.
 fn test_plz_ort_does_not_swallow_subsequent_sentence_text() {
     let recognizer = PatternRecognizer::new();
     let text = "Der Hauptsitz ist in 10115 Berlin und die Filiale ist in 80331 München.";
@@ -159,6 +172,8 @@ fn test_plz_ort_does_not_swallow_subsequent_sentence_text() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-007]
+// Prüft: Prüft die Begrenzung überlanger Eingaben auf 64 KiB.
 fn test_overlong_input_handling_and_bounded_error() {
     let small_limit_recognizer = PatternRecognizer::new().with_max_input_length(100);
     assert_eq!(small_limit_recognizer.max_input_length(), 100);
@@ -183,6 +198,8 @@ fn test_overlong_input_handling_and_bounded_error() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-008]
+// Prüft: Prüft den vollständigen Zyklus von Pseudonymisierung und anschließender Rehydrierung.
 fn test_surrogation_to_reidentification_roundtrip() {
     let vault = EgressVault::try_default().expect("vault creates");
     let recognizer = PatternRecognizer::new();
@@ -225,6 +242,8 @@ fn test_surrogation_to_reidentification_roundtrip() {
 // ============================================================================
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-PROP-009]
+// Prüft: Eigenschaftstest: Erkenner gerät bei beliebigen Zufallsstrings niemals in Panik.
 fn test_property_recognizer_never_panics_on_arbitrary_inputs() {
     let recognizer = PatternRecognizer::new();
 

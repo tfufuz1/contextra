@@ -1,5 +1,13 @@
 //! `processing_registry` — Maschinell erzeugtes Verzeichnis von Verarbeitungstätigkeiten (Art. 30 DSGVO).
 //!
+//! # Zweck
+//! Dieses Modul modelliert und generiert ein automatisiertes Verzeichnis von Verarbeitungstätigkeiten (VVT)
+//! gemäß Art. 30 Abs. 1 DSGVO (Datenschutz-Grundverordnung). Es ermöglicht die Erfassung, den strukturierten
+//! Export, Mandantenfilterung für Auskunftsersuchen nach Art. 15 DSGVO sowie die Textsuche über Verarbeitungsdaten.
+//!
+//! # Ring-Zugehörigkeit
+//! Ring 3 (Domain / Compliance).
+//!
 //! Dieses Modul modelliert und generiert ein Verzeichnis von Verarbeitungstätigkeiten gemäß Art. 30 Abs. 1 DSGVO.
 //!
 //! ### Kanonischer Mandanten-Typ:
@@ -16,6 +24,7 @@ use crate::egress_vault::BoxFuture;
 use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
 
+// ANCHOR[contextra-privacy:PR-001]
 /// Rolle bezüglich der Verarbeitungstätigkeit gemäß DSGVO.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -27,6 +36,7 @@ pub enum ProcessorRole {
 }
 
 impl ProcessorRole {
+    // ANCHOR[contextra-privacy:PR-002]
     /// Liefert die deutschsprachige Bezeichnung der Rolle.
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -36,10 +46,13 @@ impl ProcessorRole {
     }
 }
 
+// ANCHOR[contextra-privacy:PR-003]
+// Standard-Schemaversion für die Deserialisierung von Verarbeitungsdatensätzen.
 fn default_version() -> u32 {
     1
 }
 
+// ANCHOR[contextra-privacy:PR-004]
 /// Ein Datensatz einer Verarbeitungstätigkeit gemäß Art. 30 Abs. 1 DSGVO.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessingActivityRecord {
@@ -74,6 +87,7 @@ pub struct ProcessingActivityRecord {
     pub created_at_unix_secs: u64,
 }
 
+// ANCHOR[contextra-privacy:PR-005]
 /// Unveränderliches, append-only Verzeichnis von Verarbeitungstätigkeiten.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessingRegistry {
@@ -81,11 +95,13 @@ pub struct ProcessingRegistry {
 }
 
 impl ProcessingRegistry {
+    // ANCHOR[contextra-privacy:PR-006]
     /// Erstellt ein neues leeres `ProcessingRegistry`.
     pub fn new() -> Self {
         Self { records: Vec::new() }
     }
 
+    // ANCHOR[contextra-privacy:PR-007]
     /// Fügt einen Datensatz dem Verzeichnis hinzu (append-only) und belegt den Erstellungs-Zeitstempel
     /// über die injizierte Uhr.
     pub fn append_record(&mut self, mut record: ProcessingActivityRecord, clock: &dyn contextra_ports::Clock) {
@@ -97,11 +113,13 @@ impl ProcessingRegistry {
         self.records.push(record);
     }
 
+    // ANCHOR[contextra-privacy:PR-008]
     /// Liefert die Datensätze des Verzeichnisses.
     pub fn records(&self) -> &[ProcessingActivityRecord] {
         &self.records
     }
 
+    // ANCHOR[contextra-privacy:PR-009]
     /// Exportiert das Verzeichnis in eine `ProcessingRegistryExport`-Struktur.
     pub fn export(&self) -> ProcessingRegistryExport {
         ProcessingRegistryExport {
@@ -110,6 +128,7 @@ impl ProcessingRegistry {
     }
 }
 
+// ANCHOR[contextra-privacy:PR-010]
 /// Strukturierte Export-Repräsentation des Verzeichnisses von Verarbeitungstätigkeiten.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessingRegistryExport {
@@ -118,11 +137,13 @@ pub struct ProcessingRegistryExport {
 }
 
 impl ProcessingRegistryExport {
+    // ANCHOR[contextra-privacy:PR-011]
     /// Erstellt eine neue Export-Instanz mit den angegebenen Datensätzen.
     pub fn new(records: Vec<ProcessingActivityRecord>) -> Self {
         Self { records }
     }
 
+    // ANCHOR[contextra-privacy:PR-012]
     /// Filtert alle Verarbeitungstätigkeiten nach der angegebenen Mandanten-ID (Art. 15 DSGVO Auskunftsersuchen).
     ///
     /// Garantiert strikte Mandantentrennung bei Auskunftsersuchen, sodass nur Datensätze des Zielmandanten
@@ -138,6 +159,7 @@ impl ProcessingRegistryExport {
     }
 }
 
+// ANCHOR[contextra-privacy:PR-013]
 impl TextSearchEngine for ProcessingRegistryExport {
     /// Führt eine Volltext-Suche über das Verzeichnis von Verarbeitungstätigkeiten durch (Art. 15 DSGVO).
     fn search_text<'a>(
@@ -202,6 +224,7 @@ impl TextSearchEngine for ProcessingRegistryExport {
     }
 }
 
+// ANCHOR[contextra-privacy:PR-014]
 /// Erzeugt aus einer Reihe von Datensätzen eine strukturierte Export-Repräsentation.
 pub fn generate_registry(records: &[ProcessingActivityRecord]) -> ProcessingRegistryExport {
     ProcessingRegistryExport {
@@ -209,6 +232,7 @@ pub fn generate_registry(records: &[ProcessingActivityRecord]) -> ProcessingRegi
     }
 }
 
+// ANCHOR[contextra-privacy:PR-015]
 /// Hilfsfunktion zum Maskieren von Pipe-Zeichen und Zeilenumbrüchen für Markdown-Tabellenzellen.
 fn sanitize_markdown_cell(input: &str) -> String {
     input
@@ -217,6 +241,7 @@ fn sanitize_markdown_cell(input: &str) -> String {
         .replace(['\n', '\r'], "<br/>")
 }
 
+// ANCHOR[contextra-privacy:PR-016]
 /// Erzeugt eine druckfertige, deutschsprachige Markdown-Tabelle aus dem Export.
 ///
 /// Die Tabelle enthält eine Zeile pro `ProcessingActivityRecord` und Spalten für alle
@@ -312,6 +337,8 @@ mod tests {
         }
     }
 
+    // ANCHOR[contextra-privacy:TEST-PR-001]
+    // Prüft das Rendern einer leeren Datensatzliste mit korrekten Header- und Trennzeilen.
     #[test]
     fn test_empty_records_list() {
         let export = generate_registry(&[]);
@@ -324,6 +351,8 @@ mod tests {
         assert_eq!(lines.len(), 4);
     }
 
+    // ANCHOR[contextra-privacy:TEST-PR-002]
+    // Prüft das Rendern eines einzelnen Verarbeitungsdatensatzes in Tabellenform.
     #[test]
     fn test_single_record() {
         let rec = create_sample_record(123);
@@ -334,6 +363,8 @@ mod tests {
         assert!(md.contains("| TenantId(123) | Kundendaten-Analyse | Verantwortlicher | Bereitstellung von Kontext-Suchen | Art. 6 Abs. 1 lit. f DSGVO | E-Mail, IP-Adresse | Kunden, Endnutzer | Hosting-Provider | Keine | 30 Tage nach Kündigung | Verschlüsselung at rest, TLS 1.3 | 1700000000 |"));
     }
 
+    // ANCHOR[contextra-privacy:TEST-PR-003]
+    // Prüft Sonderzeichen, Zeilenumbrüche und Maskierung von Tabellen-Pipes.
     #[test]
     fn test_multiple_records_with_special_characters_and_escaping() {
         let mut rec1 = create_sample_record(123);
@@ -356,6 +387,8 @@ mod tests {
         assert_eq!(lines.len(), 6);
     }
 
+    // ANCHOR[contextra-privacy:TEST-PR-004]
+    // Prüft Volltextsuche und Mandantenisolation bei Auskunftsersuchen nach Art. 15 DSGVO.
     #[tokio::test]
     async fn test_text_search_engine_and_tenant_filter_art15() {
         let rec1 = create_sample_record(100);

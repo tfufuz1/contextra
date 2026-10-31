@@ -1,10 +1,18 @@
-// FILE-CONTEXT
-// ZWECK: Audit-Protokollierung von Änderungen am temporären Agenten-Kontext (CLM-Scratchpad).
-// INVARIANTEN: Deterministische Erzeugung von ContextEditAuditRecord-Strukturen mit Hash-Verkettung;
-//              Zeitstempel ausschließlich über den Clock-Port aus contextra-ports (INV-EGRESS-AUDIT-1);
-//              Zero-Panic im Produktionscode; kein Klartext-Inhalt im Record.
-// LEISTUNG: Schutz gegen Self-Poisoning und Prompt-Injection-Persistenz über Agenten-Kontext-Edits hinweg.
-// SIEHE AUCH: crates/contextra-privacy/src/audit_trace.rs, contextra-agent::clm_scratchpad (Ring 3 / Ring 2 Entkopplung).
+//! `context_edit_audit` — Audit-Protokollierung von Änderungen am temporären Agenten-Kontext (CLM-Scratchpad).
+//!
+//! # Zweck
+//! Ermöglicht die manipulationssichere Auditierung von Änderungen an temporären Arbeitsdaten
+//! und Scratchpads von Agenten (CLM = Context Language Model). Dies verhindert Self-Poisoning
+//! (Selbstvergiftung des Agentenkontexts) und die unbemerkte Persistierung von Prompt-Injections.
+//!
+//! # Ring-Zugehörigkeit
+//! Ring 3 (Domain / Audit Services).
+//!
+//! # Invarianten
+//! - Deterministische Erzeugung von [`ContextEditAuditRecord`]-Strukturen mit kryptografischer Hash-Verkettung (BLAKE3).
+//! - Zeitstempel stammen ausschließlich über den `Clock`-Port aus `contextra-ports` (INV-EGRESS-AUDIT-1, Regel 3).
+//! - Zero-Panic: Kein `.unwrap()`, `.expect()` im Produktionspfad.
+//! - Kein Klartext-Inhalt im Record (Privacy-by-Design: nur Längen, Hashes, Typen und Labels).
 
 #![forbid(unsafe_code)]
 
@@ -12,6 +20,7 @@ use contextra_ports::Clock;
 use contextra_types::TenantId;
 use serde::{Deserialize, Serialize};
 
+// ANCHOR[contextra-privacy:CEA-001]
 /// Art der Kontext-Änderung am temporären Agenten-Scratchpad.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ContextEditKind {
@@ -25,6 +34,7 @@ pub enum ContextEditKind {
     CheckpointReset,
 }
 
+// ANCHOR[contextra-privacy:CEA-002]
 /// Lokaler Fehlertyp für Audit-Ketten-Verifizierungsfehler.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ContextEditAuditError {
@@ -33,6 +43,7 @@ pub enum ContextEditAuditError {
     ChainTampered { index: usize },
 }
 
+// ANCHOR[contextra-privacy:CEA-003]
 /// Eingabe-Parameter zur Erstellung eines Audit-Datensatzes für eine Kontext-Änderung.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContextEditInput {
@@ -50,6 +61,7 @@ pub struct ContextEditInput {
     pub subgoal_index: u64,
 }
 
+// ANCHOR[contextra-privacy:CEA-004]
 /// Nachvollziehbarer, kryptografisch verketteter Audit-Datensatz für eine Änderung am temporären Agenten-Kontext.
 ///
 /// **Sicherheitsgarantie:** Enthält keinen Klartext des Scratchpad-Inhalts (nur Längen, Hashes und Labels).
@@ -75,7 +87,27 @@ pub struct ContextEditAuditRecord {
     pub subgoal_index: u64,
 }
 
+// ANCHOR[contextra-privacy:CEA-005]
 /// Berechnet den deterministischen BLAKE3-Hash über alle Datenfelder eines Audit-Records.
+///
+/// # Ablauf
+/// 1. Hash-Initialisierung mit `blake3::Hasher`.
+/// 2. Hinzufügen von `previous_hash` (32 Bytes).
+/// 3. Längenpräfix und Bytes der `task_id`.
+/// 4. `tenant_id` als 64-Bit Little-Endian.
+/// 5. Operationsart (`kind`) als einzelnes Byte (1..=4).
+/// 6. Optionale Kennung `chunk_label` mit Vorhandenseins-Flag und Längenpräfix.
+/// 7. Anzahl `bytes_affected` als 64-Bit Little-Endian.
+/// 8. Zeitstempel `recorded_at_tx` als 64-Bit Little-Endian.
+/// 9. `subgoal_index` als 64-Bit Little-Endian.
+///
+/// # Parameter
+/// * `previous_hash`: BLAKE3-Hash des direkten Vorgängers.
+/// * `input`: Metadaten zur Kontext-Änderung.
+/// * `recorded_at_tx`: Transaktionszeitpunkt in Unix-Nanosekunden.
+///
+/// # Rückgabe
+/// 32-Byte Hashwert des Datensatzes.
 pub fn compute_record_hash(
     previous_hash: [u8; 32],
     input: &ContextEditInput,
@@ -125,9 +157,18 @@ pub fn compute_record_hash(
     *hasher.finalize().as_bytes()
 }
 
+// ANCHOR[contextra-privacy:CEA-006]
 /// Konstruiert deterministisch einen neuen [`ContextEditAuditRecord`] mit Hash-Verkettung.
 ///
 /// Der Zeitstempel wird ausschließlich über den injizierten `Clock`-Port bezogen (kein SystemTime::now()).
+///
+/// # Ablauf
+/// 1. Bezieht aktuellen Zeitstempel über `clock.now_unix_nanos()`.
+/// 2. Berechnet den Hashwert via [`compute_record_hash`].
+/// 3. Gibt den fertig zusammengestellten Datensatz zurück.
+///
+/// # Nebenwirkungen
+/// Greift auf den injizierten `Clock`-Port zu.
 pub fn build_context_edit_audit_record(
     previous_hash: [u8; 32],
     input: ContextEditInput,
@@ -149,10 +190,20 @@ pub fn build_context_edit_audit_record(
     }
 }
 
+// ANCHOR[contextra-privacy:CEA-007]
 /// Verifiziert die Integrität und Hash-Verkettung einer Reihe von Audit-Records.
 ///
-/// Gibt `Ok(())` zurück, wenn die Kette intakt ist, oder `Err(ContextEditAuditError::ChainTampered { index })`
-/// mit dem Index des ersten manipulierten oder fehlerhaften Datensatzes.
+/// # Ablauf
+/// 1. Initialisiert den erwarteten Vorgängerhash mit Nullen (`[0u8; 32]`).
+/// 2. Iteriert über alle Datensätze der Kette:
+///    a. Prüft, ob `record.previous_hash` dem erwarteten Hash entspricht.
+///    b. Rekonstruiert die Eingabedaten und berechnet den Soll-Hashwert neu.
+///    c. Prüft, ob `record.record_hash` mit dem Soll-Hashwert übereinstimmt.
+///    d. Setzt `expected_previous_hash` auf den aktuellen `record_hash`.
+/// 3. Bricht beim ersten Fehler mit `ContextEditAuditError::ChainTampered` ab (Fail-Closed).
+///
+/// # Rückgabe
+/// `Ok(())` bei intakter Kette oder `Err(ContextEditAuditError::ChainTampered { index })`.
 pub fn verify_audit_chain(chain: &[ContextEditAuditRecord]) -> Result<(), ContextEditAuditError> {
     let mut expected_previous_hash = [0u8; 32];
 
@@ -183,10 +234,16 @@ pub fn verify_audit_chain(chain: &[ContextEditAuditRecord]) -> Result<(), Contex
     Ok(())
 }
 
+// ANCHOR[contextra-privacy:CEA-008]
 /// Formatiert einen Audit-Datensatz in eine einzeilige, menschenlesbare Log-Zeile.
 ///
 /// ### Format
 /// `"task={task_id} tenant={tenant_id} kind={kind:?} chunk_label={chunk_label} bytes={bytes_affected} recorded_at_tx={recorded_at_tx} subgoal={subgoal_index} prev_hash={prev_hash_hex} record_hash={record_hash_hex}"`
+///
+/// # Ablauf
+/// 1. Wandelt optionale Labels um (Fallback auf `"none"`).
+/// 2. Kodiert Vorgängerhash und Record-Hash in Hexadezimaldarstellung.
+/// 3. Formatiert alle Attribute in einen standardisierten Log-String.
 pub fn render_audit_line(record: &ContextEditAuditRecord) -> String {
     let label_str = record.chunk_label.as_deref().unwrap_or("none");
     let prev_hex = hex_encode_32(&record.previous_hash);
@@ -205,6 +262,8 @@ pub fn render_audit_line(record: &ContextEditAuditRecord) -> String {
     )
 }
 
+// ANCHOR[contextra-privacy:CEA-009]
+// Kodiert ein 32-Byte-Array in einen 64-Zeichen langen Kleinbuchstaben-Hex-String.
 fn hex_encode_32(bytes: &[u8; 32]) -> String {
     let mut s = String::with_capacity(64);
     for b in bytes {
@@ -218,6 +277,7 @@ fn hex_encode_32(bytes: &[u8; 32]) -> String {
 mod tests {
     use super::*;
 
+    // Hilfsstruktur: Feste Test-Uhr zur deterministischen Prüfung ohne Systemzeit.
     struct FixedTestClock {
         nanos: u64,
     }
@@ -232,6 +292,8 @@ mod tests {
         }
     }
 
+    // ANCHOR[contextra-privacy:TEST-CEA-001]
+    // Prüft alle Varianten von ContextEditKind und die korrekte Konstruktion einer 2-Glieder-Kette.
     #[test]
     fn test_all_context_edit_kind_variants_and_chain_construction() {
         let tenant = TenantId(10);
@@ -276,6 +338,8 @@ mod tests {
         assert!(verify_audit_chain(&chain).is_ok());
     }
 
+    // ANCHOR[contextra-privacy:TEST-CEA-002]
+    // Prüft, dass Manipulationen an Datensätzen zuverlässig erkannt und mit dem exakten Index gemeldet werden.
     #[test]
     fn test_tampered_chain_detection() {
         let tenant = TenantId(10);

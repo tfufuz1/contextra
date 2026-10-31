@@ -1,23 +1,36 @@
 #![forbid(unsafe_code)]
-//! Layer-4 EgressGuard — Bulk-Exfiltrations-Erkennung für Cloud Egress
+//! `egress_guard` — Layer-4 EgressGuard zur semantischen Erkennung von Bulk-Exfiltrationen.
 //!
-//! Kapselt die k-NN-Ähnlichkeitssuche gegen einen Text-Sucher-Trait / Closure
-//! und garantiert striktes Fail-Closed-Verhalten bei Index-Fehlern, Timeouts
-//! oder nicht vorhandenen/leeren Suchergebnissen.
+//! # Zweck
+//! Überprüft ausgehende Anfragetexte semantisch mittels k-NN-Ähnlichkeitssuche (k-Nearest Neighbors)
+//! gegen den vorhandenen Datenbestand (z. B. HNSW-Vektorindex oder Dokumentenspeicher).
+//! Wenn der Ähnlichkeitswert einen definierten Schwellwert übersteigt, liegt der Verdacht nahe,
+//! dass interne Dokumente unbefugt an externe Cloud-Dienste weitergeleitet werden.
+//!
+//! # Ring-Zugehörigkeit
+//! Ring 3 (Domain-Sicherheit).
+//!
+//! # Invarianten
+//! - **Fail-Closed-Doktrin**: Tritt ein Index-Fehler, uninitialisierter Zustand, leere Treffermenge
+//!   oder ein Timeout auf, wird die Anfrage strikt blockiert (`Block`).
+//! - **Kein Unsafe**: Vollständig `#![forbid(unsafe_code)]`.
+//! - **Deterministisches Auditing**: Jede Entscheidung wird über `EgressClassifierTrace` nachvollziehbar protokolliert.
 
 use crate::egress_vault::{BlockReason, BoxFuture, EgressClassification, EgressClassifier};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// Simplified candidate result from text similarity search.
+// ANCHOR[contextra-privacy:EG-001]
+/// Vereinfachtes Kandidaten-Ergebnis einer Text- bzw. Vektorähnlichkeitssuche.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextSearchResult {
     pub id: String,
     pub score: f32,
 }
 
-/// Trait for text similarity search without depending on `contextra-db::Collection` (Ring 3 DB).
+// ANCHOR[contextra-privacy:EG-002]
+/// Abstraktions-Trait für die Textähnlichkeitssuche zur Entkopplung von konkreten Datenbank-Engines.
 pub trait TextSearchEngine: Send + Sync {
     fn search_text<'a>(
         &'a self,
@@ -26,13 +39,17 @@ pub trait TextSearchEngine: Send + Sync {
     ) -> BoxFuture<'a, Result<Vec<TextSearchResult>, String>>;
 }
 
+// ANCHOR[contextra-privacy:EG-003]
 /// Standard-Timeout für EgressGuard Vector-Search (200 ms).
 pub const DEFAULT_EGRESS_GUARD_TIMEOUT: Duration = Duration::from_millis(200);
-/// Standard-Schwellwert für HNSW Cosine Similarity Match (0.85).
+// ANCHOR[contextra-privacy:EG-004]
+/// Standard-Schwellwert für Cosine-Similarity-Übereinstimmung (0.85 = 85 % Ähnlichkeit).
 pub const DEFAULT_EGRESS_GUARD_THRESHOLD: f32 = 0.85;
-/// Minimum Byte-Länge des Payloads, ab der die HNSW-Prüfung durchgeführt wird (128 Bytes).
+// ANCHOR[contextra-privacy:EG-005]
+/// Minimale Byte-Länge des Payloads, ab der die Ähnlichkeitsprüfung durchgeführt wird (128 Bytes).
 pub const DEFAULT_EGRESS_GUARD_MIN_BYTES: usize = 128;
 
+// ANCHOR[contextra-privacy:EG-006]
 /// Layer-4 EgressGuard zur Erkennung und Blockierung von Bulk-Exfiltrationen.
 ///
 /// Baut auf einem Text-Sucher (`TextSearchEngine`) auf.
@@ -48,6 +65,7 @@ pub struct EgressGuard {
 }
 
 impl EgressGuard {
+    // ANCHOR[contextra-privacy:EG-007]
     /// Erstellt eine neue `EgressGuard`-Instanz mit Standard-Timeout (200 ms).
     pub fn new(search_engine: Arc<dyn TextSearchEngine>, threshold: f32, min_bytes: usize) -> Self {
         Self {
@@ -58,29 +76,35 @@ impl EgressGuard {
         }
     }
 
+    // ANCHOR[contextra-privacy:EG-008]
     /// Setzt ein benutzerdefiniertes Timeout für die Index-Abfrage.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
-    /// Gibt den gesetzten Schwellwert zurück.
+    // ANCHOR[contextra-privacy:EG-009]
+    /// Gibt den gesetzten Schwellwert für Ähnlichkeitsprüfungen zurück.
     pub fn threshold(&self) -> f32 {
         self.threshold
     }
 
+    // ANCHOR[contextra-privacy:EG-010]
     /// Gibt die minimale Payload-Länge in Bytes zurück.
     pub fn min_bytes(&self) -> usize {
         self.min_bytes
     }
 
-    /// Gibt das gesetzte Timeout zurück.
+    // ANCHOR[contextra-privacy:EG-011]
+    /// Gibt das konfigurierte Abfrage-Timeout zurück.
     pub fn timeout(&self) -> Duration {
         self.timeout
     }
 
-    /// Checks a `TenantScoped` egress payload for bulk exfiltration only if the bound `TenantId`
-    /// matches `expected_tenant_id`. Returns `Block(BlockReason::PolicyDenied(...))` on tenant scope mismatch.
+    // ANCHOR[contextra-privacy:EG-012]
+    /// Prüft einen an einen Mandanten gebundenen Payload ([`contextra_types::TenantScoped`]) mit Mandantenisolationsprüfung.
+    ///
+    /// Liefert `Block(BlockReason::PolicyDenied(...))` bei Mandantenkonflikten.
     pub async fn check_scoped(
         &self,
         payload: contextra_types::TenantScoped<&str>,
@@ -92,6 +116,7 @@ impl EgressGuard {
         }
     }
 
+    // ANCHOR[contextra-privacy:EG-013]
     /// Prüft einen Egress-Payload auf mögliche Bulk-Exfiltration gegen die Collection.
     ///
     /// Gemäß **v17 Teil 10.3** (Priorität P1, "Fail-Closed-Randfall"), Invariante **INV-EGRESS-AUDIT-1**
@@ -156,6 +181,8 @@ impl EgressGuard {
     }
 }
 
+// ANCHOR[contextra-privacy:EG-014]
+// Implementierung des EgressClassifier-Traits zur nahtlosen Einbindung in die Schutz-Pipeline.
 impl EgressClassifier for EgressGuard {
     fn classify<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification> {
         Box::pin(self.check(payload))
