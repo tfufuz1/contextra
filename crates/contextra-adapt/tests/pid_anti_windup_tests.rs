@@ -1,3 +1,8 @@
+//! # Anti-Windup-Verifikation für den PID-Regler
+//!
+//! Überprüft, dass bei Aktuatorsättigung die Integrator-Akkumulation eingefroren wird,
+//! um Windup-Effekte und verzögertes Überschwingen zu verhindern.
+
 // FILE-CONTEXT
 // STAND: 2026-09-27T00:00:00Z
 // ZWECK: Integrationstests für conditional Back-Calculation Anti-Windup im PID-Regler.
