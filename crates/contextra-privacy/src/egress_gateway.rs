@@ -1,7 +1,20 @@
-// FILE-CONTEXT
-// ZWECK:       Egress Security Gateway & Classifier Enforcement for Cloud Queries
-// INVARIANTEN: APM-EGRESS-BYPASS: Jede Anfrage MUSS EgressClassifier::classify() durchlaufen.
-//              APM-PANIC-ON-MISSING-FIELD: Keine unwrap()/expect()-Aufrufe bei Initialization/Execution (Fail-Closed).
+//! `egress_gateway` — Zentrales Schutz-Gateway für ausgehende Cloud-Abfragen.
+//!
+//! # Zweck
+//! Bündelt die 5-stufige Schutzpipeline für ausgehende Anfragen an externe Cloud- und KI-Dienste:
+//! 1. **Richtlinien- & Guard-Prüfung**: Klassifikation über `EgressClassifier` und Layer-4 `EgressGuard`.
+//! 2. **PII-Erkennung**: Auffinden sensibler Entitäten via [`EntityRecognizer`].
+//! 3. **Surrogat-Ersetzung**: Pseudonymisierung gefundener Entitäten im `SurrogateVault`.
+//! 4. **Massenexfiltrations-Detektor**: Prüfung des kumulierten Datenvolumens via [`BulkExfiltrationDetector`].
+//! 5. **Audit-Trace-Protokollierung**: Deterministische BLAKE3-Prüfspur für jede Entscheidung.
+//!
+//! # Ring-Zugehörigkeit
+//! Ring 3 (Domain-Gateway).
+//!
+//! # Invarianten
+//! - **APM-EGRESS-BYPASS**: Keine Cloud-Anfrage darf ohne Prüfung versendet werden.
+//! - **Fail-Closed**: Alle unvorhergesehenen Zustände, Timeouts oder Parsing-Fehler führen zur Blockierung.
+//! - **Mandantentrennung**: Scoped-Funktionen verlangen zwingend einen gültigen [`TenantId`].
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -21,18 +34,23 @@ use contextra_types::{TenantId, TenantScoped};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+// ANCHOR[contextra-privacy:EGW-001]
+/// Standardmäßiger Klassifikator auf Basis von [`EgressVault`].
 pub type DefaultEgressClassifier = EgressVault;
 
-/// Maximum allowed search query length in bytes (64 KB).
+// ANCHOR[contextra-privacy:EGW-002]
+/// Maximale Suchanfragengröße in Bytes (64 KiB = 65.536 Bytes).
 pub const MAX_SEARCH_QUERY_BYTES: usize = 64 * 1024;
 
-/// Trait contract for Layer 4 bulk-exfiltration checks via `EgressGuard`.
+// ANCHOR[contextra-privacy:EGW-003]
+/// Trait-Vertrag für Layer-4 k-NN Vektor-Ähnlichkeitsprüfungen gegen Bulk-Exfiltration.
 pub trait EgressGuardCheck: Send + Sync {
     /// Evaluates the outbound payload against vector index / similarity models.
     fn check<'a>(&'a self, payload: &'a str) -> BoxFuture<'a, EgressClassification>;
 }
 
-/// Default pass-through EgressGuard when no separate L4 vector guard is configured.
+// ANCHOR[contextra-privacy:EGW-004]
+/// Standardmäßiger Pass-Through Guard, falls kein separater L4-Vektor-Guard konfiguriert ist.
 pub struct DefaultEgressGuard;
 
 impl EgressGuardCheck for DefaultEgressGuard {
@@ -41,12 +59,14 @@ impl EgressGuardCheck for DefaultEgressGuard {
     }
 }
 
-/// Trait contract for checking prompt injection in cloud responses without depending on Ring 4 crates.
+// ANCHOR[contextra-privacy:EGW-005]
+/// Trait zur Prüfung auf Prompt-Injection in eingehenden Cloud-Antworten.
 pub trait InjectionDetector: Send + Sync {
     fn detect(&self, text: &str) -> Option<String>;
 }
 
-/// Unified Egress Gateway enforcing the full 5-stage protection pipeline:
+// ANCHOR[contextra-privacy:EGW-006]
+/// Einheitliches Egress-Gateway zur Durchsetzung der 5-stufigen Schutzpipeline:
 /// 1. Policy/Guard check
 /// 2. Entity recognition
 /// 3. Surrogate replacement
@@ -69,6 +89,8 @@ impl std::fmt::Debug for EgressGateway {
 
 /// Builder for constructing an `EgressGateway` with mandatory components.
 #[derive(Default)]
+// ANCHOR[contextra-privacy:EGW-007]
+/// Builder zur typsicheren Konstruktion einer [`EgressGateway`]-Instanz.
 pub struct EgressGatewayBuilder {
     classifier: Option<Arc<dyn EgressClassifier>>,
     egress_guard: Option<Arc<dyn EgressGuardCheck>>,
@@ -274,6 +296,8 @@ impl EgressGateway {
 
 /// Inbound Layer 5 Re-Hydrator replacing surrogate tokens with original vault entities.
 #[derive(Debug, Clone, Default)]
+// ANCHOR[contextra-privacy:EGW-008]
+/// Rehydrierer zur sicheren Rückübersetzung von Surrogat-Tokens in Cloud-Antworten.
 pub struct CloudResponseRehydrator {
     vault_map: BTreeMap<String, String>,
 }
@@ -351,6 +375,8 @@ impl CloudResponseRehydrator {
 }
 
 /// Evaluates whether PII vault data forces CryptoShred mode for an affected document (INV-COLLECTION-PROFILE-3).
+// ANCHOR[contextra-privacy:EGW-009]
+/// Entscheidet anhand von PII-Match und Speichermodus, ob kryptografisches Schreddern erzwungen wird.
 pub fn pii_vault_forces_crypto_shred(is_pii_match: bool, is_memory_only: bool) -> bool {
     is_pii_match && !is_memory_only
 }
@@ -358,6 +384,8 @@ pub fn pii_vault_forces_crypto_shred(is_pii_match: bool, is_memory_only: bool) -
 /// Read-only check for PII Vault coupling (Spec B.1.8 / INV-COLLECTION-PROFILE-3):
 /// If a document contains a PII match AND `durability_mode` is not `MemoryOnly`,
 /// force `KvDeleteMode::CryptoShred` for this document regardless of collection preset.
+// ANCHOR[contextra-privacy:EGW-010]
+/// Bestimmt den effektiven Löschmodus (Shredding vs. Tombstone) unter Berücksichtigung von PII-Vorgaben.
 pub fn resolve_effective_kv_delete_mode<D, K>(
     is_pii_match: bool,
     durability_mode: D,
@@ -377,6 +405,8 @@ where
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-privacy:EGW-011]
+/// Anfrage-Struktur für ausgehende Cloud-Queries.
 pub struct CloudQueryRequest {
     pub query: String,
     pub collection: Option<String>,
@@ -384,6 +414,8 @@ pub struct CloudQueryRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-privacy:EGW-012]
+/// Antwort-Struktur nach erfolgreicher Bereinigung und Durchlauf der Egress-Pipeline.
 pub struct CloudQueryResponse {
     pub status: String,
     pub query: String,
@@ -392,6 +424,8 @@ pub struct CloudQueryResponse {
     pub abstraction_notice: Option<String>,
 }
 
+// ANCHOR[contextra-privacy:EGW-013]
+/// Verarbeitet eine ausgehende Cloud-Query über die Standard-Schutz-Pipeline.
 pub async fn handle_cloud_query(
     request: CloudQueryRequest,
     classifier: &dyn EgressClassifier,
@@ -403,6 +437,8 @@ pub async fn handle_cloud_query(
 }
 
 /// Handles a cloud query request bound to a tenant scope, enforcing matching `TenantId` and the standard 5-stage pipeline.
+// ANCHOR[contextra-privacy:EGW-014]
+/// Verarbeitet eine mandantengebundene Cloud-Query ([`TenantScoped`]).
 pub async fn handle_cloud_query_scoped(
     request: TenantScoped<CloudQueryRequest>,
     expected_tenant_id: &TenantId,
@@ -424,6 +460,8 @@ pub async fn handle_cloud_query_scoped(
 #[deprecated(
     note = "Use EgressGateway or handle_cloud_query_scoped which enforces the full 5-stage protection pipeline"
 )]
+// ANCHOR[contextra-privacy:EGW-015]
+/// Verarbeitet eine mandantengebundene Cloud-Query mit zusätzlichem Layer-4 Vektor-Guard.
 pub async fn handle_cloud_query_scoped_with_guard(
     request: TenantScoped<CloudQueryRequest>,
     expected_tenant_id: &TenantId,
@@ -446,6 +484,8 @@ pub async fn handle_cloud_query_scoped_with_guard(
 #[deprecated(
     note = "Use EgressGateway or handle_cloud_query_scoped which enforces the full 5-stage protection pipeline"
 )]
+// ANCHOR[contextra-privacy:EGW-016]
+/// Vollständige Prüfung inklusive Mandantenisolation, L4-Guard und Bulk-Exfiltrations-Detektor.
 pub async fn handle_cloud_query_scoped_with_bulk_detector(
     request: TenantScoped<CloudQueryRequest>,
     expected_tenant_id: &TenantId,
@@ -474,6 +514,8 @@ pub async fn handle_cloud_query_scoped_with_bulk_detector(
 #[deprecated(
     note = "Use EgressGateway or handle_cloud_query_scoped which enforces the full 5-stage protection pipeline"
 )]
+// ANCHOR[contextra-privacy:EGW-017]
+/// Verarbeitet eine Cloud-Query mit zusätzlichem Layer-4 Vektor-Guard.
 pub async fn handle_cloud_query_with_guard(
     request: CloudQueryRequest,
     classifier: &dyn EgressClassifier,
@@ -487,6 +529,8 @@ pub async fn handle_cloud_query_with_guard(
 }
 
 /// Evaluates a query payload against the `BulkExfiltrationDetector` for a specific `SessionId`.
+// ANCHOR[contextra-privacy:EGW-018]
+/// Überprüft eine Anfrage gegen den Bulk-Exfiltrations-Detektor.
 pub fn check_bulk_exfiltration(
     detector: &BulkExfiltrationDetector,
     session: SessionId,
@@ -507,6 +551,8 @@ pub fn check_bulk_exfiltration(
 #[deprecated(
     note = "Use EgressGateway or handle_cloud_query_scoped which enforces the full 5-stage protection pipeline"
 )]
+// ANCHOR[contextra-privacy:EGW-019]
+/// Führt die Cloud-Query-Prüfung mit L4-Guard und Bulk-Exfiltrations-Detektor durch.
 pub async fn handle_cloud_query_with_bulk_detector(
     request: CloudQueryRequest,
     classifier: &dyn EgressClassifier,
@@ -529,6 +575,8 @@ pub async fn handle_cloud_query_with_bulk_detector(
 
 /// Processes inbound responses from cloud LLMs by checking for prompt injections
 /// and rehydrating surrogate tokens back to original values.
+// ANCHOR[contextra-privacy:EGW-020]
+/// Verarbeitet die Antwort einer Cloud-Query (Rehydrierung und Prompt-Injection-Erkennung).
 pub async fn process_cloud_response(
     raw_response: &str,
     injection_guard: &dyn InjectionDetector,

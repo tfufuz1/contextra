@@ -1,5 +1,29 @@
 #![forbid(unsafe_code)]
 //! `contextra-privacy` — Cloud Egress Security, DLP & Exfiltration Protection (Ring 3)
+//!
+//! # Zweck und Architektur
+//! Dieses Crate implementiert die Sicherheits- und Datenschutzschicht für ausgehende Datenströme
+//! (Cloud Egress) in Contextra. Ziel ist es, Data Loss Prevention (DLP, Schutz vor Datenverlust),
+//! Erkennung von Exfiltrationsversuchen, automatisierte Pseudonymisierung über Surrogat-Token
+//! sowie unveränderbare Audit-Protokolle bereitzustellen.
+//!
+//! # Ring-Zugehörigkeit
+//! Ring 3 (Domain / Application Services). Das Crate liegt oberhalb der Speicher- und Kryptokerne
+//! (Ring 1/2) und unterhalb der API- und Netzwerk-Fassaden (Ring 4).
+//!
+//! # Einbindung und Abhängigkeiten
+//! - **Eingehend:** Wird eingebunden von `contextra`, `contextra-mcp` und `contextra-router`.
+//! - **Ausgehend:** Hängt ab von `contextra-types`, `contextra-ports`, `contextra-avv-generator`.
+//!
+//! # Wichtigste Module
+//! - [`egress_vault`]: DLP-Prüfung, Regex-Klassifikation und `SurrogateVault`-Pseudonymisierung.
+//! - [`entity_recognizer`]: Erkennung personenbezogener Daten (PII) wie IBAN, E-Mail, Kreditkarten.
+//! - [`egress_guard`]: Semantische k-NN Vektorähnlichkeitsprüfung gegen Datenabfluss.
+//! - [`egress_gateway`]: Zentrales Schutzgateway (Egress Shield) vor Weiterleitung in externe Cloud-Dienste.
+//! - [`bulk_exfiltration_detector`]: Sitzungsbasiertes Rate-Limiting gegen Massenabflüsse.
+//! - [`context_edit_audit`]: Kryptografisch verkettete Audit-Aufzeichnungen von Kontextbearbeitungen.
+//! - [`processing_registry`]: Verzeichnis von Verarbeitungstätigkeiten (VVT) nach Art. 30 DSGVO.
+//! - [`guarded_payload`]: Type-State-Muster zur Verhinderung ungesäuberter Datenabflüsse zur Compile-Zeit.
 
 pub mod audit_trace;
 pub mod avv_generator;
@@ -13,6 +37,8 @@ pub mod error;
 pub mod guarded_payload;
 pub mod processing_registry;
 
+// ANCHOR[contextra-privacy:LIB-001]
+// Re-Exports für bequemen Zugriff auf die Kernfunktionalitäten
 pub use audit_trace::{compute_audit_trace, extract_rule_id, EgressClassifierTrace};
 #[allow(deprecated)]
 pub use avv_generator::{generate_avv_draft, AvvContext};
