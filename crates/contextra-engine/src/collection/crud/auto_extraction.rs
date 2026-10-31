@@ -1,3 +1,10 @@
+//! # Modul: auto_extraction.rs
+//!
+//! **Zweck:** Automatische Entitätsextraktion beim Einfügen und Aktualisieren.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Ingestion-Hook fuer LLM- und regelbasierte Entitaetsextraktion (OpenIE / Rule-Based).
 // INVARIANTEN: Default enabled: true (sofern nicht auto-extraction-opt-out gesetzt); Best-Effort Fehlerbehandlung; Keine Panics.
@@ -13,6 +20,8 @@ use contextra_types::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+// ANCHOR[contextra-engine:COL-EXT-025]
+/// Dokumentation für `ExtractorMode` im Rahmen der Collection- und Suchabstraktion.
 #[cfg(not(feature = "entity-extraction"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExtractorMode {
@@ -27,6 +36,8 @@ impl Default for ExtractorMode {
     }
 }
 
+// ANCHOR[contextra-engine:COL-ENT-039]
+/// Dokumentation für `EntityExtractionConfig` im Rahmen der Collection- und Suchabstraktion.
 #[cfg(not(feature = "entity-extraction"))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityExtractionConfig {

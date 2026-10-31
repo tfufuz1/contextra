@@ -1,3 +1,10 @@
+//! # Modul: unit_tests.rs
+//!
+//! **Zweck:** Unit-Tests für Textsegmentierung und Randbedingungen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Unittests für den Markdown-Chunker.
 // INVARIANTEN: Stellt sicher, dass Grundfunktionen des Chunkers korrekt arbeiten.

@@ -1,3 +1,10 @@
+//! # Signaldefinitionen & Metadaten-Handling (`signal`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Behandelt Klassifikationen von Suchsignalen (`SignalKind`), Kontextinformationen
+//! über Modellreife und Drift sowie Prioritätsregeln für Metadaten-Merges.
+
 use std::fmt;
 
 use super::types::SignalContribution;
@@ -7,6 +14,8 @@ use serde::{Deserialize, Serialize};
 
 /// Calibration and drift context for a search signal during mRRF weight modulation.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-rank:SIG-001]
+/// Kontext zu Modellkalibrierung und Driftzustand eines Signals für die mRRF-Gewichtsmodulation.
 pub struct SignalCalibrationContext {
     /// Signal identifier matching the result set signal name (e.g., "vector", "text", "graph").
     pub signal_name: String,
@@ -82,6 +91,8 @@ pub(super) struct FusedEntry<'a> {
 /// Identifies the kind of search signal used during fusion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+// ANCHOR[contextra-rank:SIG-002]
+/// Klassifikation der unterschiedlichen Retrieval-Signalarten im Contextra-System.
 pub enum SignalKind {
     /// Vector (semantic k-NN) search signal.
     Vector,
@@ -151,6 +162,8 @@ impl fmt::Display for SignalKind {
 
 /// Configures signal priority order for metadata merging during Reciprocal Rank Fusion.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+// ANCHOR[contextra-rank:SIG-003]
+/// Prioritätsstrategie bei der Zusammenführung kollidierender Metadatenschlüssel.
 pub enum MetadataMergePriority {
     /// Vector metadata is processed first (default behavior). Order: Vector, Text, Graph.
     #[default]

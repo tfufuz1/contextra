@@ -1,3 +1,12 @@
+//! # Geshardeter Segment-Store (`kv_segment/store.rs`)
+//!
+//! Bietet thread-sicheren Zugriff auf Segmente über konfigurierbare Shards,
+//! um Lock-Contention bei vielen parallelen Mandanten zu minimieren.
+//!
+//! ## Invarianten
+//! - Locks werden immer pro Shard genommen, niemals global über den gesamten Store.
+//! - LRU-Verdrängung rotiert fair über Mandanten, um Starvation zu verhindern.
+
 // FILE-CONTEXT
 // ZWECK: Tenant-isolierter KV-Segment-Store (INV-TENANT Isolation).
 // STAND: TS:2026-09-13T00:00:00Z
@@ -493,6 +502,7 @@ impl TenantIsolatedKvStore {
         freed
     }
 
+    /// Leert alle Segmente aus allen Shards vollständig und löscht deren Speicher via Zeroize.
     pub fn clear_all(&self) {
         let mut all_segments: Vec<KvSegment> = Vec::new();
         for shard in self.shards.iter() {

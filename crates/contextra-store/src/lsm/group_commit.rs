@@ -1,3 +1,7 @@
+//! # Group-Commit Pipeline (Ring 1)
+//!
+//! Buendelt parallele Schreibanfragen deterministisch zur Reduktion von fsync-Aufrufen.
+
 use crate::lsm::config::DurabilityMode;
 use crate::wal::{PreparedBatch, Wal, WalOp};
 use contextra_types::{Result, TxId};

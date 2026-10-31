@@ -1,3 +1,18 @@
+//! # Konsolidierungs-Sitzung (`context_compaction/session.rs`)
+//!
+//! Implementiert eine transaktionale OCC-Sitzung ([`ConsolidationSession`])
+//! für die Gedächtniskompaktierung im Schlafzyklus.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ring 3). Koordiniert `Collection`, Speicher-Engine und LLM-Aufrufe.
+//!
+//! ## Invarianten
+//! - **Optimistic Concurrency Control (OCC):** Verhindert verlorene Aktualisierungen (Lost Updates),
+//!   indem sichergestellt wird, dass Quelldokumente während des LLM-Aufrufs nicht verändert wurden.
+//! - **Crash-Resilienz (INV-CONSOLIDATE-1/2):** Schreibt zu Beginn einen `CommitIntent::Consolidation`
+//!   in das Speichersystem, der bei erfolgreichem Abschluss gelöscht wird.
+//! - **Fail-Closed bei Löschfehlern:** Scheitert das Entfernen von Quelldokumenten, schlägt der Commit fehl.
+
 use contextra_engine::collection::{Collection, StoredDocumentMeta};
 use contextra_engine::transaction::CommitIntent;
 use contextra_ports::{LlmTextGenerator, StorageEngine, VectorIndex};
@@ -12,6 +27,8 @@ use super::types::CompactionStrategy;
 /// Prevents lost updates / phantom erasures by verifying that no source documents were modified
 /// while asynchronous LLM summarization was in progress. Also journals a `CommitIntent::Consolidation`
 /// entry into storage for crash resilience (INV-CONSOLIDATE-1, INV-CONSOLIDATE-2).
+// ANCHOR[contextra-cognition:SESS-001]
+/// Transaktionale OCC-Konsolidierungssitzung.
 pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex>
 {
     /// Reference to the active collection.
@@ -29,6 +46,8 @@ pub struct ConsolidationSession<'a, S: StorageEngine, V: VectorIndex = contextra
 impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     /// Starts a consolidation session, snapshotting the version of each source document
     /// and writing a `CommitIntent::Consolidation` intent to storage.
+    // ANCHOR[contextra-cognition:SESS-002]
+    /// Startet eine neue Konsolidierungs-Session und sichert Versionen der Quelldokumente.
     pub async fn start(
         collection: &'a Collection<S, V>,
         source_doc_ids: &[DocId],
@@ -65,6 +84,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
 
     /// Validates optimistic concurrency control: checks that every source document
     /// has NOT been mutated since the consolidation session started.
+    // ANCHOR[contextra-cognition:SESS-003]
+    /// Validiert die optimistische Nebenläufigkeitskontrolle.
     pub async fn validate_occ(&self) -> Result<()> {
         for &(doc_id, expected_tx) in &self.source_docs {
             match self.collection.get_doc_tx(doc_id).await? {
@@ -91,6 +112,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     /// This is used to retry consolidation after an OCC conflict, allowing the caller to re-summarize
     /// only the documents that have actually changed.
     /// Returns a list of document IDs that were mutated or deleted since the session started.
+    // ANCHOR[contextra-cognition:SESS-004]
+    /// Aktualisiert Versionen nach einem OCC-Konflikt.
     pub async fn refresh(&mut self) -> Result<Vec<DocId>> {
         let mut changed_docs = Vec::new();
         let mut new_source_docs = Vec::with_capacity(self.source_docs.len());
@@ -133,6 +156,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     }
 
     /// Cancels / aborts the consolidation session, removing the intent key.
+    // ANCHOR[contextra-cognition:SESS-005]
+    /// Bricht die Session ab und entfernt den Intent-Schlüssel.
     pub async fn abort(self) -> Result<()> {
         let abort_tx = self.collection.allocate_tx()?;
         self.collection
@@ -145,6 +170,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
 
     /// Executes the consolidation process using the provided LLM text generator:
     /// validates OCC, reads source document contents, generates summary, and commits.
+    // ANCHOR[contextra-cognition:SESS-006]
+    /// Führt den gesamten Konsolidierungsablauf aus.
     pub async fn execute<G>(&self, generator: &G) -> Result<()>
     where
         G: LlmTextGenerator + ?Sized,
@@ -217,6 +244,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     }
 
     /// Commits the consolidated document and removes the source documents.
+    // ANCHOR[contextra-cognition:SESS-007]
+    /// Committet das konsolidierte Dokument und löscht Quelldokumente.
     pub async fn commit(
         self,
         target_string_id: &str,
@@ -229,6 +258,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationSession<'a, S, V> {
     }
 
     /// Commits the consolidated document and removes the source documents (takes `&self`).
+    // ANCHOR[contextra-cognition:SESS-008]
+    /// Committet das konsolidierte Dokument unter Beibehaltung der Session-Referenz.
     pub async fn commit_ref(
         &self,
         target_string_id: &str,

@@ -1,3 +1,10 @@
+//! # Modul: weights.rs
+//!
+//! **Zweck:** Gewichtungskonfiguration für Multi-Signal-Suchen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use contextra_types::{FusionWeights, Result};
 
 /// Custom weights for vector, text, and graph signals in hybrid search.

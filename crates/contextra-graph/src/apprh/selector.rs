@@ -1,3 +1,9 @@
+//! Selektionslogik (`ApprhSelector`) für die dynamische Auswahl von PageRank-Algorithmen.
+//!
+//! # Zweck
+//! Entscheidet anhand von Graphmetriken (Knotendichte, Hyperkantenanteil, Kostenmodell),
+//! ob klassisches PPR oder APPRH (Averaging-based Personalized PageRank) verwendet wird.
+
 // FILE-CONTEXT
 // ZWECK: ApprhSelector zur Steuerung von Shadow-Mode-Abtastung und expliziter Produktionsschaltung (P1.3)
 // INVARIANTEN: Instanz-Objekt ohne globalen statischen Zustand (ADR-N10, P29).
@@ -15,6 +21,7 @@ use std::sync::Arc;
 
 /// Operating mode for [`ApprhSelector`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-001]
 pub enum ApprhMode {
     /// APPRH disabled; authoritative Forward-Push PPR is returned.
     Off,
@@ -29,6 +36,7 @@ pub enum ApprhMode {
 
 /// Configuration parameters for [`ApprhSelector`].
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-002]
 pub struct ApprhSelectorConfig {
     /// Sampling rate for shadow evaluations: 1 = every call, N = every N-th call.
     pub sample_interval: u64,
@@ -56,6 +64,7 @@ impl Default for ApprhSelectorConfig {
 /// - Production release is strictly explicit (`promote_to_production` / `set_mode`).
 /// - Hysteresis: If monitor loses readiness in Production mode, selector automatically falls back
 ///   to Shadow mode and emits a `tracing::warn!` log.
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-003]
 pub struct ApprhSelector {
     config: ApprhSelectorConfig,
     monitor: Arc<ApprhGateMonitor>,
@@ -65,6 +74,7 @@ pub struct ApprhSelector {
 
 impl ApprhSelector {
     /// Creates a new [`ApprhSelector`] with the specified configuration and gate monitor.
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-004]
     pub fn new(config: ApprhSelectorConfig, monitor: Arc<ApprhGateMonitor>) -> Self {
         Self {
             config,
@@ -78,12 +88,14 @@ impl ApprhSelector {
     ///
     /// # Errors
     /// Returns [`ApprhError`] if monitor configuration fails validation.
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-005]
     pub fn with_default_monitor(config: ApprhSelectorConfig) -> Result<Self, ApprhError> {
         let monitor = Arc::new(ApprhGateMonitor::default());
         Ok(Self::new(config, monitor))
     }
 
     /// Returns the current operating mode of the selector.
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-006]
     pub fn mode(&self) -> ApprhMode {
         *self.mode.read()
     }
@@ -93,6 +105,7 @@ impl ApprhSelector {
     /// # Errors
     /// Returns [`ApprhError::InvalidParameter`] if attempting to promote to `Production` mode
     /// when `monitor.production_ready()` is `false`.
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-007]
     pub fn set_mode(&self, new_mode: ApprhMode) -> Result<(), ApprhError> {
         if new_mode == ApprhMode::Production && !self.monitor.production_ready() {
             return Err(ApprhError::InvalidParameter(
@@ -108,16 +121,19 @@ impl ApprhSelector {
     ///
     /// # Errors
     /// Returns [`ApprhError::InvalidParameter`] if gate monitor is not production ready.
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-008]
     pub fn promote_to_production(&self) -> Result<(), ApprhError> {
         self.set_mode(ApprhMode::Production)
     }
 
     /// Explicitly demotes the selector to `Shadow` mode.
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-009]
     pub fn demote_to_shadow(&self) {
         *self.mode.write() = ApprhMode::Shadow;
     }
 
     /// Returns a reference to the internal [`ApprhGateMonitor`].
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-010]
     pub fn monitor(&self) -> &ApprhGateMonitor {
         &self.monitor
     }
@@ -126,6 +142,7 @@ impl ApprhSelector {
     ///
     /// # Errors
     /// Returns [`ApprhError`] if graph execution fails in non-recoverable paths.
+// ANCHOR[contextra-graph:SRC-APPRH-SELECTOR-011]
     pub fn evaluate_and_run<G: PathGraph>(
         &self,
         graph: &G,

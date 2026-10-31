@@ -1,3 +1,8 @@
+//! # Integrationstest: `rfc_vectors.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `rfc_vectors`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Verification of cryptographic primitives against official RFC and reference test vectors.
 // INVARIANTEN: AES-256-GCM-SIV against RFC 8452, HKDF against RFC 5869, HMAC-SHA256 against RFC 4231.

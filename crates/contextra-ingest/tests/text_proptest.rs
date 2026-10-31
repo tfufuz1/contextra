@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `text_proptest.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Property-based Tests (proptest) für Identitätsinvariante und Zero-Panic (WP M4).
 // INVARIANTEN: Zero-Panic bei beliebigen Bytes, Identität bei Markdown/Txt.
@@ -18,6 +24,8 @@ proptest! {
     /// Identitätsinvariante für Markdown:
     /// Saubere UTF-8 Strings ohne \r und Steuerzeichen (außer \n/\t) müssen
     /// bei Markdown byte-identisch in canonical().text enthalten sein.
+// ANCHOR[contextra-ingest:TST-0438]
+// Testet die Funktionsfaehigkeit von `prop_markdown_identity`.
     #[test]
     fn prop_markdown_identity(s in "[a-zA-Z0-9 \\n\\täöüß🦀#=-]+") {
         let limits = IngestLimits::default();
@@ -40,6 +48,8 @@ proptest! {
     }
 
     /// Zero-Panic Garantie: Beliebige Bytes in alle 6 Textformate dürfen NIEMALS panikieren.
+// ANCHOR[contextra-ingest:TST-0439]
+// Testet die Funktionsfaehigkeit von `prop_zero_panic_arbitrary_bytes`.
     #[test]
     fn prop_zero_panic_arbitrary_bytes(bytes in proptest::collection::vec(any::<u8>(), 0..2048)) {
         let limits = IngestLimits::default();

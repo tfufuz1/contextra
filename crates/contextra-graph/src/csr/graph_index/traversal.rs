@@ -1,3 +1,9 @@
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-INDEX-TRAVERSAL-001]
+//! Traversierungsmethoden des `GraphIndex`-Ports auf `CsrGraph`.
+//!
+//! # Zweck
+//! Stellt k-Hop-Nachbarschaftsabfragen, Vorgänger- und Nachfolgerlisten bereit.
+
 use std::collections::{HashMap, VecDeque};
 
 use contextra_ports::BoxFuture;

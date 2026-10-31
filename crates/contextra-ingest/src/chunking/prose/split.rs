@@ -1,3 +1,10 @@
+//! Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Aufspaltung übergroßer Blöcke (Code, Tabelle, Absatz, Liste) über dem Hard-Limit (WP M3 / SPEC C-11.7).
 // INVARIANTEN: Zero-Panic, UTF-8-sicher, Sprachsynthese von Code-Fences und Tabellenköpfen, Deterministisch.
@@ -14,6 +21,8 @@ use std::ops::Range;
 
 /// Kontextdaten für das Aufspalten übergroßer Blöcke.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-ingest:CHK-0230]
+// struct `SplitContext` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub struct SplitContext<'a> {
     pub span: Range<usize>,
     pub locator: Locator,
@@ -24,6 +33,8 @@ pub struct SplitContext<'a> {
 }
 
 /// Erzeugt Teil-Drafts für einen übergroßen Codeblock.
+// ANCHOR[contextra-ingest:CHK-0231]
+// fn `split_oversized_code` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub fn split_oversized_code(
     fence_head: &str,
     fence_tail: &str,
@@ -109,6 +120,8 @@ pub fn split_oversized_code(
 }
 
 /// Erzeugt Teil-Drafts für eine übergroße Tabelle.
+// ANCHOR[contextra-ingest:CHK-0232]
+// fn `split_oversized_table` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub fn split_oversized_table(
     header_lines: &[String],
     body_lines: &[String],
@@ -203,6 +216,8 @@ pub fn split_oversized_table(
 }
 
 /// Erzeugt Teil-Drafts für eine übergroße Liste an Item-Grenzen.
+// ANCHOR[contextra-ingest:CHK-0233]
+// fn `split_oversized_list` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub fn split_oversized_list(
     items: &[ParsedListItem],
     sctx: &SplitContext<'_>,
@@ -269,6 +284,8 @@ pub fn split_oversized_list(
 }
 
 /// Erzeugt Teil-Drafts für einen übergroßen Absatz.
+// ANCHOR[contextra-ingest:CHK-0234]
+// fn `split_oversized_paragraph` fuer Splitting-Logik fuer Textbloecke anhand von Absaetzen und Ueberschriften.
 pub fn split_oversized_paragraph(
     para_text: &str,
     sctx: &SplitContext<'_>,

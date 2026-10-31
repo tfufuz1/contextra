@@ -1,3 +1,8 @@
+//! RAM-Bedarfsabschätzung und Budgetierung für den inneren Graphen.
+//!
+//! # Zweck
+//! Schätzt Heap- und Peak-Speicherverbrauch für Indexe, Arrays und Kompaktierungsläufe.
+
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -7,6 +12,7 @@ use super::super::types::EdgePayload;
 use super::GraphInner;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// ANCHOR[contextra-graph:SRC-CSR-INNER-ESTIMATE-001]
 pub struct MemoryEstimate {
     pub shared_payload_bytes: usize,
     pub private_bytes: usize,
@@ -14,6 +20,7 @@ pub struct MemoryEstimate {
 
 impl MemoryEstimate {
     #[inline]
+// ANCHOR[contextra-graph:SRC-CSR-INNER-ESTIMATE-002]
     pub fn total_bytes(&self) -> usize {
         self.shared_payload_bytes + self.private_bytes
     }

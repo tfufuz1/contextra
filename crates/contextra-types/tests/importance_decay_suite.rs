@@ -1,3 +1,6 @@
+//! Integrations-Testsuite für MemoryImportance und Abklingfunktionen (DecayFunction).
+//! Prüft exponentiellen Zerfall, Step-Floor und Score-Clamping.
+
 //! Comprehensive decay calculation and importance score test suite for `contextra-types`.
 
 #![allow(

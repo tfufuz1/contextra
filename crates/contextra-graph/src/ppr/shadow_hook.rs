@@ -6,6 +6,7 @@ use contextra_types::EntityId;
 
 /// Protokolliert die mittlere absolute Differenz (MAE) zwischen den Baseline- und
 /// TL-HFD-Kandidaten-PPR-Score-Maps über die gegebene Diskrepanz-Senke.
+// ANCHOR[contextra-graph:SRC-PPR-SHADOW-HOOK-001]
 pub fn log_tl_hfd_vs_baseline_discrepancy(
     baseline: &AHashMap<EntityId, f32>,
     candidate: &AHashMap<EntityId, f32>,
@@ -64,6 +65,7 @@ mod tests {
     }
 
     /// Test (c): log_tl_hfd_vs_baseline_discrepancy berechnet die mittlere absolute Differenz korrekt
+// ANCHOR[contextra-graph:SRC-PPR-SHADOW-HOOK-002]
     #[test]
     fn test_log_tl_hfd_vs_baseline_discrepancy_mae_calculation() {
         let mut baseline = AHashMap::new();

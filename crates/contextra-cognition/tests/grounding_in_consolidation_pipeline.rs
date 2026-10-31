@@ -1,3 +1,8 @@
+//! # Integrationstest: Grounding in der Konsolidierungs-Pipeline (`tests/grounding_in_consolidation_pipeline.rs`)
+//!
+//! Validiert die Faktentreue-Prüfung (Grounding Validation) während der generativen Synthese
+//! in der Konsolidierungs-Pipeline sowohl mit Standard- als auch mit Rich-Grounding-Validatoren.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -72,6 +77,8 @@ impl GroundingValidator for TestMockRichValidator {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-GROUNDIN-059]
+// Prüft Testfall `test_grounding_validation_pass_and_fail_modes`.
 #[tokio::test]
 async fn test_grounding_validation_pass_and_fail_modes() {
     let llm = TestMockLlm;
@@ -140,6 +147,8 @@ async fn test_grounding_validation_pass_and_fail_modes() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-GROUNDIN-060]
+// Prüft Testfall `test_consolidation_pipeline_rich_validator_wiring`.
 #[tokio::test]
 async fn test_consolidation_pipeline_rich_validator_wiring() {
     let dir = tempdir().unwrap();

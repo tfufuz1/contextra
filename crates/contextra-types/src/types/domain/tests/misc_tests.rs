@@ -1,3 +1,6 @@
+//! Unittests für Graph-Entitäten, Edges, WorkflowState und ConfigFingerprint.
+//! Stellt sicher, dass Serialisierungen und Invarianten intakt bleiben.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use crate::error::ContextraError;

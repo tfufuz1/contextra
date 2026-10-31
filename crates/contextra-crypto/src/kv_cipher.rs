@@ -1,3 +1,14 @@
+//! # KV-Segment-Verschlüsselung (`kv_cipher.rs`)
+//!
+//! Stellt die Authenticated Encryption with Associated Data (AEAD) für Key-Value-Segmente
+//! im Cache und Speicher bereit.
+//!
+//! ## Invarianten
+//! - Tenant- und Model-Fingerprints fließen als Associated Data (AD) ein, um
+//!   mandantenübergreifende Vertauschungsangriffe zu verhindern.
+//! - Format-Versionierungs-Header garantiert Abwärtskompatibilität.
+//! - Nonce-Generierung schließt Kollisionen aus.
+
 // FILE-CONTEXT
 // ZWECK: Dedicated AEAD encryption and key isolation for KV-cache segments (contextra-crypto).
 // INVARIANTEN: Key derivation per (tenant_id, model_fingerprint) tuple via KeyManager HKDF-Expand.
@@ -96,6 +107,8 @@ use crate::kv_shredding::KeyRegistry;
 
 /// High-level cipher engine for KV-cache segment encryption and decryption.
 /// Consolidates onto `KeyRegistry` envelope crypto-shredding as the single shredding path.
+// ANCHOR[contextra-crypto:KV-001]
+/// Chiffre für segmentweise verschlüsselte KV-Einträge.
 pub struct KvSegmentCipher {
     key_manager: KeyManager,
     registry: KeyRegistry,

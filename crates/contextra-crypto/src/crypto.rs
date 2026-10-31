@@ -1,3 +1,14 @@
+//! # Haupt-Verschlüsselungs- und Schlüsselverwaltungskomponente (`crypto.rs`)
+//!
+//! Stellt den zentralen [`KeyManager`] bereit, der Master-Schlüssel verwaltet,
+//! dateispezifische Unterschlüssel ableitet und AEAD-Operationen durchführt.
+//!
+//! ## Invarianten
+//! - Pro Datei/Segment wird via HKDF-Expand ein isolierter Teilschlüssel generiert.
+//! - Nonces bestehen aus Präfix und Zufalls-Suffix, um Nonce-Reuse auszuschließen.
+//! - Bei Speicherfreigabe (`Drop`) werden alle Schlüsselmaterialien genullt (`Zeroize`).
+//! - Strikte Panic-Freiheit in allen Produktionspfaden.
+
 // FILE-CONTEXT
 // ZWECK: Key Management and AES-256-GCM-SIV authenticated encryption for Contextra data structures.
 // INVARIANTEN: Nonce prefix (4 bytes) + monotonic counter suffix (8 bytes) per encrypt_auto_nonce call. HKDF-Expand per file_id.
@@ -46,6 +57,11 @@ use std::sync::OnceLock;
 use zeroize::Zeroizing;
 
 /// Manager for encryption keys and block encryption.
+// ANCHOR[contextra-crypto:CRY-002]
+/// Zentraler kryptographischer Schlüsselmanager für symmetrische Verschlüsselung.
+///
+/// Hält den Master-Key im RAM, leitet per HKDF-Expand datei- und mandantenspezifische
+/// Teilschlüssel ab und kapselt symmetrische AEAD-Ver- und Entschlüsselung.
 pub struct KeyManager {
     key: VolatileEncryptionKey,
     cipher_cache: OnceLock<Aes256GcmSiv>,

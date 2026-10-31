@@ -1,3 +1,8 @@
+//! # Tests für die Kontext-Kompaktierung (`context_compaction/tests.rs`)
+//!
+//! Validiert die Kompaktierungs-Strategien, Token-Budget-Einhaltung,
+//! Tool-Output-Priorisierung, OCC-Konflikterkennung und Intent-Bereinigungslogik.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -36,6 +41,8 @@ fn make_chunk(id: u64, content: &str, relevance: f32, is_tool: bool) -> ContextC
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-045]
+// Prüft Testfall `test_compactor_within_budget`.
 #[test]
 fn test_compactor_within_budget() {
     let budget = TokenBudget::new(100, 0);
@@ -56,6 +63,8 @@ fn test_compactor_within_budget() {
     assert_eq!(result.tokens_used, "chunk 1".len() + "chunk 2".len());
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-046]
+// Prüft Testfall `test_compactor_tool_output_compacted_first`.
 #[test]
 fn test_compactor_tool_output_compacted_first() {
     let budget = TokenBudget::new(20, 0);
@@ -82,6 +91,8 @@ fn test_compactor_tool_output_compacted_first() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-047]
+// Prüft Testfall `test_compactor_truncate_strategy`.
 #[test]
 fn test_compactor_truncate_strategy() {
     let budget = TokenBudget::new(10, 0);
@@ -102,6 +113,8 @@ fn test_compactor_truncate_strategy() {
     assert!(result.status_tokens.is_empty());
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-048]
+// Prüft Testfall `test_compactor_summarize_strategy_fallback`.
 #[test]
 fn test_compactor_summarize_strategy_fallback() {
     let budget = TokenBudget::new(10, 0);
@@ -125,6 +138,8 @@ fn test_compactor_summarize_strategy_fallback() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-049]
+// Prüft Testfall `test_compact_with_contextual_prefix_respects_budget`.
 #[test]
 fn test_compact_with_contextual_prefix_respects_budget() {
     let budget = TokenBudget::new(20, 0); // 20 tokens available
@@ -165,6 +180,8 @@ impl LlmTextGenerator for UnreachableLlmGenerator {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-050]
+// Prüft Testfall `test_consolidate_via_llm_error_propagation_on_unreachable_client`.
 #[tokio::test]
 async fn test_consolidate_via_llm_error_propagation_on_unreachable_client() {
     let budget = TokenBudget::new(100, 0);
@@ -191,6 +208,8 @@ async fn test_consolidate_via_llm_error_propagation_on_unreachable_client() {
     assert!(res.is_err());
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-051]
+// Prüft Testfall `test_consolidate_via_llm_provenance_and_empty`.
 #[tokio::test]
 async fn test_consolidate_via_llm_provenance_and_empty() {
     let budget = TokenBudget::new(100, 0);
@@ -219,6 +238,8 @@ impl LlmTextGenerator for MockLlmGenerator {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-052]
+// Prüft Testfall `test_consolidate_via_llm_provenance_3_source_docs`.
 #[tokio::test]
 async fn test_consolidate_via_llm_provenance_3_source_docs() {
     let budget = TokenBudget::new(1000, 0);
@@ -265,6 +286,8 @@ async fn test_consolidate_via_llm_provenance_3_source_docs() {
         .contains_key(&DocId::new(30).0.to_string()));
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-053]
+// Prüft Testfall `test_compact_empty_chunks_returns_empty_compacted_context`.
 #[test]
 fn test_compact_empty_chunks_returns_empty_compacted_context() {
     let budget = TokenBudget::new(100, 0);
@@ -384,6 +407,8 @@ impl StorageEngine for FaultyDeleteStorage {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-054]
+// Prüft Testfall `test_consolidation_aborts_on_delete_failure`.
 #[tokio::test]
 async fn test_consolidation_aborts_on_delete_failure(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -462,6 +487,8 @@ async fn test_consolidation_aborts_on_delete_failure(
     Ok(())
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-055]
+// Prüft Testfall `test_compactor_jitter_reproducible_and_in_bounds`.
 #[test]
 fn test_compactor_jitter_reproducible_and_in_bounds() {
     use contextra_ports::{Rng, SeededRng};
@@ -495,6 +522,8 @@ fn test_compactor_jitter_reproducible_and_in_bounds() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-056]
+// Prüft Testfall `test_compactor_with_rng_builder`.
 #[test]
 fn test_compactor_with_rng_builder() {
     use contextra_ports::SeededRng;
@@ -506,6 +535,8 @@ fn test_compactor_with_rng_builder() {
     assert_eq!(compactor.compact(vec![]).tokens_used, 0);
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-057]
+// Prüft Testfall `test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_monotonically`.
 #[tokio::test]
 async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_monotonically(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -552,6 +583,8 @@ async fn test_cleanup_orphaned_consolidation_intents_uses_next_tx_allocator_mono
     Ok(())
 }
 
+// ANCHOR[contextra-cognition:TEST-TESTS-058]
+// Prüft Testfall `test_concurrent_mutation_aborts_consolidation`.
 #[tokio::test]
 async fn test_concurrent_mutation_aborts_consolidation() -> Result<()> {
     let tmp = tempfile::tempdir().unwrap();

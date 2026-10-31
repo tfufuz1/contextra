@@ -1,3 +1,8 @@
+//! Kern-Datenstrukturen des inneren CSR-Graphzustands (`GraphInner`).
+//!
+//! # Zweck
+//! Hält Knoten-, Offset- und Kanten-Arrays flach im RAM für optimale CPU-Cache-Ausnutzung.
+
 pub mod compaction;
 pub mod estimate;
 pub mod reinforcement;
@@ -15,6 +20,7 @@ use super::types::{EdgePayload, InternalIndex, StagedEdgePayload};
 pub use estimate::MemoryEstimate;
 
 #[derive(Clone)]
+// ANCHOR[contextra-graph:SRC-CSR-INNER-MOD-001]
 pub struct GraphInner {
     pub(crate) id_map: HashMap<EntityId, InternalIndex>,
     pub(crate) reverse_map: Vec<EntityId>,
@@ -63,6 +69,7 @@ impl Default for GraphInner {
 }
 
 impl GraphInner {
+// ANCHOR[contextra-graph:SRC-CSR-INNER-MOD-002]
     pub fn new() -> Self {
         Self {
             id_map: HashMap::new(),

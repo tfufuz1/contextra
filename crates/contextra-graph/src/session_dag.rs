@@ -27,30 +27,36 @@ use std::sync::Arc;
 /// let tree = SessionBranchTree::new("a".into(), "b".into());
 /// let _ = tree.edges.read(); // Field `edges` is private
 /// ```
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-001]
 pub struct NodesGuard<'a> {
     tree: &'a SessionBranchTree,
     _nodes_guard: RwLockReadGuard<'a, HashMap<NodeIdx, AgentStateNode>>,
 }
 
 impl<'a> NodesGuard<'a> {
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-002]
     pub fn nodes(&self) -> &HashMap<NodeIdx, AgentStateNode> {
         &self._nodes_guard
     }
 
     /// Erwirbt den edges-Lock. Kann NUR aufgerufen werden, wenn bereits ein NodesGuard existiert
     /// -> Lock-Reihenfolge ist durch die Typsignatur erzwungen, nicht nur dokumentiert.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-003]
     pub fn edges(&self) -> RwLockReadGuard<'_, Vec<DagEdge>> {
         self.tree.edges.read()
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-004]
     pub fn edges_write(&self) -> RwLockWriteGuard<'_, Vec<DagEdge>> {
         self.tree.edges.write()
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-005]
     pub fn active_head(&self) -> RwLockReadGuard<'_, NodeIdx> {
         self.tree.active_head.read()
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-006]
     pub fn active_head_write(&self) -> RwLockWriteGuard<'_, NodeIdx> {
         self.tree.active_head.write()
     }
@@ -58,42 +64,51 @@ impl<'a> NodesGuard<'a> {
 
 /// Exklusiver Schreib-Guard, der NUR erhalten werden kann, nachdem der `nodes`-Schreiblock bereits gehalten wird.
 /// Erzwingt die Lock-Reihenfolge nodes -> edges/active_head zur Compile-Zeit.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-007]
 pub struct NodesWriteGuard<'a> {
     tree: &'a SessionBranchTree,
     _nodes_guard: RwLockWriteGuard<'a, HashMap<NodeIdx, AgentStateNode>>,
 }
 
 impl<'a> NodesWriteGuard<'a> {
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-008]
     pub fn nodes(&self) -> &HashMap<NodeIdx, AgentStateNode> {
         &self._nodes_guard
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-009]
     pub fn nodes_mut(&mut self) -> &mut HashMap<NodeIdx, AgentStateNode> {
         &mut self._nodes_guard
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-010]
     pub fn edges(&self) -> RwLockReadGuard<'_, Vec<DagEdge>> {
         self.tree.edges.read()
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-011]
     pub fn edges_write(&self) -> RwLockWriteGuard<'_, Vec<DagEdge>> {
         self.tree.edges.write()
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-012]
     pub fn active_head(&self) -> RwLockReadGuard<'_, NodeIdx> {
         self.tree.active_head.read()
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-013]
     pub fn active_head_write(&self) -> RwLockWriteGuard<'_, NodeIdx> {
         self.tree.active_head.write()
     }
 }
 
 /// Index of a node in the Session-DAG.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-014]
 pub type NodeIdx = u64;
 
 /// State of an agent step in the conversation DAG.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-015]
 pub struct AgentStateNode {
     pub step_id: NodeIdx,
     /// LLM prompt of this step.
@@ -110,6 +125,7 @@ pub struct AgentStateNode {
 
 /// Directed edge in the DAG: parent -> child.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-016]
 pub struct DagEdge {
     pub parent: NodeIdx,
     pub child: NodeIdx,
@@ -118,13 +134,16 @@ pub struct DagEdge {
 }
 
 /// Maximum allowed byte size for prompt/response strings (10 MB).
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-017]
 pub const MAX_DAG_STRING_BYTES: usize = 10 * 1024 * 1024;
 
 /// Maximale Pfadtiefe in einem SessionDag (Schutz vor Zyklen und Tiefenexplosion).
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-018]
 pub const MAX_DAG_TRAVERSAL_DEPTH: usize = 10_000;
 
 /// Options for creating or branching a new step in the Session-DAG.
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-019]
 pub struct SessionDagStepOptions<'a> {
     pub prompt: String,
     pub response: String,
@@ -139,6 +158,7 @@ pub struct SessionDagStepOptions<'a> {
 /// - Directed Acyclic Graph: parent must exist before branch creation
 /// - `active_head` always points to an existing node
 /// - Node IDs are monotonically increasing (`AtomicU64`)
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-020]
 pub struct SessionBranchTree {
     nodes: RwLock<HashMap<NodeIdx, AgentStateNode>>,
     edges: RwLock<Vec<DagEdge>>,
@@ -148,6 +168,7 @@ pub struct SessionBranchTree {
 
 impl SessionBranchTree {
     /// Creates a new DAG with a root node (step_id 0).
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-021]
     pub fn new(root_prompt: String, root_response: String) -> Self {
         let root = AgentStateNode {
             step_id: 0,
@@ -170,6 +191,7 @@ impl SessionBranchTree {
 
     /// Einziger öffentlicher Einstiegspunkt, um nodes zu lesen/sperren — ersetzt jeden direkten
     /// Zugriff auf `self.nodes` von außerhalb des Moduls.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-022]
     pub fn lock_nodes(&self) -> NodesGuard<'_> {
         let guard = self.nodes.read();
         NodesGuard {
@@ -179,6 +201,7 @@ impl SessionBranchTree {
     }
 
     /// Einziger öffentlicher Einstiegspunkt für exklusiven Schreibzugriff auf nodes.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-023]
     pub fn lock_nodes_write(&self) -> NodesWriteGuard<'_> {
         let guard = self.nodes.write();
         NodesWriteGuard {
@@ -239,6 +262,7 @@ impl SessionBranchTree {
     }
 
     /// Appends a step to the current active head node atomically under a single write lock.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-024]
     pub fn append_step(
         &self,
         prompt: String,
@@ -269,6 +293,7 @@ impl SessionBranchTree {
     ///
     /// # Errors
     /// Returns `Err(ContextraError::InvalidInput)` if `parent_node` does not exist in the DAG.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-025]
     pub fn branch_from(
         &self,
         parent_node: NodeIdx,
@@ -293,6 +318,7 @@ impl SessionBranchTree {
     }
 
     /// Sets the active head to an existing node.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-026]
     pub fn set_active_head(&self, node_idx: NodeIdx) -> Result<()> {
         let nodes = self.lock_nodes_write();
         if nodes.nodes().contains_key(&node_idx) {
@@ -308,6 +334,7 @@ impl SessionBranchTree {
     }
 
     /// Reconstructs the linear conversation path from root to current active head.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-027]
     pub fn path_to_head(&self) -> Vec<AgentStateNode> {
         let nodes_guard = self.lock_nodes();
         let nodes = nodes_guard.nodes();
@@ -348,6 +375,7 @@ impl SessionBranchTree {
     }
 
     /// Returns all direct children of a given node.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-028]
     pub fn children_of(&self, node_idx: NodeIdx) -> Vec<NodeIdx> {
         let nodes = self.lock_nodes();
         let edges = nodes.edges();
@@ -359,6 +387,7 @@ impl SessionBranchTree {
     }
 
     /// Returns the active head node index.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-029]
     pub fn active_head(&self) -> NodeIdx {
         let nodes = self.lock_nodes();
         let head = *nodes.active_head();
@@ -366,11 +395,13 @@ impl SessionBranchTree {
     }
 
     /// Returns the total number of nodes in the DAG.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-030]
     pub fn node_count(&self) -> usize {
         self.lock_nodes().nodes().len()
     }
 
     /// Retrieves a reference to a specific node by index if it exists.
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-031]
     pub fn get_node(&self, node_idx: NodeIdx) -> Option<AgentStateNode> {
         self.lock_nodes().nodes().get(&node_idx).cloned()
     }
@@ -485,6 +516,7 @@ mod tests {
     // Ein direkter Aufruf wie `dag.edges.read()` oder `dag.active_head.read()` von außerhalb oder ohne
     // `lock_nodes()` scheitert an der Sichtbarkeit der Felder (private).
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-032]
     #[test]
     fn test_dag_root_creation() {
         let dag = SessionBranchTree::new("Hello".into(), "Hi there!".into());
@@ -500,6 +532,7 @@ mod tests {
         assert!(!path[0].compacted);
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-033]
     #[test]
     fn test_linear_append() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
@@ -531,6 +564,7 @@ mod tests {
         assert_eq!(path[2].step_id, 2);
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-034]
     #[test]
     fn test_session_dag_branch_from_arbitrary_node() {
         let dag = SessionBranchTree::new("Root".into(), "Root Resp".into());
@@ -582,6 +616,7 @@ mod tests {
         assert_eq!(children, vec![2, 3]);
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-035]
     #[test]
     fn test_invalid_parent_branching_fails() {
         let dag = SessionBranchTree::new("Root".into(), "Root Resp".into());
@@ -590,6 +625,7 @@ mod tests {
         assert!(matches!(res.unwrap_err(), ContextraError::InvalidInput(_)));
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-036]
     #[test]
     fn test_set_active_head() {
         let dag = SessionBranchTree::new("Root".into(), "Root Resp".into());
@@ -614,6 +650,7 @@ mod tests {
         assert!(dag.set_active_head(999).is_err());
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-037]
     #[tokio::test]
     async fn session_dag_survives_restart() {
         use contextra_store::{LsmConfig, LsmStorage};
@@ -682,6 +719,7 @@ mod tests {
         assert_eq!(children, vec![branch1]);
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-038]
     #[test]
     #[allow(non_snake_case)]
     fn append_step_CASE_oversized_prompt_returns_invalid_input() {
@@ -693,6 +731,7 @@ mod tests {
         assert!(matches!(res.unwrap_err(), ContextraError::InvalidInput(_)));
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-039]
     #[test]
     #[allow(non_snake_case)]
     fn get_node_CASE_existent_and_nonexistent() {
@@ -710,6 +749,7 @@ mod tests {
         assert!(dag.get_node(999).is_none());
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-040]
     #[test]
     #[allow(non_snake_case)]
     fn children_of_CASE_leaf_node_returns_empty() {
@@ -728,6 +768,7 @@ mod tests {
         assert!(children.is_empty(), "Leaf node must have zero children");
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-041]
     #[test]
     #[allow(non_snake_case)]
     fn new_CASE_empty_and_unicode_strings() {
@@ -747,6 +788,7 @@ mod tests {
         assert_eq!(unicode_root.response, unicode_response);
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-042]
     #[tokio::test]
     #[allow(non_snake_case)]
     async fn load_CASE_non_existent_namespace_returns_not_found() {
@@ -770,6 +812,7 @@ mod tests {
         );
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-043]
     #[tokio::test]
     #[allow(non_snake_case)]
     async fn load_CASE_corrupt_data_returns_serialization_error() {
@@ -800,6 +843,7 @@ mod tests {
         );
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-044]
     #[test]
     #[allow(non_snake_case)]
     fn serialization_roundtrip_CASE_agent_state_node_and_dag_edge() {
@@ -827,6 +871,7 @@ mod tests {
         assert_eq!(edge, deserialized_edge);
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-045]
     #[test]
     fn test_path_to_head_detects_cycle() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
@@ -869,6 +914,7 @@ mod tests {
         assert!(!path.is_empty());
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-046]
     #[test]
     fn test_path_to_head_depth_limit() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
@@ -898,6 +944,7 @@ mod tests {
         assert_eq!(path.len(), MAX_DAG_TRAVERSAL_DEPTH);
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-047]
     #[test]
     fn test_set_active_head_invalid_node_returns_error() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
@@ -906,6 +953,7 @@ mod tests {
         assert!(matches!(res.unwrap_err(), ContextraError::InvalidInput(_)));
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-048]
     #[test]
     fn test_append_step_sequential() {
         let dag = SessionBranchTree::new("Root Prompt".into(), "Root Resp".into());
@@ -933,6 +981,7 @@ mod tests {
         );
     }
 
+// ANCHOR[contextra-graph:SRC-SESSION-DAG-049]
     #[tokio::test]
     async fn test_append_step_concurrent_atomicity() {
         let dag = Arc::new(SessionBranchTree::new(

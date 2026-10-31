@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `text_extractors_test.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Golden-Tests, Kodierungstests und RTF-Spezialtests für Text-Extraktoren (WP M4).
 // INVARIANTEN: Zero-Panic, JSON-Snapshots, UTF-16/Windows-1252/Unicode-Tag Handling.
@@ -40,6 +46,8 @@ fn extract_doc(format: FormatId, bytes: &[u8], policy: ExtractPolicy) -> Documen
 
 // --- GOLDEN TESTS (mit Umlauten äöü, ß, Emoji 🦀) ---
 
+// ANCHOR[contextra-ingest:TST-0426]
+// Testet die Funktionsfaehigkeit von `test_golden_txt`.
 #[test]
 fn test_golden_txt() {
     let text =
@@ -52,6 +60,8 @@ fn test_golden_txt() {
     assert_eq!(ir.blocks.len(), 2);
 }
 
+// ANCHOR[contextra-ingest:TST-0427]
+// Testet die Funktionsfaehigkeit von `test_golden_markdown`.
 #[test]
 fn test_golden_markdown() {
     let text = "---\ntitle: \"Titel mit Umlauten äöü und ß 🦀\"\n---\n\n# Überschrift\n\nText";
@@ -69,6 +79,8 @@ fn test_golden_markdown() {
     assert_eq!(ir.canonical().text, text);
 }
 
+// ANCHOR[contextra-ingest:TST-0428]
+// Testet die Funktionsfaehigkeit von `test_golden_rst`.
 #[test]
 fn test_golden_rst() {
     let text = "Rst Dokument äöü\n================\n\nAbsatz mit ß und 🦀.\n\n.. code-block:: rust\n\n  fn main() {}\n";
@@ -79,6 +91,8 @@ fn test_golden_rst() {
     assert!(json_snapshot.contains("rust"));
 }
 
+// ANCHOR[contextra-ingest:TST-0429]
+// Testet die Funktionsfaehigkeit von `test_golden_asciidoc`.
 #[test]
 fn test_golden_asciidoc() {
     let text =
@@ -96,6 +110,8 @@ fn test_golden_asciidoc() {
         .any(|b| matches!(b.kind, BlockKind::Table(_))));
 }
 
+// ANCHOR[contextra-ingest:TST-0430]
+// Testet die Funktionsfaehigkeit von `test_golden_tex`.
 #[test]
 fn test_golden_tex() {
     let text = "% TeX Kommentar\n\\section{TeX Kapitel äöü}\nAbsatz mit ß und 🦀.\n\n\\[ a^2 + b^2 = c^2 \\]\n";
@@ -105,6 +121,8 @@ fn test_golden_tex() {
     assert!(ir.canonical().text.contains("a^2 + b^2 = c^2"));
 }
 
+// ANCHOR[contextra-ingest:TST-0431]
+// Testet die Funktionsfaehigkeit von `test_golden_rtf`.
 #[test]
 fn test_golden_rtf() {
     let rtf_str = r#"{\rtf1\ansi{\info{\title RTF Titel \'e4\'f6\'fc}}\f0 Hallo \u223? und \u129408?!\par Ende.}"#;
@@ -115,6 +133,8 @@ fn test_golden_rtf() {
 
 // --- KODIERUNGSTESTS ---
 
+// ANCHOR[contextra-ingest:TST-0432]
+// Testet die Funktionsfaehigkeit von `test_encoding_utf16le_with_bom`.
 #[test]
 fn test_encoding_utf16le_with_bom() {
     let mut bytes = vec![0xFF, 0xFE]; // UTF-16LE BOM
@@ -126,6 +146,8 @@ fn test_encoding_utf16le_with_bom() {
     assert!(ir.canonical().text.contains("Hallo UTF-16LE äöü"));
 }
 
+// ANCHOR[contextra-ingest:TST-0433]
+// Testet die Funktionsfaehigkeit von `test_encoding_windows1252_fallback`.
 #[test]
 fn test_encoding_windows1252_fallback() {
     // 0xE4, 0xF6, 0xFC, 0xDF in Windows-1252 are äöüß
@@ -139,6 +161,8 @@ fn test_encoding_windows1252_fallback() {
         .any(|w| w.code == WarningCode::EncodingGuessed));
 }
 
+// ANCHOR[contextra-ingest:TST-0434]
+// Testet die Funktionsfaehigkeit von `test_encoding_unicode_tags_removed_and_reported`.
 #[test]
 fn test_encoding_unicode_tags_removed_and_reported() {
     // Input containing Unicode tag character U+E0001
@@ -155,6 +179,8 @@ fn test_encoding_unicode_tags_removed_and_reported() {
 
 // --- RTF SPEZIALTESTS ---
 
+// ANCHOR[contextra-ingest:TST-0435]
+// Testet die Funktionsfaehigkeit von `test_rtf_nesting_depth_limit`.
 #[test]
 fn test_rtf_nesting_depth_limit() {
     // 10,000 nested brackets => LimitExceeded without stack overflow
@@ -183,6 +209,8 @@ fn test_rtf_nesting_depth_limit() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0436]
+// Testet die Funktionsfaehigkeit von `test_rtf_unicode_escapes_and_tables`.
 #[test]
 fn test_rtf_unicode_escapes_and_tables() {
     let rtf_bytes = br#"{\rtf1\ansi\trowd\cell \u20013?\cell \u25991?\row}"#;
@@ -199,6 +227,8 @@ fn test_rtf_unicode_escapes_and_tables() {
         .any(|b| matches!(b.kind, BlockKind::Table(_))));
 }
 
+// ANCHOR[contextra-ingest:TST-0437]
+// Testet die Funktionsfaehigkeit von `test_rtf_hidden_text_policy`.
 #[test]
 fn test_rtf_hidden_text_policy() {
     let rtf_bytes = br#"{\rtf1\ansi Visible text \v Hidden secret\v0  visible again.}"#;

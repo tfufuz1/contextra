@@ -1,15 +1,23 @@
-//! Hardlink cloner for physical SSTable cloning with MVCC pin holding.
+//! # Hardlink-Cloner für physische SSTables mit MVCC-Snapshot-Pinning
 //!
-//! # Architecture & Copy-on-Write
-//! Creates a physical hardlink clone of all visible SSTables for a given sequence number
-//! into a target directory. Holds an active `SnapshotRegistry` pin for the duration of
-//! the cloning process to prevent LSM compaction or garbage collection from removing
-//! SSTables during the clone operation.
+//! Dieses Modul ermöglicht schnelles Klonen von SSTables auf Dateisystem-Ebene via Hardlinks.
 //!
-//! # Copy-on-Write and File Copy Fallback
-//! Hardlinks are preferred for O(1) instantaneous Copy-on-Write SSTable clones. If hardlinks fail
-//! (e.g. across mount points / filesystems, Windows NTFS link limit, or unsupported filesystems),
-//! cloning gracefully falls back to full byte-for-byte file copying (`fs::copy`).
+//! ## Ring & Rolle
+//! Gehört zu **Ring 1 (Persistenz)**. SSTables (Sorted String Tables) sind die unveränderlichen
+//! Datendateien der LSM-Speicherengine. Dieses Modul erlaubt O(1) Copy-on-Write Klone beim
+//! Forking von Agenten-Zuständen.
+//!
+//! ## Architektur & Copy-on-Write
+//! Erzeugt einen physischen Hardlink-Klon aller sichtbaren SSTables einer gegebenen Sequenznummer
+//! in ein Zielverzeichnis. Während des gesamten Klonvorgangs wird ein aktiver Pin in der
+//! [`SnapshotRegistry`] gehalten, damit die LSM-Compaction oder Garbage Collection (GC) keine
+//! SSTables löscht.
+//!
+//! ## Copy-on-Write und Dateikopie-Fallback
+//! Hardlinks werden für blitzschnelle Klone bevorzugt. Schlagen Hardlinks fehl (z. B. über
+//! Partitionen/Mount-Points hinweg, Erreichen des NTFS-Hardlink-Limits unter Windows oder
+//! nicht-unterstützte Dateisysteme), schlägt der Vorgang automatisch auf eine vollständige
+//! Byte-für-Byte-Kopie (`fs::copy`) zurück.
 
 #![allow(unexpected_cfgs)]
 
@@ -77,14 +85,24 @@ mod fs {
     pub struct LoomMetadata;
 }
 
-/// Result structure returned upon completing an SSTable hardlink clone operation.
+// ANCHOR[contextra-checkpoint:CLONE-001]
+/// Ergebnisstruktur einer durchgeführten Hardlink-Klon-Operation für SSTables.
+///
+/// # Zweck
+/// Liefert dem Aufrufer die Sequenznummer sowie die Liste aller erfolgreich verknüpften
+/// oder kopierten Zieldateien.
+///
+/// # Felder
+/// - `source_seq_no`: Die gepinnte und geklonte Quell-Sequenznummer.
+/// - `linked_files`: Liste der im Zielverzeichnis erzeugten Pfade.
+/// - `wal_tail_offset`: Offset im Write-Ahead-Log, ab dem der geklonte Zustand neue Mutationen akzeptiert.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HardlinkCloneResult {
-    /// The source sequence number pinned and cloned.
+    /// Die gepinnte und geklonte Quell-Sequenznummer.
     pub source_seq_no: u64,
-    /// List of target paths created as hardlinks.
+    /// Liste der Zielpfade, die als Hardlinks oder Kopien erzeugt wurden.
     pub linked_files: Vec<PathBuf>,
-    /// WAL tail offset at which the clone begins accepting new mutations.
+    /// WAL-Tail-Offset, an dem der Klon beginnt, neue Mutationen anzunehmen.
     ///
     /// **Known Gap / Backlog Note:**
     /// Real-time WAL tail offset extraction requires active coordination with the WAL manager
@@ -93,16 +111,28 @@ pub struct HardlinkCloneResult {
     pub wal_tail_offset: Option<u64>,
 }
 
-/// Trait defining the physical hardlink cloning interface for SSTables.
+// ANCHOR[contextra-checkpoint:CLONE-002]
+/// Trait für die Schnittstelle zum physischen SSTable-Klonen via Hardlinks.
+///
+/// # Zweck
+/// Abstrahiert das Dateisystem-Klonen für Tests und verschiedene Plattformen.
 ///
 /// # Windows NTFS Limit
-/// On Windows systems, `CreateHardLink` is NTFS-exclusive and capped at **1023 links** per volume file.
-/// Exceeding this limit or linking across different filesystems/mount points will raise
-/// [`ContextraError::CrossDeviceLink`].
+/// Unter Windows ist `CreateHardLink` NTFS-exklusiv und auf maximal **1023 Links** pro Datei limitiert.
+/// Bei Überschreitung oder dateisystemübergreifenden Links wird [`ContextraError::CrossDeviceLink`] gemeldet.
 pub trait CheckpointHardlinkCloner: Send + Sync {
-    /// Clones all SSTable files visible for `seq_no` in `source_dir` into `target_dir` via physical hardlinks.
+    /// Klont alle für `seq_no` sichtbaren SSTable-Dateien im Quellverzeichnis ins Zielverzeichnis.
     ///
-    /// Maintains an active `SnapshotRegistry` pin for `seq_no` during the operation.
+    /// Hält während der Operation einen aktiven `SnapshotRegistry`-Pin auf `seq_no`.
+    ///
+    /// # Parameter
+    /// - `seq_no`: Sequenznummer des MVCC-Snapshots.
+    /// - `source_dir`: Quellverzeichnis mit bestehenden `.sst`-Dateien.
+    /// - `target_dir`: Zielverzeichnis für die Klone.
+    /// - `snapshot_registry`: Referenz auf die MVCC-Snapshot-Registry zum Pinning.
+    ///
+    /// # Fehler
+    /// Gibt einen Fehler zurück bei Dateisystemproblemen oder unauflösbaren Link-Konflikten.
     fn clone_sstable_hardlinks<'a>(
         &'a self,
         seq_no: u64,
@@ -112,18 +142,30 @@ pub trait CheckpointHardlinkCloner: Send + Sync {
     ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>>;
 }
 
-/// Productive implementation of [`CheckpointHardlinkCloner`] using `tokio::fs`.
+// ANCHOR[contextra-checkpoint:CLONE-003]
+/// Produktive Implementierung von [`CheckpointHardlinkCloner`] basierend auf `tokio::fs`.
+///
+/// Nutzt asynchrone Dateisystem-Operationen ohne den Haupt-Thread zu blockieren.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DefaultHardlinkCloner;
 
 impl DefaultHardlinkCloner {
-    /// Creates a new [`DefaultHardlinkCloner`].
+    /// Erzeugt eine neue Instanz von [`DefaultHardlinkCloner`].
     pub fn new() -> Self {
         Self
     }
 }
 
 impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
+    // ANCHOR[contextra-checkpoint:CLONE-004]
+    // Ablauf von `clone_sstable_hardlinks`:
+    // 1. Snapshot in der `SnapshotRegistry` pinnen (_guard verhindert Compactor-Löschung).
+    // 2. Zielverzeichnis anlegen falls noch nicht vorhanden.
+    // 3. Quellverzeichnis nach `.sst`-Dateien durchsuchen.
+    // 4. Für jede Datei bestehende Zieldatei entfernen und Hardlink setzen.
+    // 5. Schlägt der Hardlink fehl, Fallback auf `fs::copy`.
+    // 6. Liegt ein Cross-Device-Fehler vor, fehlerhafte Operation als `cross_device_link` melden.
+    // 7. Zieldateien deterministisch sortieren und Ergebnis zurückgeben.
     fn clone_sstable_hardlinks<'a>(
         &'a self,
         seq_no: u64,
@@ -133,6 +175,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
     ) -> contextra_ports::BoxFuture<'a, Result<HardlinkCloneResult>> {
         Box::pin(async move {
             // 1. Pin snapshot in SnapshotRegistry for the duration of the clone operation
+            // NOTE: Der Guard wird über die gesamte Future gehalten, damit kein GC-Lauf SSTables löscht
             let _guard = snapshot_registry.register(seq_no);
 
             // 2. Ensure target directory exists
@@ -166,6 +209,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
                             let _ = fs::remove_file(&target_path).await;
                         }
 
+                        // NOTE: Hardlink ist O(1). Bei Fehlschlag (z. B. anderes Volume) greift Fallback-Kopie.
                         if let Err(io_err) = fs::hard_link(&path, &target_path).await {
                             tracing::warn!(
                                 source = %path.display(),
@@ -191,6 +235,7 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
             }
 
             // Sort linked files for deterministic output ordering
+            // NOTE: Sortierung sichert plattformunabhängige, reproduzierbare Ergebnislisten
             linked_files.sort();
 
             Ok(HardlinkCloneResult {
@@ -202,13 +247,17 @@ impl CheckpointHardlinkCloner for DefaultHardlinkCloner {
     }
 }
 
-/// Helper function to detect cross-device link errors across OS platforms.
+// ANCHOR[contextra-checkpoint:CLONE-005]
+/// Hilfsfunktion zur Erkennung plattformspezifischer Cross-Device-Link-Fehler (z. B. EXDEV).
+///
+/// # Ablauf:
+/// Prüft sowohl `ErrorKind::CrossesDevices` als auch die systemeigenen Fehlercodes (Unix: 18, Windows: 17).
 fn is_cross_device_error(err: &std::io::Error) -> bool {
     if err.kind() == std::io::ErrorKind::CrossesDevices {
         return true;
     }
     if let Some(code) = err.raw_os_error() {
-        // Unix EXDEV (18), Windows ERROR_NOT_SAME_DEVICE (17)
+        // NOTE: Unix EXDEV (18), Windows ERROR_NOT_SAME_DEVICE (17)
         return code == 18 || code == 17;
     }
     false

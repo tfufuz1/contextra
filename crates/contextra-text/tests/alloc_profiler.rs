@@ -233,8 +233,10 @@ fn generate_english_doc(doc_idx: usize) -> String {
     doc
 }
 
+// ANCHOR[contextra-text:TEST-134]
+// Testfall `run_profile_10k_documents`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
-#[ignore]
+#[ignore = "manuelles Profiling-Harness, 10k Dokumente, nicht Teil des Gates"]
 async fn run_profile_10k_documents() {
     println!("\n================================================================================");
     println!("CONTEXTRA-TEXT ALLOCATION PROFILE & BENCHMARK HARNESS (10,000 DOCS)");
@@ -246,7 +248,7 @@ async fn run_profile_10k_documents() {
     println!("\n--- [1] TOKENIZER DIRECT EVALUATION (10,000 Documents) ---");
 
     // 1a. German Morphological Tokenizer
-    let german_tok = GermanMorphTokenizer::new();
+    let german_tok = GermanMorphTokenizer::try_new().expect("tokenizer init");
     let mut total_words_de = 0usize;
     let mut total_tokens_de = 0usize;
 
@@ -482,4 +484,131 @@ async fn run_profile_10k_documents() {
     );
 
     println!("\n================================================================================");
+}
+
+/// Allocation budget gate for deterministic 500-document workload.
+///
+/// Measured Baseline (Debug Profile, 500 documents each German & English):
+/// - Tokenizer Phase (500 German + 500 English docs):
+///   * Measured Allocs: 17,038,512
+///   * Measured Bytes : 224,902,066 (~214.48 MB)
+/// - Ingestion Phase (500 German docs + 500 English docs into FastRamStorage):
+///   * Measured German Allocs: 17,801,956 | Bytes: 1,341,933,250 (~1279.76 MB)
+///   * Measured English Allocs: 1,119,381 | Bytes: 930,981,878 (~887.85 MB)
+///   * Combined Index Allocs  : 18,921,337 | Bytes: 2,272,915,128 (~2167.62 MB)
+/// - BM25 Search Phase (50 queries against German index):
+///   * Measured Allocs: 213,400
+///   * Measured Bytes : 12,449,980 (~11.87 MB)
+///
+/// Chosen Upper Bounds with Margin (Regel 9: Messen vor Behaupten):
+/// - Tokenizer: 22,000,000 allocs (+29.1% headroom), 300,000,000 bytes (~286 MB, +33.4% headroom)
+/// - Index Pipeline: 24,000,000 allocs (+26.8% headroom), 2,900,000,000 bytes (~2.70 GB, +27.6% headroom)
+/// - BM25 Search: 300,000 allocs (+40.6% headroom), 18,000,000 bytes (~17.17 MB, +44.6% headroom)
+#[tokio::test]
+async fn alloc_budget_gate() {
+    const NUM_DOCS: usize = 500;
+
+    let german_tok = GermanMorphTokenizer::try_new().expect("tokenizer init");
+    let german_docs: Vec<String> = (0..NUM_DOCS).map(generate_german_doc).collect();
+    let english_tok = DefaultTokenizer;
+    let english_docs: Vec<String> = (0..NUM_DOCS).map(generate_english_doc).collect();
+
+    // --- PHASE 1: Tokenizer Budget Gate ---
+    reset_stats();
+    for doc in &german_docs {
+        let _ = german_tok.tokenize(doc);
+    }
+    for doc in &english_docs {
+        let _ = english_tok.tokenize(doc);
+    }
+    let (allocs_tok, _, bytes_tok) = get_stats();
+
+    const MAX_TOKENIZER_ALLOCS: u64 = 22_000_000;
+    const MAX_TOKENIZER_BYTES: u64 = 300_000_000;
+    assert!(
+        allocs_tok <= MAX_TOKENIZER_ALLOCS,
+        "Tokenizer allocations ({}) exceeded budget limit ({})",
+        allocs_tok,
+        MAX_TOKENIZER_ALLOCS
+    );
+    assert!(
+        bytes_tok <= MAX_TOKENIZER_BYTES,
+        "Tokenizer byte volume ({}) exceeded budget limit ({})",
+        bytes_tok,
+        MAX_TOKENIZER_BYTES
+    );
+
+    // --- PHASE 2: Inverted Index Pipeline Budget Gate ---
+    let storage_de = Arc::new(FastRamStorage::new());
+    let index_de =
+        InvertedIndex::new_with_language(storage_de.clone(), "de_gate", Language::German);
+
+    let storage_en = Arc::new(FastRamStorage::new());
+    let index_en = InvertedIndex::new(storage_en.clone(), "en_gate");
+
+    reset_stats();
+    for (i, doc) in german_docs.iter().enumerate() {
+        let tx = TxId::new((i + 1) as u64);
+        let doc_id = DocId::new((i + 1) as u64);
+        index_de
+            .insert(tx, doc_id, doc)
+            .await
+            .expect("insert succeeds");
+        index_de.commit(tx).await.expect("commit succeeds");
+    }
+    for (i, doc) in english_docs.iter().enumerate() {
+        let tx = TxId::new((i + 1) as u64);
+        let doc_id = DocId::new((i + 1) as u64);
+        index_en
+            .insert(tx, doc_id, doc)
+            .await
+            .expect("insert succeeds");
+        index_en.commit(tx).await.expect("commit succeeds");
+    }
+    let (allocs_idx, _, bytes_idx) = get_stats();
+
+    const MAX_INDEX_ALLOCS: u64 = 24_000_000;
+    const MAX_INDEX_BYTES: u64 = 2_900_000_000;
+    assert!(
+        allocs_idx <= MAX_INDEX_ALLOCS,
+        "Index pipeline allocations ({}) exceeded budget limit ({})",
+        allocs_idx,
+        MAX_INDEX_ALLOCS
+    );
+    assert!(
+        bytes_idx <= MAX_INDEX_BYTES,
+        "Index pipeline byte volume ({}) exceeded budget limit ({})",
+        bytes_idx,
+        MAX_INDEX_BYTES
+    );
+
+    // --- PHASE 3: BM25 Search Budget Gate ---
+    let queries = [
+        "Bundesverfassungsgericht Datenschutzrichtlinie",
+        "Arbeitsvertrag Gehalt Urlaubsansprüche",
+        "Qualitätsmanagementsystem Auftragsbestätigung",
+        "Vektorsuche hybrides Indexing",
+        "Lagerbestandsverwaltung Lieferkette",
+    ];
+    reset_stats();
+    for i in 0..50 {
+        let q = queries[i % queries.len()];
+        let _ = index_de.search(q, 10).await.expect("search succeeds");
+    }
+    let (allocs_search, _, bytes_search) = get_stats();
+
+    const MAX_SEARCH_ALLOCS: u64 = 300_000;
+    const MAX_SEARCH_BYTES: u64 = 18_000_000;
+    assert!(
+        allocs_search <= MAX_SEARCH_ALLOCS,
+        "Search allocations ({}) exceeded budget limit ({})",
+        allocs_search,
+        MAX_SEARCH_ALLOCS
+    );
+    assert!(
+        bytes_search <= MAX_SEARCH_BYTES,
+        "Search byte volume ({}) exceeded budget limit ({})",
+        bytes_search,
+        MAX_SEARCH_BYTES
+    );
 }

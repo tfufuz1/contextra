@@ -1,3 +1,7 @@
+//! # Kontext-Kompaktierungs-Wiederholungs- und Fehlertests
+//!
+//! Prüft Retry-Strategien und Fehlerbehandlung bei der Kompaktierung langer Konversationsverläufe.
+//!
 use contextra_db::{
     cleanup_orphaned_consolidation_intents, ContextCompactor, Contextra, ContextraConfig,
 };
@@ -14,6 +18,8 @@ struct MockLlmGenerator {
 }
 
 impl MockLlmGenerator {
+    // ANCHOR[contextra-db:TEST-CONTEXT_COMPACTION_RETRY_TEST-01-NEW]
+    // Testet die Funktionalität von `new`.
     fn new() -> Self {
         Self {
             call_count: Arc::new(AtomicUsize::new(0)),
@@ -22,6 +28,8 @@ impl MockLlmGenerator {
 }
 
 impl LlmTextGenerator for MockLlmGenerator {
+    // ANCHOR[contextra-db:TEST-CONTEXT_COMPACTION_RETRY_TEST-02-GENERATE]
+    // Testet die Funktionalität von `generate`.
     fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, Result<String>> {
         Box::pin(async move {
             self.call_count.fetch_add(1, Ordering::SeqCst);
@@ -38,6 +46,8 @@ struct MutatingLlmGenerator<S: StorageEngine, V: VectorIndex> {
 }
 
 impl<S: StorageEngine, V: VectorIndex> LlmTextGenerator for MutatingLlmGenerator<S, V> {
+    // ANCHOR[contextra-db:TEST-CONTEXT_COMPACTION_RETRY_TEST-03-GENERATE]
+    // Testet die Funktionalität von `generate`.
     fn generate<'a>(&'a self, _prompt: &'a str) -> BoxFuture<'a, Result<String>> {
         Box::pin(async move {
             let count = self.call_count.fetch_add(1, Ordering::SeqCst);
@@ -56,6 +66,8 @@ impl<S: StorageEngine, V: VectorIndex> LlmTextGenerator for MutatingLlmGenerator
     }
 }
 
+// ANCHOR[contextra-db:TEST-CONTEXT_COMPACTION_RETRY_TEST-04-TEST_CONFIG]
+// Testet die Funktionalität von `test_config`.
 fn test_config() -> ContextraConfig {
     ContextraConfig {
         dimension: 4,
@@ -63,6 +75,8 @@ fn test_config() -> ContextraConfig {
     }
 }
 
+// ANCHOR[contextra-db:TEST-CONTEXT_COMPACTION_RETRY_TEST-05-TEST_CONSOLIDATE_WITH_RETRY_SUCCEEDS_ON_FIRST_ATTEMPT]
+// Testet die Funktionalität von `test_consolidate_with_retry_succeeds_on_first_attempt`.
 #[tokio::test]
 async fn test_consolidate_with_retry_succeeds_on_first_attempt() -> Result<()> {
     let tmp = tempfile::tempdir()?;
@@ -103,6 +117,8 @@ async fn test_consolidate_with_retry_succeeds_on_first_attempt() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-db:TEST-CONTEXT_COMPACTION_RETRY_TEST-06-TEST_CONSOLIDATE_WITH_RETRY_RETRIES_ON_OCC_CONFLICT]
+// Testet die Funktionalität von `test_consolidate_with_retry_retries_on_occ_conflict`.
 #[tokio::test]
 async fn test_consolidate_with_retry_retries_on_occ_conflict() -> Result<()> {
     let tmp = tempfile::tempdir()?;
@@ -141,6 +157,8 @@ async fn test_consolidate_with_retry_retries_on_occ_conflict() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-db:TEST-CONTEXT_COMPACTION_RETRY_TEST-07-TEST_CONSOLIDATE_WITH_RETRY_FAILS_AFTER_MAX_RETRIES]
+// Testet die Funktionalität von `test_consolidate_with_retry_fails_after_max_retries`.
 #[tokio::test]
 async fn test_consolidate_with_retry_fails_after_max_retries() -> Result<()> {
     let tmp = tempfile::tempdir()?;
@@ -188,6 +206,8 @@ async fn test_consolidate_with_retry_fails_after_max_retries() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-db:TEST-CONTEXT_COMPACTION_RETRY_TEST-08-TEST_CLEANUP_ORPHANED_INTENTS_REMOVES_STALE_KEYS]
+// Testet die Funktionalität von `test_cleanup_orphaned_intents_removes_stale_keys`.
 #[tokio::test]
 async fn test_cleanup_orphaned_intents_removes_stale_keys() -> Result<()> {
     let tmp = tempfile::tempdir()?;

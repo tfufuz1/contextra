@@ -1,18 +1,38 @@
+//! # Konformitätsprüfsuite für den `VectorIndex`-Port (`conformance/vector`)
+//!
+//! Dieses Modul testet die vertraglichen Zusicherungen (Contract Invariants)
+//! für Vektorindizes des [`contextra_ports::VectorIndex`]-Ports.
+//!
+//! ## Getestete Verträge
+//! 1. **Distanz- und Relevanzordnung:** Näher liegende Vektoren erhalten höhere Scores und erscheinen zuerst.
+//! 2. **Löschung & Tombstone-Konsistenz:** Gelöschte Dokumente dürfen weder in `search` noch in `all_doc_ids` auftauchen.
+//! 3. **Upsert-Verhalten:** Erneutes Einfügen derselben `DocId` aktualisiert den Vektor ohne Duplizierung in `len`.
+//! 4. **Dimensionsprüfung:** Abweichende Vektorlängen bei `insert` und `search` müssen abgewiesen werden.
+//! 5. **NaN-Zurückweisung:** Ungültige Fließkommazahlen (`f32::NAN`) müssen fail-closed abgewiesen werden.
+//! 6. **Top-k größer als Index:** Liefert alle verfügbaren Elemente ohne Indexgrenzenfehler (Out-of-Bounds).
+//! 7. **Extremwerte für DocId:** Unterstützt den gesamten 64-Bit-Wertebereich (`u64::MAX - 1`).
+
 use super::failure::{ConformanceFailure, ConformanceResult};
 use contextra_ports::VectorIndex;
 use contextra_types::{DocId, TxId};
 use std::future::Future;
 
-/// Runs the complete conformance test suite for a [`VectorIndex`] implementation.
+// ANCHOR[contextra-testkit:CONF-VECTOR-SUITE-001]
+/// Führt die vollständige Konformitätsprüfung für eine [`VectorIndex`]-Implementierung durch.
 ///
-/// # Contract Requirements Tested
-/// 1. Insert & Search distance ordering: items closer to query score higher and appear first.
-/// 2. Deletion & Tombstone consistency: deleted docs do not appear in `search` or `all_doc_ids`.
-/// 3. Upsert: re-inserting same `DocId` updates its vector without duplicating `len`.
-/// 4. Dimension mismatch rejection: returning an error if vector length differs from index dimension.
-/// 5. NaN rejection: returning an error if embedding contains `f32::NAN`.
-/// 6. Search `k` larger than index size: returns all available items without out-of-bounds error.
-/// 7. Support for full range of `DocId`s.
+/// **Parameter:**
+/// - `factory`: Asynchrone Closure, die eine frische Vektorindex-Instanz erzeugt.
+///
+/// **Ablauf:**
+/// 1. Test 1: Distanzordnung bei Vektorsuche prüfen (nähere Vektoren zuerst).
+/// 2. Test 2: Tombstone-Konsistenz nach dem Löschen prüfen.
+/// 3. Test 3: Upsert-Aktualisierung bestehender Dokumenten-IDs.
+/// 4. Test 4: Ablehnung von Vektoren mit Dimensionskonflikten.
+/// 5. Test 5: Ablehnung von nicht-endlichen Werten (`NaN`).
+/// 6. Test 6: Stabilität bei `k > anzahl_dokumente`.
+/// 7. Test 7: Unterstützung großer `DocId`-Werte.
+///
+/// **Rückgabe:** `Ok(())` bei Erfolg, `Err(ConformanceFailure)` bei Abweichung.
 pub async fn run_vector_index_suite<F, Fut, V>(factory: F) -> ConformanceResult
 where
     F: Fn() -> Fut,

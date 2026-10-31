@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `chunk_paged_acceptance.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Akzeptanztests und Zitierbarkeitstests für PagedChunker (WP-ING-14).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic, clippy::cast_possible_truncation)]
@@ -24,6 +30,8 @@ fn slide_loc(slide: u32) -> Locator {
     loc
 }
 
+// ANCHOR[contextra-ingest:TST-0307]
+// Testet die Funktionsfaehigkeit von `test_header_footer_note_isolation`.
 #[test]
 fn test_header_footer_note_isolation() {
     let mut ir = DocumentIr::new(FormatId::Pdf);
@@ -78,6 +86,8 @@ fn test_header_footer_note_isolation() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0308]
+// Testet die Funktionsfaehigkeit von `test_pdf_40_small_pages_merged`.
 #[test]
 fn test_pdf_40_small_pages_merged() {
     let mut ir = DocumentIr::new(FormatId::Pdf);
@@ -109,6 +119,8 @@ fn test_pdf_40_small_pages_merged() {
     assert_eq!(&canon.text[drafts[0].span.clone()], drafts[0].text);
 }
 
+// ANCHOR[contextra-ingest:TST-0309]
+// Testet die Funktionsfaehigkeit von `test_pdf_6000_tokens_large_page_parts`.
 #[test]
 fn test_pdf_6000_tokens_large_page_parts() {
     let mut ir = DocumentIr::new(FormatId::Pdf);
@@ -147,6 +159,8 @@ fn test_pdf_6000_tokens_large_page_parts() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0310]
+// Testet die Funktionsfaehigkeit von `test_cross_page_paragraph_join`.
 #[test]
 fn test_cross_page_paragraph_join() {
     let mut ir = DocumentIr::new(FormatId::Pdf);
@@ -204,6 +218,8 @@ fn test_cross_page_paragraph_join() {
     assert_eq!(drafts_no_join[1].locator.page, Some(2));
 }
 
+// ANCHOR[contextra-ingest:TST-0311]
+// Testet die Funktionsfaehigkeit von `test_bookmark_hierarchy_across_pages`.
 #[test]
 fn test_bookmark_hierarchy_across_pages() {
     let mut ir = DocumentIr::new(FormatId::Pdf);
@@ -277,6 +293,8 @@ fn test_bookmark_hierarchy_across_pages() {
     assert_eq!(drafts[2].breadcrumb.as_deref(), Some("# Kapitel 2"));
 }
 
+// ANCHOR[contextra-ingest:TST-0312]
+// Testet die Funktionsfaehigkeit von `test_presentation_slides_and_notes`.
 #[test]
 fn test_presentation_slides_and_notes() {
     let mut ir = DocumentIr::new(FormatId::Pptx);
@@ -344,6 +362,8 @@ fn test_presentation_slides_and_notes() {
     assert_eq!(drafts_no_notes.len(), 21);
 }
 
+// ANCHOR[contextra-ingest:TST-0313]
+// Testet die Funktionsfaehigkeit von `test_empty_pages_produce_no_chunks`.
 #[test]
 fn test_empty_pages_produce_no_chunks() {
     let mut ir = DocumentIr::new(FormatId::Pdf);
@@ -378,6 +398,8 @@ fn test_empty_pages_produce_no_chunks() {
     assert_eq!(drafts[0].locator.page, Some(2));
 }
 
+// ANCHOR[contextra-ingest:TST-0314]
+// Testet die Funktionsfaehigkeit von `test_large_table_splitting_and_headers`.
 #[test]
 fn test_large_table_splitting_and_headers() {
     let mut ir = DocumentIr::new(FormatId::Pdf);
@@ -440,6 +462,8 @@ impl LcgRng {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0315]
+// Testet die Funktionsfaehigkeit von `test_citation_accuracy_200_snippets`.
 #[test]
 fn test_citation_accuracy_200_snippets() {
     let mut ir = DocumentIr::new(FormatId::Pdf);

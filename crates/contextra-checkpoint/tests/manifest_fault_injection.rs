@@ -9,6 +9,10 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
+//! # Integrationstest: Fehlereinschleusung in Manifeste
+//!
+//! Simuliert Dateibeschädigung und unvollständige Schreibvorgänge in Checkpoint-Manifesten.
+
 use contextra_checkpoint::{CheckpointManifest, CheckpointMeta};
 use contextra_types::TxId;
 

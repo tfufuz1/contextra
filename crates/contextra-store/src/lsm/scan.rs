@@ -1,3 +1,7 @@
+//! # Bereichsscans im LSM-Tree (Ring 1)
+//!
+//! Merged Iteratoren ueber MemTable und SSTables mit Snapshot-Sichtbarkeit.
+
 use super::*;
 use crate::memtable::is_valid_range_bounds;
 use contextra_types::{Result, TOMBSTONE_BIT};

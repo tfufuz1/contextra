@@ -1,3 +1,6 @@
+//! Integrations-Testsuite für Typ-basierte Mandanten-Isolation (TenantScoped).
+//! Garantiert, dass Werte nicht ohne die korrekte TenantId entpackt werden können.
+
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use contextra_types::{TenantId, TenantScopeViolation, TenantScoped};

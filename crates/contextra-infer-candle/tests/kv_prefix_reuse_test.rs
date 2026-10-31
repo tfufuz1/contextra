@@ -3,6 +3,12 @@
 // ZWECK: Integration test suite for KV cache stage B prefix reuse, counters, and tenant isolation (Spec §9.2).
 // INVARIANTEN: No .unwrap() / .expect() in production code; `#![cfg(feature = "kv-stage-b")]` test gates.
 
+//! Integrations-Testsuite für KV-Cache-Präfix-Wiederverwendung (Stage B, Spec §9.2).
+//!
+//! # Zweck
+//! Prüft Prefill-Überspringen, Cache-Hits, Telemetrie-Zähler und Mandanten-Isolation beim KV-Reuse.
+
+// ANCHOR[contextra-infer-candle:TEST-KV-PREFIX-REUSE-SUITE]
 #![cfg(feature = "kv-stage-b")]
 
 use candle_core::Device;

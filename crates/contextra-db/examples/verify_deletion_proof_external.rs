@@ -1,12 +1,13 @@
 //! # Externe Verifizierbarkeit von Löschnachweisen (AK-20)
 //!
+//! # Zweck des Beispiels
 //! Dieses Beispiel demonstriert die **externe Verifizierbarkeit** von DSGVO-Art.-17-Löschnachweisen
-//! (`DeletionProof`) durch unbeteiligte Dritte (Third-Party Verifiers) gemäß
+//! ([`DeletionProof`]) durch unbeteiligte Dritte (Third-Party Verifiers) gemäß
 //! `CONTEXTRA_SPEC_2_.md` §2.5.1 ("Sovereign Ring vs. Third-Party Attestation") und §15.6.
 //!
 //! ## Kernkonzept
 //! Ein Löschbeweis, den niemand außer dem Hersteller lesen oder verifizieren kann, ist eine bloße
-//! Selbstattestierung. Contextra stellt deshalb Ed25519-signierte Löschnachweise (Version 3) bereit,
+//! Selbstattestierung. Contextra stellt deshalb Ed25519-signierte Löschnachweise bereit,
 //! die von jedem unabhängigen Dritten ohne Zugriff auf die Contextra-Instanz, deren Storage-Backends,
 //! oder deren internen `KeyManager` eigenständig mathematisch verifiziert werden können.
 //!
@@ -31,13 +32,14 @@ use tempfile::TempDir;
 // FREISTEHENDE EXTERNE PRÜFFUNKTION (AK-20)
 // =========================================================================
 
-/// Externe Verifikationsfunktion für unabhängige Dritte (Rolle b: Externer Prüfer).
+// ANCHOR[contextra-db:EXAMPLE-PROOF-001]
+/// Externe Verifikationsfunktion für unabhängige Dritte (Rolle: Externer Prüfer).
 ///
-/// ABHÄNGIGKEIT & CODE-STRUKTUR:
-/// Diese Funktion hat nachweislich KEINEN Zugriff auf Contextra-DB-, Collection- oder
-/// KeyManager-Instanzen. Sie nimmt ausschliesslich den `DeletionProof` und den
-/// öffentlichen Ed25519 `VerifyingKey` entgegen und ist somit strikt von der Betreiber-
-/// und Storage-Ebene isoliert.
+/// # Abhängigkeiten & Architektur
+/// Diese Funktion hat nachweislich **keinen** Zugriff auf Contextra-DB-, Collection- oder
+/// KeyManager-Instanzen. Sie nimmt ausschließlich den [`DeletionProof`] und den
+/// öffentlichen Ed25519-Prüfschlüssel ([`VerifyingKey`]) entgegen und ist somit strikt
+/// von der internen Persistenz- und Storage-Ebene isoliert.
 fn verify_external(proof: &DeletionProof, verifying_key: &VerifyingKey) -> Result<(), CryptoError> {
     let is_valid = proof
         .verify(verifying_key)
@@ -57,7 +59,8 @@ fn verify_external(proof: &DeletionProof, verifying_key: &VerifyingKey) -> Resul
 // ROLLE: Contextra-Betreiber (Operator)
 // =========================================================================
 
-/// Simuliert die Betreiber-Rolle: Erzeugt Daten, führt Löschung durch und erzeugt Löschnachweis.
+// ANCHOR[contextra-db:EXAMPLE-PROOF-002]
+/// Simuliert die Betreiber-Rolle: Erzeugt Daten, führt Löschung durch und exportiert den Löschnachweis.
 #[allow(deprecated)]
 async fn run_operator_role(
     proof_file_path: &Path,
@@ -149,6 +152,7 @@ async fn run_operator_role(
 // ROLLE: Externer Prüfer (Third-Party Verifier)
 // =========================================================================
 
+// ANCHOR[contextra-db:EXAMPLE-PROOF-003]
 /// Simuliert den externen Prüfer: Liest AUSSCHLIESSLICH die Proof-Datei und den öffentlichen Schlüssel von Disk.
 fn run_external_verifier_role(
     proof_file_path: &Path,
@@ -206,6 +210,8 @@ fn run_external_verifier_role(
 // MAIN ENTRYPOINT
 // =========================================================================
 
+// ANCHOR[contextra-db:EXAMPLE-PROOF-004]
+/// Hauptprogramm: Führt nacheinander einen Positivtest (gültiger Beweis) und einen Negativtest (manipulierter Beweis) durch.
 #[tokio::main]
 async fn main() -> contextra_types::Result<()> {
     println!("=========================================================================");

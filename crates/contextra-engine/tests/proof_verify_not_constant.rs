@@ -1,9 +1,17 @@
+//! # Integrationstest: proof verify not constant
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 use contextra_crypto::deletion_proof::{CustodyLevel, DeletionProof};
 use contextra_ports::scanner::ScanTechnique;
 use contextra_ports::SystemClock;
 use contextra_testkit::mint_witness_for_tests;
 use contextra_types::{RequestContext, SagaRecord, TenantId, TxId};
 
+// ANCHOR[contextra-engine:TST29-001]
+/// Testblock zur Überprüfung von `test_proof_verify_with_wrong_key_fails`.
 #[test]
 fn test_proof_verify_with_wrong_key_fails() {
     let clock = SystemClock::new();

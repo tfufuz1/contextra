@@ -3,19 +3,34 @@
 // INVARIANTEN: Restmengen ergeben verified == false; Nachweis entsteht nur bei unabhängiger Messung aller Schichten.
 // NICHT-OFFENSICHTLICH: Rohdaten-Needle-Scans verifizieren die Unabhängigkeit der Schichten-Scans gegenüber physischen Disk-Dateien.
 
+//! # Integrationstest: `deletion_chain_e2e`
+//!
+//! Überprüft die vollständige Fail-Closed-Löschkette (Erasure & DeletionProof) über die Fassade.
+//!
+//! Enthält 7 umfassende Szenarien:
+//! 1. `test_scenario_1_attrappe_entlarvt`: Restmengen im Speicher führen zu `verified == false` und verweigern den Löschnachweis.
+//! 2. `test_scenario_2_voller_pfad`: Vollständiger Pfad über alle Speicherschichten (Memtable, SSTables, WAL, HNSW, Text).
+//! 3. `test_scenario_3_rohdaten_needle`: Byteweise Festplattendurchsuchung stellt sicher, dass keine Reste verbleiben.
+//! 4. `test_scenario_4_mehrere_level_und_neustart`: Löschung über mehrere LSM-Level hinweg nach Prozess-Neustart.
+//! 5. `test_scenario_5_collection_loeschung`: Vollständiges Löschen ganzer Collections und Bereinigung der Registry.
+//! 6. `test_scenario_6_fehlender_schluessel`: Abbruch vor Datensatzmutation bei fehlendem Signaturschlüssel.
+//! 7. `test_scenario_7_offener_snapshot_blockiert_purge`: MVCC-Snapshot-Isolation verhindert vorzeitiges Purgen aktiver Datenstände.
+
 use contextra::{builder, open_with_config, ContextraConfig};
-use contextra_core::{ContextraError, TenantId};
 use contextra_db::engine::ProofKeyProvider;
 use contextra_db::EmbeddingBackend;
 use contextra_ports::scanner::{PurgeStats, Purger, ScanTarget};
 use contextra_ports::StorageEngine;
 use contextra_types::RequestContext;
+use contextra_types::{ContextraError, TenantId};
 use serde_json::json;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra:TEST-DCE-001]
+/// Test-Implementierung für `ProofKeyProvider`, die einen festen Schlüssel liefert.
 struct TestProofKeyProvider(Vec<u8>);
 
 impl ProofKeyProvider for TestProofKeyProvider {
@@ -24,6 +39,7 @@ impl ProofKeyProvider for TestProofKeyProvider {
     }
 }
 
+// ANCHOR[contextra:TEST-DCE-002]
 /// Sabotierter Purger für Szenario 1, der absichtlich Restdaten im Speicher zurücklässt.
 struct SabotagedPurger;
 
@@ -38,6 +54,7 @@ impl Purger for SabotagedPurger {
     }
 }
 
+// ANCHOR[contextra:TEST-DCE-003]
 /// Rekursive Suche nach Vorkommen von `needle` in allen Dateien im Verzeichnis `dir`.
 fn count_bytes_occurrences(dir: &Path, needle: &[u8]) -> usize {
     let mut matches = 0;
@@ -58,6 +75,8 @@ fn count_bytes_occurrences(dir: &Path, needle: &[u8]) -> usize {
     matches
 }
 
+// ANCHOR[contextra:TEST-DCE-004]
+/// Erstellt eine minimale Standard-Testkonfiguration ohne Embedding-Backend oder Konsolidierung.
 fn test_config(dimension: usize) -> ContextraConfig {
     ContextraConfig {
         dimension,
@@ -67,6 +86,7 @@ fn test_config(dimension: usize) -> ContextraConfig {
     }
 }
 
+// ANCHOR[contextra:TEST-DCE-005]
 /// Szenario 1: Attrappe wird entlarvt
 /// Dokument einfügen (Text plus Vektor), logisch löschen ohne Purge;
 /// `erase_*` mit einem Purger, der einen Rest absichtlich lässt,
@@ -140,6 +160,7 @@ async fn test_scenario_1_attrappe_entlarvt() -> std::result::Result<(), Contextr
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-DCE-006]
 /// Szenario 2: Voller Pfad
 /// Builder → insert → erase_document: verified == true,
 /// jede Schicht (LsmMemtable, SsTableAllLevels, WalAllSegments, HnswIndex, TextIndex) hat
@@ -228,6 +249,7 @@ async fn test_scenario_2_voller_pfad() -> std::result::Result<(), ContextraError
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-DCE-007]
 /// Szenario 3: Rohdaten-Needle
 /// Vor dem Löschen eine eindeutige Zeichenkette im Dokument.
 /// Nach dem Löschen durchsucht der Test das gesamte Datenverzeichnis byteweise
@@ -295,6 +317,7 @@ async fn test_scenario_3_rohdaten_needle() -> std::result::Result<(), ContextraE
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-DCE-008]
 /// Szenario 4: Mehrere Level und Neustart
 /// Daten über mehrere Level verteilen, Prozess-Neustart (Reopen), dann löschen.
 /// Gleiche Erwartung wie in Szenario 2. Nach erneutem Reopen taucht das Dokument nirgends auf.
@@ -405,6 +428,7 @@ async fn test_scenario_4_mehrere_level_und_neustart() -> std::result::Result<(),
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-DCE-009]
 /// Szenario 5: Collection-Löschung
 /// erase_collection mit mehreren Dokumenten, danach Registry-Eintrag weg,
 /// Datenverzeichnis ohne Needles.
@@ -473,6 +497,7 @@ async fn test_scenario_5_collection_loeschung() -> std::result::Result<(), Conte
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-DCE-010]
 /// Szenario 6: Fehlender Schlüssel
 /// Fehler vor Mutation, Dokument noch vorhanden.
 #[tokio::test(flavor = "multi_thread")]
@@ -511,6 +536,7 @@ async fn test_scenario_6_fehlender_schluessel() -> std::result::Result<(), Conte
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-DCE-011]
 /// Szenario 7: Offener Snapshot
 /// Offener Snapshot blockiert den Purge: Ergebnis ist Err oder verified == false mit klarem Grund, nie ein Proof.
 #[tokio::test(flavor = "multi_thread")]

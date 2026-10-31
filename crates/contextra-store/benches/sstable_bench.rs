@@ -1,3 +1,7 @@
+//! # Benchmark: SSTable Lese- und Scan-Geschwindigkeit
+//!
+//! Bewertet Durchsatz beim sequentiellen Scannen und wahlfreien Zugriff auf SSTables.
+
 use contextra_store::sstable::{create_block_cache, SstableBuilder, SstableReader};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use tempfile::TempDir;

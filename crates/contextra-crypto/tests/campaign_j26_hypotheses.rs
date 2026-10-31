@@ -1,3 +1,8 @@
+//! # Integrationstest: `campaign_j26_hypotheses.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_j26_hypotheses`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Campaign J-26 hypothesis test suite for crypto compliance, revocation logs, audit chains, commitments, and deletion proofs.
 // INVARIANTEN: Zero-Panic doctrine in non-test code, fail-closed revocation checks, length-prefixed deletion proof hashes, and Blake3 audit chain integrity.
@@ -18,13 +23,73 @@ use contextra_crypto::{
     kv_shredding::KeyRegistry,
     revocation_log::{RevocationLog, RevocationTarget},
 };
-use contextra_ports::SystemClock;
-use contextra_types::{DocId, TenantId, TxId};
+use contextra_ports::{SystemClock, Vfs};
+use contextra_types::{ContextraError, DocId, TenantId, TxId};
 use ed25519_dalek::SigningKey;
 use rand::{rngs::OsRng, RngCore};
 use std::collections::HashSet;
+use std::path::Path;
 use std::sync::Arc;
 use tempfile::NamedTempFile;
+
+/// Lokale Vfs-Implementierung delegierend an std::fs für Integrationstests
+#[derive(Debug, Default)]
+struct StdTestVfs;
+
+impl Vfs for StdTestVfs {
+    fn read(&self, path: &Path) -> contextra_ports::Result<Vec<u8>> {
+        std::fs::read(path).map_err(ContextraError::Io)
+    }
+
+    fn write_atomic(&self, path: &Path, data: &[u8]) -> contextra_ports::Result<()> {
+        let parent = path.parent().unwrap_or_else(|| Path::new("."));
+        let mut temp_file =
+            tempfile::NamedTempFile::new_in(parent).map_err(|e| ContextraError::Io(e.into()))?;
+        use std::io::Write;
+        temp_file.write_all(data).map_err(ContextraError::Io)?;
+        temp_file.as_file().sync_all().map_err(ContextraError::Io)?;
+        temp_file
+            .persist(path)
+            .map_err(|e| ContextraError::Io(e.error))?;
+        let _ = self.sync_dir(parent);
+        Ok(())
+    }
+
+    fn create_dir_all(&self, path: &Path) -> contextra_ports::Result<()> {
+        std::fs::create_dir_all(path).map_err(ContextraError::Io)
+    }
+
+    fn remove_file(&self, path: &Path) -> contextra_ports::Result<()> {
+        std::fs::remove_file(path).map_err(ContextraError::Io)
+    }
+
+    fn exists(&self, path: &Path) -> contextra_ports::Result<bool> {
+        Ok(path.exists())
+    }
+
+    fn len(&self, path: &Path) -> contextra_ports::Result<u64> {
+        let meta = std::fs::metadata(path).map_err(ContextraError::Io)?;
+        Ok(meta.len())
+    }
+
+    fn list_dir(&self, path: &Path) -> contextra_ports::Result<Vec<String>> {
+        let mut entries = Vec::new();
+        for entry in std::fs::read_dir(path).map_err(ContextraError::Io)? {
+            let entry = entry.map_err(ContextraError::Io)?;
+            if let Some(name) = entry.file_name().to_str() {
+                entries.push(name.to_string());
+            }
+        }
+        Ok(entries)
+    }
+
+    fn sync_dir(&self, path: &Path) -> contextra_ports::Result<()> {
+        if let Ok(dir) = std::fs::File::open(path) {
+            let _ = dir.sync_all();
+        }
+        Ok(())
+    }
+}
 
 fn test_ed25519_keypair() -> (SigningKey, ed25519_dalek::VerifyingKey) {
     let sk = SigningKey::generate(&mut OsRng);
@@ -42,9 +107,10 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     let log_path = tmp_file.path().to_path_buf();
     let (sk, vk) = test_ed25519_keypair();
     let clock = Arc::new(SystemClock::new());
+    let vfs: Arc<dyn Vfs> = Arc::new(StdTestVfs);
 
     let rev_log = Arc::new(
-        RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk)
+        RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), Some(sk), vk)
             .expect("open revocation log"),
     );
 
@@ -77,7 +143,8 @@ fn test_h1_key_registry_revoke_group_missing_log_persistence() {
     drop(rev_log);
 
     let reloaded_log = Arc::new(
-        RevocationLog::open_or_create(&log_path, clock, None, vk).expect("reload revocation log"),
+        RevocationLog::open_or_create(vfs, &log_path, clock, None, vk)
+            .expect("reload revocation log"),
     );
     let new_registry = KeyRegistry::new().with_revocation_log(reloaded_log.clone());
 
@@ -94,9 +161,11 @@ fn test_h1_demonstrate_coupling_between_registry_and_revocation_log() {
     let log_path = tmp_file.path().to_path_buf();
     let (sk, vk) = test_ed25519_keypair();
     let clock = Arc::new(SystemClock::new());
+    let vfs: Arc<dyn Vfs> = Arc::new(StdTestVfs);
 
     let rev_log = Arc::new(
-        RevocationLog::open_or_create(&log_path, clock, Some(sk), vk).expect("open revocation log"),
+        RevocationLog::open_or_create(vfs, &log_path, clock, Some(sk), vk)
+            .expect("open revocation log"),
     );
 
     let km = KeyManager::try_new("test-passphrase-h1-demo", b"salt-h1").expect("keymanager");
@@ -236,19 +305,21 @@ fn test_h2_revocation_cascade_isolation_and_resurrection_prevention() {
 fn test_h3_revocation_log_tamper_matrix() {
     let (sk, vk) = test_ed25519_keypair();
     let clock = Arc::new(SystemClock::new());
+    let vfs: Arc<dyn Vfs> = Arc::new(StdTestVfs);
 
     // Construct a log with 10 entries for thorough sampling
     let tmp_file = NamedTempFile::new().expect("tempfile");
     let log_path = tmp_file.path().to_path_buf();
 
-    let log = RevocationLog::open_or_create(&log_path, clock.clone(), Some(sk), vk).expect("log");
+    let log = RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), Some(sk), vk)
+        .expect("log");
     for i in 0..10 {
         log.append(RevocationTarget::Group(i)).expect("append");
     }
     assert_eq!(log.len(), 10);
     assert!(log.verify_integrity().is_ok());
 
-    let original_bytes = std::fs::read(&log_path).expect("read raw log bytes");
+    let original_bytes = vfs.read(&log_path).expect("read raw log bytes");
     let parsed_entries: Vec<contextra_crypto::revocation_log::RevocationEntry> =
         bincode::deserialize(&original_bytes).expect("deserialize entries");
 
@@ -263,8 +334,9 @@ fn test_h3_revocation_log_tamper_matrix() {
             tampered[idx] ^= 1 << bit_shift;
 
             // Write tampered bytes directly to disk file and test open_or_create
-            std::fs::write(&log_path, &tampered).expect("write tampered");
-            match RevocationLog::open_or_create(&log_path, clock.clone(), None, vk) {
+            vfs.write_atomic(&log_path, &tampered)
+                .expect("write tampered");
+            match RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk) {
                 Err(_) => detected_tamper += 1,
                 Ok(reopened_log) => {
                     // If open_or_create succeeded, check if the 10 entries are still intact and verified.
@@ -279,7 +351,8 @@ fn test_h3_revocation_log_tamper_matrix() {
         }
     }
     // Restore original file
-    std::fs::write(&log_path, &original_bytes).expect("restore");
+    vfs.write_atomic(&log_path, &original_bytes)
+        .expect("restore");
 
     assert_eq!(
         detected_tamper, total_flips,
@@ -291,10 +364,10 @@ fn test_h3_revocation_log_tamper_matrix() {
         let mut tampered_entries = parsed_entries.clone();
         tampered_entries.remove(delete_idx);
         let tampered_bytes = bincode::serialize(&tampered_entries).expect("serialize");
-        std::fs::write(&log_path, &tampered_bytes).expect("write");
+        vfs.write_atomic(&log_path, &tampered_bytes).expect("write");
 
         assert!(
-            RevocationLog::open_or_create(&log_path, clock.clone(), None, vk).is_err(),
+            RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk).is_err(),
             "Deleting entry at index {delete_idx} MUST be detected as an integrity violation"
         );
     }
@@ -305,10 +378,11 @@ fn test_h3_revocation_log_tamper_matrix() {
         let mut tampered_entries = parsed_entries.clone();
         tampered_entries.remove(9);
         let tampered_bytes = bincode::serialize(&tampered_entries).expect("serialize");
-        std::fs::write(&log_path, &tampered_bytes).expect("write");
+        vfs.write_atomic(&log_path, &tampered_bytes).expect("write");
 
-        let reopened = RevocationLog::open_or_create(&log_path, clock.clone(), None, vk)
-            .expect("open_or_create accepts tail-truncated log");
+        let reopened =
+            RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk)
+                .expect("open_or_create accepts tail-truncated log");
         assert_eq!(
             reopened.len(),
             9,
@@ -321,10 +395,10 @@ fn test_h3_revocation_log_tamper_matrix() {
         let mut tampered_entries = parsed_entries.clone();
         tampered_entries.swap(3, 4);
         let tampered_bytes = bincode::serialize(&tampered_entries).expect("serialize");
-        std::fs::write(&log_path, &tampered_bytes).expect("write");
+        vfs.write_atomic(&log_path, &tampered_bytes).expect("write");
 
         assert!(
-            RevocationLog::open_or_create(&log_path, clock.clone(), None, vk).is_err(),
+            RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk).is_err(),
             "Swapping adjacent entries MUST be detected as an integrity violation"
         );
     }
@@ -334,10 +408,10 @@ fn test_h3_revocation_log_tamper_matrix() {
         let mut tampered_entries = parsed_entries.clone();
         tampered_entries.insert(2, parsed_entries[2].clone());
         let tampered_bytes = bincode::serialize(&tampered_entries).expect("serialize");
-        std::fs::write(&log_path, &tampered_bytes).expect("write");
+        vfs.write_atomic(&log_path, &tampered_bytes).expect("write");
 
         assert!(
-            RevocationLog::open_or_create(&log_path, clock.clone(), None, vk).is_err(),
+            RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk).is_err(),
             "Duplicating an entry MUST be detected as an integrity violation"
         );
     }
@@ -345,21 +419,22 @@ fn test_h3_revocation_log_tamper_matrix() {
     // Matrix Test 5: File truncation
     {
         let truncated_bytes = &original_bytes[..original_bytes.len() / 2];
-        std::fs::write(&log_path, truncated_bytes).expect("write");
+        vfs.write_atomic(&log_path, truncated_bytes).expect("write");
 
         assert!(
-            RevocationLog::open_or_create(&log_path, clock.clone(), None, vk).is_err(),
+            RevocationLog::open_or_create(vfs.clone(), &log_path, clock.clone(), None, vk).is_err(),
             "Truncating the log file in the middle MUST be detected fail-closed"
         );
     }
 
     // Matrix Test 6: Wrong verifying key
     {
-        std::fs::write(&log_path, &original_bytes).expect("write back original");
+        vfs.write_atomic(&log_path, &original_bytes)
+            .expect("write back original");
         let (_wrong_sk, wrong_vk) = test_ed25519_keypair();
 
         assert!(
-            RevocationLog::open_or_create(&log_path, clock, None, wrong_vk).is_err(),
+            RevocationLog::open_or_create(vfs, &log_path, clock, None, wrong_vk).is_err(),
             "Opening log with wrong verifying key MUST fail integrity verification"
         );
     }

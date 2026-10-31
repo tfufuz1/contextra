@@ -1,3 +1,8 @@
+//! # SSTable-Builder (Ring 1)
+//!
+//! Konstruiert neue SSTable-Dateien aus sortierten Sequenzen von Key-Value-Paaren,
+//! generiert Datenbloecke, Block-Indizes und Bloom-Filter.
+
 use super::block_cache::{BLOCK_SIZE, SSTABLE_MAGIC_MFSX};
 use super::bloom::BloomFilter;
 use crate::wal::KeyManager;
@@ -196,6 +201,8 @@ pub struct SstableMetadata {
 ///
 /// Note: Uses a whole-SSTable Bloom filter with a default FPR. The Bloom filter FPR should be
 /// treated as a tunable parameter and configured via [`crate::lsm::LsmConfig`].
+// ANCHOR[contextra-store:SST-BLD-001]
+/// Erzeugt deterministisch geordnete SSTable-Dateien mit Datenbloecken und Index.
 pub struct SstableBuilder {
     path: PathBuf,
     file: File,

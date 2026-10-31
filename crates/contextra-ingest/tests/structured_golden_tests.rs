@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `structured_golden_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Golden-Tests für strukturierte Extrakte (Json, Jsonl, Xml, Yaml, Toml).
 // INVARIANTEN: Zero-Panic, All-features / All-targets Konformität.
@@ -57,6 +63,8 @@ fn extract_records(
         .collect()
 }
 
+// ANCHOR[contextra-ingest:TST-0417]
+// Testet die Funktionsfaehigkeit von `test_golden_cross_format_logical_equivalence`.
 #[test]
 fn test_golden_cross_format_logical_equivalence() {
     let extractor = StructuredExtractor::new();
@@ -84,6 +92,8 @@ fn test_golden_cross_format_logical_equivalence() {
     assert_eq!(json_map, toml_map);
 }
 
+// ANCHOR[contextra-ingest:TST-0418]
+// Testet die Funktionsfaehigkeit von `test_special_character_keys`.
 #[test]
 fn test_special_character_keys() {
     let extractor = StructuredExtractor::new();
@@ -105,6 +115,8 @@ fn test_special_character_keys() {
     assert_eq!(map["[\"\"]"], "EmptyKey");
 }
 
+// ANCHOR[contextra-ingest:TST-0419]
+// Testet die Funktionsfaehigkeit von `test_german_umlauts_in_keys_and_values`.
 #[test]
 fn test_german_umlauts_in_keys_and_values() {
     let extractor = StructuredExtractor::new();
@@ -121,6 +133,8 @@ fn test_german_umlauts_in_keys_and_values() {
     assert_eq!(map["[\"äquivalenz\"]"], "großschreibung ÄÖÜß");
 }
 
+// ANCHOR[contextra-ingest:TST-0420]
+// Testet die Funktionsfaehigkeit von `test_duplicate_json_keys`.
 #[test]
 fn test_duplicate_json_keys() {
     let extractor = StructuredExtractor::new();
@@ -156,6 +170,8 @@ fn test_duplicate_json_keys() {
     assert_eq!(r1, ("key", "Second Value"));
 }
 
+// ANCHOR[contextra-ingest:TST-0421]
+// Testet die Funktionsfaehigkeit von `test_empty_containers`.
 #[test]
 fn test_empty_containers() {
     let extractor = StructuredExtractor::new();
@@ -171,6 +187,8 @@ fn test_empty_containers() {
     assert_eq!(map["arr"], "[]");
 }
 
+// ANCHOR[contextra-ingest:TST-0422]
+// Testet die Funktionsfaehigkeit von `test_jsonl_broken_lines_and_all_invalid`.
 #[test]
 fn test_jsonl_broken_lines_and_all_invalid() {
     let extractor = StructuredExtractor::new();
@@ -204,6 +222,8 @@ fn test_jsonl_broken_lines_and_all_invalid() {
     ));
 }
 
+// ANCHOR[contextra-ingest:TST-0423]
+// Testet die Funktionsfaehigkeit von `test_yaml_multi_document_prefixing`.
 #[test]
 fn test_yaml_multi_document_prefixing() {
     let extractor = StructuredExtractor::new();
@@ -218,6 +238,8 @@ fn test_yaml_multi_document_prefixing() {
     assert_eq!(map["doc[1].val"], "200");
 }
 
+// ANCHOR[contextra-ingest:TST-0424]
+// Testet die Funktionsfaehigkeit von `test_toml_array_of_tables`.
 #[test]
 fn test_toml_array_of_tables() {
     let extractor = StructuredExtractor::new();
@@ -231,6 +253,8 @@ fn test_toml_array_of_tables() {
     assert_eq!(map["items[1].name"], "B");
 }
 
+// ANCHOR[contextra-ingest:TST-0425]
+// Testet die Funktionsfaehigkeit von `test_xml_attributes_namespaces_cdata`.
 #[test]
 fn test_xml_attributes_namespaces_cdata() {
     let extractor = StructuredExtractor::new();

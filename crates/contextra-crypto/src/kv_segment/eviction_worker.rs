@@ -1,3 +1,11 @@
+//! # Eviction Worker (`kv_segment/eviction_worker.rs`)
+//!
+//! Asynchroner Hintergrund-Task, der bei Speicherdruck Segmente nach LRU-Strategie freigibt.
+//!
+//! ## Invarianten
+//! - Blockiert niemals den Tokio-Executor bei CPU-intensiven Operationen.
+//! - Reagiert unmittelbar auf Notfall-Löschsignale.
+
 // FILE-CONTEXT
 // ZWECK: Eviction-Worker (nicht-blockierender Hot-Path LRU) und emergency_wipe (synchroner Notfall).
 // STAND: TS:2026-09-09T16:10:00Z (SESSION: dafac391)
@@ -27,6 +35,8 @@ enum EvictionCommand {
 /// Regelmäßiger Eviction-Pfad (VRAM > 80%-Trigger). NICHT im Async-Executor,
 /// da regelmäßige Zeroize-Operationen den Tokio-Scheduler blockieren würden.
 // AI-TAG[CONCURRENCY][MAJOR][RESOLVED] EvictionWorker is Sync via Mutex protection of sender and handle (ID: AGT-CRYPTO-edaee52e) (TS: 2026-09-09T13:17:00Z) (SESSION: a413a598)
+// ANCHOR[contextra-crypto:KV-005]
+/// Hintergrund-Worker für die Speicherfreigabe nach dem Least-Recently-Used-Prinzip (LRU).
 pub struct EvictionWorker {
     sender: parking_lot::Mutex<mpsc::Sender<EvictionCommand>>,
     handle: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>,

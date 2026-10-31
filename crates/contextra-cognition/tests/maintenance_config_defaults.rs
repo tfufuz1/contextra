@@ -1,3 +1,7 @@
+//! # Integrationstest: Wartungskonfiguration Defaults (`tests/maintenance_config_defaults.rs`)
+//!
+//! Prüft, dass die Standardwerte von [`MaintenanceConfig`] exakt den Architekturvorgaben entsprechen.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -13,6 +17,8 @@
 
 use contextra_cognition::maintenance_config::MaintenanceConfig;
 
+// ANCHOR[contextra-cognition:TEST-MAINTENA-077]
+// Prüft Testfall `test_maintenance_config_defaults`.
 #[test]
 fn test_maintenance_config_defaults() {
     let config = MaintenanceConfig::default();

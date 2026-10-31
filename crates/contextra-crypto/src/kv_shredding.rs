@@ -1,3 +1,12 @@
+//! # Kryptographisches Shredding für KV-Daten (`kv_shredding.rs`)
+//!
+//! Ermöglicht DSGVO-konforme Löschung einzelner Datensätze oder ganzer Mandantengruppen
+//! durch gezielte Zerstörung des zugehörigen kryptographischen Schlüssels (Crypto-Erase).
+//!
+//! ## Invarianten
+//! - Nach Zerstörung des Schlüssels ist der Chiffretext informationstheoretisch unentschlüsselbar.
+//! - Gruppe und Einzelschlüssel-Hierarchie erlauben feingranulares Shredding.
+
 // FILE-CONTEXT
 // ZWECK: Envelope Encryption und Key-Registry für KV-Crypto-Shredding (AP-P0-06, Spec v17 §16.1).
 // INVARIANTEN: CryptoShred vernichtet KEK (Gruppenlöschung) oder DEK-Wrap (Einzellöschung) in O(1).

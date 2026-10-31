@@ -1,3 +1,7 @@
+//! # MVCC-Tests (Ring 1)
+//!
+//! Testet Snapshot-Isolation und historische Sequenznummern.
+
 use super::*;
 use tempfile::TempDir;
 

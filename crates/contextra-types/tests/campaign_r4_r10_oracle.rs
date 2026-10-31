@@ -1,3 +1,6 @@
+//! Orakel- und Differenzial-Tests für R4/R10 Invarianten.
+//! Prüft Bit-Dekomposition von DocId, TenantId-Reservierung und TxId-Monotonie.
+
 //! Campaign Test: Independent Oracle and Counter-Test Verification (Rule R4 / R10)
 //!
 //! Demonstrates anti-mirroring (R4) by using mathematical invariants (bitwise shift and mask properties)

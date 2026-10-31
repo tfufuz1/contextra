@@ -1,3 +1,10 @@
+//! # Modul: blocks.rs
+//!
+//! **Zweck:** Blockbasierte Segmentierung mit semantischer Grenzerkennung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Zerlegung roher Abschnitte in atomare Markdown-Blöcke (Code, Tabelle, Absatz).
 // INVARIANTEN: Erhält Codeblöcke (``` und ~~~ mit Längenregeln) und Tabellen als strukturierte Einheiten.
@@ -7,11 +14,15 @@
 use super::estimate::estimate_tokens;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-engine:BLK-001]
+/// Repräsentiert einen Code-Block-Begrenzer.
 pub(crate) struct CodeFence {
     pub(crate) char_type: char,
     pub(crate) length: usize,
 }
 
+// ANCHOR[contextra-engine:BLK-002]
+/// Parst eine öffnende Code-Fence-Zeile.
 pub(crate) fn parse_opening_fence(line: &str) -> Option<CodeFence> {
     let trimmed = line.trim_start();
     if line.len().saturating_sub(trimmed.len()) > 3 {
@@ -34,6 +45,8 @@ pub(crate) fn parse_opening_fence(line: &str) -> Option<CodeFence> {
     }
 }
 
+// ANCHOR[contextra-engine:BLK-003]
+/// Prüft, ob eine Zeile den Code-Block schließt.
 pub(crate) fn is_closing_fence(line: &str, active_fence: &CodeFence) -> bool {
     let trimmed = line.trim();
     let count = trimmed
@@ -44,6 +57,8 @@ pub(crate) fn is_closing_fence(line: &str, active_fence: &CodeFence) -> bool {
 }
 
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-engine:BLK-004]
+/// Strukturierte Markdown-Blöcke.
 pub(crate) enum MarkdownBlock {
     CodeBlock {
         fence: String,
@@ -60,6 +75,8 @@ pub(crate) enum MarkdownBlock {
 }
 
 impl MarkdownBlock {
+    // ANCHOR[contextra-engine:BLK-005]
+    /// Konvertiert den Block zurück in Text.
     pub(crate) fn to_text(&self) -> String {
         match self {
             MarkdownBlock::CodeBlock {
@@ -91,11 +108,15 @@ impl MarkdownBlock {
         }
     }
 
+    // ANCHOR[contextra-engine:BLK-006]
+    /// Schätzt die Token-Anzahl des Blocks ab.
     pub(crate) fn estimate_tokens(&self) -> usize {
         estimate_tokens(&self.to_text())
     }
 }
 
+// ANCHOR[contextra-engine:BLK-007]
+/// Zerlegt den Text in strukturierte Markdown-Blöcke.
 pub(crate) fn parse_markdown_blocks(lines: &[String]) -> Vec<MarkdownBlock> {
     let mut blocks = Vec::new();
     let mut i = 0;
@@ -190,6 +211,8 @@ pub(crate) fn parse_markdown_blocks(lines: &[String]) -> Vec<MarkdownBlock> {
     blocks
 }
 
+// ANCHOR[contextra-engine:BLK-008]
+/// Prüft, ob eine Zeile eine Tabellenzeile ist.
 pub(crate) fn is_table_row(line: &str) -> bool {
     let t = line.trim();
     if t.is_empty() {
@@ -198,6 +221,8 @@ pub(crate) fn is_table_row(line: &str) -> bool {
     t.starts_with('|') || (t.ends_with('|') && t.contains('|'))
 }
 
+// ANCHOR[contextra-engine:BLK-009]
+/// Prüft, ob eine Zeile eine Tabellen-Trennzeile ist.
 pub(crate) fn is_table_delimiter_row(line: &str) -> bool {
     let t = line.trim();
     t.contains("---") || t.contains("-|-")

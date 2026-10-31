@@ -9,13 +9,16 @@ use contextra_types::EntityId;
 use std::cmp::Ordering;
 
 /// Minimum required sample count for shadow mode default flip evaluation.
+// ANCHOR[contextra-graph:SRC-TL-HFD-SHADOW-001]
 pub const MIN_SHADOW_SAMPLES: u64 = 10_000;
 
 /// Minimum required mean top-k Jaccard agreement threshold for shadow mode default flip evaluation.
+// ANCHOR[contextra-graph:SRC-TL-HFD-SHADOW-002]
 pub const MIN_AGREEMENT_THRESHOLD: f32 = 0.85;
 
 /// Aggregated discrepancy report over a shadow mode evaluation window.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:SRC-TL-HFD-SHADOW-003]
 pub struct ShadowDiscrepancyReport {
     /// Number of evaluated query pairs (ForwardPush vs TL-HFD).
     pub sample_count: u64,
@@ -28,6 +31,7 @@ pub struct ShadowDiscrepancyReport {
 }
 
 /// Formal default-flip gate trait evaluating whether TL-HFD can replace ForwardPush as default.
+// ANCHOR[contextra-graph:SRC-TL-HFD-SHADOW-004]
 pub trait DefaultFlipGate {
     /// Returns `true` iff:
     /// 1. `sample_count >= MIN_SHADOW_SAMPLES`
@@ -42,12 +46,14 @@ pub trait DefaultFlipGate {
 
 /// Standard default flip gate evaluator for TL-HFD.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+// ANCHOR[contextra-graph:SRC-TL-HFD-SHADOW-005]
 pub struct TlHfdFlipGate;
 
 impl DefaultFlipGate for TlHfdFlipGate {}
 
 /// Result structure of shadow mode comparison between Forward-Push PPR and TL-HFD.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-graph:SRC-TL-HFD-SHADOW-006]
 pub struct ShadowComparison {
     /// Maximum absolute score difference across top-k union nodes.
     pub max_abs_diff: f32,
@@ -69,6 +75,7 @@ pub struct ShadowComparison {
 ///
 /// # Complexity
 /// Time complexity $O(\text{iterations} \cdot k \cdot |\text{Seeds}| \cdot \text{max\_edge\_size} + |V| \log |V|)$.
+// ANCHOR[contextra-graph:SRC-TL-HFD-SHADOW-007]
 pub fn shadow_compare_forward_push_vs_tl_hfd<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],

@@ -1,3 +1,6 @@
+//! Integrations-Testsuite für Fehlerpfade, RequestContext und Saga-Protokolle.
+//! Stellt sicher, dass Restmessungstypen und Tombstones fehlerfrei interagieren.
+
 //! Error, Witness, Tombstone, and TenantScoped isolation test suite for `contextra-types`.
 
 #![allow(

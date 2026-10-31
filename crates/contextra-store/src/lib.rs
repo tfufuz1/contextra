@@ -1,3 +1,33 @@
+//! # contextra-store (Ring 1)
+//!
+//! Die Crate `contextra-store` implementiert das persistente LSM-Tree-Speichertriebwerk
+//! (Log-Structured Merge-tree) fuer die Contextra-Plattform. Sie stellt die primaere
+//! Datenspeicherebene bereit und garantiert atomare Schreibvorgaenge, Konsistenz
+//! ueber Snapshots sowie Ausfallsicherheit durch Write-Ahead-Logging (WAL).
+//!
+//! ## Architektur & Datenpfad
+//! - **Client / Engine:** Sendet atomare Schreiboperationen (Put, Delete) ueber Transaktionspuffer.
+//! - **WAL (Write-Ahead-Log):** Persistiert alle Mutationen sequentiell auf Festplatte inklusive
+//!   CRC32- und HMAC-Integritaetspruefung, bevor sie im RAM bestaetigt werden.
+//! - **MemTable:** Haltebereich im Arbeitsspeicher (SkipList / Sharded BTreeMap), der schnelle
+//!   Suchen und Einfuegungen bei geordneten Sequenznummern ermoeglicht.
+//! - **Flush & SSTable:** Bei Erreichen von Groessenschwellen wird die aktive MemTable eingefroren
+//!   und asynchron als unveraenderliche SSTable (Sorted String Table) auf Platte geschrieben.
+//! - **Compaction:** Hintergrundprozess, der SSTables hierarchisch (Leveled / Tiered) zusammenfuehrt,
+//!   Tombstones bereinigt und Lese- sowie Speicherverstaerkung minimiert.
+//!
+//! ## Sicherheitsinvariante
+//! Die gesamte Crate erzwingt `#![forbid(unsafe_code)]` in Produktion. Es existieren keinerlei
+//! `unsafe`-Bloecke im Produktionscode.
+//!
+//! ## Ring-Hierarchie & Abhaengigkeiten
+//! - **Ring 1:** Kernkomponente des Speichersystems.
+//! - **Eingehende Abhaengigkeiten:** Wird genutzt von `contextra-engine`, `contextra-db`,
+//!   `contextra-cognition`, `contextra-graph`, `contextra-checkpoint`, `contextra-agent`,
+//!   `contextra-py` und der uebergeordneten Facade `contextra`.
+//! - **Ausgehende Abhaengigkeiten:** Nutzt `contextra-types`, `contextra-ports`, `contextra-crypto`,
+//!   `contextra-sys`, `contextra-mvcc`.
+
 #![deny(dead_code)]
 //! `Contextra` Store — LSM-Tree based storage engine.
 //!

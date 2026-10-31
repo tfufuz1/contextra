@@ -1,3 +1,9 @@
+//! # Integrationstest: Stresstests, Multithreading und Fehlerüberlastung für Kalibrierer
+//!
+//! **Crate:** `contextra-rank`
+//!
+//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // FILE-CONTEXT
 // STAND: 2026-09-15T14:45:00Z (SESSION: 527bbb50)
@@ -11,6 +17,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+// ANCHOR[contextra-rank:CAL-TEST-004]
 #[test]
 fn test_isotonic_fifo_eviction_and_force_rebuild() {
     let max_obs = 20;
@@ -37,6 +44,7 @@ fn test_isotonic_fifo_eviction_and_force_rebuild() {
     );
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_platt_scaler_extreme_finite_logits_monotonicity() {
     let mut obs = Vec::new();
@@ -65,6 +73,7 @@ fn test_platt_scaler_extreme_finite_logits_monotonicity() {
     }
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_pid_controller_multithreaded_stress() {
     let pid = Arc::new(Mutex::new(PidController::new(150.0, 50, 200, Some(100))));
@@ -95,6 +104,7 @@ fn test_pid_controller_multithreaded_stress() {
 }
 
 proptest! {
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_isotonic_ece_non_negative_and_bounded(
         outcomes in prop::collection::vec(prop::bool::ANY, 50..150)

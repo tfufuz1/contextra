@@ -1,8 +1,16 @@
+//! # Integrationstest: tenant collection handle sharing
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_types::TenantId;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-engine:TST34-001]
+/// Testblock zur Überprüfung von `test_tenant_handles_are_shared_for_same_tenant_and_collection`.
 #[tokio::test]
 async fn test_tenant_handles_are_shared_for_same_tenant_and_collection(
 ) -> contextra_types::Result<()> {
@@ -40,6 +48,8 @@ async fn test_tenant_handles_are_shared_for_same_tenant_and_collection(
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST34-002]
+/// Testblock zur Überprüfung von `test_tenant_handles_are_isolated_for_different_tenants`.
 #[tokio::test]
 async fn test_tenant_handles_are_isolated_for_different_tenants() -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();

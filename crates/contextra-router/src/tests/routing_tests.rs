@@ -1,3 +1,9 @@
+//! # Routing-Test-Suiten und Untermodul-Deklarationen
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Routing-Test-Suiten und Untermodul-Deklarationen.
+
+// ANCHOR[contextra-router:TST-RTG-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,

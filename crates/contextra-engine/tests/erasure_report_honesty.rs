@@ -1,9 +1,17 @@
+//! # Integrationstest: erasure report honesty
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![forbid(unsafe_code)]
 
 use contextra_crypto::deletion_proof::LayerWitnessExt;
 use contextra_engine::{summary_from_witness, UNMEASURED_ERASURE_LAYERS};
 use contextra_ports::scanner::{mint_witness_for_testkit, ScanTechnique, WitnessLayer};
 
+// ANCHOR[contextra-engine:TST14-001]
+/// Testblock zur Überprüfung von `test_control_matches_reflects_witness_not_scanned`.
 #[test]
 fn test_control_matches_reflects_witness_not_scanned() {
     let scanned_count = 100u64;
@@ -49,6 +57,8 @@ fn test_control_matches_reflects_witness_not_scanned() {
     );
 }
 
+// ANCHOR[contextra-engine:TST14-002]
+/// Testblock zur Überprüfung von `test_unmeasured_erasure_layers_constant_contains_exact_names`.
 #[test]
 fn test_unmeasured_erasure_layers_constant_contains_exact_names() {
     let expected_unmeasured_layers = &[

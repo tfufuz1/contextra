@@ -1,3 +1,9 @@
+//! # Integrationstest: engine commit crash points
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
@@ -164,6 +170,8 @@ async fn create_faulty_collection() -> (
     (col, storage)
 }
 
+// ANCHOR[contextra-engine:TST11-001]
+/// Testblock zur Überprüfung von `test_f19_intent_put_failure_triggers_rollback`.
 #[tokio::test]
 async fn test_f19_intent_put_failure_triggers_rollback() -> Result<()> {
     let (col, storage) = create_faulty_collection().await;
@@ -205,6 +213,8 @@ async fn test_f19_intent_put_failure_triggers_rollback() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST11-002]
+/// Testblock zur Überprüfung von `test_f20_pending_intent_written_first`.
 #[tokio::test]
 async fn test_f20_pending_intent_written_first() -> Result<()> {
     let (col, storage) = create_faulty_collection().await;
@@ -226,6 +236,8 @@ async fn test_f20_pending_intent_written_first() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST11-003]
+/// Testblock zur Überprüfung von `test_t06_committed_marker_write_failure_retries`.
 #[tokio::test]
 async fn test_t06_committed_marker_write_failure_retries() -> Result<()> {
     let (col, storage) = create_faulty_collection().await;

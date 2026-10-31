@@ -1,3 +1,18 @@
+//! # Konsolidierungs-Locks und Kaskaden-Invalidierung (`consolidation_locks.rs`)
+//!
+//! Stellt das Guard-Konstrukt [`ConsolidationNodesGuard`] für nebenläufigkeitssicheres Locking
+//! und geordnete Kaskaden-Invalidierung veralteter Graphkanten im Schlafzyklus bereit.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ring 3). Koordiniert `Collection` (Ring 2) und Graph-Operationen (Ring 0).
+//!
+//! ## Invarianten
+//! - **Nicht-blockierender Erwerb:** Der Lock wird atomar via `try_lock` angefordert, um Livelocks zu verhindern.
+//! - **Kanonische Sortierung (Deadlock-Prävention):** Kaskadierende Kanteninvalidierungen werden zwingend
+//!   aufsteigend nach numerischer `DocId` sortiert (APM-LOCK-ORDER-INVERSION Schutz).
+//! - **Fehlerisolation:** Scheitert die Invalidierung für eine `DocId`, wird dies protokolliert,
+//!   während nachfolgende IDs weiter abgearbeitet werden.
+
 // FILE-CONTEXT
 // ZWECK: Guard-Konstrukt fuer typsicheres Locking und geordnete Kaskaden-Invalidierung in der Sleep-Cycle-Konsolidierung.
 // INVARIANTEN: Lock-Erwerb erfolgt atomic via try_lock. Kaskadierende Kanten-Invalidierungen werden kanonisch nach DocId sortiert (Deadlock-Praevention).
@@ -25,6 +40,8 @@ use tokio::sync::MutexGuard;
 /// 1. `collection.consolidation_guard` exklusiv gehalten wird (`try_lock`),
 /// 2. Kaskadierende Graph-Edge-Invalidierungen in kanonisch sortierter `DocId`-Reihenfolge
 ///    ausgeführt werden, um Lock Order Inversions (APM-LOCK-ORDER-INVERSION) und Deadlocks zu verhindern.
+// ANCHOR[contextra-cognition:LOCK-001]
+/// Guard zur Erzwingung der Lock-Reihenfolge und kanonischen Node-Sortierung während der Konsolidierung.
 pub struct ConsolidationNodesGuard<'a, S: StorageEngine, V: VectorIndex> {
     collection: &'a Collection<S, V>,
     _guard: MutexGuard<'a, ()>,
@@ -33,6 +50,8 @@ pub struct ConsolidationNodesGuard<'a, S: StorageEngine, V: VectorIndex> {
 impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationNodesGuard<'a, S, V> {
     /// Versucht, den `consolidation_guard` der Collection zu erwerben.
     /// Gibt `Some(ConsolidationNodesGuard)` zurueck, wenn der Lock frei war, sonst `None`.
+    // ANCHOR[contextra-cognition:LOCK-002]
+    /// Versucht, das Konsolidierungs-Lock atomar zu erwerben.
     pub fn try_acquire(collection: &'a Collection<S, V>) -> Option<Self> {
         match collection.consolidation_guard.try_lock() {
             Ok(guard) => Some(Self {
@@ -45,6 +64,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationNodesGuard<'a, S, V> {
 
     /// Referenz auf die geschützte Collection.
     #[inline]
+    // ANCHOR[contextra-cognition:LOCK-003]
+    /// Liefert eine Referenz auf die geschützte Collection.
     pub fn collection(&self) -> &'a Collection<S, V> {
         self.collection
     }
@@ -54,6 +75,8 @@ impl<'a, S: StorageEngine, V: VectorIndex> ConsolidationNodesGuard<'a, S, V> {
     /// Sortiert die Eingabe-`DocId`s vor der Verarbeitung kanonisch (nach numerischem `doc_id.inner()`),
     /// um Lock Order Inversion (APM-LOCK-ORDER-INVERSION) und Deadlocks zwischen parallelen Durchläufen
     /// oder konkurrierenden Lese/Schreib-Transaktionen zu verhindern.
+    // ANCHOR[contextra-cognition:LOCK-004]
+    /// Führt kaskadierende Graph-Edge-Invalidierungen in kanonischer Reihenfolge aus.
     pub async fn cascade_invalidate_edges_ordered(
         &self,
         superseded_doc_ids: &[DocId],

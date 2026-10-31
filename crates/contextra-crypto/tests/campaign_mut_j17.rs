@@ -1,3 +1,8 @@
+//! # Integrationstest: `campaign_mut_j17.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_mut_j17`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Targeted killer test suite for contextra-crypto mutants (shard 1/4 campaign J-17).
 // ORAKEL: Independent math/spec assertions and explicit boundary inputs (R4).

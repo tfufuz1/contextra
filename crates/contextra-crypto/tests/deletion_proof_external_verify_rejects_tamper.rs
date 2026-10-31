@@ -1,3 +1,8 @@
+//! # Integrationstest: `deletion_proof_external_verify_rejects_tamper.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_external_verify_rejects_tamper`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
     LayerCleanupProof,

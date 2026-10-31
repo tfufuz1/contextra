@@ -1,3 +1,13 @@
+//! # Unit- und Integrationstests für PyO3-Bindings (`tests`)
+//!
+//! Dieses Modul enthält automatisierte Tests zur Verifikation aller Kernfunktionen der Python-Bindings:
+//! - Parsen und Begrenzen von Umgebungsvariablen (`CONTEXTRA_WORKER_THREADS`).
+//! - Validierung von IDs, Collection-Namen, Beziehungs-Labels, Pfaden, Abfragetexten und Vektoren.
+//! - Mapping von `ContextraError` auf Python-spezifische Exception-Typen.
+//! - Absicherung der FFI-Grenze gegen unkontrollierte Rust-Panics (`catch_unwind` und Engine-Poisoning).
+//! - Typ- und Datenkonvertierungen zwischen Python und Rust (`serde_json`, `pythonize`).
+//! - GIL-Release-Verifikation unter nebenläufigen Python-Threads.
+
 #[cfg(test)]
 mod tests {
     use super::super::*;
@@ -9,18 +19,21 @@ mod tests {
 
     // ─── Worker Threads Env Parsing ─────────────────────────────────────────────
 
+    // Prüft, ob CONTEXTRA_WORKER_THREADS=0 auf das Minimum (1) geklemmt wird.
     #[test]
     fn test_parse_worker_threads_env_clamping_low() {
         std::env::set_var("CONTEXTRA_WORKER_THREADS", "0");
         assert_eq!(parse_worker_threads_env(), 1);
     }
 
+    // Prüft, ob CONTEXTRA_WORKER_THREADS=1000 auf das Maximum (256) geklemmt wird.
     #[test]
     fn test_parse_worker_threads_env_clamping_high() {
         std::env::set_var("CONTEXTRA_WORKER_THREADS", "1000");
         assert_eq!(parse_worker_threads_env(), 256);
     }
 
+    // Prüft, ob bei ungültigen String-Werten der Fallback auf einen gültigen Thread-Bereich greift.
     #[test]
     fn test_parse_worker_threads_env_invalid_fallback() {
         std::env::set_var("CONTEXTRA_WORKER_THREADS", "not_a_number");
@@ -28,6 +41,7 @@ mod tests {
         assert!((1..=256).contains(&val));
     }
 
+    // Prüft, ob ein gültiger Thread-Wert exakt übernommen wird.
     #[test]
     fn test_parse_worker_threads_env_valid_value() {
         std::env::set_var("CONTEXTRA_WORKER_THREADS", "8");
@@ -36,6 +50,7 @@ mod tests {
 
     // ─── Runtime State ──────────────────────────────────────────────────────────
 
+    // Prüft die korrekte Initialisierung des PyRuntimeState-Structs mit Tokio-Runtime.
     #[test]
     fn test_py_runtime_state_initialization() {
         let rt = tokio::runtime::Builder::new_multi_thread()
@@ -51,39 +66,46 @@ mod tests {
 
     // ─── ID Validation ──────────────────────────────────────────────────────────
 
+    // Prüft, dass leere Dokumenten-IDs mit einem Fehler abgewiesen werden.
     #[test]
     fn test_validate_id_empty() {
         assert!(validate_id("").is_err());
     }
 
+    // Prüft, dass Whitespace-only Dokumenten-IDs abgewiesen werden.
     #[test]
     fn test_validate_id_whitespace() {
         assert!(validate_id("   ").is_err());
         assert!(validate_id("\t\n").is_err());
     }
 
+    // Prüft, dass Null-Bytes in Dokumenten-IDs abgewiesen werden.
     #[test]
     fn test_validate_id_null_byte() {
         assert!(validate_id("doc\0id").is_err());
     }
 
+    // Prüft, dass Dokumenten-IDs über der Maximallänge (1024 Zeichen) abgewiesen werden.
     #[test]
     fn test_validate_id_max_len_exceeded() {
         let long_id = "a".repeat(MAX_ID_LENGTH + 1);
         assert!(validate_id(&long_id).is_err());
     }
 
+    // Prüft, dass Dokumenten-IDs exakt an der Maximallänge (1024 Zeichen) akzeptiert werden.
     #[test]
     fn test_validate_id_max_len_exact() {
         let max_id = "a".repeat(MAX_ID_LENGTH);
         assert!(validate_id(&max_id).is_ok());
     }
 
+    // Prüft, dass reguläre alphanumerische IDs mit Sonderzeichen akzeptiert werden.
     #[test]
     fn test_validate_id_valid_alphanumeric() {
         assert!(validate_id("doc_123_abc-XYZ").is_ok());
     }
 
+    // Prüft das Extrahieren und Validieren von String-IDs aus Python-Objekten.
     #[test]
     fn test_validate_id_obj_str_valid() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -94,6 +116,7 @@ mod tests {
         })
     }
 
+    // Prüft das Extrahieren und Validieren von positiven Integer-IDs aus Python-Objekten.
     #[test]
     fn test_validate_id_obj_int_valid() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -104,6 +127,7 @@ mod tests {
         })
     }
 
+    // Prüft, dass der Integer 0 als gültige ID akzeptiert wird.
     #[test]
     fn test_validate_id_obj_int_zero() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -114,6 +138,7 @@ mod tests {
         })
     }
 
+    // Prüft, dass negative Integer-IDs mit einem Fehler abgewiesen werden.
     #[test]
     fn test_validate_id_obj_int_negative() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -124,6 +149,7 @@ mod tests {
         })
     }
 
+    // Prüft, dass ungültige Python-Typen (wie Floats) für IDs abgewiesen werden.
     #[test]
     fn test_validate_id_obj_invalid_type() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -136,33 +162,39 @@ mod tests {
 
     // ─── Collection Name Validation ────────────────────────────────────────────
 
+    // Prüft, dass leere Collection-Namen abgewiesen werden.
     #[test]
     fn test_validate_collection_name_empty() {
         assert!(validate_collection_name("").is_err());
     }
 
+    // Prüft, dass Whitespace-only Collection-Namen abgewiesen werden.
     #[test]
     fn test_validate_collection_name_whitespace() {
         assert!(validate_collection_name("   ").is_err());
     }
 
+    // Prüft, dass Null-Bytes in Collection-Namen abgewiesen werden.
     #[test]
     fn test_validate_collection_name_null_byte() {
         assert!(validate_collection_name("col\0name").is_err());
     }
 
+    // Prüft, dass Collection-Namen über 64 Zeichen abgewiesen werden.
     #[test]
     fn test_validate_collection_name_max_len_exceeded() {
         let long_col = "c".repeat(MAX_COLLECTION_NAME_LENGTH + 1);
         assert!(validate_collection_name(&long_col).is_err());
     }
 
+    // Prüft, dass Collection-Namen mit exakt 64 Zeichen akzeptiert werden.
     #[test]
     fn test_validate_collection_name_max_len_exact() {
         let max_col = "c".repeat(MAX_COLLECTION_NAME_LENGTH);
         assert!(validate_collection_name(&max_col).is_ok());
     }
 
+    // Prüft, dass ein typischer gültiger Collection-Name akzeptiert wird.
     #[test]
     fn test_validate_collection_name_valid() {
         assert!(validate_collection_name("my_collection_1").is_ok());
@@ -170,55 +202,65 @@ mod tests {
 
     // ─── Label Validation ───────────────────────────────────────────────────────
 
+    // Prüft, dass leere Beziehungs-Labels abgewiesen werden.
     #[test]
     fn test_validate_label_empty() {
         assert!(validate_label("").is_err());
     }
 
+    // Prüft, dass Whitespace-only Labels abgewiesen werden.
     #[test]
     fn test_validate_label_whitespace() {
         assert!(validate_label("   ").is_err());
     }
 
+    // Prüft, dass Null-Bytes in Labels abgewiesen werden.
     #[test]
     fn test_validate_label_null_byte() {
         assert!(validate_label("label\0null").is_err());
     }
 
+    // Prüft, dass Labels über 256 Zeichen abgewiesen werden.
     #[test]
     fn test_validate_label_max_len_exceeded() {
         let long_label = "l".repeat(MAX_LABEL_LENGTH + 1);
         assert!(validate_label(&long_label).is_err());
     }
 
+    // Prüft, dass Labels mit exakt 256 Zeichen akzeptiert werden.
     #[test]
     fn test_validate_label_max_len_exact() {
         let max_label = "l".repeat(MAX_LABEL_LENGTH);
         assert!(validate_label(&max_label).is_ok());
     }
 
+    // Prüft, dass ein gültiges Label akzeptiert wird.
     #[test]
     fn test_validate_label_valid() {
         assert!(validate_label("knows_person").is_ok());
     }
 
-    // ─── Database Path Validation ───────────────────────────────────────────────
+    // ─── Database Path Validation ───────────────────────────────────────--------
 
+    // Prüft, dass leere Datenbankpfade abgewiesen werden.
     #[test]
     fn test_validate_db_path_empty() {
         assert!(validate_db_path("").is_err());
     }
 
+    // Prüft, dass Whitespace-only Datenbankpfade abgewiesen werden.
     #[test]
     fn test_validate_db_path_whitespace() {
         assert!(validate_db_path("   ").is_err());
     }
 
+    // Prüft, dass Null-Bytes in Datenbankpfaden abgewiesen werden.
     #[test]
     fn test_validate_db_path_null_byte() {
         assert!(validate_db_path("path\0null").is_err());
     }
 
+    // Prüft, dass ein gültiger Verzeichnispfad akzeptiert wird.
     #[test]
     fn test_validate_db_path_valid() {
         assert!(validate_db_path("/tmp/contextra_db_test").is_ok());
@@ -226,33 +268,39 @@ mod tests {
 
     // ─── Query Text Validation ──────────────────────────────────────────────────
 
+    // Prüft, dass leere Volltext-Suchabfragen abgewiesen werden.
     #[test]
     fn test_validate_query_text_empty() {
         assert!(validate_query_text("").is_err());
     }
 
+    // Prüft, dass Whitespace-only Abfragetexte abgewiesen werden.
     #[test]
     fn test_validate_query_text_whitespace() {
         assert!(validate_query_text("   ").is_err());
     }
 
+    // Prüft, dass Null-Bytes im Abfragetext abgewiesen werden.
     #[test]
     fn test_validate_query_text_null_byte() {
         assert!(validate_query_text("query\0null").is_err());
     }
 
+    // Prüft, dass Abfragetexte über 1024 Zeichen abgewiesen werden.
     #[test]
     fn test_validate_query_text_max_len_exceeded() {
         let long_q = "q".repeat(MAX_ID_LENGTH + 1);
         assert!(validate_query_text(&long_q).is_err());
     }
 
+    // Prüft, dass Abfragetexte mit exakt 1024 Zeichen akzeptiert werden.
     #[test]
     fn test_validate_query_text_max_len_exact() {
         let max_q = "q".repeat(MAX_ID_LENGTH);
         assert!(validate_query_text(&max_q).is_ok());
     }
 
+    // Prüft, dass ein natürlicher Suchtext akzeptiert wird.
     #[test]
     fn test_validate_query_text_valid() {
         assert!(validate_query_text("natural language query text").is_ok());
@@ -260,21 +308,25 @@ mod tests {
 
     // ─── Batch Size Validation ──────────────────────────────────────────────────
 
+    // Prüft, dass eine Batch-Größe von 0 abgewiesen wird.
     #[test]
     fn test_validate_batch_size_zero() {
         assert!(validate_batch_size(0).is_err());
     }
 
+    // Prüft, dass eine Batch-Größe von 1 akzeptiert wird.
     #[test]
     fn test_validate_batch_size_one() {
         assert!(validate_batch_size(1).is_ok());
     }
 
+    // Prüft, dass das obere Limit von 10.000 Elementen akzeptiert wird.
     #[test]
     fn test_validate_batch_size_max() {
         assert!(validate_batch_size(MAX_BATCH_SIZE).is_ok());
     }
 
+    // Prüft, dass mehr als 10.000 Elemente in einer Batch abgewiesen werden.
     #[test]
     fn test_validate_batch_size_overflow() {
         assert!(validate_batch_size(MAX_BATCH_SIZE + 1).is_err());
@@ -282,26 +334,31 @@ mod tests {
 
     // ─── Vector Validation ──────────────────────────────────────────────────────
 
+    // Prüft, dass leere Vektoren abgewiesen werden.
     #[test]
     fn test_validate_vector_empty() {
         assert!(validate_vector(&[]).is_err());
     }
 
+    // Prüft, dass reguläre Gleitkomma-Vektoren akzeptiert werden.
     #[test]
     fn test_validate_vector_valid() {
         assert!(validate_vector(&[0.1, 0.2, -0.5, 1.0]).is_ok());
     }
 
+    // Prüft, dass Vektoren mit NaN-Werten abgewiesen werden.
     #[test]
     fn test_validate_vector_nan() {
         assert!(validate_vector(&[1.0, f32::NAN, 2.0]).is_err());
     }
 
+    // Prüft, dass Vektoren mit positivem Unendlich abgewiesen werden.
     #[test]
     fn test_validate_vector_pos_inf() {
         assert!(validate_vector(&[1.0, f32::INFINITY, 2.0]).is_err());
     }
 
+    // Prüft, dass Vektoren mit negativem Unendlich abgewiesen werden.
     #[test]
     fn test_validate_vector_neg_inf() {
         assert!(validate_vector(&[1.0, f32::NEG_INFINITY, 2.0]).is_err());
@@ -309,6 +366,7 @@ mod tests {
 
     // ─── Exception Mapping Tests ────────────────────────────────────────────────
 
+    // Prüft, dass ContextraError::NotFound auf Python NotFoundError abgebildet wird.
     #[test]
     fn test_err_mapping_not_found() {
         pyo3::prepare_freethreaded_python();
@@ -318,6 +376,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::Conflict auf Python IntegrityError abgebildet wird.
     #[test]
     fn test_err_mapping_conflict() {
         pyo3::prepare_freethreaded_python();
@@ -327,6 +386,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::NamespaceViolation auf Python TenantError abgebildet wird.
     #[test]
     fn test_err_mapping_tenant_mismatch() {
         pyo3::prepare_freethreaded_python();
@@ -336,6 +396,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::PolicyViolation auf Python PyPermissionError abgebildet wird.
     #[test]
     fn test_err_mapping_policy_violation() {
         pyo3::prepare_freethreaded_python();
@@ -345,6 +406,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::InvalidInput auf Python ContextraValueError abgebildet wird.
     #[test]
     fn test_err_mapping_invalid_input() {
         pyo3::prepare_freethreaded_python();
@@ -354,6 +416,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::Storage auf Python ContextraIOError abgebildet wird.
     #[test]
     fn test_err_mapping_storage() {
         pyo3::prepare_freethreaded_python();
@@ -363,6 +426,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::Io auf Python ContextraIOError abgebildet wird.
     #[test]
     fn test_err_mapping_io() {
         pyo3::prepare_freethreaded_python();
@@ -372,6 +436,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::Index auf Python ContextraIndexError abgebildet wird.
     #[test]
     fn test_err_mapping_index() {
         pyo3::prepare_freethreaded_python();
@@ -381,6 +446,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::Crypto auf Python ContextraCryptoError abgebildet wird.
     #[test]
     fn test_err_mapping_crypto() {
         pyo3::prepare_freethreaded_python();
@@ -390,6 +456,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::MemoryBudgetExceeded auf Python PyMemoryError abgebildet wird.
     #[test]
     fn test_err_mapping_memory_budget() {
         pyo3::prepare_freethreaded_python();
@@ -399,6 +466,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::CapabilityUnsupported auf Python PyNotImplementedError abgebildet wird.
     #[test]
     fn test_err_mapping_capability_unsupported() {
         pyo3::prepare_freethreaded_python();
@@ -411,6 +479,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::Internal auf Python ContextraInternalError abgebildet wird.
     #[test]
     fn test_err_mapping_internal() {
         pyo3::prepare_freethreaded_python();
@@ -420,6 +489,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::Serialization auf Python ContextraValueError abgebildet wird.
     #[test]
     fn test_err_mapping_serialization() {
         pyo3::prepare_freethreaded_python();
@@ -429,6 +499,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::ChecksumMismatch auf Python ContextraIOError abgebildet wird.
     #[test]
     fn test_err_mapping_checksum_mismatch() {
         pyo3::prepare_freethreaded_python();
@@ -438,6 +509,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass ContextraError::WalCorruption auf Python ContextraIOError abgebildet wird.
     #[test]
     fn test_err_mapping_wal_corruption() {
         pyo3::prepare_freethreaded_python();
@@ -447,6 +519,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass gemappte Python-Exceptions die dynamischen Attribute 'kind' und 'message' tragen.
     #[test]
     fn test_contextra_err_attributes_kind_and_message() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -464,6 +537,7 @@ mod tests {
 
     // ─── FFI Blocking & Panic Isolation ───────────────────────────────────────
 
+    // Prüft, dass run_blocking_ffi im Erfolgsfall das Resultat korrekt liefert und das Flag unberührt lässt.
     #[test]
     fn test_run_blocking_ffi_success() {
         pyo3::prepare_freethreaded_python();
@@ -475,6 +549,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass run_blocking_ffi einen Rust-Panic abfängt, in PyRuntimeError übersetzt und das poisoned-Flag setzt.
     #[test]
     fn test_run_blocking_ffi_panic_containment() {
         pyo3::prepare_freethreaded_python();
@@ -494,6 +569,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass nach dem Setzen von poisoned=true nachfolgende Aufrufe sofort abgewiesen werden (Fail-Closed).
     #[test]
     fn test_run_blocking_ffi_blocked_after_poisoning() {
         pyo3::prepare_freethreaded_python();
@@ -508,6 +584,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass die interne Testhook-Funktion nur bei aktiviertem test-hooks Feature exportiert wird.
     #[test]
     fn test_trigger_panic_for_test_not_exported_without_test_hooks_feature() {
         pyo3::prepare_freethreaded_python();
@@ -525,6 +602,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass trigger_panic_helper Panics via resume_unwind auslöst und im run_blocking_ffi abfängt.
     #[test]
     fn test_trigger_panic_helper_resume_unwind_containment() {
         pyo3::prepare_freethreaded_python();
@@ -542,6 +620,7 @@ mod tests {
 
     // ─── Link Relation Parsing ─────────────────────────────────────────────────
 
+    // Prüft das Parsen der Relation 'elaborates'.
     #[test]
     fn test_parse_link_relation_elaborates() {
         assert_eq!(
@@ -550,6 +629,7 @@ mod tests {
         );
     }
 
+    // Prüft das Parsen der Relation 'contradicts'.
     #[test]
     fn test_parse_link_relation_contradicts() {
         assert_eq!(
@@ -558,6 +638,7 @@ mod tests {
         );
     }
 
+    // Prüft das Parsen der Relation 'supersedes'.
     #[test]
     fn test_parse_link_relation_supersedes() {
         assert_eq!(
@@ -566,6 +647,7 @@ mod tests {
         );
     }
 
+    // Prüft das Parsen der Relation 'references'.
     #[test]
     fn test_parse_link_relation_references() {
         assert_eq!(
@@ -574,6 +656,7 @@ mod tests {
         );
     }
 
+    // Prüft, dass das Parsen von Link-Relationen unabhängig von Groß-/Kleinschreibung erfolgt.
     #[test]
     fn test_parse_link_relation_case_insensitive() {
         assert_eq!(
@@ -586,6 +669,7 @@ mod tests {
         );
     }
 
+    // Prüft, dass ungültige Relations-Bezeichner abgewiesen werden.
     #[test]
     fn test_parse_link_relation_invalid() {
         assert!(crate::kv_links::parse_link_relation("invalid_relation").is_err());
@@ -594,6 +678,7 @@ mod tests {
 
     // ─── Conversions & Helpers ─────────────────────────────────────────────────
 
+    // Prüft die Konvertierung eines Rust-Dokuments mit Metadaten in ein PyDocument.
     #[test]
     fn test_doc_to_py_conversion() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -609,6 +694,7 @@ mod tests {
         })
     }
 
+    // Prüft die Konvertierung eines Rust-Dokuments ohne Metadaten in ein PyDocument.
     #[test]
     fn test_doc_to_py_conversion_no_metadata() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -624,6 +710,7 @@ mod tests {
         })
     }
 
+    // Prüft die Konvertierung einer Liste interner SearchResult in PySearchResult.
     #[test]
     fn test_results_to_py_conversion() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -641,6 +728,7 @@ mod tests {
         })
     }
 
+    // Prüft die Konvertierung eines PyDict in serde_json::Value.
     #[test]
     fn test_dict_to_json_conversion() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -655,6 +743,7 @@ mod tests {
         })
     }
 
+    // Prüft opt_dict_to_json, wenn ein PyDict übergeben wird.
     #[test]
     fn test_opt_dict_to_json_some() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -668,6 +757,7 @@ mod tests {
         })
     }
 
+    // Prüft opt_dict_to_json, wenn None übergeben wird.
     #[test]
     fn test_opt_dict_to_json_none() -> PyResult<()> {
         let res = opt_dict_to_json(None)?;
@@ -675,6 +765,7 @@ mod tests {
         Ok(())
     }
 
+    // Prüft die Konvertierung von serde_json::Value in ein natives Python-Objekt.
     #[test]
     fn test_json_to_py_conversion() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
@@ -693,6 +784,7 @@ mod tests {
 
     // ─── Open DB Parameter Guards ──────────────────────────────────────────────
 
+    // Prüft, dass open() mit dimension=0 mit einem Fehler abgewiesen wird.
     #[test]
     fn test_open_db_invalid_dimension_zero() {
         pyo3::prepare_freethreaded_python();
@@ -702,6 +794,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass open() mit dimension > 10.000 abgewiesen wird.
     #[test]
     fn test_open_db_invalid_dimension_too_large() {
         pyo3::prepare_freethreaded_python();
@@ -711,6 +804,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass open() mit max_elements=0 abgewiesen wird.
     #[test]
     fn test_open_db_invalid_max_elements_zero() {
         pyo3::prepare_freethreaded_python();
@@ -720,6 +814,7 @@ mod tests {
         });
     }
 
+    // Prüft, dass open() mit einer unbekannten Distanzmetrik abgewiesen wird.
     #[test]
     fn test_open_db_invalid_distance_metric() {
         pyo3::prepare_freethreaded_python();
@@ -738,6 +833,7 @@ mod tests {
 
     // ─── GIL Concurrency Unit Test ─────────────────────────────────────────────
 
+    // Prüft, dass bei blockierenden Scan- und Leseoperationen der GIL freigegeben wird und parallele Python-Threads nicht verhungern.
     #[test]
     fn test_gil_not_held_during_blocking_ops() {
         use numpy::PyArrayMethods;

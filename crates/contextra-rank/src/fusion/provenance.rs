@@ -1,8 +1,16 @@
+//! # Provenance-Builder für Herkunftsnachweise (`provenance`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Ermöglicht die schrittweise Konstruktion von `ProvenanceRecord`-Instanzen.
+
 use super::types::{ProvenanceRecord, SignalContribution};
 use ahash::AHashMap;
 
 /// Fluent builder for constructing `ProvenanceRecord` instances.
 #[derive(Debug, Clone, PartialEq)]
+// ANCHOR[contextra-rank:PROV-001]
+/// Fluent-Builder zum deterministischen Erstellen von `ProvenanceRecord`-Strukturen.
 pub struct ProvenanceBuilder {
     vector_distance: Option<f32>,
     vector_rank: Option<u32>,
@@ -103,6 +111,8 @@ impl ProvenanceBuilder {
     }
 
     /// Builds the resulting `ProvenanceRecord`.
+    // ANCHOR[contextra-rank:PROV-002]
+    /// Schließt die Konstruktion ab und berechnet die RRF-Beiträge je Signal.
     pub fn build(self) -> ProvenanceRecord {
         build_provenance(&self)
     }

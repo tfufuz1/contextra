@@ -1,3 +1,9 @@
+//! # Integrationstest: wasm merge operator
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(feature = "sandbox")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -66,6 +72,8 @@ pub const INFINITE_LOOP_WASM: &[u8] = &[
     116, 0, 0, 10, 9, 1, 7, 0, 3, 64, 12, 0, 11, 11,
 ];
 
+// ANCHOR[contextra-engine:TST40-001]
+/// Testblock zur Überprüfung von `test_counter_module_adds_le_u64_values`.
 #[test]
 fn test_counter_module_adds_le_u64_values() {
     let op = WasmMergeOperator::new(COUNTER_WASM).expect("valid WASM operator");
@@ -77,6 +85,8 @@ fn test_counter_module_adds_le_u64_values() {
     assert_eq!(val, 3);
 }
 
+// ANCHOR[contextra-engine:TST40-002]
+/// Testblock zur Überprüfung von `test_execution_from_various_calling_contexts`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_execution_from_various_calling_contexts() {
     let op = Arc::new(WasmMergeOperator::new(COUNTER_WASM).expect("valid WASM operator"));
@@ -108,6 +118,8 @@ async fn test_execution_from_various_calling_contexts() {
     assert_eq!(u64::from_le_bytes(direct_res.try_into().unwrap()), 3000);
 }
 
+// ANCHOR[contextra-engine:TST40-003]
+/// Testblock zur Überprüfung von `test_infinite_loop_module_returns_error_promptly`.
 #[test]
 fn test_infinite_loop_module_returns_error_promptly() {
     let op = WasmMergeOperator::new(INFINITE_LOOP_WASM).expect("valid WASM operator");
@@ -116,6 +128,8 @@ fn test_infinite_loop_module_returns_error_promptly() {
     assert!(matches!(res.unwrap_err(), ContextraError::Sandbox(_)));
 }
 
+// ANCHOR[contextra-engine:TST40-004]
+/// Testblock zur Überprüfung von `test_determinism_identical_inputs_yield_identical_outputs`.
 #[test]
 fn test_determinism_identical_inputs_yield_identical_outputs() {
     let op = WasmMergeOperator::new(COUNTER_WASM).expect("valid WASM operator");
@@ -129,6 +143,8 @@ fn test_determinism_identical_inputs_yield_identical_outputs() {
     assert_eq!(u64::from_le_bytes(res1.try_into().unwrap()), 100);
 }
 
+// ANCHOR[contextra-engine:TST40-005]
+/// Testblock zur Überprüfung von `test_invalid_module_returns_error_on_new`.
 #[test]
 fn test_invalid_module_returns_error_on_new() {
     let invalid_bytes: &[u8] = b"NOT_A_WASM_BINARY";
@@ -137,6 +153,8 @@ fn test_invalid_module_returns_error_on_new() {
     assert!(matches!(res.unwrap_err(), ContextraError::Sandbox(_)));
 }
 
+// ANCHOR[contextra-engine:TST40-006]
+/// Testblock zur Überprüfung von `test_clean_drop_terminates_worker_thread`.
 #[test]
 fn test_clean_drop_terminates_worker_thread() {
     let op = WasmMergeOperator::new(COUNTER_WASM).expect("valid WASM operator");
@@ -147,6 +165,8 @@ fn test_clean_drop_terminates_worker_thread() {
     drop(op);
 }
 
+// ANCHOR[contextra-engine:TST40-007]
+/// Testblock zur Überprüfung von `test_wasm_merge_operator_denies_clock_and_rng_access`.
 #[test]
 fn test_wasm_merge_operator_denies_clock_and_rng_access() {
     // WAT module that attempts clock_time_get and panics/traps if ERRNO_ACCES (2) is returned
@@ -223,11 +243,14 @@ fn test_wasm_merge_operator_denies_clock_and_rng_access() {
     );
 }
 
+// ANCHOR[contextra-engine:TST40-008]
+/// Testblock zur Überprüfung von `test_wasm_merge_operator_normal_case_in_compaction`.
 #[tokio::test]
 async fn test_wasm_merge_operator_normal_case_in_compaction() {
-    use contextra_core::{ResourceBudget, ResourceTracker, SnapshotRegistry};
+    use contextra_mvcc::SnapshotRegistry;
     use contextra_store::compaction::{CompactionConfig, CompactionEngine};
     use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
+    use contextra_types::{ResourceBudget, ResourceTracker};
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();
@@ -294,11 +317,14 @@ async fn test_wasm_merge_operator_normal_case_in_compaction() {
     );
 }
 
+// ANCHOR[contextra-engine:TST40-009]
+/// Testblock zur Überprüfung von `test_wasm_merge_operator_fuel_exhausted_in_compaction`.
 #[tokio::test]
 async fn test_wasm_merge_operator_fuel_exhausted_in_compaction() {
-    use contextra_core::{ResourceBudget, ResourceTracker, SnapshotRegistry};
+    use contextra_mvcc::SnapshotRegistry;
     use contextra_store::compaction::{CompactionConfig, CompactionEngine};
     use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
+    use contextra_types::{ResourceBudget, ResourceTracker};
     use std::time::Duration;
     use tempfile::tempdir;
 

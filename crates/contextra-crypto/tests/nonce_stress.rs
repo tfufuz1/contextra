@@ -1,3 +1,8 @@
+//! # Integrationstest: `nonce_stress.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `nonce_stress`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Multi-threaded nonce uniqueness stress testing & empirical vs theoretical collision probability verification.
 // INVARIANTEN: 1,000,000 nonces generated via KeyManager::encrypt_auto_nonce across parallel threads must be distinct (0 collisions).

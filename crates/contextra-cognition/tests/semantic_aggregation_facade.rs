@@ -1,3 +1,8 @@
+//! # Integrationstest: Semantische Aggregations-Fassade (`tests/semantic_aggregation_facade.rs`)
+//!
+//! Validiert die freie Fassadenfunktion `consolidate_semantic_hyperedges` zur
+//! Hyperkanten-Konsolidierung (LeanRAG Stage 3) unter Einhaltung von Budgetgrenzen und Seed-Determinismus.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -84,6 +89,8 @@ async fn create_test_collection(
     Some((col, dir))
 }
 
+// ANCHOR[contextra-cognition:TEST-SEMANTIC-086]
+// Prüft Testfall `test_consolidate_semantic_hyperedges_successful_clustering_and_superedge`.
 #[tokio::test]
 async fn test_consolidate_semantic_hyperedges_successful_clustering_and_superedge() {
     let (col, _dir) = match create_test_collection().await {
@@ -171,6 +178,8 @@ async fn test_consolidate_semantic_hyperedges_successful_clustering_and_superedg
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-SEMANTIC-087]
+// Prüft Testfall `test_consolidate_semantic_hyperedges_budget_exceeded_aborts_before_llm`.
 #[tokio::test]
 async fn test_consolidate_semantic_hyperedges_budget_exceeded_aborts_before_llm() {
     let (col, _dir) = match create_test_collection().await {
@@ -204,6 +213,8 @@ async fn test_consolidate_semantic_hyperedges_budget_exceeded_aborts_before_llm(
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-SEMANTIC-088]
+// Prüft Testfall `test_consolidate_semantic_hyperedges_deterministic_seed`.
 #[tokio::test]
 async fn test_consolidate_semantic_hyperedges_deterministic_seed() {
     let (col1, _dir1) = match create_test_collection().await {

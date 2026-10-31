@@ -375,6 +375,7 @@ pub enum ContextraError {
 
 impl ContextraError {
     /// Creates a `LimitExceeded` error.
+    // ANCHOR[contextra-types:ERR-FN-LIMIT_EXCEEDED]
     pub fn limit_exceeded(limit: usize, context: impl Into<String>) -> Self {
         Self::LimitExceeded {
             limit,
@@ -383,6 +384,7 @@ impl ContextraError {
     }
 
     /// Creates a `ModelLoad` error.
+    // ANCHOR[contextra-types:ERR-FN-MODEL_LOAD]
     pub fn model_load(path: impl Into<String>, reason: impl Into<String>) -> Self {
         Self::ModelLoad {
             path: path.into(),
@@ -391,11 +393,13 @@ impl ContextraError {
     }
 
     /// Creates a `SnapshotUnsupportedForSignal` error.
+    // ANCHOR[contextra-types:ERR-FN-SNAPSHOT_UNSUPPORTED_FOR_SIGNAL]
     pub fn snapshot_unsupported_for_signal(strategy: impl Into<String>) -> Self {
         Self::SnapshotUnsupportedForSignal(strategy.into())
     }
 
     /// Creates an `OrphanedVectorReference` error.
+    // ANCHOR[contextra-types:ERR-FN-ORPHANED_VECTOR_REFERENCE]
     pub fn orphaned_vector_reference(
         doc_id: impl Into<String>,
         index_id: impl Into<String>,
@@ -407,6 +411,7 @@ impl ContextraError {
     }
 
     /// Creates a `CapabilityUnsupported` error.
+    // ANCHOR[contextra-types:ERR-FN-CAPABILITY_UNSUPPORTED]
     pub fn capability_unsupported(
         capability: impl Into<String>,
         reason: impl Into<String>,
@@ -417,11 +422,13 @@ impl ContextraError {
         }
     }
     /// Creates an `InvalidInput` error from any displayable value.
+    // ANCHOR[contextra-types:ERR-FN-INVALID_INPUT]
     pub fn invalid_input(msg: impl Into<String>) -> Self {
         Self::InvalidInput(msg.into())
     }
 
     /// Creates a `WalCorruption` error.
+    // ANCHOR[contextra-types:ERR-FN-WAL_CORRUPTION]
     pub fn wal_corruption(offset: u64, reason: impl Into<String>) -> Self {
         Self::WalCorruption {
             offset,
@@ -430,6 +437,7 @@ impl ContextraError {
     }
 
     /// Creates a `ChecksumMismatch` error.
+    // ANCHOR[contextra-types:ERR-FN-CHECKSUM_MISMATCH]
     pub fn checksum_mismatch(path: impl Into<String>, block_id: u64) -> Self {
         Self::ChecksumMismatch {
             path: path.into(),
@@ -438,21 +446,25 @@ impl ContextraError {
     }
 
     /// Creates a `KvQuantization` error.
+    // ANCHOR[contextra-types:ERR-FN-KV_QUANTIZATION]
     pub fn kv_quantization(msg: impl Into<String>) -> Self {
         Self::KvQuantization(msg.into())
     }
 
     /// Creates a `DurabilityConfig` error.
+    // ANCHOR[contextra-types:ERR-FN-DURABILITY_CONFIG]
     pub fn durability_config(msg: impl Into<String>) -> Self {
         Self::DurabilityConfig(msg.into())
     }
 
     /// Creates a `PinBudgetExceeded` error.
+    // ANCHOR[contextra-types:ERR-FN-PIN_BUDGET_EXCEEDED]
     pub fn pin_budget_exceeded(msg: impl Into<String>) -> Self {
         Self::PinBudgetExceeded(msg.into())
     }
 
     /// Creates a `CrossDeviceLink` error.
+    // ANCHOR[contextra-types:ERR-FN-CROSS_DEVICE_LINK]
     pub fn cross_device_link(
         source_path: impl Into<String>,
         target_path: impl Into<String>,
@@ -464,6 +476,7 @@ impl ContextraError {
     }
 
     /// Creates a `WalTruncationDetected` error.
+    // ANCHOR[contextra-types:ERR-FN-WAL_TRUNCATION_DETECTED]
     pub fn wal_truncation_detected(expected_hmac: [u8; 32], actual_hmac: [u8; 32]) -> Self {
         Self::WalTruncationDetected {
             expected_hmac,
@@ -472,6 +485,7 @@ impl ContextraError {
     }
 
     /// Returns `true` if this error represents an optimistic concurrency control (OCC) conflict or stale read.
+    // ANCHOR[contextra-types:ERR-FN-IS_OCC_CONFLICT]
     pub fn is_occ_conflict(&self) -> bool {
         matches!(self, Self::StaleRead(_) | Self::Conflict(_))
     }

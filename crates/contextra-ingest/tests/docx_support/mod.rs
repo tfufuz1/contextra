@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `mod.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Hilfsfunktionen zum Erzeugen von DOCX-ZIP-Dateien im Speicher für Integrationstests (WP-ING-04).
 // INVARIANTEN: Zero-Panic in Testhelfern.

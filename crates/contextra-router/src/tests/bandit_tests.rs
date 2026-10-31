@@ -1,3 +1,9 @@
+//! # Einheitentests für Bandit-Routing und Richtlinien
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Einheitentests für Bandit-Routing und Richtlinien.
+
+// ANCHOR[contextra-router:TST-BND-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
@@ -21,6 +27,8 @@ use serde_json::json;
 #[cfg(feature = "bandit-routing")]
 use std::sync::Arc;
 
+// ANCHOR[contextra-router:TST-BND-T01]
+// Test `test_route_triggers_bandit_drift_reaction`: Prüft das erwartete Verhalten und Invarianten für einheitentests für bandit-routing und richtlinien.
 #[tokio::test]
 #[cfg(feature = "bandit-routing")]
 async fn test_route_triggers_bandit_drift_reaction() -> Result<(), Box<dyn std::error::Error>> {

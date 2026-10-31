@@ -14,6 +14,8 @@ pub struct TestCase {
     pub target_compound: &'static str,
 }
 
+// ANCHOR[contextra-db:TEST-COMPOUND_SPLIT_RECALL_IMPACT-01-TEST_GERMAN_COMPOUND_SPLIT_RECALL_IMPACT]
+// Testet die Funktionalität von `test_german_compound_split_recall_impact`.
 #[tokio::test]
 async fn test_german_compound_split_recall_impact() {
     let tmp = TempDir::new().expect("failed to create temp dir");

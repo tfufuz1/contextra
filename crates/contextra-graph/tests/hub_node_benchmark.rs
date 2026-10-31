@@ -8,6 +8,7 @@ use contextra_ports::GraphIndex;
 use contextra_types::{Entity, EntityId, TxId};
 use std::time::Instant;
 
+// ANCHOR[contextra-graph:TESTS-HUB-NODE-BENCHMARK-001]
 #[tokio::test]
 async fn test_hub_node_bfs_scaling_benchmark() {
     println!("\n=== HUB-NODE BFS TRAVERSAL SCALING BENCHMARK ===");

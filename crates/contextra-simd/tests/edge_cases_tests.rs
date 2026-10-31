@@ -1,6 +1,15 @@
 // FILE-CONTEXT
 // ZWECK: Edge-case tests covering NaN, Infinity, denormals, zero-vectors, huge magnitudes, and error boundaries.
 
+//! # Randfall- und Grenzwert-Test-Suite: `edge_cases_tests`
+//!
+//! **Zweck:**
+//! Testet gezielt mathematische und speicherbezogene Grenzfälle:
+//! - Erkennung von ungültigen Gleitkommazahlen (NaN, +Inf, -Inf, subnormale/denormale Zahlen).
+//! - Längenprüfungen (leere Vektoren, 1-Element-Vektoren, Dimensions-Fehlanpassungen).
+//! - Mathematische Extrema (Nullvektoren, identische Vektoren, orthogonale Vektoren, antipodische Vektoren).
+//! - Numerische Stabilität (sehr große Werte bis 1e18, maximale u8-Akkumulation ohne 32-Bit Überlauf).
+
 // ADR-002 / SPEC §27: Test assertions and test dataset casts
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
@@ -25,6 +34,8 @@ use contextra_simd::{
 use contextra_types::{ContextraError, DistanceMetric};
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-NAN-DETECTION]
+// Prüft, dass validate_vector Vektoren mit NaN-Werten zuverlässig abweist.
 fn test_nan_detection_in_vector() {
     let nan_vec = vec![1.0f32, 2.0, f32::NAN, 4.0];
     let res = validate_vector(&nan_vec);
@@ -32,6 +43,8 @@ fn test_nan_detection_in_vector() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-INF-DETECTION]
+// Prüft, dass validate_vector positive und negative Unendlichkeit abweist.
 fn test_infinity_detection_in_vector() {
     let inf_vec = vec![1.0f32, f32::INFINITY, 3.0];
     assert!(matches!(
@@ -47,6 +60,8 @@ fn test_infinity_detection_in_vector() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-VALIDATE-BOUNDARIES]
+// Prüft die Erkennung von NaN und Inf an Indexgrenzen (erstes, mittleres, letztes Element).
 fn test_validate_vector_nan_and_inf_at_boundary_indices() {
     let mut vec_first_nan = vec![0.0f32; 100];
     vec_first_nan[0] = f32::NAN;
@@ -58,6 +73,8 @@ fn test_validate_vector_nan_and_inf_at_boundary_indices() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-VALIDATE-EMPTY-LARGE]
+// Prüft validate_vector mit leeren und großen gültigen Vektoren.
 fn test_validate_vector_empty_and_large_valid_slices() {
     let empty: Vec<f32> = vec![];
     assert!(validate_vector(&empty).is_ok());
@@ -67,6 +84,8 @@ fn test_validate_vector_empty_and_large_valid_slices() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-COMPUTE-REJECTS-NAN]
+// Prüft, dass compute_distance bei NaN oder Inf in a oder b einen Fehler liefert.
 fn test_compute_distance_rejects_nan_and_inf() {
     let valid = vec![1.0f32, 2.0, 3.0];
     let nan = vec![1.0f32, f32::NAN, 3.0];
@@ -78,6 +97,8 @@ fn test_compute_distance_rejects_nan_and_inf() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-COMPUTE-TRUSTED-METRICS]
+// Prüft compute_distance_trusted für alle unterstützten Distanzmetriken.
 fn test_compute_distance_trusted_all_supported_metrics() {
     let a = [1.0f32, 2.0, 3.0, 4.0];
     let b = [2.0f32, 3.0, 4.0, 5.0];
@@ -92,6 +113,8 @@ fn test_compute_distance_trusted_all_supported_metrics() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-COMPUTE-BYTES-METRICS]
+// Prüft compute_distance_f32_bytes_trusted für alle unterstützten Distanzmetriken.
 fn test_compute_distance_f32_bytes_trusted_all_supported_metrics() {
     let a = [1.0f32, 2.0, 3.0, 4.0];
     let b = [2.0f32, 3.0, 4.0, 5.0];
@@ -107,6 +130,8 @@ fn test_compute_distance_f32_bytes_trusted_all_supported_metrics() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-DENORMAL-FLOATS]
+// Prüft die stabile Berechnung von Distanzen bei subnormalen/denormalen Gleitkommazahlen.
 fn test_denormal_float_handling() {
     // 1e-18f32 is a valid subnormal/small float whose square 1e-36 is above DENORMAL_MIN (~1.4e-45)
     let subnormal = 1e-18f32;
@@ -131,6 +156,8 @@ fn test_denormal_float_handling() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-ZERO-VEC-COSINE]
+// Prüft, dass Nullvektoren bei der Kosinus-Distanz sicher 1.0 liefern (keine Null-Division).
 fn test_zero_vector_cosine_distance() {
     let zero = vec![0.0f32; 128];
     let v = vec![1.0f32; 128];
@@ -142,6 +169,8 @@ fn test_zero_vector_cosine_distance() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-LARGE-MAGNITUDES]
+// Prüft numerische Stabilität bei Vektoren mit extrem großen Amplituden (1e18).
 fn test_large_magnitudes_handling() {
     // 1e18f32 is a large magnitude float whose square 1e36 is within f32::MAX (~3.4e38)
     let large_a = vec![1e18f32; 64];
@@ -161,6 +190,8 @@ fn test_large_magnitudes_handling() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-IDENTICAL-VECTORS]
+// Prüft, dass identische Vektoren Kosinus-Distanz 0.0 und euklidische Distanz 0.0 haben.
 fn test_identical_vectors_cosine_and_euclidean() {
     let a = vec![1.5f32, -2.3, 4.1, 0.8, -9.2];
 
@@ -175,6 +206,8 @@ fn test_identical_vectors_cosine_and_euclidean() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-OPPOSITE-VECTORS]
+// Prüft, dass entgegengesetzte Vektoren maximale Kosinus-Distanz 2.0 haben.
 fn test_opposite_vectors_cosine() {
     let a = vec![1.0f32, 2.0, 3.0, 4.0];
     let b = vec![-1.0f32, -2.0, -3.0, -4.0];
@@ -187,6 +220,8 @@ fn test_opposite_vectors_cosine() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-ORTHOGONAL-VECTORS]
+// Prüft, dass orthogonale Vektoren Kosinus-Distanz 1.0 haben.
 fn test_orthogonal_vectors_cosine() {
     let a = vec![1.0f32, 0.0, 0.0, 0.0];
     let b = vec![0.0f32, 1.0, 0.0, 0.0];
@@ -199,6 +234,8 @@ fn test_orthogonal_vectors_cosine() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-DIM-MISMATCH]
+// Prüft, dass ungleiche Vektordimensionen sauber mit InvalidInput abgewiesen werden.
 fn test_dimension_mismatch_error() {
     let a = vec![1.0f32; 8];
     let b = vec![1.0f32; 10];
@@ -274,6 +311,8 @@ fn test_dimension_mismatch_error() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-EMPTY-VECTORS]
+// Prüft das Verhalten aller Distanzfunktionen bei leeren Vektoren (Länge 0).
 fn test_empty_vectors_handling() {
     let empty_f32: Vec<f32> = vec![];
     let empty_u8: Vec<u8> = vec![];
@@ -291,6 +330,8 @@ fn test_empty_vectors_handling() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-SINGLE-ELEMENT]
+// Prüft Distanzfunktionen bei 1-dimensionalen Skalar-Vektoren.
 fn test_single_element_vectors() {
     let a = vec![4.0f32];
     let b = vec![2.0f32];
@@ -301,6 +342,8 @@ fn test_single_element_vectors() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-NORMALIZE-EDGES]
+// Prüft Grenzfälle der In-Place-Normalisierung (Nullvektor, leere Slice, Einheitsvektor).
 fn test_normalize_inplace_edge_cases() {
     let mut zero_vec = vec![0.0f32; 10];
     normalize_inplace(&mut zero_vec);
@@ -321,6 +364,8 @@ fn test_normalize_inplace_edge_cases() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-U8-MAX-ACCUMULATION]
+// Prüft, dass 255-Werte bei 1024 Dimensionen ohne u32-Überlauf akkumulieren.
 fn test_u8_max_accumulation_without_overflow() {
     // 60,000 u8 elements with max value 255.
     // 255 * 255 * 60,000 = 3,901,500,000 <= 4,294,967,295 (u32::MAX)
@@ -339,6 +384,8 @@ fn test_u8_max_accumulation_without_overflow() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-SCALAR-DIRECT]
+// Prüft direkte Aufrufe der Skalarfunktionen auf identische, orthogonale und Null-Vektoren.
 fn test_scalar_reference_functions_directly() {
     let a = vec![1.0f32, 2.0, 3.0, 4.0];
     let b = vec![2.0f32, 3.0, 4.0, 5.0];
@@ -358,6 +405,8 @@ fn test_scalar_reference_functions_directly() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-TRAIT-IMPLS]
+// Prüft Debug-, Clone-, Copy- und PartialEq-Trait-Implementierungen der Ergebnis-Strukturen.
 fn test_struct_debug_and_copy_traits() {
     let parts_u8 = CosineSimilarityPartsU8 {
         dot: 100,
@@ -385,6 +434,8 @@ fn test_struct_debug_and_copy_traits() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-EDGE-SCALAR-SLICES]
+// Prüft direkte Skalarfunktionen mit leeren Slices und 1-Element-Slices.
 fn test_scalar_functions_zero_length_and_single_element_slices() {
     let empty_f32: [f32; 0] = [];
 

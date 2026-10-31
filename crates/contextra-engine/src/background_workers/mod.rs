@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** Subsystem für asynchrone Hintergrund-Wartungsaufgaben (GC, Expiry, Orphan-Bereinigung).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Hintergrund-Worker-Tasks zur TTL-Löschung, Entropie-Pruning und Bereinigung verwaister Transaktionen (Orphan Cleanup).
 // INVARIANTEN: Geordnete Abschaltung via CancellationToken; Beschränkung der pro Tick verarbeiteten Elemente.

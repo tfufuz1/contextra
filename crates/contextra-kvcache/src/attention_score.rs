@@ -1,50 +1,62 @@
 #![forbid(unsafe_code)]
 
-//! Attention-aware Eviction Module (SnapKV/H2O Foundation).
+//! # Attention-basierte Verdrängung (Eviction)
 //!
-//! Provides traits and ranking logic for KV-cache segment eviction, combining
-//! traditional LRU access timestamps with LLM attention importance scores.
+//! ANCHOR[contextra-kvcache:ATTN-001]
+//!
+//! Dieses Modul implementiert aufmerksamkeitsgesteuerte Verdrängungsstrategien (SnapKV / H2O = Heavy-Hitter Oracle).
+//! Es kombiniert klassische LRU-Zugriffszeitstempel (Least Recently Used) mit Attention-Wichtigkeits-Scores
+//! aus großen Sprachmodellen.
+//!
+//! ## Warum Attention-gestützte Verdrängung?
+//! Ein reines LRU-Verfahren verwirft stets die am längsten nicht zugegriffenen KV-Blöcke. Bei LLMs
+//! gibt es jedoch Token (z. B. System-Instruktionen, syntaktische Anker oder zentrale Entitäten),
+//! auf die fast jeder nachfolgende Token eine sehr hohe Aufmerksamkeit (Attention Weight) richtet.
+//! Durch Berücksichtigung dieser Attention-Scores werden wichtige Segmente im RAM gehalten, selbst
+//! wenn der letzte Zugriff bereits etwas zurückliegt.
+//!
+//! ## Fallback-Verhalten
+//! Fehlen Attention-Informationen (z. B. bei Verwendung von [`NullAttentionScoreSource`]), fällt
+//! der Algorithmus streng deterministisch auf das Standard-LRU-Verfahren zurück.
 
 use contextra_ports::RequestId;
 use contextra_types::TenantId;
 use std::time::Instant;
 
-/// Dyn-compatible source for segment attention importance scores.
+// ANCHOR[contextra-kvcache:ATTN-002]
+/// Dyn-kompatible Trait-Schnittstelle zur Bereitstellung von Attention-Wichtigkeits-Scores.
 ///
-/// Implemented by upstream inference backends or test mocks to supply
-/// attention weights without introducing dependencies on specific ML tensor frameworks.
+/// Wird von Upstream-Inferenz-Backends (z. B. Candle/Ollama) oder Test-Mocks implementiert,
+/// um Aufmerksamkeitsscores bereitzustellen, ohne direkte Abhängigkeiten zu Tensor-Frameworks einzuführen.
 pub trait AttentionScoreSource: Send + Sync {
-    /// Returns the importance score for a given `segment_id`.
+    /// Liefert den Wichtigkeits-Score für ein gegebenes `segment_id`.
     ///
-    /// Higher values indicate higher retention importance (less evictable).
-    /// Lower values indicate lower retention importance (more evictable).
-    /// Returns `None` if no attention score is available for the segment.
+    /// - Höhere Werte bedeuten höhere Relevanz (bleibt länger im Cache).
+    /// - Niedrigere Werte bedeuten geringe Relevanz (wird bevorzugt verdrängt).
+    /// - Liefert `None`, falls für dieses Segment kein Score bekannt ist.
     fn importance_score(&self, segment_id: u64) -> Option<f32>;
 
-    /// Returns the importance score for a given tenant and `segment_id`.
+    /// Liefert den Wichtigkeits-Score für einen Mandanten und ein `segment_id`.
     ///
-    /// Default implementation delegates to [`importance_score`](Self::importance_score).
+    /// Standardmäßig wird an [`Self::importance_score`] delegiert.
     fn importance_score_for_tenant(&self, _tenant_id: TenantId, segment_id: u64) -> Option<f32> {
         self.importance_score(segment_id)
     }
 
-    /// Registers a segment mapping from `(tenant_id, segment_id)` to `request_id`.
+    /// Registriert eine Zuordnung von `(tenant_id, segment_id)` zu `request_id`.
     fn register_segment(&self, _tenant_id: TenantId, _segment_id: u64, _request_id: RequestId) {}
 
-    /// Unregisters a segment mapping for `(tenant_id, segment_id)` when evicted or released.
+    /// Entfernt eine Zuordnung, wenn das Segment verdrängt oder freigegeben wurde.
     fn unregister_segment(&self, _tenant_id: TenantId, _segment_id: u64) {}
 }
 
-/// Default implementation that provides no attention scores (pure LRU behavior).
+// ANCHOR[contextra-kvcache:ATTN-003]
+/// Standard-Implementierung, die keine Attention-Scores liefert (reines LRU-Verhalten).
 ///
 /// # Fallback-Verhalten
-///
-/// Wenn kein Attention-Signal verfügbar ist (oder [`NullAttentionScoreSource`] verwendet wird),
-/// erfolgt die Eviction streng deterministisch nach dem LRU-Prinzip (älteste Zugriffszeit zuerst).
-/// Es werden keinerlei Zufalls- oder stochastische Entscheidungen getroffen.
-///
-/// Im Betrieb wird bei jeder Eviction-Bewertung ohne Attention-Signal eine
-/// `tracing::warn!`-Meldung ausgegeben, um das Fehlen des Attention-Signals im Monitoring zu signalisieren.
+/// Wenn kein Attention-Signal verfügbar ist, erfolgt die Verdrängung streng deterministisch
+/// nach dem LRU-Prinzip (älteste Zugriffszeit zuerst).
+/// Im Monitoring wird eine Warnmeldung geloggt, um das Fehlen des Signals transparent zu machen.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct NullAttentionScoreSource;
 
@@ -63,11 +75,10 @@ impl AttentionScoreSource for NullAttentionScoreSource {
     }
 }
 
-/// Ranks eviction candidates using a default balanced weighting (50% LRU age, 50% attention score).
+// ANCHOR[contextra-kvcache:ATTN-004]
+/// Bewertet Verdrängungskandidaten mit Standard-Gewichtung (50% LRU-Alter, 50% Attention-Score).
 ///
-/// Returns a vector of segment IDs ordered by eviction priority (first element = evicted first).
-/// If `scores` supplies `None` for all candidates (such as [`NullAttentionScoreSource`]),
-/// the result strictly preserves LRU order (oldest access instant evicted first).
+/// Gibt eine sortierte Liste von Segment-IDs zurück (erstes Element = wird zuerst verdrängt).
 pub fn rank_for_eviction(
     candidates: &[(u64, Instant)],
     scores: &dyn AttentionScoreSource,
@@ -75,12 +86,13 @@ pub fn rank_for_eviction(
     rank_for_eviction_weighted(candidates, scores, 0.5)
 }
 
-/// Ranks eviction candidates combining normalized LRU access age and attention scores.
+// ANCHOR[contextra-kvcache:ATTN-005]
+/// Bewertet Verdrängungskandidaten unter Kombination von normalisiertem LRU-Alter und Attention-Score.
 ///
-/// `attention_weight` must be in `[0.0, 1.0]`, controlling the weight given to attention importance
-/// versus LRU access age.
-///
-/// Returns a vector of segment IDs ordered by eviction priority (first element = evicted first).
+/// # Parameter
+/// - `candidates`: Liste aus Tupeln `(Segment-ID, Zugriffszeitstempel)`.
+/// - `scores`: Quelle für Aufmerksamkeitsscores.
+/// - `attention_weight`: Gewichtung zwischen `0.0` (rein LRU) und `1.0` (rein Attention).
 pub fn rank_for_eviction_weighted(
     candidates: &[(u64, Instant)],
     scores: &dyn AttentionScoreSource,
@@ -89,7 +101,17 @@ pub fn rank_for_eviction_weighted(
     rank_for_eviction_weighted_for_tenant(TenantId::SYSTEM, candidates, scores, attention_weight)
 }
 
-/// Ranks eviction candidates for a specific tenant combining normalized LRU access age and attention scores.
+// ANCHOR[contextra-kvcache:ATTN-006]
+/// Bewertet Verdrängungskandidaten mandantenspezifisch.
+///
+/// # Ablauf
+/// 1. Schnellausstieg bei 0 oder 1 Kandidaten.
+/// 2. Zeitstempel normalisieren: Zeitdifferenz zur ältesten Anfrage ermitteln.
+/// 3. Attention-Scores der Kandidaten abfragen und ungültige/nicht-endliche Werte (NaN, Inf) filtern.
+/// 4. Min/Max-Skalierung (Min-Max-Normalization) über gefundene Scores berechnen.
+/// 5. Zusammengesetzten Eviction-Score berechnen:
+///    `composite_score = (1.0 - weight) * norm_lru + weight * norm_importance`.
+/// 6. Stabil aufsteigend nach zusammengesetztem Score sortieren (niedrigste Wichtigkeit zuerst).
 pub fn rank_for_eviction_weighted_for_tenant(
     tenant_id: TenantId,
     candidates: &[(u64, Instant)],
@@ -205,6 +227,7 @@ mod tests {
         }
     }
 
+    // Prüft, dass ohne Attention-Scores die reine LRU-Reihenfolge strikt erhalten bleibt.
     #[test]
     fn test_null_attention_score_source_preserves_pure_lru() {
         let base = Instant::now();
@@ -221,6 +244,7 @@ mod tests {
         assert_eq!(ranked, vec![300, 200, 100]);
     }
 
+    // Prüft, dass hohe Attention-Werte die LRU-Reihenfolge gezielt überschreiben können.
     #[test]
     fn test_attention_score_overrides_lru_order_when_weighted() {
         let base = Instant::now();
@@ -241,6 +265,7 @@ mod tests {
         assert_eq!(ranked, vec![2, 1]);
     }
 
+    // Prüft Randfälle wie leere Kandidatenlisten und einelementige Mengen.
     #[test]
     fn test_rank_empty_and_single_candidate() {
         let null_source = NullAttentionScoreSource;
@@ -250,6 +275,7 @@ mod tests {
         assert_eq!(rank_for_eviction(&single, &null_source), vec![42]);
     }
 
+    // Prüft die numerische Stabilität bei gleichen Zeitstempeln, gleichen Scores oder NaN/Inf.
     #[test]
     fn test_v5_numerical_stability_edge_cases() {
         let base = Instant::now();

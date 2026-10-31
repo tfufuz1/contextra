@@ -1,3 +1,9 @@
+//! # Integrationstest: Fallback- und Robustheitstests für score-normalisierte Fusion
+//!
+//! **Crate:** `contextra-rank`
+//!
+//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use contextra_rank::fusion::{
     fuse_search_results_with_strategy, MetadataMergePriority, SearchResult,
@@ -14,6 +20,7 @@ fn make_doc(id: &str, score: f32) -> SearchResult {
     }
 }
 
+// ANCHOR[contextra-rank:NORM-TEST-001]
 #[test]
 fn test_score_normalized_fallback_empty_signal_list() {
     // (a) Active signal with an empty list when total_active_signals > 1
@@ -52,6 +59,7 @@ fn test_score_normalized_fallback_empty_signal_list() {
     }
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_score_normalized_fallback_constant_scores() {
     // (b) Signal with constant scores (MinMax degenerated max_s <= min_s)
@@ -94,6 +102,7 @@ fn test_score_normalized_fallback_constant_scores() {
     }
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_score_normalized_fallback_non_finite_scores() {
     // (c) Signal with NaN or Infinity doc scores

@@ -1,3 +1,7 @@
+//! # Schreibpfad-Implementierung (Ring 1)
+//!
+//! Fuehrt Put- und Delete-Befehle ueber Group-Commit, WAL-Append und MemTable-Update aus.
+
 use super::super::config::DurabilityMode;
 use super::super::engine::LsmStorage;
 use super::super::group_commit::{
@@ -296,11 +300,7 @@ fn prepare_commit_ops(
     storage: &LsmStorage,
     tx_id: TxId,
     ops: &[IndexOp<(Vec<u8>, Vec<u8>)>],
-) -> Result<(
-    Vec<(WalOp, u64)>,
-    Vec<(Vec<u8>, Vec<u8>, u64)>,
-    u64,
-)> {
+) -> Result<(Vec<(WalOp, u64)>, Vec<(Vec<u8>, Vec<u8>, u64)>, u64)> {
     let mut wal_ops = Vec::with_capacity(ops.len() + 1);
     let mut mem_updates = Vec::with_capacity(ops.len());
 
@@ -372,7 +372,7 @@ async fn single_commit_path(
     mem_updates: Vec<(Vec<u8>, Vec<u8>, u64)>,
     first_seq: u64,
 ) -> Result<()> {
-    let (wal_entries, _prev_hmac) = wal.prepare_batch(wal_ops).await?;
+    let (wal_entries, prev_hmac) = wal.prepare_batch(wal_ops).await?;
     let entries_for_observer = if storage.has_observers() {
         wal_entries.entries().to_vec()
     } else {
@@ -380,57 +380,78 @@ async fn single_commit_path(
     };
     let durability_mode = storage.config.durability_mode;
 
-    let append_handle = tokio::spawn(async move {
-        match durability_mode {
-            DurabilityMode::Full | DurabilityMode::WalNoHmac => {
-                let truncate_guard = wal.truncate_lock.lock().await;
-                let start_offset = wal.size();
-                let start_hmac = wal.last_hmac_snapshot().await;
-                let append_res = wal.append_batch_locked(wal_entries, &truncate_guard).await;
-                if append_res.is_err() {
-                    if let Err(trunc_err) = wal.truncate(start_offset, start_hmac).await {
-                        tracing::error!(
-                            "Failed to truncate WAL after failed single append_batch: {trunc_err}"
-                        );
+    struct SingleCommitGuard<'a> {
+        storage: &'a LsmStorage,
+        wal: &'a super::super::Wal,
+        tx_id: TxId,
+        first_seq: u64,
+        prev_hmac: [u8; 32],
+        committed: bool,
+    }
+
+    impl<'a> Drop for SingleCommitGuard<'a> {
+        fn drop(&mut self) {
+            if !self.committed {
+                let _ = self.wal.rollback_hmac_sync(self.prev_hmac);
+                if self.first_seq > 0 {
+                    if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
+                        seq_val.forget_from(self.first_seq);
                     }
-                    if wal.is_poisoned() {
-                        match wal.recover_from_poison().await {
-                            Ok(()) => {
-                                tracing::info!("WAL successfully recovered from poison state")
-                            }
-                            Err(rec_err) => tracing::error!(
-                                "Failed to recover WAL from poison state: {rec_err}"
-                            ),
+                }
+                self.storage.cleanup_intent_locks_for_tx(self.tx_id);
+            }
+        }
+    }
+
+    let mut guard = SingleCommitGuard {
+        storage,
+        wal: &wal,
+        tx_id,
+        first_seq,
+        prev_hmac,
+        committed: false,
+    };
+
+    let single_append_res = match durability_mode {
+        DurabilityMode::Full | DurabilityMode::WalNoHmac => {
+            let truncate_guard = wal.truncate_lock.lock().await;
+            let start_offset = wal.size();
+            let append_res = wal.append_batch_locked(wal_entries, &truncate_guard).await;
+            if append_res.is_err() {
+                if let Err(trunc_err) = wal.truncate(start_offset, prev_hmac).await {
+                    tracing::error!(
+                        "Failed to truncate WAL after failed single append_batch: {trunc_err}"
+                    );
+                }
+                if wal.is_poisoned() {
+                    match wal.recover_from_poison().await {
+                        Ok(()) => {
+                            tracing::info!("WAL successfully recovered from poison state")
+                        }
+                        Err(rec_err) => {
+                            tracing::error!("Failed to recover WAL from poison state: {rec_err}")
                         }
                     }
-                    drop(truncate_guard);
-                } else {
-                    drop(truncate_guard);
                 }
-                append_res
+                drop(truncate_guard);
+            } else {
+                drop(truncate_guard);
             }
-            DurabilityMode::MemoryOnly => Ok(()),
+            append_res
         }
-    });
-
-    let single_append_res = match append_handle.await {
-        Ok(res) => res,
-        Err(join_err) => Err(ContextraError::Internal(format!(
-            "WAL append task panicked: {join_err}"
-        ))),
+        DurabilityMode::MemoryOnly => {
+            let _ = wal.rollback_hmac(prev_hmac).await;
+            Ok(())
+        }
     };
 
     if let Err(e) = single_append_res {
-        if first_seq > 0 {
-            if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-                seq_val.forget_from(first_seq);
-            }
-        }
-        storage.cleanup_intent_locks_for_tx(tx_id);
         return Err(ContextraError::Storage(format!(
             "Commit failed (at WAL append), WAL anchor rollback executed: {e}"
         )));
     }
+
+    guard.committed = true;
 
     let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
     storage.notify_commit_observers(
@@ -530,9 +551,9 @@ async fn follower_commit_path(
                 }
                 drop(queue_guard);
                 if first_seq > 0 {
-                        if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-                            seq_val.forget_from(first_seq);
-                        }
+                    if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
+                        seq_val.forget_from(first_seq);
+                    }
                 }
                 storage.cleanup_intent_locks_for_tx(tx_id);
                 Err(ContextraError::CommitTimeout {
@@ -588,15 +609,38 @@ async fn leader_commit_path(
 
     struct LeaderCancelGuard<'a> {
         storage: &'a LsmStorage,
+        wal: &'a super::super::Wal,
         leader_tx_id: TxId,
         leader_first_seq: u64,
-        active: bool,
+        pending_queue: Option<PendingCommitQueue>,
+        prev_hmac: Option<[u8; 32]>,
+        committed: bool,
     }
 
     impl<'a> Drop for LeaderCancelGuard<'a> {
         fn drop(&mut self) {
-            if self.active {
-                if let Ok(mut queue_guard) = self.storage.pending_commit_queue.try_lock() {
+            if !self.committed {
+                if let Some(prev) = self.prev_hmac {
+                    let _ = self.wal.rollback_hmac_sync(prev);
+                }
+                if let Some(pending_queue) = self.pending_queue.take() {
+                    for r in pending_queue.requests {
+                        let r_first_seq = r
+                            .mem_updates
+                            .first()
+                            .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
+                            .unwrap_or(0);
+                        if r_first_seq > 0 {
+                            if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
+                                seq_val.forget_from(r_first_seq);
+                            }
+                        }
+                        self.storage.cleanup_intent_locks_for_tx(r.tx_id);
+                        let _ = r.sender.send(Err(ContextraError::Storage(
+                            "Leader cancelled group commit".into(),
+                        )));
+                    }
+                } else if let Ok(mut queue_guard) = self.storage.pending_commit_queue.try_lock() {
                     if let Some(pending_queue) = queue_guard.take() {
                         for r in pending_queue.requests {
                             let r_first_seq = r
@@ -605,9 +649,9 @@ async fn leader_commit_path(
                                 .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
                                 .unwrap_or(0);
                             if r_first_seq > 0 {
-                                    if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
-                                        seq_val.forget_from(r_first_seq);
-                                    }
+                                if let Some(ref seq_val) = self.storage.sequence_log_ssi_validator {
+                                    seq_val.forget_from(r_first_seq);
+                                }
                             }
                             self.storage.cleanup_intent_locks_for_tx(r.tx_id);
                             let _ = r.sender.send(Err(ContextraError::Storage(
@@ -628,9 +672,12 @@ async fn leader_commit_path(
 
     let mut leader_guard = LeaderCancelGuard {
         storage,
+        wal: &wal,
         leader_tx_id,
         leader_first_seq: first_seq,
-        active: true,
+        pending_queue: None,
+        prev_hmac: None,
+        committed: false,
     };
 
     drop(commit_lock);
@@ -654,44 +701,22 @@ async fn leader_commit_path(
     };
     drop(queue_guard);
 
-    leader_guard.active = false;
+    leader_guard.pending_queue = Some(pending_queue);
 
     let mut all_wal_ops = leader_wal_ops;
-    for r in pending_queue.requests.iter() {
-        all_wal_ops.extend(r.wal_ops.clone());
+    if let Some(ref pq) = leader_guard.pending_queue {
+        for r in pq.requests.iter() {
+            all_wal_ops.extend(r.wal_ops.clone());
+        }
     }
 
-    let (all_wal_entries, _prev_hmac) = match wal.prepare_batch(all_wal_ops).await {
+    let (all_wal_entries, prev_hmac) = match wal.prepare_batch(all_wal_ops).await {
         Ok(res) => res,
         Err(e) => {
-            if first_seq > 0 {
-                if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-                    seq_val.forget_from(first_seq);
-                }
-            }
-            for r in &pending_queue.requests {
-                let r_first_seq = r
-                    .mem_updates
-                    .first()
-                    .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
-                    .unwrap_or(0);
-                if r_first_seq > 0 {
-                    if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-                        seq_val.forget_from(r_first_seq);
-                    }
-                }
-            }
-            let mut batch_txs = vec![leader_tx_id];
-            batch_txs.extend(pending_queue.requests.iter().map(|r| r.tx_id));
-            storage.cleanup_intent_locks_for_txs(&batch_txs);
-
-            let err_msg = format!("Group commit batch preparation failed: {e}");
-            for r in pending_queue.requests {
-                let _ = r.sender.send(Err(ContextraError::Storage(err_msg.clone())));
-            }
             return Err(e);
         }
     };
+    leader_guard.prev_hmac = Some(prev_hmac);
 
     let leader_entries_count = leader_mem_updates.len() + 1;
     let leader_entries_for_observer = if storage.has_observers() {
@@ -704,66 +729,38 @@ async fn leader_commit_path(
         Vec::new()
     };
 
-    let wal_clone = wal.clone();
     let durability_mode = storage.config.durability_mode;
     let batch_for_append = all_wal_entries.clone();
-    let committed_flag_for_task = Arc::clone(&committed_flag);
-    let append_handle = tokio::spawn(async move {
-        let truncate_guard = wal_clone.truncate_lock.lock().await;
-        execute_group_commit_append(
-            &wal_clone,
-            durability_mode,
-            batch_for_append,
-            truncate_guard,
-            &committed_flag_for_task,
-        )
-        .await
-    });
+    let truncate_guard = wal.truncate_lock.lock().await;
+    let append_res = execute_group_commit_append(
+        &wal,
+        durability_mode,
+        batch_for_append,
+        truncate_guard,
+        &committed_flag,
+    )
+    .await;
 
-    let append_res = match append_handle.await {
-        Ok(res) => res,
-        Err(join_err) => Err(ContextraError::Internal(format!(
-            "Group commit append task panicked: {join_err}"
-        ))),
-    };
+    if durability_mode == DurabilityMode::MemoryOnly {
+        let _ = wal.rollback_hmac(prev_hmac).await;
+    }
 
     if let Err(e) = append_res {
-        if first_seq > 0 {
-            if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-                seq_val.forget_from(first_seq);
-            }
-        }
-        for r in &pending_queue.requests {
-            let r_first_seq = r
-                .mem_updates
-                .first()
-                .map(|(_, _, seq)| seq & !TOMBSTONE_BIT)
-                .unwrap_or(0);
-            if r_first_seq > 0 {
-                if let Some(ref seq_val) = storage.sequence_log_ssi_validator {
-                    seq_val.forget_from(r_first_seq);
-                }
-            }
-        }
-
         let err_msg = format!(
             "Commit failed (at WAL append), WAL anchor rollback executed: WAL append failed: {e}"
         );
-
-        let mut batch_txs = vec![leader_tx_id];
-        batch_txs.extend(pending_queue.requests.iter().map(|r| r.tx_id));
-        storage.cleanup_intent_locks_for_txs(&batch_txs);
-
-        for r in pending_queue.requests {
-            if r.sender
-                .send(Err(ContextraError::Storage(err_msg.clone())))
-                .is_err()
-            {
-                tracing::warn!(follower_tx = ?r.tx_id, "Follower dropped receiver during group commit failure notification");
-            }
-        }
         return Err(ContextraError::Storage(err_msg));
     }
+
+    leader_guard.committed = true;
+    let pending_queue = match leader_guard.pending_queue.take() {
+        Some(pq) => pq,
+        None => {
+            return Err(ContextraError::Internal(
+                "Group commit pending_queue unexpectedly missing after durability".into(),
+            ));
+        }
+    };
 
     let is_durable = storage.config.durability_mode != DurabilityMode::MemoryOnly;
     storage.notify_commit_observers(

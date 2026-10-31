@@ -1,13 +1,17 @@
-//! Conformal Calibration and Adaptive Conformal Prediction with Propensity Weighting.
+//! # Konforme Prädiktion & Adaptive Kalibrierung (`conformal`)
 //!
-//! Provides quantile-based online threshold estimation for target coverage guarantees
-//! under covariate shift via propensity weighting.
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Bietet quantilbasierte Online-Schwellenwertschätzung mit mathematischen
+//! Finite-Sample-Abdeckungsgarantien (Coverage Guarantees).
 
 use contextra_types::ConfigFingerprint;
 use thiserror::Error;
 
 /// Error type for conformal calibration and threshold updates.
 #[derive(Debug, Clone, PartialEq, Error)]
+// ANCHOR[contextra-rank:CONF-001]
+/// Fehlertypen für die konforme Kalibrierung.
 pub enum ConformalError {
     /// Target miscoverage level `alpha` is not finite or outside (0.0, 1.0).
     #[error("Invalid target miscoverage alpha: {0} (must be finite and in (0.0, 1.0))")]
@@ -31,6 +35,8 @@ pub enum ConformalError {
 }
 
 /// Trait for deterministic, online conformal calibration and threshold estimation.
+// ANCHOR[contextra-rank:CONF-002]
+/// Trait für deterministische konforme Schwellenwertschätzung.
 pub trait ConformalCalibrator {
     /// Deterministically updates the threshold given a non-conformity score and propensity weight.
     ///
@@ -42,6 +48,14 @@ pub trait ConformalCalibrator {
     /// - `Ok(true)` if the update altered the threshold value.
     /// - `Ok(false)` if the threshold value remained unchanged.
     /// - `Err(ConformalError)` if any input parameter is non-finite or non-positive.
+    // ANCHOR[contextra-rank:CONF-004]
+    // Ablauf des Online-Pinball-Updates:
+    // 1. Validierung: Prüfen, ob propensity_weight > 0.0 und non_conformity_score endlich sind.
+    // 2. Schrittweite berechnen:
+    //    - Bei Überschreitung (S_t > threshold): Delta = +gamma * w_t * (1 - alpha)
+    //    - Bei Unterschreitung (S_t <= threshold): Delta = -gamma * w_t * alpha
+    // 3. Klemmen: Neuer Schwellenwert wird auf [min_threshold, max_threshold] beschränkt.
+    // 4. Inkrementieren: Zähler der Beobachtungen erhöhen und Änderungsstatus zurückgeben.
     fn update(
         &mut self,
         non_conformity_score: f32,
@@ -59,6 +73,8 @@ pub trait ConformalCalibrator {
 /// the threshold increases by $\gamma \cdot w_t \cdot (1 - \alpha)$. Otherwise, it decreases by
 /// $\gamma \cdot w_t \cdot \alpha$.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-rank:CONF-003]
+/// Adaptiver konformer Kalibrierer für Online-Schwellenwerte unter Covariate Shift.
 pub struct AdaptiveConformalCalibrator {
     alpha: f32,
     threshold: f32,

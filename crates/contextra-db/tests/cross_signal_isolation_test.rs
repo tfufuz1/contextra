@@ -1,3 +1,7 @@
+//! # Signal-Isolations-Tests
+//!
+//! Stellt sicher, dass Teilsignale (Vektor, Text, Graph) keine unerwünschten Querbeeinflussungen zeigen.
+//!
 // FILE-CONTEXT
 // ZWECK: Prüft Cross-Signal Snapshot-Isolation in contextra-db während paralleler Writes/Updates.
 // INVARIANTEN: Verifiziert, ob 4-Signal Hybrid-Suche konsistent gegen einen Snapshot liest oder Isolation-Asymmetrien auftreten.
@@ -10,6 +14,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-db:TEST-CROSS_SIGNAL_ISOLATION_TEST-01-TEST_CROSS_SIGNAL_ISOLATION_SINGLE_RUN]
+// Testet die Funktionalität von `test_cross_signal_isolation_single_run`.
 #[tokio::test]
 async fn test_cross_signal_isolation_single_run() -> Result<()> {
     let dir = tempdir().unwrap();
@@ -65,6 +71,8 @@ async fn test_cross_signal_isolation_single_run() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-db:TEST-CROSS_SIGNAL_ISOLATION_TEST-02-TEST_GRAPH_SIGNAL_SNAPSHOT_ISOLATION_WITH_HOPS_STRATEGY]
+// Testet die Funktionalität von `test_graph_signal_snapshot_isolation_with_hops_strategy`.
 #[tokio::test]
 async fn test_graph_signal_snapshot_isolation_with_hops_strategy() -> Result<()> {
     let dir = tempdir().unwrap();
@@ -128,6 +136,8 @@ async fn test_graph_signal_snapshot_isolation_with_hops_strategy() -> Result<()>
     Ok(())
 }
 
+// ANCHOR[contextra-db:TEST-CROSS_SIGNAL_ISOLATION_TEST-03-TEST_HYBRID_SEARCH_CONSISTENT_SNAPSHOT_ACROSS_SIGNALS]
+// Testet die Funktionalität von `test_hybrid_search_consistent_snapshot_across_signals`.
 #[tokio::test]
 async fn test_hybrid_search_consistent_snapshot_across_signals() -> Result<()> {
     let dir = tempdir().unwrap();
@@ -206,6 +216,8 @@ async fn test_hybrid_search_consistent_snapshot_across_signals() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-db:TEST-CROSS_SIGNAL_ISOLATION_TEST-04-TEST_CROSS_SIGNAL_ISOLATION_100_ITERATIONS_STRESS]
+// Testet die Funktionalität von `test_cross_signal_isolation_100_iterations_stress`.
 #[tokio::test]
 async fn test_cross_signal_isolation_100_iterations_stress() -> Result<()> {
     let split_brain_count = Arc::new(AtomicUsize::new(0));

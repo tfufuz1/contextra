@@ -1,3 +1,7 @@
+//! # Checkpoint-Stresstests
+//!
+//! Testet fortlaufende Checkpointerstellung unter kontinuierlicher Schreiblast.
+//!
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::StorageEngine;
 use contextra_store::{LsmConfig, LsmStorage};

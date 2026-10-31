@@ -1,3 +1,8 @@
+//! # Integrationstest: Rich-Grounding-Pfad mit GASP-Kalibrierung (`tests/grounding_validator_rich_path_test.rs`)
+//!
+//! Validiert das Zusammenwirken von `GaspValidator` (isotone Regression/Kalibrierung)
+//! und `execute_background_consolidation_with_rich_validator` zum Schutz vor Halluzinationen.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -37,6 +42,8 @@ impl LlmTextGenerator for TestLlmGenerator {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-GROUNDIN-061]
+// Prüft Testfall `test_grounding_validator_rich_path_with_gasp_calibration_and_policy_violation`.
 #[tokio::test]
 async fn test_grounding_validator_rich_path_with_gasp_calibration_and_policy_violation() {
     let dir = tempdir().unwrap();

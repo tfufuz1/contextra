@@ -1,3 +1,9 @@
+//! # Integrationstest: Referenztests für RRF mit bekannten numerischen Sollwerten
+//!
+//! **Crate:** `contextra-rank`
+//!
+//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use ahash::AHashMap;
 use contextra_rank::fusion::{reciprocal_rank_fusion, SearchResult};
@@ -32,6 +38,7 @@ fn rrf_fusion(result_lists: &[Vec<DocId>], k: usize) -> AHashMap<DocId, f32> {
     scores
 }
 
+// ANCHOR[contextra-rank:RRF-TEST-002]
 #[test]
 fn rrf_known_values() {
     let list_a = vec![DocId::from(1), DocId::from(2), DocId::from(3)];
@@ -50,6 +57,7 @@ fn rrf_known_values() {
     }
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn rrf_with_disjoint_lists() {
     let list_a = vec![DocId::from(10), DocId::from(20)];
@@ -74,6 +82,7 @@ fn rrf_with_disjoint_lists() {
     }
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn rrf_with_three_lists() {
     let list_a = vec![DocId::from(100), DocId::from(200), DocId::from(300)];

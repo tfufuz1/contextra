@@ -1,7 +1,9 @@
-//! Global Fusion Strategy for Corpus-Wide Topic Retrieval (§B.3.4).
+//! # Globale korpusweite Fusionsstrategie (`global`)
 //!
-//! Executes community-aware Reciprocal Rank Fusion (RRF) over LeanRAG-aggregated nodes
-//! grouped by Leiden community assignments.
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Implementiert eine themenbasierte, korpusweite Fusion über zusammengefasste
+//! Wissensgraph-Knoten (LeanRAG / Leiden-Community-Cluster).
 
 use ahash::{AHashMap, AHashSet};
 use contextra_types::ContextraError;
@@ -13,6 +15,8 @@ use super::types::SearchResult;
 
 /// Configuration for `GlobalFusionStrategy`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-rank:GLOB-001]
+/// Konfigurationsparameter für die globale Community-Fusionsstrategie.
 pub struct GlobalFusionConfig {
     /// Maximum number of community nodes to include in the final result set.
     pub max_community_nodes: Option<usize>,
@@ -40,6 +44,8 @@ struct CommunityResult {
 
 /// Community-aware fusion strategy for corpus-wide topic retrieval (LeanRAG-backed).
 #[derive(Debug, Clone, Default)]
+// ANCHOR[contextra-rank:GLOB-002]
+/// Globale Fusionsstrategie für hierarchische und korpusweite Retrieval-Szenarien.
 pub struct GlobalFusionStrategy {
     config: GlobalFusionConfig,
 }

@@ -1,17 +1,15 @@
-// FILE-CONTEXT
-// ZWECK: Eviction-Worker (nicht-blockierender Hot-Path LRU / Attention) und emergency_wipe (synchroner Notfall).
-// STAND: TS:2026-09-15T00:00:00Z
-
-//! # Eviction-Architektur
+//! # Eviction-Worker und Notfall-Bereinigung
 //!
-//! Dieses Modul trennt strikt zwischen zwei Eviction-Pfaden:
+//! ANCHOR[contextra-kvcache:EVICT-001]
 //!
-//! 1. **`EvictionWorker`**: Für den regelmäßigen Hot-Path (z.B. VRAM > 80%-Trigger).
+//! Dieses Modul trennt strikt zwischen zwei Eviction-Pfaden (Speicherverdrängung):
+//!
+//! 1. **[`EvictionWorker`]**: Für den regelmäßigen Hot-Path (z. B. Trigger bei VRAM > 80%).
 //!    Arbeitet auf einem **dedizierten OS-Thread** via `std::sync::mpsc`. Reicht
 //!    Löschbefehle asynchron ein, damit synchrone `Zeroize`-Operationen NIEMALS
 //!    den Tokio-Async-Executor blockieren.
 //!
-//! 2. **`emergency_wipe()`**: Für seltene Notfall-Löschungen (z.B. Prozess-Shutdown,
+//! 2. **[`emergency_wipe()`]**: Für seltene Notfall-Löschungen (z. B. Prozess-Shutdown,
 //!    Sicherheits-Alarm). Synchron, blockierend, garantiert vor Rückkehr
 //!    vollständig abgeschlossen — bewusst anders als der reguläre Worker-Pfad.
 
@@ -30,8 +28,8 @@ enum EvictionCommand {
     Shutdown,
 }
 
-/// Adapter: translates request-centered [`AttentionExporter`] (Ring 2 interface) into
-/// segment-centered [`AttentionScoreSource`] (Ring 1 interface).
+/// Adapter: Übersetzt die anfragezentrierte Schnittstelle [`AttentionExporter`] (Ring 2)
+/// in die segmentzentrierte Schnittstelle [`AttentionScoreSource`] (Ring 1).
 struct ExporterBackedScoreSource {
     exporter: Arc<dyn AttentionExporter>,
     segment_map: RwLock<HashMap<(TenantId, u64), RequestId>>,
@@ -79,8 +77,11 @@ impl AttentionScoreSource for ExporterBackedScoreSource {
     }
 }
 
-/// Regelmäßiger Eviction-Pfad (VRAM > 80%-Trigger). NICHT im Async-Executor,
-/// da regelmäßige Zeroize-Operationen den Tokio-Scheduler blockieren würden.
+// ANCHOR[contextra-kvcache:EVICT-002]
+/// Asynchroner Hintergrund-Worker für die KV-Cache-Verdrängung.
+///
+/// Läuft auf einem eigenständigen Betriebssystem-Thread, um die Tokio-Worker-Threads
+/// nicht durch aufwendige Speicherfreigaben und Zeroize-Routinen zu belasten.
 pub struct EvictionWorker {
     attention_source: Arc<RwLock<Arc<dyn AttentionScoreSource>>>,
     sender: parking_lot::Mutex<mpsc::Sender<EvictionCommand>>,
@@ -90,6 +91,12 @@ pub struct EvictionWorker {
 
 impl EvictionWorker {
     /// Spawnt den Eviction-Worker auf einem dedizierten OS-Thread.
+    ///
+    /// # Ablauf
+    /// 1. Initialisiert Standard-[`NullAttentionScoreSource`].
+    /// 2. Erzeugt einen MPSC-Kanal für Verdrängungsbefehle.
+    /// 3. Startet einen benannten Thread `kv-eviction-worker`.
+    /// 4. Verarbeitet eingehende Befehle in einer Schleife bis zum Shutdown.
     pub fn spawn(store: Arc<TenantIsolatedKvStore>) -> Self {
         let attention_source = Arc::new(RwLock::new(
             Arc::new(NullAttentionScoreSource) as Arc<dyn AttentionScoreSource>
@@ -135,7 +142,7 @@ impl EvictionWorker {
         }
     }
 
-    /// Builder-Methode zur Injektion eines echten Attention-Backends.
+    /// Builder-Methode zur Injektion eines echten Attention-Backends via [`AttentionExporter`].
     pub fn with_attention_exporter(self, exporter: Arc<dyn AttentionExporter>) -> Self {
         let adapter: Arc<dyn AttentionScoreSource> =
             Arc::new(ExporterBackedScoreSource::new(exporter));
@@ -163,12 +170,14 @@ impl EvictionWorker {
             .unregister_segment(tenant_id, segment_id);
     }
 
-    /// Liefert die aktuell konfigurierte AttentionScoreSource.
+    /// Liefert die aktuell konfigurierte [`AttentionScoreSource`].
     pub fn attention_source(&self) -> Arc<dyn AttentionScoreSource> {
         self.attention_source.read().clone()
     }
 
-    /// Nicht-blockierender Trigger vom Hot-Path aus.
+    /// Löst nicht-blockierend eine Verdrängung im Hintergrund aus.
+    ///
+    /// Sendet den Auftrag über den MPSC-Kanal an den Worker-Thread und kehrt sofort zurück.
     pub fn trigger_eviction(&self, target_free_bytes: usize) {
         let _ = self
             .sender
@@ -184,7 +193,7 @@ impl EvictionWorker {
             .send(EvictionCommand::BlockReleased { block_id });
     }
 
-    /// Beendet den Worker-Thread geordnet.
+    /// Beendet den Worker-Thread geordnet und wartet auf dessen Abschluss (Join).
     pub fn shutdown(&self) {
         let _ = self.sender.lock().send(EvictionCommand::Shutdown);
         if let Some(handle) = self.handle.lock().take() {
@@ -199,8 +208,12 @@ impl Drop for EvictionWorker {
     }
 }
 
-/// SEPARATER Pfad für Notfall-Löschung (z.B. Prozess-Shutdown, expliziter
-/// Sicherheits-Trigger). Synchron, blockierend, garantiert vor Rückkehr abgeschlossen.
+// ANCHOR[contextra-kvcache:EVICT-003]
+/// Synchroner Notfall-Wipe für sofortige Speicherlöschung.
+///
+/// Löscht blockierend alle Segmente im Store synchron aus dem RAM und stellt
+/// sicher, dass alle vertraulichen Tensordaten mittels Zeroize überschrieben sind,
+/// bevor die Funktion zurückkehrt.
 pub fn emergency_wipe(store: &TenantIsolatedKvStore) {
     store.clear_all();
 }
@@ -212,6 +225,7 @@ mod tests {
     use contextra_types::TenantId;
     use std::time::Duration;
 
+    // Prüft, dass der Aufruf von trigger_eviction den aufrufenden Thread nicht blockiert.
     #[test]
     fn test_eviction_worker_nonblocking_trigger() {
         let store = Arc::new(TenantIsolatedKvStore::new());
@@ -243,6 +257,7 @@ mod tests {
         assert_eq!(store.get_segments(tenant), vec![2]);
     }
 
+    // Prüft, dass der Worker nach LRU-Ordnung und nicht nach FIFO (First In First Out) verdrängt.
     #[test]
     fn test_lru_eviction_order_not_fifo() {
         let store = Arc::new(TenantIsolatedKvStore::new());
@@ -284,6 +299,7 @@ mod tests {
         assert!(remaining_ids.contains(&30), "Segment C must be retained");
     }
 
+    // Prüft, dass emergency_wipe synchron und sofort alle Segmente tilgt.
     #[test]
     fn test_emergency_wipe_synchronous_completion() {
         let store = TenantIsolatedKvStore::new();
@@ -302,6 +318,7 @@ mod tests {
         );
     }
 
+    // Prüft, dass EvictionWorker thread-sicher ist (Send + Sync implementiert).
     #[test]
     fn test_eviction_worker_is_send_and_sync() {
         fn assert_send_sync<T: Send + Sync>() {}

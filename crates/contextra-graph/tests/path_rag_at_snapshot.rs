@@ -1,7 +1,13 @@
+//! Snapshot-gebundene Pfadsuche im Path-RAG.
+//!
+//! # Zweck
+//! Beweist, dass Anfragen zu einem historischen `TxId`-Stand exakt isoliert bleiben.
+
 use contextra_graph::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
 
+// ANCHOR[contextra-graph:TESTS-PATH-RAG-AT-SNAPSHOT-001]
 #[tokio::test]
 async fn test_path_rag_at_edge_visibility_by_seq() {
     // (a) Kante mit TxId 10 und Kante mit TxId 20: seq = 15 sieht nur die erste, seq = 25 beide
@@ -50,6 +56,7 @@ async fn test_path_rag_at_edge_visibility_by_seq() {
     assert!(res_ids_25.contains(&e3));
 }
 
+// ANCHOR[contextra-graph:TESTS-PATH-RAG-AT-SNAPSHOT-002]
 #[tokio::test]
 async fn test_path_rag_at_deleted_edge_visibility() {
     // (b) eine zum seq gelöschte Kante ist unsichtbar, vor der Löschung sichtbar
@@ -82,6 +89,7 @@ async fn test_path_rag_at_deleted_edge_visibility() {
     assert!(!res_seq25.iter().any(|(id, _)| *id == e2));
 }
 
+// ANCHOR[contextra-graph:TESTS-PATH-RAG-AT-SNAPSHOT-003]
 #[tokio::test]
 async fn test_path_rag_at_latest_seq_matches_latest_state() {
     // (c) bei seq = neuester Stand entspricht das Ergebnis der bisherigen, nicht-snapshotfähigen PathRAG-Abfrage
@@ -121,6 +129,7 @@ async fn test_path_rag_at_latest_seq_matches_latest_state() {
     assert!(!res_seq100.is_empty());
 }
 
+// ANCHOR[contextra-graph:TESTS-PATH-RAG-AT-SNAPSHOT-004]
 #[tokio::test]
 async fn test_path_rag_at_deterministic_ordering() {
     // (d) deterministische Reihenfolge über 10 Wiederholungen
@@ -173,6 +182,7 @@ async fn test_path_rag_at_deterministic_ordering() {
     }
 }
 
+// ANCHOR[contextra-graph:TESTS-PATH-RAG-AT-SNAPSHOT-005]
 #[tokio::test]
 async fn test_path_rag_at_unknown_anchor_returns_empty() {
     // (e) unbekannter Anker liefert ein leeres Ergebnis ohne Panic
@@ -183,6 +193,7 @@ async fn test_path_rag_at_unknown_anchor_returns_empty() {
     assert!(res.is_empty());
 }
 
+// ANCHOR[contextra-graph:TESTS-PATH-RAG-AT-SNAPSHOT-006]
 #[tokio::test]
 async fn test_path_rag_at_hub_entity_budget() {
     // (f) Hub-Entität mit sehr vielen Nachbarn bleibt im Budget
@@ -212,6 +223,7 @@ async fn test_path_rag_at_hub_entity_budget() {
     assert!(!res.is_empty());
 }
 
+// ANCHOR[contextra-graph:TESTS-PATH-RAG-AT-SNAPSHOT-007]
 #[tokio::test]
 async fn test_path_rag_at_via_graph_index_trait_snapshot_isolation() {
     // Verifies that path_rag_at invoked via GraphIndex trait object (dyn GraphIndex)
@@ -270,6 +282,7 @@ async fn test_path_rag_at_via_graph_index_trait_snapshot_isolation() {
     assert!(res_at_25.iter().any(|(id, _)| *id == e3));
 }
 
+// ANCHOR[contextra-graph:TESTS-PATH-RAG-AT-SNAPSHOT-008]
 #[tokio::test]
 async fn test_path_rag_at_concurrent_mutations_isolation() {
     // Proves task 5 requirement:

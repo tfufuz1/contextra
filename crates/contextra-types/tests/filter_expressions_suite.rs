@@ -1,3 +1,6 @@
+//! Integrations-Testsuite für strukturierte Metadaten-Filterausdrücke.
+//! Verifiziert alle Vergleichsoperatoren, logische Verknüpfungen und Null-Wert-Behandlung.
+
 //! Comprehensive filter evaluation and precedence test suite for `contextra-types`.
 
 #![allow(

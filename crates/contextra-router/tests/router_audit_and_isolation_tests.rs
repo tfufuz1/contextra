@@ -1,3 +1,9 @@
+//! # Integrationstest: Audit-Logging und Mandanten-Isolation
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Integrationstest: Audit-Logging und Mandanten-Isolation.
+
+// ANCHOR[contextra-router:IT-AUD-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
@@ -130,6 +136,8 @@ fn create_test_router<S: contextra_ports::StorageEngine + 'static>(
 }
 
 // ── Test 1: Fixed Seed Reproducibility ───────────────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T01]
+// Test `test_fixed_seed_routing_reproducibility`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_fixed_seed_routing_reproducibility() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -185,6 +193,8 @@ async fn test_fixed_seed_routing_reproducibility() -> Result<()> {
 }
 
 // ── Test 2: Idempotent Outcome Processing ────────────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T02]
+// Test `test_record_outcome_idempotency`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_record_outcome_idempotency() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -246,6 +256,8 @@ async fn test_record_outcome_idempotency() -> Result<()> {
 }
 
 // ── Test 3: Arm Registry & Tenant Statistics Isolation ──────────────────────
+// ANCHOR[contextra-router:IT-AUD-T03]
+// Test `test_arm_registry_and_stats_tenant_isolation`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_arm_registry_and_stats_tenant_isolation() {
     let reg1 = ArmRegistry::default();
@@ -264,6 +276,8 @@ fn test_arm_registry_and_stats_tenant_isolation() {
 }
 
 // ── Test 4: Cold Start Default Route Fallback ────────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T04]
+// Test `test_cold_start_fallback_default_route`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_cold_start_fallback_default_route() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -317,6 +331,8 @@ async fn test_cold_start_fallback_default_route() -> Result<()> {
 }
 
 // ── Test 5: Typed Transport Error Propagation ──────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T05]
+// Test `test_transport_error_propagation_typed`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_transport_error_propagation_typed() {
     let profile_invalid_endpoint =
@@ -351,6 +367,8 @@ async fn test_transport_error_propagation_typed() {
 }
 
 // ── Test 6: Restart Resumption with initial_decision_id ─────────────────────
+// ANCHOR[contextra-router:IT-AUD-T06]
+// Test `test_restart_resumption_with_initial_decision_id`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_restart_resumption_with_initial_decision_id() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -394,6 +412,8 @@ async fn test_restart_resumption_with_initial_decision_id() -> Result<()> {
 }
 
 // ── Test 7: Deterministic Clock-based Eviction via Public API ────────────────
+// ANCHOR[contextra-router:IT-AUD-T07]
+// Test `test_clock_based_ttl_eviction_public_api`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_clock_based_ttl_eviction_public_api() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -433,6 +453,8 @@ async fn test_clock_based_ttl_eviction_public_api() -> Result<()> {
 }
 
 // ── Test 8: ProfileCalibrator Monotonic Updates ─────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T08]
+// Test `test_profile_calibrator_update_monotonic`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_profile_calibrator_update_monotonic() {
     let mut cal = ProfileCalibrator::new(0.05, 0.01, 0.5);
@@ -447,6 +469,8 @@ fn test_profile_calibrator_update_monotonic() {
 }
 
 // ── Test 9: ConfigFingerprint Invalidation ──────────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T09]
+// Test `test_profile_calibration_state_fingerprint_invalidation`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_profile_calibration_state_fingerprint_invalidation() {
     let mut state = ProfileCalibrationState::new(0.5);
@@ -466,6 +490,8 @@ fn test_profile_calibration_state_fingerprint_invalidation() {
 }
 
 // ── Test 10: Lyapunov Drift Status Summary Unconfigured ────────────────────
+// ANCHOR[contextra-router:IT-AUD-T10]
+// Test `test_lyapunov_drift_status_summary_unconfigured`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_lyapunov_drift_status_summary_unconfigured() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -492,6 +518,8 @@ async fn test_lyapunov_drift_status_summary_unconfigured() -> Result<()> {
 }
 
 // ── Test 11: Lyapunov Drift Status Summary Empty ─────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T11]
+// Test `test_lyapunov_drift_status_summary_empty`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_lyapunov_drift_status_summary_empty() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -510,6 +538,8 @@ async fn test_lyapunov_drift_status_summary_empty() -> Result<()> {
 }
 
 // ── Test 12: Hot Reload Profile Update Preserves Calibration ─────────────────
+// ANCHOR[contextra-router:IT-AUD-T12]
+// Test `test_router_engine_update_profiles_hot_reload`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_router_engine_update_profiles_hot_reload() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -569,6 +599,8 @@ async fn test_router_engine_update_profiles_hot_reload() -> Result<()> {
 }
 
 // ── Test 13: Try Update Profiles Validation Rejection ────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T13]
+// Test `test_router_engine_try_update_profiles_validation_error`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_router_engine_try_update_profiles_validation_error() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -608,6 +640,8 @@ async fn test_router_engine_try_update_profiles_validation_error() -> Result<()>
 }
 
 // ── Test 14: Warmup Period Uncalibrated Confidence Metrics ────────────────────
+// ANCHOR[contextra-router:IT-AUD-T14]
+// Test `test_confidence_metrics_warmup_period`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_confidence_metrics_warmup_period() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -649,6 +683,8 @@ async fn test_confidence_metrics_warmup_period() -> Result<()> {
 }
 
 // ── Test 15: Decision ID Generator Monotonicity ─────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T15]
+// Test `test_decision_id_generator_monotonicity`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_decision_id_generator_monotonicity() {
     let gen = contextra_router::DecisionIdGenerator::new(100);
@@ -664,6 +700,8 @@ fn test_decision_id_generator_monotonicity() {
 }
 
 // ── Test 16: Routing Outcome Non-Conformity Scores ────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T16]
+// Test `test_routing_outcome_non_conformity_scores`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_routing_outcome_non_conformity_scores() {
     assert_eq!(RoutingOutcome::Success.non_conformity_score(), 0.0);
@@ -684,6 +722,8 @@ fn test_routing_outcome_non_conformity_scores() {
 }
 
 // ── Test 17: SLM Profile Estimated Cost Fallback ─────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T17]
+// Test `test_slm_profile_estimated_cost_fallback`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_slm_profile_estimated_cost_fallback() {
     let budget = TokenBudget::new(4096, 512);
@@ -698,6 +738,8 @@ fn test_slm_profile_estimated_cost_fallback() {
 }
 
 // ── Test 18: Reset All Calibration Resets Every Profile ─────────────────────
+// ANCHOR[contextra-router:IT-AUD-T18]
+// Test `test_reset_all_calibration_resets_every_profile`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_reset_all_calibration_resets_every_profile() -> Result<()> {
     let dir = tempfile::tempdir()?;
@@ -736,6 +778,8 @@ async fn test_reset_all_calibration_resets_every_profile() -> Result<()> {
 }
 
 // ── Test 19: Quantization Level Default and Display ──────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T19]
+// Test `test_quantization_level_default_and_variants`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[test]
 fn test_quantization_level_default_and_variants() {
     use contextra_router::profile::QuantizationLevel;
@@ -746,6 +790,8 @@ fn test_quantization_level_default_and_variants() {
 }
 
 // ── Test 20: Drift Baseline Setting ──────────────────────────────────────────
+// ANCHOR[contextra-router:IT-AUD-T20]
+// Test `test_set_lyapunov_baseline_existing_and_nonexisting`: Prüft das erwartete Verhalten und Invarianten für integrationstest: audit-logging und mandanten-isolation.
 #[tokio::test]
 async fn test_set_lyapunov_baseline_existing_and_nonexisting() -> Result<()> {
     let dir = tempfile::tempdir()?;

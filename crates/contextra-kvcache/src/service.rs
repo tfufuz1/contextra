@@ -1,12 +1,11 @@
-// FILE-CONTEXT
-// ZWECK: Öffentliche Facade `KvCacheService` und `KvCacheServiceBuilder` für Ring-1/Ring-2 Verdrahtung.
-
-//! Öffentliche Fassade für den KV-Cache-Dienst ([`KvCacheService`]).
+//! # Öffentliche Fassade für den KV-Cache-Dienst (`KvCacheService`)
+//!
+//! ANCHOR[contextra-kvcache:SERV-001]
 //!
 //! Stellt eine einheitliche, mandantenisolierte Schnittstelle bereit mit Unterstützung für:
 //! - Speicherbudgetierung & Eviction-Policy ([`KvReusePolicy`])
 //! - Verschlüsselten Tier-2-Spill ([`KvBridgeStorage`])
-//! - KIVI 2-Bit Quantisierung ([`KiviQuantizeConfig`])
+//! - KIVI 2-Bit Quantisierung
 //! - Scratchpad-Invalidierung & Mandantenlöschung ([`TenantId`])
 //!
 //! # Beispiel
@@ -68,25 +67,27 @@ fn block_on_simple<F: std::future::Future>(fut: F) -> F::Output {
     }
 }
 
+// ANCHOR[contextra-kvcache:SERV-002]
 /// Statistiken über die KV-Cache-Nutzung eines Mandanten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct KvCacheStats {
-    /// Total number of active segments stored in RAM for this tenant.
+    /// Gesamtanzahl aktiver Segmente im RAM für diesen Mandanten.
     pub segment_count: usize,
-    /// Total number of radix tree entries stored for this tenant.
+    /// Gesamtanzahl von Einträgen im Prefix-Radix-Baum dieses Mandanten.
     pub radix_entry_count: usize,
 }
 
-/// Facade configuration for [`KvCacheService`].
+// ANCHOR[contextra-kvcache:SERV-003]
+/// Konfiguration für die Fassade [`KvCacheService`].
 #[derive(Clone)]
 pub struct KvCacheConfig {
-    /// Maximum RAM memory budget in bytes (default: 512 MiB).
+    /// Maximales RAM-Speicherbudget in Bytes (Standard: 512 MiB).
     pub memory_budget_bytes: usize,
-    /// Prefix reuse policy (default: `CostBased { min_prefix_len: 4 }`).
+    /// Präfix-Wiederverwendungs-Policy (Standard: `CostBased { min_prefix_len: 4 }`).
     pub reuse_policy: KvReusePolicy,
-    /// Whether Tier-2 spill storage is enabled (default: true if spill storage is attached).
+    /// Gibt an, ob Tier-2 Spill aktiviert ist (Standard: true bei konfiguriertem Spill-Storage).
     pub spill_enabled: bool,
-    /// KIVI 2-bit quantization configuration, if enabled.
+    /// Optionale KIVI 2-Bit Quantisierungskonfiguration.
     #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
     pub kivi_config: Option<KiviQuantizeConfig>,
 }
@@ -103,6 +104,7 @@ impl Default for KvCacheConfig {
     }
 }
 
+// ANCHOR[contextra-kvcache:SERV-004]
 /// Builder zur Erstellung von [`KvCacheService`].
 pub struct KvCacheServiceBuilder {
     config: KvCacheConfig,
@@ -126,19 +128,19 @@ impl KvCacheServiceBuilder {
         }
     }
 
-    /// Konfiguriert das Speicherbudget in Bytes.
+    /// Konfiguriert das Speicherbudget in Bytes (mindestens 1 MiB).
     pub fn memory_budget_bytes(mut self, bytes: usize) -> Self {
         self.config.memory_budget_bytes = bytes.max(1 << 20);
         self
     }
 
-    /// Konfiguriert die Prefix-Wiederverwendungs-Policy.
+    /// Konfiguriert die Prefix-Wiederverwendungs-Policy ([`KvReusePolicy`]).
     pub fn reuse_policy(mut self, policy: KvReusePolicy) -> Self {
         self.config.reuse_policy = policy;
         self
     }
 
-    /// Aktiviert oder deaktiviert den Tier-2 Spill.
+    /// Aktiviert oder deaktiviert den Tier-2 Spill auf Sekundärspeicher.
     pub fn spill_enabled(mut self, enabled: bool) -> Self {
         self.config.spill_enabled = enabled;
         self
@@ -151,13 +153,13 @@ impl KvCacheServiceBuilder {
         self
     }
 
-    /// Injiziert die Clock-Port-Implementierung.
+    /// Injiziert die Clock-Port-Implementierung zur Einhaltung deterministischer Zeitvorgaben (P28 / Regel 3).
     pub fn clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = Some(clock);
         self
     }
 
-    /// Konfiguriert den Tier-2 Spill-Storage Adapter.
+    /// Konfiguriert den Tier-2 Spill-Storage Adapter ([`KvBridgeStorage`]).
     pub fn spill_storage(mut self, storage: Arc<dyn KvBridgeStorage>) -> Self {
         self.spill_storage = Some(storage);
         self
@@ -169,19 +171,25 @@ impl KvCacheServiceBuilder {
         self
     }
 
-    /// Konfiguriert eine benutzerdefinierte `AttentionScoreSource`.
+    /// Konfiguriert eine benutzerdefinierte [`AttentionScoreSource`].
     pub fn attention_source(mut self, source: Arc<dyn AttentionScoreSource>) -> Self {
         self.attention_source = Some(source);
         self
     }
 
-    /// Konfiguriert einen `AttentionExporter` für den EvictionWorker.
+    /// Konfiguriert einen [`AttentionExporter`] für den [`EvictionWorker`].
     pub fn attention_exporter(mut self, exporter: Arc<dyn AttentionExporter>) -> Self {
         self.attention_exporter = Some(exporter);
         self
     }
 
     /// Baut die [`KvCacheService`]-Instanz.
+    ///
+    /// # Ablauf
+    /// 1. Clock und Store initialisieren.
+    /// 2. EvictionWorker spawnen und Attention-Quellen injizieren.
+    /// 3. Tier-2 SpillHandler registrieren, falls konfiguriert.
+    /// 4. Service-Struktur zusammenbauen und zurückgeben.
     pub fn build(self) -> KvCacheService {
         let clock = self.clock.unwrap_or_else(|| Arc::new(SystemClock::new()));
         let store = Arc::new(TenantIsolatedKvStore::new());
@@ -251,7 +259,11 @@ impl Default for KvCacheServiceBuilder {
     }
 }
 
-/// Öffentlicher Mandanten-isolierter KV-Cache-Dienst.
+// ANCHOR[contextra-kvcache:SERV-005]
+/// Öffentlicher mandantenisolierter KV-Cache-Dienst.
+///
+/// Zentrale Facade für Inferenz-Laufzeiten: verbindet Radix-Präfixsuche,
+/// Speicher-LRU, Hintergrundverdrängung und Tier-2 Persistenz.
 pub struct KvCacheService {
     config: KvCacheConfig,
     store: Arc<TenantIsolatedKvStore>,
@@ -268,6 +280,13 @@ impl KvCacheService {
     /// Sucht nach einem übereinstimmenden Prefix oder fügt ein neues KV-Segment ein.
     ///
     /// Fail-closed: `tenant_id` ist Pflichtparameter jeder Operation.
+    ///
+    /// # Ablauf
+    /// 1. Eingaben validieren (Tokens und Daten dürfen nicht leer sein).
+    /// 2. Im Prefix-Radix-Baum des Mandanten nach übereinstimmendem Präfix suchen.
+    /// 3. Falls Treffer: Guard erzeugen und `Some((match, guard))` zurückliefern.
+    /// 4. Falls Miss: Prüfen des Speicherbudgets und ggf. Hintergrund-Eviction anstoßen.
+    /// 5. Segment quantisieren/komprimieren (falls aktiviert), in den Store einfügen und im Radix-Baum registrieren.
     pub fn get_or_insert_prefix(
         &self,
         tenant_id: TenantId,
@@ -357,6 +376,10 @@ impl KvCacheService {
     }
 
     /// Liest ein Segment-Payload aus RAM oder Tier-2 Spill-Storage.
+    ///
+    /// # Ablauf
+    /// 1. Versuch, das Segment direkt aus dem RAM-Store zu lesen und zu dekomprimieren/dequantisieren.
+    /// 2. Falls nicht im RAM: Versuch, das Segment aus dem Tier-2 Spill-Storage abzurufen und zu entschlüsseln.
     pub async fn read_segment(
         &self,
         tenant_id: TenantId,
@@ -385,7 +408,7 @@ impl KvCacheService {
         Ok(None)
     }
 
-    /// Spill-over method: persists a segment to Tier-2 spill storage encrypted per tenant.
+    /// Persistiert ein Segment explizit verschlüsselt auf Tier-2 Sekundärspeicher.
     pub async fn spill_segment(
         &self,
         tx_id: TxId,
@@ -413,6 +436,7 @@ impl KvCacheService {
         Ok(())
     }
 
+    /// Interne Hilfsfunktion zur Dekomprimierung oder Dequantisierung gelesener Bytes.
     fn decompress_or_dequantize(&self, bytes: &[u8]) -> Result<Option<Vec<u8>>> {
         #[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
         {
@@ -429,7 +453,7 @@ impl KvCacheService {
         Ok(Some(bytes.to_vec()))
     }
 
-    /// Invalidates scratchpad tokens matching scope for the specified tenant.
+    /// Invalidiert Scratchpad-Tokens, die zum angegebenen Scope gehören.
     pub fn invalidate_scratchpad(
         &self,
         tenant_id: TenantId,
@@ -445,7 +469,13 @@ impl KvCacheService {
         Ok(invalidated)
     }
 
-    /// Removes all RAM segments and Radix nodes for the given tenant (Mandantenlöschung).
+    /// Entfernt alle RAM-Segmente und Radix-Knoten für einen Mandanten (DSGVO Art. 17 Mandantenlöschung).
+    ///
+    /// # Ablauf
+    /// 1. Alle Segment-IDs des Mandanten ermitteln und RAM-Zähler korrigieren.
+    /// 2. Segmente aus dem Store löschen (ZeroizeOnDrop).
+    /// 3. Radix-Baum des Mandanten entfernen.
+    /// 4. Assoziierte Tier-2 Spill-Einträge auf dem Sekundärspeicher überschreiben.
     pub fn delete_tenant(&self, tenant_id: TenantId) {
         // Remove all RAM segments and track deleted byte length
         let segments = self.store.get_segments(tenant_id);
@@ -484,12 +514,12 @@ impl KvCacheService {
         tracing::info!(tenant_id = ?tenant_id, freed_bytes = freed_bytes, "Deleted all KV-cache resources for tenant");
     }
 
-    /// Triggers background non-blocking eviction targeting `target_free_bytes`.
+    /// Löst eine nicht-blockierende Verdrängung im Hintergrund aus.
     pub fn trigger_eviction(&self, target_free_bytes: usize) {
         self.eviction_worker.trigger_eviction(target_free_bytes);
     }
 
-    /// Returns the active clock port reference.
+    /// Liefert eine Referenz auf den injizierten Clock-Port.
     pub fn clock(&self) -> &Arc<dyn Clock> {
         &self.clock
     }
@@ -511,6 +541,7 @@ impl KvCacheService {
 mod tests {
     use super::*;
 
+    // Prüft Erstellung über KvCacheServiceBuilder und Durchsetzung der Mandantentrennung bei Lookups und Löschungen.
     #[test]
     fn test_kv_cache_service_builder_and_isolation() {
         let service = KvCacheServiceBuilder::new()

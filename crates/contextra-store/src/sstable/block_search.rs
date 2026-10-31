@@ -1,3 +1,8 @@
+//! # Binaersuche in SSTable-Bloecken (Ring 1)
+//!
+//! Stellt hochoptimierte Binaersuchroutinen ueber geordnete Schluessel-Offsets
+//! innerhalb eines SSTable-Datenblocks bereit.
+
 use contextra_types::{ContextraError, Result};
 
 /// Entry offset accessor supporting both 16-bit (legacy v0..v2) and 32-bit (v3+) block formats.

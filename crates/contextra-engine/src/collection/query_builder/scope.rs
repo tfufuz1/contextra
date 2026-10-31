@@ -1,3 +1,10 @@
+//! # Modul: scope.rs
+//!
+//! **Zweck:** Mandanten- und Scope-Einschränkungen für Abfragen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Scoping-Typen und Query-Builder Ergänzung für ACORN-Hard-Boundary (Spec §5.3, §8.5, §10.4).
 // INVARIANTEN: allowed_doc_ids als BTreeSet für deterministische Iteration (P-Systeminvariante 3).

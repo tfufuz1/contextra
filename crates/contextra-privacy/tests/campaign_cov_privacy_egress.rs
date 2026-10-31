@@ -1,3 +1,4 @@
+//! Integrationstests für Bulk-Exfiltration-Rate-Limiter und Cloud-Response-Rehydrierung.
 // FILE-CONTEXT
 // ZWECK: Campaign coverage test for CloudResponseRehydrator and BulkExfiltrationDetector fail-closed policy evaluation.
 // INVARIANTEN: Egress Gateway enforces PII vault surrogate rehydration and volume rate limits fail-closed.
@@ -13,6 +14,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-COV-002]
+// Prüft: Prüft die Rehydrierung von Surrogat-Tokens in Cloud-Antworten und Validierung der Schredderregeln.
 fn test_cloud_response_rehydrator_and_pii_vault_shred_rules() {
     let surrogate_1 = "[USER_ENTITY_0001]".to_string();
     let surrogate_2 = "[USER_ENTITY_0002]".to_string();
@@ -40,6 +43,8 @@ fn test_cloud_response_rehydrator_and_pii_vault_shred_rules() {
 }
 
 #[test]
+// ANCHOR[contextra-privacy:TEST-COV-001]
+// Prüft: Prüft das Fail-Closed-Verhalten des Bulk-Exfiltration-Detektors bei Limit-Überschreitung.
 fn test_check_bulk_exfiltration_rate_limiter_fail_closed() {
     let detector = BulkExfiltrationDetector::new(100, Duration::from_secs(10));
     let session = SessionId::from("egress_session_campaign");

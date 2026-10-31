@@ -10,6 +10,7 @@
 use crate::error::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
+// ANCHOR[contextra-types:SCHEMA-001]
 /// Indicates the DocId bit-width expected or produced by a schema version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -23,7 +24,11 @@ pub enum DocIdWidth {
 }
 
 impl DocIdWidth {
+    // ANCHOR[contextra-types:SCHEMA-002]
     /// Returns the active compile-time `DocIdWidth`.
+    ///
+    /// # Ablauf
+    /// Prüft zur Compile-Zeit via `cfg!(feature = "docid-128")`, welche Breite gewählt ist.
     pub fn current() -> Self {
         if cfg!(feature = "docid-128") {
             Self::Bit128
@@ -32,6 +37,7 @@ impl DocIdWidth {
         }
     }
 
+    // ANCHOR[contextra-types:SCHEMA-003]
     /// Returns the size in bytes of a single `DocId` value under this width.
     pub fn bytes_len(self) -> usize {
         match self {
@@ -41,6 +47,7 @@ impl DocIdWidth {
     }
 }
 
+// ANCHOR[contextra-types:SCHEMA-004]
 /// SSTable and WAL Manifest schema version identifier.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
@@ -57,6 +64,7 @@ pub enum ManifestSchemaVersion {
 }
 
 impl ManifestSchemaVersion {
+    // ANCHOR[contextra-types:SCHEMA-005]
     /// Returns the corresponding `DocIdWidth` for this schema version.
     pub fn doc_id_width(self) -> DocIdWidth {
         match self {
@@ -65,12 +73,17 @@ impl ManifestSchemaVersion {
         }
     }
 
+    // ANCHOR[contextra-types:SCHEMA-006]
     /// Returns the numeric version byte.
     pub fn as_u8(self) -> u8 {
         self as u8
     }
 
+    // ANCHOR[contextra-types:SCHEMA-007]
     /// Parses a version from a numeric byte indicator.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Serialization`, falls das übergebene Byte keiner bekannten Version entspricht.
     pub fn from_u8(version_byte: u8) -> Result<Self> {
         match version_byte {
             1 => Ok(Self::V1),
@@ -81,6 +94,7 @@ impl ManifestSchemaVersion {
         }
     }
 
+    // ANCHOR[contextra-types:SCHEMA-008]
     /// Returns `true` if this schema version is compatible with the compile-time DocId feature flags.
     pub fn is_compatible_with_current_build(self) -> bool {
         self.doc_id_width() == DocIdWidth::current()
@@ -92,6 +106,7 @@ impl ManifestSchemaVersion {
 mod tests {
     use super::*;
 
+    // NOTE: Prüft Konvertierung zwischen Byte und ManifestSchemaVersion sowie Fehler bei unbekannten Bytes.
     #[test]
     fn test_manifest_schema_version_roundtrip() {
         assert_eq!(
@@ -105,6 +120,7 @@ mod tests {
         assert!(ManifestSchemaVersion::from_u8(3).is_err());
     }
 
+    // NOTE: Prüft Bytegrößen von 64-Bit und 128-Bit DocIdWidth.
     #[test]
     fn test_doc_id_width_bytes_len() {
         assert_eq!(DocIdWidth::Bit64.bytes_len(), 8);

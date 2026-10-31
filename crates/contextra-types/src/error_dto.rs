@@ -39,6 +39,7 @@ pub struct ContextraErrorDto {
 
 impl ContextraErrorDto {
     /// Creates a new `ContextraErrorDto` with custom kind and message.
+    // ANCHOR[contextra-types:DTO-NEW]
     pub fn new(kind: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             kind: kind.into(),
@@ -48,6 +49,7 @@ impl ContextraErrorDto {
     }
 
     /// Creates a new `ContextraErrorDto` with custom kind, message, and details payload.
+    // ANCHOR[contextra-types:DTO-WITH-DETAILS]
     pub fn with_details(
         kind: impl Into<String>,
         message: impl Into<String>,

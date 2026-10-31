@@ -17,6 +17,7 @@
 
 use crate::types::TOMBSTONE_BIT;
 
+// ANCHOR[contextra-types:TOMB-001]
 /// Trait defining tombstone semantics for index sequence numbers and key-value records.
 ///
 /// # Bit-Mask Convention (IP-07 / ADR-041)
@@ -41,6 +42,7 @@ pub trait TombstoneSemanticsCheck {
     fn make_tombstone(seq: u64) -> Vec<u8>;
 }
 
+// ANCHOR[contextra-types:TOMB-002]
 /// Default reference implementation of [`TombstoneSemanticsCheck`].
 ///
 /// Uses bit 63 (`TOMBSTONE_BIT = 1 << 63`) in `seq: u64` or bit 0 in `flags: u8` (`flags & 0x01 != 0`)
@@ -50,15 +52,25 @@ pub trait TombstoneSemanticsCheck {
 pub struct SeqBitTombstone;
 
 impl TombstoneSemanticsCheck for SeqBitTombstone {
+    // ANCHOR[contextra-types:TOMB-003]
     /// Returns `true` if `(seq & TOMBSTONE_BIT) != 0` OR if flag bit 0 (`(flags & 0x01) != 0`) is set.
+    ///
+    /// # Ablauf
+    /// 1. Prüfen, ob Bit 63 in `seq` gesetzt ist.
+    /// 2. Prüfen, ob Bit 0 in `flags` gesetzt ist.
+    /// 3. Liefert `true`, wenn mindestens eine Bedingung wahr ist.
     #[inline]
     fn is_tombstone(seq: u64, flags: u8) -> bool {
         (seq & TOMBSTONE_BIT) != 0 || (flags & 0x01) != 0
     }
 
+    // ANCHOR[contextra-types:TOMB-004]
     /// Encodes `seq` with `TOMBSTONE_BIT` set into an 8-byte little-endian byte vector.
     ///
     /// If `seq` already has `TOMBSTONE_BIT` set, bit 63 remains set without double-wrapping or error.
+    ///
+    /// # Ablauf
+    /// Verodert `seq` mit `TOMBSTONE_BIT` und serialisiert das Ergebnis in 8 Little-Endian-Bytes.
     #[inline]
     fn make_tombstone(seq: u64) -> Vec<u8> {
         (seq | TOMBSTONE_BIT).to_le_bytes().to_vec()
@@ -70,6 +82,7 @@ impl TombstoneSemanticsCheck for SeqBitTombstone {
 mod tests {
     use super::*;
 
+    // NOTE: Prüft Roundtrip von Sequenznummern zu Tombstone-Bytes und zurück.
     #[test]
     fn test_roundtrip_property() {
         let test_seqs = [0u64, 1, 42, 1_000_000, max_seq_simulation()];
@@ -91,6 +104,7 @@ mod tests {
         }
     }
 
+    // NOTE: Prüft, dass Sequenzen ohne Tombstone-Bit oder -Flags nicht als Tombstone gewertet werden.
     #[test]
     fn test_negative_cases() {
         let non_tombstones = [
@@ -111,6 +125,7 @@ mod tests {
         }
     }
 
+    // NOTE: Prüft die Tombstone-Erkennung über das Flags-Byte (Bit 0).
     #[test]
     fn test_flags_tombstone_detection() {
         assert!(SeqBitTombstone::is_tombstone(0, 0x01));
@@ -119,6 +134,7 @@ mod tests {
         assert!(!SeqBitTombstone::is_tombstone(100, 0xFE));
     }
 
+    // NOTE: Prüft Idempotenz bei bereits gesetztem Tombstone-Bit.
     #[test]
     fn test_edge_case_already_tombstoned_seq() {
         let raw_seq = 100u64;
@@ -135,6 +151,7 @@ mod tests {
         );
     }
 
+    // NOTE: Hilfsfunktion zur Erzeugung einer maximalen regulären Sequenznummer.
     fn max_seq_simulation() -> u64 {
         (1u64 << 62) - 1
     }

@@ -1,3 +1,9 @@
+//! # Integrationstest: Äquivalenztests für DiBud-Streaming-Fusion gegen Standard-RRF
+//!
+//! **Crate:** `contextra-rank`
+//!
+//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![cfg(feature = "dibud")]
 
@@ -39,6 +45,7 @@ fn make_doc_key_string(key_num: u64) -> String {
     format!("doc_{key_num:05}")
 }
 
+// ANCHOR[contextra-rank:DIBUD-TEST-001]
 #[test]
 fn test_dibud_unlimited_budget_equivalence_200_fixtures() {
     let mut lcg = SimpleLcg::new(0xDEAD_BEEF_1234_5678);
@@ -165,6 +172,7 @@ fn test_dibud_unlimited_budget_equivalence_200_fixtures() {
     }
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_dibud_limited_budget_prefix_property() {
     let mut lcg = SimpleLcg::new(0xCAFE_BABE_9876_5432);

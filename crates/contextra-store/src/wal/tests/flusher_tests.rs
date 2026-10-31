@@ -1,3 +1,7 @@
+//! # Tests fuer den WAL-Flusher (Ring 1)
+//!
+//! Prueft Flush-Backpressure, Batch-Grouping und Fehlerweitergabe.
+
 use super::*;
 use crate::wal::{PreparedBatch, WalConfig, WalEntry, WalOp};
 use contextra_types::TxId;

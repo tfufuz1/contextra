@@ -1,3 +1,10 @@
+//! Prosa- und Markdown-Chunking-Modul fuer Fliesstext.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: ProseChunker Hauptmodul für IR-basiertes span-genaues Chunking (WP M3 / SPEC C-11.7).
 // INVARIANTEN: Zero-Panic, deterministisch, span-genau im kanonischen Text, Parität zu Engine-Chunker.
@@ -24,6 +31,8 @@ use serde_json::{Map, Value};
 use std::ops::Range;
 
 #[derive(Debug, Default, Clone)]
+// ANCHOR[contextra-ingest:CHK-0226]
+// struct `ProseChunker` fuer Prosa- und Markdown-Chunking-Modul fuer Fliesstext.
 pub struct ProseChunker;
 
 impl IrChunker for ProseChunker {
@@ -62,6 +71,8 @@ enum InterKind {
     Other,
 }
 
+// ANCHOR[contextra-ingest:CHK-0227]
+// fn `draft_prose` fuer Prosa- und Markdown-Chunking-Modul fuer Fliesstext.
 pub fn draft_prose(
     ir: &DocumentIr,
     canon: &CanonicalText,

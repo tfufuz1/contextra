@@ -1,9 +1,17 @@
+//! # Integrationstest: chunker robustness
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::chunker::{
     chunk_text, chunk_text_with_overlap, ChunkerConfig, MarkdownChunker,
 };
 use contextra_types::DocId;
 
+// ANCHOR[contextra-engine:TST07-001]
+/// Testblock zur Überprüfung von `test_chunker_markdown_utf8_and_boundary_safety`.
 #[test]
 fn test_chunker_markdown_utf8_and_boundary_safety() {
     let config = ChunkerConfig {

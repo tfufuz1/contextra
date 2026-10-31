@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** CRUD-Subsystem für Dokumente, Metadaten und Schlüsselwerte.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: CRUD-Operationen (Insert, Upsert, Update, Delete, Get) für Collection.
 // INVARIANTEN: Atomare Multi-Index Commits via DbTransaction; Validierung aller Eingabegrenzen (ID-Länge, Batch-Größe).

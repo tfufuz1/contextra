@@ -1,3 +1,8 @@
+//! # Integrationstest: `guarantee_audit_chain_tamper.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `guarantee_audit_chain_tamper`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Independent guarantee test suite for AuditChain anti-tampering, head signature verification, and encrypted commitments.
 // INVARIANTEN: Any alteration, removal, insertion, reordering, or truncation of a signed audit chain is detected by verify_chain or verify_head_signature against published head.

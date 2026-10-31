@@ -1,3 +1,12 @@
+//! # KV-Segment-Speicher und Sharding (`kv_segment/`)
+//!
+//! Dieses Subsystem implementiert einen hochgradig nebenläufigen, geschützten In-Memory-Segment-Cache.
+//!
+//! ## Komponenten
+//! - `segment.rs`: Datensegment mit Zeroize-on-Drop.
+//! - `store.rs`: Geshardeter Segment-Speicher mit LRU-Eviction.
+//! - `eviction_worker.rs`: Asynchroner Hintergrund-Worker zur Speicherbereinigung.
+
 // FILE-CONTEXT
 // ZWECK: KV-Cache-Bridge Sicherheitsschicht (KvSegment, Tenant-Isolation, Eviction-Worker, Segment-Verschlüsselung).
 // STAND: TS:2026-09-08T00:00:00Z (SESSION: a413a598)

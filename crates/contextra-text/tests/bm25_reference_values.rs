@@ -1,3 +1,8 @@
+//! Testsuite `bm25_reference_values.rs` für contextra-text.
+//!
+//! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
+
 // FILE-CONTEXT: Reference value verification tests for BM25 and BM25F implementation.
 // ZWECK: Verifiziert BM25 score_term_with_params und score_term_bm25f gegen unabhängig berechnete Referenzwerte der publizierten Formeln.
 // INVARIANTEN: #![forbid(unsafe_code)], alle Erwartungswerte werden unabhängig in Rust (f64) nachgerechnet.
@@ -107,6 +112,8 @@ fn compute_reference_bm25f_score(
     }
 }
 
+// ANCHOR[contextra-text:TEST-147]
+// Testfall `test_bm25_known_reference_value`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25_known_reference_value() {
     // Reference scenario from spec/task description:
@@ -139,6 +146,8 @@ fn test_bm25_known_reference_value() {
     );
 }
 
+// ANCHOR[contextra-text:TEST-148]
+// Testfall `test_bm25_reference_table`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25_reference_table() {
     // Generate a parameter matrix of at least 20 different parameter combinations
@@ -200,6 +209,8 @@ fn test_bm25_reference_table() {
     );
 }
 
+// ANCHOR[contextra-text:TEST-149]
+// Testfall `test_bm25f_reference_value`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn test_bm25f_reference_value() {
     // BM25F field-weighted scoring reference test:

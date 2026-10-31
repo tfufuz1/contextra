@@ -1,3 +1,7 @@
+//! # Asynchroner WAL-Flusher (Ring 1)
+//!
+//! Koordiniert Flush- und fsync-Aufrufe mit Timeout und Batching-Strategien.
+
 use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -276,6 +280,12 @@ impl Wal {
                                     Err(_elapsed) => break,
                                 }
                             }
+                        }
+
+                        if acks.iter().all(|a| a.is_closed()) {
+                            // All waiting callers cancelled/timed out before physical write.
+                            // Discard this batch to maintain atomicity and prevent phantom commits.
+                            continue;
                         }
 
                         let size_before = size.load(std::sync::atomic::Ordering::Acquire);

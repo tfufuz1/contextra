@@ -119,6 +119,7 @@ pub use tl_hfd::{
 };
 
 /// Extension trait for [`contextra_ports::GraphIndex`] providing entity removal functionality.
+// ANCHOR[contextra-graph:SRC-LIB-001]
 pub trait GraphIndexExt: contextra_ports::GraphIndex {
     /// Removes an entity node and all its incident (outgoing and incoming) edges from the graph.
     fn remove_entity<'a>(

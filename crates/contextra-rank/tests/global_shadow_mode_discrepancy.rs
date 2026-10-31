@@ -1,3 +1,9 @@
+//! # Integrationstest: Diskrepanz-Logging-Tests für Shadow-Mode bei globaler Fusion
+//!
+//! **Crate:** `contextra-rank`
+//!
+//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use contextra_rank::{
     weighted_reciprocal_rank_fusion, GlobalFusionConfig, GlobalFusionStrategy, SearchResult,
@@ -16,6 +22,7 @@ fn make_search_result(id: &str, score: f32, community_id: Option<u64>) -> Search
 }
 
 /// ShadowMode Discrepancy Evaluator comparing `Global` fusion against `Hybrid` baseline fusion.
+// ANCHOR[contextra-rank:GLOB-TEST-002]
 #[test]
 fn test_global_shadow_mode_discrepancy_logging() {
     let global_config = GlobalFusionConfig {

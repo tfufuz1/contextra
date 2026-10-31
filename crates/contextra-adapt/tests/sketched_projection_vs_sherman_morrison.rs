@@ -1,3 +1,8 @@
+//! # Vergleichstest: Sketched-Projection vs. exaktes Sherman-Morrison
+//!
+//! Validiert die statistische Rangkorrelation der UCB-Scores zwischen projiziertem und
+//! volldimensionalem Bandit.
+
 // FILE-CONTEXT
 // ZWECK: Differential-Test SketchedProjection vs. ShermanMorrison baseline (§13.2).
 // STAND: TS:2026-09-26T00:00:00Z

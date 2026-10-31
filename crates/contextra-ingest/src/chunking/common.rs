@@ -1,3 +1,10 @@
+//! Gemeinsame Datenstrukturen und Hilfsfunktionen fuer Chunks.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Hilfsfunktionen für Token-Zählung, Window-Splitting und Finalisierung von ContextChunk (WP M3).
 // INVARIANTEN: Zero-Panic, UTF-8-sicher, Reagiert auf ResourceBudget/Limits.
@@ -15,11 +22,15 @@ use contextra_types::{ContextChunk, DocId};
 use std::ops::Range;
 
 /// Schätzt die Token-Anzahl eines Textes via engine estimate_tokens.
+// ANCHOR[contextra-ingest:CHK-0201]
+// fn `token_count` fuer Gemeinsame Datenstrukturen und Hilfsfunktionen fuer Chunks.
 pub fn token_count(text: &str) -> usize {
     estimate_tokens(text)
 }
 
 /// UTF-8-sicheres Window-Splitting mit Overlap (Span-Mapping).
+// ANCHOR[contextra-ingest:CHK-0202]
+// fn `window_split` fuer Gemeinsame Datenstrukturen und Hilfsfunktionen fuer Chunks.
 pub fn window_split(text: &str, window_chars: usize, overlap_chars: usize) -> Vec<Range<usize>> {
     if text.is_empty() || window_chars == 0 {
         return Vec::new();
@@ -41,6 +52,8 @@ pub fn window_split(text: &str, window_chars: usize, overlap_chars: usize) -> Ve
 
 /// Wandelt ChunkDrafts in fertige `ContextChunk`-Instanzen um. Verwirft leere Drafts
 /// und erzwingt das Limit `max_chunks_per_document`.
+// ANCHOR[contextra-ingest:CHK-0203]
+// fn `finalize` fuer Gemeinsame Datenstrukturen und Hilfsfunktionen fuer Chunks.
 pub fn finalize(
     drafts: Vec<ChunkDraft>,
     ir: &DocumentIr,

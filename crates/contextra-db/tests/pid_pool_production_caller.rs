@@ -1,3 +1,7 @@
+//! # PID-Kandidatenpool-Regulierung im Produktivpfad
+//!
+//! Testet das dynamische Einschwingen der Kandidatenpoolgröße über den PID-Regler.
+//!
 // FILE-CONTEXT
 // ZWECK: Prüft die PID-regulatorische Einbindung in den Multi-Step Candidate Pool und Grenzwerte [50, 200].
 
@@ -13,6 +17,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-db:TEST-PID_POOL_PRODUCTION_CALLER-01-CREATE_TEST_COLLECTION]
+// Testet die Funktionalität von `create_test_collection`.
 async fn create_test_collection() -> Arc<Collection<LsmStorage>> {
     let dir = tempdir().expect("tempdir");
     let lsm_config = LsmConfig {
@@ -41,6 +47,8 @@ async fn create_test_collection() -> Arc<Collection<LsmStorage>> {
     Arc::new(col)
 }
 
+// ANCHOR[contextra-db:TEST-PID_POOL_PRODUCTION_CALLER-02-TEST_PID_CANDIDATE_POOL_UPDATE_AND_BOUNDS]
+// Testet die Funktionalität von `test_pid_candidate_pool_update_and_bounds`.
 #[test]
 fn test_pid_candidate_pool_update_and_bounds() {
     let mut pid = PidController::new(100.0, 50, 200, Some(100));
@@ -73,6 +81,8 @@ struct FastForwardClock {
 }
 
 impl FastForwardClock {
+    // ANCHOR[contextra-db:TEST-PID_POOL_PRODUCTION_CALLER-03-NEW]
+    // Testet die Funktionalität von `new`.
     fn new(advance_ms: u64) -> Self {
         Self {
             nanos: AtomicU64::new(0),
@@ -82,16 +92,22 @@ impl FastForwardClock {
 }
 
 impl Clock for FastForwardClock {
+    // ANCHOR[contextra-db:TEST-PID_POOL_PRODUCTION_CALLER-04-NOW_UNIX_NANOS]
+    // Testet die Funktionalität von `now_unix_nanos`.
     fn now_unix_nanos(&self) -> u64 {
         0
     }
 
+    // ANCHOR[contextra-db:TEST-PID_POOL_PRODUCTION_CALLER-05-MONOTONIC_NANOS]
+    // Testet die Funktionalität von `monotonic_nanos`.
     fn monotonic_nanos(&self) -> u64 {
         self.nanos
             .fetch_add(self.advance_per_call, Ordering::SeqCst)
     }
 }
 
+// ANCHOR[contextra-db:TEST-PID_POOL_PRODUCTION_CALLER-06-TEST_MULTISTEP_ENGINE_USES_PID_CANDIDATE_POOL]
+// Testet die Funktionalität von `test_multistep_engine_uses_pid_candidate_pool`.
 #[tokio::test]
 async fn test_multistep_engine_uses_pid_candidate_pool() {
     let col = create_test_collection().await;

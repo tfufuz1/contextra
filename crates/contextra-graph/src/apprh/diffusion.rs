@@ -19,6 +19,7 @@ use std::collections::VecDeque;
 ///
 /// # Errors
 /// Returns [`ApprhError`] if parameters are invalid, seed list is empty, or non-finite float is produced.
+// ANCHOR[contextra-graph:SRC-APPRH-DIFFUSION-001]
 pub fn run_apprh_push<G: PathGraph>(
     graph: &G,
     seeds: &[EntityId],

@@ -1,13 +1,17 @@
-// FILE-CONTEXT
-// ZWECK: Golden-Test für identische Greedy-Tokenfolgen mit/ohne Prefix-Reuse (Spec §9.2 / Task 4-04).
-// STAND: TS:2026-09-15T00:00:00Z
+//! # Golden-Test für Greedy-Decoding mit und ohne Prefix-Reuse
+//!
+//! ANCHOR[contextra-kvcache:TEST-GREEDY-001]
+//!
+//! Verifiziert die zentrale Invariante aus Spec §9.2:
+//! Die durch Greedy-Decoding erzeugte Ausgabetokenfolge muss bei Prefix-Reuse
+//! zu 100% bit-identisch zur Generierung ohne Cache sein.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_kvcache::{KvReusePolicy, KvSegment, TenantIsolatedKvStore};
 use contextra_types::{ContextraError, TenantId};
 
-/// Simuliert ein deterministisches Greedy-Decoding (z.B. Nächstes Token = (letztes Token * 31 + 7) % 1000).
+/// Simuliert ein deterministisches Greedy-Decoding (z. B. Nächstes Token = (letztes Token * 31 + 7) % 10000).
 /// Gibt die generierte Tokenfolge sowie die Anzahl der wiederverwendeten Prefix-Tokens zurück.
 fn simulate_greedy_decode(
     prompt: &[u32],
@@ -45,6 +49,7 @@ fn simulate_greedy_decode(
     Ok((generated_tokens, matched_len))
 }
 
+// Prüft die Bit-Identität generierter Tokens bei Einzelprompts mit und ohne Cache-Wiederverwendung.
 #[test]
 fn test_golden_greedy_decode_single_prompt_bit_identity() -> Result<(), ContextraError> {
     let tenant_id = TenantId::try_new(101)?;
@@ -96,6 +101,7 @@ fn test_golden_greedy_decode_single_prompt_bit_identity() -> Result<(), Contextr
     Ok(())
 }
 
+// Prüft die Bit-Identität über eine Testsuite mehrerer Prompts mit verschiedenen Präfix-Längen.
 #[test]
 fn test_golden_greedy_decode_multi_prompt_suite() -> Result<(), ContextraError> {
     let tenant_id = TenantId::try_new(202)?;
@@ -145,6 +151,7 @@ fn test_golden_greedy_decode_multi_prompt_suite() -> Result<(), ContextraError> 
     Ok(())
 }
 
+// Prüft das korrekte Inkrementieren und Dekrementieren des Referenzzählers während des Prefix-Reuse.
 #[test]
 fn test_golden_greedy_decode_guard_refcount_during_reuse() -> Result<(), ContextraError> {
     let store = TenantIsolatedKvStore::new();

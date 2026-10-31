@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `chunk_prose_proptest.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Property-Tests (proptest) für den ProseChunker (WP M3 / SPEC C-11.7).
 // INVARIANTEN: kein Inhaltsverlust, UTF-8-Grenzen, token_count <= hard_limit, exakter Span oder Synthese, Monotonie, Determinismus.
@@ -15,6 +21,8 @@ use proptest::prelude::*;
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(50))]
 
+// ANCHOR[contextra-ingest:TST-0326]
+// Testet die Funktionsfaehigkeit von `test_prose_chunker_properties`.
     #[test]
     fn test_prose_chunker_properties(
         headings in prop::collection::vec("[a-zA-Z0-9öäüß]{3,20}", 1..4),

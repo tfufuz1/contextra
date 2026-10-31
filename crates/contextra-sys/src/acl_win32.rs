@@ -4,15 +4,59 @@
 // INVARIANTEN: 100% safe Rust facade; zero panic; cross-platform file permissions enforcement
 // SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7
 
-//! ACL restriction and file ownership verification low-level system call wrappers.
+//! # Modul: Zugriffskontrolle und Besitzverifikation für Dateien (`acl_win32`)
+//!
+//! Dieses Modul implementiert betriebssystemspezifische Sicherheitsprüfungen und Zugriffsbeschränkungen
+//! (Access Control Lists = ACL) für sensible Dateien, wie z. B. kryptografische Schlüsseldateien oder
+//! Write-Ahead-Logs (WAL).
+//!
+//! ## Ring-Zugehörigkeit und Zweck
+//! - **Ring 0 (Systemnaher Kern):** Kapselt FFI-Aufrufe (Foreign Function Interface) nach POSIX (`libc`)
+//!   und Windows (`windows-sys`).
+//! - **Sicherheitsziel (Fail-Closed):** Eine Datei mit sensiblen Daten darf unter keinen Umständen von
+//!   anderen Benutzern des Betriebssystems gelesen oder modifiziert werden können. Kann dies nicht
+//!   garantiert oder verifiziert werden, schlägt die Operation fehl.
+//!
+//! ## Plattformunterstützung
+//! - **Unix/POSIX:** Setzen des Dateimodus auf `0600` (`-rw-------`) und Verifikation, dass keine Gruppen-
+//!   oder Welt-Rechte existieren sowie die Besitzer-UID (User ID) exakt mit der effektiven UID des aktuellen
+//!   Prozesses übereinstimmt.
+//! - **Windows (Win32):** Erstellung und Verifikation einer DACL (Discretionary Access Control List), die
+//!   ausschließlich den SID (Security Identifier) des aktuellen Prozesses berechtigt und Vererbung blockiert.
+//! - **Andere Plattformen:** Best-Effort-Fallback (No-Op), falls weder Unix noch Windows vorliegen.
 
 use std::path::Path;
 
 #[cfg(unix)]
-/// Restricts permissions on `path` to owner-only read/write (`0600` / `-rw-------`).
+// ANCHOR[contextra-sys:ACL-SET-UNIX-001]
+/// Beschränkt die Zugriffsrechte der angegebenen Datei unter Unix auf den Besitzer (`0600` / `-rw-------`).
 ///
-/// # Errors
-/// Returns an [`std::io::Error`] if changing permissions fails.
+/// # Ablauf
+/// 1. Konvertiert den oktalen Modus `0600` (nur Lese- und Schreibrechte für den Besitzer) in einen Unix-Berechtigungstyp.
+/// 2. Wendet die Berechtigungen über `std::fs::set_permissions` auf das Dateisystem an.
+///
+/// # Vorbedingungen
+/// - Der Pfad `path` muss existieren und für den aktuellen Prozess änderbar sein.
+///
+/// # Nachbedingungen
+/// - Nach erfolgreichem Aufruf können andere Benutzer oder Gruppen auf diesem Unix-System die Datei weder lesen noch schreiben.
+///
+/// # Fehlerfälle
+/// Gibt einen [`std::io::Error`] zurück, wenn:
+/// - die Datei nicht existiert ([`std::io::ErrorKind::NotFound`]),
+/// - die Berechtigungen des aktuellen Prozesses nicht ausreichen ([`std::io::ErrorKind::PermissionDenied`]).
+///
+/// # Beispiel
+/// ```no_run
+/// use std::path::Path;
+/// use contextra_sys::set_restrictive_file_acl;
+///
+/// # fn run() -> std::io::Result<()> {
+/// let key_file = Path::new("secret.key");
+/// set_restrictive_file_acl(key_file)?;
+/// # Ok(())
+/// # }
+/// ```
 pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let perms = std::fs::Permissions::from_mode(0o600);
@@ -20,10 +64,22 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(unix)]
-/// Verifies that `path` has owner-only permissions (`0600`) and belongs to the current process owner UID.
+// ANCHOR[contextra-sys:ACL-VERIFY-UNIX-001]
+/// Verifiziert unter Unix, dass eine Datei strikt auf den Besitzer beschränkt ist (`0600`) und dem aktuellen Prozess gehört.
 ///
-/// # Errors
-/// Returns an [`std::io::Error`] if metadata cannot be read or if group/other bits are set or owner UID mismatches.
+/// # Ablauf
+/// 1. Liest die Dateimetadaten über `std::fs::metadata(path)`.
+/// 2. Prüft die Modus-Bits: Sind Bits für Gruppe oder Andere gesetzt (`mode & 0o077 != 0`), wird sofort abgebrochen.
+/// 3. Ermittelt über den POSIX-Systemaufruf `libc::geteuid()` die effektive Benutzer-ID (UID) des aktuellen Prozesses.
+/// 4. Vergleicht die Besitzer-UID der Datei (`meta.uid()`) mit der Prozess-UID. Stimmen sie nicht überein, wird abgelehnt.
+///
+/// # Fehlerfälle
+/// Gibt einen [`std::io::Error`] mit [`std::io::ErrorKind::PermissionDenied`] zurück, wenn:
+/// - Rechte für Gruppe oder Welt freigegeben sind,
+/// - die Datei einem anderen Benutzer gehört.
+///
+/// # Nebenwirkungen
+/// Führt Dateisystem-Metadaten-I/O und den POSIX-Systemaufruf `geteuid` aus.
 pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::MetadataExt;
     let meta = std::fs::metadata(path)?;
@@ -38,7 +94,7 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
         ));
     }
     let file_uid = meta.uid();
-    // SAFETY: `libc::geteuid` is a safe side-effect-free POSIX syscall returning effective UID of current process.
+    // SAFETY: `libc::geteuid` ist ein nebenwirkungsfreier POSIX-Systemaufruf, der stets die effektive UID des aufrufenden Prozesses liefert. Es werden keine Zeiger dereferenziert.
     let proc_uid = unsafe { libc::geteuid() };
     if file_uid != proc_uid {
         return Err(std::io::Error::new(
@@ -53,13 +109,16 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(windows)]
+// ANCHOR[contextra-sys:ACL-WIN32-TOKEN-001]
+/// RAII-Wächter (Resource Acquisition Is Initialization) für Windows-Prozesstoken-Handles (`HANDLE`).
+/// Schließt das Handle automatisch beim Verlassen des Gültigkeitsbereichs mittels `CloseHandle`.
 struct TokenGuard(windows_sys::Win32::Foundation::HANDLE);
 
 #[cfg(windows)]
 impl Drop for TokenGuard {
     fn drop(&mut self) {
         if !self.0.is_null() {
-            // SAFETY: `CloseHandle` safely releases process token handle.
+            // SAFETY: `self.0` ist ein gültiges, nicht-nulles Win32-HANDLE, das von `OpenProcessToken` stammt und exklusiv von dieser Guard gehalten wird.
             unsafe {
                 windows_sys::Win32::Foundation::CloseHandle(self.0);
             }
@@ -68,6 +127,17 @@ impl Drop for TokenGuard {
 }
 
 #[cfg(windows)]
+// ANCHOR[contextra-sys:ACL-WIN32-SID-001]
+/// Ermittelt die Sicherheits-ID (SID = Security Identifier) des aktuellen Windows-Prozesses.
+///
+/// # Ablauf
+/// 1. Öffnet das Token des aktuellen Prozesses (`OpenProcessToken`) mit der Berechtigung `TOKEN_QUERY`.
+/// 2. Fragt mit `GetTokenInformation` zuerst die benötigte Puffergröße für die Benutzer-SID ab.
+/// 3. Allokiert einen Bytepuffer in exakt dieser Größe.
+/// 4. Liest die Benutzerinformationen (`TokenUser`) in den Puffer ein und gibt ihn zusammen mit dem TokenGuard zurück.
+///
+/// # Fehlerfälle
+/// Gibt einen [`std::io::Error`] zurück, wenn ein Windows-API-Aufruf fehlschlägt oder eine ungültige Pufferlänge liefert.
 fn get_process_owner_sid_buffer() -> std::io::Result<(TokenGuard, Vec<u8>)> {
     use std::ptr::null_mut;
     use windows_sys::Win32::Foundation::{GetLastError, HANDLE};
@@ -75,7 +145,7 @@ fn get_process_owner_sid_buffer() -> std::io::Result<(TokenGuard, Vec<u8>)> {
     use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
     let mut token_handle: HANDLE = null_mut();
-    // SAFETY: Queries process token and owner information from current process.
+    // SAFETY: `GetCurrentProcess` liefert ein Pseudohandle. `token_handle` ist ein gültiger Zeiger auf ein HANDLE. `GetTokenInformation` wird zunächst zur Größenermittlung mit Null-Puffer und danach mit einem ausreichend großen Puffer aufgerufen.
     unsafe {
         if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token_handle) == 0 {
             return Err(std::io::Error::new(
@@ -111,10 +181,19 @@ fn get_process_owner_sid_buffer() -> std::io::Result<(TokenGuard, Vec<u8>)> {
 }
 
 #[cfg(windows)]
-/// Restricts permissions on `path` to process owner only via Win32 DACL.
+// ANCHOR[contextra-sys:ACL-SET-WIN32-001]
+/// Beschränkt unter Windows die Zugriffsrechte der angegebenen Datei auf den Prozessbesitzer mittels Win32-DACL.
 ///
-/// # Errors
-/// Returns an [`std::io::Error`] if setting security descriptor on file object fails.
+/// # Ablauf
+/// 1. Ruft die Besitzer-SID des aktuellen Prozesses über `get_process_owner_sid_buffer()` ab.
+/// 2. Ermittelt die Länge der SID via `GetLengthSid`.
+/// 3. Allokiert Speicher für die Windows-Zugriffskontrollliste (DACL = Discretionary Access Control List) inklusive eines ACE (Access Control Entry).
+/// 4. Initialisiert die ACL mit `InitializeAcl` und fügt mit `AddAccessAllowedAce` einen Eintrag ein, der dem Besitzer Vollzugriff (`GENERIC_ALL`) gewährt.
+/// 5. Konvertiert den Dateipfad in UTF-16 (`encode_wide`) mit Null-Terminierung.
+/// 6. Wendet den Sicherheitsdeskriptor über `SetNamedSecurityInfoW` an und setzt das Flag `PROTECTED_DACL_SECURITY_INFORMATION`, um Vererbung von übergeordneten Verzeichnissen zu unterbinden.
+///
+/// # Fehlerfälle
+/// Gibt einen [`std::io::Error`] zurück, wenn die SID ungültig ist, der ACL-Puffer nicht initialisiert werden kann oder `SetNamedSecurityInfoW` einen Fehlercode zurückgibt.
 pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use std::ptr::null_mut;
@@ -128,7 +207,7 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
     let (_guard, buffer) = get_process_owner_sid_buffer()?;
     let token_user = buffer.as_ptr() as *const TOKEN_USER;
 
-    // SAFETY: Initializes ACL and attaches access-allowed ACE for owner SID before calling SetNamedSecurityInfoW.
+    // SAFETY: `token_user` zeigt auf den zuvor erfolgreich gelesenen Puffer. Der `owner_sid`-Zeiger wird auf Null geprüft. `acl_buf` ist ausreichend groß dimensioniert für ACL + ACCESS_ALLOWED_ACE + sid_len. `path_wide` ist nullterminiert.
     unsafe {
         let owner_sid = (*token_user).User.Sid;
         if owner_sid.is_null() {
@@ -186,10 +265,19 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(windows)]
-/// Verifies that `path` has DACL restricted strictly to current process owner.
+// ANCHOR[contextra-sys:ACL-VERIFY-WIN32-001]
+/// Verifiziert unter Windows, dass die Datei über eine geschützte DACL verfügt, die ausschließlich dem aktuellen Prozessbesitzer Zugriff gewährt.
 ///
-/// # Errors
-/// Returns an [`std::io::Error`] if DACL is unprotected, missing, or SID mismatches.
+/// # Ablauf
+/// 1. Konvertiert den Pfad in nullterminiertes UTF-16.
+/// 2. Liest die DACL und den Sicherheitsdeskriptor über `GetNamedSecurityInfoW`.
+/// 3. Kapselt den Sicherheitsdeskriptor in einer RAII-Guard, um ihn mit `LocalFree` zuverlässig freizugeben.
+/// 4. Prüft über `GetSecurityDescriptorControl`, ob das Bit `SE_DACL_PROTECTED` gesetzt ist (keine vererbten Berechtigungen von übergeordneten Ordnern).
+/// 5. Prüft, ob exakt ein einzelner ACE vorhanden ist (`AceCount == 1`).
+/// 6. Vergleicht über `EqualSid` die im ACE berechtigte SID mit der Prozess-SID.
+///
+/// # Fehlerfälle
+/// Schlägt fehl, falls die DACL fehlt, Vererbung erlaubt ist, mehr als ein Benutzer berechtigt ist oder die SID abweicht.
 pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use std::ptr::null_mut;
@@ -210,7 +298,7 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     let mut p_sec_desc: PSECURITY_DESCRIPTOR = null_mut();
     let mut p_dacl: *mut ACL = null_mut();
 
-    // SAFETY: Retrieves DACL and security descriptor for path_wide object.
+    // SAFETY: `path_wide` ist ein gültiger nullterminierter UTF-16-Puffer. Die Ausgabepointer `p_dacl` und `p_sec_desc` sind gültig und werden vom Win32-Subsystem befüllt.
     unsafe {
         let status = GetNamedSecurityInfoW(
             path_wide.as_ptr() as *mut _,
@@ -230,11 +318,13 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
         }
     }
 
+    // ANCHOR[contextra-sys:ACL-WIN32-SECDESC-001]
+    // RAII-Guard: Stellt sicher, dass der von Windows allokierte Sicherheitsdeskriptor über LocalFree freigegeben wird.
     struct SecDescGuard(PSECURITY_DESCRIPTOR);
     impl Drop for SecDescGuard {
         fn drop(&mut self) {
             if !self.0.is_null() {
-                // SAFETY: LocalFree frees Windows security descriptor memory.
+                // SAFETY: `self.0` ist ein gültiger Zeiger auf einen Windows-Sicherheitsdeskriptor, der von `GetNamedSecurityInfoW` stammt.
                 unsafe {
                     windows_sys::Win32::Foundation::LocalFree(self.0 as _);
                 }
@@ -253,7 +343,7 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     let (_token_guard, buffer) = get_process_owner_sid_buffer()?;
     let token_user = buffer.as_ptr() as *const TOKEN_USER;
 
-    // SAFETY: Reads control flags, ACE count, and compares owner SID with ACE SID.
+    // SAFETY: `p_sec_desc` und `p_dacl` wurden von `GetNamedSecurityInfoW` erfolgreich initialisiert und auf Nicht-Null geprüft. `GetAce` liest den ersten Eintrag (Index 0). `EqualSid` vergleicht zwei gültige SID-Zeiger.
     unsafe {
         let mut control: SECURITY_DESCRIPTOR_CONTROL = 0;
         let mut revision = 0u32;
@@ -309,23 +399,28 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(not(any(unix, windows)))]
-/// Fallback no-op for non-Unix/non-Windows target architectures.
+// ANCHOR[contextra-sys:ACL-FALLBACK-001]
+/// Best-Effort-Fallback für Zielarchitekturen, die weder Unix noch Windows sind (No-Op).
 pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
     let _ = path;
     Ok(())
 }
 
 #[cfg(not(any(unix, windows)))]
-/// Fallback no-op for non-Unix/non-Windows target architectures.
+// ANCHOR[contextra-sys:ACL-FALLBACK-002]
+/// Best-Effort-Fallback für Zielarchitekturen, die weder Unix noch Windows sind (No-Op).
 pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     let _ = path;
     Ok(())
 }
 
+// ANCHOR[contextra-sys:ACL-TESTS-001]
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // ANCHOR[contextra-sys:ACL-TEST-ROUNDTRIP-001]
+    // Prüft den regulären Lebenszyklus: Setzen von 0600-Rechten und anschließende erfolgreiche Verifikation.
     #[test]
     fn test_set_and_verify_file_acl_owner_only() -> std::io::Result<()> {
         let temp_dir = std::env::temp_dir();
@@ -339,6 +434,8 @@ mod tests {
         Ok(())
     }
 
+    // ANCHOR[contextra-sys:ACL-TEST-NONEXISTENT-001]
+    // Prüft, dass die Verifikation bei einer nicht existierenden Datei wie erwartet fehlschlägt.
     #[test]
     fn test_verify_file_acl_owner_only_nonexistent_file() {
         let nonexistent = Path::new("/nonexistent_acl_test_file_path_1234");
@@ -346,6 +443,8 @@ mod tests {
         assert!(res.is_err());
     }
 
+    // ANCHOR[contextra-sys:ACL-TEST-SET-NONEXISTENT-001]
+    // Prüft, dass das Setzen von Rechten bei einer nicht existierenden Datei fehlschlägt.
     #[test]
     fn test_set_restrictive_file_acl_nonexistent_file() {
         let nonexistent = Path::new("/nonexistent_acl_test_file_path_5678");
@@ -353,6 +452,8 @@ mod tests {
         assert!(res.is_err());
     }
 
+    // ANCHOR[contextra-sys:ACL-TEST-PERMISSIVE-001]
+    // Prüft den Fail-Closed-Schutz: Zu freizügige Rechte (0666) werden von der Verifikation abgelehnt.
     #[test]
     fn test_verify_file_acl_owner_only_negative_permissions() -> std::io::Result<()> {
         let temp_dir = std::env::temp_dir();
@@ -371,6 +472,8 @@ mod tests {
         Ok(())
     }
 
+    // ANCHOR[contextra-sys:ACL-TEST-EXEC-001]
+    // Prüft, dass Ausführungsrechte für Gruppen (0610) zuverlässig erkannt und abgewiesen werden.
     #[test]
     fn test_verify_file_acl_owner_only_group_executable() -> std::io::Result<()> {
         let temp_dir = std::env::temp_dir();
@@ -389,6 +492,8 @@ mod tests {
         Ok(())
     }
 
+    // ANCHOR[contextra-sys:ACL-TEST-OTHER-001]
+    // Prüft, dass Leserechte für andere Benutzer (0604) zuverlässig abgelehnt werden.
     #[test]
     fn test_verify_file_acl_owner_only_other_read() -> std::io::Result<()> {
         let temp_dir = std::env::temp_dir();

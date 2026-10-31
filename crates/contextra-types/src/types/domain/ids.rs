@@ -176,6 +176,7 @@ pub struct DocId(pub u64);
 /// Internal document identifier (128-bit variant).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(C, align(16))]
+// ANCHOR[contextra-types:ID-DOC-128]
 pub struct DocId(pub u128);
 
 #[cfg(not(feature = "docid-128"))]

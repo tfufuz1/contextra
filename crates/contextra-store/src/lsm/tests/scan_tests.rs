@@ -1,3 +1,7 @@
+//! # Scan-Tests (Ring 1)
+//!
+//! Testet Bereichsabfragen ueber gemischte Speicherbereiche.
+
 use super::*;
 use std::ops::Bound;
 

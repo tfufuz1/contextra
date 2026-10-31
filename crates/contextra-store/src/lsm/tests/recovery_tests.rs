@@ -1,3 +1,7 @@
+//! # Recovery-Tests (Ring 1)
+//!
+//! Validiert Neustarts nach simulierten Systemabstuerzen.
+
 use super::*;
 use std::sync::atomic::Ordering;
 use tempfile::TempDir;

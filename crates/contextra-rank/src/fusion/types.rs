@@ -1,3 +1,10 @@
+//! # Typdefinitionen der Signal-Fusion (`types`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Enthält grundlegende Datenstrukturen für Retrieval-Ergebnisse, aggregierte Fusionsergebnisse,
+//! Herkunftsnachweise (Provenance) und Fehlerrichtlinien bei Signalausfällen.
+
 use ahash::AHashMap;
 use contextra_types::{ContextChunk, ContextraError, DocId, MemoryLink};
 use serde::{Deserialize, Serialize};
@@ -22,6 +29,7 @@ pub(super) fn estimate_tokens(text: &str) -> usize {
     }
 }
 
+// ANCHOR[contextra-rank:TYPE-001]
 impl TryFrom<SearchResult> for ContextChunk {
     type Error = ContextraError;
 
@@ -57,6 +65,8 @@ impl TryFrom<SearchResult> for ContextChunk {
 
 /// Provenance record for fused search result.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+// ANCHOR[contextra-rank:TYPE-004]
+/// Auditierbarer Herkunftsnachweis (Provenance) über alle beteiligten Retrieval-Kanäle.
 pub struct ProvenanceRecord {
     /// Distance score from vector search signal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -113,6 +123,8 @@ impl ProvenanceRecord {
 
 /// Signal contribution details.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-rank:TYPE-005]
+/// Beitrag eines einzelnen Signals zum aggregierten RRF-Score.
 pub struct SignalContribution {
     /// Raw score before normalization/fusion.
     pub raw_score: f32,
@@ -124,6 +136,8 @@ pub struct SignalContribution {
 
 /// Individual search result candidate for fusion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+// ANCHOR[contextra-rank:TYPE-002]
+/// Standard-Suchergebnis eines einzelnen Retrieval-Signals oder einer Fusionsstufe.
 pub struct SearchResult {
     /// Document or memory entry identifier.
     pub id: String,
@@ -140,6 +154,8 @@ pub struct SearchResult {
 }
 
 /// Type alias for fused score output item.
+// ANCHOR[contextra-rank:TYPE-003]
+/// Aggregierter Fusionswert eines Dokuments (Typ-Alias auf SearchResult).
 pub type FusedScore = SearchResult;
 
 /// Query retrieval signal identifier.
@@ -150,6 +166,8 @@ pub type FusedScore = SearchResult;
 /// Er unterscheidet sich von `contextra_types::Signal`, welches temporale bzw. System-Signale
 /// repräsentiert.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// ANCHOR[contextra-rank:TYPE-006]
+/// Kennzeichnung der Signalherkunft.
 pub enum Signal {
     /// Dense vector similarity signal.
     Vector,
@@ -170,10 +188,14 @@ impl std::fmt::Display for Signal {
 }
 
 /// Policy governing multi-signal retrieval error handling semantics.
+// ANCHOR[contextra-rank:TYPE-007]
+/// Richtlinie für den Umgang mit Signalfehlern während der Fusionsberechnung.
 pub use contextra_types::OnSignalFailure as SignalFailurePolicy;
 
 /// Execution report for search query execution.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+// ANCHOR[contextra-rank:TYPE-008]
+/// Detaillierter Audit-Report über den Fusions- und Suchablauf.
 pub struct SearchReport {
     /// List of signals that failed during query execution when using Degrade policy.
     pub degraded_signals: Vec<Signal>,

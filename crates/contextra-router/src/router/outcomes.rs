@@ -1,3 +1,14 @@
+//! # Ergebnisrückmeldung und Drift-Tracking der RouterEngine
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Verwaltung von Feedback zu getroffenen Entscheidungen (`record_outcome`),
+//! Aktualisierung der konformalen Kalibrierung und Abfrage des Drift-Status.
+//!
+//! **Kalibrierungs-Update:**
+//! Nach jedem Durchlauf meldet der Agent den Erfolg oder Misserfolg via `record_outcome()` zurück.
+//! Bei Fehlschlägen wird der Quantils-Schwellwert adaptiv verschärft, um zukünftige Fehlentscheidungen
+//! zu reduzieren.
+
 // FILE-CONTEXT
 // STAND: 2026-10-29
 // ZWECK: Outcome-Recording, Kalibrierungs- und Drift-Statistiken für RouterEngine.
@@ -8,16 +19,22 @@ use super::*;
 impl RouterEngine {
     #[cfg(feature = "bandit-routing")]
     /// Liefert die aufgezeichnete Logging-Propensity für eine ausstehende Bandit-Entscheidung.
+    // ANCHOR[contextra-router:OTC-001]
+    /// Liefert die Aktionswahrscheinlichkeit (Propensity) einer offenen Bandit-Entscheidung.
     pub fn bandit_decision_propensity(&self, id: DecisionId) -> Option<f32> {
         self.pending_bandit.read().get(&id).map(|d| d.propensity)
     }
 
     /// Gibt aktuelle Kalibrierungsstatistik für alle Profile zurück.
+    // ANCHOR[contextra-router:OTC-002]
+    /// Liefert eine Momentaufnahme aller aktuellen Profil-Kalibrierungen.
     pub fn calibration_stats(&self) -> BTreeMap<String, ProfileCalibrationState> {
         self.state.load().calibration.clone()
     }
 
     /// Setzt Kalibrierungsstatistik für ein bestimmtes Profil zurück.
+    // ANCHOR[contextra-router:OTC-003]
+    /// Setzt die Kalibrierungsstatistik für ein einzelnes Profil zurück.
     pub fn reset_calibration(&self, profile_name: &str) {
         let current = self.state.load_full();
         if current.calibration.contains_key(profile_name) {
@@ -30,6 +47,8 @@ impl RouterEngine {
     }
 
     /// Gibt den aktuellen Lyapunov-Drift-Status für ein Profil zurück.
+    // ANCHOR[contextra-router:OTC-004]
+    /// Fragt den Ljapunow-Drift-Status für ein bestimmtes Profil ab.
     pub fn drift_status(&self, profile_name: &str) -> Option<LyapunovResult> {
         self.state
             .load()
@@ -39,6 +58,8 @@ impl RouterEngine {
     }
 
     /// Gives a human-readable summary string of Lyapunov drift status across active profile watchers.
+    // ANCHOR[contextra-router:OTC-005]
+    /// Liefert eine textuelle Gesamtübersicht des System-Drifts.
     pub fn overall_drift_status(&self) -> String {
         let state = self.state.load();
         if state.lyapunov_watchers.is_empty() {
@@ -64,6 +85,8 @@ impl RouterEngine {
     }
 
     /// Setzt die Baseline für den Lyapunov-Drift-Wächter eines bestimmten Profils.
+    // ANCHOR[contextra-router:OTC-006]
+    /// Setzt die Referenz-Baseline für die Drift-Erkennung eines Profils.
     pub fn set_lyapunov_baseline(&self, profile_name: &str, baseline: &[f32]) -> bool {
         let current = self.state.load_full();
         if current.lyapunov_watchers.contains_key(profile_name) {
@@ -101,6 +124,8 @@ impl RouterEngine {
 
     /// Muss vom Aufrufer (Agent-Loop) nach Abschluss des SLM-Aufrufs aufgerufen werden.
     /// Liefert das tatsächliche Ergebnis zurück und trainiert die Kalibrierung.
+    // ANCHOR[contextra-router:OTC-007]
+    /// Protokolliert das Ergebnis einer Routing-Entscheidung und aktualisiert Kalibrierung und Bandit-Statistiken.
     pub fn record_outcome(&self, decision_id: DecisionId, outcome: RoutingOutcome) -> bool {
         let profile_name = match self.pending_decisions.write().remove(&decision_id) {
             Some((name, _ts)) => name,
@@ -181,11 +206,15 @@ impl RouterEngine {
     }
 
     /// Anzahl offener Decisions.
+    // ANCHOR[contextra-router:OTC-008]
+    /// Liefert die Anzahl offener Entscheidungen, die auf Feedback warten.
     pub fn pending_decision_count(&self) -> usize {
         self.pending_decisions.read().len()
     }
 
     /// Setzt Kalibrierungsstatistik für alle Profile zurück.
+    // ANCHOR[contextra-router:OTC-009]
+    /// Setzt alle Kalibrierungen systemweit auf ihre Initialwerte zurück.
     pub fn reset_all_calibration(&self) {
         let current = self.state.load_full();
         let mut new_state = (*current).clone();

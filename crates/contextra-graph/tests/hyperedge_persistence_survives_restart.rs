@@ -1,3 +1,8 @@
+//! Dauerhaftigkeitsprüfung für Hyperkanten nach simuliertem Systemneustart.
+//!
+//! # Zweck
+//! Sichert die verlustfreie Wiederherstellung aller n-ären Relationen und Rollenbindungen ab.
+
 #![expect(clippy::unwrap_used)]
 
 use contextra_graph::csr::{CsrGraph, EdgeType};
@@ -8,6 +13,7 @@ use contextra_types::{DocId, EntityId, TxId};
 use std::sync::Arc;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-graph:TESTS-HYPEREDGE-PERSISTENCE-SURVIVES-RESTART-001]
 #[tokio::test]
 async fn test_hyperedge_persistence_survives_restart() {
     let dir = tempdir().unwrap();

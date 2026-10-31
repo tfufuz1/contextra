@@ -1,3 +1,10 @@
+//! Zusammenfuehrung von Teilbloecken unter Einhaltung des Token-Budgets.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Zusammenführen kleiner Chunks (min_tokens) und Durchsetzung der Überschriften-Klebepflicht (WP M3 / SPEC C-11.7).
 // INVARIANTEN: Zero-Panic, Überschrift klebt immer an Folgeblock, Merge nur innerhalb derselben Hauptsektion.
@@ -9,6 +16,8 @@ use crate::chunking::ChunkDraft;
 use serde_json::{json, Value};
 
 /// Wendet Zusammenführungsregeln (Heading-Attachment und min_tokens-Merge) auf Drafts an.
+// ANCHOR[contextra-ingest:CHK-0225]
+// fn `merge_small_chunks` fuer Zusammenfuehrung von Teilbloecken unter Einhaltung des Token-Budgets.
 pub fn merge_small_chunks(drafts: Vec<ChunkDraft>, hard_limit: usize, cfg: &ChunkingConfig) -> Vec<ChunkDraft> {
     if drafts.is_empty() {
         return Vec::new();

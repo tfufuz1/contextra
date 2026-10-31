@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `mod.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Minimal-Writer für OLE/CFB Test-Fixtures (Doc, Ppt, Msg).
 // INVARIANTEN: Zero-Dependency CFB-Writer via cfb-Crate, deterministische Test-Bytes.

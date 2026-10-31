@@ -68,9 +68,11 @@ pub struct WorkflowState {
 
 // INVARIANT: Bit 63 der SeqNo markiert Tombstones.
 /// Bit mask for identifying tombstones in sequence numbers.
+// ANCHOR[contextra-types:MISC-TOMBSTONE-BIT]
 pub const TOMBSTONE_BIT: u64 = 1 << 63;
 
 /// Reserved metadata key for sequence-based document TTL expiration.
+// ANCHOR[contextra-types:MISC-EXPIRY-KEY]
 pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 
 /// Maximum number of search results that any hybrid/vector/text search may return.
@@ -84,6 +86,7 @@ pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 ///
 /// # DECISION-REF
 /// AGT-DB-003 — Boundary defence at Layer 2 against unbounded `k` from untrusted JSON-RPC.
+// ANCHOR[contextra-types:MISC-MAX-SEARCH-K]
 pub const MAX_SEARCH_K: usize = 1_000;
 
 /// Relationship types between Zettelkasten memory chunks (A-MEM).

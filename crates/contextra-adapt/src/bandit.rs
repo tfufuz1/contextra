@@ -1,4 +1,23 @@
-//! LinUCB Contextual Bandit für SLM-Profil-Routing (§13.2).
+//! # LinUCB Contextual Bandit für SLM-Profil-Routing (§13.2)
+//!
+//! Dieses Modul implementiert Contextual-Bandit-Algorithmen (insb. LinUCB nach Li et al. 2010
+//! und Garivier & Moulines 2011) zur dynamischen Auswahl optimaler SLM-Modellprofile
+//! (Small Language Models) basierend auf Anfragemerkmalen (Context Embeddings).
+//!
+//! ## Ring & Architektur
+//! - **Ring:** Ring 0 (Parameteradaption / mathematischer Kern).
+//! - **Status:** Rand `[R]`, Feature `bandit-routing` (Default: off).
+//! - **Rechnerische Komplexität:**
+//!   - Sherman-Morrison: $O(d^2)$ Rang-1-Update ohne explizite Matrixinversion.
+//!   - Sketched Projection: $O(d \cdot k + k^2)$ Dimensionsreduktion via Rademacher-Zufallsmatrix.
+//!   - Diagonal-Approximation: $O(d)$ speichereffizienter Fallback.
+//!
+//! ## Mathematische Modellierung
+//! - UCB-Score: $r̂_p(x) = \theta_p^T x + \alpha_p \sqrt{\Sigma_p(x)} - \lambda c_p - \mu \cdot \mathbf{1}_{\text{Cloud}}$
+//! - Angepasste Belohnung: $r_{\text{adj}} = r_{\text{outcome}} - \lambda c_p - \mu \cdot \mathbf{1}_{\text{Cloud}}$
+//! - Konzeptdrift-Kopplung: Temporäre Erhöhung von $\alpha_p$ und beschleunigtes Abklingen ($\gamma_{\text{drift}}$).
+//!
+//! Feature `bandit-routing` (Default: off). Kein Default-Wechsel ohne P7-Nachweis.
 //! Feature `bandit-routing` (Default: off). Kein Default-Wechsel ohne P7-Nachweis.
 
 #![allow(clippy::needless_range_loop)]
@@ -8,10 +27,12 @@ use thiserror::Error;
 
 /// Intervall für die periodische Re-Faktorisierung/Drift-Prüfung der Sherman-Morrison Inversen.
 // Wert ist ein konservativer Startwert, siehe PR-Diskussion für Tuning
+// ANCHOR[contextra-adapt:BANDIT-CONST-001]
 pub const SHERMAN_MORRISON_REFACTORIZATION_INTERVAL: u64 = 1000;
 
 /// Fehlerzustände des Contextual Bandits.
 #[derive(Debug, Error, PartialEq, Clone)]
+// ANCHOR[contextra-adapt:BANDIT-ERROR-001]
 pub enum BanditError {
     /// Dimension des Eingabevektors stimmt nicht mit dem Bandit-Zustand überein.
     #[error("Embedding dimension mismatch: expected {expected}, actual {actual}")]
@@ -74,6 +95,7 @@ impl From<BanditError> for contextra_types::ContextraError {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 #[repr(align(64))]
+// ANCHOR[contextra-adapt:BANDIT-ALIGNED-001]
 pub struct AlignedF32Vec(pub Vec<f32>);
 
 impl std::ops::Deref for AlignedF32Vec {
@@ -104,6 +126,7 @@ impl AlignedF32Vec {
 /// LinUCB-Implementierungsvariante (§13.2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-adapt:BANDIT-IMPL-ENUM-001]
 pub enum BanditImplementation {
     /// Sherman-Morrison O(d²): Produktions-Default.
     #[default]
@@ -125,6 +148,7 @@ pub enum BanditImplementation {
 
 /// Projektionsmatrix $R \in \mathbb{R}^{k \times d}$ für Sketched Projection.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-adapt:BANDIT-SKETCH-001]
 pub struct SketchMatrix {
     /// Flacher Speicher der Matrix (Row-Major, k Zeilen x d Spalten).
     pub data: AlignedF32Vec,
@@ -138,6 +162,7 @@ pub struct SketchMatrix {
 
 impl SketchMatrix {
     /// Leitet einen mandantenisolierten PRNG-Seed via BLAKE3-Hash aus `TenantId` und `base_seed` ab.
+    // ANCHOR[contextra-adapt:BANDIT-SKETCH-SEED-001]
     pub fn derive_seed(tenant_id: &contextra_types::TenantId, base_seed: u64) -> u64 {
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"contextra_sketched_bandit_seed_v1");
@@ -149,6 +174,7 @@ impl SketchMatrix {
     }
 
     /// SplitMix64-PRNG aus `seed`, Rademacher-Einträge ±1/√k.
+    // ANCHOR[contextra-adapt:BANDIT-SKETCH-FROMSEED-001]
     pub fn from_seed(
         seed: u64,
         original_dim: usize,
@@ -179,6 +205,7 @@ impl SketchMatrix {
     }
 
     /// Projiziert Vektor x aus dem Ursprungsraum (Dim d) in den projizierten Raum (Dim k) via Rx.
+    // ANCHOR[contextra-adapt:BANDIT-SKETCH-PROJECT-001]
     pub fn project(&self, x: &[f32]) -> Vec<f32> {
         let mut projected = Vec::with_capacity(self.projected_dim);
         for row in self.data.chunks_exact(self.original_dim) {
@@ -189,6 +216,7 @@ impl SketchMatrix {
 }
 
 /// Trait für Bandit-Routing Policies mit Konzeptdrift-Anpassung (§5.2.3).
+// ANCHOR[contextra-adapt:BANDIT-POLICY-TRAIT-001]
 pub trait BanditPolicy: Send + Sync {
     /// Wendet Drift-Penalty / Covariance Discounting bei erkannter concept drift an.
     fn apply_drift_penalty(&mut self, k_drift: f32, alpha_max: f32, gamma: f32);
@@ -302,15 +330,16 @@ fn fused_row_update(row: &mut [f32], v: &[f32], scale_row: f32, scale_v: f32) {
 /// Score: r̂_p(x) = θ_pᵀ x + α_p √(Σ_p(x)) - λ·c_p - μ·1[transport=HttpCloud]
 /// Reward: r_adj = r_outcome - λ·c_p - μ·1[transport=HttpCloud]
 /// Update (Discounted-Diagonal / Sherman-Morrison, Garivier & Moulines 2011):
-///   σ²_p[i] ← max(γ · σ²_p[i], 1.0)
-///   θ_p[i] += r_adj · x[i] / σ²_p[i]
-///   σ²_p[i] += x[i]²
+///   `σ²_p[i]` ← max(γ · `σ²_p[i]`, 1.0)
+///   `θ_p[i]` += r_adj · `x[i]` / `σ²_p[i]`
+///   `σ²_p[i]` ← max(γ · `σ²_p[i]`, 1.0)
 ///
 /// # Cold-Start (§13.2)
-/// θ_p = 0-Vektor, σ²_p[i] = 1.0 (uninformative Prior), α_p = α_base (Default: 0.5)
+/// θ_p = 0-Vektor, `σ²_p[i]` = 1.0 (uninformative Prior), α_p = α_base (Default: 0.5)
 /// gamma = 0.999 (1000 Schritte effektives Gedächtnisfenster 1/(1-γ))
 /// drift_gamma = 0.95 (beschleunigter Decay nach Drift-Erkennung)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-adapt:BANDIT-PROFILE-STATE-001]
 pub struct BanditProfileState {
     /// Gewichtsvektor θ_p (Dimension = Embedding-Dim).
     pub theta: Vec<f32>,
@@ -382,6 +411,7 @@ impl BanditPolicy for BanditProfileState {
 
 impl BanditProfileState {
     /// Erstellt einen neuen Cold-Start-Zustand für Dimension `d`.
+    // ANCHOR[contextra-adapt:BANDIT-COLD-START-001]
     pub fn cold_start(d: usize, alpha_base: f32) -> Self {
         let mut inv_a = vec![0.0f32; d * d];
         for i in 0..d {
@@ -410,6 +440,7 @@ impl BanditProfileState {
     }
 
     /// Stellt sicher, dass der Sketched-State für `projected_dim` k ordnungsgemäß initialisiert ist.
+    // ANCHOR[contextra-adapt:BANDIT-ENSURE-SKETCH-001]
     pub fn ensure_sketched_state(&mut self, projected_dim: usize) -> Result<(), BanditError> {
         let d = if let Some(ref sketch) = self.sketch_matrix {
             sketch.original_dim
@@ -483,10 +514,23 @@ impl BanditProfileState {
         }
     }
 
-    /// Berechnet UCB-Score für Kontext-Embedding `x` und Profilkosten `cost`.
+    /// Berechnet den Upper-Confidence-Bound (UCB) Score für ein Kontext-Embedding `x`.
     ///
-    /// r̂_p(x) = θᵀx + α√(Σ(x)) - λ·cost - μ·is_cloud
+    /// # Ablauf
+    /// 1. Dimension des Kontext-Vektors `x` gegen `expected_dim()` validieren.
+    /// 2. Bei `SketchedProjection`: Vektor via Rademacher-Matrix `Rx` in den $k$-dimensionalen Raum projizieren.
+    /// 3. Erwartungswert-Term berechnen: Skalarprodukt $	heta^T x$ (bzw. $	heta_{\text{sketch}}^T (Rx)$).
+    /// 4. Unsicherheits-/Varianz-Term $\sqrt{\Sigma(x)}$ ermitteln:
+    ///    - Sherman-Morrison / Sketched: Quadratische Form $\sqrt{x^T A^{-1} x}$.
+    ///    - Diagonal-Approximation: $\sqrt{\sum x_i^2 / \sigma_i^2}$.
+    /// 5. Kostenabzug $-\lambda \cdot \text{cost}$ und Cloud-Privacy-Malus $-\mu \cdot \mathbf{1}_{\text{cloud}}$ anwenden.
+    /// 6. Berechneten Gesamtscore zurückgeben.
+    ///
+    /// # Fehlerfälle
+    /// - `BanditError::DimensionMismatch`: Wenn `x.len() != expected_dim()`.
+    /// - `BanditError::NonFiniteVariance`: Wenn der Varianzterm negativ oder NaN ist.
     #[allow(clippy::needless_range_loop)]
+    // ANCHOR[contextra-adapt:BANDIT-SCORE-001]
     pub fn score(
         &self,
         x: &[f32],
@@ -616,9 +660,21 @@ impl BanditProfileState {
         Ok(dot + self.alpha * variance_term - self.lambda * cost - privacy_penalty)
     }
 
-    /// Aktualisiert θ und σ² (sowie A⁻¹ bei Sherman-Morrison) nach beobachtetem Outcome unter Berücksichtigung von Discounting.
+    /// Aktualisiert den Bandit-Zustand nach beobachtetem Feedback (Outcome).
     ///
-    /// r_adj = r_outcome - λ·cost - μ·is_cloud
+    /// # Ablauf
+    /// 1. Dimension des Kontext-Vektors `x` validieren.
+    /// 2. Angepasste Belohnung ermitteln: $r_{\text{adj}} = r_{\text{outcome}} - \lambda \cdot \text{cost} - \mu \cdot \mathbf{1}_{\text{cloud}}$.
+    /// 3. Effektiven Diskontierungsfaktor $\gamma$ wählen (beschleunigter Decay $\gamma_{\text{drift}}$ falls im Post-Drift-Fenster).
+    /// 4. Zustand je nach Implementierungsvariante aktualisieren:
+    ///    - `DiagonalApproximation`: Diagonale $\sigma^2$ diskontieren, Gradient addieren.
+    ///    - `ShermanMorrison` / `SketchedProjection`:
+    ///      a. Diskontierten Hilfsvektor $v = \gamma^{-1} A^{-1} x$ berechnen.
+    ///      b. Nenner $1 + x^T v$ prüfen; bei Nicht-Positivität oder nach 1000 Schritten Drift melden.
+    ///      c. Fused-Row-Update auf $A^{-1}$ anwenden.
+    ///      d. Parametervektor $\theta$ mit Residuum $(r_{\text{adj}} - \theta^T x) k$ aktualisieren.
+    /// 5. Bei Erfolg `Ok(())` zurückgeben.
+    // ANCHOR[contextra-adapt:BANDIT-UPDATE-001]
     pub fn update(
         &mut self,
         x: &[f32],
@@ -761,6 +817,7 @@ impl BanditProfileState {
     ///
     /// α_p ← min(α_p · k_drift, α_base · alpha_max_multiplier)
     /// drift_steps_remaining ← drift_decay_window (Default: 50)
+    // ANCHOR[contextra-adapt:BANDIT-ONDRIFT-001]
     pub fn on_drift_detected(&mut self, k_drift: f32) {
         self.apply_drift_penalty(k_drift, self.alpha_max_multiplier, self.drift_gamma);
     }

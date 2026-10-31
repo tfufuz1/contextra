@@ -5,7 +5,15 @@
 // HOTSPOTS: tokenize, DefaultTokenizer::tokenize, GermanMorphTokenizer::tokenize
 // STAND: TS:2026-09-10T19:25:46Z (SESSION: c844907e)
 
-//! Tokenizer using `unicode-segmentation`.
+//! Tokenisierung, Stoppwort-Filterung und Schutz atomarer Token (URLs, E-Mails).
+//!
+//! # Ring-Zuordnung
+//! Ring 0 (Kern).
+//!
+//! # Funktionsweise
+//! Zerlegt Text in einzelne Wort-Token unter Verwendung von `unicode-segmentation`.
+//! URLs und E-Mail-Adressen werden über reguläre Ausdrücke geschützt, damit sie
+//! nicht fälschlich an Interpunktionszeichen aufgespalten werden.
 
 use contextra_types::{ContextraError, Result};
 use regex::Regex;
@@ -18,14 +26,19 @@ static STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
 static PROTECTED_REGEX: OnceLock<std::result::Result<Regex, String>> = OnceLock::new();
 static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>> = OnceLock::new();
 
-/// Compiles a protected regex pattern, returning a `ContextraError` on failure (fail-closed, E-1.1).
+// ANCHOR[contextra-text:TOK-001]
+/// Kompiliert ein reguläres Muster für geschützte Token mit Fail-Closed-Fehlerbehandlung.
+///
+/// # Fehler
+/// Gibt [`ContextraError::Text`] zurück, falls der reguläre Ausdruck syntaktisch ungültig ist.
 pub fn compile_protected_regex(pattern: &str) -> Result<Regex> {
     Regex::new(pattern).map_err(|e| {
         ContextraError::Text(format!("Invalid protected regex pattern '{pattern}': {e}"))
     })
 }
 
-/// Retrieves the cached default protected regex for URLs and emails, or returns a `ContextraError` if initialization fails.
+// ANCHOR[contextra-text:TOK-002]
+/// Liefert den gecachten regulären Standardausdruck für geschützte URLs und E-Mail-Adressen.
 pub fn get_protected_regex() -> Result<&'static Regex> {
     let res = PROTECTED_REGEX.get_or_init(|| {
         Regex::new(r"(?i)(?:https?://[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
@@ -116,24 +129,28 @@ fn get_stopwords() -> &'static HashSet<String> {
     })
 }
 
-/// Tokenizer trait for different language-specific or morphological strategies.
+// ANCHOR[contextra-text:TOK-003]
+/// Trait für Text-Tokenizer mit unterschiedlichen Filter- oder Zerlegungsstrategien.
 pub trait Tokenizer: Send + Sync {
-    /// Tokenizes text into lowercase words and filters stopwords.
+    /// Zerlegt den übergebenen Text in kleingeschriebene Wort-Token und filtert Stoppwörter heraus.
     fn tokenize(&self, text: &str) -> Vec<String>;
 }
 
-/// Default tokenizer using Unicode word boundaries and generic stopwords.
+// ANCHOR[contextra-text:TOK-004]
+/// Standard-Tokenizer basierend auf Unicode-Wortgrenzen und generischen Stoppwörtern.
 pub struct DefaultTokenizer;
 
 impl DefaultTokenizer {
-    /// Constructs a `DefaultTokenizer`, validating configuration and protected regex initialization.
+    // ANCHOR[contextra-text:TOK-005]
+    /// Fallible Konstruktion eines `DefaultTokenizer` mit Validierung des regulären Schutzmusters.
     pub fn try_new() -> Result<Self> {
         let _ = get_stopwords();
         let _ = get_protected_regex()?;
         Ok(Self)
     }
 
-    /// Constructs a `DefaultTokenizer`.
+    // ANCHOR[contextra-text:TOK-006]
+    /// Konstruiert einen `DefaultTokenizer`.
     #[deprecated(
         since = "0.1.0",
         note = "Use DefaultTokenizer::try_new() instead for fallible initialization"
@@ -151,6 +168,11 @@ impl Default for DefaultTokenizer {
 }
 
 impl Tokenizer for DefaultTokenizer {
+    // ANCHOR[contextra-text:TOK-007]
+    // Ablauf von tokenize (DefaultTokenizer):
+    // 1. Text segmentieren (geschützte URLs/E-Mails separat erfassen).
+    // 2. Reguläre Abschnitte nach Unicode-Wörtern trennen, klein schreiben und Stoppwörter verwerfen.
+    // 3. Geschützte Abschnitte unverändert als atomare Tokens übernehmen.
     fn tokenize(&self, text: &str) -> Vec<String> {
         let stopwords = get_stopwords();
         let segments = segment_text(text);
@@ -175,13 +197,15 @@ impl Tokenizer for DefaultTokenizer {
     }
 }
 
-/// German tokenizer with morphological compound splitting.
+// ANCHOR[contextra-text:TOK-008]
+/// Deutscher Tokenizer mit morphologischer Zerlegung von Wortzusammensetzungen.
 pub struct GermanMorphTokenizer {
     splitter: Arc<crate::morphology::GermanCompoundSplitter>,
 }
 
 impl GermanMorphTokenizer {
-    /// Fallibly creates a new `GermanMorphTokenizer`.
+    // ANCHOR[contextra-text:TOK-009]
+    /// Erzeugt eine neue Instanz des deutschen morphologischen Tokenizers.
     pub fn try_new() -> Result<Self> {
         let _ = get_protected_regex()?;
         Ok(Self {
@@ -189,7 +213,8 @@ impl GermanMorphTokenizer {
         })
     }
 
-    /// Creates a new `GermanMorphTokenizer` using default shared splitter.
+    // ANCHOR[contextra-text:TOK-010]
+    /// Erzeugt einen deutschen Tokenizer mit geteiltem Standard-Splitter.
     #[deprecated(
         since = "0.1.0",
         note = "Use GermanMorphTokenizer::try_new() instead for fallible initialization"
@@ -209,6 +234,11 @@ impl Default for GermanMorphTokenizer {
 }
 
 impl Tokenizer for GermanMorphTokenizer {
+    // ANCHOR[contextra-text:TOK-011]
+    // Ablauf von tokenize (GermanMorphTokenizer):
+    // 1. Text segmentieren (geschützte URLs/Mails isolieren).
+    // 2. Wörter extrahieren, normalisieren und gegen Stoppwortliste prüfen.
+    // 3. Komposita zerlegen und sowohl Originalwort als auch Teilbestandteile hinzufügen.
     fn tokenize(&self, text: &str) -> Vec<String> {
         use crate::morphology::{normalize_umlauts, MorphologicalTokenizer};
         let stopwords = get_stopwords();
@@ -265,8 +295,8 @@ impl Tokenizer for GermanMorphTokenizer {
     }
 }
 
-/// Tokenizes text into lowercase words using Unicode word boundaries and filters stopwords.
-/// Deprecated: Use `DefaultTokenizer.tokenize()` instead.
+// ANCHOR[contextra-text:TOK-012]
+/// Hilfsfunktion zur Tokenisierung mit dem [`DefaultTokenizer`].
 pub fn tokenize(text: &str) -> Vec<String> {
     DefaultTokenizer.tokenize(text)
 }

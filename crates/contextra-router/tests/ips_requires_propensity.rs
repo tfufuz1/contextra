@@ -1,8 +1,16 @@
+//! # Integrationstest: IPS (Inverse Propensity Scoring) benötigt Propensity
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Integrationstest: IPS (Inverse Propensity Scoring) benötigt Propensity.
+
+// ANCHOR[contextra-router:IT-IPS-001]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 // Testpflicht AK-15 (docs/specs/CONTEXTRA_SPEC_v2.md)
 
 use contextra_router::OffPolicyEvaluator;
 
+// ANCHOR[contextra-router:IT-IPS-T01]
+// Test `test_propensity_lower_bound_clamping_and_discard`: Prüft das erwartete Verhalten und Invarianten für integrationstest: ips (inverse propensity scoring) benötigt propensity.
 #[test]
 fn test_propensity_lower_bound_clamping_and_discard() {
     let mut evaluator = OffPolicyEvaluator::new();
@@ -31,6 +39,8 @@ fn test_propensity_lower_bound_clamping_and_discard() {
     assert_eq!(evaluator.stats().discarded, 3);
 }
 
+// ANCHOR[contextra-router:IT-IPS-T02]
+// Test `test_valid_propensity_accepted`: Prüft das erwartete Verhalten und Invarianten für integrationstest: ips (inverse propensity scoring) benötigt propensity.
 #[test]
 fn test_valid_propensity_accepted() {
     let mut evaluator = OffPolicyEvaluator::new();

@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `contract_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Integrationstests für Verträge, Formate, Kanonisierung, Pipeline & Fallback-Chunker (WP M5).
 // INVARIANTEN: All-targets / All-features Lints strikt einhalten.
@@ -76,6 +82,8 @@ impl DocumentExtractor for PanickingExtractor {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0344]
+// Testet die Funktionsfaehigkeit von `test_contract_1_format_id_consistency`.
 #[test]
 fn test_contract_1_format_id_consistency() {
     let formats = [
@@ -104,6 +112,8 @@ fn test_contract_1_format_id_consistency() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0345]
+// Testet die Funktionsfaehigkeit von `test_contract_2_canonical_golden_and_slicing`.
 #[test]
 fn test_contract_2_canonical_golden_and_slicing() {
     let mut ir = DocumentIr::new(FormatId::Markdown);
@@ -197,6 +207,8 @@ fn test_contract_2_canonical_golden_and_slicing() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0346]
+// Testet die Funktionsfaehigkeit von `test_contract_3_sanitize_text_cases`.
 #[test]
 fn test_contract_3_sanitize_text_cases() {
     let raw = "Hello\r\nWorld\rBOM\u{FEFF} Tag\u{E0001} Bidi\u{202A} C0\u{0007}End";
@@ -205,6 +217,8 @@ fn test_contract_3_sanitize_text_cases() {
     assert!(count >= 5);
 }
 
+// ANCHOR[contextra-ingest:TST-0347]
+// Testet die Funktionsfaehigkeit von `test_contract_4_pipeline_mock_end_to_end_determinism`.
 #[test]
 fn test_contract_4_pipeline_mock_end_to_end_determinism() {
     let mut reg = ExtractorRegistry::new_empty();
@@ -232,6 +246,8 @@ fn test_contract_4_pipeline_mock_end_to_end_determinism() {
     assert_eq!(meta1["chunk_id"], meta2["chunk_id"]);
 }
 
+// ANCHOR[contextra-ingest:TST-0348]
+// Testet die Funktionsfaehigkeit von `test_contract_5_panic_catching`.
 #[test]
 fn test_contract_5_panic_catching() {
     let mut reg = ExtractorRegistry::new_empty();
@@ -255,6 +271,8 @@ fn test_contract_5_panic_catching() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0349]
+// Testet die Funktionsfaehigkeit von `test_contract_6_error_mapping`.
 #[test]
 fn test_contract_6_error_mapping() {
     let limit_err = IngestError::LimitExceeded {
@@ -266,6 +284,8 @@ fn test_contract_6_error_mapping() {
     assert!(matches!(c_err, ContextraError::LimitExceeded { .. }));
 }
 
+// ANCHOR[contextra-ingest:TST-0350]
+// Testet die Funktionsfaehigkeit von `test_contract_7_fallback_chunker_markdown_chunker_equality`.
 #[test]
 fn test_contract_7_fallback_chunker_markdown_chunker_equality() {
     let _markdown = "# Section 1\nFirst paragraph text.\n## Section 2\nSecond paragraph text.";
@@ -321,6 +341,8 @@ fn test_contract_7_fallback_chunker_markdown_chunker_equality() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0351]
+// Testet die Funktionsfaehigkeit von `test_contract_8_stubs_return_unsupported_and_fuzz_support_panics_free`.
 #[test]
 fn test_contract_8_stubs_return_unsupported_and_fuzz_support_panics_free() {
     let reg = ExtractorRegistry::with_defaults();

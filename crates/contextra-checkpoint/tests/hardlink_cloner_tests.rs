@@ -9,6 +9,10 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
+//! # Integrationstest: SSTable Hardlink-Cloner
+//!
+//! Überprüft die Erstellung von Hardlink-Klonen, Dateisystem-Fallbacks und Cross-Device-Verhalten.
+
 use contextra_checkpoint::{CheckpointHardlinkCloner, DefaultHardlinkCloner};
 use contextra_mvcc::SnapshotRegistry;
 use contextra_types::ContextraError;
@@ -16,6 +20,7 @@ use std::fs;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// Testet: test successful hardlink clone and inode identity.
 #[tokio::test]
 async fn test_successful_hardlink_clone_and_inode_identity() -> contextra_types::Result<()> {
     let source_dir = TempDir::new().map_err(ContextraError::Io)?;
@@ -71,6 +76,7 @@ async fn test_successful_hardlink_clone_and_inode_identity() -> contextra_types:
     Ok(())
 }
 
+// Testet: test cross device link error handling.
 #[tokio::test]
 async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> {
     let source_dir = TempDir::new().map_err(ContextraError::Io)?;
@@ -114,6 +120,7 @@ async fn test_cross_device_link_error_handling() -> contextra_types::Result<()> 
     }
 }
 
+// Testet: test snapshot registry compaction gc exclusion during cloning.
 #[tokio::test]
 async fn test_snapshot_registry_compaction_gc_exclusion_during_cloning(
 ) -> contextra_types::Result<()> {

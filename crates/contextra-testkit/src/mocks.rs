@@ -1,3 +1,21 @@
+//! # Mock-Implementierungen für Tests (`mocks`)
+//!
+//! Dieses Modul stellt Test-Doppelgänger (Mocks) für Ports bereit, die in Testumgebungen
+//! deterministisches Verhalten ohne externe Dienste sicherstellen:
+//! - [`MockEmbedder`]: Liefert deterministische Vektor-Embeddings für Textanalyse.
+//! - [`TestMetricsSink`]: Zeichnet Metrik-Ereignisse (Counter, Gauge, Histogram) im Speicher auf.
+//! - [`MetricEvent`]: Repräsentiert ein einzelnes aufgezeichnetes Metrik-Ereignis.
+//!
+//! ## Ring & Architektur-Einordnung
+//! - **Ring:** Werkzeug / Tooling
+//! - **Implementierte Ports:**
+//!   - [`contextra_ports::EmbeddingProvider`]
+//!   - [`contextra_ports::MetricsSink`]
+//!
+//! ## Invarianten
+//! - Kein `unsafe` (`#![forbid(unsafe_code)]`).
+//! - Thread-sichere Aufzeichnung von Metriken über Mutex-geschützte Ereignislisten.
+
 // FILE-CONTEXT
 // STAND: 2026-10-25
 // ZWECK: Mock implementations for testing (MockEmbedder, TestMetricsSink, MetricEvent).
@@ -5,16 +23,27 @@
 
 use contextra_ports::{BoxFuture, EmbeddingError, EmbeddingProvider, MetricsSink};
 
-/// Deterministic mock embedding provider for tests.
+// ANCHOR[contextra-testkit:MOCK-EMBEDDER-STRUCT-001]
+/// Deterministischer Mock-Embedding-Provider für Testläufe.
+///
+/// **Zweck:** Ermöglicht semantische Vektortests ohne teure oder nicht-deterministische
+/// externe KI-/ML-Modelle oder Inferenz-Engines.
+///
+/// **Verhalten:**
+/// Gibt entweder einen statischen Vektor (`fixed_output`) oder einen Default-Vektor
+/// aus wiederholten `0.1f32`-Werten der gewünschten Dimension zurück.
 pub struct MockEmbedder {
-    /// Target embedding dimensionality.
+    /// Ziel-Dimensionalität der generierten Embeddings.
     pub dim: usize,
-    /// Fixed output vector for deterministic testing.
+    /// Fester Ausgabevektor für reproduzierbare Assertions in Tests.
     pub fixed_output: Option<Vec<f32>>,
 }
 
 impl MockEmbedder {
-    /// Creates a new `MockEmbedder` with the specified dimension.
+    // ANCHOR[contextra-testkit:MOCK-EMBEDDER-NEW-001]
+    /// Erzeugt einen `MockEmbedder` mit der vorgegebenen Dimension.
+    ///
+    /// Standardmäßig wird ein Vektor aus `0.1f32` der Länge `dim` erzeugt.
     pub fn new(dim: usize) -> Self {
         Self {
             dim,
@@ -22,7 +51,10 @@ impl MockEmbedder {
         }
     }
 
-    /// Creates a new `MockEmbedder` with a fixed output vector.
+    // ANCHOR[contextra-testkit:MOCK-EMBEDDER-FIXED-001]
+    /// Erzeugt einen `MockEmbedder` mit einem festen Vektor.
+    ///
+    /// Die Dimension wird automatisch aus der Länge von `fixed_output` abgeleitet.
     pub fn with_fixed_output(fixed_output: Vec<f32>) -> Self {
         let dim = fixed_output.len();
         Self {
@@ -32,11 +64,18 @@ impl MockEmbedder {
     }
 }
 
+// ANCHOR[contextra-testkit:MOCK-EMBEDDER-TRAIT-IMPL-001]
 impl EmbeddingProvider for MockEmbedder {
+    /// Gibt den festen Provider-Namen `"mock"` zurück.
     fn provider_name(&self) -> &str {
         "mock"
     }
 
+    /// Asynchrone Embedding-Erzeugung für einen Eingabetext.
+    ///
+    /// **Ablauf:**
+    /// Liefert sofort ein `Ok` mit dem geklonten `fixed_output` oder
+    /// einem mit `0.1f32` gefüllten Vektor der Dimension `dim`.
     fn embed<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, Result<Vec<f32>, EmbeddingError>> {
         Box::pin(async move {
             Ok(self
@@ -46,56 +85,70 @@ impl EmbeddingProvider for MockEmbedder {
         })
     }
 
+    /// Liefert die konfigurierte Vektordimension.
     fn embedding_dim(&self) -> usize {
         self.dim
     }
 }
 
-/// A recorded metric event captured by [`TestMetricsSink`].
+// ANCHOR[contextra-testkit:METRIC-EVENT-ENUM-001]
+/// Ein einzelnes aufgezeichnetes Metrik-Ereignis aus [`TestMetricsSink`].
+///
+/// **Zweck:** Dient in Test-Assertions der genauen Überprüfung, ob Instrumentierungen
+/// die richtigen Namen, Werte und Labels gemeldet haben.
 #[derive(Debug, Clone, PartialEq)]
 pub enum MetricEvent {
-    /// Counter increment event.
+    /// Inkrement-Ereignis eines monotonen Zählers (Counter).
     Counter {
-        /// Metric name.
+        /// Name der Metrik.
         name: String,
-        /// Incremented value.
+        /// Um wie viel der Zähler erhöht wurde.
         value: u64,
-        /// Metric key-value labels.
+        /// Schlüssel-Wert-Labels (Tags) zur Dimensionierung.
         labels: Vec<(String, String)>,
     },
-    /// Gauge setting event.
+    /// Absoluter Füllstandsmesser (Gauge).
     Gauge {
-        /// Metric name.
+        /// Name der Metrik.
         name: String,
-        /// Absolute gauge value.
+        /// Aktueller Wert.
         value: f64,
-        /// Metric key-value labels.
+        /// Schlüssel-Wert-Labels.
         labels: Vec<(String, String)>,
     },
-    /// Histogram observation event.
+    /// Beobachtung einer Wertverteilung (Histogramm, z. B. Latenz).
     Histogram {
-        /// Metric name.
+        /// Name der Metrik.
         name: String,
-        /// Observed value.
+        /// Gemessener Wert.
         value: f64,
-        /// Metric key-value labels.
+        /// Schlüssel-Wert-Labels.
         labels: Vec<(String, String)>,
     },
 }
 
-/// An in-memory [`MetricsSink`] implementation for testing that records all emitted metric events.
+// ANCHOR[contextra-testkit:TEST-METRICS-SINK-STRUCT-001]
+/// In-Memory-Implementierung von [`contextra_ports::MetricsSink`] für Tests.
+///
+/// **Zweck:** Fängt alle Metrik-Aufrufe ab und speichert sie chronologisch
+/// in einer threadsicheren Liste zur späteren Auswertung in Unit-Tests.
 #[derive(Debug, Default, Clone)]
 pub struct TestMetricsSink {
+    /// Mutex-geschützte Liste aller eingegangenen Ereignisse.
     events: std::sync::Arc<std::sync::Mutex<Vec<MetricEvent>>>,
 }
 
 impl TestMetricsSink {
-    /// Creates a new empty [`TestMetricsSink`].
+    // ANCHOR[contextra-testkit:TEST-METRICS-SINK-NEW-001]
+    /// Erstellt eine leere [`TestMetricsSink`].
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Returns a snapshot copy of all recorded metric events.
+    // ANCHOR[contextra-testkit:TEST-METRICS-SINK-EVENTS-001]
+    /// Erstellt einen Schnappschuss (Snapshot) aller bisher aufgezeichneten Ereignisse.
+    ///
+    /// Behandelt vergiftete Mutexe (`PoisonError`) defensiv via `into_inner()`.
     pub fn events(&self) -> Vec<MetricEvent> {
         self.events
             .lock()
@@ -103,7 +156,8 @@ impl TestMetricsSink {
             .clone()
     }
 
-    /// Clears all recorded metric events.
+    // ANCHOR[contextra-testkit:TEST-METRICS-SINK-CLEAR-001]
+    /// Leert die Liste aller aufgezeichneten Metrik-Ereignisse.
     pub fn clear(&self) {
         self.events
             .lock()
@@ -112,7 +166,9 @@ impl TestMetricsSink {
     }
 }
 
+// ANCHOR[contextra-testkit:TEST-METRICS-SINK-TRAIT-IMPL-001]
 impl MetricsSink for TestMetricsSink {
+    /// Zeichnet ein Zähler-Ereignis (Counter) auf.
     fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]) {
         let labels_vec = labels
             .iter()
@@ -128,6 +184,7 @@ impl MetricsSink for TestMetricsSink {
             });
     }
 
+    /// Zeichnet einen absoluten Messwert (Gauge) auf.
     fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
         let labels_vec = labels
             .iter()
@@ -143,6 +200,7 @@ impl MetricsSink for TestMetricsSink {
             });
     }
 
+    /// Zeichnet eine Histogramm-Beobachtung auf.
     fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]) {
         let labels_vec = labels
             .iter()
@@ -164,6 +222,8 @@ mod tests {
     use super::*;
     use contextra_ports::TextEmbeddingEngine;
 
+    // ANCHOR[contextra-testkit:TEST-MOCKS-EMBEDDER-001]
+    // Prüft Einbettungs-Dimension und deterministische Vektorerzeugung von MockEmbedder.
     #[tokio::test]
     async fn test_mock_embedder_methods() -> Result<(), Box<dyn std::error::Error>> {
         let embedder = MockEmbedder::new(4);
@@ -181,6 +241,8 @@ mod tests {
         Ok(())
     }
 
+    // ANCHOR[contextra-testkit:TEST-MOCKS-BATCH-001]
+    // Prüft Batch-Verarbeitung und Blanket-Trait-Implementierung für TextEmbeddingEngine.
     #[tokio::test]
     async fn test_embedding_provider_batch_and_blanket_trait(
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -198,6 +260,8 @@ mod tests {
         Ok(())
     }
 
+    // ANCHOR[contextra-testkit:TEST-MOCKS-SINK-001]
+    // Prüft die chronologische Aufzeichnung und das Leeren von Counter-, Gauge- und Histogramm-Ereignissen.
     #[test]
     fn test_test_metrics_sink() {
         let sink = TestMetricsSink::new();

@@ -1,3 +1,32 @@
+//! # Kognitions-Engine (`contextra-cognition`)
+//!
+//! Die Crate `contextra-cognition` bildet die Kognitions- und Konsolidierungsschicht
+//! im Contextra-Workspace (historisch Ring 3, adaptiert nach Spezifikation §4/§5.2).
+//! Sie stellt Hintergrundprozesse für Gedächtniskonsolidierung (Memory Consolidation),
+//! Kontext-Kompaktierung (Context Compaction), semantische Aggregation (LeanRAG / Hyperedge Consolidation)
+//! und Wartungsplanung (Maintenance Scheduling) bereit.
+//!
+//! ## Ring-Zugehörigkeit und Abhängigkeiten
+//! - **Abhängigkeiten (eingehend):** Wird von höheren Orchestrierungsschichten wie `contextra-db` eingebunden.
+//! - **Abhängigkeiten (ausgehend):** Nutzt Basis- und Speicher-Crates:
+//!   - `contextra-types`: Domänentypen, Fehlermodelle, Mandanten-IDs.
+//!   - `contextra-ports`: Abstrakte Port-Schnittstellen (Storage, Clock, Rng, Metrics).
+//!   - `contextra-engine`: Ausführungs- und Storage-Subsysteme.
+//!   - `contextra-store`: Schlüssel-Wert- und LSM-Speicher (Key-Value-Store).
+//!   - `contextra-vector`: Vektorindizes und Embeddings.
+//!   - `contextra-graph`: CSR-Graphdarstellung und Hyperedges.
+//!
+//! ## Kernkomponenten
+//! - [`ContextManager`]: Verwaltet Kontexte, Raumgrenzen (SpatialFence) und Token-Budgets.
+//! - [`ContextCompactor`]: Führt Transaktions- und Dialogkompaktierung durch.
+//! - [`ConsolidationEngine`]: Hintergrund-Worker für Schlafzyklen (Sleep Cycles) und semantische Verschmelzung.
+//! - [`MaintenanceScheduler`]: Steuert periodische Wartungsläufe und Speicherbereinigungen.
+//!
+//! ## Invarianten
+//! - **Kein Unsafe-Code:** `#![forbid(unsafe_code)]` wird strikt auf Crate-Ebene erzwungen.
+//! - **Mandantentrennung:** Strikte Isolierung nach `tenant_id` (VETO-F10).
+//! - **Deterministische Sortierung:** Alle aggregierten und vorverdichteten Strukturen werden deterministisch sortiert.
+
 #![deny(dead_code)]
 // FILE-CONTEXT
 // ZWECK: Contextra Cognition Engine (Layer 3 - Cognition).
@@ -8,18 +37,32 @@
 //                          deterministische Sortierung nach tenant_id und text_digest.
 #![forbid(unsafe_code)]
 
+// ANCHOR[contextra-cognition:ROOT-001]
+/// Modul für Aggregationsphase (LeanRAG Stage 3).
 pub mod aggregation_phase;
+/// Modul für die Ausführung der Konsolidierung.
 pub mod consolidation_executor;
+/// Modul für Konsolidierungs-Locks und Kaskaden-Invalidierung.
 pub mod consolidation_locks;
+/// Modul für autonome Kontextverwaltung und Token-Budgetierung.
 pub mod context;
+/// Modul für Kontext-Kompaktierung.
 pub mod context_compaction;
+/// Modul für Graph-Senken (Super-Hyperkanten).
 pub mod graph_sink;
+/// Modul zur Vorbereitung von LeanRAG-Eingabedaten.
 pub mod leanrag_input;
+/// Modul für Wartungskonfigurationen.
 pub mod maintenance_config;
+/// Modul für periodische Wartungsplanung.
 pub mod maintenance_scheduler;
+/// Modul für Gedächtniskonsolidierung (Structural Pass).
 pub mod memory_consolidation;
+/// Modul für die Fassadenschnittstelle zur semantischen Aggregation.
 pub mod semantic_aggregation_facade;
+/// Modul für generative Wissenssynthese (LLM-Pass).
 pub mod synthesis_phase;
+/// Modul für Transitivitäts-Veto-Prüfungen.
 pub mod transitivity_veto;
 
 pub use aggregation_phase::{

@@ -1,4 +1,8 @@
-//! Integrationstests für LeanRAG Aggregation Phase (Consolidation Stage 3).
+//! # Integrationstests: LeanRAG Aggregationsphase (`tests/leanrag_aggregation.rs`)
+//!
+//! Validiert GMM-Clusterung, Permutationsinvarianz, Typ-Denoising, LLM-Budgetierung
+//! und Superkanten-Erzeugung in Stage 3.
+
 
 #![allow(
     clippy::unwrap_used,
@@ -81,6 +85,8 @@ impl SuperEdgeSink for MockSink {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-062]
+// Prüft Testfall `test_gmm_determinism_and_permutation_invariance`.
 #[tokio::test]
 async fn test_gmm_determinism_and_permutation_invariance() {
     // 6 nodes in 2 distinct 2D clusters
@@ -153,6 +159,8 @@ async fn test_gmm_determinism_and_permutation_invariance() {
     assert_eq!(alpha1, alpha2);
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-063]
+// Prüft Testfall `test_clustering_two_distinct_blobs`.
 #[tokio::test]
 async fn test_clustering_two_distinct_blobs() {
     let nodes = vec![
@@ -203,6 +211,8 @@ async fn test_clustering_two_distinct_blobs() {
     assert!(sink.committed);
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-064]
+// Prüft Testfall `test_type_denoising_tombstones_inconsistent_edge`.
 #[tokio::test]
 async fn test_type_denoising_tombstones_inconsistent_edge() {
     let nodes = vec![
@@ -260,6 +270,8 @@ async fn test_type_denoising_tombstones_inconsistent_edge() {
     assert_eq!(sink.tombstoned, vec![HyperEdgeId::new(10)]);
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-065]
+// Prüft Testfall `test_llm_budgeting_and_per_cluster_error_recovery`.
 #[tokio::test]
 async fn test_llm_budgeting_and_per_cluster_error_recovery() {
     let nodes = vec![
@@ -308,6 +320,8 @@ async fn test_llm_budgeting_and_per_cluster_error_recovery() {
     assert_eq!(alphas[0].cluster_id, 1);
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-066]
+// Prüft Testfall `test_memory_budget_exceeded`.
 #[test]
 fn test_memory_budget_exceeded() {
     let cfg = AggregationConfig {
@@ -328,6 +342,8 @@ fn test_memory_budget_exceeded() {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-067]
+// Prüft Testfall `test_super_edge_carries_correct_child_edge_ids`.
 #[tokio::test]
 async fn test_super_edge_carries_correct_child_edge_ids() {
     // 2 clusters
@@ -395,6 +411,8 @@ async fn test_super_edge_carries_correct_child_edge_ids() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-068]
+// Prüft Testfall `test_no_commit_on_sink_error`.
 #[tokio::test]
 async fn test_no_commit_on_sink_error() {
     // Non-finite embedding to trigger immediate error
@@ -417,6 +435,8 @@ async fn test_no_commit_on_sink_error() {
     assert!(!sink.committed, "Sink commit must NOT be called on error");
 }
 
+// ANCHOR[contextra-cognition:TEST-LEANRAG_-069]
+// Prüft Testfall `test_type_renaming_and_deprecation`.
 #[test]
 fn test_type_renaming_and_deprecation() {
     // Verify SegmentSynthesisResult in synthesis_phase

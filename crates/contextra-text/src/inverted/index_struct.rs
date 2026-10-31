@@ -7,13 +7,14 @@ use std::sync::Arc;
 
 use contextra_ports::{StorageEngine, TextIndex, TextIndexStats};
 use contextra_types::{ContextraError, DocId, Result, ScoredDocument, TxId, MAX_SEARCH_K};
-/// An inverted index tied to a specific collection namespace.
+// ANCHOR[contextra-text:INV-008]
+/// Persistenter invertierter Index über einer Kollektion im Storage-Backend.
 ///
-/// # Concurrency & Lock Hierarchy:
-/// 1. `commit_lock` (`parking_lot::Mutex`): Ensures single-writer serialization during transactional stats commits.
-/// 2. `staged_stats` (`parking_lot::Mutex`): Synchronous, short-lived spinlock guarding in-memory uncommitted transaction statistics.
+/// # Nebenläufigkeit & Sperrhierarchie:
+/// 1. `commit_lock` (`parking_lot::Mutex`): Serialisiert Transaktions-Commits auf den Statistiken (Single-Writer).
+/// 2. `staged_stats` (`parking_lot::Mutex`): Kurzlebiger Spinlock für ungecommittete Transaktionsänderungen im RAM.
 ///
-/// **Rule**: `commit_lock` must ALWAYS be acquired BEFORE acquiring `staged_stats`. Never hold synchronous lock guards across `.await` points.
+/// **Regel**: `commit_lock` muss IMMER vor `staged_stats` akquiriert werden. Niemals synchrone Sperren über `.await`-Punkte halten!
 pub struct InvertedIndex<S: StorageEngine> {
     storage: Arc<S>,
     prefix: Vec<u8>,
@@ -45,13 +46,16 @@ impl<S: StorageEngine> Clone for InvertedIndex<S> {
 }
 
 impl<S: StorageEngine> InvertedIndex<S> {
-    /// Maximum allowed document text size in bytes (10 MB).
+    // ANCHOR[contextra-text:INV-009]
+    /// Maximale Textgröße pro Dokument (10 MiB) zur Begrenzung von Speicherverbrauch und DoS-Schutz.
     pub const MAX_TEXT_BYTES: usize = 10 * 1024 * 1024;
 
-    /// Maximum allowed staged uncommitted transaction statistics changes (10,000).
+    // ANCHOR[contextra-text:INV-010]
+    /// Maximale Anzahl gleichzeitig ungecommitteter Transaktionen (10.000).
     pub const MAX_STAGED_TRANSACTIONS: usize = 10_000;
 
-    /// Creates a new InvertedIndex with explicit language configuration.
+    // ANCHOR[contextra-text:INV-011]
+    /// Erzeugt einen neuen invertierten Index mit expliziter Sprachkonfiguration.
     ///
     /// # Language Selection
     /// Use `Language::from_iso("de")` for German,
@@ -84,12 +88,14 @@ impl<S: StorageEngine> InvertedIndex<S> {
         }
     }
 
-    /// Creates a new InvertedIndex with English tokenizer (default).
+    // ANCHOR[contextra-text:INV-012]
+    /// Erzeugt einen neuen invertierten Index mit englischem Standard-Tokenizer.
     pub fn new(storage: Arc<S>, namespace: &str) -> Self {
         Self::new_with_language(storage, namespace, Language::English)
     }
 
-    /// Sets a custom tokenizer for the inverted index.
+    // ANCHOR[contextra-text:INV-013]
+    /// Konfiguriert einen benutzerdefinierten Tokenizer.
     pub fn with_tokenizer(mut self, tokenizer: Arc<dyn Tokenizer>) -> Self {
         self.tokenizer = tokenizer;
         self
@@ -110,7 +116,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
         &self.commit_lock
     }
 
-    /// Loads index statistics from storage into the cache.
+    // ANCHOR[contextra-text:INV-014]
+    /// Lädt die persistenten Statistiken (`meta:stats`) aus dem Storage in die atomaren In-Memory-Felder.
     pub async fn load_stats(&self) -> Result<()> {
         let meta_key = self.key("meta:stats");
         if let Some(bytes) = self.storage.get(&meta_key).await? {
@@ -251,6 +258,15 @@ impl<S: StorageEngine> InvertedIndex<S> {
         k
     }
 
+    // ANCHOR[contextra-text:INV-015]
+    /// Fügt ein Dokument in den Index ein oder aktualisiert ein bestehendes.
+    ///
+    /// # Ablauf
+    /// 1. Größenprüfung gegen `MAX_TEXT_BYTES`.
+    /// 2. Tokenisierung und Berechnung der Termfrequenzen.
+    /// 3. Vorherige Dokumentlänge und Terme auslesen; für weggefallene Terme Tombstones schreiben.
+    /// 4. Dokumentlänge `dl:{doc_id}` und Vorwärtsindex `fw:{doc_id}` schreiben.
+    /// 5. Postings in Storage schreiben und speicherresidenten Index per RCU aktualisieren.
     #[tracing::instrument(skip(self, text))]
     pub async fn upsert_document(&self, tx: TxId, doc_id: DocId, text: &str) -> Result<()> {
         if text.len() > Self::MAX_TEXT_BYTES {
@@ -336,12 +352,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
     }
 
     ///
-    /// For every document with a `tbs:{doc_id}` marker this method reads the
-    /// *current* forward index and removes posting-list entries for terms that
-    /// are no longer present.  Call this during background compaction or
-    /// whenever write throughput is low.
-    ///
-    /// Returns the number of tombstones that were resolved.
+    // ANCHOR[contextra-text:INV-016]
+    /// Löst aufgelaufene Tombstones (`tbs:{doc_id}:{term}`) auf und bereinigt verwaiste Posting-Listen.
     pub async fn resolve_tombstones(&self, tx: TxId) -> Result<u64> {
         let tbs_prefix = {
             let mut k = Vec::with_capacity(self.prefix.len() + 4);
@@ -418,7 +430,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
         Ok(resolved)
     }
 
-    /// Deletes a document from the index.
+    // ANCHOR[contextra-text:INV-017]
+    /// Löscht ein Dokument logisch aus dem Index und markiert alle Terme mit Tombstones.
     pub async fn delete_document(&self, tx: TxId, doc_id: DocId) -> Result<()> {
         let dl_key = self.key_with_id("dl:", doc_id.inner());
         let fw_key = self.key_with_id("fw:", doc_id.inner());
@@ -487,6 +500,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
         Ok(())
     }
 
+    // ANCHOR[contextra-text:INV-018]
+    /// Überträgt die gepufferten statistischen Änderungen einer Transaktion dauerhaft.
     pub(crate) async fn commit_stats(&self, tx: TxId) -> Result<()> {
         let change = {
             let mut guard = self.staged_stats.lock();
@@ -539,6 +554,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
         self.storage.put(tx, &meta_key, &meta_bytes).await
     }
 
+    // ANCHOR[contextra-text:INV-019]
+    /// Verwirft die gepufferten statistischen Änderungen einer Transaktion bei Rollback.
     pub(crate) async fn rollback_stats(&self, tx: TxId) -> Result<()> {
         let mut guard = self.staged_stats.lock();
         guard.remove(&tx);
@@ -546,7 +563,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
         Ok(())
     }
 
-    /// Searches the inverted index using BM25.
+    // ANCHOR[contextra-text:INV-020]
+    /// Führt eine Volltextsuche mit BM25 aus.
     #[tracing::instrument(skip(self, query))]
     pub async fn search_bm25(
         &self,
@@ -557,7 +575,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
         self.search_bm25_at(query, k, max_seq).await
     }
 
-    /// Searches the inverted index using BM25 at a specific snapshot version.
+    // ANCHOR[contextra-text:INV-021]
+    /// Führt eine Volltextsuche mit BM25 zu einer bestimmten MVCC-Snapshot-Sequenznummer aus.
     #[tracing::instrument(skip(self, query))]
     pub async fn search_bm25_at(
         &self,

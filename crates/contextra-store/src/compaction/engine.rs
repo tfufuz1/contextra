@@ -1,3 +1,7 @@
+//! # Kompaktierungs-Engine (Ring 1)
+//!
+//! Fuehrt das Zusammenfuehren ueberlappender SSTables durch und bereinigt alte Versionen.
+
 use super::adaptive::{AdaptiveCompactionPlanner, CostBasedAdaptivePlanner, WorkloadMetrics};
 use super::config::CompactionConfig;
 use super::merge_operator::MergeOperator;
@@ -14,6 +18,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing;
 
+// ANCHOR[contextra-store:COMP-ENG-001]
+/// Orchestriert die periodische Verdichtung und Bereinigung von SSTables.
 pub struct CompactionEngine {
     config: CompactionConfig,
     pub(super) snapshot_registry: Arc<SnapshotRegistry>,

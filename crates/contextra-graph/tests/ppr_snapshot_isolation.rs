@@ -1,7 +1,13 @@
+//! Snapshot-Isolationstests für PageRank-Berechnungen unter Schreiblast.
+//!
+//! # Zweck
+//! Stellt sicher, dass parallele Schreibtransaktionen laufende PageRank-Iterationen nicht verfälschen.
+
 use contextra_graph::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, PprAlgorithm, PprConfig, TxId};
 
+// ANCHOR[contextra-graph:TESTS-PPR-SNAPSHOT-ISOLATION-001]
 #[tokio::test]
 async fn test_ppr_snapshot_isolation_temporal_visibility() {
     let graph = CsrGraph::new();
@@ -81,6 +87,7 @@ async fn test_ppr_snapshot_isolation_temporal_visibility() {
     );
 }
 
+// ANCHOR[contextra-graph:TESTS-PPR-SNAPSHOT-ISOLATION-002]
 #[tokio::test]
 async fn test_ppr_snapshot_isolation_matches_live_at_latest_seq() {
     let graph = CsrGraph::new();
@@ -148,6 +155,7 @@ async fn test_ppr_snapshot_isolation_matches_live_at_latest_seq() {
     }
 }
 
+// ANCHOR[contextra-graph:TESTS-PPR-SNAPSHOT-ISOLATION-003]
 #[tokio::test]
 async fn test_ppr_snapshot_isolation_tombstone_and_validity_range() {
     let graph = CsrGraph::new();
@@ -197,6 +205,7 @@ async fn test_ppr_snapshot_isolation_tombstone_and_validity_range() {
     );
 }
 
+// ANCHOR[contextra-graph:TESTS-PPR-SNAPSHOT-ISOLATION-004]
 #[tokio::test]
 async fn test_ppr_snapshot_isolation_hyperedge_visibility() {
     use contextra_graph::csr::EdgeType;
@@ -266,6 +275,7 @@ async fn test_ppr_snapshot_isolation_hyperedge_visibility() {
     );
 }
 
+// ANCHOR[contextra-graph:TESTS-PPR-SNAPSHOT-ISOLATION-005]
 #[tokio::test]
 async fn test_ppr_snapshot_isolation_empty_seeds_and_determinism() {
     let graph = CsrGraph::new();
@@ -316,6 +326,7 @@ async fn test_ppr_snapshot_isolation_empty_seeds_and_determinism() {
     );
 }
 
+// ANCHOR[contextra-graph:TESTS-PPR-SNAPSHOT-ISOLATION-006]
 #[tokio::test]
 async fn test_ppr_snapshot_isolation_algorithms_parity() {
     let graph = CsrGraph::new();

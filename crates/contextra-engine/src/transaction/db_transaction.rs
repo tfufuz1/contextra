@@ -1,3 +1,10 @@
+//! # Modul: db_transaction.rs
+//!
+//! **Zweck:** Zentrale Transaktionsabstraktion mit ReadSet/WriteSet-Verwaltung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 use super::intent::StagedKeyOp;
 use crate::Collection;
 use bytes::Bytes;
@@ -25,6 +32,8 @@ pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::Hn
 }
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
+    // ANCHOR[contextra-engine:NEW-035]
+    /// Dokumentation für `new` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn new(collection: Collection<S, V>, tx_id: TxId) -> Self {
         Self {
             tx_id,
@@ -76,6 +85,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         Arc::make_mut(&mut ids).push(doc_id);
     }
 
+    // ANCHOR[contextra-engine:STA-086]
+    /// Dokumentation für `stage_text_insert` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn stage_text_insert(&self, doc_id: DocId, text: String) {
         let mut guard = match self.staged_text_ops.lock() {
             Ok(g) => g,
@@ -84,6 +95,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         guard.push((doc_id, text));
     }
 
+    // ANCHOR[contextra-engine:STA-094]
+    /// Dokumentation für `stage_text_delete` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn stage_text_delete(&self, doc_id: DocId) {
         let mut guard = match self.staged_text_deletes.lock() {
             Ok(g) => g,
@@ -92,6 +105,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         guard.push(doc_id);
     }
 
+    // ANCHOR[contextra-engine:STA-102]
+    /// Dokumentation für `stage_graph_entity` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn stage_graph_entity(&self, entity: Entity) {
         let mut guard = match self.staged_graph_entities.lock() {
             Ok(g) => g,
@@ -100,6 +115,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         guard.push(entity);
     }
 
+    // ANCHOR[contextra-engine:STA-110]
+    /// Dokumentation für `stage_graph_edge` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn stage_graph_edge(&self, edge: Edge) {
         let mut guard = match self.staged_graph_edges.lock() {
             Ok(g) => g,
@@ -108,6 +125,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         guard.push(edge);
     }
 
+    // ANCHOR[contextra-engine:STA-118]
+    /// Dokumentation für `stage_graph_entity_delete` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn stage_graph_entity_delete(&self, entity_id: EntityId) {
         let mut guard = match self.staged_graph_entity_deletes.lock() {
             Ok(g) => g,
@@ -116,6 +135,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         guard.push(entity_id);
     }
 
+    // ANCHOR[contextra-engine:STA-126]
+    /// Dokumentation für `stage_graph_edge_delete` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn stage_graph_edge_delete(&self, from: EntityId, to: EntityId) {
         let mut guard = match self.staged_graph_edge_deletes.lock() {
             Ok(g) => g,
@@ -124,6 +145,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         guard.push((from, to));
     }
 
+    // ANCHOR[contextra-engine:STA-134]
+    /// Dokumentation für `stage_hyperedge` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn stage_hyperedge(&self, hyperedge: contextra_graph::hyperedge::HyperEdge) {
         let mut guard = match self.staged_hyperedges.lock() {
             Ok(g) => g,

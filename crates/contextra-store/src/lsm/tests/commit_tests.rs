@@ -1,3 +1,7 @@
+//! # Commit-Tests (Ring 1)
+//!
+//! Prueft Rollbacks, Timeouts und Batch-Sicherheit.
+
 use super::*;
 use contextra_testkit::ManualClock;
 use std::sync::atomic::Ordering;

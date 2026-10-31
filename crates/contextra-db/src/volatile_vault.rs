@@ -1,52 +1,78 @@
 #![forbid(unsafe_code)]
 //! Ephemerer RAM-Puffer für sensitive Kontexte (Safe-Modus).
 //!
-//! `VolatileContextVault` speichert Chunks ausschließlich im Heap, nie auf
-//! dauerhaftem Speicher. Beim Drop (oder explizitem `purge()`) werden alle Inhalte via
-//! [`zeroize::Zeroize`] überschrieben.
+//! # Architektur & Ring-Zugehörigkeit
+//! `VolatileContextVault` gehört zu `contextra-db` (Ring 3, Fassade) und implementiert
+//! einen flüchtigen Zwischenspeicher für hochgradig sensitive Kontextdaten (DSGVO/Privacy).
+//!
+//! # Funktionsweise & Garantien
+//! Der Vault speichert Chunks ausschließlich im Arbeitsspeicher (Heap), niemals auf
+//! SSD/Festplatte oder in persistenten WAL-Dateien (Write-Ahead-Log).
+//! Beim Drop (oder explizitem Aufruf von [`VolatileContextVault::purge()`]) werden sämtliche Inhalte via
+//! [`zeroize::Zeroize`] mit Nullen überschrieben.
 //!
 //! # Sicherheitshinweise
 //!
 //! - **Memory-Locking:** Sensitive Chunks werden via `contextra_sys::LockedRegions`
-//!   (mlock / VirtualLock) im physischen RAM fixiert, um OS-Swap-Auslagerung zu verhindern (best-effort).
+//!   (mittels `mlock` unter Linux/macOS bzw. `VirtualLock` unter Windows) im physischen RAM fixiert,
+//!   um eine Auslagerung in den Betriebssystem-Swap zu verhindern (Best-Effort).
 //! - **`std::mem::forget`:** Das Aufrufen von `std::mem::forget(vault)` ÜBERSPRINGT den
 //!   `Drop`-Impl und damit die Zeroize-Garantie. Dies muss der Aufrufer selbst vermeiden.
-//!   Nutze ausschließlich `purge()` oder lass den Vault per RAII droppen.
-//! - **Swap-Risiko ohne mlock:** Falls `mlock()` fehlschlägt (Kapazitätslimit, fehlende
-//!   Berechtigungen), bleibt der Vault nutzbar, aber ohne physische RAM-Fixierung.
-//!   Eine Warnung wird via `tracing::warn!` ausgegeben.
+//!   Nutze ausschließlich [`VolatileContextVault::purge()`] oder lass den Vault regulär per RAII droppen.
+//! - **Swap-Risiko ohne mlock:** Falls `mlock()` fehlschlägt (z. B. fehlendes `RLIMIT_MEMLOCK`,
+//!   fehlende Capabilities oder Kapazitätsgrenzen), bleibt der Vault nutzbar, aber ohne physische
+//!   RAM-Fixierung. Eine Warnung wird via `tracing::warn!` ausgegeben.
 
 use contextra_sys::LockedRegions;
 use contextra_types::{DocId, TenantId, TxId};
 use std::time::Instant;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-/// Modalität eines Vault-Chunks — bestimmt Verarbeitungskontext beim Commit.
+// ANCHOR[contextra-db:VAULT-001]
+/// Modalität eines Vault-Chunks — bestimmt den Verarbeitungskontext beim späteren Commit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SignalModality {
+    /// Audiospur oder Sprach-Transkript.
     AudioTranscript,
+    /// Visuelle Erfassung, Screenshot oder Bilddaten.
     VisualCapture,
+    /// Reguläre Texteingabe oder Prompt.
     TextInput,
+    /// Strukturierte JSON- oder Key-Value-Eingabedaten.
     StructuredData,
 }
 
-/// Ein einzelner Chunk im VolatileContextVault.
-/// Inhalte werden bei Drop via Zeroize überschrieben.
+// ANCHOR[contextra-db:VAULT-002]
+/// Ein einzelner Datenblock (Chunk) im `VolatileContextVault`.
+///
+/// Sämtliche Inhalte werden beim Drop via [`ZeroizeOnDrop`] kryptographisch überschrieben.
 #[derive(ZeroizeOnDrop)]
 pub struct VaultChunk {
+    /// Dokumenten-ID (DocId) des Chunks.
     #[zeroize(skip)]
     pub id: DocId, // DocId-Wert, ohne komplexe Drop-Interaktion
-    /// Sensitiver Inhalt — wird bei Drop gezeroized.
+    /// Sensitiver Inhalt im Speicher — wird bei Deallokation sofort gezeroized.
     pub content: Vec<u8>,
+    /// Signal-Modalität des Chunks (Text, Audio, Bild etc.).
     #[zeroize(skip)]
     pub modality: SignalModality,
+    /// Sequenznummer oder Transaktions-ID (TxId) zum Aufnahmezeitpunkt.
     #[zeroize(skip)]
     pub captured_tx: u64, // TxId-Wert
+    /// Optionale Kennzeichnung oder Kategorisierung des Chunks.
     #[zeroize(skip)]
     pub label: Option<String>,
 }
 
 impl VaultChunk {
+    // ANCHOR[contextra-db:VAULT-003]
+    /// Erzeugt einen neuen sensitiven Chunk.
+    ///
+    /// # Parameter
+    /// - `id`: Eindeutige Dokumenten-ID.
+    /// - `content`: Rohe Nutzdaten (z. B. Text- oder Binärdaten).
+    /// - `modality`: Art der Eingabedaten.
+    /// - `captured_tx`: Transaktions-Sequenznummer zum Zeitpunkt der Aufnahme.
     pub fn new(id: DocId, content: Vec<u8>, modality: SignalModality, captured_tx: TxId) -> Self {
         Self {
             id,
@@ -57,29 +83,33 @@ impl VaultChunk {
         }
     }
 
+    // ANCHOR[contextra-db:VAULT-004]
+    /// Weist dem Chunk eine beschreibende Bezeichnung (Label) zu.
     pub fn with_label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
 
-    /// Größe des Chunk-Inhalts in Bytes.
+    // ANCHOR[contextra-db:VAULT-005]
+    /// Gibt die Größe des Chunk-Inhalts in Bytes zurück.
     pub fn size_bytes(&self) -> usize {
         self.content.len()
     }
 }
 
-/// Konfiguration für den VolatileContextVault.
+// ANCHOR[contextra-db:VAULT-006]
+/// Konfiguration für den `VolatileContextVault`.
 #[derive(Debug, Clone)]
 pub struct VaultConfig {
-    /// Maximale Größe aller Chunks (Bytes). Überschreitung → Err statt Disk-Fallback.
-    /// Default: 512 MB
+    /// Maximale Speicherkapazität aller Chunks in Bytes (Standard: 512 MB).
+    /// Bei Überschreitung schlägt `ingest()` mit [`VaultError::CapacityExceeded`] fehl (Fail-Closed).
     pub max_capacity_bytes: usize,
-    /// Ob mlock() versucht werden soll (best-effort, Fehler werden geloggt, nicht propagiert).
-    /// Default: true
+    /// Ob physisches Speicher-Locking (`mlock`) versucht werden soll (Best-Effort).
     pub attempt_mlock: bool,
 }
 
 impl Default for VaultConfig {
+    /// Standardwerte: 512 MB Puffergröße, mlock aktiviert.
     fn default() -> Self {
         Self {
             max_capacity_bytes: 512 * 1024 * 1024, // 512 MB
@@ -88,55 +118,61 @@ impl Default for VaultConfig {
     }
 }
 
-/// Quittung nach erfolgreichem purge().
+// ANCHOR[contextra-db:VAULT-007]
+/// Quittung nach erfolgreichem [`VolatileContextVault::purge()`].
 #[derive(Debug)]
 pub struct PurgeReceipt {
-    /// Anzahl gelöschter Chunks.
+    /// Anzahl physisch gelöschter und überschriebener Chunks.
     pub chunks_purged: usize,
-    /// Bytes, die gezeroized wurden.
+    /// Exakte Anzahl an Bytes, die im RAM mit Nullen überschrieben wurden.
     pub bytes_zeroed: usize,
-    /// Zeitpunkt des Purge.
+    /// Zeitstempel, an dem die Löschung vollzogen wurde.
     pub purged_at: Instant,
 }
 
-/// Quittung nach erfolgreichem commit_to_storage().
+// ANCHOR[contextra-db:VAULT-008]
+/// Quittung nach Übergabe der Chunks an die persistente Datenbank via [`VolatileContextVault::commit()`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitReceipt {
     /// Anzahl geschriebener Chunks.
     pub chunks_committed: usize,
-    /// Bytes, die in Storage übergeben wurden.
+    /// Gesamtgröße der übergebenen Nutzdaten in Bytes.
     pub bytes_committed: usize,
-    /// Mandant (TenantId), unter dem der Commit erfolgte.
+    /// Mandantenkennung ([`TenantId`]), unter welcher der Commit verbucht wurde.
     pub tenant_id: TenantId,
-    /// Transaktions- / Sequenznummer (TxId) des Commits.
+    /// Zugewiesene Transaktions- und Sequenznummer ([`TxId`]).
     pub tx_id: TxId,
-    /// Optionaler Verweis auf den zugehörigen Löschnachweis (z. B. Proof-Hash / URN).
+    /// Optionaler Verweis auf den zugehörigen Löschnachweis (z. B. DeletionProof URN).
     pub deletion_proof_reference: Option<String>,
 }
 
-/// Fehler des VolatileContextVault.
+// ANCHOR[contextra-db:VAULT-009]
+/// Fehlerzustände des flüchtigen Speicher-Puffers.
 #[derive(Debug, thiserror::Error)]
 pub enum VaultError {
+    /// Kapazitätsgrenze im RAM wurde überschritten (Fail-Closed, kein Disk-Spillover).
     #[error("Vault-Kapazität überschritten: {current_bytes} + {new_bytes} > {max_bytes}")]
     CapacityExceeded {
         current_bytes: usize,
         new_bytes: usize,
         max_bytes: usize,
     },
+    /// Der Vault wurde bereits geleert oder final übergeben.
     #[error("Vault bereits konsumiert (purge oder commit bereits aufgerufen)")]
     AlreadyConsumed,
 }
 
-/// Ephemerer RAM-Puffer für sensitive Kontexte.
+// ANCHOR[contextra-db:VAULT-010]
+/// Ephemerer RAM-Puffer für sensitive Kontexte im Safe-Modus.
 ///
 /// # INVARIANTEN
 ///
-/// - INV-VAULT-1: `purge()` zeroized alle Chunk-Inhalte via `ZeroizeOnDrop` vor
+/// - **INV-VAULT-1:** `purge()` zeroized alle Chunk-Inhalte via `ZeroizeOnDrop` vor
 ///   der Deallokation. `std::mem::forget` auf den Vault hebelt diese Invariante aus.
-/// - INV-VAULT-2: `ingest()` schreibt NIE in Storage, Log-Writer oder
+/// - **INV-VAULT-2:** `ingest()` schreibt NIE in Storage, Log-Writer oder
 ///   irgendeinen Vektorindex. Einziger Schreibpfad auf dauerhafte Ablage:
-///   expliziter Aufruf von `drain_for_commit()`.
-/// - INV-VAULT-3: Kapazitätsüberschreitung → `VaultError::CapacityExceeded`.
+///   expliziter Aufruf von `commit()`.
+/// - **INV-VAULT-3:** Kapazitätsüberschreitung führt zu `VaultError::CapacityExceeded`.
 ///   Kein stiller Fallback auf Disk-Speicher.
 pub struct VolatileContextVault {
     chunks: Vec<VaultChunk>,
@@ -152,7 +188,10 @@ pub struct VolatileContextVault {
 }
 
 impl VolatileContextVault {
-    /// Neuen leeren Vault öffnen. Kein I/O.
+    // ANCHOR[contextra-db:VAULT-011]
+    /// Öffnet einen neuen leeren Vault im RAM.
+    ///
+    /// Führt keinerlei Datei-I/O oder Festplattenzugriffe aus.
     pub fn open(config: VaultConfig) -> Self {
         let initial_locked = config.attempt_mlock;
         if !config.attempt_mlock {
@@ -170,12 +209,17 @@ impl VolatileContextVault {
         }
     }
 
-    /// Chunk einpflegen.
+    // ANCHOR[contextra-db:VAULT-012]
+    /// Nimmt einen sensitiven Chunk in den RAM-Puffer auf.
     ///
-    /// # INVARIANTE INV-VAULT-2
-    /// Diese Funktion schreibt NIE auf dauerhaften Speicher.
-    /// Jeder Codepfad, der Storage-Puts oder Transaction-Commits ausführt,
-    /// ist ein Verstoß gegen P13 (Signal-First Isolation).
+    /// # Ablauf von `ingest`:
+    /// 1. Status prüfen: Wurde der Vault bereits konsumiert? Falls ja: `Err(AlreadyConsumed)`.
+    /// 2. Kapazität prüfen: Überschreitet `current_bytes + new_bytes` das Limit? Falls ja: `Err(CapacityExceeded)`.
+    /// 3. Memory-Locking: `mlock`-Aufruf versuchen, um Swap-Auslagerung auf SSD zu verhindern.
+    /// 4. Chunk im flüchtigen RAM-Vektor speichern und Byte-Zähler inkrementieren.
+    ///
+    /// # Invariante INV-VAULT-2:
+    /// Schreibt niemals auf Festplatte oder in ein persistentes Log.
     pub fn ingest(&mut self, chunk: VaultChunk) -> Result<(), VaultError> {
         if self.consumed {
             return Err(VaultError::AlreadyConsumed);
@@ -210,14 +254,13 @@ impl VolatileContextVault {
         Ok(())
     }
 
-    /// Alle Chunks verwerfen und Heap-Inhalt nullsetzen.
+    // ANCHOR[contextra-db:VAULT-013]
+    /// Verwirft alle Chunks sofort und überschreibt deren Heap-Inhalte kryptographisch mit Nullen.
     ///
-    /// Nach diesem Aufruf enthält der Vault keine Daten mehr. Der Vault selbst
-    /// wird konsumiert (dropped). Keine SSD-Fragmente, keine WAL-Einträge.
-    ///
-    /// # Hinweis zu std::mem::forget
-    /// Falls der Aufrufer `std::mem::forget(vault)` aufruft STATT `purge()`,
-    /// wird weder munlock() noch Zeroize ausgeführt. Dies ist ein Missbrauch der API.
+    /// # Ablauf von `purge`:
+    /// 1. Alle Chunk-Inhalte im Heap explizit via [`Zeroize::zeroize()`] mit Nullen überschreiben.
+    /// 2. Erst nach dem Nullsetzen: Betriebssystem-Locks via `unlock_all()` freigeben (`munlock`).
+    /// 3. Chunk-Liste leeren, Vault als konsumiert markieren und [`PurgeReceipt`] ausstellen.
     pub fn purge(mut self) -> PurgeReceipt {
         let chunks_purged = self.chunks.len();
         let bytes_zeroed = self.current_bytes;
@@ -245,33 +288,41 @@ impl VolatileContextVault {
         }
     }
 
-    /// Wie viele Bytes liegen aktuell im Vault (RAM)?
+    // ANCHOR[contextra-db:VAULT-014]
+    /// Gibt die Summe der aktuell im flüchtigen RAM liegenden Nutzdaten in Bytes zurück.
     pub fn current_size_bytes(&self) -> usize {
         self.current_bytes
     }
 
-    /// Anzahl der Chunks im Vault.
+    // ANCHOR[contextra-db:VAULT-015]
+    /// Gibt die Anzahl der aktuell gepufferten Chunks zurück.
     pub fn len(&self) -> usize {
         self.chunks.len()
     }
 
+    // ANCHOR[contextra-db:VAULT-016]
+    /// Prüft, ob der Vault leer ist.
     pub fn is_empty(&self) -> bool {
         self.chunks.is_empty()
     }
 
-    /// Gibt zurück, ob alle sensitiven Chunk-Inhalte im RAM fixiert (memory-locked) sind.
+    // ANCHOR[contextra-db:VAULT-017]
+    /// Gibt an, ob alle Chunk-Inhalte im RAM gegen Swap gesichert sind (`mlock`).
     ///
-    /// Liefert `false`, wenn `attempt_mlock` in der [`VaultConfig`] deaktiviert war,
-    /// falls das Betriebssystem das Locking verweigert hat (z. B. fehlendes `CAP_IPC_LOCK`
-    /// oder Limit erreicht), oder falls die Plattform kein Speicher-Locking unterstützt.
+    /// Liefert `false`, falls `attempt_mlock` deaktiviert war oder das Betriebssystem
+    /// das Sperren verweigerte.
     pub fn is_memory_locked(&self) -> bool {
         self.is_memory_locked
     }
 
-    /// Transferiert alle Chunks aus dem Vault zur dauerhaften Speicherung und erzeugt ein [`CommitReceipt`].
+    // ANCHOR[contextra-db:VAULT-018]
+    /// Transferiert alle Chunks zur dauerhaften Speicherung und stellt ein [`CommitReceipt`] aus.
     ///
-    /// Konsumiert den Vault-Inhalt und gibt die extrahierten Chunks zusammen mit dem
-    /// Quittungsnachweis zurück, der Mandant, Sequenznummer/TxId und Löschbeweis-Verweis enthält.
+    /// # Ablauf von `commit`:
+    /// 1. Status prüfen: Falls bereits konsumiert, `Err(AlreadyConsumed)`.
+    /// 2. Chunks aus dem Puffer entnehmen (`std::mem::take`).
+    /// 3. Speicher-Locks lösen (`munlock`).
+    /// 4. Quittung mit Mandanten-ID, Transaktions-ID und Prüfreferenz erzeugen.
     pub fn commit(
         mut self,
         tenant_id: TenantId,
@@ -300,8 +351,10 @@ impl VolatileContextVault {
         Ok((chunks, receipt))
     }
 
-    /// Lesezugriff auf Chunks (für User-Preview vor Commit/Purge-Entscheidung).
-    /// Gibt nur Metadaten zurück, keine Inhalte — verhindert versehentliches Logging.
+    // ANCHOR[contextra-db:VAULT-019]
+    /// Gibt eine Vorschau der Metadaten zurück, ohne sensible Inhalte zu exponieren.
+    ///
+    /// Verhindert versehentliches Ausleiten oder Protokollieren von Geheimnissen.
     pub fn preview_metadata(&self) -> Vec<VaultChunkMetadata> {
         self.chunks
             .iter()
@@ -315,15 +368,23 @@ impl VolatileContextVault {
     }
 }
 
-/// Metadaten-Ansicht eines VaultChunks ohne sensitiven Inhalt.
+// ANCHOR[contextra-db:VAULT-020]
+/// Metadaten-Ansicht eines Chunks ohne sensiblen Nutzdateninhalt.
 #[derive(Debug, Clone)]
 pub struct VaultChunkMetadata {
+    /// Eindeutige ID des Dokuments.
     pub id: DocId,
+    /// Modalität (Text, Audio etc.).
     pub modality: SignalModality,
+    /// Größe der Nutzdaten in Bytes.
     pub size_bytes: usize,
+    /// Optionale Beschreibung/Kategorie.
     pub label: Option<String>,
 }
 
+// ANCHOR[contextra-db:VAULT-021]
+// RAII-Drop-Implementierung: Schützt vor Speicherlecks und ungelöschtem RAM,
+// falls ein Vault den Gültigkeitsbereich verlässt, ohne explizit purge() aufzurufen.
 impl Drop for VolatileContextVault {
     fn drop(&mut self) {
         if !self.consumed {
@@ -352,6 +413,7 @@ mod tests {
     use super::*;
     use contextra_types::{DocId, TxId};
 
+    // Erzeugt einen Test-Chunk mit gegebenem Bezeichner und Nutzdaten.
     fn make_chunk(id: u64, content: &[u8]) -> VaultChunk {
         VaultChunk::new(
             DocId(id),

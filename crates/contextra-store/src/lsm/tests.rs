@@ -1,3 +1,7 @@
+//! # LSM-Haupttests (Ring 1)
+//!
+//! Modultests fuer den LSM-Speicherkern.
+
 pub use super::*;
 pub use crate::compaction::{CompactionConfig, CompactionEngine};
 pub use contextra_types::TOMBSTONE_BIT;

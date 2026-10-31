@@ -1,3 +1,8 @@
+//! # Integrationstest: `deletion_proof_signature_version_serde.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_signature_version_serde`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 use contextra_crypto::deletion_proof::{
     DeletionLayer, DeletionProof, DeletionScope, ExcludedScope, LayerCleanupProof,
 };

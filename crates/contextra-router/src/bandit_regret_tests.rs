@@ -42,6 +42,8 @@ const SEEDS: [u32; 5] = [42, 1337, 2026, 9999, 77777];
 /// LinUCB benötigt bei Cold-Start (d=4, alpha=0.5) ca. 100-200 Schritte für das Aufwärmen.
 const EVAL_STEPS: usize = 500;
 
+// ANCHOR[contextra-router:TST-REG-T01]
+// Test `test_bandit_vs_cascade_regret_comparison`: Prüft das erwartete Verhalten und Invarianten für regret-vergleichstests für bandit-routing gegenüber kaskade.
 #[test]
 fn test_bandit_vs_cascade_regret_comparison() {
     let dim = 4;
@@ -173,6 +175,8 @@ fn test_bandit_vs_cascade_regret_comparison() {
 ///
 /// Falls dieser Test flaky wird: Budget auf 5ms erhöhen (ADR-Beschluss einholen).
 #[cfg(all(test, feature = "bandit-routing"))]
+// ANCHOR[contextra-router:TST-REG-T02]
+// Test `test_bandit_diagonal_vs_linucb_latency_budget`: Prüft das erwartete Verhalten und Invarianten für regret-vergleichstests für bandit-routing gegenüber kaskade.
 #[test]
 fn test_bandit_diagonal_vs_linucb_latency_budget() {
     use std::time::Instant;
@@ -235,6 +239,8 @@ fn test_bandit_diagonal_vs_linucb_latency_budget() {
 
 /// Test Befund 0.2: DimensionMismatch Result-Fehlerbehandlung.
 #[cfg(all(test, feature = "bandit-routing"))]
+// ANCHOR[contextra-router:TST-REG-T03]
+// Test `test_dimension_mismatch_returns_err`: Prüft das erwartete Verhalten und Invarianten für regret-vergleichstests für bandit-routing gegenüber kaskade.
 #[test]
 fn test_dimension_mismatch_returns_err() {
     use contextra_adapt::BanditError;
@@ -266,6 +272,8 @@ fn test_dimension_mismatch_returns_err() {
 /// Quantifiziert die numerische Abweichung zwischen dem in `update()` implementierten Inkrement
 /// `theta[i] += r_adj * x[i] / sigma_sq[i]` und der mathematischen LinUCB-Referenz θ = A^{-1} b = b / σ².
 #[cfg(all(test, feature = "bandit-routing"))]
+// ANCHOR[contextra-router:TST-REG-T04]
+// Test `test_reproduce_linucb_theta_update_math_deviation`: Prüft das erwartete Verhalten und Invarianten für regret-vergleichstests für bandit-routing gegenüber kaskade.
 #[test]
 fn test_reproduce_linucb_theta_update_math_deviation() {
     let mut state = BanditProfileState::cold_start(1, 0.5);

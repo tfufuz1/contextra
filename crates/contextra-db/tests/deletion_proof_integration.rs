@@ -11,6 +11,8 @@ use contextra_types::{CollectionId, DistanceMetric, TenantId, TxId};
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-DELETION_PROOF_INTEGRATION-01-SETUP_DB]
+// Testet die Funktionalität von `setup_db`.
 async fn setup_db(dim: usize) -> (Contextra, TempDir) {
     let tmp = TempDir::new().expect("Failed to create temp dir");
     let config = ContextraConfig {

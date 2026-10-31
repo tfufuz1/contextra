@@ -1,3 +1,11 @@
+//! # Segment-Repräsentation (`kv_segment/segment.rs`)
+//!
+//! Kapselt ein verschlüsseltes oder geschütztes Datensegment im Speicher.
+//!
+//! ## Invarianten
+//! - Implementiert `ZeroizeOnDrop`, um Puffer im Heap bei Freigabe sicher zu überschreiben.
+//! - `#![forbid(unsafe_code)]` wird strikt eingehalten.
+
 // FILE-CONTEXT
 // ZWECK: KvSegment mit Zeroize-Garantie (ZeroizeOnDrop, nie unverschlüsselt auf Disk).
 // STAND: TS:2026-09-08T00:00:00Z (SESSION: a413a598)
@@ -32,6 +40,8 @@ pub struct EncryptedSegmentPayload {
 /// - `encrypted`: Kennzeichen, ob die Tensor-Bytes verschlüsselt vorliegen
 /// - `data`: Rohe Tensor-Bytes oder Ciphertext-Bytes. WIRD gezeroized beim Drop.
 #[derive(Zeroize, ZeroizeOnDrop)]
+// ANCHOR[contextra-crypto:KV-003]
+/// Repräsentiert ein einzelnes Datensegment mit automatischer Speicherlöschung.
 pub struct KvSegment {
     #[zeroize(skip)] // Metadaten, keine sensiblen Tensor-Daten
     pub tenant_id: TenantId,

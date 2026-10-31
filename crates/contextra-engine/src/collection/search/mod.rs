@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** Suchsubsystem für Collections (Text-, Vektor-, Graph- und Hybridsuche).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Suchoperationen (Vector-, Text-, Graph- & Hybrid-Retrieval) für Collection modularisiert nach Familien.
 // INVARIANTEN: Snapshot-Pinning garantiert Isolation während gefilterter Suche; MAX_SEARCH_K Obergrenze.

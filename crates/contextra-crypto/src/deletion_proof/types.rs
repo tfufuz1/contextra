@@ -1,3 +1,10 @@
+//! # Datenstrukturen für Löschbeweise (`deletion_proof/types.rs`)
+//!
+//! Definiert den kanonischen Aufbau eines Löschzertifikats inklusive aller Schicht-Zeugen.
+//!
+//! ## Invarianten
+//! - Deterministische BLAKE3-Prüfsummen über alle gelöschten Schlüssel.
+//! - Schicht-IDs (Layer IDs) sind eindeutig und aufsteigend geordnet.
 // FILE-CONTEXT
 // ZWECK: Structural types and data definitions for cryptographic deletion proofs (GDPR Art. 17).
 // INVARIANTEN: INV-DELETION-1: Proof creation requires verified layer sanitization witnesses.
@@ -309,6 +316,8 @@ pub enum DeletionScope {
 
 /// Cryptographic proof of data deletion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+// ANCHOR[contextra-crypto:PROOF-001]
+/// Kryptographisches Löschzertifikat (Deletion Proof) nach Art. 17 DSGVO.
 pub struct DeletionProof {
     /// Version der Signatur-Payload-Konstruktion.
     #[serde(default = "default_signature_version")]

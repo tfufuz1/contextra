@@ -1,4 +1,9 @@
-//! Isotonic Calibration via PAVA (Pool-Adjacent Violators Algorithm).
+//! # Isotonische Kalibrierung via PAVA (`isotonic`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Implementiert die nicht-parametrische isotonische Regression über den
+//! Pool-Adjacent Violators Algorithm (PAVA) sowie die ECE-Berechnung.
 
 use contextra_ports::{Clock, SystemClock};
 use contextra_types::ConfigFingerprint;
@@ -23,6 +28,8 @@ const REBUILD_THRESHOLD_NEW_OBS: usize = 10;
 
 /// Isotonic Calibrator using Pool-Adjacent Violators Algorithm.
 #[derive(Clone)]
+// ANCHOR[contextra-rank:ISO-001]
+/// Nicht-parametrischer Kalibrierer auf Basis von PAVA.
 pub struct IsotonicCalibrator {
     observations: VecDeque<(f32, bool)>,
     warmup_required: u32,
@@ -85,6 +92,8 @@ impl IsotonicCalibrator {
     }
 
     /// Records a new observation `(raw_score, outcome)`. Non-finite `raw_score` values are safely ignored.
+    // ANCHOR[contextra-rank:ISO-002]
+    /// Nimmt eine neue Beobachtung `(raw_score, outcome)` auf.
     pub fn record_outcome(&mut self, raw_score: f32, outcome: bool) {
         if !raw_score.is_finite() {
             tracing::warn!(
@@ -122,6 +131,8 @@ impl IsotonicCalibrator {
     }
 
     /// Returns calibrated probability if warm, or `None` if below warmup requirement.
+    // ANCHOR[contextra-rank:ISO-003]
+    /// Liefert die kalibrierte Wahrscheinlichkeit für einen Roh-Score.
     pub fn calibrated_probability(&mut self, raw_score: f32) -> Option<f32> {
         if !self.is_calibrated() {
             return None;
@@ -160,6 +171,14 @@ impl IsotonicCalibrator {
         }
     }
 
+    // ANCHOR[contextra-rank:ISO-004]
+    // Ablauf des PAVA-Rebuilds (Pool-Adjacent Violators Algorithm):
+    // 1. Sortieren: Beobachtungen aufsteigend nach raw_score ordnen.
+    // 2. Pooling: Identische Scores zusammenfassen und Labels akkumulieren.
+    // 3. Block-Merging: Rückwärts iterieren; verletzt ein Block die Monotonie (last <= prev),
+    //    werden beide verschmolzen und deren gewichtetes Mittel gebildet.
+    // 4. Stützstellen bilden: Blöcke in f32 konvertieren und im Cache hinterlegen.
+    // 5. Zeitstempel über Clock-Port abfragen und ECE für Modellgüte aktualisieren.
     fn rebuild_model(&mut self) {
         let mut sorted: Vec<(f32, f32)> = self
             .observations
