@@ -2,6 +2,12 @@
 // STAND: 2026-09-22T00:00:00Z
 // ZWECK: Unit and integration tests for Stage B KvState and forked Llama KV cache integration.
 
+//! Unit- und Integrationstests für Stufe B (`KvState`) und LLaMA KV-Cache-Integration.
+//!
+//! # Zweck
+//! Prüft 4D-Tensor-Export, Import, Truncation und Serialisierung über mehrere Schichten.
+
+// ANCHOR[contextra-infer-candle:TEST-KV-STAGE-B]
 #![cfg(feature = "kv-stage-b")]
 
 use candle_core::{DType, Device, Tensor};
