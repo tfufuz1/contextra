@@ -1,3 +1,8 @@
+//! Strukturierte Metadaten-Filterausdrücke.
+//!
+//! # Architektur-Rolle
+//! Ring 0 (Kern). Reines In-Memory Filter-AST-Modell.
+
 //! Metadata filter expression DSL and evaluation engine.
 
 // FILE-CONTEXT

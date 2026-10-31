@@ -2,9 +2,13 @@
 //! ACHTUNG: NICHT zu verwechseln mit `contextra_router::RoutingStrategy`
 //! (SLM-Profil-Routing, Cascade/ContextualBandit/FlowCorrectedThompson) — dieser Typ hier
 //! beschreibt, WELCHES der vier Fusionssignale (§8) ein Bandit-Arm repräsentiert.
+//!
+//! # Architektur-Rolle
+//! Ring 0 (Kern). Keine I/O- oder Asynchron-Abhängigkeiten.
 
 use core::fmt;
 
+// ANCHOR[contextra-types:RETRIEVAL-001]
 /// Semantische Retrieval-Strategie für Signal-Fusion (§8/§9).
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -28,6 +32,8 @@ pub enum RetrievalStrategy {
 }
 
 impl fmt::Display for RetrievalStrategy {
+    // ANCHOR[contextra-types:RETRIEVAL-002]
+    /// Formatiert die Retrieval-Strategie für Logging und Diagnosen.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Vector => write!(f, "Vector"),
@@ -43,6 +49,7 @@ impl fmt::Display for RetrievalStrategy {
 mod tests {
     use super::*;
 
+    // NOTE: Prüft Display-Formatierung aller RetrievalStrategy-Varianten.
     #[test]
     fn test_retrieval_strategy_display() {
         assert_eq!(RetrievalStrategy::Vector.to_string(), "Vector");
@@ -59,6 +66,7 @@ mod tests {
         );
     }
 
+    // NOTE: Prüft JSON-Serialisierung und Deserialisierung für alle Varianten inklusive Global.
     #[test]
     fn test_retrieval_strategy_serde_roundtrip() {
         let strategies = [

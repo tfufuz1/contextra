@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 /// Scores the importance of a memory item on a normalized scale of `0.0` to `1.0`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:IMPORTANCE-SCORE]
 pub struct ImportanceScore(f32);
 
 impl ImportanceScore {
@@ -47,6 +48,7 @@ impl Default for ImportanceScore {
 /// Recency-decay mathematical function for episodic relevance.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 #[non_exhaustive]
+// ANCHOR[contextra-types:IMPORTANCE-DECAY-FN]
 pub enum DecayFunction {
     /// No recency decay (factor remains 1.0).
     #[default]
@@ -164,6 +166,7 @@ impl DecayFunction {
 
 /// Tracks the importance score and decay parameters of a document.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:IMPORTANCE-MEMORY]
 pub struct MemoryImportance {
     /// Base LLM or heuristic evaluation score.
     pub base_score: ImportanceScore,

@@ -4,10 +4,20 @@
 // INVARIANTEN: SHA-256 over weight blob concatenated with quantization string; distinct quant tiers yield distinct fingerprints.
 
 //! Canonical `ModelFingerprint` definition for Contextra.
+//!
+//! # Architektur-Rolle
+//! Ring 0 (Kern). Keine I/O- oder Asynchron-Abhängigkeiten.
+//!
+//! # Zweck
+//! Eindeutige kryptografische Identifikation von Modellgewichten und Quantisierungsstufen.
 
 use serde::{Deserialize, Serialize};
 
+// ANCHOR[contextra-types:FINGERPRINT-001]
 /// Uniquely identifies a model weight file and its quantization tier.
+///
+/// Dient dazu, Modellgewicht-Dateien und Quantisierungsstufen auf Systemebene
+/// unverwechselbar zuzuordnen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModelFingerprint {
     /// SHA-256 hash digest over model weight blob and quantization tier string.
@@ -19,7 +29,11 @@ pub struct ModelFingerprint {
 }
 
 impl ModelFingerprint {
+    // ANCHOR[contextra-types:FINGERPRINT-002]
     /// Creates a new `ModelFingerprint`.
+    ///
+    /// # Ablauf
+    /// Übernimmt Hash, Modellbezeichner und Quantisierungsstring ohne Nebenwirkungen.
     pub fn new(
         hash: [u8; 32],
         model_id: impl Into<String>,
@@ -38,6 +52,7 @@ impl ModelFingerprint {
 mod tests {
     use super::*;
 
+    // NOTE: Prüft Instanziierung und JSON-Roundtrip des ModelFingerprint.
     #[test]
     fn test_model_fingerprint_new_and_serde() {
         let fp = ModelFingerprint::new([0xab; 32], "test-model", "Q4_K_M");

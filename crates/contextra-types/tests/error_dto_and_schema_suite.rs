@@ -1,3 +1,6 @@
+//! Integrations-Testsuite für ContextraErrorDto und Schema-Versionierung.
+//! Prüft JSON-Serialisierung von Fehler-Details und Schema-Kompatibilität.
+
 //! Error DTO, schema versioning, and error conversion test suite for `contextra-types`.
 
 #![allow(

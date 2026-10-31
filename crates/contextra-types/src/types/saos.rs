@@ -134,6 +134,7 @@ impl Default for GraphTraversalStrategy {
 
 /// Normalized fusion weights for hybrid search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-FUSION-WEIGHTS]
 pub struct FusionWeights {
     vector: f32,
     text: f32,
@@ -211,6 +212,7 @@ impl FusionWeights {
 
 /// A chunk of context for LLM budget allocation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-CONTEXT-CHUNK]
 pub struct ContextChunk {
     /// Document identifier associated with this chunk.
     pub doc_id: DocId,
@@ -269,6 +271,7 @@ impl ContextChunk {
 
 /// An aggregated context window constrained by a token budget.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-CONTEXT-WINDOW]
 pub struct ContextWindow {
     /// List of included context chunks.
     pub chunks: Vec<ContextChunk>,
@@ -322,7 +325,7 @@ impl std::fmt::Display for Signal {
 /// **Semantik**:
 /// - `Fail` (Default): If an individual signal fails due to an underlying internal error
 ///   (e.g., vector index failure or timeout), the search aborts immediately and returns a
-///   structured error ([`ContextraError::SignalFailed`]) explicitly identifying the failing signal.
+///   structured error (`ContextraError::SignalFailed`) explicitly identifying the failing signal.
 /// - `Degrade`: If an individual signal fails, the search logs a warning and proceeds with
 ///   fusion across the remaining successful signals. The returned results bear a non-empty
 ///   `degraded_signals` list detailing which signals failed.
@@ -397,6 +400,7 @@ pub struct ScoredEntry {
 
 /// A unified query traversing multiple index signals.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:SAOS-HYBRID-QUERY]
 pub struct HybridQuery {
     /// Optional full-text query string.
     pub text_query: Option<String>,
@@ -465,6 +469,7 @@ impl HybridQuery {
 /// an eine aktive `Collection`-Instanz mit Storage- und Vektorindex-Handles gebunden und führt
 /// die Abfrage über `.execute()` direkt auf der Datenbank aus.
 #[derive(Default)]
+// ANCHOR[contextra-types:SAOS-QUERY-BUILDER]
 pub struct HybridQueryBuilder {
     text_query: Option<String>,
     vector_query: Option<Vec<f32>>,

@@ -1,4 +1,7 @@
 //! Domain types for Contextra.
+//!
+//! # Architektur-Rolle
+//! Ring 0 (Kern). Enthält fundamentale Identifikatoren (IDs) und Domänen-Entitäten.
 
 // FILE-CONTEXT
 // STAND: 2026-09-09T14:43:31Z (SESSION: a69d21e4)
@@ -15,8 +18,11 @@
 //! # Invarianten
 //! - `DocId` und `TxId` sind Wrapper um primitive Typen mit deterministischer Hash-Generierung.
 
+// ANCHOR[contextra-types:DOM-MOD-DOC]
 mod document;
+// ANCHOR[contextra-types:DOM-MOD-IDS]
 mod ids;
+// ANCHOR[contextra-types:DOM-MOD-MISC]
 mod misc;
 
 pub use document::*;
