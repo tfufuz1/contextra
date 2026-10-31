@@ -9,6 +9,10 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
+//! # Integrationstest: Systematische Crash- und Recovery-Simulation
+//!
+//! Simuliert plötzliche Abstürze vor, während und nach dem Schreiben von Checkpoints.
+
 // ANCHOR[TEST:CHK-005] STATUS:DONE (TS:2026-09-25T00:00:00Z)
 // OPTION (b) DECISION & RATIONALE:
 // 1. Vorab-Recherche Resultat: `contextra-testkit` provides `InMemoryStorageEngine` (Option a),
@@ -42,6 +46,7 @@ use tempfile::TempDir;
 /// Set conservatively to 30 to guarantee execution runtime remains well under 120s in CI.
 const MAX_IO_POINTS: usize = 30;
 
+// Testet: systematic crash at every checkpoint io point.
 #[tokio::test]
 async fn systematic_crash_at_every_checkpoint_io_point() {
     for crash_point in 0..MAX_IO_POINTS {
@@ -195,6 +200,7 @@ async fn systematic_crash_at_every_checkpoint_io_point() {
     }
 }
 
+// Testet: crash during checkpoint deletion leaves clean state.
 #[tokio::test]
 async fn crash_during_checkpoint_deletion_leaves_clean_state() {
     let vfs = FaultVfs::new();

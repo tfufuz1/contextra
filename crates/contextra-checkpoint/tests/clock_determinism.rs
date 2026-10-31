@@ -9,11 +9,16 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
+//! # Integrationstest: Deterministische Zeitmessung im Gesamtsystem
+//!
+//! Stellt sicher, dass keine unkontrollierten Systemaufrufe (std::time::SystemTime) genutzt werden.
+
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore, PinGuard};
 use contextra_testkit::{InMemoryStorageEngine, ManualClock};
 use contextra_types::TxId;
 use std::sync::Arc;
 
+// Testet: test checkpoint store clock determinism.
 #[tokio::test]
 async fn test_checkpoint_store_clock_determinism() {
     let start_nanos = 1_700_000_000_000_000_000; // 1,700,000,000 ms
@@ -110,6 +115,7 @@ async fn test_checkpoint_store_clock_determinism() {
     );
 }
 
+// Testet: test agent step with clock determinism.
 #[tokio::test]
 async fn test_agent_step_with_clock_determinism() {
     let start_nanos = 1_800_000_000_000_000_000;

@@ -9,6 +9,10 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
+//! # Integrationstest: Fehlerpfade und Randwertverhalten
+//!
+//! Prüft das Verhalten bei ungültigen Eingaben, Überläufen und Systemfehlern.
+
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_types::{ContextraError, Result, TxId};

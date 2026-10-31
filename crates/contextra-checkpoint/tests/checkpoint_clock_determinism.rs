@@ -9,12 +9,17 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
+//! # Integrationstest: Determinismus des Clock-Ports
+//!
+//! Verifiziert, dass alle Zeitstempel deterministisch über den injizierten Clock-Port erzeugt werden.
+
 
 use contextra_checkpoint::{CheckpointGuard, PersistentCheckpointStore};
 use contextra_testkit::{InMemoryStorageEngine, ManualClock};
 use contextra_types::TxId;
 use std::sync::Arc;
 
+// Testet: test a stores with same clock produce identical timestamps.
 #[tokio::test]
 async fn test_a_stores_with_same_clock_produce_identical_timestamps() {
     let initial_nanos = 1_700_000_000_000_000_000; // 1,700,000,000 ms
@@ -86,6 +91,7 @@ async fn test_a_stores_with_same_clock_produce_identical_timestamps() {
     );
 }
 
+// Testet: test b clock backward jump preserves monotonicity.
 #[tokio::test]
 async fn test_b_clock_backward_jump_preserves_monotonicity() {
     let clock = Arc::new(ManualClock::new(2_000_000_000_000)); // 2,000,000 ms
@@ -109,6 +115,7 @@ async fn test_b_clock_backward_jump_preserves_monotonicity() {
     assert_eq!(ts2, 2_000_000);
 }
 
+// Testet: test c unfinalized guard drop records orphan with test clock.
 #[tokio::test]
 async fn test_c_unfinalized_guard_drop_records_orphan_with_test_clock() {
     let clock_nanos = 3_456_000_000_000_000; // 3,456,000 ms
@@ -139,6 +146,7 @@ async fn test_c_unfinalized_guard_drop_records_orphan_with_test_clock() {
     );
 }
 
+// Testet: test d default constructors smoke test with system clock.
 #[tokio::test]
 async fn test_d_default_constructors_smoke_test_with_system_clock() {
     let storage = Arc::new(InMemoryStorageEngine::new());
@@ -174,6 +182,7 @@ async fn test_d_default_constructors_smoke_test_with_system_clock() {
     let _ = guard.commit();
 }
 
+// Testet: test e pin guard with clock determinism.
 #[tokio::test]
 async fn test_e_pin_guard_with_clock_determinism() {
     let pin_clock_nanos = 5_000_000_000_000_000; // 5,000,000 ms

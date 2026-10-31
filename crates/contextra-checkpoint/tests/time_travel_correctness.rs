@@ -10,6 +10,10 @@
     clippy::await_holding_lock,
     clippy::type_complexity
 )]
+//! # Integrationstest: Korrektheit von Time-Travel-Wiederherstellungen
+//!
+//! Verifiziert das Zurücksetzen von Speicherzuständen auf historische Checkpoint-Stände.
+
 
 use contextra_checkpoint::PersistentCheckpointStore;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
