@@ -1,6 +1,17 @@
 // FILE-CONTEXT
 // ZWECK: Benchmarks for SIMD distance kernels.
 
+//! # Benchmark-Suite: `simd_bench`
+//!
+//! **Zweck:**
+//! Misst Durchsatz und Latenz der SIMD-Distanzberechnungen (`cosine_distance`,
+//! `euclidean_distance`, `dot_product_distance`) unter Verwendung des Criterion-Frameworks.
+//!
+//! **Getestete Dimensionen:**
+//! - 128 Dimensionen: Typisch für kleine Embedding-Modelle (z. B. MiniLM) und Audio-Features.
+//! - 512 Dimensionen: Mittlere Text-Embeddings und CLIP-Bildvektoren.
+//! - 1536 Dimensionen: Große Standard-Embeddings (z. B. OpenAI text-embedding-3-small/ada-002).
+
 #![allow(unsafe_code)]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
@@ -9,6 +20,11 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use contextra_simd::dispatch::{cosine_distance, dot_product_distance, euclidean_distance};
 
+// ANCHOR[contextra-simd:BENCH-SIMD-DISTANCES]
+// Benchmark-Ablauf:
+// 1. Initialisiert synthetische Testvektoren mit aufsteigenden Werten für Dimensionen 128, 512 und 1536.
+// 2. Misst die Ausführungszeit von `cosine_distance`, `euclidean_distance` und `dot_product_distance` im Criterion-Loop.
+// 3. Verhindert mit `black_box`, dass der Compiler konstante Berechnungen wegoptimiert.
 fn bench_simd_distances(c: &mut Criterion) {
     let mut group = c.benchmark_group("simd_distances");
 

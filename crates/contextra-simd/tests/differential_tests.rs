@@ -7,6 +7,15 @@
 // FILE-CONTEXT
 // ZWECK: Deterministic differential test suite across vector dimensions 1..=257 and unaligned slice windows.
 
+//! # Differential-Test-Suite: `differential_tests`
+//!
+//! **Zweck:**
+//! Vergleicht die Ergebnisse der SIMD-beschleunigten Kernel (über `dispatch`) sequenziell
+//! und differentiell mit den exakten skalaren Referenzimplementierungen über alle Vektordimensionen
+//! von 1 bis 257.
+//! Dadurch wird nachgewiesen, dass SIMD-Loop-Unrolling, Restschleifen (Tail-Loops) und
+//! nicht 32-Byte-ausgerichtete Slice-Fenster identische Resultate liefern.
+
 // ADR-002 / SPEC §27: Test assertions and test dataset casts
 
 use contextra_simd::dispatch::{
@@ -64,6 +73,8 @@ impl DeterministicRng {
 // The resulting precision difference is typically within 1e-4 relative tolerance for normal float values.
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-COSINE-F32]
+// Prüft Kosinus-Distanz für Dimensionen 1 bis 257 differentiell gegen Skalar-Referenz.
 fn test_sequential_dimensions_cosine_f32() {
     let mut rng = DeterministicRng::with_seed(0x1234_5678_9ABC_DEF0);
 
@@ -84,6 +95,8 @@ fn test_sequential_dimensions_cosine_f32() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-EUCLIDEAN-F32]
+// Prüft euklidische Distanz für Dimensionen 1 bis 257 differentiell gegen Skalar-Referenz.
 fn test_sequential_dimensions_euclidean_f32() {
     let mut rng = DeterministicRng::with_seed(0x2345_6789_ABCD_EF01);
 
@@ -104,6 +117,8 @@ fn test_sequential_dimensions_euclidean_f32() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-DOT-F32]
+// Prüft Skalarprodukt-Distanz für Dimensionen 1 bis 257 differentiell gegen Skalar-Referenz.
 fn test_sequential_dimensions_dot_product_f32() {
     let mut rng = DeterministicRng::with_seed(0x3456_789A_BCDE_F012);
 
@@ -124,6 +139,8 @@ fn test_sequential_dimensions_dot_product_f32() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-COSINE-BYTES]
+// Prüft Kosinus-Distanz auf Byte-Slices für Dimensionen 1 bis 257 gegen Skalar-Referenz.
 fn test_sequential_dimensions_cosine_f32_bytes() {
     let mut rng = DeterministicRng::with_seed(0x4567_89AB_CDEF_0123);
 
@@ -145,6 +162,8 @@ fn test_sequential_dimensions_cosine_f32_bytes() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-EUCLIDEAN-BYTES]
+// Prüft euklidische Distanz auf Byte-Slices für Dimensionen 1 bis 257 gegen Skalar-Referenz.
 fn test_sequential_dimensions_euclidean_f32_bytes() {
     let mut rng = DeterministicRng::with_seed(0x5678_9ABC_DEF0_1234);
 
@@ -166,6 +185,8 @@ fn test_sequential_dimensions_euclidean_f32_bytes() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-DOT-BYTES]
+// Prüft Skalarprodukt auf Byte-Slices für Dimensionen 1 bis 257 gegen Skalar-Referenz.
 fn test_sequential_dimensions_dot_product_f32_bytes() {
     let mut rng = DeterministicRng::with_seed(0x6789_ABCD_EF01_2345);
 
@@ -187,6 +208,8 @@ fn test_sequential_dimensions_dot_product_f32_bytes() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-DOT-U8]
+// Prüft u8-Skalarprodukt für Dimensionen 1 bis 257 auf bitgenaue Übereinstimmung.
 fn test_sequential_dimensions_dot_product_u8() {
     let mut rng = DeterministicRng::with_seed(0x789A_BCDE_F012_3456);
 
@@ -205,6 +228,8 @@ fn test_sequential_dimensions_dot_product_u8() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-EUCLIDEAN-SQ-U8]
+// Prüft quadrierte u8-euklidische Distanz für Dimensionen 1 bis 257 auf bitgenaue Gleichheit.
 fn test_sequential_dimensions_euclidean_sq_u8() {
     let mut rng = DeterministicRng::with_seed(0x89AB_CDEF_0123_4567);
 
@@ -223,6 +248,8 @@ fn test_sequential_dimensions_euclidean_sq_u8() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-COSINE-PARTS-U8]
+// Prüft u8-Kosinus-Komponentensummen für Dimensionen 1 bis 257 gegen Skalar-Werte.
 fn test_sequential_dimensions_cosine_similarity_parts_u8() {
     let mut rng = DeterministicRng::with_seed(0x9ABC_DEF0_1234_5678);
 
@@ -241,6 +268,8 @@ fn test_sequential_dimensions_cosine_similarity_parts_u8() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-DOT-F32-U8]
+// Prüft gemischtes f32/u8-Skalarprodukt für Dimensionen 1 bis 257 gegen Referenz.
 fn test_sequential_dimensions_dot_product_f32_u8() {
     let mut rng = DeterministicRng::with_seed(0xABCD_EF01_2345_6789);
 
@@ -254,6 +283,8 @@ fn test_sequential_dimensions_dot_product_f32_u8() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-EUCLIDEAN-SQ-F32-U8]
+// Prüft gemischte dequantisierte quadrierte Distanz für Dimensionen 1 bis 257 gegen Referenz.
 fn test_sequential_dimensions_euclidean_sq_f32_u8() {
     let mut rng = DeterministicRng::with_seed(0xBCDE_F012_3456_789A);
 
@@ -269,6 +300,8 @@ fn test_sequential_dimensions_euclidean_sq_f32_u8() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-COSINE-PARTS-F32-U8]
+// Prüft gemischte f32/u8-Kosinus-Komponenten für Dimensionen 1 bis 257 gegen Referenz.
 fn test_sequential_dimensions_cosine_similarity_parts_f32_u8() {
     let mut rng = DeterministicRng::with_seed(0xCDEF_0123_4567_89AB);
 
@@ -283,6 +316,8 @@ fn test_sequential_dimensions_cosine_similarity_parts_f32_u8() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEQ-NORMALIZE]
+// Prüft In-Place-Normalisierung auf Einheitslänge für Dimensionen 1 bis 257.
 fn test_sequential_dimensions_normalize_inplace() {
     let mut rng = DeterministicRng::with_seed(0x1122_3344_5566_7788);
 
@@ -299,6 +334,8 @@ fn test_sequential_dimensions_normalize_inplace() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEEDS-F32]
+// Prüft f32-Metriken über 20 verschiedene Pseudozufalls-Seeds auf Konsistenz.
 fn test_multiple_prng_seeds_f32_metrics() {
     let seeds = [
         0x1111_2222_3333_4444,
@@ -329,6 +366,8 @@ fn test_multiple_prng_seeds_f32_metrics() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-SEEDS-U8]
+// Prüft u8-Metriken über 20 verschiedene Pseudozufalls-Seeds auf Konsistenz.
 fn test_multiple_prng_seeds_u8_metrics() {
     let seeds = [
         0xA1B2_C3D4_E5F6_0102,
@@ -359,6 +398,8 @@ fn test_multiple_prng_seeds_u8_metrics() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-UNALIGNED-F32]
+// Prüft f32-Berechnungen auf unaligned Speicher-Fenstern (Offsets 0 bis 7).
 fn test_unaligned_slice_windows_f32() {
     let mut rng = DeterministicRng::with_seed(0xDEF0_1234_5678_9ABC);
 
@@ -399,6 +440,8 @@ fn test_unaligned_slice_windows_f32() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-UNALIGNED-U8]
+// Prüft u8-Berechnungen auf unaligned Speicher-Fenstern (Offsets 0 bis 31).
 fn test_unaligned_slice_windows_u8() {
     let mut rng = DeterministicRng::with_seed(0xEF01_2345_6789_ABCD);
 
@@ -435,6 +478,8 @@ fn test_unaligned_slice_windows_u8() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-UNALIGNED-BYTES]
+// Prüft Byte-Slices mit beliebigen Byte-Offsets auf korrekte Dekodierung und Distanz.
 fn test_unaligned_f32_bytes_slice_windows() {
     let mut rng = DeterministicRng::with_seed(0x0123_4567_89AB_CDEF);
 
