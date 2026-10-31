@@ -1,3 +1,10 @@
+//! # Modul: maintenance.rs
+//!
+//! **Zweck:** Wartungsoperationen für einzelne Collections (Kompaktierung, Index-Optimierung).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 // FILE-CONTEXT
 // ZWECK: Wartungs-, Reparatur- und Bereinigungsoperationen (Index repair, Expiry cleanup, Community detection).
 // INVARIANTEN: repair() stellt LSM<->Index Synchronität nach Crash sicher; Reaping stützt sich auf Snapshot-Sequenzen.
@@ -858,6 +865,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 }
 
+// ANCHOR[contextra-engine:COL-PER-870]
+/// Dokumentation für `PercolationResult` im Rahmen der Collection- und Suchabstraktion.
 #[cfg(feature = "graph-connectivity-health")]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PercolationResult {

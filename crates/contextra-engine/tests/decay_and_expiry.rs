@@ -1,3 +1,9 @@
+//! # Integrationstest: decay and expiry
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{
     AdaptiveDecayController, Contextra, ContextraConfig, DecayControllerConfig, DecaySignalInputs,
@@ -6,6 +12,8 @@ use contextra_types::MemoryType;
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST10-001]
+/// Testblock zur Überprüfung von `test_adaptive_decay_controller_temperature_and_eviction`.
 #[test]
 fn test_adaptive_decay_controller_temperature_and_eviction() {
     let controller = AdaptiveDecayController::new(DecayControllerConfig {
@@ -42,6 +50,8 @@ fn test_adaptive_decay_controller_temperature_and_eviction() {
     );
 }
 
+// ANCHOR[contextra-engine:TST10-002]
+/// Testblock zur Überprüfung von `test_expiry_reaper_cleans_expired_working_memory`.
 #[tokio::test]
 async fn test_expiry_reaper_cleans_expired_working_memory() -> contextra_types::Result<()> {
     let tmp = TempDir::new().expect("Failed to create temporary directory");
@@ -120,6 +130,8 @@ impl contextra_ports::Clock for TestClock {
     }
 }
 
+// ANCHOR[contextra-engine:TST10-003]
+/// Testblock zur Überprüfung von `test_trigger_expiry_cleanup_with_custom_clock`.
 #[tokio::test]
 async fn test_trigger_expiry_cleanup_with_custom_clock() -> contextra_types::Result<()> {
     use std::sync::atomic::{AtomicU64, Ordering};

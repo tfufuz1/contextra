@@ -1,3 +1,10 @@
+//! # Modul: builder_exec.rs
+//!
+//! **Zweck:** Ausführung des Query Builders und Koordination der Teilsuchen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::builder::HybridQueryBuilder;
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, Result};

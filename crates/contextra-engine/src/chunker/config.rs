@@ -1,3 +1,10 @@
+//! # Modul: config.rs
+//!
+//! **Zweck:** Konfigurationsparameter für Chunk-Größen, Overlap und Grenzzeichen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Konfiguration des Markdown-Chunkers (WP-7.1 / Teil 6.12 Spezifikation).
 // INVARIANTEN: Standardwerte entsprechen Ingestion-Vorgaben; max_tokens > 0.

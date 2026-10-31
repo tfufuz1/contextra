@@ -1,3 +1,10 @@
+//! # Modul: search_tests.rs
+//!
+//! **Zweck:** Tests für Einzel-Signal-Suchen (Text/Vektor).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::fixtures::*;
 
 #[tokio::test]

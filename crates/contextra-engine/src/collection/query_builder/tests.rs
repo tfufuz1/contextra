@@ -1,3 +1,10 @@
+//! # Modul: tests.rs
+//!
+//! **Zweck:** Tests für Abfrageerstellung und Parameterübergabe.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::*;
 use crate::{Collection, DistanceMetric, Language};
 use contextra_graph::CsrGraph;

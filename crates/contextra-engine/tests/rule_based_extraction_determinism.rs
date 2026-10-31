@@ -1,3 +1,9 @@
+//! # Integrationstest: rule based extraction determinism
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Determinismus- & Provenienztests fuer RuleBasedExtractor (v17 §6.3, §10.5, P28).
@@ -29,6 +35,8 @@ impl TextEmbeddingEngine for FakeEmbedder {
     }
 }
 
+// ANCHOR[contextra-engine:TST32-001]
+/// Testblock zur Überprüfung von `test_rule_based_extraction_100_runs_determinism`.
 /// Test 1: Determinismus & Stabile Sortierung über 100 Läufe mit identischer Eingabe.
 #[tokio::test]
 async fn test_rule_based_extraction_100_runs_determinism() {
@@ -60,6 +68,8 @@ async fn test_rule_based_extraction_100_runs_determinism() {
     }
 }
 
+// ANCHOR[contextra-engine:TST32-002]
+/// Testblock zur Überprüfung von `test_rule_based_extraction_provenance_100_percent`.
 /// Test 2: Provenienz — 100 % der aus der RuleBased-Extraktion stammenden Kanten tragen `source_doc_id`.
 #[tokio::test]
 async fn test_rule_based_extraction_provenance_100_percent() {
@@ -134,6 +144,8 @@ async fn test_rule_based_extraction_provenance_100_percent() {
     }
 }
 
+// ANCHOR[contextra-engine:TST32-003]
+/// Testblock zur Überprüfung von `test_rule_based_extraction_edge_cases`.
 /// Test 3: Edge cases — Leerer Text, Unicode NFC vs. NFD, überlange Texte, nur Satzzeichen.
 #[tokio::test]
 async fn test_rule_based_extraction_edge_cases() {

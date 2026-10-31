@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** Entitäts- und Relationsextraktion aus unstrukturiertem Text.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Extraktion.
+
 // FILE-CONTEXT
 // ZWECK: Moduldefinition für Entitätsextraktion (OpenIE & Rule-Based) (Layer 3 - Engine).
 // INVARIANTEN: Zero panic / unwrap / expect in non-test paths.

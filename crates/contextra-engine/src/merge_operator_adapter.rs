@@ -1,3 +1,10 @@
+//! # Modul: merge_operator_adapter.rs
+//!
+//! **Zweck:** Adapter für LSM-Merge-Operatoren (z.B. Sandboxed Wasm-Merge).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
+
 // FILE-CONTEXT
 // ZWECK: Synchronous bridge from contextra-store MergeOperator to async WasmMergeFunction
 // INVARIANTEN: Fail-Safe (always return Err on error, never panic); Thread/Runtime context independent; #![forbid(unsafe_code)]

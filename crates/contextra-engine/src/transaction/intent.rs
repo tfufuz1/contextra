@@ -1,3 +1,10 @@
+//! # Modul: intent.rs
+//!
+//! **Zweck:** Transaktions-Intents für zweiphasige Indizierung und Schreibsperren.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 use bytes::Bytes;
 use contextra_types::{DocId, TxId};
 use serde::{Deserialize, Serialize};

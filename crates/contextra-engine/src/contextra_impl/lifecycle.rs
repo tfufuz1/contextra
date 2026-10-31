@@ -1,3 +1,10 @@
+//! # Modul: lifecycle.rs
+//!
+//! **Zweck:** Start-, Shutdown- und Wiederherstellungsroutinen der Engine.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 use crate::*;
 use contextra_ports::license::{AuthorizedRing, FeatureRing, LicenseGate, OpenFastGate};
 use contextra_store::LsmStorage;
@@ -225,6 +232,8 @@ impl Contextra {
         Ok(())
     }
 
+    // ANCHOR[contextra-engine:REP-236]
+    /// Dokumentation für `repair_on_open` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn repair_on_open(&self) -> Result<()> {
         let timeout_duration = std::time::Duration::from_secs(30);
@@ -444,10 +453,14 @@ impl Contextra {
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
+    // ANCHOR[contextra-engine:LFC-002]
+    /// Signalisiert den Shutdown aller Hintergrunddienste.
     pub fn shutdown(&self) {
         self.cancel_token.cancel();
     }
 
+    // ANCHOR[contextra-engine:LFC-003]
+    /// Wartet asynchron auf den geordneten Stopp aller Worker.
     pub async fn wait_shutdown(&self) {
         self.shutdown();
         self.task_tracker.close();
@@ -464,6 +477,8 @@ impl Drop for Contextra {
 }
 
 impl Contextra {
+    // ANCHOR[contextra-engine:CLO-479]
+    /// Dokumentation für `close` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn close(self) -> Result<()> {
         self.wait_shutdown().await;
@@ -472,6 +487,8 @@ impl Contextra {
         Ok(())
     }
 
+    // ANCHOR[contextra-engine:WIT-487]
+    /// Dokumentation für `with_embedder` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self, embedder))]
     pub async fn with_embedder(self, embedder: Arc<dyn TextEmbeddingEngine>) -> Self {
         {
@@ -487,6 +504,8 @@ impl Contextra {
         self
     }
 
+    // ANCHOR[contextra-engine:SET-502]
+    /// Dokumentation für `set_embedder` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self, embedder))]
     pub async fn set_embedder(&self, embedder: Arc<dyn TextEmbeddingEngine>) -> Result<()> {
         {

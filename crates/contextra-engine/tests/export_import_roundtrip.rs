@@ -1,9 +1,17 @@
+//! # Integrationstest: export import roundtrip
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig, ExportDocumentV1, SCHEMA_VERSION_V1};
 use contextra_types::ContextraError;
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST15-001]
+/// Testblock zur Überprüfung von `test_export_import_collection_roundtrip_and_schema_validation`.
 #[tokio::test]
 async fn test_export_import_collection_roundtrip_and_schema_validation(
 ) -> contextra_types::Result<()> {

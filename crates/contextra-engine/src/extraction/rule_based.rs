@@ -1,3 +1,10 @@
+//! # Modul: rule_based.rs
+//!
+//! **Zweck:** Regelbasierte Mustersuche für Entitäten und Beziehungen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Extraktion.
+
 // FILE-CONTEXT
 // ZWECK: Regelbasierte Entitäts- und Relationsextraktion (Layer 3 - Engine).
 // INVARIANTEN: Zero panic / unwrap / expect in non-test paths; Rein, deterministisch, ohne Uhr, ohne Rng, ohne Netz.

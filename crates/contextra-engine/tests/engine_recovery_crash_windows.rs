@@ -1,3 +1,9 @@
+//! # Integrationstest: engine recovery crash windows
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 // FILE-CONTEXT
 // ZWECK: Integrationstests für Crash-Fenster-Recovery und commit-uncertain Transaktionen (F-20 / T-06).
@@ -217,6 +223,8 @@ async fn create_faulty_collection() -> (
     (col, storage)
 }
 
+// ANCHOR[contextra-engine:TST12-001]
+/// Testblock zur Überprüfung von `test_crash_after_text_staging_before_intent_write`.
 /// (a) Crash nach Text-Staging, vor Intent-Write:
 /// Text-Einträge werden gestagt, aber vor Commit bzw. Intent-Write stürzt der Prozess ab.
 /// Nach Wiederanlauf / repair() dürfen keine phantomen Text-Index-Einträge existieren.
@@ -247,6 +255,8 @@ async fn test_crash_after_text_staging_before_intent_write() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST12-002]
+/// Testblock zur Überprüfung von `test_crash_after_graph_staging_before_storage_commit`.
 /// (b) Crash nach Graph-Staging, vor Storage-Commit:
 /// Simuliert einen Crash, nachdem Graph/Text/Vector-Staging und Phase (a) Intent-Write stattfand,
 /// aber vor dem Storage-Commit (Phase c).
@@ -315,6 +325,8 @@ async fn test_crash_after_graph_staging_before_storage_commit() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST12-003]
+/// Testblock zur Überprüfung von `test_storage_commit_success_committed_marker_failure_recovery`.
 /// (c) Storage-Commit erfolgreich, `Committed`-Marker-Write scheitert dauerhaft (T-06):
 /// Nach Recovery: Daten bleiben in Storage und Indizes, KEINE Kompensation, Intent wird bereinigt.
 #[tokio::test]
@@ -369,6 +381,8 @@ async fn test_storage_commit_success_committed_marker_failure_recovery() -> Resu
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST12-004]
+/// Testblock zur Überprüfung von `test_pending_intent_without_storage_commit_cleans_indices`.
 /// (d) Storage-Commit nicht erfolgt + Pending-Intent:
 /// Recovery entfernt Index-Einträge ohne Storage-Datensatz (Vektor, Text, Graph) und bereinigt den Intent.
 #[tokio::test]

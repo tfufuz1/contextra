@@ -1,3 +1,10 @@
+//! # Modul: tests.rs
+//!
+//! **Zweck:** Tests für CRUD-Operationen und Konsistenzprüfungen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::MAX_SCAN_RESULTS;
 use std::ops::Bound;
 use std::sync::Arc;

@@ -1,9 +1,18 @@
+//! # Modul: collections.rs
+//!
+//! **Zweck:** Lifecycle-Verwaltung von Collections (Erstellen, Öffnen, Schließen, Löschen).
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 use crate::*;
 use contextra_store::LsmStorage;
 use contextra_types::{Result, TxId};
 use std::sync::Arc;
 
 impl Contextra {
+    // ANCHOR[contextra-engine:COL-001]
+    /// Liefert oder initialisiert eine Collection für einen Mandanten.
     pub async fn collection_for_tenant(
         &self,
         name: &str,
@@ -14,6 +23,8 @@ impl Contextra {
             .await
     }
 
+    // ANCHOR[contextra-engine:COL-002]
+    /// Öffnet oder erstellt eine Collection mit Sprachkonfiguration für einen Mandanten.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn collection_with_language_and_tenant(
         &self,
@@ -214,6 +225,8 @@ impl Contextra {
         Ok(col_arc)
     }
 
+    // ANCHOR[contextra-engine:ALL-228]
+    /// Dokumentation für `allocate_tx` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub fn allocate_tx(&self) -> Result<TxId> {
         let id = self.next_tx.fetch_add(1, Ordering::SeqCst);
         if id > TxId::MAX_COLLECTION_SEQUENCE {
@@ -224,6 +237,8 @@ impl Contextra {
         Ok(TxId::new(id))
     }
 
+    // ANCHOR[contextra-engine:LIS-239]
+    /// Dokumentation für `list_collections` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn list_collections(&self) -> Result<Vec<String>> {
         let col_idx_prefix = b"__col_idx:\x00";
@@ -249,6 +264,8 @@ impl Contextra {
         Ok(sorted_names)
     }
 
+    // ANCHOR[contextra-engine:LIS-264]
+    /// Dokumentation für `list_collections_for_tenant` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn list_collections_for_tenant(&self, tenant_id: TenantId) -> Result<Vec<String>> {
         let tenant_storage = contextra_store::tenant_codec::TenantScopedStorage::new(
@@ -273,6 +290,8 @@ impl Contextra {
         Ok(sorted_names)
     }
 
+    // ANCHOR[contextra-engine:DRO-288]
+    /// Dokumentation für `drop_collection` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self, proof_key))]
     pub async fn drop_collection(
         &self,

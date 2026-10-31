@@ -1,3 +1,9 @@
+//! # Integrationstest: invariant isolation
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use serde_json::json;
@@ -5,6 +11,8 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::Barrier;
 
+// ANCHOR[contextra-engine:TST23-001]
+/// Testblock zur Überprüfung von `test_mvcc_isolation_uncommitted_writes_invisible`.
 #[tokio::test]
 async fn test_mvcc_isolation_uncommitted_writes_invisible() -> contextra_types::Result<()> {
     let tmp_dir = TempDir::new().expect("Failed to create temporary directory");

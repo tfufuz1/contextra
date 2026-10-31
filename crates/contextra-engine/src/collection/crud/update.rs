@@ -1,3 +1,10 @@
+//! # Modul: update.rs
+//!
+//! **Zweck:** Aktualisierungspfade für Dokumentinhalte und Metadaten.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::internal::{validate_doc_id, validate_embedding};
 use crate::collection::{
     ensure_importance_metadata, extract_text, Collection, StoredDocument, StoredDocumentMeta,
@@ -41,6 +48,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
     }
 
+    // ANCHOR[contextra-engine:COL-UPD-051]
+    /// Dokumentation für `update_op` im Rahmen der Collection- und Suchabstraktion.
     pub async fn update_op(
         &self,
         db_tx: &crate::transaction::DbTransaction<S, V>,

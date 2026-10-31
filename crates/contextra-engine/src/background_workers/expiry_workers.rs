@@ -1,3 +1,10 @@
+//! # Modul: expiry_workers.rs
+//!
+//! **Zweck:** Worker zur automatischen Löschung abgelaufener TTL-Dokumente.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Worker-Tasks zur TTL-Löschung abgelaufener Dokumente und Entropie-Pruning/Decay-Eviction.
 // INVARIANTEN: Intervallsteuerung und geordnete Task-Beendigung über CancellationToken.

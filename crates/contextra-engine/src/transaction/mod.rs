@@ -1,3 +1,10 @@
+//! # Modul: mod.rs
+//!
+//! **Zweck:** MVCC-Transaktionsmanagement über relationale, Vektor- und Graphdaten.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 // FILE-CONTEXT
 // ZWECK: Orchestrierung atomarer 4-Index 2-Phase-Commits und kompensierender Transaktionen.
 // INVARIANTEN: [INV-DB-3] Keine verschluckten Fehler bei Rollbacks; Kompensierende Transaktionen bei HNSW/BM25/Graph Ausfällen.

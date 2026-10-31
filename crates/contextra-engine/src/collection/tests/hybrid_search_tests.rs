@@ -1,3 +1,10 @@
+//! # Modul: hybrid_search_tests.rs
+//!
+//! **Zweck:** Tests für kombinierte Text- und Vektorsuchpfade.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::fixtures::*;
 
 #[tokio::test]

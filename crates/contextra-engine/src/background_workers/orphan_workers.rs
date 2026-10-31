@@ -1,3 +1,10 @@
+//! # Modul: orphan_workers.rs
+//!
+//! **Zweck:** Bereinigung verwaister Vektor- und Graphknoten nach unvollständigen Transaktionen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Textverarbeitung.
+
 // FILE-CONTEXT
 // ZWECK: Worker-Tasks zur Bereinigung verwaister Transaktionen (Orphan Cleanup) und HNSW-Index-Rebuilds.
 // INVARIANTEN: Geordnete Abschaltung via CancellationToken; Beschränkung der pro Tick verarbeiteten Waisen.

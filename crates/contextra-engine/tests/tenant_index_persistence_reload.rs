@@ -1,9 +1,17 @@
+//! # Integrationstest: tenant index persistence reload
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 #![allow(deprecated)]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_types::TenantId;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-engine:TST35-001]
+/// Testblock zur Überprüfung von `test_tenant_index_persistence_and_vector_search_reload`.
 #[tokio::test]
 async fn test_tenant_index_persistence_and_vector_search_reload() -> contextra_types::Result<()> {
     let dir = tempdir().unwrap();
@@ -62,6 +70,8 @@ async fn test_tenant_index_persistence_and_vector_search_reload() -> contextra_t
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST35-002]
+/// Testblock zur Überprüfung von `test_tenant_drop_collection_invalidates_cache_and_clears_data`.
 #[tokio::test]
 async fn test_tenant_drop_collection_invalidates_cache_and_clears_data(
 ) -> contextra_types::Result<()> {

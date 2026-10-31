@@ -1,3 +1,9 @@
+//! # Integrationstest: chunker golden tests
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 use contextra_engine::chunker::{ChunkerConfig, MarkdownChunker};
 use contextra_types::DocId;
 use serde_json::{json, Value};
@@ -25,6 +31,8 @@ fn assert_golden(case_name: &str, chunker: &MarkdownChunker, doc: &str, expected
     );
 }
 
+// ANCHOR[contextra-engine:TST05-001]
+/// Testblock zur Überprüfung von `test_golden_cases_01_to_27`.
 #[test]
 fn test_golden_cases_01_to_27() {
     let default_chunker = MarkdownChunker::with_defaults();

@@ -1,3 +1,10 @@
+//! # Modul: types.rs
+//!
+//! **Zweck:** Typdefinitionen für Triple, Entitäten und Extraktionsergebnisse.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, deterministische Extraktion.
+
 // FILE-CONTEXT
 // ZWECK: Datentypen für OpenIE Entitätsextraktion.
 // INVARIANTEN: No unwrap/expect in non-test paths.
@@ -9,6 +16,8 @@ use serde::{Deserialize, Serialize};
 
 /// Ein aus dem Text extrahiertes Wissens-Tripel (Subject, Predicate, Object).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-engine:EXT-001]
+/// Extrahiertes Wissens-Tripel (Subjekt, Prädikat, Objekt).
 pub struct ExtractedTriple {
     /// Subjekt der Relation / Entität
     pub subject: String,
