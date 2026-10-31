@@ -1,3 +1,7 @@
+//! # Benchmark: Block-Cache Durchsatz
+//!
+//! Misst Trefferquote und Latenz des LRU-Block-Caches unter nebenlaeufigem Zugriff.
+
 use bytes::Bytes;
 use contextra_store::sstable::BlockCache;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

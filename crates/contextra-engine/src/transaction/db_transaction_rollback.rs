@@ -1,3 +1,10 @@
+//! # Modul: db_transaction_rollback.rs
+//!
+//! **Zweck:** Rollback-Logik für abgebrochene oder fehlerhafte Transaktionen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
@@ -6,6 +13,8 @@ use std::sync::atomic::Ordering;
 
 #[allow(dead_code)]
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
+    // ANCHOR[contextra-engine:COM-016]
+    /// Dokumentation für `compensate_hnsw` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub(super) async fn compensate_hnsw(&self, doc_ids: &[DocId]) {
         let comp_tx = TxId::new(
             self.collection
@@ -26,6 +35,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
     }
 
+    // ANCHOR[contextra-engine:COM-036]
+    /// Dokumentation für `compensate_text` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub(super) async fn compensate_text(&self, doc_ids: &[DocId]) {
         let comp_tx = TxId::new(
             self.collection
@@ -51,6 +62,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
     }
 
+    // ANCHOR[contextra-engine:COM-061]
+    /// Dokumentation für `compensate_lsm` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub(super) async fn compensate_lsm(&self, intent_key: &[u8], doc_ids: &[DocId]) {
         let f_keys = {
             let mut guard = match self.staged_forward_keys.lock() {
@@ -165,6 +178,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
     }
 
+    // ANCHOR[contextra-engine:ROL-175]
+    /// Dokumentation für `rollback_internal` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub(super) async fn rollback_internal(&self) {
         if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
             tracing::error!("[INV-DB-3] Graph index rollback failed: {}", e);

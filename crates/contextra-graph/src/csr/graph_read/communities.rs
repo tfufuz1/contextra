@@ -1,9 +1,15 @@
+//! Abfrage- und Batch-Zuweisungsmethoden für Community-Cluster im CSR-Graphen.
+//!
+//! # Zweck
+//! Verknüpft Knotenindizes mit identifizierten Community-Gruppen für globales Clustering.
+
 use super::super::graph_write::CsrGraph;
 use super::super::types::GRAPH_COMMUNITY_PREFIX;
 use contextra_types::{EntityId, Result};
 use std::collections::HashMap;
 
 impl CsrGraph {
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-READ-COMMUNITIES-001]
     pub fn set_communities_batch(&self, assignments: &[crate::CommunityAssignment]) {
         let mut inner = self.inner_write();
         for a in assignments {

@@ -1,3 +1,7 @@
+//! # Invarianten-Validierung (Ring 1)
+//!
+//! Prueft interne Datenstrukturen auf Konsistenz und Korrektheit.
+
 use super::{MAX_KEY_SIZE, MAX_VALUE_SIZE};
 use contextra_types::{ContextraError, DocId, Result};
 

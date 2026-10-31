@@ -1,3 +1,7 @@
+//! # WAL-Frame-Kodierung (Ring 1)
+//!
+//! Kodiert und dekodiert WAL-Eintraege mit Laengenfeldern, Sequenznummern und Prüfsummen.
+
 use contextra_crypto::wal_crypto::WalHmac;
 use contextra_types::{ContextraError, Result, TxId};
 

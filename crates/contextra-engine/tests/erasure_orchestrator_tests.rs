@@ -1,3 +1,9 @@
+//! # Integrationstest: erasure orchestrator tests
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 // FILE-CONTEXT
 // ZWECK: Testen der fail-closed Datenlöschung und ErasureOrchestrator Garantien.
 // INVARIANTEN: Restmengen ergeben verified == false; fehlender Schlüssel schlägt vor Mutation fehl.
@@ -15,6 +21,8 @@ impl ProofKeyProvider for TestProofKeyProvider {
     }
 }
 
+// ANCHOR[contextra-engine:TST13-001]
+/// Testblock zur Überprüfung von `test_erase_document_e2e_verified`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_erase_document_e2e_verified() -> Result<()> {
     let dir = tempdir().unwrap();
@@ -59,6 +67,8 @@ async fn test_erase_document_e2e_verified() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST13-002]
+/// Testblock zur Überprüfung von `test_erase_document_missing_key_preflight_fails_before_mutation`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_erase_document_missing_key_preflight_fails_before_mutation() -> Result<()> {
     let dir = tempdir().unwrap();
@@ -92,6 +102,8 @@ async fn test_erase_document_missing_key_preflight_fails_before_mutation() -> Re
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST13-003]
+/// Testblock zur Überprüfung von `test_sabotage_purger_leaves_residual_fails_verification`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_sabotage_purger_leaves_residual_fails_verification() -> Result<()> {
     let dir = tempdir().unwrap();
@@ -119,6 +131,8 @@ async fn test_sabotage_purger_leaves_residual_fails_verification() -> Result<()>
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST13-004]
+/// Testblock zur Überprüfung von `test_erase_collection_e2e_and_registry_timing`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_erase_collection_e2e_and_registry_timing() -> Result<()> {
     let dir = tempdir().unwrap();
@@ -163,6 +177,8 @@ async fn test_erase_collection_e2e_and_registry_timing() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:TST13-005]
+/// Testblock zur Überprüfung von `test_erase_distinct_deletions_produce_distinct_proofs`.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_erase_distinct_deletions_produce_distinct_proofs() -> Result<()> {
     let dir = tempdir().unwrap();

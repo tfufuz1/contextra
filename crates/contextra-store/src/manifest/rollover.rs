@@ -1,3 +1,7 @@
+//! # Manifest-Rollover (Ring 1)
+//!
+//! Schreibt periodisch kompakte Manifest-Snapshots, um Logdateien klein zu halten.
+
 use contextra_types::{ContextraError, Result};
 use tokio::io::AsyncWriteExt;
 

@@ -1,3 +1,6 @@
+//! Integrations-Testsuite für ModelFingerprint, TokenBudget und ResourceTracker.
+//! Testet Eindeutigkeit von Hash-Fingerabdrücken und Backpressure-Verhalten.
+
 //! Model fingerprint, schema versioning, and comprehensive domain model test suite for `contextra-types`.
 
 #![allow(

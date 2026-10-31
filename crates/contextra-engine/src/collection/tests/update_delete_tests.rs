@@ -1,3 +1,10 @@
+//! # Modul: update_delete_tests.rs
+//!
+//! **Zweck:** Tests für Dokument-Updates und Löschkonsistenz.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use super::fixtures::*;
 
 #[tokio::test]

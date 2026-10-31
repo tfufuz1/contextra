@@ -1,3 +1,7 @@
+//! # Schreibpfad-Implementierung (Ring 1)
+//!
+//! Fuehrt Put- und Delete-Befehle ueber Group-Commit, WAL-Append und MemTable-Update aus.
+
 use super::super::config::DurabilityMode;
 use super::super::engine::LsmStorage;
 use super::super::group_commit::{

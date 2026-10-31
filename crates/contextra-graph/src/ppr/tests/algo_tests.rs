@@ -1,8 +1,14 @@
+//! Algorithmische Vergleichstests zwischen Dense- und Forward-Push-PPR.
+//!
+//! # Zweck
+//! Stellt die Rangfolge-Äquivalenz der Top-K-Ergebnisse beider Algorithmen sicher.
+
 use super::super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-001]
 #[tokio::test]
 async fn test_ppr_context_reuse_when_graph_grows() {
     let graph = CsrGraph::new();
@@ -67,6 +73,7 @@ async fn test_ppr_context_reuse_when_graph_grows() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-002]
 #[tokio::test]
 async fn test_ppr_analytical_5_node_ring() {
     let graph = CsrGraph::new();
@@ -143,6 +150,7 @@ async fn test_ppr_analytical_5_node_ring() {
     assert!(rank_map[&EntityId::new(4)] > rank_map[&EntityId::new(5)]);
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-003]
 #[tokio::test]
 async fn test_ppr_handles_sink_node_correctly() {
     // Graph: A (1) -> B (2), B has NO outgoing edge (Sink), C (3) -> A (1)
@@ -198,6 +206,7 @@ async fn test_ppr_handles_sink_node_correctly() {
     assert!(rank_map[&id_b] > 0.0, "Sink node B score must be positive");
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-004]
 #[tokio::test]
 async fn test_ppr_per_iteration_mass_conservation_dangling_and_isolated() {
     // Graph with multiple dangling nodes and isolated components
@@ -331,6 +340,7 @@ async fn test_ppr_per_iteration_mass_conservation_dangling_and_isolated() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-005]
 #[tokio::test]
 async fn test_ppr_dangling_node_mass_conservation() {
     let graph = CsrGraph::new();
@@ -367,6 +377,7 @@ async fn test_ppr_dangling_node_mass_conservation() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-006]
 #[tokio::test]
 async fn test_ppr_bit_identical_determinism() {
     let graph = CsrGraph::new();
@@ -426,6 +437,7 @@ async fn test_ppr_bit_identical_determinism() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-007]
 #[tokio::test]
 async fn test_ppr_single_node_no_edges() {
     let graph = CsrGraph::new();
@@ -449,6 +461,7 @@ async fn test_ppr_single_node_no_edges() {
     assert!((results[0].1 - 1.0).abs() < 1e-4);
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-008]
 #[tokio::test]
 async fn test_ppr_isolated_nodes_handling() {
     let graph = CsrGraph::new();
@@ -487,6 +500,7 @@ async fn test_ppr_isolated_nodes_handling() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-009]
 #[tokio::test]
 async fn test_ppr_self_loop_handling() {
     let graph = CsrGraph::new();
@@ -526,6 +540,7 @@ async fn test_ppr_self_loop_handling() {
     assert!((total_mass - 1.0).abs() < 1e-4);
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-010]
 #[tokio::test]
 async fn test_ppr_duplicate_multi_edges_deterministic() {
     let graph = CsrGraph::new();
@@ -581,6 +596,7 @@ async fn test_ppr_duplicate_multi_edges_deterministic() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-011]
 #[tokio::test]
 async fn test_ppr_exact_score_tie_breaking_by_entity_id() {
     let graph = CsrGraph::new();
@@ -654,6 +670,7 @@ async fn test_ppr_exact_score_tie_breaking_by_entity_id() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-012]
 #[tokio::test]
 async fn test_ppr_hyperedge_expansion_dense_and_forward_push() {
     use crate::hyperedge::{HyperEdge, HyperEdgeId, RoleBinding, RoleId};
@@ -748,6 +765,7 @@ async fn test_ppr_hyperedge_expansion_dense_and_forward_push() {
 }
 
 proptest::proptest! {
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-013]
     #[test]
     fn prop_ppr_rank_mass_conservation(
         node_count in 1..=20usize,
@@ -831,6 +849,7 @@ impl tracing::field::Visit for StringVisitor {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-014]
 #[tokio::test]
 async fn test_ppr_tl_hfd_dispatch_valid() {
     let graph = CsrGraph::new();
@@ -878,6 +897,7 @@ async fn test_ppr_tl_hfd_dispatch_valid() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-015]
 #[tokio::test]
 async fn test_ppr_shadow_mode_tl_hfd_parity() {
     let graph = CsrGraph::new();
@@ -938,6 +958,7 @@ async fn test_ppr_shadow_mode_tl_hfd_parity() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-016]
 #[tokio::test]
 async fn test_ppr_tl_hfd_invalid_params_fallback() {
     let graph = CsrGraph::new();
@@ -975,6 +996,7 @@ async fn test_ppr_tl_hfd_invalid_params_fallback() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-017]
 #[tokio::test]
 async fn test_auto_ppr_cost_model_few_seeds_small_graph_selects_forward_push() {
     let graph = CsrGraph::new();
@@ -1023,6 +1045,7 @@ async fn test_auto_ppr_cost_model_few_seeds_small_graph_selects_forward_push() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-018]
 #[tokio::test]
 async fn test_auto_ppr_cost_model_few_seeds_large_graph_selects_forward_push() {
     let graph = CsrGraph::new();
@@ -1068,6 +1091,7 @@ async fn test_auto_ppr_cost_model_few_seeds_large_graph_selects_forward_push() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-019]
 #[tokio::test]
 async fn test_auto_ppr_cost_model_dense_graph_selects_power_iteration() {
     let graph = CsrGraph::new();
@@ -1117,6 +1141,7 @@ async fn test_auto_ppr_cost_model_dense_graph_selects_power_iteration() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-ALGO-TESTS-020]
 #[tokio::test]
 async fn test_auto_ppr_cost_model_crossover_boundary() {
     // Test proving decision adheres strictly to cost model instead of fixed 100 seed threshold.

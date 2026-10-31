@@ -1,3 +1,8 @@
+//! Modul für personalisierten PageRank (PPR) und Relevanzdiffusion im Wissensgraphen.
+//!
+//! # Zweck
+//! Orchestriert Dense-, Forward-Push- und Schattenmodus-Verfahren zur Relevanzbewertung.
+
 pub mod cost;
 pub mod dense;
 pub mod forward_push;
@@ -23,6 +28,7 @@ pub(crate) fn compute_ppr(
 }
 
 #[cfg(feature = "apprh-diffusion")]
+// ANCHOR[contextra-graph:SRC-PPR-MOD-001]
 pub fn compute_ppr_with_apprh_selector(
     inner: &GraphInner,
     seed_nodes: &[EntityId],

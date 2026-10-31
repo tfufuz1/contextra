@@ -1,3 +1,9 @@
+//! # Integrationstest: hybrid adaptive overfetch
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Collection, DistanceMetric, Language};
 use contextra_graph::CsrGraph;
@@ -9,6 +15,8 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST17-001]
+/// Testblock zur Überprüfung von `create_test_collection`.
 async fn create_test_collection(name: &str) -> (Collection<LsmStorage, HnswIndex>, TempDir) {
     let dir = TempDir::new().unwrap();
     let lsm_config = LsmConfig {
@@ -36,6 +44,8 @@ async fn create_test_collection(name: &str) -> (Collection<LsmStorage, HnswIndex
     (col, dir)
 }
 
+// ANCHOR[contextra-engine:TST17-002]
+/// Testblock zur Überprüfung von `test_adaptive_overfetch_1_percent_selectivity`.
 #[tokio::test]
 async fn test_adaptive_overfetch_1_percent_selectivity() {
     let (col, _dir) = create_test_collection("overfetch_col").await;
@@ -105,6 +115,8 @@ async fn test_adaptive_overfetch_1_percent_selectivity() {
     );
 }
 
+// ANCHOR[contextra-engine:TST17-003]
+/// Testblock zur Überprüfung von `test_adaptive_overfetch_stage_progression_reporting`.
 #[tokio::test]
 async fn test_adaptive_overfetch_stage_progression_reporting() {
     let (col, _dir) = create_test_collection("overfetch_stages_col").await;

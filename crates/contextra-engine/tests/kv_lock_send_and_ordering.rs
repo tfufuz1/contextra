@@ -1,9 +1,17 @@
+//! # Integrationstest: kv lock send and ordering
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use std::sync::Arc;
 use tempfile::TempDir;
 
 fn assert_send<F: Send>(_: F) {}
 
+// ANCHOR[contextra-engine:TST25-001]
+/// Testblock zur Überprüfung von `create_test_db`.
 async fn create_test_db() -> (Arc<contextra_engine::Contextra>, TempDir) {
     let tmp = TempDir::new().expect("temp dir");
     let config = contextra_engine::ContextraConfig {
@@ -17,6 +25,8 @@ async fn create_test_db() -> (Arc<contextra_engine::Contextra>, TempDir) {
     (Arc::new(db), tmp)
 }
 
+// ANCHOR[contextra-engine:TST25-002]
+/// Testblock zur Überprüfung von `test_collection_futures_are_send`.
 #[tokio::test]
 async fn test_collection_futures_are_send() {
     let (db, _tmp) = create_test_db().await;
@@ -31,6 +41,8 @@ async fn test_collection_futures_are_send() {
     assert_send(col.delete("key1"));
 }
 
+// ANCHOR[contextra-engine:TST25-003]
+/// Testblock zur Überprüfung von `test_concurrent_lock_acquisition_deadlock_free`.
 #[tokio::test]
 async fn test_concurrent_lock_acquisition_deadlock_free() {
     let (db, _tmp) = create_test_db().await;

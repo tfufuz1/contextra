@@ -1,3 +1,8 @@
+//! # Segmentierte KV-Verwaltung & Shredding (Ring 1)
+//!
+//! Ermoeglicht granulare Schluesselverwaltung und O(1) Loeschung sensibler
+//! Gruppen durch Schluesselrevokation in der [`KeyRegistry`].
+
 // FILE-CONTEXT
 // ZWECK: Verdrahtung von KvDeleteMode und contextra_crypto::kv_shredding für KV-Segment-Verschlüsselung und Crypto-Shredding (AP-P0-06 / Spec B.1.8).
 // INVARIANTEN:
@@ -13,6 +18,8 @@ use std::sync::Arc;
 
 /// Configuration for KV segment storage and shredding behavior.
 #[derive(Debug, Clone, Default)]
+// ANCHOR[contextra-store:KV-SEG-001]
+/// Konfiguration fuer segmentierten KV-Speicher.
 pub struct KvSegmentConfig {
     /// Delete mode specifying whether segments are tombstone-only or crypto-shredded.
     pub delete_mode: KvDeleteMode,

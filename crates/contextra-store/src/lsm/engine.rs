@@ -1,3 +1,7 @@
+//! # LSM-Storage Engine (Ring 1)
+//!
+//! Implementiert [`LsmStorage`] als zentrale Fassade fuer alle Speicheroperationen.
+
 use super::config::LsmConfig;
 use super::group_commit::PendingCommitQueue;
 use super::guard::LsmState;
@@ -24,6 +28,8 @@ pub enum StorageHealth {
 }
 
 /// LSM-Tree based storage engine.
+// ANCHOR[contextra-store:LSM-ENG-001]
+/// Primaere Schnittstelle fuer den LSM-Baum mit get, put, delete und scan.
 pub struct LsmStorage {
     pub(super) config: LsmConfig,
     pub(super) key_manager: Option<Arc<KeyManager>>,

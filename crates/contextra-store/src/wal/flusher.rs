@@ -1,3 +1,7 @@
+//! # Asynchroner WAL-Flusher (Ring 1)
+//!
+//! Koordiniert Flush- und fsync-Aufrufe mit Timeout und Batching-Strategien.
+
 use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 use std::sync::Arc;

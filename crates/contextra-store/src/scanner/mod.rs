@@ -1,3 +1,7 @@
+//! # Scanner-Modul fuer Zero-Panic Scans (Ring 1)
+//!
+//! Stellt Scanner ueber MemTable, SSTables, WAL und Purge-Schnittstellen bereit.
+
 // FILE-CONTEXT
 // ZWECK: Export und Orchestrierung der LSM Storage-Scanner und Purger (SPEC §12.7.4, Verträge W1-P01).
 // INVARIANTEN: lsm_scanners und lsm_purgers erzeugen nur valide, isolierte Instanzen für Memtable, SSTable und WAL.

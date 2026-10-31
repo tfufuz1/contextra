@@ -1,3 +1,4 @@
+// ANCHOR[contextra-graph:SRC-CSR-001]
 //! CSR-Graph-Implementierung für Entity-Relation-Traversal.
 
 pub(crate) mod graph_index;

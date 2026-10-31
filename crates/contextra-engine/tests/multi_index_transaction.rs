@@ -1,9 +1,17 @@
+//! # Integrationstest: multi index transaction
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_types::{DocId, Edge, Entity, EntityId};
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST27-001]
+/// Testblock zur Überprüfung von `test_db_transaction_multi_index_staging_commit_and_rollback`.
 #[tokio::test]
 async fn test_db_transaction_multi_index_staging_commit_and_rollback() -> contextra_types::Result<()>
 {

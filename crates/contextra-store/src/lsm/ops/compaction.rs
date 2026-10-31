@@ -1,3 +1,7 @@
+//! # Kompaktierungsoperationen (Ring 1)
+//!
+//! Integriert die CompactionEngine in den Lebenszyklus des LSM-Speichers.
+
 use super::super::engine::LsmStorage;
 use super::super::{MemTable, SstableBuilder, SstableReader, Wal};
 use crate::compaction::retain_key_versions;

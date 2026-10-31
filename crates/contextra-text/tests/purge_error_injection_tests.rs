@@ -1,3 +1,8 @@
+//! Testsuite `purge_error_injection_tests.rs` für contextra-text.
+//!
+//! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
+
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats, TextIndex};
 use contextra_text::{InvertedIndex, TextPurger};
 use contextra_types::{ContextraError, DocId, Result, TxId};
@@ -146,6 +151,8 @@ impl StorageEngine for FaultyStorage {
     }
 }
 
+// ANCHOR[contextra-text:TEST-185]
+// Testfall `test_purge_report_success_on_clean_document`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_purge_report_success_on_clean_document() -> Result<()> {
     let storage = Arc::new(FaultyStorage::new());
@@ -172,6 +179,8 @@ async fn test_purge_report_success_on_clean_document() -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-186]
+// Testfall `test_purge_report_catches_corrupted_posting_list_bytes`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_purge_report_catches_corrupted_posting_list_bytes() -> Result<()> {
     let storage = Arc::new(FaultyStorage::new());
@@ -211,6 +220,8 @@ async fn test_purge_report_catches_corrupted_posting_list_bytes() -> Result<()> 
     Ok(())
 }
 
+// ANCHOR[contextra-text:TEST-187]
+// Testfall `test_purge_report_catches_storage_deletion_failure`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[tokio::test]
 async fn test_purge_report_catches_storage_deletion_failure() -> Result<()> {
     let storage = Arc::new(FaultyStorage::new());

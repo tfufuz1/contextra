@@ -1,3 +1,7 @@
+//! # Kompaktierungskonfiguration (Ring 1)
+//!
+//! Parameter fuer Ebenengroessen, Multiplikatoren und Tombstone-Grenzwerte.
+
 // FILE-CONTEXT
 // STAND: 2026-09-11T10:21:34Z (SESSION: 31ada253)
 // ZWECK: Size-Tiered Compaction Strategy (STCS) für SSTables

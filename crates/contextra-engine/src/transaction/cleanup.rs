@@ -1,3 +1,10 @@
+//! # Modul: cleanup.rs
+//!
+//! **Zweck:** Bereinigung von Transaktionsmetadaten und Versionseinträgen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 use super::intent::CommitIntent;
 use contextra_ports::StorageEngine;
 use contextra_types::{Result, TxId};

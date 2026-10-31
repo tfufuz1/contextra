@@ -1,7 +1,16 @@
+//! # Modul: internal.rs
+//!
+//! **Zweck:** Interne Hilfsfunktionen für Dokumenttransformation und Validierung.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use crate::collection::Collection;
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::Result;
 
+// ANCHOR[contextra-engine:COL-VAL-012]
+/// Dokumentation für `validate_doc_id` im Rahmen der Collection- und Suchabstraktion.
 pub(crate) fn validate_doc_id(id: &str) -> Result<()> {
     if id.is_empty() {
         return Err(contextra_types::ContextraError::invalid_input(
@@ -21,6 +30,8 @@ pub(crate) fn validate_doc_id(id: &str) -> Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-engine:COL-VAL-031]
+/// Dokumentation für `validate_embedding` im Rahmen der Collection- und Suchabstraktion.
 pub(crate) fn validate_embedding(embedding: &[f32]) -> Result<()> {
     if embedding.is_empty() {
         return Err(contextra_types::ContextraError::invalid_input(

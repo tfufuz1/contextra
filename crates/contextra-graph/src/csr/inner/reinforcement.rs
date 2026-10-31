@@ -1,3 +1,9 @@
+// ANCHOR[contextra-graph:SRC-CSR-INNER-REINFORCEMENT-001]
+//! Hebbsches Verstärkungslernen für Kantengewichte im GraphInner.
+//!
+//! # Zweck
+//! Passt Kantengewichte dynamisch an, wenn Pfade erfolgreich traversiert werden.
+
 #[cfg(feature = "edge-reinforcement-learning")]
 use contextra_types::EntityId;
 

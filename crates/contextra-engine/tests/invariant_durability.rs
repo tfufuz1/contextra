@@ -1,8 +1,16 @@
+//! # Integrationstest: invariant durability
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-engine:TST22-001]
+/// Testblock zur Überprüfung von `test_durability_after_wal_commit_and_simulated_crash`.
 #[tokio::test]
 async fn test_durability_after_wal_commit_and_simulated_crash() -> contextra_types::Result<()> {
     let tmp_dir = TempDir::new().expect("Failed to create temporary directory");

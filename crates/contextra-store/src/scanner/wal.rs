@@ -1,3 +1,7 @@
+//! # WAL-Scanner (Ring 1)
+//!
+//! Scannt sequentiell durch das WAL zur Integritaetspruefung oder gezielten Datenextraktion.
+
 // FILE-CONTEXT
 // ZWECK: WAL-Scanner für WalAllSegments-Schicht (§12.7.4, INV-WITNESS-MINT-1).
 // INVARIANTEN: dekodiert alle WAL-Segmente inklusive HMAC-Prüfung und misst Rohdaten.

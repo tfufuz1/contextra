@@ -1,3 +1,9 @@
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-INDEX-MUTATIONS-001]
+//! Mutationsmethoden des `GraphIndex`-Ports auf `CsrGraph`.
+//!
+//! # Zweck
+//! Ermöglicht das transaktionale Hinzufügen und Entfernen von Kanten und Entitäten.
+
 use std::sync::atomic::Ordering;
 
 use crate::consistency_enforcement::EdgeAssertion;

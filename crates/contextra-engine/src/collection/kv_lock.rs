@@ -1,3 +1,10 @@
+//! # Modul: kv_lock.rs
+//!
+//! **Zweck:** Schlüsselbasierte Sperren zur Vermeidung von Write-Skews und Datenrennen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
+
 use tokio::sync::{Mutex, MutexGuard};
 
 const KV_LOCK_SHARDS: usize = 16;
@@ -13,12 +20,16 @@ pub(crate) struct KeyGuard<'a> {
     _guard: MutexGuard<'a, ()>,
 }
 
+// ANCHOR[contextra-engine:COL-KVK-023]
+/// Dokumentation für `KvKeyLocks` im Rahmen der Collection- und Suchabstraktion.
 pub(crate) struct KvKeyLocks {
     shards: [Mutex<()>; KV_LOCK_SHARDS],
     hasher: ahash::RandomState,
 }
 
 impl KvKeyLocks {
+    // ANCHOR[contextra-engine:COL-NEW-029]
+    /// Dokumentation für `new` im Rahmen der Collection- und Suchabstraktion.
     pub fn new() -> Self {
         // INV-HASHER-SEEDS: niemals randomisieren
         let hasher = ahash::RandomState::with_seeds(SEED_A, SEED_B, SEED_C, SEED_D);
@@ -28,20 +39,28 @@ impl KvKeyLocks {
         }
     }
 
+    // ANCHOR[contextra-engine:COL-SHA-038]
+    /// Dokumentation für `shard_idx` im Rahmen der Collection- und Suchabstraktion.
     pub fn shard_idx(&self, key: &str) -> usize {
         (self.hasher.hash_one(key) as usize) % KV_LOCK_SHARDS
     }
 
+    // ANCHOR[contextra-engine:COL-LOC-042]
+    /// Dokumentation für `lock_shard` im Rahmen der Collection- und Suchabstraktion.
     pub async fn lock_shard<'a>(&'a self, idx: usize) -> KeyGuard<'a> {
         let guard = self.shards[idx].lock().await;
         KeyGuard { _guard: guard }
     }
 
+    // ANCHOR[contextra-engine:COL-LOC-047]
+    /// Dokumentation für `lock_for` im Rahmen der Collection- und Suchabstraktion.
     pub async fn lock_for<'a>(&'a self, key: &str) -> KeyGuard<'a> {
         let idx = self.shard_idx(key);
         self.lock_shard(idx).await
     }
 
+    // ANCHOR[contextra-engine:COL-TRY-053]
+    /// Dokumentation für `try_lock_shard` im Rahmen der Collection- und Suchabstraktion.
     #[cfg(test)]
     pub fn try_lock_shard<'a>(&'a self, idx: usize) -> Option<KeyGuard<'a>> {
         self.shards[idx]
@@ -50,6 +69,8 @@ impl KvKeyLocks {
             .map(|guard| KeyGuard { _guard: guard })
     }
 
+    // ANCHOR[contextra-engine:COL-TRY-061]
+    /// Dokumentation für `try_lock_for` im Rahmen der Collection- und Suchabstraktion.
     #[cfg(test)]
     pub fn try_lock_for<'a>(&'a self, key: &str) -> Option<KeyGuard<'a>> {
         let idx = self.shard_idx(key);

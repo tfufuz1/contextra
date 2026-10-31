@@ -1,3 +1,9 @@
+//! # Integrationstest: auto triple extraction
+//!
+//! **Zweck:** Prüft spezifische Garantien, Transaktionskonsistenz und Fehlertoleranz der Engine.
+//!
+//! Gehört zur Testsuite von `contextra-engine`.
+
 #![cfg(not(loom))]
 use contextra_engine::collection::crud::AutoExtractionConfig;
 use contextra_engine::{Contextra, ContextraConfig};
@@ -55,6 +61,8 @@ impl LlmTextGenerator for MockLlmGenerator {
     }
 }
 
+// ANCHOR[contextra-engine:TST04-001]
+/// Testblock zur Überprüfung von `test_auto_triple_extraction_default_config_creates_graph_edges`.
 #[tokio::test]
 async fn test_auto_triple_extraction_default_config_creates_graph_edges() -> Result<()> {
     let tmp = TempDir::new().expect("temp dir");

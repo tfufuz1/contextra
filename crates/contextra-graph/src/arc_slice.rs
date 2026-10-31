@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 /// A zero-copy slice view into an underlying `Arc<[T]>`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-001]
 pub struct ArcSlice<T> {
     shared: Arc<[T]>,
     offset: usize,
@@ -17,6 +18,7 @@ pub struct ArcSlice<T> {
 impl<T> ArcSlice<T> {
     /// Creates a new `ArcSlice` wrapping the entire `Arc<[T]>`.
     #[inline]
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-002]
     pub fn new(shared: Arc<[T]>) -> Self {
         let len = shared.len();
         Self {
@@ -28,6 +30,7 @@ impl<T> ArcSlice<T> {
 
     /// Creates an `ArcSlice` from a `Vec<T>`.
     #[inline]
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-003]
     pub fn from_vec(vec: Vec<T>) -> Self {
         Self::new(vec.into())
     }
@@ -35,6 +38,7 @@ impl<T> ArcSlice<T> {
     /// Creates a zero-copy sub-slice within the given index range bounds.
     ///
     /// Returns `None` if the range bounds are invalid or out of bounds.
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-004]
     pub fn try_slice(&self, range: impl RangeBounds<usize>) -> Option<Self> {
         use std::ops::Bound;
 
@@ -62,6 +66,7 @@ impl<T> ArcSlice<T> {
     }
 
     /// Creates a zero-copy sub-slice within the given index range bounds, clamping to valid bounds.
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-005]
     pub fn slice(&self, range: impl RangeBounds<usize>) -> Self {
         self.try_slice(range).unwrap_or_else(|| Self {
             shared: Arc::clone(&self.shared),
@@ -72,30 +77,35 @@ impl<T> ArcSlice<T> {
 
     /// Returns a reference to the underlying `Arc<[T]>` slice.
     #[inline]
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-006]
     pub fn as_arc(&self) -> &Arc<[T]> {
         &self.shared
     }
 
     /// Returns the offset within the backing `Arc<[T]>`.
     #[inline]
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-007]
     pub fn offset(&self) -> usize {
         self.offset
     }
 
     /// Returns the number of elements in the sub-slice.
     #[inline]
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-008]
     pub fn len(&self) -> usize {
         self.len
     }
 
     /// Returns `true` if the slice contains no elements.
     #[inline]
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-009]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// Returns a reference to the slice of elements.
     #[inline]
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-010]
     pub fn as_slice(&self) -> &[T] {
         &self.shared[self.offset..self.offset + self.len]
     }
@@ -138,6 +148,7 @@ impl<'a, T> IntoIterator for &'a ArcSlice<T> {
 mod tests {
     use super::*;
 
+// ANCHOR[contextra-graph:SRC-ARC-SLICE-011]
     #[test]
     fn test_arc_slice_basic() {
         let vec = vec![10, 20, 30, 40, 50];

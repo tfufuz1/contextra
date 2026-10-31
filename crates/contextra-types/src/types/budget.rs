@@ -34,6 +34,7 @@ pub enum BudgetStrategy {
 
 /// Token budget configuration for LLM context management.
 #[derive(Debug)]
+// ANCHOR[contextra-types:BUDGET-TOKEN]
 pub struct TokenBudget {
     /// Maximum total token limit.
     pub limit: usize,
@@ -322,6 +323,7 @@ impl Default for TokenBudget {
 
 /// Resource budget for memory management.
 #[derive(Debug, Clone, Copy)]
+// ANCHOR[contextra-types:BUDGET-RESOURCE]
 pub struct ResourceBudget {
     /// Maximum allowed memory usage in bytes.
     pub memory_limit: u64,
@@ -337,6 +339,7 @@ impl Default for ResourceBudget {
 
 /// Tracks resource usage against a budget.
 #[derive(Debug)]
+// ANCHOR[contextra-types:BUDGET-TRACKER]
 pub struct ResourceTracker {
     /// The configured budget.
     budget: ResourceBudget,

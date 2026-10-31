@@ -1,3 +1,8 @@
+//! Integrationstest für k-Pfad-Diffusion mit Budgetierung bei Hub-Knoten.
+//!
+//! # Zweck
+//! Stellt sicher, dass stark vernetzte Knoten (Hubs) das konfigurierte Kanten- und Tiefenbudget nicht überschreiten.
+
 #![cfg(feature = "k-path-diffusion")]
 
 use contextra_graph::path_rag::k_path::{KPathConfig, KPathDiffusion};
@@ -54,6 +59,7 @@ impl PathGraph for SyntheticHubGraph {
     }
 }
 
+// ANCHOR[contextra-graph:TESTS-BUDGETED-K-PATH-HUB-ENTITY-001]
 #[test]
 fn test_budgeted_k_path_hub_entity_high_fanout_exhaustion() {
     let source = EntityId::new(10);
@@ -90,6 +96,7 @@ fn test_budgeted_k_path_hub_entity_high_fanout_exhaustion() {
     }
 }
 
+// ANCHOR[contextra-graph:TESTS-BUDGETED-K-PATH-HUB-ENTITY-002]
 #[test]
 fn test_budgeted_k_path_within_budget_success() {
     let source = EntityId::new(10);
@@ -124,6 +131,7 @@ fn test_budgeted_k_path_within_budget_success() {
     );
 }
 
+// ANCHOR[contextra-graph:TESTS-BUDGETED-K-PATH-HUB-ENTITY-003]
 #[test]
 fn test_budgeted_k_path_edge_cases() {
     let source = EntityId::new(1);

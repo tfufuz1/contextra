@@ -1,3 +1,7 @@
+//! # Adaptive Kompaktierungsstrategie (Ring 1)
+//!
+//! Berechnet optimale Kompaktierungsplaene basierend auf Schreib-/Leselast und Verstaerkung.
+
 // FILE-CONTEXT
 // STAND: 2026-09-27T00:00:00Z
 // ZWECK: Workload-adaptive Compaction-Strategie (EcoTune / ArceKV inspiriert)

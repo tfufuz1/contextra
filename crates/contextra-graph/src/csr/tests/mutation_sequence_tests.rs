@@ -1,3 +1,8 @@
+//! Sequenzielle Mutationstests für komplexe Einfüge- und Löschfolgen.
+//!
+//! # Zweck
+//! Überprüft die Konsistenz nach wechselnden `add_edge`, `remove_edge` und Re-Insert-Aufrufen.
+
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Entity, EntityId, TxId};
@@ -7,6 +12,7 @@ fn create_entity(id: u64) -> Entity {
     Entity::new(EntityId::new(id), "label", "type")
 }
 
+// ANCHOR[contextra-graph:SRC-CSR-TESTS-MUTATION-SEQUENCE-TESTS-001]
 #[tokio::test]
 async fn test_csr_mutation_sequence_equivalence() {
     let g = Arc::new(CsrGraph::new());

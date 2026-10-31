@@ -314,6 +314,11 @@ pub static FAIL_APPEND_PARTIAL_ONCE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
 #[derive(Debug, Clone)]
+// ANCHOR[contextra-store:WAL-CORE-001]
+/// Konfigurationsoptionen für das Write-Ahead-Log (WAL).
+///
+/// Steuert Schlüsselmanager, Integritätsschlüssel-Rückfallebenen, Mindestversion
+/// und Flusher-Einstellungen für asynchrone Schreibvorgänge.
 pub struct WalConfig {
     pub key_manager: Option<Arc<KeyManager>>,
     pub(crate) allow_legacy_integrity_key_fallback: bool,
@@ -339,6 +344,8 @@ impl WalConfig {
     }
 }
 
+// ANCHOR[contextra-store:WAL-CORE-002]
+/// Hauptstruktur fuer das Write-Ahead-Log mit Append- und Replay-Operationen.
 pub struct Wal {
     pub(crate) path: PathBuf,
     pub(crate) size: Arc<std::sync::atomic::AtomicU64>,

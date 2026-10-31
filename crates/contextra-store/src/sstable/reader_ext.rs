@@ -1,3 +1,7 @@
+//! # Erweiterte SSTable-Leseoperationen (Ring 1)
+//!
+//! Stellt Scanner und Hilfsiteratoren fuer Snapshot-orientierte Abfragen bereit.
+
 use super::block_search::{binary_search_index_in_block, get_entry_at_index};
 use super::reader::{parse_block_trailer, SstableReader};
 use bytes::Bytes;

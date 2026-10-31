@@ -17,6 +17,7 @@ use crate::hyperedge::{HyperEdge, HyperEdgeId};
 use crate::path_rag::PathGraph;
 
 /// Snapshot-isolated wrapper around `GraphInner` at a specific transaction sequence number (`as_of_tx`).
+// ANCHOR[contextra-graph:SRC-PATH-RAG-SNAPSHOT-001]
 pub struct SnapshotPathGraph<'a> {
     inner: &'a GraphInner,
     as_of_tx: TxId,
@@ -24,6 +25,7 @@ pub struct SnapshotPathGraph<'a> {
 
 impl<'a> SnapshotPathGraph<'a> {
     /// Creates a new `SnapshotPathGraph` borrowing `inner` at transaction `as_of_tx`.
+// ANCHOR[contextra-graph:SRC-PATH-RAG-SNAPSHOT-002]
     pub fn new(inner: &'a GraphInner, as_of_tx: TxId) -> Self {
         Self { inner, as_of_tx }
     }

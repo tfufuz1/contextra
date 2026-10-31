@@ -1,3 +1,7 @@
+//! # WAL Modultests (Ring 1)
+//!
+//! Sammelmodul fuer interne WAL-Tests.
+
 pub use super::*;
 #[cfg(feature = "encryption-at-rest")]
 use contextra_crypto::crypto::KeyManager;

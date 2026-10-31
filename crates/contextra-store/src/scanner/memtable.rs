@@ -1,3 +1,7 @@
+//! # MemTable-Scanner (Ring 1)
+//!
+//! Liest Eintraege aus MemTable-Strukturen ohne Panic-Gefahr fuer Snapshot-Suchen.
+
 // FILE-CONTEXT
 // ZWECK: Memtable-Scanner für LsmMemtable-Schicht (§12.7.4, INV-WITNESS-MINT-1).
 // INVARIANTEN: liest Roh-Einträge (inkl. Tombstones & Versionen) ohne logische Aggregation.

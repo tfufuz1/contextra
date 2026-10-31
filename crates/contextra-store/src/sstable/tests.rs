@@ -1,3 +1,7 @@
+//! # Unit-Tests fuer SSTables (Ring 1)
+//!
+//! Testet Serialisierung, Deserialisierung, Block-Caching und Filter-Korrektheit.
+
 use super::*;
 use bytes::Bytes;
 use contextra_types::ContextraError;

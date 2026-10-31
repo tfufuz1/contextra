@@ -1,3 +1,8 @@
+//! Integrationstests für die regelbasierte Entitäts- und Beziehungsextraktion.
+//!
+//! # Zweck
+//! Prüft Erkennungsgenauigkeit von Schlüsselbegriffen, Typzuweisungen und semantischen Kanten.
+
 // FILE-CONTEXT
 // ZWECK: Integrations- und Evaluationstests für die regelbasierte Entitäts- und Relations-Extraktion in contextra-graph.
 
@@ -7,6 +12,7 @@ use contextra_graph::entity_extraction::{
 };
 use contextra_types::DocId;
 
+// ANCHOR[contextra-graph:TESTS-ENTITY-EXTRACTION-TESTS-001]
 #[test]
 fn test_rule_based_entity_extractor_sample_cases() {
     let extractor = RuleBasedEntityExtractor::new(0.50);
@@ -51,6 +57,7 @@ fn test_rule_based_entity_extractor_sample_cases() {
     assert_eq!(r5[0].relation_type, "LEADS");
 }
 
+// ANCHOR[contextra-graph:TESTS-ENTITY-EXTRACTION-TESTS-002]
 #[test]
 fn test_confidence_filtering() {
     let extractor = RuleBasedEntityExtractor::new(0.82);
@@ -65,6 +72,7 @@ fn test_confidence_filtering() {
     assert_eq!(res_high.len(), 1);
 }
 
+// ANCHOR[contextra-graph:TESTS-ENTITY-EXTRACTION-TESTS-003]
 #[test]
 fn test_ingest_extracted_relations_to_graph() {
     let graph = CsrGraph::new();

@@ -8,6 +8,7 @@ mod tests {
     use super::*;
     use contextra_types::ContextraError;
 
+// ANCHOR[contextra-graph:SRC-ERROR-001]
     #[test]
     fn test_graph_mutation_error_display_and_conversion() {
         let err1 = GraphMutationError::InsufficientParticipants {

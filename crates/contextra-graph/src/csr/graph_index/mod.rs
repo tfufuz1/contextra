@@ -1,3 +1,9 @@
+// ANCHOR[contextra-graph:SRC-CSR-GRAPH-INDEX-MOD-001]
+//! Port-Implementierung des `GraphIndex`-Traits für den CSR-Graphen.
+//!
+//! # Zweck
+//! Trennt Lese- (Traversierungs-) und Schreib- (Mutations-) Methoden der Schnittstelle logisch auf.
+
 pub mod mutations;
 pub mod traversal;
 

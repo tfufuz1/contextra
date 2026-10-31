@@ -1,3 +1,10 @@
+//! # Modul: tests.rs
+//!
+//! **Zweck:** Unit-Tests für Transaktionsisolation und Commit/Rollback-Pfade.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
+
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use crate::Collection;

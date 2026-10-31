@@ -1,3 +1,10 @@
+//! # Modul: filter.rs
+//!
+//! **Zweck:** Prädikat- und Metadatenfilterung für Hybrid-Suchanfragen.
+//!
+//! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
+//! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
+
 // FILE-CONTEXT
 // ZWECK: Metadaten-Filterung und Extraktion von Kognitiven MemoryTypes (Episodic, Semantic, Working).
 // INVARIANTEN: Keine Panics bei Typ-Mismatches im Filter-Evaluation-Pfad; Rückfall auf MemoryType::Semantic.
@@ -24,6 +31,8 @@ pub fn extract_memory_type(metadata: &Option<Value>) -> MemoryType {
     note = "Use contextra_types::FilterExpr directly; conversion via TryFrom<MetadataFilter> for FilterExpr"
 )]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+// ANCHOR[contextra-engine:FLT-001]
+/// Vergleichsoperationen für Metadaten-Prädikatfilter (z. B. Gleichheit, Größer, Kleiner, Inklusion).
 pub enum FilterOp {
     /// Equal to
     Eq,
@@ -46,6 +55,8 @@ pub enum FilterOp {
 }
 
 /// Advanced metadata filter for document retrieval and search.
+// ANCHOR[contextra-engine:FLT-002]
+/// Strukturierte Filterbedingung auf Dokumentmetadaten (deprecated zugunsten von FilterExpr).
 #[deprecated(
     since = "0.1.0",
     note = "Use contextra_types::FilterExpr directly; conversion via TryFrom<MetadataFilter> for FilterExpr"
@@ -74,6 +85,8 @@ impl MetadataFilter {
         since = "0.1.0",
         note = "Use contextra_types::FilterExpr directly; conversion via TryFrom<MetadataFilter> for FilterExpr"
     )]
+    // ANCHOR[contextra-engine:FLT-003]
+    /// Prüft, ob das gegebene JSON-Metadatenobjekt die Filterbedingungen erfüllt.
     pub fn matches(&self, metadata: &Value) -> bool {
         if let Ok(expr) = FilterExpr::try_from(self.clone()) {
             expr.evaluate(metadata)
