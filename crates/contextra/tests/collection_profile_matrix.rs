@@ -10,7 +10,6 @@
 //! Compliance (mit aktivem DeletionProof) in Kombination mit `KvDeleteMode::TombstoneOnly`
 //! muss zwingend mit `CollectionProfileError::KvDeleteMismatch` abgewiesen werden.
 
-
 use contextra::collection_profile::{
     AutoExtractionMode, CollectionProfile, CollectionProfileError, LsmTuning,
 };

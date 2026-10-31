@@ -26,7 +26,6 @@
 //! - **INV-PERF-PROFILE-2**: Lizenz-Erzwingung: Profile mit erhöhtem Feature-Ring (wie `Sovereign` im Compliance-Profil)
 //!   dürfen nur instanziiert werden, wenn das hinterlegte [`LicenseGate`] die Berechtigung erteilt.
 
-
 pub use contextra_ports::license::VectorDeleteMode;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
 use contextra_store::lsm::config::{DurabilityConfigError, DurabilityMode};
@@ -133,5 +132,136 @@ impl ResolvedProfileConfig {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct MockLicenseGate {
+        allowed_ring: FeatureRing,
+    }
+
+    impl LicenseGate for MockLicenseGate {
+        fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError> {
+            if ring <= self.allowed_ring {
+                Ok(())
+            } else {
+                Err(LicenseError::InsufficientRing)
+            }
+        }
+
+        fn authorize(
+            &self,
+            ring: FeatureRing,
+        ) -> Result<contextra_ports::license::GateToken, LicenseError> {
+            self.check_ring(ring)?;
+            Ok(contextra_ports::license::GateToken::for_test(ring))
+        }
+    }
+
+    #[test]
+    fn test_performance_profile_default() {
+        assert_eq!(
+            PerformanceProfile::default(),
+            PerformanceProfile::Compliance
+        );
+    }
+
+    #[test]
+    fn test_performance_profile_resolve_values() {
+        // Compliance
+        let comp = PerformanceProfile::Compliance.resolve();
+        assert_eq!(comp.durability_mode, DurabilityMode::Full);
+        assert_eq!(comp.vector_delete_mode, VectorDeleteMode::SynchronousRepair);
+        assert!(comp.deletion_proof_active);
+        assert_eq!(comp.feature_ring, FeatureRing::Sovereign);
+
+        // Balanced
+        let bal = PerformanceProfile::Balanced.resolve();
+        assert_eq!(bal.durability_mode, DurabilityMode::WalNoHmac);
+        assert_eq!(bal.vector_delete_mode, VectorDeleteMode::BackgroundRepair);
+        assert!(!bal.deletion_proof_active);
+        assert_eq!(bal.feature_ring, FeatureRing::Fast);
+
+        // BareMetal
+        let bare = PerformanceProfile::BareMetal.resolve();
+        assert_eq!(bare.durability_mode, DurabilityMode::MemoryOnly);
+        assert_eq!(bare.vector_delete_mode, VectorDeleteMode::BackgroundRepair);
+        assert!(!bare.deletion_proof_active);
+        assert_eq!(bare.feature_ring, FeatureRing::Fast);
+    }
+
+    #[test]
+    fn test_all_resolved_presets_validate_successfully() {
+        assert!(PerformanceProfile::Compliance.resolve().validate().is_ok());
+        assert!(PerformanceProfile::Balanced.resolve().validate().is_ok());
+        assert!(PerformanceProfile::BareMetal.resolve().validate().is_ok());
+    }
+
+    #[test]
+    fn test_enforce_license_fast_ring_requires_no_gate() {
+        let bal = PerformanceProfile::Balanced.resolve();
+        let gate = MockLicenseGate {
+            allowed_ring: FeatureRing::Fast,
+        };
+        assert!(bal.enforce_license(&gate).is_ok());
+
+        let bare = PerformanceProfile::BareMetal.resolve();
+        assert!(bare.enforce_license(&gate).is_ok());
+    }
+
+    #[test]
+    fn test_enforce_license_sovereign_ring_with_fast_gate_fails() {
+        let comp = PerformanceProfile::Compliance.resolve();
+        let gate = MockLicenseGate {
+            allowed_ring: FeatureRing::Fast,
+        };
+        let res = comp.enforce_license(&gate);
+        assert!(matches!(
+            res,
+            Err(PerformanceProfileError::LicenseRequired(
+                FeatureRing::Sovereign,
+                LicenseError::InsufficientRing
+            ))
+        ));
+    }
+
+    #[test]
+    fn test_enforce_license_sovereign_ring_with_sovereign_gate_succeeds() {
+        let comp = PerformanceProfile::Compliance.resolve();
+        let gate = MockLicenseGate {
+            allowed_ring: FeatureRing::Sovereign,
+        };
+        assert!(comp.enforce_license(&gate).is_ok());
+    }
+
+    #[test]
+    fn test_durability_vector_mismatch_error() {
+        let invalid_config = ResolvedProfileConfig {
+            durability_mode: DurabilityMode::Full,
+            vector_delete_mode: VectorDeleteMode::BackgroundRepair,
+            deletion_proof_active: true,
+            feature_ring: FeatureRing::Sovereign,
+        };
+        assert_eq!(
+            invalid_config.validate(),
+            Err(PerformanceProfileError::DurabilityVectorMismatch)
+        );
+    }
+
+    #[test]
+    fn test_error_display_and_from_conversion() {
+        let mismatch_err = PerformanceProfileError::DurabilityVectorMismatch;
+        assert!(mismatch_err
+            .to_string()
+            .contains("breaks the deletion-proof guarantee"));
+
+        let lic_err = PerformanceProfileError::LicenseRequired(
+            FeatureRing::Sovereign,
+            LicenseError::InsufficientRing,
+        );
+        assert!(lic_err.to_string().contains("requires a valid license"));
     }
 }

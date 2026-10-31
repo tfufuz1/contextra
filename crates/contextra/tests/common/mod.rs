@@ -10,7 +10,6 @@
 //! - Verwendet ausschließlich die öffentliche Schnittstelle von `contextra`.
 //! - Keine direkten internen Crate-Imports aus tieferen Ringen.
 
-
 use contextra::performance_profile::PerformanceProfile;
 use contextra::{builder, Contextra, ContextraError};
 use serde_json::{json, Value};

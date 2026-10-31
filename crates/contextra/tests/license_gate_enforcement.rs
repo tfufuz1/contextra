@@ -8,14 +8,13 @@
 //! - Abwärtskompatibilität für Standard-Builds ohne explizites Performance-Profil.
 //! - Erfolgreiche Initialisierung bei autorisierendem Lizenzgate-Testdouble.
 
-
 use std::sync::Arc;
 
 use contextra::builder::ContextraBuilder;
 use contextra::performance_profile::PerformanceProfile;
-use contextra_core::error::ContextraError;
 use contextra_license::OpenFastGate;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate};
+use contextra_types::error::ContextraError;
 
 // ANCHOR[contextra:TEST-LGE-001]
 /// Test case a: Compliance profile without explicit with_license_gate fails using default OpenFastGate.

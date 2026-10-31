@@ -27,11 +27,10 @@
 //! - **INV-COLLECTION-PROFILE-2**: Alle Voreinstellungen in `DeploymentTier` müssen bei Aufruf von `resolve()`
 //!   stets valide sein (`validate().is_ok()`).
 
-
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
-pub use contextra_core::types::domain::AutoExtractionMode;
 use contextra_ports::license::LicenseGate;
 use contextra_store::kv::delete_mode::KvDeleteMode;
+pub use contextra_types::types::domain::AutoExtractionMode;
 
 // ANCHOR[contextra:PRF-001]
 /// Standardmodus für die automatische LLM-gestützte Metadaten-/Entitäten-Extraktion bei Standard-Tiers.

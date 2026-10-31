@@ -26,16 +26,15 @@
 //! - **Lizenzprüfung (Fail-Closed)**: Zugriffe auf erweiterte Ringe (z. B. Sovereign) werden über
 //!   ein [`LicenseGate`] vor dem Hochfahren autorisiert. Ungültige Lizenzen führen zum Abbruch.
 
-
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use contextra_core::error::ContextraError;
-use contextra_core::DistanceMetric;
 use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
 use contextra_license::SignedLicenseGate;
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate, OpenFastGate};
+use contextra_types::error::ContextraError;
+use contextra_types::DistanceMetric;
 use zeroize::Zeroizing;
 
 // ANCHOR[contextra:BLD-001]

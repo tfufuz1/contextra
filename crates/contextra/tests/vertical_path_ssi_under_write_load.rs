@@ -1,9 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-
 // FILE-CONTEXT
 // ZWECK: Vertikaler Pfad-Test 3 (Teil 14.3 v17), Bezug B-16: Schreiblast parallel zu einem langen offenen Snapshot darf SSI nicht beeinträchtigen oder ausfallen lassen.
 // INVARIANTEN: Greift ausschließlich über die öffentliche Facade (contextra::*) zu; Zero-Panic in Produktion; Timeout-geschützt.
-
 
 //! # Integrationstest: `vertical_path_ssi_under_write_load`
 //!

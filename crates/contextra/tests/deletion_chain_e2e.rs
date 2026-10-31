@@ -16,14 +16,13 @@
 //! 6. `test_scenario_6_fehlender_schluessel`: Abbruch vor Datensatzmutation bei fehlendem Signaturschlüssel.
 //! 7. `test_scenario_7_offener_snapshot_blockiert_purge`: MVCC-Snapshot-Isolation verhindert vorzeitiges Purgen aktiver Datenstände.
 
-
 use contextra::{builder, open_with_config, ContextraConfig};
-use contextra_core::{ContextraError, TenantId};
 use contextra_db::engine::ProofKeyProvider;
 use contextra_db::EmbeddingBackend;
 use contextra_ports::scanner::{PurgeStats, Purger, ScanTarget};
 use contextra_ports::StorageEngine;
 use contextra_types::RequestContext;
+use contextra_types::{ContextraError, TenantId};
 use serde_json::json;
 use std::fs;
 use std::path::Path;

@@ -5,9 +5,9 @@
 //! Prüft den Lebenszyklus der agentenorientierten Fassade `AgentMemory`
 //! (Speichern, Suchen, Verknüpfen, Löschen).
 
-
 use contextra::{builder, AgentMemory, TextEmbeddingEngine};
-use contextra_core::{BoxFuture, Result};
+use contextra_ports::BoxFuture;
+use contextra_types::error::Result;
 use serde_json::json;
 use std::sync::Arc;
 

@@ -15,7 +15,7 @@
 //!
 //! ## Ring-Zugehörigkeit & Abhängigkeiten
 //! - **Ring 4 (Fassade)**: Greift als Composition Root auf Teilsysteme wie `contextra-db` (Ring 3),
-//!   `contextra-core`, `contextra-types`, `contextra-ports`, `contextra-license`, `contextra-store`
+//!   `contextra-types`, `contextra-ports`, `contextra-license`, `contextra-store`
 //!   und `contextra-rank` zu.
 //! - **Keine zyklischen Abhängigkeiten**: Höhere Ringe hängen von niederen Ringen ab, nie umgekehrt.
 //! - **Eingebunden von**: `contextra-mcp` (Model Context Protocol Adapter für LLM-Agenten).
@@ -35,7 +35,6 @@
 //!   nach oben gereicht (Fail-Closed-Prinzip).
 //! - **Entkopplung**: Zeit-, Zufalls- und ID-Generierungsoperationen erfolgen deterministisch über Ports.
 
-
 #![forbid(unsafe_code)]
 
 pub mod agent_memory;
@@ -46,14 +45,14 @@ pub mod query_rewriter;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::{ContextraBuilder, ContextraConfigExt, EncryptionMode};
-pub use contextra_core::error::ContextraError;
-pub use contextra_core::types::domain::{DocId, ScoredDocument};
-pub use contextra_core::DistanceMetric;
 pub use contextra_db::{
     chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
     Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
     SearchResult, TextEmbeddingEngine,
 };
+pub use contextra_types::error::ContextraError;
+pub use contextra_types::types::domain::{DocId, ScoredDocument};
+pub use contextra_types::DistanceMetric;
 pub use query_rewriter::LlmQueryRewriter;
 
 pub use contextra_rank as rank;

@@ -10,7 +10,6 @@
 //! - Ablehnung der Nachweisverifikation mit inkorrekten HMAC-Schlüsseln.
 //! - Statische Typsicherheit (kein Issue ohne `LayerWitness`).
 
-
 use contextra_crypto::deletion_proof::{CustodyLevel, DeletionProof, ExcludedScope};
 use contextra_ports::scanner::ScanTechnique;
 use contextra_ports::SystemClock;

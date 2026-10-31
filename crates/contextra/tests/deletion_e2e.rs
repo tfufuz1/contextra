@@ -8,9 +8,8 @@
 //! - T-DEL-1: Physische Abwesenheit gelöschter Canary-Bytes auf Datenträgern nach Kompaktierung.
 //! - T-DEL-3: Verifikation eines kryptografischen Löschnachweises (DeletionProof) schlägt bei falschem Schlüssel fehl.
 
-
 use contextra::{open_with_config, ContextraConfig};
-use contextra_core::{ContextraError, TenantId};
+use contextra_types::{ContextraError, TenantId};
 use serde_json::json;
 use std::fs;
 use std::path::Path;

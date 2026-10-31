@@ -7,7 +7,6 @@
 //! (`DeploymentTier::EdgeMinimal`, `PowerUserLocal`, `EnterpriseShared`, `EnterpriseRegulated`)
 //! müssen nach der Auflösung via `.resolve()` eine intern valide Konfiguration ergeben (`validate().is_ok()`).
 
-
 use contextra::collection_profile::DeploymentTier;
 
 // ANCHOR[contextra:TEST-DTP-001]

@@ -5,10 +5,10 @@
 //! Prüft die Erstellung und Validierung n-ärer Beziehungen (Hyperedges) im Wissensgraphen
 //! über `AgentMemory::relate_n_ary`.
 
-
 use contextra::agent_memory::{MemoryId, RelationId};
 use contextra::{builder, AgentMemory, ContextraError, TextEmbeddingEngine};
-use contextra_core::{BoxFuture, Result};
+use contextra_ports::BoxFuture;
+use contextra_types::error::Result;
 use std::sync::Arc;
 
 // ANCHOR[contextra:TEST-AMH-001]

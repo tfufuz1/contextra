@@ -8,7 +8,6 @@
 //! - Explizit und implizit unverschlüsselter Modus (inkl. Warnungsausgabe im Log).
 //! - Erfolgreicher Roundtrip bei verschlüsselter Speicherung.
 
-
 use contextra::{
     builder, ContextraBuilder, ContextraConfig, ContextraConfigExt, ContextraError, EncryptionMode,
 };

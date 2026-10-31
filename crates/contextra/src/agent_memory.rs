@@ -28,10 +28,9 @@
 //! - **Wissensgraph & Hyperedges**: Unterstützt binäre Beziehungen (`relate`) sowie n-äre Hyperedges (`relate_n_ary`),
 //!   bei denen mehrere Teilnehmer jeweils an eine semantische Rolle (z. B. `author`, `reviewer`) gebunden sind.
 
-
-use contextra_core::error::ContextraError;
 use contextra_db::{Contextra, ProvenanceRecord, SearchResult};
 use contextra_ports::IdGen;
+use contextra_types::error::ContextraError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;

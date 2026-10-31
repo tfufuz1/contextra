@@ -8,7 +8,6 @@
 //! - `EnterpriseRegulated` muss aus Datenschutzgründen (Datenminimierung) standardmäßig auf `Disabled` stehen.
 //! - Alle übrigen Stufen verwenden `Enabled`.
 
-
 use contextra::collection_profile::{
     AutoExtractionMode, DeploymentTier, ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT,
 };

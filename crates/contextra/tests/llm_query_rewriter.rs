@@ -11,11 +11,10 @@
 //! - UTF-8-Zeichengrenzen bei Multi-Byte-Snippets (keine Panics).
 //! - Prompt-Injection-Isolation via `<untrusted_context>`.
 
-
 use contextra::LlmQueryRewriter;
-use contextra_core::error::ContextraError;
 use contextra_db::QueryRewriter;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_types::error::ContextraError;
 use contextra_types::ScoredEntry;
 use std::sync::{Arc, Mutex};
 
@@ -52,7 +51,7 @@ impl LlmTextGenerator for FakeGenerator {
     fn generate<'a>(
         &'a self,
         prompt: &'a str,
-    ) -> BoxFuture<'a, contextra_core::error::Result<String>> {
+    ) -> BoxFuture<'a, contextra_types::error::Result<String>> {
         let p = prompt.to_string();
         if let Ok(mut guard) = self.captured_prompt.lock() {
             *guard = Some(p);

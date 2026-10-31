@@ -7,7 +7,7 @@
 //! - Das Löschen einer Collection für Mandant A tangiert Mandant B in keiner Weise.
 
 use contextra::{open_with_config, ContextraConfig};
-use contextra_core::{ContextraError, TenantId};
+use contextra_types::{ContextraError, TenantId};
 use serde_json::json;
 use tempfile::TempDir;
 

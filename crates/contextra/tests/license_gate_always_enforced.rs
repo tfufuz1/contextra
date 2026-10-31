@@ -5,13 +5,12 @@
 //! Prüft, dass Lizenzprüfungen für privilegierte Feature-Ringe (`Sovereign`)
 //! unter allen Umständen erzwungen werden und nicht durch Standardwerte umgangen werden können.
 
-
 use contextra::builder::ContextraBuilder;
 use contextra::performance_profile::{PerformanceProfile, VectorDeleteMode};
-use contextra_core::error::ContextraError;
 use contextra_license::SignedLicenseGate;
 use contextra_ports::license::FeatureRing;
 use contextra_store::lsm::config::DurabilityMode;
+use contextra_types::error::ContextraError;
 
 // ANCHOR[contextra:TEST-LGA-001]
 // Stellt sicher, dass contextra::open ohne explizites Lizenzgate niemals die Sovereign-Rechte (DeletionProof) vergibt.
