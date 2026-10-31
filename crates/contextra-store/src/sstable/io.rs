@@ -1,3 +1,8 @@
+//! # SSTable I/O-Routinen (Ring 1)
+//!
+//! Kapselt Low-Level Datei- und Lesevorgaenge ueber `tokio::fs` und `std::fs`
+//! innerhalb von Block-Level I/O-Grenzen.
+
 pub(super) fn pread_exact(
     file: &std::fs::File,
     buf: &mut [u8],

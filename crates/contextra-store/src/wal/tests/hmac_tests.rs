@@ -1,3 +1,7 @@
+//! # Tests fuer WAL HMAC-Verkettung (Ring 1)
+//!
+//! Testet Schutz gegen Vertauschung und Modifikation von Frame-Hashes.
+
 use super::*;
 use crate::wal::KeyManager;
 use crate::wal::Wal;

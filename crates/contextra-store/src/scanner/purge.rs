@@ -1,3 +1,7 @@
+//! # Purge-Scanner (Ring 1)
+//!
+//! Identifiziert gezielt zu loeschende Schluesselbereiche ueber Speicherschichten hinweg.
+
 // FILE-CONTEXT
 // ZWECK: Physical Purger implementation für LSM-Storage-Schichten (§12.7.4, INV-WITNESS-MINT-1).
 // INVARIANTEN: Physikalische Entfernung durch Flush, Range Compaction, File Zeroing und Unlink.

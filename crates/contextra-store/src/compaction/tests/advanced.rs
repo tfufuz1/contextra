@@ -1,3 +1,7 @@
+//! # Fortgeschrittene Kompaktierungstests (Ring 1)
+//!
+//! Prueft Multi-Level Merge, Tombstone Shadows und Snapshot Pinning.
+
 use super::*;
 
 #[tokio::test(flavor = "multi_thread")]

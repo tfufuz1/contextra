@@ -1,3 +1,7 @@
+//! # Crash-Recovery des LSM-Trees (Ring 1)
+//!
+//! Stellt den letzten konsistenten Zustand durch Manifest- und WAL-Replay wieder her.
+
 use super::*;
 use crate::compaction::{CompactionEngine, MergeOperator};
 use crate::memtable::MemTable;

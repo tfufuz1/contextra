@@ -1,3 +1,7 @@
+//! # Retention & Tombstone-Bereinigung (Ring 1)
+//!
+//! Bestimmt anhand aktiver Snapshots, welche geloeschten Schluessel physisch verworfen werden duerfen.
+
 use contextra_types::TOMBSTONE_BIT;
 
 /// Filters a sequence of entries for a SINGLE key (sorted by raw sequence DESCENDING)

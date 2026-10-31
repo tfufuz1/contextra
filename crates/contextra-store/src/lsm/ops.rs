@@ -1,3 +1,7 @@
+//! # LSM-Kernoperationen (Ring 1)
+//!
+//! Buendelt Lese-, Schreib-, Wartungs- und Kompaktierungsoperationen.
+
 mod compaction;
 mod maintenance;
 pub(super) mod read;

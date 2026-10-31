@@ -1,3 +1,7 @@
+//! # Low-Level Dateisystem-I/O fuer WAL (Ring 1)
+//!
+//! Fuehrt sequentielle Appends und fsync-Befehle auf dem physischen Dateisystem durch.
+
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result, TxId};
 use std::path::{Path, PathBuf};

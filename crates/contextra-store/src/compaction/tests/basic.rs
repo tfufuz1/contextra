@@ -1,3 +1,7 @@
+//! # Grundlegende Kompaktierungstests (Ring 1)
+//!
+//! Validiert Standard-Zusammenfuehrungen zweier SSTables.
+
 use super::*;
 
 use crate::sstable::{create_block_cache, SstableBuilder};

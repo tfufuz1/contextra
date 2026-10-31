@@ -1,3 +1,7 @@
+//! # HMAC-Integritaetskette fuer WAL (Ring 1)
+//!
+//! Garantiert kryptografische Verkettung und Manipulationssicherheit der WAL-Frames.
+
 // ZWECK: Legacy HMAC key migration path, deobfuscation and integrity key status.
 
 use contextra_types::{ContextraError, Result};

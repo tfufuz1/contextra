@@ -1,3 +1,7 @@
+//! # WAL-Observer & Ereignisbeobachter (Ring 1)
+//!
+//! Informiert registrierte Beobachter ueber persistierte WAL-Eintraege.
+
 // ZWECK: WalObserver Interface, Circuit-Breaker und Bounded-Dispatcher für Fail-Open Commit-Sicherheit.
 
 use crate::wal::{WalEntry, WalOp};

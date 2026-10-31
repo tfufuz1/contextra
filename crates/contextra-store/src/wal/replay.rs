@@ -1,3 +1,7 @@
+//! # WAL Replay & Wiederherstellung (Ring 1)
+//!
+//! Rekonstruiert den Zustand der MemTable beim Hochfahren des Stores aus dem WAL.
+
 #[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result};

@@ -1,3 +1,8 @@
+//! # Mandantentrennung & Key-Codec (Ring 1)
+//!
+//! Definiert [`TenantKeyCodec`] und [`TenantScopedStorage`], um Daten strikt
+//! mandantenfaehig zu praefigieren und logisch zu isolieren.
+
 // FILE-CONTEXT
 // STAND: 2026-09-28T00:00:00Z
 // ZWECK: Multi-Tenant Key Isolation & Encoding für LSM Storage Engine

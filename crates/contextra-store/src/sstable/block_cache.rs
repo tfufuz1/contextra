@@ -1,3 +1,8 @@
+//! # Block-Cache fuer SSTable-Daten (Ring 1)
+//!
+//! Implementiert einen LRU-basierten Block-Cache fuer SSTables, um Lesezugriffe
+//! auf haeufig abgefragte Datenbloecke ohne Festplatten-I/O zu bedienen.
+
 use bytes::Bytes;
 use lru::LruCache;
 use parking_lot::RwLock;

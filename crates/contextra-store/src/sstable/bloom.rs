@@ -1,3 +1,8 @@
+//! # Bloom-Filter fuer SSTables (Ring 1)
+//!
+//! Implementiert probabilistische Filter (Split-Block Lemire / Blocked Bloom),
+//! um unnoetige Plattenzugriffe fuer nicht existente Schluessel abzuwenden.
+
 use bytes::BufMut;
 use contextra_types::{ContextraError, Result};
 
