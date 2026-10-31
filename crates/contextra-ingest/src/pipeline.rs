@@ -1,3 +1,14 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: Haupt-Pipeline für Ingestion (Format-Erkennung, Extraktion, Kanonisierung & Chunking) (WP M3).
 // INVARIANTEN: Zero-Panic, Limit-Einhaltung (max_document_bytes, max_text_bytes, max_chunks_per_document).

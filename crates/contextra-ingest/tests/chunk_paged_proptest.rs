@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `chunk_paged_proptest.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Property-basierte Tests für PagedChunker (WP-ING-14).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::panic, clippy::cast_possible_truncation)]
@@ -24,6 +30,8 @@ fn slide_locator(s: u32) -> Locator {
 }
 
 proptest! {
+// ANCHOR[contextra-ingest:TST-0316]
+// Testet die Funktionsfaehigkeit von `prop_pdf_page_invariants`.
     #[test]
     fn prop_pdf_page_invariants(
         num_pages in 1u32..20u32,
@@ -108,6 +116,8 @@ proptest! {
         }
     }
 
+// ANCHOR[contextra-ingest:TST-0317]
+// Testet die Funktionsfaehigkeit von `prop_presentation_slide_invariants`.
     #[test]
     fn prop_presentation_slide_invariants(
         num_slides in 1u32..15u32,

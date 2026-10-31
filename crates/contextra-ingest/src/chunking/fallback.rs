@@ -1,3 +1,10 @@
+//! Fallback-Chunker fuer unstrukturierte oder unbekannte Dokumentarten.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: FallbackChunker delegierend an contextra_engine::chunker::MarkdownChunker (WP M3).
 // INVARIANTEN: Monotone Suche im kanonischen Text, bei Nichtfund approximativ span_approximate=true.
@@ -15,6 +22,8 @@ use serde_json::{Map, Value};
 
 /// Fallback-Chunker, der die kanonische Textrepräsentation an den MarkdownChunker aus contextra-engine übergibt.
 #[derive(Debug, Default)]
+// ANCHOR[contextra-ingest:CHK-0212]
+// struct `FallbackChunker` fuer Fallback-Chunker fuer unstrukturierte oder unbekannte Dokumentarten.
 pub struct FallbackChunker;
 
 impl IrChunker for FallbackChunker {

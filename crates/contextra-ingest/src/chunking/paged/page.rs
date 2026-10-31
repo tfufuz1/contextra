@@ -1,3 +1,10 @@
+//! Verarbeitung einzelner Seiten und Folienabschnitte.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Seiten- und Folien-Verarbeitung für PagedChunker (WP-ING-14).
 // INVARIANTEN: Zero-Panic, Zitierbarkeit über page/slide locators, monotone Spans.
@@ -27,6 +34,8 @@ struct PageGroup {
 }
 
 /// Verarbeitet das Dokument seiten- bzw. folienbasiert.
+// ANCHOR[contextra-ingest:CHK-0220]
+// fn `process_paged_document` fuer Verarbeitung einzelner Seiten und Folienabschnitte.
 pub fn process_paged_document(
     ir: &DocumentIr,
     canon: &CanonicalText,

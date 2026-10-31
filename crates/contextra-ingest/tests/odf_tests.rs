@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `odf_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Golden- und Integrationstests für ODT, ODP und Flat-ODF Extrakte.
 // STAND: TS:2026-10-31T00:00:00Z
@@ -70,6 +76,8 @@ fn create_context<'a>(
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0381]
+// Testet die Funktionsfaehigkeit von `test_odf_heading_hierarchy_and_nested_list`.
 #[test]
 fn test_odf_heading_hierarchy_and_nested_list() {
     let content_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -143,6 +151,8 @@ fn test_odf_heading_hierarchy_and_nested_list() {
     );
 }
 
+// ANCHOR[contextra-ingest:TST-0382]
+// Testet die Funktionsfaehigkeit von `test_odf_table_column_span_and_repeated_empty_protection`.
 #[test]
 fn test_odf_table_column_span_and_repeated_empty_protection() {
     let content_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -192,6 +202,8 @@ fn test_odf_table_column_span_and_repeated_empty_protection() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0383]
+// Testet die Funktionsfaehigkeit von `test_odf_non_empty_table_cell_repeated_exceeds_budget`.
 #[test]
 fn test_odf_non_empty_table_cell_repeated_exceeds_budget() {
     let content_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -229,6 +241,8 @@ fn test_odf_non_empty_table_cell_repeated_exceeds_budget() {
     ));
 }
 
+// ANCHOR[contextra-ingest:TST-0384]
+// Testet die Funktionsfaehigkeit von `test_odf_footnotes_comments_and_tracked_deletions_policy`.
 #[test]
 fn test_odf_footnotes_comments_and_tracked_deletions_policy() {
     let content_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -299,6 +313,8 @@ fn test_odf_footnotes_comments_and_tracked_deletions_policy() {
     assert!(text_content2.contains("gelöschter Text"));
 }
 
+// ANCHOR[contextra-ingest:TST-0385]
+// Testet die Funktionsfaehigkeit von `test_odf_hidden_paragraph_prompt_injection_policy`.
 #[test]
 fn test_odf_hidden_paragraph_prompt_injection_policy() {
     let content_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -353,6 +369,8 @@ fn test_odf_hidden_paragraph_prompt_injection_policy() {
     assert!(full_text.contains("PROMPT INJECTION"));
 }
 
+// ANCHOR[contextra-ingest:TST-0386]
+// Testet die Funktionsfaehigkeit von `test_odp_presentation_title_notes_and_hidden_slide`.
 #[test]
 fn test_odp_presentation_title_notes_and_hidden_slide() {
     let content_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -423,6 +441,8 @@ fn test_odp_presentation_title_notes_and_hidden_slide() {
     assert_eq!(speaker_notes[0], "Sprechernotiz zu Folie 1");
 }
 
+// ANCHOR[contextra-ingest:TST-0387]
+// Testet die Funktionsfaehigkeit von `test_flat_odf_extraction`.
 #[test]
 fn test_flat_odf_extraction() {
     let flat_fodt = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -453,6 +473,8 @@ fn test_flat_odf_extraction() {
     assert_eq!(ir.blocks.len(), 2);
 }
 
+// ANCHOR[contextra-ingest:TST-0388]
+// Testet die Funktionsfaehigkeit von `test_encrypted_odf_returns_encrypted_error`.
 #[test]
 fn test_encrypted_odf_returns_encrypted_error() {
     let manifest_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -483,6 +505,8 @@ fn test_encrypted_odf_returns_encrypted_error() {
     assert_eq!(err, IngestError::Encrypted { format: Some(FormatId::Odt) });
 }
 
+// ANCHOR[contextra-ingest:TST-0389]
+// Testet die Funktionsfaehigkeit von `test_corrupt_xml_returns_corrupt_error`.
 #[test]
 fn test_corrupt_xml_returns_corrupt_error() {
     let zip_bytes = create_test_zip_package(

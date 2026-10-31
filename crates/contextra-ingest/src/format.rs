@@ -1,3 +1,14 @@
+//! Modul
+//!
+//! # Zweck & Architektur
+//! Komponente des  Subsystems (Ring 4 Adapter-Schicht).
+//! Stellt Parser-, Extraktions- oder Hilfsfunktionen fuer die strukturierte Dokumentverarbeitung bereit.
+//!
+//! # Invarianten
+//! - Zero-Panic: Alle Operationen sind defensiv aufgebaut.
+//! - Fail-Closed: Fehlerhafte oder unvollstaendige Daten fuehren zu typisierten Fehlern.
+//! - Kein externer I/O ueber Netzwerk oder unkontrollierte Dateisystempfade.
+
 // FILE-CONTEXT
 // ZWECK: Dokumentformat-IDs und Chunk-Strategie-Zuordnungen für contextra-ingest (WP M2).
 // INVARIANTEN: Zero-Panic, #[non_exhaustive], kleingeschriebene stabile Namen, Dateiendungs- und MIME-Zuordnung.

@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `structured_abuse_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Missbrauchs- und Proptest-Tests für strukturierte Extraktoren (P00B/WP M4).
 // INVARIANTEN: Zero-Panic, LimitExceeded bei Tiefen- und Textgrößenüberschreitungen.
@@ -33,6 +39,8 @@ fn create_ctx<'a>(
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0412]
+// Testet die Funktionsfaehigkeit von `test_json_depth_limit_exceeded`.
 #[test]
 fn test_json_depth_limit_exceeded() {
     let extractor = StructuredExtractor::new();
@@ -65,6 +73,8 @@ fn test_json_depth_limit_exceeded() {
     ));
 }
 
+// ANCHOR[contextra-ingest:TST-0413]
+// Testet die Funktionsfaehigkeit von `test_yaml_deep_nesting_limit`.
 #[test]
 fn test_yaml_deep_nesting_limit() {
     let extractor = StructuredExtractor::new();
@@ -96,6 +106,8 @@ fn test_yaml_deep_nesting_limit() {
     ));
 }
 
+// ANCHOR[contextra-ingest:TST-0414]
+// Testet die Funktionsfaehigkeit von `test_xml_billion_laughs_and_entities_discarded`.
 #[test]
 fn test_xml_billion_laughs_and_entities_discarded() {
     let extractor = StructuredExtractor::new();
@@ -120,6 +132,8 @@ fn test_xml_billion_laughs_and_entities_discarded() {
     assert!(!ir.blocks.is_empty());
 }
 
+// ANCHOR[contextra-ingest:TST-0415]
+// Testet die Funktionsfaehigkeit von `test_text_bytes_limit_exceeded`.
 #[test]
 fn test_text_bytes_limit_exceeded() {
     let extractor = StructuredExtractor::new();
@@ -149,6 +163,8 @@ fn test_text_bytes_limit_exceeded() {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(50))]
 
+// ANCHOR[contextra-ingest:TST-0416]
+// Testet die Funktionsfaehigkeit von `test_property_zero_panic_arbitrary_bytes`.
     #[test]
     fn test_property_zero_panic_arbitrary_bytes(
         fmt_idx in 0u8..5u8,

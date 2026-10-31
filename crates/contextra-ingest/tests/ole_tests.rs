@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `ole_tests.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Golden & Contract Tests für OLE Formate (Doc, Ppt, Msg) (WP M4).
 // INVARIANTEN: Zero-Panic, deterministische Extraktion, Limit- und Fehlerprüfungen.
@@ -21,6 +27,8 @@ fn create_test_context(limits: &IngestLimits) -> (ResourceBudget, ExtractorRegis
     (budget, registry)
 }
 
+// ANCHOR[contextra-ingest:TST-0390]
+// Testet die Funktionsfaehigkeit von `test_doc_golden_ansi_utf16_field_code`.
 #[test]
 fn test_doc_golden_ansi_utf16_field_code() {
     let doc_bytes = ole_support::create_minimal_doc(
@@ -66,6 +74,8 @@ fn test_doc_golden_ansi_utf16_field_code() {
     assert!(full_text.contains("DisplayResult"));
 }
 
+// ANCHOR[contextra-ingest:TST-0391]
+// Testet die Funktionsfaehigkeit von `test_ppt_golden_slides_and_notes`.
 #[test]
 fn test_ppt_golden_slides_and_notes() {
     let slides = [
@@ -125,6 +135,8 @@ fn test_ppt_golden_slides_and_notes() {
     assert!(speaker_notes[0].contains("Sprechernotiz"));
 }
 
+// ANCHOR[contextra-ingest:TST-0392]
+// Testet die Funktionsfaehigkeit von `test_msg_golden_subject_sender_body_attachment`.
 #[test]
 fn test_msg_golden_subject_sender_body_attachment() {
     let attach_doc_bytes =
@@ -188,6 +200,8 @@ fn test_msg_golden_subject_sender_body_attachment() {
     assert_eq!(attachment_boundaries[0], "bericht.doc");
 }
 
+// ANCHOR[contextra-ingest:TST-0393]
+// Testet die Funktionsfaehigkeit von `test_msg_nested_msg_attachment`.
 #[test]
 fn test_msg_nested_msg_attachment() {
     let child_msg = ole_support::create_minimal_msg(
@@ -250,6 +264,8 @@ fn test_msg_nested_msg_attachment() {
     assert!(full_text.contains("Details zur Unteraufgabe"));
 }
 
+// ANCHOR[contextra-ingest:TST-0394]
+// Testet die Funktionsfaehigkeit von `test_encrypted_doc_and_ppt_returns_encrypted_error`.
 #[test]
 fn test_encrypted_doc_and_ppt_returns_encrypted_error() {
     let encrypted_doc = ole_support::create_minimal_doc("Geheim", "", "", true);
@@ -285,6 +301,8 @@ fn test_encrypted_doc_and_ppt_returns_encrypted_error() {
     ));
 }
 
+// ANCHOR[contextra-ingest:TST-0395]
+// Testet die Funktionsfaehigkeit von `generate_fuzz_corpus_seeds`.
 #[test]
 fn generate_fuzz_corpus_seeds() {
     use std::fs;
@@ -343,6 +361,8 @@ fn generate_fuzz_corpus_seeds() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0396]
+// Testet die Funktionsfaehigkeit von `test_corrupt_cfb_returns_corrupt_error_without_panic`.
 #[test]
 fn test_corrupt_cfb_returns_corrupt_error_without_panic() {
     let corrupt_bytes = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];

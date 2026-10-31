@@ -1,3 +1,10 @@
+//! Markdown-Parser fuer Fliesstext-Segmentierung.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Eigenständiger Markdown-Blockparser mit exakten Byte-Offsets ohne Fremdabhängigkeiten (WP M3 / SPEC C-11.7).
 // INVARIANTEN: Zero-Panic, UTF-8-sicher, exakte Byte-Spans relativ zur Eingabe, Deterministisch.
@@ -8,6 +15,8 @@ use std::ops::Range;
 
 /// Klassifikation von geparsten Markdown-Blöcken.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-ingest:CHK-0221]
+// enum `ParsedBlockKind` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub enum ParsedBlockKind {
     YamlFrontMatter,
     Heading {
@@ -47,6 +56,8 @@ pub enum ParsedBlockKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-ingest:CHK-0222]
+// struct `ParsedListItem` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub struct ParsedListItem {
     pub depth: u8,
     pub ordered: bool,
@@ -55,6 +66,8 @@ pub struct ParsedListItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-ingest:CHK-0223]
+// struct `ParsedMarkdownBlock` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub struct ParsedMarkdownBlock {
     pub kind: ParsedBlockKind,
     pub text: String,
@@ -70,6 +83,8 @@ struct LineInfo<'a> {
 }
 
 /// Zerlegt einen Markdown-Text in Blöcke mit exakten Byte-Spans.
+// ANCHOR[contextra-ingest:CHK-0224]
+// fn `parse_markdown_blocks` fuer Markdown-Parser fuer Fliesstext-Segmentierung.
 pub fn parse_markdown_blocks(full_text: &str, base_offset: usize) -> Vec<ParsedMarkdownBlock> {
     if full_text.is_empty() {
         return Vec::new();

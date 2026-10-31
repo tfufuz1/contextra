@@ -1,3 +1,9 @@
+//! Integrationstest-Suite: `chunk_prose_edge_cases.rs`
+//!
+//! # Zweck & Testabdeckung
+//! Verifiziert das Verhalten, Zero-Panic-Invariante und deterministische Ausgabe
+//! von `contextra-ingest` fuer dieses Modul/Format gemaess Spezifikation.
+//!
 // FILE-CONTEXT
 // ZWECK: Randfall- und Performance-Smoke-Tests für ProseChunker (WP M3 / SPEC C-11.7).
 // STAND: TS:2026-10-31T00:00:00Z
@@ -9,6 +15,8 @@ use contextra_ingest::chunking::draft_document;
 use contextra_ingest::format::FormatId;
 use contextra_ingest::ir::{BlockKind, DocumentIr, Locator};
 
+// ANCHOR[contextra-ingest:TST-0318]
+// Testet die Funktionsfaehigkeit von `test_heading_inside_tilde_fence_is_not_heading`.
 #[test]
 fn test_heading_inside_tilde_fence_is_not_heading() {
     let md = "~~~rust\n# Heading inside fence\n~~~\n\n# Real Heading\nSome content.";
@@ -23,6 +31,8 @@ fn test_heading_inside_tilde_fence_is_not_heading() {
     assert_ne!(fence_draft.breadcrumb.as_deref(), Some("# Heading inside fence"));
 }
 
+// ANCHOR[contextra-ingest:TST-0319]
+// Testet die Funktionsfaehigkeit von `test_5000_char_paragraph_without_punctuation`.
 #[test]
 fn test_5000_char_paragraph_without_punctuation() {
     let para = "a".repeat(5000);
@@ -41,6 +51,8 @@ fn test_5000_char_paragraph_without_punctuation() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0320]
+// Testet die Funktionsfaehigkeit von `test_code_block_3000_lines`.
 #[test]
 fn test_code_block_3000_lines() {
     let mut code_lines = Vec::new();
@@ -67,6 +79,8 @@ fn test_code_block_3000_lines() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0321]
+// Testet die Funktionsfaehigkeit von `test_table_500_lines_header_repetition`.
 #[test]
 fn test_table_500_lines_header_repetition() {
     let mut table_lines = Vec::new();
@@ -93,6 +107,8 @@ fn test_table_500_lines_header_repetition() {
     }
 }
 
+// ANCHOR[contextra-ingest:TST-0322]
+// Testet die Funktionsfaehigkeit von `test_empty_ir_yields_no_drafts`.
 #[test]
 fn test_empty_ir_yields_no_drafts() {
     let ir = DocumentIr::new(FormatId::Markdown);
@@ -103,6 +119,8 @@ fn test_empty_ir_yields_no_drafts() {
     assert!(drafts.is_empty());
 }
 
+// ANCHOR[contextra-ingest:TST-0323]
+// Testet die Funktionsfaehigkeit von `test_headings_only_document`.
 #[test]
 fn test_headings_only_document() {
     let md = "# Title\n## Section 1\n### Sub 1";
@@ -116,6 +134,8 @@ fn test_headings_only_document() {
     assert!(!drafts.is_empty());
 }
 
+// ANCHOR[contextra-ingest:TST-0324]
+// Testet die Funktionsfaehigkeit von `test_performance_smoke_8mib_linear_time`.
 #[test]
 fn test_performance_smoke_8mib_linear_time() {
     let paragraph_template = "Dies ist ein typischer Performance-Smoke-Test-Absatz. Er prüft die verarbeiteten Bytes pro Sekunde.\n";

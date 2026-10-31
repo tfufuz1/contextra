@@ -1,3 +1,9 @@
+//! Fuzzing-Target: `fuzz_ole.rs`
+//!
+//! # Zweck & Invariante
+//! Ueberprueft die Zero-Panic-Invariante von `contextra-ingest` gegenueber
+//! beliebig manipulierten, bösartigen oder unerwarteten Bytefolgen via LibFuzzer.
+//!
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
@@ -14,3 +20,6 @@ fuzz_target!(|data: &[u8]| {
 
     contextra_ingest::fuzz_support::run(format, &data[1..]);
 });
+
+// ANCHOR[contextra-ingest:FUZZ-0455]
+// Fuzzing-Target-Definition fuer fuzz_ole.rs.

@@ -1,3 +1,10 @@
+//! Zentrales Chunking-Modul fuer strukturbewusste Dokumentzerlegung.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Root-Modul für Chunking-Strategien und Infrastructure (WP M3).
 // INVARIANTEN: Zero-Panic, deterministisch.
@@ -35,6 +42,8 @@ use std::ops::Range;
 
 /// Entwurf eines Chunks vor der Finalisierung.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// ANCHOR[contextra-ingest:CHK-0214]
+// struct `ChunkDraft` fuer Zentrales Chunking-Modul fuer strukturbewusste Dokumentzerlegung.
 pub struct ChunkDraft {
     pub text: String,
     pub span: Range<usize>,
@@ -45,6 +54,8 @@ pub struct ChunkDraft {
 }
 
 /// Trait für strategie-spezifische IrChunker.
+// ANCHOR[contextra-ingest:CHK-0215]
+// trait `IrChunker` fuer Zentrales Chunking-Modul fuer strukturbewusste Dokumentzerlegung.
 pub trait IrChunker: Send + Sync {
     fn strategy(&self) -> ChunkStrategy;
     fn draft(
@@ -56,6 +67,8 @@ pub trait IrChunker: Send + Sync {
 }
 
 /// Erzeugt ChunkDrafts aus einer `DocumentIr` und deren `CanonicalText`.
+// ANCHOR[contextra-ingest:CHK-0216]
+// fn `draft_document` fuer Zentrales Chunking-Modul fuer strukturbewusste Dokumentzerlegung.
 pub fn draft_document(
     ir: &DocumentIr,
     canon: &CanonicalText,
@@ -75,6 +88,8 @@ pub fn draft_document(
 }
 
 /// Erzeugt ChunkDrafts für einen Teilbereich von Blöcken einer `DocumentIr`.
+// ANCHOR[contextra-ingest:CHK-0217]
+// fn `draft_block_range` fuer Zentrales Chunking-Modul fuer strukturbewusste Dokumentzerlegung.
 pub fn draft_block_range(
     ir: &DocumentIr,
     canon: &CanonicalText,

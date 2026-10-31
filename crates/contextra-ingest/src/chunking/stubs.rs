@@ -1,3 +1,10 @@
+//! Stubs und Platzhalter fuer experimentelle Chunking-Strategien.
+//!
+//! # Zweck & Architektur
+//! Gehoert zur Segmentierungsschicht (Ring 4) in `contextra-ingest`.
+//! Zerlegt die hierarchische `DocumentIr` in semantisch zusammenhaengende,
+//! budgetierte Einheiten (Chunks) fuer Embeddings und Volltext-Indexierung.
+//!
 // FILE-CONTEXT
 // ZWECK: Stubs und Anbindung spezifischer Chunking-Strategien (WP M3/M4 / WP-ING-15).
 // INVARIANTEN: Zero-Panic, Delegierung an Strategie-Modul oder FallbackChunker.
@@ -17,6 +24,8 @@ pub mod prose_impl;
 pub use prose_impl::*;
 
 #[derive(Debug, Default)]
+// ANCHOR[contextra-ingest:CHK-0236]
+// struct `ProseChunker` fuer Stubs und Platzhalter fuer experimentelle Chunking-Strategien.
 pub struct ProseChunker;
 
 impl IrChunker for ProseChunker {
@@ -38,6 +47,8 @@ impl IrChunker for ProseChunker {
 mod tabular_impl;
 
 #[derive(Debug, Default)]
+// ANCHOR[contextra-ingest:CHK-0237]
+// struct `TabularChunker` fuer Stubs und Platzhalter fuer experimentelle Chunking-Strategien.
 pub struct TabularChunker;
 
 impl IrChunker for TabularChunker {
@@ -66,6 +77,8 @@ mod structured_impl;
 pub use structured_impl::StructuredChunker;
 
 #[derive(Debug, Default)]
+// ANCHOR[contextra-ingest:CHK-0238]
+// struct `PagedChunker` fuer Stubs und Platzhalter fuer experimentelle Chunking-Strategien.
 pub struct PagedChunker;
 
 impl IrChunker for PagedChunker {
