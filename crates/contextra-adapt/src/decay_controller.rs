@@ -6,7 +6,7 @@
 //! - query_load_inverse: AtomicU64-Zähler in LsmStorage
 //!
 //! FORMEL:
-//! T(t) = w1 * tombstone_ratio + w2 * query_load_inverse  ∈ [0,1]
+//! T(t) = w1 * tombstone_ratio + w2 * query_load_inverse  ∈ `[0, 1]`
 //! half_life_eff = half_life_base * (1 + κ * (1 − T(t)))
 //! effective_score = base_score * exp(−(ln2 / half_life_eff) * elapsed_tx)
 //!
@@ -18,9 +18,9 @@
 /// Inputs for Adaptive Decay Controller (Cache-Eviction mit Time-Weighted Decay) aus bestehenden System-Metriken.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DecaySignalInputs {
-    /// HNSW-Tombstone-Ratio ∈ [0,1]. Quelle: HnswIndex::tombstone_ratio().
+    /// HNSW-Tombstone-Ratio ∈ `[0, 1]`. Quelle: HnswIndex::tombstone_ratio().
     pub tombstone_ratio: f32,
-    /// Normalisierte inverse Query-Rate ∈ [0,1].
+    /// Normalisierte inverse Query-Rate ∈ `[0, 1]`.
     /// Berechnung: 1 - (queries_in_window / max_queries_per_window).
     /// Hoher Wert = wenig Queries = System idle = konservativer Verfall.
     pub query_load_inverse: f32,
@@ -84,7 +84,7 @@ impl AdaptiveDecayController {
         &self.config
     }
 
-    /// Berechnet aktuelle Systemtemperatur T(t) ∈ [0,1].
+    /// Berechnet aktuelle Systemtemperatur T(t) ∈ `[0, 1]`.
     #[inline]
     pub fn system_temperature(&self, inputs: &DecaySignalInputs) -> f32 {
         (inputs.w_tombstone * inputs.tombstone_ratio + inputs.w_query * inputs.query_load_inverse)
