@@ -247,6 +247,10 @@ impl StorageEngine for InMemoryStorageEngine {
                 std::ops::Bound::Unbounded => std::ops::Bound::Unbounded,
             };
 
+            if limit == Some(0) {
+                return Ok(Vec::new());
+            }
+
             let mut results = Vec::new();
             for (key, (val, _)) in data.range((start_bound, end_bound)) {
                 results.push((key.clone(), val.clone()));

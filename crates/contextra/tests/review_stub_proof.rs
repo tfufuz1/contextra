@@ -3,12 +3,20 @@
 // INVARIANTEN: Prüft, dass Löschbeweise mit Restzahlen (> 0) oder falschem Schlüssel als Err abgelehnt werden.
 // NICHT-OFFENSICHTLICH: Beinhaltet compile_fail Doctests zur Absicherung, dass keine DeletionProof-Erzeugung ohne LayerWitness möglich ist.
 
+//! # Integrationstest: `review_stub_proof`
+//!
+//! Testet Sicherheitsanforderungen der Spezifikation (T-DEL-2) an Löschnachweise:
+//! - Ablehnung von Nachweiserteilungen bei Schichtzeugen mit Restbeständen (`remaining > 0`).
+//! - Ablehnung der Nachweisverifikation mit inkorrekten HMAC-Schlüsseln.
+//! - Statische Typsicherheit (kein Issue ohne `LayerWitness`).
+
 use contextra_crypto::deletion_proof::{CustodyLevel, DeletionProof, ExcludedScope};
 use contextra_ports::scanner::ScanTechnique;
 use contextra_ports::SystemClock;
 use contextra_testkit::mint_witness_for_tests;
 use contextra_types::{RequestContext, SagaRecord, TenantId, TxId};
 
+// ANCHOR[contextra:TEST-RSP-001]
 /// T-DEL-2: Bericht/Witness mit Restbestand (remaining > 0) muss Err liefern.
 #[test]
 fn test_proof_with_remaining_items_must_fail() {
@@ -39,6 +47,7 @@ fn test_proof_with_remaining_items_must_fail() {
     );
 }
 
+// ANCHOR[contextra:TEST-RSP-002]
 /// T-DEL-2: Verifikation mit falschem Schlüssel muss Err liefern bzw. false ergeben.
 #[test]
 fn test_proof_verification_with_wrong_key_fails() {
@@ -71,6 +80,7 @@ fn test_proof_verification_with_wrong_key_fails() {
     );
 }
 
+// ANCHOR[contextra:TEST-RSP-003]
 /// T-DEL-2: Nachweis ohne Scanner-Witness darf nicht kompilieren.
 ///
 /// ```compile_fail

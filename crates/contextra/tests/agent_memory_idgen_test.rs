@@ -1,8 +1,16 @@
+//! # Integrationstest: `agent_memory_idgen_test`
+//!
+//! Überprüft die deterministische ID-Generierung über den `IdGen`-Port (`SequentialIdGen`)
+//! sowie das geordnete Verhalten des Fallback-ID-Generators bei nicht injiziertem Port.
+
 use contextra::{builder, AgentMemory, TextEmbeddingEngine};
-use contextra_core::{BoxFuture, Result};
+use contextra_ports::BoxFuture;
 use contextra_ports::SequentialIdGen;
+use contextra_types::error::Result;
 use std::sync::Arc;
 
+// ANCHOR[contextra:TEST-AMI-001]
+/// Test-Double für Vektoreinbettungen.
 struct MockEmbedder;
 
 impl TextEmbeddingEngine for MockEmbedder {
@@ -15,6 +23,8 @@ impl TextEmbeddingEngine for MockEmbedder {
     }
 }
 
+// ANCHOR[contextra:TEST-AMI-002]
+// Prüft, dass zwei unabhängig instanziierte AgentMemory-Systeme mit gleichem IdGen-Startwert identische, deterministische MemoryIds erzeugen.
 #[tokio::test]
 async fn test_agent_memory_deterministic_id_generation(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -60,6 +70,8 @@ async fn test_agent_memory_deterministic_id_generation(
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-AMI-003]
+// Verifiziert, dass bei fehlendem IdGen-Port deterministische IDs mit 'fallback-'-Präfix generiert werden und recall fehlerfrei funktioniert.
 #[tokio::test]
 async fn test_agent_memory_fallback_id_generation(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {

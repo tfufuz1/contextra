@@ -2,14 +2,21 @@
 // ZWECK: E2E-Löschtests (T-DEL-1 und T-DEL-3) für Contextra Facade (Ring 4).
 // INVARIANTEN: Nutzt ausschließlich bestehende öffentliche Schnittstellen.
 
+//! # Integrationstest: `deletion_e2e`
+//!
+//! Prüft End-to-End-Löschanforderungen der Spezifikation (T-DEL-1 und T-DEL-3):
+//! - T-DEL-1: Physische Abwesenheit gelöschter Canary-Bytes auf Datenträgern nach Kompaktierung.
+//! - T-DEL-3: Verifikation eines kryptografischen Löschnachweises (DeletionProof) schlägt bei falschem Schlüssel fehl.
+
 use contextra::{open_with_config, ContextraConfig};
-use contextra_core::{ContextraError, TenantId};
+use contextra_types::{ContextraError, TenantId};
 use serde_json::json;
 use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
-/// Helper function to recursively search a directory for a given byte slice.
+// ANCHOR[contextra:TEST-DE2-001]
+/// Rekursive Hilfsfunktion zur Zählung von Canary-Byte-Treffern in allen Dateien eines Verzeichnisses.
 fn count_canary_occurrences(dir: &Path, canary: &[u8]) -> usize {
     let mut matches = 0;
     if let Ok(entries) = fs::read_dir(dir) {
@@ -29,6 +36,7 @@ fn count_canary_occurrences(dir: &Path, canary: &[u8]) -> usize {
     matches
 }
 
+// ANCHOR[contextra:TEST-DE2-002]
 /// T-DEL-1: Schreiben, Löschen, Vollkompaktion/Flush -> Canary-Bytesuche im Datenverzeichnis erwartet 0 Treffer.
 #[tokio::test]
 async fn test_tdel_1_canary_bytes_erased_after_compaction() -> Result<(), ContextraError> {
@@ -76,6 +84,7 @@ async fn test_tdel_1_canary_bytes_erased_after_compaction() -> Result<(), Contex
     Ok(())
 }
 
+// ANCHOR[contextra:TEST-DE2-003]
 /// T-DEL-3: Verifikation eines DeletionProof mit falschem Schlüssel muss Err liefern.
 #[tokio::test]
 async fn test_tdel_3_proof_verification_fails_with_invalid_key() -> Result<(), ContextraError> {

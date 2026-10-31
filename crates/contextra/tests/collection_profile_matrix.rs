@@ -1,12 +1,23 @@
 // FILE-CONTEXT
 // ZWECK: Test matrix of PerformanceProfile x KvDeleteMode combinations (Spec B.1.8)
 
+//! # Integrationstest: `collection_profile_matrix`
+//!
+//! Validiert die vollständige Matrix aus Kombinationen von [`PerformanceProfile`]
+//! und [`KvDeleteMode`].
+//!
+//! Prüft insbesondere die Invariante INV-COLLECTION-PROFILE-1:
+//! Compliance (mit aktivem DeletionProof) in Kombination mit `KvDeleteMode::TombstoneOnly`
+//! muss zwingend mit `CollectionProfileError::KvDeleteMismatch` abgewiesen werden.
+
 use contextra::collection_profile::{
     AutoExtractionMode, CollectionProfile, CollectionProfileError, LsmTuning,
 };
 use contextra::performance_profile::PerformanceProfile;
 use contextra_store::kv::delete_mode::KvDeleteMode;
 
+// ANCHOR[contextra:TEST-CPM-001]
+// Prüft alle Permutationen von PerformanceProfile (Compliance, Balanced, BareMetal) und KvDeleteMode (TombstoneOnly, CryptoShred) auf korrekte Validierung bzw. Ablehnung bei Inkompatibilität.
 #[test]
 fn test_collection_profile_matrix() {
     let dummy_tuning = LsmTuning {

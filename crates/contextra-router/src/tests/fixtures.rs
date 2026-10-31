@@ -1,3 +1,9 @@
+//! # Gemeinsame Test-Fixtures, Mock-Provider und Hilfsstrukturen
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Gemeinsame Test-Fixtures, Mock-Provider und Hilfsstrukturen.
+
+// ANCHOR[contextra-router:TST-FIX-001]
 use crate::{RouterEngine, SlmProfile};
 use contextra_db::{Collection, ContextManager};
 use contextra_ports::clock::Clock;
