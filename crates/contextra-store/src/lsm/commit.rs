@@ -1,3 +1,7 @@
+//! # Commit-Pfade & Transaktionsabschluss (Ring 1)
+//!
+//! Verwaltet atomare Batch-Commits und Rollbacks im LSM-Speicher.
+
 use super::observer::WriteOrigin;
 use super::*;
 use crate::wal::WalEntry;

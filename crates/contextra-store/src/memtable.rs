@@ -1,3 +1,8 @@
+//! # MemTable - In-Memory Schreibpuffer (Ring 1)
+//!
+//! Verwaltet aktive Mutationen im Hauptspeicher mit sequenzbasierter
+//! Sortierung und MVCC-Unterstuetzung vor dem Schreiben auf Festplatte.
+
 // FILE-CONTEXT
 // STAND: 2026-08-30T15:00:19Z (SESSION: 283abf0f)
 // ZWECK: In-Memory BTreeMap MemTable-Sharding mit MVCC Snapshot-Isolation.

@@ -1,3 +1,7 @@
+//! # Key-Value Speicherabstraktion (Ring 1)
+//!
+//! Enthaelt Untermodule fuer Segmentierung und Loeschmodi (Tombstone vs. CryptoShredding).
+
 // FILE-CONTEXT
 // ZWECK: Key-Value Segment-Verwaltung und Löschmodi (TombstoneOnly, CryptoShred).
 // INVARIANTEN:

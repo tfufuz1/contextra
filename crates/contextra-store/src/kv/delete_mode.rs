@@ -1,3 +1,8 @@
+//! # Loeschmodi fuer Key-Value-Segmente (Ring 1)
+//!
+//! Definiert [`KvDeleteMode`], um festzulegen, ob Loeschungen ueber regulaere
+//! LSM-Tombstones oder kryptografisches Shredding (Schluesselvernichtung) erfolgen.
+
 // FILE-CONTEXT
 // ZWECK: Definition von KvDeleteMode (TombstoneOnly vs CryptoShred).
 // INVARIANTEN:

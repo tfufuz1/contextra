@@ -1,3 +1,7 @@
+//! # Manifest-Kernlogik (Ring 1)
+//!
+//! Serialisiert und deserialisiert Manifest-Eintraege fuer Dateiaustausch und Compaction.
+
 // FILE-CONTEXT
 // STAND: 2026-09-29 (S-01 / T-04)
 // ZWECK: Kernimplementierung des Manifests zum Lesen, Schreiben, Rollover und Reconstruct aktiver SSTables.
@@ -18,6 +22,8 @@ pub const MANIFEST_HEADER_MAGIC: &[u8; 4] = b"MFMN";
 pub const CURRENT_MANIFEST_VERSION: u8 = 1;
 
 /// Append-only Manifest file handle for recording active SSTable set transitions.
+// ANCHOR[contextra-store:MAN-CORE-001]
+/// Verwaltet die VersionSet-Manifestdatei zur dauerhaften Erfassung aller SSTables.
 pub struct Manifest {
     pub(super) path: PathBuf,
     pub(super) file: tokio::sync::Mutex<tokio::fs::File>,

@@ -1,3 +1,7 @@
+//! # Tests fuer WAL Replay (Ring 1)
+//!
+//! Prueft deterministisches Replay ueber Sequenzgrenzen hinweg.
+
 use super::*;
 use contextra_types::TxId;
 use tempfile::tempdir;

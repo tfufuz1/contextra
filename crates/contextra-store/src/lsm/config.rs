@@ -1,3 +1,7 @@
+//! # LSM-Konfiguration (Ring 1)
+//!
+//! Konfiguriert Schwellenwerte fuer MemTable-Groesse, Flush-Intervalle und WAL-Pfade.
+
 use crate::compaction::CompactionConfig;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

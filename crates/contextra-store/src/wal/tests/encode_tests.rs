@@ -1,3 +1,7 @@
+//! # Tests fuer WAL-Frame-Kodierung (Ring 1)
+//!
+//! Validiert Roundtrips, Framing-Grenzfaelle und Bitflips.
+
 use super::*;
 #[cfg(feature = "encryption-at-rest")]
 use crate::wal::KeyManager;

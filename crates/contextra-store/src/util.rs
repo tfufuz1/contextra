@@ -1,3 +1,8 @@
+//! # Hilfswerkzeuge fuer den Store (Ring 1)
+//!
+//! Stellt universelle Hilfsfunktionen bereit, insbesondere fuer deterministische
+//! Hashberechnungen und Byte-Konvertierungen.
+
 // FILE-CONTEXT: Utility functions for contextra-store (fsync helpers, etc.) (TS: 2026-08-29T17:17:31Z) (SESSION: 8f882f1f)
 //! Utility functions for storage engine operations.
 
@@ -14,6 +19,8 @@ pub(crate) use crate::fsync::fsync_parent_dir;
 /// Handle for exclusive database directory locking.
 #[cfg(not(loom))]
 #[derive(Debug)]
+// ANCHOR[contextra-store:ROOT-UTIL-001]
+/// Handle fuer exklusive Datenverzeichnissperre.
 pub(crate) struct DirLock {
     _file: Option<File>,
 }

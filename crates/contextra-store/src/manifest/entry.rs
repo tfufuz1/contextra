@@ -1,3 +1,7 @@
+//! # Manifest-Eintraege (Ring 1)
+//!
+//! Modelliert Hinzufuegen und Entfernen von SSTables sowie Snapshot-Zustaende.
+
 // FILE-CONTEXT
 // STAND: 2026-09-29 (S-01 / T-04)
 // ZWECK: Datenstruktur und (De-)Serialisierungslogik für SSTable-Manifest-Einträge (ManifestEntry).

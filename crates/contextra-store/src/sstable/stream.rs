@@ -1,3 +1,8 @@
+//! # SSTable Streaming-Iteratoren (Ring 1)
+//!
+//! Erlaubt das Streamen grosser Datenbereiche aus SSTables mit minimalem
+//! Speicher-Footprint.
+
 use super::reader::SstableReader;
 use bytes::Bytes;
 use contextra_types::{ContextraError, Result};

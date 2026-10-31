@@ -1,3 +1,7 @@
+//! # Lesepfad-Implementierung (Ring 1)
+//!
+//! Sucht Schluessel hierarchisch: Aktive MemTable -> Immutable MemTables -> L0..LN SSTables.
+
 use super::super::engine::LsmStorage;
 use super::super::scan::{check_in_range, SstableScanMode};
 use super::super::validate_key;

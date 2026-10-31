@@ -1,3 +1,7 @@
+//! # Kompaktierungs-Unit-Tests (Ring 1)
+//!
+//! Testsuite fuer grundlegende und fortgeschrittene Kompaktierungsszenarien.
+
 use super::*;
 use crate::sstable::{create_block_cache, BlockCache, SstableBuilder, SstableReader};
 use contextra_mvcc::SnapshotRegistry;

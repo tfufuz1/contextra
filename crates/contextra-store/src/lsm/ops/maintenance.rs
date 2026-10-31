@@ -1,3 +1,7 @@
+//! # Wartungsoperationen (Ring 1)
+//!
+//! Behandelt periodische Dateisystembereinigungen und Metadaten-Updates.
+
 use super::super::engine::LsmStorage;
 use contextra_ports::StorageStats;
 use contextra_types::{Result, TxId};
