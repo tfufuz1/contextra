@@ -1,3 +1,7 @@
+//! # Fehlerinjektion im Two-Phase-Commit
+//!
+//! Simuliert Ausfälle während der Prepare- und Commit-Phasen des zweiphasigen Commits.
+//!
 // FILE-CONTEXT: 2PC Fault-Injection Test Suite & Multi-Engine Rollback Verification
 // ZWECK: Prüft atomare 2PC-Transaktions-Kompensation und Crash-Recovery (repair_on_open) über alle 4 Sub-Engines.
 // STAND: TS:2026-08-31T22:30:00Z (SESSION: 0dcb9f3b)
@@ -30,6 +34,8 @@ pub struct FaultyStorage {
 }
 
 impl FaultyStorage {
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-01-NEW]
+    // Testet die Funktionalität von `new`.
     pub fn new(inner: Arc<LsmStorage>) -> Self {
         Self {
             inner,
@@ -43,10 +49,14 @@ impl FaultyStorage {
 }
 
 impl StorageEngine for FaultyStorage {
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-02-GET]
+    // Testet die Funktionalität von `get`.
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
         Box::pin(async move { self.inner.get(key).await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-03-GET_AT_SEQ]
+    // Testet die Funktionalität von `get_at_seq`.
     fn get_at_seq<'a>(
         &'a self,
         key: &'a [u8],
@@ -55,6 +65,8 @@ impl StorageEngine for FaultyStorage {
         Box::pin(async move { self.inner.get_at_seq(key, seq).await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-04-PUT]
+    // Testet die Funktionalität von `put`.
     fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_put_text.load(Ordering::SeqCst) && key.starts_with(b"__txt:") {
@@ -71,6 +83,8 @@ impl StorageEngine for FaultyStorage {
         })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-05-PUT_IF_ABSENT]
+    // Testet die Funktionalität von `put_if_absent`.
     fn put_if_absent<'a>(
         &'a self,
         tx_id: TxId,
@@ -92,10 +106,14 @@ impl StorageEngine for FaultyStorage {
         })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-06-DELETE]
+    // Testet die Funktionalität von `delete`.
     fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.delete(tx_id, key).await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-07-COMMIT]
+    // Testet die Funktionalität von `commit`.
     fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             if self.fail_all_commits.load(Ordering::SeqCst) {
@@ -127,38 +145,56 @@ impl StorageEngine for FaultyStorage {
         })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-08-ROLLBACK]
+    // Testet die Funktionalität von `rollback`.
     fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.rollback(tx_id).await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-09-ROLLBACK_TO_TX]
+    // Testet die Funktionalität von `rollback_to_tx`.
     fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.rollback_to_tx(tx_id).await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-10-FLUSH]
+    // Testet die Funktionalität von `flush`.
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.flush().await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-11-STATS]
+    // Testet die Funktionalität von `stats`.
     fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
         Box::pin(async move { self.inner.stats().await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-12-LAST_SEQ_NO]
+    // Testet die Funktionalität von `last_seq_no`.
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move { self.inner.last_seq_no().await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-13-LAST_TX_ID]
+    // Testet die Funktionalität von `last_tx_id`.
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
         Box::pin(async move { self.inner.last_tx_id().await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-14-PIN_CHECKPOINT]
+    // Testet die Funktionalität von `pin_checkpoint`.
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.pin_checkpoint(seq_no).await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-15-UNPIN_CHECKPOINT]
+    // Testet die Funktionalität von `unpin_checkpoint`.
     fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move { self.inner.unpin_checkpoint(seq_no).await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-16-SCAN_PREFIX]
+    // Testet die Funktionalität von `scan_prefix`.
     fn scan_prefix<'a>(
         &'a self,
         prefix: &'a [u8],
@@ -166,6 +202,8 @@ impl StorageEngine for FaultyStorage {
         Box::pin(async move { self.inner.scan_prefix(prefix).await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-17-SCAN_PREFIX_AT]
+    // Testet die Funktionalität von `scan_prefix_at`.
     fn scan_prefix_at<'a>(
         &'a self,
         prefix: &'a [u8],
@@ -174,6 +212,8 @@ impl StorageEngine for FaultyStorage {
         Box::pin(async move { self.inner.scan_prefix_at(prefix, seq_no).await })
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-18-SCAN]
+    // Testet die Funktionalität von `scan`.
     fn scan<'a>(
         &'a self,
         start: std::ops::Bound<&'a [u8]>,
@@ -192,6 +232,8 @@ pub struct FaultyVectorIndex {
 }
 
 impl FaultyVectorIndex {
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-19-NEW]
+    // Testet die Funktionalität von `new`.
     pub fn new(inner: Arc<HnswIndex>) -> Self {
         Self {
             inner,
@@ -202,6 +244,8 @@ impl FaultyVectorIndex {
 }
 
 impl VectorIndex for FaultyVectorIndex {
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-20-INSERT]
+    // Testet die Funktionalität von `insert`.
     async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {
         if self.fail_insert.load(Ordering::SeqCst) {
             return Err(ContextraError::Transaction(
@@ -211,14 +255,20 @@ impl VectorIndex for FaultyVectorIndex {
         self.inner.insert(tx, id, embedding).await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-21-SEARCH]
+    // Testet die Funktionalität von `search`.
     async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {
         self.inner.search(query, k).await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-22-SEARCH_AT]
+    // Testet die Funktionalität von `search_at`.
     async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
         self.inner.search_at(query, k, seq_no).await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-23-SEARCH_FILTERED]
+    // Testet die Funktionalität von `search_filtered`.
     async fn search_filtered(
         &self,
         query: &[f32],
@@ -228,10 +278,14 @@ impl VectorIndex for FaultyVectorIndex {
         self.inner.search_filtered(query, k, filter).await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-24-DELETE]
+    // Testet die Funktionalität von `delete`.
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
         self.inner.delete(tx, id).await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-25-COMMIT]
+    // Testet die Funktionalität von `commit`.
     async fn commit(&self, tx: TxId) -> Result<()> {
         if self.fail_commit.load(Ordering::SeqCst) {
             return Err(ContextraError::Transaction(
@@ -241,26 +295,38 @@ impl VectorIndex for FaultyVectorIndex {
         self.inner.commit(tx).await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-26-ROLLBACK]
+    // Testet die Funktionalität von `rollback`.
     async fn rollback(&self, tx: TxId) -> Result<()> {
         self.inner.rollback(tx).await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-27-ROLLBACK_TO_TX]
+    // Testet die Funktionalität von `rollback_to_tx`.
     async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
         self.inner.rollback_to_tx(tx_id).await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-28-LAST_TX_ID]
+    // Testet die Funktionalität von `last_tx_id`.
     async fn last_tx_id(&self) -> Result<TxId> {
         self.inner.last_tx_id().await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-29-LEN]
+    // Testet die Funktionalität von `len`.
     async fn len(&self) -> usize {
         self.inner.len().await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-30-STATS]
+    // Testet die Funktionalität von `stats`.
     async fn stats(&self) -> Result<VectorIndexStats> {
         self.inner.stats().await
     }
 
+    // ANCHOR[contextra-db:TEST-FAULT_INJECTION_2PC-31-ALL_DOC_IDS]
+    // Testet die Funktionalität von `all_doc_ids`.
     async fn all_doc_ids(&self) -> Result<Vec<DocId>> {
         self.inner.all_doc_ids().await
     }

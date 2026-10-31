@@ -1,3 +1,7 @@
+//! # Kaskadierende Invalidierung im Wissensgraphen
+//!
+//! Validiert die konsistente Entfernung von Kanten und Knoten bei Kaskadeninvalidierung.
+//!
 use contextra_db::Contextra;
 use contextra_graph::path_rag::PathRAGEngine;
 use contextra_ports::GraphIndex;
@@ -5,6 +9,8 @@ use contextra_types::LinkRelation;
 use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
 use tempfile::tempdir;
 
+// ANCHOR[contextra-db:TEST-CASCADE_INVALIDATION_TEST-01-TEST_E2E_SUPERSEDES_CASCADE_INVALIDATES_GRAPH_EDGES]
+// Testet die Funktionalität von `test_e2e_supersedes_cascade_invalidates_graph_edges`.
 #[tokio::test]
 async fn test_e2e_supersedes_cascade_invalidates_graph_edges() {
     let dir = tempdir().unwrap();

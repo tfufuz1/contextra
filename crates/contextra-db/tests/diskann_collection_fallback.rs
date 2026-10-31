@@ -1,3 +1,7 @@
+//! # DiskANN-Kollektions-Fallback-Tests
+//!
+//! Testet das Fallback-Verhalten bei Nichtverfügbarkeit von DiskANN-Indizes.
+//!
 // FILE-CONTEXT
 // ZWECK: Collection Integration Fallback Test (Pflichttest 3).
 // INVARIANTEN: Proves that Collection::<S, DiskAnnIndex>::query() continues returning search results (via HNSW fallback) after a simulated DiskANN rebuild failure or corruption, rather than returning Err to the caller.
@@ -14,6 +18,8 @@ use contextra_vector::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
+// ANCHOR[contextra-db:TEST-DISKANN_COLLECTION_FALLBACK-01-TEST_COLLECTION_QUERY_WITH_CORRUPTED_DISKANN_RETURNS_RESULTS_VIA_FALLBACK]
+// Testet die Funktionalität von `test_collection_query_with_corrupted_diskann_returns_results_via_fallback`.
 #[tokio::test]
 async fn test_collection_query_with_corrupted_diskann_returns_results_via_fallback() {
     let dir = tempfile::tempdir().expect("tempdir");

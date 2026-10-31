@@ -89,6 +89,8 @@ async fn test_drop_default_collection_is_rejected() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-SPRINT2_ACID_TESTS-01-TEST_DROP_COLLECTION_REMOVES_ALL_DATA]
+// Testet die Funktionalität von `test_drop_collection_removes_all_data`.
 #[tokio::test]
 async fn test_drop_collection_removes_all_data() {
     let (db, _tmp) = setup_db(3).await;
@@ -136,6 +138,8 @@ async fn test_drop_collection_removes_all_data() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-SPRINT2_ACID_TESTS-02-TEST_PARTIAL_COMPACTION_PRESERVES_TOMBSTONES]
+// Testet die Funktionalität von `test_partial_compaction_preserves_tombstones`.
 #[tokio::test]
 async fn test_partial_compaction_preserves_tombstones() {
     use contextra_store::{CompactionConfig, LsmConfig};

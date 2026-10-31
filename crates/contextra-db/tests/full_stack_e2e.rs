@@ -7,6 +7,8 @@ use contextra_db::{Contextra, ContextraConfig, DistanceMetric};
 use serde_json::json;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-FULL_STACK_E2E-01-TEST_FULL_STACK_DOCUMENT_LIFECYCLE]
+// Testet die Funktionalität von `test_full_stack_document_lifecycle`.
 #[tokio::test]
 async fn test_full_stack_document_lifecycle() {
     let tmp = TempDir::new().expect("Failed to create temp dir");

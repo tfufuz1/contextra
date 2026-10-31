@@ -1,8 +1,14 @@
+//! # Lint-Prüfung gegen pauschale Deprecated-Allows
+//!
+//! Stellt sicher, dass veraltete Schnittstellen nicht durch pauschale Lint-Ausnahmen verborgen werden.
+//!
 // FILE-CONTEXT
 // ZWECK: Automated regression guard ensuring no blanket crate-level `#![allow(deprecated)]` attribute is reintroduced.
 // INVARIANTEN: crates/contextra-db/src/lib.rs MUST NOT contain `#![allow(deprecated)]`.
 // STAND: TS:2026-09-05T00:00:00Z (SESSION: 0dcb9f3b)
 
+// ANCHOR[contextra-db:TEST-NO_BLANKET_ALLOW_DEPRECATED-01-TEST_NO_BLANKET_ALLOW_DEPRECATED_IN_LIB_RS]
+// Testet die Funktionalität von `test_no_blanket_allow_deprecated_in_lib_rs`.
 #[test]
 fn test_no_blanket_allow_deprecated_in_lib_rs() {
     let manifest_dir =

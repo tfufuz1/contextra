@@ -1,3 +1,7 @@
+//! # Temporale Filter-Integration
+//!
+//! Testet zeitbasierte Filterung von Dokumenten und Kontexten entlang von Zeitstempeln.
+//!
 use contextra_db::{Collection, DistanceMetric, Language};
 use contextra_graph::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
@@ -8,6 +12,8 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-INTEGRATION_TEMPORAL_FILTER-01-CREATE_TEST_COLLECTION]
+// Testet die Funktionalität von `create_test_collection`.
 async fn create_test_collection(name: &str) -> (Collection<LsmStorage, HnswIndex>, TempDir) {
     let dir = TempDir::new().unwrap();
     let lsm_config = LsmConfig {
@@ -35,6 +41,8 @@ async fn create_test_collection(name: &str) -> (Collection<LsmStorage, HnswIndex
     (col, dir)
 }
 
+// ANCHOR[contextra-db:TEST-INTEGRATION_TEMPORAL_FILTER-02-TEST_INTEGRATION_TEMPORAL_FILTER_VALID_UNTIL_IN_PAST]
+// Testet die Funktionalität von `test_integration_temporal_filter_valid_until_in_past`.
 #[tokio::test]
 async fn test_integration_temporal_filter_valid_until_in_past() {
     let (col, _dir) = create_test_collection("test_past").await;
@@ -68,6 +76,8 @@ async fn test_integration_temporal_filter_valid_until_in_past() {
     assert_eq!(results[0].id, "doc-valid");
 }
 
+// ANCHOR[contextra-db:TEST-INTEGRATION_TEMPORAL_FILTER-03-TEST_INTEGRATION_TEMPORAL_FILTER_FAIL_OPEN]
+// Testet die Funktionalität von `test_integration_temporal_filter_fail_open`.
 #[tokio::test]
 async fn test_integration_temporal_filter_fail_open() {
     let (col, _dir) = create_test_collection("test_fail_open").await;
@@ -100,6 +110,8 @@ async fn test_integration_temporal_filter_fail_open() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-INTEGRATION_TEMPORAL_FILTER-04-TEST_INTEGRATION_TEMPORAL_FILTER_AS_OF_SUPERSEDED_CHUNK]
+// Testet die Funktionalität von `test_integration_temporal_filter_as_of_superseded_chunk`.
 #[tokio::test]
 async fn test_integration_temporal_filter_as_of_superseded_chunk() {
     let (col, _dir) = create_test_collection("test_as_of_superseded").await;
@@ -163,6 +175,8 @@ async fn test_integration_temporal_filter_as_of_superseded_chunk() {
     );
 }
 
+// ANCHOR[contextra-db:TEST-INTEGRATION_TEMPORAL_FILTER-05-TEST_INTEGRATION_BITEMPORAL_AND_LOGIC]
+// Testet die Funktionalität von `test_integration_bitemporal_and_logic`.
 #[tokio::test]
 async fn test_integration_bitemporal_and_logic() {
     let (col, _dir) = create_test_collection("test_bitemporal_and").await;

@@ -14,6 +14,8 @@ use contextra_db::{Contextra, ContextraConfig};
 use std::sync::Arc;
 use tempfile::TempDir;
 
+// ANCHOR[contextra-db:TEST-LOOM_RELATE_N_ARY-01-CREATE_TEST_DB]
+// Testet die Funktionalität von `create_test_db`.
 async fn create_test_db() -> (Arc<Contextra>, TempDir) {
     let tmp = TempDir::new().expect("temp dir");
     let config = ContextraConfig {
@@ -27,6 +29,8 @@ async fn create_test_db() -> (Arc<Contextra>, TempDir) {
     (Arc::new(db), tmp)
 }
 
+// ANCHOR[contextra-db:TEST-LOOM_RELATE_N_ARY-02-TEST_CONCURRENT_RELATE_N_ARY_DEADLOCK_FREE_OVERLAPPING_PARTICIPANTS]
+// Testet die Funktionalität von `test_concurrent_relate_n_ary_deadlock_free_overlapping_participants`.
 #[tokio::test]
 async fn test_concurrent_relate_n_ary_deadlock_free_overlapping_participants() {
     let (db, _tmp) = create_test_db().await;

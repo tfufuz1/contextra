@@ -1,3 +1,7 @@
+//! # 128-Bit-DocId-Konsolidierung
+//!
+//! Überprüft die konsistente Handhabung von 128-Bit-Dokumenten-IDs in Konsolidierungsphasen.
+//!
 use contextra_db::memory_consolidation::compute_community_hash;
 #[cfg(feature = "volatile-vault")]
 use contextra_db::volatile_vault::{SignalModality, VaultChunk};
@@ -5,6 +9,8 @@ use contextra_types::DocId;
 #[cfg(feature = "volatile-vault")]
 use contextra_types::TxId;
 
+// ANCHOR[contextra-db:TEST-DOCID_128_CONSOLIDATION-01-TEST_VAULT_CHUNK_DOCID_TYPE]
+// Testet die Funktionalität von `test_vault_chunk_docid_type`.
 #[cfg(feature = "volatile-vault")]
 #[test]
 fn test_vault_chunk_docid_type() {
@@ -21,6 +27,8 @@ fn test_vault_chunk_docid_type() {
     }
 }
 
+// ANCHOR[contextra-db:TEST-DOCID_128_CONSOLIDATION-02-TEST_COMPUTE_COMMUNITY_HASH_DETERMINISTIC]
+// Testet die Funktionalität von `test_compute_community_hash_deterministic`.
 #[test]
 fn test_compute_community_hash_deterministic() {
     if let (Ok(doc_id_1), Ok(doc_id_2)) = (

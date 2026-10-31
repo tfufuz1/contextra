@@ -1,3 +1,7 @@
+//! # HNSW-Löschung und Reparatur
+//!
+//! Testet Graph-Reparatur und Backfill nach Entfernung von Vektoren im HNSW-Index.
+//!
 // FILE-CONTEXT: HNSW Soft-Delete Error Propagation & Search Backfill Verification
 // ZWECK: Verifiziert, dass ein Fehler beim HNSW-Delete nicht verschluckt wird und Vektorsuchen bei Tombstones durch Backfill k valide Ergebnisse liefern.
 
@@ -19,18 +23,26 @@ struct FaultyDeleteVectorIndex {
 }
 
 impl VectorIndex for FaultyDeleteVectorIndex {
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-01-INSERT]
+    // Testet die Funktionalität von `insert`.
     async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {
         self.inner.insert(tx, id, embedding).await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-02-SEARCH]
+    // Testet die Funktionalität von `search`.
     async fn search(&self, query: &[f32], k: usize) -> Result<Vec<ScoredDocument>> {
         self.inner.search(query, k).await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-03-SEARCH_AT]
+    // Testet die Funktionalität von `search_at`.
     async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
         self.inner.search_at(query, k, seq_no).await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-04-SEARCH_FILTERED]
+    // Testet die Funktionalität von `search_filtered`.
     async fn search_filtered(
         &self,
         query: &[f32],
@@ -40,6 +52,8 @@ impl VectorIndex for FaultyDeleteVectorIndex {
         self.inner.search_filtered(query, k, filter).await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-05-DELETE]
+    // Testet die Funktionalität von `delete`.
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
         if self.fail_delete.load(Ordering::SeqCst) {
             return Err(ContextraError::Transaction(
@@ -49,30 +63,44 @@ impl VectorIndex for FaultyDeleteVectorIndex {
         self.inner.delete(tx, id).await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-06-COMMIT]
+    // Testet die Funktionalität von `commit`.
     async fn commit(&self, tx: TxId) -> Result<()> {
         self.inner.commit(tx).await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-07-ROLLBACK]
+    // Testet die Funktionalität von `rollback`.
     async fn rollback(&self, tx: TxId) -> Result<()> {
         self.inner.rollback(tx).await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-08-ROLLBACK_TO_TX]
+    // Testet die Funktionalität von `rollback_to_tx`.
     async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
         self.inner.rollback_to_tx(tx_id).await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-09-LAST_TX_ID]
+    // Testet die Funktionalität von `last_tx_id`.
     async fn last_tx_id(&self) -> Result<TxId> {
         self.inner.last_tx_id().await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-10-LEN]
+    // Testet die Funktionalität von `len`.
     async fn len(&self) -> usize {
         self.inner.len().await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-11-STATS]
+    // Testet die Funktionalität von `stats`.
     async fn stats(&self) -> Result<VectorIndexStats> {
         self.inner.stats().await
     }
 
+    // ANCHOR[contextra-db:TEST-HNSW_DELETE_AND_BACKFILL-12-ALL_DOC_IDS]
+    // Testet die Funktionalität von `all_doc_ids`.
     async fn all_doc_ids(&self) -> Result<Vec<DocId>> {
         self.inner.all_doc_ids().await
     }

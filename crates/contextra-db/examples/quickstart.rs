@@ -1,22 +1,31 @@
 //! # Contextra Quickstart
 //!
-//! Demonstrates the core workflow: open a database, insert documents
-//! with embeddings and metadata, then perform semantic search.
+//! # Zweck des Beispiels
+//! Dieses Beispiel demonstriert den grundlegenden Arbeitsablauf für Junior-Entwickler:
+//! 1. Öffnen (oder Erzeugen) einer Datenbank mit konfigurierter Vektordimension.
+//! 2. Einfügen von Dokumenten mit dichten Vektoren (Embeddings) und strukturierten JSON-Metadaten.
+//! 3. Semantische Ähnlichkeitssuche mittels Kosinus-Distanz auf dem HNSW-Index.
+//! 4. Punktueller Dokumentenzugriff (Direktabfrage nach Primärschlüssel).
+//! 5. Geordnetes Schließen und Aufräumen der Datenbank.
 //!
-//! Run with: `cargo run --example quickstart`
+//! Ausführen mit: `cargo run --example quickstart`
 
 use contextra_db::{Contextra, ContextraConfig};
 
+// ANCHOR[contextra-db:EXAMPLE-QUICKSTART-001]
+/// Hauptfunktion des Schnellstart-Beispiels.
+///
+/// Zeigt Initialisierung, Dokumentenablage, Vektorsuche und sauberes Beenden.
 #[tokio::main]
 async fn main() -> contextra_types::Result<()> {
-    // 1. Open (or create) a database with 4-dimensional vectors
+    // 1. Datenbank öffnen (oder neu erzeugen) mit 4-dimensionalen Vektoren
     let config = ContextraConfig {
         dimension: 4,
         ..Default::default()
     };
     let db = Contextra::open_with_config("./example_data", config).await?;
 
-    // 2. Insert documents with embeddings and metadata
+    // 2. Dokumente mit dichten Vektoren und Metadaten einfügen
     db.insert(
         "rust-lang",
         &[1.0, 0.0, 0.0, 0.0],
@@ -38,7 +47,7 @@ async fn main() -> contextra_types::Result<()> {
     )
     .await?;
 
-    // 3. Semantic search — find the 2 most similar documents
+    // 3. Semantische Vektorsuche — die 2 ähnlichsten Dokumente finden
     let query = [0.95, 0.05, 0.0, 0.0];
     let results = db.search(&query, 2).await?;
 
@@ -50,13 +59,13 @@ async fn main() -> contextra_types::Result<()> {
         }
     }
 
-    // 4. Retrieve a specific document by key
+    // 4. Einzelnes Dokument direkt über Primärschlüssel abrufen
     if let Some(doc) = db.get("rust-lang").await? {
         println!("\n=== Direct Lookup ===");
         println!("  Found: {} {:?}", doc.id, doc.metadata);
     }
 
-    // 5. Clean up
+    // 5. Datenbank schließen und Beispieldaten auf Datenträger entfernen
     db.close().await?;
 
     // Remove example data directory
