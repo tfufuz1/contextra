@@ -1,20 +1,40 @@
+//! # Konformitätsprüfsuite für den `StorageEngine`-Port (`conformance/storage`)
+//!
+//! Dieses Modul testet die vertraglichen Zusicherungen (Contract Invariants)
+//! für Speicher-Engines des [`contextra_ports::StorageEngine`]-Ports.
+//!
+//! ## Getestete Verträge
+//! 1. **Put-Commit-Get-Delete:** Gespeicherte Werte sind nach `commit` abrufbar und nach `delete` + `commit` getilgt.
+//! 2. **Überschreiben (Overwrite):** Neuer `put` auf denselben Schlüssel überschreibt den Altwert.
+//! 3. **Lexikografische Scan-Ordnung:** `scan_prefix` und `scan` liefern Einträge strikt lexikografisch sortiert zurück.
+//! 4. **Mandanten-Präfix-Isolation (Regel 7):** Scans nach `t1:` isolieren vollständig gegen `t2:`.
+//! 5. **Große Werte (Large Values):** 1 MB große Werte werden fehlerfrei persistiert und gelesen.
+//! 6. **Grenzfälle (Edge Cases):** Leere Schlüssel (`b""`) und leere Werte (`b""`) werden korrekt unterstützt.
+//! 7. **Atomare Batches:** `put_batch`, `delete_many`, `delete_prefix` verhalten sich atomar.
+//! 8. **Transaktions-Isolation & Rollback:** Nicht bestätigte Mutationen sind unsichtbar; nach `rollback` verworfen.
+
 use super::failure::{ConformanceFailure, ConformanceResult};
 use contextra_ports::StorageEngine;
 use contextra_types::TxId;
 use std::future::Future;
 
-/// Runs the complete conformance test suite for a [`StorageEngine`] implementation.
+// ANCHOR[contextra-testkit:CONF-STORAGE-SUITE-001]
+/// Führt die vollständige Konformitätsprüfung für eine [`StorageEngine`]-Implementierung durch.
 ///
-/// # Contract Requirements Tested
-/// 1. `put` + `commit` + `get` retrieves stored value.
-/// 2. `delete` + `commit` removes stored value.
-/// 3. Overwriting key updates stored value.
-/// 4. `scan_prefix` and `scan` return items in strict lexicographical order.
-/// 5. Tenant prefix isolation (e.g., `t1:` vs `t2:` scanning).
-/// 6. Support for large values (1 MB).
-/// 7. Support for empty keys and empty values.
-/// 8. `put_batch`, `delete_many`, `delete_prefix` atomic batch behavior.
-/// 9. Uncommitted mutations are isolated (not visible before `commit`, cleared on `rollback`).
+/// **Parameter:**
+/// - `factory`: Eine Closure, die für jeden isolierten Testfall eine frische Storage-Instanz asynchron erzeugt.
+///
+/// **Ablauf:**
+/// 1. Test 1: Basis-Lebenszyklus (`put` -> `commit` -> `get` -> `delete` -> `commit` -> `get`).
+/// 2. Test 2: Überschreiben bestehender Schlüssel.
+/// 3. Test 3: Lexikografische Sortierordnung bei Präfix-Scans.
+/// 4. Test 4: Isolation von Mandanten-Präfixen (`t1:` vs `t2:`).
+/// 5. Test 5: Speichern und Lesen von 1-MB-Großwerten.
+/// 6. Test 6: Grenzfälle leerer Schlüssel und leerer Nutzdaten.
+/// 7. Test 7: Batch-Operationen (`put_batch`, `delete_many`, `delete_prefix`).
+/// 8. Test 8: Uncommitted Isolation und Transaktions-Rollback.
+///
+/// **Rückgabe:** `Ok(())` bei Vertragskonformität, andernfalls `Err(ConformanceFailure)`.
 pub async fn run_storage_engine_suite<F, Fut, S>(factory: F) -> ConformanceResult
 where
     F: Fn() -> Fut,

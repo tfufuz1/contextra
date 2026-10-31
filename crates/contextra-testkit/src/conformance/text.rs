@@ -1,15 +1,32 @@
+//! # Konformitätsprüfsuite für den `TextIndex`-Port (`conformance/text`)
+//!
+//! Dieses Modul testet die vertraglichen Zusicherungen (Contract Invariants)
+//! für Volltextindizes des [`contextra_ports::TextIndex`]-Ports.
+//!
+//! ## Getestete Verträge
+//! 1. **Indexierung & Wiederauffindbarkeit:** Eingefügte Dokumente können über Teilwörter gefunden werden.
+//! 2. **Löschung (Never retrievable):** Gelöschte und bestätigte Dokumente tauchen bei Folgesuchen nie mehr auf.
+//! 3. **Normalisierung von Umlauten und ß:** Findet "Köln" über "Köln" und "Grüße" über "grüsse".
+//! 4. **Leere Suchanfrage:** Leere Strings als Abfrage führen zu einer leeren Trefferliste ohne Fehler/Panic.
+
 use super::failure::{ConformanceFailure, ConformanceResult};
 use contextra_ports::TextIndex;
 use contextra_types::{DocId, TxId};
 use std::future::Future;
 
-/// Runs the complete conformance test suite for a [`TextIndex`] implementation.
+// ANCHOR[contextra-testkit:CONF-TEXT-SUITE-001]
+/// Führt die vollständige Konformitätsprüfung für eine [`TextIndex`]-Implementierung durch.
 ///
-/// # Contract Requirements Tested
-/// 1. Document indexing & search retrieval.
-/// 2. Deletion: once deleted and committed, document is never retrievable again.
-/// 3. German Umlaute and ß case normalization matching (e.g. "Grüße" / "Köln").
-/// 4. Empty query handling without errors or crashes.
+/// **Parameter:**
+/// - `factory`: Asynchrone Closure, die eine frische Textindex-Instanz erzeugt.
+///
+/// **Ablauf:**
+/// 1. Test 1: Dokument anlegen, committen und per Begriff suchen.
+/// 2. Test 2: Dokument löschen und Unauffindbarkeit verifizieren.
+/// 3. Test 3: Normalisierung deutscher Umlaute und `ß` prüfen.
+/// 4. Test 4: Verhalten bei leerer Suchanfrage (`""`) testen.
+///
+/// **Rückgabe:** `Ok(())` bei Vertragskonformität, andernfalls `Err(ConformanceFailure)`.
 pub async fn run_text_index_suite<F, Fut, T>(factory: F) -> ConformanceResult
 where
     F: Fn() -> Fut,

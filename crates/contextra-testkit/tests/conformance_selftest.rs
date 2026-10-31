@@ -1,3 +1,15 @@
+//! # Konformitäts-Selbsttests (`conformance_selftest`)
+//!
+//! Diese Testdatei validiert die Konformitätsprüfsuiten selbst über Mutation-Testing
+//! (Reference-Green & Mutant-Red).
+//!
+//! ## Testprinzip
+//! 1. **Referenzimplementierungen (Green):** Standard-Mocks wie `InMemoryStorageEngine`,
+//!    `InMemoryVectorIndex` etc. müssen die Suiten fehlerfrei bestehen (`assert!(res.is_ok())`).
+//! 2. **Mutanten mit bekannten Fehlern (Red):** Absichtlich fehlerhafte Implementierungen
+//!    (z. B. No-Op-Delete, nicht-monotone Clock, NaN-RNG) müssen zuverlässig abgefangen
+//!    und mit den exakten Testfall-Namen abgewiesen werden (`assert_eq!(failure.test_case, ...)`).
+
 #![allow(clippy::panic, clippy::unwrap_used)]
 
 use contextra_ports::{
@@ -16,7 +28,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 // MUTANT IMPLEMENTATIONS FOR MUTATION PROOF TESTS
 // ============================================================================
 
-/// Mutant StorageEngine where delete operations are no-ops.
+// ANCHOR[contextra-testkit:SELFTEST-MUTANT-STORE-001]
+/// Mutante StorageEngine, bei der Löschoperationen absichtlich ignoriert werden (No-Op).
 #[derive(Clone, Debug)]
 struct BuggyDeleteStorageEngine(InMemoryStorageEngine);
 
@@ -95,7 +108,8 @@ impl StorageEngine for BuggyDeleteStorageEngine {
     }
 }
 
-/// Mutant VectorIndex where delete is a no-op.
+// ANCHOR[contextra-testkit:SELFTEST-MUTANT-VECTOR-001]
+/// Mutante VectorIndex, bei dem Löschen eine No-Op ist.
 #[derive(Clone, Debug)]
 struct BuggyDeleteVectorIndex(InMemoryVectorIndex);
 
@@ -142,7 +156,8 @@ impl VectorIndex for BuggyDeleteVectorIndex {
     }
 }
 
-/// Mutant TextIndex where delete is a no-op.
+// ANCHOR[contextra-testkit:SELFTEST-MUTANT-TEXT-001]
+/// Mutante TextIndex, bei dem Löschen eine No-Op ist.
 #[derive(Clone, Debug)]
 struct BuggyDeleteTextIndex(InMemoryTextIndex);
 
@@ -185,7 +200,8 @@ impl TextIndex for BuggyDeleteTextIndex {
     }
 }
 
-/// Mutant GraphIndex where remove_edge is a no-op.
+// ANCHOR[contextra-testkit:SELFTEST-MUTANT-GRAPH-001]
+/// Mutante GraphIndex, bei dem `remove_edge` eine No-Op ist.
 #[derive(Clone, Debug)]
 struct BuggyRemoveEdgeGraphIndex(InMemoryGraphIndex);
 
@@ -245,7 +261,8 @@ impl GraphIndex for BuggyRemoveEdgeGraphIndex {
     }
 }
 
-/// Mutant Clock where time decreases on consecutive reads.
+// ANCHOR[contextra-testkit:SELFTEST-MUTANT-CLOCK-001]
+/// Mutante Uhr, deren monotone Zeit bei jedem Abruf sinkt.
 #[derive(Debug)]
 struct DecreasingClock(AtomicU64);
 
@@ -260,7 +277,8 @@ impl Clock for DecreasingClock {
     }
 }
 
-/// Mutant Rng where next_unit_f64 returns values outside [0.0, 1.0).
+// ANCHOR[contextra-testkit:SELFTEST-MUTANT-RNG-001]
+/// Mutanter RNG, dessen `next_unit_f64` Werte außerhalb von [0.0, 1.0) liefert.
 #[derive(Debug)]
 struct OutOfBoundsRng(AtomicU64);
 
@@ -279,7 +297,8 @@ impl Rng for OutOfBoundsRng {
     }
 }
 
-/// Mutant MetricsSink that panics on record_counter.
+// ANCHOR[contextra-testkit:SELFTEST-MUTANT-METRICS-001]
+/// Mutante MetricsSink, die beim Zählen absichtlich panickt.
 #[derive(Debug)]
 struct PanickingMetricsSink;
 
@@ -297,6 +316,8 @@ impl MetricsSink for PanickingMetricsSink {
 // SELF-TESTS: REFERENCE GREEN & MUTANT RED
 // ============================================================================
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-STO-GREEN-001]
+// Prüft, dass die In-Memory-Speicher-Engine alle Verträge der StorageEngine-Suite besteht.
 #[tokio::test]
 async fn test_storage_engine_conformance_reference_green() {
     let res = run_storage_engine_suite(|| async { InMemoryStorageEngine::new() }).await;
@@ -306,6 +327,8 @@ async fn test_storage_engine_conformance_reference_green() {
     );
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-STO-RED-001]
+// Prüft, dass die Mutante mit defektem Delete zuverlässig als Fehler gemeldet wird.
 #[tokio::test]
 async fn test_storage_engine_conformance_mutant_red() {
     let res = run_storage_engine_suite(|| async {
@@ -321,6 +344,8 @@ async fn test_storage_engine_conformance_mutant_red() {
     }
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-VEC-GREEN-001]
+// Prüft, dass der In-Memory-Vektorindex alle Verträge der VectorIndex-Suite besteht.
 #[tokio::test]
 async fn test_vector_index_conformance_reference_green() {
     let res = run_vector_index_suite(|| async { InMemoryVectorIndex::new(3) }).await;
@@ -330,6 +355,8 @@ async fn test_vector_index_conformance_reference_green() {
     );
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-VEC-RED-001]
+// Prüft, dass der Vektor-Mutant mit No-Op-Delete als ConformanceFailure erkannt wird.
 #[tokio::test]
 async fn test_vector_index_conformance_mutant_red() {
     let res =
@@ -344,6 +371,8 @@ async fn test_vector_index_conformance_mutant_red() {
     }
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-TXT-GREEN-001]
+// Prüft, dass der In-Memory-Textindex alle Verträge der TextIndex-Suite erfüllt.
 #[tokio::test]
 async fn test_text_index_conformance_reference_green() {
     let res = run_text_index_suite(|| async { InMemoryTextIndex::new() }).await;
@@ -353,6 +382,8 @@ async fn test_text_index_conformance_reference_green() {
     );
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-TXT-RED-001]
+// Prüft, dass der Text-Mutant mit No-Op-Delete als ConformanceFailure erkannt wird.
 #[tokio::test]
 async fn test_text_index_conformance_mutant_red() {
     let res =
@@ -366,6 +397,8 @@ async fn test_text_index_conformance_mutant_red() {
     }
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-GRP-GREEN-001]
+// Prüft, dass der In-Memory-Graphindex alle Verträge der GraphIndex-Suite erfüllt.
 #[tokio::test]
 async fn test_graph_index_conformance_reference_green() {
     let res = run_graph_index_suite(|| async { InMemoryGraphIndex::new() }).await;
@@ -375,6 +408,8 @@ async fn test_graph_index_conformance_reference_green() {
     );
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-GRP-RED-001]
+// Prüft, dass der Graph-Mutant mit fehlendem remove_edge als ConformanceFailure erkannt wird.
 #[tokio::test]
 async fn test_graph_index_conformance_mutant_red() {
     let res =
@@ -389,6 +424,8 @@ async fn test_graph_index_conformance_mutant_red() {
     }
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-CLK-GREEN-001]
+// Prüft, dass die ManualClock alle Anforderungen der Clock-Suite besteht.
 #[test]
 fn test_clock_conformance_reference_green() {
     let clock = ManualClock::new(1000);
@@ -399,6 +436,8 @@ fn test_clock_conformance_reference_green() {
     );
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-CLK-RED-001]
+// Prüft, dass eine Uhr mit rückläufiger Zeit die Suite fehlschlagen lässt.
 #[test]
 fn test_clock_conformance_mutant_red() {
     let mutant_clock = DecreasingClock(AtomicU64::new(5000));
@@ -412,6 +451,8 @@ fn test_clock_conformance_mutant_red() {
     }
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-RNG-GREEN-001]
+// Prüft, dass SeededRng alle Konformitätsprüfungen für Pseudozufall besteht.
 #[test]
 fn test_rng_conformance_reference_green() {
     let rng = SeededRng::new(12345);
@@ -419,6 +460,8 @@ fn test_rng_conformance_reference_green() {
     assert!(res.is_ok(), "SeededRng must pass rng conformance: {res:?}");
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-RNG-RED-001]
+// Prüft, dass RNGs mit Werten außerhalb von [0, 1) als fehlerhaft erkannt werden.
 #[test]
 fn test_rng_conformance_mutant_red() {
     let mutant_rng = OutOfBoundsRng(AtomicU64::new(1));
@@ -432,6 +475,8 @@ fn test_rng_conformance_mutant_red() {
     }
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-MET-GREEN-001]
+// Prüft, dass TestMetricsSink die Konformitätsprüfung für Metriksenken besteht.
 #[test]
 fn test_metrics_sink_conformance_reference_green() {
     let sink = TestMetricsSink::new();
@@ -442,6 +487,8 @@ fn test_metrics_sink_conformance_reference_green() {
     );
 }
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-MET-RED-001]
+// Prüft, dass panickende Metriksenken als ConformanceFailure mit 'record_panic' diagnostiziert werden.
 #[test]
 fn test_metrics_sink_conformance_mutant_red() {
     let panicking_sink = PanickingMetricsSink;
