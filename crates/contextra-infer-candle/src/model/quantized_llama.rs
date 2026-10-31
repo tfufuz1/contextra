@@ -4,14 +4,6 @@
 // INVARIANTEN: Zero-Panic doctrine (no .unwrap() or .expect() in production code);
 // Full access to layer-wise KV cache tensors via export_kv_state, import_kv_state, and truncate_kv_cache.
 
-use crate::kv_state::{KvState, LayerKv};
-use candle_core::quantized::{gguf_file, QMatMul, QTensor};
-use candle_core::{DType, Device, IndexOp, Tensor};
-use candle_nn::{Embedding, Module};
-use candle_transformers::quantized_nn::RmsNorm;
-use contextra_types::ContextraError;
-use std::collections::HashMap;
-
 //! Quantisierte LLaMA-Modellarchitektur mit direkter KV-Cache-Zustandsverwaltung (Spec §9.2 Stufe B).
 //!
 //! # Zweck und Einordnung
@@ -19,6 +11,14 @@ use std::collections::HashMap;
 //!   für GGUF-quantisierte LLaMA-Modelle mit nativem Export und Import von [`KvState`].
 //! - **Invariante**: Zero-Panic-Doktrin: Sämtliche Tensor-Transformationen werden mit `map_err`
 //!   in [`ContextraError`] überführt, ohne unkontrollierte Panics.
+
+use crate::kv_state::{KvState, LayerKv};
+use candle_core::quantized::{gguf_file, QMatMul, QTensor};
+use candle_core::{DType, Device, IndexOp, Tensor};
+use candle_nn::{Embedding, Module};
+use candle_transformers::quantized_nn::RmsNorm;
+use contextra_types::ContextraError;
+use std::collections::HashMap;
 
 /// Maximale Sequenzlänge für die Vorberechnung der RoPE-Drehfrequenzen (Rotary Positional Embedding).
 // ANCHOR[contextra-infer-candle:LLAMA-INTERNAL-MAX-SEQ-LEN]
