@@ -1,3 +1,9 @@
+//! # Detail-Tests für Randfälle und Fehlerbehandlung (Teil 2)
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Detail-Tests für Randfälle und Fehlerbehandlung (Teil 2).
+
+// ANCHOR[contextra-router:TST-MSC2-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
@@ -15,6 +21,8 @@ use contextra_types::TokenBudget;
 use serde_json::json;
 use std::sync::Arc;
 
+// ANCHOR[contextra-router:TST-MSC2-T01]
+// Test `test_confidence_metrics_serde`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_confidence_metrics_serde() -> Result<(), Box<dyn std::error::Error>> {
     use crate::router::ConfidenceMetrics;
@@ -62,6 +70,8 @@ fn test_confidence_metrics_serde() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T02]
+// Test `test_serde_helpers_sorted_u64_set`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_serde_helpers_sorted_u64_set() -> Result<(), Box<dyn std::error::Error>> {
     use crate::serde_helpers::sorted_u64_set;
@@ -85,6 +95,8 @@ fn test_serde_helpers_sorted_u64_set() -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T03]
+// Test `test_record_outcome_trains_calibration`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[tokio::test]
 async fn test_record_outcome_trains_calibration() {
     let dir = tempfile::tempdir().unwrap();
@@ -133,6 +145,8 @@ async fn test_record_outcome_trains_calibration() {
     );
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T04]
+// Test `test_decision_id_and_routing_outcome_methods`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_decision_id_and_routing_outcome_methods() {
     let gen1 = DecisionIdGenerator::new(0);
@@ -159,6 +173,8 @@ fn test_decision_id_and_routing_outcome_methods() {
     assert_eq!(rejected.non_conformity_score(), 1.0);
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T05]
+// Test `test_record_outcome_unknown_id_returns_false`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[tokio::test]
 async fn test_record_outcome_unknown_id_returns_false() {
     let dir = tempfile::tempdir().unwrap();
@@ -185,6 +201,8 @@ async fn test_record_outcome_unknown_id_returns_false() {
     assert!(!router.record_outcome(unknown_id, RoutingOutcome::Success));
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T06]
+// Test `test_lyapunov_drift_status_integration`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[tokio::test]
 async fn test_lyapunov_drift_status_integration() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
@@ -217,6 +235,8 @@ async fn test_lyapunov_drift_status_integration() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T07]
+// Test `test_lyapunov_observe_score_and_analyze_drift_detection`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_lyapunov_observe_score_and_analyze_drift_detection() {
     use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
@@ -264,6 +284,8 @@ fn test_lyapunov_observe_score_and_analyze_drift_detection() {
     }
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T08]
+// Test `test_lyapunov_update_empty_scores_or_uninitialized_baseline`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_lyapunov_update_empty_scores_or_uninitialized_baseline() {
     use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
@@ -286,6 +308,8 @@ fn test_lyapunov_update_empty_scores_or_uninitialized_baseline() {
     assert_eq!(res_clamped, LyapunovResult::InsufficientData);
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T09]
+// Test `test_pending_decisions_evicted_after_ttl`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[tokio::test]
 async fn test_pending_decisions_evicted_after_ttl() -> Result<(), Box<dyn std::error::Error>> {
     use crate::router::{MAX_PENDING_DECISIONS, PENDING_DECISION_TTL};
@@ -342,6 +366,8 @@ async fn test_pending_decisions_evicted_after_ttl() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T10]
+// Test `test_pending_decisions_max_capacity_enforced`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[tokio::test]
 async fn test_pending_decisions_max_capacity_enforced() -> Result<(), Box<dyn std::error::Error>> {
     use crate::router::{MAX_PENDING_DECISIONS, PENDING_DECISION_TTL};
@@ -397,6 +423,8 @@ async fn test_pending_decisions_max_capacity_enforced() -> Result<(), Box<dyn st
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T11]
+// Test `test_cascade_confidence_uses_conformal_alpha`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_cascade_confidence_uses_conformal_alpha() -> Result<(), Box<dyn std::error::Error>> {
     use crate::profile::ProfileCalibrationState;
@@ -466,6 +494,8 @@ fn test_cascade_confidence_uses_conformal_alpha() -> Result<(), Box<dyn std::err
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T12]
+// Test `test_cascade_non_conformity_score_not_zero`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_cascade_non_conformity_score_not_zero() -> Result<(), Box<dyn std::error::Error>> {
     use crate::profile::ProfileCalibrationState;
@@ -523,6 +553,8 @@ fn test_cascade_non_conformity_score_not_zero() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T13]
+// Test `test_quantization_level_default_and_try_new`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_quantization_level_default_and_try_new() {
     use crate::profile::QuantizationLevel;
@@ -570,6 +602,8 @@ fn test_quantization_level_default_and_try_new() {
     assert!(invalid_neg_score.is_err());
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T14]
+// Test `test_conformal_calibrator_empirical_rate_and_reset`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_conformal_calibrator_empirical_rate_and_reset() {
     use crate::profile::ProfileCalibrator;
@@ -589,6 +623,8 @@ fn test_conformal_calibrator_empirical_rate_and_reset() {
     assert_eq!(cal.empirical_error_rate(), 0.0);
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T15]
+// Test `test_profile_calibration_state_edge_cases`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_profile_calibration_state_edge_cases() {
     use crate::profile::ProfileCalibrationState;
@@ -611,6 +647,8 @@ fn test_profile_calibration_state_edge_cases() {
     assert_eq!(state.conformal.window_total, 0);
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T16]
+// Test `test_lyapunov_uncovered_branch_paths`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_lyapunov_uncovered_branch_paths() {
     use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
@@ -630,6 +668,8 @@ fn test_lyapunov_uncovered_branch_paths() {
     assert_eq!(res, LyapunovResult::InsufficientData);
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T17]
+// Test `test_slm_profile_nan_and_negative_validation_bounds`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_slm_profile_nan_and_negative_validation_bounds() {
     // min_relevance_score NaN validation
@@ -683,6 +723,8 @@ fn test_slm_profile_nan_and_negative_validation_bounds() {
     assert!(profile_neg_cost.validate().is_err());
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T18]
+// Test `test_overall_drift_status_aggregation`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[tokio::test]
 async fn test_overall_drift_status_aggregation() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
@@ -757,6 +799,8 @@ async fn test_overall_drift_status_aggregation() -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC2-T19]
+// Test `test_slm_profile_estimated_cost_fallback`: Prüft das erwartete Verhalten und Invarianten für detail-tests für randfälle und fehlerbehandlung (teil 2).
 #[test]
 fn test_slm_profile_estimated_cost_fallback() {
     let budget = TokenBudget::new(4096, 512);
