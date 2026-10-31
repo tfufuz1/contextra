@@ -1,3 +1,14 @@
+//! # Manipulationsschutz und Notfall-Löschung (`anti_tamper.rs`)
+//!
+//! Stellt sichere Speicherbehälter bereit, die sensibles Schlüsselmaterial vor
+//! Kaltstart-Angriffen, Speicher-Dumps und unbefugtem Auslesen schützen.
+//!
+//! ## Invarianten
+//! - Automatisches Zeroizing beim Verlassen des Gültigkeitsbereichs (`Drop`).
+//! - Manuelle Notfalllöschung (`emergency_wipe`) überschreibt Speicher deterministisch mit Nullen.
+//! - Debug-Ausgaben maskieren sensible Schlüssel (`[REDACTED]`).
+//! - Strikter Verzicht auf `unsafe`-Code.
+
 // FILE-CONTEXT
 // ZWECK: Cold-boot protection and explicit Zeroize discipline for volatile encryption keys.
 // INVARIANTEN: Key bytes held in Zeroizing<[u8; 32]>. emergency_wipe explicitly zeroizes memory.

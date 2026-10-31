@@ -1,3 +1,8 @@
+//! # Integrationstest: `audit_chain_tests.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `audit_chain_tests`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Tests for Blake3 Audit Hash Chain, Ed25519 head signature verification, crypto-shredded record commitments, and DeletionProof linkage.
 // INVARIANTEN: Tampering with any entry breaks chain verification. Shredded salt renders commitments indistinguishable under dictionary attacks. INV-DELETION-1 strictly enforced.

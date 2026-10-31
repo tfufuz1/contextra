@@ -1,3 +1,8 @@
+//! # Integrationstest: `crypto_crossimpl_python.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `crypto_crossimpl_python`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Cross-Implementation Validierung zwischen Contextra Rust Primitive-Funktionen und Python (cryptography, argon2-cffi, blake3).
 // INVARIANTEN: 200 zufällige Testfälle je Primitive mit festem Seed (42) oder konfigurierbarem ENV Seed.

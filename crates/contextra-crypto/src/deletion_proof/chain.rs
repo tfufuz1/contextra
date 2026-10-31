@@ -1,3 +1,6 @@
+//! # Verkettung von Löschbeweisen (`deletion_proof/chain.rs`)
+//!
+//! Verknüpft aufeinanderfolgende Löschbeweise zu einer manipulationssicheren Beweiskette.
 // FILE-CONTEXT
 // ZWECK: Chain verification functions for deletion proof audit trails.
 // INVARIANTEN: Any alteration, removal, insertion, reordering, or truncation is detected.

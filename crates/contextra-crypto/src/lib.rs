@@ -8,16 +8,38 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
-//! Cryptography module for Contextra.
+//! # Kryptographie-Kern für Contextra (Ring 0)
 //!
-//! # Architektur
-//! Bietet Verschlüsselung und Integritätsschutz für WAL und SSTables.
-//! Nutzt AES-256-GCM-SIV für Datenverschlüsselung und HMAC-SHA256 für Integrität.
+//! Dieses Modul bildet die kryptographische Basis des gesamten Contextra-Systems.
+//! Als Ring-0-Komponente (Kern) stellt es grundlegende Sicherheitsprimitive bereit,
+//! ohne selbst von höheren Schichten abzuhängen.
 //!
-//! # Invarianten
-//! - Pro Datei wird ein eindeutiger Schlüssel abgeleitet (Nonce-Reuse Mitigation).
-//! - Passwörter werden via HKDF in Keys expandiert.
-//! - Absolut lock-frei und frei von synchronen/asynchronen I/O-Operationen.
+//! ## Ring-Zugehörigkeit und Einbindung
+//! - **Ring:** Ring 0 (Kern / Foundation)
+//! - **Abhängigkeiten (ausgehend):** `contextra-ports`, `contextra-types`
+//! - **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`,
+//!   `contextra-infer-candle`, `contextra-kvcache`, `contextra-mcp`, `contextra-privacy`,
+//!   `contextra-store`, `contextra-vector`.
+//!
+//! ## Hauptaufgaben
+//! 1. **AEAD-Blockverschlüsselung:** Authentifizierte Verschlüsselung via AES-256-GCM-SIV
+//!    mit deterministischer Nonce-Generierung zur Verhinderung von Nonce-Wiederverwendung.
+//! 2. **Schlüsselableitung (KDF):** Schlüsselhierarchie via HKDF (HMAC-SHA256) und
+//!    Argon2id für sichere Passphrasen-Verarbeitung.
+//! 3. **WAL-Integrität:** Kryptographische Integritätsketten mittels HMAC-SHA256 für
+//!    das Write-Ahead-Log (WAL).
+//! 4. **DSGVO-Löschbeweise:** Erstellung und Verifikation kryptographisch signierter
+//!    Löschzertifikate (Ed25519, BLAKE3) nach Art. 17 DSGVO.
+//! 5. **KV-Segment-Verschlüsselung & Shredding:** Feingranulare Mandanten- und Segment-
+//!    Isolierung mit kryptographischem Shredding (Crypto-Erase).
+//!
+//! ## Invarianten
+//! - `#![forbid(unsafe_code)]`: Es gibt ausnahmslos keinen Unsafe-Code in dieser Crate.
+//! - **Zeroize-on-Drop:** Sämtliche geheimen Schlüsselmaterialien werden bei der Freigabe
+//!   deterministisch im Speicher mit Nullen überschrieben.
+//! - **I/O- und Lock-Freiheit in `src/crypto`:** Reine Kryptographie-Routinen führen keine
+//!   Dateisystem- oder Netzwerk-I/O durch.
+
 
 pub mod anti_tamper;
 pub mod audit_chain;

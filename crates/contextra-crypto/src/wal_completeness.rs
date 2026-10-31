@@ -1,3 +1,10 @@
+//! # WAL-Vollständigkeitsprüfung (`wal_completeness.rs`)
+//!
+//! Prüft, ob ein WAL-Segment lückenlos vom Start bis zum Ende erhalten ist.
+//!
+//! ## Invarianten
+//! - Gibt Fehler zurück, wenn die berechnete HMAC-Kette nicht mit dem erwarteten Endwert übereinstimmt.
+
 // FILE-CONTEXT
 // ZWECK: Verification of WAL log tail completeness against checkpoint manifest high-water-mark to detect truncation attacks.
 // INVARIANTEN: Zero-I/O, zero async, zero non-determinism, constant-time HMAC comparison (subtle::ConstantTimeEq).
@@ -33,6 +40,8 @@ use subtle::ConstantTimeEq;
 /// WAL als auch das Checkpoint-Manifest kontrolliert. Sie schützt gegen
 /// teilweise Dateitrunkierungen durch Dateisystem- oder Hardware-Fehler sowie
 /// gegen Angreifer, die nur WAL-Schreibzugriff, aber keinen Manifest-Zugriff haben.
+// ANCHOR[contextra-crypto:WAL-002]
+/// Validiert die Vollständigkeit einer WAL-HMAC-Kette über ein gesamtes Segment.
 pub fn verify_wal_chain_completeness(
     wal_tail_hmac: &[u8; 32],
     manifest_high_water_mark: &[u8; 32],

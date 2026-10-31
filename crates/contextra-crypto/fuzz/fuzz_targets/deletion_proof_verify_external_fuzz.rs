@@ -1,3 +1,6 @@
+//! # Fuzz-Target: Externe Beweisverifikation (`fuzz/deletion_proof_verify_external_fuzz.rs`)
+//!
+//! Testet Robustheit des Standalone-Prüfers gegen beliebige ungültige Eingaben.
 #![no_main]
 
 use arbitrary::Arbitrary;

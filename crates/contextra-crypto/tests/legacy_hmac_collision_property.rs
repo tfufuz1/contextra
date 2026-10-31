@@ -1,3 +1,8 @@
+//! # Integrationstest: `legacy_hmac_collision_property.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `legacy_hmac_collision_property`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Property-Test for legacy v2 HMAC length-prefixed deletion keys hashing function against collisions.
 // INVARIANTEN: Distinct key collections and distinct segmentations MUST produce non-colliding Blake3 hashes.

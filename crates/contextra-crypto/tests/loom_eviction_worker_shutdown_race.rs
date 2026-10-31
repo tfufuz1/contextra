@@ -1,3 +1,8 @@
+//! # Integrationstest: `loom_eviction_worker_shutdown_race.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `loom_eviction_worker_shutdown_race`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 #![allow(unexpected_cfgs)]
 
 //! Loom-basierter Nebenläufigkeitsbeweis für EvictionWorker Shutdown Race in `contextra-crypto`.

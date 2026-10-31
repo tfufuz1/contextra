@@ -1,3 +1,6 @@
+//! # Erzeugung von Löschbeweisen (`deletion_proof/creation.rs`)
+//!
+//! Verantwortlich für das Aggregieren der Schicht-Zeugen und die asymmetrische Signierung.
 // FILE-CONTEXT
 // ZWECK: Generation logic for cryptographic deletion proofs (v1, v2, v3, v5, WAL receipts).
 // INVARIANTEN: INV-DELETION-1: Proof creation requires verified layer sanitization witnesses.

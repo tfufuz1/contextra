@@ -1,3 +1,8 @@
+//! # Integrationstest: `campaign_cov_deletion_proof.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_cov_deletion_proof`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Campaign coverage test for DeletionProof verify_external and export_for_audit.
 // INVARIANTEN: DeletionProof V3 signatures are verified externally via Ed25519 verifying key without secret key.
