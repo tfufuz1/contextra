@@ -9,6 +9,7 @@
 use contextra_types::{DocId, TenantId, TxId};
 
 #[test]
+/// Prüft die bitweise Dekomposition und Identität eines `DocId`-Werts gegenüber einem mathematischen Orakel.
 fn test_doc_id_canonical_bit_decomposition_oracle() {
     // Oracle Source: Standard 64-bit integer bitwise decomposition math (R4)
     let raw_val: u64 = 0xDEAD_BEEF_1234_5678;
@@ -19,6 +20,7 @@ fn test_doc_id_canonical_bit_decomposition_oracle() {
 }
 
 #[test]
+/// Prüft die strikte Monotonie und totale Ordnung von Transaktions-IDs (`TxId`).
 fn test_tx_id_monotonicity_oracle() {
     // Oracle Source: Strict total ordering invariant for transaction IDs (R4)
     let tx1 = TxId::new(100);
@@ -29,6 +31,7 @@ fn test_tx_id_monotonicity_oracle() {
 }
 
 #[test]
+/// Prüft die strikte Reservierung von `TenantId(0)` für das System gemäß Spezifikation.
 fn test_tenant_id_system_reservation_oracle() -> Result<(), Box<dyn std::error::Error>> {
     // Oracle Source: System Specification invariant (TenantId(0) is reserved for SYSTEM)
     let sys_tenant = TenantId::SYSTEM;

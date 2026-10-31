@@ -1,10 +1,15 @@
 //! Semantische Retrieval-Strategie (Spec §9.5). Additiv, kein Breaking Change.
+//!
+//! # Zweck & Architektur-Rolle: Ring 0
+//!
+//! Dieses Modul definiert, welches der vier Retrieval-Signale (Vektor, Text, Graph, Recency)
+//! bzw. welche Suchkombination bei einer Wissensabfrage priorisiert oder ausgewählt wird.
+//!
+//! # Abgrenzung
 //! ACHTUNG: NICHT zu verwechseln mit `contextra_router::RoutingStrategy`
 //! (SLM-Profil-Routing, Cascade/ContextualBandit/FlowCorrectedThompson) — dieser Typ hier
-//! beschreibt, WELCHES der vier Fusionssignale (§8) ein Bandit-Arm repräsentiert.
-//!
-//! # Architektur-Rolle
-//! Ring 0 (Kern). Keine I/O- oder Asynchron-Abhängigkeiten.
+//! beschreibt, WELCHES der vier Fusionssignale (§8) ein Bandit-Arm repräsentiert oder
+//! welche Aggregationsstufe (z. B. globale Communities) abgefragt wird.
 
 use core::fmt;
 
@@ -12,6 +17,8 @@ use core::fmt;
 /// Semantische Retrieval-Strategie für Signal-Fusion (§8/§9).
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+// ANCHOR[contextra-types:RET-001]
+/// Semantische Retrieval-Strategie für Signal-Fusion (§8/§9).
 pub enum RetrievalStrategy {
     /// Vektorbasiertes semantisches Signal.
     Vector,

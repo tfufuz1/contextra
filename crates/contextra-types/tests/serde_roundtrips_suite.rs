@@ -16,6 +16,7 @@ use contextra_types::*;
 use std::sync::Arc;
 
 #[test]
+/// Prüft die JSON-Serialisierung und -Deserialisierung aller numerischen Identifikatoren.
 fn test_exhaustive_serde_json_strings_and_bytes() {
     let tenant = TenantId::try_new(999).unwrap();
     let json_t = serde_json::to_string(&tenant).unwrap();
@@ -59,6 +60,7 @@ fn test_exhaustive_serde_json_strings_and_bytes() {
 }
 
 #[test]
+/// Prüft, dass fehlerhaft formatierte JSON-Eingaben und unbekannte Enum-Werte strikt abgewiesen werden.
 fn test_serde_invalid_json_payloads_rejected() {
     // Malformed JSON strings
     assert!(serde_json::from_str::<TenantId>("invalid_num").is_err());
@@ -76,6 +78,7 @@ fn test_serde_invalid_json_payloads_rejected() {
 }
 
 #[test]
+/// Prüft die exakten Bytegrößen bei der Bincode-Binärserialisierung.
 fn test_bincode_binary_payload_sizes() {
     let tenant = TenantId::try_new(42).unwrap();
     let bytes_t = bincode::serialize(&tenant).unwrap();
@@ -104,6 +107,7 @@ fn test_bincode_binary_payload_sizes() {
 }
 
 #[test]
+/// Prüft die JSON-Serialisierung komplex geschachtelter Strukturen wie `HybridQuery` und `ContextWindow`.
 fn test_serde_complex_nested_structures() {
     let filter = FilterExpr::And(
         Box::new(FilterExpr::Eq {
@@ -167,6 +171,7 @@ fn test_serde_complex_nested_structures() {
 }
 
 #[test]
+/// Prüft die hexadezimale Serialisierung des 32-Byte-Hashes in `WorkflowState`.
 fn test_workflow_state_hex_serialization() {
     let hash = [0x12u8; 32];
     let state = WorkflowState {
@@ -183,6 +188,7 @@ fn test_workflow_state_hex_serialization() {
 }
 
 #[test]
+/// Prüft die Serialisierung von Entitäts-Attributen in einer `ahash::AHashMap`.
 fn test_entity_and_edge_attribute_maps() {
     let mut attrs = ahash::AHashMap::new();
     attrs.insert("level".to_string(), serde_json::json!(5));

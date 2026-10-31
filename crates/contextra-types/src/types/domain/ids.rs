@@ -1,8 +1,15 @@
-//! Identifikatoren (IDs) fuer Mandanten, Collections, Dokumente, Entitaeten und Transaktionen.
+//! Identifikatoren: `DocId`, `EntityId`, `TxId`, `TenantId`, `CollectionId`.
 //!
-//! # Architektur-Rolle
-//! Ring 0 (Kern). Enthaelt `TenantId`, `CollectionId`, `DocId`, `EntityId` und `TxId`.
-//! Keine I/O- oder Zeit-Abhaengigkeiten (TxId niemals ueber SystemTime!).
+//! # Architektur-Rolle: Ring 0 (Typensichere Newtypes)
+//!
+//! Alle Primärschlüssel und logischen Referenzen sind als Newtypes modelliert.
+//! Dies verhindert das versehentliche Verwechseln von Roh-Ganzzahlen (z. B. Übergabe einer `TxId`
+//! an eine Funktion, die eine `DocId` erwartet).
+//!
+//! # Invarianten
+//! - INV-TENANT-1: `TenantId(0)` ist zwingend für das System reserviert (`TenantId::SYSTEM`).
+//! - AGT-GRAPH-001: `TxId` unterscheidet strikt zwischen regulären Collection-Transaktionen
+//!   (`[1, MAX_COLLECTION_SEQUENCE]`) und internen System-Transaktionen (`[INTERNAL_BASE, u64::MAX]`).
 
 use crate::error::{ContextraError, Result};
 use serde::{Deserialize, Serialize};

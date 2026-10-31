@@ -1,8 +1,15 @@
-//! Serializable DTO representation of `ContextraError` for IPC and FFI boundaries (ADR-028).
+//! Serialisierbare DTO-Repräsentation von `ContextraError` für IPC- und FFI-Schnittstellen (ADR-028).
 //!
-//! # Architektur-Rolle
-//! Ring 0 (Kern). Serialisierbare Fehlerdaten für IPC- und FFI-Grenzen (ADR-028).
-//! Keine I/O- oder Asynchron-Laufzeiten.
+//! # Zweck & Architektur-Rolle: Ring 0
+//!
+//! Bei der Übertragung von Fehlern über FFI-Grenzen (z. B. zu Python via `contextra-py` oder
+//! Tauri/Web-Frontends via IPC) gehen bei einfachen String-Repräsentationen die Typinformationen
+//! und strukturierte Felder verloren.
+//!
+//! Dieses Modul stellt mit `ContextraErrorDto` ein Data-Transfer-Object bereit, das:
+//! - Den Fehlertyp (`kind`) als stabilen String erhält,
+//! - Die menschenlesbare Fehlermeldung (`message`) transportiert,
+//! - Spezifische Strukturdaten (`details`, z. B. Byte-Offsets oder Block-IDs) als JSON-Objekt abbildet.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T21:51:46Z (SESSION: a43b7682)
@@ -20,7 +27,7 @@ use serde::{Deserialize, Serialize};
 /// Used across IPC and API boundaries (e.g. Tauri frontend IPC) to preserve structured
 /// error kinds and optional JSON detail fields without losing error typing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:DTO-MAIN]
+// ANCHOR[contextra-types:DTO-001]
 pub struct ContextraErrorDto {
     /// Stable string identifier for the error variant (e.g. `"NotFound"`, `"PolicyViolation"`).
     pub kind: String,
@@ -90,6 +97,11 @@ impl From<&str> for ContextraErrorDto {
     }
 }
 
+// ANCHOR[contextra-types:DTO-002]
+// Ablauf der Konvertierung von &ContextraError in ContextraErrorDto:
+// 1. Jede Variante von ContextraError wird exakt gematcht.
+// 2. Einfache Fehlervarianten belegen kind und message.
+// 3. Strukturierte Fehlervarianten extrahieren Attribute in ein JSON-Objekt unter details.
 impl From<&ContextraError> for ContextraErrorDto {
     fn from(err: &ContextraError) -> Self {
         // NOTE: Strictly no catch-all `_ => ...` wildcard arm in this match expression.

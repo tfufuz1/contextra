@@ -14,6 +14,7 @@ use crate::error::ContextraError;
 use crate::types::domain::*;
 
 #[test]
+/// Prüft, dass bei ungleichen Vektordimensionen ein Fehler zurückgegeben wird.
 fn test_core_distance_dimension_mismatch() {
     let a = [1.0f32; 128];
     let b = [1.0f32; 256];
@@ -22,6 +23,7 @@ fn test_core_distance_dimension_mismatch() {
 }
 
 #[test]
+/// Prüft Dimension, L2-Norm und Einheitsnormierung inklusive Nullvektor-Sonderfall.
 fn test_embedding_norm_and_normalize() {
     let emb = Embedding::new(vec![3.0, 4.0]);
     assert_eq!(emb.dim(), 2);
@@ -38,6 +40,7 @@ fn test_embedding_norm_and_normalize() {
 }
 
 #[test]
+/// Prüft mathematische Korrektheit aller f32-Distanzmetriken an orthogonalen Einheitsvektoren.
 fn test_distance_metrics_f32() {
     let a = [1.0, 0.0];
     let b = [0.0, 1.0];
@@ -53,6 +56,7 @@ fn test_distance_metrics_f32() {
 }
 
 #[test]
+/// Prüft die u8-Distanzmetriken auf Festkomma-Skalierung und Vorzeicheninversion.
 fn test_distance_metrics_u8() {
     let a = [10, 20];
     let b = [20, 30];
@@ -136,6 +140,7 @@ fn test_distance_metrics_u8_overflow() {
 }
 
 #[test]
+/// Prüft die Rangordnungs- und Wert-Parität zwischen quantisierten u8- und f32-Berechnungen.
 fn test_u8_and_f32_distance_metrics_ranking_and_value_parity() {
     let metrics = [
         DistanceMetric::Cosine,
@@ -201,6 +206,7 @@ fn test_u8_and_f32_distance_metrics_ranking_and_value_parity() {
 }
 
 #[test]
+/// Prüft Randfälle bei leeren (0-dimensionalen) und 1-dimensionalen Vektoren.
 fn test_distance_metrics_empty_and_single_element() {
     let empty_a: [f32; 0] = [];
     let empty_b: [f32; 0] = [];
@@ -237,6 +243,7 @@ fn test_distance_metrics_empty_and_single_element() {
 }
 
 #[test]
+/// Stellt sicher, dass bei ungleicher Dimension für alle drei Metriken ein Fehler zurückgeliefert wird.
 fn test_distance_metric_dimension_mismatch() {
     let a = vec![1.0, 2.0, 3.0];
     let b = vec![1.0, 2.0];
@@ -261,6 +268,7 @@ fn test_distance_metric_dimension_mismatch() {
 }
 
 #[test]
+/// Prüft Randfälle bei der Vektornormierung (Nullvektoren, 1D-Vektoren und subnormale Zahlen).
 fn test_embedding_normalize_edge_cases() {
     let zero_emb = Embedding::new(vec![0.0, 0.0, 0.0]);
     let norm_zero = zero_emb.normalize();

@@ -1,3 +1,12 @@
+//! Kanonische `ModelFingerprint`-Definition für Contextra.
+//!
+//! # Zweck & Architektur-Rolle: Ring 0
+//!
+//! Ein Modell-Fingerabdruck sichert die Konsistenz zwischen Vektordatenbank und Inferenz-Engine ab.
+//! Wenn Vektoren mit einem Modell (z. B. Embedding-Modell oder SLM) generiert wurden, muss
+//! sichergestellt sein, dass bei nachfolgenden Abfragen oder Indexerweiterungen exakt
+//! dasselbe Modell und dieselbe Quantisierungsstufe (z. B. Q4_K_M, Q8_0) verwendet wird.
+
 // FILE-CONTEXT
 // STAND: 2026-09-12T00:00:00Z
 // ZWECK: Canonical ModelFingerprint type definition shared across workspace crates.
@@ -19,6 +28,8 @@ use serde::{Deserialize, Serialize};
 /// Dient dazu, Modellgewicht-Dateien und Quantisierungsstufen auf Systemebene
 /// unverwechselbar zuzuordnen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:MFP-001]
+/// Identifiziert eine Modelldatei und deren Quantisierungsstufe eindeutig.
 pub struct ModelFingerprint {
     /// SHA-256 hash digest over model weight blob and quantization tier string.
     pub hash: [u8; 32],

@@ -14,6 +14,7 @@
 use contextra_types::*;
 
 #[test]
+/// Prüft Konstruktion von `ContextraErrorDto` mit und ohne zusätzliche strukturierte JSON-Details.
 fn test_error_dto_new_and_with_details() {
     let dto = ContextraErrorDto::new("NotFound", "Document doc_100 not found");
     assert_eq!(dto.kind, "NotFound");
@@ -39,6 +40,7 @@ fn test_error_dto_new_and_with_details() {
 }
 
 #[test]
+/// Prüft die formatierte Text- und Debug-Ausgabe von `ContextraErrorDto`.
 fn test_error_dto_display_and_formatting() {
     let dto = ContextraErrorDto::new("InvalidInput", "Key cannot be empty");
     let disp = format!("{dto}");
@@ -50,6 +52,7 @@ fn test_error_dto_display_and_formatting() {
 }
 
 #[test]
+/// Prüft Fehlervarianten der HNSW-Graph-Löschung und deren Konvertierung in `ContextraError`.
 fn test_hnsw_deletion_error_variants() {
     let err_node = HnswDeletionError::NodeNotFound(DocId::new(42));
     assert_eq!(
@@ -79,6 +82,7 @@ fn test_hnsw_deletion_error_variants() {
 }
 
 #[test]
+/// Prüft Eigenschaften und Kompatibilität von `ManifestSchemaVersion` und `DocIdWidth`.
 fn test_manifest_schema_version_and_doc_id_width_properties() {
     let v1 = ManifestSchemaVersion::V1;
     assert_eq!(v1.as_u8(), 1);

@@ -1,7 +1,13 @@
-//! Verschiedene Domaenentypen: Graph-Elemente (Entity, Edge), WorkflowState und Konfigurationen.
+//! Wissensgraphen-Elemente (`Entity`, `Edge`), `MemoryType`, `WorkflowState` und Verfallskonstanten.
 //!
-//! # Architektur-Rolle
-//! Ring 0 (Kern). Reines In-Memory-Domaenenmodell ohne I/O.
+//! # Architektur-Rolle: Ring 0 (Wissensgraph & Gedächtnismodelle)
+//!
+//! Dieses Modul enthält Strukturen für:
+//! - `WorkflowState`: Eingefrorener Workflow-Zustand mit Transaktions- und Graph-Hash als Savepoint.
+//! - `Entity`, `Edge`, `LinkRelation`: Wissensgraphen- und Zettelkasten-Primitive (A-MEM).
+//! - `MemoryType`: Kognitive Einteilung (episodisch, semantisch, prozedural, working) mit Verfallsraten.
+//! - `PprConfig`, `TlHfdParams`: Konfigurationsparameter für Graph-Diffusionsalgorithmen (Personalized PageRank).
+//! - `ConfigFingerprint`: Bit-exakte Konfigurations-Fingerabdrücke zur Vermeidung von Score-Kalibrierungs-Drift.
 
 use crate::error::{ContextraError, Result};
 use crate::types::domain::{DocId, EntityId, TxId};
@@ -85,7 +91,7 @@ pub const MAX_SEARCH_K: usize = 1_000;
 
 /// Relationship types between Zettelkasten memory chunks (A-MEM).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-LINK-RELATION]
+// ANCHOR[contextra-types:MISC-LINK]
 pub enum LinkRelation {
     /// Target memory provides more detail or context.
     Elaborates,
@@ -99,7 +105,7 @@ pub enum LinkRelation {
 
 /// A directional link to another memory chunk in the Zettelkasten.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-MEMORY-LINK]
+// ANCHOR[contextra-types:MISC-MEMLINK]
 pub struct MemoryLink {
     /// The target document ID.
     pub target: DocId,
@@ -297,7 +303,7 @@ impl Edge {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
-// ANCHOR[contextra-types:MISC-MEMORY-TYPE]
+// ANCHOR[contextra-types:MISC-MEMTYPE]
 pub enum MemoryType {
     /// Episodisches Gedächtnis: Erlebnisse, Unterhaltungen, zeitlich verankerte Ereignisse.
     /// Retrieval: Zeitliche Nähe und Relevanz zur aktuellen Session.
@@ -375,7 +381,7 @@ impl MemoryType {
 /// Im Gegensatz dazu ist `contextra_graph::tl_hfd::params::TlHfdParams` die Graph-Engine-Spezifische
 /// Parameterstruktur in Ring 1 mit Ausführungs- und Diffusionsmatrix-Validierungen.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-TLHFD-PARAMS]
+// ANCHOR[contextra-types:MISC-TLHFD]
 pub struct TlHfdParams {
     /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
     #[serde(default = "default_tl_hfd_sigma")]
@@ -432,7 +438,7 @@ impl Default for TlHfdParams {
 /// Selection of algorithm strategy for Personalized PageRank (PPR).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-// ANCHOR[contextra-types:MISC-PPR-ALGO]
+// ANCHOR[contextra-types:MISC-PPRALG]
 pub enum PprAlgorithm {
     /// Auto heuristic dispatch based on seed count (ForwardPush for <= 100 seeds, DensePowerIteration otherwise).
     #[default]
@@ -453,7 +459,7 @@ pub enum PprAlgorithm {
 
 /// Configuration parameters for Personalized PageRank (PPR).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-PPR-CONFIG]
+// ANCHOR[contextra-types:MISC-PPRCFG]
 pub struct PprConfig {
     /// Damping factor (probability of continuing random walk vs restarting). Default: 0.85.
     pub damping_factor: f32,
@@ -497,7 +503,7 @@ impl Default for PprConfig {
 /// BEGRÜNDUNG: arXiv:2608.01460 — Coverage-Kollaps unter Konfigurations-Drift.
 /// Q4 und Q8 bei identischem model_id erzeugen unterschiedliche Score-Verteilungen.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-CONFIG-FINGERPRINT]
+// ANCHOR[contextra-types:MISC-FINGERPRINT]
 pub struct ConfigFingerprint {
     /// LLM-Modell-ID (z.B. "llama-3.2-3b-instruct")
     pub model_id: String,
@@ -566,7 +572,7 @@ impl Default for ConfigFingerprint {
 /// Mode for automatic OpenIE entity extraction during document ingestion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-// ANCHOR[contextra-types:MISC-AUTO-EXTRACTION]
+// ANCHOR[contextra-types:MISC-EXTRACTMODE]
 pub enum AutoExtractionMode {
     /// Automatic entity extraction is enabled.
     Enabled,

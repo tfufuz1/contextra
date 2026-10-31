@@ -1,11 +1,14 @@
-//! Trait and reference implementation for tombstone semantics checking in Contextra sequence logs and indexes.
+//! Trait und Referenzimplementierung für Tombstone-Semantikprüfung in Sequenzprotokollen und Indizes.
 //!
-//! # Architektur-Rolle
-//! Ring 0 (Kern). Keine I/O- oder Asynchron-Abhängigkeiten.
+//! # Zweck & Architektur-Rolle: Ring 0
 //!
-//! # Zweck
-//! Definiert das Tombstone-Bit (Bit 63 einer `u64`-Sequenznummer) und Flag-Bits (Bit 0 eines Statusbytes)
-//! zur Kennzeichnung logisch gelöschter Datensätze (Soft-Deletes) in Sequenzprotokollen und LSM-Trees.
+//! In Multi-Version Concurrency Control (MVCC) und LSM-Tree-Speichern werden Datensätze
+//! bei einer Löschung nicht physisch überschrieben, sondern mit einem Löschmarker ("Tombstone")
+//! versehen.
+//!
+//! Gemäß ADR-041 und IP-07 wird dafür das höchstwertige Bit 63 der Sequenznummer (`u64`) reserviert.
+//! Ist Bit 63 gesetzt (`TOMBSTONE_BIT`), handelt es sich um eine Soft-Deletion.
+//! Alternativ kann ein Flag-Byte mit gesetztem Bit 0 (`0x01`) als Indikator dienen.
 
 // FILE-CONTEXT
 // STAND: 2026-09-16T21:00:00Z (SESSION: IP-07)
@@ -30,6 +33,7 @@ use crate::types::TOMBSTONE_BIT;
 /// # Zero-Panic Guarantees
 /// All methods in this trait perform purely bitwise operations and infallible memory allocations,
 /// guaranteeing zero panic across all input ranges.
+// ANCHOR[contextra-types:TOMB-001]
 pub trait TombstoneSemanticsCheck {
     /// Returns `true` if the sequence number or flags indicate a soft-deleted tombstone.
     fn is_tombstone(seq: u64, flags: u8) -> bool;
@@ -44,6 +48,7 @@ pub trait TombstoneSemanticsCheck {
 /// Uses bit 63 (`TOMBSTONE_BIT = 1 << 63`) in `seq: u64` or bit 0 in `flags: u8` (`flags & 0x01 != 0`)
 /// to identify and construct tombstones.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+// ANCHOR[contextra-types:TOMB-002]
 pub struct SeqBitTombstone;
 
 impl TombstoneSemanticsCheck for SeqBitTombstone {

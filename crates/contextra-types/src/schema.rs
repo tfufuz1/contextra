@@ -1,11 +1,11 @@
-//! Schema Versioning structures and utilities for Contextra SSTable/WAL Manifest transitions (ADR-082).
+//! Schema-Versionierungsstrukturen und Hilfsfunktionen für SSTable- und WAL-Manifest-Übergänge (ADR-082).
 //!
-//! # Architektur-Rolle
-//! Ring 0 (Kern). Keine I/O- oder Asynchron-Abhängigkeiten.
+//! # Zweck & Architektur-Rolle: Ring 0
 //!
-//! # Zweck
-//! Stellt Versionsidentifikatoren für Manifestdateien von SSTables (Sorted String Tables) und
-//! WALs (Write-Ahead Logs) sowie die DocId-Bitbreite bereit.
+//! Dieses Modul definiert Typen zur Identifikation und Aushandlung von Datenformatversionen
+//! in persistenten Manifesten von SSTable (Sorted String Table) und WAL (Write-Ahead-Log).
+//! Insbesondere wird hier die Bitbreite von Dokument-Identifikatoren (`DocIdWidth`: 64 vs. 128 Bit)
+//! typensicher modelliert, um Inkompatibilitäten frühzeitig abzufangen.
 
 use crate::error::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 /// Indicates the DocId bit-width expected or produced by a schema version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
+// ANCHOR[contextra-types:SCH-001]
+/// Gibt die von einer Schemaversion erwartete oder erzeugte Bitbreite einer `DocId` an.
 pub enum DocIdWidth {
     /// 64-bit DocId format (8-byte BLAKE3 truncation).
     Bit64 = 64,
@@ -51,6 +53,8 @@ impl DocIdWidth {
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
 )]
 #[repr(u8)]
+// ANCHOR[contextra-types:SCH-002]
+/// Schema-Versionskennung für SSTable- und WAL-Manifeste.
 pub enum ManifestSchemaVersion {
     /// Schema Version 1 (v0.x legacy 64-bit DocId layout).
     #[default]

@@ -15,6 +15,7 @@ use contextra_types::importance::*;
 use contextra_types::TxId;
 
 #[test]
+/// Prüft das Klemmen extremer und ungültiger Werte (NaN, Inf, Grenzwerte) bei `ImportanceScore`.
 fn test_importance_score_clamping_boundary_cases() {
     let s_min = ImportanceScore::new(-1.0);
     assert_eq!(s_min.value(), 0.0);
@@ -36,6 +37,7 @@ fn test_importance_score_clamping_boundary_cases() {
 }
 
 #[test]
+/// Prüft, dass die Verfallsvariante `None` unabhängig von der Transaktionszeit stets den Faktor 1.0 liefert.
 fn test_decay_function_none_variant() {
     let decay = DecayFunction::None;
     let t_created = TxId::new(100);
@@ -49,6 +51,7 @@ fn test_decay_function_none_variant() {
 }
 
 #[test]
+/// Prüft den exponentiellen Verfall anhand von Transaktionsschritten.
 fn test_decay_function_exponential_variant() {
     let half_life_tx = 1000u64;
     let decay = DecayFunction::Exponential { half_life_tx };
@@ -78,6 +81,7 @@ fn test_decay_function_exponential_variant() {
 }
 
 #[test]
+/// Prüft den exponentiellen Verfall anhand von Wanduhrzeit-Sekunden.
 fn test_decay_function_wallclock_exponential() {
     let half_life_secs = 86_400u64;
 
@@ -96,6 +100,7 @@ fn test_decay_function_wallclock_exponential() {
 }
 
 #[test]
+/// Prüft die Stufenfunktion `StepFloor` vor und nach Überschreiten der Zugriffsschwelle.
 fn test_decay_function_step_floor_variant() {
     let decay = DecayFunction::StepFloor {
         access_count_floor: 10,
@@ -113,6 +118,7 @@ fn test_decay_function_step_floor_variant() {
 }
 
 #[test]
+/// Prüft die Gesamtwirkung des Verfalls auf den effektiven Wichtigkeits-Score eines Dokuments.
 fn test_memory_importance_effective_score_decay() {
     let base = ImportanceScore::new(1.0);
     let decay = DecayFunction::Exponential { half_life_tx: 2000 };

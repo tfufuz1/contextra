@@ -15,6 +15,7 @@ use contextra_types::*;
 use proptest::prelude::*;
 
 #[test]
+/// Prüft Kosinus-Distanzwerte für identische (0.0), entgegengesetzte (2.0) und orthogonale (1.0) Vektoren.
 fn test_cosine_distance_identical_and_opposite_vectors() {
     let a = vec![1.0, 2.0, 3.0, 4.0];
     let identical = vec![1.0, 2.0, 3.0, 4.0];
@@ -35,6 +36,7 @@ fn test_cosine_distance_identical_and_opposite_vectors() {
 }
 
 #[test]
+/// Prüft die euklidische Distanzberechnung und deren mathematische Symmetrie.
 fn test_euclidean_distance_properties() {
     let a = vec![0.0, 0.0, 0.0];
     let b = vec![3.0, 4.0, 0.0];
@@ -48,6 +50,7 @@ fn test_euclidean_distance_properties() {
 }
 
 #[test]
+/// Prüft die Distanzberechnung per invertiertem Skalarprodukt (-dot).
 fn test_dot_product_distance_properties() {
     let a = vec![1.0, 2.0, 3.0];
     let b = vec![4.0, 5.0, 6.0];
@@ -58,6 +61,7 @@ fn test_dot_product_distance_properties() {
 }
 
 #[test]
+/// Prüft L2-Normierung und Dimensionstreue von Vektor-Embeddings.
 fn test_embedding_normalization_invariants() {
     let v = vec![1.0, 1.0, 1.0, 1.0];
     let emb = Embedding::new(v.clone());
@@ -73,6 +77,7 @@ fn test_embedding_normalization_invariants() {
 }
 
 #[test]
+/// Stellt sicher, dass nicht-endliche Werte (NaN, Inf) bei allen Distanzmetriken abgewiesen werden.
 fn test_distance_metrics_non_finite_inputs_rejected() {
     let normal = vec![1.0, 2.0];
     let nan_vec = vec![f32::NAN, 2.0];
@@ -91,6 +96,7 @@ fn test_distance_metrics_non_finite_inputs_rejected() {
 
 proptest! {
     #[test]
+        /// Property-Test: Symmetrie und Nicht-Negativität euklidischer und Kosinus-Distanzen.
     fn prop_distance_metric_symmetry_and_non_negativity(
         vx in proptest::collection::vec(-100.0f32..100.0f32, 16),
         vy in proptest::collection::vec(-100.0f32..100.0f32, 16)
@@ -107,6 +113,7 @@ proptest! {
     }
 
     #[test]
+        /// Property-Test: Mehrfache L2-Vektornormierung ist idempotent.
     fn prop_embedding_normalize_is_idempotent(
         v in proptest::collection::vec(-50.0f32..50.0f32, 8)
     ) {
