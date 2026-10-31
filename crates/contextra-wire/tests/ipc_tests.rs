@@ -1,3 +1,8 @@
+//! # Integrationstests für contextra-wire
+//!
+//! **Ring & Zweck:** Ring 0 Testsuite.
+//! Prüft Roundtrips, Buffer-Verifikation, Fuzzing-Robustheit, Nebenläufigkeit
+//! und JSON-RPC 2.0 Spezifikationskonformität.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -61,6 +66,8 @@ impl SimpleLcg {
 // 1. Roundtrip Tests for FlatBuffers Types
 // ============================================================================
 
+// ANCHOR[contextra-wire:TST-001]
+// Prüft Testfall `test_embedding_roundtrip_basic`.
 #[test]
 fn test_embedding_roundtrip_basic() {
     let mut builder = FlatBufferBuilder::new();
@@ -85,6 +92,8 @@ fn test_embedding_roundtrip_basic() {
     assert_eq!(emb.quantized_u8().unwrap().len(), 3);
 }
 
+// ANCHOR[contextra-wire:TST-002]
+// Prüft Testfall `test_embedding_roundtrip_quantized_only`.
 #[test]
 fn test_embedding_roundtrip_quantized_only() {
     let mut builder = FlatBufferBuilder::new();
@@ -108,6 +117,8 @@ fn test_embedding_roundtrip_quantized_only() {
     assert_eq!(emb.quantized_u8().unwrap().len(), 2);
 }
 
+// ANCHOR[contextra-wire:TST-003]
+// Prüft Testfall `test_embedding_roundtrip_unquantized_only`.
 #[test]
 fn test_embedding_roundtrip_unquantized_only() {
     let mut builder = FlatBufferBuilder::new();
@@ -131,6 +142,8 @@ fn test_embedding_roundtrip_unquantized_only() {
     assert!(emb.quantized_u8().is_none());
 }
 
+// ANCHOR[contextra-wire:TST-004]
+// Prüft Testfall `test_scored_document_roundtrip_basic`.
 #[test]
 fn test_scored_document_roundtrip_basic() {
     let mut builder = FlatBufferBuilder::new();
@@ -157,6 +170,8 @@ fn test_scored_document_roundtrip_basic() {
     assert!(doc.embedding().is_none());
 }
 
+// ANCHOR[contextra-wire:TST-005]
+// Prüft Testfall `test_scored_document_roundtrip_without_embedding`.
 #[test]
 fn test_scored_document_roundtrip_without_embedding() {
     let mut builder = FlatBufferBuilder::new();
@@ -181,6 +196,8 @@ fn test_scored_document_roundtrip_without_embedding() {
     assert!(doc.metadata().is_none());
 }
 
+// ANCHOR[contextra-wire:TST-006]
+// Prüft Testfall `test_search_response_roundtrip_basic`.
 #[test]
 fn test_search_response_roundtrip_basic() {
     let mut builder = FlatBufferBuilder::new();
@@ -213,6 +230,8 @@ fn test_search_response_roundtrip_basic() {
     assert_eq!(resp.results().unwrap().len(), 1);
 }
 
+// ANCHOR[contextra-wire:TST-007]
+// Prüft Testfall `test_search_response_roundtrip_empty_results`.
 #[test]
 fn test_search_response_roundtrip_empty_results() {
     let mut builder = FlatBufferBuilder::new();
@@ -233,6 +252,8 @@ fn test_search_response_roundtrip_empty_results() {
     assert!(resp.results().is_none());
 }
 
+// ANCHOR[contextra-wire:TST-008]
+// Prüft Testfall `test_vector_index_update_roundtrip_basic`.
 #[test]
 fn test_vector_index_update_roundtrip_basic() {
     let mut builder = FlatBufferBuilder::new();
@@ -254,6 +275,8 @@ fn test_vector_index_update_roundtrip_basic() {
     assert_eq!(update.id(), Some("vec-1"));
 }
 
+// ANCHOR[contextra-wire:TST-009]
+// Prüft Testfall `test_role_id_roundtrip`.
 #[test]
 fn test_role_id_roundtrip() {
     let mut builder = FlatBufferBuilder::new();
@@ -266,6 +289,8 @@ fn test_role_id_roundtrip() {
     assert_eq!(role.id(), 42);
 }
 
+// ANCHOR[contextra-wire:TST-010]
+// Prüft Testfall `test_hyper_edge_id_roundtrip`.
 #[test]
 fn test_hyper_edge_id_roundtrip() {
     let mut builder = FlatBufferBuilder::new();
@@ -278,6 +303,8 @@ fn test_hyper_edge_id_roundtrip() {
     assert_eq!(edge.id(), 1001);
 }
 
+// ANCHOR[contextra-wire:TST-011]
+// Prüft Testfall `test_role_binding_roundtrip`.
 #[test]
 fn test_role_binding_roundtrip() {
     let mut builder = FlatBufferBuilder::new();
@@ -297,6 +324,8 @@ fn test_role_binding_roundtrip() {
     assert_eq!(binding.entity(), 77);
 }
 
+// ANCHOR[contextra-wire:TST-012]
+// Prüft Testfall `test_hyper_edge_roundtrip`.
 #[test]
 fn test_hyper_edge_roundtrip() {
     let mut builder = FlatBufferBuilder::new();
@@ -340,6 +369,8 @@ fn test_hyper_edge_roundtrip() {
 // 2. WireBuffer Zero-Copy Adapter Tests
 // ============================================================================
 
+// ANCHOR[contextra-wire:TST-013]
+// Prüft Testfall `test_wire_buffer_adapter_creation_and_conversion`.
 #[test]
 fn test_wire_buffer_adapter_creation_and_conversion() {
     let bytes = Bytes::from_static(b"hello_wire");
@@ -348,6 +379,8 @@ fn test_wire_buffer_adapter_creation_and_conversion() {
     assert_eq!(wire_buf.into_inner(), bytes);
 }
 
+// ANCHOR[contextra-wire:TST-014]
+// Prüft Testfall `test_wire_buffer_as_ref`.
 #[test]
 fn test_wire_buffer_as_ref() {
     let wire_buf = WireBuffer::new(Bytes::from_static(b"test_payload"));
@@ -359,6 +392,8 @@ fn test_wire_buffer_as_ref() {
 // 3. Mutation and Truncation Fuzzing (≥ 5,000 Iterations per Type)
 // ============================================================================
 
+// ANCHOR[contextra-wire:TST-015]
+// Prüft Testfall `test_fuzz_mutation_embedding_5000_iters`.
 #[test]
 fn test_fuzz_mutation_embedding_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -387,6 +422,8 @@ fn test_fuzz_mutation_embedding_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-016]
+// Prüft Testfall `test_fuzz_truncation_embedding_5000_iters`.
 #[test]
 fn test_fuzz_truncation_embedding_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -411,6 +448,8 @@ fn test_fuzz_truncation_embedding_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-017]
+// Prüft Testfall `test_fuzz_mutation_scored_document_5000_iters`.
 #[test]
 fn test_fuzz_mutation_scored_document_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -440,6 +479,8 @@ fn test_fuzz_mutation_scored_document_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-018]
+// Prüft Testfall `test_fuzz_truncation_scored_document_5000_iters`.
 #[test]
 fn test_fuzz_truncation_scored_document_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -465,6 +506,8 @@ fn test_fuzz_truncation_scored_document_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-019]
+// Prüft Testfall `test_fuzz_mutation_search_response_5000_iters`.
 #[test]
 fn test_fuzz_mutation_search_response_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -492,6 +535,8 @@ fn test_fuzz_mutation_search_response_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-020]
+// Prüft Testfall `test_fuzz_truncation_search_response_5000_iters`.
 #[test]
 fn test_fuzz_truncation_search_response_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -515,6 +560,8 @@ fn test_fuzz_truncation_search_response_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-021]
+// Prüft Testfall `test_fuzz_mutation_vector_index_update_5000_iters`.
 #[test]
 fn test_fuzz_mutation_vector_index_update_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -543,6 +590,8 @@ fn test_fuzz_mutation_vector_index_update_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-022]
+// Prüft Testfall `test_fuzz_truncation_vector_index_update_5000_iters`.
 #[test]
 fn test_fuzz_truncation_vector_index_update_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -567,6 +616,8 @@ fn test_fuzz_truncation_vector_index_update_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-023]
+// Prüft Testfall `test_fuzz_mutation_role_id_5000_iters`.
 #[test]
 fn test_fuzz_mutation_role_id_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -587,6 +638,8 @@ fn test_fuzz_mutation_role_id_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-024]
+// Prüft Testfall `test_fuzz_truncation_role_id_5000_iters`.
 #[test]
 fn test_fuzz_truncation_role_id_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -603,6 +656,8 @@ fn test_fuzz_truncation_role_id_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-025]
+// Prüft Testfall `test_fuzz_mutation_hyper_edge_5000_iters`.
 #[test]
 fn test_fuzz_mutation_hyper_edge_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -637,6 +692,8 @@ fn test_fuzz_mutation_hyper_edge_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-026]
+// Prüft Testfall `test_fuzz_truncation_hyper_edge_5000_iters`.
 #[test]
 fn test_fuzz_truncation_hyper_edge_5000_iters() {
     let mut builder = FlatBufferBuilder::new();
@@ -667,6 +724,8 @@ fn test_fuzz_truncation_hyper_edge_5000_iters() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-027]
+// Prüft Testfall `test_fuzz_jsonrpc_mutation_5000_iters`.
 #[test]
 fn test_fuzz_jsonrpc_mutation_5000_iters() {
     let valid_json = r#"{"jsonrpc": "2.0", "id": 1, "method": "search", "params": {"q": "rust"}}"#;
@@ -688,6 +747,8 @@ fn test_fuzz_jsonrpc_mutation_5000_iters() {
 // 4. JSON-RPC Protocol & Error Mapping Tests
 // ============================================================================
 
+// ANCHOR[contextra-wire:TST-028]
+// Prüft Testfall `test_jsonrpc_single_request_roundtrip`.
 #[test]
 fn test_jsonrpc_single_request_roundtrip() {
     let raw = r#"{"jsonrpc": "2.0", "id": "req-1", "method": "ping"}"#;
@@ -700,6 +761,8 @@ fn test_jsonrpc_single_request_roundtrip() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-029]
+// Prüft Testfall `test_jsonrpc_notification_roundtrip`.
 #[test]
 fn test_jsonrpc_notification_roundtrip() {
     let raw = r#"{"jsonrpc": "2.0", "method": "notify_event"}"#;
@@ -712,6 +775,8 @@ fn test_jsonrpc_notification_roundtrip() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-030]
+// Prüft Testfall `test_jsonrpc_batch_request_roundtrip`.
 #[test]
 fn test_jsonrpc_batch_request_roundtrip() {
     let raw = r#"[
@@ -726,12 +791,16 @@ fn test_jsonrpc_batch_request_roundtrip() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-031]
+// Prüft Testfall `test_jsonrpc_error_response_formatting`.
 #[test]
 fn test_jsonrpc_error_response_formatting() {
     let resp = JsonRpcResponse::err(None, -32700, "Parse error");
     assert_eq!(resp.error.unwrap().code, -32700);
 }
 
+// ANCHOR[contextra-wire:TST-032]
+// Prüft Testfall `test_jsonrpc_parse_error_code_minus_32700`.
 #[test]
 fn test_jsonrpc_parse_error_code_minus_32700() {
     let err = JsonRpcError::parse_error("invalid syntax");
@@ -739,30 +808,40 @@ fn test_jsonrpc_parse_error_code_minus_32700() {
     assert_eq!(err.message, "invalid syntax");
 }
 
+// ANCHOR[contextra-wire:TST-033]
+// Prüft Testfall `test_jsonrpc_invalid_request_code_minus_32600`.
 #[test]
 fn test_jsonrpc_invalid_request_code_minus_32600() {
     let err = JsonRpcError::invalid_request("bad request payload");
     assert_eq!(err.code, -32600);
 }
 
+// ANCHOR[contextra-wire:TST-034]
+// Prüft Testfall `test_jsonrpc_method_not_found_code_minus_32601`.
 #[test]
 fn test_jsonrpc_method_not_found_code_minus_32601() {
     let err = JsonRpcError::method_not_found("unknown method");
     assert_eq!(err.code, -32601);
 }
 
+// ANCHOR[contextra-wire:TST-035]
+// Prüft Testfall `test_jsonrpc_invalid_params_code_minus_32602`.
 #[test]
 fn test_jsonrpc_invalid_params_code_minus_32602() {
     let err = JsonRpcError::invalid_params("param type mismatch");
     assert_eq!(err.code, -32602);
 }
 
+// ANCHOR[contextra-wire:TST-036]
+// Prüft Testfall `test_jsonrpc_internal_error_code_minus_32603`.
 #[test]
 fn test_jsonrpc_internal_error_code_minus_32603() {
     let err = JsonRpcError::internal_error("internal database fault");
     assert_eq!(err.code, -32603);
 }
 
+// ANCHOR[contextra-wire:TST-037]
+// Prüft Testfall `test_jsonrpc_oversized_payload`.
 #[test]
 fn test_jsonrpc_oversized_payload() {
     let config = JsonRpcConfig {
@@ -774,6 +853,8 @@ fn test_jsonrpc_oversized_payload() {
     assert_eq!(err.code, -32700);
 }
 
+// ANCHOR[contextra-wire:TST-038]
+// Prüft Testfall `test_jsonrpc_structural_depth_bomb`.
 #[test]
 fn test_jsonrpc_structural_depth_bomb() {
     let config = JsonRpcConfig {
@@ -785,6 +866,8 @@ fn test_jsonrpc_structural_depth_bomb() {
     assert_eq!(err.code, -32700);
 }
 
+// ANCHOR[contextra-wire:TST-039]
+// Prüft Testfall `test_jsonrpc_empty_batch_array`.
 #[test]
 fn test_jsonrpc_empty_batch_array() {
     let raw = "[]";
@@ -792,6 +875,8 @@ fn test_jsonrpc_empty_batch_array() {
     assert_eq!(err.code, -32600);
 }
 
+// ANCHOR[contextra-wire:TST-040]
+// Prüft Testfall `test_jsonrpc_batch_size_limit`.
 #[test]
 fn test_jsonrpc_batch_size_limit() {
     let config = JsonRpcConfig {
@@ -806,6 +891,8 @@ fn test_jsonrpc_batch_size_limit() {
     assert_eq!(err.code, -32600);
 }
 
+// ANCHOR[contextra-wire:TST-041]
+// Prüft Testfall `test_jsonrpc_duplicate_keys_detection`.
 #[test]
 fn test_jsonrpc_duplicate_keys_detection() {
     let raw = r#"{"jsonrpc": "2.0", "id": 1, "id": 2, "method": "ping"}"#;
@@ -813,6 +900,8 @@ fn test_jsonrpc_duplicate_keys_detection() {
     assert_eq!(err.code, -32700);
 }
 
+// ANCHOR[contextra-wire:TST-042]
+// Prüft Testfall `test_jsonrpc_invalid_utf8_sequence`.
 #[test]
 fn test_jsonrpc_invalid_utf8_sequence() {
     let bad_utf8 = vec![0x80, 0x81, 0x82];
@@ -820,6 +909,8 @@ fn test_jsonrpc_invalid_utf8_sequence() {
     assert_eq!(err.code, -32700);
 }
 
+// ANCHOR[contextra-wire:TST-043]
+// Prüft Testfall `test_jsonrpc_missing_method_field`.
 #[test]
 fn test_jsonrpc_missing_method_field() {
     let raw = r#"{"jsonrpc": "2.0", "id": 1}"#;
@@ -827,6 +918,8 @@ fn test_jsonrpc_missing_method_field() {
     assert_eq!(err.code, -32600);
 }
 
+// ANCHOR[contextra-wire:TST-044]
+// Prüft Testfall `test_jsonrpc_whitespace_method`.
 #[test]
 fn test_jsonrpc_whitespace_method() {
     let req = JsonRpcRequest {
@@ -839,6 +932,8 @@ fn test_jsonrpc_whitespace_method() {
     assert_eq!(err.code, -32600);
 }
 
+// ANCHOR[contextra-wire:TST-045]
+// Prüft Testfall `test_jsonrpc_invalid_version_1_0`.
 #[test]
 fn test_jsonrpc_invalid_version_1_0() {
     let req = JsonRpcRequest {
@@ -851,6 +946,8 @@ fn test_jsonrpc_invalid_version_1_0() {
     assert_eq!(err.code, -32600);
 }
 
+// ANCHOR[contextra-wire:TST-046]
+// Prüft Testfall `test_jsonrpc_invalid_version_3_0`.
 #[test]
 fn test_jsonrpc_invalid_version_3_0() {
     let req = JsonRpcRequest {
@@ -867,6 +964,8 @@ fn test_jsonrpc_invalid_version_3_0() {
 // 5. FlatBuffers Verification Specific Tests
 // ============================================================================
 
+// ANCHOR[contextra-wire:TST-047]
+// Prüft Testfall `test_flatbuffers_verification_search_response_valid`.
 #[test]
 fn test_flatbuffers_verification_search_response_valid() {
     let mut builder = FlatBufferBuilder::new();
@@ -885,6 +984,8 @@ fn test_flatbuffers_verification_search_response_valid() {
     assert!(verify_and_parse_search_response(buf, &config).is_ok());
 }
 
+// ANCHOR[contextra-wire:TST-048]
+// Prüft Testfall `test_flatbuffers_verification_search_response_invalid`.
 #[test]
 fn test_flatbuffers_verification_search_response_invalid() {
     let config = FlatBufferConfig::default();
@@ -892,6 +993,8 @@ fn test_flatbuffers_verification_search_response_invalid() {
     assert!(verify_and_parse_search_response(&garbage, &config).is_err());
 }
 
+// ANCHOR[contextra-wire:TST-049]
+// Prüft Testfall `test_flatbuffers_verification_embedding_valid`.
 #[test]
 fn test_flatbuffers_verification_embedding_valid() {
     let mut builder = FlatBufferBuilder::new();
@@ -910,12 +1013,16 @@ fn test_flatbuffers_verification_embedding_valid() {
     assert!(verify_and_parse_embedding(buf, &config).is_ok());
 }
 
+// ANCHOR[contextra-wire:TST-050]
+// Prüft Testfall `test_flatbuffers_verification_embedding_invalid`.
 #[test]
 fn test_flatbuffers_verification_embedding_invalid() {
     let config = FlatBufferConfig::default();
     assert!(verify_and_parse_embedding(&[0xFF; 8], &config).is_err());
 }
 
+// ANCHOR[contextra-wire:TST-051]
+// Prüft Testfall `test_flatbuffers_verification_scored_document_valid`.
 #[test]
 fn test_flatbuffers_verification_scored_document_valid() {
     let mut builder = FlatBufferBuilder::new();
@@ -935,12 +1042,16 @@ fn test_flatbuffers_verification_scored_document_valid() {
     assert!(verify_and_parse_scored_document(buf, &config).is_ok());
 }
 
+// ANCHOR[contextra-wire:TST-052]
+// Prüft Testfall `test_flatbuffers_verification_scored_document_invalid`.
 #[test]
 fn test_flatbuffers_verification_scored_document_invalid() {
     let config = FlatBufferConfig::default();
     assert!(verify_and_parse_scored_document(&[0x01, 0x02], &config).is_err());
 }
 
+// ANCHOR[contextra-wire:TST-053]
+// Prüft Testfall `test_flatbuffers_verification_vector_index_update_valid`.
 #[test]
 fn test_flatbuffers_verification_vector_index_update_valid() {
     let mut builder = FlatBufferBuilder::new();
@@ -959,12 +1070,16 @@ fn test_flatbuffers_verification_vector_index_update_valid() {
     assert!(verify_and_parse_vector_index_update(buf, &config).is_ok());
 }
 
+// ANCHOR[contextra-wire:TST-054]
+// Prüft Testfall `test_flatbuffers_verification_vector_index_update_invalid`.
 #[test]
 fn test_flatbuffers_verification_vector_index_update_invalid() {
     let config = FlatBufferConfig::default();
     assert!(verify_and_parse_vector_index_update(&[0xFA, 0xFB], &config).is_err());
 }
 
+// ANCHOR[contextra-wire:TST-055]
+// Prüft Testfall `test_flatbuffers_verification_role_id_valid`.
 #[test]
 fn test_flatbuffers_verification_role_id_valid() {
     let mut builder = FlatBufferBuilder::new();
@@ -976,12 +1091,16 @@ fn test_flatbuffers_verification_role_id_valid() {
     assert!(verify_and_parse_role_id(buf, &config).is_ok());
 }
 
+// ANCHOR[contextra-wire:TST-056]
+// Prüft Testfall `test_flatbuffers_verification_role_id_invalid`.
 #[test]
 fn test_flatbuffers_verification_role_id_invalid() {
     let config = FlatBufferConfig::default();
     assert!(verify_and_parse_role_id(&[0x00], &config).is_err());
 }
 
+// ANCHOR[contextra-wire:TST-057]
+// Prüft Testfall `test_flatbuffers_verification_hyper_edge_id_valid`.
 #[test]
 fn test_flatbuffers_verification_hyper_edge_id_valid() {
     let mut builder = FlatBufferBuilder::new();
@@ -993,12 +1112,16 @@ fn test_flatbuffers_verification_hyper_edge_id_valid() {
     assert!(verify_and_parse_hyper_edge_id(buf, &config).is_ok());
 }
 
+// ANCHOR[contextra-wire:TST-058]
+// Prüft Testfall `test_flatbuffers_verification_hyper_edge_id_invalid`.
 #[test]
 fn test_flatbuffers_verification_hyper_edge_id_invalid() {
     let config = FlatBufferConfig::default();
     assert!(verify_and_parse_hyper_edge_id(&[0xAA, 0xBB], &config).is_err());
 }
 
+// ANCHOR[contextra-wire:TST-059]
+// Prüft Testfall `test_flatbuffers_verification_role_binding_valid`.
 #[test]
 fn test_flatbuffers_verification_role_binding_valid() {
     let mut builder = FlatBufferBuilder::new();
@@ -1016,12 +1139,16 @@ fn test_flatbuffers_verification_role_binding_valid() {
     assert!(verify_and_parse_role_binding(buf, &config).is_ok());
 }
 
+// ANCHOR[contextra-wire:TST-060]
+// Prüft Testfall `test_flatbuffers_verification_role_binding_invalid`.
 #[test]
 fn test_flatbuffers_verification_role_binding_invalid() {
     let config = FlatBufferConfig::default();
     assert!(verify_and_parse_role_binding(&[0xCC, 0xDD], &config).is_err());
 }
 
+// ANCHOR[contextra-wire:TST-061]
+// Prüft Testfall `test_flatbuffers_verification_hyper_edge_valid`.
 #[test]
 fn test_flatbuffers_verification_hyper_edge_valid() {
     let mut builder = FlatBufferBuilder::new();
@@ -1047,6 +1174,8 @@ fn test_flatbuffers_verification_hyper_edge_valid() {
     assert!(verify_and_parse_hyper_edge(buf, &config).is_ok());
 }
 
+// ANCHOR[contextra-wire:TST-062]
+// Prüft Testfall `test_flatbuffers_verification_hyper_edge_invalid`.
 #[test]
 fn test_flatbuffers_verification_hyper_edge_invalid() {
     let config = FlatBufferConfig::default();
@@ -1057,6 +1186,8 @@ fn test_flatbuffers_verification_hyper_edge_invalid() {
 // 6. Concurrency and Parallel Processing Tests
 // ============================================================================
 
+// ANCHOR[contextra-wire:TST-063]
+// Prüft Testfall `test_concurrency_parallel_serialization`.
 #[test]
 fn test_concurrency_parallel_serialization() {
     let threads: Vec<_> = (0..8)
@@ -1103,6 +1234,8 @@ fn test_concurrency_parallel_serialization() {
     }
 }
 
+// ANCHOR[contextra-wire:TST-064]
+// Prüft Testfall `test_shared_buffer_concurrency`.
 #[test]
 fn test_shared_buffer_concurrency() {
     let mut builder = FlatBufferBuilder::new();

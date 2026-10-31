@@ -4,25 +4,50 @@
 // INVARIANTEN: Strict JSON-RPC 2.0 wire spec compliance; zero panic in production code; zero unsafe; zero unwrap/expect.
 
 //! Generic JSON-RPC 2.0 protocol types and hardened parser for `Contextra` IPC.
+//!
+//! # Gehärtetes JSON-RPC-2.0-Protokoll-Modul
+//!
+//! **Ring:** Ring 0 (Unsafe-Insel 3 von 3), Klasse Kern `[K]`.
+//!
+//! ## Zweck
+//! Dieses Modul stellt Typen und Parser für das JSON-RPC-2.0-Drahtprotokoll bereit. Es wird für
+//! IPC-Nachrichten (z. B. zwischen CLI/MCP/Router und Engine) eingesetzt.
+//!
+//! ## Sicherheitsinvariante & Zero-Panic-Garantie
+//! Die Verarbeitung erfolgt strikt defensiv (Fail-Closed) und ohne `unsafe`-Code:
+//! 1. **Größenbeschränkung (`max_message_size`):** Verhindert Erschöpfung des Arbeitsspeichers durch übergroße Payloads.
+//! 2. **Tiefenbegrenzung (`max_depth`):** Schützt vor Stack-Overflow-Angriffen durch stark geschachtelte JSON-Strukturen (Depth-Bombs).
+//! 3. **Batch-Größenlimit (`max_batch_size`):** Verhindert CPU-Überlastung durch riesige Anfragen-Arrays.
+//! 4. **Duplikatschutz (`reject_duplicate_keys`):** Verhindert semantische Unklarheiten und Smuggling durch doppelte Objektschlüssel.
+//! 5. **Zero-Panic:** Kein `unwrap()`, kein `expect()`, kein `panic!`. Alle Fehler werden als standardkonforme `JsonRpcError`-Objekte geliefert.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
+// ANCHOR[contextra-wire:RPC-001]
 /// Configurable limits and security parameters for JSON-RPC message processing.
+///
+/// Konfigurierbare Obergrenzen und Sicherheitsparameter für die JSON-RPC-Verarbeitung.
 #[derive(Debug, Clone)]
 pub struct JsonRpcConfig {
     /// Maximum allowed payload size in bytes (default: 10 MiB).
+    /// Maximal erlaubte Nachrichtengröße in Bytes (Standard: 10 MiB).
     pub max_message_size: usize,
     /// Maximum allowed JSON structural nesting depth (default: 64).
+    /// Maximal erlaubte JSON-Schachtelungstiefe für Objekte und Arrays (Standard: 64).
     pub max_depth: usize,
     /// Maximum number of requests allowed in a batch payload (default: 100).
+    /// Maximale Anzahl an Anfragen in einem Batch-Payload (Standard: 100).
     pub max_batch_size: usize,
     /// Reject JSON objects containing duplicate key names (default: true).
+    /// JSON-Objekte mit doppelten Schlüsselnamen strikt ablehnen (Standard: true).
     pub reject_duplicate_keys: bool,
 }
 
 impl Default for JsonRpcConfig {
+    // ANCHOR[contextra-wire:RPC-002]
+    /// Erzeugt Standardwerte mit sicheren Produktionsgrenzen.
     fn default() -> Self {
         Self {
             max_message_size: 10 * 1024 * 1024,
@@ -33,32 +58,51 @@ impl Default for JsonRpcConfig {
     }
 }
 
+// ANCHOR[contextra-wire:RPC-003]
 /// Parsed JSON-RPC payload representing either a single request or a batch of requests.
+///
+/// Geparste JSON-RPC-Payload: Repräsentiert entweder eine Einzelanfrage oder einen Batch von Anfragen.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum JsonRpcPayload {
     /// Single JSON-RPC request.
+    /// Einzelne JSON-RPC-Anfrage (`JsonRpcRequest`).
     Single(JsonRpcRequest),
     /// Batch of JSON-RPC requests.
+    /// Batch-Array mehrerer JSON-RPC-Anfragen (`Vec<JsonRpcRequest>`).
     Batch(Vec<JsonRpcRequest>),
 }
 
+// ANCHOR[contextra-wire:RPC-004]
 /// Incoming JSON-RPC 2.0 message (Request or Notification).
+///
+/// Eingehende JSON-RPC 2.0-Nachricht (Anfrage oder Benachrichtigung).
+/// Handelt es sich um eine Benachrichtigung (Notification), ist das Feld `id` auf `None` gesetzt.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcRequest {
     /// Always "2.0".
+    /// Protokollversion: Muss strikt `"2.0"` sein.
     pub jsonrpc: String,
     /// `None` for notifications (no response expected).
+    /// Anforderungs-ID. `None` für Benachrichtigungen (keine Antwort erwartet).
     pub id: Option<Value>,
     /// Name of the RPC method to invoke.
+    /// Name der aufzurufenden RPC-Methode (darf nicht leer sein).
     pub method: String,
     /// Parameter payload (Array or Object).
+    /// Parameter der Methode (beliebiger JSON-Wert, typischerweise Array oder Object).
     #[serde(default)]
     pub params: Value,
 }
 
 impl JsonRpcRequest {
+    // ANCHOR[contextra-wire:RPC-005]
     /// Validates that the request complies with the JSON-RPC 2.0 specification (fail-closed).
+    ///
+    /// # Ablauf
+    /// 1. Prüfen, ob `jsonrpc` exakt `"2.0"` entspricht. Falls nicht -> `InvalidRequest`.
+    /// 2. Prüfen, ob `method` nach Entfernung von führenden/nachfolgenden Leerzeichen nicht leer ist. Falls leer -> `InvalidRequest`.
+    /// 3. Liefert `Ok(())` bei Konformität.
     pub fn validate(&self) -> Result<(), JsonRpcError> {
         if self.jsonrpc != "2.0" {
             return Err(JsonRpcError::invalid_request(format!(
@@ -75,29 +119,42 @@ impl JsonRpcRequest {
     }
 }
 
+// ANCHOR[contextra-wire:RPC-006]
 /// Outgoing JSON-RPC 2.0 response.
+///
+/// Ausgehende JSON-RPC 2.0-Antwort (Erfolg oder Fehler).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcResponse {
     /// Always "2.0".
+    /// Protokollversion: Immer `"2.0"`.
     pub jsonrpc: String,
     /// Request ID (`None` for parse/batch errors).
+    /// Zugehörige Anforderungs-ID der Anfrage (`None` bei Parse- oder Batch-Fehlern).
     pub id: Option<Value>,
     /// Result payload on success.
+    /// Ergebnis-Payload im Erfolgsfall.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<Value>,
     /// Error object on failure.
+    /// Fehlerobjekt im Fehlerfall.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<JsonRpcError>,
 }
 
+// ANCHOR[contextra-wire:RPC-007]
 /// JSON-RPC 2.0 Error object.
+///
+/// Standardisiertes JSON-RPC 2.0 Fehlerobjekt.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct JsonRpcError {
     /// Numeric error code per JSON-RPC 2.0 specification.
+    /// Numerischer standardisierter Fehlercode gemäß JSON-RPC 2.0 Spezifikation.
     pub code: i32,
     /// Brief error message.
+    /// Kurze menschenlesbare Fehlerbeschreibung.
     pub message: String,
     /// Optional additional error context data.
+    /// Optionale strukturierte Zusatzdaten zum Fehlerkontext.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
 }
@@ -111,7 +168,9 @@ impl std::fmt::Display for JsonRpcError {
 impl std::error::Error for JsonRpcError {}
 
 impl JsonRpcError {
+    // ANCHOR[contextra-wire:RPC-008]
     /// Parse error (-32700): Invalid JSON received by server.
+    /// Erzeugt einen Parse error (-32700): Ungültiges JSON empfangen.
     pub fn parse_error(message: impl Into<String>) -> Self {
         Self {
             code: -32700,
@@ -120,7 +179,9 @@ impl JsonRpcError {
         }
     }
 
+    // ANCHOR[contextra-wire:RPC-009]
     /// Invalid Request (-32600): JSON sent is not a valid Request object.
+    /// Erzeugt einen Invalid Request (-32600): Gesendetes JSON ist keine gültige Anfrage.
     pub fn invalid_request(message: impl Into<String>) -> Self {
         Self {
             code: -32600,
@@ -129,7 +190,9 @@ impl JsonRpcError {
         }
     }
 
+    // ANCHOR[contextra-wire:RPC-010]
     /// Method not found (-32601): The method does not exist / is not available.
+    /// Erzeugt einen Method not found (-32601): Methode existiert nicht oder ist nicht verfügbar.
     pub fn method_not_found(message: impl Into<String>) -> Self {
         Self {
             code: -32601,
@@ -138,7 +201,9 @@ impl JsonRpcError {
         }
     }
 
+    // ANCHOR[contextra-wire:RPC-011]
     /// Invalid params (-32602): Invalid method parameter(s).
+    /// Erzeugt einen Invalid params (-32602): Ungültige Methodenparameter übergeben.
     pub fn invalid_params(message: impl Into<String>) -> Self {
         Self {
             code: -32602,
@@ -147,7 +212,9 @@ impl JsonRpcError {
         }
     }
 
+    // ANCHOR[contextra-wire:RPC-012]
     /// Internal error (-32603): Internal JSON-RPC error.
+    /// Erzeugt einen Internal error (-32603): Interner JSON-RPC Serverfehler.
     pub fn internal_error(message: impl Into<String>) -> Self {
         Self {
             code: -32603,
@@ -158,7 +225,14 @@ impl JsonRpcError {
 }
 
 impl JsonRpcResponse {
+    // ANCHOR[contextra-wire:RPC-013]
     /// Constructs a successful JSON-RPC response.
+    ///
+    /// Konstruiert eine erfolgreiche JSON-RPC 2.0-Antwort mit Ergebnisdaten.
+    ///
+    /// # Parameter
+    /// - `id`: ID der beantworteten Anfrage.
+    /// - `result`: Rückgabedaten als JSON-Wert.
     pub fn ok(id: Option<Value>, result: Value) -> Self {
         Self {
             jsonrpc: "2.0".into(),
@@ -168,7 +242,15 @@ impl JsonRpcResponse {
         }
     }
 
+    // ANCHOR[contextra-wire:RPC-014]
     /// Constructs an error JSON-RPC response.
+    ///
+    /// Konstruiert eine JSON-RPC 2.0-Fehlerantwort.
+    ///
+    /// # Parameter
+    /// - `id`: ID der Anfrage (oder `None`, falls unbekannt).
+    /// - `code`: Numerischer JSON-RPC Fehlercode.
+    /// - `message`: Fehlerbeschreibung.
     pub fn err(id: Option<Value>, code: i32, message: impl Into<String>) -> Self {
         Self {
             jsonrpc: "2.0".into(),
@@ -183,12 +265,32 @@ impl JsonRpcResponse {
     }
 }
 
+// ANCHOR[contextra-wire:RPC-015]
 /// Parses raw bytes into a `JsonRpcPayload` using default configuration limits.
+///
+/// Parst rohe Bytes in ein `JsonRpcPayload` unter Verwendung der Standard-Konfiguration.
 pub fn parse_jsonrpc_payload(raw: &[u8]) -> Result<JsonRpcPayload, JsonRpcError> {
     parse_jsonrpc_payload_with_config(raw, &JsonRpcConfig::default())
 }
 
+// ANCHOR[contextra-wire:RPC-016]
 /// Parses raw bytes into a `JsonRpcPayload` with strict security and size validation.
+///
+/// Parst rohe Bytes in ein `JsonRpcPayload` mit strikter Sicherheits- und Größenvalidierung.
+///
+/// # Ablauf von `parse_jsonrpc_payload_with_config`:
+/// 1. Puffergröße gegen `config.max_message_size` prüfen.
+/// 2. UTF-8-Konformität sicherstellen.
+/// 3. Vorvalidierung der Struktur via `validate_json_structure_and_limits` (Schachtelungstiefe und Duplikate).
+/// 4. Deserialisierung in generischen `serde_json::Value`.
+/// 5. Verzweigung nach Wurzelelement:
+///    - `Value::Array`: Batch-Verarbeitung. Prüfen auf Nicht-Leerheit und `max_batch_size`. Jedes Element validieren.
+///    - `Value::Object`: Einzelanfrage parsen und validieren.
+///    - Primitive Werte: Ablehnung mit `InvalidRequest`.
+///
+/// # Fehlerfälle
+/// Liefert `JsonRpcError::parse_error` bei Größen-, UTF-8- oder Syntaxfehlern,
+/// oder `JsonRpcError::invalid_request` bei Schemaverletzungen.
 pub fn parse_jsonrpc_payload_with_config(
     raw: &[u8],
     config: &JsonRpcConfig,
@@ -247,14 +349,22 @@ pub fn parse_jsonrpc_payload_with_config(
     }
 }
 
+// ANCHOR[contextra-wire:RPC-017]
 /// Helper struct for tracking object state during JSON key scanning.
+///
+/// Hilfsstruktur zur Zustandsverfolgung während des Scannens von JSON-Objektschlüsseln.
 #[derive(Debug)]
 struct ObjectKeyScope {
     seen_keys: BTreeSet<String>,
     expecting_key: bool,
 }
 
+// ANCHOR[contextra-wire:RPC-018]
 /// Validates structural nesting depth and duplicate key constraints.
+///
+/// Validiert Schachtelungstiefe und Duplikate von Schlüsseln in linearem Durchlauf.
+/// Verarbeitet den String Byte für Byte ohne Heap-Allokationen für den Tokenizer,
+/// um DoS-Angriffe frühzeitig vor der eigentlichen DOM-Erstellung abzufangen.
 fn validate_json_structure_and_limits(
     text: &str,
     config: &JsonRpcConfig,
@@ -293,6 +403,7 @@ fn validate_json_structure_and_limits(
                     if let Some(scope) = object_stack.last_mut() {
                         if scope.expecting_key {
                             // Extract key string starting at i + 1
+                            // Schlüssel-String ab Position i + 1 extrahieren
                             let key_start = i + 1;
                             let mut key_end = key_start;
                             let mut key_escape = false;
@@ -313,6 +424,7 @@ fn validate_json_structure_and_limits(
                             }
 
                             // Look ahead past string to check for ':'
+                            // Vorausschau nach dem String auf Doppelpunkt ':'
                             let mut next_idx = key_end + 1;
                             while next_idx < bytes.len() {
                                 if match bytes.get(next_idx) {
@@ -405,6 +517,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    // Prüft die Serialisierung und Deserialisierung einer erfolgreichen JsonRpcResponse.
     #[test]
     fn test_json_rpc_response_ok_serialization() {
         let resp = JsonRpcResponse::ok(Some(json!(42)), json!({"status": "success"}));
@@ -421,6 +534,7 @@ mod tests {
         assert!(deser.error.is_none());
     }
 
+    // Prüft die Serialisierung und Deserialisierung einer fehlerhaften JsonRpcResponse.
     #[test]
     fn test_json_rpc_response_err_serialization() {
         let resp = JsonRpcResponse::err(Some(json!("req-1")), -32600, "Invalid Request");
@@ -438,6 +552,7 @@ mod tests {
         assert_eq!(deser.error.expect("error present").code, -32600);
     }
 
+    // Prüft das erfolgreiche Validieren einer vorschriftsmäßigen JsonRpcRequest.
     #[test]
     fn test_json_rpc_request_validation_valid() {
         let req = JsonRpcRequest {
@@ -449,6 +564,7 @@ mod tests {
         assert!(req.validate().is_ok());
     }
 
+    // Prüft die Zurückweisung einer ungültigen Protokollversion in JsonRpcRequest.
     #[test]
     fn test_json_rpc_request_validation_invalid_version() {
         let req = JsonRpcRequest {
@@ -462,6 +578,7 @@ mod tests {
         assert!(err.message.contains("Invalid JSON-RPC protocol version"));
     }
 
+    // Prüft die Zurückweisung einer leeren Methodenbezeichnung in JsonRpcRequest.
     #[test]
     fn test_json_rpc_request_validation_empty_method() {
         let req = JsonRpcRequest {
@@ -475,6 +592,7 @@ mod tests {
         assert!(err.message.contains("method name must not be empty"));
     }
 
+    // Prüft die korrekte Zuordnung aller Fehlercodes und Konstruktoren von JsonRpcError.
     #[test]
     fn test_json_rpc_error_constructors_codes() {
         assert_eq!(JsonRpcError::parse_error("msg").code, -32700);
@@ -484,6 +602,7 @@ mod tests {
         assert_eq!(JsonRpcError::internal_error("msg").code, -32603);
     }
 
+    // Prüft das Parsen einer gültigen einzelnen JSON-RPC-Anfrage.
     #[test]
     fn test_json_rpc_parse_single_valid() {
         let raw = r#"{"jsonrpc": "2.0", "id": 100, "method": "query", "params": {"k": "v"}}"#;
@@ -498,6 +617,7 @@ mod tests {
         }
     }
 
+    // Prüft das Parsen einer gültigen Benachrichtigung ohne ID.
     #[test]
     fn test_json_rpc_parse_notification_valid() {
         let raw = r#"{"jsonrpc": "2.0", "method": "ping"}"#;
@@ -511,6 +631,7 @@ mod tests {
         }
     }
 
+    // Prüft das Parsen eines gültigen Arrays von mehreren JSON-RPC-Anfragen (Batch).
     #[test]
     fn test_json_rpc_parse_batch_valid() {
         let raw = r#"[
@@ -528,6 +649,7 @@ mod tests {
         }
     }
 
+    // Prüft, dass ein leeres Batch-Array mit InvalidRequest abgelehnt wird.
     #[test]
     fn test_json_rpc_parse_empty_batch_rejected() {
         let raw = "[]";
@@ -536,6 +658,7 @@ mod tests {
         assert!(err.message.contains("empty batch array"));
     }
 
+    // Prüft, dass die Überschreitung des konfigurierten Batch-Limits abgelehnt wird.
     #[test]
     fn test_json_rpc_parse_batch_over_limit_rejected() {
         let config = JsonRpcConfig {
@@ -552,6 +675,7 @@ mod tests {
         assert!(err.message.contains("Batch size"));
     }
 
+    // Prüft, dass überdimensionierte Payloads mit ParseError (-32700) abgelehnt werden.
     #[test]
     fn test_json_rpc_parse_oversized_payload_rejected() {
         let config = JsonRpcConfig {
@@ -564,6 +688,7 @@ mod tests {
         assert!(err.message.contains("Payload size"));
     }
 
+    // Prüft, dass ungültige UTF-8-Bytefolgen mit ParseError abgelehnt werden.
     #[test]
     fn test_json_rpc_parse_invalid_utf8_rejected() {
         let invalid_utf8 = vec![0xFF, 0xFE, 0xFD, 0x00];
@@ -572,6 +697,7 @@ mod tests {
         assert!(err.message.contains("Invalid UTF-8"));
     }
 
+    // Prüft, dass zu tiefe Schachtelungen (Depth-Bombs) abgefangen werden.
     #[test]
     fn test_json_rpc_parse_depth_bomb_rejected() {
         let config = JsonRpcConfig {
@@ -584,6 +710,7 @@ mod tests {
         assert!(err.message.contains("nesting depth"));
     }
 
+    // Prüft, dass doppelte Schlüssel in einem Objekt abgelehnt werden.
     #[test]
     fn test_json_rpc_parse_duplicate_key_rejected() {
         let raw = r#"{"jsonrpc": "2.0", "id": 1, "id": 2, "method": "ping"}"#;
@@ -592,6 +719,7 @@ mod tests {
         assert!(err.message.contains("Duplicate key"));
     }
 
+    // Prüft, dass doppelte Schlüssel in verschachtelten Objekten erkannt und abgelehnt werden.
     #[test]
     fn test_json_rpc_parse_nested_duplicate_key_rejected() {
         let raw = r#"{"jsonrpc": "2.0", "method": "ping", "params": {"dup": 1, "dup": 2}}"#;
@@ -600,6 +728,7 @@ mod tests {
         assert!(err.message.contains("Duplicate key"));
     }
 
+    // Prüft, dass primitive Typen als Wurzel-Payload mit InvalidRequest abgelehnt werden.
     #[test]
     fn test_json_rpc_parse_primitive_payload_rejected() {
         let raw = "12345";
