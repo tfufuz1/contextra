@@ -1,3 +1,6 @@
+//! Unittests für Identifikatoren (TenantId, CollectionId, DocId, TxId, EntityId).
+//! Prüft deterministische Hashing-Eigenschaften, Boundaries und Serde-Roundtrips.
+
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use crate::error::{ContextraError, Result};

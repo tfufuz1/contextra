@@ -1,3 +1,6 @@
+//! Integrations-Testsuite für Vektordistanzmetriken und Embedding-Normalisierung.
+//! Prüft Symmetrie, Dreiecksungleichung, Cosine-, Euclidean- und DotProduct-Eigenschaften.
+
 //! Distance metrics, embeddings, and vector math property test suite for `contextra-types`.
 
 #![allow(

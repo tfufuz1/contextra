@@ -1,3 +1,6 @@
+//! Integrations-Testsuite für Newtype-Invarianten (DocId, TxId, TenantId, CollectionId).
+//! Verifiziert Typ-Grenzwerte, Display-Formatierung und Proptest-Garantien.
+
 //! Additional comprehensive invariant and property tests for `contextra-types`.
 //!
 //! Verifies:

@@ -1,3 +1,6 @@
+//! Unittests für Vektormetriken (Cosine, Euclidean, DotProduct) und Embeddings.
+//! Verifiziert Normalisierungs-Invarianten und Äquivalenz.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

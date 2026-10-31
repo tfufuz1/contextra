@@ -1,4 +1,8 @@
 //! Serializable DTO representation of `ContextraError` for IPC and FFI boundaries (ADR-028).
+//!
+//! # Architektur-Rolle
+//! Ring 0 (Kern). Serialisierbare Fehlerdaten für IPC- und FFI-Grenzen (ADR-028).
+//! Keine I/O- oder Asynchron-Laufzeiten.
 
 // FILE-CONTEXT
 // STAND: 2026-08-30T21:51:46Z (SESSION: a43b7682)
@@ -16,6 +20,7 @@ use serde::{Deserialize, Serialize};
 /// Used across IPC and API boundaries (e.g. Tauri frontend IPC) to preserve structured
 /// error kinds and optional JSON detail fields without losing error typing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:DTO-MAIN]
 pub struct ContextraErrorDto {
     /// Stable string identifier for the error variant (e.g. `"NotFound"`, `"PolicyViolation"`).
     pub kind: String,
@@ -27,6 +32,7 @@ pub struct ContextraErrorDto {
 
 impl ContextraErrorDto {
     /// Creates a new `ContextraErrorDto` with custom kind and message.
+    // ANCHOR[contextra-types:DTO-NEW]
     pub fn new(kind: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             kind: kind.into(),
@@ -36,6 +42,7 @@ impl ContextraErrorDto {
     }
 
     /// Creates a new `ContextraErrorDto` with custom kind, message, and details payload.
+    // ANCHOR[contextra-types:DTO-WITH-DETAILS]
     pub fn with_details(
         kind: impl Into<String>,
         message: impl Into<String>,

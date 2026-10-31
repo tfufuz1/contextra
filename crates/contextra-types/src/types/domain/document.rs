@@ -1,3 +1,9 @@
+//! Vektormetriken, Embeddings und Dokumentbewertungstypen.
+//!
+//! # Architektur-Rolle
+//! Ring 0 (Kern). Definiert `DistanceMetric`, `Embedding`, `ScoredDocument` und `RerankResult`.
+//! Reines In-Memory-Computing ohne I/O.
+
 use crate::error::{ContextraError, Result};
 use crate::types::domain::DocId;
 use serde::{Deserialize, Serialize};
@@ -5,6 +11,7 @@ use serde::{Deserialize, Serialize};
 /// Distance metric for vector comparison.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
 #[non_exhaustive]
+// ANCHOR[contextra-types:DOC-DISTANCE-METRIC]
 pub enum DistanceMetric {
     /// Cosine distance (`1.0 - cos(angle)`).
     #[default]
@@ -158,6 +165,7 @@ impl DistanceMetric {
 
 /// Vector embedding representation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-types:DOC-EMBEDDING]
 pub struct Embedding {
     /// Raw vector data elements.
     pub data: Vec<f32>,
@@ -204,6 +212,7 @@ impl Embedding {
 
 /// A scored search result.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+// ANCHOR[contextra-types:DOC-SCORED-DOC]
 pub struct ScoredDocument {
     /// Identifier of the scored document.
     pub doc_id: DocId,
@@ -220,6 +229,7 @@ impl ScoredDocument {
 
 /// Result of cross-encoder reranking operation for a candidate item.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-types:DOC-RERANK-RESULT]
 pub struct RerankResult {
     /// Rank position after reranking (0-based).
     pub index: usize,

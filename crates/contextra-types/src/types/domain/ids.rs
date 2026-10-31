@@ -1,3 +1,9 @@
+//! Identifikatoren (IDs) fuer Mandanten, Collections, Dokumente, Entitaeten und Transaktionen.
+//!
+//! # Architektur-Rolle
+//! Ring 0 (Kern). Enthaelt `TenantId`, `CollectionId`, `DocId`, `EntityId` und `TxId`.
+//! Keine I/O- oder Zeit-Abhaengigkeiten (TxId niemals ueber SystemTime!).
+
 use crate::error::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +21,7 @@ use serde::{Deserialize, Serialize};
 /// für PII-Policy-Keying im Egress/Filter-Gateway.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ID-TENANT]
 pub struct TenantId(pub u64);
 
 impl TenantId {
@@ -97,6 +104,7 @@ impl std::fmt::Display for TenantId {
 /// Internal collection identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ID-COLLECTION]
 pub struct CollectionId(pub u64);
 
 impl CollectionId {
@@ -154,12 +162,14 @@ impl std::fmt::Display for CollectionId {
 #[cfg(not(feature = "docid-128"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ID-DOC]
 pub struct DocId(pub u64);
 
 #[cfg(feature = "docid-128")]
 /// Internal document identifier (128-bit variant).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(C, align(16))]
+// ANCHOR[contextra-types:ID-DOC-128]
 pub struct DocId(pub u128);
 
 #[cfg(not(feature = "docid-128"))]
@@ -278,6 +288,7 @@ impl std::fmt::Display for DocId {
 /// Internal entity identifier for graph nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ID-ENTITY]
 pub struct EntityId(pub u64);
 
 impl EntityId {
@@ -394,6 +405,7 @@ impl std::fmt::Display for EntityId {
 /// Transaction identifier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
+// ANCHOR[contextra-types:ID-TX]
 pub struct TxId(pub u64);
 
 impl TxId {

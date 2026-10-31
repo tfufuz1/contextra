@@ -1,3 +1,6 @@
+//! Integrations-Testsuite für Serde-Roundtrips über alle Domänentypen.
+//! Testet JSON- und Bincode-Serialisierung auf Byte-Exaktheit und Fehlertoleranz.
+
 //! Exhaustive Serde roundtrip and invalid payload rejection test suite for `contextra-types`.
 
 #![allow(
