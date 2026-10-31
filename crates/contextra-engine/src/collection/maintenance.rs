@@ -859,6 +859,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 }
 
 #[cfg(feature = "graph-connectivity-health")]
+pub use contextra_graph::percolation::PercolationConfig;
+
+#[cfg(feature = "graph-connectivity-health")]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PercolationResult {
     pub health: Option<f32>,

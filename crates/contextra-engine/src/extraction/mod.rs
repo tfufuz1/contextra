@@ -14,7 +14,7 @@ pub mod tests;
 pub mod types;
 
 pub use open_ie::extract_triples;
-pub use rule_based::RuleBasedExtractor;
+pub use rule_based::{RuleBasedExtractor, MAX_EXTRACTION_TEXT_LENGTH};
 pub use types::{EntityExtractionConfig, ExtractedTriple, ExtractorMode};
 
 use contextra_ports::{BoxFuture, LlmTextGenerator};

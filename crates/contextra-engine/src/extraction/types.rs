@@ -42,3 +42,11 @@ impl Default for EntityExtractionConfig {
         }
     }
 }
+
+/// Modus der Entitätsextraktion (LLM-basiertes OpenIE oder regelbasiert).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum ExtractorMode {
+    #[default]
+    OpenIe,
+    RuleBased,
+}

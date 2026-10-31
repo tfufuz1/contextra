@@ -225,9 +225,10 @@ fn test_wasm_merge_operator_denies_clock_and_rng_access() {
 
 #[tokio::test]
 async fn test_wasm_merge_operator_normal_case_in_compaction() {
-    use contextra_core::{ResourceBudget, ResourceTracker, SnapshotRegistry};
+    use contextra_mvcc::SnapshotRegistry;
     use contextra_store::compaction::{CompactionConfig, CompactionEngine};
     use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
+    use contextra_types::{ResourceBudget, ResourceTracker};
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();
@@ -296,9 +297,10 @@ async fn test_wasm_merge_operator_normal_case_in_compaction() {
 
 #[tokio::test]
 async fn test_wasm_merge_operator_fuel_exhausted_in_compaction() {
-    use contextra_core::{ResourceBudget, ResourceTracker, SnapshotRegistry};
+    use contextra_mvcc::SnapshotRegistry;
     use contextra_store::compaction::{CompactionConfig, CompactionEngine};
     use contextra_store::sstable::{BlockCache, SstableBuilder, SstableReader};
+    use contextra_types::{ResourceBudget, ResourceTracker};
     use std::time::Duration;
     use tempfile::tempdir;
 
