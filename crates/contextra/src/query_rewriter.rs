@@ -2,6 +2,29 @@
 // ZWECK: LLM-gestützter QueryRewriter für MultiStep-Retrieval in der Facade (Ring 4).
 // INVARIANTEN: Zero Panic; UTF-8-sichere Snippet-Kürzung; Prompt-Injection-Isolation via XML-Tags; keine Async Locks.
 
+//! # Modul: LLM-gestützter QueryRewriter für Multi-Step Retrieval (Ring 4)
+//!
+//! Dieses Modul stellt mit [`LlmQueryRewriter`] eine Implementierung des [`QueryRewriter`]-Ports
+//! bereit. Ein externes LLM (Large Language Model) formuliert ursprüngliche Benutzeranfragen
+//! anhand bereits gefundener Zwischenergebnisse adaptiv um oder zerlegt sie in Teilfragen (Sub-Queries).
+//!
+//! ## Ring-Zugehörigkeit
+//! - **Ring 4 (Fassade)**: Greift auf den Port `LlmTextGenerator` aus `contextra-ports` zu und
+//!   erweitert den Suchfluss von `contextra-db` um semantische Abfrageerweiterung.
+//!
+//! ## Wichtigste Typen
+//! - [`LlmQueryRewriter`]: Der zentrale Rewriter mit konfigurierbaren Limits für Subqueries und Snippetlängen.
+//!
+//! ## Sicherheits- und Entwurfs-Invarianten
+//! - **Prompt-Injection-Isolation**: Benutzer- und Dokumenttexte werden in getrennte XML-Blöcke
+//!   (`<query>` und `<untrusted_context>`) gekapselt mit expliziten System-Instruktionen zur Isolation.
+//! - **UTF-8-Sicherheit**: Kürzungen von Zeichenketten (`truncate_str_chars`) schneiden niemals
+//!   mitten in Multi-Byte-Sequenzen (wie deutschen Umlauten oder Emojis), um Panics zu verhindern.
+//! - **Keine Async-Locks**: Verhindert Deadlocks oder TOCTOU-Probleme; alle Transformationen laufen
+//!   synchron ab, bevor der asynchrone Port-Aufruf erfolgt.
+//! - **Robustes Parsing**: Bereinigt Code-Fences, Nummerierungen, Aufzählungszeichen und JSON-Formatierungen.
+
+
 use contextra_core::error::Result;
 use contextra_db::QueryRewriter;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
@@ -10,7 +33,11 @@ use contextra_types::ScoredEntry;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-/// LLM-supported query rewriter for multi-step retrieval.
+// ANCHOR[contextra:REW-001]
+/// LLM-unterstützter Abfrage-Umformulierer für iteratives oder mehrstufiges Retrieval (Multi-Step Retrieval).
+///
+/// Sendet den aktuellen Suchkontext an ein LLM via [`LlmTextGenerator`], um alternative,
+/// semantisch präzisere Suchanfragen zu generieren.
 pub struct LlmQueryRewriter {
     generator: Arc<dyn LlmTextGenerator>,
     max_subqueries: usize,
@@ -19,10 +46,11 @@ pub struct LlmQueryRewriter {
 }
 
 impl LlmQueryRewriter {
-    /// Creates a new `LlmQueryRewriter` with default limits:
-    /// - `max_subqueries`: 3
-    /// - `max_context_results`: 3
-    /// - `max_snippet_chars`: 300
+    // ANCHOR[contextra:REW-002]
+    /// Erstellt einen neuen `LlmQueryRewriter` mit Standardgrenzwerten:
+    /// - `max_subqueries`: 3 alternative Abfragen
+    /// - `max_context_results`: 3 Dokumente als Kontext
+    /// - `max_snippet_chars`: 300 Zeichen pro Snippet
     pub fn new(generator: Arc<dyn LlmTextGenerator>) -> Self {
         Self {
             generator,
@@ -32,19 +60,22 @@ impl LlmQueryRewriter {
         }
     }
 
-    /// Sets the maximum number of alternative sub-queries to generate.
+    // ANCHOR[contextra:REW-003]
+    /// Konfiguriert die maximale Anzahl an generierten Teilabfragen.
     pub fn with_max_subqueries(mut self, n: usize) -> Self {
         self.max_subqueries = n;
         self
     }
 
-    /// Sets the maximum number of previous context search results to include in the prompt.
+    // ANCHOR[contextra:REW-004]
+    /// Konfiguriert die maximale Anzahl an bestehenden Suchergebnissen, die als Kontext in den Prompt fließen.
     pub fn with_max_context_results(mut self, n: usize) -> Self {
         self.max_context_results = n;
         self
     }
 
-    /// Sets the maximum number of characters per result snippet in the prompt.
+    // ANCHOR[contextra:REW-005]
+    /// Konfiguriert die maximale Textlänge (in Zeichen) für Textausschnitte (Snippets) im Prompt.
     pub fn with_max_snippet_chars(mut self, n: usize) -> Self {
         self.max_snippet_chars = n;
         self
@@ -52,6 +83,17 @@ impl LlmQueryRewriter {
 }
 
 impl QueryRewriter for LlmQueryRewriter {
+    // ANCHOR[contextra:REW-006]
+    /// Führt die Umformulierung asynchron durch.
+    ///
+    /// # Ablauf von `rewrite`:
+    /// 1. Erstellung des isolierten Prompts aus Originalanfrage und bisherigen Zwischenergebnissen (`build_prompt`).
+    /// 2. Asynchroner Aufruf des LLM-Textgenerators über den Port (`self.generator.generate(&prompt).await`).
+    /// 3. Bereinigung und syntaktisches Parsen der LLM-Antwort in eine Liste eindeutiger Teilabfragen (`parse_response`).
+    /// 4. Rückgabe der Liste neu formulierter Abfragen.
+    ///
+    /// # Fehler
+    /// Gibt den Fehler des LLM-Generators zurück, falls der Port-Aufruf fehlschlägt.
     fn rewrite<'a>(
         &'a self,
         original_query: &'a str,
@@ -72,6 +114,10 @@ impl QueryRewriter for LlmQueryRewriter {
     }
 }
 
+// ANCHOR[contextra:REW-007]
+/// Schneidet einen String sicher an einer Zeichengrenze (Char-Boundary) ab.
+///
+/// Verhindert Panics beim Slicen von UTF-8-Zeichenketten mit variabler Byte-Länge.
 fn truncate_str_chars(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
         Some((idx, _)) => &s[..idx],
@@ -79,6 +125,10 @@ fn truncate_str_chars(s: &str, max_chars: usize) -> &str {
     }
 }
 
+// ANCHOR[contextra:REW-008]
+/// Extrahiert einen lesbaren Textausschnitt aus den Metadaten eines Treffers (`ScoredEntry`).
+///
+/// Sucht bevorzugt nach Feldern `text` oder `content` und serialisiert andernfalls die Metadaten nach JSON.
 fn extract_snippet(res: &ScoredEntry) -> String {
     if let Some(meta) = &res.metadata {
         if let Some(text) = meta
@@ -95,6 +145,11 @@ fn extract_snippet(res: &ScoredEntry) -> String {
     String::new()
 }
 
+// ANCHOR[contextra:REW-009]
+/// Erstellt den Prompt für das LLM unter Beachtung von Sicherheitsisolationen.
+///
+/// Umschließt nicht vertrauenswürdige Inhalte mit `<untrusted_context>`-Tags und weist
+/// das Modell explizit an, enthaltene Anweisungen zu ignorieren (Schutz vor Indirect Prompt Injection).
 fn build_prompt(
     original_query: &str,
     current_results: &[ScoredEntry],
@@ -123,6 +178,11 @@ fn build_prompt(
     prompt
 }
 
+// ANCHOR[contextra:REW-010]
+/// Bereinigt eine einzelne Textzeile der LLM-Antwort.
+///
+/// Entfernt Markdown-Listenzeichen (`-`, `*`, `•`, `+`), vorangestellte Nummerierungen (`1.`, `1)`)
+/// und Index-Klammern (`[1]`).
 fn clean_line(line: &str) -> &str {
     let mut s = line.trim();
     if s.starts_with("```") {
@@ -147,6 +207,8 @@ fn clean_line(line: &str) -> &str {
     s
 }
 
+// ANCHOR[contextra:REW-011]
+/// Entfernt Markdown-Codeblöcke (Triple Backticks) aus dem Antworttext.
 fn strip_code_fences(input: &str) -> String {
     let trimmed = input.trim();
     let lines: Vec<&str> = trimmed
@@ -156,6 +218,11 @@ fn strip_code_fences(input: &str) -> String {
     lines.join("\n")
 }
 
+// ANCHOR[contextra:REW-012]
+/// Analysiert die Rohantwort des LLM und extrahiert gültige, deduplizierte Teilabfragen.
+///
+/// Unterstützt sowohl JSON-Format (`["abfrage1", "abfrage2"]`) als auch zeilenbasierte Textausgaben.
+/// Filtert Duplikate und Übereinstimmungen mit der Originalabfrage heraus.
 #[allow(clippy::disallowed_types)]
 fn parse_response(response: &str, original_query: &str, max_subqueries: usize) -> Vec<String> {
     let stripped = strip_code_fences(response);

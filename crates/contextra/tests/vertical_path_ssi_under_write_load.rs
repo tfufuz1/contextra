@@ -4,6 +4,19 @@
 // ZWECK: Vertikaler Pfad-Test 3 (Teil 14.3 v17), Bezug B-16: Schreiblast parallel zu einem langen offenen Snapshot darf SSI nicht beeinträchtigen oder ausfallen lassen.
 // INVARIANTEN: Greift ausschließlich über die öffentliche Facade (contextra::*) zu; Zero-Panic in Produktion; Timeout-geschützt.
 
+
+//! # Integrationstest: `vertical_path_ssi_under_write_load`
+//!
+//! Vertikaler Pfad-Test 3 (Teil 14.3 v17 / Bezug B-16):
+//! Überprüft die Stabilität und Korrektheit der seriellen Snapshot-Isolation (SSI = Serializable Snapshot Isolation)
+//! und MVCC (Multi-Version Concurrency Control) unter kontinuierlicher paralleler Schreiblast
+//! (1.000 Transaktionen über mehrere Tokio-Tasks).
+//!
+//! Stellt sicher, dass:
+//! - Lang offene Snapshots unverändert isoliert bleiben (keine Phantome, keine Versions-Leaks).
+//! - Schreibkonflikte als erwartete OCC-/SSI-Konflikte behandelt werden, ohne interne Fehler zu werfen.
+//! - Nach Lastspitzen eine vollständige System-Normalisierung eintritt.
+
 mod common;
 
 use common::{create_test_db, dummy_metadata, dummy_vector};
@@ -15,7 +28,8 @@ use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use tokio::time::timeout;
 
-/// Helper function to determine if an error is a documented, expected SSI or OCC conflict.
+// ANCHOR[contextra:TEST-VSS-001]
+/// Hilfsfunktion zur Klassifizierung dokumentierter, erwarteter SSI- und OCC-Konflikte (Optimistic Concurrency Control).
 fn is_expected_ssi_conflict(err: &ContextraError) -> bool {
     if err.is_occ_conflict() {
         return true;
@@ -31,6 +45,7 @@ fn is_expected_ssi_conflict(err: &ContextraError) -> bool {
     }
 }
 
+// ANCHOR[contextra:TEST-VSS-002]
 /// Vertikaler Pfad-Test 3 (Teil 14.3 v17), Bezug B-16:
 /// Schreiblast parallel zu einem langen offenen Snapshot darf SSI nicht unbrauchbar machen.
 #[tokio::test]

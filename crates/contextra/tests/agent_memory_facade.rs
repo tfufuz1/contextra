@@ -1,10 +1,18 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+//! # Integrationstest: `agent_memory_facade`
+//!
+//! Prüft den Lebenszyklus der agentenorientierten Fassade `AgentMemory`
+//! (Speichern, Suchen, Verknüpfen, Löschen).
+
+
 use contextra::{builder, AgentMemory, TextEmbeddingEngine};
 use contextra_core::{BoxFuture, Result};
 use serde_json::json;
 use std::sync::Arc;
 
+// ANCHOR[contextra:TEST-AMF-001]
+/// Test-Double für die Einbettungs-Engine, das deterministische 16-dimensionale Vektoren liefert.
 struct MockEmbedder;
 
 impl TextEmbeddingEngine for MockEmbedder {
@@ -17,6 +25,13 @@ impl TextEmbeddingEngine for MockEmbedder {
     }
 }
 
+// ANCHOR[contextra:TEST-AMF-002]
+// Prüft den vollständigen Agenten-Gedächtnis-Lebenszyklus:
+// 1. remember (zwei Einträge mit und ohne Metadaten anlegen),
+// 2. recall (semantisches Wiederfinden des ersten Eintrags),
+// 3. relate (Wissensgraphen-Kante zwischen beiden Einträgen erzeugen),
+// 4. forget (ersten Eintrag löschen),
+// 5. recall (verifizieren, dass der gelöschte Eintrag nicht mehr auffindbar ist).
 #[tokio::test]
 async fn test_agent_memory_facade_lifecycle() {
     let tmp_dir = tempfile::tempdir().expect("tempdir");
