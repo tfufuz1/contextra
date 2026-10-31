@@ -11,6 +11,24 @@
 //! Evaluates Inverse Document Frequencies integrating natively into the
 //! `fusion.rs` layer in `contextra-db`.
 //!
+//! # Einordnung in die Gesamtarchitektur (Ring-Modell)
+//! Dieses Modul gehört zu **Ring 0 (Kern)** von Contextra. Es enthält grundlegende
+//! Textindizierungs- und Volltextsuch-Primitive (BM25, WAND, morphologische Zerlegung
+//! für Deutsch, invertierte Indizes und Posting-Listen).
+//!
+//! # Abhängigkeiten
+//! - **Normal**: `contextra-ports`, `contextra-types`, sowie Hilfs-Bibliotheken (`bincode`, `blake3`,
+//!   `bytes`, `futures`, `itoa`, `parking_lot`, `regex`, `serde`, `serde_json`, `thiserror`, `tracing`,
+//!   `unicode-segmentation`).
+//! - **Wird genutzt von**: `contextra-engine`, `contextra-db`, `contextra-router`, `contextra-agent`
+//!   sowie Benchmarks (`contextra-bench`).
+//!
+//! # Haupttypen
+//! - [`Bm25Scorer`]: Öffentliche Fassade zur Anbindung an den Port [`TextIndex`].
+//! - [`InvertedIndex`]: Kern des persistenten invertierten Index mit MVCC-Snapshot-Isolation.
+//! - [`BM25`] & [`BM25F`]: Mathematische Scoring-Modelle für Dokument-Relevanz.
+//! - [`Bm25CandidateStream`]: Asynchroner Pull-Stream zur iterativen Ermittlung von Treffern.
+//!
 //! ## Scoring Models & Opt-in Features
 //! - **Standard BM25**: Default scoring algorithm used for keyword and morphological search.
 //! - **BM25F (Field-Weighted BM25)**: Opt-in field-weighted scoring model available via the
@@ -41,12 +59,31 @@ pub use tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 use contextra_ports::{TextIndex, TextIndexStats};
 use contextra_types::{DocId, Result, ScoredDocument, TxId};
 
-/// Evaluates keyword weights and applies standard BM25 logic.
+// ANCHOR[contextra-text:LIB-001]
+/// Berechnet Begriffsgewichte und wendet die Standard-BM25-Relevanzbewertung an.
+///
+/// `Bm25Scorer` fungiert als primäre Integrationsfassade für den Port [`TextIndex`].
+/// Alle Operationen (Suche, Einfügen, Löschen, Transaktions-Commit/-Rollback) werden
+/// direkt an den internen [`InvertedIndex`] delegiert.
+///
+/// # Generische Parameter
+/// - `S`: Implementierung von [`contextra_ports::StorageEngine`], über welche
+///   Posting-Listen und Dokument-Längen persistent abgelegt werden.
 pub struct Bm25Scorer<S: contextra_ports::StorageEngine> {
     index: InvertedIndex<S>,
 }
 
 impl<S: contextra_ports::StorageEngine> Bm25Scorer<S> {
+    // ANCHOR[contextra-text:LIB-002]
+    /// Erzeugt eine neue `Bm25Scorer`-Instanz über der angegebenen Speicher-Engine.
+    ///
+    /// # Ablauf
+    /// 1. Übernahme der Referenz auf die `StorageEngine`.
+    /// 2. Initialisierung des internen [`InvertedIndex`] mit dem Namensraum-Präfix.
+    ///
+    /// # Parameter
+    /// - `storage`: Referenzgezählter Zeiger ([`std::sync::Arc`]) auf den Speicher-Port.
+    /// - `namespace`: Präfix zur Mandanten- und Tabellen-Isolation der Schlüssel.
     pub fn new(storage: std::sync::Arc<S>, namespace: &str) -> Self {
         Self {
             index: InvertedIndex::new(storage, namespace),
@@ -55,45 +92,74 @@ impl<S: contextra_ports::StorageEngine> Bm25Scorer<S> {
 }
 
 impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
+    // ANCHOR[contextra-text:LIB-003]
+    /// Führt eine Volltextsuche anhand der Query aus und liefert bis zu `k` Treffer.
+    ///
+    /// # Ablauf
+    /// 1. Tokenisierung der Anfrage mit dem Standard-Tokenizer.
+    /// 2. Ermittlung der Kandidaten und Bewertung per BM25.
+    /// 3. Sortierung nach Relevanzwert (absteigend) und DocId (aufsteigend bei Gleichstand).
     async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {
         self.index.search(query, k).await
     }
 
-    /// Searches the inverted index at a specific MVCC sequence number snapshot.
+    // ANCHOR[contextra-text:LIB-004]
+    /// Führt eine Volltextsuche zu einem bestimmten MVCC-Sequenznummer-Snapshot aus.
     ///
-    /// Snapshot isolation is preserved by delegating to `InvertedIndex::search_at`.
+    /// Snapshot-Isolation wird garantiert, indem nur Einträge berücksichtigt werden,
+    /// deren Sequenznummer kleiner oder gleich `seq_no` ist.
     async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
         self.index.search_at(query, k, seq_no).await
     }
 
+    // ANCHOR[contextra-text:LIB-005]
+    /// Fügt ein Dokument unter der Transaktions-ID `tx` in den Index ein.
+    ///
+    /// # Ablauf
+    /// 1. Tokenisierung und Ermittlung von Termfrequenzen und Dokumentlänge.
+    /// 2. Vorbereitung der Änderungen im Transaktions-Staging-Puffer.
     async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {
         self.index.insert(tx, id, text).await
     }
 
+    // ANCHOR[contextra-text:LIB-006]
+    /// Markiert ein Dokument unter der Transaktions-ID `tx` als gelöscht (Tombstone).
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
         self.index.delete(tx, id).await
     }
 
+    // ANCHOR[contextra-text:LIB-007]
+    /// Schreibt alle für Transaktion `tx` vorgemerkten Änderungen dauerhaft in die Storage-Engine.
     async fn commit(&self, tx: TxId) -> Result<()> {
         self.index.commit(tx).await
     }
 
+    // ANCHOR[contextra-text:LIB-008]
+    /// Verwirft alle für die Transaktion `tx` im Speicher gepufferten Änderungen.
     async fn rollback(&self, tx: TxId) -> Result<()> {
         self.index.rollback(tx).await
     }
 
+    // ANCHOR[contextra-text:LIB-009]
+    /// Führt einen Rollback aller Transaktionen bis einschließlich `tx_id` aus.
     async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
         self.index.rollback_to_tx(tx_id).await
     }
 
+    // ANCHOR[contextra-text:LIB-010]
+    /// Liefert die höchste im Index registrierte Transaktions-ID.
     async fn last_tx_id(&self) -> Result<TxId> {
         self.index.last_tx_id().await
     }
 
+    // ANCHOR[contextra-text:LIB-011]
+    /// Liefert die Gesamtzahl aktiver Dokumente im Index.
     async fn len(&self) -> usize {
         self.index.len().await
     }
 
+    // ANCHOR[contextra-text:LIB-012]
+    /// Liefert statistische Kennzahlen über den Textindex (z. B. Dokumentenanzahl, Terme).
     async fn stats(&self) -> Result<TextIndexStats> {
         self.index.stats().await
     }
@@ -238,6 +304,8 @@ mod tests {
         }
     }
 
+    // ANCHOR[contextra-text:TEST-LIB-001]
+    // Prüft den gesamten Lebenszyklus des Bm25Scorer: Insert, Commit, Suche, Stats, Delete und Rollback.
     #[tokio::test]
     async fn bm25_scorer_case_full_lifecycle() -> Result<()> {
         let storage = std::sync::Arc::new(MockStorage::new());

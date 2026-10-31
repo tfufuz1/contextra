@@ -203,6 +203,8 @@ impl StorageEngine for TestMVCCStorage {
 ///
 /// Indexes a document containing German umlauts, compounds, and protected special characters
 /// (URL / email). For EVERY generated token, performs a point search to verify 100% recall.
+// ANCHOR[contextra-text:TEST-PIPE-001]
+/// Testzweck: Prüft Verhaltensaspekte im Modul pipeline_identity_regression.rs.
 #[tokio::test]
 async fn test_pipeline_identity_point_search_recall() -> Result<()> {
     let storage = Arc::new(TestMVCCStorage::new());
@@ -237,6 +239,8 @@ async fn test_pipeline_identity_point_search_recall() -> Result<()> {
 ///
 /// Doc A at seq=1, Doc A' (same ID, different text) at seq=2.
 /// search_at(query_A, seq=1) MUST find A, not A'.
+// ANCHOR[contextra-text:TEST-PIPE-002]
+/// Testzweck: Prüft Verhaltensaspekte im Modul pipeline_identity_regression.rs.
 #[tokio::test]
 async fn test_snapshot_isolation_same_doc_id_update() -> Result<()> {
     let storage = Arc::new(TestMVCCStorage::new());
@@ -285,6 +289,8 @@ async fn test_snapshot_isolation_same_doc_id_update() -> Result<()> {
 /// P5: Transaction Rollback Test
 ///
 /// Mutation under TxId T, Rollback of T -> text index entry is removed.
+// ANCHOR[contextra-text:TEST-PIPE-003]
+/// Testzweck: Prüft Verhaltensaspekte im Modul pipeline_identity_regression.rs.
 #[tokio::test]
 async fn test_transaction_rollback_cleans_entry() -> Result<()> {
     let storage = Arc::new(TestMVCCStorage::new());

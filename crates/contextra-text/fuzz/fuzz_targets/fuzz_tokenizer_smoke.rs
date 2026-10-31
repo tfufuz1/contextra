@@ -1,3 +1,5 @@
+//! Fuzz-Target für Tokenizer-Smoke-Tests und Regex-Kompilierung.
+// ANCHOR[contextra-text:FUZZ-002]
 #![no_main]
 
 use contextra_text::tokenizer::{

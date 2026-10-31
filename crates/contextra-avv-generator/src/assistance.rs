@@ -1,9 +1,38 @@
 //! Unterstützung bei Art. 32–36 DSGVO gemäß Art. 28 Abs. 3 lit. f DSGVO.
+//!
+//! # Zweck & Hintergrund
+//! Dieser Abschnitt regelt die Unterstützungspflichten des Auftragsverarbeiters bei
+//! sicherheits- und compliancebezogenen Anforderungen der DSGVO.
+//!
+//! Gesetzlicher Kernpunkt nach Art. 28 Abs. 3 lit. f DSGVO:
+//! Der Verarbeiter unterstützt den Verantwortlichen bei:
+//! - **Art. 32 DSGVO:** Technische und organisatorische Maßnahmen zur Sicherheit der Verarbeitung.
+//! - **Art. 33 & 34 DSGVO:** Meldung von Verletzungen des Schutzes personenbezogener Daten (Data Breaches)
+//!   an Aufsichtsbehörden und Benachrichtigung betroffener Personen.
+//! - **Art. 35 & 36 DSGVO:** Durchführung von Datenschutz-Folgenabschätzungen (DSFA) sowie
+//!   etwaige vorherige Konsultationen der Aufsichtsbehörde.
+//!
+//! # Ring-Zugehörigkeit
+//! Teil von Ring 4 (Erweiterung).
 
 use crate::error::AvvError;
 use std::fmt::Write;
 
-/// Renders Section 10: Assistance with Security and Compliance Obligations (Art. 32–36 GDPR).
+// ANCHOR[contextra-avv-generator:ASST-001]
+/// Rendert Abschnitt 10: „Unterstützung bei Einhaltung der Pflichten gemäß Art. 32–36 DSGVO“.
+///
+/// Schreibt die detaillierten Unterstützungspflichten für Datensicherheit, Breach-Notification
+/// und Folgenabschätzungen in den Ausgabepuffer.
+///
+/// # Ablauf
+/// 1. Überschrift für Abschnitt 10 ausgeben.
+/// 2. Einleitungssatz zur Unterstützungszusage unter Berücksichtigung verfügbarer Informationen.
+/// 3. Unterpunkt Art. 32 DSGVO: Gewährleistung der Sicherheit durch TOMs.
+/// 4. Unterpunkt Art. 33 & 34 DSGVO: Unverzügliche Meldung von Datenschutzvorfällen.
+/// 5. Unterpunkt Art. 35 & 36 DSGVO: Mitwirkung bei Datenschutz-Folgenabschätzungen.
+///
+/// # Fehler
+/// Gibt [`AvvError::RenderError`] zurück, falls Schreiboperationen in den Puffer fehlschlagen.
 pub fn render_section(out: &mut String) -> Result<(), AvvError> {
     writeln!(
         out,

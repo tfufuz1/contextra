@@ -200,6 +200,8 @@ impl StorageEngine for MVCCMockStorage {
 
 /// Invariant Check: A document that was deleted or updated (leaving tombstones)
 /// MUST NOT appear in BM25 search results before `resolve_tombstones()` is called.
+// ANCHOR[contextra-text:TEST-RYW-001]
+/// Testzweck: Prüft Verhaltensaspekte im Modul tombstone_read_your_writes.rs.
 #[tokio::test]
 async fn proof_deleted_doc_not_in_search_results() -> Result<()> {
     let storage = Arc::new(MVCCMockStorage::new());
@@ -254,6 +256,8 @@ async fn proof_deleted_doc_not_in_search_results() -> Result<()> {
 /// Invariant Check: Tombstone evaluation MUST respect MVCC snapshot isolation (`at_seq`).
 /// A snapshot taken BEFORE the update/delete must still see the old document,
 /// while a snapshot taken AFTER the update/delete must NOT see the old terms.
+// ANCHOR[contextra-text:TEST-RYW-002]
+/// Testzweck: Prüft Verhaltensaspekte im Modul tombstone_read_your_writes.rs.
 #[tokio::test]
 async fn proof_tombstone_snapshot_isolation() -> Result<()> {
     let storage = Arc::new(MVCCMockStorage::new());

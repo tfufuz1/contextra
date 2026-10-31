@@ -1,11 +1,24 @@
 #![forbid(unsafe_code)]
-//! Campaign J-27 AVV Test Suite — GDPR Art. 28 AVV Generator Technical Completeness
+//! Kampagnen-Test J-27: Technische Vollständigkeitsprüfung des AVV-Generators gemäß Art. 28 DSGVO.
+//!
+//! # Zweck & Testziel
+//! Dieser Test validiert die Konformität des AVV-Generators mit den formalen und technischen
+//! Anforderungen von Art. 28 Abs. 3 lit. a-h DSGVO im Rahmen der Kampagne J-27 (Compliance-Audits).
+//!
+//! Darüber hinaus verifiziert der Test, dass die in den standardmäßigen technischen und
+//! organisatorischen Maßnahmen ([`default_technical_measures`]) versprochenen Sicherheitsgarantien
+//! tatsächlich im Quellcode des Contextra-Workspace existieren:
+//! 1. Ed25519-Löschbeweis (`crates/contextra-crypto/src/deletion_proof`)
+//! 2. Zero-Egress-Gateway (`crates/contextra-privacy/src/egress_gateway.rs`)
+//! 3. Kryptografische Mandantentrennung (`crates/contextra-types/src/tenant_scope.rs`)
+//! 4. Verschlüsselter KV-Cache (`crates/contextra-crypto/src/crypto.rs`)
 
 use contextra_avv_generator::{default_technical_measures, render_avv_markdown, AvvContext};
 use contextra_types::TenantId;
 
 // ── H11: Art. 28 DSGVO AVV Generator Technical Completeness ─────────────────────
 
+// ANCHOR[contextra-avv-generator:TEST-CAMPAIGN-001]
 #[test]
 #[allow(clippy::expect_used, clippy::disallowed_methods)]
 fn test_h11_gdpr_art28_avv_generator_technical_completeness(

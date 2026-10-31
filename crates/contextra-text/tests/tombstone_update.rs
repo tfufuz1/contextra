@@ -127,6 +127,8 @@ impl StorageEngine for MockStorage {
 /// On update the tombstone path must NOT call `storage.delete` for old
 /// posting-list entries — those are overwritten lazily by LSM semantics.
 /// Only `resolve_tombstones()` should trigger deletions.
+// ANCHOR[contextra-text:TEST-TOMBUPD-001]
+/// Testzweck: Prüft Verhaltensaspekte im Modul tombstone_update.rs.
 #[tokio::test]
 async fn test_tombstone_update_no_eager_delete(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -166,6 +168,8 @@ async fn test_tombstone_update_no_eager_delete(
 
 /// After `resolve_tombstones()` the stale entries from the old document version
 /// should be removed and the BM25 index should reflect only the new terms.
+// ANCHOR[contextra-text:TEST-TOMBUPD-002]
+/// Testzweck: Prüft Verhaltensaspekte im Modul tombstone_update.rs.
 #[tokio::test]
 async fn test_bm25_correct_after_tombstone_update(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -215,6 +219,8 @@ async fn test_bm25_correct_after_tombstone_update(
 
 /// Multiple sequential updates of the same document should accumulate only
 /// ONE tombstone (because the same key is overwritten each time).
+// ANCHOR[contextra-text:TEST-TOMBUPD-003]
+/// Testzweck: Prüft Verhaltensaspekte im Modul tombstone_update.rs.
 #[tokio::test]
 async fn test_multiple_updates_single_tombstone(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {

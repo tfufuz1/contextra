@@ -123,6 +123,8 @@ impl StorageEngine for TestStorage {
 }
 
 /// Test 1: Scanner reports residual when document is present or only logically tombstoned.
+// ANCHOR[contextra-text:TEST-SCANPURGE-001]
+/// Testzweck: Prüft Verhaltensaspekte im Modul text_scanner_purger_tests.rs.
 #[tokio::test]
 async fn test_scanner_detects_unpurged_residual(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -156,6 +158,8 @@ async fn test_scanner_detects_unpurged_residual(
 
 /// Test 2: After `Purger::purge`, `remaining == 0`, doc is unsearchable,
 /// and BM25 score of remaining doc matches a freshly built index without doc 100.
+// ANCHOR[contextra-text:TEST-SCANPURGE-002]
+/// Testzweck: Prüft Verhaltensaspekte im Modul text_scanner_purger_tests.rs.
 #[tokio::test]
 async fn test_purge_and_bm25_score_equivalence(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -221,6 +225,8 @@ async fn test_purge_and_bm25_score_equivalence(
 }
 
 /// Test 3: Document with a unique term: term disappears from dictionary after purge.
+// ANCHOR[contextra-text:TEST-SCANPURGE-003]
+/// Testzweck: Prüft Verhaltensaspekte im Modul text_scanner_purger_tests.rs.
 #[tokio::test]
 async fn test_unique_term_dictionary_purge() -> std::result::Result<(), Box<dyn std::error::Error>>
 {
@@ -249,6 +255,8 @@ async fn test_unique_term_dictionary_purge() -> std::result::Result<(), Box<dyn 
 }
 
 /// Test 4: Collection-wide fast purge clears all documents in namespace.
+// ANCHOR[contextra-text:TEST-SCANPURGE-004]
+/// Testzweck: Prüft Verhaltensaspekte im Modul text_scanner_purger_tests.rs.
 #[tokio::test]
 async fn test_collection_wide_fast_purge() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let storage = Arc::new(TestStorage::new());
@@ -283,6 +291,8 @@ async fn test_collection_wide_fast_purge() -> std::result::Result<(), Box<dyn st
 }
 
 /// Test 5: Concurrency test — reader task during purge sees consistent state.
+// ANCHOR[contextra-text:TEST-SCANPURGE-005]
+/// Testzweck: Prüft Verhaltensaspekte im Modul text_scanner_purger_tests.rs.
 #[tokio::test]
 async fn test_concurrency_purge_and_read() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let storage = Arc::new(TestStorage::new());
@@ -319,6 +329,8 @@ async fn test_concurrency_purge_and_read() -> std::result::Result<(), Box<dyn st
 }
 
 /// Test 6: Sabotage test A — claiming 0 remaining without purging fails scanner check.
+// ANCHOR[contextra-text:TEST-SCANPURGE-006]
+/// Testzweck: Prüft Verhaltensaspekte im Modul text_scanner_purger_tests.rs.
 #[tokio::test]
 async fn test_sabotage_unpurged_residual_detected(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -351,6 +363,8 @@ async fn test_sabotage_unpurged_residual_detected(
 }
 
 /// Test 7: Sabotage test B — scanner positive control verifies canary presence.
+// ANCHOR[contextra-text:TEST-SCANPURGE-007]
+/// Testzweck: Prüft Verhaltensaspekte im Modul text_scanner_purger_tests.rs.
 #[tokio::test]
 async fn test_scanner_positive_control_execution(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {

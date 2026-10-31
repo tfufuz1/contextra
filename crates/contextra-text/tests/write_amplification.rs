@@ -133,6 +133,8 @@ impl StorageEngine for InstrumentedStorage {
 ///   - N puts for posting lists (pl:{term}:{doc_id})
 ///   - N puts for batch posting lists (plb:{term})
 ///   Total: 2*N + 3 puts, 0 deletes
+// ANCHOR[contextra-text:TEST-WAMP-001]
+/// Testzweck: Prüft Verhaltensaspekte im Modul write_amplification.rs.
 #[tokio::test]
 async fn test_first_insert_io_count() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let storage = Arc::new(InstrumentedStorage::new());
@@ -165,6 +167,8 @@ async fn test_first_insert_io_count() -> std::result::Result<(), Box<dyn std::er
 ///   - NOT call delete for old terms (tombstone path)
 ///   - Put: 1 dl + 1 fw + 1 meta + 3 tombstones + N_new * 2 (single + batch) posting lists
 ///   Total: 2 * N_new + 6 puts, 0 deletes (before resolve_tombstones)
+// ANCHOR[contextra-text:TEST-WAMP-002]
+/// Testzweck: Prüft Verhaltensaspekte im Modul write_amplification.rs.
 #[tokio::test]
 async fn test_tombstone_update_io_count() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let storage = Arc::new(InstrumentedStorage::new());
@@ -204,6 +208,8 @@ async fn test_tombstone_update_io_count() -> std::result::Result<(), Box<dyn std
 
 /// After resolve_tombstones, stale entries are cleaned up via deletes.
 /// This must delete the removed terms (pl & plb) and tombstones.
+// ANCHOR[contextra-text:TEST-WAMP-003]
+/// Testzweck: Prüft Verhaltensaspekte im Modul write_amplification.rs.
 #[tokio::test]
 async fn test_resolve_tombstones_cleanup_count(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {

@@ -111,6 +111,8 @@ impl StorageEngine for MockStorage {
 
 /// Sequential large-batch insert followed by updates. Verifies that
 /// `total_docs` and `total_tokens` are correct after the full sequence.
+// ANCHOR[contextra-text:TEST-CONCUR-001]
+/// Testzweck: Prüft Verhaltensaspekte im Modul concurrent_metadata.rs.
 #[tokio::test]
 async fn test_sequential_large_batch_stats_correct(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -156,6 +158,8 @@ async fn test_sequential_large_batch_stats_correct(
 /// Concurrent upserts from multiple tasks. With MockStorage (no true MVCC),
 /// sequential serialization is expected. This test validates that the
 /// index survives concurrent access without panicking.
+// ANCHOR[contextra-text:TEST-CONCUR-002]
+/// Testzweck: Prüft Verhaltensaspekte im Modul concurrent_metadata.rs.
 #[tokio::test]
 async fn test_concurrent_upserts_no_panic() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let storage = Arc::new(MockStorage::new());
@@ -192,6 +196,8 @@ async fn test_concurrent_upserts_no_panic() -> std::result::Result<(), Box<dyn s
 
 /// Demonstrates that `meta:stats` read-modify-write under concurrent upserts
 /// can lead to stale counts. This is a known limitation (PE-01-TEXT-002).
+// ANCHOR[contextra-text:TEST-CONCUR-003]
+/// Testzweck: Prüft Verhaltensaspekte im Modul concurrent_metadata.rs.
 #[tokio::test]
 async fn test_concurrent_upserts_stats_eventual_count(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {

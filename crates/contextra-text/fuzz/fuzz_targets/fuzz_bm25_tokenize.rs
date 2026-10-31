@@ -1,3 +1,5 @@
+//! Fuzz-Target für BM25-Tokenisierung mit arbiträren UTF-8-Strings.
+// ANCHOR[contextra-text:FUZZ-001]
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use contextra_text::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};

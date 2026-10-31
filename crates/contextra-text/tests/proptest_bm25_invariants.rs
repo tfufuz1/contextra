@@ -206,6 +206,8 @@ proptest! {
     // PROP-1: BM25-Score strikt positiv für vorhandene Terme
     // Für tf ≥ 1, doc_len ≥ 1, avg_doc_len > 0, df ≥ 1, n ≥ df:
     // score_term(tf, doc_len, avg_doc_len, df, n) > 0.0.
+// ANCHOR[contextra-text:TEST-PROP-001]
+/// Testzweck: Prüft Verhaltensaspekte im Modul proptest_bm25_invariants.rs.
     #[test]
     fn prop_1_bm25_score_strictly_positive_for_present_terms(
         tf in 1..10_000u32,
@@ -225,6 +227,8 @@ proptest! {
 
     // PROP-2: BM25-Score monoton in tf (bei fixem doc_len)
     // tf1 < tf2 -> score(tf1, ...) < score(tf2, ...).
+// ANCHOR[contextra-text:TEST-PROP-002]
+/// Testzweck: Prüft Verhaltensaspekte im Modul proptest_bm25_invariants.rs.
     #[test]
     fn prop_2_bm25_score_monotone_increasing_in_tf(
         tf1 in 1..5_000u32,
@@ -261,6 +265,8 @@ proptest! {
     // Dementsprechend gilt für d(Score)/d(doc_len) = -N * IDF * (k1 * b / avg_doc_len) / (D(doc_len))^2 < 0.
     // Somit ist die Score-Funktion bezüglich doc_len streng monoton fallend:
     // doc_len1 < doc_len2 ==> score(tf, doc_len1, ...) > score(tf, doc_len2, ...).
+// ANCHOR[contextra-text:TEST-PROP-003]
+/// Testzweck: Prüft Verhaltensaspekte im Modul proptest_bm25_invariants.rs.
     #[test]
     fn prop_3_bm25_score_monotone_decreasing_in_doc_len(
         tf in 1..10_000u32,
@@ -284,6 +290,8 @@ proptest! {
     // PROP-4: Keine NaN-Ausgabe der Score-Funktion
     // Für beliebige valide Inputs (tf ∈ [1..1000], doc_len ∈ [1..10000], avg_doc_len ∈ [1.0..1000.0], df ∈ [1..10000], n ∈ [df..100000]):
     // !score_term(...).is_nan().
+// ANCHOR[contextra-text:TEST-PROP-004]
+/// Testzweck: Prüft Verhaltensaspekte im Modul proptest_bm25_invariants.rs.
     #[test]
     fn prop_4_no_nan_output_for_valid_inputs(
         tf in 1..1000u32,
@@ -311,6 +319,8 @@ proptest! {
     // - search_bm25_at(q, k, Some(S1)) enthält DocId.
     // - search_bm25_at(q, k, Some(S2)) enthält DocId NICHT.
     // Invariante gilt für beliebige Queries [a-z]{2..8} und k ∈ [1..20].
+// ANCHOR[contextra-text:TEST-PROP-005]
+/// Testzweck: Prüft Verhaltensaspekte im Modul proptest_bm25_invariants.rs.
     #[test]
     fn prop_5_tombstone_isolation_snapshot_semantics(
         q in "[a-z]{2,8}",
