@@ -1,6 +1,9 @@
-// FILE-CONTEXT
-// ZWECK: Port- und Isolationstests für TenantPrefixKvStore (§9.2).
-// STAND: TS:2026-09-15T00:00:00Z
+//! # Port- und Isolationstests für TenantPrefixKvStore
+//!
+//! ANCHOR[contextra-kvcache:TEST-PREFIX-PORT-001]
+//!
+//! Verifiziert die Implementierung des `KvPrefixStore`-Ports, inklusive LCP-Präfixauflösung,
+//! Kosten-Policy, Mandantentrennung, Budget-Verdrängung und Nebenläufigkeit über 8 Threads.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -34,6 +37,7 @@ fn make_block(id: u64, size: usize) -> KvBlock {
     }
 }
 
+// Prüft einfachen Roundtrip aus Einfügen und exaktem Abrufen von KV-Blöcken über ein Token-Präfix.
 #[test]
 fn test_round_trip() -> Result<(), ContextraError> {
     let store = TenantPrefixKvStore::new();
@@ -53,6 +57,7 @@ fn test_round_trip() -> Result<(), ContextraError> {
     Ok(())
 }
 
+// Prüft, dass bei mehreren passenden Sequenzen stets das längste gemeinsame Präfix gewinnt.
 #[test]
 fn test_longest_prefix_wins() -> Result<(), ContextraError> {
     let store = TenantPrefixKvStore::new().with_reuse_policy(KvReusePolicy::Always);
@@ -76,6 +81,7 @@ fn test_longest_prefix_wins() -> Result<(), ContextraError> {
     Ok(())
 }
 
+// Prüft, dass die kostenbasierte Policy kurze Präfixe unterhalb der Min-Länge unterdrückt.
 #[test]
 fn test_cost_based_policy_suppresses_short_matches() -> Result<(), ContextraError> {
     let store = TenantPrefixKvStore::new()
@@ -97,6 +103,7 @@ fn test_cost_based_policy_suppresses_short_matches() -> Result<(), ContextraErro
     Ok(())
 }
 
+// Prüft strikte Mandanten-Isolation: Mandant B hat keinen Zugriff auf Präfix-Blöcke von Mandant A.
 #[test]
 fn test_tenant_isolation() -> Result<(), ContextraError> {
     let store = TenantPrefixKvStore::new();
@@ -119,6 +126,7 @@ fn test_tenant_isolation() -> Result<(), ContextraError> {
     Ok(())
 }
 
+// Prüft, dass unterschiedliche PrefixKeys (z. B. verschiedene Modelle) getrennt gehalten werden.
 #[test]
 fn test_different_prefix_key_miss() -> Result<(), ContextraError> {
     let store = TenantPrefixKvStore::new();
@@ -134,6 +142,7 @@ fn test_different_prefix_key_miss() -> Result<(), ContextraError> {
     Ok(())
 }
 
+// Prüft Ablehnung übergroßer Blöcke und automatische LRU-Eviction bei Überschreitung des Mandanten-Budgets.
 #[test]
 fn test_budget_eviction_and_oversized_rejection() -> Result<(), ContextraError> {
     let store = TenantPrefixKvStore::new().with_byte_budget_per_tenant(300);
@@ -168,6 +177,7 @@ fn test_budget_eviction_and_oversized_rejection() -> Result<(), ContextraError> 
     Ok(())
 }
 
+// Prüft, dass die Methode evict die exakte Anzahl der entfernten Blöcke zurückliefert.
 #[test]
 fn test_evict_returns_block_count() -> Result<(), ContextraError> {
     let store = TenantPrefixKvStore::new();
@@ -195,6 +205,7 @@ fn test_evict_returns_block_count() -> Result<(), ContextraError> {
     Ok(())
 }
 
+// Prüft Thread-Sicherheit und Konsistenz bei gleichzeitigen Schreib- und Lesezugriffen über 8 Threads.
 #[test]
 fn test_concurrency_8_threads() -> Result<(), ContextraError> {
     let store = Arc::new(TenantPrefixKvStore::new().with_byte_budget_per_tenant(1024 * 1024));
@@ -227,6 +238,7 @@ fn test_concurrency_8_threads() -> Result<(), ContextraError> {
     Ok(())
 }
 
+// Prüft die dyn-Kompatibilität von TenantPrefixKvStore als Arc<dyn KvPrefixStore>.
 #[test]
 fn test_arc_dyn_trait_object() -> Result<(), ContextraError> {
     let store: Arc<dyn KvPrefixStore> = Arc::new(TenantPrefixKvStore::new());

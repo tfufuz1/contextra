@@ -1,3 +1,10 @@
+//! # Tests für mandantenübergreifende Isolation im Content-Addressed KV-Store
+//!
+//! ANCHOR[contextra-kvcache:TEST-CONTENT-ISO-001]
+//!
+//! Verifiziert, dass im content-adressierten KV-Store weder bei exakten Präfixen,
+//! noch bei BLAKE3-Content-Hashes oder semantischen Embeddings Daten zwischen Mandanten lecken.
+
 #![cfg(feature = "content-addressed-kv-cache")]
 
 use contextra_kvcache::{
@@ -14,6 +21,7 @@ impl SemanticEmbedder for DummyEmbedder {
     }
 }
 
+// Prüft strikte Mandantentrennung bei exaktem Präfix-Lookup: Mandant B erhält niemals Treffer von Mandant A.
 #[test]
 fn test_cross_tenant_content_addressed_isolation_exact_and_content_hash() {
     let tenant_a = TenantId::try_new(101).expect("valid tenant_a");
@@ -73,6 +81,7 @@ fn test_cross_tenant_content_addressed_isolation_exact_and_content_hash() {
     }
 }
 
+// Prüft, dass BLAKE3-Content-Hash-Treffer strikt auf den jeweiligen Mandanten isoliert bleiben.
 #[test]
 fn test_cross_tenant_content_hash_hit_isolation() {
     let tenant_a = TenantId::try_new(10).expect("valid tenant_a");
@@ -107,6 +116,7 @@ fn test_cross_tenant_content_hash_hit_isolation() {
     );
 }
 
+// Prüft, dass semantische Ähnlichkeitstreffer über Vektor-Embeddings Mandantengrenzen strikt respektieren.
 #[test]
 fn test_cross_tenant_semantic_similarity_hit_isolation() {
     let tenant_a = TenantId::try_new(1).expect("valid tenant_a");

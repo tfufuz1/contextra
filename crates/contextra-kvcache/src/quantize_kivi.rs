@@ -1,19 +1,39 @@
-#![forbid(unsafe_code)]
-
-//! KIVI 2-Bit Quantization Metadata, Asymmetric Quantization, and Unpacking Infrastructure.
+//! # KIVI 2-Bit Quantisierung und Kompression
 //!
-//! Provides metadata representations, validation, asymmetric 2-bit quantization
-//! (per-channel for keys, per-token for values), and dequantization for KV-cache byte blocks.
+//! ANCHOR[contextra-kvcache:KIVI-001]
+//!
+//! Dieses Modul implementiert asymmetrische 2-Bit-Quantisierung nach dem KIVI-Verfahren
+//! (arXiv:2402.02750: *KIVI: A Tuning-Free Asymmetric 2-bit Quantization for KV Cache*).
+//!
+//! ## Was ist KIVI?
+//! Bei langen Text-Kontexten wächst der KV-Cache im RAM massiv an. Übliche FP16/BF16-Tensoren
+//! belegen 16 Bit pro Skalarwert. KIVI reduziert diesen Speicherbedarf drastisch auf **2 Bit**:
+//! - **Keys (Schlüssel)**: Werden *per-channel* (kanalweise) in Gruppen (`key_group_size`, z. B. 16) quantisiert.
+//! - **Values (Werte)**: Werden *per-token* quantisiert.
+//!
+//! ## INV-KIVI-AEAD-ORDER
+//! Für das Tiering auf Sekundärspeicher gilt zwingend folgende Reihenfolge:
+//! 1. **Quantisierung** (Datenvolumen um ~75% reduzieren).
+//! 2. **Kompression** (Run-Length-Encoding / Packen).
+//! 3. **AEAD-Verschlüsselung** (Authentifizierte Verschlüsselung mit Nonce).
+//!
+//! Beim Lesen gilt exakt die umgekehrte Reihenfolge:
+//! 1. **AEAD-Entschlüsselung**
+//! 2. **Dekomprimierung**
+//! 3. **Dequantisierung**
+
+#![forbid(unsafe_code)]
 
 use contextra_types::{ContextraError, Result};
 use serde::{Deserialize, Serialize};
 
-/// Configuration for KIVI quantization parameters.
+// ANCHOR[contextra-kvcache:KIVI-002]
+/// Konfiguration für die KIVI-Quantisierungsparameter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KiviQuantizeConfig {
-    /// Group size for key channel quantization (default: 16).
+    /// Gruppengröße für die per-channel Key-Quantisierung (Standard: 16).
     pub key_group_size: usize,
-    /// Whether value quantization is enabled (default: true).
+    /// Gibt an, ob Values ebenfalls quantisiert werden sollen (Standard: true).
     pub quantize_values: bool,
 }
 
@@ -26,21 +46,25 @@ impl Default for KiviQuantizeConfig {
     }
 }
 
-/// A view over unquantized raw key and value tensors.
+// ANCHOR[contextra-kvcache:KIVI-003]
+/// Sicht (View) auf unquantisierte Roh-Tensoren für Keys und Values.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct KvTensorView {
-    /// Key tensor floats in [num_tokens, num_channels] row-major order.
+    /// Key-Tensor als Fließkommazahlen in `[num_tokens, num_channels]` Row-Major-Ordnung.
     pub keys: Vec<f32>,
-    /// Value tensor floats in [num_tokens, num_channels] row-major order.
+    /// Value-Tensor als Fließkommazahlen in `[num_tokens, num_channels]` Row-Major-Ordnung.
     pub values: Vec<f32>,
-    /// Number of tokens encoded.
+    /// Anzahl encodierter Tokens.
     pub num_tokens: usize,
-    /// Number of channels per head/token.
+    /// Anzahl Kanäle pro Head/Token.
     pub num_channels: usize,
 }
 
 impl KvTensorView {
-    /// Creates a new `KvTensorView` validating element count dimensions.
+    /// Erstellt einen neuen `KvTensorView` und prüft die Dimensionen gegen die Elementanzahl.
+    ///
+    /// # Fehler
+    /// Liefert [`ContextraError::InvalidInput`], falls `keys.len()` oder `values.len()` nicht `num_tokens * num_channels` entsprechen.
     pub fn new(
         keys: Vec<f32>,
         values: Vec<f32>,
@@ -74,61 +98,63 @@ impl KvTensorView {
         })
     }
 
-    /// Serializes tensor view to bytes using bincode.
+    /// Serialisiert die Tensor-Sicht in Bytes via Bincode.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         bincode::serialize(self).map_err(|e| ContextraError::Serialization(e.to_string()))
     }
 
-    /// Deserializes tensor view from bytes using bincode.
+    /// Deserialisiert eine Tensor-Sicht aus Bytes via Bincode.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         bincode::deserialize(bytes).map_err(|e| ContextraError::Serialization(e.to_string()))
     }
 }
 
-/// Metadata required to dequantize a 2-bit KIVI block.
+// ANCHOR[contextra-kvcache:KIVI-004]
+/// Metadaten zur Dequantisierung eines 2-Bit KIVI-Blocks.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct KiviBlockMeta {
-    /// Number of bits allocated per scalar value (must be 2 for KIVI).
+    /// Anzahl Bits pro Skalarwert (für KIVI strikt 2).
     pub bits_per_value: u8,
-    /// Scaling multiplier for linear quantization.
+    /// Skalierungsfaktor (Scale) für lineare Min/Max-Quantisierung.
     pub scale: f32,
-    /// Zero-point baseline shift for linear quantization.
+    /// Nullpunktverschiebung (Zero Point) für asymmetrische Quantisierung.
     pub zero_point: f32,
-    /// Number of floating point values encoded in the block.
+    /// Ursprüngliche Elementanzahl der Fließkommawerte im Block.
     pub original_len: usize,
 
-    /// Number of tokens.
+    /// Anzahl Tokens.
     #[serde(default)]
     pub num_tokens: usize,
-    /// Number of channels.
+    /// Anzahl Kanäle.
     #[serde(default)]
     pub num_channels: usize,
-    /// Key quantization group size.
+    /// Key-Quantisierungs-Gruppengröße.
     #[serde(default)]
     pub key_group_size: usize,
-    /// Whether values are quantized.
+    /// Gibt an, ob Values quantisiert wurden.
     #[serde(default)]
     pub quantize_values: bool,
-    /// Per-channel key scaling factors.
+    /// Skalierungsfaktoren pro Kanalgruppe für Keys.
     #[serde(default)]
     pub key_scales: Vec<f32>,
-    /// Per-channel key zero points.
+    /// Nullpunkte pro Kanalgruppe für Keys.
     #[serde(default)]
     pub key_zero_points: Vec<f32>,
-    /// Per-token value scaling factors.
+    /// Skalierungsfaktoren pro Token für Values.
     #[serde(default)]
     pub value_scales: Vec<f32>,
-    /// Per-token value zero points.
+    /// Nullpunkte pro Token für Values.
     #[serde(default)]
     pub value_zero_points: Vec<f32>,
 }
 
-/// A 2-bit quantized byte block with accompanying metadata.
+// ANCHOR[contextra-kvcache:KIVI-005]
+/// 2-Bit-quantisierter Byte-Block mit zugehörigen Dequantisierungs-Metadaten.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct KiviQuantizedBlock {
-    /// Quantization metadata.
+    /// Dequantisierungs-Metadaten.
     pub meta: KiviBlockMeta,
-    /// Packed 2-bit scalar values (4 values packed per byte, LSB-first).
+    /// Gepackte 2-Bit-Skalarwerte (4 Werte pro Byte gepackt, LSB-first).
     pub packed: Vec<u8>,
 }
 
@@ -138,9 +164,16 @@ struct KiviPackedPayload {
     packed_values: Vec<u8>,
 }
 
-/// Quantizes raw `KvTensorView` into 2-bit `KiviQuantizedBlock`.
+// ANCHOR[contextra-kvcache:KIVI-006]
+/// Quantisiert einen unkomprimierten [`KvTensorView`] in einen 2-Bit [`KiviQuantizedBlock`].
 ///
-/// Implements asymmetric 2-bit quantization (per-channel for keys, per-token for values, arXiv:2402.02750).
+/// # Ablauf
+/// 1. Dimensionen prüfen und Gruppengröße festlegen.
+/// 2. **Keys quantisieren**: Für jede Kanalgruppe Min- und Max-Werte ermitteln,
+///    Scale und Zero-Point berechnen und die Werte auf 2 Bit (0..=3) packen (4 Werte pro Byte).
+/// 3. **Values quantisieren**: Pro Token Min/Max berechnen und in 2 Bit packen
+///    (bzw. unquantisiert serialisieren, falls `quantize_values == false`).
+/// 4. Metadaten und gepackte Byte-Payload in [`KiviQuantizedBlock`] assemblieren.
 pub fn kivi_quantize(raw: &KvTensorView, config: KiviQuantizeConfig) -> Result<KiviQuantizedBlock> {
     let num_tokens = raw.num_tokens;
     let num_channels = raw.num_channels;
@@ -329,7 +362,13 @@ pub fn kivi_quantize(raw: &KvTensorView, config: KiviQuantizeConfig) -> Result<K
     Ok(KiviQuantizedBlock { meta, packed })
 }
 
-/// Dequantizes packed 2-bit bytes back into `KvTensorView`.
+// ANCHOR[contextra-kvcache:KIVI-007]
+/// Dequantisiert gepackte 2-Bit-Bytes zurück in einen [`KvTensorView`].
+///
+/// # Ablauf
+/// 1. Metadaten validieren (`bits_per_value == 2`, Skalen und Nullpunkte müssen endlich sein).
+/// 2. Payload deserialisieren.
+/// 3. 2-Bit-Codes entpacken und mit `v = zp + code * sc` in f32 zurückrechnen.
 pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorView> {
     if meta.bits_per_value != 2 {
         return Err(ContextraError::kv_quantization(format!(
@@ -476,7 +515,8 @@ pub fn kivi_dequantize(bytes: &[u8], meta: &KiviBlockMeta) -> Result<KvTensorVie
     KvTensorView::new(keys, values, num_tokens, num_channels)
 }
 
-/// Dequantizes a 2-bit packed block back into floating point `Vec<f32>`.
+// ANCHOR[contextra-kvcache:KIVI-008]
+/// Entpackt einen einzelnen linearen 2-Bit-Block zurück in ein `Vec<f32>`.
 pub fn unpack_kivi_block(block: &KiviQuantizedBlock) -> Result<Vec<f32>> {
     if block.meta.bits_per_value != 2 {
         return Err(ContextraError::InvalidInput(format!(
@@ -523,7 +563,8 @@ pub fn unpack_kivi_block(block: &KiviQuantizedBlock) -> Result<Vec<f32>> {
     Ok(result)
 }
 
-/// Reference implementation for 2-bit linear min/max quantization.
+// ANCHOR[contextra-kvcache:KIVI-009]
+/// Referenz-Implementierung für lineare 2-Bit Min/Max-Quantisierung eines Fließkomma-Slices.
 pub fn pack_kivi_block(values: &[f32]) -> KiviQuantizedBlock {
     if values.is_empty() {
         return KiviQuantizedBlock {
@@ -602,7 +643,11 @@ pub fn pack_kivi_block(values: &[f32]) -> KiviQuantizedBlock {
     }
 }
 
-/// Losslessly compresses byte slice for LSM spill (Quantization -> Compression -> AEAD).
+// ANCHOR[contextra-kvcache:KIVI-010]
+/// Komprimiert ein Byte-Slice verlustfrei für Tier-2 Auslagerungen (LSM-Spill).
+///
+/// Nutzt ein einfaches Run-Length-Encoding (RLE) mit Header `0x43` ('C' für Compressed)
+/// bzw. Fallback `0x55` ('U' für Uncompressed), falls RLE keine Ersparnis bringt.
 pub fn compress_bytes(input: &[u8]) -> Vec<u8> {
     if input.is_empty() {
         return vec![0x55];
@@ -635,7 +680,11 @@ pub fn compress_bytes(input: &[u8]) -> Vec<u8> {
     }
 }
 
-/// Losslessly decompresses byte slice produced by `compress_bytes`.
+// ANCHOR[contextra-kvcache:KIVI-011]
+/// Dekomprimiert ein zuvor mit [`compress_bytes`] komprimiertes Byte-Slice.
+///
+/// # Fehler
+/// Liefert [`ContextraError::kv_quantization`], falls die Eingabe leer ist oder der Header ungültig ist.
 pub fn decompress_bytes(input: &[u8]) -> Result<Vec<u8>> {
     if input.is_empty() {
         return Err(ContextraError::kv_quantization(
@@ -667,6 +716,7 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
+    // Prüft, dass ungültige Metadaten (z. B. bits_per_value != 2) sauber mit Fehler quittiert werden ohne Panic.
     #[test]
     fn test_kivi_metadata_validation_errors_no_panic() {
         let meta_wrong_bits = KiviBlockMeta {
@@ -690,6 +740,7 @@ mod tests {
         assert!(unpack_kivi_block(&block_wrong_bits).is_err());
     }
 
+    // Prüft grundlegendes Quantisieren und Dequantisieren eines einfachen KvTensorViews.
     #[test]
     fn test_kivi_quantize_dequantize_roundtrip_simple() {
         let raw = KvTensorView::new(vec![1.0, 2.0, 3.0, 4.0], vec![10.0, 20.0, 30.0, 40.0], 2, 2)
@@ -709,6 +760,7 @@ mod tests {
         assert_eq!(decompressed.values.len(), 4);
     }
 
+    // Prüft verlustfreien Roundtrip von Kompression und Dekompression.
     #[test]
     fn test_compress_decompress_bytes_roundtrip() {
         let sample = vec![0x00, 0x00, 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD];
@@ -717,6 +769,7 @@ mod tests {
         assert_eq!(sample, decompressed);
     }
 
+    // Prüft die Rekonstruktionsgenauigkeit: Kosinus-Ähnlichkeit zwischen Original und Rekonstruktion muss > 0.99 sein.
     #[test]
     fn test_v3_kivi_quantization_cosine_similarity_reconstruction() {
         // Generate a synthetic attention KV tensor view [num_tokens: 32, num_channels: 64]
@@ -778,6 +831,7 @@ mod tests {
     }
 
     proptest! {
+        // Eigenschaftstest: Beliebige Byte-Vektoren bleiben nach Kompression und Dekompression unverändert.
         #[test]
         fn prop_compression_roundtrip(vec in proptest::collection::vec(0u8..255u8, 0..100)) {
             let compressed = compress_bytes(&vec);

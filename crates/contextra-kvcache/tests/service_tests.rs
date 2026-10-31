@@ -1,3 +1,11 @@
+//! # Integrationstests für KvCacheService und Adapter
+//!
+//! ANCHOR[contextra-kvcache:TEST-SERV-001]
+//!
+//! Prüft den gesamten Lebenszyklus der Service-Fassade `KvCacheService`:
+//! Einfügen, Suchen, Lesen, Mandantenlöschung, Speicherlimits, Nebenläufigkeit
+//! sowie Brückenadapter für Storage-Engines und Plugin-Manifeste.
+
 use std::collections::BTreeMap;
 use std::ops::Bound;
 use std::sync::Arc;
@@ -164,6 +172,7 @@ impl EmbeddingProvider for MockEmbeddingProvider {
     }
 }
 
+// Prüft das deterministische LRU-Fallback-Verhalten bei NullAttentionScoreSource.
 #[test]
 fn test_null_attention_score_source_fallback_and_eviction() {
     let null_source = NullAttentionScoreSource;
@@ -179,6 +188,7 @@ fn test_null_attention_score_source_fallback_and_eviction() {
     assert_eq!(ranked, vec![300, 200, 100]);
 }
 
+// Prüft den vollständigen Lebenszyklus: Einfügen, Auffinden, Lesen und anschließendes Löschen des Mandanten.
 #[tokio::test]
 async fn test_service_lifecycle_put_get_evict() {
     let service = KvCacheServiceBuilder::new()
@@ -224,6 +234,7 @@ async fn test_service_lifecycle_put_get_evict() {
     assert_eq!(stats_after.radix_entry_count, 0);
 }
 
+// Prüft, dass Mandant B bei identischen Tokens niemals einen Treffer auf Daten von Mandant A erhält.
 #[test]
 fn test_tenant_isolation_foreign_prefix_miss() {
     let service = KvCacheServiceBuilder::new()
@@ -257,6 +268,7 @@ fn test_tenant_isolation_foreign_prefix_miss() {
     assert_eq!(service.stats(tenant_b).segment_count, 1);
 }
 
+// Prüft die Einhaltung des konfigurierten Speicherbudgets sowie die Zurückweisung übergroßer oder leerer Segmente.
 #[test]
 fn test_memory_limit_and_budget_eviction() {
     // 1 MiB budget
@@ -294,6 +306,7 @@ fn test_memory_limit_and_budget_eviction() {
         .is_none());
 }
 
+// Prüft nebenläufige parallele Zugriffe auf KvCacheService über 8 Threads.
 #[test]
 fn test_concurrency_multi_threaded_access() {
     let service: Arc<KvCacheService> = Arc::new(
@@ -334,6 +347,7 @@ fn test_concurrency_multi_threaded_access() {
     }
 }
 
+// Prüft den StorageEngineKvBridge-Adapter bei Put-, Commit- und Get-Operationen auf der Storage-Engine.
 #[tokio::test]
 async fn test_adapter_roundtrip_storage_engine_bridge() {
     let mock_engine = Arc::new(MockStorageEngine::new());
@@ -357,6 +371,7 @@ async fn test_adapter_roundtrip_storage_engine_bridge() {
     assert_eq!(fetched, Some(Bytes::from_static(value)));
 }
 
+// Prüft die Erstellung von EmbeddingProviderSemanticEmbedder und die Validierung des Plugin-Manifests.
 #[test]
 fn test_adapter_roundtrip_embedding_provider_and_plugin_manifest() {
     let mock_provider = Arc::new(MockEmbeddingProvider);
