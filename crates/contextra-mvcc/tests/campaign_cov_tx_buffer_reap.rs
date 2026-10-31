@@ -1,3 +1,9 @@
+// ANCHOR[contextra-mvcc:TEST-CAMPAIGN-COV-TX-REAP-ROOT]
+//! # Kampagnen-Test für TxBuffer Orphan-Reaping und Obergrenzen
+//!
+//! Prüft die gezielte Testabdeckung von `reap_orphans_bounded` unter deterministischer
+//! Zeiteinspeisung über `ManualClock`.
+
 // FILE-CONTEXT
 // ZWECK: Campaign coverage test for TxBuffer reap_orphans_bounded and deterministic time injection.
 // INVARIANTEN: reap_orphans_bounded caps reaped orphan count to max and leaves remaining unexpired/unreaped transactions intact.
@@ -11,6 +17,7 @@ use contextra_types::TxId;
 use std::sync::Arc;
 use std::time::Duration;
 
+// Prüft die exakte Begrenzung der abgeräumten verwaisten Transaktionen auf die vorgegebene Obergrenze.
 #[test]
 fn test_tx_buffer_reap_orphans_bounded_exact_capping_and_time_injection() {
     let clock = Arc::new(ManualClock::new(100_000_000_000));
