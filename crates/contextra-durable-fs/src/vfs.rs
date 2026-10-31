@@ -1,3 +1,22 @@
+//! # Virtuelles Dateisystem (VFS - Virtual File System)
+//!
+//! Zweck: Bereitstellung einer Schnittstellenabstraktion für Dateisystemoperationen,
+//! um positionsbasiertes I/O (`read_at`, `write_at`), Dateisynchronisation (`sync_data`, `sync_all`)
+//! und Verzeichnisverwaltung testbar und mockbar zu machen.
+//!
+//! Ring-Zugehörigkeit: Ring 0 (I/O- und Speicherschnittstellen).
+//! Wird genutzt von: Index- und Speicher-Engines (z. B. HNSW-Vektorindex, Blockmanager).
+//! Wichtigste Typen:
+//! - [`Vfs`]: Der abstrakte Trait für Dateisystemaktionen (Öffnen, Löschen, Umbenennen).
+//! - [`VfsFile`]: Der Trait für positionsabhängige Lese- und Schreibzugriffe auf offene Dateien.
+//! - [`VfsOpenOptions`]: Parameter zum Öffnen von Dateien (Lesen, Schreiben, Erstellen, Kürzen).
+//! - [`RealFs`]: Standardimplementierung, die Aufrufe an das reale Host-Dateisystem weiterleitet.
+//! - [`RealFsFile`]: Dateihandle-Wrapper für [`std::fs::File`] mit plattformspezifischen Erweiterungen.
+//!
+//! Invarianten:
+//! - Schnittstellenvertrag: Deterministische I/O-Fehlerweiterleitung ohne `panic!`.
+//! - Plattformunabhängigkeit: Verwendet auf Unix `FileExt::read_at`/`write_at` und auf Windows `FileExt::seek_read`/`seek_write`.
+
 // FILE-CONTEXT
 // STAND: 2026-10-12
 // ZWECK: Virtual File System (VFS) Abstraktion fuer deterministische I/O-Injektion und Testbarkeit.
@@ -12,62 +31,80 @@ use std::os::unix::fs::FileExt;
 #[cfg(windows)]
 use std::os::windows::fs::FileExt;
 
-/// File opening options passed to [`Vfs::open`].
+// ANCHOR[contextra-durable-fs:VFS-OPTIONS-001]
+/// Optionen zum Öffnen von Dateien über das virtuelle Dateisystem ([`Vfs::open`]).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct VfsOpenOptions {
-    /// Open for reading.
+    /// Öffnet die Datei mit Leserechten.
     pub read: bool,
-    /// Open for writing.
+    /// Öffnet die Datei mit Schreibrechten.
     pub write: bool,
-    /// Create new file if it does not exist.
+    /// Erstellt eine neue Datei, falls sie noch nicht existiert.
     pub create: bool,
-    /// Create new file, failing if file already exists.
+    /// Erstellt eine neue Datei und schlägt fehl, falls sie bereits existiert (`create_new`).
     pub create_new: bool,
-    /// Truncate existing file length to 0.
+    /// Setzt die Dateilänge beim Öffnen sofort auf 0 zurück (`truncate`).
     pub truncate: bool,
-    /// Append write mode.
+    /// Hängt neue Schreiboperationen immer an das Dateiende an (`append`).
     pub append: bool,
 }
 
-/// Abstract virtual filesystem interface for storage engines.
+// ANCHOR[contextra-durable-fs:VFS-TRAIT-001]
+/// Abstrakte Schnittstelle für Dateisysteme zur Entkopplung von Speicherkomponenten.
 pub trait Vfs: Send + Sync + 'static {
-    /// Opens a file according to specified options.
+    // ANCHOR[contextra-durable-fs:VFS-OPEN]
+    /// Öffnet eine Datei gemäß den übergebenen Optionen.
     fn open(&self, path: &Path, opts: &VfsOpenOptions) -> std::io::Result<Box<dyn VfsFile>>;
-    /// Creates directory and all parent directories.
+    // ANCHOR[contextra-durable-fs:VFS-CREATE-DIR-ALL]
+    /// Erstellt das angegebene Verzeichnis inklusive aller übergeordneten Ordner.
     fn create_dir_all(&self, path: &Path) -> std::io::Result<()>;
-    /// Removes a file from filesystem.
+    // ANCHOR[contextra-durable-fs:VFS-REMOVE-FILE]
+    /// Entfernt eine Datei dauerhaft aus dem Dateisystem.
     fn remove_file(&self, path: &Path) -> std::io::Result<()>;
-    /// Renames a file atomically from `from` to `to`.
+    // ANCHOR[contextra-durable-fs:VFS-RENAME]
+    /// Benennt eine Datei atomar von `from` nach `to` um.
     fn rename(&self, from: &Path, to: &Path) -> std::io::Result<()>;
-    /// Lists all entries inside a directory path.
+    // ANCHOR[contextra-durable-fs:VFS-READ-DIR]
+    /// Liest alle Einträge eines Verzeichnisses aus.
     fn read_dir(&self, path: &Path) -> std::io::Result<Vec<PathBuf>>;
-    /// Checks if a file or directory exists.
+    // ANCHOR[contextra-durable-fs:VFS-EXISTS]
+    /// Prüft, ob ein Pfad (Datei oder Ordner) im Dateisystem existiert.
     fn exists(&self, path: &Path) -> std::io::Result<bool>;
-    /// Synchronizes directory metadata to stable storage.
+    // ANCHOR[contextra-durable-fs:VFS-SYNC-DIR]
+    /// Synchronisiert die Verzeichnismetadaten auf stabile Speichermedien.
     fn sync_dir(&self, path: &Path) -> std::io::Result<()>;
 }
 
-/// Abstract positional file handle returned by [`Vfs::open`].
+// ANCHOR[contextra-durable-fs:VFS-FILE-TRAIT-001]
+/// Abstraktes Dateihandle mit Unterstützung für positionsbasiertes I/O (Offset-Zugriff).
 pub trait VfsFile: Send + Sync {
-    /// Positional read into `buf` from `offset`.
+    // ANCHOR[contextra-durable-fs:VFS-FILE-READ-AT]
+    /// Liest Daten ab einem festen Byte-Offset `offset` in den Puffer `buf`, ohne den Dateizeiger zu verändern.
     fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize>;
-    /// Positional write of `buf` at `offset`.
+    // ANCHOR[contextra-durable-fs:VFS-FILE-WRITE-AT]
+    /// Schreibt Daten aus `buf` an den festen Byte-Offset `offset`, ohne den Dateizeiger zu verändern.
     fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize>;
-    /// Truncates or extends file length.
+    // ANCHOR[contextra-durable-fs:VFS-FILE-SET-LEN]
+    /// Ändert die physische Größe der Datei (Kürzen oder Erweitern).
     fn set_len(&self, len: u64) -> std::io::Result<()>;
-    /// Queries physical file length in bytes.
+    // ANCHOR[contextra-durable-fs:VFS-FILE-LEN]
+    /// Fragt die aktuelle Dateigröße in Bytes ab.
     fn len(&self) -> std::io::Result<u64>;
-    /// Returns `true` if file length is 0 bytes.
+    // ANCHOR[contextra-durable-fs:VFS-FILE-IS-EMPTY]
+    /// Prüft, ob die Datei 0 Bytes groß ist.
     fn is_empty(&self) -> std::io::Result<bool> {
         Ok(self.len()? == 0)
     }
-    /// Synchronizes data bytes to disk.
+    // ANCHOR[contextra-durable-fs:VFS-FILE-SYNC-DATA]
+    /// Synchronisiert die geschriebenen Nutzdatenblöcke auf die Festplatte (`fdatasync`).
     fn sync_data(&self) -> std::io::Result<()>;
-    /// Synchronizes data bytes and metadata to disk.
+    // ANCHOR[contextra-durable-fs:VFS-FILE-SYNC-ALL]
+    /// Synchronisiert Nutzdaten und alle Dateimetadaten auf die Festplatte (`fsync`).
     fn sync_all(&self) -> std::io::Result<()>;
 }
 
-/// Standard real filesystem implementation delegating to [`std::fs`].
+// ANCHOR[contextra-durable-fs:REAL-FS-001]
+/// Standard-Implementierung des [`Vfs`], die direkt mit dem Host-Betriebssystem interagiert.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RealFs;
 
@@ -95,6 +132,7 @@ impl Vfs for RealFs {
     }
 
     fn rename(&self, from: &Path, to: &Path) -> std::io::Result<()> {
+        // NOTE: Verwendet rename_durable aus contextra-sys zur dauerhaften Umbenennung.
         contextra_sys::rename_durable(from, to)?;
         if let Some(parent) = to.parent() {
             let _ = crate::sync_dir(parent);
@@ -120,7 +158,8 @@ impl Vfs for RealFs {
     }
 }
 
-/// Positional [`std::fs::File`] wrapper implementing [`VfsFile`].
+// ANCHOR[contextra-durable-fs:REAL-FS-FILE-001]
+/// Implementierung von [`VfsFile`] auf Basis von [`std::fs::File`].
 #[derive(Debug)]
 pub struct RealFsFile {
     file: File,

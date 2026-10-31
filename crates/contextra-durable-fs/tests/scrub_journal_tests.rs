@@ -1,8 +1,14 @@
+//! # Testsuite: scrub_journal_tests.rs
+//!
+//! Zweck: Integrationstests für `scrub_if_safe` mit Hardlink-Verweigerung und `PendingDeleteJournal`.
+
 use contextra_durable_fs::{
     durable_remove, scrub_if_safe, PendingDeleteJournal, ScrubOutcome, ScrubPolicy, ScrubRefusal,
 };
 use tempfile::tempdir;
 
+// ANCHOR[contextra-durable-fs:TEST-SCRUB-JOURNAL-HARDLINK]
+/// Prüft die Verweigerung des Nullen-Überschreibens bei mehreren Hardlinks.
 #[test]
 fn test_scrub_if_safe_hardlink_refusal() -> std::io::Result<()> {
     let dir = tempdir()?;
@@ -47,6 +53,8 @@ fn test_scrub_if_safe_hardlink_refusal() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-SCRUB-JOURNAL-DISABLED]
+/// Prüft die direkte Entfernung ohne Überschreiben bei deaktivierter Richtlinie.
 #[test]
 fn test_scrub_if_safe_policy_disabled() -> std::io::Result<()> {
     let dir = tempdir()?;
@@ -60,6 +68,8 @@ fn test_scrub_if_safe_policy_disabled() -> std::io::Result<()> {
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:TEST-SCRUB-JOURNAL-RECOVERY]
+/// Prüft die Crash-Recovery des PendingDeleteJournals bei unvollständiger Bereinigung.
 #[test]
 fn test_pending_delete_journal_crash_recovery() -> std::io::Result<()> {
     let dir = tempdir()?;
