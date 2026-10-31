@@ -574,7 +574,7 @@ mod tests {
         assert!(registry.is_group_active(group_id));
 
         // Revoke entire group (Group Deletion)
-        let revoked = registry.revoke_group(group_id).expect("revoke_group");
+        let revoked = registry.revoke_group(group_id)?;
         assert!(revoked, "Group 100 revocation must succeed");
         assert!(!registry.is_group_active(group_id));
 

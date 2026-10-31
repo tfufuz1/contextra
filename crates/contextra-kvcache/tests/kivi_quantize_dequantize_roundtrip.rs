@@ -1,3 +1,10 @@
+//! # Tests für KIVI Quantisierungs- und Dequantisierungs-Roundtrips
+//!
+//! ANCHOR[contextra-kvcache:TEST-KIVI-ROUNDTRIP-001]
+//!
+//! Verifiziert das Verhalten von KIVI bei leeren/Null-Tensoren, Validierungsfehler
+//! bei ungültigen Metadaten sowie theoretische Fehlerschranken über Property-Tests.
+
 #![forbid(unsafe_code)]
 #![cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 
@@ -8,6 +15,7 @@ use contextra_kvcache::{
 use contextra_types::ContextraError;
 use proptest::prelude::*;
 
+// Prüft den Roundtrip bei leeren Tensoren sowie Tensoren mit lauter Nullen.
 #[test]
 fn test_kivi_empty_and_zero_tensors_roundtrip() {
     let empty_raw = KvTensorView::new(Vec::new(), Vec::new(), 0, 0).unwrap();
@@ -33,6 +41,7 @@ fn test_kivi_empty_and_zero_tensors_roundtrip() {
     }
 }
 
+// Prüft, dass ungültige Metadaten (z. B. bits_per_value != 2 oder NaN) sauber mit KvQuantization-Fehlern abgefangen werden.
 #[test]
 fn test_kivi_dequantize_invalid_metadata_returns_kv_quantization_error() {
     let invalid_bits_meta = KiviBlockMeta {
@@ -90,13 +99,7 @@ fn test_kivi_dequantize_invalid_metadata_returns_kv_quantization_error() {
 }
 
 proptest! {
-    /// Property test: Quantization error bound verification for KIVI 2-bit asymmetric quantization.
-    ///
-    /// Theoretical error bound reasoning:
-    /// For a 2-bit linear uniform quantizer mapping [min_val, max_val] into 4 discrete levels {0, 1, 2, 3},
-    /// quantization step size delta = (max_val - min_val) / 3.
-    /// Maximum distance from any scalar value to its nearest quantization level is delta / 2 = (max_val - min_val) / 6.0.
-    /// With floating point rounding tolerance, error |v_orig - v_recon| <= (max_val - min_val) / 6.0 + 1e-3.
+    // Eigenschaftstest: Verifiziert die theoretische Fehlerschranke der asymmetrischen 2-Bit-Quantisierung (|err| <= delta / 6 + 1e-3).
     #[test]
     fn prop_kivi_asymmetric_quantize_dequantize_roundtrip_error_bound(
         num_tokens in 1usize..8,

@@ -1,3 +1,8 @@
+//! # Stabilitätstests für den PID-Latenzregler
+//!
+//! Validiert Einschwingzeit, Überschwinggrenzen und das Fehlen stationärer Regelfehler
+//! bei Lastsprüngen.
+
 // FILE-CONTEXT
 // STAND: 2026-09-15T00:00:00Z
 // ZWECK: Stabilitätstest des PID-Reglers mit Bekannter Sprungantwort (Settling Time, Overshoot, Steady-State Error).

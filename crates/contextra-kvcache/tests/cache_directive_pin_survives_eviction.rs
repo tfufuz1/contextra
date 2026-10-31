@@ -1,3 +1,10 @@
+//! # Integrationstests für CacheDirectives und Pinning-Verhalten
+//!
+//! ANCHOR[contextra-kvcache:TEST-PIN-001]
+//!
+//! Prüft deklarative Cache-Direktiven wie permanentes Pinning (`Pin { ttl: None }`),
+//! zeitlich begrenztes Pinning mit TTL, Budgetüberschreitungen, `NeverCache` und `ReleaseAfterStep`.
+
 use contextra_kvcache::store::{
     CacheDirective, StepId, TenantIsolatedKvStore, MAX_PINNED_BYTES_PER_TENANT,
 };
@@ -5,6 +12,7 @@ use contextra_kvcache::KvSegment;
 use contextra_types::{ContextraError, TenantId};
 use std::time::Duration;
 
+// Prüft, dass gepinnte Segmente bei Speicherverdrängung (Eviction) niemals verdrängt werden.
 #[test]
 fn test_cache_directive_pin_survives_eviction() {
     let store = TenantIsolatedKvStore::with_capacity(5);
@@ -41,6 +49,7 @@ fn test_cache_directive_pin_survives_eviction() {
     );
 }
 
+// Prüft, dass ein mit TTL gepinnter Block nach Ablauf der Gültigkeit regulär verdrängt werden kann.
 #[test]
 fn test_cache_directive_pin_ttl_expiration_eviction() {
     let store = TenantIsolatedKvStore::with_capacity(5);
@@ -78,6 +87,7 @@ fn test_cache_directive_pin_ttl_expiration_eviction() {
     assert_eq!(store.get_tenant_segment_len(tenant), 0);
 }
 
+// Prüft, dass das Überschreiten des maximalen Pin-Budgets pro Mandant mit PinBudgetExceeded abgelehnt wird.
 #[test]
 fn test_cache_directive_pin_budget_exceeded() {
     let store = TenantIsolatedKvStore::new();
@@ -115,6 +125,7 @@ fn test_cache_directive_pin_budget_exceeded() {
     );
 }
 
+// Prüft, dass Segmente mit der Direktive NeverCache erst gar nicht im Cache gespeichert werden.
 #[test]
 fn test_cache_directive_never_cache() {
     let store = TenantIsolatedKvStore::new();
@@ -133,6 +144,7 @@ fn test_cache_directive_never_cache() {
     assert!(store.get_segment_bytes(tenant, 1).is_none());
 }
 
+// Prüft, dass transiente Segmente über release_step gezielt nach Beendigung eines Ausführungsschritts freigegeben werden.
 #[test]
 fn test_cache_directive_release_after_step() {
     let store = TenantIsolatedKvStore::new();

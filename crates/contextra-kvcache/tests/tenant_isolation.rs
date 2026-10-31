@@ -1,12 +1,16 @@
-// FILE-CONTEXT
-// ZWECK: Tenant-Isolations-Tests für den KV-Cache (Task KV-05 / INV-TENANT).
-// STAND: TS:2026-09-15T00:00:00Z
+//! # Tests zur Durchsetzung strenger Mandantenisolation (INV-TENANT)
+//!
+//! ANCHOR[contextra-kvcache:TEST-TENANT-ISO-001]
+//!
+//! Verifiziert, dass Lookups, Segmentauflistungen, Prefix-Radix-Treffer,
+//! Block-Guards, Verdrängung und Transaktions-Rollbacks strikt mandantenisoliert bleiben.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_kvcache::{emergency_wipe, KvReusePolicy, KvSegment, TenantIsolatedKvStore};
 use contextra_types::{ContextraError, TenantId};
 
+// Prüft direkte Segment-Lookups: Mandant B hat keinen Zugriff auf Segmente oder Längen von Mandant A.
 #[test]
 fn test_tenant_isolation_direct_lookup_and_segments() -> Result<(), ContextraError> {
     let store = TenantIsolatedKvStore::new();
@@ -39,6 +43,7 @@ fn test_tenant_isolation_direct_lookup_and_segments() -> Result<(), ContextraErr
     Ok(())
 }
 
+// Prüft, dass der Prefix-Radix-Baum und Block-Guards mandantenisoliert arbeiten und keine Fremdtreffer erlauben.
 #[test]
 fn test_tenant_isolation_prefix_radix_tree() -> Result<(), ContextraError> {
     let store = TenantIsolatedKvStore::new();
@@ -73,6 +78,7 @@ fn test_tenant_isolation_prefix_radix_tree() -> Result<(), ContextraError> {
     Ok(())
 }
 
+// Prüft faire Verdrängung und das Fehlen von Cross-Tenant-Leckagen bei gemeinsamen Verdrängungsläufen.
 #[test]
 fn test_tenant_isolation_eviction_and_fair_recycling() -> Result<(), ContextraError> {
     let store = TenantIsolatedKvStore::new();
@@ -117,6 +123,7 @@ fn test_tenant_isolation_eviction_and_fair_recycling() -> Result<(), ContextraEr
     Ok(())
 }
 
+// Prüft, dass ein transaktionaler Rollback für Mandant A keinerlei Auswirkung auf die Segmente von Mandant B hat.
 #[test]
 fn test_tenant_isolation_rollback_no_cross_tenant_impact() -> Result<(), ContextraError> {
     let store = TenantIsolatedKvStore::new();
@@ -145,6 +152,7 @@ fn test_tenant_isolation_rollback_no_cross_tenant_impact() -> Result<(), Context
     Ok(())
 }
 
+// Prüft, dass emergency_wipe die Segmente aller Mandanten synchron und restlos leert.
 #[test]
 fn test_tenant_isolation_emergency_wipe() -> Result<(), ContextraError> {
     let store = TenantIsolatedKvStore::new();

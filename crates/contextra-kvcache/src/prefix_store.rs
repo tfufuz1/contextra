@@ -1,11 +1,21 @@
-// FILE-CONTEXT
-// ZWECK: Mandantenisolierter KV-Prefix-Store mit Byte-Budget & LRU-Eviction (Spec §9.2 / INV-CLM-SCRATCHPAD-1).
-// STAND: TS:2026-10-01T00:00:00Z
-
 //! # Mandantenisolierter KV-Prefix-Store (`TenantPrefixKvStore`)
 //!
-//! Implementierung des Ports `contextra_ports::KvPrefixStore` für `contextra-kvcache`.
-//! Verwendet `PrefixRadixTree` und `KvReusePolicy`, mit Byte-Budget pro Tenant und LRU-Eviction.
+//! ANCHOR[contextra-kvcache:PREFIX-001]
+//!
+//! Dieses Modul implementiert den Port `contextra_ports::kv::KvPrefixStore` für `contextra-kvcache`.
+//! Es bietet prefix-basierte Speicherung und Abfrage von Inferenz-Blöcken mit festem Byte-Budget
+//! pro Mandant und deterministischer LRU-Verdrängung.
+//!
+//! ## Funktionsweise
+//! Im Gegensatz zur einfachen Segmentablage speichert `TenantPrefixKvStore` ganze Gruppen von
+//! [`KvBlock`]-Tensoren unter einem [`PrefixKey`] (bestehend aus Modell-Fingerabdruck, Tokenizer-Hash
+//! und KV-Layout). Die interne Zuordnung erfolgt über einen [`PrefixRadixTree`].
+//!
+//! ## Mandantentrennung & Ressourcen-Limits
+//! - Partitionierung nach Schlüssel-Tupeln `(TenantId, PrefixKey)`.
+//! - Konfigurierbares Byte-Budget pro Mandant ([`DEFAULT_BYTE_BUDGET_PER_TENANT`] = 256 MiB).
+//! - Bei Überschreitung des Budgets werden automatisch die ältesten Block-Gruppen des Mandanten
+//!   verdrängt (LRU über logischen Tick-Zähler).
 
 use ahash::AHashMap;
 use contextra_ports::kv::{KvBlock, KvPrefixHit, KvPrefixStore, PrefixKey};
@@ -15,7 +25,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::radix::{KvReusePolicy, PrefixRadixTree};
 
-/// Standard-Byte-Budget pro Tenant (256 MiB).
+// ANCHOR[contextra-kvcache:PREFIX-002]
+/// Standard-Byte-Budget pro Mandant (256 MiB).
 pub const DEFAULT_BYTE_BUDGET_PER_TENANT: usize = 256 * 1024 * 1024;
 
 #[derive(Debug, Clone)]
@@ -53,10 +64,11 @@ impl std::fmt::Debug for Partition {
     }
 }
 
+// ANCHOR[contextra-kvcache:PREFIX-003]
 /// Mandantenisolierter KV-Prefix-Store.
 ///
 /// Bietet strukturelle Isolation via `(TenantId, PrefixKey)`-Key in den Partitionen.
-/// Unterstützt konfigurierbares Byte-Budget pro Tenant und LRU-Eviction bei Überschreitung.
+/// Unterstützt konfigurierbares Byte-Budget pro Mandant und LRU-Eviction bei Überschreitung.
 pub struct TenantPrefixKvStore {
     partitions: RwLock<AHashMap<(TenantId, PrefixKey), Partition>>,
     byte_budget_per_tenant: usize,
@@ -83,13 +95,22 @@ impl TenantPrefixKvStore {
         self
     }
 
-    /// Konfiguriert die Wiederverwendungs-Policy (`KvReusePolicy`).
+    /// Konfiguriert die Wiederverwendungs-Policy ([`KvReusePolicy`]).
     pub fn with_reuse_policy(mut self, policy: KvReusePolicy) -> Self {
         self.reuse_policy = policy;
         self
     }
 
     /// Sucht nach dem längsten übereinstimmenden Präfix in Blöcken für die angegebenen Tokens.
+    ///
+    /// # Parameter
+    /// - `tenant`: Eigentümer-Mandant.
+    /// - `key`: Modell- und Layout-Präfix-Key.
+    /// - `tokens`: Abzufragende Token-Sequenz.
+    ///
+    /// # Rückgabe
+    /// Liefert einen [`KvPrefixHit`] mit den gematchten Tokens und Klonen der Blöcke,
+    /// oder `None` bei einem Cache-Miss.
     pub fn lookup(&self, tenant: TenantId, key: &PrefixKey, tokens: &[u32]) -> Option<KvPrefixHit> {
         if tokens.is_empty() {
             return None;
@@ -112,6 +133,13 @@ impl TenantPrefixKvStore {
     }
 
     /// Fügt KV-Blöcke für ein Token-Präfix in den Store ein.
+    ///
+    /// # Ablauf
+    /// 1. Eingabe prüfen (weder Tokens noch Blöcke dürfen leer sein).
+    /// 2. Prüfen, ob die Blockgruppe allein das Mandanten-Budget überschreitet (`PolicyViolation`).
+    /// 3. Vorhandene alte Gruppe für diese Token-Kette entfernen.
+    /// 4. Neue Gruppe einfügen und Radix-Baum aktualisieren.
+    /// 5. Bei Überschreiten des Budgets älteste Einträge des Mandanten verdrängen (`evict_to_budget_internal`).
     pub fn insert(
         &self,
         tenant: TenantId,
@@ -243,6 +271,7 @@ impl TenantPrefixKvStore {
         Ok(total_invalidated)
     }
 
+    /// Interne Hilfsfunktion: Verdrängt iterativ die ältesten Blöcke eines Mandanten, bis das Budget eingehalten ist.
     fn evict_to_budget_internal(
         map: &mut AHashMap<(TenantId, PrefixKey), Partition>,
         tenant: TenantId,
@@ -340,6 +369,7 @@ impl KvPrefixStore for TenantPrefixKvStore {
 mod tests {
     use super::*;
 
+    // Prüft die Speichereffizienz bei 1.000 Schlüsseln mit identischem 100-Token-Präfix.
     #[test]
     fn test_v2_prefix_sharing_memory_efficiency_1000_keys() {
         let tenant = TenantId::try_new(100).unwrap();

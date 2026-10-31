@@ -1,12 +1,16 @@
-// FILE-CONTEXT
-// ZWECK: Cancellation- & RAII-Guard-Tests für den KV-Cache (Task KV-06).
-// STAND: TS:2026-09-15T00:00:00Z
+//! # Cancellation- und RAII-Guard-Tests für den KV-Cache
+//!
+//! ANCHOR[contextra-kvcache:TEST-CANCEL-001]
+//!
+//! Prüft das korrekte Verhalten bei Anfrage-Abbrüchen (Cancellation), Freigabe von
+//! RAII-Guards (`KvBlockGuard`), Worker-Benachrichtigungen und Rollback gestageder Segmente.
 
 use contextra_kvcache::{EvictionWorker, KvSegment, TenantIsolatedKvStore};
 use contextra_types::{ContextraError, TenantId};
 use std::sync::Arc;
 use std::thread;
 
+// Prüft, dass ein aktiver RAII-Guard das Segment vor Eviction schützt und nach Drop freigegeben wird.
 #[test]
 fn test_cancellation_raii_guard_prevents_eviction_and_releases() -> Result<(), ContextraError> {
     let store = TenantIsolatedKvStore::new();
@@ -43,6 +47,7 @@ fn test_cancellation_raii_guard_prevents_eviction_and_releases() -> Result<(), C
     Ok(())
 }
 
+// Prüft, dass der EvictionWorker nach Guard-Freigabe benachrichtigt wird und die Verdrängung im Hintergrund ausführt.
 #[test]
 fn test_cancellation_eviction_worker_notification() -> Result<(), ContextraError> {
     let store = Arc::new(TenantIsolatedKvStore::new());
@@ -81,6 +86,7 @@ fn test_cancellation_eviction_worker_notification() -> Result<(), ContextraError
     Ok(())
 }
 
+// Prüft, dass bei Abbruch einer mehrstufigen Inferenz alle gestageden Segmente rückstandslos bereinigt werden.
 #[test]
 fn test_cancellation_transaction_rollback_cleans_up_staged_segments() -> Result<(), ContextraError>
 {
@@ -109,6 +115,7 @@ fn test_cancellation_transaction_rollback_cleans_up_staged_segments() -> Result<
     Ok(())
 }
 
+// Prüft die Thread-Sicherheit bei nebenläufigen Anfragen, Guards und vorzeitigen Abbrüchen.
 #[test]
 fn test_cancellation_concurrent_requests_guard_safety() -> Result<(), ContextraError> {
     let store = Arc::new(TenantIsolatedKvStore::new());
