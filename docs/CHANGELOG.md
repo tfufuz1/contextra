@@ -1,3 +1,24 @@
+## [4.1] - 2026-10-31
+
+### Changed
+- Dokumentation auf Ist-Stand Commit `3a0b11699` gebracht. Repo enthält 35 Crate-Verzeichnisse, nicht 14.
+- `docs/SPEC.md` auf Fassung 4.1 (Konsolidierung). Scope D-K1 offen, verweist auf ADR 0009.
+- `docs/PLAN.md` auf Fassung 4.1 mit Phase K0 (Build herstellen) als Voraussetzung.
+- `docs/ARCHITECTURE.md` mit gemessenem Crate-Inventar, Ringmodell, Abhängigkeiten und Befunden D1 bis D6.
+- `README.md` mit korrigiertem Status.
+- Vorherige Fassungen nach `docs/spec/archiv/` verschoben (SPEC 3.1, 4.0; PLAN 3.1, 4.0).
+
+### Added
+- `docs/decisions/0009-scope-entscheidung-kern-oder-vollumfang.md` (Proposed).
+- `docs/analysis/BEFUNDE_2026-10-31.md` mit Befehlen zur Reproduktion.
+
+### Known issues
+- Build nicht verifiziert. `xtask` im Workspace ohne Verzeichnis.
+- Feature `onnx` und `adaptive-candidate-pool-sizing` ohne deklarierte Abhängigkeit.
+- `contextra-vector` führt Dateisystem-I/O in Ring 0 aus.
+- `contextra-durable-fs` ohne Eintrag in `capabilities.toml`.
+- `CLAUDE.md` und `AGENTS.md` nicht überarbeitet, Widersprüche in PLAN K2.2 erfasst.
+
 <!-- doc-stamp: 2026-10-29 10cc17922 -->
 
 # Contextra — Chronologischer Tag- & Review-Bericht

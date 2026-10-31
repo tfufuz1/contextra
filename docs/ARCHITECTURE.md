@@ -1,200 +1,148 @@
-# Contextra – Architekturübersicht
+# Contextra – Architektur (Ist-Stand)
 
-<!-- doc-stamp: 2026-10-30 | Nicht normativ. Normativ: docs/SPEC.md Fassung 4.0 -->
-
-Dieses Dokument beschreibt den **Ist-Zustand nach der Reduktion vom 30.10.2026**. Es erklärt, wie die verbleibenden Crates zusammenhängen. Verbindlich sind die Regeln in `docs/SPEC.md` (§4 Ringmodell, §3 Regeln). Bei Abweichungen gilt die SPEC.
+| Feld | Wert |
+|---|---|
+| Stand | 31.10.2026, Commit `3a0b11699` |
+| Status | Nicht normativ. Normativ: `docs/SPEC.md` 4.1 |
+| Messmethode | Statische Auswertung von `Cargo.toml` (`[dependencies]`), `capabilities.toml`, `git grep` auf `src/` |
+| Nicht gemessen | Laufzeitverhalten, Speicherbedarf, Latenz, Build- und Testergebnisse |
 
 ---
 
 ## 1. Überblick
 
-Contextra ist eine eingebettete Rust-Bibliothek für lokale Such- und Speicheraufgaben. Sie kombiniert:
+Contextra ist ein Cargo-Workspace mit 35 Crates unter `crates/`. Der Workspace enthält zusätzlich `benchmarks/contextra-bench` und das Mitglied `xtask`, dessen Verzeichnis fehlt (siehe §5).
 
-- einen **LSM-Speicher** mit Write-Ahead-Log, MemTable, SSTables und Kompaktion,
-- **MVCC-Transaktionen** mit Serializable-Snapshot-Isolation,
-- einen **HNSW-Vektorindex** mit SIMD-Distanzen,
-- einen **BM25-Textindex** mit deutscher Morphologie,
-- eine **Fusion** der Ranglisten mit Kalibrierung,
-- **Mandantentrennung** und **Verschlüsselung at rest**.
+Die Crates sind in Ringe eingeteilt. Ein Ring ist eine Schicht: Crates in Ring N dürfen nur von Ringen ≤ N abhängen. Die Zuordnung steht in `capabilities.toml`. Das Ringmodell ist über die deklarierten Abhängigkeiten am Commit vollständig eingehalten (0 Verletzungen).
 
-Alles läuft in einem Prozess auf einem Rechner. Es gibt keinen Netzwerkdienst.
+## 2. Ringmodell
 
----
-
-## 2. Ringe und Abhängigkeiten
-
-```mermaid
-flowchart BT
-    types[contextra-types]
-    ports[contextra-ports]
-    sys[contextra-sys · U]
-    simd[contextra-simd · U]
-    mvcc[contextra-mvcc]
-    crypto[contextra-crypto]
-    vector[contextra-vector]
-    text[contextra-text]
-    rank[contextra-rank]
-    store[contextra-store]
-    engine[contextra-engine]
-    db[contextra-db]
-    ctx[contextra]
-    testkit[contextra-testkit · Tooling]
-
-    ports --> types
-    simd --> types
-    mvcc --> ports
-    mvcc --> types
-    crypto --> ports
-    crypto --> types
-    text --> ports
-    text --> types
-    vector --> crypto
-    vector --> mvcc
-    vector --> ports
-    vector --> simd
-    vector --> sys
-    vector --> types
-    store --> crypto
-    store --> mvcc
-    store --> ports
-    store --> sys
-    store --> types
-    engine --> crypto
-    engine --> mvcc
-    engine --> ports
-    engine --> rank
-    engine --> store
-    engine --> sys
-    engine --> text
-    engine --> types
-    engine --> vector
-    db --> engine
-    db --> rank
-    db --> store
-    db --> text
-    db --> vector
-    db --> crypto
-    db --> ports
-    db --> sys
-    db --> types
-    ctx --> db
-    ctx --> crypto
-    ctx --> ports
-    ctx --> rank
-    ctx --> store
-    ctx --> types
-    testkit --> ports
-    testkit --> types
-```
-
-(U) = Unsafe-Insel. Der Graph stammt aus den `[dependencies]` der Manifeste (Stand 30.10.2026).
-
-| Ring | Crates | Regel |
+| Ring | Rolle | Crates (Anzahl) |
 |---|---|---|
-| 0 | `types`, `ports`, `sys`, `simd`, `mvcc`, `crypto`, `vector`, `text`, `rank` | Keine Abhängigkeit auf Ring 1 oder höher |
-| 1 | `store` | Nur Ring 0 |
-| 2 | `engine` | Ring 0 und 1 |
-| 3 | `db` | Ring 0 bis 2 |
-| 4 | `contextra` | Alle, aber nur Fassaden-Typen durchreichen |
-| Tooling | `testkit`, `bench` | Darf alles, wird nur als Dev-Abhängigkeit eingebunden |
+| 0 | Fundament: Typen, Ports, Speicher-Primitive, Index, Volltext, Rang, Krypto | 15 |
+| 1 | Speicher und Checkpoint | 3 |
+| 2 | Adapter und Ausführung (Inferenz, Sandbox) | 4 |
+| 3 | Engine, Routing, Privacy, Agent, Datenbank-Fassade | 6 |
+| 4 | Oberfläche: Fassade, MCP, Python, Ingest, Lizenz | 5 |
+| Tooling | Testkit | 1 |
 
----
+`capabilities.toml` enthält 34 Einträge, das Repo 35 Crate-Verzeichnisse. Es fehlt `contextra-durable-fs` (Befund D6). Die Ring-Tabelle unten zählt deshalb 34 Crates.
 
-## 3. Die Schichten im Einzelnen
+Die Ring-Zuordnung in `capabilities.toml` weicht an einer Stelle vom Inventar ab: `contextra-license` ist dort Ring 4. Die Spezifikation 3.1 nennte Ring 0. Die Datei `capabilities.toml` gilt (SPEC §1).
 
-### 3.1 Fundament (Ring 0)
+Hinweis zur Ringverletzung: Ein Ring-0-Crate darf kein Dateisystem-I/O ausführen (Invariante A3). `contextra-vector` verletzt das mit 28 Treffern in `src/` (ohne Testcode). Die Regel ist in der Prüfung `check_ring0_async_purity` nicht vollständig abgedeckt.
 
-- **`contextra-types`**: Kanonische Typen: `DocId`, `TenantId`, `TxId`, `RequestContext`, `DistanceMetric`, Budgets, Filter, Fehlertyp `ContextraError`.
-- **`contextra-ports`**: Trait-Verträge. Zeit (`Clock`), Zufall (`Rng`), IDs (`IdGen`), Dateisystem (`Vfs`), Speicher (`StorageEngine`-Ports), Indizes (`VectorIndex`, `TextIndex`).
-- **`contextra-sys`** (Unsafe-Insel): `mmap`, `mlock`, POSIX-Aufrufe, Dauerhaftigkeits-Primitive (`fsync`-Varianten), Vault, Windows-ACL.
-- **`contextra-simd`** (Unsafe-Insel): Distanzkerne mit Laufzeit-Dispatch auf die verfügbare CPU-Erweiterung.
-- **`contextra-mvcc`**: Sequenzlog, Snapshot-Registry mit RAII-Lease, Transaktionspuffer, SSI-Validierung.
-- **`contextra-crypto`**: AEAD-Blockverschlüsselung, HKDF, WAL-Verschlüsselung, Audit-Kette, Anti-Tamper. Schlüsselmaterial wird beim Verwerfen gelöscht.
-- **`contextra-vector`**: HNSW, SQ8-Quantisierung, partieller Rebuild, gefilterte Suche.
-- **`contextra-text`**: BM25, invertierter Index, WAND-Top-K, Tokenizer, Stoppwörter, Komposita-Zerlegung, Domänenwörterbücher (Recht, Medizin).
-- **`contextra-rank`**: Fusion, isotone und Platt-Kalibrierung, Drift-Erkennung, Erklärbarkeit.
+## 3. Crate-Inventar
 
-### 3.2 Persistenz (Ring 1)
+Generiert aus `Cargo.toml` und `capabilities.toml` am Commit `3a0b11699`. „Abh.“ zählt die internen `contextra-*`-Abhängigkeiten aus `[dependencies]`.
 
-**`contextra-store`** ist ein LSM-Baum.
+| Crate | Ring | Reife | Abh. | Interne Abhängigkeiten |
+|---|---|---|---|---|
+| `contextra` | Ring 4 | stable | 12 | audit-export, avv-generator, core, crypto, db, infer-candle, license, ports, privacy, rank, store, types |
+| `contextra-adapt` | Ring 0 | beta | 2 | ports, types |
+| `contextra-agent` | Ring 3 | beta | 7 | checkpoint, db, graph, ports, router, store, types |
+| `contextra-audit-export` | Ring 0 | experimental | 2 | ports, types |
+| `contextra-avv-generator` | Ring 0 | experimental | 1 | types |
+| `contextra-checkpoint` | Ring 1 | stable | 3 | mvcc, ports, types |
+| `contextra-cognition` | Ring 3 | experimental | 6 | engine, graph, ports, store, types, vector |
+| `contextra-core` | Ring 0 | deprecated | 4 | mvcc, ports, types, wire |
+| `contextra-crypto` | Ring 0 | beta | 2 | ports, types |
+| `contextra-db` | Ring 3 | beta | 13 | adapt, checkpoint, cognition, crypto, engine, graph, ports, rank, store, sys, text, types, vector |
+| `contextra-durable-fs` | ? | ? | 1 | sys |
+| `contextra-engine` | Ring 3 | beta | 12 | checkpoint, crypto, graph, mvcc, ports, rank, sandbox, store, sys, text, types, vector |
+| `contextra-graph` | Ring 0 | stable | 3 | adapt, ports, types |
+| `contextra-infer-candle` | Ring 2 | stable | 4 | crypto, ports, rank, types |
+| `contextra-infer-ollama` | Ring 2 | beta | 3 | ports, rank, types |
+| `contextra-infer-onnx` | Ring 2 | experimental | 3 | ports, rank, types |
+| `contextra-ingest` | Ring 4 | experimental | 2 | engine, types |
+| `contextra-kvcache` | Ring 1 | beta | 3 | crypto, ports, types |
+| `contextra-license` | Ring 4 | experimental | 2 | ports, types |
+| `contextra-mcp` | Ring 4 | beta | 12 | contextra, crypto, infer-candle, infer-ollama, infer-onnx, license, ports, privacy, rank, router, types, wire |
+| `contextra-mvcc` | Ring 0 | stable | 2 | ports, types |
+| `contextra-ports` | Ring 0 | stable | 1 | types |
+| `contextra-privacy` | Ring 3 | stable | 3 | avv-generator, ports, types |
+| `contextra-py` | Ring 4 | stable | 6 | adapt, db, rank, store, types, wire |
+| `contextra-rank` | Ring 0 | stable | 2 | ports, types |
+| `contextra-router` | Ring 3 | stable | 5 | adapt, ports, privacy, types, wire |
+| `contextra-sandbox` | Ring 2 | stable | 0 | – |
+| `contextra-simd` | Ring 0 | beta | 1 | types |
+| `contextra-store` | Ring 1 | beta | 5 | crypto, mvcc, ports, sys, types |
+| `contextra-sys` | Ring 0 | stable | 0 | – |
+| `contextra-testkit` | Tooling | stable | 2 | ports, types |
+| `contextra-text` | Ring 0 | beta | 2 | ports, types |
+| `contextra-types` | Ring 0 | stable | 0 | – |
+| `contextra-vector` | Ring 0 | beta | 6 | crypto, mvcc, ports, simd, sys, types |
+| `contextra-wire` | Ring 0 | stable | 0 | – |
 
-- **WAL**: Anfügen, HMAC-Verkettung, CRC32, Replay. Jeder Commit ist durch einen Flush gesichert.
-- **MemTable**: Skip-Liste mit Sequenznummern. Tombstones für Löschungen.
-- **SSTable**: Blöcke mit Bloom-Filter, Index, CRC32 und Kompression. Block-Cache.
-- **Manifest**: Transaktionale Liste der SSTable-Generationen.
-- **Kompaktion**: Hintergrundprozess, der SSTables zusammenführt und Tombstones physisch entfernt.
-- **`tenant_codec`**: Schlüssel-Präfixe pro Mandant.
+In dieser Tabelle steht `?`, wo `capabilities.toml` keinen Eintrag hat (Befund D6). Die Tabelle wird von Hand gepflegt, bis das Generator-Skript aus PLAN K2.3 existiert.
 
-### 3.3 Orchestrierung (Ring 2)
+## 4. Abhängigkeitsstruktur
 
-**`contextra-engine`** verbindet Speicher, Indizes und Transaktionen zu Collections.
+Zentrale Bausteine (Fan-in, Anzahl direkter Abhängiger):
 
-- **Collections**: Dokumente mit Mandant, Metadaten und Indexeinträgen.
-- **Query-Builder**: Baut eine hybride Suchanfrage aus Vektor- und Textteil, Filtern und Gewichten.
-- **Chunker**: Zerlegt Text in Abschnitte, Fenster oder Blöcke.
-- **Hintergrundarbeiter**: Kompaktion, Wartung (Feature `background-maintenance`).
-- **Öffnen**: `repair_on_open` prüft und repariert den Zustand, bevor Anfragen angenommen werden.
+| Crate | Fan-in | Bedeutung |
+|---|---|---|
+| `contextra-types` | 30 | Domänenmodelle, von allen Produkten getragen |
+| `contextra-ports` | 25 | Traits für Austauschbarkeit (Ports und Adapter) |
+| `contextra-crypto` | 8 | AES-256-GCM-SIV, HMAC-Ketten, Löschnachweis |
+| `contextra-rank` | 8 | Rangfusion und Kalibrierung |
+| `contextra-store` | 6 | LSM, WAL, Verschlüsselung im Ruhezustand |
+| `contextra-mvcc` | 5 | Snapshot-Isolation |
+| `contextra-sys` | 5 | Plattform-Schicht, `mlock`, `mmap` |
 
-### 3.4 Fassade (Ring 3 und 4)
+Sammelstellen (Fan-out):
 
-- **`contextra-db`** (Ring 3): Prelude mit der stabilen Kern-API (`Contextra`, `Collection`, `SearchResult`, `EmbeddingBackend`). Modul `advanced` für erweiterte Schnittstellen.
-- **`contextra`** (Ring 4): Composition Root mit `builder`, `open` und `open_with_config`. Verdrahtet die Ports mit den konkreten Implementierungen.
+| Crate | Abhängigkeiten | Bewertung |
+|---|---|---|
+| `contextra-db` | 13 | Legacy-Fassade, Auflösung geplant (Strangler) |
+| `contextra-engine` | 12 | Orchestrator, enthält Erasure-Module und Chunker |
+| `contextra-mcp` | 12 | Protokoll-Adapter, zieht Inferenz, Lizenz, Wire |
+| `contextra` | 12 | Gesamtfassade mit `builder()` |
 
----
+Blattknoten ohne interne Abhängigkeiten: `contextra-sandbox`, `contextra-sys`, `contextra-types`, `contextra-wire`.
 
-## 4. Datenpfade
+## 5. Bekannte Defekte am Commit
 
-### 4.1 Schreiben
+| Nr. | Defekt | Wirkung | Fundstelle | Behebung |
+|---|---|---|---|---|
+| D1 | `xtask` ist Workspace-Mitglied, Verzeichnis fehlt | `cargo metadata` schlägt fehl, kein Build möglich | `Cargo.toml` | PLAN K0.1 |
+| D2 | Feature `onnx` ohne `dep:contextra-infer-onnx` | Build mit `--features onnx` schlägt fehl | `contextra-engine/Cargo.toml`, `lifecycle.rs:188` | PLAN K0.2 |
+| D3 | Feature `adaptive-candidate-pool-sizing` ohne `dep:contextra-adapt` | Build mit diesem Feature schlägt fehl | `contextra-engine/Cargo.toml`, `builder.rs:45` | PLAN K0.3 |
+| D4 | Dateisystem-I/O in Ring 0 | Ringinvariante verletzt | `contextra-vector`, 28 Treffer | PLAN K0.7 |
+| D5 | 20 Stellen mit `#[ignore]` im Workspace | Testabdeckung kleiner als die gezählten 4.729 Testfunktionen | verteilt, u. a. `contextra-store` | Prüfung in K0.5 |
+| D6 | `contextra-durable-fs` hat keinen Eintrag in `capabilities.toml` | Ring und Reifegrad unbekannt, Invariante A1 wird für diese Crate nicht geprüft | `crates/contextra-durable-fs/` | Eintrag ergänzen, Ring festlegen (PLAN K2.5) |
 
-```
-Client → Collection (engine) → TxBuffer (mvcc)
-       → WAL (store)         → MemTable (store)
-       → Index-Update        (vector: HNSW · text: BM25)
-       → Commit (SSI-Prüfung in mvcc)
-       → später: SSTable (store) → Kompaktion (store)
-```
+## 6. Unsafe-Fläche
 
-Die Reihenfolge ist fest: Was persistent werden soll, geht zuerst über das WAL (Regel 4). Ein Commit gilt erst nach erfolgreichem Flush. Fehler beim Flush werden propagiert, nie verschluckt (Regel 5).
+Gezählt als Treffer des Wortes `unsafe` in `src/`, nicht als Funktionen:
 
-### 4.2 Hybride Suche
+| Crate | Treffer | Deklariert als Insel |
+|---|---|---|
+| `simd` | 271 | ja |
+| `wire` | 46 | ja |
+| `sys` | 21 | ja |
+| `infer-onnx` | 5 | nein |
+| `crypto` | 5 | nein |
+| `ingest` | 10 | nein |
+| `text` | 8 | nein |
 
-```
-Anfrage (engine, Query-Builder)
-  ├─ Vektorsuche   (vector: HNSW, SIMD-Distanz, Filter)
-  ├─ Textsuche     (text: BM25, WAND)
-  └─ Fusion        (rank: RRF, Kalibrierung)
-→ Ergebnisliste mit Erklärung (rank::explain)
-```
+Gesamt: 383 Treffer. Die Zahl ist eine obere Schranke, da Kommentare mitgezählt sind. Ein Audit-Schritt muss die Treffer nach `unsafe {`, `unsafe fn` und `unsafe impl` trennen.
 
-Mandantenfilter greifen vor der Indexabfrage, nicht danach (VETO-F10).
+## 7. Datenfluss
 
-### 4.3 Löschen
+Die Beschreibung des Datenflusses (Schreibpfad über WAL und LSM, Lesepfad über HNSW, BM25 und Rangfusion) stammt aus der Crate-Dokumentation und dem README. Am Commit ist sie nicht durch Tests belegt. Sie wird in K0.5 mit den Tests abgeglichen.
 
-Löschen setzt einen Tombstone im Speicher. Der Index markiert den Eintrag. Physisch entfernt wird er bei der Kompaktion (Speicher) bzw. beim Rebuild (HNSW, VETO-F02). Die Zusicherungen dazu stehen in `docs/SPEC.md` §9.
+Schreibpfad (laut Fassung 3.1, nicht verifiziert): Dokument → Chunking (`ingest`/`engine`) → Vektor (`vector`) und Volltextindex (`text`) → Speicher (`store`, WAL mit HMAC-Kette, Verschlüsselung).
 
----
+Lesepfad (laut Fassung 3.1, nicht verifiziert): Anfrage → BM25 (`text`) und Vektorsuche (`vector`) → Rangfusion (`rank`) → Mandantenfilter.
 
-## 5. Querschnittsthemen
+## 8. Dokumentation
 
-- **Mandanten**: Der Mandant kommt aus dem `RequestContext` und wird in jeder Schicht als Schlüsselpräfix oder Filter geführt.
-- **Fehler**: Ein gemeinsamer Fehlertyp (`ContextraError`, definiert in `contextra-types`). Keine `unwrap`-Abkürzungen (Clippy-Lint in Workspace, Regel 2).
-- **Zeit und Zufall**: Nur über `Clock`, `Rng`, `IdGen`. Tests verwenden `ManualClock` aus `contextra-testkit`.
-- **Unsafe**: Ausschließlich in `contextra-sys` und `contextra-simd`. Jeder Block trägt `// SAFETY:`.
-- **Telemetrie**: Über die Ports `metrics` und `observability`. Keine eigene Ausgabeschicht.
-
----
-
-## 6. Tests und Benchmarks
-
-- Unit- und Integrationstests je Crate unter `crates/<name>/tests/`.
-- Workspace-Tests unter `tests/`: Ringregeln (`layering.rs`), Unsafe-Inseln (`unsafe_islands.rs`).
-- Testwerkzeuge in `contextra-testkit`: deterministische Uhr, In-Memory-Speicher, fehlerinjizierendes Dateisystem (`FaultVfs`), Referenzmodell, Konformitätssuiten.
-- Benchmarks in `benchmarks/contextra-bench`: ANN-Benchmarks, BEIR, Pfad-RAG, Regressions-Gate.
-
----
-
-## 7. Was in dieser Architektur fehlt
-
-Die Reduktion hat folgende Bereiche aus dem Vorzustand entfernt: Inferenz-Backends, Agenten-Laufzeit, Router, Graph-Index und Konsolidierung, MCP- und Python-Schnittstellen, Dokumenten-Ingestion, PII-Filter, KV-Cache, DiskANN und die Löschkette. Details und Wiederherstellungspunkt stehen in `docs/SPEC.md` §5.2.
-
-Wenn Teile davon zurückkehren sollen, geschieht das über einen eigenen Plan (`docs/PLAN.md` Phase R6), nicht durch Wiederherstellen einzelner Dateien.
+| Datei | Inhalt | Normativ |
+|---|---|---|
+| `docs/SPEC.md` | Scope, Build-Vertrag, Invarianten | ja |
+| `docs/PLAN.md` | Umsetzungsschritte | nein, Plan |
+| `docs/ARCHITECTURE.md` | diese Datei | nein |
+| `docs/decisions/` | ADRs | nur bestätigte |
+| `docs/analysis/BEFUNDE_2026-10-31.md` | Messungen mit Befehlen | nein, Beleg |
+| `docs/spec/archiv/` | Fassungen 3.1, 4.0 | nein |
