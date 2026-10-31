@@ -4,6 +4,14 @@
 // INVARIANTEN: Zero-Panic doctrine (no .unwrap() or .expect() in production code);
 // Full access to layer-wise KV cache tensors via export_kv_state, import_kv_state, and truncate_kv_cache.
 
+//! Quantisierte LLaMA-Modellarchitektur mit direkter KV-Cache-Zustandsverwaltung (Spec §9.2 Stufe B).
+//!
+//! # Zweck und Einordnung
+//! - **Zweck**: Implementiert die Transformer-Schichten (Attention, RoPE, RMSNorm, SwiGLU Feed-Forward)
+//!   für GGUF-quantisierte LLaMA-Modelle mit nativem Export und Import von [`KvState`].
+//! - **Invariante**: Zero-Panic-Doktrin: Sämtliche Tensor-Transformationen werden mit `map_err`
+//!   in [`ContextraError`] überführt, ohne unkontrollierte Panics.
+
 use crate::kv_state::{KvState, LayerKv};
 use candle_core::quantized::{gguf_file, QMatMul, QTensor};
 use candle_core::{DType, Device, IndexOp, Tensor};
@@ -12,6 +20,8 @@ use candle_transformers::quantized_nn::RmsNorm;
 use contextra_types::ContextraError;
 use std::collections::HashMap;
 
+/// Maximale Sequenzlänge für die Vorberechnung der RoPE-Drehfrequenzen (Rotary Positional Embedding).
+// ANCHOR[contextra-infer-candle:LLAMA-INTERNAL-MAX-SEQ-LEN]
 pub const MAX_SEQ_LEN: usize = 4096;
 
 fn repeat_kv(x: Tensor, n_rep: usize) -> Result<Tensor, ContextraError> {
@@ -78,6 +88,8 @@ fn build_causal_mask(
         .map_err(|e| ContextraError::Internal(format!("Failed to create causal mask tensor: {e}")))
 }
 
+/// Quantisierte Matrixmultiplikation mit integrierter Tracing-Span.
+// ANCHOR[contextra-infer-candle:LLAMA-QUANT-MATMUL-STRUCT]
 #[derive(Debug, Clone)]
 pub struct QuantizedMatMul {
     inner: QMatMul,
@@ -132,7 +144,8 @@ impl MlpOrMoe {
     }
 }
 
-/// Transformer layer weights wrapping QMatMul attention projections, RMS norms, and KV cache.
+/// Transformer-Schichtgewichte mit QMatMul Attention-Projektionen, RMS-Norms und KV-Cache.
+// ANCHOR[contextra-infer-candle:LLAMA-LAYER-WEIGHTS-STRUCT]
 #[derive(Debug, Clone)]
 pub struct LayerWeights {
     pub attention_wq: QuantizedMatMul,
@@ -275,19 +288,27 @@ impl LayerWeights {
     }
 }
 
-/// Quantized Llama model weights and layer structures with explicit KvState management.
+/// Quantisierte LLaMA-Modellgewichte und Schichten mit expliziter KV-Cache-Zustandsverwaltung.
+// ANCHOR[contextra-infer-candle:LLAMA-MODEL-WEIGHTS-STRUCT]
 #[derive(Debug, Clone)]
 pub struct ModelWeights {
+    /// Token-Einbettungsmatrix.
     pub tok_embeddings: Embedding,
+    /// Decoder-Schichten des Transformer-Netzwerks.
     pub layers: Vec<LayerWeights>,
+    /// Finale RMS-Normalisierung vor der Projektion.
     pub norm: RmsNorm,
+    /// Ausgabeprojektion auf das Vokabular.
     pub output: QuantizedMatMul,
+    /// Gecachte Kausalitätsmasken.
     pub masks: HashMap<(usize, usize), Tensor>,
     span: tracing::Span,
     span_output: tracing::Span,
 }
 
 impl ModelWeights {
+    /// Lädt und initialisiert das Modell aus einem GGUF-Datenstrom.
+    // ANCHOR[contextra-infer-candle:LLAMA-MODEL-FROM-GGUF]
     pub fn from_gguf<R: std::io::Seek + std::io::Read>(
         ct: gguf_file::Content,
         reader: &mut R,
@@ -438,6 +459,8 @@ impl ModelWeights {
     }
 
     /// Exports the current KV cache across all model layers into a `KvState`.
+    /// Exportiert den KV-Cache aller Schichten in ein [`KvState`].
+    // ANCHOR[contextra-infer-candle:LLAMA-MODEL-EXPORT-KV]
     pub fn export_kv_state(&self) -> Result<KvState, ContextraError> {
         let mut layer_kvs = Vec::with_capacity(self.layers.len());
         let mut max_pos = 0;
@@ -459,6 +482,8 @@ impl ModelWeights {
     }
 
     /// Imports a `KvState` into all model layers.
+    /// Importiert einen [`KvState`] in die Caches der Schichten.
+    // ANCHOR[contextra-infer-candle:LLAMA-MODEL-IMPORT-KV]
     pub fn import_kv_state(&mut self, state: &KvState) -> Result<(), ContextraError> {
         if self.layers.len() != state.layers.len() {
             return Err(ContextraError::InvalidInput(format!(
@@ -476,6 +501,8 @@ impl ModelWeights {
     }
 
     /// Truncates the cached KV tensors across all layers to `pos` tokens.
+    /// Schneidet die KV-Caches aller Schichten auf `pos` zurück.
+    // ANCHOR[contextra-infer-candle:LLAMA-MODEL-TRUNCATE-KV]
     pub fn truncate_kv_cache(&mut self, pos: usize) -> Result<(), ContextraError> {
         for layer in self.layers.iter_mut() {
             if let Some((k, v)) = &mut layer.kv_cache {
@@ -501,6 +528,8 @@ impl ModelWeights {
     }
 
     /// Clears the KV cache across all layers.
+    /// Setzt die KV-Caches aller Schichten zurück.
+    // ANCHOR[contextra-infer-candle:LLAMA-MODEL-CLEAR-KV]
     pub fn clear_kv_cache(&mut self) {
         for layer in self.layers.iter_mut() {
             layer.kv_cache = None;
@@ -508,6 +537,8 @@ impl ModelWeights {
     }
 
     /// Performs forward pass through token embeddings, attention layers, norms, and output projection.
+    /// Führt den Vorwärtslauf (Forward-Pass) des Modells für die Eingabetoken `x` an Position `index_pos` aus.
+    // ANCHOR[contextra-infer-candle:LLAMA-MODEL-FORWARD]
     pub fn forward(&mut self, x: &Tensor, index_pos: usize) -> Result<Tensor, ContextraError> {
         let (_b_sz, seq_len) = x
             .dims2()

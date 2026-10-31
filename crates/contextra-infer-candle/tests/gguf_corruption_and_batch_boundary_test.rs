@@ -3,6 +3,13 @@
 // ZWECK: Error path and boundary tests for GGUF loading, quantization mismatch, batch boundaries, and concurrent hot-swap.
 // INVARIANTEN: Zero real model downloads (hermetic bytes); no panics on corrupt binary inputs; strict batch boundary limits.
 
+//! Tests für Korruptionsbehandlung, Quantisierungsstufen und Batch-Grenzen.
+//!
+//! # Zweck
+//! Verifiziert das Fail-Safe-Verhalten bei fehlerhaften Binärdaten sowie die strikte Einhaltung
+//! der maximalen Batch-Grenzen (255, 256, 257) und Hot-Swap Concurrency.
+
+// ANCHOR[contextra-infer-candle:TEST-GGUF-CORRUPTION-AND-BATCH]
 use candle_core::Device;
 use contextra_infer_candle::embedding::CandleEmbedInner;
 use contextra_infer_candle::gguf_loader::parse_gguf_metadata;

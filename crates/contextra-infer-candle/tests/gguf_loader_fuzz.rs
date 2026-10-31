@@ -2,6 +2,12 @@
 // STAND: 2026-09-12T00:00:00Z
 // ZWECK: 15+ synthetic fuzz and corruption tests for GGUF model loader hardening.
 
+//! Fuzz- und Korruptions-Tests für den GGUF-Loader.
+//!
+//! # Zweck
+//! Überprüft 15+ Rand- und Fehlerfälle (Magic Bytes, Truncation, String-Überlauf, Tensor-Counts, Checksums).
+
+// ANCHOR[contextra-infer-candle:TEST-GGUF-LOADER-FUZZ]
 use contextra_infer_candle::gguf_loader::{
     parse_gguf_metadata, parse_gguf_metadata_with_checksum, MAX_GGUF_METADATA_KVS, MAX_GGUF_TENSORS,
 };
