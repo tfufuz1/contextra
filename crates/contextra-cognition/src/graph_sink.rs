@@ -1,8 +1,20 @@
-//! Graph-Sink Implementation (`CsrGraphSuperEdgeSink`) for LeanRAG Stage 3 Aggregation (§21.4).
+//! # Graph-Senke für Hyperkanten (`graph_sink.rs`)
 //!
-//! Provides a buffered [`SuperEdgeSink`] implementation against [`CsrGraph`].
-//! Mutations (tombstones and new superedges) are held locally until [`SuperEdgeSink::commit`]
-//! is called, executing a single atomic RCU publish on the underlying graph.
+//! Stellt eine gepufferte Senke ([`CsrGraphSuperEdgeSink`]) für die LeanRAG Stage 3 Aggregation
+//! (§21.4) bereit. Tombstone-Markierungen und neu synthetisierte Hyperkanten werden lokal gesammelt
+//! und erst beim Aufruf von `commit()` atomar via RCU (Read-Copy-Update) in den unterliegenden
+//! [`CsrGraph`] publiziert.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ring 3), greift auf `contextra-graph` (Ring 0) zu.
+//!
+//! ## Invarianten
+//! - **Single Writer:** Es wird von einem einzelnen aktiven Schreiber während der Konsolidierung
+//!   ausgegangen (extern garantiert durch `ConsolidationNodesGuard`).
+//! - **Atomare Batch-Veröffentlichung:** Alle Änderungen werden gemeinsam im Graphen publiziert.
+//! - **Generische Rollenbindung:** Bei der Erzeugung synthetischer Hyperkanten wird ein Standard-Rollen-Binding
+//!   mit `RoleId::new(0)` verwendet.
+
 
 use crate::aggregation_phase::{SuperEdgeDraft, SuperEdgeSink};
 use contextra_graph::csr::EdgeType;
@@ -15,6 +27,8 @@ use contextra_types::{ContextraError, Result, TxId};
 /// # Invariant
 /// Assumes a single active writer per `CsrGraph` during consolidation (enforced externally via
 /// `ConsolidationLockGuard` in `consolidation_executor.rs`).
+// ANCHOR[contextra-cognition:SINK-001]
+/// Gepufferte Senke zum Schreiben synthetischer Hyperkanten und Tombstone-Anfragen in den CsrGraph.
 pub struct CsrGraphSuperEdgeSink<'a> {
     graph: &'a CsrGraph,
     wal_tx: TxId,
@@ -24,6 +38,8 @@ pub struct CsrGraphSuperEdgeSink<'a> {
 
 impl<'a> CsrGraphSuperEdgeSink<'a> {
     /// Creates a new `CsrGraphSuperEdgeSink` instance attached to the given graph and WAL transaction.
+    // ANCHOR[contextra-cognition:SINK-002]
+    /// Erstellt eine neue CsrGraphSuperEdgeSink gebunden an den Graphen und die WAL-Transaktion.
     pub fn new(graph: &'a CsrGraph, wal_tx: TxId) -> Self {
         Self {
             graph,

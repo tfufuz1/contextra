@@ -1,3 +1,19 @@
+//! # Semantische Aggregations-Fassade (`semantic_aggregation_facade.rs`)
+//!
+//! Öffentliche Fassaden-Schnittstelle für die LeanRAG Stage-3-Hyperkantenaggregation (Spec §5.3, §12.4).
+//!
+//! ## Ring-Zugehörigkeit & Architektur-Invariante
+//! Gemäß der Ring-DAG-Ebenenhierarchie (§4) hängt `contextra-cognition` von `contextra-engine` ab (Ring 3 -> Ring 2).
+//! Eine `impl`-Methode direkt auf `contextra_engine::Collection` innerhalb von `contextra-engine` würde
+//! eine zyklische Abhängigkeit erzeugen. Stattdessen wird [`consolidate_semantic_hyperedges`]
+//! als freie Funktion in `contextra-cognition` bereitgestellt.
+//!
+//! ## Invarianten
+//! - **Speicherbudget-Vorprüfung:** Vor Allokationen oder LLM-Aufrufen wird das erwartete
+//!   Spitzenbudget (`estimate_compaction_peak_bytes`) via [`check_compaction_budget`] validiert.
+//! - **Fehler-Prävention:** Überschreitungen des Speicherbudgets führen zum sofortigen, sauberen Abbruch.
+//! - **Embedding-Fallback:** Fehlt ein Vektorextrakt in den Dokumenten, wird er über den injizierten Embedder erzeugt.
+
 // FILE-CONTEXT
 // ZWECK: Öffentliche Facade-Schnittstelle für LeanRAG Stage-3-Hyperkantenaggregatierung (Spec §5.3, §12.4).
 // ARCHITEKTUR-INVARIANTE: contextra-cognition hängt von contextra-engine ab (nicht umgekehrt).
@@ -37,6 +53,8 @@ use contextra_types::{DocId, Result};
 /// via [`check_compaction_budget`] mit der `estimate_compaction_peak_bytes()`-Primitive des
 /// Graph-Index aufgerufen (Spec §12.4). Falls das konfigurierte Speicherbudget überschritten ist,
 /// wird die Konsolidierung sofort abgebrochen, ohne LLM-Aufrufe oder Cluster-Allokationen durchzuführen.
+// ANCHOR[contextra-cognition:FACADE-001]
+/// Freie Funktion zur Ausführung der semantischen Hyperkanten-Konsolidierung (LeanRAG Stage 3).
 pub async fn consolidate_semantic_hyperedges<S: StorageEngine, V: VectorIndex>(
     collection: &Collection<S, V>,
     embedder: &dyn TextEmbeddingEngine,

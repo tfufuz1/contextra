@@ -1,3 +1,14 @@
+//! # Bereinigung verwaister Intents (`context_compaction/cleanup.rs`)
+//!
+//! Bereinigt nach Systemabstürzen verwaiste `ConsolidationIntent`-Einträge im Speicher.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ring 3). Verwendet den `StorageEngine`-Port.
+//!
+//! ## Invarianten
+//! - **Transaktionale Sicherheit:** Jedes Entfernen erfolgt über eine reguläre, atomare Speicher-Transaktion.
+//! - **Präfix-Scans:** Sucht unter `consolidation_intent:` und `__tx_intent:`.
+
 use contextra_engine::transaction::CommitIntent;
 use contextra_ports::StorageEngine;
 use contextra_types::{Result, TxId};
@@ -7,6 +18,8 @@ use contextra_types::{Result, TxId};
 ///
 /// Verwaiste Intents entstehen wenn consolidate_with_retry() nach commit(intent_key)
 /// aber vor dem eigentlichen Dokument-Commit crashed.
+// ANCHOR[contextra-cognition:CLEAN-001]
+/// Bereinigt nach Abstürzen verwaiste ConsolidationIntents im Storage.
 pub async fn cleanup_orphaned_consolidation_intents<S: StorageEngine>(
     storage: &S,
     next_tx: &std::sync::atomic::AtomicU64,

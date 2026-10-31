@@ -1,3 +1,9 @@
+//! # Integrationstest: Intake vorverdichteter Eingaben (`tests/pre_condensed_input_intake.rs`)
+//!
+//! Validiert die agentenunabhängige Schnittstelle zur Aufnahme vorverdichteter
+//! Eingaben (`PreCondensedInput`), inklusive Mandantentrennung (VETO-F10),
+//! Provenienzerhalt, Längenbeschränkungen, deterministischer Sortierung und Grounding.
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -28,6 +34,8 @@ impl ResponseGroundingValidator for TestMockValidator {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-PRE_COND-078]
+// Prüft Testfall `test_pre_condensed_input_tenant_boundary_veto_f10`.
 #[test]
 fn test_pre_condensed_input_tenant_boundary_veto_f10() {
     let target_tenant = TenantId::try_new(101).unwrap();
@@ -67,6 +75,8 @@ fn test_pre_condensed_input_tenant_boundary_veto_f10() {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-PRE_COND-079]
+// Prüft Testfall `test_pre_condensed_input_provenance_retention`.
 #[test]
 fn test_pre_condensed_input_provenance_retention() {
     let tenant = TenantId::try_new(101).unwrap();
@@ -104,6 +114,8 @@ fn test_pre_condensed_input_provenance_retention() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-PRE_COND-080]
+// Prüft Testfall `test_pre_condensed_input_length_and_bound_limits`.
 #[test]
 fn test_pre_condensed_input_length_and_bound_limits() {
     let tenant = TenantId::try_new(101).unwrap();
@@ -150,6 +162,8 @@ fn test_pre_condensed_input_length_and_bound_limits() {
     assert!(matches!(res3.unwrap_err(), ContextraError::InvalidInput(_)));
 }
 
+// ANCHOR[contextra-cognition:TEST-PRE_COND-081]
+// Prüft Testfall `test_pre_condensed_input_deterministic_sorting`.
 #[test]
 fn test_pre_condensed_input_deterministic_sorting() {
     let tenant = TenantId::try_new(101).unwrap();
@@ -212,6 +226,8 @@ fn test_pre_condensed_input_deterministic_sorting() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-PRE_COND-082]
+// Prüft Testfall `test_pre_condensed_input_grounding_rejection`.
 #[test]
 fn test_pre_condensed_input_grounding_rejection() {
     let tenant = TenantId::try_new(101).unwrap();

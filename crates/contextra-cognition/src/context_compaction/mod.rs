@@ -1,3 +1,22 @@
+//! # Kontext-Kompaktierung (`context_compaction`)
+//!
+//! Dieses Submodul stellt Mechanismen zur Verdichtung langer Kontextverläufe
+//! und veralteter Werkzeugausgaben bereit, um das Token-Budget im LLM-Kontextfenster
+//! optimal auszunutzen.
+//!
+//! ## Ring-Zugehörigkeit
+//! Teil der Kognitionsschicht (Ring 3). Verarbeitet Chunks aus `contextra-types`.
+//!
+//! ## Kernbestandteile
+//! - [`ContextCompactor`]: Führt die kontextuelle Verdichtung anhand konfigurierter Strategien aus.
+//! - [`ConsolidationSession`]: Verwaltet eine transaktionale Kompaktierungssitzung mit Status-Token.
+//! - [`cleanup_orphaned_consolidation_intents`]: Bereinigt verwaiste Kompaktierungs-Absichten (Intents).
+//! - [`CompactionStrategy`], [`StatusToken`], [`CompactedContext`]: Daten- und Statusmodelle.
+//!
+//! ## Invarianten
+//! - **Provenienzerhalt:** Chunks behalten stets ihre Herkunfts-Dokument-IDs.
+//! - **Deterministischer Fallback:** Bei Ausfall von LLMs greifen Truncate- und Heuristikstrategien.
+
 // FILE-CONTEXT
 // ZWECK: Kontextkompaktierung und Zusammenfassung langer Gesprächs- und Dokumentverläufe.
 // INVARIANTEN: Provenance-Erhalt via Token-Budgeting; Rückfall auf Truncate/Summarize bei LLM-Ausfall.

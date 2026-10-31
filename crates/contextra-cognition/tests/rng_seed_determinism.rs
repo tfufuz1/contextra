@@ -1,3 +1,8 @@
+//! # Integrationstest: RNG-Seed Determinismus (`tests/rng_seed_determinism.rs`)
+//!
+//! Validiert die bit-exakte Reproduzierbarkeit und Determinismus aller
+//! stochastischen Prozesse (Konsolidierung, Kompaktierung, GMM-Clustering).
+
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -67,6 +72,8 @@ impl SuperEdgeSink for TestMockSink {
     }
 }
 
+// ANCHOR[contextra-cognition:TEST-RNG_SEED-083]
+// Prüft Testfall `test_consolidation_pass_determinism`.
 #[test]
 fn test_consolidation_pass_determinism() {
     let emb1 = vec![1.0, 0.0, 0.0, 0.0];
@@ -90,6 +97,8 @@ fn test_consolidation_pass_determinism() {
     );
 }
 
+// ANCHOR[contextra-cognition:TEST-RNG_SEED-084]
+// Prüft Testfall `test_context_compactor_seed_determinism`.
 #[test]
 fn test_context_compactor_seed_determinism() {
     let budget = TokenBudget::new(100, 0);
@@ -132,6 +141,8 @@ fn test_context_compactor_seed_determinism() {
     assert_eq!(out1.tokens_used, out2.tokens_used);
 }
 
+// ANCHOR[contextra-cognition:TEST-RNG_SEED-085]
+// Prüft Testfall `test_aggregation_pass_seed_determinism`.
 #[tokio::test]
 async fn test_aggregation_pass_seed_determinism() {
     let node1 = AggregationNode {
