@@ -1,3 +1,8 @@
+//! # Integrationstest: `deletion_proof_hash_collision.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_hash_collision`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Tests verifying collision prevention via length-prefixed hashing for DeletionProof.
 // INVARIANTEN: Key sets ["ab", "c"] and ["a", "bc"] MUST produce distinct deleted_keys_hash values.

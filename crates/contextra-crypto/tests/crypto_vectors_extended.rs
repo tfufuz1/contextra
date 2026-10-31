@@ -1,3 +1,8 @@
+//! # Integrationstest: `crypto_vectors_extended.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `crypto_vectors_extended`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Kryptografische Validierung gegen offizielle RFC-/NIST-Vektoren und herstellerunabhängige Standardwerte.
 // INVARIANTEN: Keine selbst berechneten Soll-Werte; alle Erwartungswerte entstammen offiziellen Spezifikationen (RFC 8032, RFC 5869, RFC 4231, RFC 8452, RFC 9106, BLAKE3 specification).

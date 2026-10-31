@@ -1,3 +1,8 @@
+//! # Integrationstest: `deletion_proof_prefix_collision_proptest.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_prefix_collision_proptest`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: AK-21 Collision test for length-prefixed key hash function hash_deleted_keys_length_prefixed.
 // INVARIANTEN: Distinct key chunk partitions of identical byte sequences MUST produce distinct length-prefixed hashes.

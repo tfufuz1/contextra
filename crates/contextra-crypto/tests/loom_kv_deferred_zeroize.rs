@@ -1,3 +1,8 @@
+//! # Integrationstest: `loom_kv_deferred_zeroize.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `loom_kv_deferred_zeroize`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 #![allow(unexpected_cfgs)]
 
 //! Loom-basierter Nebenläufigkeitsbeweis für Deferred Zeroize in `contextra-security` (`crates/contextra-crypto`).

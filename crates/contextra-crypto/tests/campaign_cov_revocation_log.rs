@@ -1,3 +1,8 @@
+//! # Integrationstest: `campaign_cov_revocation_log.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `campaign_cov_revocation_log`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Campaign coverage test for RevocationLog verify_integrity and chain verification.
 // INVARIANTEN: RevocationLog chain verification enforces monotonic sequence numbers, link prev_hash, and valid signatures.

@@ -1,3 +1,8 @@
+//! # Integrationstest: `deletion_proof_negative_and_golden.rs`
+//!
+//! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `deletion_proof_negative_and_golden`.
+//! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+
 // FILE-CONTEXT
 // ZWECK: Negative and golden vector integration tests for DeletionProof and DeletionProofVerifier.
 // INVARIANTEN: Comprehensive coverage of negative scenarios (tampering, reordering, truncation, wrong key, tenant mismatch, unknown version, empty chain) and golden vector serialization stability.

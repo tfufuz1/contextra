@@ -1,3 +1,6 @@
+//! # Verifikation von Löschbeweisen (`deletion_proof/verification.rs`)
+//!
+//! Prüft kryptographische Signaturen und BLAKE3-Digests fail-closed.
 // FILE-CONTEXT
 // ZWECK: Verification logic for cryptographic deletion proofs (v1, v2, v3, v5, WAL receipt verification).
 // INVARIANTEN: Constant-time comparison for secret/HMAC verification; Fail-closed on missing/mismatched keys.

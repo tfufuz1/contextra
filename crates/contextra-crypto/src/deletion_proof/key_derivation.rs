@@ -1,3 +1,6 @@
+//! # Schlüsselableitung für Löschbeweise (`deletion_proof/key_derivation.rs`)
+//!
+//! Leitet deterministisch Signatur- und Verifikationsschlüssel für Löschbeweise ab.
 // FILE-CONTEXT
 // ZWECK: Key derivation helper methods specifically for deletion proof scope keys.
 // INVARIANTEN: INV-KEYPURPOSE-1: HKDF domain separation tag mandatory.
