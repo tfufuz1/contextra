@@ -1,11 +1,20 @@
-// FILE-CONTEXT
-// ZWECK: Targeted Invalidation von Agent-Scratchpad-Prefixes im Radix-Baum (Spec §9.2 / INV-CLM-SCRATCHPAD-1).
-// STAND: TS:2026-10-01T00:00:00Z
-
 //! # Scratchpad-Invalidierung (`ScratchpadCacheScope`, `ScratchpadInvalidator`)
+//!
+//! ANCHOR[contextra-kvcache:SCRATCH-001]
 //!
 //! Stellt Mechanismen zur gezielten Invalidierung von Agenten-Scratchpad-Bereichen im KV-Prefix-Store
 //! bereit, ohne den gepinnten Basiskontext anderer Partitionen oder Mandanten zu beeinträchtigen.
+//!
+//! ## Was ist ein Scratchpad?
+//! In agentischen LLM-Architekturen (z. B. CLM = Context-aware Language Model) nutzen Agenten
+//! flüchtige Arbeitsbereiche (Scratchpads) zum Nachdenken, Planen und Evaluieren von Zwischenergebnissen.
+//! Während der Basiskontext (System-Prompt, Dokumente) unverändert bleibt, ändert sich das Scratchpad
+//! dynamisch nach jedem Schritt.
+//!
+//! ## Ziel der selektiven Invalidierung
+//! - Nur veraltete Scratchpad-Zustände aus dem KV-Cache tilgen.
+//! - Den teuer vorberechneten Basiskontext im PrefixRadixTree intakt lassen (`INV-CLM-SCRATCHPAD-1`).
+//! - Strikte Wahrung von Mandantengrenzen: Mandant A darf niemals Scratchpads von Mandant B löschen.
 
 #![forbid(unsafe_code)]
 
@@ -15,6 +24,7 @@ use contextra_types::TenantId;
 
 use crate::prefix_store::TenantPrefixKvStore;
 
+// ANCHOR[contextra-kvcache:SCRATCH-002]
 /// Definiert den Bereich (Scope) eines Agenten-Scratchpads für die Cache-Invalidierung.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScratchpadCacheScope {
@@ -25,7 +35,7 @@ pub struct ScratchpadCacheScope {
 }
 
 impl ScratchpadCacheScope {
-    /// Erstellt einen neuen `ScratchpadCacheScope` für den angegebenen Mandanten und das Token-Präfix.
+    /// Erstellt einen neuen [`ScratchpadCacheScope`] für den angegebenen Mandanten und das Token-Präfix.
     pub fn new(tenant_id: TenantId, scratchpad_key_prefix: Vec<u32>) -> Self {
         Self {
             tenant_id,
@@ -34,25 +44,27 @@ impl ScratchpadCacheScope {
     }
 }
 
+// ANCHOR[contextra-kvcache:SCRATCH-003]
 /// Schnittstelle zur gezielten Invalidation von Scratchpad-Cache-Scopes.
 pub trait ScratchpadInvalidator {
-    /// Invalidiert alle Gruppen/Blöcke im Radix-Baum, die zum angegebenen `ScratchpadCacheScope` gehören.
+    /// Invalidiert alle Gruppen/Blöcke im Radix-Baum, die zum angegebenen [`ScratchpadCacheScope`] gehören.
     ///
     /// # Fehler
-    /// Gibt einen `Result<usize>` zurück, wobei `usize` die Anzahl invalidierter Segmente/Blöcke darstellt.
+    /// Gibt ein `Result<usize>` zurück, wobei `usize` die Anzahl invalidierter Segmente/Blöcke darstellt.
     fn invalidate_scope(&self, scope: &ScratchpadCacheScope) -> Result<usize>;
 }
 
-/// Implementierung von `ScratchpadInvalidator` für `TenantPrefixKvStore`.
+// ANCHOR[contextra-kvcache:SCRATCH-004]
+/// Implementierung von [`ScratchpadInvalidator`] für [`TenantPrefixKvStore`].
 pub struct PrefixStoreScratchpadInvalidator<'a> {
-    /// Referenz auf den unterliegenden `TenantPrefixKvStore`.
+    /// Referenz auf den unterliegenden [`TenantPrefixKvStore`].
     pub store: &'a TenantPrefixKvStore,
-    /// Liste von `PrefixKey`s, die im Store auf Scratchpad-Präfixe geprüft und evictiert werden sollen.
+    /// Liste von [`PrefixKey`]s, die im Store auf Scratchpad-Präfixe geprüft und evictiert werden sollen.
     pub keys: Vec<PrefixKey>,
 }
 
 impl<'a> PrefixStoreScratchpadInvalidator<'a> {
-    /// Erstellt einen neuen `PrefixStoreScratchpadInvalidator` für den angegebenen Store.
+    /// Erstellt einen neuen [`PrefixStoreScratchpadInvalidator`] für den angegebenen Store.
     pub fn new(store: &'a TenantPrefixKvStore) -> Self {
         Self {
             store,
@@ -60,7 +72,7 @@ impl<'a> PrefixStoreScratchpadInvalidator<'a> {
         }
     }
 
-    /// Konfiguriert die zu prüfenden `PrefixKey`s für die Invalidation.
+    /// Konfiguriert die zu prüfenden [`PrefixKey`]s für die Invalidation.
     pub fn with_keys(mut self, keys: Vec<PrefixKey>) -> Self {
         self.keys = keys;
         self
@@ -68,6 +80,12 @@ impl<'a> PrefixStoreScratchpadInvalidator<'a> {
 }
 
 impl<'a> ScratchpadInvalidator for PrefixStoreScratchpadInvalidator<'a> {
+    /// Führt die gezielte Invalidierung im Prefix-Store durch.
+    ///
+    /// # Ablauf
+    /// 1. Schnellausstieg mit `Ok(0)`, falls das Präfix leer ist.
+    /// 2. Ruft [`TenantPrefixKvStore::invalidate_prefix_scope_keys`] auf.
+    /// 3. Gibt die Gesamtzahl entfernter Blöcke zurück.
     fn invalidate_scope(&self, scope: &ScratchpadCacheScope) -> Result<usize> {
         if scope.scratchpad_key_prefix.is_empty() {
             return Ok(0);
@@ -106,6 +124,7 @@ mod tests {
         }
     }
 
+    // Prüft, dass übereinstimmende Scratchpad-Präfixe gezielt invalidiert werden, während der Basiskontext erhalten bleibt.
     #[test]
     fn test_scratchpad_invalidation_matching_prefix() {
         let store = TenantPrefixKvStore::new().with_reuse_policy(KvReusePolicy::Always);
@@ -152,6 +171,7 @@ mod tests {
         assert_eq!(base_hit.matched_tokens, 4);
     }
 
+    // Prüft, dass gepinnte Basiskontexte durch Invalidierung unpassender Scopes unberührt bleiben.
     #[test]
     fn test_pinned_base_context_remains_untouched() {
         let store = TenantPrefixKvStore::new().with_reuse_policy(KvReusePolicy::Always);
@@ -180,6 +200,7 @@ mod tests {
         assert_eq!(hit.matched_tokens, 5);
     }
 
+    // Prüft, dass Scratchpad-Invalidierung strikt auf den anfragenden Mandanten begrenzt ist.
     #[test]
     fn test_tenant_isolation_scratchpad_invalidation() {
         let store = TenantPrefixKvStore::new().with_reuse_policy(KvReusePolicy::Always);

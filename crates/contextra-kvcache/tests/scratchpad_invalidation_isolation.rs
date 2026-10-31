@@ -1,6 +1,9 @@
-// FILE-CONTEXT
-// ZWECK: Integrationstest für Mandantenisolation bei der Invalidation von Scratchpad-Cache-Scopes.
-// INVARIANTEN: Mandantenisolation (VETO-F10): Invalidation von Mandant A lässt Mandant B bitgleich unberührt.
+//! # Integrationstest für Mandantenisolation bei der Scratchpad-Invalidierung
+//!
+//! ANCHOR[contextra-kvcache:TEST-SCRATCH-ISO-001]
+//!
+//! Prüft Invariante VETO-F10: Die Invalidierung eines Scratchpads für Mandant A
+//! lässt identische Scratchpad-Blöcke von Mandant B vollständig und bitidentisch unberührt.
 
 #![forbid(unsafe_code)]
 #![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
@@ -33,6 +36,7 @@ fn make_prefix_key(model_name: &str) -> PrefixKey {
     }
 }
 
+// Prüft, dass die Scratchpad-Invalidierung von Mandant A den Scratchpad-Cache von Mandant B bitgleich unberührt lässt.
 #[test]
 fn test_scratchpad_invalidation_multi_tenant_isolation() {
     let store = TenantPrefixKvStore::new().with_reuse_policy(KvReusePolicy::Always);

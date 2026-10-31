@@ -57,6 +57,9 @@ pub enum CryptoError {
 
     #[error("key or group has been revoked: {0}")]
     KeyRevoked(String),
+
+    #[error("storage or I/O error: {0}")]
+    Storage(#[from] contextra_types::ContextraError),
 }
 
 impl CryptoError {

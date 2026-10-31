@@ -1,3 +1,7 @@
+//! # Tests für Propensity-Anforderungen im Inverse Propensity Scoring (IPS)
+//!
+//! Prüft die Untergrenzen-Klammerung und das strikte Verwerfen ungültiger Propensity-Werte.
+
 // Testpflicht AK-15 (docs/specs/CONTEXTRA_SPEC_v2.md / Spec §15.2)
 
 use contextra_adapt::OffPolicyEvaluator;

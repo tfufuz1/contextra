@@ -1,3 +1,10 @@
+//! # Tests für die Verdrängung mit AttentionExporter
+//!
+//! ANCHOR[contextra-kvcache:TEST-ATTN-EXP-001]
+//!
+//! Vergleicht das Basis-LRU-Verhalten ohne Exporter mit dem Erhalt
+//! aufmerksamkeitsstarker Segmente bei angebundenem Mock-AttentionExporter.
+
 #![forbid(unsafe_code)]
 
 use contextra_kvcache::{segment::KvSegment, EvictionWorker, TenantIsolatedKvStore};
@@ -25,6 +32,7 @@ impl AttentionExporter for MockAttentionExporter {
     }
 }
 
+// Prüft das reine LRU-Baseline-Verhalten ohne Attention-Exporter: Das älteste Segment wird zuerst verdrängt.
 #[test]
 fn test_null_attention_exporter_baseline_lru() {
     let store = Arc::new(TenantIsolatedKvStore::new());
@@ -50,6 +58,7 @@ fn test_null_attention_exporter_baseline_lru() {
     assert!(remaining.contains(&30));
 }
 
+// Prüft, dass ein Segment mit hohem Attention-Score trotz hohen Alters im Cache verbleibt.
 #[test]
 fn test_eviction_with_mock_attention_exporter_retains_important_segment() {
     let store = Arc::new(TenantIsolatedKvStore::new());
