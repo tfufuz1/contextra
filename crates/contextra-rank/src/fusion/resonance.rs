@@ -1,9 +1,18 @@
+//! # Resonanz-Kohärenz-Bonus (`resonance`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Dieses Modul belohnt Dokumente, die in mehreren voneinander unabhängigen Retrieval-Kanälen
+//! gleichzeitig gefunden wurden. Dies basiert auf dem Prinzip der inter-sensorischen Kohärenz.
+
 use super::rrf::weighted_reciprocal_rank_fusion;
 use super::types::{FusedScore, SearchResult};
 use serde::{Deserialize, Serialize};
 
 /// Configuration for Resonance Coherence Bonus.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-rank:RES-001]
+/// Konfigurationsparameter für die Berechnung des Resonanz-Kohärenz-Bonus.
 pub struct ResonanceConfig {
     /// Exponent β for coherence bonus. Default: 0.5.
     pub beta: f32,
@@ -21,6 +30,8 @@ impl Default for ResonanceConfig {
 }
 
 /// Convenience API to fuse multi-signal search results.
+// ANCHOR[contextra-rank:RES-002]
+/// Komfortfunktion zur Zusammenführung mehrerer Signal-Ergebnismengen mittels gewichteter RRF.
 pub fn fuse_signals(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
@@ -29,6 +40,8 @@ pub fn fuse_signals(
 }
 
 /// Applies Resonance Coherence Bonus to fused search results.
+// ANCHOR[contextra-rank:RES-003]
+/// Wendet den Resonanz-Kohärenz-Bonus auf bereits fusionierte Suchergebnisse an.
 pub fn apply_resonance_bonus(
     results: Vec<SearchResult>,
     valid_signal_count: usize,

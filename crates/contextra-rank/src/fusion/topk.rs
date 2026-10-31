@@ -1,3 +1,10 @@
+//! # Größenbeschränkter Min-Heap für Top-K-Selektion (`topk`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Bietet einen größenbeschränkten Min-Heap (`BoundedTopK`), um während der Rangfusion
+//! speichereffizient die K besten Elemente beizubehalten.
+
 pub(super) fn cmp_scores(a: f32, b: f32) -> std::cmp::Ordering {
     match (a.is_nan(), b.is_nan()) {
         (true, false) => std::cmp::Ordering::Less,
@@ -13,6 +20,8 @@ pub(super) fn cmp_scores(a: f32, b: f32) -> std::cmp::Ordering {
 /// zur Akkumulation der K besten Kandidaten während der Multi-Signal-Fusion (RRF / Score-Normalisierung).
 /// Er ist zu unterscheiden von `contextra_text::wand::BoundedTopK`, welcher speziell für den
 /// WAND-Algorithmus zur Trefferbeschränkung bei der Invertierten-Index-Suche eingesetzt wird.
+// ANCHOR[contextra-rank:TOPK-001]
+/// Größenbeschränkter Min-Heap für die Top-K-Kandidatenselektion während der Rangfusion.
 pub struct BoundedTopK<T> {
     heap: std::collections::BinaryHeap<T>,
     capacity: usize,

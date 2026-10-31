@@ -1,5 +1,12 @@
-//! Hybrid Search Signal Fusion implementations (Reciprocal Rank Fusion & Score Normalization).
+//! # Signal-Fusions-Subsystem (`fusion`)
+//!
+//! **Ring:** Ring 0 (Ranking & Kalibrierung)
+//!
+//! Dieses Modul bündelt alle Algorithmen zur Zusammenführung (Fusion) mehrdimensionaler
+//! Suchergebnisse aus verschiedenen Retrieval-Kanälen (Dense Vector, BM25-Volltext,
+//! Graph-Traversierung, Reranking).
 
+// ANCHOR[contextra-rank:FUS-MOD-001]
 mod global;
 mod normalized;
 mod provenance;

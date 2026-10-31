@@ -16,7 +16,9 @@ fn make_search_result(id: &str, score: f32) -> SearchResult {
     }
 }
 
+// ANCHOR[contextra-rank:RRF-TEST-001]
 proptest! {
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_rrf_empty_lists_return_empty(max_results in 0usize..100) {
         let empty_sets: Vec<Vec<SearchResult>> = vec![vec![], vec![]];
@@ -24,6 +26,7 @@ proptest! {
         prop_assert!(fused.is_empty());
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_rrf_monotonicity_single_list(
         num_items in 1usize..50,
@@ -44,6 +47,7 @@ proptest! {
         }
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_rrf_permutation_invariance(
         perm in prop_oneof![
@@ -88,6 +92,7 @@ proptest! {
         }
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_rrf_k_boundary_values(
         k_val in prop_oneof![Just(0.0), Just(1.0), Just(60.0), Just(1_000_000.0)],
@@ -113,6 +118,7 @@ proptest! {
         }
     }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn prop_rrf_duplicate_ids_in_single_list(
         num_dups in 2usize..10,
@@ -128,6 +134,7 @@ proptest! {
     }
 }
 
+    // Testet das erwartete Verhalten und mathematische Invarianten.
 #[test]
 fn test_prop_rrf_tie_breaker_stability_deterministic() {
     // Multiple documents with identical fusion scores must be tie-broken deterministically by DocId ascending.
