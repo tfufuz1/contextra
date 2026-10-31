@@ -1,8 +1,10 @@
-// FILE-CONTEXT
-// ZWECK: Integrationstest für INV-CLM-SCRATCHPAD-1 (Gepinnter Basiskontext bleibt bei Scratchpad-Reset unberührt).
-// INVARIANTEN: Ein Scratchpad-Reset invalidiert ausschließlich den zugehörigen KV-Cache-Branch,
-//              niemals den gepinnten Basiskontext.
-//              Wiederholte Invalidation ist idempotent (zweiter Aufruf liefert 0).
+//! # Integrationstest für INV-CLM-SCRATCHPAD-1
+//!
+//! ANCHOR[contextra-kvcache:TEST-CLM-PIN-001]
+//!
+//! Verifiziert, dass ein Scratchpad-Reset ausschließlich den zugehörigen KV-Cache-Ast
+//! invalidiert, niemals den gepinnten Basiskontext. Zudem wird die Idempotenz
+//! wiederholter Invalidierungen geprüft.
 
 #![forbid(unsafe_code)]
 #![allow(clippy::panic, clippy::unwrap_used, clippy::expect_used)]
@@ -35,6 +37,7 @@ fn make_prefix_key(model_name: &str) -> PrefixKey {
     }
 }
 
+// Prüft, dass der gepinnte Basiskontext bei Scratchpad-Invalidierung unberührt bleibt und die Operation idempotent ist.
 #[test]
 fn test_clm_pinned_base_preserved_and_invalidation_idempotency() {
     let store = TenantPrefixKvStore::new().with_reuse_policy(KvReusePolicy::Always);
