@@ -1,9 +1,8 @@
-// FILE-CONTEXT
-// ZWECK: Produktive Adapter-Implementierungen für Port-Traits (`KvBridgeStorage`, `SemanticEmbedder`, `PluginManifest`).
-
-//! Produktive Port-Adapter für den Contextra KV-Cache.
+//! # Produktive Port-Adapter für den Contextra KV-Cache
 //!
-//! Dieses Modul stellt konkrete Implementierungen der Ring-0 Port-Traits bereit:
+//! ANCHOR[contextra-kvcache:ADAPT-001]
+//!
+//! Dieses Modul stellt konkrete Implementierungen der Ring-0/Ring-1 Port-Traits bereit:
 //! - [`StorageEngineKvBridge`]: Verbindet Tier-2 Persistence über den generischen [`StorageEngine`]-Port.
 //! - [`EmbeddingProviderSemanticEmbedder`]: Adaptiert den [`EmbeddingProvider`]-Port für semantische Cache-Lookups.
 //! - [`KvCachePluginManifest`]: Bietet ein validiertes Manifest mit Capabilities, Limits und Versionierung.
@@ -35,6 +34,7 @@ fn block_on_simple<F: std::future::Future>(fut: F) -> F::Output {
     }
 }
 
+// ANCHOR[contextra-kvcache:ADAPT-002]
 /// Produktiver Tier-2 Spill-over Adapter über das generische [`StorageEngine`]-Interface.
 ///
 /// Bietet mandantengetrennte Persistierung von KV-Segmenten im Storage-Layer.
@@ -43,17 +43,19 @@ pub struct StorageEngineKvBridge {
 }
 
 impl StorageEngineKvBridge {
-    /// Erstellt eine neue `StorageEngineKvBridge`.
+    /// Erstellt eine neue `StorageEngineKvBridge` um eine gegebene [`StorageEngine`].
     pub fn new(engine: Arc<dyn StorageEngine>) -> Self {
         Self { engine }
     }
 }
 
 impl KvBridgeStorage for StorageEngineKvBridge {
+    /// Liest Roh-Bytes zu einem Schlüssel asynchron aus der Storage-Engine.
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, ContextraResult<Option<Bytes>>> {
         Box::pin(async move { self.engine.get(key).await })
     }
 
+    /// Schreibt ein KV-Paar im Kontext einer Transaktion (`tx_id`) in die Storage-Engine.
     fn put<'a>(
         &'a self,
         tx_id: TxId,
@@ -63,12 +65,14 @@ impl KvBridgeStorage for StorageEngineKvBridge {
         Box::pin(async move { self.engine.put(tx_id, key, value).await })
     }
 
+    /// Bestätigt eine Transaktion (`commit`) dauerhaft in der Storage-Engine.
     fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, ContextraResult<()>> {
         Box::pin(async move { self.engine.commit(tx_id).await })
     }
 }
 
-/// Adaptiert einen generic [`EmbeddingProvider`] für den `SemanticEmbedder`-Trait im KV-Cache.
+// ANCHOR[contextra-kvcache:ADAPT-003]
+/// Adaptiert einen generischen [`EmbeddingProvider`] für den `SemanticEmbedder`-Trait im KV-Cache.
 pub struct EmbeddingProviderSemanticEmbedder {
     provider: Arc<dyn EmbeddingProvider>,
 }
@@ -79,7 +83,7 @@ impl EmbeddingProviderSemanticEmbedder {
         Self { provider }
     }
 
-    /// Returns a reference to the underlying `EmbeddingProvider`.
+    /// Liefert eine Referenz auf den zugrundeliegenden [`EmbeddingProvider`].
     pub fn provider(&self) -> &Arc<dyn EmbeddingProvider> {
         &self.provider
     }
@@ -87,6 +91,12 @@ impl EmbeddingProviderSemanticEmbedder {
 
 #[cfg(feature = "content-addressed-kv-cache")]
 impl SemanticEmbedder for EmbeddingProviderSemanticEmbedder {
+    /// Berechnet das Text-Embedding für eine Sequenz von Token-IDs.
+    ///
+    /// # Ablauf
+    /// 1. Validieren, dass Tokens nicht leer sind.
+    /// 2. Tokens als String repräsentieren.
+    /// 3. In separatem Thread asynchron über den Provider berechnen und auf Ergebnis warten.
     fn embed(&self, tokens: &[u32]) -> ContextraResult<Vec<f32>> {
         if tokens.is_empty() {
             return Err(ContextraError::InvalidInput(
@@ -106,20 +116,24 @@ impl SemanticEmbedder for EmbeddingProviderSemanticEmbedder {
             block_on_simple(future)
         });
 
+        // NOTE: Bei Aktivierung von `content-addressed-kv-cache` schlägt `handle.join()...?`
+        // typmäßig fehl, da `EmbeddingError` nicht in `ContextraError` konvertiert wird.
+        // Gemäß Vorgabe wird der Code nicht modifiziert.
         handle.join().map_err(|_| {
             ContextraError::Internal("Thread panic during embedding computation".to_string())
         })?
     }
 }
 
+// ANCHOR[contextra-kvcache:ADAPT-004]
 /// Validierte Konfiguration für das KV-Cache-Plugin-Manifest.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KvCachePluginConfig {
-    /// Plugin version tuple (major, minor, patch).
+    /// Plugin Versions-Tupel (Major, Minor, Patch).
     pub version: (u32, u32, u32),
-    /// Max RAM memory limit in bytes for KV-cache allocation.
+    /// Maximales Speicherlimit im RAM in Bytes für KV-Cache-Allokationen.
     pub max_memory_bytes: u64,
-    /// Minimum required feature ring.
+    /// Mindestens erforderlicher Feature-Ring der Lizenz.
     pub feature_ring_required: FeatureRing,
 }
 
@@ -134,7 +148,7 @@ impl Default for KvCachePluginConfig {
 }
 
 impl KvCachePluginConfig {
-    /// Validates the plugin configuration parameters.
+    /// Validiert die Konfigurationsparameter (mindestens 1 MiB RAM erforderlich).
     pub fn validate(&self) -> ContextraResult<()> {
         if self.max_memory_bytes < (1 << 20) {
             return Err(ContextraError::InvalidInput(
@@ -145,14 +159,15 @@ impl KvCachePluginConfig {
     }
 }
 
-/// Concrete, validated [`PluginManifest`] implementation for `contextra-kvcache`.
+// ANCHOR[contextra-kvcache:ADAPT-005]
+/// Konkrete, validierte [`PluginManifest`]-Implementierung für `contextra-kvcache`.
 #[derive(Debug, Clone)]
 pub struct KvCachePluginManifest {
     config: KvCachePluginConfig,
 }
 
 impl KvCachePluginManifest {
-    /// Constructs a new validated `KvCachePluginManifest`.
+    /// Erstellt ein neues, validiertes `KvCachePluginManifest`.
     pub fn new(config: KvCachePluginConfig) -> ContextraResult<Self> {
         config.validate()?;
         Ok(Self { config })
@@ -199,6 +214,7 @@ impl PluginManifest for KvCachePluginManifest {
 mod tests {
     use super::*;
 
+    // Prüft Validierungsregeln des Plugin-Manifests (z. B. Mindestspeichergröße).
     #[test]
     fn test_kv_cache_plugin_manifest_validation() {
         let invalid_config = KvCachePluginConfig {

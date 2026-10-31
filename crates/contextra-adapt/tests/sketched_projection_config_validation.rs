@@ -1,3 +1,7 @@
+//! # Konfigurationsvalidierung für Sketched-Bandits
+//!
+//! Testet die Dimensionsvalidierung und Grenzen der Rademacher-Projektionsmatrix.
+
 // FILE-CONTEXT
 // ZWECK: Konfigurations- und Validierungstests für SketchedProjection (§13.2).
 // STAND: TS:2026-09-26T00:00:00Z

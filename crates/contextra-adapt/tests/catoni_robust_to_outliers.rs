@@ -1,9 +1,11 @@
-//! Differential test for `CatoniDriftDetector` vs Naive Arithmetic Mean Detector.
+//! # Robustheitstests für Catoni-Drift-Detektor
 //!
-//! Verifies that `CatoniDriftDetector` does NOT falsely report drift when single extreme reward
-//! outliers are injected into an otherwise stable reward stream, whereas a naive arithmetic mean
-//! detector falsely triggers drift. Also verifies that `CatoniDriftDetector` correctly detects
-//! true sustained distribution shifts.
+//! Differentieller Test für `CatoniDriftDetector` vs. naiven arithmetischen Mittelwert-Detektor.
+//!
+//! ## Testziele
+//! - Verifiziert, dass `CatoniDriftDetector` keine Fehlalarme bei einzelnen extremen Ausreißern liefert.
+//! - Verifiziert, dass ein naiver Mittelwert-Detektor bei Ausreißern fälschlicherweise Drift meldet.
+//! - Verifiziert, dass echte, anhaltende Verteilungsverschiebungen zuverlässig erkannt werden.
 
 use contextra_adapt::{CatoniDriftDetector, DriftDetector, DriftSignal};
 

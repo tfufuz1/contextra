@@ -1,3 +1,22 @@
+//! # RAII-Guards für Snapshot-Pinning und Transaktions-Sicherheit
+//!
+//! Dieses Modul implementiert RAII-Guards (Resource Acquisition Is Initialization), die sicherstellen,
+//! dass Transaktionen entweder explizit committet werden oder andernfalls ein sicheres Rollback auslösen.
+//!
+//! ## Ring & Rolle
+//! Gehört zu **Ring 1 (Persistenz)**. Bildet die Brücke zwischen laufenden Transaktionen der Anwendungslogik
+//! (z. B. Agenten-Workflows in Ring 2/3) und der Persistenzebene ([`contextra_ports::StorageEngine`]).
+//!
+//! ## Hauptkomponenten
+//! - [`PinGuard`]: Schützt gepinnte MVCC-Sequenznummern vor versehentlichem Löschen durch den LSM-Compactor.
+//! - [`CheckpointGuard`]: Kapselt Transaktionen eines Agenten-Schritts. Erzwingt explizites `commit()` oder `rollback()`.
+//!
+//! ## Invariante: Fail-Closed und Non-Blocking Drop (ADR-011, ADR-053)
+//! Wenn ein Guard panickt oder vorzeitig fallen gelassen (`drop`) wird, darf der synchrone Drop-Handler
+//! keine blockierenden Disk-I/O- oder Netzwerk-Operationen im Tokio-Worker-Thread ausführen.
+//! Stattdessen wird der betroffene Zustand synchron in der [`InstanceOrphanRegistry`] vorgemerkt,
+//! sodass spätere Recovery-Durchläufe die Ressourcen gefahrlos freigeben können.
+
 use crate::meta::StateCheckpoint;
 use crate::orphan::{clock_timestamp_ms, InstanceOrphanRegistry, PinnedSeqNoOrphan};
 use contextra_ports::SystemClock;
@@ -5,9 +24,19 @@ use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+// ANCHOR[contextra-checkpoint:GRD-001]
 /// RAII-Guard für gepinnte Checkpoint-Sequenznummern (gemäß ADR-015).
+///
+/// # Zweck
 /// Garantiert, dass eine gepinnte Sequenznummer bei einem Fehler oder Panic während des Schreibens
-/// automatisch entpinnt wird, um dauerhafte GC-Blockaden zu verhindern.
+/// automatisch entpinnt oder als verwaist registriert wird, um dauerhafte GC-Blockaden (LSM-Compaction)
+/// zu verhindern.
+///
+/// # Felder
+/// - `storage`: Referenz auf die Speicherengine zum Entpinnen.
+/// - `seq_no`: Die gepinnte Sequenznummer (wird bei `defuse()` oder `unpin()` geleert).
+/// - `orphan_registry`: Instanzgebundene Registry für verwaiste Einträge bei unkontrolliertem Drop.
+/// - `clock`: Injizierter Uhrzeit-Port für deterministische Zeitmessung.
 #[must_use = "PinGuard must be defused upon successful checkpoint storage"]
 pub struct PinGuard<S: contextra_ports::StorageEngine> {
     storage: Arc<S>,
@@ -17,6 +46,13 @@ pub struct PinGuard<S: contextra_ports::StorageEngine> {
 }
 
 impl<S: contextra_ports::StorageEngine> PinGuard<S> {
+    // ANCHOR[contextra-checkpoint:GRD-002]
+    /// Pinnt eine Sequenznummer in der Storage-Engine unter Verwendung der Clock aus der Orphan-Registry.
+    ///
+    /// # Parameter
+    /// - `storage`: Die zugrundeliegende Speicherengine.
+    /// - `seq_no`: Zu pinnende MVCC-Sequenznummer.
+    /// - `orphan_registry`: Registry für den Drop-Fehlerfall.
     pub async fn pin(
         storage: Arc<S>,
         seq_no: u64,
@@ -26,12 +62,22 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
         Self::pin_with_clock(storage, seq_no, orphan_registry, clock).await
     }
 
+    // ANCHOR[contextra-checkpoint:GRD-003]
+    /// Pinnt eine Sequenznummer mit explizit übergebenem Clock-Port.
+    ///
+    /// # Ablauf von `pin_with_clock`:
+    /// 1. `storage.pin_checkpoint(seq_no)` asynchron ausführen.
+    /// 2. Bei Erfolg PinGuard-Instanz zurückgeben.
+    ///
+    /// # Fehler
+    /// Gibt einen Fehler zurück, falls die Speicher-Engine das Pinnen verweigert (z. B. I/O-Fehler).
     pub async fn pin_with_clock(
         storage: Arc<S>,
         seq_no: u64,
         orphan_registry: Arc<InstanceOrphanRegistry>,
         clock: Arc<dyn contextra_ports::Clock>,
     ) -> Result<Self> {
+        // NOTE: Pinnen verhindert das physische Löschen von SSTables durch den LSM-Compactor
         storage.pin_checkpoint(seq_no).await?;
         Ok(Self {
             storage,
@@ -41,16 +87,24 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
         })
     }
 
+    /// Liefert eine Referenz auf den injizierten Clock-Port.
     pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
         &self.clock
     }
 
     /// Entschärft den Guard nach erfolgreicher Persistierung, sodass die Sequenznummer gepinnt bleibt.
     pub fn defuse(mut self) {
+        // NOTE: Entnimmt seq_no, damit der Drop-Handler keinen Orphan-Eintrag registriert
         self.seq_no.take();
     }
 
+    // ANCHOR[contextra-checkpoint:GRD-004]
     /// Entpinnt die Sequenznummer explizit und asynchron bei einem abgefangenen Fehler.
+    ///
+    /// # Ablauf von `unpin`:
+    /// 1. `seq_no` entnehmen.
+    /// 2. `storage.unpin_checkpoint(seq_no)` ausführen.
+    /// 3. Piggyback-Flush der Orphan-Registry anstoßen.
     pub async fn unpin(mut self) -> Result<()> {
         if let Some(seq_no) = self.seq_no.take() {
             self.storage.unpin_checkpoint(seq_no).await?;
@@ -63,6 +117,12 @@ impl<S: contextra_ports::StorageEngine> PinGuard<S> {
 }
 
 impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
+    // ANCHOR[contextra-checkpoint:GRD-005]
+    // Ablauf von `PinGuard::drop`:
+    // Wenn `seq_no` noch gesetzt ist (Guard wurde nicht defused oder unpinned):
+    // 1. Zeitstempel über Clock-Port lesen.
+    // 2. Als `PinnedSeqNoOrphan` synchron in der `InstanceOrphanRegistry` vormerken.
+    // 3. Warnung loggen.
     fn drop(&mut self) {
         if let Some(seq_no) = self.seq_no.take() {
             let timestamp_ms = clock_timestamp_ms(self.clock.as_ref());
@@ -70,6 +130,7 @@ impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
                 seq_no,
                 timestamp_ms,
             };
+            // NOTE: Keine blockierenden Disk-Operationen im Drop, rein speicherbasiert
             self.orphan_registry.register_orphan_sync(orphan);
             tracing::warn!(
                 seq = seq_no,
@@ -79,6 +140,7 @@ impl<S: contextra_ports::StorageEngine> Drop for PinGuard<S> {
     }
 }
 
+// ANCHOR[contextra-checkpoint:GRD-006]
 /// RAII Guard, der explizit über [`commit`](Self::commit) oder [`rollback`](Self::rollback) finalisiert werden MUSS.
 ///
 /// # RAII-Kontrakt und Betriebshinweise
@@ -99,11 +161,13 @@ pub struct CheckpointGuard<S: contextra_ports::StorageEngine> {
 }
 
 impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
+    /// Erzeugt einen neuen `CheckpointGuard` mit Standard-SystemClock.
     pub fn new(checkpoint: StateCheckpoint, storage: Arc<S>, namespace: impl Into<String>) -> Self {
         let clock: Arc<dyn contextra_ports::Clock> = Arc::new(SystemClock::new());
         Self::with_clock(checkpoint, storage, namespace, clock)
     }
 
+    /// Erzeugt einen neuen `CheckpointGuard` mit injiziertem Clock-Port.
     pub fn with_clock(
         checkpoint: StateCheckpoint,
         storage: Arc<S>,
@@ -124,6 +188,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         )
     }
 
+    /// Erzeugt einen neuen `CheckpointGuard` mit vorhandener Orphan-Registry.
     pub fn with_registry(
         checkpoint: StateCheckpoint,
         storage: Arc<S>,
@@ -142,6 +207,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         )
     }
 
+    /// Erzeugt einen neuen `CheckpointGuard` mit vorhandener Orphan-Registry und Zähler für übersprungene Rollbacks.
     pub fn with_registry_and_counter(
         checkpoint: StateCheckpoint,
         storage: Arc<S>,
@@ -160,6 +226,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         )
     }
 
+    /// Vollständiger interner Konstruktor mit allen Parametern.
     pub fn with_registry_counter_and_clock(
         checkpoint: StateCheckpoint,
         storage: Arc<S>,
@@ -181,11 +248,13 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         }
     }
 
+    /// Ergänzt den Guard um eine Metrik-Senke zur Erfassung von Ausführungsdauern.
     pub fn with_metrics_sink(mut self, sink: Arc<dyn contextra_ports::MetricsSink>) -> Self {
         self.metrics_sink = Some(sink);
         self
     }
 
+    /// Ergänzt den Guard optional um eine Metrik-Senke.
     pub fn with_metrics_sink_opt(
         mut self,
         sink: Option<Arc<dyn contextra_ports::MetricsSink>>,
@@ -194,16 +263,19 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         self
     }
 
+    /// Liefert den verwendeten Clock-Port.
     pub fn clock(&self) -> &Arc<dyn contextra_ports::Clock> {
         &self.clock
     }
 
-    /// Erstellt einen neuen CheckpointGuard für einen Agenten-Schritt.
+    // ANCHOR[contextra-checkpoint:GRD-007]
+    /// Erstellt einen neuen CheckpointGuard für einen Agenten-Schritt mit SystemClock.
     pub async fn for_agent_step(storage: Arc<S>, tx: TxId) -> Result<Self> {
         let clock = Arc::new(SystemClock::new());
         Self::for_agent_step_with_clock(storage, tx, clock).await
     }
 
+    /// Erstellt einen CheckpointGuard für einen Agenten-Schritt mit spezifischer Orphan-Registry.
     pub async fn for_agent_step_with_registry(
         storage: Arc<S>,
         tx: TxId,
@@ -223,6 +295,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         ))
     }
 
+    /// Erstellt einen CheckpointGuard für einen Agenten-Schritt mit speziellem Clock-Port.
     pub async fn for_agent_step_with_clock(
         storage: Arc<S>,
         tx: TxId,
@@ -240,12 +313,21 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         Ok(Self::with_registry(cp, storage, ns, registry))
     }
 
+    /// Liefert eine Referenz auf den enthaltenen Checkpoint, sofern noch nicht konsumiert.
     pub fn checkpoint(&self) -> Result<&StateCheckpoint> {
         self.checkpoint
             .as_ref()
             .ok_or_else(|| ContextraError::Internal("Checkpoint already consumed".into()))
     }
 
+    // ANCHOR[contextra-checkpoint:GRD-008]
+    /// Überführt den Guard in einen dauerhaften Zustand (Commit) und konsumiert ihn.
+    ///
+    /// # Ablauf von `commit`:
+    /// 1. Checkpoint aus Option entnehmen (bei vorherigem Konsum -> Fehler).
+    /// 2. Bei vorhandenem Metrics-Sink Dauer erfassen und protokollieren (`checkpoint_duration_seconds`).
+    /// 3. Asynchronen Hintergrund-Task für Piggyback-Flush der Orphan-Registry spawnen.
+    /// 4. [`StateCheckpoint`] zurückliefern.
     pub fn commit(mut self) -> Result<StateCheckpoint> {
         let cp = self
             .checkpoint
@@ -264,6 +346,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
             );
         }
         let reg = Arc::clone(&self.orphan_registry);
+        // NOTE: Piggyback-Flush im Hintergrund persistiert zuvor gemerkte Orphans ohne Transaktionslatenz
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             handle.spawn(async move {
                 if let Err(err) = reg.flush_orphan_registry().await {
@@ -274,12 +357,20 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         Ok(cp)
     }
 
+    // ANCHOR[contextra-checkpoint:GRD-009]
     /// Führt ein manuelles, asynchrones Rollback des Checkpoints aus.
     /// Nach Aufruf von `rollback()` ist der Guard konsumiert, sodass beim Drop kein erneutes Rollback ausgelöst wird.
     ///
     /// # Serialisierungsbarriere
     /// Wenn neuere committete Transaktionen mit `last_tx > target_tx` existieren, schlägt das Rollback mit
     /// einem Fehler fehl, um Datenverlust neuerer Transaktionen zu verhindern.
+    ///
+    /// # Ablauf von `rollback`:
+    /// 1. Checkpoint entnehmen.
+    /// 2. Metrik protokollieren (`status: rollback`).
+    /// 3. Prüfen, ob `storage.last_tx_id() > cp.tx_id` ist (Serialisierungsbarriere).
+    /// 4. `storage.rollback_to_tx(cp.tx_id)` aufrufen.
+    /// 5. Piggyback-Flush der Orphan-Registry anstoßen.
     pub async fn rollback(mut self) -> Result<()> {
         if let Some(cp) = self.checkpoint.take() {
             if let Some(ref sink) = self.metrics_sink {
@@ -295,6 +386,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
                 );
             }
             let last_tx = self.storage.last_tx_id().await?;
+            // NOTE: Verhindert versehentliches Überschreiben bereits persistierter neuerer Transaktionen
             if last_tx > cp.tx_id {
                 return Err(ContextraError::Transaction(format!(
                     "Serialization barrier violation: Cannot rollback to TxId {} because newer committed transaction TxId {} exists in storage",
@@ -314,6 +406,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
         }
     }
 
+    // ANCHOR[contextra-checkpoint:GRD-010]
     /// Führt ein synchrones, blockierendes Rollback des Checkpoints aus.
     ///
     /// # Einschränkung
@@ -322,6 +415,7 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
     /// [`ContextraError::Internal`], um Deadlocks und Tokio-Panics zu verhindern. Verwende in async-Kontexten
     /// stattdessen [`rollback`](Self::rollback).
     pub fn rollback_blocking(mut self) -> Result<()> {
+        // NOTE: Schutz vor Deadlocks durch block_on innerhalb laufender Tokio-Runtime
         if tokio::runtime::Handle::try_current().is_ok() {
             return Err(ContextraError::Internal(
                 "Cannot call rollback_blocking from within an active async Tokio runtime context; use rollback().await instead"
@@ -371,6 +465,14 @@ impl<S: contextra_ports::StorageEngine> CheckpointGuard<S> {
 }
 
 impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
+    // ANCHOR[contextra-checkpoint:GRD-011]
+    // Ablauf von `CheckpointGuard::drop`:
+    // Wenn `checkpoint` noch vorhanden ist (kein explizites commit() oder rollback()):
+    // 1. Rollback-Dauermetrik protokollieren.
+    // 2. Namespace im Checkpoint setzen.
+    // 3. Atomaren Zähler `skipped_rollbacks` inkrementieren.
+    // 4. Fehler loggen.
+    // 5. In der `InstanceOrphanRegistry` synchron ohne Disk-I/O registrieren.
     fn drop(&mut self) {
         if let Some(mut cp) = self.checkpoint.take() {
             if let Some(ref sink) = self.metrics_sink {
@@ -392,6 +494,7 @@ impl<S: contextra_ports::StorageEngine> Drop for CheckpointGuard<S> {
                 "CheckpointGuard dropped without explicit commit or rollback — \
                  checkpoint registered in instance-scoped orphan registry for controlled recovery (ADR-053)."
             );
+            // NOTE: Reines In-Memory-Vormerken; der eigentliche Rollback erfolgt kontrolliert beim Recovery
             self.orphan_registry.register_checkpoint_sync(cp);
         }
     }
@@ -521,6 +624,7 @@ mod tests {
         }
     }
 
+    // Prüft, dass ein PinGuard beim Droppen ohne unpin/defuse automatisch als verwaist in der Registry registriert wird.
     #[test]
     fn test_orphan_registry_persists_across_drop() {
         let registry = Arc::new(InstanceOrphanRegistry::new(""));
@@ -551,6 +655,7 @@ mod tests {
         assert_eq!(orphans[0].seq_no, seq_no);
     }
 
+    // Prüft die synchrone Ausführung von rollback_blocking in einem synchronen Thread-Kontext.
     #[test]
     fn test_rollback_blocking_in_sync_context() {
         let storage = Arc::new(MockStorage::new());
@@ -570,6 +675,7 @@ mod tests {
         assert_eq!(rolled_back, vec![TxId::new(909)]);
     }
 
+    // Prüft, dass rollback_blocking innerhalb einer aktiven Tokio-Runtime sofort mit einem Fehler abbricht, um Deadlocks zu verhindern.
     #[tokio::test]
     async fn test_rollback_blocking_in_async_context_returns_error() {
         let storage = Arc::new(MockStorage::new());
@@ -601,6 +707,7 @@ mod tests {
         }
     }
 
+    // Prüft das Erstellen und Committen eines CheckpointGuards für einen Agenten-Schritt.
     #[tokio::test]
     async fn test_checkpoint_guard_for_agent_step() {
         let storage = Arc::new(MockStorage::new());
@@ -616,6 +723,7 @@ mod tests {
         assert_eq!(committed.tx_id, TxId::new(55));
     }
 
+    // Prüft, dass ein uncommitteter Guard seinen Zustand behält und Zugriff auf den Checkpoint gewährt.
     #[allow(non_snake_case)]
     #[tokio::test]
     async fn checkpoint_guard_CASE_uncommitted_guard_holds_state() {
@@ -634,6 +742,7 @@ mod tests {
         assert_eq!(committed_cp.tx_id, TxId::new(500));
     }
 
+    // Prüft, dass commit() das Eigentum am Checkpoint übernimmt und den internen Zustand konsumiert.
     #[allow(non_snake_case)]
     #[tokio::test]
     async fn checkpoint_guard_CASE_commit_moves_ownership() {
@@ -655,6 +764,7 @@ mod tests {
         assert_eq!(cp.timestamp_ms, 12345);
     }
 
+    // Prüft, dass Aufrufe von checkpoint(), commit() oder rollback() auf einem bereits konsumierten Guard abgewiesen werden.
     #[allow(non_snake_case)]
     #[tokio::test]
     async fn checkpoint_guard_CASE_rollback_consumed_returns_err() {
@@ -704,6 +814,7 @@ mod tests {
         assert!(matches!(res, Err(ContextraError::Internal(_))));
     }
 
+    // Prüft die Erfassung von Dauer-Histogrammmetriken beim erfolgreichen Commit eines Guards.
     #[tokio::test]
     async fn test_checkpoint_metrics_commit_duration() {
         use contextra_testkit::{MetricEvent, TestMetricsSink};
@@ -738,6 +849,7 @@ mod tests {
         }
     }
 
+    // Prüft die Erfassung von Rollback-Metriken, wenn ein Guard ohne Commit gedroppt wird.
     #[tokio::test]
     async fn test_checkpoint_metrics_drop_rollback_duration() {
         use contextra_testkit::{MetricEvent, TestMetricsSink};

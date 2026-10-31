@@ -1,5 +1,14 @@
+//! # Tests für die Orphan-Registry
+//!
+//! Dieses Modul enthält Unit- und Property-Tests für verwaiste Pins und Checkpoints.
+//!
+//! ## Zweck
+//! Verifiziert die Monotonie der Zeitstempel, das Entleeren (Draining) von Einträgen
+//! sowie die Unabhängigkeit mehrerer Instanzen der [`InstanceOrphanRegistry`].
+
 use super::*;
 
+// Prüft, dass der veraltete globale Pfad sicher aufgerufen werden kann und Log-Warnungen emittiert.
 #[test]
 fn test_deprecated_global_orphan_path_warns() {
     #[allow(deprecated)]
@@ -14,6 +23,7 @@ fn test_deprecated_global_orphan_path_warns() {
     }
 }
 
+// Prüft, dass aufeinanderfolgende Millisekunden-Zeitstempel monoton wachsend sind.
 #[test]
 fn timestamp_ms_is_monotonic() {
     let clock = SystemClock::new();
@@ -22,6 +32,7 @@ fn timestamp_ms_is_monotonic() {
     assert!(t2 >= t1, "Timestamp must be monotonic");
 }
 
+// Prüft das atomare Auslesen und Leeren (`drain`) von Pins und Checkpoints.
 #[test]
 fn test_instance_orphan_registry_drain_pins_and_checkpoints() {
     let registry = InstanceOrphanRegistry::new("");
@@ -49,6 +60,7 @@ fn test_instance_orphan_registry_drain_pins_and_checkpoints() {
     assert!(registry.get_orphaned_checkpoints().is_empty());
 }
 
+// Prüft, dass das Löschen nicht vorhandener IDs keine Fehler wirft und bestehende Einträge nicht tangiert.
 #[test]
 fn test_instance_orphan_registry_clear_nonexistent() {
     let registry = InstanceOrphanRegistry::new("");
@@ -70,6 +82,7 @@ fn test_instance_orphan_registry_clear_nonexistent() {
     assert_eq!(registry.get_orphaned_checkpoints().len(), 1);
 }
 
+// Prüft, dass eine Registry ohne Dateipfad (In-Memory) fehlerfrei synchron gespeichert werden kann.
 #[test]
 fn test_instance_orphan_registry_empty_path_persistence_noop() {
     let registry = InstanceOrphanRegistry::new("");
@@ -79,6 +92,7 @@ fn test_instance_orphan_registry_empty_path_persistence_noop() {
     assert!(state.persist_sync().is_ok());
 }
 
+// Prüft, dass zwei unterschiedliche Instanz-Registries vollständig voneinander isoliert operieren.
 #[test]
 fn test_two_instance_registries_independent() {
     let dir1 = tempfile::tempdir().expect("tempdir 1");
@@ -108,6 +122,7 @@ fn test_two_instance_registries_independent() {
     assert_eq!(reg2.get_orphaned_checkpoints().len(), 1);
 }
 
+// Property-Test zur Verifikation der Monotonie von Zeitstempeln unter verschiedenen Ausführungsbedingungen.
 proptest::proptest! {
     #[test]
     fn prop_monotonic_timestamp_ms_increases_or_equals(_n: u8) {

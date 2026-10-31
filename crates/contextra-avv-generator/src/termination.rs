@@ -1,10 +1,44 @@
 //! Löschung und Rückgabe nach Beendigung gemäß Art. 28 Abs. 3 lit. g DSGVO.
+//!
+//! # Zweck & Hintergrund
+//! Regelt das Schicksal der Mandantendaten nach Beendigung des Hauptvertrages oder nach
+//! gesonderter Löschanforderung.
+//!
+//! Gesetzlicher Kernpunkt nach Art. 28 Abs. 3 lit. g DSGVO:
+//! Der Auftragsverarbeiter muss alle personenbezogenen Daten nach Wahl des Verantwortlichen
+//! entweder löschen oder zurückgeben, sofern keine gesetzlichen Aufbewahrungsfristen entgegenstehen.
+//!
+//! Contextra verknüpft diese rechtliche Verpflichtung direkt mit messbaren technischen Garantien:
+//! - Definierte Löschfrist (SLA = Service Level Agreement in Tagen).
+//! - Optionaler kryptografischer Löschbeweis (Ed25519-Signatur), welcher die physikalische
+//!   Entfernung der Daten aus Speicherschichten und Caches mathematisch nachweist.
+//!
+//! # Ring-Zugehörigkeit
+//! Teil von Ring 4 (Erweiterung).
 
 use crate::error::AvvError;
 use crate::AvvContext;
 use std::fmt::Write;
 
-/// Renders Section 8: Deletion of Data and Deletion SLA after termination.
+// ANCHOR[contextra-avv-generator:TERM-001]
+/// Rendert Abschnitt 8: „Löschung von Daten und SLA“.
+///
+/// Schreibt die Löschklausel unter Einbindung der Mandanten-ID ([`contextra_types::TenantId`])
+/// und des konfigurierten Lösch-SLAs in Tagen in den Zielpuffer.
+///
+/// # Parameter
+/// - `out`: Der Puffer, in den der Markdown-Text geschrieben wird.
+/// - `ctx`: Der Kontext mit dem vereinbarten Deletion-SLA (`deletion_sla_days`).
+/// - `escaped_tenant_id`: Die bereits gegen Markdown-Injection maskierte Mandanten-ID.
+///
+/// # Ablauf
+/// 1. Überschrift für Abschnitt 8 ausgeben.
+/// 2. Absatz 1: Gesetzliche Grundpflicht zur Löschung oder Rückgabe nach Art. 28 Abs. 3 lit. g DSGVO.
+/// 3. Absatz 2: Fristgebundene Löschzusage bezogen auf die konkrete Mandanten-ID (`escaped_tenant_id`).
+/// 4. Absatz 3: Bereitstellung eines kryptografischen Ed25519-Löschbeweises.
+///
+/// # Fehler
+/// Gibt [`AvvError::RenderError`] zurück, falls ein Formatierungsfehler auftritt.
 pub fn render_section(
     out: &mut String,
     ctx: &AvvContext,

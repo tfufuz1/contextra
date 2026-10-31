@@ -9,6 +9,10 @@
     clippy::cast_possible_truncation,
     clippy::await_holding_lock
 )]
+//! # Integrationstest: Cache-Nebenläufigkeit und Snapshot-Pinning
+//!
+//! Prüft das Pinning und Entpinnen unter starker nebenläufiger Last sowie Cache-Treffer.
+
 // ANCHOR[TEST:CKPT-001] STATUS:DONE (TS:2026-09-02T23:18:12Z) (SESSION: 358e3b0a)
 // AUFGABE : Verify Concurrent Checkpoint Pinning & GC Exclusions
 // GATE    : cargo test -p contextra-checkpoint --test cache_concurrency_pinning

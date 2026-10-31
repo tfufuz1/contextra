@@ -1,8 +1,18 @@
 //! `error` — Zentrale Fehlertypen für das Cloud Egress Gateway und Privacy-Subsystem.
+//!
+//! # Zweck
+//! Definiert typisierte Fehlerstrukturen für Fehlschläge bei der DLP-Prüfung (Data Loss Prevention),
+//! Richtlinienverstößen, ungültigen Parametern sowie Surrogat-Token-Kollisionen.
+//!
+//! # Ring-Zugehörigkeit
+//! Ring 3 (Domain Services). Wird modulweit und in übergeordneten Schichten zur Fehlerbehandlung genutzt.
 
 use thiserror::Error;
 
+// ANCHOR[contextra-privacy:ERR-001]
 /// Fehlertypen des Egress-Gateways und der DLP-Prüfung.
+///
+/// Signalisiert spezifische Fehlerzustände bei der Analyse und Weiterleitung von Daten an externe Cloud-Dienste.
 #[derive(Debug, Error)]
 pub enum EgressError {
     /// Ungültige Eingabeparameter oder Konfiguration.
@@ -26,6 +36,12 @@ pub enum EgressError {
     },
 }
 
+// ANCHOR[contextra-privacy:ERR-002]
+// Konvertierung von EgressVaultError in EgressError zur feingranularen Fehlerweitergabe.
+// 1. InvalidPattern -> EgressError::InvalidParams
+// 2. PayloadTooLarge -> EgressError::InvalidParams
+// 3. TenantScopeViolation -> EgressError::PolicyViolation
+// 4. SurrogateCollision -> EgressError::SurrogateCollision
 impl From<crate::egress_vault::EgressVaultError> for EgressError {
     fn from(err: crate::egress_vault::EgressVaultError) -> Self {
         match err {
@@ -52,17 +68,29 @@ impl From<crate::egress_vault::EgressVaultError> for EgressError {
 }
 
 impl EgressError {
+    // ANCHOR[contextra-privacy:ERR-003]
     /// Konstruiert einen `EgressError::InvalidParams`.
+    ///
+    /// # Parameter
+    /// * `msg`: Fehlermeldung oder Beschreibung der ungültigen Parameter.
     pub fn invalid_params(msg: impl Into<String>) -> Self {
         Self::InvalidParams(msg.into())
     }
 
+    // ANCHOR[contextra-privacy:ERR-004]
     /// Konstruiert einen `EgressError::PolicyViolation`.
+    ///
+    /// # Parameter
+    /// * `msg`: Beschreibung des verletzten Richtlinien-Kriteriums.
     pub fn policy_violation(msg: impl Into<String>) -> Self {
         Self::PolicyViolation(msg.into())
     }
 
+    // ANCHOR[contextra-privacy:ERR-005]
     /// Konstruiert einen `EgressError::InternalError`.
+    ///
+    /// # Parameter
+    /// * `msg`: Interne System-Fehlermeldung.
     pub fn internal_error(msg: impl Into<String>) -> Self {
         Self::InternalError(msg.into())
     }

@@ -1,9 +1,40 @@
 #![forbid(unsafe_code)]
 
-//! Contextra KV-Cache Crate (Ring 1).
+//! # Contextra KV-Cache (Ring 1)
 //!
-//! Stellt den In-Memory LRU-Cache, Eviction-Worker, Tenant-Isolation,
-//! Prefix-Radix-Baum, Tiering und Crypto-Shredding Infrastruktur bereit.
+//! ANCHOR[contextra-kvcache:LIB-001]
+//!
+//! Dieses Modul bildet die zentrale Schnittstelle des `contextra-kvcache`-Crates.
+//!
+//! ## Was ist ein KV-Cache?
+//! In LLMs (Large Language Models = großen Sprachmodellen) bezeichnet der **KV-Cache**
+//! (Key-Value-Cache) zwischengespeicherte Zwischenzustände von Aufmerksamkeitsmatrizen
+//! (Attention-Keys und Values) vorheriger Token. Wenn mehrere Anfragen denselben Prompt-Präfix
+//! teilen (z. B. System-Prompts oder Dokumentenkontexte), kann durch Wiederverwendung des Caches
+//! massive Rechenzeit eingespart werden (Prompt Caching).
+//!
+//! ## Architektur & Ring-Zugehörigkeit
+//! - **Ring 1 (State & Storage)**:
+//!   Die Crate verwaltet kurzlebige und transiente Speicherstrukturen im RAM sowie verschlüsselte
+//!   Segmente im Rahmen des Tiering (Auslagerung auf sekundäre Speicher).
+//! - **Erzwungene Sicherheit**: Es gilt `#![forbid(unsafe_code)]` – kein `unsafe` im gesamten Crate.
+//! - **Abhängigkeiten (eingehend)**: Keine Workspace-Crate bindet `contextra-kvcache` aktuell
+//!   direkt als Abhängigkeit ein (wird jedoch im Workspace mitgebaut und getestet).
+//! - **Abhängigkeiten (ausgehend)**:
+//!   - `contextra-types`: Domänentypen wie `TenantId` (Mandanten-Identifikator).
+//!   - `contextra-ports`: Abstrakte Schnittstellen (z. B. `KvPrefixStore`, `Clock`, `StorageEngine`).
+//!   - `contextra-crypto`: Kryptographische Primitiven für AEAD-Verschlüsselung und Crypto-Shredding.
+//!
+//! ## Kernkomponenten
+//! 1. [`radix`]: Ein Prefix-Radix-Baum zur schnellen Identifikation geteilter Token-Sequenzen.
+//! 2. [`store`]: [`TenantIsolatedKvStore`] als mandantengetrennter In-Memory-LRU-Cache.
+//! 3. [`segment`]: [`KvSegment`] und [`ShreddableSegmentKey`] für kryptographisch geschützte Segmente.
+//! 4. [`eviction_worker`]: Asynchroner Hintergrund-Worker zur Speicherbereinigung und Verdrängung.
+//! 5. [`attention_score`]: Gewichtete Verdrängungsstrategien basierend auf Attention-Scores.
+//! 6. [`scratchpad_invalidation`]: Gezielte Invalidierung von Scratchpads bei Agenteninteraktionen.
+//! 7. `quantize_kivi`: Optionale KIVI 2-Bit Quantisierung für maximale Speichereffizienz (feature-gated).
+//! 8. [`adapters`]: Brückenadapter zu Embedding-Providern und Storage-Engines.
+//! 9. [`service`]: Hochrangige Fassade [`KvCacheService`] zur einfachen Verwendung.
 
 pub mod adapters;
 pub mod attention_score;

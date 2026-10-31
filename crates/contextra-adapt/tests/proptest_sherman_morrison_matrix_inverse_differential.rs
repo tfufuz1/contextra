@@ -1,4 +1,11 @@
-//! Differential property tests for Sherman-Morrison O(d²) matrix inverse recursion vs independent Gauss-Jordan reinversion (Spec §21, §13.2).
+//! # Differential-Property-Tests für Sherman-Morrison Matrixinversion
+//!
+//! Vergleicht inkrementelle Sherman-Morrison Rang-1-Updates gegen eine naive
+//! exakte Matrixinversion via Gauß-Jordan über zufällig generierte Feature-Vektoren.
+//!
+//! ## Invarianten
+//! - Frobenius-Norm-Abstand zwischen iterativer Sherman-Morrison-Inverser und exakter Inversion bleibt beschränkt.
+//! - Garantierte numerische Stabilität bei stark korrelierten Eingabevektoren.
 
 use contextra_adapt::bandit::{BanditImplementation, BanditProfileState};
 

@@ -1,9 +1,33 @@
 //! Weisungsbindung gemäß Art. 28 Abs. 3 lit. a DSGVO.
+//!
+//! # Zweck & Hintergrund
+//! Dieser Abschnitt regelt verbindlich, dass der Auftragsverarbeiter (Contextra-Betreiber)
+//! personenbezogene Daten ausschließlich im Rahmen der dokumentierten Weisungen des
+//! Verantwortlichen verarbeitet.
+//!
+//! Gesetzlicher Kernpunkt nach Art. 28 Abs. 3 lit. a DSGVO:
+//! Der Verarbeiter darf Daten nicht eigenmächtig für sekundäre Zwecke verwenden und muss
+//! den Verantwortlichen unverzüglich warnen, falls eine Weisung gegen Datenschutzrecht verstößt.
+//!
+//! # Ring-Zugehörigkeit
+//! Teil von Ring 4 (Erweiterung). Reines Template-Fragment ohne Systemabhängigkeiten oder Zustand.
 
 use crate::error::AvvError;
 use std::fmt::Write;
 
-/// Renders Section 4: Obligations and Rights of Controller & Instruction Binding.
+// ANCHOR[contextra-avv-generator:INST-001]
+/// Rendert Abschnitt 4: „Pflichten und Rechte des Verantwortlichen & Weisungsbindung“.
+///
+/// Schreibt den formatierten Markdown-Abschnitt in den übergebenen Ausgabe-Puffer.
+///
+/// # Ablauf
+/// 1. Überschrift für Abschnitt 4 ausgeben.
+/// 2. Absatz 1: Feststellung der alleinigen Verantwortlichkeit des Auftraggebers für die Zulässigkeit.
+/// 3. Absatz 2: Strikte Bindung des Auftragsverarbeiters an dokumentierte Weisungen (inkl. Drittlandstransfers).
+/// 4. Absatz 3: Gesetzliche Hinweispflicht bei rechtswidrigen Weisungen.
+///
+/// # Fehler
+/// Gibt [`AvvError::RenderError`] zurück, falls das Schreiben in den Puffer fehlschlägt.
 pub fn render_section(out: &mut String) -> Result<(), AvvError> {
     writeln!(
         out,

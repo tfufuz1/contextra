@@ -1,3 +1,4 @@
+//! Tests für die deterministische Audit-Trace-Generierung nach INV-EGRESS-AUDIT-1.
 use contextra_ports::Clock;
 use contextra_privacy::{
     compute_audit_trace, extract_rule_id, BlockReason, EgressClassification, EgressClassifier,
@@ -28,6 +29,8 @@ impl Clock for FixedClock {
 }
 
 #[tokio::test]
+// ANCHOR[contextra-privacy:TEST-ATT-001]
+// Prüft: Prüft die deterministische Wiederholbarkeit der 32-Byte-BLAKE3-Traces.
 async fn test_audit_trace_determinism() -> Result<(), Box<dyn std::error::Error>> {
     let patterns = vec![r"sk-[a-zA-Z0-9]{32}".to_string()];
     let vault = EgressVault::new(patterns)?;
@@ -50,6 +53,8 @@ async fn test_audit_trace_determinism() -> Result<(), Box<dyn std::error::Error>
 }
 
 #[tokio::test]
+// ANCHOR[contextra-privacy:TEST-ATT-003]
+// Prüft: Prüft die Trace-Erzeugung bei blockierten Anfragen mit spezifischen Block-Gründen.
 async fn test_audit_trace_negatives() -> Result<(), Box<dyn std::error::Error>> {
     let patterns = vec![
         r"sk-[a-zA-Z0-9]{32}".to_string(),
@@ -82,6 +87,8 @@ async fn test_audit_trace_negatives() -> Result<(), Box<dyn std::error::Error>> 
 }
 
 #[tokio::test]
+// ANCHOR[contextra-privacy:TEST-ATT-002]
+// Prüft: Prüft die Übereinstimmung der Klassifikation mit und ohne Trace-Erzeugung.
 async fn test_audit_trace_parity_with_classify() -> Result<(), Box<dyn std::error::Error>> {
     let patterns = vec![r"password".to_string()];
     let vault = EgressVault::new(patterns)?;
@@ -106,6 +113,8 @@ async fn test_audit_trace_parity_with_classify() -> Result<(), Box<dyn std::erro
 }
 
 #[tokio::test]
+// ANCHOR[contextra-privacy:TEST-ATT-004]
+// Prüft: Prüft das Verhalten an Grenzen (leere Payloads und maximale 64-KiB-Grenze).
 async fn test_audit_trace_empty_and_max_boundary_no_panic() -> Result<(), Box<dyn std::error::Error>>
 {
     let vault = EgressVault::try_default()?;
@@ -134,6 +143,8 @@ async fn test_audit_trace_empty_and_max_boundary_no_panic() -> Result<(), Box<dy
 }
 
 #[tokio::test]
+// ANCHOR[contextra-privacy:TEST-ATT-005]
+// Prüft: Stellt sicher, dass sensible Klartext-PII niemals in Audit-Logs oder Traces lecken.
 async fn test_audit_trace_contains_zero_raw_pii_or_plaintext() -> Result<(), Box<dyn std::error::Error>> {
     let raw_email = "super_secret_user@example.com";
     let raw_iban = "DE89370400440532013000";

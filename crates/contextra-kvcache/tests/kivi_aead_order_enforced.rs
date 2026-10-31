@@ -1,3 +1,11 @@
+//! # Tests zur Einhaltung von INV-KIVI-AEAD-ORDER
+//!
+//! ANCHOR[contextra-kvcache:TEST-KIVI-ORDER-001]
+//!
+//! Verifiziert die strikte Einhaltung der Pipeline-Reihenfolge:
+//! Schreiben: Quantisierung -> Kompression -> AEAD-Verschlüsselung.
+//! Lesen: AEAD-Entschlüsselung -> Dekomprimierung -> Dequantisierung.
+
 #![forbid(unsafe_code)]
 #![cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
 
@@ -64,6 +72,7 @@ impl contextra_crypto::KvCipher for FailingCipher {
     }
 }
 
+// Prüft, dass beim Schreiben erst quantisiert und dann verschlüsselt wird, und beim Lesen erst entschlüsselt und dann dequantisiert wird.
 #[test]
 fn test_inv_kivi_aead_order_enforced_write_and_read() {
     let tenant = TenantId::try_new(101).unwrap();
@@ -102,6 +111,7 @@ fn test_inv_kivi_aead_order_enforced_write_and_read() {
     assert_eq!(reconstructed.values.len(), 4);
 }
 
+// Prüft, dass ein Scheitern der AEAD-Entschlüsselung die nachgelagerte Dequantisierung blockiert.
 #[test]
 fn test_inv_kivi_aead_order_enforced_decryption_failure_blocks_dequantization() {
     let tenant = TenantId::try_new(101).unwrap();
