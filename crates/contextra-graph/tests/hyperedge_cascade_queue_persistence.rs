@@ -1,3 +1,8 @@
+//! Persistenzprüfung für die Warteschlange kaskadierender Kanteninvalidierungen.
+//!
+//! # Zweck
+//! Stellt sicher, dass anstehende Invalidierungsaufträge auch über Neustarts hinweg erhalten bleiben.
+
 #![expect(clippy::unwrap_used)]
 
 use contextra_graph::cascade::{
@@ -12,6 +17,7 @@ use contextra_types::{DocId, EntityId, TxId};
 use std::sync::Arc;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-graph:TESTS-HYPEREDGE-CASCADE-QUEUE-PERSISTENCE-001]
 #[tokio::test]
 async fn test_hyperedge_cascade_queue_persistence_and_drain() {
     let dir = tempdir().unwrap();

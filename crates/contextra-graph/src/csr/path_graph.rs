@@ -1,3 +1,9 @@
+// ANCHOR[contextra-graph:SRC-CSR-PATH-GRAPH-001]
+//! Implementierung des `PathGraph`-Traits für den CSR-Graphen.
+//!
+//! # Zweck
+//! Stellt standardisierte Nachbarschafts-Iteratoren für die Path-RAG-Engine bereit.
+
 use std::sync::Arc;
 
 use contextra_types::EntityId;

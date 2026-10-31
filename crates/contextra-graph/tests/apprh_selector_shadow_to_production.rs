@@ -79,6 +79,7 @@ impl PathGraph for MockGraph {
     }
 }
 
+// ANCHOR[contextra-graph:TESTS-APPRH-SELECTOR-SHADOW-TO-PRODUCTION-001]
 #[test]
 fn test_selector_shadow_always_returns_forward_push() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -117,6 +118,7 @@ fn test_selector_shadow_always_returns_forward_push() -> Result<(), Box<dyn std:
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-APPRH-SELECTOR-SHADOW-TO-PRODUCTION-002]
 #[test]
 fn test_selector_readiness_does_not_auto_promote() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -153,6 +155,7 @@ fn test_selector_readiness_does_not_auto_promote() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-APPRH-SELECTOR-SHADOW-TO-PRODUCTION-003]
 #[test]
 fn test_selector_explicit_promotion_yields_apprh() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -187,6 +190,7 @@ fn test_selector_explicit_promotion_yields_apprh() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-APPRH-SELECTOR-SHADOW-TO-PRODUCTION-004]
 #[test]
 fn test_selector_outlier_causes_hysteresis_demotion() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -229,6 +233,7 @@ fn test_selector_outlier_causes_hysteresis_demotion() -> Result<(), Box<dyn std:
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-APPRH-SELECTOR-SHADOW-TO-PRODUCTION-005]
 #[test]
 fn test_selector_deterministic_sampling() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();

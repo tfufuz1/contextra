@@ -1,3 +1,8 @@
+//! Tests für `PprContext` und Speicherpuffer-Wiederverwendung.
+//!
+//! # Zweck
+//! Verifiziert die Vermeidung wiederholter Heap-Allokationen in wiederkehrenden Aufrufen.
+
 use super::super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
@@ -25,6 +30,7 @@ impl tracing::field::Visit for StringVisitor {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-001]
 #[tokio::test]
 async fn test_ppr_warn_on_non_convergence_suppressible() {
     let graph = CsrGraph::new();
@@ -67,6 +73,7 @@ async fn test_ppr_warn_on_non_convergence_suppressible() {
         );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-002]
 #[tokio::test]
 async fn test_ppr_non_convergence_logs_warning_and_returns_best_effort() {
     use tracing_subscriber::layer::SubscriberExt;
@@ -131,6 +138,7 @@ async fn test_ppr_non_convergence_logs_warning_and_returns_best_effort() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-003]
 #[tokio::test]
 async fn test_ppr_pathological_max_iterations_ceiling() {
     let graph = CsrGraph::new();
@@ -180,6 +188,7 @@ async fn test_ppr_pathological_max_iterations_ceiling() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-004]
 #[tokio::test]
 async fn test_ppr_ignores_deleted_entities() {
     use contextra_ports::StorageEngine;
@@ -256,6 +265,7 @@ async fn test_ppr_ignores_deleted_entities() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-005]
 #[tokio::test]
 async fn test_ppr_phantom_node_no_rank_mass() {
     use contextra_ports::StorageEngine;
@@ -344,6 +354,7 @@ async fn test_ppr_phantom_node_no_rank_mass() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-006]
 #[test]
 fn test_deleted_view_methods() {
     let empty_view = DeletedView::empty();
@@ -362,6 +373,7 @@ fn test_deleted_view_methods() {
     assert!(!view.contains(1));
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-007]
 #[tokio::test]
 async fn test_deleted_view_tombstone_filtering_all_entry_points() {
     use contextra_ports::StorageEngine;
@@ -435,6 +447,7 @@ async fn test_deleted_view_tombstone_filtering_all_entry_points() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-008]
 #[tokio::test]
 async fn test_out_weight_sums_incremental_equivalence() {
     let graph = Arc::new(CsrGraph::new());
@@ -491,6 +504,7 @@ async fn test_out_weight_sums_incremental_equivalence() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-009]
 #[tokio::test]
 async fn test_compact_async_numerical_equivalence() {
     let graph = Arc::new(CsrGraph::new());
@@ -538,6 +552,7 @@ async fn test_compact_async_numerical_equivalence() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-010]
 #[tokio::test]
 async fn test_forward_push_vs_dense_numerical_equivalence_and_shadow_mode() {
     let graph = CsrGraph::new();
@@ -629,6 +644,7 @@ async fn test_forward_push_vs_dense_numerical_equivalence_and_shadow_mode() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-011]
 #[tokio::test]
 async fn test_forward_push_100_runs_bit_identical_determinism() {
     let graph = CsrGraph::new();
@@ -690,6 +706,7 @@ async fn test_forward_push_100_runs_bit_identical_determinism() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-012]
 #[tokio::test]
 async fn test_forward_push_performance_benchmark_vs_dense() {
     let graph = CsrGraph::new();
@@ -785,6 +802,7 @@ async fn test_forward_push_performance_benchmark_vs_dense() {
         );
 }
 
+// ANCHOR[contextra-graph:SRC-PPR-TESTS-CONTEXT-TESTS-013]
 #[tokio::test]
 async fn test_ppr_tl_hfd_and_shadow_mode_context_dispatch() {
     let graph = CsrGraph::new();

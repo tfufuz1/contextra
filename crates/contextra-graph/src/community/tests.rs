@@ -1,8 +1,11 @@
+//! Test-Modul fuer Community-Detection
+
 use super::*;
 use crate::csr::CsrGraph;
 use contextra_ports::GraphIndex;
 use contextra_types::{Edge, Entity, EntityId, TxId};
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-001]
 #[tokio::test]
 async fn test_community_detection_determinism() {
     let graph = CsrGraph::new();
@@ -49,6 +52,7 @@ async fn test_community_detection_determinism() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-002]
 #[tokio::test]
 async fn test_community_detection_disconnected_clusters() {
     let graph = CsrGraph::new();
@@ -143,6 +147,7 @@ async fn test_community_detection_disconnected_clusters() {
 /// merging the two distinct clusters into a single community.
 /// Under Leiden, the Refinement Phase evaluates sub-community modularity and guarantees that Cluster A and Cluster B
 /// remain as distinct, well-connected communities.
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-003]
 #[tokio::test]
 async fn test_leiden_vs_lpa_well_connected_communities_comparison() {
     let graph = CsrGraph::new();
@@ -266,6 +271,7 @@ impl tracing::field::Visit for StringVisitor {
 }
 
 proptest::proptest! {
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-004]
     #[test]
     fn prop_community_detection_never_panics(
         node_count in 1usize..50,
@@ -299,6 +305,7 @@ proptest::proptest! {
         res?;
     }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-005]
     #[test]
     fn prop_community_detection_every_node_assigned(
         node_count in 1usize..30,
@@ -338,6 +345,7 @@ proptest::proptest! {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-006]
 #[tokio::test]
 async fn test_community_detection_non_convergence_logs_warning_and_returns_best_effort() {
     use tracing_subscriber::layer::SubscriberExt;
@@ -400,6 +408,7 @@ async fn test_community_detection_non_convergence_logs_warning_and_returns_best_
     );
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-007]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn detect_communities_CASE_empty_graph() {
@@ -413,6 +422,7 @@ async fn detect_communities_CASE_empty_graph() {
     );
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-008]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn detect_communities_CASE_single_node() {
@@ -434,6 +444,7 @@ async fn detect_communities_CASE_single_node() {
     assert_eq!(assignments[0].community_id, id.inner());
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-009]
 #[test]
 #[allow(non_snake_case)]
 fn serialization_roundtrip_CASE_community_config_and_assignment() {
@@ -465,6 +476,7 @@ fn serialization_roundtrip_CASE_community_config_and_assignment() {
     assert_eq!(assignment, deserialized_assignment);
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-010]
 #[test]
 #[allow(non_snake_case)]
 fn test_hyperedges_included_flag_default_is_false() {
@@ -482,6 +494,7 @@ fn test_hyperedges_included_flag_default_is_false() {
     assert!(!assignment.hyperedges_included);
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-011]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_hyperedges_included_flag_passthrough_from_config_to_assignment() {
@@ -532,6 +545,7 @@ async fn test_hyperedges_included_flag_passthrough_from_config_to_assignment() {
     }
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-012]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_star_expansion_iterator_and_community_detection() {
@@ -627,6 +641,7 @@ async fn test_star_expansion_iterator_and_community_detection() {
     assert_eq!(comm_2_h, comm_3_h);
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-013]
 #[test]
 #[allow(non_snake_case)]
 fn test_hyperedges_included_serde_backwards_compatibility() {
@@ -672,6 +687,7 @@ fn test_hyperedges_included_serde_backwards_compatibility() {
     assert!(deserialized_a.hyperedges_included);
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-014]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_star_expansion_iterator_iteration() {
@@ -713,6 +729,7 @@ async fn test_star_expansion_iterator_iteration() {
     assert_eq!(items[2], (EntityId::new(3), he_id, 2.5));
 }
 
+// ANCHOR[contextra-graph:SRC-COMMUNITY-TESTS-015]
 #[tokio::test]
 #[allow(non_snake_case)]
 async fn test_community_detection_with_star_expansion_hyperedges() {

@@ -82,6 +82,7 @@ impl PathGraph for MockGraph {
     }
 }
 
+// ANCHOR[contextra-graph:TESTS-TLHFD-SHADOW-MODE-PARITY-001]
 #[test]
 fn test_determinism_20_runs_and_seed_permutations() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -127,6 +128,7 @@ fn test_determinism_20_runs_and_seed_permutations() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-TLHFD-SHADOW-MODE-PARITY-002]
 #[test]
 fn test_locality_bounded_visited_set() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -156,6 +158,7 @@ fn test_locality_bounded_visited_set() -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-TLHFD-SHADOW-MODE-PARITY-003]
 #[test]
 fn test_p24_boundary_large_hyperedge() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -184,6 +187,7 @@ fn test_p24_boundary_large_hyperedge() -> Result<(), Box<dyn std::error::Error>>
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-TLHFD-SHADOW-MODE-PARITY-004]
 #[test]
 fn test_parameter_validation_and_no_panic() {
     let g = MockGraph::new();
@@ -226,6 +230,7 @@ fn test_parameter_validation_and_no_panic() {
     ));
 }
 
+// ANCHOR[contextra-graph:TESTS-TLHFD-SHADOW-MODE-PARITY-005]
 #[test]
 fn test_symmetric_graph_tie_breaker_order() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -256,6 +261,7 @@ fn test_symmetric_graph_tie_breaker_order() -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-TLHFD-SHADOW-MODE-PARITY-006]
 #[test]
 fn test_shadow_mode_parity_2_cluster_graph() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();
@@ -301,6 +307,7 @@ fn test_shadow_mode_parity_2_cluster_graph() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
+// ANCHOR[contextra-graph:TESTS-TLHFD-SHADOW-MODE-PARITY-007]
 #[test]
 fn test_shadow_mode_discrepancy_reported() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = MockGraph::new();

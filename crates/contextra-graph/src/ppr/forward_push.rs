@@ -1,3 +1,9 @@
+// ANCHOR[contextra-graph:SRC-PPR-FORWARD-PUSH-001]
+//! Forward-Push-Algorithmus (Andersen et al.) für personalisierten PageRank.
+//!
+//! # Zweck
+//! Ermöglicht hochgradig lokalisierte Diffusionsberechnungen mit sublinearer Laufzeitkomplexität.
+
 use super::dense::{collect_valid_seeds, compute_out_weight_sums};
 use super::types::{DeletedView, PprContext};
 use crate::csr::GraphInner;
