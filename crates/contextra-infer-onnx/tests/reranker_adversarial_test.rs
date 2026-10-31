@@ -1,11 +1,19 @@
 // FILE-CONTEXT
-// STAND: 2026-08-31
-// ZWECK: Quantitativer Test- & Benchmark-Suite für Cross-Encoder Reranker Adversarial Attacks.
+// STAND: 2026-10-31
+// ZWECK: Quantitativer Test- & Benchmark-Suite für Cross-Encoder Reranker Adversarial Attacks (Ring 2).
+
+//! # Adversarial- und Robustheitstests für `CrossEncoderReranker`
+//!
+//! Untersucht Angriffsvektoren gegen das Reranking:
+//! - **Query-Stuffing / Keyword-Stuffing**: Wiederholung relevanter Signalwörter in sonst irrelevanten Chunks.
+//! - **Prefix-Injection**: Voranstellen der Suchanfrage vor unpassenden Text.
+//! - **Post-RRF Rank-Hijacking**: Prüfung, ob manipulierter Content durch Oversampling legitimierte Dokumente verdrängen kann.
 
 #![cfg(feature = "onnx")]
 
 use contextra_infer_onnx::{CrossEncoderReranker, RerankConfig};
 
+// ANCHOR[contextra-infer-onnx:TEST-ADVERSARIAL-STUFFING]
 /// Testet die Auswirkung von Keyword/Query-Stuffing auf die Sequenzlänge und Reranker-Struktur.
 #[tokio::test]
 async fn test_adversarial_query_stuffing_quantification() {
@@ -47,6 +55,7 @@ async fn test_adversarial_query_stuffing_quantification() {
     }
 }
 
+// ANCHOR[contextra-infer-onnx:TEST-POST-RRF-HIJACK]
 /// Simuliert die Rank-Hijacking-Dynamik im Post-RRF Reranking-Schritt (k * 3 Oversampling).
 #[tokio::test]
 async fn test_post_rrf_rerank_oversampling_hijack() {
