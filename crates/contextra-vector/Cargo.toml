@@ -33,6 +33,7 @@ blake3 = { workspace = true }
 [features]
 default = []
 docid-128 = ["contextra-types/docid-128"]
+experimental-diskann = []
 experimental-rabitq = []
 experimental-predicate-augmented-search = []
 graph = []
@@ -75,6 +76,10 @@ name = "audit_benchmarks"
 harness = false
 
 [[bench]]
+name = "flush_threshold_amplification"
+harness = false
+
+[[bench]]
 name = "partial_rebuild_recall_bench"
 harness = false
 required-features = ["partial-index-rebuild"]
@@ -86,8 +91,28 @@ harness = false
 [[bench]]
 name = "filtered_search_selectivity_bench"
 harness = false
-required-features = []
+required-features = ["experimental-diskann"]
+
+[[test]]
+name = "diskann_fault_injection_test"
+required-features = ["experimental-diskann"]
+
+[[test]]
+name = "diskann_corruption_fallback_test"
+required-features = ["experimental-diskann"]
+
+[[test]]
+name = "diskann_recall_test"
+required-features = ["experimental-diskann"]
+
+[[test]]
+name = "mmap_toctou_test"
+required-features = ["experimental-diskann"]
+
+[[test]]
+name = "quantize_persistence_audit"
+required-features = ["experimental-diskann"]
 
 [[test]]
 name = "recall_audit"
-required-features = []
+required-features = ["experimental-diskann"]

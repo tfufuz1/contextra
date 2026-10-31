@@ -10,19 +10,28 @@ description = "Contextra — Embedded hybrid-search for AI agents (Facade)"
 ring = "4"
 
 [dependencies]
+contextra-core = { workspace = true }
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
+contextra-license = { workspace = true }
 contextra-store = { workspace = true }
 contextra-db = { workspace = true }
 contextra-crypto = { workspace = true, optional = true }
+contextra-privacy = { workspace = true, optional = true }
+contextra-audit-export = { workspace = true, optional = true }
+contextra-avv-generator = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { version = "1", features = ["v4"] }
+contextra-infer-candle = { workspace = true, optional = true }
 contextra-rank = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 
 [dev-dependencies]
+tracing-subscriber = { workspace = true }
 tempfile = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-testkit = { workspace = true }
@@ -30,6 +39,10 @@ contextra-testkit = { workspace = true }
 [features]
 default = ["embedded"]
 embedded = []
+compliance = ["audit-export", "avv-generator"]
+audit-export = ["dep:contextra-audit-export"]
+avv-generator = ["dep:contextra-avv-generator"]
+candle = ["contextra-infer-candle"]
 
 [lints]
 workspace = true

@@ -1,0 +1,73 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-ingest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Document format extractors and structure-aware chunking adapter crate"
+
+[package.metadata.contextra]
+ring = "4"
+
+[features]
+default = ["fmt-text"]
+fmt-text = ["dep:encoding_rs"]
+fmt-web = ["dep:html5ever", "dep:markup5ever_rcdom", "dep:encoding_rs", "zip-container", "xml"]
+fmt-docx = ["zip-container", "xml"]
+fmt-pptx = ["zip-container", "xml"]
+fmt-odf = ["zip-container", "xml"]
+fmt-sheets = ["dep:calamine", "dep:csv", "dep:encoding_rs", "zip-container", "xml"]
+fmt-pdf = ["dep:lopdf"]
+fmt-ole = ["dep:cfb"]
+fmt-email = ["dep:mail-parser"]
+fmt-structured = ["dep:yaml-rust2", "dep:toml", "xml"]
+zip-container = ["dep:zip"]
+xml = ["dep:quick-xml", "dep:encoding_rs"]
+all-formats = [
+    "fmt-text",
+    "fmt-web",
+    "fmt-docx",
+    "fmt-pptx",
+    "fmt-odf",
+    "fmt-sheets",
+    "fmt-pdf",
+    "fmt-ole",
+    "fmt-email",
+    "fmt-structured",
+]
+
+[dependencies]
+# Workspace crates
+contextra-types = { workspace = true }
+contextra-engine = { workspace = true }
+
+# Always dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+blake3 = { workspace = true }
+unicode-segmentation = { workspace = true }
+
+# Optional format dependencies
+zip = { workspace = true, optional = true }
+quick-xml = { workspace = true, optional = true }
+encoding_rs = { workspace = true, optional = true }
+html5ever = { workspace = true, optional = true }
+markup5ever_rcdom = { workspace = true, optional = true }
+calamine = { workspace = true, optional = true }
+csv = { workspace = true, optional = true }
+lopdf = { workspace = true, optional = true }
+cfb = { workspace = true, optional = true }
+mail-parser = { workspace = true, optional = true }
+yaml-rust2 = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest = "1.4"
+tempfile = { workspace = true }
+zip = { workspace = true, default-features = false, features = ["deflate", "bzip2", "time"] }
+lopdf = { workspace = true }
+cfb = { workspace = true }

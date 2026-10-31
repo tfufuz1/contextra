@@ -6,6 +6,7 @@ use contextra_core::error::Result;
 use contextra_db::QueryRewriter;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::ScoredEntry;
+#[allow(clippy::disallowed_types)]
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -155,6 +156,7 @@ fn strip_code_fences(input: &str) -> String {
     lines.join("\n")
 }
 
+#[allow(clippy::disallowed_types)]
 fn parse_response(response: &str, original_query: &str, max_subqueries: usize) -> Vec<String> {
     let stripped = strip_code_fences(response);
     let trimmed = stripped.trim();

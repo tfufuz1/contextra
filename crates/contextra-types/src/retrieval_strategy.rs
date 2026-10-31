@@ -1,5 +1,7 @@
 //! Semantische Retrieval-Strategie (Spec §9.5). Additiv, kein Breaking Change.
-//! Dieser Typ beschreibt, WELCHES der vier Fusionssignale (§8) ein Bandit-Arm repräsentiert.
+//! ACHTUNG: NICHT zu verwechseln mit `contextra_router::RoutingStrategy`
+//! (SLM-Profil-Routing, Cascade/ContextualBandit/FlowCorrectedThompson) — dieser Typ hier
+//! beschreibt, WELCHES der vier Fusionssignale (§8) ein Bandit-Arm repräsentiert.
 
 use core::fmt;
 

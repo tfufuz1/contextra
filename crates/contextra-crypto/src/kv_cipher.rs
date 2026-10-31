@@ -370,7 +370,10 @@ mod tests {
         assert_eq!(decrypted, plaintext);
 
         // Revoke sub-key in the consolidated KeyRegistry
-        let revoked = cipher.registry().revoke_subkey(segment_id);
+        let revoked = cipher
+            .registry()
+            .revoke_subkey(segment_id)
+            .expect("revoke_subkey");
         assert!(revoked, "Sub-key revocation in KeyRegistry must succeed");
 
         // Decryption now fails because the single shredding path has been revoked

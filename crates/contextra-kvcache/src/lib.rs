@@ -1,0 +1,47 @@
+#![forbid(unsafe_code)]
+
+//! Contextra KV-Cache Crate (Ring 1).
+//!
+//! Stellt den In-Memory LRU-Cache, Eviction-Worker, Tenant-Isolation,
+//! Prefix-Radix-Baum, Tiering und Crypto-Shredding Infrastruktur bereit.
+
+pub mod adapters;
+pub mod attention_score;
+pub mod eviction_worker;
+pub mod prefix_store;
+#[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+pub mod quantize_kivi;
+pub mod radix;
+pub mod scratchpad_invalidation;
+pub mod segment;
+pub mod service;
+pub mod store;
+
+pub use adapters::{
+    EmbeddingProviderSemanticEmbedder, KvCachePluginConfig, KvCachePluginManifest,
+    StorageEngineKvBridge,
+};
+pub use attention_score::{
+    rank_for_eviction, rank_for_eviction_weighted, AttentionScoreSource, NullAttentionScoreSource,
+};
+pub use eviction_worker::{emergency_wipe, EvictionWorker};
+pub use prefix_store::TenantPrefixKvStore;
+#[cfg(any(feature = "kivi-quantization", feature = "kvcache-kivi-quant"))]
+pub use quantize_kivi::{
+    compress_bytes, decompress_bytes, kivi_dequantize, kivi_quantize, pack_kivi_block,
+    unpack_kivi_block, KiviBlockMeta, KiviQuantizeConfig, KiviQuantizedBlock, KvTensorView,
+};
+#[cfg(feature = "content-addressed-kv-cache")]
+pub use radix::{
+    ContentAddressedKvStore, KvLookupResult, KvSegmentRef, SemanticCacheConfig, SemanticEmbedder,
+};
+pub use radix::{KvBlockGuard, KvReusePolicy, PrefixMatch, PrefixRadixTree};
+pub use scratchpad_invalidation::{
+    PrefixStoreScratchpadInvalidator, ScratchpadCacheScope, ScratchpadInvalidator,
+};
+pub use segment::{
+    KvSegment, KvSegmentContent, ShreddableSegmentKey, Tier2EncryptedSegment,
+    CURRENT_KV_KEY_DERIVATION_VERSION,
+};
+pub use service::{KvCacheConfig, KvCacheService, KvCacheServiceBuilder, KvCacheStats};
+pub use store::{SpillHandler, TenantIsolatedKvStore};

@@ -53,3 +53,6 @@ loom = "0.7"
 name = "crypto_benchmarks"
 harness = false
 
+[[bench]]
+name = "deletion_proof_latency_bench"
+harness = false

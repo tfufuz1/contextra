@@ -1,7 +1,5 @@
 # AGENTS.md — `contextra-vector`
 
-> **Status 30.10.2026 (Reduktion):** Dieses Crate gehört zum Kern v1. Ring und Abhängigkeiten stimmen mit `docs/SPEC.md` §4 überein. Verweise auf entfernte Crates oder Funktionen sind veraltet. Enthält Code für DiskANN (entfernt) und RaBitQ (Nicht-Ziel, offen: D-R4). Maßgeblich ist der Quelltext. Bereinigung: `docs/PLAN.md` Phase R0 bis R3.
-
 ## 1. Rolle
 `contextra-vector` implementiert speichereffiziente Vektorindexierung und Ähnlichkeitssuche (HNSW, DiskANN, SQ8) mit Mandantenisolation und Tombstone-Pruning.
 
