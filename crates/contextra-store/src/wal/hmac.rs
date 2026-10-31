@@ -174,6 +174,23 @@ impl Wal {
         Ok((PreparedBatch(entries), prev_hmac))
     }
 
+    /// Rolls back the in-memory HMAC state to `prev_hmac` asynchronously.
+    pub async fn rollback_hmac(&self, prev_hmac: [u8; 32]) {
+        let mut last_hmac = self.last_hmac.lock().await;
+        *last_hmac = prev_hmac;
+    }
+
+    /// Synchronously rolls back the in-memory HMAC state to `prev_hmac` using non-blocking `try_lock`.
+    /// Suitable for use within `Drop` implementations.
+    pub fn rollback_hmac_sync(&self, prev_hmac: [u8; 32]) -> bool {
+        if let Ok(mut last_hmac) = self.last_hmac.try_lock() {
+            *last_hmac = prev_hmac;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Internal helper to retrieve or derive the 256-bit integrity key for HMAC chaining.
     pub(crate) fn get_integrity_key(&self) -> Result<[u8; 32]> {
         if let Some(km) = &self.key_manager {
