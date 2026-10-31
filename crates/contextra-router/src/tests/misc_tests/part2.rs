@@ -1,3 +1,8 @@
+//! # Ergänzende Regressionstests für Router-Operationen (Teil 2)
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Ergänzende Regressionstests für Router-Operationen (Teil 2).
+
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,

@@ -1,3 +1,9 @@
+//! # Integrationstest: Vollständiger Durchstich des Bandit-Dispatches
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Integrationstest: Vollständiger Durchstich des Bandit-Dispatches.
+
+// ANCHOR[contextra-router:IT-BNDD-001]
 #![cfg(feature = "bandit-routing")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -76,6 +82,8 @@ fn create_mock_router(profiles: Vec<SlmProfile>, dim: usize) -> RouterEngine {
     RouterEngine::new(search, comm, prep, profiles, None)
 }
 
+// ANCHOR[contextra-router:IT-BNDD-T01]
+// Test `test_default_strategy_is_cascade`: Prüft das erwartete Verhalten und Invarianten für integrationstest: vollständiger durchstich des bandit-dispatches.
 #[tokio::test]
 async fn test_default_strategy_is_cascade() {
     let dim = 4;
@@ -105,6 +113,8 @@ async fn test_default_strategy_is_cascade() {
     assert_eq!(decision.profile.name, "p2");
 }
 
+// ANCHOR[contextra-router:IT-BNDD-T02]
+// Test `test_bandit_deterministic_selection_with_same_seed`: Prüft das erwartete Verhalten und Invarianten für integrationstest: vollständiger durchstich des bandit-dispatches.
 #[tokio::test]
 async fn test_bandit_deterministic_selection_with_same_seed() {
     let dim = 4;
@@ -146,6 +156,8 @@ async fn test_bandit_deterministic_selection_with_same_seed() {
     assert_eq!(dec1.profile.name, dec2.profile.name);
 }
 
+// ANCHOR[contextra-router:IT-BNDD-T03]
+// Test `test_record_outcome_updates_theta`: Prüft das erwartete Verhalten und Invarianten für integrationstest: vollständiger durchstich des bandit-dispatches.
 #[tokio::test]
 async fn test_record_outcome_updates_theta() {
     let dim = 4;
@@ -188,6 +200,8 @@ async fn test_record_outcome_updates_theta() {
     assert!(theta_after[0] > theta_before[0]);
 }
 
+// ANCHOR[contextra-router:IT-BNDD-T04]
+// Test `test_fallback_to_cascade_when_bandit_state_missing`: Prüft das erwartete Verhalten und Invarianten für integrationstest: vollständiger durchstich des bandit-dispatches.
 #[tokio::test]
 async fn test_fallback_to_cascade_when_bandit_state_missing() {
     let dim = 4;
@@ -212,6 +226,8 @@ async fn test_fallback_to_cascade_when_bandit_state_missing() {
     assert_eq!(decision.unwrap().profile.name, "p1");
 }
 
+// ANCHOR[contextra-router:IT-BNDD-T05]
+// Test `test_fallback_to_cascade_on_dimension_mismatch`: Prüft das erwartete Verhalten und Invarianten für integrationstest: vollständiger durchstich des bandit-dispatches.
 #[tokio::test]
 async fn test_fallback_to_cascade_on_dimension_mismatch() {
     let dim = 4;
@@ -237,6 +253,8 @@ async fn test_fallback_to_cascade_on_dimension_mismatch() {
     assert_eq!(decision.unwrap().profile.name, "p1");
 }
 
+// ANCHOR[contextra-router:IT-BNDD-T06]
+// Test `test_bandit_decision_propensity_floor_clamp`: Prüft das erwartete Verhalten und Invarianten für integrationstest: vollständiger durchstich des bandit-dispatches.
 #[tokio::test]
 async fn test_bandit_decision_propensity_floor_clamp() {
     let dim = 4;

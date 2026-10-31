@@ -1,3 +1,9 @@
+//! # Tests für den Dispatch-Vorgang an SLMs
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Tests für den Dispatch-Vorgang an SLMs.
+
+// ANCHOR[contextra-router:TST-DSP-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
@@ -11,6 +17,8 @@
 use crate::{dispatch_to_slm, DecisionId, RoutingDecision, SlmProfile};
 use contextra_types::{ContextChunk, ContextWindow, ContextraError, DocId, TokenBudget};
 
+// ANCHOR[contextra-router:TST-DSP-T01]
+// Test `test_dispatch_to_slm_mock_server_receives_trimmed_context_only`: Prüft das erwartete Verhalten und Invarianten für tests für den dispatch-vorgang an slms.
 #[tokio::test]
 async fn test_dispatch_to_slm_mock_server_receives_trimmed_context_only() {
     let temp_dir = tempfile::tempdir().unwrap();
@@ -70,6 +78,8 @@ async fn test_dispatch_to_slm_mock_server_receives_trimmed_context_only() {
     );
 }
 
+// ANCHOR[contextra-router:TST-DSP-T02]
+// Test `test_dispatch_error_paths`: Prüft das erwartete Verhalten und Invarianten für tests für den dispatch-vorgang an slms.
 #[tokio::test]
 async fn test_dispatch_error_paths() {
     // 1. Process spawn error / bad command
@@ -181,6 +191,8 @@ async fn test_dispatch_error_paths() {
     );
 }
 
+// ANCHOR[contextra-router:TST-DSP-T03]
+// Test `test_dispatch_invalid_json_response`: Prüft das erwartete Verhalten und Invarianten für tests für den dispatch-vorgang an slms.
 #[tokio::test]
 async fn test_dispatch_invalid_json_response() {
     let profile = SlmProfile::new(
@@ -219,6 +231,8 @@ async fn test_dispatch_invalid_json_response() {
     );
 }
 
+// ANCHOR[contextra-router:TST-DSP-T04]
+// Test `test_dispatch_empty_endpoint_err`: Prüft das erwartete Verhalten und Invarianten für tests für den dispatch-vorgang an slms.
 #[tokio::test]
 async fn test_dispatch_empty_endpoint_err() {
     let profile = SlmProfile::new("empty-ep", "  ", vec![1], TokenBudget::default(), 0.1);
@@ -240,6 +254,8 @@ async fn test_dispatch_empty_endpoint_err() {
     );
 }
 
+// ANCHOR[contextra-router:TST-DSP-T05]
+// Test `test_dispatch_additional_error_and_format_paths`: Prüft das erwartete Verhalten und Invarianten für tests für den dispatch-vorgang an slms.
 #[tokio::test]
 async fn test_dispatch_additional_error_and_format_paths() {
     use crate::dispatch_to_slm;

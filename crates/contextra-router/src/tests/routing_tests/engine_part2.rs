@@ -1,3 +1,8 @@
+//! # Tests für Kernfunktionen der RouterEngine (Teil 2)
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Tests für Kernfunktionen der RouterEngine (Teil 2).
+
 use super::super::fixtures::*;
 use crate::{RoutingOutcome, SlmProfile};
 use contextra_db::{Contextra, ContextraConfig};

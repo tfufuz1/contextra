@@ -1,3 +1,8 @@
+//! # Unit-Tests für RouterEngine
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Unit-Tests für RouterEngine.
+
 // FILE-CONTEXT
 // ZWECK: Unit-Tests für RouterEngine.
 // INVARIANTEN: Instanz-Unabhängigkeit von DecisionIdGeneratoren, Kalibrierungs-Resets.

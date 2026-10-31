@@ -1,3 +1,22 @@
+//! # contextra-router
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht / Peripherie).
+//! **Zweck:** Intelligentes Routing von Anfragen an geeignete Small Language Models (SLM).
+//! Bewertet Modell-Profile (z. B. Token-Limits, Domänen-Affinitäten), kalibriert Konfidenzwerte
+//! über konforme Vorhersagen (Conformal Prediction) und steuert Multi-Armed-Bandit-Verfahren (LinUCB / Thompson Sampling).
+//!
+//! **Abhängigkeiten:**
+//! - Upstream: `contextra-types`, `contextra-ports`, `contextra-wire`, `contextra-adapt`, `contextra-privacy`.
+//! - Downstream: Wird eingebunden von `contextra-agent` und `contextra-mcp`.
+//!
+//! **Hauptkomponenten:**
+//! - [`RouterEngine`]: Primärer Routing-Endpunkt zur Entscheidung für das beste Modell.
+//! - [`SlmProfile`]: Spezifikation der Fähigkeiten und Begrenzungen eines Modells.
+//! - [`ConformalCalibrator`]: Statistische Fehlerüberwachung und Kalibrierung.
+//! - [`ArmRegistry`]: Zuordnung von Modellprofilen zu Bandit-Armen.
+//! - [`dispatch_to_slm`]: Ausführung des eigentlichen SLM-Aufrufs.
+
+// ANCHOR[contextra-router:LIB-001]
 #![deny(dead_code)]
 #![forbid(unsafe_code)]
 

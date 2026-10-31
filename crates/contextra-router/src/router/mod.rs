@@ -4,7 +4,21 @@
 // INVARIANTEN: Atomare Snapshot-Sicherheit bei Hot-Reload, NaN-Safety bei Distanz-Eingaben.
 // SIEHE AUCH: docs/decisions/ADR-020-contextra-brain.md
 
-//! Core routing engine for matching hybrid search context to SLM profiles.
+//! # Haupt-Routing-Engine für Kontext-Zuweisung an SLM-Profile
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Zentrale Routing-Komponente ([`RouterEngine`]) zur Auswahl des passenden
+//! Sprachmodells basierend auf Suchergebnissen, Token-Budgets, Domänenaffinitäten und
+//! konformaler Kalibrierung.
+//!
+//! **Architektur & Nebenläufigkeit:**
+//! - Verwaltet den Systemzustand über einen atomaren Snapshot [`ArcSwap<RouterState>`] für lock-freie Lesezugriffe beim Routing.
+//! - Modifikationen (wie Neukalibrierungen oder Profil-Updates) erfolgen serialisiert über ein `parking_lot::RwLock`.
+//! - Erkennt Konzeptdrift über adaptive Ljapunow-Wächter ([`LyapunovDriftWatcher`]).
+//!
+//! **Abhängigkeiten:**
+//! - Upstream: `contextra_types`, `contextra_ports`, `contextra_adapt`, `arc_swap`, `parking_lot`.
+//! - Downstream: Agent-Orchestrierung (`contextra-agent`), MCP-Server (`contextra-mcp`).
 
 use crate::lyapunov::{LyapunovDriftWatcher, LyapunovResult};
 use crate::outcome::{DecisionId, DecisionIdGenerator, RoutingOutcome};
@@ -84,6 +98,8 @@ pub(crate) const MAX_PENDING_DECISIONS: usize = 10_000;
 
 /// Calibrated confidence metrics for a routing decision.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// ANCHOR[contextra-router:RTR-001]
+/// Statistische Konfidenzmetriken einer Routing-Entscheidung (Conformal Prediction).
 pub struct ConfidenceMetrics {
     /// Lower bound of the confidence interval (None when not calibrated).
     pub score_lower: Option<f32>,
@@ -101,6 +117,8 @@ pub struct ConfidenceMetrics {
 
 /// Result of a routing operation containing the selected profile, prepared context, confidence, and decision ID.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+// ANCHOR[contextra-router:RTR-002]
+/// Vollständige Entscheidung des Routers mit ausgewähltem Modellprofil, Kontextfenster und Metriken.
 pub struct RoutingDecision {
     /// The target SLM profile selected for the query.
     pub profile: SlmProfile,
@@ -116,14 +134,20 @@ pub struct RoutingDecision {
 
 /// Inner state for `RouterEngine` holding active profiles, calibration states, and Lyapunov drift watchers.
 #[derive(Clone)]
+// ANCHOR[contextra-router:RTR-003]
+/// Unveränderlicher Snapshot des Router-Zustands für atomares Swapping via `ArcSwap`.
 pub struct RouterState {
     pub profiles: Vec<SlmProfile>,
     pub calibration: BTreeMap<String, ProfileCalibrationState>,
     pub lyapunov_watchers: BTreeMap<String, LyapunovDriftWatcher>,
 }
 
+// ANCHOR[contextra-router:RTR-004]
+/// Standard-Typalias für die Routing-Engine.
 pub type DefaultRouterEngine = RouterEngine;
 
+// ANCHOR[contextra-router:RTR-005]
+/// Die primäre Routing-Engine zur Evaluierung und Zuweisung von SLM-Profilen.
 pub struct RouterEngine {
     pub(crate) search_provider: Arc<dyn HybridSearchProvider>,
     pub(crate) community_resolver: Arc<dyn CommunityResolver>,
@@ -282,6 +306,8 @@ pub(crate) fn select_profile_from_chunks(
     }
 }
 
+// ANCHOR[contextra-router:RTR-006]
+/// Implementierung des Drift-Status-Providers für nachgelagerte Komponenten.
 impl LocalDriftStatusProvider for RouterEngine {
     fn overall_drift_status(&self) -> String {
         self.overall_drift_status()

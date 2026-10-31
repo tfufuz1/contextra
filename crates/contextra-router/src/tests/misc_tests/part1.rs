@@ -1,3 +1,9 @@
+//! # Detail-Tests für Kalibrierung und Profilbehandlung (Teil 1)
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Detail-Tests für Kalibrierung und Profilbehandlung (Teil 1).
+
+// ANCHOR[contextra-router:TST-MSC1-001]
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
@@ -16,6 +22,8 @@ use contextra_types::{ContextraError, EntityId, TokenBudget};
 use serde_json::json;
 use std::sync::Arc;
 
+// ANCHOR[contextra-router:TST-MSC1-T01]
+// Test `test_nan_single_chunk_ignored_in_max_score`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn test_nan_single_chunk_ignored_in_max_score() -> Result<(), Box<dyn std::error::Error>> {
     use crate::router::{compute_max_score, select_profile_from_chunks};
@@ -83,6 +91,8 @@ fn test_nan_single_chunk_ignored_in_max_score() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T02]
+// Test `test_nan_all_chunks_fallback_and_tracing_error`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn test_nan_all_chunks_fallback_and_tracing_error() -> Result<(), Box<dyn std::error::Error>> {
     use crate::router::select_profile_from_chunks;
@@ -148,6 +158,8 @@ fn test_nan_all_chunks_fallback_and_tracing_error() -> Result<(), Box<dyn std::e
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T03]
+// Test `test_nan_routing_determinism_repeats`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn test_nan_routing_determinism_repeats() -> Result<(), Box<dyn std::error::Error>> {
     use crate::router::select_profile_from_chunks;
@@ -212,6 +224,8 @@ fn test_nan_routing_determinism_repeats() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T04]
+// Test `test_slm_profile_validation`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn test_slm_profile_validation() {
     // Valid profile
@@ -255,6 +269,8 @@ fn test_slm_profile_validation() {
     );
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T05]
+// Test `prop_slm_profile_equality`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn prop_slm_profile_equality() {
     use proptest::prelude::*;
@@ -271,6 +287,8 @@ fn prop_slm_profile_equality() {
     });
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T06]
+// Test `prop_slm_profile_serde`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn prop_slm_profile_serde() {
     use proptest::prelude::*;
@@ -288,6 +306,8 @@ fn prop_slm_profile_serde() {
     });
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T07]
+// Test `prop_routing_decision_profile_in_input`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn prop_routing_decision_profile_in_input() {
     use crate::router::select_profile_from_chunks;
@@ -321,6 +341,8 @@ fn prop_routing_decision_profile_in_input() {
     });
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T08]
+// Test `test_slm_profile_validation_extended`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn test_slm_profile_validation_extended() {
     let inf_score = SlmProfile::try_new(
@@ -357,6 +379,8 @@ fn test_slm_profile_validation_extended() {
     );
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T09]
+// Test `test_cascade_hit`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn test_cascade_hit() {
     use crate::profile::ProfileCalibrationState;
@@ -428,6 +452,8 @@ fn test_cascade_hit() {
     assert!(!metrics.calibrated);
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T10]
+// Test `test_cascade_fallthrough`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn test_cascade_fallthrough() {
     use crate::profile::ProfileCalibrationState;
@@ -494,6 +520,8 @@ fn test_cascade_fallthrough() {
     assert!(!metrics.calibrated);
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T11]
+// Test `test_calibrated_threshold_convergence`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[tokio::test]
 async fn test_calibrated_threshold_convergence() {
     use contextra_types::ConfigFingerprint;
@@ -566,6 +594,8 @@ async fn test_calibrated_threshold_convergence() {
         );
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T12]
+// Test `test_calibration_invalidation_on_temperature_change`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[tokio::test]
 async fn test_calibration_invalidation_on_temperature_change() {
     use contextra_types::ConfigFingerprint;
@@ -667,6 +697,8 @@ async fn test_calibration_invalidation_on_temperature_change() {
     );
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T13]
+// Test `test_calibration_invalidation_on_prompt_template_hash_change`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[tokio::test]
 async fn test_calibration_invalidation_on_prompt_template_hash_change() {
     use contextra_types::ConfigFingerprint;
@@ -743,6 +775,8 @@ async fn test_calibration_invalidation_on_prompt_template_hash_change() {
     );
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T14]
+// Test `test_calibration_invalidation_on_quantization_change`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[tokio::test]
 async fn test_calibration_invalidation_on_quantization_change() {
     use contextra_types::ConfigFingerprint;
@@ -819,6 +853,8 @@ async fn test_calibration_invalidation_on_quantization_change() {
     );
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T15]
+// Test `test_calibration_failsafe_on_unknown_quantization`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[tokio::test]
 async fn test_calibration_failsafe_on_unknown_quantization() {
     let dir = tempfile::tempdir().unwrap();
@@ -868,6 +904,8 @@ async fn test_calibration_failsafe_on_unknown_quantization() {
     );
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T16]
+// Test `test_cascade_determinism`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[tokio::test]
 async fn test_cascade_determinism() {
     let dir = tempfile::tempdir().unwrap();
@@ -935,6 +973,8 @@ async fn test_cascade_determinism() {
     }
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T17]
+// Test `test_conformal_calibrator_default_and_reset_window`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn test_conformal_calibrator_default_and_reset_window() {
     use crate::profile::ProfileCalibrator;
@@ -954,6 +994,8 @@ fn test_conformal_calibrator_default_and_reset_window() {
     assert_eq!(cal.empirical_error_rate(), 0.0);
 }
 
+// ANCHOR[contextra-router:TST-MSC1-T18]
+// Test `test_profile_calibration_state_default_and_average_confidence`: Prüft das erwartete Verhalten und Invarianten für detail-tests für kalibrierung und profilbehandlung (teil 1).
 #[test]
 fn test_profile_calibration_state_default_and_average_confidence() {
     use crate::profile::ProfileCalibrationState;

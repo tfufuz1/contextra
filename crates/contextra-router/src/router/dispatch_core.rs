@@ -1,3 +1,9 @@
+//! # Kern-Routing-Dispatch und Kaskaden-/Bandit-Profilauswahl
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Ausführung der Profilauswahl-Kaskade (`route()`), Kontext-Anreicherung über Hybrid-Suche
+//! und Graph-Communities sowie multi-kriterielle Filterung nach Token-Budgets und Konfidenz-Schwellwerten.
+
 // FILE-CONTEXT
 // STAND: 2026-10-29
 // ZWECK: Kern-Routing-Dispatch und Kaskaden-/Bandit-Profilauswahl für RouterEngine.

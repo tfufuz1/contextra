@@ -1,3 +1,9 @@
+//! # Outcome-Recording und Kalibrierungs-Aktualisierung
+//!
+//! **Ring:** Ring 3 (Applikations- und Koordinationsschicht).
+//! **Zweck:** Verarbeitung von Feedback zu Routing-Entscheidungen (`record_outcome()`)
+//! sowie Wartung der PAVA- und Conformal-Kalibrierungszustände und Bereinigung alter Einträge.
+
 // FILE-CONTEXT
 // STAND: 2026-10-29
 // ZWECK: Outcome-Recording, Kalibrierungs- und Drift-Statistiken für RouterEngine.

@@ -1,3 +1,9 @@
+//! # Benchmark für die Latenzschranke der Bandit-Entscheidung
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Benchmark für die Latenzschranke der Bandit-Entscheidung.
+
+// ANCHOR[contextra-router:BN-BLAT-001]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 #[cfg(feature = "bandit-routing")]
@@ -57,6 +63,8 @@ fn bench_bandit_latency_gate(c: &mut Criterion) {
 }
 
 #[cfg(feature = "bandit-routing")]
+// ANCHOR[contextra-router:BN-BLAT-CRIT]
+// Benchmark-Gruppe für Performance- und Regressionsmessungen.
 criterion_group!(benches, bench_bandit_latency_gate);
 #[cfg(feature = "bandit-routing")]
 criterion_main!(benches);

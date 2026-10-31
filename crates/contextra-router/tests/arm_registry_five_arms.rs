@@ -1,8 +1,16 @@
+//! # Integrationstest: ArmRegistry mit fünf Standard-Armen
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Integrationstest: ArmRegistry mit fünf Standard-Armen.
+
+// ANCHOR[contextra-router:IT-ARM5-001]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_router::{ArmRegistry, ArmRegistryError};
 use contextra_types::RetrievalStrategy;
 
+// ANCHOR[contextra-router:IT-ARM5-T01]
+// Test `test_arm_registry_five_arms_bijection`: Prüft das erwartete Verhalten und Invarianten für integrationstest: armregistry mit fünf standard-armen.
 #[test]
 fn test_arm_registry_five_arms_bijection() {
     let registry = ArmRegistry::default();
@@ -32,6 +40,8 @@ fn test_arm_registry_five_arms_bijection() {
     }
 }
 
+// ANCHOR[contextra-router:IT-ARM5-T02]
+// Test `test_arm_registry_five_arms_custom_global_variant`: Prüft das erwartete Verhalten und Invarianten für integrationstest: armregistry mit fünf standard-armen.
 #[test]
 fn test_arm_registry_five_arms_custom_global_variant() {
     let registry = ArmRegistry::default();
@@ -45,6 +55,8 @@ fn test_arm_registry_five_arms_custom_global_variant() {
     assert_eq!(mapped_arm, 4);
 }
 
+// ANCHOR[contextra-router:IT-ARM5-T03]
+// Test `test_arm_registry_five_arms_out_of_range`: Prüft das erwartete Verhalten und Invarianten für integrationstest: armregistry mit fünf standard-armen.
 #[test]
 fn test_arm_registry_five_arms_out_of_range() {
     let registry = ArmRegistry::default();

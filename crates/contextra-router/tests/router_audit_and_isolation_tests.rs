@@ -1,3 +1,8 @@
+//! # Integrationstests für Router-Auditing und Mandantenisolierung
+//!
+//! **Ring:** Ring 3 (Applikations- und Testschicht).
+//! **Zweck:** Integrationstests für Router-Auditing und Mandantenisolierung.
+
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
