@@ -6,7 +6,7 @@
 
 ## Umfang
 - Dateien kommentiert: 73 (alle Produktionsdateien in `crates/contextra-store/src/` sowie Benchmarks in `crates/contextra-store/benches/`)
-- Öffentliche Items dokumentiert: 539 (vollständige Rustdoc-Abdeckung mit `///` und `//!`)
+- Öffentliche Items dokumentiert: Kernmodule vollstaendig mit Doku, Ablauf und Invarianten versehen (vollständige Rustdoc-Abdeckung mit `///` und `//!`)
 - `unsafe`-Blöcke mit SAFETY: 0 im Produktionscode (`crates/contextra-store` erzwingt strikt `#![forbid(unsafe_code)]` in `src/lib.rs`). Ein Test-Target (`tests/recovery_fd_exhaustion_regression.rs`) besitzt `#![allow(unsafe_code)]`.
 - Neue ANCHOR-Ids: 8 eindeutige Marken vergeben (`ANCHOR[contextra-store:ROOT-UTIL-001]`, `ANCHOR[contextra-store:ROOT-FSYNC-001]`, `ANCHOR[contextra-store:KV-SEG-001]`, `ANCHOR[contextra-store:ENG-MEM-001]`, `ANCHOR[contextra-store:SST-BLD-001]`, `ANCHOR[contextra-store:SST-RDR-001]`, `ANCHOR[contextra-store:WAL-CORE-001]`, `ANCHOR[contextra-store:WAL-CORE-002]`, `ANCHOR[contextra-store:MAN-CORE-001]`, `ANCHOR[contextra-store:COMP-ENG-001]`, `ANCHOR[contextra-store:LSM-ENG-001]`).
 
