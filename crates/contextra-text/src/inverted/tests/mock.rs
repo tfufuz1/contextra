@@ -1,3 +1,8 @@
+//! Testsuite `mock.rs` für contextra-text.
+//!
+//! # Ring-Zuordnung
+//! Ring LAB / Testbereich.
+
 use contextra_ports::{BoxFuture, StorageEngine};
 use contextra_types::{Result, TxId};
 use parking_lot::RwLock;

@@ -2,6 +2,17 @@
 // ZWECK: Multi-Term Query-Traversierung mit Block-Maximalwert-Pruning und dynamic thresholding.
 // INVARIANTEN: Zero-Panic Doctrine, Safe Optimization (Ergebnisse identisch zu Full-Scan), MVCC & Tombstone Isolation.
 
+//! Block-Max WAND (Weak AND) Algorithmus für performante Multi-Term BM25-Suchen.
+//!
+//! # Ring-Zuordnung
+//! Ring 0 (Kern).
+//!
+//! # Funktionsweise
+//! WAND vermeidet das vollständige Berechnen von BM25-Scores für alle Dokumente,
+//! indem anhand vorberechneter Obergrenzen (`term_max_score` und `block_max_scores`)
+//! Terme und Dokumentblöcke dynamisch übersprungen werden, deren potentieller
+//! Maximalscore den aktuellen Schwellenwert der Top-K-Treffer nicht übersteigen kann.
+
 use crate::bm25::score_term;
 use crate::posting_list::{DocIdRaw, Posting, PostingList, BLOCK_SIZE};
 use contextra_ports::StorageEngine;
@@ -9,6 +20,8 @@ use contextra_types::{ContextraError, DocId, Result, MAX_SEARCH_K};
 use std::collections::{BinaryHeap, HashMap};
 use std::sync::Arc;
 
+// ANCHOR[contextra-text:WAND-001]
+/// Interner BM25-Kandidat für die Top-K-Min-Heap-Verwaltung.
 struct Bm25Candidate {
     doc_id: DocId,
     score: f32,
@@ -39,12 +52,16 @@ impl PartialOrd for Bm25Candidate {
     }
 }
 
+// ANCHOR[contextra-text:WAND-002]
+/// Begrenzter Min-Heap zur effizienten Verwaltung der K besten Treffer.
 pub struct BoundedTopK {
     heap: BinaryHeap<Bm25Candidate>,
     capacity: usize,
 }
 
 impl BoundedTopK {
+    // ANCHOR[contextra-text:WAND-003]
+    /// Erzeugt einen neuen `BoundedTopK`-Puffer mit maximaler Kapazität (`MAX_SEARCH_K`).
     pub fn new(capacity: usize) -> Self {
         let capacity = capacity.min(MAX_SEARCH_K);
         Self {
@@ -53,6 +70,8 @@ impl BoundedTopK {
         }
     }
 
+    // ANCHOR[contextra-text:WAND-004]
+    /// Fügt einen neuen Kandidaten ein, wenn er besser als der schlechteste bisherige Treffer ist.
     pub fn push(&mut self, doc_id: DocId, score: f32) {
         if self.capacity == 0 {
             return;
@@ -68,6 +87,8 @@ impl BoundedTopK {
         }
     }
 
+    // ANCHOR[contextra-text:WAND-005]
+    /// Liefert den aktuellen Minimal-Score (Schwelle), den ein Kandidat übertreffen muss.
     pub fn min_threshold(&self) -> f32 {
         if self.heap.len() < self.capacity {
             0.0
@@ -76,6 +97,8 @@ impl BoundedTopK {
         }
     }
 
+    // ANCHOR[contextra-text:WAND-006]
+    /// Konvertiert den Heap in einen nach Relevanz absteigend sortierten Ergebnisvektor.
     pub fn into_sorted_vec(self) -> Vec<(DocId, f32)> {
         self.heap
             .into_sorted_vec()
@@ -213,14 +236,27 @@ impl TermCursor {
     }
 }
 
-/// Result from Block-Max WAND search containing top-k items and execution metrics.
+// ANCHOR[contextra-text:WAND-007]
+/// Ergebnis einer Block-Max-WAND-Suche inklusive Top-K-Treffern und Metadaten über evaluierte Dokumente.
 #[derive(Debug)]
 pub struct WandSearchResult {
+    /// Gefundene Trefferdokumente mit Relevanzwert.
     pub results: Vec<(DocId, f32)>,
+    /// Anzahl tatsächlich voll berechneter Dokumente (Pruning-Effektivitätsmetrik).
     pub evaluated_docs_count: usize,
 }
 
-/// Executes Block-Max WAND traversal over resident posting lists.
+// ANCHOR[contextra-text:WAND-008]
+/// Führt den Block-Max WAND-Algorithmus über speicherresidenten Posting-Listen aus.
+///
+/// # Ablauf
+/// 1. Snapshot-Sequenznummer auflösen und aktive Tombstones vorladen.
+/// 2. Cursors für alle Abfrageterme initialisieren und obere Schranken vorberechnen.
+/// 3. In einer Schleife:
+///    a) Cursors nach aktueller DocId sortieren.
+///    b) Pivot-Term auswählen, dessen kumulierter Max-Score die aktuelle Top-K-Schwelle übersteigt.
+///    c) Falls Min-DocId == Pivot-DocId: Block-Max-Schranke prüfen, exakten BM25-Score berechnen und in Top-K aufnehmen.
+///    d) Andernfalls Cursors zur Pivot-DocId vorspringen lassen (Skip).
 // ADR-0015: Block-Max WAND query search signature requires storage, index, and query parameters.
 #[allow(clippy::too_many_arguments)]
 pub async fn block_max_wand_search<S: StorageEngine>(
@@ -773,6 +809,8 @@ mod tests {
         }
     }
 
+    // ANCHOR[contextra-text:TEST-WAND-001]
+    // Prüft Ergebnis-Äquivalenz und Auswertungs-Pruning von Block-Max WAND im Vergleich zum Vollscan.
     #[tokio::test]
     async fn test_block_max_wand_equivalence_and_pruning_performance() -> Result<()> {
         let storage = Arc::new(MockStorage::new());

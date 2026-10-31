@@ -13,6 +13,16 @@
 // BOTTLENECK: Heap-Allokationen (format!, Vec::new)
 // OPTIMIERUNG: itoa::Buffer + Vec::with_capacity + doc_len_cache
 
+//! Persistenter, LSM-basierter invertierter Volltextindex mit MVCC-Snapshot-Isolation.
+//!
+//! # Ring-Zuordnung
+//! Ring 0 (Kern).
+//!
+//! # Funktionsweise
+//! Verwaltet Dokumente, Posting-Listen, Vorwärtsindex und BM25-Statistiken über dem
+//! [`contextra_ports::StorageEngine`]-Port. Unterstützt Transaktionen (Staging, Commit, Rollback),
+//! physische Löschung (Purge) und Scans für Verifiable Deletion.
+
 mod index_struct;
 mod morph_index;
 pub mod purge;

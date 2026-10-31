@@ -4,6 +4,16 @@
 // NICHT-OFFENSICHTLICH: Document purge purges postings, dl, fw, tbs, empties plb keys and updates atomic stats.
 // HOTSPOTS: purge_document_internal, purge_collection_internal
 
+//! Physische Löschung (Purge) für Dokumente und Kollektionen im Textindex.
+//!
+//! # Ring-Zuordnung
+//! Ring 0 (Kern).
+//!
+//! # Zweck & DSGVO-Konformität
+//! Stellt sicher, dass bei Verifiable Deletion (DSGVO Art. 17) sämtliche Spuren
+//! eines Dokuments (Postings, Vorwärtsindex, Dokumentlänge, Tombstones) unwiderruflich
+//! aus dem persistenten Storage entfernt und die BM25-Statistiken atomar korrigiert werden.
+
 use crate::inverted::index_struct::InvertedIndex;
 use crate::inverted::scanner::ParsedTextTarget;
 use crate::inverted::types::TextIndexMetadata;
@@ -15,7 +25,7 @@ use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-/// Executes an async block safely inside synchronous purger methods.
+/// Führt einen asynchronen Block synchron blockierend aus.
 fn block_on_async<F: std::future::Future + Send + 'static>(f: F) -> F::Output
 where
     F::Output: Send + 'static,
@@ -23,21 +33,23 @@ where
     futures::executor::block_on(f)
 }
 
-/// Detailed purge execution report capturing purged units, failed units, bytes freed, and errors.
+// ANCHOR[contextra-text:PURGE-001]
+/// Detaillierter Ausführungsbericht eines Purge-Laufs mit Einheiten, freigegebenem Speicher und Fehlern.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PurgeReport {
-    /// Number of units successfully purged.
+    /// Anzahl erfolgreich physisch gelöschter Einheiten.
     pub units_purged: u64,
-    /// Number of units that failed during purge execution.
+    /// Anzahl fehlgeschlagener Einheiten während der Ausführung.
     pub units_failed: u64,
-    /// Number of storage bytes freed.
+    /// Freigegebener physischer Speicherplatz in Bytes.
     pub bytes_freed: u64,
-    /// List of error descriptions encountered during partial failures.
+    /// Fehlermeldungen bei Teilfehlschlägen.
     pub errors: Vec<String>,
 }
 
 impl PurgeReport {
-    /// Creates a new empty `PurgeReport`.
+    // ANCHOR[contextra-text:PURGE-002]
+    /// Erzeugt einen leeren Purge-Bericht.
     pub fn new() -> Self {
         Self {
             units_purged: 0,
@@ -47,12 +59,14 @@ impl PurgeReport {
         }
     }
 
-    /// Returns `true` if no errors occurred during purge.
+    // ANCHOR[contextra-text:PURGE-003]
+    /// Liefert `true`, wenn die Löschung fehlerfrei und vollständig war.
     pub fn is_success(&self) -> bool {
         self.units_failed == 0 && self.errors.is_empty()
     }
 
-    /// Converts this report to `PurgeStats`, or returns an error if partial failure occurred.
+    // ANCHOR[contextra-text:PURGE-004]
+    /// Konvertiert den Bericht in [`PurgeStats`] oder liefert einen Fehler bei Teilabbrüchen.
     pub fn to_purge_stats(&self) -> Result<PurgeStats> {
         if self.is_success() {
             Ok(PurgeStats {
@@ -74,7 +88,8 @@ impl Default for PurgeReport {
     }
 }
 
-/// Physical Purger implementation for `InvertedIndex`.
+// ANCHOR[contextra-text:PURGE-005]
+/// Physischer Purger für den Textindex zur Bereinigung von Storage und Metadaten.
 pub struct TextPurger<S: StorageEngine + 'static> {
     index: Arc<InvertedIndex<S>>,
 }
@@ -467,7 +482,8 @@ impl<S: StorageEngine + 'static> Purger for TextPurger<S> {
     }
 }
 
-/// Factory function to construct a `Purger` for text index.
+// ANCHOR[contextra-text:PURGE-006]
+/// Erzeugt eine instanziierte Implementierung des [`Purger`]-Ports für den Textindex.
 pub fn text_purger<S: StorageEngine + 'static>(index: Arc<InvertedIndex<S>>) -> Arc<dyn Purger> {
     Arc::new(TextPurger::new(index))
 }
