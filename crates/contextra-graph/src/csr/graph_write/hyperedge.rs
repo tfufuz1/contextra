@@ -366,7 +366,10 @@ impl CsrGraph {
         let mut seen_ids = HashSet::with_capacity(new_edges.len());
         for edge in &new_edges {
             if !seen_ids.insert(edge.id) || inner_ptr.hyperedges.contains_key(&edge.id) {
-                return Err(GraphMutationError::Internal(format!("Duplicate hyperedge ID {}", edge.id)));
+                return Err(GraphMutationError::Internal(format!(
+                    "Duplicate hyperedge ID {}",
+                    edge.id
+                )));
             }
             edge.validate()?;
         }
