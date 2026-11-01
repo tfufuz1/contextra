@@ -62,8 +62,12 @@ pub fn ring_of(name: &str) -> Option<Ring> {
 /// Liest `crates/*/Cargo.toml` aus dem Workspace-Root und sammelt Name und normale Abhängigkeiten.
 pub fn load_crates(root: &Path) -> Result<Vec<Krate>, String> {
     let crates_dir = root.join("crates");
-    let entries = fs::read_dir(&crates_dir)
-        .map_err(|e| format!("crates-Verzeichnis nicht lesbar ({}): {e}", crates_dir.display()))?;
+    let entries = fs::read_dir(&crates_dir).map_err(|e| {
+        format!(
+            "crates-Verzeichnis nicht lesbar ({}): {e}",
+            crates_dir.display()
+        )
+    })?;
     let mut out = Vec::new();
     for entry in entries {
         let entry = entry.map_err(|e| format!("Verzeichniseintrag: {e}"))?;
@@ -114,10 +118,16 @@ pub fn check_layering(crates: &[Krate]) -> Vec<String> {
         };
         for dep in &krate.deps {
             if my_ring == Ring::Ring0 && dep == "tokio" {
-                violations.push(format!("Ring 0 verletzt: {} hängt von tokio ab", krate.name));
+                violations.push(format!(
+                    "Ring 0 verletzt: {} hängt von tokio ab",
+                    krate.name
+                ));
                 continue;
             }
-            if ALLOWLIST.iter().any(|(from, to)| *from == krate.name && *to == dep) {
+            if ALLOWLIST
+                .iter()
+                .any(|(from, to)| *from == krate.name && *to == dep)
+            {
                 continue;
             }
             let Some(dep_ring) = ring_of(dep) else {
@@ -171,13 +181,20 @@ pub fn check_unsafe(root: &Path, crates: &[Krate]) -> Vec<String> {
                     continue;
                 }
                 let is_block = code.contains("unsafe {") || code.ends_with("unsafe");
-                let is_fn = code.contains("unsafe fn") || code.contains("unsafe impl") || code.contains("unsafe trait");
+                let is_fn = code.contains("unsafe fn")
+                    || code.contains("unsafe impl")
+                    || code.contains("unsafe trait");
                 if !is_block && !is_fn {
                     continue;
                 }
                 let rel = file.strip_prefix(root).unwrap_or(&file).display();
                 if !island {
-                    violations.push(format!("{}:{}: unsafe in Nicht-Insel {}", rel, idx + 1, krate.name));
+                    violations.push(format!(
+                        "{}:{}: unsafe in Nicht-Insel {}",
+                        rel,
+                        idx + 1,
+                        krate.name
+                    ));
                     continue;
                 }
                 if is_block {
@@ -188,7 +205,11 @@ pub fn check_unsafe(root: &Path, crates: &[Krate]) -> Vec<String> {
                         .map(|ctx| ctx.iter().any(|l| l.contains("SAFETY:")))
                         .unwrap_or(false);
                     if !has_safety {
-                        violations.push(format!("{}:{}: unsafe-Block ohne // SAFETY:", rel, idx + 1));
+                        violations.push(format!(
+                            "{}:{}: unsafe-Block ohne // SAFETY:",
+                            rel,
+                            idx + 1
+                        ));
                     }
                 }
             }
@@ -237,7 +258,7 @@ mod tests {
 
     #[test]
     fn erlaubt_abwaerts_abhaengigkeit() {
-        let v = check_layering(&[krate("contextra-db", &["contextra-engine", "contextra-types"])]);
+        let v = check_layering(&[krate("contextra", &["contextra-engine", "contextra-types"])]);
         assert!(v.is_empty(), "{v:?}");
     }
 }

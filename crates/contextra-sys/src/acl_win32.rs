@@ -94,7 +94,9 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
         ));
     }
     let file_uid = meta.uid();
-    // SAFETY: `libc::geteuid` ist ein nebenwirkungsfreier POSIX-Systemaufruf, der stets die effektive UID des aufrufenden Prozesses liefert. Es werden keine Zeiger dereferenziert.
+    // SAFETY: `libc::geteuid` ist ein nebenwirkungsfreier, zustandsloser POSIX-Systemaufruf,
+    // der die effektive User-ID des aktuellen Threads/Prozesses zurückgibt. Es werden keine Zeiger
+    // übergeben oder dereferenziert und kein Speicher allokiert oder freigegeben.
     let proc_uid = unsafe { libc::geteuid() };
     if file_uid != proc_uid {
         return Err(std::io::Error::new(
@@ -118,7 +120,9 @@ struct TokenGuard(windows_sys::Win32::Foundation::HANDLE);
 impl Drop for TokenGuard {
     fn drop(&mut self) {
         if !self.0.is_null() {
-            // SAFETY: `self.0` ist ein gültiges, nicht-nulles Win32-HANDLE, das von `OpenProcessToken` stammt und exklusiv von dieser Guard gehalten wird.
+            // SAFETY: `self.0` ist ein gültiges, nicht-nulles Win32-HANDLE, das aus einem erfolgreichen
+            // Aufruf von `OpenProcessToken` stammt. Es wird exklusiv von dieser Guard-Instanz besessen und
+            // wird beim Drop genau einmal ordnungsgemäß via `CloseHandle` geschlossen.
             unsafe {
                 windows_sys::Win32::Foundation::CloseHandle(self.0);
             }
@@ -145,7 +149,11 @@ fn get_process_owner_sid_buffer() -> std::io::Result<(TokenGuard, Vec<u8>)> {
     use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
     let mut token_handle: HANDLE = null_mut();
-    // SAFETY: `GetCurrentProcess` liefert ein Pseudohandle. `token_handle` ist ein gültiger Zeiger auf ein HANDLE. `GetTokenInformation` wird zunächst zur Größenermittlung mit Null-Puffer und danach mit einem ausreichend großen Puffer aufgerufen.
+    // SAFETY: `GetCurrentProcess` liefert ein prozesslokales Pseudo-Handle, das nicht geschlossen werden muss.
+    // `&mut token_handle` ist ein gültiger Zeiger auf ein lokales HANDLE auf dem Stack.
+    // Der erste Aufruf von `GetTokenInformation` ermittelt strikt die erforderliche Puffergröße `len`.
+    // Anschließend wird `buffer` exakt auf `len` Bytes dimensioniert und als Zeiger übergeben.
+    // Schlägt ein API-Aufruf fehl, wird der Fehlercode unverzüglich via `GetLastError` abgefragt.
     unsafe {
         if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token_handle) == 0 {
             return Err(std::io::Error::new(
@@ -207,7 +215,11 @@ pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
     let (_guard, buffer) = get_process_owner_sid_buffer()?;
     let token_user = buffer.as_ptr() as *const TOKEN_USER;
 
-    // SAFETY: `token_user` zeigt auf den zuvor erfolgreich gelesenen Puffer. Der `owner_sid`-Zeiger wird auf Null geprüft. `acl_buf` ist ausreichend groß dimensioniert für ACL + ACCESS_ALLOWED_ACE + sid_len. `path_wide` ist nullterminiert.
+    // SAFETY: `token_user` referenziert den von `get_process_owner_sid_buffer` validierten Puffer,
+    // der mindestens die Größe einer `TOKEN_USER`-Struktur besitzt. `owner_sid` wird vor der
+    // Verwendung explizit gegen `null` geprüft. Die Größe `acl_size` wird exakt als Summe aus
+    // `ACL`, `ACCESS_ALLOWED_ACE` und `sid_len` berechnet, sodass `acl_buf` ausreichend Kapazität
+    // für den ACE-Eintrag besitzt. `path_wide` ist ein zusammenhängender, nullterminierter UTF-16-Puffer.
     unsafe {
         let owner_sid = (*token_user).User.Sid;
         if owner_sid.is_null() {
@@ -298,7 +310,9 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     let mut p_sec_desc: PSECURITY_DESCRIPTOR = null_mut();
     let mut p_dacl: *mut ACL = null_mut();
 
-    // SAFETY: `path_wide` ist ein gültiger nullterminierter UTF-16-Puffer. Die Ausgabepointer `p_dacl` und `p_sec_desc` sind gültig und werden vom Win32-Subsystem befüllt.
+    // SAFETY: `path_wide` ist ein gültiger, nullterminierter UTF-16-String auf dem Heap.
+    // `&mut p_dacl` und `&mut p_sec_desc` sind gültige Zeiger auf Stack-Variablen, die von
+    // `GetNamedSecurityInfoW` bei Erfolg mit Zeigern auf die allokierten Sicherheitsstrukturen befüllt werden.
     unsafe {
         let status = GetNamedSecurityInfoW(
             path_wide.as_ptr() as *mut _,
@@ -324,7 +338,9 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     impl Drop for SecDescGuard {
         fn drop(&mut self) {
             if !self.0.is_null() {
-                // SAFETY: `self.0` ist ein gültiger Zeiger auf einen Windows-Sicherheitsdeskriptor, der von `GetNamedSecurityInfoW` stammt.
+                // SAFETY: `self.0` ist ein gültiger, nicht-nuller Zeiger auf einen Windows-Sicherheitsdeskriptor,
+                // der von `GetNamedSecurityInfoW` allokiert wurde und laut Win32-Spezifikation mittels `LocalFree`
+                // freigegeben werden muss.
                 unsafe {
                     windows_sys::Win32::Foundation::LocalFree(self.0 as _);
                 }
@@ -343,7 +359,10 @@ pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
     let (_token_guard, buffer) = get_process_owner_sid_buffer()?;
     let token_user = buffer.as_ptr() as *const TOKEN_USER;
 
-    // SAFETY: `p_sec_desc` und `p_dacl` wurden von `GetNamedSecurityInfoW` erfolgreich initialisiert und auf Nicht-Null geprüft. `GetAce` liest den ersten Eintrag (Index 0). `EqualSid` vergleicht zwei gültige SID-Zeiger.
+    // SAFETY: `p_sec_desc` und `p_dacl` stammen aus dem erfolgreichen `GetNamedSecurityInfoW`-Aufruf
+    // und wurden vorab auf Ungleich-Null geprüft. `GetAce` greift mit Index `0` nur dann zu, wenn
+    // `AceCount == 1` bereits verifiziert wurde. `EqualSid` vergleicht die beiden gültigen SIDs
+    // ohne Speicherüberläufe.
     unsafe {
         let mut control: SECURITY_DESCRIPTOR_CONTROL = 0;
         let mut revision = 0u32;
