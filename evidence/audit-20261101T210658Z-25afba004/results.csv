@@ -124,35 +124,35 @@ nr,gruppe,schritt,status,rc,sekunden,detail,log,befehl,hinweis
 122,4-bench,bench__contextra-vector__sq8_bench,PASS,0,58.3,4 Messpunkte,logs/122_bench__contextra-vector__sq8_bench.log,cargo bench -p contextra-vector --bench sq8_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
 123,4-bench,bench__contextra-vector__hnsw_bench,PASS,0,38.7,3 Messpunkte,logs/123_bench__contextra-vector__hnsw_bench.log,cargo bench -p contextra-vector --bench hnsw_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
 124,4-bench,bench__contextra-vector__hnsw_delete_search_bench,PASS,0,28.8,2 Messpunkte,logs/124_bench__contextra-vector__hnsw_delete_search_bench.log,cargo bench -p contextra-vector --bench hnsw_delete_search_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-125,4-bench,bench__contextra-vector__audit_benchmarks,PENDING,,0.0,,,cargo bench -p contextra-vector --bench audit_benchmarks --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-126,4-bench,bench__contextra-vector__flush_threshold_amplification,PENDING,,0.0,,,cargo bench -p contextra-vector --bench flush_threshold_amplification --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-127,4-bench,bench__contextra-vector__partial_rebuild_recall_bench,PENDING,,0.0,,,cargo bench -p contextra-vector --bench partial_rebuild_recall_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-128,4-bench,bench__contextra-vector__distance_nan_impact_bench,PENDING,,0.0,,,cargo bench -p contextra-vector --bench distance_nan_impact_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-129,4-bench,bench__contextra-vector__filtered_search_selectivity_bench,PENDING,,0.0,,,cargo bench -p contextra-vector --bench filtered_search_selectivity_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-130,4-bench,bench__contextra-store__sstable_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench sstable_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-131,4-bench,bench__contextra-store__memtable_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench memtable_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-132,4-bench,bench__contextra-store__wal_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench wal_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-133,4-bench,bench__contextra-store__lsm_concurrency_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench lsm_concurrency_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-134,4-bench,bench__contextra-store__block_cache_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench block_cache_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-135,4-bench,bench__contextra-store__redb_comparative_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench redb_comparative_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-136,4-bench,bench__contextra-simd__simd_bench,PENDING,,0.0,,,cargo bench -p contextra-simd --bench simd_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
-137,5-tief,fuzz__text__fuzz_bm25_tokenize,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_bm25_tokenize -- -max_total_time=120,
-138,5-tief,fuzz__text__fuzz_tokenizer_smoke,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_tokenizer_smoke -- -max_total_time=120,
-139,5-tief,fuzz__crypto__wal_hmac_chain_verify_fuzz,PENDING,,0.0,,,cargo +nightly fuzz run wal_hmac_chain_verify_fuzz -- -max_total_time=120,
-140,5-tief,fuzz__vector__fuzz_hnsw_persistence,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_hnsw_persistence -- -max_total_time=120,
-141,5-tief,fuzz__vector__hnsw_insert_search,PENDING,,0.0,,,cargo +nightly fuzz run hnsw_insert_search -- -max_total_time=120,
-142,5-tief,fuzz__store__fuzz_compaction_interleave,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_compaction_interleave -- -max_total_time=120,
-143,5-tief,fuzz__store__fuzz_manifest_load,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_manifest_load -- -max_total_time=120,
-144,5-tief,fuzz__store__fuzz_memtable_concurrent,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_memtable_concurrent -- -max_total_time=120,
-145,5-tief,fuzz__store__fuzz_recovery_arbitrary_state,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_recovery_arbitrary_state -- -max_total_time=120,
-146,5-tief,fuzz__store__fuzz_sstable_binary_search,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_sstable_binary_search -- -max_total_time=120,
-147,5-tief,fuzz__store__fuzz_wal_replay,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_wal_replay -- -max_total_time=120,
-148,5-tief,fuzz__store__wal_mutation_chaos,PENDING,,0.0,,,cargo +nightly fuzz run wal_mutation_chaos -- -max_total_time=120,
-149,5-tief,fuzz__store__wal_roundtrip,PENDING,,0.0,,,cargo +nightly fuzz run wal_roundtrip -- -max_total_time=120,
-150,5-tief,mutation_tier0_1,PENDING,,0.0,,,cargo mutants --config .cargo/mutants.toml --timeout 120,
-151,5-tief,loom_mvcc,PENDING,,0.0,,,cargo test -p contextra-mvcc --release --locked,
-152,5-tief,miri_vector_scalar,PENDING,,0.0,,,cargo +nightly miri test -p contextra-vector --lib,
-153,5-tief,asan_vector,PENDING,,0.0,,,cargo +nightly test -p contextra-vector --target x86_64-unknown-linux-gnu,
+125,4-bench,bench__contextra-vector__audit_benchmarks,PASS,0,170.9,keine Criterion-Zeilen erkannt,logs/125_bench__contextra-vector__audit_benchmarks.log,cargo bench -p contextra-vector --bench audit_benchmarks --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+126,4-bench,bench__contextra-vector__flush_threshold_amplification,PASS,0,0.4,keine Criterion-Zeilen erkannt,logs/126_bench__contextra-vector__flush_threshold_amplification.log,cargo bench -p contextra-vector --bench flush_threshold_amplification --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+127,4-bench,bench__contextra-vector__partial_rebuild_recall_bench,FAIL,101,0.3,keine Criterion-Zeilen erkannt,logs/127_bench__contextra-vector__partial_rebuild_recall_bench.log,cargo bench -p contextra-vector --bench partial_rebuild_recall_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+128,4-bench,bench__contextra-vector__distance_nan_impact_bench,PASS,0,26.1,2 Messpunkte,logs/128_bench__contextra-vector__distance_nan_impact_bench.log,cargo bench -p contextra-vector --bench distance_nan_impact_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+129,4-bench,bench__contextra-vector__filtered_search_selectivity_bench,FAIL,101,0.5,keine Criterion-Zeilen erkannt,logs/129_bench__contextra-vector__filtered_search_selectivity_bench.log,cargo bench -p contextra-vector --bench filtered_search_selectivity_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+130,4-bench,bench__contextra-store__sstable_bench,PASS,0,26.7,2 Messpunkte,logs/130_bench__contextra-store__sstable_bench.log,cargo bench -p contextra-store --bench sstable_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+131,4-bench,bench__contextra-store__memtable_bench,PASS,0,30.3,2 Messpunkte,logs/131_bench__contextra-store__memtable_bench.log,cargo bench -p contextra-store --bench memtable_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+132,4-bench,bench__contextra-store__wal_bench,PASS,0,220.0,15 Messpunkte,logs/132_bench__contextra-store__wal_bench.log,cargo bench -p contextra-store --bench wal_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+133,4-bench,bench__contextra-store__lsm_concurrency_bench,PASS,0,953.4,5 Messpunkte,logs/133_bench__contextra-store__lsm_concurrency_bench.log,cargo bench -p contextra-store --bench lsm_concurrency_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+134,4-bench,bench__contextra-store__block_cache_bench,PASS,0,39.0,3 Messpunkte,logs/134_bench__contextra-store__block_cache_bench.log,cargo bench -p contextra-store --bench block_cache_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+135,4-bench,bench__contextra-store__redb_comparative_bench,PASS,0,294.6,8 Messpunkte,logs/135_bench__contextra-store__redb_comparative_bench.log,cargo bench -p contextra-store --bench redb_comparative_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+136,4-bench,bench__contextra-simd__simd_bench,PASS,0,121.3,9 Messpunkte,logs/136_bench__contextra-simd__simd_bench.log,cargo bench -p contextra-simd --bench simd_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+137,5-tief,fuzz__text__fuzz_bm25_tokenize,FAIL,1,0.4,,logs/137_fuzz__text__fuzz_bm25_tokenize.log,cargo +nightly fuzz run fuzz_bm25_tokenize -- -max_total_time=120,
+138,5-tief,fuzz__text__fuzz_tokenizer_smoke,FAIL,1,0.2,,logs/138_fuzz__text__fuzz_tokenizer_smoke.log,cargo +nightly fuzz run fuzz_tokenizer_smoke -- -max_total_time=120,
+139,5-tief,fuzz__crypto__wal_hmac_chain_verify_fuzz,FAIL,1,0.2,,logs/139_fuzz__crypto__wal_hmac_chain_verify_fuzz.log,cargo +nightly fuzz run wal_hmac_chain_verify_fuzz -- -max_total_time=120,
+140,5-tief,fuzz__vector__fuzz_hnsw_persistence,FAIL,1,0.2,,logs/140_fuzz__vector__fuzz_hnsw_persistence.log,cargo +nightly fuzz run fuzz_hnsw_persistence -- -max_total_time=120,
+141,5-tief,fuzz__vector__hnsw_insert_search,FAIL,1,0.2,,logs/141_fuzz__vector__hnsw_insert_search.log,cargo +nightly fuzz run hnsw_insert_search -- -max_total_time=120,
+142,5-tief,fuzz__store__fuzz_compaction_interleave,FAIL,1,0.2,,logs/142_fuzz__store__fuzz_compaction_interleave.log,cargo +nightly fuzz run fuzz_compaction_interleave -- -max_total_time=120,
+143,5-tief,fuzz__store__fuzz_manifest_load,FAIL,1,0.2,,logs/143_fuzz__store__fuzz_manifest_load.log,cargo +nightly fuzz run fuzz_manifest_load -- -max_total_time=120,
+144,5-tief,fuzz__store__fuzz_memtable_concurrent,FAIL,1,0.2,,logs/144_fuzz__store__fuzz_memtable_concurrent.log,cargo +nightly fuzz run fuzz_memtable_concurrent -- -max_total_time=120,
+145,5-tief,fuzz__store__fuzz_recovery_arbitrary_state,FAIL,1,0.2,,logs/145_fuzz__store__fuzz_recovery_arbitrary_state.log,cargo +nightly fuzz run fuzz_recovery_arbitrary_state -- -max_total_time=120,
+146,5-tief,fuzz__store__fuzz_sstable_binary_search,FAIL,1,0.2,,logs/146_fuzz__store__fuzz_sstable_binary_search.log,cargo +nightly fuzz run fuzz_sstable_binary_search -- -max_total_time=120,
+147,5-tief,fuzz__store__fuzz_wal_replay,FAIL,1,0.2,,logs/147_fuzz__store__fuzz_wal_replay.log,cargo +nightly fuzz run fuzz_wal_replay -- -max_total_time=120,
+148,5-tief,fuzz__store__wal_mutation_chaos,FAIL,1,0.2,,logs/148_fuzz__store__wal_mutation_chaos.log,cargo +nightly fuzz run wal_mutation_chaos -- -max_total_time=120,
+149,5-tief,fuzz__store__wal_roundtrip,FAIL,1,0.2,,logs/149_fuzz__store__wal_roundtrip.log,cargo +nightly fuzz run wal_roundtrip -- -max_total_time=120,
+150,5-tief,mutation_tier0_1,FAIL,1,110.9,,logs/150_mutation_tier0_1.log,cargo mutants --config .cargo/mutants.toml --timeout 120,
+151,5-tief,loom_mvcc,FAIL,101,1.3,,logs/151_loom_mvcc.log,cargo test -p contextra-mvcc --release --locked,
+152,5-tief,miri_vector_scalar,FAIL,1,6.7,,logs/152_miri_vector_scalar.log,cargo +nightly miri test -p contextra-vector --lib,
+153,5-tief,asan_vector,FAIL,101,10.4,,logs/153_asan_vector.log,cargo +nightly test -p contextra-vector --target x86_64-unknown-linux-gnu,
 154,5-tief,coverage,PENDING,,0.0,,,cargo llvm-cov --workspace --locked --json --output-path /home/freddy/Projekte/contextra/evidence/audit-20261101T210658Z-25afba004/coverage.json,
 155,S-spec,spec_gates_statisch,PENDING,,0.0,,,,"Messung der Spezifikations-Gates (Ring, Sicherheit, Rueckbau, Tests, Groesse)"
 156,6-spec,spec_budgets_mutation,PENDING,,0.0,,,,"Laufzeit-Budgets, Regression, Mutation (liest target/criterion, mutants.out)"

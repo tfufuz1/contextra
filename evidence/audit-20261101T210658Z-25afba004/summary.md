@@ -1,17 +1,17 @@
 # Contextra Voll-Audit
 
 - Commit: `25afba004` (2026-11-01 22:06:33 +0100), Branch `main`, hinter origin: 0, ungespeicherte Aenderungen: False
-- Start: 2026-11-01T21:06:58+00:00  Dauer: 35.1 min
+- Start: 2026-11-01T21:06:58+00:00  Dauer: 68.7 min
 - Toolchain-Pin: `1.89.0`; Preflight: **PASS** (cargo 1.89.0 (c24e10642 2025-06-23) | Pin 1.89.0)
 - Host: Linux-7.2.7-1-liquorix-amd64-x86_64-with-glibc2.41 | 8 CPUs | MemTotal:       10121020 kB
 - Nutzer: freddy
 
 ## Gesamt
 
-- **FAIL**: 59
+- **FAIL**: 78
 - **INFO**: 6
-- **PASS**: 60
-- **PENDING**: 32
+- **PASS**: 70
+- **PENDING**: 3
 
 Hinweis: Bei `befund_*`-Schritten bedeutet FAIL, dass der Befund **vorliegt**. `INFO` ist eine Messung oder ein Hinweis ohne Urteil.
 
@@ -78,6 +78,25 @@ Hinweis: Bei `befund_*`-Schritten bedeutet FAIL, dass der Befund **vorliegt**. `
 | `test_gesamt_release` | FAIL | 46.2 | passed=0 failed=0 ignored=0 | COMPILE-FEHLER | `logs/117_test_gesamt_release.log` |
 | `bench__contextra-crypto__crypto_benchmarks` | FAIL | 0.7 | keine Criterion-Zeilen erkannt | `logs/119_bench__contextra-crypto__crypto_benchmarks.log` |
 | `bench__contextra-crypto__deletion_proof_latency_bench` | FAIL | 0.3 | keine Criterion-Zeilen erkannt | `logs/120_bench__contextra-crypto__deletion_proof_latency_bench.log` |
+| `bench__contextra-vector__partial_rebuild_recall_bench` | FAIL | 0.3 | keine Criterion-Zeilen erkannt | `logs/127_bench__contextra-vector__partial_rebuild_recall_bench.log` |
+| `bench__contextra-vector__filtered_search_selectivity_bench` | FAIL | 0.5 | keine Criterion-Zeilen erkannt | `logs/129_bench__contextra-vector__filtered_search_selectivity_bench.log` |
+| `fuzz__text__fuzz_bm25_tokenize` | FAIL | 0.4 |  | `logs/137_fuzz__text__fuzz_bm25_tokenize.log` |
+| `fuzz__text__fuzz_tokenizer_smoke` | FAIL | 0.2 |  | `logs/138_fuzz__text__fuzz_tokenizer_smoke.log` |
+| `fuzz__crypto__wal_hmac_chain_verify_fuzz` | FAIL | 0.2 |  | `logs/139_fuzz__crypto__wal_hmac_chain_verify_fuzz.log` |
+| `fuzz__vector__fuzz_hnsw_persistence` | FAIL | 0.2 |  | `logs/140_fuzz__vector__fuzz_hnsw_persistence.log` |
+| `fuzz__vector__hnsw_insert_search` | FAIL | 0.2 |  | `logs/141_fuzz__vector__hnsw_insert_search.log` |
+| `fuzz__store__fuzz_compaction_interleave` | FAIL | 0.2 |  | `logs/142_fuzz__store__fuzz_compaction_interleave.log` |
+| `fuzz__store__fuzz_manifest_load` | FAIL | 0.2 |  | `logs/143_fuzz__store__fuzz_manifest_load.log` |
+| `fuzz__store__fuzz_memtable_concurrent` | FAIL | 0.2 |  | `logs/144_fuzz__store__fuzz_memtable_concurrent.log` |
+| `fuzz__store__fuzz_recovery_arbitrary_state` | FAIL | 0.2 |  | `logs/145_fuzz__store__fuzz_recovery_arbitrary_state.log` |
+| `fuzz__store__fuzz_sstable_binary_search` | FAIL | 0.2 |  | `logs/146_fuzz__store__fuzz_sstable_binary_search.log` |
+| `fuzz__store__fuzz_wal_replay` | FAIL | 0.2 |  | `logs/147_fuzz__store__fuzz_wal_replay.log` |
+| `fuzz__store__wal_mutation_chaos` | FAIL | 0.2 |  | `logs/148_fuzz__store__wal_mutation_chaos.log` |
+| `fuzz__store__wal_roundtrip` | FAIL | 0.2 |  | `logs/149_fuzz__store__wal_roundtrip.log` |
+| `mutation_tier0_1` | FAIL | 110.9 |  | `logs/150_mutation_tier0_1.log` |
+| `loom_mvcc` | FAIL | 1.3 |  | `logs/151_loom_mvcc.log` |
+| `miri_vector_scalar` | FAIL | 6.7 |  | `logs/152_miri_vector_scalar.log` |
+| `asan_vector` | FAIL | 10.4 |  | `logs/153_asan_vector.log` |
 
 ## Alle Schritte
 
@@ -208,35 +227,35 @@ Hinweis: Bei `befund_*`-Schritten bedeutet FAIL, dass der Befund **vorliegt**. `
 | 4-bench | `bench__contextra-vector__sq8_bench` | PASS | 58.3 | 4 Messpunkte |
 | 4-bench | `bench__contextra-vector__hnsw_bench` | PASS | 38.7 | 3 Messpunkte |
 | 4-bench | `bench__contextra-vector__hnsw_delete_search_bench` | PASS | 28.8 | 2 Messpunkte |
-| 4-bench | `bench__contextra-vector__audit_benchmarks` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-vector__flush_threshold_amplification` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-vector__partial_rebuild_recall_bench` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-vector__distance_nan_impact_bench` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-vector__filtered_search_selectivity_bench` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-store__sstable_bench` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-store__memtable_bench` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-store__wal_bench` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-store__lsm_concurrency_bench` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-store__block_cache_bench` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-store__redb_comparative_bench` | PENDING | 0.0 |  |
-| 4-bench | `bench__contextra-simd__simd_bench` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__text__fuzz_bm25_tokenize` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__text__fuzz_tokenizer_smoke` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__crypto__wal_hmac_chain_verify_fuzz` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__vector__fuzz_hnsw_persistence` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__vector__hnsw_insert_search` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__store__fuzz_compaction_interleave` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__store__fuzz_manifest_load` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__store__fuzz_memtable_concurrent` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__store__fuzz_recovery_arbitrary_state` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__store__fuzz_sstable_binary_search` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__store__fuzz_wal_replay` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__store__wal_mutation_chaos` | PENDING | 0.0 |  |
-| 5-tief | `fuzz__store__wal_roundtrip` | PENDING | 0.0 |  |
-| 5-tief | `mutation_tier0_1` | PENDING | 0.0 |  |
-| 5-tief | `loom_mvcc` | PENDING | 0.0 |  |
-| 5-tief | `miri_vector_scalar` | PENDING | 0.0 |  |
-| 5-tief | `asan_vector` | PENDING | 0.0 |  |
+| 4-bench | `bench__contextra-vector__audit_benchmarks` | PASS | 170.9 | keine Criterion-Zeilen erkannt |
+| 4-bench | `bench__contextra-vector__flush_threshold_amplification` | PASS | 0.4 | keine Criterion-Zeilen erkannt |
+| 4-bench | `bench__contextra-vector__partial_rebuild_recall_bench` | FAIL | 0.3 | keine Criterion-Zeilen erkannt |
+| 4-bench | `bench__contextra-vector__distance_nan_impact_bench` | PASS | 26.1 | 2 Messpunkte |
+| 4-bench | `bench__contextra-vector__filtered_search_selectivity_bench` | FAIL | 0.5 | keine Criterion-Zeilen erkannt |
+| 4-bench | `bench__contextra-store__sstable_bench` | PASS | 26.7 | 2 Messpunkte |
+| 4-bench | `bench__contextra-store__memtable_bench` | PASS | 30.3 | 2 Messpunkte |
+| 4-bench | `bench__contextra-store__wal_bench` | PASS | 220.0 | 15 Messpunkte |
+| 4-bench | `bench__contextra-store__lsm_concurrency_bench` | PASS | 953.4 | 5 Messpunkte |
+| 4-bench | `bench__contextra-store__block_cache_bench` | PASS | 39.0 | 3 Messpunkte |
+| 4-bench | `bench__contextra-store__redb_comparative_bench` | PASS | 294.6 | 8 Messpunkte |
+| 4-bench | `bench__contextra-simd__simd_bench` | PASS | 121.3 | 9 Messpunkte |
+| 5-tief | `fuzz__text__fuzz_bm25_tokenize` | FAIL | 0.4 |  |
+| 5-tief | `fuzz__text__fuzz_tokenizer_smoke` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__crypto__wal_hmac_chain_verify_fuzz` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__vector__fuzz_hnsw_persistence` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__vector__hnsw_insert_search` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__store__fuzz_compaction_interleave` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__store__fuzz_manifest_load` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__store__fuzz_memtable_concurrent` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__store__fuzz_recovery_arbitrary_state` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__store__fuzz_sstable_binary_search` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__store__fuzz_wal_replay` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__store__wal_mutation_chaos` | FAIL | 0.2 |  |
+| 5-tief | `fuzz__store__wal_roundtrip` | FAIL | 0.2 |  |
+| 5-tief | `mutation_tier0_1` | FAIL | 110.9 |  |
+| 5-tief | `loom_mvcc` | FAIL | 1.3 |  |
+| 5-tief | `miri_vector_scalar` | FAIL | 6.7 |  |
+| 5-tief | `asan_vector` | FAIL | 10.4 |  |
 | 5-tief | `coverage` | PENDING | 0.0 |  |
 | S-spec | `spec_gates_statisch` | PENDING | 0.0 |  |
 | 6-spec | `spec_budgets_mutation` | PENDING | 0.0 |  |
