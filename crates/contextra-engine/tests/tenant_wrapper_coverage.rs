@@ -230,10 +230,8 @@ async fn test_tenant_scoped_storage_full_coverage() -> contextra_types::Result<(
         "Tenant B doc_b_1 must remain unaffected by Tenant A single document delete"
     );
 
-    let proof_a = db
-        .drop_collection("shared_col", tenant_a, b"secret_proof_key_32bytes_1234567")
+    db.drop_collection("shared_col", tenant_a, b"secret_proof_key_32bytes_1234567")
         .await?;
-    assert_eq!(proof_a.tenant_id(), tenant_a);
 
     // Assert Tenant B collection remains fully intact
     let doc_b1_after_drop = col_b.get("doc_b_1").await?;

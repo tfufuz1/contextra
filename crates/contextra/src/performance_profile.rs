@@ -145,19 +145,11 @@ mod tests {
 
     impl LicenseGate for MockLicenseGate {
         fn check_ring(&self, ring: FeatureRing) -> Result<(), LicenseError> {
-            if ring <= self.allowed_ring {
+            if ring == FeatureRing::Fast || ring == self.allowed_ring {
                 Ok(())
             } else {
-                Err(LicenseError::InsufficientRing)
+                Err(LicenseError::NotActivated(ring))
             }
-        }
-
-        fn authorize(
-            &self,
-            ring: FeatureRing,
-        ) -> Result<contextra_ports::license::GateToken, LicenseError> {
-            self.check_ring(ring)?;
-            Ok(contextra_ports::license::GateToken::for_test(ring))
         }
     }
 
@@ -223,7 +215,7 @@ mod tests {
             res,
             Err(PerformanceProfileError::LicenseRequired(
                 FeatureRing::Sovereign,
-                LicenseError::InsufficientRing
+                LicenseError::NotActivated(FeatureRing::Sovereign)
             ))
         ));
     }
@@ -260,7 +252,7 @@ mod tests {
 
         let lic_err = PerformanceProfileError::LicenseRequired(
             FeatureRing::Sovereign,
-            LicenseError::InsufficientRing,
+            LicenseError::NotActivated(FeatureRing::Sovereign),
         );
         assert!(lic_err.to_string().contains("requires a valid license"));
     }

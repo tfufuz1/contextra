@@ -44,8 +44,6 @@
 pub mod anti_tamper;
 pub mod audit_chain;
 pub mod crypto;
-pub mod deletion_proof;
-pub mod ed25519_proof;
 pub mod error;
 pub mod kdf;
 pub mod wal_completeness;
@@ -57,11 +55,6 @@ pub use audit_chain::{
 };
 pub use crypto::KeyManager as CryptoKey;
 pub use crypto::KeyManager;
-pub use deletion_proof::{
-    CustodyLevel, DeletionLayer, DeletionProof, DeletionProofKeyPair, DeletionScope, ExcludedScope,
-    LayerCleanupProof, SigningKeyHandle,
-};
-pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
 pub use wal_completeness::verify_wal_chain_completeness;

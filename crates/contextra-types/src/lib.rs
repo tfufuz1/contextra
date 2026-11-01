@@ -55,10 +55,6 @@ pub mod tombstone;
 // ANCHOR[contextra-types:MOD-TYP]
 /// Zentrale Domänentypen, Filter, Budgets, Scoring-Funktionen und SAOS-Suchstrukturen.
 pub mod types;
-// ANCHOR[contextra-types:MOD-WIT]
-/// Audit-Trails, Zeugnisse (Witnesses) und Saga-Transaktionsaufzeichnungen.
-pub mod witness;
-
 pub use error::{ContextraError, HnswDeletionError, Result};
 pub use error_dto::ContextraErrorDto;
 pub use model_fingerprint::ModelFingerprint;
@@ -67,4 +63,3 @@ pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use tenant_scope::{TenantScopeViolation, TenantScoped};
 pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use types::*;
-pub use witness::{RequestContext, SagaRecord, ScanMethod};

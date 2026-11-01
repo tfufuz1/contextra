@@ -10,11 +10,12 @@ use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, EntityId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
-    /// Deletes a document from the collection by its ID.
+    /// Performs a logical deletion of a document from the collection by its ID.
+    ///
+    /// Hinweis: Dies ist eine rein logische Löschung; keine Schlüsselvernichtung und keine Index-Bereinigung.
     #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn delete(&self, id: &str) -> Result<()> {
+    pub async fn logical_delete(&self, id: &str) -> Result<()> {
         let _guard = self.kv_locks.lock_for(id).await;
-        drop(_guard);
         let mut db_tx = self.begin_transaction()?;
 
         match self.delete_op(&mut db_tx, id).await {
@@ -30,6 +31,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 Err(e)
             }
         }
+    }
+
+    /// Alias for `logical_delete` for backward compatibility.
+    #[inline]
+    pub async fn delete(&self, id: &str) -> Result<()> {
+        self.logical_delete(id).await
     }
 
     // ANCHOR[contextra-engine:COL-DEL-035]

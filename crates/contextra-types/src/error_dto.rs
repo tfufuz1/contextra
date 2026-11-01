@@ -375,6 +375,11 @@ impl From<&ContextraError> for ContextraErrorDto {
                     "target_path": target_path,
                 })),
             },
+            ContextraError::Unsupported(msg) => Self {
+                kind: "Unsupported".to_string(),
+                message: err.to_string(),
+                details: Some(serde_json::json!({ "reason": msg })),
+            },
         }
     }
 }

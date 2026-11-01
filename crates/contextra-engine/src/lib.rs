@@ -12,9 +12,6 @@
 
 #![forbid(unsafe_code)]
 
-pub use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope,
-};
 use contextra_ports::license::LicenseGate;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
@@ -373,14 +370,7 @@ pub struct Contextra {
         Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
     >,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
-    proof_key_provider:
-        parking_lot::RwLock<Option<Arc<dyn contextra_impl::erasure::ProofKeyProvider>>>,
 }
-
-pub use contextra_impl::erasure::{
-    summary_from_witness, ErasureFailure, ErasureReport, LayerSummary, ProofKeyProvider,
-    UNMEASURED_ERASURE_LAYERS,
-};
 
 #[cfg(not(loom))]
 mod contextra_impl;

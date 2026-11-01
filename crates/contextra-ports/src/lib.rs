@@ -61,8 +61,6 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
-/// Storage layer scanners and purgers (Vertrag V1, SPEC §12.7.4).
-pub mod scanner;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
@@ -89,10 +87,6 @@ pub use plugin::*;
 pub use query_rewriter::*;
 pub use reranker::*;
 pub use rng::*;
-pub use scanner::{
-    LayerScanner, LayerWitness, PurgeStats, Purger, ScanSession, ScanTarget, ScanTechnique,
-    WitnessLayer,
-};
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;

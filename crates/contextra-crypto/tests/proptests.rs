@@ -9,8 +9,7 @@
 // STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
 
 use contextra_crypto::wal_crypto::{EncryptedWal, IntegrityVerifier, WalEntrySnapshot, WalHmac};
-use contextra_crypto::{CryptoKey, KvSegmentCipher, ModelFingerprint};
-use contextra_types::TenantId;
+use contextra_crypto::CryptoKey;
 use proptest::prelude::*;
 
 proptest! {

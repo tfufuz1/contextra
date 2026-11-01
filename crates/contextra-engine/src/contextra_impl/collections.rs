@@ -290,49 +290,44 @@ impl Contextra {
         Ok(sorted_names)
     }
 
-    // ANCHOR[contextra-engine:DRO-288]
-    /// Dokumentation für `drop_collection` im Rahmen der Transaktions- und Facade-Orchestrierung.
-    #[tracing::instrument(level = "trace", skip(self, proof_key))]
+    /// Performs a logical drop of a collection.
+    ///
+    /// Hinweis: Dies ist eine rein logische Löschung; keine Schlüsselvernichtung und keine Index-Bereinigung.
+    #[tracing::instrument(level = "trace", skip(self, _proof_key))]
+    pub async fn logical_drop_collection(
+        &self,
+        name: &str,
+        tenant_id: TenantId,
+        _proof_key: &[u8],
+    ) -> Result<()> {
+        let col = self.collection_for_tenant(name, tenant_id).await?;
+        col.logical_drop_collection().await?;
+        let mut tenant_cols = self.tenant_collections.write().await;
+        tenant_cols.remove(&(tenant_id, name.to_string()));
+        let mut collections = self.collections.write().await;
+        collections.remove(name);
+        Ok(())
+    }
+
+    /// Drop a collection logically.
+    #[inline]
     pub async fn drop_collection(
         &self,
         name: &str,
         tenant_id: TenantId,
         proof_key: &[u8],
-    ) -> Result<DeletionProof> {
-        struct InlineKeyProvider(Vec<u8>);
-        impl contextra_impl::erasure::ProofKeyProvider for InlineKeyProvider {
-            fn resolve_proof_key(&self, _tenant_id: TenantId) -> Result<Vec<u8>> {
-                Ok(self.0.clone())
-            }
-        }
+    ) -> Result<()> {
+        self.logical_drop_collection(name, tenant_id, proof_key).await
+    }
 
-        let provider = Arc::new(InlineKeyProvider(proof_key.to_vec()));
-        let mut old_provider = self.proof_key_provider.write();
-        let prev = old_provider.take();
-        *old_provider = Some(provider);
-        drop(old_provider);
-
-        let report = self.erase_collection(tenant_id, name).await;
-
-        if let Some(p) = prev {
-            *self.proof_key_provider.write() = Some(p);
-        }
-
-        let report = report?;
-        if report.verified {
-            report.proof.ok_or_else(|| {
-                contextra_types::ContextraError::Internal(
-                    "ErasureReport was verified but contained no DeletionProof".to_string(),
-                )
-            })
-        } else {
-            let reason = report
-                .failure
-                .map(|f| format!("{}: {}", f.layer, f.reason))
-                .unwrap_or_else(|| "Unknown erasure failure".to_string());
-            Err(contextra_types::ContextraError::Internal(format!(
-                "Collection deletion verification failed: {reason}"
-            )))
-        }
+    /// Public erase stub: returns `ContextraError::Unsupported`.
+    pub async fn erase_collection(
+        &self,
+        _tenant_id: TenantId,
+        _name: &str,
+    ) -> Result<()> {
+        Err(contextra_types::ContextraError::Unsupported(
+            "Cryptographic erasure chain has been removed. Use logical_delete or logical_drop_collection.".to_string(),
+        ))
     }
 }

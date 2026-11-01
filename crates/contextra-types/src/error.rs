@@ -371,6 +371,10 @@ pub enum ContextraError {
         /// Path of target file.
         target_path: String,
     },
+
+    /// Operation or API is unsupported.
+    #[error("Unsupported operation: {0}")]
+    Unsupported(String),
 }
 
 impl ContextraError {

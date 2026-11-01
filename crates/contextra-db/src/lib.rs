@@ -48,7 +48,7 @@ pub mod prelude {
         HybridQueryBuilder, Language, ProvenanceRecord, SearchResult, SearchStrategy,
         SignalContribution, SignalWeights,
     };
-    pub use contextra_types::{DistanceMetric, DocId, RequestContext, TenantId, TxId};
+    pub use contextra_types::{DistanceMetric, DocId, TenantId, TxId};
 
     pub use crate::multistep::{MultiStepConfig, MultiStepEngine, MultiStepResult, QueryRewriter};
 
@@ -96,8 +96,6 @@ pub mod advanced {
 
     #[cfg(feature = "graph-connectivity-health")]
     pub use contextra_engine::collection::maintenance::PercolationResult;
-    #[cfg(feature = "sandbox")]
-    pub use contextra_engine::SandboxBridge;
 }
 
 // Abwärtskompatible Re-Exports auf Root-Ebene (bestehender Code kompiliert nahtlos weiter)
@@ -777,49 +775,6 @@ mod tests {
                 cache_dir: None,
             }
         );
-    }
-
-    // Prüft ONNX-Embedding-Integration End-to-End mit Modell-Fixtures.
-    #[tokio::test]
-    #[cfg(feature = "onnx")]
-    async fn test_onnx_default_backend_e2e_with_fixture() {
-        let tmp = TempDir::new().expect("temp dir");
-        let cache_tmp = TempDir::new().expect("cache temp dir");
-        let model_dir = cache_tmp.path().join("nomic-embed-text");
-        std::fs::create_dir_all(&model_dir).expect("create model dir");
-
-        let fixture_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join("contextra-embed")
-            .join("tests")
-            .join("fixtures");
-
-        std::fs::copy(fixture_dir.join("model.onnx"), model_dir.join("model.onnx"))
-            .expect("copy model");
-        std::fs::copy(
-            fixture_dir.join("tokenizer.json"),
-            model_dir.join("tokenizer.json"),
-        )
-        .expect("copy tokenizer");
-
-        let config = ContextraConfig {
-            dimension: 32, // Fixture BERT model output dim is 32
-            embedding_backend: EmbeddingBackend::Onnx {
-                model_name: "nomic-embed-text".to_string(),
-                cache_dir: Some(cache_tmp.path().to_path_buf()),
-            },
-            ..Default::default()
-        };
-
-        let db = Contextra::open_with_config(tmp.path(), config)
-            .await
-            .expect("open_with_config");
-
-        assert!(db.embedder.read().is_some());
-        let embedder = db.embedder.read().as_ref().cloned().expect("embedder");
-        let vec = embedder.embed("test document").await.expect("embed test");
-        assert_eq!(vec.len(), 32);
     }
 
     // Prüft, dass Wiederöffnen mit abweichender Vektordimension fehlschlägt.

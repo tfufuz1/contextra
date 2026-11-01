@@ -839,9 +839,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(map)
     }
 
-    /// Removes all data belonging to this collection from storage.
+    /// Removes all data belonging to this collection from storage logically.
+    ///
+    /// Hinweis: Dies ist eine rein logische Löschung; keine Schlüsselvernichtung und keine Index-Bereinigung.
     #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn drop_collection(&self) -> Result<()> {
+    pub async fn logical_drop_collection(&self) -> Result<()> {
         let _guard = self.consolidation_guard.lock().await;
         let prefix = if self.name == "default" {
             return Err(contextra_types::ContextraError::invalid_input(
@@ -862,6 +864,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
         self.storage.commit(tx).await?;
         Ok(())
+    }
+
+    /// Alias for `logical_drop_collection` for backward compatibility.
+    #[inline]
+    pub async fn drop_collection(&self) -> Result<()> {
+        self.logical_drop_collection().await
     }
 }
 

@@ -3,7 +3,8 @@
 //! Überprüft Metadaten- und Attributfilter bei Vektor- und Hybridsuchen.
 //!
 #[allow(deprecated)]
-use contextra_db::{filter::FilterOp, Contextra, ContextraConfig, MetadataFilter};
+use contextra_db::{filter::FilterOp, Contextra, ContextraConfig};
+use contextra_engine::MetadataFilter;
 use serde_json::json;
 use tempfile::TempDir;
 

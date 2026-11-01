@@ -92,8 +92,7 @@ async fn test_tenant_drop_collection_invalidates_cache_and_clears_data(
     .await?;
 
     // 2. Drop collection for tenant
-    let proof = db.drop_collection("drop_col", tenant_1, proof_key).await?;
-    assert_eq!(proof.tenant_id(), tenant_1);
+    db.drop_collection("drop_col", tenant_1, proof_key).await?;
 
     // 3. Requesting collection again returns a fresh, empty handle
     let col2 = db.collection_for_tenant("drop_col", tenant_1).await?;

@@ -15,22 +15,18 @@ fn test_facade_type_identities() {
     _assert_same_type(facade_err, types_err);
 
     // 2. DocId
-    let facade_doc_id: contextra::DocId = contextra::DocId::from_u64(1);
-    let types_doc_id: contextra_types::DocId = contextra_types::DocId::from_u64(1);
+    let facade_doc_id: contextra::DocId = contextra::DocId::from(1);
+    let types_doc_id: contextra_types::DocId = contextra_types::DocId::from(1);
     _assert_same_type(facade_doc_id, types_doc_id);
 
     // 3. ScoredDocument
     let facade_doc = contextra::ScoredDocument {
-        id: contextra::DocId::from_u64(1),
+        doc_id: contextra::DocId::from(1),
         score: 1.0,
-        metadata: None,
-        vector: None,
     };
     let types_doc = contextra_types::ScoredDocument {
-        id: contextra_types::DocId::from_u64(1),
+        doc_id: contextra_types::DocId::from(1),
         score: 1.0,
-        metadata: None,
-        vector: None,
     };
     _assert_same_type(facade_doc, types_doc);
 
