@@ -1,9 +1,13 @@
 //! QueryRewriter port trait for Multi-Step Retrieval query expansion.
+//!
+//! # SPEC-REF
+//! Ausgelagert/deprecated gemäß SPEC §1.4 und §8.2.
 
 use crate::BoxFuture;
 use contextra_types::{QueryRewriteOutput, Result, ScoredEntry};
 
 /// Trait for query rewriting in multi-step iterative retrieval (LLM-agnostic).
+#[deprecated(since = "0.2.0", note = "Nicht im Soll-Kern v1 (SPEC §1.4 / D-24)")]
 pub trait QueryRewriter: Send + Sync {
     /// Generates alternative text sub-queries based on original query and previous search results.
     ///
@@ -26,7 +30,7 @@ pub trait QueryRewriter: Send + Sync {
         })
     }
 
-    /// Generates multi-signal query reformulations (text, semantic, and graph anchors) for multi-step retrieval.
+    /// Generates multi-signal query reformulations (text and semantic anchors) for multi-step retrieval.
     ///
     /// Default implementation delegates to `rewrite` and wraps the resulting string queries as `QueryRewriteOutput::text_only`.
     fn rewrite_structured<'a>(
