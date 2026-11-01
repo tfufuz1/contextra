@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-contextra_full_audit.py (v3) - Befund-Pruefung, Produkt-Pruefung, Tests, Lints, Gates, Benchmarks, Fuzz, Mutation.
+contextra_full_audit.py (v6, aus v4 optimiert) - Befund-Pruefung, Produkt-Pruefung, Tests, Lints, Gates, Benchmarks, Fuzz, Mutation.
 
 Aufruf im Repo-Root (dort, wo die Cargo.toml mit [workspace] liegt):
 
@@ -106,6 +106,13 @@ VERBOTEN_IM_PRODUKT = ["contextra-engine", "contextra-db", "contextra-store", "c
 K78_KNOWN = {"mmap_readonly", "reopen_and_dup2"}   # aus K7/K8 (Ausgangsbefund)
 SAFE_WRAPPER_SCOPE = "contextra-sys"          # Crate, in dem pub-fn ohne unsafe nicht unsafe-Inhalt haben duerfen
 PREFLIGHT = "toolchain_preflight"
+# Nach dem Rueckbau (Scope-Schnitt, Entscheidung E-17) geplant entfernt: fehlendes Verzeichnis ist dann
+# erwartet und kein Befund. Quelle: Umsetzungsplan 3 / Final 2.2.
+RUECKBAU_GEPLANT = {"contextra-kvcache", "contextra-agent", "contextra-router", "contextra-ingest",
+                    "contextra-privacy", "contextra-mcp", "contextra-wire", "contextra-core",
+                    "contextra-bench", "contextra-py", "contextra-sandbox", "contextra-infer-onnx",
+                    "contextra-infer-ollama", "contextra-audit-export", "contextra-avv-generator",
+                    "contextra-cognition", "contextra-adapt", "contextra-graph", "contextra-license"}
 SLOW_CRATES = {"contextra-crypto": 3600, "contextra-store": 3600, "contextra-vector": 3600,
                "contextra-graph": 3600, "contextra-engine": 3600}
 DEFAULT_TIMEOUT = 1800
@@ -164,7 +171,12 @@ class Workspace:
         ws = _toml(root / "Cargo.toml").get("workspace", {})
         self.members: dict[str, Path] = {}     # Paketname -> absolutes Verzeichnis
         self.problems: list[str] = []
+        self.fehlend: list[str] = []            # Mitglied in Cargo.toml, Verzeichnis fehlt
+        self.fehlend_default: list[str] = []    # default-member ohne Verzeichnis
         for pat in ws.get("members", []):
+            if "*" not in pat and not (root / pat).exists():
+                self.fehlend.append(pat)
+                continue
             hits = sorted(root.glob(pat)) if "*" in pat else [root / pat]
             for d in hits:
                 name = (_toml(d / "Cargo.toml").get("package") or {}).get("name")
@@ -178,6 +190,8 @@ class Workspace:
             d = (root / pat).resolve()
             if d in by_dir:
                 self.default.append(by_dir[d])
+            elif not (root / pat).exists():
+                self.fehlend_default.append(pat)
             else:
                 self.problems.append(f"default-member {pat} ist kein Workspace-Mitglied")
 
@@ -409,6 +423,8 @@ def befund_ingest_wiring(ctx: Ctx, outdir: Path):
     name = "contextra-ingest"
     d = ctx.ws.members.get(name)
     if not d:
+        if name in RUECKBAU_GEPLANT:
+            return "INFO", f"{name} entfernt (Rueckbau geplant, kein Befund)", ""
         return "FAIL", f"{name} ist kein Workspace-Mitglied", ""
     consumers = [n for n, p in ctx.ws.members.items() if n != name and name in _read(p / "Cargo.toml")]
     deps = _toml(d / "Cargo.toml").get("dependencies") or {}
@@ -429,11 +445,16 @@ def befund_ingest_wiring(ctx: Ctx, outdir: Path):
 def befund_default_members(ctx: Ctx, outdir: Path):
     ws = ctx.ws
     missing = [c for c in PRODUKT if c not in ws.members]
+    geplant = [c for c in missing if c in RUECKBAU_GEPLANT]
+    unerwartet = [c for c in missing if c not in RUECKBAU_GEPLANT]
     notdef = [c for c in PRODUKT if c in ws.members and c not in ws.default]
     detail = (f"members={len(ws.members)} default-members={len(ws.default)}; "
-              f"Produkt nicht Mitglied: {missing}; Produkt nicht in default-members: {notdef}")
-    bad = bool(missing or notdef or ws.problems)
-    return ("FAIL" if bad else "PASS"), detail, "\n".join(ws.problems)
+              f"Produkt ohne Verzeichnis (Rueckbau geplant): {len(geplant)}; "
+              f"unerwartet fehlend: {unerwartet or 'keine'}; Produkt nicht in default-members: {notdef or 'keine'}")
+    bad = bool(unerwartet or notdef or ws.problems)
+    extra = [f"Mitglieder ohne Verzeichnis ({len(ws.fehlend)}): {', '.join(ws.fehlend)}",
+             f"default-members ohne Verzeichnis ({len(ws.fehlend_default)}): {', '.join(ws.fehlend_default)}"]
+    return ("FAIL" if bad else "PASS"), detail, "\n".join(extra + ws.problems)
 
 
 def befund_adr(ctx: Ctx, outdir: Path):
@@ -803,6 +824,7 @@ def build_plan(ctx: Ctx, args, outdir: Path) -> list[Step]:
                  str(outdir / "coverage.json")], requires=["cargo-llvm-cov"], timeout=10800),
         ]
 
+    S += spec_plan_steps(ctx, args)
     if args.gruppe:
         g = args.gruppe.lower()
         S = [s for s in S if s.group.lower().startswith(g) or s.group.split("-", 1)[-1].lower().startswith(g)]
@@ -968,6 +990,7 @@ def write_reports(ctx: Ctx, steps: list[Step], outdir: Path, meta: dict, final: 
             w.writeheader()
             w.writerows(rows)
 
+    export_spec(outdir)
     counts: dict[str, int] = defaultdict(int)
     for s in steps:
         counts[s.status] += 1
@@ -1093,6 +1116,598 @@ def compare_runs(a: Path, b: Path) -> int:
 # main
 # ----------------------------------------------------------------------------------------------
 
+# ==============================================================================================
+# v4: Spezifikations-Messung (Umbauplan Contextra V1)
+#
+# Misst jede Anforderung und jedes Gate aus den Dokumenten gegen den Quellstand. Quellen:
+#   Umsetzungsplan (Abschnitte 3-9), Entscheidungsgrundlage (Abschnitte 4-8),
+#   Implementierungsspezifikation SOLL (Abschnitte 3-4, 6, 8), Produktspezifikation Final (Abschnitte 2, 5-7),
+#   Spezifikation Erasure (veraltet, nur Referenz).
+#
+# Status je Messpunkt:
+#   PASS            Ziel erreicht
+#   FAIL            Verstoss gegen Pflicht, die bereits gelten muss (Sicherheit, Ring, Panic, unsafe, Doku-Behauptung)
+#   FEHLT           Umbauschritt noch nicht erledigt (zaehlt gegen Fortschritt, nicht als Gate-Verletzung)
+#   OFFEN           Entscheidung fehlt (E-Nummer in den Dokumenten)
+#   MANUELL         Rechts- oder Sicherheitsreview, nicht maschinell messbar
+#   NICHT_GEMESSEN  Lauf fehlt (Benchmark, Mutation, Test)
+#   INFO            Messwert ohne Urteil
+# Der Lauf ist nur dann FAIL, wenn ein FAIL-Punkt existiert. FEHLT bedeutet: Arbeit offen.
+# ==============================================================================================
+
+RING = {  # Ring-Zuordnung, Umsetzungsplan Abschnitt 4 (E1 offen: Nummerierung)
+    "contextra-types": 0, "contextra-ports": 0, "contextra-sys": 0, "contextra-simd": 0, "contextra-durable-fs": 0,
+    "contextra-crypto": 1, "contextra-mvcc": 1, "contextra-text": 1, "contextra-vector": 1, "contextra-rank": 1,
+    "contextra-store": 2, "contextra-checkpoint": 2,
+    "contextra-engine": 3,
+    "contextra-db": 4, "contextra": 4,
+}
+KERN_V1 = ["contextra-types", "contextra-ports", "contextra-sys", "contextra-simd", "contextra-durable-fs",
+           "contextra-crypto", "contextra-mvcc", "contextra-store", "contextra-vector", "contextra-text",
+           "contextra-engine", "contextra-db", "contextra"]                          # Final 2.2 "Behalten"
+ENTFERNEN_V1 = ["contextra-kvcache", "contextra-agent", "contextra-router", "contextra-ingest", "contextra-privacy",
+                "contextra-mcp", "contextra-wire", "contextra-core", "contextra-bench", "contextra-py",
+                "contextra-sandbox", "contextra-infer-onnx", "contextra-infer-ollama", "contextra-audit-export",
+                "contextra-avv-generator", "contextra-cognition", "contextra-adapt"]     # Final 2.2 + E-17
+ENTKOPPELN_V1 = ["contextra-graph", "contextra-license", "contextra-checkpoint"]     # Entscheidungsgrundlage 6.2
+ERLAUBT_NICHT_DEFAULT = ["contextra-testkit"]                                        # Testinfrastruktur
+OFFEN_ENTSCHEIDUNG = {"contextra-rank": "E-16 (Final: entfernen, Entscheidungsgrundlage: auf Fusion reduzieren)"}
+RING_EXTERN = {"contextra-graph", "contextra-license", "contextra-testkit"}           # nur ueber Ports / optional
+
+SPEC_GROESSE = {  # Dokumentwerte (Dateien, Zeilen), Umsetzungsplan 2 bzw. Entscheidungsgrundlage
+    "store": (210, 50132), "graph": (121, 30689), "engine": (117, 28074), "vector": (97, 23858),
+    "db": (57, 13666), "cognition": (30, 10280), "mvcc": (21, 6295), "durable-fs": (14, 2689),
+    "ports": (24, 4310), "testkit": (21, 4803), "text": (45, 13279), "checkpoint": (26, 9418),
+    "types": (30, 8736), "adapt": (27, 7501), "rank": (36, 7353), "crypto": (24, 6094), "sys": (7, 1860),
+    "simd": (12, 4866), "license": (15, 3069), "contextra": (21, 3822),
+}
+
+SPEC_TEST_IDS = [  # Testmatrix: Umsetzungsplan 7.3 plus Erasure-Spezifikation (Referenz)
+    "T-ISO-1", "T-ISO-2", "T-ISO-3", "T-VER-1", "T-RAW-1", "T-RAW-2", "T-RAW-3", "T-CRASH-1", "T-CRASH-2",
+    "T-CRASH-3", "T-CRASH-4", "T-CONC-1", "T-DIFF-1", "T-WAL-1", "T-WAL-2", "T-COV-1", "T-LINT-1", "T-LINT-2",
+    "T-ARCH-1", "T-ARCH-2", "T-REPORT-1", "T-REPORT-2", "T-SEC-1", "T-SEC-2",
+    "T-SAGA-1", "T-GRAN-1", "T-REL-1", "T-FEAT-1", "T-CACHE-1", "T-API-2", "T-API-3", "T-API-4",
+    "T-PROOF-1", "T-LOG-1", "T-VEC-1", "T-TXT-1", "T-DEF-1", "T-KDF-1", "T-WAL-3", "T-FILE-1", "T-SLA-1",
+]
+
+SPEC_ENTSCHEIDUNGEN = [  # Entscheidungsgrundlage Abschnitt 7 und Anhang; Status aus governance/entscheidungen.toml
+    "E-1", "E-2", "E-3", "E-4", "E-5", "E-6", "E-7", "E-8", "E-9", "E-10", "E-11", "E-12", "E-13", "E-14",
+    "E-15", "E-16", "E-17", "E-18",
+]
+
+# Laufzeit-Budgets aus Umsetzungsplan 7.5, Implementierungsspez. 4.6/4.11 und Entscheidungsgrundlage 5.3.
+# Paarung: erster Benchmark-Name, der das Muster trifft (sortiert). Die Paarung wird im Bericht ausgegeben.
+BUDGETS = [
+    dict(id="B-GATE-get", wp="E6", name="Erased-Pruefung auf get: Overhead",
+         num=r"gate.*get|get.*gate", den=r"get.*(plain|ungated|baseline)", max_ratio=1.03),
+    dict(id="B-GATE-scan", wp="E6", name="Erased-Pruefung auf scan: Overhead",
+         num=r"gate.*scan|scan.*gate", den=r"scan.*(plain|ungated|baseline)", max_ratio=1.05),
+    dict(id="B-ERASE-LAT", wp="E4", name="Erase bis Gated, p50 <= 10 ms", abs_ns=10_000_000,
+         num=r"erase.*(gated|gate)"),
+    dict(id="B-REDB", wp="E2", name="LSM gegen redb <= 1.5x",
+         num=r"lsm|store", den=r"redb", max_ratio=1.5),
+]
+
+SPEC_ITEMS: list[dict] = []
+START_EPOCH: float = 0.0
+_CFG_TEST = re.compile(r"#\[cfg\(test\)\]")
+_PANIC = re.compile(r"\.unwrap\(\)|\.expect\(|\bpanic!\(|\btodo!\(|\bunimplemented!\(")
+_FORBIDDEN = re.compile(r"garantiert gelöscht|DSGVO-konform|rechtskonform|unwiderbringlich|"
+                        r"kryptografisch gelöscht|informationstheoretisch gelöscht|vollständig gelöscht")
+_ALT_NAMES = {"deletion_proof", "proof_key", "proof_key_env", "kv_shredding", "kv_cipher", "revocation_log",
+              "ed25519_proof", "scanner", "purge", "erasure.rs"}
+
+
+def it(wp, gid, req, methode, status, wert, ziel, quelle):
+    d = dict(wp=wp, id=gid, anforderung=req, methode=methode, status=status, messwert=wert, ziel=ziel, quelle=quelle)
+    SPEC_ITEMS.append(d)
+    return d
+
+
+def is_test_file(p: Path) -> bool:
+    return ("tests" in p.parts or p.name.startswith("tests") or p.name.endswith(("_tests.rs", "_test.rs"))
+            or "benches" in p.parts or "fuzz" in p.parts)
+
+
+def src_files(d: Path) -> list[Path]:
+    """Produktionsdateien unter src/ (ohne Testdateien, Benches, Fuzz)."""
+    src = d / "src"
+    return [p for p in src.rglob("*.rs") if "target" not in p.parts and not is_test_file(p)] if src.exists() else []
+
+
+def prod_text(text: str) -> str:
+    """Entfernt Items hinter #[cfg(test)] (Klammerzaehlung; Items ohne Block bis ';')."""
+    out, i, n = [], 0, len(text)
+    while True:
+        m = _CFG_TEST.search(text, i)
+        if not m:
+            out.append(text[i:])
+            break
+        out.append(text[i:m.start()])
+        j_brace, j_semi = text.find("{", m.end()), text.find(";", m.end())
+        if j_brace == -1 or (j_semi != -1 and j_semi < j_brace):
+            i = (j_semi + 1) if j_semi != -1 else n
+            continue
+        depth, k = 0, j_brace
+        while k < n:
+            c = text[k]
+            if c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            k += 1
+        i = k + 1
+    return "".join(out)
+
+
+def find_cycle(edges: dict[str, list[str]]) -> Optional[list[str]]:
+    state: dict[str, int] = {}
+    stack: list[str] = []
+
+    def dfs(u: str) -> Optional[list[str]]:
+        state[u] = 1
+        stack.append(u)
+        for v in edges.get(u, []):
+            if state.get(v) == 1:
+                return stack[stack.index(v):] + [v]
+            if state.get(v) is None:
+                r = dfs(v)
+                if r:
+                    return r
+        stack.pop()
+        state[u] = 2
+        return None
+
+    for u in list(edges):
+        if state.get(u) is None:
+            r = dfs(u)
+            if r:
+                return r
+    return None
+
+
+def test_presence(ctx: Ctx) -> dict[str, list[str]]:
+    """T-ID -> Dateien, in denen eine Testfunktion mit dem snake_case-Namen steht."""
+    files: list[Path] = []
+    for sub in ("crates", "tests", "benchmarks"):
+        d = ctx.root / sub
+        if d.exists():
+            files += [p for p in d.rglob("*.rs") if "target" not in p.parts]
+    texts = {p: _read(p) for p in files}
+    res: dict[str, list[str]] = {}
+    for tid in SPEC_TEST_IDS:
+        pat = re.compile(r"fn\s+" + re.escape(tid.lower().replace("-", "_")) + r"(?:_\w*)?\s*\(")
+        res[tid] = sorted(str(p.relative_to(ctx.root)) for p, t in texts.items() if pat.search(t))
+    return res
+
+
+def _dep_map(ctx: Ctx, name: str) -> dict[str, bool]:
+    """Normale Abhaengigkeiten (Paketname -> optional?). Dev-Abhaengigkeiten bleiben draussen."""
+    ct = _toml(ctx.ws.members[name] / "Cargo.toml")
+    ws_deps = (_toml(ctx.root / "Cargo.toml").get("workspace") or {}).get("dependencies") or {}
+    out: dict[str, bool] = {}
+    for k, v in (ct.get("dependencies") or {}).items():
+        spec = v if isinstance(v, dict) else {}
+        if spec.get("workspace") and k in ws_deps and isinstance(ws_deps[k], dict):
+            spec = {**ws_deps[k], **spec}
+        pkg = spec.get("package", k)
+        out[pkg] = bool(spec.get("optional"))
+    return out
+
+
+def spec_static(ctx: Ctx, outdir: Path):
+    SPEC_ITEMS.clear()
+    mem, names = ctx.ws.members, set(ctx.ws.members)
+    deps = {n: _dep_map(ctx, n) for n in names}
+
+    # ---------- WP-1: Scope ----------
+    entf = [c for c in ENTFERNEN_V1 if c in names]
+    it("WP-1", "S-ENTF", "Entfernen-Liste: Crates noch Workspace-Mitglied", "Workspace-Mitglieder",
+       "FEHLT" if entf else "PASS", f"{len(entf)}: {entf}", "0", "Final 2.2, Entscheidung E-17")
+    extra_def = [c for c in ctx.ws.default if c not in KERN_V1 and c not in ERLAUBT_NICHT_DEFAULT
+                 and c not in OFFEN_ENTSCHEIDUNG]
+    it("WP-1", "S-DEF-1", "default-members nur Kern", "default-members minus Kern",
+       "FEHLT" if extra_def else "PASS", f"{len(extra_def)}: {extra_def}", "0", "Umsetzungsplan 3, H6")
+    missing_def = [c for c in KERN_V1 if c in names and c not in ctx.ws.default]
+    it("WP-1", "S-DEF-2", "Kern in default-members vollstaendig", "Kern minus default-members",
+       "FEHLT" if missing_def else "PASS", f"{len(missing_def)}: {missing_def}", "0", "Final 2.2")
+    alt = []
+    for p in (ctx.root / "crates").rglob("*"):
+        if "target" in p.parts:
+            continue
+        n = p.name
+        is_old = (p.is_dir() and n in ("scanner", "deletion_proof")) or (
+            p.is_file() and (n.startswith(("deletion_proof", "proof_key", "kv_shredding", "kv_cipher",
+                                           "revocation_log", "ed25519_proof")) or
+                             (n == "purge.rs") or (n == "erasure.rs" and "contextra_impl" in p.parts)))
+        if is_old:
+            alt.append(str(p.relative_to(ctx.root)))
+    it("WP-3", "S-ALT", "Altlast-Dateien der alten Loeschkette existieren nicht mehr", "Dateinamen-Suche",
+       "FEHLT" if alt else "PASS", f"{len(alt)}: {sorted(alt)[:12]}", "0", "Umsetzungsplan 8.1, Final 8.1")
+
+    # Statische V1-Huelle der Fassade (ohne optionale Abhaengigkeiten, ohne Features)
+    hull, todo = set(), ["contextra"] if "contextra" in names else []
+    while todo:
+        u = todo.pop()
+        if u in hull or u not in names:
+            continue
+        hull.add(u)
+        todo += [d for d, opt in deps.get(u, {}).items() if not opt and d in names]
+    verboten = [c for c in hull if c in ENTFERNEN_V1 + ENTKOPPELN_V1 + list(OFFEN_ENTSCHEIDUNG)]
+    it("WP-6", "S-HULL", "Statische V1-Huelle der Fassade ohne Nicht-Kern", "Closure normaler, nicht optionaler Abhaengigkeiten",
+       "FEHLT" if verboten else "PASS", f"{len(hull)} Crates, verboten: {sorted(verboten)}", "0", "Final G-REL, Entsch. 6.2")
+
+    # ---------- WP-2: Sicherheitsbasis (FAIL = bereits falsch) ----------
+    wal_gates = sum(len(re.findall(r'feature\s*=\s*"wal-integrity"', _read(p)))
+                    for n in names for p in ctx.ws.members[n].rglob("*.rs") if "target" not in p.parts)
+    it("WP-2", "S-SEC-1", "WAL-Integritaet: keine Feature-Gates (R-SEC-6)", 'cfg(feature = "wal-integrity") zaehlen',
+       "FAIL" if wal_gates else "PASS", f"{wal_gates} Gates", "0", "Final R-SEC-6, Entsch. H1")
+    sec_gates = 0
+    sec_kw = re.compile(r"hmac|integrity|verify|aead|decrypt|encrypt|crc|checksum|seq|auth|tamper|zeroize", re.I)
+    for sub in ("contextra-store", "contextra-crypto", "contextra-mvcc"):
+        if sub in mem:
+            for p in src_files(mem[sub]):
+                ls = prod_text(_read(p)).splitlines()
+                for i, l in enumerate(ls):
+                    if re.search(r"cfg\((?:not\()?feature", l) and any(sec_kw.search(x) for x in ls[i:i + 4]):
+                        sec_gates += 1
+    it("WP-2", "S-SEC-2", "Keine cfg(feature) in Sicherheitsmodulen (store, crypto, mvcc; A1)", "Produktionscode",
+       "FAIL" if sec_gates else "PASS", f"{sec_gates} Gates mit Sicherheitsbezug (4-Zeilen-Fenster)", "0", "Umsetzungsplan 4 (A1)")
+    allow_c = sum(len(re.findall(r"allow\(unexpected_cfgs\)", _read(p)))
+                  for n in names for p in src_files(mem[n]))
+    it("WP-2", "S-SEC-3", "Kein allow(unexpected_cfgs) in src/ (hebt deny auf)", "src/-Dateien",
+       "FAIL" if allow_c else "PASS", f"{allow_c} Stellen", "0", "Entscheidungsgrundlage 2.1")
+    undecl = befund_cfg_features(ctx, outdir)
+    it("WP-2", "S-SEC-4", "Alle cfg(feature) deklariert", "befund_cfg_features", "FAIL" if undecl[0] == "FAIL" else "PASS",
+       undecl[1], "0", "Umsetzungsplan 4, H1")
+    enc_hits = []
+    for p in (mem["contextra-store"] / "src").rglob("config.rs") if "contextra-store" in mem else []:
+        if re.search(r"encryption_passphrase:\s*None", _read(p)):
+            enc_hits.append(str(p.relative_to(ctx.root)))
+    it("WP-2", "S-SEC-5", "Verschluesselung standardmaessig an (R-SEC-1)", "Default-Konfiguration",
+       "FAIL" if enc_hits else "PASS", f"Default None in {enc_hits or 'keiner'}", "an", "Final R-SEC-1, B-S02")
+    tp = [str(p.relative_to(ctx.root)) for n in names for p in src_files(mem[n])
+          if re.search(r"impl\s+Default\s+for\s+TenantPolicy[\s\S]{0,400}?Optional", _read(p))]
+    it("WP-2", "S-SEC-6", "TenantPolicy::Required als Standard (R-SEC-2)", "impl Default for TenantPolicy",
+       "FAIL" if tp else "PASS", f"Default Optional in {tp or 'keiner'}", "Required", "Final R-SEC-2, B-S15")
+    kdf_low = [str(p.relative_to(ctx.root)) for n in names for p in src_files(mem[n])
+               if re.search(r"\b19[_]?456\b", _read(p)) and "kdf" in p.name]
+    it("WP-2", "S-SEC-7", "Argon2id Untergrenze 64 MiB (R-SEC-3)", "KDF-Konstante 19456 KiB",
+       "FAIL" if kdf_low else "PASS", f"19456 KiB in {kdf_low or 'keiner'}", ">= 65536", "Final R-SEC-3, B-S01/S04")
+    pw_opt = [str(p.relative_to(ctx.root)) for n in names for p in src_files(mem[n])
+              if re.search(r"passphrase:\s*Option<String>", _read(p))]
+    it("WP-2", "S-SEC-8", "Passphrase nicht als Option<String> (R-SEC-4)", "Feldtyp",
+       "FAIL" if pw_opt else "PASS", f"{pw_opt or 'keiner'}", "Zeroizing", "Final R-SEC-4, B-S03")
+    legacy = [n for n in names if re.search(r"^legacy-wal-key\s*=", _read(mem[n] / "Cargo.toml"), re.M)]
+    it("WP-2", "S-SEC-9", "Feature legacy-wal-key (Migrationspfad oder Entfernung)", "Cargo.toml [features]",
+       "OFFEN" if legacy else "PASS", f"deklariert in {legacy or 'keinem'}", "entschieden", "Entscheidung E-12")
+
+    # ---------- WP-3: Rueckbau (Symbol-Suche) ----------
+    anh_a = re.compile(r"\b(DeletionProof|KeyRegistry|LsmPurger|ScanTarget|RevocationLog|hnsw_purger|KvDeleteMode|delete_segment)\b|\bPurger\b")
+    hits: dict[str, int] = defaultdict(int)
+    for sub in ("crates", "tests", "examples", "docs", "benchmarks"):
+        d = ctx.root / sub
+        if not d.exists():
+            continue
+        for p in d.rglob("*"):
+            if not p.is_file() or p.suffix not in (".rs", ".toml", ".md") or "target" in p.parts or "archive" in p.parts:
+                continue
+            if p.name in ("CHANGELOG.md",):
+                continue
+            c = len(anh_a.findall(_read(p)))
+            if c:
+                hits[str(p.relative_to(ctx.root))] += c
+    total = sum(hits.values())
+    top = sorted(hits.items(), key=lambda kv: -kv[1])[:8]
+    it("WP-3", "S-RUECK-1", "Alte Loeschsymbole (Anhang A) nicht mehr vorhanden", "Symbolsuche rs/toml/md",
+       "FEHLT" if total else "PASS", f"{total} Treffer in {len(hits)} Dateien; top: {top}", "0", "Umsetzungsplan Anhang A")
+    prof = [str(p.relative_to(ctx.root)) for p in (ctx.root / "crates/contextra/src").rglob("*.rs")
+            if re.search(r"DeletionProof aktiv|Crypto-Shredding", _read(p))] if (ctx.root / "crates/contextra/src").exists() else []
+    it("WP-3", "S-RUECK-2", "Profil-Doku behauptet keine entfernte Funktion (H4)", "Doku-Strings in contextra/src",
+       "FEHLT" if prof else "PASS", f"{prof or 'keine'}", "0", "Umsetzungsplan H4")
+    dang = [str(p.relative_to(ctx.root)) for p in (ctx.root / "crates/contextra-ports/src").rglob("*.rs")
+            if re.search(r"LayerScanner|\bPurger\b", _read(p))] if (ctx.root / "crates/contextra-ports/src").exists() else []
+    it("WP-3", "S-RUECK-3", "Keine toten Verweise LayerScanner/Purger in ports", "Symbolsuche",
+       "FEHLT" if dang else "PASS", f"{dang or 'keine'}", "0", "Erasure-Spez. F-02, Umsetzungsplan H3")
+    spec_konflikt = [s for s in ("ErasureReport", "LayerWitness") if any(
+        re.search(r"\b" + s + r"\b", _read(p)) for p in (ctx.root / "crates").rglob("*.rs"))] if (ctx.root / "crates").exists() else []
+    it("WP-3", "S-RUECK-4", "Anhang A ohne Widerspruch zum Neudesign", "Vergleich Anhang A gegen Erasure 4.9",
+       "INFO", f"Anhang A verbietet, Neudesign nutzt: {spec_konflikt or 'keine im Code'}", "entschieden",
+       "Umsetzungsplan Anhang A vs. Erasure 4.9")
+    mg = ctx.root / "mutants-guarantees.toml"
+    missing_mut = []
+    if mg.exists():
+        for f in set(re.findall(r"[\w./-]+\.rs", _read(mg))):
+            base = Path(f).name
+            if not any(p.name == base for p in (ctx.root / "crates").rglob(base)):
+                missing_mut.append(f)
+    it("WP-3", "S-RUECK-5", "mutants-guarantees.toml verweist nur auf existierende Dateien (F-14)", "Pfadpruefung",
+       "FEHLT" if missing_mut else "PASS", f"{len(missing_mut)} fehlend: {sorted(missing_mut)[:6]}", "0", "Implementierungsspez. F-14")
+    agents = ctx.root / "AGENTS.md"
+    named = set(re.findall(r"\bcontextra(?:-[a-z0-9]+)*\b", _read(agents))) if agents.exists() else set()
+    ghost = sorted(n for n in named if n not in names and n != "contextra")
+    it("WP-4", "S-RUECK-6", "AGENTS.md nennt nur Workspace-Crates (H5)", "Namensabgleich AGENTS.md gegen members",
+       "FEHLT" if ghost else "PASS", f"nicht im Workspace: {ghost[:10]}", "0", "Umsetzungsplan H5")
+
+    # ---------- WP-4: Ring, Qualitaet (FAIL = Gate verletzt) ----------
+    viol, hard, unclass, entf_dep = [], [], [], []
+    for src in sorted(RING):
+        if src not in names:
+            continue
+        for dep, opt in deps[src].items():
+            if dep not in names:
+                continue
+            if dep in RING:
+                if RING[dep] > RING[src]:
+                    viol.append(f"{src}(R{RING[src]})->{dep}(R{RING[dep]})")
+                if dep in ENTKOPPELN_V1 and not opt:
+                    hard.append(f"{src}->{dep}")
+            elif dep in ENTFERNEN_V1:
+                entf_dep.append(f"{src}->{dep}")
+            elif dep in RING_EXTERN and not opt:
+                hard.append(f"{src}->{dep} (nicht optional)")
+    for n in sorted(names):
+        if n not in RING and n not in ENTFERNEN_V1 and n not in ENTKOPPELN_V1 and n not in OFFEN_ENTSCHEIDUNG \
+                and n not in ERLAUBT_NICHT_DEFAULT and n not in RING_EXTERN:
+            unclass.append(n)
+    it("WP-4", "S-RING-1", "Ring-Regel: nur Abhaengigkeiten auf gleichen oder niedrigeren Ring", "Cargo.toml, Ringtabelle",
+       "FAIL" if viol else "PASS", f"{len(viol)} Verstoesse: {viol[:8]}", "0", "Umsetzungsplan 4, G-Ring")
+    it("WP-4", "S-RING-5", "Keine Abhaengigkeit auf zu entfernende Crates", "Cargo.toml der Ring-Crates",
+       "FEHLT" if entf_dep else "PASS", f"{len(entf_dep)}: {entf_dep[:8]}", "0", "Final 2.2, E-17")
+    edges = {s: [d for d in deps[s] if d in RING and s in RING] for s in RING if s in names}
+    cyc = find_cycle(edges)
+    it("WP-4", "S-RING-2", "Keine Zyklen zwischen Ring-Crates", "DFS ueber Ringkanten",
+       "FAIL" if cyc else "PASS", " -> ".join(cyc) if cyc else "keine", "0", "Umsetzungsplan 4")
+    it("WP-4", "S-RING-3", "Harte Abhaengigkeit auf optionales Crate (graph/license/checkpoint/testkit)", "Cargo.toml",
+       "FAIL" if hard else "PASS", f"{hard[:8] or 'keine'}", "0", "Entscheidungsgrundlage 6.2")
+    it("WP-4", "S-RING-4", "Jedes Crate ist klassifiziert (Ringtabelle oder Entfernen/Entkoppeln)", "Vollstaendigkeit",
+       "FEHLT" if unclass else "PASS", f"{unclass or 'alle'}", "0", "Umsetzungsplan 4 (E1)")
+    uns = {}
+    for n in sorted(names):
+        if n in ("contextra-sys", "contextra-simd"):
+            continue
+        c = sum(_unsafe_lines(p) for p in src_files(mem[n]))
+        if c:
+            uns[n] = c
+    uns_keep = {k: v for k, v in uns.items() if k not in ENTFERNEN_V1}
+    uns_rm = {k: v for k, v in uns.items() if k in ENTFERNEN_V1}
+    it("WP-4", "S-UNS-1", "unsafe nur in sys und simd (G-Unsafe)", "unsafe-Zeilen je Crate (bleibende Crates)",
+       "FAIL" if uns_keep else ("FEHLT" if uns_rm else "PASS"),
+       f"bleibend: {uns_keep or 'keine'}; zu entfernen: {uns_rm or 'keine'}", "0", "Umsetzungsplan 8, G-Unsafe")
+    pan = {}
+    for n in RING:
+        if n in names:
+            c = sum(len(_PANIC.findall(prod_text(_read(p)))) for p in src_files(mem[n]))
+            if c:
+                pan[n] = c
+    it("WP-4", "S-PAN-1", "Kein unwrap/expect/panic im Produktionscode Ring 0-3 (G-Panic)", "Heuristik ohne cfg(test)",
+       "FAIL" if pan else "PASS", f"{sum(pan.values())} in {pan or 'keinem'}", "0", "Umsetzungsplan 5, G-Panic")
+    big = []
+    for n in RING:
+        if n in names:
+            for p in src_files(mem[n]):
+                lines = len(_read(p).splitlines())
+                if lines > 500:
+                    big.append((lines, str(p.relative_to(ctx.root))))
+    big.sort(reverse=True)
+    it("WP-4", "S-DAT-1", "Dateien unter 500 Zeilen (Ring 0-3, Produktionsdateien)", "Zeilenzahl src/",
+       "FEHLT" if big else "PASS", f"{len(big)} Dateien > 500, groesste: {big[:5]}", "0", "Umsetzungsplan 5")
+    forb = defaultdict(int)
+    for n in names:
+        for p in src_files(mem[n]):
+            c = len(_FORBIDDEN.findall(_read(p)))
+            if c:
+                forb[str(p.relative_to(ctx.root))] += c
+    for extra in ("README.md", "docs/SPEC.md", "docs/ARCHITECTURE.md", "docs/SECURITY.md"):
+        f = ctx.root / extra
+        if f.exists():
+            c = len(_FORBIDDEN.findall(_read(f)))
+            if c:
+                forb[extra] += c
+    it("WP-4", "S-LINT-1", "Verbotene Loeschbegriffe (T-LINT-1) in Quelle und Doku", "Phrasensuche",
+       "FAIL" if forb else "PASS", f"{sum(forb.values())} Treffer in {len(forb)} Dateien", "0", "Final 0.2, T-LINT-1")
+
+    # ---------- WP-5: Store ----------
+    st = mem.get("contextra-store")
+    if st:
+        fs_direct = sum(len(re.findall(r"\b(?:std::fs|tokio::fs)::", prod_text(_read(p)))) for p in src_files(st))
+        vfs_refs = sum(len(re.findall(r"\bVfs\b", _read(p))) for p in src_files(st))
+        let_ = sum(len(re.findall(r"let _ =", prod_text(_read(p)))) for p in src_files(st)
+                   if "wal" in p.parts or "ops" in p.parts)
+        it("WP-5", "S-FS-1", "Store ohne direkte std::fs/tokio::fs-Aufrufe (WP-L5, T-LINT-2)", "Produktionscode store/src",
+           "FEHLT" if fs_direct else "PASS", f"{fs_direct} Aufrufe", "0", "Umsetzungsplan 9 WP-L5, Entsch. 5.3")
+        it("WP-5", "S-FS-2", "Vfs-Port im Store verwendet", "Referenzen auf Vfs in store/src",
+           "FEHLT" if vfs_refs == 0 else "PASS", f"{vfs_refs} Referenzen", ">0", "Entscheidung 5.3, F-06")
+        it("WP-5", "S-FS-3", "Kein 'let _ =' in WAL und Compaction (Fehler nie verwerfen)", "wal/, lsm/ops/",
+           "FEHLT" if let_ else "PASS", f"{let_} Stellen", "0", "Umsetzungsplan 6.2, N9")
+    comp = mem.get("contextra-engine")
+    if comp:
+        csr = sum(len(re.findall(r"\bCsrGraph\b", _read(p))) for p in src_files(comp))
+        it("WP-6", "S-GR-1", "Engine nutzt Graph nur ueber Port (kein CsrGraph)", "Treffer CsrGraph in engine/src",
+           "FEHLT" if csr else "PASS", f"{csr} Treffer", "0", "Umsetzungsplan 7 G3, H8")
+        it("WP-6", "S-GR-2", "Engine ohne harte Abhaengigkeit auf graph", "Cargo.toml engine",
+           "FEHLT" if deps.get("contextra-engine", {}).get("contextra-graph") is False else "PASS",
+           str(deps.get("contextra-engine", {}).get("contextra-graph", "nicht abhaengig")), "optional", "Umsetzungsplan 7 G2")
+
+    # ---------- Neubau (WP-E*, WP-I*, V*) : Vorhandensein ----------
+    neu = [
+        ("WP-E1", "S-NEU-1", "Typen erasure in contextra-types", "contextra-types/src/erasure"),
+        ("WP-E2", "S-NEU-2", "Purge-Compaction im Store (erase-Modul)", "contextra-store/src/erase"),
+        ("WP-E4", "S-NEU-3", "Saga in Engine (erasure-Modul)", "contextra-engine/src/erasure"),
+        ("WP-E5", "S-NEU-4", "Betroffenen-Index (subject)", "contextra-engine/src/subject_index.rs"),
+        ("WP-V1", "S-NEU-5", "Erasure Lab in testkit", "contextra-testkit/src/erasure_lab"),
+    ]
+    for wp, gid, req, rel in neu:
+        p = ctx.root / "crates" / rel
+        it(wp, gid, req, "Pfadpruefung", "PASS" if p.exists() else "FEHLT", "vorhanden" if p.exists() else "fehlt",
+           "vorhanden", "Umsetzungsplan 8.2 / Final 9")
+
+    # ---------- Testmatrix ----------
+    presence = test_presence(ctx)
+    for tid in SPEC_TEST_IDS:
+        fund = presence[tid]
+        it("TEST", tid, f"Testfunktion {tid.lower().replace('-', '_')} vorhanden", "Funktionsnamen-Suche",
+           "PASS" if fund else "FEHLT", f"{len(fund)} Fundstelle(n)", ">=1", "Umsetzungsplan 7.3")
+    fehlt_t = sum(1 for t in SPEC_TEST_IDS if not presence[t])
+
+    # ---------- Entscheidungen ----------
+    gov = _toml(ctx.root / "governance" / "entscheidungen.toml")
+    entsch = gov.get("entscheidungen", {}) if gov else {}
+    offen = [e for e in SPEC_ENTSCHEIDUNGEN if (entsch.get(e) or {}).get("status", "offen") == "offen"]
+    it("ENT", "S-ENT", "Entscheidungen E-1..E-18 getroffen", "governance/entscheidungen.toml (fehlt: alle offen)",
+       "OFFEN" if offen else "PASS", f"{len(offen)} offen von {len(SPEC_ENTSCHEIDUNGEN)}", "0", "Entscheidungsgrundlage 7, Anhang")
+    it("G", "S-LEGAL", "G-LEGAL: schriftliche Rechtspruefung vorhanden", "manuell", "MANUELL",
+       "nicht maschinell", "Gutachten", "Final G-LEGAL, Umsetzungsplan 9")
+    it("G", "S-SEC-REV", "G-SEC: externes Review Sicherheitsbasis und Saga", "manuell", "MANUELL",
+       "nicht maschinell", "Review", "Final G-SEC")
+
+    # ---------- Groessenbilanz (Ist gegen Dokumentwerte) ----------
+    groesse = {}
+    for n in sorted(names):
+        short_n = n.removeprefix("contextra-") if n != "contextra" else "contextra"
+        files = [p for p in ctx.ws.members[n].rglob("*.rs") if "target" not in p.parts]
+        lines = sum(len(_read(p).splitlines()) for p in files)
+        groesse[short_n] = (len(files), lines)
+    SPEC_ITEMS.append(dict(wp="INFO", id="S-GROESSE", anforderung="Groessenbilanz je Crate (Ist/Doku)", methode="Zaehlung",
+                           status="INFO", messwert=json.dumps({k: {"ist": v, "doku": SPEC_GROESSE.get(k)} for k, v in groesse.items()}),
+                           ziel="Dokumentwerte", quelle="Umsetzungsplan 2"))
+    SPEC_ITEMS.append(dict(wp="INFO", id="S-ALLOW", anforderung="#[allow(...)] im Produktionscode (216 laut Bericht)",
+                           methode="Zaehlung", status="INFO",
+                           messwert=str(sum(len(re.findall(r"#\[allow\(", prod_text(_read(p)))) for n in RING if n in names
+                                            for p in src_files(mem[n]))), ziel="0", quelle="Entscheidungsgrundlage 2.3"))
+
+    # ---------- Ausgabe ----------
+    counts = defaultdict(int)
+    for x in SPEC_ITEMS:
+        counts[x["status"]] += 1
+    fails = [x for x in SPEC_ITEMS if x["status"] == "FAIL"]
+    detail = (f"PASS={counts['PASS']} FAIL={counts['FAIL']} FEHLT={counts['FEHLT']} OFFEN={counts['OFFEN']} "
+              f"MANUELL={counts['MANUELL']} INFO={counts['INFO']} (Tests fehlen: {fehlt_t}/{len(SPEC_TEST_IDS)})")
+    text = "\n".join(f"{x['status']:8s} {x['id']:12s} {x['anforderung']} | {x['messwert']}" for x in SPEC_ITEMS)
+    return ("FAIL" if fails else "PASS"), detail, text
+
+
+def spec_budgets(ctx: Ctx, outdir: Path):
+    """Laufzeit-Budgets (Criterion), Basislinie (Regression) und Mutation (Saga, Matcher)."""
+    crit_rows: dict[str, float] = {}
+    crit = ctx.root / "target" / "criterion"
+    if crit.exists():
+        for est in crit.rglob("new/estimates.json"):
+            if est.stat().st_mtime < START_EPOCH:
+                continue
+            try:
+                d = json.loads(est.read_text())
+                crit_rows["/".join(est.relative_to(crit).parts[:-2])] = float(d["median"]["point_estimate"])
+            except (OSError, KeyError, ValueError):
+                continue
+    lines = []
+    fails = 0
+    for b in BUDGETS:
+        if not crit_rows:
+            it(b["wp"], b["id"], b["name"], "Criterion", "NICHT_GEMESSEN", "kein Benchmarklauf", "Budget", "Umsetzungsplan 7.5")
+            continue
+        num = sorted(k for k in crit_rows if re.search(b["num"], k, re.I))
+        if not num:
+            it(b["wp"], b["id"], b["name"], "Criterion", "NICHT_GEMESSEN", "kein Benchmark passt", "Budget", "Implementierungsspez. 4.6")
+            continue
+        if "abs_ns" in b:
+            v = crit_rows[num[0]]
+            ok = v <= b["abs_ns"]
+            fails += 0 if ok else 1
+            it(b["wp"], b["id"], b["name"], f"Criterion {num[0]}", "PASS" if ok else "FAIL", f"{v/1e6:.3f} ms", f"<= {b['abs_ns']/1e6:.0f} ms", "Implementierungsspez. 4.11")
+            continue
+        den = sorted(k for k in crit_rows if re.search(b["den"], k, re.I)) if b.get("den") else []
+        if not den:
+            it(b["wp"], b["id"], b["name"], f"Criterion {num[0]}", "NICHT_GEMESSEN", "Vergleichsbenchmark fehlt", f"<= {b['max_ratio']}", "Umsetzungsplan 7.5")
+            continue
+        ratio = crit_rows[num[0]] / crit_rows[den[0]] if crit_rows[den[0]] else float("inf")
+        ok = ratio <= b["max_ratio"]
+        fails += 0 if ok else 1
+        it(b["wp"], b["id"], b["name"], f"Paar: {num[0]} / {den[0]}", "PASS" if ok else "FAIL",
+           f"{ratio:.3f}", f"<= {b['max_ratio']}", "Umsetzungsplan 7.5")
+
+    base = ctx.root / "governance" / "bench_baseline.csv"
+    if base.exists() and crit_rows:
+        ref = {r["benchmark"]: float(r["median_ns"]) for r in csv.DictReader(open(base))}
+        reg = [(k, crit_rows[k] / ref[k]) for k in crit_rows if k in ref and ref[k] > 0 and crit_rows[k] / ref[k] > 1.05]
+        fails += 1 if reg else 0
+        it("V4", "B-REG", "Regression <= 5 % gegen Basislinie", f"governance/bench_baseline.csv ({len(ref)} Werte)",
+           "FAIL" if reg else "PASS", f"{len(reg)} Regressionen: {[r[0] for r in reg[:5]]}", "<= 1.05", "Umsetzungsplan 7.5")
+    else:
+        it("V4", "B-REG", "Regression <= 5 % gegen Basislinie", "governance/bench_baseline.csv", "NICHT_GEMESSEN",
+           "keine Basislinie", "Basislinie", "Umsetzungsplan 9 V4")
+
+    mdir = ctx.root / "mutants.out"
+    caught = missed = 0
+    if (mdir / "caught.txt").exists():
+        pat = re.compile(r"erase|saga|matcher|barrier|purge", re.I)
+        caught = sum(1 for l in _read(mdir / "caught.txt").splitlines() if pat.search(l))
+        missed = sum(1 for l in _read(mdir / "missed.txt").splitlines() if pat.search(l))
+    if caught + missed:
+        score = caught / (caught + missed)
+        ok = score >= 0.95
+        fails += 0 if ok else 1
+        it("V3", "B-MUT", "Mutation auf Saga und Matcher >= 95 %", "cargo-mutants caught/missed",
+           "PASS" if ok else "FAIL", f"{caught}/{caught + missed} = {score:.1%}", ">= 95 %", "Umsetzungsplan 9 V3")
+    else:
+        it("V3", "B-MUT", "Mutation auf Saga und Matcher >= 95 %", "mutants.out", "NICHT_GEMESSEN",
+           "keine Mutationsergebnisse", ">= 95 %", "Umsetzungsplan 9 V3")
+
+    text = "\n".join(f"{x['status']:14s} {x['id']:10s} {x['anforderung']} | {x['messwert']} | {x['ziel']}"
+                    for x in SPEC_ITEMS if x["wp"] in ("E2", "E4", "E6", "V3", "V4"))
+    return ("FAIL" if fails else "PASS"), f"{fails} Budgetverletzungen", text
+
+
+def export_spec(outdir: Path) -> None:
+    if not SPEC_ITEMS:
+        return
+    with open(outdir / "spec_messung.csv", "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(SPEC_ITEMS[0].keys()))
+        w.writeheader()
+        w.writerows(SPEC_ITEMS)
+    L = ["# Spezifikations-Messung V1", "", "Status: PASS · FAIL (Verstoss) · FEHLT (Arbeit offen) · OFFEN (Entscheidung) · "
+         "MANUELL · NICHT_GEMESSEN · INFO", ""]
+    per: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for x in SPEC_ITEMS:
+        per[x["wp"]][x["status"]] += 1
+    L += ["| Arbeitspaket | PASS | FAIL | FEHLT | OFFEN | MANUELL | NICHT_GEMESSEN | INFO |", "|---|---:|---:|---:|---:|---:|---:|---:|"]
+    for wp in sorted(per):
+        c = per[wp]
+        L.append(f"| {wp} | {c['PASS']} | {c['FAIL']} | {c['FEHLT']} | {c['OFFEN']} | {c['MANUELL']} | "
+                 f"{c['NICHT_GEMESSEN']} | {c['INFO']} |")
+    L += ["", "## Befunde mit Status FAIL", ""]
+    L += [f"- **{x['id']}** {x['anforderung']}: {x['messwert']} (Ziel {x['ziel']}, Quelle {x['quelle']})"
+          for x in SPEC_ITEMS if x["status"] == "FAIL"] or ["keine"]
+    L += ["", "## Alle Messpunkte", "", "| Status | ID | Anforderung | Messwert | Ziel | Quelle |", "|---|---|---|---|---|---|"]
+    L += [f"| {x['status']} | `{x['id']}` | {x['anforderung']} | {x['messwert']} | {x['ziel']} | {x['quelle']} |"
+          for x in SPEC_ITEMS if x["id"] != "S-GROESSE"]
+    grs = next((x for x in SPEC_ITEMS if x["id"] == "S-GROESSE"), None)
+    if grs:
+        L += ["", "## Groessenbilanz (Ist gegen Dokument)", "", "| Crate | Dateien Ist | Zeilen Ist | Dateien Doku | Zeilen Doku |",
+              "|---|---:|---:|---:|---:|"]
+        for k, v in sorted(json.loads(grs["messwert"]).items()):
+            doku = v.get("doku") or [None, None]
+            L.append(f"| {k} | {v['ist'][0]} | {v['ist'][1]} | {doku[0] or '-'} | {doku[1] or '-'} |")
+    (outdir / "spec_messung.md").write_text("\n".join(L) + "\n")
+
+
+def spec_plan_steps(ctx: Ctx, args) -> list:
+    steps = [Step("S-spec", "spec_gates_statisch", py=spec_static, timeout=900,
+                  note="Messung der Spezifikations-Gates (Ring, Sicherheit, Rueckbau, Tests, Groesse)")]
+    steps.append(Step("6-spec", "spec_budgets_mutation", py=spec_budgets, timeout=600,
+                      note="Laufzeit-Budgets, Regression, Mutation (liest target/criterion, mutants.out)"))
+    if getattr(args, "spec_tests", False):
+        for tid, fund in test_presence(ctx).items():
+            if fund:
+                steps.append(Step("3-spec", f"spec_test__{tid.lower().replace('-', '_')}",
+                                  ["cargo", "test", "--workspace", "--locked",
+                                   tid.lower().replace("-", "_"), "--no-fail-fast"],
+                                  timeout=DEFAULT_TIMEOUT, note=f"Spezifikations-Test {tid}"))
+    return steps
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Contextra: testen, benchmarken, Befunde pruefen, Ergebnisse speichern")
     ap.add_argument("--quick", action="store_true", help="ohne Benchmarks, Fuzz, Mutation")
@@ -1108,6 +1723,7 @@ def main() -> int:
     ap.add_argument("--resume", help="bestehendes evidence/audit-... Verzeichnis fortsetzen")
     ap.add_argument("--vergleich", nargs=2, metavar=("A", "B"), help="zwei Lauf-Verzeichnisse vergleichen")
     ap.add_argument("--root", default=".", help="Repo-Root (Standard: aktuelles Verzeichnis)")
+    ap.add_argument("--spec-tests", action="store_true", help="Spezifikations-Tests (T-*) per cargo test ausfuehren")
     args = ap.parse_args()
 
     if args.vergleich:
@@ -1119,11 +1735,15 @@ def main() -> int:
         print("Fehler: bitte im Workspace-Root ausfuehren (Cargo.toml mit [workspace]).", file=sys.stderr)
         return 2
     ctx = Ctx(root)
-    if ctx.ws.problems:
-        print("Workspace-Hinweise:", *ctx.ws.problems, sep="\n  ")
+    if ctx.ws.fehlend or ctx.ws.fehlend_default or ctx.ws.problems:
+        print(f"Workspace: {len(ctx.ws.fehlend)} Mitglieder ohne Verzeichnis, "
+              f"{len(ctx.ws.fehlend_default)} default-members ohne Verzeichnis, "
+              f"{len(ctx.ws.problems)} sonstige Hinweise (Details im Befund 'default_members')")
 
     start = now_utc()
-    t_start = time.time()
+    global START_EPOCH
+    START_EPOCH = time.time()
+    t_start = START_EPOCH
     commit = subprocess.run("git rev-parse --short HEAD", shell=True, cwd=root,
                             capture_output=True, text=True).stdout.strip() or "nogit"
     if args.resume:

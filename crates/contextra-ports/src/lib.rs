@@ -41,10 +41,6 @@ pub mod graph;
 pub mod graph_index;
 /// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
-/// Key-value prefix store traits and types.
-pub mod kv;
-/// Key-value bridge storage port trait.
-pub mod kv_bridge_port;
 /// License and activation gate port traits.
 pub mod license;
 /// Grounding validator traits and context preparer contracts.
@@ -61,8 +57,6 @@ pub mod query_rewriter;
 pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
-/// Storage layer scanners and purgers (Vertrag V1, SPEC §12.7.4).
-pub mod scanner;
 /// Key-value storage engine traits.
 pub mod storage;
 /// Text retrieval and indexing traits (BM25 / Inverted Index).
@@ -79,8 +73,6 @@ pub use embedding::*;
 pub use graph::*;
 pub use graph_index::*;
 pub use id_gen::*;
-pub use kv::*;
-pub use kv_bridge_port::*;
 pub use license::*;
 pub use lifecycle::*;
 pub use metrics::*;
@@ -89,10 +81,6 @@ pub use plugin::*;
 pub use query_rewriter::*;
 pub use reranker::*;
 pub use rng::*;
-pub use scanner::{
-    LayerScanner, LayerWitness, PurgeStats, Purger, ScanSession, ScanTarget, ScanTechnique,
-    WitnessLayer,
-};
 pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
