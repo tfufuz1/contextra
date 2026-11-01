@@ -41,6 +41,7 @@ scc = "2"
 thiserror = { workspace = true }
 
 [dev-dependencies]
+bytes = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 contextra-store = { workspace = true }
 contextra-testkit = { workspace = true }

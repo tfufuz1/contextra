@@ -443,7 +443,6 @@ pub fn contextra_err(e: contextra_types::ContextraError) -> PyErr {
             }
             "NamespaceViolation" | "TenantMismatch" => TenantError::new_err(dto.message.clone()),
             "PolicyViolation"
-            | "NamespaceViolation"
             | "Sandbox"
             | "MemoryLimitExceeded"
             | "SandboxTimeout" => PyPermissionError::new_err(dto.message.clone()),

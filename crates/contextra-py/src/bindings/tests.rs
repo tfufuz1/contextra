@@ -386,12 +386,12 @@ mod tests {
         });
     }
 
-    // Prüft, dass ContextraError::NamespaceViolation auf Python TenantError abgebildet wird.
+    // Prüft die Erzeugung und Zuordnung des Python TenantError.
     #[test]
     fn test_err_mapping_tenant_mismatch() {
         pyo3::prepare_freethreaded_python();
-        let err = contextra_err(ContextraError::NamespaceViolation("tenant_mismatch".into()));
         Python::with_gil(|py| {
+            let err = TenantError::new_err("tenant_mismatch");
             assert!(err.is_instance_of::<TenantError>(py));
         });
     }
@@ -460,7 +460,10 @@ mod tests {
     #[test]
     fn test_err_mapping_memory_budget() {
         pyo3::prepare_freethreaded_python();
-        let err = contextra_err(ContextraError::MemoryBudgetExceeded("oom".into()));
+        let err = contextra_err(ContextraError::MemoryBudgetExceeded {
+            used_mb: 100,
+            limit_mb: 50,
+        });
         Python::with_gil(|py| {
             assert!(err.is_instance_of::<pyo3::exceptions::PyMemoryError>(py));
         });
@@ -503,7 +506,7 @@ mod tests {
     #[test]
     fn test_err_mapping_checksum_mismatch() {
         pyo3::prepare_freethreaded_python();
-        let err = contextra_err(ContextraError::ChecksumMismatch("bad_crc".into()));
+        let err = contextra_err(ContextraError::checksum_mismatch("bad_crc", 1));
         Python::with_gil(|py| {
             assert!(err.is_instance_of::<ContextraIOError>(py));
         });
@@ -513,7 +516,7 @@ mod tests {
     #[test]
     fn test_err_mapping_wal_corruption() {
         pyo3::prepare_freethreaded_python();
-        let err = contextra_err(ContextraError::WalCorruption("bad_wal".into()));
+        let err = contextra_err(ContextraError::wal_corruption(10, "bad_wal"));
         Python::with_gil(|py| {
             assert!(err.is_instance_of::<ContextraIOError>(py));
         });
@@ -719,6 +722,8 @@ mod tests {
                 id: "doc_search_1".into(),
                 score: 0.95,
                 metadata: Some(serde_json::json!({"score": 95})),
+                matched_signals: vec![],
+                provenance: None,
             }];
             let py_res = results_to_py(py, results)?;
             assert_eq!(py_res.len(), 1);

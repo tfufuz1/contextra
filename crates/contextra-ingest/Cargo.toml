@@ -66,6 +66,7 @@ yaml-rust2 = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
 
 [dev-dependencies]
+contextra-ingest = { path = ".", features = ["all-formats"] }
 proptest = "1.4"
 tempfile = { workspace = true }
 zip = { workspace = true, default-features = false, features = ["deflate", "bzip2", "time"] }

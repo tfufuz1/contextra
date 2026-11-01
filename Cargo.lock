@@ -784,7 +784,11 @@ name = "contextra-bench"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "contextra-core",
  "contextra-db",
+ "contextra-graph",
+ "contextra-infer-candle",
+ "contextra-infer-onnx",
  "contextra-store",
  "contextra-sys",
  "contextra-text",
@@ -987,6 +991,7 @@ dependencies = [
  "arc-swap",
  "bincode",
  "blake3",
+ "bytes",
  "contextra-adapt",
  "contextra-ports",
  "contextra-store",
@@ -1083,6 +1088,7 @@ dependencies = [
  "calamine",
  "cfb",
  "contextra-engine",
+ "contextra-ingest",
  "contextra-types",
  "csv",
  "encoding_rs",

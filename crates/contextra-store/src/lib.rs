@@ -56,6 +56,8 @@ pub mod manifest;
 #[cfg(not(loom))]
 pub mod memtable;
 #[cfg(not(loom))]
+pub mod scanner;
+#[cfg(not(loom))]
 pub mod sstable;
 #[cfg(not(loom))]
 pub mod system_pressure;

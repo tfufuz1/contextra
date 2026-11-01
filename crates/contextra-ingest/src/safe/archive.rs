@@ -89,6 +89,20 @@ impl<'a> SafeZipReader<'a> {
         self.archive.by_name(name).is_ok()
     }
 
+    /// Alias für `contains_file`.
+    pub fn has_entry(&mut self, name: &str) -> bool {
+        self.contains_file(name)
+    }
+
+    /// Alias für `read_file`.
+    pub fn read_entry(
+        &mut self,
+        name: &str,
+        budget: &ResourceBudget,
+    ) -> Result<Vec<u8>, IngestError> {
+        self.read_file(name, budget)
+    }
+
     /// Gibt eine Liste aller Dateipfade im Archiv zurück.
     pub fn file_names(&mut self) -> Vec<String> {
         let mut names = Vec::new();
@@ -99,4 +113,64 @@ impl<'a> SafeZipReader<'a> {
         }
         names
     }
+}
+
+pub type SafeArchive<'a> = SafeZipReader<'a>;
+
+/// Validiert ein Zip-Archiv vor der Verarbeitung gegen `IngestLimits`.
+pub fn validate_zip_archive<R: std::io::Read + std::io::Seek>(
+    reader: R,
+    limits: &crate::limits::IngestLimits,
+) -> Result<(), IngestError> {
+    let mut archive = zip::ZipArchive::new(reader).map_err(|e| IngestError::Corrupt {
+        format: None,
+        detail: format!("Ungültiges Zip-Archiv: {e}"),
+    })?;
+
+    let num_entries = match u32::try_from(archive.len()) {
+        Ok(v) => v,
+        Err(_) => u32::MAX,
+    };
+    if num_entries > limits.max_archive_entries {
+        return Err(IngestError::LimitExceeded {
+            kind: crate::error::LimitKind::ArchiveEntries,
+            limit: limits.max_archive_entries as u64,
+            observed: num_entries as u64,
+        });
+    }
+
+    let mut total_uncompressed: u64 = 0;
+    let mut total_compressed: u64 = 0;
+
+    for i in 0..archive.len() {
+        let file = archive.by_index(i).map_err(|e| IngestError::Corrupt {
+            format: None,
+            detail: format!("Zip-Eintrag {i} nicht lesbar: {e}"),
+        })?;
+
+        total_uncompressed = total_uncompressed.saturating_add(file.size());
+        total_compressed = total_compressed.saturating_add(file.compressed_size());
+
+        if total_uncompressed > limits.max_decompressed_bytes {
+            return Err(IngestError::LimitExceeded {
+                kind: crate::error::LimitKind::DecompressedBytes,
+                limit: limits.max_decompressed_bytes,
+                observed: total_uncompressed,
+            });
+        }
+    }
+
+    if total_uncompressed > 0 {
+        let compressed_denom = total_compressed.max(1);
+        let ratio = total_uncompressed / compressed_denom;
+        if ratio > limits.max_compression_ratio as u64 {
+            return Err(IngestError::LimitExceeded {
+                kind: crate::error::LimitKind::CompressionRatio,
+                limit: limits.max_compression_ratio as u64,
+                observed: ratio,
+            });
+        }
+    }
+
+    Ok(())
 }
