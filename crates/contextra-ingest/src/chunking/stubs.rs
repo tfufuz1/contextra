@@ -76,6 +76,9 @@ mod structured_impl;
 
 pub use structured_impl::StructuredChunker;
 
+#[path = "paged/mod.rs"]
+mod paged_impl;
+
 #[derive(Debug, Default)]
 // ANCHOR[contextra-ingest:CHK-0238]
 // struct `PagedChunker` fuer Stubs und Platzhalter fuer experimentelle Chunking-Strategien.
