@@ -1,7 +1,7 @@
 # Contextra Voll-Audit
 
 - Commit: `722d45aa8` (2026-11-01 19:17:04 +0100), Branch `main`, hinter origin: 0, ungespeicherte Aenderungen: True
-- Start: 2026-11-01T18:45:45+00:00  Dauer: 84.4 min
+- Start: 2026-11-01T18:45:45+00:00  Dauer: 140.7 min
 - Toolchain-Pin: `1.89.0`; Preflight: **PASS** (cargo 1.89.0 (c24e10642 2025-06-23) | Pin 1.89.0)
 - Host: Linux-7.2.7-1-liquorix-amd64-x86_64-with-glibc2.41 | 8 CPUs | MemTotal:       10121020 kB
 - Nutzer: freddy
@@ -103,6 +103,40 @@ Hinweis: Bei `befund_*`-Schritten bedeutet FAIL, dass der Befund **vorliegt**. `
 | `loom_mvcc` | FAIL | 222.7 |  | `logs/151_loom_mvcc.log` |
 | `miri_vector_scalar` | FAIL | 63.4 |  | `logs/152_miri_vector_scalar.log` |
 | `asan_vector` | FAIL | 128.5 |  | `logs/153_asan_vector.log` |
+
+## Panic-Flaeche im Produktivcode (Clippy, lib, ohne Tests)
+
+| Crate | unwrap | expect | panic | todo | index | Summe |
+|---|---:|---:|---:|---:|---:|---:|
+| `contextra-text` | 0 | 0 | 0 | 0 | 13 | 13 |
+| `contextra-durable-fs` | 0 | 0 | 0 | 0 | 7 | 7 |
+
+## unsafe-Inventar gegen capabilities.toml
+
+- `contextra-arch-tests`: 0 Zeilen, island=False, nicht in capabilities.toml
+- `contextra-durable-fs`: 0 Zeilen, island=False, nicht in capabilities.toml
+- `contextra-simd`: 269 Zeilen, island=True, ok
+- `contextra-sys`: 21 Zeilen, island=True, ok
+
+## Benchmarks: 65 Messwerte in `bench_results.csv`
+
+## Reife-Behauptung vs. Beleg (capabilities.toml gegen diesen Lauf)
+
+| Crate | behauptet | lib-Tests | Clippy lib | Urteil |
+|---|---|---|---|---|
+| `contextra` | stable | FAIL | FAIL | **Behauptung ohne Beleg** |
+| `contextra-crypto` | beta | FAIL | FAIL | **Behauptung ohne Beleg** |
+| `contextra-engine` | beta | FAIL | FAIL | **Behauptung ohne Beleg** |
+| `contextra-mvcc` | stable | FAIL | PASS | **Behauptung ohne Beleg** |
+| `contextra-ports` | stable | FAIL | PASS | **Behauptung ohne Beleg** |
+| `contextra-rank` | stable | PASS | FAIL | **Behauptung ohne Beleg** |
+| `contextra-simd` | beta | PASS | PASS | ok |
+| `contextra-store` | beta | FAIL | FAIL | **Behauptung ohne Beleg** |
+| `contextra-sys` | stable | PASS | PASS | ok |
+| `contextra-testkit` | stable | PASS | FAIL | **Behauptung ohne Beleg** |
+| `contextra-text` | beta | PASS | FAIL | **Behauptung ohne Beleg** |
+| `contextra-types` | stable | PASS | PASS | ok |
+| `contextra-vector` | beta | PASS | FAIL | **Behauptung ohne Beleg** |
 
 ## Alle Schritte
 

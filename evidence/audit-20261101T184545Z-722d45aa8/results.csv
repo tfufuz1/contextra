@@ -153,6 +153,6 @@ nr,gruppe,schritt,status,rc,sekunden,detail,log,befehl,hinweis
 151,5-tief,loom_mvcc,FAIL,101,222.7,,logs/151_loom_mvcc.log,cargo test -p contextra-mvcc --release --locked,
 152,5-tief,miri_vector_scalar,FAIL,1,63.4,,logs/152_miri_vector_scalar.log,cargo +nightly miri test -p contextra-vector --lib,
 153,5-tief,asan_vector,FAIL,101,128.5,,logs/153_asan_vector.log,cargo +nightly test -p contextra-vector --target x86_64-unknown-linux-gnu,
-154,5-tief,coverage,PENDING,,0.0,,,cargo llvm-cov --workspace --locked --json --output-path /home/freddy/Projekte/contextra/evidence/audit-20261101T184545Z-722d45aa8/coverage.json,
+154,5-tief,coverage,PENDING,,0.0,,logs/154_coverage.log,cargo llvm-cov --workspace --locked --json --output-path /home/freddy/Projekte/contextra/evidence/audit-20261101T184545Z-722d45aa8/coverage.json,
 155,S-spec,spec_gates_statisch,PENDING,,0.0,,,,"Messung der Spezifikations-Gates (Ring, Sicherheit, Rueckbau, Tests, Groesse)"
 156,6-spec,spec_budgets_mutation,PENDING,,0.0,,,,"Laufzeit-Budgets, Regression, Mutation (liest target/criterion, mutants.out)"
