@@ -1,16 +1,16 @@
 #![allow(clippy::panic, clippy::unwrap_used)]
 
 use bytes::Bytes;
-use contextra_ports::{Clock, GraphIndex, Rng, SeededRng, StorageEngine, TextIndex, VectorIndex};
+use contextra_ports::{Clock, Rng, SeededRng, StorageEngine, TextIndex, VectorIndex};
 use contextra_testkit::conformance::{
-    run_clock_suite, run_graph_index_suite, run_metrics_sink_suite, run_rng_suite,
-    run_storage_engine_suite, run_text_index_suite, run_vector_index_suite,
+    run_clock_suite, run_metrics_sink_suite, run_rng_suite, run_storage_engine_suite,
+    run_text_index_suite, run_vector_index_suite,
 };
 use contextra_testkit::{
-    InMemoryGraphIndex, InMemoryStorageEngine, InMemoryTextIndex, InMemoryVectorIndex, ManualClock,
-    ReferenceModel, TestMetricsSink,
+    InMemoryStorageEngine, InMemoryTextIndex, InMemoryVectorIndex, ManualClock, ReferenceModel,
+    TestMetricsSink,
 };
-use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
+use contextra_types::{DocId, TxId};
 use std::ops::Bound;
 use std::time::Duration;
 
@@ -24,15 +24,6 @@ async fn test_in_memory_storage_engine_conformance() {
     assert!(
         result.is_ok(),
         "InMemoryStorageEngine must pass conformance suite: {result:?}"
-    );
-}
-
-#[tokio::test]
-async fn test_in_memory_graph_index_conformance() {
-    let result = run_graph_index_suite(|| async { InMemoryGraphIndex::new() }).await;
-    assert!(
-        result.is_ok(),
-        "InMemoryGraphIndex must pass conformance suite: {result:?}"
     );
 }
 
@@ -246,122 +237,7 @@ async fn test_storage_engine_stats_and_last_tx() {
 }
 
 // ============================================================================
-// 3. EDGE CASE TESTS: IN-MEMORY GRAPH INDEX
-// ============================================================================
-
-#[tokio::test]
-async fn test_graph_index_empty_and_unknown_queries() {
-    let graph = InMemoryGraphIndex::new();
-
-    // Neighbors of unknown node
-    let nbs = graph.neighbors(EntityId::new(999)).await.unwrap();
-    assert!(nbs.is_empty());
-
-    // Traversal on unknown node
-    let trav = graph.traverse(EntityId::new(999), 3).await.unwrap();
-    assert!(trav.is_empty());
-
-    // Traversal with 0 max_hops
-    let trav_zero = graph.traverse(EntityId::new(999), 0).await.unwrap();
-    assert!(trav_zero.is_empty());
-
-    // Graph length and stats on empty graph
-    assert_eq!(graph.len().await, 0);
-    let stats = graph.stats().await.unwrap();
-    assert_eq!(stats.num_entities, 0);
-    assert_eq!(stats.num_edges, 0);
-}
-
-#[tokio::test]
-async fn test_graph_index_remove_nonexistent_edge() {
-    let graph = InMemoryGraphIndex::new();
-    let tx = TxId::new(1);
-
-    // Removing edge that does not exist should not fail
-    let rem_res = graph
-        .remove_edge(tx, EntityId::new(1), EntityId::new(2))
-        .await;
-    assert!(rem_res.is_ok());
-
-    let commit_res = graph.commit(tx).await;
-    assert!(commit_res.is_ok());
-}
-
-#[tokio::test]
-async fn test_graph_index_duplicate_entities_and_edges() {
-    let graph = InMemoryGraphIndex::new();
-    let tx = TxId::new(10);
-
-    // Add entity twice
-    let e1 = Entity::new(EntityId::new(1), "Original", "TypeA");
-    let e1_dup = Entity::new(EntityId::new(1), "Updated", "TypeA");
-    graph.add_entity(tx, e1).await.unwrap();
-    graph.add_entity(tx, e1_dup).await.unwrap();
-
-    // Add edge twice
-    let edge1 = Edge::new(EntityId::new(1), EntityId::new(2), "rel");
-    let edge2 = Edge::new(EntityId::new(1), EntityId::new(2), "rel");
-    graph.add_edge(tx, edge1).await.unwrap();
-    graph.add_edge(tx, edge2).await.unwrap();
-
-    graph.commit(tx).await.unwrap();
-
-    // Len should reflect 1 entity, stats reflect 1 edge
-    assert_eq!(graph.len().await, 1);
-    let stats = graph.stats().await.unwrap();
-    assert_eq!(stats.num_entities, 1);
-    assert_eq!(stats.num_edges, 1);
-
-    // Neighbors should not duplicate EntityId(2)
-    let nbs = graph.neighbors(EntityId::new(1)).await.unwrap();
-    assert_eq!(nbs, vec![EntityId::new(2)]);
-}
-
-#[tokio::test]
-async fn test_graph_index_cycle_and_decay_traversal() {
-    let graph = InMemoryGraphIndex::new();
-    let tx = TxId::new(20);
-
-    // Create a triangle cycle: 1 -> 2 -> 3 -> 1
-    let mut e1 = Edge::new(EntityId::new(1), EntityId::new(2), "link");
-    e1.weight = 1.0;
-    let mut e2 = Edge::new(EntityId::new(2), EntityId::new(3), "link");
-    e2.weight = 1.0;
-    let mut e3 = Edge::new(EntityId::new(3), EntityId::new(1), "link");
-    e3.weight = 1.0;
-
-    graph.add_edge(tx, e1).await.unwrap();
-    graph.add_edge(tx, e2).await.unwrap();
-    graph.add_edge(tx, e3).await.unwrap();
-    graph.commit(tx).await.unwrap();
-
-    // Traversal from 1 for 5 hops: cycle should not loop infinitely
-    let trav = graph.traverse(EntityId::new(1), 5).await.unwrap();
-    assert!(!trav.is_empty());
-
-    // Traversal results are sorted descending by score
-    for window in trav.windows(2) {
-        if let [prev, next] = window {
-            assert!(prev.1 >= next.1);
-        }
-    }
-}
-
-#[tokio::test]
-async fn test_graph_index_rollback() {
-    let graph = InMemoryGraphIndex::new();
-    let tx = TxId::new(30);
-
-    let e = Entity::new(EntityId::new(10), "RollbackNode", "Test");
-    graph.add_entity(tx, e).await.unwrap();
-    graph.rollback(tx).await.unwrap();
-    graph.commit(tx).await.unwrap();
-
-    assert_eq!(graph.len().await, 0);
-}
-
-// ============================================================================
-// 4. EDGE CASE TESTS: IN-MEMORY VECTOR INDEX
+// 3. EDGE CASE TESTS: IN-MEMORY VECTOR INDEX
 // ============================================================================
 
 #[tokio::test]
@@ -454,7 +330,7 @@ async fn test_vector_index_rollback() {
 }
 
 // ============================================================================
-// 5. EDGE CASE TESTS: IN-MEMORY TEXT INDEX
+// 4. EDGE CASE TESTS: IN-MEMORY TEXT INDEX
 // ============================================================================
 
 #[tokio::test]
@@ -582,7 +458,7 @@ async fn test_text_index_rollback_and_stats() {
 }
 
 // ============================================================================
-// 6. EDGE CASE TESTS: MANUAL CLOCK
+// 5. EDGE CASE TESTS: MANUAL CLOCK
 // ============================================================================
 
 #[test]
@@ -628,7 +504,7 @@ fn test_manual_clock_large_advance_and_set() {
 }
 
 // ============================================================================
-// 7. REFERENCE MODEL VS IN-MEMORY STORAGE EQUIVALENCE
+// 6. REFERENCE MODEL VS IN-MEMORY STORAGE EQUIVALENCE
 // ============================================================================
 
 #[tokio::test]

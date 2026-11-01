@@ -17,7 +17,6 @@
 //! - [`InMemoryStorageEngine`]: Transaktionale In-Memory-Speicher-Engine mit Rollback-Unterstützung.
 //! - [`InMemoryVectorIndex`]: In-Memory-Vektorindex mit Cosine-Distanzberechnung.
 //! - [`InMemoryTextIndex`]: In-Memory-Volltextindex (BM25-ähnlich).
-//! - [`InMemoryGraphIndex`]: In-Memory-Graphindex für Kanten- und Knotentraversierung.
 //! - [`ReferenceModel`]: Referenzmodell zur Validierung von MVCC-Isolationsstufen (Multi-Version Concurrency Control).
 //! - [`mocks`]: Mocks für Embedder und Metriken (`MockEmbedder`, `TestMetricsSink`).
 //! - [`conformance`]: Standardisierte Konformitätstests für Ports (Clock, RNG, Storage, Vector, etc.).
@@ -26,11 +25,11 @@
 //! - **Normal:** `contextra-ports`, `contextra-types`, `bytes`, `parking_lot`, `tracing`.
 //! - **Wird eingebunden von:** `contextra`, `contextra-agent`, `contextra-checkpoint`,
 //!   `contextra-cognition`, `contextra-crypto`, `contextra-db`, `contextra-engine`,
-//!   `contextra-graph`, `contextra-mvcc`, `contextra-privacy`, `contextra-store`.
+//!   `contextra-mvcc`, `contextra-privacy`, `contextra-store`.
 
 // FILE-CONTEXT
-// STAND: 2026-10-29
-// ZWECK: Deterministic test utilities, ManualClock, InMemoryStorageEngine, InMemoryVectorIndex, InMemoryTextIndex, InMemoryGraphIndex, FaultVfs, ReferenceModel, Mocks, and Conformance suites.
+// STAND: 2026-11-01
+// ZWECK: Deterministic test utilities, ManualClock, InMemoryStorageEngine, InMemoryVectorIndex, InMemoryTextIndex, FaultVfs, ReferenceModel, Mocks, and Conformance suites.
 // INVARIANTEN: No unsafe code allowed in testkit (#![forbid(unsafe_code)]).
 
 #![forbid(unsafe_code)]
@@ -42,10 +41,6 @@ pub mod conformance;
 // ANCHOR[contextra-testkit:MOD-FAULT-VFS-001]
 /// Virtuelles Dateisystem mit deterministischer Fehlerinjektion (I/O- und fsync-Failures).
 pub mod fault_vfs;
-
-// ANCHOR[contextra-testkit:MOD-IN-MEM-GRAPH-001]
-/// Deterministische In-Memory-Referenzimplementierung des `GraphIndex`-Ports.
-pub mod in_memory_graph;
 
 // ANCHOR[contextra-testkit:MOD-IN-MEM-STORE-001]
 /// Transaktionale In-Memory-Referenzimplementierung des `StorageEngine`-Ports.
@@ -73,7 +68,6 @@ pub mod reference_model;
 
 // Re-Exports der zentralen Typen für bequemen Zugriff in Testsuiten
 pub use fault_vfs::{FaultConfig, FaultVfs};
-pub use in_memory_graph::InMemoryGraphIndex;
 pub use in_memory_store::InMemoryStorageEngine;
 pub use in_memory_text::InMemoryTextIndex;
 pub use in_memory_vector::InMemoryVectorIndex;
