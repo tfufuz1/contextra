@@ -76,11 +76,7 @@ import tomllib  # noqa: E402
 
 BENCHES = {
     "contextra-mvcc": ["mvcc_bench"],
-    "contextra-checkpoint": ["checkpoint_bench"],
-    "contextra-router": ["router_bench", "bandit_latency_gate", "cost_routing_savings_bench"],
-    "contextra-graph": ["csr_traversal_bench", "binary_edge_regression"],
-    "contextra-crypto": ["crypto_benchmarks", "deletion_proof_latency_bench"],
-    "contextra-infer-candle": ["kv_bridge_bench"],
+    "contextra-crypto": ["crypto_benchmarks"],
     "contextra-vector": [
         "distance_bench", "sq8_bench", "hnsw_bench", "hnsw_delete_search_bench", "audit_benchmarks",
         "flush_threshold_amplification", "partial_rebuild_recall_bench", "distance_nan_impact_bench",
@@ -89,19 +85,25 @@ BENCHES = {
     "contextra-store": ["sstable_bench", "memtable_bench", "wal_bench", "lsm_concurrency_bench",
                         "block_cache_bench", "redb_comparative_bench"],
     "contextra-simd": ["simd_bench"],
-    "contextra-bench": ["competitive_kv", "locomo", "long_mem_eval"],
 }
 
-FUZZ_CRATES = ["ingest", "mcp", "text", "db", "crypto", "vector", "store", "wire"]
+FUZZ_CRATES = ["crypto", "store", "text", "vector"]
 
-# Produktmenge laut Entscheidung (SOURCE OF TRUTH). avv-generator nur, weil privacy daran haengen kann.
-PRODUKT = ["contextra-types", "contextra-ports", "contextra-rank", "contextra-ingest", "contextra-privacy",
-           "contextra-infer-ollama", "contextra-audit-export", "contextra-testkit", "contextra-avv-generator"]
-# Diese duerfen in der Abhaengigkeitshuelle der Produktmenge NICHT vorkommen:
-VERBOTEN_IM_PRODUKT = ["contextra-engine", "contextra-db", "contextra-store", "contextra-graph",
-                       "contextra-cognition", "contextra-adapt", "contextra-core", "contextra",
-                       "contextra-vector", "contextra-text", "contextra-simd", "contextra-mvcc",
-                       "contextra-checkpoint", "contextra-sandbox"]
+# Produktmenge laut docs/SPEC.md §5.1 (14 Kern-Crates)
+PRODUKT = [
+    "contextra-types", "contextra-ports", "contextra-sys", "contextra-simd",
+    "contextra-durable-fs", "contextra-crypto", "contextra-mvcc", "contextra-store",
+    "contextra-text", "contextra-vector", "contextra-rank", "contextra-engine", "contextra",
+]
+# Nicht-Ziele / archivierte Crates (SPEC §1.4, §5.1), die im Produktiv-Workspace und dessen Huelle verboten sind:
+VERBOTEN_IM_PRODUKT = [
+    "contextra-agent", "contextra-checkpoint", "contextra-cognition", "contextra-adapt",
+    "contextra-core", "contextra-db", "contextra-graph", "contextra-infer-candle",
+    "contextra-infer-ollama", "contextra-infer-onnx", "contextra-ingest", "contextra-kvcache",
+    "contextra-license", "contextra-mcp", "contextra-privacy", "contextra-py",
+    "contextra-router", "contextra-sandbox", "contextra-wire", "contextra-audit-export",
+    "contextra-avv-generator", "contextra-bench",
+]
 
 K78_KNOWN = {"mmap_readonly", "reopen_and_dup2"}   # aus K7/K8 (Ausgangsbefund)
 SAFE_WRAPPER_SCOPE = "contextra-sys"          # Crate, in dem pub-fn ohne unsafe nicht unsafe-Inhalt haben duerfen
