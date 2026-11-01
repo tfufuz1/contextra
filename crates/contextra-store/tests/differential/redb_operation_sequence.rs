@@ -361,6 +361,7 @@ async fn run_differential_with_config(
                 .await?;
             }
             Op::Restart => {
+                storage.wait_shutdown().await;
                 drop(storage);
                 storage = LsmStorage::new(lsm_config.clone())
                     .await
@@ -616,6 +617,7 @@ async fn run_differential_large(ops: Vec<Op>) -> Result<(), TestCaseError> {
                 .await?;
             }
             Op::Restart => {
+                storage.wait_shutdown().await;
                 drop(storage);
                 storage = LsmStorage::new(lsm_config.clone())
                     .await
