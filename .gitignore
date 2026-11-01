@@ -46,7 +46,6 @@ benchmarks/contextra-bench/tests/data/
 coverage.json
 
 # Generierte Benchmark-/Test-Ergebnisse
-results/
 
 # Jules Session History Log (alt: .jules/, neu: .agents/jules/)
 .jules/session_history.jsonl*
@@ -62,10 +61,5 @@ results/
 .agents/jules/context/*.txt
 !.agents/jules/context/.gitkeep
 
-# Jules local state and gate artifacts (untracked)
-/.jules/gate_ledger.json
-/.jules/session.env
-/.jules/local/
-.agents/jules/session.env
-.agents/jules/gate_ledger.json
-evidence/
+
+
