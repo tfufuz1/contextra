@@ -23,7 +23,6 @@
 //!   womit das Commitment nicht mehr auf Originalattribute zurückführbar ist (Wörterbuchangriff
 //!   unmöglich, da salt unbekannt).
 
-use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
 use contextra_types::{DocId, TxId};
 use serde::{Deserialize, Serialize};

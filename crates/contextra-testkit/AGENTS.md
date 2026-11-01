@@ -1,28 +1,49 @@
 # AGENTS.md — `contextra-testkit`
 
-## 1. Rolle
-`contextra-testkit` stellt Test-Mocks, In-Memory Reference Stores und Injektions-Fixtures ausschließlich für Testumgebungen bereit.
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.15](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Werkzeug / Tooling
-- **Klasse:** Werkzeug (`—`)
-- **Reifegrad:** `—` (Werkzeug-Crate)
-- **`may_use` (Obergrenze):** Beliebig, **nur** als `dev-dependency` zugelassen (INV-EMBED-1, Spec §6.9)
+## 1. Rolle & Zweck
+`contextra-testkit` stellt wiederverwendbare Testbausteine, deterministische Testuhren, speicherbasierte Referenzmodelle, In-Memory-Ports und Fehlerinjektions-Tools für Unit-, Integrations- und Crash-Tests bereit.
 
-## 3. Garantien & Anforderungen (§33, §6.6)
-- **INV-EMBED-1:** Darf unter keinen Umständen als normale Abhängigkeit in Produktions-Features oder Release-Binaries eingebunden werden.
-- **REQ-TST-001:** Deterministische `ManualClock`, `ReferenceStore` und `TenantMatrixRunner` Test-Fixtures.
-- **Durchsetzungsmechanismus (§27.6):** `#![forbid(unsafe_code)]`, `check-ring-layering` Cargo-Dependency Checks.
+## 2. Ring, Abhängigkeiten & Einbindungsregeln
+- **Ring:** dev (Test-Infrastruktur)
+- **Erlaubte Einbindung:** **Ausschließlich als `dev-dependency`** in Tests oder Benchmarks (INV-EMBED-1).
+- **Verbotene Einbindung:** Darf unter keinen Umständen in normalen `[dependencies]` eines Produktionscrates auftauchen.
+- **Verbotene Muster:**
+  - **Strikt kein `unsafe`** (`#![forbid(unsafe_code)]`).
+  - Keine Produktionstypen mit Mock-Typen im Produktivcode vermischen.
 
-## 4. Verbotene Muster
-- Einbindung in `[dependencies]` von Nicht-Testkit Crates.
-- Kein `unsafe` (`#![forbid(unsafe_code)]`).
+## 3. Komponenten-Inventar (Soll-Zustand laut SPEC §8.15)
 
-## 5. Implementierte & konsumierte Ports (Anhang A)
-- Implementiert: `ManualClock`, Mock Storage & Engine Adapters.
+| Komponente | Inhalt & Verantwortung |
+|---|---|
+| `FaultVfs` | Hochentwickelter Fehlerinjektor: Absturzsimulation nach Operation $n$, abgerissene Schreibvorgänge an Byte $b$, `ENOSPC` (Disk voll), synchrone `EIO`-Fehler bei `sync_*`, verzögerte Sichtbarkeit (Page-Cache-Simulation), lückenlose Operations-Historie. |
+| `ReferenceModel` | Unabhängiges BTreeMap-Orakel zur Validierung von Transaktionen, MVCC-Zeitreisen und Löschsemantiken. |
+| `ManualClock` | Deterministisch steuerbare Testuhr (implementiert `Clock`-Port). |
+| `InMemoryStore` | Schneller In-Memory Key-Value-Speicher (implementiert `StorageEngine`). Ersetzt altes `memory-only-storage` im Produktivcode. |
+| `RecordingStorage` | Protokolliert jeden physisch geschriebenen Schlüssel zur Vollständigkeitsprüfung aller Operationen (T-COV-1). |
+| `NeighborDigest` | BLAKE3-Hash über alle Nicht-Ziel-Schlüssel/Werte zur Verifikation, dass Löschungen unbeteiligte Daten unberührt lassen. |
+| `LeakyLayer` | Absichtlich defekte `ErasureLayer`-Implementierung (vergisst Datenbereinigung) als Positivkontrolle für das Erasure Lab (T-RAW-2). |
+| `CanaryFactory` | Generiert hochentropische Canary-Needles mit protokolliertem Seed für Löschmessungen. |
+| `MemVfs`, `MemLedger` | Reine RAM-Implementierungen von `Vfs` und `LedgerSink`. |
 
-## 6. Tests & Gates
-- **Self-Tests:** `erasure_harness_selftest.rs`.
+> [!IMPORTANT]
+> **Bereinigung veralteter Test-Mocks (SPEC §8.15):**
+> Das historische `in_memory_graph` wird vollständig entfernt.
 
-## 7. Offene Punkte
-- keine.
+## 4. Kritische Invarianten
+1. **Deterministische Reproduzierbarkeit:** Jeder Testfall mit `FaultVfs` oder `ManualClock` ist über einen Seed exakt reproduzierbar.
+2. **Keine Produktionsverunreinigung:** Kein Typ aus `contextra-testkit` darf im Produktions-Release kompiliert werden.
+
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+
+- **[ ] WP-1.2: Veraltete Test-Mocks entfernen**
+  - Rückbau von `in_memory_graph` und Graph-Fixtures.
+- **[ ] WP-2.6 & WP-2.10: `FaultVfs` erweitern für Crash-Matrix**
+  - Implementierung feingranularer Fehlerinjektionen (Torn-Writes, `sync`-Abbrüche) für die LSM-Crash-Tests.
+- **[ ] WP-5.1: `LeakyLayer` und `CanaryFactory` bereitstellen**
+  - Implementierung der Positivkontroll-Fixtures für das Erasure Lab.
+
+## 6. Verifikation & Selbstevaluierung
+- **Selbsttests:** `FaultVfs`-Selbsttests auf deterministisches Verhalten bei I/O-Fehlern.
+- **T-RAW-2:** Nachweis, dass `LeakyLayer` von den Erasure-Scannern zuverlässig als fehlerhaft erkannt wird.
