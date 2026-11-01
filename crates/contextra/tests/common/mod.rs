@@ -16,15 +16,14 @@ use serde_json::{json, Value};
 use tempfile::TempDir;
 
 // ANCHOR[contextra:TEST-COM-001]
-/// Erstellt eine schnelle, temporäre `Contextra`-Testdatenbank mit `PerformanceProfile::BareMetal`.
-///
-/// Vermeidet Festplatten-Syncs im WAL für maximale Testausführungsgeschwindigkeit.
+/// Erstellt eine temporäre `Contextra`-Testdatenbank mit Passphrase und `PerformanceProfile::BareMetal`.
 pub async fn create_test_db(
     tmp_dir: &TempDir,
     dimension: usize,
 ) -> Result<Contextra, ContextraError> {
     builder(dimension)
         .with_storage_path(tmp_dir.path())
+        .with_encryption_passphrase("test-common-passphrase")
         .with_performance_profile(PerformanceProfile::BareMetal)
         .build()
         .await

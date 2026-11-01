@@ -16,9 +16,9 @@ contextra-engine = { workspace = true }
 contextra-store = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-rank = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-uuid = { version = "1", features = ["v4"] }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
@@ -29,6 +29,7 @@ tracing-subscriber = { workspace = true }
 tempfile = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-testkit = { workspace = true }
+trybuild = "1"
 
 [features]
 default = ["embedded"]
