@@ -30,9 +30,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use contextra_db::{Contextra, ContextraConfig, EmbeddingBackend, TextEmbeddingEngine};
-use contextra_license::SignedLicenseGate;
+use contextra_engine::{Contextra, ContextraConfig, EmbeddingBackend};
 use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate, OpenFastGate};
+use contextra_ports::TextEmbeddingEngine;
 use contextra_types::error::ContextraError;
 use contextra_types::DistanceMetric;
 use zeroize::Zeroizing;
@@ -253,36 +253,6 @@ impl ContextraBuilder {
     pub fn with_license_gate(mut self, gate: Arc<dyn LicenseGate>) -> Self {
         self.license_gate = gate;
         self.signed_license_error = None;
-        self
-    }
-
-    // ANCHOR[contextra:BLD-015]
-    /// Konfiguriert ein kryptografisch signiertes Lizenzgate (Ed25519-Signaturprüfung).
-    ///
-    /// Überprüft die Signatur des Lizenz-Payloads mit dem angegebenen öffentlichen Verifizierungsschlüssel.
-    /// Schlägt die Verifikation fehl, wird ein Fehler gespeichert, der beim Aufruf von `build()` fehlschlägt.
-    pub fn with_signed_license(
-        mut self,
-        payload_bytes: &[u8],
-        signature: &[u8; 64],
-        verifying_key_bytes: &[u8; 32],
-    ) -> Self {
-        match contextra_license::signed_gate::VerifyingKey::from_bytes(verifying_key_bytes) {
-            Ok(key) => {
-                match SignedLicenseGate::from_signed_payload(payload_bytes, signature, key) {
-                    Ok(gate) => {
-                        self.license_gate = Arc::new(gate);
-                        self.signed_license_error = None;
-                    }
-                    Err(e) => {
-                        self.signed_license_error = Some(e.to_string());
-                    }
-                }
-            }
-            Err(_) => {
-                self.signed_license_error = Some(LicenseError::InvalidSignature.to_string());
-            }
-        }
         self
     }
 

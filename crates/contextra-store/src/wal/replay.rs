@@ -2,12 +2,10 @@
 //!
 //! Rekonstruiert den Zustand der MemTable beim Hochfahren des Stores aus dem WAL.
 
-#[cfg(feature = "wal-integrity")]
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
-#[cfg(feature = "wal-integrity")]
 use super::{legacy_integrity_key, WalOp};
 use super::{
     Wal, WalEntry, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,

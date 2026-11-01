@@ -1,29 +1,40 @@
 # AGENTS.md — `contextra-sys`
 
-## 1. Rolle
-`contextra-sys` bietet systemnahes Memory-Mapping (mmap), Prozess-Härtung und plattformspezifische I/O-Primitiven über eine sichere Fassade.
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.3](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Unsafe-Insel 2 von 3)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types` (Spec §6.9, `capabilities.toml`)
+## 1. Rolle & Zweck
+`contextra-sys` ist eine der genau zwei zugelassenen `unsafe`-Inseln (D-29) im Gesamtsystem. Es kapselt plattformspezifische Systemprimitive (I/O-Synchronisation, Dateisystem-Dauerhaftigkeit, Speicher-Locking und Berechtigungen) hinter sicheren Rust-Schnittstellen.
 
-## 3. Garantien & Anforderungen (§33, §6.7)
-- **REQ-SYS-001:** Safe API Wrapper um OS-level Mmap und Prozess-Härtung (`harden_process`).
-- **REQ-SYS-002:** Jeder `unsafe`-Block trägt ein explizites `// SAFETY:` Kommentar.
-- **Durchsetzungsmechanismus (§27.6):** Plattform-Checks, Miri / Non-Linux Fail-Closed Fallback (`io::ErrorKind::Unsupported`).
+## 2. Ring, Abhängigkeiten & Insel-Regeln
+- **Ring:** Ring 1 (Plattform-Primitive, `unsafe`-Insel 1 von 2)
+- **Erlaubte Abhängigkeiten:** `contextra-types`, `libc`
+- **Insel-Doktrin (P2, SPEC §8.3):**
+  - Jeder einzelne `unsafe`-Block erfordert zwingend eine präzise `// SAFETY:`-Dokumentation, die Alignment, Pointer-Gültigkeit, Bounds und Plattformannahmen belegt.
+  - Öffentliche Funktionen ohne `unsafe` dürfen **keinen** unsicheren Inhalt mit offenen Vorbedingungen haben. Bekannte historische Schwachstellen (`mmap_readonly`, `reopen_and_dup2`) müssen als `unsafe fn` deklariert oder restlos beseitigt werden.
 
-## 4. Verbotene Muster
-- Exponieren roher OS-Handles oder unsicherer Pointer in der öffentlichen Schnittstelle.
-- `unsafe`-Blöcke ohne `// SAFETY:` Begründung.
+## 3. Modul-Inventar (Soll-Zustand laut SPEC §8.3)
 
-## 5. Implementierte & konsumierte Ports (Anhang A)
-- Stellt Mmap- und System-Primitiven für `contextra-store` und `contextra-vector` bereit.
+| Modul | Inhalt & Verantwortung |
+|---|---|
+| `fsync` | Robuste Datei-Synchronisation: `fsync_file`, `fdatasync`, `F_FULLFSYNC` unter macOS; Fehler werden ausnahmslos propagiert. |
+| `dir` | Verzeichnis-Dauerhaftigkeit: `flush_dir`, `rename_durable` (atomares Rename inklusive Verzeichnis-`fsync`). |
+| `mem` | Speicherhygiene: `mlock_best_effort`, `munlock` zum Schutz sensibler Schlüssel im RAM gegen Auslagerung (Swap). |
+| `perm` | Dateisystem-Rechte: `set_mode`, `check_mode` (Erzwingung von 0600 für Dateien, 0700 für Verzeichnisse). |
 
-## 6. Tests & Gates
-- **Miri Gate:** Miri-Verifikation für Memory-Mapping Pointers.
-- **Cross-Platform Tests:** Fail-Closed Verhalten auf Nicht-Linux Plattformen.
+## 4. Kritische Invarianten
+1. **Kein verschlucktes `fsync`:** Rückgabewerte von OS-Sync-Befehlen werden niemals mit `let _ =` verworfen, sondern als `io::Result<()>` propagiert.
+2. **Fail-Closed bei Nicht-POSIX:** Plattformen ohne Unterstützung verweigern die Arbeit kontrolliert mit typisiertem Fehler.
 
-## 7. Offene Punkte
-- keine.
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+
+- **[ ] WP-1.2: Wire- und IPC-Reste entfernen**
+  - Vollständiges Entfernen aller historischen `contextra-wire`-Primitiven aus `contextra-sys`.
+- **[ ] WP-2.6: Primitive für konsolidiertes Vfs bereitstellen**
+  - Saubere Bereitstellung von `flush_dir`, `rename_durable` und `fsync_file` für `contextra-durable-fs`.
+- **[ ] WP-6.4: Unsafe-Audit & Miri-Validierung**
+  - Lückenlose Dokumentation aller `// SAFETY:`-Blöcke; Miri-Testläufe für Pointer- und Memory-Mapping-Operationen.
+
+## 6. Verifikation & Tests
+- **T-UNSAFE-1:** CI-Prüfung aller `unsafe`-Blöcke auf `// SAFETY:`-Begründung.
+- **Miri-Suite:** Prüfung der Pointer- und Speicherausrichtung.
+- **T-PERM-1:** Validierung der strikten Dateirechte-Prüfung.

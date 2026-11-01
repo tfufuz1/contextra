@@ -1,154 +1,70 @@
-# AGENTS.md — contextra-store
-> Layer 1 | LSM-Tree Storage Engine mit WAL, MemTable, SSTable, Compaction | ~13100 LOC
+# AGENTS.md — `contextra-store`
 
-## 1. Zweck & Architekturrolle
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.8](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
 
-Persistenzschicht des gesamten Systems. Implementiert einen vollständigen LSM-Tree
-mit Write-Ahead-Log, MemTable (Skip-List), SSTable (Block-basiert mit Bloom-Filter,
-CRC32, Compression), Background-Compaction und MVCC-Snapshot-Isolation.
-Einziger Implementor des `StorageEngine` Traits aus `contextra-core`.
+## 1. Rolle & Zweck
+`contextra-store` ist der blinde, transaktionale LSM-Tree-Speicherkern von Contextra. Er verwaltet Write-Ahead-Log (WAL), Memtables, persistente SSTables, das Manifest, Hintergrundkompaktionen und **Purge-Primitive**. Er kennt weder Dokumentinhalte noch Volltext- oder Vektorindizes, sondern operiert rein auf `KeyBuf`, `Seq`, opaken Bytes und `Matcher`.
 
-**Datenpfad**: Client → `TxBuffer` → WAL → MemTable → SSTable → Compaction
+## 2. Ring, Abhängigkeiten & Verbote
+- **Ring:** Ring 2 (Speicherschicht)
+- **Erlaubte Abhängigkeiten:** `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-crypto`, `contextra-mvcc`.
+- **Verbotene Abhängigkeiten:** Keine Abhängigkeit zu `text`, `vector`, `erasure`, `engine` oder `contextra-durable-fs` (I/O ausschließlich über den `Vfs`-Port aus `contextra-ports`!).
+- **Verbotene Muster:**
+  - **Strikt kein `unsafe`** (`#![forbid(unsafe_code)]`).
+  - Kein direkter Aufruf von `std::fs` oder `tokio::fs` (D-04: I/O ausschließlich über `Vfs`).
+  - Kein `let _ =` auf `sync_*` (vollständige Fehlerpropagation).
+  - Kein unverschlüsselter Blockpfad (Verschlüsselung ist Pflicht, D-05).
+  - Kein `HashMap`/`HashSet` in Manifest oder Kernpfaden (ausschließlich `BTreeMap`/`BTreeSet`, P28).
 
-## 2. Modul-Karte
+## 3. Modul-Inventar (Soll-Zustand laut SPEC §8.8)
 
-| Datei / Verzeichnis | Verantwortung |
+| Modul | Inhalt & Verantwortung |
 |---|---|
-| `lib.rs` | Modul-Deklaration, `#![deny(unsafe_code)]`, Datenpfad-Invariante |
-| `lsm.rs` | `LsmStorage` — Orchestrator: öffnet DB, koordiniert WAL/MemTable/SSTable/Compaction, implementiert `StorageEngine` Trait |
-| `wal/` | Write-Ahead-Log: Modul mit `encode.rs`, `flusher.rs`, `hmac.rs`, `io.rs`, `replay.rs`. Append-Only, HMAC-Chaining, CRC32, Flusher-Actor, Passives WAL-Shipping (`rotate_and_seal`), Bounds-Prüfung |
-| `memtable.rs` | In-Memory Skip-List mit Sequenznummern, Tombstone-Unterstützung (Ziel: Range-Sharded MemTable) |
-| `sstable.rs` | On-Disk sortierte Segmente: Block-Kompression, Bloom-Filter, Index, CRC32, Block-Cache-Integration (LRU Default / SIEVE Opt-in) |
-| `compaction.rs` | `CompactionEngine` — Hintergrund-Merge von SSTables (Tiered/Leveled) |
-| `checkpoint.rs` | `pub(crate)` — Internes MVCC-Snapshot-Pinning via injiziertem `Clock`-Port (P28, INV-CHECKPOINT-DETERMINISM-1), **NICHT** die öffentliche Checkpoint-API (die ist in `contextra-checkpoint`) |
-| `manifest.rs` | Transaktionale Manifest-Verwaltung für SSTable-Generationen |
-| `tenant_codec.rs` | Tenant-spezifische Key-Präfix-Codierung und Scopes |
-| `system_pressure.rs` | Überwachung von Memory- und Disk-Pressure für Flush/Throttling |
-| `util.rs` | `pub(crate)` Hilfsfunktionen (Atomic Rename, load_or_create_integrity_key) |
+| `codec` | Cluster-Codec (SPEC §9.1): `encode_data_key`, `encode_loc_key`, `encode_meta_key`, `parse`, `range_of(Target)`. Ersetzt `tenant_codec.rs`. |
+| `scoped` | `TenantScopedStorage` (einziger Zugriffspunkt, T-ARCH-2): Erzwingt Mandantentrennung, prüft `ReadGate` bei jedem Lese- und Scanvorgang. |
+| `wal` | Write-Ahead-Log: `frame` (HMAC-Kette, CRC32, Seq, TxId), `io` (Append, Rotate, Seal), `flusher` (Gruppen-Commit), `replay` (eine kanonische Implementierung). |
+| `memtable` | Skip-List mit allen Versionen; `remove_range(&Matcher)` zum rückstandslosen Entfernen aller Versionen bei Purge. |
+| `sstable` | Block-AEAD-SSTables (AES-256-GCM-SIV, AAD = `file_id ‖ block_idx ‖ version`), Bloom-Filter, Index, LRU-Blockcache mit Zeroize. |
+| `manifest` | Transaktionales Append-Log: `AddFile`, `RemoveFile`, `ReplaceFiles{old,new}`, `SetSeq`. `fsync` je Eintrag. |
+| `compaction` | Leveled Compaction; `CompactionFilter` verwirft gegatete Bereiche über den Port `ReadGate`; Purge-`Barrier`. |
+| `lsm` | `LsmStorage` implementiert `StorageEngine` und `ErasureLayer`. |
+| `erase` | Purge-Ablauf (FI-S20..S27, SPEC §11.4): `plan`, `drain`, `rewrite_file`, `swap`, `unlink_verify`. |
 
-## 3. Kritische Invarianten
+## 4. Kritische Invarianten
+1. **WAL-First Consistency (I-1):** Schreibreihenfolge ist verbindlich: WAL-Frame erzeugen → Gruppen-Commit → `sync_data` WAL → Memtable eintragen → Sichtbarkeit im Read-Pfad.
+2. **Cancel-Safety (I-14, D-C01):** Commit läuft in eigener Task; Abbruch des Aufrufer-Futures ändert den Ausgang nicht.
+3. **Ebene A Purge-Disziplin (SPEC §11.4):**
+   - SSTable-Rewrite behält Original-Sequenznummern `seq`, `tx_id` und `flags` für alle Nicht-Ziel-Einträge unverändert bei (I-2).
+   - `swap` tauscht Dateien atomar im Manifest (`ReplaceFiles`), synchronisiert Datei und Verzeichnis, invalidiert und nullt betroffene Blockcache-Einträge und löscht die Altdatei mit Verzeichnis-Sync und Fehlen-Prüfung (`Vfs::exists`).
+4. **Behebung Sicherheitsbefunde (SPEC §4.2):**
+   - `#![allow(unexpected_cfgs)]` und die sieben toten `wal-integrity`-Gates in `wal/replay.rs` werden restlos entfernt.
+   - Alle `encryption-at-rest`-Gates entfallen; Verschlüsselung ist fundamentaler Kernbestandteil.
 
-### fsync Error Propagation (ABSOLUT)
-JEDER `sync_all()` und `sync_data()` Aufruf **MUSS** Fehler mit `?` propagieren.
-`let _ = dir.sync_all()` ist **VERBOTEN** — verschluckt WAL-Durability-Garantien.
-CI Gate 3 erzwingt dies automatisch.
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
 
-### last_committed_tx — Single Load Rule
-In `get_at_seq()` und `scan_prefix_at()`: `last_committed_tx` **EINMAL** am Start
-in eine lokale Variable laden. NICHT während der Iteration neu lesen — bricht
-Snapshot Isolation unter konkurrierenden Writes.
+- **[ ] WP-2.1: Snapshot-Sentinel Fix in Compaction**
+  - Korrektur in `store/src/lsm/ops/compaction.rs` (Z. 225–231), sodass keine Tombstone-Bits mehr an `prune_through` übergeben werden.
+- **[ ] WP-2.3: WAL-Integrität wiederherstellen & Replay vereinheitlichen**
+  - Entfernen von `allow(unexpected_cfgs)`; Vereinheitlichung der doppelten Replay-Logik.
+- **[ ] WP-2.4: CRC-Fehler bei Offset 4 lokalisieren (Zeitbox 2 Wochen)**
+  - Diagnose und Beseitigung des CRC-Fehlers bei verschlüsseltem WAL-Replay.
+- **[ ] WP-2.5: Sicherheitsdefaults umsetzen (D-05, D-07)**
+  - Entfernen unverschlüsselter Pfade; `KeySet`-Integration; Mandantentrennung via `TenantScopedStorage`.
+- **[ ] WP-2.6: Vfs-Migration (D-04)**
+  - Vollständige Umstellung aller Datei- und Verzeichnisoperationen auf den `Vfs`-Port.
+- **[ ] WP-2.7: Cancel-sicherer Follower-Commit**
+  - Entkopplung des Gruppen-Commits von Client-Futures via `oneshot`.
+- **[ ] WP-2.8: Lebenszyklus und Drop-Sicherheit**
+  - Geordnetes Schließen aller Hintergrundtasks in `close()`; kein Blockieren in `Drop`.
+- **[ ] WP-2.9: Zero-Panic & Determinismus**
+  - Entfernung aller `unwrap()`/`expect()` in Produktionspfaden; Umstellung von `HashMap` auf `BTreeMap` im Manifest.
+- **[ ] WP-2.10: Crash-Matrix (T-CRASH-1..4)**
+  - Validierung gegen Kill- und Stromausfall-Simulationen mit `FaultVfs`.
+- **[ ] WP-3.7 & WP-3.8: Purge-Barrier, Drain und SSTable-Rewrite**
+  - Exklusive `Barrier`, Memtable-Flush, WAL-Drain und atomarer `swap` via Manifest.
 
-### WAL HMAC Key Sourcing
-**IMMER** `load_or_create_integrity_key()` verwenden. **NIEMALS** Schlüssel hartcodieren.
-Der Key wird via HKDF aus dem Master Key abgeleitet (siehe `contextra-crypto`, Cargo-Package-Name: `contextra-privacy`).
-
-### TOMBSTONE_BIT-Disziplin (ADR-041)
-Bit 63 **strikt** maskieren (`seq & !TOMBSTONE_BIT`) vor allen `max_seq` Vergleichen.
-Unmaskierte Tombstone-Sequenznummern führen zu Phantom-Sichtbarkeit gelöschter Einträge.
-
-### Flush-before-Visible (ADR-043)
-`last_committed_tx` **VOR** `sstables.push()` in `LsmStorage::flush` aktualisieren.
-Umgekehrte Reihenfolge erzeugt ein Race-Window: SSTable ist sichtbar bevor
-die Transaktion als committed markiert ist.
-
-### I/O Pattern (ADR-012)
-- `tokio::fs` für Metadaten/Lifecycle (WAL-Append, Flush, Directory-Create)
-- `std::fs::File` **NUR** inside `spawn_blocking` für Block-Level Random-Access (SSTable pread)
-
-### Atomic Rename Pattern (Writes)
-`write_to_file()` MUSS tmp-file + atomic rename verwenden:
-1. Schreibe nach `path.with_extension("tmp")`
-2. `fsync` die Datei
-3. `rename(tmp, final)` — atomar auf POSIX
-4. `fsync` das Parent-Directory
-
-### pub(crate) checkpoint Sichtbarkeit
-`checkpoint.rs` ist `pub(crate)` — internes Snapshot-Pinning.
-Die öffentliche benannte Checkpoint-API lebt in `contextra-checkpoint` (ADR-011).
-**NIEMALS** `contextra-store::checkpoint` von außerhalb importieren.
-
-## 4. Public API Quick-Reference
-
-```rust
-// === LsmStorage (lsm.rs) — Implementiert StorageEngine ===
-pub struct LsmStorage { ... }
-impl LsmStorage {
-    pub async fn open(config: LsmConfig) -> Result<Self>;
-    pub async fn repair_on_open(&self) -> Result<()>;
-    // Alle StorageEngine Methoden (get, put, commit, flush, scan_prefix_at, ...)
-}
-
-pub struct LsmConfig {
-    pub data_dir: PathBuf,
-    pub memtable_size_limit: usize,     // Default: 4 MB
-    pub compaction: CompactionConfig,
-    pub encryption_passphrase: Option<String>,
-}
-
-// === CompactionEngine (compaction.rs) ===
-pub struct CompactionEngine { ... }
-pub struct CompactionConfig {
-    pub max_sstable_count: usize,       // Trigger-Schwelle
-    pub size_ratio: f64,                // Tiered Size Ratio
-}
-```
-
-## 5. Anti-Patterns & LLM-Fallstricke
-
-```rust
-// ❌ FALSCH — IO-Fehler verschluckt:
-let _ = file.sync_all().await;
-let _ = dir.sync_all();
-// ✅ KORREKT:
-file.sync_all().await.map_err(|e| ContextraError::Storage(format!("fsync: {e}")))?;
-
-// ❌ FALSCH — Deserialisierung mit Default-Fallback:
-let entry = bincode::deserialize(&bytes).unwrap_or_default();
-// ✅ KORREKT:
-let entry = bincode::deserialize(&bytes)
-    .map_err(|e| ContextraError::ParseError(format!("WAL corrupt: {e}")))?;
-
-// ❌ FALSCH — Unmaskierter Tombstone-Vergleich:
-if entry.seq > max_seq { ... }  // Bit 63 kann gesetzt sein!
-// ✅ KORREKT:
-if (entry.seq & !TOMBSTONE_BIT) > max_seq { ... }
-
-// ❌ FALSCH — std::fs direkt im async Kontext:
-let file = std::fs::File::open(&path)?;
-// ✅ KORREKT:
-let file = tokio::task::spawn_blocking(move || std::fs::File::open(&path)).await??;
-
-// ❌ FALSCH — checkpoint.rs von extern importieren:
-use contextra_store::checkpoint::SnapshotPinner;
-// ✅ KORREKT — pub(crate), nutze stattdessen:
-use contextra_checkpoint::CheckpointGuard;
-```
-
-## 6. Concurrency & Lock-Hierarchie
-
-| Lock | Typ | Scope | Reihenfolge |
-|---|---|---|---|
-| `write_lock` | `tokio::sync::Mutex` | WAL + MemTable Atomizität | 1. (äußerster) |
-| `memtable` | `Arc<parking_lot::RwLock>` | MemTable Read/Write | 2. |
-| `sstables` | `Arc<parking_lot::RwLock>` | SSTable-Liste | 3. |
-| `snapshot_registry` | `parking_lot::Mutex` | Snapshot Pins | 4. (innerster) |
-
-**Regel**: Niemals einen Lock in umgekehrter Reihenfolge akquirieren. Niemals einen `parking_lot` Guard über `.await`-Punkte halten.
-
-## 7. Cross-Crate-Schnittstellen & DAG-Grenzen
-
-- **Erlaubte Imports**: `contextra-core` (L0), `contextra-crypto` (Cargo-Package-Name: `contextra-privacy`) (L1 Peer)
-- **Verbotene Imports**: `contextra-db` (L2), `contextra-vector` (L1 Peer — kein Peer-Import!), `contextra-text` (L1 Peer)
-- **Implementiert**: `StorageEngine` Trait aus `contextra-core`
-- **Genutzt von**: `contextra-db`, `contextra-agent`, `contextra-router` (als `Arc<dyn StorageEngine>`)
-
-## 8. Relevante ADRs & Rules
-
-| ADR/Rule | Relevanz |
-|---|---|
-| ADR-012 | I/O Pattern (tokio::fs vs. spawn_blocking) |
-| ADR-041 | TOMBSTONE_BIT-Maskierung |
-| ADR-043 | Flush-before-Visible Race Fix |
-| `rules/async-io.md` | spawn_blocking Pattern für SSTable Reads |
-| `rules/wal_crypto.md` | HMAC Chaining & Key Derivation |
-| `rules/error-handling.md` | ContextraError Variant Policy |
+## 6. Verifikation & Benchmarks
+- **T-DIFF-1:** Differential-Testing gegen `ReferenceModel` ($10^6$ Operationen).
+- **T-CRASH-1..4:** Crash-Matrix ohne Datenverlust committeter Transaktionen.
+- **T-CANCEL-1:** Abbruchfestigkeit bei parallelen Commits.
+- **Benchmarks:** B-INSERT, B-GET, B-SCAN, B-WAL, B-SST, B-ERASE-WA, B-RECOVER.

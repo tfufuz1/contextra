@@ -300,14 +300,6 @@ impl LsmStorage {
         self.next_seq_no.load(std::sync::atomic::Ordering::Acquire)
     }
 
-    pub(crate) fn sstables_arc(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
-        Arc::clone(&self.sstables)
-    }
-
-    pub(crate) fn block_cache(&self) -> Arc<BlockCache> {
-        Arc::clone(&self.block_cache)
-    }
-
     #[doc(hidden)]
     #[cfg(any(test, feature = "test-utils", feature = "test-hooks"))]
     pub fn sstables_for_test(&self) -> Arc<RwLock<Vec<Arc<SstableReader>>>> {
@@ -474,25 +466,6 @@ impl LsmStorage {
         }
 
         Ok(migrated_count)
-    }
-
-    /// Returns a snapshot of the active memtable and immutable memtables for scanner/purger introspection.
-    pub(crate) async fn memtables_for_scanner(
-        &self,
-    ) -> (
-        Arc<crate::memtable::MemTable>,
-        Vec<Arc<crate::memtable::MemTable>>,
-    ) {
-        let state = self.state.read().await;
-        (
-            Arc::clone(&state.memtable),
-            state.immutable_memtables.clone(),
-        )
-    }
-
-    /// Returns a snapshot of currently open SSTable readers.
-    pub(crate) async fn sstables_for_scanner(&self) -> Vec<Arc<crate::sstable::SstableReader>> {
-        self.sstables.read().await.clone()
     }
 
     /// Returns the data directory path.

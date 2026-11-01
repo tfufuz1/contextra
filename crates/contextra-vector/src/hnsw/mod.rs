@@ -8,9 +8,6 @@
 
 pub mod adaptive_ef;
 pub mod arena;
-pub mod deletion;
-pub mod purge;
-pub mod scanner;
 pub mod sq8_bias;
 
 mod acorn_filtered;
@@ -29,9 +26,6 @@ pub use adaptive_ef::{AdaptiveEfPolicy, AdaptiveEfStateMachine, AdaptiveEfStats}
 pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
 pub use config::{HnswConfig, HnswConfigBuilder};
-pub use deletion::DeletionStats;
-pub use purge::{hnsw_purger, HnswPurger};
-pub use scanner::{hnsw_scanner, HnswScanner};
 pub use sq8_bias::Sq8Bias;
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,

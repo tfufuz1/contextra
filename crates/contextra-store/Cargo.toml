@@ -23,6 +23,7 @@ windows-sys = { version = "0.61", features = [
 [features]
 default = []
 test-hooks = []
+test-utils = ["test-hooks"]
 memory-only-storage = []
 fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]

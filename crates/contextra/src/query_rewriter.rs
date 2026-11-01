@@ -24,8 +24,7 @@
 //!   synchron ab, bevor der asynchrone Port-Aufruf erfolgt.
 //! - **Robustes Parsing**: Bereinigt Code-Fences, Nummerierungen, Aufzählungszeichen und JSON-Formatierungen.
 
-use contextra_db::QueryRewriter;
-use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_ports::{BoxFuture, LlmTextGenerator, QueryRewriter};
 use contextra_types::error::Result;
 use contextra_types::ScoredEntry;
 #[allow(clippy::disallowed_types)]

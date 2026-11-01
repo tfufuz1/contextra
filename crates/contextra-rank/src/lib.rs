@@ -31,7 +31,6 @@
 #![warn(missing_docs)]
 
 // ANCHOR[contextra-rank:MOD-001]
-pub mod calibration;
 pub mod drift;
 pub mod explain;
 pub mod fusion;
@@ -39,10 +38,6 @@ pub mod fusion;
 #[cfg(feature = "dibud")]
 pub mod dibud;
 
-pub use calibration::{
-    AdaptiveConformalCalibrator, ConformalCalibrator, ConformalError, IsotonicCalibrator,
-    PlattScaler,
-};
 #[cfg(feature = "dibud")]
 pub use dibud::{
     fuse_exact_prefix, fuse_exact_prefix_async, BudgetedChannel, DiBudFusionState, DiBudOutcome,

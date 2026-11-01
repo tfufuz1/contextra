@@ -42,21 +42,17 @@
 // MODUL-HIERARCHIE: lsm.rs orchestriert, memtable/wal/sstable sind Bausteine.
 
 #![forbid(unsafe_code)]
-#![allow(unexpected_cfgs)]
 
 #[cfg(not(loom))]
 pub mod compaction;
 pub mod engine;
 pub mod fsync;
-pub mod kv;
 #[cfg(not(loom))]
 pub mod lsm;
 #[cfg(not(loom))]
 pub mod manifest;
 #[cfg(not(loom))]
 pub mod memtable;
-#[cfg(not(loom))]
-pub mod scanner;
 #[cfg(not(loom))]
 pub mod sstable;
 #[cfg(not(loom))]

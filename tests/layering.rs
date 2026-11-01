@@ -59,28 +59,24 @@ pub fn find_allowlist_entry(from_crate: &str, to_crate: &str) -> Option<&'static
 impl Ring {
     pub fn for_crate(name: &str) -> Option<Ring> {
         match name {
-            // Ring 0: Foundation & Core Domain Logic
-            "contextra-types" | "contextra-ports" | "contextra-mvcc" | "contextra-vector"
-            | "contextra-rank" | "contextra-adapt" | "contextra-text" | "contextra-graph"
-            | "contextra-crypto" | "contextra-simd" | "contextra-sys" | "contextra-wire"
-        | "contextra-core" => Some(Ring::Ring0),
+            // Ring 0: Fundament & Primitive
+            "contextra-types" | "contextra-ports" => Some(Ring::Ring0),
 
-            // Ring 1: Storage & State Persistence
-            "contextra-store" | "contextra-checkpoint" | "contextra-kvcache" => Some(Ring::Ring1),
+            // Ring 1: Hardware-Isolation, Unsafe-Inseln & Krypto
+            "contextra-sys" | "contextra-simd" | "contextra-durable-fs" | "contextra-crypto" => Some(Ring::Ring1),
 
-            // Ring 2: External Integrations & Execution Sandboxes
-            "contextra-sandbox" | "contextra-infer-onnx" | "contextra-infer-candle"
-            | "contextra-infer-ollama" => Some(Ring::Ring2),
+            // Ring 2: Speicherschicht & Indizes
+            "contextra-mvcc" | "contextra-store" | "contextra-vector" | "contextra-text"
+            | "contextra-rank" => Some(Ring::Ring2),
 
-            // Ring 3: Engine, Reasoning & Cognition
-            "contextra-engine" | "contextra-cognition" | "contextra-privacy"
-            | "contextra-router" | "contextra-agent" | "contextra-db" => Some(Ring::Ring3),
+            // Ring 3: Orchestrierung & Kernverarbeitung
+            "contextra-engine" => Some(Ring::Ring3),
 
-            // Ring 4: Public Facade & Protocol Servers
-            "contextra" | "contextra-mcp" | "contextra-py" => Some(Ring::Ring4),
+            // Ring 4: Fassade
+            "contextra" => Some(Ring::Ring4),
 
             // Tooling
-            "contextra-testkit" | "contextra-bench" => Some(Ring::Tooling),
+            "contextra-testkit" => Some(Ring::Tooling),
 
             _ => None,
         }

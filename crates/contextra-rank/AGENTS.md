@@ -1,30 +1,43 @@
 # AGENTS.md — `contextra-rank`
 
-## 1. Rolle
-`contextra-rank` bietet Score-Kalibrierung (Platt, Isotonisch, Conformal) und Ergebnis-Anreicherungen zur Verfeinerung von Retrieval-Rankings.
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.13](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Ranking & Kalibrierung)
-- **Klasse:** Rand `[R]`
-- **Reifegrad:** `experimental` (Anmerkung: In `capabilities.toml` aktuell als `stable` geführt, siehe `docs/status/ABW-L3.md`)
-- **`may_use` (Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)
+## 1. Rolle & Zweck
+`contextra-rank` ist für die deterministische Fusion von Trefferlisten aus Volltext- und Vektorsuche mittels Reciprocal Rank Fusion (RRF) zuständig.
 
-## 3. Garantien & Anforderungen (§33, §12)
-- **REQ-RNK-001:** Deterministischer Tie-Breaker (bei gleichen Scores Sortierung nach DocId aufsteigend).
-- **REQ-RNK-002:** Konforme Kalibrierung und Platt/Isotonische Skalierung ohne Mutation der Ursprungsscores.
-- **Durchsetzungsmechanismus (§27.6):** `#![forbid(unsafe_code)]`, Ranking Unit-Tests.
+## 2. Ring, Abhängigkeiten & Verbote
+- **Ring:** Ring 2 (Ranking & Fusion)
+- **Erlaubte Abhängigkeiten:** `contextra-types`, `contextra-ports`
+- **Verbotene Abhängigkeiten:** Keine Abhängigkeiten zu `contextra-store`, `contextra-engine` oder externen ML-/Adapt-Crates.
+- **Verbotene Muster:**
+  - **Strikt kein `unsafe`** (`#![forbid(unsafe_code)]`).
+  - Keine Hintergrund-Threads oder asynchronen Tasks.
+  - Keine nicht-deterministischen Floating-Point-Operationen oder instabile Sortierungen.
 
-## 4. Verbotene Muster
-- **Keine Hintergrund-Threads ohne Port.**
-- Kein `unsafe` (`#![forbid(unsafe_code)]`).
-- **Keine zweite Standardfusion:** RRF-Standardfusion liegt im Kern (`engine`), `rank` bietet nur Kalibrierer/Erweiterungen (§6.10, Punkt 10).
+## 3. Funktionsumfang & API (Soll-Zustand laut SPEC §8.13)
 
-## 5. Implementierte & konsumierte Ports (Anhang A)
-- Implementiert: `Calibrator` Port.
-- Konsumiert: Port `Metric`.
+- **Kanonische Fusions-API:**
+  ```rust
+  pub fn rrf_fuse(lists: &[Vec<Hit>], k: u32, top: usize) -> Vec<Hit>;
+  ```
+  Standardwert für $k = 60$.
+- **Deterministischer Tie-Break:** Bei identischen RRF-Scores erfolgt der Tie-Break strikt deterministisch nach aufsteigendem `doc_tag`.
 
-## 6. Tests & Gates
-- **Ranking Tie-Breaker Tests:** Determinismus-Tests für identische Fusion-Scores.
+> [!IMPORTANT]
+> **Bereinigung veralteter Ranking-Module (SPEC §8.13):**
+> Historische Kalibratoren (`IsotonicCalibrator`, Platt Scaling), adaptive Ranking-Strategien und alle Abhängigkeiten zu `adapt` werden vollständig entfernt. `contextra-rank` konzentriert sich ausschließlich auf die RRF-Standardfusion.
 
-## 7. Offene Punkte
-- keine.
+## 4. Kritische Invarianten
+1. **Permutationsinvarianz:** Die Reihenfolge, in der Trefferlisten an `rrf_fuse` übergeben werden, beeinflusst weder die berechneten Scores noch die Ergebnisrangfolge.
+2. **Determinismus:** Identische Eingabelisten liefern auf jeder unterstützten Architektur exakt dieselbe Byte-Ausgabe.
+
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+
+- **[ ] WP-1.2: Komplexe Kalibratoren entfernen**
+  - Rückbau von `IsotonicCalibrator`, Conformal Calibration und externen Adaptiv-Abhängigkeiten.
+- **[ ] WP-6.1: T-RANK-1 Property-Tests & Benchmarks**
+  - Verifikation der RRF-Eigenschaften (Permutationsinvarianz, Tie-Breaker, handberechnete Referenzvektoren).
+
+## 6. Verifikation & Benchmarks
+- **T-RANK-1:** Property-Tests mit permutierten Eingabelisten und synthetischen Scores.
+- **B-RRF:** Benchmark für Fusionsdurchsatz bei Listen bis 10.000 Einträgen.

@@ -1,29 +1,42 @@
 # AGENTS.md — `contextra-simd`
 
-## 1. Rolle
-`contextra-simd` kapselt hardwarenahe SIMD-Vektordistanzberechnungen in einer genau auditierten, sicheren API-Insel.
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.4](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
 
-## 2. Ring, Klasse, Reifegrad & `may_use`
-- **Ring:** Ring 0 (Unsafe-Insel 1 von 3)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **`may_use` (Obergrenze):** `contextra-types` (Spec §6.9, `capabilities.toml`)
+## 1. Rolle & Zweck
+`contextra-simd` ist die zweite zugelassene `unsafe`-Insel (D-29) im Gesamtsystem. Es stellt hochoptimierte Hardware-Distanzberechnungen für f32-Vektoren (`l2`, `dot`, `cosine`) bereit, die in `contextra-vector` genutzt werden.
 
-## 3. Garantien & Anforderungen (§33, §6.7)
-- **REQ-SMD-001:** Exponiert ausschließlich **sichere** öffentliche APIs.
-- **REQ-SMD-002:** Jeder `unsafe`-Block trägt ein explizites `// SAFETY:` Kommentar.
-- **Durchsetzungsmechanismus (§27.6):** Miri-Ausführung, Property-Tests gegen sichere Skalar-Referenzimplementierungen.
+## 2. Ring, Abhängigkeiten & Insel-Regeln
+- **Ring:** Ring 1 (Distanzkernel, `unsafe`-Insel 2 von 2)
+- **Erlaubte Abhängigkeiten:** `contextra-types`
+- **Insel-Doktrin (P2, SPEC §8.4):**
+  - Jeder `unsafe`-Block erfordert ein präzises `// SAFETY:`-Kommentar mit Nachweis über Alignment, Bounds und SIMD-Registergrenzen.
+  - Sichere Skalar-Referenzimplementierungen dienen als unveränderliche Ground-Truth.
+  - Exponiert ausschließlich **sichere** öffentliche Funktionen nach außen.
 
-## 4. Verbotene Muster
-- Exponieren unsicherer Funktionen in der öffentlichen Schnittstelle.
-- `unsafe`-Blöcke ohne `// SAFETY:` Begründung.
+## 3. Funktionsumfang & Kernel-Matrix (Soll-Zustand laut SPEC §8.4)
 
-## 5. Implementierte & konsumierte Ports (Anhang A)
-- Exponiert direkte Vektor-Distanzfunktionen (L2, Cosine, DotProduct, Hamming) für `contextra-vector`.
+| Metrik | Datentyp | Implementierungen & Dispatch |
+|---|---|---|
+| L2-Distanz (Euklidisch) | `f32` | Skalar-Referenz, AVX2 + FMA, AVX-512 (f32), ARM NEON |
+| Skalarprodukt (`dot`) | `f32` | Skalar-Referenz, AVX2 + FMA, AVX-512 (f32), ARM NEON |
+| Kosinus-Ähnlichkeit | `f32` | Skalar-Referenz, AVX2 + FMA, AVX-512 (f32), ARM NEON |
 
-## 6. Tests & Gates
-- **Miri Gate:** Miri-Verifikation aller SIMD Intrinsics / Pointer-Operationen.
-- **Property-Tests:** Bit-exakte Gleichheit gegen reine Skalar-Funktionen.
+> [!CAUTION]
+> **Gestrichen gemäß SPEC D-28:** Der historische u8-VNNI-Pfad (`_mm512_dpbusd_epi32`) war fehlerhaft und ist **vollständig zu entfernen**. In v1 gibt es keine quantisierten u8-VNNI-Kernel.
 
-## 7. Offene Punkte
-- keine.
+## 4. Kritische Invarianten
+1. **Genauigkeitskorridor:** Jeder SIMD-Kernel liefert für identische Eingaben das Ergebnis der Skalar-Referenz innerhalb einer relativen Fehlertoleranz von $\epsilon = 10^{-4}$ bei Vektoren mit Norm $\le 10^3$.
+2. **Sicheres Tail-Handling:** Vektorlängen, die kein Vielfaches der Registerbreite (8 bzw. 16 Floats) sind, werden deterministisch über den Skalar-Rest berechnet. Keinerlei Out-of-Bounds Lesezugriffe über Slice-Grenzen hinaus!
+3. **Deterministischer Laufzeit-Dispatch:** CPU-Feature-Prüfung erfolgt dynamisch über Standard-Makros (`is_x86_feature_detected!`); bei fehlenden Befehlssatzerweiterungen wird verzweigungsfrei auf die Skalar-Referenz zurückgefallen.
+
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+
+- **[ ] WP-1.4: SIMD-Reduktion (D-28)**
+  - Vollständiges Entfernen des u8-VNNI-Codes und Bereinigung der Kernel-Schnittstellen auf f32.
+- **[ ] WP-6.4: Unsafe-Audit & Miri-Validierung**
+  - Überprüfung aller Speicherzugriffe und Pointer-Arithmetik mit Miri.
+  - Vollständige `// SAFETY:`-Dokumentation für jeden SIMD-Intrinsic-Aufruf.
+
+## 6. Verifikation & Benchmarks
+- **T-SIMD-1:** Property-Tests über $10^5$ Zufallsvektoren (Längen 1 bis 4096 Floats) über alle Dispatch-Pfade gegen die Skalar-Referenz.
+- **B-SIMD:** Durchsatz-Benchmarks für alle Kernel; Regressionsgrenze $\le 5\,\%$.

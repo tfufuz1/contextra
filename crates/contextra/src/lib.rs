@@ -45,20 +45,17 @@ pub mod query_rewriter;
 
 pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::{ContextraBuilder, ContextraConfigExt, EncryptionMode};
-pub use contextra_db::{
-    chunker, execute_background_consolidation, memory_consolidation, Collection, CollectionConfig,
-    Contextra, ContextraConfig, ContextraStats, DriftStatusProvider, EmbeddingBackend,
-    SearchResult, TextEmbeddingEngine,
+pub use contextra_engine::{
+    chunker, Collection, CollectionConfig, Contextra, ContextraConfig, ContextraStats,
+    EmbeddingBackend, SearchResult,
 };
+pub use contextra_ports::{DriftStatusProvider, TextEmbeddingEngine};
 pub use contextra_types::error::ContextraError;
 pub use contextra_types::types::domain::{DocId, ScoredDocument};
 pub use contextra_types::DistanceMetric;
 pub use query_rewriter::LlmQueryRewriter;
 
 pub use contextra_rank as rank;
-
-#[cfg(feature = "candle")]
-pub use contextra_infer_candle as candle;
 
 // ANCHOR[contextra:LIB-001]
 /// Erzeugt einen neuen [`ContextraBuilder`] zur Konfiguration und Instanziierung der Datenbank [`Contextra`].

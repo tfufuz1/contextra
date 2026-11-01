@@ -23,23 +23,22 @@ pub enum Ring {
     Tooling = 99,
 }
 
-/// Ring-Zuordnung je Workspace-Crate (Spezifikation 4.1).
+/// Ring-Zuordnung je Workspace-Crate (SPEC §5.2).
 pub const RING_TABLE: &[(&str, Ring)] = &[
     ("contextra-types", Ring::Ring0),
     ("contextra-ports", Ring::Ring0),
-    ("contextra-sys", Ring::Ring0),
-    ("contextra-simd", Ring::Ring0),
-    ("contextra-mvcc", Ring::Ring0),
-    ("contextra-crypto", Ring::Ring0),
-    ("contextra-vector", Ring::Ring0),
-    ("contextra-text", Ring::Ring0),
-    ("contextra-rank", Ring::Ring0),
-    ("contextra-store", Ring::Ring1),
-    ("contextra-engine", Ring::Ring2),
-    ("contextra-db", Ring::Ring3),
+    ("contextra-sys", Ring::Ring1),
+    ("contextra-simd", Ring::Ring1),
+    ("contextra-durable-fs", Ring::Ring1),
+    ("contextra-crypto", Ring::Ring1),
+    ("contextra-mvcc", Ring::Ring2),
+    ("contextra-store", Ring::Ring2),
+    ("contextra-vector", Ring::Ring2),
+    ("contextra-text", Ring::Ring2),
+    ("contextra-rank", Ring::Ring2),
+    ("contextra-engine", Ring::Ring3),
     ("contextra", Ring::Ring4),
     ("contextra-testkit", Ring::Tooling),
-    ("contextra-bench", Ring::Tooling),
 ];
 
 /// Crates, in denen `unsafe` erlaubt ist (NFR-2).

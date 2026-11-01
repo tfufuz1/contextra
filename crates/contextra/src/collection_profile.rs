@@ -29,8 +29,23 @@
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
 use contextra_ports::license::LicenseGate;
-use contextra_store::kv::delete_mode::KvDeleteMode;
 pub use contextra_types::types::domain::AutoExtractionMode;
+
+/// Mode specifying KV segment deletion behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+pub enum KvDeleteMode {
+    /// Standard Tombstone
+    TombstoneOnly,
+    /// Cryptographic shredding
+    CryptoShred,
+}
+
+impl Default for KvDeleteMode {
+    fn default() -> Self {
+        Self::TombstoneOnly
+    }
+}
 
 // ANCHOR[contextra:PRF-001]
 /// Standardmodus für die automatische LLM-gestützte Metadaten-/Entitäten-Extraktion bei Standard-Tiers.

@@ -12,9 +12,6 @@
 
 #![forbid(unsafe_code)]
 
-pub use contextra_crypto::deletion_proof::{
-    DeletionLayer, DeletionProof, DeletionScope, ExcludedScope,
-};
 use contextra_ports::license::LicenseGate;
 #[cfg(feature = "sandbox")]
 use contextra_ports::BoxFuture;
@@ -89,7 +86,6 @@ pub use collection::maintenance::PercolationResult;
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
 #[cfg(not(loom))]
 pub use collection::{Collection, CollectionConfig};
-pub use contextra_checkpoint;
 pub use contextra_text::Language;
 #[cfg(not(loom))]
 #[allow(deprecated)]
