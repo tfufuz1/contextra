@@ -1,54 +1,52 @@
 ---
 name: contextra-product-suite
 description: >-
-  Use this skill to guide the packaging, testing, and release validation of Contextra's sub-products:
-  EP1 Memory, EP6 Guard (Privacy Gateway), EP2 Proof, and EP7 Ingest.
+  Use this skill to guide the testing and release validation of Contextra's product stages (SPEC §1.3):
+  S0 Hardened Storage & Erasure, S1 Fulltext Search, S2 Vector Search, and S3 Hybrid Retrieval v1.0.0.
 ---
 
-# Contextra Product Suite – Modul- & Produktvalidierung
+# Contextra Product Suite – Produktstufen & Release-Validierung
 
-Dieser Skill unterstützt Entwickler und Agenten bei der Entkopplung, Validierung und Paketierung der disjunkten Contextra-Produktfamilie nach [PLAN.md §11](file:///home/freddy/Projekte/contextra/PLAN.md#L526) und [docs/SPEC.md §4](file:///home/freddy/Projekte/contextra/docs/SPEC.md#L83).
-
----
-
-## 1. Die vier Zielprodukte
-
-| Produkt | Zweck & Wertversprechen | Beteiligte Crates | Release-Reihenfolge |
-|---|---|---|---|
-| **EP6 Guard** | Lokales Privacy-Gateway: Egress-Filterung, PII-Erkennung mit Prüfziffernvalidierung (IBAN, Luhn, St-ID), reversible Tokenisierung. | `contextra-privacy`, `contextra-sandbox` | **1. Produkt (schnellstes Go-to-Market)** |
-| **EP1 Memory** | Eingebettete Hybrid-Suche (HNSW + BM25 mit deutscher Morphologie + RRF) mit gemessener DSGVO-Löschung (Ebene A & B). | `store`, `vector`, `text`, `engine`, `db`, `durable-fs` | **2. Produkt (Kern-Alleinstellungsmerkmal)** |
-| **EP2 Proof** | Asymmetrisch signierte Lösch- und Revisionsberichte (Ed25519 Proof V5) und AVV-Generator (Art. 28 DSGVO). | `contextra-audit-export`, `contextra-avv-generator` | Add-on zu Memory & Guard |
-| **EP7 Ingest** | Format-Parser für unvertrauenswürdige Dokumente (PDF, DOCX, XLSX, HTML, EPUB) in isoliertem Subprozess. | `contextra-ingest` | Nach Subprozess-Isolation & Fuzzing |
+Dieser Skill unterstützt Entwickler und Agenten bei der inkrementellen Validierung und Paketierung der Contextra-Produktstufen nach [docs/SPEC.md §1.3](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md).
 
 ---
 
-## 2. Release-Gates (G1 bis G4)
+## 1. Die vier Produktstufen (SPEC §1.3)
 
-Ein Modul oder Produkt darf nur freigegeben werden, wenn alle vier Gates bestanden sind:
+Jede Stufe ist in sich geschlossen und einzeln lieferbar:
 
-- **G1 (Korrektheit)**: Besteht Konformitäts- und Differentialtests gegen ein unabhängiges Orakel ohne Hänger oder Timeouts.
-- **G2 (Haltbarkeit)**: Übersteht Kill- und Crash-Durability-Tests (`SIGKILL` an beliebiger Stelle) ohne Datenverlust und ohne Klartextreste.
-- **G3 (Leistung)**: Mindestens das 1,5-fache der etablierten Referenz (z. B. HNSW gegen Exakt-Scan, BM25-Top-10 Recall).
-- **G4 (Wartbarkeit)**: Schmaler Port, Zero-Panic (`deny(clippy::unwrap_used)`), `unsafe` nur in benannter Insel mit `// SAFETY:`.
+| Stufe | Inhalt | Lieferbares Ergebnis |
+|---|---|---|
+| **S0** | Gehärteter LSM-Speicher mit Löschcluster-Schlüsselraum, Pflichtverschlüsselung, Tresor, Gate, Saga, Purge, Journal, Bericht, Lab, Verifier. Dokumente, Zeitreisen, Mandanten. | Verschlüsselter Dokumentenspeicher mit belegbarer Löschung. Vollwertiges Produkt (Agentengedächtnis ohne Suche). |
+| **S1** | Textsuche als abgeleiteter, segmentierter, AEAD-verschlüsselter BM25-Index | Volltextsuche mit denselben Lösch- und Messnachweisen |
+| **S2** | Vektorsuche (HNSW) mit Slot-Zeroing, verschlüsselten Snapshot-Chunks und Batch-Rebuild | RAG-Vektorkern |
+| **S3** | Hybridsuche (RRF), API-Politur, Dokumentation, Release-Candidate | v1.0.0 Komplettsystem |
 
 ---
 
-## 3. Sub-Workspace Build- und Test-Kommandos
+## 2. Gate-Prüfpfade (PLAN.md)
+
+1. **Gate G-C (Speicherkern)**: LSM-Tree gehärtet, WAL-Integrität, Cancel-Safety, Vfs-Migration, Zero-Panic, Crash-Matrix (T-CRASH-1..4).
+2. **Gate G-D (Löschung Dokumente)**: Saga, ReadGate (`ErasedSet`), Purge-Barrier, SSTable-Rewrite/Swap, Snapshot-Widerruf.
+3. **Gate G-E (Indizes)**: Segment-Rewrite BM25 (WP-4.1), HNSW Slot-Zeroing & Rebuild (WP-4.2), Blockcache-Eviction.
+4. **Gate G-F (Nachweis & Bericht)**: Erasure Lab, signierter Bericht `ctx-erasure-report/1`, Verifier `ctx-verify`.
+5. **Gate G-G (Härtung)**: Fuzzing, Concurrency, Mutationstests, Unsafe-Audit.
+6. **Gate G-H (Freigabe)**: Externes Review, Dokumentation, v1.0.0 Release Candidate.
+
+---
+
+## 3. Test-Kommandos
 
 ```bash
-# EP6 Guard validieren
-cargo test -p contextra-privacy
+# Speicherkern testen (Stufe S0)
+cargo test -p contextra-store -p contextra-mvcc -p contextra-crypto
 
-# EP1 Memory validieren
-cargo test -p contextra-vector -p contextra-text -p contextra-rank -p contextra-store
+# Textsuche testen (Stufe S1)
+cargo test -p contextra-text
 
-# EP2 Proof validieren
-cargo test -p contextra-crypto --test deletion_proof_tests
-cargo test -p contextra-audit-export
-cargo test -p contextra-avv-generator
+# Vektorsuche testen (Stufe S2)
+cargo test -p contextra-vector -p contextra-simd
 
-# EP7 Ingest validieren
-cargo test -p contextra-ingest --no-default-features
+# Hybridsuche & Gesamtsystem testen (Stufe S3)
+cargo test -p contextra-rank -p contextra-engine -p contextra
 ```
-
-Weitere Details: siehe [references/product_specs.md](file:///home/freddy/Projekte/contextra/.agents/skills/contextra-product-suite/references/product_specs.md).

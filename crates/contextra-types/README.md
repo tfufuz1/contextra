@@ -1,14 +1,22 @@
 # contextra-types
 
-Grundlegende Typdefinitionen (DocId, TxId, TenantId, Error-Typen).
+Kanonische Typdefinitionen, Identifikatoren, Schlüssel-Buffer, Fehler und Löschtypen.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, `capabilities.toml`).
+- **Ring:** Ring 0 (Typen-Kern, deterministisch, I/O-frei, kein `tokio`)
+- **Normativ:** [docs/SPEC.md §8.1](../../docs/SPEC.md)
+- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
 
-## Rolle in einem Satz
-`contextra-types` definiert die zentralen, produkt- und I/O-unabhängigen Domänentypen, Identifikatoren und Fehler-Enums des Gesamtsystems.
+## Rolle & Zweck
+`contextra-types` definiert die reinen, zustandslosen, I/O- und runtime-unabhängigen Domänentypen für das Gesamtsystem Contextra:
+- `ids`: `TenantId`, `CollectionName`, `DocKey`, `SubjectId`, blinde Tags (`TenantTag`, `CollTag`, `ClusterTag`, `DocTag`, `TermTag`), `Seq(NonZeroU64)`, `TxId`, `ErasureId`, `SegmentId`, `Slot`.
+- `key`: `Region`, `Family`, `KeyBuf`, `KeyRange`, `Matcher` (Löschcluster-Schlüsselraum SPEC §9.1).
+- `erasure`: `EraseTarget`, `ErasureState`, `LayerId`, `LayerStatus`, `ErasureClass`, `ResidualRisk`, `ErasureReport`, `RetentionAttestation`, `NeedleSet`, `LayerScan`, `Evidence`.
+- `error`: `ContextraError`.
+- `secret`: `SecretBytes`, `SecretKey32` (`Zeroizing`).
+- `limits`: Normative Obergrenzen aus SPEC §14.6.
 
-## Ring, Klasse & Reifegrad
-- **Ring:** Ring 0 (Typen-Kern, deterministisch, kein `tokio`, I/O-frei)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `(keine)` (Spec §6.9, `capabilities.toml`)
+## Invarianten
+- `#![forbid(unsafe_code)]`
+- Kein `async`, kein I/O, keine Zeit- oder Zufallsabfragen.
+- Alle Tags implementieren kein `Display`, nur gekürztes Hex in `Debug`.
+- `Seq` hat keinen Sentinel (`u64::MAX`).

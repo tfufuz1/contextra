@@ -1,8 +1,8 @@
 # Contextra – Sicherheitsmodell & Bedrohungsanalyse (Security Model)
 
-<!-- doc-stamp: 2026-10-31 | Normativ: docs/SPEC.md §3, §8, §9, §12 | PLAN.md §6 -->
+<!-- doc-stamp: 2026-11-01 | Normativ: docs/SPEC.md §10, §11, §12 | PLAN.md Phase 2 -->
 
-Dieses Dokument beschreibt das Bedrohungsmodell, die Sicherheitsarchitektur und den Härtungsfahrplan für Contextra.
+Dieses Dokument beschreibt das Bedrohungsmodell, die Sicherheitsarchitektur und die Sicherheits-Defaults für Contextra gemäß [docs/SPEC.md](SPEC.md) und [PLAN.md](../PLAN.md).
 
 ---
 
@@ -10,48 +10,51 @@ Dieses Dokument beschreibt das Bedrohungsmodell, die Sicherheitsarchitektur und 
 
 | Schutzgut | Speicherort | Primärer Schutzmechanismus |
 |---|---|---|
-| **Dokumente & Metadaten** | SSTables, MemTable, WAL | AEAD-Verschlüsselung (AES-GCM-SIV / ChaCha20-Poly1305), HMAC-Verkettung im WAL, CRC32C in Datenblöcken. |
-| **Schlüsselmaterial** | RAM des Prozesses | KDF via Argon2id (PLAN S-01), Zeroization beim Drop (`zeroize`), Paging-Schutz (`mlock` via `contextra-sys`). |
-| **Mandantentrennung** | Alle Schichten | `TenantId` aus dem `RequestContext`, Präfix-Isolation, Partitionsfilter vor Distanzberechnungen (VETO-F10). |
-| **Suchindizes** | HNSW (Vektor), BM25 (Text) | Physischer Purge bei Löschung, Rebuild nach VETO-F02, Isolation flüchtiger Segmente. |
-| **Löschbeweise** | Export / MCP | Manipulationssichere Signaturkette (Ed25519 + HMAC), Prüfung auf Mindestentropie (>= 32 Bytes). |
+| **Dokumente & Datensätze** | SSTables, MemTable, WAL | Pflichtverschlüsselung mit AES-256-GCM-SIV, Envelope-Format (SPEC §9.3), HMAC-SHA256-Kette im WAL, CRC32 für Torn-Write-Erkennung. |
+| **Schlüsselmaterial** | RAM des Prozesses | KDF via Argon2id ($m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$), HKDF-Ableitung in `KeySet` (SPEC §13.1), `Zeroizing<T>`, Paging-Schutz (`mlock` via `contextra-sys`). |
+| **Mandantentrennung** | Alle Schichten | Verpflichtende `TenantId`, physische und logische Isolation über `TenantScopedStorage` (T-ARCH-2, VETO-F10). |
+| **Suchindizes** | HNSW (Vektor), BM25 (Text) | AEAD-verschlüsselte Chunks und Segmente auf Platte; Slot-Zeroing im RAM; physischer Purge-Rewrite bei Löschung. |
+| **Löschberichte** | Dateisystem / Export | Asymmetrisch Ed25519-signierter Bericht `ctx-erasure-report/1` mit E1/E2/E3-Residuenmessung. Keine Klartext-IDs. |
 
 ### Vertrauensgrenzen
-- **Prozessgrenze:** Contextra läuft eingebettet im Prozess der Trägeranwendung. Die Trägeranwendung wird als kooperativ vorausgesetzt; memory-dump-Schutz erfolgt über `mlock` und `Zeroize`.
-- **Dateisystemgrenze:** Das Datenverzeichnis wird als feindlich bzw. unzuverlässig betrachtet. Unvollständige Schreibvorgänge, Crash-Reste oder unautorisierte Änderungen führen zu sofortigem Abbruch (INV-FAILCLOSED-1).
-- **Mandantengrenze:** Anfragen verschiedener Mandanten sind informationstheoretisch und physisch strikt isoliert. Kein Mandant kann Indizes, Caches oder Daten eines anderen Mandanten einsehen (VETO-F10).
-- **Netzgrenze (Single-Node):** Der Kern öffnet keinerlei Netzwerk-Sockets. Externe Kommunikation ist ausschließlich optional über das Adapter-Crate `contextra-infer-ollama` an eine lokale REST-Schnittstelle möglich.
+- **Prozessgrenze:** Contextra läuft eingebettet im Prozess der Trägeranwendung. Memory-Dump-Schutz erfolgt über `mlock_best_effort` und `Zeroize`.
+- **Dateisystemgrenze:** Das Datenverzeichnis wird als potentiell feindlich oder fehleranfällig betrachtet. Manipulationen, unvollständige Schreibvorgänge oder CRC-Mismatches führen zum sofortigen kontrollierten Abbruch (INV-FAILCLOSED-1).
+- **Mandantengrenze:** Anfragen verschiedener Mandanten sind informationstheoretisch und physisch strikt isoliert (VETO-F10). Kein geteilter Cache, keine gemischten SSTables, keine mandantenübergreifenden Kanten.
+- **Netzgrenze (Single-Node-Doktrin):** Der Kern öffnet keinerlei Netzwerk-Sockets und enthält keine Netzwerk-Crates im Produktionsbaum.
 
 ---
 
-## 2. Sicherheitsbefunde & Härtungsplan (PLAN §6)
+## 2. Verbindliche Sicherheits-Defaults (SPEC §10)
 
-Folgende kritische Sicherheitsbefunde sind im Rahmen von Stufe 1 und Stufe 2 zu härten:
-
-| ID | Schwere | Befund & Fundstelle | Verbindliche Gegenmaßnahme |
+| ID | Gegenstand | Sicherheits-Vorgabe (Normativ) | Begründung |
 |---|---|---|---|
-| **S-01** | Kritisch | Passphrase-Ableitung via HKDF-SHA256 (`crypto.rs:88`) | Umstellung des Standard-KDF auf **Argon2id** (`try_new_with_kdf`). HKDF nur noch für Subkey-Ableitung aus sicherem Master-Material. |
-| **S-02** | Kritisch | Verschlüsselung standardmäßig inaktiv (`config.rs`) | Invertierung des Defaults: **Verschlüsselung ist standardmäßig aktiv**. Unverschlüsselter Betrieb erfordert expliziten Opt-Out (`InsecurePlaintextStorage`). |
-| **S-03** | Kritisch | Mandantenmodus optional (`TenantMode::Optional`) | Umstellung auf **`TenantMode::Required` als Standard**. Anfragen ohne `RequestContext` werden abgelehnt. |
-| **S-04** | Kritisch | Automatische LLM-Entitätsextraktion aktiv | Standardmäßig auf **`Disabled`** setzen, um unbemerkten PII-Abfluss zu verhindern. |
-| **S-05** | Hoch | Passphrase als Klartext-String im Builder (`builder.rs:355`) | Kapselung in `SecretString` mit redigiertem `Debug`-Format (`[REDACTED]`) und automatischer Speicher-Nullung. |
-| **S-06** | Hoch | ODF-Dekompressionsbudget umgehbar (`odf/mod.rs:124`) | Hartes Limit auf tatsächlich entpackte Bytes bei allen Archiv-Formaten (Schutz vor Decompression Bombs). |
-| **S-07** | Hoch | EPUB Fail-Open bei Entschlüsselungsfehlern (`epub.rs:122`) | Konsequentes Fail-Closed: Beschädigte oder verschlüsselte DRM-Dateien führen zum Abbruch. |
-| **S-09** | Hoch | Fehlende Entropieprüfung für Proof-Keys (`mcp/proof_key.rs`) | Erzwingen von mindestens 256 Bit (32 Bytes) Entropie für Signaturschlüssel; Konsolidierung redundanter Funktionen. |
-| **S-10** | Mittel | Egress-Audit standardmäßig No-Op | Scharfschalten lokaler Egress-Audits in `contextra-infer-ollama`. |
-| **S-16** | Mittel | WAL-Integritätsschlüssel im Klartext (`wal/hmac.rs:221`) | Schlüssel wird über den `KeyManager` geschützt statt als ungeschützte Datei abgelegt. |
+| **D-05** | Verschlüsselung | **Pflicht ohne Opt-Out** (`EncryptionMode::Required`). Kein unverschlüsselter Block- oder SSTable-Pfad im Produktionscode. | Schutz vor Datenremanenz auf persistenten Medien. |
+| **D-06** | Passphrase-KDF | **Argon2id mit $m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$** (`derive_master`). HKDF für Passphrasen ist strikt verboten (B-15). | Brute-Force-Resistenz gegen GPU/ASIC-Angriffe. |
+| **D-07** | Mandantenisolation | **Verpflichtend ohne Opt-Out** (`TenantPolicy::Required`). `TenantId` stammt aus dem Kontext. | Ausschluss versehentlicher mandantenloser Speicherung. |
+| **D-27** | Entitätsextraktion | **Vollständig entfallen in v1**. Kein unkontrollierter PII-Abfluss an externe LLM-Dienste. | Minimierung der Angriffsfläche und Datenschutzrisiken. |
+| **D-29** | Unsafe-Code | **Strikt auf 2 Inseln beschränkt** (`contextra-sys`, `contextra-simd`). Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`. | Speichersicherheit des Gesamtsystems. |
+| **D-31** | Schlüsselraum | **Blinde Tags:** `doc_tag`, `coll_tag`, `tenant_tag`, `term_tag` via keyed BLAKE3 (`blind_tag`). Kein Klartext in Schlüsseln. | Schutz vor Metadaten-Leaks in Indizes und Bloom-Filtern. |
 
 ---
 
-## 3. Zweistufiges Löschmodell (SPEC §12)
+## 3. Lösch- und Nachweismodell (SPEC §11, §12, ADR-001)
 
-Zur Einhaltung von Art. 17 DSGVO ohne Leistungsverlust kombiniert Contextra zwei Sicherheitsstufen:
-
-1. **Ebene A (Arbeitsspeicher & aktive Indizes):** Physischer Purge. Löschung entfernt Vektoren aus dem HNSW-Index (Tombstone + Rebuild nach VETO-F02), bereinigt BM25-Posting-Listen und invalidiert MemTables.
-2. **Ebene B (Persistenter LSM-Speicher):** Krypto-Löschung (*Crypto-Shredding*). Der dokumentspezifische Schlüssel (`DocDek`) in der `KeyRegistry` wird unwiederbringlich genullt (`zeroize`). Persistierte SSTables bleiben physisch unverändert, sind jedoch informationstheoretisch unentschlüsselbar.
+Gemäß ADR-001 (SPEC §3.3, D-01) implementiert Contextra in v1 ein belegbares Löschmodell basierend auf physischer Bereinigung und Verifikation:
+1. **Sofortige Lesesperre (`ReadGate`):** Sobald ein Löschauftrag `Gated` ist, blockiert `ErasedSet` fail-closed alle Lese- und Suchpfade auf Zielschlüssel. Aktive Snapshots, die Zielversionen sehen könnten, werden widerrufen (`SnapshotRevoked`).
+2. **Physisches Purging (Ebene A):**
+   - Store: `drain` versiegelt WAL; `rewrite_file` streamt neue SSTables ohne Zieldaten (Originalsequenzen bleiben erhalten, I-2); atomarer `swap` via Manifest; Block-Cache Eviction mit Zeroize.
+   - Vector: `zero_slot` überschreibt RAM-Bytes mit Nullen, Tombstone-Flag, Rewrite betroffener Snapshot-Chunks, Rebuild ab Schwelle.
+   - Text: Puffer leeren, betroffene Segmente ohne Zieldaten neu schreiben, Alt-Segmente löschen, Term-Statistik neu aggregieren.
+3. **Residuenmessung & Zeugen:**
+   - **E1**: Byte-genauer Rohscan des Datenverzeichnisses nach Needles.
+   - **E2**: Strukturierter Scan nach Dekodierung aller Container.
+   - **E3**: Nachweis der Schlüssel- und Slot-Abwesenheit.
+   - Positivkontrolle (Canary) vor jeder Messung beweist Detektionsfähigkeit.
+4. **Bericht `ctx-erasure-report/1`:**
+   Ed25519-signiert, maschinenlesbar, enthält keine Klartext-IDs oder Personendaten. Verifizierbar durch die unabhängige Binärdatei `ctx-verify`.
 
 ---
 
 ## 4. Meldung von Sicherheitslücken (Vulnerability Disclosure)
 
-Sicherheitsrelevante Schwachstellen dürfen nicht über öffentliche GitHub-Issues gemeldet werden. Bitte senden Sie vertrauliche Berichte mit PoC an: `security@contextra.local` (oder PGP-verschlüsselt an die Maintainer).
+Sicherheitsrelevante Schwachstellen dürfen nicht über öffentliche Issue-Tracker gemeldet werden. Vertrauliche Berichte mit Proof-of-Concept richten Sie bitte direkt an die Core-Maintainer.

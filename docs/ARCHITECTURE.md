@@ -2,111 +2,124 @@
 
 | Feld | Wert |
 |---|---|
-| Stand | 31.10.2026 |
-| Normative Referenz | [`docs/SPEC.md`](SPEC.md) (Fassung 2.4, Zielzustand v1.0) & [`PLAN.md`](../PLAN.md) |
-| Ring-Definition | [`capabilities.toml`](../capabilities.toml) |
-| Sicherheits-Doktrin | Single-Node, Safe Rust, Zero Panic, Fail-Closed, absolute Mandantentrennung (VETO-F10) |
+| Stand | 2026-11-01 |
+| Normative Referenz | [`docs/SPEC.md`](SPEC.md) (Fassung 2.0.0 für Release 1.0.0) & [`PLAN.md`](../PLAN.md) |
+| Ring-Definition | SPEC §5.1, §5.2, §5.3 |
+| Sicherheits-Doktrin | Single-Node, Safe Rust (2 Unsafe-Inseln), Zero Panic, Fail-Closed, Pflichtverschlüsselung, absolute Mandantentrennung |
 
 ---
 
-## 1. Überblick & Grundprinzipien
+## 1. Überblick & Mission
 
-Contextra ist ein lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rust. Das Gesamtsystem ist als strikter, azyklischer Graph (**DAG**) organisiert. 
-
-### Architektur-Invarianten
-1. **Strikte Schichtung (Ring 4 → 0):** Ein Crate in Ring $N$ darf nur von Crates in Ringen $\le N$ abhängen.
-2. **Klassen-Schutz:** Kern-Crates (`[K]`) dürfen niemals von Rand- (`[R]`), experimentellen (`[E]`) oder eingefrorenen Crates abhängen.
-3. **Single-Node-Doktrin:** Ein Prozess hält das Datenverzeichnis. Keine verteilten Knoten, kein Sharding, kein P2P, keine Netzwerk-Listener im Kern.
-4. **Zero-Panic-Doktrin (P7):** Öffentliche APIs und Produktionspfade dürfen niemals paniken (`unwrap`, `expect`, `panic!`, ungeprüftes Indexieren sind verboten).
-5. **P28 Determinismus:** Zeit, Zufall und IDs werden über Ports (`Clock`, `Rng`, `IdGen`) injiziert.
-6. **WAL First (P24):** Zustandsänderungen werden vor der In-Memory-Modifikation dauerhaft im WAL synchronisiert (`fsync`).
-7. **Absolute Mandantentrennung (VETO-F10):** Jede Abfrage und Datenstruktur erzwingt `TenantId` aus dem `RequestContext`.
+Contextra ist ein lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rust (Single-Node, Library-First) für Agenten- und RAG-Systeme:
+- **Speichern**: Transaktionaler LSM-Tree-Speicher mit Write-Ahead-Log (WAL) als einziger Quelle der Wahrheit (I-1: WAL → Memtable → Sichtbarkeit).
+- **Finden**: Hybrides Retrieval (HNSW-Vektorsuche + BM25-Volltextsuche + RRF-Fusion), strikt mandantengrenzenbeachtend.
+- **Löschen (DSGVO Art. 17/18)**: Eigenständiger, entkoppelter und gemessener Löschprozess gemäß ADR-001 (physische Bereinigung Ebene A + fail-closed `ReadGate` + E1/E2/E3 Messungen + Ed25519-Löschbericht `ctx-erasure-report/1`).
 
 ---
 
-## 2. Ringmodell (SPEC §4)
+## 2. Ringmodell & Crate-Topologie (SPEC §5.1, §5.2)
+
+Das Gesamtsystem ist als strikter, azyklischer gerichteter Graph (**DAG**) in 5 Ringen organisiert:
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│ Ring 4: Fassade & Schnittstellen                                       │
-│ contextra (Composition Root) · contextra-mcp · [R] contextra-py        │
-│ [E] contextra-license · [E] audit-export · [E] avv-generator           │
-├────────────────────────────────────────────────────────────────────────┤
-│ Ring 3: Orchestrierung                                                 │
-│ contextra-engine · contextra-db · [R] contextra-privacy                │
-│ [eingefroren: contextra-agent, contextra-cognition, contextra-graph]    │
-├────────────────────────────────────────────────────────────────────────┤
-│ Ring 2: Isolation & Inferenz                                           │
-│ contextra-infer-ollama · [R] contextra-infer-candle*                   │
-│ [eingefroren: contextra-infer-onnx*, contextra-sandbox*]               │
-├────────────────────────────────────────────────────────────────────────┤
-│ Ring 1: Persistenz                                                     │
-│ contextra-store · contextra-checkpoint                                 │
-├────────────────────────────────────────────────────────────────────────┤
-│ Ring 0: Fundament & Verträge                                           │
-│ contextra-types · contextra-ports · contextra-mvcc · contextra-crypto   │
-│ contextra-vector · contextra-text · contextra-rank · durable-fs · core │
-│ ─── Unsafe-Inseln (Ring 0) ───                                         │
-│ contextra-sys · contextra-simd · contextra-wire                       │
-├────────────────────────────────────────────────────────────────────────┤
-│ Tooling & Benchmarks                                                   │
-│ contextra-testkit · contextra-bench                                    │
-└────────────────────────────────────────────────────────────────────────┘
+Ring 4  contextra                               (Fassade, Composition Root)
+Ring 3  contextra-erasure   contextra-engine    (Löschkern, Orchestrierung)
+Ring 2  contextra-mvcc  contextra-store  contextra-text  contextra-vector  contextra-rank
+Ring 1  contextra-sys   contextra-simd   contextra-durable-fs  contextra-crypto
+Ring 0  contextra-types contextra-ports
+dev     contextra-testkit  contextra-lab  ctx-verify  tests/arch
 ```
 
----
+### Die 14 Produktionscrates
 
-## 3. Die 15 Kern-Crates (Klasse `[K]`)
-
-| Crate | Ring | Unsafe | Aufgabe & Kernkomponenten |
-|---|---|---|---|
-| `contextra-types` | 0 | Nein | Kanonische Typen, `RequestContext`, Identitäten, `ContextraError`. |
-| `contextra-ports` | 0 | Nein | Synchrone Verträge: `StorageEngine`, `Clock`, `Rng`, `IdGen`, `KmsProvider`, `Vfs`. |
-| `contextra-sys` | 0 | **Ja** | Low-Level OS-FFI, `mmap_readonly`, Durability-Primitive (`durable_flush_file`, `durable_flush_dir`). |
-| `contextra-simd` | 0 | **Ja** | AVX-512 / AVX2 / NEON Distanzkernel; Skalar-Referenz als Orakel. |
-| `contextra-wire` | 0 | **Ja** | Zero-Copy FlatBuffers IPC und Serialisierungs-Layouts. |
-| `contextra-mvcc` | 0 | Nein | Snapshot-Isolation, SequenceLog, TxBuffer, ReadSet, SSI-Validator. |
-| `contextra-crypto` | 0 | Nein | AEAD, KDF (Argon2id/HKDF), KeyRegistry, RevocationLog, Ed25519, Proof-Ausstellung. |
-| `contextra-vector` | 0 | Nein | HNSW-Index, SQ8-Quantisierung, gefilterte Vektorsuche, Bitset-Isolation. |
-| `contextra-text` | 0 | Nein | BM25/BM25F-Volltextindex, Komposita-Zerlegung, Block-Max WAND. |
-| `contextra-rank` | 0 | Nein | Reziproke Rangfusion (RRF in `fusion/`), Score-Normalisierung, Explain-Metadaten. |
-| `contextra-store` | 1 | Nein | LSM-Tree, WAL, SSTables, Block-Cache, Compaction, KV-Segmentverschlüsselung. |
-| `contextra-checkpoint` | 1 | Nein | Snapshots, Point-in-Time-Recovery, Restore-Guard, Backup-Export. |
-| `contextra-engine` | 3 | Nein | Hybrid-Planer, Background-Reaper, ErasureSaga, Lesesperren, Lifecycle. |
-| `contextra-db` | 3 | Nein | Collections-API, Multi-Tenant-Scoping, Transaktionsverwaltung. |
-| `contextra` | 4 | Nein | **Hauptfassade & einzige Composition Root** (`ContextraBuilder`). |
+| Ring | Crate | Rolle | Unsafe |
+|---|---|---|:---:|
+| **Ring 0** | `contextra-types` | Reine, zustandslose Typen (IDs, Tags, Fehler, Schlüsselcodec, Löschtypen). Kein I/O, kein `async`. | Nein |
+| **Ring 0** | `contextra-ports` | Abstrakte Schnittstellen-Traits (`StorageEngine`, `ErasureLayer`, `ReadGate`, `Vfs`, `Clock`, `Rng`, etc.). | Nein |
+| **Ring 1** | `contextra-sys` | Plattform- und OS-Primitive (`fsync`, `flush_dir`, `rename_durable`, `mlock`). **Unsafe-Insel 1 von 2**. | **Ja** |
+| **Ring 1** | `contextra-simd` | f32-Distanzkernel (`l2`, `dot`, `cosine`) mit Skalar-Referenz. **Unsafe-Insel 2 von 2**. | **Ja** |
+| **Ring 1** | `contextra-durable-fs` | `RealVfs`-Implementierung, atomare Dateieretzung, best-effort Zeroize-Scrub. | Nein |
+| **Ring 1** | `contextra-crypto` | AEAD (AES-256-GCM-SIV), Argon2id KDF, HKDF, WAL-HMAC, Hash-Ketten, Ed25519-Signatur. | Nein |
+| **Ring 2** | `contextra-mvcc` | Monotone `Seq`, Snapshots, SSI-Validierung, Snapshot-Widerruf (`revoke_covering`). | Nein |
+| **Ring 2** | `contextra-store` | Transaktionaler LSM-Tree (WAL, Memtable, Leveled SSTables, Purge-Rewrite & Swap). Blind für Dokumentinhalte. | Nein |
+| **Ring 2** | `contextra-text` | BM25-Segmentindex (AEAD-verschlüsselte Segmente, Term-Tags, kein Klartext). | Nein |
+| **Ring 2** | `contextra-vector` | HNSW-Vektorindex (Slot-Zeroing, verschlüsselte Snapshot-Chunks, Batch-Rebuild). | Nein |
+| **Ring 2** | `contextra-rank` | RRF-Fusion (`rrf_fuse`) mit deterministischem Tie-Break nach `doc_tag`. | Nein |
+| **Ring 3** | `contextra-erasure` | Entkoppelter Löschkern: Saga, Journal, ReadGate (`ErasedSet`), Tresor (`vault`), Messung, Bericht. | Nein |
+| **Ring 3** | `contextra-engine` | Orchestrierung: Collections, Transaktionen, Schreib-/Lesepfade, Verdrahtung. | Nein |
+| **Ring 4** | `contextra` | Öffentliche Fassade, `EngineBuilder`, Re-Exporte. | Nein |
 
 ---
 
-## 4. Zerlegung in die Produktfamilie (PLAN §11)
+## 3. Erlaubte Abhängigkeiten (Matrix SPEC §5.3)
 
-Um monolithische Querkanten dauerhaft aufzulösen, ist das System in sieben disjunkte Produkte strukturiert:
+| von \ nach | types | ports | sys | simd | dfs | crypto | mvcc | store | text | vector | rank | erasure |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| ports | ✓ | | | | | | | | | | | |
+| sys | ✓ | | | | | | | | | | | |
+| simd | ✓ | | | | | | | | | | | |
+| durable-fs | ✓ | ✓ | ✓ | | | | | | | | | |
+| crypto | ✓ | ✓ | | | | | | | | | | |
+| mvcc | ✓ | ✓ | | | | | | | | | | |
+| store | ✓ | ✓ | ✓ | | | ✓ | ✓ | | | | | |
+| text | ✓ | ✓ | | | | ✓ | | | | | | |
+| vector | ✓ | ✓ | | ✓ | | ✓ | | | | | | |
+| rank | ✓ | ✓ | | | | | | | | | | |
+| erasure | ✓ | ✓ | | | | ✓ | | | | | | |
+| engine | ✓ | ✓ | | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-1. **EP1 Memory (Kern):** Eingebettete, verschlüsselte Hybrid-Suche mit Gedächtnis-Lebenszyklus (`store`, `vector`, `text`, `engine`, `db`, `durable-fs`).
-2. **EP2 Proof (Compliance):** Extern prüfbare Löschbeweise und DSGVO-Nachweise (`audit-export`, `avv-generator`, `verify`).
-3. **EP3 Graph (Erweiterung):** Wissensgraph und GraphRAG (`graph` – temporär eingefroren).
-4. **EP4 Inference (Adapter):** Lokale Inferenzanbindungen (`infer-ollama`, optional `infer-onnx`, `infer-candle`).
-5. **EP5 Agent (Laufzeit):** Wiederanlauffähige, budgetierte Agenten-Laufzeit (`agent`, `router` – temporär eingefroren).
-6. **EP6 Guard (Firewall):** Fail-Closed-Firewall für LLM-Ein- und Ausgänge mit PII-Erkennung und Sandbox (`privacy`, `sandbox`).
-7. **EP7 Ingest (Pipeline):** Lokale Offline-Dokumentenextraktion (PDF, DOCX, EPUB, Mail, Markdown) zu kanonischen Text-Chunks mit Byte-Spans (`ingest`).
+**Architektur-Regeln (AR-1 bis AR-8):**
+1. Abhängigkeiten zeigen nur auf gleiche oder niedrigere Ringe; innerhalb Ring 2 gilt strikt obige Matrix.
+2. `store` kennt weder `text`, `vector` noch `erasure`.
+3. `erasure` kennt **keine** Ring-2-Crates, sondern kommuniziert ausschließlich über Ports (`ports`-Traits).
+4. `store` nutzt `Vfs` ausschließlich als Port aus `contextra-ports`, niemals direkt aus `contextra-durable-fs`.
+5. Keine Netzwerk-Crates im Produktionsbaum (Single-Node-Doktrin).
+6. `unsafe` ist strikt auf `contextra-sys` und `contextra-simd` beschränkt. Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
 
 ---
 
-## 5. Entkopplung von Querkanten (PLAN §11.4)
+## 4. Löscharchitektur & DSGVO (ADR-001, SPEC §11, §12)
 
-Bestehende historische Querkanten werden gemäß `PLAN.md` wie folgt bereinigt:
-
-- **Engine → Graph:** Gekoppelt über Trait-Port `GraphEnginePort`; Graph-Code wird hinter `#[cfg(feature = "graph")]` gelegt oder entkoppelt.
-- **DB → Cognition:** Konsolidierungslogik wird über Lifecycle-Hooks abstrahiert; kein direkter Import im Standard-Build.
-- **MCP → Router:** Dispatcher greift direkt auf die Fassade bzw. Engine zu, nicht hart auf das Router-Crate.
-- **Store & Rank Dev-Dependencies:** Entfernung von Zirkelbezügen zu `graph`, `sandbox` und `adapt` in Tests.
+Das Löschen ist in Contextra ein eigenständiger, entkoppelter und maschinell gemessener Prozess:
+- **Keine Ebene B in v1 (ADR-001, D-01):** Die kryptografische Schlüsselvernichtung (`DocDek`) entfällt in v1. Löschung ist die physische Bereinigung (Ebene A) kombiniert mit fail-closed `ReadGate`, Residuenmessung und signiertem Bericht.
+- **Zustandsmaschine**:
+  `Requested → Gated → Drained → Rewritten → Cleaned → Measured → Completed`
+- **ReadGate (`ErasedSet`)**:
+  Unmittelbar nach `Gated` blockiert das Gate jeden Lese- und Suchzugriff auf Zielschlüssel fail-closed. Aktive Snapshots, die Zielversionen sehen könnten, werden widerrufen (`SnapshotRevoked`).
+- **Physisches Purging (Ebene A)**:
+  - **Store**: `drain` versiegelt WAL; `rewrite_file` erzeugt neue SSTables ohne Zieldaten (Originalsequenzen bleiben erhalten); atomarer `swap` via Manifest; Block-Cache Eviction mit Zeroize.
+  - **Vector**: `zero_slot` nullt Slot-Bytes und markiert Tombstone; Snapshot-Chunks werden neu geschrieben; Rebuild ab Schwelle.
+  - **Text**: Textpuffer leeren; betroffene Segmente ohne Zieldokumente neu schreiben; Alt-Segmente löschen; Term-Statistik neu aggregieren.
+- **Residuenmessung (E1, E2, E3)**:
+  - **E1**: Byte-genauer Rohscan des Datenverzeichnisses nach Needles.
+  - **E2**: Strukturierter Scan nach Dekodierung aller Container.
+  - **E3**: Nachweis der Schlüssel- und Slot-Abwesenheit.
+- **Löschbericht (`ctx-erasure-report/1`)**:
+  Ed25519-signiert, maschinenlesbar, frei von Klartext-IDs oder Personendaten.
 
 ---
 
-## 6. Build- und Test-Infrastruktur
+## 5. Laufzeitmodell & Datenflüsse (SPEC §5.4, §5.5)
 
-- Die Governance-Prüfung erfolgt über standardisierte Cargo- und Just-Workflows:
-  - `just check`: Führt `cargo fmt`, `cargo clippy --all-targets` und `cargo check --workspace` aus.
-  - `just test`: Führt die Testsuite mit `cargo test --locked` aus.
-  - `just gates`: Führt den architektonischen Layering-Test (`tests/layering.rs`) aus.
-- Keine versteckten Skripte: Alle Pfade und Gates werden direkt per Cargo geprüft.
+- **Runtime:** Tokio multi-thread über den übergebenen `tokio::runtime::Handle` in `EngineBuilder`.
+- **Cancel-Safety (I-14):** Mutierende Schreib- und Löschoperationen laufen in entkoppelten Tasks (`spawn`); der Aufrufer wartet auf ein `oneshot`-Signal.
+- **Sperren:** Dokument-Lock über die gesamte Operation (verhindert Race-Conditions zwischen Insert, Delete und Erase). Exklusive Purge-`Barrier` zwischen Kompaktion und Purge.
+- **Dateisystem-Layout (SPEC §5.6):**
+  ```
+  <data>/                       0700
+    LOCK                        exklusiver Prozess-Lock
+    HEADER                      Format-Version, KDF-Parameter, Salt[32], Store-ID
+    wal/        *.wal           HMAC-Kette, verschlüsselt
+    sst/        *.sst           SSTables (Block-AEAD), Level-Struktur
+    MANIFEST/   *.log           Manifest-Log (Datei-Mengen, Bereiche, Seq)
+    text/       *.seg           Textsegmente (AEAD-verschlüsselt)
+    vector/     *.snap          Vektorsnapshots (AEAD-verschlüsselt)
+    vault/      vault.dat       Tresor (Slots)
+    erasure/    journal.log     Löschjournal (Hash-Kette, verschlüsselt)
+                erased.set      aktive Gates (Bereiche, Commitments)
+                ledger.log      abgeschlossene Löschungen (Restore-Guard)
+                report/         signierte Berichte
+    keys/       0700            Schlüssel-Seeds (0600)
+    tmp/                        Waisen-Bereinigung beim Start
+  ```

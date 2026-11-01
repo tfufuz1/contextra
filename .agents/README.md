@@ -23,17 +23,17 @@ Dieses Verzeichnis (`.agents/`) und die Root-Dateien (`AGENTS.md`, `GEMINI.md`) 
     ├── hooks/
     │   └── session_start.sh           # Hook-Skript zur Initialisierung
     ├── skills/                        # Spezialisierte Agenten-Skills
-    │   ├── contextra-doctor/          # Diagnose & Reparatur (Cargo, B-01, xtask)
-    │   ├── contextra-deletion-verifier/# Löschkette, Saga, Canary, Ed25519 Proofs
-    │   ├── contextra-security-audit/  # KDF (Argon2id), Zeroize, Tenant-Isolation
-    │   ├── contextra-invariants-gate/ # Ring-DAG, Zero-Panic, Unsafe-Inseln
-    │   └── contextra-product-suite/   # EP1 Memory, EP6 Guard, EP2 Proof, EP7 Ingest
+    │   ├── contextra-doctor/          # Diagnose & Reparatur (Cargo, Compiler, Manifeste)
+    │   ├── contextra-deletion-verifier/# Löschkette, Saga, Canary, Ed25519-Löschberichte
+    │   ├── contextra-security-audit/  # KDF (Argon2id), Zeroize, Tenant-Isolation, Pflichtverschlüsselung
+    │   ├── contextra-invariants-gate/ # Ring-DAG, Zero-Panic, 2 Unsafe-Inseln
+    │   └── contextra-product-suite/   # Produktstufen S0 bis S3 (SPEC §1.3)
     ├── rules/                         # Modulare Governance-Regeln
-    │   ├── deletion_pipeline.md       # Löschinvariante & Zweistufigkeit
+    │   ├── deletion_pipeline.md       # Löschmodell v1 & Saga-Zustände (ADR-001)
     │   ├── zero_panic.md              # Zero-Panic & Error Handling
-    │   ├── async-io.md                # Async-Reinheit in Ring 0
-    │   ├── dependencies.md            # Crate- & Ring-Hierarchie
-    │   ├── simd_safety.md             # Unsafe-Inseln & 64B-Alignment
+    │   ├── async-io.md                # Asynchrones I/O, Laufzeitmodell & Cancel-Safety
+    │   ├── dependencies.md            # Crate- & Ring-Hierarchie (SPEC §5.2, §5.3)
+    │   ├── simd_safety.md             # Unsafe-Inseln (sys, simd) & Epsilon-Garantie
     │   ├── testing.md                 # Deterministische Tests
     │   ├── test_quality.md            # Red-to-Green & Testqualität
     │   └── wal_crypto.md              # WAL-First & Krypto-Integrität
@@ -53,10 +53,10 @@ Dieses Verzeichnis (`.agents/`) und die Root-Dateien (`AGENTS.md`, `GEMINI.md`) 
 2. **Skills nutzen**:
    Die Skills werden dank *Progressive Disclosure* automatisch erkannt. Sie können im Chat direkt angesprochen werden:
    - `/contextra-doctor`: Überprüft Workspace-Integrität, Manifeste und bekannte Compiler-Fehler.
-   - `/contextra-deletion-verifier`: Führt durch die Verifikation der 6-Schichten-Löschpipeline und Canary-Tests.
-   - `/contextra-security-audit`: Überprüft Sicherheits-Defaults (Argon2id, Verschlüsselung, TenantPolicy).
-   - `/contextra-invariants-gate`: Prüft Ring-Hierarchie, Zero-Panic und Unsafe-Inseln.
-   - `/contextra-product-suite`: Hilft beim Bauen und Testen der Sub-Produkte (Guard, Memory, Proof, Ingest).
+   - `/contextra-deletion-verifier`: Führt durch die Verifikation der Löschpipeline, Saga-Zustände und Canary-Tests.
+   - `/contextra-security-audit`: Überprüft Sicherheits-Defaults (Argon2id, Pflichtverschlüsselung, TenantPolicy).
+   - `/contextra-invariants-gate`: Prüft Ring-Hierarchie, Zero-Panic und die 2 Unsafe-Inseln.
+   - `/contextra-product-suite`: Hilft beim Bauen und Testen der Produktstufen S0 bis S3 (SPEC §1.3).
 
 3. **Status und Skills neu laden**:
    ```text

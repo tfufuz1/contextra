@@ -1,14 +1,19 @@
 # contextra-simd
 
-SIMD-beschleunigte Distanzberechnungen und Vektor-Operationen.
+Hardwarenahe f32-Distanzkernel für Vektorsuchen (`l2`, `dot`, `cosine`).
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0 Unsafe-Insel, `stable`; §6.1, §6.7, §6.9, `capabilities.toml`).
+- **Ring:** Ring 1 (Unsafe-Insel 2 von 2, SPEC §8.4, D-29)
+- **Normativ:** [docs/SPEC.md §8.4](../../docs/SPEC.md)
+- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
 
-## Rolle in einem Satz
-`contextra-simd` kapselt hardwarenahe SIMD-Vektordistanzberechnungen in einer genau auditierten, sicheren API-Insel.
+## Rolle & Zweck
+`contextra-simd` stellt optimierte Distanzberechnungen für f32-Vektoren bereit:
+- Euklidische Distanz (`l2`), Skalarprodukt (`dot`), Kosinus-Ähnlichkeit (`cosine`).
+- Implementierungen: Skalar-Referenz, AVX2 + FMA, AVX-512 (f32), ARM NEON.
+- Dynamischer Laufzeit-Dispatch mit Fallback auf die Skalar-Referenz.
 
-## Ring, Klasse & Reifegrad
-- **Ring:** Ring 0 (Unsafe-Insel 1 von 3, `#![deny(unsafe_code)]` ausgenommen)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types` (Spec §6.9, `capabilities.toml`)
+## Invarianten
+- Genauigkeitskorridor: Relativer Fehler gegenüber Skalar-Referenz $\le 10^{-4}$ bei Vektoren mit Norm $\le 10^3$.
+- Sicheres Tail-Handling: Reste werden deterministisch skalar berechnet; keine Out-of-Bounds-Lesezugriffe.
+- Der historische u8-VNNI-Pfad ist gestrichen (`D-28`).
+- Jeder `unsafe`-Block erfordert ein `// SAFETY:`-Kommentar.

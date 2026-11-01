@@ -13,8 +13,6 @@
 #![forbid(unsafe_code)]
 
 use contextra_ports::license::LicenseGate;
-#[cfg(feature = "sandbox")]
-use contextra_ports::BoxFuture;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
 pub use contextra_ports::VectorDeleteMode;
@@ -54,10 +52,7 @@ pub mod temporal_filter;
 #[cfg(not(loom))]
 pub mod transaction;
 
-#[cfg(feature = "sandbox")]
-pub mod merge_operator_adapter;
-#[cfg(feature = "sandbox")]
-pub use merge_operator_adapter::WasmMergeOperator;
+
 
 #[cfg(not(loom))]
 pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
@@ -77,11 +72,6 @@ pub use background_workers::{start_expiry_cleanup_worker, start_orphan_cleanup_w
 
 #[cfg(not(loom))]
 pub use collection::crud::MAX_SCAN_RESULTS;
-#[cfg(feature = "graph-connectivity-health")]
-pub use collection::maintenance::PercolationConfig;
-#[cfg(not(loom))]
-#[cfg(feature = "graph-connectivity-health")]
-pub use collection::maintenance::PercolationResult;
 #[cfg(not(loom))]
 pub use collection::query_builder::{HybridQueryBuilder, SearchStrategy, SignalWeights};
 #[cfg(not(loom))]
@@ -370,20 +360,9 @@ pub struct Contextra {
     cancel_token: tokio_util::sync::CancellationToken,
     task_tracker: tokio_util::task::TaskTracker,
     embedder: parking_lot::RwLock<Option<Arc<dyn TextEmbeddingEngine>>>,
-    orphan_registry: Arc<contextra_checkpoint::InstanceOrphanRegistry>,
     router: parking_lot::RwLock<Option<std::sync::Weak<dyn DriftStatusProvider>>>,
-    calibrator: parking_lot::RwLock<
-        Option<std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>>,
-    >,
     metrics_sink: parking_lot::RwLock<Arc<dyn contextra_ports::MetricsSink>>,
-    proof_key_provider:
-        parking_lot::RwLock<Option<Arc<dyn contextra_impl::erasure::ProofKeyProvider>>>,
 }
-
-pub use contextra_impl::erasure::{
-    summary_from_witness, ErasureFailure, ErasureReport, LayerSummary, ProofKeyProvider,
-    UNMEASURED_ERASURE_LAYERS,
-};
 
 #[cfg(not(loom))]
 mod contextra_impl;
@@ -408,88 +387,5 @@ impl Contextra {
     /// Returns a reference to the attached [`LicenseGate`].
     pub fn license_gate(&self) -> Arc<dyn LicenseGate> {
         Arc::clone(&self.license_gate)
-    }
-}
-
-// ANCHOR[contextra-engine:SND-001]
-/// Brücke zur sicheren Ausführung von sandboxed Operatoren (z.B. Wasm).
-#[cfg(feature = "sandbox")]
-pub trait SandboxBridge: Send + Sync {
-    fn db_search<'a>(
-        &'a self,
-        query: &'a [u8],
-        k: usize,
-    ) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>>;
-    fn db_insert<'a>(
-        &'a self,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<()>>;
-    fn db_get<'a>(
-        &'a self,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>>;
-}
-
-#[cfg(feature = "sandbox")]
-impl SandboxBridge for Contextra {
-    fn db_search<'a>(
-        &'a self,
-        query: &'a [u8],
-        k: usize,
-    ) -> BoxFuture<'a, contextra_types::Result<Vec<u8>>> {
-        Box::pin(async move {
-            let f32_count = query.len() / 4;
-            let mut vector = Vec::with_capacity(f32_count);
-            for i in 0..f32_count {
-                let start = i * 4;
-                let bits = u32::from_le_bytes(
-                    query
-                        .get(start..start + 4)
-                        .ok_or_else(|| {
-                            contextra_types::ContextraError::Serialization("Query too short".into())
-                        })?
-                        .try_into()
-                        .map_err(|_| {
-                            contextra_types::ContextraError::Serialization("Invalid slice".into())
-                        })?,
-                );
-                vector.push(f32::from_bits(bits));
-            }
-
-            let results: Vec<SearchResult> = self.search(&vector, k).await?;
-            serde_json::to_vec(&results)
-                .map_err(|e| contextra_types::ContextraError::Internal(e.to_string()))
-        })
-    }
-
-    fn db_insert<'a>(
-        &'a self,
-        key: &'a [u8],
-        value: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<()>> {
-        Box::pin(async move {
-            let id = String::from_utf8_lossy(key).to_string();
-            let val_json: Value = serde_json::from_slice(value)
-                .unwrap_or(serde_json::json!({ "raw_data": String::from_utf8_lossy(value) }));
-
-            self.insert(&id, &[], Some(val_json)).await
-        })
-    }
-
-    fn db_get<'a>(
-        &'a self,
-        key: &'a [u8],
-    ) -> BoxFuture<'a, contextra_types::Result<Option<Vec<u8>>>> {
-        Box::pin(async move {
-            let id = String::from_utf8_lossy(key).to_string();
-            let doc = self.get(&id).await?;
-            match doc {
-                Some(d) => Ok(Some(serde_json::to_vec(&d).map_err(|e| {
-                    contextra_types::ContextraError::Internal(e.to_string())
-                })?)),
-                None => Ok(None),
-            }
-        })
     }
 }

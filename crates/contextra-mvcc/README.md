@@ -1,14 +1,19 @@
 # contextra-mvcc
 
-Multi-Version Concurrency Control und Isolation-Mechanismen.
+Multi-Version Concurrency Control, Sequenzsemantik, Snapshot-Isolation und Snapshot-Widerruf.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, `capabilities.toml`).
+- **Ring:** Ring 2 (Transaktionsisolation)
+- **Normativ:** [docs/SPEC.md §8.7](../../docs/SPEC.md)
+- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
 
-## Rolle in einem Satz
-`contextra-mvcc` bietet deterministische Multi-Version Concurrency Control (SequenceLog, SnapshotRegistry, TxBuffer, ReadSet, SSI-Validator) für atomare Transaktionsisolation.
+## Rolle & Zweck
+`contextra-mvcc` stellt deterministische Transaktionsisolation und MVCC bereit:
+- `seq`: Monotone Sequenzen `Seq(NonZeroU64)` ohne Sentinel `u64::MAX`.
+- `snapshot_registry`: Snapshot-Registrierung, `min_active()`, Snapshot-Widerruf (`revoke_covering(&Matcher)`).
+- `ssi`: `SsiValidator` für Serializable Snapshot Isolation ohne Write-Skew.
+- `tx_buffer`: Transaktionspuffer zur Isolation uncommitteter Änderungen.
 
-## Ring, Klasse & Reifegrad
-- **Ring:** Ring 0 (Transaktionsisolation)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)
+## Invarianten
+- `#![forbid(unsafe_code)]`
+- `prune_through` mit gesetztem Tombstone-Bit ist ein Fehler, kein stilles Maskieren (D-C02 Bugfix).
+- Snapshot-Widerruf (`revoke_covering`): Snapshots, die gelöschte Sequenzen sehen könnten, werden als widerrufen markiert; Folgeoperationen scheitern fail-closed mit `SnapshotRevoked`.

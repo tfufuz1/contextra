@@ -1,7 +1,12 @@
 # Löschung personenbezogener Daten in RAG-Systemen durch Schlüsselvernichtung (Crypto-Shredding)
 
+> [!IMPORTANT]
+> **Normative Einordnung (ADR-001, docs/SPEC.md §3.3, §11, D-01):**
+> Die vorliegende historische Synthese bildete die Diskussionsgrundlage für die Konzeption. Für die technische Umsetzung von Contextra v1 ist **ausschließlich [`docs/SPEC.md`](SPEC.md) (Fassung 2.0.0 für Release 1.0.0)** maßgeblich.
+> Gemäß **ADR-001 (SPEC §3.3, D-01)** entfällt Ebene B (kryptografische DocDek-Schlüsselvernichtung) in v1 vollständig. Löschung in Contextra v1 ist die physische Bereinigung (Ebene A: SSTable-Rewrite/Swap, HNSW-Slot-Zeroing, Text-Segment-Rewrite) kombiniert mit fail-closed `ReadGate` (`ErasedSet`), automatischer Residuen-Messung (E1 Rohscan, E2 Decoder-Scan, E3 Schlüsselabwesenheit) und dem kryptografisch Ed25519-signierten Löschbericht (`ctx-erasure-report/1`, D-13).
+
 **Rechts- und Architektursynthese: DSGVO, BDSG, EU-KI-Regulierung, technische Standards**
-Stand der zugrunde liegenden Prüfung: 27.10.2026. Keine erneute Verifikation bei Erstellung dieser Synthese. Keine Rechtsberatung, kein Gutachten.
+Stand der zugrunde liegenden Prüfung: 27.10.2026. Aktualisiert: 01.11.2026. Keine Rechtsberatung, kein Gutachten.
 
 ---
 

@@ -1,100 +1,68 @@
 ---
 name: contextra-deletion-verifier
 description: >-
-  Use this skill to verify, test, and develop the Contextra 6-layer deletion pipeline, ErasureSaga state machine,
-  Ebene A (in-memory) and Ebene B (cryptographic DocDek key revocation) erasure, Ed25519 proofs, and mutation tests.
+  Use this skill to verify, test, and develop the Contextra deletion pipeline, ErasureSaga state machine,
+  Ebene A physical purge, ReadGate (ErasedSet), E1/E2/E3 residue scans, Canary tests, and Ed25519 erasure reports.
 ---
 
 # Contextra Deletion Verifier – Löschpipeline & DSGVO-Konformität
 
-Dieser Skill führt Agenten und Entwickler durch die Entwicklung, Verifikation und Auditierung des zweistufigen Löschvertrags (Ebene A und Ebene B) nach [docs/SPEC.md §12](file:///home/freddy/Projekte/contextra/docs/SPEC.md#L405) und [PLAN.md §10](file:///home/freddy/Projekte/contextra/PLAN.md#L405).
+Dieser Skill führt Agenten und Entwickler durch die Entwicklung, Verifikation und Auditierung der gemessenen Löschpipeline nach [docs/SPEC.md §11, §12](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [ADR-001](file:///home/freddy/Projekte/contextra/docs/SPEC.md#L1421-L1434).
 
 ---
 
-## 1. Architektur-Prinzip: Zwei Ebenen
+## 1. Architektur-Prinzip (ADR-001, D-01)
 
-Schlüsselvernichtung allein gilt niemals als Löschung! Löschung wirkt ausschließlich durch das Zusammenwirken von:
+Gemäß **ADR-001 (SPEC §3.3, D-01)** entfällt die sogenannte Ebene B (kryptografische `DocDek`-Schlüsselvernichtung) in v1 vollständig.
 
-| Ebene | Zielbereich | Methode | Messung / Nachweis |
-|---|---|---|---|
-| **Ebene A** | RAM, HNSW-Slots, BM25-Postings, Caches | Physisches Zeroizing, Segment-Rewrite, Cache-Drop | Positivkontrolle (Canary-Scan), Slot-Scan |
-| **Ebene B** | Persistente SSTables, WAL, Snapshots, CoW/Flash | Vernichtung des `DocDek` (Dokument-Schlüssel) | KeyTable-Abwesenheit, scheiternde Entschlüsselung |
+Löschung in Contextra v1 ist die **physische Bereinigung (Ebene A)** kombiniert mit:
+1. **Fail-Closed `ReadGate` (`ErasedSet`)**: Sperrt Lese- und Suchpfade sofort bei Status `Gated`.
+2. **Snapshot-Widerruf (`revoke_covering`)**: Widerruft aktive MVCC-Snapshots, die Zielversionen sehen könnten.
+3. **Physischer Purge**:
+   - Memtable: vollständiges Entfernen aller Versionen (`remove_range`).
+   - Store: WAL `drain`, SSTable-Rewrite (`rewrite_file`) ohne Zieldaten unter Beibehaltung der Originalsequenzen, atomarer `swap` via Manifest, Block-Cache Eviction mit Zeroize.
+   - Vector: HNSW Slot-Zeroing (`zero_slot`), Snapshot-Chunk-Rewrite, Batch-Rebuild.
+   - Text: Puffer leeren, Segment-Rewrite, Alt-Segment löschen.
+4. **Maschinelle Residuenmessung (E1, E2, E3)** mit obligatorischer Positivkontrolle (Canary).
+5. **Kryptografischer Löschbericht (`ctx-erasure-report/1`)**: Ed25519-signiert, maschinenlesbar, ohne personenbezogene Daten.
 
 ---
 
-## 2. Die Lösch-Saga Zustandsmaschine
+## 2. Die Lösch-Saga Zustandsmaschine (SPEC §8.2, §11.2)
 
-Jede Löschung muss deterministisch und crash-tolerant als Saga ablaufen:
+Jede Löschung läuft deterministisch und crash-tolerant als Saga in `contextra-erasure` ab:
 
 ```
 [Requested]
      │
      ▼
-  [Frozen] ────► Sofortige Lesesperre via ErasedSet (fail-closed)
+  [Gated] ────────► Sofortige Lesesperre via ErasedSet (fail-closed)
+     │              Widerruf betroffener MVCC-Snapshots (SnapshotRevoked)
+     ▼
+ [Drained] ───────► WAL versiegelt, Memtables geflusht, temporäre Puffer geleert
      │
      ▼
-[LogicallyDeleted]
+[Rewritten] ──────► SSTables, Textsegmente und Vektorsnapshots ohne Zieldaten neu geschrieben
+     │              Atomarer Manifest-Swap, Blockcache gelöscht & genullt
+     ▼
+ [Cleaned] ───────► Alt-Dateien gelöscht und Fehlen via Vfs::exists verifiziert
      │
      ▼
-[PlaintextPurged] ──► Ebene A: HNSW zeroize_and_free_node, BM25 Rewrite, Memtable
-     │
+ [Measured] ──────► Residuen-Scan (E1 Rohscan, E2 Decoder-Scan, E3 Schlüsselabwesenheit)
+     │              mit vorangestellter Canary-Positivkontrolle
      ▼
-[PlaintextMeasured] ─► Bestätigung der Klartextfreiheit über LayerScanner
-     │
-     ▼
- [KeyDestroyed] ────► Ebene B: DocDek im KeyTable atomar überschreiben/löschen
-     │
-     ▼
-  [Measured] ────────► Schlüsselabwesenheit und Canary-Entschlüsselung fehlgeschlagen
-     │
-     ▼
- [Completed] ───────► Ausstellung des signierten Proof v4/v5 (Ed25519)
+[Completed] ──────► Ausstellung des signierten Berichts ctx-erasure-report/1 (Ed25519)
 ```
 
-### Crash-Recovery Invariante (INV-NO-RESURRECTION-1)
-- Ein Absturz an jedem beliebigen Punkt führt bei `ErasureSaga::recover()` zum Wiederaufsetzen oder zum Verharren in `Partial{outstanding}`.
-- Es darf niemals vorkommen, dass ein abgebrochener Commit nach einem Neustart wieder lesbar wird (D-01 Fix).
+### Crash-Recovery Invariante (I-11)
+- Bei einem unvorhergesehenen Absturz setzt `ErasureSaga::recover()` vor der Freigabe von Schreib- oder Lesepfaden auf.
+- Jeder Fehler in einer Phase persistiert den Zustand `Pending { attempt, next_retry_at }` mit exponentiellem Backoff (1 s bis max. 15 min). Fehler werden niemals ignoriert.
 
 ---
 
-## 3. Verifikations-Schritte für den Entwickler
+## 3. Messklassen & Nachweis (SPEC §12)
 
-### Schritt 1: Scope-Prüfung (Kein Prefix-Matching auf Mandanten-Strings)
-Prüfe in `crates/contextra-store/src/scanner/purge.rs`:
-- Ziel muss ein strikter `ErasureScope { tenant, collection, doc }` sein.
-- Der Bug F01 (LsmPurger ignoriert `_target` und purged alle Collections des Mandanten) muss durch gezielte Scans verhindert werden.
-
-### Schritt 2: SSTable-Rewrite Atomarität (F02)
-Prüfe beim Umschreiben von SSTable-Segmenten:
-- Der alte SSTable-Reader bleibt aktiv, bis die temporäre Datei vollständig geschrieben, per `sync_all` gesichert und atomar umbenannt (`rename`) wurde.
-- Fehlerhafte Schreibvorgänge dürfen keine Daten still verlieren.
-
-### Schritt 3: Positivkontrolle (Canary-Test)
-1. **Vor Vernichtung**: Test prüft, dass der Canary-Datensatz im Index findbar und entschlüsselbar ist.
-2. **Nach Vernichtung**:
-   - Ebene-A-Scan findet keinen Klartext-Match.
-   - Ebene-B-Probe scheitert mit `AuthenticationTagMismatch` oder `KeyNotFound`.
-3. Der Canary landet **niemals** im produktiven WAL.
-
-### Schritt 4: Ed25519 Löschbericht (Proof v4/v5)
-Prüfe den generierten Löschbericht in `crates/contextra-crypto/src/deletion_proof/`:
-- **Nur asymmetrische Ed25519-Signatur** (`verify` benötigt nur den Public Key).
-- Keine Klartext-IDs, personenbezogene Daten oder Prompt-Inhalte im Bericht (L-05).
-- Restrisiken müssen explizit im Bericht deklariert sein (`UNMEASURED_ERASURE_LAYERS`: Blob, Checkpoints, Swap).
-
----
-
-## 4. Testausführung
-
-```bash
-# Deletion E2E Tests
-cargo test -p contextra-store --test deletion_e2e
-cargo test -p contextra-crypto --test deletion_proof_tests
-cargo test -p contextra-engine --test review_stub_proof
-
-# Regressionstests für F01 und F02
-cargo test -p contextra-store test_r_f01_scope_isolation
-cargo test -p contextra-store test_r_f02_sstable_rewrite_atomic
-```
-
-Weitere Details: siehe [references/deletion_architecture.md](file:///home/freddy/Projekte/contextra/.agents/skills/contextra-deletion-verifier/references/deletion_architecture.md).
+- **E1 (Rohscan)**: Byte-genauer Scan aller Dateien im Datenverzeichnis nach Ziel-Needles (BLAKE3-Hashes, Schlüsselbytes).
+- **E2 (Decoder-Scan)**: Strukturierter Scan nach vollständiger Entschlüsselung aller SSTables, Textsegmente und Vektorsnapshots.
+- **E3 (Schlüssel-/Slot-Abwesenheit)**: Verifikation, dass Schlüssel, Locator-Einträge und Slots nicht mehr existieren.
+- **Positivkontrolle (Canary)**: Vor jeder Messung injiziert `CanaryFactory` Test-Needles in einen Testmandanten, um die Detektionsfähigkeit der Scanner maschinell zu beweisen.

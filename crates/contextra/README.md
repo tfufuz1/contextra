@@ -1,33 +1,28 @@
 # contextra
 
-> **Haupt-Bibliotheksfassade und einzige Composition Root für Endanwender**
->
-> Normativitätsklasse: **Kern `[K]`** (Ring 4, `stable`; SPEC §4, `capabilities.toml`).
+Haupt-Bibliotheksfassade und einzige Composition Root von Contextra.
 
----
+- **Ring:** Ring 4 (Fassade, Composition Root)
+- **Normativ:** [docs/SPEC.md §7, §8.14](../../docs/SPEC.md)
+- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
 
-## Zweck & Rolle im System
+## Rolle & Zweck
+`contextra` ist die primäre Fassade und die einzige **Composition Root** des Gesamtsystems (Ring 4). Sie re-exportiert ausschließlich die autorisierte öffentliche API:
+- `EngineBuilder`: Sicherer Builder zur Konfiguration und Öffnung der Datenbank (`open().await?`).
+  - Erzwingt Tokio-Runtime-Handle.
+  - Erzwingt Passphrase für Argon2id KDF ($m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$).
+  - Erzwingt Mandantenisolation (`TenantPolicy::Required`).
+  - Stellt System-Defaults bereit (`RealVfs`, `SystemClock`, `OsRng`).
+- `Collection`: Dokumentenverwaltung (`insert`, `get`, `scan`, `delete`, `search_hybrid`).
+- Lösch- und Prüfpfade:
+  - `db.erase(target, retention)`: Startet Löschung und liefert `ErasureReceipt` mit Status `Gated`.
+  - `db.erasure_status(erasure_id)`: Statusabfrage der Saga.
+  - `contextra::verify(report, target)`: Unabhängige Berichts- und Residuenprüfung.
 
-`contextra` ist die primäre Fassade und die einzige **Composition Root** des Gesamtsystems (Ring 4). Sie stellt den zentralen Einstiegspunkt und das Builder-Muster (`ContextraBuilder`) für Anwendungen bereit, um Speicher-Engines, Vektor- und Textindizes, Krypto-Verwaltung und Inferenzanbindungen sauber und sicher zu instanziieren.
-
-## Ring-Zugehörigkeit & Sicherheitsgarantien
-
-- **Ring:** Ring 4 (Fassade / Composition Root)
-- **Status:** `stable` / Primäre Schnittstelle
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-- **Zero Panic:** Alle öffentlichen APIs geben `Result<T, ContextraError>` zurück.
-- **Fail-Closed:** Fehlerhafte Konfigurationen oder fehlende Schlüssel verhindern den Start.
-
-## Öffentliche API-Übersicht
-
-- **Composition Root / Builder:** `ContextraBuilder` zur sicheren Assemblierung aller Subsysteme.
-- **Konfiguration:** `ContextraConfig`, `StorageConfig`, `SecurityConfig`.
-- **Datenbank-Zugriff:** Re-Exports der Sammlungs- und Transaktionsverwaltung aus `contextra-db`.
-- **Löschpfad:** Initiierung von physischem Purge und Crypto-Shredding über die `ErasureSaga`.
-
-## Weiterführende Dokumentation
-
-- 📖 [Gesamtspezifikation (SPEC.md)](../../docs/SPEC.md)
-- 📋 [Implementierungsplan (PLAN.md)](../../PLAN.md)
-- 🏗️ [Architektur & Schichtenmodell](../../docs/ARCHITECTURE.md)
-- 🛠️ [Kompilieranleitung für Implementierer](../../docs/COMPILATION.md)
+## Invarianten
+- `#![forbid(unsafe_code)]`
+- Kein anderes Crate im Workspace darf von `contextra` abhängen (AR-1).
+- Zero Panic: Alle Funktionen liefern `Result<T, ContextraError>`.
+- Pflichtverschlüsselung ohne Opt-Out (D-05).
+- Sauberes Beenden über `close().await?`; kein Blockieren in `Drop`.
+- Veraltete Features (`audit-export`, `avv-generator`, `candle`, `privacy`, `license`) sind entfernt.

@@ -1,86 +1,45 @@
 # Contextra — Claude / Antigravity-Betriebsanleitung
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+<!-- doc-stamp: 2026-11-01 | Spec-Fassung: 2.0.0 (SOLL-Zustand Release 1.0.0) | PLAN: 2026-11-01 -->
 
-<!-- doc-stamp: 2026-10-29 0796b40ed | Spec-Fassung: 3.0 -->
-
-> Diese Datei gilt **ausschließlich** für Claude/Antigravity. Für Jules gilt `AGENTS.md §2a` + `.agents/jules/SESSION_BOOTSTRAP.md`.
-
-## ⚠️ Subagenten: Sparsam verwenden
-
-Subagenten nur für klar abgrenzbare, parallele Aufgaben. Sequenziell arbeiten, wo möglich.
-
-- ✅ Subagenten für parallele, unabhängige Dokumentations- oder Analyse-Tasks
-- ❌ Kein Aufteilen von Aufgaben, die Daten aus demselben Code-Zustand brauchen
-- ✅ Kontingent-bewusst: lieber eine Datei mehr selbst lesen als delegieren
-- ✅ Für Coding-Tasks: direkt im Kontext arbeiten
+> **Normative Richtlinie:** Diese Datei gilt für Claude und Antigravity. Maßgeblich sind ausnahmslos [docs/SPEC.md](file:///home/freddy/Projekte/contextra/docs/SPEC.md), [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md) und [AGENTS.md](file:///home/freddy/Projekte/contextra/AGENTS.md).
 
 ---
 
-## Start
+## 1. Arbeitsweise
 
-> **`AGENTS.md §2a` ist für Jules — Claude/Antigravity überspringt diesen Abschnitt vollständig.**
+- **Ein PR = ein Arbeitspaket (WP) = höchstens ein Crate-Schnitt (REQ-CHG-2).**
+- **Rot vor Grün (TDD):** Vor dem Fix zwingend ein fehlschlagender Regressionstest.
+- **Evidenzpflicht:** Logs und Befehle unter `evidence/<WP-ID>/` ablegen.
+- APIs und Dateipfade im Code und in `docs/SPEC.md` verifizieren — niemals aus dem Gedächtnis annehmen.
+- Kleinste mögliche Änderung. Kein Over-Engineering.
 
+---
+
+## 2. Die 12 Kernregeln (AGENTS.md §2, SPEC §0.2)
+
+1. **Ring- & Schichten-Disziplin:** Abhängigkeiten zeigen strikt abwärts (Ring 4 → 0). Innerhalb Ring 2 gilt Matrix SPEC §5.3.
+2. **Zero-Panic in Produktion:** Kein `unwrap()`, `expect()`, `panic!()`, `todo!()`, `assert!()` oder ungeprüftes Index-Slicing (`[i]`) im Produktionscode.
+3. **Determinismus & Port-Purity:** Zeit, Zufall und IDs stammen ausschließlich aus den Ports `Clock`, `Rng`, `IdGen` aus `contextra-ports`.
+4. **WAL-First Consistency:** Frame(s) → Gruppen-Commit → `sync_data` WAL → Memtable → Sichtbarkeit.
+5. **I/O ausschließlich über `Vfs`:** Kein direkter Aufruf von `std::fs` oder `tokio::fs`. Alle Sync-Fehler propagieren.
+6. **Unsafe ausschließlich in 2 Inseln (D-29):** Nur in `contextra-simd` und `contextra-sys`. Jeder Block mit `// SAFETY:`. Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
+7. **Mandantentrennung verpflichtend (D-07):** `TenantId` stammt aus dem Kontext (`TenantPolicy::Required`). Store-Zugriff nur über `TenantScopedStorage`.
+8. **Sicherheit ist kein Feature-Schalter (D-05, D-06):** AES-256-GCM-SIV Pflicht ohne Opt-Out. KDF: Argon2id mit $m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$.
+9. **Messen vor Behaupten (D-35):** Restbestände stammen aus echten Messungen (`scan_residue` über `ErasureLayer`, E1/E2/E3) mit Positivkontrolle (Canary).
+10. **Fail-Closed:** Unbekannte Zustände oder Krypto-Fehler führen sofort zum geordneten Abbruch.
+11. **Eine Typfamilie je Konzept:** Reine Domänentypen in `contextra-types`, Krypto in `contextra-crypto`.
+12. **Gate-getrieben:** Verbindliche Gate-Reihenfolge (G-A bis G-H, G0) gemäß `PLAN.md`.
+
+---
+
+## 3. Lokale Verifikation
+
+Vor jedem Commit oder PR ausführen:
 ```bash
-cargo check --workspace
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::indexing_slicing
+cargo check --workspace --all-targets
+cargo test --workspace --locked
+cargo test -p tests-arch
 ```
-
-Dann: `docs/SPEC.md` §0 lesen (LLM-Schnellstart, 3 Minuten).
-
----
-
-## Ablauf
-
-1. Task lesen, Ziel verstehen, Quellen der Wahrheit identifizieren.
-2. APIs und Dateipfade im Code verifizieren — niemals aus dem Gedächtnis annehmen.
-3. Kleinste mögliche Änderung. Kein Over-Engineering.
-4. Verifizieren: Gates, Lints, Tests grün (`cargo check --workspace` && `cargo test --workspace`).
-5. PR-Text formulieren (mit WP-Nummer aus PLAN.md).
-
----
-
-## Kontingent clever nutzen
-
-| Statt… | Besser… |
-|---|---|
-| Subagent starten um Datei zu lesen | `read_file` direkt aufrufen |
-| Subagent für Suche | `grep`/`find` via `run_command` |
-| Große Kontextmengen komplett laden | Gezielt nur relevante Abschnitte lesen |
-| Ganzes SPEC.md lesen | §0 (Schnellstart) + gezielt §x für die Aufgabe |
-
----
-
-## Kernregeln (aus AGENTS.md §4, SPEC §0.2)
-
-1. **Zero-Panic:** Kein `unwrap()`, `expect()`, `panic!()` in Produktionspfaden (P7).
-2. **Unsafe-Isolierung:** Nur in `contextra-simd`, `contextra-sys`, `contextra-wire`. Stets `// SAFETY:` (P2).
-3. **Determinismus:** Zeit/Zufall/IDs nur über Ports `Clock`, `Rng`, `IdGen`. Kein `Instant::now()`, `thread_rng()`, `env::var()` in Kernlogik (P28).
-4. **Single-Node:** Embedded Library, kein Server, kein Sharding.
-5. **Mandant aus `RequestContext`:** Nie aus Literalen, Defaults oder Nutzerparametern (VETO-F10).
-6. **Sicherheit kein Feature:** Kein `cfg(not(feature))` für Security-Typen (A1).
-7. **I/O über `Vfs`:** `fsync`-Fehler propagieren, nie mit `let _ =` wegwerfen (P24).
-8. **Gate-Integrität:** Gates, Lints, Ratchets niemals abschwächen oder umgehen (REQ-QA-010).
-9. **Baukasten-Module [M] mit Vertrag:** `graph`, `cognition`, `adapt`, `kvcache`, `router`, `agent`, `infer-onnx`, `infer-ollama`, `privacy`, `mcp`, `py`, `sandbox` sind aktive Baukasten-Module mit isoliertem Vertrag (SPEC §4.2, §5).
-10. **Ein PR = ein WP:** Kein Crate-Schnitt über mehrere WPs in einem PR (REQ-CHG-2).
-
----
-
-## Crate-Status kurz
-
-**Kern [K] — aktiv:** `types` · `ports` · `mvcc` · `crypto` · `vector` · `text` · `rank` · `store` · `checkpoint` · `engine` · `db` · `contextra`
-
-**Rand-Module [M] — aktiv:** `infer-candle` · `infer-onnx` · `infer-ollama` · `kvcache` · `adapt` · `graph` · `cognition` · `router` · `agent` · `privacy` · `mcp` · `py` · `sandbox`
-
-**Auslaufend:** `contextra-core` (WP 2.8: schrittweise Entfernung der Kompatibilitätsfassade)
-
----
-
-## Vollständige Referenzen
-
-| Dokument | Zweck |
-|----------|-------|
-| `docs/SPEC.md` | **Einzige normative Quelle** (Fassung 2.3) |
-| `docs/PLAN.md` | Implementierungsplan, Arbeitspakete WP 0.1–9.4 |
-| `AGENTS.md` | Vollständige Agenten-Betriebsanleitung |
-| `capabilities.toml` | Ring, Klasse, Reifegrad je Crate |
-| `docs/VETOES.md` | Veto-Register |

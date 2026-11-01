@@ -1,16 +1,23 @@
 # contextra-crypto
 
-Kryptographische Vaults, Zeroize, Egress-Verschlüsselung, Audit-Ketten und Löschnachweise.
+Kryptografische Primitive, Schlüsselverwaltung, AEAD-Verschlüsselung, blinde Tags und Signaturen.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, §20, `capabilities.toml`).
+- **Ring:** Ring 1 (Kryptografie & Nachweis-Primitive)
+- **Normativ:** [docs/SPEC.md §8.6](../../docs/SPEC.md)
+- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
 
-## Rolle in einem Satz
-`contextra-crypto` stellt I/O-freie kryptographische Primitiven, Schlüsselverwaltung, Zeroization, Audit-Chains und DeletionProof-Erzeugung/Verifikation bereit.
+## Rolle & Zweck
+`contextra-crypto` kapselt sämtliche kryptografischen Operationen in einer strikt auditierten Typfamilie:
+- `kdf`: Argon2id KDF ($m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$, `derive_master`).
+- `keys`: `KeySet` (deterministische Ableitung aller Teilschlüssel via HKDF aus $K_\text{master}$).
+- `aead`: AES-256-GCM-SIV (`seal`, `open`), 96-Bit Nonce aus CSPRNG (`OsRng`).
+- `envelope`: Record-Envelope-Sealing (SPEC §9.3).
+- `tag`: `blind_tag` via Keyed-BLAKE3 mit Längenpräfixen gegen Mehrdeutigkeiten.
+- `wal_crypto`: HMAC-SHA256-Verkettung für WAL-Frames.
+- `sign`: Ed25519-Signatur und Verifikation für Löschberichte `ctx-erasure-report/1`.
 
-## Ring, Klasse & Reifegrad
-- **Ring:** Ring 0 (Kryptographie & Nachweislogik, I/O-frei, keine Threads)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports` (Persistenz nur über Port `DurableLog`; Spec §6.9, `capabilities.toml`)
-
-*Hinweis zu Abweichungen:* `capabilities.toml` führt aktuell veraltetes `contextra-core` in `may_depend_on` (siehe `docs/status/ABW-L3.md`).
+## Invarianten
+- `#![forbid(unsafe_code)]`
+- Kein Schlüsselmaterial in `Clone`, `Debug`, `Display` oder `Serialize`. Alle Puffer in `Zeroizing<T>`.
+- Kein HKDF für Passphrasen (B-15) — ausschließlich Argon2id!
+- Injektivitätsgarantie für `blind_tag`.

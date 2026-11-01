@@ -2,34 +2,30 @@
 name: contextra-invariants-gate
 description: >-
   Use this skill to enforce Contextra architectural invariants, ring hierarchy (0-4),
-  Zero-Panic deny-lints (unwrap, expect, panic, slice indexing), Unsafe island bounds, and deterministic port usage.
+  Zero-Panic deny-lints (unwrap, expect, panic, slice indexing), the 2 Unsafe island bounds, and deterministic port usage.
 ---
 
 # Contextra Invariants Gate – Architektur- & Qualitätsprüfung
 
-Dieser Skill führt die formalen Gates und Architekturprüfungen nach [docs/SPEC.md §3](file:///home/freddy/Projekte/contextra/docs/SPEC.md#L186) und [AGENTS.md §2](file:///home/freddy/Projekte/contextra/AGENTS.md) durch.
-
-## Schnell-Ausführung
-
-```bash
-bash .agents/skills/contextra-invariants-gate/scripts/check_invariants.sh
-```
+Dieser Skill führt die formalen Gates und Architekturprüfungen nach [docs/SPEC.md §5, §11](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [AGENTS.md §2](file:///home/freddy/Projekte/contextra/AGENTS.md) durch.
 
 ---
 
 ## 1. Die Invarianten im Detail
 
-### Invariante 1: Ring-Hierarchie (P1, P5, P30)
-- Abhängigkeiten dürfen nur seitwärts oder nach unten verlaufen.
-- Ring 0 darf weder `tokio` noch Async-Runtimes in Produktions-Dependencies führen (P26).
-- Ring 0 darf niemals von Ring 1, 2, 3 oder 4 abhängen.
+### Invariante 1: Ring-Hierarchie (P1, P30, SPEC §5.2)
+- Abhängigkeiten dürfen nur abwärts oder innerhalb von Ring 2 gemäß Matrix SPEC §5.3 verlaufen.
+- Ring 0 (`contextra-types`, `contextra-ports`) führt weder `tokio` noch I/O- oder Netzwerk-Crates.
+- `store` kennt weder `text`, `vector` noch `erasure`.
+- `erasure` kennt keine Ring-2-Crates.
 
-### Invariante 2: Zero-Panic Richtlinie (P7)
-In Produktionscode (`src/` außerhalb von `#[cfg(test)]`):
+### Invariante 2: Zero-Panic Richtlinie (P7, SPEC §11.1)
+In Produktionscode (`crates/*/src/` außerhalb von `#[cfg(test)]`):
 - Kein `.unwrap()`
 - Kein `.expect()`
 - Kein `panic!()`
 - Kein `todo!()` oder `unimplemented!()`
+- Kein `assert!()`
 - Kein ungeprüftes Indexing `arr[i]` (stattdessen `.get(i).ok_or(...)`)
 
 Verstöße werden über den Clippy-Lintsatz auf `deny`-Ebene blockiert:
@@ -41,32 +37,18 @@ cargo clippy --workspace --all-targets -- \
   -D clippy::indexing_slicing
 ```
 
-### Invariante 3: Unsafe-Inseln (P2)
-`unsafe` ist ausschließlich in diesen drei Crates gestattet:
-1. `crates/contextra-simd` (AVX2 / AVX-512 Vektorbeschleunigung)
-2. `crates/contextra-sys` (OS-Primitive, mlock, sync)
-3. `crates/contextra-wire` (FlatBuffers Layouts)
+### Invariante 3: Genau zwei Unsafe-Inseln (P2, D-29, SPEC §5.2)
+`unsafe` ist ausschließlich in diesen zwei Crates gestattet:
+1. `crates/contextra-simd` (AVX2 / AVX-512 f32 / NEON Distanzkernel)
+2. `crates/contextra-sys` (Low-Level OS-Primitive, mlock, sync)
 
-Jeder Block **muss** einen vorangestellten Kommentar `// SAFETY:` besitzen, der die Garantien belegt.
+Jeder Block **muss** einen vorangestellten Kommentar `// SAFETY:` besitzen, der Alignment, Bounds und Gültigkeit belegt. Alle anderen 12 Produktivcrates erzwingen strikt `#![forbid(unsafe_code)]`.
 
-### Invariante 4: Determinismus & Port-Purity (P28)
-- Verboten in Kern-Logik:
-  - `Instant::now()`
-  - `SystemTime::now()`
-  - `rand::thread_rng()`
-  - `std::env::var()`
-- Zulässig: Ports `Clock`, `Rng`, `IdGen` aus `contextra-ports`.
+### Invariante 4: Port-Purity & Determinismus (P28)
+- Zeit, Zufall und IDs stammen aus `Clock`, `Rng` und `IdGen` aus `contextra-ports`.
+- Keine direkten Aufrufe von `Instant::now()`, `SystemTime::now()` oder `thread_rng()` in Kernlogik.
+- Keine `HashMap`/`HashSet` mit Standard-Hasher in deterministischen Pfaden (stattdessen `BTreeMap`/`BTreeSet`).
 
-### Invariante 5: Vfs-Disziplin (P24)
-- Direkte Zugriffe via `std::fs` oder `tokio::fs` sind im Kern verboten. Alle Dateioperationen laufen über den `Vfs`-Port.
-
----
-
-## 2. Abhilfemaßnahmen bei Gate-Fehlschlägen
-
-1. **Clippy meldet `unwrap_used`**:
-   - Ersetze `.unwrap()` durch Fehlerweiterleitung mit `?` oder `.ok_or_else(|| ContextraError::...)`.
-2. **Ring-Verletzung**:
-   - Trenne Typdefinitionen in `contextra-types` oder Ports in `contextra-ports` aus, anstatt zyklisch zu importieren.
-3. **Fehlendes `// SAFETY:`**:
-   - Ergänze eine fundierte Begründung, warum Pointer gültig und Speicherbereiche aligned sind.
+### Invariante 5: I/O ausschließlich über `Vfs` (D-04)
+- Kein direkter Aufruf von `std::fs` oder `tokio::fs` in Produktivcrates.
+- Sämtliche `fsync`- und `sync_*`-Fehler werden ausnahmslos propagiert.

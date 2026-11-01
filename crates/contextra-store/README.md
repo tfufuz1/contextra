@@ -1,29 +1,24 @@
 # contextra-store
 
-LSM-Tree Storage Engine, WAL Durability und Compaction Engine.
+Transaktionaler LSM-Tree, WAL-Durability, Leveled SSTables und Purge-Primitive.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 1, `stable`; §6.0, `capabilities.toml`).
+- **Ring:** Ring 2 (Speicherschicht)
+- **Normativ:** [docs/SPEC.md §8.8](../../docs/SPEC.md)
+- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
 
+## Rolle & Zweck
+`contextra-store` ist der blinde, transaktionale Key-Value-Speicherkern von Contextra. Er operiert ausschließlich auf `KeyBuf`, `Seq`, opaken Bytes und `Matcher`:
+- `wal`: Write-Ahead-Log mit HMAC-SHA256-Kette, CRC32 und Gruppen-Commit.
+- `memtable`: Skip-List mit allen Versionen; `remove_range` für Purge.
+- `sstable`: Block-AEAD-SSTables (AES-256-GCM-SIV), Index, Bloom-Filter, LRU-Cache mit Zeroize.
+- `manifest`: Append-Log für atomaren Dateitausch (`ReplaceFiles{old, new}`).
+- `erase`: Purge-Ablauf (FI-S20..S27, SPEC §11.4): `plan`, `drain`, `rewrite_file`, `swap`, `unlink_verify`.
+- `scoped`: `TenantScopedStorage` erzwingt Mandantentrennung und `ReadGate`-Prüfung.
 
-`contextra-store` ist die LSM-Tree Storage Engine von Contextra (Ring 1).
-
-## Zweck
-
-Verwaltet persistenten Key-Value-Speicher mit Write-Ahead-Log (WAL), HMAC-Integritätskette, MemTable, SSTables, `KvKeyLocks` und Compaction.
-
-## Ring-Zugehörigkeit & Status
-
-- **Ring:** Ring 1 (Persistenz-Engine)
-- **Status:** 🟢 Fertig
-- **Sicherheits-Invariante:** `#![forbid(unsafe_code)]`
-
-## Öffentliche API-Übersicht
-
-- **LSM & WAL:** `LsmStorage`, `LsmConfig`, `WalHandle`, `WalError`
-- **Key-Granulare Locks:** `KvKeyLocks`, `KeyGuard`, `MultiKeyGuard`
-- **Manifest & Compaction:** `Manifest`, `ManifestEntry`, `CompactionEngine`
-- **Pressure Monitoring:** `SystemPressure`, `SystemPressureMonitor`
-
-## Architektur & Verweise
-
-Details zur Storage-Engine und Lock-Hierarchie finden sich in [`ARCHITECTURE.md`](../../ARCHITECTURE.md) (folgt in Kürze) sowie `README.md` §5.
+## Invarianten
+- `#![forbid(unsafe_code)]`
+- I/O ausschließlich über den `Vfs`-Port (`durable-fs` wird nicht direkt referenziert).
+- WAL-First Consistency (I-1): Frame(s) → Gruppen-Commit → `sync_data` WAL → Memtable → Sichtbarkeit.
+- Follower-Commits sind cancel-sicher (I-14, D-C01).
+- SSTable-Rewrite behält Original-Sequenzen (`seq`, `tx_id`, `flags`) bei (I-2).
+- Pflichtverschlüsselung ohne Opt-Out (D-05).

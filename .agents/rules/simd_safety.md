@@ -1,24 +1,28 @@
 # Governance Rule: SIMD Safety & Unsafe Islands Isolation (`rules/simd_safety.md`)
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Normative Vorgabe nach docs/SPEC.md §5.2, §8.3, §8.4 und D-29.**
 
 ## Gilt für
 - `crates/contextra-simd`
 - `crates/contextra-sys`
-- `crates/contextra-wire`
-- `crates/contextra-crypto`
+- Gesamter Workspace (Durchsetzung des `#![forbid(unsafe_code)]` Verbots)
 
 ## Pflichtregeln
-1. **Unsafe Isolation Invariante**: `unsafe` Rust Code darf ausschließlich in den drei freigegebenen Unsafe-Inseln (`contextra-simd`, `contextra-sys`, `contextra-wire`) existieren (SPEC §4.6). Alle anderen Crates erzwingen `#![forbid(unsafe_code)]` oder `#![deny(unsafe_code)]` (Quelle: `docs/SPEC.md`, `capabilities.toml`).
-2. **`// SAFETY:` Dokumentationspflicht**: Jeder `unsafe`-Block muss eine explizite, unmissverständliche `// SAFETY:` Begründung enthalten, welche Invarianten (Alignment, Bounds, Pointer Validity) eingehalten werden (Quelle: `CONSTITUTION.md`, `crates/contextra-simd/src/lib.rs`).
-3. **64-Byte Alignment für Vector-Slabs**: SIMD-Kernels und Arena-Allocators verlangen striktes Memory Alignment von 64 Byte (`ARENA_ALIGNMENT_BYTES = 64`), um UB und Alignment Faults bei AVX-512/NEON Vektor-Loads zu verhindern (Quelle: `crates/contextra-vector/src/hnsw/arena.rs`).
-
-## Häufige Fehler
-- Fehlen des `// SAFETY:`-Kommentars bei Zeiger-Deref.
-- Ausführen von unaligned Reads auf SIMD-Puffern.
-- Einschleusen von `unsafe`-Blöcken in Ring-0/Ring-1 Kernmodule außerhalb der Inseln.
+1. **Unsafe-Insel-Doktrin (D-29, P2)**:
+   - `unsafe` Rust Code ist im gesamten Workspace **ausschließlich in zwei benannten Inseln** erlaubt:
+     1. `crates/contextra-simd` (AVX2 / AVX-512 f32 / NEON Distanzkernel)
+     2. `crates/contextra-sys` (Low-Level OS-Primitive, mlock, Dateisystem-Sync)
+   - Alle anderen 12 Produktivcrates erzwingen strikt `#![forbid(unsafe_code)]`.
+2. **Lückenlose `// SAFETY:` Dokumentation**:
+   - Jeder einzelne `unsafe`-Block erfordert zwingend eine präzise Begründung, die Alignment, Slice-Bounds und Pointer-Gültigkeit nachweist.
+3. **Genauigkeits- & Tail-Disziplin in SIMD (SPEC §8.4)**:
+   - Jeder Kernel muss für identische Eingaben das Ergebnis der Skalar-Referenz innerhalb einer relativen Fehlertoleranz von $\epsilon = 10^{-4}$ (für Norm $\le 10^3$) einhalten.
+   - Vektorlängen, die kein Vielfaches der Registerbreite sind, werden deterministisch über den Skalar-Rest berechnet. Keine Out-of-Bounds Lesezugriffe!
+4. **Verbot von u8-VNNI (D-28)**:
+   - Der historische u8-VNNI-Pfad ist defekt und gestrichen. In v1 existieren ausschließlich f32-Kernel.
 
 ## Verweise
-- `CONSTITUTION.md`
-- `capabilities.toml`
-- `crates/contextra-simd/src/lib.rs`
+- `docs/SPEC.md` §8.3, §8.4
+- `CONSTITUTION.md` §1.1
+- `crates/contextra-simd/AGENTS.md`
+- `crates/contextra-sys/AGENTS.md`

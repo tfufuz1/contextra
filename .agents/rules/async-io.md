@@ -1,22 +1,29 @@
-# Governance Rule: Asynchrones I/O & Non-Blocking Bounds (`rules/async-io.md`)
+# Governance Rule: Asynchrones I/O, Laufzeitmodell & Cancel-Safety (`rules/async-io.md`)
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Normative Vorgabe nach docs/SPEC.md §5.4 (Laufzeitmodell), §8.2 und I-14.**
 
 ## Gilt für
 - `crates/contextra-engine`
-- `crates/contextra-ports`
-- `crates/contextra-infer-onnx`
-- Ring 0 Crate Async-Purity
+- `crates/contextra-store`
+- `crates/contextra-erasure`
+- `crates/contextra`
 
 ## Pflichtregeln
-1. **Ring 0 Async-Reinheit**: Ring-0-Crates (z.B. `contextra-types`, `contextra-ports`, `contextra-adapt`) dürfen keine direkten Abhängigkeiten zu Asynchronous Runtimes wie `tokio` aufweisen (SPEC §0.2 P26).
-2. **Blocking Storage Trait Partitioning**: Speicher-Interfaces sind strikt in synchrone Lese-Pfade (`StorageRead`) und asynchrone Schreib-Pfade (`StorageWrite` via `BoxFuture`) getrennt (Quelle: `crates/contextra-ports/src/storage.rs`).
-3. **No Thread Starvation in CPU Heavy Tasks**: Intensive Rechenoperationen (z.B. ONNX-Inferenz) in async Handlern müssen zwingend auf Blocking-Threadpools entladen werden via `tokio::task::spawn_blocking` (Quelle: `crates/contextra-infer-onnx/src/embedder.rs`).
-
-## Häufige Fehler
-- Mischung von synchronen Blockaden in async Task-Kontexten.
-- Einschleusen von `tokio`-Traits in Ring 0 Kern-Module.
-- Unbegrenzte Future-Instantiierung ohne Backpressure-Steuerung.
+1. **Laufzeitmodell & Tokio-Handle (SPEC §5.4)**:
+   - Die Bibliothek startet keine eigene Tokio-Runtime, sondern verlangt bei `EngineBuilder::open` zwingend die Übergabe eines `tokio::runtime::Handle`.
+   - Alle Hintergrundtasks laufen auf diesem Handle.
+2. **Cancel-Safety bei mutierenden Operationen (I-14, D-C01)**:
+   - Jede mutierende Operation (Commit, Write, Purge, Erase) läuft in einer vom Aufrufer unabhängigen Task (`spawn`).
+   - Der Aufrufer wartet auf das Ergebnis über einen `oneshot`-Kanal. Der Abbruch des Aufruferfutures (Drop des Futures) verändert den Ausgang des Commits nicht.
+3. **Lebenszyklus von Hintergrundtasks (SPEC §11.3)**:
+   - WAL-Flusher, Memtable-Flush, Kompaktion, Purge-Scheduler, Vektor-Rebuild, Textsegment-Merge und Ledger-Rotation besitzen explizite Stop-Flags und `JoinHandle`s.
+   - `close().await?` beendet alle Hintergrundtasks geordnet und synchronisiert die Daten.
+   - **Kein Blockieren in `Drop`** (SPEC §14.3).
+4. **Sperren & Lock-Reihenfolge**:
+   - Dokumentlock: Pro Dokument ein asynchroner Lock, der Insert, Update, Delete und Erase serialisiert (behebt Race-Befund B-13).
+   - Purge-Barrier (`RwLock`): Shared zwischen Kompaktionen, exklusiv für Purge.
+   - **Verbot von Sync-Locks über `.await`**: Keine Sperren über fremde asynchrone Wartepunkte halten.
 
 ## Verweise
-- `crates/contextra-ports/src/storage.rs`
+- `docs/SPEC.md` §5.4
+- `PLAN.md` WP-2.7, WP-2.8

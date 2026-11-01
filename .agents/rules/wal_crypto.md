@@ -1,24 +1,27 @@
 # Governance Rule: WAL & Cryptographic Invariants (`rules/wal_crypto.md`)
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+> **Normative Vorgabe nach docs/SPEC.md §8.6, §8.8, §10 und PLAN.md Phase 2.**
 
 ## Gilt für
 - `crates/contextra-store`
 - `crates/contextra-crypto`
-- Alle Storage- und Crypto-Interaktionen in Contextra Cognitive OS
+- `crates/contextra-erasure`
 
 ## Pflichtregeln
-1. **WAL-First Consistency (P1/P28)**: Jede krypto-relevante oder persistente Mutation muss vor ihrer Anwendung im In-Memory-Index dauerhaft im Write-Ahead Log (`crates/contextra-store/src/wal/`) protokolliert werden (Quelle: `crates/contextra-store/AGENTS.md`, ADR-005).
-2. **HMAC-Integrationsschutz (INV-WAL-LEGACY-KEY-1)**: WAL-Segmente nutzen HMAC-SHA256 mit rotierbarem Master-Key. Der Zugriff auf den obfuscated Legacy-Schlüssel ist strikt auf MIGRATION-Pfade über `Wal::open_for_legacy_migration` beschränkt (Quelle: `crates/contextra-store/src/wal/reader.rs`).
-3. **Zeroize für Cryptographic Keys**: Alle Speicherstrukturen, die Schlüsselmaterial verwalten, müssen `zeroize::Zeroize` oder `ZeroizeOnDrop` implementieren, um Key-Remanenz im RAM zu verhindern (Quelle: `crates/contextra-crypto/src/ed25519_proof.rs`, ADR-012).
-4. **Asymmetrische Deletion Proofs (AK-20/AK-21)**: Löschnachweise müssen extern verifizierbar sein (Ed25519 Signaturen via `DeletionProof::verify`) ohne Abhängigkeit von Datenbank-Zustand oder KeyManager (Quelle: `crates/contextra-crypto/src/deletion_proof.rs`, `docs/reports/deletion_proof_verifiability_report.md`).
-
-## Häufige Fehler
-- Nutzung unverschlüsselter Puffer für sensible Keys im RAM.
-- Umgehung des WAL-Protokolls bei Batch-Writes im LSM-Tree.
-- Verwenden von symmetrischem Secret-State für Dritte bei Deletion Proof Verification.
+1. **WAL-First Consistency (I-1, P24)**:
+   - Jede persistente Zustandsänderung folgt der strikten Reihenfolge: WAL-Frame erzeugen → Gruppen-Commit → `sync_data` WAL → Memtable eintragen → Sichtbarkeit im Read-Pfad.
+2. **Kryptografische WAL-Integrität (SPEC §8.8, §9.2)**:
+   - Jeder WAL-Frame besitzt eine kryptografische HMAC-SHA256-Verkettung unter dem Schlüssel `K_wal` (abgeleitet aus `KeySet`).
+   - CRC32 dient ausschließlich der schnellen Torn-Write-Erkennung am Dateiende. CRC-Mismatch am Dateiende führt zum kontrollierten Abschneiden; CRC-Mismatch mitten in der Datei ist ein fataler Integritätsfehler.
+   - Historische Legacy-Keys ohne HMAC (`WalVersion::V1`) sind verboten und werden nicht als reguläre Writes akzeptiert.
+3. **Schlüsselhierarchie & Zeroize (SPEC §10.1, §10.4)**:
+   - Master-Key wird zwingend via Argon2id ($m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$) aus der Passphrase abgeleitet.
+   - Teilschlüssel (`k_enc`, `k_idx`, `k_wal`, `k_journal`, `k_vault`, `k_unit`, `k_meta`, `k_hdr`, `k_sign_seed`) werden per HKDF abgeleitet.
+   - Sämtliche Schlüsselstrukturen implementieren `Zeroizing` und löschen sensible Daten bei Scope-Verlassen aus dem RAM.
+4. **Asymmetrisch signierter Löschbericht (D-13, SPEC §9.1)**:
+   - Löschnachweise erfolgen über das Format `ctx-erasure-report/1`, signiert per Ed25519.
+   - Der Bericht enthält keine Klartext-IDs, personenbezogene Daten oder Dokumentinhalte.
 
 ## Verweise
-- `crates/contextra-store/src/wal/`
-- `crates/contextra-crypto/src/deletion_proof.rs`
-- `docs/decisions/`
+- `docs/SPEC.md` §8.6, §8.8, §10
+- `PLAN.md` WP-2.3, WP-2.4, WP-2.5

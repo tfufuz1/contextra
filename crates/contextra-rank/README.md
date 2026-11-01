@@ -1,14 +1,19 @@
 # contextra-rank
 
-Ranking-, Fusion- und Score-Kalibrierungs-Algorithmen.
+Deterministische Reciprocal Rank Fusion (RRF).
 
-Normativitätsklasse: **Rand `[R]`** (Ring 0, `experimental`; §6.1, §6.9, §12, `capabilities.toml`).
+- **Ring:** Ring 2 (Ranking & Fusion)
+- **Normativ:** [docs/SPEC.md §8.13](../../docs/SPEC.md)
+- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
 
-## Rolle in einem Satz
-`contextra-rank` bietet Score-Kalibrierung (Platt, Isotonisch, Conformal) und Ergebnis-Anreicherungen zur Verfeinerung von Retrieval-Rankings.
+## Rolle & Zweck
+`contextra-rank` ist für die deterministische Fusion von Trefferlisten aus Volltext- und Vektorsuche mittels Reciprocal Rank Fusion (RRF) zuständig:
+- `rrf_fuse(lists: &[Vec<Hit>], k: u32, top: usize) -> Vec<Hit>`
+- Standardparameter $k = 60$.
+- Deterministischer Tie-Break nach aufsteigendem `doc_tag`.
 
-## Ring, Klasse & Reifegrad
-- **Ring:** Ring 0 (Ranking & Kalibrierung)
-- **Klasse:** Rand `[R]`
-- **Reifegrad:** `experimental` (abweichend in `capabilities.toml` als `stable` geführt, siehe `docs/status/ABW-L3.md`)
-- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports` (Spec §6.9, `capabilities.toml`)
+## Invarianten
+- `#![forbid(unsafe_code)]`
+- Permutationsinvarianz bezüglich der Reihenfolge der Eingabelisten.
+- Keine Hintergrund-Threads, keine asynchronen Tasks.
+- Komplexe historische Kalibratoren (`IsotonicCalibrator`, Platt Scaling) und Abhängigkeiten zu `adapt` sind vollständig entfernt.

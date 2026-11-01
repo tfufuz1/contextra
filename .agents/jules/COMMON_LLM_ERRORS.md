@@ -124,11 +124,10 @@ unsafe { ptr::copy_nonoverlapping(src, dst, len) }
 unsafe { ptr::copy_nonoverlapping(src, dst, len) }
 ```
 
-**unsafe ist NUR erlaubt in Unsafe-Inseln** (AGENTS.md §6, capabilities.toml):
+**unsafe ist NUR erlaubt in den genau zwei Unsafe-Inseln (D-29, SPEC §5.2):**
 - `crates/contextra-simd`
 - `crates/contextra-sys`
-- `crates/contextra-wire`
-- `crates/contextra-crypto`
+Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
 
 ## FEHLER-KLASSE 7: Test-Mirroring
 

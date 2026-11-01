@@ -1,16 +1,23 @@
 # contextra-vector
 
-Vektorsuche und Indexierung (HNSW, DiskANN, SQ8 Quantisierung).
+HNSW-Vektorsuche, verschlüsselte Snapshots, Slot-Zeroing und Batch-Rebuild.
 
-Normativitätsklasse: **Kern `[K]`** (Ring 0, `stable`; §6.1, §6.9, §9.2, §9.3, `capabilities.toml`).
+- **Ring:** Ring 2 (Vektorindexierung)
+- **Normativ:** [docs/SPEC.md §8.10](../../docs/SPEC.md)
+- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
 
-## Rolle in einem Satz
-`contextra-vector` implementiert speichereffiziente Vektorindexierung und Ähnlichkeitssuche (HNSW, SQ8, ACL-Bitset) mit Mandantenisolation und Tombstone-Pruning.
+## Rolle & Zweck
+`contextra-vector` implementiert speichereffiziente Vektorindexierung und k-NN-Ähnlichkeitssuche für dichte f32-Einbettungen:
+- `arena`: Speicherarena mit Slot-Zeroing im RAM.
+- `hnsw`: Hierarchical Navigable Small World Graph (Multi-Layer-Traversierung).
+- `docmap`: Zuordnung `doc_tag ↔ slot`.
+- `snapshot`: Persistente Chunk-Dateien (AEAD-verschlüsselt mit AES-256-GCM-SIV).
+- `rebuild`: Vollständiger Batch-Rebuild ab Überschreitung der Tombstone-Quote (`vector_rebuild_ratio`).
+- `layer`: Implementiert den `ErasureLayer`-Port für Vektordaten.
 
-## Ring, Klasse & Reifegrad
-- **Ring:** Ring 0 (Vektorindexierung)
-- **Klasse:** Kern `[K]`
-- **Reifegrad:** `stable`
-- **Erlaubte Abhängigkeiten (`may_use` Obergrenze):** `contextra-types`, `contextra-ports`, `contextra-simd` (Spec §6.9, `capabilities.toml`)
-
-*Sicherheits & Lösch-Invarianten:* VETO-F02 (Tombstone-Pruning ohne kryptographische Löschbeweise), INV-TENANT-IDX-1 (mandantenisolierte Vektorräume).
+## Invarianten
+- `#![forbid(unsafe_code)]` (Distanzberechnungen delegieren an `contextra-simd`).
+- Vektoren verlassen den Prozess nur AEAD-verschlüsselt.
+- Slots dürfen erst nach Zeroing im RAM **und** Snapshot-Rewrite auf Platte wiederverwendet werden.
+- Suchergebnisse enthalten niemals Tombstones.
+- Veraltete Module (`acorn`, `diskann`, `quantize*`) sind vollständig entfernt.
