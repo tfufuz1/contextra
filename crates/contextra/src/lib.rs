@@ -57,8 +57,7 @@ pub use query_rewriter::LlmQueryRewriter;
 
 pub use contextra_rank as rank;
 
-#[cfg(feature = "candle")]
-pub use contextra_infer_candle as candle;
+
 
 // ANCHOR[contextra:LIB-001]
 /// Erzeugt einen neuen [`ContextraBuilder`] zur Konfiguration und Instanziierung der Datenbank [`Contextra`].

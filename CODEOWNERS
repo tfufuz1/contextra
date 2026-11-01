@@ -25,7 +25,6 @@
 
 # Tier 3 — Spezifische Funktionalität (Graph, Routing & Adaption)
 /crates/contextra-graph/               @contextra/intelligence-tier3
-/crates/contextra-router/              @contextra/intelligence-tier3
 /crates/contextra-rank/                @contextra/intelligence-tier3
 /crates/contextra-adapt/               @contextra/intelligence-tier3
 

@@ -189,25 +189,10 @@ impl Contextra {
                 model_name,
                 cache_dir,
             } => {
-                #[cfg(feature = "onnx")]
-                {
-                    let model_dir = contextra_infer_onnx::ensure_onnx_model_download(
-                        model_name,
-                        cache_dir.as_deref(),
-                    )
-                    .await?;
-                    let embedder = contextra_infer_onnx::OnnxEmbedder::load(model_dir)?;
-                    let embedder_arc: Arc<dyn TextEmbeddingEngine> = Arc::new(embedder);
-                    self.set_embedder(embedder_arc).await?;
-                }
-                #[cfg(not(feature = "onnx"))]
-                {
-                    let _ = (model_name, cache_dir);
-                    tracing::debug!(
-                        "EmbeddingBackend::Onnx requested, but 'onnx' feature is disabled in this build. \
-                         Recompile with feature 'onnx' to enable local ONNX embeddings."
-                    );
-                }
+                let _ = (model_name, cache_dir);
+                tracing::debug!(
+                    "EmbeddingBackend::Onnx requested, but ONNX inference is not supported in core."
+                );
             }
             EmbeddingBackend::None => {}
         }

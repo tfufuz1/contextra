@@ -61,7 +61,6 @@ contextra-store = { path = ".", features = ["test-hooks"] }
 contextra-testkit = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-graph = { workspace = true }
-contextra-sandbox = { workspace = true }
 libc = "0.2"
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }

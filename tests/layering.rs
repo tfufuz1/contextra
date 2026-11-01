@@ -32,24 +32,6 @@ pub const LAYER_ALLOWLIST: &[AllowlistEntry] = &[
         target_phase: "Phase 1a",
         reason: "Dev-dependency on store for graph integration tests; to be isolated into contextra-testkit in Phase 1a",
     },
-    AllowlistEntry {
-        from_crate: "contextra-infer-onnx",
-        to_crate: "contextra-infer-candle",
-        target_phase: "Phase 1b",
-        reason: "Embed depends on candle provider; execution provider abstraction in Phase 1b",
-    },
-    AllowlistEntry {
-        from_crate: "contextra-infer-candle",
-        to_crate: "contextra-store",
-        target_phase: "Phase 1b",
-        reason: "Candle provider uses store directly; store traits abstraction in Phase 1b",
-    },
-    AllowlistEntry {
-        from_crate: "contextra-infer-ollama",
-        to_crate: "contextra-infer-onnx",
-        target_phase: "Phase 1b",
-        reason: "Ollama provider dev-dependency on embed for benchmarks/tests; to be isolated in Phase 1b",
-    },
 ];
 
 pub fn find_allowlist_entry(from_crate: &str, to_crate: &str) -> Option<&'static AllowlistEntry> {
@@ -61,26 +43,23 @@ impl Ring {
         match name {
             // Ring 0: Foundation & Core Domain Logic
             "contextra-types" | "contextra-ports" | "contextra-mvcc" | "contextra-vector"
-            | "contextra-rank" | "contextra-adapt" | "contextra-text" | "contextra-graph"
-            | "contextra-crypto" | "contextra-simd" | "contextra-sys" | "contextra-wire"
-        | "contextra-core" => Some(Ring::Ring0),
+            | "contextra-rank" | "contextra-text" | "contextra-crypto" | "contextra-simd"
+            | "contextra-sys" | "contextra-durable-fs" => Some(Ring::Ring0),
 
             // Ring 1: Storage & State Persistence
-            "contextra-store" | "contextra-checkpoint" | "contextra-kvcache" => Some(Ring::Ring1),
+            "contextra-store" | "contextra-checkpoint" => Some(Ring::Ring1),
 
-            // Ring 2: External Integrations & Execution Sandboxes
-            "contextra-sandbox" | "contextra-infer-onnx" | "contextra-infer-candle"
-            | "contextra-infer-ollama" => Some(Ring::Ring2),
+            // Ring 2: Core Processing & Adapters
+            "contextra-graph" | "contextra-adapt" | "contextra-cognition" | "contextra-license" => Some(Ring::Ring2),
 
-            // Ring 3: Engine, Reasoning & Cognition
-            "contextra-engine" | "contextra-cognition" | "contextra-privacy"
-            | "contextra-router" | "contextra-agent" | "contextra-db" => Some(Ring::Ring3),
+            // Ring 3: Engine & DB
+            "contextra-engine" | "contextra-db" => Some(Ring::Ring3),
 
             // Ring 4: Public Facade & Protocol Servers
-            "contextra" | "contextra-mcp" | "contextra-py" => Some(Ring::Ring4),
+            "contextra" => Some(Ring::Ring4),
 
             // Tooling
-            "contextra-testkit" | "contextra-bench" => Some(Ring::Tooling),
+            "contextra-testkit" | "contextra-arch-tests" => Some(Ring::Tooling),
 
             _ => None,
         }

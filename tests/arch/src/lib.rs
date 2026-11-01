@@ -34,12 +34,17 @@ pub const RING_TABLE: &[(&str, Ring)] = &[
     ("contextra-vector", Ring::Ring0),
     ("contextra-text", Ring::Ring0),
     ("contextra-rank", Ring::Ring0),
+    ("contextra-durable-fs", Ring::Ring0),
+    ("contextra-checkpoint", Ring::Ring1),
     ("contextra-store", Ring::Ring1),
-    ("contextra-engine", Ring::Ring2),
+    ("contextra-adapt", Ring::Ring2),
+    ("contextra-cognition", Ring::Ring2),
+    ("contextra-graph", Ring::Ring2),
+    ("contextra-license", Ring::Ring2),
+    ("contextra-engine", Ring::Ring3),
     ("contextra-db", Ring::Ring3),
     ("contextra", Ring::Ring4),
     ("contextra-testkit", Ring::Tooling),
-    ("contextra-bench", Ring::Tooling),
 ];
 
 /// Crates, in denen `unsafe` erlaubt ist (NFR-2).

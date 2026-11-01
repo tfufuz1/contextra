@@ -28,4 +28,4 @@ jobs:
         run: cargo test -p contextra-vector --test deleted_nodes_lock_contention -- --nocapture
       - name: Coverage Report
         run: |
-          cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
+          cargo llvm-cov --workspace --json --output-path coverage.json
