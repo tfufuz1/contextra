@@ -22,7 +22,7 @@
 //! - `contextra`, `contextra-adapt`, `contextra-agent`, `contextra-audit-export`, `contextra-avv-generator`,
 //!   `contextra-checkpoint`, `contextra-cognition`, `contextra-core`, `contextra-crypto`, `contextra-db`,
 //!   `contextra-engine`, `contextra-graph`, `contextra-infer-candle`, `contextra-infer-ollama`,
-//!   `contextra-infer-onnx`, `contextra-ingest`, `contextra-kvcache`, `contextra-license`, `contextra-mcp`,
+//!   `contextra-infer-onnx`, `contextra-ingest`, `contextra-license`, `contextra-mcp`,
 //!   `contextra-mvcc`, `contextra-ports`, `contextra-privacy`, `contextra-py`, `contextra-rank`,
 //!   `contextra-router`, `contextra-simd`, `contextra-store`, `contextra-testkit`, `contextra-text`,
 //!   `contextra-vector`.

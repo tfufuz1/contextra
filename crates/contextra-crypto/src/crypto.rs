@@ -55,6 +55,7 @@ use sha2::Sha256;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use zeroize::Zeroizing;
+use contextra_types::ModelFingerprint;
 
 /// Manager for encryption keys and block encryption.
 // ANCHOR[contextra-crypto:CRY-002]
@@ -238,7 +239,7 @@ impl KeyManager {
     pub fn derive_kv_key(
         &self,
         tenant_id: contextra_types::TenantId,
-        model_fingerprint: &crate::kv_cipher::ModelFingerprint,
+        model_fingerprint: &ModelFingerprint,
     ) -> Result<Self> {
         let hk = Hkdf::<Sha256>::from_prk(self.key.as_bytes())
             .map_err(|_| CryptoError::Crypto("Invalid PRK length".to_string()))?;
@@ -292,7 +293,7 @@ impl KeyManager {
     /// Returns [`CryptoError::InvalidInput`] if a tenant scope violation occurs.
     pub fn derive_kv_key_scoped(
         &self,
-        scoped_fingerprint: contextra_types::TenantScoped<&crate::kv_cipher::ModelFingerprint>,
+        scoped_fingerprint: contextra_types::TenantScoped<&ModelFingerprint>,
         expected_tenant_id: &contextra_types::TenantId,
     ) -> Result<Self> {
         let fingerprint = scoped_fingerprint
@@ -303,11 +304,11 @@ impl KeyManager {
 
     /// Derives a tenant-isolated `KeyManager` instance for a specific `TenantId`.
     pub fn cipher_for(&self, tenant_id: contextra_types::TenantId) -> Result<Self> {
-        let dummy_fp = crate::kv_cipher::ModelFingerprint {
-            hash: [0u8; 32],
-            model_id: "default_tenant_cipher".to_string(),
-            quantization: "raw".to_string(),
-        };
+        let dummy_fp = ModelFingerprint::new(
+            [0u8; 32],
+            "default_tenant_cipher".to_string(),
+            "raw".to_string(),
+        );
         self.derive_kv_key(tenant_id, &dummy_fp)
     }
 
@@ -707,7 +708,7 @@ mod tests {
 
     #[test]
     fn test_derive_kv_key_length_prefix_prevents_collision() -> Result<()> {
-        use crate::kv_cipher::ModelFingerprint;
+        use contextra_types::ModelFingerprint;
         use contextra_types::TenantId;
 
         // Setup: Zwei ModelFingerprint-Instanzen mit gleichem hash, aber unterschiedlicher
@@ -739,7 +740,7 @@ mod tests {
 
     #[test]
     fn test_derive_kv_key_same_fingerprint_produces_same_key() -> Result<()> {
-        use crate::kv_cipher::ModelFingerprint;
+        use contextra_types::ModelFingerprint;
         use contextra_types::TenantId;
 
         // Determinismus-Test: Gleiche Eingaben → gleicher Key (HKDF ist deterministisch)
@@ -761,7 +762,7 @@ mod tests {
 
     #[test]
     fn test_derive_kv_key_scoped_enforces_tenant_isolation() -> Result<()> {
-        use crate::kv_cipher::ModelFingerprint;
+        use contextra_types::ModelFingerprint;
         use contextra_types::{TenantId, TenantScoped};
 
         let km = KeyManager::try_new("test-master-key-32bytes-exactly!", b"salt1")?;

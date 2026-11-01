@@ -29,7 +29,6 @@
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
 use contextra_ports::license::LicenseGate;
-use contextra_store::kv::delete_mode::KvDeleteMode;
 pub use contextra_types::types::domain::AutoExtractionMode;
 
 // ANCHOR[contextra:PRF-001]
@@ -66,7 +65,6 @@ pub struct LsmTuning {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CollectionProfile {
     pub performance: PerformanceProfile,
-    pub kv_delete_mode: KvDeleteMode,
     pub lsm_tuning: LsmTuning,
     pub auto_extraction: AutoExtractionMode,
 }
@@ -77,8 +75,6 @@ pub struct CollectionProfile {
 pub enum CollectionProfileError {
     #[error("performance profile invalid: {0}")]
     Performance(#[from] PerformanceProfileError),
-    #[error("deletion-proof active but KvDeleteMode::TombstoneOnly cannot satisfy a KV-side DeletionProof")]
-    KvDeleteMismatch,
 }
 
 impl CollectionProfile {
@@ -87,16 +83,9 @@ impl CollectionProfile {
     ///
     /// # Ablauf von `validate`:
     /// 1. Performance-Profil auflösen und dessen Konfiguration prüfen (`resolved.validate()`).
-    /// 2. Prüfen, ob `deletion_proof_active` mit `KvDeleteMode::TombstoneOnly` kombiniert wurde (Invariante INV-COLLECTION-PROFILE-1).
-    ///
-    /// # Fehler
-    /// Gibt [`CollectionProfileError::KvDeleteMismatch`] zurück, falls Löschnachweise aktiv sind, aber nur Tombstones konfiguriert wurden.
     pub fn validate(&self) -> Result<(), CollectionProfileError> {
         let resolved = self.performance.resolve();
         resolved.validate()?;
-        if resolved.deletion_proof_active && self.kv_delete_mode == KvDeleteMode::TombstoneOnly {
-            return Err(CollectionProfileError::KvDeleteMismatch);
-        }
         Ok(())
     }
 
@@ -136,7 +125,6 @@ impl DeploymentTier {
         match self {
             Self::EdgeMinimal => CollectionProfile {
                 performance: PerformanceProfile::BareMetal,
-                kv_delete_mode: KvDeleteMode::TombstoneOnly,
                 lsm_tuning: LsmTuning {
                     memtable_size_limit: 8 << 20,
                     max_ram_mb: 64,
@@ -147,7 +135,6 @@ impl DeploymentTier {
             },
             Self::PowerUserLocal => CollectionProfile {
                 performance: PerformanceProfile::Balanced,
-                kv_delete_mode: KvDeleteMode::TombstoneOnly,
                 lsm_tuning: LsmTuning {
                     memtable_size_limit: 64 << 20,
                     max_ram_mb: 512,
@@ -158,7 +145,6 @@ impl DeploymentTier {
             },
             Self::EnterpriseShared => CollectionProfile {
                 performance: PerformanceProfile::Balanced,
-                kv_delete_mode: KvDeleteMode::CryptoShred,
                 lsm_tuning: LsmTuning {
                     memtable_size_limit: 256 << 20,
                     max_ram_mb: 4_096,
@@ -169,7 +155,6 @@ impl DeploymentTier {
             },
             Self::EnterpriseRegulated => CollectionProfile {
                 performance: PerformanceProfile::Compliance,
-                kv_delete_mode: KvDeleteMode::CryptoShred,
                 lsm_tuning: LsmTuning {
                     memtable_size_limit: 256 << 20,
                     max_ram_mb: 4_096,

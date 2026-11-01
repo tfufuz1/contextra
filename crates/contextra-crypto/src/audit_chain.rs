@@ -23,9 +23,7 @@
 //!   womit das Commitment nicht mehr auf Originalattribute zurückführbar ist (Wörterbuchangriff
 //!   unmöglich, da salt unbekannt).
 
-use crate::crypto::KeyManager;
 use crate::error::{CryptoError, Result};
-use crate::kv_shredding::KeyRegistry;
 use contextra_types::{DocId, TxId};
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
@@ -168,28 +166,6 @@ pub struct EncryptedCommitmentSalt {
     pub ciphertext: Vec<u8>,
     /// AES-GCM-SIV Nonce (12 Bytes).
     pub nonce: [u8; 12],
-}
-
-impl EncryptedCommitmentSalt {
-    /// Verschlüsselt ein Salt-Byte-Array über den `KeyRegistry`-Shredding-Mechanismus.
-    pub fn encrypt(
-        registry: &KeyRegistry,
-        master_key: &KeyManager,
-        group_id: u64,
-        salt: &[u8],
-    ) -> Result<Self> {
-        let (ciphertext, nonce) = registry.encrypt_with_group(master_key, group_id, salt)?;
-        Ok(Self {
-            group_id,
-            ciphertext,
-            nonce,
-        })
-    }
-
-    /// Entschlüsselt das Salt. Schlägt fehl, wenn der Sub-Key für `group_id` geschreddert/widerrufen wurde.
-    pub fn decrypt(&self, registry: &KeyRegistry) -> Result<Vec<u8>> {
-        registry.decrypt_with_group(self.group_id, &self.ciphertext, &self.nonce)
-    }
 }
 
 /// Berechnet das Commitment `Blake3(salt || attr)`.

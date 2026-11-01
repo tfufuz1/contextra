@@ -48,10 +48,6 @@ pub mod deletion_proof;
 pub mod ed25519_proof;
 pub mod error;
 pub mod kdf;
-pub mod kv_cipher;
-pub mod kv_segment;
-pub mod kv_shredding;
-pub mod revocation_log;
 pub mod wal_completeness;
 pub mod wal_crypto;
 
@@ -68,15 +64,6 @@ pub use deletion_proof::{
 pub use ed25519_proof::{DeletionProofError, SignatureVersion};
 pub use error::{CryptoError, Result};
 pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
-pub use kv_cipher::{EncryptedKvLayer, KvCipher, KvSegmentCipher, ModelFingerprint};
-pub use kv_segment::{
-    eviction_worker::{emergency_wipe, EvictionWorker},
-    segment::KvSegment,
-    store::TenantIsolatedKvStore,
-    CURRENT_KV_KEY_DERIVATION_VERSION,
-};
-pub use kv_shredding::{derive_subkey, KeyRegistry, SubKey, DEFAULT_SHRED_KEY_GROUP_SIZE};
-pub use revocation_log::{RevocationEntry, RevocationLog, RevocationTarget};
 pub use wal_completeness::verify_wal_chain_completeness;
 #[cfg(feature = "cloud-egress-guard")]
 pub use wal_crypto::CloudEgressGuard;
