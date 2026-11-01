@@ -112,14 +112,6 @@ impl Contextra {
         let cancel_token = tokio_util::sync::CancellationToken::new();
         let task_tracker = tokio_util::task::TaskTracker::new();
 
-        let orphan_path = config
-            .orphan_registry_path
-            .clone()
-            .unwrap_or_else(|| path.as_ref().join(".orphan_registry.json"));
-        let orphan_registry = Arc::new(contextra_checkpoint::InstanceOrphanRegistry::new(
-            &orphan_path,
-        ));
-
         let metrics_sink: Arc<dyn contextra_ports::MetricsSink> = config
             .metrics_sink
             .clone()
@@ -138,11 +130,8 @@ impl Contextra {
             cancel_token: cancel_token.clone(),
             task_tracker: task_tracker.clone(),
             embedder: parking_lot::RwLock::new(None),
-            orphan_registry,
             router: parking_lot::RwLock::new(None),
-            calibrator: parking_lot::RwLock::new(None),
             metrics_sink: parking_lot::RwLock::new(metrics_sink),
-            proof_key_provider: parking_lot::RwLock::new(None),
         };
 
         db.initialize_collections().await?;

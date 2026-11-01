@@ -27,16 +27,7 @@ impl Contextra {
             .map(|r| r.overall_drift_status())
             .unwrap_or_else(|| "nicht verfügbar".to_string());
 
-        let (calibration_ece, last_calibration_at) = self
-            .calibrator
-            .read()
-            .as_ref()
-            .and_then(|w| w.upgrade())
-            .map(|c| {
-                let guard = c.lock();
-                (guard.cached_ece(), guard.last_calibration_at())
-            })
-            .unwrap_or((None, None));
+        let (calibration_ece, last_calibration_at) = (None, None);
 
         let pid_pool_size = None;
 
@@ -57,11 +48,5 @@ impl Contextra {
     pub async fn flush(&self) -> Result<()> {
         self.storage.flush().await?;
         Ok(())
-    }
-
-    // ANCHOR[contextra-engine:DIA-003]
-    /// Liefert Zugriff auf die Registry verwaister Knoten.
-    pub fn orphan_registry(&self) -> &Arc<contextra_checkpoint::InstanceOrphanRegistry> {
-        &self.orphan_registry
     }
 }

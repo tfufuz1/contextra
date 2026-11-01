@@ -350,21 +350,6 @@ impl Contextra {
         self.default_col().await?.delete(id).await
     }
 
-    // ANCHOR[contextra-engine:REL-302]
-    /// Dokumentation für `relate` im Rahmen der Transaktions- und Facade-Orchestrierung.
-    #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn relate(&self, from: &str, to: &str, label: &str) -> Result<()> {
-        let col = self.default_col().await?;
-        col.relate(from, to, label).await
-    }
-
-    // ANCHOR[contextra-engine:REL-308]
-    /// Dokumentation für `relate_bidirectional` im Rahmen der Transaktions- und Facade-Orchestrierung.
-    #[tracing::instrument(level = "trace", skip(self))]
-    pub async fn relate_bidirectional(&self, from: &str, to: &str, label: &str) -> Result<()> {
-        let col = self.default_col().await?;
-        col.relate_bidirectional(from, to, label).await
-    }
 
     // ANCHOR[contextra-engine:SCA-314]
     /// Dokumentation für `scan_prefix` im Rahmen der Transaktions- und Facade-Orchestrierung.

@@ -85,15 +85,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     }
                 }
 
-                if relation == contextra_types::domain::LinkRelation::Supersedes {
-                    contextra_graph::cascade_invalidate_edges_for_superseded_doc(
-                        &self.graph_index,
-                        to,
-                        tx.inner(),
-                    )
-                    .await?;
-                }
-
                 self.storage.commit(tx).await?;
             }
         }

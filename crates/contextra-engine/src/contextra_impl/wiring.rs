@@ -24,13 +24,4 @@ impl Contextra {
     pub fn set_router(&self, router: std::sync::Weak<dyn DriftStatusProvider>) {
         *self.router.write() = Some(router);
     }
-
-    // ANCHOR[contextra-engine:WIR-002]
-    /// Registriert die Score-Kalibrator-Komponente.
-    pub fn set_calibrator(
-        &self,
-        calibrator: std::sync::Weak<parking_lot::Mutex<contextra_rank::IsotonicCalibrator>>,
-    ) {
-        *self.calibrator.write() = Some(calibrator);
-    }
 }

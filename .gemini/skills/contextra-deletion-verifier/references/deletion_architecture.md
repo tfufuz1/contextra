@@ -1,48 +1,52 @@
 # Contextra Deletion Pipeline Architecture Reference
 
-Diese Referenz dokumentiert die normative Spezifikation des Löschsystems aus SPEC §12 und PLAN §10.
+> **Normative Vorgabe gemäß docs/SPEC.md §11, §12 und ADR-001 (D-01).**
 
-## 1. Wirkungsklassen
+## 1. Löschmodell & ADR-001 (D-01)
 
-Contextra unterscheidet vier messbare Klassen:
+Gemäß **ADR-001 (SPEC §3.3, D-01)** entfällt die sogenannte Ebene B (kryptografische DocDek-Schlüsselvernichtung) in v1.
+Die Löschung basiert rein auf:
+1. **Physischer Bereinigung (Ebene A)**: Memtable Purge, SSTable-Rewrite/Swap, HNSW-Slot-Zeroing, Text-Segment-Rewrite.
+2. **Fail-Closed ReadGate (`ErasedSet`)**: Sperrt Lese- und Suchzugriffe ab Status `Gated`.
+3. **Snapshot-Widerruf (`revoke_covering`)**: Widerruft aktive MVCC-Snapshots.
+4. **Maschineller Residuenmessung (E1, E2, E3)** mit Canary-Positivkontrolle.
+5. **Ed25519-signiertem Löschbericht (`ctx-erasure-report/1`, D-13)**.
 
-- **Klasse L (Logisch gesperrt)**:
-  - Der Scope ist im `ErasedSet` registriert und per `fsync` persistent.
-  - Alle Lese- und Suchpfade weisen Anfragen auf den Scope sofort ab (`Fail-Closed`).
-- **Klasse P (Klartext bereinigt)**:
-  - Ebene-A-Purge ist auf allen flüchtigen und speicherinternen Strukturen (Memtable, HNSW, BM25 Postings, Caches) abgeschlossen.
-  - Der Canary-Scan bestätigt die Abwesenheit von Klartextmustern.
-- **Klasse C (Persistente Reste unlesbar)**:
-  - Der dokumentspezifische `DocDek` wurde im `KeyTable` vernichtet.
-  - Das Chiffrat auf persistenten Medien (SSTables, WAL) ist mathematisch unentschlüsselbar.
-- **Klasse E (Technisch vollständig)**:
-  - Klasse P und Klasse C sind lückenlos für alle im Scope deklarierten Schichten vollzogen.
-  - Jede Schicht hat einen gültigen `LayerWitness` geliefert.
+---
 
-## 2. Invarianten des Löschpfads
+## 2. Messklassen nach SPEC §12.1 (D-35)
 
-- **INV-DEL-ORDER-1**: Ebene A (Klartext-Purge) MUSS vor der Schlüsselvernichtung (Ebene B) abgeschlossen sein. Purger müssen noch entschlüsseln können, um Multi-Dokument-Blöcke neu zu schreiben.
-- **INV-NO-RESURRECTION-1**: Ein gelöschter Scope darf nach einem Crash, Restore oder Replay niemals wieder lesbar werden.
-- **INV-CLASS-MEASURED-1**: Ein Bericht darf niemals eine Klasse ausweisen, deren Voraussetzungen nicht von einem Schicht-Scanner gemessen wurden.
-- **VETO-F02**: HNSW-Löschung erfolgt durch Markierung, Slot-Nullung (`zeroize_and_free_node`) und Rebuild. Es erfolgt KEIN dynamisches Rewiring der Nachbarkanten.
+- **E1 (Rohscan)**:
+  - Byte-genauer Scan aller Dateien im Datenverzeichnis nach Ziel-Needles (BLAKE3-Hashes, Tags, Schlüsselbytes).
+- **E2 (Decoder-Scan)**:
+  - Strukturierter Scan nach vollständiger AEAD-Entschlüsselung aller Container (SSTables, Textsegmente, Vektorsnapshots).
+- **E3 (Schlüssel- und Slot-Abwesenheit)**:
+  - Nachweis, dass der Zielschlüssel im Index, Locator und Tresor nicht mehr existiert.
 
-## 3. Schlüsselhierarchie
+---
+
+## 3. Invarianten des Löschpfads
+
+- **INV-FAILCLOSED-1**: Bei unbekanntem Zustand oder Fehlern verweigert das System den Zugriff fail-closed.
+- **INV-NO-RESURRECTION-1**: Ein gelöschter Scope darf nach einem Crash, Restore oder Replay niemals wieder lesbar werden (`erasure/ledger.log` Restore-Guard).
+- **INV-CLAIMS-1 (D-35)**: Kein Bericht ohne maschinelle Zeugen (`LayerScan`). Jede Behauptung beruht auf echten Messungen.
+- **VETO-F02**: HNSW-Löschung erfolgt durch Tombstone-Markierung, Slot-Nullung (`zero_slot`) und periodischen Batch-Rebuild. Kein partielles Rewiring.
+
+---
+
+## 4. Schlüsselhierarchie (SPEC §10.1, §13.1)
 
 ```
-Root-Passphrase
+Passphrase (Argon2id: m >= 64 MiB, t >= 3, p >= 1, Salt[32])
    │
-   ▼ Argon2id (m >= 64 MiB, t >= 3, p >= 1)
-KEK_root
+   ▼
+K_master (SecretKey32)
    │
-   ▼ HKDF-SHA256 (Context || Tenant || Collection)
-KEK_coll
-   │
-   ▼ Wrap
-DocDek (Dokument-Schlüssel, 32 Byte CSPRNG)
-   │
-   ├── Chunk-Text (AEAD)
-   ├── Vektoren (AEAD)
-   └── Metadaten (AEAD)
+   ├── HKDF("ctx/enc/v1")     ──► K_enc (SSTable- & Segment-AEAD)
+   ├── HKDF("ctx/idx/v1")     ──► K_idx (blind_tag BLAKE3-Key)
+   ├── HKDF("ctx/wal/v1")     ──► K_wal (WAL-HMAC-Kette)
+   ├── HKDF("ctx/journal/v1") ──► K_journal (Löschjournal-AEAD)
+   ├── HKDF("ctx/vault/v1")   ──► K_vault (Tresor-AEAD)
+   ├── HKDF("ctx/unit/v1")    ──► K_unit (Envelope-Sealing)
+   └── HKDF("ctx/sign/v1")    ──► K_sign_seed (Ed25519-Berichtssignatur)
 ```
-
-Jedes Chiffrat bindet zusätzliche authentifizierte Daten (AAD) an `(Tenant, Collection, DocId, KeyGeneration, SuiteId)`.

@@ -1,20 +1,24 @@
-# Contextra Product Family Specifications
+# Contextra Product Stages Specifications
 
-Detaillierte Spezifikation der Produktprofile nach PLAN.md §11 und SPEC.md §4.
+> **Normative Vorgabe gemäß docs/SPEC.md §1.3 und PLAN.md.**
 
-## 1. EP6 Guard (Privacy Firewall)
-- **Problem**: Unternehmen dürfen keine personenbezogenen Daten (PII) ungeprüft an externe LLM-APIs senden.
-- **Lösung**: Lokale Vorverarbeitung.
-- **Komponenten**:
-  - PII-Mustererkennung mit Prüfziffern-Validierung (IBAN Mod-97, Luhn für Kreditkarten, deutsche Steuer-ID).
-  - Reversible Pseudonymisierung / Tokenisierung vor API-Egress.
-  - Fail-closed Egress-Policy: Standardmäßig Blockade unautorisierter Netzwerkzugriffe.
+Contextra v1 ist in vier inkrementelle, einzeln lieferbare Produktstufen unterteilt. Jede Stufe fügt eine Schicht hinzu, während die Vorstufe bereits ein vollwertiges Produkt darstellt:
 
-## 2. EP1 Memory (Embedded RAG Engine)
-- **Problem**: Externe Vektordatenbanken sind komplex, unterstützen oft keine deutsche Sprachmorphologie und bieten keine belegbare Löschung.
-- **Lösung**: Lokale, eingebettete Single-Node-Bibliothek mit HNSW, BM25 (inkl. Kompositazerlegung), RRF und 6-Stufen-Löschung.
-- **Grenzen**: Single-Node bis zu 10^7 Vektoren je Knoten. Kein verteiltes Sharding.
+## 1. Stufe S0: Gehärteter LSM-Dokumentenspeicher mit belegbarer Löschung
+- **Umfang**: Transaktionaler LSM-Tree mit Löschcluster-Schlüsselraum (SPEC §9.1), Pflichtverschlüsselung (AES-256-GCM-SIV, D-05), Argon2id KDF (D-06), Mandantentrennung (D-07), Tresor (`vault`), Lösch-Saga, ReadGate (`ErasedSet`), Purge-Rewrite & Swap, Journal, E1/E2/E3 Messungen, Ed25519-Löschbericht (`ctx-erasure-report/1`), Erasure Lab und Verifier (`ctx-verify`).
+- **Lieferbares Ergebnis**: Verschlüsselter Dokumenten- und Gedächtnisspeicher mit belegbarer physischer Löschung (Agentengedächtnis ohne Suche).
+- **Crates**: `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-durable-fs`, `contextra-crypto`, `contextra-mvcc`, `contextra-store`, `contextra-erasure`, `contextra-engine`, `contextra`, `testkit`, `lab`, `ctx-verify`.
 
-## 3. EP2 Proof (Compliance & DSGVO Audit)
-- **Problem**: DSGVO Art. 17 verlangt den Nachweis erfolgter Löschungen gegenüber Aufsichtsbehörden.
-- **Lösung**: Kryptografisch signierte Ed25519-Löschberichte (Proof V5) ohne Klartext-IDs.
+## 2. Stufe S1: Volltextsuche als abgeleiteter Segmentindex
+- **Umfang**: BM25-Segmentindex auf unveränderlichen, AEAD-verschlüsselten Segmenten (SPEC §9.7, D-20). Kein Termklartext auf Platte (nur `term_tag`). Block-Max WAND. Dynamische Statistikaggregation. Segment-Rewrite bei Purge.
+- **Lieferbares Ergebnis**: Volltextsuche mit denselben kryptografischen Lösch- und Messnachweisen.
+- **Crate**: `contextra-text`.
+
+## 3. Stufe S2: Vektorsuche mit löschbarer Persistenz
+- **Umfang**: HNSW-Vektorsuche für f32-Einbettungen mit SIMD-Beschleunigung (`contextra-simd`). In-Memory Slot-Zeroing (`zero_slot`). Verschlüsselte Snapshot-Chunks (SPEC §9.8). Vollständiger Batch-Rebuild ab Tombstone-Schwelle.
+- **Lieferbares Ergebnis**: RAG-Vektorkern mit garantierter physischer Löschbarkeit.
+- **Crates**: `contextra-simd`, `contextra-vector`.
+
+## 4. Stufe S3: Hybridsuche & Release Candidate v1.0.0
+- **Umfang**: Reciprocal Rank Fusion (RRF, `contextra-rank`) mit deterministischem Tie-Break nach `doc_tag`. End-to-End Orchestrierung in `contextra-engine`. Öffentliche API-Politur in `contextra`. Verifikation aller Release-Gates G-A bis G-H und G0.
+- **Lieferbares Ergebnis**: v1.0.0 Gesamtrelease.
