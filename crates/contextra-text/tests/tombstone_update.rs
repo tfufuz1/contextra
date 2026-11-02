@@ -1,3 +1,17 @@
+// Begründung: Integrationstest-Fixtures und Assertions dürfen Test-Unwraps, Indizierung und Test-Zeitgeber verwenden.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::unnecessary_cast,
+    clippy::type_complexity
+)]
+
 //! SD-05-TEXT-001 — Tombstone update path integration tests.
 //!
 //! Verifies that `upsert_document` no longer eagerly deletes old posting-list

@@ -12,7 +12,7 @@ use std::collections::HashSet;
 #[test]
 fn german_tokenizer_splits_compounds() {
     use crate::tokenizer::Tokenizer;
-    let tok = crate::tokenizer::GermanMorphTokenizer::new();
+    let tok = crate::tokenizer::GermanMorphTokenizer::try_new().unwrap_or_default();
     let tokens = tok.tokenize("Datenbankentwicklung");
     assert!(tokens.iter().any(|t| t == "Datenbank" || t == "datenbank"));
 }
@@ -22,7 +22,7 @@ fn german_tokenizer_splits_compounds() {
 #[test]
 fn german_tokenizer_normalizes_umlauts() {
     use crate::tokenizer::Tokenizer;
-    let tok = crate::tokenizer::GermanMorphTokenizer::new();
+    let tok = crate::tokenizer::GermanMorphTokenizer::try_new().unwrap_or_default();
     let tokens = tok.tokenize("Bücher");
     // "Bücher" → "buecher" oder ähnlich
     assert!(tokens

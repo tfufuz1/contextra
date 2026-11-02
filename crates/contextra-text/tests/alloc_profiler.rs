@@ -1,3 +1,17 @@
+// Begründung: Integrationstest-Fixtures und Assertions dürfen Test-Unwraps, Indizierung und Test-Zeitgeber verwenden.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::unnecessary_cast,
+    clippy::type_complexity
+)]
+
 //! Allocation Profiling Harness for contextra-text
 //! Measures heap allocation count, bytes allocated, execution time, and throughput
 //! for 10,000 documents (~500 words per document) across German and English workloads.
@@ -24,6 +38,7 @@ static ALLOC_BYTES: AtomicU64 = AtomicU64::new(0);
 // 2. Memory Safety: All heap allocations and deallocations are forwarded unchanged to `std::alloc::System`.
 // 3. Trait Contract: `alloc` and `dealloc` obey all layout and pointer invariants required by the `GlobalAlloc` contract.
 #[allow(unsafe_code)]
+// SAFETY: Thread-safe delegation to System allocator.
 unsafe impl GlobalAlloc for CountingAllocator {
     // SAFETY: Thread-safe delegation to System allocator.
     // SAFETY: Layout invariants (size, alignment) are guaranteed by the `GlobalAlloc` contract caller.

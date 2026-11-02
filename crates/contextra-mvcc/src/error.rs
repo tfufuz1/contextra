@@ -8,13 +8,21 @@ pub use contextra_types::{ContextraError, Result};
 /// Typisierte Fehler für `contextra-mvcc`.
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum MvccError {
-    /// Ungültige Sequenznummer (z. B. Tombstone-Bit gesetzt oder Sentinel-Wert wie `u64::MAX`).
+    /// Ungültige Sequenznummer.
+    #[error("Invalid sequence number: {0}")]
+    InvalidSeq(u64),
+
+    /// Veraltete Variante für Abwärtskompatibilität.
     #[error("Invalid sequence number: {0}")]
     InvalidSequence(u64),
 
     /// Snapshot wurde widerrufen (z. B. durch Purge / Löschung).
     #[error("Snapshot revoked: sequence {0}")]
     SnapshotRevoked(u64),
+
+    /// Snapshot-Limit je Mandant überschritten.
+    #[error("Snapshot limit exceeded")]
+    LimitSnapshots,
 
     /// Datenkonflikt während der Transaktionsvalidierung (SSI / Write-Skew).
     #[error("Conflict: {0}")]
@@ -32,10 +40,16 @@ pub enum MvccError {
 impl From<MvccError> for ContextraError {
     fn from(err: MvccError) -> Self {
         match err {
-            MvccError::InvalidSequence(seq) => ContextraError::InvalidSequenceNumber(seq),
+            MvccError::InvalidSeq(seq) | MvccError::InvalidSequence(seq) => {
+                ContextraError::InvalidSequenceNumber(seq)
+            }
             MvccError::SnapshotRevoked(seq) => {
                 ContextraError::Conflict(format!("Snapshot revoked at sequence {seq}"))
             }
+            MvccError::LimitSnapshots => ContextraError::limit_exceeded(
+                1024,
+                "Snapshot limit per tenant exceeded".to_string(),
+            ),
             MvccError::Conflict(msg) => ContextraError::Conflict(msg),
             MvccError::LimitExceeded(msg) => ContextraError::limit_exceeded(0, msg),
             MvccError::Transaction(msg) => ContextraError::Transaction(msg),

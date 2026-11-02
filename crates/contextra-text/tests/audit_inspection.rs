@@ -1,3 +1,17 @@
+// Begründung: Integrationstest-Fixtures und Assertions dürfen Test-Unwraps, Indizierung und Test-Zeitgeber verwenden.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::unnecessary_cast,
+    clippy::type_complexity
+)]
+
 //! Testsuite `audit_inspection.rs` für contextra-text.
 //!
 //! # Ring-Zuordnung
@@ -13,7 +27,7 @@ use contextra_text::tokenizer::{GermanMorphTokenizer, Tokenizer};
 #[test]
 fn inspect_20_compounds() {
     let splitter = GermanCompoundSplitter::new();
-    let tokenizer = GermanMorphTokenizer::new();
+    let tokenizer = GermanMorphTokenizer::try_new().unwrap_or_default();
 
     let words = vec![
         "Datenschutzgrundverordnung",
@@ -53,7 +67,7 @@ fn inspect_20_compounds() {
 // Testfall `inspect_umlaut_bimap`: Prüft das Verhalten und Invarianten der Textverarbeitung.
 #[test]
 fn inspect_umlaut_bimap() {
-    let tokenizer = GermanMorphTokenizer::new();
+    let tokenizer = GermanMorphTokenizer::try_new().unwrap_or_default();
 
     let pairs = vec![
         ("Bär", "Baer"),
