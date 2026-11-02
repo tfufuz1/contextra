@@ -2,7 +2,7 @@ Reine Datentypen: IDs, Tags, Schlüssel, Fehler, Löschtypen. Kein I/O.
 
 ## Status
 
-Ring 0. Ist-Zustand: vorhanden mit Altlasten (`DocId`, `saos`, `tombstone`, `AutoExtractionMode`, `erasure.rs` entspricht nicht dem Soll). Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
+Ring 0. Kanonische Zieltypen nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8 sowie `docs/specs/01-contextra-types.md`.
 
 ## Abhängigkeiten
 

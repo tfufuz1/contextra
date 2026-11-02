@@ -181,14 +181,14 @@ impl SnapshotRegistry {
         }
     }
 
-    /// Abwärtskompatible Methode für bestehende Tests und Konsumenten.
+    /// Abwärtskompatible Hilfsmethode für bestehende Aufrufer.
     ///
-    /// Liefert die kleinste Sequenznummer oder `u64::MAX` falls keine Snapshots aktiv sind.
-    /// Neue Implementierungen müssen `min_read_snapshot()` (liefert `Option<Seq>`)
-    /// oder `min_for_compaction()` verwenden (MV-01, MV-02).
+    /// Gibt die kleinste Sequenznummer zurück, oder 0, falls keine Snapshots aktiv sind.
+    /// Keinesfalls wird ein Sentinel-Wert wie `u64::MAX` zurückgegeben (MV-01, I-12).
+    /// Konsumenten müssen auf `min_read_snapshot()` (`Option<Seq>`) oder `min_for_compaction()` umsteigen.
     pub fn min_active_seqno(&self) -> u64 {
         if self.active_count.load(Ordering::Acquire) == 0 {
-            u64::MAX
+            0
         } else {
             self.min_active_seqno.load(Ordering::Acquire)
         }
@@ -378,11 +378,6 @@ impl SnapshotRegistry {
 
     /// Bereinigt und entfernt alle aktiven Snapshot-Pins, die älter als `max_pin_duration` sind.
     pub fn reap_expired_pins_at(&self, max_pin_duration: Duration, now_nanos: u64) -> Vec<u64> {
-        let max_nanos = match u64::try_from(max_pin_duration.as_nanos()) {
-            Ok(n) => n,
-            Err(_) => u64::MAX.saturating_sub(1),
-        };
-
         let mut expired_seqs = Vec::new();
         let mut tenants = self.tenants.lock();
         let mut total_reaped: usize = 0;
@@ -392,7 +387,8 @@ impl SnapshotRegistry {
             for (&seq_no, timestamps) in state.timestamps.iter_mut() {
                 let initial_len = timestamps.len();
                 timestamps.retain(|&ts| {
-                    if now_nanos.saturating_sub(ts) > max_nanos {
+                    let elapsed = Duration::from_nanos(now_nanos.saturating_sub(ts));
+                    if elapsed > max_pin_duration {
                         expired_seqs.push(seq_no);
                         false
                     } else {
