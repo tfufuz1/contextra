@@ -351,11 +351,7 @@ fn test_sync_error_consumes_handle<V: Vfs>(vfs: &V) -> ConformanceResult {
     };
 
     let file = vfs.open(p, &opts).map_err(|e| {
-        ConformanceFailure::new(
-            SUITE_NAME,
-            "sync_consume_open",
-            format!("open failed: {e}"),
-        )
+        ConformanceFailure::new(SUITE_NAME, "sync_consume_open", format!("open failed: {e}"))
     })?;
 
     file.write_at(b"data", 0).map_err(|e| {
