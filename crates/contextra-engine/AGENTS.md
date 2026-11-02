@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-engine`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.12](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.12](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-engine` orchestriert die Teilsysteme (`contextra-store`, `contextra-text`, `contextra-vector`, `contextra-rank`, `contextra-erasure`) zu einem kohärenten Ganzen. Es stellt Collections, Transaktionen, Dokumentenzerlegung, Hybridsuche und die Laufzeit-Verdrahtung bereit — besitzt jedoch **keine eigene Löschlogik** (diese ist an `contextra-erasure` und die `ErasureLayer` delegiert).
@@ -38,7 +38,7 @@
 2. **ReadGate vor Entschlüsselung:** Sämtliche Lese- und Suchpfade (`get`, `scan`, `search_*`) konsultieren das `ReadGate` **vor** jeglicher AEAD-Entschlüsselung. Ist das Ziel gegatet, wird sofort `Erased` zurückgegeben.
 3. **Dokumentlock-Disziplin (B-13 Fix):** Lese-, Schreib-, Lösch- (`delete`) und Bereinigungsvorgänge (`erase`) auf demselben Dokument teilen denselben asynchronen Dokument-Lock. Das Lock wird während der gesamten Dauer gehalten.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-1.1: Konsumenten entkoppeln**
   - Rückbau aller Graph-, NLP-, Privacy- und Checkpoint-Abhängigkeiten in der Engine.

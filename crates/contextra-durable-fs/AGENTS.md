@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-durable-fs`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.5](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.5](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-durable-fs` stellt `RealVfs` bereit — die einzige produktive Implementierung des `Vfs`-Ports aus `contextra-ports`. Es garantiert crash-sichere Dateisystemoperationen, atomare Datei-Ersetzungen und best-effort Datenbereinigung unter Verwendung von `contextra-sys`.
@@ -28,7 +28,7 @@
 2. **Propagierung aller Sync-Fehler:** Sämtliche Rückgabewerte von `sync_data()`, `sync_all()` und `sync_dir()` werden verbindlich geprüft und propagiert.
 3. **Dateisystem-Rechte (0600 / 0700):** Neu angelegte Verzeichnisse erzwingen Modus `0700`, Datendateien erzwingen Modus `0600`. Abweichende Rechte beim Start führen zu `Io`-Fehlern.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-1.3: Veraltete Löschfragmente entfernen**
   - Vollständiges Entfernen des alten `PendingDeleteJournal` (das Löschjournal wird ausschließlich in `contextra-erasure` geführt).

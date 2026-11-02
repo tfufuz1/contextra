@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-erasure`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.9](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.9](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-erasure` ist der entkoppelte, zentrale Löschkern von Contextra. Er orchestriert die Lösch-Saga, führt das kryptografische Löschjournal, verwaltet aktive Lese- und Suchsperren (`ReadGate` via `ErasedSet`), steuert den Daten-Tresor (`vault`), koordiniert die Residuen-Messungen über alle `ErasureLayer` und erzeugt den kryptografisch signierten Löschbericht (`ctx-erasure-report/1`).
@@ -24,7 +24,7 @@
 | `vault` | Daten-Tresor (`vault/vault.dat`): Slot-Verwaltung, In-Memory-Index, DEK-LRU, `create_slot`, `dek`, `destroy`, `compact`; implementiert `RecordSealer` (FI-E08..E13). |
 | `saga` | Deterministische Zustandsmaschine für den Löschablauf: `Requested → Gated → Drained → Rewritten → Cleaned → Measured → Completed` (FI-E14..E17). |
 | `scheduler` | Steuerung von Purge-Fenstern, Deduplikation nach Commitment, `Timing::Now`, SLA-Alarme (FI-E18). |
-| `measure` | Orchestriert E1/E2/E3-Messungen über `ErasureLayer::scan_residue` und Positivkontrollen (`positive_control`) (FI-E19..E21). |
+| `measure` | Orchestriert MK1/MK2/MK3-Messungen über `ErasureLayer::scan_residue` und Positivkontrollen (`positive_control`) (FI-E19..E21). |
 | `classify` | Reine zustandslose Funktion `Evidence → ErasureClass` (G/K/P-Verband) (FI-E22). |
 | `report` | Erstellung, kanonische Serialisierung und Ed25519-Signierung des Löschberichts `ctx-erasure-report/1` (FI-E23..E25). |
 | `ledger` | Abgeschlossene Löschungen für den Restore-Guard (`erasure/ledger.log`); implementiert `LedgerSink` (FI-E26..E28). |
@@ -34,9 +34,9 @@
 ## 4. Kritische Invarianten
 1. **Unmittelbares Gating (I-7):** Sobald der Zustand `Gated` im Journal persistiert ist, blockiert `ErasedSet` fail-closed alle Lese- und Suchzugriffe auf die Zielschlüssel.
 2. **Crash-Resilienz (I-11):** Nach einem unvorhergesehenen Absturz setzt `recover()` den Zustand aller unvollständigen Sagas vor der Freigabe von Schreib- oder Lesepfaden wieder auf.
-3. **Messen vor Behaupten:** Kein Bericht wird ausgestellt, ohne dass alle drei Messklassen (E1 Rohscan, E2 Decoder-Scan, E3 Schlüsselabwesenheit) durch maschinelle Zeugen (`LayerScan`) belegt sind.
+3. **Messen vor Behaupten:** Kein Bericht wird ausgestellt, ohne dass alle drei Messklassen (MK1 Struktur, MK2 Rohscan, MK3 Schlüsselprobe) durch maschinelle Zeugen (`LayerScan`) belegt sind.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-3.1: Löschtypen integration (`contextra-types`)**
 - **[ ] WP-3.5: Journal und ErasedSet implementieren**
@@ -48,7 +48,7 @@
 - **[ ] WP-3.11: Erase-Schnittstelle & Batch-Löschung**
   - Koordination von Mehrfachlöschungen und Fristen.
 - **[ ] WP-3.12: Betroffenen-Löschung (D-14)**
-  - Auflösung aller Dokumente einer `SubjectId` über den Locator-Index.
+  - Auflösung aller Dokumente einer `SubjectId` über Löschcluster (cluster_tag = subject_tag, D-31/D-70).
 - **[ ] WP-5.2: Bericht v1 & Verifier (D-13)**
   - Erzeugung des signierten `ctx-erasure-report/1`.
 

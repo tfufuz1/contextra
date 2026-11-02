@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-simd`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.4](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.4](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-simd` ist die zweite zugelassene `unsafe`-Insel (D-29) im Gesamtsystem. Es stellt hochoptimierte Hardware-Distanzberechnungen für f32-Vektoren (`l2`, `dot`, `cosine`) bereit, die in `contextra-vector` genutzt werden.
@@ -29,7 +29,7 @@
 2. **Sicheres Tail-Handling:** Vektorlängen, die kein Vielfaches der Registerbreite (8 bzw. 16 Floats) sind, werden deterministisch über den Skalar-Rest berechnet. Keinerlei Out-of-Bounds Lesezugriffe über Slice-Grenzen hinaus!
 3. **Deterministischer Laufzeit-Dispatch:** CPU-Feature-Prüfung erfolgt dynamisch über Standard-Makros (`is_x86_feature_detected!`); bei fehlenden Befehlssatzerweiterungen wird verzweigungsfrei auf die Skalar-Referenz zurückgefallen.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-1.4: SIMD-Reduktion (D-28)**
   - Vollständiges Entfernen des u8-VNNI-Codes und Bereinigung der Kernel-Schnittstellen auf f32.

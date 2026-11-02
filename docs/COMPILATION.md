@@ -1,6 +1,6 @@
 # Contextra – Implementierer-Kompilier- und Bauanleitung
 
-<!-- doc-stamp: 2026-11-01 | Normativ: docs/SPEC.md §5.1, PLAN.md -->
+<!-- doc-stamp: 2026-11-02 | Normativ: docs/SPEC.md §5.1, §14.7, §15 -->
 
 Dieses Dokument dient als operative Anleitung für Entwickler und Agenten, um den standardkonformen Cargo-Workspace von Contextra schrittweise zu kompilieren, zu testen und Quality-Gates auszuführen.
 
@@ -8,10 +8,10 @@ Dieses Dokument dient als operative Anleitung für Entwickler und Agenten, um de
 
 ## 1. Systemvoraussetzungen
 
-- **Rust-Toolchain:** Version 1.89+ laut [`rust-toolchain.toml`](../rust-toolchain.toml) (Edition 2021).
+- **Rust-Toolchain:** Entsprechend [`rust-toolchain.toml`](../rust-toolchain.toml) und SPEC §4.2 D-82 (MSRV und Toolchain höchstens 2 Minor-Versionen hinter Stable).
 - **Komponenten:** `rustfmt`, `clippy`.
 - **Cargo:** Resolver v2.
-- **Plattform:** Linux (x86_64 / aarch64), macOS.
+- **Plattform:** Linux (x86_64 / aarch64), macOS. Windows wird in v1 nicht unterstützt (D-56; Windows-Code ist entfernt).
 - **Single-Node-Umgebung:** Lokales Dateisystem (POSIX-kompatibel für `fsync` und `sync_dir`).
 
 ---
@@ -24,50 +24,26 @@ Der Soll-Workspace besteht aus genau 14 Produktionscrates und 4 Hilfs-/Test-Crat
 Ring 4:  contextra (Fassade)
 Ring 3:  contextra-erasure · contextra-engine
 Ring 2:  contextra-mvcc · contextra-store · contextra-text · contextra-vector · contextra-rank
-Ring 1:  contextra-sys [unsafe] · contextra-simd [unsafe] · contextra-durable-fs · contextra-crypto
+Ring 1:  contextra-sys · contextra-simd · contextra-durable-fs · contextra-crypto
 Ring 0:  contextra-types · contextra-ports
 dev:     contextra-testkit · contextra-lab · ctx-verify · tests/arch
 ```
 
-> [!NOTE]
-> Alle historischen Crates (`graph`, `checkpoint`, `ingest`, `privacy`, `mcp`, `infer-*`, `candle`, `wire`, `license`, `db`) sind gemäß SPEC §5.1 nicht Teil des v1-Kerns und werden nicht im Produktions-Workspace geführt.
-
 ---
 
-## 3. Bau- und Prüfschritte
+## 3. Kompilier- und Testbefehle
 
-### 3.1 Standard-Build & Check
+### 3.1 Workspace kompilieren
 ```bash
-# Workspace-Bibliotheken prüfen
-cargo check --workspace
-
-# Alle Targets (inkl. Tests, Beispiele, Benches) prüfen
-cargo check --workspace --all-targets
+cargo check --workspace --all-targets --locked
 ```
 
-### 3.2 Lints & Zero-Panic Prüfung (P7, SPEC §11.1)
-Contextra erzwingt strikte Deny-Lints auf allen Produktivpfaden:
+### 3.2 Architektur- und Lint-Tests ausführen
 ```bash
-cargo clippy --workspace --all-targets -- \
-  -D warnings \
-  -D clippy::unwrap_used \
-  -D clippy::expect_used \
-  -D clippy::panic \
-  -D clippy::indexing_slicing
+cargo test -p contextra-arch-tests
 ```
 
-### 3.3 Test-Ausführung
+### 3.3 Kern-Tests ausführen
 ```bash
-# Unit- und Integrationstests
 cargo test --workspace --locked
-
-# Architektur- und Unsafe-Insel-Gates
-cargo test -p tests-arch
-```
-
-### 3.4 Unsafe-Audit & Miri (SPEC §8.3, §8.4)
-```bash
-# Miri auf den genau zwei Unsafe-Inseln
-cargo miri test -p contextra-sys
-cargo miri test -p contextra-simd
 ```

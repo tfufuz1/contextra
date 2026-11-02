@@ -13,7 +13,7 @@ Entkoppelter Löschkern, Saga-Zustandsmaschine, Journal, Tresor, Messung und Ber
 - `erased_set`: `erasure/erased.set` verwaltet aktive Gates und implementiert `ReadGate`.
 - `vault`: Daten-Tresor (`vault/vault.dat`) für DEK-Slots; implementiert `RecordSealer`.
 - `saga`: Deterministische Lösch-Saga: `Requested → Gated → Drained → Rewritten → Cleaned → Measured → Completed`.
-- `measure`: Koordiniert E1/E2/E3-Messungen über `ErasureLayer::scan_residue` und Positivkontrollen (`positive_control`).
+- `measure`: Koordiniert MK1/MK2/MK3-Messungen über `ErasureLayer::scan_residue` und Positivkontrollen (`positive_control`).
 - `classify`: Berechnet die kanonische `ErasureClass` (G/K/P-Verband) aus den Zeugen.
 - `report`: Erstellt und signiert den Löschbericht `ctx-erasure-report/1` via Ed25519.
 - `ledger`: Persistiert abgeschlossene Löschungen für den Restore-Guard (`erasure/ledger.log`).
@@ -23,4 +23,4 @@ Entkoppelter Löschkern, Saga-Zustandsmaschine, Journal, Tresor, Messung und Ber
 - `#![forbid(unsafe_code)]`
 - Kennt keine Ring-2-Crates (`store`, `text`, `vector`, `mvcc`).
 - Unmittelbares Gating: Sobald `Gated` persistiert ist, blockiert `ErasedSet` fail-closed alle Lese- und Suchpfade.
-- Messen vor Behaupten: Berichte werden erst nach verifizierten E1/E2/E3-Scans ausgestellt.
+- Messen vor Behaupten: Berichte werden erst nach verifizierten MK1/MK2/MK3-Scans ausgestellt.

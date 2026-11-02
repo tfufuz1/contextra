@@ -1,8 +1,8 @@
 # Contextra – Sicherheitsmodell & Bedrohungsanalyse (Security Model)
 
-<!-- doc-stamp: 2026-11-01 | Normativ: docs/SPEC.md §10, §11, §12 | PLAN.md Phase 2 -->
+<!-- doc-stamp: 2026-11-02 | Normativ: docs/SPEC.md §6, §10, §11, §17 -->
 
-Dieses Dokument beschreibt das Bedrohungsmodell, die Sicherheitsarchitektur und die Sicherheits-Defaults für Contextra gemäß [docs/SPEC.md](SPEC.md) und [PLAN.md](../PLAN.md).
+Dieses Dokument beschreibt das Bedrohungsmodell, die Sicherheitsarchitektur, kryptografische Standards und die CRA-Meldeprozesse für Contextra gemäß [docs/SPEC.md](SPEC.md).
 
 ---
 
@@ -10,51 +10,45 @@ Dieses Dokument beschreibt das Bedrohungsmodell, die Sicherheitsarchitektur und 
 
 | Schutzgut | Speicherort | Primärer Schutzmechanismus |
 |---|---|---|
-| **Dokumente & Datensätze** | SSTables, MemTable, WAL | Pflichtverschlüsselung mit AES-256-GCM-SIV, Envelope-Format (SPEC §9.3), HMAC-SHA256-Kette im WAL, CRC32 für Torn-Write-Erkennung. |
-| **Schlüsselmaterial** | RAM des Prozesses | KDF via Argon2id ($m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$), HKDF-Ableitung in `KeySet` (SPEC §13.1), `Zeroizing<T>`, Paging-Schutz (`mlock` via `contextra-sys`). |
-| **Mandantentrennung** | Alle Schichten | Verpflichtende `TenantId`, physische und logische Isolation über `TenantScopedStorage` (T-ARCH-2, VETO-F10). |
-| **Suchindizes** | HNSW (Vektor), BM25 (Text) | AEAD-verschlüsselte Chunks und Segmente auf Platte; Slot-Zeroing im RAM; physischer Purge-Rewrite bei Löschung. |
-| **Löschberichte** | Dateisystem / Export | Asymmetrisch Ed25519-signierter Bericht `ctx-erasure-report/1` mit E1/E2/E3-Residuenmessung. Keine Klartext-IDs. |
+| **Dokumente & Datensätze** | SSTables, MemTable, WAL | Pflichtverschlüsselung mit AES-256-GCM-SIV (SPEC §9.4, §10), HMAC-SHA256-Kette im WAL (D-73), CRC32 für Torn-Write-Erkennung. |
+| **Schlüsselmaterial** | RAM & Tresor | KDF via Argon2id ($m \in [64\,\text{MiB}, 4\,\text{GiB}], t \in [3, 16], p \in [1, 16]$; D-06), Keyslots (D-52), `ZeroizeOnDrop`, Paging-Schutz (`mlock` via `contextra-sys`). |
+| **Schlüsselhierarchie (Tresor)** | `vault/vault.dat` | Hierarchischer Tresor mit Open-Addressing (D-79): Slots `T` (Mandant), `C` (Collection), `S` (Betroffener), `D` (Dokument). O(1)-Vernichtung übergeordneter Slots macht alle darunterliegenden DEKs unableitbar. |
+| **Dateischlüssel** | `vault/vault.dat` | Dateischlüssel-Vernichtung (D-85): Datendateien besitzen eigene Zufallsschlüssel als `F`-Slots; Freigabe nullt den `F`-Slot vor dem `unlink`. |
+| **Mandantentrennung** | Alle Schichten | Verpflichtender `TenantContext`, physische und logische Isolation über `TenantScopedStorage` (AR-6, VETO-F10). |
+| **Suchindizes** | HNSW (Vektor), BM25 (Text) | AEAD-verschlüsselte Chunks und Segmente auf Platte; Vektor-Surrogat und Kantenreparatur (D-77); Textpostings unter DEK gebunden (D-69). |
+| **Löschberichte** | Dateisystem / Export | Asymmetrisch Ed25519-signierter Bericht `ctx-erasure-report/1` (D-13) mit MK1/MK2/MK3 Messung. Keine Klartext-IDs. |
 
 ### Vertrauensgrenzen
-- **Prozessgrenze:** Contextra läuft eingebettet im Prozess der Trägeranwendung. Memory-Dump-Schutz erfolgt über `mlock_best_effort` und `Zeroize`.
-- **Dateisystemgrenze:** Das Datenverzeichnis wird als potentiell feindlich oder fehleranfällig betrachtet. Manipulationen, unvollständige Schreibvorgänge oder CRC-Mismatches führen zum sofortigen kontrollierten Abbruch (INV-FAILCLOSED-1).
+- **Prozessgrenze:** Contextra läuft eingebettet im Prozess der Trägeranwendung (Single-Node-Doktrin, VETO-SN01). Memory-Dump-Schutz erfolgt über `mlock`, `RLIMIT_CORE` und `PR_SET_DUMPABLE` via `contextra-sys`.
+- **Dateisystemgrenze:** Das Datenverzeichnis wird als potentiell manipulierbar oder fehleranfällig betrachtet. Manipulationen, unvollständige Schreibvorgänge oder CRC-Mismatches führen zum sofortigen kontrollierten Abbruch (P2 Fail-Closed, VETO-FAILCLOSED).
 - **Mandantengrenze:** Anfragen verschiedener Mandanten sind informationstheoretisch und physisch strikt isoliert (VETO-F10). Kein geteilter Cache, keine gemischten SSTables, keine mandantenübergreifenden Kanten.
-- **Netzgrenze (Single-Node-Doktrin):** Der Kern öffnet keinerlei Netzwerk-Sockets und enthält keine Netzwerk-Crates im Produktionsbaum.
+- **Netzgrenze:** Der Kern öffnet keinerlei Netzwerk-Sockets und enthält keine Netzwerk-Crates im Produktionsbaum (AR-7, D-54).
 
 ---
 
-## 2. Verbindliche Sicherheits-Defaults (SPEC §10)
+## 2. Kryptografische Richtlinien & Schlüsselhierarchie
 
-| ID | Gegenstand | Sicherheits-Vorgabe (Normativ) | Begründung |
-|---|---|---|---|
-| **D-05** | Verschlüsselung | **Pflicht ohne Opt-Out** (`EncryptionMode::Required`). Kein unverschlüsselter Block- oder SSTable-Pfad im Produktionscode. | Schutz vor Datenremanenz auf persistenten Medien. |
-| **D-06** | Passphrase-KDF | **Argon2id mit $m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$** (`derive_master`). HKDF für Passphrasen ist strikt verboten (B-15). | Brute-Force-Resistenz gegen GPU/ASIC-Angriffe. |
-| **D-07** | Mandantenisolation | **Verpflichtend ohne Opt-Out** (`TenantPolicy::Required`). `TenantId` stammt aus dem Kontext. | Ausschluss versehentlicher mandantenloser Speicherung. |
-| **D-27** | Entitätsextraktion | **Vollständig entfallen in v1**. Kein unkontrollierter PII-Abfluss an externe LLM-Dienste. | Minimierung der Angriffsfläche und Datenschutzrisiken. |
-| **D-29** | Unsafe-Code | **Strikt auf 2 Inseln beschränkt** (`contextra-sys`, `contextra-simd`). Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`. | Speichersicherheit des Gesamtsystems. |
-| **D-31** | Schlüsselraum | **Blinde Tags:** `doc_tag`, `coll_tag`, `tenant_tag`, `term_tag` via keyed BLAKE3 (`blind_tag`). Kein Klartext in Schlüsseln. | Schutz vor Metadaten-Leaks in Indizes und Bloom-Filtern. |
-
----
-
-## 3. Lösch- und Nachweismodell (SPEC §11, §12, ADR-001)
-
-Gemäß ADR-001 (SPEC §3.3, D-01) implementiert Contextra in v1 ein belegbares Löschmodell basierend auf physischer Bereinigung und Verifikation:
-1. **Sofortige Lesesperre (`ReadGate`):** Sobald ein Löschauftrag `Gated` ist, blockiert `ErasedSet` fail-closed alle Lese- und Suchpfade auf Zielschlüssel. Aktive Snapshots, die Zielversionen sehen könnten, werden widerrufen (`SnapshotRevoked`).
-2. **Physisches Purging (Ebene A):**
-   - Store: `drain` versiegelt WAL; `rewrite_file` streamt neue SSTables ohne Zieldaten (Originalsequenzen bleiben erhalten, I-2); atomarer `swap` via Manifest; Block-Cache Eviction mit Zeroize.
-   - Vector: `zero_slot` überschreibt RAM-Bytes mit Nullen, Tombstone-Flag, Rewrite betroffener Snapshot-Chunks, Rebuild ab Schwelle.
-   - Text: Puffer leeren, betroffene Segmente ohne Zieldaten neu schreiben, Alt-Segmente löschen, Term-Statistik neu aggregieren.
-3. **Residuenmessung & Zeugen:**
-   - **E1**: Byte-genauer Rohscan des Datenverzeichnisses nach Needles.
-   - **E2**: Strukturierter Scan nach Dekodierung aller Container.
-   - **E3**: Nachweis der Schlüssel- und Slot-Abwesenheit.
-   - Positivkontrolle (Canary) vor jeder Messung beweist Detektionsfähigkeit.
-4. **Bericht `ctx-erasure-report/1`:**
-   Ed25519-signiert, maschinenlesbar, enthält keine Klartext-IDs oder Personendaten. Verifizierbar durch die unabhängige Binärdatei `ctx-verify`.
+- **Master Key ($K_\text{master}$):** Zufälliger 256-Bit-Schlüssel, gespeichert in Keyslots (SPEC §10.2, D-52). Keyslot entschlüsselt mit $K_\text{slot} = \text{Argon2id}(\text{Passphrase}, \text{Salt}_\text{slot})$.
+- **Argon2id-Grenzen (D-06):** Parameter werden vor Ausführung strikt validiert:
+  - Speicher $m$: $64\,\text{MiB} \le m \le 4\,\text{GiB}$ (Standard $128\,\text{MiB}$)
+  - Iterationen $t$: $3 \le t \le 16$ (Standard $3$)
+  - Parallelität $p$: $1 \le p \le 16$ (Standard $4$)
+  - Bei Grenzüberschreitung: Abbruch mit `ContextraError::Config`.
+- **DEK-Ableitung (D-79):**
+  $$\text{DEK} = \text{HKDF-SHA256}(\text{ikm}=K_\text{unit}, \text{salt}=\text{SHA-256}(\text{"ctx/dek-salt/v2"} \mathbin{\Vert} \text{salt}_T \mathbin{\Vert} \text{salt}_C \mathbin{\Vert} \text{salt}_S \mathbin{\Vert} \text{salt}_D), \text{info}=\text{"ctx/dek/v2"} \mathbin{\Vert} \text{doc\_tag})$$
+- **Nonces (D-60):** 4-Byte Zufallspräfix je `KeyManager` + 8-Byte monoton steigender Zähler.
 
 ---
 
-## 4. Meldung von Sicherheitslücken (Vulnerability Disclosure)
+## 3. Cyber Resilience Act (CRA) & Schwachstellenmanagement (D-67, SPEC §17.3)
 
-Sicherheitsrelevante Schwachstellen dürfen nicht über öffentliche Issue-Tracker gemeldet werden. Vertrauliche Berichte mit Proof-of-Concept richten Sie bitte direkt an die Core-Maintainer.
+Contextra behandelt sich vorsorglich als den Vorgaben des Cyber Resilience Act (VO (EU) 2024/2847, Art. 14) und ProdHaftG unterliegend:
+- **Meldewege:** Sicherheitslücken können verschlüsselt an das PSIRT gemeldet werden (z. B. via `security@contextra.dev` oder Sicherheitskontakt im Repo).
+- **CRA Art. 14 Fristen für aktiv ausgenutzte Schwachstellen:**
+  - *Frühwarnung:* Meldung an CSIRTs / ENISA innerhalb von **24 Stunden** nach Bekanntwerden einer aktiv ausgenutzten Schwachstelle.
+  - *Vollständige Meldung:* Detaillierte Meldung innerhalb von **72 Stunden**.
+- **Interne Behebungsfristen (HR-8):**
+  - Kritische Schwachstellen: Bereitstellung eines Sicherheitsupdates innerhalb von **7 Tagen**.
+  - Hohe Schwachstellen: Bereitstellung eines Sicherheitsupdates innerhalb von **30 Tagen**.
+- **Support-Zeitraum (D-67, SPEC §17.2):** Für jede Hauptversion werden mindestens **5 Jahre** Sicherheitsupdates bereitgestellt.
+- **Transparenz:** Jedes Release liefert eine maschinenlesbare Software Bill of Materials (SBOM) im CycloneDX-Format (`cargo cyclonedx`) und signierte Artefakte.

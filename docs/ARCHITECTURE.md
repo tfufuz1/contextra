@@ -2,19 +2,22 @@
 
 | Feld | Wert |
 |---|---|
-| Stand | 2026-11-01 |
-| Normative Referenz | [`docs/SPEC.md`](SPEC.md) (Fassung 2.0.0 für Release 1.0.0) & [`PLAN.md`](../PLAN.md) |
+| Stand | 2026-11-02 |
+| Normative Referenz | [`docs/SPEC.md`](SPEC.md) (Fassung 4.0.0 für Release 1.0.0) |
 | Ring-Definition | SPEC §5.1, §5.2, §5.3 |
-| Sicherheits-Doktrin | Single-Node, Safe Rust (2 Unsafe-Inseln), Zero Panic, Fail-Closed, Pflichtverschlüsselung, absolute Mandantentrennung |
+| Sicherheits-Doktrin | Single-Node, Safe Rust (2 Unsafe-Inseln), Zero Panic, Fail-Closed, Pflichtverschlüsselung, absolute Mandantentrennung, 3 Säulen der Löschung |
 
 ---
 
 ## 1. Überblick & Mission
 
 Contextra ist ein lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rust (Single-Node, Library-First) für Agenten- und RAG-Systeme:
-- **Speichern**: Transaktionaler LSM-Tree-Speicher mit Write-Ahead-Log (WAL) als einziger Quelle der Wahrheit (I-1: WAL → Memtable → Sichtbarkeit).
-- **Finden**: Hybrides Retrieval (HNSW-Vektorsuche + BM25-Volltextsuche + RRF-Fusion), strikt mandantengrenzenbeachtend.
-- **Löschen (DSGVO Art. 17/18)**: Eigenständiger, entkoppelter und gemessener Löschprozess gemäß ADR-001 (physische Bereinigung Ebene A + fail-closed `ReadGate` + E1/E2/E3 Messungen + Ed25519-Löschbericht `ctx-erasure-report/1`).
+- **Speichern**: Transaktionaler LSM-Tree-Speicher mit Write-Ahead-Log (WAL) als einziger Quelle der Wahrheit (I-1: WAL → Memtable → Sichtbarkeit; WAL wird nie umgeschrieben, D-73).
+- **Finden**: Hybrides Retrieval (HNSW-Vektorsuche + segmentierter BM25-Volltextsuche + RRF-Fusion), strikt mandantengrenzenbeachtend.
+- **Löschen (Art. 17/18 DSGVO)**: Entkoppelter, gemessener Löschprozess auf drei Säulen (D-01, ADR-002):
+  1. *Gate und physischer Purge:* Sofortige Lesesperre (`ReadGate`) und physisches Umschreiben betroffener Dateien (LSM-SSTable, HNSW-Batch-Kantenreparatur mit Surrogaten und deterministischem Rebuild D-77, Textsegment-Rewrite D-71).
+  2. *Kryptografische Schlüsselvernichtung:* Hierarchischer Tresor (`FileVault`, D-79) vernichtet Mandanten- (`T`), Collection- (`C`), Betroffenen- (`S`) oder Dokument-Slots (`D`), wodurch untergeordnete DEKs sofort unableitbar werden; Dateischlüssel-Vernichtung (`F`-Slots, D-85) entwertet freigegebene Blöcke.
+  3. *Unabhängige Messung & Nachweis:* Typisierter Zeuge `LayerWitness` (Messklassen MK1, MK2, MK3-Feld), Ed25519-signierter Bericht und unabhängige Feldprüfung via `ctx-verify scan/report` und Erasure Lab.
 
 ---
 
@@ -23,103 +26,51 @@ Contextra ist ein lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rus
 Das Gesamtsystem ist als strikter, azyklischer gerichteter Graph (**DAG**) in 5 Ringen organisiert:
 
 ```
-Ring 4  contextra                               (Fassade, Composition Root)
-Ring 3  contextra-erasure   contextra-engine    (Löschkern, Orchestrierung)
+Ring 4  contextra                         (Fassade)
+Ring 3  contextra-erasure   contextra-engine
 Ring 2  contextra-mvcc  contextra-store  contextra-text  contextra-vector  contextra-rank
-Ring 1  contextra-sys   contextra-simd   contextra-durable-fs  contextra-crypto
-Ring 0  contextra-types contextra-ports
-dev     contextra-testkit  contextra-lab  ctx-verify  tests/arch
+Ring 1  contextra-sys  contextra-simd  contextra-durable-fs  contextra-crypto
+Ring 0  contextra-types  contextra-ports
+dev     testkit  lab  ctx-verify  tests/arch
 ```
 
-### Die 14 Produktionscrates
+### Die 14 Produktions-Crates (SPEC §5.1)
 
-| Ring | Crate | Rolle | Unsafe |
-|---|---|---|:---:|
-| **Ring 0** | `contextra-types` | Reine, zustandslose Typen (IDs, Tags, Fehler, Schlüsselcodec, Löschtypen). Kein I/O, kein `async`. | Nein |
-| **Ring 0** | `contextra-ports` | Abstrakte Schnittstellen-Traits (`StorageEngine`, `ErasureLayer`, `ReadGate`, `Vfs`, `Clock`, `Rng`, etc.). | Nein |
-| **Ring 1** | `contextra-sys` | Plattform- und OS-Primitive (`fsync`, `flush_dir`, `rename_durable`, `mlock`). **Unsafe-Insel 1 von 2**. | **Ja** |
-| **Ring 1** | `contextra-simd` | f32-Distanzkernel (`l2`, `dot`, `cosine`) mit Skalar-Referenz. **Unsafe-Insel 2 von 2**. | **Ja** |
-| **Ring 1** | `contextra-durable-fs` | `RealVfs`-Implementierung, atomare Dateieretzung, best-effort Zeroize-Scrub. | Nein |
-| **Ring 1** | `contextra-crypto` | AEAD (AES-256-GCM-SIV), Argon2id KDF, HKDF, WAL-HMAC, Hash-Ketten, Ed25519-Signatur. | Nein |
-| **Ring 2** | `contextra-mvcc` | Monotone `Seq`, Snapshots, SSI-Validierung, Snapshot-Widerruf (`revoke_covering`). | Nein |
-| **Ring 2** | `contextra-store` | Transaktionaler LSM-Tree (WAL, Memtable, Leveled SSTables, Purge-Rewrite & Swap). Blind für Dokumentinhalte. | Nein |
-| **Ring 2** | `contextra-text` | BM25-Segmentindex (AEAD-verschlüsselte Segmente, Term-Tags, kein Klartext). | Nein |
-| **Ring 2** | `contextra-vector` | HNSW-Vektorindex (Slot-Zeroing, verschlüsselte Snapshot-Chunks, Batch-Rebuild). | Nein |
-| **Ring 2** | `contextra-rank` | RRF-Fusion (`rrf_fuse`) mit deterministischem Tie-Break nach `doc_tag`. | Nein |
-| **Ring 3** | `contextra-erasure` | Entkoppelter Löschkern: Saga, Journal, ReadGate (`ErasedSet`), Tresor (`vault`), Messung, Bericht. | Nein |
-| **Ring 3** | `contextra-engine` | Orchestrierung: Collections, Transaktionen, Schreib-/Lesepfade, Verdrahtung. | Nein |
-| **Ring 4** | `contextra` | Öffentliche Fassade, `EngineBuilder`, Re-Exporte. | Nein |
-
----
-
-## 3. Erlaubte Abhängigkeiten (Matrix SPEC §5.3)
-
-| von \ nach | types | ports | sys | simd | dfs | crypto | mvcc | store | text | vector | rank | erasure |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| ports | ✓ | | | | | | | | | | | |
-| sys | ✓ | | | | | | | | | | | |
-| simd | ✓ | | | | | | | | | | | |
-| durable-fs | ✓ | ✓ | ✓ | | | | | | | | | |
-| crypto | ✓ | ✓ | | | | | | | | | | |
-| mvcc | ✓ | ✓ | | | | | | | | | | |
-| store | ✓ | ✓ | ✓ | | | ✓ | ✓ | | | | | |
-| text | ✓ | ✓ | | | | ✓ | | | | | | |
-| vector | ✓ | ✓ | | ✓ | | ✓ | | | | | | |
-| rank | ✓ | ✓ | | | | | | | | | | |
-| erasure | ✓ | ✓ | | | | ✓ | | | | | | |
-| engine | ✓ | ✓ | | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-
-**Architektur-Regeln (AR-1 bis AR-8):**
-1. Abhängigkeiten zeigen nur auf gleiche oder niedrigere Ringe; innerhalb Ring 2 gilt strikt obige Matrix.
-2. `store` kennt weder `text`, `vector` noch `erasure`.
-3. `erasure` kennt **keine** Ring-2-Crates, sondern kommuniziert ausschließlich über Ports (`ports`-Traits).
-4. `store` nutzt `Vfs` ausschließlich als Port aus `contextra-ports`, niemals direkt aus `contextra-durable-fs`.
-5. Keine Netzwerk-Crates im Produktionsbaum (Single-Node-Doktrin).
-6. `unsafe` ist strikt auf `contextra-sys` und `contextra-simd` beschränkt. Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
+| Crate | Ring | Rolle |
+|---|---|---|
+| `contextra-types` | 0 | Reine Typen (IDs, blinde Tags, Schlüssel, Fehler, Löschtypen, typisierter Zeuge). Kein I/O, kein `async`. |
+| `contextra-ports` | 0 | Traits: `StorageEngine`, `TextIndex`, `VectorIndex` (statisch dispatcht), `Vfs` (einziges VFS-Trait), `Clock`, `Rng`, `IdGen`, `ErasureLayer`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink`, `Metrics`. |
+| `contextra-sys` | 1 | Unsafe-Insel für OS-Primitive: `fsync`, `flush_dir`, `rename_durable`, `mlock`, POSIX-Dateirechte. Windows-Code ist entfernt. |
+| `contextra-simd` | 1 | Unsafe-Insel: f32-Distanzkerne (Dot, L2, Cosine) mit Skalar-Referenz und automatischem Laufzeit-Dispatch. |
+| `contextra-durable-fs` | 1 | `Vfs`-Implementierung (`RealVfs`), atomarer Austausch, optionales Scrubbing (D-83), Startprobe (D-56). |
+| `contextra-crypto` | 1 | AES-256-GCM-SIV, Argon2id mit strengen Grenzen (D-06), HKDF-SHA256, keyed BLAKE3, WAL-HMAC-Kette, Ed25519. |
+| `contextra-mvcc` | 2 | Sequenzen, Snapshots, SSI-Validierung, Snapshot-Registry nach `tenant_tag`. Kein `u64::MAX`-Sentinel. |
+| `contextra-store` | 2 | LSM-Tree: WAL (HMAC-Kette, nie umgeschrieben), Memtable, SSTable mit Block-AEAD, kooperative Kompaktion (D-78), Purge-Primitive. |
+| `contextra-text` | 2 | Segmentierter BM25-Index (D-20, D-71, D-81): Textpuffer, Segmente, Merge, Rewrite je Zielsegment. Implementiert `TextIndex` und `ErasureLayer`. |
+| `contextra-vector` | 2 | HNSW mit Arena (D-86), Surrogat-Zeroing, Batch-Kantenreparatur, deterministischer Rebuild (D-77), verschlüsselter Snapshot nur über `Vfs`. Implementiert `VectorIndex` und `ErasureLayer`. |
+| `contextra-rank` | 2 | RRF-Fusion (`k_rrf = 60`), deterministische Tie-Breaks nach `doc_tag`. |
+| `contextra-erasure` | 3 | Löschkern: Saga-Zustandsmaschine, `ErasedSet`/Gate-Log, Journal, Tresor (`FileVault`, `RecordSealer`, `FileKeyring`), Messung (`Scanner<Armed>`), Berichtsbau, Ledger, Restore-Guard. Hängt nur an `types`, `ports`, `crypto`. |
+| `contextra-engine` | 3 | Orchestrierung: `TenantScopedStorage`, Collections, Transaktionen, Suche, Hintergrundtasks, Startsequenz. Enthält keine Löschlogik. |
+| `contextra` | 4 | Fassade, Einstiegspunkt, `system_defaults()`, Re-Exports. |
 
 ---
 
-## 4. Löscharchitektur & DSGVO (ADR-001, SPEC §11, §12)
+## 3. Architekturregeln (AR-1 bis AR-9, SPEC §5.2)
 
-Das Löschen ist in Contextra ein eigenständiger, entkoppelter und maschinell gemessener Prozess:
-- **Keine Ebene B in v1 (ADR-001, D-01):** Die kryptografische Schlüsselvernichtung (`DocDek`) entfällt in v1. Löschung ist die physische Bereinigung (Ebene A) kombiniert mit fail-closed `ReadGate`, Residuenmessung und signiertem Bericht.
-- **Zustandsmaschine**:
-  `Requested → Gated → Drained → Rewritten → Cleaned → Measured → Completed`
-- **ReadGate (`ErasedSet`)**:
-  Unmittelbar nach `Gated` blockiert das Gate jeden Lese- und Suchzugriff auf Zielschlüssel fail-closed. Aktive Snapshots, die Zielversionen sehen könnten, werden widerrufen (`SnapshotRevoked`).
-- **Physisches Purging (Ebene A)**:
-  - **Store**: `drain` versiegelt WAL; `rewrite_file` erzeugt neue SSTables ohne Zieldaten (Originalsequenzen bleiben erhalten); atomarer `swap` via Manifest; Block-Cache Eviction mit Zeroize.
-  - **Vector**: `zero_slot` nullt Slot-Bytes und markiert Tombstone; Snapshot-Chunks werden neu geschrieben; Rebuild ab Schwelle.
-  - **Text**: Textpuffer leeren; betroffene Segmente ohne Zieldokumente neu schreiben; Alt-Segmente löschen; Term-Statistik neu aggregieren.
-- **Residuenmessung (E1, E2, E3)**:
-  - **E1**: Byte-genauer Rohscan des Datenverzeichnisses nach Needles.
-  - **E2**: Strukturierter Scan nach Dekodierung aller Container.
-  - **E3**: Nachweis der Schlüssel- und Slot-Abwesenheit.
-- **Löschbericht (`ctx-erasure-report/1`)**:
-  Ed25519-signiert, maschinenlesbar, frei von Klartext-IDs oder Personendaten.
+1. **AR-1 (DAG-Fluss):** Abhängigkeiten zeigen nur auf den gleichen oder einen niedrigeren Ring; innerhalb Ring 2 nur laut Matrix SPEC §5.3.
+2. **AR-2 (Store-Isolation):** `store` kennt weder `text`, `vector` noch `erasure`.
+3. **AR-3 (Erasure-Entkopplung):** `erasure` kennt **keine** Ring-2-Crates, nur `ports`-Traits, `types` und `crypto`.
+4. **AR-4 (Unabhängige Prüfer):** `lab` und `ctx-verify` hängen weder an `store`, `engine`, `erasure` noch an Produktions-Decodern von `crypto`. Sie besitzen unabhängige Format-Parser nach SPEC Anhang F.
+5. **AR-5 (Types-Reinheit):** `contextra-types` ist frei von `async` und I/O.
+6. **AR-6 (Mandantenschranke):** Nur `TenantScopedStorage` darf den rohen Speicher ansprechen.
+7. **AR-7 (Single-Node-Garantie):** Keine Netzwerk-Crates im Produktionsbaum.
+8. **AR-8 (Unsafe-Inseln):** `unsafe` ausschließlich in `sys` und `simd`; alle anderen 12 Produktivcrates deklarieren `#![forbid(unsafe_code)]`.
+9. **AR-9 (Feature-Hygiene):** Jedes `cfg(feature)` ist in `Cargo.toml` deklariert; kein `allow(unexpected_cfgs)`. Keine Features schwächen Sicherheitsfunktionen (D-84).
 
 ---
 
-## 5. Laufzeitmodell & Datenflüsse (SPEC §5.4, §5.5)
+## 4. Löschcluster-Schlüsselraum (SPEC §9.1, D-31, D-70)
 
-- **Runtime:** Tokio multi-thread über den übergebenen `tokio::runtime::Handle` in `EngineBuilder`.
-- **Cancel-Safety (I-14):** Mutierende Schreib- und Löschoperationen laufen in entkoppelten Tasks (`spawn`); der Aufrufer wartet auf ein `oneshot`-Signal.
-- **Sperren:** Dokument-Lock über die gesamte Operation (verhindert Race-Conditions zwischen Insert, Delete und Erase). Exklusive Purge-`Barrier` zwischen Kompaktion und Purge.
-- **Dateisystem-Layout (SPEC §5.6):**
-  ```
-  <data>/                       0700
-    LOCK                        exklusiver Prozess-Lock
-    HEADER                      Format-Version, KDF-Parameter, Salt[32], Store-ID
-    wal/        *.wal           HMAC-Kette, verschlüsselt
-    sst/        *.sst           SSTables (Block-AEAD), Level-Struktur
-    MANIFEST/   *.log           Manifest-Log (Datei-Mengen, Bereiche, Seq)
-    text/       *.seg           Textsegmente (AEAD-verschlüsselt)
-    vector/     *.snap          Vektorsnapshots (AEAD-verschlüsselt)
-    vault/      vault.dat       Tresor (Slots)
-    erasure/    journal.log     Löschjournal (Hash-Kette, verschlüsselt)
-                erased.set      aktive Gates (Bereiche, Commitments)
-                ledger.log      abgeschlossene Löschungen (Restore-Guard)
-                report/         signierte Berichte
-    keys/       0700            Schlüssel-Seeds (0600)
-    tmp/                        Waisen-Bereinigung beim Start
-  ```
+Schlüssel werden zur Unterstützung von O(1)-Pruning und gezieltem Umschreiben nach Löschclustern partitioniert:
+- **Dokument-Identität:** `doc_tag = tag("ctx/doc/v2", tenant_tag ‖ coll_tag ‖ subject_tag_oder_0¹⁶ ‖ doc_key)`. Der Betroffene ist Teil der Identität (`DocRef`, D-70).
+- **Cluster-Präfix:** Schlüssel gruppieren Datensätze desselben Betroffenen (`cluster_tag = subject_tag`), sodass ein Subject-Erase nur zusammenhängende SSTables betrifft und der Schreibaufwand proportional zum Ziel bleibt (P11, BM-ERASE-WA).

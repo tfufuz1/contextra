@@ -1,6 +1,6 @@
 # Beitragen zu Contextra
 
-<!-- doc-stamp: 2026-11-01 | Normativ: docs/SPEC.md §0.2, §2, PLAN.md §1 -->
+<!-- doc-stamp: 2026-11-02 | Normativ: docs/SPEC.md §0.2, §2, §6.4, §15.4 -->
 
 Vielen Dank für Ihr Interesse an der Entwicklung von Contextra. Dieses Dokument beschreibt die verbindlichen Richtlinien, Qualitätsstandards und Entwicklungsabläufe für alle Beitragenden und Implementierer.
 
@@ -8,47 +8,32 @@ Vielen Dank für Ihr Interesse an der Entwicklung von Contextra. Dieses Dokument
 
 ## 1. Voraussetzungen & Normative Quellen
 
-- **Rust-Toolchain:** Version 1.89+ laut [`rust-toolchain.toml`](../rust-toolchain.toml) (Edition 2021).
+- **Rust-Toolchain:** Version nach SPEC §4.2 D-82 / [`rust-toolchain.toml`](../rust-toolchain.toml).
 - **Normative Pflichtlektüre:**
-  - [`docs/SPEC.md`](SPEC.md) (Einzige normative Quelle für den Soll-Zustand v2.0.0).
-  - [`PLAN.md`](../PLAN.md) (Verbindliche Phasen 0–7, Gates G-A bis G-H, Arbeitspakete WP-0.1 bis WP-7.4).
+  - [`docs/SPEC.md`](SPEC.md) (Einzige normative Quelle für den Soll-Zustand Release 1.0.0). Alle Byte-Formate stehen in Anhang F, der Umsetzungsplan in §15.4.
   - [`AGENTS.md`](../AGENTS.md) (12 unverhandelbare Kernregeln).
+  - [`docs/CONSTITUTION.md`](CONSTITUTION.md) (Verfassungsprinzipien).
 
 ---
 
-## 2. Entwicklungsablauf (PLAN §1)
+## 2. Entwicklungsablauf (SPEC §15.4)
 
 1. **Ein PR = ein Arbeitspaket (WP) = max. ein Crate-Schnitt (REQ-CHG-2):**
-   - Jede Code-Änderung muss exakt einem Arbeitspaket aus `PLAN.md` zugeordnet sein.
+   - Jede Code-Änderung muss exakt einem Arbeitspaket aus `docs/SPEC.md` §15.4 zugeordnet sein.
    - PRs dürfen nicht mehrere Schichten oder Crates unkoordiniert vermischen.
 2. **Rot vor Grün (TDD):**
    - Jeder WP beginnt zwingend mit einem fehlschlagenden Test (Red Phase), der den Befund oder das Fehlen der Funktionalität beweist.
-   - Ohne roten Test wird kein Pull Request gemergt.
-3. **Evidenzpflicht:**
-   - Nach Fertigstellung eines WP werden Logs, Befehle und Testausgaben unter `evidence/<WP-ID>/` abgelegt (Befehl, Commit-ID, Ergebnis).
-4. **Lokale Verifikation:**
-   Vor jedem PR müssen alle blockierenden CI-Prüfungen lokal grün sein:
-   ```bash
-   cargo fmt --all -- --check
-   cargo clippy --workspace --all-targets -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::indexing_slicing
-   cargo check --workspace --all-targets
-   cargo test --workspace --locked
-   cargo test -p tests-arch
-   ```
+3. **Keine neuen Warnungen oder Sicherheitslücken (HR-12):**
+   - Keine neuen `unsafe`-Blöcke außerhalb von `sys` und `simd`.
+   - Keine neuen Abhängigkeiten ohne Begründung und Test.
 
 ---
 
-## 3. Die 12 unverhandelbaren Kernregeln (SPEC §0.2)
+## 3. Wortlaut-Lint und unzulässige Aussagen (SPEC §6.4, T-LINT-1)
 
-1. **Ring- & Schichten-Disziplin:** Abhängigkeiten zeigen nur abwärts (Ring 4 → 0). Innerhalb Ring 2 gilt strikt die Matrix SPEC §5.3.
-2. **Zero-Panic in Produktion:** Kein `unwrap()`, `expect()`, `panic!()`, `todo!()`, `assert!()` oder ungeprüftes Index-Slicing im Produktionscode.
-3. **Determinismus & Port-Purity:** Zeit, Zufall und IDs stammen ausschließlich aus `Clock`, `Rng` und `IdGen` aus `contextra-ports`.
-4. **WAL-First Consistency:** Frame(s) → Gruppen-Commit → `sync_data` WAL → Memtable → Sichtbarkeit.
-5. **I/O ausschließlich über `Vfs`:** Kein direkter Aufruf von `std::fs` oder `tokio::fs`. Alle Sync-Fehler propagieren.
-6. **Unsafe nur in 2 Inseln:** `unsafe` ist ausschließlich in `contextra-sys` und `contextra-simd` erlaubt, mit lückenloser `// SAFETY:`-Dokumentation. Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
-7. **Mandantentrennung verpflichtend:** `TenantId` stammt aus dem Kontext. Zugriff auf den Store nur über `TenantScopedStorage`.
-8. **Sicherheit ist kein Feature-Schalter:** AES-256-GCM-SIV und Argon2id ($m \ge 64\,\text{MiB}$) sind Pflicht ohne Opt-Out.
-9. **Messen vor Behaupten:** Restbestände stammen aus echten Messungen (`scan_residue`) mit Positivkontrolle (Canary).
-10. **Fail-Closed:** Unbekannte Zustände oder Krypto-Fehler führen zum geordneten Abbruch, nie zu stillschweigendem Weiterlaufen.
-11. **Eine Typfamilie je Konzept:** Domänentypen in `contextra-types`, Kryptografie in `contextra-crypto`.
-12. **Gate-getrieben:** Kein Phasenwechsel ohne bestandenes Release-Gate.
+Alle Quelltexte, Kommentare, Dokumentationen, Commit-Nachrichten und PR-Beschreibungen unterliegen dem strikten Wortlaut-Lint **T-LINT-1**. Die genaue Liste verbotener Begriffe und Begründungen ist verbindlich in [`docs/SPEC.md §6.4`](SPEC.md) festgelegt.
+
+Unzulässig sind insbesondere werbliche Garantieversprechen, absolute Sicherheitsbehauptungen oder rechtliche Konformitätsaussagen für die Software.
+
+**Zulässige Außenaussage (SPEC §6.4):**
+> *„Contextra entfernt die Daten eines Löschziels aus dem Datenverzeichnis, aus den Indexen und aus den gespeicherten Zeitreise-Versionen und weist den Zustand je Schicht messtechnisch nach. Für jedes Ziel wird zusätzlich der zugehörige Schlüssel aus dem Schlüsseltresor entfernt; ob und wie das rechtlich zu werten ist, entscheidet der Betreiber. Nicht erfasst sind externe Sicherungen, Flash-Remanenz, Dateisystem-Journale, Prozessspeicher und externe Verarbeiter. Der Bericht listet diese Restrisiken.“*

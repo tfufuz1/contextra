@@ -9,7 +9,6 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_search_dimension_mismatch_rejected() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -36,7 +35,6 @@ async fn test_search_dimension_mismatch_rejected() {
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -46,163 +44,13 @@ async fn test_search_dimension_mismatch_rejected() {
     let search_res = col.search(&wrong_dim_vec, 10).await;
     assert!(search_res.is_err());
 
-    let hybrid_res = col.hybrid_search("query", &wrong_dim_vec, 10, None).await;
+    let hybrid_res = col.hybrid_search("query", &wrong_dim_vec, 10).await;
     assert!(hybrid_res.is_err());
-}
-
-#[tokio::test]
-async fn test_checkpoint_unpin_on_search_error_path() {
-    use contextra_graph::csr::CsrGraph;
-    use contextra_ports::StorageStats;
-    use contextra_ports::{BoxFuture, StorageEngine};
-    use contextra_types::{FilterExpr, Result, TxId};
-    use contextra_vector::HnswIndex;
-    use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
-    use std::sync::Arc;
-
-    struct PinTrackingFailingStorage {
-        active_pins: AtomicI64,
-        total_pins: AtomicU64,
-        total_unpins: AtomicU64,
-    }
-
-    impl StorageEngine for PinTrackingFailingStorage {
-        fn get<'a>(&'a self, _: &'a [u8]) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-            Box::pin(async move { Ok(None) })
-        }
-        fn get_at_seq<'a>(
-            &'a self,
-            _: &'a [u8],
-            _: u64,
-        ) -> BoxFuture<'a, Result<Option<bytes::Bytes>>> {
-            Box::pin(async move { Ok(None) })
-        }
-        fn put<'a>(&'a self, _: TxId, _: &'a [u8], _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move { Ok(()) })
-        }
-        fn delete<'a>(&'a self, _: TxId, _: &'a [u8]) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move { Ok(()) })
-        }
-        fn commit<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move { Ok(()) })
-        }
-        fn rollback<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move { Ok(()) })
-        }
-        fn rollback_to_tx<'a>(&'a self, _: TxId) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move { Ok(()) })
-        }
-        fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move { Ok(()) })
-        }
-        fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>> {
-            Box::pin(async move {
-                Ok(StorageStats {
-                    num_segments: 0,
-                    total_size_bytes: 0,
-                    memtable_size_bytes: 0,
-                })
-            })
-        }
-        fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>> {
-            Box::pin(async move { Ok(10) })
-        }
-        fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-            Box::pin(async move { Ok(TxId::new(1)) })
-        }
-        fn pin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move {
-                self.active_pins.fetch_add(1, Ordering::SeqCst);
-                self.total_pins.fetch_add(1, Ordering::SeqCst);
-                Ok(())
-            })
-        }
-        fn unpin_checkpoint<'a>(&'a self, _: u64) -> BoxFuture<'a, Result<()>> {
-            Box::pin(async move {
-                self.active_pins.fetch_sub(1, Ordering::SeqCst);
-                self.total_unpins.fetch_add(1, Ordering::SeqCst);
-                Ok(())
-            })
-        }
-        fn scan_prefix<'a>(
-            &'a self,
-            _: &'a [u8],
-        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-            Box::pin(async move { Ok(vec![]) })
-        }
-        fn scan_prefix_at<'a>(
-            &'a self,
-            _: &'a [u8],
-            _: u64,
-        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-            Box::pin(async move {
-                Err(contextra_types::ContextraError::Storage(
-                    "Simulated storage failure during scan_prefix_at".into(),
-                ))
-            })
-        }
-        fn scan<'a>(
-            &'a self,
-            _: std::ops::Bound<&'a [u8]>,
-            _: std::ops::Bound<&'a [u8]>,
-            _: Option<usize>,
-        ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
-            Box::pin(async move { Ok(vec![]) })
-        }
-    }
-
-    let storage = Arc::new(PinTrackingFailingStorage {
-        active_pins: AtomicI64::new(0),
-        total_pins: AtomicU64::new(0),
-        total_unpins: AtomicU64::new(0),
-    });
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
-    let col = Collection::new(
-        "default".to_string(),
-        storage.clone(),
-        index,
-        Arc::new(CsrGraph::new()),
-        Arc::new(AtomicU64::new(1)),
-        4,
-        contextra_text::Language::English,
-    );
-
-    let filter_expr = FilterExpr::Eq {
-        field: "category".to_string(),
-        value: serde_json::json!("books"),
-    };
-    let res = col
-        .search_with_filter_expr(&[1.0, 0.0, 0.0, 0.0], 5, Some(filter_expr))
-        .await;
-
-    assert!(res.is_err(), "Search must return error when scan fails");
-    assert_eq!(
-        storage.total_pins.load(Ordering::SeqCst),
-        1,
-        "pin_checkpoint should have been called once"
-    );
-    assert_eq!(
-        storage.total_unpins.load(Ordering::SeqCst),
-        1,
-        "unpin_checkpoint must be called despite inner search error"
-    );
-    assert_eq!(
-        storage.active_pins.load(Ordering::SeqCst),
-        0,
-        "Active pins must return to 0 after search error"
-    );
 }
 
 #[tokio::test]
 async fn test_search_k_zero_returns_canonical_error_message(
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -225,7 +73,6 @@ async fn test_search_k_zero_returns_canonical_error_message(
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -260,7 +107,6 @@ async fn test_search_k_zero_returns_canonical_error_message(
 #[tokio::test]
 async fn test_query_builder_query_config_include_superseded_displacement(
 ) -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::{DocId, HybridQuery};
     use contextra_vector::HnswIndex;
@@ -288,7 +134,6 @@ async fn test_query_builder_query_config_include_superseded_displacement(
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -337,106 +182,8 @@ async fn test_query_builder_query_config_include_superseded_displacement(
 }
 
 #[tokio::test]
-async fn test_community_boost_post_rrf_preserves_non_community_and_reranks(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use contextra_graph::CsrGraph;
-    use contextra_store::LsmStorage;
-    use contextra_types::EntityId;
-    use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
-    use std::sync::Arc;
-    use tempfile::tempdir;
-
-    let dir = tempdir()?;
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await?,
-    );
-    let index = Arc::new(HnswIndex::try_new(contextra_vector::HnswConfig {
-        dimension: 4,
-        ..Default::default()
-    })?);
-    let graph = Arc::new(CsrGraph::new());
-    let next_tx = Arc::new(AtomicU64::new(1));
-
-    let col = Collection::new(
-        "default".to_string(),
-        storage,
-        index,
-        graph,
-        next_tx,
-        4,
-        contextra_text::Language::English,
-    );
-
-    // Insert doc_a (community member) and doc_b (non-community member)
-    col.insert(
-        "doc_a",
-        &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "alpha topic"})),
-    )
-    .await?;
-    col.insert(
-        "doc_b",
-        &[1.0, 0.0, 0.0, 0.0],
-        Some(serde_json::json!({"text": "alpha topic"})),
-    )
-    .await?;
-
-    let eid_a = EntityId::from_key("doc_a")?;
-
-    // Relate doc_a to doc_c and run community detection so get_community(eid_a) finds target_community_id
-    col.relate("doc_a", "doc_c", "knows").await?;
-    col.run_community_detection().await?;
-    assert!(col.get_community(eid_a).await?.is_some());
-
-    // Perform hybrid search with same_community_as = doc_a
-    let results_boosted = col
-        .hybrid_search_with_strategy(
-            "alpha",
-            &[1.0, 0.0, 0.0, 0.0],
-            10,
-            None,
-            None,
-            None,
-            Some(eid_a),
-            None,
-        )
-        .await?;
-
-    // Verification 1: Non-community doc_b is NOT eliminated and remains in results!
-    assert_eq!(
-        results_boosted.len(),
-        2,
-        "Non-community doc_b must not be filtered out"
-    );
-    let ids: Vec<&str> = results_boosted.iter().map(|r| r.id.as_str()).collect();
-    assert!(
-        ids.contains(&"doc_b"),
-        "doc_b must remain in search results"
-    );
-
-    // Verification 2: Community doc_a gets boosted post-RRF and ranks #1 ahead of doc_b
-    assert_eq!(
-        results_boosted[0].id, "doc_a",
-        "Community member doc_a must rank ahead after boost"
-    );
-    assert!(
-        results_boosted[0].score > results_boosted[1].score,
-        "Boosted community doc score ({}) must exceed non-community score ({})",
-        results_boosted[0].score,
-        results_boosted[1].score
-    );
-    Ok(())
-}
-
-#[tokio::test]
 async fn test_post_rrf_supersedes_displacement_truncation_preserves_k(
 ) -> contextra_types::Result<()> {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::DocId;
     use contextra_vector::HnswIndex;
@@ -464,7 +211,6 @@ async fn test_post_rrf_supersedes_displacement_truncation_preserves_k(
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,

@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-testkit`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.15](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.15](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-testkit` stellt wiederverwendbare Testbausteine, deterministische Testuhren, speicherbasierte Referenzmodelle, In-Memory-Ports und Fehlerinjektions-Tools für Unit-, Integrations- und Crash-Tests bereit.
@@ -31,7 +31,7 @@
 1. **Deterministische Reproduzierbarkeit:** Jeder Testfall mit `FaultVfs` oder `ManualClock` ist über einen Seed exakt reproduzierbar.
 2. **Keine Produktionsverunreinigung:** Kein Typ aus `contextra-testkit` darf im Produktions-Release kompiliert werden.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[x] WP-1.2: Veraltete Test-Mocks entfernen**
   - Rückbau von `in_memory_graph` und Graph-Fixtures vollständig abgeschlossen (V-RUECKBAU).

@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-types`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.1](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.1](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-types` definiert die reinen, zustandslosen, I/O- und runtime-unabhängigen Domänentypen, Identifikatoren, Schlüssel-Buffer, Fehler und Löschtypen für das Gesamtsystem Contextra.
@@ -34,10 +34,10 @@
 3. **Kanonische Klassennamen:** `ErasureClass::display()` liefert strikt die normativen Texte aus SPEC §12.5.
 4. **Matcher-Normalisierung:** `Matcher`-Instanzen sind stets normalisiert (sortierte, disjunkte Bereiche).
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
-- **[ ] WP-0.5: ADR-001 Typ-Anpassungen**
-  - Entfernen aller Referenzen auf Ebene B (`DocDek`-Revocation-Typen).
+- **[ ] WP-0.5: ADR-002 Typ-Anpassungen**
+  - Implementierung der Drei-Säulen-Löschtypen (D-01, ADR-002, D-70 DocRef, D-79 Tresor-Slots)
 - **[ ] WP-1.2: Workspace-Bereinigung & Rückbau**
   - Entfernen veralteter Typen: `DocId(u64|u128)`, `witness.rs`, `AutoExtractionMode` sowie aller Graph-, Checkpoint- und Lizenz-Typen.
 - **[ ] WP-2.2: Sequenzsemantik festschreiben**

@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-rank`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.13](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.13](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-rank` ist für die deterministische Fusion von Trefferlisten aus Volltext- und Vektorsuche mittels Reciprocal Rank Fusion (RRF) zuständig.
@@ -31,7 +31,7 @@
 1. **Permutationsinvarianz:** Die Reihenfolge, in der Trefferlisten an `rrf_fuse` übergeben werden, beeinflusst weder die berechneten Scores noch die Ergebnisrangfolge.
 2. **Determinismus:** Identische Eingabelisten liefern auf jeder unterstützten Architektur exakt dieselbe Byte-Ausgabe.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-1.2: Komplexe Kalibratoren entfernen**
   - Rückbau von `IsotonicCalibrator`, Conformal Calibration und externen Adaptiv-Abhängigkeiten.

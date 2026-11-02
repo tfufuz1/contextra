@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-crypto`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.6](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.6](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-crypto` kapselt sämtliche kryptografischen Algorithmen, Schlüsselableitungen, AEAD-Ver-/Entschlüsselungen, Envelope-Strukturen, blinde Tags und Signaturprüfungen in einer einzigen, strikt auditierten Typfamilie.
@@ -35,7 +35,7 @@
 3. **Nonce-Disziplin:** Wiederverwendung von Nonces unter demselben Schlüssel ist kryptografisch und strukturell ausgeschlossen.
 4. **Kein Staging alter Features:** Veraltete Module (`deletion_proof`, `ed25519_proof`, `kv_cipher`, `kv_segment`, `kv_shredding`, `revocation_log`) sind restlos gelöscht; Deklarationen in `lib.rs` (Z. 47–54, 64–79) werden getilgt.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-1.2: Veraltete Krypto-Deklarationen & Features bereinigen**
   - Streichen der toten Modul-Deklarationen in `lib.rs`.

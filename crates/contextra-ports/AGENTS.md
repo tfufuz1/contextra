@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-ports`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.2](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.2](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-ports` definiert sämtliche abstrakten Port-Schnittstellen (Traits), über die die Ringe 1, 2 und 3 lose und deterministisch gekoppelt sind.
@@ -39,7 +39,7 @@
 2. **`ReadGate`-Vertrag:** Fail-Closed; bei unbekanntem Zustand oder Fehlern wird geblockt.
 3. **`Vfs`-Vertrag:** Jede Flush- und Sync-Operation liefert ein verbindliches `std::io::Result<()>`, das niemals ignoriert werden darf.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-1.2: Veraltete Ports entfernen**
   - Streichen von: `attention`, `checkpoint`, `embedding`, `graph`, `graph_index`, `license`, `plugin`, `query_rewriter`, `reranker`, `scanner`.

@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-store`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.8](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.8](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-store` ist der blinde, transaktionale LSM-Tree-Speicherkern von Contextra. Er verwaltet Write-Ahead-Log (WAL), Memtables, persistente SSTables, das Manifest, Hintergrundkompaktionen und **Purge-Primitive**. Er kennt weder Dokumentinhalte noch Volltext- oder Vektorindizes, sondern operiert rein auf `KeyBuf`, `Seq`, opaken Bytes und `Matcher`.
@@ -40,7 +40,7 @@
    - `#![allow(unexpected_cfgs)]` und die sieben toten `wal-integrity`-Gates in `wal/replay.rs` werden restlos entfernt.
    - Alle `encryption-at-rest`-Gates entfallen; Verschlüsselung ist fundamentaler Kernbestandteil.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-2.1: Snapshot-Sentinel Fix in Compaction**
   - Korrektur in `store/src/lsm/ops/compaction.rs` (Z. 225–231), sodass keine Tombstone-Bits mehr an `prune_through` übergeben werden.

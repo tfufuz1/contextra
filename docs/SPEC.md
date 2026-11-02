@@ -2,13 +2,13 @@
 
 |Feld|Wert|
 |---|---|
-|Spezifikationsversion|**4.0.0** (SOLL-Zustand für Release 1.0.0; Revision von 3.0.0)|
-|Stand|2026-11-02|
+|Spezifikationsversion|**4.1.0** (SOLL-Zustand für Release 1.0.0; Revision von 4.0.0; Änderungen: Anhang H, „Änderungen 4.1.0“)|
+|Stand|2026-11-02 (4.1.0)|
 |Status|**Final bis auf zwei benannte Vorbehalte:** (1) Gate **G0** (Speicherentscheid, 11.9): scheitert es, werden 4.1, 9.1, 11.4 und 11.9 nach der Fallbackleiter (11.9) neu gefasst; (2) Gate **G-LEGAL** (extern, 6.7): blockiert nur Löschaussagen jenseits 6.4. Alles Übrige ist entschieden und begründet (Abschnitt 4).|
-|Basis der Analyse|`github.com/tfufuz1/contextra`, `main` @ `25c8f17568025b120ef820f3cb4e45e6107c4f8e` (2026-11-02 00:38 +01:00), frisch geklont. Gegenüber `33c3e78e4` (Basis der Vorprüfung) haben sich nur `contextra-ports` (Altports entfernt, `Vfs` nach `ports` verschoben, `rng`/`vfs` gehärtet) und `contextra-testkit` geändert (24 Dateien, +687/−2.480 Zeilen) **[V]**. Gegenüber der Basis von 3.0.0 (`e5e29108d`) kommen `contextra-sys` (Härtung, `9f1e77633`) hinzu. Alle Zählungen, die nicht ausdrücklich als „neu geprüft“ gekennzeichnet sind, stammen von `33c3e78e4` und sind für die unveränderten Crates weiter gültig.|
+|Basis der Analyse|`github.com/tfufuz1/contextra`, `main` @ `25c8f17568025b120ef820f3cb4e45e6107c4f8e` (2026-11-02 00:38 +01:00), frisch geklont. Gegenüber `33c3e78e4` (Basis der Vorprüfung) haben sich nur `contextra-ports` (Altports entfernt, `Vfs` nach `ports` verschoben, `rng`/`vfs` gehärtet) und `contextra-testkit` geändert (24 Dateien, +687/−2.480 Zeilen) **[V]**. Gegenüber der Basis von 3.0.0 (`e5e29108d`) kommen `contextra-sys` (Härtung, `9f1e77633`) hinzu. Alle Zählungen, die nicht ausdrücklich als „neu geprüft“ gekennzeichnet sind, stammen von `33c3e78e4` und sind für die unveränderten Crates weiter gültig. **Ergänzung 4.1.0:** Architektur- und Strukturprüfung am HEAD `f8a3bbb24` (11 Commits nach `25c8f17`: `contextra`, `mvcc`, `durable-fs`, `tests/arch`), statisch **[V]**, ohne Build; neue Befunde F-26 bis F-31, Korrekturen F-07/F-13 (F-29).|
 |Prüfmodus|Quelltext gelesen, Manifeste ausgewertet, Muster gezählt (**[V]**). **Nicht gebaut und nicht ausgeführt:** Die Prüfumgebung hatte keine Rust-Toolchain. Alle Build- und Testwerte (**[M]**) stammen aus 3.0.0 (HEAD `e5e29108d`) und wurden nicht wiederholt. Rechtsstände wurden am 2026-11-02 gegen Primär- und Fachquellen geprüft (**[W]**).|
 |Quelle der Wahrheit|**Ausschließlich diese Datei.** `AGENTS.md`, `PLAN.md`, `VETOES.md`, `CONSTITUTION.md`, `ARCHITECTURE.md`, `SOURCE_OF_TRUTH.md`, `SECURITY.md` und alle Dateien unter `docs/` außer dieser sind **veraltet und nicht normativ**. Widerspricht eine davon dieser Spezifikation, gilt die Spezifikation; die Datei wird erneuert oder gelöscht (Anhang E). Diese Spezifikation enthält deshalb auch die Byte-Formate (Anhang F) und den Umsetzungsplan (15.4); es gibt kein Begleitdokument.|
-|Ersetzt|`docs/SPEC.md` 3.0.0. Änderungen und ihre Begründung: Anhang H.|
+|Ersetzt|`docs/SPEC.md` 4.0.0 (und 3.0.0). Änderungen und ihre Begründung: Anhang H.|
 |Geltung|Jede Abweichung des Quellcodes oder eines Folgedokuments von diesem Dokument ist ein Defekt.|
 
 > **Keine Rechtsberatung.** Kein Softwareprodukt kann „100 % Rechtskonformität“ zusagen: Rechtskonformität ist ein Merkmal des Betriebs durch den Verantwortlichen, nicht des Codes. Dieses Dokument legt deshalb fest, was Contextra technisch maximal leistet, wie jede Leistung gemessen wird und was Contextra wahrheitsgemäß behaupten darf (6.4, 16). Wo eine Rechtsfrage die Technik berührt, ist sie in 6.6 **konservativ entschieden**: Es gilt die strengste Auslegung. Eine spätere juristische Prüfung kann dadurch Aussagen lockern, nie technische Maßnahmen nachfordern.
@@ -100,7 +100,7 @@ Netzwerkdienst, Server-Socket, Sharding, Replikation, P2P; Erzeugung von Embeddi
 |P2|**Fail-closed**|Unbekannter Zustand, korrupte Daten, abgelaufene Fristen: Verweigerung oder `Pending`, nie Weiterlaufen.|
 |P3|**Ein Weg**|Ein Löschpfad, ein Format, eine Fehlerbehandlung je Konzept. Keine Legacy-Lesepfade, keine Downgrade-Pfade.|
 |P4|**Ziel-Isolation**|Jede mutierende Operation hat ein typisiertes Ziel. Nachbardaten bleiben auf Record-Ebene bitgleich (messbar).|
-|P5|**Keine Schalter für Sicherheit**|Kein `cfg(feature)` und kein Laufzeitparameter, der Verschlüsselung, Integrität, Löschmessung oder Mandantenprüfung abschaltet. Laufzeitparameter, die Schutzgrade verändern (`process_hardening`), erscheinen im Bericht.|
+|P5|**Keine Schalter für Sicherheit**|Kein `cfg(feature)` und kein Laufzeitparameter, der Verschlüsselung, Integrität, Löschmessung oder Mandantenprüfung abschaltet. Laufzeitparameter, die Schutzgrade verändern (`process_hardening`), erscheinen im Bericht. **Abschließende Ausnahmeliste (zwei Einträge):** (1) `process_hardening` (D-63, Bericht `ProcessMemory`), (2) Feature `testing` (D-46, ersetzt nur den Argon2-Schritt, CI-geprüft T-CFG-2). Jede weitere Ausnahme ist ein Defekt.|
 |P6|**Keine Panics, keine verschluckten Fehler**|Im Produktionscode kein `unwrap`, `expect`, `panic!`, `unreachable!`, `let _ =` auf `Result`, kein `unwrap_or_default` auf I/O.|
 |P7|**Determinismus über Ports**|Zeit (`Clock`), Zufall (`Rng`), Dateisystem (`Vfs`), IDs (`IdGen`). Ausnahme: Schlüssel-, Salt- und Nonce-Material aus dem OS-CSPRNG.|
 |P8|**Kleinster Kern**|Ein Crate oder Modul ist nur im Kern, wenn ein Kernkonsument es braucht (`cargo tree`-belegt).|
@@ -141,13 +141,13 @@ Marken: **[V]** geprüft am Repository (HEAD `25c8f17` bzw. unverändert gegenü
 |F-04|`crates/contextra-erasure/`: nur `README.md`, `AGENTS.md`; `crates/contextra-lab`, `ctx-verify` fehlen; `ports` und `types` enthalten die Löschtypen nicht. **[V]**|`ls`, `find`|
 |F-05|Rückbau halb fertig: Workspace listet 15 Mitglieder (ohne `contextra-erasure`). **100 Zeilen** verweisen auf `contextra_graph`/`contextra-graph` (33c3e78e4: 101). Der Commit `c2a864d` hat die Ports `graph`, `graph_index`, `checkpoint`, `license`, `attention`, `plugin`, `lifecycle` entfernt; `ports` führt weiter `embedding`, `reranker`, `query_rewriter` (D-24: zu entfernen). `AutoExtractionMode` in 10+ Dateien. **[V]**|`grep -rIn "contextra_graph\|contextra-graph" crates tests tools .github Cargo.toml Cargo.lock`|
 |F-06|**Undeklarierte `cfg(feature)`** (kein `[features]`-Eintrag): `encryption-at-rest` (11 Treffer, `store`), `adaptive-candidate-pool-sizing` (7), `onnx` (2), `graph-connectivity-health` (1), `sandbox` (1) (alle `engine`). 11 Treffer `#[allow(unexpected_cfgs)]`. **[V]**|Skript über alle `cfg(feature = …)` gegen `[features]` je Crate|
-|F-07|**Snapshot-Sentinel unverändert:** `.unwrap_or(u64::MAX)` in `store/src/lsm/ops/compaction.rs:228`. **[V]**|Quelltext|
+|F-07|*(Stand `f8a3bbb24`: siehe F-29)* **Snapshot-Sentinel unverändert:** `.unwrap_or(u64::MAX)` in `store/src/lsm/ops/compaction.rs:228`. **[V]**|Quelltext|
 |F-08|**Delete-Race unverändert:** `let _guard = …lock_for(id).await; drop(_guard);` in `engine/src/collection/crud/delete.rs`. **[V]**|Quelltext|
 |F-09|**Verschlüsselung optional:** `encryption_mode: Option<EncryptionMode>` im Builder (`contextra/src/builder.rs:86`); `Option<Arc<KeyManager>>` im WAL (`store/src/wal/mod.rs:323,353,401,445`). **[V]**|Quelltext|
 |F-10|**Mandantenpolitik:** `TenantPolicy` Default `Optional` (`engine/src/lib.rs:333`). **[V]**|Quelltext|
 |F-11|**KDF:** Untergrenze `MIN_M_COST_KIB = 19456`, `t ≥ 2` (`crypto/src/kdf.rs:36`); keine Obergrenze. `try_new(passphrase, salt)` leitet per HKDF aus der Passphrase ab. **[V]**|Quelltext|
 |F-12|**`DocId(pub u64)`** (Feature `docid-128` → `u128`), unkeyed (`types/src/types/domain/ids.rs:173,180`). **[V]**|Quelltext|
-|F-13|**Zwei `Vfs`-Traits:** `ports/src/vfs.rs:115` (seit `c2a864d` gehärtet) und `durable-fs/src/vfs.rs:54` (noch vorhanden); `store` greift 155-mal direkt auf das Dateisystem zu, `vector` 53-mal (Zählung 33c3e78e4). **[V]**|`grep "std::fs\|tokio::fs\|File::open\|File::create"`|
+|F-13|*(Stand `f8a3bbb24`: Teil 1 behoben, siehe F-29)* **Zwei `Vfs`-Traits:** `ports/src/vfs.rs:115` (seit `c2a864d` gehärtet) und `durable-fs/src/vfs.rs:54` (noch vorhanden); `store` greift 155-mal direkt auf das Dateisystem zu, `vector` 53-mal (Zählung 33c3e78e4). **[V]**|`grep "std::fs\|tokio::fs\|File::open\|File::create"`|
 |F-14|`block_on` an 7 Stellen in `crates/*/src`, davon **1 produktiv** (`engine/src/merge_operator_adapter.rs:114`, `WasmMergeOperator`-Worker). Die übrigen 6 liegen in Testmodulen. **[V]**|`grep`|
 |F-15|Produktionsmuster (Obergrenzen): `.unwrap()` **1.120** · `.expect(` **1.043** · `panic!` **72** (exakt wie 3.0.0). `let _ =` 237 · `#[allow` 134 · `HashMap/HashSet` 211 · `Instant::now/SystemTime::now` 24 · `thread_rng/from_entropy` 12 **[M]**|`grep` über `crates/*/src`|
 |F-16|**`tokio` mit Feature `full`** im Workspace (`Cargo.toml`); `Cargo.lock` enthält `mio` und `socket2`. Quelltext nutzt `tokio::net`/`std::net` nicht (0 Treffer). Das widerspricht HR-1, solange `net` im Baum ist. **[V]**|`Cargo.toml`, `Cargo.lock`, `grep`|
@@ -160,6 +160,12 @@ Marken: **[V]** geprüft am Repository (HEAD `25c8f17` bzw. unverändert gegenü
 |F-23|**Produktfremde Features in Produktionscrates:** `experimental-diskann` (`engine`, `vector`), `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `graph` (`vector`); `memory-only-storage`, `fault-injection`, `legacy-wal-key`, `block-cache-v2`, `sieve-cache` (`store`); `cloud-egress-guard`, `kv-encryption` (`crypto`); `auto-extraction-opt-out`, `entity-extraction`, `edge-reinforcement-learning`, `reranking` (`engine`). **[V]**|`[features]`-Abschnitte|
 |F-24|**Kryptoalgorithmen:** Im Code existiert nur AES-256-GCM-SIV (`aes-gcm-siv`); AES-256-GCM und ChaCha20-Poly1305 (so in 3.0.0 8.6 für Block-AEAD genannt) sind nicht vorhanden. Nonce-Schema im Code: 4 Byte Zufallspräfix je `KeyManager` plus 8-Byte-Zähler (`crypto/src/crypto.rs`), nicht „96 Bit OS-CSPRNG“ wie in 3.0.0 D-60. **[V]**|Quelltext|
 |F-25|Dokumente widersprechen sich (`VETOES.md`, `CONSTITUTION.md`, `ARCHITECTURE.md`, `SECURITY.md`, `SOURCE_OF_TRUTH.md`, `PLAN.md`, `docs/DELETION-DSGVO.md` zu Ebene B, Fassungen, Gates). Aufgelöst durch die Festlegung „nur SPEC.md ist Quelle der Wahrheit“ (Kopf, Anhang E). **[D]**|Dokumentvergleich|
+|F-26|**Fassade `contextra` widerspricht §7 und D-05/D-07/D-23/D-24:** `builder(dimension)` mit fester Dimension, `EncryptionMode::Unencrypted`, `LicenseGate`/`with_license_gate`, `TextEmbeddingEngine`/`with_embedder`, `LlmQueryRewriter`, `collection_profile.rs`, `performance_profile.rs`, Re-Export von `DocId` und `chunker`; kein `tenant()`, `erase()`, `report()`, kein `DocRef`. `lib.rs` behauptet „zero direct dependencies on Ring 0/1“, die `Cargo.toml` hängt an `types`, `ports`, `crypto`, `store`, `rank`. `README` nennt `Collection::delete` (D-51). `AGENTS.md` enthält einen absoluten Entwicklerpfad. **[V]**|`crates/contextra/src`, `Cargo.toml`, `README.md`, `AGENTS.md`|
+|F-27|**Abhängigkeitskanten gegen Matrix 5.3** (aus den `Cargo.toml`): `engine→sys`, `vector→sys`, `vector→mvcc` nicht in der Matrix; `engine→durable-fs` und `engine→erasure` (vorgeschrieben) fehlen; `text→crypto` (erlaubt, nötig für D-85) fehlt; für `contextra` gab es keine Matrixzeile (behoben durch D-88). `tokio` mit `features = ["full"]` wird von 10 Crates geerbt (F-16). **[V]**|`Cargo.toml` aller Crates|
+|F-28|**Ring-Angaben in `lib.rs`-Köpfen widersprechen 5.1:** `store` „Ring 1“, `text` und `rank` „Ring 0“, `vector` „Layer-1“, `engine` „Ring 2“ und „Layer 3“ im selben Kopf; `types` nennt 30 Konsumenten, davon rund 20 gelöschte Crates. Ursache: handgeschriebene Angaben ohne Test (D-91, T-ARCH-5). **[V]**|`crates/*/src/lib.rs`|
+|F-29|**Korrektur zu F-07 und F-13 am HEAD `f8a3bbb24`:** (a) F-13: Das zweite `Vfs`-Trait in `durable-fs` ist entfernt (`RealVfs` implementiert `ports::Vfs`); offen bleiben **169** direkte Dateizugriffe in `store` und **51** in `vector` (`grep "std::fs\|tokio::fs\|File::open\|File::create\|OpenOptions"`). (b) F-07: Der Treffer `compaction.rs:228` ist nicht mehr vorhanden; der Sentinel steht aber weiter in `mvcc/src/snapshot.rs:314` (`update_min`: `.unwrap_or(u64::MAX)`, Kommentar „ist der korrekte Standardwert“) und widerspricht 8.7. **[V]**|`grep`, Quelltext|
+|F-30|**Benennung und Struktur:** Modul `engine/src/contextra_impl` (die eigentliche Instanz, Name ohne Aussage); `Cargo.toml` führt den Alias `contextra-index` auf `contextra-vector`; `types/src/types.rs` + `types/src/types/` und `types::types::domain` (Crate, Modul und Pfad gleichnamig); Dateien `misc.rs` (`types`) und `util.rs` (`store`); gemischte Modulform (`foo.rs` + `foo/` neben `mod.rs`) in 5 Fällen (`store/compaction`, `store/sstable`, `text/inverted`, `text/morphology`, `types/types`); Dateiköpfe mit `FILE-CONTEXT`, `ANCHOR[...]`, `STAND: TS:…`, `SESSION:`. **[V]**|`find`, `grep`|
+|F-31|**Umfang gegenüber D-24/D-26/D-84 (Zeilen `src`, inkl. Inline-Tests, Obergrenzen):** `vector`: `diskann` 4.122, `quantize` 1.116, `quantize_rabitq` 506, `partial_rebuild` 363, `acorn` 213; `rank` gesamt 5.553 (`fusion` 2.252, `dibud` 524, `explain` 469, `drift` 139) bei Soll „nur RRF“; `types/types/saos.rs` 940; `engine`: `chunker` 1.533, `extraction` 642, `export`+`import` 528, `decay_controller` 115, `temporal_filter` 359, `merge_operator_adapter` 201. Restmuster (`crates/*/src`, Dateien/Treffer): `DocId` 95/791, `contextra_graph` 18/78, `LicenseGate` 5/25, `AutoExtractionMode` 4/24, `TextEmbeddingEngine` 10/28, `Reranker` 9/76, `TenantPolicy` 3/10, `saos` 4/20, `allow_legacy_integrity_key_fallback` 28 Treffer, `Option<Arc<KeyManager>>`/`Option<EncryptionMode>` 15 Treffer. Undeklarierte `cfg(feature)`: `encryption-at-rest`, `adaptive-candidate-pool-sizing`, `partial-index-rebuild`, `onnx`, `graph-connectivity-health`. **[V]**|`wc -l`, `grep`|
 
 ### 3.3 Auflösung der Dokumentkonflikte (verbindlich)
 
@@ -282,10 +288,22 @@ Jede Entscheidung nennt Begründung und belegenden Test. **Fett** gesetzte IDs w
 |**D-81**|**Textanalyse.** Segment-Header trägt `analyzer_id`, `analyzer_version`, `lang`. Analyzer v1: `de/1` (UAX-#29-Tokenisierung, NFKC, Case-Folding, `ß→ss`, Snowball-German, Stoppwortliste, wörterbuchbasierter Dekompounder) und `und/1` (neutral). Der Analyzer ist je Collection unveränderlich; ein Wechsel ist Neuaufbau in einer neuen Collection. `term_tag = tag("ctx/term/v1", analyzer_id ‖ lang ‖ normalisierter_term)`. Postings in 128er-Blöcken mit Blockmetadaten für Block-Max-Pruning (BMW), optional **Positionen** (Collection-Option, Standard an) für Phrasensuche.|3.0.0 legte `term_tag` und damit den Recall für deutschsprachige Korpora ohne Analyzer fest; ein Analyzerwechsel ist ein vollständiger Reindex und ohne `analyzer_id` im Format ein Formatbruch. Ohne Pruning ist BM-TEXT (p99 ≤ 30 ms bei 1 Mio. Chunks) für häufige Terme nicht erreichbar.|T-TEXT-ANALYZER-1 (Goldenset Komposita/Umlaute), T-TEXT-PHRASE-1, BM-TEXT|
 |**D-82**|**Toolchain.** *MSRV* (`rust-version`) = älteste in der CI-Matrix geprüfte Version, nur in Minor-Releases anhebbar. *Build-Toolchain* (`rust-toolchain.toml`) = zum Release-Schnitt aktuelle Stable, **höchstens 2 Minor-Versionen hinter der aktuellen Stable**; Release-Builds mit `--locked`, Toolchain-Version und Build-Hash im Evidenzbündel.|Das Rust-Projekt pflegt nur die jeweils aktuelle Stable mit Sicherheitskorrekturen [W]. Der Pin `1.89.0` (August 2025) ist seit dem Erscheinen von 1.90 ohne Pflege; zum 2026-06-30 war 1.96.1 aktuell [W]. Ein eingefrorener Compiler samt Standardbibliothek ist für ein CRA-pflichtiges Produkt (E-L9) ein Lieferkettenrisiko.|T-SUPPLY-2|
 |**D-83**|**Betriebsdetails.** (1) `scrub` (Überschreiben vor `unlink`) nur, wenn die Startprobe `rotational = true` und nicht-COW meldet; sonst entfällt es (nicht tragend nach D-85); Kosten getrennt in BM-ERASE-WA. (2) **Verwaiste Tresor-Slots** (`D`/`F` ohne Record bzw. Datei, etwa nach Absturz zwischen Slot-Schreiben und WAL-`fsync`) werden bei der Recovery genullt. (3) `batch_window ≤ erase_sla / 2` ist Konfigurationsprüfung; `health()` warnt, wenn die gemessene Purge-Dauer `erase_sla − batch_window` übersteigt.|Entkoppelt Wirkung vom Medium; schließt Waisen; verhindert Konfigurationen, die die SLA unerreichbar machen.|T-CRASH-5, T-CFG-3, BM-ERASE-WA|
-|**D-84**|**Verbindliche Rückbauliste (Gate G-B):** Features und Parameter `legacy-wal-key`, `allow_legacy_integrity_key_fallback`, `memory-only-storage`, `cloud-egress-guard`, `kv-encryption`, `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `graph`, `fault-injection` (ersetzt durch `FaultVfs` im `testkit`), `block-cache-v2`/`sieve-cache` (eine Cache-Implementierung bleibt), `auto-extraction-opt-out`, `entity-extraction`, `edge-reinforcement-learning`, `reranking`, `adaptive-candidate-pool-sizing`, `onnx`, `sandbox`, `graph-connectivity-health`, `encryption-at-rest`; `WasmMergeOperator` samt `block_on`; `contextra-sys/src/acl_win32.rs` und alle `cfg(windows)`. `test-utils`/`testkit` bleiben nur als Dev-Features.|F-06, F-14, F-21, F-22, F-23: jedes dieser Elemente ist ein Schalter für Sicherheit, ein Parallelpfad oder eine tote Auditfläche (P3, P5, P8).|T-CFG-1, T-ARCH-3, T-UNSAFE-1|
+|**D-84**|**Verbindliche Rückbauliste (Gate G-B):** Features und Parameter `legacy-wal-key`, `allow_legacy_integrity_key_fallback`, `memory-only-storage`, `cloud-egress-guard`, `kv-encryption`, `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `graph`, `fault-injection` (ersetzt durch `FaultVfs` im `testkit`), `block-cache-v2`/`sieve-cache` (eine Cache-Implementierung bleibt), `auto-extraction-opt-out`, `entity-extraction`, `edge-reinforcement-learning`, `reranking`, `adaptive-candidate-pool-sizing`, `onnx`, `sandbox`, `graph-connectivity-health`, `encryption-at-rest`, `docid-128`, `bm25f`, `background-maintenance`, `dibud`, `contract-tests` (nur Dev), Paketalias `contextra-index`; `WasmMergeOperator` samt `block_on`; `contextra-sys/src/acl_win32.rs` und alle `cfg(windows)`. `test-utils`/`testkit` bleiben nur als Dev-Features.|F-06, F-14, F-21, F-22, F-23: jedes dieser Elemente ist ein Schalter für Sicherheit, ein Parallelpfad oder eine tote Auditfläche (P3, P5, P8).|T-CFG-1, T-ARCH-3, T-UNSAFE-1|
 |**D-85**|**Dateischlüssel-Vernichtung.** Jede Datendatei (WAL-Segment, SSTable, Textsegment, Vektor-Snapshot, `scope/`) erhält bei Anlage einen zufälligen 32-Byte-Dateischlüssel (OS-CSPRNG), abgelegt als Tresor-Slot Typ `F` (`tag = file_id`, Payload = Schlüssel ⊕ `HKDF-Expand(K_enc, "ctx/fkmask/v1" ‖ file_id, 32)`). Beim Ausscheiden der Datei (Manifest-Swap dauerhaft) wird der `F`-Slot genullt (`sync_data`) und **dann** die Datei entfernt. Ordnung: `F`-Slot dauerhaft **vor** dem ersten dauerhaften Block der Datei (I-9b); Nullung nach dauerhaftem Manifest-Swap, vor `unlink` (I-17). Recovery: Datei ohne Manifest-Eintrag → Slot nullen, entfernen; `F`-Slot ohne Datei → nullen. Beim SSTable-Rewrite werden Nicht-Ziel-Records als Ciphertext-Envelopes unverändert in die neue Datei übernommen und unter dem neuen Dateischlüssel blockverschlüsselt (I-3).|Freigegebene Dateiblöcke enthielten sonst Strukturmetadaten (pseudonyme Tags, Clustergrößen, Postings) unter einem aus `K_master` ableitbaren Schlüssel: für den Inhaber der Passphrase lesbar. Mit Dateischlüssel-Vernichtung sind sie auch für ihn wertlos; die Remanenzfläche schrumpft auf den genullten 64-Byte-Slot. Die Maßnahme wirkt auch dort, wo Überschreiben nicht verlässlich ist (Flash, COW).|T-FK-1..3, T-CRASH-6|
 |**D-86**|**Vektor-Arena-Layout:** je Slot ein zusammenhängender, zeroisierbarer Bereich, der **alle** Repräsentationen des Vektors enthält (f32; später SQ8, PQ, binär). Gelöschte Slots werden in allen Repräsentationen überschrieben (D-77). Keine Repräsentation außerhalb der Arena (kein Quantisierungs-Nebenarray).|Spätere Quantisierung darf die Löschbarkeit nicht unterlaufen; später lässt sich das Layout nur mit Formatbruch ändern.|T-VEC-ARENA-1|
 |**D-87**|**Kapazitätsgrenzen v1:** `max_docs_per_store = 5·10⁷` (Tresor, D-79), `max_doc_bytes` 4 MiB (≤ 64 MiB), Snapshots je Mandant ≤ 1024, Dimension ≤ 4096, Query-Terme ≤ 256, `k` ≤ 1000. Überschreitung: `Limit::*`, nie stilles Kürzen.|Dokumentierte Produktgrenzen statt stillem Versagen.|T-LIMIT-1, BM-VAULT-OPEN|
+
+### 4.4 Neu in 4.1.0 (Architektur- und Strukturprüfung am HEAD `f8a3bbb24`)
+
+Die Entscheidungen D-88 bis D-92 sind Revisionsentscheidungen dieser Fassung; sie lösen die Befunde F-26 bis F-31 und sind vom Eigentümer der Spezifikation zu bestätigen (Anhang H). Sie ändern kein Datenformat und keine Löschsemantik.
+
+|ID|Entscheidung|Begründung|Test / Beleg|
+|---|---|---|---|
+|**D-88**|**Matrixkorrektur (5.3).** (1) `engine→sys` ist erlaubt, **ausschließlich** für die Prozesshärtung (D-63); alle anderen `sys`-Aufrufe laufen über `durable-fs` oder `store`. (2) `vector` hängt **weder an `sys` noch an `mvcc`**: `mlock`/`madvise` der Arena über einen Port aus `ports`, implementiert in `engine`; Sichtbarkeit und Snapshot-Widerruf (D-61) bleiben in `engine`/`erasure`, nie im Index. (3) `text→crypto` ist ausdrücklich erlaubt (verschlüsselte Segmente, D-85). (4) `contextra` (Ring 4) erhält eine Matrixzeile: `engine`, `durable-fs`, `types`. (5) `ports` re-exportiert `types` nicht per Glob (AR-10).|F-27. Eine Kante ohne Matrixeintrag ist nicht prüfbar (AR-1); `vector→mvcc` würde dem Index Snapshot-Typen geben, während `erasure` (AR-3) keine Ring-2-Crates kennen darf.|T-ARCH-3, T-ARCH-6|
+|**D-89**|**Schnitt der Fassade.** Paketname `contextra` bleibt (D-66). Das Crate enthält **keine Logik** und nur drei Module: `api` (Handles `Contextra`, `Tenant`, `Collection` als Re-Exporte aus `engine`), `wiring` (`system_defaults()`: `RealVfs`, Systemuhr, OS-CSPRNG, Verdrahtung von `FileVault`/`FileKeyring`), `error`. `EngineBuilder` (5.7) liegt in `engine`; die Fassade stellt nur `Contextra::builder()` bereit. **Entfallen:** `query_rewriter`, `collection_profile`, `performance_profile`, `EncryptionMode` (samt `Unencrypted`), Lizenz- und Embedder-Bezüge, Re-Exporte von `DocId`, `chunker`, `TextEmbeddingEngine`, `DriftStatusProvider`, `rank`. Erste Zeile von `README.md` und `//!`: „Öffentliche API und Verdrahtung. Enthält keine Logik.“|F-26. Eine Fassade, die Profile, Rewriter und Builder-Politik enthält, ist eine zweite Engine.|T-API-1, T-ARCH-3, T-ARCH-7|
+|**D-90**|**Namensregeln.** (1) Kein Modul, keine Datei und kein Crate heißt `misc`, `util`, `utils`, `common`, `helpers` oder endet auf `_impl`. (2) Kein Modul trägt den Namen seines Crates (`types::types` → `domain`, `error`, `erasure`, `tags`). (3) **Eine** Modulform: `foo.rs` neben `foo/`, kein `mod.rs`. (4) Keine Paketaliase (`contextra-index` entfällt). (5) `engine/src/contextra_impl` heißt `instance`; `wiring.rs` (27 Zeilen) geht in die Fassade (D-89). (6) Bestehende Verstöße sind per Ratchet nur sinkend (5.8).|F-30. Namen sind die erste Dokumentation; ein Name ohne Aussage kostet bei jedem Lesen.|T-ARCH-7|
+|**D-91**|**Crate-Kopf und Ringangabe.** Jedes Crate hat in `lib.rs` einen `//!`-Kopf mit Zweck (ein Satz), Ring, erlaubten Abhängigkeiten und Verweis auf den SPEC-Abschnitt. Ringangabe und Abhängigkeiten werden von `tests/arch` gegen 5.1 und 5.3 geprüft, nicht von Hand gepflegt. Verboten in Quelltext und Doku: Zeitstempel („STAND“), Sitzungs- und Agentenkennungen, `ANCHOR[...]`-Marken, absolute Entwicklerpfade.|F-28, F-30. Handgepflegte Angaben veralten ohne Test.|T-ARCH-5, T-LINT-4|
+|**D-92**|**Folgedokumente und Werkzeugverläufe.** Die in Anhang E genannten, nicht normativen Dokumente werden **gelöscht**, nicht gekürzt, sobald ihr Inhalt in dieser Datei steht. An ihre Stelle tritt **eine** `AGENTS.md` im Wurzelverzeichnis (höchstens eine Seite, verweist auf `docs/SPEC.md`); `crates/*/AGENTS.md` entfallen. Agenten- und Werkzeugverzeichnisse (`.agents/`, `.gemini/`, `.antigravity/`), `reports/` und `evidence/` gehören nicht in den Quellbaum; Evidenz liegt als Release-Artefakt (11.7, 17.1).|Anhang E nannte „angleichen“; Angleichen erzeugt weiter zwei Wahrheiten. KI-Werkzeuge lesen jede Datei im Baum.|T-TRACE-1, T-ARCH-8|
 
 ---
 
@@ -298,10 +316,10 @@ Jede Entscheidung nennt Begründung und belegenden Test. **Fett** gesetzte IDs w
 |Crate|Ring|Rolle|Ist am HEAD|
 |---|---|---|---|
 |`contextra-types`|0|Reine Typen (IDs, Tags, Schlüssel, Fehler, Löschtypen, typisierter Zeuge). Kein I/O, kein `async`.|vorhanden; enthält Altlasten (`DocId`, `saos`, `tombstone`, `AutoExtractionMode`); `erasure.rs` ist nicht das Soll|
-|`contextra-ports`|0|Traits: `StorageEngine`, `TextIndex`, `VectorIndex` (statisch dispatcht, D-03), `Vfs`, `Clock`, `Rng`, `IdGen`, `ErasureLayer`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink`, `Metrics`.|vorhanden; Altports `graph`, `checkpoint`, `license`, `attention`, `plugin` bereits entfernt (`c2a864d`); `embedding`, `reranker`, `query_rewriter` noch zu entfernen; `Vfs` liegt in `ports`, das zweite Trait in `durable-fs` fehlt noch zu entfernen; Löschports fehlen|
+|`contextra-ports`|0|Traits: `StorageEngine`, `TextIndex`, `VectorIndex` (statisch dispatcht, D-03), `Vfs`, `Clock`, `Rng`, `IdGen`, `ErasureLayer`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink`, `Metrics`.|vorhanden; Altports `graph`, `checkpoint`, `license`, `attention`, `plugin` bereits entfernt (`c2a864d`); `embedding`, `reranker`, `query_rewriter` noch zu entfernen; `Vfs` nur noch in `ports` (F-29); Glob-Re-Export `pub use contextra_types::*` zu entfernen (D-88); Löschports fehlen|
 |`contextra-sys`|1|`unsafe`-Insel: `fsync`, `flush_dir`, `rename_durable`, `mlock`, Prozesshärtung, Dateirechte (POSIX).|vorhanden, 30/30 Lib-Tests [M]; Windows-Code (`acl_win32.rs`) ist zu entfernen (D-84)|
 |`contextra-simd`|1|`unsafe`-Insel: f32-Distanzkernel mit Skalar-Referenz.|vorhanden, 13/13 Lib-Tests [M]; u8-VNNI-Pfad zu entfernen|
-|`contextra-durable-fs`|1|`Vfs`-Implementierung (`RealVfs`), atomarer Austausch, optionales `scrub` (D-83), Startprobe.|vorhanden (1.593 Zeilen), eigenes `Vfs`-Trait (zu entfernen)|
+|`contextra-durable-fs`|1|`Vfs`-Implementierung (`RealVfs`), atomarer Austausch, optionales `scrub` (D-83), Startprobe.|vorhanden; Doppel-`Vfs` behoben (F-29); Startprobe D-56 und `scrub` D-83 nicht nachgewiesen|
 |`contextra-crypto`|1|AES-256-GCM-SIV, Argon2id, HKDF, Keyslots, WAL-HMAC, Hash-Ketten, Ed25519, Tags.|vorhanden; 9 Test-/Bench-Ziele kompilieren nicht [M]; Untergrenze zu niedrig, keine Obergrenze (F-11)|
 |`contextra-mvcc`|2|Snapshots, SSI, Sequenzen.|vorhanden, 47/47 Lib-Tests [M]; Sentinel-Fehler (F-07)|
 |`contextra-store`|2|LSM-Tree (WAL, Memtable, SSTable, Manifest, Kompaktion, Purge-Primitive).|vorhanden (26.996 Zeilen, 124 Testdateien [M]); F-06, F-07, F-09, F-13, F-21|
@@ -309,8 +327,8 @@ Jede Entscheidung nennt Begründung und belegenden Test. **Fett** gesetzte IDs w
 |`contextra-vector`|2|HNSW, Arena, Snapshot.|vorhanden (13.624 Zeilen [M]); `std::fs`/`memmap2` 53 Treffer, unverschlüsselt, Feature-Altlasten (F-23)|
 |`contextra-rank`|2|RRF-Fusion.|vorhanden (3.440 Zeilen [M], Ziel deutlich kleiner)|
 |`contextra-erasure`|3|Löschkern: Saga, Gate, Journal, Tresor (`FileVault`), Messung, Berichtsbau, Ledger.|**leer** (nur README/AGENTS)|
-|`contextra-engine`|3|Orchestrierung: Collections, Suche, Transaktionen, Verdrahtung.|vorhanden (20.357 Zeilen [M]), **kompiliert nicht** [M]|
-|`contextra`|4|Fassade, einzige öffentliche Oberfläche.|vorhanden, hängt an Engine|
+|`contextra-engine`|3|Orchestrierung: `EngineBuilder`, Instanz (`instance`), Collections, Suche, Transaktionen, Verdrahtung. Keine Löschlogik, kein Chunker, keine Extraktion, kein Import/Export.|vorhanden (28.001 Zeilen [V], 20.357 [M]); **kompiliert nicht** [M]; Fremdmodule F-31; `contextra_impl` (F-30)|
+|`contextra`|4|Fassade, einzige öffentliche Oberfläche; **keine Logik**; Module `api`, `wiring`, `error` (D-89).|vorhanden (1.558 Zeilen), widerspricht §7 (F-26)|
 |`contextra-testkit`|dev|Fixtures, `FaultVfs`, `ReferenceModel`, `ManualClock`, In-Memory-Ports.|vorhanden (Graph-Reste seit `b1637a8` entfernt)|
 |`contextra-lab`|dev|Unabhängige Prüfinstanz (12.3), enthält das Scanner-Modul für `ctx-verify scan`.|**fehlt**|
 |`ctx-verify`|dev/bin|Eigenständiger Berichtsprüfer und Feldscanner (8.17).|**fehlt**|
@@ -340,6 +358,10 @@ dev     testkit  lab  ctx-verify  tests/arch
 |AR-7|Kein Netzwerk-Crate im Abhängigkeitsbaum der Produktionscrates (D-54).|T-ARCH-4|
 |AR-8|`unsafe` nur in `sys` und `simd`; alle anderen `#![forbid(unsafe_code)]`.|T-UNSAFE-1|
 |AR-9|Jedes `feature = "…"` im Quelltext ist in einem `[features]`-Abschnitt deklariert; kein `#[allow(unexpected_cfgs)]`; kein Feature schwächt ein Sicherheitsmerkmal (D-84).|T-CFG-1|
+|AR-10|`ports` re-exportiert Typen aus `types` nur einzeln und nur, wenn sie in Trait-Signaturen vorkommen; kein `pub use …::*`.|T-ARCH-6|
+|AR-11|Ringangabe und Abhängigkeiten im `//!`-Kopf jedes Crates entsprechen 5.1 und 5.3 (D-91).|T-ARCH-5|
+|AR-12|Die Fassade enthält keine Logik; Abhängigkeiten laut D-88 (4).|T-ARCH-7|
+|AR-13|Namens- und Modulregeln D-90; keine Agenten-/Zeitstempelmarken im Quelltext (D-91).|T-ARCH-7, T-LINT-4|
 
 ### 5.3 Abhängigkeitsmatrix (erlaubte Kanten)
 
@@ -356,9 +378,10 @@ dev     testkit  lab  ctx-verify  tests/arch
 |vector|✓|✓||✓||✓|||||||
 |rank|✓|✓|||||||||||
 |erasure|✓|✓||||✓|||||||
-|engine|✓|✓|||✓|✓|✓|✓|✓|✓|✓|✓|
+|contextra (Ring 4)|✓||||✓||||||||
+|engine|✓|✓|✓||✓|✓|✓|✓|✓|✓|✓|✓|
 
-`store` darf `Vfs` nur als Trait aus `ports` nutzen; die konkrete `RealVfs` wird in `engine`/`contextra` verdrahtet. `store`, `text` und `vector` erhalten Dateischlüssel ausschließlich über den Port `FileKeyring` (Implementierung `FileVault` in `erasure`, verdrahtet in `engine`). `contextra-sys` ist für `durable-fs` und `store` zulässig; `vector` benötigt `sys` nur über den Port-Wrapper in `engine`.
+`store` darf `Vfs` nur als Trait aus `ports` nutzen; die konkrete `RealVfs` wird in `engine`/`contextra` verdrahtet. `store`, `text` und `vector` erhalten Dateischlüssel ausschließlich über den Port `FileKeyring` (Implementierung `FileVault` in `erasure`, verdrahtet in `engine`). `contextra-sys` ist für `durable-fs`, `store` und (nur Prozesshärtung) `engine` zulässig; `vector` benötigt `sys` nur über den Port-Wrapper in `engine`. **Ergänzung 4.1.0 (D-88):** `engine` darf `sys` nur für die Prozesshärtung (D-63) nutzen; `vector` nutzt weder `sys` noch `mvcc` (Arena-Sperren über einen Port aus `ports`, implementiert in `engine`). Die Zeile `contextra` gilt zusätzlich zur Kante auf `engine` (die Matrix hat keine Engine-Spalte): Fassade → `engine`, `durable-fs`, `types`. `text` darf `crypto` nutzen.
 
 ### 5.4 Laufzeitmodell
 
@@ -692,9 +715,9 @@ trait FileKeyring: Send + Sync {          // D-85
 
 **8.12 `erasure`** – Löschkern (11): Saga-Treiber, `ErasedSet`/Gate-Log, Journal, Tresor-Protokoll (`FileVault`, `RecordSealer`, `FileKeyring`), Messung (`Scanner<Armed>`), Berichtsbau, Ledger, Restore-Guard. Hängt nur an `types`, `ports`, `crypto` (AR-3).
 
-**8.13 `engine`** – Verdrahtung: `TenantScopedStorage`, Collections, Transaktionen, Suche, Hintergrundtasks, Startsequenz (14.1). Enthält keine Löschlogik.
+**8.13 `engine`** – `EngineBuilder`, Instanz (Modul `instance`, D-90), Verdrahtung: `TenantScopedStorage`, Collections, Transaktionen, Suche, Hintergrundtasks, Startsequenz (14.1). Enthält keine Löschlogik.
 
-**8.14 `contextra`** – Fassade, `system_defaults()`, Re-Exports, Doc-Tests.
+**8.14 `contextra`** – Fassade ohne Logik (D-89): Module `api`, `wiring` (`system_defaults()`), `error`; Re-Exports, Doc-Tests. Abhängigkeiten: `engine`, `durable-fs`, `types` (D-88).
 
 **8.15 `testkit`** – `FaultVfs` (Fehler-/Crashinjektion je `fsync`, Write, Rename), `ReferenceModel` (naives In-Memory-Orakel), `ManualClock`, deterministischer `Rng`, In-Memory-Ports.
 
@@ -1142,7 +1165,7 @@ Bare-Metal-Linux (x86_64, ≥ 8 Kerne, 32 GiB RAM), ext4 auf NVMe (`fsync_p50` �
 ||T-VEC-ARENA-1|Alle Repräsentationen je Slot zusammenhängend und überschrieben|
 ||T-HYB-1, T-SEARCH-2|Nachladen bis `k` oder Erschöpfung; `exhausted` korrekt; nie stilles Verkürzen|
 ||T-RANK-1|RRF deterministisch|
-|Architektur|T-ARCH-1..4|Ringe, Matrix, Verbote, Netzwerkbann|
+|Architektur|T-ARCH-1..8|Ringe, Matrix, Verbote, Netzwerkbann; **neu:** T-ARCH-5 Ringangabe/Abhängigkeiten im Crate-Kopf gegen 5.1/5.3; T-ARCH-6 Matrix aus `cargo metadata`, kein Glob-Re-Export in `ports`; T-ARCH-7 Fassade ohne Logik, Namens- und Modulregeln (D-90); T-ARCH-8 keine Agenten-/Werkzeugverzeichnisse und keine nicht normativen Dokumente im Baum (D-92)|
 ||T-CFG-1/2/3|Keine Sicherheitsfeatures/Schalter; `testing` nie im Release; `batch_window ≤ erase_sla/2`|
 ||T-DEF-1|Keine Konfiguration ohne Verschlüsselung/Integrität|
 ||T-UNSAFE-1|`unsafe` nur `sys`/`simd`, Safe-Funktionen ohne offene Vorbedingung|
@@ -1217,6 +1240,7 @@ Aufwände sind Schätzungen **[E]** in Personenwochen (PW) für ein Team mit zwe
 |WP-1.2|Branch `archive/v0-full` (D-22); Rückbauliste D-84 (Features, `acl_win32.rs`, `WasmMergeOperator`)|Feature-Skript grün (AR-9)|G-B|3|
 |WP-1.3|Tokio-Features (D-54), `deny.toml` aktualisieren (Bans, Advisories mit Ablaufdatum, tote `clarify`/`wrappers`)|`cargo tree -e normal` ohne `mio`/`socket2`|G-B|1|
 |WP-1.4|Ein `Vfs`: `durable-fs` auf `ports::Vfs`; `store`/`vector` ohne `std::fs` (F-13)|T-LINT-2 grün|G-B|4|
+|WP-1.5|Struktur und Namen: Fassade nach D-89 schneiden, `contextra_impl`→`instance`, Modul-/Namensregeln D-90, Crate-Köpfe D-91, Matrixkorrektur D-88 im Code, `tests/arch` T-ARCH-5..8, Folgedokumente und Werkzeugverläufe nach D-92 entfernen|T-ARCH-5..8 grün (Ratchet für Altbestand)|G-B|3|
 |WP-2.1|`contextra-engine` und Tests wieder kompilierbar (F-01, F-02), `fmt` (F-03)|`check --all-targets --locked` grün|G-A|6|
 |WP-3.1|`types`: `DocRef`, `DocHandle`, Tags mit Längenpräfix, Löschtypen, `KeyCoverage`, `DocId` entfernt|T-KEY-1, T-DOCREF-1|G0|2|
 |WP-3.2|`crypto`: D-06 Grenzen, D-52 Slot-AAD, D-60 Nonce-Schema, D-80 Algorithmenliste, `K_sign` abgeleitet|T-KDF-*, T-KEYSLOT-*, T-NONCE-1|G-F|3|
@@ -1236,7 +1260,7 @@ Aufwände sind Schätzungen **[E]** in Personenwochen (PW) für ein Team mit zwe
 |WP-9.1|Doku: README (HR-3, 6.4), Rustdoc, `docs/OPERATIONS.md`, `docs/DSFA-BAUSTEIN.md` (Anhang G), Runbooks, `SECURITY.md`|T-LINT-1, T-LEIST-*|G-H|4|
 |WP-9.2|Release: signierte Artefakte, SBOM, Evidenzbündel, Fuzz-/Mutationsläufe, G-LEGAL-Stand|alle Gates|G-H|3|
 
-Kritischer Pfad: WP-1.x → WP-2.1 → WP-3.1..3.4 (G0) → WP-4.x → G-D. Summe ≈ 120 PW [E]; bei drei Entwicklern ca. 40 Wochen bis G-H. Bei Cut-Linie entfallen WP-8.x (≈ 14 PW) im ersten Release.
+Kritischer Pfad: WP-1.x → WP-2.1 → WP-3.1..3.4 (G0) → WP-4.x → G-D. Summe ≈ 123 PW [E] (4.1.0: +3 PW für WP-1.5); bei drei Entwicklern ca. 40 Wochen bis G-H. Bei Cut-Linie entfallen WP-8.x (≈ 14 PW) im ersten Release.
 
 ---
 
@@ -1382,10 +1406,10 @@ Konstanten: Tag 16 B, Salt 32 B, Nonce 12 B, Tresor-Slot 80 B, Segmentziel 8–3
 
 |Dokument|Änderung|
 |---|---|
-|`docs/SPEC.md`|ersetzt durch diese Fassung 4.0.0|
+|`docs/SPEC.md`|ersetzt durch diese Fassung 4.1.0|
 |`PLAN.md`|durch Verweis auf 15.4 ersetzen (kein eigenes Plandokument)|
 |`VETOES.md`|VETO-D01 aufheben, VETO-D01b einführen (Schlüsselvernichtung in v1)|
-|`CONSTITUTION.md`, `ARCHITECTURE.md`, `SOURCE_OF_TRUTH.md`, `AGENTS.md`, `crates/*/AGENTS.md`|„keine Ebene B in v1“ streichen; Verweis auf SPEC 4.0.0; Crate-Anweisungen an 5.1 angleichen|
+|`CONSTITUTION.md`, `ARCHITECTURE.md`, `SOURCE_OF_TRUTH.md`, `AGENTS.md`, `crates/*/AGENTS.md`|„keine Ebene B in v1“ streichen; Verweis auf SPEC 4.1.0; **ab 4.1.0 löschen statt angleichen (D-92):** eine Wurzel-`AGENTS.md`, keine `crates/*/AGENTS.md`|
 |`SECURITY.md`|CRA-Meldeweg, Fristen, Support-Zeitraum (D-67)|
 |`docs/DELETION-DSGVO.md`|an E-L1..E-L16 angleichen; Wortlaut-Lint|
 |`docs/FORMATS.md` (falls vorhanden)|löschen; Formate stehen in Anhang F|
@@ -1541,6 +1565,28 @@ Kanonisierung: UTF-8 NFC, Objektschlüssel aufsteigend sortiert, keine Leerzeich
 
 ---
 
+## Anhang H – Änderungen 4.1.0 (Architektur- und Strukturprüfung)
+
+Prüfgrundlage: HEAD `f8a3bbb24`, statisch **[V]**, ohne Build. **Nicht geändert:** Datenformate (Anhang F), Löschsemantik (11), Schlüsselhierarchie (10), Rechtsrahmen (6). **Vom Eigentümer zu bestätigen:** D-88 bis D-92 (Revisionsentscheidungen).
+
+|Befund|Kern der Änderung|Neu/geändert|
+|---|---|---|
+|A-01 Fassade widerspricht §7|Schnitt `api`/`wiring`/`error`, Entfallliste, Builder nach `engine`|F-26, D-89, 8.14, WP-1.5|
+|A-02 Matrix lückenhaft und im Code verletzt|`engine→sys` nur Prozesshärtung; `vector` ohne `sys`/`mvcc`; `text→crypto`; Zeile für `contextra`; kein Glob-Re-Export|F-27, D-88, AR-10, 5.3|
+|A-03 Ringangaben handgepflegt und falsch|Kopf-Pflicht, Prüfung gegen 5.1/5.3|F-28, D-91, AR-11, T-ARCH-5|
+|A-04 Befunde F-07/F-13 überholt|Korrektur mit Commit-Bezug; Sentinel in `mvcc/snapshot.rs:314`|F-29|
+|A-05 Namen ohne Aussage, gemischte Modulform|Namensregeln, `instance`, kein Alias|F-30, D-90, AR-13, T-ARCH-7|
+|A-06 Umfang gegenüber Soll nicht beziffert|Zählungen je Rückbaumodul und Restmuster|F-31, D-84 (Ergänzung)|
+|A-07 P5 ohne namentliche Ausnahmen|Ausnahmeliste: `process_hardening`, Feature `testing`|P5|
+|A-08 Doppelte Wahrheit durch Folgedokumente|Löschen statt Angleichen; eine `AGENTS.md`; Verläufe nicht im Baum|D-92, Anhang E, T-ARCH-8|
+|A-09 Aufwand|WP-1.5 (+3 PW)|15.4|
+
+Unverändert aus 4.0.0: R-01 bis R-17 (nachfolgender Abschnitt „Änderungen gegenüber 3.0.0“) bleiben gültig.
+
+**Ende der Spezifikation 4.1.0.**
+
+---
+
 ## Anhang H – Änderungen gegenüber 3.0.0 (Review-Abgleich)
 
 |Befund|Kern der Änderung|Neu/geändert|
@@ -1564,5 +1610,3 @@ Kanonisierung: UTF-8 NFC, Objektschlüssel aufsteigend sortiert, keine Leerzeich
 |R-17 Betrieb und Leistung|Kapazitätsgrenzen, Benchmarks, Gesundheit|D-83, D-87, 14, 15.2|
 
 Danach neu gegenüber der Review: Dateischlüssel-Vernichtung (D-85), Textbindung unter DEK (9.7), Fallbackleiter mit Stufen (11.9), Rückverfolgbarkeits-Test T-TRACE-1 (15.1), Umsetzungsplan (15.4), Byte-Formate (Anhang F).
-
-**Ende der Spezifikation 4.0.0.**

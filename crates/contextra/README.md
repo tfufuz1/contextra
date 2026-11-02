@@ -11,7 +11,7 @@ Haupt-Bibliotheksfassade und einzige Composition Root von Contextra.
 - `ContextraBuilder` / `builder`: Konfiguriert und öffnet die Datenbank (`build().await?`).
   - Erzwingt Passphrase für Speicherverschlüsselung (Pflicht gemäß D-05).
   - Stellt System-Defaults und den CSPRNG-Adapter `OsRngAdapter` bereit.
-- `Collection`: Dokumentenverwaltung (`insert`, `get`, `scan`, `delete`).
+- `Collection`: Dokumentenverwaltung (`insert`, `get`, `scan`, `soft_delete` (D-51)).
 - Schnittstellen zur physischen Datenlöschung und Nachweisverifikation über die Kern-Module.
 
 ## Invarianten

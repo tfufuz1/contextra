@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra` (Fassade)
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.14](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.14](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra` ist die einzige öffentliche Fassade und Composition Root von Contextra. Sie re-exportiert ausschließlich die autorisierte öffentliche API (SPEC §7) für Endanwender und kapselt die Assemblierung der internen Ringe 0 bis 3.

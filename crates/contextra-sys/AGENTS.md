@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-sys`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.3](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.3](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-sys` ist eine der genau zwei zugelassenen `unsafe`-Inseln (D-29) im Gesamtsystem. Es kapselt plattformspezifische Systemprimitive (I/O-Synchronisation, Dateisystem-Dauerhaftigkeit, Speicher-Locking und Berechtigungen) hinter sicheren Rust-Schnittstellen.
@@ -25,7 +25,7 @@
 1. **Kein verschlucktes `fsync`:** Rückgabewerte von OS-Sync-Befehlen werden niemals mit `let _ =` verworfen, sondern als `io::Result<()>` propagiert.
 2. **Fail-Closed bei Nicht-POSIX:** Plattformen ohne Unterstützung verweigern die Arbeit kontrolliert mit typisiertem Fehler.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-1.2: Wire- und IPC-Reste entfernen**
   - Vollständiges Entfernen aller historischen `contextra-wire`-Primitiven aus `contextra-sys`.

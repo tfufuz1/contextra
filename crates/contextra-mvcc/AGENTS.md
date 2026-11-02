@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-mvcc`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.7](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.7](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-mvcc` stellt deterministische Multi-Version Concurrency Control (monotone Sequenzverwaltung, Snapshot-Registry, Write-Skew-Erkennung via Serializable Snapshot Isolation / SSI und Snapshot-Widerruf bei Löschungen) bereit.
@@ -32,7 +32,7 @@
    - Jede Folgeoperation auf einem widerrufenen Snapshot scheitert fail-closed mit `ContextraError::SnapshotRevoked`.
 3. **Kein Deadlock:** Registry-Operationen sind lock-frei oder verwenden kurzlebige `parking_lot`-Mutexes ohne I/O.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-2.1: Snapshot-Sentinel reparieren (D-C02)**
   - Bereinigung von `ssi.rs` (Z. 640–652): Fehler statt stiller Maskierung, Monotonie absichern.

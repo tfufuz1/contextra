@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-text`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.11](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.11](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-text` stellt eine segmentbasierte Volltextsuchmaschine mit BM25-Scoring und Block-Max-WAND bereit. Es implementiert ein unveränderliches, AEAD-verschlüsseltes Segment-Format (SPEC §9.7), das bei Löschungen durch Rewrite und Swap physisch bereinigt wird.
@@ -40,7 +40,7 @@
    - Betroffene Segmente werden gestreamt und ohne das Zieldokument neu geschrieben.
    - Das alte Segment wird nach Manifest-Aktualisierung gelöscht und das Fehlen via `Vfs::exists` verifiziert.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-1.2: Veraltete Morphologie- und NLP-Module entfernen**
   - Rückbau von `morphology`, `domain` und historischem Sprachmodellcode.
@@ -53,5 +53,5 @@
 ## 6. Verifikation & Benchmarks
 - **T-TEXT-1:** Validierung des BM25-Rankings gegen eine mathematische Referenz.
 - **T-TEXT-2:** Beweis, dass Block-Max WAND exakt dieselben Treffer wie exhaustives BM25 liefert.
-- **T-TEXT-3:** Löschprüfung: Segment-Rewrite, Rohscan (E1/E2) findet keine Spuren, Term-Statistik bleibt mathematisch konsistent.
+- **T-TEXT-3:** Löschprüfung: Segment-Rewrite, Rohscan (MK1/MK2) findet keine Spuren, Term-Statistik bleibt mathematisch konsistent.
 - **Benchmarks:** B-TEXT-BUILD, B-TEXT-QUERY, B-TEXT-ERASE.

@@ -1,6 +1,6 @@
 # AGENTS.md — `contextra-vector`
 
-> **Normative Vorgabe gemäß [docs/SPEC.md §8.10](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md)**
+> **Normative Vorgabe gemäß [docs/SPEC.md §8.10](docs/SPEC.md) und SPEC §15.4**
 
 ## 1. Rolle & Zweck
 `contextra-vector` stellt die HNSW-Vektorsuche für dichte Einbettungen (f32) bereit. Es garantiert vollständige physische Löschbarkeit über Slot-Zeroing im Speicher, verschlüsselte Snapshot-Chunks auf Festplatte und periodischen Batch-Rebuild.
@@ -37,7 +37,7 @@
 2. **Keine Tombstones in Ergebnissen:** Vektorsuchen filtern Tombstone-Slots strikt heraus.
 3. **Persistenz-Verschlüsselung:** Vektordaten werden auf dem Datenträger ausnahmslos als AEAD-verschlüsselte Chunk-Snapshots abgelegt.
 
-## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
+## 5. Crate-Arbeitspakete zum SOLL-Zustand (SPEC §15.4)
 
 - **[ ] WP-1.2: Workspace-Bereinigung & Entfernen toter Module**
   - Rückbau von `diskann`, `acorn`, `quantize` und Hilfspools.
