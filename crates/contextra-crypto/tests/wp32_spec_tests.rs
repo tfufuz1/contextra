@@ -324,3 +324,33 @@ fn test_cr13_cr14_header_encoding_and_validation_t_hdr_1_t_fmt_1() {
         CryptoError::Corrupt
     );
 }
+
+#[test]
+fn test_t_kdf_1_min_m_kib_rejects_old_buggy_value_19456() {
+    // T-KDF-1: Regression für F-11: Alter Wert MIN_M_COST_KIB = 19456 muss abgelehnt werden.
+    // SPEC D-06 mandatiert m ∈ [65536, 4194304] KiB (= [64 MiB, 4 GiB]).
+    // Der alte Wert MIN_M_COST_KIB = 19456 (≈ 19 MiB) unterschritt das Minimum
+    // und durfte keine gültigen KdfParams erzeugen.
+
+    // Alter Buggy-Wert 19456 muss abgelehnt werden
+    assert_eq!(
+        KdfParams::from_header(19456, 3, 4),
+        Err(CryptoError::Corrupt),
+        "T-KDF-1: from_header(19456) muss Corrupt zurückgeben (< 65536 KiB)"
+    );
+    assert_eq!(
+        KdfParams::from_config(19456, 3, 4),
+        Err(CryptoError::Config),
+        "T-KDF-1: from_config(19456) muss Config zurückgeben (< 65536 KiB)"
+    );
+
+    // SPEC-Minimum 65536 KiB (64 MiB) muss akzeptiert werden
+    assert!(
+        KdfParams::from_header(65536, 3, 4).is_ok(),
+        "T-KDF-1: from_header(65536) muss Ok zurückgeben (SPEC-Minimum)"
+    );
+    assert!(
+        KdfParams::from_config(65536, 3, 4).is_ok(),
+        "T-KDF-1: from_config(65536) muss Ok zurückgeben (SPEC-Minimum)"
+    );
+}

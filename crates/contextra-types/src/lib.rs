@@ -8,6 +8,8 @@
 //! - Ring: 0
 //! - Erlaubte Workspace-Abhängigkeiten: keine.
 //! - Keine asynchronen Laufzeiten, kein I/O, kein `unsafe`.
+//! - Wird eingebunden von: `contextra-engine`, `contextra`, `contextra-crypto`, `contextra-mvcc`,
+//!   `contextra-store`, `contextra-text`, `contextra-vector`, `contextra-rank`, `contextra-ports`.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
