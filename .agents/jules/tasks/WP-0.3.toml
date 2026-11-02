@@ -77,6 +77,11 @@ evidence_required = [
 #   (vollständiges Einlesen über ports::Vfs). Eine Übergangslösung mit unsafe ist verboten
 #   (HR-12, AR-8, Crates mit forbid(unsafe_code)). Der höhere Speicherbedarf ist im PR zu
 #   nennen. Der Rest der Speicherabbildung (D-94) wird in WP-1.4 geprüft.
+#
+# Status contextra-sys (Phase A2):
+#   Die Entfernung von mmap.rs/memmap2 in contextra-sys bleibt blocked, solange
+#   Konsumenten in contextra-store (wal/replay.rs) und contextra-vector (diskann/persistence.rs)
+#   noch nicht auf Vfs umgestellt sind.
 
 [budget]
 files      = 15

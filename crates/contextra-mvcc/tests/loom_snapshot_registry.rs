@@ -28,7 +28,7 @@ mod loom_tests {
         fn new() -> Self {
             Self {
                 active: Mutex::new(BTreeMap::new()),
-                min_active_seqno: AtomicU64::new(u64::MAX),
+                min_active_seqno: AtomicU64::new(0),
             }
         }
 
@@ -49,12 +49,17 @@ mod loom_tests {
             self.update_min(&active);
         }
 
+        fn min_read_snapshot(&self) -> Option<u64> {
+            let active = self.active.lock().unwrap();
+            active.keys().next().copied()
+        }
+
         fn min_active_seqno(&self) -> u64 {
             self.min_active_seqno.load(Ordering::Acquire)
         }
 
         fn update_min(&self, active: &BTreeMap<u64, usize>) {
-            let min = active.keys().next().copied().unwrap_or(u64::MAX);
+            let min = active.keys().next().copied().unwrap_or(0);
             self.min_active_seqno.store(min, Ordering::Release);
         }
     }
@@ -85,7 +90,8 @@ mod loom_tests {
             t1.join().unwrap();
             t2.join().unwrap();
 
-            assert_eq!(registry.min_active_seqno(), u64::MAX);
+            assert_eq!(registry.min_read_snapshot(), None);
+            assert_eq!(registry.min_active_seqno(), 0);
         });
     }
 
@@ -115,7 +121,8 @@ mod loom_tests {
             t1.join().unwrap();
             t2.join().unwrap();
 
-            assert_eq!(registry.min_active_seqno(), u64::MAX);
+            assert_eq!(registry.min_read_snapshot(), None);
+            assert_eq!(registry.min_active_seqno(), 0);
         });
     }
 
@@ -190,6 +197,7 @@ mod normal_tests {
             h.join().expect("thread panicked"); // #[cfg(test)] // expect
         }
 
-        assert_eq!(registry.min_active_seqno(), u64::MAX);
+        assert_eq!(registry.min_read_snapshot(), None);
+        assert_eq!(registry.min_active_seqno(), 0);
     }
 }

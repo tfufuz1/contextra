@@ -5,13 +5,7 @@
 
 #![allow(unsafe_code)]
 
-#[path = "../src/perm.rs"]
-mod perm;
-
-#[path = "../src/hardening.rs"]
-mod hardening;
-
-use hardening::{
+use contextra_sys::{
     apply_process_hardening, ensure_fd_limit, lock_pages, mark_dont_dump, set_fd_limit,
     HardeningPolicy, SysError,
 };
@@ -21,7 +15,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 static PROBE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn compile_and_get_probe_bin() -> Option<std::path::PathBuf> {
-    let probe_src = "crates/contextra-sys/tests/support/child_probe.rs";
+    let root =
+        if std::path::Path::new("Cargo.toml").exists() && std::path::Path::new("crates").exists() {
+            std::path::PathBuf::from(".")
+        } else {
+            std::path::PathBuf::from("../..")
+        };
+    let probe_src = root.join("crates/contextra-sys/tests/support/child_probe.rs");
     let count = PROBE_COUNTER.fetch_add(1, Ordering::SeqCst);
     let probe_bin = std::path::PathBuf::from(format!(
         "/tmp/child_probe_bin_{}_{}",
@@ -29,14 +29,23 @@ fn compile_and_get_probe_bin() -> Option<std::path::PathBuf> {
         count
     ));
 
-    let deps_dir = std::path::Path::new("target/debug/deps");
-    let libc_rlib = std::fs::read_dir(deps_dir)
+    let deps_dir = root.join("target/debug/deps");
+    let libc_rlib = std::fs::read_dir(&deps_dir)
         .ok()?
         .filter_map(|e| e.ok())
         .find(|e| {
             let name = e.file_name();
             let s = name.to_string_lossy();
-            s.starts_with("liblibc") && s.ends_with(".rlib")
+            s.starts_with("liblibc-") && s.ends_with(".rlib")
+        })?;
+
+    let sys_rlib = std::fs::read_dir(&deps_dir)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .find(|e| {
+            let name = e.file_name();
+            let s = name.to_string_lossy();
+            s.starts_with("libcontextra_sys-") && s.ends_with(".rlib")
         })?;
 
     let rustc_sysroot = Command::new("rustc")
@@ -51,18 +60,31 @@ fn compile_and_get_probe_bin() -> Option<std::path::PathBuf> {
 
     let mut cmd = Command::new("rustc");
     cmd.arg(probe_src)
+        .arg("--edition=2021")
         .arg("-L")
         .arg(format!("dependency={}", deps_dir.display()))
         .arg("--extern")
         .arg(format!("libc={}", libc_rlib.path().display()))
+        .arg("--extern")
+        .arg(format!("contextra_sys={}", sys_rlib.path().display()))
         .arg(&rpath_arg)
         .arg("-o")
         .arg(&probe_bin);
 
-    let output = cmd.output().ok()?;
+    let output = match cmd.output() {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("failed to execute rustc for child_probe: {e}");
+            return None;
+        }
+    };
     if output.status.success() {
         Some(probe_bin)
     } else {
+        eprintln!(
+            "compile child_probe stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         None
     }
 }
@@ -176,8 +198,11 @@ fn t_unsafe_1_no_public_raw_address_export() {
 
 #[test]
 fn sy_10_no_panics_and_fixed_error_messages() {
-    let err = SysError::HardeningFailed("hardening operation failed");
-    assert_eq!(err.to_string(), "hardening operation failed");
+    let err = SysError::HardeningIncomplete;
+    assert_eq!(
+        err.to_string(),
+        "Process hardening incomplete for required policy"
+    );
     assert!(!err.to_string().contains('/'));
     assert!(!err.to_string().contains('\\'));
 }

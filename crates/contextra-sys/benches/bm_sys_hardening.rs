@@ -3,17 +3,13 @@
 // ZWECK: Benchmarks BM-SYS-LOCK-PAGES and BM-SYS-APPLY-HARDENING for contextra-sys
 // INVARIANTEN: Deterministic seed, writes JSON report to target/bench-report/contextra-sys.json
 
+#![allow(clippy::disallowed_methods)]
+
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
 
-#[path = "../src/perm.rs"]
-mod perm;
-
-#[path = "../src/hardening.rs"]
-mod hardening;
-
-use hardening::{apply_process_hardening, lock_pages, HardeningPolicy};
+use contextra_sys::{apply_process_hardening, lock_pages, HardeningPolicy};
 
 fn calculate_percentiles(mut samples_ns: Vec<f64>) -> (f64, f64, f64) {
     samples_ns.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
