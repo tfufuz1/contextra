@@ -1,0 +1,44 @@
+# Aufgabenkarte WP-3.3-mvcc – Sentinel-Rückbau und Mandanten-Registry in contextra-mvcc
+# Quelle: SPEC 15.4 (WP-3.3), 07-contextra-mvcc.md, Befunde MV-01..MV-10, F-07, F-29, D-61.
+
+id          = "WP-3.3-mvcc"
+title       = "contextra-mvcc: Sentinel-Rückbau, Mandanten-Registry, fail-closed Widerruf und Loom-Verifikation"
+wp          = "WP-3.3"
+gate        = "G-C"
+crate       = "contextra-mvcc"
+goal        = "Vollständige Eliminierung von Sentinel u64::MAX als Standard-/Sichtbarkeitswert. min_read_snapshot liefert Option<Seq>. Mandanten-Registry mit revoke_covering und SnapshotHandle::seq() prüft Widerruf sofort. Alle Loom- und Property-Tests grün."
+
+non_goals = [
+  "Keine Änderungen an contextra-store oder contextra-engine (Verbraucher-Anpassungen erfolgen in deren jeweiligen Sitzungen).",
+  "Keine Änderungen an contextra-types oder contextra-ports.",
+]
+
+scope = [
+  "crates/contextra-mvcc/src/**",
+  "crates/contextra-mvcc/tests/**",
+  ".agents/jules/tasks/WP-3.3-mvcc.toml",
+  ".agents/jules/tasks/BACKLOG.md",
+]
+
+forbidden = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
+]
+
+spec_ids = ["MV-01", "MV-02", "MV-03", "MV-04", "MV-05", "MV-06", "MV-07", "MV-08", "MV-09", "MV-10", "F-07", "F-29", "D-61", "D-87", "I-12", "I-20"]
+
+acceptance = [
+  "cargo test -p contextra-mvcc --locked",
+  "cargo clippy -p contextra-mvcc --all-targets -- -D warnings",
+  "RUSTFLAGS=\"--cfg loom\" cargo test -p contextra-mvcc --release --locked",
+  "Grep nach unwrap_or(u64::MAX) in crates/contextra-mvcc liefert 0 Treffer",
+]

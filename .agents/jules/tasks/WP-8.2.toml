@@ -1,0 +1,54 @@
+# Aufgabenkarte WP-8.2 – contextra-rank (RRF, Hybridsuche)
+# Nicht normativ. Quelle: SPEC 8.11, D-26, D-62, D-70, docs/specs/11-contextra-rank.md.
+
+id          = "WP-8.2"
+title       = "contextra-rank: Deterministische RRF-Fusion (Ring 2, Gate G/S3)"
+wp          = "WP-8.2"
+gate        = "G"
+crate       = "contextra-rank"
+goal        = "Kleinste mögliche Fusion, bit-genau deterministisch, ohne Gleitkomma (Festkomma floor(2^40 / (60 + rank))), kein Seitenkanal über gelöschte Dokumente, Reduktion auf ≤ 400 Zeilen src."
+
+non_goals = [
+  "Keine Gewichtung, Score-Normalisierung, Signalstrategien oder Resonanzboni.",
+  "Keine Provenienz- oder Erklärungstexte (explain entfällt).",
+  "Keine Durchreichung von Metadaten in der Fusion (I-11, HR-4).",
+]
+
+scope = [
+  "crates/contextra-rank/**",
+  ".agents/jules/tasks/WP-8.2.toml",
+]
+
+forbidden = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
+]
+
+spec_ids = ["8.11", "D-26", "D-62", "D-70", "D-87", "RK-01", "RK-02", "RK-03", "RK-04", "RK-05", "RK-06", "RK-07", "RK-08", "RK-09", "RK-10", "T-RANK-1"]
+
+acceptance = [
+  "cargo fmt --all -- --check",
+  "cargo test -p contextra-rank --locked",
+  "cargo clippy -p contextra-rank --all-targets -- -D warnings",
+  "cargo test -p contextra-arch-tests --locked",
+  "tokei / wc -l <= 400 Zeilen src",
+]
+
+evidence_required = [
+  "Rot-Nachweis für T-RANK-1, RK-03, RK-06, RK-07.",
+  "Grep: 0 Treffer für f32, f64, serde_json, unwrap(, expect(, panic!, unsafe, explain, drift, dibud.",
+  "Mikrobenchmark Fusionskosten bei 2 x 1000 Kandidaten.",
+]
+
+[budget]
+files      = 15
+lines      = 600
+iterations = 10

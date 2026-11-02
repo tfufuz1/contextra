@@ -12,9 +12,11 @@ members = [
     "crates/contextra-vector",
     "crates/contextra-text",
     "crates/contextra-rank",
+    "crates/contextra-erasure",
     "crates/contextra-engine",
     "crates/contextra",
     "crates/contextra-testkit",
+    "crates/ctx-verify",
     "tests/arch",
 ]
 default-members = [
@@ -29,6 +31,7 @@ default-members = [
     "crates/contextra-vector",
     "crates/contextra-text",
     "crates/contextra-rank",
+    "crates/contextra-erasure",
     "crates/contextra-engine",
     "crates/contextra",
     "crates/contextra-testkit",

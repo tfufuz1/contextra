@@ -44,7 +44,6 @@ crc32fast = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
-memmap2 = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 

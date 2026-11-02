@@ -1,3 +1,26 @@
+<<<<<<< HEAD
+# Aufgabenkarte WP-1.2 – Rückbauliste D-84 (Teil contextra-sys)
+# Nicht normativ. Quelle: SPEC 15.4 (WP-1.2), D-84, SY-04.
+
+id          = "WP-1.2"
+title       = "Rückbauliste D-84: Windows-Entfernung und Altlasten in contextra-sys"
+wp          = "WP-1.2"
+gate        = "B"
+crate       = "contextra-sys"
+goal        = "Kein Windows-Code (acl_win32.rs, cfg(windows)), vault.rs, reopen_and_dup2 in contextra-sys."
+
+non_goals = [
+  "Keine Änderungen außerhalb von contextra-sys.",
+  "Kein Rückbau von mmap.rs bevor Store und Vector umgestellt sind (WP-0.3 / WP-1.4).",
+]
+
+scope = [
+  "crates/contextra-sys/src/**",
+  "crates/contextra-sys/tests/**",
+]
+
+forbidden = [
+=======
 id          = "WP-1.2"
 title       = "contextra-crypto Bereinigung: Features, Altlasten und ungenutzte Abhängigkeiten"
 wp          = "WP-1.2"
@@ -9,6 +32,7 @@ non_goals   = ["Keine Änderungen an fremden Crates"]
 scope       = ["crates/contextra-crypto/**"]
 
 forbidden   = [
+>>>>>>> 536e68d9 (refactor(crypto): implement key hierarchy and primitive contracts (WP-1.2, WP-3.2, WP-4.1))
   "AGENTS.md",
   "docs/SPEC.md",
   "rust-toolchain.toml",
@@ -22,6 +46,23 @@ forbidden   = [
   ".agents/jules/setup/**",
 ]
 
+<<<<<<< HEAD
+spec_ids = ["D-84", "SY-04", "SY-02", "P8"]
+
+acceptance = [
+  "cargo test -p contextra-sys --locked",
+  "cargo clippy -p contextra-sys --all-targets -- -D warnings",
+]
+
+evidence_required = [
+  "Grep nach 'windows' und 'acl_win32' in crates/contextra-sys/src ergibt 0 Treffer.",
+]
+
+[budget]
+files      = 6
+lines      = 200
+iterations = 5
+=======
 spec_ids    = ["CR-01", "CR-15", "CR-16", "D-05", "D-53", "D-84", "P8"]
 
 acceptance  = [
@@ -35,3 +76,4 @@ evidence_required = ["Bereinigtes Cargo.toml, keine verbotenen Features, ring = 
 files      = 5
 lines      = 200
 iterations = 3
+>>>>>>> 536e68d9 (refactor(crypto): implement key hierarchy and primitive contracts (WP-1.2, WP-3.2, WP-4.1))

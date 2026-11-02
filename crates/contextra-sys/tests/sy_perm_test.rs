@@ -5,10 +5,7 @@
 
 #![allow(unsafe_code)]
 
-#[path = "../src/perm.rs"]
-mod perm;
-
-use perm::{set_mode, verify_owner_only, SysError};
+use contextra_sys::{set_mode, verify_owner_only, SysError};
 use std::fs::File;
 use std::io::Write;
 
@@ -61,16 +58,7 @@ fn sy_09_perm_reject_group_or_world_accessible() {
         std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o666)).unwrap();
         let res = verify_owner_only(&file_path);
         assert!(res.is_err());
-        match res.unwrap_err() {
-            SysError::PermissionDenied(msg) => {
-                assert!(
-                    !msg.contains('/'),
-                    "Error message must not contain file path: {}",
-                    msg
-                );
-            }
-            other => panic!("Unexpected error variant: {:?}", other),
-        }
+        assert_eq!(res.unwrap_err(), SysError::PermissionDenied);
 
         // 0o610: executable by group
         std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o610)).unwrap();
