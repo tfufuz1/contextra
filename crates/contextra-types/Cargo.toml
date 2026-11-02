@@ -20,7 +20,7 @@ auto-extraction-opt-out = []
 
 [dependencies]
 thiserror = { workspace = true }
-zeroize = "1.8"
+zeroize = { version = "1.8", features = ["zeroize_derive"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

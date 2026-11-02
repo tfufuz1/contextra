@@ -13,7 +13,7 @@
 
 mod config;
 mod expiry_workers;
-mod hyperedge_worker;
+
 mod orphan_workers;
 
 #[cfg(test)]
@@ -25,10 +25,6 @@ pub use config::{calculate_rebuild_cooldown, OrphanCleanupBackoffConfig, OrphanC
 pub use expiry_workers::{start_decay_cleanup_worker, start_thermostat_reaper};
 #[allow(deprecated)]
 pub use expiry_workers::{start_expiry_cleanup_worker, start_expiry_reaper, MAX_EXPIRED_PER_TICK};
-pub use hyperedge_worker::{
-    start_hyperedge_cascade_deferred_worker, DeferredHyperedgeQueue,
-    MAX_DEFERRED_HYPEREDGES_PER_TICK,
-};
 #[allow(deprecated)]
 pub use orphan_workers::{
     start_orphan_cleanup_worker, start_orphan_cleanup_worker_with_config, start_orphan_reaper,

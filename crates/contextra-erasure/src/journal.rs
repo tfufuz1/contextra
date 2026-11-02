@@ -1,6 +1,6 @@
 //! Journal für Saga-Zustände (SPEC §11.6, ER-29, F.9).
 
-use crate::saga::SagaState;
+pub use crate::saga::SagaState;
 use serde::{Deserialize, Serialize};
 
 /// Ein Eintrag im Löschjournal.
@@ -40,3 +40,4 @@ impl ErasureJournal {
         &self.entries
     }
 }
+

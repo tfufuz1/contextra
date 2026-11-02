@@ -413,7 +413,7 @@ async fn single_commit_path(
     };
 
     let single_append_res = match durability_mode {
-        DurabilityMode::Full | DurabilityMode::WalNoHmac => {
+        DurabilityMode::Full => {
             let truncate_guard = wal.truncate_lock.lock().await;
             let start_offset = wal.size();
             let append_res = wal.append_batch_locked(wal_entries, &truncate_guard).await;

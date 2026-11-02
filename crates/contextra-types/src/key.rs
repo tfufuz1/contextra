@@ -5,6 +5,10 @@
 //! - KeyBuf = 78 Byte: KeyBound(65) + family(1) + sub(u32, 4) + !commit_seq(u64, 8)
 //!
 //! `!commit_seq` (bitweises Komplement, big-endian) sorgt für absteigende Sortierung (jüngste zuerst).
+//!
+//! Serde-Hinweis: `serde` leitet `Serialize`/`Deserialize` für `[u8; N]` mit N > 32 nicht ab.
+//! `KeyBound` ([u8; 65]) und `KeyBuf` ([u8; 78]) verwenden daher manuelle Impls über `serde_bytes`.
+//! Das kanonische Format ist `bytes` (hex-kompakt in JSON, effizient in binären Formaten).
 
 use core::fmt;
 use serde::{Deserialize, Serialize};
@@ -62,8 +66,44 @@ impl Family {
 }
 
 /// 65-Byte-Bereichsgrenze für prefixfreie Bereichssuche (SPEC 9.1, D-10).
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+///
+/// Serde nutzt manuelle Impls, da `[u8; 65]` das Derive-Limit von 32 überschreitet.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct KeyBound([u8; KEY_BOUND_LEN]);
+
+impl Serialize for KeyBound {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_bytes(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for KeyBound {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = KeyBound;
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "exactly {} bytes for KeyBound", KEY_BOUND_LEN)
+            }
+            fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<KeyBound, E> {
+                let arr: [u8; KEY_BOUND_LEN] = v.try_into().map_err(|_| {
+                    E::invalid_length(v.len(), &self)
+                })?;
+                Ok(KeyBound(arr))
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<KeyBound, A::Error> {
+                let mut arr = [0u8; KEY_BOUND_LEN];
+                for (i, b) in arr.iter_mut().enumerate() {
+                    *b = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::invalid_length(i, &self)
+                    })?;
+                }
+                Ok(KeyBound(arr))
+            }
+        }
+        d.deserialize_bytes(Visitor)
+    }
+}
 
 impl KeyBound {
     /// Erzeugt ein `KeyBound` aus rohen 65 Bytes.
@@ -90,8 +130,44 @@ impl fmt::Debug for KeyBound {
 }
 
 /// 78-Byte-Schlüssel fester Länge (SPEC 9.1, D-10, TY-03).
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+///
+/// Serde nutzt manuelle Impls, da `[u8; 78]` das Derive-Limit von 32 überschreitet.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct KeyBuf([u8; KEY_LEN]);
+
+impl Serialize for KeyBuf {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_bytes(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for KeyBuf {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = KeyBuf;
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "exactly {} bytes for KeyBuf", KEY_LEN)
+            }
+            fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<KeyBuf, E> {
+                let arr: [u8; KEY_LEN] = v.try_into().map_err(|_| {
+                    E::invalid_length(v.len(), &self)
+                })?;
+                Ok(KeyBuf(arr))
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<KeyBuf, A::Error> {
+                let mut arr = [0u8; KEY_LEN];
+                for (i, b) in arr.iter_mut().enumerate() {
+                    *b = seq.next_element()?.ok_or_else(|| {
+                        serde::de::Error::invalid_length(i, &self)
+                    })?;
+                }
+                Ok(KeyBuf(arr))
+            }
+        }
+        d.deserialize_bytes(Visitor)
+    }
+}
 
 impl KeyBuf {
     /// Erzeugt einen neuen 78-Byte-Schlüssel für die DATA-Region (TY-03).
