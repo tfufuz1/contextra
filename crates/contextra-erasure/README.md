@@ -1,26 +1,11 @@
-# contextra-erasure
+Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht.
 
-Entkoppelter Löschkern, Saga-Zustandsmaschine, Journal, Tresor, Messung und Bericht.
+## Status
 
-- **Ring:** Ring 3 (Löschkern)
-- **Normativ:** [docs/SPEC.md §8.9](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 3. Ist-Zustand: **leer**; nur README und AGENTS; kein Workspace-Mitglied (Skelett nach D-96 mit WP-3.1). Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra-erasure` ist der zentrale, entkoppelte Löschkern von Contextra. Er kennt **keine Ring-2-Crates** (Kopplung ausschließlich über `contextra-ports`):
-- `scope`: Auflösung `EraseTarget` → `Matcher` und `doc_tag`-Menge.
-- `journal`: Append-only `erasure/journal.log` mit Hash-Kette und AEAD-Verschlüsselung (`K_journal`).
-- `erased_set`: `erasure/erased.set` verwaltet aktive Gates und implementiert `ReadGate`.
-- `vault`: Daten-Tresor (`vault/vault.dat`) für DEK-Slots; implementiert `RecordSealer`.
-- `saga`: Deterministische Lösch-Saga: `Requested → Gated → Drained → Rewritten → Cleaned → Measured → Completed`.
-- `measure`: Koordiniert E1/E2/E3-Messungen über `ErasureLayer::scan_residue` und Positivkontrollen (`positive_control`).
-- `classify`: Berechnet die kanonische `ErasureClass` (G/K/P-Verband) aus den Zeugen.
-- `report`: Erstellt und signiert den Löschbericht `ctx-erasure-report/1` via Ed25519.
-- `ledger`: Persistiert abgeschlossene Löschungen für den Restore-Guard (`erasure/ledger.log`).
-- `recover`: Stellt unvollständige Löschsagas nach Systemabstürzen wieder her.
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- Kennt keine Ring-2-Crates (`store`, `text`, `vector`, `mvcc`).
-- Unmittelbares Gating: Sobald `Gated` persistiert ist, blockiert `ErasedSet` fail-closed alle Lese- und Suchpfade.
-- Messen vor Behaupten: Berichte werden erst nach verifizierten E1/E2/E3-Scans ausgestellt.
+Erlaubt laut SPEC 5.3: `types`, `ports`, `crypto` (AR-3).
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

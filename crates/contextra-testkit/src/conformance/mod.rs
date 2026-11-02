@@ -40,10 +40,6 @@ pub mod clock;
 /// Typen zur detaillierten Erfassung von Konformitätsfehlschlägen.
 pub mod failure;
 
-// ANCHOR[contextra-testkit:CONF-MOD-GRAPH-001]
-/// Konformitätssuite für den `GraphIndex`-Port.
-pub mod graph;
-
 // ANCHOR[contextra-testkit:CONF-MOD-MACROS-001]
 /// Hilfsmakros für Konformitätsprüfungen (`assert_conformance!`).
 pub mod macros;
@@ -71,7 +67,6 @@ pub mod vector;
 // Re-Exports für bequemen Zugriff
 pub use clock::run_clock_suite;
 pub use failure::{ConformanceFailure, ConformanceResult};
-pub use graph::run_graph_index_suite;
 pub use metrics::run_metrics_sink_suite;
 pub use rng::run_rng_suite;
 pub use storage::run_storage_engine_suite;

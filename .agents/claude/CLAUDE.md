@@ -1,45 +1,38 @@
-# Contextra — Claude / Antigravity-Betriebsanleitung
+# Contextra – Betriebsanleitung für Claude und Antigravity
 
-<!-- doc-stamp: 2026-11-01 | Spec-Fassung: 2.0.0 (SOLL-Zustand Release 1.0.0) | PLAN: 2026-11-01 -->
-
-> **Normative Richtlinie:** Diese Datei gilt für Claude und Antigravity. Maßgeblich sind ausnahmslos [docs/SPEC.md](file:///home/freddy/Projekte/contextra/docs/SPEC.md), [PLAN.md](file:///home/freddy/Projekte/contextra/PLAN.md) und [AGENTS.md](file:///home/freddy/Projekte/contextra/AGENTS.md).
-
----
+Nicht normativ. Maßgeblich ist [`docs/SPEC.md`](../../docs/SPEC.md) (Version 4.2.0). Diese Datei fasst die Regeln für die Arbeit am Code zusammen und verweist auf die SPEC.
 
 ## 1. Arbeitsweise
 
-- **Ein PR = ein Arbeitspaket (WP) = höchstens ein Crate-Schnitt (REQ-CHG-2).**
-- **Rot vor Grün (TDD):** Vor dem Fix zwingend ein fehlschlagender Regressionstest.
-- **Evidenzpflicht:** Logs und Befehle unter `evidence/<WP-ID>/` ablegen.
-- APIs und Dateipfade im Code und in `docs/SPEC.md` verifizieren — niemals aus dem Gedächtnis annehmen.
-- Kleinste mögliche Änderung. Kein Over-Engineering.
+- Ein PR bearbeitet ein Arbeitspaket aus SPEC 15.4. Größere Änderungen werden geteilt.
+- Rot vor Grün: Vor der Implementierung steht ein fehlschlagender Test mit SPEC-ID (D-44, P10).
+- Keine Annahmen über APIs, Dateipfade oder Symbole aus dem Gedächtnis. Vor der Verwendung im Code nachsehen.
+- Kleinste sinnvolle Änderung. Keine Abstraktion ohne Kernkonsumenten (P8).
+- Protokolle für Gates gehören in CI-Artefakte oder das Evidenzbündel, nicht in den Quellbaum (D-98).
 
----
+## 2. Harte Regeln, kurz
 
-## 2. Die 12 Kernregeln (AGENTS.md §2, SPEC §0.2)
+1. **Ringe.** Abhängigkeiten nur nach unten (SPEC 5.2). Innerhalb Ring 2 gilt die Matrix SPEC 5.3.
+2. **Keine Panics.** Kein `unwrap`, `expect`, `panic!`, `unreachable!` und kein ungeprüftes Slicing im Produktionscode (P6).
+3. **Determinismus.** Zeit, Zufall und IDs nur über `Clock`, `Rng`, `IdGen` (P7).
+4. **WAL-Reihenfolge.** Frames, Gruppen-Commit, `sync_data`, Memtable, Sichtbarkeit (I-9).
+5. **Ein I/O-Weg.** Nur `Vfs`. Kein `std::fs`, kein `tokio::fs`, kein `mmap` (D-04, D-94).
+6. **Zwei `unsafe`-Inseln.** `contextra-sys` und `contextra-simd`, jeweils mit `// SAFETY:`. Alle anderen Crates: `#![forbid(unsafe_code)]` (D-29).
+7. **Mandanten.** Jede Funktion benötigt einen `TenantContext`. Rohspeicher nur über `TenantScopedStorage` (D-07, AR-6).
+8. **Keine Schalter für Sicherheit.** Verschlüsselung und WAL-Integrität sind immer aktiv (D-05, HR-13). Argon2id mit den Grenzen aus D-06.
+9. **Messen statt behaupten.** Restbestände stammen aus Zeugen mit Positivkontrolle (P1, D-72).
+10. **Fail-closed.** Unbekannte Zustände und Krypto-Fehler führen zu Abbruch oder `Pending`, nie zu stillem Weiterlaufen (P2).
+11. **Ein Typ je Konzept.** Domänentypen in `contextra-types`, Kryptografie in `contextra-crypto` (SPEC 8.1, 8.6).
+12. **Gates.** Kein Phasenwechsel ohne bestandenes Gate (SPEC 15.3).
 
-1. **Ring- & Schichten-Disziplin:** Abhängigkeiten zeigen strikt abwärts (Ring 4 → 0). Innerhalb Ring 2 gilt Matrix SPEC §5.3.
-2. **Zero-Panic in Produktion:** Kein `unwrap()`, `expect()`, `panic!()`, `todo!()`, `assert!()` oder ungeprüftes Index-Slicing (`[i]`) im Produktionscode.
-3. **Determinismus & Port-Purity:** Zeit, Zufall und IDs stammen ausschließlich aus den Ports `Clock`, `Rng`, `IdGen` aus `contextra-ports`.
-4. **WAL-First Consistency:** Frame(s) → Gruppen-Commit → `sync_data` WAL → Memtable → Sichtbarkeit.
-5. **I/O ausschließlich über `Vfs`:** Kein direkter Aufruf von `std::fs` oder `tokio::fs`. Alle Sync-Fehler propagieren.
-6. **Unsafe ausschließlich in 2 Inseln (D-29):** Nur in `contextra-simd` und `contextra-sys`. Jeder Block mit `// SAFETY:`. Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
-7. **Mandantentrennung verpflichtend (D-07):** `TenantId` stammt aus dem Kontext (`TenantPolicy::Required`). Store-Zugriff nur über `TenantScopedStorage`.
-8. **Sicherheit ist kein Feature-Schalter (D-05, D-06):** AES-256-GCM-SIV Pflicht ohne Opt-Out. KDF: Argon2id mit $m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$.
-9. **Messen vor Behaupten (D-35):** Restbestände stammen aus echten Messungen (`scan_residue` über `ErasureLayer`, E1/E2/E3) mit Positivkontrolle (Canary).
-10. **Fail-Closed:** Unbekannte Zustände oder Krypto-Fehler führen sofort zum geordneten Abbruch.
-11. **Eine Typfamilie je Konzept:** Reine Domänentypen in `contextra-types`, Krypto in `contextra-crypto`.
-12. **Gate-getrieben:** Verbindliche Gate-Reihenfolge (G-A bis G-H, G0) gemäß `PLAN.md`.
+## 3. Verbote im Code und in Dokumenten
 
----
+- Löschaussagen außerhalb SPEC 6.4 (Wortlaut-Lint, T-LINT-1).
+- Agenten-, Sitzungs- und Zeitstempelmarken im Quelltext (D-91).
+- Absolute Entwicklerpfade in Dateien oder Dokumenten (D-91).
+- Neue Abhängigkeiten, `unsafe`-Blöcke oder Features ohne belegenden Test (HR-12).
+- Schalter, die Sicherheit abschalten, auch über Umgebungsvariablen (HR-13).
 
-## 3. Lokale Verifikation
+## 4. Prüfen
 
-Vor jedem Commit oder PR ausführen:
-```bash
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::indexing_slicing
-cargo check --workspace --all-targets
-cargo test --workspace --locked
-cargo test -p tests-arch
-```
+Befehle: `docs/COMPILATION.md`. Vor dem Abschluss eines Arbeitspakets sind alle Gates des Pakets grün zu melden. Ist ein Gate rot, ist die Ursache zu beheben. Gates, Lints, Baselines und Toolchain-Pins werden nicht geändert, um Rot zu beseitigen (`.agents/jules/PREAMBLE.md`, Regel 4).

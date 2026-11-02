@@ -8,7 +8,6 @@
 // FILE-CONTEXT
 // ZWECK: Einfache Suchvarianten (search, search_with_filter, search_with_filter_expr, search_text) für Collection.
 
-use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
@@ -74,27 +73,22 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             )));
         }
         let k = k.min(contextra_types::MAX_SEARCH_K);
-        // 🛡️ SICHERUNG: Snapshot-Isolation (FIND-DB-003)
-        // Pin-first, read-after: the seq is read under the protection of the pin,
-        // eliminating the TOCTOU window between snapshot_seq() and pin activation.
-        with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
-            let filter = match filter {
-                Some(f) => f,
-                None => return self.search_filtered_at(query, k, None, seq).await,
-            };
+        let seq = self.storage.last_seq_no().await?;
+        let filter = match filter {
+            Some(f) => f,
+            None => return self.search_filtered_at(query, k, None, seq).await,
+        };
 
-            let matched_ids = self.get_matching_doc_ids_at(&filter, seq).await?;
+        let matched_ids = self.get_matching_doc_ids_at(&filter, seq).await?;
 
-            // If no docs match the filter, return early
-            if matched_ids.is_empty() {
-                return Ok(Vec::new());
-            }
+        // If no docs match the filter, return early
+        if matched_ids.is_empty() {
+            return Ok(Vec::new());
+        }
 
-            let filter_fn = move |id: DocId| matched_ids.contains(&id);
-            self.search_filtered_at(query, k, Some(&filter_fn), seq)
-                .await
-        })
-        .await
+        let filter_fn = move |id: DocId| matched_ids.contains(&id);
+        self.search_filtered_at(query, k, Some(&filter_fn), seq)
+            .await
     }
 
     /// Performs semantic search using a raw text query (automatically embedded).

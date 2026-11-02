@@ -24,10 +24,19 @@
 //! ## Kernkomponenten
 //! 1. [`acl_win32`]: Plattformspezifische Zugriffsbeschränkungen (DACL unter Windows, chmod `0600` und UID-Prüfung unter Unix).
 //! 2. [`durability`]: Haltbare Dateisystem-Synchronisation (WAL/LSM fsync, fdatasync, F_FULLFSYNC, FlushFileBuffers).
-//! 3. [`mlock`]: Festpinnen sensibler Speicherseiten im RAM (Verhinderung von Paging/Swapping auf die Festplatte).
-//! 4. [`mmap`]: Sichere Nur-Lese-Speicherabbildung (`mmap_readonly`) für Vektordaten und SSTables.
-//! 5. [`posix`]: POSIX-Ressourcenlimits (`rlimit` für Dateideskriptoren) und Deskriptorumleitungen (`dup2`).
-//! 6. [`vault`]: RAII-Sicherheitsverwaltung ([`LockedRegions`]) für sensible Schlüsselpuffer inklusive sicherem Nullsetzen (Zeroize).
+//! 3. [`mlock`]: Festpinnen sensibler Speicherseiten im RAM (Verhinderung von Paging/Swapping auf die Festplatte) via `mem_lock_slice` oder `mem_lock_with_policy`.
+//! 4. [`mmap`]: Nur-Lese-Speicherabbildung ([`mmap_readonly`]) für Vektordaten und SSTables unter Beachtung der Speicherinvariante.
+//! 5. [`posix`]: POSIX-Ressourcenlimits (`rlimit` für Dateideskriptoren) und atomare Deskriptorumleitungen ([`reopen_and_dup2`]).
+//! 6. [`vault`]: RAII-Sicherheitsverwaltung ([`LockedRegions`]) für sensible Schlüsselpuffer inklusive sicherem Nullsetzen ([`LockedRegions::zeroize_slice`]).
+//!
+//! ## Unsafe-Oberfläche und Verträge
+//! Als autorisierte `unsafe`-Insel (Ring 0) macht `contextra-sys` alle Vorbedingungen explizit:
+//! - [`mmap_readonly`]: Als `pub unsafe fn` deklariert (Vertrag V-SYS), da Modifikationen oder Kürzungen der Datei
+//!   außerhalb des Prozesses zu Speicherverletzungen (SIGBUS) führen können.
+//! - [`reopen_and_dup2`]: Als `pub unsafe fn` deklariert (Vertrag V-SYS), da `dup2` Deskriptoren atomar überschreibt
+//!   und strikte Ownership-Garantien des Aufrufers verlangt.
+//! - [`mem_lock_with_policy`], [`mem_lock`], [`mem_unlock`]: Rohzeiger-basierte Primitiven sind `pub unsafe fn`.
+//!   Für sichere Zugriffe steht die Slice-API [`mem_lock_slice`] bzw. der RAII-Manager [`LockedRegions`] bereit.
 
 pub mod acl_win32;
 pub mod durability;
@@ -43,7 +52,10 @@ pub use durability::{
     durable_flush_dir, durable_flush_file, flush_dir, flush_file, fs_class, rename_durable,
     write_all_durable, FlushKind, FsClass,
 };
-pub use mlock::{mem_lock, mem_lock_with_policy, mem_unlock, MemLockPolicy};
+pub use mlock::{
+    mem_lock, mem_lock_slice, mem_lock_slice_tolerant, mem_lock_with_policy, mem_unlock,
+    MemLockPolicy,
+};
 pub use mmap::mmap_readonly;
 pub use posix::{ensure_fd_limit, reopen_and_dup2, set_fd_limit};
 pub use vault::LockedRegions;

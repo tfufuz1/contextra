@@ -1,28 +1,11 @@
-# contextra
+Öffentliche API und Verdrahtung. Enthält keine Logik.
 
-Haupt-Bibliotheksfassade und einzige Composition Root von Contextra.
+## Status
 
-- **Ring:** Ring 4 (Fassade, Composition Root)
-- **Normativ:** [docs/SPEC.md §7, §8.14](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 4. Ist-Zustand: vorhanden (1.558 Zeilen), widerspricht SPEC 7 in mehreren Punkten (`builder(dimension)`, `EncryptionMode`, `LicenseGate`, `TextEmbeddingEngine`, Profile, Rewriter). Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra` ist die primäre Fassade und die einzige **Composition Root** des Gesamtsystems (Ring 4). Sie re-exportiert ausschließlich die autorisierte öffentliche API:
-- `EngineBuilder`: Sicherer Builder zur Konfiguration und Öffnung der Datenbank (`open().await?`).
-  - Erzwingt Tokio-Runtime-Handle.
-  - Erzwingt Passphrase für Argon2id KDF ($m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$).
-  - Erzwingt Mandantenisolation (`TenantPolicy::Required`).
-  - Stellt System-Defaults bereit (`RealVfs`, `SystemClock`, `OsRng`).
-- `Collection`: Dokumentenverwaltung (`insert`, `get`, `scan`, `delete`, `search_hybrid`).
-- Lösch- und Prüfpfade:
-  - `db.erase(target, retention)`: Startet Löschung und liefert `ErasureReceipt` mit Status `Gated`.
-  - `db.erasure_status(erasure_id)`: Statusabfrage der Saga.
-  - `contextra::verify(report, target)`: Unabhängige Berichts- und Residuenprüfung.
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- Kein anderes Crate im Workspace darf von `contextra` abhängen (AR-1).
-- Zero Panic: Alle Funktionen liefern `Result<T, ContextraError>`.
-- Pflichtverschlüsselung ohne Opt-Out (D-05).
-- Sauberes Beenden über `close().await?`; kein Blockieren in `Drop`.
-- Veraltete Features (`audit-export`, `avv-generator`, `candle`, `privacy`, `license`) sind entfernt.
+Erlaubt laut SPEC 5.3: `types`, `durable-fs`, `engine` (D-88).
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

@@ -69,7 +69,10 @@ pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
         use std::os::unix::io::AsRawFd;
         let fd = file.as_raw_fd();
         loop {
-            // SAFETY: `fd` ist ein gültiger, offener Dateideskriptor, der direkt aus `std::fs::File::as_raw_fd()` bezogen wurde.
+            // SAFETY: `fd` ist ein unveränderlicher, offener Dateideskriptor aus der langlebigen Referenz `&file`.
+            // `libc::fsync` und `libc::fdatasync` sind standardisierte POSIX-Systemaufrufe, die keine Pointer
+            // dereferenzieren und den Deskriptor nicht schließen. Fehler (inklusive Signalunterbrechung `EINTR`)
+            // werden über den Rückgabewert und `errno` vollständig erfasst.
             let res = unsafe {
                 if metadata_changed {
                     libc::fsync(fd)
@@ -93,7 +96,9 @@ pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
         let fd = file.as_raw_fd();
         let _ = metadata_changed;
         loop {
-            // SAFETY: `fd` ist ein gültiger Dateideskriptor aus `std::fs::File`. `F_FULLFSYNC` erzwingt auf macOS das Leeren aller physischen Caches.
+            // SAFETY: `fd` ist ein offener POSIX-Dateideskriptor aus `&file`. `libc::fcntl` mit `F_FULLFSYNC`
+            // erzwingt auf macOS / APFS das Leeren aller physischen Platten- und Controller-Caches.
+            // Der Aufruf modifiziert keine Speicherbereiche und schließt den Deskriptor nicht.
             let res = unsafe { libc::fcntl(fd, libc::F_FULLFSYNC, 0) };
             if res != -1 {
                 return Ok(());
@@ -111,7 +116,8 @@ pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
         let fd = file.as_raw_fd();
         let _ = metadata_changed;
         loop {
-            // SAFETY: `fd` ist ein gültiger offener Dateideskriptor aus `std::fs::File`.
+            // SAFETY: `fd` ist ein unveränderlicher, offener Dateideskriptor aus `&file`. `libc::fsync`
+            // flasht Daten und Metadaten auf den persistenten Datenträger ohne Speicherzugriffe oder Deskriptormodifikationen.
             let res = unsafe { libc::fsync(fd) };
             if res == 0 {
                 return Ok(());
@@ -128,7 +134,8 @@ pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
         use std::os::windows::io::AsRawHandle;
         let handle = file.as_raw_handle() as windows_sys::Win32::Foundation::HANDLE;
         let _ = metadata_changed;
-        // SAFETY: `handle` ist ein gültiges OS-Datei-Handle aus `std::fs::File::as_raw_handle()`.
+        // SAFETY: `handle` ist ein gültiges, offenes Win32-Dateihandle, geliehen von `&file`.
+        // `FlushFileBuffers` überträgt gepufferte Dateidaten auf den Datenträger und schließt das Handle nicht.
         let res = unsafe { windows_sys::Win32::Storage::FileSystem::FlushFileBuffers(handle) };
         if res != 0 {
             Ok(())
@@ -282,10 +289,18 @@ pub fn fs_class(path: &Path) -> Result<FsClass> {
 }
 
 /// Durably renames `from` to `to` and flushes the parent directory.
+///
+/// # Ablauf
+/// 1. Benennt `from` atomar in `to` um mittels [`std::fs::rename`].
+/// 2. Ermittelt das übergeordnete Verzeichnis von `to` und flasht dieses via [`durable_flush_dir`].
+///
+/// # Fehlerbehandlung
+/// Fehler bei der Verzeichnissynchronisation werden nicht verschluckt, sondern sofort als
+/// [`Result`] zurückgegeben, um Datenverlust bei Stromausfall nachweisbar zu verhindern.
 pub fn rename_durable(from: &Path, to: &Path) -> Result<()> {
     std::fs::rename(from, to)?;
     if let Some(parent) = to.parent() {
-        let _ = durable_flush_dir(parent);
+        durable_flush_dir(parent)?;
     }
     Ok(())
 }

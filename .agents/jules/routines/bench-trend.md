@@ -1,12 +1,9 @@
 # Routine: Benchmark-Trend
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
-
-- **Takt**: Wöchentlich
-- **Ziel**: Erkennung von Performance-Degredationen und Regressionen in Latenz/Durchsatz.
-- **Eingaben**:
-  - `cargo bench`
-- **Harte Grenzen**: Max. 15 Dateien / 1 Crate pro PR. Scope-Globs: `benches/**`, `crates/*/**`.
-- **Stopp-Bedingungen**: Benchmark-Schwankungen durch VM-Rauschen.
-- **Ergebnisformat**: Benchmark-Bericht als Markdown-Artefakt oder PR mit Latenz-Fix.
-- **Eskalation**: Siehe Architekturdokument §9.3.
+- **Takt:** wöchentlich
+- **Ziel:** Erkennen von Regressionen bei Latenz und Durchsatz. Schwellen nach SPEC 15.2: Verschlechterung über 10 % gegenüber der Basis auf derselben Hardware blockiert (BM-WRITE, BM-GET, BM-ERASE-LAT).
+- **Eingaben:** `cargo bench` (Mikrobenchmarks). Der Makro-Harness `ctx-bench` folgt mit WP-6.1.
+- **Harte Grenzen:** höchstens 15 Dateien in einem Crate je PR. Scope: `crates/*/benches/**`, `benchmarks/**`.
+- **Stopp:** Schwankungen durch VM-Rauschen sind keine Regression. Ohne Hardware-Protokoll ist ein Lauf ungültig (P9, SPEC 14.8).
+- **Ergebnis:** Bericht als Markdown-Artefakt. Ein PR mit Korrektur nur, wenn die Ursache im Code liegt.
+- **Eskalation:** siehe [`../HARNESS_QUICKSTART.md`](../HARNESS_QUICKSTART.md).

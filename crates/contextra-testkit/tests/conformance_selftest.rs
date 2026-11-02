@@ -13,15 +13,14 @@
 #![allow(clippy::panic, clippy::unwrap_used)]
 
 use contextra_ports::{
-    BoxFuture, Clock, GraphIndex, GraphIndexStats, MetricsSink, Rng, SeededRng, StorageEngine,
-    StorageStats, TextIndex, TextIndexStats, VectorIndex, VectorIndexStats,
+    BoxFuture, Clock, MetricsSink, Rng, SeededRng, StorageEngine, StorageStats, TextIndex,
+    TextIndexStats, VectorIndex, VectorIndexStats,
 };
 use contextra_testkit::conformance::*;
 use contextra_testkit::{
-    InMemoryGraphIndex, InMemoryStorageEngine, InMemoryTextIndex, InMemoryVectorIndex, ManualClock,
-    TestMetricsSink,
+    InMemoryStorageEngine, InMemoryTextIndex, InMemoryVectorIndex, ManualClock, TestMetricsSink,
 };
-use contextra_types::{DocId, Edge, Entity, EntityId, Result, ScoredDocument, TxId};
+use contextra_types::{DocId, Result, ScoredDocument, TxId};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 // ============================================================================
@@ -200,67 +199,6 @@ impl TextIndex for BuggyDeleteTextIndex {
     }
 }
 
-// ANCHOR[contextra-testkit:SELFTEST-MUTANT-GRAPH-001]
-/// Mutante GraphIndex, bei dem `remove_edge` eine No-Op ist.
-#[derive(Clone, Debug)]
-struct BuggyRemoveEdgeGraphIndex(InMemoryGraphIndex);
-
-impl GraphIndex for BuggyRemoveEdgeGraphIndex {
-    fn add_entity<'a>(&'a self, tx: TxId, entity: Entity) -> BoxFuture<'a, Result<()>> {
-        self.0.add_entity(tx, entity)
-    }
-
-    fn add_edge<'a>(&'a self, tx: TxId, edge: Edge) -> BoxFuture<'a, Result<()>> {
-        self.0.add_edge(tx, edge)
-    }
-
-    fn remove_edge<'a>(
-        &'a self,
-        _tx: TxId,
-        _from: EntityId,
-        _to: EntityId,
-    ) -> BoxFuture<'a, Result<()>> {
-        // BUG: remove_edge is a no-op!
-        Box::pin(async move { Ok(()) })
-    }
-
-    fn commit<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<()>> {
-        self.0.commit(tx)
-    }
-
-    fn rollback<'a>(&'a self, tx: TxId) -> BoxFuture<'a, Result<()>> {
-        self.0.rollback(tx)
-    }
-
-    fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>> {
-        self.0.rollback_to_tx(tx_id)
-    }
-
-    fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>> {
-        self.0.last_tx_id()
-    }
-
-    fn neighbors<'a>(&'a self, start_node: EntityId) -> BoxFuture<'a, Result<Vec<EntityId>>> {
-        self.0.neighbors(start_node)
-    }
-
-    fn traverse<'a>(
-        &'a self,
-        start_node: EntityId,
-        max_hops: usize,
-    ) -> BoxFuture<'a, Result<Vec<(EntityId, f32)>>> {
-        self.0.traverse(start_node, max_hops)
-    }
-
-    fn len<'a>(&'a self) -> BoxFuture<'a, usize> {
-        self.0.len()
-    }
-
-    fn stats<'a>(&'a self) -> BoxFuture<'a, Result<GraphIndexStats>> {
-        self.0.stats()
-    }
-}
-
 // ANCHOR[contextra-testkit:SELFTEST-MUTANT-CLOCK-001]
 /// Mutante Uhr, deren monotone Zeit bei jedem Abruf sinkt.
 #[derive(Debug)]
@@ -394,33 +332,6 @@ async fn test_text_index_conformance_mutant_red() {
             assert_eq!(failure.test_case, "delete_never_retrievable");
         }
         Ok(_) => panic!("BuggyDeleteTextIndex must fail conformance test suite"),
-    }
-}
-
-// ANCHOR[contextra-testkit:SELFTEST-RUN-GRP-GREEN-001]
-// Prüft, dass der In-Memory-Graphindex alle Verträge der GraphIndex-Suite erfüllt.
-#[tokio::test]
-async fn test_graph_index_conformance_reference_green() {
-    let res = run_graph_index_suite(|| async { InMemoryGraphIndex::new() }).await;
-    assert!(
-        res.is_ok(),
-        "InMemoryGraphIndex must pass conformance: {res:?}"
-    );
-}
-
-// ANCHOR[contextra-testkit:SELFTEST-RUN-GRP-RED-001]
-// Prüft, dass der Graph-Mutant mit fehlendem remove_edge als ConformanceFailure erkannt wird.
-#[tokio::test]
-async fn test_graph_index_conformance_mutant_red() {
-    let res =
-        run_graph_index_suite(|| async { BuggyRemoveEdgeGraphIndex(InMemoryGraphIndex::new()) })
-            .await;
-    match res {
-        Err(failure) => {
-            assert_eq!(failure.suite_name, "GraphIndex");
-            assert_eq!(failure.test_case, "remove_edge");
-        }
-        Ok(_) => panic!("BuggyRemoveEdgeGraphIndex must fail conformance test suite"),
     }
 }
 

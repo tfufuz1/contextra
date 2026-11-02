@@ -11,9 +11,7 @@ use super::Collection;
 use crate::filter::MetadataFilter;
 use crate::fusion::SignalFailurePolicy;
 use contextra_ports::{MetricsSink, Reranker, StorageEngine, VectorIndex};
-use contextra_types::{
-    DocId, EntityId, FilterExpr, FusionWeights, MemoryType, SignalFusionStrategies,
-};
+use contextra_types::{DocId, FilterExpr, FusionWeights, MemoryType, SignalFusionStrategies};
 use std::sync::Arc;
 
 /// Default candidate pool expansion multiplier for Cross-Encoder reranking (10x requested k).
@@ -37,8 +35,6 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) fusion_strategy: Option<SignalFusionStrategies>,
     pub(super) strategy: Option<SearchStrategy>,
     pub(super) filter: Option<FilterExpr>,
-    pub(super) anchor_entities: Option<Vec<EntityId>>,
-    pub(super) same_community_as: Option<EntityId>,
     pub(super) memory_type_filter: Option<Vec<MemoryType>>,
     pub(super) include_superseded: bool,
     pub(super) include_provenance: bool,
@@ -48,8 +44,6 @@ pub struct HybridQueryBuilder<'a, S: StorageEngine, V: VectorIndex> {
     pub(super) rerank_pool_multiplier: Option<usize>,
     pub(super) rerank_pool_max: Option<usize>,
     pub(super) on_signal_failure: SignalFailurePolicy,
-    #[cfg(feature = "adaptive-candidate-pool-sizing")]
-    pub(super) pid_controller: Option<Arc<parking_lot::Mutex<contextra_adapt::PidController>>>,
     pub(super) seq: Option<u64>,
     pub(super) as_of_timestamp: Option<u64>,
     pub(super) query_timestamp: Option<u64>,
@@ -69,8 +63,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             fusion_strategy: None,
             strategy: None,
             filter: None,
-            anchor_entities: None,
-            same_community_as: None,
             memory_type_filter: None,
             include_superseded: false,
             include_provenance: false,
@@ -80,8 +72,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             rerank_pool_multiplier: None,
             rerank_pool_max: None,
             on_signal_failure: SignalFailurePolicy::Fail,
-            #[cfg(feature = "adaptive-candidate-pool-sizing")]
-            pid_controller: None,
             seq: None,
             as_of_timestamp: None,
             query_timestamp: None,
@@ -158,21 +148,10 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     }
 
     /// Sets anchor seed entities for graph traversal signal.
-    pub fn anchor_entities(mut self, anchors: impl IntoIterator<Item = EntityId>) -> Self {
-        self.anchor_entities = Some(anchors.into_iter().collect());
-        self
-    }
 
     /// Alias for `.anchor_entities()`.
-    pub fn anchors(self, anchors: impl IntoIterator<Item = EntityId>) -> Self {
-        self.anchor_entities(anchors)
-    }
 
     /// Sets target entity for community context boosting/filtering.
-    pub fn same_community_as(mut self, entity_id: EntityId) -> Self {
-        self.same_community_as = Some(entity_id);
-        self
-    }
 
     /// Sets cognitive memory type filter (Pre-RRF filter).
     pub fn memory_type_filter(mut self, types: impl IntoIterator<Item = MemoryType>) -> Self {
@@ -227,14 +206,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     }
 
     /// Sets optional PID controller for adaptive reranking candidate pool sizing.
-    #[cfg(feature = "adaptive-candidate-pool-sizing")]
-    pub fn pid_controller(
-        mut self,
-        pid: Arc<parking_lot::Mutex<contextra_adapt::PidController>>,
-    ) -> Self {
-        self.pid_controller = Some(pid);
-        self
-    }
 
     /// Sets snapshot sequence number for MVCC snapshot-isolated queries.
     pub fn seq(mut self, seq_no: u64) -> Self {
@@ -276,6 +247,39 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     }
 
     /// Configures builder options from an existing `HybridQuery` struct.
+
+    /// No-op anchor entities setter for backward compatibility during removal.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Graph search is removed; this method is a no-op"
+    )]
+    pub fn anchor_entities(
+        self,
+        _anchors: impl IntoIterator<Item = contextra_types::EntityId>,
+    ) -> Self {
+        self
+    }
+
+    /// Alias for `.anchor_entities()`.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Graph search is removed; this method is a no-op"
+    )]
+    // Begründung: Aufruf der internen deprecated no-op Kompatibilitätsmethode
+    #[allow(deprecated)]
+    pub fn anchors(self, anchors: impl IntoIterator<Item = contextra_types::EntityId>) -> Self {
+        self.anchor_entities(anchors)
+    }
+
+    /// No-op same community setter for backward compatibility during removal.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Community context is removed; this method is a no-op"
+    )]
+    pub fn same_community_as(self, _entity_id: contextra_types::EntityId) -> Self {
+        self
+    }
+
     pub fn query_config(mut self, query: &contextra_types::HybridQuery) -> Self {
         if let Some(ref text) = query.text_query {
             self.text = Some(text.clone());
@@ -283,16 +287,10 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         if let Some(ref vector) = query.vector_query {
             self.vector = Some(vector.clone());
         }
-        if let Some(ref start_node) = query.graph_start_node {
-            if let Ok(eid) = EntityId::from_key(start_node) {
-                self.anchor_entities = Some(vec![eid]);
-            }
-        }
-        self.strategy = Some(query.graph_strategy.clone().into());
+        self.strategy = None;
         self.weights = Some(query.fusion_weights.clone());
         self.fusion_strategy = Some(query.fusion_strategy);
         self.filter = query.filter.clone();
-        self.same_community_as = query.same_community_as;
         self.memory_type_filter = query.memory_type_filter.clone();
         self.include_superseded = query.include_superseded;
         self.include_provenance = query.include_provenance;

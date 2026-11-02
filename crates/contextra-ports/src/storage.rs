@@ -170,10 +170,10 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// Returns the last transaction ID committed to storage.
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>>;
 
-    /// Pins a checkpoint for sequence number.
+    /// Pins a sequence number snapshot for durability / retention.
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>>;
 
-    /// Unpins a checkpoint for sequence number.
+    /// Unpins a sequence number snapshot.
     fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>>;
 
     /// Scans a range of keys with given prefix.

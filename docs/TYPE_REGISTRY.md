@@ -1,37 +1,106 @@
-# Contextra – Typ-Registry & Kanonische Typen
+# Typ-Registry
 
-<!-- doc-stamp: 2026-11-01 | Normativ: docs/SPEC.md §8.1, §8.6, §9.1 | PLAN.md Phase 3 -->
+Abgeleitet aus [`SPEC.md`](SPEC.md) Abschnitte 7, 8, 9 und 11 sowie Anhang C. Bei Widerspruch gilt die SPEC.
 
-> **Regel 11 (Eine Typfamilie je Konzept, SPEC §0.2, §8.1):** Jeder Domänenbegriff, Identifikator und Trait existiert genau einmal an seinem kanonischen Ort im DAG. Doppelte Typdefinitionen über Crate-Grenzen hinweg sind Architektur-Schulden und verboten.
+## 1. Regel
 
----
+Jeder Domänenbegriff, Identifikator und Trait existiert genau einmal an seinem kanonischen Ort (SPEC 8.1, D-97). Doppelte Definitionen über Crate-Grenzen hinweg sind verboten. Re-Exporte sind nur einzeln und nur, wenn der Typ in einer Trait-Signatur vorkommt (AR-10). Glob-Re-Exporte (`pub use …::*`) sind verboten.
 
-## 1. Kanonische Typ-Verteilung nach Ringen
+## 2. Kanonische Typen je Crate
 
-| Konzept / Typ | Kanonischer Ort | Erlaubte Re-Exports | Status laut SPEC |
-|---|---|---|---|
-| `TenantId`, `CollectionName`, `DocKey`, `SubjectId` | `contextra-types::ids` | `contextra-ports`, `contextra-engine`, `contextra` | ✅ Kanonisch (Newtypes mit Validierung) |
-| `TenantTag`, `CollTag`, `ClusterTag`, `DocTag`, `TermTag` | `contextra-types::ids` | Workspace-weit | ✅ Kanonisch (`[u8; 16]`, blind) |
-| `Seq(NonZeroU64)`, `TxId(u64)`, `ErasureId([u8; 16])` | `contextra-types::ids` | `mvcc`, `store`, `erasure`, `engine` | ✅ Kanonisch (kein Sentinel) |
-| `KeyBuf`, `KeyRange`, `Matcher`, `Region`, `Family` | `contextra-types::key` | `store`, `erasure`, `engine` | ✅ Kanonisch (Löschcluster-Schlüsselraum SPEC §9.1) |
-| `EraseTarget`, `ErasureState`, `LayerId`, `LayerStatus`, `ErasureClass` | `contextra-types::erasure` | `erasure`, `engine`, `contextra` | ✅ Kanonisch (Löschpipeline) |
-| `ErasureReport`, `RetentionAttestation`, `NeedleSet`, `LayerScan`, `Evidence` | `contextra-types::erasure` | `erasure`, `engine`, `contextra`, `testkit` | ✅ Kanonisch (Nachweis & Bericht) |
-| `SecretBytes`, `SecretKey32` | `contextra-types::secret` | `crypto`, `store`, `erasure`, `engine` | ✅ Kanonisch (`Zeroizing`, kein Clone/Debug) |
-| `ContextraError` | `contextra-types::error` | Workspace-weit | ✅ Kanonisch |
-| `KeySet`, `KdfParams`, `KdfHeader` | `contextra-crypto::keys`, `kdf` | `store`, `erasure`, `engine` | ✅ Kanonisch (Argon2id + HKDF) |
-| `StorageEngine`, `ErasureLayer`, `ReadGate`, `RecordSealer`, `LedgerSink` | `contextra-ports` | Workspace-weit | ✅ Kanonisch (Port-Traits) |
-| `Vfs`, `VfsFile` | `contextra-ports` | Workspace-weit | ✅ Kanonisch (Konsolidiert) |
-| `Clock`, `Rng`, `IdGen`, `Metrics` | `contextra-ports` | Workspace-weit | ✅ Kanonisch (Determinismus-Ports) |
+### `contextra-types` (Ring 0, kein I/O)
 
----
+| Typ | Zweck |
+|---|---|
+| `Tag` | 16-Byte-Tag (`[u8; 16]`-Newtype), Basis aller keyed Identifikatoren |
+| `KeyBuf` | Schlüsselpuffer mit fester Länge, kein String (SPEC 8.1) |
+| `DocRef { subject: Option<SubjectRef>, key: DocKey }` | Dokumentadresse; der Betroffene ist Teil der Identität (D-70, D-08) |
+| `DocHandle` | opaker Suchtreffer mit `cluster_tag` und `doc_tag` (D-70) |
+| `SearchPage { hits, exhausted }` | Suchergebnis; `exhausted` markiert fehlende Treffer (D-62) |
+| `TenantRef`, `CollectionRef`, `SubjectRef`, `DocKey` | Adressen für Mandant, Collection, Betroffenen und Dokument |
+| `ErasureId` | Kennung einer Löschung, abgeleitet aus Ziel-Commitment und Attestierung |
+| `EraseTarget` | `Document`, `Subject`, `Collection`, `Tenant` (SPEC 7.3) |
+| `EraseMode` | `Erase` oder `Restrict` |
+| `Timing` | `Now` oder `Batched` |
+| `RetentionAttestation { code, attested_by, attested_at }` | Pflichtangabe bei jedem Löschauftrag (D-15) |
+| `RetentionCode` | geschlossene Liste: `NoObligation`, `ObligationExpired`, `ObligationActive`, `LegalClaimsPending`, `DataSubjectRequestedRestriction`, `OperatorOverride` (E-L12) |
+| `ErasureStatus` | `Requested`, `Gated`, `KeyDestroyed`, `Purging`, `Verifying`, `Completed`, `Pending { reason }`, `Refused(reason)` |
+| `PendingReason` | `Io`, `SlaExceeded`, `LayerFailed(id)`, `WitnessMissing`, `DiskReserve` (SPEC 11.2) |
+| `RefusalReason` | Ablehnungsgründe, z. B. `RetentionObligation` |
+| `KeyCoverage` | `full`, `unlinked`, `none` je Schicht (D-69) |
+| `LayerWitness` | Zeuge einer Schicht; nur aus `Scanner<Armed>` konstruierbar (D-72, I-19) |
+| `ResidualRisk` | geschlossener Katalog nach SPEC Anhang D |
+| `GateVariant` | `Erased`, `Restricted` (SPEC 11.3) |
+| `HealthReport`, `HealthState`, `DegradedReason` | Gesundheitsstatus (D-64, 14.5) |
+| `Error` | geschlossene Enum: `Config`, `Io`, `Corrupt`, `Auth`, `Erased`, `Restricted`, `NotFound`, `Conflict`, `Limit`, `SnapshotRevoked`, `Cancelled`, `Refused`, `Internal` (SPEC 7.5) |
+| `Conflict` | `IdCollision`, `Exists` (`SubjectImmutable` entfällt, D-40) |
+| `Limit` | `Capacity`, `DiskReserve`, `Snapshots`, `QueryTooLarge` und weitere `Limit::*` (D-87) |
 
-## 2. Entfernte und ersetzte historische Typen
+Alle öffentlichen Typen sind `#[non_exhaustive]`, außer Konfigurationsbausteinen (D-66). Fehlertexte sind fest und enthalten keine Nutzerinhalte (HR-4).
 
-| Historischer Typ | Früherer Ort | Grund der Entfernung / Ersatz |
+### `contextra-crypto` (Ring 1)
+
+| Typ | Zweck |
+|---|---|
+| `Secret` | `zeroize`-on-drop, ohne `Debug`, `Display` und `Clone` (SPEC 7.1) |
+| `KdfParams` | Argon2id-Parameter mit Grenzen aus D-06 |
+| `KeySlot` | Slot mit `slot_id`, `anchor_id`, `kdf_id`, `m`, `t`, `p`, `slot_salt`, `wrapped_master` (SPEC F.2) |
+
+### `contextra-ports` (Ring 0, nur Traits)
+
+`StorageEngine`, `TextIndex`, `VectorIndex` (statisch dispatcht, D-03); `Vfs` (ein Trait, D-04); `Clock`, `Rng`, `IdGen`, `Metrics`; `ErasureLayer`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink` (dyn-fähig, `BoxFuture`, D-03).
+
+Die Trait-Signaturen stehen im Rustdoc. Eine Abweichung von SPEC 8.2 ist ein Defekt.
+
+### `contextra-erasure` (Ring 3, Skelett ausstehend)
+
+`Scanner<Armed>` (Typzustand, `#[must_use]`, private Konstruktoren), `FileVault` (Implementierung von `RecordSealer` und `FileKeyring`), `Journal`, `Ledger`, `ErasedSet`, Berichtsbau. Der Typ `Scanner<Armed>` entsteht nur nach erfolgreicher Positivkontrolle (D-72).
+
+### `contextra` (Ring 4)
+
+Öffentliche Handles `Contextra`, `Tenant`, `Collection` (Re-Exporte aus `engine`); `EngineBuilder` liegt in `engine` (D-89). `system_defaults()` in `wiring`.
+
+## 3. Entfernte oder ersetzte Typen
+
+| Früherer Typ | Ersatz oder Entscheidung | Quelle |
 |---|---|---|
-| `DocId(u64\|u128)` | `contextra-types` | Ersetzt durch `DocKey` (extern) und `DocTag` (intern blind, SPEC §8.1). |
-| `AutoExtractionMode` | `contextra-types` | Vollständig entfernt in v1 (`D-27`). |
-| `KeyManager` | `contextra-crypto` | Ersetzt durch das deterministische `KeySet` (`D-05`, SPEC §8.6). |
-| `DocDek`, `GroupKek`, `KeyRegistry` | `contextra-crypto` (Ebene B) | Ebene B entfällt in v1 (`D-01`, ADR-001). `DocDek` existiert nur als lokaler Ableitungstyp im `RecordSealer`. |
-| `TenantPolicy::Optional` | `contextra-engine` | Vollständig gestrichen (`D-07`); Mandant ist ausnahmslos Pflicht. |
-| `IsotonicCalibrator`, `PlattScaling` | `contextra-rank` | Vollständig entfernt (`D-26`); `contextra-rank` bietet ausschließlich `rrf_fuse`. |
+| `DocId(u64)` (auch `u128` mit Feature `docid-128`) | `DocRef` und `DocHandle`, Identität über `doc_tag` | D-08, D-84 |
+| `TenantPolicy` (Default `Optional`) | `TenantContext` ist Pflicht | D-07 |
+| `EncryptionMode`, `Option<Arc<KeyManager>>` | Verschlüsselung ist nicht abschaltbar | D-05 |
+| `allow_legacy_integrity_key_fallback`, `legacy-wal-key` | entfällt | D-05, D-84 |
+| `Collection::delete` | `Collection::soft_delete` (logisch) | D-51 |
+| `Conflict::SubjectImmutable` | entfällt; Betroffener ist Teil der Identität | D-40 |
+| `Locator`-Familie, Region `LOC` | entfällt; `DocRef` adressiert direkt | D-70 |
+| `AutoExtractionMode` | entfällt vollständig | D-27 |
+| `LicenseGate`, `with_license_gate` | entfällt | D-23 |
+| `TextEmbeddingEngine`, `embedding`, `reranker`, `query_rewriter` (Ports) | entfällt | D-24 |
+| `saos`, `tombstone` (in `types`) | außerhalb des Soll; entfernen | SPEC 5.1, F-36 |
+| zweites `Vfs`-Trait in `durable-fs` | entfernt; einziger Trait in `ports` | D-04, F-29 |
+| `u64::MAX` als Sentinel für `min_read_snapshot` | `Option`; ohne Snapshots gilt `current_seq` | 8.7, I-12 |
+| Feature-Schalter `encryption-at-rest`, `onnx`, `sandbox` u. a. | entfällt | D-84 |
+
+Die vollständige Rückbauliste steht in SPEC D-84.
+
+## 4. Konstanten und Labels (SPEC Anhang C)
+
+| Zweck | Label |
+|---|---|
+| `tenant_tag` | `ctx/tenant/v1` |
+| `coll_tag` | `ctx/coll/v1` |
+| `subject_tag` | `ctx/subj/v1` |
+| `doc_tag` | `ctx/doc/v2` |
+| `term_tag` | `ctx/term/v1` |
+| `name_tag` | `ctx/name/v1` |
+| Commitment | `ctx/commit/v1` (mit Epochenschlüssel) |
+| Schlüsselableitung | `ctx/enc/v1`, `ctx/idx/v1`, `ctx/unit/v1`, `ctx/sign/v1`, `ctx/wal/v1`, `ctx/ledger/v1`, `ctx/file/v1`, `ctx/fkmask/v1`, `ctx/dek/v2`, `ctx/dek-salt/v2` |
+| Record-AAD | `ctx/rec/v2` |
+| Keyslot-AAD | `ctx/slot/v1` |
+| Vault-Slot-MAC | `ctx/vault-mac/v1` |
+| Header-MAC | `ctx/hdr/v1` |
+| Textbindung-AAD | `ctx/tbind/v1` |
+
+Weitere Konstanten: Tag 16 Byte, Salt 32 Byte, Nonce 12 Byte, Tresor-Slot 80 Byte, Segmentziel 8 bis 32 MiB, SSTable-Ziel 32 MiB ab Level 1, `k_rrf = 60`, `commit_epoch = 365 d`, `ef_max = 4096`, Posting-Block 128, Tresor-Lastfaktor höchstens 0,7.
+
+## 5. Pflege
+
+Ein neuer Typ wird zuerst in der SPEC beschrieben und dann in dieser Registry eingetragen. Änderungen an Typen, die in Trait-Signaturen vorkommen, brauchen eine SPEC-Änderung mit Eintrag in Anhang H. Prüfbar ist die Regel über `contextra-arch-tests` (T-ARCH-6, T-ARCH-7).

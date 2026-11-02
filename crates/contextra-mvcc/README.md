@@ -1,19 +1,11 @@
-# contextra-mvcc
+Sequenzen, Snapshots und SSI-Validierung für Mehrversions-Nebenläufigkeit.
 
-Multi-Version Concurrency Control, Sequenzsemantik, Snapshot-Isolation und Snapshot-Widerruf.
+## Status
 
-- **Ring:** Ring 2 (Transaktionsisolation)
-- **Normativ:** [docs/SPEC.md §8.7](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 2. Ist-Zustand: vorhanden, 47/47 Lib-Tests in 3.0.0; Sentinel `u64::MAX` in `snapshot.rs:314` (`update_min`) widerspricht 8.7. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra-mvcc` stellt deterministische Transaktionsisolation und MVCC bereit:
-- `seq`: Monotone Sequenzen `Seq(NonZeroU64)` ohne Sentinel `u64::MAX`.
-- `snapshot_registry`: Snapshot-Registrierung, `min_active()`, Snapshot-Widerruf (`revoke_covering(&Matcher)`).
-- `ssi`: `SsiValidator` für Serializable Snapshot Isolation ohne Write-Skew.
-- `tx_buffer`: Transaktionspuffer zur Isolation uncommitteter Änderungen.
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- `prune_through` mit gesetztem Tombstone-Bit ist ein Fehler, kein stilles Maskieren (D-C02 Bugfix).
-- Snapshot-Widerruf (`revoke_covering`): Snapshots, die gelöschte Sequenzen sehen könnten, werden als widerrufen markiert; Folgeoperationen scheitern fail-closed mit `SnapshotRevoked`.
+Erlaubt laut SPEC 5.3: `types`, `ports`.
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

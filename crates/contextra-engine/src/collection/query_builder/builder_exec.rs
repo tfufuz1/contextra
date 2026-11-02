@@ -99,16 +99,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
             .unwrap_or(super::builder::DEFAULT_RERANK_POOL_MULTIPLIER);
         let base_pool = (raw_mult * k).clamp(50, 200);
 
-        #[cfg(feature = "adaptive-candidate-pool-sizing")]
-        let effective_pool_max = if let Some(ref pid) = self.pid_controller {
-            let pid_pool = pid.lock().current_pool_size().unwrap_or(base_pool);
-            base_pool.min(pid_pool).clamp(50, 200)
-        } else {
-            self.rerank_pool_max
-                .map_or(base_pool, |max_val| base_pool.min(max_val).clamp(50, 200))
-        };
-
-        #[cfg(not(feature = "adaptive-candidate-pool-sizing"))]
         let effective_pool_max = self
             .rerank_pool_max
             .map_or(base_pool, |max_val| base_pool.min(max_val).clamp(50, 200));
@@ -116,21 +106,13 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         contextra_types::HybridQuery {
             text_query: self.text.clone(),
             vector_query: self.vector.clone(),
-            graph_start_node: self
-                .anchor_entities
-                .as_ref()
-                .and_then(|a| a.first())
-                .map(|e| e.to_string()),
-            graph_strategy: self
-                .strategy
-                .as_ref()
-                .map(|s| s.to_graph_strategy())
-                .unwrap_or_default(),
+            graph_start_node: None,
+            graph_strategy: contextra_types::GraphTraversalStrategy::default(),
             fusion_weights,
             fusion_strategy,
             filter: self.filter.clone(),
             memory_type_filter: self.memory_type_filter.clone(),
-            same_community_as: self.same_community_as,
+            same_community_as: None,
             include_superseded: self.include_superseded,
             include_provenance: self.include_provenance,
             rerank_pool_multiplier: self.rerank_pool_multiplier,
@@ -142,7 +124,10 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     }
 
     /// Applies post-RRF metadata, memory-type, custom predicate, and bi-temporal validity filters.
-    fn apply_post_rrf_filters(&self, mut results: Vec<crate::SearchResult>) -> Vec<crate::SearchResult> {
+    fn apply_post_rrf_filters(
+        &self,
+        mut results: Vec<crate::SearchResult>,
+    ) -> Vec<crate::SearchResult> {
         if let Some(ref filter_expr) = self.filter {
             results.retain(|res| {
                 let meta_ref = res.metadata.as_ref().unwrap_or(&serde_json::Value::Null);
@@ -268,10 +253,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
                 .monotonic_nanos()
                 .saturating_sub(start_nanos),
         );
-        #[cfg(feature = "adaptive-candidate-pool-sizing")]
-        if let Some(ref pid) = self.pid_controller {
-            pid.lock().update(_elapsed, _elapsed.as_millis() as f32);
-        }
 
         if !accumulated_ranked.is_empty() {
             accumulated_ranked.sort_by(|a, b| {
@@ -364,7 +345,9 @@ where
             self.collection.snapshot_seq().await?
         };
 
-        let results = self.hydrate_acorn_search_results(acorn_tuples, seq_no).await?;
+        let results = self
+            .hydrate_acorn_search_results(acorn_tuples, seq_no)
+            .await?;
         let results = self.apply_post_rrf_filters(results);
 
         if let Some(reranker) = self.reranker {

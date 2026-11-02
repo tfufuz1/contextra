@@ -1,19 +1,11 @@
-# contextra-rank
+Reciprocal Rank Fusion für die Hybridsuche.
 
-Deterministische Reciprocal Rank Fusion (RRF).
+## Status
 
-- **Ring:** Ring 2 (Ranking & Fusion)
-- **Normativ:** [docs/SPEC.md §8.13](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 2. Ist-Zustand: vorhanden (3.440 Zeilen in 3.0.0), Ziel deutlich kleiner; Module `dibud`, `drift`, `explain`, `fusion/*` außer RRF sind zu entfernen. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra-rank` ist für die deterministische Fusion von Trefferlisten aus Volltext- und Vektorsuche mittels Reciprocal Rank Fusion (RRF) zuständig:
-- `rrf_fuse(lists: &[Vec<Hit>], k: u32, top: usize) -> Vec<Hit>`
-- Standardparameter $k = 60$.
-- Deterministischer Tie-Break nach aufsteigendem `doc_tag`.
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- Permutationsinvarianz bezüglich der Reihenfolge der Eingabelisten.
-- Keine Hintergrund-Threads, keine asynchronen Tasks.
-- Komplexe historische Kalibratoren (`IsotonicCalibrator`, Platt Scaling) und Abhängigkeiten zu `adapt` sind vollständig entfernt.
+Erlaubt laut SPEC 5.3: `types`, `ports`.
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

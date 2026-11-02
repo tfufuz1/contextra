@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Low-level unsafe system abstractions and FFI island for Contextra (Ring 0)"
+description = "Einzige `unsafe`-Stelle für Betriebssystemaufrufe: `fsync`, `mlock`, Prozesshärtung."
 
 [package.metadata.contextra]
 ring = "0"

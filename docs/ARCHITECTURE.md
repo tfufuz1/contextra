@@ -1,58 +1,52 @@
-# Contextra – Architektur-Dokumentation
+# Architektur
 
-| Feld | Wert |
-|---|---|
-| Stand | 2026-11-01 |
-| Normative Referenz | [`docs/SPEC.md`](SPEC.md) (Fassung 2.0.0 für Release 1.0.0) & [`PLAN.md`](../PLAN.md) |
-| Ring-Definition | SPEC §5.1, §5.2, §5.3 |
-| Sicherheits-Doktrin | Single-Node, Safe Rust (2 Unsafe-Inseln), Zero Panic, Fail-Closed, Pflichtverschlüsselung, absolute Mandantentrennung |
+Abgeleitet aus [`SPEC.md`](SPEC.md) Kapitel 5 (Ringe, Matrix, Laufzeitmodell, Datenflüsse, Verzeichnislayout) und Kapitel 9 bis 11. Bei Widerspruch gilt die SPEC.
 
----
+## 1. Überblick
 
-## 1. Überblick & Mission
+Contextra ist eine eingebettete Bibliothek mit einem LSM-Speicher, einem segmentierten Textindex, einem HNSW-Vektorindex und einem eigenen Löschkern. Alle Schichten sind über Traits aus `contextra-ports` entkoppelt (P12). Jede Löschung ist ein Vorgang mit Journal, Gate, Schlüsselvernichtung, Purge und signiertem Bericht (SPEC 11.2).
 
-Contextra ist ein lokaler, eingebetteter Wissens- und Gedächtnisspeicher in Rust (Single-Node, Library-First) für Agenten- und RAG-Systeme:
-- **Speichern**: Transaktionaler LSM-Tree-Speicher mit Write-Ahead-Log (WAL) als einziger Quelle der Wahrheit (I-1: WAL → Memtable → Sichtbarkeit).
-- **Finden**: Hybrides Retrieval (HNSW-Vektorsuche + BM25-Volltextsuche + RRF-Fusion), strikt mandantengrenzenbeachtend.
-- **Löschen (DSGVO Art. 17/18)**: Eigenständiger, entkoppelter und gemessener Löschprozess gemäß ADR-001 (physische Bereinigung Ebene A + fail-closed `ReadGate` + E1/E2/E3 Messungen + Ed25519-Löschbericht `ctx-erasure-report/1`).
-
----
-
-## 2. Ringmodell & Crate-Topologie (SPEC §5.1, §5.2)
-
-Das Gesamtsystem ist als strikter, azyklischer gerichteter Graph (**DAG**) in 5 Ringen organisiert:
+## 2. Ringe
 
 ```
-Ring 4  contextra                               (Fassade, Composition Root)
-Ring 3  contextra-erasure   contextra-engine    (Löschkern, Orchestrierung)
+Ring 4  contextra                         Fassade, keine Logik
+Ring 3  contextra-erasure   contextra-engine
 Ring 2  contextra-mvcc  contextra-store  contextra-text  contextra-vector  contextra-rank
-Ring 1  contextra-sys   contextra-simd   contextra-durable-fs  contextra-crypto
-Ring 0  contextra-types contextra-ports
-dev     contextra-testkit  contextra-lab  ctx-verify  tests/arch
+Ring 1  contextra-sys  contextra-simd  contextra-durable-fs  contextra-crypto
+Ring 0  contextra-types  contextra-ports
+dev     contextra-testkit  contextra-lab  ctx-verify  contextra-arch-tests
 ```
 
-### Die 14 Produktionscrates
+Abhängigkeiten zeigen nur auf gleiche oder niedrigere Ringe (AR-1). Innerhalb von Ring 2 gilt die Matrix unten.
 
-| Ring | Crate | Rolle | Unsafe |
-|---|---|---|:---:|
-| **Ring 0** | `contextra-types` | Reine, zustandslose Typen (IDs, Tags, Fehler, Schlüsselcodec, Löschtypen). Kein I/O, kein `async`. | Nein |
-| **Ring 0** | `contextra-ports` | Abstrakte Schnittstellen-Traits (`StorageEngine`, `ErasureLayer`, `ReadGate`, `Vfs`, `Clock`, `Rng`, etc.). | Nein |
-| **Ring 1** | `contextra-sys` | Plattform- und OS-Primitive (`fsync`, `flush_dir`, `rename_durable`, `mlock`). **Unsafe-Insel 1 von 2**. | **Ja** |
-| **Ring 1** | `contextra-simd` | f32-Distanzkernel (`l2`, `dot`, `cosine`) mit Skalar-Referenz. **Unsafe-Insel 2 von 2**. | **Ja** |
-| **Ring 1** | `contextra-durable-fs` | `RealVfs`-Implementierung, atomare Dateieretzung, best-effort Zeroize-Scrub. | Nein |
-| **Ring 1** | `contextra-crypto` | AEAD (AES-256-GCM-SIV), Argon2id KDF, HKDF, WAL-HMAC, Hash-Ketten, Ed25519-Signatur. | Nein |
-| **Ring 2** | `contextra-mvcc` | Monotone `Seq`, Snapshots, SSI-Validierung, Snapshot-Widerruf (`revoke_covering`). | Nein |
-| **Ring 2** | `contextra-store` | Transaktionaler LSM-Tree (WAL, Memtable, Leveled SSTables, Purge-Rewrite & Swap). Blind für Dokumentinhalte. | Nein |
-| **Ring 2** | `contextra-text` | BM25-Segmentindex (AEAD-verschlüsselte Segmente, Term-Tags, kein Klartext). | Nein |
-| **Ring 2** | `contextra-vector` | HNSW-Vektorindex (Slot-Zeroing, verschlüsselte Snapshot-Chunks, Batch-Rebuild). | Nein |
-| **Ring 2** | `contextra-rank` | RRF-Fusion (`rrf_fuse`) mit deterministischem Tie-Break nach `doc_tag`. | Nein |
-| **Ring 3** | `contextra-erasure` | Entkoppelter Löschkern: Saga, Journal, ReadGate (`ErasedSet`), Tresor (`vault`), Messung, Bericht. | Nein |
-| **Ring 3** | `contextra-engine` | Orchestrierung: Collections, Transaktionen, Schreib-/Lesepfade, Verdrahtung. | Nein |
-| **Ring 4** | `contextra` | Öffentliche Fassade, `EngineBuilder`, Re-Exporte. | Nein |
+## 3. Crates
 
----
+| Crate | Ring | Zweck | Status (Ist) |
+|---|---|---|---|
+| `contextra-types` | 0 | Reine Datentypen: IDs, Tags, Schlüssel, Fehler, Löschtypen. Kein I/O. | vorhanden, enthält Altlasten |
+| `contextra-ports` | 0 | Schnittstellen (Traits) zwischen den Schichten | vorhanden, Löschports fehlen |
+| `contextra-sys` | 1 | Einzige `unsafe`-Stelle für Betriebssystemaufrufe | vorhanden, Build-Fehler durch `mmap` |
+| `contextra-simd` | 1 | Vektor-Distanzfunktionen mit SIMD-Kernen und Skalar-Referenz | vorhanden, u8-VNNI zu entfernen |
+| `contextra-durable-fs` | 1 | `RealVfs` mit dauerhaften Schreib- und Austauschoperationen | vorhanden, Startprobe nicht nachgewiesen |
+| `contextra-crypto` | 1 | Kryptoprimitive: AEAD, Argon2id, HKDF, HMAC, Ed25519, Tags | vorhanden, Feature-Altlasten |
+| `contextra-mvcc` | 2 | Sequenzen, Snapshots und SSI-Validierung | vorhanden, Sentinel `u64::MAX` zu entfernen |
+| `contextra-store` | 2 | LSM-Speicher: WAL, Memtable, SSTables, Manifest, Kompaktion, Purge-Primitive | vorhanden, Build-Fehler |
+| `contextra-text` | 2 | BM25-Volltextindex als verschlüsselte Segmente mit deutschem Analyzer | vorhanden, Umbau nötig |
+| `contextra-vector` | 2 | HNSW-Vektorindex mit Arena, löschbaren Slots und verschlüsseltem Snapshot | vorhanden, Build-Fehler, großer Anteil außerhalb des Soll |
+| `contextra-rank` | 2 | Reciprocal Rank Fusion für die Hybridsuche | vorhanden, deutlich größer als nötig |
+| `contextra-erasure` | 3 | Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht | **leer** |
+| `contextra-engine` | 3 | Orchestrierung: Mandanten, Collections, Transaktionen, Suche, Hintergrundtasks | vorhanden, Build-Status nicht erreicht |
+| `contextra` | 4 | Öffentliche API und Verdrahtung | vorhanden, widerspricht §7 |
+| `contextra-testkit` | dev | Testhilfen: `FaultVfs`, Referenzmodell, deterministische Uhr | vorhanden |
+| `contextra-lab` | dev | Unabhängige Prüfinstanz für die Löschmessung | **fehlt** |
+| `ctx-verify` | dev/bin | Eigenständiger Verifizierer für Berichte und Feldscans | **fehlt** |
+| `contextra-arch-tests` | dev | Architektur-, Ring-, Namens- und Lint-Tests | vorhanden |
 
-## 3. Erlaubte Abhängigkeiten (Matrix SPEC §5.3)
+Die Zweck-Sätze sind in SPEC 5.1a festgelegt und stehen wortgleich in `Cargo.toml`, im `//!`-Kopf von `lib.rs` und in der ersten Zeile jeder `README.md`.
+
+## 4. Abhängigkeitsmatrix (SPEC 5.3)
+
+Zeilen sind die Quellcrates, Spalten die erlaubten Ziele.
 
 | von \ nach | types | ports | sys | simd | dfs | crypto | mvcc | store | text | vector | rank | erasure |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -67,59 +61,86 @@ dev     contextra-testkit  contextra-lab  ctx-verify  tests/arch
 | vector | ✓ | ✓ | | ✓ | | ✓ | | | | | | |
 | rank | ✓ | ✓ | | | | | | | | | | |
 | erasure | ✓ | ✓ | | | | ✓ | | | | | | |
-| engine | ✓ | ✓ | | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| contextra | ✓ | | | | ✓ | | | | | | | |
+| engine | ✓ | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-**Architektur-Regeln (AR-1 bis AR-8):**
-1. Abhängigkeiten zeigen nur auf gleiche oder niedrigere Ringe; innerhalb Ring 2 gilt strikt obige Matrix.
-2. `store` kennt weder `text`, `vector` noch `erasure`.
-3. `erasure` kennt **keine** Ring-2-Crates, sondern kommuniziert ausschließlich über Ports (`ports`-Traits).
-4. `store` nutzt `Vfs` ausschließlich als Port aus `contextra-ports`, niemals direkt aus `contextra-durable-fs`.
-5. Keine Netzwerk-Crates im Produktionsbaum (Single-Node-Doktrin).
-6. `unsafe` ist strikt auf `contextra-sys` und `contextra-simd` beschränkt. Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
+Zusätzliche Regeln (SPEC 5.3, D-88, D-95):
 
----
+- `engine` darf `sys` nur für die Prozesshärtung nutzen.
+- `vector` hängt weder an `sys` noch an `mvcc`. Die Arena-Sperren laufen über einen Port aus `ports`, implementiert in `engine`.
+- `text` darf `crypto` nutzen.
+- Die Fassade übergibt nur `RealVfs`, Uhr und OS-CSPRNG. `engine` erzeugt den Tresor.
+- `store`, `text` und `vector` beziehen Dateischlüssel ausschließlich über den Port `FileKeyring`.
 
-## 4. Löscharchitektur & DSGVO (ADR-001, SPEC §11, §12)
+## 5. Laufzeitmodell
 
-Das Löschen ist in Contextra ein eigenständiger, entkoppelter und maschinell gemessener Prozess:
-- **Keine Ebene B in v1 (ADR-001, D-01):** Die kryptografische Schlüsselvernichtung (`DocDek`) entfällt in v1. Löschung ist die physische Bereinigung (Ebene A) kombiniert mit fail-closed `ReadGate`, Residuenmessung und signiertem Bericht.
-- **Zustandsmaschine**:
-  `Requested → Gated → Drained → Rewritten → Cleaned → Measured → Completed`
-- **ReadGate (`ErasedSet`)**:
-  Unmittelbar nach `Gated` blockiert das Gate jeden Lese- und Suchzugriff auf Zielschlüssel fail-closed. Aktive Snapshots, die Zielversionen sehen könnten, werden widerrufen (`SnapshotRevoked`).
-- **Physisches Purging (Ebene A)**:
-  - **Store**: `drain` versiegelt WAL; `rewrite_file` erzeugt neue SSTables ohne Zieldaten (Originalsequenzen bleiben erhalten); atomarer `swap` via Manifest; Block-Cache Eviction mit Zeroize.
-  - **Vector**: `zero_slot` nullt Slot-Bytes und markiert Tombstone; Snapshot-Chunks werden neu geschrieben; Rebuild ab Schwelle.
-  - **Text**: Textpuffer leeren; betroffene Segmente ohne Zieldokumente neu schreiben; Alt-Segmente löschen; Term-Statistik neu aggregieren.
-- **Residuenmessung (E1, E2, E3)**:
-  - **E1**: Byte-genauer Rohscan des Datenverzeichnisses nach Needles.
-  - **E2**: Strukturierter Scan nach Dekodierung aller Container.
-  - **E3**: Nachweis der Schlüssel- und Slot-Abwesenheit.
-- **Löschbericht (`ctx-erasure-report/1`)**:
-  Ed25519-signiert, maschinenlesbar, frei von Klartext-IDs oder Personendaten.
+- **Runtime.** Tokio multi-thread. Die Bibliothek erzeugt keine eigene Runtime. `EngineBuilder::runtime(Handle)` ist Pflicht.
+- **Cancel-Safety (I-14).** Jede mutierende Operation läuft in einem vom Aufrufer unabhängigen Task. Der Aufrufer wartet auf ein `oneshot`.
+- **Hintergrundtasks.** WAL-Flusher, Memtable-Flush, Kompaktion, Purge-Scheduler, Vektor-Reparatur und Rebuild, Textsegment-Merge, Ledger-Rotation. Jede Task hat ein Stop-Flag und ein `JoinHandle`.
+- **Sperrreihenfolge.** Dokumentlock, dann Commit-Barriere, dann Purge-Barriere, dann Journal. Keine Sperre über ein `.await` fremder Tasks.
+- **Drop** blockiert nicht. Ein geordneter Shutdown läuft über `close().await`.
 
----
+## 6. Datenflüsse
 
-## 5. Laufzeitmodell & Datenflüsse (SPEC §5.4, §5.5)
+**Schreiben.** `Collection::insert` prüft den Mandantenkontext und das ReadGate, nimmt den Dokumentlock und leitet `doc_tag` und `cluster_tag` ab. Der Tresor legt fehlende Slots der Ahnenkette an und leitet den DEK ab. Danach folgt eine Store-Transaktion: Der Gruppen-Commit-Leader prüft das ReadGate erneut, schreibt die neuen Tresor-Slots mit `sync_data`, anschließend die WAL-Frames mit `sync_data` und zuletzt Memtable und Sichtbarkeit.
 
-- **Runtime:** Tokio multi-thread über den übergebenen `tokio::runtime::Handle` in `EngineBuilder`.
-- **Cancel-Safety (I-14):** Mutierende Schreib- und Löschoperationen laufen in entkoppelten Tasks (`spawn`); der Aufrufer wartet auf ein `oneshot`-Signal.
-- **Sperren:** Dokument-Lock über die gesamte Operation (verhindert Race-Conditions zwischen Insert, Delete und Erase). Exklusive Purge-`Barrier` zwischen Kompaktion und Purge.
-- **Dateisystem-Layout (SPEC §5.6):**
-  ```
-  <data>/                       0700
-    LOCK                        exklusiver Prozess-Lock
-    HEADER                      Format-Version, KDF-Parameter, Salt[32], Store-ID
-    wal/        *.wal           HMAC-Kette, verschlüsselt
-    sst/        *.sst           SSTables (Block-AEAD), Level-Struktur
-    MANIFEST/   *.log           Manifest-Log (Datei-Mengen, Bereiche, Seq)
-    text/       *.seg           Textsegmente (AEAD-verschlüsselt)
-    vector/     *.snap          Vektorsnapshots (AEAD-verschlüsselt)
-    vault/      vault.dat       Tresor (Slots)
-    erasure/    journal.log     Löschjournal (Hash-Kette, verschlüsselt)
-                erased.set      aktive Gates (Bereiche, Commitments)
-                ledger.log      abgeschlossene Löschungen (Restore-Guard)
-                report/         signierte Berichte
-    keys/       0700            Schlüssel-Seeds (0600)
-    tmp/                        Waisen-Bereinigung beim Start
-  ```
+**Lesen.** `get` leitet die Tags ab, prüft das ReadGate, liest den Record, öffnet den Envelope mit dem DEK. Fehlt ein Slot der Ahnenkette, ist das Ergebnis `Erased`.
+
+**Suchen.** Text und Vektor liefern `DocHandle`-Treffer. Die Bindung wird nur für Kandidaten entschlüsselt. Ein ReadGate-Filter lädt bis `k` gültige Treffer nach (D-62). Danach RRF und Laden der Dokumente.
+
+**Löschen.** Validierung und Aufbewahrungsattestation, Journal `Requested`, Gate-Gruppen-Commit, Schlüsselvernichtung der höchsten Ebene und Vektor-Surrogat, Journal `KeyDestroyed`, Rückgabe `Gated`. Im Purge-Fenster folgen Drain, Flush, Entfernen der WAL-Segmente, SSTable-Rewrite, Dateischlüssel-Vernichtung, Textsegment-Rewrite, Vektor-Reparatur, Entfernen der `D`-Slots, Cache-Eviction, Messung, Bericht, Ledger und `Completed` (SPEC 11.2).
+
+## 7. Löschkern im Überblick
+
+- **Gate (`ReadGate`).** Varianten `Erased` und `Restricted`. Prüfung in jedem Lesepfad, im Suchstrom, in Zeitreisen, in der Commit-Phase und in der Kompaktion. Persistiert in `gates.log`.
+- **Schlüsselhierarchie (D-79).** Slots `T` (Mandant), `C` (Collection), `S` (Betroffener), `D` (Dokument). Die Vernichtung eines Slots der höchsten Ebene macht alle darunter liegenden DEKs unableitbar. Die Zeit bis `Gated` ist unabhängig von der Zielgröße (P16).
+- **Tresor.** Plattenresidente Hash-Tabelle mit 80-Byte-Slots (SPEC F.3). Keine vollständigen RAM-Indizes.
+- **Purge.** Die WAL wird nie umgeschrieben (D-73). Entfernt werden ganze WAL-Segmente bis zum Flush-Punkt. SSTables werden ohne Zielrecords neu geschrieben.
+- **Messung.** `LayerWitness` nur aus `Scanner<Armed>`, also nur nach erfolgreicher Positivkontrolle (D-72). Produktion misst MK1, MK2 und die Schlüsselabwesenheit (MK3-Feld). Die unabhängige Prüfung erfolgt im Lab und mit `ctx-verify scan`.
+
+## 8. Datenmodell
+
+**Löschcluster-Schlüsselraum (SPEC 9.1, D-31).** Schlüsselaufbau:
+
+```
+region(1) ‖ tenant_tag(16) ‖ coll_tag(16) ‖ cluster_tag(16) ‖ doc_tag(16) ‖ family(1) ‖ sub(u32) ‖ !commit_seq(u64)
+```
+
+Regionen: `DATA` (0x01) und `META` (0x03). Die Region `LOC` entfällt (D-70). Ein Subject-Ziel ist ein Bereich `DATA ‖ tenant ‖ coll ‖ cluster`.
+
+**Familien (SPEC 9.2).** `Doc`, `DocMap`, `Manifest`, `TextBuf`.
+
+**Tags (SPEC 9.3, Anhang C).** Alle Tags sind BLAKE3-keyed über `K_idx` mit festen Labels und längenpräfigierten Eingaben. Die Tag-Länge beträgt 16 Byte.
+
+**Envelope v2 (SPEC 9.4, F.6).** Version, `alg_id`, `doc_tag`, Nonce (96 Bit), Ciphertext, AEAD-Tag. Der Schlüssel ist der DEK des Dokuments; die AAD umfasst den vollständigen Schlüssel einschließlich `!commit_seq`.
+
+**Textindex (SPEC 9.7).** Segmente sind unveränderlich, verschlüsselt und enthalten nur `term_tag` statt Klartextterme. Postings tragen segmentlokale `doc_ord`. Die Bindung `doc_ord → (cluster_tag, doc_tag)` liegt als Envelope unter dem DEK. Nach Schlüsselvernichtung sind die Postings `unlinked`.
+
+**Vektorindex (SPEC 9.8).** HNSW mit Arena. Je Slot liegen alle Repräsentationen zusammenhängend (D-86). Löschung: Surrogat vor `Gated`, Batch-Kantenreparatur im Purge-Fenster, deterministischer Rebuild nach Quote (D-77).
+
+## 9. Verzeichnislayout (SPEC 5.6)
+
+```
+<data>/
+  LOCK                     exklusiver Prozess-Lock (D-50)
+  HEADER.a  HEADER.b       Format-Version, Store-ID, Keyslots; A/B mit Generationszähler
+  report.pub               öffentlicher Schlüssel für Berichte (vom Betreiber extern hinterlegt)
+  wal/      <file_id>.wal  HMAC-Kette, verschlüsselt
+  sst/      <file_id>.sst  SSTables, Block-AEAD
+  MANIFEST/ <file_id>.log  Manifest-Log
+  text/     <tenant_tag>/<coll_tag>/<file_id>.seg
+  vector/   <tenant_tag>/<coll_tag>/<file_id>.vsn
+  vault/    vault.dat      Tresor (Slots T, C, S, D, F)
+  erasure/  journal.log, gates.log, scope/, report/
+  tmp/                     Waisen werden beim Start entfernt
+```
+
+Außerhalb des Datenverzeichnisses liegt das Ledger (`LedgerSink`, SPEC 11.8). Kein Datei- oder Verzeichnisname enthält Klartext (D-75, T-RAW-6).
+
+## 10. Startsequenz (SPEC 14.1)
+
+1. Verzeichnis-Lock. 2. Startprobe des Dateisystems. 3. HEADER lesen, KDF-Grenzen prüfen, Passphrase prüfen. 4. Prozesshärtung. 5. Orphans in `tmp/` entfernen. 6. Gate-Log laden. 7. Journal lesen, offene Löschungen aufnehmen. 8. Manifest und WAL-Recovery. 9. Tresor öffnen, Waisen bereinigen. 10. Ledger prüfen. 11. Lesepfade freigeben, Tasks starten. Fehler in den Schritten 1 bis 10 verhindern den Start.
+
+## 11. Ist-Zustand
+
+Der Workspace baut derzeit nicht vollständig (SPEC F-32). Der Löschkern fehlt (F-33). Die Kapazitätsgrenzen, Kryptografie-Parameter und Formate gelten als Soll; ihre Umsetzung wird mit den Arbeitspaketen aus SPEC 15.4 geprüft.

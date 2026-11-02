@@ -12,7 +12,6 @@ use tempfile::TempDir;
 
 use contextra_engine::collection::query_builder::ScopeConstraint;
 use contextra_engine::{Collection, DistanceMetric, Language};
-use contextra_graph::CsrGraph;
 use contextra_ports::{Result as PortResult, ScoredDocument, TxId, VectorIndex, VectorIndexStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId};
@@ -127,13 +126,11 @@ async fn create_mock_collection(
     };
     let storage = Arc::new(LsmStorage::new(lsm_config).await.unwrap());
     let index = Arc::new(MockFilteredIndex::new(4));
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
     let col = Collection::new(
         name.to_string(),
         storage,
         index,
-        graph,
         next_tx,
         4,
         Language::English,
@@ -154,13 +151,11 @@ async fn create_standard_collection(name: &str) -> (Collection<LsmStorage, HnswI
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap());
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
     let col = Collection::new(
         name.to_string(),
         storage,
         index,
-        graph,
         next_tx,
         4,
         Language::English,

@@ -1,22 +1,11 @@
-# contextra-types
+Reine Datentypen: IDs, Tags, Schlüssel, Fehler, Löschtypen. Kein I/O.
 
-Kanonische Typdefinitionen, Identifikatoren, Schlüssel-Buffer, Fehler und Löschtypen.
+## Status
 
-- **Ring:** Ring 0 (Typen-Kern, deterministisch, I/O-frei, kein `tokio`)
-- **Normativ:** [docs/SPEC.md §8.1](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 0. Ist-Zustand: vorhanden mit Altlasten (`DocId`, `saos`, `tombstone`, `AutoExtractionMode`, `erasure.rs` entspricht nicht dem Soll). Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra-types` definiert die reinen, zustandslosen, I/O- und runtime-unabhängigen Domänentypen für das Gesamtsystem Contextra:
-- `ids`: `TenantId`, `CollectionName`, `DocKey`, `SubjectId`, blinde Tags (`TenantTag`, `CollTag`, `ClusterTag`, `DocTag`, `TermTag`), `Seq(NonZeroU64)`, `TxId`, `ErasureId`, `SegmentId`, `Slot`.
-- `key`: `Region`, `Family`, `KeyBuf`, `KeyRange`, `Matcher` (Löschcluster-Schlüsselraum SPEC §9.1).
-- `erasure`: `EraseTarget`, `ErasureState`, `LayerId`, `LayerStatus`, `ErasureClass`, `ResidualRisk`, `ErasureReport`, `RetentionAttestation`, `NeedleSet`, `LayerScan`, `Evidence`.
-- `error`: `ContextraError`.
-- `secret`: `SecretBytes`, `SecretKey32` (`Zeroizing`).
-- `limits`: Normative Obergrenzen aus SPEC §14.6.
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- Kein `async`, kein I/O, keine Zeit- oder Zufallsabfragen.
-- Alle Tags implementieren kein `Display`, nur gekürztes Hex in `Debug`.
-- `Seq` hat keinen Sentinel (`u64::MAX`).
+Erlaubt laut SPEC 5.3: keine (Ring 0).
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

@@ -1,58 +1,27 @@
-# Contextra — Jules Agent Context
+# Contextra – Kontext für Jules-Sitzungen
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
-> Version: 3.1 | Stand: 2026-10-26 | Permanent Ambient Context für Jules Sessions (Spezifikation v9)
->
-> ⚠️ **FRISCHEGARANTIE**: Diese Datei regelt ausschließlich die Session-Prozessführung für Jules.
-> Die tatsächlichen Code-Fakten, Crate-Strukturen, Invarianten und Implementierungsstände
-> sind gemäß MECE-Prinzip (CONSTITUTION.md §Documentation Model) in folgenden Quellen verankert:
-> - **Code-Zustand & Non-Obvious Decisions**: siehe `AGENTS.md`
-> - **Dynamischer Projektstatus & Tag-Inventar**: siehe `WORKING_STATE.md`
-> - **Architektur-Entscheidungen (ADRs)**: siehe `docs/decisions/README.md` (ADR-Index gemäß ADR-095)
+Nicht normativ. Maßgeblich ist [`docs/SPEC.md`](../../docs/SPEC.md), Version 4.2.0.
 
----
+## Ladeordnung
 
-## 🎯 Kontext-Ladeordnung & Modus Operandi für Sessions
+1. `.agents/jules/SESSION_BOOTSTRAP.md`: Ablauf einer Sitzung.
+2. `.agents/jules/PREAMBLE.md`: Grundregeln.
+3. `AGENTS.md` im Wurzelverzeichnis: Ist-Zustand und harte Regeln.
+4. `docs/SPEC.md`: Soll-Zustand, nur die Abschnitte der Aufgabe.
+5. `crates/<crate>/AGENTS.md`: Hinweise je Crate.
 
-Um Halluzinationen und veraltete Fakten zu vermeiden, gilt für jede Jules-Session folgende Lade- und Nachschlage-Reihenfolge:
-1. **System & Arbeitsumgebung**: `.agents/jules/context/SESSION_START.md` (automatisch durch `refresh-context.sh` erzeugt)
-2. **Prozessanleitung**: `.agents/jules/SESSION_BOOTSTRAP.md`
-3. **Aktueller Code-Zustand & Invarianten**: `AGENTS.md` (Verifizierter Code-Befund, Non-Obvious Decisions)
-4. **Verbindliche Architektur-Vorgaben**: `docs/decisions/README.md` (ADR-Index gemäß ADR-095)
+## Projektstand
 
-> 📌 **Hinweis für Prompt-Erstellung**: Die automatische Erstellung von GitHub-Issues durch Workflows/Gates ist deaktiviert.
+- Contextra ist eine eingebettete Rust-Bibliothek für lokale Speicherung und nachweisbares Löschen in Agenten- und RAG-Systemen.
+- Der Workspace baut derzeit nicht vollständig (SPEC F-32). Der Löschkern `contextra-erasure` ist leer (F-33).
+- Die Arbeit folgt den Arbeitspaketen in SPEC 15.4. Die Reihenfolge der Gates ist A, B, G0, C, D, F, E, G, H.
 
----
+## Crate-Topologie
 
-## 📜 Audit-Report & Remediation-Prompts Kontext-Anker
+Die verbindliche Ringzuordnung und die erlaubten Abhängigkeiten stehen in SPEC 5.1, 5.2 und 5.3. Frühere Quellen, die als Architekturgrundlage dienten (`WORKING_STATE.md`, `capabilities.toml`), sind nicht maßgeblich. Die Ring- und Abhängigkeitsprüfung erfolgt durch `contextra-arch-tests` (T-ARCH-3, T-ARCH-5, T-ARCH-6).
 
-Produktive Remediation-Historie wird ausschließlich über Git-Commit-Historie und `docs/decisions/` nachvollzogen.
+## Was Jules nicht tut
 
----
-
-## 📐 Crate-Topologie & Referenzen
-
-Alleinige Quelle für Ring-Zuordnungen und Abhängigkeiten ist `capabilities.toml`.
-
-> ⚠️ **Warnung**: `WORKING_STATE.md` darf NICHT als Architektur-Quelle referenziert werden, da dessen "Layer"-Feld ein rein build-graph-abgeleitetes Sortierkriterium ist und inhaltlich von `capabilities.toml` abweicht (z. B. ist `contextra-privacy` laut `capabilities.toml` Ring 3, in `WORKING_STATE.md` jedoch als Layer 0 geführt).
-
----
-
-## 📖 Crate AGENTS.md Laderegel <!-- doc-ref-ignore -->
-
-**MANDATORY FIRST STEP:** Bevor Code in einer Crate bearbeitet wird, MUSS Jules die jeweilige `AGENTS.md` der Crate laden (sofern vorhanden). Sie enthält Modul-Karten, API-Signaturen, Anti-Patterns und Lock-Hierarchien.
-
-Die vollständige Lookup-Tabelle steht in `.agents/jules/context/SESSION_START.md` (Abschnitt "Crate-AGENTS.md laden").
-
----
-
-## 🚫 Architektur-Entscheidungen (ADRs)
-
-Vollständige Liste und Verbindlichkeit aller Architektur-Entscheidungen: siehe `docs/decisions/README.md` (ADR-Index gemäß ADR-095) sowie `AGENTS.md` Abschnitt **"Non-Obvious Decisions"**.
-
----
-
-## ✅ Existierende Typen & API-Disziplin
-
-- **Existierende Typen**: Die Übersicht aller bereits verifizierten Ring-0 Typen befindet sich in `docs/TYPE_REGISTRY.md`. Vor jeder Neuimplementierung die Typübersicht prüfen.
-- **Kritische Implementierungs-Muster**: Details zu `TxId`-Allokation, `fsync`-Fehlerbehandlung, `unsafe`-Einschränkungen und HMAC-Keys sind zentral in `AGENTS.md` unter **"Non-Obvious Decisions"** hinterlegt.
+- Keine Änderung an Verschlüsselung, Integritätsprüfung, Löschlogik oder Mandantenprüfung ohne Arbeitspaket und Freigabe.
+- Keine neuen Abhängigkeiten, `unsafe`-Blöcke oder Features ohne Begründung im PR (HR-12).
+- Keine Löschaussagen außerhalb SPEC 6.4.
