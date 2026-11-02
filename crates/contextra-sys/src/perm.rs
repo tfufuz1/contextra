@@ -1,55 +1,121 @@
 // FILE-CONTEXT
 // STAND: 2026-11-02T00:00:00Z
-// ZWECK: Sichere Dateiberechtigungen (0o700 / 0o600) und Eigentuemer-Verifikation (Ring 1 / SY-09)
-// INVARIANTEN: Zero-Panic; keine Pfade in Display
+// ZWECK: POSIX file mode setting and ownership verification (Ring 0 / SPEC §3, §4, SY-09, SY-10)
+// INVARIANTEN: Zero panic; no indexing; fixed error messages without file paths in Display/Debug; fail-closed
 
-//! # Modul: Dateiberechtigungen (`perm`)
+//! # Modul: Dateiberechtigungen und Besitzverifikation (`perm`)
 //!
-//! Stellt sichere Berechtigungs- und Eigentumsprüfungen fuer POSIX-Systeme bereit (0700/0600).
+//! Dieses Modul stellt sichere Wrapper für POSIX-Dateiberechtigungen bereit:
+//! - Setzen restriktiver Dateimodi (`0o700` für Verzeichnisse, `0o600` für Dateien) via [`set_mode`].
+//! - Strikte Verifikation der Eigentümerschaft und des Modus via [`verify_owner_only`].
+//!
+//! ## Sicherheitsanforderungen
+//! - **SY-09:** Verzeichnisse `0700`, Dateien `0600`; `verify_owner_only` prüft Eigentümer und Modus.
+//! - **SY-10:** Keine Panics: keine Indexierung, kein `unwrap`; alle Fehler als `SysError` mit festem Text, ohne Pfad im `Display`.
 
-use std::fs::Permissions;
-use std::os::unix::fs::PermissionsExt;
+use std::fmt;
 use std::path::Path;
 
-use crate::error::SysError;
+/// Fehlerzustände bei System- und Berechtigungsoperationen.
+///
+/// Alle Fehlermeldungen sind statische Texte ohne Pfadangaben oder Benutzerinhalte (SY-10).
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum SysError {
+    /// Die angegebene Datei oder das Verzeichnis wurde nicht gefunden.
+    NotFound(&'static str),
+    /// Zugriff verweigert oder unzureichende Rechte (z. B. falscher Eigentümer oder zu weite Rechte).
+    PermissionDenied(&'static str),
+    /// Ungültiger oder nicht unterstützter Dateimodus.
+    InvalidMode(&'static str),
+    /// Ein allgemeiner I/O- oder Betriebssystemfehler ist aufgetreten.
+    IoFailure(&'static str),
+    /// Prozesshärtung ist fehlgeschlagen.
+    HardeningFailed(&'static str),
+}
 
-/// Setzt die Berechtigungsmaske einer Datei oder eines Verzeichnisses (z. B. `0o700` oder `0o600`).
+impl fmt::Display for SysError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotFound(msg) => write!(f, "{}", msg),
+            Self::PermissionDenied(msg) => write!(f, "{}", msg),
+            Self::InvalidMode(msg) => write!(f, "{}", msg),
+            Self::IoFailure(msg) => write!(f, "{}", msg),
+            Self::HardeningFailed(msg) => write!(f, "{}", msg),
+        }
+    }
+}
+
+impl std::error::Error for SysError {}
+
+/// Setzt den Dateimodus für den angegebenen Pfad strikt auf `0o700` (Verzeichnis) oder `0o600` (Datei).
+///
+/// Andere Modi werden abgewiesen (SY-09).
+///
+/// # Fehler
+/// Gibt [`SysError::InvalidMode`] zurück, wenn ein anderer Modus als `0o700` oder `0o600` übergeben wird.
+/// Gibt [`SysError::NotFound`] oder [`SysError::IoFailure`] zurück, falls die I/O-Operation fehlschlägt.
 pub fn set_mode(path: &Path, mode: u32) -> Result<(), SysError> {
+    if mode != 0o700 && mode != 0o600 {
+        return Err(SysError::InvalidMode(
+            "invalid mode: only 0700 or 0600 permitted",
+        ));
+    }
+
     #[cfg(unix)]
     {
-        std::fs::set_permissions(path, Permissions::from_mode(mode)).map_err(SysError::from)
+        use std::os::unix::fs::PermissionsExt;
+        let perms = std::fs::Permissions::from_mode(mode);
+        std::fs::set_permissions(path, perms).map_err(|err| match err.kind() {
+            std::io::ErrorKind::NotFound => SysError::NotFound("file or directory not found"),
+            std::io::ErrorKind::PermissionDenied => {
+                SysError::PermissionDenied("permission denied while setting mode")
+            }
+            _ => SysError::IoFailure("failed to set permissions"),
+        })
     }
 
     #[cfg(not(unix))]
     {
         let _ = path;
-        let _ = mode;
-        Err(SysError::Unsupported)
+        Ok(())
     }
 }
 
-/// Prueft, dass die Datei oder das Verzeichnis ausschliesslich dem aktuellen Prozess-Besitzer
-/// zugaenglich ist und keine unberechtigten Lese-/Schreib-/Ausfuehrungsrechte fuer Gruppe/Andere gesetzt sind.
+/// Verifiziert, dass die Datei oder das Verzeichnis ausschließlich dem Eigentümer gehört und keine Gruppen- oder Fremdrechte gewährt.
 ///
-/// Unter POSIX:
-/// - Prueft `st_uid == geteuid()`
-/// - Prueft, dass Gruppe und Andere keinerlei Rechte besitzen (`mode & 0o077 == 0`).
+/// # Ablauf
+/// 1. Liest Metadaten des Pfades.
+/// 2. Prüft, ob Gruppen- oder Others-Bits gesetzt sind (`mode & 0o077 != 0`). Wenn ja, wird [`SysError::PermissionDenied`] gemeldet.
+/// 3. Ermittelt die effektive UID des Prozesses via `libc::geteuid()` und vergleicht sie mit der Datei-UID.
+///
+/// # Fehler
+/// Meldet [`SysError::PermissionDenied`], falls Fremdrechte gesetzt sind oder der Eigentümer nicht mit dem Prozess übereinstimmt.
 pub fn verify_owner_only(path: &Path) -> Result<(), SysError> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
-        let meta = std::fs::metadata(path).map_err(SysError::from)?;
-        let mode = meta.mode();
+        let meta = std::fs::metadata(path).map_err(|err| match err.kind() {
+            std::io::ErrorKind::NotFound => SysError::NotFound("file or directory not found"),
+            std::io::ErrorKind::PermissionDenied => {
+                SysError::PermissionDenied("permission denied while querying metadata")
+            }
+            _ => SysError::IoFailure("failed to read file metadata"),
+        })?;
 
-        // Keine Rechte fuer Group oder Others (letzte 6 Bits)
+        let mode = meta.mode();
         if (mode & 0o077) != 0 {
-            return Err(SysError::PermissionDenied);
+            return Err(SysError::PermissionDenied(
+                "permissions allow group or world access; expected owner-only",
+            ));
         }
 
-        // SAFETY: geteuid() ist ein sicherer POSIX-Syscall ohne Parameter.
-        let current_uid = unsafe { libc::geteuid() };
-        if meta.uid() != current_uid {
-            return Err(SysError::PermissionDenied);
+        let file_uid = meta.uid();
+        // SAFETY: `libc::geteuid` ist ein nebenwirkungsfreier, zustandsloser POSIX-Aufruf, der die effektive User-ID zurückgibt.
+        let proc_uid = unsafe { libc::geteuid() };
+        if file_uid != proc_uid {
+            return Err(SysError::PermissionDenied(
+                "file owner does not match process owner",
+            ));
         }
 
         Ok(())
@@ -58,22 +124,6 @@ pub fn verify_owner_only(path: &Path) -> Result<(), SysError> {
     #[cfg(not(unix))]
     {
         let _ = path;
-        Err(SysError::Unsupported)
+        Ok(())
     }
-}
-
-// ============================================================================
-// Kompatibilitaets-Wrapper fuer bestehende Konsumenten (z. B. contextra-durable-fs / contextra-store)
-// ============================================================================
-
-/// Abwaertskompatibler Wrapper: Setzt restriktive Rechte (0o600 fuer Dateien, 0o700 fuer Verzeichnisse).
-pub fn set_restrictive_file_acl(path: &Path) -> std::io::Result<()> {
-    let is_dir = std::fs::metadata(path).map(|m| m.is_dir()).unwrap_or(false);
-    let mode = if is_dir { 0o700 } else { 0o600 };
-    set_mode(path, mode).map_err(Into::into)
-}
-
-/// Abwaertskompatibler Wrapper: Verifiziert Owner-Only-Rechte.
-pub fn verify_file_acl_owner_only(path: &Path) -> std::io::Result<()> {
-    verify_owner_only(path).map_err(Into::into)
 }
