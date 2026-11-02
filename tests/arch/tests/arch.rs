@@ -1,8 +1,12 @@
 //! Führt die Architekturprüfungen gegen das echte Workspace aus (SPEC §5.2).
 
 use contextra_arch_tests::{
-    check_feature_hygiene, check_layering, check_network_dependencies, check_raw_storage_isolation,
-    check_store_fs_usage, check_types_purity, check_unsafe, check_wording, load_crates,
+    check_clean_source_tree, check_crate_headers_and_descriptions,
+    check_exports_and_dev_dependencies, check_feature_hygiene, check_layering,
+    check_naming_and_facade_structure, check_network_dependencies, check_obsolete_evidence_terms,
+    check_raw_storage_isolation, check_session_marks_and_timestamps, check_store_fs_usage,
+    check_test_traceability, check_trademark_and_session_marks, check_types_purity, check_unsafe,
+    check_wording, load_crates,
 };
 use std::path::PathBuf;
 
@@ -42,6 +46,110 @@ fn test_t_arch_4_single_node_garantie() -> Result<(), String> {
     assert!(
         violations.is_empty(),
         "T-ARCH-4 Verstöße:\n{}",
+        violations.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn test_t_arch_5_crate_headers_and_descriptions() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_crate_headers_and_descriptions(&root, &crates);
+    assert!(
+        violations.is_empty(),
+        "T-ARCH-5 Verstöße:\n{}",
+        violations.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn test_t_arch_6_exports_and_dev_dependencies() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_exports_and_dev_dependencies(&root, &crates);
+    assert!(
+        violations.is_empty(),
+        "T-ARCH-6 Verstöße:\n{}",
+        violations.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn test_t_arch_7_naming_and_facade_structure() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_naming_and_facade_structure(&crates);
+    assert!(
+        violations.is_empty(),
+        "T-ARCH-7 Verstöße:\n{}",
+        violations.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn test_t_arch_8_clean_source_tree() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_clean_source_tree(&crates);
+    assert!(
+        violations.is_empty(),
+        "T-ARCH-8 Verstöße:\n{}",
+        violations.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn test_t_doc_1_session_marks_and_timestamps() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_session_marks_and_timestamps(&root, &crates);
+    assert!(
+        violations.is_empty(),
+        "T-DOC-1 Verstöße:\n{}",
+        violations.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn test_t_lint_4_trademark_and_session_marks() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_trademark_and_session_marks(&root, &crates);
+    assert!(
+        violations.is_empty(),
+        "T-LINT-4 Verstöße:\n{}",
+        violations.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn test_t_lint_3_obsolete_evidence_terms() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_obsolete_evidence_terms(&root, &crates);
+    assert!(
+        violations.is_empty(),
+        "T-LINT-3 Verstöße:\n{}",
+        violations.join("\n")
+    );
+    Ok(())
+}
+
+#[test]
+fn test_t_trace_1_test_traceability() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_test_traceability(&root, &crates);
+    assert!(
+        violations.is_empty(),
+        "T-TRACE-1 Verstöße:\n{}",
         violations.join("\n")
     );
     Ok(())
