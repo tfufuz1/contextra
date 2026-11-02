@@ -404,6 +404,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-erasure"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "bytes",
+ "contextra-crypto",
+ "contextra-ports",
+ "contextra-types",
+ "ed25519-dalek",
+ "parking_lot",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "zeroize",
+]
+
+[[package]]
 name = "contextra-mvcc"
 version = "0.1.0"
 dependencies = [
@@ -417,6 +438,7 @@ dependencies = [
  "parking_lot",
  "proptest",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",
@@ -522,6 +544,7 @@ dependencies = [
  "bytes",
  "contextra-ports",
  "contextra-types",
+ "criterion",
  "parking_lot",
  "tempfile",
  "tokio",
