@@ -1,0 +1,42 @@
+# Aufgabenkarte WP-1.2 – Branch archive/v0-full und Rückbauliste D-84
+# Nicht normativ. Quelle: SPEC 15.4 (WP-1.2), D-22, D-84.
+
+id          = "WP-1.2"
+title       = "Rückbauliste D-84 (Features, Legacy-Pfade) und Archivierung"
+wp          = "WP-1.2"
+gate        = "B"
+crate       = "contextra-types"
+goal        = "Features in contextra-types entfernt (docid-128, auto-extraction-opt-out, default), ungenutzte Module rückgebaut."
+non_goals   = ["Keine Änderungen an anderen Crates"]
+
+scope       = [
+  "crates/contextra-types/**",
+  ".agents/jules/tasks/WP-1.2.toml",
+]
+
+forbidden   = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
+]
+
+spec_ids    = ["D-22", "D-84", "T-CFG-1"]
+
+acceptance  = [
+  "cargo test -p contextra-types --locked",
+]
+
+evidence_required = ["Feature-Entfernung in contextra-types verifiziert"]
+
+[budget]
+files      = 5
+lines      = 200
+iterations = 4
