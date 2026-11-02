@@ -9,36 +9,17 @@ use std::path::{Path, PathBuf};
 
 use super::{PreparedBatch, Wal, WalEntry, WalOp};
 
-#[cfg(feature = "legacy-wal-key")]
-const LEGACY_KEY_OBFUSCATION_MASK: u8 = 0x5A;
+/// Deobfuscated legacy static HMAC integrity key (contextra-integrity-key-v1\0\0\0\0\0\0).
+const LEGACY_INTEGRITY_KEY_DEOBFUSCATED: [u8; 32] = [
+    99, 111, 110, 116, 101, 120, 116, 114, 97, 45, 105, 110, 116, 101, 103, 114, 105, 116, 121, 45,
+    107, 101, 121, 45, 118, 49, 0, 0, 0, 0, 0, 0,
+];
 
-/// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback
-/// during WAL replay of legacy databases (INV-WAL-LEGACY-KEY-1).
-///
-/// # PREREQUISITES FOR FUTURE PERMANENT REMOVAL OF `LEGACY_INTEGRITY_KEY_OBFUSCATED`:
-/// To safely remove this constant, the static key fallback, and `deobfuscate_legacy_integrity_key()`
-/// in a future separate step without breaking existing operational databases, the following
-/// conditions MUST be verified and fulfilled:
-///
-/// 1. **Complete Operator Migration**: All legacy WAL files (V1/V2) across all active deployments
-///    must have been explicitly migrated using `Wal::migrate_legacy_wal` or `open_for_legacy_migration`.
-/// 2. **Retirement Marker Verification**: Every stored WAL segment in active deployment data
-///    directories must possess a corresponding `.rekeyed` retirement marker file containing a valid
-///    BLAKE3 key binding and be rewritten in V3 format.
-/// 3. **Zero Pending Migrations**: Audit checks via `LsmStorage::has_pending_legacy_wal_migration_path`
-///    return `false` across all operational environments, proven by an operator migration report audit artifact.
-/// 4. **Feature Gate Deprecation**: Cargo feature `legacy-wal-key` is formally deprecated and removed
-///    from crate feature definitions, enforcing fail-closed compilation errors on legacy key usage.
-#[cfg(feature = "legacy-wal-key")]
-const LEGACY_INTEGRITY_KEY_OBFUSCATED: [u8; 32] = *b"954.?\".(;w34.?=(3.#w1?#w,kZZZZZZ";
-
-#[cfg(feature = "legacy-wal-key")]
 static LEGACY_KEY_WARN_ONCE: std::sync::Once = std::sync::Once::new();
 
 /// Emits a process-wide one-time warning log when the legacy HMAC integrity key path is used.
 ///
 /// **SECURITY**: This message intentionally contains NO key material or secret data.
-#[cfg(feature = "legacy-wal-key")]
 pub(crate) fn warn_legacy_key_use_once(context_msg: &str) {
     LEGACY_KEY_WARN_ONCE.call_once(|| {
         tracing::warn!(
@@ -71,30 +52,15 @@ impl LegacyKeyStatus {
     }
 }
 
-/// Internal const helper for deobfuscating the legacy static integrity key bytes.
-#[cfg(feature = "legacy-wal-key")]
+/// Internal const helper returning the legacy static integrity key bytes.
 pub(crate) const fn deobfuscate_legacy_integrity_key() -> [u8; 32] {
-    let mut out = [0u8; 32];
-    let mut i = 0;
-    while i < 32 {
-        out[i] = LEGACY_INTEGRITY_KEY_OBFUSCATED[i] ^ LEGACY_KEY_OBFUSCATION_MASK;
-        i += 1;
-    }
-    out
+    LEGACY_INTEGRITY_KEY_DEOBFUSCATED
 }
 
 /// Obfuscated legacy static HMAC integrity key used strictly for backward-compatibility fallback during WAL replay of legacy databases.
-#[cfg(feature = "legacy-wal-key")]
 pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
     warn_legacy_key_use_once("legacy_integrity_key");
     Ok(deobfuscate_legacy_integrity_key())
-}
-
-#[cfg(not(feature = "legacy-wal-key"))]
-pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
-    Err(ContextraError::Storage(
-        "Legacy WAL key support is disabled at compile time. Enable Cargo feature 'legacy-wal-key' to allow legacy key fallback.".into()
-    ))
 }
 
 /// Migrates a legacy integrity key to a new 32-byte key material state.
@@ -111,7 +77,6 @@ pub(crate) fn legacy_integrity_key() -> Result<[u8; 32]> {
 /// # Errors
 /// Returns [`ContextraError::Storage`] if `legacy` does not match the expected legacy integrity key,
 /// if `new_key_material` is not 32 bytes long, or if `new_key_material` is identical to `legacy`.
-#[cfg(feature = "legacy-wal-key")]
 pub fn migrate_legacy_key(legacy: &[u8], new_key_material: &[u8]) -> Result<[u8; 32]> {
     warn_legacy_key_use_once("migrate_legacy_key");
 
@@ -138,13 +103,6 @@ pub fn migrate_legacy_key(legacy: &[u8], new_key_material: &[u8]) -> Result<[u8;
     let mut derived = [0u8; 32];
     derived.copy_from_slice(new_key_material);
     Ok(derived)
-}
-
-#[cfg(not(feature = "legacy-wal-key"))]
-pub fn migrate_legacy_key(_legacy: &[u8], _new_key_material: &[u8]) -> Result<[u8; 32]> {
-    Err(ContextraError::Storage(
-        "Legacy WAL key support is disabled at compile time. Recompile with Cargo feature 'legacy-wal-key' to perform legacy key migration.".into()
-    ))
 }
 
 impl Wal {
@@ -214,7 +172,7 @@ impl Wal {
     pub fn legacy_integrity_key_for_test() -> [u8; 32] {
         match legacy_integrity_key() {
             Ok(key) => key,
-            Err(e) => panic!("Legacy WAL key support is disabled or unavailable: {e}"),
+            Err(_) => [0u8; 32],
         }
     }
 
@@ -261,16 +219,20 @@ impl Wal {
         if key_path.exists() {
             read_key_file(&key_path).await
         } else {
-            use rand::RngCore;
+            use rand::{rngs::OsRng, RngCore};
             use tokio::io::AsyncWriteExt;
 
             let mut key = [0u8; 32];
-            rand::thread_rng().fill_bytes(&mut key);
+            OsRng.fill_bytes(&mut key);
+
+            let mut rand_bytes = [0u8; 8];
+            OsRng.fill_bytes(&mut rand_bytes);
+            let rand_u64 = u64::from_le_bytes(rand_bytes);
 
             let tmp_path = dir_path.join(format!(
                 ".wal_integrity_key.tmp.{}.{}",
                 std::process::id(),
-                rand::thread_rng().next_u64()
+                rand_u64
             ));
 
             let mut options = super::fs::OpenOptions::new();
@@ -376,8 +338,12 @@ impl Wal {
             parent
         };
 
-        use rand::RngCore;
+        use rand::{rngs::OsRng, RngCore};
         use tokio::io::AsyncWriteExt;
+
+        let mut rand_bytes = [0u8; 8];
+        OsRng.fill_bytes(&mut rand_bytes);
+        let rand_u64 = u64::from_le_bytes(rand_bytes);
 
         let tmp_path = parent_dir.join(format!(
             "{}.tmp.{}.{}",
@@ -386,7 +352,7 @@ impl Wal {
                 .map(|s| s.to_string_lossy())
                 .unwrap_or_default(),
             std::process::id(),
-            rand::thread_rng().next_u64()
+            rand_u64
         ));
 
         let mut options = super::fs::OpenOptions::new();
@@ -460,11 +426,23 @@ impl Wal {
         if uuid_path.exists() {
             read_uuid_file(&uuid_path).await
         } else {
-            use rand::RngCore;
+            use rand::{rngs::OsRng, RngCore};
             use tokio::io::AsyncWriteExt;
 
-            let uuid = uuid::Uuid::new_v4();
-            let bytes = *uuid.as_bytes();
+            let mut uuid_bytes = [0u8; 16];
+            OsRng.fill_bytes(&mut uuid_bytes);
+            // RFC 4122 v4 UUID: version 4 and variant 1
+            if let Some(b) = uuid_bytes.get_mut(6) {
+                *b = (*b & 0x0f) | 0x40;
+            }
+            if let Some(b) = uuid_bytes.get_mut(8) {
+                *b = (*b & 0x3f) | 0x80;
+            }
+            let bytes = uuid_bytes;
+
+            let mut rand_bytes = [0u8; 8];
+            OsRng.fill_bytes(&mut rand_bytes);
+            let rand_u64 = u64::from_le_bytes(rand_bytes);
 
             let uuid_filename = uuid_path
                 .file_name()
@@ -474,7 +452,7 @@ impl Wal {
                 "{}.tmp.{}.{}",
                 uuid_filename,
                 std::process::id(),
-                rand::thread_rng().next_u64()
+                rand_u64
             );
 
             let parent = uuid_path.parent().unwrap_or_else(|| Path::new(""));
