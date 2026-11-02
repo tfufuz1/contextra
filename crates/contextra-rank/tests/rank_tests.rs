@@ -1,112 +1,115 @@
-//! # Integrationstest: Basis-Ranking-Tests für RRF
-//!
-//! **Crate:** `contextra-rank`
-//!
-//! Prüft die Korrektheit, Stabilität und Invarianten der RRF-Komponenten.
+//! Unit-Tests für contextra-rank.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
-#[cfg(test)]
-mod tests {
-    use contextra_rank::fusion::{
-        g, reciprocal_rank_fusion, rrf_fuse, BoundedTopK, Hit, ProvenanceBuilder, SearchResult,
+use contextra_rank::{rrf_fuse, unseen_bound, Candidate, DocHandle, RankError, RrfScore};
+
+/// SPEC: RK-03
+#[test]
+fn rk_03_tie_break_order_and_multi_list_sum() {
+    // Gleicher Score: Tie-Break nach doc_tag aufsteigend, dann cluster_tag aufsteigend
+    let handle_a = DocHandle {
+        cluster_tag: [5; 16],
+        doc_tag: [1; 16],
+    };
+    let handle_b = DocHandle {
+        cluster_tag: [2; 16],
+        doc_tag: [2; 16],
+    };
+    let handle_c = DocHandle {
+        cluster_tag: [9; 16],
+        doc_tag: [1; 16],
     };
 
-    // ANCHOR[contextra-rank:RNK-TEST-001]
-    #[test]
-    fn test_rrf_k_zero_boundary() {
-        let prov = ProvenanceBuilder::new(0.0)
-            .vector(0.9, 1, 1.0)
-            .source_collection("col")
-            .index_type("hnsw")
-            .expected_total(1.0)
-            .build();
-        let contrib = prov
-            .signal_contributions
-            .get("vector")
-            .expect("vector contribution present");
-        assert_eq!(contrib.rrf_contribution, 1.0);
-    }
+    let list1 = [Candidate { handle: handle_a }];
+    let list2 = [Candidate { handle: handle_c }];
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
-    #[test]
-    fn test_rrf_dual_signal_higher_than_single_signal() {
-        let set1 = vec![SearchResult {
-            id: "doc_both".to_string(),
-            score: 0.99,
-            metadata: None,
-            matched_signals: vec![],
-            provenance: None,
-        }];
-        let set2 = vec![
-            SearchResult {
-                id: "doc_both".to_string(),
-                score: 0.95,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
+    let res = rrf_fuse(&[&list1, &[Candidate { handle: handle_b }]], 5).unwrap();
+    assert_eq!(res.len(), 2);
+    assert_eq!(res.first().map(|f| f.handle), Some(handle_a));
+    assert_eq!(res.get(1).map(|f| f.handle), Some(handle_b));
+
+    // Now test cluster_tag tie-break when doc_tag is identical
+    let res2 = rrf_fuse(&[&list1, &list2], 5).unwrap();
+    assert_eq!(res2.len(), 2);
+    assert_eq!(res2.first().map(|f| f.handle), Some(handle_a));
+    assert_eq!(res2.get(1).map(|f| f.handle), Some(handle_c));
+
+    // Gleiches (cluster_tag, doc_tag) in mehreren Listen => summiert
+    let list_multi1 = [Candidate { handle: handle_b }];
+    let list_multi2 = [Candidate { handle: handle_b }];
+    let res_sum = rrf_fuse(&[&list_multi1, &list_multi2], 5).unwrap();
+    assert_eq!(res_sum.len(), 1);
+    let expected_single = (1u64 << 40) / 61;
+    assert_eq!(
+        res_sum.first().map(|f| f.score),
+        Some(RrfScore(expected_single * 2))
+    );
+}
+
+/// SPEC: RK-06
+#[test]
+fn rk_06_input_validation_boundaries() {
+    let dummy = Candidate {
+        handle: DocHandle {
+            cluster_tag: [0; 16],
+            doc_tag: [1; 16],
+        },
+    };
+
+    // top = 0 => leere Ausgabe
+    let list = [dummy];
+    let res = rrf_fuse(&[&list], 0).unwrap();
+    assert!(res.is_empty());
+
+    // Mehr als 1000 Kandidaten je Liste => RankError::TooLarge
+    let mut large_list = Vec::with_capacity(1001);
+    for i in 0..1001u32 {
+        let mut doc_tag = [0u8; 16];
+        doc_tag[..4].copy_from_slice(&i.to_be_bytes());
+        large_list.push(Candidate {
+            handle: DocHandle {
+                cluster_tag: [0; 16],
+                doc_tag,
             },
-            SearchResult {
-                id: "doc_single".to_string(),
-                score: 0.99,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        ];
-
-        let fused = reciprocal_rank_fusion(vec![set1, set2], 10);
-        assert_eq!(fused.len(), 2);
-        if let (Some(f0), Some(f1)) = (fused.first(), fused.get(1)) {
-            assert_eq!(f0.id, "doc_both");
-            assert_eq!(f1.id, "doc_single");
-            assert!(f0.score > f1.score);
-        }
+        });
     }
+    let err = rrf_fuse(&[&large_list], 10);
+    assert_eq!(err, Err(RankError::TooLarge));
 
-    // Testet kanonische rrf_fuse Funktion mit Hits
-    #[test]
-    fn test_rrf_fuse_dual_signal_higher_than_single_signal() {
-        let set1 = vec![Hit::new("doc_both", 0.99)];
-        let set2 = vec![Hit::new("doc_both", 0.95), Hit::new("doc_single", 0.99)];
+    // Duplikate innerhalb einer Liste => RankError::Duplicate
+    let dup_list = [dummy, dummy];
+    let err_dup = rrf_fuse(&[&dup_list], 10);
+    assert_eq!(err_dup, Err(RankError::Duplicate));
+}
 
-        let fused = rrf_fuse(&[set1, set2], 60, 10);
-        assert_eq!(fused.len(), 2);
-        if let (Some(f0), Some(f1)) = (fused.first(), fused.get(1)) {
-            assert_eq!(f0.id, "doc_both");
-            assert_eq!(f1.id, "doc_single");
-            assert!(f0.score > f1.score);
-        }
-    }
+/// SPEC: RK-07
+#[test]
+fn rk_07_unseen_bound_calculation() {
+    let depths = [10, 20];
+    let bound = unseen_bound(&depths);
+    let term1 = (1u64 << 40) / 71;
+    let term2 = (1u64 << 40) / 81;
+    assert_eq!(bound, RrfScore(term1 + term2));
+}
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
-    #[test]
-    fn test_bounded_top_k() {
-        let mut top_k = BoundedTopK::new(2);
-        top_k.push(10i32);
-        top_k.push(20i32);
-        top_k.push(5i32);
-        let sorted = top_k.into_sorted_vec();
-        assert_eq!(sorted, vec![5, 10]);
-    }
+/// SPEC: T-DOCREF-1
+#[test]
+fn t_docref_1_handle_identity() {
+    // Gleiche doc_tag mit anderem cluster_tag => verschiedene Einträge
+    let h1 = DocHandle {
+        cluster_tag: [1; 16],
+        doc_tag: [42; 16],
+    };
+    let h2 = DocHandle {
+        cluster_tag: [2; 16],
+        doc_tag: [42; 16],
+    };
+    let l1 = [Candidate { handle: h1 }];
+    let l2 = [Candidate { handle: h2 }];
 
-    // Testet das erwartete Verhalten und mathematische Invarianten.
-    #[test]
-    fn test_g_function_standalone_properties() {
-        // (c) g(0) is exactly 0
-        assert_eq!(g(0.0), 0.0);
-        assert_eq!(g(-0.0), 0.0);
-
-        // g(x) bounded towards 1 for x -> infinity
-        assert!((g(1000.0) - 1.0).abs() < 0.01);
-        assert!((g(1_000_000.0) - 1.0).abs() < 0.0001);
-
-        // g(x) bounded towards -1 for x -> -infinity
-        assert!((g(-1000.0) - (-1.0)).abs() < 0.01);
-
-        // Non-finite float safety
-        assert_eq!(g(f32::NAN), 0.0);
-        assert_eq!(g(f32::INFINITY), 0.0);
-        assert_eq!(g(f32::NEG_INFINITY), 0.0);
-    }
+    let res = rrf_fuse(&[&l1, &l2], 10).unwrap();
+    assert_eq!(res.len(), 2);
+    assert_eq!(res.first().map(|f| f.handle), Some(h1));
+    assert_eq!(res.get(1).map(|f| f.handle), Some(h2));
 }
