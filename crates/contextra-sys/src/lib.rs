@@ -1,61 +1,40 @@
 #![allow(unsafe_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(missing_docs)]
-#![doc = "Contextra Unsafe System Abstraction Crate (Ring 0 - Unsafe-Insel)"]
+#![doc = "Contextra Unsafe System Abstraction Crate (Ring 1 - Unsafe-Insel)"]
 
-//! # Contextra-Sys: Low-Level-Systemabstraktionen und Unsafe-Insel (Ring 0)
+//! # Contextra-Sys: Low-Level-Systemabstraktionen und Unsafe-Insel (Ring 1)
 //!
-//! Dieses Modul bildet die hardware- und betriebssystemnahe Basis (Ring 0) für das Contextra-System.
-//! Es kapselt alle systemweiten Zugriffe, die betriebssystemspezifische FFI-Aufrufe (Foreign Function Interface,
-//! Schnittstelle zu betriebssystemeigenem C-Code) oder `unsafe`-Code erfordern, in sicheren, typisierten Rust-Schnittstellen.
+//! Dieses Modul bildet die hardware- und betriebssystemnahe Basis fuer das Contextra-System.
+//! Es kapselt alle systemweiten Zugriffe, die betriebssystemspezifische FFI-Aufrufe
+//! oder `unsafe`-Code erfordern, in sicheren, typisierten Rust-Schnittstellen.
 //!
-//! ## Ring-Zugehörigkeit und Architektur
-//! - **Ring 0 (Kern / Unsafe-Insel):** Darf von höheren Ringen eingebunden werden, hängt selbst von keinen anderen
-//!   Contextra-Crates ab.
-//! - **Abhängigkeiten (ausgehend):** Keine internen Workspace-Abhängigkeiten. Externe Crates: `libc` (POSIX),
-//!   `windows-sys` (Win32), `memmap2`, `tracing`.
-//! - **Eingehende Abhängigkeiten (wer nutzt contextra-sys):**
-//!   - `contextra-db` (Transaktions- und Datenbankverwaltung)
-//!   - `contextra-durable-fs` (Dauerhafte Dateisystem-Abstraktionen)
-//!   - `contextra-engine` (Such- und Indexierungs-Engine)
-//!   - `contextra-store` (LSM-Speicher und WAL = Write-Ahead-Log)
-//!   - `contextra-vector` (Vektorindex und DiskANN-Speicherabbildung)
+//! ## Ring-Zugehoerigkeit und Architektur
+//! - **Ring 1 (Kern / Unsafe-Insel):** Darf von hoeheren Ringen eingebunden werden.
+//! - **Abhaengigkeiten:** `libc`, `tracing`.
 //!
 //! ## Kernkomponenten
-//! 1. [`acl_win32`]: Plattformspezifische Zugriffsbeschränkungen (DACL unter Windows, chmod `0600` und UID-Prüfung unter Unix).
-//! 2. [`durability`]: Haltbare Dateisystem-Synchronisation (WAL/LSM fsync, fdatasync, F_FULLFSYNC, FlushFileBuffers).
-//! 3. [`mlock`]: Festpinnen sensibler Speicherseiten im RAM (Verhinderung von Paging/Swapping auf die Festplatte) via `mem_lock_slice` oder `mem_lock_with_policy`.
-//! 4. [`mmap`]: Nur-Lese-Speicherabbildung ([`mmap_readonly`]) für Vektordaten und SSTables unter Beachtung der Speicherinvariante.
-//! 5. [`posix`]: POSIX-Ressourcenlimits (`rlimit` für Dateideskriptoren) und atomare Deskriptorumleitungen ([`reopen_and_dup2`]).
-//! 6. [`vault`]: RAII-Sicherheitsverwaltung ([`LockedRegions`]) für sensible Schlüsselpuffer inklusive sicherem Nullsetzen ([`LockedRegions::zeroize_slice`]).
-//!
-//! ## Unsafe-Oberfläche und Verträge
-//! Als autorisierte `unsafe`-Insel (Ring 0) macht `contextra-sys` alle Vorbedingungen explizit:
-//! - [`mmap_readonly`]: Als `pub unsafe fn` deklariert (Vertrag V-SYS), da Modifikationen oder Kürzungen der Datei
-//!   außerhalb des Prozesses zu Speicherverletzungen (SIGBUS) führen können.
-//! - [`reopen_and_dup2`]: Als `pub unsafe fn` deklariert (Vertrag V-SYS), da `dup2` Deskriptoren atomar überschreibt
-//!   und strikte Ownership-Garantien des Aufrufers verlangt.
-//! - [`mem_lock_with_policy`], [`mem_lock`], [`mem_unlock`]: Rohzeiger-basierte Primitiven sind `pub unsafe fn`.
-//!   Für sichere Zugriffe steht die Slice-API [`mem_lock_slice`] bzw. der RAII-Manager [`LockedRegions`] bereit.
+//! 1. [`durability`]: Haltbare Dateisystem-Synchronisation (`flush_file`, `flush_dir`, `rename_durable`).
+//! 2. [`fs_probe`]: Dateisystemerkennung fuer die Startprobe (`fs_class`).
+//! 3. [`hardening`]: Prozess- und Speicherhaertung (`apply_process_hardening`, `mark_dont_dump`, `lock_pages`).
+//! 4. [`perm`]: Dateiberechtigungen und Eigentuemer-Verifikation (`set_mode`, `verify_owner_only`).
+//! 5. [`error`]: Fehler- und Statustypen (`SysError`, `SyncFailure`, `UnsupportedKind`).
 
-pub mod acl_win32;
 pub mod durability;
-pub mod mlock;
-pub mod mmap;
-pub mod posix;
-pub mod vault;
+pub mod error;
+pub mod fs_probe;
+pub mod hardening;
+pub mod perm;
 
-// ANCHOR[contextra-sys:LIB-REEXPORT-001]
-// Öffentliche Re-Exports für ergonomischen Direktzugriff durch übergeordnete Ringe (z. B. contextra-store, contextra-engine).
-pub use acl_win32::{set_restrictive_file_acl, verify_file_acl_owner_only};
+// Oeffentliche Re-Exporte gemaess Spezifikation 03-contextra-sys.md
 pub use durability::{
-    durable_flush_dir, durable_flush_file, flush_dir, flush_file, fs_class, rename_durable,
-    write_all_durable, FlushKind, FsClass,
+    durable_flush_dir, durable_flush_file, flush_dir, flush_dir_sync, flush_file, flush_file_sync,
+    rename_durable, rename_durable_sync, write_all_durable, FlushKind,
 };
-pub use mlock::{
-    mem_lock, mem_lock_slice, mem_lock_slice_tolerant, mem_lock_with_policy, mem_unlock,
-    MemLockPolicy,
+pub use error::{SyncFailure, SysError, UnsupportedKind};
+pub use fs_probe::{fs_class, fs_class_spec, FsClass, FsKind};
+pub use hardening::{
+    apply_process_hardening, ensure_fd_limit, lock_pages, mark_dont_dump, set_fd_limit,
+    HardeningPolicy, HardeningReport,
 };
-pub use mmap::mmap_readonly;
-pub use posix::{ensure_fd_limit, reopen_and_dup2, set_fd_limit};
-pub use vault::LockedRegions;
+pub use perm::{set_mode, set_restrictive_file_acl, verify_file_acl_owner_only, verify_owner_only};
