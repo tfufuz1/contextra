@@ -511,7 +511,7 @@ impl<S> TenantScopedStorage<S> {
     fn strip_key(&self, key: Vec<u8>) -> Option<Vec<u8>> {
         let prefix = self.codec.scan_prefix();
         if key.starts_with(prefix) {
-            Some(key[prefix.len()..].to_vec())
+            key.get(prefix.len()..).map(|s| s.to_vec())
         } else {
             None
         }
@@ -523,7 +523,7 @@ impl<S> TenantScopedStorage<S> {
             .into_iter()
             .filter_map(|(k, v)| {
                 if k.starts_with(prefix) {
-                    Some((k[prefix.len()..].to_vec(), v))
+                    k.get(prefix.len()..).map(|stripped| (stripped.to_vec(), v))
                 } else {
                     None
                 }

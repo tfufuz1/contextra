@@ -352,13 +352,13 @@ impl ObserverRegistry {
 
         let clock = self.clock.read().clone();
         let max_latency = self.max_observer_latency();
-        let max_latency_nanos = max_latency.as_nanos() as u64;
+        let max_latency_nanos = u64::try_from(max_latency.as_nanos()).unwrap_or(u64::MAX);
         let now_nanos = clock.monotonic_nanos();
 
         // Circuit breaker cooldown: 1 second
         let cooldown_nanos = 1_000_000_000u64;
 
-        let mut panicking: Vec<Arc<dyn WalObserver>> = Vec::new();
+        let mut failed_observers: Vec<Arc<dyn WalObserver>> = Vec::new();
 
         let mut run_notify = || {
             for worker in &observers_snapshot {
@@ -422,9 +422,9 @@ impl ObserverRegistry {
                             .store(now_nanos.saturating_add(cooldown_nanos), Ordering::Relaxed);
                         tracing::error!(
                             tx_id = ctx.tx_id.inner(),
-                            "WalObserver panicked during on_commit execution; deregistering observer"
+                            "WalObserver failed during on_commit execution; deregistering observer"
                         );
-                        panicking.push(Arc::clone(&worker.inner));
+                        failed_observers.push(Arc::clone(&worker.inner));
                     }
                     Err(RecvTimeoutError::Timeout) => {
                         worker.dropped_count.fetch_add(1, Ordering::Relaxed);
@@ -458,9 +458,9 @@ impl ObserverRegistry {
             run_notify();
         }
 
-        if !panicking.is_empty() {
+        if !failed_observers.is_empty() {
             let mut guard = self.observers.write();
-            guard.retain(|w| !panicking.iter().any(|p| Arc::ptr_eq(&w.inner, p)));
+            guard.retain(|w| !failed_observers.iter().any(|p| Arc::ptr_eq(&w.inner, p)));
         }
     }
 

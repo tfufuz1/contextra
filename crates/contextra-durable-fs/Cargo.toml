@@ -10,9 +10,10 @@ rust-version.workspace = true
 description = "Durable filesystem operations and synchronous disk flushing for Contextra"
 
 [package.metadata.contextra]
-ring = "0"
+ring = "1"
 
 [dependencies]
+contextra-ports = { path = "../contextra-ports", version = "0.1.0" }
 contextra-sys = { path = "../contextra-sys", version = "0.1.0" }
 
 [dev-dependencies]

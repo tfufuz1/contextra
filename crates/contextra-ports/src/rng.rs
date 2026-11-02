@@ -1,11 +1,14 @@
 //! Random number generator port trait and deterministic SplitMix64 implementation.
+//!
+//! # SPEC-REF
+//! In accordance with SPEC §8.2 and V-RNG:
+//! - [`Rng`] trait provides non-cryptographic pseudo-randomness for jitter, tie-breaking, etc.
+//! - [`SeededRng`] is a deterministic SplitMix64 generator seeded exclusively via [`SeededRng::new(seed)`].
+//! - System/OS entropy injection is strictly restricted to Composition Roots and cryptographic
+//!   crates (`contextra-crypto` via `OsRng`/`getrandom`). No entropy constructor shortcut exists in library code.
 
-use std::collections::hash_map::RandomState;
-use std::hash::{BuildHasher, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-
-static ENTROPY_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 /// Port trait for random number generators, enabling deterministic testing by decoupling
 /// non-deterministic entropy sources.
@@ -27,9 +30,9 @@ pub trait Rng: Send + Sync + 'static {
 /// Lock-free and thread-safe without requiring `Mutex`.
 ///
 /// # Entropy Seeding
-/// Note that non-deterministic entropy seeding (e.g., via `OsRng` or system entropy)
-/// is the responsibility of the Composition Root. Application entry points should gather entropy
-/// at startup and pass the initial seed to [`SeededRng::new`].
+/// In accordance with V-RNG, non-deterministic entropy seeding (e.g. via `OsRng` or system entropy)
+/// is strictly the responsibility of the Composition Root or test harnesses.
+/// Seeded instances MUST be constructed via [`SeededRng::new(seed)`].
 #[derive(Debug)]
 pub struct SeededRng {
     state: AtomicU64,
@@ -43,32 +46,6 @@ impl SeededRng {
         Self {
             state: AtomicU64::new(seed),
         }
-    }
-
-    /// Creates a new [`SeededRng`] seeded from process/runtime entropy.
-    ///
-    /// # Non-Cryptographic Usage
-    /// This entropy source uses [`std::collections::hash_map::RandomState`] and an internal counter.
-    /// It is intended strictly for non-cryptographic usages such as jitter, load balancing,
-    /// and randomized algorithm initialization. Cryptographic keys and salts MUST use
-    /// dedicated cryptographic RNGs (`OsRng`).
-    ///
-    /// # Composition Root Architecture
-    /// Only Composition Roots (application entry points) should construct a [`SeededRng`] via `from_entropy`.
-    /// Internal library logic MUST accept an injected [`Rng`] instance instead of calling `from_entropy` directly.
-    pub fn from_entropy() -> Self {
-        let counter = ENTROPY_COUNTER.fetch_add(1, Ordering::Relaxed);
-
-        let mut hasher1 = RandomState::new().build_hasher();
-        hasher1.write_u64(counter);
-        let h1 = hasher1.finish();
-
-        let mut hasher2 = RandomState::new().build_hasher();
-        hasher2.write_u64(h1);
-        let h2 = hasher2.finish();
-
-        let seed = h1 ^ h2.rotate_left(32) ^ GOLDEN_RATIO_64.wrapping_mul(counter);
-        Self::new(seed)
     }
 }
 
@@ -133,23 +110,9 @@ mod tests {
         let rng1 = SeededRng::new(12345);
         let rng2 = SeededRng::new(12345);
 
-        for _ in 0..10 {
+        for _ in 0..100 {
             assert_eq!(rng1.next_u64(), rng2.next_u64());
         }
-    }
-
-    #[test]
-    fn test_from_entropy_different_sequences() {
-        let rng1 = SeededRng::from_entropy();
-        let rng2 = SeededRng::from_entropy();
-
-        let draws1: Vec<u64> = (0..4).map(|_| rng1.next_u64()).collect();
-        let draws2: Vec<u64> = (0..4).map(|_| rng2.next_u64()).collect();
-
-        assert_ne!(
-            draws1, draws2,
-            "from_entropy instances generated identical 4-draw sequences"
-        );
     }
 
     #[test]
@@ -157,7 +120,24 @@ mod tests {
         let rng1 = SeededRng::new(100);
         let rng2 = SeededRng::new(200);
 
-        assert_ne!(rng1.next_u64(), rng2.next_u64());
+        let s1: Vec<u64> = (0..10).map(|_| rng1.next_u64()).collect();
+        let s2: Vec<u64> = (0..10).map(|_| rng2.next_u64()).collect();
+        assert_ne!(s1, s2, "Different seeds must produce different sequences");
+    }
+
+    #[test]
+    fn test_seeded_rng_golden_sequence() {
+        let rng = SeededRng::new(42);
+        let first_draw = rng.next_u64();
+        let second_draw = rng.next_u64();
+        assert_ne!(first_draw, 0);
+        assert_ne!(second_draw, 0);
+        assert_ne!(first_draw, second_draw);
+
+        // Deterministic reset check
+        let rng_reset = SeededRng::new(42);
+        assert_eq!(rng_reset.next_u64(), first_draw);
+        assert_eq!(rng_reset.next_u64(), second_draw);
     }
 
     #[test]
@@ -173,7 +153,7 @@ mod tests {
     fn test_fill_bytes_lengths() {
         let rng = SeededRng::new(999);
 
-        for len in [0, 1, 7, 8, 9] {
+        for len in [0, 1, 7, 8, 9, 31, 32, 64] {
             let mut buf = vec![0u8; len];
             rng.fill_bytes(&mut buf);
             assert_eq!(buf.len(), len);

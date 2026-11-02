@@ -51,6 +51,7 @@ use std::time::Duration;
 /// - `clock`: Zeitport zur Erfassung der Haltedauer aktiver Snapshots.
 pub struct SnapshotRegistry {
     active: Mutex<BTreeMap<u64, Vec<u64>>>,
+    revoked: Mutex<std::collections::BTreeSet<u64>>,
     min_active_seqno: AtomicU64,
     clock: Arc<dyn Clock>,
 }
@@ -81,6 +82,7 @@ impl SnapshotRegistry {
     pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
         Self {
             active: Mutex::new(BTreeMap::new()),
+            revoked: Mutex::new(std::collections::BTreeSet::new()),
             min_active_seqno: AtomicU64::new(u64::MAX),
             clock,
         }
@@ -169,6 +171,37 @@ impl SnapshotRegistry {
         self.release_at(seq_no, None);
     }
 
+    // ANCHOR[contextra-mvcc:SNAPSHOT-REGISTRY-REVOCATION]
+    /// Prüft, ob eine Snapshot-Sequenznummer widerrufen wurde.
+    pub fn is_revoked(&self, seq_no: u64) -> bool {
+        let clean_seq = seq_no & !TOMBSTONE_BIT;
+        self.revoked.lock().contains(&clean_seq)
+    }
+
+    /// Markiert Snapshots, die das Prädikat erfüllen, als widerrufen.
+    ///
+    /// Gibt die Anzahl der betroffenen aktiven Sequenznummern zurück.
+    pub fn revoke_where<F>(&self, predicate: F) -> usize
+    where
+        F: Fn(u64) -> bool,
+    {
+        let active = self.active.lock();
+        let mut revoked = self.revoked.lock();
+        let mut count = 0;
+        for &seq in active.keys() {
+            if predicate(seq) && revoked.insert(seq) {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Widerruft alle Snapshots mit `seq <= erased_through_seq` (D-11 / Purge-Widerruf).
+    pub fn revoke_through(&self, erased_through_seq: u64) -> usize {
+        let clean_seq = erased_through_seq & !TOMBSTONE_BIT;
+        self.revoke_where(|seq| seq <= clean_seq)
+    }
+
     // Interne Freigabe einer Registrierung unter Berücksichtigung des spezifischen Erstellungs-Zeitstempels.
     // Ablauf:
     // 1. Tombstone-Bit ausmaskieren.
@@ -190,6 +223,7 @@ impl SnapshotRegistry {
             }
             if timestamps.is_empty() {
                 active.remove(&seq_no);
+                self.revoked.lock().remove(&seq_no);
             }
         } else {
             // NOTE: Unpinning oder Releasing einer ungetrackten Sequenznummer ist ein No-op (Regel 2: Zero-Panic).
@@ -298,6 +332,20 @@ impl SnapshotGuard {
     pub fn seq_no(&self) -> u64 {
         self.seq_no
     }
+
+    /// Prüft, ob dieser Snapshot durch einen Purge oder Widerruf ungültig geworden ist.
+    pub fn is_revoked(&self) -> bool {
+        self.registry.is_revoked(self.seq_no)
+    }
+
+    /// Validiert den Snapshot. Gibt `Err(MvccError::SnapshotRevoked)` zurück, falls widerrufen.
+    pub fn validate(&self) -> Result<(), crate::error::MvccError> {
+        if self.is_revoked() {
+            Err(crate::error::MvccError::SnapshotRevoked(self.seq_no))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl Drop for SnapshotGuard {
@@ -404,6 +452,34 @@ mod tests {
         registry.release(12345);
         registry.unpin(12345);
         assert_eq!(registry.min_active_seqno(), u64::MAX);
+    }
+
+    // Prüft den Snapshot-Widerruf bei Purge (D-11).
+    #[test]
+    fn test_snapshot_revocation() {
+        let registry = Arc::new(SnapshotRegistry::new());
+        let g1 = registry.register(50);
+        let g2 = registry.register(100);
+
+        assert!(!g1.is_revoked());
+        assert!(!g2.is_revoked());
+        assert!(g1.validate().is_ok());
+
+        // Revoke up to seq 50
+        let count = registry.revoke_through(50);
+        assert_eq!(count, 1);
+
+        assert!(g1.is_revoked());
+        assert!(!g2.is_revoked());
+        assert_eq!(
+            g1.validate(),
+            Err(crate::error::MvccError::SnapshotRevoked(50))
+        );
+        assert!(g2.validate().is_ok());
+
+        drop(g1);
+        // After dropping g1, 50 is no longer tracked
+        assert!(!registry.is_revoked(50));
     }
 
     // Prüft Doppelregistrierung und sequentiellen Drop zweier Guards auf gleicher Sequenznummer.

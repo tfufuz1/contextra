@@ -183,7 +183,8 @@ pub fn scrub_if_safe_with_injector<F: FaultInjector>(
                 .unwrap_or(zeros.len())
                 .min(zeros.len());
             injector.on_write(Some(path), chunk_size)?;
-            file.write_all(&zeros[..chunk_size])?;
+            let slice = zeros.get(..chunk_size).unwrap_or(&zeros);
+            file.write_all(slice)?;
             remaining -= chunk_size as u64;
         }
 
@@ -222,15 +223,18 @@ fn verify_zero_readback(
         let chunk_size = usize::try_from(remaining)
             .unwrap_or(buf.len())
             .min(buf.len());
-        file.read_exact(&mut buf[..chunk_size])?;
-        if buf[..chunk_size].iter().any(|&b| b != 0) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!(
-                    "readback zero verification failed for file '{:?}': non-zero bytes detected after scrub",
-                    path
-                ),
-            ));
+        let buf_slice = buf.get_mut(..chunk_size).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "readback buffer slice out of bounds",
+            )
+        })?;
+        file.read_exact(buf_slice)?;
+        if buf_slice.iter().any(|&b| b != 0) {
+            return Err(std::io::Error::other(format!(
+                "readback zero verification failed for file '{:?}': non-zero bytes detected after scrub",
+                path
+            )));
         }
         remaining -= chunk_size as u64;
     }
@@ -274,7 +278,9 @@ fn check_cow_filesystem(path: &Path) -> Option<ScrubRefusal> {
                 continue;
             }
 
-            let mount_point = parts[4];
+            let Some(&mount_point) = parts.get(4) else {
+                continue;
+            };
             let mount_path = Path::new(mount_point);
 
             if canonical_path.starts_with(mount_path) {
@@ -282,8 +288,10 @@ fn check_cow_filesystem(path: &Path) -> Option<ScrubRefusal> {
                 if mlen >= best_match_len {
                     best_match_len = mlen;
                     if let Some(dash_pos) = parts.iter().position(|&p| p == "-") {
-                        if dash_pos + 1 < parts.len() {
-                            best_match_fstype = parts[dash_pos + 1].to_lowercase();
+                        if let Some(&fstype) =
+                            dash_pos.checked_add(1).and_then(|idx| parts.get(idx))
+                        {
+                            best_match_fstype = fstype.to_lowercase();
                         }
                     }
                 }

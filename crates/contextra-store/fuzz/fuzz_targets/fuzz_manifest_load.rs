@@ -1,7 +1,7 @@
 #![no_main]
 
-use libfuzzer_sys::fuzz_target;
 use contextra_store::manifest::Manifest;
+use libfuzzer_sys::fuzz_target;
 use tempfile::tempdir;
 
 fuzz_target!(|data: &[u8]| {

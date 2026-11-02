@@ -4,48 +4,13 @@
 
 use contextra_durable_fs::{scrub_and_remove, ScrubReceipt};
 use std::fs::{self, File};
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::SystemTime;
-
-static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-struct TestDir {
-    path: PathBuf,
-}
-
-impl TestDir {
-    fn new() -> std::io::Result<Self> {
-        let count = TEST_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let pid = std::process::id();
-        let nanos = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
-
-        let dir_name = format!("contextra_scrub_test_{}_{}_{}", pid, nanos, count);
-        let path = std::env::temp_dir().join(dir_name);
-        fs::create_dir_all(&path)?;
-
-        Ok(Self { path })
-    }
-
-    fn path(&self) -> &Path {
-        &self.path
-    }
-}
-
-impl Drop for TestDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
-    }
-}
+use tempfile::tempdir;
 
 // ANCHOR[contextra-durable-fs:TEST-SCRUB-HARDLINK-OVERWRITE]
 /// Prüft das Überschreiben und Entfernen von Dateien bei einfachen Hardlinks.
 #[test]
 fn test_scrub_and_remove_hardlink_overwrite() -> std::io::Result<()> {
-    let dir = TestDir::new()?;
+    let dir = tempdir()?;
     let original = dir.path().join("original.txt");
     let hardlink = dir.path().join("hardlink.txt");
 
@@ -74,7 +39,7 @@ fn test_scrub_and_remove_hardlink_overwrite() -> std::io::Result<()> {
 /// Prüft das Scrubbing großer, nicht block-ausgerichteter Dateien.
 #[test]
 fn test_scrub_and_remove_large_unaligned_file() -> std::io::Result<()> {
-    let dir = TestDir::new()?;
+    let dir = tempdir()?;
     let file_path = dir.path().join("large.bin");
 
     let file_size = 70_000usize;
@@ -93,7 +58,7 @@ fn test_scrub_and_remove_large_unaligned_file() -> std::io::Result<()> {
 /// Prüft, dass Symlinks beim Scrubbing sicher abgewiesen werden.
 #[test]
 fn test_scrub_and_remove_symlink_rejected() -> std::io::Result<()> {
-    let dir = TestDir::new()?;
+    let dir = tempdir()?;
     let target = dir.path().join("target.txt");
     let symlink = dir.path().join("symlink.txt");
 
@@ -118,7 +83,7 @@ fn test_scrub_and_remove_symlink_rejected() -> std::io::Result<()> {
 /// Prüft die Fehlerbehandlung bei nicht existierenden Pfaden.
 #[test]
 fn test_scrub_and_remove_not_found() -> std::io::Result<()> {
-    let dir = TestDir::new()?;
+    let dir = tempdir()?;
     let missing = dir.path().join("does_not_exist.txt");
 
     let res = scrub_and_remove(&missing);
@@ -134,7 +99,7 @@ fn test_scrub_and_remove_not_found() -> std::io::Result<()> {
 /// Prüft das Bereinigen und Entfernen leerer Dateien (0 Bytes).
 #[test]
 fn test_scrub_and_remove_empty_file() -> std::io::Result<()> {
-    let dir = TestDir::new()?;
+    let dir = tempdir()?;
     let empty_file = dir.path().join("empty.txt");
     File::create(&empty_file)?;
 
