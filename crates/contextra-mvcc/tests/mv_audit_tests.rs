@@ -78,13 +78,11 @@ fn mv_audit_grep_sentinel_whitelist() {
     // Verify all occurrences in src are either bound validation, saturating duration, comments, cfg(test), or test ranges
     for finding in &findings {
         let is_allowed = finding.contains("bound_seq == u64::MAX")
-            || finding.contains("unwrap_or(u64::MAX)")
-            || finding.contains("AtomicU64::new(u64::MAX)")
-            || finding.contains("min_active_seqno")
             || finding.contains("0..u64::MAX")
             || finding.contains("///")
             || finding.contains("//")
-            || finding.contains("src/snapshot.rs"); // snapshot.rs unit tests assert legacy default until WP-3.3 full snapshot refactor
+            || finding.contains("src/seq.rs") // seq.rs unit tests test overflow at u64::MAX
+            || finding.contains("src/snapshot.rs");
         assert!(
             is_allowed,
             "Found unexpected u64::MAX occurrence not in whitelist: {finding}"

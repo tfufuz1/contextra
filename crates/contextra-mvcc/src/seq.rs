@@ -68,7 +68,7 @@ impl SeqAllocator {
     /// 1. Lade `current_seq` und `ledger_floor`.
     /// 2. Berechne `base = max(current_seq, ledger_floor)`.
     /// 3. Berechne `next = base.checked_add(1)`.
-    /// 4. Bei Überlauf (`None`): Gebe `Err(MvccError::InvalidSequence(u64::MAX))` zurück.
+    /// 4. Bei Überlauf (`None`): Gebe `Err(MvccError::InvalidSequence(base))` zurück (kein Sentinel-Wert).
     /// 5. Atomarer CAS auf `current_seq`: Setze auf `next`. Bei Konflikt wiederhole ab Schritt 1.
     pub fn next_seq(&self) -> Result<u64, MvccError> {
         let mut curr = self.current_seq.load(Ordering::Acquire);
@@ -77,7 +77,7 @@ impl SeqAllocator {
             let base = curr.max(floor);
             let next = base
                 .checked_add(1)
-                .ok_or(MvccError::InvalidSequence(u64::MAX))?;
+                .ok_or(MvccError::InvalidSequence(base))?;
 
             match self.current_seq.compare_exchange_weak(
                 curr,

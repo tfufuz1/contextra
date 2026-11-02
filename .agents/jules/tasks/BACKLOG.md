@@ -27,6 +27,7 @@ Nicht normativ. Maßgeblich sind die Arbeitspakete in [`docs/SPEC.md`](../../../
 | WP-3.1 | `types`: `DocRef`, `DocHandle`, Tags mit Längenpräfix, Löschtypen, `KeyCoverage`, `DocId` entfernt; `ports`: Löschports; `erasure`-Skelett als Workspace-Mitglied (D-96) | G0 | WP-2.1 | bei Aufnahme | todo | Erstes Paket des Löschkerns. |
 | WP-3.2 | `crypto`: D-06 Grenzen, D-52 Slot-AAD, D-60 Nonce-Schema, D-80 Algorithmenliste, `K_sign` abgeleitet | G-F | WP-3.1 | bei Aufnahme | todo | Kryptografie: Test vor Änderung, keine Änderung ohne Testnachweis. |
 | WP-3.3 | `store`: Schlüsselraum 9.1, Envelope v2, WAL ohne Rewrite, `WalFloor`, Sentinel-Fix, Delete-Race-Fix, Pflichtverschlüsselung | G-C | WP-3.2 | bei Aufnahme | todo | Umfang groß. Bei Bedarf in Teilpakete zerlegen (siehe Regeln). |
+| WP-3.3-mvcc | `contextra-mvcc`: Sentinel-Rückbau (`Option<Seq>`), Mandanten-Registry, fail-closed Widerruf, Loom- & Property-Verifikation | G-C | WP-3.2 | vorhanden | done | F-07, F-29, D-61, D-87, MV-01..MV-10. |
 | WP-3.4 | G0-Prototyp: Schlüsselraum mit D-70/D-71, SSTable-Rewrite, BM-ERASE-WA/-WA-TEXT auf 1/10 GiB | G0 | WP-3.3 | bei Aufnahme | todo | Ergebnis ist ein Messprotokoll und eine Entscheidung über die Fallbackstufe (SPEC 11.9). |
 | WP-3.5 | Fortschreibung der SPEC nach G0 (Anhang H), falls Stufe > 0 | G0 | WP-3.4 | bei Aufnahme | todo | Nur ausführen, wenn WP-3.4 eine Stufe > 0 ergibt. Sonst `done` ohne Änderung. |
 | WP-4.1 | `erasure`: Tresor (`FileVault`, F.3), `RecordSealer`/`FileKeyring`, Dateischlüssel-Lebenszyklus | G-D | WP-3.4 | bei Aufnahme | todo | |
