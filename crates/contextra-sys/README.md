@@ -1,19 +1,11 @@
-# contextra-sys
+Einzige `unsafe`-Stelle für Betriebssystemaufrufe: `fsync`, `mlock`, Prozesshärtung.
 
-Plattformnahe Systemprimitive, Dateisystem-Synchronisation und Speicher-Härtung.
+## Status
 
-- **Ring:** Ring 1 (Unsafe-Insel 1 von 2, SPEC §8.3, D-29)
-- **Normativ:** [docs/SPEC.md §8.3](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 1. Ist-Zustand: vorhanden, 30/30 Lib-Tests in 3.0.0; `acl_win32.rs` und `mmap.rs` zu entfernen; `mmap_readonly` ist `unsafe fn` und bricht den Build der Aufrufer. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra-sys` kapselt plattformspezifische I/O- und Speicherprimitive hinter sicheren Rust-Funktionen:
-- `fsync`: `fsync_file`, `fdatasync`, `F_FULLFSYNC` unter macOS. Fehler werden ausnahmslos propagiert.
-- `dir`: `flush_dir`, `rename_durable` (atomares Rename inklusive Verzeichnis-`fsync`).
-- `mem`: `mlock_best_effort`, `munlock` zum Schutz von Schlüsseln im RAM vor Paging.
-- `perm`: `set_mode`, `check_mode` (0600 für Dateien, 0700 für Verzeichnisse).
+## Abhängigkeiten
 
-## Invarianten & Insel-Doktrin
-- Jeder einzelne `unsafe`-Block erfordert ein `// SAFETY:`-Kommentar mit Bounds, Alignment und Gültigkeitsnachweis.
-- Safe Funktionen ohne `unsafe` dürfen keine Vorbedingungen vor dem Aufrufer verbergen.
-- Fail-Closed: Nicht unterstützte Plattformen verweigern kontrolliert den Dienst.
+Erlaubt laut SPEC 5.3: `types`.
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

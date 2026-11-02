@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Deterministic test utilities, ManualClock, InMemoryStorageEngine, and FaultVfs for Contextra"
+description = "Testhilfen: `FaultVfs`, Referenzmodell, deterministische Uhr, In-Memory-Ports."
 
 [package.metadata.contextra]
 ring = "tooling"

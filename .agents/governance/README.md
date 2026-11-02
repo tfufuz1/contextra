@@ -1,23 +1,18 @@
-# Governance in Contextra
+# governance – Gate- und Regeldateien
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+Nicht normativ. Normativ sind [`docs/SPEC.md`](../../docs/SPEC.md) Abschnitt 5.8 (Budgets), 15.1 (Tests), 15.3 (Gates) und D-93 (Lockfile).
 
-Diese Governance-Dokumentation beschreibt die Richtlinien, Werkzeuge und Ausnahmeverfahren zur Sicherung der Code-Integrität und Supply-Chain-Sicherheit.
+Dieser Ordner enthält maschinenlesbare Regeln für Tests und Gates. Die Inhalte der TOML-Dateien sind in dieser Revision nicht geprüft.
 
-## Zweck
-Die drei Governance-Gates verhindern, dass Menschen oder KI-Agenten Sicherheitsabsicherungen, Lints oder Tests schwächen, um rote Pipeline-Ergebnisse künstlich zu umgehen:
-1. `protected-paths`: Schützt kritische Konfigurations-, CI- und Governance-Pfade vor unbefugter oder versehentlicher Änderung.
-2. `gate-weakening`: Erkennt Versuche, CI-Pipelines, Lints, Test-Assertionen oder Baselines aufzuweichen (z. B. `continue-on-error: true`, Entfernen von `-D warnings`, Reduzieren von Asserts).
-3. `ratchet`: Erzwingt Monotonie bei Qualitätskennzahlen (wie `.unwrap()`-Verwendung oder `unsafe`-Blöcken) und senkt die Baselines automatisch ab, wenn Werte verbessert werden.
+| Datei | Zweck nach SPEC | Zustand |
+|---|---|---|
+| `constitution.toml` | Verfassungsregeln als Prüfdaten | nicht geprüft, Abgleich mit SPEC 2 und 6.3 offen |
+| `gates.toml` | Gate-Definitionen | nicht geprüft, Abgleich mit SPEC 15.3 offen |
+| `protected-paths.toml` | Pfade, die nicht ohne Freigabe geändert werden | nicht geprüft |
+| `ratchet.toml` | Basiswerte für `unwrap`, `expect`, `panic!`, `let _ =` (sinkend, SPEC 5.8) | **fehlt**; wird mit WP-0.1 angelegt (F-20) |
+| `exceptions.toml` | befristete Ausnahmen von T-ARCH- und T-TRACE-Prüfungen (SPEC 15.1) | **fehlt**; wird mit WP-0.1 angelegt |
+| `unsafe-safety-baseline.toml` | Basis für `unsafe`-Blöcke in den Inseln | nicht geprüft |
+| `determinism-allow.toml`, `determinism-baseline.toml` | Ausnahmen und Basis für Nicht-Determinismus (P7) | nicht geprüft |
+| `verdict-required.toml` | Pflichtnachweise je Gate | nicht geprüft |
 
-## Ausnahmeverfahren per ADR
-Niemals dürfen Baselines oder Sicherheitsregeln erhöht bzw. gelockert werden, nur um einen roten Build "grün" zu erzwingen.
-
-Falls eine Änderung an geschützten Pfaden oder eine vorübergehende Regelanpassung architektonisch zwingend erforderlich ist:
-1. Erstelle ein neues Architecture Decision Record (ADR) in `docs/decisions/ADR-NNN-*.md`.
-2. Füge den passenden Git-Trailer zum Commit hinzu:
-   - Für geschützte Pfade: `Protected-Change: ADR-NNN` (plus Label `protected-change` am PR)
-   - Für Gate-Anpassungen / Ratchet-Erhöhungen: `Gate-Weakening: ADR-NNN` bzw. `--adr ADR-NNN`
-3. Die Änderung wird vom Gate geprüft und erfordert eine explizite menschliche Review-Freigabe.
-
-⚠️ **WARNUNG:** Das Erhöhen einer Ratchet-Baseline ohne gültiges ADR und menschliche Freigabe wird vom System als Sicherheitsverstoß gewertet und blockiert.
+Regel für Änderungen: Basiswerte in Ratchet-Dateien dürfen nur sinken. Ausnahmen brauchen ein Ablaufdatum (SPEC 15.1, 17.3).

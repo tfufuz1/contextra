@@ -1,9 +1,12 @@
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+# Grundregeln für Jules
 
-1. Lies die Crate-AGENTS.md und die Task-Karte.
-2. Verifiziere jedes Symbol bevor du es benutzt.
-3. Ändere ausschließlich Dateien im `scope` der Karte. Alles andere: unter „Out-of-scope Findings" im PR melden.
-4. Ändere niemals Gates, Lints, Baselines, Toolchain oder geschützte Pfade, um Rot zu beseitigen. Behebe die Ursache.
-5. Schreibe zuerst einen Test, der fehlschlägt (rot), dann den Fix (grün).
-6. Gleicher Fehler zweimal → Vorgehen reflektieren und stoppen.
-7. „Fertig" heißt: Tests und Checks (`just check`, `just test`) grün.
+Nicht normativ. Maßgeblich: [`docs/SPEC.md`](../../docs/SPEC.md) (Version 4.2.0) und [`AGENTS.md`](../../AGENTS.md).
+
+1. Lies `AGENTS.md`, den Abschnitt der SPEC zur Aufgabe und die `AGENTS.md` des betroffenen Crates.
+2. Verifiziere jedes Symbol, bevor du es verwendest. Nimm keine APIs aus dem Gedächtnis an.
+3. Ändere nur Dateien, die zur Aufgabe gehören. Alles andere wird im PR unter „Gefundene Probleme außerhalb des Umfangs“ gemeldet.
+4. Ändere niemals Gates, Lints, Baselines, Toolchain-Pins, `governance/`-Dateien oder geschützte Pfade, um Rot zu beseitigen. Behebe die Ursache.
+5. Schreibe zuerst einen Test, der fehlschlägt, und dann die Korrektur. Der Test trägt die SPEC-ID (`#[ctx_test(id = "T-…")]`).
+6. Tritt derselbe Fehler zweimal auf, reflektiere das Vorgehen und stoppe.
+7. „Fertig“ heißt: `cargo check --workspace --all-targets --locked`, `cargo test --workspace --locked` und `cargo test -p contextra-arch-tests --locked` sind grün. Befehle: `docs/COMPILATION.md`. Der Task-Runner `just` ist optional.
+8. Ändert sich `Cargo.toml`, wird `Cargo.lock` im selben Commit erneuert (D-93).

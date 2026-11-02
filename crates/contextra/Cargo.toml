@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Contextra — Embedded hybrid-search for AI agents (Facade)"
+description = "Öffentliche API und Verdrahtung. Enthält keine Logik."
 
 [package.metadata.contextra]
 ring = "4"

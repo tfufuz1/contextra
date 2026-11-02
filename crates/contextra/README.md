@@ -1,24 +1,11 @@
-# contextra
+Öffentliche API und Verdrahtung. Enthält keine Logik.
 
-Haupt-Bibliotheksfassade und einzige Composition Root von Contextra.
+## Status
 
-- **Ring:** Ring 4 (Fassade, Composition Root)
-- **Normativ:** [docs/SPEC.md §7, §8.14](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 4. Ist-Zustand: vorhanden (1.558 Zeilen), widerspricht SPEC 7 in mehreren Punkten (`builder(dimension)`, `EncryptionMode`, `LicenseGate`, `TextEmbeddingEngine`, Profile, Rewriter). Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra` ist die primäre Fassade und die einzige **Composition Root** des Gesamtsystems (Ring 4). Sie re-exportiert ausschließlich die autorisierte öffentliche API:
-- `ContextraBuilder` / `builder`: Konfiguriert und öffnet die Datenbank (`build().await?`).
-  - Erzwingt Passphrase für Speicherverschlüsselung (Pflicht gemäß D-05).
-  - Stellt System-Defaults und den CSPRNG-Adapter `OsRngAdapter` bereit.
-- `Collection`: Dokumentenverwaltung (`insert`, `get`, `scan`, `delete`).
-- Schnittstellen zur physischen Datenlöschung und Nachweisverifikation über die Kern-Module.
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- Kein anderes Crate im Workspace darf von `contextra` abhängen (AR-1).
-- Zero Panic: Alle öffentlichen Funktionen liefern `Result<T, ContextraError>`.
-- Pflichtverschlüsselung ohne Klartext-Opt-Out (D-05).
-- Sauberes Beenden über `close().await?`; kein Blockieren in `Drop`.
-- Veraltete Features (`agent_memory`, `graph`, `license`) sind entfernt.
-- Sachliche, überprüfbare Formulierungen ohne Rechtsbehauptungen.
+Erlaubt laut SPEC 5.3: `types`, `durable-fs`, `engine` (D-88).
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

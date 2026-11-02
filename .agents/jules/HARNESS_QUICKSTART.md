@@ -1,46 +1,27 @@
-# Harness Quickstart
+# Schnellstart für Jules-Sitzungen
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+Nicht normativ. Die Befehle stehen in [`docs/COMPILATION.md`](../../docs/COMPILATION.md).
 
-Dieses Dokument beschreibt die Benutzung der schlanken 5-Phasen-Fassade für Jules-Sessions.
-
-## Entwickler-Workflows
-
-1. **`just check`**
-   Prüft Syntax, Formatierung (`cargo fmt --check`), Lints (`cargo clippy`) und Workspace-Kompilierung.
-2. **`just test`**
-   Führt die Test-Suite aus.
-3. **`just gates`**
-   Führt Architektur- und Layering-Tests aus (`tests/layering.rs`).
-4. **`just pre-push`**
-   Führt den vollständigen Pre-Push-Check aus (`check test gates`).
-
-## Beispielablauf
+## Verlässliche Befehle
 
 ```bash
-# 1. Formatierung und Lints prüfen
-just check
-
-# 2. Tests ausführen
-just test
-
-# 3. Layering & Architektur prüfen
-just gates
+cargo fmt --all -- --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo test -p contextra-arch-tests --locked
 ```
 
-## Exit-Codes
+Der Workspace baut derzeit nicht vollständig (SPEC F-32). Bis die Behebung abgeschlossen ist, meldet ein Lauf der ersten Befehle diese Fehler. Sie sind keine Regression der Aufgabe und werden im PR als Vorbestand vermerkt.
 
-- `0` (pass / not_applicable): Phase erfolgreich durchlaufen.
-- `1` (fail / Verstoß): Determinister Gate-Verstoß oder Testfehler.
-- `2` (error / fail-closed): Unvollständiges Setup, fehlendes Pflichtkommando oder Systemfehler.
+## Just-Rezepte
 
-## Eskalationsleiter
+Das Justfile enthält unter anderem `check`, `test`, `gates`, `pre-push`, `crate`, `loom`, `bootstrap`, `coverage`, `loom-store` und `session-context`. Es ist ein optionaler Wrapper. Den Inhalt von `gates` und `session-context` prüfe ich in dieser Revision nicht. Das Rezept `gates` verweist laut Vorfassung auf `tests/layering.rs`; diese Datei existiert nicht. Verlässlich sind die Architekturtests mit `cargo test -p contextra-arch-tests --locked`.
 
-1. **Phase 1: Lokales Stoppen (Prompt-Thrashing)**
-   Derselbe Compiler- oder Testfehler nach 2 Iterationen → `jules stop --reason thrash`.
-2. **Phase 2: Plan-Lint-Ablehnung (Revisionszähler >= 3)**
-   3. Ablehnung im Plan-Linting → Status `error` mit Aufforderung: Task teilen.
-3. **Phase 3: Menschliche Intervention**
-   Mensch prüft Log und passt Task-Karte / Scope an.
+## Eskalation
 
-Für Prompt-Details siehe [PREAMBLE.md](PREAMBLE.md).
+1. **Lokal stoppen.** Derselbe Compiler- oder Testfehler nach zwei Iterationen: Vorgehen überprüfen und Sitzung anhalten.
+2. **Aufgabe teilen.** Wird der Plan wiederholt abgelehnt, wird die Aufgabe kleiner geschnitten.
+3. **Mensch entscheidet.** Der Mensch prüft das Log und passt Aufgabe und Scope an.
+
+Die Regeln der Vorfassung zu Exit-Codes und einem Stoppbefehl sind nicht geprüft und gelten nur, soweit sie in der Umgebung tatsächlich vorhanden sind.

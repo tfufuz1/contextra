@@ -1,23 +1,11 @@
-# contextra-crypto
+Kryptoprimitive: AEAD, Argon2id, HKDF, HMAC, Ed25519, Tags.
 
-Kryptografische Primitive, Schlüsselverwaltung, AEAD-Verschlüsselung, blinde Tags und Signaturen.
+## Status
 
-- **Ring:** Ring 1 (Kryptografie & Nachweis-Primitive)
-- **Normativ:** [docs/SPEC.md §8.6](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 1. Ist-Zustand: vorhanden; Untergrenze der KDF zu niedrig und ohne Obergrenze (F-11); Feature-Altlasten (F-21, F-23); Tests und Benchmarks kompilieren nicht vollständig (3.0.0). Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra-crypto` kapselt sämtliche kryptografischen Operationen in einer strikt auditierten Typfamilie:
-- `kdf`: Argon2id KDF ($m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$, `derive_master`).
-- `keys`: `KeySet` (deterministische Ableitung aller Teilschlüssel via HKDF aus $K_\text{master}$).
-- `aead`: AES-256-GCM-SIV (`seal`, `open`), 96-Bit Nonce aus CSPRNG (`OsRng`).
-- `envelope`: Record-Envelope-Sealing (SPEC §9.3).
-- `tag`: `blind_tag` via Keyed-BLAKE3 mit Längenpräfixen gegen Mehrdeutigkeiten.
-- `wal_crypto`: HMAC-SHA256-Verkettung für WAL-Frames.
-- `sign`: Ed25519-Signatur und Verifikation für Löschberichte `ctx-erasure-report/1`.
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- Kein Schlüsselmaterial in `Clone`, `Debug`, `Display` oder `Serialize`. Alle Puffer in `Zeroizing<T>`.
-- Kein HKDF für Passphrasen (B-15) — ausschließlich Argon2id!
-- Injektivitätsgarantie für `blind_tag`.
+Erlaubt laut SPEC 5.3: `types`, `ports`.
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

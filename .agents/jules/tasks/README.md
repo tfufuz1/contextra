@@ -1,27 +1,39 @@
-# Task-Karten in Contextra
+# Task-Karten
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+Nicht normativ. Eine Task-Karte beschreibt ein abgegrenztes Arbeitspaket für Jules. Sie setzt Scope und Grenzen fest und verweist auf die SPEC.
 
-Eine Task-Karte beschreibt ein isoliertes, maschinell prüfbares Arbeitspaket für Jules. Sie verhindert vage Aufträge und setzt klare Scope- und Budgetgrenzen.
+## Pflichtfelder
 
-## Drei Beispiele guter Task-Karten
+| Feld | Inhalt |
+|---|---|
+| `id` | eindeutige Kennung der Karte |
+| `title` | kurze Beschreibung |
+| `wp` | Arbeitspaket aus SPEC 15.4, z. B. `WP-3.3` |
+| `crate` | betroffenes Crate |
+| `goal` | gewünschte Wirkung, prüfbar |
+| `non_goals` | ausdrücklich nicht zu ändern |
+| `scope` | erlaubte Pfade |
+| `forbidden` | verbotene Pfade (mindestens `AGENTS.md`, `docs/SPEC.md`, `rust-toolchain.toml`, `deny.toml`, `governance/**`, `.github/**`, `.agents/jules/setup/**`) |
+| `spec_ids` | betroffene SPEC-IDs (I-, FM-, T-, BM-, D-, HR-) |
+| `acceptance` | Befehle, die bestehen müssen |
+| `evidence_required` | was im PR belegt wird |
 
-### Beispiel 1: WAL-fsync Fehlerbehandlung (`crates/contextra-store`)
+Ein Budget (`files`, `lines`, `iterations`) ist sinnvoll, um Sitzungen zu begrenzen.
+
+## Beispiel
+
 ```toml
 id        = "T-2026-0101"
-title     = "WAL: fsync-Fehler propagieren statt verschlucken"
+title     = "WAL: Fehler beim Flush propagieren statt verschlucken"
+wp        = "WP-3.3"
 crate     = "contextra-store"
-tier      = 1
-risk      = "crash"
-goal      = "Ersetze ignoriertes fsync in wal/flusher.rs durch fehlerfortpflanzendes Result."
-non_goals = ["Keine Änderungen am CompactionEngine", "Keine neuen Dependencies"]
+goal      = "Ein fehlgeschlagener Flush liefert einen Fehler an den Aufrufer, kein stilles Verwerfen."
+non_goals = ["Keine Änderung an der Kompaktion", "Keine neuen Abhängigkeiten"]
 scope     = ["crates/contextra-store/src/wal/flusher.rs", "crates/contextra-store/tests/wal_*.rs"]
-forbidden = [".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
-invariants = ["INV-WAL-POISON-EXPLICIT", "Zero-Panic"]
-acceptance = [
-  "cargo test -p contextra-store --test wal_lifecycle_crash_point_matrix"
-]
-evidence_required = ["Neuer Test für I/O-Fehler beim Flushen"]
+forbidden = ["AGENTS.md", "docs/SPEC.md", "rust-toolchain.toml", "deny.toml", "governance/**", ".github/**", ".agents/jules/setup/**"]
+spec_ids  = ["P6", "I-10", "FM-5", "D-55", "T-FSYNC-1"]
+acceptance = ["cargo test -p contextra-store --locked --test wal_lifecycle_crash_point_matrix"]
+evidence_required = ["Neuer Test für einen I/O-Fehler beim Flush (rot, dann grün)"]
 
 [budget]
 files = 6
@@ -29,48 +41,4 @@ lines = 250
 iterations = 6
 ```
 
-### Beispiel 2: SIMD-Bounds-Prüfung (`crates/contextra-simd`)
-```toml
-id        = "T-2026-0102"
-title     = "SIMD: Slices-Bounds-Check vor Vektorisierung sicherstellen"
-crate     = "contextra-simd"
-tier      = 1
-risk      = "simd"
-goal      = "Expliziten Slices-Längencheck vor SIMD-Dot-Product einfügen."
-non_goals = ["Keine ungesicherten Memory-Layouts"]
-scope     = ["crates/contextra-simd/src/lib.rs"]
-forbidden = [".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
-invariants = ["Zero-Panic", "Unsafe Islands Only"]
-acceptance = [
-  "cargo test -p contextra-simd"
-]
-evidence_required = ["Fuzzing-Test oder Out-of-bounds Testfall"]
-
-[budget]
-files = 3
-lines = 100
-iterations = 4
-```
-
-### Beispiel 3: Dokumentations-Fix (`crates/contextra-types`)
-```toml
-id        = "T-2026-0103"
-title     = "Doku: Sync von Domain-Type Invarianten"
-crate     = "contextra-types"
-tier      = 1
-risk      = "none"
-goal      = "Aktualisiere Doc-Comments in domain/mod.rs bezüglich Fehlercodes."
-non_goals = ["Keine API-Code-Änderungen"]
-scope     = ["crates/contextra-types/src/types/domain/mod.rs"]
-forbidden = [".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
-invariants = ["Single Error Root"]
-acceptance = [
-  "cargo test -p contextra-types"
-]
-evidence_required = ["Doku-Check bestanden"]
-
-[budget]
-files = 2
-lines = 50
-iterations = 3
-```
+Die Vorfassung verwendete Invariantennamen wie `INV-WAL-POISON-EXPLICIT`, die nicht in der SPEC stehen. Verwendet werden die IDs aus SPEC 13.1 und 13.2.

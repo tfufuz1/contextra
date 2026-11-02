@@ -1,12 +1,9 @@
 # Routine: Flake-Jagd
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
-
-- **Takt**: Nächtlich
-- **Ziel**: Aufspüren und Beheben nicht-deterministischer Test-Flakes.
-- **Eingaben**:
-  - `cargo nextest run --retries 0`
-- **Harte Grenzen**: Max. 15 Dateien / 1 Crate pro PR. Scope-Globs: `crates/*/tests/**`.
-- **Stopp-Bedingungen**: Flake durch externe Umgebungseinflüsse außerhalb des Repos.
-- **Ergebnisformat**: Flake-Issue oder PR mit Fix für Ursachen von Race-Conditions/Timeouts.
-- **Eskalation**: Siehe Architekturdokument §9.3.
+- **Takt:** nächtlich
+- **Ziel:** nicht deterministische Tests finden und beheben (Ursachen: Nebenläufigkeit, Zeitgrenzen, fehlende Ports für Zeit und Zufall, P7)
+- **Eingaben:** `cargo nextest run --retries 0`. `cargo-nextest` muss installiert sein; die Vorfassung setzte es voraus, die Installation ist nicht geprüft.
+- **Harte Grenzen:** höchstens 15 Dateien in einem Crate je PR. Scope: `crates/*/tests/**`.
+- **Stopp:** Flakes durch Einflüsse außerhalb des Repositorys sind keine Codeänderung.
+- **Ergebnis:** Flake-Issue oder PR mit Korrektur der Ursache. Keine Verlängerung von Zeitgrenzen als Lösung.
+- **Eskalation:** siehe [`../HARNESS_QUICKSTART.md`](../HARNESS_QUICKSTART.md).

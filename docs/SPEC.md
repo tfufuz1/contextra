@@ -2,13 +2,13 @@
 
 |Feld|Wert|
 |---|---|
-|Spezifikationsversion|**4.2.0** (SOLL-Zustand für Release 1.0.0; Revision von 4.1.0; Änderungen: Anhang H.1)|
-|Stand|2026-11-02 (4.2.0)|
+|Spezifikationsversion|**4.3.0** (SOLL-Zustand für Release 1.0.0; Revision von 4.2.0; Änderungen: Anhang H.0)|
+|Stand|2026-11-02 (4.3.0)|
 |Status|**Final bis auf zwei benannte Vorbehalte:** (1) Gate **G0** (Speicherentscheid, 11.9): scheitert es, werden 4.1, 9.1, 11.4 und 11.9 nach der Fallbackleiter (11.9) neu gefasst; (2) Gate **G-LEGAL** (extern, 6.7): blockiert nur Löschaussagen jenseits 6.4. Alles Übrige ist entschieden und begründet (Abschnitt 4).|
-|Basis der Analyse|`github.com/tfufuz1/contextra`, `main` @ `25c8f17568025b120ef820f3cb4e45e6107c4f8e` (2026-11-02 00:38 +01:00), frisch geklont. Gegenüber `33c3e78e4` (Basis der Vorprüfung) haben sich nur `contextra-ports` (Altports entfernt, `Vfs` nach `ports` verschoben, `rng`/`vfs` gehärtet) und `contextra-testkit` geändert (24 Dateien, +687/−2.480 Zeilen) **[V]**. Gegenüber der Basis von 3.0.0 (`e5e29108d`) kommen `contextra-sys` (Härtung, `9f1e77633`) hinzu. Alle Zählungen, die nicht ausdrücklich als „neu geprüft“ gekennzeichnet sind, stammen von `33c3e78e4` und sind für die unveränderten Crates weiter gültig. **Ergänzung 4.1.0:** Architektur- und Strukturprüfung am HEAD `f8a3bbb24` (11 Commits nach `25c8f17`: `contextra`, `mvcc`, `durable-fs`, `tests/arch`), statisch **[V]**, ohne Build; neue Befunde F-26 bis F-31, Korrekturen F-07/F-13 (F-29). **Ergänzung 4.2.0:** Review am HEAD `4e208c1797e30e15508838de8e7ebea670f81175` (2026-11-02 02:52 +01:00, Shallow-Clone); neue Befunde F-32 bis F-37, Entscheidungen D-93 bis D-97.|
+|Basis der Analyse|`github.com/tfufuz1/contextra`, `main` @ `25c8f17568025b120ef820f3cb4e45e6107c4f8e` (2026-11-02 00:38 +01:00), frisch geklont. Gegenüber `33c3e78e4` (Basis der Vorprüfung) haben sich nur `contextra-ports` (Altports entfernt, `Vfs` nach `ports` verschoben, `rng`/`vfs` gehärtet) und `contextra-testkit` geändert (24 Dateien, +687/−2.480 Zeilen) **[V]**. Gegenüber der Basis von 3.0.0 (`e5e29108d`) kommen `contextra-sys` (Härtung, `9f1e77633`) hinzu. Alle Zählungen, die nicht ausdrücklich als „neu geprüft“ gekennzeichnet sind, stammen von `33c3e78e4` und sind für die unveränderten Crates weiter gültig. **Ergänzung 4.1.0:** Architektur- und Strukturprüfung am HEAD `f8a3bbb24` (11 Commits nach `25c8f17`: `contextra`, `mvcc`, `durable-fs`, `tests/arch`), statisch **[V]**, ohne Build; neue Befunde F-26 bis F-31, Korrekturen F-07/F-13 (F-29). **Ergänzung 4.2.0:** Review am HEAD `4e208c1797e30e15508838de8e7ebea670f81175` (2026-11-02 02:52 +01:00, Shallow-Clone); neue Befunde F-32 bis F-37, Entscheidungen D-93 bis D-97. **Ergänzung 4.3.0:** Revision der Folgedokumente; D-92 entfällt, D-98 tritt an seine Stelle. Keine neuen Befunde, keine Änderung an Datenformaten, Löschsemantik, Schlüsselhierarchie oder Rechtsrahmen.|
 |Prüfmodus|Quelltext gelesen, Manifeste ausgewertet, Muster gezählt (**[V]**). **Nicht gebaut und nicht ausgeführt:** Die Prüfumgebung hatte keine Rust-Toolchain. Alle Build- und Testwerte (**[M]**) stammen aus 3.0.0 (HEAD `e5e29108d`) und wurden nicht wiederholt. **Ausnahme 4.2.0:** `cargo check --workspace` (Lib-Targets, Rust 1.97.0 stable, ohne `--locked`) am HEAD `4e208c179` (F-32 **[M]**); Tests, `clippy`, `fmt` und Benchmarks wurden weiter nicht ausgeführt. Rechtsstände wurden am 2026-11-02 gegen Primär- und Fachquellen geprüft (**[W]**).|
-|Quelle der Wahrheit|**Ausschließlich diese Datei.** `AGENTS.md`, `PLAN.md`, `VETOES.md`, `CONSTITUTION.md`, `ARCHITECTURE.md`, `SOURCE_OF_TRUTH.md`, `SECURITY.md` und alle Dateien unter `docs/` außer dieser sind **veraltet und nicht normativ**. Widerspricht eine davon dieser Spezifikation, gilt die Spezifikation; die Datei wird erneuert oder gelöscht (Anhang E). Diese Spezifikation enthält deshalb auch die Byte-Formate (Anhang F) und den Umsetzungsplan (15.4); es gibt kein Begleitdokument.|
-|Ersetzt|`docs/SPEC.md` 4.1.0 (und 4.0.0, 3.0.0). Änderungen und ihre Begründung: Anhang H.|
+|Quelle der Wahrheit|**Ausschließlich diese Datei ist normativ.** `AGENTS.md`, `README.md`, `crates/*/README.md`, `crates/*/AGENTS.md`, `docs/` (außer dieser Datei) und `.agents/` sind **abgeleitete Dokumente**. Sie geben Fakten dieser Spezifikation wieder, nennen den Abschnitt, auf den sie sich stützen, und werden zusammen mit ihr gepflegt (D-98, Anhang E). Ein Widerspruch eines abgeleiteten Dokuments zu dieser Spezifikation ist ein Defekt des Dokuments; die Spezifikation gilt. Diese Spezifikation enthält deshalb auch die Byte-Formate (Anhang F) und den Umsetzungsplan (15.4); es gibt kein Begleitdokument.|
+|Ersetzt|`docs/SPEC.md` 4.2.0 (und 4.1.0, 4.0.0, 3.0.0). Änderungen und ihre Begründung: Anhang H.|
 |Geltung|Jede Abweichung des Quellcodes oder eines Folgedokuments von diesem Dokument ist ein Defekt.|
 
 > **Keine Rechtsberatung.** Kein Softwareprodukt kann „100 % Rechtskonformität“ zusagen: Rechtskonformität ist ein Merkmal des Betriebs durch den Verantwortlichen, nicht des Codes. Dieses Dokument legt deshalb fest, was Contextra technisch maximal leistet, wie jede Leistung gemessen wird und was Contextra wahrheitsgemäß behaupten darf (6.4, 16). Wo eine Rechtsfrage die Technik berührt, ist sie in 6.6 **konservativ entschieden**: Es gilt die strengste Auslegung. Eine spätere juristische Prüfung kann dadurch Aussagen lockern, nie technische Maßnahmen nachfordern.
@@ -309,7 +309,7 @@ Die Entscheidungen D-88 bis D-92 sind Revisionsentscheidungen dieser Fassung; si
 |**D-89**|**Schnitt der Fassade.** Paketname `contextra` bleibt (D-66). Das Crate enthält **keine Logik** und nur drei Module: `api` (Handles `Contextra`, `Tenant`, `Collection` als Re-Exporte aus `engine`), `wiring` (`system_defaults()`: `RealVfs`, Systemuhr, OS-CSPRNG; den Tresor erzeugt `engine`, D-95), `error`. `EngineBuilder` (5.7) liegt in `engine`; die Fassade stellt nur `Contextra::builder()` bereit. **Entfallen:** `query_rewriter`, `collection_profile`, `performance_profile`, `EncryptionMode` (samt `Unencrypted`), Lizenz- und Embedder-Bezüge, Re-Exporte von `DocId`, `chunker`, `TextEmbeddingEngine`, `DriftStatusProvider`, `rank`. Erste Zeile von `README.md` und `//!`: „Öffentliche API und Verdrahtung. Enthält keine Logik.“|F-26. Eine Fassade, die Profile, Rewriter und Builder-Politik enthält, ist eine zweite Engine.|T-API-1, T-ARCH-3, T-ARCH-7|
 |**D-90**|**Namensregeln.** (1) Kein Modul, keine Datei und kein Crate heißt `misc`, `util`, `utils`, `common`, `helpers` oder endet auf `_impl`. (2) Kein Modul trägt den Namen seines Crates (`types::types` → `domain`, `error`, `erasure`, `tags`). (3) **Eine** Modulform: `foo.rs` neben `foo/`, kein `mod.rs`. (4) Keine Paketaliase (`contextra-index` entfällt). (5) `engine/src/contextra_impl` heißt `instance`; `wiring.rs` (27 Zeilen) geht in die Fassade (D-89). (6) Bestehende Verstöße sind per Ratchet nur sinkend (5.8).|F-30. Namen sind die erste Dokumentation; ein Name ohne Aussage kostet bei jedem Lesen.|T-ARCH-7|
 |**D-91**|**Crate-Kopf und Ringangabe.** Jedes Crate hat in `lib.rs` einen `//!`-Kopf mit Zweck (ein Satz), Ring, erlaubten Abhängigkeiten und Verweis auf den SPEC-Abschnitt. Ringangabe und Abhängigkeiten werden von `tests/arch` gegen 5.1 und 5.3 geprüft, nicht von Hand gepflegt. Verboten in Quelltext und Doku: Zeitstempel („STAND“), Sitzungs- und Agentenkennungen, `ANCHOR[...]`-Marken, absolute Entwicklerpfade.|F-28, F-30. Handgepflegte Angaben veralten ohne Test.|T-ARCH-5, T-LINT-4|
-|**D-92**|**Folgedokumente und Werkzeugverläufe.** Die in Anhang E genannten, nicht normativen Dokumente werden **gelöscht**, nicht gekürzt, sobald ihr Inhalt in dieser Datei steht. An ihre Stelle tritt **eine** `AGENTS.md` im Wurzelverzeichnis (höchstens eine Seite, verweist auf `docs/SPEC.md`); `crates/*/AGENTS.md` entfallen. Agenten- und Werkzeugverzeichnisse (`.agents/`, `.gemini/`, `.antigravity/`), `reports/` und `evidence/` gehören nicht in den Quellbaum; Evidenz liegt als Release-Artefakt (11.7, 17.1).|Anhang E nannte „angleichen“; Angleichen erzeugt weiter zwei Wahrheiten. KI-Werkzeuge lesen jede Datei im Baum.|T-TRACE-1, T-ARCH-8|
+|**D-92**|**entfällt** (ersetzt durch D-98, Anhang H.0). Die ID bleibt reserviert.|Die Löschregel für Folgedokumente war eine Übergangsregel, solange diese nicht aktualisiert waren. Nach Auslieferung der aktualisierten Dokumente gilt D-98.|T-DOC-1 (D-98)|
 
 ### 4.5 Neu in 4.2.0 (Review am HEAD `4e208c179`)
 
@@ -322,6 +322,14 @@ Die Entscheidungen D-93 bis D-97 lösen die Befunde F-32 bis F-37 und sind vom E
 |**D-95**|**Der Tresor wird in `engine` erzeugt.** `engine` baut `FileVault` (als `RecordSealer` und `FileKeyring`) aus `contextra-erasure`. Die Fassade übergibt nur `RealVfs`, Uhr und OS-CSPRNG (`system_defaults()`). Das ersetzt die Nennung von `FileVault`/`FileKeyring` im `wiring`-Modul in D-89.|D-89 und die Anmerkung zu 5.3 widersprachen sich: Die Fassade darf nicht an `erasure` hängen, sollte aber den Tresor verdrahten.|T-ARCH-3, T-ARCH-7|
 |**D-96**|**Skelett-Regel für den Löschkern.** `contextra-erasure` ist Workspace-Mitglied, sobald WP-3.1 beginnt, mit Crate-Kopf (D-91) und leerem `lib.rs`. Löschports (`ErasureLayer`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink`) und Löschtypen entstehen in `ports` und `types` **vor** jeder Implementierung in `store`, `text` und `vector`.|F-33. P12 (Entkopplung) und AR-3 sind nur prüfbar, wenn das Crate existiert; Schichten, die `ErasureLayer` von Anfang an mitimplementieren, verhindern nachträgliches Anflanschen der Löschung.|T-ARCH-3|
 |**D-97**|**Zweck-Satz und Dev-Abhängigkeiten.** Jedes Crate hat genau einen Zweck-Satz (5.1a), wortgleich in `Cargo.toml`, `//!`-Kopf und README-Zeile 1. Dev-Abhängigkeiten folgen der Matrix 5.3 (AR-14); Selbst-Dev-Abhängigkeiten zum Aktivieren von Features sind verboten.|F-35: Köpfe nannten falsche Ringe und nicht vorhandene Verbraucher; die Frage „worum geht es in diesem Crate?“ blieb unbeantwortet. Dev-Kanten waren ungeregelt.|T-ARCH-5, T-ARCH-6|
+
+### 4.6 Neu in 4.3.0 (Folgedokumente)
+
+D-98 ersetzt D-92. Die Folgedokumente werden gepflegt; sie werden nicht entfernt.
+
+|ID|Entscheidung|Begründung|Test / Beleg|
+|---|---|---|---|
+|**D-98**|**Folgedokumente werden gepflegt, nicht gelöscht.** (1) Abgeleitete Dokumente sind: `AGENTS.md` im Wurzelverzeichnis, `README.md`, `docs/*.md` außer dieser Datei, `crates/*/README.md`, `crates/*/AGENTS.md` und `.agents/**/*.md`. Sie geben Fakten dieser Spezifikation wieder, nennen den Abschnitt, auf den sie sich stützen, und enthalten keine eigenen Anforderungen. (2) Agenten- und Werkzeugverzeichnisse (`.agents/`, `.gemini/`, `.antigravity/`) sind Teil des Repositorys. Sie unterliegen denselben Konsistenzprüfungen, soweit sie Pfade, Befehle, Crate-Namen oder Workflows nennen. (3) Nicht in den Quellbaum gehören Sitzungsverläufe und Protokolle früherer Prüfungen sowie `reports/` und `evidence/`. Evidenz ist Release-Artefakt (11.7, 17.1). (4) Jede Änderung einer Tatsache in dieser Spezifikation wird im selben Änderungspaket in allen betroffenen abgeleiteten Dokumenten nachgezogen. (5) Die Konsistenz wird automatisiert geprüft.|Folgedokumente sind der Einstieg für Entwickler und Agenten. Ihre Löschung hätte Wissen entfernt, das nur mit großem Aufwand wiederherzustellen wäre. Schattenwahrheiten entstehen durch Abweichung von der Spezifikation, nicht durch die Existenz eines Dokuments. Die Prüfung setzt deshalb an der Abweichung an.|T-DOC-1, T-ARCH-8, T-TRACE-1|
 
 ---
 
@@ -1209,7 +1217,7 @@ Bare-Metal-Linux (x86_64, ≥ 8 Kerne, 32 GiB RAM), ext4 auf NVMe (`fsync_p50` �
 ||T-VEC-ARENA-1|Alle Repräsentationen je Slot zusammenhängend und überschrieben|
 ||T-HYB-1, T-SEARCH-2|Nachladen bis `k` oder Erschöpfung; `exhausted` korrekt; nie stilles Verkürzen|
 ||T-RANK-1|RRF deterministisch|
-|Architektur|T-ARCH-1..8|Ringe, Matrix, Verbote, Netzwerkbann; **neu:** T-ARCH-5 Ringangabe, Abhängigkeiten und Zweck-Satz im Crate-Kopf gegen 5.1/5.1a/5.3; T-ARCH-6 Matrix aus `cargo metadata`, kein Glob-Re-Export in `ports`, Dev-Abhängigkeiten (AR-14); T-ARCH-7 Fassade ohne Logik, Namens- und Modulregeln (D-90); T-ARCH-8 keine Agenten-/Werkzeugverzeichnisse und keine nicht normativen Dokumente im Baum (D-92)|
+|Architektur|T-ARCH-1..8|Ringe, Matrix, Verbote, Netzwerkbann; **neu:** T-ARCH-5 Ringangabe, Abhängigkeiten und Zweck-Satz im Crate-Kopf gegen 5.1/5.1a/5.3; T-ARCH-6 Matrix aus `cargo metadata`, kein Glob-Re-Export in `ports`, Dev-Abhängigkeiten (AR-14); T-ARCH-7 Fassade ohne Logik, Namens- und Modulregeln (D-90); T-ARCH-8 keine Sitzungsverläufe, Prüfprotokolle, `reports/` und `evidence/` im Quellbaum (D-98)|
 |Build|T-BUILD-1|`cargo check --workspace --all-targets --locked` ist blockierend; ein veraltetes `Cargo.lock` schlägt fehl (D-93)|
 ||T-CFG-1/2/3|Keine Sicherheitsfeatures/Schalter; `testing` nie im Release; `batch_window ≤ erase_sla/2`|
 ||T-DEF-1|Keine Konfiguration ohne Verschlüsselung/Integrität|
@@ -1219,6 +1227,7 @@ Bare-Metal-Linux (x86_64, ≥ 8 Kerne, 32 GiB RAM), ext4 auf NVMe (`fsync_p50` �
 ||T-PLAT-1|Startprobe verweigert unbekannte Dateisysteme|
 ||T-LIMIT-1|Kapazitätsgrenzen liefern `Limit::*`|
 ||T-TRACE-1|Rückverfolgbarkeit Spezifikation ↔ Test|
+||T-DOC-1|Abgeleitete Dokumente (D-98): Zweck-Sätze in `Cargo.toml`, `lib.rs` und erster Zeile der `README.md` sind wortgleich; außerhalb dieser Datei keine Begriffe aus 6.4; Pfad-, Workflow- und Crate-Verweise existieren; keine Zeitstempel, Agentenkennungen oder absoluten Pfade (D-91)|
 |Betrieb|T-SLA-1|`erase` bis `Gated` innerhalb D-30; SLA-Verletzung wird ausgewiesen|
 ||T-OPS-1/2|`health()` Felder; Plattenreserve|
 ||T-LOG-1|Keine Inhalte/Kennungen in Logs und Fehlern|
@@ -1286,7 +1295,7 @@ Aufwände sind Schätzungen **[E]** in Personenwochen (PW) für ein Team mit zwe
 |WP-1.2|Branch `archive/v0-full` (D-22); Rückbauliste D-84 (Features, `acl_win32.rs`, `WasmMergeOperator`)|Feature-Skript grün (AR-9)|G-B|3|
 |WP-1.3|Tokio-Features (D-54), `deny.toml` aktualisieren (Bans, Advisories mit Ablaufdatum, tote `clarify`/`wrappers`)|`cargo tree -e normal` ohne `mio`/`socket2`|G-B|1|
 |WP-1.4|Ein `Vfs`: `durable-fs` auf `ports::Vfs`; `store`/`vector` ohne `std::fs` (F-13)|T-LINT-2 grün|G-B|4|
-|WP-1.5|Struktur und Namen: Fassade nach D-89 schneiden, `contextra_impl`→`instance`, Modul-/Namensregeln D-90, Crate-Köpfe D-91, Matrixkorrektur D-88 im Code, `tests/arch` T-ARCH-5..8, Folgedokumente und Werkzeugverläufe nach D-92 entfernen|T-ARCH-5..8 grün (Ratchet für Altbestand)|G-B|3|
+|WP-1.5|Struktur und Namen: Fassade nach D-89 schneiden, `contextra_impl`→`instance`, Modul-/Namensregeln D-90, Crate-Köpfe D-91, Matrixkorrektur D-88 im Code, `tests/arch` T-ARCH-5..8, Folgedokumente nach D-98 aktualisieren, Sitzungsverläufe aus dem Quellbaum nehmen, T-DOC-1 einrichten|T-ARCH-5..8 und T-DOC-1 grün (Ratchet für Altbestand)|G-B|3|
 |WP-2.1|`contextra-engine` und Tests wieder kompilierbar (F-01, F-02), `fmt` (F-03)|`check --all-targets --locked` grün|G-A|6|
 |WP-3.1|`types`: `DocRef`, `DocHandle`, Tags mit Längenpräfix, Löschtypen, `KeyCoverage`, `DocId` entfernt; `ports`: Löschports; `erasure`-Skelett als Workspace-Mitglied (D-96)|T-KEY-1, T-DOCREF-1, T-ARCH-3|G0|3|
 |WP-3.2|`crypto`: D-06 Grenzen, D-52 Slot-AAD, D-60 Nonce-Schema, D-80 Algorithmenliste, `K_sign` abgeleitet|T-KDF-*, T-KEYSLOT-*, T-NONCE-1|G-F|3|
@@ -1452,10 +1461,10 @@ Konstanten: Tag 16 B, Salt 32 B, Nonce 12 B, Tresor-Slot 80 B, Segmentziel 8–3
 
 |Dokument|Änderung|
 |---|---|
-|`docs/SPEC.md`|ersetzt durch diese Fassung 4.1.0|
+|`docs/SPEC.md`|ersetzt durch diese Fassung 4.3.0|
 |`PLAN.md`|durch Verweis auf 15.4 ersetzen (kein eigenes Plandokument)|
 |`VETOES.md`|VETO-D01 aufheben, VETO-D01b einführen (Schlüsselvernichtung in v1)|
-|`CONSTITUTION.md`, `ARCHITECTURE.md`, `SOURCE_OF_TRUTH.md`, `AGENTS.md`, `crates/*/AGENTS.md`|„keine Ebene B in v1“ streichen; Verweis auf SPEC 4.1.0; **ab 4.1.0 löschen statt angleichen (D-92):** eine Wurzel-`AGENTS.md`, keine `crates/*/AGENTS.md`|
+|`CONSTITUTION.md`, `ARCHITECTURE.md`, `SOURCE_OF_TRUTH.md`, `AGENTS.md`, `crates/*/AGENTS.md`, `.agents/`|„keine Ebene B in v1“ streichen; Verweis auf die aktuelle SPEC-Fassung; **angleichen, nicht löschen (D-98):** `AGENTS.md` im Wurzelverzeichnis ist die Einstiegsdatei für Agenten; `crates/*/AGENTS.md` sind abgeleitete Crate-Hinweise; `.agents/` wird nach T-DOC-1 gepflegt|
 |`SECURITY.md`|CRA-Meldeweg, Fristen, Support-Zeitraum (D-67)|
 |`docs/DELETION-DSGVO.md`|an E-L1..E-L16 angleichen; Wortlaut-Lint|
 |`docs/FORMATS.md` (falls vorhanden)|löschen; Formate stehen in Anhang F|
@@ -1613,6 +1622,18 @@ Kanonisierung: UTF-8 NFC, Objektschlüssel aufsteigend sortiert, keine Leerzeich
 
 ## Anhang H – Änderungshistorie
 
+### H.0 Änderungen 4.3.0 (Folgedokumente)
+
+Anlass: Die Löschregel für Folgedokumente (D-92) war als Übergangsregel gedacht, bis die Dokumente aktualisiert sind. Mit der Auslieferung der aktualisierten Dokumente entfällt sie. **Nicht geändert:** Datenformate (Anhang F), Löschsemantik (11), Schlüsselhierarchie (10), Rechtsrahmen (6). **Vom Eigentümer zu bestätigen:** D-98.
+
+|Befund|Kern der Änderung|Neu/geändert|
+|---|---|---|
+|Löschregel für Folgedokumente (D-92) als Übergangsregel|D-92 entfällt; Folgedokumente werden gepflegt, nicht gelöscht|D-92 (entfällt), D-98, 4.6, Anhang E|
+|Quelle der Wahrheit im Kopf nennt Folgedokumente veraltet|Folgedokumente sind abgeleitet und mit der SPEC zu pflegen|Kopf, Zeile „Quelle der Wahrheit“|
+|T-ARCH-8 prüfte das Vorhandensein von Dokumenten|T-ARCH-8 prüft Sitzungsverläufe, Prüfprotokolle und Evidenz im Baum; die Konsistenz der Dokumente prüft T-DOC-1|15.1, T-DOC-1|
+|WP-1.5 sah das Entfernen von Dokumenten vor|WP-1.5 aktualisiert Dokumente und richtet T-DOC-1 ein|15.4|
+|F-37 führt `.agents/`, `.gemini/`, `.antigravity/` als Befund|F-37 bleibt als Ist-Befund bestehen. Die Werkzeugverzeichnisse sind nach D-98 zulässig; beanstandet bleiben Marker, Sitzungsverläufe und Evidenz im Baum|F-37 (Ist-Befund), D-98|
+
 ### H.1 Änderungen 4.2.0 (Review am HEAD `4e208c179`)
 
 Prüfgrundlage: HEAD `4e208c1797e30e15508838de8e7ebea670f81175`, statisch **[V]** und `cargo check` der Lib-Targets **[M]**. **Nicht geändert:** Datenformate (Anhang F), Löschsemantik (11), Schlüsselhierarchie (10), Rechtsrahmen (6). **Vom Eigentümer zu bestätigen:** D-93 bis D-97.
@@ -1674,4 +1695,4 @@ Unverändert aus 4.0.0: R-01 bis R-17 (Abschnitt H.3) bleiben gültig.
 
 Danach neu gegenüber der Review: Dateischlüssel-Vernichtung (D-85), Textbindung unter DEK (9.7), Fallbackleiter mit Stufen (11.9), Rückverfolgbarkeits-Test T-TRACE-1 (15.1), Umsetzungsplan (15.4), Byte-Formate (Anhang F).
 
-**Ende der Spezifikation 4.2.0.**
+**Ende der Spezifikation 4.3.0.**

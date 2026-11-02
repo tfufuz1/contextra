@@ -1,12 +1,9 @@
 # Routine: Unsafe-Prüfung
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
-
-- **Takt**: Wöchentlich
-- **Ziel**: Verifikation aller Unsafe-Inseln auf Gültigkeit der SAFETY-Kommentare und Miri-Sauberkeit.
-- **Eingaben**:
-  - `cargo miri test`
-- **Harte Grenzen**: Max. 15 Dateien / 1 Crate pro PR. Scope-Globs: `crates/*/**`.
-- **Stopp-Bedingungen**: Miri-Undefined-Behavior im Fremdcode ohne direkten Fix.
-- **Ergebnisformat**: Audit-Report im PR-Text mit Miri-Verifikationsprotokoll.
-- **Eskalation**: Siehe Architekturdokument §9.3.
+- **Takt:** wöchentlich
+- **Ziel:** Gültigkeit der `// SAFETY:`-Kommentare und Speichersicherheit der Unsafe-Inseln `contextra-sys` und `contextra-simd` (D-29, T-UNSAFE-1)
+- **Eingaben:** Miri auf der Skalar-Referenz von `contextra-simd`, Miri auf `contextra-types` und `contextra-mvcc`, AddressSanitizer auf `contextra-sys` (siehe [`docs/COMPILATION.md`](../../../docs/COMPILATION.md)). Miri auf dem gesamten Workspace ist nicht vorgesehen.
+- **Harte Grenzen:** höchstens 15 Dateien in einem Crate je PR. Scope: `crates/contextra-sys/**`, `crates/contextra-simd/**`.
+- **Stopp:** Undefined Behavior in Fremdcode ohne direkte Korrektur wird gemeldet, nicht überdeckt.
+- **Ergebnis:** Bericht mit Protokoll der Miri- und ASan-Läufe im PR.
+- **Eskalation:** siehe [`../HARNESS_QUICKSTART.md`](../HARNESS_QUICKSTART.md).
