@@ -5,6 +5,9 @@
 //! Dieses Modul belohnt Dokumente, die in mehreren voneinander unabhängigen Retrieval-Kanälen
 //! gleichzeitig gefunden wurden. Dies basiert auf dem Prinzip der inter-sensorischen Kohärenz.
 
+// Begründung: Veraltete Wrapper bleiben für Abwärtskompatibilität zu contextra-engine erhalten
+// bis diese umgestellt ist (siehe ÜBERGABE).
+#[allow(deprecated)]
 use super::rrf::weighted_reciprocal_rank_fusion;
 use super::types::{FusedScore, SearchResult};
 use serde::{Deserialize, Serialize};
@@ -36,6 +39,8 @@ pub fn fuse_signals(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
 ) -> Vec<FusedScore> {
+    // Begründung: Interner Aufruf des als deprecated markierten RRF-Aufrufs für Abwärtskompatibilität zu contextra-engine.
+    #[allow(deprecated)]
     weighted_reciprocal_rank_fusion(result_sets, max_results)
 }
 

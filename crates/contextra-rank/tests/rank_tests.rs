@@ -1,23 +1,19 @@
-//! # Integrationstest: Basis-Ranking-Tests für mRRF, RRF, ECE und Drift
+//! # Integrationstest: Basis-Ranking-Tests für RRF
 //!
 //! **Crate:** `contextra-rank`
 //!
-//! Prüft die Korrektheit, Stabilität und Invarianten der Ranking- und Kalibrierungskomponenten.
+//! Prüft die Korrektheit, Stabilität und Invarianten der RRF-Komponenten.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-//! Comprehensive unit test suite for `contextra-rank` crate modules.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, deprecated)]
 
 #[cfg(test)]
 mod tests {
-    use contextra_rank::calibration::{IsotonicCalibrator, PlattScaler};
-    use contextra_rank::drift::DriftDetector;
     use contextra_rank::fusion::{
-        reciprocal_rank_fusion, BoundedTopK, ProvenanceBuilder, SearchResult,
+        g, reciprocal_rank_fusion, rrf_fuse, BoundedTopK, Hit, ProvenanceBuilder, SearchResult,
     };
-    use contextra_types::ConfigFingerprint;
 
     // ANCHOR[contextra-rank:RNK-TEST-001]
-#[test]
+    #[test]
     fn test_rrf_k_zero_boundary() {
         let prov = ProvenanceBuilder::new(0.0)
             .vector(0.9, 1, 1.0)
@@ -68,6 +64,21 @@ mod tests {
         }
     }
 
+    // Testet kanonische rrf_fuse Funktion mit Hits
+    #[test]
+    fn test_rrf_fuse_dual_signal_higher_than_single_signal() {
+        let set1 = vec![Hit::new("doc_both", 0.99)];
+        let set2 = vec![Hit::new("doc_both", 0.95), Hit::new("doc_single", 0.99)];
+
+        let fused = rrf_fuse(&[set1, set2], 60, 10);
+        assert_eq!(fused.len(), 2);
+        if let (Some(f0), Some(f1)) = (fused.first(), fused.get(1)) {
+            assert_eq!(f0.id, "doc_both");
+            assert_eq!(f1.id, "doc_single");
+            assert!(f0.score > f1.score);
+        }
+    }
+
     // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
     fn test_bounded_top_k() {
@@ -81,70 +92,7 @@ mod tests {
 
     // Testet das erwartete Verhalten und mathematische Invarianten.
     #[test]
-    fn test_isotonic_calibrator_warmup() {
-        let mut cal = IsotonicCalibrator::new(10, 100);
-        for i in 0..9 {
-            cal.record_outcome(i as f32 / 10.0, i > 4);
-        }
-        assert!(cal.calibrated_probability(0.5).is_none());
-
-        cal.record_outcome(0.9, true);
-        assert!(cal.calibrated_probability(0.5).is_some());
-    }
-
-    // Testet das erwartete Verhalten und mathematische Invarianten.
-    #[test]
-    fn test_isotonic_p8_invalidation() {
-        let mut cal = IsotonicCalibrator::new(5, 100);
-        for i in 0..10 {
-            cal.record_outcome(i as f32 / 10.0, i > 4);
-        }
-        let fp1 = ConfigFingerprint::new("model-1", "Q4", "prompt", 0.7);
-        cal.invalidate_on_config_change(fp1.clone());
-        assert_eq!(cal.observation_count(), 0);
-
-        cal.record_outcome(0.5, true);
-        cal.invalidate_on_config_change(fp1);
-        assert_eq!(cal.observation_count(), 1);
-    }
-
-    // Testet das erwartete Verhalten und mathematische Invarianten.
-    #[test]
-    fn test_platt_scaler_fit_and_predict() {
-        let mut obs = Vec::new();
-        for i in -10..=10 {
-            let logit = i as f32 * 0.2;
-            obs.push((logit, logit > 0.0));
-        }
-
-        let scaler = PlattScaler::fit(&obs);
-        assert!(scaler.is_fitted());
-        assert!(scaler.predict(1.0) > 0.7);
-        assert!(scaler.predict(-1.0) < 0.3);
-    }
-
-    // Testet das erwartete Verhalten und mathematische Invarianten.
-    #[test]
-    fn test_drift_detector() {
-        let mut detector = DriftDetector::new(10, 0.1);
-        detector.set_baseline(0.5);
-
-        for _ in 0..10 {
-            detector.observe(0.51);
-        }
-        assert_eq!(detector.overall_drift_status(), "stabil");
-
-        for _ in 0..10 {
-            detector.observe(0.9);
-        }
-        assert_eq!(detector.overall_drift_status(), "kritisch");
-    }
-
-    // Testet das erwartete Verhalten und mathematische Invarianten.
-    #[test]
     fn test_g_function_standalone_properties() {
-        use contextra_rank::g;
-
         // (c) g(0) is exactly 0
         assert_eq!(g(0.0), 0.0);
         assert_eq!(g(-0.0), 0.0);
@@ -160,181 +108,5 @@ mod tests {
         assert_eq!(g(f32::NAN), 0.0);
         assert_eq!(g(f32::INFINITY), 0.0);
         assert_eq!(g(f32::NEG_INFINITY), 0.0);
-    }
-
-    // Testet das erwartete Verhalten und mathematische Invarianten.
-    #[test]
-    fn test_mrrf_determinism_baseline() {
-        use contextra_rank::drift::DriftStatus;
-        use contextra_rank::fusion::{
-            weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
-            MetadataMergePriority, SearchResult, SignalCalibrationContext,
-        };
-
-        let res_a = vec![
-            SearchResult {
-                id: "doc1".to_string(),
-                score: 0.9,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-            SearchResult {
-                id: "doc2".to_string(),
-                score: 0.8,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        ];
-        let res_b = vec![
-            SearchResult {
-                id: "doc2".to_string(),
-                score: 0.85,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-            SearchResult {
-                id: "doc1".to_string(),
-                score: 0.75,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        ];
-
-        let sets = vec![
-            ("signal_a".to_string(), res_a.clone(), 1.0),
-            ("signal_b".to_string(), res_b.clone(), 1.0),
-        ];
-
-        // Baseline standard weighted RRF
-        let standard_fused = weighted_reciprocal_rank_fusion_with_options(
-            sets.clone(),
-            10,
-            MetadataMergePriority::default(),
-            true,
-            None,
-        );
-
-        // mRRF with beta = 0.0
-        let mrrf_fused_beta0 = weighted_reciprocal_rank_fusion_mrrf(
-            sets.clone(),
-            10,
-            MetadataMergePriority::default(),
-            true,
-            None,
-            None,
-            0.0,
-        );
-
-        // mRRF with beta = 1.0 but uncalibrated/unstable signal context (so m_s defaults to 0)
-        let uncalibrated_ctxs = vec![
-            SignalCalibrationContext::new(
-                "signal_a",
-                false,
-                DriftStatus::Stable { mean_shift: 0.0 },
-            ),
-            SignalCalibrationContext::new(
-                "signal_b",
-                true,
-                DriftStatus::DriftDetected {
-                    mean_shift: 0.3,
-                    threshold: 0.1,
-                },
-            ),
-        ];
-        let mrrf_fused_uncalibrated = weighted_reciprocal_rank_fusion_mrrf(
-            sets,
-            10,
-            MetadataMergePriority::default(),
-            true,
-            None,
-            Some(&uncalibrated_ctxs),
-            1.0,
-        );
-
-        assert_eq!(standard_fused, mrrf_fused_beta0);
-        assert_eq!(standard_fused, mrrf_fused_uncalibrated);
-    }
-
-    // Testet das erwartete Verhalten und mathematische Invarianten.
-    #[test]
-    fn test_mrrf_margin_modulation_relative_weight_effect() {
-        use contextra_rank::drift::DriftStatus;
-        use contextra_rank::fusion::{
-            modulate_and_renormalize_weights, SearchResult, SignalCalibrationContext,
-        };
-
-        // Signal A: Close tie (m_s = 0.80 - 0.79 = 0.01)
-        let res_a = vec![
-            SearchResult {
-                id: "docA1".to_string(),
-                score: 0.80,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-            SearchResult {
-                id: "docA2".to_string(),
-                score: 0.79,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        ];
-
-        // Signal B: Clear margin (m_s = 0.90 - 0.40 = 0.50)
-        let res_b = vec![
-            SearchResult {
-                id: "docB1".to_string(),
-                score: 0.90,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-            SearchResult {
-                id: "docB2".to_string(),
-                score: 0.40,
-                metadata: None,
-                matched_signals: vec![],
-                provenance: None,
-            },
-        ];
-
-        let sets = vec![
-            ("signal_a".to_string(), res_a, 1.0),
-            ("signal_b".to_string(), res_b, 1.0),
-        ];
-
-        let contexts = vec![
-            SignalCalibrationContext::new(
-                "signal_a",
-                true,
-                DriftStatus::Stable { mean_shift: 0.0 },
-            ),
-            SignalCalibrationContext::new(
-                "signal_b",
-                true,
-                DriftStatus::Stable { mean_shift: 0.0 },
-            ),
-        ];
-
-        let beta = 1.0;
-        let modulated_weights = modulate_and_renormalize_weights(&sets, Some(&contexts), beta);
-
-        if let (Some(&w_a), Some(&w_b)) = (modulated_weights.first(), modulated_weights.get(1)) {
-            let total_weight = w_a + w_b;
-            assert!(
-                (total_weight - 2.0).abs() < 0.001,
-                "Weight sum invariant violated: {total_weight}"
-            );
-
-            assert!(
-                w_b > w_a,
-                "Expected Signal B weight ({w_b}) to be strictly greater than Signal A weight ({w_a})"
-            );
-        }
     }
 }

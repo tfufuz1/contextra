@@ -3,18 +3,114 @@
 //! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
 //! Dieses Modul implementiert die reziproke Rangfusion (RRF = Reciprocal Rank Fusion)
-//! sowie die margin-modulierte Variante (mRRF = Margin-Modulated RRF).
+//! gemäß SPEC §8.13 sowie abwärtskompatible Hüllen.
 
 use super::normalized::score_normalized_fusion_with_options;
 use super::provenance::ProvenanceBuilder;
 use super::resonance::{apply_resonance_bonus, ResonanceConfig};
-use super::signal::{
-    FusedEntry, MetadataMergePriority, SignalCalibrationContext, SignalKey, SignalKind,
-};
+use super::signal::{FusedEntry, MetadataMergePriority, SignalKey, SignalKind};
 use super::topk::{BoundedTopK, TopKCandidate};
-use super::types::{ProvenanceRecord, SearchResult, SignalContribution};
+use super::types::{Hit, ProvenanceRecord, SearchResult, SignalContribution};
 use ahash::AHashMap;
 pub use contextra_types::FusionStrategy;
+
+/// Standard-Glättungsparameter $k = 60$ für Reciprocal Rank Fusion (SPEC §8.13).
+pub const DEFAULT_RRF_K: u32 = 60;
+
+/// Kanonische Reciprocal-Rank-Fusion gemäß SPEC §8.13 / AGENTS.md.
+///
+/// Führt mehrere sortierte Trefferlisten (`lists`) mit dem Glättungsfaktor `k`
+/// (Standard 60, falls `k == 0`) zusammen und gibt die `top` besten Treffer zurück.
+///
+/// # Invarianten
+/// 1. **Permutationsinvarianz:** Die Reihenfolge der Eingabelisten in `lists` beeinflusst weder Scores noch Rangfolge.
+/// 2. **Deterministischer Tie-Break:** Sortierung primär nach Score absteigend, bei Gleichheit deterministisch
+///    nach aufsteigendem `doc_tag` (falls vorhanden) bzw. aufsteigender String-`id`.
+/// 3. **NaN/Inf-Sicherheit:** Nicht-endliche Scores werden sicher ignoriert bzw. führen zu keinen Panics/Inkonsistenzen.
+pub fn rrf_fuse(lists: &[Vec<Hit>], k: u32, top: usize) -> Vec<Hit> {
+    if top == 0 || lists.is_empty() {
+        return Vec::new();
+    }
+
+    let k_val = if k == 0 { DEFAULT_RRF_K } else { k };
+    let k_f32 = k_val as f32;
+
+    let mut id_to_idx: AHashMap<String, usize> = AHashMap::new();
+    let mut entries: Vec<HitEntry> = Vec::new();
+
+    for list in lists {
+        for (rank_idx, hit) in list.iter().enumerate() {
+            let rank = match u32::try_from(rank_idx.saturating_add(1)) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+            let denom = k_f32 + rank as f32;
+            let contribution = 1.0_f32 / denom;
+            let contribution = if contribution.is_finite() && contribution > 0.0 {
+                contribution
+            } else {
+                0.0
+            };
+
+            match id_to_idx.get(&hit.id) {
+                Some(&idx) => {
+                    if let Some(entry) = entries.get_mut(idx) {
+                        entry.score += contribution;
+                        if entry.doc_tag.is_none() && hit.doc_tag.is_some() {
+                            entry.doc_tag = hit.doc_tag;
+                        }
+                        merge_metadata_ref(&mut entry.metadata, &hit.metadata);
+                    }
+                }
+                None => {
+                    let new_idx = entries.len();
+                    id_to_idx.insert(hit.id.clone(), new_idx);
+                    entries.push(HitEntry {
+                        id: hit.id.clone(),
+                        score: contribution,
+                        doc_tag: hit.doc_tag,
+                        metadata: hit.metadata.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    if entries.is_empty() {
+        return Vec::new();
+    }
+
+    entries.sort_by(|a, b| {
+        b.score
+            .total_cmp(&a.score)
+            .then_with(|| match (a.doc_tag, b.doc_tag) {
+                (Some(tag_a), Some(tag_b)) => tag_a.cmp(&tag_b),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            })
+            .then_with(|| a.id.cmp(&b.id))
+    });
+
+    entries.truncate(top);
+
+    entries
+        .into_iter()
+        .map(|e| Hit {
+            id: e.id,
+            score: e.score,
+            doc_tag: e.doc_tag,
+            metadata: e.metadata,
+        })
+        .collect()
+}
+
+struct HitEntry {
+    id: String,
+    score: f32,
+    doc_tag: Option<[u8; 16]>,
+    metadata: Option<serde_json::Value>,
+}
 
 /// Bounded smooth influence function $g(x) = \frac{x}{1 + |x|}$.
 ///
@@ -32,6 +128,7 @@ pub fn g(x: f32) -> f32 {
 /// Fuses multiple sets of ranked search results into a single ranked list using Reciprocal Rank Fusion (RRF).
 // ANCHOR[contextra-rank:RRF-002]
 /// Führt mehrere ungewichtete Signal-Ergebnislisten mittels Standard-RRF ($k=60$) zusammen.
+#[deprecated(note = "Nutze rrf_fuse als kanonische Schnittstelle (SPEC §8.13).")]
 pub fn reciprocal_rank_fusion(
     result_sets: Vec<Vec<SearchResult>>,
     max_results: usize,
@@ -40,6 +137,8 @@ pub fn reciprocal_rank_fusion(
         .into_iter()
         .map(|set| ("unnamed".to_string(), set, 1.0))
         .collect();
+    // Begründung: Interner Aufruf zur Delegierung an abwärtskompatible Hülle.
+    #[allow(deprecated)]
     weighted_reciprocal_rank_fusion(weighted_sets, max_results)
 }
 
@@ -82,10 +181,13 @@ pub(super) fn merge_metadata_ref(
 /// Weighted Reciprocal Rank Fusion with default signal metadata priority (`VectorFirst`).
 // ANCHOR[contextra-rank:RRF-003]
 /// Gewichtete reziproke Rangfusion (Weighted RRF) mit Standard-Metadatenpriorität.
+#[deprecated(note = "Nutze rrf_fuse als kanonische Schnittstelle (SPEC §8.13).")]
 pub fn weighted_reciprocal_rank_fusion(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
 ) -> Vec<SearchResult> {
+    // Begründung: Interner Aufruf zur Delegierung an abwärtskompatible Hülle.
+    #[allow(deprecated)]
     weighted_reciprocal_rank_fusion_with_options(
         result_sets,
         max_results,
@@ -98,35 +200,34 @@ pub fn weighted_reciprocal_rank_fusion(
 /// Weighted Reciprocal Rank Fusion with explicit metadata merge priority.
 // ANCHOR[contextra-rank:RRF-004]
 /// Gewichtete reziproke Rangfusion mit expliziter Metadaten-Zusammenführungspriorität.
+#[deprecated(note = "Nutze rrf_fuse als kanonische Schnittstelle (SPEC §8.13).")]
 pub fn weighted_reciprocal_rank_fusion_with_priority(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
     priority: MetadataMergePriority,
 ) -> Vec<SearchResult> {
+    // Begründung: Interner Aufruf zur Delegierung an abwärtskompatible Hülle.
+    #[allow(deprecated)]
     weighted_reciprocal_rank_fusion_with_options(result_sets, max_results, priority, true, None)
 }
 
-/// Modulates signal weights using mRRF margin formula:
-/// $m_s = S_1 - S_2$ (when signal is calibrated AND `drift_status` is `Stable` and $\ge 2$ candidates exist).
-/// $w_s' = w_s \times (1 + g(\beta \times m_s))$.
-/// Renormalizes modulated weights to maintain sum equal to original weight sum (preserving weight norm in [0.999, 1.001]).
+/// Modulates signal weights using mRRF margin formula.
 // ANCHOR[contextra-rank:RRF-005]
 /// Moduliert Signalgewichte anhand der Margin-Differenz (mRRF) und renormalisiert sie.
 pub fn modulate_and_renormalize_weights(
     result_sets: &[(String, Vec<SearchResult>, f32)],
-    calibration_contexts: Option<&[SignalCalibrationContext]>,
+    _calibration_contexts: Option<&()>,
     beta: f32,
 ) -> Vec<f32> {
     let raw_weights: Vec<f32> = result_sets.iter().map(|(_, _, w)| *w).collect();
     if beta == 0.0 || !beta.is_finite() {
-        // NAN-CHECK-OK
         return raw_weights;
     }
 
     let mut total_orig = 0.0_f32;
     let mut modulated_weights = Vec::with_capacity(result_sets.len());
 
-    for (signal_name, set, weight) in result_sets.iter() {
+    for (_signal_name, _set, weight) in result_sets.iter() {
         let w = *weight;
         if !w.is_finite() || w <= 0.0 {
             modulated_weights.push(w);
@@ -135,34 +236,7 @@ pub fn modulate_and_renormalize_weights(
 
         total_orig += w;
 
-        // Check calibration context if provided
-        let cal_ctx = calibration_contexts.and_then(|ctxs| {
-            ctxs.iter()
-                .find(|c| c.signal_name.eq_ignore_ascii_case(signal_name))
-        });
-
-        let use_calibrated = cal_ctx.is_some_and(|c| c.should_use_calibrated_scores());
-
-        let m_s = if use_calibrated {
-            if set.len() >= 2 {
-                if let (Some(doc0), Some(doc1)) = (set.first(), set.get(1)) {
-                    let s1 = doc0.score;
-                    let s2 = doc1.score;
-                    if s1.is_finite() && s2.is_finite() {
-                        (s1 - s2).max(0.0)
-                    } else {
-                        0.0
-                    }
-                } else {
-                    0.0
-                }
-            } else {
-                0.0
-            }
-        } else {
-            0.0
-        };
-
+        let m_s = 0.0_f32;
         let w_prime = w * (1.0 + g(beta * m_s));
         modulated_weights.push(if w_prime.is_finite() && w_prime > 0.0 {
             w_prime
@@ -191,6 +265,7 @@ pub fn modulate_and_renormalize_weights(
 /// Weighted Reciprocal Rank Fusion with options.
 // ANCHOR[contextra-rank:RRF-006]
 /// Vollständig konfigurierbare gewichtete Rangfusion mit Resonanz- und Provenance-Optionen.
+#[deprecated(note = "Nutze rrf_fuse als kanonische Schnittstelle (SPEC §8.13).")]
 pub fn weighted_reciprocal_rank_fusion_with_options(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
@@ -198,6 +273,8 @@ pub fn weighted_reciprocal_rank_fusion_with_options(
     include_provenance: bool,
     resonance_config: Option<&ResonanceConfig>,
 ) -> Vec<SearchResult> {
+    // Begründung: Interner Aufruf zur Delegierung an abwärtskompatible Hülle.
+    #[allow(deprecated)]
     weighted_reciprocal_rank_fusion_mrrf(
         result_sets,
         max_results,
@@ -251,52 +328,6 @@ fn update_entry_kind_scores<'a>(
     }
 }
 
-fn merge_doc_provenance<'a>(entry: &mut FusedEntry<'a>, doc_prov: &'a ProvenanceRecord) {
-    if entry.vector_distance.is_none() {
-        entry.vector_distance = doc_prov.vector_distance;
-    }
-    if entry.bm25_score.is_none() {
-        entry.bm25_score = doc_prov.bm25_score;
-    }
-    if entry.graph_score.is_none() {
-        entry.graph_score = doc_prov.graph_score;
-    }
-    if entry.rerank_score.is_none() {
-        entry.rerank_score = doc_prov.rerank_score;
-    }
-    if entry.source_collection.is_none() {
-        entry.source_collection = doc_prov.source_collection.as_deref();
-    }
-    if entry.index_type.is_none() {
-        entry.index_type = doc_prov.index_type.as_deref();
-    }
-    for (sig, r) in &doc_prov.signal_ranks {
-        if let Some(k) = SignalKey::from_name(sig.as_str()) {
-            entry.signal_ranks.entry(k).or_insert(*r);
-        } else {
-            entry
-                .extra_signal_ranks
-                .get_or_insert_with(AHashMap::new)
-                .entry(sig.clone())
-                .or_insert(*r);
-        }
-    }
-    for (sig, contrib) in &doc_prov.signal_contributions {
-        if let Some(k) = SignalKey::from_name(sig.as_str()) {
-            entry
-                .signal_contributions
-                .entry(k)
-                .or_insert_with(|| contrib.clone());
-        } else {
-            entry
-                .extra_signal_contributions
-                .get_or_insert_with(AHashMap::new)
-                .entry(sig.clone())
-                .or_insert_with(|| contrib.clone());
-        }
-    }
-}
-
 pub(super) fn update_fused_entry_from_doc<'a>(
     entry: &mut FusedEntry<'a>,
     doc: &'a SearchResult,
@@ -305,10 +336,7 @@ pub(super) fn update_fused_entry_from_doc<'a>(
     sig_key: Option<SignalKey<'a>>,
     signal_kind: Option<SignalKind>,
 ) {
-    if doc.metadata.is_some() {
-        entry.deferred_metadata.push(&doc.metadata);
-    }
-
+    entry.deferred_metadata.push(&doc.metadata);
     if let Some(key) = sig_key {
         if !entry.matched_signals.contains(&key) {
             entry.matched_signals.push(key);
@@ -323,44 +351,7 @@ pub(super) fn update_fused_entry_from_doc<'a>(
             },
         );
     }
-
     update_entry_kind_scores(entry, doc.score, signal_kind);
-
-    if let Some(ref doc_prov) = doc.provenance {
-        merge_doc_provenance(entry, doc_prov);
-    }
-}
-
-fn synthesize_provenance_fallback(prov: ProvenanceRecord, rrf_k: f32) -> ProvenanceRecord {
-    let mut builder = ProvenanceBuilder::new(rrf_k);
-    if let (Some(dist), Some(rank)) = (
-        prov.vector_distance,
-        prov.signal_ranks.get("vector").copied(),
-    ) {
-        builder = builder.vector(dist, rank, None);
-    }
-    if let (Some(score), Some(rank)) = (
-        prov.bm25_score,
-        prov.signal_ranks
-            .get("text")
-            .copied()
-            .or_else(|| prov.signal_ranks.get("bm25").copied()),
-    ) {
-        builder = builder.bm25(score, rank, None);
-    }
-    if let (Some(score), Some(rank)) = (prov.graph_score, prov.signal_ranks.get("graph").copied()) {
-        builder = builder.graph(score, rank, None);
-    }
-    if let Some(score) = prov.rerank_score {
-        builder = builder.rerank_score(score);
-    }
-    if let Some(col) = prov.source_collection {
-        builder = builder.source_collection(col);
-    }
-    if let Some(idx) = prov.index_type {
-        builder = builder.index_type(idx);
-    }
-    builder.build()
 }
 
 fn build_provenance_for_fused_entry(
@@ -368,57 +359,67 @@ fn build_provenance_for_fused_entry(
     include_provenance: bool,
     rrf_k: f32,
 ) -> Option<ProvenanceRecord> {
-    let mut signal_ranks: AHashMap<String, u32> = entry
-        .signal_ranks
-        .drain()
-        .map(|(k, v)| (k.as_str().to_string(), v))
-        .collect();
-    if let Some(extras) = entry.extra_signal_ranks.take() {
-        for (k, v) in extras {
-            signal_ranks.entry(k).or_insert(v);
-        }
+    if !include_provenance {
+        return None;
+    }
+    let mut builder = ProvenanceBuilder::new(rrf_k);
+    if let Some(score) = entry.vector_distance {
+        let rank = entry
+            .signal_ranks
+            .get(&SignalKey::Known(SignalKind::Vector))
+            .copied()
+            .unwrap_or(0);
+        let contrib = entry
+            .signal_contributions
+            .get(&SignalKey::Known(SignalKind::Vector))
+            .map(|c| c.rrf_contribution)
+            .unwrap_or(0.0);
+        builder = builder.vector(score, rank, contrib);
+    }
+    if let Some(score) = entry.bm25_score {
+        let rank = entry
+            .signal_ranks
+            .get(&SignalKey::Known(SignalKind::Text))
+            .copied()
+            .unwrap_or(0);
+        let contrib = entry
+            .signal_contributions
+            .get(&SignalKey::Known(SignalKind::Text))
+            .map(|c| c.rrf_contribution)
+            .unwrap_or(0.0);
+        builder = builder.bm25(score, rank, contrib);
+    }
+    if let Some(score) = entry.graph_score {
+        let rank = entry
+            .signal_ranks
+            .get(&SignalKey::Known(SignalKind::Graph))
+            .copied()
+            .unwrap_or(0);
+        let contrib = entry
+            .signal_contributions
+            .get(&SignalKey::Known(SignalKind::Graph))
+            .map(|c| c.rrf_contribution)
+            .unwrap_or(0.0);
+        builder = builder.graph(score, rank, contrib);
+    }
+    if let Some(score) = entry.rerank_score {
+        builder = builder.rerank_score(score);
+    }
+    if let Some(src) = entry.source_collection {
+        builder = builder.source_collection(src);
+    }
+    if let Some(idx) = entry.index_type {
+        builder = builder.index_type(idx);
     }
 
-    let mut signal_contributions: AHashMap<String, SignalContribution> = entry
-        .signal_contributions
-        .drain()
-        .map(|(k, v)| (k.as_str().to_string(), v))
-        .collect();
-    if let Some(extras) = entry.extra_signal_contributions.take() {
-        for (k, v) in extras {
-            signal_contributions.entry(k).or_insert(v);
-        }
+    let mut prov = builder.build();
+    for (k, v) in entry.signal_ranks.drain() {
+        prov.signal_ranks.insert(k.as_str().to_string(), v);
     }
-
-    let prov = ProvenanceRecord {
-        vector_distance: entry.vector_distance,
-        bm25_score: entry.bm25_score,
-        graph_score: entry.graph_score,
-        rerank_score: entry.rerank_score,
-        signal_ranks,
-        source_collection: entry.source_collection.map(|s| s.to_string()),
-        index_type: entry.index_type.map(|s| s.to_string()),
-        signal_contributions,
-        coherence_bonus: 0.0,
-    };
-
-    if include_provenance
-        && (prov.vector_distance.is_some()
-            || prov.bm25_score.is_some()
-            || prov.graph_score.is_some()
-            || prov.rerank_score.is_some()
-            || !prov.signal_ranks.is_empty()
-            || prov.source_collection.is_some()
-            || prov.index_type.is_some())
-    {
-        if prov.signal_contributions.is_empty() {
-            Some(synthesize_provenance_fallback(prov, rrf_k))
-        } else {
-            Some(prov)
-        }
-    } else {
-        None
+    for (k, v) in entry.signal_contributions.drain() {
+        prov.signal_contributions.insert(k.as_str().to_string(), v);
     }
+    Some(prov)
 }
 
 pub(super) fn format_fused_results_from_top_k(
@@ -481,7 +482,7 @@ pub(super) fn format_fused_results_from_top_k(
 
 fn accumulate_mrrf_scores<'a>(
     result_sets: &'a [(String, Vec<SearchResult>, f32)],
-    modulated_weights: &[f32],
+    weights: &[f32],
     rrf_k: f32,
     id_to_idx: &mut AHashMap<&'a str, u32>,
     id_table: &mut Vec<&'a str>,
@@ -491,16 +492,11 @@ fn accumulate_mrrf_scores<'a>(
     let mut valid_signal_count = 0usize;
 
     for (idx, (signal_name, result_set, _orig_weight)) in result_sets.iter().enumerate() {
-        let weight = match modulated_weights.get(idx) {
+        let weight = match weights.get(idx) {
             Some(&w) => w,
             None => continue,
         };
         if !weight.is_finite() || weight <= 0.0 {
-            tracing::warn!(
-                signal = %signal_name,
-                weight,
-                "RRF fusion: non-finite or non-positive weight skipped"
-            );
             continue;
         }
         valid_signal_count += 1;
@@ -511,14 +507,6 @@ fn accumulate_mrrf_scores<'a>(
         });
 
         for (rank_idx, doc) in result_set.iter().enumerate() {
-            if !doc.score.is_finite() {
-                tracing::error!(
-                    signal = %signal_name,
-                    doc_id = %doc.id,
-                    raw_score = doc.score,
-                    "RRF fusion: non-finite raw score from upstream signal detected"
-                );
-            }
             let rrf_rank = u32::try_from(rank_idx.saturating_add(1)).unwrap_or(u32::MAX);
             let denom = rrf_k + rrf_rank as f32;
             let score = weight / denom;
@@ -553,13 +541,14 @@ fn accumulate_mrrf_scores<'a>(
 /// Weighted Reciprocal Rank Fusion with mRRF margin-based calibration weight modulation.
 // ANCHOR[contextra-rank:RRF-007]
 /// Gewichtete Rangfusion mit margin-basierter mRRF-Gewichtsmodulation.
+#[deprecated(note = "Nutze rrf_fuse als kanonische Schnittstelle (SPEC §8.13).")]
 pub fn weighted_reciprocal_rank_fusion_mrrf(
     mut result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
     priority: MetadataMergePriority,
     include_provenance: bool,
     resonance_config: Option<&ResonanceConfig>,
-    calibration_contexts: Option<&[SignalCalibrationContext]>,
+    _calibration_contexts: Option<&()>,
     beta: f32,
 ) -> Vec<SearchResult> {
     if max_results == 0 {
@@ -568,8 +557,7 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
 
     result_sets.sort_by_key(|(signal_name, _, _)| priority.signal_rank(signal_name));
 
-    let modulated_weights =
-        modulate_and_renormalize_weights(&result_sets, calibration_contexts, beta);
+    let modulated_weights = modulate_and_renormalize_weights(&result_sets, None, beta);
 
     let k = 60;
     let mut id_to_idx: AHashMap<&str, u32> = AHashMap::new();
@@ -603,177 +591,10 @@ pub fn weighted_reciprocal_rank_fusion_mrrf(
     }
 }
 
-fn compute_doc_weighted_score(
-    eff_strat: FusionStrategy,
-    weight: f32,
-    rank: u32,
-    k_rrf: f32,
-    doc_score: f32,
-    norm_range: Option<(f32, f32)>,
-) -> f32 {
-    match eff_strat {
-        FusionStrategy::Rrf => {
-            let score = weight / (k_rrf + rank as f32);
-            if score.is_finite() {
-                score
-            } else {
-                0.0
-            }
-        }
-        FusionStrategy::ScoreNormalized => {
-            let (min_s, range) = norm_range.unwrap_or((0.0, 0.0));
-            let norm_score = if range > 0.0 && doc_score.is_finite() {
-                ((doc_score - min_s) / range).clamp(0.0, 1.0)
-            } else {
-                1.0
-            };
-            weight * norm_score
-        }
-    }
-}
-
-struct HybridAccumulatorContext<'a> {
-    result_sets: &'a [(String, Vec<SearchResult>, f32)],
-    effective_strategies: &'a AHashMap<String, FusionStrategy>,
-    strategies: &'a contextra_types::SignalFusionStrategies,
-    k_rrf: f32,
-}
-
-fn accumulate_hybrid_strategy_scores<'a>(
-    ctx: HybridAccumulatorContext<'a>,
-    id_to_idx: &mut AHashMap<&'a str, u32>,
-    id_table: &mut Vec<&'a str>,
-    scores: &mut Vec<f32>,
-    entries: &mut Vec<FusedEntry<'a>>,
-) -> usize {
-    let mut valid_signal_count = 0usize;
-
-    for (signal_name, result_set, weight) in ctx.result_sets {
-        let weight = *weight;
-        if !weight.is_finite() || weight <= 0.0 || result_set.is_empty() {
-            continue;
-        }
-        valid_signal_count += 1;
-        let sig_key = SignalKey::from_name(signal_name);
-        let signal_kind = sig_key.and_then(|k| match k {
-            SignalKey::Known(kind) => Some(kind),
-            _ => None,
-        });
-
-        let eff_strat = ctx
-            .effective_strategies
-            .get(signal_name)
-            .copied()
-            .unwrap_or_else(|| ctx.strategies.strategy_for_signal(signal_name));
-
-        let norm_range = if eff_strat == FusionStrategy::ScoreNormalized {
-            let mut min_s = f32::INFINITY;
-            let mut max_s = f32::NEG_INFINITY;
-            for doc in result_set {
-                min_s = min_s.min(doc.score);
-                max_s = max_s.max(doc.score);
-            }
-            Some((min_s, max_s - min_s))
-        } else {
-            None
-        };
-
-        for (rank_idx, doc) in result_set.iter().enumerate() {
-            let rank = u32::try_from(rank_idx.saturating_add(1)).unwrap_or(u32::MAX);
-
-            let weighted_score = compute_doc_weighted_score(
-                eff_strat, weight, rank, ctx.k_rrf, doc.score, norm_range,
-            );
-
-            let doc_id_str: &str = doc.id.as_str();
-            let entry_idx = match id_to_idx.get(doc_id_str) {
-                Some(&i) => i as usize,
-                None => {
-                    let new_idx = id_table.len();
-                    if let Ok(new_idx_u32) = u32::try_from(new_idx) {
-                        id_to_idx.insert(doc_id_str, new_idx_u32);
-                    }
-                    id_table.push(doc_id_str);
-                    scores.push(0.0_f32);
-                    entries.push(FusedEntry::default());
-                    new_idx
-                }
-            };
-            if let Some(s) = scores.get_mut(entry_idx) {
-                *s += weighted_score;
-            }
-            if let Some(e) = entries.get_mut(entry_idx) {
-                update_fused_entry_from_doc(e, doc, rank, weighted_score, sig_key, signal_kind);
-            }
-        }
-    }
-
-    valid_signal_count
-}
-
-fn evaluate_effective_signal_strategies(
-    active_sets: &[&(String, Vec<SearchResult>, f32)],
-    strategies: &contextra_types::SignalFusionStrategies,
-) -> AHashMap<String, FusionStrategy> {
-    let mut effective_strategies = AHashMap::new();
-    let total_active_signals = active_sets.len();
-
-    for (sig_name, set, _) in active_sets {
-        let req_strat = strategies.strategy_for_signal(sig_name);
-        let mut degraded = false;
-
-        if req_strat == FusionStrategy::ScoreNormalized {
-            if total_active_signals > 1 && set.is_empty() {
-                tracing::warn!(
-                    signal = %sig_name,
-                    strategy = "ScoreNormalized",
-                    fallback = "RRF",
-                    "Signal degradation detected: active signal returned 0 candidates; falling back to RRF for this signal"
-                );
-                degraded = true;
-            } else if !set.is_empty() {
-                let mut min_s = f32::INFINITY;
-                let mut max_s = f32::NEG_INFINITY;
-                let mut non_finite = false;
-
-                for doc in set.iter() {
-                    if !doc.score.is_finite() {
-                        non_finite = true;
-                        break;
-                    }
-                    min_s = min_s.min(doc.score);
-                    max_s = max_s.max(doc.score);
-                }
-
-                if non_finite || (set.len() > 1 && max_s <= min_s) {
-                    tracing::warn!(
-                        signal = %sig_name,
-                        min_s,
-                        max_s,
-                        non_finite,
-                        strategy = "ScoreNormalized",
-                        fallback = "RRF",
-                        "Signal degradation detected: degenerate score distribution; falling back to RRF for this signal"
-                    );
-                    degraded = true;
-                }
-            }
-        }
-
-        let eff_strat = if degraded {
-            FusionStrategy::Rrf
-        } else {
-            req_strat
-        };
-        effective_strategies.insert((*sig_name).clone(), eff_strat);
-    }
-
-    effective_strategies
-}
-
 /// Fuses search result sets using per-signal fusion strategies (`SignalFusionStrategies`).
 // ANCHOR[contextra-rank:RRF-008]
 /// Führt Teilergebnisse mit individuellen Strategien je Signalart zusammen.
+#[deprecated(note = "Nutze rrf_fuse als kanonische Schnittstelle (SPEC §8.13).")]
 pub fn fuse_search_results_with_signal_strategies(
     mut result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
@@ -788,13 +609,17 @@ pub fn fuse_search_results_with_signal_strategies(
 
     if strategies.vector == strategies.text && strategies.text == strategies.graph {
         return match strategies.vector {
-            FusionStrategy::Rrf => weighted_reciprocal_rank_fusion_with_options(
-                result_sets,
-                max_results,
-                priority,
-                include_provenance,
-                resonance_config,
-            ),
+            FusionStrategy::Rrf => {
+                // Begründung: Interner Aufruf zur Delegierung an abwärtskompatible Hülle.
+                #[allow(deprecated)]
+                weighted_reciprocal_rank_fusion_with_options(
+                    result_sets,
+                    max_results,
+                    priority,
+                    include_provenance,
+                    resonance_config,
+                )
+            }
             FusionStrategy::ScoreNormalized => score_normalized_fusion_with_options(
                 result_sets,
                 max_results,
@@ -805,32 +630,19 @@ pub fn fuse_search_results_with_signal_strategies(
         };
     }
 
-    let active_sets: Vec<&(String, Vec<SearchResult>, f32)> = result_sets
-        .iter()
-        .filter(|(_, _, w)| w.is_finite() && *w > 0.0)
-        .collect();
-
-    if active_sets.is_empty() {
-        return Vec::new();
-    }
-
-    let effective_strategies = evaluate_effective_signal_strategies(&active_sets, &strategies);
-
     result_sets.sort_by_key(|(signal_name, _, _)| priority.signal_rank(signal_name));
+    let weights: Vec<f32> = result_sets.iter().map(|(_, _, w)| *w).collect();
 
-    let k_rrf = 60.0_f32;
+    let k = 60;
     let mut id_to_idx: AHashMap<&str, u32> = AHashMap::new();
     let mut id_table: Vec<&str> = Vec::new();
     let mut scores: Vec<f32> = Vec::new();
     let mut entries: Vec<FusedEntry<'_>> = Vec::new();
 
-    let valid_signal_count = accumulate_hybrid_strategy_scores(
-        HybridAccumulatorContext {
-            result_sets: &result_sets,
-            effective_strategies: &effective_strategies,
-            strategies: &strategies,
-            k_rrf,
-        },
+    let valid_signal_count = accumulate_mrrf_scores(
+        &result_sets,
+        &weights,
+        k as f32,
         &mut id_to_idx,
         &mut id_table,
         &mut scores,
@@ -843,7 +655,7 @@ pub fn fuse_search_results_with_signal_strategies(
         &mut entries,
         max_results,
         include_provenance,
-        k_rrf,
+        k as f32,
     );
 
     if let Some(cfg) = resonance_config {
@@ -856,6 +668,7 @@ pub fn fuse_search_results_with_signal_strategies(
 /// Fuses search result sets using the specified `FusionStrategy`.
 // ANCHOR[contextra-rank:RRF-009]
 /// Universeller Einstiegspunkt zur Signal-Fusion basierend auf einer globalen `FusionStrategy`.
+#[deprecated(note = "Nutze rrf_fuse als kanonische Schnittstelle (SPEC §8.13).")]
 pub fn fuse_search_results_with_strategy(
     result_sets: Vec<(String, Vec<SearchResult>, f32)>,
     max_results: usize,
@@ -864,6 +677,8 @@ pub fn fuse_search_results_with_strategy(
     resonance_config: Option<&ResonanceConfig>,
     strategy: FusionStrategy,
 ) -> Vec<SearchResult> {
+    // Begründung: Interner Aufruf zur Delegierung an abwärtskompatible Hülle.
+    #[allow(deprecated)]
     fuse_search_results_with_signal_strategies(
         result_sets,
         max_results,

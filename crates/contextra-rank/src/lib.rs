@@ -1,56 +1,38 @@
 //! # Contextra Rank (`contextra-rank`)
 //!
-//! **Ring:** Ring 0 (Ranking & Kalibrierung / Kernlogik)
+//! **Ring:** Ring 2 (Ranking & Fusion)
 //! **Klasse:** Rand `[R]`
-//! **Reifegrad:** Experimentell / Aktiv (Kern v1)
+//! **Reifegrad:** Aktiv (Kern v1, SPEC §8.13, D-26)
 //!
 //! ## Zweck des Crates
-//! Dieses Crate implementiert Methoden zur Fusion, Kalibrierung und Erklärung
-//! von Retrieval-Ergebnissen im Contextra-System. Dazu gehören:
-//! - **4-Signal-Fusion:** Verknüpfung von Vektor-, Text- (BM25), Graph- und
-//!   Rerank-Scores mittels reziproker Rangfusion (RRF = Reciprocal Rank Fusion)
-//!   und score-basierter Normalisierung.
-//! - **Kalibrierung:** Umwandlung von Roh-Scores in Wahrscheinlichkeiten via
-//!   Platt-Scaling (logistische Regression) und Isotonische Regression
-//!   (PAVA = Pool-Adjacent Violators Algorithm).
-//! - **Konforme Prädiktion:** Finite-Sample-Abdeckungsgarantien und adaptive
-//!   Schwellenwertanpassung bei Verteilungsverschiebung (Covariate Shift).
-//! - **Drift-Erkennung:** Überwachung von Score-Verteilungen zur Laufzeit.
-//! - **Erklärbarkeit (Explainability):** Umwandlung maschinenlesbarer Herkunftsnachweise
-//!   (`ProvenanceRecord`) in strukturierte und deutschsprachige Erklärungen.
-//! - **DiBud (Discrete Budgeted):** Jederzeit abbrechbare Streaming-Fusion unter Zeit-
-//!   und Kanalbudgets.
-//!
-//! ## Einbindung und Abhängigkeiten
-//! - **Konsumiert (Ring 0):** `contextra-types` (Domain-Typen), `contextra-ports` (Hardware-Abstraktionen).
-//! - **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`,
-//!   `contextra-infer-candle`, `contextra-infer-ollama`, `contextra-infer-onnx`,
-//!   `contextra-mcp`, `contextra-py`.
+//! Dieses Crate implementiert die deterministische Reciprocal Rank Fusion (RRF)
+//! für Hybridsuche im Contextra-System:
+//! - Kanonische Schnittstelle: [`rrf_fuse`]
+//! - Standard-Glättungsfaktor $k = 60$
+//! - Deterministischer Tie-Break (primär Score absteigend, sekundär `doc_tag` / `id` aufsteigend)
+//! - Permutationsinvarianz bezüglich der Listenreihenfolge
+//! - Keine Hintergrund-Threads, kein `unsafe` (`#![forbid(unsafe_code)]`).
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+// Begründung: Veraltete Wrapper bleiben für Abwärtskompatibilität zu contextra-engine erhalten
+// bis diese umgestellt ist (siehe ÜBERGABE).
+#[allow(deprecated)]
+pub use fusion::{
+    fuse_search_results_with_signal_strategies, fuse_search_results_with_strategy,
+    reciprocal_rank_fusion, weighted_reciprocal_rank_fusion, weighted_reciprocal_rank_fusion_mrrf,
+    weighted_reciprocal_rank_fusion_with_options, weighted_reciprocal_rank_fusion_with_priority,
+};
+
 // ANCHOR[contextra-rank:MOD-001]
-pub mod drift;
 pub mod explain;
 pub mod fusion;
 
-#[cfg(feature = "dibud")]
-pub mod dibud;
-
-#[cfg(feature = "dibud")]
-pub use dibud::{
-    fuse_exact_prefix, fuse_exact_prefix_async, BudgetedChannel, DiBudFusionState, DiBudOutcome,
-    DiBudStep, FusionBudget,
-};
-pub use drift::{DriftDetector, DriftStatus};
 pub use explain::{explain, ExplanationEntry, RetrievalExplanation};
 pub use fusion::{
-    apply_resonance_bonus, fuse_search_results_with_strategy, g, modulate_and_renormalize_weights,
-    reciprocal_rank_fusion, score_normalized_fusion_with_options, weighted_reciprocal_rank_fusion,
-    weighted_reciprocal_rank_fusion_mrrf, weighted_reciprocal_rank_fusion_with_options,
-    weighted_reciprocal_rank_fusion_with_priority, weights_to_signal_factors, BoundedTopK,
-    GlobalFusionConfig, GlobalFusionStrategy, MetadataMergePriority, ProvenanceBuilder,
-    ProvenanceRecord, ResonanceConfig, SearchResult, SignalCalibrationContext, SignalContribution,
-    SignalKind,
+    apply_resonance_bonus, fuse_signals, g, modulate_and_renormalize_weights, rrf_fuse,
+    score_normalized_fusion_with_options, weights_to_signal_factors, BoundedTopK, Hit,
+    MetadataMergePriority, ProvenanceBuilder, ProvenanceRecord, ResonanceConfig, SearchReport,
+    SearchResult, Signal, SignalContribution, SignalFailurePolicy, SignalKind, DEFAULT_RRF_K,
 };

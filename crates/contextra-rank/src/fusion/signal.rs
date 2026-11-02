@@ -2,50 +2,13 @@
 //!
 //! **Ring:** Ring 0 (Ranking & Kalibrierung)
 //!
-//! Behandelt Klassifikationen von Suchsignalen (`SignalKind`), Kontextinformationen
-//! über Modellreife und Drift sowie Prioritätsregeln für Metadaten-Merges.
+//! Behandelt Klassifikationen von Suchsignalen (`SignalKind`) und Prioritätsregeln für Metadaten-Merges.
 
 use std::fmt;
 
 use super::types::SignalContribution;
-use crate::drift::DriftStatus;
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
-
-/// Calibration and drift context for a search signal during mRRF weight modulation.
-#[derive(Debug, Clone)]
-// ANCHOR[contextra-rank:SIG-001]
-/// Kontext zu Modellkalibrierung und Driftzustand eines Signals für die mRRF-Gewichtsmodulation.
-pub struct SignalCalibrationContext {
-    /// Signal identifier matching the result set signal name (e.g., "vector", "text", "graph").
-    pub signal_name: String,
-    /// Indicates whether the calibrator for this signal is warm and calibrated.
-    pub is_calibrated: bool,
-    /// Current statistical drift status for this signal.
-    pub drift_status: DriftStatus,
-}
-
-impl SignalCalibrationContext {
-    /// Creates a new `SignalCalibrationContext`.
-    pub fn new(
-        signal_name: impl Into<String>,
-        is_calibrated: bool,
-        drift_status: DriftStatus,
-    ) -> Self {
-        Self {
-            signal_name: signal_name.into(),
-            is_calibrated,
-            drift_status,
-        }
-    }
-
-    /// Evaluates whether calibrated scores should be used for margin calculation.
-    ///
-    /// Returns `true` if and only if `is_calibrated` is true AND `drift_status` is `DriftStatus::Stable`.
-    pub fn should_use_calibrated_scores(&self) -> bool {
-        self.is_calibrated && matches!(self.drift_status, DriftStatus::Stable { .. })
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum SignalKey<'a> {
@@ -82,9 +45,7 @@ pub(super) struct FusedEntry<'a> {
     pub(super) source_collection: Option<&'a str>,
     pub(super) index_type: Option<&'a str>,
     pub(super) signal_ranks: AHashMap<SignalKey<'a>, u32>,
-    pub(super) extra_signal_ranks: Option<AHashMap<String, u32>>,
     pub(super) signal_contributions: AHashMap<SignalKey<'a>, SignalContribution>,
-    pub(super) extra_signal_contributions: Option<AHashMap<String, SignalContribution>>,
     pub(super) deferred_metadata: Vec<&'a Option<serde_json::Value>>,
 }
 
