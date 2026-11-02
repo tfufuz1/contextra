@@ -10,17 +10,15 @@ rust-version.workspace = true
 description = "Reciprocal Rank Fusion für die Hybridsuche."
 
 [package.metadata.contextra]
-ring = "0"
+ring = "2"
 
 [dependencies]
 contextra-types.workspace = true
-contextra-ports.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-ahash.workspace = true
-tracing.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
 proptest = "1"
-tokio = { workspace = true, features = ["full"] }
+
+[[bench]]
+name = "bm_rank_rrf"
+harness = false

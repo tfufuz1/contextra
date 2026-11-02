@@ -1,0 +1,42 @@
+# Aufgabenkarte WP-1.5 – Struktur und Namen
+# Nicht normativ. Quelle: SPEC 15.4 (WP-1.5), D-89, D-90, D-91, D-98.
+
+id          = "WP-1.5"
+title       = "Struktur und Namen: Modulplan D-90, Crate-Köpfe D-91, Marken-Abbau"
+wp          = "WP-1.5"
+gate        = "B"
+crate       = "contextra-types"
+goal        = "Modulstruktur in contextra-types nach Abschnitt 3 der Crate-Spezifikation (D-90). Keine verschachtelten types::types, keine misc.rs, eine Modulform."
+non_goals   = ["Keine Änderungen an anderen Crates"]
+
+scope       = [
+  "crates/contextra-types/**",
+  ".agents/jules/tasks/WP-1.5.toml",
+]
+
+forbidden   = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
+]
+
+spec_ids    = ["D-90", "D-91", "T-ARCH-7", "T-DOC-1"]
+
+acceptance  = [
+  "cargo test -p contextra-types --locked",
+]
+
+evidence_required = ["Modulstruktur entspricht D-90 und Crate-Spec 01"]
+
+[budget]
+files      = 15
+lines      = 600
+iterations = 6
