@@ -1,3 +1,6 @@
+[lints]
+workspace = true
+
 [package]
 name = "contextra-erasure"
 version.workspace = true
@@ -14,18 +17,20 @@ contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-crypto = { workspace = true }
 
-blake3 = { workspace = true }
-sha2 = "0.10"
-ed25519-dalek = { version = "2", default-features = false, features = ["fast", "zeroize", "rand_core"] }
-zeroize = { version = "1.9", features = ["derive"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
-parking_lot = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
+zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
+blake3 = { workspace = true }
+sha2 = "0.10"
 bytes = { workspace = true }
-rand_core = { version = "0.6", features = ["getrandom"] }
+parking_lot = { workspace = true }
+futures-util = "0.3"
+tokio = { workspace = true }
 
-[lints]
-workspace = true
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = "1.4"
+loom = "0.7"
+tokio = { workspace = true, features = ["test-util"] }
