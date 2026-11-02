@@ -65,12 +65,14 @@ fn test_prune_through_mechanics() {
     assert_eq!(validator.tracked_commit_keys(), 3);
     assert_eq!(validator.pruned_through(), 0);
 
+    #[allow(deprecated)]
     let removed = validator.prune_through(20);
     assert_eq!(removed, 2);
     assert_eq!(validator.tracked_commit_keys(), 1);
     assert_eq!(validator.pruned_through(), 20);
 
     // Monotonicity check: smaller bound does not lower watermark or remove entries
+    #[allow(deprecated)]
     let removed_2 = validator.prune_through(15);
     assert_eq!(removed_2, 0);
     assert_eq!(validator.pruned_through(), 20);
@@ -81,6 +83,7 @@ fn test_prune_through_mechanics() {
 fn test_fail_closed_validation() {
     let validator = SequenceLogSsiValidator::new();
     validator.record_commit_key(b"key1", 5);
+    #[allow(deprecated)]
     validator.prune_through(10);
 
     let mut old_rs = ReadSet::new();
@@ -173,6 +176,7 @@ proptest::proptest! {
             val_pruned.record_commit_key(key, *seq);
         }
 
+        #[allow(deprecated)]
         val_pruned.prune_through(prune_bound);
 
         let mut rs = ReadSet::new();

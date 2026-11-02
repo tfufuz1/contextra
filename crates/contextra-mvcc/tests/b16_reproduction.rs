@@ -123,6 +123,7 @@ fn test_fail_closed_snapshot_pruned_still_enforced_after_coarsening() {
     }
 
     // Prune up to sequence 15
+    #[allow(deprecated)]
     validator.prune_through(15);
     assert_eq!(validator.pruned_through(), 15);
 
