@@ -469,19 +469,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-lab"
+name = "contextra-erasure"
 version = "0.1.0"
 dependencies = [
- "aes-gcm-siv",
- "argon2",
  "blake3",
- "ed25519-dalek",
- "hkdf",
- "hmac",
- "rand 0.8.8",
+ "bytes",
+ "contextra-crypto",
+ "contextra-ports",
+ "contextra-types",
+ "futures-util",
+ "loom",
+ "parking_lot",
+ "proptest",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "zeroize",
 ]
 
 [[package]]
