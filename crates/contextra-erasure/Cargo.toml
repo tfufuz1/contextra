@@ -1,0 +1,31 @@
+[package]
+name = "contextra-erasure"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht."
+
+[package.metadata.contextra]
+ring = "3"
+
+[dependencies]
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-crypto = { workspace = true }
+
+blake3 = { workspace = true }
+sha2 = "0.10"
+ed25519-dalek = { version = "2", default-features = false, features = ["fast", "zeroize", "rand_core"] }
+zeroize = { version = "1.9", features = ["derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+bytes = { workspace = true }
+rand_core = { version = "0.6", features = ["getrandom"] }
+
+[lints]
+workspace = true
