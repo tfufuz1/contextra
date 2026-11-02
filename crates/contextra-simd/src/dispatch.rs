@@ -14,7 +14,7 @@
 //! 1. Bei jedem Funktionsaufruf werden mittels Compiler-Makros (`is_x86_feature_detected!`,
 //!    `is_aarch64_feature_detected!`) die verfügbaren Prozessorbefehle abgefragt.
 //! 2. Es wird die höchstwertige verfügbare Vektorebene gewählt:
-//!    - x86_64: AVX-512 (falls `avx512f` bzw. `avx512vnni`) -> AVX2+FMA -> Skalarer Fallback.
+//!    - x86_64: AVX-512 (falls `avx512f`) -> AVX2+FMA -> Skalarer Fallback.
 //!    - AArch64: NEON -> Skalarer Fallback.
 //! 3. Sämtliche Vorbedingungen (z. B. identische Vektorlängen, Puffergrößen bei Bytes) werden
 //!    vor dem Betreten von `unsafe`-Blöcken strikt validiert.
@@ -26,7 +26,6 @@ use contextra_types::ContextraError;
 
 // ANCHOR[contextra-simd:DISP-OVERRIDE-ENUM]
 /// SIMD path override options for testing purposes.
-#[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SimdPathOverride {
     /// Force scalar fallback execution.
@@ -39,21 +38,18 @@ pub enum SimdPathOverride {
     Neon,
 }
 
-#[cfg(test)]
 std::thread_local! {
     static OVERRIDE_PATH: std::cell::Cell<Option<SimdPathOverride>> = const { std::cell::Cell::new(None) };
 }
 
 // ANCHOR[contextra-simd:DISP-SET-OVERRIDE]
-/// Sets thread-local SIMD dispatch path override for testing.
-#[cfg(test)]
+/// Sets thread-local SIMD dispatch path override for testing and verification.
 pub fn set_dispatch_override(path: Option<SimdPathOverride>) {
     OVERRIDE_PATH.with(|p| p.set(path));
 }
 
 // ANCHOR[contextra-simd:DISP-GET-OVERRIDE]
 /// Retrieves the current thread-local SIMD dispatch path override.
-#[cfg(test)]
 pub fn get_dispatch_override() -> Option<SimdPathOverride> {
     OVERRIDE_PATH.with(|p| p.get())
 }
@@ -90,7 +86,6 @@ pub fn cosine_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
         });
     }
 
-    #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         match forced {
             SimdPathOverride::Scalar => return Ok(scalar::cosine_distance_scalar(a, b)),
@@ -173,7 +168,6 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError> {
         });
     }
 
-    #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         match forced {
             SimdPathOverride::Scalar => return Ok(scalar::euclidean_distance_scalar(a, b)),
@@ -256,7 +250,6 @@ pub fn dot_product_distance(a: &[f32], b: &[f32]) -> Result<f32, ContextraError>
         });
     }
 
-    #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         match forced {
             SimdPathOverride::Scalar => return Ok(scalar::dot_product_scalar(a, b)),
@@ -339,7 +332,6 @@ pub fn cosine_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Conte
         });
     }
 
-    #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         match forced {
             SimdPathOverride::Scalar => {
@@ -411,7 +403,6 @@ pub fn euclidean_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, Co
         });
     }
 
-    #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         match forced {
             SimdPathOverride::Scalar => {
@@ -483,7 +474,6 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
         });
     }
 
-    #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         match forced {
             SimdPathOverride::Scalar => {
@@ -527,8 +517,8 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
 // ANCHOR[contextra-simd:DISP-DOT-U8]
 /// Computes integer dot product between two `u8` byte slices.
 ///
-/// Dynamically dispatches to AVX-512 VNNI (`dpbusd`) or AVX2 (`madd_epi16`),
-/// falling back to scalar execution if SIMD features are missing or overridden in tests.
+/// Dynamically dispatches to AVX2 (`madd_epi16`), falling back to scalar execution
+/// if SIMD features are missing or overridden in tests.
 ///
 /// # Semantics
 ///
@@ -545,7 +535,7 @@ pub fn dot_product_distance_f32_bytes(a: &[f32], b_bytes: &[u8]) -> Result<f32, 
 ///
 /// # Features
 ///
-/// Requires runtime detection of `avx512f`+`avx512bw`+`avx512vnni` or `avx2` on `x86_64`.
+/// Requires runtime detection of `avx2` on `x86_64`.
 #[inline]
 pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
     if a.len() != b.len() {
@@ -555,7 +545,6 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
         });
     }
 
-    #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         match forced {
             SimdPathOverride::Scalar => return Ok(scalar::dot_product_u8_scalar(a, b)),
@@ -563,15 +552,6 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
             SimdPathOverride::Avx2 if is_x86_feature_detected!("avx2") => {
                 // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU feature `avx2` is verified.
                 return Ok(unsafe { avx2::dot_product_u8_avx2(a, b) });
-            }
-            #[cfg(target_arch = "x86_64")]
-            SimdPathOverride::Avx512
-                if is_x86_feature_detected!("avx512f")
-                    && is_x86_feature_detected!("avx512bw")
-                    && is_x86_feature_detected!("avx512vnni") =>
-            {
-                // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU features `avx512f`, `avx512bw`, `avx512vnni` are verified.
-                return Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) });
             }
             _ => {
                 return Err(ContextraError::invalid_input(
@@ -583,13 +563,6 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f")
-            && is_x86_feature_detected!("avx512bw")
-            && is_x86_feature_detected!("avx512vnni")
-        {
-            // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU features `avx512f`, `avx512bw`, `avx512vnni` are confirmed at runtime.
-            return Ok(unsafe { avx512::dot_product_u8_avx512vnni(a, b) });
-        }
         if is_x86_feature_detected!("avx2") {
             // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU feature `avx2` is confirmed at runtime.
             return Ok(unsafe { avx2::dot_product_u8_avx2(a, b) });
@@ -602,8 +575,8 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
 // ANCHOR[contextra-simd:DISP-EUCLIDEAN-SQ-U8]
 /// Computes squared Euclidean distance ($\|a - b\|_2^2$) between two `u8` byte slices.
 ///
-/// Dynamically dispatches to AVX-512 or AVX2 SIMD implementations,
-/// falling back to scalar execution if SIMD features are missing or overridden in tests.
+/// Dynamically dispatches to AVX2 SIMD implementation, falling back to scalar execution
+/// if SIMD features are missing or overridden in tests.
 ///
 /// # Semantics
 ///
@@ -620,7 +593,7 @@ pub fn dot_product_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
 ///
 /// # Features
 ///
-/// Requires runtime detection of `avx512f`+`avx512bw` or `avx2` on `x86_64`.
+/// Requires runtime detection of `avx2` on `x86_64`.
 #[inline]
 pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraError> {
     if a.len() != b.len() {
@@ -630,7 +603,6 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
         });
     }
 
-    #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         match forced {
             SimdPathOverride::Scalar => return Ok(scalar::euclidean_distance_sq_u8_scalar(a, b)),
@@ -638,13 +610,6 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
             SimdPathOverride::Avx2 if is_x86_feature_detected!("avx2") => {
                 // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU feature `avx2` is verified.
                 return Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) });
-            }
-            #[cfg(target_arch = "x86_64")]
-            SimdPathOverride::Avx512
-                if is_x86_feature_detected!("avx512f") && is_x86_feature_detected!("avx512bw") =>
-            {
-                // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU features `avx512f` and `avx512bw` are verified.
-                return Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) });
             }
             _ => {
                 return Err(ContextraError::invalid_input(
@@ -656,10 +621,6 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f") && is_x86_feature_detected!("avx512bw") {
-            // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU features `avx512f` and `avx512bw` are confirmed at runtime.
-            return Ok(unsafe { avx512::euclidean_distance_sq_u8_avx512(a, b) });
-        }
         if is_x86_feature_detected!("avx2") {
             // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU feature `avx2` is confirmed at runtime.
             return Ok(unsafe { avx2::euclidean_distance_sq_u8_avx2(a, b) });
@@ -672,8 +633,8 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
 // ANCHOR[contextra-simd:DISP-COSINE-PARTS-U8]
 /// Computes cosine similarity component parts (dot product, norm_a_sq, norm_b_sq) for two `u8` byte slices.
 ///
-/// Dynamically dispatches to AVX-512 VNNI or AVX2 SIMD implementations,
-/// falling back to scalar execution if SIMD features are missing or overridden in tests.
+/// Dynamically dispatches to AVX2 SIMD implementation, falling back to scalar execution
+/// if SIMD features are missing or overridden in tests.
 ///
 /// # Semantics
 ///
@@ -690,7 +651,7 @@ pub fn euclidean_distance_sq_u8(a: &[u8], b: &[u8]) -> Result<u32, ContextraErro
 ///
 /// # Features
 ///
-/// Requires runtime detection of `avx512f`+`avx512bw`+`avx512vnni` or `avx2` on `x86_64`.
+/// Requires runtime detection of `avx2` on `x86_64`.
 #[inline]
 pub fn cosine_similarity_parts_u8(
     a: &[u8],
@@ -703,7 +664,6 @@ pub fn cosine_similarity_parts_u8(
         });
     }
 
-    #[cfg(test)]
     if let Some(forced) = get_dispatch_override() {
         match forced {
             SimdPathOverride::Scalar => return Ok(scalar::cosine_similarity_parts_u8_scalar(a, b)),
@@ -711,15 +671,6 @@ pub fn cosine_similarity_parts_u8(
             SimdPathOverride::Avx2 if is_x86_feature_detected!("avx2") => {
                 // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU feature `avx2` is verified.
                 return Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) });
-            }
-            #[cfg(target_arch = "x86_64")]
-            SimdPathOverride::Avx512
-                if is_x86_feature_detected!("avx512f")
-                    && is_x86_feature_detected!("avx512bw")
-                    && is_x86_feature_detected!("avx512vnni") =>
-            {
-                // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU features `avx512f`, `avx512bw`, `avx512vnni` are verified.
-                return Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) });
             }
             _ => {
                 return Err(ContextraError::invalid_input(
@@ -731,13 +682,6 @@ pub fn cosine_similarity_parts_u8(
 
     #[cfg(target_arch = "x86_64")]
     {
-        if is_x86_feature_detected!("avx512f")
-            && is_x86_feature_detected!("avx512bw")
-            && is_x86_feature_detected!("avx512vnni")
-        {
-            // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU features `avx512f`, `avx512bw`, `avx512vnni` are confirmed at runtime.
-            return Ok(unsafe { avx512::cosine_similarity_parts_u8_avx512(a, b) });
-        }
         if is_x86_feature_detected!("avx2") {
             // SAFETY: Slice lengths `a` and `b` are validated equal above, and CPU feature `avx2` is confirmed at runtime.
             return Ok(unsafe { avx2::cosine_similarity_parts_u8_avx2(a, b) });
