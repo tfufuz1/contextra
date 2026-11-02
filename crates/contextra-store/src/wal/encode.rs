@@ -157,14 +157,21 @@ impl WalEntry {
         match op {
             WalOp::Put { key, value, .. } => {
                 mac.update(&[0u8]); // op type
-                mac.update(&(key.len() as u32).to_le_bytes());
+                let k_len = u32::try_from(key.len())
+                    .map_err(|_| ContextraError::Serialization("Key length exceeds u32".into()))?;
+                mac.update(&k_len.to_le_bytes());
                 mac.update(key);
-                mac.update(&(value.len() as u32).to_le_bytes());
+                let v_len = u32::try_from(value.len()).map_err(|_| {
+                    ContextraError::Serialization("Value length exceeds u32".into())
+                })?;
+                mac.update(&v_len.to_le_bytes());
                 mac.update(value);
             }
             WalOp::Delete { key, .. } => {
                 mac.update(&[1u8]); // op type
-                mac.update(&(key.len() as u32).to_le_bytes());
+                let k_len = u32::try_from(key.len())
+                    .map_err(|_| ContextraError::Serialization("Key length exceeds u32".into()))?;
+                mac.update(&k_len.to_le_bytes());
                 mac.update(key);
             }
             WalOp::TxEnd { committed, .. } => {
@@ -237,7 +244,9 @@ impl WalEntry {
                 total_payload_size, MAX_WAL_ENTRY_SIZE
             )));
         }
-        buf.extend_from_slice(&(total_payload_size as u32).to_le_bytes());
+        let total_payload_u32 = u32::try_from(total_payload_size)
+            .map_err(|_| ContextraError::Serialization("Payload size exceeds u32".into()))?;
+        buf.extend_from_slice(&total_payload_u32.to_le_bytes());
 
         // 2. CRC32 Placeholder (we'll fill this at the end)
         let crc_offset = buf.len();
@@ -253,15 +262,22 @@ impl WalEntry {
             WalOp::Put { tx_id, key, value } => {
                 buf.push(0u8);
                 buf.extend_from_slice(&tx_id.inner().to_le_bytes());
-                buf.extend_from_slice(&(key.len() as u32).to_le_bytes());
+                let k_len = u32::try_from(key.len())
+                    .map_err(|_| ContextraError::Serialization("Key length exceeds u32".into()))?;
+                buf.extend_from_slice(&k_len.to_le_bytes());
                 buf.extend_from_slice(key);
-                buf.extend_from_slice(&(value.len() as u32).to_le_bytes());
+                let v_len = u32::try_from(value.len()).map_err(|_| {
+                    ContextraError::Serialization("Value length exceeds u32".into())
+                })?;
+                buf.extend_from_slice(&v_len.to_le_bytes());
                 buf.extend_from_slice(value);
             }
             WalOp::Delete { tx_id, key } => {
                 buf.push(1u8);
                 buf.extend_from_slice(&tx_id.inner().to_le_bytes());
-                buf.extend_from_slice(&(key.len() as u32).to_le_bytes());
+                let k_len = u32::try_from(key.len())
+                    .map_err(|_| ContextraError::Serialization("Key length exceeds u32".into()))?;
+                buf.extend_from_slice(&k_len.to_le_bytes());
                 buf.extend_from_slice(key);
             }
             WalOp::TxEnd { tx_id, committed } => {
@@ -272,8 +288,14 @@ impl WalEntry {
         }
 
         // 4. Compute CRC32 over payload and fill placeholder
-        let crc = crc32fast::hash(&buf[payload_start..]);
-        buf[crc_offset..crc_offset + 4].copy_from_slice(&crc.to_le_bytes());
+        let payload_slice = buf
+            .get(payload_start..)
+            .ok_or_else(|| ContextraError::Serialization("Payload start out of bounds".into()))?;
+        let crc = crc32fast::hash(payload_slice);
+        let crc_target = buf
+            .get_mut(crc_offset..crc_offset + 4)
+            .ok_or_else(|| ContextraError::Serialization("CRC placeholder out of bounds".into()))?;
+        crc_target.copy_from_slice(&crc.to_le_bytes());
 
         Ok(buf)
     }
