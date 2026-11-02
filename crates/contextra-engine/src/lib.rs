@@ -12,10 +12,24 @@
 
 #![forbid(unsafe_code)]
 
-use contextra_ports::license::LicenseGate;
 use contextra_ports::StorageEngine;
 pub use contextra_ports::TextEmbeddingEngine;
-pub use contextra_ports::VectorDeleteMode;
+
+/// Vector deletion mode for vector index maintenance.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum VectorDeleteMode {
+    /// Synchronous graph repair during vector deletion.
+    SynchronousRepair,
+    /// Asynchronous background graph repair during vector deletion.
+    BackgroundRepair,
+}
+
+impl Default for VectorDeleteMode {
+    fn default() -> Self {
+        Self::BackgroundRepair
+    }
+}
 #[cfg(not(loom))]
 pub use contextra_store::lsm::DurabilityMode;
 #[cfg(not(loom))]
@@ -51,8 +65,6 @@ pub mod metrics_names;
 pub mod temporal_filter;
 #[cfg(not(loom))]
 pub mod transaction;
-
-
 
 #[cfg(not(loom))]
 pub use decay_controller::{AdaptiveDecayController, DecayControllerConfig, DecaySignalInputs};
@@ -352,7 +364,6 @@ pub struct Contextra {
     next_tx: Arc<AtomicU64>,
     dimension: usize,
     config: ContextraConfig,
-    license_gate: Arc<dyn LicenseGate>,
     expiry_reaper_interval: std::time::Duration,
     community_detection_threshold: u64,
     collections: tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,
@@ -383,9 +394,20 @@ impl Contextra {
     pub fn config(&self) -> &ContextraConfig {
         &self.config
     }
+}
 
-    /// Returns a reference to the attached [`LicenseGate`].
-    pub fn license_gate(&self) -> Arc<dyn LicenseGate> {
-        Arc::clone(&self.license_gate)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// T-ID: T-DEF-1
+    #[test]
+    fn test_vector_delete_mode_default_and_variants() {
+        assert_eq!(
+            VectorDeleteMode::default(),
+            VectorDeleteMode::BackgroundRepair
+        );
+        let sync_mode = VectorDeleteMode::SynchronousRepair;
+        assert_ne!(sync_mode, VectorDeleteMode::BackgroundRepair);
     }
 }

@@ -10,7 +10,7 @@ use contextra_types::{ContextraError, Result};
 #[derive(Clone)]
 /// A reader for memory-mapped HNSW indices.
 pub struct MmapIndex {
-    pub mmap: std::sync::Arc<memmap2::Mmap>,
+    pub mmap: std::sync::Arc<[u8]>,
     pub header: HnswHeader,
     pub path: Option<std::path::PathBuf>,
 }
@@ -18,21 +18,18 @@ pub struct MmapIndex {
 impl MmapIndex {
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let path_buf = path.as_ref().to_path_buf();
-        let file = std::fs::File::open(&path_buf)
-            .map_err(|e| ContextraError::Storage(format!("Failed to open HNSW file: {}", e)))?;
+        let buffer = std::fs::read(&path_buf)
+            .map_err(|_| ContextraError::Storage("Failed to read HNSW file".into()))?;
 
-        let mmap = contextra_sys::mmap_readonly(&file)
-            .map_err(|e| ContextraError::Storage(format!("Failed to mmap HNSW: {}", e)))?;
-
-        let header_slice = mmap
+        let header_slice = buffer
             .get(0..HnswHeader::SIZE)
-            .or_else(|| mmap.get(0..76))
-            .or_else(|| mmap.get(0..64))
+            .or_else(|| buffer.get(0..76))
+            .or_else(|| buffer.get(0..64))
             .ok_or_else(|| ContextraError::Storage("HNSW file too small for header".into()))?;
         let header = HnswHeader::try_from_bytes(header_slice)?;
 
         let index_obj = Self {
-            mmap: std::sync::Arc::new(mmap),
+            mmap: std::sync::Arc::from(buffer.into_boxed_slice()),
             header,
             path: Some(path_buf),
         };
@@ -217,5 +214,29 @@ impl MmapIndex {
         }
 
         Ok(connections)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// T-ID: T-LINT-2
+    #[test]
+    fn test_mmap_index_buffer_header_read() -> Result<()> {
+        let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+        let file_path = temp_dir.path().join("test_index.hnsw");
+
+        let header = HnswHeader::new(128, 16, 1, 0, -1.0, 1.0, 0, -1, 64, 64, 1);
+        let header_bytes = header.to_bytes();
+        std::fs::write(&file_path, &header_bytes)
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+
+        let index = MmapIndex::open(&file_path)?;
+        assert_eq!(index.header.dimension(), 128);
+        assert_eq!(index.header.node_count(), 0);
+        assert_eq!(index.mmap.len(), header_bytes.len());
+
+        Ok(())
     }
 }

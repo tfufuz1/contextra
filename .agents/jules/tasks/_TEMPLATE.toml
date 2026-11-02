@@ -1,22 +1,46 @@
-# Task-Karte Template
-# ID Format: T-YYYY-NNNN
-id        = "T-2026-0001"
-title     = "Kurzer, prägnanter Titel der Aufgabe"
-crate     = "contextra-core"
-tier      = 1            # 1, 2, 3 (muss zu prompter-tiers.toml passen)
-risk      = "none"       # sec | crash | simd | utf8 | fusion | concurrency | calib | none
-goal      = "Präzise Beschreibung des angestrebten Zielzustands"
-non_goals = ["Was explizit nicht getan werden soll", "Kein Refactoring fremder Module"]
-scope     = ["crates/contextra-core/src/**"]
-forbidden = [".github/**", "capabilities.toml", "AGENTS.md", "rust-toolchain.toml", "deny.toml", ".jules/setup/**"]
-invariants = ["Zero-Panic", "Single Error Root"]
-acceptance = [
-  "cargo test -p contextra-core",
-  "just check"
+# Aufgabenkarte – Vorlage
+# Kopie nach .agents/jules/tasks/WP-<x.y>.toml anlegen. Pflichtfelder sind ohne Kommentar.
+# Nicht normativ. Maßgeblich ist SPEC 15.4 für Inhalt und SPEC 15.3 für das Gate.
+
+id          = "WP-x.y"                  # gleich dem Arbeitspaket aus SPEC 15.4
+title       = "Kurzer, prägnanter Titel"
+wp          = "WP-x.y"
+gate        = "A"                       # A, B, G0, C, D, E, F, G, G-H
+crate       = "contextra-…"             # betroffenes Crate, bei mehreren: Liste in scope
+goal        = "Gewünschter Zielzustand, prüfbar formuliert."
+non_goals   = ["Was ausdrücklich nicht geändert wird", "Kein Refactoring fremder Module"]
+
+# Erlaubte Pfade (Glob). Nur Dateien, die das Paket braucht.
+scope       = ["crates/contextra-…/src/**", "crates/contextra-…/tests/**"]
+
+# Verbotene Pfade. Mindestens diese Einträge; zusätzlich alles aus governance/protected-paths.toml.
+forbidden   = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
 ]
-evidence_required = ["Neuer Test, der die Funktionalität absichert"]
+
+spec_ids    = ["P6", "D-…", "T-…"]      # betroffene IDs aus SPEC (I-, FM-, T-, BM-, D-, HR-, P-, AR-)
+
+# Befehle, die bestehen müssen (Ausgabe im PR nennen).
+acceptance  = [
+  "cargo fmt --all -- --check",
+  "cargo check --workspace --all-targets --locked",
+  "cargo test -p contextra-arch-tests --locked",
+]
+
+# Was im PR belegt werden muss.
+evidence_required = ["Neuer Test mit SPEC-ID, zuerst rot, dann grün"]
 
 [budget]
-files = 5
-lines = 200
-iterations = 5
+files      = 6
+lines      = 250
+iterations = 6

@@ -79,8 +79,8 @@ impl Wal {
         }
     }
 
-    /// Replays the WAL using memory mapping (`memmap2`) for zero-copy entry decoding.
-    /// Falls back to stream replay if mmap or parsing fails.
+    /// Replays the WAL into memory for entry decoding.
+    /// Falls back to stream replay if buffer reading or parsing fails.
     pub async fn replay(&self) -> Result<Vec<(u64, WalEntry, u64)>> {
         self.replay_with_sink(&NoopReplayProgressSink).await
     }
@@ -137,7 +137,7 @@ impl Wal {
             Ok(res) => Ok(res),
             Err(e) => {
                 tracing::warn!(
-                    "WAL mmap replay failed for {:?} ({}), falling back to stream reader",
+                    "WAL replay failed for {:?} ({}), falling back to stream reader",
                     self.path,
                     e
                 );
@@ -153,34 +153,30 @@ impl Wal {
         }
     }
 
-    /// Replays the WAL using zero-copy memory mapping (`mmap`).
+    /// Replays the WAL.
     /// Returns all valid entries with sequence numbers, entries, end offsets, and detected WAL version.
     #[allow(clippy::type_complexity)]
     pub async fn replay_mmap(&self) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         self.replay_mmap_with_sink(&NoopReplayProgressSink).await
     }
 
-    /// Replays the WAL using zero-copy memory mapping (`mmap`) with progress callback.
+    /// Replays the WAL with progress callback.
     #[allow(clippy::type_complexity)]
     pub async fn replay_mmap_with_sink<S: ReplayProgressSink>(
         &self,
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        let std_file = std::fs::File::open(&self.path)
-            .map_err(|e| ContextraError::Storage(format!("Failed to open WAL for mmap: {e}")))?;
-        let metadata = std_file
-            .metadata()
-            .map_err(|e| ContextraError::Storage(format!("Failed to stat WAL for mmap: {e}")))?;
-        let file_size = metadata.len();
+        // Übergang bis WP-1.4: Lesen über Vfs::read_at
+        let buffer = tokio::fs::read(&self.path)
+            .await
+            .map_err(|_| ContextraError::Storage("Failed to read WAL file".into()))?;
+        let file_size = buffer.len() as u64;
 
         if file_size == 0 {
             return Ok((Vec::new(), WalVersion::V1));
         }
 
-        let mmap = contextra_sys::mmap_readonly(&std_file)
-            .map_err(|e| ContextraError::Storage(format!("WAL mmap failed: {e}")))?;
-
-        self.parse_mmap_slice_with_sink(&mmap, file_size, sink)
+        self.parse_mmap_slice_with_sink(&buffer, file_size, sink)
     }
 
     #[allow(dead_code, clippy::type_complexity)]
@@ -203,7 +199,7 @@ impl Wal {
         let slice_len = file_size_usize.min(mmap.len());
         let slice = mmap
             .get(..slice_len)
-            .ok_or_else(|| ContextraError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
+            .ok_or_else(|| ContextraError::wal_corruption(0, "Slice bounds exceeded"))?;
         let mut entries = Vec::new();
         let version = self.scan_entries_from_slice(slice, file_size, |seq, entry, pos| {
             sink.on_entry_replayed(seq, None);
@@ -213,9 +209,9 @@ impl Wal {
         Ok((entries, version))
     }
 
-    /// Scans the WAL using read-only memory mapping (`memmap2`) for zero-copy entry parsing.
+    /// Scans the WAL using slice decoding.
     ///
-    /// If mmap mapping or slice scanning encounters any error, it logs a warning (`tracing::warn!`)
+    /// If slice reading or scanning encounters any error, it logs a warning (`tracing::warn!`)
     /// and automatically falls back to stream-based scanning (`scan_entries_with_callback`).
     pub async fn scan_entries_mmap<F>(&self, file_size: u64, mut callback: F) -> Result<WalVersion>
     where
@@ -225,32 +221,28 @@ impl Wal {
             return Ok(WalVersion::V1);
         }
 
+        // Übergang bis WP-1.4: Lesen über Vfs::read_at
         #[allow(clippy::type_complexity)]
-        let mmap_res = (|| -> Result<(WalVersion, Vec<(u64, WalEntry, u64)>)> {
-            let std_file = std::fs::File::open(&self.path).map_err(|e| {
-                ContextraError::Storage(format!("Failed to open WAL file for mmap: {e}"))
-            })?;
-            let mmap = contextra_sys::mmap_readonly(&std_file).map_err(|e| {
-                ContextraError::Storage(format!(
-                    "Failed to mmap WAL file {}: {e}",
-                    self.path.display()
-                ))
-            })?;
+        let read_res: Result<(WalVersion, Vec<(u64, WalEntry, u64)>)> = async {
+            let buffer = tokio::fs::read(&self.path)
+                .await
+                .map_err(|_| ContextraError::Storage("Failed to read WAL file".into()))?;
 
             let file_size_usize = usize::try_from(file_size).unwrap_or(usize::MAX);
             let slice_len = file_size_usize.min(mmap.len());
             let slice = mmap
                 .get(..slice_len)
-                .ok_or_else(|| ContextraError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
+                .ok_or_else(|| ContextraError::wal_corruption(0, "Slice bounds exceeded"))?;
             let mut buffered_entries = Vec::new();
             let version = self.scan_entries_from_slice(slice, file_size, |seq, entry, pos| {
                 buffered_entries.push((seq, entry, pos));
                 true
             })?;
             Ok((version, buffered_entries))
-        })();
+        }
+        .await;
 
-        match mmap_res {
+        match read_res {
             Ok((version, buffered_entries)) => {
                 for (seq, entry, pos) in buffered_entries {
                     if !callback(seq, entry, pos) {
@@ -262,7 +254,7 @@ impl Wal {
             Err(e) => {
                 tracing::warn!(
                     error = ?e,
-                    "scan_entries_mmap: HMAC/integrity verify error during mmap scan, falling back to stream"
+                    "scan_entries_mmap: HMAC/integrity verify error during scan, falling back to stream"
                 );
                 self.scan_entries_with_callback(file_size, callback).await
             }
@@ -751,4 +743,85 @@ pub(crate) async fn recover_from_bak_if_present(wal_path: &std::path::Path) -> R
         }
     }
     Ok(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::wal::WalOp;
+    use contextra_types::TxId;
+    use tempfile::tempdir;
+
+    /// T-ID: T-WAL-1
+    #[tokio::test]
+    async fn test_replay_mmap_and_scan_entries_match_replay() -> Result<()> {
+        let dir = tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+        let wal_path = dir.path().join("test_replay_paths.wal");
+
+        let wal = Wal::open(&wal_path).await?;
+        let op1 = WalOp::Put {
+            tx_id: TxId::new(1),
+            key: b"key1".to_vec(),
+            value: b"val1".to_vec(),
+        };
+        let op2 = WalOp::Put {
+            tx_id: TxId::new(2),
+            key: b"key2".to_vec(),
+            value: b"val2".to_vec(),
+        };
+        let (batch1, _) = wal.prepare_batch(vec![(op1, 1)]).await?;
+        wal.append_batch(batch1).await?;
+        let (batch2, _) = wal.prepare_batch(vec![(op2, 2)]).await?;
+        wal.append_batch(batch2).await?;
+        drop(wal);
+
+        let wal_read = Wal::open_read_only(&wal_path).await?;
+        let entries_replay = wal_read.replay().await?;
+        let (entries_mmap, _ver_mmap) = wal_read.replay_mmap().await?;
+
+        assert_eq!(entries_replay.len(), 2);
+        assert_eq!(entries_replay.len(), entries_mmap.len());
+        assert_eq!(entries_replay[0].0, entries_mmap[0].0);
+        assert_eq!(entries_replay[1].0, entries_mmap[1].0);
+        assert_eq!(entries_replay[0].1.seq_no, entries_mmap[0].1.seq_no);
+        assert_eq!(entries_replay[1].1.seq_no, entries_mmap[1].1.seq_no);
+
+        let mut scanned_entries = Vec::new();
+        let file_size = crate::wal::fs::metadata(&wal_path)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?
+            .len();
+        let ver_scan = wal_read
+            .scan_entries_mmap(file_size, |seq, entry, pos| {
+                scanned_entries.push((seq, entry, pos));
+                true
+            })
+            .await?;
+
+        assert_eq!(ver_scan, WalVersion::V3);
+        assert_eq!(scanned_entries.len(), entries_replay.len());
+        assert_eq!(scanned_entries[0].0, entries_replay[0].0);
+        assert_eq!(scanned_entries[1].0, entries_replay[1].0);
+        assert_eq!(scanned_entries[0].1.seq_no, entries_replay[0].1.seq_no);
+        assert_eq!(scanned_entries[1].1.seq_no, entries_replay[1].1.seq_no);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_empty_file_replay_mmap_yields_empty_v1() -> Result<()> {
+        let dir = tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
+        let wal_path = dir.path().join("empty.wal");
+        tokio::fs::File::create(&wal_path)
+            .await
+            .map_err(|e| ContextraError::Storage(e.to_string()))?;
+
+        let wal = Wal::open_read_only(&wal_path).await?;
+        let (entries, version) = wal.replay_mmap().await?;
+
+        assert!(entries.is_empty());
+        assert_eq!(version, WalVersion::V1);
+
+        Ok(())
+    }
 }
