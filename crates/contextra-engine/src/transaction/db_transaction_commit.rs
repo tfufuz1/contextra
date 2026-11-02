@@ -127,7 +127,22 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         Ok(())
     }
 
-    /// Commits the transaction atomically across all 4 indices (LSM, HNSW, BM25, CSR).
+    // ANCHOR[contextra-engine:COM-001]
+    /// Führt den zweiphasigen atomaren Commit über alle Subsysteme aus.
+    ///
+    /// # Ablauf
+    /// 1. Zeitmessung für Metriken starten.
+    /// 2. Internen Commit (`commit_internal`) koordinieren:
+    ///    - Phase (a): CommitIntent::Pending persistent in LSM speichern (F-20).
+    ///    - Phase (b): LSM Storage committen (Nutzdaten & Metadaten dauerhaft).
+    ///    - Phase (c): Staged Text-, Graph- und Vektor-Indizes anwenden und committen.
+    ///    - Phase (d): CommitIntent::Committed Marker schreiben.
+    ///    - Phase (e): Transaktions-Status atomar auf committed setzen.
+    /// 3. Latenz-Histogramm in `metrics_sink` aufzeichnen.
+    ///
+    /// # Fehlerbehandlung
+    /// Schlägt ein Zwischenschritt fehl, werden über das Kompensations-Ledger (`CommitLedger`)
+    /// Rollback-Aktionen ausgeführt (Fail-Closed).
     pub async fn commit(self) -> Result<()> {
         let start_nanos = self.collection.clock().monotonic_nanos();
         let res = self.commit_internal().await;

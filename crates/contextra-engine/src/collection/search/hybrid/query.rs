@@ -60,6 +60,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Performs hybrid search returning both search results and an execution `SearchReport`.
+    // ANCHOR[contextra-engine:COL-HYB-001]
+    /// Führt die strukturierte Hybrid-Suche über Vektor- und BM25-Signale an einem Snapshot aus.
+    ///
+    /// # Ablauf
+    /// 1. Schneller Ausstieg bei k = 0; k auf `MAX_SEARCH_K` deckeln.
+    /// 2. Fail-Fast: Vektorelemente auf NaN/Inf prüfen.
+    /// 3. Pre-RRF Filterfunktionen vorbereiten (Metadaten- und MemoryType-Filter).
+    /// 4. Signal 1 (Vektor) evaluieren (`evaluate_vector_signal_for_query`) mit adaptivem Oversampling.
+    /// 5. Signal 2 (BM25) evaluieren (`evaluate_text_signal_for_query`).
+    /// 6. Ergebnisse über Fusionsstrategie (`fuse_results`) zusammenführen (RRF / Weighted Score).
+    /// 7. ReadGate anwenden und finale Top-K Treffer samt `SearchReport` zurückgeben.
     // Begründung: Interne Abwärtskompatibilität für deprecated API bis Abschluss Stufe 2
     #[allow(deprecated)]
     pub async fn hybrid_search_with_query_and_report_at(

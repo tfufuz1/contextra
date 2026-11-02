@@ -25,7 +25,14 @@ pub fn apply_read_gate(hits: Vec<crate::SearchResult>) -> Vec<crate::SearchResul
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     // ANCHOR[contextra-engine:COL-HYD-016]
-    /// Dokumentation für `hydrate_from_scored_at` im Rahmen der Collection- und Suchabstraktion.
+    /// Hydriert bewertete Dokumenttreffer (`ScoredDocument`) an einer gegebenen Snapshot-Sequenznummer `seq`.
+    ///
+    /// # Ablauf
+    /// 1. Schnelle Rückgabe bei leerer Trefferliste.
+    /// 2. Iteration über Treffer und Laden der Metadaten aus dem Storage (`get_at_seq`).
+    /// 3. Überspringen von gelöschten Datensätzen (Tombstones).
+    /// 4. Aufbau von Provenienz-Daten (`ProvenanceBuilder`) für Vektor-Signal.
+    /// 5. Read-Gate-Filter anwenden und Treffer samt Anzahl übersprungener Tombstones zurückgeben.
     pub(super) async fn hydrate_from_scored_at(
         &self,
         scored_docs: Vec<contextra_types::ScoredDocument>,

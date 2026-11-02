@@ -195,7 +195,16 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
     }
 
-    /// Rolls back any uncommitted changes applied to all 4 sub-systems in reverse commit order.
+    // ANCHOR[contextra-engine:ROL-001]
+    /// Führt den Rollback aller uncommitteten Änderungen über alle 4 Subsysteme in umgekehrter Reihenfolge aus.
+    ///
+    /// # Ablauf
+    /// 1. Transaktionsstatus atomar auf abgeschlossen setzen (`committed.store(true)`).
+    /// 2. Rollback für Graph-Index ausführen.
+    /// 3. Rollback für Text-Index (BM25) ausführen.
+    /// 4. Rollback für Vektor-Index (HNSW) ausführen.
+    /// 5. Rollback für Storage-Engine (LSM) ausführen.
+    /// 6. Fehler sammeln; traten Fehler auf, wird ein zusammenfassender `ContextraError::Transaction` zurückgegeben.
     pub async fn rollback(self) -> Result<()> {
         self.committed.store(true, Ordering::Release);
 
