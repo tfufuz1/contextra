@@ -39,6 +39,11 @@ pub enum MemLockPolicy {
 // ANCHOR[contextra-sys:MLOCK-LOCK-UNIX-001]
 /// Sperrt unter Unix eine Speicherregion im RAM, um das Auslagern (Swapping) zu verhindern.
 ///
+/// # Safety
+/// - `ptr` muss entweder null sein (bei `len == 0`) oder auf mindestens `len` Bytes
+///   eines gültig allokierten, lesbaren Speicherbereichs im Adressraum des aktuellen Prozesses zeigen.
+/// - Der Speicherbereich darf während des Sperrens nicht durch konkurrierende Deallokation freigegeben werden.
+///
 /// # Ablauf
 /// 1. Prüft, ob `len == 0` oder `ptr.is_null()` ist: In diesem Fall ist nichts zu tun (`Ok(true)`).
 /// 2. Ruft den POSIX-Systemaufruf `libc::mlock` mit dem Speicherzeiger und der Länge auf.
@@ -47,18 +52,19 @@ pub enum MemLockPolicy {
 ///    - Unter [`MemLockPolicy::FailClosed`] wird ein typisierter [`std::io::Error`] erzeugt und zurückgegeben.
 ///    - Unter [`MemLockPolicy::Tolerant`] wird eine Warnung protokolliert und `Ok(false)` zurückgegeben.
 ///
-/// # Vorbedingungen
-/// - `ptr` muss auf einen gültigen, allokierten Speicherbereich von mindestens `len` Bytes zeigen.
-///
 /// # Fehlerfälle
 /// - Gibt bei unzureichenden Rechten (`EPERM`) oder überschrittenem Limit (`ENOMEM`) einen Fehler zurück,
 ///   sofern `policy` auf [`MemLockPolicy::FailClosed`] steht.
 #[cfg(unix)]
-pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Result<bool> {
+pub unsafe fn mem_lock_with_policy(
+    ptr: *const u8,
+    len: usize,
+    policy: MemLockPolicy,
+) -> Result<bool> {
     if len == 0 || ptr.is_null() {
         return Ok(true);
     }
-    // SAFETY: `ptr` ist nicht null und verweist auf `len` Bytes gültig allokierten Speicher. `libc::mlock` pinnt Seiten im RAM.
+    // SAFETY: Der Aufrufer garantiert über den `# Safety`-Vertrag, dass `ptr` auf `len` Bytes gültigen Speicher verweist. `libc::mlock` pinnt Seiten im RAM.
     let ret = unsafe { libc::mlock(ptr as *const libc::c_void, len) };
     if ret != 0 {
         let err = Error::last_os_error();
@@ -89,14 +95,15 @@ pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -
 // ANCHOR[contextra-sys:MLOCK-UNLOCK-UNIX-001]
 /// Entsperrt eine zuvor unter Unix gesperrte Speicherregion im RAM.
 ///
-/// # Vorbedingungen
-/// - `addr` und `len` müssen exakt einer zuvor über [`mem_lock_with_policy`] gesperrten Region entsprechen.
+/// # Safety
+/// - `addr` und `len` müssen exakt einer zuvor gesperrten Speicherregion entsprechen.
+/// - Die Speicherregion darf während des Entsperrens nicht in inkonsistentem Zustand deallokiert worden sein.
 #[cfg(unix)]
-pub fn mem_unlock(addr: usize, len: usize) {
+pub unsafe fn mem_unlock(addr: usize, len: usize) {
     if len == 0 || addr == 0 {
         return;
     }
-    // SAFETY: `addr` und `len` referenzieren eine gültige Speicherallokation, die zuvor an `mem_lock` übergeben wurde.
+    // SAFETY: `addr` und `len` referenzieren eine gültige Speicherallokation, wie vom Aufrufer garantiert.
     unsafe {
         libc::munlock(addr as *mut libc::c_void, len);
     }
@@ -104,6 +111,11 @@ pub fn mem_unlock(addr: usize, len: usize) {
 
 // ANCHOR[contextra-sys:MLOCK-LOCK-WIN32-001]
 /// Sperrt unter Windows eine Speicherregion im RAM gemäß der übergebenen [`MemLockPolicy`].
+///
+/// # Safety
+/// - `ptr` muss entweder null sein (bei `len == 0`) oder auf mindestens `len` Bytes
+///   eines gültig allokierten Speicherbereichs im Adressraum des aktuellen Prozesses zeigen.
+/// - Der Speicherbereich darf während des Aufrufs nicht deallokiert werden.
 ///
 /// # Ablauf
 /// 1. Behandelt Nullzeiger oder Nulllänge sofort mit `Ok(true)`.
@@ -113,11 +125,15 @@ pub fn mem_unlock(addr: usize, len: usize) {
 ///    - Bei [`MemLockPolicy::FailClosed`] Rückgabe eines Fehlers.
 ///    - Bei [`MemLockPolicy::Tolerant`] Warnung via `tracing` und Rückgabe von `Ok(false)`.
 #[cfg(windows)]
-pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Result<bool> {
+pub unsafe fn mem_lock_with_policy(
+    ptr: *const u8,
+    len: usize,
+    policy: MemLockPolicy,
+) -> Result<bool> {
     if len == 0 || ptr.is_null() {
         return Ok(true);
     }
-    // SAFETY: `ptr` ist nicht null und verweist auf `len` Bytes gültig allokierten Speicher. `VirtualLock` pinnt Seiten im physischen RAM.
+    // SAFETY: Der Aufrufer garantiert über den `# Safety`-Vertrag, dass `ptr` auf `len` Bytes gültig allokierten Speicher zeigt.
     let ret = unsafe {
         windows_sys::Win32::System::Memory::VirtualLock(ptr as *const std::ffi::c_void, len)
     };
@@ -149,12 +165,15 @@ pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -
 
 // ANCHOR[contextra-sys:MLOCK-UNLOCK-WIN32-001]
 /// Entsperrt eine zuvor unter Windows gesperrte Speicherregion im RAM über `VirtualUnlock`.
+///
+/// # Safety
+/// - `addr` und `len` müssen einer zuvor via `VirtualLock` gesperrten Speicherregion entsprechen.
 #[cfg(windows)]
-pub fn mem_unlock(addr: usize, len: usize) {
+pub unsafe fn mem_unlock(addr: usize, len: usize) {
     if len == 0 || addr == 0 {
         return;
     }
-    // SAFETY: `addr` und `len` referenzieren eine gültige Speicherallokation, die zuvor an `VirtualLock` übergeben wurde.
+    // SAFETY: `addr` und `len` referenzieren eine gültige Speicherallokation, wie vom Aufrufer garantiert.
     unsafe {
         windows_sys::Win32::System::Memory::VirtualUnlock(addr as *const std::ffi::c_void, len);
     }
@@ -163,10 +182,17 @@ pub fn mem_unlock(addr: usize, len: usize) {
 // ANCHOR[contextra-sys:MLOCK-FALLBACK-001]
 /// Fallback-Implementierung für Zielarchitekturen, die weder Unix noch Windows unterstützen.
 ///
+/// # Safety
+/// Teilt denselben `# Safety`-Vertrag wie die plattformspezifischen Varianten.
+///
 /// # Fehlerfälle
 /// Liefert bei [`MemLockPolicy::FailClosed`] und `len > 0` stets einen `Unsupported`-Fehler.
 #[cfg(not(any(unix, windows)))]
-pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -> Result<bool> {
+pub unsafe fn mem_lock_with_policy(
+    ptr: *const u8,
+    len: usize,
+    policy: MemLockPolicy,
+) -> Result<bool> {
     if len == 0 || ptr.is_null() {
         return Ok(true);
     }
@@ -188,16 +214,49 @@ pub fn mem_lock_with_policy(ptr: *const u8, len: usize, policy: MemLockPolicy) -
 
 // ANCHOR[contextra-sys:MLOCK-UNLOCK-FALLBACK-001]
 /// Fallback No-Op zum Entsperren von Speicher auf nicht unterstützten Plattformen.
+///
+/// # Safety
+/// Teilt denselben `# Safety`-Vertrag wie die plattformspezifischen Varianten.
 #[cfg(not(any(unix, windows)))]
-pub fn mem_unlock(_addr: usize, _len: usize) {}
+pub unsafe fn mem_unlock(_addr: usize, _len: usize) {}
 
 // ANCHOR[contextra-sys:MLOCK-CONVENIENCE-001]
 /// Sperrt eine Speicherregion im RAM mit der Standard-Richtlinie [`MemLockPolicy::Tolerant`].
 ///
+/// # Safety
+/// Teilt denselben `# Safety`-Vertrag wie [`mem_lock_with_policy`].
+///
 /// Gibt `true` zurück, falls das Sperren erfolgreich war, oder `false`, falls das Betriebssystem
 /// das Sperren verweigert hat (z. B. wegen Ressourcenbeschränkungen).
-pub fn mem_lock(ptr: *const u8, len: usize) -> bool {
-    mem_lock_with_policy(ptr, len, MemLockPolicy::Tolerant).unwrap_or(false)
+pub unsafe fn mem_lock(ptr: *const u8, len: usize) -> bool {
+    // SAFETY: Die Vorbedingungen für `ptr` und `len` werden durch den Aufrufer von `mem_lock` garantiert.
+    unsafe { mem_lock_with_policy(ptr, len, MemLockPolicy::Tolerant).unwrap_or(false) }
+}
+
+// ANCHOR[contextra-sys:MLOCK-SAFE-SLICE-001]
+/// Sperrt einen sicheren Byte-Slice im physischen RAM gemäß der angegebenen [`MemLockPolicy`].
+///
+/// Diese Funktion ist vollständig sicher (safe Rust), da der übergebene Slice garantiert
+/// auf gültigen, ausgerichteten Speicher verweist, der für die Dauer des Funktionsaufrufs
+/// nicht deallokiert werden kann.
+///
+/// # Fehlerfälle
+/// Gibt einen [`std::io::Error`] zurück, wenn das Sperren scheitert und `policy` auf
+/// [`MemLockPolicy::FailClosed`] gesetzt ist.
+pub fn mem_lock_slice(slice: &[u8], policy: MemLockPolicy) -> Result<bool> {
+    if slice.is_empty() {
+        return Ok(true);
+    }
+    // SAFETY: `slice` ist eine gültige Rust-Referenz auf `slice.len()` allokierte Bytes.
+    unsafe { mem_lock_with_policy(slice.as_ptr(), slice.len(), policy) }
+}
+
+// ANCHOR[contextra-sys:MLOCK-SAFE-SLICE-TOLERANT-001]
+/// Sperrt einen sicheren Byte-Slice im physischen RAM mit toleranter Richtlinie ([`MemLockPolicy::Tolerant`]).
+///
+/// Gibt `true` zurück, wenn die Speicherregion erfolgreich im RAM verankert wurde, sonst `false`.
+pub fn mem_lock_slice_tolerant(slice: &[u8]) -> bool {
+    mem_lock_slice(slice, MemLockPolicy::Tolerant).unwrap_or(false)
 }
 
 // ANCHOR[contextra-sys:MLOCK-TESTS-001]
@@ -209,18 +268,21 @@ mod tests {
     // Prüft, dass Nullzeiger und Nulllänge von allen Policies ohne Fehler und ohne Systemaufruf akzeptiert werden.
     #[test]
     fn test_mem_lock_null_or_zero_len() -> Result<()> {
-        assert!(mem_lock_with_policy(
-            std::ptr::null(),
-            0,
-            MemLockPolicy::FailClosed
-        )?);
-        assert!(mem_lock_with_policy(
-            std::ptr::null(),
-            0,
-            MemLockPolicy::Tolerant
-        )?);
-        assert!(mem_lock(std::ptr::null(), 0));
-        mem_unlock(0, 0);
+        // SAFETY: Null-Zeiger mit Länge 0 ist laut Sicherheitsvertrag explizit erlaubt und erzeugt kein UB.
+        unsafe {
+            assert!(mem_lock_with_policy(
+                std::ptr::null(),
+                0,
+                MemLockPolicy::FailClosed
+            )?);
+            assert!(mem_lock_with_policy(
+                std::ptr::null(),
+                0,
+                MemLockPolicy::Tolerant
+            )?);
+            assert!(mem_lock(std::ptr::null(), 0));
+            mem_unlock(0, 0);
+        }
         Ok(())
     }
 
@@ -232,9 +294,12 @@ mod tests {
         let ptr = buf.as_ptr();
         let len = buf.len();
 
-        let ok = mem_lock_with_policy(ptr, len, MemLockPolicy::Tolerant)?;
-        if ok {
-            mem_unlock(ptr as usize, len);
+        // SAFETY: `buf` lebt über den gesamten Testlauf; `ptr` und `len` beschreiben den Vektor exakt.
+        unsafe {
+            let ok = mem_lock_with_policy(ptr, len, MemLockPolicy::Tolerant)?;
+            if ok {
+                mem_unlock(ptr as usize, len);
+            }
         }
         Ok(())
     }
@@ -247,9 +312,12 @@ mod tests {
         let ptr = buf.as_ptr();
         let len = buf.len();
 
-        let res = mem_lock_with_policy(ptr, len, MemLockPolicy::FailClosed);
-        if let Ok(true) = res {
-            mem_unlock(ptr as usize, len);
+        // SAFETY: `buf` ist ein gültiger allokierter Speicherbereich.
+        unsafe {
+            let res = mem_lock_with_policy(ptr, len, MemLockPolicy::FailClosed);
+            if let Ok(true) = res {
+                mem_unlock(ptr as usize, len);
+            }
         }
     }
 
@@ -259,7 +327,8 @@ mod tests {
     fn test_mem_lock_invalid_address_fail_closed_simulation() {
         // Pass a dangling non-null pointer with unmapped address to simulate mlock failure.
         let invalid_ptr = (usize::MAX - 4096) as *const u8;
-        let res = mem_lock_with_policy(invalid_ptr, 4096, MemLockPolicy::FailClosed);
+        // SAFETY: Testfall prüft Fehlerbehandlung für ungemappte Adressen bei FailClosed-Policy.
+        let res = unsafe { mem_lock_with_policy(invalid_ptr, 4096, MemLockPolicy::FailClosed) };
         assert!(res.is_err());
     }
 
@@ -268,8 +337,22 @@ mod tests {
     #[test]
     fn test_mem_lock_invalid_address_tolerant_simulation() -> Result<()> {
         let invalid_ptr = (usize::MAX - 4096) as *const u8;
-        let res = mem_lock_with_policy(invalid_ptr, 4096, MemLockPolicy::Tolerant)?;
+        // SAFETY: Testfall prüft toleranten Modus bei ungültiger Adresse.
+        let res = unsafe { mem_lock_with_policy(invalid_ptr, 4096, MemLockPolicy::Tolerant)? };
         assert!(!res);
+        Ok(())
+    }
+
+    // ANCHOR[contextra-sys:MLOCK-TEST-SAFE-SLICE-001]
+    // Prüft die sichere Slice-API `mem_lock_slice` und `mem_lock_slice_tolerant`.
+    #[test]
+    fn test_mem_lock_safe_slice() -> Result<()> {
+        let data = vec![0x42u8; 2048];
+        let _ = mem_lock_slice(&data, MemLockPolicy::Tolerant)?;
+        let _ = mem_lock_slice_tolerant(&data);
+        let empty: [u8; 0] = [];
+        assert!(mem_lock_slice(&empty, MemLockPolicy::FailClosed)?);
+        assert!(mem_lock_slice_tolerant(&empty));
         Ok(())
     }
 }

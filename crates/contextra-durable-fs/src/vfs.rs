@@ -1,214 +1,286 @@
-//! # Virtuelles Dateisystem (VFS - Virtual File System)
+//! # Reales Virtuelles Dateisystem (`RealVfs`)
 //!
-//! Zweck: Bereitstellung einer Schnittstellenabstraktion für Dateisystemoperationen,
-//! um positionsbasiertes I/O (`read_at`, `write_at`), Dateisynchronisation (`sync_data`, `sync_all`)
-//! und Verzeichnisverwaltung testbar und mockbar zu machen.
+//! Zweck: Bereitstellung von `RealVfs` als primäre Produktionsimplementierung des kanonischen
+//! [`contextra_ports::vfs::Vfs`]-Traits.
 //!
-//! Ring-Zugehörigkeit: Ring 0 (I/O- und Speicherschnittstellen).
-//! Wird genutzt von: Index- und Speicher-Engines (z. B. HNSW-Vektorindex, Blockmanager).
-//! Wichtigste Typen:
-//! - [`Vfs`]: Der abstrakte Trait für Dateisystemaktionen (Öffnen, Löschen, Umbenennen).
-//! - [`VfsFile`]: Der Trait für positionsabhängige Lese- und Schreibzugriffe auf offene Dateien.
-//! - [`VfsOpenOptions`]: Parameter zum Öffnen von Dateien (Lesen, Schreiben, Erstellen, Kürzen).
-//! - [`RealFs`]: Standardimplementierung, die Aufrufe an das reale Host-Dateisystem weiterleitet.
-//! - [`RealFsFile`]: Dateihandle-Wrapper für [`std::fs::File`] mit plattformspezifischen Erweiterungen.
+//! Ring-Zugehörigkeit: Ring 1 (Dateisystem-Durability).
 //!
 //! Invarianten:
-//! - Schnittstellenvertrag: Deterministische I/O-Fehlerweiterleitung ohne `panic!`.
-//! - Plattformunabhängigkeit: Verwendet auf Unix `FileExt::read_at`/`write_at` und auf Windows `FileExt::seek_read`/`seek_write`.
+//! - Atomares Schreiben (`write_atomic`): Temp-Datei schreiben -> `sync_all` -> atomares `rename` -> `sync_dir`.
+//! - Alle Fehler von `sync_*`, `write`, `rename` werden unverändert propagiert (kein `let _ =` auf `Result`).
+//! - Dateirechte: Verzeichnisse erzwingen Modus `0700`, Datendateien erzwingen Modus `0600`.
+//! - Startprobe (`probe_platform_durability`): Verifiziert Plattform-Durability und Verzeichnis-fsync (T-PLAT-1, SPEC §8.5 D-56).
 
 // FILE-CONTEXT
-// STAND: 2026-10-12
-// ZWECK: Virtual File System (VFS) Abstraktion fuer deterministische I/O-Injektion und Testbarkeit.
-// INVARIANTEN: Zero-Panic, Fail-Closed, SCHNITTSTELLENVERTRAG exakt eingehalten.
+// STAND: 2026-11-02
+// ZWECK: Kanonische RealVfs-Implementierung fuer das einheitliche contextra_ports::Vfs-Trait.
+// INVARIANTEN: Zero-Panic, Fail-Closed, Zweistufige Haltbarkeit, Rechte 0600/0700.
 
-use std::fs::{self, File, OpenOptions};
-use std::path::{Path, PathBuf};
+pub use contextra_ports::vfs::Vfs;
+use contextra_ports::{ContextraError, Result};
+use contextra_sys::{flush_dir, flush_file, fs_class, rename_durable, FlushKind};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-#[cfg(unix)]
-use std::os::unix::fs::FileExt;
+/// Atomarer Zähler zur Generierung kollisionsfreier temporärer Dateinamen für `RealVfs`.
+static VFS_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-#[cfg(windows)]
-use std::os::windows::fs::FileExt;
+// ANCHOR[contextra-durable-fs:REAL-VFS-001]
+/// Produktionsimplementierung von [`contextra_ports::vfs::Vfs`] für reale Dateisysteme.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RealVfs;
 
-// ANCHOR[contextra-durable-fs:VFS-OPTIONS-001]
-/// Optionen zum Öffnen von Dateien über das virtuelle Dateisystem ([`Vfs::open`]).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct VfsOpenOptions {
-    /// Öffnet die Datei mit Leserechten.
-    pub read: bool,
-    /// Öffnet die Datei mit Schreibrechten.
-    pub write: bool,
-    /// Erstellt eine neue Datei, falls sie noch nicht existiert.
-    pub create: bool,
-    /// Erstellt eine neue Datei und schlägt fehl, falls sie bereits existiert (`create_new`).
-    pub create_new: bool,
-    /// Setzt die Dateilänge beim Öffnen sofort auf 0 zurück (`truncate`).
-    pub truncate: bool,
-    /// Hängt neue Schreiboperationen immer an das Dateiende an (`append`).
-    pub append: bool,
+/// Alias für Rückwärtskompatibilität.
+pub type RealFs = RealVfs;
+
+impl RealVfs {
+    /// Erstellt eine neue Instanz von [`RealVfs`].
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
 }
 
-// ANCHOR[contextra-durable-fs:VFS-TRAIT-001]
-/// Abstrakte Schnittstelle für Dateisysteme zur Entkopplung von Speicherkomponenten.
-pub trait Vfs: Send + Sync + 'static {
-    // ANCHOR[contextra-durable-fs:VFS-OPEN]
-    /// Öffnet eine Datei gemäß den übergebenen Optionen.
-    fn open(&self, path: &Path, opts: &VfsOpenOptions) -> std::io::Result<Box<dyn VfsFile>>;
-    // ANCHOR[contextra-durable-fs:VFS-CREATE-DIR-ALL]
-    /// Erstellt das angegebene Verzeichnis inklusive aller übergeordneten Ordner.
-    fn create_dir_all(&self, path: &Path) -> std::io::Result<()>;
-    // ANCHOR[contextra-durable-fs:VFS-REMOVE-FILE]
-    /// Entfernt eine Datei dauerhaft aus dem Dateisystem.
-    fn remove_file(&self, path: &Path) -> std::io::Result<()>;
-    // ANCHOR[contextra-durable-fs:VFS-RENAME]
-    /// Benennt eine Datei atomar von `from` nach `to` um.
-    fn rename(&self, from: &Path, to: &Path) -> std::io::Result<()>;
-    // ANCHOR[contextra-durable-fs:VFS-READ-DIR]
-    /// Liest alle Einträge eines Verzeichnisses aus.
-    fn read_dir(&self, path: &Path) -> std::io::Result<Vec<PathBuf>>;
-    // ANCHOR[contextra-durable-fs:VFS-EXISTS]
-    /// Prüft, ob ein Pfad (Datei oder Ordner) im Dateisystem existiert.
-    fn exists(&self, path: &Path) -> std::io::Result<bool>;
-    // ANCHOR[contextra-durable-fs:VFS-SYNC-DIR]
-    /// Synchronisiert die Verzeichnismetadaten auf stabile Speichermedien.
-    fn sync_dir(&self, path: &Path) -> std::io::Result<()>;
-}
-
-// ANCHOR[contextra-durable-fs:VFS-FILE-TRAIT-001]
-/// Abstraktes Dateihandle mit Unterstützung für positionsbasiertes I/O (Offset-Zugriff).
-pub trait VfsFile: Send + Sync {
-    // ANCHOR[contextra-durable-fs:VFS-FILE-READ-AT]
-    /// Liest Daten ab einem festen Byte-Offset `offset` in den Puffer `buf`, ohne den Dateizeiger zu verändern.
-    fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize>;
-    // ANCHOR[contextra-durable-fs:VFS-FILE-WRITE-AT]
-    /// Schreibt Daten aus `buf` an den festen Byte-Offset `offset`, ohne den Dateizeiger zu verändern.
-    fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize>;
-    // ANCHOR[contextra-durable-fs:VFS-FILE-SET-LEN]
-    /// Ändert die physische Größe der Datei (Kürzen oder Erweitern).
-    fn set_len(&self, len: u64) -> std::io::Result<()>;
-    // ANCHOR[contextra-durable-fs:VFS-FILE-LEN]
-    /// Fragt die aktuelle Dateigröße in Bytes ab.
-    fn len(&self) -> std::io::Result<u64>;
-    // ANCHOR[contextra-durable-fs:VFS-FILE-IS-EMPTY]
-    /// Prüft, ob die Datei 0 Bytes groß ist.
-    fn is_empty(&self) -> std::io::Result<bool> {
-        Ok(self.len()? == 0)
-    }
-    // ANCHOR[contextra-durable-fs:VFS-FILE-SYNC-DATA]
-    /// Synchronisiert die geschriebenen Nutzdatenblöcke auf die Festplatte (`fdatasync`).
-    fn sync_data(&self) -> std::io::Result<()>;
-    // ANCHOR[contextra-durable-fs:VFS-FILE-SYNC-ALL]
-    /// Synchronisiert Nutzdaten und alle Dateimetadaten auf die Festplatte (`fsync`).
-    fn sync_all(&self) -> std::io::Result<()>;
-}
-
-// ANCHOR[contextra-durable-fs:REAL-FS-001]
-/// Standard-Implementierung des [`Vfs`], die direkt mit dem Host-Betriebssystem interagiert.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct RealFs;
-
-impl Vfs for RealFs {
-    fn open(&self, path: &Path, opts: &VfsOpenOptions) -> std::io::Result<Box<dyn VfsFile>> {
-        let mut std_opts = OpenOptions::new();
-        std_opts
-            .read(opts.read)
-            .write(opts.write)
-            .create(opts.create)
-            .create_new(opts.create_new)
-            .truncate(opts.truncate)
-            .append(opts.append);
-
-        let file = std_opts.open(path)?;
-        Ok(Box::new(RealFsFile { file }))
+impl Vfs for RealVfs {
+    /// Liest den gesamten Dateiinhalt an `path`.
+    fn read(&self, path: &Path) -> Result<Vec<u8>> {
+        if !path.exists() {
+            return Err(ContextraError::NotFound(path.display().to_string()));
+        }
+        fs::read(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })
     }
 
-    fn create_dir_all(&self, path: &Path) -> std::io::Result<()> {
-        fs::create_dir_all(path)
+    /// Schreibt Daten atomar und crash-sicher an `path`.
+    ///
+    /// Ablauf (SPEC FI-F01):
+    /// 1. Elternverzeichnis ermitteln und sicherstellen (erstellt mit Rechten 0700).
+    /// 2. Temporäre Datei im selben Verzeichnis anlegen (Rechte 0600).
+    /// 3. Daten vollständig schreiben.
+    /// 4. `flush_file(FlushKind::DataAndMetadata)` (`fsync`) aufrufen.
+    /// 5. Datei schließen und atomar via `rename_durable` auf Zielpfad verschieben.
+    /// 6. Elternverzeichnis via `flush_dir` synchronisieren.
+    fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {
+        let parent = path.parent().ok_or_else(|| {
+            ContextraError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "target path has no parent directory",
+            ))
+        })?;
+
+        if !parent.exists() {
+            self.create_dir_all(parent)?;
+        }
+
+        let file_stem = path.file_name().and_then(|s| s.to_str()).unwrap_or("tmp");
+        let count = VFS_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let pid = std::process::id();
+        let tmp_filename = format!(".{}.tmp.{}.{}", file_stem, pid, count);
+        let tmp_path = parent.join(tmp_filename);
+
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            options.share_access(7);
+        }
+
+        let mut tmp_file = options.open(&tmp_path).map_err(ContextraError::Io)?;
+        let guard = TmpFileCleanupGuard(&tmp_path);
+
+        // Daten schreiben
+        tmp_file.write_all(data).map_err(ContextraError::Io)?;
+
+        // Datei synchronisieren (fsync)
+        flush_file(&tmp_file, FlushKind::DataAndMetadata).map_err(ContextraError::Io)?;
+        drop(tmp_file);
+
+        // Rechte sicherstellen (0600)
+        contextra_sys::set_restrictive_file_acl(&tmp_path).map_err(ContextraError::Io)?;
+
+        // Atomar umbenennen
+        rename_durable(&tmp_path, path).map_err(ContextraError::Io)?;
+
+        // Verzeichnis synchronisieren
+        flush_dir(parent).map_err(ContextraError::Io)?;
+
+        std::mem::forget(guard);
+        Ok(())
     }
 
-    fn remove_file(&self, path: &Path) -> std::io::Result<()> {
-        crate::durable_remove(path)
-    }
-
-    fn rename(&self, from: &Path, to: &Path) -> std::io::Result<()> {
-        // NOTE: Verwendet rename_durable aus contextra-sys zur dauerhaften Umbenennung.
-        contextra_sys::rename_durable(from, to)?;
-        if let Some(parent) = to.parent() {
-            let _ = crate::sync_dir(parent);
+    /// Erstellt ein Verzeichnis rekursiv mit restriktiven Rechten (0700 unter Unix).
+    fn create_dir_all(&self, path: &Path) -> Result<()> {
+        fs::create_dir_all(path).map_err(ContextraError::Io)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+                .map_err(ContextraError::Io)?;
         }
         Ok(())
     }
 
-    fn read_dir(&self, path: &Path) -> std::io::Result<Vec<PathBuf>> {
-        let entries = fs::read_dir(path)?;
-        let mut res = Vec::new();
-        for entry in entries {
-            res.push(entry?.path());
+    /// Entfernt eine Datei dauerhaft und flusht das Elternverzeichnis.
+    fn remove_file(&self, path: &Path) -> Result<()> {
+        if !path.exists() {
+            return Err(ContextraError::NotFound(path.display().to_string()));
         }
-        Ok(res)
+        let parent = path.parent();
+        fs::remove_file(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })?;
+
+        if let Some(dir) = parent {
+            if dir.exists() {
+                flush_dir(dir).map_err(ContextraError::Io)?;
+            }
+        }
+        Ok(())
     }
 
-    fn exists(&self, path: &Path) -> std::io::Result<bool> {
+    /// Prüft, ob `path` existiert.
+    fn exists(&self, path: &Path) -> Result<bool> {
         Ok(path.exists())
     }
 
-    fn sync_dir(&self, path: &Path) -> std::io::Result<()> {
-        crate::sync_dir(path)
+    /// Gibt die Dateilänge in Bytes zurück.
+    fn len(&self, path: &Path) -> Result<u64> {
+        if !path.exists() {
+            return Err(ContextraError::NotFound(path.display().to_string()));
+        }
+        fs::metadata(path).map(|m| m.len()).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ContextraError::NotFound(path.display().to_string())
+            } else {
+                ContextraError::Io(e)
+            }
+        })
+    }
+
+    /// Listet Dateinamen innerhalb des Verzeichnisses auf.
+    fn list_dir(&self, path: &Path) -> Result<Vec<String>> {
+        if !path.exists() {
+            return Err(ContextraError::NotFound(path.display().to_string()));
+        }
+        let entries = fs::read_dir(path).map_err(ContextraError::Io)?;
+        let mut names = Vec::new();
+        for entry_res in entries {
+            let entry = entry_res.map_err(ContextraError::Io)?;
+            let file_name = entry.file_name();
+            names.push(file_name.to_string_lossy().to_string());
+        }
+        names.sort();
+        Ok(names)
+    }
+
+    /// Synchronisiert die Verzeichnismetadaten dauerhaft auf Festplatte.
+    fn sync_dir(&self, path: &Path) -> Result<()> {
+        if !path.exists() {
+            return Err(ContextraError::NotFound(path.display().to_string()));
+        }
+        flush_dir(path).map_err(ContextraError::Io)
     }
 }
 
-// ANCHOR[contextra-durable-fs:REAL-FS-FILE-001]
-/// Implementierung von [`VfsFile`] auf Basis von [`std::fs::File`].
-#[derive(Debug)]
-pub struct RealFsFile {
-    file: File,
+/// RAII-Guard zum automatischen Löschen temporärer Zwischendateien bei Fehlern.
+struct TmpFileCleanupGuard<'a>(&'a Path);
+
+impl<'a> Drop for TmpFileCleanupGuard<'a> {
+    fn drop(&mut self) {
+        if let Err(e) = fs::remove_file(self.0) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                // Best-effort cleanup inside drop without panic or swallowed unexamined result
+                drop(e);
+            }
+        }
+    }
 }
 
-impl VfsFile for RealFsFile {
-    fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize> {
-        #[cfg(unix)]
-        {
-            FileExt::read_at(&self.file, buf, offset)
-        }
-        #[cfg(windows)]
-        {
-            FileExt::seek_read(&self.file, buf, offset)
-        }
-        #[cfg(not(any(unix, windows)))]
-        {
-            compile_error!("Unsupported target OS for positional VfsFile");
+// ANCHOR[contextra-durable-fs:PROBE-PLATFORM-DURABILITY-001]
+/// Startprobe für Plattform-Durability und Verzeichnis-fsync (T-PLAT-1, SPEC §8.5 D-56).
+///
+/// Ablauf:
+/// 1. Dateisystem-Klasse via [`fs_class`] ermitteln. Nicht unterstützte (Netzwerk, FUSE, CloudSync) abweisen.
+/// 2. Testverzeichnis mit Rechten 0700 erstellen.
+/// 3. Testdatei mit Rechten 0600 schreiben und `fsync` ausführen.
+/// 4. Atomares Rename durchführen.
+/// 5. Verzeichnis-`fsync` ausführen.
+/// 6. Berechtigungen verifizieren.
+/// 7. Testartefakte rückstandslos bereinigen.
+pub fn probe_platform_durability(base_dir: &Path) -> Result<()> {
+    let class = fs_class(base_dir).map_err(ContextraError::Io)?;
+    if !class.is_supported_local() {
+        return Err(ContextraError::Storage(format!(
+            "unsupported filesystem class for durability: {:?}",
+            class
+        )));
+    }
+
+    let probe_dir = base_dir.join(format!(
+        ".contextra_durability_probe_{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&probe_dir).map_err(ContextraError::Io)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&probe_dir, fs::Permissions::from_mode(0o700))
+            .map_err(ContextraError::Io)?;
+    }
+
+    let probe_file = probe_dir.join("probe_init.dat");
+    let target_file = probe_dir.join("probe_target.dat");
+
+    let vfs = RealVfs::new();
+    vfs.write_atomic(&probe_file, b"DURABILITY_PROBE_PAYLOAD")?;
+
+    // Rename-Test
+    rename_durable(&probe_file, &target_file).map_err(ContextraError::Io)?;
+    flush_dir(&probe_dir).map_err(ContextraError::Io)?;
+
+    // Verifikation der Leseoperation
+    let read_back = vfs.read(&target_file)?;
+    if read_back != b"DURABILITY_PROBE_PAYLOAD" {
+        fs::remove_dir_all(&probe_dir).map_err(ContextraError::Io)?;
+        return Err(ContextraError::Storage(
+            "durability probe readback mismatch".to_string(),
+        ));
+    }
+
+    // Berechtigungen verifizieren (0600 für Datei, 0700 für Verzeichnis)
+    contextra_sys::verify_file_acl_owner_only(&target_file).map_err(ContextraError::Io)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let dir_meta = fs::metadata(&probe_dir).map_err(ContextraError::Io)?;
+        let mode = dir_meta.mode() & 0o777;
+        if mode != 0o700 {
+            fs::remove_dir_all(&probe_dir).map_err(ContextraError::Io)?;
+            return Err(ContextraError::Storage(format!(
+                "durability probe directory permissions mismatch: expected 0700, got 0{:o}",
+                mode
+            )));
         }
     }
 
-    fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize> {
-        #[cfg(unix)]
-        {
-            FileExt::write_at(&self.file, buf, offset)
-        }
-        #[cfg(windows)]
-        {
-            FileExt::seek_write(&self.file, buf, offset)
-        }
-        #[cfg(not(any(unix, windows)))]
-        {
-            compile_error!("Unsupported target OS for positional VfsFile");
-        }
-    }
-
-    fn set_len(&self, len: u64) -> std::io::Result<()> {
-        self.file.set_len(len)
-    }
-
-    fn len(&self) -> std::io::Result<u64> {
-        self.file.metadata().map(|m| m.len())
-    }
-
-    fn sync_data(&self) -> std::io::Result<()> {
-        self.file.sync_data()
-    }
-
-    fn sync_all(&self) -> std::io::Result<()> {
-        self.file.sync_all()
-    }
+    // Bereinigung
+    fs::remove_dir_all(&probe_dir).map_err(ContextraError::Io)?;
+    Ok(())
 }

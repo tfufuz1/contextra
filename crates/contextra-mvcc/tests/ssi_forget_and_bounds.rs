@@ -47,6 +47,7 @@ fn committed_writes_bounded() {
         let seq = u64::try_from(i).expect("valid u64") + 1;
         validator.record_commit_key(format!("key_{i}").as_bytes(), seq);
         if (i + 1) % 5 == 0 {
+            #[allow(deprecated)]
             let removed = validator.prune_through(seq);
             assert!(removed > 0);
         }

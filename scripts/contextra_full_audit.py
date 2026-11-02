@@ -74,20 +74,14 @@ import tomllib  # noqa: E402
 # Konfiguration
 # ----------------------------------------------------------------------------------------------
 
-BENCHES = {
-    "contextra-mvcc": ["mvcc_bench"],
-    "contextra-crypto": ["crypto_benchmarks"],
-    "contextra-vector": [
-        "distance_bench", "sq8_bench", "hnsw_bench", "hnsw_delete_search_bench", "audit_benchmarks",
-        "flush_threshold_amplification", "partial_rebuild_recall_bench", "distance_nan_impact_bench",
-        "filtered_search_selectivity_bench",
-    ],
-    "contextra-store": ["sstable_bench", "memtable_bench", "wal_bench", "lsm_concurrency_bench",
-                        "block_cache_bench", "redb_comparative_bench"],
-    "contextra-simd": ["simd_bench"],
-}
-
-FUZZ_CRATES = ["crypto", "store", "text", "vector"]
+# Soll-Spezifikation laut docs/SPEC.md §5.1 (14 Produktions-Crates, 4 Hilfs-Mitglieder)
+SPEC_51_PRODUKTION = [
+    "contextra-types", "contextra-ports", "contextra-sys", "contextra-simd",
+    "contextra-durable-fs", "contextra-crypto", "contextra-mvcc", "contextra-store",
+    "contextra-text", "contextra-vector", "contextra-rank", "contextra-erasure",
+    "contextra-engine", "contextra",
+]
+SPEC_51_HILFS = ["contextra-testkit", "contextra-lab", "ctx-verify", "tests/arch"]
 
 # Produktmenge laut docs/SPEC.md §5.1 (14 Kern-Crates)
 PRODUKT = [
@@ -95,6 +89,7 @@ PRODUKT = [
     "contextra-durable-fs", "contextra-crypto", "contextra-mvcc", "contextra-store",
     "contextra-text", "contextra-vector", "contextra-rank", "contextra-engine", "contextra",
 ]
+
 # Nicht-Ziele / archivierte Crates (SPEC §1.4, §5.1), die im Produktiv-Workspace und dessen Huelle verboten sind:
 VERBOTEN_IM_PRODUKT = [
     "contextra-agent", "contextra-checkpoint", "contextra-cognition", "contextra-adapt",
@@ -105,16 +100,51 @@ VERBOTEN_IM_PRODUKT = [
     "contextra-avv-generator", "contextra-bench",
 ]
 
+BENCHES = {
+    "contextra-mvcc": ["mvcc_bench"],
+    "contextra-crypto": ["crypto_benchmarks"],
+    "contextra-vector": [
+        "distance_bench", "sq8_bench", "hnsw_bench", "hnsw_delete_search_bench", "audit_benchmarks",
+        "flush_threshold_amplification", "partial_rebuild_recall_bench", "distance_nan_impact_bench",
+        "filtered_search_selectivity_bench", "acorn_vs_post_filter", "overfetch_selectivity",
+    ],
+    "contextra-store": ["sstable_bench", "memtable_bench", "wal_bench", "lsm_concurrency_bench",
+                        "block_cache_bench", "redb_comparative_bench"],
+    "contextra-simd": ["simd_bench"],
+}
+
+FUZZ_CRATES = ["crypto", "store", "text", "vector"]
+
 K78_KNOWN = {"mmap_readonly", "reopen_and_dup2"}   # aus K7/K8 (Ausgangsbefund)
 SAFE_WRAPPER_SCOPE = "contextra-sys"          # Crate, in dem pub-fn ohne unsafe nicht unsafe-Inhalt haben duerfen
 PREFLIGHT = "toolchain_preflight"
-# Nach dem Rueckbau (Scope-Schnitt, Entscheidung E-17) geplant entfernt: fehlendes Verzeichnis ist dann
-# erwartet und kein Befund. Quelle: Umsetzungsplan 3 / Final 2.2.
+
 RUECKBAU_GEPLANT = {"contextra-kvcache", "contextra-agent", "contextra-router", "contextra-ingest",
                     "contextra-privacy", "contextra-mcp", "contextra-wire", "contextra-core",
                     "contextra-bench", "contextra-py", "contextra-sandbox", "contextra-infer-onnx",
                     "contextra-infer-ollama", "contextra-audit-export", "contextra-avv-generator",
                     "contextra-cognition", "contextra-adapt", "contextra-graph", "contextra-license"}
+
+
+def derive_workspace_benches(ws: Workspace) -> dict[str, list[str]]:
+    """Leitet vorhandene Benchmarks aus den Workspace-Mitgliedern ab."""
+    benches: dict[str, list[str]] = {}
+    for name, p in ws.members.items():
+        b_dir = p / "benches"
+        if b_dir.is_dir():
+            found = sorted(f.stem for f in b_dir.glob("*.rs"))
+            if found:
+                benches[name] = found
+    return benches
+
+
+def derive_workspace_fuzz_crates(ws: Workspace) -> list[str]:
+    """Leitet Fuzz-Crates aus den Workspace-Mitgliedern ab."""
+    fuzz: list[str] = []
+    for name, p in ws.members.items():
+        if (p / "fuzz" / "fuzz_targets").is_dir():
+            fuzz.append(name.removeprefix("contextra-"))
+    return sorted(fuzz)
 SLOW_CRATES = {"contextra-crypto": 3600, "contextra-store": 3600, "contextra-vector": 3600,
                "contextra-graph": 3600, "contextra-engine": 3600}
 DEFAULT_TIMEOUT = 1800
@@ -169,7 +199,7 @@ def locked_version(root: Path, pkg: str) -> Optional[str]:
 
 class Workspace:
     def __init__(self, root: Path):
-        self.root = root
+        self.root = root.resolve()
         ws = _toml(root / "Cargo.toml").get("workspace", {})
         self.members: dict[str, Path] = {}     # Paketname -> absolutes Verzeichnis
         self.problems: list[str] = []
@@ -206,10 +236,23 @@ class Workspace:
 
 class Ctx:
     def __init__(self, root: Path):
-        self.root = root
-        self.ws = Workspace(root)
-        self.caps: dict = _toml(root / "capabilities.toml").get("crates", {})
-        self.pin = (_toml(root / "rust-toolchain.toml").get("toolchain") or {}).get("channel", "(kein Pin)")
+        self.root = root.resolve()
+        self.ws = Workspace(self.root)
+        raw_caps: dict = _toml(self.root / "capabilities.toml").get("crates", {})
+        dir_to_member = {str(p.relative_to(self.root)): n for n, p in self.ws.members.items()}
+        self.caps: dict = {}
+        for k, v in raw_caps.items():
+            canonical_name = k
+            if k not in self.ws.members:
+                clean_k = k.removeprefix("./").rstrip("/")
+                if clean_k in dir_to_member:
+                    canonical_name = dir_to_member[clean_k]
+                elif isinstance(v, dict) and "path" in v:
+                    clean_path = str(v["path"]).removeprefix("./").rstrip("/")
+                    if clean_path in dir_to_member:
+                        canonical_name = dir_to_member[clean_path]
+            self.caps[canonical_name] = v
+        self.pin = (_toml(self.root / "rust-toolchain.toml").get("toolchain") or {}).get("channel", "(kein Pin)")
 
 
 def crate_for_path(path: str, dir_map: dict[str, str]) -> str:
@@ -450,12 +493,20 @@ def befund_default_members(ctx: Ctx, outdir: Path):
     geplant = [c for c in missing if c in RUECKBAU_GEPLANT]
     unerwartet = [c for c in missing if c not in RUECKBAU_GEPLANT]
     notdef = [c for c in PRODUKT if c in ws.members and c not in ws.default]
+    # SPEC §5.1 Soll-Drift:
+    # Prüfe ob Workspace-Mitglieder mit SPEC §5.1 Produktion übereinstimmen (unter Berücksichtigung von contextra-erasure)
+    spec_prod_missing = [c for c in SPEC_51_PRODUKTION if c not in ws.members and c != "contextra-erasure"]
+    forbidden_in_ws = [c for c in ws.members if c in VERBOTEN_IM_PRODUKT]
+
     detail = (f"members={len(ws.members)} default-members={len(ws.default)}; "
               f"Produkt ohne Verzeichnis (Rueckbau geplant): {len(geplant)}; "
-              f"unerwartet fehlend: {unerwartet or 'keine'}; Produkt nicht in default-members: {notdef or 'keine'}")
-    bad = bool(unerwartet or notdef or ws.problems)
+              f"unerwartet fehlend: {unerwartet or 'keine'}; Produkt nicht in default-members: {notdef or 'keine'}; "
+              f"SPEC §5.1 Abweichungen: {spec_prod_missing or 'keine'}; Verboten im Workspace: {forbidden_in_ws or 'keine'}")
+    bad = bool(unerwartet or notdef or ws.problems or spec_prod_missing or forbidden_in_ws)
     extra = [f"Mitglieder ohne Verzeichnis ({len(ws.fehlend)}): {', '.join(ws.fehlend)}",
-             f"default-members ohne Verzeichnis ({len(ws.fehlend_default)}): {', '.join(ws.fehlend_default)}"]
+             f"default-members ohne Verzeichnis ({len(ws.fehlend_default)}): {', '.join(ws.fehlend_default)}",
+             f"SPEC 5.1 Soll-Mitglieder fehlend: {spec_prod_missing}",
+             f"Verbotene Crates im Workspace: {forbidden_in_ws}"]
     return ("FAIL" if bad else "PASS"), detail, "\n".join(extra + ws.problems)
 
 
@@ -838,13 +889,37 @@ def build_plan(ctx: Ctx, args, outdir: Path) -> list[Step]:
 # ----------------------------------------------------------------------------------------------
 
 def tool_available(step: Step) -> tuple[bool, str]:
+    # Prüfe explizite Anforderungen
     for r in step.requires:
         if r == "cargo-miri":
             if not which("cargo-miri"):
                 return False, "cargo-miri fehlt (rustup +nightly component add miri)"
+            try:
+                res = subprocess.run(["cargo", "+nightly", "miri", "--version"],
+                                     capture_output=True, text=True, timeout=10)
+                if res.returncode != 0:
+                    return False, "cargo-miri Komponente für +nightly nicht installiert (rustup component add --toolchain nightly miri)"
+            except Exception as e:
+                return False, f"cargo-miri fehlgeschlagen: {e}"
+        elif r in ("cargo-fuzz", "cargo-mutants", "cargo-hack", "cargo-deny", "cargo-audit", "cargo-llvm-cov"):
+            if not which(r):
+                hint = f" (cargo install {r} --locked)"
+                return False, f"{r} nicht gefunden{hint}"
         elif not which(r):
             hint = f" (cargo install {r} --locked)" if r.startswith("cargo-") else ""
             return False, f"{r} nicht gefunden{hint}"
+
+    # Prüfe Nightly-Toolchain-Bedarf
+    if "+nightly" in step.cmd:
+        if not which("rustup"):
+            return False, "rustup fehlt für +nightly-Schritt"
+        try:
+            res = subprocess.run(["rustc", "+nightly", "-V"], capture_output=True, text=True, timeout=10)
+            if res.returncode != 0:
+                return False, "nightly-Toolchain nicht installiert (rustup toolchain install nightly)"
+        except Exception as e:
+            return False, f"nightly-Toolchain-Pruefung fehlgeschlagen: {e}"
+
     return True, ""
 
 
@@ -1005,12 +1080,16 @@ def write_reports(ctx: Ctx, steps: list[Step], outdir: Path, meta: dict, final: 
          f"- Toolchain-Pin: `{ctx.pin}`; Preflight: **{pre.status if pre else 'nicht gelaufen'}** "
          f"({pre.detail if pre else ''})",
          f"- Host: {meta['host']}", f"- Nutzer: {meta['user']}", "", "## Gesamt", ""]
-    L += [f"- **{k}**: {v}" for k, v in sorted(counts.items(), key=lambda kv: order.get(kv[0], 9))]
+    for k, v in sorted(counts.items(), key=lambda kv: order.get(kv[0], 9)):
+        if k == "SKIPPED":
+            L.append(f"- **{k}** (nicht geprueft): {v}")
+        else:
+            L.append(f"- **{k}**: {v}")
     if pre and pre.status != "PASS":
         L += ["", "> **Kein gueltiges Audit:** der Toolchain-Preflight ist nicht bestanden. "
               "Alle cargo-Schritte sind SKIPPED und zaehlen nicht als gruen."]
     L += ["", "Hinweis: Bei `befund_*`-Schritten bedeutet FAIL, dass der Befund **vorliegt**. "
-          "`INFO` ist eine Messung oder ein Hinweis ohne Urteil.", "",
+          "`INFO` ist eine Messung oder ein Hinweis ohne Urteil. `SKIPPED` bedeutet, dass ein Werkzeug oder eine Toolchain fehlt und der Schritt daher nicht geprueft werden konnte.", "",
           "## Rote und uebersprungene Schritte", "", "| Schritt | Status | Sek | Detail | Log |", "|---|---|---:|---|---|"]
     for s in sorted(steps, key=lambda x: order.get(x.status, 9)):
         if s.status in ("FAIL", "TIMEOUT", "SKIPPED"):
@@ -1347,6 +1426,7 @@ def spec_static(ctx: Ctx, outdir: Path):
     it("WP-2", "S-SEC-1", "WAL-Integritaet: keine Feature-Gates (R-SEC-6)", 'cfg(feature = "wal-integrity") zaehlen',
        "FAIL" if wal_gates else "PASS", f"{wal_gates} Gates", "0", "Final R-SEC-6, Entsch. H1")
     sec_gates = 0
+    sec_hits = []
     sec_kw = re.compile(r"hmac|integrity|verify|aead|decrypt|encrypt|crc|checksum|seq|auth|tamper|zeroize", re.I)
     for sub in ("contextra-store", "contextra-crypto", "contextra-mvcc"):
         if sub in mem:
@@ -1355,31 +1435,47 @@ def spec_static(ctx: Ctx, outdir: Path):
                 for i, l in enumerate(ls):
                     if re.search(r"cfg\((?:not\()?feature", l) and any(sec_kw.search(x) for x in ls[i:i + 4]):
                         sec_gates += 1
+                        sec_hits.append(f"{p.relative_to(ctx.root)}:{i+1}")
+    sec_detail = f"{sec_gates} Gates ({', '.join(sec_hits[:5])}{'...' if len(sec_hits) > 5 else ''})" if sec_hits else "0 Gates"
     it("WP-2", "S-SEC-2", "Keine cfg(feature) in Sicherheitsmodulen (store, crypto, mvcc; A1)", "Produktionscode",
-       "FAIL" if sec_gates else "PASS", f"{sec_gates} Gates mit Sicherheitsbezug (4-Zeilen-Fenster)", "0", "Umsetzungsplan 4 (A1)")
-    allow_c = sum(len(re.findall(r"allow\(unexpected_cfgs\)", _read(p)))
-                  for n in names for p in src_files(mem[n]))
+       "FAIL" if sec_gates else "PASS", sec_detail, "0", "Umsetzungsplan 4 (A1)")
+    allow_hits = []
+    for n in names:
+        for p in src_files(mem[n]):
+            for i, l in enumerate(_read(p).splitlines()):
+                if "allow(unexpected_cfgs)" in l:
+                    allow_hits.append(f"{p.relative_to(ctx.root)}:{i+1}")
     it("WP-2", "S-SEC-3", "Kein allow(unexpected_cfgs) in src/ (hebt deny auf)", "src/-Dateien",
-       "FAIL" if allow_c else "PASS", f"{allow_c} Stellen", "0", "Entscheidungsgrundlage 2.1")
+       "FAIL" if allow_hits else "PASS", f"{len(allow_hits)} Stellen ({', '.join(allow_hits[:3])})", "0", "Entscheidungsgrundlage 2.1")
     undecl = befund_cfg_features(ctx, outdir)
     it("WP-2", "S-SEC-4", "Alle cfg(feature) deklariert", "befund_cfg_features", "FAIL" if undecl[0] == "FAIL" else "PASS",
        undecl[1], "0", "Umsetzungsplan 4, H1")
     enc_hits = []
     for p in (mem["contextra-store"] / "src").rglob("config.rs") if "contextra-store" in mem else []:
-        if re.search(r"encryption_passphrase:\s*None", _read(p)):
-            enc_hits.append(str(p.relative_to(ctx.root)))
+        for i, l in enumerate(_read(p).splitlines()):
+            if "encryption_passphrase: None" in l or re.search(r"encryption_passphrase:\s*None", l):
+                enc_hits.append(f"{p.relative_to(ctx.root)}:{i+1}")
     it("WP-2", "S-SEC-5", "Verschluesselung standardmaessig an (R-SEC-1)", "Default-Konfiguration",
        "FAIL" if enc_hits else "PASS", f"Default None in {enc_hits or 'keiner'}", "an", "Final R-SEC-1, B-S02")
     tp = [str(p.relative_to(ctx.root)) for n in names for p in src_files(mem[n])
           if re.search(r"impl\s+Default\s+for\s+TenantPolicy[\s\S]{0,400}?Optional", _read(p))]
     it("WP-2", "S-SEC-6", "TenantPolicy::Required als Standard (R-SEC-2)", "impl Default for TenantPolicy",
        "FAIL" if tp else "PASS", f"Default Optional in {tp or 'keiner'}", "Required", "Final R-SEC-2, B-S15")
-    kdf_low = [str(p.relative_to(ctx.root)) for n in names for p in src_files(mem[n])
-               if re.search(r"\b19[_]?456\b", _read(p)) and "kdf" in p.name]
+    kdf_low = []
+    for n in names:
+        for p in src_files(mem[n]):
+            if "kdf" in p.name:
+                for i, l in enumerate(_read(p).splitlines()):
+                    if re.search(r"\b19[_]?456\b", l):
+                        kdf_low.append(f"{p.relative_to(ctx.root)}:{i+1}")
     it("WP-2", "S-SEC-7", "Argon2id Untergrenze 64 MiB (R-SEC-3)", "KDF-Konstante 19456 KiB",
        "FAIL" if kdf_low else "PASS", f"19456 KiB in {kdf_low or 'keiner'}", ">= 65536", "Final R-SEC-3, B-S01/S04")
-    pw_opt = [str(p.relative_to(ctx.root)) for n in names for p in src_files(mem[n])
-              if re.search(r"passphrase:\s*Option<String>", _read(p))]
+    pw_opt = []
+    for n in names:
+        for p in src_files(mem[n]):
+            for i, l in enumerate(_read(p).splitlines()):
+                if re.search(r"passphrase:\s*Option<String>", l):
+                    pw_opt.append(f"{p.relative_to(ctx.root)}:{i+1}")
     it("WP-2", "S-SEC-8", "Passphrase nicht als Option<String> (R-SEC-4)", "Feldtyp",
        "FAIL" if pw_opt else "PASS", f"{pw_opt or 'keiner'}", "Zeroizing", "Final R-SEC-4, B-S03")
     legacy = [n for n in names if re.search(r"^legacy-wal-key\s*=", _read(mem[n] / "Cargo.toml"), re.M)]
@@ -1479,13 +1575,20 @@ def spec_static(ctx: Ctx, outdir: Path):
        "FAIL" if uns_keep else ("FEHLT" if uns_rm else "PASS"),
        f"bleibend: {uns_keep or 'keine'}; zu entfernen: {uns_rm or 'keine'}", "0", "Umsetzungsplan 8, G-Unsafe")
     pan = {}
+    pan_hits = []
     for n in RING:
         if n in names:
-            c = sum(len(_PANIC.findall(prod_text(_read(p)))) for p in src_files(mem[n]))
+            c = 0
+            for p in src_files(mem[n]):
+                for i, l in enumerate(prod_text(_read(p)).splitlines()):
+                    matches = _PANIC.findall(l)
+                    if matches:
+                        c += len(matches)
+                        pan_hits.append(f"{p.relative_to(ctx.root)}:{i+1}")
             if c:
                 pan[n] = c
     it("WP-4", "S-PAN-1", "Kein unwrap/expect/panic im Produktionscode Ring 0-3 (G-Panic)", "Heuristik ohne cfg(test)",
-       "FAIL" if pan else "PASS", f"{sum(pan.values())} in {pan or 'keinem'}", "0", "Umsetzungsplan 5, G-Panic")
+       "FAIL" if pan else "PASS", f"{sum(pan.values())} in {pan or 'keinem'} ({', '.join(pan_hits[:5])}{'...' if len(pan_hits) > 5 else ''})", "0", "Umsetzungsplan 5, G-Panic")
     big = []
     for n in RING:
         if n in names:
@@ -1497,19 +1600,24 @@ def spec_static(ctx: Ctx, outdir: Path):
     it("WP-4", "S-DAT-1", "Dateien unter 500 Zeilen (Ring 0-3, Produktionsdateien)", "Zeilenzahl src/",
        "FEHLT" if big else "PASS", f"{len(big)} Dateien > 500, groesste: {big[:5]}", "0", "Umsetzungsplan 5")
     forb = defaultdict(int)
+    forb_hits = []
     for n in names:
         for p in src_files(mem[n]):
-            c = len(_FORBIDDEN.findall(_read(p)))
-            if c:
-                forb[str(p.relative_to(ctx.root))] += c
+            for i, l in enumerate(_read(p).splitlines()):
+                matches = _FORBIDDEN.findall(l)
+                if matches:
+                    forb[str(p.relative_to(ctx.root))] += len(matches)
+                    forb_hits.append(f"{p.relative_to(ctx.root)}:{i+1}")
     for extra in ("README.md", "docs/SPEC.md", "docs/ARCHITECTURE.md", "docs/SECURITY.md"):
         f = ctx.root / extra
         if f.exists():
-            c = len(_FORBIDDEN.findall(_read(f)))
-            if c:
-                forb[extra] += c
+            for i, l in enumerate(_read(f).splitlines()):
+                matches = _FORBIDDEN.findall(l)
+                if matches:
+                    forb[extra] += len(matches)
+                    forb_hits.append(f"{extra}:{i+1}")
     it("WP-4", "S-LINT-1", "Verbotene Loeschbegriffe (T-LINT-1) in Quelle und Doku", "Phrasensuche",
-       "FAIL" if forb else "PASS", f"{sum(forb.values())} Treffer in {len(forb)} Dateien", "0", "Final 0.2, T-LINT-1")
+       "FAIL" if forb else "PASS", f"{sum(forb.values())} Treffer in {len(forb)} Dateien ({', '.join(forb_hits[:5])}{'...' if len(forb_hits) > 5 else ''})", "0", "Final 0.2, T-LINT-1")
 
     # ---------- WP-5: Store ----------
     st = mem.get("contextra-store")
@@ -1669,6 +1777,16 @@ def export_spec(outdir: Path) -> None:
         w = csv.DictWriter(fh, fieldnames=list(SPEC_ITEMS[0].keys()))
         w.writeheader()
         w.writerows(SPEC_ITEMS)
+
+    # Exportiere spec_gates.csv mit Details und Fundstellen
+    spec_gate_ids = {"S-SEC-2", "S-SEC-3", "S-SEC-4", "S-SEC-5", "S-SEC-7", "S-SEC-8", "S-PAN-1", "S-LINT-1"}
+    gate_rows = [x for x in SPEC_ITEMS if x["id"] in spec_gate_ids or x["id"].startswith("S-SEC-")]
+    if gate_rows:
+        with open(outdir / "spec_gates.csv", "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=["id", "anforderung", "status", "messwert", "ziel", "methode", "quelle"])
+            w.writeheader()
+            for r in gate_rows:
+                w.writerow({k: r[k] for k in ["id", "anforderung", "status", "messwert", "ziel", "methode", "quelle"]})
     L = ["# Spezifikations-Messung V1", "", "Status: PASS · FAIL (Verstoss) · FEHLT (Arbeit offen) · OFFEN (Entscheidung) · "
          "MANUELL · NICHT_GEMESSEN · INFO", ""]
     per: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))

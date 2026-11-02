@@ -26,9 +26,18 @@ check:
 test *ARGS:
     cargo test --locked {{ARGS}}
 
-# Executes governance layering test
+# Executes governance layering test and static specification gates
 gates:
     cargo test --test layering --locked
+    python3 scripts/contextra_full_audit.py --gruppe spec
+
+# Führt ein vollständiges Audit durch (inkl. Benchmarks)
+audit *ARGS:
+    python3 scripts/contextra_full_audit.py {{ARGS}}
+
+# Führt ein schnelles Audit durch (ohne Benchmarks/Fuzz/Mutation)
+audit-quick *ARGS:
+    python3 scripts/contextra_full_audit.py --quick {{ARGS}}
 
 # Full pre-push pipeline: check → test → gates
 pre-push: check test gates

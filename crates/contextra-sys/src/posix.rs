@@ -28,6 +28,19 @@ use std::path::Path;
 /// 3. Dupliziert den neu erhaltenen Deskriptor mit `libc::dup2(fd, target_fd)` auf das Ziellimit.
 /// 4. Schließt den temporären Zwischendeskriptor `fd` über `libc::close(fd)`.
 ///
+/// # Safety
+///
+/// Diese Funktion manipuliert die Dateideskriptortabelle des laufenden Prozesses atomar via `dup2`.
+/// Sie ist als `unsafe fn` deklariert, weil:
+/// - **Deskriptorüberschreibung:** `libc::dup2` schließt einen eventuell unter `target_fd` bereits
+///   geöffneten Dateideskriptor ohne Vorwarnung. Wenn ein anderer Thread diesen Deskriptor zeitgleich
+///   nutzt oder eine Rust-Datenstruktur ([`std::fs::File`]) die Verantwortung dafür trägt, führt
+///   dies zu schweren Use-After-Close- oder Aliasing-Bugs (UB).
+/// - **Dateideskriptor-Gültigkeit:** Der Aufrufer muss garantieren, dass `target_fd` im gültigen
+///   Bereich für Dateideskriptoren liegt (`>= 0` und `< RLIMIT_NOFILE`) und dass keine Race Conditions
+///   bezüglich des Lebenszyklus von `target_fd` im Prozess existieren.
+/// - **POSIX-Flags:** `flags` muss ein gültiger Satz an Zugriffsmodi (z. B. `libc::O_RDONLY`, `libc::O_WRONLY`) sein.
+///
 /// # Vorbedingungen
 /// - `path` darf kein Null-Byte (`\0`) im Dateipfad enthalten.
 /// - `target_fd` muss ein gültiger Deskriptorindex sein.
@@ -38,14 +51,14 @@ use std::path::Path;
 /// # Fehlerfälle
 /// Gibt einen [`std::io::Error`] zurück, wenn die Pfadkonvertierung ungültig ist oder einer der Systemaufrufe fehlschlägt.
 #[cfg(target_os = "linux")]
-pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Result<()> {
+pub unsafe fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Result<()> {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
 
     let path_c = CString::new(path.as_os_str().as_bytes())
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
 
-    // SAFETY: `path_c` ist ein gültiger nullterminierter C-String. `target_fd` ist eine ganzzahlige Deskriptornummer. `libc::open`, `libc::dup2` und `libc::close` sind Standard-POSIX-Syscalls, deren Rückgabewerte unmittelbar auf Fehler geprüft werden.
+    // SAFETY: `path_c` ist ein gültiger, nullterminierter C-String. Der Aufrufer garantiert über den `# Safety`-Vertrag, dass `target_fd` gültig ist und nicht nebenläufig anderweitig verwendet wird. `libc::open`, `libc::dup2` und `libc::close` sind Standard-POSIX-Syscalls, deren Rückgabewerte unmittelbar auf Fehler geprüft werden.
     unsafe {
         let fd = libc::open(path_c.as_ptr(), flags);
         if fd < 0 {
@@ -63,10 +76,13 @@ pub fn reopen_and_dup2(path: &Path, target_fd: i32, flags: i32) -> std::io::Resu
 // ANCHOR[contextra-sys:POSIX-DUP2-FALLBACK-001]
 /// Fallback für Nicht-Linux-Systeme, auf denen `reopen_and_dup2` nicht unterstützt wird.
 ///
+/// # Safety
+/// Teilt denselben `# Safety`-Vertrag wie die Linux-Variante, gibt jedoch stets einen Fehler zurück.
+///
 /// # Fehlerfälle
 /// Liefert stets [`std::io::ErrorKind::Unsupported`].
 #[cfg(not(target_os = "linux"))]
-pub fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::Result<()> {
+pub unsafe fn reopen_and_dup2(_path: &Path, _target_fd: i32, _flags: i32) -> std::io::Result<()> {
     Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,
         "reopen_and_dup2 is only supported on Linux target OS",
@@ -91,7 +107,10 @@ pub fn ensure_fd_limit(min_fds: u64) -> bool {
     {
         use std::mem::MaybeUninit;
         let min_fds_rlim = min_fds as libc::rlim_t;
-        // SAFETY: `getrlimit` und `setrlimit` lesen und schreiben die `rlimit`-Struktur des Prozesses über gültige Zeiger auf allokierten/uninitialisierten Speicher.
+        // SAFETY: `rlim` und `current_rlim` sind ordnungsgemäß auf dem Stack allokierte `MaybeUninit<libc::rlimit>`-Puffer,
+        // deren Zeiger an `libc::getrlimit` übergeben werden. Nach erfolgreichem Rückgabewert `0` garantiert der Kernel,
+        // dass die Struktur vollständig initialisiert ist, sodass `assume_init()` wohl-definiert ist.
+        // `libc::setrlimit` liest die wohldefinierte `rlimit`-Struktur über eine unveränderliche Referenz.
         unsafe {
             let mut rlim = MaybeUninit::<libc::rlimit>::uninit();
             if libc::getrlimit(libc::RLIMIT_NOFILE, rlim.as_mut_ptr()) != 0 {
@@ -132,7 +151,8 @@ pub fn set_fd_limit(limit: u64) -> bool {
             rlim_cur: limit as libc::rlim_t,
             rlim_max: limit as libc::rlim_t,
         };
-        // SAFETY: `rlim` ist eine vollständig initialisierte C-Struktur auf dem Stack. `setrlimit` liest diese sicher ein.
+        // SAFETY: `rlim` ist eine gültig initialisierte `libc::rlimit`-Instanz auf dem Stack.
+        // `libc::setrlimit` liest den Deskriptor-Grenzwert über den Zeiger ein; es erfolgt keine Ownership-Übertragung.
         let res = unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &rlim) };
         res == 0
     }
@@ -196,7 +216,10 @@ mod tests {
             let target_file = File::create(&dummy_path)?;
             use std::os::unix::io::AsRawFd;
             let target_fd = target_file.as_raw_fd();
-            reopen_and_dup2(&path, target_fd, libc::O_RDONLY)?;
+            // SAFETY: `target_fd` ist ein gültiger Deskriptor der soeben geöffneten Datei `target_file`.
+            unsafe {
+                reopen_and_dup2(&path, target_fd, libc::O_RDONLY)?;
+            }
             let mut buf = Vec::new();
             // SAFETY: `target_fd` wurde via `dup2` ersetzt und ist ein gültiger offener Deskriptor. `libc::dup` erzeugt ein neues dupliziertes Handle für die sichere Übergabe an Rusts `File::from_raw_fd`.
             let mut duped_file = unsafe {
@@ -209,7 +232,8 @@ mod tests {
 
         #[cfg(not(target_os = "linux"))]
         {
-            let res = reopen_and_dup2(&path, 1, 0);
+            // SAFETY: Testfall auf Nicht-Linux-Plattformen führt zum kontrollierten Unsupported-Fehler.
+            let res = unsafe { reopen_and_dup2(&path, 1, 0) };
             assert!(res.is_err());
         }
 
@@ -222,7 +246,8 @@ mod tests {
     #[test]
     fn test_reopen_and_dup2_invalid_path() {
         let invalid_path = Path::new("/nonexistent/file/path/dup2_test");
-        let res = reopen_and_dup2(invalid_path, 999, 0);
+        // SAFETY: Testdeskriptor 999 wird beim Scheitern des Pfadöffnens nicht manipuliert.
+        let res = unsafe { reopen_and_dup2(invalid_path, 999, 0) };
         #[cfg(target_os = "linux")]
         assert!(res.is_err());
         #[cfg(not(target_os = "linux"))]

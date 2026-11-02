@@ -5,14 +5,12 @@
 //! Testet die Verschlüsselungskonfiguration des Builders (`EncryptionMode`, `ContextraConfigExt`):
 //! - Maskierung vertraulicher Passphrasen ([REDACTED]) in Debug-Ausgaben.
 //! - Ablehnung leerer Passphrasen.
-//! - Explizit und implizit unverschlüsselter Modus (inkl. Warnungsausgabe im Log).
+//! - Ablehnung unverschlüsselter Konfiguration (D-05 Pflicht-Verschlüsselung).
 //! - Erfolgreicher Roundtrip bei verschlüsselter Speicherung.
 
 use contextra::{
     builder, ContextraBuilder, ContextraConfig, ContextraConfigExt, ContextraError, EncryptionMode,
 };
-use std::sync::{Arc, Mutex};
-use tracing_subscriber::layer::SubscriberExt;
 use zeroize::Zeroizing;
 
 // ANCHOR[contextra:TEST-ENC-001]
@@ -58,70 +56,53 @@ async fn test_empty_passphrase_rejection() {
 }
 
 // ANCHOR[contextra:TEST-ENC-003]
-// Testet die Instanziierung einer Datenbank im explizit unverschlüsselten Modus.
+// Testet die Ablehnung einer explizit unverschlüsselten Datenbank nach D-05.
 #[tokio::test]
-async fn test_explicit_unencrypted_mode_building() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_explicit_unencrypted_mode_rejected() -> Result<(), Box<dyn std::error::Error>> {
     let tmp_path = std::env::temp_dir().join(format!(
         "contextra_integ_unencrypted_{}",
         std::process::id()
     ));
     let _ = std::fs::remove_dir_all(&tmp_path);
 
-    let builder = builder(4)
+    let res = builder(4)
         .with_storage_path(&tmp_path)
-        .with_encryption(EncryptionMode::Unencrypted);
+        .with_encryption(EncryptionMode::Unencrypted)
+        .build()
+        .await;
 
-    assert!(!builder.is_encrypted());
-
-    let db = builder.build().await?;
-    assert_eq!(db.len().await?, 0);
+    assert!(res.is_err());
+    match res {
+        Err(ContextraError::InvalidInput(msg)) => {
+            assert!(msg.contains("Unencrypted storage mode is not permitted"));
+        }
+        _ => panic!("Expected ContextraError::InvalidInput for Unencrypted mode"),
+    }
 
     let _ = std::fs::remove_dir_all(&tmp_path);
     Ok(())
 }
 
 // ANCHOR[contextra:TEST-ENC-004]
-// Fängt Tracing-Logs ab und prüft, ob beim Start ohne explizite Verschlüsselungsauswahl eine Warnung emittiert wird.
+// Testet die Ablehnung einer Datenbank ohne Passphrase nach D-05.
 #[tokio::test]
-async fn test_implicit_unencrypted_mode_warning() -> Result<(), Box<dyn std::error::Error>> {
-    #[derive(Clone, Default)]
-    struct StringWriter(Arc<Mutex<Vec<u8>>>);
-    impl std::io::Write for StringWriter {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.lock().unwrap().extend_from_slice(buf);
-            Ok(buf.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    let logs = StringWriter::default();
-    let logs_clone = logs.clone();
-    let subscriber = tracing_subscriber::fmt::layer()
-        .with_writer(move || logs_clone.clone())
-        .with_ansi(false);
-    let dispatch = tracing::Dispatch::new(tracing_subscriber::registry().with(subscriber));
-
+async fn test_unconfigured_encryption_rejected() -> Result<(), Box<dyn std::error::Error>> {
     let tmp_path =
         std::env::temp_dir().join(format!("contextra_implicit_test_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp_path);
 
-    {
-        let _guard = tracing::dispatcher::set_default(&dispatch);
-        let db = ContextraBuilder::new(4)
-            .with_storage_path(&tmp_path)
-            .build()
-            .await?;
-        assert_eq!(db.len().await?, 0);
-    }
+    let res = ContextraBuilder::new(4)
+        .with_storage_path(&tmp_path)
+        .build()
+        .await;
 
-    let output = String::from_utf8(logs.0.lock().unwrap().clone())?;
-    assert!(
-        output.contains("implicit unencrypted mode"),
-        "Expected warning log for implicit unencrypted mode, got: {}",
-        output
-    );
+    assert!(res.is_err());
+    match res {
+        Err(ContextraError::InvalidInput(msg)) => {
+            assert!(msg.contains("Encryption passphrase is required"));
+        }
+        _ => panic!("Expected ContextraError::InvalidInput for unconfigured encryption"),
+    }
 
     let _ = std::fs::remove_dir_all(&tmp_path);
     Ok(())

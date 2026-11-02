@@ -11,39 +11,34 @@
 //! Die Fassade dient als zentrale Abstraktions- und Konfigurationsschicht für anwendende
 //! Systeme (wie z. B. `contextra-mcp` oder externe SDKs/Applikationen). Sie verbirgt die
 //! interne Komplexität der tieferen Schichten (Ring 0 bis 3) und stellt eine einheitliche,
-//! ergonomische Programmierschnittstelle (API = Application Programming Interface) bereit.
+//! ergonomische Programmierschnittstelle (API) bereit.
 //!
 //! ## Ring-Zugehörigkeit & Abhängigkeiten
-//! - **Ring 4 (Fassade)**: Greift als Composition Root auf Teilsysteme wie `contextra-db` (Ring 3),
-//!   `contextra-types`, `contextra-ports`, `contextra-license`, `contextra-store`
-//!   und `contextra-rank` zu.
+//! - **Ring 4 (Fassade)**: Greift als Composition Root auf Teilsysteme wie `contextra-engine` (Ring 3),
+//!   `contextra-types`, `contextra-ports`, `contextra-store` und `contextra-rank` zu.
 //! - **Keine zyklischen Abhängigkeiten**: Höhere Ringe hängen von niederen Ringen ab, nie umgekehrt.
-//! - **Eingebunden von**: `contextra-mcp` (Model Context Protocol Adapter für LLM-Agenten).
 //!
 //! ## Kernkonzepte & wichtigste Typen
-//! - [`ContextraBuilder`]: Konfiguriert Speicherpfade, Vektordimensionen, Verschlüsselung, Lizenzprüfung
+//! - [`ContextraBuilder`]: Konfiguriert Speicherpfade, Vektordimensionen, Verschlüsselung
 //!   und Profile vor dem Start der Datenbankinstanz.
 //! - [`Contextra`]: Die eigentliche Datenbankinstanz zur Verwaltung von Collections (Dokumentensammlungen),
 //!   Vektorindizes und Volltextindizes.
-//! - [`AgentMemory`]: Eine agentenzentrierte High-Level-Abstraktion mit `remember()`, `recall()`, `forget()`
-//!   und Wissensgraphen-Relationen (`relate()`).
 //! - [`LlmQueryRewriter`]: LLM-gestützte Umformulierung von Suchanfragen für mehrstufiges Retrieval.
 //!
 //! ## Sicherheits- und Entwurfs-Invarianten
-//! - **Kein Unsafe**: Striktes `#![forbid(unsafe_code)]` garantiert Speichersicherheit zur Compile-Zeit.
+//! - **Kein Unsafe**: Striktes `#![forbid(unsafe_code)]` garantiert Typsicherheit und Speichersicherheit.
 //! - **Kein Panik-Zustand**: Fehler werden strikt über den Ergebnistyp [`Result`] bzw. [`ContextraError`]
 //!   nach oben gereicht (Fail-Closed-Prinzip).
 //! - **Entkopplung**: Zeit-, Zufalls- und ID-Generierungsoperationen erfolgen deterministisch über Ports.
 
 #![forbid(unsafe_code)]
 
-pub mod agent_memory;
 pub mod builder;
 pub mod collection_profile;
 pub mod performance_profile;
 pub mod query_rewriter;
+pub mod rng;
 
-pub use agent_memory::{AgentMemory, Memory, MemoryId};
 pub use builder::{ContextraBuilder, ContextraConfigExt, EncryptionMode};
 pub use contextra_engine::{
     chunker, Collection, CollectionConfig, Contextra, ContextraConfig, ContextraStats,
@@ -54,6 +49,7 @@ pub use contextra_types::error::ContextraError;
 pub use contextra_types::types::domain::{DocId, ScoredDocument};
 pub use contextra_types::DistanceMetric;
 pub use query_rewriter::LlmQueryRewriter;
+pub use rng::OsRngAdapter;
 
 pub use contextra_rank as rank;
 
@@ -64,11 +60,11 @@ pub use contextra_rank as rank;
 /// - `dimension`: Die Anzahl der Dimensionen (z. B. 384, 768, 1536) für die Vektoreinbettungen (Embeddings).
 ///
 /// # Rückgabe
-/// Gibt einen vorinitialisierten [`ContextraBuilder`] mit Standardeinstellungen zurück.
+/// Gibt einen vorinitialisierten [`ContextraBuilder`] zurück.
 ///
 /// # Ablauf von `builder`:
 /// 1. Übernahme der gewünschten Vektordimension (`dimension`).
-/// 2. Initialisierung des Builders mit Default-Parametern (Speicherpfad `./contextra_data`, Fast-Lizenzgate).
+/// 2. Initialisierung des Builders mit Default-Parametern (Speicherpfad `./contextra_data`).
 /// 3. Rückgabe der Builder-Instanz zur methodenweisen Weiterkonfiguration.
 ///
 /// # Vorbedingungen
@@ -89,8 +85,6 @@ pub fn builder(dimension: usize) -> ContextraBuilder {
 
 // ANCHOR[contextra:LIB-002]
 /// Öffnet oder erstellt eine [`Contextra`]-Datenbankinstanz am angegebenen Dateisystempfad mit Standardkonfiguration.
-///
-/// Verwendet standardmäßig eine Vektordimension von 768 und das unbeschränkte Entwicklungs-Lizenzgate (`OpenFastGate`).
 ///
 /// # Parameter
 /// - `path`: Dateipfad zum Datenbankverzeichnis (wird bei Bedarf erstellt).
@@ -138,7 +132,7 @@ pub async fn open(path: impl AsRef<std::path::Path>) -> Result<Contextra, Contex
 ///
 /// # Rückgabe
 /// - `Ok(Contextra)`: Bereitgestellte Datenbankinstanz.
-/// - `Err(ContextraError)`: Konfigurationskonflikt, I/O-Fehler oder Verstoß gegen Lizenzrichtlinien.
+/// - `Err(ContextraError)`: Konfigurationskonflikt oder I/O-Fehler.
 ///
 /// # Ablauf von `open_with_config`:
 /// 1. Entnahme der Dimension aus der übergebenen `config` (`config.dimension`).
@@ -173,7 +167,7 @@ mod tests {
     use super::*;
 
     // ANCHOR[contextra:TEST-LIB-001]
-    // Prüft die drei primären Fassaden-Einstiegspunkte (open, open_with_config, builder) auf korrekte Initialisierung einer leeren Datenbank.
+    // Prüft die drei primären Fassaden-Einstiegspunkte (open, open_with_config, builder) mit Passphrase.
     #[tokio::test]
     async fn test_facade_open_and_builder_entrypoints() -> Result<(), Box<dyn std::error::Error>> {
         let base_tmp =
@@ -181,11 +175,16 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base_tmp);
 
         let db1_path = base_tmp.join("db1");
-        let db1 = open(&db1_path).await?;
+        let db1 = builder(768)
+            .with_storage_path(&db1_path)
+            .with_encryption_passphrase("test-passphrase-1")
+            .build()
+            .await?;
         assert_eq!(db1.len().await?, 0);
 
         let config = ContextraConfig {
             dimension: 16,
+            encryption_passphrase: Some("test-passphrase-2".to_string()),
             ..Default::default()
         };
         let db2_path = base_tmp.join("db2");
@@ -193,7 +192,11 @@ mod tests {
         assert_eq!(db2.len().await?, 0);
 
         let db3_path = base_tmp.join("db3");
-        let db3 = builder(32).with_storage_path(&db3_path).build().await?;
+        let db3 = builder(32)
+            .with_storage_path(&db3_path)
+            .with_encryption_passphrase("test-passphrase-3")
+            .build()
+            .await?;
         assert_eq!(db3.len().await?, 0);
 
         let _ = std::fs::remove_dir_all(&base_tmp);

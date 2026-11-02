@@ -45,8 +45,17 @@ use std::io;
 /// fehlschlägt (z. B. unzureichender virtueller Adressraum oder Berechtigungsfehler).
 ///
 /// # Safety
-/// Die Invariante wird hergestellt, da die Datei nur lesend eingebunden wird (`Mmap`, nicht `MmapMut`).
-/// Modifikationen im Adressraum sind typtechnisch unmöglich.
+///
+/// Das Einbinden einer Datei in den Adressraum (`mmap`) ist inhärent unsicher (UB-Risiko),
+/// da das Betriebssystem den Speicherbereich außerhalb der Kontrolle des Rust-Compilers verwaltet:
+/// - **Dateimodifikation:** Modifiziert ein anderer Prozess oder Thread die unterliegende Datei schreibend
+///   während der Lebensdauer des Mappings, kann dies zu undefiniertem Verhalten (UB / Data Races) führen.
+/// - **Dateikürzung (Truncation):** Wird die Datei gekürzt, während das Mapping aktiv ist, führt ein
+///   späterer Lesezugriff auf abgeschnittene Seiten zu einem Hardware-Signal (`SIGBUS` unter POSIX bzw.
+///   Access Violation unter Windows), das den Prozess unweigerlich abstürzen lässt.
+/// - **Vorbedingung des Aufrufers:** Der Aufrufer muss sicherstellen, dass die Datei während der gesamten
+///   Gültigkeitsdauer der zurückgegebenen [`memmap2::Mmap`]-Instanz weder von außen gekürzt noch
+///   inkonsistent modifiziert wird.
 ///
 /// # Beispiel
 /// ```no_run
@@ -55,13 +64,14 @@ use std::io;
 ///
 /// # fn run() -> std::io::Result<()> {
 /// let file = File::open("vector_index.bin")?;
-/// let mmap = mmap_readonly(&file)?;
+/// // SAFETY: Die Datei wird exklusiv gelesen und während des Zugriffs nicht gekürzt oder verändert.
+/// let mmap = unsafe { mmap_readonly(&file)? };
 /// println!("Dateigröße im Speicher: {} Bytes", mmap.len());
 /// # Ok(())
 /// # }
 /// ```
-pub fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
-    // SAFETY: `file` ist ein gültiger, geöffneter Read-Only-Dateideskriptor. Die Read-Only-Abbildung verhindert Data Races im Rust-Adressraum. Seitenfehler (Page Faults) werden transparent vom Betriebssystemkernel behandelt.
+pub unsafe fn mmap_readonly(file: &File) -> io::Result<memmap2::Mmap> {
+    // SAFETY: `file` referenziert eine geöffnete Datei. Der Aufrufer garantiert über den `# Safety`-Vertrag, dass die Datei nicht gekürzt oder nebenläufig mutiert wird. Das Mapping erfolgt strikt schreibgeschützt via `memmap2::Mmap::map`.
     unsafe { memmap2::Mmap::map(file) }
 }
 
@@ -85,7 +95,8 @@ mod tests {
             file.write_all(b"contextra mmap readonly test payload")?;
         }
         let file = File::open(&path)?;
-        let mmap = mmap_readonly(&file)?;
+        // SAFETY: Die Datei ist temporär und wird während des Tests von keinem anderen Prozess modifiziert oder gekürzt.
+        let mmap = unsafe { mmap_readonly(&file)? };
         assert_eq!(&mmap[..], b"contextra mmap readonly test payload");
         let _ = std::fs::remove_file(path);
         Ok(())
@@ -104,7 +115,8 @@ mod tests {
             File::create(&path)?;
         }
         let file = File::open(&path)?;
-        let mmap = mmap_readonly(&file)?;
+        // SAFETY: Leere Datei bleibt während des Mappings unverändert.
+        let mmap = unsafe { mmap_readonly(&file)? };
         assert!(mmap.is_empty());
         let _ = std::fs::remove_file(path);
         Ok(())
@@ -125,7 +137,8 @@ mod tests {
             file.write_all(&payload)?;
         }
         let file = File::open(&path)?;
-        let mmap = mmap_readonly(&file)?;
+        // SAFETY: 1-MiB-Testdatei wird während des Mappings von keinem Prozess mutiert.
+        let mmap = unsafe { mmap_readonly(&file)? };
         assert_eq!(mmap.len(), 1024 * 1024);
         assert_eq!(&mmap[..], &payload[..]);
         let _ = std::fs::remove_file(path);
@@ -146,7 +159,8 @@ mod tests {
             file.write_all(b"short payload")?;
         }
         let file = File::open(&path)?;
-        let mmap = mmap_readonly(&file)?;
+        // SAFETY: Testdatei wird während des Mappings nicht gekürzt.
+        let mmap = unsafe { mmap_readonly(&file)? };
         assert_eq!(mmap.get(..13), Some(&b"short payload"[..]));
         assert_eq!(mmap.get(13), None);
         let _ = std::fs::remove_file(path);
