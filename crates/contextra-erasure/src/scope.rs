@@ -1,0 +1,1 @@
+//! Scope-Verwaltung für Löschumfänge.
