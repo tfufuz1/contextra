@@ -300,14 +300,16 @@ struct CommittedWrites {
 
 impl CommittedWrites {
     fn tracked_count(&self) -> usize {
-        self.keys.len() + self.coarsened_prefix_count()
+        self.keys
+            .len()
+            .saturating_add(self.coarsened_prefix_count())
     }
 
     fn coarsened_prefix_count(&self) -> usize {
-        let mut count = 0;
+        let mut count: usize = 0;
         for bucket in self.seq_index.values() {
             if let SeqBucket::Coarsened { prefixes, .. } = bucket {
-                count += prefixes.len();
+                count = count.saturating_add(prefixes.len());
             }
         }
         count
@@ -330,14 +332,14 @@ impl CommittedWrites {
                 SeqBucket::Coarsened {
                     original_key_count, ..
                 } => {
-                    *original_key_count += 1;
+                    *original_key_count = original_key_count.saturating_add(1);
                 }
             },
         }
     }
 
     fn coarsen_oldest_buckets(&mut self) -> usize {
-        let mut coarsened_count = 0;
+        let mut coarsened_count: usize = 0;
         let seqs: Vec<u64> = self.seq_index.keys().copied().collect();
 
         for seq in seqs {
@@ -358,7 +360,7 @@ impl CommittedWrites {
                         original_key_count: original_keys.len(),
                     },
                 );
-                coarsened_count += 1;
+                coarsened_count = coarsened_count.saturating_add(1);
             }
         }
 
@@ -371,7 +373,7 @@ impl CommittedWrites {
         }
 
         let seqs: Vec<u64> = self.seq_index.keys().copied().collect();
-        let mut merged_count = 0;
+        let mut merged_count: usize = 0;
 
         for chunk in seqs.chunks(2) {
             if chunk.len() == 2 {
@@ -380,7 +382,7 @@ impl CommittedWrites {
                         (self.seq_index.remove(&s1), self.seq_index.remove(&s2))
                     {
                         let mut prefixes = Vec::new();
-                        let mut total_keys = 0;
+                        let mut total_keys: usize = 0;
 
                         for (b, seq) in [(b1, s1), (b2, s2)] {
                             match b {
@@ -390,14 +392,14 @@ impl CommittedWrites {
                                             self.keys.remove(k);
                                         }
                                     }
-                                    total_keys += keys.len();
+                                    total_keys = total_keys.saturating_add(keys.len());
                                     prefixes.extend(coarsen_keys_to_prefixes(&keys, 2));
                                 }
                                 SeqBucket::Coarsened {
                                     prefixes: p,
                                     original_key_count,
                                 } => {
-                                    total_keys += original_key_count;
+                                    total_keys = total_keys.saturating_add(original_key_count);
                                     prefixes.extend(p);
                                 }
                             }
@@ -411,7 +413,7 @@ impl CommittedWrites {
                                 original_key_count: total_keys,
                             },
                         );
-                        merged_count += 1;
+                        merged_count = merged_count.saturating_add(1);
                     }
                 }
             }
@@ -422,7 +424,7 @@ impl CommittedWrites {
 
     fn remove_from_seq(&mut self, first_seq: u64) -> usize {
         let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;
-        let mut removed = 0;
+        let mut removed: usize = 0;
         let mut seqs_to_remove = Vec::new();
 
         for (&seq, bucket) in self.seq_index.range(first_seq..) {
@@ -445,14 +447,14 @@ impl CommittedWrites {
                             } else {
                                 self.keys.remove(key);
                             }
-                            removed += 1;
+                            removed = removed.saturating_add(1);
                         }
                     }
                 }
                 SeqBucket::Coarsened {
                     original_key_count, ..
                 } => {
-                    removed += *original_key_count;
+                    removed = removed.saturating_add(*original_key_count);
                 }
             }
         }
@@ -466,7 +468,7 @@ impl CommittedWrites {
 
     fn prune_through(&mut self, bound_seq: u64) -> usize {
         let bound_seq = bound_seq & !crate::types::TOMBSTONE_BIT;
-        let mut removed = 0;
+        let mut removed: usize = 0;
         let mut seqs_to_remove = Vec::new();
 
         for (&seq, bucket) in self.seq_index.range(..=bound_seq) {
@@ -475,14 +477,14 @@ impl CommittedWrites {
                 SeqBucket::Exact(keys) => {
                     for key in keys {
                         if self.keys.get(key) == Some(&seq) && self.keys.remove(key).is_some() {
-                            removed += 1;
+                            removed = removed.saturating_add(1);
                         }
                     }
                 }
                 SeqBucket::Coarsened {
                     original_key_count, ..
                 } => {
-                    removed += *original_key_count;
+                    removed = removed.saturating_add(*original_key_count);
                 }
             }
         }
@@ -641,7 +643,7 @@ impl SequenceLogSsiValidator {
     ///
     /// Vertrag V-MVCC:
     /// - `bound == None`: Es gibt nichts zu prunen -> liefert `Ok(())`.
-    /// - `bound == Some(seq)`: Prüft auf ungültige Sequenzen (Tombstone-Bit gesetzt oder Sentinel `u64::MAX`).
+    /// - `bound == Some(seq)`: Prüft auf ungültige Sequenzen (Tombstone-Bit gesetzt oder unzulässige Maximalwerte).
     ///   Trifft dies zu, wird fail-closed `Err(MvccError::InvalidSequence(seq))` zurückgegeben.
     /// - `pruned_through` steigt monoton und überschreitet niemals die höchste committete Sequenznummer.
     pub fn prune_through_checked(&self, bound: Option<u64>) -> std::result::Result<(), MvccError> {
@@ -673,7 +675,7 @@ impl SequenceLogSsiValidator {
     /// Aktualisiert den atomaren `pruned_through`-Wasserstand.
     ///
     /// ### V-MVCC Vertrag & D-C02 Bugfix:
-    /// Veraltete Hülle um [`prune_through_checked`]. Ignoriert Sentinel-Werte (`u64::MAX`)
+    /// Veraltete Hülle um [`prune_through_checked`]. Ignoriert unzulässige Maximalwerte (`u64::MAX`)
     /// und gesetzte Tombstone-Bits sicher, anstatt sie dauerhaft in `pruned_through` zu speichern.
     #[doc(hidden)]
     #[deprecated(
@@ -719,11 +721,11 @@ impl SequenceLogSsiValidator {
         let initial_len = writes.len();
         let reached_threshold = initial_len >= threshold;
 
-        let mut rounds = 0;
+        let mut rounds: usize = 0;
         while writes.len() >= threshold && rounds < 10 {
             let coarsened = writes.coarsen_oldest_buckets();
             let merged = writes.merge_adjacent_buckets();
-            rounds += 1;
+            rounds = rounds.saturating_add(1);
             if coarsened == 0 && merged == 0 {
                 break;
             }

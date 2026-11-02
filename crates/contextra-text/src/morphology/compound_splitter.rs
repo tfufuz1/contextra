@@ -3,7 +3,6 @@
 use super::stopwords::normalize_umlauts;
 use super::trie::Trie;
 use crate::domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
-use std::collections::HashSet;
 
 // ANCHOR[contextra-text:MORPH-016]
 /// KMU-Fachvokabular und allgemeiner deutscher Wortschatz.
@@ -75,10 +74,13 @@ impl GermanCompoundSplitter {
 
     // ANCHOR[contextra-text:MORPH-021]
     /// Erzeugt einen Zerleger mit benutzerdefiniertem Wörterbuch.
-    pub fn with_dictionary(min_len: usize, custom_words: HashSet<String>) -> Self {
+    pub fn with_dictionary(
+        min_len: usize,
+        custom_words: impl IntoIterator<Item = impl AsRef<str>>,
+    ) -> Self {
         let mut trie = Trie::new();
         for word in custom_words {
-            let norm = normalize_umlauts(&word);
+            let norm = normalize_umlauts(word.as_ref());
             if norm.len() >= 2 {
                 trie.insert(&norm);
             }
@@ -204,18 +206,20 @@ impl MorphologicalTokenizer for GermanCompoundSplitter {
 
         let n = token.len();
         let mut dp: Vec<Option<PathNode>> = vec![None; n + 1];
-        dp[0] = Some(PathNode {
-            prev: 0,
-            segment_count: 0,
-            min_segment_len: usize::MAX,
-        });
+        if let Some(slot) = dp.first_mut() {
+            *slot = Some(PathNode {
+                prev: 0,
+                segment_count: 0,
+                min_segment_len: usize::MAX,
+            });
+        }
 
         for i in 0..n {
             if !token.is_char_boundary(i) {
                 continue;
             }
 
-            let current_node = match &dp[i] {
+            let current_node = match dp.get(i).and_then(|opt| opt.as_ref()) {
                 Some(node) => node.clone(),
                 None => continue,
             };
@@ -229,7 +233,10 @@ impl MorphologicalTokenizer for GermanCompoundSplitter {
                     continue;
                 }
 
-                let sub = &token[i..j];
+                let sub = match token.get(i..j) {
+                    Some(s) => s,
+                    None => continue,
+                };
                 let is_last = j == n;
 
                 if self.is_valid_component(sub, is_last) {
@@ -243,7 +250,7 @@ impl MorphologicalTokenizer for GermanCompoundSplitter {
                         min_segment_len: new_min_len,
                     };
 
-                    let update = match &dp[j] {
+                    let update = match dp.get(j).and_then(|opt| opt.as_ref()) {
                         None => true,
                         Some(existing) => {
                             if candidate.segment_count < existing.segment_count {
@@ -257,22 +264,28 @@ impl MorphologicalTokenizer for GermanCompoundSplitter {
                     };
 
                     if update {
-                        dp[j] = Some(candidate);
+                        if let Some(slot) = dp.get_mut(j) {
+                            *slot = Some(candidate);
+                        }
                     }
                 }
             }
         }
 
         // Backtrack optimal path if compound decomposition (>= 2 segments) was found
-        if let Some(ref target_node) = dp[n] {
+        if let Some(target_node) = dp.get(n).and_then(|opt| opt.as_ref()) {
             if target_node.segment_count >= 2 {
                 let mut path = Vec::with_capacity(target_node.segment_count);
                 let mut curr = n;
                 while curr > 0 {
-                    if let Some(ref node) = dp[curr] {
+                    if let Some(node) = dp.get(curr).and_then(|opt| opt.as_ref()) {
                         let prev = node.prev;
                         if token.is_char_boundary(prev) && token.is_char_boundary(curr) {
-                            path.push(&token[prev..curr]);
+                            if let Some(sub) = token.get(prev..curr) {
+                                path.push(sub);
+                            } else {
+                                break;
+                            }
                         } else {
                             break;
                         }

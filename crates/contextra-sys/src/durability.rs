@@ -16,7 +16,7 @@
 //! - **Verwendung im System:** Wird von `contextra-store` (Write-Ahead-Log WAL und LSM-SSTables)
 //!   sowie `contextra-durable-fs` genutzt.
 //! - **Persistenz & Fehlergarantie:** Fehler bei `fsync`-Aufrufen werden niemals verschluckt, sondern
-//!   strikt als [`std::io::Result`] bzw. [`SyncFailure`] an den Aufrufer propagiert (Fail-Closed-Prinzip).
+s//!   strikt als [`std::io::Result`] bzw. [`SyncFailure`] an den Aufrufer propagiert (Fail-Closed-Prinzip).
 //!
 //! ## Plattformunterschiede
 //! - **Linux:** Nutzt `fdatasync` (für Daten) oder `fsync` (für alle Metadaten).
@@ -24,6 +24,10 @@
 //!   Daher wird zwingend `fcntl(fd, F_FULLFSYNC, 0)` verwendet (SY-06).
 //! - **Signalbehandlung:** Aufrufe werden bei Unterbrechung durch Unix-Signale (`EINTR`) automatisch wiederholt.
 
+#[path = "error.rs"]
+mod error;
+
+pub use error::SyncFailure;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Result, Write};
 use std::os::unix::io::AsRawFd;
@@ -55,6 +59,7 @@ pub enum FlushKind {
 ///    - **Anderes POSIX:** Ruft `libc::fsync` auf.
 ///    - **Nicht unterstützte Plattform:** Gibt sofort einen `Unsupported`-Fehler zurück (Fail-Closed).
 /// 3. Fängt den Fehler `EINTR` (Interrupted system call) ab und wiederholt die Operation automatisch.
+/// 4. Gibt sonstige Fehler unverändert nach oben zurück (SY-05).
 ///
 /// # Vorbedingungen
 /// - `file` muss eine gültige, geöffnete Datei referenzieren.
@@ -199,7 +204,10 @@ pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> Result<()> {
                 ));
             }
             Ok(n) => {
-                buf = buf.get(n..).unwrap_or(&[]);
+                buf = match buf.get(n..) {
+                    Some(b) => b,
+                    None => &[],
+                };
             }
             Err(ref e) if e.kind() == ErrorKind::Interrupted => {
                 continue;

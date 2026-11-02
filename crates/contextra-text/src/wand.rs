@@ -17,7 +17,7 @@ use crate::bm25::score_term;
 use crate::posting_list::{DocIdRaw, Posting, PostingList, BLOCK_SIZE};
 use contextra_ports::StorageEngine;
 use contextra_types::{ContextraError, DocId, Result, MAX_SEARCH_K};
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BTreeMap, BinaryHeap};
 use std::sync::Arc;
 
 // ANCHOR[contextra-text:WAND-001]
@@ -213,7 +213,7 @@ impl TermCursor {
         while block_idx < blocks.len()
             && blocks
                 .get(block_idx)
-                .map_or(false, |b| b.max_doc_id < target_doc_id)
+                .is_some_and(|b| b.max_doc_id < target_doc_id)
         {
             block_idx += 1;
         }
@@ -287,8 +287,8 @@ pub async fn block_max_wand_search<S: StorageEngine>(
     let is_latest = max_seq.is_none() || max_seq == Some(u64::MAX);
     let total_docs_u32 = u32::try_from(total_docs).unwrap_or(u32::MAX).max(1);
 
-    let mut doc_len_cache: HashMap<DocId, Option<u32>> = HashMap::new();
-    let mut tbs_cache: HashMap<Vec<u8>, bool> = HashMap::new();
+    let mut doc_len_cache: BTreeMap<DocId, Option<u32>> = BTreeMap::new();
+    let mut tbs_cache: BTreeMap<Vec<u8>, bool> = BTreeMap::new();
 
     // Prefetch active tombstones globally at snapshot `seq` in a single prefix scan
     let tbs_global_prefix = tombstone_key_helper(DocId::new(0), "")
@@ -621,19 +621,19 @@ mod tests {
     use contextra_ports::BoxFuture;
     use parking_lot::RwLock;
 
-    type MockStoreMap = RwLock<HashMap<Vec<u8>, Vec<(Vec<u8>, u64)>>>;
+    type MockStoreMap = RwLock<BTreeMap<Vec<u8>, Vec<(Vec<u8>, u64)>>>;
 
     struct MockStorage {
         store: MockStoreMap,
-        staged: RwLock<HashMap<contextra_types::TxId, Vec<Vec<u8>>>>,
+        staged: RwLock<BTreeMap<contextra_types::TxId, Vec<Vec<u8>>>>,
         next_seq: std::sync::atomic::AtomicU64,
     }
 
     impl MockStorage {
         fn new() -> Self {
             Self {
-                store: MockStoreMap::new(HashMap::new()),
-                staged: RwLock::new(HashMap::new()),
+                store: MockStoreMap::new(BTreeMap::new()),
+                staged: RwLock::new(BTreeMap::new()),
                 next_seq: std::sync::atomic::AtomicU64::new(1),
             }
         }

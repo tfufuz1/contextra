@@ -15,7 +15,7 @@ pub use legal_de::LegalDomainVocabulary;
 pub use medical_de::MedicalDomainVocabulary;
 
 use crate::morphology::normalize_umlauts;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 // ANCHOR[contextra-text:DOM-001]
 /// Trait für domänenspezifische Vokabularpakete (z. B. Recht und Medizin).
@@ -71,7 +71,7 @@ pub(crate) fn parse_domain_resource(raw: &'static str) -> ParsedVocabulary {
     protected_vec.sort_unstable();
     protected_vec.dedup();
 
-    let protected_set: HashSet<&'static str> = protected_vec.iter().copied().collect();
+    let protected_set: BTreeSet<&'static str> = protected_vec.iter().copied().collect();
     stems_vec.retain(|stem| !protected_set.contains(stem));
 
     let static_stems: &'static [&'static str] = Box::leak(stems_vec.into_boxed_slice());
