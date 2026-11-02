@@ -34,7 +34,12 @@
 // NICHT-OFFENSICHTLICH: Orphan Reaper & min_read_snapshot führen getrennte Locks pro Shard 0..N-1 durch; keinesfalls verschachtelt.
 // SIEHE AUCH: crates/contextra-mvcc/src/ssi.rs
 
-// INVARIANT: Sharded Transaction Buffer für lock-freie Concurrency.
+//! ## Lock-Hierarchie und Concurrency-Garantien (MV-08)
+//! - **Keine Sperren über `.await`-Grenzen**: Operationen im `TxBuffer` sind strikt synchron
+//!   und halten niemals Sperren über asynchrone Ausführungsunterbrechungen hinweg.
+//! - **Globale Lockreihenfolge**: Dokumentlock → Commit-Barriere → Purge-Barrier → Journal.
+//!   Innerhalb des MVCC/TxBuffer-Bereichs werden Locks ausschließlich auf einzelnen Shards
+//!   gehalten (Shard-Lock nie verschachtelt).
 
 use crate::error::{ContextraError, Result};
 use crate::ssi::ReadSet;
@@ -668,7 +673,7 @@ impl<T: Clone> TxBuffer<T> {
     /// 5. `thread::yield_now()` nach jedem Shard ausführen, um parallelen Schreibern Vorrang zu gewähren.
     pub fn reap_orphans_bounded_at(&self, max: usize, now_nanos: u64) -> Vec<TxId> {
         let mut expired = Vec::new();
-        let timeout_nanos = u64::try_from(self.tx_timeout.as_nanos()).unwrap_or(u64::MAX);
+        // Sättigender Vergleich via Duration::from_nanos ohne Sentinel-Unwrap (MV-07)
 
         for shard_lock in &self.shards {
             if expired.len() >= max {
@@ -678,7 +683,8 @@ impl<T: Clone> TxBuffer<T> {
                 let mut shard_expired = Vec::new();
                 shard.ops.retain(|tx, (_, created_nanos)| {
                     if expired.len() + shard_expired.len() < max
-                        && now_nanos.saturating_sub(*created_nanos) > timeout_nanos
+                        && Duration::from_nanos(now_nanos.saturating_sub(*created_nanos))
+                            > self.tx_timeout
                     {
                         shard_expired.push(*tx);
                         false
