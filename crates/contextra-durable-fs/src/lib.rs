@@ -7,9 +7,9 @@
 //! Zweck: Bereitstellung von betriebssystemübergreifenden Hilfsfunktionen für atomares Ersetzen,
 //! dauerhaftes Löschen und synchrone Verzeichnis- und Datei-Flushes (`fsync`/`fdatasync`).
 //!
-//! Ring-Zugehörigkeit: Ring 0 (Basisinfrastruktur / OS-Abstraktion; in `Cargo.toml` als `ring = "0"` annotiert).
+//! Ring-Zugehörigkeit: Ring 1 (Dateisystem-Durability; in `Cargo.toml` als `ring = "1"` annotiert).
 //! Wird eingebunden von: Derzeit keinen anderen Crates direkt (Stand SPEC 4.1 Ist-Zustand).
-//! Abhängigkeiten: [`contextra-sys`] (Plattform-Durability-Primitive und Dateisystem-Klassifikation).
+//! Abhängigkeiten: [`contextra-ports`], [`contextra-sys`] (Plattform-Durability-Primitive und Dateisystem-Klassifikation).
 //!
 //! Wichtigste bereitgestellte Komponenten:
 //! - [`sync_dir`]: Flusht Verzeichnis-Metadaten auf die physische Festplatte.
@@ -19,6 +19,7 @@
 //! - [`DurableHandle`]: Kapselt [`File`] und vergiftet sich dauerhaft bei I/O- oder `fsync`-Fehlern (`INV-FSYNC-1`).
 //! - [`DirLock`]: Verzeichnis-Sperre mit Dateisystem-Validierung (verbietet Locking auf Netzlaufwerken / FUSE).
 //! - [`FaultInjector`]: Trait für deterministische Fehlerinjektion in Persistenzpfaden.
+//! - [`RealVfs`]: Produktions-Implementierung des kanonischen [`contextra_ports::vfs::Vfs`]-Traits.
 //!
 //! ## Invarianten
 //!
@@ -49,7 +50,7 @@ pub use journal::PendingDeleteJournal;
 pub use scrub::{
     scrub_if_safe, scrub_if_safe_with_injector, ScrubOutcome, ScrubPolicy, ScrubRefusal,
 };
-pub use vfs::{RealFs, RealFsFile, Vfs, VfsFile, VfsOpenOptions};
+pub use vfs::{probe_platform_durability, RealFs, RealVfs, Vfs};
 
 use contextra_sys::{flush_dir, flush_file, fs_class, rename_durable, FsClass};
 use std::fs::{File, OpenOptions};
@@ -489,7 +490,8 @@ pub fn scrub_and_remove_with_injector<F: FaultInjector>(
                 .unwrap_or(zeros.len())
                 .min(zeros.len());
             injector.on_write(Some(path), chunk_size)?;
-            file.write_all(&zeros[..chunk_size])?;
+            let slice = zeros.get(..chunk_size).unwrap_or(&zeros);
+            file.write_all(slice)?;
             remaining -= chunk_size as u64;
         }
 

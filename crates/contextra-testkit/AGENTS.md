@@ -27,18 +27,14 @@
 | `CanaryFactory` | Generiert hochentropische Canary-Needles mit protokolliertem Seed für Löschmessungen. |
 | `MemVfs`, `MemLedger` | Reine RAM-Implementierungen von `Vfs` und `LedgerSink`. |
 
-> [!IMPORTANT]
-> **Bereinigung veralteter Test-Mocks (SPEC §8.15):**
-> Das historische `in_memory_graph` wird vollständig entfernt.
-
 ## 4. Kritische Invarianten
 1. **Deterministische Reproduzierbarkeit:** Jeder Testfall mit `FaultVfs` oder `ManualClock` ist über einen Seed exakt reproduzierbar.
 2. **Keine Produktionsverunreinigung:** Kein Typ aus `contextra-testkit` darf im Produktions-Release kompiliert werden.
 
 ## 5. Crate-Arbeitspakete zum SOLL-Zustand (PLAN.md)
 
-- **[ ] WP-1.2: Veraltete Test-Mocks entfernen**
-  - Rückbau von `in_memory_graph` und Graph-Fixtures.
+- **[x] WP-1.2: Veraltete Test-Mocks entfernen**
+  - Rückbau von `in_memory_graph` und Graph-Fixtures vollständig abgeschlossen (V-RUECKBAU).
 - **[ ] WP-2.6 & WP-2.10: `FaultVfs` erweitern für Crash-Matrix**
   - Implementierung feingranularer Fehlerinjektionen (Torn-Writes, `sync`-Abbrüche) für die LSM-Crash-Tests.
 - **[ ] WP-5.1: `LeakyLayer` und `CanaryFactory` bereitstellen**

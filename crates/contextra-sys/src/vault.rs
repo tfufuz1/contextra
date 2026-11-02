@@ -79,7 +79,8 @@ impl LockedRegions {
         let ptr = slice.as_ptr();
         let len = slice.len();
 
-        let locked = mem_lock_with_policy(ptr, len, policy)?;
+        // SAFETY: `slice` ist ein gültiger Byte-Slice; `ptr` und `len` beschreiben exakt diese valide Allokation.
+        let locked = unsafe { mem_lock_with_policy(ptr, len, policy)? };
         if locked {
             self.regions.push((ptr as usize, len));
         }
@@ -99,7 +100,10 @@ impl LockedRegions {
     /// Iteriert über jedes Byte des Slices und schreibt atomar/flüchtig eine Null hinein.
     pub fn zeroize_slice(slice: &mut [u8]) {
         for byte in slice.iter_mut() {
-            // SAFETY: `byte` ist eine gültige, ausgerichtete mutable Referenz auf ein `u8` im übergebenen Slice. Volatile Schreibzugriffe verhindern das Wegoptimieren durch den Compiler.
+            // SAFETY: `byte` ist eine ausgerichtete, gültige und ungeteilt veränderbare Referenz auf ein Byte
+            // im übergebenen Slice `slice`. Das Schreiben des Nullwerts erfolgt mittels `std::ptr::write_volatile`,
+            // um Dead-Store-Elimination durch optimierende Compiler zu unterbinden. Es entstehen keine Datenwettläufe,
+            // da Rusts Typsystem die Exklusivität von `&mut [u8]` garantiert.
             unsafe {
                 std::ptr::write_volatile(byte, 0);
             }
@@ -110,7 +114,10 @@ impl LockedRegions {
     /// Entsperrt alle registrierten Speicherregionen und leert die interne Nachverfolgungsliste.
     pub fn unlock_all(&mut self) {
         for (addr, len) in self.regions.drain(..) {
-            mem_unlock(addr, len);
+            // SAFETY: `addr` und `len` stammen aus zuvor über `mem_lock_with_policy` erfolgreich registrierten Regionen dieser Instanz.
+            unsafe {
+                mem_unlock(addr, len);
+            }
         }
     }
 

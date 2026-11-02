@@ -19,6 +19,7 @@ async fn tenant_a_cannot_read_tenant_b() -> Result<(), ContextraError> {
     let config = ContextraConfig {
         dimension: 4,
         consolidation_enabled: false,
+        encryption_passphrase: Some("tenant-isolation-passphrase".to_string()),
         ..Default::default()
     };
 
@@ -137,6 +138,7 @@ async fn startup_ssi_tracking_check() -> Result<(), ContextraError> {
     let config = ContextraConfig {
         dimension: 4,
         consolidation_enabled: false,
+        encryption_passphrase: Some("tenant-isolation-passphrase".to_string()),
         ..Default::default()
     };
 

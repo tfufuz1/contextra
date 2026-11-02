@@ -12,16 +12,22 @@
 //! - Crash-/Reopen-Persistenz geschriebener Datensätze.
 
 use contextra::performance_profile::PerformanceProfile;
-use contextra::{builder, open, open_with_config, ContextraConfig, ContextraError};
+use contextra::{builder, open_with_config, ContextraConfig, ContextraError};
 use contextra_store::lsm::DurabilityMode;
 use tempfile::TempDir;
+
+const TEST_PASSPHRASE: &str = "wiring-matrix-secret-passphrase";
 
 // ANCHOR[contextra:TEST-WIR-001]
 // Prüft, dass gepinnte MVCC-Snapshots auch nach einem Memtable-Flush auf SSTable konsistent bleiben.
 #[tokio::test]
 async fn flush_preserves_pinned_snapshot() -> Result<(), Box<dyn std::error::Error>> {
     let tmp = TempDir::new()?;
-    let db = builder(16).with_storage_path(tmp.path()).build().await?;
+    let db = builder(16)
+        .with_storage_path(tmp.path())
+        .with_encryption_passphrase(TEST_PASSPHRASE)
+        .build()
+        .await?;
 
     let coll = db.collection("default").await?;
 
@@ -59,10 +65,18 @@ async fn flush_preserves_pinned_snapshot() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 async fn second_open_same_directory_rejected() -> Result<(), Box<dyn std::error::Error>> {
     let tmp = TempDir::new()?;
-    let _db1 = open(tmp.path()).await?;
+    let _db1 = builder(16)
+        .with_storage_path(tmp.path())
+        .with_encryption_passphrase(TEST_PASSPHRASE)
+        .build()
+        .await?;
 
     // Second open on the same directory in the same process must be rejected with lock failure
-    let db2_res = open(tmp.path()).await;
+    let db2_res = builder(16)
+        .with_storage_path(tmp.path())
+        .with_encryption_passphrase(TEST_PASSPHRASE)
+        .build()
+        .await;
     assert!(
         db2_res.is_err(),
         "Second open on locked directory must be rejected"
@@ -80,6 +94,7 @@ async fn open_without_gate_never_grants_sovereign() -> Result<(), Box<dyn std::e
     // Requesting Compliance performance profile (which requires Sovereign ring) without attaching a valid signed license gate must fail
     let res = builder(16)
         .with_storage_path(tmp.path())
+        .with_encryption_passphrase(TEST_PASSPHRASE)
         .with_performance_profile(PerformanceProfile::Compliance)
         .build()
         .await;
@@ -108,6 +123,7 @@ async fn profile_durability_reaches_lsm_config() -> Result<(), Box<dyn std::erro
     // BareMetal performance profile sets MemoryOnly durability mode
     let db = builder(16)
         .with_storage_path(tmp.path())
+        .with_encryption_passphrase(TEST_PASSPHRASE)
         .with_performance_profile(PerformanceProfile::BareMetal)
         .build()
         .await?;
@@ -129,7 +145,11 @@ async fn confirmed_commit_survives_drop_reopen() -> Result<(), Box<dyn std::erro
     let tmp = TempDir::new()?;
 
     {
-        let db = builder(16).with_storage_path(tmp.path()).build().await?;
+        let db = builder(16)
+            .with_storage_path(tmp.path())
+            .with_encryption_passphrase(TEST_PASSPHRASE)
+            .build()
+            .await?;
         let coll = db.collection("persistent").await?;
         coll.insert("key1", &[0.5; 16], None).await?;
         // Explicitly close db instance to release DirLock
@@ -139,6 +159,7 @@ async fn confirmed_commit_survives_drop_reopen() -> Result<(), Box<dyn std::erro
     // Reopen with matching dimension config (16) and verify data persisted across instance lifecycle
     let config = ContextraConfig {
         dimension: 16,
+        encryption_passphrase: Some(TEST_PASSPHRASE.to_string()),
         ..Default::default()
     };
     let db_reopened = open_with_config(tmp.path(), config).await?;

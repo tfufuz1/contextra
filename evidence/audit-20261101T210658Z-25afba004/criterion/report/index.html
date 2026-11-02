@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Index - Criterion.rs</title>
+    <style type="text/css">
+        body {
+            font: 14px Helvetica Neue;
+            text-rendering: optimizelegibility;
+        }
+
+        .body {
+            width: 960px;
+            margin: auto;
+        }
+
+        a:link {
+            color: #1F78B4;
+            text-decoration: none;
+        }
+
+        h2 {
+            font-size: 36px;
+            font-weight: 300;
+        }
+
+        h3 {
+            font-size: 24px;
+            font-weight: 300;
+        }
+
+        #footer {
+            height: 40px;
+            background: #888;
+            color: white;
+            font-size: larger;
+            font-weight: 300;
+        }
+
+        #footer a {
+            color: white;
+            text-decoration: underline;
+        }
+
+        #footer p {
+            text-align: center
+        }
+
+        table {
+            border-collapse: collapse;
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid #888;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="body">
+        <h2>Criterion.rs Benchmark Index</h2>
+        See individual benchmark pages below for more details.
+        <ul>
+            <li><a href="../BlockCache_MultiThreaded_HotSet/report/index.html">BlockCache_MultiThreaded_HotSet</a></li>
+            
+            <ul>
+                <li><a href="../BlockCache_MultiThreaded_HotSet/readers_16_threads/report/index.html">readers_16_threads</a></li>
+                <li><a href="../BlockCache_MultiThreaded_HotSet/readers_32_threads/report/index.html">readers_32_threads</a></li>
+                <li><a href="../BlockCache_MultiThreaded_HotSet/readers_8_threads/report/index.html">readers_8_threads</a></li>
+            </ul>
+            <li><a href="../Distances/report/index.html">Distances</a></li>
+            
+            <ul>
+                <li><a href="../Distances/cosine_scalar/report/index.html">cosine_scalar</a></li>
+                <li><a href="../Distances/cosine_simd/report/index.html">cosine_simd</a></li>
+                <li><a href="../Distances/dot_product_scalar/report/index.html">dot_product_scalar</a></li>
+                <li><a href="../Distances/dot_product_simd/report/index.html">dot_product_simd</a></li>
+                <li><a href="../Distances/euclidean_scalar/report/index.html">euclidean_scalar</a></li>
+                <li><a href="../Distances/euclidean_simd/report/index.html">euclidean_simd</a></li>
+            </ul>
+            <li><a href="../HNSW_Delete_Search/report/index.html">HNSW_Delete_Search</a></li>
+            
+            <ul>
+                <li><a href="../HNSW_Delete_Search/search_0_percent_deletes/report/index.html">search_0_percent_deletes</a></li>
+                <li><a href="../HNSW_Delete_Search/search_30_percent_deletes/report/index.html">search_30_percent_deletes</a></li>
+            </ul>
+            <li>HNSW_Insertion</li>
+            
+            <ul>
+                <li><a href="../HNSW_Insertion/insert_100_docs/report/index.html">insert_100_docs</a></li>
+            </ul>
+            <li><a href="../HNSW_Search/report/index.html">HNSW_Search</a></li>
+            
+            <ul>
+                <li><a href="../HNSW_Search/search_k10/report/index.html">search_k10</a></li>
+                <li><a href="../HNSW_Search/search_k50/report/index.html">search_k50</a></li>
+            </ul>
+            <li>LSM_Compaction_Extreme_Load</li>
+            
+            <ul>
+                <li><a href="../LSM_Compaction_Extreme_Load/50k_puts_large_values_under_compaction/report/index.html">50k_puts_large_values_under_compaction</a></li>
+            </ul>
+            <li><a href="../LSM_Concurrent_Commits/report/index.html">LSM_Concurrent_Commits</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../LSM_Concurrent_Commits/tps_writers/report/index.html">tps_writers</a></th>
+                        </tr>
+                        <tr>
+                            <th>1</th>
+                            <td><a href="../LSM_Concurrent_Commits/tps_writers/1/report/index.html">LSM_Concurrent_Commits/tps_writers/1</a></td>
+                        </tr>
+                        <tr>
+                            <th>4</th>
+                            <td><a href="../LSM_Concurrent_Commits/tps_writers/4/report/index.html">LSM_Concurrent_Commits/tps_writers/4</a></td>
+                        </tr>
+                        <tr>
+                            <th>16</th>
+                            <td><a href="../LSM_Concurrent_Commits/tps_writers/16/report/index.html">LSM_Concurrent_Commits/tps_writers/16</a></td>
+                        </tr>
+                        <tr>
+                            <th>32</th>
+                            <td><a href="../LSM_Concurrent_Commits/tps_writers/32/report/index.html">LSM_Concurrent_Commits/tps_writers/32</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../MemTable Concurrent Puts/report/index.html">MemTable Concurrent Puts</a></li>
+            
+            <ul>
+                <li><a href="../MemTable Concurrent Puts/new_full_key_blake3_sharding/report/index.html">new_full_key_blake3_sharding</a></li>
+                <li><a href="../MemTable Concurrent Puts/old_first_byte_sharding/report/index.html">old_first_byte_sharding</a></li>
+            </ul>
+            <li><a href="../SQ8/report/index.html">SQ8</a></li>
+            
+            <ul>
+                <li><a href="../SQ8/asymmetric_dist_cosine/report/index.html">asymmetric_dist_cosine</a></li>
+                <li><a href="../SQ8/dequantize/report/index.html">dequantize</a></li>
+                <li><a href="../SQ8/quantize/report/index.html">quantize</a></li>
+                <li><a href="../SQ8/symmetric_dist_cosine/report/index.html">symmetric_dist_cosine</a></li>
+            </ul>
+            <li><a href="../SSTable/report/index.html">SSTable</a></li>
+            
+            <ul>
+                <li><a href="../SSTable/get_existing/report/index.html">get_existing</a></li>
+                <li><a href="../SSTable/get_nonexistent/report/index.html">get_nonexistent</a></li>
+            </ul>
+            <li><a href="../WAL_Encryption/report/index.html">WAL_Encryption</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../WAL_Encryption/batch_preparation/report/index.html">batch_preparation</a></th>
+                        </tr>
+                        <tr>
+                            <th>8</th>
+                            <td><a href="../WAL_Encryption/batch_preparation/8/report/index.html">WAL_Encryption/batch_preparation/8</a></td>
+                        </tr>
+                        <tr>
+                            <th>32</th>
+                            <td><a href="../WAL_Encryption/batch_preparation/32/report/index.html">WAL_Encryption/batch_preparation/32</a></td>
+                        </tr>
+                        <tr>
+                            <th>128</th>
+                            <td><a href="../WAL_Encryption/batch_preparation/128/report/index.html">WAL_Encryption/batch_preparation/128</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../WAL_GroupCommit_Throughput/report/index.html">WAL_GroupCommit_Throughput</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/report/index.html">append_batch_concurrency</a></th>
+                        </tr>
+                        <tr>
+                            <th>window_0us_producers_1</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_0us_producers_1/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_0us_producers_1</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_0us_producers_128</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_0us_producers_128/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_0us_producers_128</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_0us_producers_32</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_0us_producers_32/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_0us_producers_32</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_0us_producers_8</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_0us_producers_8/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_0us_producers_8</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_100us_producers_1</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_100us_producers_1/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_100us_producers_1</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_100us_producers_128</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_100us_producers_128/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_100us_producers_128</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_100us_producers_32</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_100us_producers_32/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_100us_producers_32</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_100us_producers_8</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_100us_producers_8/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_100us_producers_8</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_500us_producers_1</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_500us_producers_1/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_500us_producers_1</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_500us_producers_128</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_500us_producers_128/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_500us_producers_128</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_500us_producers_32</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_500us_producers_32/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_500us_producers_32</a></td>
+                        </tr>
+                        <tr>
+                            <th>window_500us_producers_8</th>
+                            <td><a href="../WAL_GroupCommit_Throughput/append_batch_concurrency/window_500us_producers_8/report/index.html">WAL_GroupCommit_Throughput/append_batch_concurrency/window_500us_producers_8</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../distance_nan_impact/report/index.html">distance_nan_impact</a></li>
+            
+            <ul>
+                <li><a href="../distance_nan_impact/compute_distance_no_nan_scan/report/index.html">compute_distance_no_nan_scan</a></li>
+                <li><a href="../distance_nan_impact/cosine_distance_direct/report/index.html">cosine_distance_direct</a></li>
+            </ul>
+            <li><a href="../mixed_workload/report/index.html">mixed_workload</a></li>
+            
+            <ul>
+                <li><a href="../mixed_workload/contextra_store_mixed_workload/report/index.html">contextra_store_mixed_workload</a></li>
+                <li><a href="../mixed_workload/redb_mixed_workload/report/index.html">redb_mixed_workload</a></li>
+            </ul>
+            <li><a href="../random_read/report/index.html">random_read</a></li>
+            
+            <ul>
+                <li><a href="../random_read/contextra_store_random_read/report/index.html">contextra_store_random_read</a></li>
+                <li><a href="../random_read/redb_random_read/report/index.html">redb_random_read</a></li>
+            </ul>
+            <li><a href="../range_scan/report/index.html">range_scan</a></li>
+            
+            <ul>
+                <li><a href="../range_scan/contextra_store_range_scan/report/index.html">contextra_store_range_scan</a></li>
+                <li><a href="../range_scan/redb_range_scan/report/index.html">redb_range_scan</a></li>
+            </ul>
+            <li><a href="../seq_log_entry_is_visible_o1/report/index.html">seq_log_entry_is_visible_o1</a></li>
+            <li><a href="../sequential_write/report/index.html">sequential_write</a></li>
+            
+            <ul>
+                <li><a href="../sequential_write/contextra_store_sequential_write/report/index.html">contextra_store_sequential_write</a></li>
+                <li><a href="../sequential_write/redb_sequential_write/report/index.html">redb_sequential_write</a></li>
+            </ul>
+            <li><a href="../simd_distances/report/index.html">simd_distances</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../simd_distances/cosine/report/index.html">cosine</a></th>
+                            <th><a href="../simd_distances/dot_product/report/index.html">dot_product</a></th>
+                            <th><a href="../simd_distances/euclidean/report/index.html">euclidean</a></th>
+                        </tr>
+                        <tr>
+                            <th><a href="../simd_distances/128/report/index.html">128</a></th>
+                            <td><a href="../simd_distances/cosine/128/report/index.html">simd_distances/cosine/128</a></td>
+                            <td><a href="../simd_distances/dot_product/128/report/index.html">simd_distances/dot_product/128</a></td>
+                            <td><a href="../simd_distances/euclidean/128/report/index.html">simd_distances/euclidean/128</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../simd_distances/512/report/index.html">512</a></th>
+                            <td><a href="../simd_distances/cosine/512/report/index.html">simd_distances/cosine/512</a></td>
+                            <td><a href="../simd_distances/dot_product/512/report/index.html">simd_distances/dot_product/512</a></td>
+                            <td><a href="../simd_distances/euclidean/512/report/index.html">simd_distances/euclidean/512</a></td>
+                        </tr>
+                        <tr>
+                            <th><a href="../simd_distances/1536/report/index.html">1536</a></th>
+                            <td><a href="../simd_distances/cosine/1536/report/index.html">simd_distances/cosine/1536</a></td>
+                            <td><a href="../simd_distances/dot_product/1536/report/index.html">simd_distances/dot_product/1536</a></td>
+                            <td><a href="../simd_distances/euclidean/1536/report/index.html">simd_distances/euclidean/1536</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../snapshot_registry_min_active/report/index.html">snapshot_registry_min_active</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../snapshot_registry_min_active/min_active_seqno/report/index.html">min_active_seqno</a></th>
+                        </tr>
+                        <tr>
+                            <th>10</th>
+                            <td><a href="../snapshot_registry_min_active/min_active_seqno/10/report/index.html">snapshot_registry_min_active/min_active_seqno/10</a></td>
+                        </tr>
+                        <tr>
+                            <th>1000</th>
+                            <td><a href="../snapshot_registry_min_active/min_active_seqno/1000/report/index.html">snapshot_registry_min_active/min_active_seqno/1000</a></td>
+                        </tr>
+                        <tr>
+                            <th>100000</th>
+                            <td><a href="../snapshot_registry_min_active/min_active_seqno/100000/report/index.html">snapshot_registry_min_active/min_active_seqno/100000</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+            <li><a href="../snapshot_registry_register_drop/report/index.html">snapshot_registry_register_drop</a></li>
+            
+            <ul>
+                <li>
+                    <table>
+                        <tr>
+                            <th></th>
+                            <th><a href="../snapshot_registry_register_drop/register_and_drop/report/index.html">register_and_drop</a></th>
+                        </tr>
+                        <tr>
+                            <th>10</th>
+                            <td><a href="../snapshot_registry_register_drop/register_and_drop/10/report/index.html">snapshot_registry_register_drop/register_and_drop/10</a></td>
+                        </tr>
+                        <tr>
+                            <th>1000</th>
+                            <td><a href="../snapshot_registry_register_drop/register_and_drop/1000/report/index.html">snapshot_registry_register_drop/register_and_drop/1000</a></td>
+                        </tr>
+                        <tr>
+                            <th>100000</th>
+                            <td><a href="../snapshot_registry_register_drop/register_and_drop/100000/report/index.html">snapshot_registry_register_drop/register_and_drop/100000</a></td>
+                        </tr>
+                    </table>
+                </li>
+            </ul>
+        </ul>
+    </div>
+    <div id="footer">
+        <p>This report was generated by
+            <a href="https://github.com/bheisler/criterion.rs">Criterion.rs</a>, a statistics-driven benchmarking
+            library in Rust.</p>
+    </div>
+</body>
+</html>

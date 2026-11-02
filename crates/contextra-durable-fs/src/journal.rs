@@ -97,7 +97,7 @@ impl PendingDeleteJournal {
     ///
     /// Ablauf:
     /// 1. Pfad an die interne Liste anhängen.
-    /// 2. Journaldatei via [`PendingDeleteJournal::flush`] atomar auf Festplatte synchronisieren.
+    /// 2. Journaldatei via internem Flush atomar auf Festplatte synchronisieren.
     ///
     /// Fehlerfälle:
     /// - Liefert `Err(std::io::Error)` bei Schreib- oder `fsync`-Fehlern.
@@ -146,7 +146,9 @@ impl PendingDeleteJournal {
                 }
                 Err(err) => {
                     // NOTE: Fehlgeschlagenen Eintrag und alle nachfolgenden unberührten Einträge im Journal behalten.
-                    remaining.extend(self.entries[idx..].iter().cloned());
+                    if let Some(tail) = self.entries.get(idx..) {
+                        remaining.extend(tail.iter().cloned());
+                    }
                     self.entries = remaining;
                     if let Err(flush_err) = self.flush() {
                         self.health.record_event(HealthEvent::FsyncFailure);
