@@ -32,7 +32,7 @@ Nicht normativ. Maßgeblich sind die Arbeitspakete in [`docs/SPEC.md`](../../../
 | WP-4.1 | `erasure`: Tresor (`FileVault`, F.3), `RecordSealer`/`FileKeyring`, Dateischlüssel-Lebenszyklus | G-D | WP-3.4 | bei Aufnahme | todo | |
 | WP-4.2 | `erasure`: Gate-Log, Gate-Gruppen-Commit, Saga, Journal, Recovery, Kompaktions-Kooperation | G-D | WP-4.1 | bei Aufnahme | todo | |
 | WP-4.3 | Messung: `Scanner<Armed>`, `LayerWitness`, Bericht, Ledger und Restore-Guard | G-D | WP-4.2 | bei Aufnahme | todo | |
-| WP-4.4 | `lab` und `ctx-verify` (unabhängige Parser nach Anhang F), Mutationstests | G-D | WP-4.3 | bei Aufnahme | todo | Die Crates `contextra-lab` und `ctx-verify` fehlen am HEAD (F-04). |
+| WP-4.4 | `lab` und `ctx-verify` (unabhängige Parser nach Anhang F), Mutationstests | G-D | WP-4.3 | vorhanden | in_progress | Phase A-D: contextra-lab als unabhängige Prüfinstanz aufgebaut. |
 | WP-5.1 | `engine`: `TenantScopedStorage`, Collections, `DocRef`-API, Suchstrom mit Nachladen, Startsequenz 14.1 | G-D | WP-4.4 | bei Aufnahme | todo | |
 | WP-5.2 | Plattformprobe, Prozesshärtung, `health()`/`Metrics`, Plattenreserve | G-F | WP-3.2 | bei Aufnahme | todo | |
 | WP-6.1 | Benchmark-Harness `ctx-bench`, Referenzhardware, erste Basislinien aller BM | G-D | WP-4.4 | bei Aufnahme | todo | Ohne Basislinie kein Gate (P9). |

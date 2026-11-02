@@ -404,6 +404,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "contextra-lab"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm-siv",
+ "argon2",
+ "blake3",
+ "ed25519-dalek",
+ "hkdf",
+ "hmac",
+ "rand 0.8.8",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "contextra-mvcc"
 version = "0.1.0"
 dependencies = [
@@ -417,6 +433,7 @@ dependencies = [
  "parking_lot",
  "proptest",
  "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",
@@ -522,6 +539,7 @@ dependencies = [
  "bytes",
  "contextra-ports",
  "contextra-types",
+ "criterion",
  "parking_lot",
  "tempfile",
  "tokio",

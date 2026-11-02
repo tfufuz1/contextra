@@ -1,0 +1,39 @@
+id          = "WP-4.4"
+title       = "contextra-lab (neues dev-Crate, unabhängige Prüfinstanz, Gate D)"
+wp          = "WP-4.4"
+gate        = "G-D"
+crate       = "contextra-lab"
+goal        = "Unabhängige Prüfinstanz zur Verifikation von Byte-Formaten (Anhang F), Messklassen MK1-MK3, T-DIFF-1 und T-MUT-1."
+non_goals   = ["Keine Produktions-Decoder übernehmen", "Keine Abhängigkeit zu Workspace-Crates"]
+
+scope       = ["crates/contextra-lab/**"]
+
+forbidden   = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
+]
+
+spec_ids    = ["AR-4", "TY-14", "HR-12", "T-DIFF-1", "T-MUT-1", "T-RAW-1", "T-RAW-2", "T-RAW-3", "T-RAW-4", "T-RAW-5", "T-RAW-6", "T-PROOF-1"]
+
+acceptance  = [
+  "cargo fmt --all -- --check",
+  "cargo check -p contextra-lab --all-targets --locked",
+  "cargo test -p contextra-lab --locked",
+  "cargo clippy -p contextra-lab --all-targets -- -D warnings",
+]
+
+evidence_required = ["Unabhängige Format-Parser nach Anhang F mit Golden-Tests", "Scanner mit Typzustand", "T-DIFF-1 und T-MUT-1"]
+
+[budget]
+files      = 25
+lines      = 2500
+iterations = 10
