@@ -16,6 +16,7 @@ members = [
     "crates/contextra-engine",
     "crates/contextra",
     "crates/contextra-testkit",
+    "crates/ctx-verify",
     "tests/arch",
 ]
 default-members = [

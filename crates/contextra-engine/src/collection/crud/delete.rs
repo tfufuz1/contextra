@@ -10,7 +10,18 @@ use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, EntityId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
-    /// Deletes a document from the collection by its ID.
+    // ANCHOR[contextra-engine:COL-DEL-001]
+    /// Löscht ein Dokument anhand seines Identifikators aus allen Subsystemen der Collection.
+    ///
+    /// # Ablauf
+    /// 1. KV-Lock für die gegebene ID anfordern.
+    /// 2. Neue Datenbanktransaktion (`begin_transaction`) starten.
+    /// 3. `delete_op` ausführen:
+    ///    - Schlüssel für User-Key und Doc-Key berechnen.
+    ///    - Bisherige Werte für Kompensation/Rollback auslesen.
+    ///    - Staging für Text- und Graph-Löschungen registrieren.
+    ///    - Storage-Einträge und Vektor-Index-Eintrag löschen.
+    /// 4. Transaktion committen oder bei Fehlern sauber zurückrollen.
     #[tracing::instrument(level = "trace", skip(self))]
     pub async fn delete(&self, id: &str) -> Result<()> {
         let _guard = self.kv_locks.lock_for(id).await;
