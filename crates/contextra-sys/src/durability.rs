@@ -1,8 +1,7 @@
 // FILE-CONTEXT
-// STAND: 2026-10-28T00:00:00Z
-// ZWECK: Platform-aware low-level durability primitives for file and directory flushes (Ring 0 / SPEC 7.7)
-// INVARIANTEN: Zero panic; typed io::Error propagation; fail-closed on unsupported targets; EINTR handling
-// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7 (INV-DURABILITY-PRIM-1)
+// STAND: 2026-11-02T00:00:00Z
+// ZWECK: Platform-aware low-level durability primitives for file and directory flushes (Ring 0 / SPEC §8.3, SY-05, SY-06, SY-10, D-55, D-56)
+// INVARIANTEN: Zero panic; typed io::Error/SyncFailure propagation; fail-closed on unsupported targets; EINTR handling
 
 //! # Modul: Dauerhaftigkeit und physische Synchronisation (`durability`)
 //!
@@ -12,20 +11,23 @@
 //!
 //! ## Ring-Zugehörigkeit und Zweck
 //! - **Ring 0 (Kern):** Kapselt direkte Betriebssystem-Aufrufe (`libc::fsync`, `libc::fdatasync`,
-//!   `libc::fcntl(F_FULLFSYNC)`, `FlushFileBuffers`).
+//!   `libc::fcntl(F_FULLFSYNC)`).
 //! - **Verwendung im System:** Wird von `contextra-store` (Write-Ahead-Log WAL und LSM-SSTables)
 //!   sowie `contextra-durable-fs` genutzt.
 //! - **Persistenz & Fehlergarantie:** Fehler bei `fsync`-Aufrufen werden niemals verschluckt, sondern
-//!   strikte als [`std::io::Error`] an den Aufrufer propagiert (Fail-Closed-Prinzip: Bricht der Flush
+//!   strikte als [`SyncFailure`] an den Aufrufer propagiert (Fail-Closed-Prinzip: Bricht der Flush
 //!   ab, darf keine Transaktion als erfolgreich bestätigt werden).
 //!
-//! ## Plattformunterschiede
+//! ## Plattformunterschiede (SY-06)
 //! - **Linux:** Nutzt `fdatasync` (wenn keine Metadaten wie Dateigröße geändert wurden) oder `fsync`.
 //! - **macOS:** Standardmäßiges `fsync` flasht auf Apple-Dateisystemen (APFS) oft nur den Betriebssystem-Cache,
 //!   nicht jedoch den Festplattencache. Daher wird zwingend `fcntl(fd, F_FULLFSYNC, 0)` verwendet.
-//! - **Windows:** Verwendet `FlushFileBuffers`.
 //! - **Signalbehandlung:** Aufrufe werden bei Unterbrechung durch Unix-Signale (`EINTR`) automatisch wiederholt.
 
+#[path = "error.rs"]
+mod error;
+
+pub use error::SyncFailure;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Result, Write};
 use std::path::Path;
@@ -34,14 +36,13 @@ use std::path::Path;
 /// Flasht Dateiinhalt und optional Metadaten auf den physischen Datenträger gemäß den Garantien der Zielplattform.
 ///
 /// # Ablauf
-/// 1. Extrahiert den rohen Dateideskriptor bzw. das Datei-Handle (`fd` unter Unix, `HANDLE` unter Windows).
+/// 1. Extrahiert den rohen Dateideskriptor (`fd` unter Unix).
 /// 2. Führt die plattformspezifische Synchronisation aus:
 ///    - **Linux:** Ruft in einer Schleife `libc::fdatasync` (falls `metadata_changed == false`) oder `libc::fsync` auf.
 ///    - **macOS:** Ruft `libc::fcntl(fd, libc::F_FULLFSYNC, 0)` auf, um den Hardware-Plattencache zu leeren.
 ///    - **Anderes POSIX:** Ruft `libc::fsync` auf.
-///    - **Windows:** Ruft `FlushFileBuffers` auf.
-///    - **Nicht unterstützte Plattform:** Gibt sofort einen `Unsupported`-Fehler zurück (Fail-Closed).
 /// 3. Fängt den Fehler `EINTR` (Interrupted system call) ab und wiederholt die Operation automatisch.
+/// 4. Gibt sonstige Fehler unverändert nach oben zurück (SY-05).
 ///
 /// # Vorbedingungen
 /// - `file` muss eine gültige, geöffnete Datei referenzieren.
@@ -51,18 +52,6 @@ use std::path::Path;
 ///
 /// # Fehlerfälle
 /// - Gibt bei I/O-Fehlern, Dateisystemfehlern oder Plattenfehlern einen typisierten [`std::io::Error`] zurück.
-///
-/// # Beispiel
-/// ```no_run
-/// use std::fs::File;
-/// use contextra_sys::durable_flush_file;
-///
-/// # fn run() -> std::io::Result<()> {
-/// let file = File::open("wal_segment.log")?;
-/// durable_flush_file(&file, false)?;
-/// # Ok(())
-/// # }
-/// ```
 pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
     #[cfg(target_os = "linux")]
     {
@@ -129,22 +118,7 @@ pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
         }
     }
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::io::AsRawHandle;
-        let handle = file.as_raw_handle() as windows_sys::Win32::Foundation::HANDLE;
-        let _ = metadata_changed;
-        // SAFETY: `handle` ist ein gültiges, offenes Win32-Dateihandle, geliehen von `&file`.
-        // `FlushFileBuffers` überträgt gepufferte Dateidaten auf den Datenträger und schließt das Handle nicht.
-        let res = unsafe { windows_sys::Win32::Storage::FileSystem::FlushFileBuffers(handle) };
-        if res != 0 {
-            Ok(())
-        } else {
-            Err(Error::last_os_error())
-        }
-    }
-
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     {
         let _ = (file, metadata_changed);
         Err(Error::new(
@@ -155,7 +129,7 @@ pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
 }
 
 // ANCHOR[contextra-sys:DUR-FLUSH-DIR-001]
-/// Flasht den Verzeichniseintrag (übergeordnetes Verzeichnis) einer neu erstellten oder umbenannten Datei.
+/// Flasht den Verzeichniseintrag (übergeordnetes Verzeichnis) einer neu erstellten oder umbenannten Datei (SY-06).
 ///
 /// # Warum ein Directory Flush notwendig ist
 /// Unter Unix-Dateisystemen (wie ext4 oder XFS) reicht ein `fsync` auf eine neu erstellte Datei nicht aus,
@@ -163,9 +137,8 @@ pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
 /// liegt im übergeordneten Verzeichnis und muss separat geflasht werden.
 ///
 /// # Ablauf
-/// 1. **Unix:** Öffnet das Verzeichnis schreibgeschützt als [`File`] und ruft [`durable_flush_file`] mit `metadata_changed = true` auf.
-/// 2. **Windows:** Verzeichnis-Handles unterstützen kein `FlushFileBuffers`; Änderungen werden über Dateisystem-Semantiken verwaltet (Best Effort, `Ok(())`).
-/// 3. **Nicht unterstützt:** Gibt `ErrorKind::Unsupported` zurück (Fail-Closed).
+/// 1. Öffnet das Verzeichnis schreibgeschützt als [`File`] und ruft [`durable_flush_file`] mit `metadata_changed = true` auf.
+/// 2. Bei nicht unterstützter Plattform: Gibt `ErrorKind::Unsupported` zurück (Fail-Closed).
 ///
 /// # Fehlerfälle
 /// Gibt einen [`std::io::Error`] zurück, wenn das Verzeichnis nicht geöffnet oder nicht synchronisiert werden kann.
@@ -176,14 +149,7 @@ pub fn durable_flush_dir(path: &Path) -> Result<()> {
         durable_flush_file(&dir, true)
     }
 
-    #[cfg(windows)]
-    {
-        let _ = path;
-        // Windows directory handles do not support FlushFileBuffers; changes are managed via filesystem semantics (Best Effort).
-        Ok(())
-    }
-
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     {
         let _ = path;
         Err(Error::new(
@@ -217,7 +183,10 @@ pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> Result<()> {
                 ));
             }
             Ok(n) => {
-                buf = buf.get(n..).unwrap_or(&[]);
+                buf = match buf.get(n..) {
+                    Some(b) => b,
+                    None => &[],
+                };
             }
             Err(ref e) if e.kind() == ErrorKind::Interrupted => {
                 continue;
@@ -228,19 +197,23 @@ pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> Result<()> {
     Ok(())
 }
 
-/// Specification of the flush scope for file handles.
+/// Specification of the flush scope for file handles (SY-06).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FlushKind {
-    /// Flush file data to stable storage without requiring metadata update synchronization.
+    /// Flush only file data to stable storage without metadata.
+    Data,
+    /// Flush both file data and metadata to stable storage.
+    All,
+    /// Compatibility alias: flush file data without metadata.
     DataOnly,
-    /// Flush both file data and metadata changes to stable storage.
+    /// Compatibility alias: flush file data and metadata.
     DataAndMetadata,
 }
 
 /// Filesystem classification for durability and locking guarantees.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FsClass {
-    /// Local filesystem with supported POSIX/Win32 durability guarantees.
+    /// Local filesystem with supported POSIX durability guarantees.
     LocalSupported,
     /// Network filesystem.
     Network,
@@ -260,18 +233,18 @@ impl FsClass {
     }
 }
 
-/// Flushes an open file to disk using platform durability primitives.
-pub fn flush_file(file: &File, kind: FlushKind) -> Result<()> {
+/// Flushes an open file to disk using platform durability primitives (SY-05, SY-06).
+pub fn flush_file(file: &File, kind: FlushKind) -> std::result::Result<(), SyncFailure> {
     let metadata_changed = match kind {
-        FlushKind::DataOnly => false,
-        FlushKind::DataAndMetadata => true,
+        FlushKind::Data | FlushKind::DataOnly => false,
+        FlushKind::All | FlushKind::DataAndMetadata => true,
     };
-    durable_flush_file(file, metadata_changed)
+    durable_flush_file(file, metadata_changed).map_err(SyncFailure::new)
 }
 
-/// Flushes directory metadata entries to stable storage.
-pub fn flush_dir(dir: &Path) -> Result<()> {
-    durable_flush_dir(dir)
+/// Flushes directory metadata entries to stable storage (SY-06).
+pub fn flush_dir(dir: &Path) -> std::result::Result<(), SyncFailure> {
+    durable_flush_dir(dir).map_err(SyncFailure::new)
 }
 
 /// Classifies the filesystem host of `path`.
@@ -288,32 +261,31 @@ pub fn fs_class(path: &Path) -> Result<FsClass> {
     }
 }
 
-/// Durably renames `from` to `to` and flushes the parent directory.
+/// Durably renames `from` to `to` and flushes the parent directory (SY-05, SY-06).
 ///
 /// # Ablauf
 /// 1. Benennt `from` atomar in `to` um mittels [`std::fs::rename`].
-/// 2. Ermittelt das übergeordnete Verzeichnis von `to` und flasht dieses via [`durable_flush_dir`].
+/// 2. Ermittelt das übergeordnete Verzeichnis von `to` (bzw. `.` falls relativer Dateiname) und flasht dieses via [`flush_dir`].
 ///
 /// # Fehlerbehandlung
 /// Fehler bei der Verzeichnissynchronisation werden nicht verschluckt, sondern sofort als
-/// [`Result`] zurückgegeben, um Datenverlust bei Stromausfall nachweisbar zu verhindern.
-pub fn rename_durable(from: &Path, to: &Path) -> Result<()> {
-    std::fs::rename(from, to)?;
-    if let Some(parent) = to.parent() {
-        durable_flush_dir(parent)?;
-    }
+/// [`SyncFailure`] zurückgegeben, um Datenverlust bei Stromausfall nachweisbar zu verhindern.
+pub fn rename_durable(from: &Path, to: &Path) -> std::result::Result<(), SyncFailure> {
+    std::fs::rename(from, to).map_err(SyncFailure::new)?;
+    let parent = match to.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p,
+        _ => Path::new("."),
+    };
+    flush_dir(parent)?;
     Ok(())
 }
 
-// ANCHOR[contextra-sys:DUR-TESTS-001]
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs::OpenOptions;
     use std::io::Read;
 
-    // ANCHOR[contextra-sys:DUR-TEST-WRITE-FLUSH-001]
-    // Prüft das Zusammenspiel von `write_all_durable` und nachfolgendem `durable_flush_file` mit Daten- und Metadaten-Flush.
     #[test]
     fn test_write_all_durable_and_flush_file() -> std::io::Result<()> {
         let temp_dir = std::env::temp_dir();
@@ -345,8 +317,6 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:DUR-TEST-META-VAR-001]
-    // Prüft das Flashen von Dateien bei Variation des `metadata_changed`-Flags (fdatasync vs. fsync).
     #[test]
     fn test_durable_flush_file_metadata_variations() -> std::io::Result<()> {
         let temp_dir = std::env::temp_dir();
@@ -369,8 +339,6 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:DUR-TEST-DIR-001]
-    // Prüft die Verzeichnissynchronisation (`durable_flush_dir`) nach dem Erstellen einer Datei in einem Unterverzeichnis.
     #[test]
     fn test_durable_flush_dir() -> std::io::Result<()> {
         let temp_dir = std::env::temp_dir();
@@ -394,8 +362,6 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:DUR-TEST-EMPTY-001]
-    // Prüft, dass das haltbare Schreiben eines leeren Puffers ohne Fehler erfolgreich beendet wird.
     #[test]
     fn test_write_all_durable_empty_buffer() -> std::io::Result<()> {
         let temp_dir = std::env::temp_dir();
@@ -412,8 +378,6 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:DUR-TEST-CHUNKED-001]
-    // Prüft das Schreiben größerer Datenmengen (64 KiB), um blockweises Schreiben zu testen.
     #[test]
     fn test_write_all_durable_chunked() -> std::io::Result<()> {
         let temp_dir = std::env::temp_dir();
@@ -431,22 +395,13 @@ mod tests {
         Ok(())
     }
 
-    // ANCHOR[contextra-sys:DUR-TEST-NONEXISTENT-DIR-001]
-    // Prüft das Fehlerverhalten beim Flashen eines nicht existierenden Verzeichnisses.
     #[test]
     fn test_durable_flush_dir_nonexistent_path() {
-        let nonexistent = std::path::Path::new("/nonexistent_path_contextra_sys_test_12345");
-        #[cfg(unix)]
-        {
-            assert_eq!(
-                durable_flush_dir(nonexistent).err().map(|e| e.kind()),
-                Some(std::io::ErrorKind::NotFound)
-            );
-        }
-        #[cfg(windows)]
-        {
-            let res = durable_flush_dir(nonexistent);
-            assert!(res.is_ok());
+        let nonexistent = Path::new("/nonexistent_path_contextra_sys_test_12345");
+        let res = durable_flush_dir(nonexistent);
+        assert!(res.is_err());
+        if let Err(err) = res {
+            assert_eq!(err.kind(), ErrorKind::NotFound);
         }
     }
 }
