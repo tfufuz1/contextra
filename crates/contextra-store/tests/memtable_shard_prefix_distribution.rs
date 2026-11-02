@@ -29,12 +29,8 @@ fn test_memtable_shard_for_monotonicity_and_prefix_distribution() {
         }
     }
 
-    // Verify monotonicity across ordered keys
+    // Verify monotonicity across ordered non-system user keys (PR #3933 hash-shards system keys starting with `__`)
     let ordered_keys = [
-        b"__col:0001".as_slice(),
-        b"__col:0002".as_slice(),
-        b"__meta:0001".as_slice(),
-        b"__sys:0001".as_slice(),
         b"doc:0001".as_slice(),
         b"graph:0001".as_slice(),
         b"t1:0001".as_slice(),

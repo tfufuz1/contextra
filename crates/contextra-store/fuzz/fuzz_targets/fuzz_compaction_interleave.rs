@@ -2,21 +2,16 @@
 
 use arbitrary::Arbitrary;
 use contextra_ports::StorageEngine;
-use contextra_types::TxId;
 use contextra_store::{LsmConfig, LsmStorage};
+use contextra_types::TxId;
 use libfuzzer_sys::fuzz_target;
 use std::collections::HashMap;
 use tempfile::tempdir;
 
 #[derive(Arbitrary, Debug, Clone)]
 enum CompactionOp {
-    Put {
-        key_suffix: u8,
-        val_byte: u8,
-    },
-    Delete {
-        key_suffix: u8,
-    },
+    Put { key_suffix: u8, val_byte: u8 },
+    Delete { key_suffix: u8 },
     Flush,
     Compact,
 }

@@ -1,52 +1,52 @@
-# Contextra — Quellen der Wahrheit (Single Source of Truth)
+# Quellen der Wahrheit
 
-<!-- doc-stamp: 2026-11-01 | Spec-Fassung: 2.0.0 (SOLL-Zustand Release 1.0.0) | PLAN: 2026-11-01 -->
+Abgeleitet aus [`SPEC.md`](SPEC.md), Abschnitt „Quelle der Wahrheit“ und D-98 (Abschnitt 4.6). Bei Widerspruch gilt die SPEC.
 
-> **Normative Grundregel (INV-DOC-SINGLE-SOURCE-1):** Jede Tatsache hat genau eine kanonische Quelle.
-> Abgeleitetes wird generiert oder per Doc-Truth-Gate geprüft. Doppelt vergebene IDs oder widersprüchliche Dokumente sind Gate-Fehler.
-> Jede Abweichung des Quellcodes oder anderer Dokumente von `docs/SPEC.md` ist ein Defekt.
+## 1. Grundregel
 
----
+Jede Tatsache hat genau eine normative Quelle: die SPEC. Abgeleitete Dokumente wiederholen Fakten nur, wenn sie für das Verständnis nötig sind, und verweisen dann auf die SPEC-Stelle. Weicht ein abgeleitetes Dokument von der SPEC ab, ist das Dokument fehlerhaft und wird im selben Änderungspaket korrigiert (D-98).
 
-## 1. Rangfolge der Informationsquellen
+## 2. Rangfolge
 
-Bei inhaltlichen Konflikten oder Widersprüchen gilt zwingend folgende Rangfolge:
-
-| Rang | Quelle | Status | Inhalt & Gültigkeit |
-|:---:|:---|:---:|:---|
-| **1** | **[`docs/SPEC.md`](SPEC.md)** | **normativ** | **Fassung 2.0.0 (SOLL-Zustand für Release 1.0.0).** Einzige normative Quelle für Architektur, Verhalten, Konstanten, Schnittstellen, Testvorgaben, Gates und Invarianten. |
-| **2** | **[`PLAN.md`](../PLAN.md)** | **arbeitsleitend** | Begleitdokument zur Spezifikation: Phasen 0–7, Gates G-A bis G-H, G0, verbindliche Arbeitspakete (WP-0.1 bis WP-7.4). |
-| **3** | **[`docs/VETOES.md`](VETOES.md)** | **normativ** | Veto-Register: Architekturentscheidungen und harte Verbote (VETO-F02, VETO-F10, VETO-SN01, ADR-001 Vetos). |
-| **4** | **[`AGENTS.md`](../AGENTS.md)** | **normativ** | Verbindliche Agenten- und Entwickler-Betriebsanleitung für den gesamten Workspace gemäß ADR-001. |
-| **5** | **[`docs/CONSTITUTION.md`](CONSTITUTION.md)** | **normativ** | Dauerhafte Governance-, Qualitäts- und Sicherheitsprinzipien (Zero Panic, P28 Determinismus, WAL First, Fail-Closed, 2 Unsafe-Inseln). |
-| **6** | **Produktionscode + grüne Gates** | **faktisch** | Maschinenlesbarer Beleg realer Ausführung (`cargo check`, `cargo test`, Gate-Evidenz unter `evidence/<WP-ID>/`). |
-
----
-
-## 2. Dokument-Karte
-
-| Dokument | Status | Zweck & Inhalt |
+| Rang | Quelle | Status |
 |---|---|---|
-| [`docs/SPEC.md`](SPEC.md) | **normativ** | Gesamtspezifikation v2.0.0 (SOLL-Zustand Release 1.0.0, 14 Kern-Crates, Löschpipeline, E1/E2/E3 Messungen, Bericht `ctx-erasure-report/1`). |
-| [`PLAN.md`](../PLAN.md) | **arbeitsleitend** | Phasenplan 0–7, Gates G-A bis G-H, Arbeitspakete WP-0.1 bis WP-7.4. |
-| [`AGENTS.md`](../AGENTS.md) | **normativ** | Zentrale Arbeitsrichtlinie für Entwickler und Agenten im Workspace-Root. |
-| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | beschreibend | Darstellung der Schichtenarchitektur (Ringe 0–4), DAG, Abhängigkeitsmatrix und Datenflüsse. |
-| [`docs/COMPILATION.md`](COMPILATION.md) | instruktiv | Kompilieranleitung und Workspace-Mitglieder nach SPEC §5.1. |
-| [`docs/SECURITY.md`](SECURITY.md) | normativ | Bedrohungsmodell, Vertrauensgrenzen, Pflicht-Verschlüsselung, KDF-Vorgaben (Argon2id $\ge 64\,\text{MiB}$). |
-| [`docs/DELETION-DSGVO.md`](DELETION-DSGVO.md) | analytisch | Rechts- und Architektursynthese zu Art. 17/18 DSGVO, Löschbegriff, Vorbehalt und ADR-001 Einordnung. |
-| [`docs/CONSTITUTION.md`](CONSTITUTION.md) | normativ | Verfassung: Safety First, Zero Panic, WAL First, P28 Determinismus, 2 Unsafe-Inseln. |
-| [`docs/CONTRIBUTING.md`](CONTRIBUTING.md) | informativ | Beitragsrichtlinien, TDD-Workflow, Commit-Konventionen (ein WP = ein PR). |
-| [`docs/TYPE_REGISTRY.md`](TYPE_REGISTRY.md) | normativ | Inventar kanonischer Typen nach SPEC §8.1 / §8.6. |
-| [`docs/VETOES.md`](VETOES.md) | normativ | Verbindliches Register aller Feature-Vetos. |
+| 1 | `docs/SPEC.md` (Version 4.3.0) | normativ, einzige Quelle |
+| 2 | `docs/VETOES.md` | normativ, konkretisiert Verbote aus der SPEC |
+| 3 | `docs/CONSTITUTION.md` | abgeleitet, fasst Prinzipien und harte Regeln zusammen |
+| 4 | `docs/ARCHITECTURE.md`, `docs/TYPE_REGISTRY.md` | abgeleitet |
+| 5 | `docs/COMPILATION.md`, `docs/CONTRIBUTING.md`, `docs/SECURITY.md`, `docs/DELETION-DSGVO.md`, `AGENTS.md`, `README.md`, `crates/*/README.md`, `crates/*/AGENTS.md`, `.agents/` | abgeleitet |
+| 6 | Quellcode und grüne Gates (`cargo check --locked`, Tests, Lab-Protokolle) | Beleg, kein Maßstab |
 
----
+Der Quellcode belegt den Ist-Zustand. Er definiert keinen Soll-Zustand. Grüne Gates belegen die Einhaltung der SPEC, sie ersetzen sie nicht.
 
-## 3. Prinzip der Evidenzstufen (INV-EVIDENCE-1)
+## 3. Abgeleitete Dokumente und ihr Pflegestand
 
-Aussagen in Dokumenten, Kommentaren oder PRs sind solange reine Absichtserklärungen (**E0**), bis sie maschinell belegt sind:
+Nach D-98 bleiben alle abgeleiteten Dokumente im Repository und werden mit der SPEC gepflegt. Die Tabelle nennt den Stand dieser Revision (SPEC 4.3.0).
 
-- **E0 (Behauptung):** Idee, Plan oder unüberprüfte Dokumentation.
-- **E1 (Quelltext-Beleg):** Durch Inspektion des Codes an Zeilennummern nachgewiesen.
-- **E2 (Gate-Lauf):** Erfolgreicher lokaler Gate- oder Skriptlauf mit archiviertem Protokoll (`evidence/<WP-ID>/`).
-- **E3 (CI-Reproduzierbar):** Grüner Lauf in isolierter Umgebung auf unabhängigem Runner.
-- **E4 (Produktionsreife):** E3 plus unabhängiges Test-Orakel, Mutationsprüfung (`cargo mutants`) und Nachweis im Erasure Lab.
+| Datei oder Verzeichnis | Stand | Offener Pflegebedarf |
+|---|---|---|
+| `AGENTS.md`, `README.md` | überarbeitet | – |
+| `docs/` (außer SPEC) mit `ARCHITECTURE`, `COMPILATION`, `CONSTITUTION`, `CONTRIBUTING`, `SECURITY`, `SOURCE_OF_TRUTH`, `TYPE_REGISTRY`, `VETOES`, `DELETION-DSGVO`, `CHANGELOG` | überarbeitet | Rechtsstand in `DELETION-DSGVO` bei Änderungen prüfen (G-LEGAL) |
+| `docs/IMPLEMENTATION_SPEC_PER_CRATE.md` | nicht überarbeitet | Abgleich mit SPEC 8 |
+| `docs/DELETION-DSGVO.md` | überarbeitet | – |
+| `crates/*/README.md`, `crates/*/AGENTS.md` | überarbeitet (14 Crates und `contextra-erasure`) | Zweck-Sätze in `lib.rs` (WP-1.5) |
+| `.agents/**/*.md` | überarbeitet (40 Dateien) | Skripte und Konfiguration offen (siehe `.agents/README.md`) |
+| `.agents/` als Werkzeugverzeichnis | Teil des Repositorys (D-98) | Konsistenz der Pfade und Workflows nach T-DOC-1 |
+| `.gemini/`, `.antigravity/` | Teil des Repositorys (D-98) | nicht überarbeitet, Konsistenz prüfen |
+| `docs/CHANGELOG.md` | Kopf überarbeitet, Historie erhalten | – |
+| `docs/AUDIT_*.md`, `docs/ROOT_CAUSE_ANALYSIS.md` | Prüfprotokolle früherer Audits | nach D-98 (3) nicht im Quellbaum; in den Archivbranch verschieben |
+| `docs/cleanup/`, `docs/postmortems/`, `docs/analysis/` | Protokolle und Analysen | nach D-98 (3) nicht im Quellbaum; in den Archivbranch verschieben |
+| `docs/explain/protected-paths.toml` | nicht geprüft | Pfadregeln in `.agents/governance/` abgleichen |
+| `reports/`, `evidence/` | Evidenz | nach D-98 (3) nicht im Quellbaum; als Release-Artefakt führen |
+| `tools/*.py`, `scripts/contextra_full_audit.py` | Einmalwerkzeuge | nicht von D-98 erfasst; Entscheidung des Eigentümers offen |
+
+## 4. Umgang mit Widersprüchen
+
+1. Widerspruch zwischen einem abgeleiteten Dokument und der SPEC: Das Dokument wird im selben Änderungspaket korrigiert.
+2. Widerspruch zwischen SPEC und Quellcode: Der Code ist ein Defekt und wird mit einem Arbeitspaket behoben.
+3. Widerspruch innerhalb der SPEC: Die SPEC wird über Anhang H korrigiert. Bis dahin gilt die strengere Auslegung (SPEC 6.6).
+4. Fehlende Information: Es wird nichts erfunden. Die Lücke wird als Arbeitspaket oder Gate-Bedingung erfasst.
+
+## 5. Prüfung
+
+Die Konsistenz der abgeleiteten Dokumente prüft der Test T-DOC-1 (`contextra-arch-tests`). Er erfasst Zweck-Sätze, Löschbegriffe, Pfad- und Workflow-Verweise sowie Zeitstempel- und Agentenmarken. Die Prüfung auf Sitzungsverläufe, Prüfprotokolle und Evidenz im Quellbaum erfolgt über T-ARCH-8. Beide Tests sind Teil von Gate B.

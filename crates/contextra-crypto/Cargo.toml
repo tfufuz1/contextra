@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Encryption at Rest and KV-Cache Security utilities for Contextra"
+description = "Kryptoprimitive: AEAD, Argon2id, HKDF, HMAC, Ed25519, Tags."
 
 [package.metadata.contextra]
 ring = "0"

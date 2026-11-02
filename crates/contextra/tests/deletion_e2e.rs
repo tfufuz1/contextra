@@ -46,6 +46,7 @@ async fn test_tdel_1_canary_bytes_erased_after_compaction() -> Result<(), Contex
     let config = ContextraConfig {
         dimension: 4,
         consolidation_enabled: false,
+        encryption_passphrase: Some("e2e-deletion-passphrase-secure".to_string()),
         ..Default::default()
     };
 
@@ -75,7 +76,7 @@ async fn test_tdel_1_canary_bytes_erased_after_compaction() -> Result<(), Contex
     // 3. Canary-Bytesuche im Datenverzeichnis
     let matches = count_canary_occurrences(tmp.path(), canary);
 
-    // Erwartet: 0 Treffer (schlägt auf aktuellem Stand fehl durch Assertion mit matches > 0)
+    // Erwartet: 0 Treffer (durch Verschlüsselung und anschließendes Löschen)
     assert_eq!(
         matches, 0,
         "T-DEL-1: Canary-Bytes wurden im Datenverzeichnis ({matches} Datei(en)) nach Schreiben, Löschen und Flush gefunden"
@@ -92,6 +93,7 @@ async fn test_tdel_3_proof_verification_fails_with_invalid_key() -> Result<(), C
     let config = ContextraConfig {
         dimension: 4,
         consolidation_enabled: false,
+        encryption_passphrase: Some("e2e-deletion-passphrase-secure".to_string()),
         ..Default::default()
     };
     let db = open_with_config(tmp.path(), config).await?;

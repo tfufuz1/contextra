@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Ring 0 SIMD distance kernels and runtime dispatch for Contextra (Unsafe Island)"
+description = "Vektor-Distanzfunktionen (L2, Dot, Cosine) mit SIMD-Kernen und Skalar-Referenz."
 
 [package.metadata.contextra]
 ring = "0"

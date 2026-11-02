@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Reciprocal Rank Fusion (RRF) for Contextra Cognitive OS"
+description = "Reciprocal Rank Fusion für die Hybridsuche."
 
 [package.metadata.contextra]
 ring = "0"

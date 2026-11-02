@@ -6,14 +6,14 @@
 //!
 //! Dieses Modul stellt den zentralen Builder (`ContextraBuilder`) zur Verfügung, welcher als
 //! **Composition Root** dient: Hier fließen alle Subsysteme (Speicher, Lizenzprüfung, Verschlüsselung,
-//! Embedding-Engine, Performance-Profile) zusammen und werden initial verdrahtet.
+//! Embedding-Engine, Performance-Profile, CSPRNG-Zufallsquelle) zusammen und werden initial verdrahtet.
 //!
 //! ## Ring-Zugehörigkeit
 //! - **Ring 4 (Fassade)**: Enthält selbst **keine Geschäftslogik**, sondern orchestriert
-//!   ausschließlich die Konfiguration und Übergabe von Parametern an `contextra-db` (Ring 3).
+//!   ausschließlich die Konfiguration und Übergabe von Parametern an `contextra-engine` (Ring 3).
 //!
 //! ## Wichtigste Typen
-//! - [`EncryptionMode`]: Steuert, ob und wie Daten im Ruhezustand (Data-at-Rest) verschlüsselt werden.
+//! - [`EncryptionMode`]: Steuert die Data-at-Rest-Verschlüsselung (Pflichtverschlüsselung gemäß D-05).
 //! - [`ContextraConfigExt`]: Hilfstraiterweiterung für Konfigurationsabfragen bezüglich Verschlüsselung.
 //! - [`ContextraBuilder`]: Die fluide Builder-Struktur zur Konstruktion einer lauffähigen Datenbank.
 //!
@@ -23,16 +23,18 @@
 //! - **Sichere Geheimnisverwaltung**: Passphrasen werden umgehend in [`Zeroizing<String>`] gekapselt,
 //!   sodass ihr Speicherbereich beim Verlassen des Gültigkeitsbereichs mit Nullen überschrieben wird.
 //!   Zudem wird in Debug-Ausgaben der Platzhalter `[REDACTED]` ausgegeben.
-//! - **Lizenzprüfung (Fail-Closed)**: Zugriffe auf erweiterte Ringe (z. B. Sovereign) werden über
-//!   ein [`LicenseGate`] vor dem Hochfahren autorisiert. Ungültige Lizenzen führen zum Abbruch.
+//! - **Pflichtverschlüsselung (D-05)**: Unverschlüsselter Betrieb ist im Soll-Zustand nicht zulässig.
+//!   Fehlt eine Passphrase oder wird unverschlüsselter Modus angefordert, bricht `build()` mit einem
+//!   typisierten Fehler ab.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::rng::OsRngAdapter;
 use contextra_engine::{Contextra, ContextraConfig, EmbeddingBackend};
-use contextra_ports::license::{FeatureRing, LicenseError, LicenseGate, OpenFastGate};
-use contextra_ports::TextEmbeddingEngine;
+use contextra_ports::license::{FeatureRing, LicenseGate, OpenFastGate};
+use contextra_ports::{Rng, TextEmbeddingEngine};
 use contextra_types::error::ContextraError;
 use contextra_types::DistanceMetric;
 use zeroize::Zeroizing;
@@ -42,11 +44,12 @@ use zeroize::Zeroizing;
 ///
 /// Bestimmt, ob Schreib-Lese-Operationen auf Festplatte (LSM-Tree, WAL = Write-Ahead-Log)
 /// über AES-GCM-SIV verschlüsselt werden.
+/// Gemäß D-05 ist Verschlüsselung standardmäßig obligatorisch.
 #[derive(Clone)]
 pub enum EncryptionMode {
     /// Storage is encrypted using a key derived from a passphrase.
     Passphrase(Zeroizing<String>),
-    /// Storage is explicitly unencrypted.
+    /// Explicitly unencrypted mode is disallowed by policy (D-05) and rejected at build time.
     Unencrypted,
 }
 
@@ -78,7 +81,7 @@ impl ContextraConfigExt for ContextraConfig {
 /// Ein Builder zur flexiblen Konfiguration und Instanziierung der Datenbank [`Contextra`].
 ///
 /// `ContextraBuilder` fungiert als primärer Einstiegspunkt (Composition Root) in Ring 4.
-/// Er sammelt alle Einstellungen (Pfade, Vektordimensionen, Metriken, Lizenzen) und baut
+/// Er sammelt alle Einstellungen (Pfade, Vektordimensionen, Metriken, Passphrasen) und baut
 /// bei [`ContextraBuilder::build`] die vollständige Engine zusammen.
 pub struct ContextraBuilder {
     storage_path: PathBuf,
@@ -90,6 +93,7 @@ pub struct ContextraBuilder {
     license_gate: Arc<dyn LicenseGate>,
     signed_license_error: Option<String>,
     performance_profile: Option<crate::performance_profile::PerformanceProfile>,
+    rng: Option<Arc<dyn Rng>>,
 }
 
 impl std::fmt::Debug for ContextraBuilder {
@@ -106,6 +110,7 @@ impl std::fmt::Debug for ContextraBuilder {
             .field("license_gate", &"<dyn LicenseGate>")
             .field("signed_license_error", &self.signed_license_error)
             .field("performance_profile", &self.performance_profile)
+            .field("rng", &self.rng.as_ref().map(|_| "<dyn Rng>"))
             .finish()
     }
 }
@@ -122,6 +127,7 @@ impl Clone for ContextraBuilder {
             license_gate: Arc::clone(&self.license_gate),
             signed_license_error: self.signed_license_error.clone(),
             performance_profile: self.performance_profile,
+            rng: self.rng.clone(),
         }
     }
 }
@@ -135,8 +141,9 @@ impl ContextraBuilder {
     ///
     /// # Standardwerte
     /// - Speicherpfad: `./contextra_data`
-    /// - Lizenzgate: `OpenFastGate` (Entwicklungsmodus ohne Lizenzschlüssel)
-    /// - Verschlüsselung: Uninitialisiert (wird bei `build` gewarnt oder auf unverschlüsselt gesetzt)
+    /// - Lizenzgate: `OpenFastGate`
+    /// - Verschlüsselung: Uninitialisiert (muss vor `build()` gesetzt werden, D-05)
+    /// - RNG: Standardmäßig [`OsRngAdapter`] (CSPRNG aus OS-Entropie)
     pub fn new(dimension: usize) -> Self {
         Self {
             storage_path: PathBuf::from("./contextra_data"),
@@ -151,6 +158,7 @@ impl ContextraBuilder {
             license_gate: Arc::new(OpenFastGate),
             signed_license_error: None,
             performance_profile: None,
+            rng: Some(Arc::new(OsRngAdapter::new())),
         }
     }
 
@@ -188,7 +196,7 @@ impl ContextraBuilder {
     /// Konfiguriert den Verschlüsselungsmodus explizit.
     ///
     /// Validiert bei Passphrasen sofort, dass diese nicht leer sind oder nur aus Leerzeichen bestehen.
-    /// Leere Passphrasen merken einen Fehler für [`ContextraBuilder::build`] vor (Fail-Closed).
+    /// Leere Passphrasen oder unverschlüsselter Modus merken einen Fehler für [`ContextraBuilder::build`] vor (Fail-Closed).
     pub fn with_encryption(mut self, mode: EncryptionMode) -> Self {
         match &mode {
             EncryptionMode::Passphrase(secret) => {
@@ -198,7 +206,12 @@ impl ContextraBuilder {
                     return self;
                 }
             }
-            EncryptionMode::Unencrypted => {}
+            EncryptionMode::Unencrypted => {
+                self.encryption_error = Some(
+                    "Unencrypted storage mode is not permitted by policy (D-05); an encryption passphrase is required".to_string(),
+                );
+                return self;
+            }
         }
         self.encryption_mode = Some(mode);
         self.config.encryption_passphrase = None;
@@ -223,7 +236,7 @@ impl ContextraBuilder {
     }
 
     // ANCHOR[contextra:BLD-011]
-    /// Wählt das Backend für Text-Embeddings (z. B. intern via Candle oder externer Dienst).
+    /// Wählt das Backend für Text-Embeddings (z. B. intern oder externer Dienst).
     pub fn with_embedding_backend(mut self, backend: EmbeddingBackend) -> Self {
         self.config.embedding_backend = backend;
         self
@@ -256,11 +269,15 @@ impl ContextraBuilder {
         self
     }
 
+    // ANCHOR[contextra:BLD-015]
+    /// Injiziert eine benutzerdefinierte Zufallsquelle ([`contextra_ports::Rng`]), z. B. für deterministische Tests.
+    pub fn with_rng(mut self, rng: Arc<dyn Rng>) -> Self {
+        self.rng = Some(rng);
+        self
+    }
+
     // ANCHOR[contextra:BLD-016]
-    /// Setzt ein vordefiniertes Performance-Profil ([`PerformanceProfile`]).
-    ///
-    /// Profile (wie `Compliance`, `Balanced`, `BareMetal`) steuern standardisierte
-    /// Kombinationen aus Durability (WAL-fsync), Vektor-Löschmodi und Lizenzringen.
+    /// Setzt ein vordefiniertes Performance-Profil ([`crate::performance_profile::PerformanceProfile`]).
     pub fn with_performance_profile(
         mut self,
         profile: crate::performance_profile::PerformanceProfile,
@@ -292,16 +309,15 @@ impl ContextraBuilder {
     /// Baut und initialisiert die [`Contextra`]-Datenbankinstanz asynchron.
     ///
     /// # Ablauf von `build`:
-    /// 1. **Vorabprüfung**: Prüfe, ob frühere Fehler (z. B. leere Passphrase oder ungültige Signatur) vorliegen.
-    /// 2. **Verschlüsselung konfigurieren**: Passphrase aus dem `EncryptionMode` in die Laufzeitkonfiguration übertragen.
-    /// 3. **Performance-Profil auflösen**: Falls ein Profil gesetzt ist, Durability- und Löschmodi übernehmen
-    ///    oder bei Konflikten mit expliziten Parametern abbrechen.
-    /// 4. **Lizenz-Autorisierung**: Den angeforderten Ring (z. B. `Fast` oder `Sovereign`) über `license_gate.authorize` abfragen.
+    /// 1. **Vorabprüfung**: Prüfe, ob Konfigurationsfehler (z. B. leere Passphrase) vorliegen.
+    /// 2. **Pflicht-Verschlüsselung (D-05)**: Erzwinge zwingend gesetzte, nicht-leere Passphrase.
+    /// 3. **Performance-Profil auflösen**: Falls ein Profil gesetzt ist, Durability- und Löschmodi übernehmen.
+    /// 4. **Lizenz-Autorisierung**: Autorisierung am Gate abfragen.
     /// 5. **Instanziierung**: Aufruf von `Contextra::open_authorized` mit Pfad, Konfiguration und Token.
-    /// 6. **Embedder anhängen**: Falls ein benutzerdefinierter Text-Embedder hinterlegt wurde, diesen registrieren.
+    /// 6. **Embedder anhängen**: Falls ein Text-Embedder hinterlegt wurde, diesen registrieren.
     ///
     /// # Fehlerfälle
-    /// - [`ContextraError::InvalidInput`]: Leere Passphrase.
+    /// - [`ContextraError::InvalidInput`]: Fehlende oder leere Passphrase oder unverschlüsselter Modus angefordert.
     /// - [`ContextraError::PolicyViolation`]: Lizenz unzureichend oder Konflikt zwischen Profil und Konfiguration.
     /// - [`ContextraError::Io`]: Dateisystem- oder Speicherinitialisierungsfehler.
     pub async fn build(self) -> Result<Contextra, ContextraError> {
@@ -325,13 +341,14 @@ impl ContextraBuilder {
                 config_for_open.encryption_passphrase = Some(secret.as_str().to_string());
             }
             Some(EncryptionMode::Unencrypted) => {
-                config_for_open.encryption_passphrase = None;
+                return Err(ContextraError::invalid_input(
+                    "Unencrypted storage mode is not permitted by policy (D-05); an encryption passphrase is required",
+                ));
             }
             None => {
-                tracing::warn!(
-                    "Contextra started in implicit unencrypted mode; explicit EncryptionMode selection will be required in a future version"
-                );
-                config_for_open.encryption_passphrase = None;
+                return Err(ContextraError::invalid_input(
+                    "Encryption passphrase is required by policy (D-05); unconfigured encryption mode is not allowed",
+                ));
             }
         }
 
@@ -390,7 +407,7 @@ mod tests {
     use super::*;
 
     // ANCHOR[contextra:TEST-BLD-001]
-    // Prüft, ob der Builder mit den erwarteten Default-Werten (Dimension 768, Standardpfad, keine Verschlüsselung) startet.
+    // Prüft, ob der Builder mit den erwarteten Default-Werten (Dimension 768, Standardpfad) startet.
     #[test]
     fn test_builder_defaults() {
         let builder = ContextraBuilder::default();
@@ -467,9 +484,9 @@ mod tests {
     }
 
     // ANCHOR[contextra:TEST-BLD-005]
-    // Prüft, dass der explizit unverschlüsselte Modus korrekt initialisiert werden kann.
+    // Prüft, dass der explizit unverschlüsselte Modus gemäß D-05 abgewiesen wird.
     #[tokio::test]
-    async fn test_explicit_unencrypted_mode() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_explicit_unencrypted_mode_rejected() {
         let tmp_path =
             std::env::temp_dir().join(format!("contextra_unencrypted_test_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&tmp_path);
@@ -478,17 +495,42 @@ mod tests {
             .with_storage_path(&tmp_path)
             .with_encryption(EncryptionMode::Unencrypted);
 
-        assert!(!builder.is_encrypted());
-
-        let db = builder.build().await?;
-        assert_eq!(db.len().await?, 0);
+        let res = builder.build().await;
+        assert!(res.is_err());
+        if let Err(ContextraError::InvalidInput(msg)) = res {
+            assert!(msg.contains("Unencrypted storage mode is not permitted"));
+        } else {
+            panic!("Expected InvalidInput error for Unencrypted mode");
+        }
 
         let _ = std::fs::remove_dir_all(&tmp_path);
-        Ok(())
     }
 
     // ANCHOR[contextra:TEST-BLD-006]
-    // Testet einen vollständigen Durchlauf von Instanzerstellung, Initialisierung und Ressourcenfreigabe.
+    // Prüft, dass das Weglassen jeglicher Passphrase gemäß D-05 mit einem klaren Fehler endet.
+    #[tokio::test]
+    async fn test_unconfigured_encryption_rejected() {
+        let tmp_path =
+            std::env::temp_dir().join(format!("contextra_no_enc_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp_path);
+
+        let res = ContextraBuilder::new(4)
+            .with_storage_path(&tmp_path)
+            .build()
+            .await;
+
+        assert!(res.is_err());
+        if let Err(ContextraError::InvalidInput(msg)) = res {
+            assert!(msg.contains("Encryption passphrase is required"));
+        } else {
+            panic!("Expected InvalidInput error for unconfigured encryption");
+        }
+
+        let _ = std::fs::remove_dir_all(&tmp_path);
+    }
+
+    // ANCHOR[contextra:TEST-BLD-007]
+    // Testet einen vollständigen Durchlauf von Instanzerstellung, Initialisierung und Ressourcenfreigabe mit Passphrase.
     #[tokio::test]
     async fn test_builder_build_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
         let tmp_path =
@@ -498,6 +540,7 @@ mod tests {
         let db = ContextraBuilder::new(4)
             .with_storage_path(&tmp_path)
             .with_distance_metric(DistanceMetric::Cosine)
+            .with_encryption_passphrase("valid-passphrase-roundtrip")
             .build()
             .await?;
 

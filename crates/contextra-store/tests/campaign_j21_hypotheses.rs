@@ -3,10 +3,8 @@
 //! Observer Fail-Open, Differential BTreeMap Model, and System Pressure.
 
 use bytes::Bytes;
-use contextra_crypto::{crypto::KeyManager, kv_shredding::KeyRegistry};
 use contextra_ports::StorageEngine;
 use contextra_store::{
-    kv::{KvDeleteMode, KvSegmentConfig, KvSegmentManager},
     lsm::{
         observer::{CommittedBatch, ObserverRegistry, WalObserver},
         DurabilityMode, LsmConfig, LsmStorage,
@@ -252,68 +250,10 @@ async fn test_h3_tenant_scoped_storage_isolation() {
 }
 
 // ============================================================================
-// H4: KV Segment Deletion Proof Binding State
+// H4: KV Segment Deletion Proof Binding State (Entfernt / Nicht mehr im Soll)
 // ============================================================================
-
-#[test]
-fn test_h4_kv_segment_deletion_proof_state_binding() {
-    let registry = Arc::new(KeyRegistry::new());
-    let master_key = Arc::new(
-        KeyManager::try_new("master-passphrase-shredding", b"master-salt-123").expect("KeyManager"),
-    );
-
-    // 1. TombstoneOnly manager
-    let mgr_tombstone = KvSegmentManager::new(
-        KvSegmentConfig {
-            delete_mode: KvDeleteMode::TombstoneOnly,
-        },
-        registry.clone(),
-        Some(master_key.clone()),
-    );
-
-    let proof_tombstone = mgr_tombstone.generate_deletion_proof(100);
-    assert!(
-        proof_tombstone.is_err(),
-        "TombstoneOnly mode MUST reject deletion proof generation"
-    );
-
-    // 2. CryptoShred manager
-    let mgr_shred = KvSegmentManager::new(
-        KvSegmentConfig {
-            delete_mode: KvDeleteMode::CryptoShred,
-        },
-        registry.clone(),
-        Some(master_key.clone()),
-    );
-
-    let group_id = 42u64;
-    let payload = mgr_shred.write_segment(group_id, b"secret_data").unwrap();
-
-    // Proof before shredding -> key is active, so deletion proof is false (not deleted)
-    let proof_before = mgr_shred.generate_deletion_proof(group_id).unwrap();
-    assert!(
-        !proof_before,
-        "Deletion proof must be false when segment key is still active"
-    );
-
-    // Read segment works
-    let read_back = mgr_shred.read_segment(&payload).unwrap();
-    assert_eq!(read_back, b"secret_data");
-
-    // Delete segment (crypto shred)
-    let revoked = mgr_shred.delete_segment(group_id).expect("delete_segment failed");
-    assert!(revoked, "Subkey revocation must return true");
-
-    // Proof after shredding -> key is inactive, so deletion proof is true (deleted)
-    let proof_after = mgr_shred.generate_deletion_proof(group_id).unwrap();
-    assert!(
-        proof_after,
-        "Deletion proof must be true after crypto shredding"
-    );
-
-    // Read segment fails after shredding
-    assert!(mgr_shred.read_segment(&payload).is_err());
-}
+// V-RUECKBAU: kv_segment / kv_shredding Module wurden aus contextra-crypto und
+// contextra-store rückgebaut (SPEC §8.8 / Cleanup Task R4).
 
 // ============================================================================
 // H5: Single-Process LsmStorage Reopen / Lock Behavior

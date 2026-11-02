@@ -1,5 +1,10 @@
 //! Pure In-Memory `StorageEngine` implementation for `memory-only-storage`.
 //!
+//! WARNUNG (NICHT FUER PRODUKTIONSBETRIEB):
+//! Dieses Modul stellt einen reinen Klartext-In-Memory-Speicher bereit und
+//! darf keinesfalls in produktiven Umgebungen eingesetzt werden. Es ist
+//! ausschließlich unter `test-utils` bzw. in Testumgebungen aktivierbar.
+//!
 //! Provides transactional KV operations with staging and zero disk/WAL/mmap I/O.
 
 use bytes::Bytes;

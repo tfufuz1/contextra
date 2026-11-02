@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "LSM-Tree storage engine for Contextra"
+description = "LSM-Speicher: WAL, Memtable, SSTables, Manifest, Kompaktion, Purge-Primitive."
 
 [package.metadata.contextra]
 ring = "1"

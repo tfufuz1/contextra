@@ -37,11 +37,13 @@
 
 pub use contextra_types::*;
 
+pub mod error;
 pub mod seq_log;
 pub mod snapshot;
 pub mod ssi;
 pub mod tx_buffer;
 
+pub use error::MvccError;
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
 pub use snapshot::{SnapshotGuard, SnapshotRegistry};
 pub use ssi::{PruningBlockerInfo, ReadSet, SequenceLogSsiValidator, SsiValidator};

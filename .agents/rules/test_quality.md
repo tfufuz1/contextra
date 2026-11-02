@@ -1,21 +1,11 @@
-# Governance Rule: Test Quality & Zero-Panic Assurance (`rules/test_quality.md`)
+# Testqualität
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+Abgeleitet aus SPEC 15.1, P10, D-35, D-72, HR-10.
 
-## Gilt für
-- `crates/*/tests/`
-- Workspace-weite Test-Suiten
-
-## Pflichtregeln
-1. **Red-to-Green Workflow**: Vor der Implementierung eines Fixes/Features muss der fehlschlagende Test (Red Phase) nachgewiesen und dokumentiert sein (Quelle: `AGENTS.md`).
-2. **Keine Assertion-losen Tests**: Testfunktionen dürfen nicht nur ohne Panics durchlaufen, sondern müssen explizite Invarianten-Assertions (`assert!`, `assert_eq!`) enthalten.
-3. **Kein Auto-Accept von Snapshots**: Snapshot-Updates (`insta::assert_snapshot!`) dürfen keinesfalls ungeprüft committet werden; Differenzen müssen manuell verifiziert werden.
-4. **Zero-Panic Invariante in Produktion**: Produktionscode darf keine `unwrap()`, `expect()` oder `panic!` enthalten, außer in explizit geführten Baseline-Dateien (`.github/unwrap_baseline.txt`) (Quelle: `.github/unwrap_baseline.txt`, `clippy::unwrap_used`).
-
-## Häufige Fehler
-- Nutzung von `.unwrap()` in Produktionspfaden statt richtiger `ContextraError`-Propagation.
-- Leere Test-Rümpfe, die als "erfolgreich" gewertet werden.
-
-## Verweise
-- `.github/unwrap_baseline.txt`
-- `AGENTS.md`
+- Jeder Test prüft eine benannte Eigenschaft mit SPEC-ID. Tests ohne Bezug werden nicht gemergt.
+- Ein Test, der nur „kein Panic“ prüft, belegt keine Zusage. Die Assertion muss das erwartete Ergebnis angeben.
+- Positivkontrolle: Ein Scanner-Zeuge ist nur gültig, wenn er ein eingestreutes Muster in einer Kontrolldatei findet (HR-10, T-RAW-2).
+- Mutationstests auf `erasure`, Klassifikation, Matcher, Gate und Tresor. Überlebende Mutanten blockieren Gate G-D (T-MUT-1).
+- Abdeckung: Zeilen ≥ 90 % in `erasure`, `crypto`, `store`, `ports`; ≥ 95 % in der Entscheidungslogik von `erasure` und der Klassifikation (SPEC 15.1). Der Wert steigt nur.
+- Golden-Dateien je Format-Version (T-FMT-1, Anhang F).
+- Fuzz-Ziele für alle Parser aus Anhang F und das KDF-Header-Format (T-KDF-2).

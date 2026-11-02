@@ -1,4 +1,4 @@
-//! Contract verification test suite for `Clock`, `Rng`, `Vfs`, and `MetricsSink` implementations.
+//! Contract verification test suite for Contextra port implementations.
 //!
 //! # SPEC-REF
 //! Compliance and contract testing suite enabled under feature `contract-tests`.
@@ -11,7 +11,11 @@ use crate::clock::Clock;
 use crate::error::ContextraError;
 use crate::metrics::MetricsSink;
 use crate::rng::{Rng, SeededRng};
+use crate::storage::StorageEngine;
+use crate::text_index::TextIndex;
+use crate::vector_index::VectorIndex;
 use crate::vfs::Vfs;
+use contextra_types::{DocId, TxId};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -161,6 +165,150 @@ pub fn verify_metrics_sink_contract<M: MetricsSink>(sink: &M) {
     sink.record_counter("contract_counter", 5, &[("layer", "ring0")]);
     sink.record_gauge("contract_gauge", 99.5, &[("node", "n1")]);
     sink.record_histogram("contract_latency", 0.005, &[("op", "read")]);
+}
+
+/// Contract test helper verifying [`StorageEngine`] trait implementation compliance.
+///
+/// Verifies put, get, commit, rollback, uncommitted isolation, and deletion.
+pub async fn verify_storage_engine_contract<S: StorageEngine>(engine: &S) {
+    let tx1 = TxId::new(101);
+    engine
+        .put(tx1, b"contract_k1", b"val_1")
+        .await
+        .expect("put must succeed");
+
+    // Uncommitted isolation: k1 must not be visible prior to commit
+    let uncommitted = engine
+        .get(b"contract_k1")
+        .await
+        .expect("get uncommitted must succeed");
+    assert!(
+        uncommitted.is_none(),
+        "uncommitted put must not be visible via get"
+    );
+
+    engine.commit(tx1).await.expect("commit must succeed");
+
+    let committed = engine
+        .get(b"contract_k1")
+        .await
+        .expect("get committed must succeed");
+    assert_eq!(
+        committed.as_deref(),
+        Some(&b"val_1"[..]),
+        "committed value must be visible"
+    );
+
+    // Rollback test
+    let tx2 = TxId::new(102);
+    engine
+        .put(tx2, b"contract_k2", b"val_2")
+        .await
+        .expect("put k2 must succeed");
+    engine.rollback(tx2).await.expect("rollback must succeed");
+
+    let rolled_back = engine
+        .get(b"contract_k2")
+        .await
+        .expect("get rolled back must succeed");
+    assert!(rolled_back.is_none(), "rolled back key must not be visible");
+
+    // Deletion test
+    let tx3 = TxId::new(103);
+    engine
+        .delete(tx3, b"contract_k1")
+        .await
+        .expect("delete must succeed");
+    engine
+        .commit(tx3)
+        .await
+        .expect("commit delete must succeed");
+
+    let deleted = engine
+        .get(b"contract_k1")
+        .await
+        .expect("get deleted must succeed");
+    assert!(deleted.is_none(), "deleted key must not be visible");
+}
+
+/// Contract test helper verifying [`TextIndex`] trait implementation compliance.
+pub async fn verify_text_index_contract<T: TextIndex>(index: &T) {
+    let tx = TxId::new(201);
+    index
+        .insert(tx, DocId(42), "rust contracts for text search")
+        .await
+        .expect("insert into text index must succeed");
+    index
+        .commit(tx)
+        .await
+        .expect("commit text index must succeed");
+
+    let hits = index
+        .search("contracts", 10)
+        .await
+        .expect("search must succeed");
+    assert!(
+        hits.iter().any(|h| h.doc_id == DocId(42)),
+        "inserted document must be returned in text search hits"
+    );
+
+    let tx_del = TxId::new(202);
+    index
+        .delete(tx_del, DocId(42))
+        .await
+        .expect("delete text index must succeed");
+    index
+        .commit(tx_del)
+        .await
+        .expect("commit text index delete must succeed");
+
+    let hits_after = index
+        .search("contracts", 10)
+        .await
+        .expect("search after delete must succeed");
+    assert!(
+        !hits_after.iter().any(|h| h.doc_id == DocId(42)),
+        "deleted document must not be returned in search"
+    );
+}
+
+/// Contract test helper verifying [`VectorIndex`] trait implementation compliance.
+pub async fn verify_vector_index_contract<V: VectorIndex>(index: &V) {
+    let tx = TxId::new(301);
+    let vec = [0.1f32, 0.2, 0.3, 0.4];
+    index
+        .insert(tx, DocId(99), &vec)
+        .await
+        .expect("insert vector must succeed");
+    index.commit(tx).await.expect("commit vector must succeed");
+
+    let hits = index
+        .search(&vec, 5)
+        .await
+        .expect("vector search must succeed");
+    assert!(
+        hits.iter().any(|h| h.doc_id == DocId(99)),
+        "inserted vector must be found in top search results"
+    );
+
+    let tx_del = TxId::new(302);
+    index
+        .delete(tx_del, DocId(99))
+        .await
+        .expect("delete vector must succeed");
+    index
+        .commit(tx_del)
+        .await
+        .expect("commit vector delete must succeed");
+
+    let hits_after = index
+        .search(&vec, 5)
+        .await
+        .expect("vector search after delete must succeed");
+    assert!(
+        !hits_after.iter().any(|h| h.doc_id == DocId(99)),
+        "deleted vector must not be found in search"
+    );
 }
 
 /// In-memory VFS reference implementation used strictly for contract self-testing.

@@ -21,7 +21,7 @@
 pub(crate) mod avx2;
 
 // ANCHOR[contextra-simd:KERN-MOD-AVX512]
-// x86_64 AVX-512F / AVX-512BW / AVX-512VNNI Instruktionen (512-Bit Vektoren).
+// x86_64 AVX-512F Instruktionen (512-Bit Vektoren).
 pub(crate) mod avx512;
 
 // ANCHOR[contextra-simd:KERN-MOD-NEON]

@@ -8,25 +8,21 @@
 // FILE-CONTEXT
 // ZWECK: Hybrid-Familie Submodule für Query-basierte Suche.
 
-use crate::collection::search::checkpoint::{
-    with_pinned_checkpoint, with_pinned_checkpoint_at_latest,
-};
 use crate::collection::search::filtered::{MAX_OVERFETCH_SCAN, OVERFETCH_STAGE_MULTIPLIERS};
 use crate::collection::Collection;
 use crate::fusion::{SearchReport, Signal, SignalFailurePolicy};
-use crate::metrics_names::{
-    record_histogram_safe, SEARCH_LATENCY_GRAPH, SEARCH_LATENCY_TEXT, SEARCH_LATENCY_VECTOR,
-};
-use contextra_ports::{GraphIndex, MetricsSink, StorageEngine, TextIndex, VectorIndex};
+use crate::metrics_names::{record_histogram_safe, SEARCH_LATENCY_TEXT, SEARCH_LATENCY_VECTOR};
+use contextra_ports::{MetricsSink, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{DocId, Result};
 
 /// Calculates effective candidate count limit based on query overfetch preferences and reranker settings.
 pub(super) fn calc_hybrid_candidate_k(query: &contextra_types::HybridQuery, k: usize) -> usize {
-    let overfetch = k.saturating_mul(Collection::<crate::LsmStorage, crate::HnswIndex>::OVERFETCH_FACTOR);
+    let overfetch =
+        k.saturating_mul(Collection::<crate::LsmStorage, crate::HnswIndex>::OVERFETCH_FACTOR);
     if query.has_reranker {
-        let pool_max = query
-            .rerank_pool_max
-            .unwrap_or(Collection::<crate::LsmStorage, crate::HnswIndex>::DEFAULT_MIN_RERANK_CANDIDATES);
+        let pool_max = query.rerank_pool_max.unwrap_or(
+            Collection::<crate::LsmStorage, crate::HnswIndex>::DEFAULT_MIN_RERANK_CANDIDATES,
+        );
         overfetch.max(pool_max)
     } else {
         overfetch
@@ -34,7 +30,7 @@ pub(super) fn calc_hybrid_candidate_k(query: &contextra_types::HybridQuery, k: u
 }
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
-    /// Performs hybrid search combining BM25, vector, and graph signals configured via `HybridQuery`.
+    /// Performs hybrid search combining BM25 and vector signals configured via `HybridQuery`.
     ///
     /// Applies `memory_type_filter` and metadata `FilterExpr` as Pre-RRF filters to preserve
     /// Reciprocal Rank Fusion properties (ADR-024).
@@ -45,15 +41,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         &self,
         query: &contextra_types::HybridQuery,
     ) -> Result<Vec<crate::SearchResult>> {
-        // Pin-first, read-after: the seq is read under the protection of the pin,
-        // eliminating the TOCTOU window between snapshot_seq() and pin activation.
-        with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
-            self.hybrid_search_with_query_at(query, seq).await
-        })
-        .await
+        let seq = self.storage.last_seq_no().await?;
+        self.hybrid_search_with_query_at(query, seq).await
     }
 
-    /// Performs hybrid search combining BM25, vector, and graph signals configured via `HybridQuery` at a specific snapshot sequence.
+    /// Performs hybrid search combining BM25 and vector signals configured via `HybridQuery` at a specific snapshot sequence.
+    // Begründung: Interne Abwärtskompatibilität für deprecated API bis Abschluss Stufe 2
     #[allow(deprecated)]
     pub async fn hybrid_search_with_query_at(
         &self,
@@ -67,6 +60,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     }
 
     /// Performs hybrid search returning both search results and an execution `SearchReport`.
+    // Begründung: Interne Abwärtskompatibilität für deprecated API bis Abschluss Stufe 2
     #[allow(deprecated)]
     pub async fn hybrid_search_with_query_and_report_at(
         &self,
@@ -95,98 +89,81 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
 
-        with_pinned_checkpoint(self.storage.as_ref(), seq, || async move {
-            let mut report = SearchReport::default();
-            let is_text_empty = text.trim().is_empty();
-            let candidate_k = calc_hybrid_candidate_k(query, k);
-            let total_docs = self.len().await;
+        let mut report = SearchReport::default();
+        let is_text_empty = text.trim().is_empty();
+        let candidate_k = calc_hybrid_candidate_k(query, k);
+        let total_docs = self.len().await;
 
-            let filter_pre_rrf = |list: Vec<crate::SearchResult>| {
-                let mut filtered = Vec::with_capacity(list.len());
-                for res in list {
-                    if let Some(ref filter_expr) = query.filter {
-                        let meta_ref = res.metadata.as_ref().unwrap_or(&serde_json::Value::Null);
-                        if !filter_expr.evaluate(meta_ref) {
-                            continue;
-                        }
+        let filter_pre_rrf = |list: Vec<crate::SearchResult>| {
+            let mut filtered = Vec::with_capacity(list.len());
+            for res in list {
+                if let Some(ref filter_expr) = query.filter {
+                    let meta_ref = res.metadata.as_ref().unwrap_or(&serde_json::Value::Null);
+                    if !filter_expr.evaluate(meta_ref) {
+                        continue;
                     }
-
-                    if let Some(ref type_filter) = query.memory_type_filter {
-                        let memory_type = crate::filter::extract_memory_type(&res.metadata);
-                        if !type_filter.contains(&memory_type) {
-                            continue;
-                        }
-                    }
-
-                    filtered.push(res);
                 }
-                filtered
-            };
 
-            let is_filtered = query.filter.is_some() || query.memory_type_filter.is_some();
-            let fallback_sink = self.metrics_sink();
-            let active_sink: &dyn MetricsSink = metrics.unwrap_or_else(|| fallback_sink.as_ref());
+                if let Some(ref type_filter) = query.memory_type_filter {
+                    let memory_type = crate::filter::extract_memory_type(&res.metadata);
+                    if !type_filter.contains(&memory_type) {
+                        continue;
+                    }
+                }
 
-            let vector_results = self
-                .evaluate_vector_signal_for_query(
-                    query,
-                    vector,
-                    seq,
-                    candidate_k,
-                    total_docs,
-                    is_filtered,
-                    &filter_pre_rrf,
-                    &mut report,
-                    active_sink,
-                )
-                .await?;
-
-            let text_results = self
-                .evaluate_text_signal_for_query(
-                    query,
-                    text,
-                    is_text_empty,
-                    seq,
-                    candidate_k,
-                    total_docs,
-                    is_filtered,
-                    &filter_pre_rrf,
-                    &mut report,
-                    active_sink,
-                )
-                .await?;
-
-            let graph_results = self
-                .evaluate_graph_signal_for_query(
-                    query,
-                    &text_results,
-                    seq,
-                    candidate_k,
-                    is_filtered,
-                    &filter_pre_rrf,
-                    &mut report,
-                    active_sink,
-                )
-                .await?;
-
-            if vector_results.is_empty() && text_results.is_empty() && graph_results.is_empty() {
-                return Ok((Vec::new(), report));
+                filtered.push(res);
             }
+            filtered
+        };
 
-            let fused_results = self
-                .fuse_and_filter_superseded_results(
-                    query,
-                    k,
-                    candidate_k,
-                    vector_results,
-                    text_results,
-                    graph_results,
-                )
-                .await?;
+        let is_filtered = query.filter.is_some() || query.memory_type_filter.is_some();
+        let pre_matched_ids = self.get_matching_doc_ids_for_query_at(query, seq).await?;
 
-            Ok((fused_results, report))
-        })
-        .await
+        let default_sink = self.metrics_sink();
+        let active_sink = metrics.unwrap_or(default_sink.as_ref());
+
+        // 1. Vector Signal Evaluation
+        let vector_results = self
+            .evaluate_vector_signal_for_query(
+                query,
+                vector,
+                seq,
+                candidate_k,
+                total_docs,
+                is_filtered,
+                &pre_matched_ids,
+                &filter_pre_rrf,
+                &mut report,
+                active_sink,
+            )
+            .await?;
+
+        // 2. Text Signal Evaluation
+        let text_results = self
+            .evaluate_text_signal_for_query(
+                query,
+                text,
+                is_text_empty,
+                seq,
+                candidate_k,
+                total_docs,
+                is_filtered,
+                &filter_pre_rrf,
+                &mut report,
+                active_sink,
+            )
+            .await?;
+
+        if vector_results.is_empty() && text_results.is_empty() {
+            return Ok((Vec::new(), report));
+        }
+
+        let fused_results = self
+            .fuse_results(query, k, candidate_k, vector_results, text_results)
+            .await?;
+
+        let filtered_final = crate::collection::search::hydrate::apply_read_gate(fused_results);
+        Ok((filtered_final, report))
     }
 
     /// Evaluates the vector signal for a hybrid query at a given snapshot sequence.
@@ -199,6 +176,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         candidate_k: usize,
         total_docs: usize,
         is_filtered: bool,
+        pre_matched_ids: &Option<std::collections::HashSet<DocId>>,
         filter_pre_rrf: &impl Fn(Vec<crate::SearchResult>) -> Vec<crate::SearchResult>,
         report: &mut SearchReport,
         active_sink: &dyn MetricsSink,
@@ -209,22 +187,24 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let vector_res: Result<Vec<crate::SearchResult>> = if is_vector_zero {
             Ok(Vec::new())
         } else if is_filtered {
-            let matched_ids_opt = self.get_matching_doc_ids_for_query_at(query, seq).await?;
-            if let Some(ref matched_ids) = matched_ids_opt {
-                if matched_ids.is_empty() {
-                    Ok(Vec::new())
+            if let Some(ref ids) = pre_matched_ids {
+                let filter_fn = |doc_id: DocId| ids.contains(&doc_id);
+                if ids.len() <= candidate_k * 4 {
+                    report.overfetch_stages = report.overfetch_stages.max(1);
+                    // Begründung: Aufruf der bestehenden search_filtered_at Methode innerhalb der Engine
+                    #[allow(deprecated)]
+                    self.search_filtered_at(vector, candidate_k, Some(&filter_fn), seq)
+                        .await
                 } else {
-                    let matched_ids_cloned = matched_ids.clone();
-                    let filter_fn = move |id: DocId| matched_ids_cloned.contains(&id);
                     let max_cap = total_docs.min(MAX_OVERFETCH_SCAN).max(candidate_k);
                     let mut final_filtered = Vec::new();
 
-                    for (stage_idx, &stage_mult) in
-                        OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate()
-                    {
+                    for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
                         report.overfetch_stages =
                             report.overfetch_stages.max((stage_idx + 1) as u8);
                         let oversample = (candidate_k * stage_mult).min(max_cap);
+                        // Begründung: Aufruf der bestehenden search_filtered_at Methode innerhalb der Engine
+                        #[allow(deprecated)]
                         let raw_vec_results = self
                             .search_filtered_at(vector, oversample, Some(&filter_fn), seq)
                             .await?;
@@ -251,9 +231,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 let mut final_filtered = Vec::new();
 
                 for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
-                    report.overfetch_stages =
-                        report.overfetch_stages.max((stage_idx + 1) as u8);
+                    report.overfetch_stages = report.overfetch_stages.max((stage_idx + 1) as u8);
                     let oversample = (candidate_k * stage_mult).min(max_cap);
+                    #[allow(deprecated)]
                     let raw_vec_results = self
                         .search_filtered_at(vector, oversample, None, seq)
                         .await?;
@@ -277,11 +257,17 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         } else {
             report.overfetch_stages = report.overfetch_stages.max(1);
+            // Begründung: Aufruf der bestehenden search_filtered_at Methode innerhalb der Engine
+            #[allow(deprecated)]
             self.search_filtered_at(vector, candidate_k, None, seq)
                 .await
         };
 
-        let elapsed_vec = (self.clock().monotonic_nanos().saturating_sub(vec_start_nanos)) as f64 / 1_000_000_000.0;
+        let elapsed_vec = (self
+            .clock()
+            .monotonic_nanos()
+            .saturating_sub(vec_start_nanos)) as f64
+            / 1_000_000_000.0;
         record_histogram_safe(active_sink, SEARCH_LATENCY_VECTOR, elapsed_vec, &[]);
 
         match vector_res {
@@ -331,8 +317,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
             for (stage_idx, &stage_mult) in OVERFETCH_STAGE_MULTIPLIERS.iter().enumerate() {
                 report.overfetch_stages = report.overfetch_stages.max((stage_idx + 1) as u8);
-                let oversample =
-                    (calculated_initial * stage_mult / 3).clamp(candidate_k, max_cap);
+                let oversample = (calculated_initial * stage_mult / 3).clamp(candidate_k, max_cap);
                 let bm25_results = self.text_index.search_at(text, oversample, seq).await?;
                 let bm25_len = bm25_results.len();
                 let hydrated = self
@@ -373,7 +358,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .await
         };
 
-        let elapsed_text = (self.clock().monotonic_nanos().saturating_sub(text_start_nanos)) as f64 / 1_000_000_000.0;
+        let elapsed_text = (self
+            .clock()
+            .monotonic_nanos()
+            .saturating_sub(text_start_nanos)) as f64
+            / 1_000_000_000.0;
         record_histogram_safe(active_sink, SEARCH_LATENCY_TEXT, elapsed_text, &[]);
 
         match text_res {
@@ -390,137 +379,16 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
     }
 
-    /// Evaluates the graph signal for a hybrid query at a given snapshot sequence.
-    #[allow(clippy::too_many_arguments)]
-    async fn evaluate_graph_signal_for_query(
-        &self,
-        query: &contextra_types::HybridQuery,
-        text_results: &[crate::SearchResult],
-        seq: u64,
-        candidate_k: usize,
-        _is_filtered: bool,
-        filter_pre_rrf: &impl Fn(Vec<crate::SearchResult>) -> Vec<crate::SearchResult>,
-        report: &mut SearchReport,
-        active_sink: &dyn MetricsSink,
-    ) -> Result<Vec<crate::SearchResult>> {
-        let implicit_anchors: Vec<contextra_types::EntityId>;
-        let anchors_ref: Option<&[contextra_types::EntityId]> =
-            if let Some(ref start_node) = query.graph_start_node {
-                let parsed_eid = if let Ok(u) = start_node.parse::<u64>() {
-                    Some(contextra_types::EntityId::new(u))
-                } else if let Some(inner_str) = start_node
-                    .strip_prefix("EntityId(")
-                    .and_then(|s| s.strip_suffix(')'))
-                {
-                    inner_str
-                        .parse::<u64>()
-                        .ok()
-                        .map(contextra_types::EntityId::new)
-                } else {
-                    contextra_types::EntityId::from_key(start_node).ok()
-                };
-                if let Some(eid) = parsed_eid {
-                    implicit_anchors = vec![eid];
-                    Some(&implicit_anchors)
-                } else {
-                    None
-                }
-            } else if !text_results.is_empty() {
-                implicit_anchors = text_results
-                    .iter()
-                    .filter_map(|r| contextra_types::EntityId::from_key(r.id.as_str()).ok())
-                    .collect();
-                Some(&implicit_anchors)
-            } else {
-                None
-            };
-
-        let graph_start_nanos = self.clock().monotonic_nanos();
-        let graph_res: Result<Vec<crate::SearchResult>> = if let Some(anchors) = anchors_ref {
-            let tuples_res = match query.graph_strategy {
-                contextra_types::GraphTraversalStrategy::Hops { max_hops } => {
-                    self.graph_index
-                        .multi_traverse_at(anchors, max_hops, seq)
-                        .await
-                }
-                contextra_types::GraphTraversalStrategy::PersonalizedPageRank(ref cfg) => {
-                    self.graph_index
-                        .personalized_page_rank_at(anchors, cfg, seq)
-                        .await
-                }
-                contextra_types::GraphTraversalStrategy::PathRag { max_hops, .. } => {
-                    self.graph_index.path_rag_at(anchors, max_hops, seq).await
-                }
-            };
-
-            match tuples_res {
-                Ok(mut raw_tuples) => {
-                    raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                    raw_tuples.truncate(candidate_k);
-                    let doc_tuples = raw_tuples
-                        .into_iter()
-                        .map(|(eid, score)| (contextra_types::DocId::new(eid.inner()), score))
-                        .collect();
-                    let hydrated = self.hydrate_from_tuples_at(doc_tuples, seq).await?;
-                    Ok(filter_pre_rrf(hydrated))
-                }
-                Err(e) => Err(e),
-            }
-        } else {
-            Ok(Vec::new())
-        };
-
-        let elapsed_graph = (self.clock().monotonic_nanos().saturating_sub(graph_start_nanos)) as f64 / 1_000_000_000.0;
-        record_histogram_safe(active_sink, SEARCH_LATENCY_GRAPH, elapsed_graph, &[]);
-
-        let graph_results = match graph_res {
-            Ok(res) => res,
-            Err(err) => {
-                if query.on_signal_failure == SignalFailurePolicy::Fail {
-                    return Err(err);
-                }
-                report.degraded_signals.push(Signal::Graph);
-                tracing::warn!("Graph search signal failed under Degrade policy: {err}");
-                Vec::new()
-            }
-        };
-
-        if !text_results.is_empty()
-            && graph_results.is_empty()
-            && query.graph_start_node.is_none()
-        {
-            let msg =
-                "Implicit graph anchors derived from text results produced empty graph signal";
-            tracing::warn!(text_count = text_results.len(), "{msg}");
-            report.warnings.push(msg.to_string());
-        } else if query.graph_start_node.is_some() && graph_results.is_empty() {
-            let msg = "Explicit graph anchor produced empty graph signal";
-            tracing::warn!("{msg}");
-            report.warnings.push(msg.to_string());
-        }
-
-        Ok(graph_results)
-    }
-
-    /// Fuses vector, text, and graph signal sets and applies post-fusion community boosting and supersedes filtering.
-    async fn fuse_and_filter_superseded_results(
+    /// Fuses vector and text signal sets.
+    async fn fuse_results(
         &self,
         query: &contextra_types::HybridQuery,
         k: usize,
         candidate_k: usize,
         vector_results: Vec<crate::SearchResult>,
         text_results: Vec<crate::SearchResult>,
-        graph_results: Vec<crate::SearchResult>,
     ) -> Result<Vec<crate::SearchResult>> {
-        let (vw, tw, gw) =
-            crate::fusion::weights_to_signal_factors(Some(&query.fusion_weights));
-
-        let target_community_id: Option<u64> =
-            if let Some(same_comm_entity) = query.same_community_as {
-                self.get_community(same_comm_entity).await?
-            } else {
-                None
-            };
+        let (vw, tw, _) = crate::fusion::weights_to_signal_factors(Some(&query.fusion_weights));
 
         let mut signal_sets = Vec::new();
         if !vector_results.is_empty() {
@@ -528,9 +396,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
         if !text_results.is_empty() {
             signal_sets.push(("text".to_string(), text_results, tw));
-        }
-        if !graph_results.is_empty() {
-            signal_sets.push(("graph".to_string(), graph_results, gw));
         }
 
         let max_fusion_results = candidate_k
@@ -546,39 +411,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             query.fusion_strategy,
         );
 
-        let supersedes_pool_size = k.saturating_mul(3).max(k);
-        fused_results.truncate(supersedes_pool_size);
-
-        if !query.include_superseded {
-            let mut superseded_targets = std::collections::HashSet::new();
-            for res in &fused_results {
-                if let Ok(doc_id) = DocId::from_key(&res.id) {
-                    let links = self.get_links(doc_id).await?;
-                    for link in links {
-                        if link.relation == contextra_types::domain::LinkRelation::Supersedes {
-                            superseded_targets.insert(link.target);
-                        }
-                    }
-                }
-            }
-            if !superseded_targets.is_empty() {
-                fused_results.retain(|res| {
-                    if let Ok(doc_id) = DocId::from_key(&res.id) {
-                        !superseded_targets.contains(&doc_id)
-                    } else {
-                        true
-                    }
-                });
-            }
-        }
-
         fused_results.truncate(k);
-
-        self.apply_community_boost_post_fusion(
-            fused_results,
-            target_community_id,
-            Self::DEFAULT_COMMUNITY_BOOST,
-        )
-        .await
+        Ok(fused_results)
     }
 }

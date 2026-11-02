@@ -1,22 +1,11 @@
-# contextra-ports
+Schnittstellen (Traits) zwischen den Schichten: Speicher, Index, Dateisystem, Zeit, Zufall, Löschschicht.
 
-Abstrakte Port-Schnittstellen und Trait-Definitionen für deterministische Entkopplung.
+## Status
 
-- **Ring:** Ring 0 (Port-Fundament)
-- **Normativ:** [docs/SPEC.md §8.2](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 0. Ist-Zustand: vorhanden; Altports `graph`, `checkpoint`, `license`, `attention`, `plugin` entfernt; `embedding`, `reranker`, `query_rewriter` noch vorhanden; Löschports fehlen. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra-ports` definiert sämtliche abstrakten Port-Traits, über die die Ringe 1 bis 3 gekoppelt sind:
-- `StorageEngine`: Asynchroner Zugriff auf Key-Value-Speicher auf `KeyBuf`/`Bytes`.
-- `ErasureLayer`: Einheitlicher Vertrag für löschbare Schichten (`plan`, `purge`, `scan_residue`, `positive_control`).
-- `ReadGate`: Fail-closed Lesesperre (`blocked`, `blocked_range`).
-- `RecordSealer`: Lokales Envelope-Sealing und Öffnen via Tresor.
-- `LedgerSink`: Append-only Sink für Restore-Guard-Ledger.
-- `Vfs` / `VfsFile`: Konsolidierte virtuelle Dateisystemschnittstelle.
-- `Clock`, `Rng`, `IdGen`, `Metrics`: Ports für strikten Determinismus (P28).
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- Keine konkreten Produktions-Implementierungen (nur Conformance-Suiten).
-- Conformance-Tests in `ports::contract_tests` laufen gegen jede Implementierung.
+Erlaubt laut SPEC 5.3: `types`.
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

@@ -337,39 +337,42 @@ impl StorageEngine for InMemoryStorageEngine {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
     // ANCHOR[contextra-testkit:TEST-IN-MEM-STORE-COMMIT-001]
     // Prüft, dass gestagete Werte erst nach dem Commit sichtbar werden.
     #[tokio::test]
-    async fn test_in_memory_store_put_get_commit() {
+    async fn test_in_memory_store_put_get_commit(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
         let store = InMemoryStorageEngine::new();
         let tx = TxId::new(1);
 
-        assert!(store.get(b"key1").await.unwrap().is_none());
+        assert!(store.get(b"key1").await?.is_none());
 
-        store.put(tx, b"key1", b"value1").await.unwrap();
+        store.put(tx, b"key1", b"value1").await?;
         // Not visible before commit
-        assert!(store.get(b"key1").await.unwrap().is_none());
+        assert!(store.get(b"key1").await?.is_none());
 
-        store.commit(tx).await.unwrap();
-        let val = store.get(b"key1").await.unwrap();
+        store.commit(tx).await?;
+        let val = store.get(b"key1").await?;
         assert_eq!(val, Some(Bytes::from_static(b"value1")));
+        Ok(())
     }
 
     // ANCHOR[contextra-testkit:TEST-IN-MEM-STORE-ROLLBACK-001]
     // Prüft, dass ein Rollback unbestätigte Änderungen verwirft und diese nicht sichtbar werden.
     #[tokio::test]
-    async fn test_in_memory_store_rollback() {
+    async fn test_in_memory_store_rollback() -> std::result::Result<(), Box<dyn std::error::Error>>
+    {
         let store = InMemoryStorageEngine::new();
         let tx = TxId::new(2);
 
-        store.put(tx, b"key_rb", b"val").await.unwrap();
-        store.rollback(tx).await.unwrap();
-        store.commit(tx).await.unwrap();
+        store.put(tx, b"key_rb", b"val").await?;
+        store.rollback(tx).await?;
+        store.commit(tx).await?;
 
-        assert!(store.get(b"key_rb").await.unwrap().is_none());
+        assert!(store.get(b"key_rb").await?.is_none());
+        Ok(())
     }
 }

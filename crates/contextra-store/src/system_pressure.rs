@@ -160,7 +160,7 @@ impl SystemPressureMonitor {
 
                     // Sample blocking thread pool utilization using a probe task with timeout.
                     // Probe measures task execution/dispatch latency through the blocking queue.
-                    let sample_start = std::time::Instant::now();
+                    let sample_start = tokio::time::Instant::now();
                     let blocking_probe = tokio::task::spawn_blocking(|| {
                         // Minimal work in blocking thread
                     });

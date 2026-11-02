@@ -1,60 +1,51 @@
-# Contextra – Sicherheitsmodell & Bedrohungsanalyse (Security Model)
+# Sicherheit
 
-<!-- doc-stamp: 2026-11-01 | Normativ: docs/SPEC.md §10, §11, §12 | PLAN.md Phase 2 -->
+Maßgeblich: [`SPEC.md`](SPEC.md) Abschnitte 4.2 (D-55, D-56, D-63, D-67, D-80), 6.2 (H3, H4), 6.3 (HR-8), 17.3 und Anhang D.
 
-Dieses Dokument beschreibt das Bedrohungsmodell, die Sicherheitsarchitektur und die Sicherheits-Defaults für Contextra gemäß [docs/SPEC.md](SPEC.md) und [PLAN.md](../PLAN.md).
+## 1. Schwachstellen melden
 
----
+**Meldeweg:** [Platzhalter – verschlüsselter Meldekanal vor dem ersten Release vom Maintainer einzutragen.] SPEC 17.3 verlangt einen verschlüsselten Meldeweg. Im Repository ist er derzeit nicht hinterlegt. Bitte keine Details über öffentliche Issues melden.
 
-## 1. Schutzgüter & Vertrauensgrenzen
+**Fristen.**
 
-| Schutzgut | Speicherort | Primärer Schutzmechanismus |
-|---|---|---|
-| **Dokumente & Datensätze** | SSTables, MemTable, WAL | Pflichtverschlüsselung mit AES-256-GCM-SIV, Envelope-Format (SPEC §9.3), HMAC-SHA256-Kette im WAL, CRC32 für Torn-Write-Erkennung. |
-| **Schlüsselmaterial** | RAM des Prozesses | KDF via Argon2id ($m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$), HKDF-Ableitung in `KeySet` (SPEC §13.1), `Zeroizing<T>`, Paging-Schutz (`mlock` via `contextra-sys`). |
-| **Mandantentrennung** | Alle Schichten | Verpflichtende `TenantId`, physische und logische Isolation über `TenantScopedStorage` (T-ARCH-2, VETO-F10). |
-| **Suchindizes** | HNSW (Vektor), BM25 (Text) | AEAD-verschlüsselte Chunks und Segmente auf Platte; Slot-Zeroing im RAM; physischer Purge-Rewrite bei Löschung. |
-| **Löschberichte** | Dateisystem / Export | Asymmetrisch Ed25519-signierter Bericht `ctx-erasure-report/1` mit E1/E2/E3-Residuenmessung. Keine Klartext-IDs. |
+- Frühwarnung innerhalb von 24 Stunden und Meldung innerhalb von 72 Stunden bei aktiv ausgenutzten Schwachstellen oder schweren Vorfällen nach dem Cyber Resilience Act, Art. 14 (SPEC H4, D-67). Die Meldepflicht gilt laut SPEC seit dem 11.09.2026 über die ENISA Single Reporting Platform.
+- Interne Bearbeitungsfristen nach Bestätigung (HR-8): kritisch 7 Tage, hoch 30 Tage.
+- Unterstützungszeitraum: mindestens fünf Jahre Sicherheitsupdates je Hauptversion ab Veröffentlichung (D-67). Eine veröffentlichte Version gibt es noch nicht.
 
-### Vertrauensgrenzen
-- **Prozessgrenze:** Contextra läuft eingebettet im Prozess der Trägeranwendung. Memory-Dump-Schutz erfolgt über `mlock_best_effort` und `Zeroize`.
-- **Dateisystemgrenze:** Das Datenverzeichnis wird als potentiell feindlich oder fehleranfällig betrachtet. Manipulationen, unvollständige Schreibvorgänge oder CRC-Mismatches führen zum sofortigen kontrollierten Abbruch (INV-FAILCLOSED-1).
-- **Mandantengrenze:** Anfragen verschiedener Mandanten sind informationstheoretisch und physisch strikt isoliert (VETO-F10). Kein geteilter Cache, keine gemischten SSTables, keine mandantenübergreifenden Kanten.
-- **Netzgrenze (Single-Node-Doktrin):** Der Kern öffnet keinerlei Netzwerk-Sockets und enthält keine Netzwerk-Crates im Produktionsbaum.
+Die rechtliche Einordnung ist nicht Gegenstand dieses Dokuments. Sie steht in SPEC 6.2 und 6.7.
 
----
+## 2. Sicherheitsmerkmale im Entwurf
 
-## 2. Verbindliche Sicherheits-Defaults (SPEC §10)
+- **Pflichtverschlüsselung.** Records und Blöcke mit AES-256-GCM-SIV. Keyslots mit Argon2id; Parameter gelten nur innerhalb fester Grenzen (`m` 64 MiB bis 4 GiB, `t` 3 bis 16, `p` 1 bis 16; D-06). Standard: 128 MiB, `t` 3, `p` 4 (D-68). Subschlüssel über HKDF; die Passphrase wird nie per HKDF abgeleitet (D-06).
+- **Keine Schalter.** Es gibt keinen unverschlüsselten Modus, keinen Integritäts-Downgrade und keinen Schlüssel für ältere WAL-Formate (D-05, F-21).
+- **Integrität.** WAL als HMAC-Kette, Dateikopf mit Format-Version und Algorithmus-IDs, Schlüsselwrap mit gebundener AAD (D-52, D-60, D-42).
+- **Schlüsselvernichtung.** Löschung über den Schlüsselbaum. Dateischlüssel werden vor dem Entfernen einer Datei genullt (D-79, D-85).
+- **Prozesshärtung.** Optionen `Required`, `BestEffort` (Standard) und `Off`: `RLIMIT_CORE = 0`, `PR_SET_DUMPABLE = 0`, `MADV_DONTDUMP` für Schlüsselseiten, `mlock` nach Möglichkeit. Diese Maßnahmen wirken prozessweit. Der Status steht in `health()` und im Bericht (D-63).
+- **`fsync`.** Ein Fehler ist für die betroffene Datei fatal. Der Store wechselt in den Zustand `Poisoned`. Blindes Wiederholen findet nicht statt (D-55).
+- **Unsafe-Code.** Nur in `contextra-sys` und `contextra-simd`. Alle anderen Crates setzen `#![forbid(unsafe_code)]`. Keine Speicherabbildung (D-29, D-94).
+- **Netzwerk und Telemetrie.** Keine Netzwerk-Bibliothek im Produktionsbaum (HR-1, HR-2, D-54).
+- **Logs und Fehler.** Keine Nutzerinhalte, Schlüssel, Klartext-Kennungen oder personenbezogenen Pfade (HR-4, T-LOG-1).
 
-| ID | Gegenstand | Sicherheits-Vorgabe (Normativ) | Begründung |
-|---|---|---|---|
-| **D-05** | Verschlüsselung | **Pflicht ohne Opt-Out** (`EncryptionMode::Required`). Kein unverschlüsselter Block- oder SSTable-Pfad im Produktionscode. | Schutz vor Datenremanenz auf persistenten Medien. |
-| **D-06** | Passphrase-KDF | **Argon2id mit $m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$** (`derive_master`). HKDF für Passphrasen ist strikt verboten (B-15). | Brute-Force-Resistenz gegen GPU/ASIC-Angriffe. |
-| **D-07** | Mandantenisolation | **Verpflichtend ohne Opt-Out** (`TenantPolicy::Required`). `TenantId` stammt aus dem Kontext. | Ausschluss versehentlicher mandantenloser Speicherung. |
-| **D-27** | Entitätsextraktion | **Vollständig entfallen in v1**. Kein unkontrollierter PII-Abfluss an externe LLM-Dienste. | Minimierung der Angriffsfläche und Datenschutzrisiken. |
-| **D-29** | Unsafe-Code | **Strikt auf 2 Inseln beschränkt** (`contextra-sys`, `contextra-simd`). Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`. | Speichersicherheit des Gesamtsystems. |
-| **D-31** | Schlüsselraum | **Blinde Tags:** `doc_tag`, `coll_tag`, `tenant_tag`, `term_tag` via keyed BLAKE3 (`blind_tag`). Kein Klartext in Schlüsseln. | Schutz vor Metadaten-Leaks in Indizes und Bloom-Filtern. |
+## 3. Bekannte Restrisiken
 
----
+Alle Restrisiken mit Bedingungen stehen in SPEC Anhang D. Jeder Bericht eines Löschvorgangs führt die zutreffenden auf. Das betrifft insbesondere:
 
-## 3. Lösch- und Nachweismodell (SPEC §11, §12, ADR-001)
+- `FlashRemanence`, `FsJournalOrCow`, `FreedBlockRemanence`: Medium und Dateisystem.
+- `WrappedKeyRemanence`, `OldKeyslotRemanence`: Schlüsselreste auf dem Medium.
+- `ProcessMemory`: Klartext im Prozessspeicher, Swap oder Coredump.
+- `IndexTopologyInference`, `TextIndexUntilPurge`: Index-Rückstände bis zur Reparatur oder zum Rewrite.
+- `ExternalCopies`, `ExternalProcessors`: Kopien außerhalb von Contextra.
 
-Gemäß ADR-001 (SPEC §3.3, D-01) implementiert Contextra in v1 ein belegbares Löschmodell basierend auf physischer Bereinigung und Verifikation:
-1. **Sofortige Lesesperre (`ReadGate`):** Sobald ein Löschauftrag `Gated` ist, blockiert `ErasedSet` fail-closed alle Lese- und Suchpfade auf Zielschlüssel. Aktive Snapshots, die Zielversionen sehen könnten, werden widerrufen (`SnapshotRevoked`).
-2. **Physisches Purging (Ebene A):**
-   - Store: `drain` versiegelt WAL; `rewrite_file` streamt neue SSTables ohne Zieldaten (Originalsequenzen bleiben erhalten, I-2); atomarer `swap` via Manifest; Block-Cache Eviction mit Zeroize.
-   - Vector: `zero_slot` überschreibt RAM-Bytes mit Nullen, Tombstone-Flag, Rewrite betroffener Snapshot-Chunks, Rebuild ab Schwelle.
-   - Text: Puffer leeren, betroffene Segmente ohne Zieldaten neu schreiben, Alt-Segmente löschen, Term-Statistik neu aggregieren.
-3. **Residuenmessung & Zeugen:**
-   - **E1**: Byte-genauer Rohscan des Datenverzeichnisses nach Needles.
-   - **E2**: Strukturierter Scan nach Dekodierung aller Container.
-   - **E3**: Nachweis der Schlüssel- und Slot-Abwesenheit.
-   - Positivkontrolle (Canary) vor jeder Messung beweist Detektionsfähigkeit.
-4. **Bericht `ctx-erasure-report/1`:**
-   Ed25519-signiert, maschinenlesbar, enthält keine Klartext-IDs oder Personendaten. Verifizierbar durch die unabhängige Binärdatei `ctx-verify`.
+## 4. Betreiberpflichten
 
----
+- Passphrase sicher verwalten. Es gibt keine Wiederherstellung (HR-3).
+- Volume-Verschlüsselung mit Schlüsselvernichtung einsetzen, wenn der Schutzbedarf hoch ist.
+- Swap verschlüsseln oder deaktivieren. Coredumps abschalten.
+- Backups und Ledger nach SPEC 16 (Punkt 5) und 11.8 behandeln. `backup_retention` muss mindestens so lang sein wie die Aufbewahrung der Sicherungen.
 
-## 4. Meldung von Sicherheitslücken (Vulnerability Disclosure)
+## 5. Lieferkette
 
-Sicherheitsrelevante Schwachstellen dürfen nicht über öffentliche Issue-Tracker gemeldet werden. Vertrauliche Berichte mit Proof-of-Concept richten Sie bitte direkt an die Core-Maintainer.
+- Signierte Quell- und Binärartefakte (Sigstore oder minisign), SBOM im Format CycloneDX, Bericht von `cargo-audit` und `cargo-deny` je Release (SPEC 17.1).
+- Advisory-Ausnahmen in `deny.toml` nur mit Ablaufdatum (F-17, 17.3).
+- Keine `continue-on-error`-Option auf Sicherheitsgates (17.3).
+- Build mit `--locked` und einer Toolchain nach D-82. Die Version steht im Evidenzbündel.

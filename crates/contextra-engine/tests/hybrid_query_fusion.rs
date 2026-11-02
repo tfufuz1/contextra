@@ -7,7 +7,7 @@
 #![cfg(not(loom))]
 use contextra_engine::{Contextra, ContextraConfig};
 use contextra_ports::{BoxFuture, TextEmbeddingEngine};
-use contextra_types::{EntityId, FusionWeights, GraphTraversalStrategy, Result};
+use contextra_types::{FusionWeights, Result};
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -61,21 +61,14 @@ async fn test_hybrid_query_fusion_signals_ranking_and_k_zero_boundary(
     )
     .await?;
 
-    col.relate("doc_fusion_1", "doc_fusion_2", "SIMILAR_TOPIC")
-        .await?;
-
-    // 2. Execute Hybrid Query combining vector, text, and anchor entities
-    let anchor_id = EntityId::from_key("doc_fusion_1")?;
-
-    let custom_weights = FusionWeights::new(0.4, 0.4, 0.2)?;
+    // 2. Execute Hybrid Query combining vector and text signals
+    let custom_weights = FusionWeights::new(0.5, 0.5, 0.0)?;
 
     let results = col
         .query()
         .text("Quantum Computing")
         .vector(&[1.0, 0.0, 0.0, 0.0])
-        .anchors(vec![anchor_id])
         .fusion_weights(custom_weights)
-        .strategy(GraphTraversalStrategy::Hops { max_hops: 2 })
         .include_provenance(true)
         .k(2)
         .execute()

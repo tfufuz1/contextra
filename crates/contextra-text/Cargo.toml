@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Contextra — Text processing and BM25 search for Hybrid Search"
+description = "BM25-Volltextindex als verschlüsselte Segmente mit deutschem Analyzer."
 
 [package.metadata.contextra]
 ring = "0"

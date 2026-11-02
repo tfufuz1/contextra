@@ -1,27 +1,13 @@
-# Governance Rule: WAL & Cryptographic Invariants (`rules/wal_crypto.md`)
+# WAL, Schlüssel und Krypto
 
-> **Normative Vorgabe nach docs/SPEC.md §8.6, §8.8, §10 und PLAN.md Phase 2.**
+Abgeleitet aus SPEC 10.1 bis 10.5, D-05, D-42, D-52, D-60, D-73, D-79, D-80, D-85, Anhang F.
 
-## Gilt für
-- `crates/contextra-store`
-- `crates/contextra-crypto`
-- `crates/contextra-erasure`
-
-## Pflichtregeln
-1. **WAL-First Consistency (I-1, P24)**:
-   - Jede persistente Zustandsänderung folgt der strikten Reihenfolge: WAL-Frame erzeugen → Gruppen-Commit → `sync_data` WAL → Memtable eintragen → Sichtbarkeit im Read-Pfad.
-2. **Kryptografische WAL-Integrität (SPEC §8.8, §9.2)**:
-   - Jeder WAL-Frame besitzt eine kryptografische HMAC-SHA256-Verkettung unter dem Schlüssel `K_wal` (abgeleitet aus `KeySet`).
-   - CRC32 dient ausschließlich der schnellen Torn-Write-Erkennung am Dateiende. CRC-Mismatch am Dateiende führt zum kontrollierten Abschneiden; CRC-Mismatch mitten in der Datei ist ein fataler Integritätsfehler.
-   - Historische Legacy-Keys ohne HMAC (`WalVersion::V1`) sind verboten und werden nicht als reguläre Writes akzeptiert.
-3. **Schlüsselhierarchie & Zeroize (SPEC §10.1, §10.4)**:
-   - Master-Key wird zwingend via Argon2id ($m \ge 64\,\text{MiB}, t \ge 3, p \ge 1$) aus der Passphrase abgeleitet.
-   - Teilschlüssel (`k_enc`, `k_idx`, `k_wal`, `k_journal`, `k_vault`, `k_unit`, `k_meta`, `k_hdr`, `k_sign_seed`) werden per HKDF abgeleitet.
-   - Sämtliche Schlüsselstrukturen implementieren `Zeroizing` und löschen sensible Daten bei Scope-Verlassen aus dem RAM.
-4. **Asymmetrisch signierter Löschbericht (D-13, SPEC §9.1)**:
-   - Löschnachweise erfolgen über das Format `ctx-erasure-report/1`, signiert per Ed25519.
-   - Der Bericht enthält keine Klartext-IDs, personenbezogene Daten oder Dokumentinhalte.
-
-## Verweise
-- `docs/SPEC.md` §8.6, §8.8, §10
-- `PLAN.md` WP-2.3, WP-2.4, WP-2.5
+- **WAL-Kette.** Jeder Frame trägt `mac_n = HMAC-SHA256(K_wal, prev_mac ‖ len ‖ seq ‖ ct ‖ aead_tag)` (F.4).
+- **Torn Write.** Ein ungültiger letzter Frame wird nur verworfen, wenn alle folgenden Bytes null sind. Sonst `Corrupt` und Start verweigert (T-WAL-1).
+- **Nie umschreiben.** Das WAL wird nicht editiert. Gelöscht werden ganze Segmente bis zum Flush-Punkt. Die Kette setzt über `WalFloor` mit `tail_mac` fort (D-73, T-WAL-2).
+- **Kein Downgrade.** Kein Schlüssel für ältere WAL-Formate, kein Integritäts-Opt-out (D-05).
+- **Nonces.** Datendateien: `0x00000000 ‖ u64(Blockzähler)` unter zufälligem Dateischlüssel. Record-Envelope und Keyslot-Wrap: 96 Bit aus dem OS-CSPRNG. Höchstens 2³² Blöcke je Datei (D-60).
+- **AAD.** Bindet Dateityp, `file_id`, Blockindex und bei Appendlogs den Vorgänger-MAC. Umordnen und Kreuzkopieren müssen scheitern (T-ENC-2).
+- **Schlüsselhierarchie.** `K_master` ist zufällig und in Keyslots gewickelt (D-52). `K_sign` ist nur abgeleitet (D-80). Löschung über Slots `T`, `C`, `S`, `D` und die Dateischlüssel `F` (D-79, D-85).
+- **Algorithmen.** Satz v1: AES-256-GCM-SIV, HMAC-SHA256, HKDF-SHA256, BLAKE3 keyed, Argon2id, Ed25519. `alg_id = 2` ist reserviert und nicht implementiert (D-80).
+- **Header.** Jeder Header trägt `format_version` und `alg_ids`. Unbekannte Werte führen zu `Corrupt` (I-6, D-42).

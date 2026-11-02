@@ -70,7 +70,12 @@ fuzz_target!(|input: ConcurrentMemTableInput| {
                             seq_no,
                             tx_id,
                         } => {
-                            mt.put(bytes::Bytes::copy_from_slice(key), bytes::Bytes::copy_from_slice(value), *seq_no, *tx_id);
+                            mt.put(
+                                bytes::Bytes::copy_from_slice(key),
+                                bytes::Bytes::copy_from_slice(value),
+                                *seq_no,
+                                *tx_id,
+                            );
                         }
                         MemTableOp::Get { key } => {
                             let _ = mt.get(key);

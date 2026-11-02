@@ -1,90 +1,147 @@
-# Contextra — Feature-Veto-Register (VETOES.md)
+# Veto-Register
 
-<!-- doc-stamp: 2026-11-01 | Spec-Fassung: 2.0.0 (SOLL-Zustand Release 1.0.0) | Normativ -->
+Abgeleitet aus [`SPEC.md`](SPEC.md). Bei Widerspruch gilt die SPEC. Ein vorhandenes Veto darf nur durch eine SPEC-Änderung mit Eintrag in Anhang H aufgehoben werden.
 
-> **Normativer Status:** Dieses Dokument ist nach [`docs/SPEC.md`](SPEC.md) die zweithöchste normative Quelle des Repositories (Rang 2). Hier festgehaltene Vetos dürfen unter keinen Umständen ohne formales Architecture Decision Record (ADR) und Freigabe durch die Core Maintainer aufgehoben oder umgangen werden.
-
----
-
-## VETO-F02: Kein partielles HNSW-Rewiring
-
-- **Feature-ID:** F-02
-- **Status:** Bestätigt (`permanent_enforced`, SPEC §8.10)
-- **Betroffene Pfade:** `crates/contextra-vector/`
-- **Schlüsselbegriffe:** `partial hnsw rebuild`, `nucleation`, `rebuild_region`, `F-02`
-- **Begründung:** Partielles Rewiring oder lokales Re-Graphing im HNSW-Index führt zu Recall-Kollaps, Deadlocks und extremer Lock-Contention. Zulässige Strategie ist ausschließlich: **Tombstone-Markierung + Slot-Zeroing im RAM + vollständiger Batch-Rebuild** ab Erreichen der Schwelle (`vector_rebuild_ratio`). Slot-Nummern dürfen erst nach Zeroing und Snapshot-Rewrite wiederverwendet werden.
+Diese Fassung ersetzt die Fassung 2.0.0. Dabei wurden die Vetos gegen die SPEC-Entscheidungen 4.x abgeglichen (Anhang E, KF-1).
 
 ---
 
-## VETO-F10: Absolute Mandantentrennung (Zero Cross-Tenant)
+## VETO-SN01: Single-Node, kein Server, kein Netzwerk
 
-- **Feature-ID:** F-10 (SPEC §7.2, §8.8)
-- **Status:** Dauerhaft bestätigt (`permanent_enforced`)
-- **Betroffene Pfade:** Alle Crates (insb. `contextra-engine`, `contextra-store`)
-- **Schlüsselbegriffe:** `cross-tenant`, `tenant knowledge sharing`, `TenantPolicy::Optional`, `F-10`
-- **Begründung:** Jeglicher mandantenübergreifende Datenfluss, Wissensaustausch oder Cross-Tenant-Index-Sharing ist verboten. Die Mandantenisolation (`TenantId`, `TenantTag`) ist absolut. Zugriff auf den Store erfolgt ausschließlich über `TenantScopedStorage` (T-ARCH-2). `TenantPolicy::Optional` ist restlos gestrichen (D-07).
+- **Quelle:** SPEC 1.4, HR-1, HR-2, D-43, D-54
+- **Status:** gültig
+- **Regel:** Keine Netzwerkfunktion, kein Server, kein Socket, kein P2P, kein Sharding, keine Replikation. Keine Netzwerk-Bibliothek im Produktionsbaum (`deny.toml`, `cargo tree -e normal`).
+- **Test:** T-ARCH-4
 
----
+## VETO-FAILCLOSED: Keine stillen Fallbacks
 
-## VETO-SN01: Single-Node-Doktrin (Kein P2P, kein Sharding, kein Server)
+- **Quelle:** P2, P6, FM-10, FM-16
+- **Status:** gültig
+- **Regel:** Unbekannter Zustand, korrupte Daten, abgelaufene Fristen führen zu Verweigerung oder `Pending`. Kein `unwrap_or_default` auf I/O, kein `let _ =` auf `Result`, kein `unwrap_or(u64::MAX)` als Sentinel. Ein Fehler ist sichtbar.
+- **Test:** T-LINT-2, T-FSYNC-1
 
-- **Feature-ID:** SN-01 (SPEC §1.4, §5.1)
-- **Status:** Dauerhaft bestätigt (`permanent_enforced`)
-- **Betroffene Pfade:** Gesamter Produktionsbaum
-- **Schlüsselbegriffe:** `distributed consensus`, `raft`, `p2p`, `sharding`, `replication`, `tcp`, `http-server`
-- **Begründung:** Contextra ist ein lokaler, eingebetteter Single-Node-Speicher (Library-First). Ein einziger Primärprozess besitzt und sperrt das lokale Datenverzeichnis (`LOCK`). Verteilte Konsensprotokolle, P2P-Netzwerke oder Cluster-Sharding im Kern erhöhen die Angriffsfläche und untergraben die lokale Löschverifizierbarkeit. Netzwerk-Crates sind im Produktionsbaum verboten (AR-7).
+## VETO-D01b: Schlüsselvernichtung ist Teil von v1
 
----
+- **Quelle:** D-01, KF-1, SPEC 3.3
+- **Status:** gültig. Ersetzt VETO-D01 (Fassung 2.0.0, „keine Ebene B in v1“), das aufgehoben ist.
+- **Regel:** Löschen in v1 umfasst drei Säulen: Gate und Purge, Schlüsselvernichtung über den Tresor und unabhängige Messung. Die Reichweite der Schlüsselvernichtung wird je Schicht ausgewiesen (`key_coverage`, D-69). Die rechtliche Wertung bleibt beim Betreiber (E-L2).
+- **Test:** T-VAULT-1 bis T-VAULT-5, T-KEYCOV-1
 
-## VETO-FAILCLOSED: Keine stillen Fallbacks bei Sicherheitsfehlern
+## VETO-F02: Keine regionale HNSW-Neuverdrahtung
 
-- **Feature-ID:** FC-01 (INV-FAILCLOSED-1)
-- **Status:** Dauerhaft bestätigt (`permanent_enforced`)
-- **Betroffene Pfade:** Alle Schichten
-- **Schlüsselbegriffe:** `silent fallback`, `unwrap_or_default`, `ignore error`, `let _ =`, `FC-01`
-- **Begründung:** Kryptografische Fehler, fehlende Schlüssel, gebrochene Prüfsummen oder unzureichende Berechtigungen MÜSSEN zu einem sofortigen, expliziten Fehler (`ContextraError`) führen. Es ist strengstens verboten, bei Krypto-Fehlern unverschlüsselte Fallbacks zu wählen, I/O-Fehler mit `let _ =` zu verwerfen oder Löschfehler still zu ignorieren.
+- **Quelle:** D-77 (ersetzt die Formulierung der Fassung 2.0.0)
+- **Status:** gültig, präzisiert
+- **Regel:** Verboten sind partielles Rewiring und lokales Re-Graphing einzelner Regionen. Erlaubt sind genau: (1) Vektor-Surrogat vor `Gated`, (2) eine **lineare Batch-Kantenreparatur** über alle Adjazenzlisten im Purge-Fenster, (3) ein **vollständiger deterministischer Rebuild** nach Quote. Slot-Nummern werden erst nach Reparatur in die Freiliste aufgenommen.
+- **Test:** T-VEC-DEL-1, T-VEC-DEL-2, T-VEC-REBUILD-INDEP
 
----
+## VETO-F10: Keine mandantenlose Zugriffsfunktion
 
-## VETO-D01: Kein kryptografischer DocDek-Vernichtungspfad in v1 (ADR-001)
+- **Quelle:** D-07, D-61, T-API-1, T-ISO-1
+- **Status:** gültig
+- **Regel:** Jede Funktion benötigt einen `TenantContext`. `TenantPolicy` entfällt. Kein mandantenübergreifender Datenfluss, kein Cross-Tenant-Index. Zugriff auf den Rohspeicher nur über `TenantScopedStorage` (AR-6).
+- **Test:** T-API-1 (trybuild), T-TENANT-1
 
-- **Feature-ID:** D-01 (ADR-001, SPEC §3.3)
-- **Status:** Dauerhaft bestätigt (`permanent_enforced`)
-- **Betroffene Pfade:** `contextra-crypto`, `contextra-store`, `contextra-erasure`
-- **Begründung:** Die sogenannte Ebene B (kryptografische Schlüsselvernichtung per `DocDek`/KeyTable) entfällt in v1 vollständig. Löschung in v1 ist die physische Bereinigung (Ebene A: SSTable-Rewrite/Swap, Slot-Zeroing, Segment-Rewrite) kombiniert mit fail-closed `ReadGate`, automatischer Residuenmessung (E1/E2/E3) und signiertem Bericht (`ctx-erasure-report/1`).
+## VETO-D05: Keine Schalter für Verschlüsselung und Integrität
 
----
+- **Quelle:** P5, D-05, HR-13
+- **Status:** gültig
+- **Regel:** Kein unverschlüsselter Modus, kein `Option<KeyManager>`, kein Feature für Integritäts-Downgrade, kein Schlüssel für ältere WAL-Formate. Ausnahmen gelten nur für `process_hardening` (D-63) und das Feature `testing` (D-46), das nur den Argon2-Schritt ersetzt und nie im Release aktiv ist.
+- **Test:** T-DEF-1, T-CFG-1, T-CFG-2
 
-## VETO-D05: Kein unverschlüsselter Speicherbetrieb
+## VETO-D06: Passphrase nur über Argon2id
 
-- **Feature-ID:** D-05 (SPEC §10)
-- **Status:** Dauerhaft bestätigt (`permanent_enforced`)
-- **Betroffene Pfade:** `contextra-store`, `contextra-engine`, `contextra`
-- **Begründung:** Verschlüsselung at rest (AES-256-GCM-SIV) ist in jedem Produktiv-Build Pflicht ohne Opt-Out (`EncryptionMode::Required`). Es gibt keinen unverschlüsselten Block- oder SSTable-Pfad.
+- **Quelle:** D-06, D-68
+- **Status:** gültig
+- **Regel:** Die Passphrase wird nur mit Argon2id abgeleitet, innerhalb von `m` ∈ [64 MiB, 4 GiB], `t` ∈ [3, 16], `p` ∈ [1, 16]. Die Grenzen werden vor der Ableitung geprüft. HKDF dient ausschließlich der Subschlüssel-Ableitung aus `K_master`.
+- **Test:** T-KDF-1, T-KDF-2
 
----
+## VETO-D27: Keine automatische Entitäts- oder Metadatenextraktion
 
-## VETO-D06: Keine Passphrasen-Ableitung via HKDF
+- **Quelle:** D-27, SPEC 1.4
+- **Status:** gültig
+- **Regel:** `AutoExtractionMode` und jede LLM-basierte Extraktion entfallen. Der Aufrufer liefert Metadaten.
+- **Test:** T-ARCH-3
 
-- **Feature-ID:** D-06 (B-15, SPEC §10)
-- **Status:** Dauerhaft bestätigt (`permanent_enforced`)
-- **Betroffene Pfade:** `contextra-crypto`
-- **Begründung:** Root-Passphrasen dürfen niemals per HKDF-SHA256 abgeleitet werden. Pflicht für Passphrasen ist Argon2id mit Parametern $m \ge 65.536\,\text{KiB}~(64\,\text{MiB}), t \ge 3, p \ge 1$ (`derive_master`). HKDF ist ausschließlich für die Subkey-Ableitung aus $K_\text{master}$ zulässig.
+## VETO-D29: `unsafe` nur in `sys` und `simd`
 
----
+- **Quelle:** D-29, AR-8
+- **Status:** gültig
+- **Regel:** `unsafe` ist ausschließlich in `contextra-sys` und `contextra-simd` erlaubt, mit `// SAFETY:`-Kommentar. Alle anderen Produktcrates setzen `#![forbid(unsafe_code)]`. Eine `unsafe fn` darf von keinem Crate mit `forbid` aufgerufen werden; die Funktion wird dann nicht angeboten.
+- **Test:** T-UNSAFE-1
 
-## VETO-D27: Keine automatische Entitätsextraktion
+## VETO-D94: Keine Speicherabbildung (`mmap`)
 
-- **Feature-ID:** D-27 (SPEC §1.4, §10)
-- **Status:** Dauerhaft bestätigt (`permanent_enforced`)
-- **Betroffene Pfade:** `contextra-types`, `contextra-engine`
-- **Begründung:** Automatische LLM-basierte Entitätsextraktion (`AutoExtractionMode`) entfällt vollständig in v1, um unbemerkten PII-Abfluss auszuschließen.
+- **Quelle:** D-94, D-29
+- **Status:** gültig
+- **Regel:** Kein `mmap` und kein `memmap2`. Lesezugriffe auf WAL, SSTable, Textsegment und Snapshot laufen über positionelles Lesen des Ports `Vfs`. Begründung: Klartextseiten im Page-Cache entziehen sich der Kontrolle des Löschkerns.
+- **Test:** T-UNSAFE-1, T-LINT-2
 
----
+## VETO-D03: Kein `block_on` im Bibliothekscode
 
-## VETO-D29: Keine unsafe-Inseln außerhalb von `sys` und `simd`
+- **Quelle:** D-03, F-14
+- **Status:** gültig
+- **Regel:** Synchrone Ports über asynchrone I/O und `block_on` sind verboten. Der `WasmMergeOperator` mit `block_on` entfällt (D-84).
+- **Test:** T-LINT-2
 
-- **Feature-ID:** D-29 (SPEC §5.2)
-- **Status:** Dauerhaft bestätigt (`permanent_enforced`)
-- **Betroffene Pfade:** Gesamter Workspace
-- **Begründung:** `unsafe` Rust-Code ist ausschließlich in `contextra-sys` und `contextra-simd` erlaubt. Alle anderen 12 Produktivcrates erzwingen strikt `#![forbid(unsafe_code)]`. `contextra-wire` ist nicht Teil von v1.
+## VETO-D04: Ein `Vfs`, keine direkten Dateizugriffe
+
+- **Quelle:** D-04, F-13, F-29
+- **Status:** gültig
+- **Regel:** Ein einziger Trait `Vfs` in `ports`, Implementierung `RealVfs` in `durable-fs`. `store`, `vector`, `text` und `erasure` nutzen nur `Vfs`.
+- **Test:** T-LINT-2
+
+## VETO-D55: Kein Wiederholen nach `fsync`-Fehler
+
+- **Quelle:** D-55, I-10, FM-5
+- **Status:** gültig
+- **Regel:** Ein Fehler von `sync_data`, `sync_all` oder `sync_dir` macht die betroffene Datei fatal. Derselbe Handle wird nie erneut synchronisiert. Der Store wechselt in `Poisoned`.
+- **Test:** T-FSYNC-1
+
+## VETO-D73: Der WAL wird nie umgeschrieben
+
+- **Quelle:** D-73, I-3
+- **Status:** gültig
+- **Regel:** Zielframes werden nicht aus WAL-Segmenten herausgeschnitten. Entfernt werden ganze Segmente bis zum Flush-Punkt. Die HMAC-Kette wird über `WalFloor` fortgesetzt.
+- **Test:** T-WAL-2, T-ISO-1
+
+## VETO-D57: Keine Dokumentlocks für Subject, Collection und Tenant
+
+- **Quelle:** D-57, D-78
+- **Status:** gültig
+- **Regel:** Dokumentlocks gelten nur für `EraseTarget::Document`. Für Subject, Collection und Tenant gibt es kein Lock-Set. Die Gate-Barriere ist O(1).
+- **Test:** T-GATEGROUP-1, T-CONC-1
+
+## VETO-D75: Keine Klartext-Namen in Pfaden
+
+- **Quelle:** D-75, D-09, HR-4
+- **Status:** gültig
+- **Regel:** Datei- und Verzeichnisnamen enthalten nur Tags, `file_id`, `erasure_id` oder feste Namen. Keine Mandanten- oder Collection-Namen im Dateisystem.
+- **Test:** T-RAW-6
+
+## VETO-D77: Keine Nullvektoren als Löschung
+
+- **Quelle:** D-77, D-18
+- **Status:** gültig
+- **Regel:** Ein Vektor wird nicht durch Nullen ersetzt, das die Navigation zerstört. Löschung erfolgt über Surrogat (Mittelwert der Nachbarn bzw. Einstiegsknoten), Batch-Kantenreparatur und Rebuild.
+- **Test:** T-VEC-DEL-1
+
+## VETO-HR3: Kein Schlüssel-Escrow
+
+- **Quelle:** HR-3, D-43
+- **Status:** gültig
+- **Regel:** Der Hersteller hält keinen Schlüssel und kann keine Daten wiederherstellen. Zusätzliche Keyslots des Betreibers sind Betreiberentscheidung.
+- **Test:** Doku-Test, Review
+
+## VETO-D15: Aufbewahrungsattestation ist Pflicht
+
+- **Quelle:** D-15, E-L7
+- **Status:** gültig
+- **Regel:** Jeder Löschauftrag trägt eine `RetentionAttestation`. Contextra prüft die Erklärung nicht inhaltlich, führt sie aber signiert im Bericht.
+- **Test:** T-API-2
+
+## VETO-D51: `soft_delete` ist keine Löschung
+
+- **Quelle:** D-51, KF-6
+- **Status:** gültig
+- **Regel:** Es gibt kein `delete`. Die Dokumentation von `soft_delete` beginnt mit „Für Löschpflichten `erase` verwenden.“
+- **Test:** T-API-3, T-LINT-1

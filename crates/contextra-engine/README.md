@@ -1,25 +1,11 @@
-# contextra-engine
+Orchestrierung: Mandanten, Collections, Transaktionen, Suche, Hintergrundtasks.
 
-Orchestrierung der Teilsysteme, Collections, Transaktionen, Hybridsuche und Erase-Bridge.
+## Status
 
-- **Ring:** Ring 3 (Orchestrierung)
-- **Normativ:** [docs/SPEC.md §8.12](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 3. Ist-Zustand: vorhanden (28.001 Zeilen); kompiliert in der Prüfung 4.2.0 nicht erreichbar; enthält Fremdmodule (`chunker`, `extraction`, `export`, `import`, `temporal_filter`, `decay_controller`); Modul `contextra_impl` heißt `instance`. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra-engine` verdrahtet die Speicher- und Indexschichten zu einem kohärenten Ganzen, besitzt jedoch **keine eigene Löschlogik** (diese ist an `contextra-erasure` und die `ErasureLayer` delegiert):
-- `wiring`: Assemblierung des Laufzeitgraphen, Verwaltung von Hintergrundtasks, geordnetes `close()`.
-- `collection`: `Collection` mit `insert`, `get`, `scan`, `delete`, `search_hybrid`.
-- `doc`: Zerlegung von Dokumenten in Records (`Doc`, `DocMap`, `Manifest`, `Locator`) gemäß SPEC §9.3.
-- `search`: Vorab-Filterung durch `ReadGate`, RRF-Fusion und nachgelagerter Metadatenfilter.
-- `transaction`: Atomare Transaktion über Store, Tresor und Indizes.
-- `recovery`: Wiederanlauf der abgeleiteten Indizes aus WAL-Segmenten (`derived_durable_through`).
-- `erase_bridge`: Anbindung von `ErasureCore` an die `ErasureLayer`-Instanzen.
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- Atomares Insert: `Doc`, `DocMap`, `Manifest` und `Locator` werden in einer einzigen Store-Transaktion geschrieben; Tresor-Slot ist vorher dauerhaft.
-- ReadGate vor Entschlüsselung: Alle Lese- und Suchpfade prüfen das `ReadGate`, bevor Daten entschlüsselt werden.
-- Asynchroner Dokument-Lock über die gesamte Operation (behebt Race-Befund B-13 zwischen Insert, Delete und Erase).
-- Mandantentrennung ist verpflichtend (`TenantPolicy::Required`, D-07).
-- Veraltete Module (Graph, Extraction, Checkpoint, Privacy, License) sind vollständig entfernt.
+Erlaubt laut SPEC 5.3: `types`, `ports`, `sys` (nur Prozesshärtung, D-88), `durable-fs`, `crypto`, `mvcc`, `store`, `text`, `vector`, `rank`, `erasure`.
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).
