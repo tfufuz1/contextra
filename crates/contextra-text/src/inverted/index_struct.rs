@@ -1,7 +1,7 @@
 use super::types::{Language, StagedStatsChange, TextIndexMetadata};
 use crate::posting_list::{Posting, ResidentPostingIndex};
 use crate::tokenizer::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -22,8 +22,8 @@ pub struct InvertedIndex<S: StorageEngine> {
     pub(crate) total_docs: Arc<AtomicU64>,
     pub(crate) total_tokens: Arc<AtomicU64>,
     pub(crate) avg_doc_len_x1000: Arc<AtomicU64>, // Cached fixed-point (FIND-TXT-004)
-    pub(crate) staged_stats: Arc<parking_lot::Mutex<HashMap<TxId, StagedStatsChange>>>,
-    pub(crate) staged_terms: Arc<parking_lot::Mutex<HashMap<TxId, Vec<String>>>>,
+    pub(crate) staged_stats: Arc<parking_lot::Mutex<BTreeMap<TxId, StagedStatsChange>>>,
+    pub(crate) staged_terms: Arc<parking_lot::Mutex<BTreeMap<TxId, Vec<String>>>>,
     commit_lock: Arc<parking_lot::Mutex<()>>,
     pub(crate) resident_index: Arc<ResidentPostingIndex>,
 }
@@ -81,8 +81,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
             total_docs: Arc::new(AtomicU64::new(0)),
             total_tokens: Arc::new(AtomicU64::new(0)),
             avg_doc_len_x1000: Arc::new(AtomicU64::new(0)),
-            staged_stats: Arc::new(parking_lot::Mutex::new(HashMap::new())),
-            staged_terms: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+            staged_stats: Arc::new(parking_lot::Mutex::new(BTreeMap::new())),
+            staged_terms: Arc::new(parking_lot::Mutex::new(BTreeMap::new())),
             commit_lock: Arc::new(parking_lot::Mutex::new(())),
             resident_index: Arc::new(ResidentPostingIndex::new()),
         }
@@ -201,7 +201,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         let raw_entries = self.storage.scan_prefix(&prefix).await?;
         let mut postings = Vec::with_capacity(raw_entries.len());
         for (key, val_bytes) in raw_entries {
-            let suffix_bytes = &key[prefix.len()..];
+            let suffix_bytes = key.get(prefix.len()..).unwrap_or_default();
             if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
                 #[cfg(not(feature = "docid-128"))]
                 let parsed_doc_id = suffix.parse::<u64>().ok();
@@ -211,14 +211,16 @@ impl<S: StorageEngine> InvertedIndex<S> {
                 if let Some(doc_id_raw) = parsed_doc_id {
                     if val_bytes.len() == 4 {
                         let doc_id = DocId::new(doc_id_raw);
-                        let tf =
-                            u32::from_le_bytes((&val_bytes[..4]).try_into().map_err(|_| {
-                                ContextraError::Storage("Invalid posting tf length".into())
-                            })?);
+                        let slice = val_bytes.get(..4).ok_or_else(|| {
+                            ContextraError::Storage("Invalid posting tf length".into())
+                        })?;
+                        let tf = u32::from_le_bytes(slice.try_into().map_err(|_| {
+                            ContextraError::Storage("Invalid posting tf length".into())
+                        })?);
                         let dl_key = self.key_with_id("dl:", doc_id.inner());
                         let doc_len = match self.storage.get(&dl_key).await? {
                             Some(dl_bytes) if dl_bytes.len() == 4 => {
-                                u32::from_le_bytes((&dl_bytes[..]).try_into().map_err(|_| {
+                                u32::from_le_bytes(dl_bytes.as_ref().try_into().map_err(|_| {
                                     ContextraError::Storage("Invalid doc_len length".into())
                                 })?)
                             }
@@ -278,9 +280,9 @@ impl<S: StorageEngine> InvertedIndex<S> {
         }
 
         let tokens = self.tokenizer.tokenize(text);
-        let new_len = tokens.len() as u32;
+        let new_len = u32::try_from(tokens.len()).unwrap_or(u32::MAX);
 
-        let mut tfs = HashMap::with_capacity(tokens.len());
+        let mut tfs = BTreeMap::new();
         for t in tokens {
             *tfs.entry(t).or_insert(0u32) += 1;
         }
@@ -367,19 +369,24 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
         for (tbs_key, _) in tombstones {
             // Format: {prefix}tbs:{doc_id}:{term}
-            let suffix = &tbs_key[tbs_prefix.len()..];
+            let suffix = tbs_key.get(tbs_prefix.len()..).unwrap_or_default();
             let parts: Vec<&[u8]> = suffix.split(|&b| b == b':').collect();
-            if parts.len() < 2 {
-                continue;
-            }
+            let part0 = match parts.first() {
+                Some(p) => *p,
+                None => continue,
+            };
+            let part1 = match parts.get(1) {
+                Some(p) => *p,
+                None => continue,
+            };
 
             #[cfg(not(feature = "docid-128"))]
-            let doc_id_raw_opt = std::str::from_utf8(parts[0])
+            let doc_id_raw_opt = std::str::from_utf8(part0)
                 .ok()
                 .and_then(|s| s.parse::<u64>().ok())
                 .map(DocId::new);
             #[cfg(feature = "docid-128")]
-            let doc_id_raw_opt = std::str::from_utf8(parts[0])
+            let doc_id_raw_opt = std::str::from_utf8(part0)
                 .ok()
                 .and_then(|s| s.parse::<u128>().ok())
                 .map(|v| DocId::new(v));
@@ -387,7 +394,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
                 Some(v) => v,
                 None => continue,
             };
-            let term = String::from_utf8_lossy(parts[1]).to_string();
+            let term = String::from_utf8_lossy(part1).to_string();
 
             // Read the *current* forward index to know which terms are live.
             // DECISION-REF: Consistent with load_stats() (L92) — bincode errors must propagate,
@@ -511,7 +518,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         if change.docs_delta != 0 || change.tokens_delta != 0 {
             if change.docs_delta > 0 {
                 self.total_docs
-                    .fetch_add(change.docs_delta as u64, Ordering::SeqCst);
+                    .fetch_add(change.docs_delta.unsigned_abs(), Ordering::SeqCst);
             } else if change.docs_delta < 0 {
                 self.total_docs
                     .fetch_sub(change.docs_delta.unsigned_abs(), Ordering::SeqCst);
@@ -519,7 +526,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
 
             if change.tokens_delta > 0 {
                 self.total_tokens
-                    .fetch_add(change.tokens_delta as u64, Ordering::SeqCst);
+                    .fetch_add(change.tokens_delta.unsigned_abs(), Ordering::SeqCst);
             } else if change.tokens_delta < 0 {
                 self.total_tokens
                     .fetch_sub(change.tokens_delta.unsigned_abs(), Ordering::SeqCst);
@@ -528,7 +535,8 @@ impl<S: StorageEngine> InvertedIndex<S> {
             let docs = self.total_docs.load(Ordering::SeqCst);
             let tokens = self.total_tokens.load(Ordering::SeqCst);
             let avg_len = if docs > 0 {
-                (tokens as f64 / docs as f64 * 1000.0) as u64
+                let scaled = (tokens as u128).saturating_mul(1000) / (docs as u128);
+                u64::try_from(scaled).unwrap_or(u64::MAX)
             } else {
                 0
             };
@@ -678,7 +686,7 @@ impl<S: StorageEngine> TextIndex for InvertedIndex<S> {
     }
 
     async fn len(&self) -> usize {
-        self.total_docs.load(Ordering::Acquire) as usize
+        usize::try_from(self.total_docs.load(Ordering::Acquire)).unwrap_or(usize::MAX)
     }
 
     async fn stats(&self) -> Result<TextIndexStats> {
@@ -691,8 +699,8 @@ impl<S: StorageEngine> TextIndex for InvertedIndex<S> {
         };
 
         Ok(TextIndexStats {
-            num_documents: meta.total_docs as usize,
-            num_tokens: meta.total_tokens as usize,
+            num_documents: usize::try_from(meta.total_docs).unwrap_or(usize::MAX),
+            num_tokens: usize::try_from(meta.total_tokens).unwrap_or(usize::MAX),
             memory_usage_bytes: 0,
         })
     }

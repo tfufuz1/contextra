@@ -17,12 +17,12 @@
 
 use contextra_types::{ContextraError, Result};
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use unicode_segmentation::UnicodeSegmentation;
 
-static STOPWORDS: OnceLock<HashSet<String>> = OnceLock::new();
+static STOPWORDS: OnceLock<BTreeSet<String>> = OnceLock::new();
 static PROTECTED_REGEX: OnceLock<std::result::Result<Regex, String>> = OnceLock::new();
 static SHARED_SPLITTER: OnceLock<Arc<crate::morphology::GermanCompoundSplitter>> = OnceLock::new();
 
@@ -114,7 +114,7 @@ fn segment_text<'a>(text: &'a str) -> Vec<TextSegment<'a>> {
     segments
 }
 
-fn get_stopwords() -> &'static HashSet<String> {
+fn get_stopwords() -> &'static BTreeSet<String> {
     STOPWORDS.get_or_init(|| {
         let words = vec![
             "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into",
@@ -316,7 +316,7 @@ mod tests {
 
         #[test]
         fn german_tokenizer_never_panics(s in ".*") {
-            let _ = GermanMorphTokenizer::new().tokenize(&s);
+            let _ = GermanMorphTokenizer::try_new().unwrap_or_default().tokenize(&s);
         }
 
         #[test]
@@ -337,7 +337,7 @@ mod tests {
             let _ = DefaultTokenizer.tokenize(&s);
 
             // 2. GermanMorphTokenizer
-            let german_tok = GermanMorphTokenizer::new();
+            let german_tok = GermanMorphTokenizer::try_new().unwrap_or_default();
             let _ = german_tok.tokenize(&s);
 
             // 3. normalize_umlauts
@@ -357,7 +357,7 @@ mod tests {
     fn test_tokenizer_edge_cases_bounded() {
         let long_str = "a".repeat(100_000);
         let edge_cases = ["", " \t\n", "🦀🦀", long_str.as_str(), "\0", "ÄÖÜß"];
-        let german_tok = GermanMorphTokenizer::new();
+        let german_tok = GermanMorphTokenizer::try_new().unwrap_or_default();
         for input in &edge_cases {
             let tokens = DefaultTokenizer.tokenize(input);
             assert!(tokens.len() <= input.chars().count() + 1);
@@ -419,7 +419,7 @@ mod tests {
 
     #[test]
     fn test_german_morph_tokenizer() {
-        let tokenizer = GermanMorphTokenizer::new();
+        let tokenizer = GermanMorphTokenizer::try_new().unwrap_or_default();
         let tokens = tokenizer.tokenize("Das Bundesverfassungsgericht");
         // "Das" is stopword
         assert!(tokens.contains(&"bundesverfassungsgericht".to_string()));
@@ -456,7 +456,9 @@ mod tests {
             "Email/URL parts should not appear as separate tokens"
         );
 
-        let german_tokens = GermanMorphTokenizer::new().tokenize(text);
+        let german_tokens = GermanMorphTokenizer::try_new()
+            .unwrap_or_default()
+            .tokenize(text);
         assert!(
             german_tokens.contains(&"user@example.com".to_string()),
             "GermanMorphTokenizer should protect email as atomic token. Got: {:?}",
@@ -472,7 +474,7 @@ mod tests {
     #[test]
     fn test_german_compound_no_regression() {
         let text = "Im Softwareentwicklungskontext entstehen oft neue Herausforderungen.";
-        let german_tok = GermanMorphTokenizer::new();
+        let german_tok = GermanMorphTokenizer::try_new().unwrap_or_default();
         let tokens = german_tok.tokenize(text);
 
         // Verify that Softwareentwicklungskontext or its components exist in tokens
@@ -491,7 +493,7 @@ mod tests {
 
         let start = Instant::now();
         for _ in 0..100 {
-            let tok = GermanMorphTokenizer::new();
+            let tok = GermanMorphTokenizer::try_new().unwrap_or_default();
             let _ = tok.tokenize("Testtext für Performance");
         }
         let elapsed = start.elapsed();
@@ -509,7 +511,7 @@ mod tests {
     fn test_tokenizers_panic_free_edge_cases() {
         let long_string = "a".repeat(100_000);
         let edge_cases = ["", " ", ".", "🦀", long_string.as_str()];
-        let german_tokenizer = GermanMorphTokenizer::new();
+        let german_tokenizer = GermanMorphTokenizer::try_new().unwrap_or_default();
 
         for text in &edge_cases {
             let default_tokens = tokenize(text);
@@ -538,7 +540,9 @@ mod tests {
         let default_tokens = DefaultTokenizer.tokenize(text);
         assert!(!default_tokens.is_empty());
 
-        let german_tokens = GermanMorphTokenizer::new().tokenize(text);
+        let german_tokens = GermanMorphTokenizer::try_new()
+            .unwrap_or_default()
+            .tokenize(text);
         assert!(!german_tokens.is_empty());
         assert!(
             german_tokens

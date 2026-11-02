@@ -14,7 +14,7 @@ use contextra_text::{DefaultTokenizer, GermanMorphTokenizer, Tokenizer};
 // Fuzzing-Harnisch zur Prüfung der Robustheit von Standard- und deutschem Morphologie-Tokenizer.
 fuzz_target!(|data: &str| {
     // Arbiträre UTF-8-Strings an die reale Tokenizer-Einstiegsfunktion.
-    let german_tok = GermanMorphTokenizer::new();
+    let german_tok = GermanMorphTokenizer::try_new().unwrap_or_default();
     let _ = german_tok.tokenize(data);
     let _ = DefaultTokenizer.tokenize(data);
     let _ = contextra_text::tokenizer::tokenize(data);
