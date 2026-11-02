@@ -2,6 +2,7 @@
 # =============================================================================
 # Contextra — Jules Environment Setup (schwer, snapshot-fähig, idempotent)
 # Ziel: Jules-VM (Ubuntu 24.04, rustup/Node/Python/Go/Java/Docker vorinstalliert)
+# Stand: SPEC 4.3.0. Geprüft gegen HEAD 909ff27; veraltete Verweise (contextra-wire, contextra-mcp) entfernt.
 # Läuft bei "Run and Snapshot". Danach wird nur der SNAPSHOT wiederverwendet —
 # alles Zeitabhängige (Commits, Tags, Claims, PRs) steckt deshalb in
 # refresh-context.sh, das bei JEDEM Task-Start läuft.
@@ -45,10 +46,10 @@ else
       strace valgrind gdb python3-venv python3-dev
   ok "apt abgeschlossen"
 fi
-# flatc-SHIM: crates/contextra-wire/build.rs ruft bei vorhandenem `flatc` IMMER neu generieren auf und
-# überschreibt die getrackte src/contextra_generated.rs. Ubuntus flatc (2.0.8) passt nicht zum
-# flatbuffers-Crate (24.12.x) → 35 Compilerfehler (E0053) + dirty Working Tree.
-# Ohne nutzbares flatc nimmt build.rs den eingecheckten Code. Daher: apt-flatc entfernen/verdecken.
+# flatc-SHIM: Historisch hat crates/contextra-wire/build.rs bei vorhandenem `flatc` neu generiert
+# und eine getrackte Datei überschrieben. Das Crate existiert am HEAD nicht mehr; der Shim bleibt
+# als Absicherung, falls es wieder eingeführt wird. Ubuntus flatc (2.0.8) passt nicht zum
+# flatbuffers-Crate (24.x). Der Shim verhindert, dass ein unpassendes flatc aufgerufen wird.
 mkdir -p "$HOME/.local/bin"
 [ "$SUDO" != "__none__" ] && try $SUDO apt-get remove -y -q flatbuffers-compiler
 cat > "$HOME/.local/bin/flatc" <<'SHIM'
@@ -140,7 +141,10 @@ fi
 # ── 7. Repo-Invarianten nur MELDEN (ein roter Repo-Zustand darf den Snapshot nicht blockieren)
 step "[7/7] Invarianten-Report"
 [ -f AGENTS.md ] && ok "AGENTS.md ($(wc -l < AGENTS.md) Zeilen)" || { echo "  ❌ AGENTS.md fehlt"; FAILS=$((FAILS+1)); }
-grep -q axum crates/contextra-mcp/Cargo.toml 2>/dev/null && warn "ADR-010 verletzt: axum in contextra-mcp" || ok "ADR-010: kein axum in contextra-mcp"
+if grep -q 'features = \["full"\]' Cargo.toml 2>/dev/null; then warn "tokio mit features=[\"full\"] im Workspace (WP-1.3, SPEC F-16)"; else ok "tokio ohne features=full"; fi
+[ -d crates/contextra-erasure ] && ok "contextra-erasure vorhanden (Skelett, WP-3.1)" || warn "contextra-erasure fehlt"
+ls crates/*/Cargo.toml >/dev/null 2>&1 && ok "Crate-Manifeste: $(ls -d crates/*/ | wc -l) Verzeichnisse"
+
 OPEN=$(grep -rn 'AI-TAG\[[A-Z]*\]\[\(CRITICAL\|BLOCKER\)\]' crates/ --include='*.rs' 2>/dev/null | grep -vc RESOLVED)
 echo "  ℹ️  Offene CRITICAL/BLOCKER-Tags: ${OPEN:-0} (Ziel: 0)"
 
