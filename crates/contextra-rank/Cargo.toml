@@ -21,9 +21,6 @@ ahash.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 
-[features]
-dibud = []
-
 [dev-dependencies]
 proptest = "1"
 tokio = { workspace = true, features = ["full"] }

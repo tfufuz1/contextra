@@ -9,6 +9,45 @@ use ahash::AHashMap;
 use contextra_types::{ContextChunk, ContextraError, DocId, MemoryLink};
 use serde::{Deserialize, Serialize};
 
+/// Kanonischer Treffer für die Reciprocal-Rank-Fusion (RRF).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Hit {
+    /// Dokument-Identifikator.
+    pub id: String,
+    /// Score-Wert (z. B. RRF-Score).
+    pub score: f32,
+    /// Optionales 16-Byte blindes Tag (DocTag) für deterministisches Tie-Breaking (SPEC §8.13).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doc_tag: Option<[u8; 16]>,
+    /// Optionale Dokument-Metadaten.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
+}
+
+impl Hit {
+    /// Erstellt eine neue `Hit`-Instanz.
+    pub fn new(id: impl Into<String>, score: f32) -> Self {
+        Self {
+            id: id.into(),
+            score,
+            doc_tag: None,
+            metadata: None,
+        }
+    }
+
+    /// Setzt das `doc_tag` für den Treffer.
+    pub fn with_doc_tag(mut self, doc_tag: [u8; 16]) -> Self {
+        self.doc_tag = Some(doc_tag);
+        self
+    }
+
+    /// Setzt Metadaten für den Treffer.
+    pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
+        self.metadata = Some(metadata);
+        self
+    }
+}
+
 fn map_is_empty<K, V, S>(m: &ahash::AHashMap<K, V, S>) -> bool {
     m.is_empty()
 }
@@ -151,6 +190,29 @@ pub struct SearchResult {
     /// Optional provenance record.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provenance: Option<ProvenanceRecord>,
+}
+
+impl From<Hit> for SearchResult {
+    fn from(hit: Hit) -> Self {
+        Self {
+            id: hit.id,
+            score: hit.score,
+            metadata: hit.metadata,
+            matched_signals: Vec::new(),
+            provenance: None,
+        }
+    }
+}
+
+impl From<SearchResult> for Hit {
+    fn from(r: SearchResult) -> Self {
+        Self {
+            id: r.id,
+            score: r.score,
+            doc_tag: None,
+            metadata: r.metadata,
+        }
+    }
 }
 
 /// Type alias for fused score output item.

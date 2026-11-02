@@ -5,10 +5,11 @@
 //! Implementiert die lineare Score-Kombination nach Min-Max-Normalisierung.
 
 use super::resonance::{apply_resonance_bonus, ResonanceConfig};
-use super::rrf::{
-    format_fused_results_from_top_k, update_fused_entry_from_doc,
-    weighted_reciprocal_rank_fusion_with_options,
-};
+// Begründung: Veraltete Wrapper bleiben für Abwärtskompatibilität zu contextra-engine erhalten
+// bis diese umgestellt ist (siehe ÜBERGABE).
+#[allow(deprecated)]
+use super::rrf::weighted_reciprocal_rank_fusion_with_options;
+use super::rrf::{format_fused_results_from_top_k, update_fused_entry_from_doc};
 use super::signal::{FusedEntry, MetadataMergePriority, SignalKey};
 use super::types::SearchResult;
 use ahash::AHashMap;
@@ -145,6 +146,8 @@ pub fn score_normalized_fusion_with_options(
     }
 
     if check_signal_set_degradation(&active_sets) {
+        // Begründung: Interner Aufruf des als deprecated markierten RRF-Fallbacks für Abwärtskompatibilität.
+        #[allow(deprecated)]
         return weighted_reciprocal_rank_fusion_with_options(
             result_sets,
             max_results,
