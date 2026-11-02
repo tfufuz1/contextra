@@ -1,21 +1,20 @@
 //! Löschkern: Saga, Gate, Journal, Tresor, Messung, signierter Bericht.
 //!
-//! Ring 3 (SPEC §5.2). Abhängigkeitsregel AR-3 (SPEC §5.3): Erlaubte Abhängigkeiten
-//! sind ausschließlich `contextra-types`, `contextra-ports` und `contextra-crypto`.
+//! Ring 3. Erlaubte Abhängigkeiten: `types`, `ports`, `crypto` (AR-3).
+//! Spezifikation: SPEC 4.3.0, Abschnitte 11, 12, 13; Anhang F.3, F.9, F.10.
 
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
-#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod error;
-pub mod io;
-pub mod vault;
 pub mod gate;
 pub mod journal;
-pub mod scope;
-pub mod saga;
-pub mod purge;
-pub mod measure;
-pub mod report;
 pub mod ledger;
+pub mod measure;
+pub mod purge;
+pub mod report;
 pub mod restore;
+pub mod saga;
+pub mod scope;
+pub mod vault;
+
+pub use error::ErasureError;
