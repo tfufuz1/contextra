@@ -113,7 +113,7 @@ fn hash_remainder(remainder: &[u8]) -> usize {
         hash ^= byte as u64;
         hash = hash.wrapping_mul(0x100000001b3u64);
     }
-    (hash as usize) % SHARD_COUNT
+    (usize::try_from(hash).unwrap_or(0)) % SHARD_COUNT
 }
 
 /// A single shard of the MemTable, holding a subset of the key space.
@@ -162,7 +162,7 @@ impl MemTable {
     #[inline]
     pub fn shard_for(key: &[u8]) -> usize {
         if let Some(prefix) = matching_reserved_prefix(key) {
-            let remainder = &key[prefix.len()..];
+            let remainder = key.get(prefix.len()..).unwrap_or(&[]);
             hash_remainder(remainder)
         } else {
             let b0 = key.first().copied().unwrap_or(0) as u16;
@@ -176,16 +176,16 @@ impl MemTable {
     #[inline]
     fn shard_range_for_prefix(prefix: &[u8]) -> std::ops::RangeInclusive<usize> {
         if prefix.first() == Some(&b'_') {
-            0..=SHARD_COUNT - 1
+            0..=SHARD_COUNT.saturating_sub(1)
         } else if prefix.len() >= 2 {
             let shard = Self::shard_for(prefix);
             shard..=shard
-        } else if prefix.len() == 1 {
-            let start = Self::shard_for(&[prefix[0], 0x00]);
-            let end = Self::shard_for(&[prefix[0], 0xFF]);
+        } else if let Some(&p0) = prefix.first() {
+            let start = Self::shard_for(&[p0, 0x00]);
+            let end = Self::shard_for(&[p0, 0xFF]);
             start..=end
         } else {
-            0..=SHARD_COUNT - 1
+            0..=SHARD_COUNT.saturating_sub(1)
         }
     }
 
@@ -234,15 +234,19 @@ impl MemTable {
     pub fn put(&self, key: Bytes, value: Bytes, seq_no: u64, tx_id: u64) {
         let additional_size = key.len() + value.len() + STAGING_ENTRY_OVERHEAD_BYTES;
         let shard_idx = Self::shard_for(&key);
-        let mut entries = self.shards[shard_idx].entries.write();
+        let Some(shard) = self.shards.get(shard_idx) else {
+            return;
+        };
+        let mut entries = shard.entries.write();
 
         let versions = entries.entry(key).or_insert_with(|| Vec::with_capacity(2));
         let raw_seq = seq_no & !TOMBSTONE_BIT;
 
-        if versions
+        let is_monotonic = versions
             .last()
-            .map_or(true, |(last_s, _, _)| (*last_s & !TOMBSTONE_BIT) <= raw_seq)
-        {
+            .is_none_or(|(last_s, _, _)| (*last_s & !TOMBSTONE_BIT) <= raw_seq);
+
+        if is_monotonic {
             // Fast path: sequence numbers are monotonically non-decreasing
             versions.push((seq_no, value, tx_id));
         } else {
@@ -250,8 +254,12 @@ impl MemTable {
             let idx = match versions.binary_search_by_key(&raw_seq, |(s, _, _)| *s & !TOMBSTONE_BIT)
             {
                 Ok(i) => {
-                    let mut pos = i + 1;
-                    while pos < versions.len() && (versions[pos].0 & !TOMBSTONE_BIT) == raw_seq {
+                    let mut pos = i.saturating_add(1);
+                    while pos < versions.len()
+                        && versions
+                            .get(pos)
+                            .is_some_and(|v| (v.0 & !TOMBSTONE_BIT) == raw_seq)
+                    {
                         pos += 1;
                     }
                     pos
@@ -346,7 +354,8 @@ impl MemTable {
     /// Retrieves the latest value and sequence number by key.
     pub fn get(&self, key: &[u8]) -> Option<(Bytes, u64)> {
         let shard_idx = Self::shard_for(key);
-        let entries = self.shards[shard_idx].entries.read();
+        let shard = self.shards.get(shard_idx)?;
+        let entries = shard.entries.read();
         entries
             .get(key)
             .and_then(|versions| versions.last().map(|(seq, val, _tx)| (val.clone(), *seq)))
@@ -356,7 +365,8 @@ impl MemTable {
     /// and bounded by maximum transaction ID for Snapshot Isolation.
     pub fn get_at_seq(&self, key: &[u8], seq_no: u64, max_tx: u64) -> Option<(Bytes, u64, u64)> {
         let shard_idx = Self::shard_for(key);
-        let entries = self.shards[shard_idx].entries.read();
+        let shard = self.shards.get(shard_idx)?;
+        let entries = shard.entries.read();
         let versions = entries.get(key)?;
 
         use contextra_types::{TxId, TOMBSTONE_BIT};
@@ -368,7 +378,9 @@ impl MemTable {
                 Ok(i) => {
                     let mut last = i;
                     while last + 1 < versions.len()
-                        && (versions[last + 1].0 & !TOMBSTONE_BIT) == target_raw_seq
+                        && versions
+                            .get(last + 1)
+                            .is_some_and(|v| (v.0 & !TOMBSTONE_BIT) == target_raw_seq)
                     {
                         last += 1;
                     }
@@ -384,9 +396,10 @@ impl MemTable {
 
         // Linear search backwards for the latest version satisfying (tx <= max_tx || tx >= INTERNAL_BASE)
         for i in (0..=idx).rev() {
-            let (s, v, tx) = &versions[i];
-            if *tx <= max_tx || *tx >= TxId::INTERNAL_BASE {
-                return Some((v.clone(), *s, *tx));
+            if let Some((s, v, tx)) = versions.get(i) {
+                if *tx <= max_tx || *tx >= TxId::INTERNAL_BASE {
+                    return Some((v.clone(), *s, *tx));
+                }
             }
         }
         None
@@ -468,7 +481,10 @@ impl MemTable {
         let shard_range = Self::shard_range_for_prefix(prefix);
 
         for shard_idx in shard_range {
-            let entries = self.shards[shard_idx].entries.read();
+            let Some(shard) = self.shards.get(shard_idx) else {
+                continue;
+            };
+            let entries = shard.entries.read();
             for (k, versions) in
                 entries.range::<[u8], _>((Bound::Included(prefix), Bound::Unbounded))
             {
@@ -542,7 +558,10 @@ impl MemTable {
         let shard_range = Self::shard_range_for_bounds(start, end);
 
         for shard_idx in shard_range {
-            let entries = self.shards[shard_idx].entries.read();
+            let Some(shard) = self.shards.get(shard_idx) else {
+                continue;
+            };
+            let entries = shard.entries.read();
             for (k, versions) in entries.range::<[u8], _>((start, end)) {
                 let mut best_version: Option<(&Bytes, u64)> = None;
                 for (seq, val, tx) in versions {
@@ -596,7 +615,7 @@ impl MemTable {
     /// Returns entry count for each shard (used for testing shard distribution).
     #[doc(hidden)]
     pub fn shard_entry_counts(&self) -> [usize; SHARD_COUNT] {
-        std::array::from_fn(|i| self.shards[i].entries.read().len())
+        std::array::from_fn(|i| self.shards.get(i).map_or(0, |s| s.entries.read().len()))
     }
 }
 

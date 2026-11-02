@@ -1,7 +1,7 @@
 #![no_main]
 
-use libfuzzer_sys::fuzz_target;
 use contextra_store::wal::{Wal, WalConfig, WalVersion};
+use libfuzzer_sys::fuzz_target;
 use tempfile::tempdir;
 
 fuzz_target!(|data: &[u8]| {
@@ -24,11 +24,9 @@ fuzz_target!(|data: &[u8]| {
             return;
         }
 
-        let config = WalConfig {
-            allow_legacy_integrity_key_fallback: true,
-            min_wal_version: WalVersion::V1,
-            ..Default::default()
-        };
+        let mut config = WalConfig::default();
+        config.min_wal_version = WalVersion::V1;
+        let config = config.with_legacy_fallback(true);
 
         match Wal::open_with_config(&wal_path, config).await {
             Ok(wal) => {

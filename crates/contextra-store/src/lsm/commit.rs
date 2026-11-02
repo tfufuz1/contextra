@@ -55,9 +55,9 @@ impl LsmStorage {
 
     /// Suspends execution briefly if memory usage exceeds 80% to apply backpressure.
     pub(super) async fn apply_backpressure(&self) {
-        if self.budget.memory_used()
-            >= (self.config.max_ram_mb as f64 * 1024.0 * 1024.0 * 0.80) as u64
-        {
+        let max_ram_bytes = self.config.max_ram_mb.saturating_mul(1024 * 1024);
+        let threshold = max_ram_bytes.saturating_mul(8) / 10;
+        if self.budget.memory_used() >= threshold {
             tokio::time::sleep(std::time::Duration::from_millis(5)).await;
         }
     }
