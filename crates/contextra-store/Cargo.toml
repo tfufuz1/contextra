@@ -29,7 +29,6 @@ fault-injection = []
 block-cache-v2 = ["dep:quick_cache"]
 sieve-cache = []
 docid-128 = ["contextra-types/docid-128"]
-legacy-wal-key = []
 
 [dependencies]
 contextra-types = { workspace = true }
@@ -78,7 +77,6 @@ path = "tests/differential/redb_operation_sequence.rs"
 [[test]]
 name = "wal_truncation_and_legacy_isolation"
 path = "tests/wal_truncation_and_legacy_isolation.rs"
-required-features = ["legacy-wal-key"]
 
 [[bench]]
 name = "sstable_bench"
