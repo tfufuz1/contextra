@@ -346,7 +346,6 @@ async fn test_wal_fsync_failure_poisons_handle() -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "encryption-at-rest")]
 #[tokio::test]
 async fn test_wal_rewrite_multi_frame_chunking_encrypted() -> Result<()> {
     let dir = tempdir()?;

@@ -30,8 +30,8 @@ pub(crate) fn next_temp_file_counter() -> u64 {
 /// P28-Ausnahme: kryptografisches Salt-Material (Spezifikation v17 Teil 3.1 & Governance-Regel 5).
 pub(crate) fn generate_crypto_salt() -> [u8; 32] {
     let mut buf = [0u8; 32];
-    use rand::Rng;
-    rand::thread_rng().fill(&mut buf);
+    use rand::{rngs::OsRng, RngCore};
+    OsRng.fill_bytes(&mut buf);
     buf
 }
 
@@ -243,8 +243,8 @@ impl LsmStorage {
         let manifest_exists = manifest_path.exists();
         #[allow(clippy::type_complexity)]
         let (valid_manifest_sstables, dead_manifest_sstables, manifest_hwm): (
-            Option<std::collections::HashSet<std::path::PathBuf>>,
-            Option<std::collections::HashSet<std::path::PathBuf>>,
+            Option<std::collections::BTreeSet<std::path::PathBuf>>,
+            Option<std::collections::BTreeSet<std::path::PathBuf>>,
             Option<[u8; 32]>,
         ) = if manifest_exists {
             let entries = crate::manifest::Manifest::load(&manifest_path).await?;
@@ -252,7 +252,9 @@ impl LsmStorage {
                 .into_iter()
                 .map(|(path, _rank)| path)
                 .collect();
-            let dead_set = crate::manifest::Manifest::reconstruct_dead_sstables(&entries);
+            let dead_set = crate::manifest::Manifest::reconstruct_dead_sstables(&entries)
+                .into_iter()
+                .collect();
             let hwm = crate::manifest::Manifest::extract_high_water_mark(&entries);
             (Some(valid_set), Some(dead_set), hwm)
         } else {
@@ -263,11 +265,11 @@ impl LsmStorage {
         let mut max_seq = 0u64;
         let mut max_tx = 0u64;
         let mut replayed_size = 0u64;
-        let mut pending_tx_map: std::collections::HashMap<u64, Vec<PendingTxOp>> =
-            std::collections::HashMap::new();
+        let mut pending_tx_map: std::collections::BTreeMap<u64, Vec<PendingTxOp>> =
+            std::collections::BTreeMap::new();
 
         let mut last_replayed_hmac: Option<[u8; 32]> = None;
-        let mut replayed_hmac_set = std::collections::HashSet::new();
+        let mut replayed_hmac_set = std::collections::BTreeSet::new();
         replayed_hmac_set.insert([0u8; 32]);
 
         for (_ts, wal_path) in &wal_files {
@@ -632,7 +634,9 @@ impl LsmStorage {
                 let wal = storage.wal.read().await;
                 wal.path().to_path_buf()
             };
-            for (_ts, old_wal_path) in &wal_files[..wal_files.len() - 1] {
+            let old_wal_count = wal_files.len().saturating_sub(1);
+            let old_wals = wal_files.get(..old_wal_count).unwrap_or(&[]);
+            for (_ts, old_wal_path) in old_wals {
                 if old_wal_path != &active_wal_path {
                     if let Err(e) = tokio::fs::remove_file(old_wal_path).await {
                         tracing::warn!("Failed to remove old WAL file {:?}: {}", old_wal_path, e);
@@ -730,7 +734,7 @@ impl LsmStorage {
         wal.truncate(target_offset, target_hmac).await?;
 
         fn prune_memtable_above_tx(memtable: &crate::memtable::MemTable, target_tx: u64) {
-            let txs_to_rollback: std::collections::HashSet<u64> = memtable
+            let txs_to_rollback: std::collections::BTreeSet<u64> = memtable
                 .iter()
                 .into_iter()
                 .map(|(_, _, _, tx)| tx)
