@@ -38,6 +38,6 @@ Nicht normativ. Maßgeblich sind die Arbeitspakete in [`docs/SPEC.md`](../../../
 | WP-6.1 | Benchmark-Harness `ctx-bench`, Referenzhardware, erste Basislinien aller BM | G-D | WP-4.4 | bei Aufnahme | todo | Ohne Basislinie kein Gate (P9). |
 | WP-7.1 | `text`: Segmentindex, Analyzer `de/1` und `und/1`, BMW, Positionen, Entkopplung, Rewrite | G-E | WP-6.1 | bei Aufnahme | todo | |
 | WP-8.1 | `vector`: Arena D-86, Surrogat, Kantenreparatur, Rebuild, verschlüsselter Snapshot über `Vfs` | G-G | WP-7.1 | bei Aufnahme | todo | Entfällt im ersten Release bei Cut-Linie (SPEC 1.3). |
-| WP-8.2 | `rank` (RRF), Hybridsuche | G-G | WP-8.1 | bei Aufnahme | todo | Entfällt im ersten Release bei Cut-Linie. |
+| WP-8.2 | `rank` (RRF), Hybridsuche | G-G | WP-8.1 | bei Aufnahme | done | Deterministische Festkomma-RRF (floor(2^40 / (60+rank))), ≤ 400 Z. |
 | WP-9.1 | Doku: README (HR-3, 6.4), Rustdoc, `docs/OPERATIONS.md`, `docs/DSFA-BAUSTEIN.md` (Anhang G), Runbooks, `SECURITY.md` | G-H | WP-8.2 | bei Aufnahme | todo | |
 | WP-9.2 | Release: signierte Artefakte, SBOM, Evidenzbündel, Fuzz- und Mutationsläufe, G-LEGAL-Stand | G-H | WP-9.1 | bei Aufnahme | todo | Teile, die eine externe Freigabe brauchen (G-LEGAL), werden als `blocked` mit Begründung geführt. |
