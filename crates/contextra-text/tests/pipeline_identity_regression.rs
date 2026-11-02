@@ -1,3 +1,17 @@
+// Begründung: Integrationstest-Fixtures und Assertions dürfen Test-Unwraps, Indizierung und Test-Zeitgeber verwenden.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::unnecessary_cast,
+    clippy::type_complexity
+)]
+
 //! Regression test for Tokenizer Pipeline Identity (P1), Snapshot Isolation (P4), and Tx Rollback (P5).
 
 use contextra_ports::{BoxFuture, StorageEngine, TextIndex};
@@ -215,7 +229,7 @@ async fn test_pipeline_identity_point_search_recall() -> Result<()> {
     index.insert(tx, doc_id, sample_text).await?;
     index.commit(tx).await?;
 
-    let tokenizer = GermanMorphTokenizer::new();
+    let tokenizer = GermanMorphTokenizer::try_new().unwrap_or_default();
     let tokens = tokenizer.tokenize(sample_text);
 
     assert!(!tokens.is_empty(), "Tokenization must yield tokens");

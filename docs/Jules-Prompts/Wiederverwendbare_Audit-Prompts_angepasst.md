@@ -8,8 +8,8 @@
 
 # Contextra — Elite Audit-Prompt-Bibliothek v5
 
-> **Basis:** Repository `https://github.com/tfufuz1/contextra`, HEAD `c41afc15` (angepasst am 2026-11-02)  
-> **Normativität:** Code + grüne Gates > AGENTS.md > Spec > alles andere (AGENTS.md §1)  
+> **Basis:** Repository `https://github.com/tfufuz1/contextra`, HEAD `c41afc15` (angepasst am 2026-11-02)
+> **Normativität:** Code + grüne Gates > AGENTS.md > Spec > alles andere (AGENTS.md §1)
 > **Verwendung:** Jeden Prompt einzeln in Jules (Coding-Agent) einfügen. Jeder Prompt ist vollständig selbstenthaltend — keine externe Kontext-Vorbedingung nötig. Wiederverwendbar nach jedem Merge, Sprint oder Release.
 
 ---

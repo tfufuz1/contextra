@@ -16,7 +16,7 @@
 
 use contextra_ports::StorageEngine;
 use contextra_types::{DocId, Result, MAX_SEARCH_K};
-use std::collections::{HashSet, VecDeque};
+use std::collections::{BTreeSet, VecDeque};
 
 use crate::inverted::InvertedIndex;
 
@@ -45,7 +45,7 @@ pub struct Bm25CandidateStream<'a, S: StorageEngine> {
     max_seq: Option<u64>,
     batch_size: usize,
     buffer: VecDeque<(DocId, f32)>,
-    seen: HashSet<DocId>,
+    seen: BTreeSet<DocId>,
     fetched_k: usize,
     yielded: usize,
     exhausted: bool,
@@ -70,7 +70,7 @@ impl<'a, S: StorageEngine> Bm25CandidateStream<'a, S> {
             max_seq,
             batch_size: DEFAULT_STREAM_BATCH_SIZE,
             buffer: VecDeque::new(),
-            seen: HashSet::new(),
+            seen: BTreeSet::new(),
             fetched_k: 0,
             yielded: 0,
             exhausted: false,
