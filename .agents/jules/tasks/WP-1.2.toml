@@ -1,0 +1,37 @@
+id          = "WP-1.2"
+title       = "contextra-crypto Bereinigung: Features, Altlasten und ungenutzte Abhängigkeiten"
+wp          = "WP-1.2"
+gate        = "B"
+crate       = "contextra-crypto"
+goal        = "Entferne verbotene Features (test-utils, kv-encryption, cloud-egress-guard, wal-integrity, legacy-wal-key), Selbst-Dev-Abhängigkeit, KmsProvider, CloudEgressGuard, Altpfade und ungenutzte Abhängigkeiten. Setze ring = '1'."
+non_goals   = ["Keine Änderungen an fremden Crates"]
+
+scope       = ["crates/contextra-crypto/**"]
+
+forbidden   = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
+]
+
+spec_ids    = ["CR-01", "CR-15", "CR-16", "D-05", "D-53", "D-84", "P8"]
+
+acceptance  = [
+  "cargo tree -p contextra-crypto -e normal",
+  "cargo check -p contextra-crypto --all-targets",
+]
+
+evidence_required = ["Bereinigtes Cargo.toml, keine verbotenen Features, ring = 1"]
+
+[budget]
+files      = 5
+lines      = 200
+iterations = 3

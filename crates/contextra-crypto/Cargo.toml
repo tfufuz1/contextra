@@ -10,7 +10,7 @@ rust-version.workspace = true
 description = "Kryptoprimitive: AEAD, Argon2id, HKDF, HMAC, Ed25519, Tags."
 
 [package.metadata.contextra]
-ring = "0"
+ring = "1"
 
 [dependencies]
 thiserror = { workspace = true }
@@ -21,28 +21,14 @@ argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
 hkdf = "0.12"
 subtle = "2.6"
 blake3 = { workspace = true }
-bincode = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
 contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
 rand = { workspace = true }
-tracing = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
-parking_lot = { workspace = true }
-ahash = { workspace = true }
-lru = "0.16.4"
-regex = { workspace = true }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [features]
-test-utils = []
-kv-encryption = []
-cloud-egress-guard = []
 
 [dev-dependencies]
-contextra-crypto = { path = ".", features = ["test-utils"] }
-contextra-testkit = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }
 proptest = "1.4"
