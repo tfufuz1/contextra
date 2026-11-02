@@ -3,13 +3,10 @@
 //! Validiert Roundtrips, Framing-Grenzfaelle und Bitflips.
 
 use super::*;
-#[cfg(feature = "encryption-at-rest")]
 use crate::wal::KeyManager;
 use contextra_types::TxId;
-#[cfg(feature = "encryption-at-rest")]
 use std::sync::Arc;
 use tempfile::tempdir;
-#[cfg(feature = "encryption-at-rest")]
 use tokio::fs;
 
 #[test]
@@ -120,7 +117,6 @@ fn test_wal_entry_crc_roundtrip() {
     }
 }
 
-#[cfg(feature = "encryption-at-rest")]
 #[tokio::test]
 async fn test_batch_encryption_single_nonce_layout() {
     let dir = tempdir().expect("tempdir"); // expect
@@ -181,43 +177,6 @@ async fn test_batch_encryption_single_nonce_layout() {
     assert_eq!(nonce_bytes.len(), 12);
 }
 
-#[cfg(not(feature = "encryption-at-rest"))]
-#[tokio::test]
-async fn test_batch_plaintext_layout() {
-    let dir = tempdir().expect("tempdir");
-    let wal_path = dir.path().join("plaintext_test.wal");
-
-    let wal = Wal::open(&wal_path).await.expect("open wal");
-
-    let ops = vec![
-        (
-            WalOp::Put {
-                tx_id: TxId::new(1),
-                key: b"k1".to_vec(),
-                value: b"v1".to_vec(),
-            },
-            100,
-        ),
-        (
-            WalOp::Put {
-                tx_id: TxId::new(1),
-                key: b"k2".to_vec(),
-                value: b"v2".to_vec(),
-            },
-            101,
-        ),
-    ];
-
-    let (batch, _) = wal.prepare_batch(ops).await.expect("prepare batch");
-    assert_eq!(batch.len(), 2);
-
-    wal.append_batch(batch).await.expect("append batch");
-
-    let entries = wal.replay().await.expect("replay wal");
-    assert_eq!(entries.len(), 2);
-    assert_eq!(entries[0].0, 100);
-    assert_eq!(entries[1].0, 101);
-}
 
 #[test]
 fn test_wal_op_from_bytes_oversized_key_val() {
