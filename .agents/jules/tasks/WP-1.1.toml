@@ -1,0 +1,76 @@
+# Aufgabenkarte WP-1.1 – Rückbau Graph und Altlasten
+# Nicht normativ. Quelle: SPEC 15.4 (WP-1.1), Befunde F-05, F-23, D-24, D-84.
+
+id          = "WP-1.1"
+title       = "Rückbau: Graph-Verweise, AutoExtractionMode, Ports embedding/reranker/query_rewriter"
+wp          = "WP-1.1"
+gate        = "B"
+crate       = "contextra-engine, contextra-store, contextra-types, contextra-ports"
+goal        = "Null Treffer für `contextra_graph` und `contextra-graph` in allen Quell- und Build-Dateien, die dieses Paket verantwortet. Keine Referenz auf `AutoExtractionMode`. Die Ports `embedding`, `reranker`, `query_rewriter` sind aus `contextra-ports` entfernt, soweit sie nicht über die Fassade `contextra` gebraucht werden."
+
+non_goals = [
+  "Kein Fassaden-Schnitt (WP-1.5, D-89). Ist ein Port nur über `contextra` erreichbar, bleibt er bis WP-1.5 bestehen.",
+  "Keine Änderung an Löschlogik, Verschlüsselung oder WAL.",
+  "Keine Umbenennung von Modulen (WP-1.5).",
+]
+
+scope = [
+  "crates/contextra-engine/src/**",
+  "crates/contextra-engine/tests/**",
+  "crates/contextra-store/src/**",
+  "crates/contextra-types/src/**",
+  "crates/contextra-ports/src/**",
+  "crates/contextra-ports/tests/**",
+  "crates/contextra-ports/Cargo.toml",
+  "crates/contextra-types/Cargo.toml",
+  "crates/contextra-engine/Cargo.toml",
+  "tools/generate_migration_edges.py",
+  "Cargo.lock",
+]
+
+forbidden = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
+]
+
+spec_ids = ["F-05", "F-23", "D-24", "D-84", "AR-9", "AR-1"]
+
+# Ausgangslage (vom Agenten neu zu zählen):
+#   - 73 Vorkommen von contextra_graph / contextra-graph in ca. 27 Dateien.
+#   - Außerhalb des Pakets, nur zu melden, nicht zu ändern (geschützt):
+#       .github/copilot-instructions.md, .github/workflows/proof-correctness.yml,
+#       .github/workflows/tsan.yml, .github/workflows/rust-ci.yml,
+#       .github/workflows/scheduled-audit.yml, deny.toml
+#   - AutoExtractionMode: 11 Dateien in crates/*/src.
+#
+# Vor dem Löschen eines Ports: `grep -rn "contextra_ports::<port>" crates` ausführen. Nutzt
+# die Fassade oder ein anderes Crate den Port noch, bleibt er bestehen; das Teilergebnis
+# steht im PR und in BACKLOG.md unter WP-1.5.
+
+acceptance = [
+  "cargo fmt --all -- --check",
+  "cargo check --workspace --all-targets --locked",
+  "grep -rIln \"contextra_graph\\|contextra-graph\" crates tests tools Cargo.toml   # erwartet: leer",
+  "cargo test -p contextra-arch-tests --locked",
+]
+
+evidence_required = [
+  "Zählung der Treffer vor und nach der Änderung (Befehl und Ausgabe im PR).",
+  "Liste der Treffer in geschützten Pfaden (menschliche Freigabe nötig).",
+  "Ausgabe von cargo check, grün.",
+  "Tests, die den Rückbau absichern: Die bestehenden Tests in crates/contextra-engine laufen weiter grün.",
+]
+
+[budget]
+files      = 40
+lines      = 1200
+iterations = 12

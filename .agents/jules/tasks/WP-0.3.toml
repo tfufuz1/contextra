@@ -1,0 +1,84 @@
+# Aufgabenkarte WP-0.3 – Build wieder grün
+# Nicht normativ. Quelle: SPEC 15.4 (WP-0.3), Befunde F-01, F-32, D-93, D-94.
+
+id          = "WP-0.3"
+title       = "Build wieder grün: fehlende Port-Imports, mmap-Aufrufer, Cargo.lock"
+wp          = "WP-0.3"
+gate        = "A"
+crate       = "contextra, contextra-engine, contextra-store, contextra-vector"
+goal        = "`cargo check --workspace --all-targets --locked` ist grün, `cargo fmt --all -- --check` ist grün."
+
+non_goals = [
+  "Kein Rückbau der Altlasten (das ist WP-1.1 und WP-1.2).",
+  "Keine Änderung am Fassaden-Schnitt (WP-1.5).",
+  "Keine neuen Features, keine neuen Abhängigkeiten.",
+  "Kein Eingriff in Verschlüsselung, WAL-Integrität oder Löschlogik.",
+]
+
+scope = [
+  "crates/contextra/src/**",
+  "crates/contextra-engine/src/**",
+  "crates/contextra-store/src/**",
+  "crates/contextra-vector/src/**",
+  "crates/contextra-store/tests/**",
+  "crates/contextra-vector/tests/**",
+  "Cargo.lock",
+]
+
+forbidden = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
+]
+
+spec_ids = ["F-01", "F-32", "D-04", "D-93", "D-94", "P6", "P7", "T-LINT-2"]
+
+# Ausgangslage, vom Agenten neu zu verifizieren (nicht blind übernehmen):
+#   - contextra_ports::license ist entfernt (c2a864d), wird aber noch referenziert:
+#       crates/contextra-store/src/lsm/config.rs:44
+#       crates/contextra-engine/src/lib.rs:15
+#       crates/contextra-engine/src/contextra_impl/lifecycle.rs:9,17
+#       crates/contextra/src/builder.rs:36
+#       crates/contextra/src/collection_profile.rs:31
+#       crates/contextra/src/performance_profile.rs:29,30,158,160
+#   - mmap_readonly ist eine unsafe fn, ihre Aufrufer sind forbid(unsafe_code):
+#       crates/contextra-store/src/wal/replay.rs:180,233
+#       crates/contextra-vector/src/persistence/mmap.rs:24
+#       crates/contextra-vector/src/diskann/persistence.rs:291
+#   - Cargo.lock ist veraltet; --locked schlägt fehl.
+# Der Build von contextra-engine und contextra war am HEAD nicht prüfbar (F-32).
+# Vollständige Fehlerliste zuerst mit `cargo check --workspace --all-targets --keep-going`
+# erheben und im PR festhalten.
+
+acceptance = [
+  "cargo fmt --all -- --check",
+  "cargo check --workspace --all-targets --locked",
+  "cargo test -p contextra-store -p contextra-vector --locked --lib",
+  "cargo test -p contextra-arch-tests --locked",
+]
+
+evidence_required = [
+  "Vollständige Fehlerliste vor der Änderung (Ausgabe im PR).",
+  "Ausgabe von `cargo check --workspace --all-targets --locked`, grün.",
+  "Neuer Test: Lesen über den Port Vfs liefert dieselben Bytes wie der frühere mmap-Pfad (zuerst rot, dann grün), SPEC-ID D-94.",
+  "Begründung für jede Änderung an Cargo.lock: welche Abhängigkeit warum.",
+]
+
+# Entscheidungsregel für dieses Paket:
+#   Die Aufrufer von mmap_readonly werden in diesem Paket auf Vfs-Lesen umgestellt
+#   (vollständiges Einlesen über ports::Vfs). Eine Übergangslösung mit unsafe ist verboten
+#   (HR-12, AR-8, Crates mit forbid(unsafe_code)). Der höhere Speicherbedarf ist im PR zu
+#   nennen. Der Rest der Speicherabbildung (D-94) wird in WP-1.4 geprüft.
+
+[budget]
+files      = 15
+lines      = 600
+iterations = 10

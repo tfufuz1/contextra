@@ -5,7 +5,7 @@
 
 //! # Modul: Dauerhaftigkeit und physische Synchronisation (`durability`)
 //!
-//! Dieses Modul stellt plattformspezifische Grundfunktionen (Primitiven) zur Verfügung,
+//! Dieses Modul stellt Grundfunktionen (Primitiven) zur Verfügung,
 //! um sicherzustellen, dass geschriebene Daten tatsächlich auf dem physischen Speichermedium
 //! (SSD/HDD) dauerhaft persistiert werden (Durability gemäß ACID-Kriterien).
 //!
@@ -30,7 +30,23 @@ mod error;
 pub use error::SyncFailure;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Result, Write};
+use std::os::unix::io::AsRawFd;
 use std::path::Path;
+
+use crate::error::SyncFailure;
+
+/// Specification of the flush scope for file handles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FlushKind {
+    /// Flush only data without forcing metadata updates to disk (Linux `fdatasync`).
+    Data,
+    /// Flush both data and all filesystem metadata (Linux `fsync`, macOS `F_FULLFSYNC`).
+    All,
+    /// Abwaertskompatibilitaet: alias for Data.
+    DataOnly,
+    /// Abwaertskompatibilitaet: alias for All.
+    DataAndMetadata,
+}
 
 // ANCHOR[contextra-sys:DUR-FLUSH-FILE-001]
 /// Flasht Dateiinhalt und optional Metadaten auf den physischen Datenträger gemäß den Garantien der Zielplattform.
@@ -38,8 +54,8 @@ use std::path::Path;
 /// # Ablauf
 /// 1. Extrahiert den rohen Dateideskriptor (`fd` unter Unix).
 /// 2. Führt die plattformspezifische Synchronisation aus:
-///    - **Linux:** Ruft in einer Schleife `libc::fdatasync` (falls `metadata_changed == false`) oder `libc::fsync` auf.
-///    - **macOS:** Ruft `libc::fcntl(fd, libc::F_FULLFSYNC, 0)` auf, um den Hardware-Plattencache zu leeren.
+///    - **Linux:** Ruft in einer Schleife `libc::fdatasync` (bei [`FlushKind::Data`]) oder `libc::fsync` (bei [`FlushKind::All`]) auf.
+///    - **macOS:** Ruft `libc::fcntl(fd, libc::F_FULLFSYNC, 0)` auf, um den Hardware-Plattencache zu leeren (SY-06).
 ///    - **Anderes POSIX:** Ruft `libc::fsync` auf.
 /// 3. Fängt den Fehler `EINTR` (Interrupted system call) ab und wiederholt die Operation automatisch.
 /// 4. Gibt sonstige Fehler unverändert nach oben zurück (SY-05).
@@ -55,66 +71,58 @@ use std::path::Path;
 pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
     #[cfg(target_os = "linux")]
     {
-        use std::os::unix::io::AsRawFd;
-        let fd = file.as_raw_fd();
         loop {
-            // SAFETY: `fd` ist ein unveränderlicher, offener Dateideskriptor aus der langlebigen Referenz `&file`.
-            // `libc::fsync` und `libc::fdatasync` sind standardisierte POSIX-Systemaufrufe, die keine Pointer
-            // dereferenzieren und den Deskriptor nicht schließen. Fehler (inklusive Signalunterbrechung `EINTR`)
-            // werden über den Rückgabewert und `errno` vollständig erfasst.
+            // SAFETY: `fd` ist ein gültiger, geöffneter Dateideskriptor aus `file.as_raw_fd()`.
+            // Die Deskriptorlebensdauer wird durch die unveränderliche Referenz `&File` garantiert.
             let res = unsafe {
-                if metadata_changed {
-                    libc::fsync(fd)
-                } else {
-                    libc::fdatasync(fd)
+                match kind {
+                    FlushKind::Data | FlushKind::DataOnly => libc::fdatasync(fd),
+                    FlushKind::All | FlushKind::DataAndMetadata => libc::fsync(fd),
                 }
             };
             if res == 0 {
                 return Ok(());
             }
             let err = Error::last_os_error();
-            if err.kind() != ErrorKind::Interrupted {
-                return Err(err);
+            if err.kind() == ErrorKind::Interrupted {
+                continue;
             }
+            return Err(SyncFailure::from(err));
         }
     }
 
     #[cfg(target_os = "macos")]
     {
-        use std::os::unix::io::AsRawFd;
-        let fd = file.as_raw_fd();
-        let _ = metadata_changed;
+        let _ = kind;
         loop {
-            // SAFETY: `fd` ist ein offener POSIX-Dateideskriptor aus `&file`. `libc::fcntl` mit `F_FULLFSYNC`
-            // erzwingt auf macOS / APFS das Leeren aller physischen Platten- und Controller-Caches.
-            // Der Aufruf modifiziert keine Speicherbereiche und schließt den Deskriptor nicht.
+            // SAFETY: `fd` ist ein geöffneter, gültiger Dateideskriptor aus `file.as_raw_fd()`.
+            // `F_FULLFSYNC` verlangt das dritte Argument als `0` und leert den Hardware-Speichercache.
             let res = unsafe { libc::fcntl(fd, libc::F_FULLFSYNC, 0) };
-            if res != -1 {
+            if res == 0 {
                 return Ok(());
             }
             let err = Error::last_os_error();
-            if err.kind() != ErrorKind::Interrupted {
-                return Err(err);
+            if err.kind() == ErrorKind::Interrupted {
+                continue;
             }
+            return Err(SyncFailure::from(err));
         }
     }
 
-    #[cfg(all(unix, not(target_os = "linux"), not(target_os = "macos")))]
+    #[cfg(all(unix, not(any(target_os = "linux", target_os = "macos"))))]
     {
-        use std::os::unix::io::AsRawFd;
-        let fd = file.as_raw_fd();
-        let _ = metadata_changed;
+        let _ = kind;
         loop {
-            // SAFETY: `fd` ist ein unveränderlicher, offener Dateideskriptor aus `&file`. `libc::fsync`
-            // flasht Daten und Metadaten auf den persistenten Datenträger ohne Speicherzugriffe oder Deskriptormodifikationen.
+            // SAFETY: `fd` ist ein gültiger offener Dateideskriptor aus `file.as_raw_fd()`.
             let res = unsafe { libc::fsync(fd) };
             if res == 0 {
                 return Ok(());
             }
             let err = Error::last_os_error();
-            if err.kind() != ErrorKind::Interrupted {
-                return Err(err);
+            if err.kind() == ErrorKind::Interrupted {
+                continue;
             }
+            return Err(SyncFailure::from(err));
         }
     }
 
@@ -142,12 +150,9 @@ pub fn durable_flush_file(file: &File, metadata_changed: bool) -> Result<()> {
 ///
 /// # Fehlerfälle
 /// Gibt einen [`std::io::Error`] zurück, wenn das Verzeichnis nicht geöffnet oder nicht synchronisiert werden kann.
-pub fn durable_flush_dir(path: &Path) -> Result<()> {
-    #[cfg(unix)]
-    {
-        let dir = File::open(path)?;
-        durable_flush_file(&dir, true)
-    }
+pub fn flush_dir(path: &Path) -> Result<()> {
+    flush_dir_sync(path).map_err(Into::into)
+}
 
     #[cfg(not(unix))]
     {
@@ -157,6 +162,7 @@ pub fn durable_flush_dir(path: &Path) -> Result<()> {
             "durable_flush_dir is not supported on this target architecture (fail-closed)",
         ))
     }
+    Ok(())
 }
 
 // ANCHOR[contextra-sys:DUR-WRITE-ALL-001]
@@ -170,9 +176,6 @@ pub fn durable_flush_dir(path: &Path) -> Result<()> {
 ///    - `Ok(n)`: Rückt den Pufferzeiger um `n` geschriebene Bytes vor.
 ///    - `Err(EINTR)`: Wiederholt den Schreibaufruf ohne Datenverlust.
 ///    - Sonstiger Fehler: Gibt den I/O-Fehler sofort an den Aufrufer zurück.
-///
-/// # Fehlerfälle
-/// Gibt einen [`std::io::Error`] zurück, wenn das Zielmedium voll ist (`WriteZero`) oder ein Hardware-Fehler auftritt.
 pub fn write_all_durable(file: &mut File, mut buf: &[u8]) -> Result<()> {
     while !buf.is_empty() {
         match file.write(buf) {

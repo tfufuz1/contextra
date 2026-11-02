@@ -37,37 +37,6 @@ impl From<DurabilityConfigError> for contextra_types::ContextraError {
     }
 }
 
-impl DurabilityMode {
-    pub fn validate_against_features(
-        self,
-        deletion_proof_active: bool,
-        feature_ring: contextra_ports::license::FeatureRing,
-    ) -> Result<(), DurabilityConfigError> {
-        use DurabilityMode::*;
-        match self {
-            Full => Ok(()),
-            WalNoHmac if deletion_proof_active => {
-                Err(DurabilityConfigError::IncompatibleCombination {
-                    mode: self,
-                    feature: "deletion-proof",
-                    reason: "no HMAC integrity chain to anchor the proof",
-                })
-            }
-            MemoryOnly
-                if deletion_proof_active
-                    || feature_ring == contextra_ports::license::FeatureRing::Sovereign =>
-            {
-                Err(DurabilityConfigError::IncompatibleCombination {
-                    mode: self,
-                    feature: "deletion-proof / FeatureRing::Sovereign",
-                    reason: "no persistence layer exists to prove deletion from",
-                })
-            }
-            _ => Ok(()),
-        }
-    }
-}
-
 /// LSM storage configuration.
 // SEC-001 — Erweitere LsmConfig um `encryption_passphrase` und AES-256.
 // TEST: cargo test -p contextra-store test_encrypted_db_unreadable_without_key

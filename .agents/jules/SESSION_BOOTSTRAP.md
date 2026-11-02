@@ -1,52 +1,68 @@
 # Contextra – Ablauf einer Jules-Sitzung
 
-Nicht normativ. Maßgeblich: [`docs/SPEC.md`](../../docs/SPEC.md) (Version 4.2.0). Repository: `tfufuz1/contextra`.
+Nicht normativ. Maßgeblich: [`docs/SPEC.md`](../../docs/SPEC.md) (Version 4.3.0). Repository: `tfufuz1/contextra`.
 
-## Schritt 0 – Kontext prüfen
+Die Sitzung läuft ohne Unterbrechung, bis die Arbeitsliste abgearbeitet oder ein Stopp nach `PREAMBLE.md`, Abschnitt B, eingetreten ist. Die Arbeitsliste im Repository ist die Quelle der Wahrheit. GitHub-Issues sind eine optionale Ergänzung und keine Voraussetzung.
 
-Vor dem Code den aktuellen Zustand auf GitHub prüfen. Die gh-CLI ist die bevorzugte Quelle.
+## Schritt 0 – Umgebung prüfen (1 Minute)
 
 ```bash
-# Offene Aufgaben für Jules
-gh issue list --state open --label "jules" --json number,title,body,milestone
-
-# Details zu einer Aufgabe
-gh issue view <N>
-
-# Rote CI-Läufe und ihre Ursache
-gh run list --limit 5
-gh run view <RUN-ID> --log-failed
-
-# Neueste Pull Requests
-gh pr list --state all --limit 10
+cargo --version && rustc --version      # Pin laut rust-toolchain.toml (1.89.0)
+just --version                          # optional, Ausführung der Befehle geht auch ohne
 ```
 
-**Stopbedingung:** Ist `main` rot, wird zuerst die Ursache behoben. Anderer Code wird vorher nicht geschrieben.
+Fehlt die Toolchain: `bash .agents/jules/setup/environment_script.sh`. Das Skript ist idempotent. Einzelne optionale Werkzeuge dürfen fehlen, die Sitzung läuft weiter.
 
-## Schritt 1 – Regeln lesen
+## Schritt 1 – Kontext laden
 
-`AGENTS.md`, `.agents/jules/PREAMBLE.md`, und der Abschnitt der SPEC zur Aufgabe. Für Änderungen am Löschkern zusätzlich `.agents/rules/deletion_pipeline.md`. Für WAL und Krypto `.agents/rules/wal_crypto.md`.
+In dieser Reihenfolge, jeweils nur die nötigen Abschnitte:
 
-## Schritt 2 – Arbeitspaket bestimmen
+1. `AGENTS.md` (Ist-Zustand, harte Regeln).
+2. `.agents/jules/PREAMBLE.md` (Entscheidungsregeln, Stopp-Katalog, Prüfbefehle).
+3. `.agents/jules/tasks/BACKLOG.md` (Reihenfolge und Status der Arbeitspakete).
+4. `docs/SPEC.md` Abschnitt 15.3 (Gates) und den Abschnitt 15.4 zum gewählten `WP-x.y`, dazu die dort verlinkten Befehle, IDs und Abschnitte.
+5. `crates/<crate>/AGENTS.md` des betroffenen Crates.
+6. `.agents/jules/context/SESSION_START.md`, falls vorhanden: aktuelle CI-Lage und offene PRs. Die Datei entsteht durch `refresh-context.sh` und ist nicht versioniert.
 
-Die Aufgabe muss einem Arbeitspaket aus SPEC 15.4 entsprechen (`WP-x.y`). Passt keines, wird die Aufgabe nicht begonnen. Rückfrage im Issue.
+## Schritt 2 – Paket wählen
+
+- Wähle das erste Paket in `BACKLOG.md` mit Status `todo`, dessen Vorgänger alle `done` sind.
+- Ist `main` rot, weil ein Befehl aus dem Paket betroffen ist, gehört die Ursache zum Paket. Ist `main` rot aus anderem Grund, notiere das und arbeite trotzdem am Paket, sofern es nicht von dem Fehler abhängt.
+- Setze den Status auf `in_progress` und committe das gemeinsam mit der ersten Änderung des Pakets.
 
 ## Schritt 3 – Rot
 
-Fehlschlagenden Test mit SPEC-ID schreiben (`#[ctx_test(id = "T-…")]`) und die Ausgabe festhalten.
+- Lies die Karte `tasks/WP-x.y.toml`. Fehlt sie, erstelle sie aus `_TEMPLATE.toml` und der Beschreibung in SPEC 15.4.
+- Schreibe einen fehlschlagenden Test mit SPEC-ID nach `PREAMBLE.md`, Abschnitt D. Führe ihn aus und halte die Fehlerausgabe im PR fest.
+- Ist das Paket ein Build-Paket (z. B. WP-0.3), ist das „Rot“ die Ausgabe von `cargo check --workspace --all-targets --locked`.
 
 ## Schritt 4 – Grün
 
-Minimale Änderung. Keine Änderung an Gates, Lints, Baselines, `governance/` oder Toolchain-Pins.
+- Minimale Änderung, die nur die Karte und das Paket betrifft.
+- Keine Änderung an Gates, Lints, Baselines, Toolchain-Pins, `governance/` oder geschützten Pfaden (siehe `PREAMBLE.md`, Abschnitt B, S3).
+- Hält eine Änderung das Budget der Karte nicht ein, teile das Paket in zwei Teilpakete `WP-x.ya` und `WP-x.yb` und trage sie in die Arbeitsliste ein. Beides ist eine Entscheidung, die du selbst triffst.
 
 ## Schritt 5 – Prüfen
 
-Befehle aus `docs/COMPILATION.md`. Bei geändertem `Cargo.toml` wird `Cargo.lock` im selben Commit erneuert (D-93) und mit `--locked` geprüft.
+Die Befehle stehen in `PREAMBLE.md`, Abschnitt C, Punkt 7. Ergebnisse notieren. Bei Zeitüberschreitung eines Gesamtlaufs die betroffenen Crates einzeln prüfen und den Rest im PR als offen nennen.
 
-## Schritt 6 – Pull Request
+## Schritt 6 – Arbeitsliste aktualisieren
 
-Die Beschreibung enthält: Arbeitspaket, betroffene SPEC-IDs, Testliste, Prüfergebnisse, Abschnitt „Gefundene Probleme außerhalb des Umfangs“. Die Vorlage für PRs ist `.github/pull_request_template.md`.
+- Status des Pakets auf `done` oder `blocked` setzen. Bei `blocked` die Ursache und den Verweis auf den Fehler in der Spalte „Notiz“ schreiben.
+- Neu gefundene Pakete (z. B. Teilpakete oder Altbestand aus F-Befunden) als neue Zeilen mit Status `todo` eintragen.
 
-## Abbruchregel
+## Schritt 7 – Pull Request
 
-Tritt derselbe Fehler zweimal auf, wird das Vorgehen überprüft und die Sitzung angehalten. Die Ursache wird im Issue beschrieben.
+1. `git fetch origin && git rebase origin/<Hauptzweig>`. Bei Konflikten: lösen und Schritt 5 wiederholen.
+2. Commit im Format `WP-x.y: <Kurzbeschreibung>`.
+3. PR-Beschreibung mit den Abschnitten aus `PREAMBLE.md`, Abschnitt E.
+4. Einreichen.
+
+## Schritt 8 – Weitermachen
+
+Mit dem nächsten Paket in `BACKLOG.md` (zurück zu Schritt 2), bis S4 eintritt. Jedes Paket erhält einen eigenen Branch und PR.
+
+## Schutzregeln für Sitzungsdaten
+
+- Setze `git reset --hard` und `git clean` nicht ein, um den Arbeitsbaum zu säubern. Sie verwerfen eigene, noch nicht committete Arbeit. Committe oder stashe stattdessen.
+- Generierte Dateien unter `.agents/jules/context/` sind nicht versioniert (`.gitignore`). Verändere sie nicht.

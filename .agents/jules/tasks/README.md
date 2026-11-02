@@ -1,44 +1,40 @@
-# Task-Karten
+# Aufgabenkarten
 
-Nicht normativ. Eine Task-Karte beschreibt ein abgegrenztes Arbeitspaket für Jules. Sie setzt Scope und Grenzen fest und verweist auf die SPEC.
+Nicht normativ. Eine Aufgabenkarte beschreibt ein abgegrenztes Arbeitspaket für Jules. Sie setzt Umfang und Grenzen fest und verweist auf die SPEC.
+
+## Wie die Dateien zusammenhängen
+
+| Datei | Zweck |
+|---|---|
+| `BACKLOG.md` | Reihenfolge, Status und Abhängigkeiten aller Pakete. Maßgeblich für die Auswahl. |
+| `_TEMPLATE.toml` | Vorlage für neue Karten. |
+| `WP-x.y.toml` | Karte eines einzelnen Pakets. Wird angelegt, wenn das Paket aufgenommen wird. |
+
+Eine Karte, die fehlt, ist kein Hindernis. Jules erstellt sie aus der Vorlage und der Beschreibung in SPEC 15.4.
 
 ## Pflichtfelder
 
 | Feld | Inhalt |
 |---|---|
-| `id` | eindeutige Kennung der Karte |
+| `id` | Kennung, gleich dem Arbeitspaket, z. B. `WP-3.3` |
 | `title` | kurze Beschreibung |
-| `wp` | Arbeitspaket aus SPEC 15.4, z. B. `WP-3.3` |
-| `crate` | betroffenes Crate |
+| `wp` | Arbeitspaket aus SPEC 15.4 |
+| `gate` | Gate aus SPEC 15.3 |
+| `crate` | betroffene Crates |
 | `goal` | gewünschte Wirkung, prüfbar |
 | `non_goals` | ausdrücklich nicht zu ändern |
-| `scope` | erlaubte Pfade |
-| `forbidden` | verbotene Pfade (mindestens `AGENTS.md`, `docs/SPEC.md`, `rust-toolchain.toml`, `deny.toml`, `governance/**`, `.github/**`, `.agents/jules/setup/**`) |
-| `spec_ids` | betroffene SPEC-IDs (I-, FM-, T-, BM-, D-, HR-) |
+| `scope` | erlaubte Pfade (Glob) |
+| `forbidden` | verbotene Pfade. Mindestens die Einträge aus `_TEMPLATE.toml`, zusätzlich alles aus `.agents/governance/protected-paths.toml` |
+| `spec_ids` | betroffene SPEC-IDs |
 | `acceptance` | Befehle, die bestehen müssen |
 | `evidence_required` | was im PR belegt wird |
 
-Ein Budget (`files`, `lines`, `iterations`) ist sinnvoll, um Sitzungen zu begrenzen.
+`[budget]` (`files`, `lines`, `iterations`) begrenzt eine Sitzung. Überschreitet die Arbeit das Budget, wird das Paket geteilt (siehe `SESSION_BOOTSTRAP.md`, Schritt 4).
 
-## Beispiel
+## Verbindliche Prüfregel
 
-```toml
-id        = "T-2026-0101"
-title     = "WAL: Fehler beim Flush propagieren statt verschlucken"
-wp        = "WP-3.3"
-crate     = "contextra-store"
-goal      = "Ein fehlgeschlagener Flush liefert einen Fehler an den Aufrufer, kein stilles Verwerfen."
-non_goals = ["Keine Änderung an der Kompaktion", "Keine neuen Abhängigkeiten"]
-scope     = ["crates/contextra-store/src/wal/flusher.rs", "crates/contextra-store/tests/wal_*.rs"]
-forbidden = ["AGENTS.md", "docs/SPEC.md", "rust-toolchain.toml", "deny.toml", "governance/**", ".github/**", ".agents/jules/setup/**"]
-spec_ids  = ["P6", "I-10", "FM-5", "D-55", "T-FSYNC-1"]
-acceptance = ["cargo test -p contextra-store --locked --test wal_lifecycle_crash_point_matrix"]
-evidence_required = ["Neuer Test für einen I/O-Fehler beim Flush (rot, dann grün)"]
+Jede Karte nennt die Ausgangslage mit Datei und Zeile, zum Beispiel aus einem Befund. Der Agent prüft die Zahlen, bevor er sie verwendet. Befunde aus der SPEC sind Momentaufnahmen. Der Build und `grep` am aktuellen Stand gelten.
 
-[budget]
-files = 6
-lines = 250
-iterations = 6
-```
+## Status-Ablauf
 
-Die Vorfassung verwendete Invariantennamen wie `INV-WAL-POISON-EXPLICIT`, die nicht in der SPEC stehen. Verwendet werden die IDs aus SPEC 13.1 und 13.2.
+`todo` → `in_progress` → `done` oder `blocked`. Eine Änderung des Status gehört in denselben PR wie die Arbeit am Paket.

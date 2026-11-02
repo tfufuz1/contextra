@@ -1,6 +1,3 @@
-[lints]
-workspace = true
-
 [package]
 name = "contextra-sys"
 version.workspace = true
@@ -10,21 +7,31 @@ rust-version.workspace = true
 description = "Einzige `unsafe`-Stelle für Betriebssystemaufrufe: `fsync`, `mlock`, Prozesshärtung."
 
 [package.metadata.contextra]
-ring = "0"
-
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = [
-    "Win32_Foundation",
-    "Win32_Security",
-    "Win32_Security_Authorization",
-    "Win32_Storage_FileSystem",
-    "Win32_System_Memory",
-    "Win32_System_Threading",
-] }
-
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
+ring = "1"
 
 [dependencies]
-memmap2 = { workspace = true }
+libc = "0.2"
 tracing = { workspace = true }
+
+[dev-dependencies]
+proptest = "1.4"
+criterion = { version = "0.5", features = ["async_tokio"] }
+tempfile = "3"
+trybuild = "1.0"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+missing_safety_doc = "deny"
+await_holding_lock = "deny"
+
+[[test]]
+name = "sy_audit_unsafe"
+path = "tests/sy_audit_unsafe.rs"
+
+[[test]]
+name = "sy_audit_hygiene"
+path = "tests/sy_audit_hygiene.rs"
+
+[[test]]
+name = "sy_platform_tests"
+path = "tests/sy_platform_tests.rs"
