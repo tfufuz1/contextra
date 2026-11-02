@@ -115,10 +115,19 @@ fn sy_platform_09_t_ops_2_permissions() {
     set_restrictive_file_acl(&file_path).expect("set_restrictive_file_acl");
     verify_file_acl_owner_only(&file_path).expect("verify owner only again");
 
-    // Zu freizügige Rechte (0o666) müssen von verify_owner_only abgewiesen werden
-    set_mode(&file_path, 0o666).expect("set permissive");
-    let verify_res = verify_owner_only(&file_path);
-    assert_eq!(verify_res, Err(SysError::PermissionDenied));
+    // Zu freizügige Rechte (0o666) müssen von set_mode abgewiesen werden (SY-09)
+    let inv_mode = set_mode(&file_path, 0o666);
+    assert_eq!(inv_mode, Err(SysError::InvalidInput));
+
+    // Falls manuell per std::fs freizügige Rechte gesetzt werden, weist verify_owner_only ab
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o666))
+            .expect("chmod 666");
+        let verify_res = verify_owner_only(&file_path);
+        assert_eq!(verify_res, Err(SysError::PermissionDenied));
+    }
 }
 
 /// SY-10 & T-LOG-1: Fehlertexte fest, ohne Pfade oder Nutzerinhalte in Debug/Display.

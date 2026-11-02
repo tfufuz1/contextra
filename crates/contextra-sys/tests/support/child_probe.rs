@@ -7,13 +7,7 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 
-#[path = "../../src/hardening.rs"]
-mod hardening;
-
-#[path = "../../src/perm.rs"]
-mod perm;
-
-use hardening::{apply_process_hardening, lock_pages, mark_dont_dump, HardeningPolicy};
+use contextra_sys::{apply_process_hardening, lock_pages, mark_dont_dump, HardeningPolicy};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
