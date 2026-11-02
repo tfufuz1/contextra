@@ -33,23 +33,23 @@ async fn test_integration_open_heal_torn_tail_recovery() -> Result<()> {
     let size_healed = wal.size();
     assert!(size_healed < truncated_len as u64);
 
-    // 4. Append entry 4
-    let op4 = WalOp::Put {
-        tx_id: TxId::new(4),
-        key: b"k4".to_vec(),
-        value: b"v4".to_vec(),
+    // 4. Append entry 3 (replacing chopped torn tail entry 3)
+    let op3 = WalOp::Put {
+        tx_id: TxId::new(3),
+        key: b"k3".to_vec(),
+        value: b"v3".to_vec(),
     };
-    let (batch4, _) = wal.prepare_batch(vec![(op4, 4)]).await?;
-    wal.append_batch(batch4).await?;
+    let (batch3, _) = wal.prepare_batch(vec![(op3, 3)]).await?;
+    wal.append_batch(batch3).await?;
     drop(wal);
 
-    // 5. Reopen and verify replay yields 3 valid entries (1, 2, 4)
+    // 5. Reopen and verify replay yields 3 valid entries (1, 2, 3)
     let wal_reopened = Wal::open(&path).await?;
     let replayed = wal_reopened.replay().await?;
     assert_eq!(replayed.len(), 3);
     assert_eq!(replayed[0].1.seq_no, 1);
     assert_eq!(replayed[1].1.seq_no, 2);
-    assert_eq!(replayed[2].1.seq_no, 4);
+    assert_eq!(replayed[2].1.seq_no, 3);
 
     Ok(())
 }
@@ -162,13 +162,13 @@ async fn test_integration_encrypted_wal_open_heal() -> Result<()> {
     fs::write(&path, &raw[..raw.len() - 8]).await?;
 
     let wal = Wal::open_with_config(&path, config.clone()).await?;
-    let op4 = WalOp::Put {
-        tx_id: TxId::new(4),
-        key: b"k4".to_vec(),
-        value: b"v4".to_vec(),
+    let op3 = WalOp::Put {
+        tx_id: TxId::new(3),
+        key: b"k3".to_vec(),
+        value: b"v3".to_vec(),
     };
-    let (batch4, _) = wal.prepare_batch(vec![(op4, 4)]).await?;
-    wal.append_batch(batch4).await?;
+    let (batch3, _) = wal.prepare_batch(vec![(op3, 3)]).await?;
+    wal.append_batch(batch3).await?;
     drop(wal);
 
     let wal2 = Wal::open_with_config(&path, config).await?;
@@ -176,7 +176,7 @@ async fn test_integration_encrypted_wal_open_heal() -> Result<()> {
     assert_eq!(replayed.len(), 3);
     assert_eq!(replayed[0].1.seq_no, 1);
     assert_eq!(replayed[1].1.seq_no, 2);
-    assert_eq!(replayed[2].1.seq_no, 4);
+    assert_eq!(replayed[2].1.seq_no, 3);
 
     Ok(())
 }

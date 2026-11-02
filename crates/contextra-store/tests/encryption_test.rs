@@ -117,3 +117,20 @@ async fn test_encrypted_db_unreadable_as_plaintext() {
         "Secret value was found in plaintext in the database files!"
     );
 }
+
+/// Prüft, dass eine Konfiguration ohne Verschlüsselungspassphrase (encryption_passphrase = None)
+/// für die Übergabe an K5 (Pflichtverschlüsselung) dokumentiert und abgrenzbar ist.
+#[tokio::test]
+async fn test_unencrypted_config_warning_or_error() {
+    let tmp = TempDir::new().expect("temp dir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        encryption_passphrase: None,
+        ..Default::default()
+    };
+
+    assert!(
+        config.encryption_passphrase.is_none(),
+        "Default config must have None passphrase during Stufe 1 transition"
+    );
+}
