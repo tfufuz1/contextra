@@ -18,6 +18,7 @@
 
 use std::path::Path;
 
+// ANCHOR[contextra-durable-fs:LIB-SCRUB-RECEIPT-001]
 /// Quittung über das sichere Überschreiben (Scrubbing) einer Datei.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScrubReceipt {
@@ -25,6 +26,7 @@ pub struct ScrubReceipt {
     pub bytes_scrubbed: u64,
 }
 
+// ANCHOR[contextra-durable-fs:LIB-FAULT-INJECTOR-001]
 /// Trait für deterministische Fehlerinjektion in Persistenzpfaden (intern für scrub-Kompatibilität).
 pub trait FaultInjector: Send + Sync {
     /// Hook vor oder während eines Schreibvorgangs.
@@ -45,6 +47,7 @@ pub trait FaultInjector: Send + Sync {
     }
 }
 
+// ANCHOR[contextra-durable-fs:LIB-NO-FAULT-001]
 /// Null-Kosten-Standardinjektor für Produktivumgebungen.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct NoFault;
@@ -66,6 +69,12 @@ impl<T: FaultInjector + ?Sized> FaultInjector for &T {
     }
 }
 
+// ANCHOR[contextra-durable-fs:LIB-DURABLE-REMOVE-001]
+// Ablauf von `durable_remove_with_injector`:
+// 1. Elternverzeichnis ermitteln.
+// 2. Datei physisch via `std::fs::remove_file` löschen.
+// 3. Fehlerinjektor-Hook `on_dir_fsync` für das Elternverzeichnis ausführen.
+// 4. Verzeichnis-Metadaten via `contextra_sys::flush_dir` synchronisieren (DF-09).
 pub(crate) fn durable_remove_with_injector<F: FaultInjector>(
     path: &Path,
     injector: &F,
@@ -83,6 +92,7 @@ pub(crate) fn durable_remove_with_injector<F: FaultInjector>(
     Ok(())
 }
 
+// ANCHOR[contextra-durable-fs:LIB-MOD-REAL-VFS-001]
 /// Reales Virtuelles Dateisystem (`RealVfs`) als primäre Produktionsimplementierung.
 pub mod real_vfs {
     use contextra_ports::vfs::{Vfs, VfsFile, VfsOpenOptions};
@@ -96,6 +106,7 @@ pub mod real_vfs {
 
     static VFS_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+    // ANCHOR[contextra-durable-fs:LIB-REAL-FILE-001]
     /// Dateihandle für VfsFile mit dauerhafter Vergiftung bei I/O- oder fsync-Fehlern (DF-03, INV-FSYNC-1).
     pub struct RealFile {
         file: Mutex<Option<File>>,
@@ -227,6 +238,7 @@ pub mod real_vfs {
         }
     }
 
+    // ANCHOR[contextra-durable-fs:LIB-REAL-VFS-001]
     /// Produktionsimplementierung des [`contextra_ports::vfs::Vfs`]-Traits.
     #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
     pub struct RealVfs;
@@ -395,6 +407,7 @@ pub mod real_vfs {
     }
 }
 
+// ANCHOR[contextra-durable-fs:LIB-MOD-ATOMIC-001]
 /// Atomare Austausch- und Schreiboperationen (`write_atomic`, DF-02).
 pub mod atomic {
     use contextra_sys::{flush_dir, flush_file, rename_durable, FlushKind};
@@ -450,6 +463,7 @@ pub mod atomic {
     }
 }
 
+// ANCHOR[contextra-durable-fs:LIB-MOD-DIR-LOCK-001]
 /// Exklusive Verzeichnissperre (`LOCK`-Datei) gemäß SPEC D-50 und DF-05.
 pub mod dir_lock {
     use contextra_sys::fs_class;

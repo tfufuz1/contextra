@@ -22,6 +22,7 @@ use std::time::Duration;
 /// Atomarer Zähler zur Generierung kollisionsfreier Namen für Testdateien der Startprobe.
 static PROBE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+// ANCHOR[contextra-durable-fs:PROBE-TIER-001]
 /// Plattform- und Dateisystemstufe gemäß SPEC D-56.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tier {
@@ -31,6 +32,7 @@ pub enum Tier {
     Tier2,
 }
 
+// ANCHOR[contextra-durable-fs:PROBE-UNSUPPORTED-FS-001]
 /// Nicht unterstützte Dateisystemtypen, die den Start verweigern (SPEC D-56, T-PLAT-1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnsupportedFilesystem {
@@ -50,6 +52,7 @@ pub enum UnsupportedFilesystem {
     ProbeFailed,
 }
 
+// ANCHOR[contextra-durable-fs:PROBE-VERDICT-ENUM-001]
 /// Ergebnis der Startprobe-Beurteilung.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ProbeVerdict {
@@ -59,6 +62,7 @@ pub enum ProbeVerdict {
     Refused(UnsupportedFilesystem),
 }
 
+// ANCHOR[contextra-durable-fs:PROBE-DETECTED-FS-001]
 /// Erkannter konkreter Dateisystemtyp.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DetectedFs {
@@ -86,6 +90,7 @@ pub enum DetectedFs {
     Unknown,
 }
 
+// ANCHOR[contextra-durable-fs:PROBE-FS-PROBE-001]
 /// Ergebnis der physischen Dateisystem-Startprobe (SPEC 4. Schnittstellen [E]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FsProbe {
@@ -123,6 +128,15 @@ impl<'a> Drop for ProbeTempFile<'a> {
 /// # Fehler
 /// Liefert einen [`io::Error`] mit festem Fehlertext, falls das Verzeichnis nicht existiert
 /// oder die Dateizugriffe scheitern (ohne Klartextpfade in Display gemäß DF-11).
+// ANCHOR[contextra-durable-fs:PROBE-DIR-001]
+// Ablauf von `probe_dir`:
+// 1. Verzeichnisvalidierung (DF-11: Pfadprüfung ohne Klartext-Pfad im Display).
+// 2. Grobe Klassifikation via `fs_class` und Erkennung von Copy-on-Write (CoW).
+// 3. Rotationsmedium-Erkennung (HDD vs. SSD/NVMe) für D-83.
+// 4. Atomaritätsprobe für `rename_durable`.
+// 5. Verzeichnis-`fsync` via `flush_dir`.
+// 6. Atomaritätsprobe für 64-Byte ausgerichtete Writes und 80-Byte-Slots (L-4).
+// 7. Stichprobenmessung von `fsync_p50` zur Baseline-Bestimmung (D-30).
 pub fn probe_dir(path: &Path) -> io::Result<FsProbe> {
     if !path.is_dir() {
         return Err(io::Error::new(
@@ -170,6 +184,12 @@ pub fn probe_dir(path: &Path) -> io::Result<FsProbe> {
 ///
 /// # Fehler
 /// Liefert einen [`io::Error`], falls der Pfad nicht existiert oder die Abfrage scheitert.
+// ANCHOR[contextra-durable-fs:PROBE-FREE-SPACE-001]
+// Ablauf von `free_space`:
+// 1. Pfadexistenz prüfen.
+// 2. Unter Linux: Primär `stat -f`, sekundär `df -B1` zur Ermittlung freier Bytes nutzen.
+// 3. Unter macOS: `df -k` parsen und in Bytes umrechnen.
+// 4. Bei Misserfolg oder anderen Betriebssystemen fail-closed mit `ErrorKind::Unsupported` abbrechen.
 pub fn free_space(path: &Path) -> io::Result<u64> {
     if !path.exists() {
         return Err(io::Error::new(io::ErrorKind::NotFound, "path not found"));
@@ -245,6 +265,11 @@ pub fn free_space(path: &Path) -> io::Result<u64> {
 }
 
 /// Bewertet das Ergebnis der Startprobe und entscheidet über Zulässigkeit und Stufe.
+// ANCHOR[contextra-durable-fs:PROBE-VERDICT-FN-001]
+// Ablauf von `verdict`:
+// 1. Hardware-Persistenz prüfen (Rename, Verzeichnis-fsync, 64B-Atomarität). Bei Misserfolg -> `Refused(ProbeFailed)`.
+// 2. Netzwerk- und Userspace-Dateisysteme (SMB, NFS, FUSE, Overlayfs, NTFS) strikt abweisen (DF-06, T-PLAT-1).
+// 3. Einstufung lokaler Dateisysteme: ext4/XFS auf Linux x86_64/aarch64 -> Tier 1, APFS/Btrfs/ZFS -> Tier 2.
 #[must_use]
 pub fn verdict(probe: &FsProbe) -> ProbeVerdict {
     // Wenn grundlegende Hardware-Persistenz-Prüfungen fehlschlagen -> Refused
@@ -298,6 +323,8 @@ pub fn verdict(probe: &FsProbe) -> ProbeVerdict {
     }
 }
 
+// ANCHOR[contextra-durable-fs:PROBE-ATOMIC-RENAME-001]
+// NOTE: Hilfsfunktion: Prüft, ob `rename_durable` eine Zwischendatei atomar ersetzt.
 fn probe_atomic_rename(dir: &Path) -> io::Result<bool> {
     let count = PROBE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();
@@ -322,6 +349,8 @@ fn probe_atomic_rename(dir: &Path) -> io::Result<bool> {
     Ok(ok)
 }
 
+// ANCHOR[contextra-durable-fs:PROBE-ALIGNED-SLOT-WRITES-001]
+// NOTE: Hilfsfunktion: Prüft 64-Byte-ausgerichtetes Schreiben und 80-Byte-Slot-Schreiben (L-4).
 fn probe_aligned_and_slot_writes(dir: &Path) -> io::Result<bool> {
     let count = PROBE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();
@@ -377,6 +406,8 @@ fn probe_aligned_and_slot_writes(dir: &Path) -> io::Result<bool> {
     Ok(true)
 }
 
+// ANCHOR[contextra-durable-fs:PROBE-MEASURE-FSYNC-P50-001]
+// NOTE: Hilfsfunktion: Führt 7 Test-Flushes durch und ermittelt die Mediandauer `fsync_p50`.
 fn measure_fsync_p50(dir: &Path) -> io::Result<Duration> {
     let count = PROBE_COUNTER.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();
@@ -414,6 +445,8 @@ fn measure_fsync_p50(dir: &Path) -> io::Result<Duration> {
     Ok(non_zero_p50)
 }
 
+// ANCHOR[contextra-durable-fs:PROBE-DETECT-FS-TYPE-001]
+// NOTE: Hilfsfunktion: Ermittelt den konkreten Dateisystemtyp aus /proc/self/mountinfo bzw. statfs.
 fn detect_filesystem_type(path: &Path) -> DetectedFs {
     #[cfg(target_os = "linux")]
     {
@@ -515,6 +548,8 @@ fn map_fstype_str(s: &str) -> DetectedFs {
     }
 }
 
+// ANCHOR[contextra-durable-fs:PROBE-DETECT-ROTATIONAL-001]
+// NOTE: Hilfsfunktion: Prüft /sys/block/*/queue/rotational zur Erkennung von Rotationsmedien (HDD).
 fn detect_rotational(path: &Path) -> Option<bool> {
     #[cfg(target_os = "linux")]
     {
