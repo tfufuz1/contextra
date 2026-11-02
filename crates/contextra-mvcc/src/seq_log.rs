@@ -262,11 +262,11 @@ impl SequenceLog {
     ///
     /// Rückgabe ist aufsteigend sortiert.
     pub fn expired_pins_at(&self, now_nanos: u64) -> Vec<u64> {
-        let max_nanos = u64::try_from(self.max_pin_duration.as_nanos()).unwrap_or(u64::MAX);
         let mut expired = Vec::new();
         for (&seq_no, timestamps) in &self.pinned_snapshots {
             for &ts in timestamps {
-                if now_nanos.saturating_sub(ts) > max_nanos {
+                let elapsed = Duration::from_nanos(now_nanos.saturating_sub(ts));
+                if elapsed > self.max_pin_duration {
                     expired.push(seq_no);
                     break;
                 }
@@ -311,14 +311,13 @@ impl SequenceLog {
         let min_seq = self.pinned_snapshots.keys().copied().min();
         if let Some(seq) = min_seq {
             if let Some(timestamps) = self.pinned_snapshots.get(&seq) {
-                let max_nanos = u64::try_from(self.max_pin_duration.as_nanos()).unwrap_or(u64::MAX);
                 for &ts in timestamps {
-                    let duration_nanos = now_nanos.saturating_sub(ts);
-                    if duration_nanos > max_nanos {
+                    let elapsed = Duration::from_nanos(now_nanos.saturating_sub(ts));
+                    if elapsed > self.max_pin_duration {
                         tracing::warn!(
                             seq_no = seq,
                             max_pin_duration = ?self.max_pin_duration,
-                            elapsed_nanos = duration_nanos,
+                            elapsed_nanos = elapsed.as_nanos(),
                             "Snapshot pin active beyond max duration"
                         );
                         break;
@@ -803,3 +802,8 @@ mod tests {
         assert_eq!(log.min_retention_seq(), Some(50));
     }
 }
+
+// Inkludiere Modul `seq`
+#[path = "seq.rs"]
+pub mod seq;
+pub use seq::SeqAllocator;

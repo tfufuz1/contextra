@@ -1471,6 +1471,104 @@ async fn test_seq_no_near_u64_max_boundary() -> Result<()> {
     Ok(())
 }
 
+/// T-WAL-1: Toleranz von AEAD-Entschlüsselungsfehlern am Dateiende (Torn Write / Open-Heal).
+#[tokio::test]
+async fn test_t_wal_1_aead_decryption_failure_tolerated_at_tail() -> Result<()> {
+    let dir = tempdir()?;
+    let wal_path = dir.path().join("t_wal_1_tail.wal");
+
+    let km = Arc::new(KeyManager::try_new(
+        "passphrase123",
+        b"salt123456789012345678901234567890",
+    )?);
+    let mut config = WalConfig::default();
+    config.key_manager = Some(km);
+
+    // 1. Zwei valide Einträge schreiben
+    {
+        let wal = Wal::open_with_config(&wal_path, config.clone()).await?;
+        for i in 1..=2 {
+            let op = WalOp::Put {
+                tx_id: TxId::new(i),
+                key: format!("key_{i}").into_bytes(),
+                value: format!("val_{i}").into_bytes(),
+            };
+            let (batch, _) = wal.prepare_batch(vec![(op, i)]).await?;
+            wal.append_batch(batch).await?;
+        }
+    }
+
+    // 2. Unvollständigen / korrumpierten Frame am Dateiende simulieren
+    let mut raw_bytes = tokio::fs::read(&wal_path).await?;
+    // Hänge einen unvollständigen Frame an: 4 Bytes Länge, 12 Bytes Nonce, 10 Bytes fehlerhafter Ciphertext
+    let fake_len = (12 + 10) as u32;
+    raw_bytes.extend_from_slice(&fake_len.to_le_bytes());
+    raw_bytes.extend_from_slice(&[0x42u8; 12]); // Fake Nonce
+    raw_bytes.extend_from_slice(&[0x99u8; 10]); // Fake Ciphertext (schlägt bei AEAD fehl)
+    tokio::fs::write(&wal_path, &raw_bytes).await?;
+
+    // 3. Replay muss tolerieren, dass am Dateiende die Entschlüsselung fehlschlägt
+    let wal_reopened = Wal::open_read_only_with_config(&wal_path, config).await?;
+    let entries = wal_reopened.replay().await?;
+    assert_eq!(entries.len(), 2, "AEAD-Tail-Fehler muss als unvollständiger Write toleriert werden");
+    assert_eq!(entries[0].1.seq_no, 1);
+    assert_eq!(entries[1].1.seq_no, 2);
+
+    Ok(())
+}
+
+/// T-WAL-1: Ablehnung von Deserialisierungsfehlern nach erfolgreicher AEAD-Entschlüsselung (Fail-Closed).
+#[tokio::test]
+async fn test_t_wal_1_deserialization_failure_rejected_in_authenticated_chunk() -> Result<()> {
+    let dir = tempdir()?;
+    let wal_path = dir.path().join("t_wal_1_authenticated_corrupt.wal");
+
+    let km = Arc::new(KeyManager::try_new(
+        "passphrase123",
+        b"salt123456789012345678901234567890",
+    )?);
+    let mut config = WalConfig::default();
+    config.key_manager = Some(km.clone());
+
+    // UUID abrufen und sub_km ableiten (wie von Wal::open erwartet)
+    let uuid_bytes = Wal::load_or_create_wal_uuid(&wal_path).await?;
+    let sub_km = km.derive_file_key(&uuid_bytes)?;
+
+    // Erzeuge eine Datei mit V3 Header und einem verschlüsselten Frame, dessen Klartext korrumpierte Deserialisierungsdaten enthält
+    let mut bad_inner_plaintext = Vec::new();
+    // Innerer Längen-Präfix: 16 Bytes
+    bad_inner_plaintext.extend_from_slice(&16u32.to_le_bytes());
+    // 16 Bytes Müll (kein gültiger WalEntry, CRC und Framing fehlerhaft)
+    bad_inner_plaintext.extend_from_slice(&[0xFFu8; 16]);
+
+    let (ciphertext, nonce) = sub_km.encrypt_auto_nonce(&bad_inner_plaintext)?;
+    let chunk_len = (12 + ciphertext.len()) as u32;
+
+    let mut wal_bytes = Vec::new();
+    wal_bytes.extend_from_slice(&WAL_V3_HEADER);
+    wal_bytes.extend_from_slice(&chunk_len.to_le_bytes());
+    wal_bytes.extend_from_slice(&nonce);
+    wal_bytes.extend_from_slice(&ciphertext);
+
+    tokio::fs::write(&wal_path, &wal_bytes).await?;
+
+    // Replay muss hart mit ContextraError::wal_corruption fehlschlagen!
+    let wal = Wal::open_read_only_with_config(&wal_path, config).await?;
+    let replay_res = wal.replay().await;
+    assert!(
+        replay_res.is_err(),
+        "Deserialisierungsfehler in authentifiziertem Chunk MUSS hart abgelehnt werden"
+    );
+    let err = replay_res.err().unwrap();
+    assert!(
+        matches!(err, ContextraError::WalCorruption { .. }),
+        "Erwartet WalCorruption, erhalten: {:?}",
+        err
+    );
+
+    Ok(())
+}
+
 #[tokio::test]
 async fn test_mmap_slice_bounds_mismatch_no_panic() {
     let dir = tempdir().expect("tempdir");

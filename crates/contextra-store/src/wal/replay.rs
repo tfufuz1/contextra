@@ -1,6 +1,28 @@
 //! # WAL Replay & Wiederherstellung (Ring 1)
 //!
 //! Rekonstruiert den Zustand der MemTable beim Hochfahren des Stores aus dem WAL.
+//!
+//! ## Replay- und Tail-Toleranz-Policy (Befund K3 / T-WAL-1 / SPEC §8.8)
+//!
+//! Das Write-Ahead-Log unterscheidet strikt zwischen zwei Fehlerklassen während des Replays:
+//!
+//! 1. **Unvollständige Append-Operationen am Dateiende (Torn Writes / Crash-Recovery):**
+//!    Erreicht das Replay das physische Dateiende (`pos >= file_size`), wird ein partieller
+//!    Header oder ein unvollständig geschriebener Frame als Crash-Artefakt interpretiert und
+//!    über den Open-Heal-Mechanismus toleriert.
+//!    - Ein **AEAD-Entschlüsselungsfehler** direkt am Dateiende (`pos >= file_size`) wird
+//!      als abgerissener Schreibvorgang (z. B. unvollständiger Ciphertext oder Nonce-Block
+//!      nach plötzlichem Stromausfall) toleriert (`tracing::error!`), sodass der Store
+//!      auf den letzten intakten Commit-Zustand zurückrollt und den Rest abschneidet.
+//!
+//! 2. **Korruption in authentifizierten Chunks (Fail-Closed-Invariante):**
+//!    Wurde ein AEAD-verschlüsselter Frame erfolgreich authentifiziert und entschlüsselt,
+//!    handelt es sich um kryptografisch verifizierte Nutzlast.
+//!    - Schlägt die **Deserialisierung** (`WalEntry::from_bytes_classified`) innerhalb eines
+//!      solchen erfolgreich entschlüsselten Batches fehl, handelt es sich **niemals** um einen
+//!      harmlosen Tail-Abriss, sondern um eine echte Datenkorruption oder Manipulation.
+//!    - In diesem Fall wird der Vorgang ausnahmslos mit `ContextraError::wal_corruption`
+//!      hart abgebrochen (Fail-Closed).
 
 use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result};
@@ -177,7 +199,8 @@ impl Wal {
         file_size: u64,
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        let slice_len = (file_size as usize).min(mmap.len());
+        let file_size_usize = usize::try_from(file_size).unwrap_or(usize::MAX);
+        let slice_len = file_size_usize.min(mmap.len());
         let slice = mmap
             .get(..slice_len)
             .ok_or_else(|| ContextraError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
@@ -214,7 +237,8 @@ impl Wal {
                 ))
             })?;
 
-            let slice_len = (file_size as usize).min(mmap.len());
+            let file_size_usize = usize::try_from(file_size).unwrap_or(usize::MAX);
+            let slice_len = file_size_usize.min(mmap.len());
             let slice = mmap
                 .get(..slice_len)
                 .ok_or_else(|| ContextraError::wal_corruption(0, "Mmap slice bounds exceeded"))?;
@@ -358,7 +382,11 @@ impl Wal {
                 break;
             }
 
-            let len_bytes_slice = match slice.get(pos as usize..pos as usize + 4) {
+            let pos_usize = match usize::try_from(pos) {
+                Ok(u) => u,
+                Err(_) => break,
+            };
+            let len_bytes_slice = match slice.get(pos_usize..pos_usize.saturating_add(4)) {
                 Some(s) => s,
                 None => {
                     tracing::warn!(
@@ -399,7 +427,9 @@ impl Wal {
                 ));
             }
 
-            if pos + 4 + len as u64 > file_size || (pos + 4 + len as u64) as usize > slice.len() {
+            let entry_end_pos = pos + 4 + len as u64;
+            let entry_end_usize = usize::try_from(entry_end_pos).unwrap_or(usize::MAX);
+            if entry_end_pos > file_size || entry_end_usize > slice.len() {
                 if entries_count == 0 && file_size > 64 {
                     return Err(ContextraError::wal_corruption(
                         pos,
@@ -413,7 +443,7 @@ impl Wal {
                 break;
             }
 
-            let entry_data_raw = match slice.get(pos as usize + 4..pos as usize + 4 + len) {
+            let entry_data_raw = match slice.get(pos_usize.saturating_add(4)..pos_usize.saturating_add(4).saturating_add(len)) {
                 Some(data) => data,
                 None => {
                     tracing::warn!(
