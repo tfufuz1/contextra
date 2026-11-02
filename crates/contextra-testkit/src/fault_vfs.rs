@@ -2,7 +2,7 @@
 //!
 //! Dieses Modul stellt mit [`FaultVfs`] ein In-Memory-Dateisystem bereit, das I/O-Fehler,
 //! Abstürze und `fsync`-Verweigerungen gezielt nach einer konfigurierbaren Anzahl von
-//! Operationen injizieren kann.
+//! Operationen oder anhand eines deterministischen Plans injizieren kann.
 //!
 //! ## Ring & Architektur-Einordnung
 //! - **Ring:** Werkzeug / Tooling
@@ -10,23 +10,15 @@
 //! - **Regel 5 (SPEC §3.2):** I/O nur über Vfs; `fsync`-Fehler müssen strikt propagiert werden.
 //! - **Regel 10 (SPEC §3.2):** Fail-Closed: Schlägt ein I/O- oder sync-Aufruf fehl, darf das
 //!   System keinen Teilerfolg vortäuschen oder in einen inkonsistenten Zustand verfallen.
-//!
-//! ## Funktionsweise der Fehlerinjektion
-//! Über [`FaultConfig`] wird konfiguriert, nach wie vielen erfolgreichen Schreib-,
-//! Lese-, Sync- oder Rename-Operationen ein synthetischer I/O-Fehler ausgelöst wird:
-//! - `fail_writes_after`: Gibt nach N erfolgreichen Schreibvorgängen einen Fehler zurück.
-//! - `fail_syncs_after`: Simuliert fehlschlagende `fsync`-Befehle des Betriebssystems.
-//! - `fail_reads_after`: Simuliert Lesefehler von defekten Blöcken.
-//! - `fail_renames_after`: Simuliert Fehler beim atomaren Umbenennen.
-//! - `fail_at_operation`: Gezielt bei `(FaultOperation, index)` fehlschlagen.
-//! - `crashed`: Simuliert einen sofortigen Systemabsturz (Power-Cut).
+//! - **T-FSYNC-1 / DF-03:** Ein `fsync`-Fehler auf einem Handle macht dieses dauerhaft fatal
+//!   (`Poisoned`). Weitere Aufrufe werden abgewiesen.
 
 // FILE-CONTEXT
 // STAND: 2026-11-01
 // ZWECK: Deterministic I/O error injector and Virtual File System test utility.
-// INVARIANTEN: Zero real data corruption, deterministic fault triggers based on operation count.
+// INVARIANTEN: Zero real data corruption, deterministic fault triggers based on operation count, T-FSYNC-1 handle poisoning.
 
-use contextra_ports::Vfs;
+use contextra_ports::{Vfs, VfsFile, VfsOpenOptions};
 use contextra_types::{ContextraError, Result};
 use parking_lot::RwLock;
 use std::collections::{BTreeMap, BTreeSet};
@@ -39,11 +31,11 @@ use std::sync::Arc;
 /// Klassifikation der I/O-Operationsarten für gezielte Fehlerinjektion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum FaultOperation {
-    /// Lesezugriff auf Dateiinhalte (`read`).
+    /// Lesezugriff auf Dateiinhalte (`read`, `read_at`).
     Read,
-    /// Schreibzugriff (`write_atomic` / `write_file`).
+    /// Schreibzugriff (`write_atomic`, `write_file`, `write_at`).
     Write,
-    /// Synchronisationsaufruf (`sync`, `sync_dir`).
+    /// Synchronisationsaufruf (`sync`, `sync_dir`, `sync_data`, `sync_all`).
     Sync,
     /// Umbenennen (`rename`).
     Rename,
@@ -51,6 +43,30 @@ pub enum FaultOperation {
     Remove,
     /// Verzeichnisanlage (`create_dir_all`).
     CreateDir,
+    /// Längenänderung (`set_len`).
+    SetLen,
+}
+
+/// Spezifischer Fehlerinjektions-Plan für den n-ten Aufruf einer Operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FaultPlan {
+    /// Betroffene Operationsart.
+    pub operation: FaultOperation,
+    /// 0-basierter Index des Aufrufs, der fehlschlagen soll.
+    pub nth_call: usize,
+    /// Art des zurückzugebenden I/O-Fehlers.
+    pub error_kind: ErrorKind,
+}
+
+impl FaultPlan {
+    /// Erstellt einen exakten Plan für den n-ten Aufruf einer Operation mit dem angegebenen Fehler.
+    pub fn exact(operation: FaultOperation, nth_call: usize, error_kind: ErrorKind) -> Self {
+        Self {
+            operation,
+            nth_call,
+            error_kind,
+        }
+    }
 }
 
 // ANCHOR[contextra-testkit:FAULT-CONFIG-STRUCT-001]
@@ -70,8 +86,158 @@ pub struct FaultConfig {
     pub fail_renames_after: Option<usize>,
     /// Gezielt bei einer bestimmten Operation und einem bestimmten Null-basierten Index fehlschlagen.
     pub fail_at_operation: Option<(FaultOperation, usize)>,
+    /// Expliziter Einzelplan oder Liste von Plänen.
+    pub plan: Option<FaultPlan>,
     /// Globaler Notschalter: Alle Operationen schlagen sofort fehl.
     pub fail_all: bool,
+    /// Crash-Punkt (nach N Operationen crashen und alle nachfolgenden ungeschriebenen Daten verwerfen).
+    pub crash_after_ops: Option<usize>,
+}
+
+/// In-Memory Repräsentation einer geöffneten Datei in [`FaultVfs`].
+#[derive(Debug)]
+pub struct FaultFile {
+    path: PathBuf,
+    vfs: FaultVfs,
+    options: VfsOpenOptions,
+    poisoned: AtomicBool,
+}
+
+impl FaultFile {
+    fn check_poisoned(&self) -> io::Result<()> {
+        if self.poisoned.load(Ordering::SeqCst) {
+            return Err(io::Error::other(
+                "File handle is poisoned due to previous fsync error",
+            ));
+        }
+        Ok(())
+    }
+
+    fn poison(&self) {
+        self.poisoned.store(true, Ordering::SeqCst);
+    }
+}
+
+impl VfsFile for FaultFile {
+    fn read_at(&self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
+        self.check_poisoned()?;
+        if !self.options.read {
+            return Err(io::Error::new(
+                ErrorKind::PermissionDenied,
+                "File not open for reading",
+            ));
+        }
+        self.vfs
+            .check_fault(FaultOperation::Read, &self.vfs.read_count)?;
+        let files = self.vfs.files.read();
+        let data = files
+            .get(&self.path)
+            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found"))?;
+
+        let off = usize::try_from(offset)
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "Offset out of range"))?;
+
+        if off >= data.len() {
+            return Ok(0);
+        }
+
+        let available = data.get(off..).unwrap_or(&[]);
+        let to_copy = std::cmp::min(buf.len(), available.len());
+        if let (Some(dst), Some(src)) = (buf.get_mut(..to_copy), available.get(..to_copy)) {
+            dst.copy_from_slice(src);
+        }
+        Ok(to_copy)
+    }
+
+    fn write_at(&self, buf: &[u8], offset: u64) -> io::Result<usize> {
+        self.check_poisoned()?;
+        if !self.options.write {
+            return Err(io::Error::new(
+                ErrorKind::PermissionDenied,
+                "File not open for writing",
+            ));
+        }
+        self.vfs
+            .check_fault(FaultOperation::Write, &self.vfs.write_count)?;
+
+        let off = usize::try_from(offset)
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "Offset out of range"))?;
+
+        let mut files = self.vfs.files.write();
+        let data = files.entry(self.path.clone()).or_default();
+
+        if off + buf.len() > data.len() {
+            data.resize(off + buf.len(), 0);
+        }
+
+        if let Some(target_slice) = data.get_mut(off..off + buf.len()) {
+            target_slice.copy_from_slice(buf);
+        }
+        Ok(buf.len())
+    }
+
+    fn set_len(&self, len: u64) -> io::Result<()> {
+        self.check_poisoned()?;
+        if !self.options.write {
+            return Err(io::Error::new(
+                ErrorKind::PermissionDenied,
+                "File not open for writing",
+            ));
+        }
+        self.vfs
+            .check_fault(FaultOperation::SetLen, &self.vfs.set_len_count)?;
+
+        let target_len = usize::try_from(len)
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "Length out of range"))?;
+
+        let mut files = self.vfs.files.write();
+        let data = files
+            .get_mut(&self.path)
+            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found"))?;
+        data.resize(target_len, 0);
+        Ok(())
+    }
+
+    fn len(&self) -> io::Result<u64> {
+        self.check_poisoned()?;
+        self.vfs
+            .check_fault(FaultOperation::Read, &self.vfs.read_count)?;
+        let files = self.vfs.files.read();
+        let data = files
+            .get(&self.path)
+            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found"))?;
+        Ok(data.len() as u64)
+    }
+
+    fn sync_data(&self) -> io::Result<()> {
+        self.check_poisoned()?;
+        match self
+            .vfs
+            .check_fault(FaultOperation::Sync, &self.vfs.sync_count)
+        {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                // T-FSYNC-1 / DF-03: Handle wird fatal vergiftet
+                self.poison();
+                Err(e)
+            }
+        }
+    }
+
+    fn sync_all(&self) -> io::Result<()> {
+        self.check_poisoned()?;
+        match self
+            .vfs
+            .check_fault(FaultOperation::Sync, &self.vfs.sync_count)
+        {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                // T-FSYNC-1 / DF-03: Handle wird fatal vergiftet
+                self.poison();
+                Err(e)
+            }
+        }
+    }
 }
 
 // ANCHOR[contextra-testkit:FAULT-VFS-STRUCT-001]
@@ -79,11 +245,6 @@ pub struct FaultConfig {
 ///
 /// **Zweck:** Dient als I/O-Testunterlage für Speichermodule (z. B. WAL und LSM-Storage),
 /// um Fehlertoleranz und Absturzsicherheit ohne reale Festplattenfehler zu testen.
-///
-/// **Nebenläufigkeit:**
-/// - Dateiinhalte liegen geschützt in einem [`RwLock<BTreeMap<PathBuf, Vec<u8>>>`].
-/// - Verzeichnisstruktur liegt in einem [`RwLock<BTreeSet<PathBuf>>`].
-/// - Die Operationszähler sind atomare [`AtomicUsize`].
 #[derive(Debug, Clone, Default)]
 pub struct FaultVfs {
     /// In-Memory Dateispeicher: Pfad -> Dateibytes.
@@ -102,6 +263,8 @@ pub struct FaultVfs {
     remove_count: Arc<AtomicUsize>,
     /// Anzahl der versuchten CreateDir-Operationen.
     create_dir_count: Arc<AtomicUsize>,
+    /// Anzahl der versuchten SetLen-Operationen.
+    set_len_count: Arc<AtomicUsize>,
     /// Aktuelle Injektionskonfiguration.
     config: Arc<RwLock<FaultConfig>>,
     /// Flag für simulierten Totalabsturz.
@@ -121,6 +284,12 @@ impl FaultVfs {
         *self.config.write() = config;
     }
 
+    /// Setzt einen gezielten Fehlerinjektions-Plan.
+    pub fn set_plan(&self, plan: FaultPlan) {
+        let mut cfg = self.config.write();
+        cfg.plan = Some(plan);
+    }
+
     // ANCHOR[contextra-testkit:FAULT-VFS-TRIGGER-CRASH-001]
     /// Simuliert einen abrupten Systemabsturz (Power-Cut).
     pub fn trigger_crash(&self) {
@@ -138,6 +307,7 @@ impl FaultVfs {
         self.rename_count.store(0, Ordering::SeqCst);
         self.remove_count.store(0, Ordering::SeqCst);
         self.create_dir_count.store(0, Ordering::SeqCst);
+        self.set_len_count.store(0, Ordering::SeqCst);
         self.crashed.store(false, Ordering::SeqCst);
     }
 
@@ -147,18 +317,34 @@ impl FaultVfs {
         if self.crashed.load(Ordering::SeqCst) {
             return Err(io::Error::new(ErrorKind::BrokenPipe, "VFS simulated crash"));
         }
+        let total = self.total_operations();
         let cfg = self.config.read();
+
+        if let Some(limit) = cfg.crash_after_ops {
+            if total >= limit {
+                self.crashed.store(true, Ordering::SeqCst);
+                return Err(io::Error::new(ErrorKind::BrokenPipe, "VFS simulated crash"));
+            }
+        }
+
         if cfg.fail_all {
-            return Err(io::Error::other("Simulated injected failure (fail_all)"));
+            return Err(io::Error::other("Simulated injected failure"));
         }
 
         let idx = counter.fetch_add(1, Ordering::SeqCst);
 
+        if let Some(ref plan) = cfg.plan {
+            if plan.operation == op && plan.nth_call == idx {
+                return Err(io::Error::new(
+                    plan.error_kind,
+                    "Simulated failure from FaultPlan",
+                ));
+            }
+        }
+
         if let Some((target_op, target_idx)) = cfg.fail_at_operation {
             if target_op == op && target_idx == idx {
-                return Err(io::Error::other(format!(
-                    "Simulated failure at {op:?} operation index {idx}"
-                )));
+                return Err(io::Error::other("Simulated failure at operation"));
             }
         }
 
@@ -197,7 +383,7 @@ impl FaultVfs {
                     }
                 }
             }
-            FaultOperation::Remove | FaultOperation::CreateDir => {}
+            FaultOperation::Remove | FaultOperation::CreateDir | FaultOperation::SetLen => {}
         }
 
         Ok(())
@@ -222,7 +408,7 @@ impl FaultVfs {
             .read()
             .get(path)
             .cloned()
-            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found in FaultVfs"))
+            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found"))
     }
 
     // ANCHOR[contextra-testkit:FAULT-VFS-SYNC-001]
@@ -267,6 +453,7 @@ impl FaultVfs {
             + self.rename_count.load(Ordering::SeqCst)
             + self.remove_count.load(Ordering::SeqCst)
             + self.create_dir_count.load(Ordering::SeqCst)
+            + self.set_len_count.load(Ordering::SeqCst)
     }
 
     // ANCHOR[contextra-testkit:FAULT-VFS-CRASH-MATRIX-001]
@@ -275,8 +462,8 @@ impl FaultVfs {
     /// **Ablauf:**
     /// 1. Führt den Workload zuerst unbeeinflusst aus, um die Gesamtzahl an Operationen $M$ zu ermitteln.
     /// 2. Iteriert für jeden Punkt $i \in [0, M]$ durch:
-    ///    - Erstellt eine frische `FaultVfs`-Instanz mit Fehler bei Operation $i$.
-    ///    - Führt die Test-Closure `test_fn` aus.
+    ///    - Erstellt eine frische `FaultVfs`-Instanz mit Crash-Punkt nach $i$ Operationen.
+    ///    - Führt die Test-Closure `setup_and_run` aus.
     pub fn for_each_crash_point<F, R>(mut setup_and_run: F) -> Vec<(usize, R)>
     where
         F: FnMut(&FaultVfs, Option<usize>) -> R,
@@ -291,12 +478,12 @@ impl FaultVfs {
         // 2. Iterate each crash point
         for crash_at in 0..=total_ops {
             let vfs = FaultVfs::new();
-            vfs.set_config(FaultConfig {
-                fail_writes_after: Some(crash_at),
-                fail_syncs_after: Some(crash_at),
-                fail_renames_after: Some(crash_at),
-                ..Default::default()
-            });
+            if crash_at < total_ops {
+                vfs.set_config(FaultConfig {
+                    crash_after_ops: Some(crash_at),
+                    ..Default::default()
+                });
+            }
             let outcome = setup_and_run(&vfs, Some(crash_at));
             results.push((crash_at, outcome));
         }
@@ -307,6 +494,35 @@ impl FaultVfs {
 
 // ANCHOR[contextra-testkit:FAULT-VFS-TRAIT-IMPL-001]
 impl Vfs for FaultVfs {
+    fn open(&self, path: &Path, opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
+        if opts.create_new && self.exists(path)? {
+            return Err(ContextraError::Io(io::Error::new(
+                ErrorKind::AlreadyExists,
+                "File already exists with create_new",
+            )));
+        }
+
+        if !self.exists(path)? {
+            if opts.create || opts.create_new {
+                if let Some(parent) = path.parent() {
+                    self.create_dir_all(parent)?;
+                }
+                self.files.write().insert(path.to_path_buf(), Vec::new());
+            } else {
+                return Err(ContextraError::NotFound(String::new()));
+            }
+        } else if opts.truncate {
+            self.files.write().insert(path.to_path_buf(), Vec::new());
+        }
+
+        Ok(Box::new(FaultFile {
+            path: path.to_path_buf(),
+            vfs: self.clone(),
+            options: opts.clone(),
+            poisoned: AtomicBool::new(false),
+        }))
+    }
+
     fn read(&self, path: &Path) -> Result<Vec<u8>> {
         self.check_fault(FaultOperation::Read, &self.read_count)
             .map_err(ContextraError::Io)?;
@@ -314,7 +530,7 @@ impl Vfs for FaultVfs {
             .read()
             .get(path)
             .cloned()
-            .ok_or_else(|| ContextraError::NotFound(path.display().to_string()))
+            .ok_or_else(|| ContextraError::NotFound(String::new()))
     }
 
     fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {
@@ -355,8 +571,26 @@ impl Vfs for FaultVfs {
         if files.remove(path).is_some() {
             Ok(())
         } else {
-            Err(ContextraError::NotFound(path.display().to_string()))
+            Err(ContextraError::NotFound(String::new()))
         }
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> Result<()> {
+        self.check_fault(FaultOperation::Rename, &self.rename_count)
+            .map_err(ContextraError::Io)?;
+
+        let mut files = self.files.write();
+        let data = files
+            .remove(from)
+            .ok_or_else(|| ContextraError::NotFound(String::new()))?;
+
+        if let Some(parent) = to.parent() {
+            self.create_dir_all_internal(parent)
+                .map_err(ContextraError::Io)?;
+        }
+
+        files.insert(to.to_path_buf(), data);
+        Ok(())
     }
 
     fn exists(&self, path: &Path) -> Result<bool> {
@@ -375,13 +609,13 @@ impl Vfs for FaultVfs {
         files
             .get(path)
             .map(|data| data.len() as u64)
-            .ok_or_else(|| ContextraError::NotFound(path.display().to_string()))
+            .ok_or_else(|| ContextraError::NotFound(String::new()))
     }
 
     fn list_dir(&self, path: &Path) -> Result<Vec<String>> {
         let dirs = self.dirs.read();
         if !dirs.contains(path) && !path.as_os_str().is_empty() {
-            return Err(ContextraError::NotFound(path.display().to_string()));
+            return Err(ContextraError::NotFound(String::new()));
         }
 
         let files = self.files.read();
@@ -414,7 +648,7 @@ impl Vfs for FaultVfs {
         if dirs.contains(path) || path.as_os_str().is_empty() {
             Ok(())
         } else {
-            Err(ContextraError::NotFound(path.display().to_string()))
+            Err(ContextraError::NotFound(String::new()))
         }
     }
 }

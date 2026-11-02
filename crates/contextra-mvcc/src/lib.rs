@@ -43,6 +43,7 @@ pub mod snapshot;
 pub mod ssi;
 pub mod tx_buffer;
 
+// Re-Exporte laut Spec §3 einzeln (seq, snapshot, ssi, tx, error)
 pub use error::MvccError;
 pub use seq_log::{SeqLogChange, SeqLogEntry, SequenceLog};
 pub use snapshot::{SnapshotGuard, SnapshotRegistry};
