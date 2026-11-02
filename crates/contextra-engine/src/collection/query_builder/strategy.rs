@@ -1,64 +1,28 @@
 //! # Modul: strategy.rs
 //!
-//! **Zweck:** Suchstrategien (z.B. Exact, Approximate, Hybrid, Rerank).
+//! **Zweck:** Suchstrategien (z.B. RRF, ScoreNormalized).
 //!
 //! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
 
-use contextra_types::{FusionStrategy, GraphTraversalStrategy, SignalFusionStrategies};
+use contextra_types::{FusionStrategy, SignalFusionStrategies};
 
-/// Strategy for hybrid search and graph signal traversal.
-#[derive(Debug, Clone, PartialEq)]
+/// Strategy for hybrid search signal fusion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SearchStrategy {
     /// Reciprocal Rank Fusion (default fusion strategy per ADR-003).
+    #[default]
     Rrf,
     /// Score-normalized fusion (CombSUM / Z-Score).
     ScoreNormalized,
-    /// Multi-hop BFS graph traversal strategy.
-    Hops {
-        /// Maximum traversal hop depth.
-        max_hops: usize,
-    },
-    /// Personalized PageRank power iteration graph traversal strategy.
-    PersonalizedPageRank(contextra_types::PprConfig),
-    /// PathRAG bidirectional Dijkstra graph traversal strategy.
-    PathRag {
-        /// Maximum traversal hop depth.
-        max_hops: usize,
-        /// Sufficiency threshold for filtering low-confidence paths.
-        sufficiency_threshold: f64,
-    },
 }
 
 impl SearchStrategy {
-    /// Converts `SearchStrategy` into core `GraphTraversalStrategy`.
-    pub fn to_graph_strategy(&self) -> GraphTraversalStrategy {
-        match self {
-            SearchStrategy::Rrf | SearchStrategy::ScoreNormalized => {
-                GraphTraversalStrategy::Hops { max_hops: 3 }
-            }
-            SearchStrategy::Hops { max_hops } => GraphTraversalStrategy::Hops {
-                max_hops: *max_hops,
-            },
-            SearchStrategy::PersonalizedPageRank(cfg) => {
-                GraphTraversalStrategy::PersonalizedPageRank(cfg.clone())
-            }
-            SearchStrategy::PathRag {
-                max_hops,
-                sufficiency_threshold,
-            } => GraphTraversalStrategy::PathRag {
-                max_hops: *max_hops,
-                sufficiency_threshold: *sufficiency_threshold,
-            },
-        }
-    }
-
     /// Converts `SearchStrategy` into core `FusionStrategy`.
     pub fn to_fusion_strategy(&self) -> FusionStrategy {
         match self {
             SearchStrategy::Rrf => FusionStrategy::Rrf,
             SearchStrategy::ScoreNormalized => FusionStrategy::ScoreNormalized,
-            _ => FusionStrategy::Rrf,
         }
     }
 
@@ -68,20 +32,17 @@ impl SearchStrategy {
     }
 }
 
-impl From<GraphTraversalStrategy> for SearchStrategy {
-    fn from(strategy: GraphTraversalStrategy) -> Self {
+impl From<FusionStrategy> for SearchStrategy {
+    fn from(strategy: FusionStrategy) -> Self {
         match strategy {
-            GraphTraversalStrategy::Hops { max_hops } => SearchStrategy::Hops { max_hops },
-            GraphTraversalStrategy::PersonalizedPageRank(cfg) => {
-                SearchStrategy::PersonalizedPageRank(cfg)
-            }
-            GraphTraversalStrategy::PathRag {
-                max_hops,
-                sufficiency_threshold,
-            } => SearchStrategy::PathRag {
-                max_hops,
-                sufficiency_threshold,
-            },
+            FusionStrategy::Rrf => SearchStrategy::Rrf,
+            FusionStrategy::ScoreNormalized => SearchStrategy::ScoreNormalized,
         }
+    }
+}
+
+impl From<contextra_types::GraphTraversalStrategy> for SearchStrategy {
+    fn from(_: contextra_types::GraphTraversalStrategy) -> Self {
+        SearchStrategy::default()
     }
 }
