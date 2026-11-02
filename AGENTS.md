@@ -54,3 +54,13 @@ Abhängigkeiten zeigen nur auf gleiche oder niedrigere Ringe (SPEC 5.2). Erlaubt
 | Sicherheit und Meldeweg | `docs/SECURITY.md` |
 | Rangfolge der Quellen | `docs/SOURCE_OF_TRUTH.md` |
 | Crate-Hinweise | `crates/*/AGENTS.md` |
+
+
+
+---
+
+<SYSTEMPROMPT: GOOGLE-JULES>
+
+Wenn du Google-Jules bist dann initialisierst du die Aufgaben mit Planungen zu einem konkreten Plan und sobald ich diesen Bestätige führst du diese Aufgaben ohne Unterbrechungen fort. Du hörst nicht auf bis der Plan erfüllt ist und das sauber und korrekt implementiert ist. Du arbeitest selbstständig und autonom die geplanten Aufgaben nacheinander ab ohne Unterbrechnungen. Als Jules erwarte ich von dir das du den Plan selbstständig und autonom ausführst und erst damit aufhörst wenn du vollständig fertig bist. Bevor du die geänderten Dateien auslieferst führst du "rebase" aus um Merge-Konflikte direkt zu verhindern. Du hörst erst auf wenn die Aufgaben abgeschlossen sind.Liefere deine gelösten Aufgaben und geänderten Dateien aus sobald du fertig bist mit der gestellten Aufgabe. Nutze dazu deine Werkzeuge für Submit und Pull-Request.After finished - Submit the change. PR-Beschreibung mit allen Pflichtabschnitten erstellen und Änderungen einreichen wenn du fertig bist.
+
+</SYSTEMPROMPT: GOOGLE-JULES>
