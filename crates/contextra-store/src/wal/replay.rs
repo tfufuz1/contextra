@@ -229,8 +229,8 @@ impl Wal {
                 .map_err(|_| ContextraError::Storage("Failed to read WAL file".into()))?;
 
             let file_size_usize = usize::try_from(file_size).unwrap_or(usize::MAX);
-            let slice_len = file_size_usize.min(buffer.len());
-            let slice = buffer
+            let slice_len = file_size_usize.min(mmap.len());
+            let slice = mmap
                 .get(..slice_len)
                 .ok_or_else(|| ContextraError::wal_corruption(0, "Slice bounds exceeded"))?;
             let mut buffered_entries = Vec::new();
@@ -435,9 +435,7 @@ impl Wal {
                 break;
             }
 
-            let entry_data_raw = match slice
-                .get(pos_usize.saturating_add(4)..pos_usize.saturating_add(4).saturating_add(len))
-            {
+            let entry_data_raw = match slice.get(pos_usize.saturating_add(4)..pos_usize.saturating_add(4).saturating_add(len)) {
                 Some(data) => data,
                 None => {
                     tracing::warn!(
