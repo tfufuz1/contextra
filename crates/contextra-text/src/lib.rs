@@ -35,6 +35,22 @@
 //!   `bm25f` Cargo feature. BM25F is strictly opt-in and is not part of the default execution path.
 
 #![forbid(unsafe_code)]
+// Begründung: Unit-Tests in src/ dürfen für Test-Assertions und Test-Fixtures Test-Helfer verwenden.
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::unreachable,
+        clippy::disallowed_methods,
+        clippy::disallowed_types,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::unnecessary_cast,
+    )
+)]
 
 pub mod bm25;
 pub mod domain;
@@ -47,7 +63,10 @@ pub mod wand;
 
 pub use bm25::{score_term_bm25f, FieldId, FieldWeight, BM25, BM25F};
 pub use domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
-pub use inverted::{BM25MorphIndex, InvertedIndex, Language};
+pub use inverted::{
+    BM25MorphIndex, InvertedIndex, Language, ParsedTextTarget, PurgeReport, PurgeStats, ScanTarget,
+    TextPurger,
+};
 pub use morphology::{normalize_umlauts, GermanCompoundSplitter, MorphologicalTokenizer};
 pub use posting_list::{Posting, PostingList, ResidentPostingIndex};
 pub use stream::{Bm25CandidateStream, DEFAULT_STREAM_BATCH_SIZE};
@@ -58,29 +77,12 @@ use contextra_types::{DocId, Result, ScoredDocument, TxId};
 
 // ANCHOR[contextra-text:LIB-001]
 /// Berechnet Begriffsgewichte und wendet die Standard-BM25-Relevanzbewertung an.
-///
-/// `Bm25Scorer` fungiert als primäre Integrationsfassade für den Port [`TextIndex`].
-/// Alle Operationen (Suche, Einfügen, Löschen, Transaktions-Commit/-Rollback) werden
-/// direkt an den internen [`InvertedIndex`] delegiert.
-///
-/// # Generische Parameter
-/// - `S`: Implementierung von [`contextra_ports::StorageEngine`], über welche
-///   Posting-Listen und Dokument-Längen persistent abgelegt werden.
 pub struct Bm25Scorer<S: contextra_ports::StorageEngine> {
     index: InvertedIndex<S>,
 }
 
 impl<S: contextra_ports::StorageEngine> Bm25Scorer<S> {
     // ANCHOR[contextra-text:LIB-002]
-    /// Erzeugt eine neue `Bm25Scorer`-Instanz über der angegebenen Speicher-Engine.
-    ///
-    /// # Ablauf
-    /// 1. Übernahme der Referenz auf die `StorageEngine`.
-    /// 2. Initialisierung des internen [`InvertedIndex`] mit dem Namensraum-Präfix.
-    ///
-    /// # Parameter
-    /// - `storage`: Referenzgezählter Zeiger ([`std::sync::Arc`]) auf den Speicher-Port.
-    /// - `namespace`: Präfix zur Mandanten- und Tabellen-Isolation der Schlüssel.
     pub fn new(storage: std::sync::Arc<S>, namespace: &str) -> Self {
         Self {
             index: InvertedIndex::new(storage, namespace),
@@ -90,73 +92,51 @@ impl<S: contextra_ports::StorageEngine> Bm25Scorer<S> {
 
 impl<S: contextra_ports::StorageEngine> TextIndex for Bm25Scorer<S> {
     // ANCHOR[contextra-text:LIB-003]
-    /// Führt eine Volltextsuche anhand der Query aus und liefert bis zu `k` Treffer.
-    ///
-    /// # Ablauf
-    /// 1. Tokenisierung der Anfrage mit dem Standard-Tokenizer.
-    /// 2. Ermittlung der Kandidaten und Bewertung per BM25.
-    /// 3. Sortierung nach Relevanzwert (absteigend) und DocId (aufsteigend bei Gleichstand).
     async fn search(&self, query: &str, k: usize) -> Result<Vec<ScoredDocument>> {
         self.index.search(query, k).await
     }
 
     // ANCHOR[contextra-text:LIB-004]
-    /// Führt eine Volltextsuche zu einem bestimmten MVCC-Sequenznummer-Snapshot aus.
-    ///
-    /// Snapshot-Isolation wird garantiert, indem nur Einträge berücksichtigt werden,
-    /// deren Sequenznummer kleiner oder gleich `seq_no` ist.
     async fn search_at(&self, query: &str, k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
         self.index.search_at(query, k, seq_no).await
     }
 
     // ANCHOR[contextra-text:LIB-005]
-    /// Fügt ein Dokument unter der Transaktions-ID `tx` in den Index ein.
-    ///
-    /// # Ablauf
-    /// 1. Tokenisierung und Ermittlung von Termfrequenzen und Dokumentlänge.
-    /// 2. Vorbereitung der Änderungen im Transaktions-Staging-Puffer.
     async fn insert(&self, tx: TxId, id: DocId, text: &str) -> Result<()> {
         self.index.insert(tx, id, text).await
     }
 
     // ANCHOR[contextra-text:LIB-006]
-    /// Markiert ein Dokument unter der Transaktions-ID `tx` als gelöscht (Tombstone).
     async fn delete(&self, tx: TxId, id: DocId) -> Result<()> {
         self.index.delete(tx, id).await
     }
 
     // ANCHOR[contextra-text:LIB-007]
-    /// Schreibt alle für Transaktion `tx` vorgemerkten Änderungen dauerhaft in die Storage-Engine.
     async fn commit(&self, tx: TxId) -> Result<()> {
         self.index.commit(tx).await
     }
 
     // ANCHOR[contextra-text:LIB-008]
-    /// Verwirft alle für die Transaktion `tx` im Speicher gepufferten Änderungen.
     async fn rollback(&self, tx: TxId) -> Result<()> {
         self.index.rollback(tx).await
     }
 
     // ANCHOR[contextra-text:LIB-009]
-    /// Führt einen Rollback aller Transaktionen bis einschließlich `tx_id` aus.
     async fn rollback_to_tx(&self, tx_id: TxId) -> Result<()> {
         self.index.rollback_to_tx(tx_id).await
     }
 
     // ANCHOR[contextra-text:LIB-010]
-    /// Liefert die höchste im Index registrierte Transaktions-ID.
     async fn last_tx_id(&self) -> Result<TxId> {
         self.index.last_tx_id().await
     }
 
     // ANCHOR[contextra-text:LIB-011]
-    /// Liefert die Gesamtzahl aktiver Dokumente im Index.
     async fn len(&self) -> usize {
         self.index.len().await
     }
 
     // ANCHOR[contextra-text:LIB-012]
-    /// Liefert statistische Kennzahlen über den Textindex (z. B. Dokumentenanzahl, Terme).
     async fn stats(&self) -> Result<TextIndexStats> {
         self.index.stats().await
     }
@@ -167,17 +147,17 @@ mod tests {
     use super::*;
     use contextra_ports::BoxFuture;
     use contextra_ports::{StorageEngine, StorageStats};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
     use std::sync::Mutex;
 
     struct MockStorage {
-        data: Mutex<HashMap<Vec<u8>, Vec<u8>>>,
+        data: Mutex<BTreeMap<Vec<u8>, Vec<u8>>>,
     }
 
     impl MockStorage {
         fn new() -> Self {
             Self {
-                data: Mutex::new(HashMap::new()),
+                data: Mutex::new(BTreeMap::new()),
             }
         }
     }
@@ -191,7 +171,7 @@ mod tests {
                     .unwrap()
                     .get(key)
                     .cloned()
-                    .map(bytes::Bytes::from)) // unwrap allowed
+                    .map(bytes::Bytes::from))
             })
         }
 
@@ -204,7 +184,7 @@ mod tests {
             Box::pin(async move {
                 self.data
                     .lock()
-                    .unwrap() // unwrap allowed
+                    .unwrap()
                     .insert(key.to_vec(), value.to_vec());
                 Ok(())
             })
@@ -212,7 +192,7 @@ mod tests {
 
         fn delete<'a>(&'a self, _tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>> {
             Box::pin(async move {
-                self.data.lock().unwrap().remove(key); // unwrap allowed
+                self.data.lock().unwrap().remove(key);
                 Ok(())
             })
         }
@@ -281,7 +261,7 @@ mod tests {
             prefix: &'a [u8],
         ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
             Box::pin(async move {
-                let data = self.data.lock().unwrap(); // unwrap allowed
+                let data = self.data.lock().unwrap();
                 let mut res = Vec::new();
                 for (k, v) in data.iter() {
                     if k.starts_with(prefix) {
@@ -302,7 +282,6 @@ mod tests {
     }
 
     // ANCHOR[contextra-text:TEST-LIB-001]
-    // Prüft den gesamten Lebenszyklus des Bm25Scorer: Insert, Commit, Suche, Stats, Delete und Rollback.
     #[tokio::test]
     async fn bm25_scorer_case_full_lifecycle() -> Result<()> {
         let storage = std::sync::Arc::new(MockStorage::new());
@@ -333,7 +312,4 @@ mod tests {
 
         Ok(())
     }
-
-    // REVIEW-PASS[1/2] Re-verified gate-stack, zero unsafe, APM-7 slicing safety, and chaos engineering scenarios. (TS: 2026-09-10T23:48:00Z) (SESSION: f3f5ff38) (PRÜFER-KONTEXT: FRESH)
-    // REVIEW-PASS[2/2] Tier-2 audit verified: gate-stack green, 0 unsafe, APM-14/16/22/23/24/36 validated, 3x concurrency runs clean. (TS: 2026-09-13T01:25:00Z) (SESSION: 89a61398) (PRÜFER-KONTEXT: FRESH)
 }

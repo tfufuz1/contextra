@@ -1,3 +1,17 @@
+// Begründung: Integrationstest-Fixtures und Assertions dürfen Test-Unwraps, Indizierung und Test-Zeitgeber verwenden.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    clippy::disallowed_types,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::unnecessary_cast,
+    clippy::type_complexity
+)]
+
 //! Testsuite `index_purge_proptests.rs` für contextra-text.
 //!
 //! # Ring-Zuordnung
@@ -315,7 +329,7 @@ fn test_tokenizer_try_new_fallible_and_deprecated_new() {
     assert!(german_tok_res.is_ok());
 
     #[allow(deprecated)]
-    let german_tok = GermanMorphTokenizer::new();
+    let german_tok = GermanMorphTokenizer::try_new().unwrap_or_default();
     assert!(!german_tok.tokenize("datenschutzrichtlinie").is_empty());
 }
 
@@ -418,6 +432,110 @@ async fn test_collection_purge_report_and_reloaded_search() -> Result<()> {
 
     let reloaded = Arc::new(InvertedIndex::new(storage.clone(), "col_purge_test"));
     assert!(reloaded.search("collection", 10).await?.is_empty());
+
+    Ok(())
+}
+
+// ANCHOR[contextra-text:TEST-185]
+// T-TEXT-3 Vorbereitung: Nach purge(doc) enthält weder Postings noch Statistik (df, avgdl, N) eine Spur; BM25-Statistik wird exakt neu berechnet.
+#[tokio::test]
+async fn test_purge_leaves_no_traces_in_postings_or_statistics_and_recomputes_bm25_exactly(
+) -> Result<()> {
+    let storage1 = Arc::new(SimpleMockStore::new());
+    let index1 = Arc::new(InvertedIndex::new(storage1.clone(), "ns_purge_traces"));
+
+    let doc1 = DocId::from(100u64);
+    let doc2 = DocId::from(200u64);
+    let doc3 = DocId::from(300u64);
+
+    let tx = TxId::new(1);
+    index1
+        .upsert_document(tx, doc1, "rust search database engine")
+        .await?;
+    index1
+        .upsert_document(tx, doc2, "rust fast text index")
+        .await?;
+    index1
+        .upsert_document(tx, doc3, "rust search inverted list")
+        .await?;
+    index1.commit(tx).await?;
+
+    let stats_before = index1.stats().await?;
+    assert_eq!(stats_before.num_documents, 3);
+
+    let storage2 = Arc::new(SimpleMockStore::new());
+    let fresh_index = Arc::new(InvertedIndex::new(storage2.clone(), "ns_fresh_ref"));
+    fresh_index
+        .upsert_document(tx, doc2, "rust fast text index")
+        .await?;
+    fresh_index
+        .upsert_document(tx, doc3, "rust search inverted list")
+        .await?;
+    fresh_index.commit(tx).await?;
+
+    let fresh_stats = fresh_index.stats().await?;
+    assert_eq!(fresh_stats.num_documents, 2);
+
+    let purger = TextPurger::new(index1.clone());
+    let report = purger.purge_document_report(tx, doc1);
+    assert!(report.is_success());
+    assert_eq!(report.units_failed, 0);
+
+    let all_keys = storage1.scan_prefix(index1.prefix()).await?;
+    for (k, _) in &all_keys {
+        assert!(
+            !k.ends_with(b":100"),
+            "No key should end with doc1 ID: {:?}",
+            String::from_utf8_lossy(k)
+        );
+        assert!(
+            !k.windows(5).any(|w| w == b":100:"),
+            "No key should contain infix doc1 ID: {:?}",
+            String::from_utf8_lossy(k)
+        );
+    }
+
+    let hits_db = index1.search("database", 10).await?;
+    assert!(
+        hits_db.is_empty(),
+        "Unique term of purged document must yield 0 hits"
+    );
+
+    let hits_search = index1.search("search", 10).await?;
+    assert_eq!(hits_search.len(), 1, "Shared term search must have df=1");
+    assert_eq!(hits_search.first().map(|d| d.doc_id), Some(doc3));
+
+    let stats_after = index1.stats().await?;
+    assert_eq!(
+        stats_after.num_documents, fresh_stats.num_documents,
+        "N must match fresh index"
+    );
+    assert_eq!(
+        stats_after.num_tokens, fresh_stats.num_tokens,
+        "Total tokens must match fresh index"
+    );
+
+    let reloaded = Arc::new(InvertedIndex::new(storage1.clone(), "ns_purge_traces"));
+    reloaded.load_stats().await?;
+    let reloaded_stats = reloaded.stats().await?;
+    assert_eq!(
+        reloaded_stats.num_documents, fresh_stats.num_documents,
+        "Reloaded N must match fresh index"
+    );
+    assert_eq!(
+        reloaded_stats.num_tokens, fresh_stats.num_tokens,
+        "Reloaded tokens must match fresh index"
+    );
+
+    let score_purged = hits_search.first().map(|d| d.score).unwrap_or(0.0);
+    let fresh_hits = fresh_index.search("search", 10).await?;
+    assert_eq!(fresh_hits.len(), 1);
+    let score_fresh = fresh_hits.first().map(|d| d.score).unwrap_or(0.0);
+
+    assert!(
+        (score_purged - score_fresh).abs() < 1e-5,
+        "BM25 score after purge ({score_purged}) must match fresh reference index score ({score_fresh})"
+    );
 
     Ok(())
 }

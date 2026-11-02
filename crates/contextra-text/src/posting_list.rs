@@ -21,7 +21,7 @@
 use contextra_types::{ContextraError, DocId};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 // ANCHOR[contextra-text:POST-001]
@@ -173,7 +173,9 @@ impl PostingList {
         let mut new_postings = self.postings.clone();
         match new_postings.binary_search_by_key(&posting.doc_id, |p| p.doc_id) {
             Ok(idx) => {
-                new_postings[idx] = posting;
+                if let Some(elem) = new_postings.get_mut(idx) {
+                    *elem = posting;
+                }
             }
             Err(idx) => {
                 new_postings.insert(idx, posting);
@@ -209,13 +211,16 @@ impl PostingList {
 
         let mut prev_doc_id = 0u64;
         for p in &self.postings {
-            let delta = (p.doc_id as u128)
+            let delta_u128 = (p.doc_id as u128)
                 .checked_sub(prev_doc_id as u128)
                 .ok_or_else(|| {
                     ContextraError::Storage(
                         "Unsorted or overflow doc_id in posting list".to_string(),
                     )
-                })? as u64;
+                })?;
+            let delta = u64::try_from(delta_u128).map_err(|_| {
+                ContextraError::Storage("DocId delta overflow in posting list".to_string())
+            })?;
             encode_varint(delta, &mut buf);
             encode_varint(p.tf as u64, &mut buf);
             encode_varint(p.doc_len as u64, &mut buf);
@@ -244,7 +249,8 @@ impl PostingList {
                     count
                 )));
             }
-            let mut postings = Vec::with_capacity(count as usize);
+            let cap = usize::try_from(count).unwrap_or(usize::MAX);
+            let mut postings = Vec::with_capacity(cap);
             let mut prev_doc_id = 0u64;
 
             for _ in 0..count {
@@ -289,17 +295,22 @@ impl PostingList {
 
 fn encode_varint(mut val: u64, buf: &mut Vec<u8>) {
     while val >= 0x80 {
-        buf.push((val as u8 & 0x7f) | 0x80);
+        let b = u8::try_from(val & 0x7f).unwrap_or(0);
+        buf.push(b | 0x80);
         val >>= 7;
     }
-    buf.push(val as u8);
+    let last = u8::try_from(val & 0x7f).unwrap_or(0);
+    buf.push(last);
 }
 
 fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, ContextraError> {
     let mut result = 0u64;
     let mut shift = 0u32;
     while *offset < bytes.len() {
-        let byte = bytes[*offset];
+        let byte = match bytes.get(*offset) {
+            Some(&b) => b,
+            None => break,
+        };
         *offset += 1;
         result |= ((byte & 0x7f) as u64) << shift;
         if (byte & 0x80) == 0 {
@@ -319,7 +330,7 @@ fn decode_varint(bytes: &[u8], offset: &mut usize) -> Result<u64, ContextraError
 /// Speicherresidenter Lese-Cache für Posting-Listen mit RCU-Verwaltung.
 #[derive(Default)]
 pub struct ResidentPostingIndex {
-    index: RwLock<HashMap<String, Arc<PostingList>>>,
+    index: RwLock<BTreeMap<String, Arc<PostingList>>>,
 }
 
 impl ResidentPostingIndex {
@@ -327,7 +338,7 @@ impl ResidentPostingIndex {
     /// Erzeugt einen leeren residenten Posting-Index.
     pub fn new() -> Self {
         Self {
-            index: RwLock::new(HashMap::new()),
+            index: RwLock::new(BTreeMap::new()),
         }
     }
 

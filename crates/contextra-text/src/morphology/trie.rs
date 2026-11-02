@@ -7,7 +7,7 @@ pub struct TrieNode {
     /// Zeigt an, ob an diesem Knoten ein vollständiges Wort aus dem Wörterbuch endet.
     pub is_terminal: bool,
     /// Kindknoten, indiziert nach Folgezeichen.
-    pub children: std::collections::HashMap<char, TrieNode>,
+    pub children: std::collections::BTreeMap<char, TrieNode>,
 }
 
 // ANCHOR[contextra-text:MORPH-011]
