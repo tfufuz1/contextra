@@ -3,9 +3,7 @@
 //! Zweck: Vollständige Matrix-Tests für alle `ScrubRefusal`-Varianten und Readback-Nullenverifikation.
 
 // FILE-CONTEXT
-// STAND: 2026-10-13
-// ZWECK: Integrationstests fuer die Scrubbing Refusal-Matrix und Readback-Nullenverifikation.
-// INVARIANTEN: Zero-Panic, pure safe Rust, fail-closed Refusal-Pfade.
+// NOTE: Integrationstests fuer die Scrubbing Refusal-Matrix und Readback-Nullenverifikation. Invarianten: Zero-Panic, pure safe Rust, fail-closed Refusal-Pfade.
 
 use contextra_durable_fs::{
     scrub_if_safe, scrub_if_safe_with_injector, FaultInjector, ScrubOutcome, ScrubPolicy,

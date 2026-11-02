@@ -92,6 +92,7 @@ impl DirLock {
         }
     }
 
+    // ANCHOR[contextra-durable-fs:DIR-LOCK-PATH-001]
     /// Liefert den Pfad zur `LOCK`-Datei.
     #[allow(dead_code)]
     #[must_use]
@@ -99,6 +100,7 @@ impl DirLock {
         &self.lock_path
     }
 
+    // ANCHOR[contextra-durable-fs:DIR-LOCK-UNLOCK-001]
     /// Gibt die Verzeichnissperre explizit vorzeitig frei.
     #[allow(dead_code)]
     pub fn unlock(mut self) {
@@ -108,6 +110,11 @@ impl DirLock {
     }
 }
 
+// ANCHOR[contextra-durable-fs:DIR-LOCK-DROP-001]
+// Ablauf von `Drop for DirLock`:
+// 1. Lock-Handle entnehmen.
+// 2. flock-Sperre freigeben via `file.unlock()`.
+// 3. LOCK-Datei bleibt auf Festplatte, um Inode-Wettläufe zwischen Prozessen zu verhindern.
 impl Drop for DirLock {
     fn drop(&mut self) {
         if let Some(file) = self.file.take() {

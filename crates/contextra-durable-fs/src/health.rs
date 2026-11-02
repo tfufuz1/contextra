@@ -17,9 +17,7 @@
 //! - Nebenläufigkeit: Lock-freier CAS-Loop (`compare_exchange_weak`) mit `AcqRel`/`Acquire`-Ordnung.
 
 // FILE-CONTEXT
-// STAND: 2026-10-12
-// ZWECK: Fail-Closed HealthState Zustandsautomat fuer Durability Substrat (§18.4).
-// INVARIANTEN: Healthy Startzustand, Poisoned verlaesst Zustand nie automatisch ohne Neustart (I-POISON-1).
+// NOTE: Fail-Closed HealthState Zustandsautomat fuer Durability Substrat (§18.4). Invarianten: Healthy Startzustand, Poisoned verlaesst Zustand nie automatisch ohne Neustart (I-POISON-1).
 
 use std::sync::atomic::{AtomicU8, Ordering};
 

@@ -19,22 +19,16 @@ Nicht normativ. Maßgeblich sind die Arbeitspakete in [`docs/SPEC.md`](../../../
 | WP-0.2 | Toolchain-Regel D-82, `rust-toolchain.toml`, MSRV-Matrix, `cargo-semver-checks`, SBOM-Job | A | WP-0.1 | bei Aufnahme | todo | Achtung: `rust-toolchain.toml` ist geschützt. Änderung im PR als „menschliche Freigabe nötig“ kennzeichnen, Rest umsetzen (PREAMBLE B, S3). |
 | WP-0.3 | Build wieder grün: Lizenz-Rest, `mmap_readonly`-Aufrufer auf `Vfs`-Lesen (D-94), `Cargo.lock` erneuern (D-93) | A | WP-0.1 | vorhanden | todo | Karte `tasks/WP-0.3.toml`. |
 | WP-1.1 | Rückbau Graph und Altlasten: Verweise (F-05), `AutoExtractionMode`, Ports `embedding`/`reranker`/`query_rewriter` | B | WP-0.3 | vorhanden | todo | Karte `tasks/WP-1.1.toml`. |
-<<<<<<< HEAD
 | WP-1.2 | Branch `archive/v0-full` (D-22); Rückbauliste D-84 (Features, `acl_win32.rs`, `WasmMergeOperator`) | B | WP-1.1 | vorhanden | in_progress | Teil contextra-sys (Windows/acl_win32/vault/posix) abgeschlossen. Karte `tasks/WP-1.2.toml`. |
-=======
-| WP-1.2 | Branch `archive/v0-full` (D-22); Rückbauliste D-84 (Features, `acl_win32.rs`, `WasmMergeOperator`) | B | WP-1.1 | vorhanden | done | Der Archiv-Branch wird im Repository angelegt. Hat Jules keinen Schreibzugriff auf Branches, notieren und mit dem Rückbau fortfahren. |
->>>>>>> 536e68d9 (refactor(crypto): implement key hierarchy and primitive contracts (WP-1.2, WP-3.2, WP-4.1))
 | WP-1.3 | Tokio-Features (D-54), `deny.toml` (Bans, Advisories mit Ablaufdatum, tote `clarify`/`wrappers`) | B | WP-1.2 | bei Aufnahme | todo | `deny.toml` ist geschützt (menschliche Freigabe). Ziel: `cargo tree -e normal` ohne `mio` und `socket2`. |
 | WP-1.4 | Ein `Vfs`: `durable-fs` auf `ports::Vfs`; `store` und `vector` ohne `std::fs` (F-13, F-29) | B | WP-1.1 | vorhanden | in_progress | Teil contextra-sys (`SyncFailure`, Durability-Flush-Primitive) abgeschlossen. Karte `tasks/WP-1.4.toml`. |
 | WP-1.5 | Struktur und Namen: Fassade nach D-89, `contextra_impl` → `instance`, D-90, Crate-Köpfe D-91, Matrixkorrektur D-88, `tests/arch` T-ARCH-5..8, Folgedokumente nach D-98, Sitzungsmarken aus dem Quellbaum, T-DOC-1 | B | WP-1.4 | bei Aufnahme | todo | Marken `ANCHOR[`, `FILE-CONTEXT`, `SESSION:`, `STAND:` entfernen. Die Anzahl ist in F-37 genannt, neu zählen. |
 | WP-2.1 | `contextra-engine` und Tests wieder kompilierbar (F-01, F-02), `fmt` (F-03) | A | WP-1.5 | bei Aufnahme | todo | Die Fehlerliste aus F-01 ist vermutlich veraltet. Vor der Arbeit mit `cargo check` neu erheben. |
-<<<<<<< HEAD
 | WP-3.1 | `types`: `DocRef`, `DocHandle`, Tags mit Längenpräfix, Löschtypen, `KeyCoverage`, `DocId` entfernt; `ports`: Löschports; `erasure`-Skelett als Workspace-Mitglied (D-96) | G0 | WP-2.1 | vorhanden | in_progress | Typvertragskern in contextra-types. |
 | WP-3.2 | `crypto`: D-06 Grenzen, D-52 Slot-AAD, D-60 Nonce-Schema, D-80 Algorithmenliste, `K_sign` abgeleitet | G-F | WP-3.1 | bei Aufnahme | todo | Kryptografie: Test vor Änderung, keine Änderung ohne Testnachweis. |
-=======
+
 | WP-3.1 | `types`: `DocRef`, `DocHandle`, Tags mit Längenpräfix, Löschtypen, `KeyCoverage`, `DocId` entfernt; `ports`: Löschports; `erasure`-Skelett als Workspace-Mitglied (D-96) | G0 | WP-2.1 | bei Aufnahme | todo | Erstes Paket des Löschkerns. |
 | WP-3.2 | `crypto`: D-06 Grenzen, D-52 Slot-AAD, D-60 Nonce-Schema, D-80 Algorithmenliste, `K_sign` abgeleitet | G-F | WP-3.1 | vorhanden | done | Kryptografie: Test vor Änderung, keine Änderung ohne Testnachweis. |
->>>>>>> 536e68d9 (refactor(crypto): implement key hierarchy and primitive contracts (WP-1.2, WP-3.2, WP-4.1))
 | WP-3.3 | `store`: Schlüsselraum 9.1, Envelope v2, WAL ohne Rewrite, `WalFloor`, Sentinel-Fix, Delete-Race-Fix, Pflichtverschlüsselung | G-C | WP-3.2 | bei Aufnahme | todo | Umfang groß. Bei Bedarf in Teilpakete zerlegen (siehe Regeln). |
 | WP-3.3-mvcc | `contextra-mvcc`: Sentinel-Rückbau (`Option<Seq>`), Mandanten-Registry, fail-closed Widerruf, Loom- & Property-Verifikation | G-C | WP-3.2 | vorhanden | done | F-07, F-29, D-61, D-87, MV-01..MV-10. |
 | WP-3.4 | G0-Prototyp: Schlüsselraum mit D-70/D-71, SSTable-Rewrite, BM-ERASE-WA/-WA-TEXT auf 1/10 GiB | G0 | WP-3.3 | bei Aufnahme | todo | Ergebnis ist ein Messprotokoll und eine Entscheidung über die Fallbackstufe (SPEC 11.9). |

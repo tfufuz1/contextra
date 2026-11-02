@@ -78,16 +78,16 @@ fn test_df_02_atomic_replace_crash_matrix() {
     let new_data = b"VERSION_2_UPDATED_CONTENT_CANARY_VALUE_9876543210";
 
     // Matrix aller Injektionspunkte:
-    // 0: Normaler Durchlauf (kein Fehler)
-    // 1: Fehler beim Schreiben
-    // 2: Fehler bei sync_data
-    // 3: Fehler beim Rename
-    // 4: Fehler beim sync_dir
+    // - Fall 0: Normaler Durchlauf (kein Fehler)
+    // - Fall 1: Fehler beim Schreiben
+    // - Fall 2: Fehler bei sync_data
+    // - Fall 3: Fehler beim Rename
+    // - Fall 4: Fehler beim sync_dir
     for phase in 0..=4 {
         let temp = TempDir::new().expect("TempDir failed");
         let target = temp.path().join("target.dat");
 
-        // Ausgangszustand: V1 anlegen
+        // NOTE: Ausgangszustand herstellen: V1 anlegen
         write_atomic(&target, old_data).expect("Initial write failed");
         assert_eq!(fs::read(&target).expect("Read failed"), old_data);
 
@@ -115,7 +115,7 @@ fn test_df_02_atomic_replace_crash_matrix() {
                 "Injected phase {phase} must report error unchanged"
             );
 
-            // T-CRASH-2: Nach Absturz/Fehler ist die Datei ENTWEDER alt ODER neu, NIE halb!
+            // NOTE: Nach Absturz/Fehler (T-CRASH-2) ist die Datei ENTWEDER alt ODER neu, NIE halb!
             let current = fs::read(&target).expect("Target file must still exist and be readable");
             let is_old = current == old_data;
             let is_new = current == new_data;

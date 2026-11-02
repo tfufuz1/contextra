@@ -11,8 +11,10 @@ fn crate_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
+// Prüft die Einhaltung der Architektur-Invariante T-ARCH-4 (kein std::net, kein tokio::fs, kein block_on).
 #[test]
 fn test_t_arch_4_no_network_no_tokio_fs_no_block_on() -> TestResult {
+    // Prüft die Einhaltung der Architektur-Invariante T-ARCH-4 (kein std::net, kein tokio::fs, kein block_on).
     let root = crate_root();
     let src_dir = root.join("src");
     let mut violations = Vec::new();
@@ -65,8 +67,10 @@ fn test_t_arch_4_no_network_no_tokio_fs_no_block_on() -> TestResult {
     Ok(())
 }
 
+// Prüft T-LINT-2: Es existiert kein zweites Vfs-Trait im Crate außer dem kanonischen contextra_ports::vfs::Vfs.
 #[test]
 fn test_t_lint_2_single_vfs_trait_no_second_vfs() -> TestResult {
+    // Prüft T-LINT-2: Es existiert kein zweites Vfs-Trait im Crate außer dem kanonischen contextra_ports::vfs::Vfs.
     let root = crate_root();
     let src_dir = root.join("src");
     let mut violations = Vec::new();
@@ -103,15 +107,19 @@ fn test_t_lint_2_single_vfs_trait_no_second_vfs() -> TestResult {
     Ok(())
 }
 
+// Verifiziert, dass RealVfs das kanonische ports::vfs::Vfs-Trait vollständig implementiert (DF-01).
 #[test]
 fn test_df_01_real_vfs_implements_ports_vfs() {
+    // Verifiziert, dass RealVfs das kanonische ports::vfs::Vfs-Trait vollständig implementiert (DF-01).
     let vfs = contextra_durable_fs::real_vfs::RealVfs::new();
     fn assert_implements_vfs<T: Vfs + 'static>(_val: &T) {}
     assert_implements_vfs(&vfs);
 }
 
+// Prüft, dass keine toten Module (health, fault_injector, journal) oder Legacy-Aliase (RealFs) in lib.rs verbleiben.
 #[test]
 fn test_clean_removal_no_realfs_no_dead_modules() -> TestResult {
+    // Prüft, dass keine toten Module (health, fault_injector, journal) oder Legacy-Aliase (RealFs) in lib.rs verbleiben.
     let root = crate_root();
     let lib_rs = root.join("src/lib.rs");
     let content = fs::read_to_string(&lib_rs)?;

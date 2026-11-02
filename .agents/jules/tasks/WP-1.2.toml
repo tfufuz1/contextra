@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Aufgabenkarte WP-1.2 – Rückbauliste D-84 (Teil contextra-sys)
 # Nicht normativ. Quelle: SPEC 15.4 (WP-1.2), D-84, SY-04.
 
@@ -20,19 +19,6 @@ scope = [
 ]
 
 forbidden = [
-=======
-id          = "WP-1.2"
-title       = "contextra-crypto Bereinigung: Features, Altlasten und ungenutzte Abhängigkeiten"
-wp          = "WP-1.2"
-gate        = "B"
-crate       = "contextra-crypto"
-goal        = "Entferne verbotene Features (test-utils, kv-encryption, cloud-egress-guard, wal-integrity, legacy-wal-key), Selbst-Dev-Abhängigkeit, KmsProvider, CloudEgressGuard, Altpfade und ungenutzte Abhängigkeiten. Setze ring = '1'."
-non_goals   = ["Keine Änderungen an fremden Crates"]
-
-scope       = ["crates/contextra-crypto/**"]
-
-forbidden   = [
->>>>>>> 536e68d9 (refactor(crypto): implement key hierarchy and primitive contracts (WP-1.2, WP-3.2, WP-4.1))
   "AGENTS.md",
   "docs/SPEC.md",
   "rust-toolchain.toml",
@@ -46,7 +32,6 @@ forbidden   = [
   ".agents/jules/setup/**",
 ]
 
-<<<<<<< HEAD
 spec_ids = ["D-84", "SY-04", "SY-02", "P8"]
 
 acceptance = [
@@ -62,18 +47,3 @@ evidence_required = [
 files      = 6
 lines      = 200
 iterations = 5
-=======
-spec_ids    = ["CR-01", "CR-15", "CR-16", "D-05", "D-53", "D-84", "P8"]
-
-acceptance  = [
-  "cargo tree -p contextra-crypto -e normal",
-  "cargo check -p contextra-crypto --all-targets",
-]
-
-evidence_required = ["Bereinigtes Cargo.toml, keine verbotenen Features, ring = 1"]
-
-[budget]
-files      = 5
-lines      = 200
-iterations = 3
->>>>>>> 536e68d9 (refactor(crypto): implement key hierarchy and primitive contracts (WP-1.2, WP-3.2, WP-4.1))
