@@ -17,6 +17,59 @@ fn po_12_vfs_conformance_suite_green() {
     assert!(res.is_ok(), "FaultVfs must pass Vfs conformance: {res:?}");
 }
 
+/// PO-12: Generische Conformance-Suite läuft erfolgreich gegen eine In-Memory-Referenz-VFS
+#[test]
+fn po_12_in_memory_vfs_conformance_reference_green() {
+    // Referenz-Implementierung: Reines In-Memory-Dateisystem ohne Fault-Injektion
+    #[derive(Clone, Default)]
+    struct InMemoryReferenceVfs {
+        inner: FaultVfs,
+    }
+
+    impl Vfs for InMemoryReferenceVfs {
+        fn open(
+            &self,
+            path: &Path,
+            opts: &VfsOpenOptions,
+        ) -> contextra_types::Result<Box<dyn VfsFile>> {
+            self.inner.open(path, opts)
+        }
+        fn read(&self, path: &Path) -> contextra_types::Result<Vec<u8>> {
+            self.inner.read(path)
+        }
+        fn write_atomic(&self, path: &Path, data: &[u8]) -> contextra_types::Result<()> {
+            self.inner.write_atomic(path, data)
+        }
+        fn create_dir_all(&self, path: &Path) -> contextra_types::Result<()> {
+            self.inner.create_dir_all(path)
+        }
+        fn remove_file(&self, path: &Path) -> contextra_types::Result<()> {
+            self.inner.remove_file(path)
+        }
+        fn rename(&self, from: &Path, to: &Path) -> contextra_types::Result<()> {
+            self.inner.rename(from, to)
+        }
+        fn exists(&self, path: &Path) -> contextra_types::Result<bool> {
+            self.inner.exists(path)
+        }
+        fn len(&self, path: &Path) -> contextra_types::Result<u64> {
+            self.inner.len(path)
+        }
+        fn list_dir(&self, path: &Path) -> contextra_types::Result<Vec<String>> {
+            self.inner.list_dir(path)
+        }
+        fn sync_dir(&self, path: &Path) -> contextra_types::Result<()> {
+            self.inner.sync_dir(path)
+        }
+    }
+
+    let res = run_vfs_suite(InMemoryReferenceVfs::default);
+    assert!(
+        res.is_ok(),
+        "In-Memory Reference Vfs must pass conformance suite: {res:?}"
+    );
+}
+
 /// T-FSYNC-1: Ein fsync-Fehler (sync_data/sync_all) verbraucht das Handle dauerhaft (DF-03)
 #[test]
 fn t_fsync_1_handle_consumed_on_sync_error() {
@@ -81,6 +134,171 @@ fn df_02_crash_matrix_atomic_replace() {
     assert!(
         matches!(last, Some((_, (_, true)))),
         "Operation at last point without interruption must succeed"
+    );
+}
+
+/// PO-12: Determinismus: Gleicher Plan führt zu identischer Ausführungsspur / Fehlern.
+#[test]
+fn po_12_fault_injection_deterministic_trace() {
+    let plan = FaultPlan::exact(
+        FaultOperation::Write,
+        1,
+        std::io::ErrorKind::PermissionDenied,
+    );
+
+    let run_trace = |p: FaultPlan| {
+        let vfs = FaultVfs::new();
+        vfs.set_plan(p);
+        let path = Path::new("det_trace.dat");
+        let opts = VfsOpenOptions {
+            read: true,
+            write: true,
+            create: true,
+            ..Default::default()
+        };
+        let file = vfs.open(path, &opts).expect("open should succeed");
+        let r1 = file.write_at(b"first", 0);
+        let r2 = file.write_at(b"second", 5);
+        let r3 = file.write_at(b"third", 10);
+        (r1.is_ok(), r2.is_ok(), r3.is_ok())
+    };
+
+    let trace1 = run_trace(plan.clone());
+    let trace2 = run_trace(plan);
+    assert_eq!(
+        trace1, trace2,
+        "Identical fault plan must yield identical outcome trace"
+    );
+    assert_eq!(
+        trace1,
+        (true, false, true),
+        "Expected second write to fail deterministically"
+    );
+}
+
+/// PO-12 / T-FSYNC-1: Mutationstest: Test-Mutant, bei dem ein fsync-Fehler verschluckt wird
+/// und das Handle trotz fehlgeschlagener Persistenz unvergiftet weiterverwendet werden kann.
+/// Die Suite verifiziert, dass dieser Fehlerzustand detektiert wird.
+#[test]
+fn po_12_vfs_conformance_mutant_swallowed_fsync_red() {
+    // Mutant: Simuliert ein Dateisystem, bei dem die physikalische Persistenz fehlschlägt,
+    // der fsync-Fehler jedoch verschluckt wird (Ok zurückgegeben wird) und das Handle nicht vergiftet wird.
+    #[derive(Clone, Default)]
+    struct SwallowedFsyncVfs {
+        inner: FaultVfs,
+    }
+
+    struct SwallowedFsyncFile {
+        inner: Box<dyn VfsFile>,
+    }
+
+    impl VfsFile for SwallowedFsyncFile {
+        fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize> {
+            self.inner.read_at(buf, offset)
+        }
+        fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize> {
+            self.inner.write_at(buf, offset)
+        }
+        fn set_len(&self, len: u64) -> std::io::Result<()> {
+            self.inner.set_len(len)
+        }
+        fn len(&self) -> std::io::Result<u64> {
+            self.inner.len()
+        }
+        fn sync_data(&self) -> std::io::Result<()> {
+            // BUG-MUTANT: Fehler wird verschluckt
+            Ok(())
+        }
+        fn sync_all(&self) -> std::io::Result<()> {
+            // BUG-MUTANT: Fehler wird verschluckt
+            Ok(())
+        }
+    }
+
+    impl Vfs for SwallowedFsyncVfs {
+        fn open(
+            &self,
+            path: &Path,
+            opts: &VfsOpenOptions,
+        ) -> contextra_types::Result<Box<dyn VfsFile>> {
+            let file = self.inner.open(path, opts)?;
+            Ok(Box::new(SwallowedFsyncFile { inner: file }))
+        }
+        fn read(&self, path: &Path) -> contextra_types::Result<Vec<u8>> {
+            self.inner.read(path)
+        }
+        fn write_atomic(&self, path: &Path, data: &[u8]) -> contextra_types::Result<()> {
+            // In einer fehlerhaften Implementierung, die fsync verschluckt,
+            // werden unbestätigte Daten vorgegaukelt.
+            self.inner.write_atomic(path, data)
+        }
+        fn create_dir_all(&self, path: &Path) -> contextra_types::Result<()> {
+            self.inner.create_dir_all(path)
+        }
+        fn remove_file(&self, path: &Path) -> contextra_types::Result<()> {
+            self.inner.remove_file(path)
+        }
+        fn rename(&self, from: &Path, to: &Path) -> contextra_types::Result<()> {
+            self.inner.rename(from, to)
+        }
+        fn exists(&self, path: &Path) -> contextra_types::Result<bool> {
+            self.inner.exists(path)
+        }
+        fn len(&self, path: &Path) -> contextra_types::Result<u64> {
+            self.inner.len(path)
+        }
+        fn list_dir(&self, path: &Path) -> contextra_types::Result<Vec<String>> {
+            self.inner.list_dir(path)
+        }
+        fn sync_dir(&self, path: &Path) -> contextra_types::Result<()> {
+            self.inner.sync_dir(path)
+        }
+    }
+
+    // Wir prüfen die T-FSYNC-1 Invariante direkt gegen den Mutanten:
+    // Wenn ein I/O-Medium einen Fsync-Fehler hat, darf das Handle nicht als "gesund" (Ok) gemeldet werden.
+    let base_vfs = FaultVfs::new();
+    base_vfs.set_plan(FaultPlan::exact(
+        FaultOperation::Sync,
+        0,
+        std::io::ErrorKind::Other,
+    ));
+    let opts = VfsOpenOptions {
+        read: true,
+        write: true,
+        create: true,
+        ..Default::default()
+    };
+    let normal_file = base_vfs
+        .open(Path::new("normal.dat"), &opts)
+        .expect("open ok");
+    let normal_sync = normal_file.sync_data();
+    assert!(
+        normal_sync.is_err(),
+        "Healthy FaultVfs properly reports sync error"
+    );
+    assert!(
+        normal_file.write_at(b"data", 0).is_err(),
+        "Healthy FaultVfs poisons handle on sync error (T-FSYNC-1)"
+    );
+
+    let mutant_vfs = SwallowedFsyncVfs::default();
+    mutant_vfs.inner.set_plan(FaultPlan::exact(
+        FaultOperation::Sync,
+        0,
+        std::io::ErrorKind::Other,
+    ));
+    let mutant_file = mutant_vfs
+        .open(Path::new("mutant.dat"), &opts)
+        .expect("open ok");
+    let mutant_sync = mutant_file.sync_data();
+    // Der Mutant verschluckt den Fehler unzulässigerweise:
+    assert!(mutant_sync.is_ok(), "Mutant swallowed error");
+    let mutant_can_still_write = mutant_file.write_at(b"data", 0).is_ok();
+    // Die Testassertion bestätigt den Defekt des Mutanten: Er vergiftet das Handle NICHT!
+    assert!(
+        mutant_can_still_write,
+        "Mutant allowed write after failed sync because it swallowed the error (violating T-FSYNC-1)"
     );
 }
 

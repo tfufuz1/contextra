@@ -362,11 +362,21 @@ fn test_sync_error_consumes_handle<V: Vfs>(vfs: &V) -> ConformanceResult {
         )
     })?;
 
+    // Initialer Sync muss funktionieren
     file.sync_data().map_err(|e| {
         ConformanceFailure::new(
             SUITE_NAME,
             "sync_consume_sync",
             format!("sync_data failed: {e}"),
+        )
+    })?;
+
+    // Nachfolgender Schreibzugriff muss weiterhin funktionieren
+    file.write_at(b"more", 4).map_err(|e| {
+        ConformanceFailure::new(
+            SUITE_NAME,
+            "sync_consume_followup",
+            format!("write_at after healthy sync failed: {e}"),
         )
     })?;
 
