@@ -19,7 +19,7 @@
 //! - [`InMemoryTextIndex`]: In-Memory-Volltextindex (BM25-ähnlich).
 //! - [`ReferenceModel`]: Referenzmodell zur Validierung von MVCC-Isolationsstufen (Multi-Version Concurrency Control).
 //! - [`mocks`]: Mocks für Embedder und Metriken (`MockEmbedder`, `TestMetricsSink`).
-//! - [`conformance`]: Standardisierte Konformitätstests für Ports (Clock, RNG, Storage, Vector, etc.).
+//! - [`conformance`]: Standardisierte Konformitätstests für Ports (Clock, RNG, Storage, Vector, VFS, etc.).
 //!
 //! ## Abhängigkeiten
 //! - **Normal:** `contextra-ports`, `contextra-types`, `bytes`, `parking_lot`, `tracing`.
@@ -65,6 +65,12 @@ pub mod mocks;
 // ANCHOR[contextra-testkit:MOD-REF-MODEL-001]
 /// Formales Referenzmodell zur Prüfung von MVCC- und Transaktionsisolationsgarantien.
 pub mod reference_model;
+
+/// Benchmark-Hilfen (Dateien aus K-C).
+pub mod bench {}
+
+/// Report-Modul für Testergebnisse und Konformitätsberichte.
+pub mod report {}
 
 // Re-Exports der zentralen Typen für bequemen Zugriff in Testsuiten
 pub use fault_vfs::{FaultConfig, FaultVfs};

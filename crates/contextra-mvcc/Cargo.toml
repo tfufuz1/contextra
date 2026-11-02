@@ -31,10 +31,23 @@ proptest = "1.4"
 criterion = { workspace = true }
 loom = "0.7"
 contextra-testkit = { workspace = true }
+serde_json = { workspace = true }
 
 [[bench]]
 name = "mvcc_bench"
 harness = false
+
+[[bench]]
+name = "bm_mvcc_ssi"
+harness = false
+
+[[test]]
+name = "mv_ssi_validation_test"
+path = "tests/mv_ssi_validation_test.rs"
+
+[[test]]
+name = "mv_audit_tests"
+path = "tests/mv_audit_tests.rs"
 
 [[test]]
 name = "ssi_write_skew"

@@ -15,22 +15,6 @@
 //! Factory-Closure (für asynchrone Neuerstellung im sauberen Zustand). Die Suite führt eine
 //! Batterie strenger Tests durch (z. B. Rollback-Isolation, Randfälle, Dimensionen) und sammelt
 //! Fehler deterministisch in `ConformanceFailure`.
-//!
-//! # Anwendungsbeispiel
-//!
-//! ```ignore
-//! #[cfg(test)]
-//! mod tests {
-//!     use contextra_testkit::assert_conformance;
-//!     use contextra_testkit::conformance::*;
-//!
-//!     #[tokio::test]
-//!     async fn test_my_storage_conformance() {
-//!         let res = run_storage_engine_suite(|| async { MyStorageEngine::new() }).await;
-//!         assert_conformance!(res);
-//!     }
-//! }
-//! ```
 
 // ANCHOR[contextra-testkit:CONF-MOD-CLOCK-001]
 /// Konformitätssuite für den `Clock`-Port.
@@ -64,6 +48,20 @@ pub mod text;
 /// Konformitätssuite für den `VectorIndex`-Port.
 pub mod vector;
 
+// ANCHOR[contextra-testkit:CONF-MOD-VFS-001]
+/// Konformitätssuite für den `Vfs`-Port.
+pub mod vfs;
+
+// Deklarationen für K-B (werden in K-B implementiert):
+// read_gate, record_sealer, file_keyring, ledger_sink
+pub mod read_gate {}
+
+pub mod record_sealer {}
+
+pub mod file_keyring {}
+
+pub mod ledger_sink {}
+
 // Re-Exports für bequemen Zugriff
 pub use clock::run_clock_suite;
 pub use failure::{ConformanceFailure, ConformanceResult};
@@ -72,3 +70,4 @@ pub use rng::run_rng_suite;
 pub use storage::run_storage_engine_suite;
 pub use text::run_text_index_suite;
 pub use vector::run_vector_index_suite;
+pub use vfs::run_vfs_suite;

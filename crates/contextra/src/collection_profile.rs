@@ -28,7 +28,6 @@
 //!   stets valide sein (`validate().is_ok()`).
 
 use crate::performance_profile::{PerformanceProfile, PerformanceProfileError};
-use contextra_ports::license::LicenseGate;
 pub use contextra_types::types::domain::AutoExtractionMode;
 
 /// Mode specifying KV segment deletion behavior.
@@ -114,21 +113,6 @@ impl CollectionProfile {
         }
         Ok(())
     }
-
-    // ANCHOR[contextra:PRF-007]
-    /// Validiert das Profil zusätzlich gegen ein Lizenzgate.
-    ///
-    /// Stellt sicher, dass das Profil intern konsistent ist und der geforderte Feature-Ring
-    /// durch die Lizenz abgedeckt ist.
-    pub fn validate_with_license(
-        &self,
-        gate: &dyn LicenseGate,
-    ) -> Result<(), CollectionProfileError> {
-        self.validate()?;
-        let resolved = self.performance.resolve();
-        resolved.enforce_license(gate)?;
-        Ok(())
-    }
 }
 
 // ANCHOR[contextra:PRF-008]
@@ -193,6 +177,31 @@ impl DeploymentTier {
                 },
                 auto_extraction: ENTERPRISE_REGULATED_AUTO_EXTRACTION_DEFAULT,
             },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// T-ID: T-DEF-1
+    #[test]
+    fn test_all_deployment_tiers_resolve_and_validate_cleanly() {
+        let tiers = [
+            DeploymentTier::EdgeMinimal,
+            DeploymentTier::PowerUserLocal,
+            DeploymentTier::EnterpriseShared,
+            DeploymentTier::EnterpriseRegulated,
+        ];
+
+        for tier in tiers {
+            let profile = tier.resolve();
+            assert!(
+                profile.validate().is_ok(),
+                "DeploymentTier::{:?} failed validation",
+                tier
+            );
         }
     }
 }

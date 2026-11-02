@@ -33,7 +33,6 @@ use std::time::Duration;
 
 use crate::rng::OsRngAdapter;
 use contextra_engine::{Contextra, ContextraConfig, EmbeddingBackend};
-use contextra_ports::license::{FeatureRing, LicenseGate, OpenFastGate};
 use contextra_ports::{Rng, TextEmbeddingEngine};
 use contextra_types::error::ContextraError;
 use contextra_types::DistanceMetric;
@@ -90,8 +89,6 @@ pub struct ContextraBuilder {
     encryption_error: Option<String>,
     explicit_user_config: bool,
     embedder: Option<Arc<dyn TextEmbeddingEngine>>,
-    license_gate: Arc<dyn LicenseGate>,
-    signed_license_error: Option<String>,
     performance_profile: Option<crate::performance_profile::PerformanceProfile>,
     rng: Option<Arc<dyn Rng>>,
 }
@@ -107,8 +104,6 @@ impl std::fmt::Debug for ContextraBuilder {
                 "embedder",
                 &self.embedder.as_ref().map(|_| "<dyn TextEmbeddingEngine>"),
             )
-            .field("license_gate", &"<dyn LicenseGate>")
-            .field("signed_license_error", &self.signed_license_error)
             .field("performance_profile", &self.performance_profile)
             .field("rng", &self.rng.as_ref().map(|_| "<dyn Rng>"))
             .finish()
@@ -124,8 +119,6 @@ impl Clone for ContextraBuilder {
             encryption_error: self.encryption_error.clone(),
             explicit_user_config: self.explicit_user_config,
             embedder: self.embedder.clone(),
-            license_gate: Arc::clone(&self.license_gate),
-            signed_license_error: self.signed_license_error.clone(),
             performance_profile: self.performance_profile,
             rng: self.rng.clone(),
         }
@@ -141,7 +134,6 @@ impl ContextraBuilder {
     ///
     /// # Standardwerte
     /// - Speicherpfad: `./contextra_data`
-    /// - Lizenzgate: `OpenFastGate`
     /// - Verschlüsselung: Uninitialisiert (muss vor `build()` gesetzt werden, D-05)
     /// - RNG: Standardmäßig [`OsRngAdapter`] (CSPRNG aus OS-Entropie)
     pub fn new(dimension: usize) -> Self {
@@ -155,8 +147,6 @@ impl ContextraBuilder {
             encryption_error: None,
             explicit_user_config: false,
             embedder: None,
-            license_gate: Arc::new(OpenFastGate),
-            signed_license_error: None,
             performance_profile: None,
             rng: Some(Arc::new(OsRngAdapter::new())),
         }
@@ -261,14 +251,6 @@ impl ContextraBuilder {
         self
     }
 
-    // ANCHOR[contextra:BLD-014]
-    /// Injiziert ein beliebiges Lizenzgate ([`LicenseGate`]) zur Ring-Autorisierung.
-    pub fn with_license_gate(mut self, gate: Arc<dyn LicenseGate>) -> Self {
-        self.license_gate = gate;
-        self.signed_license_error = None;
-        self
-    }
-
     // ANCHOR[contextra:BLD-015]
     /// Injiziert eine benutzerdefinierte Zufallsquelle ([`contextra_ports::Rng`]), z. B. für deterministische Tests.
     pub fn with_rng(mut self, rng: Arc<dyn Rng>) -> Self {
@@ -312,21 +294,16 @@ impl ContextraBuilder {
     /// 1. **Vorabprüfung**: Prüfe, ob Konfigurationsfehler (z. B. leere Passphrase) vorliegen.
     /// 2. **Pflicht-Verschlüsselung (D-05)**: Erzwinge zwingend gesetzte, nicht-leere Passphrase.
     /// 3. **Performance-Profil auflösen**: Falls ein Profil gesetzt ist, Durability- und Löschmodi übernehmen.
-    /// 4. **Lizenz-Autorisierung**: Autorisierung am Gate abfragen.
-    /// 5. **Instanziierung**: Aufruf von `Contextra::open_authorized` mit Pfad, Konfiguration und Token.
-    /// 6. **Embedder anhängen**: Falls ein Text-Embedder hinterlegt wurde, diesen registrieren.
+    /// 4. **Instanziierung**: Aufruf von `Contextra::open_with_config` mit Pfad und Konfiguration.
+    /// 5. **Embedder anhängen**: Falls ein Text-Embedder hinterlegt wurde, diesen registrieren.
     ///
     /// # Fehlerfälle
     /// - [`ContextraError::InvalidInput`]: Fehlende oder leere Passphrase oder unverschlüsselter Modus angefordert.
-    /// - [`ContextraError::PolicyViolation`]: Lizenz unzureichend oder Konflikt zwischen Profil und Konfiguration.
+    /// - [`ContextraError::PolicyViolation`]: Konflikt zwischen Profil und Konfiguration.
     /// - [`ContextraError::Io`]: Dateisystem- oder Speicherinitialisierungsfehler.
     pub async fn build(self) -> Result<Contextra, ContextraError> {
         if let Some(ref err_msg) = self.encryption_error {
             return Err(ContextraError::invalid_input(err_msg.clone()));
-        }
-
-        if let Some(ref err_msg) = self.signed_license_error {
-            return Err(ContextraError::PolicyViolation(err_msg.clone()));
         }
 
         let mut config_for_open = self.config.clone();
@@ -352,7 +329,7 @@ impl ContextraBuilder {
             }
         }
 
-        let requested_ring = if let Some(profile) = self.performance_profile {
+        if let Some(profile) = self.performance_profile {
             let resolved = profile.resolve();
             if self.explicit_user_config {
                 if config_for_open.durability_mode != resolved.durability_mode
@@ -369,23 +346,9 @@ impl ContextraBuilder {
                 config_for_open.deletion_proof_active = resolved.deletion_proof_active;
                 config_for_open.vector_delete_mode = resolved.vector_delete_mode;
             }
-            resolved.feature_ring
-        } else {
-            FeatureRing::Fast
-        };
+        }
 
-        let authorized_token = self
-            .license_gate
-            .authorize(requested_ring)
-            .map_err(|e| ContextraError::PolicyViolation(e.to_string()))?;
-
-        let instance = Contextra::open_authorized(
-            &self.storage_path,
-            config_for_open,
-            &authorized_token,
-            self.license_gate,
-        )
-        .await?;
+        let instance = Contextra::open_with_config(&self.storage_path, config_for_open).await?;
 
         if let Some(embedder) = self.embedder {
             Ok(instance.with_embedder(embedder).await)
@@ -545,6 +508,27 @@ mod tests {
             .await?;
 
         assert_eq!(db.len().await?, 0);
+        let _ = std::fs::remove_dir_all(&tmp_path);
+        Ok(())
+    }
+
+    /// T-ID: T-DEF-1
+    #[tokio::test]
+    async fn test_builder_builds_without_license_gate() -> Result<(), Box<dyn std::error::Error>> {
+        let tmp_path = std::env::temp_dir().join(format!(
+            "contextra_builder_no_license_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&tmp_path);
+
+        let db = ContextraBuilder::new(8)
+            .with_storage_path(&tmp_path)
+            .with_encryption_passphrase("test-passphrase-without-license")
+            .build()
+            .await?;
+
+        assert_eq!(db.config().dimension, 8);
+        db.close().await?;
         let _ = std::fs::remove_dir_all(&tmp_path);
         Ok(())
     }

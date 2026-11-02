@@ -22,7 +22,7 @@ fuzz_target!(|data: &str| {
     let _ = default_tok.tokenize(data);
 
     // 2. German Morphological Tokenizer execution
-    let german_tok = GermanMorphTokenizer::new();
+    let german_tok = GermanMorphTokenizer::try_new().unwrap_or_default();
     let _ = german_tok.tokenize(data);
 
     // 3. Global tokenize function
