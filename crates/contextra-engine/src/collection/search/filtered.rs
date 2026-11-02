@@ -8,7 +8,6 @@
 // FILE-CONTEXT
 // ZWECK: Filter-Familie (Selectivity, Match-DocIDs, search_filtered) für Collection.
 
-use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{Collection, StoredDocument, StoredDocumentMeta};
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, FilterExpr, Result};
@@ -174,7 +173,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 
     /// Performs filtered semantic vector search in the collection.
     // AI-TAG[SMELL][RESOLVED] audit-5.1: Vector-Suche clampt k stets auf k.min(contextra_types::MAX_SEARCH_K) über alle Einstiegspunkte hinweg.
-    // AI-TAG[SMELL][RESOLVED] audit-M-7: CheckpointPinGuard handles unpinning safely across all error return paths.
     #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, query, filter))]
@@ -185,12 +183,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         filter: Option<&(dyn Fn(DocId) -> bool + Send + Sync)>,
     ) -> Result<Vec<crate::SearchResult>> {
         let k = k.min(contextra_types::MAX_SEARCH_K);
-        // Pin-first, read-after: the seq is read under the protection of the pin,
-        // eliminating the TOCTOU window between snapshot_seq() and pin activation.
-        with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
-            self.search_filtered_at(query, k, filter, seq).await
-        })
-        .await
+        let seq = self.storage.last_seq_no().await?;
+        self.search_filtered_at(query, k, filter, seq).await
     }
 
     /// Performs filtered semantic vector search at a specific MVCC sequence number.

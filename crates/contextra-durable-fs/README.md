@@ -1,19 +1,11 @@
-# contextra-durable-fs
+Dateisystem-Implementierung `RealVfs` mit dauerhaften Schreib- und Austauschoperationen.
 
-Crash-sichere Dateisystem-Operationen und `RealVfs`-Implementierung.
+## Status
 
-- **Ring:** Ring 1 (Dateisystem-Durability)
-- **Normativ:** [docs/SPEC.md §8.5](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring 1. Ist-Zustand: vorhanden; das zweite `Vfs`-Trait ist entfernt (F-29); Startprobe (D-56) und `scrub` (D-83) nicht nachgewiesen; das Crate hat im Ist-Zustand keinen Verbraucher. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra-durable-fs` stellt die einzige produktive Implementierung des `Vfs`-Ports (`RealVfs`) bereit:
-- `real_vfs`: Konsolidierter VFS-Treiber für POSIX-/macOS-Dateisysteme.
-- `atomic`: Atomares Ersetzen (Temp-Datei → `fsync` Datei → `rename` → `sync_dir`).
-- `scrub`: Best-effort physisches Überschreiben mit Nullen (`ZeroFill`) vor dem Löschen.
-- `probe`: Startup-Probe für Dateisystemberechtigungen und Locks.
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- Sämtliche `sync_*`-Fehler werden verbindlich propagiert (`let _ =` ist verboten).
-- Verzeichnisse erzwingen Modus `0700`, Dateien erzwingen Modus `0600`.
+Erlaubt laut SPEC 5.3: `types`, `ports`, `sys`.
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

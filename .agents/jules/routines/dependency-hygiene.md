@@ -1,13 +1,9 @@
-# Routine: Dependency-Hygiene
+# Routine: Abhängigkeitshygiene
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
-
-- **Takt**: Wöchentlich
-- **Ziel**: Prüfung von Lizenzen, Sicherheitsberichten und Supply-Chain-Audits neuer/aktualisierter Abhängigkeiten.
-- **Eingaben**:
-  - `cargo deny check licenses`
-  - `cargo vet`
-- **Harte Grenzen**: Max. 15 Dateien / 1 Crate pro PR. Scope-Globs: `Cargo.toml`, `Cargo.lock`, `supply-chain/**`, `deny.toml`.
-- **Stopp-Bedingungen**: Unzulässige Lizenz ohne geschäftlich freigegebene Ausnahme.
-- **Ergebnisformat**: PR mit aktualisierten Vet-Audits oder Dependency-Fixes.
-- **Eskalation**: Siehe Architekturdokument §9.3.
+- **Takt:** wöchentlich
+- **Ziel:** Lizenzen, Sicherheitsberichte und Matrixkonformität neuer oder aktualisierter Abhängigkeiten prüfen (SPEC 5.3, D-54, HR-1)
+- **Eingaben:** `cargo deny check`, `cargo tree -e normal` (darf keine Netzwerk-Bibliothek enthalten). `cargo vet` setzt ein Verzeichnis `supply-chain/` voraus, das im Repository fehlt; ohne Einrichtung entfällt dieser Schritt.
+- **Harte Grenzen:** Scope `Cargo.toml`, `Cargo.lock`, `deny.toml`. Jede Änderung von `Cargo.toml` erneuert `Cargo.lock` im selben Commit (D-93).
+- **Stopp:** Unzulässige Lizenz ohne freigegebene Ausnahme. Ausnahmen in `deny.toml` brauchen ein Ablaufdatum (SPEC 17.3).
+- **Ergebnis:** PR mit Korrektur oder Bericht über die Befunde.
+- **Eskalation:** siehe [`../HARNESS_QUICKSTART.md`](../HARNESS_QUICKSTART.md).

@@ -1,24 +1,11 @@
-# contextra-testkit
+Testhilfen: `FaultVfs`, Referenzmodell, deterministische Uhr, In-Memory-Ports.
 
-Test-Fixtures, Mock-Engines, Referenzmodelle und Fehlerinjektion.
+## Status
 
-- **Ring:** dev (Test-Infrastruktur)
-- **Normativ:** [docs/SPEC.md §8.15](../../docs/SPEC.md)
-- **Arbeitsanweisungen:** [AGENTS.md](AGENTS.md)
+Ring dev. Ist-Zustand: vorhanden; Graph-Reste seit `b1637a8` entfernt; `FaultVfs` ersetzt das Feature `fault-injection`. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
-## Rolle & Zweck
-`contextra-testkit` stellt wiederverwendbare Testbausteine ausschließlich für Testumgebungen bereit:
-- `FaultVfs`: Hochentwickelte I/O-Fehlerinjektion (Absturz nach $n$ Operationen, Torn-Writes an Byte $b$, `ENOSPC`, `EIO` bei `sync_*`, Seitencache-Verzögerung).
-- `ReferenceModel`: Unabhängiges BTreeMap-Orakel zur Validierung von Transaktionen, MVCC-Zeitreisen und Löschsemantiken.
-- `ManualClock`: Deterministisch steuerbare Testuhr für zeitabhängige Tests.
-- `InMemoryStore`: Schneller In-Memory Key-Value-Speicher für Unit-Tests.
-- `RecordingStorage`: Protokolliert alle geschriebenen Schlüssel zur Vollständigkeitsprüfung (T-COV-1).
-- `NeighborDigest`: BLAKE3-Hash über alle Nicht-Ziel-Paare zum Nachweis unberührter Nachbardaten.
-- `LeakyLayer`: Absichtlich fehlerhafte `ErasureLayer`-Implementierung als Positivkontrolle für das Erasure Lab (T-RAW-2).
-- `CanaryFactory`: Generiert hochentropische Needles für Messungen.
-- `MemVfs`, `MemLedger`: Reine RAM-Ports.
+## Abhängigkeiten
 
-## Invarianten
-- `#![forbid(unsafe_code)]`
-- **Ausschließlich als `dev-dependency` zugelassen (INV-EMBED-1):** Darf niemals im Produktions-Release eingebunden werden.
-- Veraltetes `in_memory_graph` ist entfernt.
+Erlaubt laut SPEC 5.3: nach AR-14 frei für Dev-Abhängigkeiten; Produktionscrates dürfen nicht von `testkit` abhängen.
+
+Das Crate ist Teil der Architekturprüfung (`contextra-arch-tests`). Abhängigkeiten werden nicht von Hand gepflegt, sondern gegen die Matrix geprüft (AR-1, AR-11).

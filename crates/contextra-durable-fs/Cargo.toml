@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Durable filesystem operations and synchronous disk flushing for Contextra"
+description = "Dateisystem-Implementierung `RealVfs` mit dauerhaften Schreib- und Austauschoperationen."
 
 [package.metadata.contextra]
 ring = "1"

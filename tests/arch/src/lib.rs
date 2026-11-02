@@ -729,6 +729,144 @@ mod tests {
             &["contextra-types", "parking_lot"],
         )]);
         assert!(v.is_empty(), "{v:?}");
+
+        // Negativfall: tokio hinzugefügt
+        fs::write(
+            &cargo_toml,
+            "[package]\nname = \"contextra-types\"\n[dependencies]\ntokio = \"1\"\n",
+        )
+        .unwrap();
+        let v_neg = check_types_purity(&tmp);
+        assert!(!v_neg.is_empty(), "Tokio in types muss erkannt werden");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    // T-ARCH-2: Positiv und Negativ
+    #[test]
+    fn t_arch_2_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_arch_2_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let krate_dir = tmp.join("crates/contextra-vector");
+        let src_dir = krate_dir.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(&lib_rs, "pub struct VectorStore;\n").unwrap();
+        let k = Krate {
+            name: "contextra-vector".to_string(),
+            dir: krate_dir.clone(),
+            deps: vec![],
+        };
+        let v = check_raw_storage_isolation(&tmp, std::slice::from_ref(&k));
+        assert!(v.is_empty(), "{v:?}");
+
+        // Negativfall: direkter LsmStorage Aufruf
+        fs::write(&lib_rs, "pub fn evil() { LsmStorage::open(); }\n").unwrap();
+        let v_neg = check_raw_storage_isolation(&tmp, &[k]);
+        assert!(
+            !v_neg.is_empty(),
+            "Direkter LsmStorage Aufruf muss erkannt werden"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    // T-LINT-2: Positiv und Negativ
+    #[test]
+    fn t_lint_2_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_lint_2_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let src = tmp.join("crates/contextra-store/src");
+        fs::create_dir_all(&src).unwrap();
+        let lib_rs = src.join("lib.rs");
+        fs::write(&lib_rs, "use contextra_ports::Vfs;\n").unwrap();
+        let v = check_store_fs_usage(&tmp);
+        assert!(v.is_empty(), "{v:?}");
+
+        // Negativfall: std::fs
+        fs::write(&lib_rs, "use std::fs::File;\n").unwrap();
+        let v_neg = check_store_fs_usage(&tmp);
+        assert!(!v_neg.is_empty(), "std::fs muss erkannt werden");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    // T-UNSAFE-1: Positiv und Negativ
+    #[test]
+    fn t_unsafe_1_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_unsafe_1_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let krate_dir = tmp.join("crates/contextra-types");
+        let src_dir = krate_dir.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(&lib_rs, "#![forbid(unsafe_code)]\npub struct Safe;\n").unwrap();
+        let k = Krate {
+            name: "contextra-types".to_string(),
+            dir: krate_dir.clone(),
+            deps: vec![],
+        };
+        let v = check_unsafe(&tmp, std::slice::from_ref(&k));
+        assert!(v.is_empty(), "{v:?}");
+
+        // Negativfall: unsafe in Nicht-Insel
+        fs::write(
+            &lib_rs,
+            "#![forbid(unsafe_code)]\npub fn bad() { unsafe { } }\n",
+        )
+        .unwrap();
+        let v_neg = check_unsafe(&tmp, &[k]);
+        assert!(
+            !v_neg.is_empty(),
+            "Unsafe in Nicht-Insel muss erkannt werden"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    // T-DEF-1 / T-CFG-1: Positiv und Negativ
+    #[test]
+    fn t_def_1_negativ_sicherheits_opt_out() {
+        let tmp = std::env::temp_dir().join("t_def_1_neg");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let cargo_toml = tmp.join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            "[package]\nname = \"test-krate\"\n[features]\nno-encryption = []\n",
+        )
+        .unwrap();
+        let k = Krate {
+            name: "test-krate".to_string(),
+            dir: tmp.clone(),
+            deps: vec![],
+        };
+        let v = check_feature_hygiene(&tmp, &[k]);
+        assert!(v.iter().any(|msg| msg.contains("T-DEF-1")), "{v:?}");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_cfg_1_negativ_unexpected_cfgs() {
+        let tmp = std::env::temp_dir().join("t_cfg_1_neg");
+        let _ = fs::remove_dir_all(&tmp);
+        let src = tmp.join("src");
+        fs::create_dir_all(&src).unwrap();
+        let cargo_toml = tmp.join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            "[package]\nname = \"test-krate\"\n[features]\n",
+        )
+        .unwrap();
+        let rs_file = src.join("lib.rs");
+        fs::write(&rs_file, "#![allow(unexpected_cfgs)]\n").unwrap();
+        let k = Krate {
+            name: "test-krate".to_string(),
+            dir: tmp.clone(),
+            deps: vec![],
+        };
+        let v = check_feature_hygiene(&tmp, &[k]);
+        assert!(
+            v.iter().any(|msg| msg.contains("allow(unexpected_cfgs)")),
+            "{v:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]

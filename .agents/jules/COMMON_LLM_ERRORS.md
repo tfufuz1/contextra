@@ -1,225 +1,27 @@
-# Contextra — Häufige LLM-Fehler & Korrekturen
+# Häufige Fehler bei der Arbeit am Code und ihre Korrektur
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
-> Destilliert aus Session-Audits. Bei Unsicherheit: diese Datei zuerst prüfen.
+Nicht normativ. Jede Zeile verweist auf die SPEC-Stelle, die maßgeblich ist. Bei Unsicherheit zuerst hier nachsehen, dann die SPEC.
 
-## FEHLER-KLASSE 1: API-Halluzination
-
-**Symptom**: Agent generiert Methodenaufruf der nicht existiert oder
-falsche Signatur hat.
-
-**Häufige Halluzinationen in diesem Projekt**:
-```rust
-// ❌ HALLUZINATION — collection.search() existiert nicht so:
-collection.search("query", 10).await?
-
-// ✅ KORREKT — aus collection.rs Signatur lesen:
-collection.hybrid_search(query_text, query_vector, limit, filters).await?
-
-// ❌ HALLUZINATION — RRF mit execute_rrf():
-execute_rrf(results, k)
-
-// ✅ KORREKT — aus fusion.rs:
-reciprocal_rank_fusion(result_sets, max_results)
-// oder: weighted_reciprocal_rank_fusion(weighted_sets, max_results)
-
-// ❌ HALLUZINATION — SessionPool öffentlich zugreifen:
-let pool = SessionPool::new(config)?;
-
-// ✅ KORREKT — SessionPool ist pub(crate) in contextra-infer-onnx:
-// Aus externem Crate nicht direkt nutzbar. CrossEncoderReranker
-// hält seinen eigenen internen Pool.
-```
-
-**Heilmittel**: Vor JEDEM Methodenaufruf:
-```bash
-grep -n "pub fn <METHODE_NAME>" crates/<crate>/src/*.rs
-```
-
-## FEHLER-KLASSE 2: Typ-Duplikation
-
-**Symptom**: Agent legt neuen Typ an, der bereits existiert.
-
-**Bekannte Duplikations-Risiken**:
-```
-ContextChunk     → contextra-core/src/types/saos.rs (NICHT neu anlegen!)
-SearchResult     → contextra-core/src/types/ (NICHT neu anlegen!)
-TxId             → contextra-core/src/types/ (Newtype u64, NICHT redefinen!)
-DocId            → contextra-core/src/types/ (Blake3-Hash, NICHT redefinen!)
-ContextraError     → contextra-core/src/error.rs (EINZIGE Error-Enum)
-CheckpointGuard  → contextra-store/src/checkpoint.rs (NICHT mit PersistentCheckpointStore verwechseln!)
-```
-
-**Heilmittel**: VOR jedem `struct` oder `enum`:
-```bash
-grep -rn "struct <TYPNAME>\|enum <TYPNAME>\|type <TYPNAME>" crates/ --include="*.rs"
-grep "<TYPNAME>" docs/TYPE_REGISTRY.md
-```
-
-## FEHLER-KLASSE 3: Stille Fehler (Silent Failures)
-
-**Symptom**: Agent schreibt Code der Fehler verschluckt.
-
-```rust
-// ❌ FALSCH — IO-Fehler verschluckt:
-let _ = file.sync_all().await;
-let _ = dir.sync_all();
-
-// ❌ FALSCH — Deserialisierung mit Default-Fallback:
-let entry = bincode::deserialize(&bytes).unwrap_or_default();
-
-// ❌ FALSCH — Unhandled Result:
-collection.insert(key, doc).await; // kein ?
-
-// ✅ KORREKT — Fehler propagieren:
-file.sync_all().await.map_err(|e| ContextraError::Storage(...))?;
-let entry = bincode::deserialize(&bytes)
-    .map_err(|e| ContextraError::ParseError(format!("WAL corrupt: {e}")))?;
-collection.insert(key, doc).await?;
-```
-
-## FEHLER-KLASSE 4: DAG-Verletzungen
-
-**Symptom**: Agent importiert ein Crate aus einer höheren Schicht.
-
-```toml
-# ❌ FALSCH — contextra-core importiert contextra-db (Layer 2 in Layer 0):
-# In crates/contextra-core/Cargo.toml:
-contextra-db = { path = "../contextra-db" }  # ARCH-BRUCH!
-
-# ❌ FALSCH — contextra-store importiert contextra-vector (Layer 1 → Layer 1 Peer):
-contextra-vector = { path = "../contextra-vector" }  # LAYER-PEER-BRUCH!
-```
-
-**Heilmittel**: Vor jeder `Cargo.toml`-Änderung:
-```bash
-just dag-check
-```
-
-## FEHLER-KLASSE 5: TxId-Missbrauch
-
-```rust
-// ❌ FALSCH — SystemTime als TxId:
-let tx_id = SystemTime::now()
-    .duration_since(UNIX_EPOCH).unwrap()
-    .as_nanos() as u64;
-
-// ❌ FALSCH — Manuell zählen:
-let tx_id = self.counter.fetch_add(1, Ordering::SeqCst);
-
-// ✅ KORREKT — immer via Collection-Allocator:
-let tx_id = collection.allocate_tx().await?;
-```
-
-## FEHLER-KLASSE 6: unsafe ohne SAFETY-Kommentar
-
-```rust
-// ❌ FALSCH — unsafe ohne Beweis:
-unsafe { ptr::copy_nonoverlapping(src, dst, len) }
-
-// ✅ KORREKT:
-// SAFETY: `src` und `dst` überlappen nicht (getrennte Allokationen durch
-//         den Rust-Allokator). Länge `len` wurde durch Caller `hnsw.rs:347`
-//         gegen beide Slice-Längen geprüft (assert_eq! in debug builds).
-unsafe { ptr::copy_nonoverlapping(src, dst, len) }
-```
-
-**unsafe ist NUR erlaubt in den genau zwei Unsafe-Inseln (D-29, SPEC §5.2):**
-- `crates/contextra-simd`
-- `crates/contextra-sys`
-Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
-
-## FEHLER-KLASSE 7: Test-Mirroring
-
-```rust
-// ❌ TEST-MIRRORING — Test spiegelt die Implementierungsformel:
-let expected = (a - b).powi(2).sqrt(); // Gleiche Formel wie compute()!
-assert!((result - expected).abs() < 1e-6); // Tautologie!
-
-// ✅ KORREKT — Referenzwert unabhängig berechnet/recherchiert:
-// Euklidische Distanz von [1,0,0] und [0,1,0] = sqrt(2) ≈ 1.41421356
-assert!((result - 1.41421356_f32).abs() < 1e-4);
-```
-
-## FEHLER-KLASSE 8: Tag-Format-Verstöße
-
-```rust
-// ❌ FALSCH — fehlendes TS: und SESSION:
-// AI-TAG[SMELL][CRITICAL] Problem in dieser Funktion (ID: AGT-STORE-001)
-
-// ✅ KORREKT — vollständige Pflichtfelder:
-// AI-TAG[SMELL][CRITICAL] Problem in dieser Funktion (ID: AGT-STORE-a3f29c1d) (TS: 2026-08-29T10:00:00Z) (SESSION: a3f29c1d)
-// BEFUND: <Detaillierte Analyse>
-// RISIKO: <Was passiert bei Ausfall>
-// EMPFEHLUNG: <Konkrete Handlung>
-```
-
-## FEHLER-KLASSE 9: Stale Audit Findings implementieren
-
-**Symptom**: Agent implementiert Fixes für Probleme die bereits behoben wurden.
-
-**Regel** (aus `.jules/AUDIT_INTAKE_PROTOCOL.md`):
-1. Datei + Zeile öffnen
-2. Problem im AKTUELLEN Code prüfen
-3. Falls nicht mehr vorhanden: als `[ENTKRÄFTET]` markieren
-4. NIEMALS blind aus veralteten Audit-Prompts implementieren
-
-## FEHLER-KLASSE 10: Dokument-Status selbst bewerten
-
-```markdown
-<!-- ❌ FALSCH — Agent bewertet Status ohne CI-Beweis: -->
-| `contextra-mcp` | 🟢 Clean |
-
-<!-- ✅ KORREKT — Status NUR aus CI: -->
-<!-- Status-Indikatoren werden AUSSCHLIESSLICH aus CI-Ergebnissen gesetzt.
-     Niemals manuell auf 🟢 setzen. -->
-```
-
-## FEHLER-KLASSE 11: Lock-Guard über .await halten
-
-**Symptom**: Agent hält einen `RwLockReadGuard` oder `MutexGuard` über einen asynchronen Aufruf hinweg.
-
-```rust
-// ❌ FALSCH — Guard blockiert den Tokio Executor:
-let db = state.db.read();
-db.search(...).await?;
-
-// ✅ KORREKT — Guard droppen vor dem await:
-let collection = { state.db.read().collection("test")?.clone() };
-collection.search(...).await?;
-```
-
-## FEHLER-KLASSE 12: Feature-Gate-Vergessen (onnx)
-
-**Symptom**: Agent verwendet Code aus `contextra-infer-onnx` ohne Feature-Flag.
-
-```rust
-// ❌ FALSCH:
-use contextra_embed::TextEmbedder; // Bricht Builds ohne onnx-Feature!
-
-// ✅ KORREKT:
-#[cfg(feature = "onnx")]
-use contextra_embed::TextEmbedder;
-```
-
-## FEHLER-KLASSE 13: Modul-Pfad-Halluzination
-
-**Symptom**: Agent rät Modulpfade, anstatt in der Dateistruktur nachzusehen.
-
-```rust
-// ❌ FALSCH — Halluzinierter Pfad:
-use contextra_db::collection::Collection;
-
-// ✅ KORREKT — Tatsächlicher Pfad (vorher grep nutzen):
-use contextra_db::Collection;
-```
-
-## FEHLER-KLASSE 14: Fälschlicher Compliance-Beleg durch ungenutzte Referenzimplementierung
-
-**Symptom**: Agent bewertet eine Invariante oder System-Eigenschaft als erfüllt, weil eine konforme Referenzimplementierung im Code existiert, ohne zu verifizieren, ob diese Implementierung auch tatsächlich im produktiven Ausführungspfad aufgerufen wird.
-
-**Heilmittel**: Vor Aussagen zur Invarianten-Compliance stets per Call-Graph / grep den tatsächlichen Aufrufpfad im Produktionscode verifizieren:
-```bash
-grep -rn "<TYPNAME>" crates/ --include="*.rs"
-```
-Sicherstellen, wer den Typ zur Laufzeit in produktiven Modulen (außerhalb von `#[cfg(test)]`) instanziiert und verwendet.
+| Fehler | Richtig (SPEC) |
+|---|---|
+| `std::fs` oder `tokio::fs` im Store, Vektor oder Löschkern | Nur der Port `Vfs` (D-04) |
+| `unwrap()`, `expect()`, `panic!`, `let _ =` auf `Result` im Produktionscode | Typisierter Fehler, Propagation (P6) |
+| Feature-Schalter für Verschlüsselung, WAL-Integrität oder Legacy-Schlüssel | Kein Schalter; Verschlüsselung ist immer aktiv (P5, D-05) |
+| Passphrase mit HKDF abgeleitet | Argon2id innerhalb der Grenzen aus D-06; HKDF nur für Subschlüssel |
+| `TenantPolicy`, `Option`-Mandant oder Funktion ohne `TenantContext` | `TenantContext` ist Pflicht (D-07) |
+| `DocId(u64)` als Dokumentidentität | `DocRef` mit Betroffenem; Suchtreffer als `DocHandle` (D-08, D-70) |
+| `Collection::delete` oder Löschaussage bei `soft_delete` | `soft_delete` ist ein Tombstone; Löschpflicht über `erase` (D-51) |
+| Vektor durch Nullvektor ersetzen | Surrogat, Batch-Kantenreparatur, deterministischer Rebuild (D-77) |
+| `u64::MAX` als Wert für „alles sichtbar“ | `Option` oder `current_seq` (8.7, I-12) |
+| „Ebene B“ oder ADR-001 als Grundlage zitieren | ADR-001 ist ersetzt; Schlüsselvernichtung gehört zu v1 (D-01) |
+| `mmap` oder `memmap2` für Lesezugriffe | Positionelles Lesen über `Vfs` (D-94) |
+| WAL-Frames aus einem Segment herausschneiden | Ganze Segmente bis zum Flush-Punkt entfernen; `WalFloor` (D-73) |
+| Schreibzugriff ohne Prüfung des ReadGate | Prüfung in der Commit-Phase (D-57) |
+| Löschbericht ohne Positivkontrolle | `LayerWitness` nur aus `Scanner<Armed>` (D-72) |
+| Löschaussagen außerhalb der Außenaussage | Nur die Außenaussage aus SPEC 6.4 (HR-5) |
+| Neue Abhängigkeit ohne Matrixprüfung oder mit Netzwerk-Crate | Matrix SPEC 5.3; kein Netzwerk (HR-1) |
+| `Cargo.toml` geändert, `Cargo.lock` nicht | Im selben Commit erneuern; mit `--locked` prüfen (D-93) |
+| Agentenmarken, Zeitstempel oder absolute Pfade im Code | Verboten (D-91) |
+| Module `misc`, `util`, `*_impl`, `mod.rs` | Namensregeln (D-90) |
+| Erfundene Pfade oder Befehle (z. B. `tests/layering.rs`, `just fuzz-all`, `.jules/`) | Vor der Verwendung prüfen. Im Repository existieren sie nicht; die Ablage ist `.agents/jules/` |
+| Erfundene Workflows (z. B. `mutation-testing.yml`, `post-merge-verification.yml`) | Vorhanden sind die Dateien in `.github/workflows/`; siehe Verzeichnisliste |

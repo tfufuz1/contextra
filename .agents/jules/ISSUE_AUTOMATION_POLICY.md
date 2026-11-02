@@ -1,28 +1,24 @@
-# Policy: Issue-Automation-Abgrenzung
+# Richtlinie: Automatisierte Issues
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+Nicht normativ. Die Richtlinie beschreibt, wann Workflows Issues anlegen dürfen. Die Angaben zum Ist-Zustand stammen aus der Vorfassung und sind vor einer Änderung im Repository zu prüfen.
 
-## 1. Übersicht der Workflows mit Issue-Erstellung
+## Grundsatz
 
-| Workflow | Zweck | Trigger-Bedingung | Dedup-Mechanismus | Aktueller Status |
-| :--- | :--- | :--- | :--- | :--- |
-| `.github/workflows/scheduled-audit.yml` | Routineauftrag | Schedule (`0 22 * * 5`) / `workflow_dispatch` | Task-Datei Prüf-Header (`pending-audit-task.md`) <!-- doc-ref-ignore --> | Deaktiviert (PR-basiert) |
-| `.github/workflows/post-merge-verification.yml` | Fehler-Eskalation | Push auf `main` | Keiner | Deaktiviert |
-| `.github/workflows/mutation-testing.yml` | Fehler-Eskalation | `workflow_dispatch` / PR (`event_name !== 'pull_request'`) | Keiner | Deaktiviert |
-| `.github/workflows/chaos.yml` | Fehler-Eskalation | Schedule (`0 2 * * *`) / PR (`event_name === 'schedule'`) | Keiner | Deaktiviert |
-| `.github/workflows/tsan.yml` | Fehler-Eskalation | Schedule / PR / Dispatch | Keiner | Deaktiviert |
+Nach der Vorfassung ist die automatische Erstellung von Issues durch Workflows, Gates und PRs deaktiviert. Der Grund ist, dass sonst Rauschen im Issue-Tracker entsteht. Fehler melden Workflows im Status der GitHub-Actions-Läufe.
 
-## 2. Abgrenzungsregel für automatisierte Issues
+## Workflows mit Bezug zur Richtlinie
 
-> **Grundsatz:** Automatisierte Issue-Erstellung durch Workflows/Gates/PRs ist vollständig **DEAKTIVIERT**, um Spam im Repository-Issue-Tracker zu verhindern. Workflows schlagen im Fehlerfall in den GitHub Actions Statuses fehl, ohne automatisch neue Issues anzulegen.
+| Workflow (in `.github/workflows/`) | Zweck | Stand laut Vorfassung |
+|---|---|---|
+| `scheduled-audit.yml` | wöchentlicher Routineauftrag, Freitag 22:00 UTC | PR-basiert, keine Issues |
+| `chaos.yml` | nächtlicher Chaos-Lauf | keine Issues |
+| `tsan.yml` | Thread-Sanitizer | keine Issues |
 
-### Begründung
-* **Fehler-Eskalationen:** Sind zeitkritisch, indizieren akute Störungen im Hauptzweig oder in Integrationsläufen und benötigen sofortige menschliche und agentische Sichtbarkeit im Issue-Tracker.
-* **Proaktive Routineaufträge:** Erzeugen ohne echtes Fehlersignal unnötigen Noise im Issue-Tracker. Turnusmäßige Aufträge müssen stattdessen über Datei- und PR-basierte Handoffs (z. B. `.jules/pending-audit-task.md` <!-- doc-ref-ignore --> via Pull Request) abgewickelt werden.
+Die Vorfassung nannte außerdem `mutation-testing.yml` und `post-merge-verification.yml`. Diese Dateien existieren im Repository nicht; ihre Einträge entfallen.
 
-## 3. Governance für neue Workflows
+## Regeln für neue Workflows
 
-Jeder **NEUE** GitHub Actions Workflow, der vorhat, `github.rest.issues.create` oder vergleichbare Mechanismen zur automatisierten Issue-Erstellung einzusetzen, MUSS diese Policy vorab lesen.
-
-* Die Einordnung (Fehler-Eskalation vs. proaktiver Routineauftrag) MUSS im PR-Body des einreichenden Pull Requests explizit begründet werden.
-* PRs, die Routineaufträge ohne Fehlersignal über GitHub-Issues automatisieren wollen, sind abzulehnen und auf PR-/Datei-basierte Mechanismen umzustellen.
+- Ein neuer Workflow, der Issues anlegt, liest diese Richtlinie vorab.
+- Die Einordnung als Fehler-Eskalation oder als Routineauftrag wird im PR-Text begründet.
+- Routineaufträge ohne echtes Fehlersignal werden über PR oder Datei übergeben, nicht über Issues.
+- Ein Workflow darf keine Sicherheitsgates mit `continue-on-error` durchwinken (SPEC 17.3).

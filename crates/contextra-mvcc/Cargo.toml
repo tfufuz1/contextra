@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Multi-Version Concurrency Control (MVCC), sequence log, and transaction buffer for Contextra"
+description = "Sequenzen, Snapshots und SSI-Validierung für Mehrversions-Nebenläufigkeit."
 
 [package.metadata.contextra]
 ring = "0"

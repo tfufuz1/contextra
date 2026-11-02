@@ -1,56 +1,20 @@
-# Scheduled Proactive Audit & Mutation Testing Rotation
+# Geplante Audits und Mutationstests
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
+Nicht normativ. Die Beschreibung stammt aus der Vorfassung. Vor einer Änderung ist die Workflow-Datei zu prüfen.
 
-This document describes the automated weekly proactive audit pipeline and mutation testing rotation configured in `.github/workflows/scheduled-audit.yml`.
+## Ablauf laut Vorfassung
 
----
+Der Workflow `.github/workflows/scheduled-audit.yml` läuft freitags um 22:00 UTC und manuell per `workflow_dispatch`. Er besteht aus zwei Jobs:
 
-## 1. Setup & Requirements
+1. **Kontext vorbereiten.** Er sammelt die Commits der letzten sieben Tage und legt einen Auftrag an. Der Auftrag verweist auf [`AUDIT_INTAKE_PROTOCOL.md`](AUDIT_INTAKE_PROTOCOL.md). Er öffnet einen PR gegen `main`. Die Prüfung umfasst Race Conditions, neue `unwrap()` und `expect()` außerhalb der Basis in `.github/unwrap_baseline.txt`, `let _ =` bei I/O und Verstöße gegen die Abhängigkeitsmatrix.
+2. **Mutationstests rotieren.** Der Fokus wechselt wöchentlich zwischen Crates.
 
-*(Hinweis: Das Label `jules-audit` ist historisch und wird im automatisierten Workflow nicht mehr aktiv verwendet, da Audit-Aufträge nun als Repository-Artefakt via PR übermittelt werden. Die PR-Erstellung erfolgt über die GitHub Action `peter-evans/create-pull-request@v6` <!-- doc-ref-ignore -->.)*
+## Korrekturen zur Vorfassung
 
----
+- **Pfad der Auftragsdatei.** Die Vorfassung nennt `.jules/pending-audit-task.md`. Das Verzeichnis `.jules/` existiert nicht; die Ablage ist `.agents/jules/`. Der Pfad im Workflow ist zu prüfen. Das ist ein offener Befund.
+- **Fokus-Crates.** Die Vorfassung nennt `contextra-graph`, `contextra-agent` und `contextra-db`. Diese Crates sind nach SPEC D-24 und D-45 entfernt. Die Rotation muss vorhandene Crates verwenden, etwa `contextra-store`, `contextra-crypto`, `contextra-vector` und `contextra-text`. Ab Gate G-D kommt `contextra-erasure` hinzu.
+- **Mutations-Workflow.** Der Workflow `mutation-testing.yml`, den der Job auslöst, existiert nicht. Die Mutationstests sind nach SPEC 15.1 Pflicht für `erasure`, Klassifikation, Matcher, Gate und Tresor. Ihr Workflow ist mit G-D einzurichten.
 
-## 2. Funktionsweise des Workflows (`.github/workflows/scheduled-audit.yml`)
+## Ergebnis
 
-Der Workflow wird automatisch jeden **Freitag um 22:00 UTC** (`0 22 * * 5`) sowie manuell via `workflow_dispatch` ausgeführt.
-
-Er besteht aus zwei unabhängigen Jobs:
-
-### Job 1: `prepare-audit-context`
-- Sammelt alle Commit-Logs der letzten 7 Tage (`git log --since="7 days ago" --oneline --no-merges`).
-- Prüft vor Erstellung, ob bereits eine unbearbeitete `.jules/pending-audit-task.md` <!-- doc-ref-ignore --> existiert:
-  - Falls existiert und nicht mit `STATUS: DONE` markiert ist, wird eine Workflow-Log-Warnung (`::warning::`) ausgegeben und der neue Auftrag wird als weiterer Abschnitt angehängt.
-  - Falls nicht existiert oder mit `STATUS: DONE` markiert ist, wird die Datei mit dem Header (`STATUS: OPEN`, `CREATED: YYYY-MM-DD`) neu erstellt.
-- Öffnet automatisch einen Pull Request gegen `main` auf dem Branch `automated/weekly-audit-task-<Datum>` <!-- doc-ref-ignore --> via `peter-evans/create-pull-request@v6` <!-- doc-ref-ignore -->.
-- Der Auftragstext verweist strikt auf `.jules/AUDIT_INTAKE_PROTOCOL.md` und fordert die Prüfung auf:
-  1. Race Conditions / TOCTOU-Fehler
-  2. Neue `.unwrap()` / `.expect()` außerhalb der Baseline (`.github/unwrap_baseline.txt`)
-  3. Silent-Failure-Pattern (`let _ = ...` bei I/O-Operationen)
-  4. DAG-Grenzverletzungen in `Cargo.toml`-Dependencies
-
-### Job 2: `trigger-mutation-testing`
-- Berechnet die ISO-Kalenderwoche (`KW % 4`).
-- Rotiert wöchentlich durch die 4 Fokus-Crates:
-  - **Woche 0**: `contextra-graph`
-  - **Woche 1**: `contextra-vector`
-  - **Woche 2**: `contextra-agent`
-  - **Woche 3**: `contextra-db`
-- Löst für den berechneten Fokus-Crate den `mutation-testing.yml` <!-- doc-ref-ignore --> Workflow via `workflow_dispatch` aus.
-
----
-
-## 3. Workflow für die Bearbeitung (Artefakt-Handoff)
-
-Statt manueller Issue-Zuweisung wird der Audit-Auftrag direkt als Artefakt im Repository verarbeitet:
-1. Der automatische PR mit Branch `automated/weekly-audit-task-<Datum>` <!-- doc-ref-ignore --> wird gemergt.
-2. Eine neue Jules-Session prüft beim Empfehlungsschritt in Phase 1 von `.jules/SESSION_BOOTSTRAP.md`, ob `.jules/pending-audit-task.md` <!-- doc-ref-ignore --> mit `STATUS: OPEN` existiert.
-3. Jules arbeitet den Auftrag gemäß `.jules/AUDIT_INTAKE_PROTOCOL.md` ab.
-4. Nach Abschluss wird der Header der Datei `.jules/pending-audit-task.md` <!-- doc-ref-ignore --> auf `STATUS: DONE` gesetzt.
-
----
-
-## Audit-Workflow v2 (nach Review 2026-09)
-
-Siehe `.jules/AUDIT_INTAKE_PROTOCOL.md` Abschnitt "🔒 Verdict-Unabhängigkeitspflicht (Audit-Workflow v2)" — dort kanonisch definiert.
+Ein Audit liefert einen PR mit Behebungen oder mit einem Bericht, der Befunde nach `AUDIT_INTAKE_PROTOCOL.md` einordnet. Unklare Befunde werden nicht umgesetzt.

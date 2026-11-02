@@ -1,12 +1,9 @@
 # Routine: Drift-Wächter
 
-> **Status 30.10.2026 (Reduktion):** Diese Regel gilt weiter, soweit sie nicht auf entfernte Crates oder entfernte Routinen verweist. Solche Stellen sind veraltet. Maßgeblich: `AGENTS.md` und `docs/SPEC.md` (Fassung 4.0).
-
-- **Takt**: Täglich
-- **Ziel**: Früherkennung von Doku-, Typ- und Registrierungs-Drifts im Repository.
-- **Eingaben**:
-  - `git diff --check`
-- **Harte Grenzen**: Max. 15 Dateien / 1 Crate pro PR. Scope-Globs: `docs/**`, `capabilities.toml`, `AGENTS.md`.
-- **Stopp-Bedingungen**: Bei manuell geänderten generierten Dateien ohne Quellcode-Anpassung.
-- **Ergebnisformat**: PR mit aktualisierten Doku-Artefakten oder GitHub Issue bei unklaren Quellcode-Drifts.
-- **Eskalation**: Siehe Architekturdokument §9.3.
+- **Takt:** täglich
+- **Ziel:** Abweichungen früh erkennen zwischen den Zweck-Sätzen (SPEC 5.1a) in `Cargo.toml`, `lib.rs` und `README.md`, den Crate-Ringen (5.1, 5.2), den Veto-Einträgen und dem Wortlaut der Außenaussage (6.4). Das prüft `contextra-arch-tests` (T-ARCH-5, T-LINT-1).
+- **Eingaben:** `cargo test -p contextra-arch-tests --locked`, `git diff --check`
+- **Harte Grenzen:** Scope `docs/**`, `README.md`, `AGENTS.md`, `crates/*/README.md`, `crates/*/AGENTS.md`, `crates/*/Cargo.toml`.
+- **Stopp:** Generierte Dateien, die von Hand geändert wurden, ohne dass die Quelle angepasst wurde. Unklare Abweichungen zwischen Code und SPEC werden nicht korrigiert, sondern gemeldet.
+- **Ergebnis:** PR mit Korrektur der Dokumente oder Bericht zu Code-Abweichungen.
+- **Eskalation:** siehe [`../HARNESS_QUICKSTART.md`](../HARNESS_QUICKSTART.md).

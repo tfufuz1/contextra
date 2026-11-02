@@ -1,3 +1,44 @@
+# Changelog
+
+Dieses Dokument verzeichnet Änderungen am Projekt. Normativ ist [`SPEC.md`](SPEC.md); Änderungen an der SPEC stehen in deren Anhang H.
+
+## [Unreleased]
+
+### Dokumentation (Revision nach SPEC 4.2.0)
+
+- Alle Wurzel- und Prozessdokumente (`AGENTS.md`, `README.md`, `docs/CONTRIBUTING.md`, `docs/COMPILATION.md`, `docs/SECURITY.md`, `docs/ARCHITECTURE.md`, `docs/TYPE_REGISTRY.md`, `docs/VETOES.md`, `docs/CONSTITUTION.md`, `docs/SOURCE_OF_TRUTH.md`) sind auf die SPEC 4.2.0 abgeglichen.
+- `README.md` im Wurzelverzeichnis neu angelegt; sie beginnt mit dem Passphrasen-Hinweis (HR-3) und der zulässigen Außenaussage (SPEC 6.4).
+- Crate-Dateien `README.md` und `AGENTS.md` für alle 15 Crates überarbeitet. Die erste Zeile jeder `README.md` ist der Zweck-Satz nach SPEC 5.1a.
+- `VETO-D01` aufgehoben und durch `VETO-D01b` ersetzt: Schlüsselvernichtung ist Teil von v1 (D-01).
+- `VETO-F02` präzisiert: Batch-Kantenreparatur und deterministischer Rebuild sind zulässig, regionales Rewiring nicht (D-77).
+- Die Veto-Liste wurde um die Vetos aus den SPEC-Entscheidungen 4.x ergänzt (u. a. D-73, D-94, D-55, D-57, D-75, D-77).
+- Die Typ-Registry folgt den kanonischen Orten aus SPEC 8.1 und 9 und listet die entfernten Typen.
+
+- `docs/DELETION-DSGVO.md` auf SPEC Abschnitt 6 abgeglichen (Rechtsentscheidungen E-L1 bis E-L16, Matrix 6.5, offene Fragen des Gates G-LEGAL). Keine Rechtsberatung.
+- Die Beschreibung (`description`) in den 14 `Cargo.toml` ist auf den Zweck-Satz aus SPEC 5.1a gesetzt; `contextra-erasure` hat noch keine `Cargo.toml`.
+- Alle 40 Markdown-Dateien unter `.agents/` überarbeitet. Die Sitzungsprotokolle `JULES_LOG.md` und `JULES_LOG_2.md` sind auf einen Hinweis reduziert; der Inhalt bleibt in der Git-Historie.
+- Fehlende Workflows und Pfade in den Agentendokumenten korrigiert (`mutation-testing.yml`, `post-merge-verification.yml`, `tests/layering.rs`, `.jules/`).
+
+- SPEC auf **4.3.0** aktualisiert (Anhang H.0). D-92 (Löschen von Folgedokumenten) entfällt; die Folgedokumente werden gepflegt (D-98). Der Test T-DOC-1 prüft ihre Konsistenz mit der SPEC.
+- `docs/SOURCE_OF_TRUTH.md` führt den Pflegestand statt einer Löschliste.
+
+### Bekannter Ist-Zustand (kein Release)
+
+- Der Workspace baut derzeit nicht (SPEC F-32). Betroffen sind `contextra-store` (vier Fehler) und `contextra-vector` (ein Fehler).
+- `Cargo.lock` ist veraltet; `cargo check --locked` bricht ab (D-93).
+- `contextra-erasure` ist leer und kein Workspace-Mitglied; `contextra-lab` und `ctx-verify` fehlen (F-33).
+- `rust-toolchain.toml` pinnt 1.89.0 und erfüllt D-82 nicht.
+
+### Offene Arbeitspakete
+
+Siehe SPEC 15.4, insbesondere WP-0.2 (Toolchain), WP-0.3 (Build wieder grün), WP-1.1 bis WP-1.5 (Rückbau, Ein-`Vfs`, Struktur) und WP-3.1 (Löschkern-Skelett).
+
+---
+
+## Historie (vor der Revision nach SPEC 4.2.0)
+
+Die folgenden Einträge stammen aus früheren Fassungen des Projekts. Sie sind nicht normativ und können Begriffe oder Zusagen enthalten, die die SPEC 4.2.0 ersetzt. Maßgeblich ist die SPEC.
+
 ## [4.1] - 2026-10-31
 
 ### Changed

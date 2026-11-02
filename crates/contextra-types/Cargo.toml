@@ -7,7 +7,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Canonical domain types, IDs, budgets, filters, and error types for Contextra"
+description = "Reine Datentypen: IDs, Tags, Schlüssel, Fehler, Löschtypen. Kein I/O."
 
 [package.metadata.contextra]
 ring = "0"

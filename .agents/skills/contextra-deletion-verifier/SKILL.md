@@ -1,68 +1,66 @@
 ---
 name: contextra-deletion-verifier
 description: >-
-  Use this skill to verify, test, and develop the Contextra deletion pipeline, ErasureSaga state machine,
-  Ebene A physical purge, ReadGate (ErasedSet), E1/E2/E3 residue scans, Canary tests, and Ed25519 erasure reports.
+  Use this skill to verify and develop the Contextra erasure pipeline: the erasure saga, the read gate (ErasedSet),
+  the purge steps, the key destruction in the vault, the field measurements MK1 to MK3 with positive controls, and the signed erasure report.
 ---
 
-# Contextra Deletion Verifier – Löschpipeline & DSGVO-Konformität
+# Löschpipeline prüfen
 
-Dieser Skill führt Agenten und Entwickler durch die Entwicklung, Verifikation und Auditierung der gemessenen Löschpipeline nach [docs/SPEC.md §11, §12](file:///home/freddy/Projekte/contextra/docs/SPEC.md) und [ADR-001](file:///home/freddy/Projekte/contextra/docs/SPEC.md#L1421-L1434).
+Der Skill führt durch Entwicklung und Prüfung des Löschkerns. Maßgeblich ist [`docs/SPEC.md`](../../../../docs/SPEC.md), Kapitel 11 und 12, Anhang D und F.10.
 
----
+## 1. Prinzip (D-01)
 
-## 1. Architektur-Prinzip (ADR-001, D-01)
+Löschung in v1 stützt sich auf drei Säulen. Keine davon allein gilt als Löschung.
 
-Gemäß **ADR-001 (SPEC §3.3, D-01)** entfällt die sogenannte Ebene B (kryptografische `DocDek`-Schlüsselvernichtung) in v1 vollständig.
+1. **Gate und Purge.** Das ReadGate sperrt ab `Gated` alle Lesepfade. Der Purge entfernt die Daten physisch.
+2. **Schlüsselvernichtung.** Der Schlüssel der höchsten Ebene des Ziels wird aus dem Tresor entfernt.
+3. **Messung.** Jede Schicht wird mit Positivkontrolle gemessen. Der Bericht ist signiert.
 
-Löschung in Contextra v1 ist die **physische Bereinigung (Ebene A)** kombiniert mit:
-1. **Fail-Closed `ReadGate` (`ErasedSet`)**: Sperrt Lese- und Suchpfade sofort bei Status `Gated`.
-2. **Snapshot-Widerruf (`revoke_covering`)**: Widerruft aktive MVCC-Snapshots, die Zielversionen sehen könnten.
-3. **Physischer Purge**:
-   - Memtable: vollständiges Entfernen aller Versionen (`remove_range`).
-   - Store: WAL `drain`, SSTable-Rewrite (`rewrite_file`) ohne Zieldaten unter Beibehaltung der Originalsequenzen, atomarer `swap` via Manifest, Block-Cache Eviction mit Zeroize.
-   - Vector: HNSW Slot-Zeroing (`zero_slot`), Snapshot-Chunk-Rewrite, Batch-Rebuild.
-   - Text: Puffer leeren, Segment-Rewrite, Alt-Segment löschen.
-4. **Maschinelle Residuenmessung (E1, E2, E3)** mit obligatorischer Positivkontrolle (Canary).
-5. **Kryptografischer Löschbericht (`ctx-erasure-report/1`)**: Ed25519-signiert, maschinenlesbar, ohne personenbezogene Daten.
+Die Reichweite der Schlüsselvernichtung wird je Schicht ausgewiesen (`key_coverage`, D-69). Die rechtliche Wertung bleibt beim Betreiber (E-L2).
 
----
-
-## 2. Die Lösch-Saga Zustandsmaschine (SPEC §8.2, §11.2)
-
-Jede Löschung läuft deterministisch und crash-tolerant als Saga in `contextra-erasure` ab:
+## 2. Saga (SPEC 11.2)
 
 ```
-[Requested]
-     │
-     ▼
-  [Gated] ────────► Sofortige Lesesperre via ErasedSet (fail-closed)
-     │              Widerruf betroffener MVCC-Snapshots (SnapshotRevoked)
-     ▼
- [Drained] ───────► WAL versiegelt, Memtables geflusht, temporäre Puffer geleert
-     │
-     ▼
-[Rewritten] ──────► SSTables, Textsegmente und Vektorsnapshots ohne Zieldaten neu geschrieben
-     │              Atomarer Manifest-Swap, Blockcache gelöscht & genullt
-     ▼
- [Cleaned] ───────► Alt-Dateien gelöscht und Fehlen via Vfs::exists verifiziert
-     │
-     ▼
- [Measured] ──────► Residuen-Scan (E1 Rohscan, E2 Decoder-Scan, E3 Schlüsselabwesenheit)
-     │              mit vorangestellter Canary-Positivkontrolle
-     ▼
-[Completed] ──────► Ausstellung des signierten Berichts ctx-erasure-report/1 (Ed25519)
+Requested ─▶ Gated ─▶ KeyDestroyed ─▶ Purging ─▶ Verifying ─▶ Completed
+    └──────────────── Pending(reason) ◀──── jeder Schritt ist idempotent
+Refused (endgültig, vor dem Gate)
 ```
 
-### Crash-Recovery Invariante (I-11)
-- Bei einem unvorhergesehenen Absturz setzt `ErasureSaga::recover()` vor der Freigabe von Schreib- oder Lesepfaden auf.
-- Jeder Fehler in einer Phase persistiert den Zustand `Pending { attempt, next_retry_at }` mit exponentiellem Backoff (1 s bis max. 15 min). Fehler werden niemals ignoriert.
+Bis `Gated` sind 4 `fsync` vorgesehen (D-58). Bei gleichzeitigen Anfragen teilen sich die Anfragen einen Gate-Log-`fsync` (D-78).
 
----
+## 3. Prüfschritte
 
-## 3. Messklassen & Nachweis (SPEC §12)
+- [ ] Nach `Gated` liefert jeder Lesepfad `Erased`, auch Zeitreisen (T-GATE-1, T-VER-1).
+- [ ] Nach `Gated` schreibt nichts mehr in das Ziel (I-1).
+- [ ] Der Schlüssel der höchsten Ebene ist genullt, das Fehlen wird geprüft (T-VAULT-1 bis T-VAULT-4).
+- [ ] Die WAL wird nie umgeschrieben; entfernt werden ganze Segmente (D-73, T-WAL-2).
+- [ ] Dateischlüssel `F` werden nach dem Manifest-Swap genullt, dann folgt `unlink` (I-17).
+- [ ] Nicht-Ziel-Records sind auf Record-Ebene bitgleich (I-3, T-ISO-1).
+- [ ] `Completed` nur mit gültigen Zeugen aller Schichten (I-4, P1).
+- [ ] Der Bericht enthält keine Inhalte, Schlüssel oder Klartext-Kennungen (P13, T-REPORT-1).
 
-- **E1 (Rohscan)**: Byte-genauer Scan aller Dateien im Datenverzeichnis nach Ziel-Needles (BLAKE3-Hashes, Schlüsselbytes).
-- **E2 (Decoder-Scan)**: Strukturierter Scan nach vollständiger Entschlüsselung aller SSTables, Textsegmente und Vektorsnapshots.
-- **E3 (Schlüssel-/Slot-Abwesenheit)**: Verifikation, dass Schlüssel, Locator-Einträge und Slots nicht mehr existieren.
-- **Positivkontrolle (Canary)**: Vor jeder Messung injiziert `CanaryFactory` Test-Needles in einen Testmandanten, um die Detektionsfähigkeit der Scanner maschinell zu beweisen.
+## 4. Messklassen (SPEC 12.1)
+
+| Klasse | Prüfung |
+|---|---|
+| MK1 Struktur | entschlüsselte Strukturen und Steuerdateien gegen die Matcher |
+| MK2 Rohscan | Rohbytes aller Dateien auf Klartext-Needles und bekannte Muster |
+| MK3 Schlüsselprobe | Feld: Schlüssel weg, Ableitung scheitert. Lab: alter Schlüssel öffnet nichts |
+
+Ein Zeuge ohne Positivkontrolle ist ungültig (HR-10). `LayerWitness` ist nur aus `Scanner<Armed>` konstruierbar (D-72, I-19).
+
+## 5. Bericht (SPEC 11.7, F.10)
+
+Kanonisches JSON mit sortierten Schlüsseln, ohne Gleitkommazahlen. Signatur Ed25519 über die Domäne `ctx/report/v1`. Die Pflichttexte stehen in SPEC Anhang D. Eine Signatur beweist Integrität und Herkunft, nicht die Richtigkeit des Inhalts (E-L11).
+
+## 6. Prüfbefehle
+
+```bash
+cargo test -p contextra-erasure --locked   # ab WP-3.1, wenn das Crate Workspace-Mitglied ist
+cargo test -p contextra-arch-tests --locked
+```
+
+Der Bericht-Prüfer `ctx-verify report` und der Feldscanner `ctx-verify scan` entstehen mit WP-4.4.
+
+Weitere Details: [`references/deletion_architecture.md`](references/deletion_architecture.md).

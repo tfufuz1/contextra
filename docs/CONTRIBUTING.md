@@ -1,54 +1,56 @@
 # Beitragen zu Contextra
 
-<!-- doc-stamp: 2026-11-01 | Normativ: docs/SPEC.md §0.2, §2, PLAN.md §1 -->
+Dieses Dokument fasst die Regeln für Beiträge zusammen. Maßgeblich ist [`docs/SPEC.md`](SPEC.md) (Version 4.2.0). Bei Widerspruch gilt die SPEC.
 
-Vielen Dank für Ihr Interesse an der Entwicklung von Contextra. Dieses Dokument beschreibt die verbindlichen Richtlinien, Qualitätsstandards und Entwicklungsabläufe für alle Beitragenden und Implementierer.
+## 1. Voraussetzungen
 
----
+- Rust-Toolchain laut `rust-toolchain.toml`. Zum Sollwert und zum Pin siehe [`COMPILATION.md`](COMPILATION.md).
+- Pflichtlektüre: SPEC Kapitel 0 (Konventionen), 2 (Leitprinzipien), 6.3 (harte Regeln), 13 (Invarianten), 15 (Tests und Gates).
 
-## 1. Voraussetzungen & Normative Quellen
+## 2. Arbeitsweise
 
-- **Rust-Toolchain:** Version 1.89+ laut [`rust-toolchain.toml`](../rust-toolchain.toml) (Edition 2021).
-- **Normative Pflichtlektüre:**
-  - [`docs/SPEC.md`](SPEC.md) (Einzige normative Quelle für den Soll-Zustand v2.0.0).
-  - [`PLAN.md`](../PLAN.md) (Verbindliche Phasen 0–7, Gates G-A bis G-H, Arbeitspakete WP-0.1 bis WP-7.4).
-  - [`AGENTS.md`](../AGENTS.md) (12 unverhandelbare Kernregeln).
+1. **Arbeitspaket.** Jede Änderung gehört zu einem Arbeitspaket aus SPEC 15.4 (`WP-x.y`). Ein PR bearbeitet ein Arbeitspaket. Querschnittsänderungen werden getrennt eingereicht.
+2. **Rot vor Grün (D-44, P10).** Vor der Implementierung steht ein fehlschlagender Test mit der betroffenen SPEC-ID. Ohne Test keine Entscheidung.
+3. **Rückverfolgbarkeit (T-TRACE-1).** Tests tragen `#[ctx_test(id = "T-…")]`, Benchmarks `#[ctx_bench(id = "BM-…")]`. Jede referenzierte ID muss existieren und mindestens einen Test oder Benchmark haben.
+4. **Evidenz.** Protokolle eines Arbeitspakets werden als CI-Artefakt oder im Release-Evidenzbündel abgelegt, nicht im Quellbaum (D-98, SPEC 17.1).
+5. **Lockfile (D-93).** `Cargo.lock` wird im selben Commit wie jede Manifest-Änderung erneuert. Prüfungen laufen mit `--locked`.
 
----
+## 3. Vor jedem PR lokal
 
-## 2. Entwicklungsablauf (PLAN §1)
+Die Befehle stehen in [`COMPILATION.md`](COMPILATION.md). Mindestens:
 
-1. **Ein PR = ein Arbeitspaket (WP) = max. ein Crate-Schnitt (REQ-CHG-2):**
-   - Jede Code-Änderung muss exakt einem Arbeitspaket aus `PLAN.md` zugeordnet sein.
-   - PRs dürfen nicht mehrere Schichten oder Crates unkoordiniert vermischen.
-2. **Rot vor Grün (TDD):**
-   - Jeder WP beginnt zwingend mit einem fehlschlagenden Test (Red Phase), der den Befund oder das Fehlen der Funktionalität beweist.
-   - Ohne roten Test wird kein Pull Request gemergt.
-3. **Evidenzpflicht:**
-   - Nach Fertigstellung eines WP werden Logs, Befehle und Testausgaben unter `evidence/<WP-ID>/` abgelegt (Befehl, Commit-ID, Ergebnis).
-4. **Lokale Verifikation:**
-   Vor jedem PR müssen alle blockierenden CI-Prüfungen lokal grün sein:
-   ```bash
-   cargo fmt --all -- --check
-   cargo clippy --workspace --all-targets -- -D warnings -D clippy::unwrap_used -D clippy::expect_used -D clippy::panic -D clippy::indexing_slicing
-   cargo check --workspace --all-targets
-   cargo test --workspace --locked
-   cargo test -p tests-arch
-   ```
+```bash
+cargo fmt --all -- --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo test -p contextra-arch-tests --locked
+```
 
----
+## 4. Pflichtangaben im PR (HR-12)
 
-## 3. Die 12 unverhandelbaren Kernregeln (SPEC §0.2)
+- **Neuer `unsafe`-Block:** Begründung, `// SAFETY:`-Kommentar mit Vorbedingungen, Test-ID. `unsafe` ist nur in `contextra-sys` und `contextra-simd` erlaubt (D-29).
+- **Neue Abhängigkeit:** Prüfung gegen die Matrix SPEC 5.3, `cargo deny check`, Nachweis, dass keine Netzwerk-Bibliothek in den Produktionsbaum gelangt (`cargo tree -e normal`, HR-1).
+- **Neues Feature:** Deklaration in `[features]`, belegender Test. Kein Feature darf ein Sicherheitsmerkmal abschalten (P5, HR-13).
+- **Betroffene SPEC-IDs** (D-, I-, FM-, T-, BM-).
 
-1. **Ring- & Schichten-Disziplin:** Abhängigkeiten zeigen nur abwärts (Ring 4 → 0). Innerhalb Ring 2 gilt strikt die Matrix SPEC §5.3.
-2. **Zero-Panic in Produktion:** Kein `unwrap()`, `expect()`, `panic!()`, `todo!()`, `assert!()` oder ungeprüftes Index-Slicing im Produktionscode.
-3. **Determinismus & Port-Purity:** Zeit, Zufall und IDs stammen ausschließlich aus `Clock`, `Rng` und `IdGen` aus `contextra-ports`.
-4. **WAL-First Consistency:** Frame(s) → Gruppen-Commit → `sync_data` WAL → Memtable → Sichtbarkeit.
-5. **I/O ausschließlich über `Vfs`:** Kein direkter Aufruf von `std::fs` oder `tokio::fs`. Alle Sync-Fehler propagieren.
-6. **Unsafe nur in 2 Inseln:** `unsafe` ist ausschließlich in `contextra-sys` und `contextra-simd` erlaubt, mit lückenloser `// SAFETY:`-Dokumentation. Alle anderen Crates erzwingen `#![forbid(unsafe_code)]`.
-7. **Mandantentrennung verpflichtend:** `TenantId` stammt aus dem Kontext. Zugriff auf den Store nur über `TenantScopedStorage`.
-8. **Sicherheit ist kein Feature-Schalter:** AES-256-GCM-SIV und Argon2id ($m \ge 64\,\text{MiB}$) sind Pflicht ohne Opt-Out.
-9. **Messen vor Behaupten:** Restbestände stammen aus echten Messungen (`scan_residue`) mit Positivkontrolle (Canary).
-10. **Fail-Closed:** Unbekannte Zustände oder Krypto-Fehler führen zum geordneten Abbruch, nie zu stillschweigendem Weiterlaufen.
-11. **Eine Typfamilie je Konzept:** Domänentypen in `contextra-types`, Kryptografie in `contextra-crypto`.
-12. **Gate-getrieben:** Kein Phasenwechsel ohne bestandenes Release-Gate.
+## 5. Verbote
+
+Vollständig in SPEC 2, 6.3 und 6.4. Kurzfassung:
+
+- Panics und verschluckte Fehler im Produktionscode (P6).
+- Direkte Zugriffe auf Dateisystem, Systemuhr oder Zufall außerhalb der Ports (P7, D-04).
+- Netzwerk-, Telemetrie- und Escrow-Code (HR-1 bis HR-3).
+- Schalter, die Verschlüsselung, Integrität, Löschmessung oder Mandantenprüfung abschalten (HR-13).
+- `mmap` (D-94) und `block_on` in Bibliothekscode (D-03).
+- Agenten-, Sitzungs- und Zeitstempelmarken sowie absolute Pfade im Quelltext und in Dokumenten (D-91).
+- Löschaussagen außerhalb SPEC 6.4. Der Wortlaut-Lint (T-LINT-1) prüft Quelltext, Rustdoc, README und Doku.
+
+## 6. Dokumentation
+
+- Normativ ist nur die SPEC. Abgeleitete Dokumente werden nur nach einer SPEC-Änderung mit Eintrag in Anhang H angepasst.
+- Abgeleitete Dokumente nennen den SPEC-Abschnitt, auf den sie sich stützen. Ändert sich eine Tatsache, werden alle betroffenen Dokumente im selben PR angepasst (D-98).
+
+## 7. Review
+
+Reviewende prüfen mindestens: vorhandener roter Test, Einhaltung der Ringe und der Matrix, `Cargo.lock` im Commit, keine Verbote aus Abschnitt 5, Test-IDs, Lint-Freiheit.
