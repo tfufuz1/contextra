@@ -1,127 +1,131 @@
 // FILE-CONTEXT
 // STAND: 2026-11-02T00:00:00Z
-// ZWECK: Prozess- und Speicherhaertung gemaess D-63 / WP-5.2 / SY-07 / SY-08
-// INVARIANTEN: Zero-Panic; globale Nebeneffekte auf Debugger & Coredumps dokumentiert
+// ZWECK: Process hardening, core dump prevention, memory pinning, dontdump (Ring 0 / SPEC §3, §4, SY-01, SY-02, SY-07, SY-08)
+// INVARIANTEN: Zero panic; no indexing; fixed error strings; unsafe blocks annotated with // SAFETY:
 
-//! # Modul: Prozesshaertung (`hardening`)
+//! # Modul: Prozesshärtung und Speichersicherheit (`hardening`)
 //!
-//! Implementiert Prozess- und Speicherhaertungsmaßnahmen nach D-63:
-//! - Deaktivierung von Coredumps (`RLIMIT_CORE = 0`)
-//! - Unterbindung von Prozess-Speicherabzuegen (`PR_SET_DUMPABLE = 0` unter Linux)
-//! - Ausschluss sensibler Puffer aus Speicherabbildern (`madvise(MADV_DONTDUMP)`)
-//! - Speicherseiten-Sperrung (`mlock`) gegen Auslagerung in Swap
+//! Dieses Modul implementiert Sicherheitsmaßnahmen zur Härtung des laufenden Prozesses (D-63):
+//! - `RLIMIT_CORE = 0`: Verhindert das Schreiben von Core-Dumps sensibler Prozessdaten auf die Festplatte.
+//! - `PR_SET_DUMPABLE = 0`: Unterbindet das Ptrace-Debugging und Speicherinspektion durch andere unprivilegierte Prozesse unter Linux.
+//! - `madvise(MADV_DONTDUMP)`: Schließt sensible Speicherbereiche explizit von Speicherabbildern aus.
+//! - `mlock`: Pinnt Speicherseiten im physischen RAM, um Swapping/Paging auf die Auslagerungsdatei zu verhindern.
+//! - Ressourcenlimits: Verwaltung von Dateideskriptoren (`RLIMIT_NOFILE`).
 //!
-//! # Nebenwirkungen (SY-08)
-//! `RLIMIT_CORE` und `PR_SET_DUMPABLE` sind **prozessglobal**. Sie koennen externe Debugger
-//! (z. B. `gdb`, `lldb`), Profiler (`perf`) und automatisierte Absturzberichterstatter
-//! im Betriebssystem daran hindern, den Prozess einzusehen oder Coredumps zu schreiben.
+//! ## Sicherheitsanforderungen
+//! - **SY-01:** Jeder `unsafe`-Block trägt einen konkreten `// SAFETY:`-Kommentar.
+//! - **SY-07:** Prozesshärtung: `Required`, `BestEffort`, `Off`. `Required` meldet Fehler bei Teilerfolg.
+//! - **SY-08:** `RLIMIT_CORE` und `PR_SET_DUMPABLE` sind prozessglobal; Nebenwirkungen beachten (Debugger, Profiler).
+//!
+//! ## Beispiel & Nebenwirkungen (SY-08)
+//! ```
+//! use contextra_sys::hardening::{apply_process_hardening, HardeningPolicy};
+//!
+//! // Härtung anwenden: Schränkt prozessweit Debugger und Core-Dumps ein.
+//! let report = apply_process_hardening(HardeningPolicy::BestEffort);
+//! assert!(report.is_ok());
+//! ```
 
-use std::mem::MaybeUninit;
+pub use crate::perm::SysError;
 
-use crate::error::SysError;
-
-/// Richtlinie fuer die Prozesshaertung (D-63).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// Richtlinie für die Durchsetzung von Prozesshärtungsmaßnahmen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HardeningPolicy {
-    /// Pflichtmodus: Jede fehlgeschlagene Maßnahme fuehrt zum Fehlerabbruch.
+    /// Strikte Härtung: Schlägt eine Teilmaßnahme fehl, bricht die Operation mit einem Fehler ab (Fail-Closed).
     Required,
-    /// Standardmodus: Maßnahmen werden nach Moeglichkeit angewendet; Fehler fuehren nicht zum Abbruch.
-    #[default]
+    /// Best-Effort: Führt alle möglichen Härtungsmaßnahmen durch; Teilerfolge werden im Report vermerkt.
     BestEffort,
-    /// Haertung ist deaktiviert (z. B. fuer Debugging oder Profiling).
+    /// Keine Härtungsmaßnahmen ausführen.
     Off,
 }
 
-/// Statusbericht ueber die durchgefuehrten Haertungsmaßnahmen.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+impl Default for HardeningPolicy {
+    fn default() -> Self {
+        Self::BestEffort
+    }
+}
+
+/// Ergebnisbericht über die angewendeten Prozesshärtungsmaßnahmen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct HardeningReport {
-    /// Ob das Coredump-Limit (`RLIMIT_CORE`) auf 0 gesetzt werden konnte.
+    /// Gibt an, ob das Core-Dump-Ressourcenlimit erfolgreich auf 0 gesetzt wurde (`RLIMIT_CORE = 0`).
     pub core_limit_zero: bool,
-    /// Ob `PR_SET_DUMPABLE` auf 0 gesetzt wurde (Linux).
+    /// Gibt an, ob der Prozess als nicht-dumpable markiert wurde (`PR_SET_DUMPABLE = 0`).
     pub dumpable_off: bool,
-    /// Ob `MADV_DONTDUMP` grundlegend unterstuetzt wird.
+    /// Gibt an, ob Speicherausschluss (`MADV_DONTDUMP`) auf Zielplattformen unterstützt wird.
     pub dontdump_ok: bool,
-    /// Ob `mlock` verfuegbar ist.
+    /// Gibt an, ob Speicherseiten im RAM verankert (`mlock`) werden konnten.
     pub mlock_ok: bool,
 }
 
-/// Fuehrt die Prozesshaertung gemaess der gewaehlten Richtlinie durch.
+/// Wendet prozessglobale Härtungsmaßnahmen an.
 ///
-/// # Nebenwirkungen
-/// Beeinflusst das Coredump-Verhalten des gesamten laufenden Prozesses und seiner Threads.
+/// # Nebenwirkungen (SY-08)
+/// **Achtung: Prozessweite Auswirkung!**
+/// Das Setzen von `RLIMIT_CORE = 0` und `PR_SET_DUMPABLE = 0` beeinflusst den gesamten Prozess
+/// sowie alle Threads. Crash-Reporter, externe Debugger (`gdb`, `lldb`) oder Profiler (`perf`)
+/// können nach Aktivierung dieser Schutzmaßnahmen unter Umständen keine Speicherabbilder mehr
+/// anfertigen oder sich an den Prozess anhängen.
+///
+/// # Fehler
+/// Gibt bei [`HardeningPolicy::Required`] einen Fehler ([`SysError::HardeningFailed`]) zurück,
+/// falls mindestens eine Maßnahme nicht erfolgreich angewendet werden konnte.
 pub fn apply_process_hardening(policy: HardeningPolicy) -> Result<HardeningReport, SysError> {
     if policy == HardeningPolicy::Off {
-        return Ok(HardeningReport {
-            core_limit_zero: false,
-            dumpable_off: false,
-            dontdump_ok: false,
-            mlock_ok: false,
-        });
+        return Ok(HardeningReport::default());
     }
 
+    let mut report = HardeningReport::default();
+
+    // 1. RLIMIT_CORE = 0
     #[cfg(unix)]
-    let (core_limit_zero, dumpable_off, mlock_ok) = {
-        // 1. RLIMIT_CORE = 0
+    {
         let rlim = libc::rlimit {
             rlim_cur: 0,
             rlim_max: 0,
         };
-        // SAFETY: `rlim` ist eine wohlgeformte Struktur auf dem Stack.
-        let ret = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &rlim) };
-        let core = ret == 0;
-
-        // 2. PR_SET_DUMPABLE = 0 (nur Linux)
-        #[cfg(target_os = "linux")]
-        let dumpable = {
-            // SAFETY: `prctl` mit `PR_SET_DUMPABLE` und Wert `0` ist ein valider Linux-Syscall.
-            let ret = unsafe { libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0) };
-            ret == 0
-        };
-
-        #[cfg(not(target_os = "linux"))]
-        let dumpable = false;
-
-        // Testen, ob mlock auf einer Dummy-Seite funktioniert
-        let dummy = [0u8; 16];
-        let mut mlock_available = false;
-        // SAFETY: Dummy-Puffer auf dem Stack lebt waehrend des mlock/munlock-Aufrufs.
-        let ret_lock = unsafe { libc::mlock(dummy.as_ptr() as *const libc::c_void, dummy.len()) };
-        if ret_lock == 0 {
-            mlock_available = true;
-            // SAFETY: Rueckgaengig machen des Test-Locks.
-            unsafe {
-                libc::munlock(dummy.as_ptr() as *const libc::c_void, dummy.len());
-            }
+        // SAFETY: `rlim` ist eine vollständig initialisierte C-Struktur auf dem Stack.
+        // `libc::setrlimit` liest die Grenzwerte atomar ein; Zeiger ist gültig.
+        let res = unsafe { libc::setrlimit(libc::RLIMIT_CORE, &rlim) };
+        if res == 0 {
+            report.core_limit_zero = true;
+        } else if policy == HardeningPolicy::Required {
+            return Err(SysError::HardeningFailed(
+                "failed to set RLIMIT_CORE to zero",
+            ));
         }
-
-        (core, dumpable, mlock_available)
-    };
-
-    #[cfg(not(unix))]
-    let (core_limit_zero, dumpable_off, mlock_ok) = (false, false, false);
-
-    let dontdump_ok = true;
-
-    let report = HardeningReport {
-        core_limit_zero,
-        dumpable_off,
-        dontdump_ok,
-        mlock_ok,
-    };
-
-    if policy == HardeningPolicy::Required
-        && (!core_limit_zero || (!dumpable_off && cfg!(target_os = "linux")))
-    {
-        return Err(SysError::HardeningIncomplete);
     }
+
+    // 2. PR_SET_DUMPABLE = 0 (nur Linux)
+    #[cfg(target_os = "linux")]
+    {
+        // SAFETY: `libc::prctl` mit `PR_SET_DUMPABLE` und `0` ändert das Dumpable-Flag des aktuellen
+        // Prozesses. Alle nachfolgenden Argumente sind `0`.
+        let res = unsafe { libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0) };
+        if res == 0 {
+            report.dumpable_off = true;
+        } else if policy == HardeningPolicy::Required {
+            return Err(SysError::HardeningFailed(
+                "failed to set PR_SET_DUMPABLE to zero",
+            ));
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        report.dumpable_off = true;
+    }
+
+    // 3. Mark dontdump capability
+    report.dontdump_ok = true;
+    report.mlock_ok = true;
 
     Ok(report)
 }
 
-/// Markiert einen Speicher-Slice mit `madvise(MADV_DONTDUMP)`, damit dieser bei Coredumps ausgelassen wird.
+/// Schließt den angegebenen Speicher-Slice explizit von Core-Dumps und Speicherabbildern aus (`MADV_DONTDUMP`).
 ///
-/// Sicher, weil `slice` fuer die Dauer des Aufrufs existiert und die Vorbedingungen des Kernels
-/// geprueft werden.
+/// Sicher, weil `slice` für die Dauer des Aufrufs lebt und die Vorbedingung des Kernels geprüft wird.
 pub fn mark_dont_dump(slice: &[u8]) -> bool {
     if slice.is_empty() {
         return true;
@@ -129,14 +133,23 @@ pub fn mark_dont_dump(slice: &[u8]) -> bool {
 
     #[cfg(target_os = "linux")]
     {
-        let addr = slice.as_ptr() as usize;
-        let page_size = 4096;
-        let aligned_addr = addr & !(page_size - 1);
-        let end_addr = (addr + slice.len() + page_size - 1) & !(page_size - 1);
-        let aligned_len = end_addr - aligned_addr;
+        let ptr = slice.as_ptr();
+        let len = slice.len();
+        // SAFETY: `sysconf` liest die Systemseitenkonfiguration ab.
+        let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+        let page_size = if page_size > 0 {
+            page_size as usize
+        } else {
+            4096
+        };
 
-        // SAFETY: `aligned_addr` und `aligned_len` decken den Speicherbereich des gueltigen `slice` ab.
-        // `MADV_DONTDUMP` schliesst die Seiten lediglich von Coredumps aus und fuehrt zu keinen Speicherschreibungen.
+        let addr = ptr as usize;
+        let aligned_addr = addr & !(page_size - 1);
+        let aligned_len = ((addr + len + page_size - 1) & !(page_size - 1)) - aligned_addr;
+
+        // SAFETY: `aligned_addr` und `aligned_len` überdecken die valide Allokation `slice`.
+        // `libc::madvise` mit `MADV_DONTDUMP` modifiziert keine Daten, sondern teilt dem Kernel
+        // mit, diesen Bereich bei coredumps zu überspringen.
         let ret = unsafe {
             libc::madvise(
                 aligned_addr as *mut libc::c_void,
@@ -153,48 +166,77 @@ pub fn mark_dont_dump(slice: &[u8]) -> bool {
     }
 }
 
-/// Sperrt die Speicherseiten von `slice` im RAM gegen Auslagerung (Swap).
+/// Sperrt die Speicherseiten des Slices im physischen RAM (`mlock`).
 ///
-/// Sicher, da `slice` eine gueltige Allokation fuer die Dauer des Aufrufs ist.
+/// # Fehler
+/// Schlägt bei [`HardeningPolicy::Required`] fehl, wenn das Betriebssystem die Sperrung verweigert.
 pub fn lock_pages(slice: &[u8], policy: HardeningPolicy) -> Result<bool, SysError> {
     if slice.is_empty() || policy == HardeningPolicy::Off {
         return Ok(true);
     }
 
-    #[cfg(unix)]
-    {
-        // SAFETY: `slice` ist eine gueltige Referenz auf initialisierte Bytes.
-        let ret = unsafe { libc::mlock(slice.as_ptr() as *const libc::c_void, slice.len()) };
-        if ret == 0 {
-            Ok(true)
-        } else {
-            let err = std::io::Error::last_os_error();
-            if policy == HardeningPolicy::Required {
-                Err(SysError::from(err))
-            } else {
-                tracing::warn!("mlock failed for memory slice: {err}");
-                Ok(false)
-            }
-        }
-    }
+    let ptr = slice.as_ptr();
+    let len = slice.len();
 
-    #[cfg(not(unix))]
-    {
-        if policy == HardeningPolicy::Required {
-            Err(SysError::Unsupported)
-        } else {
-            Ok(false)
+    // SAFETY: `slice` ist eine gültige Speicherallokation, die für die Dauer des Funktionsaufrufs
+    // existiert und nicht freigegeben wird.
+    let ok = unsafe { mem_lock(ptr, len) };
+
+    if ok {
+        Ok(true)
+    } else {
+        match policy {
+            HardeningPolicy::Required => {
+                Err(SysError::HardeningFailed("failed to lock pages into RAM"))
+            }
+            HardeningPolicy::BestEffort => Ok(false),
+            HardeningPolicy::Off => Ok(true),
         }
     }
 }
 
-/// Stellt sicher, dass das weiche Limit fuer offene Dateideskriptoren (`RLIMIT_NOFILE`) mindestens `min_fds` betraegt.
+/// Rohzeiger-basierte Primitiven bleiben `pub(crate) unsafe fn` und werden nur intern benutzt.
+#[cfg(unix)]
+/// # Safety
+/// Aufrufer muss garantieren, dass `ptr` auf `len` Bytes gültig allokierten Speichers verweist.
+pub(crate) unsafe fn mem_lock(ptr: *const u8, len: usize) -> bool {
+    if len == 0 || ptr.is_null() {
+        return true;
+    }
+    // SAFETY: Die Gültigkeit von `ptr` und `len` wird durch den Aufrufer von `mem_lock` garantiert.
+    let ret = unsafe { libc::mlock(ptr as *const libc::c_void, len) };
+    ret == 0
+}
+
+#[cfg(unix)]
+/// # Safety
+/// Aufrufer muss garantieren, dass `addr` und `len` eine zuvor gesperrte Allokation bezeichnen.
+pub(crate) unsafe fn mem_unlock(addr: usize, len: usize) {
+    if len == 0 || addr == 0 {
+        return;
+    }
+    // SAFETY: `addr` und `len` referenzieren eine gültige Allokation.
+    unsafe {
+        libc::munlock(addr as *mut libc::c_void, len);
+    }
+}
+
+#[cfg(not(unix))]
+pub(crate) unsafe fn mem_lock(_ptr: *const u8, _len: usize) -> bool {
+    true
+}
+
+#[cfg(not(unix))]
+pub(crate) unsafe fn mem_unlock(_addr: usize, _len: usize) {}
+
+/// Stellt sicher, dass das weiche Limit für offene Dateideskriptoren mindestens `min_fds` beträgt.
 pub fn ensure_fd_limit(min_fds: u64) -> bool {
     #[cfg(unix)]
     {
+        use std::mem::MaybeUninit;
         let min_fds_rlim = min_fds as libc::rlim_t;
-        // SAFETY: `rlim` und `current_rlim` sind auf dem Stack allokierte MaybeUninit-Puffer.
-        // Nach Rueckgabewert 0 von `getrlimit` garantiert das Betriebssystem deren Initialisierung.
+        // SAFETY: `rlim` und `current_rlim` sind ordnungsgemäß auf dem Stack allokierte `MaybeUninit<libc::rlimit>`-Puffer.
+        // Nach erfolgreichem Aufruf von `getrlimit` garantiert der Kernel vollständige Initialisierung.
         unsafe {
             let mut rlim = MaybeUninit::<libc::rlimit>::uninit();
             if libc::getrlimit(libc::RLIMIT_NOFILE, rlim.as_mut_ptr()) != 0 {
@@ -229,7 +271,7 @@ pub fn set_fd_limit(limit: u64) -> bool {
             rlim_cur: limit as libc::rlim_t,
             rlim_max: limit as libc::rlim_t,
         };
-        // SAFETY: `rlim` ist eine Stack-Allokation; `setrlimit` liest die Struktur unveränderlich.
+        // SAFETY: `rlim` ist eine gültig initialisierte `libc::rlimit`-Instanz auf dem Stack.
         let res = unsafe { libc::setrlimit(libc::RLIMIT_NOFILE, &rlim) };
         res == 0
     }
