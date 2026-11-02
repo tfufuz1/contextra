@@ -86,6 +86,15 @@ pub struct LsmConfig {
     pub tx_timeout: Duration,
     /// Configuration for background compaction.
     pub compaction: CompactionConfig,
+    /// Passphrase für die Verschlüsselung im Ruhezustand (Encryption at Rest).
+    ///
+    /// # Sicherheits- und Übergabehinweis (P5/R-SEC-1 / Auftrag J08 Stufe 1 / K5 Stufe 2):
+    /// Die Verwendung eines einfachen `Option<String>` ist ein vorübergehender Übergangszustand,
+    /// um in Stufe 1 externe API-Brüche zu vermeiden. In Stufe 2 (Auftrag K5) wird dieses Feld
+    /// durch einen typisierten `Zeroizing<String>`- bzw. `SecretBytes`-Wrapper abgelöst.
+    ///
+    /// Im regulären Produktionsmodus ist `encryption_passphrase = None` ein unzulässiger Zustand
+    /// (Verschlüsselungspflicht gemäß D-05 / SPEC §8.8).
     pub encryption_passphrase: Option<String>,
     /// Time window in microseconds to batch concurrent WAL commits before issuing fsync.
     /// Set to 0 to disable group commit batching (immediate single commit).

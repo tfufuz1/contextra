@@ -4,419 +4,69 @@
 
 //! # Dauerhafte Dateisystem-Operationen und synchrone Disk-Flushes (`contextra-durable-fs`)
 //!
-//! Zweck: Bereitstellung von betriebssystemübergreifenden Hilfsfunktionen für atomares Ersetzen,
-//! dauerhaftes Löschen und synchrone Verzeichnis- und Datei-Flushes (`fsync`/`fdatasync`).
+//! Zweck: Dateisystem-Implementierung [`real_vfs::RealVfs`] mit dauerhaften Schreib-
+//! und Austauschoperationen gemäß Spezifikation §8.5 (DF-01 bis DF-12).
 //!
 //! Ring-Zugehörigkeit: Ring 1 (Dateisystem-Durability; in `Cargo.toml` als `ring = "1"` annotiert).
-//! Wird eingebunden von: Derzeit keinen anderen Crates direkt (Stand SPEC 4.1 Ist-Zustand).
-//! Abhängigkeiten: [`contextra-ports`], [`contextra-sys`] (Plattform-Durability-Primitive und Dateisystem-Klassifikation).
 //!
-//! Wichtigste bereitgestellte Komponenten:
-//! - [`sync_dir`]: Flusht Verzeichnis-Metadaten auf die physische Festplatte.
-//! - [`atomic_replace`]: Ersetzt eine Datei atomar über temporäre Zwischendatei, `fsync` und Verzeichnis-Sync.
-//! - [`durable_remove`]: Löscht eine Datei und flusht das Elternverzeichnis dauerhaft.
-//! - [`scrub_and_remove`]: Überschreibt Dateien vor dem Löschen mit Nullen.
-//! - [`DurableHandle`]: Kapselt [`File`] und vergiftet sich dauerhaft bei I/O- oder `fsync`-Fehlern (`INV-FSYNC-1`).
-//! - [`DirLock`]: Verzeichnis-Sperre mit Dateisystem-Validierung (verbietet Locking auf Netzlaufwerken / FUSE).
-//! - [`FaultInjector`]: Trait für deterministische Fehlerinjektion in Persistenzpfaden.
-//! - [`RealVfs`]: Produktions-Implementierung des kanonischen [`contextra_ports::vfs::Vfs`]-Traits.
-//!
-//! ## Invarianten
-//!
-//! - `INV-FSYNC-1`: Dateihandles ([`DurableHandle`]) werden bei jeglichem Schreib- oder Flush-Fehler sofort
-//!   vergiftet (`is_poisoned = true`), um nachfolgende fehlerhafte Schreiboperationen strikt abzuweisen (Fail-Closed).
-//! - `INV-ENOSPC-1`: Speichermangel (`ENOSPC`) sowie sonstige I/O-Fehler werden deterministisch als [`std::io::Error`]
-//!   propagiert; keine `panic!`, `unwrap()` oder `expect()` in Produktionspfaden.
+//! Bereitgestellte Module:
+//! - [`real_vfs`]: Produktions-Implementierung des kanonischen [`contextra_ports::vfs::Vfs`]-Traits.
+//! - [`atomic`]: Atomare Austausch- und Schreiboperationen (`write_atomic`).
+//! - [`dir_lock`]: Exklusive Verzeichnissperre (`LOCK`-Datei) mit Schutz vor unsicheren Netzdateisystemen.
+//! - [`probe`]: Startprobe zur Validierung von Plattformstufen und Dateisystemgarantien.
+//! - [`scrub`]: Sicheres Überschreiben vor dem Unlink nur auf rotierenden Medien ohne Copy-on-Write.
 
-/// Fail-Closed-Zustandsverfolgung für Speichersysteme (§18.4).
-pub mod health;
+use std::path::Path;
 
-/// Fehlerinjektions-Schnittstelle zur Simulation von Hardware- und Dateisystemausfällen.
-pub mod fault_injector;
-
-/// Crash-sicheres Journal für ausstehende Datei-Löschaufträge.
-pub mod journal;
-
-/// Sicheres Überschreiben (Scrubbing) und Schutzmechanismen vor dem Löschen.
-pub mod scrub;
-
-/// Abstraktion eines virtuellen Dateisystems (VFS) für entkoppeltes I/O und Testbarkeit.
-pub mod vfs;
-
-pub use contextra_sys::FlushKind;
-pub use fault_injector::{FaultInjector, NoFault};
-pub use health::{AtomicHealthState, HealthEvent, HealthState};
-pub use journal::PendingDeleteJournal;
-pub use scrub::{
-    scrub_if_safe, scrub_if_safe_with_injector, ScrubOutcome, ScrubPolicy, ScrubRefusal,
-};
-pub use vfs::{probe_platform_durability, RealFs, RealVfs, Vfs};
-
-use contextra_sys::{flush_dir, flush_file, fs_class, rename_durable, FsClass};
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-
-/// Atomarer Zähler zur Generierung eindeutiger temporärer Dateinamen für [`atomic_replace`].
-static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-// ANCHOR[contextra-durable-fs:POISONED-HANDLE-001]
-/// Markierungstyp zur Kennzeichnung eines durch `fsync`- oder Schreibfehler vergifteten Handles.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PoisonedHandle;
-
-// ANCHOR[contextra-durable-fs:DURABLE-HANDLE-001]
-/// Ein Wrapper um [`File`], der das Handle bei einem `fsync`- oder Schreibfehler dauerhaft vergiftet (`INV-FSYNC-1`).
-///
-/// Verhindert, dass nach einem fehlgeschlagenen Hardware-Sync weitere Schreiboperationen auf
-/// einem potenziell inkonsistenten Dateideskriptor ausgeführt werden.
-///
-/// Vorbedingungen:
-/// - Die übergebene Datei muss ein gültiges, offenes Dateihandle sein.
-///
-/// Nachbedingungen:
-/// - Sobald ein Flush fehlschlägt, wechselt `is_poisoned` auf `true` und alle Folgeaufrufe scheitern sofort.
-#[derive(Debug)]
-pub struct DurableHandle<F: FaultInjector = NoFault> {
-    file: Option<File>,
-    is_poisoned: bool,
-    injector: F,
-    path: Option<PathBuf>,
+/// Quittung über das sichere Überschreiben (Scrubbing) einer Datei.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScrubReceipt {
+    /// Gesamtanzahl der vor dem Löschen mit Nullen überschriebenen Bytes.
+    pub bytes_scrubbed: u64,
 }
 
-impl DurableHandle<NoFault> {
-    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-NEW]
-    /// Kapselt eine geöffnete [`File`] in ein neues [`DurableHandle`] mit standardmäßigem Null-Kosten-Injektor ([`NoFault`]).
-    pub fn new(file: File) -> Self {
-        Self::new_with_injector(file, NoFault)
+/// Trait für deterministische Fehlerinjektion in Persistenzpfaden (intern für scrub-Kompatibilität).
+pub trait FaultInjector: Send + Sync {
+    /// Hook vor oder während eines Schreibvorgangs.
+    fn on_write(&self, _path: Option<&Path>, _bytes: usize) -> std::io::Result<()> {
+        Ok(())
+    }
+    /// Hook vor dem Hardware-Flush einer Datei.
+    fn on_fsync(&self, _path: Option<&Path>) -> std::io::Result<()> {
+        Ok(())
+    }
+    /// Hook vor einer atomaren Umbenennungsoperation.
+    fn on_rename(&self, _from: &Path, _to: &Path) -> std::io::Result<()> {
+        Ok(())
+    }
+    /// Hook vor dem Hardware-Flush eines Verzeichnisses.
+    fn on_dir_fsync(&self, _dir: &Path) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
-impl<F: FaultInjector> DurableHandle<F> {
-    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-NEW-WITH-INJECTOR]
-    /// Kapselt eine geöffnete [`File`] mit einem benutzerdefinierten [`FaultInjector`].
-    pub fn new_with_injector(file: File, injector: F) -> Self {
-        Self {
-            file: Some(file),
-            is_poisoned: false,
-            injector,
-            path: None,
-        }
+/// Null-Kosten-Standardinjektor für Produktivumgebungen.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct NoFault;
+
+impl FaultInjector for NoFault {}
+
+impl<T: FaultInjector + ?Sized> FaultInjector for &T {
+    fn on_write(&self, path: Option<&Path>, bytes: usize) -> std::io::Result<()> {
+        (**self).on_write(path, bytes)
     }
-
-    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-NEW-WITH-PATH-AND-INJECTOR]
-    /// Kapselt eine geöffnete [`File`] mit zugehörigem Pfad und benutzerdefiniertem [`FaultInjector`].
-    pub fn new_with_path_and_injector(file: File, path: PathBuf, injector: F) -> Self {
-        Self {
-            file: Some(file),
-            is_poisoned: false,
-            injector,
-            path: Some(path),
-        }
+    fn on_fsync(&self, path: Option<&Path>) -> std::io::Result<()> {
+        (**self).on_fsync(path)
     }
-
-    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-IS-POISONED]
-    /// Prüft, ob dieses Handle aufgrund eines vorangegangenen Flush-Fehlers vergiftet ist.
-    #[must_use]
-    pub fn is_poisoned(&self) -> bool {
-        self.is_poisoned
+    fn on_rename(&self, from: &Path, to: &Path) -> std::io::Result<()> {
+        (**self).on_rename(from, to)
     }
-
-    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-FLUSH]
-    /// Flusht Dateiinhalte mittels Plattform-Primitiven auf die Festplatte und führt Fehlerinjektions-Hooks aus.
-    ///
-    /// Ablauf von `flush`:
-    /// 1. Prüfen, ob das Handle bereits vergiftet ist (`is_poisoned == true`). Falls ja, sofortiger Fehlerabbruch.
-    /// 2. Prüfen, ob die zugrundeliegende Datei vorhanden ist.
-    /// 3. Fehlerinjektor-Hook `on_fsync` aufrufen. Scheitert dieser, Handle vergiften und Fehler melden.
-    /// 4. Betriebssystem-Flush via [`flush_file`] ausführen. Scheitert dieser, Handle vergiften (`INV-FSYNC-1`).
-    ///
-    /// Fehlerfälle:
-    /// - Liefert `Err(std::io::Error)`, wenn das Handle vergiftet ist oder die Synchronisation fehlschlägt.
-    pub fn flush(&mut self, kind: FlushKind) -> std::io::Result<()> {
-        if self.is_poisoned {
-            return Err(std::io::Error::other(
-                "handle is poisoned due to a previous fsync failure",
-            ));
-        }
-
-        let Some(file) = self.file.as_ref() else {
-            return Err(std::io::Error::other("file handle has been closed"));
-        };
-
-        if let Err(err) = self.injector.on_fsync(self.path.as_deref()) {
-            self.is_poisoned = true;
-            return Err(err);
-        }
-
-        if let Err(err) = flush_file(file, kind) {
-            self.is_poisoned = true;
-            Err(err)
-        } else {
-            Ok(())
-        }
-    }
-
-    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-GET-REF]
-    /// Liefert eine unveränderliche Referenz auf die zugrundeliegende Datei, oder `None`, falls das Handle vergiftet ist.
-    #[must_use]
-    pub fn get_ref(&self) -> Option<&File> {
-        if self.is_poisoned {
-            None
-        } else {
-            self.file.as_ref()
-        }
-    }
-
-    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-GET-MUT]
-    /// Liefert eine veränderliche Referenz auf die zugrundeliegende Datei, oder `None`, falls das Handle vergiftet ist.
-    pub fn get_mut(&mut self) -> Option<&mut File> {
-        if self.is_poisoned {
-            None
-        } else {
-            self.file.as_mut()
-        }
-    }
-
-    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-POISON]
-    /// Vergiftet dieses Handle explizit manuell (z. B. bei erkannten Prüfsummenfehlern).
-    pub fn poison(&mut self) {
-        self.is_poisoned = true;
+    fn on_dir_fsync(&self, dir: &Path) -> std::io::Result<()> {
+        (**self).on_dir_fsync(dir)
     }
 }
 
-impl<F: FaultInjector> Write for DurableHandle<F> {
-    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-WRITE]
-    /// Schreibt Daten in die Datei, sofern das Handle nicht vergiftet ist.
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        if self.is_poisoned {
-            return Err(std::io::Error::other(
-                "handle is poisoned due to a previous fsync failure",
-            ));
-        }
-
-        let Some(file) = self.file.as_mut() else {
-            return Err(std::io::Error::other("file handle has been closed"));
-        };
-
-        self.injector.on_write(self.path.as_deref(), buf.len())?;
-
-        file.write(buf)
-    }
-
-    // ANCHOR[contextra-durable-fs:DURABLE-HANDLE-WRITE-FLUSH]
-    /// Führt einen vollständigen Daten- und Metadaten-Flush durch.
-    fn flush(&mut self) -> std::io::Result<()> {
-        DurableHandle::flush(self, FlushKind::DataAndMetadata)
-    }
-}
-
-// ANCHOR[contextra-durable-fs:LOCK-MODE-001]
-/// Sperrmodus für Verzeichnissperren gemäß Spezifikation §7.3.1.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum LockMode {
-    /// Standard-Sperre: Erfordert ein unterstütztes lokales Dateisystem (verhindert unsichere Netzlaufwerke).
-    #[default]
-    Normal,
-    /// Reiner In-Memory-Modus: Umgeht Dateisystemprüfungen (z. B. für reine Speichertests).
-    MemoryOnly,
-}
-
-// ANCHOR[contextra-durable-fs:DIR-LOCK-001]
-/// RAII-Guard (Resource Acquisition Is Initialization) für eine Verzeichnissperre (`.dirlock`).
-///
-/// Hält die Sperrdatei im Zielordner geöffnet und entfernt sie automatisch bei Verlassen des Gültigkeitsbereichs (`Drop`).
-#[derive(Debug)]
-pub struct DirLock {
-    lock_path: PathBuf,
-    _file: Option<File>,
-    mode: LockMode,
-}
-
-impl DirLock {
-    // ANCHOR[contextra-durable-fs:DIR-LOCK-ACQUIRE]
-    /// Erwirbt eine Sperre auf `dir` im angegebenen [`LockMode`].
-    ///
-    /// Ablauf:
-    /// 1. Dateisystemklasse über [`fs_class`] ermitteln.
-    /// 2. Im Modus [`LockMode::Normal`]: Prüfen, ob es sich um ein unterstütztes lokales Dateisystem handelt.
-    ///    Netzwerklaufwerke (`FsClass::Network`), FUSE (`FsClass::Fuse`) und Cloud-Sync-Ordner werden abgewiesen.
-    /// 3. Lock-Datei `.dirlock` im Zielordner anlegen/öffnen.
-    /// 4. [`DirLock`]-Instanz zurückgeben.
-    ///
-    /// Fehlerfälle:
-    /// - Liefert `Err(ErrorKind::Unsupported)`, wenn das Dateisystem nicht unterstützt wird (INV-LOG-1: Pfade werden in Fehlermeldungen weggelassen).
-    pub fn acquire(dir: &Path, mode: LockMode) -> std::io::Result<Self> {
-        let class = fs_class(dir)?;
-
-        if mode == LockMode::Normal && !class.is_supported_local() {
-            let class_str = match class {
-                FsClass::Network => "network",
-                FsClass::Fuse => "fuse",
-                FsClass::CloudSync => "cloud_sync",
-                _ => "unsupported_filesystem",
-            };
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
-                format!(
-                    "directory locking rejected for filesystem class: {}",
-                    class_str
-                ),
-            ));
-        }
-
-        let lock_path = dir.join(".dirlock");
-        let file = if mode == LockMode::Normal {
-            let mut options = OpenOptions::new();
-            options.write(true).create(true);
-            #[cfg(windows)]
-            {
-                use std::os::windows::fs::OpenOptionsExt;
-                // FILE_SHARE_READ (1) | FILE_SHARE_WRITE (2) | FILE_SHARE_DELETE (4)
-                options.share_access(7);
-            }
-            Some(options.open(&lock_path)?)
-        } else {
-            None
-        };
-
-        Ok(Self {
-            lock_path,
-            _file: file,
-            mode,
-        })
-    }
-
-    // ANCHOR[contextra-durable-fs:DIR-LOCK-MODE]
-    /// Liefert den aktiven [`LockMode`] dieser Verzeichnissperre.
-    #[must_use]
-    pub fn mode(&self) -> LockMode {
-        self.mode
-    }
-}
-
-impl Drop for DirLock {
-    // NOTE: Beim Verlassen des Bereichs wird die Sperrdatei im Normal-Modus geschlossen und gelöscht.
-    fn drop(&mut self) {
-        if self.mode == LockMode::Normal {
-            let _file = self._file.take();
-            drop(_file);
-            let _ = std::fs::remove_file(&self.lock_path);
-        }
-    }
-}
-
-// ANCHOR[contextra-durable-fs:SYNC-DIR-001]
-/// Synchronisiert die Verzeichnismetadaten eines Ordners mit Standard-Injektor [`NoFault`] auf die Festplatte.
-pub fn sync_dir(dir: &Path) -> std::io::Result<()> {
-    sync_dir_with_injector(dir, &NoFault)
-}
-
-// ANCHOR[contextra-durable-fs:SYNC-DIR-WITH-INJECTOR]
-/// Synchronisiert die Verzeichnismetadaten eines Ordners mit benutzerdefiniertem [`FaultInjector`].
-///
-/// Ablauf:
-/// 1. `injector.on_dir_fsync(dir)` aufrufen.
-/// 2. Verzeichnis per [`flush_dir`] synchronisieren.
-pub fn sync_dir_with_injector<F: FaultInjector>(dir: &Path, injector: &F) -> std::io::Result<()> {
-    injector.on_dir_fsync(dir)?;
-    flush_dir(dir)
-}
-
-/// RAII-Guard zum automatischen Löschen temporärer Zwischendateien bei Fehlern oder Panics.
-struct TmpFileGuard<'a>(&'a Path);
-
-impl<'a> Drop for TmpFileGuard<'a> {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(self.0);
-    }
-}
-
-// ANCHOR[contextra-durable-fs:ATOMIC-REPLACE-001]
-/// Ersetzt den Inhalt der Datei unter `path` atomar mit `bytes` unter Verwendung des Standardinjektors [`NoFault`].
-pub fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    atomic_replace_with_injector(path, bytes, &NoFault)
-}
-
-// ANCHOR[contextra-durable-fs:ATOMIC-REPLACE-WITH-INJECTOR]
-/// Ersetzt den Inhalt der Datei unter `path` atomar mit `bytes` unter Verwendung eines [`FaultInjector`].
-///
-/// Ablauf von `atomic_replace`:
-/// 1. Elternverzeichnis von `path` ermitteln. Schlägt fehl mit `InvalidInput`, falls kein Elternordner existiert.
-/// 2. Eindeutigen temporären Dateinamen im selben Ordner erzeugen (`.<stem>.tmp.<pid>.<count>`).
-/// 3. Temporäre Datei exklusiv anlegen (`create_new(true)`) und mit `TmpFileGuard` absichern.
-/// 4. Datenblöcke schreiben (`injector.on_write` und `write_all`).
-/// 5. Datei synchronisieren (`injector.on_fsync` und [`flush_file`]).
-/// 6. Datei schließen und atomar auf Zielpfad umbenennen (`injector.on_rename` und [`rename_durable`]).
-/// 7. Elternverzeichnis synchronisieren (`injector.on_dir_fsync`), damit der Verzeichniseintrag stabil ist.
-/// 8. `TmpFileGuard` vergessen (`mem::forget`), da die Datei erfolgreich finalisiert wurde.
-///
-/// Fehlerfälle:
-/// - Bricht bei Schreib-, Sync- oder Umbenennungsfehlern sofort ab; die temporäre Datei wird via Drop gelöscht.
-pub fn atomic_replace_with_injector<F: FaultInjector>(
-    path: &Path,
-    bytes: &[u8],
-    injector: &F,
-) -> std::io::Result<()> {
-    let parent = path.parent().ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "target path has no parent directory",
-        )
-    })?;
-
-    let file_stem = path.file_name().and_then(|s| s.to_str()).unwrap_or("tmp");
-
-    let count = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let pid = std::process::id();
-
-    let tmp_filename = format!(".{}.tmp.{}.{}", file_stem, pid, count);
-    let tmp_path = parent.join(tmp_filename);
-
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        options.share_access(7);
-    }
-
-    let mut tmp_file = options.open(&tmp_path)?;
-    let guard = TmpFileGuard(&tmp_path);
-
-    injector.on_write(Some(&tmp_path), bytes.len())?;
-    tmp_file.write_all(bytes)?;
-
-    injector.on_fsync(Some(&tmp_path))?;
-    flush_file(&tmp_file, FlushKind::DataAndMetadata)?;
-    drop(tmp_file);
-
-    injector.on_rename(&tmp_path, path)?;
-    rename_durable(&tmp_path, path)?;
-
-    injector.on_dir_fsync(parent)?;
-
-    std::mem::forget(guard);
-
-    Ok(())
-}
-
-// ANCHOR[contextra-durable-fs:DURABLE-REMOVE-001]
-/// Entfernt eine Datei dauerhaft und flusht das Elternverzeichnis mit Standardinjektor [`NoFault`].
-pub fn durable_remove(path: &Path) -> std::io::Result<()> {
-    durable_remove_with_injector(path, &NoFault)
-}
-
-// ANCHOR[contextra-durable-fs:DURABLE-REMOVE-WITH-INJECTOR]
-/// Entfernt eine Datei dauerhaft und flusht das Elternverzeichnis mit benutzerdefiniertem [`FaultInjector`].
-///
-/// Ablauf:
-/// 1. Elternverzeichnis ermitteln.
-/// 2. Datei aus dem Dateisystem löschen (`remove_file`).
-/// 3. Verzeichnis-Sync-Hook aufrufen (`injector.on_dir_fsync`).
-/// 4. Elternverzeichnis mit [`flush_dir`] auf Festplatte synchronisieren.
-pub fn durable_remove_with_injector<F: FaultInjector>(
+pub(crate) fn durable_remove_with_injector<F: FaultInjector>(
     path: &Path,
     injector: &F,
 ) -> std::io::Result<()> {
@@ -429,79 +79,458 @@ pub fn durable_remove_with_injector<F: FaultInjector>(
 
     std::fs::remove_file(path)?;
     injector.on_dir_fsync(parent)?;
-    flush_dir(parent)?;
+    contextra_sys::flush_dir(parent)?;
     Ok(())
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-RECEIPT-001]
-/// Quittung nach erfolgreichem Überschreiben und dauerhaftem Entfernen einer Datei.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScrubReceipt {
-    /// Gesamtanzahl der vor dem Löschen mit Nullen überschriebenen Bytes.
-    pub bytes_scrubbed: u64,
-}
+/// Reales Virtuelles Dateisystem (`RealVfs`) als primäre Produktionsimplementierung.
+pub mod real_vfs {
+    use contextra_ports::vfs::{Vfs, VfsFile, VfsOpenOptions};
+    use contextra_ports::{ContextraError, Result};
+    use contextra_sys::{flush_dir, flush_file, rename_durable, FlushKind};
+    use std::fs::{self, File, OpenOptions};
+    use std::io::{Read, Seek, SeekFrom, Write};
+    use std::path::Path;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::Mutex;
 
-// ANCHOR[contextra-durable-fs:SCRUB-AND-REMOVE-001]
-/// Überschreibt eine Datei vollständig mit Nullen und entfernt sie dauerhaft (mit [`NoFault`]).
-pub fn scrub_and_remove(path: &Path) -> std::io::Result<ScrubReceipt> {
-    scrub_and_remove_with_injector(path, &NoFault)
-}
+    static VFS_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-// ANCHOR[contextra-durable-fs:SCRUB-AND-REMOVE-WITH-INJECTOR]
-/// Überschreibt eine Datei mit Nullen und entfernt sie dauerhaft unter Verwendung eines [`FaultInjector`].
-///
-/// Ablauf:
-/// 1. Metadaten prüfen: Symlinks und Verzeichnisse werden abgewiesen.
-/// 2. Datei öffnen und in 64-KiB-Schritten mit Nullen überschreiben (`injector.on_write`).
-/// 3. Datei per `injector.on_fsync` und [`flush_file`] auf Festplatte synchronisieren.
-/// 4. Datei dauerhaft entfernen und Elternverzeichnis flushen ([`durable_remove_with_injector`]).
-/// 5. [`ScrubReceipt`] mit der Anzahl der überschriebenen Bytes zurückgeben.
-pub fn scrub_and_remove_with_injector<F: FaultInjector>(
-    path: &Path,
-    injector: &F,
-) -> std::io::Result<ScrubReceipt> {
-    let metadata = path.symlink_metadata()?;
-    let file_type = metadata.file_type();
-
-    if file_type.is_symlink() || !file_type.is_file() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "path is a symlink or not a regular file",
-        ));
+    /// Dateihandle für VfsFile mit dauerhafter Vergiftung bei I/O- oder fsync-Fehlern (DF-03, INV-FSYNC-1).
+    pub struct RealFile {
+        file: Mutex<Option<File>>,
+        poisoned: AtomicBool,
     }
 
-    let len = metadata.len();
-    if len > 0 {
+    impl RealFile {
+        /// Erstellt ein neues [`RealFile`]-Handle.
+        pub fn new(file: File) -> Self {
+            Self {
+                file: Mutex::new(Some(file)),
+                poisoned: AtomicBool::new(false),
+            }
+        }
+
+        /// Prüft, ob das Handle vergiftet ist.
+        #[must_use]
+        pub fn is_poisoned(&self) -> bool {
+            self.poisoned.load(Ordering::Acquire)
+        }
+
+        fn check_not_poisoned(&self) -> std::io::Result<()> {
+            if self.is_poisoned() {
+                Err(std::io::Error::other(
+                    "handle is poisoned due to previous I/O or fsync failure",
+                ))
+            } else {
+                Ok(())
+            }
+        }
+
+        fn poison_on_err<T>(&self, res: std::io::Result<T>) -> std::io::Result<T> {
+            if res.is_err() {
+                self.poisoned.store(true, Ordering::Release);
+            }
+            res
+        }
+    }
+
+    impl VfsFile for RealFile {
+        fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize> {
+            self.check_not_poisoned()?;
+            let Ok(mut guard) = self.file.lock() else {
+                self.poisoned.store(true, Ordering::Release);
+                return Err(std::io::Error::other("lock poisoned"));
+            };
+            let Some(file) = guard.as_mut() else {
+                return Err(std::io::Error::other("file closed"));
+            };
+
+            let res = (|| -> std::io::Result<usize> {
+                file.seek(SeekFrom::Start(offset))?;
+                file.read(buf)
+            })();
+            self.poison_on_err(res)
+        }
+
+        fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize> {
+            self.check_not_poisoned()?;
+            let Ok(mut guard) = self.file.lock() else {
+                self.poisoned.store(true, Ordering::Release);
+                return Err(std::io::Error::other("lock poisoned"));
+            };
+            let Some(file) = guard.as_mut() else {
+                return Err(std::io::Error::other("file closed"));
+            };
+
+            let res = (|| -> std::io::Result<usize> {
+                file.seek(SeekFrom::Start(offset))?;
+                file.write(buf)
+            })();
+            self.poison_on_err(res)
+        }
+
+        fn set_len(&self, len: u64) -> std::io::Result<()> {
+            self.check_not_poisoned()?;
+            let Ok(guard) = self.file.lock() else {
+                self.poisoned.store(true, Ordering::Release);
+                return Err(std::io::Error::other("lock poisoned"));
+            };
+            let Some(file) = guard.as_ref() else {
+                return Err(std::io::Error::other("file closed"));
+            };
+
+            let res = file.set_len(len);
+            self.poison_on_err(res)
+        }
+
+        fn len(&self) -> std::io::Result<u64> {
+            self.check_not_poisoned()?;
+            let Ok(guard) = self.file.lock() else {
+                self.poisoned.store(true, Ordering::Release);
+                return Err(std::io::Error::other("lock poisoned"));
+            };
+            let Some(file) = guard.as_ref() else {
+                return Err(std::io::Error::other("file closed"));
+            };
+
+            let res = file.metadata().map(|m| m.len());
+            self.poison_on_err(res)
+        }
+
+        fn sync_data(&self) -> std::io::Result<()> {
+            self.check_not_poisoned()?;
+            let Ok(guard) = self.file.lock() else {
+                self.poisoned.store(true, Ordering::Release);
+                return Err(std::io::Error::other("lock poisoned"));
+            };
+            let Some(file) = guard.as_ref() else {
+                return Err(std::io::Error::other("file closed"));
+            };
+
+            let res = flush_file(file, FlushKind::DataOnly);
+            self.poison_on_err(res)
+        }
+
+        fn sync_all(&self) -> std::io::Result<()> {
+            self.check_not_poisoned()?;
+            let Ok(guard) = self.file.lock() else {
+                self.poisoned.store(true, Ordering::Release);
+                return Err(std::io::Error::other("lock poisoned"));
+            };
+            let Some(file) = guard.as_ref() else {
+                return Err(std::io::Error::other("file closed"));
+            };
+
+            let res = flush_file(file, FlushKind::DataAndMetadata);
+            self.poison_on_err(res)
+        }
+    }
+
+    /// Produktionsimplementierung des [`contextra_ports::vfs::Vfs`]-Traits.
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub struct RealVfs;
+
+    impl RealVfs {
+        /// Erstellt eine neue Instanz von [`RealVfs`].
+        #[must_use]
+        pub const fn new() -> Self {
+            Self
+        }
+    }
+
+    impl Vfs for RealVfs {
+        fn open(&self, path: &Path, opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
+            let mut options = OpenOptions::new();
+            options.read(opts.read);
+            options.write(opts.write);
+            options.append(opts.append);
+            options.truncate(opts.truncate);
+            if opts.create_new {
+                options.create_new(true);
+            } else if opts.create {
+                options.create(true);
+            }
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+
+            let file = options.open(path).map_err(ContextraError::Io)?;
+            Ok(Box::new(RealFile::new(file)))
+        }
+
+        fn read(&self, path: &Path) -> Result<Vec<u8>> {
+            if !path.exists() {
+                return Err(ContextraError::NotFound("file not found".to_string()));
+            }
+            fs::read(path).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    ContextraError::NotFound("file not found".to_string())
+                } else {
+                    ContextraError::Io(e)
+                }
+            })
+        }
+
+        fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {
+            let parent = path.parent().ok_or_else(|| {
+                ContextraError::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "target path has no parent directory",
+                ))
+            })?;
+
+            if !parent.exists() {
+                self.create_dir_all(parent)?;
+            }
+
+            let file_stem = path.file_name().and_then(|s| s.to_str()).unwrap_or("tmp");
+            let count = VFS_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let pid = std::process::id();
+            let tmp_filename = format!(".{}.tmp.{}.{}", file_stem, pid, count);
+            let tmp_path = parent.join(tmp_filename);
+
+            let mut options = OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::OpenOptionsExt;
+                options.mode(0o600);
+            }
+
+            let mut tmp_file = options.open(&tmp_path).map_err(ContextraError::Io)?;
+
+            struct TmpGuard<'a>(&'a Path);
+            impl<'a> Drop for TmpGuard<'a> {
+                fn drop(&mut self) {
+                    let _ = fs::remove_file(self.0);
+                }
+            }
+            let guard = TmpGuard(&tmp_path);
+
+            tmp_file.write_all(data).map_err(ContextraError::Io)?;
+            flush_file(&tmp_file, FlushKind::DataAndMetadata).map_err(ContextraError::Io)?;
+            drop(tmp_file);
+
+            rename_durable(&tmp_path, path).map_err(ContextraError::Io)?;
+            flush_dir(parent).map_err(ContextraError::Io)?;
+
+            std::mem::forget(guard);
+            Ok(())
+        }
+
+        fn create_dir_all(&self, path: &Path) -> Result<()> {
+            fs::create_dir_all(path).map_err(ContextraError::Io)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+                    .map_err(ContextraError::Io)?;
+            }
+            Ok(())
+        }
+
+        fn remove_file(&self, path: &Path) -> Result<()> {
+            if !path.exists() {
+                return Err(ContextraError::NotFound("file not found".to_string()));
+            }
+            let parent = path.parent();
+            fs::remove_file(path).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    ContextraError::NotFound("file not found".to_string())
+                } else {
+                    ContextraError::Io(e)
+                }
+            })?;
+
+            if let Some(dir) = parent {
+                if dir.exists() {
+                    flush_dir(dir).map_err(ContextraError::Io)?;
+                }
+            }
+            Ok(())
+        }
+
+        fn exists(&self, path: &Path) -> Result<bool> {
+            Ok(path.exists())
+        }
+
+        fn len(&self, path: &Path) -> Result<u64> {
+            if !path.exists() {
+                return Err(ContextraError::NotFound("file not found".to_string()));
+            }
+            fs::metadata(path).map(|m| m.len()).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    ContextraError::NotFound("file not found".to_string())
+                } else {
+                    ContextraError::Io(e)
+                }
+            })
+        }
+
+        fn list_dir(&self, path: &Path) -> Result<Vec<String>> {
+            if !path.exists() {
+                return Err(ContextraError::NotFound("directory not found".to_string()));
+            }
+            let entries = fs::read_dir(path).map_err(ContextraError::Io)?;
+            let mut names = Vec::new();
+            for entry_res in entries {
+                let entry = entry_res.map_err(ContextraError::Io)?;
+                let file_name = entry.file_name();
+                names.push(file_name.to_string_lossy().to_string());
+            }
+            names.sort();
+            Ok(names)
+        }
+
+        fn sync_dir(&self, path: &Path) -> Result<()> {
+            if !path.exists() {
+                return Err(ContextraError::NotFound("directory not found".to_string()));
+            }
+            flush_dir(path).map_err(ContextraError::Io)
+        }
+    }
+}
+
+/// Atomare Austausch- und Schreiboperationen (`write_atomic`, DF-02).
+pub mod atomic {
+    use contextra_sys::{flush_dir, flush_file, rename_durable, FlushKind};
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    use std::path::Path;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static ATOMIC_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    struct TmpFileGuard<'a>(&'a Path);
+    impl<'a> Drop for TmpFileGuard<'a> {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(self.0);
+        }
+    }
+
+    /// Ersetzt den Inhalt der Datei unter `path` atomar mit `bytes` (DF-02).
+    pub fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+        let parent = path.parent().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "target path has no parent directory",
+            )
+        })?;
+
+        let file_stem = path.file_name().and_then(|s| s.to_str()).unwrap_or("tmp");
+        let count = ATOMIC_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let pid = std::process::id();
+        let tmp_filename = format!(".{}.tmp.{}.{}", file_stem, pid, count);
+        let tmp_path = parent.join(tmp_filename);
+
         let mut options = OpenOptions::new();
-        options.write(true);
-        #[cfg(windows)]
+        options.write(true).create_new(true);
+        #[cfg(unix)]
         {
-            use std::os::windows::fs::OpenOptionsExt;
-            options.share_access(7);
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
         }
 
-        let mut file = options.open(path)?;
+        let mut tmp_file = options.open(&tmp_path)?;
+        let guard = TmpFileGuard(&tmp_path);
 
-        let zeros = [0u8; 64 * 1024];
-        let mut remaining = len;
+        tmp_file.write_all(bytes)?;
+        flush_file(&tmp_file, FlushKind::DataAndMetadata)?;
+        drop(tmp_file);
 
-        while remaining > 0 {
-            let chunk_size = usize::try_from(remaining)
-                .unwrap_or(zeros.len())
-                .min(zeros.len());
-            injector.on_write(Some(path), chunk_size)?;
-            let slice = zeros.get(..chunk_size).unwrap_or(&zeros);
-            file.write_all(slice)?;
-            remaining -= chunk_size as u64;
-        }
+        rename_durable(&tmp_path, path)?;
+        flush_dir(parent)?;
 
-        injector.on_fsync(Some(path))?;
-        flush_file(&file, FlushKind::DataAndMetadata)?;
+        std::mem::forget(guard);
+        Ok(())
+    }
+}
+
+/// Exklusive Verzeichnissperre (`LOCK`-Datei) gemäß SPEC D-50 und DF-05.
+pub mod dir_lock {
+    use contextra_sys::fs_class;
+    use std::fs::{File, OpenOptions};
+    use std::path::{Path, PathBuf};
+
+    /// Sperrmodus für Verzeichnissperren.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub enum LockMode {
+        /// Standard-Sperre: Erfordert ein unterstütztes lokales Dateisystem.
+        #[default]
+        Normal,
+        /// Reiner In-Memory-Modus: Umgeht Dateisystemprüfungen.
+        MemoryOnly,
     }
 
-    durable_remove_with_injector(path, injector)?;
+    /// RAII-Guard für eine Verzeichnissperre (`LOCK`).
+    #[derive(Debug)]
+    pub struct DirLock {
+        lock_path: PathBuf,
+        _file: Option<File>,
+        mode: LockMode,
+    }
 
-    Ok(ScrubReceipt {
-        bytes_scrubbed: len,
-    })
+    impl DirLock {
+        /// Erwirbt eine exklusive Sperre auf `dir` im angegebenen [`LockMode`] (DF-05).
+        pub fn acquire(dir: &Path, mode: LockMode) -> std::io::Result<Self> {
+            let class = fs_class(dir)?;
+
+            if mode == LockMode::Normal && !class.is_supported_local() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "directory locking rejected on unsupported filesystem",
+                ));
+            }
+
+            let lock_path = dir.join("LOCK");
+            let file = if mode == LockMode::Normal {
+                let mut options = OpenOptions::new();
+                options.write(true).create(true);
+                Some(options.open(&lock_path)?)
+            } else {
+                None
+            };
+
+            Ok(Self {
+                lock_path,
+                _file: file,
+                mode,
+            })
+        }
+
+        /// Liefert den aktiven [`LockMode`].
+        #[must_use]
+        pub fn mode(&self) -> LockMode {
+            self.mode
+        }
+    }
+
+    impl Drop for DirLock {
+        fn drop(&mut self) {
+            if self.mode == LockMode::Normal {
+                let _file = self._file.take();
+                drop(_file);
+                let _ = std::fs::remove_file(&self.lock_path);
+            }
+        }
+    }
 }
+
+/// Startprobe zur Validierung von Plattform- und Dateisystem-Garantien (DF-06).
+pub mod probe;
+
+/// Sicheres Überschreiben (Scrubbing) und Schutzmechanismen vor dem Löschen (DF-07).
+pub mod scrub;
+
+// Re-Exports für primäre Komponenten
+pub use atomic::atomic_replace;
+pub use dir_lock::{DirLock, LockMode};
+pub use probe::{
+    free_space, probe_dir, verdict, DetectedFs, FsProbe, ProbeVerdict, Tier, UnsupportedFilesystem,
+};
+pub use real_vfs::{RealFile, RealVfs};
+pub use scrub::{scrub_if_safe, ScrubOutcome, ScrubPolicy, ScrubRefusal};
