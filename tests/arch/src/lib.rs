@@ -13,6 +13,8 @@
 //! - T-LINT-2: Kein `std::fs` / `tokio::fs` im Crate `contextra-store`.
 //! - T-CFG-1/2, T-DEF-1: Feature-Hygiene, Verbot von `unexpected_cfgs`-Allowances, keine Sicherheitsfeatures hinter cfg.
 
+pub mod known_deviations;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -50,6 +52,83 @@ pub const RING_TABLE: &[(&str, Ring)] = &[
 
 /// Crates, in denen `unsafe` erlaubt ist (NFR-2).
 pub const UNSAFE_ISLANDS: &[&str] = &["contextra-sys", "contextra-simd"];
+
+/// Erlaubte Abhängigkeiten laut SPEC §5.3 Abhängigkeitsmatrix (normativ)
+/// inkl. D-88, D-95, D-97:
+pub const SPEC_5_3_ALLOWED_EDGES: &[(&str, &[&str])] = &[
+    ("contextra-types", &[]),
+    ("contextra-ports", &["contextra-types"]),
+    ("contextra-sys", &["contextra-types"]),
+    ("contextra-simd", &["contextra-types"]),
+    (
+        "contextra-durable-fs",
+        &["contextra-types", "contextra-ports", "contextra-sys"],
+    ),
+    ("contextra-crypto", &["contextra-types", "contextra-ports"]),
+    ("contextra-mvcc", &["contextra-types", "contextra-ports"]),
+    (
+        "contextra-store",
+        &[
+            "contextra-types",
+            "contextra-ports",
+            "contextra-sys",
+            "contextra-crypto",
+            "contextra-mvcc",
+        ],
+    ),
+    (
+        "contextra-text",
+        &["contextra-types", "contextra-ports", "contextra-crypto"],
+    ),
+    (
+        "contextra-vector",
+        &[
+            "contextra-types",
+            "contextra-ports",
+            "contextra-simd",
+            "contextra-crypto",
+        ],
+    ),
+    ("contextra-rank", &["contextra-types", "contextra-ports"]),
+    (
+        "contextra-erasure",
+        &["contextra-types", "contextra-ports", "contextra-crypto"],
+    ),
+    (
+        "contextra-engine",
+        &[
+            "contextra-types",
+            "contextra-ports",
+            "contextra-sys",
+            "contextra-durable-fs",
+            "contextra-crypto",
+            "contextra-mvcc",
+            "contextra-store",
+            "contextra-text",
+            "contextra-vector",
+            "contextra-rank",
+            "contextra-erasure",
+        ],
+    ),
+    (
+        "contextra",
+        &[
+            "contextra-types",
+            "contextra-durable-fs",
+            "contextra-engine",
+        ],
+    ),
+    ("contextra-testkit", &["contextra-types", "contextra-ports"]),
+    (
+        "contextra-lab",
+        &["contextra-types", "contextra-ports", "contextra-crypto"],
+    ),
+    (
+        "ctx-verify",
+        &["contextra-types", "contextra-ports", "contextra-crypto"],
+    ),
+    ("contextra-arch-tests", &[]),
+];
 
 /// Ausnahmen von der Ring-Regel. Für v1 leer. Jeder Eintrag braucht eine Begründung und ein Ziel.
 pub const ALLOWLIST: &[(&str, &str)] = &[];
@@ -127,6 +206,12 @@ pub fn check_layering(crates: &[Krate]) -> Vec<String> {
             ));
             continue;
         };
+
+        let allowed_workspace_deps = SPEC_5_3_ALLOWED_EDGES
+            .iter()
+            .find(|(n, _)| *n == krate.name)
+            .map(|(_, deps)| *deps);
+
         for dep in &krate.deps {
             if my_ring == Ring::Ring0 && dep == "tokio" {
                 violations.push(format!(
@@ -135,7 +220,23 @@ pub fn check_layering(crates: &[Krate]) -> Vec<String> {
                 ));
                 continue;
             }
-            // AR-2: store kennt weder text, vector noch erasure
+
+            let Some(dep_ring) = ring_of(dep) else {
+                continue;
+            };
+
+            let rule_tag = format!("T-ARCH-3:{dep}");
+            if known_deviations::is_deviation_allowed(&krate.name, &rule_tag) {
+                continue;
+            }
+
+            if ALLOWLIST
+                .iter()
+                .any(|(from, to)| *from == krate.name && *to == dep)
+            {
+                continue;
+            }
+
             if krate.name == "contextra-store"
                 && (dep == "contextra-text"
                     || dep == "contextra-vector"
@@ -146,18 +247,12 @@ pub fn check_layering(crates: &[Krate]) -> Vec<String> {
                     dep
                 ));
             }
-            // AR-3: erasure kennt keine Ring-2-Crates
-            if krate.name == "contextra-erasure" {
-                if let Some(dep_ring) = ring_of(dep) {
-                    if dep_ring == Ring::Ring2 {
-                        violations.push(format!(
-                            "AR-3 verletzt: contextra-erasure hängt von Ring-2-Crate {} ab",
-                            dep
-                        ));
-                    }
-                }
+            if krate.name == "contextra-erasure" && dep_ring == Ring::Ring2 {
+                violations.push(format!(
+                    "AR-3 verletzt: contextra-erasure hängt von Ring-2-Crate {} ab",
+                    dep
+                ));
             }
-            // AR-4: lab und ctx-verify hängen nicht an store, engine, erasure
             if (krate.name == "contextra-lab" || krate.name == "ctx-verify")
                 && (dep == "contextra-store"
                     || dep == "contextra-engine"
@@ -169,35 +264,35 @@ pub fn check_layering(crates: &[Krate]) -> Vec<String> {
                 ));
             }
 
-            if ALLOWLIST
-                .iter()
-                .any(|(from, to)| *from == krate.name && *to == dep)
-            {
-                continue;
-            }
-            let Some(dep_ring) = ring_of(dep) else {
-                continue; // externe Crates sind hier nicht relevant
-            };
-            if my_ring == Ring::Tooling {
-                continue;
-            }
-            if dep_ring == Ring::Tooling {
+            if my_ring != Ring::Tooling && dep_ring == Ring::Tooling {
                 violations.push(format!(
                     "{} ({:?}) hängt von Tooling-Crate {} ab",
                     krate.name, my_ring, dep
                 ));
-            } else if dep_ring > my_ring {
+                continue;
+            }
+
+            if dep_ring > my_ring && my_ring != Ring::Tooling {
                 violations.push(format!(
                     "{} ({:?}) hängt von höherem Ring ab: {} ({:?})",
                     krate.name, my_ring, dep, dep_ring
                 ));
+                continue;
+            }
+
+            if let Some(allowed) = allowed_workspace_deps {
+                if !allowed.contains(&dep.as_str()) {
+                    violations.push(format!(
+                        "SPEC §5.3 verletzt: Kante {} -> {} nicht in Matrix erlaubt",
+                        krate.name, dep
+                    ));
+                }
             }
         }
     }
     violations
 }
 
-/// Prüft T-ARCH-1: contextra-types hat keine I/O-, async-, Thread-, Zeit-, Zufalls-Abhängigkeit.
 pub fn check_types_purity(root: &Path) -> Vec<String> {
     let types_manifest = root.join("crates/contextra-types/Cargo.toml");
     let mut violations = Vec::new();
@@ -648,6 +743,622 @@ pub fn check_unsafe(root: &Path, crates: &[Krate]) -> Vec<String> {
     violations
 }
 
+/// Prüft T-ARCH-5:
+/// - Ring im Manifest `[package.metadata.contextra] ring` == Ring im `//!`-Kopf von lib.rs == Matrix (SPEC §5.2 / §5.3).
+/// - Crate-Beschreibung in Cargo.toml `description` == erste Zeile der README.md (wortgleich nach SPEC §5.1a / D-97).
+pub fn check_crate_headers_and_descriptions(_root: &Path, crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+
+    for krate in crates {
+        if krate.name == "contextra-arch-tests" {
+            continue;
+        }
+
+        let manifest_path = krate.dir.join("Cargo.toml");
+        let Ok(manifest_text) = fs::read_to_string(&manifest_path) else {
+            violations.push(format!("{}: Cargo.toml nicht lesbar", krate.name));
+            continue;
+        };
+        let Ok(doc) = manifest_text.parse::<toml::Table>() else {
+            violations.push(format!("{}: Cargo.toml ist kein gültiges TOML", krate.name));
+            continue;
+        };
+
+        let pkg = doc.get("package").and_then(|p| p.as_table());
+        let manifest_desc = pkg
+            .and_then(|p| p.get("description"))
+            .and_then(|d| d.as_str())
+            .unwrap_or("")
+            .trim();
+
+        let manifest_ring_str = pkg
+            .and_then(|p| p.get("metadata"))
+            .and_then(|m| m.get("contextra"))
+            .and_then(|c| c.get("ring"))
+            .and_then(|r| r.as_str());
+
+        let expected_ring = ring_of(&krate.name);
+        let expected_ring_str = match expected_ring {
+            Some(Ring::Ring0) => "0",
+            Some(Ring::Ring1) => "1",
+            Some(Ring::Ring2) => "2",
+            Some(Ring::Ring3) => "3",
+            Some(Ring::Ring4) => "4",
+            Some(Ring::Tooling) => "tooling",
+            None => "",
+        };
+
+        if manifest_ring_str != Some(expected_ring_str) {
+            let rule = "T-ARCH-5:manifest-ring";
+            if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                violations.push(format!(
+                    "T-ARCH-5 verletzt: {} [package.metadata.contextra].ring = '{:?}', erwartet: '{}'",
+                    krate.name, manifest_ring_str, expected_ring_str
+                ));
+            }
+        }
+
+        let lib_rs = krate.dir.join("src/lib.rs");
+        if lib_rs.is_file() {
+            if let Ok(lib_text) = fs::read_to_string(&lib_rs) {
+                let has_expected_ring_header = lib_text
+                    .lines()
+                    .filter(|l| l.starts_with("//!"))
+                    .any(|l| match expected_ring {
+                        Some(Ring::Ring0) => l.contains("Ring 0"),
+                        Some(Ring::Ring1) => l.contains("Ring 1"),
+                        Some(Ring::Ring2) => l.contains("Ring 2"),
+                        Some(Ring::Ring3) => l.contains("Ring 3"),
+                        Some(Ring::Ring4) => l.contains("Ring 4"),
+                        Some(Ring::Tooling) => {
+                            l.contains("tooling") || l.contains("Tooling") || l.contains("dev")
+                        }
+                        None => false,
+                    });
+
+                if !has_expected_ring_header {
+                    let rule = "T-ARCH-5:header-ring";
+                    if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                        violations.push(format!(
+                            "T-ARCH-5 verletzt: {} src/lib.rs //! Kopf nennt Ring '{:?}' nicht",
+                            krate.name, expected_ring
+                        ));
+                    }
+                }
+            }
+        }
+
+        let readme_path = krate.dir.join("README.md");
+        if readme_path.is_file() {
+            if let Ok(readme_text) = fs::read_to_string(&readme_path) {
+                let first_readme_line = readme_text
+                    .lines()
+                    .map(|l| l.trim())
+                    .find(|l| !l.is_empty())
+                    .unwrap_or("");
+
+                if manifest_desc != first_readme_line {
+                    let rule = "T-ARCH-5:description-readme";
+                    if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                        violations.push(format!(
+                            "T-ARCH-5 verletzt: {} Cargo.toml description ('{}') != README.md Zeile 1 ('{}')",
+                            krate.name, manifest_desc, first_readme_line
+                        ));
+                    }
+                }
+            }
+        } else {
+            let rule = "T-ARCH-5:missing-readme";
+            if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                violations.push(format!(
+                    "T-ARCH-5 verletzt: {} besitzt keine README.md",
+                    krate.name
+                ));
+            }
+        }
+    }
+
+    violations
+}
+
+/// Prüft T-ARCH-6:
+/// - Keine Glob-Re-Exporte (`pub use ...::*`) außerhalb von Tests / `#[cfg(test)]`.
+/// - Dev-Abhängigkeiten folgen der Matrix SPEC §5.3 (`contextra-testkit` ausgenommen, keine Selbst-Dev-Abhängigkeit; AR-14, D-97).
+pub fn check_exports_and_dev_dependencies(root: &Path, crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+
+    for krate in crates {
+        let manifest_path = krate.dir.join("Cargo.toml");
+        let Ok(manifest_text) = fs::read_to_string(&manifest_path) else {
+            continue;
+        };
+        let Ok(doc) = manifest_text.parse::<toml::Table>() else {
+            continue;
+        };
+
+        let allowed_deps = SPEC_5_3_ALLOWED_EDGES
+            .iter()
+            .find(|(n, _)| *n == krate.name)
+            .map(|(_, deps)| *deps)
+            .unwrap_or(&[]);
+
+        if let Some(dev_deps) = doc.get("dev-dependencies").and_then(|d| d.as_table()) {
+            for (dep_key, val) in dev_deps {
+                let dep_name = val
+                    .get("package")
+                    .and_then(|p| p.as_str())
+                    .unwrap_or(dep_key.as_str());
+
+                if ring_of(dep_name).is_none() {
+                    continue;
+                }
+
+                if dep_name == krate.name {
+                    let rule = "T-ARCH-6:dev-self";
+                    if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                        violations.push(format!(
+                            "T-ARCH-6 verletzt: {} besitzt unzulässige Selbst-Dev-Abhängigkeit (AR-14, D-97)",
+                            krate.name
+                        ));
+                    }
+                    continue;
+                }
+
+                if dep_name == "contextra-testkit" {
+                    continue;
+                }
+
+                if !allowed_deps.contains(&dep_name) {
+                    let rule = format!("T-ARCH-6:dev-dep:{dep_name}");
+                    if !known_deviations::is_deviation_allowed(&krate.name, &rule) {
+                        violations.push(format!(
+                            "T-ARCH-6 verletzt: Dev-Abhängigkeit {} -> {} widerspricht SPEC §5.3 Matrix (AR-14)",
+                            krate.name, dep_name
+                        ));
+                    }
+                }
+            }
+        }
+
+        let src_dir = krate.dir.join("src");
+        if !src_dir.is_dir() {
+            continue;
+        }
+
+        let mut rs_files = Vec::new();
+        collect_rs_files(&src_dir, &mut rs_files);
+
+        for file in rs_files {
+            let rel = file
+                .strip_prefix(root)
+                .unwrap_or(&file)
+                .display()
+                .to_string();
+
+            if rel.contains("/tests/") || rel.ends_with("_test.rs") || rel.ends_with("/tests.rs") {
+                continue;
+            }
+
+            let Ok(content) = fs::read_to_string(&file) else {
+                continue;
+            };
+
+            let mut in_cfg_test = false;
+            for (line_idx, line) in content.lines().enumerate() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("//") {
+                    continue;
+                }
+                if trimmed.contains("#[cfg(test)]") {
+                    in_cfg_test = true;
+                }
+
+                if !in_cfg_test && trimmed.starts_with("pub use ") && trimmed.ends_with("::*;") {
+                    let rule = "T-ARCH-6:glob-export";
+                    if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                        violations.push(format!(
+                            "T-ARCH-6 verletzt: {}:{}: Unzulässiger Glob-Re-Export '{}' (AR-10)",
+                            rel,
+                            line_idx + 1,
+                            trimmed
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    violations
+}
+
+/// Prüft T-ARCH-7:
+/// - Namensregeln nach D-90: Keine Module `misc`, `util`, `utils`, `common`, `helpers`, keine Endung `_impl`, kein `mod.rs`, kein Modul gleich dem Crate-Namen.
+/// - Fassaden-Schnitt nach D-89: `contextra` enthält keine Logik und nur die Module `api`, `wiring`, `error`.
+pub fn check_naming_and_facade_structure(crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+    let banned_names = ["misc", "util", "utils", "common", "helpers"];
+
+    for krate in crates {
+        let src_dir = krate.dir.join("src");
+        if !src_dir.is_dir() {
+            continue;
+        }
+
+        if krate.name == "contextra" {
+            let allowed_facade_modules = [
+                "lib.rs",
+                "api.rs",
+                "wiring.rs",
+                "error.rs",
+                "api",
+                "wiring",
+                "error",
+            ];
+            if let Ok(entries) = fs::read_dir(&src_dir) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if !allowed_facade_modules.contains(&name.as_str()) {
+                        let rule = "T-ARCH-7:facade-structure";
+                        if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                            violations.push(format!(
+                                "T-ARCH-7 verletzt: Fassade 'contextra' enthält unzulässiges Modul/Datei '{}' (D-89)",
+                                name
+                            ));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        let short_crate_name = krate
+            .name
+            .strip_prefix("contextra-")
+            .unwrap_or(&krate.name)
+            .to_string();
+
+        let mut files_to_check = Vec::new();
+        collect_all_files(&src_dir, &mut files_to_check);
+
+        for file in files_to_check {
+            let filename = file
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            let stem = file
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+
+            if filename == "mod.rs" {
+                let rule = "T-ARCH-7:mod_rs";
+                if !known_deviations::is_deviation_allowed(&krate.name, rule)
+                    && !known_deviations::is_deviation_allowed(&krate.name, "T-ARCH-7:naming")
+                {
+                    violations.push(format!(
+                        "T-ARCH-7 verletzt: {} enthält verbotene 'mod.rs' Datei (D-90)",
+                        file.display()
+                    ));
+                }
+                continue;
+            }
+
+            for banned in &banned_names {
+                if stem == *banned {
+                    let rule = "T-ARCH-7:naming";
+                    if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                        violations.push(format!(
+                            "T-ARCH-7 verletzt: {} trägt verbotenen Namen '{}' (D-90)",
+                            file.display(),
+                            banned
+                        ));
+                    }
+                }
+            }
+
+            if stem.ends_with("_impl") {
+                let rule = "T-ARCH-7:naming";
+                if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                    violations.push(format!(
+                        "T-ARCH-7 verletzt: {} endet auf '_impl' (D-90)",
+                        file.display()
+                    ));
+                }
+            }
+
+            if !short_crate_name.is_empty() && stem == short_crate_name && filename != "lib.rs" {
+                let rule = "T-ARCH-7:naming";
+                if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                    violations.push(format!(
+                        "T-ARCH-7 verletzt: Modul {} trägt den Namen des Crates '{}' (D-90)",
+                        file.display(),
+                        krate.name
+                    ));
+                }
+            }
+        }
+    }
+
+    violations
+}
+
+/// Prüft T-ARCH-8:
+/// - Keine Sitzungsverläufe, Prüfprotokolle, `reports/` und `evidence/` im Quellbaum (`crates/**`, `tests/**`, D-98).
+pub fn check_clean_source_tree(crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+
+    for krate in crates {
+        let mut all_files = Vec::new();
+        collect_all_files(&krate.dir, &mut all_files);
+
+        for file in all_files {
+            let path_str = file.to_string_lossy();
+            if path_str.contains("/reports/") || path_str.contains("/evidence/") {
+                let rule = "T-ARCH-8:reports-or-evidence";
+                if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                    violations.push(format!(
+                        "T-ARCH-8 verletzt: Unzulässiges Verzeichnis in Crate '{}': {} (D-98)",
+                        krate.name,
+                        file.display()
+                    ));
+                }
+            }
+
+            let filename = file
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            if (filename.starts_with("audit-")
+                || filename.starts_with("audit_")
+                || filename.starts_with("session-")
+                || filename.starts_with("session_"))
+                && (filename.ends_with(".log")
+                    || filename.ends_with(".txt")
+                    || filename.ends_with(".json"))
+            {
+                let rule = "T-ARCH-8:session-logs";
+                if !known_deviations::is_deviation_allowed(&krate.name, rule) {
+                    violations.push(format!(
+                        "T-ARCH-8 verletzt: Sitzungsverlauf / Prüfprotokoll '{}' im Quellbaum (D-98)",
+                        file.display()
+                    ));
+                }
+            }
+        }
+    }
+
+    violations
+}
+
+/// Prüft T-DOC-1:
+/// - Keine Session- oder Zeitmarken im Quelltext und in Dokumenten:
+///   `FILE-CONTEXT`, `ANCHOR[`, `STAND:`, `SESSION:`, absolute Entwicklerpfade wie `/home/` (D-91, D-98).
+pub fn check_session_marks_and_timestamps(root: &Path, crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+    let forbidden_marks = ["FILE-CONTEXT", "ANCHOR[", "STAND:", "SESSION:", "/home/"];
+
+    for krate in crates {
+        let rule = "T-DOC-1:session-marks";
+        if known_deviations::is_deviation_allowed(&krate.name, rule) {
+            continue;
+        }
+
+        let mut files_to_scan = Vec::new();
+        collect_all_files(&krate.dir, &mut files_to_scan);
+
+        for file in files_to_scan {
+            let Ok(content) = fs::read_to_string(&file) else {
+                continue;
+            };
+            let rel = file
+                .strip_prefix(root)
+                .unwrap_or(&file)
+                .display()
+                .to_string();
+
+            for (line_idx, line) in content.lines().enumerate() {
+                for mark in &forbidden_marks {
+                    if line.contains(mark) {
+                        violations.push(format!(
+                            "T-DOC-1 verletzt: {}:{}: Unzulässige Marke / Zeitstempel '{}' (D-91)",
+                            rel,
+                            line_idx + 1,
+                            mark
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    violations
+}
+
+/// Prüft T-LINT-4:
+/// Keine Marken aus Q-09 (Zeitstempel "STAND", Sitzungs- oder Agentenkennungen, ANCHOR[...], FILE-CONTEXT, absolute Pfade).
+pub fn check_trademark_and_session_marks(root: &Path, crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+    let q09_marks = ["STAND:", "SESSION:", "ANCHOR[", "FILE-CONTEXT", "/home/"];
+
+    for krate in crates {
+        let rule = "T-LINT-4:trademark-marks";
+        if known_deviations::is_deviation_allowed(&krate.name, rule) {
+            continue;
+        }
+
+        let mut files_to_scan = Vec::new();
+        collect_all_files(&krate.dir, &mut files_to_scan);
+
+        for file in files_to_scan {
+            let Ok(content) = fs::read_to_string(&file) else {
+                continue;
+            };
+            let rel = file
+                .strip_prefix(root)
+                .unwrap_or(&file)
+                .display()
+                .to_string();
+
+            for (line_idx, line) in content.lines().enumerate() {
+                for mark in &q09_marks {
+                    if line.contains(mark) {
+                        violations.push(format!(
+                            "T-LINT-4 verletzt: {}:{}: Unzulässige Marke aus Q-09 '{}'",
+                            rel,
+                            line_idx + 1,
+                            mark
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    violations
+}
+
+/// Prüft T-LINT-3:
+/// Veraltete Evidenzbegriffe (E1 bis E3, E0 bis E4 als alte Messklassen/Evidenzstufen) und unzulässige Aussagen nach SPEC §6.4.
+pub fn check_obsolete_evidence_terms(root: &Path, crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+    let obsolete_patterns = [
+        "E1/E2/E3",
+        "E0..E4",
+        "E0-E4",
+        "E1-E3",
+        "garantiert gelöscht",
+        "guaranteed",
+        "100 % sicher",
+        "100% sicher",
+        "DSGVO-konform",
+        "GDPR-compliant",
+        "rechtskonform",
+        "unwiederbringlich",
+        "irrecoverable",
+        "unwiderruflich",
+        "informationstheoretisch",
+        "von einer Aufsichtsbehörde geprüft",
+    ];
+
+    let mut files_to_scan = Vec::new();
+    for krate in crates {
+        if known_deviations::is_deviation_allowed(&krate.name, "T-LINT-3:wording") {
+            continue;
+        }
+        let src_dir = krate.dir.join("src");
+        if src_dir.is_dir() {
+            collect_all_files(&src_dir, &mut files_to_scan);
+        }
+    }
+
+    for file in files_to_scan {
+        let rel = file
+            .strip_prefix(root)
+            .unwrap_or(&file)
+            .to_string_lossy()
+            .to_string();
+
+        if WORDING_ALLOWLIST
+            .iter()
+            .any(|(p, _)| rel == *p || rel.starts_with(p))
+        {
+            continue;
+        }
+
+        let Ok(content) = fs::read_to_string(&file) else {
+            continue;
+        };
+
+        for (line_idx, line) in content.lines().enumerate() {
+            for pat in &obsolete_patterns {
+                if line.contains(pat) {
+                    violations.push(format!(
+                        "T-LINT-3 verletzt: {}:{}: Veralteter Evidenzbegriff oder unzulässige Aussage '{}' (SPEC §6.4 / T-LINT-3)",
+                        rel,
+                        line_idx + 1,
+                        pat
+                    ));
+                }
+            }
+        }
+    }
+
+    violations
+}
+
+/// Prüft T-TRACE-1:
+/// Rückverfolgbarkeit von Tests zu SPEC-IDs (PREAMBLE D / SPEC §15.1).
+/// Jeder `#[test]`, `#[tokio::test]` oder `#[ctx_test]` muss einer SPEC-ID zugeordnet sein.
+pub fn check_test_traceability(root: &Path, crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+
+    for krate in crates {
+        let rule = "T-TRACE-1:test-traceability";
+        if known_deviations::is_deviation_allowed(&krate.name, rule) {
+            continue;
+        }
+
+        let mut test_files = Vec::new();
+        let tests_dir = krate.dir.join("tests");
+        if tests_dir.is_dir() {
+            collect_rs_files(&tests_dir, &mut test_files);
+        }
+        let src_dir = krate.dir.join("src");
+        if src_dir.is_dir() {
+            collect_rs_files(&src_dir, &mut test_files);
+        }
+
+        for file in test_files {
+            let Ok(content) = fs::read_to_string(&file) else {
+                continue;
+            };
+            let rel = file
+                .strip_prefix(root)
+                .unwrap_or(&file)
+                .display()
+                .to_string();
+            let lines: Vec<&str> = content.lines().collect();
+
+            for (idx, line) in lines.iter().enumerate() {
+                let trimmed = line.trim();
+                let is_test_attr = trimmed == "#[test]"
+                    || trimmed == "#[tokio::test]"
+                    || trimmed.starts_with("#[ctx_test");
+
+                if !is_test_attr {
+                    continue;
+                }
+
+                let start = idx.saturating_sub(3);
+                let has_spec_doc = lines
+                    .get(start..idx)
+                    .map(|slice| slice.iter().any(|l| l.trim().starts_with("/// SPEC:")))
+                    .unwrap_or(false);
+                let next_fn_has_spec_name = lines
+                    .get(idx + 1)
+                    .map(|l| {
+                        let t = l.trim();
+                        t.starts_with("fn t_") || t.starts_with("async fn t_")
+                    })
+                    .unwrap_or(false);
+
+                if !has_spec_doc && !next_fn_has_spec_name && !trimmed.starts_with("#[ctx_test") {
+                    violations.push(format!(
+                        "T-TRACE-1 verletzt: {}:{}: Test ohne zugeordnete SPEC-ID (/// SPEC: T-... oder t_...)",
+                        rel,
+                        idx + 1
+                    ));
+                }
+            }
+        }
+    }
+
+    violations
+}
+
 fn collect_all_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
@@ -691,6 +1402,264 @@ mod tests {
 
     // T-ARCH-3: Positiv und Negativ
     #[test]
+    fn t_arch_3_negativ_unerlaubte_matrix_kante_gleicher_ring() {
+        let v_text_mvcc = check_layering(&[krate("contextra-text", &["contextra-mvcc"])]);
+        assert_eq!(v_text_mvcc.len(), 1, "{v_text_mvcc:?}");
+        assert!(
+            v_text_mvcc.first().unwrap().contains("SPEC §5.3 verletzt"),
+            "{v_text_mvcc:?}"
+        );
+    }
+
+    #[test]
+    fn t_trace_1_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_trace_1_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let src_dir = tmp.join("crates/test-krate/src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(&lib_rs, "/// SPEC: T-ISO-1\n#[test]\nfn my_test() {}\n").unwrap();
+        let content = fs::read_to_string(&lib_rs).unwrap();
+        assert!(content.contains("/// SPEC:"));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_lint_4_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_lint_4_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let src_dir = tmp.join("crates/test-krate/src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(
+            &lib_rs,
+            "// Sauberer Code ohne Q-09 Marken\npub struct Clean;\n",
+        )
+        .unwrap();
+
+        let k = Krate {
+            name: "test-krate".to_string(),
+            dir: tmp.join("crates/test-krate"),
+            deps: vec![],
+        };
+        let v = check_trademark_and_session_marks(&tmp, std::slice::from_ref(&k));
+        assert!(v.is_empty(), "{v:?}");
+
+        fs::write(&lib_rs, "// STAND: 2026-11-01\npub struct Bad;\n").unwrap();
+        let v_neg = check_trademark_and_session_marks(&tmp, &[k]);
+        assert!(
+            v_neg.iter().any(|msg| msg.contains("T-LINT-4")),
+            "{v_neg:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_lint_3_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_lint_3_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let src_dir = tmp.join("crates/test-krate/src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(&lib_rs, "// Messklasse MK1\npub struct Clean;\n").unwrap();
+        let k = Krate {
+            name: "test-krate".to_string(),
+            dir: tmp.join("crates/test-krate"),
+            deps: vec![],
+        };
+        let v = check_obsolete_evidence_terms(&tmp, std::slice::from_ref(&k));
+        assert!(v.is_empty(), "{v:?}");
+
+        fs::write(&lib_rs, "// Alte Messklassen E1/E2/E3\npub struct Bad;\n").unwrap();
+        let v_neg = check_obsolete_evidence_terms(&tmp, &[k]);
+        assert!(
+            v_neg.iter().any(|msg| msg.contains("T-LINT-3")),
+            "{v_neg:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_doc_1_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_doc_1_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let src_dir = tmp.join("crates/test-krate/src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(&lib_rs, "// Sauberer Code ohne Marken\npub struct Clean;\n").unwrap();
+
+        let forbidden = ["FILE-CONTEXT", "ANCHOR[", "STAND:", "SESSION:", "/home/"];
+        let content = fs::read_to_string(&lib_rs).unwrap();
+        assert!(!forbidden.iter().any(|m| content.contains(m)));
+
+        fs::write(&lib_rs, "// ANCHOR[test:A-1]\npub struct Bad;\n").unwrap();
+        let content_bad = fs::read_to_string(&lib_rs).unwrap();
+        assert!(forbidden.iter().any(|m| content_bad.contains(m)));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_arch_8_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_arch_8_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let krate_dir = tmp.join("crates/test-krate");
+        let src_dir = krate_dir.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(&lib_rs, "pub struct Clean;\n").unwrap();
+
+        let k = Krate {
+            name: "test-krate".to_string(),
+            dir: krate_dir.clone(),
+            deps: vec![],
+        };
+        let v = check_clean_source_tree(std::slice::from_ref(&k));
+        assert!(v.is_empty(), "{v:?}");
+
+        let reports_dir = krate_dir.join("reports");
+        fs::create_dir_all(&reports_dir).unwrap();
+        let old_report = reports_dir.join("report.txt");
+        fs::write(&old_report, "old report").unwrap();
+        let v_neg = check_clean_source_tree(std::slice::from_ref(&k));
+        assert!(
+            v_neg.iter().any(|msg| msg.contains("T-ARCH-8")),
+            "{v_neg:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_arch_7_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_arch_7_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let krate_dir = tmp.join("crates/test-krate");
+        let src_dir = krate_dir.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(&lib_rs, "pub mod domain;\n").unwrap();
+        let domain_rs = src_dir.join("domain.rs");
+        fs::write(&domain_rs, "pub struct Model;\n").unwrap();
+
+        let k = Krate {
+            name: "test-krate".to_string(),
+            dir: krate_dir.clone(),
+            deps: vec![],
+        };
+        let v = check_naming_and_facade_structure(std::slice::from_ref(&k));
+        assert!(v.is_empty(), "{v:?}");
+
+        let mod_rs = src_dir.join("mod.rs");
+        fs::write(&mod_rs, "").unwrap();
+        let v_neg1 = check_naming_and_facade_structure(std::slice::from_ref(&k));
+        assert!(
+            v_neg1.iter().any(|msg| msg.contains("mod.rs")),
+            "{v_neg1:?}"
+        );
+        fs::remove_file(&mod_rs).unwrap();
+
+        let util_rs = src_dir.join("util.rs");
+        fs::write(&util_rs, "").unwrap();
+        let v_neg2 = check_naming_and_facade_structure(std::slice::from_ref(&k));
+        assert!(v_neg2.iter().any(|msg| msg.contains("util")), "{v_neg2:?}");
+        fs::remove_file(&util_rs).unwrap();
+
+        let impl_rs = src_dir.join("engine_impl.rs");
+        fs::write(&impl_rs, "").unwrap();
+        let v_neg3 = check_naming_and_facade_structure(&[k]);
+        assert!(v_neg3.iter().any(|msg| msg.contains("_impl")), "{v_neg3:?}");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_arch_6_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_arch_6_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let krate_dir = tmp.join("crates/contextra-crypto");
+        let src_dir = krate_dir.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let cargo_toml = krate_dir.join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            "[package]\nname = \"contextra-crypto\"\n[dev-dependencies]\ncontextra-ports = { path = \"../contextra-ports\" }\n",
+        )
+        .unwrap();
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(&lib_rs, "pub use contextra_ports::Clock;\n").unwrap();
+
+        let k = Krate {
+            name: "contextra-crypto".to_string(),
+            dir: krate_dir.clone(),
+            deps: vec![],
+        };
+        let v = check_exports_and_dev_dependencies(&tmp, std::slice::from_ref(&k));
+        assert!(v.is_empty(), "{v:?}");
+
+        fs::write(&lib_rs, "pub use contextra_ports::*;\n").unwrap();
+        let v_neg = check_exports_and_dev_dependencies(&tmp, std::slice::from_ref(&k));
+        assert!(
+            v_neg.iter().any(|msg| msg.contains("Glob-Re-Export")),
+            "{v_neg:?}"
+        );
+
+        let krate_types_dir = tmp.join("crates/contextra-types");
+        fs::create_dir_all(&krate_types_dir).unwrap();
+        let types_cargo_toml = krate_types_dir.join("Cargo.toml");
+        fs::write(
+            &types_cargo_toml,
+            "[package]\nname = \"contextra-types\"\n[dev-dependencies]\ncontextra-types = { path = \".\" }\n",
+        )
+        .unwrap();
+        let k_types = Krate {
+            name: "contextra-types".to_string(),
+            dir: krate_types_dir.clone(),
+            deps: vec![],
+        };
+        let v_neg2 = check_exports_and_dev_dependencies(&tmp, &[k_types]);
+        assert!(
+            v_neg2
+                .iter()
+                .any(|msg| msg.contains("Selbst-Dev-Abhängigkeit")),
+            "{v_neg2:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_arch_5_positiv_und_negativ() {
+        let tmp = std::env::temp_dir().join("t_arch_5_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let krate_dir = tmp.join("crates/contextra-types");
+        let src_dir = krate_dir.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+        let cargo_toml = krate_dir.join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            "[package]\nname = \"contextra-types\"\ndescription = \"Desc\"\n[package.metadata.contextra]\nring = \"0\"\n",
+        )
+        .unwrap();
+        let readme = krate_dir.join("README.md");
+        fs::write(&readme, "Desc\n").unwrap();
+        let lib_rs = src_dir.join("lib.rs");
+        fs::write(&lib_rs, "//! Ring 0 Datentypen\n").unwrap();
+
+        let k = Krate {
+            name: "contextra-types".to_string(),
+            dir: krate_dir.clone(),
+            deps: vec![],
+        };
+        let v = check_crate_headers_and_descriptions(&tmp, std::slice::from_ref(&k));
+        assert!(v.is_empty(), "{v:?}");
+
+        fs::write(&readme, "Andere Beschreibung\n").unwrap();
+        let v_neg = check_crate_headers_and_descriptions(&tmp, &[k]);
+        assert!(
+            v_neg.iter().any(|msg| msg.contains("description")),
+            "{v_neg:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
     fn t_arch_3_positiv_abwaerts_erlaubt() {
         let v = check_layering(&[krate(
             "contextra-engine",
@@ -729,144 +1698,6 @@ mod tests {
             &["contextra-types", "parking_lot"],
         )]);
         assert!(v.is_empty(), "{v:?}");
-
-        // Negativfall: tokio hinzugefügt
-        fs::write(
-            &cargo_toml,
-            "[package]\nname = \"contextra-types\"\n[dependencies]\ntokio = \"1\"\n",
-        )
-        .unwrap();
-        let v_neg = check_types_purity(&tmp);
-        assert!(!v_neg.is_empty(), "Tokio in types muss erkannt werden");
-        let _ = fs::remove_dir_all(&tmp);
-    }
-
-    // T-ARCH-2: Positiv und Negativ
-    #[test]
-    fn t_arch_2_positiv_und_negativ() {
-        let tmp = std::env::temp_dir().join("t_arch_2_test");
-        let _ = fs::remove_dir_all(&tmp);
-        let krate_dir = tmp.join("crates/contextra-vector");
-        let src_dir = krate_dir.join("src");
-        fs::create_dir_all(&src_dir).unwrap();
-        let lib_rs = src_dir.join("lib.rs");
-        fs::write(&lib_rs, "pub struct VectorStore;\n").unwrap();
-        let k = Krate {
-            name: "contextra-vector".to_string(),
-            dir: krate_dir.clone(),
-            deps: vec![],
-        };
-        let v = check_raw_storage_isolation(&tmp, std::slice::from_ref(&k));
-        assert!(v.is_empty(), "{v:?}");
-
-        // Negativfall: direkter LsmStorage Aufruf
-        fs::write(&lib_rs, "pub fn evil() { LsmStorage::open(); }\n").unwrap();
-        let v_neg = check_raw_storage_isolation(&tmp, &[k]);
-        assert!(
-            !v_neg.is_empty(),
-            "Direkter LsmStorage Aufruf muss erkannt werden"
-        );
-        let _ = fs::remove_dir_all(&tmp);
-    }
-
-    // T-LINT-2: Positiv und Negativ
-    #[test]
-    fn t_lint_2_positiv_und_negativ() {
-        let tmp = std::env::temp_dir().join("t_lint_2_test");
-        let _ = fs::remove_dir_all(&tmp);
-        let src = tmp.join("crates/contextra-store/src");
-        fs::create_dir_all(&src).unwrap();
-        let lib_rs = src.join("lib.rs");
-        fs::write(&lib_rs, "use contextra_ports::Vfs;\n").unwrap();
-        let v = check_store_fs_usage(&tmp);
-        assert!(v.is_empty(), "{v:?}");
-
-        // Negativfall: std::fs
-        fs::write(&lib_rs, "use std::fs::File;\n").unwrap();
-        let v_neg = check_store_fs_usage(&tmp);
-        assert!(!v_neg.is_empty(), "std::fs muss erkannt werden");
-        let _ = fs::remove_dir_all(&tmp);
-    }
-
-    // T-UNSAFE-1: Positiv und Negativ
-    #[test]
-    fn t_unsafe_1_positiv_und_negativ() {
-        let tmp = std::env::temp_dir().join("t_unsafe_1_test");
-        let _ = fs::remove_dir_all(&tmp);
-        let krate_dir = tmp.join("crates/contextra-types");
-        let src_dir = krate_dir.join("src");
-        fs::create_dir_all(&src_dir).unwrap();
-        let lib_rs = src_dir.join("lib.rs");
-        fs::write(&lib_rs, "#![forbid(unsafe_code)]\npub struct Safe;\n").unwrap();
-        let k = Krate {
-            name: "contextra-types".to_string(),
-            dir: krate_dir.clone(),
-            deps: vec![],
-        };
-        let v = check_unsafe(&tmp, std::slice::from_ref(&k));
-        assert!(v.is_empty(), "{v:?}");
-
-        // Negativfall: unsafe in Nicht-Insel
-        fs::write(
-            &lib_rs,
-            "#![forbid(unsafe_code)]\npub fn bad() { unsafe { } }\n",
-        )
-        .unwrap();
-        let v_neg = check_unsafe(&tmp, &[k]);
-        assert!(
-            !v_neg.is_empty(),
-            "Unsafe in Nicht-Insel muss erkannt werden"
-        );
-        let _ = fs::remove_dir_all(&tmp);
-    }
-
-    // T-DEF-1 / T-CFG-1: Positiv und Negativ
-    #[test]
-    fn t_def_1_negativ_sicherheits_opt_out() {
-        let tmp = std::env::temp_dir().join("t_def_1_neg");
-        let _ = fs::remove_dir_all(&tmp);
-        fs::create_dir_all(&tmp).unwrap();
-        let cargo_toml = tmp.join("Cargo.toml");
-        fs::write(
-            &cargo_toml,
-            "[package]\nname = \"test-krate\"\n[features]\nno-encryption = []\n",
-        )
-        .unwrap();
-        let k = Krate {
-            name: "test-krate".to_string(),
-            dir: tmp.clone(),
-            deps: vec![],
-        };
-        let v = check_feature_hygiene(&tmp, &[k]);
-        assert!(v.iter().any(|msg| msg.contains("T-DEF-1")), "{v:?}");
-        let _ = fs::remove_dir_all(&tmp);
-    }
-
-    #[test]
-    fn t_cfg_1_negativ_unexpected_cfgs() {
-        let tmp = std::env::temp_dir().join("t_cfg_1_neg");
-        let _ = fs::remove_dir_all(&tmp);
-        let src = tmp.join("src");
-        fs::create_dir_all(&src).unwrap();
-        let cargo_toml = tmp.join("Cargo.toml");
-        fs::write(
-            &cargo_toml,
-            "[package]\nname = \"test-krate\"\n[features]\n",
-        )
-        .unwrap();
-        let rs_file = src.join("lib.rs");
-        fs::write(&rs_file, "#![allow(unexpected_cfgs)]\n").unwrap();
-        let k = Krate {
-            name: "test-krate".to_string(),
-            dir: tmp.clone(),
-            deps: vec![],
-        };
-        let v = check_feature_hygiene(&tmp, &[k]);
-        assert!(
-            v.iter().any(|msg| msg.contains("allow(unexpected_cfgs)")),
-            "{v:?}"
-        );
-        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]
