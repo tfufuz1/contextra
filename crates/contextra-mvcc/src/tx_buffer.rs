@@ -1121,6 +1121,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(loom))]
     // Prüft die nebenläufige has_tx-Abfrage parallel zu schreibenden Operationen.
     async fn test_has_tx_concurrent() {
         let buffer = Arc::new(TxBuffer::<String>::new());

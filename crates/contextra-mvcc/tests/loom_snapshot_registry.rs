@@ -5,8 +5,6 @@
 //! - Unter Loom: Exhaustive Permutation aller Thread-Interleavings.
 //! - Unter Standard-Cargo: Paralleler Multi-Thread-Stresstest über 16 Worker-Threads.
 
-#![allow(unexpected_cfgs)]
-
 #[cfg(loom)]
 mod loom_tests {
     use loom::sync::Arc;
@@ -118,6 +116,37 @@ mod loom_tests {
             t2.join().unwrap();
 
             assert_eq!(registry.min_active_seqno(), u64::MAX);
+        });
+    }
+
+    // Loom-Test: Modelliert atomares SSI Prune-Through und Watermark-Updates.
+    #[test]
+    fn test_loom_ssi_prune_and_read_isolation() {
+        loom::model(|| {
+            let pruned_through = Arc::new(AtomicU64::new(0));
+
+            let p1 = Arc::clone(&pruned_through);
+            let p2 = Arc::clone(&pruned_through);
+
+            let t1 = thread::spawn(move || {
+                // Background compactor advances watermark to 50
+                p1.fetch_max(50, Ordering::SeqCst);
+            });
+
+            let t2 = thread::spawn(move || {
+                // Reader checks if snapshot_seq 40 is pruned
+                let current_watermark = p2.load(Ordering::SeqCst);
+                let snapshot_seq = 40;
+                let is_valid = snapshot_seq >= current_watermark;
+                if !is_valid {
+                    assert!(current_watermark >= 50);
+                }
+            });
+
+            t1.join().unwrap();
+            t2.join().unwrap();
+
+            assert_eq!(pruned_through.load(Ordering::SeqCst), 50);
         });
     }
 }

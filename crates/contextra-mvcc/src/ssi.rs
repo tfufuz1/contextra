@@ -29,6 +29,7 @@
 // NICHT-OFFENSICHTLICH: Pruning unter `committed_writes` Schreib-Lock sichert den atomaren Wasserstand. Fail-closed Protection verweigert Reads mit snapshot_seq < pruned_through.
 // SIEHE AUCH: crates/contextra-mvcc/src/seq_log.rs, crates/contextra-mvcc/src/tx_buffer.rs
 
+use crate::error::MvccError;
 use crate::error::{ContextraError, Result};
 use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
 use crate::snapshot::SnapshotRegistry;
@@ -635,16 +636,54 @@ impl SequenceLogSsiValidator {
         self
     }
 
+    // ANCHOR[contextra-mvcc:SSI-PRUNE-THROUGH-CHECKED]
+    /// Bereinigt (prunt) bestätigte Schreib-Einträge mit `commit_seq <= bound`.
+    ///
+    /// Vertrag V-MVCC:
+    /// - `bound == None`: Es gibt nichts zu prunen -> liefert `Ok(())`.
+    /// - `bound == Some(seq)`: Prüft auf ungültige Sequenzen (Tombstone-Bit gesetzt oder Sentinel `u64::MAX`).
+    ///   Trifft dies zu, wird fail-closed `Err(MvccError::InvalidSequence(seq))` zurückgegeben.
+    /// - `pruned_through` steigt monoton und überschreitet niemals die höchste committete Sequenznummer.
+    pub fn prune_through_checked(&self, bound: Option<u64>) -> std::result::Result<(), MvccError> {
+        let Some(bound_seq) = bound else {
+            return Ok(());
+        };
+
+        if bound_seq == u64::MAX || (bound_seq & crate::types::TOMBSTONE_BIT) != 0 {
+            return Err(MvccError::InvalidSequence(bound_seq));
+        }
+
+        let mut writes = self.committed_writes.write();
+        let max_commit_seq = writes.seq_index.keys().copied().next_back().unwrap_or(0);
+        let effective_bound = if max_commit_seq == 0 {
+            0
+        } else {
+            bound_seq.min(max_commit_seq)
+        };
+
+        writes.prune_through(effective_bound);
+        self.pruned_through
+            .fetch_max(effective_bound, Ordering::SeqCst);
+        Ok(())
+    }
+
     // ANCHOR[contextra-mvcc:SSI-PRUNE-THROUGH]
     /// Bereinigt (prunt) bestätigte Schreib-Einträge mit `commit_seq <= bound_seq`.
     ///
     /// Aktualisiert den atomaren `pruned_through`-Wasserstand.
     ///
-    /// ### Fail-Closed-Sicherheit:
-    /// Sobald ein Stand `bound_seq` bereinigt wurde, schlägt jede Transaktion, die einen Snapshot
-    /// mit `snapshot_seq < bound_seq` nutzt, sofort fehl, um unerkannte Write-Skews zu verhindern.
+    /// ### V-MVCC Vertrag & D-C02 Bugfix:
+    /// Veraltete Hülle um [`prune_through_checked`]. Ignoriert Sentinel-Werte (`u64::MAX`)
+    /// und gesetzte Tombstone-Bits sicher, anstatt sie dauerhaft in `pruned_through` zu speichern.
+    #[doc(hidden)]
+    #[deprecated(
+        since = "0.1.0",
+        note = "Nutze stattdessen prune_through_checked(Option<u64>)"
+    )]
     pub fn prune_through(&self, bound_seq: u64) -> usize {
-        let bound_seq = bound_seq & !crate::types::TOMBSTONE_BIT;
+        if bound_seq == u64::MAX || (bound_seq & crate::types::TOMBSTONE_BIT) != 0 {
+            return 0;
+        }
         let mut writes = self.committed_writes.write();
         let removed = writes.prune_through(bound_seq);
         self.pruned_through.fetch_max(bound_seq, Ordering::SeqCst);
