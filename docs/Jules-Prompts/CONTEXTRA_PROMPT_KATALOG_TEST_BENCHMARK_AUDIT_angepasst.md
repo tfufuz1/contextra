@@ -1123,7 +1123,7 @@ print "== Ollama =="
 command -v ollama >/dev/null && ollama list 2>&1 | head -5 || miss ollama "optional, nur für L-19"
 
 print "== Hardware / Hygiene =="
-lscpu | grep -E "Model name|^CPU\(s\)|Thread|MHz" 
+lscpu | grep -E "Model name|^CPU\(s\)|Thread|MHz"
 for f in /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor /sys/devices/system/cpu/intel_pstate/no_turbo /sys/devices/system/cpu/smt/control; do [[ -r $f ]] && print "$f: $(cat $f)"; done
 free -h | head -2; df -hT . /tmp | cat
 lsblk -d -o NAME,ROTA,MODEL,SIZE 2>/dev/null
