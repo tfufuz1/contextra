@@ -15,6 +15,7 @@ members = [
     "crates/contextra-engine",
     "crates/contextra",
     "crates/contextra-testkit",
+    "crates/contextra-lab",
     "tests/arch",
 ]
 default-members = [

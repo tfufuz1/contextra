@@ -1,0 +1,44 @@
+[package]
+name = "contextra-lab-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+contextra-lab = { path = ".." }
+
+[[bin]]
+name = "fuzz_file_header"
+path = "fuzz_targets/fuzz_file_header.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_header_ab"
+path = "fuzz_targets/fuzz_header_ab.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_vault"
+path = "fuzz_targets/fuzz_vault.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_sstable"
+path = "fuzz_targets/fuzz_sstable.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_record_envelope"
+path = "fuzz_targets/fuzz_record_envelope.rs"
+test = false
+doc = false
