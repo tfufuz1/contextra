@@ -29,11 +29,10 @@ fn test_scrub_matrix_normal_file_scrubbed_with_readback() -> std::io::Result<()>
 
     let outcome = scrub_if_safe(&path, ScrubPolicy::OverwriteZeros, false, false)?;
 
-    if let ScrubOutcome::Scrubbed(receipt) = outcome {
-        assert_eq!(receipt.bytes_scrubbed, 37);
-    } else {
-        assert!(false, "expected ScrubOutcome::Scrubbed, got {:?}", outcome);
-    }
+    assert_eq!(
+        outcome,
+        ScrubOutcome::Scrubbed(contextra_durable_fs::ScrubReceipt { bytes_scrubbed: 37 })
+    );
 
     assert!(!path.exists(), "File should be durably removed");
     Ok(())
@@ -174,16 +173,16 @@ fn test_scrub_matrix_readback_failure_returns_err() -> std::io::Result<()> {
         &CorruptingInjector,
     );
 
-    assert!(
-        res.is_err(),
-        "Readback verification must return Err when non-zero bytes are detected"
-    );
-    let err = res.unwrap_err();
-    assert!(
-        err.to_string()
+    let is_expected_err = match &res {
+        Err(err) => err
+            .to_string()
             .contains("readback zero verification failed"),
-        "Error message should mention readback zero verification failure, got: {}",
-        err
+        Ok(_) => false,
+    };
+    assert!(
+        is_expected_err,
+        "Expected Err with readback zero verification failed, got {:?}",
+        res
     );
 
     Ok(())
