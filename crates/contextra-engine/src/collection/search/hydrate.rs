@@ -12,6 +12,17 @@ use super::{Collection, StoredDocument, StoredDocumentMeta};
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, Result};
 
+/// Vorbereitender ReadGate-Filterpunkt für alle Suchpfade (Stufe 1).
+///
+/// Gemäß SPEC §8.12 und D-62 werden alle Suchergebnisse vor Rückgabe
+/// an den Aufrufer über das ReadGate gefiltert. In Stufe 1 ist dies
+/// als No-Op-Integrationspunkt vorbereitet, damit Stufe 2 (K9)
+/// die Durchleitung an den ReadGate-Port ohne Schnittstellenbruch verdrahten kann.
+pub fn apply_read_gate(hits: Vec<crate::SearchResult>) -> Vec<crate::SearchResult> {
+    // In Stufe 1: No-Op Durchleitung
+    hits
+}
+
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     // ANCHOR[contextra-engine:COL-HYD-016]
     /// Dokumentation für `hydrate_from_scored_at` im Rahmen der Collection- und Suchabstraktion.
@@ -59,7 +70,8 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 skipped_tombstones += 1;
             }
         }
-        Ok((results, skipped_tombstones))
+        let filtered = apply_read_gate(results);
+        Ok((filtered, skipped_tombstones))
     }
 
     // ANCHOR[contextra-engine:COL-HYD-063]
@@ -111,6 +123,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 "Tombstones skipped during tuple search hydration"
             );
         }
-        Ok(results)
+        Ok(apply_read_gate(results))
     }
 }

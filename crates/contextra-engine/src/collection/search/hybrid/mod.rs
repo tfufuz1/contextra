@@ -6,17 +6,16 @@
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
 
 // FILE-CONTEXT
-// ZWECK: Hybrid-Familie (hybrid_search, hybrid_search_reranked, hybrid_search_with_weights, hybrid_search_with_strategy, traverse_links, filter_by_importance) für Collection.
+// ZWECK: Hybrid-Familie (hybrid_search, hybrid_search_reranked, hybrid_search_with_weights, traverse_links, filter_by_importance) für Collection.
 
 mod query;
 
-use super::checkpoint::with_pinned_checkpoint_at_latest;
 use super::{extract_effective_importance, Collection};
-use contextra_ports::{GraphIndex, Reranker, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{DocId, EntityId, Result, TxId};
+use contextra_ports::{Reranker, StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{DocId, Result, TxId};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
-    /// Performs hybrid search combining BM25, vector search, and graph traversal results via RRF.
+    /// Performs hybrid search combining BM25 and vector search results via RRF.
     #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, text, vector))]
@@ -25,13 +24,11 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         text: &str,
         vector: &[f32],
         k: usize,
-        anchor_entities: Option<&[contextra_types::EntityId]>,
     ) -> Result<Vec<crate::SearchResult>> {
-        self.hybrid_search_with_weights(text, vector, k, anchor_entities, None)
-            .await
+        self.hybrid_search_with_weights(text, vector, k, None).await
     }
 
-    /// Performs hybrid search combining BM25, vector search, and graph traversal, followed by optional Cross-Encoder reranking.
+    /// Performs hybrid search combining BM25 and vector search, followed by optional Cross-Encoder reranking.
     /// Mindest-Kandidatenpool für Cross-Encoder-Reranking.
     /// Wissenschaftliche Basis: arXiv:2604.01733 (T2-RAGBench).
     /// k_pool=20 → Recall@5=0.458; k_pool=100 → Recall@5=0.888 (Qualitätsknie).
@@ -41,27 +38,22 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Dokumentation für `hybrid_search_reranked` im Rahmen der Collection- und Suchabstraktion.
     #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
     #[allow(deprecated)]
-    #[tracing::instrument(level = "trace", skip(self, text, vector, reranker, anchor_entities))]
+    #[tracing::instrument(level = "trace", skip(self, text, vector, reranker))]
     pub async fn hybrid_search_reranked(
         &self,
         text: &str,
         vector: &[f32],
         k: usize,
         reranker: Option<&dyn Reranker>,
-        anchor_entities: Option<&[contextra_types::EntityId]>,
     ) -> Result<Vec<crate::SearchResult>> {
         let mut builder = self.query().text(text).vector(vector).k(k);
         if let Some(r) = reranker {
             builder = builder.reranker(r);
         }
-        if let Some(anchors) = anchor_entities {
-            builder = builder.anchors(anchors.iter().copied());
-        }
         builder.execute().await
     }
 
-    /// Performs hybrid search with custom fusion weights for vector, text, and graph signals,
-    /// and optional community filtering/boosting.
+    /// Performs hybrid search with custom fusion weights for vector and text signals.
     #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
     #[allow(deprecated)]
     #[tracing::instrument(level = "trace", skip(self, text, vector))]
@@ -70,36 +62,22 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         text: &str,
         vector: &[f32],
         k: usize,
-        anchor_entities: Option<&[contextra_types::EntityId]>,
         weights: Option<&contextra_types::FusionWeights>,
     ) -> Result<Vec<crate::SearchResult>> {
-        self.hybrid_search_with_strategy(
-            text,
-            vector,
-            k,
-            anchor_entities,
-            weights,
-            None,
-            None,
-            None,
-        )
-        .await
+        self.hybrid_search_with_strategy(text, vector, k, weights, None)
+            .await
     }
 
-    /// Performs hybrid search with custom signal fusion weights and graph traversal strategy.
+    /// Performs hybrid search with custom signal fusion weights and signal fusion strategy.
     #[deprecated(since = "0.1.0", note = "use Collection::query() instead")]
     #[allow(deprecated)]
-    #[tracing::instrument(level = "trace", skip(self, text, vector, strategy))]
-    #[allow(clippy::too_many_arguments)]
+    #[tracing::instrument(level = "trace", skip(self, text, vector))]
     pub async fn hybrid_search_with_strategy(
         &self,
         text: &str,
         vector: &[f32],
         k: usize,
-        anchor_entities: Option<&[contextra_types::EntityId]>,
         weights: Option<&contextra_types::FusionWeights>,
-        strategy: Option<&contextra_types::GraphTraversalStrategy>,
-        same_community_as: Option<EntityId>,
         fusion_strategy: Option<contextra_types::SignalFusionStrategies>,
     ) -> Result<Vec<crate::SearchResult>> {
         if k == 0 {
@@ -114,230 +92,68 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
         let k = k.min(contextra_types::MAX_SEARCH_K);
 
-        // Pin-first, read-after: the seq is read under the protection of the pin,
-        // eliminating the TOCTOU window between snapshot_seq() and pin activation.
-        with_pinned_checkpoint_at_latest(self.storage.as_ref(), |seq| async move {
-            let is_vector_zero = vector.iter().all(|&v| v == 0.0);
-            let is_text_empty = text.trim().is_empty();
+        let seq = self.storage.last_seq_no().await?;
 
-            let default_strategy = contextra_types::GraphTraversalStrategy::default();
-            let graph_strat = strategy.unwrap_or(&default_strategy);
+        let is_vector_zero = vector.iter().all(|&v| v == 0.0);
+        let is_text_empty = text.trim().is_empty();
 
-            // 1. Vector Signal (Candidate overfetching for RRF fusion)
-            let vector_results = if is_vector_zero {
-                Vec::new()
-            } else {
-                self.search_filtered_at(
-                    vector,
-                    k.saturating_mul(Self::OVERFETCH_FACTOR),
-                    None,
-                    seq,
-                )
+        // 1. Vector Signal (Candidate overfetching for RRF fusion)
+        let vector_results = if is_vector_zero {
+            Vec::new()
+        } else {
+            self.search_filtered_at(vector, k.saturating_mul(Self::OVERFETCH_FACTOR), None, seq)
                 .await?
-            };
-
-            // 2. Text Signal (Candidate overfetching for RRF fusion)
-            let text_results = if is_text_empty {
-                Vec::new()
-            } else {
-                let bm25_results = self
-                    .text_index
-                    .search_at(text, k.saturating_mul(Self::OVERFETCH_FACTOR), seq)
-                    .await?;
-                self.hydrate_from_tuples_at(
-                    bm25_results
-                        .into_iter()
-                        .map(|sd| (sd.doc_id, sd.score))
-                        .collect(),
-                    seq,
-                )
-                .await?
-            };
-
-            // 3. Graph Signal
-            // AI-TAG[RESOLVED][MINOR] graph_search snapshot isolation via multi_traverse_at for Hops; PARTIAL with warning for PPR/PathRag. (ID: AGT-DB-6d724b1a)
-            let implicit_anchors: Vec<contextra_types::EntityId>;
-            let anchors_ref: Option<&[contextra_types::EntityId]> = if let Some(anchors) = anchor_entities
-            {
-                if anchors.is_empty() {
-                    None
-                } else {
-                    Some(anchors)
-                }
-            } else if !text_results.is_empty() {
-                // Graph-Knoten MÜSSEN mit demselben String-Schlüssel wie das korrespondierende Textdokument erstellt werden (via `EntityId::from_key`), sonst wird das Graph-Signal für Multi-Step-Query-Expansion und Zettelkasten-Displacement unbemerkt leer.
-                implicit_anchors = text_results
-                    .iter()
-                    .filter_map(|r| contextra_types::EntityId::from_key(r.id.as_str()).ok())
-                    .collect();
-                Some(&implicit_anchors)
-            } else {
-                None
-            };
-
-            let graph_results = if let Some(anchors) = anchors_ref {
-                self.evaluate_graph_signal_tuples_at(anchors, graph_strat, k, seq)
-                    .await?
-            } else {
-                Vec::new()
-            };
-
-            if !text_results.is_empty() && graph_results.is_empty() && anchor_entities.is_none() {
-                tracing::warn!(
-                    text_count = text_results.len(),
-                    "Implicit graph anchors derived from text results produced empty graph signal. Verify mapping invariant: graph nodes must share string keys with text documents (EntityId::from_key)."
-                );
-            }
-
-            if vector_results.is_empty() && text_results.is_empty() && graph_results.is_empty() {
-                return Ok(Vec::new());
-            }
-
-            let (vw, tw, gw) = crate::fusion::weights_to_signal_factors(weights);
-
-            let target_community_id: Option<u64> = if let Some(same_comm_entity) = same_community_as {
-                self.get_community(same_comm_entity).await?
-            } else {
-                None
-            };
-
-            let mut signal_sets = Vec::new();
-            if !vector_results.is_empty() {
-                signal_sets.push(("vector".to_string(), vector_results, vw));
-            }
-            if !text_results.is_empty() {
-                signal_sets.push(("text".to_string(), text_results, tw));
-            }
-            if !graph_results.is_empty() {
-                signal_sets.push(("graph".to_string(), graph_results, gw));
-            }
-
-            let selected_fusion_strategy = fusion_strategy.unwrap_or_default();
-
-            let mut fused = crate::fusion::fuse_search_results_with_signal_strategies(
-                signal_sets,
-                k.saturating_mul(Self::OVERFETCH_FACTOR),
-                crate::fusion::MetadataMergePriority::default(),
-                true,
-                None,
-                selected_fusion_strategy,
-            );
-            fused.truncate(k);
-
-            let boosted = self
-                .apply_community_boost_post_fusion(
-                    fused,
-                    target_community_id,
-                    Self::DEFAULT_COMMUNITY_BOOST,
-                )
-                .await?;
-            Ok(boosted)
-        })
-        .await
-    }
-
-    /// Evaluates graph signal traversal at snapshot `seq` and returns hydrated search results.
-    async fn evaluate_graph_signal_tuples_at(
-        &self,
-        anchors: &[contextra_types::EntityId],
-        graph_strat: &contextra_types::GraphTraversalStrategy,
-        k: usize,
-        seq: u64,
-    ) -> Result<Vec<crate::SearchResult>> {
-        let tuples = match graph_strat {
-            contextra_types::GraphTraversalStrategy::Hops { max_hops } => {
-                let mut raw_tuples = self
-                    .graph_index
-                    .multi_traverse_at(anchors, *max_hops, seq)
-                    .await?;
-                raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                raw_tuples.truncate(k);
-                raw_tuples
-            }
-            contextra_types::GraphTraversalStrategy::PersonalizedPageRank(cfg) => {
-                let mut raw_tuples = self
-                    .graph_index
-                    .personalized_page_rank_at(anchors, cfg, seq)
-                    .await?;
-                raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                raw_tuples.truncate(k);
-                raw_tuples
-            }
-            contextra_types::GraphTraversalStrategy::PathRag { max_hops, .. } => {
-                let mut raw_tuples = self
-                    .graph_index
-                    .path_rag_at(anchors, *max_hops, seq)
-                    .await?;
-                raw_tuples.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-                raw_tuples.truncate(k);
-                raw_tuples
-            }
         };
-        let doc_tuples = tuples
-            .into_iter()
-            .map(|(eid, score)| (contextra_types::DocId::new(eid.inner()), score))
-            .collect();
-        self.hydrate_from_tuples_at(doc_tuples, seq).await
+
+        // 2. Text Signal (Candidate overfetching for RRF fusion)
+        let text_results = if is_text_empty {
+            Vec::new()
+        } else {
+            let bm25_results = self
+                .text_index
+                .search_at(text, k.saturating_mul(Self::OVERFETCH_FACTOR), seq)
+                .await?;
+            self.hydrate_from_tuples_at(
+                bm25_results
+                    .into_iter()
+                    .map(|sd| (sd.doc_id, sd.score))
+                    .collect(),
+                seq,
+            )
+            .await?
+        };
+
+        if vector_results.is_empty() && text_results.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let (vw, tw, _) = crate::fusion::weights_to_signal_factors(weights);
+
+        let mut signal_sets = Vec::new();
+        if !vector_results.is_empty() {
+            signal_sets.push(("vector".to_string(), vector_results, vw));
+        }
+        if !text_results.is_empty() {
+            signal_sets.push(("text".to_string(), text_results, tw));
+        }
+
+        let selected_fusion_strategy = fusion_strategy.unwrap_or_default();
+
+        let mut fused = crate::fusion::fuse_search_results_with_signal_strategies(
+            signal_sets,
+            k.saturating_mul(Self::OVERFETCH_FACTOR),
+            crate::fusion::MetadataMergePriority::default(),
+            true,
+            None,
+            selected_fusion_strategy,
+        );
+        fused.truncate(k);
+
+        Ok(super::hydrate::apply_read_gate(fused))
     }
 
     /// Standard overfetch factor applied to candidate limits before fusion to balance OOM protection and recall.
     pub const OVERFETCH_FACTOR: usize = 3;
-
-    /// Standard community boost factor applied to post-fusion scores for matching community members.
-    pub const DEFAULT_COMMUNITY_BOOST: f32 = 1.2;
-
-    /// Multiplies the post-fusion scores of results belonging to `target_community_id` by `boost_factor`,
-    /// then re-sorts descending by score with deterministic secondary sorting by document ID.
-    ///
-    /// Formerly named `apply_community_boost_post_rrf`; renamed to `apply_community_boost_post_fusion`
-    /// because community boosting applies post-fusion consistently across both RRF and ScoreNormalized strategies.
-    pub(super) async fn apply_community_boost_post_fusion(
-        &self,
-        mut results: Vec<crate::SearchResult>,
-        target_community_id: Option<u64>,
-        boost_factor: f32,
-    ) -> Result<Vec<crate::SearchResult>> {
-        let Some(target_comm) = target_community_id else {
-            return Ok(results);
-        };
-
-        if results.is_empty() {
-            return Ok(results);
-        }
-
-        let parsed_eids: Vec<Option<contextra_types::EntityId>> = results
-            .iter()
-            .map(|res| contextra_types::EntityId::from_key(&res.id).ok())
-            .collect();
-
-        let candidate_eids: Vec<contextra_types::EntityId> =
-            parsed_eids.iter().filter_map(|&eid| eid).collect();
-
-        if candidate_eids.is_empty() {
-            return Ok(results);
-        }
-
-        let community_map = self.get_communities_batch(&candidate_eids).await?;
-
-        for (res, &opt_eid) in results.iter_mut().zip(parsed_eids.iter()) {
-            if let Some(eid) = opt_eid {
-                if let Some(&comm) = community_map.get(&eid) {
-                    if comm == target_comm {
-                        res.score *= boost_factor;
-                    }
-                }
-            }
-        }
-
-        results.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.id.cmp(&b.id))
-        });
-
-        Ok(results)
-    }
 
     /// Traverses Zettelkasten memory links starting from a given document up to a maximum hop depth (ADR-038).
     ///

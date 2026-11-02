@@ -6,7 +6,6 @@
 
 #![cfg(not(loom))]
 use contextra_engine::{Collection, DistanceMetric, Language};
-use contextra_graph::CsrGraph;
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{DocId, FilterExpr};
 use contextra_vector::{HnswConfig, HnswIndex};
@@ -30,13 +29,11 @@ async fn create_test_collection(name: &str) -> (Collection<LsmStorage, HnswIndex
         ..Default::default()
     };
     let index = Arc::new(HnswIndex::try_new(hnsw_config).unwrap());
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
     let col = Collection::new(
         name.to_string(),
         storage,
         index,
-        graph,
         next_tx,
         4,
         Language::English,
