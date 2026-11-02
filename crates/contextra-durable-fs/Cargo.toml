@@ -9,12 +9,32 @@ license.workspace = true
 rust-version.workspace = true
 description = "Dateisystem-Implementierung `RealVfs` mit dauerhaften Schreib- und Austauschoperationen."
 
+autotests = false
+autobenches = false
+
 [package.metadata.contextra]
 ring = "1"
 
 [dependencies]
-contextra-ports = { path = "../contextra-ports", version = "0.1.0" }
-contextra-sys = { path = "../contextra-sys", version = "0.1.0" }
+contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
+contextra-sys = { workspace = true }
 
 [dev-dependencies]
+contextra-testkit = { workspace = true }
+proptest = "1.6"
+criterion = { workspace = true }
 tempfile = { workspace = true }
+
+[[test]]
+name = "df_probe_tests"
+path = "tests/df_probe_tests.rs"
+
+[[test]]
+name = "df_arch_tests"
+path = "tests/df_arch_tests.rs"
+
+[[bench]]
+name = "bm_dfs_probe"
+harness = false
+path = "benches/bm_dfs_probe.rs"
