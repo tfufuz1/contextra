@@ -27,7 +27,7 @@ pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::Hn
     pub(super) staged_graph_edges: Mutex<Vec<Edge>>,
     pub(super) staged_graph_entity_deletes: Mutex<Vec<EntityId>>,
     pub(super) staged_graph_edge_deletes: Mutex<Vec<(EntityId, EntityId)>>,
-    pub(super) staged_hyperedges: Mutex<Vec<contextra_graph::hyperedge::HyperEdge>>,
+    pub(super) staged_hyperedges: Mutex<Vec<u8>>,
     pub(super) committed: AtomicBool,
 }
 
@@ -145,15 +145,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         guard.push((from, to));
     }
 
-    // ANCHOR[contextra-engine:STA-134]
-    /// Dokumentation für `stage_hyperedge` im Rahmen der Transaktions- und Facade-Orchestrierung.
-    pub fn stage_hyperedge(&self, hyperedge: contextra_graph::hyperedge::HyperEdge) {
-        let mut guard = match self.staged_hyperedges.lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        };
-        guard.push(hyperedge);
-    }
 }
 
 impl<S: StorageEngine, V: VectorIndex> Drop for DbTransaction<S, V> {
