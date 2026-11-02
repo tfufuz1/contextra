@@ -24,5 +24,15 @@ parking_lot = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
+
+[[test]]
+name = "tk_fault_vfs_conformance"
+path = "../../tests/tk_fault_vfs_conformance.rs"
+
+[[bench]]
+name = "bm_tk_fault_vfs"
+harness = false
+path = "../../benches/bm_tk_fault_vfs.rs"
