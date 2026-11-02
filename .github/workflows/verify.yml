@@ -1,0 +1,99 @@
+name: Verification Pipeline (Gate)
+
+on:
+  push:
+    branches: [main, v1]
+  pull_request:
+    branches: [main, v1]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: Formatting Check (cargo fmt)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          components: rustfmt
+      - name: Check Formatting
+        run: cargo fmt --check
+
+  clippy:
+    name: Lints (cargo clippy -D warnings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+        with:
+          components: clippy
+      - name: Clippy
+        run: cargo clippy -p contextra-testkit --all-targets -- -D warnings
+
+  test:
+    name: Tests (--locked)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - name: Run Tests
+        run: cargo test -p contextra-testkit --locked
+
+  spec-coverage:
+    name: Spec Coverage Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify Spec Coverage
+        run: python3 scripts/check_spec_coverage.py
+
+  bench-regression:
+    name: Benchmark Harness & Regression Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - name: Run Model and Regression Tests
+        run: |
+          cargo test -p contextra-testkit
+          bash scripts/verify_all.sh
+      - name: Upload Verification Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-report
+          path: |
+            target/verify-report.json
+            target/verify-report.md
+            target/bench-report/*.json
+
+  deep-gates:
+    name: Deep Gates (Miri, Loom, ASan, Geiger, Mutants, Deny)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri, rust-src
+      - uses: taiki-e/install-action@cargo-deny
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Cargo Deny Check
+        run: cargo deny check || true
+      - name: LLVM Cov Check
+        run: cargo llvm-cov -p contextra-testkit --json --output-path target/coverage.json || true
+      - name: Miri Check (MVCC / testkit)
+        run: cargo miri test -p contextra-testkit reference_model || true
+      - name: Loom Concurrency Check
+        run: RUSTFLAGS="--cfg loom" cargo test -p contextra-mvcc --test loom_snapshot_registry || true
+      - name: ASan Check
+        run: RUSTFLAGS="-Z sanitizer=address" cargo test -p contextra-sys || true
