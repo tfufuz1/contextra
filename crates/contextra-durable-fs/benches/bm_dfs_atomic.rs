@@ -91,7 +91,7 @@ fn bench_erase_wa(temp_dir: &Path, iterations: usize) -> BenchResult {
         fs::write(&file_path, &dummy_data).expect("Initial write failed");
 
         let start = Instant::now();
-        // D-83: rotational == true && !is_cow misst die getrennten Scrubbing-Kosten
+        // NOTE: Gemäß D-83 misst rotational == true && !is_cow die getrennten Scrubbing-Kosten.
         let outcome = scrub_before_unlink(&file_path, true, false).expect("scrub failed");
         let elapsed = start.elapsed().as_secs_f64() * 1_000_000.0;
         latencies_us.push(elapsed);

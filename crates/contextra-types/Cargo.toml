@@ -13,19 +13,16 @@ description = "Reine Datentypen: IDs, Tags, Schlüssel, Fehler, Löschtypen. Kei
 ring = "0"
 
 [features]
-default = []
+# Deprecated feature flags retained as no-op stubs during workspace migration.
+# Will be fully pruned per WP-1.2 / D-84.
 docid-128 = []
 auto-extraction-opt-out = []
 
 [dependencies]
 thiserror = { workspace = true }
+zeroize = "1.8"
 serde = { workspace = true }
 serde_json = { workspace = true }
-bincode = { workspace = true }
-ahash = { workspace = true, features = ["serde"] }
-blake3 = { workspace = true }
-sha2 = "0.10"
-bytes = { workspace = true }
 
 [dev-dependencies]
 proptest = "1.4"

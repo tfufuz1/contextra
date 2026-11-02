@@ -12,9 +12,7 @@
 //! - Startprobe (`probe_platform_durability`): Verifiziert Plattform-Durability und Verzeichnis-fsync (T-PLAT-1, SPEC §8.5 D-56).
 
 // FILE-CONTEXT
-// STAND: 2026-11-02
-// ZWECK: Kanonische RealVfs-Implementierung fuer das einheitliche contextra_ports::Vfs-Trait.
-// INVARIANTEN: Zero-Panic, Fail-Closed, Zweistufige Haltbarkeit, Rechte 0600/0700.
+// NOTE: Kanonische RealVfs-Implementierung fuer das einheitliche contextra_ports::Vfs-Trait. Invarianten: Zero-Panic, Fail-Closed, Zweistufige Haltbarkeit, Rechte 0600/0700.
 
 pub use contextra_ports::vfs::Vfs;
 use contextra_ports::{ContextraError, Result};
@@ -44,6 +42,11 @@ impl RealVfs {
 }
 
 impl Vfs for RealVfs {
+    // ANCHOR[contextra-durable-fs:REAL-VFS-READ-001]
+    // Ablauf von `read`:
+    // 1. Existenz des Pfads prüfen (Fail-Closed mit NotFound).
+    // 2. Dateiinhalt vollständig einlesen (`std::fs::read`).
+    // 3. I/O-Fehler in `ContextraError` abbilden.
     /// Liest den gesamten Dateiinhalt an `path`.
     fn read(&self, path: &Path) -> Result<Vec<u8>> {
         if !path.exists() {
@@ -121,6 +124,10 @@ impl Vfs for RealVfs {
         Ok(())
     }
 
+    // ANCHOR[contextra-durable-fs:REAL-VFS-CREATE-DIR-ALL-001]
+    // Ablauf von `create_dir_all`:
+    // 1. Verzeichnispfad rekursiv mit `std::fs::create_dir_all` anlegen.
+    // 2. Unter Unix Berechtigungsmodus 0700 erzwingen (DF-08).
     /// Erstellt ein Verzeichnis rekursiv mit restriktiven Rechten (0700 unter Unix).
     fn create_dir_all(&self, path: &Path) -> Result<()> {
         fs::create_dir_all(path).map_err(ContextraError::Io)?;
@@ -133,6 +140,11 @@ impl Vfs for RealVfs {
         Ok(())
     }
 
+    // ANCHOR[contextra-durable-fs:REAL-VFS-REMOVE-FILE-001]
+    // Ablauf von `remove_file`:
+    // 1. Existenz prüfen.
+    // 2. Datei löschen (`std::fs::remove_file`).
+    // 3. Elternverzeichnis flushen (`flush_dir`) für Metadaten-Haltbarkeit (DF-09).
     /// Entfernt eine Datei dauerhaft und flusht das Elternverzeichnis.
     fn remove_file(&self, path: &Path) -> Result<()> {
         if !path.exists() {
@@ -155,11 +167,13 @@ impl Vfs for RealVfs {
         Ok(())
     }
 
+    // ANCHOR[contextra-durable-fs:REAL-VFS-EXISTS-001]
     /// Prüft, ob `path` existiert.
     fn exists(&self, path: &Path) -> Result<bool> {
         Ok(path.exists())
     }
 
+    // ANCHOR[contextra-durable-fs:REAL-VFS-LEN-001]
     /// Gibt die Dateilänge in Bytes zurück.
     fn len(&self, path: &Path) -> Result<u64> {
         if !path.exists() {
@@ -174,6 +188,7 @@ impl Vfs for RealVfs {
         })
     }
 
+    // ANCHOR[contextra-durable-fs:REAL-VFS-LIST-DIR-001]
     /// Listet Dateinamen innerhalb des Verzeichnisses auf.
     fn list_dir(&self, path: &Path) -> Result<Vec<String>> {
         if !path.exists() {
@@ -190,6 +205,7 @@ impl Vfs for RealVfs {
         Ok(names)
     }
 
+    // ANCHOR[contextra-durable-fs:REAL-VFS-SYNC-DIR-001]
     /// Synchronisiert die Verzeichnismetadaten dauerhaft auf Festplatte.
     fn sync_dir(&self, path: &Path) -> Result<()> {
         if !path.exists() {

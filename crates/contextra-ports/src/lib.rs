@@ -55,8 +55,20 @@ pub mod text_index;
 pub mod vector_index;
 /// Virtual File System (VFS) port interface and contracts.
 pub mod vfs;
+/// Erasure layer contracts.
+pub mod erasure;
+/// ReadGate interface and types.
+pub mod gate;
+/// Key management, RecordSealer, and FileKeyring.
+pub mod keys;
+/// Ledger sink contracts.
+pub mod ledger;
 
 pub use clock::*;
+pub use erasure::*;
+pub use gate::*;
+pub use keys::*;
+pub use ledger::*;
 // Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
 #[allow(deprecated)]
 pub use embedding::*;
