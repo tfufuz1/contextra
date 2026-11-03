@@ -243,13 +243,25 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             Ok(_) => {
                 db_tx.commit().await?;
                 self.check_and_trigger_community_detection(1);
-                let elapsed = (self.clock().monotonic_nanos().saturating_sub(start_nanos)) as f64 / 1_000_000_000.0;
-                record_histogram_safe(self.metrics_sink().as_ref(), INSERT_LATENCY, elapsed, &[("status", "success")]);
+                let elapsed = (self.clock().monotonic_nanos().saturating_sub(start_nanos)) as f64
+                    / 1_000_000_000.0;
+                record_histogram_safe(
+                    self.metrics_sink().as_ref(),
+                    INSERT_LATENCY,
+                    elapsed,
+                    &[("status", "success")],
+                );
                 Ok(())
             }
             Err(e) => {
-                let elapsed = (self.clock().monotonic_nanos().saturating_sub(start_nanos)) as f64 / 1_000_000_000.0;
-                record_histogram_safe(self.metrics_sink().as_ref(), INSERT_LATENCY, elapsed, &[("status", "error")]);
+                let elapsed = (self.clock().monotonic_nanos().saturating_sub(start_nanos)) as f64
+                    / 1_000_000_000.0;
+                record_histogram_safe(
+                    self.metrics_sink().as_ref(),
+                    INSERT_LATENCY,
+                    elapsed,
+                    &[("status", "error")],
+                );
                 if let Err(rollback_err) = db_tx.rollback().await {
                     tracing::error!("[INV-DB-3] Failed to rollback insert: {}", rollback_err);
                 }

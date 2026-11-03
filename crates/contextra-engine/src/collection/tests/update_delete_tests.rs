@@ -321,7 +321,7 @@ async fn test_ttl_overflow_does_not_expire() {
     col.insert(
         "doc_overflow",
         &[1.0, 0.0, 0.0, 0.0],
-        Some(json!({\"created_at_ms\": u64::MAX - 10, "ttl_ms": 100})),
+        Some(json!({"created_at_ms": u64::MAX - 10, "ttl_ms": 100})),
     )
     .await
     .unwrap(); // unwrap
@@ -402,8 +402,6 @@ async fn test_t_del_lock_held_during_delete_op_and_commit() {
 
     assert!(
         second_try.is_none(),
-        "T-DEL-LOCK-1: delete() muss kv_lock für den gesamten Zeitraum \
-         delete_op + commit halten. Wenn dieser Test fehlschlägt, wurde das \
-         Lock zu früh freigegeben (Bug B: drop(_guard) vor delete_op)."
+        "T-DEL-LOCK-1: delete() muss kv_lock für den gesamten Zeitraum delete_op + commit halten. Wenn dieser Test fehlschlägt, wurde das Lock zu früh freigegeben (Bug B: drop(_guard) vor delete_op)."
     );
 }

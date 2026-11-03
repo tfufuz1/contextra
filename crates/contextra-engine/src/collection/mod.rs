@@ -324,14 +324,7 @@ impl<S: StorageEngine> Collection<S, HnswIndex> {
         dimension: usize,
         language: Language,
     ) -> Self {
-        Self::new(
-            name,
-            storage,
-            index,
-            next_tx,
-            dimension,
-            language,
-        )
+        Self::new(name, storage, index, next_tx, dimension, language)
     }
 }
 

@@ -144,7 +144,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         };
         guard.push((from, to));
     }
-
 }
 
 impl<S: StorageEngine, V: VectorIndex> Drop for DbTransaction<S, V> {
