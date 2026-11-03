@@ -224,6 +224,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-MOCKS-EMBEDDER-001]
     // Prüft Einbettungs-Dimension und deterministische Vektorerzeugung von MockEmbedder.
+    /// SPEC: PO-09
     #[tokio::test]
     async fn test_mock_embedder_methods() -> Result<(), Box<dyn std::error::Error>> {
         let embedder = MockEmbedder::new(4);
@@ -243,6 +244,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-MOCKS-BATCH-001]
     // Prüft Batch-Verarbeitung und Blanket-Trait-Implementierung für TextEmbeddingEngine.
+    /// SPEC: PO-09
     #[tokio::test]
     async fn test_embedding_provider_batch_and_blanket_trait(
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -262,6 +264,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-MOCKS-SINK-001]
     // Prüft die chronologische Aufzeichnung und das Leeren von Counter-, Gauge- und Histogramm-Ereignissen.
+    /// SPEC: PO-09
     #[test]
     fn test_test_metrics_sink() {
         let sink = TestMetricsSink::new();

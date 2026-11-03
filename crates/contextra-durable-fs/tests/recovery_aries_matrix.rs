@@ -15,6 +15,13 @@
 //! 4. Crash während Recovery (Wiederholbarkeit nach Absturz in Wiederherstellungsphase)
 //! 5. Zero-Trust Mutanten: dir-fsync entfernt, Manifest vor SSTable fsync, WalFloor zu früh vorgerückt.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::disallowed_methods
+)]
+
 use contextra_ports::{Vfs, VfsOpenOptions};
 use contextra_testkit::fault_vfs::{FaultOperation, FaultPlan, FaultVfs};
 use contextra_types::Result;

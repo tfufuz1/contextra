@@ -315,6 +315,7 @@ impl ReferenceModel {
 mod tests {
     use super::*;
 
+    /// SPEC: T-CRASH-1
     #[test]
     fn test_reference_model_mvcc_isolation() {
         let mut model = ReferenceModel::new();
@@ -348,6 +349,7 @@ mod tests {
         assert_eq!(p_seq2, vec![(b"k1".to_vec(), b"v1_seq2".to_vec())]);
     }
 
+    /// SPEC: T-CRASH-1
     #[test]
     fn test_reference_model_sentinel_and_tombstones() {
         let mut model = ReferenceModel::new();
@@ -364,6 +366,7 @@ mod tests {
         assert_eq!(model.min_read_snapshot(), None);
     }
 
+    /// SPEC: T-CRASH-1
     #[test]
     fn test_reference_model_property_self_consistency() {
         let mut model = ReferenceModel::new();

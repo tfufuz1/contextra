@@ -215,6 +215,28 @@ pub enum MeasureClass {
     Mk3,
 }
 
+/// Unabhängige Messmethode für Schichtprüfungen (SPEC 3.1, 12.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub enum ScanMethod {
+    /// MK1: Logische Scanmethode (z. B. Iteration über Indexeinträge).
+    Mk1,
+    /// MK2: Physische Scanmethode auf Block-/Dateiebene.
+    Mk2,
+    /// MK3: Rohmedien-Inspektion.
+    Mk3,
+}
+
+impl ScanMethod {
+    /// Liefert die zugehörige Messklasse (`MeasureClass`).
+    pub const fn class(&self) -> MeasureClass {
+        match self {
+            Self::Mk1 => MeasureClass::Mk1,
+            Self::Mk2 => MeasureClass::Mk2,
+            Self::Mk3 => MeasureClass::Mk3,
+        }
+    }
+}
+
 /// Risikobedingung zur Evaluierung von Restrisiken (SPEC Anhang D, AR-4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum RiskCondition {
@@ -324,7 +346,11 @@ pub struct Residue {
 
 impl fmt::Display for Residue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "erasure residue detected: {} matches found", self.matches)
+        write!(
+            f,
+            "erasure residue detected: {} matches found",
+            self.matches
+        )
     }
 }
 

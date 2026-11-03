@@ -70,8 +70,8 @@ impl VectorIndex for HnswIndex {
 
         let query_quantized: Option<Vec<u8>> = None;
 
-        let mmap_guard = self.inner.cold.mmap_index.read();
-        let mmap_node_count = mmap_guard
+        let buffer_guard = self.inner.cold.buffer_index.read();
+        let buffer_node_count = buffer_guard
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
@@ -89,12 +89,12 @@ impl VectorIndex for HnswIndex {
         if ep.is_empty() {
             let nodes = self.inner.hot.nodes.read();
             let deleted = self.inner.cold.deleted_nodes.read();
-            let mmap_guard = self.inner.cold.mmap_index.read();
-            let mmap_node_count = mmap_guard
+            let buffer_guard = self.inner.cold.buffer_index.read();
+            let buffer_node_count = buffer_guard
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let total = mmap_node_count + nodes.len();
+            let total = buffer_node_count + nodes.len();
             for i in 0..total {
                 if !deleted.contains(i as u64) {
                     ep.push(i);
@@ -160,8 +160,8 @@ impl VectorIndex for HnswIndex {
 
         let ctx = SearchContext {
             nodes: &nodes,
-            mmap: mmap_guard.as_ref(),
-            mmap_node_count,
+            buffer: buffer_guard.as_ref(),
+            buffer_node_count,
             prior_prepared: &[],
             backlink_map: None,
             quantizer: q_ref.map(Cow::Borrowed),
@@ -172,8 +172,8 @@ impl VectorIndex for HnswIndex {
             if deleted.contains(c.index as u64) {
                 continue;
             }
-            if c.index >= mmap_node_count {
-                if let Some(node) = nodes.get(c.index - mmap_node_count) {
+            if c.index >= buffer_node_count {
+                if let Some(node) = nodes.get(c.index - buffer_node_count) {
                     if node.committed_tx == 0 {
                         continue;
                     }
@@ -437,17 +437,17 @@ impl VectorIndex for HnswIndex {
         }
 
         {
-            let mmap_count = self
+            let buffer_count = self
                 .inner
                 .cold
-                .mmap_index
+                .buffer_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
             let mut deleted = self.inner.cold.deleted_nodes.write();
             for &idx in &indices_to_remove {
-                deleted.insert((mmap_count + idx) as u64);
+                deleted.insert((buffer_count + idx) as u64);
             }
             self.inner
                 .hot
@@ -476,8 +476,8 @@ impl VectorIndex for HnswIndex {
             return Ok(Vec::new());
         }
         let nodes = self.inner.hot.nodes.read();
-        let mmap_guard = self.inner.cold.mmap_index.read();
-        let mmap_node_count = mmap_guard
+        let buffer_guard = self.inner.cold.buffer_index.read();
+        let buffer_node_count = buffer_guard
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
@@ -485,15 +485,15 @@ impl VectorIndex for HnswIndex {
 
         let ctx = SearchContext {
             nodes: &nodes,
-            mmap: mmap_guard.as_ref(),
-            mmap_node_count,
+            buffer: buffer_guard.as_ref(),
+            buffer_node_count,
             prior_prepared: &[],
             backlink_map: None,
             quantizer: None,
             arena: &self.inner.hot.arena,
         };
 
-        let total_nodes = mmap_node_count + nodes.len();
+        let total_nodes = buffer_node_count + nodes.len();
         let mut ids = Vec::with_capacity(total_nodes.saturating_sub(deleted.len() as usize));
 
         for i in 0..total_nodes {
@@ -508,15 +508,15 @@ impl VectorIndex for HnswIndex {
         if self.inner.cold.validation_error.is_some() {
             return 0;
         }
-        let mmap_count = self
+        let buffer_count = self
             .inner
             .cold
-            .mmap_index
+            .buffer_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
-        let total = mmap_count + self.inner.hot.nodes.read().len();
+        let total = buffer_count + self.inner.hot.nodes.read().len();
         let deleted = self.inner.hot.deleted_count.load(Ordering::SeqCst) as usize;
         total.saturating_sub(deleted)
     }
@@ -531,14 +531,14 @@ impl VectorIndex for HnswIndex {
 
     async fn stats(&self) -> Result<VectorIndexStats> {
         let nodes = self.inner.hot.nodes.read();
-        let mmap_guard = self.inner.cold.mmap_index.read();
-        let mmap_count = mmap_guard
+        let buffer_guard = self.inner.cold.buffer_index.read();
+        let buffer_count = buffer_guard
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
 
         let deleted_count = self.inner.hot.deleted_count.load(Ordering::SeqCst) as usize;
-        let num_vectors = (mmap_count + nodes.len()).saturating_sub(deleted_count);
+        let num_vectors = (buffer_count + nodes.len()).saturating_sub(deleted_count);
 
         let mut vector_memory: usize = nodes
             .iter()
@@ -551,8 +551,8 @@ impl VectorIndex for HnswIndex {
         let connection_memory: usize =
             self.inner.hot.arena.arena.read().len() * std::mem::size_of::<u32>();
 
-        if let Some(mmap) = mmap_guard.as_ref() {
-            vector_memory += mmap.mmap.len();
+        if let Some(buffer) = buffer_guard.as_ref() {
+            vector_memory += buffer.buffer.len();
         }
 
         Ok(VectorIndexStats {

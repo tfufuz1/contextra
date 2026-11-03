@@ -10,7 +10,7 @@ rust-version.workspace = true
 description = "Sequenzen, Snapshots und SSI-Validierung für Mehrversions-Nebenläufigkeit."
 
 [package.metadata.contextra]
-ring = "0"
+ring = "2"
 
 [dependencies]
 contextra-types = { workspace = true }

@@ -10,8 +10,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
-use contextra_mvcc::types::TxId;
 use contextra_ports::{Clock, SystemClock};
+use contextra_types::TxId;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use serde::Serialize;
 use std::fs;

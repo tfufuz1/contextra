@@ -12,10 +12,7 @@
     clippy::exit
 )]
 
-#[path = "../../src/dir_lock.rs"]
-mod dir_lock;
-
-use dir_lock::{DirLock, DIR_LOCKED_MSG};
+use contextra_durable_fs::dir_lock::{DirLock, DIR_LOCKED_MSG};
 use std::path::Path;
 
 /// Umgebungsvariable zur Signalisierung des Kindprozess-Modus.

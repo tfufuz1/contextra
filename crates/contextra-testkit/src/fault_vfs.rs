@@ -659,6 +659,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-FAULT-VFS-WRITE-LIMIT-001]
     // Prüft, dass nach Erreichen des konfigurierten Schreiblimits folgende Schreibvorgänge abgewiesen werden.
+    /// SPEC: T-FSYNC-1
     #[test]
     fn test_fault_vfs_write_limit() {
         let vfs = FaultVfs::new();
@@ -679,6 +680,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-FAULT-VFS-SYNC-FAILURE-001]
     // Prüft, dass Sync-Aufrufe nach dem Schwellenwert fehlschlagen (fsync-Fehlersimulation).
+    /// SPEC: T-FSYNC-1
     #[test]
     fn test_fault_vfs_sync_failure() {
         let vfs = FaultVfs::new();
@@ -693,6 +695,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-FAULT-VFS-VFS-CONTRACT-001]
     // Prüft die Implementierung des contextra_ports::Vfs-Traits.
+    /// SPEC: T-FSYNC-1
     #[test]
     fn test_fault_vfs_vfs_trait_contract() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let vfs = FaultVfs::new();
@@ -718,6 +721,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-FAULT-VFS-CRASH-MATRIX-001]
     // Prüft den Crash-Matrix-Iterator for_each_crash_point.
+    /// SPEC: T-FSYNC-1
     #[test]
     fn test_fault_vfs_crash_matrix_iteration() {
         let outcomes = FaultVfs::for_each_crash_point(|vfs, crash_idx| {

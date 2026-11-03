@@ -1,5 +1,12 @@
 //! Comprehensive test suite fulfilling all SPEC WP-3.2, T-KDF-1/2, T-KEYSLOT-1..4, T-NONCE-1, T-ENC-1..3, T-HDR-1, T-FMT-1, T-KEY-1, T-WAL-1, T-PROOF-1 requirements.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation
+)]
+
 use contextra_crypto::*;
 
 #[test]
@@ -256,11 +263,99 @@ fn test_cr12_chains_and_macs_t_wal_1_2() {
 
     let wal_tag = [0xEE; 16];
     let ct = b"wal ciphertext batch";
-    let w_mac = wal_mac(hierarchy.wal(), &prev, ct.len() as u32, 1, ct, &wal_tag);
+    let w_mac = wal_mac(
+        hierarchy.wal(),
+        &prev,
+        u32::try_from(ct.len()).unwrap_or(0),
+        1,
+        ct,
+        &wal_tag,
+    );
     assert_ne!(w_mac, [0u8; 32]);
 
     let l_mac = ledger_mac(hierarchy.ledger(), &next);
     assert_ne!(l_mac, [0u8; 32]);
+}
+
+#[test]
+fn test_wal_chain_completeness_verification_spec_10_4() {
+    let master = MasterKey::generate_random();
+    let hierarchy = KeyHierarchy::from_master(master);
+
+    let wrong_master = MasterKey::generate_random();
+    let wrong_hierarchy = KeyHierarchy::from_master(wrong_master);
+
+    let mut prev = [0u8; 32];
+    let ct1 = b"frame 1 payload";
+    let tag1 = [1u8; 16];
+    let mac1 = wal_mac(hierarchy.wal(), &prev, ct1.len() as u32, 1, ct1, &tag1);
+
+    prev = mac1;
+    let ct2 = b"frame 2 payload";
+    let tag2 = [2u8; 16];
+    let mac2 = wal_mac(hierarchy.wal(), &prev, ct2.len() as u32, 2, ct2, &tag2);
+
+    prev = mac2;
+    let ct3 = b"frame 3 payload";
+    let tag3 = [3u8; 16];
+    let mac3 = wal_mac(hierarchy.wal(), &prev, ct3.len() as u32, 3, ct3, &tag3);
+
+    // 1. Valid chain matches expected tail
+    let expected_tail = mac3;
+    assert!(verify_chain_complete(&expected_tail, &mac3).is_ok());
+    assert!(verify_wal_chain_completeness(&expected_tail, &mac3).is_ok());
+
+    // 2. Truncated chain (stopped at mac2 instead of mac3)
+    let truncated_tail = mac2;
+    assert_eq!(
+        verify_chain_complete(&expected_tail, &truncated_tail),
+        Err(CryptoError::Corrupt)
+    );
+
+    // 3. Reordered entries (swapped frame 2 and frame 3)
+    let mac3_swapped = wal_mac(hierarchy.wal(), &mac1, ct3.len() as u32, 3, ct3, &tag3);
+    let mac2_swapped = wal_mac(
+        hierarchy.wal(),
+        &mac3_swapped,
+        ct2.len() as u32,
+        2,
+        ct2,
+        &tag2,
+    );
+    assert_eq!(
+        verify_chain_complete(&expected_tail, &mac2_swapped),
+        Err(CryptoError::Corrupt)
+    );
+
+    // 4. Incorrect key
+    let wrong_mac1 = wal_mac(
+        wrong_hierarchy.wal(),
+        &[0u8; 32],
+        ct1.len() as u32,
+        1,
+        ct1,
+        &tag1,
+    );
+    let wrong_mac2 = wal_mac(
+        wrong_hierarchy.wal(),
+        &wrong_mac1,
+        ct2.len() as u32,
+        2,
+        ct2,
+        &tag2,
+    );
+    let wrong_mac3 = wal_mac(
+        wrong_hierarchy.wal(),
+        &wrong_mac2,
+        ct3.len() as u32,
+        3,
+        ct3,
+        &tag3,
+    );
+    assert_eq!(
+        verify_chain_complete(&expected_tail, &wrong_mac3),
+        Err(CryptoError::Corrupt)
+    );
 }
 
 #[test]
@@ -630,4 +725,20 @@ fn test_mutation_verify_vs_verify_strict() {
             "verify_strict mutant detected!"
         );
     }
+}
+
+#[test]
+fn test_t_nonce_1_nonce_format_and_counter_properties() {
+    let key = FileKey::new([0x33; 32]);
+    let file_id = [0x99; 16];
+    let mut sealer = BlockSealer::new(key, FileKind::Wal, file_id, None);
+
+    // Verify block 0 can be sealed
+    let block0 = sealer.seal(b"first block").expect("block 0");
+    assert_eq!(block0.tag.len(), 16);
+
+    // Verify counter overflow at 2^32
+    sealer.set_counter_for_test(1u64 << 32);
+    let overflow_res = sealer.seal(b"overflow block");
+    assert_eq!(overflow_res.err(), Some(CryptoError::Limit));
 }

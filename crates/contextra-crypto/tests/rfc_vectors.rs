@@ -2,12 +2,17 @@
 //!
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `rfc_vectors`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
+//!
+//! ZWECK: Verification of cryptographic primitives against official RFC and reference test vectors.
+//! INVARIANTEN: AES-256-GCM-SIV against RFC 8452, HKDF against RFC 5869, HMAC-SHA256 against RFC 4231.
+//! NICHT-OFFENSICHTLICH: All expected ciphertext/hash values are independently taken from RFC standards, not auto-generated.
 
-// FILE-CONTEXT
-// ZWECK: Verification of cryptographic primitives against official RFC and reference test vectors.
-// INVARIANTEN: AES-256-GCM-SIV against RFC 8452, HKDF against RFC 5869, HMAC-SHA256 against RFC 4231.
-// NICHT-OFFENSICHTLICH: All expected ciphertext/hash values are independently taken from RFC standards, not auto-generated.
-// STAND: TS:2026-08-30T19:25:00Z (SESSION: 20260830)
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::needless_borrows_for_generic_args
+)]
 
 use aes_gcm_siv::{
     aead::{Aead, KeyInit as AeadKeyInit},

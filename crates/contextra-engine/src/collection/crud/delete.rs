@@ -7,7 +7,7 @@
 
 use crate::collection::Collection;
 use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_types::{DocId, EntityId, Result};
+use contextra_types::{DocId, Result};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     // ANCHOR[contextra-engine:COL-DEL-001]
@@ -19,7 +19,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// 3. `delete_op` ausführen:
     ///    - Schlüssel für User-Key und Doc-Key berechnen.
     ///    - Bisherige Werte für Kompensation/Rollback auslesen.
-    ///    - Staging für Text- und Graph-Löschungen registrieren.
+    ///    - Staging für Text-Löschungen registrieren.
     ///    - Storage-Einträge und Vektor-Index-Eintrag löschen.
     /// 4. Transaktion committen oder bei Fehlern sauber zurückrollen.
     #[tracing::instrument(level = "trace", skip(self))]
@@ -27,11 +27,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let _guard = self.kv_locks.lock_for(id).await;
         let mut db_tx = self.begin_transaction()?;
 
-        match self.delete_op(&mut db_tx, id).await {
+        let res = match self.delete_op(&mut db_tx, id).await {
             Ok(_) => {
                 db_tx.commit().await?;
-                self.check_and_trigger_community_detection(1);
-                drop(_guard);
                 Ok(())
             }
             Err(e) => {
@@ -41,7 +39,9 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 drop(_guard);
                 Err(e)
             }
-        }
+        };
+        drop(_guard);
+        res
     }
 
     // ANCHOR[contextra-engine:COL-DEL-035]
@@ -68,10 +68,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             .await?;
 
         db_tx.stage_text_delete(doc_id);
-
-        if let Ok(eid) = EntityId::from_key(id) {
-            db_tx.stage_graph_entity_delete(eid);
-        }
 
         self.storage.delete(tx, &user_key).await?;
         self.storage.delete(tx, &doc_key).await?;

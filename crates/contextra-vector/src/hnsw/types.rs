@@ -28,7 +28,7 @@ pub enum VectorData {
 }
 
 /// A node in the HNSW graph.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HnswNode {
     pub(super) doc_id: DocId,
     pub(super) vector: VectorData,
@@ -176,7 +176,7 @@ pub struct HnswColdCore {
     pub tx_buffer: TxBuffer<Vec<f32>>,
     pub quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
     pub sq8_bias: RwLock<Sq8Bias>,
-    pub mmap_index: RwLock<Option<crate::persistence::MmapIndex>>,
+    pub buffer_index: RwLock<Option<crate::persistence::BufferIndex>>,
     pub seq_log: RwLock<contextra_mvcc::SequenceLog>,
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
@@ -244,7 +244,7 @@ impl HnswIndex {
                     tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
-                    mmap_index: RwLock::new(None),
+                    buffer_index: RwLock::new(None),
                     seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
@@ -316,7 +316,7 @@ impl HnswIndex {
                     tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
-                    mmap_index: RwLock::new(None),
+                    buffer_index: RwLock::new(None),
                     seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
@@ -517,23 +517,23 @@ impl HnswIndex {
         self.inner.wait_for_rebuild_with_timeout(timeout).await
     }
 
-    pub async fn load_mmap(&self, path: impl AsRef<std::path::Path> + Send) -> Result<()> {
-        let mmap_index = crate::persistence::MmapIndex::open_async(path).await?;
-        self.load_mmap_from_instance(mmap_index)
+    pub async fn load_buffer(&self, path: impl AsRef<std::path::Path> + Send) -> Result<()> {
+        let buffer_index = crate::persistence::BufferIndex::open_async(path).await?;
+        self.load_buffer_from_instance(buffer_index)
     }
 
-    pub(super) fn load_mmap_from_instance(
+    pub(super) fn load_buffer_from_instance(
         &self,
-        mmap_index: crate::persistence::MmapIndex,
+        buffer_index: crate::persistence::BufferIndex,
     ) -> Result<()> {
-        let ep = if mmap_index.header.entry_point() >= 0 {
-            Some(mmap_index.header.entry_point() as usize)
+        let ep = if buffer_index.header.entry_point() >= 0 {
+            Some(buffer_index.header.entry_point() as usize)
         } else {
             None
         };
 
         let max_layer = if let Some(e) = ep {
-            let record = mmap_index.get_node_record(e)?;
+            let record = buffer_index.get_node_record(e)?;
             record.max_layer as u64
         } else {
             0
@@ -545,11 +545,11 @@ impl HnswIndex {
             self.inner.hot.max_layer.store(max_layer, Ordering::SeqCst);
         }
 
-        *self.inner.cold.sq8_bias.write() = mmap_index.header.sq8_bias();
+        *self.inner.cold.sq8_bias.write() = buffer_index.header.sq8_bias();
 
-        if mmap_index.header.is_quantized() {
+        if buffer_index.header.is_quantized() {
             let dim = self.inner.cold.config.dimension;
-            let header = &mmap_index.header;
+            let header = &buffer_index.header;
 
             let mut mins = Vec::new();
             let mut maxes = Vec::new();
@@ -559,8 +559,8 @@ impl HnswIndex {
                 && header.quant_calibration_len() as usize >= dim * 4 * 2
             {
                 let offset = header.quant_calibration_offset() as usize;
-                let cal_bytes = mmap_index
-                    .mmap
+                let cal_bytes = buffer_index
+                    .buffer
                     .get(offset..offset + dim * 4 * 2)
                     .ok_or_else(|| {
                         ContextraError::Storage("Calibration segment out of bounds".into())
@@ -609,12 +609,12 @@ impl HnswIndex {
             });
         }
 
-        let mut guard = self.inner.cold.mmap_index.write();
+        let mut guard = self.inner.cold.buffer_index.write();
         self.inner
             .hot
             .last_tx_id
-            .store(mmap_index.header.last_tx_id(), Ordering::SeqCst);
-        *guard = Some(mmap_index);
+            .store(buffer_index.header.last_tx_id(), Ordering::SeqCst);
+        *guard = Some(buffer_index);
         Ok(())
     }
 

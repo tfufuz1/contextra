@@ -11,7 +11,6 @@ echo "[1/3] Checking Unsafe Islands..."
 UNSAFE_OUTSIDE=$(grep -rnE "\bunsafe\s+(fn|trait|impl|\{)" crates/*/src/ 2>/dev/null | \
   grep -v "crates/contextra-simd" | \
   grep -v "crates/contextra-sys" | \
-  grep -v "crates/contextra-wire" | \
   grep -v "#\[cfg(test)\]" | \
   grep -v "^\s*//" || true)
 
@@ -20,7 +19,7 @@ if [ -n "$UNSAFE_OUTSIDE" ]; then
     echo "$UNSAFE_OUTSIDE" | head -n 5
     ERRORS=$((ERRORS + 1))
 else
-    echo "  ✓ Unsafe is cleanly isolated in simd/sys/wire."
+    echo "  ✓ Unsafe is cleanly isolated in simd/sys."
 fi
 
 echo "[2/3] Checking for forbidden System Time and Thread RNG in Core Production Logic..."

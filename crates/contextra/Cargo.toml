@@ -11,29 +11,26 @@ ring = "4"
 
 [dependencies]
 contextra-types = { workspace = true }
-contextra-ports = { workspace = true }
+contextra-durable-fs = { workspace = true }
 contextra-engine = { workspace = true }
+contextra-ports = { workspace = true }
 contextra-store = { workspace = true }
-contextra-crypto = { workspace = true }
-contextra-rank = { workspace = true }
-rand = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
-zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
+bincode = { workspace = true }
+getrandom = { version = "0.2", default-features = false, features = ["std"] }
 
 [dev-dependencies]
-tracing-subscriber = { workspace = true }
 tempfile = { workspace = true }
-contextra-crypto = { workspace = true }
-contextra-testkit = { workspace = true }
 trybuild = "1"
+criterion = { workspace = true }
+
+[[bench]]
+name = "bm_facade_open"
+harness = false
 
 [features]
-default = ["embedded"]
-embedded = []
+default = []
 
 [lints]
 workspace = true

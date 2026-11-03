@@ -4,9 +4,9 @@ use contextra_arch_tests::{
     check_clean_source_tree, check_crate_headers_and_descriptions, check_dependency_matrix_5_3,
     check_exports_and_dev_dependencies, check_feature_hygiene, check_layering,
     check_naming_and_facade_structure, check_network_dependencies, check_obsolete_evidence_terms,
-    check_raw_storage_isolation, check_session_marks_and_timestamps, check_store_fs_usage,
-    check_test_traceability, check_trademark_and_session_marks, check_types_purity, check_unsafe,
-    check_wording, load_crates,
+    check_ratchet_hygiene, check_raw_storage_isolation, check_session_marks_and_timestamps,
+    check_store_fs_usage, check_test_traceability, check_trademark_and_session_marks,
+    check_types_purity, check_unsafe, check_wording, load_crates,
 };
 use std::path::PathBuf;
 
@@ -247,5 +247,39 @@ fn test_t_cfg_and_def_hygiene() -> Result<(), String> {
             violations.join("\n")
         );
     }
+    Ok(())
+}
+
+#[test]
+fn test_t_arch_9_double_modules() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_double_modules(&crates);
+    assert!(
+        violations.is_empty(),
+        "T-ARCH-9 Verstöße:
+{}",
+        violations.join(
+            "
+"
+        )
+    );
+    Ok(())
+}
+
+#[test]
+fn test_t_gov_1_ratchet_hygiene() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_ratchet_hygiene(&root, &crates);
+    assert!(
+        violations.is_empty(),
+        "T-GOV-1 Verstöße (Stale-Einträge in ratchet.toml):
+{}",
+        violations.join(
+            "
+"
+        )
+    );
     Ok(())
 }

@@ -2,11 +2,76 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
-use contextra_rank::{rrf_fuse, unseen_bound, Candidate, DocHandle, RankError, RrfScore};
+use contextra_rank::{rrf_fuse, unseen_bound, Candidate, DocHandle, RankError, RrfScore, K_RRF};
 
-/// SPEC: RK-03
+/// SPEC: T-RANK-1
 #[test]
-fn rk_03_tie_break_order_and_multi_list_sum() {
+fn t_rank_1_empty_and_partial_lists() {
+    let empty: [Candidate; 0] = [];
+    let h1 = DocHandle {
+        cluster_tag: [1; 16],
+        doc_tag: [10; 16],
+    };
+    let single = [Candidate { handle: h1 }];
+
+    // Völlig leere Eingabe
+    let res = rrf_fuse(&[], 10).unwrap();
+    assert!(res.is_empty());
+
+    // Leere Teillisten
+    let res = rrf_fuse(&[&empty, &empty], 10).unwrap();
+    assert!(res.is_empty());
+
+    // Teilweise leere Listen
+    let res = rrf_fuse(&[&empty, &single, &empty], 10).unwrap();
+    assert_eq!(res.len(), 1);
+    assert_eq!(res[0].handle, h1);
+    let expected_score = (1u64 << 40) / (K_RRF as u64 + 1);
+    assert_eq!(res[0].score, RrfScore(expected_score));
+}
+
+/// SPEC: T-RANK-1
+#[test]
+fn t_rank_1_golden_ranking_deterministic() {
+    let doc_a = DocHandle {
+        cluster_tag: [1; 16],
+        doc_tag: [10; 16],
+    };
+    let doc_b = DocHandle {
+        cluster_tag: [1; 16],
+        doc_tag: [20; 16],
+    };
+    let doc_c = DocHandle {
+        cluster_tag: [2; 16],
+        doc_tag: [20; 16],
+    };
+
+    let list_vector = [Candidate { handle: doc_a }, Candidate { handle: doc_b }];
+    let list_text = [Candidate { handle: doc_b }, Candidate { handle: doc_c }];
+
+    let fused = rrf_fuse(&[&list_vector, &list_text], 3).unwrap();
+    assert_eq!(fused.len(), 3);
+
+    // doc_b ist Rang 2 in Liste 1 und Rang 1 in Liste 2:
+    // Score(doc_b) = floor(2^40 / 62) + floor(2^40 / 61)
+    let score_rank_1 = (1u64 << 40) / 61;
+    let score_rank_2 = (1u64 << 40) / 62;
+    let expected_doc_b = score_rank_1 + score_rank_2;
+    assert_eq!(fused[0].handle, doc_b);
+    assert_eq!(fused[0].score, RrfScore(expected_doc_b));
+
+    // doc_a: Rang 1 in Liste 1 -> score_rank_1
+    // doc_c: Rang 2 in Liste 2 -> score_rank_2
+    assert_eq!(fused[1].handle, doc_a);
+    assert_eq!(fused[1].score, RrfScore(score_rank_1));
+
+    assert_eq!(fused[2].handle, doc_c);
+    assert_eq!(fused[2].score, RrfScore(score_rank_2));
+}
+
+/// SPEC: T-RANK-1
+#[test]
+fn t_rank_1_tie_break_order_and_multi_list_sum() {
     // Gleicher Score: Tie-Break nach doc_tag aufsteigend, dann cluster_tag aufsteigend
     let handle_a = DocHandle {
         cluster_tag: [5; 16],
@@ -47,9 +112,9 @@ fn rk_03_tie_break_order_and_multi_list_sum() {
     );
 }
 
-/// SPEC: RK-06
+/// SPEC: T-LIMIT-1
 #[test]
-fn rk_06_input_validation_boundaries() {
+fn t_limit_1_input_validation_boundaries() {
     let dummy = Candidate {
         handle: DocHandle {
             cluster_tag: [0; 16],
@@ -83,14 +148,17 @@ fn rk_06_input_validation_boundaries() {
     assert_eq!(err_dup, Err(RankError::Duplicate));
 }
 
-/// SPEC: RK-07
+/// SPEC: T-HYB-1
 #[test]
-fn rk_07_unseen_bound_calculation() {
+fn t_hyb_1_unseen_bound_calculation() {
     let depths = [10, 20];
-    let bound = unseen_bound(&depths);
+    let bound = unseen_bound(&depths).unwrap();
     let term1 = (1u64 << 40) / 71;
     let term2 = (1u64 << 40) / 81;
     assert_eq!(bound, RrfScore(term1 + term2));
+
+    // Leere Tiefen => Score 0
+    assert_eq!(unseen_bound(&[]).unwrap(), RrfScore(0));
 }
 
 /// SPEC: T-DOCREF-1

@@ -9,8 +9,8 @@
 use contextra_mvcc::seq_log::{SeqLogEntry, SequenceLog};
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::tx_buffer::TxBuffer;
-use contextra_mvcc::types::{TxId, TOMBSTONE_BIT};
 use contextra_mvcc::ContextraError;
+use contextra_types::{TxId, TOMBSTONE_BIT};
 
 // Prüft, dass forget_from nach einem Rollback vorherige Commit-Versionen desselben Schlüssels korrekt wiederherstellt.
 #[test]
@@ -88,7 +88,7 @@ fn test_tombstone_bit_masking_in_tx_buffer() {
 // Prüft, dass SeqLogEntry::is_visible und SequenceLog-Methoden mit gesetztem TOMBSTONE_BIT fehlerfrei arbeiten.
 #[test]
 fn test_tombstone_bit_masking_in_seq_log() {
-    let doc_id = contextra_mvcc::types::DocId::from(100);
+    let doc_id = contextra_types::DocId::from(100);
 
     let entry = SeqLogEntry {
         doc_id,

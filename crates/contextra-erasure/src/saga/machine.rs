@@ -132,7 +132,13 @@ impl EraseSaga {
     /// Führt einen Zustandsübergang durch (ER-18: idempotent).
     ///
     /// Gibt `Err` zurück wenn der Übergang nicht erlaubt ist.
-    pub fn transition_to(
+    /// Führt einen Zustandsübergang durch (ER-18: idempotent).
+    pub fn transition_to(&mut self, next: SagaState) -> Result<(), crate::error::ErasureError> {
+        self.transition_to_with_reason(next, None)
+    }
+
+    /// Führt einen Zustandsübergang mit optionalem Grund durch (ER-18: idempotent).
+    pub fn transition_to_with_reason(
         &mut self,
         next: SagaState,
         reason: Option<PendingReason>,
@@ -151,5 +157,11 @@ impl EraseSaga {
     /// Prüft ob die Saga abgeschlossen ist.
     pub fn is_terminal(&self) -> bool {
         self.state.is_terminal()
+    }
+}
+
+impl Default for EraseSaga {
+    fn default() -> Self {
+        Self::new(ErasureId::new([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]))
     }
 }
