@@ -47,6 +47,7 @@ pub const RING_TABLE: &[(&str, Ring)] = &[
     ("contextra-testkit", Ring::Tooling),
     ("contextra-lab", Ring::Tooling),
     ("ctx-verify", Ring::Tooling),
+    ("contextra-testmacros", Ring::Tooling),
     ("contextra-arch-tests", Ring::Tooling),
 ];
 
@@ -127,6 +128,7 @@ pub const SPEC_5_3_ALLOWED_EDGES: &[(&str, &[&str])] = &[
         "ctx-verify",
         &["contextra-types", "contextra-ports", "contextra-crypto"],
     ),
+    ("contextra-testmacros", &[]),
     ("contextra-arch-tests", &[]),
 ];
 
@@ -290,6 +292,71 @@ pub fn check_layering(crates: &[Krate]) -> Vec<String> {
             }
         }
     }
+    violations
+}
+
+/// Prüft die Abhängigkeitsmatrix laut SPEC §5.3 (inkl. D-88, D-95, D-97) und AR-14 (Dev-Abhängigkeiten).
+///
+/// Für jedes Workspace-Crate muss jede Kante (`[dependencies]` und `[dev-dependencies]`) in der Matrix
+/// `SPEC_5_3_ALLOWED_EDGES` erlaubt sein.
+pub fn check_dependency_matrix_5_3(_root: &Path, crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+
+    for krate in crates {
+        let Some(allowed) = SPEC_5_3_ALLOWED_EDGES
+            .iter()
+            .find(|(n, _)| *n == krate.name)
+            .map(|(_, deps)| *deps)
+        else {
+            violations.push(format!(
+                "T-ARCH-3b verletzt: {} ist nicht in SPEC_5_3_ALLOWED_EDGES definiert (fail-closed)",
+                krate.name
+            ));
+            continue;
+        };
+
+        // 1. Prüfe reguläre [dependencies]
+        for dep in &krate.deps {
+            if ring_of(dep).is_some() && !allowed.contains(&dep.as_str()) {
+                violations.push(format!(
+                    "T-ARCH-3b (SPEC §5.3) verletzt: Kante {} [dependencies] -> {} nicht in Matrix erlaubt",
+                    krate.name, dep
+                ));
+            }
+        }
+
+        // 2. Prüfe [dev-dependencies] (AR-14, D-97)
+        let manifest_path = krate.dir.join("Cargo.toml");
+        if let Ok(manifest_text) = fs::read_to_string(&manifest_path) {
+            if let Ok(doc) = manifest_text.parse::<toml::Table>() {
+                if let Some(dev_deps) = doc.get("dev-dependencies").and_then(|d| d.as_table()) {
+                    for (dep_key, val) in dev_deps {
+                        let dep_name = val
+                            .get("package")
+                            .and_then(|p| p.as_str())
+                            .unwrap_or(dep_key.as_str());
+
+                        if ring_of(dep_name).is_none() {
+                            continue;
+                        }
+
+                        // AR-14: testkit und testmacros sind Hilfs-Crates für Tests
+                        if dep_name == "contextra-testkit" || dep_name == "contextra-testmacros" {
+                            continue;
+                        }
+
+                        if !allowed.contains(&dep_name) {
+                            violations.push(format!(
+                                "T-ARCH-3b (SPEC §5.3, AR-14) verletzt: Kante {} [dev-dependencies] -> {} nicht in Matrix erlaubt",
+                                krate.name, dep_name
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     violations
 }
 
@@ -559,37 +626,72 @@ pub fn check_wording(root: &Path) -> Vec<String> {
     violations
 }
 
-/// Prüft T-LINT-2: Kein `std::fs` oder `tokio::fs` im Crate contextra-store (nur contextra_ports::Vfs).
+/// Allowlist für direkte Dateisystemzugriffe (`std::fs` / `tokio::fs`) außerhalb `contextra-sys` und `contextra-durable-fs`.
+/// Gemäß SPEC muss diese Liste leer sein; jeder Eintrag bedarf der Begründung.
+pub const DIRECT_FS_ALLOWLIST: &[(&str, &str)] = &[];
+
+/// Prüft T-LINT-2: Kein `std::fs` oder `tokio::fs` außerhalb von `contextra-sys` und `contextra-durable-fs`.
 pub fn check_store_fs_usage(root: &Path) -> Vec<String> {
     let mut violations = Vec::new();
-    let store_src = root.join("crates/contextra-store/src");
-    let mut rs_files = Vec::new();
-    collect_rs_files(&store_src, &mut rs_files);
+    let crates_dir = root.join("crates");
+    let Ok(entries) = fs::read_dir(&crates_dir) else {
+        return violations;
+    };
 
-    for file in rs_files {
-        let Ok(content) = fs::read_to_string(&file) else {
-            continue;
-        };
-        let rel = file
-            .strip_prefix(root)
-            .unwrap_or(&file)
-            .display()
+    for entry in entries.flatten() {
+        let crate_path = entry.path();
+        let crate_name = crate_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
             .to_string();
-        for (line_idx, line) in content.lines().enumerate() {
-            let code = line.trim();
-            if code.starts_with("//") {
+
+        // sys und durable-fs sind die einzigen legitimierten FS-Inseln
+        if crate_name == "contextra-sys" || crate_name == "contextra-durable-fs" {
+            continue;
+        }
+
+        let src_dir = crate_path.join("src");
+        if !src_dir.is_dir() {
+            continue;
+        }
+
+        let mut rs_files = Vec::new();
+        collect_rs_files(&src_dir, &mut rs_files);
+
+        for file in rs_files {
+            let Ok(content) = fs::read_to_string(&file) else {
                 continue;
-            }
-            if code.contains("std::fs") || code.contains("tokio::fs") {
-                violations.push(format!(
-                    "T-LINT-2 verletzt: {}:{}: Direkte Dateisystemnutzung '{}' statt Vfs",
-                    rel,
-                    line_idx + 1,
-                    code
-                ));
+            };
+            let rel = file
+                .strip_prefix(root)
+                .unwrap_or(&file)
+                .display()
+                .to_string();
+
+            for (line_idx, line) in content.lines().enumerate() {
+                let code = line.trim();
+                if code.starts_with("//") {
+                    continue;
+                }
+                if code.contains("std::fs") || code.contains("tokio::fs") {
+                    if DIRECT_FS_ALLOWLIST
+                        .iter()
+                        .any(|(c, pattern)| *c == crate_name && rel.contains(pattern))
+                    {
+                        continue;
+                    }
+                    violations.push(format!(
+                        "T-LINT-2 verletzt: {}:{}: Direkte Dateisystemnutzung '{}' statt Vfs (außerhalb durable-fs/sys verboten)",
+                        rel,
+                        line_idx + 1,
+                        code
+                    ));
+                }
             }
         }
     }
+
     violations
 }
 
@@ -1400,7 +1502,8 @@ mod tests {
         }
     }
 
-    // T-ARCH-3: Positiv und Negativ
+    // T-ARCH-3 / T-ARCH-3b: Positiv und Negativ
+    /// SPEC: T-ARCH-3
     #[test]
     fn t_arch_3_negativ_unerlaubte_matrix_kante_gleicher_ring() {
         let v_text_mvcc = check_layering(&[krate("contextra-text", &["contextra-mvcc"])]);
@@ -1409,6 +1512,58 @@ mod tests {
             v_text_mvcc.first().unwrap().contains("SPEC §5.3 verletzt"),
             "{v_text_mvcc:?}"
         );
+    }
+
+    /// SPEC: T-ARCH-3
+    #[test]
+    fn t_arch_3b_positiv_und_negativ_matrix_pruefung() {
+        let tmp = std::env::temp_dir().join("t_arch_3b_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let crate_dir = tmp.join("crates/contextra-ports");
+        fs::create_dir_all(&crate_dir).unwrap();
+        let cargo_toml = crate_dir.join("Cargo.toml");
+        fs::write(
+            &cargo_toml,
+            "[package]\nname = \"contextra-ports\"\n[dependencies]\ncontextra-types = { path = \"../contextra-types\" }\n[dev-dependencies]\ncontextra-testkit = { path = \"../contextra-testkit\" }\n",
+        )
+        .unwrap();
+
+        let k = Krate {
+            name: "contextra-ports".to_string(),
+            dir: crate_dir.clone(),
+            deps: vec!["contextra-types".to_string()],
+        };
+        let v_pos = check_dependency_matrix_5_3(&tmp, std::slice::from_ref(&k));
+        assert!(
+            v_pos.is_empty(),
+            "Erlaubte Kante darf keine Verletzung erzeugen: {v_pos:?}"
+        );
+
+        // Negativfall 1: Verbotene Kante in [dependencies]
+        let k_bad_dep = Krate {
+            name: "contextra-ports".to_string(),
+            dir: crate_dir.clone(),
+            deps: vec!["contextra-types".to_string(), "contextra-store".to_string()],
+        };
+        let v_neg1 = check_dependency_matrix_5_3(&tmp, &[k_bad_dep]);
+        assert!(
+            v_neg1.iter().any(|m| m.contains("contextra-store")),
+            "Verbotene [dependencies]-Kante muss erkannt werden: {v_neg1:?}"
+        );
+
+        // Negativfall 2: Verbotene Kante in [dev-dependencies] (AR-14, D-97)
+        fs::write(
+            &cargo_toml,
+            "[package]\nname = \"contextra-ports\"\n[dependencies]\ncontextra-types = { path = \"../contextra-types\" }\n[dev-dependencies]\ncontextra-crypto = { path = \"../contextra-crypto\" }\n",
+        )
+        .unwrap();
+        let v_neg2 = check_dependency_matrix_5_3(&tmp, &[k]);
+        assert!(
+            v_neg2.iter().any(|m| m.contains("contextra-crypto")),
+            "Verbotene [dev-dependencies]-Kante muss erkannt werden: {v_neg2:?}"
+        );
+
+        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]
