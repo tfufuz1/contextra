@@ -342,6 +342,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-IN-MEM-STORE-COMMIT-001]
     // Prüft, dass gestagete Werte erst nach dem Commit sichtbar werden.
+    /// SPEC: PO-02
     #[tokio::test]
     async fn test_in_memory_store_put_get_commit(
     ) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -362,6 +363,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-IN-MEM-STORE-ROLLBACK-001]
     // Prüft, dass ein Rollback unbestätigte Änderungen verwirft und diese nicht sichtbar werden.
+    /// SPEC: PO-02
     #[tokio::test]
     async fn test_in_memory_store_rollback() -> std::result::Result<(), Box<dyn std::error::Error>>
     {

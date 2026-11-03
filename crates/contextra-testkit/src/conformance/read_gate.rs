@@ -425,12 +425,14 @@ pub fn run_mutant_tests() -> std::result::Result<(), String> {
 mod tests {
     use super::*;
 
+    /// SPEC: PO-07
     #[test]
     fn po_07_read_gate_reference_passes() {
         let res = run_reference_test();
         assert!(res.is_ok(), "Reference must pass: {res:?}");
     }
 
+    /// SPEC: PO-07
     #[test]
     fn po_07_read_gate_mutants_fail() {
         let res = run_mutant_tests();
