@@ -6,12 +6,16 @@ feature-depth = 1
 
 [advisories]
 ignore = [
-    "RUSTSEC-2024-0384", # number_prefix
-    "RUSTSEC-2024-0436", # paste
-    "RUSTSEC-2026-0176", # pyo3
-    "RUSTSEC-2026-0177", # pyo3
-    "RUSTSEC-2026-0285", # rustls
-    "RUSTSEC-2026-0205", # scc
+    # --- Unmaintained / Unsound Package Advisories ---
+    { id = "RUSTSEC-2024-0384", reason = "instant: unmaintained; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2024-0436", reason = "paste: unmaintained macro crate; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2025-0141", reason = "bincode v1: unmaintained; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0176", reason = "pyo3: bindings advisory; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0177", reason = "pyo3: bindings advisory; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0205", reason = "scc: unsound Array::insert; panics treten in compare fn nicht auf; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0253", reason = "lru: unsound LruCache::pop; panics in drop nicht vorhanden; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0285", reason = "rustls advisory; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
+    { id = "RUSTSEC-2026-0386", reason = "tokio: AsyncFd unsoundness; AsyncFd im Workspace nicht genutzt; ADR folgt (Folgeaufgabe an GV-1); Ablaufdatum: 2027-04-30" },
 ]
 
 [licenses]
@@ -29,9 +33,6 @@ allow = [
     "CC0-1.0",
     "Zlib",
 ]
-clarify = [
-    { name = "contextra-mcp", expression = "MIT OR Apache-2.0", license-files = [] },
-]
 confidence-threshold = 0.8
 
 [bans]
@@ -41,45 +42,24 @@ highlight = "all"
 deny = [
     { crate = "tokio", wrappers = [
         "criterion",
-        "hyper",
-        "hyper-rustls",
-        "hyper-util",
         "contextra",
-        "contextra-agent",
-        "contextra-audit-export", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-bench",
-        "contextra-checkpoint", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-cognition",
-        "contextra-core", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-crypto", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-db",
+        "contextra-crypto",
+        "contextra-durable-fs",
         "contextra-engine",
-        "contextra-graph", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-infer-candle",
-        "contextra-infer-ollama",
-        "contextra-infer-onnx",
-        "contextra-kvcache", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-mcp",
-        "contextra-mvcc", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-ports", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-privacy",
-        "contextra-py",
-        "contextra-rank", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-router",
-        "contextra-sandbox",
-        "contextra-store", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
+        "contextra-erasure",
+        "contextra-mvcc",
+        "contextra-ports",
+        "contextra-rank",
+        "contextra-store",
         "contextra-testkit",
-        "contextra-text", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "contextra-vector", # TRANSITION E29, bis 2027-04-30, REQ-ASYNC-1
-        "reqwest",
-        "tokio-rustls",
+        "contextra-text",
+        "contextra-vector",
         "tokio-util",
-        "tower",
     ] },
-    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers", "contextra-infer-candle"] },
-    { crate = "pyo3", wrappers = ["contextra-py", "numpy", "pythonize"] },
-    { crate = "reqwest", wrappers = ["contextra-infer-ollama"] },
-    { crate = "wasmtime", wrappers = ["contextra-sandbox"] },
+    { crate = "candle-core", wrappers = ["candle-nn", "candle-transformers"] },
+    { crate = "pyo3", wrappers = ["numpy", "pythonize"] },
+    { crate = "reqwest" },
+    { crate = "wasmtime" },
 ]
 
 [sources]

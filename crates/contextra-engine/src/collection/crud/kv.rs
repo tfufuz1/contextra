@@ -34,15 +34,21 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let tx = self.allocate_tx()?;
         let user_key = self.namespaced_key(id.as_bytes(), 0);
         let data = serde_json::to_vec(value)?;
-        let written = self.storage.put_if_absent(tx, &user_key, &data).await?;
-        if !written {
-            if let Err(rollback_err) = self.storage.rollback(tx).await {
-                tracing::error!(
-                    tx_id = ?tx,
-                    key = %id,
-                    error = %rollback_err,
-                    "put_kv_if_absent: rollback after failed put_if_absent also failed — transaction may be left in an inconsistent state"
-                );
+        let res = match self.storage.put_if_absent(tx, &user_key, &data).await {
+            Ok(true) => self.storage.commit(tx).await,
+            Ok(false) => {
+                if let Err(rollback_err) = self.storage.rollback(tx).await {
+                    tracing::error!(
+                        tx_id = ?tx,
+                        key = %id,
+                        error = %rollback_err,
+                        "put_kv_if_absent: rollback after failed put_if_absent also failed — transaction may be left in an inconsistent state"
+                    );
+                }
+                Err(contextra_types::ContextraError::Conflict(format!(
+                    "Key '{}' already exists in collection KV store",
+                    id
+                )))
             }
             drop(_guard);
             return Err(contextra_types::ContextraError::Conflict(format!(

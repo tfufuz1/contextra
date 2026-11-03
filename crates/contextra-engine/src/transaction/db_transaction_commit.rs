@@ -6,14 +6,14 @@
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, ACID/SSI-Transaktionsgarantien.
 
 use super::compensating_actions::{
-    CommitLedger, CompensateGraphAction, CompensateHnswAction, CompensateLsmAction,
-    CompensateTextAction, RollbackStagedAction,
+    CommitLedger, CompensateHnswAction, CompensateLsmAction, CompensateTextAction,
+    RollbackStagedAction,
 };
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
 use crate::metrics_names::{record_histogram_safe, COMMIT_LATENCY};
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, Result, TenantId, TxId};
+use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{ContextraError, Result, TxId};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -53,80 +53,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         Ok(())
     }
 
-    // ANCHOR[contextra-engine:COM-054]
-    /// Dokumentation für `commit_graph_staged` im Rahmen der Transaktions- und Facade-Orchestrierung.
-    pub(super) async fn commit_graph_staged(&self) -> Result<()> {
-        let entities = {
-            let mut guard = match self.staged_graph_entities.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-        let edges = {
-            let mut guard = match self.staged_graph_edges.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-
-        for entity in entities {
-            self.collection
-                .graph_index
-                .add_entity(self.tx_id, entity)
-                .await?;
-        }
-
-        for edge in edges {
-            GraphIndex::add_edge(&*self.collection.graph_index, self.tx_id, edge).await?;
-        }
-
-        let hyperedges = {
-            let mut guard = match self.staged_hyperedges.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-
-        for hyperedge in hyperedges {
-            self.collection.graph_index.insert_hyperedge(hyperedge);
-        }
-
-        let edge_deletes = {
-            let mut guard = match self.staged_graph_edge_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-
-        for (from, to) in edge_deletes {
-            self.collection
-                .graph_index
-                .remove_edge(self.tx_id, from, to)
-                .await?;
-        }
-
-        let entity_deletes = {
-            let mut guard = match self.staged_graph_entity_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            std::mem::take(&mut *guard)
-        };
-
-        for entity_id in entity_deletes {
-            self.collection
-                .graph_index
-                .remove_entity(self.tx_id, entity_id)
-                .await?;
-        }
-
-        Ok(())
-    }
-
     // ANCHOR[contextra-engine:COM-001]
     /// Führt den zweiphasigen atomaren Commit über alle Subsysteme aus.
     ///
@@ -135,7 +61,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     /// 2. Internen Commit (`commit_internal`) koordinieren:
     ///    - Phase (a): CommitIntent::Pending persistent in LSM speichern (F-20).
     ///    - Phase (b): LSM Storage committen (Nutzdaten & Metadaten dauerhaft).
-    ///    - Phase (c): Staged Text-, Graph- und Vektor-Indizes anwenden und committen.
+    ///    - Phase (c): Staged Text- und Vektor-Indizes anwenden und committen.
     ///    - Phase (d): CommitIntent::Committed Marker schreiben.
     ///    - Phase (e): Transaktions-Status atomar auf committed setzen.
     /// 3. Latenz-Histogramm in `metrics_sink` aufzeichnen.
@@ -186,33 +112,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             !ops.is_empty() || !dels.is_empty()
         };
 
-        let has_graph = {
-            let ents = match self.staged_graph_entities.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let edgs = match self.staged_graph_edges.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let e_dels = match self.staged_graph_edge_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let ent_dels = match self.staged_graph_entity_deletes.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            let hyperedgs = match self.staged_hyperedges.lock() {
-                Ok(g) => g,
-                Err(p) => p.into_inner(),
-            };
-            !ents.is_empty()
-                || !edgs.is_empty()
-                || !e_dels.is_empty()
-                || !ent_dels.is_empty()
-                || !hyperedgs.is_empty()
-        };
+        let has_graph = false;
 
         let mut ledger = CommitLedger::new();
         ledger.push(RollbackStagedAction::new(
@@ -313,13 +213,8 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             }
         }
 
-        // Phase (c): Execute staged index steps and commit vector, text, graph indices
+        // Phase (c): Execute staged index steps and commit vector and text indices
         if let Err(e) = self.commit_text_staged().await {
-            ledger.execute_rollback().await;
-            return Err(e);
-        }
-
-        if let Err(e) = self.commit_graph_staged().await {
             ledger.execute_rollback().await;
             return Err(e);
         }
@@ -331,7 +226,7 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
                 index_err
             )));
         }
-        let tenant_id = TenantId::try_new(1).unwrap_or_default();
+        let tenant_id = self.collection.tenant_id();
         ledger.push(CompensateHnswAction::new(
             self.collection.clone(),
             tenant_id,
@@ -349,18 +244,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             self.collection.clone(),
             Arc::clone(&doc_ids),
         ));
-
-        if let Err(graph_err) = self.collection.graph_index.commit(self.tx_id).await {
-            ledger.execute_rollback().await;
-            return Err(ContextraError::Transaction(format!(
-                "Graph index commit failed: {}",
-                graph_err
-            )));
-        }
-        ledger.push(CompensateGraphAction {
-            collection: self.collection.clone(),
-            doc_ids: Arc::clone(&doc_ids),
-        });
 
         // Phase (d): Write CommitIntent::Committed with bounded retry and backoff (T-06)
         let cleanup_tx = TxId::new(

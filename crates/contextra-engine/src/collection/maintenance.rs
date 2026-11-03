@@ -14,7 +14,7 @@
 use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
 use crate::metrics_names::{
-    record_counter_safe, record_histogram_safe, REBUILD_DURATION, REAPER_DOCS_REAPED,
+    record_counter_safe, record_histogram_safe, REAPER_DOCS_REAPED, REBUILD_DURATION,
 };
 use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, DocId, Result, TxId, EXPIRY_METADATA_KEY};
@@ -142,7 +142,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         Ok(count)
     }
 
-
     /// Repairs the index by re-syncing with the storage.
     ///
     /// Scans the storage for any documents that are missing from the index
@@ -220,9 +219,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             if let Ok(intent_variant) = serde_json::from_slice::<CommitIntent>(&intent_val) {
                 let (doc_ids, has_text) = match intent_variant {
                     CommitIntent::Pending {
-                        doc_ids,
-                        has_text,
-                        ..
+                        doc_ids, has_text, ..
                     } => (doc_ids, has_text),
                     CommitIntent::Consolidation {
                         source_docs: _,
@@ -311,7 +308,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                                         }
                                     }
                                 }
-
                             }
                         }
                     }
@@ -495,7 +491,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         if count > 0 {
-            record_counter_safe(self.metrics_sink().as_ref(), REAPER_DOCS_REAPED, count as u64, &[]);
+            record_counter_safe(
+                self.metrics_sink().as_ref(),
+                REAPER_DOCS_REAPED,
+                count as u64,
+                &[],
+            );
         }
 
         if count > 0 && self.index.is_rebuild_required() {
@@ -629,12 +630,16 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         if count > 0 {
-            record_counter_safe(self.metrics_sink().as_ref(), REAPER_DOCS_REAPED, count as u64, &[]);
+            record_counter_safe(
+                self.metrics_sink().as_ref(),
+                REAPER_DOCS_REAPED,
+                count as u64,
+                &[],
+            );
         }
 
         Ok(count)
     }
-
 
     /// Aktualisiert den Importance-Score sowie die Provenance (Modell-ID) in den Metadaten.
     ///

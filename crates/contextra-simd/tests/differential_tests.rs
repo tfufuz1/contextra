@@ -366,6 +366,41 @@ fn test_multiple_prng_seeds_f32_metrics() {
 }
 
 #[test]
+// ANCHOR[contextra-simd:TEST-DIFF-MAX-DIM-DETERMINISM]
+// SPEC §8.4 / SI-02 & D-87:
+// Prüft Vektoren der Maximallänge (4096 Dimensionen) sowie kritische Grenzdimensionen {384, 512, 768, 1024, 1536, 4096}.
+fn test_large_dimensions_and_spec_matrix() {
+    let mut rng = DeterministicRng::with_seed(0xCAFE_BABE_DEAD_BEEF);
+    let dims = [384, 512, 768, 1024, 1536, 4096];
+
+    for &dim in &dims {
+        let a = rng.gen_f32_vec(dim, -1.0, 1.0);
+        let b = rng.gen_f32_vec(dim, -1.0, 1.0);
+
+        let scalar_cos = cosine_distance_scalar(&a, &b);
+        let simd_cos = cosine_distance(&a, &b).unwrap();
+        assert!(
+            (scalar_cos - simd_cos).abs() <= 1e-4 * scalar_cos.abs().max(simd_cos.abs()).max(1.0),
+            "Cosine mismatch at dim {dim}: scalar={scalar_cos}, simd={simd_cos}"
+        );
+
+        let scalar_euc = euclidean_distance_scalar(&a, &b);
+        let simd_euc = euclidean_distance(&a, &b).unwrap();
+        assert!(
+            (scalar_euc - simd_euc).abs() <= 1e-3 * scalar_euc.abs().max(simd_euc.abs()).max(1.0),
+            "Euclidean mismatch at dim {dim}: scalar={scalar_euc}, simd={simd_euc}"
+        );
+
+        let scalar_dot = dot_product_scalar(&a, &b);
+        let simd_dot = dot_product_distance(&a, &b).unwrap();
+        assert!(
+            (scalar_dot - simd_dot).abs() <= 1e-3 * scalar_dot.abs().max(simd_dot.abs()).max(1.0),
+            "Dot mismatch at dim {dim}: scalar={scalar_dot}, simd={simd_dot}"
+        );
+    }
+}
+
+#[test]
 // ANCHOR[contextra-simd:TEST-DIFF-SEEDS-U8]
 // Prüft u8-Metriken über 20 verschiedene Pseudozufalls-Seeds auf Konsistenz.
 fn test_multiple_prng_seeds_u8_metrics() {

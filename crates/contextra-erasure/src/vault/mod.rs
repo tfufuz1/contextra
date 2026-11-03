@@ -10,11 +10,11 @@ pub mod rehash;
 pub mod open;
 
 use crate::error::ErasureError;
-use slot::{SlotData, SlotType};
+use slot::SlotData;
+pub use slot::{SlotType, SlotType as VaultSlotType, VAULT_SLOT_SIZE};
 use table::{VaultTable, VAULT_SLOT_BASE};
 
 /// Öffentlich re-exportierte Konstanten für Tests und externe Crates.
-pub use slot::{VAULT_SLOT_SIZE, SlotType as VaultSlotType};
 pub use table::VAULT_SLOT_BASE;
 
 /// In-Memory-Tresor (Fassade über `VaultTable`).
