@@ -9,9 +9,6 @@ license.workspace = true
 rust-version.workspace = true
 description = "Dateisystem-Implementierung `RealVfs` mit dauerhaften Schreib- und Austauschoperationen."
 
-autotests = false
-autobenches = false
-
 [package.metadata.contextra]
 ring = "1"
 

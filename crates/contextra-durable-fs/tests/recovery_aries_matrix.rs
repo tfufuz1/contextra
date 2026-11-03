@@ -352,7 +352,7 @@ fn test_aries_purge_disk_reserve_full_rejection() {
     let res_ok = engine.execute_purge_rewrite(1, 1024, 512);
     assert!(res_ok.is_ok());
 
-    // Fall 2: Platte voll / Unter Reserve -> Limit::DiskReserve / Pending(DiskReserve)
+    // Fall 2: Platte voll / Unter Reserve -> Limit::DiskReserve / Pending(DiskReserve) (T-CRASH-3, DF-10, D-65)
     let res_err = engine.execute_purge_rewrite(2, 100 * 1024 * 1024, 1024 * 1024 * 1024);
     assert!(res_err.is_err());
     let err_str = match res_err {
@@ -371,6 +371,25 @@ fn test_aries_purge_disk_reserve_full_rejection() {
         Err(e) => panic!("recover failed: {e:?}"),
     };
     assert!(!st.active_ssts.contains(&"cluster_2_clean.sst".to_string()));
+
+    // Fall 3: Simulation von physischem ENOSPC während Schreibvorgang
+    let enospc_vfs = Arc::new(FaultVfs::new());
+    let enospc_root = PathBuf::from("/data_enospc");
+    if let Err(e) = enospc_vfs.create_dir_all(&enospc_root) {
+        panic!("create_dir_all failed: {e:?}");
+    }
+    // Injiziere ENOSPC (Disk full) beim Schreiben
+    enospc_vfs.set_plan(FaultPlan::exact(
+        FaultOperation::Write,
+        0,
+        ErrorKind::StorageFull,
+    ));
+    let enospc_engine = MockRecoveryEngine::new(enospc_vfs.clone(), enospc_root.clone());
+    let enospc_res = enospc_engine.execute_wal_group_commit(99, false);
+    assert!(
+        enospc_res.is_err(),
+        "ENOSPC during write must fail-closed without corrupting state (T-CRASH-3)"
+    );
 }
 
 #[test]
