@@ -30,10 +30,10 @@ pub enum VectorData {
 /// A node in the HNSW graph.
 #[derive(Debug, Clone)]
 pub struct HnswNode {
-    pub(super) doc_id: DocId,
-    pub(super) vector: VectorData,
-    pub(super) max_layer: usize,
-    pub(super) committed_tx: u64,
+    pub doc_id: DocId,
+    pub vector: VectorData,
+    pub max_layer: usize,
+    pub committed_tx: u64,
 }
 
 /// Search candidate.
@@ -86,8 +86,9 @@ impl<'a> Drop for SnapshotPinGuard<'a> {
 }
 
 /// The HNSW (Hierarchical Navigable Small World) vector index.
+#[derive(Clone)]
 pub struct HnswIndex {
-    pub(super) inner: std::sync::Arc<HnswIndexCore>,
+    pub inner: std::sync::Arc<HnswIndexCore>,
 }
 
 #[repr(align(64))]

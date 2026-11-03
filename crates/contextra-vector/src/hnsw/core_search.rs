@@ -670,9 +670,14 @@ impl HnswIndex {
                         if node.committed_tx == 0 {
                             continue;
                         }
+                    } else {
+                        continue;
                     }
                 }
-                let doc_id = self.inner.resolve_doc_id(c.index, &ctx)?;
+                let doc_id = match self.inner.resolve_doc_id(c.index, &ctx) {
+                    Ok(id) => id,
+                    Err(_) => continue,
+                };
 
                 if let Some(f) = filter {
                     if !f(doc_id) {
