@@ -52,28 +52,21 @@ pub mod vector;
 /// Konformitätssuite für den `Vfs`-Port.
 pub mod vfs;
 
-/// Konformitätssuite für den `ReadGate`-Port.
-pub mod read_gate;
-
-/// Konformitätssuite für den `RecordSealer`-Port.
-pub mod record_sealer;
-
-/// Konformitätssuite für den `FileKeyring`-Port.
+// Zusätzliche Port-Konformitätssuiten nach D-53 / PO-04..PO-07:
+// read_gate, record_sealer, file_keyring, ledger_sink
 pub mod file_keyring;
-
-/// Konformitätssuite für den `LedgerSink`-Port.
 pub mod ledger_sink;
-
-/// Konformitätssuite für den `TextIndex`-Port (erweitert).
-pub mod text_index;
-
-/// Konformitätssuite für den `VectorIndex`-Port (erweitert).
-pub mod vector_index;
+pub mod read_gate;
+pub mod record_sealer;
 
 // Re-Exports für bequemen Zugriff
 pub use clock::run_clock_suite;
 pub use failure::{ConformanceFailure, ConformanceResult};
+pub use file_keyring::run as run_file_keyring_suite;
+pub use ledger_sink::run as run_ledger_sink_suite;
 pub use metrics::run_metrics_sink_suite;
+pub use read_gate::run as run_read_gate_suite;
+pub use record_sealer::run as run_record_sealer_suite;
 pub use rng::run_rng_suite;
 pub use storage::run_storage_engine_suite;
 pub use text::run_text_index_suite;

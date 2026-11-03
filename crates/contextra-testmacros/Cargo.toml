@@ -1,0 +1,25 @@
+[lints]
+workspace = true
+
+[package]
+name = "contextra-testmacros"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Proc-Macros für Contextra-Tests und Benchmarks (`ctx_test`, `ctx_bench`)."
+
+[package.metadata.contextra]
+ring = "tooling"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+trybuild = "1.0"
