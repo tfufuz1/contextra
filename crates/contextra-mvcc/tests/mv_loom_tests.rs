@@ -74,6 +74,8 @@ mod loom_conc_tests {
     fn t_lock_loom_lock_order_hierarchy_full_spec_5_4() {
         // SPEC 5.4: Dokumentlock -> Commit-Barriere -> Purge-Barrier -> Journal
         loom::model(|| {
+            // SPEC 5.4 / MV-08: Globale Lockreihenfolge:
+            // Dokumentlock -> Commit-Barriere -> Purge-Barrier -> Journal
             let doc_lock = Arc::new(Mutex::new(0));
             let commit_barrier = Arc::new(RwLock::new(0));
             let purge_barrier = Arc::new(RwLock::new(0));

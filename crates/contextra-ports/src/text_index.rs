@@ -5,24 +5,12 @@
 // ZWECK: TextIndex & SegmentSynthesizer Trait-Definitionen für BM25/Inverted Index.
 // INVARIANTEN: AFIT for TextIndex, BoxFuture for SegmentSynthesizer.
 
-use super::BoxFuture;
 use crate::types::{DocId, ScoredDocument, TxId};
 use crate::Result;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
 pub use crate::embedding::TextEmbeddingEngine;
-
-/// Trait-Abstraktion für LLM-Synthesizer zur Segment-Zusammenfassung (REM-Phase).
-pub trait SegmentSynthesizer: Send + Sync {
-    /// Synthetisiert ein Segment von Texten zu einer abstrakten Zusammenfassung.
-    fn synthesize_segment<'a>(
-        &'a self,
-        segment_texts: &'a [&'a str],
-    ) -> BoxFuture<'a, Result<String>>;
-    /// Gibt die Modell-ID des Synthesizers zurück.
-    fn model_id(&self) -> &str;
-}
 
 /// Statistics for a text index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
