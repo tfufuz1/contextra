@@ -1,7 +1,7 @@
 //! Führt die Architekturprüfungen gegen das echte Workspace aus (SPEC §5.2).
 
 use contextra_arch_tests::{
-    check_clean_source_tree, check_crate_headers_and_descriptions, check_double_modules,
+    check_clean_source_tree, check_crate_headers_and_descriptions, check_dependency_matrix_5_3,
     check_exports_and_dev_dependencies, check_feature_hygiene, check_layering,
     check_naming_and_facade_structure, check_network_dependencies, check_obsolete_evidence_terms,
     check_ratchet_hygiene, check_raw_storage_isolation, check_session_marks_and_timestamps,
@@ -16,6 +16,7 @@ fn workspace_root() -> PathBuf {
         .join("..")
 }
 
+/// SPEC: T-ARCH-1
 #[test]
 fn test_t_arch_1_types_purity() {
     let root = workspace_root();
@@ -27,6 +28,7 @@ fn test_t_arch_1_types_purity() {
     );
 }
 
+/// SPEC: T-ARCH-3
 #[test]
 fn test_t_arch_3_ring_regeln_gelten() -> Result<(), String> {
     let crates = load_crates(&workspace_root())?;
@@ -39,6 +41,21 @@ fn test_t_arch_3_ring_regeln_gelten() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-ARCH-3
+#[test]
+fn test_t_arch_3b_matrix_edges() -> Result<(), String> {
+    let root = workspace_root();
+    let crates = load_crates(&root)?;
+    let violations = check_dependency_matrix_5_3(&root, &crates);
+    assert!(
+        violations.is_empty(),
+        "SPEC §5.3 Kanten-Verstöße (T-ARCH-3b):\n{}",
+        violations.join("\n")
+    );
+    Ok(())
+}
+
+/// SPEC: T-ARCH-4
 #[test]
 fn test_t_arch_4_single_node_garantie() -> Result<(), String> {
     let crates = load_crates(&workspace_root())?;
@@ -51,6 +68,7 @@ fn test_t_arch_4_single_node_garantie() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-ARCH-5
 #[test]
 fn test_t_arch_5_crate_headers_and_descriptions() -> Result<(), String> {
     let root = workspace_root();
@@ -64,6 +82,7 @@ fn test_t_arch_5_crate_headers_and_descriptions() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-ARCH-6
 #[test]
 fn test_t_arch_6_exports_and_dev_dependencies() -> Result<(), String> {
     let root = workspace_root();
@@ -77,6 +96,7 @@ fn test_t_arch_6_exports_and_dev_dependencies() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-ARCH-7
 #[test]
 fn test_t_arch_7_naming_and_facade_structure() -> Result<(), String> {
     let root = workspace_root();
@@ -90,6 +110,7 @@ fn test_t_arch_7_naming_and_facade_structure() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-ARCH-8
 #[test]
 fn test_t_arch_8_clean_source_tree() -> Result<(), String> {
     let root = workspace_root();
@@ -103,6 +124,7 @@ fn test_t_arch_8_clean_source_tree() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-DOC-1
 #[test]
 fn test_t_doc_1_session_marks_and_timestamps() -> Result<(), String> {
     let root = workspace_root();
@@ -116,6 +138,7 @@ fn test_t_doc_1_session_marks_and_timestamps() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-LINT-4
 #[test]
 fn test_t_lint_4_trademark_and_session_marks() -> Result<(), String> {
     let root = workspace_root();
@@ -129,6 +152,7 @@ fn test_t_lint_4_trademark_and_session_marks() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-LINT-3
 #[test]
 fn test_t_lint_3_obsolete_evidence_terms() -> Result<(), String> {
     let root = workspace_root();
@@ -142,6 +166,7 @@ fn test_t_lint_3_obsolete_evidence_terms() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-TRACE-1
 #[test]
 fn test_t_trace_1_test_traceability() -> Result<(), String> {
     let root = workspace_root();
@@ -155,6 +180,7 @@ fn test_t_trace_1_test_traceability() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-UNSAFE-1
 #[test]
 fn test_t_unsafe_1_unsafe_nur_in_inseln() -> Result<(), String> {
     let root = workspace_root();
@@ -168,6 +194,7 @@ fn test_t_unsafe_1_unsafe_nur_in_inseln() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-LINT-1
 #[test]
 fn test_t_lint_1_wortlaut_workspace() {
     let root = workspace_root();
@@ -180,6 +207,7 @@ fn test_t_lint_1_wortlaut_workspace() {
     }
 }
 
+/// SPEC: T-LINT-2
 #[test]
 fn test_t_lint_2_store_fs_usage() {
     let root = workspace_root();
@@ -192,6 +220,7 @@ fn test_t_lint_2_store_fs_usage() {
     }
 }
 
+/// SPEC: T-ARCH-2
 #[test]
 fn test_t_arch_2_raw_storage_isolation() -> Result<(), String> {
     let root = workspace_root();
@@ -206,6 +235,7 @@ fn test_t_arch_2_raw_storage_isolation() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-CFG-1
 #[test]
 fn test_t_cfg_and_def_hygiene() -> Result<(), String> {
     let root = workspace_root();
