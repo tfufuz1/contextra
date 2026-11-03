@@ -415,3 +415,41 @@ Dequantisierung → `do_insert` → Requantisierung mit ggf. neu kalibrierten Gr
 ---
 
 *Ende des Audits. Normativ: `docs/SPEC.md` 4.3.0.*
+
+---
+
+## 11. D-77 Audit & Restrisikoanalyse (Implementierungsstand)
+
+### 11.1 Umsetzungsnachweis D-77 Löschkette & Arena-Bereinigung
+
+1. **Navigationssurrogat (D-77 (1)):**
+   - Methode `replace_with_navigation_surrogate(target_doc_id)` implementiert in `crates/contextra-vector/src/hnsw/deletion.rs`.
+   - Vektor des Zielslots wird vor `Gated` durch das Mittel der nicht gegateten Nachbarn (oder den Entry-Point-Vektor) ersetzt.
+   - Nullvektoren sind strikt verboten und werden durch einen Pseudozufalls-Fallback abgefangen.
+   - Vorherige Originalvektor-Bytes werden mit `zeroize::Zeroize` physisch überschrieben.
+   - Nachgewiesen durch `test_t_vec_del_1_surrogate_navigation_and_zeroize`.
+
+2. **Batch-Kantenreparatur & Freiliste (D-77 (2)):**
+   - Methode `batch_repair_and_free(target_doc_ids)` implementiert.
+   - Führt einen speichergebundenen Durchlauf über alle Adjazenzlisten aus, entfernt Referenzen auf Zielslots, zieht Ersatzkanten über die HNSW-Standardheuristik aus der 2. Ordnung ein und nullt Zielkantenlisten via `zeroize_and_free_node`.
+   - Zielslots werden in die Freiliste eingereiht.
+   - Nachgewiesen durch `test_t_vec_del_2_batch_edge_repair_and_reachability` (volle Konnektivität aller lebenden Knoten vom Entry Point).
+
+3. **Deterministischer Rebuild (D-77 (3)):**
+   - Methode `deterministic_rebuild_in_place()` sortiert alle lebenden Knoten nach `doc_tag` / `doc_id` und baut den Index topologieunabhängig von der Einfügereihenfolge auf.
+   - Nachgewiesen durch `test_t_vec_rebuild_indep`.
+
+4. **Recall@10-Gates:**
+   - 1 % Deletion: Recall@10 ≥ 0.90 (Ist: 1.00)
+   - 5 % Deletion: Recall@10 ≥ 0.85 (Ist: 1.00)
+   - 20 % Deletion: Recall@10 ≥ 0.70 (Ist: 0.90)
+   - Nachgewiesen durch `test_recall_gates_after_deletion`.
+
+### 11.2 Restrisikoliste Vektor (SPEC D-77 & Glossar §31)
+
+| Risiko-ID | Risikobeschreibung | Auswirkung | Kompensation / Status |
+|---|---|---|---|
+| **R-VEC-01** | **Rekonstruierbarkeit des Originals aus Nachbarn (`IndexTopologyInference`):** Durch die Bildung des Surrogats als Mittelwert der Nachbarn und das Einziehen von Ersatzkanten können theoretisch Rückschlüsse auf die Cluster-Zugehörigkeit gezogen werden. | Mittel | Ausweis als `IndexTopologyInference` im Löschbericht (D-77). Vollständige Beseitigung topologischer Residuen erfolgt spätestens beim nächsten deterministischen Rebuild nach Quote (≥ 20 % oder ≥ 10 % gelöschte Slots). |
+| **R-VEC-02** | **Quantisierungsreste bei Rebuild (SQ8 Drift):** Wiederholte Dequantisierung und Requantisierung im Rebuild kann zu akkumulierter Drift führen. | Niedrig | In SPEC v1 ist Quantisierung in der Haupt-Arena bis zur Fertigstellung des D-86 Layouts nicht freigegeben (VC-11). Original-F32-Pfad ist driftfrei. |
+| **R-VEC-03** | **Snapshots und Altdaten auf Platte:** Nicht-verschlüsselte Dateireste oder verwaiste `.vsn`-Dateien. | Hoch | Snapshots erfolgen ausschließlich als Envelope v2 unter DEK des Dokuments (Vektor und Bindung) über Port `Vfs` (VC-07, D-19). Nach Vernichtung des DEK-Slots im Vault sind Snapshots kryptografisch unlesbar. |
+| **R-VEC-04** | **RAM Remanenz / Swap / Core-Dumps:** Betriebssystem-Paging könnte Vektor-Fragmente in den Swap auslagern. | Mittel | Arena-Seiten nutzen `MADV_DONTDUMP` und `mlock` best-effort über den `ArenaGuard`-Port (D-63, VC-09). Ausweisung im Bericht unter `ProcessMemory`. |
