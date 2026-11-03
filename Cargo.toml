@@ -16,7 +16,7 @@ members = [
     "crates/contextra-engine",
     "crates/contextra",
     "crates/contextra-testkit",
-    "crates/ctx-verify",
+    "crates/contextra-testmacros",
     "tests/arch",
 ]
 default-members = [
@@ -35,6 +35,7 @@ default-members = [
     "crates/contextra-engine",
     "crates/contextra",
     "crates/contextra-testkit",
+    "crates/contextra-testmacros",
     "tests/arch",
 ]
 
@@ -97,6 +98,7 @@ contextra-rank = { path = "crates/contextra-rank" }
 contextra-engine = { path = "crates/contextra-engine" }
 contextra = { path = "crates/contextra" }
 contextra-testkit = { path = "crates/contextra-testkit" }
+contextra-testmacros = { path = "crates/contextra-testmacros" }
 
 # Ingestion dependencies
 unicode-segmentation = "1.12"

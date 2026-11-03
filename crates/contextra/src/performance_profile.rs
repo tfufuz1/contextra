@@ -38,7 +38,7 @@ pub enum PerformanceProfile {
 }
 
 impl Default for PerformanceProfile {
-    /// Standardmäßig wird das `Compliance`-Profil gewählt (Security-by-Default / DSGVO-Konformität).
+    /// Standardmäßig wird das `Compliance`-Profil gewählt (Security-by-Default / Compliance-Vorgaben).
     fn default() -> Self {
         Self::Compliance
     }

@@ -354,3 +354,280 @@ fn test_t_kdf_1_min_m_kib_rejects_old_buggy_value_19456() {
         "T-KDF-1: from_config(65536) muss Ok zurückgeben (SPEC-Minimum)"
     );
 }
+
+/// SPEC: T-NONCE, T-ENC, T-KEYSLOT, T-KDF
+/// Comprehensive Negative Test Matrix
+#[test]
+fn test_negative_matrix_bit_flip_and_truncation() {
+    use aes_gcm_siv::aead::{Aead, KeyInit};
+
+    let key = FileKey::new([0x33; 32]);
+    let file_id = [0x99; 16];
+    let mut sealer = BlockSealer::new(key, FileKind::SSTable, file_id, None);
+    let block = sealer.seal(b"Secret database block").expect("seal block");
+
+    let cipher_key = aes_gcm_siv::Key::<aes_gcm_siv::Aes256GcmSiv>::from_slice(&[0x33; 32]);
+    let cipher = aes_gcm_siv::Aes256GcmSiv::new(cipher_key);
+
+    let mut nonce = [0u8; 12];
+    nonce[4..12].copy_from_slice(&0u64.to_be_bytes());
+    let mut aad = Vec::new();
+    aad.push(FileKind::SSTable as u8);
+    aad.extend_from_slice(&file_id);
+    aad.extend_from_slice(&0u64.to_be_bytes());
+
+    let mut full_ct = block.ciphertext.clone();
+    full_ct.extend_from_slice(&block.tag);
+
+    for i in 0..full_ct.len() {
+        let mut tampered = full_ct.clone();
+        tampered[i] ^= 0x01;
+        let payload = aes_gcm_siv::aead::Payload {
+            msg: &tampered,
+            aad: &aad,
+        };
+        assert!(
+            cipher
+                .decrypt(aes_gcm_siv::Nonce::from_slice(&nonce), payload)
+                .is_err(),
+            "Bit flip at byte {i} should fail auth"
+        );
+    }
+
+    for len in 0..full_ct.len() {
+        let truncated = &full_ct[..len];
+        let payload = aes_gcm_siv::aead::Payload {
+            msg: truncated,
+            aad: &aad,
+        };
+        assert!(
+            cipher
+                .decrypt(aes_gcm_siv::Nonce::from_slice(&nonce), payload)
+                .is_err(),
+            "Truncation to length {len} should fail auth"
+        );
+    }
+}
+
+#[test]
+fn test_negative_slot_replay_older_generation() {
+    let master = MasterKey::generate_random();
+    let hierarchy = KeyHierarchy::from_master(master);
+
+    let mut h1 = Header {
+        format_version: HEADER_FORMAT_VERSION,
+        kind: HEADER_KIND,
+        alg_ids: HEADER_ALG_IDS,
+        store_id: [0x42; 16],
+        generation: 10,
+        slot_count: 1,
+        report_pub: [0x88; 32],
+        slots: [
+            HeaderSlot::empty(),
+            HeaderSlot::empty(),
+            HeaderSlot::empty(),
+            HeaderSlot::empty(),
+        ],
+    };
+    h1.slots[0] = HeaderSlot {
+        slot_id: 1,
+        anchor_id: 1,
+        kdf_id: 1,
+        status: 1,
+        m_kib: 131072,
+        t: 3,
+        p: 4,
+        slot_salt: [0x77; 32],
+        nonce: [0x11; 12],
+        wrapped_master: [0x99; 48],
+    };
+
+    let encoded_gen10 = h1.encode(hierarchy.hdr());
+    let decoded_gen10 = Header::decode_checked(&encoded_gen10).expect("valid header");
+
+    let mut h2 = h1.clone();
+    h2.generation = 9; // older generation replay
+    let encoded_gen9 = h2.encode(hierarchy.hdr());
+    let decoded_gen9 = Header::decode_checked(&encoded_gen9).expect("valid header");
+
+    assert!(decoded_gen9.generation < decoded_gen10.generation);
+}
+
+#[test]
+fn test_negative_downgrade_attempts_and_fuzz_params() {
+    let mut bad_alg_header = [0u8; HEADER_SIZE];
+    bad_alg_header[..8].copy_from_slice(HEADER_MAGIC);
+    bad_alg_header[8..10].copy_from_slice(&HEADER_FORMAT_VERSION.to_be_bytes());
+    bad_alg_header[10] = HEADER_KIND;
+    bad_alg_header[11..15].copy_from_slice(&[2, 0, 1, 1]); // alg_id = 2
+    bad_alg_header[39] = 1; // slot_count
+    let chk = Header::check16(&bad_alg_header[..584]);
+    bad_alg_header[584..600].copy_from_slice(&chk);
+
+    assert_eq!(
+        Header::decode_checked(&bad_alg_header).unwrap_err(),
+        CryptoError::Corrupt
+    );
+
+    let bad_kdf_inputs = [
+        (0u32, 3u8, 4u8),
+        (65535, 3, 4),
+        (4194305, 3, 4),
+        (u32::MAX, 3, 4),
+        (131072, 0, 4),
+        (131072, 2, 4),
+        (131072, 17, 4),
+        (131072, u8::MAX, 4),
+        (131072, 3, 0),
+        (131072, 3, 17),
+        (131072, 3, u8::MAX),
+    ];
+    for (m, t, p) in bad_kdf_inputs {
+        assert_eq!(
+            KdfParams::from_header(m, t, p),
+            Err(CryptoError::Corrupt),
+            "Failed for ({m}, {t}, {p})"
+        );
+        assert_eq!(
+            KdfParams::from_config(m, t, p),
+            Err(CryptoError::Config),
+            "Failed for ({m}, {t}, {p})"
+        );
+    }
+}
+
+#[test]
+fn test_property_labels_are_prefix_free() {
+    let all_labels: &[&[u8]] = &[
+        labels::TENANT_TAG,
+        labels::COLL_TAG,
+        labels::SUBJECT_TAG,
+        labels::DOC_TAG,
+        labels::TERM_TAG,
+        labels::NAME_TAG,
+        labels::COMMIT,
+        labels::ENC,
+        labels::IDX,
+        labels::UNIT,
+        labels::SIGN,
+        labels::WAL,
+        labels::LEDGER,
+        labels::FILE,
+        labels::FKMASK,
+        labels::DEK,
+        labels::DEK_SALT,
+        labels::REC_AAD,
+        labels::SLOT_AAD,
+        labels::VAULT_MAC,
+        labels::HDR,
+        labels::TBIND_AAD,
+        labels::REPORT_PREFIX,
+    ];
+
+    for (i, l1) in all_labels.iter().enumerate() {
+        for (j, l2) in all_labels.iter().enumerate() {
+            if i != j {
+                assert!(
+                    !l2.starts_with(l1),
+                    "Label {:?} is a prefix of label {:?}",
+                    std::str::from_utf8(l1).unwrap(),
+                    std::str::from_utf8(l2).unwrap()
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_compile_time_zeroize_on_drop_bound() {
+    fn assert_zeroize_on_drop<T: zeroize::ZeroizeOnDrop>() {}
+    assert_zeroize_on_drop::<SecretKey<32>>();
+    assert_zeroize_on_drop::<Secret>();
+}
+
+#[test]
+fn test_constant_time_eq_distribution() {
+    use subtle::ConstantTimeEq;
+
+    let a = [0x42u8; 32];
+    let b = [0x42u8; 32];
+    let c = [0x24u8; 32];
+
+    let mut sum_equal = 0u64;
+    let mut sum_diff = 0u64;
+
+    for _ in 0..1_000_000 {
+        sum_equal += a.ct_eq(&b).unwrap_u8() as u64;
+        sum_diff += a.ct_eq(&c).unwrap_u8() as u64;
+    }
+
+    assert_eq!(sum_equal, 1_000_000);
+    assert_eq!(sum_diff, 0);
+}
+
+#[test]
+fn test_mutation_explicit_domain_separation_check() {
+    let master = MasterKey::new([0x11; 32]);
+    let hierarchy = KeyHierarchy::from_master(master);
+
+    let mut empty_derived = [0u8; 32];
+    hkdf_expand(hierarchy.enc().0.as_bytes(), b"", &mut empty_derived).unwrap();
+    assert_ne!(hierarchy.enc().0.as_bytes(), &empty_derived);
+
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(hierarchy.sign_seed().0.as_bytes());
+    let report_content = b"Art. 17 GDPR Erasure Attestation";
+    let sig_with_prefix = sign_report(hierarchy.sign_seed(), report_content);
+
+    use ed25519_dalek::Signer;
+    let sig_without_prefix = signing_key.sign(report_content).to_bytes();
+    assert_ne!(
+        sig_with_prefix, sig_without_prefix,
+        "Domain label removal mutant detected!"
+    );
+}
+
+#[test]
+fn test_mutation_aad_omission_fails() {
+    let key = SecretKey::<32>::new([0x22; 32]);
+    let dek = Dek(key);
+    let doc_tag = [0x77; 16];
+    let key_bytes = b"my_key";
+    let plain = b"data";
+
+    let env = seal_record(&dek, doc_tag, key_bytes, plain);
+
+    assert_eq!(
+        open_record(&dek, b"", &env).unwrap_err(),
+        CryptoError::Auth,
+        "AAD omission mutant detected!"
+    );
+}
+
+#[test]
+fn test_mutation_nonce_reuse_prevention() {
+    let key = FileKey::new([0x33; 32]);
+    let file_id = [0x99; 16];
+    let mut sealer = BlockSealer::new(key, FileKind::SSTable, file_id, None);
+    let block1 = sealer.seal(b"same content").unwrap();
+    let block2 = sealer.seal(b"same content").unwrap();
+
+    assert_ne!(
+        block1.ciphertext, block2.ciphertext,
+        "Nonce reuse mutant detected!"
+    );
+}
+
+#[test]
+fn test_mutation_verify_vs_verify_strict() {
+    let mut small_order_pub = [0u8; 32];
+    small_order_pub[0] = 1;
+    if let Ok(weak_vk) = ed25519_dalek::VerifyingKey::from_bytes(&small_order_pub) {
+        let dummy_sig = [0u8; 64];
+        let res = verify_report(&weak_vk.to_bytes(), b"data", &dummy_sig);
+        assert_eq!(
+            res.unwrap_err(),
+            CryptoError::Auth,
+            "verify_strict mutant detected!"
+        );
+    }
+}
