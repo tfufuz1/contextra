@@ -11,9 +11,9 @@
 
 use contextra_mvcc::error::MvccError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
-use contextra_mvcc::types::TxId;
 use contextra_mvcc::ContextraError;
 use contextra_testkit::reference_model::ReferenceModel;
+use contextra_types::TxId;
 use proptest::prelude::*;
 use std::collections::BTreeMap;
 

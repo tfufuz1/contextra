@@ -27,7 +27,7 @@ use std::time::Duration;
 
 use contextra_ports::{Clock, SystemClock};
 
-use crate::types::DocId;
+use contextra_types::DocId;
 
 // ANCHOR[contextra-mvcc:SEQ-LOG-CONST]
 /// Standard-Lebensdauer für Snapshot-Pins (5 Minuten), bevor Diagnose-Warnungen für
@@ -76,9 +76,9 @@ impl SeqLogEntry {
     #[inline]
     pub fn is_visible(&self, as_of: u64) -> bool {
         // NOTE: Tombstone-Bit wird ausmaskiert, damit Berechnungen nicht durch interne Markierungsbits verfälscht werden.
-        let as_of = as_of & !crate::types::TOMBSTONE_BIT;
-        let insert_seq = self.insert_seq & !crate::types::TOMBSTONE_BIT;
-        let delete_seq = self.delete_seq.map(|d| d & !crate::types::TOMBSTONE_BIT);
+        let as_of = as_of & !contextra_types::TOMBSTONE_BIT;
+        let insert_seq = self.insert_seq & !contextra_types::TOMBSTONE_BIT;
+        let delete_seq = self.delete_seq.map(|d| d & !contextra_types::TOMBSTONE_BIT);
         insert_seq <= as_of && delete_seq.is_none_or(|del| del > as_of)
     }
 }
@@ -229,7 +229,7 @@ impl SequenceLog {
 
     /// Pinnt eine Sequenznummer zu einem expliziten Nanosekunden-Zeitstempel (für deterministische Tests).
     pub fn pin_snapshot_at(&mut self, seq_no: u64, at_nanos: u64) {
-        let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
+        let seq_no = seq_no & !contextra_types::TOMBSTONE_BIT;
         self.pinned_snapshots
             .entry(seq_no)
             .or_default()
@@ -244,7 +244,7 @@ impl SequenceLog {
     /// 2. Den letzten Zeitstempel vom Stack dieses Eintrags entfernen (LIFO).
     /// 3. Ist die Liste der Zeitstempel für diese Sequenznummer leer, den Eintrag vollständig aus der Map löschen.
     pub fn unpin_snapshot(&mut self, seq_no: u64) {
-        let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
+        let seq_no = seq_no & !contextra_types::TOMBSTONE_BIT;
         if let std::collections::hash_map::Entry::Occupied(mut entry) =
             self.pinned_snapshots.entry(seq_no)
         {
@@ -348,7 +348,7 @@ impl SequenceLog {
     /// 3. Vorherige Löschmarkierung aus der Schnellsuch-Map `deletions` entfernen.
     /// 4. Neuen Eintrag [`SeqLogEntry`] mit `insert_seq = seq` und `delete_seq = None` anfügen.
     pub fn record_insert(&mut self, doc_id: DocId, seq: u64) {
-        let seq = seq & !crate::types::TOMBSTONE_BIT;
+        let seq = seq & !contextra_types::TOMBSTONE_BIT;
         if let Some(entry) = self
             .entries
             .iter_mut()
@@ -372,7 +372,7 @@ impl SequenceLog {
     /// 2. Den letzten noch aktiven Eintrag des Dokuments suchen und dessen `delete_seq` auf `seq` setzen.
     /// 3. Dokument und Lösch-Sequenznummer in `deletions` aufnehmen.
     pub fn record_delete(&mut self, doc_id: DocId, seq: u64) {
-        let seq = seq & !crate::types::TOMBSTONE_BIT;
+        let seq = seq & !contextra_types::TOMBSTONE_BIT;
         if let Some(entry) = self
             .entries
             .iter_mut()
@@ -389,15 +389,15 @@ impl SequenceLog {
     /// Ein Dokument ist sichtbar, wenn es vor oder bei `seq_no` eingefügt wurde und nicht
     /// vor oder bei `seq_no` gelöscht wurde.
     pub fn is_visible(&self, doc_id: DocId, seq_no: u64) -> bool {
-        let seq_no = seq_no & !crate::types::TOMBSTONE_BIT;
+        let seq_no = seq_no & !contextra_types::TOMBSTONE_BIT;
         let mut inserted = false;
         let mut deleted = false;
         for entry in &self.entries {
-            let insert_seq = entry.insert_seq & !crate::types::TOMBSTONE_BIT;
+            let insert_seq = entry.insert_seq & !contextra_types::TOMBSTONE_BIT;
             if entry.doc_id == doc_id && insert_seq <= seq_no {
                 inserted = true;
                 if let Some(del) = entry.delete_seq {
-                    let del_seq = del & !crate::types::TOMBSTONE_BIT;
+                    let del_seq = del & !contextra_types::TOMBSTONE_BIT;
                     deleted = del_seq <= seq_no;
                 } else {
                     deleted = false;
@@ -421,21 +421,22 @@ impl SequenceLog {
     ///    `delete_seq >= min_active_seqno` ist.
     /// 3. Map `deletions` bereinigen.
     pub fn compact(&mut self, min_active_seqno: u64) {
-        let min_active_seqno = min_active_seqno & !crate::types::TOMBSTONE_BIT;
+        let min_active_seqno = min_active_seqno & !contextra_types::TOMBSTONE_BIT;
         self.compacted_below = Some(
             self.compacted_below
                 .map_or(min_active_seqno, |c| c.max(min_active_seqno)),
         );
         self.entries.retain(|entry| {
             if let Some(del_seq) = entry.delete_seq {
-                let del_seq = del_seq & !crate::types::TOMBSTONE_BIT;
+                let del_seq = del_seq & !contextra_types::TOMBSTONE_BIT;
                 del_seq >= min_active_seqno
             } else {
                 true
             }
         });
-        self.deletions
-            .retain(|_, &mut del_seq| (del_seq & !crate::types::TOMBSTONE_BIT) >= min_active_seqno);
+        self.deletions.retain(|_, &mut del_seq| {
+            (del_seq & !contextra_types::TOMBSTONE_BIT) >= min_active_seqno
+        });
     }
 
     /// Gibt die Anzahl der aktuell im Log vorgehaltenen Einträge zurück.
@@ -455,10 +456,10 @@ impl SequenceLog {
     /// Wird verwendet, um einen veralteten Index-Zustand per Delta-Replay schnell
     /// auf einen neueren Stand zu aktualisieren.
     pub fn changes_since(&self, snapshot_seq: u64) -> Vec<SeqLogChange> {
-        let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
+        let snapshot_seq = snapshot_seq & !contextra_types::TOMBSTONE_BIT;
         let mut changes = Vec::new();
         for entry in &self.entries {
-            let insert_seq = entry.insert_seq & !crate::types::TOMBSTONE_BIT;
+            let insert_seq = entry.insert_seq & !contextra_types::TOMBSTONE_BIT;
             if insert_seq > snapshot_seq {
                 changes.push(SeqLogChange::Insert {
                     doc_id: entry.doc_id,
@@ -466,7 +467,7 @@ impl SequenceLog {
                 });
             }
             if let Some(del_seq) = entry.delete_seq {
-                let del_seq = del_seq & !crate::types::TOMBSTONE_BIT;
+                let del_seq = del_seq & !contextra_types::TOMBSTONE_BIT;
                 if del_seq > snapshot_seq {
                     changes.push(SeqLogChange::Delete {
                         doc_id: entry.doc_id,
