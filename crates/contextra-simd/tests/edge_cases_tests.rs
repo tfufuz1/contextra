@@ -74,13 +74,16 @@ fn test_validate_vector_nan_and_inf_at_boundary_indices() {
 
 #[test]
 // ANCHOR[contextra-simd:TEST-EDGE-VALIDATE-EMPTY-LARGE]
-// Prüft validate_vector mit leeren und großen gültigen Vektoren.
+// Prüft validate_vector mit leeren, maximalen (4096) und überdimensionalen (>4096) Vektoren gemäß D-87.
 fn test_validate_vector_empty_and_large_valid_slices() {
     let empty: Vec<f32> = vec![];
     assert!(validate_vector(&empty).is_ok());
 
-    let large_valid: Vec<f32> = (0..10_000).map(|i| (i as f32) * 0.01 - 50.0).collect();
-    assert!(validate_vector(&large_valid).is_ok());
+    let max_valid: Vec<f32> = (0..4096).map(|i| (i as f32) * 0.01 - 20.0).collect();
+    assert!(validate_vector(&max_valid).is_ok());
+
+    let over_dimension: Vec<f32> = (0..4097).map(|i| (i as f32) * 0.01).collect();
+    assert!(validate_vector(&over_dimension).is_err());
 }
 
 #[test]
