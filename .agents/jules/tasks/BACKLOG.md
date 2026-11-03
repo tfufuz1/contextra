@@ -1,6 +1,6 @@
 # Arbeitsliste für Jules
 
-Nicht normativ. Maßgeblich sind die Arbeitspakete in [`docs/SPEC.md`](../../../docs/SPEC.md), Abschnitt 15.4, und die Gates in 15.3 (Version 4.3.0).
+Nicht normativ. Maßgeblich sind die Arbeitspakete in [`docs/SPEC.md`](../../../docs/SPEC.md), Abschnitt 15.4, und die Gates in 15.3 (Version 5.1.0).
 
 ## Regeln
 
