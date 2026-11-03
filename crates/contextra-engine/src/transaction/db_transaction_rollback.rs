@@ -7,7 +7,7 @@
 
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
+use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, DocId, Result, TxId};
 use std::sync::atomic::Ordering;
 
@@ -181,9 +181,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     // ANCHOR[contextra-engine:ROL-175]
     /// Dokumentation für `rollback_internal` im Rahmen der Transaktions- und Facade-Orchestrierung.
     pub(super) async fn rollback_internal(&self) {
-        if let Err(e) = self.collection.graph_index.rollback(self.tx_id).await {
-            tracing::error!("[INV-DB-3] Graph index rollback failed: {}", e);
-        }
         if let Err(e) = self.collection.text_index.rollback(self.tx_id).await {
             tracing::error!("[INV-DB-3] Text index rollback failed: {}", e);
         }
@@ -196,26 +193,21 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     }
 
     // ANCHOR[contextra-engine:ROL-001]
-    /// Führt den Rollback aller uncommitteten Änderungen über alle 4 Subsysteme in umgekehrter Reihenfolge aus.
+    /// Führt den Rollback aller uncommitteten Änderungen über alle Subsysteme in umgekehrter Reihenfolge aus.
     ///
     /// # Ablauf
     /// 1. Transaktionsstatus atomar auf abgeschlossen setzen (`committed.store(true)`).
-    /// 2. Rollback für Graph-Index ausführen.
-    /// 3. Rollback für Text-Index (BM25) ausführen.
-    /// 4. Rollback für Vektor-Index (HNSW) ausführen.
-    /// 5. Rollback für Storage-Engine (LSM) ausführen.
-    /// 6. Fehler sammeln; traten Fehler auf, wird ein zusammenfassender `ContextraError::Transaction` zurückgegeben.
+    /// 2. Rollback für Text-Index (BM25) ausführen.
+    /// 3. Rollback für Vektor-Index (HNSW) ausführen.
+    /// 4. Rollback für Storage-Engine (LSM) ausführen.
+    /// 5. Fehler sammeln; traten Fehler auf, wird ein zusammenfassender `ContextraError::Transaction` zurückgegeben.
     pub async fn rollback(self) -> Result<()> {
         self.committed.store(true, Ordering::Release);
 
-        let graph_res = self.collection.graph_index.rollback(self.tx_id).await;
         let text_res = self.collection.text_index.rollback(self.tx_id).await;
         let index_res = self.collection.index.rollback(self.tx_id).await;
         let storage_res = self.collection.storage.rollback(self.tx_id).await;
 
-        if let Err(ref e) = graph_res {
-            tracing::error!("[INV-DB-3] Graph index rollback failed: {}", e);
-        }
         if let Err(ref e) = text_res {
             tracing::error!("[INV-DB-3] Text index rollback failed: {}", e);
         }
@@ -227,9 +219,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         }
 
         let mut errors = Vec::new();
-        if let Err(e) = graph_res {
-            errors.push(format!("Graph: {}", e));
-        }
         if let Err(e) = text_res {
             errors.push(format!("Text: {}", e));
         }

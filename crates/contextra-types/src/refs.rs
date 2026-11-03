@@ -45,7 +45,12 @@ macro_rules! define_ref_newtype {
         impl fmt::Debug for $name {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 // Redigierte Ausgabe laut I-11 / HR-4
-                write!(f, "{}([REDACTED {} bytes])", stringify!($name), self.0.len())
+                write!(
+                    f,
+                    "{}([REDACTED {} bytes])",
+                    stringify!($name),
+                    self.0.len()
+                )
             }
         }
     };

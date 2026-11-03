@@ -7,7 +7,7 @@
 )]
 #![warn(missing_docs)]
 
-//! Unabhängige Prüfinstanz und Byte-Format-Parser für die Löschverifikation.
+//! Unabhängige Prüfinstanz für die Löschmessung, ohne Produktions-Decoder.
 //!
 //! # Architektur-Rolle: Ring dev (Unabhängige Prüfinstanz)
 //!

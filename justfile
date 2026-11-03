@@ -9,6 +9,10 @@ default:
 
 # ── Core Dev-Loop (10 targets + mandated extras) ──────────────────────────────
 
+# CI build check: Gate G-A (SPEC D-93, 15.3)
+ci-build:
+    cargo check --workspace --all-targets --locked
+
 # Runs formatting, clippy and checks compilation (nix-develop aware)
 check:
     #!/usr/bin/env bash

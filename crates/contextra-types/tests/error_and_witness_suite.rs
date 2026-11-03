@@ -1,7 +1,4 @@
-//! Integrations-Testsuite für Fehlerpfade, RequestContext und Saga-Protokolle.
-//! Stellt sicher, dass Restmessungstypen und Tombstones fehlerfrei interagieren.
-
-//! Error, Witness, Tombstone, and TenantScoped isolation test suite for `contextra-types`.
+//! Integrations-Testsuite für Löschtypen, Zeugen, Mandantenisolation und Tombstones (SPEC 5.1, 7.3, 8.1, 12.1, 12.2, TY-10).
 
 #![allow(
     clippy::unwrap_used,
@@ -12,44 +9,81 @@
 )]
 
 use contextra_types::*;
+use core::time::Duration;
 use proptest::prelude::*;
 
 #[test]
-/// Prüft Konstruktion, Feldzugriff und JSON-Serialisierung von `RequestContext`.
-fn test_request_context_creation_and_fields() {
-    let t_id = TenantId::try_new(42).unwrap();
-    let tx_id = TxId::new(100);
-
-    let ctx = RequestContext::new(t_id, tx_id);
-    assert_eq!(ctx.tenant_id, t_id);
-    assert_eq!(ctx.tx_id, tx_id);
+/// Prüft Konstruktion, Feldzugriff und JSON-Serialisierung von `TenantContext` (SPEC D-07, 7.3).
+fn test_tenant_context_creation_and_fields() {
+    let t_ref = TenantRef::try_new(b"tenant-42".to_vec()).unwrap();
+    let ctx = TenantContext::new(t_ref.clone());
+    assert_eq!(ctx.tenant(), &t_ref);
 
     let json = serde_json::to_string(&ctx).unwrap();
-    let deser: RequestContext = serde_json::from_str(&json).unwrap();
-    assert_eq!(deser.tenant_id, t_id);
-    assert_eq!(deser.tx_id, tx_id);
+    let deser: TenantContext = serde_json::from_str(&json).unwrap();
+    assert_eq!(deser.tenant(), &t_ref);
 }
 
 #[test]
-/// Prüft `SagaRecord`-Hash-Felder und die Serialisierung aller `ScanMethod`-Varianten.
-fn test_saga_record_and_scan_methods() {
+/// Prüft typisierten Scanner, Positivkontrolle (ControlEvidence) und Zeugenerzeugung (SPEC 8.1, 12.2, D-72, TY-10).
+fn test_typed_scanner_witness_and_residue_semantics() {
+    let layer = LayerId::new([0x01; 16]);
+    let class = MeasureClass::Mk2;
+    let method_id = 42u16;
+
+    // 1. Unarmed Scanner anlegen
+    let scanner_unarmed = Scanner::new(layer, class, method_id);
+
+    // 2. Scharfschalten via ControlEvidence (Positivkontrolle)
+    let evidence = ControlEvidence::observed();
+    let mut scanner_armed = scanner_unarmed.arm(evidence);
+
+    // 3. Durchsuchte Einheiten aufzeichnen
+    scanner_armed.record(10, 2048);
+
+    // 4. Erfolgreicher Abschluss ohne Funde (matches == 0) -> erzeugt LayerWitness
     let hash = [0x55u8; 32];
-    let saga = SagaRecord::new(hash);
-    assert_eq!(saga.deleted_keys_hash, hash);
+    let duration = Duration::from_millis(15);
+    let witness_res = scanner_armed.finish(0, duration, hash);
+    assert!(
+        witness_res.is_ok(),
+        "finish(0) muss Ok(LayerWitness) liefern"
+    );
 
-    let json = serde_json::to_string(&saga).unwrap();
-    let deser: SagaRecord = serde_json::from_str(&json).unwrap();
-    assert_eq!(deser.deleted_keys_hash, hash);
+    let witness = witness_res.unwrap();
+    assert_eq!(witness.layer(), layer);
+    assert_eq!(witness.class(), class);
+    assert_eq!(witness.method_id(), method_id);
+    assert_eq!(witness.files(), 10);
+    assert_eq!(witness.bytes(), 2048);
+    assert_eq!(witness.duration(), duration);
+    assert_eq!(witness.hash(), &hash);
+    assert_eq!(
+        witness.matches(),
+        0,
+        "LayerWitness darf per Konstruktion 0 Funde haben (I-19)"
+    );
 
-    for method in [
-        ScanMethod::Structural,
-        ScanMethod::NotMeasured("compaction pending".to_string()),
-        ScanMethod::FeatureDisabled,
-    ] {
-        let json_m = serde_json::to_string(&method).unwrap();
-        let deser_m: ScanMethod = serde_json::from_str(&json_m).unwrap();
-        assert_eq!(method, deser_m);
-        assert!(!format!("{method:?}").is_empty());
+    // 5. Fehlgeschlagener Abschluss bei Funden (matches > 0) -> erzeugt Residue
+    let scanner_fail = Scanner::new(layer, class, method_id).arm(evidence);
+    let residue_res = scanner_fail.finish(3, duration, hash);
+    assert!(
+        residue_res.is_err(),
+        "finish(matches > 0) muss Err(Residue) liefern"
+    );
+    let residue = residue_res.unwrap_err();
+    assert_eq!(residue.matches, 3);
+    assert_eq!(
+        residue.to_string(),
+        "erasure residue detected: 3 matches found"
+    );
+
+    // 6. Messklassen und Serde-Prüfung
+    for mc in [MeasureClass::Mk1, MeasureClass::Mk2, MeasureClass::Mk3] {
+        let json_mc = serde_json::to_string(&mc).unwrap();
+        let deser_mc: MeasureClass = serde_json::from_str(&json_mc).unwrap();
+        assert_eq!(mc, deser_mc);
+        assert!(!format!("{mc:?}").is_empty());
     }
 }
 
