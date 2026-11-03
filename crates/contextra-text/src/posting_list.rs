@@ -32,11 +32,7 @@ pub const POSTING_LIST_V2_MAGIC: &[u8; 4] = b"PL\x02\x00";
 /// Blockgröße für die Block-Max-WAND-Zerlegung (64 Postings pro Block).
 pub const BLOCK_SIZE: usize = 64;
 
-#[cfg(not(feature = "docid-128"))]
 pub type DocIdRaw = u64;
-
-#[cfg(feature = "docid-128")]
-pub type DocIdRaw = u128;
 
 // ANCHOR[contextra-text:POST-003]
 /// Metadaten eines 64er-Posting-Blocks zur Berechnung oberer BM25-Schranken in Block-Max WAND.
@@ -224,14 +220,7 @@ impl PostingList {
             encode_varint(delta, &mut buf);
             encode_varint(p.tf as u64, &mut buf);
             encode_varint(p.doc_len as u64, &mut buf);
-            #[cfg(not(feature = "docid-128"))]
-            {
-                prev_doc_id = p.doc_id;
-            }
-            #[cfg(feature = "docid-128")]
-            {
-                prev_doc_id = p.doc_id as u64;
-            }
+            prev_doc_id = p.doc_id;
         }
 
         Ok(buf)
