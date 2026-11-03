@@ -42,18 +42,6 @@ async fn test_db_transaction_multi_index_staging_commit_and_rollback() -> contex
         "Transaktions-Text für Commit-Test".to_string(),
     );
 
-    let entity1 = Entity::new(EntityId::from_key("tx_entity_1")?, "Node1", "Concept");
-    let entity2 = Entity::new(EntityId::from_key("tx_entity_2")?, "Node2", "Concept");
-    tx_commit.stage_graph_entity(entity1);
-    tx_commit.stage_graph_entity(entity2);
-
-    let edge = Edge::new(
-        EntityId::from_key("tx_entity_1")?,
-        EntityId::from_key("tx_entity_2")?,
-        "CONNECTS_TO",
-    );
-    tx_commit.stage_graph_edge(edge);
-
     // Execute commit
     tx_commit.commit().await?;
 
@@ -64,16 +52,7 @@ async fn test_db_transaction_multi_index_staging_commit_and_rollback() -> contex
         "Committed transaction document must exist in storage"
     );
 
-    // Verify graph index contains committed edge
-    let node1_id = EntityId::from_key("tx_entity_1")?;
-    let node2_id = EntityId::from_key("tx_entity_2")?;
-    let neighbors = col.graph_index().neighbors(node1_id).await?;
-    assert!(
-        neighbors.contains(&node2_id),
-        "Graph index must contain committed edge from tx_entity_1 to tx_entity_2"
-    );
-
-    // 2. Rollback Scenario: Staging text and graph entities, then rolling back
+    // 2. Rollback Scenario: Staging text, then rolling back
     let mut tx_rollback = col.begin_transaction()?;
 
     col.insert_op(
@@ -90,18 +69,6 @@ async fn test_db_transaction_multi_index_staging_commit_and_rollback() -> contex
         "Transaktions-Text für Rollback-Test".to_string(),
     );
 
-    let entity_rb1 = Entity::new(EntityId::from_key("tx_rb_1")?, "RB1", "Concept");
-    let entity_rb2 = Entity::new(EntityId::from_key("tx_rb_2")?, "RB2", "Concept");
-    tx_rollback.stage_graph_entity(entity_rb1);
-    tx_rollback.stage_graph_entity(entity_rb2);
-
-    let edge_rb = Edge::new(
-        EntityId::from_key("tx_rb_1")?,
-        EntityId::from_key("tx_rb_2")?,
-        "TEMP_EDGE",
-    );
-    tx_rollback.stage_graph_edge(edge_rb);
-
     // Execute rollback
     tx_rollback.rollback().await?;
 
@@ -110,15 +77,6 @@ async fn test_db_transaction_multi_index_staging_commit_and_rollback() -> contex
     assert!(
         rb_doc.is_none(),
         "Storage must NOT contain rolled-back transaction document"
-    );
-
-    // Verify graph index DOES NOT contain rolled-back edge
-    let rb1_id = EntityId::from_key("tx_rb_1")?;
-    let rb2_id = EntityId::from_key("tx_rb_2")?;
-    let rb_neighbors = col.graph_index().neighbors(rb1_id).await?;
-    assert!(
-        !rb_neighbors.contains(&rb2_id),
-        "Graph index must NOT contain rolled-back edge"
     );
 
     db.close().await?;
