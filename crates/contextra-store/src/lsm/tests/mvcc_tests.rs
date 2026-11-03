@@ -13,7 +13,6 @@ async fn test_storage() -> (LsmStorage, TempDir) {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = LsmStorage::new(config).await.expect("create storage");
@@ -511,7 +510,6 @@ async fn test_commit_mutex_released_before_flusher_await() {
         tx_timeout: Duration::from_secs(60),
         group_commit_window_micros: 10_000, // 10ms window to force group commit
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = Arc::new(LsmStorage::new(config).await.expect("create storage"));

@@ -23,7 +23,6 @@ fn create_test_config(path: &Path) -> LsmConfig {
         memtable_size_limit: 1024 * 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: None,
         compaction: contextra_store::compaction::CompactionConfig {
             min_sstables_per_tier: 2,
             ..Default::default()
