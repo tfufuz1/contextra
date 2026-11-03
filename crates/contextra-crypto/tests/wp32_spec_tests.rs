@@ -1,6 +1,41 @@
 //! Comprehensive test suite fulfilling all SPEC WP-3.2, T-KDF-1/2, T-KEYSLOT-1..4, T-NONCE-1, T-ENC-1..3, T-HDR-1, T-FMT-1, T-KEY-1, T-WAL-1, T-PROOF-1 requirements.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation
+)]
+
 use contextra_crypto::*;
+use proptest::prelude::*;
+
+proptest! {
+    /// T-KDF-1 & T-KDF-2: Property-based test over arbitrary inputs for KdfParams bounds.
+    /// Ensures that from_header and from_config fail closed with Corrupt and Config respectively,
+    /// and that only inputs within the exact SPEC bounds succeed.
+    #[test]
+    fn proptest_t_kdf_1_2_bounds(m_kib in any::<u32>(), t in any::<u8>(), p in any::<u8>()) {
+        let is_valid = (MIN_M_KIB..=MAX_M_KIB).contains(&m_kib)
+            && (MIN_T..=MAX_T).contains(&t)
+            && (MIN_P..=MAX_P).contains(&p);
+
+        let res_header = KdfParams::from_header(m_kib, t, p);
+        let res_config = KdfParams::from_config(m_kib, t, p);
+
+        if is_valid {
+            prop_assert!(res_header.is_ok(), "Valid bounds should succeed for from_header");
+            prop_assert!(res_config.is_ok(), "Valid bounds should succeed for from_config");
+            let params = res_header.unwrap();
+            prop_assert_eq!(params.m_kib, m_kib);
+            prop_assert_eq!(params.t, t);
+            prop_assert_eq!(params.p, p);
+        } else {
+            prop_assert_eq!(res_header, Err(CryptoError::Corrupt), "Invalid bounds must return Corrupt for from_header");
+            prop_assert_eq!(res_config, Err(CryptoError::Config), "Invalid bounds must return Config for from_config");
+        }
+    }
+}
 
 #[test]
 fn test_cr02_kdf_bounds_and_constructors_t_kdf_1_2() {
@@ -256,11 +291,99 @@ fn test_cr12_chains_and_macs_t_wal_1_2() {
 
     let wal_tag = [0xEE; 16];
     let ct = b"wal ciphertext batch";
-    let w_mac = wal_mac(hierarchy.wal(), &prev, ct.len() as u32, 1, ct, &wal_tag);
+    let w_mac = wal_mac(
+        hierarchy.wal(),
+        &prev,
+        u32::try_from(ct.len()).unwrap_or(0),
+        1,
+        ct,
+        &wal_tag,
+    );
     assert_ne!(w_mac, [0u8; 32]);
 
     let l_mac = ledger_mac(hierarchy.ledger(), &next);
     assert_ne!(l_mac, [0u8; 32]);
+}
+
+#[test]
+fn test_wal_chain_completeness_verification_spec_10_4() {
+    let master = MasterKey::generate_random();
+    let hierarchy = KeyHierarchy::from_master(master);
+
+    let wrong_master = MasterKey::generate_random();
+    let wrong_hierarchy = KeyHierarchy::from_master(wrong_master);
+
+    let mut prev = [0u8; 32];
+    let ct1 = b"frame 1 payload";
+    let tag1 = [1u8; 16];
+    let mac1 = wal_mac(hierarchy.wal(), &prev, ct1.len() as u32, 1, ct1, &tag1);
+
+    prev = mac1;
+    let ct2 = b"frame 2 payload";
+    let tag2 = [2u8; 16];
+    let mac2 = wal_mac(hierarchy.wal(), &prev, ct2.len() as u32, 2, ct2, &tag2);
+
+    prev = mac2;
+    let ct3 = b"frame 3 payload";
+    let tag3 = [3u8; 16];
+    let mac3 = wal_mac(hierarchy.wal(), &prev, ct3.len() as u32, 3, ct3, &tag3);
+
+    // 1. Valid chain matches expected tail
+    let expected_tail = mac3;
+    assert!(verify_chain_complete(&expected_tail, &mac3).is_ok());
+    assert!(verify_wal_chain_completeness(&expected_tail, &mac3).is_ok());
+
+    // 2. Truncated chain (stopped at mac2 instead of mac3)
+    let truncated_tail = mac2;
+    assert_eq!(
+        verify_chain_complete(&expected_tail, &truncated_tail),
+        Err(CryptoError::Corrupt)
+    );
+
+    // 3. Reordered entries (swapped frame 2 and frame 3)
+    let mac3_swapped = wal_mac(hierarchy.wal(), &mac1, ct3.len() as u32, 3, ct3, &tag3);
+    let mac2_swapped = wal_mac(
+        hierarchy.wal(),
+        &mac3_swapped,
+        ct2.len() as u32,
+        2,
+        ct2,
+        &tag2,
+    );
+    assert_eq!(
+        verify_chain_complete(&expected_tail, &mac2_swapped),
+        Err(CryptoError::Corrupt)
+    );
+
+    // 4. Incorrect key
+    let wrong_mac1 = wal_mac(
+        wrong_hierarchy.wal(),
+        &[0u8; 32],
+        ct1.len() as u32,
+        1,
+        ct1,
+        &tag1,
+    );
+    let wrong_mac2 = wal_mac(
+        wrong_hierarchy.wal(),
+        &wrong_mac1,
+        ct2.len() as u32,
+        2,
+        ct2,
+        &tag2,
+    );
+    let wrong_mac3 = wal_mac(
+        wrong_hierarchy.wal(),
+        &wrong_mac2,
+        ct3.len() as u32,
+        3,
+        ct3,
+        &tag3,
+    );
+    assert_eq!(
+        verify_chain_complete(&expected_tail, &wrong_mac3),
+        Err(CryptoError::Corrupt)
+    );
 }
 
 #[test]
@@ -323,6 +446,71 @@ fn test_cr13_cr14_header_encoding_and_validation_t_hdr_1_t_fmt_1() {
         Header::decode_checked(&reserved_alg).unwrap_err(),
         CryptoError::Corrupt
     );
+}
+
+#[test]
+fn test_negative_record_envelope_v2_tampering_and_version() {
+    let master = MasterKey::generate_random();
+    let hierarchy = KeyHierarchy::from_master(master);
+
+    let salts = AncestorSalts {
+        t: [10u8; 32],
+        c: [20u8; 32],
+        s: Some([30u8; 32]),
+        d: [40u8; 32],
+    };
+    let doc_tag = [0x55; 16];
+    let dek = derive_dek(hierarchy.unit(), &salts, doc_tag);
+
+    let key_bytes = b"tenants/test/records/1";
+    let plain = b"Encrypted sensitive record payload";
+    let env = seal_record(&dek, doc_tag, key_bytes, plain);
+
+    // 1. Valid open succeeds
+    let opened = open_record(&dek, key_bytes, &env).expect("valid open");
+    assert_eq!(opened.as_slice(), plain);
+
+    // 2. Corrupted version != 2 -> Corrupt
+    let mut bad_version = env.clone();
+    bad_version[0] = 1; // legacy v1
+    assert_eq!(
+        open_record(&dek, key_bytes, &bad_version).unwrap_err(),
+        CryptoError::Corrupt
+    );
+
+    let mut bad_version_future = env.clone();
+    bad_version_future[0] = 3; // unsupported future v3
+    assert_eq!(
+        open_record(&dek, key_bytes, &bad_version_future).unwrap_err(),
+        CryptoError::Corrupt
+    );
+
+    // 3. Corrupted alg_id != 1 -> Corrupt
+    let mut bad_alg = env.clone();
+    bad_alg[1] = 2; // reserved alg_id 2
+    assert_eq!(
+        open_record(&dek, key_bytes, &bad_alg).unwrap_err(),
+        CryptoError::Corrupt
+    );
+
+    // 4. Truncated envelope -> Corrupt
+    for len in 0..30 {
+        let truncated = &env[..len];
+        assert_eq!(
+            open_record(&dek, key_bytes, truncated).unwrap_err(),
+            CryptoError::Corrupt
+        );
+    }
+
+    // 5. Bit flips in ciphertext/tag -> Auth
+    for i in 30..env.len() {
+        let mut tampered = env.clone();
+        tampered[i] ^= 0x01;
+        assert_eq!(
+            open_record(&dek, key_bytes, &tampered).unwrap_err(),
+            CryptoError::Auth
+        );
+    }
 }
 
 #[test]
@@ -629,5 +817,176 @@ fn test_mutation_verify_vs_verify_strict() {
             CryptoError::Auth,
             "verify_strict mutant detected!"
         );
+    }
+}
+
+#[test]
+fn test_t_nonce_1_nonce_format_and_counter_properties() {
+    let key = FileKey::new([0x33; 32]);
+    let file_id = [0x99; 16];
+    let mut sealer = BlockSealer::new(key, FileKind::Wal, file_id, None);
+
+    // Verify block 0 can be sealed
+    let block0 = sealer.seal(b"first block").expect("block 0");
+    assert_eq!(block0.tag.len(), 16);
+
+    // Verify counter overflow at 2^32
+    sealer.set_counter_for_test(1u64 << 32);
+    let overflow_res = sealer.seal(b"overflow block");
+    assert_eq!(overflow_res.err(), Some(CryptoError::Limit));
+}
+
+#[test]
+fn test_t_keycov_hierarchy_erasure_irrecoverability() {
+    // SPEC 10.1, D-79, T-KEYCOV-1:
+    // Derivation vs Wrapping model: Slot destruction wipes MasterKey and prevents derivation of all child keys.
+    // Destruction of any component in T/C/S/D invalidates DEK derivation permanently.
+    let master = MasterKey::generate_random();
+    let hierarchy = KeyHierarchy::from_master(master);
+
+    let ancestor_salts = AncestorSalts {
+        t: [0x11; 32], // Tenant salt
+        c: [0x22; 32], // Collection salt
+        s: Some([0x33; 32]), // Subject salt
+        d: [0x44; 32], // Document salt
+    };
+    let doc_tag = [0xAA; 16];
+
+    let original_dek = derive_dek(hierarchy.unit(), &ancestor_salts, doc_tag);
+    let key_bytes = b"tenants/11/collections/22/docs/doc_1";
+    let plain_payload = b"Top secret GDPR confidential personal data";
+    let envelope = seal_record(&original_dek, doc_tag, key_bytes, plain_payload);
+
+    // Verify envelope decrypts with valid original DEK
+    let decrypted = open_record(&original_dek, key_bytes, &envelope).expect("decryption succeeds");
+    assert_eq!(decrypted.as_slice(), plain_payload);
+
+    // 1. Slot destruction: Master key wiped -> newly derived hierarchy has completely uncorrelated keys
+    let zeroed_master = MasterKey::new([0u8; 32]);
+    let zeroed_hierarchy = KeyHierarchy::from_master(zeroed_master);
+    let zeroed_dek = derive_dek(zeroed_hierarchy.unit(), &ancestor_salts, doc_tag);
+    assert_eq!(
+        open_record(&zeroed_dek, key_bytes, &envelope).unwrap_err(),
+        CryptoError::Auth,
+        "Zeroed master key cannot derive original DEK or decrypt data"
+    );
+
+    // 2. Tenant salt wiped / rotated
+    let destroyed_tenant_salts = AncestorSalts {
+        t: [0x00; 32],
+        c: ancestor_salts.c,
+        s: ancestor_salts.s,
+        d: ancestor_salts.d,
+    };
+    let tenant_erased_dek = derive_dek(hierarchy.unit(), &destroyed_tenant_salts, doc_tag);
+    assert_eq!(
+        open_record(&tenant_erased_dek, key_bytes, &envelope).unwrap_err(),
+        CryptoError::Auth,
+        "Tenant salt erasure renders DEK unrecoverable"
+    );
+
+    // 3. Collection salt wiped / rotated
+    let destroyed_collection_salts = AncestorSalts {
+        t: ancestor_salts.t,
+        c: [0x00; 32],
+        s: ancestor_salts.s,
+        d: ancestor_salts.d,
+    };
+    let coll_erased_dek = derive_dek(hierarchy.unit(), &destroyed_collection_salts, doc_tag);
+    assert_eq!(
+        open_record(&coll_erased_dek, key_bytes, &envelope).unwrap_err(),
+        CryptoError::Auth,
+        "Collection salt erasure renders DEK unrecoverable"
+    );
+
+    // 4. Subject salt wiped (Right to be Forgotten - Art. 17 GDPR)
+    let destroyed_subject_salts = AncestorSalts {
+        t: ancestor_salts.t,
+        c: ancestor_salts.c,
+        s: None, // Subject salt erased
+        d: ancestor_salts.d,
+    };
+    let subj_erased_dek = derive_dek(hierarchy.unit(), &destroyed_subject_salts, doc_tag);
+    assert_eq!(
+        open_record(&subj_erased_dek, key_bytes, &envelope).unwrap_err(),
+        CryptoError::Auth,
+        "Subject salt erasure renders DEK unrecoverable"
+    );
+
+    // 5. Document salt wiped
+    let destroyed_doc_salts = AncestorSalts {
+        t: ancestor_salts.t,
+        c: ancestor_salts.c,
+        s: ancestor_salts.s,
+        d: [0x00; 32],
+    };
+    let doc_erased_dek = derive_dek(hierarchy.unit(), &destroyed_doc_salts, doc_tag);
+    assert_eq!(
+        open_record(&doc_erased_dek, key_bytes, &envelope).unwrap_err(),
+        CryptoError::Auth,
+        "Document salt erasure renders DEK unrecoverable"
+    );
+}
+
+
+#[test]
+fn test_t_log_1_secret_freedom_in_debug_and_display() {
+    // CR-10 / T-LOG-1 / HR-4:
+    // Verify that Debug/Display/Error strings for all key wrappers and errors
+    // contain ZERO secret key bytes, zero unmasked raw material, and only REDACTED or fixed enum names.
+    let raw = [0x7A; 32];
+    let secret_key = SecretKey::new(raw);
+    let secret = Secret::from_slice(&raw);
+
+    let master = MasterKey::new(raw);
+    let enc = EncKey(SecretKey::new(raw));
+    let idx = IdxKey(SecretKey::new(raw));
+    let unit = UnitKey(SecretKey::new(raw));
+    let sign_seed = SignSeed(SecretKey::new(raw));
+    let wal = WalKey(SecretKey::new(raw));
+    let ledger = LedgerKey(SecretKey::new(raw));
+    let hdr = HdrKey(SecretKey::new(raw));
+    let commit = CommitKey(SecretKey::new(raw));
+    let vmac = VaultMacKey(SecretKey::new(raw));
+    let file = FileKey::new(raw);
+    let dek = Dek(SecretKey::new(raw));
+
+    let debug_outputs = vec![
+        format!("{:?}", secret_key),
+        format!("{:?}", secret),
+        format!("{:?}", master),
+        format!("{:?}", enc),
+        format!("{:?}", idx),
+        format!("{:?}", unit),
+        format!("{:?}", sign_seed),
+        format!("{:?}", wal),
+        format!("{:?}", ledger),
+        format!("{:?}", hdr),
+        format!("{:?}", commit),
+        format!("{:?}", vmac),
+        format!("{:?}", file),
+        format!("{:?}", dek),
+    ];
+
+    for dbg in &debug_outputs {
+        assert!(dbg.contains("[REDACTED]"), "Debug output must be masked: {dbg}");
+        assert!(!dbg.contains("122"), "Debug output leaked decimal byte 122 (0x7A): {dbg}");
+        assert!(!dbg.contains("7a"), "Debug output leaked hex byte 7a: {dbg}");
+        assert!(!dbg.contains("7A"), "Debug output leaked hex byte 7A: {dbg}");
+    }
+
+    // Verify CryptoError Display and Debug
+    let errors = vec![
+        CryptoError::Auth,
+        CryptoError::Corrupt,
+        CryptoError::Config,
+        CryptoError::Limit,
+        CryptoError::Internal,
+    ];
+    for err in errors {
+        let disp = format!("{err}");
+        let dbg = format!("{err:?}");
+        assert!(!disp.contains("0x"), "Error display leaked memory/addresses: {disp}");
+        assert!(!dbg.contains("0x"), "Error debug leaked memory/addresses: {dbg}");
     }
 }

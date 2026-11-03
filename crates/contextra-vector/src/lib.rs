@@ -11,10 +11,9 @@
 // KERNKOMPONENTEN: HNSW (Graph-basierte ANN) + CSR Graph (Relationen) + SIMD-Distanz.
 // INVARIANTE: HNSW-Graphen liegen exklusiv im RAM. Disk-Storage erfolgt über contextra-store (via LsmStorage).
 
-// ANCHOR[REFACTOR:WP-0.0-STABLESIMD] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Remove nightly portable_simd
 // TEST: cargo +stable check -p contextra-index
 // DONE: #![feature(portable_simd)] ist entfernt und distance.rs nutzt stabiles Rust.
-// INVARIANTE: Zero unsafe code in contextra-vector. SIMD an contextra-simd ausgelagert; kein mmap (D-94).
+// INVARIANTE: Zero unsafe code in contextra-vector. SIMD an contextra-simd, buffer an contextra-sys ausgelagert.
 #![forbid(unsafe_code)]
 // ADR-077: Vector index numerical conversions, array indexing, and internal collections.
 #![allow(
@@ -46,7 +45,7 @@ pub use candidate_stream::{VectorCandidateStream, DEFAULT_VECTOR_STREAM_BATCH_SI
 pub use compute_pool::ComputePool;
 #[cfg(feature = "experimental-diskann")]
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
-pub use hnsw::{HnswConfig, HnswIndex, RebuildStatus};
+pub use hnsw::{DeletionStats, GhostFreeVectorIndex, HnswConfig, HnswIndex, RebuildStatus};
 pub use persistence::{HnswHeader, MmapIndex};
 pub use quantize::ScalarQuantizer;
 #[cfg(feature = "experimental-rabitq")]

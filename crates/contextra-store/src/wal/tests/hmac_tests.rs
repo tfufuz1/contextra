@@ -5,7 +5,7 @@
 use super::*;
 use crate::wal::KeyManager;
 use crate::wal::Wal;
-use contextra_crypto::wal_crypto::WalHmac;
+use crate::wal::WalHmac;
 use contextra_types::TxId;
 use std::sync::Arc;
 use tempfile::tempdir;

@@ -257,14 +257,26 @@ impl Wal {
             };
 
             if let Err(e) = file.write_all(&key).await {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                    tracing::warn!(
+                        "Failed to remove temporary key file {}: {}",
+                        tmp_path.display(),
+                        rm_err
+                    );
+                }
                 return Err(ContextraError::Storage(format!(
                     "Failed to write WAL integrity key: {}",
                     e
                 )));
             }
             if let Err(e) = file.sync_all().await {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                    tracing::warn!(
+                        "Failed to remove temporary key file {}: {}",
+                        tmp_path.display(),
+                        rm_err
+                    );
+                }
                 return Err(ContextraError::Storage(format!(
                     "Failed to sync WAL integrity key file: {}",
                     e
@@ -274,12 +286,24 @@ impl Wal {
 
             #[cfg(windows)]
             if let Err(e) = super::io::set_restrictive_file_acl(&tmp_path) {
-                let _ = super::fs::remove_file(&tmp_path).await;
+                if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                    tracing::warn!(
+                        "Failed to remove temporary key file {}: {}",
+                        tmp_path.display(),
+                        rm_err
+                    );
+                }
                 return Err(e.into());
             }
 
             let link_res = super::fs::hard_link(&tmp_path, &key_path).await;
-            let _ = super::fs::remove_file(&tmp_path).await;
+            if let Err(rm_err) = super::fs::remove_file(&tmp_path).await {
+                tracing::warn!(
+                    "Failed to remove temporary key file {}: {}",
+                    tmp_path.display(),
+                    rm_err
+                );
+            }
 
             match link_res {
                 Ok(()) => {
@@ -448,12 +472,7 @@ impl Wal {
                 .file_name()
                 .map(|s| s.to_string_lossy())
                 .unwrap_or_default();
-            let tmp_filename = format!(
-                "{}.tmp.{}.{}",
-                uuid_filename,
-                std::process::id(),
-                rand_u64
-            );
+            let tmp_filename = format!("{}.tmp.{}.{}", uuid_filename, std::process::id(), rand_u64);
 
             let parent = uuid_path.parent().unwrap_or_else(|| Path::new(""));
             let tmp_path = if parent.as_os_str().is_empty() {

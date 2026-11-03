@@ -177,7 +177,6 @@ async fn test_batch_encryption_single_nonce_layout() {
     assert_eq!(nonce_bytes.len(), 12);
 }
 
-
 #[test]
 fn test_wal_op_from_bytes_oversized_key_val() {
     // Construct payload with key_len > 1MB

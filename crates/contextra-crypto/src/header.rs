@@ -44,15 +44,27 @@ impl HeaderSlot {
 
     pub fn encode(&self, out: &mut [u8; 128]) {
         out.fill(0);
-        out[0] = self.slot_id;
-        out[1] = self.anchor_id;
-        out[2] = self.kdf_id;
-        out[3] = self.status;
+        if let Some(b) = out.get_mut(0) {
+            *b = self.slot_id;
+        }
+        if let Some(b) = out.get_mut(1) {
+            *b = self.anchor_id;
+        }
+        if let Some(b) = out.get_mut(2) {
+            *b = self.kdf_id;
+        }
+        if let Some(b) = out.get_mut(3) {
+            *b = self.status;
+        }
         if let Some(slot) = out.get_mut(4..8) {
             slot.copy_from_slice(&self.m_kib.to_be_bytes());
         }
-        out[8] = self.t;
-        out[9] = self.p;
+        if let Some(b) = out.get_mut(8) {
+            *b = self.t;
+        }
+        if let Some(b) = out.get_mut(9) {
+            *b = self.p;
+        }
         // reserved 2 bytes (out[10..12]) = 0
         if let Some(slot) = out.get_mut(12..44) {
             slot.copy_from_slice(&self.slot_salt);
@@ -125,7 +137,10 @@ impl Header {
     }
 
     pub fn mac(hdr_key: &HdrKey, bytes584: &[u8]) -> [u8; 32] {
-        let mut mac = Hmac::<Sha256>::new_from_slice(hdr_key.0.as_bytes()).expect("hdr key");
+        let mut mac = match Hmac::<Sha256>::new_from_slice(hdr_key.0.as_bytes()) {
+            Ok(m) => m,
+            Err(_) => return [0u8; 32],
+        };
         mac.update(bytes584);
         mac.finalize().into_bytes().into()
     }
@@ -219,7 +234,7 @@ impl Header {
         let bytes584 = raw.get(..584).ok_or(CryptoError::Corrupt)?;
         let expected_check = Self::check16(bytes584);
         let actual_check = raw.get(584..600).ok_or(CryptoError::Corrupt)?;
-        if subtle::ConstantTimeEq::ct_eq(actual_check, &expected_check).unwrap_u8() == 0 {
+        if !bool::from(subtle::ConstantTimeEq::ct_eq(actual_check, &expected_check)) {
             return Err(CryptoError::Corrupt);
         }
 
@@ -273,7 +288,7 @@ impl Header {
         let bytes584 = raw.get(..584).ok_or(CryptoError::Corrupt)?;
         let expected = Self::mac(hdr_key, bytes584);
         let actual_mac = raw.get(600..632).ok_or(CryptoError::Corrupt)?;
-        if subtle::ConstantTimeEq::ct_eq(actual_mac, &expected).unwrap_u8() == 1 {
+        if bool::from(subtle::ConstantTimeEq::ct_eq(actual_mac, &expected)) {
             Ok(())
         } else {
             Err(CryptoError::Auth)

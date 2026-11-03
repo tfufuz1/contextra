@@ -22,7 +22,7 @@
 
 // INVARIANT: Einzige Error-Enum für den gesamten Workspace.
 // Neue Varianten nur ANHÄNGEN (niemals umsortieren) → binäre Kompatibilität.
-// DOWNSTREAM: contextra-store, contextra-index, contextra-db konvertieren via `?` und `From`.
+// DOWNSTREAM: contextra-store, contextra-engine, contextra konvertieren via `?` und `From`.
 
 use crate::DocId;
 use thiserror::Error;
@@ -80,7 +80,7 @@ impl From<u64> for StepId {
 }
 
 /// Declarative agent directive controlling segment caching, pinning, and eviction lifecycle.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-types:ERR-003]
 pub enum CacheDirective {
     /// Segment is explicitly pinned in memory until TTL expiration or explicit release.
@@ -91,18 +91,13 @@ pub enum CacheDirective {
     /// Segment must never be inserted into the cache.
     NeverCache,
     /// Standard automatic cache insertion and eviction management.
+    #[default]
     Auto,
     /// Transient step segment automatically released after completion of the specified step.
     ReleaseAfterStep {
         /// Step ID after whose completion this segment should be released.
         step_id: StepId,
     },
-}
-
-impl Default for CacheDirective {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// Convenience alias for `Result<T, ContextraError>`.
@@ -114,7 +109,6 @@ pub type Result<T> = std::result::Result<T, ContextraError>;
 /// # Non-Exhaustive Variant Guarantee
 /// This enum is marked `#[non_exhaustive]` to allow appending new error variants
 /// in future minor releases without breaking downstream `match` statements across crate boundaries
-/// (such as `contextra-py` and `contextra-mcp`).
 ///
 /// Downstream callers matching on `ContextraError` must include a wildcard arm (`_ => ...`).
 /// New variants are appended strictly to the bottom of the enum to preserve binary and FFI compatibility.
@@ -302,7 +296,7 @@ pub enum ContextraError {
     },
 
     /// GGUF-/Modell-Ladefehler (Candle-Backend). Nutzung: korrupte, unvollständige
-    /// oder dimensions-inkompatible Modell-Dateien beim Laden über contextra-candle.
+    /// oder dimensions-inkompatible Modell-Dateien beim Laden über Modell-Backends.
     #[error("Model load error for {path}: {reason}")]
     ModelLoad {
         /// Path to model file.

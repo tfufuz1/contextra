@@ -2,7 +2,7 @@
 //!
 //! Kodiert und dekodiert WAL-Eintraege mit Laengenfeldern, Sequenznummern und Prüfsummen.
 
-use contextra_crypto::wal_crypto::WalHmac;
+use super::verifier::WalHmac;
 use contextra_types::{ContextraError, Result, TxId};
 
 use super::MAX_WAL_ENTRY_SIZE;

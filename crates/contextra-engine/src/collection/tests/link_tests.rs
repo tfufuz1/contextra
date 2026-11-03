@@ -12,8 +12,8 @@ async fn test_link_memories_cycle_prevention_for_all_relations() -> contextra_ty
     use contextra_store::LsmStorage;
     use contextra_types::DocId;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();

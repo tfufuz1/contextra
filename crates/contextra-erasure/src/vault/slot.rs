@@ -41,15 +41,15 @@ pub mod off {
 #[repr(u8)]
 pub enum SlotType {
     /// Mandanten-Stamm-Slot.
-    Tenant = 0x54,   // 'T'
+    Tenant = 0x54, // 'T'
     /// Collection-Slot.
     Collection = 0x43, // 'C'
     /// Betroffenen-Slot (Subject).
-    Subject = 0x53,  // 'S'
+    Subject = 0x53, // 'S'
     /// Dokument-Slot.
     Document = 0x44, // 'D'
     /// Datei-Schlüssel-Slot.
-    File = 0x46,     // 'F'
+    File = 0x46, // 'F'
 }
 
 impl SlotType {
@@ -137,26 +137,27 @@ pub fn decode_slot(
 pub fn compute_slot_mac(mac_key: &[u8; 32], body: &[u8]) -> [u8; 24] {
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
-    let mut hmac = Hmac::<Sha256>::new_from_slice(mac_key)
-        .expect("HMAC key length always valid for 32 bytes");
-    hmac.update(body);
-    let full: [u8; 32] = hmac.finalize().into_bytes().into();
     let mut out = [0u8; 24];
-    out.copy_from_slice(&full[..24]);
+    if let Ok(mut hmac) = <Hmac<Sha256> as Mac>::new_from_slice(mac_key) {
+        <Hmac<Sha256> as Mac>::update(&mut hmac, body);
+        let full: [u8; 32] = <Hmac<Sha256> as Mac>::finalize(hmac).into_bytes().into();
+        out.copy_from_slice(&full[..24]);
+    }
     out
 }
 
 /// Bestimmt die Slot-Position im Slot-Array durch BLAKE3-Hash.
 /// `BLAKE3(slot_type ‖ tag)[0..8] mod capacity` → lineares Sondieren.
 pub fn slot_probe_start(slot_type: SlotType, tag: &[u8; 16], capacity: usize) -> usize {
+    if capacity == 0 {
+        return 0;
+    }
     let mut hasher = blake3::Hasher::new();
     hasher.update(&[slot_type as u8]);
     hasher.update(tag);
     let h = hasher.finalize();
-    let idx = u64::from_le_bytes(
-        h.as_bytes()[..8]
-            .try_into()
-            .expect("BLAKE3 output >= 8 bytes"),
-    );
-    (idx as usize) % capacity
+    let mut le_bytes = [0u8; 8];
+    le_bytes.copy_from_slice(&h.as_bytes()[..8]);
+    let idx = u64::from_le_bytes(le_bytes);
+    usize::try_from(idx % (capacity as u64)).unwrap_or(0)
 }

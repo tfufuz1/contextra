@@ -6,10 +6,7 @@
 //! bzw. welche Suchkombination bei einer Wissensabfrage priorisiert oder ausgewählt wird.
 //!
 //! # Abgrenzung
-//! ACHTUNG: NICHT zu verwechseln mit `contextra_router::RoutingStrategy`
-//! (SLM-Profil-Routing, Cascade/ContextualBandit/FlowCorrectedThompson) — dieser Typ hier
-//! beschreibt, WELCHES der vier Fusionssignale (§8) ein Bandit-Arm repräsentiert oder
-//! welche Aggregationsstufe (z. B. globale Communities) abgefragt wird.
+//! Dieser Typ beschreibt, welches der Signale abgefragt oder priorisiert wird.
 
 use core::fmt;
 

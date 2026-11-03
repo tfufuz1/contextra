@@ -547,7 +547,6 @@ async fn test_merge_operator_wall_clock_timeout_fail_safe() {
 
 #[tokio::test]
 async fn test_merge_operator_pure_capabilities_enforcement() {
-    // V-RUECKBAU: contextra-sandbox wurde rückgebaut (Phase 0).
     // MergeOperator-Defaults werden direkt in CompactionConfig verifiziert.
     let config = CompactionConfig::default();
     assert_eq!(config.merge_max_fuel, 10_000_000);

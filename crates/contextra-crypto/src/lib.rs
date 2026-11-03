@@ -1,11 +1,17 @@
 #![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
-//! Kryptoprimitive für Contextra (Ring 1)
+//! Kryptoprimitive für Contextra: AEAD, Argon2id, HKDF, HMAC, Ed25519, Tags.
 //!
-//! AEAD, Argon2id, HKDF, HMAC, Ed25519, Tags.
+//! Ring: Ring 1 (Krypto-Insel).
+//! Erlaubte Abhängigkeiten: `contextra-types`, `contextra-ports`.
+//! Referenz: SPEC Abschnitt 5.1, 5.3, 10 (Kryptographie), Anhang F (Formate).
 //!
-//! ## Schnittstellenvertrag für Tresor (`FileVault`, Sitzung 12 / `erasure`)
+//! ## Schnittstellenvertrag für Tresor (`FileVault` / `erasure`)
 //!
 //! Gemäß SPEC 10.1, D-79, D-80, D-85 und F.3 stellt `contextra-crypto` für `erasure`
 //! folgende zustandslose Operationen bereit:
@@ -28,13 +34,28 @@ pub mod secret;
 pub mod sign;
 pub mod tag;
 
-pub use aead::*;
-pub use chain::*;
-pub use dek::*;
+pub use aead::{open_record, seal_record, unwrap_master, wrap_master, Block, BlockSealer, SlotAad};
+pub use chain::{
+    chain_next, ledger_mac, verify_chain_complete, verify_wal_chain_completeness, wal_mac,
+};
+pub use dek::{derive_dek, AncestorSalts, Dek, DocTag, Salt};
 pub use error::{CryptoError, Result};
-pub use header::*;
-pub use hierarchy::*;
-pub use kdf::*;
-pub use secret::*;
-pub use sign::*;
-pub use tag::*;
+pub use header::{
+    Header, HeaderSlot, HEADER_ALG_IDS, HEADER_FORMAT_VERSION, HEADER_KIND, HEADER_MAGIC,
+    HEADER_SIZE,
+};
+pub use hierarchy::{
+    CommitKey, EncKey, FileKey, FileKind, HdrKey, IdxKey, KeyHierarchy, LedgerKey, MasterKey,
+    SignSeed, UnitKey, VaultMacKey, WalKey,
+};
+pub use kdf::{
+    derive_kek, hkdf_expand, KdfParams, MAX_M_KIB, MAX_P, MAX_T, MIN_M_KIB, MIN_P, MIN_T,
+};
+pub use labels::{
+    COLL_TAG, COMMIT, DEK, DEK_SALT, DOC_TAG, ENC, FILE, FKMASK, HDR, IDX, LEDGER, NAME_TAG,
+    REC_AAD, REPORT_PREFIX, SIGN, SLOT_AAD, SUBJECT_TAG, TBIND_AAD, TENANT_TAG, TERM_TAG, UNIT,
+    VAULT_MAC, WAL,
+};
+pub use secret::{Secret, SecretKey};
+pub use sign::{sign_report, verify_report};
+pub use tag::{tag, TagPreimage};

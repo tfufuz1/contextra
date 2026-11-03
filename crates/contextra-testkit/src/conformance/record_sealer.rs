@@ -404,12 +404,14 @@ pub async fn run_mutant_tests() -> std::result::Result<(), String> {
 mod tests {
     use super::*;
 
+    /// SPEC: D-53
     #[tokio::test]
     async fn d_53_record_sealer_reference_passes() {
         let res = run_reference_test().await;
         assert!(res.is_ok(), "Reference must pass: {res:?}");
     }
 
+    /// SPEC: D-53
     #[tokio::test]
     async fn d_53_record_sealer_mutants_fail() {
         let res = run_mutant_tests().await;

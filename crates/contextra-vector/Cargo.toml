@@ -25,7 +25,6 @@ parking_lot = { workspace = true }
 rand = { workspace = true }
 roaring = { workspace = true }
 tracing = { workspace = true }
-memmap2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 zeroize = "1.8"
 blake3 = { workspace = true }
@@ -106,7 +105,7 @@ name = "diskann_recall_test"
 required-features = ["experimental-diskann"]
 
 [[test]]
-name = "mmap_toctou_test"
+name = "toctou_test"
 required-features = ["experimental-diskann"]
 
 [[test]]

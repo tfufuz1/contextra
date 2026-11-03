@@ -11,9 +11,9 @@
 
 use contextra_mvcc::error::MvccError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
-use contextra_mvcc::types::TOMBSTONE_BIT;
 use contextra_types::TxId;
-use std::collections::{HashMap, HashSet};
+use contextra_types::TOMBSTONE_BIT;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Beschreibt eine Transaktion in der Ausführungshistorie für den Dependency-Checker.
 #[derive(Debug, Clone)]
@@ -29,7 +29,7 @@ pub struct TxExecution {
 /// Elle-artiger Dependency-Graph zur Erkennung von Zyklen und Pivots (G-SI / G-MSR Anomalien).
 #[derive(Default)]
 pub struct ElleHistoryChecker {
-    transactions: HashMap<u64, TxExecution>,
+    transactions: BTreeMap<u64, TxExecution>,
 }
 
 impl ElleHistoryChecker {
@@ -71,16 +71,16 @@ impl ElleHistoryChecker {
     /// Prüft auf Zyklen im rw-Antidependenz-Graphen (Write Skew Zyklus).
     pub fn has_rw_cycle(&self) -> bool {
         let edges = self.detect_rw_antidependencies();
-        let mut adj: HashMap<u64, Vec<u64>> = HashMap::new();
+        let mut adj: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
         for (u, v) in edges {
             adj.entry(u).or_default().push(v);
         }
 
         fn dfs(
             node: u64,
-            adj: &HashMap<u64, Vec<u64>>,
-            visited: &mut HashSet<u64>,
-            rec_stack: &mut HashSet<u64>,
+            adj: &BTreeMap<u64, Vec<u64>>,
+            visited: &mut BTreeSet<u64>,
+            rec_stack: &mut BTreeSet<u64>,
         ) -> bool {
             visited.insert(node);
             rec_stack.insert(node);
@@ -99,8 +99,8 @@ impl ElleHistoryChecker {
             false
         }
 
-        let mut visited = HashSet::new();
-        let mut rec_stack = HashSet::new();
+        let mut visited = BTreeSet::new();
+        let mut rec_stack = BTreeSet::new();
         for &node in adj.keys() {
             if !visited.contains(&node) && dfs(node, &adj, &mut visited, &mut rec_stack) {
                 return true;
@@ -223,7 +223,9 @@ fn test_sentinel_boundary_values_and_tombstone_bit() {
 
     // 4. Boundary: u64::MAX - 1 (wenn Tombstone-Bit nicht gesetzt)
     let max_minus_one_masked = (u64::MAX - 1) & !TOMBSTONE_BIT;
-    assert!(validator.prune_through_checked(Some(max_minus_one_masked)).is_ok());
+    assert!(validator
+        .prune_through_checked(Some(max_minus_one_masked))
+        .is_ok());
 
     // 5. None
     assert!(validator.prune_through_checked(None).is_ok());

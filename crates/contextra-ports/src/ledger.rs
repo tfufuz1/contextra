@@ -151,11 +151,29 @@ impl fmt::Debug for LedgerEntry {
 /// Durable audit ledger sink located outside the primary data directory (SPEC §4.2, §11.8).
 pub trait LedgerSink: Send + Sync {
     /// Appends a new verified erasure entry to the ledger.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei Schreib- oder MAC-Validierungsfehlern.
+    ///
+    /// # Crash
+    /// Schreibt dauerhaft in das Ledger-Log; fsync stellt Dauerhaftigkeit sicher.
     fn append(&self, e: &LedgerEntry) -> Result<(), String>;
 
     /// Reads all entries recorded in the ledger for verification or auditing.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei I/O- oder Integritätsbrüchen der Hashkette.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff zur Audit-Prüfung.
     fn read_all(&self) -> Result<Vec<LedgerEntry>, String>;
 
     /// Prunes entries older than the specified retention threshold.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei I/O-Fehlern beim Kürzen.
+    ///
+    /// # Crash
+    /// Kürzt veraltete Ledger-Einträge atomar.
     fn prune(&self, older_than: Timestamp) -> Result<usize, String>;
 }

@@ -15,7 +15,6 @@ async fn test_lsm_rollback_persistence() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
 
@@ -83,7 +82,6 @@ async fn test_rollback_with_sstables() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = LsmStorage::new(config).await.expect("create storage");
@@ -157,7 +155,6 @@ async fn test_rollback_recompacts_spanning_sstable() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = LsmStorage::new(config).await.expect("create storage");
@@ -233,7 +230,6 @@ async fn test_rollback_drops_sstable_fully_stale_after_recompaction() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = LsmStorage::new(config).await.expect("create storage");
@@ -270,7 +266,6 @@ async fn test_wal_survives_process_restart() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
 
@@ -448,7 +443,6 @@ async fn test_recovery_scan_ignores_and_removes_tmp_files() {
         max_ram_mb: 64,
         tx_timeout: std::time::Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
 
@@ -472,7 +466,6 @@ async fn test_startup_flush_before_wal_cleanup() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
 
@@ -534,7 +527,6 @@ async fn test_rollback_small_tx_inline_no_sstable() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         group_commit_window_micros: 0,
         ..Default::default()
     };
@@ -579,7 +571,6 @@ async fn test_wal_uuid_sidecar_cleaned_up_on_startup() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
 
@@ -627,7 +618,6 @@ async fn test_rollback_crash_recovery_startup() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         group_commit_window_micros: 0,
         ..Default::default()
     };
@@ -821,7 +811,6 @@ async fn test_rollback_spanning_sstable_below_min_entries_threshold() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = LsmStorage::new(config).await.expect("create storage");

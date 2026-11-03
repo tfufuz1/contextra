@@ -117,7 +117,7 @@ impl TagPreimage {
 
     /// Fügt ein Feld mit vorangestellter 32-Bit-Länge (big-endian) hinzu (TY-07).
     pub fn field(mut self, f: &[u8]) -> Self {
-        let len = f.len() as u32;
+        let len = u32::try_from(f.len()).unwrap_or(u32::MAX);
         self.0.extend_from_slice(&len.to_be_bytes());
         self.0.extend_from_slice(f);
         self

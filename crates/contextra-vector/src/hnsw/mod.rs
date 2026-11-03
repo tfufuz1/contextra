@@ -17,6 +17,8 @@ mod config;
 mod core_insert;
 mod core_rebuild;
 mod core_search;
+pub mod deletion;
+mod erasure_layer_impl;
 mod types;
 mod vector_index_impl;
 

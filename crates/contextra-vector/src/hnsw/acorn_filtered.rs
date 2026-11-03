@@ -71,8 +71,8 @@ impl FilteredIndex for HnswIndex {
         }
 
         let nodes_guard = self.inner.hot.nodes.read();
-        let mmap_guard = self.inner.cold.mmap_index.read();
-        let mmap_node_count = mmap_guard
+        let buffer_guard = self.inner.cold.buffer_index.read();
+        let buffer_node_count = buffer_guard
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
@@ -86,15 +86,15 @@ impl FilteredIndex for HnswIndex {
 
         let ctx = SearchContext {
             nodes: &nodes_guard,
-            mmap: mmap_guard.as_ref(),
-            mmap_node_count,
+            buffer: buffer_guard.as_ref(),
+            buffer_node_count,
             prior_prepared: &[],
             backlink_map: None,
             quantizer: q_ref.map(Cow::Borrowed),
             arena: &self.inner.hot.arena,
         };
 
-        let total_nodes = mmap_node_count.saturating_add(nodes_guard.len());
+        let total_nodes = buffer_node_count.saturating_add(nodes_guard.len());
         if total_nodes == 0 {
             return Ok(Vec::new());
         }

@@ -10,10 +10,9 @@
     clippy::disallowed_methods
 )]
 
-#[path = "../src/atomic.rs"]
-mod atomic;
-
-use atomic::{clean_tmp, write_atomic, write_atomic_with_injector, AtomicFaultInjector};
+use contextra_durable_fs::atomic::{
+    clean_tmp, write_atomic, write_atomic_with_injector, AtomicFaultInjector,
+};
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -78,12 +77,31 @@ fn test_df_02_atomic_replace_crash_matrix() {
     let new_data = b"VERSION_2_UPDATED_CONTENT_CANARY_VALUE_9876543210";
 
     // Matrix aller Injektionspunkte:
-    // - Fall 0: Normaler Durchlauf (kein Fehler)
-    // - Fall 1: Fehler beim Schreiben
-    // - Fall 2: Fehler bei sync_data
-    // - Fall 3: Fehler beim Rename
-    // - Fall 4: Fehler beim sync_dir
-    for phase in 0..=4 {
+    // Tabelle „Crash nach Schritt n → Zustand nach Recovery“ (DF-02, T-CRASH-2):
+    // Schritt 0: Normaler Durchlauf (kein Fehler)   -> Ziel ist neu (V2), keine Waisen
+    // Schritt 1: Fehler beim Schreiben             -> Ziel bleibt alt (V1), Tmp wird verworfen
+    // Schritt 2: Fehler bei sync_data              -> Ziel bleibt alt (V1), Tmp wird verworfen
+    // Schritt 3: Fehler beim Rename                -> Ziel bleibt alt (V1), Tmp wird verworfen
+    // Schritt 4: Fehler beim sync_dir              -> Ziel ist neu (V2), Inode im Verzeichnis ungesynct, clean_tmp räumt auf
+    #[derive(Debug, Clone, Copy)]
+    enum ExpectedState {
+        MustBeOld,
+        MustBeNew,
+    }
+
+    let matrix_cases = [
+        (0, "Baseline (kein Fehler)", ExpectedState::MustBeNew),
+        (1, "Crash vor/beim Schreiben", ExpectedState::MustBeOld),
+        (2, "Crash bei sync_data", ExpectedState::MustBeOld),
+        (3, "Crash bei rename", ExpectedState::MustBeOld),
+        (
+            4,
+            "Crash bei sync_dir (nach rename)",
+            ExpectedState::MustBeNew,
+        ),
+    ];
+
+    for (phase, desc, expected_state) in matrix_cases {
         let temp = TempDir::new().expect("TempDir failed");
         let target = temp.path().join("target.dat");
 
@@ -103,33 +121,33 @@ fn test_df_02_atomic_replace_crash_matrix() {
         let result = write_atomic_with_injector(&target, new_data, &injector);
 
         if phase == 0 {
-            assert!(result.is_ok(), "Baseline write must succeed");
+            assert!(result.is_ok(), "Baseline write must succeed: {desc}");
             assert_eq!(
                 fs::read(&target).expect("Read failed"),
                 new_data,
-                "Target must contain new data"
+                "Target must contain new data: {desc}"
             );
         } else {
             assert!(
                 result.is_err(),
-                "Injected phase {phase} must report error unchanged"
+                "Injected phase {phase} ({desc}) must report error unchanged"
             );
 
             // NOTE: Nach Absturz/Fehler (T-CRASH-2) ist die Datei ENTWEDER alt ODER neu, NIE halb!
             let current = fs::read(&target).expect("Target file must still exist and be readable");
-            let is_old = current == old_data;
-            let is_new = current == new_data;
-            assert!(
-                is_old || is_new,
-                "Phase {phase}: Target must be either V1 or V2, but was partially written / corrupted"
-            );
-
-            // Bei Fehlern vor dem Rename muss die Zieldatei zwingend V1 sein
-            if phase <= 2 {
-                assert!(
-                    is_old,
-                    "Phase {phase}: Prior to rename, target must strictly remain V1"
-                );
+            match expected_state {
+                ExpectedState::MustBeOld => {
+                    assert_eq!(
+                        current, old_data,
+                        "Phase {phase} ({desc}): target must strictly remain V1"
+                    );
+                }
+                ExpectedState::MustBeNew => {
+                    assert_eq!(
+                        current, new_data,
+                        "Phase {phase} ({desc}): target must be V2 after rename succeeded"
+                    );
+                }
             }
         }
 
@@ -210,6 +228,9 @@ fn test_df_08_file_and_directory_permissions() {
 
         let file_meta = fs::metadata(&target).expect("File metadata failed");
         let file_mode = file_meta.mode() & 0o777;
-        assert_eq!(file_mode, 0o600, "File must be created with mode 0600 (DF-08)");
+        assert_eq!(
+            file_mode, 0o600,
+            "File must be created with mode 0600 (DF-08)"
+        );
     }
 }

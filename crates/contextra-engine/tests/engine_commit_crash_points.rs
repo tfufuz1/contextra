@@ -5,15 +5,14 @@
 //! Gehört zur Testsuite von `contextra-engine`.
 
 #![cfg(not(loom))]
-use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
-// contextra_graph::CsrGraph entfernt per SPEC
+use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, Result, TxId};
 use contextra_vector::HnswIndex;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tempfile::tempdir;
 
 struct FaultyStorage<S: StorageEngine> {
@@ -178,16 +177,6 @@ async fn test_f19_intent_put_failure_triggers_rollback() -> Result<()> {
 
     let doc_id = DocId::new(999);
     tx.stage_text_insert(doc_id, "test text for F19 failure".to_string());
-
-    let e1 = Entity::new(EntityId::from_key("node_f19_1")?, "Node1", "Concept");
-    let e2 = Entity::new(EntityId::from_key("node_f19_2")?, "Node2", "Concept");
-    tx.stage_graph_entity(e1);
-    tx.stage_graph_entity(e2);
-    tx.stage_graph_edge(Edge::new(
-        EntityId::from_key("node_f19_1")?,
-        EntityId::from_key("node_f19_2")?,
-        "CONNECTS",
-    ));
 
     // Inject failure on intent put
     storage.fail_intent_put.store(true, Ordering::SeqCst);

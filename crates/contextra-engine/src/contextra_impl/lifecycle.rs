@@ -89,7 +89,6 @@ impl Contextra {
             dimension: config.dimension,
             config: config.clone(),
             expiry_reaper_interval: config.expiry_reaper_interval,
-            community_detection_threshold: config.community_detection.auto_trigger_threshold,
             collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),
             tenant_collections: tokio::sync::RwLock::new(ahash::AHashMap::new()),
             cancel_token: cancel_token.clone(),
@@ -462,8 +461,8 @@ impl Contextra {
 #[cfg(test)]
 mod consolidation_launcher_tests {
     use crate::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU32, Ordering};
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -547,6 +546,43 @@ mod consolidation_launcher_tests {
         assert_eq!(db.config().dimension, 64);
         assert!(db.config().deletion_proof_active);
         db.close().await?;
+
+        Ok(())
+    }
+
+    /// SPEC §14.3 / T-SHUTDOWN-1:
+    /// Drop blockiert nie und setzt Stop-Flags.
+    /// Geordneter Shutdown via close().await wartet auf Hintergrunddienste und flushed Speicher konsistent.
+    #[tokio::test]
+    async fn test_shutdown_restart_graceful() -> contextra_types::Result<()> {
+        let dir = tempdir().unwrap();
+        let config = ContextraConfig {
+            dimension: 4,
+            expiry_reaper_interval: std::time::Duration::from_millis(50),
+            ..Default::default()
+        };
+
+        // 1. Instanz öffnen und Daten schreiben
+        let db = Contextra::open_with_config(dir.path(), config.clone()).await?;
+        let col = db.collection("default").await?;
+        col.insert("shutdown_doc_1", &[1.0, 0.0, 0.0, 0.0], None)
+            .await?;
+
+        // 2. Geordneter Shutdown über close()
+        db.close().await?;
+
+        // 3. Re-open und Konsistenzprüfung (Recovery)
+        let db_reopened = Contextra::open_with_config(dir.path(), config).await?;
+        let col_reopened = db_reopened.collection("default").await?;
+        let doc = col_reopened.get("shutdown_doc_1").await?;
+        assert!(
+            doc.is_some(),
+            "Dokument muss nach geordnetem Shutdown und Neustart vorhanden sein"
+        );
+
+        // 4. Drop-Verhalten prüfen: darf nicht blockieren
+        drop(col_reopened);
+        drop(db_reopened);
 
         Ok(())
     }

@@ -359,23 +359,16 @@ checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 name = "contextra"
 version = "0.1.0"
 dependencies = [
- "contextra-crypto",
+ "bincode",
+ "contextra-durable-fs",
  "contextra-engine",
- "contextra-ports",
- "contextra-rank",
- "contextra-store",
- "contextra-testkit",
  "contextra-types",
- "rand 0.8.8",
- "serde",
- "serde_json",
+ "criterion",
+ "getrandom 0.2.17",
  "tempfile",
  "thiserror",
  "tokio",
- "tracing",
- "tracing-subscriber",
  "trybuild",
- "zeroize",
 ]
 
 [[package]]
@@ -466,6 +459,7 @@ dependencies = [
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",
+ "ed25519-dalek",
  "futures-util",
  "hmac",
  "loom",
@@ -559,9 +553,8 @@ dependencies = [
 name = "contextra-store"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm-siv",
  "ahash",
- "blake3",
- "bytes",
  "contextra-crypto",
  "contextra-mvcc",
  "contextra-ports",
@@ -570,19 +563,21 @@ dependencies = [
  "contextra-testkit",
  "contextra-types",
  "contextra-vector",
- "crc32fast",
  "criterion",
  "futures",
+ "hkdf",
+ "hmac",
  "libc",
  "loom",
  "lru",
- "parking_lot",
  "proptest",
  "quick_cache",
  "rand 0.8.8",
  "redb",
  "serde",
  "serde_json",
+ "sha2",
+ "subtle",
  "tempfile",
  "thiserror",
  "tokio",
@@ -590,6 +585,7 @@ dependencies = [
  "tracing",
  "uuid",
  "windows-sys",
+ "zeroize",
 ]
 
 [[package]]
@@ -637,6 +633,7 @@ dependencies = [
 name = "contextra-text"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm-siv",
  "bincode",
  "blake3",
  "bytes",
@@ -687,7 +684,6 @@ dependencies = [
  "contextra-types",
  "criterion",
  "loom",
- "memmap2",
  "parking_lot",
  "proptest",
  "rand 0.8.8",
@@ -720,9 +716,9 @@ dependencies = [
 
 [[package]]
 name = "crc32fast"
-version = "1.5.1"
+version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8498c871161e1742aaa9d52551b2d6ebdd4c3d45a3be423e3728f33b955be550"
+checksum = "01a7799fd6b852db0e61728dde9a204c423b44d689dbd432522543614b490e78"
 dependencies = [
  "cfg-if",
 ]
@@ -1312,15 +1308,6 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
-
-[[package]]
-name = "memmap2"
-version = "0.9.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "mio"

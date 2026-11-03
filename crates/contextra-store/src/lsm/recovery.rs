@@ -7,7 +7,6 @@ use crate::compaction::{CompactionEngine, MergeOperator};
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
-use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp};
 use contextra_mvcc::{SnapshotRegistry, TxBuffer};
 use contextra_ports::{ResourceBudget, ResourceTracker};
@@ -149,8 +148,24 @@ impl LsmStorage {
         Self::new_with_merge_operator(config, None).await
     }
 
+    pub async fn new_with_key_manager_and_merge_operator(
+        config: LsmConfig,
+        key_manager: Option<Arc<KeyManager>>,
+        merge_operator: Option<Arc<dyn MergeOperator>>,
+    ) -> Result<Self> {
+        Self::new_internal(config, key_manager, merge_operator).await
+    }
+
     pub async fn new_with_merge_operator(
         config: LsmConfig,
+        merge_operator: Option<Arc<dyn MergeOperator>>,
+    ) -> Result<Self> {
+        Self::new_internal(config, None, merge_operator).await
+    }
+
+    async fn new_internal(
+        config: LsmConfig,
+        key_manager: Option<Arc<KeyManager>>,
         merge_operator: Option<Arc<dyn MergeOperator>>,
     ) -> Result<Self> {
         if config.block_cache_shards == 0 || !config.block_cache_shards.is_power_of_two() {
@@ -169,7 +184,7 @@ impl LsmStorage {
         let dir_lock = DirLock::acquire(&config.path, config.durability_mode)?;
 
         let salt_path = config.path.join("SALT");
-        let salt = match tokio::fs::read(&salt_path).await {
+        let _salt = match tokio::fs::read(&salt_path).await {
             Ok(buf) => {
                 if buf.len() != 32 {
                     return Err(ContextraError::Storage(format!(
@@ -194,11 +209,7 @@ impl LsmStorage {
             }
         };
 
-        let key_manager = config
-            .encryption_passphrase
-            .as_ref()
-            .map(|p| KeyManager::try_new(p, &salt).map(Arc::new))
-            .transpose()?;
+        // D-05: Key material comes exclusively via KeyManager, no passphrase field in LsmConfig
 
         let mut max_wal_id: Option<u64> = None;
         let mut wal_files = Vec::new();
@@ -360,8 +371,7 @@ impl LsmStorage {
             } else {
                 actual_tail_hmac
             };
-            if contextra_crypto::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err()
-            {
+            if crate::wal::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err() {
                 return Err(ContextraError::wal_truncation_detected(
                     expected_hwm,
                     actual_tail_hmac,
@@ -614,7 +624,8 @@ impl LsmStorage {
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
             clock: parking_lot::RwLock::new(Arc::new(contextra_ports::SystemClock::new())),
-            ssi_validator: Arc::clone(&default_ssi_val) as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+            ssi_validator: Arc::clone(&default_ssi_val)
+                as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
             sequence_log_ssi_validator: Some(default_ssi_val),
             metrics_sink: metrics_sink_container,
         };
@@ -712,19 +723,7 @@ impl LsmStorage {
                 .map_err(|e| {
                     ContextraError::Storage(format!("Failed to write rollback intent file: {e}"))
                 })?;
-            let parent = self.config.path.clone();
-            tokio::task::spawn_blocking(move || {
-                // INVARIANT-KONFORM: In spawn_blocking gewrappt; Parent-Directory FSync bei Crash-Recovery / Rollback (kein Hot-Path).
-                std::fs::File::open(&parent)
-                    .and_then(|f| f.sync_all())
-                    .map_err(|e| {
-                        ContextraError::Storage(format!(
-                            "Failed to fsync dir after intent file: {e}"
-                        ))
-                    })
-            })
-            .await
-            .map_err(|e| ContextraError::Internal(e.to_string()))??;
+            crate::util::fsync_parent_dir(&intent_path).await?;
         }
 
         let state = self.state.write().await;
@@ -776,7 +775,7 @@ impl LsmStorage {
                 }
             }
 
-            if !surviving_entries.is_empty() {
+            if surviving_entries.len() > Self::ROLLBACK_INLINE_THRESHOLD_ENTRIES {
                 let count = self.segment_counter.fetch_add(1, Ordering::Relaxed);
                 let seq = self.next_seq_no.load(Ordering::Relaxed);
                 let new_sst_path =
@@ -810,6 +809,10 @@ impl LsmStorage {
                     .await?;
 
                 sstables_lock.push(Arc::new(new_reader));
+            } else if !surviving_entries.is_empty() {
+                for (k, v, seq, tx) in surviving_entries {
+                    state.memtable.put(Bytes::from(k), Bytes::from(v), seq, tx);
+                }
             }
 
             sst_to_remove.push(spanning.file_path().to_path_buf());

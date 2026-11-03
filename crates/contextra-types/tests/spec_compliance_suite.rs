@@ -1,8 +1,8 @@
 /// SPEC: T-KEY-1
 #[test]
 fn t_key_1_schluesselkodierung_feste_laengen_und_sortierung() {
-    use contextra_types::tags::*;
     use contextra_types::key::*;
+    use contextra_types::tags::*;
 
     let tenant = TenantTag::new([1u8; 16]);
     let coll = CollTag::new([2u8; 16]);
@@ -41,20 +41,20 @@ fn t_key_1_schluesselkodierung_feste_laengen_und_sortierung() {
     assert!(key < key_older, "Neueste Version muss zuerst sortieren");
 
     // TagPreimage prefix check (TY-07)
-    let pre1 = TagPreimage::new(b"test")
-        .field(b"a")
-        .field(b"bc");
-    let pre2 = TagPreimage::new(b"test")
-        .field(b"ab")
-        .field(b"c");
-    assert_ne!(pre1.as_bytes(), pre2.as_bytes(), "Längenpräfixe müssen Kollisionen verhindern");
+    let pre1 = TagPreimage::new(b"test").field(b"a").field(b"bc");
+    let pre2 = TagPreimage::new(b"test").field(b"ab").field(b"c");
+    assert_ne!(
+        pre1.as_bytes(),
+        pre2.as_bytes(),
+        "Längenpräfixe müssen Kollisionen verhindern"
+    );
 }
 
 /// SPEC: T-ISO-2
 #[test]
 fn t_iso_2_matcher_bereichs_und_exakt_treffer() {
-    use contextra_types::tags::*;
     use contextra_types::key::*;
+    use contextra_types::tags::*;
 
     let tenant = TenantTag::new([1u8; 16]);
     let coll = CollTag::new([2u8; 16]);
@@ -93,13 +93,13 @@ fn t_iso_2_matcher_bereichs_und_exakt_treffer() {
 
 /// SPEC: T-DOCREF-1
 #[test]
-fn t_docref_1_dokumentidentitaet_und_cluster_tag() {
-    use contextra_types::tags::*;
+fn t_docref_1_dokumentidentitaet_und_cluster_tag() -> Result<(), Box<dyn std::error::Error>> {
     use contextra_types::refs::*;
+    use contextra_types::tags::*;
 
-    let doc_key = DocKey::try_new(b"doc-123".to_vec()).expect("valid doc key");
-    let subj_a = SubjectRef::try_new(b"subject-A".to_vec()).expect("valid subject");
-    let subj_b = SubjectRef::try_new(b"subject-B".to_vec()).expect("valid subject");
+    let doc_key = DocKey::try_new(b"doc-123".to_vec())?;
+    let subj_a = SubjectRef::try_new(b"subject-A".to_vec())?;
+    let subj_b = SubjectRef::try_new(b"subject-B".to_vec())?;
 
     let doc_ref_a = DocRef {
         subject: Some(subj_a.clone()),
@@ -110,7 +110,10 @@ fn t_docref_1_dokumentidentitaet_und_cluster_tag() {
         key: doc_key,
     };
 
-    assert_ne!(doc_ref_a, doc_ref_b, "Gleicher Key mit anderem Betroffenen muss verschiedene Identität haben");
+    assert_ne!(
+        doc_ref_a, doc_ref_b,
+        "Gleicher Key mit anderem Betroffenen muss verschiedene Identität haben"
+    );
 
     let subj_tag = SubjectTag::new([9u8; 16]);
     let cluster_from_subj = ClusterTag::from_subject(subj_tag);
@@ -120,6 +123,7 @@ fn t_docref_1_dokumentidentitaet_und_cluster_tag() {
     let unassigned = ClusterTag::unassigned(doc_tag);
     assert_eq!(&unassigned.as_bytes()[0..12], &[0u8; 12]);
     assert_eq!(&unassigned.as_bytes()[12..16], &doc_tag.as_bytes()[0..4]);
+    Ok(())
 }
 
 /// SPEC: T-ARCH-1
@@ -132,8 +136,8 @@ fn t_arch_1_reinheit_ohne_io() {
 /// SPEC: T-FMT-1
 #[test]
 fn t_fmt_1_file_kind_und_alg_ids_parsing() {
-    use contextra_types::file::*;
     use contextra_types::error::Error;
+    use contextra_types::file::*;
 
     for k in 1..=10u8 {
         let kind = FileKind::try_from(k);
@@ -172,8 +176,14 @@ fn t_log_1_alle_fehlertexte_statisch_ohne_nutzerdaten() {
 
     for err in all_errors {
         let msg = format!("{err}");
-        assert!(!msg.contains("{}"), "Fehlertext darf keine Format-Platzhalter enthalten: {msg}");
-        assert!(!msg.contains("%s"), "Fehlertext darf keine Format-Platzhalter enthalten: {msg}");
+        assert!(
+            !msg.contains("{}"),
+            "Fehlertext darf keine Format-Platzhalter enthalten: {msg}"
+        );
+        assert!(
+            !msg.contains("%s"),
+            "Fehlertext darf keine Format-Platzhalter enthalten: {msg}"
+        );
     }
 }
 
@@ -218,8 +228,8 @@ fn t_api_2_retention_code_und_erasure_id() {
 /// SPEC: L-8 Golden Test
 #[test]
 fn test_l8_meta_schluesselformat_golden() {
-    use contextra_types::tags::*;
     use contextra_types::key::*;
+    use contextra_types::tags::*;
 
     let tenant = TenantTag::new([0x11; 16]);
     let coll = CollTag::new([0x22; 16]);
@@ -241,4 +251,79 @@ fn test_l10_dimension_error_limit() {
 
     let err = Error::Limit(Limit::Dimension);
     assert_eq!(err.to_string(), "limit exceeded: dimension");
+}
+
+/// SPEC: T-API-4
+#[test]
+fn test_t_api_4_fehlertexte_eingefroren_golden() {
+    use contextra_types::error::*;
+
+    let table = [
+        (
+            Error::Config(ConfigError::EmptyIdentifier),
+            "configuration error: identifier is empty",
+        ),
+        (
+            Error::Config(ConfigError::IdentifierTooLong),
+            "configuration error: identifier exceeds maximum length",
+        ),
+        (
+            Error::Config(ConfigError::InvalidLength),
+            "configuration error: invalid byte length",
+        ),
+        (Error::Io, "i/o error"),
+        (Error::Corrupt, "data corruption detected"),
+        (Error::Auth, "authentication failed"),
+        (Error::Erased, "target is erased"),
+        (Error::Restricted, "target is restricted"),
+        (Error::NotFound, "not found"),
+        (
+            Error::Conflict(Conflict::IdCollision),
+            "conflict: identifier collision",
+        ),
+        (
+            Error::Conflict(Conflict::Exists),
+            "conflict: record already exists",
+        ),
+        (
+            Error::Limit(Limit::Capacity),
+            "limit exceeded: storage capacity",
+        ),
+        (
+            Error::Limit(Limit::DiskReserve),
+            "limit exceeded: disk reserve exhausted",
+        ),
+        (Error::Limit(Limit::Snapshots), "limit exceeded: snapshots"),
+        (
+            Error::Limit(Limit::QueryTooLarge),
+            "limit exceeded: query too large",
+        ),
+        (Error::Limit(Limit::Dimension), "limit exceeded: dimension"),
+        (Error::SnapshotRevoked, "snapshot revoked"),
+        (Error::Cancelled, "operation cancelled"),
+        (Error::Refused, "operation refused"),
+        (Error::Internal, "internal system error"),
+    ];
+
+    for (err, expected_text) in table {
+        assert_eq!(
+            err.to_string(),
+            expected_text,
+            "Fehlertext weicht von gefrorener D-110-Vorgabe ab"
+        );
+    }
+}
+
+/// SPEC: T-LIMIT-1
+#[test]
+fn test_t_limit_1_typebene_kapazitaetsgrenzen() {
+    use contextra_types::limits::*;
+
+    assert_eq!(MAX_DOCS_PER_STORE, 50_000_000);
+    assert_eq!(MAX_DOC_BYTES_DEFAULT, 4 * 1024 * 1024);
+    assert_eq!(MAX_DOC_BYTES_HARD, 64 * 1024 * 1024);
+    assert_eq!(MAX_SNAPSHOTS_PER_TENANT, 1024);
+    assert_eq!(MAX_DIMENSION, 4096);
+    assert_eq!(MAX_QUERY_TERMS, 256);
+    assert_eq!(MAX_K, 1000);
 }

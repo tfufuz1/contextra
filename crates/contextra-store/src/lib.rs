@@ -60,11 +60,13 @@ pub mod system_pressure;
 pub mod tenant_codec;
 pub(crate) mod util;
 pub mod wal;
+pub mod vfs;
+pub mod envelope;
 
-pub mod purge;
 pub mod erase;
-pub mod tenant_scoped;
 pub mod health;
+pub mod purge;
+pub mod tenant_scoped;
 
 // WP-4.1 (UNIMPLEMENTED): mmap-basierter SSTable-Zugriff für Out-of-Core-Daten.
 // Aktuell: reguläres tokio::fs/std::fs File-I/O in sstable.rs.

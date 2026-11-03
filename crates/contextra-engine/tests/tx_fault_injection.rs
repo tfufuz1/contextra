@@ -251,7 +251,6 @@ async fn test_tx_fault_crash_between_intent_log_and_execution() -> contextra_typ
         let pending = CommitIntent::Pending {
             doc_ids: Arc::new(vec![doc_id]),
             has_text: true,
-            has_graph: false,
             stages_completed: 0,
         };
         let bytes = serde_json::to_vec(&pending)?;

@@ -1,33 +1,32 @@
 # CODEOWNERS - Contextra Governance & Ownership
 #
-# WARNUNG: Handles sind Platzhalter, ohne existierende Teams ignoriert GitHub diese Datei.
-#
 # Fachliche Begründung: CONTEXTRA_SPEC_2_.md §15.5 (Crate-Tier-Modell nach Kritikalität).
 # Diese Datei definiert die automatische Zuordnung von Code-Ownern für Pull Requests
 # basierend auf der Architektur-Kritikalität der verschiedenen Komponenten.
 #
-# HINWEIS FOR MAINTAINER:
-# Die untenstehenden GitHub-Team-Handles (@contextra/*) sind Platzhalter.
-# Die tatsächlichen Team- und Nutzernamen müssen vom Repository-Maintainer vor dem
-# Merge final in dieses Repository eingetragen werden.
+# Maintainer-Handle: @contextra/architecture-board
 
-# Tier 0 — Höchste Kritikalität (Sicherheit, Kryptographie)
-/crates/contextra-crypto/              @contextra/security-tier0
+# Tier 0 — Höchste Kritikalität (Sicherheit, Kryptographie, Ring 0)
+/crates/contextra-types/               @contextra/architecture-board
+/crates/contextra-ports/               @contextra/architecture-board
+/crates/contextra-sys/                 @contextra/architecture-board
+/crates/contextra-simd/                @contextra/architecture-board
 
-# Tier 1 — Hohe Kritikalität (Speicher & Checkpointing)
-/crates/contextra-store/               @contextra/storage-tier1
-/crates/contextra-checkpoint/          @contextra/storage-tier1
+# Tier 1 — Hohe Kritikalität (Speicher & FS & Krypto, Ring 1)
+/crates/contextra-durable-fs/          @contextra/architecture-board
+/crates/contextra-crypto/              @contextra/architecture-board
+/crates/contextra-store/               @contextra/architecture-board
 
-# Tier 2 — Mittlere Kritikalität (Retrieval, Vektoren & Indizierung)
-/crates/contextra-vector/              @contextra/retrieval-tier2
-/crates/contextra-text/                @contextra/retrieval-tier2
-/crates/contextra-simd/                @contextra/retrieval-tier2
+# Tier 2 — Mittlere Kritikalität (Retrieval, Vektoren, MVCC & Indizierung, Ring 2)
+/crates/contextra-mvcc/                @contextra/architecture-board
+/crates/contextra-vector/              @contextra/architecture-board
+/crates/contextra-text/                @contextra/architecture-board
+/crates/contextra-rank/                @contextra/architecture-board
 
-# Tier 3 — Spezifische Funktionalität (Graph, Routing & Adaption)
-/crates/contextra-graph/               @contextra/intelligence-tier3
-/crates/contextra-router/              @contextra/intelligence-tier3
-/crates/contextra-rank/                @contextra/intelligence-tier3
-/crates/contextra-adapt/               @contextra/intelligence-tier3
+# Tier 3 & 4 — Höhere Schichten (Löschkern, Engine & Fassade, Ring 3 & 4)
+/crates/contextra-erasure/             @contextra/architecture-board
+/crates/contextra-engine/              @contextra/architecture-board
+/crates/contextra/                     @contextra/architecture-board
 
 # Build & Infrastruktur & Governance Tooling
 /.github/                              @contextra/build-infra

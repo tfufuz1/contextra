@@ -1,7 +1,7 @@
 //! Dateitypen und Header-Konstanten (SPEC Anhang F.1, TY-15).
 
-use serde::{Deserialize, Serialize};
 use crate::error::Error;
+use serde::{Deserialize, Serialize};
 
 /// Format-Version des Speicherframeworks (SPEC F.1).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]

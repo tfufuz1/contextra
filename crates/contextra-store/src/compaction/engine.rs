@@ -21,6 +21,7 @@ use tracing;
 // ANCHOR[contextra-store:COMP-ENG-001]
 /// Orchestriert die periodische Verdichtung und Bereinigung von SSTables.
 pub struct CompactionEngine {
+    pub purge_waiting: std::sync::atomic::AtomicBool,
     config: CompactionConfig,
     pub(super) snapshot_registry: Arc<SnapshotRegistry>,
     block_cache: Arc<BlockCache>,
@@ -57,6 +58,7 @@ impl CompactionEngine {
             };
 
         Self {
+            purge_waiting: std::sync::atomic::AtomicBool::new(false),
             config,
             snapshot_registry,
             block_cache,

@@ -2,8 +2,8 @@
 //!
 //! # Zweck & Architektur-Rolle: Ring 0
 //!
-//! Bei der Übertragung von Fehlern über FFI-Grenzen (z. B. zu Python via `contextra-py` oder
-//! Tauri/Web-Frontends via IPC) gehen bei einfachen String-Repräsentationen die Typinformationen
+//! Bei der Übertragung von Fehlern über FFI-Grenzen (z. B. zu Python via FFI-Schnittstellen oder
+//! Desktop/Web-Frontends via IPC) gehen bei einfachen String-Repräsentationen die Typinformationen
 //! und strukturierte Felder verloren.
 //!
 //! Dieses Modul stellt mit `ContextraErrorDto` ein Data-Transfer-Object bereit, das:

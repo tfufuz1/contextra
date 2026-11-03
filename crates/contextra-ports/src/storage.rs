@@ -1,8 +1,7 @@
 //! Storage engine subsystem trait definitions and statistics.
 
 use super::BoxFuture;
-use crate::types::*;
-use crate::Result;
+use crate::{ContextraError, Result, TxId};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
@@ -35,9 +34,21 @@ pub const MAX_SCAN_MERGE_ACCUMULATOR: usize = 100_000;
 pub trait StorageEngine: Send + Sync + 'static {
     // TOCTOU-ACCEPTED: StorageEngine provides default batching/tracking delegate methods.
     /// Retrieves a value by key.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Lesefehlern oder `ContextraError::NotFound` falls Schlüssel fehlt.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff; modifiziert keinen persistenten Zustand.
     fn get<'a>(&'a self, key: &'a [u8]) -> BoxFuture<'a, Result<Option<Bytes>>>;
 
     /// Retrieves a value by key at a specific sequence number (MVCC).
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei I/O-Fehlern oder `ContextraError::NotFound`.
+    ///
+    /// # Crash
+    /// Lesezugriff auf historische Snapshot-Version; keine Zustandsmutation.
     fn get_at_seq<'a>(&'a self, key: &'a [u8], seq: u64) -> BoxFuture<'a, Result<Option<Bytes>>>;
 
     /// Retrieves a value by key tracked within transaction `tx_id` for SSI read-set validation.
@@ -45,6 +56,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// # ReadSet Tracking
     /// Untracked: Default implementation delegates to [`StorageEngine::get`] and registriert KEINE Lesezugriffe im ReadSet.
     /// Concrete SSI-enabled engines (e.g. `LsmStorage`) override this method to record keys in the transaction's `ReadSet`.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Lesefehlern oder `ContextraError::NotFound`.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff mit Registrierung im flüchtigen Transaktions-ReadSet; keine Plattenmutation.
     fn get_tracked<'a>(
         &'a self,
         _tx_id: TxId,
@@ -58,6 +75,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// # ReadSet Tracking
     /// Untracked: Default implementation delegates to [`StorageEngine::get_at_seq`] and registriert KEINE Lesezugriffe im ReadSet.
     /// Concrete SSI-enabled engines (e.g. `LsmStorage`) override this method to record keys in the transaction's `ReadSet`.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Lesefehlern oder `ContextraError::NotFound`.
+    ///
+    /// # Crash
+    /// Reiner historischer Lesezugriff mit flüchtiger ReadSet-Registrierung; keine Plattenmutation.
     fn get_at_seq_tracked<'a>(
         &'a self,
         _tx_id: TxId,
@@ -72,6 +95,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// # ReadSet Tracking
     /// Untracked: Default implementation delegates to [`StorageEngine::scan_prefix`] and registriert KEINE Lesezugriffe im ReadSet.
     /// Concrete SSI-enabled engines (e.g. `LsmStorage`) override this method to record keys/prefixes in the transaction's `ReadSet`.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Lesefehlern.
+    ///
+    /// # Crash
+    /// Reiner Scan mit flüchtiger Präfix-ReadSet-Registrierung; keine Plattenmutation.
     #[allow(clippy::type_complexity)]
     fn scan_prefix_tracked<'a>(
         &'a self,
@@ -84,11 +113,23 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// Returns `true` if this storage engine implementation actively tracks read-sets for SSI validation.
     ///
     /// Default implementation returns `false`.
+    ///
+    /// # Fehler
+    /// Keine; unfehlbare Fähigkeitsabfrage.
+    ///
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn supports_ssi_tracking(&self) -> bool {
         false
     }
 
     /// Stores a key-value pair as part of a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Schreibfehlern oder `ContextraError::Conflict` bei MVCC-Konflikten.
+    ///
+    /// # Crash
+    /// Schreibt in die Transaktions-Staging-Puffer; Persistierung erfolgt erst beim Commit.
     fn put<'a>(&'a self, tx_id: TxId, key: &'a [u8], value: &'a [u8]) -> BoxFuture<'a, Result<()>>;
 
     /// Atomically writes `value` under `key` within transaction ONLY IF no value exists.
@@ -99,7 +140,7 @@ pub trait StorageEngine: Send + Sync + 'static {
         _value: &'a [u8],
     ) -> BoxFuture<'a, Result<bool>> {
         Box::pin(async move {
-            Err(crate::error::ContextraError::capability_unsupported(
+            Err(ContextraError::capability_unsupported(
                 "put_if_absent",
                 "Atomic put_if_absent is not supported by default — concrete storage engines must implement it atomically.",
             ))
@@ -107,6 +148,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     }
 
     /// Stores multiple key-value pairs as part of a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei I/O-Fehlern oder Konflikt bei MVCC.
+    ///
+    /// # Crash
+    /// Schreibt Einträge in den Transaktionspuffer; Persistierung erfolgt erst beim Commit.
     fn put_batch<'a>(
         &'a self,
         tx_id: TxId,
@@ -121,6 +168,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     }
 
     /// Deletes a key as part of a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei I/O-Fehlern.
+    ///
+    /// # Crash
+    /// Schreibt einen Tombstone in den Transaktionspuffer; persistent erst nach Commit.
     fn delete<'a>(&'a self, tx_id: TxId, key: &'a [u8]) -> BoxFuture<'a, Result<()>>;
 
     /// Deletes multiple keys as a single logical batch operation.
@@ -137,6 +190,12 @@ pub trait StorageEngine: Send + Sync + 'static {
 
     /// Deletes all key-value pairs starting with `prefix` as part of a transaction.
     // TOCTOU-ACCEPTED
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Scan- oder Löschfehlern.
+    ///
+    /// # Crash
+    /// Schreibt Tombstones in den Transaktionspuffer; persistent erst nach Commit.
     fn delete_prefix<'a>(&'a self, tx_id: TxId, prefix: &'a [u8]) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move {
             let matching_keys: Vec<Vec<u8>> = self
@@ -150,33 +209,93 @@ pub trait StorageEngine: Send + Sync + 'static {
     }
 
     /// Commits a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei WAL- oder fsync-Fehlern.
+    ///
+    /// # Crash
+    /// Scheitert ein fsync während des Commits, wechselt der Speicher unverzüglich in den Zustand `Poisoned` (P14, D-55).
     fn commit<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;
 
     /// Rolls back a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei internen Fehlern.
+    ///
+    /// # Crash
+    /// Verwirft unpersistierte Transaktionsdaten im RAM; atomar und crash-sicher.
     fn rollback<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;
 
     /// Rolls back the entire storage state to a specific transaction ID.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Transaktion nicht existiert oder unzulässig ist.
+    ///
+    /// # Crash
+    /// Stellt vorherigen persistenten Zustand wieder her.
     fn rollback_to_tx<'a>(&'a self, tx_id: TxId) -> BoxFuture<'a, Result<()>>;
 
     /// Flushes memtable to disk.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Schreib- oder Sync-Fehlern.
+    ///
+    /// # Crash
+    /// Führt durable sync auf der neuen SSTable und dem Manifest aus; bei fsync-Fehler tritt Poisoning ein.
     fn flush<'a>(&'a self) -> BoxFuture<'a, Result<()>>;
 
     /// Returns storage statistics.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei Problemen beim Auslesen von Metriken.
+    ///
+    /// # Crash
+    /// Reine Speicherabfrage ohne Seiteneffekte.
     fn stats<'a>(&'a self) -> BoxFuture<'a, Result<StorageStats>>;
 
     /// Returns the last sequence number committed to storage.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Sequenz nicht ermittelbar ist.
+    ///
+    /// # Crash
+    /// Deterministische In-Memory / Manifest-Abfrage.
     fn last_seq_no<'a>(&'a self) -> BoxFuture<'a, Result<u64>>;
 
     /// Returns the last transaction ID committed to storage.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls TxId nicht ermittelbar ist.
+    ///
+    /// # Crash
+    /// Deterministische Zustandsabfrage.
     fn last_tx_id<'a>(&'a self) -> BoxFuture<'a, Result<TxId>>;
 
     /// Pins a sequence number snapshot for durability / retention.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei ungültiger Sequenz.
+    ///
+    /// # Crash
+    /// Registriert Snapshot im RAM / Manifest.
     fn pin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>>;
 
     /// Unpins a sequence number snapshot.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Snapshot unbekannt ist.
+    ///
+    /// # Crash
+    /// Entfernt Snapshot-Pin; gibt Ressourcen für GC frei.
     fn unpin_checkpoint<'a>(&'a self, seq_no: u64) -> BoxFuture<'a, Result<()>>;
 
     /// Scans a range of keys with given prefix.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Lesefehlern.
+    ///
+    /// # Crash
+    /// Reiner Lese-Scan ohne Mutation.
     #[allow(clippy::type_complexity)]
     fn scan_prefix<'a>(
         &'a self,
@@ -225,7 +344,7 @@ pub trait StorageEngine: Send + Sync + 'static {
         _seq_no: u64,
     ) -> BoxFuture<'a, Result<Vec<(Vec<u8>, Vec<u8>)>>> {
         Box::pin(async move {
-            Err(crate::error::ContextraError::capability_unsupported(
+            Err(ContextraError::capability_unsupported(
                 "snapshot_read_at",
                 "Storage-level snapshot-isolated prefix scan (scan_prefix_at) is not supported by default — implementors must override this method to guarantee MVCC snapshot isolation.",
             ))
@@ -233,6 +352,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     }
 
     /// Scans range between start and end bounds.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Lesefehlern.
+    ///
+    /// # Crash
+    /// Reiner Bereichs-Scan ohne Mutation.
     #[allow(clippy::type_complexity)]
     fn scan<'a>(
         &'a self,
@@ -251,7 +376,7 @@ pub trait StorageEngine: Send + Sync + 'static {
         _cursor: Option<&'a [u8]>,
     ) -> BoxFuture<'a, Result<(Vec<(Vec<u8>, Vec<u8>)>, Option<Vec<u8>>)>> {
         Box::pin(async move {
-            Err(crate::error::ContextraError::capability_unsupported(
+            Err(ContextraError::capability_unsupported(
                 "scan_bounded",
                 "Bounded range scan (scan_bounded) is not supported by default",
             ))
@@ -264,14 +389,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_storage_stats_serialization() {
+    fn test_storage_stats_serialization() -> Result<()> {
         let s_stats = StorageStats {
             num_segments: 2,
             total_size_bytes: 2048,
             memtable_size_bytes: 512,
         };
-        let ser = serde_json::to_string(&s_stats).unwrap();
-        let deser: StorageStats = serde_json::from_str(&ser).unwrap();
+        let ser = serde_json::to_string(&s_stats)
+            .map_err(|e| ContextraError::Serialization(e.to_string()))?;
+        let deser: StorageStats =
+            serde_json::from_str(&ser).map_err(|e| ContextraError::Serialization(e.to_string()))?;
         assert_eq!(s_stats.total_size_bytes, deser.total_size_bytes);
+        Ok(())
     }
 }

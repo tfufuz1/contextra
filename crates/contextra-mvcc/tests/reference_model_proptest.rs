@@ -5,7 +5,7 @@
 //! einfaches BTreeMap-basiertes Referenzmodell.
 
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
-use contextra_mvcc::types::TxId;
+use contextra_types::TxId;
 use proptest::prelude::*;
 use std::collections::BTreeMap;
 

@@ -12,7 +12,6 @@
 
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
-// contextra_graph::CsrGraph entfernt per SPEC
 use contextra_ports::{BoxFuture, GraphIndex, StorageEngine, StorageStats, VectorIndex};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};
@@ -269,7 +268,6 @@ async fn test_crash_after_graph_staging_before_storage_commit() -> Result<()> {
     let intent = CommitIntent::Pending {
         doc_ids: Arc::new(vec![doc_id]),
         has_text: true,
-        has_graph: true,
         stages_completed: 0,
     };
     let intent_bytes = serde_json::to_vec(&intent)?;
@@ -393,14 +391,13 @@ async fn test_pending_intent_without_storage_commit_cleans_indices() -> Result<(
     let intent = CommitIntent::Pending {
         doc_ids: Arc::new(vec![doc_id]),
         has_text: true,
-        has_graph: true,
         stages_completed: 0,
     };
     let intent_bytes = serde_json::to_vec(&intent)?;
     storage.put(intent_tx, &intent_key, &intent_bytes).await?;
     storage.commit(intent_tx).await?;
 
-    // Put entries in vector, graph indices
+    // Put entries in vector, text indices
     let idx_tx = col.allocate_tx()?;
     col.vector_index()
         .insert(idx_tx, doc_id, &[0.0, 1.0, 0.0, 0.0])

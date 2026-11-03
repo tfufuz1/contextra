@@ -11,8 +11,8 @@ use crate::Collection;
 use contextra_store::LsmStorage;
 use contextra_types::DocId;
 use contextra_vector::HnswIndex;
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 use tempfile::tempdir;
 
 async fn create_test_collection() -> Collection<LsmStorage, HnswIndex> {
@@ -97,13 +97,11 @@ fn test_commit_intent_arc_serde_kompatibel_mit_vec() {
     let intent_arc = CommitIntent::Pending {
         doc_ids: doc_ids_arc,
         has_text: false,
-        has_graph: false,
         stages_completed: 0,
     };
     let json_arc = serde_json::to_string(&intent_arc).expect("serialize Arc");
 
-    let legacy_json =
-        r#"{"Pending":{"doc_ids":[1,2],"has_text":false,"has_graph":false,"stages_completed":0}}"#;
+    let legacy_json = r#"{"Pending":{"doc_ids":[1,2],"has_text":false,"stages_completed":0}}"#;
 
     assert_eq!(
         json_arc, legacy_json,

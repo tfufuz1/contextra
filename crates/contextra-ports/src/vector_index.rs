@@ -5,8 +5,8 @@
 // ZWECK: VectorIndex Trait & VectorIndexStats für HNSW/Vektor-Indizes.
 // INVARIANTEN: Rebuild-Triggering & Filtered Search Fallback.
 
-use crate::types::{DocId, ScoredDocument, TxId};
 use crate::Result;
+use crate::{ContextraError, DocId, ScoredDocument, TxId};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
@@ -36,6 +36,12 @@ pub struct VectorIndexStats {
 /// Verwendet native `async fn` (AFIT) für statischen Dispatch.
 pub trait VectorIndex: Send + Sync + 'static {
     /// Inserts a vector with an associated document ID.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei Dimensions-Mismatch oder Allokationsfehlern.
+    ///
+    /// # Crash
+    /// Schreibt Vektor in den RAM-Graphknoten; Persistierung erfolgt im Snapshot.
     fn insert(
         &self,
         tx: TxId,
@@ -44,11 +50,23 @@ pub trait VectorIndex: Send + Sync + 'static {
     ) -> impl Future<Output = Result<()>> + Send;
 
     /// Returns all active (non-deleted) document IDs in the index.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei internen Zugriffsfehlern.
+    ///
+    /// # Crash
+    /// Reiner In-Memory-Lesezugriff; keine Plattenmutation.
     fn all_doc_ids(&self) -> impl Future<Output = Result<Vec<DocId>>> + Send {
         async { Ok(Vec::new()) }
     }
 
     /// Inserts multiple vectors with associated document IDs.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei Dimensions-Mismatch oder Allokationsfehlern.
+    ///
+    /// # Crash
+    /// Schreibt Vektoren in den RAM-Graphen; Persistierung erfolgt im Snapshot.
     fn insert_batch(
         &self,
         tx: TxId,
@@ -63,6 +81,12 @@ pub trait VectorIndex: Send + Sync + 'static {
     }
 
     /// Searches for the k nearest neighbors to a query vector.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei Dimensions-Mismatch oder unzulässigen Parametern.
+    ///
+    /// # Crash
+    /// Reiner Lese-Graph-Traversierungsschritt im RAM; keine Festplattenmutation.
     fn search(
         &self,
         query: &[f32],
@@ -71,10 +95,11 @@ pub trait VectorIndex: Send + Sync + 'static {
 
     /// Searches for the k nearest neighbors to a query vector at a specific sequence number.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::CapabilityUnsupported`][crate::ContextraError::CapabilityUnsupported]
-    /// with capability `"snapshot_read_at"` if snapshot-isolated vector search is not implemented.
-    /// Tested via `capability_coverage` test module.
+    /// # Fehler
+    /// Liefert `ContextraError::CapabilityUnsupported` falls nicht implementiert oder Fehler bei Dimensionsmismatch.
+    ///
+    /// # Crash
+    /// Reiner historischer Snapshot-Lesezugriff; keine Mutation auf Festplatte.
     fn search_at(
         &self,
         query: &[f32],
@@ -83,7 +108,7 @@ pub trait VectorIndex: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send {
         async move {
             let _ = (query, k, seq_no);
-            Err(crate::error::ContextraError::capability_unsupported(
+            Err(ContextraError::capability_unsupported(
                 "snapshot_read_at",
                 "Vector search snapshot isolation (search_at) is not supported by default — tracked in ADR-024",
             ))
@@ -96,13 +121,11 @@ pub trait VectorIndex: Send + Sync + 'static {
     /// Returns an error if a filter is provided. Implementors **MUST** override
     /// this method if filtered search is supported by their vector engine.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::CapabilityUnsupported`][crate::ContextraError::CapabilityUnsupported]
-    /// with capability `"vector_filtered_search"` if a filter predicate is passed to an engine without filter support.
-    /// Tested via `capability_coverage` test module.
+    /// # Fehler
+    /// Liefert `ContextraError::CapabilityUnsupported` falls Filterung nicht unterstützt wird.
     ///
-    /// # Note
-    /// This default exists solely for backward compatibility.
+    /// # Crash
+    /// Reiner Graph-Suchschritt; keine Mutation auf Festplatte.
     fn search_filtered(
         &self,
         query: &[f32],
@@ -111,7 +134,7 @@ pub trait VectorIndex: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send {
         async move {
             if filter.is_some() {
-                return Err(crate::error::ContextraError::capability_unsupported(
+                return Err(ContextraError::capability_unsupported(
                     "vector_filtered_search",
                     "Filtered vector search is not supported by default for this vector engine",
                 ));
@@ -121,37 +144,97 @@ pub trait VectorIndex: Send + Sync + 'static {
     }
 
     /// Deletes a vector by its document ID.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Markierung im Index fehlschlägt.
+    ///
+    /// # Crash
+    /// Markiert Vektorknoten als gelöscht (Tombstone); persistiert erst nach Snapshot/Commit.
     fn delete(&self, tx: TxId, id: DocId) -> impl Future<Output = Result<()>> + Send;
 
     /// Commits a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei WAL- oder Snapshot-Fehlern.
+    ///
+    /// # Crash
+    /// Macht eingefügte/gelöschte Vektoren im Graphen sichtbar und persistent; fsync-Fehler führen zu Poisoning.
     fn commit(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Rolls back a transaction.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei internen Rollback-Fehlern.
+    ///
+    /// # Crash
+    /// Verwirft unpersistierte Vektoränderungen der Transaktion im RAM; crash-sicher.
     fn rollback(&self, tx: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Rolls back the entire index state to a specific transaction ID.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Transaktion nicht existiert oder unzulässig ist.
+    ///
+    /// # Crash
+    /// Stellt vorherigen Indexzustand wieder her.
     fn rollback_to_tx(&self, tx_id: TxId) -> impl Future<Output = Result<()>> + Send;
 
     /// Returns the last transaction ID processed by the index.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls TxId nicht ermittelt werden kann.
+    ///
+    /// # Crash
+    /// Deterministischer RAM-/Manifest-Statusabruf ohne Seiteneffekte.
     fn last_tx_id(&self) -> impl Future<Output = Result<TxId>> + Send;
 
     /// Returns the number of vectors in the index.
+    ///
+    /// # Fehler
+    /// Keine; unfehlbare Zählung.
+    ///
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn len(&self) -> impl Future<Output = usize> + Send;
 
     /// Returns true if the index is empty.
+    ///
+    /// # Fehler
+    /// Keine; unfehlbare Prüfung.
+    ///
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn is_empty(&self) -> impl Future<Output = bool> + Send {
         async { self.len().await == 0 }
     }
 
     /// Returns index statistics.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Statistiken nicht ermittelt werden können.
+    ///
+    /// # Crash
+    /// Reines Abfragen von Zählern im RAM.
     fn stats(&self) -> impl Future<Output = Result<VectorIndexStats>> + Send;
 
     /// Returns true if the index requires a background rebuild (e.g. due to tombstone accumulation).
+    ///
+    /// # Fehler
+    /// Keine; unfehlbare Schwellwertprüfung im RAM.
+    ///
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn is_rebuild_required(&self) -> bool {
         false
     }
 
     /// Triggers an asynchronous background rebuild of the index if supported.
+    ///
+    /// # Fehler
+    /// Keine direkte Fehlerpropagation; Rebuild läuft asynchron im Hintergrund.
+    ///
+    /// # Crash
+    /// Startet Hintergrundtask zur Reorganisation des HNSW-Graphen.
     fn trigger_rebuild_async(&self) {}
 }
 
@@ -168,8 +251,8 @@ mod tests {
             deleted_ratio: 0.1,
             rebuild_count: 1,
         };
-        let ser = serde_json::to_string(&v_stats).unwrap();
-        let deser: VectorIndexStats = serde_json::from_str(&ser).unwrap();
+        let ser = serde_json::to_string(&v_stats).expect("serialize vector stats");
+        let deser: VectorIndexStats = serde_json::from_str(&ser).expect("deserialize vector stats");
         assert_eq!(v_stats.num_vectors, deser.num_vectors);
     }
 
@@ -274,14 +357,17 @@ mod tests {
             (DocId(1), [1.0, 2.0].as_slice()),
             (DocId(2), [3.0, 4.0].as_slice()),
         ];
-        index.insert_batch(TxId(1), &vectors).await.unwrap();
+        index
+            .insert_batch(TxId(1), &vectors)
+            .await
+            .expect("batch insert succeeds");
         assert_eq!(index.len().await, 2);
         assert!(!index.is_empty().await);
 
         // Test search_filtered default error
         let res = index.search_filtered(&[1.0], 1, Some(&|_| true)).await;
         match res {
-            Err(crate::error::ContextraError::CapabilityUnsupported { capability, .. }) => {
+            Err(ContextraError::CapabilityUnsupported { capability, .. }) => {
                 assert_eq!(capability, "vector_filtered_search");
             }
             _ => panic!("Expected CapabilityUnsupported for search_filtered"),
@@ -290,7 +376,7 @@ mod tests {
         // Test search_at default error
         let res2 = index.search_at(&[1.0], 1, 42).await;
         match res2 {
-            Err(crate::error::ContextraError::CapabilityUnsupported { capability, reason }) => {
+            Err(ContextraError::CapabilityUnsupported { capability, reason }) => {
                 assert_eq!(capability, "snapshot_read_at");
                 assert!(reason.contains("ADR-024"), "Unexpected reason: {reason}");
             }

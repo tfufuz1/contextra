@@ -224,7 +224,7 @@ pub fn ensure_fd_limit(min_fds: u64) -> bool {
     {
         let min_fds_rlim = min_fds as libc::rlim_t;
         // SAFETY: `rlim` und `current_rlim` sind auf dem Stack allokierte MaybeUninit-Puffer.
-        // Nach Rueckgabewert 0 von `getrlimit` garantiert das Betriebssystem deren Initialisierung.
+        // Nach Rueckgabewert 0 von `getrlimit` initialisiert das Betriebssystem die Werte.
         unsafe {
             let mut rlim = MaybeUninit::<libc::rlimit>::uninit();
             if libc::getrlimit(libc::RLIMIT_NOFILE, rlim.as_mut_ptr()) != 0 {

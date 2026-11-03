@@ -19,8 +19,7 @@ fn t_report_1_canonical_json_and_signature() {
     assert!(!canonical.contains('\n'));
     assert!(!canonical.contains(": "));
 
-    let mut rng = rand_core::OsRng;
-    let signing_key = SigningKey::generate(&mut rng);
+    let signing_key = SigningKey::from_bytes(&[0x42; 32]);
     let signed = SignedReport::sign(report, &signing_key).expect("signing failed");
     assert!(!signed.signature_base64().is_empty());
 }
