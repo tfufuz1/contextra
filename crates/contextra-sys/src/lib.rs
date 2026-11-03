@@ -34,7 +34,7 @@ pub use durability::{
 pub use error::{SyncFailure, SysError, UnsupportedKind};
 pub use fs_probe::{fs_class, fs_class_spec, FsClass, FsKind};
 pub use hardening::{
-    apply_process_hardening, ensure_fd_limit, lock_pages, mark_dont_dump, set_fd_limit,
-    HardeningPolicy, HardeningReport,
+    apply_process_hardening, ensure_fd_limit, lock_pages, mark_dont_dump, secure_zero_volatile,
+    set_fd_limit, HardeningPolicy, HardeningReport,
 };
 pub use perm::{set_mode, set_restrictive_file_acl, verify_file_acl_owner_only, verify_owner_only};
