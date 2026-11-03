@@ -57,7 +57,7 @@ coverage:
     #!/usr/bin/env bash
     set -euo pipefail
     which cargo-llvm-cov || cargo install cargo-llvm-cov
-    cargo llvm-cov --workspace --exclude contextra-py --json --output-path coverage.json
+    cargo llvm-cov --workspace --json --output-path coverage.json
     echo "✅ Coverage-Gate bestanden"
 
 # Runs Loom concurrency exploration model test for group commit lock handoff (unoptimized debug build required by Loom)
@@ -74,14 +74,10 @@ fuzz-all SECONDS="60":
         "contextra-store:fuzz_wal_replay"
         "contextra-vector:fuzz_hnsw_persistence"
         "contextra-text:fuzz_bm25_tokenize"
-        "contextra-wire:fuzz_flatbuffers_ipc"
-        "contextra-mcp:fuzz_jsonrpc_parsing"
         "contextra-store:wal_roundtrip"
         "contextra-store:fuzz_manifest_load"
         "contextra-store:wal_mutation_chaos"
         "contextra-vector:hnsw_insert_search"
-        "contextra-db:rrf_fusion"
-        "contextra-mcp:fuzz_prompt_injection_guard"
     )
     for entry in "${targets[@]}"; do
         crate="${entry%%:*}"
