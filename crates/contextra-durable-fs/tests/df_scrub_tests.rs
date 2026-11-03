@@ -17,8 +17,8 @@ use tempfile::TempDir;
 fn test_df_07_scrub_truth_table() {
     let cases = [
         // (rotational, is_cow, expected_scrubbed)
-        (true, false, true),   // Fall 1: HDD / Rotational ohne CoW -> Scrubbing aktiv (D-83)
-        (true, true, false),   // Fall 2: CoW-Dateisystem -> No-Op (kein Überschreiben)
+        (true, false, true), // Fall 1: HDD / Rotational ohne CoW -> Scrubbing aktiv (D-83)
+        (true, true, false), // Fall 2: CoW-Dateisystem -> No-Op (kein Überschreiben)
         (false, false, false), // Fall 3: Flash/SSD -> No-Op (Wear-Leveling macht Nullen wirkungslos)
         (false, true, false),  // Fall 4: Flash/SSD mit CoW -> No-Op
     ];
@@ -77,8 +77,7 @@ fn test_df_07_t_cfg_3_hardlinks_refused() {
         fs::hard_link(&file1, &file2).expect("Hard link creation failed");
 
         // Wenn Hardlinks existieren, muss auch bei rotational=true und !is_cow verweigert werden
-        let outcome =
-            scrub_before_unlink(&file1, true, false).expect("scrub_before_unlink failed");
+        let outcome = scrub_before_unlink(&file1, true, false).expect("scrub_before_unlink failed");
 
         assert_eq!(
             outcome,

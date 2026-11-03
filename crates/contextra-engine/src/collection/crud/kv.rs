@@ -19,15 +19,10 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let tx = self.allocate_tx()?;
         let user_key = self.namespaced_key(id.as_bytes(), 0);
         let data = serde_json::to_vec(value)?;
-        let res = match self.storage.put(tx, &user_key, &data).await {
-            Ok(()) => self.storage.commit(tx).await,
-            Err(e) => {
-                let _ = self.storage.rollback(tx).await;
-                Err(e)
-            }
-        };
+        self.storage.put(tx, &user_key, &data).await?;
+        self.storage.commit(tx).await?;
         drop(_guard);
-        res
+        Ok(())
     }
 
     /// Stores a non-vector key-value entry directly in LSM storage only if the key does not already exist.
@@ -55,13 +50,15 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     id
                 )))
             }
-            Err(e) => {
-                let _ = self.storage.rollback(tx).await;
-                Err(e)
-            }
-        };
+            drop(_guard);
+            return Err(contextra_types::ContextraError::Conflict(format!(
+                "Key '{}' already exists in collection KV store",
+                id
+            )));
+        }
+        self.storage.commit(tx).await?;
         drop(_guard);
-        res
+        Ok(())
     }
 
     /// Retrieves a key-value entry directly from LSM storage.

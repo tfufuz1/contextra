@@ -709,21 +709,12 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let doc_bytes = serde_json::to_vec(&meta_only)?;
 
         let _guard = self.kv_locks.lock_for(doc_id).await;
-        let res = match self.storage.put(tx, &user_key, &user_bytes).await {
-            Ok(()) => match self.storage.put(tx, &doc_key, &doc_bytes).await {
-                Ok(()) => self.storage.commit(tx).await,
-                Err(e) => {
-                    let _ = self.storage.rollback(tx).await;
-                    Err(e)
-                }
-            },
-            Err(e) => {
-                let _ = self.storage.rollback(tx).await;
-                Err(e)
-            }
-        };
+        self.storage.put(tx, &user_key, &user_bytes).await?;
+        self.storage.put(tx, &doc_key, &doc_bytes).await?;
+        self.storage.commit(tx).await?;
         drop(_guard);
-        res
+
+        Ok(())
     }
 
     /// Removes all data belonging to this collection from storage.
