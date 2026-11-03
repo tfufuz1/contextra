@@ -60,6 +60,8 @@ pub mod system_pressure;
 pub mod tenant_codec;
 pub(crate) mod util;
 pub mod wal;
+pub mod vfs;
+pub mod envelope;
 
 pub mod purge;
 pub mod erase;

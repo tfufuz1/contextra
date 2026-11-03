@@ -45,6 +45,7 @@ pub const RING_TABLE: &[(&str, Ring)] = &[
     ("contextra-engine", Ring::Ring3),
     ("contextra", Ring::Ring4),
     ("contextra-testkit", Ring::Tooling),
+    ("contextra-testmacros", Ring::Tooling),
     ("contextra-lab", Ring::Tooling),
     ("ctx-verify", Ring::Tooling),
     ("contextra-testmacros", Ring::Tooling),

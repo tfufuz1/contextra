@@ -419,7 +419,7 @@ impl LsmStorage {
             crate::lsm::recovery::write_salt_atomically(&salt_path, &buf).await?;
         }
 
-        let salt = tokio::fs::read(&salt_path).await.map_err(|e| {
+        let _salt = tokio::fs::read(&salt_path).await.map_err(|e| {
             contextra_types::ContextraError::Storage(format!(
                 "SALT file read failed during migration: {e}"
             ))

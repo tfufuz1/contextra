@@ -168,7 +168,7 @@ impl LsmStorage {
         let dir_lock = DirLock::acquire(&config.path, config.durability_mode)?;
 
         let salt_path = config.path.join("SALT");
-        let salt = match tokio::fs::read(&salt_path).await {
+        let _salt = match tokio::fs::read(&salt_path).await {
             Ok(buf) => {
                 if buf.len() != 32 {
                     return Err(ContextraError::Storage(format!(
