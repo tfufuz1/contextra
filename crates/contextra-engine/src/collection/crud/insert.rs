@@ -242,6 +242,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         match self.insert_op(&db_tx, id, embedding, metadata).await {
             Ok(_) => {
                 db_tx.commit().await?;
+                self.check_and_trigger_community_detection(1);
                 let elapsed = (self.clock().monotonic_nanos().saturating_sub(start_nanos)) as f64
                     / 1_000_000_000.0;
                 record_histogram_safe(

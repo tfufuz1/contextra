@@ -94,6 +94,46 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         };
         guard.push(doc_id);
     }
+
+    // ANCHOR[contextra-engine:STA-102]
+    /// Dokumentation für `stage_graph_entity` im Rahmen der Transaktions- und Facade-Orchestrierung.
+    pub fn stage_graph_entity(&self, entity: Entity) {
+        let mut guard = match self.staged_graph_entities.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        guard.push(entity);
+    }
+
+    // ANCHOR[contextra-engine:STA-110]
+    /// Dokumentation für `stage_graph_edge` im Rahmen der Transaktions- und Facade-Orchestrierung.
+    pub fn stage_graph_edge(&self, edge: Edge) {
+        let mut guard = match self.staged_graph_edges.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        guard.push(edge);
+    }
+
+    // ANCHOR[contextra-engine:STA-118]
+    /// Dokumentation für `stage_graph_entity_delete` im Rahmen der Transaktions- und Facade-Orchestrierung.
+    pub fn stage_graph_entity_delete(&self, entity_id: EntityId) {
+        let mut guard = match self.staged_graph_entity_deletes.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        guard.push(entity_id);
+    }
+
+    // ANCHOR[contextra-engine:STA-126]
+    /// Dokumentation für `stage_graph_edge_delete` im Rahmen der Transaktions- und Facade-Orchestrierung.
+    pub fn stage_graph_edge_delete(&self, from: EntityId, to: EntityId) {
+        let mut guard = match self.staged_graph_edge_deletes.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        guard.push((from, to));
+    }
 }
 
 impl<S: StorageEngine, V: VectorIndex> Drop for DbTransaction<S, V> {
