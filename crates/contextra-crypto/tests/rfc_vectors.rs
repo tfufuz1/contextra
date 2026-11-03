@@ -7,6 +7,13 @@
 //! INVARIANTEN: AES-256-GCM-SIV against RFC 8452, HKDF against RFC 5869, HMAC-SHA256 against RFC 4231.
 //! NICHT-OFFENSICHTLICH: All expected ciphertext/hash values are independently taken from RFC standards, not auto-generated.
 
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::needless_borrows_for_generic_args
+)]
+
 use aes_gcm_siv::{
     aead::{Aead, KeyInit as AeadKeyInit},
     Aes256GcmSiv, Nonce,
