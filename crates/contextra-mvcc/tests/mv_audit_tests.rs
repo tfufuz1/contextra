@@ -108,8 +108,8 @@ fn mv_audit_no_vector_dep() {
 #[test]
 fn mv_audit_t_log_1_no_user_content_leak() {
     use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
-    use contextra_mvcc::types::TxId;
     use contextra_mvcc::ContextraError;
+    use contextra_types::TxId;
 
     let validator = SequenceLogSsiValidator::new();
     let tx = TxId::new(42);
