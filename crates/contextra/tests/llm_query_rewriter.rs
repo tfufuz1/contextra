@@ -12,7 +12,6 @@
 //! - Prompt-Injection-Isolation via `<untrusted_context>`.
 
 use contextra::LlmQueryRewriter;
-// contextra_db::QueryRewriter entfernt per SPEC D-24, D-45
 use contextra_ports::QueryRewriter;
 use contextra_ports::{BoxFuture, LlmTextGenerator};
 use contextra_types::error::ContextraError;
