@@ -6,7 +6,7 @@ Abgeleitet aus [`docs/SPEC.md`](../../docs/SPEC.md). Bei Widerspruch gilt die SP
 
 **Ring und Abhängigkeiten:** Ring 2. Erlaubt: `types`, `ports`, `simd`, `crypto`.
 
-**Verboten:** `sys` und `mvcc` (D-88), `std::fs`, `memmap2` (D-94), Nullvektoren als Löschung (D-77), Quantisierung außerhalb der Arena (D-86), Features `experimental-diskann`, `experimental-rabitq`, `partial-index-rebuild` (D-84), regionales HNSW-Rewiring (VETO-F02)
+**Verboten:** `sys` und `mvcc` (D-88), `std::fs`, `buffer_removed` (D-94), Nullvektoren als Löschung (D-77), Quantisierung außerhalb der Arena (D-86), Features `experimental-diskann`, `experimental-rabitq`, `partial-index-rebuild` (D-84), regionales HNSW-Rewiring (VETO-F02)
 
 **Entscheidungen:** D-18, D-19, D-77, D-84, D-86, D-88
 

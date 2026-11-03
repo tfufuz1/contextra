@@ -1,21 +1,20 @@
 // FILE-CONTEXT
-// ZWECK: mmap-basiertes Lesen für HNSW Vektor-Indizes.
-// INVARIANTEN: Zero-Panic bei Deserialisierung; mmap-Reads überleben POSIX file replace.
-// NICHT-OFFENSICHTLICH: MmapIndex hält read-only FD; Schreibvorgänge laufen atomar über .tmp und Rename.
-// HOTSPOTS: persistence/mmap.rs (MmapIndex::open)
+// ZWECK: Gepuffertes Lesen für HNSW Vektor-Indizes.
+// INVARIANTEN: Zero-Panic bei Deserialisierung.
+// HOTSPOTS: persistence/buffer.rs (BufferIndex::open)
 
 use super::{HnswHeader, NodeRecord};
 use contextra_types::{ContextraError, Result};
 
 #[derive(Clone)]
-/// A reader for memory-mapped HNSW indices.
-pub struct MmapIndex {
-    pub mmap: std::sync::Arc<[u8]>,
+/// A reader for buffered HNSW indices.
+pub struct BufferIndex {
+    pub buffer: std::sync::Arc<[u8]>,
     pub header: HnswHeader,
     pub path: Option<std::path::PathBuf>,
 }
 
-impl MmapIndex {
+impl BufferIndex {
     pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let path_buf = path.as_ref().to_path_buf();
         let buffer = std::fs::read(&path_buf)
@@ -29,7 +28,7 @@ impl MmapIndex {
         let header = HnswHeader::try_from_bytes(header_slice)?;
 
         let index_obj = Self {
-            mmap: std::sync::Arc::from(buffer.into_boxed_slice()),
+            buffer: std::sync::Arc::from(buffer.into_boxed_slice()),
             header,
             path: Some(path_buf),
         };
@@ -92,16 +91,16 @@ impl MmapIndex {
     pub fn get_node_record(&self, index: usize) -> Result<NodeRecord> {
         let byte_offset = index
             .checked_mul(NodeRecord::SIZE)
-            .ok_or_else(|| ContextraError::Storage("Node index overflow in mmap".into()))?;
+            .ok_or_else(|| ContextraError::Storage("Node index overflow in buffer".into()))?;
         let nodes_offset = self.header.nodes_offset() as usize;
-        let offset = nodes_offset
-            .checked_add(byte_offset)
-            .ok_or_else(|| ContextraError::Storage("Node record offset overflow in mmap".into()))?;
+        let offset = nodes_offset.checked_add(byte_offset).ok_or_else(|| {
+            ContextraError::Storage("Node record offset overflow in buffer".into())
+        })?;
         let record_end = offset
             .checked_add(NodeRecord::SIZE)
-            .ok_or_else(|| ContextraError::Storage("Node record end overflow in mmap".into()))?;
+            .ok_or_else(|| ContextraError::Storage("Node record end overflow in buffer".into()))?;
         let slice = self
-            .mmap
+            .buffer
             .get(offset..record_end)
             .ok_or_else(|| ContextraError::Storage("Node record out of bounds".into()))?;
         NodeRecord::from_bytes(slice)
@@ -113,14 +112,14 @@ impl MmapIndex {
             dim
         } else {
             dim.checked_mul(4)
-                .ok_or_else(|| ContextraError::Storage("Vector size overflow in mmap".into()))?
+                .ok_or_else(|| ContextraError::Storage("Vector size overflow in buffer".into()))?
         };
         let offset = record.vector_offset as usize;
         let vector_end = offset
             .checked_add(size)
-            .ok_or_else(|| ContextraError::Storage("Vector offset overflow in mmap".into()))?;
+            .ok_or_else(|| ContextraError::Storage("Vector offset overflow in buffer".into()))?;
         let slice = self
-            .mmap
+            .buffer
             .get(offset..vector_end)
             .ok_or_else(|| ContextraError::Storage("Vector data out of bounds".into()))?;
         Ok(slice)
@@ -129,7 +128,7 @@ impl MmapIndex {
     pub fn get_connections(&self, record: &NodeRecord, layer: usize) -> Result<Vec<u32>> {
         let offset = record.connections_offset as usize;
         let num_layers_byte = *self
-            .mmap
+            .buffer
             .get(offset)
             .ok_or_else(|| ContextraError::Storage("Connections offset out of bounds".into()))?;
 
@@ -146,7 +145,7 @@ impl MmapIndex {
                 ContextraError::Storage("Connection length position overflow".into())
             })?;
             let len_bytes = self
-                .mmap
+                .buffer
                 .get(current_pos..check_pos)
                 .ok_or_else(|| ContextraError::Storage("Connection length out of bounds".into()))?;
             let len = u32::from_le_bytes(
@@ -171,7 +170,7 @@ impl MmapIndex {
             .checked_add(4)
             .ok_or_else(|| ContextraError::Storage("Connection length position overflow".into()))?;
         let len_bytes = self
-            .mmap
+            .buffer
             .get(current_pos..check_pos)
             .ok_or_else(|| ContextraError::Storage("Connection length out of bounds".into()))?;
 
@@ -190,7 +189,7 @@ impl MmapIndex {
             .ok_or_else(|| ContextraError::Storage("Connection end offset overflow".into()))?;
 
         let raw = self
-            .mmap
+            .buffer
             .get(start..end)
             .ok_or_else(|| ContextraError::Storage("Connection data out of bounds".into()))?;
 
@@ -223,7 +222,7 @@ mod tests {
 
     /// T-ID: T-LINT-2
     #[test]
-    fn test_mmap_index_buffer_header_read() -> Result<()> {
+    fn test_buffer_index_header_read() -> Result<()> {
         let temp_dir = tempfile::tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
         let file_path = temp_dir.path().join("test_index.hnsw");
 
@@ -232,10 +231,10 @@ mod tests {
         std::fs::write(&file_path, &header_bytes)
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
-        let index = MmapIndex::open(&file_path)?;
+        let index = BufferIndex::open(&file_path)?;
         assert_eq!(index.header.dimension(), 128);
         assert_eq!(index.header.node_count(), 0);
-        assert_eq!(index.mmap.len(), header_bytes.len());
+        assert_eq!(index.buffer.len(), header_bytes.len());
 
         Ok(())
     }

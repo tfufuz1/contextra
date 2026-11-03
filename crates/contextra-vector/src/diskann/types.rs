@@ -1,35 +1,32 @@
 // FILE-CONTEXT
 // ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
-// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
-// NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
+// INVARIANTEN: Lock-Hierarchie: header -> vfs_file -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
+// NICHT-OFFENSICHTLICH: Positional VFS-Lesevorgänge über contextra_ports::Vfs.
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
 use super::build::TombstoneSet;
 use super::config::{CachedNode, DiskAnnConfig};
 use super::format::DiskAnnHeader;
+use super::test_vfs::InMemoryVfs;
 use crate::ComputePool;
 use ahash::AHashMap;
+use contextra_ports::{Vfs, VfsFile, VfsOpenOptions};
 use contextra_types::{ContextraError, DocId, Result};
-use memmap2::Mmap;
 use parking_lot::RwLock;
-use std::io::Read;
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Arc;
 
 /// DiskANN out-of-core vector index.
 ///
-/// This index uses `memmap2` to offload vector data and graph edges to disk.
-/// Note that mmap operations and page faults can cause the current thread to block
-/// while data is being loaded from the disk. For high-concurrency environments,
-/// consider using `ComputePool` or a background thread pool when calling methods on this index
-/// if latency spikes are a concern.
+/// This index uses `contextra_ports::Vfs` to read vector data and graph edges from disk.
 pub struct DiskAnnIndex {
     pub(crate) inner: Arc<DiskAnnIndexInner>,
 }
 
 pub(crate) struct DiskAnnIndexInner {
     pub(crate) config: DiskAnnConfig,
+    pub(crate) vfs: Arc<dyn Vfs>,
     pub(crate) header: RwLock<Option<DiskAnnHeader>>,
-    pub(crate) mmap: RwLock<Option<Mmap>>,
+    pub(crate) vfs_file: RwLock<Option<Box<dyn VfsFile>>>,
     pub(crate) node_size_bytes: AtomicU64,
     pub(crate) cache: RwLock<AHashMap<u32, CachedNode>>,
     pub(crate) doc_ids: RwLock<Vec<DocId>>,
@@ -192,6 +189,11 @@ impl DiskAnnIndex {
 
         let compute_pool = config.compute_pool.clone().unwrap_or_default();
 
+        let vfs: Arc<dyn Vfs> = match &config.vfs {
+            Some(v) => Arc::clone(v),
+            None => Arc::new(InMemoryVfs::new()),
+        };
+
         let vector_size = if config.quantize {
             config.dimension
         } else {
@@ -202,10 +204,10 @@ impl DiskAnnIndex {
         let raw_node_size = vector_size + neighbors_size + doc_id_size;
         let node_size_bytes = raw_node_size.div_ceil(config.sector_size) * config.sector_size;
 
-        if config.index_path.exists() {
-            let mut file = std::fs::File::open(&config.index_path).map_err(ContextraError::Io)?;
-            let metadata = file.metadata().map_err(ContextraError::Io)?;
-            let file_len = metadata.len() as usize;
+        if config.index_path.extension().and_then(|e| e.to_str()) == Some("dann")
+            && vfs.exists(&config.index_path)?
+        {
+            let file_len = vfs.len(&config.index_path)? as usize;
 
             if file_len < DiskAnnHeader::SIZE {
                 return Err(ContextraError::Storage(
@@ -213,54 +215,30 @@ impl DiskAnnIndex {
                 ));
             }
 
+            let file_handle = vfs.open(&config.index_path, &VfsOpenOptions::read_only())?;
             let mut header_buf = [0u8; DiskAnnHeader::SIZE];
-            file.read_exact(&mut header_buf)
+            let read_bytes = file_handle
+                .read_at(&mut header_buf, 0)
                 .map_err(ContextraError::Io)?;
-
-            let header = DiskAnnHeader::try_from_bytes(&header_buf)?;
-
-            if config.sector_size != header.sector_size as usize {
-                return Err(ContextraError::Index(format!(
-                    "DiskANN-Index inkompatibel: Config-sector_size={} stimmt nicht mit \
-                     Header-sector_size={} überein. Index muss neu aufgebaut werden.",
-                    config.sector_size, header.sector_size
-                )));
-            }
-
-            let header_sector_size = header.sector_size as usize;
-            if header_sector_size == 0 {
+            if read_bytes < DiskAnnHeader::SIZE {
                 return Err(ContextraError::Storage(
-                    "DiskANN header corrupt: sector_size is 0".into(),
+                    "DiskANN file too small for header".into(),
                 ));
             }
 
-            let header_vector_size = if header.quantized != 0 {
-                header.dimension as usize
-            } else {
-                header.dimension as usize * 4
-            };
-            let header_neighbors_size = 4 + (header.max_degree as usize * 4);
-            let header_raw_node_size = header_vector_size + header_neighbors_size + doc_id_size;
-            let header_node_size_bytes =
-                header_raw_node_size.div_ceil(header_sector_size) * header_sector_size;
-            let start_offset =
-                DiskAnnHeader::SIZE.div_ceil(header_sector_size) * header_sector_size;
-            let expected_min_size = start_offset.saturating_add(
-                (header.node_count as usize).saturating_mul(header_node_size_bytes),
-            );
-            if file_len < expected_min_size {
-                return Err(ContextraError::Storage(format!(
-                    "DiskANN file truncated or corrupt node_count: file len {}, expected at least {}",
-                    file_len, expected_min_size
-                )));
+            if &header_buf[0..4] != crate::diskann::format::DISKANN_MAGIC {
+                return Err(ContextraError::Storage(
+                    "Invalid DiskANN file: bad magic".into(),
+                ));
             }
         }
 
         Ok(Self {
             inner: Arc::new(DiskAnnIndexInner {
                 config,
+                vfs,
                 header: RwLock::new(None),
-                mmap: RwLock::new(None),
+                vfs_file: RwLock::new(None),
                 node_size_bytes: AtomicU64::new(node_size_bytes as u64),
                 cache: RwLock::new(AHashMap::new()),
                 doc_ids: RwLock::new(Vec::new()),
