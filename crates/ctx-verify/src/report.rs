@@ -12,6 +12,7 @@ use std::path::Path;
 
 /// Layer witness entry in report (SPEC §12.2).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct LayerWitnessReport {
     pub layer: String,
     pub class: String,
@@ -26,6 +27,7 @@ pub struct LayerWitnessReport {
 
 /// Journal step recorded in the report for journal reduction proof.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct JournalStepReport {
     pub prev_hash_hex: String,
     pub raw_entry_hex: String,
@@ -34,6 +36,7 @@ pub struct JournalStepReport {
 
 /// Ledger reference recorded in the report or verified via external file.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct LedgerEntryReport {
     pub commitment_hex: String,
     pub gated_seq: u64,
@@ -43,6 +46,7 @@ pub struct LedgerEntryReport {
 
 /// Full structure of a signed deletion report per SPEC §11.7, F.10.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ErasureReport {
     pub report_version: u32,
     pub store_id: String,
@@ -74,18 +78,35 @@ pub struct ErasureReport {
     pub signature: String,
 }
 
-/// Verifies a deletion report file against a public key file and optional ledger file.
+/// Verifies a deletion report file against a public key file, optional ledger file, and optional expected store ID.
 pub fn verify_report_file(
     report_path: &Path,
     pub_key_path: &Path,
     ledger_path: Option<&Path>,
+    expected_store_id: Option<&str>,
 ) -> Result<(), InvalidCode> {
     let pub_key_bytes = std::fs::read(pub_key_path).map_err(|_| InvalidCode::MissingKey)?;
     let verifying_key = parse_public_key(&pub_key_bytes)?;
 
-    let report_bytes = std::fs::read(report_path).map_err(|_| InvalidCode::IoError)?;
+    // TOCTOU mitigation: read once into memory buffer
+    let mut file = std::fs::File::open(report_path).map_err(|_| InvalidCode::IoError)?;
+    let mut report_bytes = Vec::new();
+    use std::io::Read;
+    file.by_ref()
+        .take((crate::canonical_json::MAX_REPORT_BYTES + 1) as u64)
+        .read_to_end(&mut report_bytes)
+        .map_err(|_| InvalidCode::IoError)?;
 
-    verify_report_bytes(&report_bytes, &verifying_key, ledger_path)
+    if report_bytes.len() > crate::canonical_json::MAX_REPORT_BYTES {
+        return Err(InvalidCode::IoError);
+    }
+
+    verify_report_bytes_with_target(
+        &report_bytes,
+        &verifying_key,
+        ledger_path,
+        expected_store_id,
+    )
 }
 
 /// Parses an Ed25519 public key from 32 raw bytes or 64 hex characters.
@@ -119,6 +140,16 @@ pub fn verify_report_bytes(
     raw_bytes: &[u8],
     verifying_key: &VerifyingKey,
     ledger_path: Option<&Path>,
+) -> Result<(), InvalidCode> {
+    verify_report_bytes_with_target(raw_bytes, verifying_key, ledger_path, None)
+}
+
+/// Verifies canonical report bytes against verifying key with optional target store_id binding.
+pub fn verify_report_bytes_with_target(
+    raw_bytes: &[u8],
+    verifying_key: &VerifyingKey,
+    ledger_path: Option<&Path>,
+    expected_store_id: Option<&str>,
 ) -> Result<(), InvalidCode> {
     // 1. Canonical JSON format check
     verify_canonical_json(raw_bytes).map_err(|_| InvalidCode::NonCanonicalJson)?;
@@ -180,6 +211,13 @@ pub fn verify_report_bytes(
     // 4. Parse full report structure
     let report: ErasureReport =
         serde_json::from_value(val).map_err(|_| InvalidCode::NonCanonicalJson)?;
+
+    // Check store_id binding (replay protection across different stores/targets)
+    if let Some(target_id) = expected_store_id {
+        if report.store_id != target_id {
+            return Err(InvalidCode::TargetMismatch);
+        }
+    }
 
     // 5. Temporal order: requested_at <= gated_at <= key_destroyed_at <= completed_at
     if !(report.requested_at <= report.gated_at

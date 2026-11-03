@@ -1,8 +1,8 @@
 # Audit: `contextra-vector` – Schwachstellen, Lücken, Optimierungspotenzial
 
-**Datum:** 2026-11-02  
-**Prüfer:** ANN-Forscher/-Ingenieur (HNSW/DiskANN/ACORN), autonome Analyse  
-**Basis:** Quellcode-Stand `crates/contextra-vector/` (alle `src/`- und `tests/`-Dateien)  
+**Datum:** 2026-11-02
+**Prüfer:** ANN-Forscher/-Ingenieur (HNSW/DiskANN/ACORN), autonome Analyse
+**Basis:** Quellcode-Stand `crates/contextra-vector/` (alle `src/`- und `tests/`-Dateien)
 **Normativ:** `docs/SPEC.md` 4.3.0; bei Widerspruch gilt SPEC.
 
 ---
@@ -23,7 +23,7 @@ Die HNSW-Implementierung ist strukturell solide und erfüllt viele Kernanforderu
 
 **Aktueller Workaround:** `try_relink_pruned_neighbors` in [`core_search.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-vector/src/hnsw/core_search.rs#L124-L151) führt **lazy pruning** durch: Wenn ein traversierter Knoten tote Nachbarn hat, werden diese live aus der Kantenliste gelöscht. Dies ist **keine Reparatur** (kein Reconnect zu Überlebenden), sondern nur eine Schrumpfung des Kantengraphen.
 
-**Algorithmusvergleich (Malkov/Yashunin, FreshDiskANN §4):**  
+**Algorithmusvergleich (Malkov/Yashunin, FreshDiskANN §4):**
 Korrekte Nachbarschafts-Reparatur verbindet die Nachbarn des gelöschten Knotens miteinander (oder mit dem besten Überlebenden) via `SelectNeighborsHeuristic`. Nur so bleibt der Small-World-Charakter erhalten.
 
 **Fehlender Test:** Kein Test prüft, ob nach Löschung von 5/20 % der Knoten der Recall@10 über einer Gate-Schwelle bleibt. `partial_rebuild_recall.rs` prüft nur, dass `rebuild_region` den Recall nicht schlechter macht als reines Tombstoning – **kein absoluter Gate-Wert**.
@@ -229,7 +229,7 @@ Solche Gates sind Voraussetzung für jede Löschaussage nach SPEC 1.1.
 ```rust
 #[test]
 fn recall_gate_1_percent_deletion() { ... assert!(recall >= 0.90); }
-#[test]  
+#[test]
 fn recall_gate_5_percent_deletion() { ... assert!(recall >= 0.85); }
 #[test]
 fn recall_gate_20_percent_deletion() { ... assert!(recall >= 0.70); }

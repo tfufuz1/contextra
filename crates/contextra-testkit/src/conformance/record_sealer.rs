@@ -26,7 +26,9 @@ impl KeyBuf {
     pub fn from_prefix(prefix: &[u8]) -> Self {
         let mut buf = [0u8; 78];
         let copy_len = prefix.len().min(78);
-        buf[..copy_len].copy_from_slice(&prefix[..copy_len]);
+        if let (Some(dst), Some(src)) = (buf.get_mut(..copy_len), prefix.get(..copy_len)) {
+            dst.copy_from_slice(src);
+        }
         Self(buf)
     }
 }
@@ -41,7 +43,9 @@ impl KeyBound {
     pub fn from_prefix(prefix: &[u8]) -> Self {
         let mut buf = [0u8; 65];
         let copy_len = prefix.len().min(65);
-        buf[..copy_len].copy_from_slice(&prefix[..copy_len]);
+        if let (Some(dst), Some(src)) = (buf.get_mut(..copy_len), prefix.get(..copy_len)) {
+            dst.copy_from_slice(src);
+        }
         Self(buf)
     }
 }

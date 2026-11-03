@@ -387,3 +387,109 @@ fn po_12_vfs_conformance_mutant_red() {
         "Mutant Vfs with broken lock contract must fail conformance suite"
     );
 }
+
+/// SPEC: T-FSYNC-1 / DF-09
+/// Positivkontrolle (ALICE-Muster): Erkennung eines fehlenden Parent-Directory-fsyncs.
+/// In einem korrekten Persistenzprotokoll nach ALICE (Application-Level Intelligent Crash Explorer)
+/// muss nach dem Erstellen/Verschieben einer Datei das übergeordnete Verzeichnis synchronisiert werden.
+/// Unterbleibt der Verzeichnis-Sync (Mutant/fehlerhaftes Programm), muss dies bei der Crash-Recovery
+/// als Konsistenzverletzung auffallen (Datei ist nach dem Crash verloren oder ungültig).
+#[test]
+fn t_alice_missing_parent_dir_fsync_detected() {
+    let dir = Path::new("alice_scope");
+
+    // ALICE-Crash-Simulator:
+    // Ein Dateisystem, das trackt, ob ein Verzeichniseintrag vor einem Crash per sync_dir()
+    // dauerhaft persistiert wurde. Unterbleibt sync_dir(), geht der Eintrag beim Crash verloren!
+    struct AliceCrashSimVfs {
+        inner: FaultVfs,
+        uncommitted_files:
+            std::sync::Arc<parking_lot::RwLock<std::collections::HashSet<std::path::PathBuf>>>,
+    }
+
+    impl AliceCrashSimVfs {
+        fn new() -> Self {
+            Self {
+                inner: FaultVfs::new(),
+                uncommitted_files: std::sync::Arc::new(parking_lot::RwLock::new(
+                    std::collections::HashSet::new(),
+                )),
+            }
+        }
+
+        fn open_and_write(&self, path: &Path, data: &[u8]) -> contextra_types::Result<()> {
+            let file = self.inner.open(
+                path,
+                &VfsOpenOptions {
+                    read: true,
+                    write: true,
+                    create: true,
+                    ..Default::default()
+                },
+            )?;
+            file.write_at(data, 0)
+                .map_err(contextra_types::ContextraError::Io)?;
+            file.sync_data()
+                .map_err(contextra_types::ContextraError::Io)?;
+            self.uncommitted_files.write().insert(path.to_path_buf());
+            Ok(())
+        }
+
+        fn sync_dir(&self, path: &Path) -> contextra_types::Result<()> {
+            self.inner.sync_dir(path)?;
+            // Committet alle Dateien unter diesem Verzeichnis
+            self.uncommitted_files
+                .write()
+                .retain(|p| p.parent() != Some(path));
+            Ok(())
+        }
+
+        fn simulate_power_cut_crash(&self) {
+            // Alle ungesyncten Verzeichniseinträge gehen beim Crash verloren!
+            let uncommitted = self.uncommitted_files.read().clone();
+            for p in uncommitted {
+                let _ = self.inner.remove_file(&p);
+            }
+            self.inner.trigger_crash();
+            self.inner.reset_counters();
+        }
+
+        fn exists_after_recovery(&self, path: &Path) -> bool {
+            self.inner.exists(path).unwrap_or(false)
+        }
+    }
+
+    // 1. Ehrliches Programm: Schreibt Datei, ruft sync_data() und sync_dir() auf.
+    // Nach Crash & Recovery muss die Datei vorhanden sein.
+    let honest_sim = AliceCrashSimVfs::new();
+    honest_sim.inner.create_dir_all(dir).unwrap();
+    let honest_file = dir.join("honest.dat");
+    honest_sim
+        .open_and_write(&honest_file, b"HONEST_DATA")
+        .unwrap();
+    honest_sim
+        .sync_dir(dir)
+        .expect("Honest program syncs parent directory");
+    honest_sim.simulate_power_cut_crash();
+    assert!(
+        honest_sim.exists_after_recovery(&honest_file),
+        "Honest program must survive power-cut crash because parent dir was synced"
+    );
+
+    // 2. Fehlerhaftes Programm (ALICE-Bug): Schreibt Datei, ruft sync_data() auf, vergisst aber sync_dir().
+    // Nach Crash & Recovery MUSS der Datenverlust auffallen (Datei ist weg!).
+    let buggy_sim = AliceCrashSimVfs::new();
+    buggy_sim.inner.create_dir_all(dir).unwrap();
+    let buggy_file = dir.join("buggy.dat");
+    buggy_sim
+        .open_and_write(&buggy_file, b"BUGGY_DATA")
+        .unwrap();
+    // ALICE-Bug: buggy_sim.sync_dir(dir) wird unterlassen!
+    buggy_sim.simulate_power_cut_crash();
+
+    let recovered = buggy_sim.exists_after_recovery(&buggy_file);
+    assert!(
+        !recovered,
+        "ALICE positive control: Missing parent directory sync MUST cause file loss across power-cut crash"
+    );
+}

@@ -41,6 +41,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                 if let Err(rollback_err) = db_tx.rollback().await {
                     tracing::error!("[INV-DB-3] Failed to rollback update: {}", rollback_err);
                 }
+                drop(_guard);
                 Err(e)
             }
         };

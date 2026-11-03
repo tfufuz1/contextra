@@ -66,11 +66,11 @@ pub mod mocks;
 /// Formales Referenzmodell zur Prüfung von MVCC- und Transaktionsisolationsgarantien.
 pub mod reference_model;
 
-/// Benchmark-Hilfen (Dateien aus K-C).
-pub mod bench {}
+/// Benchmark-Hilfen und Regressionsprüfung (SPEC 14.8, 15.2, WP-6.1).
+pub mod bench;
 
 /// Report-Modul für Testergebnisse und Konformitätsberichte.
-pub mod report {}
+pub mod report;
 
 // Re-Exports der zentralen Typen für bequemen Zugriff in Testsuiten
 pub use fault_vfs::{FaultConfig, FaultVfs};

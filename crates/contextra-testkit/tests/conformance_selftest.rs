@@ -461,3 +461,45 @@ fn test_metrics_sink_conformance_mutant_red() {
         Ok(_) => panic!("PanickingMetricsSink must fail metrics conformance"),
     }
 }
+
+// ============================================================================
+// SELF-TESTS: FILE_KEYRING, RECORD_SEALER, READ_GATE, LEDGER_SINK
+// ============================================================================
+
+#[tokio::test]
+async fn test_file_keyring_conformance_suite() {
+    let res = contextra_testkit::conformance::file_keyring::run_reference_test().await;
+    assert!(res.is_ok(), "FileKeyring reference must pass: {res:?}");
+    let mut_res = contextra_testkit::conformance::file_keyring::run_mutant_tests().await;
+    assert!(
+        mut_res.is_ok(),
+        "FileKeyring mutants must fail: {mut_res:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_record_sealer_conformance_suite() {
+    let res = contextra_testkit::conformance::record_sealer::run_reference_test().await;
+    assert!(res.is_ok(), "RecordSealer reference must pass: {res:?}");
+    let mut_res = contextra_testkit::conformance::record_sealer::run_mutant_tests().await;
+    assert!(
+        mut_res.is_ok(),
+        "RecordSealer mutants must fail: {mut_res:?}"
+    );
+}
+
+#[test]
+fn test_read_gate_conformance_suite() {
+    let res = contextra_testkit::conformance::read_gate::run_reference_test();
+    assert!(res.is_ok(), "ReadGate reference must pass: {res:?}");
+    let mut_res = contextra_testkit::conformance::read_gate::run_mutant_tests();
+    assert!(mut_res.is_ok(), "ReadGate mutants must fail: {mut_res:?}");
+}
+
+#[tokio::test]
+async fn test_ledger_sink_conformance_suite() {
+    let res = contextra_testkit::conformance::ledger_sink::run_reference_test().await;
+    assert!(res.is_ok(), "LedgerSink reference must pass: {res:?}");
+    let mut_res = contextra_testkit::conformance::ledger_sink::run_mutant_tests().await;
+    assert!(mut_res.is_ok(), "LedgerSink mutants must fail: {mut_res:?}");
+}

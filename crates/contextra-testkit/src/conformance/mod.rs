@@ -73,7 +73,11 @@ pub mod vector_index;
 // Re-Exports für bequemen Zugriff
 pub use clock::run_clock_suite;
 pub use failure::{ConformanceFailure, ConformanceResult};
+pub use file_keyring::run as run_file_keyring_suite;
+pub use ledger_sink::run as run_ledger_sink_suite;
 pub use metrics::run_metrics_sink_suite;
+pub use read_gate::run as run_read_gate_suite;
+pub use record_sealer::run as run_record_sealer_suite;
 pub use rng::run_rng_suite;
 pub use storage::run_storage_engine_suite;
 pub use text::run_text_index_suite;

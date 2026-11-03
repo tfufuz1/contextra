@@ -1,0 +1,42 @@
+id          = "WP-0.1"
+title       = "Governance: Ratchet, Ausnahmeliste, PR-Vorlage, tests/arch-Grundgerüst, Wortlaut-Lint, Testmakro ctx_test (T-TRACE-1)"
+wp          = "WP-0.1"
+gate        = "A"
+crate       = "contextra-testmacros"
+goal        = "Bereitstellung des Proc-Macro-Crates `contextra-testmacros` mit Attributen `#[ctx_test(id = \"T-...\")]` und `#[ctx_bench(id = \"BM-...\")]` zur statischen Verifikation von SPEC-IDs (T-TRACE-1), Ablösung der Übergangsregel PREAMBLE D."
+non_goals   = ["Keine Änderung an Produktionscode-Logik außerhalb von Testinfrastruktur"]
+
+scope       = [
+  "crates/contextra-testmacros/**",
+  "crates/contextra-testkit/**",
+  ".agents/jules/tasks/WP-0.1.toml",
+]
+
+forbidden   = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
+]
+
+spec_ids    = ["15.1", "T-TRACE-1", "L-6", "P10", "D-44"]
+
+acceptance  = [
+  "cargo fmt --all -- --check",
+  "cargo test -p contextra-testmacros --locked",
+  "cargo test -p contextra-testkit --locked",
+]
+
+evidence_required = ["Trybuild Tests für fehlende/ungültige IDs und gültige T-/BM-IDs"]
+
+[budget]
+files      = 8
+lines      = 400
+iterations = 6

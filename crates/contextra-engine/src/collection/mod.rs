@@ -96,7 +96,7 @@ impl From<&StoredDocument> for StoredDocumentMeta {
 }
 
 /// Parses an LLM response string into an f32 importance score in `[0.0, 1.0]`.
-#[deprecated(note = "Parsing LLM responses should happen outside contextra-db")]
+#[deprecated(note = "Parsing LLM responses should happen in the calling layer (SPEC D-45)")]
 pub fn parse_importance_score(response: &str) -> f32 {
     for token in response.split_whitespace() {
         if let Ok(val) = token.parse::<f32>() {
