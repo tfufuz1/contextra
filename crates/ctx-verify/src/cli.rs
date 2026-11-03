@@ -2,7 +2,6 @@
 
 use crate::codes::{VerifyOutcome, EXIT_INVALID, EXIT_SUCCESS};
 use crate::report::verify_report_file;
-use crate::scan::execute_field_scan;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -28,6 +27,10 @@ pub enum Commands {
         /// Optional path to ledger file for reference verification
         #[arg(long = "ledger")]
         ledger: Option<PathBuf>,
+
+        /// Optional expected store identifier for replay protection
+        #[arg(long = "store-id")]
+        store_id: Option<String>,
     },
 
     /// Performs independent field verification (MK1, MK2, MK3) on a data directory.
@@ -42,6 +45,10 @@ pub enum Commands {
         /// Target identifier (hex tag) to verify absence of
         #[arg(long = "target")]
         target: String,
+
+        /// Optional positive control pattern (hex needle) to verify scanner functioning
+        #[arg(long = "control-needle")]
+        control_needle: Option<String>,
     },
 }
 
@@ -52,7 +59,8 @@ pub fn run_cli(cli: Cli) -> (VerifyOutcome, i32) {
             report,
             pub_key,
             ledger,
-        } => match verify_report_file(&report, &pub_key, ledger.as_deref()) {
+            store_id,
+        } => match verify_report_file(&report, &pub_key, ledger.as_deref(), store_id.as_deref()) {
             Ok(()) => (VerifyOutcome::Valid, EXIT_SUCCESS),
             Err(code) => (VerifyOutcome::Invalid(code), EXIT_INVALID),
         },
@@ -60,9 +68,18 @@ pub fn run_cli(cli: Cli) -> (VerifyOutcome, i32) {
             datadir,
             passphrase_fd,
             target,
-        } => match execute_field_scan(&datadir, &target, passphrase_fd) {
-            Ok(()) => (VerifyOutcome::Valid, EXIT_SUCCESS),
-            Err(code) => (VerifyOutcome::Invalid(code), EXIT_INVALID),
-        },
+            control_needle,
+        } => {
+            let control_bytes = control_needle.as_deref().and_then(|h| hex::decode(h).ok());
+            match crate::scan::execute_field_scan_with_control(
+                &datadir,
+                &target,
+                passphrase_fd,
+                control_bytes.as_deref(),
+            ) {
+                Ok(()) => (VerifyOutcome::Valid, EXIT_SUCCESS),
+                Err(code) => (VerifyOutcome::Invalid(code), EXIT_INVALID),
+            }
+        }
     }
 }

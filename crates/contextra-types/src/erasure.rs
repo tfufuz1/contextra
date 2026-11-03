@@ -198,7 +198,7 @@ pub enum KeyCoverage {
 /// Gate-Zustandsvariante (SPEC 11.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum GateVariant {
-    /// Vollständig gelöscht und gesperrt.
+    /// Klasse P: Physisch gelöscht und gesperrt.
     Erased,
     /// Einschränkung der Verarbeitung aktiv.
     Restricted,

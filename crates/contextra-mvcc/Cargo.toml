@@ -41,6 +41,10 @@ harness = false
 name = "bm_mvcc_ssi"
 harness = false
 
+[[bench]]
+name = "bm_mvcc_seq"
+harness = false
+
 [[test]]
 name = "mv_ssi_validation_test"
 path = "tests/mv_ssi_validation_test.rs"
@@ -76,3 +80,7 @@ path = "tests/campaign_cov_tx_buffer_reap.rs"
 [[test]]
 name = "isolation_tests"
 path = "tests/isolation_tests.rs"
+
+[[test]]
+name = "history_anomaly_checker"
+path = "tests/history_anomaly_checker.rs"

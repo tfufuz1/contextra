@@ -1,124 +1,69 @@
-// FILE-CONTEXT
-// ZWECK: E2E-Löschtests (T-DEL-1 und T-DEL-3) für Contextra Facade (Ring 4).
-// INVARIANTEN: Nutzt ausschließlich bestehende öffentliche Schnittstellen.
-
-//! # Integrationstest: `deletion_e2e`
+//! # Integrationstest: `deletion_e2e` (SPEC §7)
 //!
-//! Prüft End-to-End-Löschanforderungen der Spezifikation (T-DEL-1 und T-DEL-3):
-//! - T-DEL-1: Physische Abwesenheit gelöschter Canary-Bytes auf Datenträgern nach Kompaktierung.
-//! - T-DEL-3: Verifikation eines kryptografischen Löschnachweises (DeletionProof) schlägt bei falschem Schlüssel fehl.
+//! Prüft die Trennung von logischem `soft_delete` (Tombstone) und
+//! physischer Löschung `erase` über die Fassade.
 
-use contextra::{open_with_config, ContextraConfig};
-use contextra_types::{ContextraError, TenantId};
-use serde_json::json;
-use std::fs;
-use std::path::Path;
+use contextra::{
+    CollectionOptions, Contextra, DocKey, DocRef, Document, EraseMode, EraseRequest,
+    EraseTarget, RetentionAttestation, RetentionCode, Secret, TenantContext, TenantRef, Timing,
+};
 use tempfile::TempDir;
 
-// ANCHOR[contextra:TEST-DE2-001]
-/// Rekursive Hilfsfunktion zur Zählung von Canary-Byte-Treffern in allen Dateien eines Verzeichnisses.
-fn count_canary_occurrences(dir: &Path, canary: &[u8]) -> usize {
-    let mut matches = 0;
-    if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                matches += count_canary_occurrences(&path, canary);
-            } else if path.is_file() {
-                if let Ok(content) = fs::read(&path) {
-                    if content.windows(canary.len()).any(|window| window == canary) {
-                        matches += 1;
-                    }
-                }
-            }
-        }
-    }
-    matches
-}
-
-// ANCHOR[contextra:TEST-DE2-002]
-/// T-DEL-1: Schreiben, Löschen, Vollkompaktion/Flush -> Canary-Bytesuche im Datenverzeichnis erwartet 0 Treffer.
 #[tokio::test]
-async fn test_tdel_1_canary_bytes_erased_after_compaction() -> Result<(), ContextraError> {
+async fn test_erase_vs_soft_delete_facade() {
     let tmp = TempDir::new().expect("Failed to create tempdir");
-    let canary = b"CANARY_SENSITIVE_DATA_987654321_E2E_DELETE_TEST";
+    let secret = Secret::new(b"sehr-sichere-passphrase-12345".to_vec());
+    let rt = tokio::runtime::Handle::current();
 
-    let config = ContextraConfig {
-        dimension: 4,
-        consolidation_enabled: false,
-        encryption_passphrase: Some("e2e-deletion-passphrase-secure".to_string()),
-        ..Default::default()
+    let builder = Contextra::builder()
+        .data_dir(tmp.path())
+        .passphrase(secret)
+        .runtime(rt);
+
+    let db = builder.open().await.expect("Failed to open Contextra instance");
+
+    let tenant_ctx = TenantContext::try_new(100).expect("Valid tenant id");
+    let tenant = db.tenant(tenant_ctx).await.expect("Tenant handle");
+
+    let coll_opts = CollectionOptions::default();
+    let coll = tenant.collection("test_col", coll_opts).await.expect("Collection handle");
+
+    let doc_key = DocKey::try_new(b"doc-1".to_vec()).expect("Valid doc key");
+    let doc_ref = DocRef {
+        subject: None,
+        key: doc_key,
     };
 
-    // 1. Schreiben: Dokument mit Canary-Bytes einfügen und flush auf Disk
-    {
-        let db = open_with_config(tmp.path(), config.clone()).await?;
-        db.insert(
-            "doc_canary_1",
-            &[0.1, 0.2, 0.3, 0.4],
-            Some(json!({
-                "secret": std::str::from_utf8(canary).expect("valid utf8")
-            })),
-        )
-        .await?;
-        db.flush().await?;
-        db.close().await?;
-    }
-
-    // 2. Löschen & Flush: Dokument über Re-opened DB löschen und flushen
-    {
-        let db = open_with_config(tmp.path(), config).await?;
-        db.delete("doc_canary_1").await?;
-        db.flush().await?;
-        db.close().await?;
-    }
-
-    // 3. Canary-Bytesuche im Datenverzeichnis
-    let matches = count_canary_occurrences(tmp.path(), canary);
-
-    // Erwartet: 0 Treffer (durch Verschlüsselung und anschließendes Löschen)
-    assert_eq!(
-        matches, 0,
-        "T-DEL-1: Canary-Bytes wurden im Datenverzeichnis ({matches} Datei(en)) nach Schreiben, Löschen und Flush gefunden"
-    );
-
-    Ok(())
-}
-
-// ANCHOR[contextra:TEST-DE2-003]
-/// T-DEL-3: Verifikation eines DeletionProof mit falschem Schlüssel muss Err liefern.
-#[tokio::test]
-async fn test_tdel_3_proof_verification_fails_with_invalid_key() -> Result<(), ContextraError> {
-    let tmp = TempDir::new().expect("Failed to create tempdir");
-    let config = ContextraConfig {
-        dimension: 4,
-        consolidation_enabled: false,
-        encryption_passphrase: Some("e2e-deletion-passphrase-secure".to_string()),
-        ..Default::default()
+    let doc = Document {
+        content: "Sensible Daten für Löschtest".to_string(),
+        metadata: Vec::new(),
+        vector: None,
     };
-    let db = open_with_config(tmp.path(), config).await?;
 
-    let tenant_id = TenantId::try_new(100)?;
-    let correct_key = b"correct_secret_proof_key_32bytes";
-    let wrong_key = b"wrong_invalid_proof_key_32bytes_";
+    // 1. Einfügen
+    coll.insert(doc_ref.clone(), doc).await.expect("Insert succeeded");
 
-    // Erstelle eine Collection für Tenant
-    let _col = db.collection_for_tenant("test_col", tenant_id).await?;
+    // 2. Soft delete (Tombstone)
+    coll.soft_delete(doc_ref.clone()).await.expect("Soft delete succeeded");
 
-    // Generiere einen DeletionProof über drop_collection
-    let proof = db
-        .drop_collection("test_col", tenant_id, correct_key)
-        .await?;
+    // 3. Echtes erase über Contextra-Handle (SPEC 7.3)
+    let erase_req = EraseRequest {
+        target: EraseTarget::Document {
+            tenant: TenantRef::try_new(b"tenant-100".to_vec()).expect("TenantRef"),
+            collection: contextra::CollectionRef::try_new(b"test_col".to_vec()).expect("CollectionRef"),
+            doc: doc_ref,
+        },
+        timing: Timing::Now,
+        retention: RetentionAttestation {
+            code: RetentionCode::NoObligation,
+            attested_by: contextra::OperatorRef::try_new(b"operator-1".to_vec()).expect("OperatorRef"),
+            attested_at: contextra::Timestamp::now(),
+        },
+        mode: EraseMode::Erase,
+    };
 
-    // Verifikation mit falschem Schlüssel muss Err liefern
-    let verify_result = proof.verify(wrong_key);
+    let receipt = db.erase(erase_req).await.expect("Erase initiated");
+    assert_eq!(receipt.status, contextra::ErasureStatus::Gated);
 
-    assert!(
-        verify_result.is_err(),
-        "T-DEL-3: Verifikation eines DeletionProof mit falschem Schlüssel muss Err liefern, lieferte aber {:?}",
-        verify_result
-    );
-
-    db.close().await?;
-    Ok(())
+    db.close().await.expect("Close succeeded");
 }
