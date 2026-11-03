@@ -288,6 +288,7 @@ pub struct Collection<S: StorageEngine = LsmStorage, V: VectorIndex = HnswIndex>
     pub(super) clock: parking_lot::RwLock<Arc<dyn Clock>>,
     /// Injected metrics sink port for operational observability.
     pub(super) metrics: parking_lot::RwLock<Arc<dyn MetricsSink>>,
+    pub(super) tenant_id: parking_lot::RwLock<Option<contextra_types::TenantId>>,
 }
 
 #[cfg(not(loom))]
@@ -309,6 +310,7 @@ impl<S: StorageEngine, V: VectorIndex> Clone for Collection<S, V> {
             pressure_rx: parking_lot::RwLock::new(self.pressure_rx.read().clone()),
             clock: parking_lot::RwLock::new(self.clock.read().clone()),
             metrics: parking_lot::RwLock::new(self.metrics.read().clone()),
+            tenant_id: parking_lot::RwLock::new(*self.tenant_id.read()),
         }
     }
 }
@@ -374,7 +376,20 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             pressure_rx: parking_lot::RwLock::new(pressure_rx),
             clock: parking_lot::RwLock::new(Arc::new(SystemClock::new())),
             metrics: parking_lot::RwLock::new(Arc::new(NoopMetricsSink)),
+            tenant_id: parking_lot::RwLock::new(None),
         }
+    }
+
+    /// Gibt die Mandanten-ID dieser Collection zurück (Standard: Default/1 falls unkonfiguriert).
+    pub fn tenant_id(&self) -> contextra_types::TenantId {
+        self.tenant_id
+            .read()
+            .unwrap_or_else(|| contextra_types::TenantId::try_new(1).unwrap_or_default())
+    }
+
+    /// Setzt die Mandanten-ID für diese Collection.
+    pub fn set_tenant_id(&self, tenant_id: contextra_types::TenantId) {
+        *self.tenant_id.write() = Some(tenant_id);
     }
 
     /// Sets or overrides the metrics sink implementation (builder version).
@@ -632,6 +647,4 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     pub fn mutations_since_community_detection(&self) -> u64 {
         0
     }
-
-    pub(super) fn check_and_trigger_community_detection(&self, _count: usize) {}
 }

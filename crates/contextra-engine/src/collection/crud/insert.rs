@@ -382,11 +382,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             db_tx.stage_text_insert(doc_id, text);
         }
 
-        if let Ok(eid) = EntityId::from_key(id) {
-            let entity = contextra_types::Entity::new(eid, id, "Document");
-            db_tx.stage_graph_entity(entity);
-        }
-
         Ok(())
     }
 
@@ -462,7 +457,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
         db_tx.commit().await?;
-        self.check_and_trigger_community_detection(docs.len());
         Ok(())
     }
 
@@ -500,7 +494,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         match result {
             Ok(_) => {
                 db_tx.commit().await?;
-                self.check_and_trigger_community_detection(1);
                 Ok(())
             }
             Err(e) => {
@@ -582,7 +575,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
             }
         }
         db_tx.commit().await?;
-        self.check_and_trigger_community_detection(docs.len());
         Ok(())
     }
 }
