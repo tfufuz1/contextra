@@ -1,6 +1,6 @@
 # Contextra – Hinweise für Agenten
 
-Diese Datei ist die Einstiegsdatei für Agenten. Sie ist **nicht normativ**. Normativ ist ausschließlich [`docs/SPEC.md`](docs/SPEC.md) (Version 4.3.0). Bei jedem Widerspruch gilt die SPEC; jede Abweichung ist ein Defekt des abgeleiteten Dokuments (D-98). Diese Datei enthält keine eigenen Anforderungen, sondern gibt Fakten der SPEC wieder und nennt den Abschnitt.
+Diese Datei ist die Einstiegsdatei für Agenten. Sie ist **nicht normativ**. Normativ ist ausschließlich [`docs/SPEC.md`](docs/SPEC.md) (Version 5.1.0). Bei jedem Widerspruch gilt die SPEC; jede Abweichung ist ein Defekt des abgeleiteten Dokuments (D-98). Diese Datei enthält keine eigenen Anforderungen, sondern gibt Fakten der SPEC wieder und nennt den Abschnitt.
 
 ## 1. Was Contextra ist
 
@@ -15,7 +15,7 @@ Jede Schutzmaßnahme weist je Schicht aus, was sie abdeckt (P17). Eine Aussage �
 
 ## 2. Rangfolge und Pflege der Dokumente
 
-`docs/SPEC.md` > `docs/VETOES.md` > `docs/CONSTITUTION.md` > diese Datei > `crates/*/AGENTS.md` > `.agents/` (`docs/SOURCE_OF_TRUTH.md`). Abgeleitete Dokumente nennen den SPEC-Abschnitt, auf den sie sich stützen. Ändert sich ein Fakt, wird zuerst die SPEC geändert (Anhang H), im selben Änderungspaket danach alle abgeleiteten Dokumente (D-98 (4)). Die Konsistenz prüft T-DOC-1.
+`docs/SPEC.md` > `docs/PLAN.md` > `docs/VETOES.md` > `docs/CONSTITUTION.md` > diese Datei > `crates/*/AGENTS.md` > `.agents/` (`docs/SOURCE_OF_TRUTH.md`). Abgeleitete Dokumente nennen den SPEC-Abschnitt, auf den sie sich stützen. Ändert sich ein Fakt, wird zuerst die SPEC geändert (Anhang H), im selben Änderungspaket danach alle abgeleiteten Dokumente (D-98 (4)). Die Konsistenz prüft T-DOC-1.
 
 ## 3. Status ermitteln, nicht abschreiben
 

@@ -364,3 +364,80 @@ fn t_diff_1_ed25519_strict_edge_cases_rejected() {
     );
     assert_eq!(res_r, Err(InvalidCode::BadSignature));
 }
+
+/// SPEC: T-REPORT-1, Golden Report full verification according to SPEC §11.7, Anhang D, and F.10.
+#[test]
+fn t_report_1_golden_report() {
+    let (signing_key, val) = create_valid_test_report();
+    let canonical = to_canonical_json_string(&val).unwrap();
+
+    // Verify canonical formatting rules
+    assert!(
+        ctx_verify::canonical_json::verify_canonical_json(canonical.as_bytes()).is_ok(),
+        "Golden report must be strictly canonical JSON"
+    );
+
+    // Verify Ed25519 signature and report semantics
+    let res = verify_report_bytes(canonical.as_bytes(), &signing_key.verifying_key(), None);
+    assert_eq!(res, Ok(()), "Golden report must pass all checks");
+}
+
+/// SPEC: T-REPORT-1, Exit Code Table Verification (Exit 0 for VALID, Exit 2 for INVALID(code))
+#[test]
+fn t_report_1_exit_code_table() {
+    use ctx_verify::cli::{run_cli, Cli, Commands};
+    use ctx_verify::codes::{VerifyOutcome, EXIT_INVALID, EXIT_SUCCESS};
+
+    let dir = tempfile::tempdir().unwrap();
+
+    // 1. Success case -> Exit code 0, Outcome Valid
+    {
+        let (signing_key, val) = create_valid_test_report();
+        let canonical = to_canonical_json_string(&val).unwrap();
+
+        let report_path = dir.path().join("golden_report.json");
+        std::fs::write(&report_path, canonical).unwrap();
+
+        let pub_path = dir.path().join("report.pub");
+        std::fs::write(&pub_path, signing_key.verifying_key().to_bytes()).unwrap();
+
+        let cli = Cli {
+            command: Commands::Report {
+                report: report_path,
+                pub_key: pub_path,
+                ledger: None,
+                store_id: None,
+            },
+        };
+
+        let (outcome, exit_code) = run_cli(cli);
+        assert_eq!(exit_code, EXIT_SUCCESS);
+        assert_eq!(outcome, VerifyOutcome::Valid);
+        assert_eq!(outcome.to_string(), "VALID");
+    }
+
+    // 2. Failure cases -> Exit code 2, Outcome INVALID(code)
+    {
+        let dummy_report = dir.path().join("non_existent_report.json");
+        let dummy_pub = dir.path().join("report.pub");
+
+        let cli = Cli {
+            command: Commands::Report {
+                report: dummy_report,
+                pub_key: dummy_pub,
+                ledger: None,
+                store_id: None,
+            },
+        };
+
+        let (outcome, exit_code) = run_cli(cli);
+        assert_eq!(exit_code, EXIT_INVALID);
+        match outcome {
+            VerifyOutcome::Invalid(code) => {
+                assert_eq!(code, InvalidCode::IoError);
+                assert_eq!(outcome.to_string(), "INVALID(io_error)");
+            }
+            VerifyOutcome::Valid => panic!("non-existent file must not be valid"),
+        }
+    }
+}

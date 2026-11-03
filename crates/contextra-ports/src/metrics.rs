@@ -118,12 +118,30 @@ impl fmt::Display for MetricName {
 /// Follows PO-09: Accepts exclusively static [`MetricName`] variants and forbids dynamic ID labels.
 pub trait Metrics: Send + Sync + 'static {
     /// Records a counter metric increment.
+    ///
+    /// # Fehler
+    /// Keine; unfehlbare Zähleraktualisierung im RAM.
+    ///
+    /// # Crash
+    /// Reiner In-Memory-Metrikzustand; keine I/O- oder Festplattenmutation.
     fn record_counter(&self, metric: MetricName, value: u64);
 
     /// Records a gauge metric absolute value.
+    ///
+    /// # Fehler
+    /// Keine; unfehlbare Pegelstandsmessung im RAM.
+    ///
+    /// # Crash
+    /// Reiner In-Memory-Metrikzustand; keine I/O- oder Festplattenmutation.
     fn record_gauge(&self, metric: MetricName, value: f64);
 
     /// Records a histogram observation value in seconds or units.
+    ///
+    /// # Fehler
+    /// Keine; unfehlbare Beobachtungsregistrierung im RAM.
+    ///
+    /// # Crash
+    /// Reiner In-Memory-Metrikzustand; keine I/O- oder Festplattenmutation.
     fn record_histogram(&self, metric: MetricName, value: f64);
 }
 
