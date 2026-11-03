@@ -87,6 +87,76 @@ proptest! {
         }
     }
 
+    /// SPEC: T-RANK-1 (Asymmetrische / einseitige Kandidatenlisten)
+    /// Eine Liste enthält Kandidaten, andere Teillisten sind leer oder disjunkt;
+    /// keine Panics, deterministische Ausgabegröße und korrekte Trefferanzahl.
+    #[test]
+    fn prop_rrf_asymmetric_and_empty_lists(
+        full_list in arb_candidate_list(40),
+        disjoint_handles in prop::collection::vec(arb_doc_handle(), 1..=20),
+        top in 1usize..100
+    ) {
+        let empty_list: [Candidate; 0] = [];
+        // Erzeuge disjunkte zweite Liste
+        let full_set: BTreeSet<DocHandle> = full_list.iter().map(|c| c.handle).collect();
+        let disjoint_list: Vec<Candidate> = disjoint_handles
+            .into_iter()
+            .filter(|h| !full_set.contains(h))
+            .map(|h| Candidate { handle: h })
+            .collect();
+
+        // Fall 1: Eine volle Liste, eine leere Liste
+        let res_single = rrf_fuse(&[&full_list, &empty_list], top).unwrap();
+        prop_assert!(res_single.len() <= full_list.len().min(top));
+
+        // Fall 2: Disjunkte Mengen über mehrere Teillisten
+        let res_disjoint = rrf_fuse(&[&full_list, &disjoint_list, &empty_list], top).unwrap();
+        let total_unique = full_set.len() + disjoint_list.len();
+        prop_assert_eq!(res_disjoint.len(), total_unique.min(top));
+    }
+
+    /// SPEC: T-RANK-1 (Cross-List Duplikate / Schnittmengen)
+    /// Ein Dokument, das in mehreren Teillisten vorkommt, erhält die Summe der
+    /// Einzel-RRF-Beiträge und erscheint genau einmal im fusionierten Ranking.
+    #[test]
+    fn prop_rrf_cross_list_intersection_score_sum(
+        shared_handle in arb_doc_handle(),
+        l1_extra in arb_candidate_list(15),
+        l2_extra in arb_candidate_list(15),
+    ) {
+        // Baue Liste 1 mit shared_handle an Kopf
+        let mut l1 = vec![Candidate { handle: shared_handle }];
+        for c in l1_extra {
+            if c.handle != shared_handle {
+                l1.push(c);
+            }
+        }
+
+        // Baue Liste 2 mit shared_handle an Position 2 (nach einem anderen Kandidaten, falls vorhanden)
+        let mut l2 = Vec::new();
+        let other_cand = l2_extra.iter().find(|c| c.handle != shared_handle).copied();
+        if let Some(other) = other_cand {
+            l2.push(other);
+        }
+        l2.push(Candidate { handle: shared_handle });
+        for c in l2_extra {
+            if c.handle != shared_handle && Some(c) != other_cand {
+                l2.push(c);
+            }
+        }
+
+        let res = rrf_fuse(&[&l1, &l2], 50).unwrap();
+        let matches: Vec<_> = res.iter().filter(|f| f.handle == shared_handle).collect();
+        prop_assert_eq!(matches.len(), 1, "Shared document must appear exactly once");
+
+        // Berechne erwarteten kumulierten Score
+        let rank_in_l1 = 1u64;
+        let rank_in_l2 = if other_cand.is_some() { 2u64 } else { 1u64 };
+        let contrib1 = (1u64 << 40) / (60 + rank_in_l1);
+        let contrib2 = (1u64 << 40) / (60 + rank_in_l2);
+        prop_assert_eq!(matches.first().map(|f| f.score.0), Some(contrib1 + contrib2));
+    }
+
     /// SPEC: T-HYB-1 (unseen_bound Property)
     /// Für jedes Dokument, das in allen Listen erst nach depths[i] auftritt,
     /// darf der tatsächliche Score die unseen_bound nicht überschreiten.

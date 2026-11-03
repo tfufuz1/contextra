@@ -461,6 +461,7 @@ dependencies = [
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",
+ "ed25519-dalek",
  "futures-util",
  "hmac",
  "loom",
@@ -590,6 +591,7 @@ dependencies = [
  "tracing",
  "uuid",
  "windows-sys",
+ "zeroize",
 ]
 
 [[package]]
