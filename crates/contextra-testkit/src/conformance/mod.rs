@@ -52,15 +52,23 @@ pub mod vector;
 /// Konformitätssuite für den `Vfs`-Port.
 pub mod vfs;
 
-// Deklarationen für K-B (werden in K-B implementiert):
-// read_gate, record_sealer, file_keyring, ledger_sink
-pub mod read_gate {}
+/// Konformitätssuite für den `ReadGate`-Port.
+pub mod read_gate;
 
-pub mod record_sealer {}
+/// Konformitätssuite für den `RecordSealer`-Port.
+pub mod record_sealer;
 
-pub mod file_keyring {}
+/// Konformitätssuite für den `FileKeyring`-Port.
+pub mod file_keyring;
 
-pub mod ledger_sink {}
+/// Konformitätssuite für den `LedgerSink`-Port.
+pub mod ledger_sink;
+
+/// Konformitätssuite für den `TextIndex`-Port (erweitert).
+pub mod text_index;
+
+/// Konformitätssuite für den `VectorIndex`-Port (erweitert).
+pub mod vector_index;
 
 // Re-Exports für bequemen Zugriff
 pub use clock::run_clock_suite;

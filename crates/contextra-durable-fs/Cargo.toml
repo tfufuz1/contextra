@@ -40,3 +40,7 @@ path = "tests/df_arch_tests.rs"
 name = "bm_dfs_probe"
 harness = false
 path = "benches/bm_dfs_probe.rs"
+
+[[test]]
+name = "recovery_aries_matrix"
+path = "tests/recovery_aries_matrix.rs"
