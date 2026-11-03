@@ -65,46 +65,67 @@ impl VfsOpenOptions {
 pub trait VfsFile: Send + Sync {
     /// Reads data from byte offset `offset` into `buf` without moving the file pointer.
     ///
-    /// # Errors
-    /// Returns `std::io::Error` on read failure.
+    /// # Fehler
+    /// Liefert `std::io::Error` bei Lesefehlern oder ungültigem Offset.
+    ///
+    /// # Crash
+    /// Reiner positioneller Lesezugriff; verändert keine Dateimetadaten oder persistente Zustände.
     fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize>;
 
     /// Writes data from `buf` to byte offset `offset` without moving the file pointer.
     ///
-    /// # Errors
-    /// Returns `std::io::Error` on write failure.
+    /// # Fehler
+    /// Liefert `std::io::Error` bei Schreibfehlern oder Speicherplatzmangel.
+    ///
+    /// # Crash
+    /// Schreibt Datenblöcke; Persistenz wird erst durch nachfolgendes `sync_data` oder `sync_all` garantiert.
     fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize>;
 
     /// Truncates or extends the underlying file length to `len` bytes.
     ///
-    /// # Errors
-    /// Returns `std::io::Error` on truncate or extension failure.
+    /// # Fehler
+    /// Liefert `std::io::Error` bei Kürzungs- oder Allokationsfehlern.
+    ///
+    /// # Crash
+    /// Modifiziert die Dateigröße; wird erst durch `sync_all` crash-resistent festgeschrieben.
     fn set_len(&self, len: u64) -> std::io::Result<()>;
 
     /// Queries the current physical file length in bytes.
     ///
-    /// # Errors
-    /// Returns `std::io::Error` if file metadata cannot be queried.
+    /// # Fehler
+    /// Liefert `std::io::Error` falls Dateimetadaten nicht abgefragt werden können.
+    ///
+    /// # Crash
+    /// Reines Abfragen von Dateimetadaten ohne Seiteneffekte.
     fn len(&self) -> std::io::Result<u64>;
 
     /// Returns `true` if the file length is zero.
     ///
-    /// # Errors
-    /// Returns `std::io::Error` if querying file length fails.
+    /// # Fehler
+    /// Liefert `std::io::Error` falls die Längenabfrage fehlschlägt.
+    ///
+    /// # Crash
+    /// Reine Längenprüfung ohne Seiteneffekte.
     fn is_empty(&self) -> std::io::Result<bool> {
         Ok(self.len()? == 0)
     }
 
     /// Flushes data blocks to disk (`fdatasync`).
     ///
-    /// # Errors
-    /// Returns `std::io::Error` if data synchronization fails.
+    /// # Fehler
+    /// Liefert `std::io::Error` bei fehlschlagendem Flush. Bei Sync-Fehlern muss der Aufrufer das Handle vergiften (P14, D-55).
+    ///
+    /// # Crash
+    /// Garantiert die Haltbarkeit (Durability) der geschriebenen Datenblöcke bis zum Aufrufzeitpunkt.
     fn sync_data(&self) -> std::io::Result<()>;
 
     /// Flushes data blocks and metadata to disk (`fsync`).
     ///
-    /// # Errors
-    /// Returns `std::io::Error` if file metadata or data synchronization fails.
+    /// # Fehler
+    /// Liefert `std::io::Error` bei Synchronisationsfehlern. Scheitert `sync_all`, ist das Handle unwiederbringlich vergiftet.
+    ///
+    /// # Crash
+    /// Garantiert Haltbarkeit aller Datenblöcke und Inode-Metadaten (z. B. Dateilänge).
     fn sync_all(&self) -> std::io::Result<()>;
 }
 
@@ -118,8 +139,11 @@ pub trait Vfs: Send + Sync + 'static {
     /// # Contract V-VFS
     /// Default implementation delegates to `std::io::ErrorKind::Unsupported` unless overridden.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) if opening fails.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) bei Berechtigungs-, Nicht-Gefunden- oder I/O-Fehlern.
+    ///
+    /// # Crash
+    /// Öffnet Dateideskriptor; erzeugt ggf. eine leere Datei bei `create_new`/`create`. Keine implizite Datenpersistenz.
     fn open(&self, _path: &Path, _opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
         Err(crate::ContextraError::Io(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
@@ -129,9 +153,12 @@ pub trait Vfs: Send + Sync + 'static {
 
     /// Reads the entire contents of a file at `path`.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) or [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
-    /// if the file does not exist or cannot be read.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) oder [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
+    /// falls die Datei fehlt oder nicht gelesen werden kann.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff; keine Zustandsänderung auf dem Speichermedium.
     fn read(&self, path: &Path) -> Result<Vec<u8>>;
 
     /// Atomically writes `data` to `path` with crash-consistency guarantees.
@@ -140,27 +167,39 @@ pub trait Vfs: Send + Sync + 'static {
     /// Writes to a temporary file, calls `fsync` on the file handle, renames the temporary
     /// file over `path`, and syncs the parent directory (`sync_dir`).
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) if write, sync, or rename fails.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) falls Schreiben, Synchronisieren oder Umbenennen fehlschlägt.
+    ///
+    /// # Crash
+    /// Crash-konsistente All-or-Nothing-Garantie: Bricht der Vorgang vor atomarem Rename ab, bleibt die Originaldatei unberührt.
     fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()>;
 
     /// Creates a directory and all parent directories along `path` if missing.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) if creation fails.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) falls Verzeichnisanlage fehlschlägt.
+    ///
+    /// # Crash
+    /// Idempotente Verzeichnisanlage; Durability der Verzeichnisstruktur wird über `sync_dir` sichergestellt.
     fn create_dir_all(&self, path: &Path) -> Result<()>;
 
     /// Removes a file at `path`.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) or [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
-    /// if removal fails or file does not exist.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) oder [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
+    /// falls das Löschen fehlschlägt oder die Datei fehlt.
+    ///
+    /// # Crash
+    /// Entfernt Verzeichniseintrag; Persistenz erfordert `sync_dir` des übergeordneten Verzeichnisses.
     fn remove_file(&self, path: &Path) -> Result<()>;
 
     /// Atomically renames a file from `from` to `to`.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) if rename fails.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) falls das Umbenennen fehlschlägt.
+    ///
+    /// # Crash
+    /// Atomarer Dateisystem-Rename; bei Systemabsturz existiert entweder der Quell- oder der Zielpfad.
     fn rename(&self, from: &Path, to: &Path) -> Result<()> {
         let _ = (from, to);
         Err(crate::ContextraError::Io(std::io::Error::new(
@@ -171,8 +210,11 @@ pub trait Vfs: Send + Sync + 'static {
 
     /// Reads all entry paths within directory `path`.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) if reading directory entries fails.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) bei Lesefehlern des Verzeichnisses.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff; keine Verzeichnisänderung.
     fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>> {
         let entries = self.list_dir(path)?;
         Ok(entries.into_iter().map(|name| path.join(name)).collect())
@@ -180,28 +222,40 @@ pub trait Vfs: Send + Sync + 'static {
 
     /// Returns `true` if a file or directory exists at `path`.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) if path state cannot be inspected.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) falls Pfadstatus nicht ermittelt werden kann.
+    ///
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn exists(&self, path: &Path) -> Result<bool>;
 
     /// Returns the length in bytes of the file at `path`.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) or [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
-    /// if file metadata cannot be retrieved.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) oder [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
+    /// falls Metadaten nicht abgefragt werden können.
+    ///
+    /// # Crash
+    /// Reines Abfragen der Dateilänge ohne Seiteneffekte.
     fn len(&self, path: &Path) -> Result<u64>;
 
     /// Lists entry names (file and directory names, excluding `.` and `..`) inside directory `path`.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) or [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
-    /// if path is not a directory or cannot be read.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) oder [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
+    /// falls Pfad kein Verzeichnis ist oder nicht gelesen werden kann.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff auf Verzeichniseinträge.
     fn list_dir(&self, path: &Path) -> Result<Vec<String>>;
 
     /// Flushes directory metadata to persistent storage for durable file additions and renames.
     ///
-    /// # Errors
-    /// Returns [`ContextraError::Io`](crate::error::ContextraError::Io) if directory syncing fails.
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) falls Directory-Sync fehlschlägt.
+    ///
+    /// # Crash
+    /// Schreibt Verzeichnis-Metadaten dauerhaft auf Festplatte; schützt vor Datenverlust bei Stromausfall.
     fn sync_dir(&self, path: &Path) -> Result<()>;
 }
 
