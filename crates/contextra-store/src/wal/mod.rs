@@ -1,5 +1,6 @@
 //! Write-Ahead Log (WAL) for durability and crash recovery with HMAC chaining.
 
+pub mod crypto_shim;
 pub mod encode;
 pub mod flusher;
 pub mod hmac;
@@ -283,7 +284,7 @@ pub(crate) mod fs {
     pub type File = LoomFile;
 }
 
-pub use contextra_crypto::crypto::KeyManager;
+pub use crypto_shim::KeyManager;
 use contextra_types::{ContextraError, Result};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

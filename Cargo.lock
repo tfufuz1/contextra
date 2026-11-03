@@ -558,6 +558,7 @@ dependencies = [
 name = "contextra-store"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm-siv",
  "ahash",
  "blake3",
  "bytes",
@@ -572,6 +573,8 @@ dependencies = [
  "crc32fast",
  "criterion",
  "futures",
+ "hkdf",
+ "hmac",
  "libc",
  "loom",
  "lru",
@@ -582,6 +585,8 @@ dependencies = [
  "redb",
  "serde",
  "serde_json",
+ "sha2",
+ "subtle",
  "tempfile",
  "thiserror",
  "tokio",

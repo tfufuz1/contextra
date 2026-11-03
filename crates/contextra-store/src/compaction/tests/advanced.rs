@@ -29,7 +29,6 @@ async fn test_compaction_stress_and_gc() {
             adaptive_read_ratio_threshold: 0.70,
             ..CompactionConfig::default()
         },
-        encryption_passphrase: None,
         ..Default::default()
     };
 
@@ -596,7 +595,6 @@ async fn concurrent_flush_and_compact_is_safe() {
                 adaptive_read_ratio_threshold: 0.70,
                 ..CompactionConfig::default()
             },
-            encryption_passphrase: None,
             ..Default::default()
         };
 
