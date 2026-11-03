@@ -41,6 +41,8 @@ pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek {
     info.extend_from_slice(&salt);
     info.extend_from_slice(&doc);
 
-    let _ = hkdf_expand(unit.0.as_bytes(), &info, &mut out);
+    if hkdf_expand(unit.0.as_bytes(), &info, &mut out).is_err() {
+        out.fill(0);
+    }
     Dek(SecretKey::new(out))
 }

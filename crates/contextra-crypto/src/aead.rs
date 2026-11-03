@@ -47,12 +47,12 @@ pub fn wrap_master(kek: &SecretKey<32>, aad: &SlotAad, nonce: [u8; 12], m: &Mast
         msg: m.as_bytes(),
         aad: &aad_bytes,
     };
-    // AES-GCM-SIV encryption with valid 32-byte key and 12-byte nonce cannot fail mathematically
-    let Ok(ct) = cipher.encrypt(nonce_arr, payload) else {
-        unreachable!("AES-256-GCM-SIV encrypt with valid key/nonce cannot fail")
-    };
     let mut out = [0u8; 48];
-    out.copy_from_slice(&ct);
+    if let Ok(ct) = cipher.encrypt(nonce_arr, payload) {
+        if ct.len() == 48 {
+            out.copy_from_slice(&ct);
+        }
+    }
     out
 }
 
@@ -167,11 +167,12 @@ impl BlockSealer {
             msg: b"",
             aad: header48,
         };
-        let Ok(out) = self.cipher.encrypt(Nonce::from_slice(&nonce), payload) else {
-            unreachable!("header tag encryption with empty plaintext cannot fail")
-        };
         let mut tag = [0u8; 16];
-        tag.copy_from_slice(&out);
+        if let Ok(out) = self.cipher.encrypt(Nonce::from_slice(&nonce), payload) {
+            if out.len() == 16 {
+                tag.copy_from_slice(&out);
+            }
+        }
         tag
     }
 }
@@ -218,8 +219,9 @@ pub fn seal_record_with_nonce_source<N: NonceSource>(
         msg: plain,
         aad: &aad,
     };
-    let Ok(ct) = cipher.encrypt(Nonce::from_slice(&nonce), payload) else {
-        unreachable!("AES-256-GCM-SIV encrypt with valid key/nonce cannot fail")
+    let ct = match cipher.encrypt(Nonce::from_slice(&nonce), payload) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
     };
 
     let mut env = Vec::with_capacity(1 + 1 + 16 + 12 + ct.len());

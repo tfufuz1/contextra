@@ -273,6 +273,87 @@ fn test_cr12_chains_and_macs_t_wal_1_2() {
 }
 
 #[test]
+fn test_wal_chain_completeness_verification_spec_10_4() {
+    let master = MasterKey::generate_random();
+    let hierarchy = KeyHierarchy::from_master(master);
+
+    let wrong_master = MasterKey::generate_random();
+    let wrong_hierarchy = KeyHierarchy::from_master(wrong_master);
+
+    let mut prev = [0u8; 32];
+    let ct1 = b"frame 1 payload";
+    let tag1 = [1u8; 16];
+    let mac1 = wal_mac(hierarchy.wal(), &prev, ct1.len() as u32, 1, ct1, &tag1);
+
+    prev = mac1;
+    let ct2 = b"frame 2 payload";
+    let tag2 = [2u8; 16];
+    let mac2 = wal_mac(hierarchy.wal(), &prev, ct2.len() as u32, 2, ct2, &tag2);
+
+    prev = mac2;
+    let ct3 = b"frame 3 payload";
+    let tag3 = [3u8; 16];
+    let mac3 = wal_mac(hierarchy.wal(), &prev, ct3.len() as u32, 3, ct3, &tag3);
+
+    // 1. Valid chain matches expected tail
+    let expected_tail = mac3;
+    assert!(verify_chain_complete(&expected_tail, &mac3).is_ok());
+    assert!(verify_wal_chain_completeness(&expected_tail, &mac3).is_ok());
+
+    // 2. Truncated chain (stopped at mac2 instead of mac3)
+    let truncated_tail = mac2;
+    assert_eq!(
+        verify_chain_complete(&expected_tail, &truncated_tail),
+        Err(CryptoError::Corrupt)
+    );
+
+    // 3. Reordered entries (swapped frame 2 and frame 3)
+    let mac3_swapped = wal_mac(hierarchy.wal(), &mac1, ct3.len() as u32, 3, ct3, &tag3);
+    let mac2_swapped = wal_mac(
+        hierarchy.wal(),
+        &mac3_swapped,
+        ct2.len() as u32,
+        2,
+        ct2,
+        &tag2,
+    );
+    assert_eq!(
+        verify_chain_complete(&expected_tail, &mac2_swapped),
+        Err(CryptoError::Corrupt)
+    );
+
+    // 4. Incorrect key
+    let wrong_mac1 = wal_mac(
+        wrong_hierarchy.wal(),
+        &[0u8; 32],
+        ct1.len() as u32,
+        1,
+        ct1,
+        &tag1,
+    );
+    let wrong_mac2 = wal_mac(
+        wrong_hierarchy.wal(),
+        &wrong_mac1,
+        ct2.len() as u32,
+        2,
+        ct2,
+        &tag2,
+    );
+    let wrong_mac3 = wal_mac(
+        wrong_hierarchy.wal(),
+        &wrong_mac2,
+        ct3.len() as u32,
+        3,
+        ct3,
+        &tag3,
+    );
+    assert_eq!(
+        verify_chain_complete(&expected_tail, &wrong_mac3),
+        Err(CryptoError::Corrupt)
+    );
+}
+
+#[test]
 fn test_cr13_cr14_header_encoding_and_validation_t_hdr_1_t_fmt_1() {
     let master = MasterKey::generate_random();
     let hierarchy = KeyHierarchy::from_master(master);
@@ -361,6 +442,38 @@ fn test_t_kdf_1_min_m_kib_rejects_old_buggy_value_19456() {
     assert!(
         KdfParams::from_config(65536, 3, 4).is_ok(),
         "T-KDF-1: from_config(65536) muss Ok zurückgeben (SPEC-Minimum)"
+    );
+}
+
+#[test]
+fn test_s18_kdf_min_m_kib_enforced_strictly() {
+    // S-18: Bestätige mit einem Test, dass kdf::MIN_M_KIB >= 65536 erzwungen wird
+    // (Parameter darunter werden abgelehnt).
+    assert!(
+        MIN_M_KIB >= 65536,
+        "S-18: MIN_M_KIB muss mindestens 65536 KiB (64 MiB) betragen"
+    );
+
+    // Exakt unter der Grenze: 65535 KiB muss abgelehnt werden
+    assert_eq!(
+        KdfParams::from_header(MIN_M_KIB - 1, 3, 4),
+        Err(CryptoError::Corrupt),
+        "S-18: from_header mit MIN_M_KIB - 1 muss Corrupt liefern"
+    );
+    assert_eq!(
+        KdfParams::from_config(MIN_M_KIB - 1, 3, 4),
+        Err(CryptoError::Config),
+        "S-18: from_config mit MIN_M_KIB - 1 muss Config liefern"
+    );
+
+    // Grenze selbst muss akzeptiert werden
+    assert!(
+        KdfParams::from_header(MIN_M_KIB, 3, 4).is_ok(),
+        "S-18: from_header mit MIN_M_KIB muss erfolgreich sein"
+    );
+    assert!(
+        KdfParams::from_config(MIN_M_KIB, 3, 4).is_ok(),
+        "S-18: from_config mit MIN_M_KIB muss erfolgreich sein"
     );
 }
 
