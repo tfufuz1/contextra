@@ -10,16 +10,16 @@
 // INVARIANTEN: No orphaned index entries (Text/Graph/Vector) can exist without a corresponding storage record.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use contextra_engine::Collection;
 use contextra_engine::collection::{StoredDocument, StoredDocumentMeta};
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
-use contextra_engine::Collection;
 // contextra_graph::CsrGraph entfernt per SPEC
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats, VectorIndex};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};
 use contextra_vector::HnswIndex;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tempfile::tempdir;
 
 struct FaultyStorage<S: StorageEngine> {
@@ -240,11 +240,6 @@ async fn test_storage_commit_failure_leaves_no_orphaned_index_entries() -> Resul
         doc_id,
         "Critical crash window test document text".to_string(),
     );
-    tx.stage_graph_entity(Entity::new(
-        EntityId::from_key("501")?,
-        "Node501",
-        "Document",
-    ));
 
     // Inject storage commit failure in Phase (b)
     storage.fail_storage_commit.store(true, Ordering::SeqCst);

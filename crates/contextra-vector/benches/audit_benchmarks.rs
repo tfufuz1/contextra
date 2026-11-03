@@ -352,7 +352,7 @@ async fn main() {
 
     for &num_threads in &thread_counts {
         let index = HnswIndex::try_new(base_config.clone()).unwrap();
-        index.load_mmap(&base_file).await.unwrap();
+        index.load_buffer(&base_file).await.unwrap();
 
         let extra_vectors_arc = std::sync::Arc::new(extra_vectors.clone());
         let index_arc = std::sync::Arc::new(index);
@@ -407,7 +407,7 @@ async fn main() {
     // 6. HNSW Mixed Workload Benchmark (Concurrent Search under Write Load)
     println!("\n--- 6. HNSW MIXED WORKLOAD BENCHMARK (Concurrent Reads + High Write Load) ---");
     let mixed_index = HnswIndex::try_new(base_config.clone()).unwrap();
-    mixed_index.load_mmap(&base_file).await.unwrap();
+    mixed_index.load_buffer(&base_file).await.unwrap();
     let mixed_index_arc = std::sync::Arc::new(mixed_index);
 
     // Baseline: Pure Search Latency (Zero Write Load)

@@ -1,14 +1,49 @@
 // FILE-CONTEXT
 // ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
-// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
-// NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
-// STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
+// INVARIANTEN: Lock-Hierarchie: header -> vfs_file -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
+// NICHT-OFFENSICHTLICH: Positional VFS-Lesevorgänge über contextra_ports::Vfs.
+use contextra_crypto::hierarchy::IdxKey;
+use contextra_crypto::secret::SecretKey;
 use contextra_types::{ContextraError, Result};
 
 pub(crate) const DISKANN_MAGIC: &[u8; 4] = b"DANN";
 pub(crate) const DISKANN_VERSION: u16 = 1;
 pub(crate) const DISKANN_FOOTER_MAGIC: &[u8; 4] = b"DANF";
 pub(crate) const DISKANN_INTEGRITY_KEY: &[u8; 32] = b"contextra_diskann_integri_key_32";
+
+/// Streaming BLAKE3 Keyed Tag Berechner für O(1) Speicherverbrauch.
+pub(crate) struct StreamingTag {
+    hasher: blake3::Hasher,
+}
+
+impl StreamingTag {
+    pub(crate) fn new() -> Self {
+        let key = IdxKey(SecretKey::new(*DISKANN_INTEGRITY_KEY));
+        Self {
+            hasher: blake3::Hasher::new_keyed(key.0.as_bytes()),
+        }
+    }
+
+    pub(crate) fn update(&mut self, data: &[u8]) {
+        self.hasher.update(data);
+    }
+
+    pub(crate) fn finalize(self) -> [u8; 16] {
+        let mut out = [0u8; 16];
+        let hash = self.hasher.finalize();
+        out.copy_from_slice(&hash.as_bytes()[..16]);
+        out
+    }
+}
+
+/// Berechnet einen 16-Byte BLAKE3 Keyed Tag über die übergebenen Slices.
+pub(crate) fn compute_diskann_tag(slices: &[&[u8]]) -> [u8; 16] {
+    let mut stream = StreamingTag::new();
+    for slice in slices {
+        stream.update(slice);
+    }
+    stream.finalize()
+}
 
 pub(crate) const PENDING_WAL_MAGIC: &[u8; 4] = b"PWAL";
 pub(crate) const PENDING_WAL_VERSION: u8 = 1;
@@ -151,20 +186,20 @@ impl DiskAnnHeader {
     }
 }
 
-/// Footer for DiskANN index file (36 bytes: 4 bytes DISKANN_FOOTER_MAGIC + 32 bytes HMAC).
+/// Footer for DiskANN index file (20 bytes: 4 bytes DISKANN_FOOTER_MAGIC + 16 bytes Tag).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct DiskAnnFooter {
     pub(crate) magic: [u8; 4],
-    pub(crate) hmac: [u8; 32],
+    pub(crate) tag: [u8; 16],
 }
 
 impl DiskAnnFooter {
-    pub(crate) const SIZE: usize = 36;
+    pub(crate) const SIZE: usize = 20;
 
     pub(crate) fn to_bytes(self) -> [u8; Self::SIZE] {
         let mut buf = [0u8; Self::SIZE];
         buf[0..4].copy_from_slice(&self.magic);
-        buf[4..36].copy_from_slice(&self.hmac);
+        buf[4..20].copy_from_slice(&self.tag);
         buf
     }
 
@@ -181,14 +216,14 @@ impl DiskAnnFooter {
                 "Invalid DiskANN file: missing or incomplete build_complete footer".into(),
             ));
         }
-        let hmac: [u8; 32] = bytes
-            .get(4..36)
-            .ok_or_else(|| ContextraError::Storage("DiskANN footer HMAC out of bounds".into()))?
+        let tag_bytes: [u8; 16] = bytes
+            .get(4..20)
+            .ok_or_else(|| ContextraError::Storage("DiskANN footer tag out of bounds".into()))?
             .try_into()
-            .map_err(|_| ContextraError::Storage("Invalid DiskANN footer HMAC length".into()))?;
+            .map_err(|_| ContextraError::Storage("Invalid DiskANN footer tag length".into()))?;
         Ok(Self {
             magic: *DISKANN_FOOTER_MAGIC,
-            hmac,
+            tag: tag_bytes,
         })
     }
 }

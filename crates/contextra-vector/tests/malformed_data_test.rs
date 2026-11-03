@@ -1,10 +1,10 @@
-//! Robustheitstests für MmapIndex gegen beschädigte/manipulierte Dateien.
-//! Sichert: try_from_bytes() und MmapIndex::open() paniken NIEMALS —
+//! Robustheitstests für BufferIndex gegen beschädigte/manipulierte Dateien.
+//! Sichert: try_from_bytes() und BufferIndex::open() paniken NIEMALS —
 //! auch bei abgeschnittenen, korrumpierten oder übergroßen Headern.
 //!
 //! Referenz: Security-Review-Report SEC-01/TST-01
 
-use contextra_vector::persistence::{HnswHeader, MmapIndex, HNSW_MAGIC};
+use contextra_vector::persistence::{BufferIndex, HnswHeader, HNSW_MAGIC};
 use std::io::Write;
 use tempfile::tempdir;
 
@@ -59,11 +59,11 @@ fn test_try_from_bytes_wrong_version_returns_error() {
 }
 
 #[test]
-fn test_mmap_open_empty_file_returns_error() {
+fn test_buffer_open_empty_file_returns_error() {
     let dir = tempdir().expect("tempdir");
     let path = dir.path().join("empty.hnsw");
     std::fs::File::create(&path).expect("create file");
-    let result = MmapIndex::open(&path);
+    let result = BufferIndex::open(&path);
     assert!(
         result.is_err(),
         "Leere Datei muss Err zurückgeben statt zu paniken"
@@ -71,12 +71,12 @@ fn test_mmap_open_empty_file_returns_error() {
 }
 
 #[test]
-fn test_mmap_open_truncated_file_returns_error() {
+fn test_buffer_open_truncated_file_returns_error() {
     let dir = tempdir().expect("tempdir");
     let path = dir.path().join("truncated.hnsw");
     let mut f = std::fs::File::create(&path).expect("create");
     f.write_all(&[0u8; 10]).expect("write");
-    let result = MmapIndex::open(&path);
+    let result = BufferIndex::open(&path);
     assert!(
         result.is_err(),
         "Abgeschnittene Datei (10 Bytes) muss Err zurückgeben"
@@ -84,14 +84,14 @@ fn test_mmap_open_truncated_file_returns_error() {
 }
 
 #[test]
-fn test_mmap_open_wrong_magic_returns_error() {
+fn test_buffer_open_wrong_magic_returns_error() {
     let dir = tempdir().expect("tempdir");
     let path = dir.path().join("badmagic.hnsw");
     let mut bytes = valid_header_bytes();
     bytes[0..4].copy_from_slice(&0xDEADBEEFu32.to_le_bytes());
     let mut f = std::fs::File::create(&path).expect("create");
     f.write_all(&bytes).expect("write");
-    let result = MmapIndex::open(&path);
+    let result = BufferIndex::open(&path);
     assert!(
         result.is_err(),
         "Datei mit falschem Magic muss Err zurückgeben"
@@ -99,7 +99,7 @@ fn test_mmap_open_wrong_magic_returns_error() {
 }
 
 #[test]
-fn test_mmap_open_huge_node_count_no_panic() {
+fn test_buffer_open_huge_node_count_no_panic() {
     // node_count = u64::MAX darf nicht zu OOM/Panic führen
     let dir = tempdir().expect("tempdir");
     let path = dir.path().join("hugecnt.hnsw");
@@ -111,11 +111,11 @@ fn test_mmap_open_huge_node_count_no_panic() {
     let mut f = std::fs::File::create(&path).expect("create");
     f.write_all(&bytes).expect("write");
     // Kein Panic ist die Anforderung — Err oder Ok sind beide akzeptabel
-    let _ = MmapIndex::open(&path);
+    let _ = BufferIndex::open(&path);
 }
 
 #[test]
-fn test_mmap_open_exact_file_sizes_no_panic() {
+fn test_buffer_open_exact_file_sizes_no_panic() {
     // BEFUND 2: Dateigrößen 0, 1, 10, 63 und 64 Bytes
     for size in [0, 1, 10, 63, 64] {
         let dir = tempdir().expect("tempdir");
@@ -123,10 +123,10 @@ fn test_mmap_open_exact_file_sizes_no_panic() {
         let dummy_data = vec![0x42u8; size];
         std::fs::write(&path, &dummy_data).expect("write");
 
-        let catch_res = std::panic::catch_unwind(|| MmapIndex::open(&path));
+        let catch_res = std::panic::catch_unwind(|| BufferIndex::open(&path));
         assert!(
             catch_res.is_ok(),
-            "MmapIndex::open panicked on file size {}!",
+            "BufferIndex::open panicked on file size {}!",
             size
         );
 
@@ -143,7 +143,7 @@ fn test_mmap_open_exact_file_sizes_no_panic() {
 }
 
 #[test]
-fn test_mmap_connection_len_overflow_returns_err() {
+fn test_buffer_connection_len_overflow_returns_err() {
     // BEFUND 4: Fuzz/Property-Test mit len-Werten nahe u32::MAX/usize::MAX
     use contextra_vector::persistence::NodeRecord;
 
@@ -184,17 +184,17 @@ fn test_mmap_connection_len_overflow_returns_err() {
 
     std::fs::write(&path, &data).expect("write overflow test file");
 
-    let mmap_res = MmapIndex::open(&path);
-    if let Err(ref e) = mmap_res {
-        eprintln!("MmapIndex::open failed with: {:?}", e);
+    let buffer_res = BufferIndex::open(&path);
+    if let Err(ref e) = buffer_res {
+        eprintln!("BufferIndex::open failed with: {:?}", e);
     }
-    assert!(mmap_res.is_ok(), "Header is valid so open should succeed");
-    let mmap_index = mmap_res.unwrap();
+    assert!(buffer_res.is_ok(), "Header is valid so open should succeed");
+    let buffer_index = buffer_res.unwrap();
 
-    let node_rec = mmap_index.get_node_record(0).expect("record");
+    let node_rec = buffer_index.get_node_record(0).expect("record");
 
     // Calling get_connections with corrupt len near u32::MAX must NOT panic or overflow
-    let catch_res = std::panic::catch_unwind(|| mmap_index.get_connections(&node_rec, 0));
+    let catch_res = std::panic::catch_unwind(|| buffer_index.get_connections(&node_rec, 0));
     assert!(
         catch_res.is_ok(),
         "get_connections panicked on u32::MAX length!"

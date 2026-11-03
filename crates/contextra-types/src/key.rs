@@ -101,6 +101,9 @@ impl<'de> Deserialize<'de> for KeyBound {
                         .next_element()?
                         .ok_or_else(|| serde::de::Error::invalid_length(i, &self))?;
                 }
+                if seq.next_element::<serde::de::IgnoredAny>()?.is_some() {
+                    return Err(serde::de::Error::invalid_length(KEY_BOUND_LEN + 1, &self));
+                }
                 Ok(KeyBound(arr))
             }
         }
@@ -167,6 +170,9 @@ impl<'de> Deserialize<'de> for KeyBuf {
                     *b = seq
                         .next_element()?
                         .ok_or_else(|| serde::de::Error::invalid_length(i, &self))?;
+                }
+                if seq.next_element::<serde::de::IgnoredAny>()?.is_some() {
+                    return Err(serde::de::Error::invalid_length(KEY_LEN + 1, &self));
                 }
                 Ok(KeyBuf(arr))
             }
@@ -328,17 +334,17 @@ impl KeyRange {
 
     /// Bereich für ein einzelnes Dokument.
     pub fn doc(r: Region, t: TenantTag, c: CollTag, cl: ClusterTag, d: DocTag) -> Self {
-        let mut lo = [0u8; KEY_BOUND_LEN];
-        lo[0] = r.as_u8();
-        lo[1..17].copy_from_slice(t.as_bytes());
-        lo[17..33].copy_from_slice(c.as_bytes());
-        lo[33..49].copy_from_slice(cl.as_bytes());
-        lo[49..65].copy_from_slice(d.as_bytes());
+        let mut b = [0u8; KEY_BOUND_LEN];
+        b[0] = r.as_u8();
+        b[1..17].copy_from_slice(t.as_bytes());
+        b[17..33].copy_from_slice(c.as_bytes());
+        b[33..49].copy_from_slice(cl.as_bytes());
+        b[49..65].copy_from_slice(d.as_bytes());
 
-        let hi = lo;
+        let bound = KeyBound(b);
         Self {
-            lo: KeyBound(lo),
-            hi: KeyBound(hi),
+            lo: bound,
+            hi: bound,
         }
     }
 

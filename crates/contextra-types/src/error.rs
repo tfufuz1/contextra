@@ -22,7 +22,7 @@
 
 // INVARIANT: Einzige Error-Enum für den gesamten Workspace.
 // Neue Varianten nur ANHÄNGEN (niemals umsortieren) → binäre Kompatibilität.
-// DOWNSTREAM: contextra-store, contextra-index, contextra-db konvertieren via `?` und `From`.
+// DOWNSTREAM: contextra-store, contextra-engine, contextra konvertieren via `?` und `From`.
 
 use crate::DocId;
 use thiserror::Error;
@@ -109,7 +109,6 @@ pub type Result<T> = std::result::Result<T, ContextraError>;
 /// # Non-Exhaustive Variant Guarantee
 /// This enum is marked `#[non_exhaustive]` to allow appending new error variants
 /// in future minor releases without breaking downstream `match` statements across crate boundaries
-/// (such as `contextra-py` and `contextra-mcp`).
 ///
 /// Downstream callers matching on `ContextraError` must include a wildcard arm (`_ => ...`).
 /// New variants are appended strictly to the bottom of the enum to preserve binary and FFI compatibility.
@@ -297,7 +296,7 @@ pub enum ContextraError {
     },
 
     /// GGUF-/Modell-Ladefehler (Candle-Backend). Nutzung: korrupte, unvollständige
-    /// oder dimensions-inkompatible Modell-Dateien beim Laden über contextra-candle.
+    /// oder dimensions-inkompatible Modell-Dateien beim Laden über Modell-Backends.
     #[error("Model load error for {path}: {reason}")]
     ModelLoad {
         /// Path to model file.

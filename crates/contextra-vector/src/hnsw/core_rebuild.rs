@@ -125,16 +125,16 @@ impl HnswIndexCore {
         }
     }
 
-    fn compute_distance_with_mmap(
+    fn compute_distance_with_buffer(
         &self,
         query_exact: &[f32],
         query_quantized: Option<&[u8]>,
-        mmap: &crate::persistence::MmapIndex,
+        buffer: &crate::persistence::BufferIndex,
         record: &crate::persistence::NodeRecord,
         quantizer_opt: Option<&crate::quantize::ScalarQuantizer>,
     ) -> Result<f32> {
-        let vector_bytes = mmap.get_vector(record)?;
-        if mmap.header.is_quantized() {
+        let vector_bytes = buffer.get_vector(record)?;
+        if buffer.header.is_quantized() {
             let guard;
             let q = if let Some(q_ref) = quantizer_opt {
                 q_ref
@@ -186,7 +186,7 @@ impl HnswIndexCore {
         ctx: &SearchContext,
     ) -> Result<f32> {
         let q_ref = ctx.quantizer.as_deref();
-        let base_batch_idx = ctx.mmap_node_count + ctx.nodes.len();
+        let base_batch_idx = ctx.buffer_node_count + ctx.nodes.len();
         if idx >= base_batch_idx {
             let prepared_offset = idx - base_batch_idx;
             if let Some(prepared) = ctx.prior_prepared.get(prepared_offset) {
@@ -198,13 +198,13 @@ impl HnswIndexCore {
                 );
             }
         }
-        if let Some(mmap) = ctx.mmap {
-            if idx < ctx.mmap_node_count {
-                let record = mmap.get_node_record(idx)?;
-                return self.compute_distance_with_mmap(query, query_q, mmap, &record, q_ref);
+        if let Some(buffer) = ctx.buffer {
+            if idx < ctx.buffer_node_count {
+                let record = buffer.get_node_record(idx)?;
+                return self.compute_distance_with_buffer(query, query_q, buffer, &record, q_ref);
             }
         }
-        let ram_idx = idx.saturating_sub(ctx.mmap_node_count);
+        let ram_idx = idx.saturating_sub(ctx.buffer_node_count);
         if let Some(node) = ctx.nodes.get(ram_idx) {
             return self.compute_distance_with_data(query, query_q, &node.vector, q_ref);
         }
@@ -212,20 +212,20 @@ impl HnswIndexCore {
     }
 
     pub(super) fn resolve_doc_id(&self, idx: usize, ctx: &SearchContext) -> Result<DocId> {
-        let base_batch_idx = ctx.mmap_node_count + ctx.nodes.len();
+        let base_batch_idx = ctx.buffer_node_count + ctx.nodes.len();
         if idx >= base_batch_idx {
             let prepared_offset = idx - base_batch_idx;
             if let Some(prepared) = ctx.prior_prepared.get(prepared_offset) {
                 return Ok(prepared.doc_id);
             }
         }
-        if let Some(mmap) = ctx.mmap {
-            if idx < ctx.mmap_node_count {
-                let record = mmap.get_node_record(idx)?;
+        if let Some(buffer) = ctx.buffer {
+            if idx < ctx.buffer_node_count {
+                let record = buffer.get_node_record(idx)?;
                 return Ok(DocId::new(record.doc_id));
             }
         }
-        let ram_idx = idx.saturating_sub(ctx.mmap_node_count);
+        let ram_idx = idx.saturating_sub(ctx.buffer_node_count);
         if let Some(node) = ctx.nodes.get(ram_idx) {
             return Ok(node.doc_id);
         }
@@ -247,7 +247,7 @@ impl HnswIndexCore {
         }
 
         let ram_nodes_count = ctx.nodes.len();
-        let base_batch_idx = ctx.mmap_node_count + ram_nodes_count;
+        let base_batch_idx = ctx.buffer_node_count + ram_nodes_count;
 
         if idx >= base_batch_idx {
             let prepared_offset = idx - base_batch_idx;
@@ -256,23 +256,23 @@ impl HnswIndexCore {
             }
         }
 
-        if let Some(mmap) = ctx.mmap {
-            if idx < ctx.mmap_node_count {
-                let record = mmap.get_node_record(idx)?;
-                let bytes = mmap.get_vector(&record)?;
-                return if mmap.header.is_quantized() {
+        if let Some(buffer) = ctx.buffer {
+            if idx < ctx.buffer_node_count {
+                let record = buffer.get_node_record(idx)?;
+                let bytes = buffer.get_vector(&record)?;
+                return if buffer.header.is_quantized() {
                     Ok(VectorData::U8(bytes.to_vec()))
                 } else {
                     let mut v = vec![0.0f32; self.cold.config.dimension];
                     for i in 0..self.cold.config.dimension {
                         v[i] = f32::from_le_bytes(bytes[i * 4..(i + 1) * 4].try_into().map_err(
-                            |_| ContextraError::Index("Corrupt f32 in mmap vector".into()),
+                            |_| ContextraError::Index("Corrupt f32 in buffer vector".into()),
                         )?);
                     }
                     Ok(VectorData::F32(v))
                 };
             }
-            return Ok(ctx.nodes[idx - ctx.mmap_node_count].vector.clone());
+            return Ok(ctx.nodes[idx - ctx.buffer_node_count].vector.clone());
         }
 
         if idx < ctx.nodes.len() {
@@ -402,8 +402,8 @@ impl HnswIndexCore {
 
             if ep_val == Some(idx) || ram_ep_val == Some(idx) {
                 let nodes = self.hot.nodes.read();
-                let mmap_guard = self.cold.mmap_index.read();
-                let mmap_node_count = mmap_guard
+                let buffer_guard = self.cold.buffer_index.read();
+                let buffer_node_count = buffer_guard
                     .as_ref()
                     .map(|m| m.header.node_count() as usize)
                     .unwrap_or(0);
@@ -414,10 +414,10 @@ impl HnswIndexCore {
                 let mut max_layer = 0;
                 let mut max_ram_layer = 0;
 
-                if let Some(mmap) = mmap_guard.as_ref() {
-                    for i in 0..mmap_node_count {
+                if let Some(buffer) = buffer_guard.as_ref() {
+                    for i in 0..buffer_node_count {
                         if i != idx && !deleted.contains(i as u64) {
-                            let record = match mmap.get_node_record(i) {
+                            let record = match buffer.get_node_record(i) {
                                 Ok(r) => r,
                                 Err(_) => continue,
                             };
@@ -430,7 +430,7 @@ impl HnswIndexCore {
                 }
 
                 for (i, node) in nodes.iter().enumerate() {
-                    let global_idx = mmap_node_count + i;
+                    let global_idx = buffer_node_count + i;
                     if global_idx != idx && !deleted.contains(global_idx as u64) {
                         if node.max_layer >= max_layer {
                             max_layer = node.max_layer;
@@ -446,13 +446,14 @@ impl HnswIndexCore {
                 if ep_val == Some(idx) {
                     self.hot.set_entry_point(best_node);
                     if let Some(new_idx) = best_node {
-                        let node_max_layer = if let Some(mmap) = mmap_guard.as_ref() {
-                            if new_idx < mmap_node_count {
-                                mmap.get_node_record(new_idx)
+                        let node_max_layer = if let Some(buffer) = buffer_guard.as_ref() {
+                            if new_idx < buffer_node_count {
+                                buffer
+                                    .get_node_record(new_idx)
                                     .map(|r| r.max_layer as usize)
                                     .unwrap_or(0)
                             } else {
-                                nodes[new_idx - mmap_node_count].max_layer
+                                nodes[new_idx - buffer_node_count].max_layer
                             }
                         } else {
                             nodes[new_idx].max_layer
@@ -634,9 +635,9 @@ impl HnswIndexCore {
 
         let region_set: AHashSet<u64> = region_node_ids.into_iter().collect();
 
-        let mmap_count = self
+        let buffer_count = self
             .cold
-            .mmap_index
+            .buffer_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
@@ -666,7 +667,7 @@ impl HnswIndexCore {
         let mut arena = self.hot.arena.arena.write();
 
         for (i, node) in nodes.iter().enumerate() {
-            let global_idx = mmap_count + i;
+            let global_idx = buffer_count + i;
             if deleted_nodes.contains(global_idx as u64) {
                 continue;
             }
@@ -701,8 +702,8 @@ impl HnswIndexCore {
 
         let mut doc_map = self.hot.doc_to_node.write();
         for &ts_id in &tombstoned_in_region {
-            if ts_id >= mmap_count as u64 {
-                let ram_idx = (ts_id as usize) - mmap_count;
+            if ts_id >= buffer_count as u64 {
+                let ram_idx = (ts_id as usize) - buffer_count;
                 if let Some(node) = nodes.get(ram_idx) {
                     doc_map.remove(&node.doc_id.inner());
                 }
@@ -726,9 +727,9 @@ impl HnswIndexCore {
     fn rebuild_phase1_snapshot_and_build(&self) -> Result<(HnswIndex, u64)> {
         let (all_nodes, config, snapshot_tx) = {
             let nodes = self.hot.nodes.read();
-            let mmap_count = self
+            let buffer_count = self
                 .cold
-                .mmap_index
+                .buffer_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -739,7 +740,7 @@ impl HnswIndexCore {
             let snapshot_tx = self.hot.last_tx_id.load(Ordering::SeqCst);
             let mut all = Vec::with_capacity(nodes.len());
             for (i, node) in nodes.iter().enumerate() {
-                let global_idx = mmap_count + i;
+                let global_idx = buffer_count + i;
                 if node.committed_tx <= snapshot_tx {
                     let is_deleted = deleted_nodes.contains(global_idx as u64)
                         && seq_log
@@ -769,9 +770,9 @@ impl HnswIndexCore {
         *new_index.inner.cold.seq_log.write() = self.cold.seq_log.read().clone();
 
         {
-            let mmap_guard = self.cold.mmap_index.read();
-            if let Some(mmap) = mmap_guard.as_ref() {
-                new_index.load_mmap_from_instance(mmap.clone())?;
+            let buffer_guard = self.cold.buffer_index.read();
+            if let Some(buffer) = buffer_guard.as_ref() {
+                new_index.load_buffer_from_instance(buffer.clone())?;
             }
         }
 
@@ -857,16 +858,16 @@ impl HnswIndexCore {
                 contextra_mvcc::SeqLogChange::Insert { doc_id, seq } => {
                     let vector_opt = {
                         let doc_map = self.hot.doc_to_node.read();
-                        let mmap_count = self
+                        let buffer_count = self
                             .cold
-                            .mmap_index
+                            .buffer_index
                             .read()
                             .as_ref()
                             .map(|m| m.header.node_count() as usize)
                             .unwrap_or(0);
                         if let Some(&global_idx) = doc_map.get(&doc_id.inner()) {
-                            if global_idx >= mmap_count {
-                                let ram_idx = global_idx - mmap_count;
+                            if global_idx >= buffer_count {
+                                let ram_idx = global_idx - buffer_count;
                                 let nodes = self.hot.nodes.read();
                                 nodes.get(ram_idx).map(|n| n.vector.clone())
                             } else {
@@ -943,16 +944,16 @@ impl HnswIndexCore {
                 Ordering::SeqCst,
             );
 
-            let mmap_count = self
+            let buffer_count = self
                 .cold
-                .mmap_index
+                .buffer_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
             let mut new_deleted = RoaringTreemap::new();
             for del_idx in deleted_nodes.iter() {
-                if (del_idx as usize) < mmap_count {
+                if (del_idx as usize) < buffer_count {
                     new_deleted.insert(del_idx);
                 }
             }
@@ -1035,9 +1036,9 @@ mod tests {
             let query = vec![10.0, 20.0, 30.0, 40.0];
             let nodes_guard = index.inner.hot.nodes.read();
             let search_ctx = SearchContext {
-                mmap: None,
+                buffer: None,
                 nodes: nodes_guard.as_slice(),
-                mmap_node_count: 0,
+                buffer_node_count: 0,
                 prior_prepared: &[],
                 quantizer: None,
                 arena: &index.inner.hot.arena,

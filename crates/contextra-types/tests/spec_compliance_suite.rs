@@ -252,3 +252,78 @@ fn test_l10_dimension_error_limit() {
     let err = Error::Limit(Limit::Dimension);
     assert_eq!(err.to_string(), "limit exceeded: dimension");
 }
+
+/// SPEC: T-API-4
+#[test]
+fn test_t_api_4_fehlertexte_eingefroren_golden() {
+    use contextra_types::error::*;
+
+    let table = [
+        (
+            Error::Config(ConfigError::EmptyIdentifier),
+            "configuration error: identifier is empty",
+        ),
+        (
+            Error::Config(ConfigError::IdentifierTooLong),
+            "configuration error: identifier exceeds maximum length",
+        ),
+        (
+            Error::Config(ConfigError::InvalidLength),
+            "configuration error: invalid byte length",
+        ),
+        (Error::Io, "i/o error"),
+        (Error::Corrupt, "data corruption detected"),
+        (Error::Auth, "authentication failed"),
+        (Error::Erased, "target is erased"),
+        (Error::Restricted, "target is restricted"),
+        (Error::NotFound, "not found"),
+        (
+            Error::Conflict(Conflict::IdCollision),
+            "conflict: identifier collision",
+        ),
+        (
+            Error::Conflict(Conflict::Exists),
+            "conflict: record already exists",
+        ),
+        (
+            Error::Limit(Limit::Capacity),
+            "limit exceeded: storage capacity",
+        ),
+        (
+            Error::Limit(Limit::DiskReserve),
+            "limit exceeded: disk reserve exhausted",
+        ),
+        (Error::Limit(Limit::Snapshots), "limit exceeded: snapshots"),
+        (
+            Error::Limit(Limit::QueryTooLarge),
+            "limit exceeded: query too large",
+        ),
+        (Error::Limit(Limit::Dimension), "limit exceeded: dimension"),
+        (Error::SnapshotRevoked, "snapshot revoked"),
+        (Error::Cancelled, "operation cancelled"),
+        (Error::Refused, "operation refused"),
+        (Error::Internal, "internal system error"),
+    ];
+
+    for (err, expected_text) in table {
+        assert_eq!(
+            err.to_string(),
+            expected_text,
+            "Fehlertext weicht von gefrorener D-110-Vorgabe ab"
+        );
+    }
+}
+
+/// SPEC: T-LIMIT-1
+#[test]
+fn test_t_limit_1_typebene_kapazitaetsgrenzen() {
+    use contextra_types::limits::*;
+
+    assert_eq!(MAX_DOCS_PER_STORE, 50_000_000);
+    assert_eq!(MAX_DOC_BYTES_DEFAULT, 4 * 1024 * 1024);
+    assert_eq!(MAX_DOC_BYTES_HARD, 64 * 1024 * 1024);
+    assert_eq!(MAX_SNAPSHOTS_PER_TENANT, 1024);
+    assert_eq!(MAX_DIMENSION, 4096);
+    assert_eq!(MAX_QUERY_TERMS, 256);
+    assert_eq!(MAX_K, 1000);
+}
