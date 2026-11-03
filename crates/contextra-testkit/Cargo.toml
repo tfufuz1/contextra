@@ -19,6 +19,7 @@ testkit = []
 [dependencies]
 contextra-ports = { workspace = true, features = ["testkit"] }
 contextra-types = { workspace = true }
+blake3 = { workspace = true }
 bytes = { workspace = true }
 parking_lot = { workspace = true }
 tracing = { workspace = true }

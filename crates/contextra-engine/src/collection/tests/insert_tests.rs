@@ -100,13 +100,11 @@ async fn test_insert_typed_episodic_has_decay_metadata() {
         })
         .unwrap(), // unwrap
     );
-    let graph_index = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
     let col = Collection::new(
         "test".to_string(),
         storage,
         index,
-        graph_index,
         next_tx,
         4,
         contextra_text::Language::German,
@@ -151,13 +149,11 @@ async fn test_insert_typed_working_has_ttl_metadata() {
         })
         .unwrap(), // unwrap
     );
-    let graph_index = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
     let col = Collection::new(
         "test".to_string(),
         storage,
         index,
-        graph_index,
         next_tx,
         4,
         contextra_text::Language::German,
@@ -202,13 +198,11 @@ async fn test_insert_backward_compatible_has_semantic_default() {
         })
         .unwrap(), // unwrap
     );
-    let graph_index = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
     let col = Collection::new(
         "test".to_string(),
         storage,
         index,
-        graph_index,
         next_tx,
         4,
         contextra_text::Language::German,

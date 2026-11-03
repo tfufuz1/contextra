@@ -6,6 +6,9 @@ license.workspace = true
 rust-version.workspace = true
 description = "Eigenständiger Verifizierer für Löschberichte und Feldscans."
 
+[package.metadata.contextra]
+ring = "tooling"
+
 [[bin]]
 name = "ctx-verify"
 path = "src/main.rs"

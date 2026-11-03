@@ -1,12 +1,16 @@
-//! # Loom-Modelle für SeqAllocator und Lockreihenfolge (T-CONC-1)
+//! # Loom-Modelle für SeqAllocator, Lockreihenfolge und History-Horizon (T-LOCK, T-CONC, T-SNAP)
 //!
-//! Modelliert die nebenläufige Sequenzvergabe und die Einhaltung der Lock-Hierarchie:
-//! Dokumentlock -> Commit-Barriere -> Purge-Barrier -> Journal.
+//! Modelliert:
+//! - Nebenläufige Sequenzvergabe (T-CONC-1)
+//! - Einhaltung der vollständigen Lock-Hierarchie SPEC 5.4:
+//!   Dokumentlock -> Commit-Barriere -> Purge-Barrier -> Journal (T-LOCK)
+//! - Purge-Barriere und History-Horizon Abgrenzung gegen aktive Snapshots (T-SNAP):
+//!   Horizon <= älteste aktive Snapshot-Seq; Leser sehen vollständigen Alt-Zustand oder Verweigerung.
 
 #[cfg(loom)]
 mod loom_conc_tests {
     use loom::sync::atomic::{AtomicU64, Ordering};
-    use loom::sync::{Arc, Mutex};
+    use loom::sync::{Arc, Mutex, RwLock};
     use loom::thread;
 
     struct LoomSeqAllocator {
@@ -67,25 +71,80 @@ mod loom_conc_tests {
     }
 
     #[test]
-    fn t_conc_1_loom_lock_order_hierarchy() {
+    fn t_lock_loom_lock_order_hierarchy_full_spec_5_4() {
+        // SPEC 5.4: Dokumentlock -> Commit-Barriere -> Purge-Barrier -> Journal
         loom::model(|| {
+            // SPEC 5.4 / MV-08: Globale Lockreihenfolge:
+            // Dokumentlock -> Commit-Barriere -> Purge-Barrier -> Journal
             let doc_lock = Arc::new(Mutex::new(0));
-            let commit_barrier = Arc::new(Mutex::new(0));
+            let commit_barrier = Arc::new(RwLock::new(0));
+            let purge_barrier = Arc::new(RwLock::new(0));
+            let journal_lock = Arc::new(Mutex::new(0));
 
             let d1 = Arc::clone(&doc_lock);
             let c1 = Arc::clone(&commit_barrier);
+            let p1 = Arc::clone(&purge_barrier);
+            let j1 = Arc::clone(&journal_lock);
 
+            // Thread 1: Normaler Schreibpfad / Gruppen-Commit
             let t1 = thread::spawn(move || {
-                let _l1 = d1.lock().unwrap();
-                let _l2 = c1.lock().unwrap();
+                let _d = d1.lock().unwrap();
+                let _c = c1.read().unwrap();
+                let _p = p1.read().unwrap();
+                let _j = j1.lock().unwrap();
             });
 
             let d2 = Arc::clone(&doc_lock);
             let c2 = Arc::clone(&commit_barrier);
+            let p2 = Arc::clone(&purge_barrier);
+            let j2 = Arc::clone(&journal_lock);
 
+            // Thread 2: Konkurrierende Transaktion auf selbe Hierarchie
             let t2 = thread::spawn(move || {
-                let _l1 = d2.lock().unwrap();
-                let _l2 = c2.lock().unwrap();
+                let _d = d2.lock().unwrap();
+                let _c = c2.read().unwrap();
+                let _p = p2.read().unwrap();
+                let _j = j2.lock().unwrap();
+            });
+
+            t1.join().unwrap();
+            t2.join().unwrap();
+        });
+    }
+
+    #[test]
+    fn t_snap_loom_history_horizon_never_exceeds_active_snapshots() {
+        // Purge-Barriere und History-Horizon dürfen niemals über die kleinste aktive Snapshot-Seq gehoben werden.
+        loom::model(|| {
+            let min_active = Arc::new(AtomicU64::new(100));
+            let horizon = Arc::new(AtomicU64::new(50));
+
+            let m1 = Arc::clone(&min_active);
+            let h1 = Arc::clone(&horizon);
+
+            // Purge / Prune-Thread: darf Horizon nur bis min_active anheben
+            let t1 = thread::spawn(move || {
+                let active = m1.load(Ordering::Acquire);
+                let current_h = h1.load(Ordering::Acquire);
+                let candidate_h = 120;
+                // Invariante: Horizon <= active
+                let safe_h = candidate_h.min(active);
+                if safe_h > current_h {
+                    h1.store(safe_h, Ordering::Release);
+                }
+            });
+
+            let m2 = Arc::clone(&min_active);
+            let h2 = Arc::clone(&horizon);
+
+            // Reader-Thread: prüft, dass der gelesene Snapshot >= Horizon ist
+            let t2 = thread::spawn(move || {
+                let active = m2.load(Ordering::Acquire);
+                let h = h2.load(Ordering::Acquire);
+                assert!(
+                    h <= active,
+                    "History-Horizon darf niemals größer als min_active_seqno werden!"
+                );
             });
 
             t1.join().unwrap();
