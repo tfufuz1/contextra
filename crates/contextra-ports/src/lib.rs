@@ -82,7 +82,7 @@ pub use metrics::{
     MetricsSink, MetricsSinkAdapter, NoopMetricsSink,
 };
 pub use rng::{Rng, SeededRng};
-pub use storage::{StorageEngine, StorageStats};
+pub use storage::{StorageEngine, StorageStats, MAX_SCAN_MERGE_ACCUMULATOR};
 pub use text_index::{TextIndex, TextIndexStats};
 pub use vector_index::{VectorIndex, VectorIndexStats};
 pub use vfs::{Vfs, VfsFile, VfsOpenOptions};
@@ -112,5 +112,16 @@ mod dyn_safety {
         _assert_dyn_commit_barrier(None);
         _assert_dyn_purge_barrier(None);
         _assert_dyn_arena_guard(None);
+    }
+
+    /// SPEC: T-ARCH-3 / Rule 3
+    #[test]
+    fn test_ports_forbid_unsafe() {
+        // Enforces crate-level unsafe code prohibition per SPEC §3.2 and Rule 3.
+        let lib_src = include_str!("lib.rs");
+        assert!(
+            lib_src.contains("#![forbid(unsafe_code)]"),
+            "contextra-ports must enforce #![forbid(unsafe_code)]"
+        );
     }
 }

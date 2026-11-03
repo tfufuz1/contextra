@@ -56,6 +56,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// # ReadSet Tracking
     /// Untracked: Default implementation delegates to [`StorageEngine::get`] and registriert KEINE Lesezugriffe im ReadSet.
     /// Concrete SSI-enabled engines (e.g. `LsmStorage`) override this method to record keys in the transaction's `ReadSet`.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Lesefehlern oder `ContextraError::NotFound`.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff mit Registrierung im flüchtigen Transaktions-ReadSet; keine Plattenmutation.
     fn get_tracked<'a>(
         &'a self,
         _tx_id: TxId,
@@ -69,6 +75,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// # ReadSet Tracking
     /// Untracked: Default implementation delegates to [`StorageEngine::get_at_seq`] and registriert KEINE Lesezugriffe im ReadSet.
     /// Concrete SSI-enabled engines (e.g. `LsmStorage`) override this method to record keys in the transaction's `ReadSet`.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Lesefehlern oder `ContextraError::NotFound`.
+    ///
+    /// # Crash
+    /// Reiner historischer Lesezugriff mit flüchtiger ReadSet-Registrierung; keine Plattenmutation.
     fn get_at_seq_tracked<'a>(
         &'a self,
         _tx_id: TxId,
@@ -83,6 +95,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// # ReadSet Tracking
     /// Untracked: Default implementation delegates to [`StorageEngine::scan_prefix`] and registriert KEINE Lesezugriffe im ReadSet.
     /// Concrete SSI-enabled engines (e.g. `LsmStorage`) override this method to record keys/prefixes in the transaction's `ReadSet`.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Lesefehlern.
+    ///
+    /// # Crash
+    /// Reiner Scan mit flüchtiger Präfix-ReadSet-Registrierung; keine Plattenmutation.
     #[allow(clippy::type_complexity)]
     fn scan_prefix_tracked<'a>(
         &'a self,
@@ -95,6 +113,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     /// Returns `true` if this storage engine implementation actively tracks read-sets for SSI validation.
     ///
     /// Default implementation returns `false`.
+    ///
+    /// # Fehler
+    /// Keine; unfehlbare Fähigkeitsabfrage.
+    ///
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn supports_ssi_tracking(&self) -> bool {
         false
     }
@@ -124,6 +148,12 @@ pub trait StorageEngine: Send + Sync + 'static {
     }
 
     /// Stores multiple key-value pairs as part of a transaction.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei I/O-Fehlern oder Konflikt bei MVCC.
+    ///
+    /// # Crash
+    /// Schreibt Einträge in den Transaktionspuffer; Persistierung erfolgt erst beim Commit.
     fn put_batch<'a>(
         &'a self,
         tx_id: TxId,
@@ -160,6 +190,12 @@ pub trait StorageEngine: Send + Sync + 'static {
 
     /// Deletes all key-value pairs starting with `prefix` as part of a transaction.
     // TOCTOU-ACCEPTED
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Scan- oder Löschfehlern.
+    ///
+    /// # Crash
+    /// Schreibt Tombstones in den Transaktionspuffer; persistent erst nach Commit.
     fn delete_prefix<'a>(&'a self, tx_id: TxId, prefix: &'a [u8]) -> BoxFuture<'a, Result<u64>> {
         Box::pin(async move {
             let matching_keys: Vec<Vec<u8>> = self

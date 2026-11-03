@@ -52,6 +52,7 @@ deny = [
         "contextra-rank",
         "contextra-store",
         "contextra-testkit",
+        "contextra-testmacros",
         "contextra-text",
         "contextra-vector",
         "tokio-util",

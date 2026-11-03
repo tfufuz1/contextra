@@ -235,6 +235,12 @@ pub enum KeyCoverage {
 ///   must yield safe, repeatable outcomes without double-freeing or state corruption.
 pub trait ErasureLayer: Send + Sync {
     /// Returns the unique layer identifier.
+    ///
+    /// # Fehler
+    /// Keine; statische Identifikator-Abfrage.
+    ///
+    /// # Crash
+    /// Reiner Statusabruf ohne persistente Seiteneffekte.
     fn id(&self) -> LayerId;
 
     /// Resolves the concrete scope affected by the erase target before gating.
@@ -280,5 +286,11 @@ pub trait ErasureLayer: Send + Sync {
     ) -> BoxFuture<'_, Result<LayerWitness, String>>;
 
     /// Reports the key coverage classification (full | unlinked | none).
+    ///
+    /// # Fehler
+    /// Keine; statische Klassifikationsabfrage.
+    ///
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn key_coverage(&self) -> KeyCoverage;
 }
