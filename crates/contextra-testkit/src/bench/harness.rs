@@ -140,6 +140,7 @@ impl BenchmarkHarness {
 mod tests {
     use super::*;
 
+    /// SPEC: BM-TK-HARNESS-OVERHEAD
     #[test]
     #[allow(clippy::unwrap_used, clippy::indexing_slicing)]
     fn test_benchmark_harness_recording_and_unique_baseline() {

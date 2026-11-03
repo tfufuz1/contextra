@@ -129,6 +129,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-CLOCK-ADVANCE-001]
     // Prüft das relative Vorstellen der Uhr um verschiedene Zeiteinheiten (ns, s).
+    /// SPEC: PO-08
     #[test]
     fn test_manual_clock_advance() {
         let clock = ManualClock::new(100);
@@ -143,6 +144,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-CLOCK-SET-001]
     // Prüft das absolute Setzen der Uhr und die Umrechnung in SystemTime.
+    /// SPEC: PO-08
     #[test]
     fn test_manual_clock_set() {
         let clock = ManualClock::default();
@@ -156,6 +158,7 @@ mod tests {
 
     // ANCHOR[contextra-testkit:TEST-CLOCK-DYN-001]
     // Prüft die Nutzung von ManualClock über ein Trait-Objekt `&dyn Clock`.
+    /// SPEC: PO-08
     #[test]
     fn test_manual_clock_as_dyn_clock() {
         let clock = ManualClock::new(1_000);
