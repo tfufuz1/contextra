@@ -184,7 +184,7 @@ pub fn fs_class_spec(path: &Path) -> Result<FsClass, SysError> {
             return Err(SysError::from(std::io::Error::last_os_error()));
         }
 
-        // SAFETY: Rueckgabewert 0 garantiert Initialisierung durch macOS Kernel.
+        // SAFETY: Rueckgabewert 0 sichert Initialisierung durch macOS Kernel.
         let stat = unsafe { stat.assume_init() };
         let f_fstypename = &stat.f_fstypename;
 
