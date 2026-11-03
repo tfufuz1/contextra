@@ -10,11 +10,12 @@ rust-version.workspace = true
 description = "BM25-Volltextindex als verschlüsselte Segmente mit deutschem Analyzer."
 
 [package.metadata.contextra]
-ring = "0"
+ring = "2"
 
 [dependencies]
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
+contextra-crypto = { workspace = true }
 bytes = { workspace = true }
 itoa = { workspace = true }
 regex = { workspace = true }
@@ -30,8 +31,6 @@ futures = "0.3"
 
 [features]
 default = []
-bm25f = []
-docid-128 = ["contextra-types/docid-128"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }

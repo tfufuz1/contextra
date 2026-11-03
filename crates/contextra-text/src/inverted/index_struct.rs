@@ -203,10 +203,7 @@ impl<S: StorageEngine> InvertedIndex<S> {
         for (key, val_bytes) in raw_entries {
             let suffix_bytes = key.get(prefix.len()..).unwrap_or_default();
             if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
-                #[cfg(not(feature = "docid-128"))]
                 let parsed_doc_id = suffix.parse::<u64>().ok();
-                #[cfg(feature = "docid-128")]
-                let parsed_doc_id = suffix.parse::<u128>().ok();
 
                 if let Some(doc_id_raw) = parsed_doc_id {
                     if val_bytes.len() == 4 {
@@ -380,16 +377,10 @@ impl<S: StorageEngine> InvertedIndex<S> {
                 None => continue,
             };
 
-            #[cfg(not(feature = "docid-128"))]
             let doc_id_raw_opt = std::str::from_utf8(part0)
                 .ok()
                 .and_then(|s| s.parse::<u64>().ok())
                 .map(DocId::new);
-            #[cfg(feature = "docid-128")]
-            let doc_id_raw_opt = std::str::from_utf8(part0)
-                .ok()
-                .and_then(|s| s.parse::<u128>().ok())
-                .map(|v| DocId::new(v));
             let doc_id = match doc_id_raw_opt {
                 Some(v) => v,
                 None => continue,

@@ -341,10 +341,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                         for (key, val_bytes) in raw_entries {
                             let suffix_bytes = key.get(prefix.len()..).unwrap_or(&[]);
                             if let Ok(suffix) = std::str::from_utf8(suffix_bytes) {
-                                #[cfg(not(feature = "docid-128"))]
                                 let parsed_doc_id = suffix.parse::<u64>().ok();
-                                #[cfg(feature = "docid-128")]
-                                let parsed_doc_id = suffix.parse::<u128>().ok();
 
                                 if let Some(doc_id_raw) = parsed_doc_id {
                                     if val_bytes.len() == 4 {
@@ -403,10 +400,7 @@ pub async fn block_max_wand_search<S: StorageEngine>(
                         if let Some(colon_pos) = suffix.iter().position(|&b| b == b':') {
                             if let Some(doc_bytes) = suffix.get(..colon_pos) {
                                 if let Ok(doc_id_str) = std::str::from_utf8(doc_bytes) {
-                                    #[cfg(not(feature = "docid-128"))]
                                     let parsed_doc_id = doc_id_str.parse::<u64>().ok();
-                                    #[cfg(feature = "docid-128")]
-                                    let parsed_doc_id = doc_id_str.parse::<u128>().ok();
 
                                     if let Some(doc_id_raw) = parsed_doc_id {
                                         if list

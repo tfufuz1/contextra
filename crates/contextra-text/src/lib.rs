@@ -6,33 +6,16 @@
 // HOTSPOTS: Bm25Scorer::search, Bm25Scorer::insert
 // STAND: TS:2026-09-09T13:22:45Z (SESSION: dc71d70)
 
-//! Hybrid Search Engine & BM25 Scoring (WP-2.1)
+//! BM25-Volltextindex als verschlüsselte Segmente mit deutschem Analyzer.
 //!
-//! Evaluates Inverse Document Frequencies integrating natively into the
-//! `fusion.rs` layer in `contextra-engine`.
+//! # Ring und Abhängigkeiten
+//! Ring 2. Erlaubte Workspace-Abhängigkeiten: `contextra-types`, `contextra-ports`, `contextra-crypto` (SPEC §5.2, §5.3, D-88).
+//! Konsument: `contextra-engine`.
 //!
-//! # Einordnung in die Gesamtarchitektur (Ring-Modell)
-//! Dieses Modul gehört zu **Ring 0 (Kern)** von Contextra. Es enthält grundlegende
-//! Textindizierungs- und Volltextsuch-Primitive (BM25, WAND, morphologische Zerlegung
-//! für Deutsch, invertierte Indizes und Posting-Listen).
-//!
-//! # Abhängigkeiten
-//! - **Normal**: `contextra-ports`, `contextra-types`, sowie Hilfs-Bibliotheken (`bincode`, `blake3`,
-//!   `bytes`, `futures`, `itoa`, `parking_lot`, `regex`, `serde`, `serde_json`, `thiserror`, `tracing`,
-//!   `unicode-segmentation`).
-//! - **Wird genutzt von**: `contextra-engine`
-//!   (SPEC D-24: `contextra-db`, `contextra-router`, `contextra-agent`, `contextra-bench` entfernt).
-//!
-//! # Haupttypen
-//! - [`Bm25Scorer`]: Öffentliche Fassade zur Anbindung an den Port [`TextIndex`].
-//! - [`InvertedIndex`]: Kern des persistenten invertierten Index mit MVCC-Snapshot-Isolation.
-//! - [`BM25`] & [`BM25F`]: Mathematische Scoring-Modelle für Dokument-Relevanz.
-//! - [`Bm25CandidateStream`]: Asynchroner Pull-Stream zur iterativen Ermittlung von Treffern.
-//!
-//! ## Scoring Models & Opt-in Features
-//! - **Standard BM25**: Default scoring algorithm used for keyword and morphological search.
-//! - **BM25F (Field-Weighted BM25)**: Opt-in field-weighted scoring model available via the
-//!   `bm25f` Cargo feature. BM25F is strictly opt-in and is not part of the default execution path.
+//! # Hauptkomponenten
+//! - Invertierte Textindizes und segmentbasierter BM25-Index
+//! - Deutscher Analyzer `de/1` mit Kompositazerlegung und normalisiertem Vokabular
+//! - Block-Max WAND Pruning auf 128er-Blöcken
 
 #![forbid(unsafe_code)]
 // Begründung: Unit-Tests in src/ dürfen für Test-Assertions und Test-Fixtures Test-Helfer verwenden.
@@ -52,14 +35,27 @@
     )
 )]
 
+pub mod analyzer;
 pub mod bm25;
+pub mod buffer;
 pub mod domain;
 pub mod inverted;
 pub mod morphology;
 pub mod posting_list;
+pub mod segment;
 pub mod stream;
 pub mod tokenizer;
 pub mod wand;
+
+pub use analyzer::{
+    compute_term_tag, AnalyzedDocument, AnalyzedToken, Analyzer, AnalyzerId, GermanAnalyzer,
+    UndAnalyzer,
+};
+pub use buffer::{purge_segments, TextBuffer, TextBufferEntry, TextDocHandle, TextPurgeOutcome};
+pub use segment::{
+    BlockMeta, DocumentEntry, SegmentBuilder, SegmentHeader, SegmentPosting, SegmentPostingBlock,
+    SegmentReader, POSTING_BLOCK_SIZE,
+};
 
 pub use bm25::{score_term_bm25f, FieldId, FieldWeight, BM25, BM25F};
 pub use domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};
