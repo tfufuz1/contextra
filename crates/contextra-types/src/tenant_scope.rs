@@ -87,3 +87,21 @@ pub enum TenantScopeViolation {
         actual: TenantId,
     },
 }
+
+/// Mandanten-Kontext für alle mandantenspezifischen Aufrufe (SPEC D-07, VETO-F10).
+#[derive(Clone, PartialEq, Eq, Hash, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TenantContext {
+    tenant: crate::ids::TenantRef,
+}
+
+impl TenantContext {
+    /// Erzeugt einen neuen `TenantContext`.
+    pub fn new(tenant: crate::ids::TenantRef) -> Self {
+        Self { tenant }
+    }
+
+    /// Liefert die Mandanten-Referenz.
+    pub fn tenant(&self) -> &crate::ids::TenantRef {
+        &self.tenant
+    }
+}
