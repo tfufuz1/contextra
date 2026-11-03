@@ -69,23 +69,65 @@ mod loom_conc_tests {
     #[test]
     fn t_conc_1_loom_lock_order_hierarchy() {
         loom::model(|| {
+            // SPEC 5.4 / MV-08: Globale Lockreihenfolge:
+            // Dokumentlock -> Commit-Barriere -> Purge-Barrier -> Journal
             let doc_lock = Arc::new(Mutex::new(0));
             let commit_barrier = Arc::new(Mutex::new(0));
+            let purge_barrier = Arc::new(Mutex::new(0));
+            let journal_lock = Arc::new(Mutex::new(0));
 
             let d1 = Arc::clone(&doc_lock);
             let c1 = Arc::clone(&commit_barrier);
+            let p1 = Arc::clone(&purge_barrier);
+            let j1 = Arc::clone(&journal_lock);
 
             let t1 = thread::spawn(move || {
                 let _l1 = d1.lock().unwrap();
                 let _l2 = c1.lock().unwrap();
+                let _l3 = p1.lock().unwrap();
+                let _l4 = j1.lock().unwrap();
             });
 
             let d2 = Arc::clone(&doc_lock);
             let c2 = Arc::clone(&commit_barrier);
+            let p2 = Arc::clone(&purge_barrier);
+            let j2 = Arc::clone(&journal_lock);
 
             let t2 = thread::spawn(move || {
                 let _l1 = d2.lock().unwrap();
                 let _l2 = c2.lock().unwrap();
+                let _l3 = p2.lock().unwrap();
+                let _l4 = j2.lock().unwrap();
+            });
+
+            t1.join().unwrap();
+            t2.join().unwrap();
+        });
+    }
+
+    #[test]
+    fn t_conc_1_loom_writer_vs_purge_barrier() {
+        loom::model(|| {
+            // Modelliert nebenläufige Schreiber und Purge-Kooperation (D-78)
+            let commit_barrier = Arc::new(Mutex::new(0));
+            let purge_barrier = Arc::new(Mutex::new(0));
+
+            let c1 = Arc::clone(&commit_barrier);
+            let p1 = Arc::clone(&purge_barrier);
+
+            // Writer: Commit-Barriere -> Purge-Barrier
+            let t1 = thread::spawn(move || {
+                let _c = c1.lock().unwrap();
+                let _p = p1.lock().unwrap();
+            });
+
+            let c2 = Arc::clone(&commit_barrier);
+            let p2 = Arc::clone(&purge_barrier);
+
+            // Purge: exklusive Barriere nach derselben Hierarchie
+            let t2 = thread::spawn(move || {
+                let _c = c2.lock().unwrap();
+                let _p = p2.lock().unwrap();
             });
 
             t1.join().unwrap();
