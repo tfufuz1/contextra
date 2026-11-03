@@ -1,7 +1,10 @@
-//! Core trait definitions for Contextra subsystems.
+//! Schnittstellen (Traits) zwischen den Schichten: Speicher, Index, Dateisystem, Zeit, Zufall, Löschschicht.
 //!
-//! These traits define the abstract interfaces that concrete implementations
-//! must fulfill, enabling modularity and testability.
+//! Ring 0 Komponente laut SPEC 5.1a, 5.2, 5.3 und 8.2.
+//! Erlaubte Abhängigkeiten: types.
+//!
+//! Diese Traits definieren die abstrakten Schnittstellen (Ports) zwischen
+//! den Schichten zur Realisierung einer hexagonalen Architektur.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -18,12 +21,12 @@
 use std::future::Future;
 use std::pin::Pin;
 
-pub use contextra_types::{
-    error, error_dto, model_fingerprint, schema, tombstone, types, ConfigFingerprint,
-    ContextChunk, ContextraError, DistanceMetric, DocId, ModelFingerprint, ResourceBudget,
-    ResourceTracker, Result, ScoredDocument, TenantContext, TenantId, TxId,
-};
+// AR-10: Nur Typen re-exportieren, die in Trait-Signaturen vorkommen
 pub use contextra_types::filter::FilterExpr;
+pub use contextra_types::{
+    ConfigFingerprint, ContextChunk, ContextraError, DistanceMetric, DocId, ModelFingerprint,
+    ResourceBudget, ResourceTracker, Result, ScoredDocument, TenantContext, TenantId, TxId,
+};
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -31,24 +34,24 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// Type alias for a pinned, heap-allocated `Stream` that is `Send` and dyn-compatible.
 pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> + Send + 'a>>;
 
+/// Synchronization barriers for commit, compaction, and purge mutual exclusion.
+pub mod barrier;
 /// Clock port trait and system time implementation.
 pub mod clock;
-/// Embedding provider and LLM generation traits.
-// Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
-#[allow(deprecated)]
-pub mod embedding;
+/// Erasure layer contracts.
+pub mod erasure;
+/// ReadGate interface and types.
+pub mod gate;
 /// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
+/// Key management, RecordSealer, and FileKeyring.
+pub mod keys;
+/// Ledger sink contracts.
+pub mod ledger;
+/// Memory locking and dumping protection ports for vector arenas.
+pub mod memory;
 /// Metrics reporting port trait.
 pub mod metrics;
-/// QueryRewriter port trait for multi-step retrieval sub-query generation.
-// Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
-#[allow(deprecated)]
-pub mod query_rewriter;
-/// Reranker port trait for cross-encoder post-retrieval ranking.
-// Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
-#[allow(deprecated)]
-pub mod reranker;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
 /// Key-value storage engine traits.
@@ -59,61 +62,40 @@ pub mod text_index;
 pub mod vector_index;
 /// Virtual File System (VFS) port interface and contracts.
 pub mod vfs;
-/// Erasure layer contracts.
-pub mod erasure;
-/// ReadGate interface and types.
-pub mod gate;
-/// Key management, RecordSealer, and FileKeyring.
-pub mod keys;
-/// Ledger sink contracts.
-pub mod ledger;
-/// Synchronization barriers for commit, compaction, and purge mutual exclusion.
-pub mod barrier;
-/// Memory locking and dumping protection ports for vector arenas.
-pub mod memory;
 
-pub use barrier::*;
-pub use clock::*;
-pub use erasure::*;
-pub use gate::*;
-pub use keys::*;
-pub use ledger::*;
-pub use memory::*;
-// Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
-#[allow(deprecated)]
-pub use embedding::*;
-pub use id_gen::*;
-pub use metrics::*;
-// Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
-#[allow(deprecated)]
-pub use query_rewriter::*;
-// Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
-#[allow(deprecated)]
-pub use reranker::*;
-pub use rng::*;
-pub use storage::*;
-pub use text_index::*;
-pub use vector_index::*;
-pub use vfs::*;
-
-pub use metrics::{
-    HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricSnapshot, NoopMetricsSink,
+// AR-10: Einzelne Re-Exporte statt Glob-Re-Exporte
+pub use barrier::{
+    BarrierExclusive, BarrierShared, CommitBarrier, CompactionPermit, PurgeBarrier, PurgePermit,
 };
+pub use clock::{Clock, SystemClock};
+pub use erasure::{
+    Armed, EraseTarget, ErasureLayer, KeyCoverage, LayerId, LayerScope, LayerWitness, PurgeCx,
+    PurgeOutcome, Scanner,
+};
+pub use gate::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, ReadGate, Seq};
+pub use id_gen::{IdGen, SequentialIdGen};
+pub use keys::{Envelope, FileId, FileKey, FileKeyring, FileKind, RecordSealer, SealCtx};
+pub use ledger::{LedgerEntry, LedgerSink, RangeSet, Timestamp};
+pub use memory::{ArenaGuard, MemoryLockGuard};
+pub use metrics::{
+    HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricName, MetricSnapshot, Metrics,
+    MetricsSink, MetricsSinkAdapter, NoopMetricsSink,
+};
+pub use rng::{Rng, SeededRng};
+pub use storage::{StorageEngine, StorageStats};
+pub use text_index::{TextIndex, TextIndexStats};
+pub use vector_index::{VectorIndex, VectorIndexStats};
+pub use vfs::{Vfs, VfsFile, VfsOpenOptions};
 
 #[cfg(test)]
-// Begründung: Dynamische Sicherheitsprüfung umfasst auch veraltete Ports
-#[allow(deprecated)]
 mod dyn_safety {
     use super::*;
 
     fn _assert_dyn_storage(_: Option<&dyn StorageEngine>) {}
     fn _assert_dyn_metrics_sink(_: Option<&dyn MetricsSink>) {}
-    fn _assert_dyn_embedding(_: Option<&dyn TextEmbeddingEngine>) {}
     fn _assert_dyn_clock(_: Option<&dyn Clock>) {}
     fn _assert_dyn_rng(_: Option<&dyn Rng>) {}
     fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
-    fn _assert_dyn_reranker(_: Option<&dyn Reranker>) {}
-    fn _assert_dyn_query_rewriter(_: Option<&dyn QueryRewriter>) {}
     fn _assert_dyn_vfs(_: Option<&dyn Vfs>) {}
     fn _assert_dyn_commit_barrier(_: Option<&dyn CommitBarrier>) {}
     fn _assert_dyn_purge_barrier(_: Option<&dyn PurgeBarrier>) {}
@@ -123,12 +105,9 @@ mod dyn_safety {
     fn test_dyn_safety_compiles() {
         _assert_dyn_storage(None);
         _assert_dyn_metrics_sink(None);
-        _assert_dyn_embedding(None);
         _assert_dyn_clock(None);
         _assert_dyn_rng(None);
         _assert_dyn_id_gen(None);
-        _assert_dyn_reranker(None);
-        _assert_dyn_query_rewriter(None);
         _assert_dyn_vfs(None);
         _assert_dyn_commit_barrier(None);
         _assert_dyn_purge_barrier(None);

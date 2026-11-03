@@ -6,6 +6,11 @@ use std::sync::Arc;
 /// Port trait for unique ID generation.
 pub trait IdGen: Send + Sync + 'static {
     /// Generates and returns the next unique 64-bit unsigned identifier.
+    /// # Fehler
+    /// Keine; atomare Inkrementierung ist unfehlbar.
+    ///
+    /// # Crash
+    /// Monotoner Sequenzgenerator im RAM.
     fn next_id(&self) -> u64;
 }
 

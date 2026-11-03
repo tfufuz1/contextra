@@ -5,8 +5,8 @@
 // ZWECK: VectorIndex Trait & VectorIndexStats für HNSW/Vektor-Indizes.
 // INVARIANTEN: Rebuild-Triggering & Filtered Search Fallback.
 
-use crate::types::{DocId, ScoredDocument, TxId};
 use crate::Result;
+use crate::{ContextraError, DocId, ScoredDocument, TxId};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 
@@ -36,6 +36,12 @@ pub struct VectorIndexStats {
 /// Verwendet native `async fn` (AFIT) für statischen Dispatch.
 pub trait VectorIndex: Send + Sync + 'static {
     /// Inserts a vector with an associated document ID.
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei Dimensions-Mismatch oder Allokationsfehlern.
+    ///
+    /// # Crash
+    /// Schreibt Vektor in den RAM-Graphknoten; Persistierung erfolgt im Snapshot.
     fn insert(
         &self,
         tx: TxId,
@@ -83,7 +89,7 @@ pub trait VectorIndex: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send {
         async move {
             let _ = (query, k, seq_no);
-            Err(crate::error::ContextraError::capability_unsupported(
+            Err(ContextraError::capability_unsupported(
                 "snapshot_read_at",
                 "Vector search snapshot isolation (search_at) is not supported by default — tracked in ADR-024",
             ))
@@ -111,7 +117,7 @@ pub trait VectorIndex: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send {
         async move {
             if filter.is_some() {
-                return Err(crate::error::ContextraError::capability_unsupported(
+                return Err(ContextraError::capability_unsupported(
                     "vector_filtered_search",
                     "Filtered vector search is not supported by default for this vector engine",
                 ));
@@ -168,8 +174,8 @@ mod tests {
             deleted_ratio: 0.1,
             rebuild_count: 1,
         };
-        let ser = serde_json::to_string(&v_stats).unwrap();
-        let deser: VectorIndexStats = serde_json::from_str(&ser).unwrap();
+        let ser = serde_json::to_string(&v_stats).expect("serialize vector stats");
+        let deser: VectorIndexStats = serde_json::from_str(&ser).expect("deserialize vector stats");
         assert_eq!(v_stats.num_vectors, deser.num_vectors);
     }
 
@@ -274,14 +280,17 @@ mod tests {
             (DocId(1), [1.0, 2.0].as_slice()),
             (DocId(2), [3.0, 4.0].as_slice()),
         ];
-        index.insert_batch(TxId(1), &vectors).await.unwrap();
+        index
+            .insert_batch(TxId(1), &vectors)
+            .await
+            .expect("batch insert succeeds");
         assert_eq!(index.len().await, 2);
         assert!(!index.is_empty().await);
 
         // Test search_filtered default error
         let res = index.search_filtered(&[1.0], 1, Some(&|_| true)).await;
         match res {
-            Err(crate::error::ContextraError::CapabilityUnsupported { capability, .. }) => {
+            Err(ContextraError::CapabilityUnsupported { capability, .. }) => {
                 assert_eq!(capability, "vector_filtered_search");
             }
             _ => panic!("Expected CapabilityUnsupported for search_filtered"),
@@ -290,7 +299,7 @@ mod tests {
         // Test search_at default error
         let res2 = index.search_at(&[1.0], 1, 42).await;
         match res2 {
-            Err(crate::error::ContextraError::CapabilityUnsupported { capability, reason }) => {
+            Err(ContextraError::CapabilityUnsupported { capability, reason }) => {
                 assert_eq!(capability, "snapshot_read_at");
                 assert!(reason.contains("ADR-024"), "Unexpected reason: {reason}");
             }

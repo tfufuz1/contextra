@@ -14,9 +14,6 @@ ring = "0"
 
 [features]
 default = []
-# Veraltete Feature-Stubs zur Wahrung der Abwärtskompatibilität externer Abhängigkeiten bis zum Abschluss von WP-1.2
-contract-tests = []
-testkit = []
 
 [dependencies]
 contextra-types = { workspace = true }
