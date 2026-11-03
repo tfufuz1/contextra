@@ -153,3 +153,91 @@ fn t_raw_1_field_scan_positive_control_enforced() {
     );
     assert_eq!(res_fail, Err(InvalidCode::MissingPositiveControl));
 }
+
+/// SPEC: T-MUT-1, T-RAW-2
+/// Test planted residues across MK1, MK2, and MK3, ensuring each triggers the appropriate error code.
+#[test]
+fn t_mut_1_planted_residues_trigger_findings() {
+    let target_bytes = [
+        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
+        0x00,
+    ];
+    let target_hex = hex::encode(target_bytes);
+
+    // 1. Mutant MK1 / MK2: Planted raw needle inside a file
+    {
+        let dir = tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        fs::create_dir_all(&data_dir).unwrap();
+
+        fs::write(data_dir.join("clean.dat"), b"clean_data").unwrap();
+        let mut dirty = b"header_data_".to_vec();
+        dirty.extend_from_slice(&target_bytes);
+        dirty.extend_from_slice(b"_trailer");
+        fs::write(data_dir.join("polluted.dat"), dirty).unwrap();
+
+        let mut pass_file = tempfile::NamedTempFile::new().unwrap();
+        pass_file.write_all(b"secret").unwrap();
+        let handle = File::open(pass_file.path()).unwrap();
+        let fd = handle.as_raw_fd();
+
+        let res = execute_field_scan(&data_dir, &target_hex, fd);
+        assert_eq!(
+            res,
+            Err(InvalidCode::Mk2RawResidue),
+            "Planted raw needle mutant must be detected by MK2"
+        );
+    }
+
+    // 2. Mutant MK3: Planted active key in vault.dat
+    {
+        let dir = tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        fs::create_dir_all(&data_dir).unwrap();
+
+        let mut vault_data = vec![0u8; 192];
+        let mut slot = vec![0u8; 80];
+        slot[0] = 0x01; // slot type
+        slot[1..17].copy_from_slice(&target_bytes);
+        slot[49] = 0x01; // active slot status
+        vault_data.extend_from_slice(&slot);
+        fs::write(data_dir.join("vault.dat"), vault_data).unwrap();
+
+        let mut pass_file = tempfile::NamedTempFile::new().unwrap();
+        pass_file.write_all(b"secret").unwrap();
+        let handle = File::open(pass_file.path()).unwrap();
+        let fd = handle.as_raw_fd();
+
+        let res = execute_field_scan(&data_dir, &target_hex, fd);
+        assert_eq!(
+            res,
+            Err(InvalidCode::Mk3KeyPresent),
+            "Planted active vault slot mutant must be detected by MK3"
+        );
+    }
+}
+
+/// SPEC: T-MUT-1, T-RAW-2
+/// Ensure a negative finding without positive control is invalid.
+#[test]
+fn t_mut_1_negative_finding_without_passed_positive_control_is_invalid() {
+    let dir = tempdir().unwrap();
+    let empty_data_dir = dir.path().join("data_empty");
+    fs::create_dir_all(&empty_data_dir).unwrap();
+
+    let mut pass_file = tempfile::NamedTempFile::new().unwrap();
+    pass_file.write_all(b"secret").unwrap();
+    let handle = File::open(pass_file.path()).unwrap();
+    let fd = handle.as_raw_fd();
+
+    let target_hex = "112233445566778899aabbccddeeff00";
+
+    // In an empty directory, even if no target needle is found, there is NO positive control passed!
+    // Therefore, scan MUST fail closed with MissingPositiveControl, rather than returning Ok(()).
+    let res = execute_field_scan(&empty_data_dir, target_hex, fd);
+    assert_eq!(
+        res,
+        Err(InvalidCode::MissingPositiveControl),
+        "A negative finding on empty data without positive control must be invalid"
+    );
+}
