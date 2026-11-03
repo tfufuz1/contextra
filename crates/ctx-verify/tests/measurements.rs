@@ -1,6 +1,6 @@
 //! Throughput and memory verification for ctx-verify scan and report validation.
 //!
-//! SPEC: T-SCAN, T-REPORT, D-72
+//! SPEC: T-RAW-1, T-REPORT, D-72
 
 use ctx_verify::scan::execute_field_scan;
 use std::fs::{self, File};
@@ -9,9 +9,10 @@ use std::os::fd::AsRawFd;
 use std::time::Instant;
 use tempfile::tempdir;
 
+/// SPEC: T-RAW-1
 #[allow(clippy::disallowed_methods)]
 #[test]
-fn bench_field_scan_throughput() {
+fn t_raw_1_bench_field_scan_throughput() {
     let dir = tempdir().unwrap();
     let data_dir = dir.path().join("data");
     fs::create_dir_all(&data_dir).unwrap();
