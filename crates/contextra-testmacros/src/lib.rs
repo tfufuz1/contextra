@@ -1,4 +1,3 @@
-#![forbid(unsafe_code)]
 //! # Crate `contextra-testmacros`
 //!
 //! Proc-Makros für die Contextra-Testinfrastruktur:

@@ -333,7 +333,17 @@ async fn test_ttl_overflow_does_not_expire() {
 #[tokio::test]
 async fn test_t_del_lock_held_during_delete_op_and_commit() {
     // T-DEL-LOCK-1: delete() MUSS kv_locks für die ID während des gesamten
-    // delete_op + commit halten.
+    // delete_op + commit halten. Bei Bug B wurde _guard unmittelbar nach dem
+    // Erwerb mit drop(_guard) freigegeben, bevor delete_op und commit liefen.
+    // Das öffnete ein Zeitfenster für nebenläufige Schreiber.
+    //
+    // Testprinzip (deterministisch):
+    // 1. Externes lock_for("race_doc") halten.
+    // 2. delete("race_doc") im Hintergrund starten – muss auf unser Lock warten.
+    // 3. try_lock_for("race_doc") aufrufen: gibt None zurück, wenn delete das
+    //    Lock korrekt HÄlt (Fix). Gibt Some zurück, wenn delete das Lock bereits
+    //    freigegeben hat (Bug – delete lief ohne Lock zu Ende).
+    // 4. Externes Lock freigeben → delete kann abschließen.
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;

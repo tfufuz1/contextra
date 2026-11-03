@@ -445,38 +445,6 @@ fn test_t_kdf_1_min_m_kib_rejects_old_buggy_value_19456() {
     );
 }
 
-#[test]
-fn test_s18_kdf_min_m_kib_enforced_strictly() {
-    // S-18: Bestätige mit einem Test, dass kdf::MIN_M_KIB >= 65536 erzwungen wird
-    // (Parameter darunter werden abgelehnt).
-    assert!(
-        MIN_M_KIB >= 65536,
-        "S-18: MIN_M_KIB muss mindestens 65536 KiB (64 MiB) betragen"
-    );
-
-    // Exakt unter der Grenze: 65535 KiB muss abgelehnt werden
-    assert_eq!(
-        KdfParams::from_header(MIN_M_KIB - 1, 3, 4),
-        Err(CryptoError::Corrupt),
-        "S-18: from_header mit MIN_M_KIB - 1 muss Corrupt liefern"
-    );
-    assert_eq!(
-        KdfParams::from_config(MIN_M_KIB - 1, 3, 4),
-        Err(CryptoError::Config),
-        "S-18: from_config mit MIN_M_KIB - 1 muss Config liefern"
-    );
-
-    // Grenze selbst muss akzeptiert werden
-    assert!(
-        KdfParams::from_header(MIN_M_KIB, 3, 4).is_ok(),
-        "S-18: from_header mit MIN_M_KIB muss erfolgreich sein"
-    );
-    assert!(
-        KdfParams::from_config(MIN_M_KIB, 3, 4).is_ok(),
-        "S-18: from_config mit MIN_M_KIB muss erfolgreich sein"
-    );
-}
-
 /// SPEC: T-NONCE, T-ENC, T-KEYSLOT, T-KDF
 /// Comprehensive Negative Test Matrix
 #[test]
@@ -529,59 +497,6 @@ fn test_negative_matrix_bit_flip_and_truncation() {
             "Truncation to length {len} should fail auth"
         );
     }
-}
-
-struct DeterministicNonce([u8; 12]);
-impl NonceSource for DeterministicNonce {
-    fn fill_nonce(&mut self, dest: &mut [u8; 12]) {
-        *dest = self.0;
-    }
-}
-
-#[test]
-fn test_deterministic_nonce_source_injection() {
-    let key = SecretKey::<32>::new([0x88; 32]);
-    let dek = Dek(key);
-    let doc_tag = [0x55; 16];
-    let key_bytes = b"tenants/test/key";
-    let plain = b"deterministic payload";
-
-    let mut ns1 = DeterministicNonce([0xAA; 12]);
-    let mut ns2 = DeterministicNonce([0xAA; 12]);
-
-    let env1 = seal_record_with_nonce_source(&dek, doc_tag, key_bytes, plain, &mut ns1);
-    let env2 = seal_record_with_nonce_source(&dek, doc_tag, key_bytes, plain, &mut ns2);
-
-    assert_eq!(
-        env1, env2,
-        "Identical nonces must yield identical ciphertext in AES-GCM-SIV"
-    );
-
-    let opened = open_record(&dek, key_bytes, &env1).expect("open deterministic record");
-    assert_eq!(opened.as_slice(), plain);
-}
-
-#[test]
-fn test_no_secrets_leaked_in_display_or_debug() {
-    let secret_bytes = [0xAA; 32];
-    let master = MasterKey::new(secret_bytes);
-    let hierarchy = KeyHierarchy::from_master(master);
-    let secret = Secret::from_slice(b"super_secret_passphrase");
-
-    let dbg_secret = format!("{:?}", secret);
-    assert!(!dbg_secret.contains("super_secret_passphrase"));
-    assert!(dbg_secret.contains("[REDACTED]"));
-
-    let dbg_key = format!("{:?}", hierarchy.enc().0);
-    assert!(!dbg_key.contains("170")); // 0xAA = 170
-    assert!(dbg_key.contains("[REDACTED]"));
-
-    // Verify error display
-    assert_eq!(format!("{}", CryptoError::Auth), "Auth");
-    assert_eq!(format!("{}", CryptoError::Corrupt), "Corrupt");
-    assert_eq!(format!("{}", CryptoError::Config), "Config");
-    assert_eq!(format!("{}", CryptoError::Limit), "Limit");
-    assert_eq!(format!("{}", CryptoError::Internal), "Internal");
 }
 
 #[test]

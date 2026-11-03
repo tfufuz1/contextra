@@ -37,6 +37,7 @@ default-members = [
     "crates/contextra-engine",
     "crates/contextra",
     "crates/contextra-testkit",
+    "crates/contextra-testmacros",
     "tests/arch",
 ]
 
