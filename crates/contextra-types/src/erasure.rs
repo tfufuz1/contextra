@@ -324,7 +324,11 @@ pub struct Residue {
 
 impl fmt::Display for Residue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "erasure residue detected: {} matches found", self.matches)
+        write!(
+            f,
+            "erasure residue detected: {} matches found",
+            self.matches
+        )
     }
 }
 

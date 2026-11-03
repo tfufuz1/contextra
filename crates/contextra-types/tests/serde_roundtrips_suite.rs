@@ -109,12 +109,12 @@ fn test_bincode_binary_payload_sizes() {
 #[test]
 /// Prüft die JSON-Serialisierung komplex geschachtelter Strukturen wie `HybridQuery` und `ContextWindow`.
 fn test_serde_complex_nested_structures() {
-    let filter = FilterExpr::And(
-        Box::new(FilterExpr::Eq {
+    let filter = types::FilterExpr::And(
+        Box::new(types::FilterExpr::Eq {
             field: "status".to_string(),
             value: serde_json::json!("active"),
         }),
-        Box::new(FilterExpr::Gte {
+        Box::new(types::FilterExpr::Gte {
             field: "age".to_string(),
             value: serde_json::json!(18),
         }),

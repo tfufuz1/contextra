@@ -86,17 +86,20 @@ impl<'de> Deserialize<'de> for KeyBound {
                 write!(f, "exactly {} bytes for KeyBound", KEY_BOUND_LEN)
             }
             fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<KeyBound, E> {
-                let arr: [u8; KEY_BOUND_LEN] = v.try_into().map_err(|_| {
-                    E::invalid_length(v.len(), &self)
-                })?;
+                let arr: [u8; KEY_BOUND_LEN] = v
+                    .try_into()
+                    .map_err(|_| E::invalid_length(v.len(), &self))?;
                 Ok(KeyBound(arr))
             }
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<KeyBound, A::Error> {
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<KeyBound, A::Error> {
                 let mut arr = [0u8; KEY_BOUND_LEN];
                 for (i, b) in arr.iter_mut().enumerate() {
-                    *b = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::invalid_length(i, &self)
-                    })?;
+                    *b = seq
+                        .next_element()?
+                        .ok_or_else(|| serde::de::Error::invalid_length(i, &self))?;
                 }
                 Ok(KeyBound(arr))
             }
@@ -150,17 +153,20 @@ impl<'de> Deserialize<'de> for KeyBuf {
                 write!(f, "exactly {} bytes for KeyBuf", KEY_LEN)
             }
             fn visit_bytes<E: serde::de::Error>(self, v: &[u8]) -> Result<KeyBuf, E> {
-                let arr: [u8; KEY_LEN] = v.try_into().map_err(|_| {
-                    E::invalid_length(v.len(), &self)
-                })?;
+                let arr: [u8; KEY_LEN] = v
+                    .try_into()
+                    .map_err(|_| E::invalid_length(v.len(), &self))?;
                 Ok(KeyBuf(arr))
             }
-            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<KeyBuf, A::Error> {
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<KeyBuf, A::Error> {
                 let mut arr = [0u8; KEY_LEN];
                 for (i, b) in arr.iter_mut().enumerate() {
-                    *b = seq.next_element()?.ok_or_else(|| {
-                        serde::de::Error::invalid_length(i, &self)
-                    })?;
+                    *b = seq
+                        .next_element()?
+                        .ok_or_else(|| serde::de::Error::invalid_length(i, &self))?;
                 }
                 Ok(KeyBuf(arr))
             }
@@ -329,7 +335,7 @@ impl KeyRange {
         lo[33..49].copy_from_slice(cl.as_bytes());
         lo[49..65].copy_from_slice(d.as_bytes());
 
-        let mut hi = lo;
+        let hi = lo;
         Self {
             lo: KeyBound(lo),
             hi: KeyBound(hi),

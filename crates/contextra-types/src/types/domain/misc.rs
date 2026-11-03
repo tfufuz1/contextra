@@ -588,6 +588,7 @@ impl AutoExtractionMode {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for AutoExtractionMode {
     fn default() -> Self {
         #[cfg(not(feature = "auto-extraction-opt-out"))]
