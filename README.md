@@ -18,7 +18,7 @@ Kurzformel: „SQLite für Agenten, die gezielt und nachweisbar löschen können
 
 ## Status
 
-Entwicklungsstand, **kein Release**. Die Spezifikation [`docs/SPEC.md`](docs/SPEC.md) (Version 4.2.0) beschreibt den Sollzustand für Version 1.0.0. Derzeit baut der Workspace nicht, und der Löschkern ist noch nicht implementiert. Die Bibliothek ist nicht für den produktiven Einsatz freigegeben.
+Entwicklungsstand, **kein Release**. Die Spezifikation [`docs/SPEC.md`](docs/SPEC.md) (Version 5.1.0) beschreibt den Sollzustand für Version 1.0.0. Der Umsetzungsfahrplan und der aktuelle Ist-Zustand sind verbindlich in [`docs/PLAN.md`](docs/PLAN.md) geregelt. Die Bibliothek ist noch nicht für den produktiven Einsatz freigegeben.
 
 ## Löschen
 
@@ -28,7 +28,7 @@ Entwicklungsstand, **kein Release**. Die Spezifikation [`docs/SPEC.md`](docs/SPE
 
 ## Grenzen
 
-- **Plattformen:** Linux x86_64/aarch64 auf ext4 oder XFS (Tier 1); macOS mit APFS sowie Linux mit btrfs oder ZFS (Tier 2). Windows, NFS, SMB, FUSE und overlayfs werden nicht unterstützt. Die Startprobe verweigert den Start auf nicht unterstützten Dateisystemen (SPEC D-56).
+- **Plattformen:** Linux x86_64/aarch64 auf ext4 oder XFS (Tier 1); macOS mit APFS sowie Linux mit btrfs oder ZFS (Tier 2). Windows, NFS, SMB, FUSE und overlayfs werden nicht unterstützt. Die Startprobe verweigert den Start auf nicht unterstützten Dateisystemen (SPEC D-56, D-114).
 - **Netzwerk:** Keine Netzwerkfunktion, keine Telemetrie (SPEC HR-1, HR-2).
 - **Nicht in v1:** Server, Sharding, Replikation, MCP-Server, Python-Bindings, Erzeugung von Embeddings, LLM-Aufrufe (SPEC 1.4).
 - **Restrisiken:** Die Liste mit Bedingungen steht in SPEC Anhang D und im Bericht jedes Löschvorgangs.
@@ -37,9 +37,10 @@ Keine Rechtsberatung. Die rechtliche Wertung obliegt dem Betreiber.
 
 ## Dokumentation
 
-- [`docs/SPEC.md`](docs/SPEC.md): normative Spezifikation
+- [`docs/SPEC.md`](docs/SPEC.md): normative Spezifikation (Fassung 5.1.0)
+- [`docs/PLAN.md`](docs/PLAN.md): verbindliche Umsetzungsspezifikation (D-99)
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/TYPE_REGISTRY.md`](docs/TYPE_REGISTRY.md), [`docs/VETOES.md`](docs/VETOES.md)
-- [`docs/COMPILATION.md`](docs/COMPILATION.md), [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md), [`docs/SECURITY.md`](docs/SECURITY.md)
+- [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md), [`docs/SECURITY.md`](docs/SECURITY.md), [`docs/DELETION-DSGVO.md`](docs/DELETION-DSGVO.md)
 
 ## Lizenz
 

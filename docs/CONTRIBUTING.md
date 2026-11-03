@@ -1,6 +1,6 @@
 # Beitragen zu Contextra
 
-Dieses Dokument fasst die Regeln für Beiträge zusammen. Maßgeblich ist [`docs/SPEC.md`](SPEC.md) (Version 4.2.0). Bei Widerspruch gilt die SPEC.
+Dieses Dokument fasst die Regeln für Beiträge zusammen. Maßgeblich ist [`docs/SPEC.md`](SPEC.md) (Version 5.1.0). Bei Widerspruch gilt die SPEC.
 
 ## 1. Voraussetzungen
 
