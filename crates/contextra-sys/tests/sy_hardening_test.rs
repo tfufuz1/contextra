@@ -290,3 +290,18 @@ fn sy_07_secure_zero_volatile_optimization_levels_opt0_and_opt3() {
         }
     }
 }
+
+/// SY-07: Randfall-Prüfung für leere Slices bei `secure_zero_volatile`, `mark_dont_dump` und `lock_pages`.
+#[test]
+fn sy_07_hardening_empty_slice_handling() {
+    let mut empty_buf: [u8; 0] = [];
+    // Leerer Slice bei volatile-Zeroize darf nicht crashen
+    secure_zero_volatile(&mut empty_buf);
+
+    // Leerer Slice bei dont_dump liefert sofort true
+    assert!(mark_dont_dump(&empty_buf));
+
+    // Leerer Slice bei lock_pages liefert Ok(true)
+    let res = lock_pages(&empty_buf, HardeningPolicy::Required);
+    assert_eq!(res, Ok(true));
+}

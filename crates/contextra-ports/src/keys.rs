@@ -135,11 +135,8 @@ pub trait RecordSealer: Send + Sync {
     ) -> BoxFuture<'a, Result<Envelope, String>>;
 
     /// Decrypts envelope. If slot was destroyed/missing, returns error indicating erasure.
-    fn open<'a>(
-        &'a self,
-        key: &'a KeyBuf,
-        env: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<u8>, String>>;
+    fn open<'a>(&'a self, key: &'a KeyBuf, env: &'a [u8])
+        -> BoxFuture<'a, Result<Vec<u8>, String>>;
 
     /// Evicts key range from DEK cache, zeroizing RAM keys (D-79).
     fn evict(&self, scope: &KeyRange);

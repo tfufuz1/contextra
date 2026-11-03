@@ -23,6 +23,52 @@
 
 use crate::kernels::*;
 use contextra_types::ContextraError;
+use std::sync::OnceLock;
+
+// ANCHOR[contextra-simd:DISP-PATH-ENUM]
+/// SIMD execution path selected at runtime based on hardware capabilities.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SimdPath {
+    /// AVX-512 SIMD execution (512-bit registers).
+    Avx512,
+    /// AVX2 + FMA SIMD execution (256-bit registers).
+    Avx2Fma,
+    /// ARM NEON SIMD execution (128-bit registers).
+    Neon,
+    /// Portable scalar reference fallback.
+    Scalar,
+}
+
+static CACHED_SIMD_PATH: OnceLock<SimdPath> = OnceLock::new();
+
+/// Ermittelt den aktiv gewählten SIMD-Pfad für Diagnose und Berichte (SI-04).
+/// Der Pfad wird beim ersten Aufruf bestimmt und gecacht.
+#[inline]
+pub fn active_path() -> SimdPath {
+    *CACHED_SIMD_PATH.get_or_init(detect_hardware_path)
+}
+
+fn detect_hardware_path() -> SimdPath {
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_x86_feature_detected!("avx512f") {
+            return SimdPath::Avx512;
+        }
+        if is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma") {
+            return SimdPath::Avx2Fma;
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            return SimdPath::Neon;
+        }
+    }
+
+    SimdPath::Scalar
+}
 
 // ANCHOR[contextra-simd:DISP-OVERRIDE-ENUM]
 /// SIMD path override options for testing purposes.

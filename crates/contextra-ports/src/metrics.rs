@@ -9,6 +9,7 @@
 //! - Checkpoint duration & DLQ depth
 
 use std::collections::BTreeMap;
+use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -37,6 +38,124 @@ impl MetricsSink for NoopMetricsSink {
     fn record_gauge(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {}
 
     fn record_histogram(&self, _name: &str, _value: f64, _labels: &[(&str, &str)]) {}
+}
+
+/// Static enumeration of all authorized metric names in Contextra (SPEC §14.5, PO-09, D-64).
+///
+/// In accordance with D-64 and PO-09, metric names are strictly static enums and metric
+/// labels NEVER contain user content, IDs, document tags, or tenant names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum MetricName {
+    /// Latency until erasure reach Gated state (`ctx_erase_gated_seconds`).
+    EraseGatedSeconds,
+    /// Latency of durable fsync / flush operations (`ctx_fsync_seconds`).
+    FsyncSeconds,
+    /// Count of open/active erasure operations (`ctx_open_erasures_count`).
+    OpenErasuresCount,
+    /// Age in seconds of the oldest active erasure (`ctx_oldest_open_age_seconds`).
+    OldestOpenAgeSeconds,
+    /// Count of SLA violations during erasure operations (`ctx_sla_violations_total`).
+    SlaViolationsTotal,
+    /// Ratio of tombstones to active records in storage/indexes (`ctx_tombstone_ratio`).
+    TombstoneRatio,
+    /// Free storage bytes on the primary volume (`ctx_free_bytes`).
+    FreeBytes,
+    /// Maximum time spent waiting on the purge mutual exclusion barrier (`ctx_max_purge_barrier_wait_seconds`).
+    MaxPurgeBarrierWaitSeconds,
+    /// Commit total counter.
+    CommitTotal,
+    /// Backpressure level gauge.
+    BackpressureLevel,
+    /// Thread pool utilization gauge.
+    ThreadPoolUtilization,
+    /// Search latency histogram.
+    SearchLatencySeconds,
+}
+
+impl MetricName {
+    /// Returns the canonical Prometheus/OpenTelemetry compatible string representation.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::EraseGatedSeconds => "ctx_erase_gated_seconds",
+            Self::FsyncSeconds => "ctx_fsync_seconds",
+            Self::OpenErasuresCount => "ctx_open_erasures_count",
+            Self::OldestOpenAgeSeconds => "ctx_oldest_open_age_seconds",
+            Self::SlaViolationsTotal => "ctx_sla_violations_total",
+            Self::TombstoneRatio => "ctx_tombstone_ratio",
+            Self::FreeBytes => "ctx_free_bytes",
+            Self::MaxPurgeBarrierWaitSeconds => "ctx_max_purge_barrier_wait_seconds",
+            Self::CommitTotal => "ctx_commit_total",
+            Self::BackpressureLevel => "ctx_backpressure_level",
+            Self::ThreadPoolUtilization => "ctx_thread_pool_utilization",
+            Self::SearchLatencySeconds => "ctx_search_latency_seconds",
+        }
+    }
+}
+
+impl fmt::Display for MetricName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Static, privacy-preserving metrics port (SPEC §14.5, PO-09, D-64).
+///
+/// Follows PO-09: Accepts exclusively static [`MetricName`] variants and forbids dynamic ID labels.
+pub trait Metrics: Send + Sync + 'static {
+    /// Records a counter metric increment.
+    fn record_counter(&self, metric: MetricName, value: u64);
+
+    /// Records a gauge metric absolute value.
+    fn record_gauge(&self, metric: MetricName, value: f64);
+
+    /// Records a histogram observation value in seconds or units.
+    fn record_histogram(&self, metric: MetricName, value: f64);
+}
+
+impl<T: Metrics + ?Sized> Metrics for Arc<T> {
+    fn record_counter(&self, metric: MetricName, value: u64) {
+        (**self).record_counter(metric, value);
+    }
+
+    fn record_gauge(&self, metric: MetricName, value: f64) {
+        (**self).record_gauge(metric, value);
+    }
+
+    fn record_histogram(&self, metric: MetricName, value: f64) {
+        (**self).record_histogram(metric, value);
+    }
+}
+
+/// Adapter implementing [`Metrics`] over any existing [`MetricsSink`].
+#[derive(Debug, Clone)]
+pub struct MetricsSinkAdapter<S> {
+    sink: S,
+}
+
+impl<S> MetricsSinkAdapter<S> {
+    /// Creates a new adapter wrapping `sink`.
+    pub fn new(sink: S) -> Self {
+        Self { sink }
+    }
+
+    /// Returns a reference to the inner sink.
+    pub fn inner(&self) -> &S {
+        &self.sink
+    }
+}
+
+impl<S: MetricsSink> Metrics for MetricsSinkAdapter<S> {
+    fn record_counter(&self, metric: MetricName, value: u64) {
+        self.sink.record_counter(metric.as_str(), value, &[]);
+    }
+
+    fn record_gauge(&self, metric: MetricName, value: f64) {
+        self.sink.record_gauge(metric.as_str(), value, &[]);
+    }
+
+    fn record_histogram(&self, metric: MetricName, value: f64) {
+        self.sink.record_histogram(metric.as_str(), value, &[]);
+    }
 }
 
 /// Key identifying a metric by name and sorted key-value labels.
@@ -271,6 +390,27 @@ impl<T: MetricsSink + ?Sized> MetricsSink for Arc<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_static_metrics_adapter() {
+        let sink = Arc::new(InMemoryMetricsSink::new());
+        let adapter = MetricsSinkAdapter::new(sink.clone());
+
+        adapter.record_counter(MetricName::CommitTotal, 42);
+        adapter.record_gauge(MetricName::BackpressureLevel, 1.5);
+        adapter.record_histogram(MetricName::FsyncSeconds, 0.003);
+
+        let snap = sink.snapshot();
+        let counter_key = MetricKey::new(MetricName::CommitTotal.as_str(), &[]);
+        let gauge_key = MetricKey::new(MetricName::BackpressureLevel.as_str(), &[]);
+        let hist_key = MetricKey::new(MetricName::FsyncSeconds.as_str(), &[]);
+
+        assert_eq!(snap.counters.get(&counter_key), Some(&42));
+        assert_eq!(snap.gauges.get(&gauge_key), Some(&1.5));
+        let hist_snap = snap.histograms.get(&hist_key).expect("hist key");
+        assert_eq!(hist_snap.count, 1);
+        assert_eq!(hist_snap.min, Some(0.003));
+    }
 
     #[test]
     fn test_noop_metrics_sink() {

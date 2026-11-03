@@ -18,12 +18,12 @@
 use std::future::Future;
 use std::pin::Pin;
 
-pub use contextra_types::{
-    error, error_dto, model_fingerprint, schema, tombstone, types, ConfigFingerprint,
-    ContextChunk, ContextraError, DistanceMetric, DocId, ModelFingerprint, ResourceBudget,
-    ResourceTracker, Result, ScoredDocument, TenantContext, TenantId, TxId,
-};
 pub use contextra_types::filter::FilterExpr;
+pub use contextra_types::{
+    error, error_dto, model_fingerprint, schema, tombstone, types, ConfigFingerprint, ContextChunk,
+    ContextraError, DistanceMetric, DocId, ModelFingerprint, ResourceBudget, ResourceTracker,
+    Result, ScoredDocument, TenantContext, TenantId, TxId,
+};
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -31,14 +31,26 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// Type alias for a pinned, heap-allocated `Stream` that is `Send` and dyn-compatible.
 pub type BoxStream<'a, T> = Pin<Box<dyn futures_util::stream::Stream<Item = T> + Send + 'a>>;
 
+/// Synchronization barriers for commit, compaction, and purge mutual exclusion.
+pub mod barrier;
 /// Clock port trait and system time implementation.
 pub mod clock;
 /// Embedding provider and LLM generation traits.
 // Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
 #[allow(deprecated)]
 pub mod embedding;
+/// Erasure layer contracts.
+pub mod erasure;
+/// ReadGate interface and types.
+pub mod gate;
 /// Unique ID generator port trait and atomic implementation.
 pub mod id_gen;
+/// Key management, RecordSealer, and FileKeyring.
+pub mod keys;
+/// Ledger sink contracts.
+pub mod ledger;
+/// Memory locking and dumping protection ports for vector arenas.
+pub mod memory;
 /// Metrics reporting port trait.
 pub mod metrics;
 /// QueryRewriter port trait for multi-step retrieval sub-query generation.
@@ -59,20 +71,14 @@ pub mod text_index;
 pub mod vector_index;
 /// Virtual File System (VFS) port interface and contracts.
 pub mod vfs;
-/// Erasure layer contracts.
-pub mod erasure;
-/// ReadGate interface and types.
-pub mod gate;
-/// Key management, RecordSealer, and FileKeyring.
-pub mod keys;
-/// Ledger sink contracts.
-pub mod ledger;
 
+pub use barrier::*;
 pub use clock::*;
 pub use erasure::*;
 pub use gate::*;
 pub use keys::*;
 pub use ledger::*;
+pub use memory::*;
 // Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
 #[allow(deprecated)]
 pub use embedding::*;
@@ -89,10 +95,6 @@ pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
 pub use vfs::*;
-
-/// Generic contract tests for port implementers.
-#[cfg(feature = "contract-tests")]
-pub mod contract_tests;
 
 pub use metrics::{
     HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricSnapshot, NoopMetricsSink,
@@ -113,6 +115,9 @@ mod dyn_safety {
     fn _assert_dyn_reranker(_: Option<&dyn Reranker>) {}
     fn _assert_dyn_query_rewriter(_: Option<&dyn QueryRewriter>) {}
     fn _assert_dyn_vfs(_: Option<&dyn Vfs>) {}
+    fn _assert_dyn_commit_barrier(_: Option<&dyn CommitBarrier>) {}
+    fn _assert_dyn_purge_barrier(_: Option<&dyn PurgeBarrier>) {}
+    fn _assert_dyn_arena_guard(_: Option<&dyn ArenaGuard>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -125,5 +130,8 @@ mod dyn_safety {
         _assert_dyn_reranker(None);
         _assert_dyn_query_rewriter(None);
         _assert_dyn_vfs(None);
+        _assert_dyn_commit_barrier(None);
+        _assert_dyn_purge_barrier(None);
+        _assert_dyn_arena_guard(None);
     }
 }

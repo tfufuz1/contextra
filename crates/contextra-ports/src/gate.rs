@@ -86,6 +86,11 @@ impl KeyRange {
     pub const fn new(start: KeyBuf, end: KeyBuf) -> Self {
         Self { start, end }
     }
+
+    /// Returns `true` if `key` falls within `[start, end)`.
+    pub fn contains(&self, key: &KeyBuf) -> bool {
+        key >= &self.start && key < &self.end
+    }
 }
 
 impl fmt::Debug for KeyRange {
