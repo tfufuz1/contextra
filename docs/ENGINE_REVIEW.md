@@ -1,8 +1,8 @@
 # contextra-engine – Technischer Review-Report
 
-> **Datum:** 2026-11-02  
-> **Crate:** `contextra-engine` (Ring 3)  
-> **Reviewer-Rolle:** Datenbank-Kernel-Ingenieur (Orchestrierung, Hintergrund-Worker, Lebenszyklen)  
+> **Datum:** 2026-11-02
+> **Crate:** `contextra-engine` (Ring 3)
+> **Reviewer-Rolle:** Datenbank-Kernel-Ingenieur (Orchestrierung, Hintergrund-Worker, Lebenszyklen)
 > **Basis:** Vollständige Quell-Lektüre aller Produktionsdateien in `src/`
 
 ---
@@ -24,10 +24,10 @@ Die `contextra-engine` orchestriert LSM-Store, HNSW-Vektor-Index, BM25-Text-Inde
 
 ### DEF-01 — Delete-Lock-Race: KV-Lock wird sofort nach Erwerb freigegeben
 
-**Dateien:**  
-- [`delete.rs:27-28`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/crud/delete.rs#L27-L28)  
-- [`update.rs:32-33`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/crud/update.rs#L32-L33)  
-- [`kv.rs:18-19`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/crud/kv.rs#L18-L19)  
+**Dateien:**
+- [`delete.rs:27-28`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/crud/delete.rs#L27-L28)
+- [`update.rs:32-33`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/crud/update.rs#L32-L33)
+- [`kv.rs:18-19`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/crud/kv.rs#L18-L19)
 - [`maintenance.rs:706-707`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/maintenance.rs#L706-L707)
 
 **Befund:**
@@ -120,14 +120,14 @@ ledger.push(CompensateHnswAction::new(
 
 ### HIGH-01 — 2PC-Recovery kennt `stages_completed` nicht, bricht Forward-Recovery ab
 
-**Dateien:**  
-- [`cleanup.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/transaction/cleanup.rs)  
-- [`maintenance.rs:220-244`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/maintenance.rs#L220-L244)  
+**Dateien:**
+- [`cleanup.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/transaction/cleanup.rs)
+- [`maintenance.rs:220-244`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/maintenance.rs#L220-L244)
 - [`intent.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/transaction/intent.rs)
 
 **Befund:**
 
-`CommitIntent::Pending` enthält `stages_completed: u8` (0 = Intent geschrieben, 1 = LSM committed). Die Recovery-Logik in `cleanup.rs::recover_pending_intents()` und in `maintenance.rs::recover_pending_transaction_intents()` wertet `stages_completed` **nicht aus**. Beim Forward-Recovery wird immer angenommen, dass entweder alles neu gespielt werden muss oder dass der LSM-Zustand alles entscheidet. 
+`CommitIntent::Pending` enthält `stages_completed: u8` (0 = Intent geschrieben, 1 = LSM committed). Die Recovery-Logik in `cleanup.rs::recover_pending_intents()` und in `maintenance.rs::recover_pending_transaction_intents()` wertet `stages_completed` **nicht aus**. Beim Forward-Recovery wird immer angenommen, dass entweder alles neu gespielt werden muss oder dass der LSM-Zustand alles entscheidet.
 
 Konkret:
 - Ein Intent mit `stages_completed = 1` (LSM committed, Indizes noch nicht) wird korrekt als "committed" erkannt (weil Daten in LSM vorhanden), aber die Text- und Vektor-Indizes werden **nicht zwangsrekonstruiert** — sie werden nur durch den Fallback-Scan in `fallback_scan_missing_text_index_documents()` repariert, der ausschließlich Text-Index prüft, **nicht HNSW**.
@@ -235,8 +235,8 @@ Das double-checked Locking ist korrekt implementiert (Write-Lock, nochmalige Pr�
 
 ### MED-01 — Graph-Index-Reste sind toter Code, aber im Commit-Pfad aktiv
 
-**Dateien:**  
-- [`db_transaction_commit.rs:56-128`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/transaction/db_transaction_commit.rs#L56-L128)  
+**Dateien:**
+- [`db_transaction_commit.rs:56-128`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/transaction/db_transaction_commit.rs#L56-L128)
 - [`db_transaction.rs:26-30`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/transaction/db_transaction.rs#L26-L30)
 
 `Collection` (Ring 3) hat kein `graph_index`-Feld (nicht in `mod.rs`). `DbTransaction` referenziert `collection.graph_index` und `collection.graph_index.commit/rollback` — das Projekt baut nur weil ein `graph_index`-Feld an anderer Stelle existiert (vermutlich in Test-Fixtures oder einer separaten Collection-Variante). `staged_graph_entities`, `staged_graph_edges`, `staged_graph_entity_deletes`, `staged_graph_edge_deletes`, `staged_hyperedges` — **5 von 10 Staging-Vektoren** in `DbTransaction` sind Graph-bezogen und werden in der Produktion nie befüllt (weil `Collection.graph_index` ein No-Op ist).
@@ -268,8 +268,8 @@ pub fn apply_read_gate(hits: Vec<crate::SearchResult>) -> Vec<crate::SearchResul
 
 ### MED-03 — `compensate_lsm` in `db_transaction_rollback.rs` ist duplizierter Code
 
-**Dateien:**  
-- [`db_transaction_rollback.rs:67-179`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/transaction/db_transaction_rollback.rs#L67-L179)  
+**Dateien:**
+- [`db_transaction_rollback.rs:67-179`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/transaction/db_transaction_rollback.rs#L67-L179)
 - [`compensating_actions.rs:81-193`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/transaction/compensating_actions.rs#L81-L193)
 
 `compensate_lsm` in `db_transaction_rollback.rs` und `CompensateLsmAction::execute()` in `compensating_actions.rs` sind nahezu identisch (Retry-Loop, Key-Restore, Aborted-Intent-Schreiben). Beide müssen bei Änderungen synchron gehalten werden.
@@ -310,8 +310,8 @@ BM25-Suche mit `k=1` für exakten Text kann falsche Negative produzieren: Wenn d
 
 ### MED-06 — `next_tx` wird von allen Collections und der Engine-Facade geteilt
 
-**Dateien:**  
-- [`lib.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/lib.rs) (`Arc<AtomicU64>`)  
+**Dateien:**
+- [`lib.rs`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/lib.rs) (`Arc<AtomicU64>`)
 - [`tx.rs:27`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/tx.rs#L27)
 
 Alle Collections (und die Engine selbst für Intent-Transaktionen) teilen einen einzigen `Arc<AtomicU64>`-Zähler. Das bedeutet:
@@ -345,8 +345,8 @@ Laut SPEC P7 muss Zeit ausschließlich über den Port `Clock` injiziert werden. 
 
 ### OPT-01 — `reap_expired_documents` und `trigger_expiry_cleanup` — Codeduplizierung: Zwei fast-identische Scan-Loops
 
-**Dateien:**  
-- [`maintenance.rs:419-509`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/maintenance.rs#L419-L509)  
+**Dateien:**
+- [`maintenance.rs:419-509`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/maintenance.rs#L419-L509)
 - [`maintenance.rs:517-636`](file:///home/freddy/Projekte/contextra/crates/contextra-engine/src/collection/maintenance.rs#L517-L636)
 
 Beide Methoden implementieren denselben paginierten Scan-Loop (cursor-basiert, `BATCH_SIZE = 1000`, `String::from_utf8_lossy`, prefix-stripping, `__`-Filter). Der Code sollte in eine gemeinsame `scan_user_keys_paged()`-Methode extrahiert werden.
