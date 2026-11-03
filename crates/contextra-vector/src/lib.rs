@@ -14,7 +14,7 @@
 // ANCHOR[REFACTOR:WP-0.0-STABLESIMD] STATUS:DONE (TS:2026-06-01T00:00:00Z) — Remove nightly portable_simd
 // TEST: cargo +stable check -p contextra-index
 // DONE: #![feature(portable_simd)] ist entfernt und distance.rs nutzt stabiles Rust.
-// INVARIANTE: Zero unsafe code in contextra-vector. SIMD an contextra-simd, mmap an contextra-sys ausgelagert.
+// INVARIANTE: Zero unsafe code in contextra-vector. SIMD an contextra-simd ausgelagert; kein mmap (D-94).
 #![forbid(unsafe_code)]
 // ADR-077: Vector index numerical conversions, array indexing, and internal collections.
 #![allow(
