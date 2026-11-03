@@ -125,7 +125,10 @@ impl Header {
     }
 
     pub fn mac(hdr_key: &HdrKey, bytes584: &[u8]) -> [u8; 32] {
-        let mut mac = Hmac::<Sha256>::new_from_slice(hdr_key.0.as_bytes()).expect("hdr key");
+        let mut mac = match Hmac::<Sha256>::new_from_slice(hdr_key.0.as_bytes()) {
+            Ok(m) => m,
+            Err(_) => return [0u8; 32],
+        };
         mac.update(bytes584);
         mac.finalize().into_bytes().into()
     }

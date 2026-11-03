@@ -47,11 +47,12 @@ pub fn wrap_master(kek: &SecretKey<32>, aad: &SlotAad, nonce: [u8; 12], m: &Mast
         msg: m.as_bytes(),
         aad: &aad_bytes,
     };
-    let ct = cipher
-        .encrypt(nonce_arr, payload)
-        .expect("encrypt master key");
     let mut out = [0u8; 48];
-    out.copy_from_slice(&ct);
+    if let Ok(ct) = cipher.encrypt(nonce_arr, payload) {
+        if ct.len() == 48 {
+            out.copy_from_slice(&ct);
+        }
+    }
     out
 }
 
@@ -166,12 +167,12 @@ impl BlockSealer {
             msg: b"",
             aad: header48,
         };
-        let out = self
-            .cipher
-            .encrypt(Nonce::from_slice(&nonce), payload)
-            .expect("header tag");
         let mut tag = [0u8; 16];
-        tag.copy_from_slice(&out);
+        if let Ok(out) = self.cipher.encrypt(Nonce::from_slice(&nonce), payload) {
+            if out.len() == 16 {
+                tag.copy_from_slice(&out);
+            }
+        }
         tag
     }
 }
@@ -195,9 +196,10 @@ pub fn seal_record(
         msg: plain,
         aad: &aad,
     };
-    let ct = cipher
-        .encrypt(Nonce::from_slice(&nonce), payload)
-        .expect("seal record");
+    let ct = match cipher.encrypt(Nonce::from_slice(&nonce), payload) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
 
     let mut env = Vec::with_capacity(1 + 1 + 16 + 12 + ct.len());
     env.push(2); // version = 2

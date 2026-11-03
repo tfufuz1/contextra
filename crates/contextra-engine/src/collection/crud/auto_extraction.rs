@@ -321,8 +321,14 @@ mod auto_extraction_tests {
     #[tokio::test]
     async fn test_noop_llm_generator_behavior_defined_skip() {
         let generator = NoopLlmGenerator;
-        let response = generator.generate("extract entities").await.expect("generate should succeed");
-        assert_eq!(response, "[]", "NoopLlmGenerator must return empty json array");
+        let response = generator
+            .generate("extract entities")
+            .await
+            .expect("generate should succeed");
+        assert_eq!(
+            response, "[]",
+            "NoopLlmGenerator must return empty json array"
+        );
     }
 
     #[test]

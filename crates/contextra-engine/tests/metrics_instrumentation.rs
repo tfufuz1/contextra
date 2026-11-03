@@ -102,7 +102,13 @@ async fn test_search_emits_signal_latency_metrics_without_pii() -> contextra_typ
     let secret_prompt = "TOP_SECRET_PROMPT_DO_NOT_LEAK";
     let vector = vec![0.1, 0.2, 0.3, 0.4];
 
-    collection.insert("doc-secret", &vector, Some(serde_json::json!({"text": secret_prompt}))).await?;
+    collection
+        .insert(
+            "doc-secret",
+            &vector,
+            Some(serde_json::json!({"text": secret_prompt})),
+        )
+        .await?;
 
     let _res = collection
         .query()
