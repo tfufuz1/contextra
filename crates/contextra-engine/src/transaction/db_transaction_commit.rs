@@ -11,11 +11,11 @@ use super::compensating_actions::{
 };
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
-use crate::metrics_names::{record_histogram_safe, COMMIT_LATENCY};
+use crate::metrics_names::{COMMIT_LATENCY, record_histogram_safe};
 use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, Result, TxId};
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     // ANCHOR[contextra-engine:COM-021]
@@ -112,8 +112,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             !ops.is_empty() || !dels.is_empty()
         };
 
-        let has_graph = false;
-
         let mut ledger = CommitLedger::new();
         ledger.push(RollbackStagedAction::new(
             self.collection.clone(),
@@ -145,7 +143,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         let intent = CommitIntent::Pending {
             doc_ids: Arc::clone(&doc_ids),
             has_text,
-            has_graph,
             stages_completed: 0,
         };
         let intent_bytes = serde_json::to_vec(&intent).map_err(|e| {
@@ -194,7 +191,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         let stage1_intent = CommitIntent::Pending {
             doc_ids: Arc::clone(&doc_ids),
             has_text,
-            has_graph,
             stages_completed: 1,
         };
         if let Ok(stage1_bytes) = serde_json::to_vec(&stage1_intent) {

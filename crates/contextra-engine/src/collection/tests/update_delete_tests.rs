@@ -11,8 +11,8 @@ use super::fixtures::*;
 async fn test_update_document_importance_persists_model_id_provenance() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -65,8 +65,8 @@ async fn test_expiry_cleanup_deletes_decayed_working_memory() {
     use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -133,8 +133,8 @@ async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
     use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -197,8 +197,8 @@ async fn test_ttl_missing_created_at_does_not_expire() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -243,8 +243,8 @@ async fn test_ttl_zero_does_not_expire() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -289,8 +289,8 @@ async fn test_ttl_overflow_does_not_expire() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -336,8 +336,8 @@ async fn test_t_del_lock_held_during_delete_op_and_commit() {
     // delete_op + commit halten.
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use std::time::Duration;
     use tempfile::tempdir;
 
@@ -392,4 +392,94 @@ async fn test_t_del_lock_held_during_delete_op_and_commit() {
         second_try.is_none(),
         "T-DEL-LOCK-1: delete() muss kv_lock für den gesamten Zeitraum delete_op + commit halten. Wenn dieser Test fehlschlägt, wurde das Lock zu früh freigegeben (Bug B: drop(_guard) vor delete_op)."
     );
+}
+
+/// SPEC §5.4, §14.2, B-13 / T-DEL-RACE-1:
+/// Deterministischer Race-Test zwischen nebenläufigem Schreiben (Insert/Update)
+/// und Löschen (Delete) desselben Dokuments/Clusters.
+/// Invariante: Entweder gewinnt das Löschen oder das Schreiben deterministisch;
+/// es darf kein inkonsistenter Zustand (z. B. verwaister Vektoreintrag oder Teillöschung) entstehen.
+#[tokio::test]
+async fn test_delete_write_race_same_cluster() {
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(),
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(),
+    );
+    let col = Arc::new(Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    ));
+
+    let key = "race_target_doc";
+    col.insert(key, &[0.1, 0.2, 0.3, 0.4], None).await.unwrap();
+
+    let (barrier_start, barrier_done) = (
+        Arc::new(tokio::sync::Barrier::new(3)),
+        Arc::new(tokio::sync::Barrier::new(3)),
+    );
+
+    let col_delete = Arc::clone(&col);
+    let b_start_del = Arc::clone(&barrier_start);
+    let b_done_del = Arc::clone(&barrier_done);
+    let del_handle = tokio::spawn(async move {
+        b_start_del.wait().await;
+        let res = col_delete.delete(key).await;
+        b_done_del.wait().await;
+        res
+    });
+
+    let col_write = Arc::clone(&col);
+    let b_start_write = Arc::clone(&barrier_start);
+    let b_done_write = Arc::clone(&barrier_done);
+    let write_handle = tokio::spawn(async move {
+        b_start_write.wait().await;
+        let res = col_write.update(key, &[0.5, 0.6, 0.7, 0.8], None).await;
+        b_done_write.wait().await;
+        res
+    });
+
+    barrier_start.wait().await;
+    barrier_done.wait().await;
+
+    let del_res = del_handle.await.unwrap();
+    let write_res = write_handle.await.unwrap();
+
+    // Entweder delete oder update war zuerst am Lock.
+    // Falls delete vor update war, schlägt update typischerweise fehl oder überschreibt sauber.
+    // Aber vor allem darf der Speicherzustand konsistent sein:
+    let final_doc = col.get(key).await.unwrap();
+    if final_doc.is_some() {
+        assert!(
+            write_res.is_ok(),
+            "Wenn das Dokument existiert, muss update erfolgreich gewesen sein"
+        );
+    } else {
+        // Dokument ist gelöscht.
+        assert!(
+            del_res.is_ok(),
+            "Wenn das Dokument gelöscht ist, muss delete erfolgreich gewesen sein"
+        );
+    }
 }

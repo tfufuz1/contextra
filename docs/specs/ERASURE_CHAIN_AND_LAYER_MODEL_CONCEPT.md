@@ -17,7 +17,7 @@ Rechtsanforderungen aus der DSGVO werden in **prüfbare technische Zustände** �
 
 ### Sprachliche Schutzvorschrift (SPEC §6.4)
 Der Wortlaut im Code, in Berichten und in Dokumentationen unterliegt strengen Restriktionen:
-- **Verboten:** Unzulässige Außenaussagen, Heilsversprechen und nicht belegbare Aussagen bezüglich Backups, Flash-Remanenz, FS-Journalen, Swap oder externen Verarbeitern gemäß der Negativliste in SPEC §6.4.
+- **Verboten:** „DSGVO-konform“, „rechtskonform“, „garantiert gelöscht“, „unwiederbringlich“, „Hardware-Kill-Switch“, „in Millisekunden unabhängig von der Last“, sowie Löschaussagen bezüglich Backups, Flash-Remanenz, FS-Journalen, Swap oder externen Verarbeitern.
 - **Zulässiger normativer Wortlaut (SPEC §1.5):**
   > „Contextra macht Löschen zu einem messbaren, unabhängig prüfbaren Vorgang: Wirkung sofort, Entfernung physisch, Nachweis signiert, Restrisiken benannt.“
 
@@ -133,7 +133,7 @@ Da Contextra auf Standard-Betriebssystemen und Standard-Datenträgern läuft, k�
 ## 4. Rechenschaft, Datenschutz und Datenhygiene
 
 Zur Erfüllung von Art. 5 Abs. 2 DSGVO ohne irreführende Aussagen gilt:
-1. **Keine Rechtsberatung:** Der Bericht dokumentiert verifizierte technische Fakten (Zustände, Scans, Hashes), keine rechtliche Wertung.
+1. **Keine Rechtsberatung:** Der Bericht dokumentiert verifizierte technische Fakten (Zustände, Scans, Hashes), keine Rechtskonformität.
 2. **Datenhygiene in Journal und Ledger (P13, HR-4, I-11):**
    - Weder das Intent-Journal (`erasure.jrn`) noch das Ledger (`ledger.log`) noch der Bericht enthalten Klartext-Namen, Dokumentinhalte oder Betroffenenkennungen.
    - Identifikatoren werden ausschließlich als BLAKE3-Keyed-Hashes (`doc_tag`, `cluster_tag`, `tenant_tag`) oder opake `ErasureId` geführt.

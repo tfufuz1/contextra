@@ -9,11 +9,11 @@
 // ZWECK: Worker-Tasks zur Bereinigung verwaister Transaktionen (Orphan Cleanup) und HNSW-Index-Rebuilds.
 // INVARIANTEN: Geordnete Abschaltung via CancellationToken; Beschränkung der pro Tick verarbeiteten Waisen.
 
-use super::config::{calculate_rebuild_cooldown, OrphanCleanupBackoffConfig, OrphanCleanupIndex};
+use super::config::{OrphanCleanupBackoffConfig, OrphanCleanupIndex, calculate_rebuild_cooldown};
 use contextra_mvcc::tx_buffer::TxBuffer;
 use contextra_ports::Clock;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 /// Maximum number of orphan transactions processed in a single worker tick

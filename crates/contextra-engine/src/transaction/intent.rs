@@ -20,13 +20,11 @@ pub enum CommitIntent {
     /// `stages_completed` tracks progress:
     /// 0 = Intent written,
     /// 1 = Storage (LSM) committed,
-    /// 2 = Indices (Vector, Text, Graph) committed.
+    /// 2 = Indices (Vector, Text) committed.
     Pending {
         doc_ids: Arc<Vec<DocId>>,
         #[serde(default)]
         has_text: bool,
-        #[serde(default)]
-        has_graph: bool,
         #[serde(default)]
         stages_completed: u8,
     },
