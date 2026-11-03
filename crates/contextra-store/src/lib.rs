@@ -22,9 +22,8 @@
 //!
 //! ## Ring-Hierarchie & Abhaengigkeiten
 //! - **Ring 1:** Kernkomponente des Speichersystems.
-//! - **Eingehende Abhaengigkeiten:** Wird genutzt von `contextra-engine`, `contextra-db`,
-//!   `contextra-cognition`, `contextra-graph`, `contextra-checkpoint`, `contextra-agent`,
-//!   `contextra-py` und der uebergeordneten Facade `contextra`.
+//! - **Eingehende Abhaengigkeiten:** Wird genutzt von `contextra-engine` und der uebergeordneten
+//!   Facade `contextra` (SPEC D-24: entfernte Peripherie-Crates nicht aufgefuehrt).
 //! - **Ausgehende Abhaengigkeiten:** Nutzt `contextra-types`, `contextra-ports`, `contextra-crypto`,
 //!   `contextra-sys`, `contextra-mvcc`.
 
