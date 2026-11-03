@@ -21,7 +21,6 @@ use std::path::{Path, PathBuf};
 /// Fester Fehlertext bei Verzeichnis-Sperrkonflikten gemäß DF-05 und SPEC D-50.
 pub const DIR_LOCKED_MSG: &str = "Datenverzeichnis bereits in Benutzung";
 
-// ANCHOR[contextra-durable-fs:DIR-LOCK-STRUCT-001]
 /// RAII-Guard für eine exklusive Verzeichnissperre auf der Datei `LOCK` im Datenverzeichnis.
 ///
 /// Hält einen exklusiven System-Lock ([`flock`]-Semantik über [`File::try_lock`]).
@@ -34,7 +33,6 @@ pub struct DirLock {
 }
 
 impl DirLock {
-    // ANCHOR[contextra-durable-fs:DIR-LOCK-ACQUIRE-001]
     /// Erwirbt einen exklusiven Lock auf `dir/LOCK` (DF-05, T-LOCK-1).
     ///
     /// Ablauf:
@@ -92,7 +90,6 @@ impl DirLock {
         }
     }
 
-    // ANCHOR[contextra-durable-fs:DIR-LOCK-PATH-001]
     /// Liefert den Pfad zur `LOCK`-Datei.
     #[allow(dead_code)]
     #[must_use]
@@ -100,7 +97,6 @@ impl DirLock {
         &self.lock_path
     }
 
-    // ANCHOR[contextra-durable-fs:DIR-LOCK-UNLOCK-001]
     /// Gibt die Verzeichnissperre explizit vorzeitig frei.
     #[allow(dead_code)]
     pub fn unlock(mut self) {
@@ -110,7 +106,6 @@ impl DirLock {
     }
 }
 
-// ANCHOR[contextra-durable-fs:DIR-LOCK-DROP-001]
 // Ablauf von `Drop for DirLock`:
 // 1. Lock-Handle entnehmen.
 // 2. flock-Sperre freigeben via `file.unlock()`.

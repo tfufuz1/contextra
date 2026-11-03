@@ -210,6 +210,9 @@ fn test_df_08_file_and_directory_permissions() {
 
         let file_meta = fs::metadata(&target).expect("File metadata failed");
         let file_mode = file_meta.mode() & 0o777;
-        assert_eq!(file_mode, 0o600, "File must be created with mode 0600 (DF-08)");
+        assert_eq!(
+            file_mode, 0o600,
+            "File must be created with mode 0600 (DF-08)"
+        );
     }
 }

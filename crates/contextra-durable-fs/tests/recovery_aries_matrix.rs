@@ -245,31 +245,23 @@ impl MockRecoveryEngine {
 }
 
 #[test]
-fn test_aries_wal_group_commit_crash_enumeration() {
+fn test_aries_wal_group_commit_crash_enumeration(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let fault_vfs = Arc::new(FaultVfs::new());
     let root = PathBuf::from("/data_wal");
-    if let Err(e) = fault_vfs.create_dir_all(&root) {
-        panic!("create_dir_all failed: {e:?}");
-    }
+    fault_vfs.create_dir_all(&root)?;
 
     let engine = MockRecoveryEngine::new(fault_vfs.clone(), root.clone());
 
     // 1. Ungehinderter Commit
-    if let Err(e) = engine.execute_wal_group_commit(1, false) {
-        panic!("execute_wal_group_commit failed: {e:?}");
-    }
-    let state_init = match engine.recover() {
-        Ok(s) => s,
-        Err(e) => panic!("recover failed: {e:?}"),
-    };
+    engine.execute_wal_group_commit(1, false)?;
+    let state_init = engine.recover()?;
     assert_eq!(state_init.wal_records_count, 1);
 
     // 2. Crash-Simulation: Injektion von I/O-Fehler am n-ten Sync (Vault vs WAL)
     let crash_root = PathBuf::from("/data_wal_crash");
     let sync_fault_vfs = Arc::new(FaultVfs::new());
-    if let Err(e) = sync_fault_vfs.create_dir_all(&crash_root) {
-        panic!("create_dir_all failed: {e:?}");
-    }
+    sync_fault_vfs.create_dir_all(&crash_root)?;
     // Injiziere Fehler beim 0. Sync (Vault sync_data vor WAL, Null-basierter Index)
     sync_fault_vfs.set_plan(FaultPlan::exact(FaultOperation::Sync, 0, ErrorKind::Other));
 
@@ -278,66 +270,49 @@ fn test_aries_wal_group_commit_crash_enumeration() {
     assert!(res.is_err(), "Commit must fail when vault sync fails (I-9)");
 
     // Zustand nach Recovery: Kein korrupter Zustand, WAL-Record existiert nicht ohne Vault-Sync
-    let recovery_after_crash = match engine_fault.recover() {
-        Ok(s) => s,
-        Err(e) => panic!("recover failed: {e:?}"),
-    };
+    let recovery_after_crash = engine_fault.recover()?;
     assert_eq!(
         recovery_after_crash.wal_records_count, 0,
         "No WAL record persisted if vault sync failed (I-9)"
     );
 
     // 3. Idempotenz R(R(s)) == R(s)
-    let rec1 = match engine.recover() {
-        Ok(s) => s,
-        Err(e) => panic!("recover failed: {e:?}"),
-    };
-    let rec2 = match engine.recover() {
-        Ok(s) => s,
-        Err(e) => panic!("recover failed: {e:?}"),
-    };
+    let rec1 = engine.recover()?;
+    let rec2 = engine.recover()?;
     assert_eq!(
         rec1, rec2,
         "Recovery must be strictly idempotent: R(R(s)) = R(s)"
     );
+    Ok(())
 }
 
 #[test]
-fn test_aries_memtable_flush_crash_enumeration() {
+fn test_aries_memtable_flush_crash_enumeration(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let fault_vfs = Arc::new(FaultVfs::new());
     let root = PathBuf::from("/data_flush");
-    if let Err(e) = fault_vfs.create_dir_all(&root) {
-        panic!("create_dir_all failed: {e:?}");
-    }
+    fault_vfs.create_dir_all(&root)?;
 
     let engine = MockRecoveryEngine::new(fault_vfs.clone(), root.clone());
 
     // Führe erfolgreichen Flush durch
-    if let Err(e) = engine.execute_flush_pipeline(100) {
-        panic!("execute_flush_pipeline failed: {e:?}");
-    }
-    let st1 = match engine.recover() {
-        Ok(s) => s,
-        Err(e) => panic!("recover failed: {e:?}"),
-    };
+    engine.execute_flush_pipeline(100)?;
+    let st1 = engine.recover()?;
     assert_eq!(st1.manifest_seq, 100);
     assert_eq!(st1.active_ssts.len(), 1);
 
     // Idempotenzprüfung
-    let st2 = match engine.recover() {
-        Ok(s) => s,
-        Err(e) => panic!("recover failed: {e:?}"),
-    };
+    let st2 = engine.recover()?;
     assert_eq!(st1, st2, "Idempotency invariant violated: R(R(s)) != R(s)");
+    Ok(())
 }
 
 #[test]
-fn test_aries_purge_disk_reserve_full_rejection() {
+fn test_aries_purge_disk_reserve_full_rejection(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     let fault_vfs = Arc::new(FaultVfs::new());
     let root = PathBuf::from("/data_purge");
-    if let Err(e) = fault_vfs.create_dir_all(&root) {
-        panic!("create_dir_all failed: {e:?}");
-    }
+    fault_vfs.create_dir_all(&root)?;
 
     let engine = MockRecoveryEngine::new(fault_vfs.clone(), root.clone());
 
@@ -359,21 +334,18 @@ fn test_aries_purge_disk_reserve_full_rejection() {
     );
 
     // Nach Ablehnung bleibt der vorherige Zustand intakt
-    let st = match engine.recover() {
-        Ok(s) => s,
-        Err(e) => panic!("recover failed: {e:?}"),
-    };
+    let st = engine.recover()?;
     assert!(!st.active_ssts.contains(&"cluster_2_clean.sst".to_string()));
+    Ok(())
 }
 
 #[test]
-fn test_aries_mutant_verification_parent_dir_fsync() {
+fn test_aries_mutant_verification_parent_dir_fsync(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     // Mutant 1: dir-fsync weglassen -> Verzeichnis-Sync schlägt fehl
     let fault_vfs = Arc::new(FaultVfs::new());
     let root = PathBuf::from("/data_mutant");
-    if let Err(e) = fault_vfs.create_dir_all(&root) {
-        panic!("create_dir_all failed: {e:?}");
-    }
+    fault_vfs.create_dir_all(&root)?;
 
     // Blockiere Sync auf Verzeichnis
     fault_vfs.set_plan(FaultPlan::exact(
@@ -388,4 +360,5 @@ fn test_aries_mutant_verification_parent_dir_fsync() {
         flush_res.is_err(),
         "Mutant missing dir-fsync or failing dir-fsync must yield red failure"
     );
+    Ok(())
 }

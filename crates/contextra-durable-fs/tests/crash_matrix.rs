@@ -6,9 +6,10 @@
 //! hinterlässt die Zieldatei entweder im alten Zustand oder im neuen Zustand,
 //! niemals in einem korrumpierten oder unvollständigen Zwischenzustand.
 
-use contextra_durable_fs::{
-    atomic_replace_with_injector, probe_platform_durability, FaultInjector, RealVfs, Vfs,
-};
+use contextra_durable_fs::atomic::{write_atomic_with_injector, AtomicFaultInjector};
+use contextra_durable_fs::probe::probe_dir;
+use contextra_durable_fs::RealVfs;
+use contextra_ports::vfs::Vfs;
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -40,8 +41,8 @@ impl PhaseCrashInjector {
     }
 }
 
-impl FaultInjector for PhaseCrashInjector {
-    fn on_write(&self, _path: Option<&Path>, _bytes: usize) -> std::io::Result<()> {
+impl AtomicFaultInjector for PhaseCrashInjector {
+    fn on_write(&self, _path: &Path, _bytes: usize) -> std::io::Result<()> {
         if self.phase == CrashPhase::Write {
             self.hit.store(true, Ordering::SeqCst);
             return Err(std::io::Error::other("injected crash on write"));
@@ -49,7 +50,7 @@ impl FaultInjector for PhaseCrashInjector {
         Ok(())
     }
 
-    fn on_fsync(&self, _path: Option<&Path>) -> std::io::Result<()> {
+    fn on_sync_data(&self, _path: &Path) -> std::io::Result<()> {
         if self.phase == CrashPhase::Fsync {
             self.hit.store(true, Ordering::SeqCst);
             return Err(std::io::Error::other("injected crash on fsync"));
@@ -65,7 +66,7 @@ impl FaultInjector for PhaseCrashInjector {
         Ok(())
     }
 
-    fn on_dir_fsync(&self, _dir: &Path) -> std::io::Result<()> {
+    fn on_sync_dir(&self, _dir: &Path) -> std::io::Result<()> {
         if self.phase == CrashPhase::DirFsync {
             self.hit.store(true, Ordering::SeqCst);
             return Err(std::io::Error::other("injected crash on dir fsync"));
@@ -94,7 +95,7 @@ fn test_crash_matrix_atomic_replace_all_points() -> std::io::Result<()> {
         fs::write(&target, old_data)?;
 
         let injector = PhaseCrashInjector::new(phase);
-        let res = atomic_replace_with_injector(&target, new_data, &injector);
+        let res = write_atomic_with_injector(&target, new_data, &injector);
 
         // Der Vorgang muss abbrechen
         assert!(
@@ -186,7 +187,7 @@ fn test_real_vfs_contract_roundtrip() -> std::io::Result<()> {
 #[test]
 fn test_platform_durability_probe() -> std::io::Result<()> {
     let dir = tempdir()?;
-    let probe_res = probe_platform_durability(dir.path());
+    let probe_res = probe_dir(dir.path());
     assert!(
         probe_res.is_ok(),
         "Platform durability probe failed on tempdir: {:?}",

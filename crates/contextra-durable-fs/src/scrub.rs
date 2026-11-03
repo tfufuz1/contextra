@@ -24,7 +24,6 @@ use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
-// ANCHOR[contextra-durable-fs:SCRUB-RECEIPT-001]
 /// Quittung nach erfolgreichem Überschreiben einer Datei mit Nullen vor dem Löschen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScrubReceipt {
@@ -32,7 +31,6 @@ pub struct ScrubReceipt {
     pub bytes_scrubbed: u64,
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-POLICY-001]
 /// Richtlinie zur Steuerung des Überschreibverhaltens vor dem Löschen (DF-07).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ScrubPolicy {
@@ -45,7 +43,6 @@ pub enum ScrubPolicy {
     OverwriteZeros,
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-REFUSAL-001]
 /// Gründe für eine Verweigerung des Nullen-Überschreibens aus Sicherheits- oder Plattformgründen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScrubRefusal {
@@ -63,7 +60,6 @@ pub enum ScrubRefusal {
     Unsupported,
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-OUTCOME-001]
 /// Ergebnis einer Bereinigungsoperation vor dem Löschen (DF-07).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScrubOutcome {
@@ -77,7 +73,6 @@ pub enum ScrubOutcome {
     Refused(ScrubRefusal),
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-BEFORE-UNLINK-001]
 /// Führt das Überschreiben vor dem Löschen bedingt nach Vorgabe D-83 / DF-07 aus.
 ///
 /// Ablauf:
@@ -95,7 +90,6 @@ pub fn scrub_before_unlink(
     scrub_before_unlink_with_injector(path, rotational, is_cow, &NoFault)
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-BEFORE-UNLINK-WITH-INJECTOR]
 /// Führt das bedingte Überschreiben vor dem Löschen mit Injektor-Unterstützung aus.
 pub fn scrub_before_unlink_with_injector<F: FaultInjector>(
     path: &Path,
@@ -161,7 +155,6 @@ pub fn scrub_before_unlink_with_injector<F: FaultInjector>(
     }))
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-IF-SAFE-COMPAT]
 /// Kompatibilitätsfunktion für bestehende Aufrufer von `scrub_if_safe`.
 pub fn scrub_if_safe(
     path: &Path,
@@ -172,7 +165,6 @@ pub fn scrub_if_safe(
     scrub_if_safe_with_injector(path, policy, reader_alive, not_obsolete, &NoFault)
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-IF-SAFE-WITH-INJECTOR-COMPAT]
 /// Kompatibilitätsfunktion für bestehende Aufrufer von `scrub_if_safe_with_injector`.
 pub fn scrub_if_safe_with_injector<F: FaultInjector>(
     path: &Path,
@@ -253,7 +245,6 @@ pub fn scrub_if_safe_with_injector<F: FaultInjector>(
     }))
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-VERIFY-ZERO-001]
 /// Verifiziert, dass alle Bytes der Datei nach dem Überschreiben binäre Nullen sind.
 fn verify_zero_readback(file: &mut std::fs::File, expected_len: u64) -> std::io::Result<()> {
     file.seek(SeekFrom::Start(0))?;
@@ -282,7 +273,6 @@ fn verify_zero_readback(file: &mut std::fs::File, expected_len: u64) -> std::io:
     Ok(())
 }
 
-// ANCHOR[contextra-durable-fs:SCRUB-CHECK-COW-001]
 /// Ermittelt, ob ein Pfad auf einem Copy-on-Write-Dateisystem liegt.
 fn check_cow_filesystem(path: &Path) -> Option<ScrubRefusal> {
     #[cfg(target_os = "linux")]

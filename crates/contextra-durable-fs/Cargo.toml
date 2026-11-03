@@ -44,3 +44,24 @@ path = "benches/bm_dfs_probe.rs"
 [[test]]
 name = "recovery_aries_matrix"
 path = "tests/recovery_aries_matrix.rs"
+
+[[test]]
+name = "crash_matrix"
+path = "tests/crash_matrix.rs"
+
+[[test]]
+name = "df_atomic_crash_matrix"
+path = "tests/df_atomic_crash_matrix.rs"
+
+[[test]]
+name = "df_lock_tests"
+path = "tests/df_lock_tests.rs"
+
+[[test]]
+name = "df_scrub_tests"
+path = "tests/df_scrub_tests.rs"
+
+[[bench]]
+name = "bm_dfs_atomic"
+harness = false
+path = "benches/bm_dfs_atomic.rs"

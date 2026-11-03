@@ -24,7 +24,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// Globaler atomarer Zähler zur Generierung kollisionsfreier temporärer Dateinamen.
 static ATOMIC_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-// ANCHOR[contextra-durable-fs:ATOMIC-INJECTOR-001]
 /// Schnittstelle für Fehlerinjektionen bei atomaren Schreib- und Austauschvorgängen.
 ///
 /// Ermöglicht Unterbrechungen an jedem einzelnen Schritt des atomaren Austauschs:
@@ -56,7 +55,6 @@ pub trait AtomicFaultInjector: Send + Sync {
     }
 }
 
-// ANCHOR[contextra-durable-fs:ATOMIC-NO-FAULT-001]
 /// Standard-Injektor ohne Fehlerinjektion für den Produktivbetrieb.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct NoFault;
@@ -139,7 +137,6 @@ impl<'a> Drop for TmpFileGuard<'a> {
     }
 }
 
-// ANCHOR[contextra-durable-fs:CREATE-DIR-ALL-0700]
 /// Erstellt ein Verzeichnis rekursiv mit restriktivem Berechtigungsmodus `0700` (DF-08).
 pub fn create_dir_all_0700(path: &Path) -> std::io::Result<()> {
     fs::create_dir_all(path)?;
@@ -151,7 +148,6 @@ pub fn create_dir_all_0700(path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-// ANCHOR[contextra-durable-fs:WRITE-ATOMIC-001]
 /// Schreibt Daten atomar und crash-sicher an den Zielpfad `path` (DF-02, DF-08, DF-12).
 ///
 /// Ablauf:
@@ -165,7 +161,6 @@ pub fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
     write_atomic_with_injector(path, data, &NoFault)
 }
 
-// ANCHOR[contextra-durable-fs:WRITE-ATOMIC-WITH-INJECTOR]
 /// Schreibt Daten atomar und crash-sicher unter Verwendung eines [`AtomicFaultInjector`].
 ///
 /// Ermöglicht deterministische Fehlerinjektion an allen Phasen des Austauschs (T-CRASH-2).
@@ -231,7 +226,6 @@ pub fn write_atomic_with_injector<I: AtomicFaultInjector>(
     Ok(())
 }
 
-// ANCHOR[contextra-durable-fs:CLEAN-TMP-001]
 /// Bereinigt das `tmp/`-Unterverzeichnis sowie temporäre Waisendateien beim Start (DF-08, T-CRASH-2, T-CRASH-6).
 ///
 /// Ablauf:
@@ -243,7 +237,6 @@ pub fn clean_tmp(dir: &Path) -> std::io::Result<usize> {
     clean_tmp_with_injector(dir, &NoFault)
 }
 
-// ANCHOR[contextra-durable-fs:CLEAN-TMP-WITH-INJECTOR]
 /// Bereinigt temporäre Waisendateien mit Unterstützung eines [`AtomicFaultInjector`].
 pub fn clean_tmp_with_injector<I: AtomicFaultInjector>(
     dir: &Path,

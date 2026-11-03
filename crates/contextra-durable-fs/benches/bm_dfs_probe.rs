@@ -3,13 +3,12 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use contextra_durable_fs::probe::probe_dir;
+use contextra_ports::clock::{Clock, SystemClock};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::fs;
 use std::path::Path;
-use std::time::Instant;
 use tempfile::tempdir;
 
-// ANCHOR[contextra-durable-fs:BENCH-PROBE-STARTUP-001]
 // Prüft die Latenz der vollständigen Startprobe (`probe_dir`) zur Systeminitialisierung.
 fn bm_dfs_probe_startup(c: &mut Criterion) {
     // Misst die Latenz der vollständigen Startprobe (probe_dir).
@@ -26,7 +25,6 @@ fn bm_dfs_probe_startup(c: &mut Criterion) {
     group.finish();
 }
 
-// ANCHOR[contextra-durable-fs:BENCH-FSYNC-P50-001]
 // Misst die Stabilität der fsync_p50-Stichprobenmessung und schreibt den JSON-Benchmark-Report.
 fn bm_dfs_fsync_p50(c: &mut Criterion) {
     // Misst die Stabilität der fsync_p50-Stichprobe und schreibt den Benchmark-Report.
@@ -46,7 +44,6 @@ fn bm_dfs_fsync_p50(c: &mut Criterion) {
     write_real_bench_report(dir.path());
 }
 
-// ANCHOR[contextra-durable-fs:BENCH-WRITE-REAL-REPORT-001]
 // Schreibt den strukturierten Benchmark-Report mit p50-, p99- und Durchsatzwerten nach target/bench-report/contextra-durable-fs.json.
 fn write_real_bench_report(dir: &Path) {
     // NOTE: Hilfsfunktion zum Generieren der JSON-Benchmark-Metriken.
@@ -54,11 +51,12 @@ fn write_real_bench_report(dir: &Path) {
     let mut sample_fsync_us = Vec::with_capacity(20);
 
     for _ in 0..20 {
-        let t0 = Instant::now();
+        let clock = SystemClock::new();
+        let t0 = clock.monotonic_nanos();
         if let Ok(probe) = probe_dir(dir) {
-            let elapsed_us = t0.elapsed().as_micros() as u64;
+            let elapsed_us = (clock.monotonic_nanos().saturating_sub(t0)) / 1000;
             sample_latencies_us.push(elapsed_us);
-            sample_fsync_us.push(probe.fsync_p50.as_micros() as u64);
+            sample_fsync_us.push(u64::try_from(probe.fsync_p50.as_micros()).unwrap_or(u64::MAX));
         }
     }
 

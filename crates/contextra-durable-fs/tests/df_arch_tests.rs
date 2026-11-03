@@ -114,6 +114,9 @@ fn test_df_01_real_vfs_implements_ports_vfs() {
     let vfs = contextra_durable_fs::real_vfs::RealVfs::new();
     fn assert_implements_vfs<T: Vfs + 'static>(_val: &T) {}
     assert_implements_vfs(&vfs);
+
+    let dyn_vfs: Box<dyn Vfs> = Box::new(vfs);
+    assert!(dyn_vfs.exists(Path::new("/")).is_ok());
 }
 
 // Prüft, dass keine toten Module (health, fault_injector, journal) oder Legacy-Aliase (RealFs) in lib.rs verbleiben.
