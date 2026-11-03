@@ -19,8 +19,12 @@ testkit = []
 [dependencies]
 contextra-ports = { workspace = true, features = ["testkit"] }
 contextra-types = { workspace = true }
+blake3 = { workspace = true }
 bytes = { workspace = true }
 parking_lot = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

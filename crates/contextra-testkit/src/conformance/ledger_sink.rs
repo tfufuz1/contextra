@@ -98,6 +98,7 @@ impl std::error::Error for ConformanceFailure {}
 pub type ConformanceResult = std::result::Result<(), ConformanceFailure>;
 
 /// Führt die vollständige Konformitätsprüfung für eine [`LedgerSink`]-Implementierung durch.
+#[allow(clippy::type_complexity, clippy::cast_possible_truncation)]
 pub async fn run<F, Fut, L>(factory: F) -> ConformanceResult
 where
     F: Fn() -> Fut,
@@ -252,6 +253,7 @@ where
 
 /// In-Memory Reference Implementation of [`LedgerSink`].
 #[derive(Clone, Default)]
+#[allow(clippy::type_complexity)]
 pub struct ReferenceLedgerSink {
     entries: Arc<RwLock<Vec<LedgerEntry>>>,
 }

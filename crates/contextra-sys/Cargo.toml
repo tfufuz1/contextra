@@ -35,3 +35,7 @@ path = "tests/sy_audit_hygiene.rs"
 [[test]]
 name = "sy_platform_tests"
 path = "tests/sy_platform_tests.rs"
+
+[[bench]]
+name = "bm_sys_hardening"
+harness = false
