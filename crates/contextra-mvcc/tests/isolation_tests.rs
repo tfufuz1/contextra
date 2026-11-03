@@ -308,7 +308,8 @@ fn test_isolation_pin_expiration_snapshot_registry_manual_clock() {
     // Both pins expired relative to max_pin_duration 300s
     let reaped = registry.reap_expired_pins(Duration::from_secs(300));
     assert_eq!(reaped, vec![50, 150]);
-    assert_eq!(registry.min_active_seqno(), u64::MAX);
+    assert_eq!(registry.min_read_snapshot(), None);
+    assert_eq!(registry.min_active_seqno(), 0);
 }
 
 // Prüft die Diagnoseabfrage des am längsten gehaltenen aktiven Snapshot-Pins.
@@ -354,9 +355,10 @@ fn test_isolation_snapshot_registry_out_of_order_guard_drop() {
     drop(g30);
     assert_eq!(registry.min_active_seqno(), 20);
 
-    // Drop last guard (20) -> min resets to u64::MAX
+    // Drop last guard (20) -> min resets to None / 0
     drop(g20);
-    assert_eq!(registry.min_active_seqno(), u64::MAX);
+    assert_eq!(registry.min_read_snapshot(), None);
+    assert_eq!(registry.min_active_seqno(), 0);
 }
 
 // Prüft die Referenzzählung der SnapshotRegistry, wenn mehrere Guards dieselbe Sequenznummer halten.
@@ -375,7 +377,8 @@ fn test_isolation_snapshot_registry_ref_counting_same_seq() {
     drop(g2);
     assert_eq!(registry.min_active_seqno(), 100);
     drop(g3);
-    assert_eq!(registry.min_active_seqno(), u64::MAX);
+    assert_eq!(registry.min_read_snapshot(), None);
+    assert_eq!(registry.min_active_seqno(), 0);
 }
 
 // --- 7. SequenceLog Boundary, Tombstone & Compaction Tests ---
@@ -461,7 +464,8 @@ fn test_isolation_multithreaded_snapshot_registry_concurrency() {
         h.join().expect("thread panicked");
     }
 
-    assert_eq!(registry.min_active_seqno(), u64::MAX);
+    assert_eq!(registry.min_read_snapshot(), None);
+    assert_eq!(registry.min_active_seqno(), 0);
 }
 
 // Multi-Threaded Stresstest für den SequenceLogSsiValidator bei parallelen Commit-Registrierungen.

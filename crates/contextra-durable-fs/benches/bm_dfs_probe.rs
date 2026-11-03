@@ -9,7 +9,10 @@ use std::path::Path;
 use std::time::Instant;
 use tempfile::tempdir;
 
+// ANCHOR[contextra-durable-fs:BENCH-PROBE-STARTUP-001]
+// Prüft die Latenz der vollständigen Startprobe (`probe_dir`) zur Systeminitialisierung.
 fn bm_dfs_probe_startup(c: &mut Criterion) {
+    // Misst die Latenz der vollständigen Startprobe (probe_dir).
     let dir = tempdir().expect("tempdir");
     let mut group = c.benchmark_group("BM-DFS-PROBE-STARTUP");
 
@@ -23,7 +26,10 @@ fn bm_dfs_probe_startup(c: &mut Criterion) {
     group.finish();
 }
 
+// ANCHOR[contextra-durable-fs:BENCH-FSYNC-P50-001]
+// Misst die Stabilität der fsync_p50-Stichprobenmessung und schreibt den JSON-Benchmark-Report.
 fn bm_dfs_fsync_p50(c: &mut Criterion) {
+    // Misst die Stabilität der fsync_p50-Stichprobe und schreibt den Benchmark-Report.
     let dir = tempdir().expect("tempdir");
     let mut group = c.benchmark_group("BM-DFS-FSYNC-P50");
 
@@ -40,7 +46,10 @@ fn bm_dfs_fsync_p50(c: &mut Criterion) {
     write_real_bench_report(dir.path());
 }
 
+// ANCHOR[contextra-durable-fs:BENCH-WRITE-REAL-REPORT-001]
+// Schreibt den strukturierten Benchmark-Report mit p50-, p99- und Durchsatzwerten nach target/bench-report/contextra-durable-fs.json.
 fn write_real_bench_report(dir: &Path) {
+    // NOTE: Hilfsfunktion zum Generieren der JSON-Benchmark-Metriken.
     let mut sample_latencies_us = Vec::with_capacity(20);
     let mut sample_fsync_us = Vec::with_capacity(20);
 

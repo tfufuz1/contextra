@@ -108,7 +108,15 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
 }
 
 impl Contextra {
+    // ANCHOR[contextra-engine:IMP-001]
     /// Importiert ein ExportDocumentV1 in die Contextra-Datenbank mit Schema-Versionsprüfung und Idempotenz.
+    ///
+    /// # Ablauf
+    /// 1. Schema-Version prüfen (`doc.schema_version == SCHEMA_VERSION_V1`).
+    /// 2. Für jede enthaltene Collection:
+    ///    - Collection öffnen oder erstellen (`self.collection(&name)`).
+    ///    - Erinnerungen und Relationen über `col.import_memories()` idempotent einspielen.
+    /// 3. Aggregierte `ImportSummary` zurückliefern.
     pub async fn import_memories(&self, doc: ExportDocumentV1) -> Result<ImportSummary> {
         if doc.schema_version != SCHEMA_VERSION_V1 {
             return Err(contextra_types::ContextraError::invalid_input(format!(

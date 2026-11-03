@@ -375,7 +375,15 @@ mod tests {
 }
 
 impl Contextra {
+    // ANCHOR[contextra-engine:EXP-001]
     /// Exportiert alle Collections der Contextra-Datenbank in das ExportDocumentV1 Schema.
+    ///
+    /// # Ablauf
+    /// 1. Liste aller Collections (`list_collections`) ermitteln.
+    /// 2. Für jede Collection:
+    ///    - Handle laden (`self.collection(&name)`).
+    ///    - Memories und Relationen über Prefix-Scans exportieren (`col.export_memories()`).
+    /// 3. In `ExportDocumentV1` mit Schemainspektion verpacken und zurückgeben.
     pub async fn export_memories(&self) -> Result<ExportDocumentV1> {
         let collection_names = self.list_collections().await?;
         let mut collections = Vec::new();

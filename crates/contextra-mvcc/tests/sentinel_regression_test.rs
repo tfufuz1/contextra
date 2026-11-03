@@ -40,15 +40,14 @@ fn test_t_mvcc_sentinel_compaction_without_snapshot_succeeds() {
     let validator = SequenceLogSsiValidator::new();
     let snapshot_registry = Arc::new(SnapshotRegistry::new());
 
-    // Zustand vor Compaction: keine aktiven Snapshots
-    assert_eq!(snapshot_registry.min_active_seqno(), u64::MAX);
+    // Zustand vor Compaction: keine aktiven Snapshots (None, kein Sentinel!)
+    assert_eq!(snapshot_registry.min_read_snapshot(), None);
 
     // Initialer Commit bei seq 10
     validator.record_commit_key(b"key_a", 10);
     assert_eq!(validator.pruned_through(), 0);
 
-    // Simulation des Aufrufers in contextra-store compaction.rs (vor Fix übergab dieser u64::MAX an prune_through)
-    // Das alte prune_through ignoriert nun u64::MAX sicher.
+    // Simulation des alten Aufrufers (prune_through ignoriert u64::MAX sicher)
     #[allow(deprecated)]
     validator.prune_through(u64::MAX);
     assert_eq!(
@@ -57,12 +56,8 @@ fn test_t_mvcc_sentinel_compaction_without_snapshot_succeeds() {
         "pruned_through must NOT be set to u64::MAX"
     );
 
-    // Und mit der neuen prune_through_checked API:
-    let min_active = if snapshot_registry.min_active_seqno() == u64::MAX {
-        None
-    } else {
-        Some(snapshot_registry.min_active_seqno())
-    };
+    // Und mit der prune_through_checked API direkt mit Option<Seq>:
+    let min_active = snapshot_registry.min_read_snapshot();
     validator
         .prune_through_checked(min_active)
         .expect("valid check");

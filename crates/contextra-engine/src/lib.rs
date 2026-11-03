@@ -114,6 +114,7 @@ pub type ConsolidationLauncher = Arc<
 #[deprecated(
     note = "Instanzgebundenen Launcher via ContextraConfig::with_consolidation_launcher setzen (P29)"
 )]
+/// Veraltete globale Registrierung: Gibt eine Warnung aus und hat keine Wirkung mehr.
 pub fn register_consolidation_launcher<F>(_f: F)
 where
     F: Fn(

@@ -61,6 +61,7 @@ pub enum FilterOp {
     since = "0.1.0",
     note = "Use contextra_types::FilterExpr directly; conversion via TryFrom<MetadataFilter> for FilterExpr"
 )]
+/// Repräsentiert verschachtelte Boolesche Ausdrücke (AND, OR, NOT) sowie Feld-Bedingungen.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MetadataFilter {
     /// A single condition on a metadata field.

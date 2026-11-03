@@ -1,0 +1,36 @@
+id          = "WP-4.1"
+title       = "erasure: Tresor (FileVault) Schnittstellenvertrag contextra-crypto"
+wp          = "WP-4.1"
+gate        = "G-D"
+crate       = "contextra-crypto"
+goal        = "Schnittstellenvertrag für den Tresor (FileVault) in erasure festlegen und bereitstellen: fkmask, vault_mac, derive_dek."
+non_goals   = ["Implementierung des FileVault selbst (gehört zu Session 12 / erasure)"]
+
+scope       = ["crates/contextra-crypto/**"]
+
+forbidden   = [
+  "AGENTS.md",
+  "docs/SPEC.md",
+  "rust-toolchain.toml",
+  "deny.toml",
+  "justfile",
+  "capabilities.toml",
+  "CODEOWNERS",
+  ".github/**",
+  "governance/**",
+  ".agents/governance/**",
+  ".agents/jules/setup/**",
+]
+
+spec_ids    = ["D-79", "D-80", "D-85", "F.3", "L-3"]
+
+acceptance  = [
+  "cargo test -p contextra-crypto --locked",
+]
+
+evidence_required = ["Dokumentierter Schnittstellenvertrag für erasure: fkmask, vault_mac, derive_dek"]
+
+[budget]
+files      = 2
+lines      = 100
+iterations = 2

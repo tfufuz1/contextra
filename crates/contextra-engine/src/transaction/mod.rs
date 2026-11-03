@@ -15,7 +15,7 @@
 //!
 //! This module provides `DbTransaction`, an orchestrator for atomic multi-index commits
 //! between LSM-Tree storage engine (`contextra-store`), HNSW vector index (`contextra-index`),
-//! BM25 inverted text index (`contextra-text`), and CSR graph index (`contextra-graph`).
+//! BM25 inverted text index (`contextra-text`), and CSR graph index (removed per SPEC D-24).
 //! It implements a 4-index 2-phase commit protocol and provides compensating transactions for rollbacks.
 //!
 //! # 2-Phase Commit (2PC) State Machine & Intent Log Format

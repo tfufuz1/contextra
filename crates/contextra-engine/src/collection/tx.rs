@@ -11,11 +11,11 @@ use contextra_types::{Result, TxId};
 use std::sync::atomic::Ordering;
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
-    /// Generates and returns the next sequential transaction ID for this collection.
     #[deprecated(
         since = "0.1.0",
         note = "Use `allocate_tx()` instead — both methods are functionally identical, `allocate_tx()` is the canonical public API."
     )]
+    /// Generates and returns the next sequential transaction ID for this collection (veralteter Alias für [`allocate_tx`]).
     pub fn next_tx(&self) -> Result<TxId> {
         self.allocate_tx()
     }

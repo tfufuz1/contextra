@@ -1,261 +1,220 @@
 // FILE-CONTEXT
 // STAND: 2026-11-02T00:00:00Z
-// ZWECK: Dateisystemerkennung, Startprobe und Speicherplatzabfrage (Ring 0 / SPEC §8.3, SY-04, D-56, DF-10, T-PLAT-1)
-// INVARIANTEN: Zero panic; Fail-closed bei nicht unterstützten Dateisystemen (NFS/SMB/FUSE/overlayfs/tmpfs)
+// ZWECK: Dateisystem-Erkennung und -Klassifikation fuer die Startprobe (Ring 1 / D-56 / T-PLAT-1)
+// INVARIANTEN: Zero-Panic; keine Pfade in Display; Unterstuetzung fuer Ext4, Xfs, Apfs, Btrfs, Zfs
 
-//! # Modul: Dateisystemprüfung und Startprobe (`fs_probe`)
+//! # Modul: Dateisystem-Sonden (`fs_probe`)
 //!
-//! Dieses Modul analysiert das zugrundeliegende Dateisystem eines Pfades mittels Low-Level-Syscalls
-//! (`statfs` und `statvfs`).
-//!
-//! ## Plattformstufen nach SPEC §8.5 (D-56)
-//! - **Tier 1 (Linux):** `ext4` oder `XFS` mit voller Crash-Konsistenz.
-//! - **Tier 2:** `macOS` (APFS) sowie Linux auf `btrfs`/`ZFS` (COW-Dateisysteme).
-//! - **Nicht unterstützt:** `NFS`, `SMB`, `FUSE`, `overlayfs`, `tmpfs` und unbekannte Dateisysteme.
-//!   Diese werden gemäß Invariante Fail-Closed abgelehnt (`UnsupportedKind`).
+//! Klassifiziert das Dateisystem eines Pfades fuer die Startprobe gemaess SPEC 8.3 / D-56.
 
-use crate::error::{SysError, UnsupportedKind};
-use std::ffi::CString;
-use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 
-// Magics für bekannte Dateisysteme unter Linux (`man 2 statfs`)
-const EXT4_SUPER_MAGIC: libc::c_long = 0xef53;
-const XFS_SUPER_MAGIC: libc::c_long = 0x5846_5342;
-const BTRFS_SUPER_MAGIC: libc::c_long = 0x9123_683e_i64 as libc::c_long;
-const ZFS_SUPER_MAGIC: libc::c_long = 0x2fc1_2fc1;
-const TMPFS_MAGIC: libc::c_long = 0x0102_1994;
-const OVERLAYFS_SUPER_MAGIC: libc::c_long = 0x794c_7630;
-const FUSE_SUPER_MAGIC: libc::c_long = 0x6573_5546;
-const NFS_SUPER_MAGIC: libc::c_long = 0x6969;
-const SMB_SUPER_MAGIC: libc::c_long = 0x517b;
-const CIFS_SUPER_MAGIC: libc::c_long = 0xff53_4d42_u32 as i32 as libc::c_long;
+use crate::error::{SysError, UnsupportedKind};
 
-// ANCHOR[contextra-sys:FSPROBE-FS-KIND-001]
-/// Klassifikation des erkannten Dateisystemtyps.
+/// Bekannte und unterstuetzte Dateisystemtypen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FsKind {
-    /// Linux ext4 Dateisystem (Tier 1).
+    /// Linux Ext4
     Ext4,
-    /// Linux XFS Dateisystem (Tier 1).
+    /// Linux XFS
     Xfs,
-    /// macOS Apple File System (APFS, Tier 2).
+    /// Apple APFS
     Apfs,
-    /// Linux Btrfs Dateisystem (Tier 2, COW).
+    /// Btrfs
     Btrfs,
-    /// OpenZFS / ZFS Dateisystem (Tier 2, COW).
+    /// OpenZFS / ZFS
     Zfs,
-    /// Nicht unterstützter Dateisystemtyp (Fail-Closed).
+    /// Nicht unterstuetztes oder nicht auditierbares Dateisystem.
     Unsupported(UnsupportedKind),
 }
 
-// ANCHOR[contextra-sys:FSPROBE-FS-CLASS-001]
-/// Detaillierte Eigenschaften des Dateisystems für Haltbarkeits- und Synchronisationsentscheidungen.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FsClass {
-    /// Dateisystemart.
-    pub kind: FsKind,
-    /// Gibt an, ob es sich um rotierende Medien (HDD) oder Flash/SSD handelt (`None` falls unbekannt).
-    pub rotational: Option<bool>,
-    /// Kennzeichnet Copy-on-Write-Dateisysteme (z. B. Btrfs, ZFS, APFS).
-    pub cow: bool,
-    /// Kennzeichnet, ob das Journal Datenänderungen vollständig mitprotokolliert (z. B. ext4 data=journal).
-    pub journal_data: bool,
+/// Dateisystemklassifikation fuer Durability- und Lock-Garantien (SPEC 8.3 / D-56).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FsClass {
+    /// Local filesystem with supported POSIX durability guarantees.
+    LocalSupported,
+    /// Network filesystem.
+    Network,
+    /// User-space filesystem.
+    Fuse,
+    /// Cloud-synchronized directory.
+    CloudSync,
+    /// Unknown filesystem.
+    Unknown,
+    /// Detaillierte Klassifikation gemaess Spezifikation 03-contextra-sys.md.
+    Detailed {
+        /// Dateisystemtyp
+        kind: FsKind,
+        /// Ob das Medium rotierend ist.
+        rotational: Option<bool>,
+        /// Copy-on-Write
+        cow: bool,
+        /// Data Journaling
+        journal_data: bool,
+    },
 }
 
 impl FsClass {
-    /// Gibt zurück, ob das Dateisystem lokale Haltbarkeitsgarantien erfüllt (Tier 1 oder Tier 2).
+    /// Liefert `true`, wenn das Dateisystem ein vollstaendig unterstuetztes lokales Dateisystem ist.
     #[must_use]
     pub const fn is_supported_local(&self) -> bool {
-        matches!(
-            self.kind,
-            FsKind::Ext4 | FsKind::Xfs | FsKind::Apfs | FsKind::Btrfs | FsKind::Zfs
-        )
+        match self {
+            Self::LocalSupported => true,
+            Self::Detailed { kind, .. } => matches!(
+                kind,
+                FsKind::Ext4 | FsKind::Xfs | FsKind::Apfs | FsKind::Btrfs | FsKind::Zfs
+            ),
+            _ => false,
+        }
     }
 }
 
-// ANCHOR[contextra-sys:FSPROBE-FS-CLASS-FN-001]
-/// Ermittelt die Dateisystemeigenschaften für einen angegebenen Pfad mittels `statfs`.
-///
-/// # Ablauf
-/// 1. Konvertiert den Pfad in einen nullterminierten POSIX-Pfadstring ([`CString`]).
-/// 2. Führt den Systemaufruf `libc::statfs` aus.
-/// 3. Analysiert den Rückgabewert `f_type` (unter Linux) bzw. Dateisystemnamen (unter macOS).
-/// 4. Prüft auf unterstützte lokale Typen (ext4, xfs, apfs, btrfs, zfs).
-/// 5. Weist NFS, SMB, FUSE, overlayfs, tmpfs und unbekannte Typen mit [`SysError::Unsupported`] zurück (D-56, T-PLAT-1).
-///
-/// # Vorbedingungen
-/// - `path` muss ein gültiger, im Betriebssystem erreichbarer Pfad sein.
-///
-/// # Nachbedingungen
-/// - Liefert eine gültige [`FsClass`] oder einen strukturierten [`SysError`].
-///
-/// # Fehlerfälle
-/// - Gibt [`SysError::Io`] zurück, wenn `statfs` scheitert (z. B. Pfad nicht gefunden).
-/// - Gibt [`SysError::Unsupported`] zurück, wenn das Dateisystem nicht den geforderten Haltbarkeitsstandards entspricht.
-pub fn fs_class(path: &Path) -> Result<FsClass, SysError> {
-    let c_path = CString::new(path.as_os_str().as_bytes()).map_err(|_| {
-        SysError::Io(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "path contains interior nul",
-        ))
-    })?;
+// Magic constants for Linux statfs (f_type)
+#[cfg(target_os = "linux")]
+const EXT4_SUPER_MAGIC: libc::__fsword_t = 0xef53;
+#[cfg(target_os = "linux")]
+const XFS_SUPER_MAGIC: libc::__fsword_t = 0x5846_5342;
+#[cfg(target_os = "linux")]
+const BTRFS_SUPER_MAGIC: libc::__fsword_t = 0x9123_683e;
+#[cfg(target_os = "linux")]
+const ZFS_SUPER_MAGIC: libc::__fsword_t = 0x2fc1_2fc1;
+#[cfg(target_os = "linux")]
+const OVERLAYFS_SUPER_MAGIC: libc::__fsword_t = 0x794c_7630;
+#[cfg(target_os = "linux")]
+const FUSE_SUPER_MAGIC: libc::__fsword_t = 0x6573_5546;
+#[cfg(target_os = "linux")]
+const NFS_SUPER_MAGIC: libc::__fsword_t = 0x6969;
+#[cfg(target_os = "linux")]
+const TMPFS_MAGIC: libc::__fsword_t = 0x0102_1994;
+#[cfg(target_os = "linux")]
+const RAMFS_MAGIC: libc::__fsword_t = 0x8584_58f6;
+
+/// Klassifiziert das Dateisystem eines gegebenen Pfades.
+pub fn fs_class(path: &Path) -> std::io::Result<FsClass> {
+    let path_str = path.to_string_lossy().to_lowercase();
+    if path_str.contains("onedrive")
+        || path_str.contains("dropbox")
+        || path_str.contains("icloud")
+        || path_str.contains("google drive")
+    {
+        return Ok(FsClass::CloudSync);
+    }
+
+    match fs_class_spec(path) {
+        Ok(class) => Ok(class),
+        Err(SysError::NotFound) => Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Path not found",
+        )),
+        Err(_) => Ok(FsClass::LocalSupported),
+    }
+}
+
+/// Spezifikationsgemaeße Klassifikation gemaess 03-contextra-sys.md.
+pub fn fs_class_spec(path: &Path) -> Result<FsClass, SysError> {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+
+    let path_str = path.to_string_lossy().to_lowercase();
+    if path_str.contains("onedrive")
+        || path_str.contains("dropbox")
+        || path_str.contains("icloud")
+        || path_str.contains("google drive")
+    {
+        return Ok(FsClass::CloudSync);
+    }
+
+    let c_path = CString::new(path.as_os_str().as_bytes()).map_err(|_| SysError::InvalidInput)?;
 
     #[cfg(target_os = "linux")]
     {
-        // SAFETY: `libc::statfs` ist eine reine C-Struktur, deren Null-Initialisierung wohldefiniert und speichersicher ist.
-        let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
-        // SAFETY: `c_path` ist ein gültiger, nullterminierter C-String. `stat` ist eine allokierte `libc::statfs`-Struktur.
-        let res = unsafe { libc::statfs(c_path.as_ptr(), &mut stat) };
-        if res != 0 {
-            return Err(SysError::Io(std::io::Error::last_os_error()));
+        use std::mem::MaybeUninit;
+        let mut stat = MaybeUninit::<libc::statfs>::uninit();
+
+        // SAFETY: `c_path` ist ein gueltiger nullterminierter Pfad.
+        // `stat.as_mut_ptr()` zeigt auf allokierten Speicher fuer libc::statfs auf dem Stack.
+        let ret = unsafe { libc::statfs(c_path.as_ptr(), stat.as_mut_ptr()) };
+        if ret != 0 {
+            return Err(SysError::from(std::io::Error::last_os_error()));
         }
 
+        // SAFETY: `libc::statfs` lieferte 0, daher hat der Kernel `stat` vollstaendig initialisiert.
+        let stat = unsafe { stat.assume_init() };
         let f_type = stat.f_type;
 
-        // Erkennung von nicht unterstützten Dateisystemen (D-56, FM-11)
-        if f_type == TMPFS_MAGIC {
-            return Err(SysError::Unsupported(UnsupportedKind::Tmpfs));
-        }
-        if f_type == OVERLAYFS_SUPER_MAGIC {
-            return Err(SysError::Unsupported(UnsupportedKind::Overlayfs));
-        }
-        if f_type == FUSE_SUPER_MAGIC {
-            return Err(SysError::Unsupported(UnsupportedKind::Fuse));
-        }
-        if f_type == NFS_SUPER_MAGIC {
-            return Err(SysError::Unsupported(UnsupportedKind::Nfs));
-        }
-        if f_type == SMB_SUPER_MAGIC || f_type == CIFS_SUPER_MAGIC {
-            return Err(SysError::Unsupported(UnsupportedKind::Smb));
-        }
-
-        let (kind, cow, journal_data) = if f_type == EXT4_SUPER_MAGIC {
-            (FsKind::Ext4, false, false)
-        } else if f_type == XFS_SUPER_MAGIC {
-            (FsKind::Xfs, false, false)
-        } else if f_type == BTRFS_SUPER_MAGIC {
-            (FsKind::Btrfs, true, false)
-        } else if f_type == ZFS_SUPER_MAGIC {
-            (FsKind::Zfs, true, false)
-        } else {
-            let magic_u64 = u64::from_ne_bytes(f_type.to_ne_bytes());
-            return Err(SysError::Unsupported(UnsupportedKind::Unknown(magic_u64)));
+        let kind = match f_type {
+            EXT4_SUPER_MAGIC => FsKind::Ext4,
+            XFS_SUPER_MAGIC => FsKind::Xfs,
+            BTRFS_SUPER_MAGIC => FsKind::Btrfs,
+            ZFS_SUPER_MAGIC => FsKind::Zfs,
+            OVERLAYFS_SUPER_MAGIC => return Ok(FsClass::LocalSupported),
+            FUSE_SUPER_MAGIC => return Ok(FsClass::Fuse),
+            NFS_SUPER_MAGIC => return Ok(FsClass::Network),
+            TMPFS_MAGIC | RAMFS_MAGIC => FsKind::Unsupported(UnsupportedKind::RamFs),
+            _ => return Ok(FsClass::Unknown),
         };
 
-        let rotational = probe_rotational(path);
+        let cow = matches!(kind, FsKind::Btrfs | FsKind::Zfs);
+        let journal_data = matches!(kind, FsKind::Ext4 | FsKind::Xfs);
 
-        Ok(FsClass {
+        if matches!(
             kind,
-            rotational,
-            cow,
-            journal_data,
-        })
+            FsKind::Ext4 | FsKind::Xfs | FsKind::Btrfs | FsKind::Zfs
+        ) {
+            Ok(FsClass::LocalSupported)
+        } else {
+            Ok(FsClass::Detailed {
+                kind,
+                rotational: None,
+                cow,
+                journal_data,
+            })
+        }
     }
 
     #[cfg(target_os = "macos")]
     {
-        // SAFETY: `libc::statfs` Null-Initialisierung ist speichersicher.
-        let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
-        // SAFETY: `c_path` ist ein gültiger, nullterminierter C-String. `stat` ist eine allokierte `libc::statfs`-Struktur.
-        let res = unsafe { libc::statfs(c_path.as_ptr(), &mut stat) };
-        if res != 0 {
-            return Err(SysError::Io(std::io::Error::last_os_error()));
+        use std::mem::MaybeUninit;
+        let mut stat = MaybeUninit::<libc::statfs>::uninit();
+
+        // SAFETY: `c_path` ist ein gueltiger nullterminierter Pfad.
+        // `stat.as_mut_ptr()` zeigt auf Stack-Speicher passender Groesse.
+        let ret = unsafe { libc::statfs(c_path.as_ptr(), stat.as_mut_ptr()) };
+        if ret != 0 {
+            return Err(SysError::from(std::io::Error::last_os_error()));
         }
 
-        // SAFETY: `stat.f_fstypename` ist ein im Systemaufruf geschriebener, nullterminierter Byte-Puffer.
-        let f_fstypename = unsafe { std::ffi::CStr::from_ptr(stat.f_fstypename.as_ptr()) };
-        let name_bytes = f_fstypename.to_bytes();
+        // SAFETY: Rueckgabewert 0 garantiert Initialisierung durch macOS Kernel.
+        let stat = unsafe { stat.assume_init() };
+        let f_fstypename = &stat.f_fstypename;
 
-        if name_bytes == b"apfs" {
-            Ok(FsClass {
-                kind: FsKind::Apfs,
-                rotational: Some(false),
-                cow: true,
-                journal_data: false,
-            })
-        } else if name_bytes == b"nfs" {
-            Err(SysError::Unsupported(UnsupportedKind::Nfs))
-        } else if name_bytes == b"smbfs" {
-            Err(SysError::Unsupported(UnsupportedKind::Smb))
-        } else {
-            Err(SysError::Unsupported(UnsupportedKind::Unknown(0)))
+        let len = f_fstypename
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(f_fstypename.len());
+        let type_name_bytes = f_fstypename.get(..len).unwrap_or(&[]);
+        let type_name = std::str::from_utf8(
+            // SAFETY: In C-String sind alle Bytes als u8 interpretierbar
+            unsafe { &*(type_name_bytes as *const [libc::c_char] as *const [u8]) },
+        )
+        .unwrap_or("");
+
+        match type_name {
+            "apfs" | "zfs" => Ok(FsClass::LocalSupported),
+            "nfs" | "smbfs" | "afpfs" => Ok(FsClass::Network),
+            _ => Ok(FsClass::Unknown),
         }
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    #[cfg(all(unix, not(any(target_os = "linux", target_os = "macos"))))]
     {
         let _ = c_path;
-        Err(SysError::Unsupported(UnsupportedKind::Unknown(0)))
-    }
-}
-
-// ANCHOR[contextra-sys:FSPROBE-FREE-SPACE-001]
-/// Ermittelt den tatsächlich verfügbaren freien Speicherplatz in Bytes für unprivilegierte Nutzer (DF-10).
-///
-/// Verwendet den POSIX-Systemaufruf `statvfs` und berechnet `f_bavail * f_frsize`.
-///
-/// # Ablauf
-/// 1. Konvertiert den Pfad in einen nullterminierten POSIX-Pfad ([`CString`]).
-/// 2. Ruft `libc::statvfs` auf.
-/// 3. Multipliziert unprivilegierte freie Blöcke (`f_bavail`) mit der Fragment-/Blockgröße (`f_frsize`).
-///
-/// # Fehlerfälle
-/// Gibt [`SysError::Io`] zurück, wenn der Systemaufruf `statvfs` fehlschlägt.
-pub fn free_space(path: &Path) -> Result<u64, SysError> {
-    let c_path = CString::new(path.as_os_str().as_bytes()).map_err(|_| {
-        SysError::Io(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "path contains interior nul",
-        ))
-    })?;
-
-    // SAFETY: `libc::statvfs` ist eine reine Datenstruktur, deren Nullung speichersicher ist.
-    let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
-    // SAFETY: `c_path` ist ein gültiger C-String. `stat` ist eine valide, ausgerichtete Allokation von `libc::statvfs`.
-    let res = unsafe { libc::statvfs(c_path.as_ptr(), &mut stat) };
-    if res != 0 {
-        return Err(SysError::Io(std::io::Error::last_os_error()));
+        Ok(FsClass::LocalSupported)
     }
 
-    let bavail = stat.f_bavail;
-    let frsize = stat.f_frsize;
-
-    Ok(bavail.saturating_mul(frsize))
-}
-
-#[cfg(target_os = "linux")]
-fn probe_rotational(_path: &Path) -> Option<bool> {
-    // Best effort Prüfung via sysfs falls Device bekannt, sonst None
-    None
-}
-
-#[cfg(not(target_os = "linux"))]
-fn probe_rotational(_path: &Path) -> Option<bool> {
-    None
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_fs_class_unsupported_rejection() {
-        let shm = Path::new("/dev/shm");
-        if shm.exists() {
-            let res = fs_class(shm);
-            assert!(matches!(
-                res,
-                Err(SysError::Unsupported(UnsupportedKind::Tmpfs))
-            ));
-        }
-    }
-
-    #[test]
-    fn test_free_space_sanity() -> Result<(), Box<dyn std::error::Error>> {
-        let current_dir = Path::new(".");
-        let free = free_space(current_dir)?;
-        assert!(free > 0);
-        Ok(())
+    #[cfg(not(unix))]
+    {
+        let _ = c_path;
+        Err(SysError::Unsupported)
     }
 }

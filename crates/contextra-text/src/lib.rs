@@ -9,7 +9,7 @@
 //! Hybrid Search Engine & BM25 Scoring (WP-2.1)
 //!
 //! Evaluates Inverse Document Frequencies integrating natively into the
-//! `fusion.rs` layer in `contextra-db`.
+//! `fusion.rs` layer in `contextra-engine`.
 //!
 //! # Einordnung in die Gesamtarchitektur (Ring-Modell)
 //! Dieses Modul gehört zu **Ring 0 (Kern)** von Contextra. Es enthält grundlegende
@@ -20,8 +20,8 @@
 //! - **Normal**: `contextra-ports`, `contextra-types`, sowie Hilfs-Bibliotheken (`bincode`, `blake3`,
 //!   `bytes`, `futures`, `itoa`, `parking_lot`, `regex`, `serde`, `serde_json`, `thiserror`, `tracing`,
 //!   `unicode-segmentation`).
-//! - **Wird genutzt von**: `contextra-engine`, `contextra-db`, `contextra-router`, `contextra-agent`
-//!   sowie Benchmarks (`contextra-bench`).
+//! - **Wird genutzt von**: `contextra-engine`
+//!   (SPEC D-24: `contextra-db`, `contextra-router`, `contextra-agent`, `contextra-bench` entfernt).
 //!
 //! # Haupttypen
 //! - [`Bm25Scorer`]: Öffentliche Fassade zur Anbindung an den Port [`TextIndex`].

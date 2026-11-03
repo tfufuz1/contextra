@@ -12,9 +12,7 @@
 //! - Kein `panic!` in Injektionspfaden; Fehler werden als deterministisches [`std::io::Result`] zurückgegeben.
 
 // FILE-CONTEXT
-// STAND: 2026-10-12
-// ZWECK: Trait FaultInjector und NoFault Standard-Injektor fuer I/O-Fehlerinjektion in Durability-Pfade.
-// INVARIANTEN: Zero-Cost in Produktionspfaden via Inlining und Generics (kein dyn Dispatch), Zero-Panic.
+// NOTE: Trait FaultInjector und NoFault Standard-Injektor fuer I/O-Fehlerinjektion in Durability-Pfade. Invarianten: Zero-Cost in Produktionspfaden via Inlining und Generics (kein dyn Dispatch), Zero-Panic.
 
 use std::path::Path;
 

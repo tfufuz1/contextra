@@ -253,6 +253,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         since = "0.1.0",
         note = "Graph search is removed; this method is a no-op"
     )]
+    /// Setzt Anker-Entitäten für Graph-Suche (veraltet, wirkungslos nach Ausbau).
     pub fn anchor_entities(
         self,
         _anchors: impl IntoIterator<Item = contextra_types::EntityId>,
@@ -267,6 +268,7 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
     )]
     // Begründung: Aufruf der internen deprecated no-op Kompatibilitätsmethode
     #[allow(deprecated)]
+    /// Kurzform-Alias für [`anchor_entities`].
     pub fn anchors(self, anchors: impl IntoIterator<Item = contextra_types::EntityId>) -> Self {
         self.anchor_entities(anchors)
     }
@@ -276,10 +278,12 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         since = "0.1.0",
         note = "Community context is removed; this method is a no-op"
     )]
+    /// Filtert auf dieselbe Community-ID (veraltet, wirkungslos nach Ausbau).
     pub fn same_community_as(self, _entity_id: contextra_types::EntityId) -> Self {
         self
     }
 
+    /// Übernimmt Text- und Vektorabfrage-Einstellungen aus einem bestehenden [`contextra_types::HybridQuery`].
     pub fn query_config(mut self, query: &contextra_types::HybridQuery) -> Self {
         if let Some(ref text) = query.text_query {
             self.text = Some(text.clone());

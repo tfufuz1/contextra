@@ -16,7 +16,7 @@ pub(super) async fn execute_group_commit_append(
     committed_flag: &AtomicBool,
 ) -> Result<()> {
     match durability_mode {
-        DurabilityMode::Full | DurabilityMode::WalNoHmac => {
+        DurabilityMode::Full => {
             let start_offset = wal.size();
             let start_hmac = wal.last_hmac_snapshot().await;
             let append_res = wal

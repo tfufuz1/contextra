@@ -1,0 +1,31 @@
+[package]
+name = "contextra-lab"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Unabhängige Prüfinstanz und Byte-Format-Parser für die Löschverifikation."
+
+[lib]
+name = "contextra_lab"
+path = "src/lib.rs"
+
+[package.metadata.contextra]
+ring = "tooling"
+
+[dependencies]
+aes-gcm-siv = "=0.11.1"
+argon2 = "=0.5.3"
+blake3 = "=1.8.7"
+ed25519-dalek = { version = "=2.2.0", features = ["rand_core"] }
+hkdf = "=0.12.4"
+hmac = "=0.12.1"
+sha2 = "=0.10.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+rand = "0.8"
+
+[lints]
+workspace = true

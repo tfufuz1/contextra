@@ -1,0 +1,29 @@
+[package]
+name = "ctx-verify"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Eigenständiger Verifizierer für Löschberichte und Feldscans."
+
+[package.metadata.contextra]
+ring = "tooling"
+
+[[bin]]
+name = "ctx-verify"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+sha2 = "0.10"
+blake3 = { workspace = true }
+hex = "0.4"
+zeroize = { version = "1.8", features = ["derive"] }
+unicode-normalization = "0.1"
+
+[dev-dependencies]
+tempfile = { workspace = true }
+rand = "0.8"

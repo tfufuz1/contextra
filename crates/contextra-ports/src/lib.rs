@@ -18,8 +18,12 @@
 use std::future::Future;
 use std::pin::Pin;
 
-pub use contextra_types::*;
-pub use contextra_types::{error, error_dto, model_fingerprint, schema, tombstone, types};
+pub use contextra_types::{
+    error, error_dto, model_fingerprint, schema, tombstone, types, ConfigFingerprint,
+    ContextChunk, ContextraError, DistanceMetric, DocId, ModelFingerprint, ResourceBudget,
+    ResourceTracker, Result, ScoredDocument, TenantContext, TenantId, TxId,
+};
+pub use contextra_types::filter::FilterExpr;
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -55,8 +59,20 @@ pub mod text_index;
 pub mod vector_index;
 /// Virtual File System (VFS) port interface and contracts.
 pub mod vfs;
+/// Erasure layer contracts.
+pub mod erasure;
+/// ReadGate interface and types.
+pub mod gate;
+/// Key management, RecordSealer, and FileKeyring.
+pub mod keys;
+/// Ledger sink contracts.
+pub mod ledger;
 
 pub use clock::*;
+pub use erasure::*;
+pub use gate::*;
+pub use keys::*;
+pub use ledger::*;
 // Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
 #[allow(deprecated)]
 pub use embedding::*;

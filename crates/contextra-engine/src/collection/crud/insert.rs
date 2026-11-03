@@ -179,7 +179,18 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         self.insert(id, embedding, Some(meta)).await
     }
 
-    /// Inserts a document with an embedding and optional metadata.
+    // ANCHOR[contextra-engine:COL-INS-001]
+    /// Fügt ein Dokument mit Vektor-Embedding und optionalen JSON-Metadaten ein.
+    ///
+    /// # Ablauf
+    /// 1. Vektor-Dimension gegen Collection-Konfiguration prüfen.
+    /// 2. Ggf. Backpressure anwenden (`apply_insert_backpressure`).
+    /// 3. Feingranulare Key-Sperre (`kv_locks.lock_for(id)`) erwerben.
+    /// 4. In `insert_inner_unlocked`:
+    ///    - ID und Embedding validieren.
+    ///    - Transaktion `begin_transaction()` starten.
+    ///    - `insert_op` ausführen (LSM-Speicherung, Text-/Graph-Staging, HNSW-Indexierung).
+    ///    - Transaktion committen und Latenz erfassen.
     #[tracing::instrument(level = "trace", skip(self, embedding, metadata))]
     pub async fn insert(
         &self,

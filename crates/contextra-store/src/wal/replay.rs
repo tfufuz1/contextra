@@ -28,7 +28,7 @@ use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
-use super::{legacy_integrity_key, WalOp};
+use super::WalOp;
 use super::{
     Wal, WalEntry, WalParseError, WalVersion, MAX_WAL_ENTRY_SIZE, WAL_V2_HEADER, WAL_V3_HEADER,
 };
@@ -229,8 +229,8 @@ impl Wal {
                 .map_err(|_| ContextraError::Storage("Failed to read WAL file".into()))?;
 
             let file_size_usize = usize::try_from(file_size).unwrap_or(usize::MAX);
-            let slice_len = file_size_usize.min(mmap.len());
-            let slice = mmap
+            let slice_len = file_size_usize.min(buffer.len());
+            let slice = buffer
                 .get(..slice_len)
                 .ok_or_else(|| ContextraError::wal_corruption(0, "Slice bounds exceeded"))?;
             let mut buffered_entries = Vec::new();
@@ -268,8 +268,9 @@ impl Wal {
         version: WalVersion,
         chunk_start_pos: u64,
         verifier: &mut IntegrityVerifier,
-        using_legacy_key: &mut bool,
+        _using_legacy_key: &mut bool,
     ) -> Result<()> {
+        // D-05: Kein Legacy-Key-Fallback. WAL-Integrität ist nicht abschwächbar.
         let verify_res = match version {
             WalVersion::V3 => verifier.verify_and_update_v3(snapshot, chunk_start_pos),
             WalVersion::V2 => verifier.verify_and_update_v2(snapshot, chunk_start_pos),
@@ -278,50 +279,7 @@ impl Wal {
                 Ok(())
             }
         };
-
-        if let Err(e) = verify_res {
-            if !*using_legacy_key
-                && self
-                    .allow_legacy_integrity_key_fallback
-                    .load(std::sync::atomic::Ordering::SeqCst)
-            {
-                let legacy_key = legacy_integrity_key()?;
-                let mut legacy_verifier = IntegrityVerifier::new(&legacy_key);
-                legacy_verifier.set_last_hmac(verifier.last_hmac_snapshot());
-                let legacy_res = match version {
-                    WalVersion::V3 => {
-                        legacy_verifier.verify_and_update_v3(snapshot, chunk_start_pos)
-                    }
-                    WalVersion::V2 => {
-                        legacy_verifier.verify_and_update_v2(snapshot, chunk_start_pos)
-                    }
-                    WalVersion::V1 => {
-                        legacy_verifier.skip_hmac_verify_legacy(snapshot);
-                        Ok(())
-                    }
-                };
-                if legacy_res.is_ok() {
-                    tracing::warn!(
-                        target: "contextra_store::wal::legacy_fallback",
-                        wal_path = %self.path.display(),
-                        event = "legacy_integrity_key_fallback_used",
-                        "Legacy-WAL-Integritätsschlüssel aktiv für Segment {} — dieses Segment hat keine reale Manipulationssicherheit, da der Rückfallschlüssel öffentlich im Quellcode liegt.",
-                        self.path.display()
-                    );
-                    *verifier = legacy_verifier;
-                    *using_legacy_key = true;
-                    self.legacy_key_used
-                        .store(true, std::sync::atomic::Ordering::SeqCst);
-                    Ok(())
-                } else {
-                    Err(e.into())
-                }
-            } else {
-                Err(e.into())
-            }
-        } else {
-            Ok(())
-        }
+        verify_res.map_err(|e| e.into())
     }
 
     fn scan_entries_from_slice<F>(

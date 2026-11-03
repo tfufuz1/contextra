@@ -1147,3 +1147,119 @@ mod tests {
         assert!(!not_found.is_occ_conflict());
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Schlanke, I-11-konforme Fehlertypen (SPEC 7.5, TY-12).
+//
+// Diese Typen tragen keine Nutzdaten, Schlüssel oder Klartextkennungen.
+// Sie sind für neue Schnittstellen und für den Übergang von `ContextraError`
+// vorgesehen (Arbeitspaket WP-x.y laut BACKLOG).
+//
+// WICHTIG: `Result<T>` ist weiterhin `std::result::Result<T, ContextraError>`.
+// Die folgenden Typen werden nur direkt als `error::Error` etc. verwendet.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Konfigurations- und Eingabefehler (I-11-konform, kein Nutzerinhalt).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, thiserror::Error)]
+pub enum ConfigError {
+    /// Identifier ist leer.
+    #[error("identifier is empty")]
+    EmptyIdentifier,
+    /// Identifier überschreitet Maximallänge.
+    #[error("identifier exceeds maximum length")]
+    IdentifierTooLong,
+    /// Ungültige Bytegröße.
+    #[error("invalid byte length")]
+    InvalidLength,
+}
+
+/// Konflikte bei Einfüge- oder Update-Operationen (I-11-konform).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, thiserror::Error)]
+pub enum Conflict {
+    /// Kollision bei Identifikatoren oder kryptografischen Tags (SPEC D-08).
+    #[error("identifier collision")]
+    IdCollision,
+    /// Objekt oder Dokument existiert bereits.
+    #[error("record already exists")]
+    Exists,
+}
+
+/// Kapazitäts- und Ressourcenlimits (SPEC 14.4, D-87, L-10, I-11-konform).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, thiserror::Error)]
+pub enum Limit {
+    /// Speicherkapazität erschöpft.
+    #[error("limit exceeded: storage capacity")]
+    Capacity,
+    /// Mindest-Plattenreserve unterschritten (SPEC D-65).
+    #[error("limit exceeded: disk reserve exhausted")]
+    DiskReserve,
+    /// Maximale Anzahl aktiver Mandanten-Snapshots erreicht.
+    #[error("limit exceeded: snapshots")]
+    Snapshots,
+    /// Suchanfrage überschreitet Termgrenze.
+    #[error("limit exceeded: query too large")]
+    QueryTooLarge,
+    /// Vektordimension überschreitet Grenze (L-10).
+    #[error("limit exceeded: dimension")]
+    Dimension,
+}
+
+/// Kanonische I-11-konforme Fehler-Enum (SPEC 7.5, TY-12).
+///
+/// Kein Feld trägt Nutzerinhalt, Schlüssel oder Klartextkennungen.
+/// Für neue Schnittstellen; bestehende Schnittstellen verwenden weiter `ContextraError`.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// Konfigurations- oder Konstruktionsfehler.
+    #[error("configuration error: {0}")]
+    Config(#[from] ConfigError),
+
+    /// Ein-/Ausgabefehler oder Handle-Vergiftung (SPEC D-55).
+    #[error("i/o error")]
+    Io,
+
+    /// Datenkorruption oder unerwartetes Format (fatal für das Objekt, P2).
+    #[error("data corruption detected")]
+    Corrupt,
+
+    /// Authentisierungsfehler (z. B. falsche Passphrase).
+    #[error("authentication failed")]
+    Auth,
+
+    /// Dokument oder Ziel ist gelöscht (SPEC 11.3).
+    #[error("target is erased")]
+    Erased,
+
+    /// Verarbeitung ist eingeschränkt (SPEC 11.3, Art. 18 DSGVO).
+    #[error("target is restricted")]
+    Restricted,
+
+    /// Nicht gefunden.
+    #[error("not found")]
+    NotFound,
+
+    /// Konflikt bei Transaktion oder Identität.
+    #[error("conflict: {0}")]
+    Conflict(#[from] Conflict),
+
+    /// Ressourcen- oder Systemgrenze überschritten.
+    #[error("{0}")]
+    Limit(#[from] Limit),
+
+    /// Snapshot wurde durch Purge oder Timeout widerrufen (SPEC D-61).
+    #[error("snapshot revoked")]
+    SnapshotRevoked,
+
+    /// Operation wurde abgebrochen.
+    #[error("operation cancelled")]
+    Cancelled,
+
+    /// Operation durch Richtlinie oder Aufbewahrung verweigert.
+    #[error("operation refused")]
+    Refused,
+
+    /// Interner Fehler.
+    #[error("internal system error")]
+    Internal,
+}

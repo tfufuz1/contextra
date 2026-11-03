@@ -1,65 +1,40 @@
-// FILE-CONTEXT
-// ZWECK: Contextra cryptographic kernel - Layer 1 crate for AEAD block encryption, HKDF key derivation, and WAL integrity.
-// INVARIANTEN: Cryptographic primitives strictly isolated to this crate. All key operations zeroized on drop. Lock-free & I/O-free in src/.
-// NICHT-OFFENSICHTLICH: KeyManager uses AES-256-GCM-SIV with OsRng 8-byte random suffix + 4-byte prefix to prevent nonce-reuse key leakage.
-// HOTSPOTS: [1-25]
-// STAND: TS:2026-08-31T21:13:05Z (SESSION: 8427f167)
-
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
-//! # Kryptographie-Kern für Contextra (Ring 0)
+//! Kryptoprimitive für Contextra (Ring 1)
 //!
-//! Dieses Modul bildet die kryptographische Basis des gesamten Contextra-Systems.
-//! Als Ring-0-Komponente (Kern) stellt es grundlegende Sicherheitsprimitive bereit,
-//! ohne selbst von höheren Schichten abzuhängen.
+//! AEAD, Argon2id, HKDF, HMAC, Ed25519, Tags.
 //!
-//! ## Ring-Zugehörigkeit und Einbindung
-//! - **Ring:** Ring 0 (Kern / Foundation)
-//! - **Abhängigkeiten (ausgehend):** `contextra-ports`, `contextra-types`
-//! - **Wird eingebunden von:** `contextra`, `contextra-db`, `contextra-engine`,
-//!   `contextra-infer-candle`, `contextra-kvcache`, `contextra-mcp`, `contextra-privacy`,
-//!   `contextra-store`, `contextra-vector`.
+//! ## Schnittstellenvertrag für Tresor (`FileVault`, Sitzung 12 / `erasure`)
 //!
-//! ## Hauptaufgaben
-//! 1. **AEAD-Blockverschlüsselung:** Authentifizierte Verschlüsselung via AES-256-GCM-SIV
-//!    mit deterministischer Nonce-Generierung zur Verhinderung von Nonce-Wiederverwendung.
-//! 2. **Schlüsselableitung (KDF):** Schlüsselhierarchie via HKDF (HMAC-SHA256) und
-//!    Argon2id für sichere Passphrasen-Verarbeitung.
-//! 3. **WAL-Integrität:** Kryptographische Integritätsketten mittels HMAC-SHA256 für
-//!    das Write-Ahead-Log (WAL).
-//! 4. **DSGVO-Löschbeweise:** Erstellung und Verifikation kryptographisch signierter
-//!    Löschzertifikate (Ed25519, BLAKE3) nach Art. 17 DSGVO.
-//! 5. **KV-Segment-Verschlüsselung & Shredding:** Feingranulare Mandanten- und Segment-
-//!    Isolierung mit kryptographischem Shredding (Crypto-Erase).
-//!
-//! ## Invarianten
-//! - `#![forbid(unsafe_code)]`: Es gibt ausnahmslos keinen Unsafe-Code in dieser Crate.
-//! - **Zeroize-on-Drop:** Sämtliche geheimen Schlüsselmaterialien werden bei der Freigabe
-//!   deterministisch im Speicher mit Nullen überschrieben.
-//! - **I/O- und Lock-Freiheit in `src/crypto`:** Reine Kryptographie-Routinen führen keine
-//!   Dateisystem- oder Netzwerk-I/O durch.
+//! Gemäß SPEC 10.1, D-79, D-80, D-85 und F.3 stellt `contextra-crypto` für `erasure`
+//! folgende zustandslose Operationen bereit:
+//! 1. `KeyHierarchy::fkmask(&self, id: [u8; 16]) -> [u8; 32]`:
+//!    Maskierungsschlüssel für F-Slots im Tresor via HKDF-Expand("ctx/fkmask/v1" ‖ file_id).
+//! 2. `KeyHierarchy::vault_mac(&self) -> VaultMacKey`:
+//!    Authentisierungsschlüssel für Tresor-Slots via HKDF-Expand(K_enc, "ctx/vault-mac/v1").
+//! 3. `derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek`:
+//!    DEK-Ableitung nach D-79 mit Salt-Label `ctx/dek-salt/v2` und `doc_tag` (L-3).
 
-
-pub mod anti_tamper;
-pub mod audit_chain;
-pub mod crypto;
+pub mod aead;
+pub mod chain;
+pub mod dek;
 pub mod error;
+pub mod header;
+pub mod hierarchy;
 pub mod kdf;
-pub mod wal_completeness;
-pub mod wal_crypto;
+pub mod labels;
+pub mod secret;
+pub mod sign;
+pub mod tag;
 
-pub use audit_chain::{
-    compute_record_commitment, AuditChain, AuditChainEntry, AuditChainHeadSignature, DataClass,
-    EncryptedCommitmentSalt,
-};
-pub use crypto::KeyManager as CryptoKey;
-pub use crypto::KeyManager;
+pub use aead::*;
+pub use chain::*;
+pub use dek::*;
 pub use error::{CryptoError, Result};
-pub use kdf::{derive_key_argon2id, KdfHeader, KdfParams};
-pub use wal_completeness::verify_wal_chain_completeness;
-#[cfg(feature = "cloud-egress-guard")]
-pub use wal_crypto::CloudEgressGuard;
-pub use wal_crypto::{
-    EncryptedWal, IntegrityVerifier, KmsProvider, LocalKeyManagerKms, WalEntrySnapshot, WalHmac,
-};
+pub use header::*;
+pub use hierarchy::*;
+pub use kdf::*;
+pub use secret::*;
+pub use sign::*;
+pub use tag::*;

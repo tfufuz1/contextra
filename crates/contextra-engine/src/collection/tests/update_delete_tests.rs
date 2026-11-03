@@ -333,11 +333,91 @@ async fn test_ttl_overflow_does_not_expire() {
     col.insert(
         "doc_overflow",
         &[1.0, 0.0, 0.0, 0.0],
-        Some(json!({"created_at_ms": u64::MAX - 10, "ttl_ms": 100})),
+        Some(json!({\"created_at_ms\": u64::MAX - 10, "ttl_ms": 100})),
     )
     .await
     .unwrap(); // unwrap
     let reaped = col.trigger_expiry_cleanup().await.unwrap(); // unwrap
     assert_eq!(reaped, 0);
     assert!(col.get("doc_overflow").await.unwrap().is_some()); // unwrap
+}
+
+#[tokio::test]
+async fn test_t_del_lock_held_during_delete_op_and_commit() {
+    // T-DEL-LOCK-1: delete() MUSS kv_locks für die ID während des gesamten
+    // delete_op + commit halten. Bei Bug B wurde _guard unmittelbar nach dem
+    // Erwerb mit drop(_guard) freigegeben, bevor delete_op und commit liefen.
+    // Das öffnete ein Zeitfenster für nebenläufige Schreiber.
+    //
+    // Testprinzip (deterministisch):
+    // 1. Externes lock_for("race_doc") halten.
+    // 2. delete("race_doc") im Hintergrund starten – muss auf unser Lock warten.
+    // 3. try_lock_for("race_doc") aufrufen: gibt None zurück, wenn delete das
+    //    Lock korrekt HÄlt (Fix). Gibt Some zurück, wenn delete das Lock bereits
+    //    freigegeben hat (Bug – delete lief ohne Lock zu Ende).
+    // 4. Externes Lock freigeben → delete kann abschließen.
+    use contextra_graph::CsrGraph;
+    use contextra_store::LsmStorage;
+    use contextra_vector::HnswIndex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap(); // unwrap
+    let storage = Arc::new(
+        LsmStorage::new(contextra_store::LsmConfig {
+            path: dir.path().to_path_buf(),
+            ..Default::default()
+        })
+        .await
+        .unwrap(), // unwrap
+    );
+    let index = Arc::new(
+        HnswIndex::try_new(contextra_vector::HnswConfig {
+            dimension: 4,
+            ..Default::default()
+        })
+        .unwrap(), // unwrap
+    );
+    let col = Arc::new(Collection::new(
+        "default".to_string(),
+        storage,
+        index,
+        Arc::new(CsrGraph::new()),
+        Arc::new(AtomicU64::new(1)),
+        4,
+        contextra_text::Language::English,
+    ));
+
+    col.insert("race_doc", &[1.0, 0.0, 0.0, 0.0], None)
+        .await
+        .unwrap(); // unwrap
+
+    // Externes Lock auf denselben Shard erwerben, den delete("race_doc") benötigt.
+    let guard = col.kv_locks.lock_for("race_doc").await;
+
+    // delete im Hintergrund – muss blockieren, solange wir das Lock halten.
+    let col2 = col.clone();
+    let handle = tokio::spawn(async move { col2.delete("race_doc").await });
+
+    // Dem Hintergrund-Task Zeit geben, das Lock anzufordern.
+    tokio::time::sleep(Duration::from_millis(30)).await;
+
+    // try_lock_for: Mit Fix → None (delete wartet auf das Lock, das wir halten).
+    //               Mit Bug → Some (delete hat das Lock bereits freigegeben und
+    //               ist durchgelaufen, ohne es während delete_op zu halten).
+    let second_try = col.kv_locks.try_lock_for("race_doc");
+
+    // Externes Lock freigeben → delete kann jetzt abschließen.
+    drop(guard);
+
+    handle.await.unwrap().unwrap(); // unwrap
+
+    assert!(
+        second_try.is_none(),
+        "T-DEL-LOCK-1: delete() muss kv_lock für den gesamten Zeitraum \
+         delete_op + commit halten. Wenn dieser Test fehlschlägt, wurde das \
+         Lock zu früh freigegeben (Bug B: drop(_guard) vor delete_op)."
+    );
 }

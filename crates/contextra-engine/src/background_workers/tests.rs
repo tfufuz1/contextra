@@ -9,7 +9,6 @@
 // ZWECK: Unit-Tests für background_workers Submodule.
 
 use super::*;
-use contextra_graph::hyperedge::HyperEdgeId;
 use contextra_mvcc::tx_buffer::IndexOp;
 use contextra_types::{DocId, TxId};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -74,230 +73,6 @@ impl OrphanCleanupIndex for MockDegradedHnswIndex {
             Ok(())
         })
     }
-}
-
-#[tokio::test]
-async fn test_deferred_hyperedge_queue_fifo_and_limits() {
-    let queue = DeferredHyperedgeQueue::new();
-
-    let empty = queue.drain_up_to(100).await;
-    assert!(empty.is_empty());
-
-    queue
-        .enqueue(vec![
-            HyperEdgeId::new(10),
-            HyperEdgeId::new(20),
-            HyperEdgeId::new(30),
-        ])
-        .await;
-
-    let drained_part = queue.drain_up_to(2).await;
-    assert_eq!(
-        drained_part,
-        vec![HyperEdgeId::new(10), HyperEdgeId::new(20)]
-    );
-
-    let drained_all = queue.drain_up_to(100).await;
-    assert_eq!(drained_all, vec![HyperEdgeId::new(30)]);
-
-    let empty_again = queue.drain_up_to(10).await;
-    assert!(empty_again.is_empty());
-}
-
-#[tokio::test]
-async fn test_deferred_hyperedge_worker_single_tick_processing() {
-    use contextra_graph::CsrGraph;
-    use contextra_store::LsmStorage;
-    use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
-    use tempfile::tempdir;
-
-    let dir = tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
-    let col = Arc::new(crate::Collection::new(
-        "default".to_string(),
-        storage,
-        index,
-        Arc::new(CsrGraph::new()),
-        Arc::new(AtomicU64::new(1)),
-        4,
-        contextra_text::Language::English,
-    ));
-
-    let queue = Arc::new(DeferredHyperedgeQueue::new());
-    queue
-        .enqueue(vec![HyperEdgeId::new(1), HyperEdgeId::new(2)])
-        .await;
-
-    let cancel_token = tokio_util::sync::CancellationToken::new();
-    let handle = start_hyperedge_cascade_deferred_worker(
-        col.clone(),
-        queue.clone(),
-        Duration::from_millis(10),
-        cancel_token.clone(),
-    );
-
-    let mut processed = false;
-    for _ in 0..50 {
-        sleep(Duration::from_millis(10)).await;
-        if queue.drain_up_to(1).await.is_empty() {
-            processed = true;
-            break;
-        }
-    }
-
-    cancel_token.cancel();
-    let _ = handle.await;
-
-    assert!(processed, "Worker should process queued items in tick");
-}
-
-#[tokio::test]
-async fn test_deferred_hyperedge_worker_fanout_multitick_processing() {
-    use contextra_graph::CsrGraph;
-    use contextra_store::LsmStorage;
-    use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
-    use tempfile::tempdir;
-
-    let dir = tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
-    let col = Arc::new(crate::Collection::new(
-        "default".to_string(),
-        storage,
-        index,
-        Arc::new(CsrGraph::new()),
-        Arc::new(AtomicU64::new(1)),
-        4,
-        contextra_text::Language::English,
-    ));
-
-    let queue = Arc::new(DeferredHyperedgeQueue::new());
-
-    let total_items = 2_500;
-    let items: Vec<HyperEdgeId> = (1..=total_items).map(HyperEdgeId::new).collect();
-    queue.enqueue(items).await;
-
-    let cancel_token = tokio_util::sync::CancellationToken::new();
-    let handle = start_hyperedge_cascade_deferred_worker(
-        col.clone(),
-        queue.clone(),
-        Duration::from_millis(10),
-        cancel_token.clone(),
-    );
-
-    let mut fully_drained = false;
-    for _ in 0..100 {
-        sleep(Duration::from_millis(15)).await;
-        if queue.drain_up_to(1).await.is_empty() {
-            fully_drained = true;
-            break;
-        }
-    }
-
-    cancel_token.cancel();
-    let _ = handle.await;
-
-    assert!(
-        fully_drained,
-        "Worker should drain all items across multiple ticks without item loss"
-    );
-}
-
-#[tokio::test]
-async fn test_deferred_hyperedge_worker_graceful_shutdown_preserves_queue() {
-    use contextra_graph::CsrGraph;
-    use contextra_store::LsmStorage;
-    use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
-    use tempfile::tempdir;
-
-    let dir = tempdir().unwrap();
-    let storage = Arc::new(
-        LsmStorage::new(contextra_store::LsmConfig {
-            path: dir.path().to_path_buf(),
-            ..Default::default()
-        })
-        .await
-        .unwrap(),
-    );
-    let index = Arc::new(
-        HnswIndex::try_new(contextra_vector::HnswConfig {
-            dimension: 4,
-            ..Default::default()
-        })
-        .unwrap(),
-    );
-    let col = Arc::new(crate::Collection::new(
-        "default".to_string(),
-        storage,
-        index,
-        Arc::new(CsrGraph::new()),
-        Arc::new(AtomicU64::new(1)),
-        4,
-        contextra_text::Language::English,
-    ));
-
-    let queue = Arc::new(DeferredHyperedgeQueue::new());
-    queue
-        .enqueue(vec![
-            HyperEdgeId::new(100),
-            HyperEdgeId::new(200),
-            HyperEdgeId::new(300),
-        ])
-        .await;
-
-    let cancel_token = tokio_util::sync::CancellationToken::new();
-    cancel_token.cancel();
-
-    let handle = start_hyperedge_cascade_deferred_worker(
-        col.clone(),
-        queue.clone(),
-        Duration::from_secs(60),
-        cancel_token.clone(),
-    );
-
-    let res = handle.await;
-    assert!(res.is_ok(), "Task should exit cleanly upon cancellation");
-
-    let remaining = queue.drain_up_to(100).await;
-    assert_eq!(
-        remaining,
-        vec![
-            HyperEdgeId::new(100),
-            HyperEdgeId::new(200),
-            HyperEdgeId::new(300)
-        ],
-        "Cancelled worker must not lose unhandled elements in queue"
-    );
 }
 
 #[tokio::test]
@@ -392,7 +167,6 @@ async fn test_orphan_cleanup_rebuild_backoff_and_alert() {
 
 #[tokio::test]
 async fn test_expiry_cleanup_worker_task_cleans_documents() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -418,7 +192,6 @@ async fn test_expiry_cleanup_worker_task_cleans_documents() {
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -501,7 +274,6 @@ async fn test_orphan_cleanup_worker_removes_expired() {
 
 #[tokio::test]
 async fn trigger_expiry_cleanup_deletes_expired_documents() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
@@ -521,14 +293,12 @@ async fn trigger_expiry_cleanup_deletes_expired_documents() {
         })
         .unwrap(),
     );
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = crate::Collection::new(
         "default".to_string(),
         storage,
         index,
-        graph,
         next_tx,
         4,
         contextra_text::Language::English,
@@ -555,7 +325,6 @@ async fn trigger_expiry_cleanup_deletes_expired_documents() {
 
 #[tokio::test]
 async fn test_worker_immediate_cancellation() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -581,7 +350,6 @@ async fn test_worker_immediate_cancellation() {
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -598,7 +366,6 @@ async fn test_worker_immediate_cancellation() {
 #[tokio::test]
 async fn test_decay_eviction_thresholds() {
     use crate::decay_controller::{AdaptiveDecayController, DecayControllerConfig};
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
@@ -628,7 +395,6 @@ async fn test_decay_eviction_thresholds() {
         "default".to_string(),
         storage,
         index.clone(),
-        Arc::new(CsrGraph::new()),
         next_tx.clone(),
         4,
         contextra_text::Language::English,
@@ -691,7 +457,6 @@ async fn test_decay_eviction_thresholds() {
 #[tokio::test]
 async fn test_start_decay_cleanup_worker_background_task() {
     use crate::decay_controller::DecayControllerConfig;
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
@@ -721,7 +486,6 @@ async fn test_start_decay_cleanup_worker_background_task() {
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         next_tx.clone(),
         4,
         contextra_text::Language::English,
