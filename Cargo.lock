@@ -362,8 +362,6 @@ dependencies = [
  "bincode",
  "contextra-durable-fs",
  "contextra-engine",
- "contextra-ports",
- "contextra-store",
  "contextra-types",
  "criterion",
  "getrandom 0.2.17",
