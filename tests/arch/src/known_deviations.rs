@@ -98,12 +98,7 @@ pub const KNOWN_DEVIATIONS: &[Deviation] = &[
     },
 
     // T-ARCH-5: Ring im //! Kopf von src/lib.rs
-    Deviation {
-        crate_name: "contextra-ports",
-        rule: "T-ARCH-5:header-ring",
-        work_package: "WP-1.5",
-        reason: "Kopf in lib.rs nennt Ring 0 noch nicht normativ; Aktualisierung in WP-1.5",
-    },
+
     Deviation {
         crate_name: "contextra-crypto",
         rule: "T-ARCH-5:header-ring",
@@ -141,6 +136,20 @@ pub const KNOWN_DEVIATIONS: &[Deviation] = &[
         reason: "Kopf in lib.rs nennt Ring 3 noch nicht normativ; Aktualisierung in WP-1.5",
     },
 
+    // T-UNSAFE-1: Unsafe in Nicht-Inseln
+    Deviation {
+        crate_name: "contextra-store",
+        rule: "T-UNSAFE-1:tests/chaos_dropped_write.rs",
+        work_package: "WP-3.3",
+        reason: "Chaos-Test nutzt raw libc::dup2 / /proc/self/fd zur FS-Fehlersimulation; Umstellung auf FaultVfs in WP-3.3",
+    },
+    Deviation {
+        crate_name: "contextra-text",
+        rule: "T-UNSAFE-1:tests/alloc_profiler.rs",
+        work_package: "WP-7.1",
+        reason: "Allocation Profiling Test Harness implementiert GlobalAlloc mit unsafe; Bereinigung/Auslagerung in WP-7.1",
+    },
+
     // T-ARCH-6: dev-Abhängigkeiten (AR-14, D-97)
     Deviation {
         crate_name: "contextra-crypto",
@@ -169,17 +178,18 @@ pub const KNOWN_DEVIATIONS: &[Deviation] = &[
 
     // T-ARCH-6: Glob-Re-Exporte pub use ...::*
     Deviation {
+        crate_name: "contextra-crypto",
+        rule: "T-ARCH-6:glob-export",
+        work_package: "WP-3.2",
+        reason: "Glob Re-Exporte in crypto lib.rs; Bereinigung in WP-3.2",
+    },
+    Deviation {
         crate_name: "contextra-types",
         rule: "T-ARCH-6:glob-export",
         work_package: "WP-3.1",
         reason: "Glob Re-Exporte in types.rs und lib.rs; Bereinigung in WP-3.1",
     },
-    Deviation {
-        crate_name: "contextra-ports",
-        rule: "T-ARCH-6:glob-export",
-        work_package: "WP-1.1",
-        reason: "Glob Re-Exporte in ports lib.rs (AR-10); Bereinigung in WP-1.1",
-    },
+
     Deviation {
         crate_name: "contextra-simd",
         rule: "T-ARCH-6:glob-export",
@@ -200,6 +210,12 @@ pub const KNOWN_DEVIATIONS: &[Deviation] = &[
     },
 
     // T-ARCH-7: Namensregeln D-90 und Fassaden-Schnitt D-89
+    Deviation {
+        crate_name: "contextra-erasure",
+        rule: "T-ARCH-7:mod_rs",
+        work_package: "WP-4.1",
+        reason: "mod.rs in Untermodulen; Bereinigung nach D-90 in WP-4.1",
+    },
     Deviation {
         crate_name: "contextra-types",
         rule: "T-ARCH-7:naming",

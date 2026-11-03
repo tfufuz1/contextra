@@ -1,52 +1,50 @@
-# Contextra Deletion Pipeline Architecture Reference
+# Referenz: Architektur der Löschpipeline
 
-> **Normative Vorgabe gemäß docs/SPEC.md §11, §12 und ADR-001 (D-01).**
+Nicht normativ. Maßgeblich: [`docs/SPEC.md`](../../../../../docs/SPEC.md), Kapitel 11, 12 und 13.
 
-## 1. Löschmodell & ADR-001 (D-01)
+## Gate-Varianten (11.3)
 
-Gemäß **ADR-001 (SPEC §3.3, D-01)** entfällt die sogenannte Ebene B (kryptografische DocDek-Schlüsselvernichtung) in v1.
-Die Löschung basiert rein auf:
-1. **Physischer Bereinigung (Ebene A)**: Memtable Purge, SSTable-Rewrite/Swap, HNSW-Slot-Zeroing, Text-Segment-Rewrite.
-2. **Fail-Closed ReadGate (`ErasedSet`)**: Sperrt Lese- und Suchzugriffe ab Status `Gated`.
-3. **Snapshot-Widerruf (`revoke_covering`)**: Widerruft aktive MVCC-Snapshots.
-4. **Maschineller Residuenmessung (E1, E2, E3)** mit Canary-Positivkontrolle.
-5. **Ed25519-signiertem Löschbericht (`ctx-erasure-report/1`, D-13)**.
+- `Erased`: Lesen, Suchen, Schreiben und Zeitreisen sind gesperrt. Ein Eintrag im Gate-Log (`gates.log`) ist Voraussetzung.
+- `Restricted` (Art. 18): Lesen und Schreiben gesperrt, nichts wird vernichtet. Die Kompaktion verwirft diese Daten nie (I-18). Aufhebung nur über `lift_restriction` mit Journal-Eintrag.
 
----
+## Schlüsselebenen (D-79)
 
-## 2. Messklassen nach SPEC §12.1 (D-35)
+| Ziel | Slot, der vernichtet wird |
+|---|---|
+| Dokument | `D` |
+| Betroffener (Subject) | `S` |
+| Collection | `C` |
+| Mandant | `T` |
 
-- **E1 (Rohscan)**:
-  - Byte-genauer Scan aller Dateien im Datenverzeichnis nach Ziel-Needles (BLAKE3-Hashes, Tags, Schlüsselbytes).
-- **E2 (Decoder-Scan)**:
-  - Strukturierter Scan nach vollständiger AEAD-Entschlüsselung aller Container (SSTables, Textsegmente, Vektorsnapshots).
-- **E3 (Schlüssel- und Slot-Abwesenheit)**:
-  - Nachweis, dass der Zielschlüssel im Index, Locator und Tresor nicht mehr existiert.
+Dateischlüssel (`F`) werden im Purge vernichtet, wenn die Datei ausscheidet (D-85).
 
----
+## Key Coverage je Schicht (D-69, 12.5)
 
-## 3. Invarianten des Löschpfads
+| Schicht | Nach `KeyDestroyed` | Danach |
+|---|---|---|
+| `doc_store` | `full` | – |
+| `vector_payload` | `full` | – |
+| `text_postings` | `unlinked` | `TextIndexUntilPurge` bis zum Segment-Rewrite |
+| `vector_edges` | `none` | `IndexTopologyInference` bis zum Rebuild |
+| `file_structure` | `none` | wertlos nach Dateischlüssel-Vernichtung |
 
-- **INV-FAILCLOSED-1**: Bei unbekanntem Zustand oder Fehlern verweigert das System den Zugriff fail-closed.
-- **INV-NO-RESURRECTION-1**: Ein gelöschter Scope darf nach einem Crash, Restore oder Replay niemals wieder lesbar werden (`erasure/ledger.log` Restore-Guard).
-- **INV-CLAIMS-1 (D-35)**: Kein Bericht ohne maschinelle Zeugen (`LayerScan`). Jede Behauptung beruht auf echten Messungen.
-- **VETO-F02**: HNSW-Löschung erfolgt durch Tombstone-Markierung, Slot-Nullung (`zero_slot`) und periodischen Batch-Rebuild. Kein partielles Rewiring.
+## Invarianten (Auswahl aus 13.1)
 
----
+- I-1: kein Schreiben in einen gegateten Bereich nach persistiertem Gate.
+- I-2: ein gegateter Bereich ist auch nach Neustart `Erased`.
+- I-8: `Requested` ist vor dem Gate dauerhaft.
+- I-9: Tresor-Slot ist dauerhaft, bevor ein Record unter dem DEK dauerhaft wird.
+- I-15: jede Löschung ist idempotent und nach Neustart fortsetzbar.
+- I-16: keine Hintergrundoperation hält eine wartende Löschung länger als 1 s.
+- I-20: die Sequenz ist über Restores monoton.
 
-## 4. Schlüsselhierarchie (SPEC §10.1, §13.1)
+## Fehlermodi (Auswahl aus 13.2)
 
-```
-Passphrase (Argon2id: m >= 64 MiB, t >= 3, p >= 1, Salt[32])
-   │
-   ▼
-K_master (SecretKey32)
-   │
-   ├── HKDF("ctx/enc/v1")     ──► K_enc (SSTable- & Segment-AEAD)
-   ├── HKDF("ctx/idx/v1")     ──► K_idx (blind_tag BLAKE3-Key)
-   ├── HKDF("ctx/wal/v1")     ──► K_wal (WAL-HMAC-Kette)
-   ├── HKDF("ctx/journal/v1") ──► K_journal (Löschjournal-AEAD)
-   ├── HKDF("ctx/vault/v1")   ──► K_vault (Tresor-AEAD)
-   ├── HKDF("ctx/unit/v1")    ──► K_unit (Envelope-Sealing)
-   └── HKDF("ctx/sign/v1")    ──► K_sign_seed (Ed25519-Berichtssignatur)
-```
+- FM-1 bis FM-3: Absturz zwischen Gate und Nullung, im Rewrite, Platte voll.
+- FM-8: Restore erkannt, Löschungen werden wiederholt.
+- FM-9: Journal ohne Gate-Log; das Gate wird aus dem Journal rekonstruiert.
+- FM-14: Absturz nach Manifest-Swap, vor Nullung des `F`-Slots.
+
+## Restrisiken (Anhang D)
+
+`FlashRemanence`, `FsJournalOrCow`, `WrappedKeyRemanence`, `FreedBlockRemanence`, `OldKeyslotRemanence`, `ProcessMemory`, `IndexTopologyInference`, `TextIndexUntilPurge`, `ReplicaWindow`, `ExternalCopies`, `ExternalProcessors`, `PseudonymCommitment`, `KeyCompromise`.

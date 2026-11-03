@@ -1,15 +1,15 @@
 // FILE-CONTEXT
 // ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
-// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
-// NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
+// INVARIANTEN: Lock-Hierarchie: header -> vfs_file -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
+// NICHT-OFFENSICHTLICH: Positional VFS-Lesevorgänge über contextra_ports::Vfs.
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
 
 #[cfg(test)]
 mod tests {
     use crate::diskann::config::{DiskAnnConfig, DiskAnnFallbackPolicy};
     use crate::diskann::format::{
-        compute_adaptive_flush_threshold, DiskAnnFooter, DiskAnnHeader, DISKANN_FOOTER_MAGIC,
-        DISKANN_INTEGRITY_KEY, DISKANN_VERSION, PENDING_WAL_MAGIC, PENDING_WAL_VERSION,
+        compute_adaptive_flush_threshold, compute_diskann_tag, DiskAnnFooter, DiskAnnHeader,
+        DISKANN_FOOTER_MAGIC, DISKANN_VERSION, PENDING_WAL_MAGIC, PENDING_WAL_VERSION,
     };
     use crate::diskann::types::{DiskAnnIndex, SearchCandidate};
     use contextra_ports::VectorIndex;
@@ -348,12 +348,10 @@ mod tests {
         data[neighbor_count_offset..neighbor_count_offset + 4]
             .copy_from_slice(&corrupt_count.to_le_bytes());
 
-        // Recompute HMAC for the modified payload so header & footer integrity passes, allowing load_node to test node parsing
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
+        // Recompute Tag for the modified payload so header & footer integrity passes, allowing load_node to test node parsing
         let footer_start = data.len() - DiskAnnFooter::SIZE;
-        hmac.update(&data[..footer_start]);
-        let computed = hmac.finalize();
-        data[footer_start + 4..].copy_from_slice(&computed);
+        let computed_tag = compute_diskann_tag(&[&data[..footer_start]]);
+        data[footer_start + 4..footer_start + 20].copy_from_slice(&computed_tag);
 
         tokio::fs::write(&index_path, &data)
             .await
@@ -364,7 +362,7 @@ mod tests {
             ..config
         };
         let reloaded_index = DiskAnnIndex::try_new(reloaded_config).expect("valid config"); // expect
-        reloaded_index.load().await.expect("Load header & mmap"); // expect
+        reloaded_index.load().await.expect("Load header & index"); // expect
 
         let result = reloaded_index.load_node(0);
         assert!(result.is_err());
@@ -793,12 +791,10 @@ mod tests {
         let footer = DiskAnnFooter::try_from_bytes(footer_slice).expect("footer parsing");
         assert_eq!(&footer.magic, DISKANN_FOOTER_MAGIC);
 
-        // Verify HMAC calculation over payload
-        let mut hmac = contextra_crypto::wal_crypto::WalHmac::new(DISKANN_INTEGRITY_KEY).unwrap();
+        // Verify Tag calculation over payload
         let payload = &file_bytes[..file_bytes.len() - DiskAnnFooter::SIZE];
-        hmac.update(payload);
-        let expected_hmac = hmac.finalize();
-        assert_eq!(footer.hmac, expected_hmac);
+        let expected_tag = compute_diskann_tag(&[payload]);
+        assert_eq!(footer.tag, expected_tag);
 
         // 2. Corrupt one byte of HMAC in footer, write to disk, and verify load returns integrity error
         let mut corrupt_bytes = file_bytes.clone();

@@ -1,10 +1,6 @@
 //! Benchmark BM-GATE-CHECK-IFACE: Aufrufkosten ReadGate::check über Mock mit BTreeMap (O(log n)).
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::disallowed_methods
-)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::disallowed_methods)]
 
 #[path = "../src/gate.rs"]
 pub mod gate;

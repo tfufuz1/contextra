@@ -14,7 +14,7 @@
 // ZWECK: Kanonische Metadata Filter DSL (FilterExpr) und Evaluierungs-Engine.
 // INVARIANTEN: Reines In-Memory Evaluieren gegen serde_json::Value ohne Nebenwirkungen.
 // HOTSPOTS: 20-220
-// NICHT-OFFENSICHTLICH: Legacy MetadataFilter aus contextra-db konvertiert verlustfrei in FilterExpr.
+// NICHT-OFFENSICHTLICH: Metadatenfilter konvertieren verlustfrei in FilterExpr.
 // SIEHE AUCH: rules/tag_taxonomy.md, DECISIONS.md
 
 use serde::{Deserialize, Serialize};

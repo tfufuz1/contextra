@@ -33,13 +33,13 @@ pub enum StorageHealth {
 pub struct LsmStorage {
     pub(super) config: LsmConfig,
     pub(super) key_manager: Option<Arc<KeyManager>>,
-    pub(super) state: RwLock<LsmState>,
+    pub(crate) state: RwLock<LsmState>,
     /// SSTables stored separately for shared access with compaction engine.
     pub(super) sstables: Arc<RwLock<Vec<Arc<SstableReader>>>>,
     pub(super) tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
     pub(super) budget: Arc<ResourceTracker>,
     pub(super) block_cache: Arc<BlockCache>,
-    pub(super) wal: RwLock<Arc<Wal>>,
+    pub(crate) wal: RwLock<Arc<Wal>>,
     pub snapshot_registry: Arc<SnapshotRegistry>,
     /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
     /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).

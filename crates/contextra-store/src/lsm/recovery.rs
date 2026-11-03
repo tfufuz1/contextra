@@ -7,7 +7,6 @@ use crate::compaction::{CompactionEngine, MergeOperator};
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
-use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp};
 use contextra_mvcc::{SnapshotRegistry, TxBuffer};
 use contextra_ports::{ResourceBudget, ResourceTracker};
@@ -724,19 +723,7 @@ impl LsmStorage {
                 .map_err(|e| {
                     ContextraError::Storage(format!("Failed to write rollback intent file: {e}"))
                 })?;
-            let parent = self.config.path.clone();
-            tokio::task::spawn_blocking(move || {
-                // INVARIANT-KONFORM: In spawn_blocking gewrappt; Parent-Directory FSync bei Crash-Recovery / Rollback (kein Hot-Path).
-                std::fs::File::open(&parent)
-                    .and_then(|f| f.sync_all())
-                    .map_err(|e| {
-                        ContextraError::Storage(format!(
-                            "Failed to fsync dir after intent file: {e}"
-                        ))
-                    })
-            })
-            .await
-            .map_err(|e| ContextraError::Internal(e.to_string()))??;
+            crate::util::fsync_parent_dir(&intent_path).await?;
         }
 
         let state = self.state.write().await;

@@ -35,6 +35,11 @@ contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }
 contextra-mvcc = { workspace = true }
+sha2 = "0.10"
+hmac = "0.12"
+aes-gcm-siv = "0.11"
+hkdf = "0.12"
+subtle = "2.6"
 ahash = { workspace = true }
 quick_cache = { version = "0.6", optional = true }
 contextra-crypto = { workspace = true }
@@ -106,3 +111,7 @@ harness = false
 [[bench]]
 name = "redb_comparative_bench"
 harness = false
+
+[[test]]
+name = "spec_store_tests"
+path = "tests/spec_store_tests.rs"

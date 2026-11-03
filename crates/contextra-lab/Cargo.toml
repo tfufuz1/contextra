@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Unabhängige Prüfinstanz und Byte-Format-Parser für die Löschverifikation."
+description = "Unabhängige Prüfinstanz für die Löschmessung, ohne Produktions-Decoder."
 
 [lib]
 name = "contextra_lab"

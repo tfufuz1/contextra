@@ -1,8 +1,10 @@
-//! # Crate `contextra-testmacros`
+//! Proc-Macros für Contextra-Tests und Benchmarks (`ctx_test`, `ctx_bench`).
 //!
-//! Proc-Makros für die Contextra-Testinfrastruktur:
-//! - `#[ctx_test(id = "T-...")]`: Validiert SPEC-Test-IDs und erzeugt Test-Hooks.
-//! - `#[ctx_bench(id = "BM-...")]`: Validiert SPEC-Benchmark-IDs und erzeugt Benchmark-Hooks.
+//! Ring: Tooling (dev)
+//! Erlaubte Abhängigkeiten: keine Workspace-Abhängigkeiten (AR-1, AR-14)
+//! SPEC-Verweis: SPEC §5.1, §5.1a, §5.2, §15.1, L-6, D-91, D-97
+
+#![forbid(unsafe_code)]
 
 use proc_macro::TokenStream;
 use quote::quote;

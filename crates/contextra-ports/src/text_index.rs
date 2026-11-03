@@ -5,12 +5,10 @@
 // ZWECK: TextIndex & SegmentSynthesizer Trait-Definitionen für BM25/Inverted Index.
 // INVARIANTEN: AFIT for TextIndex, BoxFuture for SegmentSynthesizer.
 
-use crate::types::{DocId, ScoredDocument, TxId};
 use crate::Result;
+use crate::{ContextraError, DocId, ScoredDocument, TxId};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
-
-pub use crate::embedding::TextEmbeddingEngine;
 
 /// Statistics for a text index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,6 +27,12 @@ pub struct TextIndexStats {
 /// Verwendet native `async fn` (AFIT) für statischen Dispatch.
 pub trait TextIndex: Send + Sync + 'static {
     /// Searches for documents matching the query.
+    ///
+    /// # Fehler
+    /// Liefert `ContextraError::Io` bei Lesefehlern.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff; keine Mutation auf Festplatte.
     fn search(
         &self,
         query: &str,
@@ -49,7 +53,7 @@ pub trait TextIndex: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send {
         async move {
             let _ = (query, k, seq_no);
-            Err(crate::error::ContextraError::capability_unsupported(
+            Err(ContextraError::capability_unsupported(
                 "snapshot_read_at",
                 "Text search snapshot isolation (search_at) is not supported by default — tracked in ADR-024",
             ))
@@ -97,8 +101,8 @@ mod tests {
             num_tokens: 1000,
             memory_usage_bytes: 256,
         };
-        let ser = serde_json::to_string(&t_stats).unwrap();
-        let deser: TextIndexStats = serde_json::from_str(&ser).unwrap();
+        let ser = serde_json::to_string(&t_stats).expect("serialize text stats");
+        let deser: TextIndexStats = serde_json::from_str(&ser).expect("deserialize text stats");
         assert_eq!(t_stats.num_documents, deser.num_documents);
     }
 
@@ -192,7 +196,7 @@ mod tests {
         let index = MockTextIndex;
         let res = index.search_at("query", 10, 42).await;
         match res {
-            Err(crate::error::ContextraError::CapabilityUnsupported { capability, reason }) => {
+            Err(ContextraError::CapabilityUnsupported { capability, reason }) => {
                 assert_eq!(capability, "snapshot_read_at");
                 assert!(reason.contains("ADR-024"), "Unexpected reason: {reason}");
             }

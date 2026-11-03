@@ -2,29 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Zustände des Löschabläufs (SPEC 11.2, ER-29).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
-pub enum SagaState {
-    /// Löschauftrag eingegangen.
-    Requested,
-    /// Gate gesetzt, Schlüsselvernichtung bevorsteht.
-    Gated,
-    /// Schlüssel vernichtet.
-    KeyDestroyed,
-    /// Purge-Phase läuft.
-    Purging,
-    /// Verifikations-Phase läuft.
-    Verifying,
-    /// Löschung vollständig abgeschlossen.
-    Completed,
-    /// Verzögerung (temporär, mit Grund).
-    Pending,
-    /// Endgültig verweigert (terminal).
-    Refused,
-}
+pub use crate::saga::SagaState;
 
 /// Ein Journal-Eintrag (SPEC §11.6, ER-29).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JournalEntry {
     /// Lösch-ID.
     pub erasure_id: [u8; 16],

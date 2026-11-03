@@ -6,7 +6,6 @@
 //!
 //! Treffer → Store nicht freigegeben, `Recovering`, automatische Wiederholung.
 
-use crate::error::ErasureError;
 use crate::ledger::sink::InMemoryLedger;
 
 /// Ergebnis des Restore-Guard-Checks.
@@ -30,13 +29,13 @@ pub enum GuardOutcome {
     LedgerMissing,
 }
 
-/// Restore-Guard: prüft auf Zeitregression und Wiederauftauchen (ER-30).
-pub struct RestoreGuard<'a> {
+/// Dateibasierter Restore-Checker: prüft auf Zeitregression und Wiederauftauchen (ER-30).
+pub struct FileRestoreChecker<'a> {
     ledger: &'a InMemoryLedger,
 }
 
-impl<'a> RestoreGuard<'a> {
-    /// Erstellt einen neuen Guard mit Ledger-Referenz.
+impl<'a> FileRestoreChecker<'a> {
+    /// Erstellt einen neuen Checker mit Ledger-Referenz.
     pub fn new(ledger: &'a InMemoryLedger) -> Self {
         Self { ledger }
     }
@@ -61,6 +60,8 @@ impl<'a> RestoreGuard<'a> {
 
     /// Berechnet die nächste sichere Sequenznummer: `max(current_seq, ledger_floor) + 1` (ER-30).
     pub fn next_safe_seq(&self, store_current_seq: u64) -> u64 {
-        store_current_seq.max(self.ledger.ledger_floor()).saturating_add(1)
+        store_current_seq
+            .max(self.ledger.ledger_floor())
+            .saturating_add(1)
     }
 }

@@ -1,40 +1,14 @@
-#![deny(dead_code)]
-// ANCHOR[contextra-mvcc:LIB-ROOT]
-//! # `Contextra` MVCC — Multi-Version Concurrency Control, Sequence Log, Transaction Staging und SSI-Validierung.
+//! Sequenzen, Snapshots und SSI-Validierung für Mehrversions-Nebenläufigkeit.
 //!
-//! Multi-Version Concurrency Control (MVCC, Mehrversions-Nebenläufigkeitssteuerung) ermöglicht es
-//! Lese- und Schreiboperationen gleichzeitig ohne gegenseitiges Blockieren auszuführen.
-//! Leser sehen konsistente Snapshots (Schnappschüsse) zu einem logischen Zeitpunkt,
-//! während Schreiber isoliert neue Versionen im Staging-Puffer vorbereiten.
-//!
-//! ## Architektur-Rolle (Ring 0 — Kernkomponente)
-//!
-//! `contextra-mvcc` gehört zur innersten Systemschicht (Ring 0, Basis/Kern). Es bietet fundamentale
-//! Isolationsgarantien für relationale und vektorielle Indexstrukturen und besitzt keinerlei
-//! Kenntnisse über Festplatten-Layouts oder Netzwerkprotokolle.
-//!
-//! ### Wer nutzt diese Crate? (Eingehende Abhängigkeiten)
-//! - `contextra-store`: Nutzt MVCC-Sequenzen für WAL-Synchronisation und Compaction-GC-Pruning.
-//! - `contextra-engine`: Koordiniert Transaktionen, ReadSets und SSI-Validierung vor Commits.
-//! - `contextra-vector`: Führt snapshot-isolierte Vektorsuchen (`_at`) durch.
-//! (Hinweis: `contextra-checkpoint` und `contextra-core` sind per SPEC D-24 entfernt.)
-//!
-//! ### Wovon hängt diese Crate ab? (Ausgehende Abhängigkeiten)
-//! - `contextra-types`: Domänentypen wie `TxId`, `DocId`, `ContextraError`.
-//! - `contextra-ports`: Abstrakte Schnittstellen wie `Clock` (Zeitport zur deterministischen Testbarkeit).
-//! - Bibliotheken dritter Parteien: `parking_lot` (effiziente Mutexe/RwLocks), `ahash` (schnelle Hashing-Algorithmen).
-//!
-//! ### Kernkomponenten
-//! - [`SequenceLog`]: Monotone Versionsverfolgung von Dokument-Änderungen für Snapshot-Suchen.
-//! - [`SnapshotRegistry`] / [`SnapshotGuard`]: RAII-geschützte Schnappschüsse, die minimale aktive Sequenzen garantieren.
-//! - [`TxBuffer`]: Nach Transaktions-ID partitionierter Staging-Puffer für atomare 2-Phase-Commit-Vorbereitungen.
-//! - [`ReadSet`] / [`SsiValidator`] / [`SequenceLogSsiValidator`]: Serializable Snapshot Isolation (SSI)
-//!   zur Erkennung von Write-Skew-Anomalien und Phantom-Reads bei Transaktionen.
+//! Ring: 2 (Kernkomponente)
+//! Erlaubte Abhängigkeiten laut SPEC §5.3: contextra-types, contextra-ports.
+//! Siehe SPEC §8.7 für normative Anforderungen.
 
+#![deny(dead_code)]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-pub use contextra_types::*;
+pub use contextra_types::{ContextraError, DocId, Result, TxId, TOMBSTONE_BIT};
 
 pub mod error;
 pub mod seq_log;

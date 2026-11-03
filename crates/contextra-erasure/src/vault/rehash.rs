@@ -7,7 +7,7 @@ use crate::error::ErasureError;
 /// ohne Grabsteine (ER-08).
 pub fn rehash(old: &VaultTable, mac_key: [u8; 32]) -> Result<VaultTable, ErasureError> {
     let new_cap = old.capacity() * 2;
-    let mut new_table = VaultTable::new(new_cap, mac_key);
+    let new_table = VaultTable::new(new_cap, mac_key);
 
     // Alle aktiven Slots in die neue Tabelle kopieren
     // (Grabsteine werden nicht übernommen, ER-08)

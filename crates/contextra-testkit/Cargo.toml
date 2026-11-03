@@ -17,7 +17,7 @@ default = ["testkit"]
 testkit = []
 
 [dependencies]
-contextra-ports = { workspace = true, features = ["testkit"] }
+contextra-ports = { workspace = true }
 contextra-types = { workspace = true }
 blake3 = { workspace = true }
 bytes = { workspace = true }

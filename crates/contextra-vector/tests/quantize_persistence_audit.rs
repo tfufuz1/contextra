@@ -1,5 +1,5 @@
 // FILE-CONTEXT
-// ZWECK: Audit-Testsuite für SQ8 Kendall-Tau Rangkorrelation, Persistence Roundtrips und Mmap Fault-Tolerance
+// ZWECK: Audit-Testsuite für SQ8 Kendall-Tau Rangkorrelation, Persistence Roundtrips und Buffer Fault-Tolerance
 // STAND: TS:2026-08-31T00:00:00Z
 
 #![cfg(feature = "experimental-diskann")]
@@ -9,7 +9,7 @@ use contextra_types::ContextraError;
 use contextra_types::{DistanceMetric, DocId, TxId};
 use contextra_vector::diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
-use contextra_vector::persistence::MmapIndex;
+use contextra_vector::persistence::BufferIndex;
 use contextra_vector::quantize::ScalarQuantizer;
 use rand::Rng;
 
@@ -221,7 +221,7 @@ async fn test_hnsw_and_diskann_persistence_roundtrip() {
     // Save and Reload
     hnsw_index.save(&hnsw_path).await.unwrap();
     let hnsw_reloaded = HnswIndex::try_new(hnsw_config).unwrap();
-    hnsw_reloaded.load_mmap(&hnsw_path).await.unwrap();
+    hnsw_reloaded.load_buffer(&hnsw_path).await.unwrap();
 
     let hnsw_post_results = hnsw_reloaded.search(query, 5).await.unwrap();
 
@@ -240,10 +240,10 @@ async fn test_hnsw_and_diskann_persistence_roundtrip() {
         );
     }
 
-    // Direct Mmap Index Header Verification
-    let mmap_hnsw = MmapIndex::open(&hnsw_path).unwrap();
-    assert_eq!(mmap_hnsw.header.node_count() as usize, n);
-    assert_eq!(mmap_hnsw.header.dimension() as usize, dim);
+    // Direct Buffer Index Header Verification
+    let buffer_hnsw = BufferIndex::open(&hnsw_path).unwrap();
+    assert_eq!(buffer_hnsw.header.node_count() as usize, n);
+    assert_eq!(buffer_hnsw.header.dimension() as usize, dim);
 
     // 2. DiskANN Persistence Roundtrip
     let diskann_config = DiskAnnConfig {
@@ -278,13 +278,13 @@ async fn test_hnsw_and_diskann_persistence_roundtrip() {
 }
 
 #[tokio::test]
-async fn test_corrupted_mmap_file_handling() {
+async fn test_corrupted_buffer_file_handling() {
     let temp_dir = tempfile::tempdir().unwrap();
 
     // 1. Completely Truncated / Empty File
     let empty_path = temp_dir.path().join("empty.hnsw");
     tokio::fs::write(&empty_path, b"").await.unwrap();
-    let res_empty_hnsw = MmapIndex::open(&empty_path);
+    let res_empty_hnsw = BufferIndex::open(&empty_path);
     assert!(
         matches!(res_empty_hnsw, Err(ContextraError::Storage(_))),
         "Opening empty file must return ContextraError::Storage"
@@ -295,7 +295,7 @@ async fn test_corrupted_mmap_file_handling() {
     let mut bad_bytes = vec![0u8; 64];
     bad_bytes[0..4].copy_from_slice(b"BADM");
     tokio::fs::write(&bad_magic_path, &bad_bytes).await.unwrap();
-    let res_bad_magic = MmapIndex::open(&bad_magic_path);
+    let res_bad_magic = BufferIndex::open(&bad_magic_path);
     assert!(matches!(res_bad_magic, Err(ContextraError::Storage(_))));
 
     // 3. DiskANN Corrupt Magic Bytes
@@ -344,6 +344,6 @@ async fn test_corrupted_mmap_file_handling() {
     let load_res = trunc_diskann.load().await;
     assert!(
         load_res.is_err(),
-        "Loading truncated mmap file must return Err(ContextraError) without panic"
+        "Loading truncated buffer file must return Err(ContextraError) without panic"
     );
 }

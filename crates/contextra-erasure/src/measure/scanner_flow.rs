@@ -26,8 +26,7 @@ pub fn run_scanner_flow(
     control_pattern: &[u8],
 ) -> Result<LayerWitness, ErasureError> {
     // Schritt 1: Positivkontrolle
-    let evidence = run_positive_control(control_pattern)
-        .ok_or(ErasureError::Residue(0))?;
+    let evidence = run_positive_control(control_pattern).ok_or(ErasureError::Residue(0))?;
 
     // Schritt 2: Scanner erstellen und armen
     let unarmed = Scanner::<Unarmed>::new(layer, class, method_id);

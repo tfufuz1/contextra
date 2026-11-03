@@ -86,6 +86,11 @@ impl KeyRange {
     pub const fn new(start: KeyBuf, end: KeyBuf) -> Self {
         Self { start, end }
     }
+
+    /// Returns `true` if `key` falls within `[start, end)`.
+    pub fn contains(&self, key: &KeyBuf) -> bool {
+        key >= &self.start && key < &self.end
+    }
 }
 
 impl fmt::Debug for KeyRange {
@@ -122,14 +127,38 @@ pub enum RangeGate {
 /// - **PO-07**: `ReadGate` is synchronous, performs zero I/O, and executes in $O(\log n)$ time.
 pub trait ReadGate: Send + Sync {
     /// Checks point status of an individual key.
+    ///
+    /// # Fehler
+    /// Synchron, keine I/O, panikfrei; liefert GateDecision.
+    ///
+    /// # Crash
+    /// Reiner RAM-Lookup in O(log n); keine Zustandsänderung.
     fn check(&self, k: &KeyBuf) -> GateDecision;
 
     /// Checks boundary status of a file or partition block for compaction or scans.
+    ///
+    /// # Fehler
+    /// Synchron, keine I/O; liefert GateDecision.
+    ///
+    /// # Crash
+    /// Reiner RAM-Lookup; keine Seiteneffekte.
     fn check_bound(&self, b: &KeyBound) -> GateDecision;
 
     /// Evaluates range policy for compaction (I-18: Erased may be dropped, Restricted never).
+    ///
+    /// # Fehler
+    /// Synchron, keine I/O; liefert RangeGate.
+    ///
+    /// # Crash
+    /// Reiner RAM-Lookup für Kompaktions-Entscheidungen.
     fn variant_for_range(&self, r: &KeyRange) -> RangeGate;
 
     /// Retrieves the sequence number at which the key was gated, if any (Restore-Guard, commit rejection).
+    ///
+    /// # Fehler
+    /// Synchron, liefert Option<Seq>.
+    ///
+    /// # Crash
+    /// Reiner RAM-Lookup; keine Mutation.
     fn gated_seq(&self, k: &KeyBuf) -> Option<Seq>;
 }

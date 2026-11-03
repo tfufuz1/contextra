@@ -1,7 +1,15 @@
-// Testet, dass ohne Passphrase bei Builder-Abschluss ein Fehler provoziert wird
-// bzw. in K10 typbasiert zur Compile-Zeit fehlschlägt.
+// Compile-Fail Test: Fehlende Passphrase verhindert Aufruf von .open() / .build()
+use contextra::Contextra;
 
-fn main() {
-    // In Stufe 1: Laufzeitfehler.
-    // In Stufe 2 (K10): Builder ohne with_passphrase() hat keine .open()/.build()-Methode.
+#[tokio::main]
+async fn main() {
+    let rt = tokio::runtime::Handle::current();
+
+    // Der Builder hat hier den Typ EngineBuilder<Missing, Set>
+    // Aufruf von .open() ist nur für EngineBuilder<Set, Set> definiert!
+    let builder = Contextra::builder()
+        .data_dir("./target/trybuild_test_db")
+        .runtime(rt);
+
+    let _db = builder.open().await;
 }

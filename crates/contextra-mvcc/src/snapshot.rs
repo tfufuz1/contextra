@@ -17,8 +17,8 @@
 //!   Die Kompaktierung nutzt `min_for_compaction(current_seq)`, was bei leerer Registry `current_seq` liefert.
 
 use crate::error::MvccError;
-use crate::types::TOMBSTONE_BIT;
 use contextra_ports::{Clock, SystemClock};
+use contextra_types::TOMBSTONE_BIT;
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -574,7 +574,7 @@ mod tests {
     #[test]
     fn test_seq_no_tombstone_masking() {
         let registry = Arc::new(SnapshotRegistry::new());
-        let seq = 100 | crate::types::TOMBSTONE_BIT;
+        let seq = 100 | contextra_types::TOMBSTONE_BIT;
         let guard = registry.register(seq);
 
         assert_eq!(guard.seq_no(), 100);

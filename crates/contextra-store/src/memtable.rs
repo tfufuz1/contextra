@@ -133,6 +133,28 @@ pub struct MemTable {
 }
 
 impl MemTable {
+    /// Retains only the elements specified by the predicate.
+    pub fn retain<F>(&self, mut f: F)
+    where
+        F: FnMut(&[u8]) -> bool,
+    {
+        let mut freed_bytes = 0;
+        for shard in &self.shards {
+            let mut guard = shard.entries.write();
+            let mut removed_bytes = 0;
+            guard.retain(|k, v| {
+                if f(k) {
+                    true
+                } else {
+                    let val_bytes: usize = v.iter().map(|(_, val, _)| val.len()).sum();
+                    removed_bytes += k.len() + val_bytes;
+                    false
+                }
+            });
+            freed_bytes += removed_bytes;
+        }
+        self.size.fetch_sub(freed_bytes, std::sync::atomic::Ordering::Relaxed);
+    }
     /// Creates a new empty MemTable with `SHARD_COUNT` independent shards.
     pub fn new() -> Self {
         Self {

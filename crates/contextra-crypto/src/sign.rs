@@ -6,6 +6,14 @@ use crate::labels;
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 
 /// Signs a canonical report message with prefix ctx/report/v1.
+///
+/// # Inputs
+/// * `seed`: Strongly-typed `SignSeed` (32 bytes) derived from the master key.
+/// * `canon`: Canonical report byte slice to be signed.
+///
+/// # Properties & Security
+/// Prepends `labels::REPORT_PREFIX` (`ctx/report/v1`) to prevent cross-protocol signature
+/// confusion. Generates a 64-byte Ed25519 signature.
 pub fn sign_report(seed: &SignSeed, canon: &[u8]) -> [u8; 64] {
     let signing_key = SigningKey::from_bytes(seed.0.as_bytes());
     let mut msg = Vec::with_capacity(labels::REPORT_PREFIX.len() + canon.len());

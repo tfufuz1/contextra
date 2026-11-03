@@ -67,6 +67,23 @@ criterion_group!(
     bench_block_aead_seal,
     bench_hkdf_expand,
     bench_tag_computation,
-    bench_kdf_params
+    bench_kdf_params,
+    bench_kdf_default_params
 );
 criterion_main!(benches);
+
+fn bench_kdf_default_params(c: &mut Criterion) {
+    let mut group = c.benchmark_group("bm_kdf_default");
+    group.sample_size(10);
+
+    let pass = Secret::from_slice(b"benchmark_master_passphrase");
+    let salt = [0x5au8; 32];
+
+    // D-68 standard: 128 MiB (131072 KiB), t = 3, p = 4
+    let params_default = KdfParams::DEFAULT;
+    group.bench_function("argon2id_default_128mib_t3_p4", |b| {
+        b.iter(|| derive_kek(black_box(&pass), black_box(&salt), black_box(&params_default)).unwrap());
+    });
+
+    group.finish();
+}

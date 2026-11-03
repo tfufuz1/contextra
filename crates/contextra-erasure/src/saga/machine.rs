@@ -5,13 +5,23 @@
 //!      └──────────┴──────────┴── Pending(reason) (idempotent, wiederholbar)
 //!   Refused  (terminal, vor Gate)
 
-use contextra_types::erasure::{EraseMode, EraseRequest, EraseTarget, PendingReason, RetentionCode};
+use contextra_ports::erasure::EraseTarget as PortEraseTarget;
+use contextra_types::erasure::PendingReason;
 use contextra_types::ids::ErasureId;
 use serde::{Deserialize, Serialize};
 
 pub use contextra_types::erasure::{
     EraseMode as SagaMode, EraseRequest as SagaEraseRequest, EraseTarget as SagaEraseTarget,
 };
+
+/// Anfrage zur Löschung (Kompatibilität mit Ports & Tests).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EraseRequest {
+    /// Ziel der Löschung
+    pub target: PortEraseTarget,
+    /// Eindeutige Lösch-ID
+    pub erasure_id: [u8; 16],
+}
 
 /// Saga-Zustand (SPEC §11.2, ER-29).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
@@ -85,7 +95,7 @@ impl std::fmt::Display for SagaState {
 }
 
 /// Zustandsmaschine für einen einzelnen Löschvorgang.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EraseSaga {
     /// Eindeutige Kennung.
     erasure_id: ErasureId,
@@ -95,9 +105,24 @@ pub struct EraseSaga {
     pending_reason: Option<PendingReason>,
 }
 
+impl Default for EraseSaga {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EraseSaga {
-    /// Erstellt eine neue Saga im Zustand `Requested`.
-    pub fn new(erasure_id: ErasureId) -> Self {
+    /// Erstellt eine neue Saga im Zustand `Requested` mit Null-ID.
+    pub fn new() -> Self {
+        Self {
+            erasure_id: ErasureId::new([0u8; 16]),
+            state: SagaState::Requested,
+            pending_reason: None,
+        }
+    }
+
+    /// Erstellt eine neue Saga mit gegebener ErasureId im Zustand `Requested`.
+    pub fn with_id(erasure_id: ErasureId) -> Self {
         Self {
             erasure_id,
             state: SagaState::Requested,
@@ -129,10 +154,15 @@ impl EraseSaga {
         self.pending_reason.as_ref()
     }
 
-    /// Führt einen Zustandsübergang durch (ER-18: idempotent).
+    /// Führt einen einfachen Zustandsübergang durch (idempotent).
+    pub fn transition_to(&mut self, next: SagaState) -> Result<(), crate::error::ErasureError> {
+        self.transition_with_reason(next, None)
+    }
+
+    /// Führt einen Zustandsübergang mit Begründung durch (ER-18: idempotent).
     ///
     /// Gibt `Err` zurück wenn der Übergang nicht erlaubt ist.
-    pub fn transition_to(
+    pub fn transition_with_reason(
         &mut self,
         next: SagaState,
         reason: Option<PendingReason>,

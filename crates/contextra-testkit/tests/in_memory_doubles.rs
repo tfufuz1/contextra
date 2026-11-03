@@ -18,6 +18,7 @@ use std::time::Duration;
 // 1. POSITIVE CONFORMANCE TEST EXECUTION AGAINST UNMODIFIED DOUBLES
 // ============================================================================
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_in_memory_storage_engine_conformance() {
     let result = run_storage_engine_suite(|| async { InMemoryStorageEngine::new() }).await;
@@ -27,6 +28,7 @@ async fn test_in_memory_storage_engine_conformance() {
     );
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_in_memory_vector_index_conformance() {
     let result = run_vector_index_suite(|| async { InMemoryVectorIndex::new(3) }).await;
@@ -36,6 +38,7 @@ async fn test_in_memory_vector_index_conformance() {
     );
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_in_memory_text_index_conformance() {
     let result = run_text_index_suite(|| async { InMemoryTextIndex::new() }).await;
@@ -45,6 +48,7 @@ async fn test_in_memory_text_index_conformance() {
     );
 }
 
+/// SPEC: PO-08
 #[test]
 fn test_manual_clock_conformance() {
     let clock = ManualClock::new(1_700_000_000_000_000_000);
@@ -55,6 +59,7 @@ fn test_manual_clock_conformance() {
     );
 }
 
+/// SPEC: V-RNG
 #[test]
 fn test_seeded_rng_conformance() {
     let rng = SeededRng::new(0x434F_4E54_5854_5241);
@@ -65,6 +70,7 @@ fn test_seeded_rng_conformance() {
     );
 }
 
+/// SPEC: PO-09
 #[test]
 fn test_test_metrics_sink_conformance() {
     let sink = TestMetricsSink::new();
@@ -79,6 +85,7 @@ fn test_test_metrics_sink_conformance() {
 // 2. EDGE CASE TESTS: IN-MEMORY STORAGE ENGINE
 // ============================================================================
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_storage_engine_delete_nonexistent_key() {
     let store = InMemoryStorageEngine::new();
@@ -95,6 +102,7 @@ async fn test_storage_engine_delete_nonexistent_key() {
     assert_eq!(val, None);
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_storage_engine_empty_scans() {
     let store = InMemoryStorageEngine::new();
@@ -122,6 +130,7 @@ async fn test_storage_engine_empty_scans() {
     assert!(scan_limit_zero.is_empty());
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_storage_engine_put_if_absent_semantics() {
     let store = InMemoryStorageEngine::new();
@@ -158,6 +167,7 @@ async fn test_storage_engine_put_if_absent_semantics() {
     assert!(!inserted_after_commit);
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_storage_engine_snapshot_and_seq_visibility() {
     let store = InMemoryStorageEngine::new();
@@ -192,6 +202,7 @@ async fn test_storage_engine_snapshot_and_seq_visibility() {
     );
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_storage_engine_scan_prefix_at_seq() {
     let store = InMemoryStorageEngine::new();
@@ -218,6 +229,7 @@ async fn test_storage_engine_scan_prefix_at_seq() {
     assert_eq!(scanned_seq2.len(), 2);
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_storage_engine_stats_and_last_tx() {
     let store = InMemoryStorageEngine::new();
@@ -240,6 +252,7 @@ async fn test_storage_engine_stats_and_last_tx() {
 // 3. EDGE CASE TESTS: IN-MEMORY VECTOR INDEX
 // ============================================================================
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_vector_index_empty_search_and_zero_k() {
     let index = InMemoryVectorIndex::new(3);
@@ -257,6 +270,7 @@ async fn test_vector_index_empty_search_and_zero_k() {
     assert!(res_zero.is_empty());
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_vector_index_delete_nonexistent() {
     let index = InMemoryVectorIndex::new(2);
@@ -268,6 +282,7 @@ async fn test_vector_index_delete_nonexistent() {
     assert_eq!(index.len().await, 0);
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_vector_index_tie_breaking_deterministic_order() {
     let index = InMemoryVectorIndex::new(2);
@@ -289,6 +304,7 @@ async fn test_vector_index_tie_breaking_deterministic_order() {
     assert_eq!(second.doc_id, DocId(50));
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_vector_index_non_finite_and_dimension_validation() {
     let index = InMemoryVectorIndex::new(2);
@@ -316,6 +332,7 @@ async fn test_vector_index_non_finite_and_dimension_validation() {
     assert!(index.search(&[f32::INFINITY, 0.0], 1).await.is_err());
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_vector_index_rollback() {
     let index = InMemoryVectorIndex::new(2);
@@ -333,6 +350,7 @@ async fn test_vector_index_rollback() {
 // 4. EDGE CASE TESTS: IN-MEMORY TEXT INDEX
 // ============================================================================
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_text_index_empty_and_whitespace_search() {
     let index = InMemoryTextIndex::new();
@@ -357,6 +375,7 @@ async fn test_text_index_empty_and_whitespace_search() {
     assert!(res_k_zero.is_empty());
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_text_index_delete_nonexistent() {
     let index = InMemoryTextIndex::new();
@@ -368,6 +387,7 @@ async fn test_text_index_delete_nonexistent() {
     assert_eq!(index.len().await, 0);
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_text_index_ranking_stability_and_tie_breaking() {
     let index = InMemoryTextIndex::new();
@@ -394,6 +414,7 @@ async fn test_text_index_ranking_stability_and_tie_breaking() {
     assert_eq!(second.doc_id, DocId(50));
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_text_index_german_normalization_comprehensive() {
     let index = InMemoryTextIndex::new();
@@ -430,6 +451,7 @@ async fn test_text_index_german_normalization_comprehensive() {
     assert_eq!(r4.first().map(|d| d.doc_id), Some(DocId(2)));
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_text_index_rollback_and_stats() {
     let index = InMemoryTextIndex::new();
@@ -461,6 +483,7 @@ async fn test_text_index_rollback_and_stats() {
 // 5. EDGE CASE TESTS: MANUAL CLOCK
 // ============================================================================
 
+/// SPEC: PO-08
 #[test]
 fn test_manual_clock_never_runs_backward() {
     let clock = ManualClock::new(5_000);
@@ -483,6 +506,7 @@ fn test_manual_clock_never_runs_backward() {
     assert_eq!(dyn_clock.now_unix_nanos(), t3);
 }
 
+/// SPEC: PO-08
 #[test]
 fn test_manual_clock_large_advance_and_set() {
     let clock = ManualClock::new(10);
@@ -507,6 +531,7 @@ fn test_manual_clock_large_advance_and_set() {
 // 6. REFERENCE MODEL VS IN-MEMORY STORAGE EQUIVALENCE
 // ============================================================================
 
+/// SPEC: T-CRASH-1
 #[tokio::test]
 async fn test_reference_model_edge_cases() {
     let mut model = ReferenceModel::new();
@@ -559,6 +584,7 @@ async fn test_reference_model_edge_cases() {
     assert_eq!(snapshot_map.get(b"c".as_slice()), Some(&b"3".to_vec()));
 }
 
+/// SPEC: PO-02
 #[tokio::test]
 async fn test_reference_model_vs_in_memory_store_equivalence() {
     // Deterministic PRNG for operations

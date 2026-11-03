@@ -1,3 +1,4 @@
+#![allow(unsafe_code)]
 // FILE-CONTEXT: Chaos test for fsync/I/O error propagation and durability guarantees during WAL write drops. (TS: 2026-08-30) (SESSION: 283abf0f)
 //! Chaos test proving fsync/I/O error propagation and non-corruption invariants in `LsmStorage`.
 //!
