@@ -10,8 +10,8 @@
 
 use contextra_mvcc::error::MvccError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
-use contextra_mvcc::types::{TxId, TOMBSTONE_BIT};
 use contextra_mvcc::SnapshotRegistry;
+use contextra_types::{TxId, TOMBSTONE_BIT};
 use std::sync::Arc;
 
 #[test]
