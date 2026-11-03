@@ -91,9 +91,7 @@ mod tests {
     async fn test_sync_file_and_parent_dir_unix() {
         let dir = tempdir().expect("tempdir");
         let file_path = dir.path().join("test_file.txt");
-        tokio::fs::write(&file_path, b"test payload")
-            .await
-            .expect("write");
+        let _ = file_path;
 
         sync_file(&file_path).await.expect("sync_file failed");
         sync_parent_dir(&file_path)

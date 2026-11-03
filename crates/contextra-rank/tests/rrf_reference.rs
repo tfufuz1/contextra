@@ -30,7 +30,7 @@ fn naive_rrf_reference(lists: &[&[Candidate]], top: usize) -> Result<Vec<Fused>,
             let contrib = (1u64 << 40) / (K_RRF as u64 + rank);
             if let Some(pos) = map.iter().position(|(h, _)| *h == cand.handle) {
                 if let Some(entry) = map.get_mut(pos) {
-                    entry.1 += contrib;
+                    entry.1 = entry.1.checked_add(contrib).ok_or(RankError::Overflow)?;
                 }
             } else {
                 map.push((cand.handle, contrib));

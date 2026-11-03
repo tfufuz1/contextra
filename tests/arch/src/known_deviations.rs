@@ -143,6 +143,12 @@ pub const KNOWN_DEVIATIONS: &[Deviation] = &[
 
     // T-UNSAFE-1: Unsafe in Nicht-Inseln
     Deviation {
+        crate_name: "contextra-store",
+        rule: "T-UNSAFE-1:tests/chaos_dropped_write.rs",
+        work_package: "WP-3.3",
+        reason: "Chaos-Test nutzt raw libc::dup2 / /proc/self/fd zur FS-Fehlersimulation; Umstellung auf FaultVfs in WP-3.3",
+    },
+    Deviation {
         crate_name: "contextra-text",
         rule: "T-UNSAFE-1:tests/alloc_profiler.rs",
         work_package: "WP-7.1",

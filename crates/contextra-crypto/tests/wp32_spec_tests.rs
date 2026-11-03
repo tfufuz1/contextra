@@ -1,6 +1,11 @@
 //! Comprehensive test suite fulfilling all SPEC WP-3.2, T-KDF-1/2, T-KEYSLOT-1..4, T-NONCE-1, T-ENC-1..3, T-HDR-1, T-FMT-1, T-KEY-1, T-WAL-1, T-PROOF-1 requirements.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::cast_possible_truncation
+)]
 
 use contextra_crypto::*;
 
@@ -720,4 +725,20 @@ fn test_mutation_verify_vs_verify_strict() {
             "verify_strict mutant detected!"
         );
     }
+}
+
+#[test]
+fn test_t_nonce_1_nonce_format_and_counter_properties() {
+    let key = FileKey::new([0x33; 32]);
+    let file_id = [0x99; 16];
+    let mut sealer = BlockSealer::new(key, FileKind::Wal, file_id, None);
+
+    // Verify block 0 can be sealed
+    let block0 = sealer.seal(b"first block").expect("block 0");
+    assert_eq!(block0.tag.len(), 16);
+
+    // Verify counter overflow at 2^32
+    sealer.set_counter_for_test(1u64 << 32);
+    let overflow_res = sealer.seal(b"overflow block");
+    assert_eq!(overflow_res.err(), Some(CryptoError::Limit));
 }

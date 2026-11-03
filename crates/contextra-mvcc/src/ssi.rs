@@ -33,9 +33,9 @@ use crate::error::MvccError;
 use crate::error::{ContextraError, Result};
 use crate::seq_log::{SequenceLog, DEFAULT_MAX_PIN_DURATION};
 use crate::snapshot::SnapshotRegistry;
-use crate::types::{DocId, TxId};
 use ahash::AHashMap;
 use contextra_ports::{Clock, SystemClock};
+use contextra_types::{DocId, TxId};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::hash::Hasher;
@@ -88,7 +88,7 @@ impl ReadSet {
     ///    (kleinste) Sequenznummer beibehalten, um strikte Isolationsgrenzen zu garantieren.
     /// 3. Aktualisiere `min_snapshot_seq` mit dem Minimum.
     pub fn record_read(&mut self, key: impl Into<Vec<u8>>, snapshot_seq: u64) {
-        let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
+        let snapshot_seq = snapshot_seq & !contextra_types::TOMBSTONE_BIT;
         let k = key.into();
         self.keys
             .entry(k)
@@ -111,7 +111,7 @@ impl ReadSet {
     /// Wenn nach diesem Lesezugriff eine andere Transaktion einen neuen Schlüssel committet,
     /// der mit diesem Präfix beginnt, schlägt die spätere SSI-Validierung fehl.
     pub fn record_prefix(&mut self, prefix: impl Into<Vec<u8>>, snapshot_seq: u64) {
-        let snapshot_seq = snapshot_seq & !crate::types::TOMBSTONE_BIT;
+        let snapshot_seq = snapshot_seq & !contextra_types::TOMBSTONE_BIT;
         let p = prefix.into();
         self.prefixes
             .entry(p)
@@ -316,7 +316,7 @@ impl CommittedWrites {
     }
 
     fn insert(&mut self, key: Vec<u8>, commit_seq: u64) {
-        let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
+        let commit_seq = commit_seq & !contextra_types::TOMBSTONE_BIT;
         self.keys.insert(key.clone(), commit_seq);
 
         match self.seq_index.entry(commit_seq) {
@@ -423,7 +423,7 @@ impl CommittedWrites {
     }
 
     fn remove_from_seq(&mut self, first_seq: u64) -> usize {
-        let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;
+        let first_seq = first_seq & !contextra_types::TOMBSTONE_BIT;
         let mut removed: usize = 0;
         let mut seqs_to_remove = Vec::new();
 
@@ -467,7 +467,7 @@ impl CommittedWrites {
     }
 
     fn prune_through(&mut self, bound_seq: u64) -> usize {
-        let bound_seq = bound_seq & !crate::types::TOMBSTONE_BIT;
+        let bound_seq = bound_seq & !contextra_types::TOMBSTONE_BIT;
         let mut removed: usize = 0;
         let mut seqs_to_remove = Vec::new();
 
@@ -651,7 +651,7 @@ impl SequenceLogSsiValidator {
             return Ok(());
         };
 
-        if bound_seq == u64::MAX || (bound_seq & crate::types::TOMBSTONE_BIT) != 0 {
+        if bound_seq == u64::MAX || (bound_seq & contextra_types::TOMBSTONE_BIT) != 0 {
             return Err(MvccError::InvalidSequence(bound_seq));
         }
 
@@ -683,7 +683,7 @@ impl SequenceLogSsiValidator {
         note = "Nutze stattdessen prune_through_checked(Option<u64>)"
     )]
     pub fn prune_through(&self, bound_seq: u64) -> usize {
-        if bound_seq == u64::MAX || (bound_seq & crate::types::TOMBSTONE_BIT) != 0 {
+        if bound_seq == u64::MAX || (bound_seq & contextra_types::TOMBSTONE_BIT) != 0 {
             return 0;
         }
         let mut writes = self.committed_writes.write();
@@ -695,7 +695,7 @@ impl SequenceLogSsiValidator {
     // ANCHOR[contextra-mvcc:SSI-FORGET-FROM]
     /// Entfernt alle Commit-Registrierungen mit `commit_seq >= first_seq` (z. B. nach Transaktionsabbruch).
     pub fn forget_from(&self, first_seq: u64) -> usize {
-        let first_seq = first_seq & !crate::types::TOMBSTONE_BIT;
+        let first_seq = first_seq & !contextra_types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         writes.remove_from_seq(first_seq)
     }
@@ -831,7 +831,7 @@ impl SequenceLogSsiValidator {
     /// 3. Kapazitätsprüfung durchführen: Liegt der Füllstand über 80 %, werden ältere Buckets
     ///    automatisch zu Präfixen vergröbert (Coarsening).
     pub fn record_commit_key(&self, key: &[u8], commit_seq: u64) {
-        let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
+        let commit_seq = commit_seq & !contextra_types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         writes.insert(key.to_vec(), commit_seq);
         self.check_and_coarsen_if_needed(&mut writes);
@@ -844,7 +844,7 @@ impl SequenceLogSsiValidator {
         keys: impl IntoIterator<Item = &'a [u8]>,
         commit_seq: u64,
     ) {
-        let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
+        let commit_seq = commit_seq & !contextra_types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         for key in keys {
             writes.insert(key.to_vec(), commit_seq);
@@ -1047,7 +1047,7 @@ impl SequenceLogSsiValidator {
         write_keys: impl IntoIterator<Item = &'a [u8]>,
         commit_seq: u64,
     ) -> Result<()> {
-        let commit_seq = commit_seq & !crate::types::TOMBSTONE_BIT;
+        let commit_seq = commit_seq & !contextra_types::TOMBSTONE_BIT;
         let mut writes = self.committed_writes.write();
         self.validate_internal(&writes, tx_id, read_set)?;
 

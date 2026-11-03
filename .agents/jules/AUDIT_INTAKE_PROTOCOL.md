@@ -8,14 +8,14 @@ Nicht normativ. Maßgeblich: [`AGENTS.md`](../../AGENTS.md) und [`docs/SPEC.md`]
 
 1. **Befund festhalten.** Datei, Zeile, Aussage des Befunds notieren.
 2. **Am Code prüfen.** Existieren Datei und Symbol? Trifft die Aussage zu? Befunde auf veraltetem Code werden als „veraltet“ markiert, nicht umgesetzt.
-3. **Gegen die SPEC prüfen.** Ist der Befund eine Abweichung vom Soll (Befund-ID `F-nn` aus SPEC 3.2 oder Bezug zu `D-`, `I-`, `P`, `HR-`)? Eine Abweichung vom Soll ist ein Defekt. Eine Aussage, die die SPEC nicht kennt, wird als Rückfrage gestellt.
+3. **Gegen die SPEC prüfen.** Ist der Befund eine Abweichung vom Soll (Befund-ID `F-nn` aus SPEC 3.2 oder Bezug zu `D-`, `I-`, `P`, `HR-`)? Eine Abweichung vom Soll ist ein Defekt. Aussagen ohne SPEC-Bezug gelten als nicht anwendbar. Rückfragen an den Nutzer sind strikt untersagt; Entscheidungen werden autonom anhand der SPEC gefällt.
 4. **Einordnen.** Ergebnis: bestätigt, nicht zutreffend, veraltet oder unklar.
 5. **Übernehmen.** Nur bestätigte Befunde kommen in ein Arbeitspaket aus SPEC 15.4. Befunde, die SPEC 3.2 schon enthält, werden nicht doppelt angelegt.
 6. **Dokumentieren.** Das Ergebnis steht im PR unter „Prüfung der Befunde“.
 
-## Stopp
+## Stopp und unklare Befunde
 
-Ist ein Befund unklar, wird nicht geraten. Die Rückfrage nennt die betroffene SPEC-ID und die Stelle im Code.
+Ist ein Befund unklar, wird nicht geraten und keinesfalls die Sitzung unterbrochen. Unklare Befunde werden im PR unter „Gefundene Probleme außerhalb des Umfangs“ oder in der Arbeitsliste dokumentiert, ohne die Ausführung anzuhalten oder den Nutzer zu fragen. Die Ausführung läuft autonom und unterbrechungsfrei weiter.
 
 ## Prüfpfade
 

@@ -105,3 +105,7 @@ harness = false
 [[bench]]
 name = "redb_comparative_bench"
 harness = false
+
+[[test]]
+name = "spec_store_tests"
+path = "tests/spec_store_tests.rs"
