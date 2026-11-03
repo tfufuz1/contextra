@@ -42,3 +42,8 @@ pub fn to_canonical_json_string<T: Serialize>(value: &T) -> Result<String, Erasu
     let bytes = to_canonical_json(value)?;
     String::from_utf8(bytes).map_err(|e| ErasureError::Json(e.to_string()))
 }
+
+/// Alias für `to_canonical_json_string` für Abwärtskompatibilität.
+pub fn canonicalize_json<T: serde::Serialize>(val: &T) -> Result<String, crate::error::ErasureError> {
+    to_canonical_json_string(val)
+}

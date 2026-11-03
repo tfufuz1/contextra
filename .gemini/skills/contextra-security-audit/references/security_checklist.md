@@ -1,25 +1,36 @@
-# Contextra Security & Cryptography Checklist
+# Referenz: Sicherheits-Checkliste
 
-> **Normatives Referenzdokument zur Durchsetzung der Sicherheitsarchitektur gemäß docs/SPEC.md §10.**
+Nicht normativ. Maßgeblich: [`docs/SPEC.md`](../../../../../docs/SPEC.md), Kapitel 10 und 13.
 
-## 1. Schutzziele
+## Schutzziele
 
-1. **Vertraulichkeit**: Alle Daten im Ruhezustand (Data at Rest) sind mittels AEAD (AES-256-GCM-SIV) verschlüsselt. Pflicht ohne Opt-Out (`EncryptionMode::Required`, D-05).
-2. **Authentizität**: Jedes Chiffrat besitzt eine kryptografische AAD-Bindung (`file_id ‖ block_index ‖ format_version` bzw. Envelope AAD).
-3. **Mandantentrennung (VETO-F10)**: Kein Datenaustausch oder statistischer Leak über Mandantengrenzen. Pflicht ohne Opt-Out (`TenantPolicy::Required`, D-07).
-4. **Schlüsselresilienz**: Schlüsselmaterial verbleibt im durch `mlock` gesicherten Speicher und wird beim Verwerfen genullt (`Zeroizing<T>`).
-5. **Fail-Closed**: Bei Fehlkonfiguration oder Krypto-Fehlern wird die Operation abgelehnt, anstatt stillschweigend unverschlüsselt fortzufahren.
-6. **Blinde Tags (D-31)**: Schlüssel auf Platte und in Indizes enthalten keine Klartext-Identifier, sondern blinde Hashes via `blind_tag` (Keyed-BLAKE3).
+1. **Vertraulichkeit im Ruhezustand.** Alle Daten sind mit AES-256-GCM-SIV verschlüsselt. Keine Ausnahme (D-05).
+2. **Integrität und Bindung.** Jeder Chiffrat-Block trägt eine AAD mit Dateityp, `file_id` und Blockindex. Umordnen und Kreuzkopieren müssen scheitern (T-ENC-2).
+3. **Mandantentrennung.** Kein Datenaustausch über Mandantengrenzen. Jede Funktion benötigt einen `TenantContext` (D-07).
+4. **Schlüsselresilienz.** Schlüsselmaterial wird beim Verwerfen genullt (`zeroize`). Die Prozesshärtung verhindert Core-Dumps und Schlüsselseiten im Dump (D-63).
+5. **Fail-closed.** Bei Konfigurationsfehlern oder Krypto-Fehlern wird die Operation abgelehnt.
+6. **Blinde Tags.** Schlüssel auf Platte und in Indizes sind keyed Hashes mit BLAKE3 (D-09, D-21), keine Klartext-Kennungen.
 
-## 2. Parameter-Vorgaben (SPEC §10)
+## Parameter (SPEC 10, Anhang C, F.2)
 
-| Parameter | Normativer Wert | Begründung |
+| Parameter | Wert | Quelle |
 |---|---|---|
-| Argon2id Memory Cost ($m$) | $\ge 64\,\text{MiB}$ ($65.536\,\text{KiB}$) | Schutz gegen GPU/ASIC-Brute-Force |
-| Argon2id Time Cost ($t$) | $\ge 3$ Iterationen | Ausreichender Rechenaufwand |
-| Argon2id Parallelism ($p$) | $\ge 1$ Lane | Vorhersagbarkeit im Threadpool |
-| AEAD-Verfahren | AES-256-GCM-SIV | Nonce-Misuse-Resistant AEAD |
-| AEAD Nonce-Länge | 96 Bit (12 Bytes) aus `OsRng` | CSPRNG-Zufall |
-| Ed25519 Schlüssellänge | 256 Bit (32 Bytes) | Asymmetrische Signatur für Löschberichte |
-| Salt Länge | 256 Bit (32 Bytes) | Schutz gegen Rainbow-Tables & Multi-Target-Angriffe |
-| Blind-Tag Länge | 128 Bit (16 Bytes) | Keyed BLAKE3 mit Injektivitäts-Präfixen |
+| Argon2id `m` | 64 MiB bis 4 GiB | D-06 |
+| Argon2id `t` | 3 bis 16 | D-06 |
+| Argon2id `p` | 1 bis 16 | D-06 |
+| Argon2id Standard | `m` 128 MiB, `t` 3, `p` 4 | D-68 |
+| AEAD | AES-256-GCM-SIV (`alg_id = 1`) | D-80 |
+| Nonce Records, Keyslots | 96 Bit aus dem OS-CSPRNG | D-60 |
+| Nonce Blöcke | `0x00000000 ‖ u64(Blockzähler)` unter Dateischlüssel | D-60 |
+| Salt | 32 Byte | 10.1, C |
+| Tag (keyed BLAKE3) | 16 Byte | 9.3, C |
+| Signatur Berichte | Ed25519 | D-13, D-80 |
+| Hash-Ketten | HMAC-SHA256 (WAL), SHA-256 (Journal, Ledger) | F.4, F.9 |
+
+## Prüfpunkte je Änderung
+
+- Ist jede neue Funktion mit `TenantContext` aufrufbar?
+- Verschlüsselt der neue Schreibpfad über den Record-Layer und den Block-Layer?
+- Enthält die neue AAD Dateityp, `file_id` und Blockindex?
+- Gibt es einen neuen Fehlertext mit Nutzerinhalt? (verboten, I-11)
+- Wird ein Schlüssel als `Clone` oder mit `Debug` ausgegeben? (verboten)

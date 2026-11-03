@@ -36,11 +36,36 @@ path = "tests/df_probe_tests.rs"
 name = "df_arch_tests"
 path = "tests/df_arch_tests.rs"
 
+[[test]]
+name = "recovery_aries_matrix"
+path = "tests/recovery_aries_matrix.rs"
+
+[[test]]
+name = "df_atomic_crash_matrix"
+path = "tests/df_atomic_crash_matrix.rs"
+
+[[test]]
+name = "df_lock_tests"
+path = "tests/df_lock_tests.rs"
+
+[[test]]
+name = "df_scrub_tests"
+path = "tests/df_scrub_tests.rs"
+
+[[test]]
+name = "durability_tests"
+path = "tests/durability_tests.rs"
+
+[[test]]
+name = "basic"
+path = "tests/basic.rs"
+
 [[bench]]
 name = "bm_dfs_probe"
 harness = false
 path = "benches/bm_dfs_probe.rs"
 
-[[test]]
-name = "recovery_aries_matrix"
-path = "tests/recovery_aries_matrix.rs"
+[[bench]]
+name = "bm_dfs_atomic"
+harness = false
+path = "benches/bm_dfs_atomic.rs"

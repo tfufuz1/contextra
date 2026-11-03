@@ -491,6 +491,56 @@ pub const WORDING_ALLOWLIST: &[(&str, &str)] = &[
     ("tests/arch/tests/arch.rs", "Testsuite des Wortlaut-Linters"),
 ];
 
+/// Normalisiert Zeichenketten fuer den Wortlaut-Lint (T-LINT-1):
+/// - Entfernung von Steuer- und Zero-Width-Zeichen (Soft-Hyphen, ZWSP, BOM)
+/// - Glaettung von Whitespace und Zeilenumbruechen im Satz
+/// - Case-Folding (lowercase)
+/// - Homoglyphen-Normalisierung
+pub fn normalize_wording_text(input: &str) -> String {
+    let mut cleaned = String::with_capacity(input.len());
+    for c in input.chars() {
+        match c {
+            '\u{00AD}' | '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{200E}' | '\u{200F}'
+            | '\u{FEFF}' => {}
+            '\n' | '\r' | '\t' => cleaned.push(' '),
+            other => cleaned.push(other),
+        }
+    }
+    let mut mapped = String::with_capacity(cleaned.len());
+    for c in cleaned.chars() {
+        let m = match c {
+            '\u{0430}' | 'a' | '\u{0410}' | 'A' => 'a',
+            '\u{0435}' | 'e' | '\u{0415}' | 'E' => 'e',
+            '\u{043E}' | 'o' | '\u{041E}' | 'O' | 'ö' | 'Ö' => 'o',
+            'ä' | 'Ä' => 'a',
+            'ü' | 'Ü' => 'u',
+            'ß' => 's',
+            '\u{0440}' | 'p' | '\u{0420}' | 'P' => 'p',
+            '\u{0441}' | 'c' | '\u{0421}' | 'C' => 'c',
+            '\u{0443}' | 'y' | '\u{0423}' | 'Y' => 'y',
+            '\u{0445}' | 'x' | '\u{0425}' | 'X' => 'x',
+            other => other,
+        };
+        for norm_c in m.to_lowercase() {
+            mapped.push(norm_c);
+        }
+    }
+    let mut collapsed = String::with_capacity(mapped.len());
+    let mut prev_space = false;
+    for c in mapped.chars() {
+        if c.is_whitespace() {
+            if !prev_space {
+                collapsed.push(' ');
+                prev_space = true;
+            }
+        } else {
+            collapsed.push(c);
+            prev_space = false;
+        }
+    }
+    collapsed
+}
+
 pub fn check_wording(root: &Path) -> Vec<String> {
     let forbidden_terms = [
         "DSGVO-konform",
@@ -541,17 +591,15 @@ pub fn check_wording(root: &Path) -> Vec<String> {
             continue;
         };
 
-        for (line_idx, line) in content.lines().enumerate() {
-            let trimmed = line.trim();
-            for term in &forbidden_terms {
-                if trimmed.contains(term) {
-                    violations.push(format!(
-                        "T-LINT-1 verletzt: {}:{}: Unzulässige Außenaussage / Begriff '{}'",
-                        rel,
-                        line_idx + 1,
-                        term
-                    ));
-                }
+        let normalized_content = normalize_wording_text(&content);
+        for term in &forbidden_terms {
+            let norm_term = normalize_wording_text(term);
+            if normalized_content.contains(&norm_term) {
+                violations.push(format!(
+                    "T-LINT-1 verletzt: {}: Unzulässige Außenaussage / Begriff '{}' (erkannt via Normalisierung)",
+                    rel,
+                    term
+                ));
             }
         }
     }
@@ -695,11 +743,33 @@ pub fn check_unsafe(root: &Path, crates: &[Krate]) -> Vec<String> {
             }
         }
         let mut files = Vec::new();
-        collect_rs_files(&krate.dir.join("src"), &mut files);
+        // Erfasse alle Targets: src/, tests/, benches/, examples/, build.rs
+        collect_rs_files(&krate.dir, &mut files);
+
         for file in files {
             let Ok(text) = fs::read_to_string(&file) else {
                 continue;
             };
+            if island && !file.starts_with(krate.dir.join("src")) {
+                // In Unsafe-Inseln wird // SAFETY: strikt auf allen src/ Produktionspfaden geprüft.
+                continue;
+            }
+            let rel = file
+                .strip_prefix(root)
+                .unwrap_or(&file)
+                .to_string_lossy()
+                .to_string();
+            let rel_in_crate = file
+                .strip_prefix(&krate.dir)
+                .unwrap_or(&file)
+                .to_string_lossy()
+                .to_string();
+            let deviation_tag = format!("T-UNSAFE-1:{rel_in_crate}");
+
+            if known_deviations::is_deviation_allowed(&krate.name, &deviation_tag) {
+                continue;
+            }
+
             let lines: Vec<&str> = text.lines().collect();
             for (idx, line) in lines.iter().enumerate() {
                 let code = line.trim();
@@ -713,7 +783,6 @@ pub fn check_unsafe(root: &Path, crates: &[Krate]) -> Vec<String> {
                 if !is_block && !is_fn {
                     continue;
                 }
-                let rel = file.strip_prefix(root).unwrap_or(&file).display();
                 if !island {
                     violations.push(format!(
                         "{}:{}: unsafe in Nicht-Insel {}",
@@ -1359,6 +1428,90 @@ pub fn check_test_traceability(root: &Path, crates: &[Krate]) -> Vec<String> {
     violations
 }
 
+/// Prüft T-ARCH-9:
+/// Doppelte Modul-Formen (X.rs und X/mod.rs bzw. X/) zur frühzeitigen Erkennung von E0761.
+/// Verbot von 'mod.rs' und Kollisionen zwischen X.rs und Unterverzeichnissen.
+pub fn check_double_modules(crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for krate in crates {
+        let src_dir = krate.dir.join("src");
+        if !src_dir.is_dir() {
+            continue;
+        }
+        let mut dirs_to_check = Vec::new();
+        dirs_to_check.push(src_dir.clone());
+        let mut all_dirs = Vec::new();
+        while let Some(current) = dirs_to_check.pop() {
+            if let Ok(entries) = fs::read_dir(&current) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir() {
+                        all_dirs.push(path.clone());
+                        dirs_to_check.push(path);
+                    }
+                }
+            }
+        }
+        for dir in all_dirs {
+            let mod_rs = dir.join("mod.rs");
+            if mod_rs.is_file() {
+                let dir_name = dir.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+                let parent = dir.parent().unwrap_or(&dir);
+                let sibling_rs = parent.join(format!("{dir_name}.rs"));
+                if sibling_rs.is_file() {
+                    violations.push(format!(
+                        "T-ARCH-9 verletzt: Kollidierende Modul-Form in Crate '{}': {} und {} (E0761-Risiko)",
+                        krate.name,
+                        sibling_rs.display(),
+                        mod_rs.display()
+                    ));
+                }
+            }
+        }
+    }
+    violations
+}
+
+/// Prüft T-GOV-1:
+/// Ratchet- und Ausnahmen-Hygiene.
+/// Verhindert Stale-Einträge in .agents/governance/ratchet.toml (Crates im Ratchet, die im Workspace nicht existieren).
+pub fn check_ratchet_hygiene(root: &Path, crates: &[Krate]) -> Vec<String> {
+    let mut violations = Vec::new();
+    let ratchet_path = root.join(".agents/governance/ratchet.toml");
+    if !ratchet_path.is_file() {
+        violations
+            .push("T-GOV-1 verletzt: .agents/governance/ratchet.toml existiert nicht".to_string());
+        return violations;
+    }
+    let Ok(content) = fs::read_to_string(&ratchet_path) else {
+        violations.push("T-GOV-1 verletzt: ratchet.toml nicht lesbar".to_string());
+        return violations;
+    };
+    let Ok(table) = content.parse::<toml::Table>() else {
+        violations.push("T-GOV-1 verletzt: ratchet.toml ist kein gültiges TOML".to_string());
+        return violations;
+    };
+
+    let existing_crate_names: std::collections::BTreeSet<String> =
+        crates.iter().map(|c| c.name.clone()).collect();
+
+    if let Some(unsafe_blocks) = table.get("unsafe_blocks").and_then(|v| v.as_table()) {
+        for (c_name, _) in unsafe_blocks {
+            if !existing_crate_names.contains(c_name)
+                && c_name != "contextra-arch-tests"
+                && c_name != "ctx-verify"
+            {
+                violations.push(format!(
+                    "T-GOV-1 verletzt: Stale-Eintrag in ratchet.toml [unsafe_blocks]: Crate '{}' existiert nicht im Workspace (Fail-Open-Risiko)",
+                    c_name
+                ));
+            }
+        }
+    }
+
+    violations
+}
+
 fn collect_all_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
@@ -1574,7 +1727,7 @@ mod tests {
     fn t_arch_6_positiv_und_negativ() {
         let tmp = std::env::temp_dir().join("t_arch_6_test");
         let _ = fs::remove_dir_all(&tmp);
-        let krate_dir = tmp.join("crates/contextra-crypto");
+        let krate_dir = tmp.join("crates/contextra-durable-fs");
         let src_dir = krate_dir.join("src");
         fs::create_dir_all(&src_dir).unwrap();
         let cargo_toml = krate_dir.join("Cargo.toml");
@@ -1587,7 +1740,7 @@ mod tests {
         fs::write(&lib_rs, "pub use contextra_ports::Clock;\n").unwrap();
 
         let k = Krate {
-            name: "contextra-crypto".to_string(),
+            name: "contextra-durable-fs".to_string(),
             dir: krate_dir.clone(),
             deps: vec![],
         };
@@ -1890,6 +2043,147 @@ mod tests {
         assert!(
             v.iter().any(|msg| msg.contains("allow(unexpected_cfgs)")),
             "{v:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    // === Zero-Trust Fehlerinjektions-Selbsttests (Mutanten) ===
+
+    #[test]
+    fn t_selftest_unsafe_in_tests_und_benches_wird_rot() {
+        let tmp = std::env::temp_dir().join("t_selftest_unsafe_targets");
+        let _ = fs::remove_dir_all(&tmp);
+        let krate_dir = tmp.join("crates/safe-krate");
+        let tests_dir = krate_dir.join("tests");
+        fs::create_dir_all(&tests_dir).unwrap();
+        let src_dir = krate_dir.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        fs::write(
+            src_dir.join("lib.rs"),
+            "#![forbid(unsafe_code)]\npub struct Safe;\n",
+        )
+        .unwrap();
+        fs::write(
+            tests_dir.join("my_test.rs"),
+            "fn test_foo() { unsafe { } }\n",
+        )
+        .unwrap();
+
+        let k = Krate {
+            name: "safe-krate".to_string(),
+            dir: krate_dir.clone(),
+            deps: vec![],
+        };
+        let v = check_unsafe(&tmp, &[k]);
+        assert!(
+            v.iter().any(|msg| msg.contains("unsafe in Nicht-Insel")),
+            "Mutant: unsafe in tests/ muss rot werden: {v:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_selftest_wording_soft_hyphen_homoglyph_wird_rot() {
+        let tmp = std::env::temp_dir().join("t_selftest_wording_mutants");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        // 1. Soft-Hyphen
+        let f1 = tmp.join("README.md");
+        fs::write(&f1, "Dies ist 100\u{00AD}% sicher.\n").unwrap();
+        let v1 = check_wording(&tmp);
+        assert!(
+            v1.iter().any(|msg| msg.contains("100% sicher")),
+            "Mutant: 100% sicher mit Soft-Hyphen muss erkannt werden: {v1:?}"
+        );
+
+        // 2. Homoglyphen & Zeilenumbruch
+        fs::write(&f1, "Dieses System ist\ngarantiert\ngel\u{043E}scht.\n").unwrap();
+        let v2 = check_wording(&tmp);
+        assert!(
+            v2.iter().any(|msg| msg.contains("garantiert gelöscht")),
+            "Mutant: garantiert gelöscht mit Zeilenumbruch und kyrillischem 'o' muss erkannt werden: {v2:?}"
+        );
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_selftest_double_modules_e0761_wird_rot() {
+        let tmp = std::env::temp_dir().join("t_selftest_double_modules");
+        let _ = fs::remove_dir_all(&tmp);
+        let krate_dir = tmp.join("crates/test-krate");
+        let src_dir = krate_dir.join("src");
+        let vault_dir = src_dir.join("vault");
+        fs::create_dir_all(&vault_dir).unwrap();
+
+        fs::write(src_dir.join("lib.rs"), "pub mod vault;\n").unwrap();
+        fs::write(src_dir.join("vault.rs"), "pub struct Vault;\n").unwrap();
+        fs::write(vault_dir.join("mod.rs"), "pub struct Vault;\n").unwrap();
+
+        let k = Krate {
+            name: "test-krate".to_string(),
+            dir: krate_dir.clone(),
+            deps: vec![],
+        };
+        let v = check_double_modules(&[k]);
+        assert!(
+            v.iter().any(|msg| msg.contains("T-ARCH-9")),
+            "Mutant: doppelte Modulform X.rs + X/mod.rs muss rot werden: {v:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_selftest_stale_ratchet_wird_rot() {
+        let tmp = std::env::temp_dir().join("t_selftest_stale_ratchet");
+        let _ = fs::remove_dir_all(&tmp);
+        let gov_dir = tmp.join(".agents/governance");
+        fs::create_dir_all(&gov_dir).unwrap();
+
+        fs::write(
+            gov_dir.join("ratchet.toml"),
+            "[unsafe_blocks]\ncontextra-phantom = 42\n",
+        )
+        .unwrap();
+
+        let k = Krate {
+            name: "contextra-types".to_string(),
+            dir: tmp.join("crates/contextra-types"),
+            deps: vec![],
+        };
+        let v = check_ratchet_hygiene(&tmp, &[k]);
+        assert!(
+            v.iter().any(|msg| msg.contains("contextra-phantom")),
+            "Mutant: Phantom-Crate in ratchet.toml muss rot werden: {v:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_selftest_ungetaggter_test_wird_rot() {
+        let tmp = std::env::temp_dir().join("t_selftest_ungetaggter_test");
+        let _ = fs::remove_dir_all(&tmp);
+        let krate_dir = tmp.join("crates/test-krate");
+        let src_dir = krate_dir.join("src");
+        fs::create_dir_all(&src_dir).unwrap();
+
+        fs::write(
+            src_dir.join("lib.rs"),
+            "#[test]\nfn some_untraced_test() {}\n",
+        )
+        .unwrap();
+
+        let k = Krate {
+            name: "test-krate".to_string(),
+            dir: krate_dir.clone(),
+            deps: vec![],
+        };
+        let v = check_test_traceability(&tmp, &[k]);
+        assert!(
+            v.iter().any(|msg| msg.contains("T-TRACE-1")),
+            "Mutant: Test ohne SPEC-ID muss rot werden: {v:?}"
         );
         let _ = fs::remove_dir_all(&tmp);
     }

@@ -135,14 +135,29 @@ pub fn decode_slot(
 
 /// Berechnet den Slot-MAC: HMAC-SHA256(K_vm, Bytes[0..56])[0..24].
 pub fn compute_slot_mac(mac_key: &[u8; 32], body: &[u8]) -> [u8; 24] {
-    use hmac::{Hmac, Mac};
-    use sha2::Sha256;
-    let mut hmac = Hmac::<Sha256>::new_from_slice(mac_key)
-        .expect("HMAC key length always valid for 32 bytes");
-    hmac.update(body);
-    let full: [u8; 32] = hmac.finalize().into_bytes().into();
+    use sha2::{Digest, Sha256};
+    let mut ipad = [0x36u8; 64];
+    let mut opad = [0x5cu8; 64];
+    for (i, &b) in mac_key.iter().enumerate() {
+        if let Some(target) = ipad.get_mut(i) {
+            *target ^= b;
+        }
+        if let Some(target) = opad.get_mut(i) {
+            *target ^= b;
+        }
+    }
+    let mut inner = Sha256::new();
+    inner.update(&ipad);
+    inner.update(body);
+    let inner_hash = inner.finalize();
+
+    let mut outer = Sha256::new();
+    outer.update(&opad);
+    outer.update(&inner_hash);
+    let outer_hash = outer.finalize();
+
     let mut out = [0u8; 24];
-    out.copy_from_slice(&full[..24]);
+    out.copy_from_slice(&outer_hash[..24]);
     out
 }
 

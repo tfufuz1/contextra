@@ -80,7 +80,7 @@ impl From<u64> for StepId {
 }
 
 /// Declarative agent directive controlling segment caching, pinning, and eviction lifecycle.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 // ANCHOR[contextra-types:ERR-003]
 pub enum CacheDirective {
     /// Segment is explicitly pinned in memory until TTL expiration or explicit release.
@@ -91,18 +91,13 @@ pub enum CacheDirective {
     /// Segment must never be inserted into the cache.
     NeverCache,
     /// Standard automatic cache insertion and eviction management.
+    #[default]
     Auto,
     /// Transient step segment automatically released after completion of the specified step.
     ReleaseAfterStep {
         /// Step ID after whose completion this segment should be released.
         step_id: StepId,
     },
-}
-
-impl Default for CacheDirective {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// Convenience alias for `Result<T, ContextraError>`.

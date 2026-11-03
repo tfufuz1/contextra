@@ -2,7 +2,7 @@
 //!
 //! Fuehrt sequentielle Appends und fsync-Befehle auf dem physischen Dateisystem durch.
 
-use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
+use super::crypto_shim::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result, TxId};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

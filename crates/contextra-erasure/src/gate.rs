@@ -1,3 +1,5 @@
+//! Gate-Modul (SPEC §11.3).
+//!
 //! Gate-Subsystem (ErasedSet, GateLog, ReadGate, Batch-Commit).
 
 pub mod erased_set;

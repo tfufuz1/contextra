@@ -148,3 +148,21 @@ fn sy_platform_10_t_log_1_error_text_fixed_no_paths() {
         "Keine Pfade in Display von SysError"
     );
 }
+
+/// SY-05 & SY-09: Fehlerfall-Prüfungen für ungültige Modi und ungültige Handles.
+#[test]
+fn sy_platform_invalid_mode_and_unsupported() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let file_path = dir.path().join("invalid_mode.bin");
+    std::fs::write(&file_path, b"test").expect("write test");
+
+    // Nur 0o600 und 0o700 sind zulässig; andere Modi müssen InvalidInput liefern.
+    let err_777 = set_mode(&file_path, 0o777);
+    assert_eq!(err_777, Err(SysError::InvalidInput));
+
+    let err_644 = set_mode(&file_path, 0o644);
+    assert_eq!(err_644, Err(SysError::InvalidInput));
+
+    let err_000 = set_mode(&file_path, 0o000);
+    assert_eq!(err_000, Err(SysError::InvalidInput));
+}

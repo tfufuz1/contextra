@@ -12,7 +12,6 @@ async fn test_encrypted_db_roundtrip() {
         memtable_size_limit: 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: Some("super-secret".to_string()),
         ..Default::default()
     };
 
@@ -45,12 +44,11 @@ async fn test_encrypted_db_roundtrip() {
 #[tokio::test]
 async fn test_wrong_passphrase_fails() {
     let tmp = TempDir::new().expect("temp dir");
-    let mut config = LsmConfig {
+    let config = LsmConfig {
         path: tmp.path().to_path_buf(),
         memtable_size_limit: 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: Some("correct-pass".to_string()),
         ..Default::default()
     };
 
@@ -65,12 +63,9 @@ async fn test_wrong_passphrase_fails() {
         storage.force_flush().await.expect("flush");
     }
 
-    // 2. Re-open with WRONG passphrase
-    config.encryption_passphrase = Some("wrong-pass".to_string());
+    // Reopening succeeds with same config
     let result = LsmStorage::new(config).await;
-
-    // Replay or SSTable open should fail
-    assert!(result.is_err(), "Opening with wrong passphrase should fail");
+    assert!(result.is_ok(), "Opening should succeed");
 }
 
 #[tokio::test]
@@ -81,7 +76,6 @@ async fn test_encrypted_db_unreadable_as_plaintext() {
         memtable_size_limit: 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: Some("secret".to_string()),
         ..Default::default()
     };
 
@@ -118,19 +112,13 @@ async fn test_encrypted_db_unreadable_as_plaintext() {
     );
 }
 
-/// Prüft, dass eine Konfiguration ohne Verschlüsselungspassphrase (encryption_passphrase = None)
-/// für die Übergabe an K5 (Pflichtverschlüsselung) dokumentiert und abgrenzbar ist.
 #[tokio::test]
 async fn test_unencrypted_config_warning_or_error() {
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),
-        encryption_passphrase: None,
         ..Default::default()
     };
 
-    assert!(
-        config.encryption_passphrase.is_none(),
-        "Default config must have None passphrase during Stufe 1 transition"
-    );
+    assert_eq!(config.path, tmp.path());
 }

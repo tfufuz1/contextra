@@ -131,7 +131,14 @@ pub fn mark_dont_dump(slice: &[u8]) -> bool {
     #[cfg(target_os = "linux")]
     {
         let addr = slice.as_ptr() as usize;
-        let page_size = 4096;
+        // Dynamische Ermittlung der Seitengröße über POSIX sysconf (_SC_PAGESIZE).
+        // SAFETY: sysconf mit _SC_PAGESIZE ist ein seiteneffektfreier POSIX-Syscall.
+        let page_size_raw = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+        let page_size = if page_size_raw > 0 {
+            page_size_raw as usize
+        } else {
+            4096
+        };
         let aligned_addr = addr & !(page_size - 1);
         let end_addr = (addr + slice.len() + page_size - 1) & !(page_size - 1);
         let aligned_len = end_addr - aligned_addr;

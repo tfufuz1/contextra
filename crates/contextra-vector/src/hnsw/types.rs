@@ -28,7 +28,7 @@ pub enum VectorData {
 }
 
 /// A node in the HNSW graph.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HnswNode {
     pub(super) doc_id: DocId,
     pub(super) vector: VectorData,

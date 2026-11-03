@@ -17,7 +17,6 @@ pub(crate) async fn test_storage() -> (LsmStorage, TempDir) {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = LsmStorage::new(config).await.expect("create storage");

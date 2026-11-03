@@ -467,6 +467,7 @@ dependencies = [
  "contextra-ports",
  "contextra-types",
  "futures-util",
+ "hmac",
  "loom",
  "parking_lot",
  "proptest",
@@ -558,6 +559,7 @@ dependencies = [
 name = "contextra-store"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm-siv",
  "ahash",
  "blake3",
  "bytes",
@@ -572,6 +574,8 @@ dependencies = [
  "crc32fast",
  "criterion",
  "futures",
+ "hkdf",
+ "hmac",
  "libc",
  "loom",
  "lru",
@@ -582,6 +586,8 @@ dependencies = [
  "redb",
  "serde",
  "serde_json",
+ "sha2",
+ "subtle",
  "tempfile",
  "thiserror",
  "tokio",
@@ -619,17 +625,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "contextra-testmacros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
- "tokio",
- "trybuild",
 ]
 
 [[package]]

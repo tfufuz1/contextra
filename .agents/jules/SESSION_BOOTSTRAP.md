@@ -7,7 +7,7 @@ Die Sitzung läuft ohne Unterbrechung, bis die Arbeitsliste abgearbeitet oder ei
 ## Schritt 0 – Umgebung prüfen (1 Minute)
 
 ```bash
-cargo --version && rustc --version      # Pin laut rust-toolchain.toml (1.89.0)
+cargo --version && rustc --version      # Pin laut rust-toolchain.toml lesen, nicht annehmen
 just --version                          # optional, Ausführung der Befehle geht auch ohne
 ```
 
@@ -21,7 +21,7 @@ In dieser Reihenfolge, jeweils nur die nötigen Abschnitte:
 2. `.agents/jules/PREAMBLE.md` (Entscheidungsregeln, Stopp-Katalog, Prüfbefehle).
 3. `.agents/jules/tasks/BACKLOG.md` (Reihenfolge und Status der Arbeitspakete).
 4. `docs/SPEC.md` Abschnitt 15.3 (Gates) und den Abschnitt 15.4 zum gewählten `WP-x.y`, dazu die dort verlinkten Befehle, IDs und Abschnitte.
-5. `crates/<crate>/AGENTS.md` des betroffenen Crates.
+5. `crates/<crate>/AGENTS.md` des betroffenen Crates (Fachprofil, Anker, Abnahme) und bei Querschnittsarbeit `.agents/experts/`.
 6. `.agents/jules/context/SESSION_START.md`, falls vorhanden: aktuelle CI-Lage und offene PRs. Die Datei entsteht durch `refresh-context.sh` und ist nicht versioniert.
 
 ## Schritt 2 – Paket wählen

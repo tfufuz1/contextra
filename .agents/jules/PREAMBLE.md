@@ -23,7 +23,7 @@ Nicht als Stopp gelten: fehlende Toolchain (installiere sie über `.agents/jules
 
 ## C. Fachliche Grundregeln
 
-1. Lies `AGENTS.md`, den Abschnitt der SPEC zur Aufgabe und die `AGENTS.md` des betroffenen Crates.
+1. Lies `AGENTS.md`, den Abschnitt der SPEC zur Aufgabe und die `AGENTS.md` des betroffenen Crates. Arbeite im dort beschriebenen Fachprofil; bei Arbeit über mehrere Crates zusätzlich im passenden Querschnittsprofil aus `.agents/experts/querschnitt.md`.
 2. Verifiziere jedes Symbol, bevor du es verwendest. Nimm keine APIs aus dem Gedächtnis an. Prüfe Signaturen mit `grep` oder dem Compiler.
 3. Ändere nur Dateien, die zum Paket gehören. Alles andere wird im PR unter „Gefundene Probleme außerhalb des Umfangs“ gemeldet.
 4. Ändere niemals Gates, Lints, Baselines, Toolchain-Pins, `governance/`-Dateien oder geschützte Pfade, um Rot zu beseitigen. Behebe die Ursache.
@@ -37,16 +37,13 @@ Nicht als Stopp gelten: fehlende Toolchain (installiere sie über `.agents/jules
    Ist ein Befehl wegen Altbestands rot, der nicht zum Paket gehört, notiere das und prüfe, ob das Paket selbst keine neuen Fehler erzeugt. Die Befehle stehen auch in `docs/COMPILATION.md`.
 8. Ändert sich `Cargo.toml`, wird `Cargo.lock` im selben Commit erneuert (D-93). Erneuere gezielt (`cargo update -p <crate>`), nicht den gesamten Lockfile. Der Umfang der Änderung (Zeilen, betroffene Abhängigkeiten) gehört in den PR.
 
-## D. Übergangsregel Testmakro
+## D. Testmakro (T-TRACE-1)
 
-Das Makro `#[ctx_test(id = "T-…")]` ist im Repository noch nicht definiert (Stand SPEC 4.3.0, Prüfung am HEAD `909ff27`). Bis WP-0.1 es liefert:
+Das Makro `#[ctx_test(id = "T-…")]` (und `#[ctx_bench(id = "BM-…")]`) liefert das Crate `contextra-testmacros` (WP-0.1). Es ist die einzige zulässige Form:
 
-- Jeder neue Test bekommt die SPEC-ID als Dokumentationszeile direkt über der Funktion: `/// SPEC: T-ISO-1`.
-- Der Funktionsname beginnt mit der kleingeschriebenen ID ohne Bindestriche, z. B. `t_iso_1_nachbardaten_bitgleich`.
-- Nutze `#[test]` bzw. `#[tokio::test]` wie bisher.
-- Bestehende Tests werden in dieser Phase nicht umbenannt. Das ist Teil von WP-0.1.
-
-WP-0.1 ersetzt diese Regel, sobald das Makro existiert. Dann wechselst du alle neuen Tests auf das Makro.
+- Jeder neue Test trägt `#[ctx_test(id = "T-…")]` mit einer existierenden SPEC-ID. Das Makro prüft die Form zur Compile-Zeit; `tests/arch` prüft in beide Richtungen, dass die ID in `docs/SPEC.md` existiert und jede ID einen Test hat.
+- Das Crate wird nur als `[dev-dependencies]` eingebunden. Prüfe vor der Verwendung im betroffenen Crate, ob die Abhängigkeit schon eingetragen ist, und erneuere `Cargo.lock` im selben Commit (D-93).
+- Bestehende Tests ohne Makro werden nur im Rahmen ihres Arbeitspakets umgestellt. Die Altbestandszahl fällt nur (Ratchet).
 
 ## E. Commit- und PR-Regeln
 

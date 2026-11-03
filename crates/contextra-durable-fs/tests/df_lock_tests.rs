@@ -10,13 +10,10 @@
     clippy::duplicate_mod
 )]
 
-#[path = "../src/dir_lock.rs"]
-mod dir_lock;
-
 #[path = "support/lock_child.rs"]
 mod lock_child;
 
-use dir_lock::{DirLock, DIR_LOCKED_MSG};
+use contextra_durable_fs::dir_lock::{DirLock, DIR_LOCKED_MSG};
 use lock_child::{
     run_child_if_requested, ENV_LOCK_CHILD_MODE, ENV_LOCK_DIR_PATH, EXIT_LOCK_ACQUIRED,
     EXIT_LOCK_CONFLICT,

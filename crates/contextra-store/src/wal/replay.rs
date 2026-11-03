@@ -24,7 +24,7 @@
 //!    - In diesem Fall wird der Vorgang ausnahmslos mit `ContextraError::wal_corruption`
 //!      hart abgebrochen (Fail-Closed).
 
-use contextra_crypto::wal_crypto::{IntegrityVerifier, WalEntrySnapshot};
+use super::crypto_shim::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
@@ -733,7 +733,7 @@ mod tests {
         wal.append_batch(batch2).await?;
         drop(wal);
 
-        let wal_read = Wal::open_read_only(&wal_path).await?;
+        let wal_read = Wal::open_read_only(&wal_path, None).await?;
         let entries_replay = wal_read.replay().await?;
         let (entries_mmap, _ver_mmap) = wal_read.replay_mmap().await?;
 
@@ -774,7 +774,7 @@ mod tests {
             .await
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
-        let wal = Wal::open_read_only(&wal_path).await?;
+        let wal = Wal::open_read_only(&wal_path, None).await?;
         let (entries, version) = wal.replay_mmap().await?;
 
         assert!(entries.is_empty());

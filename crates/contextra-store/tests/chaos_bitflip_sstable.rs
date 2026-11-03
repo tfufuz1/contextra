@@ -126,7 +126,6 @@ async fn setup_sstable_and_ground_truth(
         memtable_size_limit: 1024 * 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: None,
         ..Default::default()
     };
 
@@ -198,7 +197,6 @@ proptest! {
                         memtable_size_limit: 1024 * 1024,
                         max_ram_mb: 64,
                         tx_timeout: Duration::from_secs(60),
-                        encryption_passphrase: None,
                         ..Default::default()
                     };
 
@@ -275,7 +273,6 @@ proptest! {
                     memtable_size_limit: 1024 * 1024,
                     max_ram_mb: 64,
                     tx_timeout: Duration::from_secs(60),
-                    encryption_passphrase: None,
                     ..Default::default()
                 };
 
@@ -346,7 +343,6 @@ proptest! {
                     memtable_size_limit: 1024 * 1024,
                     max_ram_mb: 64,
                     tx_timeout: Duration::from_secs(60),
-                    encryption_passphrase: None,
                     ..Default::default()
                 };
 

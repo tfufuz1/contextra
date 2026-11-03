@@ -8,13 +8,13 @@
 use super::intent::StagedKeyOp;
 use crate::Collection;
 use bytes::Bytes;
-use contextra_ports::{GraphIndex, StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{DocId, Edge, Entity, EntityId, TxId};
+use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
+use contextra_types::{DocId, TxId};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-/// A transaction wrapper that ensures atomic multi-index commits across LSM-Store, HNSW-Index, Text-Index, and Graph-Index.
+/// A transaction wrapper that ensures atomic multi-index commits across LSM-Store, HNSW-Index, and Text-Index.
 pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex> {
     pub tx_id: TxId,
     pub(super) collection: Collection<S, V>,
@@ -23,11 +23,6 @@ pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::Hn
     pub(super) staged_doc_ids: Mutex<Arc<Vec<DocId>>>,
     pub(super) staged_text_ops: Mutex<Vec<(DocId, String)>>,
     pub(super) staged_text_deletes: Mutex<Vec<DocId>>,
-    pub(super) staged_graph_entities: Mutex<Vec<Entity>>,
-    pub(super) staged_graph_edges: Mutex<Vec<Edge>>,
-    pub(super) staged_graph_entity_deletes: Mutex<Vec<EntityId>>,
-    pub(super) staged_graph_edge_deletes: Mutex<Vec<(EntityId, EntityId)>>,
-    pub(super) staged_hyperedges: Mutex<Vec<u8>>,
     pub(super) committed: AtomicBool,
 }
 
@@ -43,11 +38,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
             staged_doc_ids: Mutex::new(Arc::new(Vec::with_capacity(16))),
             staged_text_ops: Mutex::new(Vec::with_capacity(16)),
             staged_text_deletes: Mutex::new(Vec::with_capacity(16)),
-            staged_graph_entities: Mutex::new(Vec::with_capacity(16)),
-            staged_graph_edges: Mutex::new(Vec::with_capacity(16)),
-            staged_graph_entity_deletes: Mutex::new(Vec::with_capacity(16)),
-            staged_graph_edge_deletes: Mutex::new(Vec::with_capacity(16)),
-            staged_hyperedges: Mutex::new(Vec::with_capacity(16)),
             committed: AtomicBool::new(false),
         }
     }
@@ -144,7 +134,6 @@ impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
         };
         guard.push((from, to));
     }
-
 }
 
 impl<S: StorageEngine, V: VectorIndex> Drop for DbTransaction<S, V> {
@@ -158,12 +147,6 @@ impl<S: StorageEngine, V: VectorIndex> Drop for DbTransaction<S, V> {
             let tx_id = self.tx_id;
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
                 handle.spawn(async move {
-                    if let Err(e) = collection.graph_index.rollback(tx_id).await {
-                        tracing::error!(
-                            "[INV-DB-3] Drop cleanup: Graph index rollback failed: {}",
-                            e
-                        );
-                    }
                     if let Err(e) = collection.text_index.rollback(tx_id).await {
                         tracing::error!(
                             "[INV-DB-3] Drop cleanup: Text index rollback failed: {}",
