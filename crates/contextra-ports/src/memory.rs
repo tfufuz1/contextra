@@ -45,6 +45,11 @@ pub trait ArenaGuard: Send + Sync {
     ///
     /// # Errors
     /// Returns [`ContextraError`](crate::ContextraError) if memory advising fails.
+    /// # Fehler
+    /// Liefert Fehler falls madvise fehlschlägt.
+    ///
+    /// # Crash
+    /// Reiner Speicherschutz im RAM.
     fn protect_against_dumping(&self, ptr: *const u8, len: usize) -> Result<()>;
 }
 

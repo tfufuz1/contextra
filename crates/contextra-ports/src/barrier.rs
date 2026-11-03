@@ -90,23 +90,53 @@ impl fmt::Debug for PurgePermit {
 /// Barrier trait managing commit phases and exclusive gate operations (SPEC §11.3, D-57, D-78, L-7).
 pub trait CommitBarrier: Send + Sync {
     /// Acquires a shared permit for standard group commit operations.
+    ///
+    /// # Fehler
+    /// Unfehlbar; wartet asynchron auf Commit-Freigabe.
+    ///
+    /// # Crash
+    /// Reines Synchronisations-Token im RAM; cancel-safe.
     fn shared(&self) -> BoxFuture<'_, BarrierShared>;
 
     /// Acquires an exclusive permit for gate group transitions.
+    ///
+    /// # Fehler
+    /// Unfehlbar; blockiert nachfolgende Commits exklusiv.
+    ///
+    /// # Crash
+    /// Exklusiver Token-Inhaber; cancel-safe.
     fn exclusive(&self) -> BoxFuture<'_, BarrierExclusive>;
 }
 
 /// Barrier trait managing LSM compaction and physical purge mutual exclusion (SPEC §11.3, §11.4, I-16, L-7).
 pub trait PurgeBarrier: Send + Sync {
     /// Acquires a shared permit for compaction.
+    ///
+    /// # Fehler
+    /// Unfehlbar; wartet auf Purge-Freigabe.
+    ///
+    /// # Crash
+    /// Kooperative Kompaktions-Sperre im RAM.
     fn compaction(&self) -> BoxFuture<'_, CompactionPermit>;
 
     /// Acquires an exclusive permit for physical purging.
+    ///
+    /// # Fehler
+    /// Unfehlbar; exklusiver Purge-Zugriff.
+    ///
+    /// # Crash
+    /// Erzwingt Abbruch kooperativer Kompaktionen; cancel-safe.
     fn purge(&self) -> BoxFuture<'_, PurgePermit>;
 
     /// Queries whether an exclusive purge operation is waiting for access.
     ///
     /// Background compactions inspect this periodically to cooperatively yield or abort.
+    ///
+    /// # Fehler
+    /// Keine; nicht-blockierende atomare Abfrage.
+    ///
+    /// # Crash
+    /// Reiner RAM-Zustandsprüfer.
     fn purge_waiting(&self) -> bool;
 }
 

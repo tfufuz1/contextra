@@ -98,12 +98,7 @@ pub const KNOWN_DEVIATIONS: &[Deviation] = &[
     },
 
     // T-ARCH-5: Ring im //! Kopf von src/lib.rs
-    Deviation {
-        crate_name: "contextra-ports",
-        rule: "T-ARCH-5:header-ring",
-        work_package: "WP-1.5",
-        reason: "Kopf in lib.rs nennt Ring 0 noch nicht normativ; Aktualisierung in WP-1.5",
-    },
+
     Deviation {
         crate_name: "contextra-crypto",
         rule: "T-ARCH-5:header-ring",
@@ -194,12 +189,7 @@ pub const KNOWN_DEVIATIONS: &[Deviation] = &[
         work_package: "WP-3.1",
         reason: "Glob Re-Exporte in types.rs und lib.rs; Bereinigung in WP-3.1",
     },
-    Deviation {
-        crate_name: "contextra-ports",
-        rule: "T-ARCH-6:glob-export",
-        work_package: "WP-1.1",
-        reason: "Glob Re-Exporte in ports lib.rs (AR-10); Bereinigung in WP-1.1",
-    },
+
     Deviation {
         crate_name: "contextra-simd",
         rule: "T-ARCH-6:glob-export",

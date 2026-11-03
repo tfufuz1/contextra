@@ -238,17 +238,41 @@ pub trait ErasureLayer: Send + Sync {
     fn id(&self) -> LayerId;
 
     /// Resolves the concrete scope affected by the erase target before gating.
+    ///
+    /// # Fehler
+    /// Liefert einen Fehler-String falls das EraseTarget im Layer nicht aufgelöst werden kann.
+    ///
+    /// # Crash
+    /// Reiner Berechnungsschritt vor dem Gating; modifiziert keine Daten auf Festplatte.
     fn resolve(&self, t: &EraseTarget) -> BoxFuture<'_, Result<LayerScope, String>>;
 
     /// Immediate actions prior to gating (e.g. vector surrogate marking).
+    ///
+    /// # Fehler
+    /// Liefert einen Fehler-String falls Vorbereitungsmaßnahmen vor dem Gate fehlschlagen.
+    ///
+    /// # Crash
+    /// Bereitet RAM-Zustand vor; persistente Markierung erfolgt im Gruppen-Commit.
     fn on_gate(&self, s: &LayerScope) -> BoxFuture<'_, Result<(), String>>;
 
     /// Executes the physical purge for the given scope within the operational context.
     ///
     /// Must be idempotent and repeatable (PO-05).
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei I/O- oder Kompaktionsfehlern während des physischen Löschens.
+    ///
+    /// # Crash
+    /// Idempotent (PO-05). Jeder Teilschritt ist wiederholbar. fsync-Fehler führen zu Poisoning.
     fn purge(&self, s: &LayerScope, cx: &PurgeCx) -> BoxFuture<'_, Result<PurgeOutcome, String>>;
 
     /// Verifies residue and produces a witness. Read-only (PO-05).
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Residuen des gelöschten Umfangs gefunden werden oder I/O fehlschlägt.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff (PO-05); modifiziert niemals persistenten Zustand.
     fn witness(
         &self,
         s: &LayerScope,

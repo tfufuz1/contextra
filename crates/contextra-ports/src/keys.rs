@@ -127,6 +127,12 @@ impl fmt::Debug for Envelope {
 /// Record sealer contract for crypto envelope management (SPEC §4.2, D-53).
 pub trait RecordSealer: Send + Sync {
     /// Encrypts and seals plaintext with slot allocation if missing.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Verschlüsselung oder Slot-Allokation fehlschlägt.
+    ///
+    /// # Crash
+    /// Vorübergehende Daten im RAM; Persistierung der Slots erfolgt vor dem Commit.
     fn seal<'a>(
         &'a self,
         ctx: &'a SealCtx,
@@ -135,16 +141,31 @@ pub trait RecordSealer: Send + Sync {
     ) -> BoxFuture<'a, Result<Envelope, String>>;
 
     /// Decrypts envelope. If slot was destroyed/missing, returns error indicating erasure.
-    fn open<'a>(
-        &'a self,
-        key: &'a KeyBuf,
-        env: &'a [u8],
-    ) -> BoxFuture<'a, Result<Vec<u8>, String>>;
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Schlüssel vernichtet wurde (Löschung) oder Entschlüsselung fehlschlägt.
+    ///
+    /// # Crash
+    /// Reiner kryptografischer Entschlüsselungszugriff ohne Seiteneffekte.
+    fn open<'a>(&'a self, key: &'a KeyBuf, env: &'a [u8])
+        -> BoxFuture<'a, Result<Vec<u8>, String>>;
 
     /// Evicts key range from DEK cache, zeroizing RAM keys (D-79).
+    ///
+    /// # Fehler
+    /// Synchrone Operation ohne Fehlerzustände.
+    ///
+    /// # Crash
+    /// Entfernt und nullt Schlüsselmaterial flüchtig im RAM.
     fn evict(&self, scope: &KeyRange);
 
     /// Forces persistence of vault slots (`sync_data`) before WAL frame flush (I-9, L-9).
+    ///
+    /// # Fehler
+    /// Liefert Fehler bei I/O- oder fsync-Fehlern.
+    ///
+    /// # Crash
+    /// Erzwingt Slot-Dauerhaftigkeit via sync_data; bei fsync-Fehler tritt Poisoning ein (I-9, L-9).
     fn make_slots_durable(&self) -> BoxFuture<'_, Result<(), String>>;
 }
 
@@ -155,11 +176,29 @@ pub trait RecordSealer: Send + Sync {
 /// via a read-check; failure leaves the slot in `Pending` requiring a retry upon reopen (D-55).
 pub trait FileKeyring: Send + Sync {
     /// Allocates and records a new file key for the given kind and ID.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Slot-Erzeugung oder CSPRNG fehlschlägt.
+    ///
+    /// # Crash
+    /// Persistiert Slot vor Dateierzeugung (I-9b).
     fn create(&self, kind: FileKind, id: FileId) -> BoxFuture<'_, Result<FileKey, String>>;
 
     /// Opens and retrieves the file key for the given ID.
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Dateischlüssel fehlt oder vernichtet wurde.
+    ///
+    /// # Crash
+    /// Reines Laden des Dateischlüssels aus dem Tresor.
     fn open(&self, id: FileId) -> BoxFuture<'_, Result<FileKey, String>>;
 
     /// Securely destroys the file key slot (PO-06).
+    ///
+    /// # Fehler
+    /// Liefert Fehler falls Slot-Nullung oder Sync fehlschlägt.
+    ///
+    /// # Crash
+    /// Nullt Slot, führt sync_data aus und prüft Fehlen; bei fsync-Fehler verbleibt Slot in Pending (PO-06, D-55).
     fn destroy(&self, id: FileId) -> BoxFuture<'_, Result<(), String>>;
 }
