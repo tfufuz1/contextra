@@ -8,11 +8,11 @@
 use super::auto_extraction::auto_extract_and_relate;
 use super::internal::{validate_doc_id, validate_embedding};
 use crate::collection::{
-    ensure_importance_metadata, extract_text, Collection, StoredDocument, StoredDocumentMeta,
+    Collection, StoredDocument, StoredDocumentMeta, ensure_importance_metadata, extract_text,
 };
-use crate::metrics_names::{record_histogram_safe, INSERT_LATENCY};
+use crate::metrics_names::{INSERT_LATENCY, record_histogram_safe};
 use contextra_ports::{StorageEngine, VectorIndex};
-use contextra_types::{DocId, EntityId, Result, TxId, EXPIRY_METADATA_KEY};
+use contextra_types::{DocId, EXPIRY_METADATA_KEY, EntityId, Result, TxId};
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Inserts a text document, automatically generating its embedding.
@@ -242,7 +242,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         match self.insert_op(&db_tx, id, embedding, metadata).await {
             Ok(_) => {
                 db_tx.commit().await?;
-                self.check_and_trigger_community_detection(1);
                 let elapsed = (self.clock().monotonic_nanos().saturating_sub(start_nanos)) as f64
                     / 1_000_000_000.0;
                 record_histogram_safe(

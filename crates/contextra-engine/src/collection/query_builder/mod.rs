@@ -29,7 +29,7 @@ pub const METRIC_SEARCH_LATENCY_TEXT: &str = "search.latency.text";
 /// Metric counter name for graph search signal latency in seconds.
 pub const METRIC_SEARCH_LATENCY_GRAPH: &str = "search.latency.graph";
 
-pub use builder::{HybridQueryBuilder, DEFAULT_RERANK_POOL_MAX, DEFAULT_RERANK_POOL_MULTIPLIER};
+pub use builder::{DEFAULT_RERANK_POOL_MAX, DEFAULT_RERANK_POOL_MULTIPLIER, HybridQueryBuilder};
 pub use scope::ScopeConstraint;
 pub use strategy::SearchStrategy;
 pub use weights::SignalWeights;

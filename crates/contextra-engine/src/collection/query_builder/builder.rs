@@ -5,8 +5,8 @@
 //! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
 
-use super::strategy::SearchStrategy;
 use super::Collection;
+use super::strategy::SearchStrategy;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
 use crate::fusion::SignalFailurePolicy;
@@ -146,12 +146,6 @@ impl<'a, S: StorageEngine, V: VectorIndex> HybridQueryBuilder<'a, S, V> {
         self.strategy = Some(strategy.into());
         self
     }
-
-    /// Sets anchor seed entities for graph traversal signal.
-
-    /// Alias for `.anchor_entities()`.
-
-    /// Sets target entity for community context boosting/filtering.
 
     /// Sets cognitive memory type filter (Pre-RRF filter).
     pub fn memory_type_filter(mut self, types: impl IntoIterator<Item = MemoryType>) -> Self {

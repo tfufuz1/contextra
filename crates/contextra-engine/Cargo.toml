@@ -20,7 +20,6 @@ contextra-mvcc = { workspace = true }
 bytes = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-store = { workspace = true }
-blake3 = { workspace = true }
 contextra-vector = { workspace = true }
 contextra-text = { workspace = true }
 contextra-rank = { workspace = true }
@@ -34,8 +33,6 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 zeroize = { version = "1", features = ["derive", "zeroize_derive"] }
 thiserror = { workspace = true }
 bincode = { workspace = true }
-hmac = "0.12"
-sha2 = "0.10"
 
 [target.'cfg(loom)'.dependencies]
 loom = "0.7"
@@ -54,6 +51,5 @@ default = []
 reranking = []
 experimental-diskann = ["contextra-vector/experimental-diskann"]
 background-maintenance = []
-edge-reinforcement-learning = []
 entity-extraction = []
 auto-extraction-opt-out = []

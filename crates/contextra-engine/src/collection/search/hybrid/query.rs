@@ -8,10 +8,10 @@
 // FILE-CONTEXT
 // ZWECK: Hybrid-Familie Submodule für Query-basierte Suche.
 
-use crate::collection::search::filtered::{MAX_OVERFETCH_SCAN, OVERFETCH_STAGE_MULTIPLIERS};
 use crate::collection::Collection;
+use crate::collection::search::filtered::{MAX_OVERFETCH_SCAN, OVERFETCH_STAGE_MULTIPLIERS};
 use crate::fusion::{SearchReport, Signal, SignalFailurePolicy};
-use crate::metrics_names::{record_histogram_safe, SEARCH_LATENCY_TEXT, SEARCH_LATENCY_VECTOR};
+use crate::metrics_names::{SEARCH_LATENCY_TEXT, SEARCH_LATENCY_VECTOR, record_histogram_safe};
 use contextra_ports::{MetricsSink, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{DocId, Result};
 

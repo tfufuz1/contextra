@@ -11,8 +11,8 @@
 use super::*;
 use contextra_mvcc::tx_buffer::IndexOp;
 use contextra_types::{DocId, TxId};
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tokio::time::sleep;
 

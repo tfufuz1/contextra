@@ -13,8 +13,8 @@ async fn test_collection_scan_prefix_batches_via_mock_storage() {
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_types::{Result, TxId};
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct BoundedScanMockStorage {
         bounded_call_count: AtomicUsize,
@@ -154,8 +154,8 @@ async fn test_maintenance_pagination_over_10k_documents() {
     use contextra_types::EXPIRY_METADATA_KEY;
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();
@@ -287,8 +287,8 @@ async fn test_migrate_doc_keys_v1() {
     use contextra_types::{DocId, TxId};
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap allowed (AGENT:04)

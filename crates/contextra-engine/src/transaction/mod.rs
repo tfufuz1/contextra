@@ -54,7 +54,7 @@
 //! ## Intent Log Format (`CommitIntent`)
 //! All transaction intent markers are JSON-serialized and stored under key namespace `__tx_intent:<tx_id>`
 //! (or `__col:<name>:\x03<tx_id>` for non-default collections):
-//! - `Pending { doc_ids, has_text, has_graph, stages_completed }`:
+//! - `Pending { doc_ids, has_text, stages_completed }`:
 //!   - `stages_completed = 0`: Intent logged, staging commenced.
 //!   - `stages_completed = 1`: LSM storage committed durably.
 //! - `Committed`: All 4 sub-systems committed successfully.

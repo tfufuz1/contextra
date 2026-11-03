@@ -314,7 +314,6 @@ async fn test_tx_idempotency_of_compensation_and_recovery() -> contextra_types::
     let pending = CommitIntent::Pending {
         doc_ids: Arc::new(vec![doc_id]),
         has_text: true,
-        has_graph: false,
         stages_completed: 0,
     };
     let intent_bytes = serde_json::to_vec(&pending)?;

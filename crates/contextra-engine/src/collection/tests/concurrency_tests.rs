@@ -11,8 +11,8 @@ use super::fixtures::*;
 async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_types::Result<()> {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();
@@ -73,8 +73,8 @@ async fn test_insert_does_not_block_on_collection_wide_lock() -> contextra_types
 async fn test_batch_insert_deterministic_lock_order_no_deadlock() -> contextra_types::Result<()> {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();
@@ -193,8 +193,8 @@ fn test_kv_locks_try_lock_blocking() {
 async fn test_collection_next_tx_sequence() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -234,8 +234,8 @@ async fn test_collection_next_tx_sequence() {
 async fn test_collection_allocate_tx_sequence() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -275,8 +275,8 @@ async fn test_collection_allocate_tx_sequence() {
 async fn test_concurrent_insert_and_write_ops_lock_safety() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -363,8 +363,8 @@ async fn test_concurrent_insert_many_collision_safety() {
     use contextra_store::LsmStorage;
     use contextra_types::{ContextraError, DocId, TxId};
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -471,12 +471,12 @@ async fn test_concurrent_insert_many_collision_safety() {
 }
 
 #[tokio::test]
-async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn test_graph_mapping_invariant_missing_entity_graceful_degradation()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir()?;
@@ -535,8 +535,8 @@ async fn test_graph_mapping_invariant_missing_entity_graceful_degradation(
 async fn test_begin_transaction_returns_active_db_transaction() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -571,8 +571,8 @@ async fn test_begin_transaction_returns_active_db_transaction() {
 async fn test_apm3_lock_contention_fallback() -> contextra_types::Result<()> {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();

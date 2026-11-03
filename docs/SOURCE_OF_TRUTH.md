@@ -10,7 +10,7 @@ Jede Tatsache hat genau eine normative Quelle: die SPEC. Abgeleitete Dokumente w
 
 | Rang | Quelle | Status |
 |---|---|---|
-| 1 | `docs/SPEC.md` (Version 4.3.0) | normativ, einzige Quelle |
+| 1 | `docs/SPEC.md` (Version 5.1.0) | normativ, einzige Quelle |
 | 2 | `docs/VETOES.md` | normativ, konkretisiert Verbote aus der SPEC |
 | 3 | `docs/CONSTITUTION.md` | abgeleitet, fasst Prinzipien und harte Regeln zusammen |
 | 4 | `docs/ARCHITECTURE.md`, `docs/TYPE_REGISTRY.md` | abgeleitet |
@@ -21,7 +21,7 @@ Der Quellcode belegt den Ist-Zustand. Er definiert keinen Soll-Zustand. Grüne G
 
 ## 3. Abgeleitete Dokumente und ihr Pflegestand
 
-Nach D-98 bleiben alle abgeleiteten Dokumente im Repository und werden mit der SPEC gepflegt. Die Tabelle nennt den Stand dieser Revision (SPEC 4.3.0).
+Nach D-98 bleiben alle abgeleiteten Dokumente im Repository und werden mit der SPEC gepflegt. Die Tabelle nennt den Stand dieser Revision (SPEC 5.1.0).
 
 | Datei oder Verzeichnis | Stand | Offener Pflegebedarf |
 |---|---|---|

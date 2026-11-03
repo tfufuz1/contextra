@@ -89,7 +89,7 @@ Bis zur schriftlichen Klärung darf Contextra keine Löschaussage über die Auß
 13. Reichweite des neuen ProdHaftG für B2B-Kunden und die Ausnahme für freie Software.
 14. Zweckbindung und zulässige Dauer des Ledgers (`backup_retention`).
 
-## 7. Rechtsstand laut SPEC 4.2.0
+## 7. Rechtsstand laut SPEC 5.1.0
 
 Die Angaben stammen aus der SPEC und sind dort mit Quellen versehen. Sie können sich ändern und sind vor einer Verwendung erneut zu prüfen.
 

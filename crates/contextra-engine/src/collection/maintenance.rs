@@ -11,15 +11,15 @@
 // NICHT-OFFENSICHTLICH: Pending TxIntents werden beim Start via Forward-Commit repariert und markiert.
 // STAND: TS:2026-08-29T17:22:29Z (SESSION: 0dcb9f3b)
 
-use super::{extract_text, Collection, StoredDocument, StoredDocumentMeta};
+use super::{Collection, StoredDocument, StoredDocumentMeta, extract_text};
 use crate::decay_controller::{AdaptiveDecayController, DecaySignalInputs};
 use crate::metrics_names::{
-    record_counter_safe, record_histogram_safe, REAPER_DOCS_REAPED, REBUILD_DURATION,
+    REAPER_DOCS_REAPED, REBUILD_DURATION, record_counter_safe, record_histogram_safe,
 };
 use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
-use contextra_types::{ContextraError, DocId, Result, TxId, EXPIRY_METADATA_KEY};
-use std::sync::atomic::Ordering;
+use contextra_types::{ContextraError, DocId, EXPIRY_METADATA_KEY, Result, TxId};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Führt einen Importance-Score-Sweep via Adaptive Decay Controller durch.
@@ -671,7 +671,7 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
                     _ => {
                         return Err(ContextraError::Serialization(
                             "Failed to initialize document metadata map".to_string(),
-                        ))
+                        ));
                     }
                 }
             }

@@ -44,15 +44,27 @@ impl HeaderSlot {
 
     pub fn encode(&self, out: &mut [u8; 128]) {
         out.fill(0);
-        out[0] = self.slot_id;
-        out[1] = self.anchor_id;
-        out[2] = self.kdf_id;
-        out[3] = self.status;
+        if let Some(b) = out.get_mut(0) {
+            *b = self.slot_id;
+        }
+        if let Some(b) = out.get_mut(1) {
+            *b = self.anchor_id;
+        }
+        if let Some(b) = out.get_mut(2) {
+            *b = self.kdf_id;
+        }
+        if let Some(b) = out.get_mut(3) {
+            *b = self.status;
+        }
         if let Some(slot) = out.get_mut(4..8) {
             slot.copy_from_slice(&self.m_kib.to_be_bytes());
         }
-        out[8] = self.t;
-        out[9] = self.p;
+        if let Some(b) = out.get_mut(8) {
+            *b = self.t;
+        }
+        if let Some(b) = out.get_mut(9) {
+            *b = self.p;
+        }
         // reserved 2 bytes (out[10..12]) = 0
         if let Some(slot) = out.get_mut(12..44) {
             slot.copy_from_slice(&self.slot_salt);

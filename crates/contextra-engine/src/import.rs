@@ -10,9 +10,9 @@
 // INVARIANTEN: Schema-Versionsprüfung (Pflicht); Idempotenz bezüglich ID (Upsert); Transaktionale Verlässlichkeit.
 // STAND: TS:2026-09-12
 
+use crate::Contextra;
 use crate::collection::Collection;
 use crate::export::{ExportCollectionV1, ExportDocumentV1, SCHEMA_VERSION_V1};
-use crate::Contextra;
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::Result;
 use serde::{Deserialize, Serialize};
