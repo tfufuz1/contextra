@@ -8,7 +8,7 @@
 // SIEHE AUCH: wal.rs, sstable.rs, DECISIONS.md ADR-003
 
 // INVARIANT: Zentraler Storage-Engine-Orchestrator des Triebwerks.
-// IMPLEMENTS: StorageEngine Trait (contextra-core/src/traits.rs)
+// IMPLEMENTS: StorageEngine Trait (contextra_ports::storage::StorageEngine)
 // READ-PATH:  get() → Active MemTable → Immutable MemTables → SSTables (newest first)
 // WRITE-PATH: put()/delete() → TxBuffer → commit() → WAL + MemTable
 // FLUSH:      MemTable > size_limit → rotate → SSTable schreiben → cleanup
