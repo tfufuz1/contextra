@@ -6,7 +6,7 @@ Abgeleitet aus [`docs/SPEC.md`](../../docs/SPEC.md) (8.10, 9.8, D-18, D-19, D-62
 
 **Ring und Abhängigkeiten:** Ring 2. Erlaubt: `types`, `ports`, `simd`, `crypto`. **Nicht** `sys`, **nicht** `mvcc` (D-88). Implementiert `VectorIndex` und `ErasureLayer`.
 
-## Fachprofil (Arbeitsrolle)
+**Verboten:** `sys` und `mvcc` (D-88), `std::fs`, `buffer_removed` (D-94), Nullvektoren als Löschung (D-77), Quantisierung außerhalb der Arena (D-86), Features `experimental-diskann`, `experimental-rabitq`, `partial-index-rebuild` (D-84), regionales HNSW-Rewiring (VETO-F02)
 
 ANN-Forscher und -Ingenieur (HNSW nach Malkov/Yashunin, DiskANN/FreshDiskANN, gefilterte Suche wie ACORN). Dieses Profil beschreibt Arbeitsweise und Fachwissen und begründet keine eigene Anforderung.
 

@@ -16,7 +16,7 @@ impl HnswIndexCore {
         layer: usize,
         ctx: &'a SearchContext,
     ) -> Result<Cow<'a, [u32]>> {
-        let base_batch_idx = ctx.mmap_node_count + ctx.nodes.len();
+        let base_batch_idx = ctx.buffer_node_count + ctx.nodes.len();
         if idx >= base_batch_idx {
             let prepared_offset = idx - base_batch_idx;
             if let Some(prepared) = ctx.prior_prepared.get(prepared_offset) {
@@ -29,12 +29,12 @@ impl HnswIndexCore {
             }
         }
 
-        if let Some(mmap) = ctx.mmap {
-            if idx < ctx.mmap_node_count {
-                let record = mmap.get_node_record(idx)?;
-                return Ok(Cow::Owned(mmap.get_connections(&record, layer)?));
+        if let Some(buffer) = ctx.buffer {
+            if idx < ctx.buffer_node_count {
+                let record = buffer.get_node_record(idx)?;
+                return Ok(Cow::Owned(buffer.get_connections(&record, layer)?));
             }
-            let ram_idx = idx - ctx.mmap_node_count;
+            let ram_idx = idx - ctx.buffer_node_count;
             if let Some(bmap) = ctx.backlink_map {
                 if let Some(conns) = bmap.get(ram_idx, layer) {
                     return Ok(Cow::Owned(conns.clone()));
@@ -114,9 +114,9 @@ impl HnswIndexCore {
         let new_layer = self.random_layer();
         let entry_point_opt = self.hot.get_entry_point();
 
-        let mmap_node_count = self
+        let buffer_node_count = self
             .cold
-            .mmap_index
+            .buffer_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
@@ -124,11 +124,11 @@ impl HnswIndexCore {
 
         let nodes_read = self.hot.nodes.read();
         let ram_nodes_count = nodes_read.len();
-        let new_idx = mmap_node_count + ram_nodes_count + offset;
+        let new_idx = buffer_node_count + ram_nodes_count + offset;
 
         let query_quantized: Option<Vec<u8>> = None;
 
-        let mmap_guard = self.cold.mmap_index.read();
+        let buffer_guard = self.cold.buffer_index.read();
 
         let mut ep = Vec::new();
         let mut batch_global_ep = None;
@@ -223,8 +223,8 @@ impl HnswIndexCore {
             )?;
             let ctx = SearchContext {
                 nodes: &nodes_read,
-                mmap: mmap_guard.as_ref(),
-                mmap_node_count,
+                buffer: buffer_guard.as_ref(),
+                buffer_node_count,
                 prior_prepared,
                 backlink_map: Some(&batch_ctx.backlink_map),
                 quantizer: None,
@@ -242,14 +242,14 @@ impl HnswIndexCore {
             ep = neighbors.iter().map(|c| c.index).collect();
         }
 
-        let base_batch_idx = mmap_node_count + ram_nodes_count;
+        let base_batch_idx = buffer_node_count + ram_nodes_count;
         let mut neighbor_backlinks = Vec::new();
 
         for layer in (0..=new_layer.min(current_max_layer)).rev() {
             for &ni in &final_connections[layer] {
                 let neighbor_idx = ni as usize;
 
-                if neighbor_idx < mmap_node_count {
+                if neighbor_idx < buffer_node_count {
                     continue;
                 }
 
@@ -258,7 +258,7 @@ impl HnswIndexCore {
                     neighbor_idx,
                     layer,
                     base_batch_idx,
-                    mmap_node_count,
+                    buffer_node_count,
                     &nodes_read,
                     prior_prepared,
                     batch_ctx,
@@ -275,8 +275,8 @@ impl HnswIndexCore {
                         let idx = idx_u32 as usize;
                         let ctx = SearchContext {
                             nodes: &nodes_read,
-                            mmap: mmap_guard.as_ref(),
-                            mmap_node_count,
+                            buffer: buffer_guard.as_ref(),
+                            buffer_node_count,
                             prior_prepared,
                             backlink_map: Some(&batch_ctx.backlink_map),
                             quantizer: None,
@@ -298,8 +298,8 @@ impl HnswIndexCore {
 
                     let ctx = SearchContext {
                         nodes: &nodes_read,
-                        mmap: mmap_guard.as_ref(),
-                        mmap_node_count,
+                        buffer: buffer_guard.as_ref(),
+                        buffer_node_count,
                         prior_prepared,
                         backlink_map: Some(&batch_ctx.backlink_map),
                         quantizer: None,
@@ -325,7 +325,7 @@ impl HnswIndexCore {
                         }
                     }
                 } else {
-                    let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                    let neighbor_ram_idx = neighbor_idx - buffer_node_count;
                     batch_ctx
                         .backlink_map
                         .insert(neighbor_ram_idx, layer, selected.clone());
@@ -419,14 +419,14 @@ impl HnswIndexCore {
 
     pub fn connectivity_score(&self) -> f64 {
         let deleted = self.hot.deleted_count.load(Ordering::SeqCst);
-        let mmap_count = self
+        let buffer_count = self
             .cold
-            .mmap_index
+            .buffer_index
             .read()
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
-        let total = mmap_count + self.hot.nodes.read().len();
+        let total = buffer_count + self.hot.nodes.read().len();
         if total == 0 {
             return 1.0;
         }

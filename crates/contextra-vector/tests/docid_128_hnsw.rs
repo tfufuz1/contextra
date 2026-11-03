@@ -1,7 +1,7 @@
 use contextra_ports::VectorIndex;
 use contextra_types::{ContextraError, DistanceMetric, DocId, TxId};
 use contextra_vector::hnsw::{HnswConfig, HnswIndex};
-use contextra_vector::persistence::MmapIndex;
+use contextra_vector::persistence::BufferIndex;
 
 #[tokio::test]
 async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_types::Result<()> {
@@ -25,14 +25,14 @@ async fn test_docid_128_hnsw_basic_roundtrip() -> contextra_types::Result<()> {
 
     index.save(&path).await?;
 
-    let mmap_index = MmapIndex::open(&path)?;
-    assert_eq!(mmap_index.header.node_count(), 1);
+    let buffer_index = BufferIndex::open(&path)?;
+    assert_eq!(buffer_index.header.node_count(), 1);
 
-    let record = mmap_index.get_node_record(0)?;
+    let record = buffer_index.get_node_record(0)?;
     assert_eq!(record.doc_id, doc_id.inner());
 
     let loaded_index = HnswIndex::try_new(config)?;
-    loaded_index.load_mmap(&path).await?;
+    loaded_index.load_buffer(&path).await?;
 
     let search_results = loaded_index.search(&vec, 1).await?;
     assert_eq!(search_results.len(), 1);
@@ -71,7 +71,7 @@ async fn test_docid_format_mismatch_detection() -> contextra_types::Result<()> {
 
     std::fs::write(&path, &bytes).map_err(|e| ContextraError::Storage(e.to_string()))?;
 
-    let res = MmapIndex::open(&path);
+    let res = BufferIndex::open(&path);
     assert!(res.is_err(), "Expected storage error on format mismatch");
     if let Err(ContextraError::Storage(msg)) = res {
         assert!(

@@ -34,8 +34,8 @@ impl HnswIndexCore {
         backlink_map: Option<&BacklinkTable>,
     ) -> Result<Vec<Candidate>> {
         let nodes_guard = self.hot.nodes.read();
-        let mmap_guard = self.cold.mmap_index.read();
-        let mmap_node_count = mmap_guard
+        let buffer_guard = self.cold.buffer_index.read();
+        let buffer_node_count = buffer_guard
             .as_ref()
             .map(|m| m.header.node_count() as usize)
             .unwrap_or(0);
@@ -49,8 +49,8 @@ impl HnswIndexCore {
 
         let ctx = SearchContext {
             nodes: &nodes_guard,
-            mmap: mmap_guard.as_ref(),
-            mmap_node_count,
+            buffer: buffer_guard.as_ref(),
+            buffer_node_count,
             prior_prepared,
             backlink_map,
             quantizer: q_ref.map(Cow::Borrowed),
@@ -121,8 +121,8 @@ impl HnswIndexCore {
                 }
             }
 
-            if has_dead_neighbors && current.index >= mmap_node_count {
-                let ram_idx = current.index - mmap_node_count;
+            if has_dead_neighbors && current.index >= buffer_node_count {
+                let ram_idx = current.index - buffer_node_count;
                 let seq_log = self.cold.seq_log.read();
                 let min_retention_seq = seq_log.min_retention_seq();
                 let m = self.cold.config.m;
@@ -133,8 +133,8 @@ impl HnswIndexCore {
                         kept.push(neighbor_u32);
                     } else if let Some(min_ret_seq) = min_retention_seq {
                         let neighbor_idx = neighbor_u32 as usize;
-                        if neighbor_idx >= mmap_node_count {
-                            let neighbor_ram_idx = neighbor_idx - mmap_node_count;
+                        if neighbor_idx >= buffer_node_count {
+                            let neighbor_ram_idx = neighbor_idx - buffer_node_count;
                             if let Some(neighbor_node) = nodes_guard.get(neighbor_ram_idx) {
                                 if let Some(del_seq) = seq_log.deletion_seq(neighbor_node.doc_id) {
                                     if del_seq >= min_ret_seq {
@@ -230,12 +230,12 @@ impl HnswIndex {
         if ep.is_empty() {
             let nodes = self.inner.hot.nodes.read();
             let deleted = self.inner.cold.deleted_nodes.read();
-            let mmap_guard = self.inner.cold.mmap_index.read();
-            let mmap_node_count = mmap_guard
+            let buffer_guard = self.inner.cold.buffer_index.read();
+            let buffer_node_count = buffer_guard
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let total = mmap_node_count + nodes.len();
+            let total = buffer_node_count + nodes.len();
             for i in 0..total {
                 if !deleted.contains(i as u64) {
                     ep.push(i);
@@ -249,8 +249,8 @@ impl HnswIndex {
         if let Some(f) = filter {
             let nodes = self.inner.hot.nodes.read();
             let deleted = self.inner.cold.deleted_nodes.read();
-            let mmap_guard = self.inner.cold.mmap_index.read();
-            let mmap_node_count = mmap_guard
+            let buffer_guard = self.inner.cold.buffer_index.read();
+            let buffer_node_count = buffer_guard
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
@@ -262,8 +262,8 @@ impl HnswIndex {
             let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
             let ctx = SearchContext {
                 nodes: &nodes,
-                mmap: mmap_guard.as_ref(),
-                mmap_node_count,
+                buffer: buffer_guard.as_ref(),
+                buffer_node_count,
                 prior_prepared: &[],
                 backlink_map: None,
                 quantizer: q_ref.map(Cow::Borrowed),
@@ -277,7 +277,7 @@ impl HnswIndex {
             };
             let max_filter_eps = self.inner.cold.config.ef_search.max(k) * factor;
 
-            let total_nodes = mmap_node_count + nodes.len();
+            let total_nodes = buffer_node_count + nodes.len();
             for i in (0..total_nodes).rev() {
                 if !ep.contains(&(i as _)) {
                     if snapshot_seq.is_none() && deleted.contains(i as u64) {
@@ -523,12 +523,12 @@ impl HnswIndex {
         if ep.is_empty() {
             let nodes = self.inner.hot.nodes.read();
             let deleted = self.inner.cold.deleted_nodes.read();
-            let mmap_guard = self.inner.cold.mmap_index.read();
-            let mmap_node_count = mmap_guard
+            let buffer_guard = self.inner.cold.buffer_index.read();
+            let buffer_node_count = buffer_guard
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
-            let total = mmap_node_count + nodes.len();
+            let total = buffer_node_count + nodes.len();
             for i in 0..total {
                 if !deleted.contains(i as u64) {
                     ep.push(i);
@@ -543,8 +543,8 @@ impl HnswIndex {
 
         let mut filter_eps = Vec::new();
         if let Some(f) = filter {
-            let mmap_guard = self.inner.cold.mmap_index.read();
-            let mmap_node_count = mmap_guard
+            let buffer_guard = self.inner.cold.buffer_index.read();
+            let buffer_node_count = buffer_guard
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
@@ -556,8 +556,8 @@ impl HnswIndex {
             let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
             let ctx = SearchContext {
                 nodes: &nodes,
-                mmap: mmap_guard.as_ref(),
-                mmap_node_count,
+                buffer: buffer_guard.as_ref(),
+                buffer_node_count,
                 prior_prepared: &[],
                 backlink_map: None,
                 quantizer: q_ref.map(Cow::Borrowed),
@@ -571,7 +571,7 @@ impl HnswIndex {
             };
             let max_filter_eps = policy.max_ef.max(k) * factor;
 
-            let total_nodes = mmap_node_count + nodes.len();
+            let total_nodes = buffer_node_count + nodes.len();
             for i in (0..total_nodes).rev() {
                 if !ep.contains(&(i as _)) {
                     if deleted.contains(i as u64) {
@@ -638,8 +638,8 @@ impl HnswIndex {
                 self.inner
                     .search_layer(query, query_quantized.as_deref(), &ep, ef, 0)?;
 
-            let mmap_guard = self.inner.cold.mmap_index.read();
-            let mmap_node_count = mmap_guard
+            let buffer_guard = self.inner.cold.buffer_index.read();
+            let buffer_node_count = buffer_guard
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
@@ -651,8 +651,8 @@ impl HnswIndex {
             let q_ref = q_guard.as_ref().and_then(|g| g.as_ref());
             let ctx = SearchContext {
                 nodes: &nodes,
-                mmap: mmap_guard.as_ref(),
-                mmap_node_count,
+                buffer: buffer_guard.as_ref(),
+                buffer_node_count,
                 prior_prepared: &[],
                 backlink_map: None,
                 quantizer: q_ref.map(Cow::Borrowed),
@@ -665,8 +665,8 @@ impl HnswIndex {
                 if deleted.contains(c.index as u64) {
                     continue;
                 }
-                if c.index >= mmap_node_count {
-                    if let Some(node) = nodes.get(c.index - mmap_node_count) {
+                if c.index >= buffer_node_count {
+                    if let Some(node) = nodes.get(c.index - buffer_node_count) {
                         if node.committed_tx == 0 {
                             continue;
                         }

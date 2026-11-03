@@ -1,11 +1,13 @@
 // FILE-CONTEXT
 // ZWECK: DiskANN-Graphindex für Out-of-Core Approximate Nearest Neighbor Search (WP-4.3).
-// INVARIANTEN: Lock-Hierarchie: header -> mmap -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
-// NICHT-OFFENSICHTLICH: Mmap für Vektor- & Graphlesezugriffe, ausgelagert an contextra-sys::mmap_readonly.
+// INVARIANTEN: Lock-Hierarchie: header -> vfs_file -> cache / quantizer / doc_ids; atomic rename + parent dir sync bei file persistence.
+// NICHT-OFFENSICHTLICH: Positional VFS-Lesevorgänge über contextra_ports::Vfs.
 // STAND: TS:2026-09-10T19:30:00Z (SESSION: a9d67eae)
 use crate::ComputePool;
+use contextra_ports::Vfs;
 use contextra_types::{DistanceMetric, DocId};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Fallback behavior policy when DiskANN loading, integrity checks, or reads fail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -18,7 +20,7 @@ pub enum DiskAnnFallbackPolicy {
 }
 
 /// Configuration for DiskANN index.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DiskAnnConfig {
     /// Path to the on-disk index file.
     pub index_path: PathBuf,
@@ -43,6 +45,38 @@ pub struct DiskAnnConfig {
     pub pending_flush_threshold: Option<u64>,
     /// Optional compute pool for background operations.
     pub compute_pool: Option<ComputePool>,
+    /// Injiziertes Virtual File System (VFS).
+    pub vfs: Option<Arc<dyn Vfs>>,
+}
+
+impl std::fmt::Debug for DiskAnnConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DiskAnnConfig")
+            .field("index_path", &self.index_path)
+            .field("dimension", &self.dimension)
+            .field("max_degree", &self.max_degree)
+            .field("beam_width", &self.beam_width)
+            .field("sector_size", &self.sector_size)
+            .field("memory_budget", &self.memory_budget)
+            .field("distance_metric", &self.distance_metric)
+            .field("quantize", &self.quantize)
+            .field("fallback_policy", &self.fallback_policy)
+            .field("pending_flush_threshold", &self.pending_flush_threshold)
+            .field("compute_pool", &self.compute_pool)
+            .field("vfs", &self.vfs.as_ref().map(|_| "Arc<dyn Vfs>"))
+            .finish()
+    }
+}
+
+impl DiskAnnConfig {
+    /// Erzeugt eine Konfiguration mit injiziertem VFS.
+    pub fn new_with_vfs(index_path: PathBuf, vfs: Arc<dyn Vfs>) -> Self {
+        Self {
+            index_path,
+            vfs: Some(vfs),
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for DiskAnnConfig {
@@ -59,6 +93,7 @@ impl Default for DiskAnnConfig {
             fallback_policy: DiskAnnFallbackPolicy::default(),
             pending_flush_threshold: None,
             compute_pool: None,
+            vfs: None,
         }
     }
 }
