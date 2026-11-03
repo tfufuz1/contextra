@@ -9,4 +9,3 @@ forbid_unsafe_crates = 30
 contextra-crypto = 0
 contextra-simd = 285
 contextra-sys = 30
-contextra-wire = 27

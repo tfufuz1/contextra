@@ -10,7 +10,7 @@ rust-version.workspace = true
 description = "Vektor-Distanzfunktionen (L2, Dot, Cosine) mit SIMD-Kernen und Skalar-Referenz."
 
 [package.metadata.contextra]
-ring = "0"
+ring = "1"
 
 [dependencies]
 contextra-types = { workspace = true }
