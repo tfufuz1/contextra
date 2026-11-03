@@ -114,8 +114,14 @@ async fn child_writer() {
 
     let encrypted = std::env::var("CRASH_ENCRYPTION").as_deref() == Ok("1");
 
-    let passphrase = if encrypted {
-        Some("crash_test_secret_key_987".to_string())
+    let km = if encrypted {
+        Some(Arc::new(
+            contextra_store::wal::KeyManager::try_new(
+                "crash_test_secret_key_987",
+                b"salt123456789012345678901234567890",
+            )
+            .expect("km"),
+        ))
     } else {
         None
     };
@@ -123,12 +129,11 @@ async fn child_writer() {
     let config = LsmConfig {
         path: db_path,
         group_commit_window_micros: group_commit_micros,
-        encryption_passphrase: passphrase,
         ..Default::default()
     };
 
     let storage = Arc::new(
-        LsmStorage::open(config)
+        LsmStorage::open_with_key_manager(config, km)
             .await
             .expect("child LsmStorage::open failed"),
     );
@@ -259,9 +264,15 @@ async fn test_crash_kill_durability() {
         let _ = child.kill();
         let _ = child.wait();
 
-        // Passphrase for reopening
-        let passphrase = if encrypted {
-            Some("crash_test_secret_key_987".to_string())
+        // KeyManager for reopening
+        let km = if encrypted {
+            Some(Arc::new(
+                contextra_store::wal::KeyManager::try_new(
+                    "crash_test_secret_key_987",
+                    b"salt123456789012345678901234567890",
+                )
+                .expect("km"),
+            ))
         } else {
             None
         };
@@ -269,12 +280,11 @@ async fn test_crash_kill_durability() {
         let config = LsmConfig {
             path: tmp_dir.path().to_path_buf(),
             group_commit_window_micros: group_commit_micros,
-            encryption_passphrase: passphrase.clone(),
             ..Default::default()
         };
 
         // (a) LsmStorage::open MUST succeed (no error tolerated or ignored)
-        let storage = match LsmStorage::open(config.clone()).await {
+        let storage = match LsmStorage::open_with_key_manager(config.clone(), km.clone()).await {
             Ok(s) => s,
             Err(e) => {
                 let preserved_path = tmp_dir.into_path();
@@ -470,11 +480,10 @@ async fn test_crash_kill_durability() {
             let corrupt_config = LsmConfig {
                 path: corrupt_tmp.path().to_path_buf(),
                 group_commit_window_micros: group_commit_micros,
-                encryption_passphrase: passphrase.clone(),
                 ..Default::default()
             };
 
-            let corrupt_res = LsmStorage::open(corrupt_config).await;
+            let corrupt_res = LsmStorage::open_with_key_manager(corrupt_config, km.clone()).await;
             if corrupt_res.is_ok() {
                 let preserved_path = tmp_dir.into_path();
                 panic!(

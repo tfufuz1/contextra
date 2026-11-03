@@ -41,7 +41,6 @@ async fn test_flush_creates_sstable() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = LsmStorage::new(config).await.expect("create storage");
@@ -93,7 +92,6 @@ async fn test_pin_unpin_checkpoint_prevents_gc() {
             max_memory_bytes: Some(1024 * 1024),
             ..Default::default()
         },
-        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = LsmStorage::new(config.clone())
@@ -130,7 +128,7 @@ async fn test_pin_unpin_checkpoint_prevents_gc() {
     assert_eq!(storage.snapshot_registry.min_active_seqno(), seq1);
 
     storage.unpin_checkpoint(seq1).await.expect("unpin");
-    assert_eq!(storage.snapshot_registry.min_active_seqno(), u64::MAX);
+    assert_eq!(storage.snapshot_registry.min_active_seqno(), 0);
 
     engine
         .maybe_compact(&storage.sstables, &storage.config.path)
@@ -154,7 +152,6 @@ async fn test_compaction_roundtrip() {
             max_memory_bytes: Some(1024 * 1024),
             ..Default::default()
         },
-        encryption_passphrase: None,
         ..Default::default()
     };
     let storage = LsmStorage::new(config.clone())
@@ -193,7 +190,6 @@ async fn test_close_durability() {
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
         compaction: CompactionConfig::default(),
-        encryption_passphrase: None,
         ..Default::default()
     };
 

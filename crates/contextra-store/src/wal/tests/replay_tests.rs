@@ -349,19 +349,12 @@ async fn test_wal_legacy_key_fallback_migration() {
         "Opening legacy WAL without allow_legacy_integrity_key_fallback must fail"
     );
 
-    // Opening with explicit opt-in must succeed
-    let wal = Wal::open_for_legacy_migration(&wal_path, None)
-        .await
-        .expect("open legacy wal with fallback opt-in"); // expect
-    let entries = wal.replay().await.expect("replay legacy wal"); // expect
-    assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].1.seq_no, 1);
-    if let WalOp::Put { key, value, .. } = &entries[0].1.op {
-        assert_eq!(key, b"legacy_key");
-        assert_eq!(value, b"legacy_val");
-    } else {
-        panic!("Expected Put op");
-    }
+    // Under D-05: Legacy-fallback is eliminated / non-downgradable; opening with legacy key fails closed
+    let open_mig_res = Wal::open_for_legacy_migration(&wal_path, None).await;
+    assert!(
+        open_mig_res.is_err(),
+        "Opening with legacy key must fail closed under D-05"
+    );
 }
 
 #[tokio::test]
@@ -1510,7 +1503,11 @@ async fn test_t_wal_1_aead_decryption_failure_tolerated_at_tail() -> Result<()> 
     // 3. Replay muss tolerieren, dass am Dateiende die Entschlüsselung fehlschlägt
     let wal_reopened = Wal::open_read_only_with_config(&wal_path, config).await?;
     let entries = wal_reopened.replay().await?;
-    assert_eq!(entries.len(), 2, "AEAD-Tail-Fehler muss als unvollständiger Write toleriert werden");
+    assert_eq!(
+        entries.len(),
+        2,
+        "AEAD-Tail-Fehler muss als unvollständiger Write toleriert werden"
+    );
     assert_eq!(entries[0].1.seq_no, 1);
     assert_eq!(entries[1].1.seq_no, 2);
 

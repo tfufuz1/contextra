@@ -84,6 +84,14 @@ impl LsmStorage {
         Self::new_with_merge_operator(config, None).await
     }
 
+    /// Opens or recovers an LSM storage instance with the given configuration and a KeyManager.
+    pub async fn open_with_key_manager(
+        config: LsmConfig,
+        key_manager: Option<Arc<KeyManager>>,
+    ) -> Result<Self> {
+        Self::new_with_key_manager_and_merge_operator(config, key_manager, None).await
+    }
+
     /// Opens or recovers an LSM storage instance with the given configuration and a `MergeOperator`.
     pub async fn open_with_merge_operator(
         config: LsmConfig,
@@ -419,19 +427,14 @@ impl LsmStorage {
             crate::lsm::recovery::write_salt_atomically(&salt_path, &buf).await?;
         }
 
-        let salt = tokio::fs::read(&salt_path).await.map_err(|e| {
+        let _salt = tokio::fs::read(&salt_path).await.map_err(|e| {
             contextra_types::ContextraError::Storage(format!(
                 "SALT file read failed during migration: {e}"
             ))
         })?;
 
-        let key_manager = if let Some(passphrase) = &config.encryption_passphrase {
-            Some(Arc::new(crate::wal::KeyManager::try_new(
-                passphrase, &salt,
-            )?))
-        } else {
-            None
-        };
+        // D-05: Key material comes exclusively via KeyManager, no passphrase field in LsmConfig
+        let key_manager = None;
 
         let mut migrated_count = 0usize;
 

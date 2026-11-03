@@ -1,10 +1,13 @@
 //! Write-Ahead Log (WAL) for durability and crash recovery with HMAC chaining.
 
+pub mod chain_check;
 pub mod encode;
 pub mod flusher;
 pub mod hmac;
 pub mod io;
+pub mod key_manager;
 pub mod replay;
+pub mod verifier;
 
 #[cfg(test)]
 mod tests;
@@ -283,10 +286,12 @@ pub(crate) mod fs {
     pub type File = LoomFile;
 }
 
-pub use contextra_crypto::crypto::KeyManager;
+pub use chain_check::verify_wal_chain_completeness;
 use contextra_types::{ContextraError, Result};
+pub use key_manager::KeyManager;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+pub use verifier::{IntegrityVerifier, WalEntrySnapshot, WalHmac};
 
 /// Maximum WAL size before triggering a flush (128MB).
 pub const MAX_WAL_SIZE: u64 = 128 * 1024 * 1024;

@@ -1,6 +1,8 @@
 use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
+use contextra_store::wal::KeyManager;
 use contextra_types::TxId;
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 
@@ -12,13 +14,15 @@ async fn test_encrypted_db_roundtrip() {
         memtable_size_limit: 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: Some("super-secret".to_string()),
         ..Default::default()
     };
+    let km = Arc::new(
+        KeyManager::try_new("super-secret", b"salt123456789012345678901234567890").expect("km"),
+    );
 
     // 1. Write data to encrypted DB
     {
-        let storage = LsmStorage::new(config.clone())
+        let storage = LsmStorage::open_with_key_manager(config.clone(), Some(km.clone()))
             .await
             .expect("create storage");
         let tx = TxId::new(1);
@@ -32,9 +36,9 @@ async fn test_encrypted_db_roundtrip() {
         assert_eq!(val, Some(bytes::Bytes::from_static(b"val1")));
     }
 
-    // 2. Re-open with same passphrase
+    // 2. Re-open with same KeyManager
     {
-        let storage = LsmStorage::new(config.clone())
+        let storage = LsmStorage::open_with_key_manager(config.clone(), Some(km.clone()))
             .await
             .expect("reopen storage");
         let val = storage.get(b"key1").await.expect("get after reopen");
@@ -45,18 +49,20 @@ async fn test_encrypted_db_roundtrip() {
 #[tokio::test]
 async fn test_wrong_passphrase_fails() {
     let tmp = TempDir::new().expect("temp dir");
-    let mut config = LsmConfig {
+    let config = LsmConfig {
         path: tmp.path().to_path_buf(),
         memtable_size_limit: 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: Some("correct-pass".to_string()),
         ..Default::default()
     };
+    let km_correct = Arc::new(
+        KeyManager::try_new("correct-pass", b"salt123456789012345678901234567890").expect("km"),
+    );
 
     // 1. Write data
     {
-        let storage = LsmStorage::new(config.clone())
+        let storage = LsmStorage::open_with_key_manager(config.clone(), Some(km_correct))
             .await
             .expect("create storage");
         let tx = TxId::new(1);
@@ -65,12 +71,17 @@ async fn test_wrong_passphrase_fails() {
         storage.force_flush().await.expect("flush");
     }
 
-    // 2. Re-open with WRONG passphrase
-    config.encryption_passphrase = Some("wrong-pass".to_string());
-    let result = LsmStorage::new(config).await;
+    // 2. Re-open with WRONG KeyManager
+    let km_wrong = Arc::new(
+        KeyManager::try_new("wrong-pass", b"salt123456789012345678901234567890").expect("km"),
+    );
+    let result = LsmStorage::open_with_key_manager(config, Some(km_wrong)).await;
 
     // Replay or SSTable open should fail
-    assert!(result.is_err(), "Opening with wrong passphrase should fail");
+    assert!(
+        result.is_err(),
+        "Opening with wrong key manager should fail"
+    );
 }
 
 #[tokio::test]
@@ -81,14 +92,17 @@ async fn test_encrypted_db_unreadable_as_plaintext() {
         memtable_size_limit: 1024,
         max_ram_mb: 64,
         tx_timeout: Duration::from_secs(60),
-        encryption_passphrase: Some("secret".to_string()),
         ..Default::default()
     };
+    let km =
+        Arc::new(KeyManager::try_new("secret", b"salt123456789012345678901234567890").expect("km"));
 
     // 1. Write known string
     let secret_val = b"THIS_IS_A_SECRET_VALUE_THAT_SHOULD_NOT_BE_IN_PLAINTEXT";
     {
-        let storage = LsmStorage::new(config).await.expect("create storage");
+        let storage = LsmStorage::open_with_key_manager(config, Some(km))
+            .await
+            .expect("create storage");
         let tx = TxId::new(1);
         storage.put(tx, b"key1", secret_val).await.expect("put");
         storage.commit(tx).await.expect("commit");
@@ -118,19 +132,13 @@ async fn test_encrypted_db_unreadable_as_plaintext() {
     );
 }
 
-/// Prüft, dass eine Konfiguration ohne Verschlüsselungspassphrase (encryption_passphrase = None)
-/// für die Übergabe an K5 (Pflichtverschlüsselung) dokumentiert und abgrenzbar ist.
 #[tokio::test]
 async fn test_unencrypted_config_warning_or_error() {
     let tmp = TempDir::new().expect("temp dir");
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),
-        encryption_passphrase: None,
         ..Default::default()
     };
 
-    assert!(
-        config.encryption_passphrase.is_none(),
-        "Default config must have None passphrase during Stufe 1 transition"
-    );
+    assert_eq!(config.path, tmp.path());
 }

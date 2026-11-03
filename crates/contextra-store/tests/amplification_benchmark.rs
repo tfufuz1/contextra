@@ -143,7 +143,6 @@ async fn run_amplification_benchmark() {
             max_memory_bytes: Some(128 * 1024 * 1024),
             ..Default::default()
         },
-        encryption_passphrase: None,
         ..Default::default()
     };
 
