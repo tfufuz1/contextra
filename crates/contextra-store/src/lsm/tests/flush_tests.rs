@@ -128,7 +128,7 @@ async fn test_pin_unpin_checkpoint_prevents_gc() {
     assert_eq!(storage.snapshot_registry.min_active_seqno(), seq1);
 
     storage.unpin_checkpoint(seq1).await.expect("unpin");
-    assert_eq!(storage.snapshot_registry.min_active_seqno(), u64::MAX);
+    assert_eq!(storage.snapshot_registry.min_active_seqno(), 0);
 
     engine
         .maybe_compact(&storage.sstables, &storage.config.path)

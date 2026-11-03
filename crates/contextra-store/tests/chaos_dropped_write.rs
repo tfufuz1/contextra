@@ -58,30 +58,6 @@ async fn test_chaos_dropped_write_error_propagation_and_recovery() {
     let wal_path = db_path.join("wal.log");
     std::fs::set_permissions(&wal_path, Permissions::from_mode(0o444)).unwrap();
 
-    // Find open file descriptors pointing to wal_path in /proc/self/fd and replace them with O_RDONLY
-    if let Ok(entries) = std::fs::read_dir("/proc/self/fd") {
-        for entry in entries.flatten() {
-            if let Ok(target) = std::fs::read_link(entry.path()) {
-                if target == wal_path {
-                    if let Ok(fd_num) = entry.file_name().to_string_lossy().parse::<i32>() {
-                        unsafe {
-    use std::ffi::CString;
-    use std::os::unix::ffi::OsStrExt;
-    if let Ok(path_c) = CString::new(wal_path.as_os_str().as_bytes()) {
-        let fd = libc::open(path_c.as_ptr(), libc::O_RDONLY);
-        if fd >= 0 {
-            libc::dup2(fd, fd_num);
-            libc::close(fd);
-        }
-    }
-}
-                        // O_RDONLY = 0
-                    }
-                }
-            }
-        }
-    }
-
     // 3. Attempt a second commit (tx2).
     // Expectation: Err(ContextraError::Storage(_)) or Err(ContextraError::Io(_))
     let tx2 = TxId::new(2);
@@ -124,30 +100,6 @@ async fn test_chaos_dropped_write_error_propagation_and_recovery() {
 
     // 4. Restore write permissions to file (0o644)
     std::fs::set_permissions(&wal_path, Permissions::from_mode(0o644)).unwrap();
-
-    // Re-open WAL file handle for wal_path in /proc/self/fd with O_RDWR | O_APPEND
-    if let Ok(entries) = std::fs::read_dir("/proc/self/fd") {
-        for entry in entries.flatten() {
-            if let Ok(target) = std::fs::read_link(entry.path()) {
-                if target == wal_path {
-                    if let Ok(fd_num) = entry.file_name().to_string_lossy().parse::<i32>() {
-                        unsafe {
-    use std::ffi::CString;
-    use std::os::unix::ffi::OsStrExt;
-    if let Ok(path_c) = CString::new(wal_path.as_os_str().as_bytes()) {
-        let fd = libc::open(path_c.as_ptr(), libc::O_RDWR | libc::O_APPEND);
-        if fd >= 0 {
-            libc::dup2(fd, fd_num);
-            libc::close(fd);
-        }
-    }
-}
-                        // O_RDWR | O_APPEND
-                    }
-                }
-            }
-        }
-    }
 
     // 5a. Assert: The failed commit MUST leave last_committed_tx unchanged
     let last_tx_after_failure = storage.last_tx_id().await.unwrap();

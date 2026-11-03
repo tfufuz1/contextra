@@ -84,6 +84,14 @@ impl LsmStorage {
         Self::new_with_merge_operator(config, None).await
     }
 
+    /// Opens or recovers an LSM storage instance with the given configuration and a KeyManager.
+    pub async fn open_with_key_manager(
+        config: LsmConfig,
+        key_manager: Option<Arc<KeyManager>>,
+    ) -> Result<Self> {
+        Self::new_with_key_manager_and_merge_operator(config, key_manager, None).await
+    }
+
     /// Opens or recovers an LSM storage instance with the given configuration and a `MergeOperator`.
     pub async fn open_with_merge_operator(
         config: LsmConfig,
@@ -425,6 +433,7 @@ impl LsmStorage {
             ))
         })?;
 
+        // D-05: Key material comes exclusively via KeyManager, no passphrase field in LsmConfig
         let key_manager = None;
 
         let mut migrated_count = 0usize;

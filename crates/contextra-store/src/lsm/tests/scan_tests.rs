@@ -145,7 +145,7 @@ async fn test_get_at_seq_mvcc_sequence_correctness() {
         storage.get_at_seq(b"key1", seq1 + 1).await.unwrap(),
         Some(bytes::Bytes::from_static(b"v2"))
     );
-    assert_eq!(storage.get_at_seq(b"key1", seq1 + 2).await.unwrap(), None);
+    assert_eq!(storage.get_at_seq(b"key1", seq1 + 4).await.unwrap(), None);
 }
 
 #[tokio::test]

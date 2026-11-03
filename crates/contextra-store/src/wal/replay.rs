@@ -24,7 +24,7 @@
 //!    - In diesem Fall wird der Vorgang ausnahmslos mit `ContextraError::wal_corruption`
 //!      hart abgebrochen (Fail-Closed).
 
-use super::crypto_shim::{IntegrityVerifier, WalEntrySnapshot};
+use super::verifier::{IntegrityVerifier, WalEntrySnapshot};
 use contextra_types::{ContextraError, Result};
 use std::path::PathBuf;
 
@@ -393,7 +393,9 @@ impl Wal {
                 break;
             }
 
-            let entry_data_raw = match slice.get(pos_usize.saturating_add(4)..pos_usize.saturating_add(4).saturating_add(len)) {
+            let entry_data_raw = match slice
+                .get(pos_usize.saturating_add(4)..pos_usize.saturating_add(4).saturating_add(len))
+            {
                 Some(data) => data,
                 None => {
                     tracing::warn!(
@@ -543,7 +545,7 @@ impl Wal {
                         }
                     }
                 } else {
-                    let decrypted_data;
+                    let decrypted_data: Vec<u8>;
                     let entry_data = if let Some(km) = &self.key_manager {
                         if entry_data_raw.len() < 12 {
                             return Err(ContextraError::Storage(
@@ -595,7 +597,7 @@ impl Wal {
                                 }
                             }
                         };
-                        &decrypted_data
+                        decrypted_data.as_slice()
                     } else {
                         entry_data_raw
                     };

@@ -148,8 +148,24 @@ impl LsmStorage {
         Self::new_with_merge_operator(config, None).await
     }
 
+    pub async fn new_with_key_manager_and_merge_operator(
+        config: LsmConfig,
+        key_manager: Option<Arc<KeyManager>>,
+        merge_operator: Option<Arc<dyn MergeOperator>>,
+    ) -> Result<Self> {
+        Self::new_internal(config, key_manager, merge_operator).await
+    }
+
     pub async fn new_with_merge_operator(
         config: LsmConfig,
+        merge_operator: Option<Arc<dyn MergeOperator>>,
+    ) -> Result<Self> {
+        Self::new_internal(config, None, merge_operator).await
+    }
+
+    async fn new_internal(
+        config: LsmConfig,
+        key_manager: Option<Arc<KeyManager>>,
         merge_operator: Option<Arc<dyn MergeOperator>>,
     ) -> Result<Self> {
         if config.block_cache_shards == 0 || !config.block_cache_shards.is_power_of_two() {
@@ -193,7 +209,7 @@ impl LsmStorage {
             }
         };
 
-        let key_manager = None;
+        // D-05: Key material comes exclusively via KeyManager, no passphrase field in LsmConfig
 
         let mut max_wal_id: Option<u64> = None;
         let mut wal_files = Vec::new();
@@ -355,8 +371,7 @@ impl LsmStorage {
             } else {
                 actual_tail_hmac
             };
-            if crate::wal::crypto_shim::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err()
-            {
+            if crate::wal::verify_wal_chain_completeness(&check_hmac, &expected_hwm).is_err() {
                 return Err(ContextraError::wal_truncation_detected(
                     expected_hwm,
                     actual_tail_hmac,
@@ -609,7 +624,8 @@ impl LsmStorage {
             intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
             clock: parking_lot::RwLock::new(Arc::new(contextra_ports::SystemClock::new())),
-            ssi_validator: Arc::clone(&default_ssi_val) as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
+            ssi_validator: Arc::clone(&default_ssi_val)
+                as Arc<dyn contextra_mvcc::SsiValidator + Send + Sync>,
             sequence_log_ssi_validator: Some(default_ssi_val),
             metrics_sink: metrics_sink_container,
         };
@@ -759,7 +775,7 @@ impl LsmStorage {
                 }
             }
 
-            if !surviving_entries.is_empty() {
+            if surviving_entries.len() > Self::ROLLBACK_INLINE_THRESHOLD_ENTRIES {
                 let count = self.segment_counter.fetch_add(1, Ordering::Relaxed);
                 let seq = self.next_seq_no.load(Ordering::Relaxed);
                 let new_sst_path =
@@ -793,6 +809,10 @@ impl LsmStorage {
                     .await?;
 
                 sstables_lock.push(Arc::new(new_reader));
+            } else if !surviving_entries.is_empty() {
+                for (k, v, seq, tx) in surviving_entries {
+                    state.memtable.put(Bytes::from(k), Bytes::from(v), seq, tx);
+                }
             }
 
             sst_to_remove.push(spanning.file_path().to_path_buf());
