@@ -94,32 +94,31 @@ fn t_fmt_1_f3_tresor_golden() {
     let mut vault_bytes = Vec::new();
     vault_bytes.extend_from_slice(&header_bytes);
 
-    // Metablock (64 B): capacity=2, live=1, tombstones=1, gen=1
+    // Metablock (64 B): vault_id, shard_no=0, cap_log2=1 (capacity=2), live=1, tombstones=1, gen=1
     let mut meta = [0u8; 64];
-    meta[0..8].copy_from_slice(&2u64.to_be_bytes());
-    meta[8..16].copy_from_slice(&1u64.to_be_bytes());
-    meta[16..24].copy_from_slice(&1u64.to_be_bytes());
-    meta[24..32].copy_from_slice(&1u64.to_be_bytes());
+    meta[0..16].copy_from_slice(&[0xaa; 16]); // vault_id
+    meta[16] = 0; // shard_no
+    meta[17] = 1; // cap_log2 = 1 (2^1 = 2)
+    meta[18..26].copy_from_slice(&1u64.to_be_bytes());
+    meta[26..34].copy_from_slice(&1u64.to_be_bytes());
+    meta[34..42].copy_from_slice(&1u64.to_be_bytes());
     vault_bytes.extend_from_slice(&meta);
 
-    // Padding bis VAULT_SLOT_BASE = 192 (bereits 64 + 64 = 128 -> 64 Bytes Zero Padding)
-    vault_bytes.extend_from_slice(&[0u8; 64]);
-
-    // Slot 0: Aktiv Document
-    let mut slot0 = [0u8; 80];
+    // Slot 0 (Offset 128..192): Aktiv Document (64 B)
+    let mut slot0 = [0u8; 64];
     slot0[0] = VaultSlotType::Document as u8;
-    slot0[1..17].copy_from_slice(&[0xdd; 16]);
-    slot0[17..49].copy_from_slice(&[0xee; 32]);
-    slot0[49] = VaultSlotStatus::Active as u8;
+    slot0[1] = VaultSlotStatus::Active as u8;
+    slot0[8..24].copy_from_slice(&[0xdd; 16]);
+    slot0[24..56].copy_from_slice(&[0xee; 32]);
     vault_bytes.extend_from_slice(&slot0);
 
-    // Slot 1: Grabstein (alle Bytes 0 außer Byte 49 = 0x02)
-    let mut slot1 = [0u8; 80];
-    slot1[49] = VaultSlotStatus::Tombstone as u8;
+    // Slot 1 (Offset 192..256): Grabstein (alle Bytes 0 außer Byte 1 = 0x02)
+    let mut slot1 = [0u8; 64];
+    slot1[1] = VaultSlotStatus::Tombstone as u8;
     vault_bytes.extend_from_slice(&slot1);
 
     let parsed = VaultFile::parse(&vault_bytes).expect("Parse Vault");
-    assert_eq!(parsed.meta.capacity, 2);
+    assert_eq!(parsed.meta.capacity(), 2);
     assert_eq!(parsed.slots[0].status, VaultSlotStatus::Active);
     assert_eq!(parsed.slots[1].status, VaultSlotStatus::Tombstone);
 }
@@ -231,7 +230,7 @@ fn t_fmt_1_f7_textsegment_golden() {
     let mut text_bytes = Vec::new();
     text_bytes.extend_from_slice(&header_bytes);
 
-    let mut seg_head = [0u8; 32];
+    let mut seg_head = [0u8; 33];
     seg_head[0] = 0; // bucket
     seg_head[1] = 1; // bucket_count
     seg_head[2] = 1; // analyzer_id
@@ -240,13 +239,15 @@ fn t_fmt_1_f7_textsegment_golden() {
     seg_head[8] = 1; // flags: positions
     seg_head[9..13].copy_from_slice(&10u32.to_be_bytes()); // doc_count
     seg_head[13..17].copy_from_slice(&50u32.to_be_bytes()); // term_count
-    seg_head[17..25].copy_from_slice(&500u64.to_be_bytes()); // total_len
+    seg_head[17..21].copy_from_slice(&100u32.to_be_bytes()); // member_count
+    seg_head[21..29].copy_from_slice(&500u64.to_be_bytes()); // total_len
 
     text_bytes.extend_from_slice(&seg_head);
 
     let parsed = TextSegmentFile::parse(&text_bytes).expect("Parse TextSegment");
     assert_eq!(parsed.segment_header.doc_count, 10);
     assert_eq!(parsed.segment_header.term_count, 50);
+    assert_eq!(parsed.segment_header.member_count, 100);
 
     // Test Wörterbucheintrag (32 Bytes)
     let mut term_raw = [0u8; 32];
@@ -268,7 +269,7 @@ fn t_fmt_1_f8_vector_snapshot_golden() {
     let mut vec_bytes = Vec::new();
     vec_bytes.extend_from_slice(&header_bytes);
 
-    let mut snap_head = [0u8; 16];
+    let mut snap_head = [0u8; 24];
     snap_head[0..2].copy_from_slice(&128u16.to_be_bytes()); // dim
     snap_head[2] = VectorMetric::Cosine as u8; // metric
     snap_head[3..5].copy_from_slice(&16u16.to_be_bytes()); // M
@@ -276,12 +277,14 @@ fn t_fmt_1_f8_vector_snapshot_golden() {
     snap_head[7..11].copy_from_slice(&1000u32.to_be_bytes()); // slot_count
     snap_head[11..15].copy_from_slice(&0u32.to_be_bytes()); // entry_slot
     snap_head[15] = 4; // max_level
+    snap_head[16..24].copy_from_slice(&500u64.to_be_bytes()); // built_through_seq
 
     vec_bytes.extend_from_slice(&snap_head);
 
     let parsed = VectorSnapshotFile::parse(&vec_bytes).expect("Parse VectorSnapshot");
     assert_eq!(parsed.snapshot_header.dim, 128);
     assert_eq!(parsed.snapshot_header.metric, VectorMetric::Cosine);
+    assert_eq!(parsed.snapshot_header.built_through_seq, 500);
 }
 
 /// SPEC: T-FMT-1 (F.9 Append-Logs: Journal, Gate-Log, Ledger)
