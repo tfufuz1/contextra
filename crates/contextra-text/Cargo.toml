@@ -17,6 +17,7 @@ contextra-crypto = { workspace = true }
 aes-gcm-siv = "0.11"
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
+contextra-crypto = { workspace = true }
 bytes = { workspace = true }
 itoa = { workspace = true }
 regex = { workspace = true }
@@ -32,7 +33,6 @@ futures = "0.3"
 
 [features]
 default = []
-docid-128 = ["contextra-types/docid-128"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }
