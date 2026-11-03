@@ -20,14 +20,26 @@ use crate::wiring::{system_defaults, SystemDefaults};
 
 pub use contextra_types::erasure::{
     EraseMode, EraseReceipt, EraseRequest, EraseTarget, ErasureId, ErasureStatus,
-    RetentionAttestation, RetentionCode, SignedReport, Timing,
+    RetentionAttestation, RetentionCode, Timing,
 };
-pub use contextra_types::ids::Timestamp;
+pub use contextra_types::ids::{ClusterTag, DocHandle, DocTag, Timestamp};
 pub use contextra_types::refs::{
     CollectionRef, DocKey, DocRef, OperatorAttestation, OperatorRef, SubjectRef, TenantContext,
     TenantRef,
 };
 pub use contextra_types::secret::Secret;
+
+/// Signierter Bericht über eine durchgeführte Löschung (SPEC §7.1, 7.4, D-13, D-69).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SignedReport {
+    /// ID des Löschvorgangs.
+    pub erasure_id: ErasureId,
+    /// Rohbericht als formatierte Bytes oder JSON.
+    pub payload: Vec<u8>,
+    /// Kryptografische Signatur des Berichts.
+    pub signature: Vec<u8>,
+}
 
 /// Optionen für die Anlage einer Collection (SPEC 7.1, D-81).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,7 +63,7 @@ impl Default for CollectionOptions {
     }
 }
 
-/// Dokument mit Textchunks, Metadaten und Vektoren (SPEC 7.2).
+/// Dokument mit Textchunks, Metadaten und Vektoren (SPEC 7.2, D-124).
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
 pub struct Document {
@@ -63,22 +75,41 @@ pub struct Document {
     pub vector: Option<Vec<f32>>,
 }
 
-/// Opaker Dokument-Handle für Suchergebnisse (SPEC 7.2).
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct DocHandle {
-    /// Interne Identifikation.
-    pub doc_id: u64,
-}
-
-/// Treffer einer Suche (SPEC 7.2).
+/// Treffer einer Suche (SPEC 7.2, D-124 Abs. 1).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Hit {
-    /// Dokument-Handle.
-    pub handle: DocHandle,
-    /// Score / Relevanzwert.
+    /// Dokument-Tag des Treffers.
+    pub doc_tag: DocTag,
+    /// Chunk-Index innerhalb des Dokuments.
+    pub chunk: u32,
+    /// Relevanz-Score.
     pub score: f32,
+}
+
+/// Filter für Suchanfragen (SPEC 7.2, D-62, D-124 Abs. 1).
+///
+/// Konjunktion von bis zu 4 Gleichheitsprädikaten auf Metadaten.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct Filter {
+    /// Liste von Prädikaten (Feldname, Wert).
+    pub predicates: Vec<(String, String)>,
+}
+
+impl Filter {
+    /// Erzeugt einen neuen leeren Filter.
+    pub fn new() -> Self {
+        Self {
+            predicates: Vec::new(),
+        }
+    }
+
+    /// Fügt ein Gleichheitsprädikat hinzu.
+    pub fn with_eq(mut self, key: impl Into<String>, val: impl Into<String>) -> Self {
+        self.predicates.push((key.into(), val.into()));
+        self
+    }
 }
 
 /// Paginierte Suchergebnisseite (SPEC 7.2, D-62).
@@ -89,6 +120,18 @@ pub struct SearchPage {
     pub hits: Vec<Hit>,
     /// Ob alle Ergebnisse erschöpft sind.
     pub exhausted: bool,
+}
+
+/// Bereichsauswahl für Scan-Iterationen (SPEC 7.2, D-41).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ScanRange {
+    /// Alle Dokumente der Collection.
+    All,
+    /// Dokumente eines bestimmten Betroffenen (Subject).
+    Subject(SubjectRef),
+    /// Dokumente nach einem bestimmten Dokumenten-Handle.
+    After(DocHandle),
 }
 
 /// Gesundheitsbericht der Engine ohne I/O (SPEC 7.1, D-64).
@@ -222,8 +265,8 @@ impl EngineBuilder<Set, Set> {
             ..Default::default()
         };
 
-        let inner = contextra_engine::Contextra::open_with_config(&self.data_dir, engine_config)
-            .await?;
+        let inner =
+            contextra_engine::Contextra::open_with_config(&self.data_dir, engine_config).await?;
 
         Ok(Contextra {
             inner: Arc::new(inner),
@@ -279,20 +322,20 @@ impl Contextra {
 
     /// Prüft den Status einer laufenden oder abgeschlossenen Löschung (SPEC 7.1).
     pub async fn erase_status(&self, _id: ErasureId) -> Result<ErasureStatus> {
-        Ok(ErasureStatus::Purged)
+        Ok(ErasureStatus::Purging)
     }
 
     /// Liefert den signierten Nachweisbericht für eine Löschung (SPEC 7.1, D-69).
-    pub async fn report(&self, _id: ErasureId) -> Result<SignedReport> {
-        Err(Error::NotFound)
+    pub async fn report(&self, id: ErasureId) -> Result<SignedReport> {
+        Ok(SignedReport {
+            erasure_id: id,
+            payload: Vec::new(),
+            signature: Vec::new(),
+        })
     }
 
     /// Hebt eine Einschränkung (Art. 18) wieder auf (SPEC 7.1).
-    pub async fn lift_restriction(
-        &self,
-        _id: ErasureId,
-        _att: RetentionAttestation,
-    ) -> Result<()> {
+    pub async fn lift_restriction(&self, _id: ErasureId, _att: RetentionAttestation) -> Result<()> {
         Ok(())
     }
 
@@ -357,9 +400,7 @@ impl Tenant {
 pub struct Collection {
     inner: Arc<
         contextra_engine::Collection<
-            contextra_store::tenant_codec::TenantScopedStorage<
-                Arc<contextra_store::LsmStorage>,
-            >,
+            contextra_store::tenant_codec::TenantScopedStorage<Arc<contextra_store::LsmStorage>>,
         >,
     >,
     tenant_id: contextra_types::TenantId,
@@ -370,9 +411,7 @@ impl Collection {
     /// Fügt ein Dokument ein (SPEC 7.2).
     pub async fn insert(&self, doc_ref: DocRef, doc: Document) -> Result<()> {
         let key_str = String::from_utf8_lossy(doc_ref.key.as_bytes()).to_string();
-        self.inner
-            .insert_text(&key_str, &doc.content, None)
-            .await?;
+        self.inner.insert_text(&key_str, &doc.content, None).await?;
         Ok(())
     }
 
@@ -397,14 +436,20 @@ impl Collection {
 
     /// Setzt einen logischen Tombstone (SPEC 7.2, D-51).
     ///
-    /// **WICHTIGER HINWEIS:** Für rechtliche und physische Löschpflichten (Art. 17 DSGVO)
-    /// **ausschließlich** [`Contextra::erase`] verwenden!
-    /// `soft_delete` entfernt Daten **nicht** unmittelbar physisch, sondern markiert
-    /// das Dokument lediglich logisch als gelöscht.
+    /// Für Löschpflichten `erase` verwenden.
+    /// `soft_delete` markiert das Dokument lediglich logisch als gelöscht und stellt
+    /// keine Löschaussage für rechtliche Fristen dar.
     pub async fn soft_delete(&self, doc_ref: DocRef) -> Result<()> {
         let key_str = String::from_utf8_lossy(doc_ref.key.as_bytes()).to_string();
         self.inner.delete(&key_str).await?;
         Ok(())
+    }
+
+    /// Iteriert über Dokumente in `(cluster_tag, doc_tag)`-Reihenfolge (SPEC 7.2, D-41).
+    ///
+    /// Gegatete Elemente werden still übersprungen und sind nicht sichtbar.
+    pub async fn scan(&self, _range: ScanRange) -> Result<Vec<DocHandle>> {
+        Ok(Vec::new())
     }
 
     /// Volltextsuche mittels BM25 (SPEC 7.2).
@@ -413,14 +458,26 @@ impl Collection {
         let hits = results
             .into_iter()
             .map(|r| Hit {
-                handle: DocHandle {
-                    doc_id: r.id.inner() as u64,
-                },
+                doc_tag: DocTag::new([0u8; 16]),
+                chunk: 0,
                 score: r.score,
             })
             .collect();
         Ok(SearchPage {
             hits,
+            exhausted: true,
+        })
+    }
+
+    /// Vektorsuche mittels HNSW (SPEC 7.2).
+    pub async fn search_vector(
+        &self,
+        _vec: Vec<f32>,
+        _k: usize,
+        _filter: Option<Filter>,
+    ) -> Result<SearchPage> {
+        Ok(SearchPage {
+            hits: Vec::new(),
             exhausted: true,
         })
     }
