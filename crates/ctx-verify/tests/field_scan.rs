@@ -109,3 +109,47 @@ fn t_raw_1_field_scan_invalid_fd_rejected() {
     let res = execute_field_scan(&data_dir, target_hex, -1);
     assert_eq!(res, Err(InvalidCode::PassphraseFdMissing));
 }
+
+/// SPEC: T-RAW-1, ZERO-TRUST positive control check
+#[test]
+fn t_raw_1_field_scan_positive_control_enforced() {
+    let dir = tempdir().unwrap();
+    let data_dir = dir.path().join("data");
+    fs::create_dir_all(&data_dir).unwrap();
+
+    // Data directory with unrelated data and positive control canary
+    fs::write(data_dir.join("segment_001.dat"), b"clean unrelated data").unwrap();
+    fs::write(
+        data_dir.join("control.dat"),
+        b"canary_positive_control_pattern_ok",
+    )
+    .unwrap();
+
+    let mut pass_file = tempfile::NamedTempFile::new().unwrap();
+    pass_file.write_all(b"super_secret_passphrase").unwrap();
+    pass_file.flush().unwrap();
+    let file_handle = File::open(pass_file.path()).unwrap();
+    let fd = file_handle.as_raw_fd();
+
+    let target_hex = "0102030405060708090a0b0c0d0e0f10";
+    let control_pattern = b"canary_positive_control_pattern_ok";
+
+    // 1. Positive control present -> scan succeeds
+    let res_ok = ctx_verify::scan::execute_field_scan_with_control(
+        &data_dir,
+        target_hex,
+        fd,
+        Some(control_pattern),
+    );
+    assert_eq!(res_ok, Ok(()));
+
+    // 2. Positive control missing (cannot be proven) -> scan fails closed with MissingPositiveControl
+    let missing_pattern = b"non_existent_control_canary_pattern";
+    let res_fail = ctx_verify::scan::execute_field_scan_with_control(
+        &data_dir,
+        target_hex,
+        fd,
+        Some(missing_pattern),
+    );
+    assert_eq!(res_fail, Err(InvalidCode::MissingPositiveControl));
+}
