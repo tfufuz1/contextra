@@ -9,7 +9,7 @@
 use contextra_mvcc::error::ContextraError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::tx_buffer::TxBuffer;
-use contextra_mvcc::types::TxId;
+use contextra_types::TxId;
 use std::sync::{Arc, Barrier};
 use std::time::Duration;
 

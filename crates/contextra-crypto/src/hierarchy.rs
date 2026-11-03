@@ -147,6 +147,10 @@ impl KeyHierarchy {
         &self.hdr
     }
 
+    pub fn master(&self) -> &MasterKey {
+        &self.master
+    }
+
     pub fn commit(&self, epoch: u32) -> CommitKey {
         let mut info = Vec::with_capacity(labels::COMMIT.len() + 4);
         info.extend_from_slice(labels::COMMIT);

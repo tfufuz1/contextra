@@ -10,9 +10,11 @@ rust-version.workspace = true
 description = "BM25-Volltextindex als verschlüsselte Segmente mit deutschem Analyzer."
 
 [package.metadata.contextra]
-ring = "0"
+ring = "2"
 
 [dependencies]
+contextra-crypto = { workspace = true }
+aes-gcm-siv = "0.11"
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
 bytes = { workspace = true }
@@ -30,7 +32,6 @@ futures = "0.3"
 
 [features]
 default = []
-bm25f = []
 docid-128 = ["contextra-types/docid-128"]
 
 [dev-dependencies]
