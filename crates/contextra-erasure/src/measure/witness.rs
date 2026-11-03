@@ -8,7 +8,7 @@ use std::time::Duration;
 /// Erstellt einen bewaffneten Scanner nach Positivkontrolle (ER-25).
 ///
 /// Nur aus `src/measure` aufzurufen (L-5).
-pub(crate) fn arm_scanner(
+pub fn arm_scanner(
     scanner: Scanner<Unarmed>,
     evidence: ControlEvidence,
 ) -> Scanner<Armed> {
@@ -19,7 +19,7 @@ pub(crate) fn arm_scanner(
 ///
 /// `matches == 0` → Ok(LayerWitness)
 /// `matches != 0` → Err(Residue)
-pub(crate) fn finish_scan(
+pub fn finish_scan(
     scanner: Scanner<Armed>,
     matches: u64,
     duration: Duration,

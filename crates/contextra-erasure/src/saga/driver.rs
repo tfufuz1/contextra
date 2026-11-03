@@ -65,7 +65,7 @@ impl SagaDriver {
             }
         };
 
-        saga.transition_to(next, None)?;
+        saga.transition_to(next)?;
         Ok(StepOutcome::Advanced(saga.state()))
     }
 }

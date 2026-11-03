@@ -8,16 +8,12 @@
 )]
 
 use contextra_erasure::journal::{ErasureJournal, JournalEntry};
-use contextra_erasure::saga::{EraseRequest, EraseSaga, SagaState};
-use contextra_ports::erasure::EraseTarget;
+use contextra_erasure::saga::{EraseSaga, SagaDriver, SagaState, StepOutcome};
+use contextra_types::ids::ErasureId;
 
 #[tokio::test]
 async fn t_crash_1_and_idempotence() {
-    let mut saga = EraseSaga::new();
-    let _req = EraseRequest {
-        target: EraseTarget::ExactKeys(vec![vec![1, 2, 3]]),
-        erasure_id: [0x55; 16],
-    };
+    let mut saga = EraseSaga::new(ErasureId::new([0x55; 16]));
 
     assert_eq!(saga.state(), SagaState::Requested);
 
@@ -41,7 +37,32 @@ async fn t_crash_1_and_idempotence() {
         .expect("transition to Completed");
     assert_eq!(saga.state(), SagaState::Completed);
 
+    // Idempotenter Abschluss
     assert!(saga.transition_to(SagaState::Completed).is_ok());
+}
+
+#[tokio::test]
+async fn t_driver_linearization_and_advance() {
+    let driver = SagaDriver::new();
+    let mut saga = EraseSaga::new(ErasureId::new([0x42; 16]));
+
+    let outcome = driver.step(&mut saga).expect("step to gated");
+    assert!(matches!(outcome, StepOutcome::Advanced(SagaState::Gated)));
+
+    let outcome = driver.step(&mut saga).expect("step to key destroyed");
+    assert!(matches!(outcome, StepOutcome::Advanced(SagaState::KeyDestroyed)));
+
+    let outcome = driver.step(&mut saga).expect("step to purging");
+    assert!(matches!(outcome, StepOutcome::Advanced(SagaState::Purging)));
+
+    let outcome = driver.step(&mut saga).expect("step to verifying");
+    assert!(matches!(outcome, StepOutcome::Advanced(SagaState::Verifying)));
+
+    let outcome = driver.step(&mut saga).expect("step to completed");
+    assert!(matches!(outcome, StepOutcome::Advanced(SagaState::Completed)));
+
+    let outcome = driver.step(&mut saga).expect("step terminal");
+    assert!(matches!(outcome, StepOutcome::Terminal(SagaState::Completed)));
 }
 
 #[tokio::test]
