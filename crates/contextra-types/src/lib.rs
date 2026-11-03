@@ -36,8 +36,8 @@ pub mod types;
 pub use erasure::{
     Armed, ControlEvidence, EraseMode, EraseReceipt, EraseRequest, EraseTarget, ErasureStatus,
     GateVariant, KeyCoverage, LayerId, LayerWitness, MeasureClass, PendingReason, RefusalReason,
-    ResidualRisk, Residue, RetentionAttestation, RetentionCode, RiskCondition, Scanner, Timing,
-    Unarmed,
+    ResidualRisk, Residue, RetentionAttestation, RetentionCode, RiskCondition, ScanMethod, Scanner,
+    Timing, Unarmed,
 };
 pub use error::{
     CacheDirective, ConfigError, Conflict, ContextraError, Error, HnswDeletionError, Limit, Result,
