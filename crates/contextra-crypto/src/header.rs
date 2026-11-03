@@ -125,12 +125,14 @@ impl Header {
     }
 
     pub fn mac(hdr_key: &HdrKey, bytes584: &[u8]) -> [u8; 32] {
-        let mut mac = match Hmac::<Sha256>::new_from_slice(hdr_key.0.as_bytes()) {
-            Ok(m) => m,
-            Err(_) => return [0u8; 32],
-        };
-        mac.update(bytes584);
-        mac.finalize().into_bytes().into()
+        // HMAC-SHA256 key size for SHA256 can be arbitrary length; 32 bytes is valid.
+        match Hmac::<Sha256>::new_from_slice(hdr_key.0.as_bytes()) {
+            Ok(mut mac) => {
+                mac.update(bytes584);
+                mac.finalize().into_bytes().into()
+            }
+            Err(_) => [0u8; 32],
+        }
     }
 
     pub fn encode(&self, hdr_key: &HdrKey) -> [u8; HEADER_SIZE] {
