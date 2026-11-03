@@ -1,11 +1,11 @@
 // FILE-CONTEXT
-// ZWECK: Layer-0 Ring-0 Unsafe-Insel für SIMD-Distanzkernel und Laufzeit-Dispatch.
+// ZWECK: Ring-1 Unsafe-Insel für SIMD-Distanzkernel und Laufzeit-Dispatch.
 // INVARIANTEN: Safe Public API, zero panic, bytemuck/slice alignments.
 // HOTSPOTS: lib.rs, kernels/, dispatch.rs
 
 //! # Crate `contextra-simd`
 //!
-//! **Ring-Zugehörigkeit:** Ring 0 (Kern, unsafe-Insel).
+//! **Ring-Zugehörigkeit:** Ring 1 (Kern, unsafe-Insel).
 //!
 //! **Zweck:**
 //! Diese Crate stellt hochoptimierte Vektor-Distanzberechnungen bereit.
@@ -46,18 +46,24 @@ pub use kernels::scalar::{
 use contextra_types::{ContextraError, DistanceMetric};
 
 // ANCHOR[contextra-simd:CORE-VALIDATE-VEC]
-/// Prüft, ob ein Vektor gültige endliche Zahlen enthält (kein NaN und kein Unendlich).
+/// Maximale zulässige Vektordimension gemäß SPEC D-87.
+pub const MAX_VECTOR_DIMENSION: usize = 4096;
+
+/// Prüft, ob ein Vektor gültige endliche Zahlen enthält (kein NaN und kein Unendlich)
+/// und eine zulässige Dimension besitzt (1..=4096 gemäß SPEC D-87).
 ///
 /// NaN (Not a Number) und Unendlich führen in SIMD-Registern und Metriken zu undefinierten
 /// oder korrupten Ergebnissen. Diese Prüfung verhindert solche Fehler im Vorfeld (Fail-Closed).
 ///
 /// # Ablauf von `validate_vector`:
-/// 1. Iteration über alle Elemente der `f32`-Slice.
-/// 2. Prüfung mittels `v.is_finite()`.
-/// 3. Abbruch mit Fehler (`ContextraError::invalid_input`), falls mindestens ein Wert ungültig ist.
-/// 4. Rückgabe von `Ok(())`, wenn alle Werte endlich sind.
+/// 1. Prüfung der Vektorlänge: Wenn leer, ist der Vektor leer (erlaubt für triviale Abgleiche, sonst DimensionTooLarge / InvalidInput).
+/// 2. Prüfung der Maximaldimension (D-87): Wenn `vec.len() > 4096`, Abbruch mit Fehler.
+/// 3. Iteration über alle Elemente der `f32`-Slice und Prüfung mittels `v.is_finite()`.
+/// 4. Abbruch mit Fehler (`ContextraError::invalid_input`), falls mindestens ein Wert ungültig ist.
+/// 5. Rückgabe von `Ok(())`, wenn alle Werte endlich sind.
 ///
 /// # Fehlerfälle:
+/// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn die Dimension 4096 überschreitet.
 /// - Gibt `Err(ContextraError::InvalidInput)` zurück, wenn ein Wert `f32::NAN`, `f32::INFINITY` oder `f32::NEG_INFINITY` ist.
 ///
 /// # Nebenwirkungen:
@@ -75,12 +81,41 @@ use contextra_types::{ContextraError, DistanceMetric};
 /// ```
 #[inline]
 pub fn validate_vector(vec: &[f32]) -> contextra_types::Result<()> {
+    if vec.len() > MAX_VECTOR_DIMENSION {
+        return Err(ContextraError::invalid_input(
+            "Vector dimension exceeds maximum allowed limit of 4096 (D-87)",
+        ));
+    }
     if vec.iter().any(|v| !v.is_finite()) {
         return Err(ContextraError::invalid_input(
             "NaN or Infinity detected in vector",
         ));
     }
     Ok(())
+}
+
+// ANCHOR[contextra-simd:CORE-NORM-DISTANCE]
+/// Berechnet die Distanz zwischen zwei Vektoren unter Verwendung der angegebenen Metrik inklusive Validierung (SPEC §8.4 / SI-05).
+///
+/// Prüft Länge und Endlichkeit (O(n)) beider Vektoren.
+#[inline]
+pub fn distance(metric: DistanceMetric, a: &[f32], b: &[f32]) -> contextra_types::Result<f32> {
+    validate_vector(a)?;
+    validate_vector(b)?;
+    distance_prevalidated(metric, a, b)
+}
+
+// ANCHOR[contextra-simd:CORE-NORM-DISTANCE-PREVALIDATED]
+/// Berechnet die Distanz zwischen zwei bereits vorvalidierten Vektoren (SPEC §8.4 / SI-05).
+///
+/// Überspringt den O(n) Endlichkeitsscan und prüft ausschließlich die Längengleichheit in O(1).
+#[inline]
+pub fn distance_prevalidated(
+    metric: DistanceMetric,
+    a: &[f32],
+    b: &[f32],
+) -> contextra_types::Result<f32> {
+    compute_distance_trusted(a, b, metric)
 }
 
 // ANCHOR[contextra-simd:CORE-COMPUTE-DIST]
@@ -117,9 +152,7 @@ pub fn compute_distance(
     b: &[f32],
     metric: DistanceMetric,
 ) -> contextra_types::Result<f32> {
-    validate_vector(a)?;
-    validate_vector(b)?;
-    compute_distance_trusted(a, b, metric)
+    distance(metric, a, b)
 }
 
 // ANCHOR[contextra-simd:CORE-COMPUTE-DIST-TRUSTED]
