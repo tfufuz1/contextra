@@ -13,17 +13,17 @@ Nicht normativ. Maßgeblich ist [`docs/SPEC.md`](../../docs/SPEC.md), Version 4.
 
 ## Projektstand
 
-- Contextra ist eine eingebettete Rust-Bibliothek für lokale Speicherung und nachweisbares Löschen in Agenten- und RAG-Systemen.
-- Der Workspace baut am HEAD nicht vollständig (SPEC F-32). Die Lockdatei ist veraltet.
-- `crates/contextra-erasure` ist ein leeres Skelett (README und AGENTS.md, keine Quelldatei) und kein Workspace-Mitglied (SPEC F-33).
-- Das Testmakro `#[ctx_test]` ist nicht definiert (siehe `PREAMBLE.md`, Abschnitt D).
-- Die Crate-Namen `contextra-wire`, `contextra-mcp` und `contextra-lab` sind in älteren Dokumenten und Skripten genannt. Im Repository existieren sie nicht. `contextra-lab` und `ctx-verify` sind Ziel von WP-4.4.
+- Contextra ist eine eingebettete Rust-Bibliothek für lokale Speicherung und nachweisbares Löschen in Agenten- und RAG-Systemen (SPEC 1.1).
+- **Den Ist-Zustand ermitteln, nicht abschreiben.** SPEC 3.2 ist eine Momentaufnahme. Aktueller Stand: `cargo check --workspace --all-targets --locked`, `git ls-files crates`, `.agents/jules/tasks/BACKLOG.md`.
+- Der Löschkern (`contextra-erasure`), `contextra-lab` und `ctx-verify` sind Workspace-Mitglieder und teilweise umgesetzt. Vollständigkeit je Schicht belegt nur ein Test mit Zeuge (P1); ein Ein-Zeilen-Stub gilt als Defekt-Backlog, nicht als Sollzustand.
+- Das Testmakro `#[ctx_test]` existiert (`contextra-testmacros`, WP-0.1); siehe `PREAMBLE.md`, Abschnitt D.
+- Crate-Namen aus älteren Dokumenten und Skripten (`contextra-wire`, `contextra-mcp`, `contextra-graph`, `contextra-db`, `contextra-core`) existieren nicht und werden nicht neu angelegt (D-24, D-45).
 
 ## Crate-Topologie
 
-Die verbindliche Ringzuordnung und die erlaubten Abhängigkeiten stehen in SPEC 5.1 bis 5.3. Die Prüfung erfolgt durch `contextra-arch-tests` (`tests/arch`, Tests T-ARCH-3, T-ARCH-5, T-ARCH-6).
+Die verbindliche Ringzuordnung und die erlaubten Abhängigkeiten stehen in SPEC 5.1 bis 5.3. Die Prüfung erfolgt durch `contextra-arch-tests` (`tests/arch`; T-ARCH-1 bis T-ARCH-8). Fachprofile je Crate stehen in `crates/<crate>/AGENTS.md`.
 
-Vorhandene Crates (`crates/`): `contextra`, `contextra-crypto`, `contextra-durable-fs`, `contextra-engine`, `contextra-erasure` (Skelett), `contextra-mvcc`, `contextra-ports`, `contextra-rank`, `contextra-simd`, `contextra-store`, `contextra-sys`, `contextra-testkit`, `contextra-text`, `contextra-types`, `contextra-vector`. Dazu `tests/arch` als Paket `contextra-arch-tests`.
+Vorhandene Crates: `crates/` enthält `contextra`, `contextra-crypto`, `contextra-durable-fs`, `contextra-engine`, `contextra-erasure`, `contextra-lab`, `contextra-mvcc`, `contextra-ports`, `contextra-rank`, `contextra-simd`, `contextra-store`, `contextra-sys`, `contextra-testkit`, `contextra-testmacros`, `contextra-text`, `contextra-types`, `contextra-vector`, `ctx-verify`; dazu `tests/arch` als Paket `contextra-arch-tests`. Prüfe die Mitgliedschaft im Workspace mit `cargo metadata --no-deps`.
 
 ## Feste Grenzen beim Schreiben
 
@@ -43,6 +43,6 @@ Vorhandene Crates (`crates/`): `contextra`, `contextra-crypto`, `contextra-durab
 
 - `docs/COMPILATION.md` und die `justfile` nennen Befehle, die nicht überall funktionieren. Verlässlich sind die Befehle aus `PREAMBLE.md`, Abschnitt C, Punkt 7. `just gates` ruft `cargo test --test layering` auf; diese Testdatei existiert nicht. Der Arch-Test liegt in `tests/arch`.
 - `cargo xtask …` existiert nicht. Befehle aus älteren Audit-Prompts (`docs/Jules-Prompts/`) sind nicht ausführbar, solange sie nicht ersetzt sind.
-- Die PR-Vorlage verweist auf `docs/PLAN.md`. Diese Datei gibt es nicht. Maßgeblich ist SPEC 15.4.
+- Die PR-Vorlage und ältere Dokumente verweisen auf eine eigene Plandatei. Sie existiert nicht. Maßgeblich ist SPEC 15.4 (KF-9).
 - Die Datei `.agents/jules/context/SESSION_START.md` ist generiert und nicht versioniert. Sie ist nur gültig, wenn `refresh-context.sh` in dieser Sitzung gelaufen ist.
 - `GITHUB_WORKFLOW.md` beschreibt GitHub-Issues als Aufgaben. Maßgeblich für die Auswahl ist `tasks/BACKLOG.md`. Issues sind eine optionale Ergänzung für Kommentare und Befunde.

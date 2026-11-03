@@ -1,24 +1,27 @@
-# Contextra Product Stages Specifications
+# Referenz: Produktstufen
 
-> **Normative Vorgabe gemäß docs/SPEC.md §1.3 und PLAN.md.**
+Nicht normativ. Maßgeblich: [`docs/SPEC.md`](../../../../../docs/SPEC.md), Abschnitte 1.3, 5.1 und Anhang A.
 
-Contextra v1 ist in vier inkrementelle, einzeln lieferbare Produktstufen unterteilt. Jede Stufe fügt eine Schicht hinzu, während die Vorstufe bereits ein vollwertiges Produkt darstellt:
+## S0: Dokumentenspeicher mit belegbarer Löschung
 
-## 1. Stufe S0: Gehärteter LSM-Dokumentenspeicher mit belegbarer Löschung
-- **Umfang**: Transaktionaler LSM-Tree mit Löschcluster-Schlüsselraum (SPEC §9.1), Pflichtverschlüsselung (AES-256-GCM-SIV, D-05), Argon2id KDF (D-06), Mandantentrennung (D-07), Tresor (`vault`), Lösch-Saga, ReadGate (`ErasedSet`), Purge-Rewrite & Swap, Journal, E1/E2/E3 Messungen, Ed25519-Löschbericht (`ctx-erasure-report/1`), Erasure Lab und Verifier (`ctx-verify`).
-- **Lieferbares Ergebnis**: Verschlüsselter Dokumenten- und Gedächtnisspeicher mit belegbarer physischer Löschung (Agentengedächtnis ohne Suche).
-- **Crates**: `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-durable-fs`, `contextra-crypto`, `contextra-mvcc`, `contextra-store`, `contextra-erasure`, `contextra-engine`, `contextra`, `testkit`, `lab`, `ctx-verify`.
+- **Funktionen (Anhang A):** FI-F01 Dokument-CRUD mit Mandanten und `DocRef`; FI-F02 Zeitreisen und Snapshots; FI-F03 Startprobe und Plattformstufen; FI-F04 `erase` mit Gate, Tresor, Purge und Bericht; FI-F05 Keyslots und Passphrasenwechsel; FI-F09 Restore-Guard; FI-F10 Gesundheitsstatus; FI-F11 Dateischlüssel-Vernichtung; FI-F12 `Restricted`; FI-F13 `ctx-verify`; FI-F14 Mandanten-Offboarding.
+- **Crates:** `contextra-types`, `-ports`, `-sys`, `-durable-fs`, `-crypto`, `-mvcc`, `-store`, `-erasure`, `-engine`, `contextra`.
+- **Ergebnis:** verschlüsselter Speicher mit gemessener Löschung. Ein Agentengedächtnis ohne Suche.
 
-## 2. Stufe S1: Volltextsuche als abgeleiteter Segmentindex
-- **Umfang**: BM25-Segmentindex auf unveränderlichen, AEAD-verschlüsselten Segmenten (SPEC §9.7, D-20). Kein Termklartext auf Platte (nur `term_tag`). Block-Max WAND. Dynamische Statistikaggregation. Segment-Rewrite bei Purge.
-- **Lieferbares Ergebnis**: Volltextsuche mit denselben kryptografischen Lösch- und Messnachweisen.
-- **Crate**: `contextra-text`.
+## S1: Volltextsuche als abgeleiteter Index
 
-## 3. Stufe S2: Vektorsuche mit löschbarer Persistenz
-- **Umfang**: HNSW-Vektorsuche für f32-Einbettungen mit SIMD-Beschleunigung (`contextra-simd`). In-Memory Slot-Zeroing (`zero_slot`). Verschlüsselte Snapshot-Chunks (SPEC §9.8). Vollständiger Batch-Rebuild ab Tombstone-Schwelle.
-- **Lieferbares Ergebnis**: RAG-Vektorkern mit garantierter physischer Löschbarkeit.
-- **Crates**: `contextra-simd`, `contextra-vector`.
+- **Funktionen:** FI-F06 BM25 mit Analyzer `de/1`, Phrasen über Positionen.
+- **Crate:** `contextra-text`.
+- **Ergebnis:** Suche mit denselben Lösch- und Messnachweisen. Terme liegen nur als `term_tag` vor.
 
-## 4. Stufe S3: Hybridsuche & Release Candidate v1.0.0
-- **Umfang**: Reciprocal Rank Fusion (RRF, `contextra-rank`) mit deterministischem Tie-Break nach `doc_tag`. End-to-End Orchestrierung in `contextra-engine`. Öffentliche API-Politur in `contextra`. Verifikation aller Release-Gates G-A bis G-H und G0.
-- **Lieferbares Ergebnis**: v1.0.0 Gesamtrelease.
+## S2: Vektorsuche
+
+- **Funktionen:** FI-F07 HNSW mit Surrogat, Kantenreparatur und Rebuild.
+- **Crates:** `contextra-simd`, `contextra-vector`.
+- **Ergebnis:** RAG-Kern. Löschung ohne Nullvektoren (D-77).
+
+## S3: Hybridsuche und Release
+
+- **Funktionen:** FI-F08 RRF mit `k_rrf = 60` und Tie-Break nach `doc_tag`.
+- **Crates:** `contextra-rank`, `contextra-engine`, `contextra`.
+- **Ergebnis:** v1.0.0, sofern G-H bestanden ist.

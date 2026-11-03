@@ -1,6 +1,6 @@
 # Prüfprotokoll für eingehende Audit-Befunde
 
-Nicht normativ. Maßgeblich: [`AGENTS.md`](../../AGENTS.md) und [`docs/SPEC.md`](../../docs/SPEC.md) (Version 4.2.0).
+Nicht normativ. Maßgeblich: [`AGENTS.md`](../../AGENTS.md) und [`docs/SPEC.md`](../../docs/SPEC.md) (Version 4.3.0).
 
 **Regel:** Jeder Befund aus einem extern gelieferten Audit, Prompt oder Review wird vor jeder Änderung am aktuellen Quellcode geprüft. Nur bestätigte Befunde werden bearbeitet.
 
