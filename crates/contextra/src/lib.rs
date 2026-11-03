@@ -19,10 +19,10 @@ pub mod error;
 pub mod wiring;
 
 pub use api::{
-    Collection, CollectionOptions, Contextra, DocHandle, Document, EngineBuilder, EraseMode,
-    EraseReceipt, EraseRequest, EraseTarget, ErasureId, ErasureStatus, HealthReport, Hit,
-    Missing, RetentionAttestation, RetentionCode, SearchPage, Secret, Set, SignedReport,
-    Tenant, TenantContext, Timing,
+    Collection, CollectionOptions, Contextra, DocHandle, DocKey, DocRef, Document, EngineBuilder,
+    EraseMode, EraseReceipt, EraseRequest, EraseTarget, ErasureId, ErasureStatus, Filter,
+    HealthReport, Hit, Missing, RetentionAttestation, RetentionCode, ScanRange, SearchPage, Secret,
+    Set, SignedReport, Tenant, TenantContext, TenantRef, Timing,
 };
 pub use error::{Error, Result};
 pub use wiring::{system_defaults, OsRng, SystemDefaults};

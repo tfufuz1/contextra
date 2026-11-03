@@ -2,7 +2,7 @@ Orchestrierung: Mandanten, Collections, Transaktionen, Suche, Hintergrundtasks.
 
 ## Status
 
-Ring 3. Ist-Zustand: vorhanden (28.001 Zeilen); kompiliert in der Prüfung 4.2.0 nicht erreichbar; enthält Fremdmodule (`chunker`, `extraction`, `export`, `import`, `temporal_filter`, `decay_controller`); Modul `contextra_impl` heißt `instance`. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
+Ring 3. Ist-Zustand: vorhanden (28.001 Zeilen); kompiliert in der Prüfung 5.1.0 nicht erreichbar; enthält Fremdmodule (`chunker`, `extraction`, `export`, `import`, `temporal_filter`, `decay_controller`); Modul `contextra_impl` heißt `instance`. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
 ## Abhängigkeiten
 

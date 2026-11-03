@@ -121,7 +121,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra/Cargo.toml`. `crates/contextra/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra/Cargo.toml`. `crates/contextra/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -279,7 +279,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-crypto/Cargo.toml`. `crates/contextra-crypto/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-crypto/Cargo.toml`. `crates/contextra-crypto/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -437,7 +437,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-durable-fs/Cargo.toml`. `crates/contextra-durable-fs/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-durable-fs/Cargo.toml`. `crates/contextra-durable-fs/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -595,7 +595,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-engine/Cargo.toml`. `crates/contextra-engine/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-engine/Cargo.toml`. `crates/contextra-engine/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -753,7 +753,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-mvcc/Cargo.toml`. `crates/contextra-mvcc/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-mvcc/Cargo.toml`. `crates/contextra-mvcc/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -911,7 +911,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-ports/Cargo.toml`. `crates/contextra-ports/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-ports/Cargo.toml`. `crates/contextra-ports/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -1069,7 +1069,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-rank/Cargo.toml`. `crates/contextra-rank/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-rank/Cargo.toml`. `crates/contextra-rank/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -1227,7 +1227,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-simd/Cargo.toml`. `crates/contextra-simd/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-simd/Cargo.toml`. `crates/contextra-simd/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -1385,7 +1385,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-store/Cargo.toml`. `crates/contextra-store/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-store/Cargo.toml`. `crates/contextra-store/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -1543,7 +1543,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-sys/Cargo.toml`. `crates/contextra-sys/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-sys/Cargo.toml`. `crates/contextra-sys/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -1701,7 +1701,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-testkit/Cargo.toml`. `crates/contextra-testkit/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-testkit/Cargo.toml`. `crates/contextra-testkit/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -1859,7 +1859,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-text/Cargo.toml`. `crates/contextra-text/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-text/Cargo.toml`. `crates/contextra-text/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -2017,7 +2017,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-types/Cargo.toml`. `crates/contextra-types/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-types/Cargo.toml`. `crates/contextra-types/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
@@ -2175,7 +2175,7 @@ Bei Beispielen (`/// # Beispiel`) nur Code verwenden. der laut Typsignatur kompi
 
 # Ablauf
 
-1. **Lesen:** `docs/SPEC.md` §3 (Regeln) und §4 (Ringe). `CLAUDE.md`. `crates/contextra-vector/Cargo.toml`. `crates/contextra-vector/src/lib.rs`.
+1. **Lesen:** `docs/SPEC.md` (Fassung 5.1.0) sowie `docs/PLAN.md`. `CLAUDE.md`. `crates/contextra-vector/Cargo.toml`. `crates/contextra-vector/src/lib.rs`.
 2. **Einbindung prüfen:** `cargo metadata --no-deps --format-version 1 > /dev/null` muss laufen. Stimmen die Abhängigkeiten in der Tabelle oben? Abweichungen im Report notieren. nicht still korrigieren.
 3. **Dokumentieren:** Datei für Datei. Modul zuerst. dann die Items in Quelltext-Reihenfolge.
 4. **Prüfen:**
