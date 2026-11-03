@@ -2,8 +2,8 @@
 //!
 //! Sammelmodul fuer interne WAL-Tests.
 
+use super::KeyManager;
 pub use super::*;
-use contextra_crypto::crypto::KeyManager;
 use contextra_types::{ContextraError, Result};
 
 #[cfg(test)]
