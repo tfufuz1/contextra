@@ -15,7 +15,7 @@ Nicht normativ. Maßgeblich sind die Arbeitspakete in [`docs/SPEC.md`](../../../
 
 | WP | Titel | Gate | hängt ab von | Karte | Status | Notiz |
 |---|---|---|---|---|---|---|
-| WP-0.1 | Governance: Ratchet, Ausnahmeliste, PR-Vorlage, `tests/arch`-Grundgerüst, Wortlaut-Lint, Testmakro `ctx_test` (T-TRACE-1) | – | – | bei Aufnahme | todo | Ratchet-Datei `governance/ratchet.toml` fehlt (F-20). Erst das Makro anlegen, dann Übergangsregel `PREAMBLE.md` D ablösen. |
+| WP-0.1 | Governance: Ratchet, Ausnahmeliste, PR-Vorlage, `tests/arch`-Grundgerüst, Wortlaut-Lint, Testmakro `ctx_test` (T-TRACE-1) | – | – | vorhanden | done | `contextra-testmacros` mit `#[ctx_test]` und `#[ctx_bench]` implementiert. Übergangsregel PREAMBLE D abgelöst. |
 | WP-0.2 | Toolchain-Regel D-82, `rust-toolchain.toml`, MSRV-Matrix, `cargo-semver-checks`, SBOM-Job | A | WP-0.1 | bei Aufnahme | todo | Achtung: `rust-toolchain.toml` ist geschützt. Änderung im PR als „menschliche Freigabe nötig“ kennzeichnen, Rest umsetzen (PREAMBLE B, S3). |
 | WP-0.3 | Build wieder grün: Lizenz-Rest, `mmap_readonly`-Aufrufer auf `Vfs`-Lesen (D-94), `Cargo.lock` erneuern (D-93) | A | WP-0.1 | vorhanden | todo | Karte `tasks/WP-0.3.toml`. |
 | WP-1.1 | Rückbau Graph und Altlasten: Verweise (F-05), `AutoExtractionMode`, Ports `embedding`/`reranker`/`query_rewriter` | B | WP-0.3 | vorhanden | todo | Karte `tasks/WP-1.1.toml`. |
@@ -38,8 +38,8 @@ Nicht normativ. Maßgeblich sind die Arbeitspakete in [`docs/SPEC.md`](../../../
 | WP-4.3 | Messung: `Scanner<Armed>`, `LayerWitness`, Bericht, Ledger und Restore-Guard | G-D | WP-4.2 | bei Aufnahme | todo | |
 | WP-4.4 | `lab` und `ctx-verify` (unabhängige Parser nach Anhang F), Mutationstests | G-D | WP-4.3 | bei Aufnahme | done | ctx-verify umgesetzt und verifiziert |
 | WP-5.1 | `engine`: `TenantScopedStorage`, Collections, `DocRef`-API, Suchstrom mit Nachladen, Startsequenz 14.1 | G-D | WP-4.4 | bei Aufnahme | todo | |
-| WP-5.2 | Plattformprobe, Prozesshärtung, `health()`/`Metrics`, Plattenreserve | G-F | WP-3.2 | vorhanden | in_progress | Teil contextra-sys (Prozesshärtung, fs_class, Dateimodi) abgeschlossen. Karte `tasks/WP-5.2.toml`. |
-| WP-6.1 | Benchmark-Harness `ctx-bench`, Referenzhardware, erste Basislinien aller BM | G-D | WP-4.4 | bei Aufnahme | todo | Ohne Basislinie kein Gate (P9). |
+| WP-5.2 | Plattformprobe, Prozesshärtung, `health()`/`Metrics`, Plattenreserve | G-F | WP-3.2 | bei Aufnahme | todo | |
+| WP-6.1 | Benchmark-Harness `ctx-bench`, Referenzhardware, erste Basislinien aller BM | G-D | WP-4.4 | vorhanden | done | Benchmark-Harness, SPEC 14.8 Hardware-Metadaten und nicht-überschreibende Protokolle bereitgestellt. |
 | WP-7.1 | `text`: Segmentindex, Analyzer `de/1` und `und/1`, BMW, Positionen, Entkopplung, Rewrite | G-E | WP-6.1 | bei Aufnahme | todo | |
 | WP-8.1 | `vector`: Arena D-86, Surrogat, Kantenreparatur, Rebuild, verschlüsselter Snapshot über `Vfs` | G-G | WP-7.1 | bei Aufnahme | todo | Entfällt im ersten Release bei Cut-Linie (SPEC 1.3). |
 | WP-8.2 | `rank` (RRF), Hybridsuche | G-G | WP-8.1 | bei Aufnahme | done | Deterministische Festkomma-RRF (floor(2^40 / (60+rank))), ≤ 400 Z. |

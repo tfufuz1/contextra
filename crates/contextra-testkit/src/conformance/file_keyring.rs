@@ -221,6 +221,7 @@ where
 
 /// In-Memory Reference Implementation of [`FileKeyring`].
 #[derive(Clone, Default)]
+#[allow(clippy::type_complexity)]
 pub struct ReferenceFileKeyring {
     keys: Arc<RwLock<BTreeMap<FileId, (FileKind, [u8; 32])>>>,
     destroyed: Arc<RwLock<BTreeMap<FileId, bool>>>,

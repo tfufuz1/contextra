@@ -18,8 +18,12 @@
 use std::future::Future;
 use std::pin::Pin;
 
-pub use contextra_types::*;
-pub use contextra_types::{error, error_dto, model_fingerprint, schema, tombstone, types};
+pub use contextra_types::{
+    error, error_dto, model_fingerprint, schema, tombstone, types, ConfigFingerprint,
+    ContextChunk, ContextraError, DistanceMetric, DocId, ModelFingerprint, ResourceBudget,
+    ResourceTracker, Result, ScoredDocument, TenantContext, TenantId, TxId,
+};
+pub use contextra_types::filter::FilterExpr;
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;

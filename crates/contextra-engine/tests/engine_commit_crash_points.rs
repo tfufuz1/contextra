@@ -7,7 +7,7 @@
 #![cfg(not(loom))]
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
 use contextra_engine::Collection;
-use contextra_graph::CsrGraph;
+// contextra_graph::CsrGraph entfernt per SPEC
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, Result, TxId};
@@ -155,14 +155,12 @@ async fn create_faulty_collection() -> (
         })
         .unwrap(),
     );
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Collection::new(
         "default".to_string(),
         storage.clone(),
         index,
-        graph,
         next_tx,
         4,
         contextra_text::Language::English,

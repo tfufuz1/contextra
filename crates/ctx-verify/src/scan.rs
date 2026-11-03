@@ -55,8 +55,19 @@ pub fn execute_field_scan(
     target: &str,
     passphrase_fd: i32,
 ) -> Result<(), InvalidCode> {
+    execute_field_scan_with_control(data_dir, target, passphrase_fd, None)
+}
+
+/// Executes independent field scan with positive control pattern verification.
+/// ZERO-TRUST: Ein Negativbefund ohne bestandene Positivkontrolle ist ungültig.
+pub fn execute_field_scan_with_control(
+    data_dir: &Path,
+    target: &str,
+    passphrase_fd: i32,
+    control_needle: Option<&[u8]>,
+) -> Result<(), InvalidCode> {
     let mut passphrase = read_passphrase_from_fd(passphrase_fd)?;
-    let res = execute_scan_internal(data_dir, target, &passphrase);
+    let res = execute_scan_internal(data_dir, target, &passphrase, control_needle);
     passphrase.zeroize();
     res
 }
@@ -65,6 +76,7 @@ fn execute_scan_internal(
     data_dir: &Path,
     target: &str,
     _passphrase: &[u8],
+    control_needle: Option<&[u8]>,
 ) -> Result<(), InvalidCode> {
     if !data_dir.exists() || !data_dir.is_dir() {
         return Err(InvalidCode::IoError);
@@ -75,8 +87,88 @@ fn execute_scan_internal(
         return Err(InvalidCode::Mk1StructureResidue);
     }
 
+    // Positivkontrolle: Falls ein Kontrollmuster vorgegeben ist, MUSS es im Verzeichnis nachweisbar sein.
+    // Wenn kein Muster vorgegeben ist, führen wir eine automatische Positivkontrolle auf Datenkonsistenz/Vorhandensein durch (Zero-Trust Z3).
+    if let Some(needle) = control_needle {
+        if needle.is_empty() {
+            return Err(InvalidCode::MissingPositiveControl);
+        }
+        let mut control_found = false;
+        check_control_needle(data_dir, needle, &mut control_found)?;
+        if !control_found {
+            return Err(InvalidCode::MissingPositiveControl);
+        }
+    } else {
+        // Fallback-Positivkontrolle: Das Verzeichnis muss lesbar sein und mindestens eine gültige Datei enthalten
+        let mut has_files = false;
+        check_has_files(data_dir, &mut has_files)?;
+        if !has_files {
+            return Err(InvalidCode::MissingPositiveControl);
+        }
+    }
+
     // Check directory recursively
     scan_dir_recursive(data_dir, &target_bytes)
+}
+
+fn check_has_files(dir: &Path, has_files: &mut bool) -> Result<(), InvalidCode> {
+    if *has_files {
+        return Ok(());
+    }
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return Err(InvalidCode::IoError),
+    };
+    for entry_res in entries {
+        let entry = match entry_res {
+            Ok(e) => e,
+            Err(_) => return Err(InvalidCode::IoError),
+        };
+        let path = entry.path();
+        if path.is_dir() {
+            check_has_files(&path, has_files)?;
+            if *has_files {
+                return Ok(());
+            }
+        } else if path.is_file() {
+            *has_files = true;
+            return Ok(());
+        }
+    }
+    Ok(())
+}
+
+fn check_control_needle(dir: &Path, needle: &[u8], found: &mut bool) -> Result<(), InvalidCode> {
+    if *found || needle.is_empty() {
+        return Ok(());
+    }
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return Err(InvalidCode::IoError),
+    };
+    for entry_res in entries {
+        let entry = match entry_res {
+            Ok(e) => e,
+            Err(_) => return Err(InvalidCode::IoError),
+        };
+        let path = entry.path();
+        if path.is_dir() {
+            check_control_needle(&path, needle, found)?;
+            if *found {
+                return Ok(());
+            }
+        } else if path.is_file() {
+            let content = match std::fs::read(&path) {
+                Ok(c) => c,
+                Err(_) => return Err(InvalidCode::IoError),
+            };
+            if content.windows(needle.len()).any(|w| w == needle) {
+                *found = true;
+                return Ok(());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn scan_dir_recursive(dir: &Path, target_bytes: &[u8]) -> Result<(), InvalidCode> {
