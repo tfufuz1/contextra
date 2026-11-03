@@ -637,9 +637,11 @@ dependencies = [
 name = "contextra-text"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm-siv",
  "bincode",
  "blake3",
  "bytes",
+ "contextra-crypto",
  "contextra-ports",
  "contextra-types",
  "futures",

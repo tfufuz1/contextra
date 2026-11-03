@@ -53,6 +53,13 @@
 )]
 
 pub mod bm25;
+pub mod analyzer;
+pub mod buffer;
+pub mod erasure;
+pub mod phrase;
+pub mod postings;
+pub mod segment;
+pub mod stats;
 pub mod domain;
 pub mod inverted;
 pub mod morphology;
