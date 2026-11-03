@@ -4,9 +4,17 @@ use crate::kdf::hkdf_expand;
 use crate::labels;
 use crate::secret::SecretKey;
 use rand::RngCore;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Master key wrapper (ZeroizeOnDrop).
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct MasterKey(pub SecretKey<32>);
+
+impl std::fmt::Debug for MasterKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MasterKey([REDACTED])")
+    }
+}
 
 impl MasterKey {
     /// Generates a new random master key using OsRng.
@@ -27,16 +35,85 @@ impl MasterKey {
 }
 
 // Strongly typed keys to prevent confusion at compile time
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct EncKey(pub SecretKey<32>);
+impl std::fmt::Debug for EncKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EncKey([REDACTED])")
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct IdxKey(pub SecretKey<32>);
+impl std::fmt::Debug for IdxKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IdxKey([REDACTED])")
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct UnitKey(pub SecretKey<32>);
+impl std::fmt::Debug for UnitKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UnitKey([REDACTED])")
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct SignSeed(pub SecretKey<32>);
+impl std::fmt::Debug for SignSeed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SignSeed([REDACTED])")
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct WalKey(pub SecretKey<32>);
+impl std::fmt::Debug for WalKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WalKey([REDACTED])")
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct LedgerKey(pub SecretKey<32>);
+impl std::fmt::Debug for LedgerKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LedgerKey([REDACTED])")
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct HdrKey(pub SecretKey<32>);
+impl std::fmt::Debug for HdrKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "HdrKey([REDACTED])")
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct CommitKey(pub SecretKey<32>);
+impl std::fmt::Debug for CommitKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CommitKey([REDACTED])")
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct VaultMacKey(pub SecretKey<32>);
+impl std::fmt::Debug for VaultMacKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "VaultMacKey([REDACTED])")
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct FileKey(pub SecretKey<32>);
+impl std::fmt::Debug for FileKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileKey([REDACTED])")
+    }
+}
 
 impl FileKey {
     pub fn new(b: [u8; 32]) -> Self {
