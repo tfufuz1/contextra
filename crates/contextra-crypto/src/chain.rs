@@ -21,7 +21,10 @@ pub fn wal_mac(
     ct: &[u8],
     tag: &[u8; 16],
 ) -> [u8; 32] {
-    let mut mac = Hmac::<Sha256>::new_from_slice(k.0.as_bytes()).expect("hmac key");
+    // Infallible for SHA256 HMAC when key is 32 bytes (SimpleKeyInit accepts arbitrary size)
+    let Ok(mut mac) = Hmac::<Sha256>::new_from_slice(k.0.as_bytes()) else {
+        unreachable!("HMAC-SHA256 accepts 32-byte key")
+    };
     mac.update(prev);
     mac.update(&len.to_be_bytes());
     mac.update(&seq.to_be_bytes());
@@ -32,7 +35,9 @@ pub fn wal_mac(
 
 /// Computes Ledger MAC: HMAC-SHA256(K_ledger, chain).
 pub fn ledger_mac(k: &LedgerKey, chain: &[u8; 32]) -> [u8; 32] {
-    let mut mac = Hmac::<Sha256>::new_from_slice(k.0.as_bytes()).expect("hmac key");
+    let Ok(mut mac) = Hmac::<Sha256>::new_from_slice(k.0.as_bytes()) else {
+        unreachable!("HMAC-SHA256 accepts 32-byte key")
+    };
     mac.update(chain);
     mac.finalize().into_bytes().into()
 }
