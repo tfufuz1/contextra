@@ -622,17 +622,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "contextra-testmacros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
- "tokio",
- "trybuild",
-]
-
-[[package]]
 name = "contextra-text"
 version = "0.1.0"
 dependencies = [

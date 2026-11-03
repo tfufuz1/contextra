@@ -350,7 +350,6 @@ impl Contextra {
         self.default_col().await?.delete(id).await
     }
 
-
     // ANCHOR[contextra-engine:SCA-314]
     /// Dokumentation für `scan_prefix` im Rahmen der Transaktions- und Facade-Orchestrierung.
     #[tracing::instrument(level = "trace", skip(self))]

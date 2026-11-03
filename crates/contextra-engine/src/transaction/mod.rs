@@ -67,7 +67,7 @@
 //!   rollback must never silently drop errors. Any failure logs to `tracing::error!` highlighting
 //!   potential Split-Brain.
 //! - **Idempotency**: All compensating actions (`CompensateLsmAction`, `CompensateHnswAction`,
-//!   `CompensateTextAction`, `CompensateGraphAction`) and recovery runs (`recover_pending_intents`)
+//!   `CompensateTextAction`) and recovery runs (`recover_pending_intents`)
 //!   are fully idempotent; multiple executions yield identical final storage and index state.
 //!
 //! # Lock Hierarchy & Poison Recovery
