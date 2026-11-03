@@ -181,3 +181,82 @@ fn t_docref_1_handle_identity() {
     assert_eq!(res.first().map(|f| f.handle), Some(h1));
     assert_eq!(res.get(1).map(|f| f.handle), Some(h2));
 }
+
+/// SPEC: T-RANK-1
+/// Golden-Test mit 4 festen Teillisten (z. B. Vektor, BM25, Filter-Teilliste 1, Filter-Teilliste 2).
+/// Überprüft bitgenaue Berechnung und deterministische Ordnung über 4 Listen.
+#[test]
+fn t_rank_1_golden_ranking_four_lists_exact() {
+    let d1 = DocHandle {
+        cluster_tag: [0; 16],
+        doc_tag: [1; 16],
+    };
+    let d2 = DocHandle {
+        cluster_tag: [0; 16],
+        doc_tag: [2; 16],
+    };
+    let d3 = DocHandle {
+        cluster_tag: [0; 16],
+        doc_tag: [3; 16],
+    };
+    let d4 = DocHandle {
+        cluster_tag: [0; 16],
+        doc_tag: [4; 16],
+    };
+
+    // Liste 1: [d1, d2]
+    // Liste 2: [d2, d3]
+    // Liste 3: [d3, d4]
+    // Liste 4: [d1, d3]
+    let l1 = [Candidate { handle: d1 }, Candidate { handle: d2 }];
+    let l2 = [Candidate { handle: d2 }, Candidate { handle: d3 }];
+    let l3 = [Candidate { handle: d3 }, Candidate { handle: d4 }];
+    let l4 = [Candidate { handle: d1 }, Candidate { handle: d3 }];
+
+    let scale = 1u64 << 40;
+    let r1 = scale / 61; // Rang 1
+    let r2 = scale / 62; // Rang 2
+
+    // Erwartete kumulierte Scores:
+    // d1: Rang 1 (L1) + Rang 1 (L4) = r1 + r1
+    let exp_d1 = r1 + r1;
+    // d2: Rang 2 (L1) + Rang 1 (L2) = r2 + r1
+    let exp_d2 = r2 + r1;
+    // d3: Rang 2 (L2) + Rang 1 (L3) + Rang 2 (L4) = r2 + r1 + r2
+    let exp_d3 = r2 + r1 + r2;
+    // d4: Rang 2 (L3) = r2
+    let exp_d4 = r2;
+
+    // Da exp_d3 = r1 + 2*r2 (3 Vorkommen), exp_d1 = 2*r1 (2 Vorkommen),
+    // exp_d2 = r1 + r2 (2 Vorkommen), exp_d4 = r2 (1 Vorkommen)
+    // gilt: exp_d3 > exp_d1 > exp_d2 > exp_d4
+    assert!(exp_d3 > exp_d1);
+    assert!(exp_d1 > exp_d2);
+    assert!(exp_d2 > exp_d4);
+
+    let res = rrf_fuse(&[&l1, &l2, &l3, &l4], 10).unwrap();
+    assert_eq!(res.len(), 4);
+
+    assert_eq!(
+        res.first().map(|f| (f.handle, f.score)),
+        Some((d3, RrfScore(exp_d3)))
+    );
+    assert_eq!(
+        res.get(1).map(|f| (f.handle, f.score)),
+        Some((d1, RrfScore(exp_d1)))
+    );
+    assert_eq!(
+        res.get(2).map(|f| (f.handle, f.score)),
+        Some((d2, RrfScore(exp_d2)))
+    );
+    assert_eq!(
+        res.get(3).map(|f| (f.handle, f.score)),
+        Some((d4, RrfScore(exp_d4)))
+    );
+
+    // Begrenzung auf top = 2
+    let res_top2 = rrf_fuse(&[&l1, &l2, &l3, &l4], 2).unwrap();
+    assert_eq!(res_top2.len(), 2);
+    assert_eq!(res_top2.first().map(|f| f.handle), Some(d3));
+    assert_eq!(res_top2.get(1).map(|f| f.handle), Some(d1));
+}
