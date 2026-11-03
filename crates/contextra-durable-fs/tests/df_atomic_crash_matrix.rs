@@ -10,10 +10,9 @@
     clippy::disallowed_methods
 )]
 
-#[path = "../src/atomic.rs"]
-mod atomic;
-
-use atomic::{clean_tmp, write_atomic, write_atomic_with_injector, AtomicFaultInjector};
+use contextra_durable_fs::atomic::{
+    clean_tmp, write_atomic, write_atomic_with_injector, AtomicFaultInjector,
+};
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -210,6 +209,9 @@ fn test_df_08_file_and_directory_permissions() {
 
         let file_meta = fs::metadata(&target).expect("File metadata failed");
         let file_mode = file_meta.mode() & 0o777;
-        assert_eq!(file_mode, 0o600, "File must be created with mode 0600 (DF-08)");
+        assert_eq!(
+            file_mode, 0o600,
+            "File must be created with mode 0600 (DF-08)"
+        );
     }
 }
