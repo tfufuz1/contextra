@@ -9,7 +9,6 @@ use super::fixtures::*;
 
 #[tokio::test]
 async fn test_insert_with_ttl_and_reap_expired_documents() {
-    use contextra_graph::CsrGraph;
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -36,7 +35,6 @@ async fn test_insert_with_ttl_and_reap_expired_documents() {
         "default".to_string(),
         storage,
         index,
-        Arc::new(CsrGraph::new()),
         Arc::new(AtomicU64::new(1)),
         4,
         contextra_text::Language::English,
@@ -78,7 +76,6 @@ async fn test_insert_with_ttl_and_reap_expired_documents() {
 
 #[tokio::test]
 async fn test_insert_typed_episodic_has_decay_metadata() {
-    use contextra_graph::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -100,13 +97,11 @@ async fn test_insert_typed_episodic_has_decay_metadata() {
         })
         .unwrap(), // unwrap
     );
-    let graph_index = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
     let col = Collection::new(
         "test".to_string(),
         storage,
         index,
-        graph_index,
         next_tx,
         4,
         contextra_text::Language::German,
@@ -129,7 +124,6 @@ async fn test_insert_typed_episodic_has_decay_metadata() {
 
 #[tokio::test]
 async fn test_insert_typed_working_has_ttl_metadata() {
-    use contextra_graph::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -151,13 +145,11 @@ async fn test_insert_typed_working_has_ttl_metadata() {
         })
         .unwrap(), // unwrap
     );
-    let graph_index = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
     let col = Collection::new(
         "test".to_string(),
         storage,
         index,
-        graph_index,
         next_tx,
         4,
         contextra_text::Language::German,
@@ -180,7 +172,6 @@ async fn test_insert_typed_working_has_ttl_metadata() {
 
 #[tokio::test]
 async fn test_insert_backward_compatible_has_semantic_default() {
-    use contextra_graph::CsrGraph;
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
     use std::sync::atomic::AtomicU64;
@@ -202,13 +193,11 @@ async fn test_insert_backward_compatible_has_semantic_default() {
         })
         .unwrap(), // unwrap
     );
-    let graph_index = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
     let col = Collection::new(
         "test".to_string(),
         storage,
         index,
-        graph_index,
         next_tx,
         4,
         contextra_text::Language::German,
@@ -231,7 +220,6 @@ async fn test_insert_backward_compatible_has_semantic_default() {
 
 #[tokio::test]
 async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
-    use contextra_graph::csr::CsrGraph;
     use contextra_ports::StorageStats;
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_types::{Result, TxId};
@@ -335,14 +323,12 @@ async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
         })
         .unwrap(),
     );
-    let graph = Arc::new(CsrGraph::new());
     let next_tx = Arc::new(AtomicU64::new(1));
 
     let col = Collection::new(
         "default".to_string(),
         storage,
         index,
-        graph,
         next_tx,
         4,
         contextra_text::Language::English,

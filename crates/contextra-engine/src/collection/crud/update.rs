@@ -30,22 +30,23 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         }
 
         let _guard = self.kv_locks.lock_for(id).await;
-        drop(_guard);
         let db_tx = self.begin_transaction()?;
 
-        match self.update_op(&db_tx, id, embedding, metadata).await {
+        let res = match self.update_op(&db_tx, id, embedding, metadata).await {
             Ok(_) => {
                 db_tx.commit().await?;
-                self.check_and_trigger_community_detection(1);
                 Ok(())
             }
             Err(e) => {
                 if let Err(rollback_err) = db_tx.rollback().await {
                     tracing::error!("[INV-DB-3] Failed to rollback update: {}", rollback_err);
                 }
+                drop(_guard);
                 Err(e)
             }
-        }
+        };
+        drop(_guard);
+        res
     }
 
     // ANCHOR[contextra-engine:COL-UPD-051]
@@ -104,12 +105,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         // Stage re-insertion into text index if new text present
         if let Some(new_text) = extract_text(&metadata) {
             db_tx.stage_text_insert(doc_id, new_text);
-        }
-
-        // Stage graph entity update
-        if let Ok(eid) = EntityId::from_key(id) {
-            let entity = contextra_types::Entity::new(eid, id, "Document");
-            db_tx.stage_graph_entity(entity);
         }
 
         // Re-insert into HNSW

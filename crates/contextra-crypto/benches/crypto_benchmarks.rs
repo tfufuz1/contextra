@@ -42,10 +42,31 @@ fn bench_tag_computation(c: &mut Criterion) {
     });
 }
 
+fn bench_kdf_params(c: &mut Criterion) {
+    let mut group = c.benchmark_group("bm_kdf");
+    group.sample_size(10); // Argon2id is intentionally heavy
+
+    let pass = Secret::from_slice(b"benchmark_master_passphrase");
+    let salt = [0x5au8; 32];
+
+    // D-06 minimum: 64 MiB (65536 KiB), t = 3, p = 1
+    let params_min = KdfParams {
+        m_kib: 65536,
+        t: 3,
+        p: 1,
+    };
+    group.bench_function("argon2id_min_64mib_t3_p1", |b| {
+        b.iter(|| derive_kek(black_box(&pass), black_box(&salt), black_box(&params_min)).unwrap());
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_block_aead_seal,
     bench_hkdf_expand,
-    bench_tag_computation
+    bench_tag_computation,
+    bench_kdf_params
 );
 criterion_main!(benches);

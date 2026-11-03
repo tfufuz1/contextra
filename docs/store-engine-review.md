@@ -1,8 +1,8 @@
 # contextra-store – Storage-Engine Review
 
-> **Datum:** 2026-11-02  
-> **Rolle:** Storage-Engine-Ingenieur (RocksDB/Pebble/LevelDB-Internals, redb als Referenz)  
-> **Scope:** systematische Analyse aller Implementierungsebenen in `crates/contextra-store`  
+> **Datum:** 2026-11-02
+> **Rolle:** Storage-Engine-Ingenieur (RocksDB/Pebble/LevelDB-Internals, redb als Referenz)
+> **Scope:** systematische Analyse aller Implementierungsebenen in `crates/contextra-store`
 > **Normative Referenz:** SPEC 4.3.0
 
 ---

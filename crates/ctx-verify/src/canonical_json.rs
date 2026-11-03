@@ -39,6 +39,9 @@ pub fn verify_canonical_json(bytes: &[u8]) -> Result<(), &'static str> {
         return Err("floating point numbers are forbidden");
     }
 
+    // Detect duplicate keys and ensure canonical key ordering at raw JSON syntax level
+    check_no_duplicate_keys(text)?;
+
     // Check that text exactly matches our strict canonical serialization
     let canonical = to_canonical_json_string(&val)?;
 
@@ -47,6 +50,103 @@ pub fn verify_canonical_json(bytes: &[u8]) -> Result<(), &'static str> {
     }
 
     Ok(())
+}
+
+/// Strict check for duplicate keys in any JSON object.
+fn check_no_duplicate_keys(json_str: &str) -> Result<(), &'static str> {
+    let mut deserializer = serde_json::Deserializer::from_str(json_str);
+    check_value_duplicates(&mut deserializer)?;
+    Ok(())
+}
+
+fn check_value_duplicates<'de, R: serde_json::de::Read<'de>>(
+    de: &mut serde_json::Deserializer<R>,
+) -> Result<(), &'static str> {
+    use serde::de::DeserializeSeed;
+
+    struct DuplicateChecker;
+
+    impl<'de> serde::de::Visitor<'de> for DuplicateChecker {
+        type Value = ();
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("valid JSON without duplicate keys")
+        }
+
+        fn visit_bool<E>(self, _v: bool) -> Result<Self::Value, E> {
+            Ok(())
+        }
+
+        fn visit_i64<E>(self, _v: i64) -> Result<Self::Value, E> {
+            Ok(())
+        }
+
+        fn visit_u64<E>(self, _v: u64) -> Result<Self::Value, E> {
+            Ok(())
+        }
+
+        fn visit_f64<E>(self, _v: f64) -> Result<Self::Value, E> {
+            Ok(())
+        }
+
+        fn visit_str<E>(self, _v: &str) -> Result<Self::Value, E> {
+            Ok(())
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E> {
+            Ok(())
+        }
+
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            deserializer.deserialize_any(DuplicateChecker)
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E> {
+            Ok(())
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+        {
+            while let Some(()) = seq.next_element_seed(DuplicateCheckerSeed)? {}
+            Ok(())
+        }
+
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::MapAccess<'de>,
+        {
+            let mut seen_keys = std::collections::BTreeSet::new();
+            while let Some(key) = map.next_key::<String>()? {
+                if !seen_keys.insert(key) {
+                    return Err(serde::de::Error::custom("duplicate key in JSON object"));
+                }
+                map.next_value_seed(DuplicateCheckerSeed)?;
+            }
+            Ok(())
+        }
+    }
+
+    struct DuplicateCheckerSeed;
+
+    impl<'de> DeserializeSeed<'de> for DuplicateCheckerSeed {
+        type Value = ();
+
+        fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            deserializer.deserialize_any(DuplicateChecker)
+        }
+    }
+
+    DuplicateCheckerSeed
+        .deserialize(de)
+        .map_err(|_| "duplicate key in JSON object or syntax error")
 }
 
 fn has_floating_point(val: &serde_json::Value) -> bool {

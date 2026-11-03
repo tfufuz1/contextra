@@ -17,6 +17,7 @@
 //! im Betriebssystem daran hindern, den Prozess einzusehen oder Coredumps zu schreiben.
 
 use std::mem::MaybeUninit;
+use std::sync::atomic::{compiler_fence, Ordering};
 
 use crate::error::SysError;
 
@@ -151,6 +152,28 @@ pub fn mark_dont_dump(slice: &[u8]) -> bool {
     {
         true
     }
+}
+
+/// Überschreibt einen Speicherbereich (`slice`) mit Nullen mittels flüchtiger Schreiboperationen (`write_volatile`)
+/// und sequenzieller Compiler-Barriere (`compiler_fence(Ordering::SeqCst)`).
+///
+/// Dies verhindert, dass der Compiler den Nullungsvorgang bei aktiver Optimierung (z. B. opt-level 3)
+/// als Dead-Store wegoptimiert (D-29, Zero-Trust).
+///
+/// # Vorbedingungen
+/// `slice` ist ein gültiger, veränderlicher Byte-Puffer.
+///
+/// # Nachbedingungen
+/// Alle Bytes in `slice` sind 0, und der Compiler darf nachfolgende Speicheroperationen nicht vor diese Barriere ziehen.
+pub fn secure_zero_volatile(slice: &mut [u8]) {
+    for byte in slice.iter_mut() {
+        // SAFETY: `byte` stammt aus einer gültigen, veränderlichen Referenz auf ein initialisiertes `u8`.
+        // `write_volatile` schreibt 0 ohne Aliasing-Konflikte direkt an die Zieladresse.
+        unsafe {
+            std::ptr::write_volatile(byte, 0);
+        }
+    }
+    compiler_fence(Ordering::SeqCst);
 }
 
 /// Sperrt die Speicherseiten von `slice` im RAM gegen Auslagerung (Swap).
