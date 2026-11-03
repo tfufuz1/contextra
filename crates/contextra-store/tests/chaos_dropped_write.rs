@@ -1,3 +1,4 @@
+#![allow(unsafe_code)]
 // FILE-CONTEXT: Chaos test for fsync/I/O error propagation and durability guarantees during WAL write drops. (TS: 2026-08-30) (SESSION: 283abf0f)
 //! Chaos test proving fsync/I/O error propagation and non-corruption invariants in `LsmStorage`.
 //!
@@ -63,7 +64,17 @@ async fn test_chaos_dropped_write_error_propagation_and_recovery() {
             if let Ok(target) = std::fs::read_link(entry.path()) {
                 if target == wal_path {
                     if let Ok(fd_num) = entry.file_name().to_string_lossy().parse::<i32>() {
-                        let _ = contextra_sys::reopen_and_dup2(&wal_path, fd_num, 0);
+                        unsafe {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+    if let Ok(path_c) = CString::new(wal_path.as_os_str().as_bytes()) {
+        let fd = libc::open(path_c.as_ptr(), libc::O_RDONLY);
+        if fd >= 0 {
+            libc::dup2(fd, fd_num);
+            libc::close(fd);
+        }
+    }
+}
                         // O_RDONLY = 0
                     }
                 }
@@ -120,7 +131,17 @@ async fn test_chaos_dropped_write_error_propagation_and_recovery() {
             if let Ok(target) = std::fs::read_link(entry.path()) {
                 if target == wal_path {
                     if let Ok(fd_num) = entry.file_name().to_string_lossy().parse::<i32>() {
-                        let _ = contextra_sys::reopen_and_dup2(&wal_path, fd_num, 2 | 1024);
+                        unsafe {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+    if let Ok(path_c) = CString::new(wal_path.as_os_str().as_bytes()) {
+        let fd = libc::open(path_c.as_ptr(), libc::O_RDWR | libc::O_APPEND);
+        if fd >= 0 {
+            libc::dup2(fd, fd_num);
+            libc::close(fd);
+        }
+    }
+}
                         // O_RDWR | O_APPEND
                     }
                 }

@@ -732,12 +732,14 @@ pub async fn run_mutant_tests() -> std::result::Result<(), String> {
 mod tests {
     use super::*;
 
+    /// SPEC: PO-02
     #[tokio::test]
     async fn po_02_storage_reference_passes() {
         let res = run_reference_test().await;
         assert!(res.is_ok(), "Reference implementation must pass: {res:?}");
     }
 
+    /// SPEC: PO-02
     #[tokio::test]
     async fn po_02_storage_mutants_fail() {
         let res = run_mutant_tests().await;

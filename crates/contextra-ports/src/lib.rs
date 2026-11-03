@@ -67,12 +67,18 @@ pub mod gate;
 pub mod keys;
 /// Ledger sink contracts.
 pub mod ledger;
+/// Synchronization barriers for commit, compaction, and purge mutual exclusion.
+pub mod barrier;
+/// Memory locking and dumping protection ports for vector arenas.
+pub mod memory;
 
+pub use barrier::*;
 pub use clock::*;
 pub use erasure::*;
 pub use gate::*;
 pub use keys::*;
 pub use ledger::*;
+pub use memory::*;
 // Begründung: Re-Export von veralteten Ports für Abwärtskompatibilität externer Konsumenten bis zur Fertigstellung von J14 (SPEC §1.4 / D-24)
 #[allow(deprecated)]
 pub use embedding::*;
@@ -89,10 +95,6 @@ pub use storage::*;
 pub use text_index::*;
 pub use vector_index::*;
 pub use vfs::*;
-
-/// Generic contract tests for port implementers.
-#[cfg(feature = "contract-tests")]
-pub mod contract_tests;
 
 pub use metrics::{
     HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricSnapshot, NoopMetricsSink,
@@ -113,6 +115,9 @@ mod dyn_safety {
     fn _assert_dyn_reranker(_: Option<&dyn Reranker>) {}
     fn _assert_dyn_query_rewriter(_: Option<&dyn QueryRewriter>) {}
     fn _assert_dyn_vfs(_: Option<&dyn Vfs>) {}
+    fn _assert_dyn_commit_barrier(_: Option<&dyn CommitBarrier>) {}
+    fn _assert_dyn_purge_barrier(_: Option<&dyn PurgeBarrier>) {}
+    fn _assert_dyn_arena_guard(_: Option<&dyn ArenaGuard>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -125,5 +130,8 @@ mod dyn_safety {
         _assert_dyn_reranker(None);
         _assert_dyn_query_rewriter(None);
         _assert_dyn_vfs(None);
+        _assert_dyn_commit_barrier(None);
+        _assert_dyn_purge_barrier(None);
+        _assert_dyn_arena_guard(None);
     }
 }

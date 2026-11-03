@@ -2,14 +2,13 @@
 
 |Feld|Wert|
 |---|---|
-|Spezifikationsversion|**4.3.0** (SOLL-Zustand für Release 1.0.0; Revision von 4.2.0; Änderungen: Anhang H.0)|
-|Stand|2026-11-02 (4.3.0)|
-|Status|**Final bis auf zwei benannte Vorbehalte:** (1) Gate **G0** (Speicherentscheid, 11.9): scheitert es, werden 4.1, 9.1, 11.4 und 11.9 nach der Fallbackleiter (11.9) neu gefasst; (2) Gate **G-LEGAL** (extern, 6.7): blockiert nur Löschaussagen jenseits 6.4. Alles Übrige ist entschieden und begründet (Abschnitt 4).|
-|Basis der Analyse|`github.com/tfufuz1/contextra`, `main` @ `25c8f17568025b120ef820f3cb4e45e6107c4f8e` (2026-11-02 00:38 +01:00), frisch geklont. Gegenüber `33c3e78e4` (Basis der Vorprüfung) haben sich nur `contextra-ports` (Altports entfernt, `Vfs` nach `ports` verschoben, `rng`/`vfs` gehärtet) und `contextra-testkit` geändert (24 Dateien, +687/−2.480 Zeilen) **[V]**. Gegenüber der Basis von 3.0.0 (`e5e29108d`) kommen `contextra-sys` (Härtung, `9f1e77633`) hinzu. Alle Zählungen, die nicht ausdrücklich als „neu geprüft“ gekennzeichnet sind, stammen von `33c3e78e4` und sind für die unveränderten Crates weiter gültig. **Ergänzung 4.1.0:** Architektur- und Strukturprüfung am HEAD `f8a3bbb24` (11 Commits nach `25c8f17`: `contextra`, `mvcc`, `durable-fs`, `tests/arch`), statisch **[V]**, ohne Build; neue Befunde F-26 bis F-31, Korrekturen F-07/F-13 (F-29). **Ergänzung 4.2.0:** Review am HEAD `4e208c1797e30e15508838de8e7ebea670f81175` (2026-11-02 02:52 +01:00, Shallow-Clone); neue Befunde F-32 bis F-37, Entscheidungen D-93 bis D-97. **Ergänzung 4.3.0:** Revision der Folgedokumente; D-92 entfällt, D-98 tritt an seine Stelle. Keine neuen Befunde, keine Änderung an Datenformaten, Löschsemantik, Schlüsselhierarchie oder Rechtsrahmen.|
-|Prüfmodus|Quelltext gelesen, Manifeste ausgewertet, Muster gezählt (**[V]**). **Nicht gebaut und nicht ausgeführt:** Die Prüfumgebung hatte keine Rust-Toolchain. Alle Build- und Testwerte (**[M]**) stammen aus 3.0.0 (HEAD `e5e29108d`) und wurden nicht wiederholt. **Ausnahme 4.2.0:** `cargo check --workspace` (Lib-Targets, Rust 1.97.0 stable, ohne `--locked`) am HEAD `4e208c179` (F-32 **[M]**); Tests, `clippy`, `fmt` und Benchmarks wurden weiter nicht ausgeführt. Rechtsstände wurden am 2026-11-02 gegen Primär- und Fachquellen geprüft (**[W]**).|
-|Quelle der Wahrheit|**Ausschließlich diese Datei ist normativ.** `AGENTS.md`, `README.md`, `crates/*/README.md`, `crates/*/AGENTS.md`, `docs/` (außer dieser Datei) und `.agents/` sind **abgeleitete Dokumente**. Sie geben Fakten dieser Spezifikation wieder, nennen den Abschnitt, auf den sie sich stützen, und werden zusammen mit ihr gepflegt (D-98, Anhang E). Ein Widerspruch eines abgeleiteten Dokuments zu dieser Spezifikation ist ein Defekt des Dokuments; die Spezifikation gilt. Diese Spezifikation enthält deshalb auch die Byte-Formate (Anhang F) und den Umsetzungsplan (15.4); es gibt kein Begleitdokument.|
-|Ersetzt|`docs/SPEC.md` 4.2.0 (und 4.1.0, 4.0.0, 3.0.0). Änderungen und ihre Begründung: Anhang H.|
-|Geltung|Jede Abweichung des Quellcodes oder eines Folgedokuments von diesem Dokument ist ein Defekt.|
+|Spezifikationsversion|**5.0.0** (SOLL-Zustand für Release 1.0.0; konsolidierte Neufassung von 4.3.0, Änderungen: Anhang H)|
+|Stand|2026-11-03|
+|Status|**Final.** Es gibt keine offenen Vorbehalte. Gate **G0** (Speicherentscheid, 11.9) und Gate **G-LEGAL** (extern, 6.7) bleiben Gates, ihre Folgen sind aber vorab entschieden: G0 läuft mit ausgerichteten Dateigrenzen als Grundlinie und mechanischer Fallbackleiter (D-101); G-LEGAL blockiert nie das Release, sondern nur Aussagen jenseits 6.4 (D-103). Alle Entscheidungen D-88 bis D-98 der Vorfassungen sind bestätigt.|
+|Geltungsbereich|Dieses Dokument beschreibt ausschließlich den **Soll-Zustand** (Produktverhalten, Architektur, Formate, Gates, Inventar). Den Ist-Zustand des Quelltexts, Befunde, Rückbau und Arbeitspakete enthält `docs/PLAN.md`. Eine Soll-Aussage hängt nie von einem Commit ab.|
+|Quelle der Wahrheit|**Normativ ist diese Datei** (`docs/SPEC.md`). Abgeleitet sind: `docs/PLAN.md` (verbindliche Umsetzungsspezifikation, D-99), `AGENTS.md`, `README.md`, `crates/*/README.md`, `crates/*/AGENTS.md`, `.agents/`, übrige `docs/`. Abgeleitete Dokumente geben Fakten dieser Spezifikation wieder, nennen den Abschnitt, auf den sie sich stützen, und werden mit ihr gepflegt (D-98, Anhang E). Widerspricht ein abgeleitetes Dokument der Spezifikation, ist das Dokument fehlerhaft. Die Byte-Formate stehen in Anhang F dieser Datei; es gibt kein Formatdokument daneben.|
+|Ersetzt|`docs/SPEC.md` 4.3.0 und alle früheren Fassungen.|
+|Prüfregel|Jede Abweichung des Quellcodes oder eines abgeleiteten Dokuments von diesem Dokument ist ein Defekt. Jede Abweichung dieses Dokuments von einer Messung ist ein Defekt dieses Dokuments und wird über Anhang H und einen ADR behoben, nicht stillschweigend.|
 
 > **Keine Rechtsberatung.** Kein Softwareprodukt kann „100 % Rechtskonformität“ zusagen: Rechtskonformität ist ein Merkmal des Betriebs durch den Verantwortlichen, nicht des Codes. Dieses Dokument legt deshalb fest, was Contextra technisch maximal leistet, wie jede Leistung gemessen wird und was Contextra wahrheitsgemäß behaupten darf (6.4, 16). Wo eine Rechtsfrage die Technik berührt, ist sie in 6.6 **konservativ entschieden**: Es gilt die strengste Auslegung. Eine spätere juristische Prüfung kann dadurch Aussagen lockern, nie technische Maßnahmen nachfordern.
 
@@ -18,11 +17,11 @@
 ## 0. Konventionen
 
 - **MUSS / DARF NICHT / SOLL** gelten im Sinne von RFC 2119.
-- **IDs:** `P` Prinzip · `D` Entscheidung · `HR` Harte Regel · `R` Rechtsanforderung · `E-L` Rechtsentscheidung · `H` Haftungskopf · `I` Invariante · `FM` Fehlermodus · `FI` Funktionsinventar · `AR` Architekturregel · `RB` Runbook · `F-nn` Befund am Ist-Stand · `KF-n` aufgelöster Dokumentkonflikt · `T-…` Test · `BM-…` Benchmark · `WP-n.m` Arbeitspaket. (Frühere Fassungen nutzten `B-nn` sowohl für Befunde als auch für Benchmarks; das ist getrennt.)
-- **Evidenzmarken** (Herkunft einer Aussage): **[M]** gemessen mit Toolchain, Wert aus 3.0.0 übernommen, nicht wiederholt · **[V]** am Repository statisch geprüft (Datei, Zeile, Zählung) · **[W]** am 2026-11-02 im Web geprüft · **[D]** aus Repo-Dokumenten oder Fachwissen übernommen, nicht eigenständig geprüft · **[A]** Argumentation oder Rechnung dieser Spezifikation · **[E]** Entscheidung oder Zielwert. Zielwerte sind bis zum Benchmarklauf (WP-6.1) Gate-Schwellen, keine Messungen.
+- **IDs:** `P` Prinzip · `D` Entscheidung · `HR` Harte Regel · `R` Rechtsanforderung · `E-L` Rechtsentscheidung · `H` Haftungskopf · `I` Invariante · `FM` Fehlermodus · `FI` Funktionsinventar · `AR` Architekturregel · `RB` Runbook · `KF-n` aufgelöster Dokumentkonflikt · `T-…` Test · `BM-…` Benchmark · `G-…` Gate · `WP-n.m` Arbeitspaket (nur in `docs/PLAN.md`) · `F-nn` Befund (nur in `docs/PLAN.md`).
+- **Herkunftsmarken** für Aussagen mit Zahlen oder Rechtsbezug: **[W]** am 2026-11-02 gegen Primär- oder Fachquellen geprüft · **[D]** aus Fachwissen oder Dokumenten übernommen, nicht eigenständig geprüft · **[A]** Argumentation oder Rechnung dieser Spezifikation · **[E]** Entscheidung oder Zielwert. Zielwerte sind bis zum Benchmarklauf (WP-6.1) Gate-Schwellen, keine Messungen. Messwerte stehen nie in dieser Datei, sondern im Evidenzbündel (HR-11).
 - **Evidenzstufen** für Aussagen im Repo: **EV0** Behauptung · **EV1** Quelltextbeleg · **EV2** lokaler Gate-Lauf mit Protokoll · **EV3** reproduzierbar in CI auf unabhängigem Runner · **EV4** zusätzlich unabhängiges Orakel, Mutationsprüfung und Nachweis im Erasure Lab. Eine Produktaussage über Löschung ist erst ab **EV4** zulässig.
-- **Messklassen** der Löschmessung (12.1): **MK1** Struktur · **MK2** Rohscan · **MK3** Schlüsselprobe. Sie sind von den Evidenzstufen und den Evidenzmarken getrennt benannt.
-- `grep`-Zählungen enthalten Inline-Testmodule und sind **Obergrenzen** für Produktionscode. Jede Zählung nennt ihren Befehl oder Geltungsbereich.
+- **Messklassen** der Löschmessung (12.1): **MK1** Struktur · **MK2** Rohscan · **MK3** Schlüsselprobe. Sie sind von den Evidenzstufen getrennt benannt.
+- Zählungen im Produktionscode erfolgen mit dem Zählwerkzeug aus D-107 (syn-basiert, ohne `#[cfg(test)]` und `tests/`), nie mit `grep`.
 - Alle Byte-Layouts sind big-endian, sofern nicht anders angegeben (Anhang F). Alle Zeitangaben sind UTC aus dem Port `Clock`.
 - Tags: `tag(label, eingaben)` bezeichnet immer `BLAKE3-keyed(K_idx, label ‖ eingaben)[0..16]` (9.3, Anhang C).
 
@@ -116,100 +115,90 @@ Netzwerkdienst, Server-Socket, Sharding, Replikation, P2P; Erzeugung von Embeddi
 
 ---
 
-## 3. Befund und Konsolidierung (Review-Ergebnis)
+## 3. Soll-Inventar und Konsolidierung
 
-### 3.1 Gesamturteil zur Produktionsreife
+Dieser Abschnitt ist das vollständige Inventar des Soll-Zustands. Was nicht hier, in 5 oder in Anhang A steht, ist nicht Teil von v1. Den Abgleich mit dem Ist-Zustand führt `docs/PLAN.md`.
 
-**Das Projekt ist am HEAD nicht produktionsreif und nach den Messungen von 3.0.0 nicht einmal lauffähig [M].** Die Spezifikationen sind weitgehend tragfähig, der Code folgt ihnen nur teilweise. Die Mission (nachweisbare, isolierte Löschung) ist **im Code nicht vorhanden**: Das Crate `contextra-erasure` enthält nur `README.md` und `AGENTS.md`, keine Quelldatei [V, am HEAD `25c8f17` erneut bestätigt]. Entscheidung: **weiterbauen auf dem Fundament** (Store, MVCC, Krypto, SIMD, Testkit), **neu bauen** den Löschkern, **umbauen** Textindex, Vektorpersistenz, Schlüsselraum und Engine-Schreibpfad. Ein Neuanfang wäre teurer, weil 345 Testdateien und 102.000 Zeilen `src` [M] als Orakel und Regressionsschutz erhalten bleiben.
+### 3.1 Crate-Inventar (Soll)
 
-Die Revision 4.0.0 behebt **vier strukturelle Lücken in der Spezifikation selbst**, die das Alleinstellungsmerkmal berührten (Details Anhang H):
+Budgets sind **Obergrenzen für Produktionszeilen** (ohne `#[cfg(test)]` und `tests/`, Zählwerkzeug D-107) und werden vom Ratchet nur gesenkt (D-108). Ein Modul, das hier nicht genannt ist, ist nicht im Soll.
 
-1. P11 galt nur für den LSM-Kern; Locator-Region und Textsegmente verstreuten Löschziele (D-70, D-71).
-2. Die Schlüsselvernichtung deckte nur Dokumentspeicher und Vektor-Payload; Textpostings und Dateistrukturen blieben unter einem nie vernichteten Schlüssel (D-69, D-85).
-3. Das Messversprechen war in Produktion nicht einlösbar (Messklasse „E3“ braucht den gelöschten Schlüssel; Namenskollision der Evidenzbegriffe) (D-72).
-4. Subject- und Mandanten-Löschung waren in der Schlüsselklasse O(m) statt O(1) (D-79).
+|Crate|Ring|Soll-Module|Öffentliche Verträge|Ausgeschlossen|Budget|
+|---|---|---|---|---|---|
+|`contextra-types`|0|`ids` (`DocRef`, `DocHandle`, `ErasureId`, `FileId`, `StoreId`), `tags` (Tag-Newtypes, Längenpräfix-Kodierung), `key` (`KeyBuf`, Schlüsselkodierung 9.1), `erasure` (`EraseTarget`, `LayerWitness`, `ResidualRisk`, `KeyCoverage`, `ScanMethod`), `error` (Fehlerklassen 7.5), `limits` (D-87), `secret` (zeroizende Newtypes), `tenant_scope`|Reine Datentypen, `Debug` ohne Geheimnisse|I/O, `async`, `DocId`, `saos`, `tombstone`-Sonderformen, `AutoExtractionMode`, `misc`-Module|4.000|
+|`contextra-ports`|0|`storage`, `text_index`, `vector_index` (statisch dispatcht, D-03), `vfs`, `clock`, `rng`, `id_gen`, `erasure` (`ErasureLayer`), `gate` (`ReadGate`), `keys` (`RecordSealer`, `FileKeyring`), `ledger` (`LedgerSink`), `metrics`, `barrier`|Traits laut 8.2; je Trait ein Modul; Re-Exporte einzeln (AR-10)|`embedding`, `reranker`, `query_rewriter`, Glob-Re-Export, Feature `contract-tests`, Vertragstests (liegen in `testkit`)|2.500|
+|`contextra-sys`|1|`sync` (`fsync`, `fdatasync`, `F_FULLFSYNC`, `flush_dir`), `rename` (`rename_durable`), `memlock` (`mlock`, `madvise`), `hardening` (`RLIMIT_CORE`, `PR_SET_DUMPABLE`), `perm` (POSIX)|Sichere Funktionen ohne offene Vorbedingung; alles andere `unsafe fn` (D-29)|`mmap`, Windows, `acl_win32`|700|
+|`contextra-simd`|1|`kernels` (f32: Dot, L2, Cosine; AVX2, AVX-512, NEON), `scalar` (Referenz), `dispatch`|Distanzfunktionen auf `&[f32]`|u8-VNNI, Quantisierungskerne|1.800|
+|`contextra-durable-fs`|1|`real_vfs`, `atomic` (tmp, fsync, rename, Verzeichnis-fsync), `lock`, `probe` (Startprobe D-56), `scrub` (D-83)|`RealVfs: ports::Vfs`|zweites `Vfs`-Trait, Windows|2.000|
+|`contextra-crypto`|1|`aead` (AES-256-GCM-SIV), `kdf` (Argon2id mit Grenzen D-06), `hkdf`, `mac` (HMAC-SHA256), `tag` (BLAKE3 keyed), `sign` (Ed25519), `nonce` (D-60), `keyslot` (Wrap, AAD D-52)|`KeyManager` (nicht optional), Schlüsseltypen `ZeroizeOnDrop`|`Option<KeyManager>`, Klartextmodus, `legacy-wal-key`, Feature `kv-encryption`, `cloud-egress-guard`|2.500|
+|`contextra-mvcc`|2|`sequence`, `snapshot` (Registry nach `tenant_tag`, D-61), `ssi`|`min_read_snapshot() -> Option<Seq>`|Sentinel `u64::MAX`|3.000|
+|`contextra-store`|2|`wal` (HMAC-Kette, nie umgeschrieben), `memtable`, `sstable` (Block-AEAD, Clusterschnitt D-101), `manifest` (Log, `WalFloor`), `compaction` (kooperativ), `purge` (Primitive), `tenant_scoped` (`TenantScopedStorage`), `health`, `fsync_policy`|`StorageEngine` laut `ports`; Purge-Primitive `drain_range`, `rewrite_without`, `seal_wal_at`, `drop_wal_until`, `unlink_verified`|`std::fs`, `memmap2`, `windows-sys`, Features `memory-only-storage`, `fault-injection`, `block-cache-v2`, `sieve-cache`, `docid-128`, `legacy-wal-key`, `lru`, `uuid`, `quick_cache`|14.000|
+|`contextra-text`|2|`analyzer` (`de/1`, `und/1`), `buffer` (`TextBuf`-Anbindung), `segment` (Schreiben, Lesen, Merge, Rewrite), `postings` (128er-Blöcke, Block-Max), `bm25`, `phrase`, `stats`|`TextIndex` und `ErasureLayer`|Klartext-Terme auf Datenträger, Präfix-/Wildcard-Suche, `bm25f`, `bincode`, `regex`|6.500|
+|`contextra-vector`|2|`arena` (D-86), `hnsw` (Aufbau, Suche), `surrogate`, `repair` (Batch-Kantenreparatur), `rebuild` (deterministisch), `snapshot` (verschlüsselt, über `Vfs`), `distance` (Aufruf von `simd`)|`VectorIndex` und `ErasureLayer`|`diskann`, `quantize`, `rabitq`, `acorn`, `partial_rebuild`, `graph`, `std::fs`, `memmap2`, `sys`, `mvcc`|8.000|
+|`contextra-rank`|2|`rrf`|`fuse(&[RankedList], k) -> Ranked` mit `k_rrf = 60`, Tie-Break nach `doc_tag`|Fusion außer RRF, `dibud`, `drift`, `explain`|400|
+|`contextra-erasure`|3|`vault` (`FileVault`: Tabelle, Slots T/C/S/D/F, Open, Rehash, `RecordSealer`, `FileKeyring`), `gate` (`ErasedSet`, Gate-Log, Batch), `journal` (Append-Log, Reduktion, Epoche), `scope` (Auflösung je Löschung), `saga` (Zustandsmaschine, Treiber, Retention, Idempotenz), `purge` (Reihenfolge, Fenster, Reserve), `measure` (`Scanner<Armed>`, `LayerWitness`, Positivkontrolle), `report` (Bau, kanonisches JSON, Signatur, Restrisiken), `ledger` (Einträge, `LedgerSink`), `restore` (Guard, Replay)|Löschkern laut 11|Kenntnis von `store`, `text`, `vector`, `mvcc`, `engine`|9.000|
+|`contextra-engine`|3|`builder` (`EngineBuilder`), `instance` (Instanz), `tenant`, `collection` (CRUD, Suche, Transaktionen), `search` (Suchstrom mit Nachladen D-62, Fusion), `startup` (14.1), `workers` (Hintergrundtasks), `health`, `wiring` (Tresor, Schichten), `hardening` (D-63)|`Contextra`, `Tenant`, `Collection` (nach `contextra` re-exportiert)|Löschlogik, `chunker`, `extraction`, `export`, `import`, `decay_controller`, `temporal_filter`, `merge_operator_adapter`, Features laut D-84|9.000|
+|`contextra`|4|`api`, `wiring` (`system_defaults()`), `error`|Handles, `Contextra::builder()`|Logik, Profile, Rewriter, Lizenz, Embedder, Re-Export von `DocId`, `chunker`, `rank`|1.000|
+|`contextra-testkit`|dev|`fault_vfs`, `reference_model`, `manual_clock`, `det_rng`, `mem_ports`, `conformance` (Vertragstests für `StorageEngine`, `TextIndex`, `VectorIndex`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink`, `Vfs`)|Nur als Dev-Abhängigkeit|Aufnahme in Produktionsbäume|8.000|
+|`contextra-testmacros`|dev|`ctx_test`, `ctx_bench` (D-100)|Attribute für T-TRACE-1|Laufzeitcode|300|
+|`contextra-lab`|dev|`format` (eigene Parser aller Formate aus Anhang F), `scanner` (MK1–MK3, Positivkontrolle), `crypto_ref` (eigene Primitive-Aufrufe)|Bibliothek für `ctx-verify` und CI-Lab|Abhängigkeit von `store`, `engine`, `erasure`, Produktions-Decodern von `crypto` (AR-4)|4.000|
+|`ctx-verify`|dev/bin|`report` (Berichtsprüfung), `scan` (Feldprüfung), `canonical_json`, `residual_risk`, `journal`, `codes`, `cli`|Binärdatei mit `report` und `scan` (8.17); Exit-Codes 0 und 2|Netzwerk, Secrets in Ausgaben, `store`, `engine`, `erasure`|2.000|
+|`tests/arch`|dev|Architektur-, Ring-, Namens-, Lint-, Doku- und Rückverfolgbarkeitstests (T-ARCH, T-CFG, T-LINT, T-DOC, T-TRACE)|–|Ausnahmen ohne Ablaufdatum|3.000|
 
-### 3.2 Ist-Zustand am HEAD
+Summe der Produktionsbudgets (14 Produktions-Crates): ≈ 64.400 Zeilen.
 
-Marken: **[V]** geprüft am Repository (HEAD `25c8f17` bzw. unverändert gegenüber `33c3e78e4`); **[M]** aus 3.0.0 übernommen (nicht wiederholt).
+### 3.2 Repository-Inventar (Soll)
 
-|ID|Befund|Beleg|
+|Pfad|Inhalt|Regel|
 |---|---|---|
-|F-01|**`contextra-engine` (lib) kompiliert nicht**: 33 Fehler (18× E0609, 6× undefinierter `cfg`-Wert, 4× E0599, 3× E0433) in `collection/search/hybrid`, `transaction/*`, `query_builder`, `background_workers`. Die Fassade `contextra` baut damit nicht. **[M]**|`cargo check --workspace --all-targets --locked` (3.0.0)|
-|F-02|`--all-targets` scheitert in 24 Einheiten: `crypto` (9), `engine` (lib test: 171 Fehler), `ports`, `rank` (3), `store` (4), `text` (2), `vector` (2). **[M]**|`--keep-going` (3.0.0)|
-|F-03|`cargo fmt --check` schlägt fehl (67 Diff-Blöcke). **[M]**|3.0.0|
-|F-04|`crates/contextra-erasure/`: nur `README.md`, `AGENTS.md`; `crates/contextra-lab`, `ctx-verify` fehlen; `ports` und `types` enthalten die Löschtypen nicht. **[V]**|`ls`, `find`|
-|F-05|Rückbau halb fertig: Workspace listet 15 Mitglieder (ohne `contextra-erasure`). **100 Zeilen** verweisen auf `contextra_graph`/`contextra-graph` (33c3e78e4: 101). Der Commit `c2a864d` hat die Ports `graph`, `graph_index`, `checkpoint`, `license`, `attention`, `plugin`, `lifecycle` entfernt; `ports` führt weiter `embedding`, `reranker`, `query_rewriter` (D-24: zu entfernen). `AutoExtractionMode` in 10+ Dateien. **[V]**|`grep -rIn "contextra_graph\|contextra-graph" crates tests tools .github Cargo.toml Cargo.lock`|
-|F-06|**Undeklarierte `cfg(feature)`** (kein `[features]`-Eintrag): `encryption-at-rest` (11 Treffer, `store`), `adaptive-candidate-pool-sizing` (7), `onnx` (2), `graph-connectivity-health` (1), `sandbox` (1) (alle `engine`). 11 Treffer `#[allow(unexpected_cfgs)]`. **[V]**|Skript über alle `cfg(feature = …)` gegen `[features]` je Crate|
-|F-07|*(Stand `f8a3bbb24`: siehe F-29)* **Snapshot-Sentinel unverändert:** `.unwrap_or(u64::MAX)` in `store/src/lsm/ops/compaction.rs:228`. **[V]**|Quelltext|
-|F-08|**Delete-Race unverändert:** `let _guard = …lock_for(id).await; drop(_guard);` in `engine/src/collection/crud/delete.rs`. **[V]**|Quelltext|
-|F-09|**Verschlüsselung optional:** `encryption_mode: Option<EncryptionMode>` im Builder (`contextra/src/builder.rs:86`); `Option<Arc<KeyManager>>` im WAL (`store/src/wal/mod.rs:323,353,401,445`). **[V]**|Quelltext|
-|F-10|**Mandantenpolitik:** `TenantPolicy` Default `Optional` (`engine/src/lib.rs:333`). **[V]**|Quelltext|
-|F-11|**KDF:** Untergrenze `MIN_M_COST_KIB = 19456`, `t ≥ 2` (`crypto/src/kdf.rs:36`); keine Obergrenze. `try_new(passphrase, salt)` leitet per HKDF aus der Passphrase ab. **[V]**|Quelltext|
-|F-12|**`DocId(pub u64)`** (Feature `docid-128` → `u128`), unkeyed (`types/src/types/domain/ids.rs:173,180`). **[V]**|Quelltext|
-|F-13|*(Stand `f8a3bbb24`: Teil 1 behoben, siehe F-29)* **Zwei `Vfs`-Traits:** `ports/src/vfs.rs:115` (seit `c2a864d` gehärtet) und `durable-fs/src/vfs.rs:54` (noch vorhanden); `store` greift 155-mal direkt auf das Dateisystem zu, `vector` 53-mal (Zählung 33c3e78e4). **[V]**|`grep "std::fs\|tokio::fs\|File::open\|File::create"`|
-|F-14|`block_on` an 7 Stellen in `crates/*/src`, davon **1 produktiv** (`engine/src/merge_operator_adapter.rs:114`, `WasmMergeOperator`-Worker). Die übrigen 6 liegen in Testmodulen. **[V]**|`grep`|
-|F-15|Produktionsmuster (Obergrenzen): `.unwrap()` **1.120** · `.expect(` **1.043** · `panic!` **72** (exakt wie 3.0.0). `let _ =` 237 · `#[allow` 134 · `HashMap/HashSet` 211 · `Instant::now/SystemTime::now` 24 · `thread_rng/from_entropy` 12 **[M]**|`grep` über `crates/*/src`|
-|F-16|**`tokio` mit Feature `full`** im Workspace (`Cargo.toml`); `Cargo.lock` enthält `mio` und `socket2`. Quelltext nutzt `tokio::net`/`std::net` nicht (0 Treffer). Das widerspricht HR-1, solange `net` im Baum ist. **[V]**|`Cargo.toml`, `Cargo.lock`, `grep`|
-|F-17|CI: 19 Workflows, **15× `continue-on-error`**. `deny.toml`: 6 ignorierte Advisories **ohne Ablaufdatum**; `clarify` und `wrappers` verweisen auf entfernte Crates (`contextra-mcp`, `-db`, `-graph`, …). **[V]**|`.github/workflows`, `deny.toml`|
-|F-18|`unsafe`: `contextra-simd` 278 Treffer, `contextra-sys` 57 Treffer (nach dem Härtungs-Commit `9f1e77633`; 3.0.0: 269/21). 12 Crates tragen `#![forbid(unsafe_code)]`. Zwei `safe`-Funktionen mit `unsafe`-Inhalt (`mmap_readonly`, `reopen_and_dup2`) laut Audit [D]. **[V]** für die Zählung|`grep unsafe`|
-|F-19|Positiv: Workspace-Lints (`unwrap_used`, `expect_used`, `panic`, `indexing_slicing`, …) sind `deny`; `mvcc` 47/47, `simd` 13/13, `sys` 30/30 Lib-Tests bestanden (3.0.0). **[M]**|`cargo test --lib`|
-|F-20|`governance/ratchet.toml` (in 3.0.0 als Budget-Quelle referenziert) existiert nicht. **[V]**|`ls`|
-|F-21|**Downgrade-Pfad im WAL-HMAC:** Laufzeitparameter `allow_legacy_integrity_key_fallback` (`store/src/wal/io.rs:27,274,422`, `flusher.rs:182`) und Feature `legacy-wal-key`. Widerspricht P3 und D-05. **[V]**|Quelltext|
-|F-22|**Windows-Code in der `unsafe`-Insel:** `contextra-sys/src/acl_win32.rs` und 24 `cfg(windows)`-Stellen, obwohl Windows nicht unterstützt wird (D-56). Vergrößert die Auditfläche ohne Nutzen. **[V]**|`grep`|
-|F-23|**Produktfremde Features in Produktionscrates:** `experimental-diskann` (`engine`, `vector`), `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `graph` (`vector`); `memory-only-storage`, `fault-injection`, `legacy-wal-key`, `block-cache-v2`, `sieve-cache` (`store`); `cloud-egress-guard`, `kv-encryption` (`crypto`); `auto-extraction-opt-out`, `entity-extraction`, `edge-reinforcement-learning`, `reranking` (`engine`). **[V]**|`[features]`-Abschnitte|
-|F-24|**Kryptoalgorithmen:** Im Code existiert nur AES-256-GCM-SIV (`aes-gcm-siv`); AES-256-GCM und ChaCha20-Poly1305 (so in 3.0.0 8.6 für Block-AEAD genannt) sind nicht vorhanden. Nonce-Schema im Code: 4 Byte Zufallspräfix je `KeyManager` plus 8-Byte-Zähler (`crypto/src/crypto.rs`), nicht „96 Bit OS-CSPRNG“ wie in 3.0.0 D-60. **[V]**|Quelltext|
-|F-25|Dokumente widersprechen sich (`VETOES.md`, `CONSTITUTION.md`, `ARCHITECTURE.md`, `SECURITY.md`, `SOURCE_OF_TRUTH.md`, `PLAN.md`, `docs/DELETION-DSGVO.md` zu Ebene B, Fassungen, Gates). Aufgelöst durch die Festlegung „nur SPEC.md ist Quelle der Wahrheit“ (Kopf, Anhang E). **[D]**|Dokumentvergleich|
-|F-26|**Fassade `contextra` widerspricht §7 und D-05/D-07/D-23/D-24:** `builder(dimension)` mit fester Dimension, `EncryptionMode::Unencrypted`, `LicenseGate`/`with_license_gate`, `TextEmbeddingEngine`/`with_embedder`, `LlmQueryRewriter`, `collection_profile.rs`, `performance_profile.rs`, Re-Export von `DocId` und `chunker`; kein `tenant()`, `erase()`, `report()`, kein `DocRef`. `lib.rs` behauptet „zero direct dependencies on Ring 0/1“, die `Cargo.toml` hängt an `types`, `ports`, `crypto`, `store`, `rank`. `README` nennt `Collection::delete` (D-51). `AGENTS.md` enthält einen absoluten Entwicklerpfad. **[V]**|`crates/contextra/src`, `Cargo.toml`, `README.md`, `AGENTS.md`|
-|F-27|**Abhängigkeitskanten gegen Matrix 5.3** (aus den `Cargo.toml`): `engine→sys`, `vector→sys`, `vector→mvcc` nicht in der Matrix; `engine→durable-fs` und `engine→erasure` (vorgeschrieben) fehlen; `text→crypto` (erlaubt, nötig für D-85) fehlt; für `contextra` gab es keine Matrixzeile (behoben durch D-88). `tokio` mit `features = ["full"]` wird von 10 Crates geerbt (F-16). **[V]**|`Cargo.toml` aller Crates|
-|F-28|**Ring-Angaben in `lib.rs`-Köpfen widersprechen 5.1:** `store` „Ring 1“, `text` und `rank` „Ring 0“, `vector` „Layer-1“, `engine` „Ring 2“ und „Layer 3“ im selben Kopf; `types` nennt 30 Konsumenten, davon rund 20 gelöschte Crates. Ursache: handgeschriebene Angaben ohne Test (D-91, T-ARCH-5). **[V]**|`crates/*/src/lib.rs`|
-|F-29|**Korrektur zu F-07 und F-13 am HEAD `f8a3bbb24`:** (a) F-13: Das zweite `Vfs`-Trait in `durable-fs` ist entfernt (`RealVfs` implementiert `ports::Vfs`); offen bleiben **169** direkte Dateizugriffe in `store` und **51** in `vector` (`grep "std::fs\|tokio::fs\|File::open\|File::create\|OpenOptions"`). (b) F-07: Der Treffer `compaction.rs:228` ist nicht mehr vorhanden; der Sentinel steht aber weiter in `mvcc/src/snapshot.rs:314` (`update_min`: `.unwrap_or(u64::MAX)`, Kommentar „ist der korrekte Standardwert“) und widerspricht 8.7. **[V]**|`grep`, Quelltext|
-|F-30|**Benennung und Struktur:** Modul `engine/src/contextra_impl` (die eigentliche Instanz, Name ohne Aussage); `Cargo.toml` führt den Alias `contextra-index` auf `contextra-vector`; `types/src/types.rs` + `types/src/types/` und `types::types::domain` (Crate, Modul und Pfad gleichnamig); Dateien `misc.rs` (`types`) und `util.rs` (`store`); gemischte Modulform (`foo.rs` + `foo/` neben `mod.rs`) in 5 Fällen (`store/compaction`, `store/sstable`, `text/inverted`, `text/morphology`, `types/types`); Dateiköpfe mit `FILE-CONTEXT`, `ANCHOR[...]`, `STAND: TS:…`, `SESSION:`. **[V]**|`find`, `grep`|
-|F-31|**Umfang gegenüber D-24/D-26/D-84 (Zeilen `src`, inkl. Inline-Tests, Obergrenzen):** `vector`: `diskann` 4.122, `quantize` 1.116, `quantize_rabitq` 506, `partial_rebuild` 363, `acorn` 213; `rank` gesamt 3.440 (`fusion` 2.252, `dibud` 524, `explain` 469, `drift` 139, `lib` 56; die Angabe 5.553 in 4.1.0 nannte keine Zählmethode und stimmt mit den Teilsummen nicht überein) bei Soll „nur RRF“; `types/types/saos.rs` 940; `engine`: `chunker` 1.533, `extraction` 642, `export`+`import` 528, `decay_controller` 115, `temporal_filter` 359, `merge_operator_adapter` 201. Restmuster (`crates/*/src`, Dateien/Treffer): `DocId` 95/791, `contextra_graph` 18/78, `LicenseGate` 5/25, `AutoExtractionMode` 4/24, `TextEmbeddingEngine` 10/28, `Reranker` 9/76, `TenantPolicy` 3/10, `saos` 4/20, `allow_legacy_integrity_key_fallback` 28 Treffer, `Option<Arc<KeyManager>>`/`Option<EncryptionMode>` 15 Treffer. Undeklarierte `cfg(feature)`: `encryption-at-rest`, `adaptive-candidate-pool-sizing`, `partial-index-rebuild`, `onnx`, `graph-connectivity-health`. **[V]**|`wc -l`, `grep`|
-|F-32|**Der Workspace baut am HEAD `4e208c179` nicht.** `contextra-store`: 4 Fehler (2× E0433 `contextra_ports::license` nicht gefunden, `lsm/config.rs:44,58`; 2× E0133 Aufruf der `unsafe fn contextra_sys::mmap_readonly` in `wal/replay.rs:158,210`). `contextra-vector`: 1 Fehler (E0133, `persistence/mmap.rs:24`). `contextra-engine` und `contextra` wurden wegen dieser Abhängigkeiten nicht erreicht; ob F-01 fortbesteht, ist offen. Fehlerfrei (Lib-Targets): `types`, `ports`, `sys`, `crypto`, `mvcc`, `simd`, `text`, `rank`, `durable-fs`, `arch-tests`. **`Cargo.lock` ist veraltet:** `cargo check --locked` bricht ab, das Nachziehen ändert 110 Zeilen. Ursachen: Der Port `license` wurde in `c2a864d` entfernt, `LicenseGate` hat aber noch 25 Treffer in 5 Dateien; `mmap_readonly` ist durch die Härtung `unsafe fn`, die Aufrufer sind `forbid(unsafe_code)`-Crates. **[M]**|`cargo check --workspace --keep-going --message-format=short`, `cargo check --locked`|
-|F-33|**Der Löschkern fehlt vollständig.** `crates/contextra-erasure/` enthält nur `README.md` und `AGENTS.md` und ist kein Workspace-Mitglied; `contextra-lab` und `ctx-verify` fehlen. In `crates/*/src` haben `ErasedSet`, `ReadGate`, `ErasureLayer`, `LayerWitness`, `FileVault`/`KeyDestroy` **0 Treffer**, `rewrite_without`/`rewrite_file` 0, `purge` 3, `saga` 6. `types/src/erasure.rs` (44 Zeilen) enthält nur `ScanMethod`, `RequestContext`, `SagaRecord`; nichts davon ist Soll (8.1). **[V]**|`ls`, `grep`|
-|F-34|**Fassade, Ist-Abhängigkeiten:** `contextra` hängt an `types`, `ports`, `engine`, `store`, `crypto`, `rank` (Soll `engine`, `durable-fs`, `types`); `durable-fs` fehlt, daher hat `RealVfs` **keine eingehende Kante** (kein Crate nutzt `durable-fs`; `store` nutzt `std::fs` mit 171, `vector` mit 54 Treffern, Muster inkl. `memmap2`). `lib.rs` behauptet „zero direct dependencies on Ring 0/1“ und nennt `contextra-mcp` (existiert nicht). `builder.rs` 551, `collection_profile.rs` 198, `performance_profile.rs` 267, `query_rewriter.rs` 262, `rng.rs` 75 Zeilen. **[V]**|`Cargo.toml`, `wc -l`, `grep`|
-|F-35|**Matrix und Ringköpfe am HEAD `4e208c179`:** `vector→sys` und `vector→mvcc` (verboten, D-88); `engine` ohne `durable-fs` und `erasure`; `text` ohne `crypto`; `store` hat `vector` als Dev-Abhängigkeit (AR-2 dem Sinn nach); Selbst-Dev-Abhängigkeiten zum Aktivieren von Features (`store`, `crypto`, `contextra`). Die `//!`-Köpfe nennen falsche Ringe in 8 Crates (`crypto` 0 statt 1, `mvcc` 0 statt 2, `simd` 0 statt 1, `sys` 0 statt 1, `store` 1 statt 2, `text` 0 statt 2, `rank` 0 statt 2, `engine` 2 statt 3) und keine Angabe in `vector`; `text` und `rank` nennen Verbraucher, die nicht existieren (`contextra-db`, `-router`, `-agent`, `-bench`, `-infer-*`, `-mcp`, `-py`). `tests/arch` enthält die richtige Ringtabelle, aber keine Prüfung T-ARCH-5..8. **[V]**|`Cargo.toml` aller Crates, `lib.rs`, `tests/arch/src/lib.rs`|
-|F-36|**Umfang außerhalb des Soll, neu gezählt (Zeilen `src`, inkl. Inline-Tests):** `vector` 6.320 von 13.624 (46,4 %: `diskann` 4.122, `quantize` 1.116, `quantize_rabitq` 506, `partial_rebuild` 363, `acorn` 213); `engine` 3.378 (`chunker` 1.533, `extraction` 642, `export`+`import` 528, `temporal_filter` 359, `merge_operator_adapter` 201, `decay_controller` 115); `types/saos.rs` 940; `ports` 317 (`embedding` 245, `reranker` 22, `query_rewriter` 50) plus `contract_tests.rs` 494 (gehört ins `testkit`); Fassade 727 (Profile, Rewriter); `sys` 705 (`acl_win32.rs` 536, `mmap.rs` 169); `rank` bis ≈ 2.500 (außer `fusion/rrf.rs` 875). Summe ≈ 12.400, mit `rank` bis ≈ 14.900 von ≈ 101.600 Zeilen = **12–15 %**; Budget 5.8 verlangt ≥ 30 %. **[V]** für die Zählung, **[A]** für die Summe|`wc -l`, Zählskript des Reviews|
-|F-37|**Quellbaum-Hygiene:** `FILE-CONTEXT` in 234 Dateien (624 Treffer), `ANCHOR[` in 260 Dateien (1.310 Treffer), `STAND:` in 114, `SESSION:` in 72, `/home/freddy` in 18 Dateien (38 Treffer); 15 `crates/*/AGENTS.md` plus `tests/arch/AGENTS.md`; `.agents/` (408 KB), `.gemini/`, `.antigravity/`, `reports/`, `evidence/` (38 MB, darin 4 `sqlcipher_probe`-Cargo-Projekte); Einmalwerkzeuge `tools/*.py` und `scripts/contextra_full_audit.py`. Die Wurzel-`AGENTS.md` widerspricht dieser Spezifikation: nennt „Soll-Zustand v2.0.0“, behauptet „ADR-001: Ebene B entfällt“ (D-01: Schlüsselvernichtung ist in v1), enthält einen absoluten Entwicklerpfad und verweist auf `PLAN.md` (existiert nicht). Dazu: 15 von 19 Workflows mit `continue-on-error` (F-17 unverändert), `tokio` weiter mit `features = ["full"]` (F-16 unverändert), `rust-toolchain.toml` pinnt `1.89.0` (D-82). **[V]**|`grep`, `du`, `ls`|
+|`Cargo.toml`, `Cargo.lock`|Workspace mit 14 Produktions-Crates plus 5 Hilfsmitgliedern; `default-members` = 14 Produktions-Crates|`Cargo.lock` eingecheckt, im selben Commit wie jede Manifest-Änderung erneuert (D-93)|
+|`rust-toolchain.toml`|Build-Toolchain nach D-82 und D-104|–|
+|`deny.toml`, `clippy.toml`|Lizenz-, Ban- und Advisory-Regeln (D-54, D-105); Clippy-Konfiguration|Advisory-Ausnahmen nur mit Ablaufdatum und ADR|
+|`governance/`|`ratchet.toml` (Muster- und Größenbudgets), `exceptions.toml` (befristete Ausnahmen), `deps.toml` (Abhängigkeits-Whitelist D-105)|Nur sinkend bzw. befristet|
+|`docs/SPEC.md`, `docs/PLAN.md`|Normative Spezifikation, Umsetzungsspezifikation|D-99|
+|`docs/OPERATIONS.md`, `docs/DSFA-BAUSTEIN.md`, `docs/SECURITY.md`-Verweis, `docs/adr/`|Betrieb, DSFA-Baustein (Anhang G), ADRs|17.5|
+|`AGENTS.md` (Wurzel), `crates/*/AGENTS.md`, `crates/*/README.md`|Abgeleitete Einstiegs- und Crate-Hinweise|D-98, T-DOC-1; kein Entwicklerpfad, keine Sitzungskennung|
+|`.github/workflows/`|`ci` (check, fmt, clippy, test), `deny`, `audit`, `unsafe` (miri, asan), `loom`, `fuzz`, `mutants`, `bench`, `release`|Kein `continue-on-error` auf Sicherheits- und Korrektheitsjobs; kein Python-, MCP- oder Wheel-Workflow|
+|`tests/arch/`, `fuzz/`, `benches/`|Architekturtests, Fuzz-Ziele für alle Parser aus Anhang F, Benchmark-Harness `ctx-bench`|–|
+|`evidence/` (nur Release-Evidenzbündel als Archiv-Verweis), `tools/`|Keine Einmalwerkzeuge, keine Sitzungsverläufe, keine Prüfprotokolle im Quellbaum|T-ARCH-8|
 
-### 3.3 Auflösung der Dokumentkonflikte (verbindlich)
+### 3.3 Konflikte zwischen früheren Dokumenten (verbindlich aufgelöst)
 
 |#|Konflikt|Entscheidung|Begründung|
 |---|---|---|---|
-|KF-1|Schlüsselvernichtung in v1? (ADR-001/VETO-D01 „nein“ vs. SPEC D-01 „ja“)|**Ja.** Drei Säulen (Gate und Purge, Schlüsselvernichtung, Messung). ADR-002 ersetzt ADR-001; VETO-D01 entfällt (Anhang E).|Das Datenformat (Record-Envelope, Tresor-Salt) lässt sich nach Auslieferung nicht rückwirkend einführen. Physisches Überschreiben ist auf Flash/COW unzuverlässig; Schlüsselvernichtung reduziert den Aufwand auf kleine Objekte und ist technisch anerkannt (NIST SP 800-88 Rev. 2, Cryptographic Erase [D]). Die rechtliche Wertung bleibt beim Betreiber (E-L2).|
+|KF-1|Schlüsselvernichtung in v1? (ADR-001/VETO-D01 „nein“ vs. D-01 „ja“)|**Ja.** Drei Säulen (Gate und Purge, Schlüsselvernichtung, Messung). ADR-002 ersetzt ADR-001; VETO-D01 entfällt (Anhang E).|Das Datenformat (Record-Envelope, Tresor-Salt) lässt sich nach Auslieferung nicht rückwirkend einführen. Physisches Überschreiben ist auf Flash/COW unzuverlässig; Schlüsselvernichtung reduziert den Aufwand auf kleine Objekte und ist technisch anerkannt (NIST SP 800-88 Rev. 2, Cryptographic Erase [D]). Die rechtliche Wertung bleibt beim Betreiber (E-L2).|
 |KF-2|Restriktion (Art. 18) in v1?|**Ja** als Gate-Variante `Restricted` (D-15).|Das Gate existiert ohnehin; Nachrüsten kostet mehr als Mitliefern.|
 |KF-3|Textindex: Postings als Einzelschlüssel oder Segmentindex?|**Segmentindex** (D-20).|Einzelschlüssel streuen jedes Dokument über den Schlüsselraum und zerstören P11.|
 |KF-4|Erase-Rückgabe nach `Gated`|bestätigt, p50 plattformrelativ (D-30).|–|
 |KF-5|`K_master = Argon2id(passphrase)` oder zufällig mit Keyslots?|**Keyslots** (D-52).|Passphrasenwechsel ohne Neuverschlüsselung (ISO 27001 A.8.24, Personalwechsel).|
 |KF-6|`Collection::delete`|**Umbenannt** in `soft_delete` (D-51).|Das Verb „delete“ suggeriert Löschung (H1).|
-|KF-7|Crate-Zahl|14 Produktions-Crates + `testkit` + `tests/arch` + `lab` + `ctx-verify`.|5.1|
-|KF-8|Rechtsfristen|Siehe 6.2/6.6 (Stand 2026-11-02 [W]): CRA-Meldepflichten (Art. 14) **seit 11.09.2026**, übrige CRA-Pflichten ab 11.12.2027; neues ProdHaftG (Software als Produkt) vom Bundestag am **08.10.2026** beschlossen, gilt für Produkte, die ab **09.12.2026** in Verkehr gebracht werden; EDPB Guidelines 02/2026 (Anonymisierung) als Entwurf, **Konsultation am 30.10.2026 (23:59 CET) beendet**, Endfassung offen.|6.2, 6.6|
-|KF-9|Wo stehen Byte-Formate und Umsetzungsplan?|**In dieser Datei** (Anhang F, 15.4). `docs/FORMATS.md` und `PLAN.md` sind nicht normativ.|Einzige Quelle der Wahrheit; `lab` und `ctx-verify` implementieren die Formate aus Anhang F unabhängig.|
+|KF-7|Crate-Zahl|14 Produktions-Crates plus `testkit`, `testmacros`, `lab`, `ctx-verify`, `tests/arch` (D-100).|5.1|
+|KF-8|Rechtsfristen|Siehe 6.2 und 6.6 (Stand 2026-11-02 [W]): CRA-Meldepflichten (Art. 14) seit 11.09.2026, übrige CRA-Pflichten ab 11.12.2027; neues ProdHaftG (Software als Produkt) vom Bundestag am 08.10.2026 beschlossen, gilt für Produkte, die ab 09.12.2026 in Verkehr gebracht werden; EDPB Guidelines 02/2026 (Anonymisierung) als Entwurf, Konsultation am 30.10.2026 beendet, Endfassung offen.|6.2, 6.6|
+|KF-9|Wo stehen Byte-Formate und Umsetzungsplan?|Formate in **Anhang F dieser Datei**. Der Umsetzungsplan steht in **`docs/PLAN.md`** als abgeleitete, aber verbindliche Umsetzungsspezifikation (D-99); `docs/FORMATS.md` entfällt.|Einzige Quelle der Wahrheit für Verhalten und Formate; Arbeitspakete und Ist-Zustand ändern sich häufiger als die Spezifikation und gehören nicht in sie.|
 
-### 3.4 Nicht geprüft (bewusst nicht behauptet)
+### 3.4 Bewusst nicht behauptet
 
-Kompilier-, `fmt`-, `clippy`-, Test- und Benchmarkstand am neuen HEAD (keine Toolchain; Werte aus 3.0.0); `miri`, `loom`, Fuzz, Mutation; Inhalt der nicht kompilierenden Teile von `contextra-engine`; HNSW-Snapshot-Format im Detail; ob der Blockcache entschlüsselte Blöcke hält; Kompaktions-Retention-Semantik; konkrete Argon2-Parameterprüfung über `kdf.rs:36` hinaus. Rechtsquellen jenseits ProdHaftG, EDPB 02/2026 und Rust-Release-Stand (6.2) sind **[D]** und gehören in Gate G-LEGAL. Jede Lücke hat ein Arbeitspaket mit Messung (15.4).
+Diese Spezifikation enthält keine Messwerte. Kompilier-, Test-, Fuzz-, Mutations- und Benchmarkstände gehören ins Evidenzbündel (HR-11). Rechtsquellen jenseits ProdHaftG, EDPB 02/2026 und CRA (6.2) sind **[D]** und gehören in Gate G-LEGAL.
 
 ---
 
 ## 4. Entscheidungsregister (final)
 
-Jede Entscheidung nennt Begründung und belegenden Test. **Fett** gesetzte IDs wurden gegenüber 3.0.0 geändert oder sind neu. `entfällt` heißt: in v1 nicht vorhanden; die ID bleibt reserviert.
+Jede Entscheidung nennt Begründung und belegenden Test. `entfällt` heißt: in v1 nicht vorhanden; die ID bleibt reserviert.
 
 ### 4.1 Löschen, Speicher, Schlüssel
 
 |ID|Entscheidung|Begründung|Test / Beleg|
 |---|---|---|---|
-|**D-01**|**Löschen in drei Säulen, alle in v1:** (1) Gate und physischer Purge, (2) Schlüsselvernichtung über den Tresor (höchste Ebene des Ziels, D-79), (3) unabhängige Messung mit signiertem Bericht. ADR-002 ersetzt ADR-001. Die Säulen sind **Verteidigung in der Tiefe, keine rechtliche Wertung** (E-L2). **Die Reichweite der Schlüsselvernichtung ist je Schicht ausgewiesen (`key_coverage`, D-69):** sie macht Dokumentspeicher und Vektor-Payload unlesbar und löst die Bindung der Textpostings; Kanten und Dateistrukturen werden durch Purge und Dateischlüssel-Vernichtung (D-85) beseitigt, bis dahin schützt das Gate.|Überschreiben garantiert auf Flash/COW nichts. Der Satz „Remanenzfläche = 80-Byte-Objekt je Dokument“ aus 3.0.0 galt nur für Dokumentspeicher und Vektor-Payload und entfällt (P17).|T-VAULT-*, T-KEYCOV-1, T-RAW-*, T-PROOF-1|
+|**D-01**|**Löschen in drei Säulen, alle in v1:** (1) Gate und physischer Purge, (2) Schlüsselvernichtung über den Tresor (höchste Ebene des Ziels, D-79), (3) unabhängige Messung mit signiertem Bericht. ADR-002 ersetzt ADR-001. Die Säulen sind **Verteidigung in der Tiefe, keine rechtliche Wertung** (E-L2). **Die Reichweite der Schlüsselvernichtung ist je Schicht ausgewiesen (`key_coverage`, D-69):** sie macht Dokumentspeicher und Vektor-Payload unlesbar und löst die Bindung der Textpostings; Kanten und Dateistrukturen werden durch Purge und Dateischlüssel-Vernichtung (D-85) beseitigt, bis dahin schützt das Gate.|Überschreiben garantiert auf Flash/COW nichts. Die Aussage „Remanenzfläche = 80-Byte-Objekt je Dokument“ gilt nur für Dokumentspeicher und Vektor-Payload (P17).|T-VAULT-*, T-KEYCOV-1, T-RAW-*, T-PROOF-1|
 |**D-02**|**Eigener LSM-Tree bleibt, nur mit Löschcluster-Schlüsselraum (D-31).** Gate **G0** (11.9) entscheidet verbindlich mit Zahlen und läuft als Prototyp **mit** den Varianten D-70 und D-71. Rückfall nur über die Fallbackleiter 11.9; jede Stufe bedeutet Neufassung der betroffenen Abschnitte, nicht stilles Weiterlaufen.|Der LSM-Vorteil ist die Dateigranularität. Mit verstreuten Hash-Schlüsseln läge ein Dokument in ca. 26 % aller Dateien (Rechnung 11.9).|BM-ERASE-WA, T-DIFF-1|
-|**D-03**|Ports mit Heißpfad (`StorageEngine`, `TextIndex`, `VectorIndex`) sind **statisch dispatcht**: `async fn` in Traits bzw. `-> impl Future + Send`; die Engine ist generisch darüber. Kalte Ports (`ErasureLayer`, `RecordSealer`, `FileKeyring`, `LedgerSink`, `Metrics`, `Clock`, `Rng`, `IdGen`) und `Vfs` sind dyn-fähig (`BoxFuture`). Kein `block_on` im Bibliothekscode.|`BoxFuture` allokiert je Aufruf und verhindert Inlining; auf `get`, `scan` und Postings-Abfragen ist das messbar, bei Datei-I/O nicht. Synchrone Ports über asynchroner I/O erzwingen `block_on` und Deadlocks (F-14).|T-LINT-2, BM-GET|
-|D-04|**Ein** `Vfs`-Trait in `ports`, Implementierung in `durable-fs`. Store, Vektor, Text und Erasure nutzen ausschließlich `Vfs`.|F-13. Fehler- und Crashinjektion setzt `Vfs` voraus.|T-LINT-2, T-CRASH-*|
-|D-05|Verschlüsselung und WAL-Integrität sind nicht abschaltbar. Kein `Option<KeyManager>`, kein Klartextmodus, kein Feature `wal-integrity`/`encryption-at-rest`/`legacy-wal-key`, **kein Laufzeitparameter für Integritäts-Downgrade** (`allow_legacy_integrity_key_fallback` entfällt).|F-06, F-09, F-21. Ein Opt-out erzeugt Parallelbestände und einen Angriffspfad.|T-DEF-1, T-CFG-1|
-|**D-06**|Passphrase nur über Argon2id. **Grenzen (hart, vor dem Start der Ableitung geprüft):** `m` ∈ [64 MiB, 4 GiB], `t` ∈ [3, 16], `p` ∈ [1, 16]. Verstoß: `Corrupt` (Header) bzw. `Config` (Builder). HKDF nur für Subkeys.|F-11. Untergrenze folgt RFC 9106 (64 MiB, t = 3) [D]. Die Obergrenze verhindert Ressourcenerschöpfung durch einen manipulierten Header (CWE-770); der Header wird vor der Passphrasenprüfung gelesen.|T-KDF-1, T-KDF-2 (Fuzz)|
+|**D-03**|Ports mit Heißpfad (`StorageEngine`, `TextIndex`, `VectorIndex`) sind **statisch dispatcht**: `async fn` in Traits bzw. `-> impl Future + Send`; die Engine ist generisch darüber. Kalte Ports (`ErasureLayer`, `RecordSealer`, `FileKeyring`, `LedgerSink`, `Metrics`, `Clock`, `Rng`, `IdGen`) und `Vfs` sind dyn-fähig (`BoxFuture`). Kein `block_on` im Bibliothekscode.|`BoxFuture` allokiert je Aufruf und verhindert Inlining; auf `get`, `scan` und Postings-Abfragen ist das messbar, bei Datei-I/O nicht. Synchrone Ports über asynchroner I/O erzwingen `block_on` und Deadlocks.|T-LINT-2, BM-GET|
+|D-04|**Ein** `Vfs`-Trait in `ports`, Implementierung in `durable-fs`. Store, Vektor, Text und Erasure nutzen ausschließlich `Vfs`.|Fehler- und Crashinjektion setzt `Vfs` voraus.|T-LINT-2, T-CRASH-*|
+|D-05|Verschlüsselung und WAL-Integrität sind nicht abschaltbar. Kein `Option<KeyManager>`, kein Klartextmodus, kein Feature `wal-integrity`/`encryption-at-rest`/`legacy-wal-key`, **kein Laufzeitparameter für Integritäts-Downgrade** (`allow_legacy_integrity_key_fallback` entfällt).|Ein Opt-out erzeugt Parallelbestände und einen Angriffspfad.|T-DEF-1, T-CFG-1|
+|**D-06**|Passphrase nur über Argon2id. **Grenzen (hart, vor dem Start der Ableitung geprüft):** `m` ∈ [64 MiB, 4 GiB], `t` ∈ [3, 16], `p` ∈ [1, 16]. Verstoß: `Corrupt` (Header) bzw. `Config` (Builder). HKDF nur für Subkeys.|Untergrenze folgt RFC 9106 (64 MiB, t = 3) [D]. Die Obergrenze verhindert Ressourcenerschöpfung durch einen manipulierten Header (CWE-770); der Header wird vor der Passphrasenprüfung gelesen.|T-KDF-1, T-KDF-2 (Fuzz)|
 |D-68|KDF-**Standard** m = 128 MiB, t = 3, p = 4; die Parameter stehen im Keyslot und sind je Slot änderbar.|Parallelität erhöht die Kosten für Angreifer bei gleicher Latenz des Betreibers.|T-KDF-1|
-|D-07|`TenantContext` ist Pflicht. Keine mandantenlose Zugriffsfunktion; `TenantPolicy` entfällt.|F-10.|T-API-1 (trybuild)|
-|**D-08**|Dokumentidentität: `doc_tag = tag("ctx/doc/v2", tenant_tag ‖ coll_tag ‖ subject_tag_oder_0¹⁶ ‖ doc_key)`. **Der Betroffene ist Teil der Identität** (D-70). Kollision zweier verschiedener `(subject, doc_key)` mit gleichem `doc_tag` → `Conflict::IdCollision` (Vergleich der entschlüsselten Identität im vorhandenen Record).|F-12. 128 Bit keyed, nicht aus Nutzerkennung berechenbar.|T-ISO-3, T-DOCREF-1|
+|D-07|`TenantContext` ist Pflicht. Keine mandantenlose Zugriffsfunktion; `TenantPolicy` entfällt.|Ohne Mandantenkontext gibt es keine Isolation (P4).|T-API-1 (trybuild)|
+|**D-08**|Dokumentidentität: `doc_tag = tag("ctx/doc/v2", tenant_tag ‖ coll_tag ‖ subject_tag_oder_0¹⁶ ‖ doc_key)`. **Der Betroffene ist Teil der Identität** (D-70). Kollision zweier verschiedener `(subject, doc_key)` mit gleichem `doc_tag` → `Conflict::IdCollision` (Vergleich der entschlüsselten Identität im vorhandenen Record).|128 Bit keyed, nicht aus Nutzerkennung berechenbar.|T-ISO-3, T-DOCREF-1|
 |D-09|Alle Schlüsselkomponenten **und alle Datei- und Verzeichnisnamen** sind blinde Tags oder zufällige IDs (D-75). Nutzerkennungen stehen nur verschlüsselt im Wert.|Der Indexbereich einer SSTable und der Verzeichnisbaum dürfen keine Nutzerdaten enthalten.|T-RAW-4, T-RAW-6|
 |D-10|Matcher sind **Schlüsselbereiche fester Tag-Länge** plus **exakte Schlüssel**. Keine String-Präfixe, keine variablen Präfixe.|Variable Präfixe waren Ursache des Datenvernichtungsfehlers im Altbestand (HR-7).|T-ISO-2, T-KEY-1|
 |D-11|Zeitreisen bleiben. Purge entfernt alle Versionen. Offene Snapshots **desselben Mandanten** (D-61), die ein Ziel berühren, werden widerrufen (`SnapshotRevoked`). `history_horizon` (Standard 24 h) begrenzt die Versionsmenge.|Warten auf Snapshots macht Löschfristen unbegrenzt.|T-VER-1, T-SNAP-1|
@@ -219,18 +208,18 @@ Jede Entscheidung nennt Begründung und belegenden Test. **Fett** gesetzte IDs w
 |D-15|`RetentionAttestation` ist Pflicht. **`Restricted` (Art. 18) ist Gate-Variante in v1**; eine Fristenautomatik ist kein v1-Umfang.|KF-2.|T-API-2, T-RESTR-1|
 |D-16|Keine Checkpoints, Forks, Hardlink-Klone.|Jede Kopie liegt außerhalb der Löschgrenze.|T-ARCH-3|
 |D-17|Graph und Relationen entfernt, nicht per Feature abgeschaltet.|P5; Kantenreparatur pro Löschung im Graph ist fehleranfällig. (Nicht zu verwechseln mit den HNSW-Kanten, D-77.)|T-ARCH-3|
-|**D-18**|Vektorlöschung: siehe **D-77** (Surrogat sofort, Batch-Kantenreparatur im Purge-Fenster, deterministischer Rebuild). Die Fassung „Nullen und Kanten bis Rebuild“ aus 3.0.0 entfällt.|Nullvektoren zerstören die Navigation (D-77).|T-VEC-DEL-*|
+|**D-18**|Vektorlöschung: siehe **D-77** (Surrogat sofort, Batch-Kantenreparatur im Purge-Fenster, deterministischer Rebuild). Nullen mit Kanten bis zum Rebuild entfällt.|Nullvektoren zerstören die Navigation (D-77).|T-VEC-DEL-*|
 |**D-19**|Vektor-Snapshots: je Slot ein Envelope unter dem DEK des Dokuments mit **Vektor und Slot-Bindung** `(cluster_tag, doc_tag, chunk)`; Graphkanten unter dem Dateischlüssel (D-85); ausschließlich über `Vfs`.|Embeddings gelten vorsorglich als personenbezogen (E-L3). Mit der Bindung unter dem DEK sind nach Schlüsselvernichtung weder Vektor noch Zuordnung lesbar.|T-RAW-3, T-KEYCOV-1|
 |D-20|**Textindex: abgeleiteter, segmentierter, verschlüsselter Index** (9.7). Der LSM hält keine Postings.|KF-3.|T-TEXT-*, BM-ERASE-WA-TEXT|
 |D-21|`tenant_tag`, `coll_tag`, `cluster_tag`, `doc_tag`, `term_tag`, `name_tag` sind keyed BLAKE3 mit festen Labels (Anhang C).|Index enthält keine Klartexte.|T-RAW-4|
-|D-22|Entfernte Crates liegen im Branch `archive/v0-full`.|Historie auffindbar.|15.4 WP-1.2|
+|D-22|Entfernte Crates liegen im Branch `archive/v0-full`.|Historie auffindbar.|G-B|
 |D-23|Lizenz-/DRM-Schicht entfällt.|Geschäftsmodell liegt außerhalb des Speicherkerns.|T-ARCH-3|
 |D-24|Ingest, Privacy, Agent, Cognition, Router, Adapt, KV-Cache, Inference, Sandbox, Audit-Export, AVV-Generator, `contextra-db`, Wasm-Merge-Operator sowie die Ports `embedding`, `reranker`, `query_rewriter` entfallen.|Nicht im Kern.|T-ARCH-3|
 |D-25|MCP-Server und Python-Bindings sind kein v1-Umfang. Sie entstehen nach API-Freeze als Adapter.|Löschwerkzeuge dürfen erst nach der Saga exponiert werden.|–|
 |D-26|`rank` enthält nur RRF-Fusion.|Hybridsuche ist Kern, der Rest nicht.|T-RANK-1|
-|D-27|Keine automatische Entitäts- oder Metadatenextraktion. `AutoExtractionMode` entfällt vollständig.|F-05. Erzeugt Parallelbestände und PII-Abfluss.|T-ARCH-3|
+|D-27|Keine automatische Entitäts- oder Metadatenextraktion. `AutoExtractionMode` entfällt vollständig.|Erzeugt Parallelbestände und PII-Abfluss.|T-ARCH-3|
 |D-28|SIMD: u8-VNNI-Kernel entfällt; f32-Kernel plus Skalar-Referenz. Jeder Kernel hat Cross-Check.|Falsche Operandentypen bei `_mm512_dpbusd_epi32` (u8×u8 statt u8×i8).|T-SIMD-1|
-|D-29|`unsafe` nur in `contextra-sys` und `contextra-simd`. Safe-Funktionen mit offenen Vorbedingungen werden `unsafe fn` oder entfernt. **Windows-Code (`acl_win32.rs`, `cfg(windows)`) wird entfernt (D-84).**|Kleinste Auditfläche (F-18, F-22).|T-UNSAFE-1|
+|D-29|`unsafe` nur in `contextra-sys` und `contextra-simd`. Safe-Funktionen mit offenen Vorbedingungen werden `unsafe fn` oder entfernt. **Windows-Code (`acl_win32.rs`, `cfg(windows)`) wird entfernt (D-84).**|Kleinste Auditfläche.|T-UNSAFE-1|
 |**D-30**|`erase` kehrt nach persistiertem Gate und vernichtetem Schlüssel zurück (Status `Gated`). Ziel: **p50 ≤ 10 ms auf der NVMe-Referenzplattform** (14.8) und allgemein **≤ 6 × `fsync_p50` + 2 ms** der Startprobe; p99 ≤ 5 × p50. **Gilt unabhängig von der Zielgröße** (P16, BM-ERASE-O1). `erase_sla` ist Pflichtparameter ohne Standardwert.|Die Latenz wird durch die Zahl der `fsync` bestimmt (4 im Normalpfad, D-58), nicht durch CPU und nicht durch die Zahl der Dokumente (Schlüsselhierarchie, D-79).|T-SLA-1, BM-ERASE-LAT, BM-ERASE-O1|
 |**D-31**|**Löschcluster-Schlüsselraum:** `region ‖ tenant_tag ‖ coll_tag ‖ cluster_tag ‖ doc_tag ‖ family ‖ sub` (9.1). Jedes Löschziel ist ein zusammenhängender Bereich. **Die Region `LOC` entfällt** (D-70): jedes Dokument ist aus `DocRef` direkt adressierbar.|P11, Rechnung 11.9.|BM-ERASE-WA|
 |**D-32**|**Record-Envelope** (Version 2, Anhang F.6): Jeder Wert liegt unter dem DEK seines Dokuments; zusätzlich Block-AEAD unter dem Dateischlüssel. Der Record-Layer ist für die Löschbarkeit nötig; der Block-Layer schützt Struktur und Tags gegen Angreifer ohne `K_master` und macht Dateiblöcke nach D-85 wertlos.|Entkoppelt Schlüsselvernichtung von der Blockstruktur. Der Block-Layer bleibt AEAD statt reiner Authentisierung, weil Tags und Clustergrößen sonst im Klartext auf dem Medium liegen; Kosten werden in BM-WRITE gemessen.|T-ENC-*, T-VAULT-*|
@@ -248,25 +237,25 @@ Jede Entscheidung nennt Begründung und belegenden Test. **Fett** gesetzte IDs w
 |D-44|Rot-vor-Grün; Evidenzbündel je Arbeitspaket.|Verifizierbar.|15.4|
 |D-45|`contextra-db` entfällt; `homeostat`, `multistep`, `volatile_vault` sind nicht im Kern.|Features leiten an entfernte Crates.|T-ARCH-3|
 |D-46|Tests dürfen den Master-Schlüssel direkt injizieren (`EngineBuilder::master_key_for_testing`) unter Feature `testing`, das **nur** den Argon2-Schritt ersetzt, nie die Verschlüsselung. CI prüft, dass kein Release-Build `testing` aktiviert.|Schnelle Tests ohne Sicherheitsschalter.|T-CFG-2|
-|D-47|**entfällt** (Locator-Region; ersetzt durch D-70).|Anhang H.|–|
+|D-47|**entfällt** (Locator-Region; ersetzt durch D-70).|Ersetzt durch D-70.|–|
 |**D-48**|**Commitment-Epoche:** `commit_epoch` (Standard 365 d) rotiert den Schlüssel der **Commitments in Journal und Bericht**. Die **Ledger-Lebensdauer ist davon entkoppelt und gleich `backup_retention`** (D-74).|Die Wirksamkeit des Restore-Guards hängt an der Backup-Aufbewahrung, die Datensparsamkeit der Commitments an der Epoche; beide Fristen sind getrennt begründbar (E-L4).|T-JRN-3, T-RESTORE-3|
 |**D-49**|Textsegmente: **ein Dokument liegt zu jedem Zeitpunkt in genau einem Segment oder im Textpuffer.** Ein Betroffener kann in vielen Segmenten liegen; der Rewrite-Aufwand skaliert mit der Zahl dieser Segmente (D-71).|Ehrliche Fassung von P11 für den Textindex.|BM-ERASE-WA-TEXT|
 |D-50|Ein Datenverzeichnis hat genau einen schreibenden Prozess (exklusiver Verzeichnis-Lock über `Vfs`).|Journal- und Manifest-Konsistenz.|T-LOCK-1|
 
-### 4.2 Produktionsreife, Enterprise, Lücken der Vorfassungen
+### 4.2 Produktionsreife und Enterprise
 
 |ID|Entscheidung|Begründung|Test / Beleg|
 |---|---|---|---|
 |**D-51**|`Collection::soft_delete(DocRef)` (logisch, Tombstone). Es gibt **kein** `delete`. Rustdoc und Dokumentation sagen an erster Stelle: „Für Löschpflichten `erase` verwenden.“ Nach `history_horizon` entfernt die Kompaktion Versionen physisch; das ist keine Löschaussage.|KF-6.|T-API-3 (Doc-Test), T-LINT-1|
 |**D-52**|**Keyslots:** `K_master` ist ein zufälliger 32-Byte-Schlüssel (OS-CSPRNG), im `HEADER` je Slot gewickelt (AES-256-GCM-SIV) unter `KEK = Argon2id(passphrase, slot_salt, params)`. 1..4 Slots. **Die AAD des Wraps bindet `store_id`, `slot_id`, `anchor_id`, `kdf_id`, `m`, `t`, `p` und `slot_salt`** (Anhang F.2). `change_passphrase` fügt einen Slot hinzu, prüft ihn, entfernt den alten (Nullen, `fsync`) in O(1). `HEADER` als A/B-Paar mit Generationszähler. Master-Rotation bleibt v1.1.|KF-5. Ohne AAD-Bindung lässt sich ein Slot zwischen Stores kopieren oder seine KDF-Parameter herabsetzen. Restrisiko `OldKeyslotRemanence`.|T-KEYSLOT-1..4, T-HDR-1|
 |**D-53**|Der Schlüsselanker ist **austauschbar**: Port `RecordSealer` (DEK-Operationen) und Port `FileKeyring` (Dateischlüssel, D-85) haben in v1 die gemeinsame Implementierung `FileVault`; jeder Keyslot trägt eine `anchor_id`. Hardware-Anker (TPM 2.0, PKCS#11/HSM, KMS-Adapter außerhalb des Kerns) sind v1.1 ohne Formatbruch.|Löst `WrappedKeyRemanence` bei Bedarf, ohne v1 an Hardware zu binden.|Conformance-Suite `RecordSealer`/`FileKeyring`|
-|D-54|`tokio`-Features im Workspace: `rt-multi-thread`, `sync`, `time`, `macros`. **Kein** `full`, `net`, `fs`, `process`, `signal`, `io-std`. `deny.toml` verbietet `mio`, `socket2`, `reqwest`, `hyper`, `ureq`, `curl`, `isahc`, `surf`, `attohttpc`, `tonic`, `h2` im Produktionsbaum (`cargo tree -e normal`). Dev-Abhängigkeiten (`criterion`) sind ausgenommen.|F-16. HR-1 ist sonst nicht nachweisbar.|T-ARCH-4|
+|D-54|`tokio`-Features im Workspace: `rt-multi-thread`, `sync`, `time`, `macros`. **Kein** `full`, `net`, `fs`, `process`, `signal`, `io-std`. `deny.toml` verbietet `mio`, `socket2`, `reqwest`, `hyper`, `ureq`, `curl`, `isahc`, `surf`, `attohttpc`, `tonic`, `h2` im Produktionsbaum (`cargo tree -e normal`). Dev-Abhängigkeiten (`criterion`) sind ausgenommen.|HR-1 ist sonst nicht nachweisbar.|T-ARCH-4|
 |D-55|**`fsync`-Fehler sind für die betroffene Datei fatal.** Nach einem Fehler von `sync_data`/`sync_all`/`sync_dir` wird die Datei nie auf demselben Handle wiederholt; der Store wechselt in `Poisoned`, alle mutierenden Operationen liefern `Io`, `health()` meldet es, Recovery beim nächsten Öffnen. Löschpfad: `Pending` mit Neuöffnen der Datei und Prüfung.|Nach einem fehlgeschlagenen `fsync` ist der Zustand der Seiten im Page-Cache undefiniert („fsyncgate“ [D]). Blindes Wiederholen meldet fälschlich Dauerhaftigkeit – für ein Löschprodukt ein Haftungsfall.|T-FSYNC-1|
 |**D-56**|**Plattformstufen:** Tier 1 = Linux (x86_64, aarch64) auf ext4 oder XFS. Tier 2 = macOS (APFS, `F_FULLFSYNC`) und Linux auf btrfs/ZFS (COW → Restrisiko `FsJournalOrCow` immer). **Nicht unterstützt:** Windows (Code entfernt, D-84), NFS, SMB, FUSE, overlayfs und unbekannte Dateisysteme: die Startprobe (`statfs`-Typ plus atomares Rename plus Verzeichnis-`fsync` plus Atomaritätsprobe für 64-Byte-Schreibvorgänge an ausgerichteten Offsets) verweigert den Start (`Config::UnsupportedFilesystem`).|Verzeichnis-`fsync` und atomares Rename sind die Basis der Crash-Konsistenz; Netz- und Overlay-Dateisysteme geben diese Zusagen nicht.|T-PLAT-1, FI-F03|
 |**D-57**|**Gate-Commit-Protokoll:** `ErasedSet::add` nimmt die **exklusive Commit-Barriere** des Stores, persistiert das Gate und gibt frei. Jeder Commit prüft in der Gruppen-Commit-Leader-Phase `ReadGate` für alle Schlüssel seines Batches und weist Schreibzugriffe in gegatete Bereiche mit `Erased` ab. Dokumentlocks gelten nur für `EraseTarget::Document`; für Subject/Collection/Tenant gibt es **kein** Lock-Set. **Gleichzeitige `erase`-Anfragen teilen sich eine Barriere-Phase und einen Gate-Log-`fsync` (Gate-Gruppen-Commit, D-78).**|Locks sind bei 10⁶ Dokumenten nicht haltbar. Die Barriere ist O(1) und beweisbar: alles vor dem Gate ist im Purge-Umfang (`gated_seq`), alles danach wird abgewiesen.|T-GATE-1, T-CONC-1 (loom), T-GATEGROUP-1|
 |D-58|Gate-Menge als **append-only Log** (`erasure/gates.log`, AEAD, Hash-Kette, `fsync` je Gruppe), Kompaktion beim `Completed` der Löschung. Normalpfad `Gated`: Journal `Requested+Intent` (1), Gate-Log (1), Tresor-Nullen (1), Journal `KeyDestroyed` (1) = **4 `fsync`** je Anfrage, bei Last weniger je Anfrage (Gruppen).|Atomarer Dateiaustausch je Gate kostet 3+ `fsync`; ein Append kostet einen.|BM-ERASE-LAT|
 |D-59|Release-Regel und Cut-Linie (1.3).|Kein Release mit halber Löschschicht.|G-H|
-|**D-60**|**Dateischlüssel und Nonces.** Datendateien (WAL, SSTable, Textsegment, Vektor-Snapshot, `scope/`) haben einen **zufälligen** Dateischlüssel (D-85); Steuerdateien (Manifest-Log, Journal, Gate-Log, Ledger) den abgeleiteten `K_file = HKDF-SHA256(K_enc, "ctx/file/v1" ‖ kind ‖ file_id)`. **Nonce:** in schreibeinmaligen oder append-only Dateien `0x00000000 ‖ u64(Blockzähler)` (deterministisch, unter dem Dateischlüssel eindeutig); je Record-Envelope und je Keyslot-Wrap 96 Bit aus dem OS-CSPRNG. Höchstens 2³² Blöcke je Datei, dann neue Datei.|F-24: Der Code nutzt ein Zufallspräfix je `KeyManager` plus Zähler; das ist mit Dateischlüsseln überflüssig. Ein Zähler je Datei schließt Kollisionen aus, statt sie nur unwahrscheinlich zu machen. AES-GCM-SIV bleibt als Defense in Depth.|T-NONCE-1, T-ENC-3|
+|**D-60**|**Dateischlüssel und Nonces.** Datendateien (WAL, SSTable, Textsegment, Vektor-Snapshot, `scope/`) haben einen **zufälligen** Dateischlüssel (D-85); Steuerdateien (Manifest-Log, Journal, Gate-Log, Ledger) den abgeleiteten `K_file = HKDF-SHA256(K_enc, "ctx/file/v1" ‖ kind ‖ file_id)`. **Nonce:** in schreibeinmaligen oder append-only Dateien `0x00000000 ‖ u64(Blockzähler)` (deterministisch, unter dem Dateischlüssel eindeutig); je Record-Envelope und je Keyslot-Wrap 96 Bit aus dem OS-CSPRNG. Höchstens 2³² Blöcke je Datei, dann neue Datei.|Mit Dateischlüsseln ist ein Zufallspräfix je `KeyManager` überflüssig; ein Zähler je Datei schließt Kollisionen aus, statt sie nur unwahrscheinlich zu machen. AES-GCM-SIV bleibt als Defense in Depth.|T-NONCE-1, T-ENC-3|
 |D-61|**Snapshot-Widerruf ist mandantenbezogen:** `revoke_covering` widerruft nur Snapshots des Mandanten des Ziels (Registry nach `tenant_tag`), die `seq ≤ gated_seq` halten. Snapshots anderer Mandanten bleiben unberührt.|Isolation gilt auch für Verfügbarkeit; ein Offboarding darf fremde Leser nicht stören.|T-SNAP-1|
 |**D-62**|Suche: `ReadGate`-Filter im Kandidatenstrom. **Nachladen bis `k` gültige Treffer oder Erschöpfung:** Text setzt den Postings-Strom fort; Vektor verdoppelt `ef` ab `max(ef, k)` bis `ef_max = 4096`. Das Ergebnis `SearchPage { hits, exhausted }` trägt `exhausted = true`, wenn weniger als `k` Treffer lieferbar waren. Nie stilles Verkürzen. Metadatenfilter bleiben in v1 **nachgelagert** (dokumentierte Grenze; Vorfilter-Bitmap v1.1, `DocMap` bleibt dafür erweiterbar).|Sonst verdrängen gegatete Treffer gültige aus dem Top-k; ohne Algorithmus ist „kein stilles Verkürzen“ nicht testbar.|T-HYB-1, T-SEARCH-2|
 |**D-63**|**Prozesshärtung** (`contextra-sys`) als Builder-Option `process_hardening ∈ {Required, BestEffort, Off}` (Standard `BestEffort`): `RLIMIT_CORE = 0`, `PR_SET_DUMPABLE = 0` (Linux), `MADV_DONTDUMP` für Schlüsselseiten und Vektorarena, `mlock` best effort. `Required` verweigert den Start, wenn eine Maßnahme scheitert. Der Status steht in `health()`; bei `Off` oder Teilerfolg führt der Bericht `ProcessMemory`. Die Doku nennt die Nebenwirkung: `RLIMIT_CORE` und `PR_SET_DUMPABLE` sind prozessglobal (Debugger, `perf`, Crash-Reporter).|Eine eingebettete Bibliothek darf Prozesszustand nicht still ändern; Coredumps und Swap sind die realistischen Wege für Klartext-Remanenz im Prozess.|T-DUMP-1, T-SEC-2|
@@ -275,61 +264,73 @@ Jede Entscheidung nennt Begründung und belegenden Test. **Fett** gesetzte IDs w
 |D-66|**API-Stabilität:** SemVer, alle öffentlichen Typen `#[non_exhaustive]` (außer Konfigurationsbausteinen), einzige öffentliche Oberfläche ist `contextra`. **MSRV (Kompatibilitätsversprechen) und Build-Toolchain sind getrennt (D-82).** Format-Version und Crate-Version sind getrennt.|Enterprise-Verlässlichkeit.|T-API-1, `cargo-semver-checks`|
 |D-67|**Support und Schwachstellenmanagement:** Unterstützungszeitraum je Hauptversion ≥ 5 Jahre ab Veröffentlichung; Meldeprozess nach CRA Art. 14 (Frühwarnung 24 h, Meldung 72 h, Abschlussbericht gemäß Verordnung); intern HR-8 (kritisch 7 Tage, hoch 30 Tage). Contextra behandelt sich als Hersteller im Sinne des CRA und des ProdHaftG (E-L9).|Strengste Annahme (6.6). [W] CRA-Meldepflichten gelten seit 11.09.2026.|T-SUPPLY-1|
 
-### 4.3 Neu in 4.0.0 (Schließen der Lücken aus der Prüfung von 3.0.0)
+### 4.3 Schlüsselhierarchie, Messung, Betrieb
 
 |ID|Entscheidung|Begründung|Test / Beleg|
 |---|---|---|---|
-|**D-69**|**Klasse K je Schicht.** `key_coverage ∈ {full, unlinked, none}` je Schicht (`doc_store`, `vector_payload`, `text_postings`, `vector_edges`, `file_structure`): **`full`** = Inhalt unlesbar; **`unlinked`** = Struktur vorhanden, aber ohne Bindung an Dokument und Betroffenen; **`none`** = nicht durch Schlüsselvernichtung geschützt. **Textindex:** Postings tragen nur segmentlokale `doc_ord`; die Bindung `doc_ord → (cluster_tag, doc_tag)` liegt als Envelope unter dem DEK (9.7). Nach `KeyDestroyed` sind Textpostings daher `unlinked`, HNSW-Kanten `none`. Der **Textsegment-Rewrite läuft im ersten Purge-Fenster**, nicht erst bis `erase_sla`. Restrisiko `TextIndexUntilPurge` gilt bis dahin.|3.0.0 legte Postings unter einen nie vernichteten Schlüssel: Wer `K_idx` hat, rekonstruiert per Wörterbuchangriff den Wortschatz eines gelöschten Dokuments (inhaltlicher Fingerabdruck). Die entkoppelte Bindung nimmt dem Rest die Zuordenbarkeit, ohne die Suchlatenz zu belasten (Bindungen werden nur für Top-k-Kandidaten entschlüsselt).|T-KEYCOV-1, T-TEXT-4|
-|**D-70**|**`DocRef`:** Dokumente werden mit `DocRef { subject: Option<SubjectRef>, key: DocKey }` adressiert; der Betroffene ist Teil der Identität (D-08, D-40). `cluster_tag = subject_tag`, ohne Betroffenen `0x00¹² ‖ doc_tag[0..4]`. **Die Locator-Region und die Familie `Locator` entfallen.** Suchtreffer tragen `DocHandle { cluster_tag, doc_tag }`.|3.0.0 D-47 legte je Dokument einen Locator unter `LOC ‖ … ‖ doc_tag` ab. `doc_tag` ist ein keyed Hash, die Locator-Schlüssel eines Betroffenen sind also **gleichverteilt**: Ein Subject-Erase schriebe min(*m*, #LOC-Dateien) SSTables um (das „26 %-Problem“ aus 11.9) und verletzte P11 an der zentralen Stelle.|T-DOCREF-1, T-SUBJ-1, BM-ERASE-WA|
-|**D-71**|**Textsegmente (ehrliches P11):** (a) Segment-Header trägt `bucket` und `bucket_count` (v1: `bucket_count = 1`; Formatbruch später ausgeschlossen); Bucket-Funktion `cluster_tag[0] mod bucket_count`. (b) Segmentzielgröße adaptiv: 8 MiB bis 1 Mio. Chunks je Collection, danach 32 MiB. (c) Rewrite-Aufwand eines Subject-Erase = Σ Größe der Segmente, die Zieldokumente enthalten (im Bericht: `segments_rewritten`). (d) Die Entscheidung über `bucket_count > 1` und die Segmentgrößen trifft Gate G-E anhand **BM-ERASE-WA-TEXT** und BM-TEXT, nicht Annahme.|3.0.0 D-49 sagt „Rewrite je Erase = ein Segment“; das gilt nur für ein Dokument. Die Dokumente eines Betroffenen entstanden über Jahre und liegen in vielen Segmenten.|BM-ERASE-WA-TEXT, T-TEXT-*|
-|**D-72**|**Messbegriffe und Feldprüfung.** Evidenzstufen heißen **EV0–EV4**, Messklassen **MK1–MK3** (0). Der Bericht trennt `lab_evidence` (Verweis auf den Hash des Release-Evidenzbündels; MK1–MK3 im CI-Lab, EV4) und `field_measurement` (Zeugen dieses Laufs: MK1, MK2 und Schlüsselabwesenheit MK3-Feld, durch Produktionscode). Anhang B L4 bezieht sich auf `field_measurement`. **`ctx-verify scan <datadir> --passphrase-fd N --target …`** liefert die unabhängige Feldprüfung: eigene Parser und Krypto-Aufrufe (AR-4), Tag-Berechnung aus `K_master`, MK1 über alle Strukturen, MK2 mit Klartext-Needles des Betreibers, Positivkontrolle. **Die Positivkontrolle ist typisiert:** `LayerWitness` kann nur aus einem `Scanner<Armed>` entstehen, den allein eine erfolgreiche Kontrolle erzeugt.|3.0.0 verwendete „E1–E3“ (Messklassen) und „E0–E4“ (Evidenzstufen) parallel und versprach in Produktion MK3 mit dem gelöschten DEK, den es dort nicht mehr gibt. Die Produktions-Eigenmessung ist Selbstattestierung (gleiche Decoder wie der Purge); unabhängig ist sie nur im Lab oder mit `ctx-verify scan`.|T-LINT-3, T-RAW-1..6, T-CLASS-1, T-MUT-1|
-|**D-73**|**Der WAL wird nie umgeschrieben.** Purge-Schritt: Memtable-Einträge des Ziels verwerfen, **Memtable flushen**, WAL-Segment an einer Sequenzgrenze versiegeln, **alle WAL-Segmente bis zum Flush-Punkt als Ganzes entfernen** (Dateischlüssel vernichten, unlink). Der Manifest-Eintrag `WalFloor { seq, tail_mac }` hält die Kettenfortsetzung (Anhang F.4). I-3 gilt auf **Record-Ebene** (Ciphertext-Records anderer Ziele bleiben bytegleich), nicht auf Dateiebene.|3.0.0 11.2 Schritt 6 verlangte, Zielframes aus WAL-Segmenten zu entfernen. Die HMAC-Kette verkettet jeden Frame mit dem Vorgänger; Entfernen ändert die MACs aller Folgeframes, verletzt „bitgleich“ und macht Torn-Write-Erkennung im Crash unscharf.|T-ISO-1, T-WAL-2, BM-ERASE-BATCH|
-|**D-74**|**Restore-Guard mit Bereichen.** Pflichtparameter `backup_retention` (Dauer, ohne Standard; Zweckbindung „Restore-Schutz“, Begründung gehört in die DSFA). Ledger-Eintrag: `(commitment, range_set, gated_seq, completed_at)` mit Bereichs-**Tags**. Erkennung: (a) **Zeitregression** `store.current_seq < max(gated_seq im Ledger)` ⇒ Restore, ohne Scan; (b) **Wiederauftauchen** (Dateirestore): Datei im Zielbereich mit `min_seq ≤ gated_seq` und Record mit `seq ≤ gated_seq`. Daten mit `seq > gated_seq` sind legitime Neuanlage (`doc_key` und Betroffener dürfen nach `Completed` neu verwendet werden). Die Sequenz bleibt über Restores monoton: `next_seq = max(current_seq, ledger_floor) + 1`. `commit_seq` steht als Schlüsselsuffix (lesbar ohne DEK).|3.0.0 hatte als Horizont nur `commit_epoch` (365 d) und speicherte `scope_range_hash`: Backups in Steuer-/Finanz-/Gesundheitsbranchen werden länger aufbewahrt (Scheinschutz), und aus einem Hash lässt sich kein Bereich prüfen (Vollscan). Ohne `gated_seq`-Regel wäre Wiederverwendung ein Fehlalarm.|T-RESTORE-1..3, BM-RESTORE-OPEN|
-|**D-75**|**Pfade nur mit Tags:** `text/<tenant_tag_hex>/<coll_tag_hex>/<file_id_hex>.seg`, `vector/<tenant_tag_hex>/<coll_tag_hex>/…`; Dateinamen sonst nur `file_id` (hex). Mandanten-Offboarding löscht die Verzeichnisse `…/<tenant_tag>/` plus Tresor-/LSM-Bereiche.|3.0.0 5.6 nutzte `<coll>` (Klartextname, mögliche Personenbezüge, D-09/HR-4) und hatte keine Mandantendimension (T-ISO-1/T-TENANT-1 unmöglich).|T-RAW-6, T-TENANT-1|
-|**D-76**|**G0 messbar und mit absoluter Grenze.** SSTable-Zielgröße Level ≥ 1: 32 MiB. Schwelle je Erase: `bytes_written ≤ 3 × Zielbytes + L_t × 32 MiB` mit `L_t` = Zahl der Level mit überlappender Datei (≤ 7), **absolute Obergrenze 512 MiB je isoliertem Einzeldokument-Erase**, Steigung 10 GiB/1 GiB ≤ 1,25. Fallbackleiter in 11.9.|3.0.0 verlangte „≤ 3 × Zielbytes + 2 SSTable-Zielgrößen“ bei gleichzeitig „3–6 Dateien praktisch“ (widersprüchlich) und hatte keine absolute Grenze: bei 64 MiB × 7 Level × 2 Dateien wären ≈ 0,9 GiB je Erase möglich (SSD-Verschleiß).|BM-ERASE-WA, G0|
+|**D-69**|**Klasse K je Schicht.** `key_coverage ∈ {full, unlinked, none}` je Schicht (`doc_store`, `vector_payload`, `text_postings`, `vector_edges`, `file_structure`): **`full`** = Inhalt unlesbar; **`unlinked`** = Struktur vorhanden, aber ohne Bindung an Dokument und Betroffenen; **`none`** = nicht durch Schlüsselvernichtung geschützt. **Textindex:** Postings tragen nur segmentlokale `doc_ord`; die Bindung `doc_ord → (cluster_tag, doc_tag)` liegt als Envelope unter dem DEK (9.7). Nach `KeyDestroyed` sind Textpostings daher `unlinked`, HNSW-Kanten `none`. Der **Textsegment-Rewrite läuft im ersten Purge-Fenster**, nicht erst bis `erase_sla`. Restrisiko `TextIndexUntilPurge` gilt bis dahin.|Der frühere Entwurf legte Postings unter einen nie vernichteten Schlüssel: Wer `K_idx` hat, rekonstruiert per Wörterbuchangriff den Wortschatz eines gelöschten Dokuments (inhaltlicher Fingerabdruck). Die entkoppelte Bindung nimmt dem Rest die Zuordenbarkeit, ohne die Suchlatenz zu belasten (Bindungen werden nur für Top-k-Kandidaten entschlüsselt).|T-KEYCOV-1, T-TEXT-4|
+|**D-70**|**`DocRef`:** Dokumente werden mit `DocRef { subject: Option<SubjectRef>, key: DocKey }` adressiert; der Betroffene ist Teil der Identität (D-08, D-40). `cluster_tag = subject_tag`, ohne Betroffenen `0x00¹² ‖ doc_tag[0..4]`. **Die Locator-Region und die Familie `Locator` entfallen.** Suchtreffer tragen `DocHandle { cluster_tag, doc_tag }`.|Der frühere Entwurf (D-47) legte je Dokument einen Locator unter `LOC ‖ … ‖ doc_tag` ab. `doc_tag` ist ein keyed Hash, die Locator-Schlüssel eines Betroffenen sind also **gleichverteilt**: Ein Subject-Erase schriebe min(*m*, #LOC-Dateien) SSTables um (das „26 %-Problem“ aus 11.9) und verletzte P11 an der zentralen Stelle.|T-DOCREF-1, T-SUBJ-1, BM-ERASE-WA|
+|**D-71**|**Textsegmente (ehrliches P11):** (a) Segment-Header trägt `bucket` und `bucket_count` (v1: `bucket_count = 1`; Formatbruch später ausgeschlossen); Bucket-Funktion `cluster_tag[0] mod bucket_count`. (b) Segmentzielgröße adaptiv: 8 MiB bis 1 Mio. Chunks je Collection, danach 32 MiB. (c) Rewrite-Aufwand eines Subject-Erase = Σ Größe der Segmente, die Zieldokumente enthalten (im Bericht: `segments_rewritten`). (d) Die Entscheidung über `bucket_count > 1` und die Segmentgrößen trifft Gate G-E anhand **BM-ERASE-WA-TEXT** und BM-TEXT, nicht Annahme.|Der frühere Entwurf (D-49) sagt „Rewrite je Erase = ein Segment“; das gilt nur für ein Dokument. Die Dokumente eines Betroffenen entstanden über Jahre und liegen in vielen Segmenten.|BM-ERASE-WA-TEXT, T-TEXT-*|
+|**D-72**|**Messbegriffe und Feldprüfung.** Evidenzstufen heißen **EV0–EV4**, Messklassen **MK1–MK3** (0). Der Bericht trennt `lab_evidence` (Verweis auf den Hash des Release-Evidenzbündels; MK1–MK3 im CI-Lab, EV4) und `field_measurement` (Zeugen dieses Laufs: MK1, MK2 und Schlüsselabwesenheit MK3-Feld, durch Produktionscode). Anhang B L4 bezieht sich auf `field_measurement`. **`ctx-verify scan <datadir> --passphrase-fd N --target …`** liefert die unabhängige Feldprüfung: eigene Parser und Krypto-Aufrufe (AR-4), Tag-Berechnung aus `K_master`, MK1 über alle Strukturen, MK2 mit Klartext-Needles des Betreibers, Positivkontrolle. **Die Positivkontrolle ist typisiert:** `LayerWitness` kann nur aus einem `Scanner<Armed>` entstehen, den allein eine erfolgreiche Kontrolle erzeugt.|Der frühere Entwurf verwendete „E1–E3“ (Messklassen) und „E0–E4“ (Evidenzstufen) parallel und versprach in Produktion MK3 mit dem gelöschten DEK, den es dort nicht mehr gibt. Die Produktions-Eigenmessung ist Selbstattestierung (gleiche Decoder wie der Purge); unabhängig ist sie nur im Lab oder mit `ctx-verify scan`.|T-LINT-3, T-RAW-1..6, T-CLASS-1, T-MUT-1|
+|**D-73**|**Der WAL wird nie umgeschrieben.** Purge-Schritt: Memtable-Einträge des Ziels verwerfen, **Memtable flushen**, WAL-Segment an einer Sequenzgrenze versiegeln, **alle WAL-Segmente bis zum Flush-Punkt als Ganzes entfernen** (Dateischlüssel vernichten, unlink). Der Manifest-Eintrag `WalFloor { seq, tail_mac }` hält die Kettenfortsetzung (Anhang F.4). I-3 gilt auf **Record-Ebene** (Ciphertext-Records anderer Ziele bleiben bytegleich), nicht auf Dateiebene.|Der frühere Entwurf (11.2 Schritt 6) verlangte, Zielframes aus WAL-Segmenten zu entfernen. Die HMAC-Kette verkettet jeden Frame mit dem Vorgänger; Entfernen ändert die MACs aller Folgeframes, verletzt „bitgleich“ und macht Torn-Write-Erkennung im Crash unscharf.|T-ISO-1, T-WAL-2, BM-ERASE-BATCH|
+|**D-74**|**Restore-Guard mit Bereichen.** Pflichtparameter `backup_retention` (Dauer, ohne Standard; Zweckbindung „Restore-Schutz“, Begründung gehört in die DSFA). Ledger-Eintrag: `(commitment, range_set, gated_seq, completed_at)` mit Bereichs-**Tags**. Erkennung: (a) **Zeitregression** `store.current_seq < max(gated_seq im Ledger)` ⇒ Restore, ohne Scan; (b) **Wiederauftauchen** (Dateirestore): Datei im Zielbereich mit `min_seq ≤ gated_seq` und Record mit `seq ≤ gated_seq`. Daten mit `seq > gated_seq` sind legitime Neuanlage (`doc_key` und Betroffener dürfen nach `Completed` neu verwendet werden). Die Sequenz bleibt über Restores monoton: `next_seq = max(current_seq, ledger_floor) + 1`. `commit_seq` steht als Schlüsselsuffix (lesbar ohne DEK).|Der frühere Entwurf hatte als Horizont nur `commit_epoch` (365 d) und speicherte `scope_range_hash`: Backups in Steuer-/Finanz-/Gesundheitsbranchen werden länger aufbewahrt (Scheinschutz), und aus einem Hash lässt sich kein Bereich prüfen (Vollscan). Ohne `gated_seq`-Regel wäre Wiederverwendung ein Fehlalarm.|T-RESTORE-1..3, BM-RESTORE-OPEN|
+|**D-75**|**Pfade nur mit Tags:** `text/<tenant_tag_hex>/<coll_tag_hex>/<file_id_hex>.seg`, `vector/<tenant_tag_hex>/<coll_tag_hex>/…`; Dateinamen sonst nur `file_id` (hex). Mandanten-Offboarding löscht die Verzeichnisse `…/<tenant_tag>/` plus Tresor-/LSM-Bereiche.|Der frühere Entwurf (5.6) nutzte `<coll>` (Klartextname, mögliche Personenbezüge, D-09/HR-4) und hatte keine Mandantendimension (T-ISO-1/T-TENANT-1 unmöglich).|T-RAW-6, T-TENANT-1|
+|**D-76**|**G0 messbar und mit absoluter Grenze.** SSTable-Zielgröße Level ≥ 1: 32 MiB. Schwelle je Erase: `bytes_written ≤ 3 × Zielbytes + L_t × 32 MiB` mit `L_t` = Zahl der Level mit überlappender Datei (≤ 7), **absolute Obergrenze 512 MiB je isoliertem Einzeldokument-Erase**, Steigung 10 GiB/1 GiB ≤ 1,25. Fallbackleiter in 11.9.|Der frühere Entwurf verlangte „≤ 3 × Zielbytes + 2 SSTable-Zielgrößen“ bei gleichzeitig „3–6 Dateien praktisch“ (widersprüchlich) und hatte keine absolute Grenze: bei 64 MiB × 7 Level × 2 Dateien wären ≈ 0,9 GiB je Erase möglich (SSD-Verschleiß).|BM-ERASE-WA, G0|
 |**D-77**|**HNSW-Löschung.** (1) **Vor `Gated`:** Arena-Vektoren der Zielslots werden in allen Repräsentationen durch ein **Navigationssurrogat** ersetzt (Mittel der Vektoren der nicht gegateten Nachbarn; ohne solche: Vektor des Einstiegsknotens). Kein Zielvektor-Byte bleibt in der Arena. (2) **Im Purge-Fenster:** **Batch-Kantenreparatur**: ein linearer Durchlauf über alle Adjazenzlisten entfernt Kanten auf Zielslots und wählt Ersatzkanten mit der Standard-Auswahlheuristik aus den Nachbarn der Zielknoten; danach existiert keine Referenz auf Zielslots, die Slots gehen in die Freiliste. (3) **Deterministischer Rebuild** (Einfügung in `doc_tag`-Reihenfolge, deterministische Konfliktauflösung) bei Tombstone-Quote ≥ `vector_rebuild_ratio` (0,2) oder ≥ 10 % reparaturgelöschter Slots seit dem letzten Rebuild; mit `vector_strict_rebuild` (Standard aus) im selben Purge-Fenster, spätestens zum Ende von `erase_sla`. **Eigenschaft:** Der Graph nach Rebuild hängt nur von der Menge der lebenden Slots ab (T-VEC-REBUILD-INDEP). Bis zum nächsten Rebuild nach einer Löschung weist der Bericht `IndexTopologyInference` aus (Reparaturkanten sind eine Funktion der Zielnachbarschaft).|Nullvektoren zerstören die Navigation: Distanzen zu einem Nullvektor sind bedeutungslos, hnswlib-artige Implementierungen halten gelöschte Knoten **mit** Vektor im Graphen. Bei Tombstone-Quoten bis 0,2 fiele die Erreichbarkeit ganzer Regionen (Recall@10 ≥ 0,95 ungesichert). Ein Vollrebuild je `erase_sla`-Fenster wäre bei kontinuierlichem Erase-Strom Dauerlast; die Reparatur ist ein einziger speichergebundener Durchlauf.|T-VEC-DEL-1/2, T-VEC-REBUILD-INDEP, BM-VEC-DEL, BM-VEC-REBUILD|
 |**D-78**|**Gate-Gruppen-Commit und kooperative Kompaktion.** Gleichzeitige `erase`-Anfragen teilen sich *eine* exklusive Barriere-Phase und *einen* Gate-Log-`fsync`. Kompaktion prüft pro Block `purge_waiting` und **bricht kooperativ ab** (Teilergebnis wird verworfen, nicht committet); keine Hintergrundoperation blockiert eine wartende Löschung länger als 1 s (I-16). Kompaktion **verwirft gegatete Bereiche der Variante `Erased`** beim Schreiben der Ausgabe (kostenloser Teilpurge; Zeuge MK1 bleibt Pflicht im Purge). **Bereiche der Variante `Restricted` verwirft sie nie** (I-18).|Die exklusive Barriere hält sonst bei einem Erase-Strom jeden Schreiber an; eine mehrminütige Kompaktion blockiert den Purge, während die `erase_sla`-Uhr läuft (Prioritätsinversion). Restriktion (Art. 18) ist keine Löschung: Verwerfen wäre Datenverlust.|T-GATEGROUP-1, T-COMPACT-RESTRICT-1, BM-WRITE-DURING-ERASE, BM-PURGE-WAIT|
-|**D-79**|**Schlüsselhierarchie und Tresor.** `DEK = HKDF-SHA256(ikm = K_unit, salt = SHA-256("ctx/dek-salt/v2" ‖ salt_T ‖ salt_C ‖ salt_S ‖ salt_D), info = "ctx/dek/v2" ‖ doc_tag)`. Slot-Typen `T` (tag = tenant_tag), `C` (coll_tag), `S` (subject_tag), `D` (doc_tag), je 32-Byte-Zufallssalt; Dokumente ohne Betroffenen nutzen `salt_S = 0³²`. Ziel → vernichteter Slot: `Document → D`, `Subject → S`, `Collection → C`, `Tenant → T`. **Die Vernichtung eines Slots macht alle darunter liegenden DEKs unableitbar; die Schlüsselklasse ist für jedes Ziel O(1)** (4 `fsync`, P16). Der DEK-Cache ist nach `(tenant, coll, cluster)` indiziert; der Gate-Schritt evictet und zeroisiert betroffene Einträge **vor** der Rückgabe `Gated`. Die `D`-Slots der Zielmenge entfernt der Purge (zielgrößenabhängig, nicht auf dem Pfad bis `Gated`). Der Tresor ist eine **plattenresidente Open-Addressing-Hash-Tabelle** (11.5, F.3) ohne vollständigen RAM-Index; Obergrenze `max_docs_per_store = 5·10⁷` (`Limit::Capacity`).|3.0.0 hatte nur Dokument-Slots: Ein Betroffener mit 10⁶ Dokumenten bedeutete 10⁶ Slots nullen, Mandanten-Offboarding ebenso, während das Gate selbst O(1) ist. Der RAM-Index von 80 B × N hätte BM-OPEN ≤ 2 s bei großen Beständen gesprengt.|T-VAULT-1..5, BM-ERASE-O1, BM-VAULT-OPEN|
-|**D-80**|**Kryptografie-Details.** (1) Argon2-Grenzen: D-06. (2) Keyslot-AAD: D-52. (3) **`K_sign` nur abgeleitet** (`HKDF(K_master, "ctx/sign/v1")`); das Verzeichnis `keys/` und der „verschlüsselte Seed“ entfallen. (4) **Algorithmensatz v1:** AES-256-GCM-SIV (Records, Keyslots, Block-AEAD; `alg_id = 1`), HMAC-SHA256, HKDF-SHA256, BLAKE3 (keyed), Argon2id, Ed25519. `alg_id = 2` (ChaCha20-Poly1305) ist reserviert und in v1 nicht implementiert. (5) Block-AEAD bleibt (D-32).|F-24: nur GCM-SIV existiert im Code; 3.0.0 8.6 nannte nicht vorhandene Algorithmen. 3.0.0 leitete `K_sign` ab (10.1) **und** legte einen Seed ab (5.6): eine doppelte Quelle erzeugt Abweichungsfälle.|T-KDF-2, T-KEYSLOT-4, T-ENC-*|
-|**D-81**|**Textanalyse.** Segment-Header trägt `analyzer_id`, `analyzer_version`, `lang`. Analyzer v1: `de/1` (UAX-#29-Tokenisierung, NFKC, Case-Folding, `ß→ss`, Snowball-German, Stoppwortliste, wörterbuchbasierter Dekompounder) und `und/1` (neutral). Der Analyzer ist je Collection unveränderlich; ein Wechsel ist Neuaufbau in einer neuen Collection. `term_tag = tag("ctx/term/v1", analyzer_id ‖ lang ‖ normalisierter_term)`. Postings in 128er-Blöcken mit Blockmetadaten für Block-Max-Pruning (BMW), optional **Positionen** (Collection-Option, Standard an) für Phrasensuche.|3.0.0 legte `term_tag` und damit den Recall für deutschsprachige Korpora ohne Analyzer fest; ein Analyzerwechsel ist ein vollständiger Reindex und ohne `analyzer_id` im Format ein Formatbruch. Ohne Pruning ist BM-TEXT (p99 ≤ 30 ms bei 1 Mio. Chunks) für häufige Terme nicht erreichbar.|T-TEXT-ANALYZER-1 (Goldenset Komposita/Umlaute), T-TEXT-PHRASE-1, BM-TEXT|
+|**D-79**|**Schlüsselhierarchie und Tresor.** `DEK = HKDF-SHA256(ikm = K_unit, salt = SHA-256("ctx/dek-salt/v2" ‖ salt_T ‖ salt_C ‖ salt_S ‖ salt_D), info = "ctx/dek/v2" ‖ doc_tag)`. Slot-Typen `T` (tag = tenant_tag), `C` (coll_tag), `S` (subject_tag), `D` (doc_tag), je 32-Byte-Zufallssalt; Dokumente ohne Betroffenen nutzen `salt_S = 0³²`. Ziel → vernichteter Slot: `Document → D`, `Subject → S`, `Collection → C`, `Tenant → T`. **Die Vernichtung eines Slots macht alle darunter liegenden DEKs unableitbar; die Schlüsselklasse ist für jedes Ziel O(1)** (4 `fsync`, P16). Der DEK-Cache ist nach `(tenant, coll, cluster)` indiziert; der Gate-Schritt evictet und zeroisiert betroffene Einträge **vor** der Rückgabe `Gated`. Die `D`-Slots der Zielmenge entfernt der Purge (zielgrößenabhängig, nicht auf dem Pfad bis `Gated`). Der Tresor ist eine **plattenresidente Open-Addressing-Hash-Tabelle** (11.5, F.3) ohne vollständigen RAM-Index; Obergrenze `max_docs_per_store = 5·10⁷` (`Limit::Capacity`).|Der frühere Entwurf hatte nur Dokument-Slots: Ein Betroffener mit 10⁶ Dokumenten bedeutete 10⁶ Slots nullen, Mandanten-Offboarding ebenso, während das Gate selbst O(1) ist. Der RAM-Index von 80 B × N hätte BM-OPEN ≤ 2 s bei großen Beständen gesprengt.|T-VAULT-1..5, BM-ERASE-O1, BM-VAULT-OPEN|
+|**D-80**|**Kryptografie-Details.** (1) Argon2-Grenzen: D-06. (2) Keyslot-AAD: D-52. (3) **`K_sign` nur abgeleitet** (`HKDF(K_master, "ctx/sign/v1")`); das Verzeichnis `keys/` und der „verschlüsselte Seed“ entfallen. (4) **Algorithmensatz v1:** AES-256-GCM-SIV (Records, Keyslots, Block-AEAD; `alg_id = 1`), HMAC-SHA256, HKDF-SHA256, BLAKE3 (keyed), Argon2id, Ed25519. `alg_id = 2` (ChaCha20-Poly1305) ist reserviert und in v1 nicht implementiert. (5) Block-AEAD bleibt (D-32).|Ein Algorithmensatz, der nur Implementiertes nennt, ist prüfbar. `K_sign` hat genau eine Quelle (abgeleitet), weil eine doppelte Quelle Abweichungsfälle erzeugt.|T-KDF-2, T-KEYSLOT-4, T-ENC-*|
+|**D-81**|**Textanalyse.** Segment-Header trägt `analyzer_id`, `analyzer_version`, `lang`. Analyzer v1: `de/1` (UAX-#29-Tokenisierung, NFKC, Case-Folding, `ß→ss`, Snowball-German, Stoppwortliste, wörterbuchbasierter Dekompounder) und `und/1` (neutral). Der Analyzer ist je Collection unveränderlich; ein Wechsel ist Neuaufbau in einer neuen Collection. `term_tag = tag("ctx/term/v1", analyzer_id ‖ lang ‖ normalisierter_term)`. Postings in 128er-Blöcken mit Blockmetadaten für Block-Max-Pruning (BMW), optional **Positionen** (Collection-Option, Standard an) für Phrasensuche.|Der frühere Entwurf legte `term_tag` und damit den Recall für deutschsprachige Korpora ohne Analyzer fest; ein Analyzerwechsel ist ein vollständiger Reindex und ohne `analyzer_id` im Format ein Formatbruch. Ohne Pruning ist BM-TEXT (p99 ≤ 30 ms bei 1 Mio. Chunks) für häufige Terme nicht erreichbar.|T-TEXT-ANALYZER-1 (Goldenset Komposita/Umlaute), T-TEXT-PHRASE-1, BM-TEXT|
 |**D-82**|**Toolchain.** *MSRV* (`rust-version`) = älteste in der CI-Matrix geprüfte Version, nur in Minor-Releases anhebbar. *Build-Toolchain* (`rust-toolchain.toml`) = zum Release-Schnitt aktuelle Stable, **höchstens 2 Minor-Versionen hinter der aktuellen Stable**; Release-Builds mit `--locked`, Toolchain-Version und Build-Hash im Evidenzbündel.|Das Rust-Projekt pflegt nur die jeweils aktuelle Stable mit Sicherheitskorrekturen [W]. Der Pin `1.89.0` (August 2025) ist seit dem Erscheinen von 1.90 ohne Pflege; zum 2026-06-30 war 1.96.1 aktuell [W]. Ein eingefrorener Compiler samt Standardbibliothek ist für ein CRA-pflichtiges Produkt (E-L9) ein Lieferkettenrisiko.|T-SUPPLY-2|
 |**D-83**|**Betriebsdetails.** (1) `scrub` (Überschreiben vor `unlink`) nur, wenn die Startprobe `rotational = true` und nicht-COW meldet; sonst entfällt es (nicht tragend nach D-85); Kosten getrennt in BM-ERASE-WA. (2) **Verwaiste Tresor-Slots** (`D`/`F` ohne Record bzw. Datei, etwa nach Absturz zwischen Slot-Schreiben und WAL-`fsync`) werden bei der Recovery genullt. (3) `batch_window ≤ erase_sla / 2` ist Konfigurationsprüfung; `health()` warnt, wenn die gemessene Purge-Dauer `erase_sla − batch_window` übersteigt.|Entkoppelt Wirkung vom Medium; schließt Waisen; verhindert Konfigurationen, die die SLA unerreichbar machen.|T-CRASH-5, T-CFG-3, BM-ERASE-WA|
-|**D-84**|**Verbindliche Rückbauliste (Gate G-B):** Features und Parameter `legacy-wal-key`, `allow_legacy_integrity_key_fallback`, `memory-only-storage`, `cloud-egress-guard`, `kv-encryption`, `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `graph`, `fault-injection` (ersetzt durch `FaultVfs` im `testkit`), `block-cache-v2`/`sieve-cache` (eine Cache-Implementierung bleibt), `auto-extraction-opt-out`, `entity-extraction`, `edge-reinforcement-learning`, `reranking`, `adaptive-candidate-pool-sizing`, `onnx`, `sandbox`, `graph-connectivity-health`, `encryption-at-rest`, `docid-128`, `bm25f`, `background-maintenance`, `dibud`, `contract-tests` (nur Dev), Paketalias `contextra-index`; `WasmMergeOperator` samt `block_on`; `contextra-sys/src/acl_win32.rs`, `contextra-sys/src/mmap.rs` (D-94) und alle `cfg(windows)`. `test-utils`/`testkit` bleiben nur als Dev-Features.|F-06, F-14, F-21, F-22, F-23: jedes dieser Elemente ist ein Schalter für Sicherheit, ein Parallelpfad oder eine tote Auditfläche (P3, P5, P8).|T-CFG-1, T-ARCH-3, T-UNSAFE-1|
+|**D-84**|**Verbindliche Rückbauliste (Gate G-B):** Features und Parameter `legacy-wal-key`, `allow_legacy_integrity_key_fallback`, `memory-only-storage`, `cloud-egress-guard`, `kv-encryption`, `experimental-diskann`, `experimental-rabitq`, `experimental-predicate-augmented-search`, `partial-index-rebuild`, `graph`, `fault-injection` (ersetzt durch `FaultVfs` im `testkit`), `block-cache-v2`/`sieve-cache` (eine Cache-Implementierung bleibt), `auto-extraction-opt-out`, `entity-extraction`, `edge-reinforcement-learning`, `reranking`, `adaptive-candidate-pool-sizing`, `onnx`, `sandbox`, `graph-connectivity-health`, `encryption-at-rest`, `docid-128`, `bm25f`, `background-maintenance`, `dibud`, `contract-tests` (nur Dev), Paketalias `contextra-index`; `WasmMergeOperator` samt `block_on`; `contextra-sys/src/acl_win32.rs`, `contextra-sys/src/mmap.rs` (D-94) und alle `cfg(windows)`. `test-utils`/`testkit` bleiben nur als Dev-Features.|jedes dieser Elemente ist ein Schalter für Sicherheit, ein Parallelpfad oder eine tote Auditfläche (P3, P5, P8).|T-CFG-1, T-ARCH-3, T-UNSAFE-1|
 |**D-85**|**Dateischlüssel-Vernichtung.** Jede Datendatei (WAL-Segment, SSTable, Textsegment, Vektor-Snapshot, `scope/`) erhält bei Anlage einen zufälligen 32-Byte-Dateischlüssel (OS-CSPRNG), abgelegt als Tresor-Slot Typ `F` (`tag = file_id`, Payload = Schlüssel ⊕ `HKDF-Expand(K_enc, "ctx/fkmask/v1" ‖ file_id, 32)`). Beim Ausscheiden der Datei (Manifest-Swap dauerhaft) wird der `F`-Slot genullt (`sync_data`) und **dann** die Datei entfernt. Ordnung: `F`-Slot dauerhaft **vor** dem ersten dauerhaften Block der Datei (I-9b); Nullung nach dauerhaftem Manifest-Swap, vor `unlink` (I-17). Recovery: Datei ohne Manifest-Eintrag → Slot nullen, entfernen; `F`-Slot ohne Datei → nullen. Beim SSTable-Rewrite werden Nicht-Ziel-Records als Ciphertext-Envelopes unverändert in die neue Datei übernommen und unter dem neuen Dateischlüssel blockverschlüsselt (I-3).|Freigegebene Dateiblöcke enthielten sonst Strukturmetadaten (pseudonyme Tags, Clustergrößen, Postings) unter einem aus `K_master` ableitbaren Schlüssel: für den Inhaber der Passphrase lesbar. Mit Dateischlüssel-Vernichtung sind sie auch für ihn wertlos; die Remanenzfläche schrumpft auf den genullten 64-Byte-Slot. Die Maßnahme wirkt auch dort, wo Überschreiben nicht verlässlich ist (Flash, COW).|T-FK-1..3, T-CRASH-6|
 |**D-86**|**Vektor-Arena-Layout:** je Slot ein zusammenhängender, zeroisierbarer Bereich, der **alle** Repräsentationen des Vektors enthält (f32; später SQ8, PQ, binär). Gelöschte Slots werden in allen Repräsentationen überschrieben (D-77). Keine Repräsentation außerhalb der Arena (kein Quantisierungs-Nebenarray).|Spätere Quantisierung darf die Löschbarkeit nicht unterlaufen; später lässt sich das Layout nur mit Formatbruch ändern.|T-VEC-ARENA-1|
 |**D-87**|**Kapazitätsgrenzen v1:** `max_docs_per_store = 5·10⁷` (Tresor, D-79), `max_doc_bytes` 4 MiB (≤ 64 MiB), Snapshots je Mandant ≤ 1024, Dimension ≤ 4096, Query-Terme ≤ 256, `k` ≤ 1000. Überschreitung: `Limit::*`, nie stilles Kürzen.|Dokumentierte Produktgrenzen statt stillem Versagen.|T-LIMIT-1, BM-VAULT-OPEN|
 
-### 4.4 Neu in 4.1.0 (Architektur- und Strukturprüfung am HEAD `f8a3bbb24`)
+### 4.4 Architektur und Struktur
 
-Die Entscheidungen D-88 bis D-92 sind Revisionsentscheidungen dieser Fassung; sie lösen die Befunde F-26 bis F-31 und sind vom Eigentümer der Spezifikation zu bestätigen (Anhang H). Sie ändern kein Datenformat und keine Löschsemantik.
-
-|ID|Entscheidung|Begründung|Test / Beleg|
-|---|---|---|---|
-|**D-88**|**Matrixkorrektur (5.3).** (1) `engine→sys` ist erlaubt, **ausschließlich** für die Prozesshärtung (D-63); alle anderen `sys`-Aufrufe laufen über `durable-fs` oder `store`. (2) `vector` hängt **weder an `sys` noch an `mvcc`**: `mlock`/`madvise` der Arena über einen Port aus `ports`, implementiert in `engine`; Sichtbarkeit und Snapshot-Widerruf (D-61) bleiben in `engine`/`erasure`, nie im Index. (3) `text→crypto` ist ausdrücklich erlaubt (verschlüsselte Segmente, D-85). (4) `contextra` (Ring 4) erhält eine Matrixzeile: `engine`, `durable-fs`, `types`. (5) `ports` re-exportiert `types` nicht per Glob (AR-10).|F-27. Eine Kante ohne Matrixeintrag ist nicht prüfbar (AR-1); `vector→mvcc` würde dem Index Snapshot-Typen geben, während `erasure` (AR-3) keine Ring-2-Crates kennen darf.|T-ARCH-3, T-ARCH-6|
-|**D-89**|**Schnitt der Fassade.** Paketname `contextra` bleibt (D-66). Das Crate enthält **keine Logik** und nur drei Module: `api` (Handles `Contextra`, `Tenant`, `Collection` als Re-Exporte aus `engine`), `wiring` (`system_defaults()`: `RealVfs`, Systemuhr, OS-CSPRNG; den Tresor erzeugt `engine`, D-95), `error`. `EngineBuilder` (5.7) liegt in `engine`; die Fassade stellt nur `Contextra::builder()` bereit. **Entfallen:** `query_rewriter`, `collection_profile`, `performance_profile`, `EncryptionMode` (samt `Unencrypted`), Lizenz- und Embedder-Bezüge, Re-Exporte von `DocId`, `chunker`, `TextEmbeddingEngine`, `DriftStatusProvider`, `rank`. Erste Zeile von `README.md` und `//!`: „Öffentliche API und Verdrahtung. Enthält keine Logik.“|F-26. Eine Fassade, die Profile, Rewriter und Builder-Politik enthält, ist eine zweite Engine.|T-API-1, T-ARCH-3, T-ARCH-7|
-|**D-90**|**Namensregeln.** (1) Kein Modul, keine Datei und kein Crate heißt `misc`, `util`, `utils`, `common`, `helpers` oder endet auf `_impl`. (2) Kein Modul trägt den Namen seines Crates (`types::types` → `domain`, `error`, `erasure`, `tags`). (3) **Eine** Modulform: `foo.rs` neben `foo/`, kein `mod.rs`. (4) Keine Paketaliase (`contextra-index` entfällt). (5) `engine/src/contextra_impl` heißt `instance`; `wiring.rs` (27 Zeilen) geht in die Fassade (D-89). (6) Bestehende Verstöße sind per Ratchet nur sinkend (5.8).|F-30. Namen sind die erste Dokumentation; ein Name ohne Aussage kostet bei jedem Lesen.|T-ARCH-7|
-|**D-91**|**Crate-Kopf und Ringangabe.** Jedes Crate hat in `lib.rs` einen `//!`-Kopf mit Zweck (ein Satz), Ring, erlaubten Abhängigkeiten und Verweis auf den SPEC-Abschnitt. Ringangabe und Abhängigkeiten werden von `tests/arch` gegen 5.1 und 5.3 geprüft, nicht von Hand gepflegt. Verboten in Quelltext und Doku: Zeitstempel („STAND“), Sitzungs- und Agentenkennungen, `ANCHOR[...]`-Marken, absolute Entwicklerpfade.|F-28, F-30. Handgepflegte Angaben veralten ohne Test.|T-ARCH-5, T-LINT-4|
-|**D-92**|**entfällt** (ersetzt durch D-98, Anhang H.0). Die ID bleibt reserviert.|Die Löschregel für Folgedokumente war eine Übergangsregel, solange diese nicht aktualisiert waren. Nach Auslieferung der aktualisierten Dokumente gilt D-98.|T-DOC-1 (D-98)|
-
-### 4.5 Neu in 4.2.0 (Review am HEAD `4e208c179`)
-
-Die Entscheidungen D-93 bis D-97 lösen die Befunde F-32 bis F-37 und sind vom Eigentümer der Spezifikation zu bestätigen (Anhang H.1). Sie ändern kein Datenformat und keine Löschsemantik. D-95 ändert D-89 (Verdrahtung des Tresors).
+Die Entscheidungen D-88 bis D-91 sind bestätigt. Sie ändern kein Datenformat und keine Löschsemantik.
 
 |ID|Entscheidung|Begründung|Test / Beleg|
 |---|---|---|---|
-|**D-93**|**Build-Disziplin.** `Cargo.lock` ist eingecheckt und wird im selben Commit wie jede Manifest-Änderung erneuert. `cargo check --workspace --all-targets --locked` ist ein blockierender CI-Job (G-A). Kein Merge, der den Workspace nicht baut.|F-32: Das Lockfile ist veraltet, zwei Crates der Kette `store` → `engine` → `contextra` bauen nicht, ohne dass ein Gate es verhindert hat. Reproduzierbare Builds (D-82) setzen `--locked` voraus.|T-BUILD-1|
-|**D-94**|**Kein `mmap`, keine `unsafe fn` über die Inseln hinaus.** `contextra-sys` bietet keine Speicherabbildung an (`mmap.rs` entfällt, D-84). Lesezugriffe auf WAL, SSTable, Textsegment und Snapshot laufen über `Vfs`-Positionslesen (8.5). Eine `unsafe fn` aus `sys` oder `simd` darf von keinem Crate mit `forbid(unsafe_code)` aufgerufen werden; die Lösung ist, die Funktion nicht anzubieten, nicht `unsafe` in Produktcrates zu erlauben.|F-32: drei Aufrufstellen in `store` und `vector` brechen den Build, weil die Härtung der Insel (D-29) die Funktion zu Recht als `unsafe fn` führt. 8.10 verbietet `memmap2` auf Klartext bereits. **[A]** Eine Abbildung entzieht Klartextseiten der Kontrolle des Löschkerns (Page-Cache, Zugriffsmuster), die Datei- und Schlüsselvernichtung (D-85) setzt aber geschlossene Handles voraus.|T-UNSAFE-1, T-LINT-2|
+|**D-88**|**Matrixkorrektur (5.3).** (1) `engine→sys` ist erlaubt, **ausschließlich** für die Prozesshärtung (D-63); alle anderen `sys`-Aufrufe laufen über `durable-fs` oder `store`. (2) `vector` hängt **weder an `sys` noch an `mvcc`**: `mlock`/`madvise` der Arena über einen Port aus `ports`, implementiert in `engine`; Sichtbarkeit und Snapshot-Widerruf (D-61) bleiben in `engine`/`erasure`, nie im Index. (3) `text→crypto` ist ausdrücklich erlaubt (verschlüsselte Segmente, D-85). (4) `contextra` (Ring 4) erhält eine Matrixzeile: `engine`, `durable-fs`, `types`. (5) `ports` re-exportiert `types` nicht per Glob (AR-10).|Eine Kante ohne Matrixeintrag ist nicht prüfbar (AR-1); `vector→mvcc` würde dem Index Snapshot-Typen geben, während `erasure` (AR-3) keine Ring-2-Crates kennen darf.|T-ARCH-3, T-ARCH-6|
+|**D-89**|**Schnitt der Fassade.** Paketname `contextra` bleibt (D-66). Das Crate enthält **keine Logik** und nur drei Module: `api` (Handles `Contextra`, `Tenant`, `Collection` als Re-Exporte aus `engine`), `wiring` (`system_defaults()`: `RealVfs`, Systemuhr, OS-CSPRNG; den Tresor erzeugt `engine`, D-95), `error`. `EngineBuilder` (5.7) liegt in `engine`; die Fassade stellt nur `Contextra::builder()` bereit. **Entfallen:** `query_rewriter`, `collection_profile`, `performance_profile`, `EncryptionMode` (samt `Unencrypted`), Lizenz- und Embedder-Bezüge, Re-Exporte von `DocId`, `chunker`, `TextEmbeddingEngine`, `DriftStatusProvider`, `rank`. Erste Zeile von `README.md` und `//!`: „Öffentliche API und Verdrahtung. Enthält keine Logik.“|Eine Fassade, die Profile, Rewriter und Builder-Politik enthält, ist eine zweite Engine.|T-API-1, T-ARCH-3, T-ARCH-7|
+|**D-90**|**Namensregeln.** (1) Kein Modul, keine Datei und kein Crate heißt `misc`, `util`, `utils`, `common`, `helpers` oder endet auf `_impl`. (2) Kein Modul trägt den Namen seines Crates (`types::types` → `ids`, `tags`, `key`, `erasure`, `error`). (3) **Eine** Modulform: `foo.rs` neben `foo/`, kein `mod.rs`. (4) Keine Paketaliase (`contextra-index` entfällt). (5) `engine/src/contextra_impl` heißt `instance`; `wiring.rs` (27 Zeilen) geht in die Fassade (D-89). (6) Bestehende Verstöße sind per Ratchet nur sinkend (5.8).|Namen sind die erste Dokumentation; ein Name ohne Aussage kostet bei jedem Lesen.|T-ARCH-7|
+|**D-91**|**Crate-Kopf und Ringangabe.** Jedes Crate hat in `lib.rs` einen `//!`-Kopf mit Zweck (ein Satz), Ring, erlaubten Abhängigkeiten und Verweis auf den SPEC-Abschnitt. Ringangabe und Abhängigkeiten werden von `tests/arch` gegen 5.1 und 5.3 geprüft, nicht von Hand gepflegt. Verboten in Quelltext und Doku: Zeitstempel („STAND“), Sitzungs- und Agentenkennungen, `ANCHOR[...]`-Marken, absolute Entwicklerpfade.|Handgepflegte Angaben veralten ohne Test.|T-ARCH-5, T-LINT-4|
+|**D-92**|**entfällt** (ersetzt durch D-98). Die ID bleibt reserviert.|Die Löschregel für Folgedokumente war eine Übergangsregel, solange diese nicht aktualisiert waren. Nach Auslieferung der aktualisierten Dokumente gilt D-98.|T-DOC-1 (D-98)|
+
+### 4.5 Build, Plattform, Löschkern-Skelett
+
+Die Entscheidungen D-93 bis D-97 sind bestätigt. D-95 ändert die Verdrahtung des Tresors gegenüber D-89 (Tresor entsteht in `engine`).
+
+|ID|Entscheidung|Begründung|Test / Beleg|
+|---|---|---|---|
+|**D-93**|**Build-Disziplin.** `Cargo.lock` ist eingecheckt und wird im selben Commit wie jede Manifest-Änderung erneuert. `cargo check --workspace --all-targets --locked` ist ein blockierender CI-Job (G-A). Kein Merge, der den Workspace nicht baut.|Reproduzierbare Builds (D-82) setzen `--locked` voraus; ein Workspace, der nicht baut, hat kein wirksames Gate.|T-BUILD-1|
+|**D-94**|**Kein `mmap`, keine `unsafe fn` über die Inseln hinaus.** `contextra-sys` bietet keine Speicherabbildung an (`mmap.rs` entfällt, D-84). Lesezugriffe auf WAL, SSTable, Textsegment und Snapshot laufen über `Vfs`-Positionslesen (8.5). Eine `unsafe fn` aus `sys` oder `simd` darf von keinem Crate mit `forbid(unsafe_code)` aufgerufen werden; die Lösung ist, die Funktion nicht anzubieten, nicht `unsafe` in Produktcrates zu erlauben.|8.10 verbietet `memmap2` auf Klartext. **[A]** Eine Speicherabbildung entzieht Klartextseiten der Kontrolle des Löschkerns (Page-Cache, Zugriffsmuster); die Datei- und Schlüsselvernichtung (D-85) setzt geschlossene Handles voraus. Eine Funktion, die nur `unsafe` aufrufbar ist, gehört nicht zur Schnittstelle eines `forbid(unsafe_code)`-Crates.|T-UNSAFE-1, T-LINT-2|
 |**D-95**|**Der Tresor wird in `engine` erzeugt.** `engine` baut `FileVault` (als `RecordSealer` und `FileKeyring`) aus `contextra-erasure`. Die Fassade übergibt nur `RealVfs`, Uhr und OS-CSPRNG (`system_defaults()`). Das ersetzt die Nennung von `FileVault`/`FileKeyring` im `wiring`-Modul in D-89.|D-89 und die Anmerkung zu 5.3 widersprachen sich: Die Fassade darf nicht an `erasure` hängen, sollte aber den Tresor verdrahten.|T-ARCH-3, T-ARCH-7|
-|**D-96**|**Skelett-Regel für den Löschkern.** `contextra-erasure` ist Workspace-Mitglied, sobald WP-3.1 beginnt, mit Crate-Kopf (D-91) und leerem `lib.rs`. Löschports (`ErasureLayer`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink`) und Löschtypen entstehen in `ports` und `types` **vor** jeder Implementierung in `store`, `text` und `vector`.|F-33. P12 (Entkopplung) und AR-3 sind nur prüfbar, wenn das Crate existiert; Schichten, die `ErasureLayer` von Anfang an mitimplementieren, verhindern nachträgliches Anflanschen der Löschung.|T-ARCH-3|
-|**D-97**|**Zweck-Satz und Dev-Abhängigkeiten.** Jedes Crate hat genau einen Zweck-Satz (5.1a), wortgleich in `Cargo.toml`, `//!`-Kopf und README-Zeile 1. Dev-Abhängigkeiten folgen der Matrix 5.3 (AR-14); Selbst-Dev-Abhängigkeiten zum Aktivieren von Features sind verboten.|F-35: Köpfe nannten falsche Ringe und nicht vorhandene Verbraucher; die Frage „worum geht es in diesem Crate?“ blieb unbeantwortet. Dev-Kanten waren ungeregelt.|T-ARCH-5, T-ARCH-6|
+|**D-96**|**Skelett-Regel für den Löschkern.** `contextra-erasure` ist Workspace-Mitglied, ab dem ersten Löschkern-Arbeitspaket, mit Crate-Kopf (D-91) und leerem `lib.rs`. Löschports (`ErasureLayer`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink`) und Löschtypen entstehen in `ports` und `types` **vor** jeder Implementierung in `store`, `text` und `vector`.|P12 (Entkopplung) und AR-3 sind nur prüfbar, wenn das Crate existiert; Schichten, die `ErasureLayer` von Anfang an mitimplementieren, verhindern nachträgliches Anflanschen der Löschung.|T-ARCH-3|
+|**D-97**|**Zweck-Satz und Dev-Abhängigkeiten.** Jedes Crate hat genau einen Zweck-Satz (5.1a), wortgleich in `Cargo.toml`, `//!`-Kopf und README-Zeile 1. Dev-Abhängigkeiten folgen der Matrix 5.3 (AR-14); Selbst-Dev-Abhängigkeiten zum Aktivieren von Features sind verboten.|Die Frage „worum geht es in diesem Crate?“ muss je Crate eindeutig und testbar beantwortet sein; ungeregelte Dev-Kanten umgehen die Matrix.|T-ARCH-5, T-ARCH-6|
 
-### 4.6 Neu in 4.3.0 (Folgedokumente)
+### 4.6 Dokumente, Umfang, Lieferkette, Stabilität (Konsolidierung 5.0.0)
 
-D-98 ersetzt D-92. Die Folgedokumente werden gepflegt; sie werden nicht entfernt.
+D-98 ersetzt D-92 (die ID D-92 bleibt reserviert, ohne Inhalt). D-99 bis D-110 schließen alle Punkte, die frühere Fassungen offen ließen oder als „vom Eigentümer zu bestätigen“ führten. Sie ändern kein Datenformat, keine Löschsemantik und keine Schlüsselhierarchie.
 
 |ID|Entscheidung|Begründung|Test / Beleg|
 |---|---|---|---|
 |**D-98**|**Folgedokumente werden gepflegt, nicht gelöscht.** (1) Abgeleitete Dokumente sind: `AGENTS.md` im Wurzelverzeichnis, `README.md`, `docs/*.md` außer dieser Datei, `crates/*/README.md`, `crates/*/AGENTS.md` und `.agents/**/*.md`. Sie geben Fakten dieser Spezifikation wieder, nennen den Abschnitt, auf den sie sich stützen, und enthalten keine eigenen Anforderungen. (2) Agenten- und Werkzeugverzeichnisse (`.agents/`, `.gemini/`, `.antigravity/`) sind Teil des Repositorys. Sie unterliegen denselben Konsistenzprüfungen, soweit sie Pfade, Befehle, Crate-Namen oder Workflows nennen. (3) Nicht in den Quellbaum gehören Sitzungsverläufe und Protokolle früherer Prüfungen sowie `reports/` und `evidence/`. Evidenz ist Release-Artefakt (11.7, 17.1). (4) Jede Änderung einer Tatsache in dieser Spezifikation wird im selben Änderungspaket in allen betroffenen abgeleiteten Dokumenten nachgezogen. (5) Die Konsistenz wird automatisiert geprüft.|Folgedokumente sind der Einstieg für Entwickler und Agenten. Ihre Löschung hätte Wissen entfernt, das nur mit großem Aufwand wiederherzustellen wäre. Schattenwahrheiten entstehen durch Abweichung von der Spezifikation, nicht durch die Existenz eines Dokuments. Die Prüfung setzt deshalb an der Abweichung an.|T-DOC-1, T-ARCH-8, T-TRACE-1|
+|**D-99**|**`docs/PLAN.md` ist die verbindliche Umsetzungsspezifikation** (Arbeitspakete, Ist-Stand, Abnahme). Sie ist abgeleitet: Sie darf Verhalten, Formate und Gates dieser Spezifikation weder ändern noch lockern. Ein Konflikt wird in der Spezifikation per ADR entschieden. Jedes Arbeitspaket nennt nur existierende Gate-, Test- und Benchmark-IDs.|Ist-Zustand und Aufgaben veralten schneller als Soll-Verhalten; getrennte Dokumente verhindern, dass die Spezifikation an einen Commit gebunden wird.|T-TRACE-2, T-DOC-1|
+|**D-100**|**Fünftes Hilfsmitglied `contextra-testmacros`** (Proc-Macro-Crate, dev-only): liefert `#[ctx_test(id = "T-…")]` und `#[ctx_bench(id = "BM-…")]` für T-TRACE-1. Es liegt nicht in `default-members` und ist von keinem Produktions-Crate abhängig.|Proc-Macros müssen eigene Crates sein; Rückverfolgbarkeit braucht sie.|T-ARCH-3, T-TRACE-1|
+|**D-101**|**G0 vorentschieden.** Grundlinie von v1: Die Kompaktion schneidet Ausgabedateien **weich** an Grenzen von `(tenant_tag, coll_tag)` und `cluster_tag`, sobald die laufende Datei ≥ 50 % der Zielgröße (32 MiB für Level ≥ 1) erreicht hat; Mini-Cluster ohne Betroffenen (`cluster_tag` aus `doc_tag`) lösen keinen Schnitt aus. Damit ist Stufe 1 der Fallbackleiter (11.9) Bestandteil von 9.1 und 11.4. Die Fallbackleiter beginnt bei Stufe 2; die Stufenentscheidung ist **mechanisch** aus den Schwellen von D-76 abzulesen und braucht keinen Eigentümerentscheid.|Stufe 1 kostet nichts im Format und senkt das Risiko des einzigen Gates, das die Produktarchitektur kippen kann.|BM-ERASE-WA, G0|
+|**D-102**|**Release-Umfang und Cut-Linie.** v1.0.0 = S0–S3. Sind G-A bis G-F und G-E grün und G-G rot, gilt die Cut-Linie ohne weiteren Beschluss: v1.0.0 = S0 + S1; die Fassade stellt Vektor- und Hybridsuche dann nicht bereit, `vector` und `rank` bleiben im Workspace, werden aber nicht verdrahtet und nicht veröffentlicht; v1.1 folgt. Es gibt nie eine halb fertige Löschschicht in einem Release (D-59).|Ein deterministischer Auslöser verhindert Verhandlungen unter Termindruck.|G-H|
+|**D-103**|**G-LEGAL blockiert das Release nie.** Release-Text, README und Außenaussagen beschränken sich bis zur Freigabe auf 6.4; Löschaussagen jenseits 6.4 sind verboten, bis G-LEGAL sie freigibt.|Rechtliche Wertung ist Betreibersache (E-L2); die Technik darf nicht an externer Prüfung hängen.|T-LEIST-*, Wortlaut-Lint|
+|**D-104**|**Toolchain.** `rust-toolchain.toml` pinnt **1.97.0** (zum Zeitpunkt dieser Fassung höchstens zwei Minor-Versionen hinter der aktuellen Stable); `rust-version` (MSRV) bleibt **1.89**; Edition **2021**. Beim Release-Kandidaten wird der Pin gegen D-82 geprüft und bei Überschreitung angehoben; Release-Builds laufen mit `--locked`.|Der Pin 1.94.0 überschreitet die Zwei-Minor-Regel von D-82 und erhält keine Sicherheitskorrekturen mehr. Edition 2024 bringt für v1 keinen Nutzen und ein Migrationsrisiko.|T-SUPPLY-2|
+|**D-105**|**Abhängigkeits-Whitelist** (`governance/deps.toml`, geprüft von `tests/arch`). Produktions-Crates dürfen nur diese externen Crates direkt nutzen: `tokio` (Features D-54), `tokio-util` (nur `rt`/`CancellationToken`), `futures-util` (ohne Default-Features, `alloc`), `parking_lot`, `bytes`, `ahash` (ohne `serde`), `thiserror`, `tracing`, `zeroize`, `subtle`, `getrandom`, `libc` (nur `sys`), `bytemuck` (nur `simd`), `blake3`, `crc32fast`, `sha2`, `hmac`, `hkdf`, `aes-gcm-siv`, `argon2`, `ed25519-dalek`; `text` zusätzlich `unicode-segmentation`, `unicode-normalization`, `rust-stemmers`. **Entfallen:** `bincode`, `flatbuffers`, `memmap2`, `regex`, `roaring`, `itoa`, `serde`/`serde_json` (Produktionsbaum; erlaubt nur in `lab`, `ctx-verify`, `testkit`), `rand` (ersetzt durch `getrandom` hinter dem `Rng`-Port), `windows-sys`, `uuid`, `lru`, `quick_cache`, `scc`, `paste`, `instant`, `rustls`, `pyo3`, `futures` (statt `futures-util`). Jede Ergänzung braucht einen ADR und einen Eintrag mit Ablaufprüfung.|Jede Abhängigkeit ist Auditfläche und CRA-Pflicht (E-L9); Serialisierung folgt Anhang F von Hand und nicht einem Bibliotheksformat, dessen Bytes sich ändern können.|T-ARCH-4, T-SUPPLY-1, T-CFG-1|
+|**D-106**|**CI-Satz v1** (`.github/workflows/`): `ci`, `deny`, `audit`, `unsafe`, `loom`, `fuzz`, `mutants`, `bench`, `release`. Gelöscht: alle Workflows für Python-Wheels, PyPI, MCP-Binary, Jules-/Agenten-Kontext und Branch-Pflege. Sicherheits- und Korrektheitsjobs haben kein `continue-on-error`; nur `bench` darf bis zur Basislinie (WP-6.1) berichtend laufen. Advisory-Ausnahmen in `deny.toml` tragen Ablaufdatum und ADR; Ausnahmen für entfernte Crates entfallen.|Ein Gate, das nicht blockiert, ist keines.|T-CFG-1, T-SUPPLY-1|
+|**D-107**|**Zählwerkzeug.** `tests/arch` enthält ein `syn`-basiertes Werkzeug, das `unwrap`, `expect`, `panic!`, `unreachable!`, `todo!`, `unimplemented!`, `let _ =` auf `Result`, `#[allow]`, `unsafe`, `std::fs`, `block_on` und Produktionszeilen **ausschließlich im Produktionscode** zählt (ohne `#[cfg(test)]`, `tests/`, `benches/`, `examples/`). Nur dieses Werkzeug speist `governance/ratchet.toml`.|`grep` zählt Testcode mit und liefert Obergrenzen statt Werte; ein Ratchet auf falschen Zahlen ist wirkungslos.|T-LINT-3, T-ARCH-8|
+|**D-108**|**Größenbudgets absolut.** Die Budgets von 3.1 ersetzen das relative Ziel „≥ 30 % Reduktion“; sie werden beim Anlegen des Ratchets einmalig auf den gemessenen Wert gesenkt, wenn dieser darunter liegt, und nie angehoben.|Ein relatives Ziel gegen eine Basislinie, die Testcode und gelöschte Crates zählte, ist nicht prüfbar.|T-ARCH-8|
+|**D-109**|**Dauer- und Robustheitsnachweis für 1.0.0** (zusätzlich zu 15.1): (a) 72-Stunden-Absturzschleife mit `FaultVfs` (zufällige Abbrüche an jeder Schreib-, `fsync`-, Rename- und Unlink-Stelle bei laufendem Insert, Erase, Kompaktion, Reopen) mit null Korruption, null verlorenen bestätigten Commits und null unvollendeten Löschungen ohne `Pending`-Status; (b) je Parser aus Anhang F mindestens 1 h Fuzz je Nachtlauf und 24 h kumulativ vor dem Release-Kandidaten ohne Fund; (c) `cargo-mutants` ohne überlebende Mutanten in `erasure`, Matchern, Gate, Tresor.|Ein Speicherkern ist produktionsreif, wenn er Abstürze beliebig oft überlebt, nicht wenn Tests grün sind.|T-SOAK-1, T-FMT-1, T-MUT-1|
+|**D-110**|**Ergänzung zu D-66 (ab 1.0.0).** Fehlertexte und `ErrorCode`-Werte sind eingefroren und in einem Golden-Test sowie in `cargo-semver-checks` erfasst; die Fassade veröffentlicht nur Typen, die in 7 stehen; jede Änderung eines Fehlertexts ist eine Minor-Version mit Eintrag im Changelog.|Löschprodukte brauchen stabile Fehlertexte für Runbooks (14.5, 17.4); D-66 deckt `non_exhaustive`, nicht den Wortlaut.|T-API-4, T-LOG-1|
 
 ---
 
@@ -337,30 +338,31 @@ D-98 ersetzt D-92. Die Folgedokumente werden gepflegt; sie werden nicht entfernt
 
 ### 5.1 Workspace (Soll)
 
-14 Produktions-Crates, dazu vier Hilfs-Mitglieder. Die Spalte „Ist“ zeigt den am HEAD `25c8f17` geprüften Zustand [V], sofern nicht [M] vermerkt ist.
+14 Produktions-Crates, dazu fünf Hilfs-Mitglieder (D-100). Ausführliches Modul- und Vertragsinventar: 3.1.
 
-|Crate|Ring|Rolle|Ist am HEAD|
-|---|---|---|---|
-|`contextra-types`|0|Reine Typen (IDs, Tags, Schlüssel, Fehler, Löschtypen, typisierter Zeuge). Kein I/O, kein `async`.|vorhanden; enthält Altlasten (`DocId`, `saos`, `tombstone`, `AutoExtractionMode`); `erasure.rs` ist nicht das Soll|
-|`contextra-ports`|0|Traits: `StorageEngine`, `TextIndex`, `VectorIndex` (statisch dispatcht, D-03), `Vfs`, `Clock`, `Rng`, `IdGen`, `ErasureLayer`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink`, `Metrics`.|vorhanden; Altports `graph`, `checkpoint`, `license`, `attention`, `plugin` bereits entfernt (`c2a864d`); `embedding`, `reranker`, `query_rewriter` noch zu entfernen; `Vfs` nur noch in `ports` (F-29); Glob-Re-Export `pub use contextra_types::*` zu entfernen (D-88); Löschports fehlen|
-|`contextra-sys`|1|`unsafe`-Insel: `fsync`, `flush_dir`, `rename_durable`, `mlock`, Prozesshärtung, Dateirechte (POSIX).|vorhanden, 30/30 Lib-Tests [M]; Windows-Code (`acl_win32.rs`) ist zu entfernen (D-84)|
-|`contextra-simd`|1|`unsafe`-Insel: f32-Distanzkernel mit Skalar-Referenz.|vorhanden, 13/13 Lib-Tests [M]; u8-VNNI-Pfad zu entfernen|
-|`contextra-durable-fs`|1|`Vfs`-Implementierung (`RealVfs`), atomarer Austausch, optionales `scrub` (D-83), Startprobe.|vorhanden; Doppel-`Vfs` behoben (F-29); Startprobe D-56 und `scrub` D-83 nicht nachgewiesen|
-|`contextra-crypto`|1|AES-256-GCM-SIV, Argon2id, HKDF, Keyslots, WAL-HMAC, Hash-Ketten, Ed25519, Tags.|vorhanden; 9 Test-/Bench-Ziele kompilieren nicht [M]; Untergrenze zu niedrig, keine Obergrenze (F-11)|
-|`contextra-mvcc`|2|Snapshots, SSI, Sequenzen.|vorhanden, 47/47 Lib-Tests [M]; Sentinel-Fehler (F-07)|
-|`contextra-store`|2|LSM-Tree (WAL, Memtable, SSTable, Manifest, Kompaktion, Purge-Primitive).|vorhanden (26.996 Zeilen, 124 Testdateien [M]); F-06, F-07, F-09, F-13, F-21; **kompiliert nicht** (F-32)|
-|`contextra-text`|2|BM25-Segmentindex (9.7).|vorhanden als termgeordneter LSM-Index (Module `bm25`, `inverted`, `morphology`, `tokenizer`, `wand`); Umbau nötig (D-20, D-81)|
-|`contextra-vector`|2|HNSW, Arena, Snapshot.|vorhanden (13.624 Zeilen [M]); `std::fs`/`memmap2` 53 Treffer, unverschlüsselt, Feature-Altlasten (F-23); **kompiliert nicht** (F-32); 46 % außerhalb Soll (F-36)|
-|`contextra-rank`|2|RRF-Fusion.|vorhanden (3.440 Zeilen [M], Ziel deutlich kleiner)|
-|`contextra-erasure`|3|Löschkern: Saga, Gate, Journal, Tresor (`FileVault`), Messung, Berichtsbau, Ledger.|**leer** (nur README/AGENTS), kein Workspace-Mitglied (F-33)|
-|`contextra-engine`|3|Orchestrierung: `EngineBuilder`, Instanz (`instance`), Collections, Suche, Transaktionen, Verdrahtung. Keine Löschlogik, kein Chunker, keine Extraktion, kein Import/Export.|vorhanden (28.001 Zeilen [V], 20.357 [M]); **kompiliert nicht** [M] (am HEAD `4e208c179` wegen F-32 nicht erreichbar); Fremdmodule F-31; `contextra_impl` (F-30)|
-|`contextra`|4|Fassade, einzige öffentliche Oberfläche; **keine Logik**; Module `api`, `wiring`, `error` (D-89).|vorhanden (1.558 Zeilen), widerspricht §7 (F-26, F-34)|
-|`contextra-testkit`|dev|Fixtures, `FaultVfs`, `ReferenceModel`, `ManualClock`, In-Memory-Ports.|vorhanden (Graph-Reste seit `b1637a8` entfernt)|
-|`contextra-lab`|dev|Unabhängige Prüfinstanz (12.3), enthält das Scanner-Modul für `ctx-verify scan`.|**fehlt**|
-|`ctx-verify`|dev/bin|Eigenständiger Berichtsprüfer und Feldscanner (8.17).|**fehlt**|
-|`tests/arch`|dev|Architektur- und Lint-Tests, Rückverfolgbarkeit Spezifikation ↔ Test (15.1).|vorhanden|
+|Crate|Ring|Rolle|
+|---|---|---|
+|`contextra-types`|0|Reine Typen (IDs, Tags, Schlüssel, Fehler, Löschtypen, typisierter Zeuge). Kein I/O, kein `async`.|
+|`contextra-ports`|0|Traits: `StorageEngine`, `TextIndex`, `VectorIndex` (statisch dispatcht, D-03), `Vfs`, `Clock`, `Rng`, `IdGen`, `ErasureLayer`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink`, `Metrics`.|
+|`contextra-sys`|1|`unsafe`-Insel: `fsync`, `flush_dir`, `rename_durable`, `mlock`, Prozesshärtung, Dateirechte (POSIX).|
+|`contextra-simd`|1|`unsafe`-Insel: f32-Distanzkernel mit Skalar-Referenz.|
+|`contextra-durable-fs`|1|`Vfs`-Implementierung (`RealVfs`), atomarer Austausch, optionales `scrub` (D-83), Startprobe.|
+|`contextra-crypto`|1|AES-256-GCM-SIV, Argon2id, HKDF, Keyslots, WAL-HMAC, Hash-Ketten, Ed25519, Tags.|
+|`contextra-mvcc`|2|Snapshots, SSI, Sequenzen.|
+|`contextra-store`|2|LSM-Tree (WAL, Memtable, SSTable, Manifest, Kompaktion, Purge-Primitive).|
+|`contextra-text`|2|BM25-Segmentindex (9.7).|
+|`contextra-vector`|2|HNSW, Arena, Snapshot.|
+|`contextra-rank`|2|RRF-Fusion.|
+|`contextra-erasure`|3|Löschkern: Saga, Gate, Journal, Tresor (`FileVault`), Messung, Berichtsbau, Ledger.|
+|`contextra-engine`|3|Orchestrierung: `EngineBuilder`, Instanz (`instance`), Collections, Suche, Transaktionen, Verdrahtung. Keine Löschlogik, kein Chunker, keine Extraktion, kein Import/Export.|
+|`contextra`|4|Fassade, einzige öffentliche Oberfläche; **keine Logik**; Module `api`, `wiring`, `error` (D-89).|
+|`contextra-testkit`|dev|Fixtures, `FaultVfs`, `ReferenceModel`, `ManualClock`, In-Memory-Ports, Vertragstests der Ports.|
+|`contextra-testmacros`|dev|Proc-Macros `ctx_test` und `ctx_bench` für die Rückverfolgbarkeit (D-100).|
+|`contextra-lab`|dev|Unabhängige Prüfinstanz (12.3), enthält das Scanner-Modul für `ctx-verify scan`.|
+|`ctx-verify`|dev/bin|Eigenständiger Berichtsprüfer und Feldscanner (8.17).|
+|`tests/arch`|dev|Architektur- und Lint-Tests, Rückverfolgbarkeit Spezifikation ↔ Test (15.1).|
 
-`members` = alle obigen Einträge. `default-members` = die 14 Produktions-Crates (ohne `testkit`, `lab`, `ctx-verify`). Pfadabhängigkeiten und `[workspace.dependencies]` auf entfernte Crates entfallen (Reste: F-05).
+`members` = alle obigen Einträge. `default-members` = die 14 Produktions-Crates plus `testkit` und `tests/arch` (damit `cargo test` ohne Argumente den Kern prüft); `lab`, `ctx-verify` und `testmacros` werden explizit gebaut. Es gibt keine Pfadabhängigkeiten und keine `[workspace.dependencies]` auf nicht vorhandene Crates.
 
 ### 5.1a Zweck-Sätze (D-97)
 
@@ -383,6 +385,7 @@ Jedes Crate hat genau einen Zweck-Satz. Er steht wortgleich in `Cargo.toml` (`de
 |`contextra-engine`|Orchestrierung: Mandanten, Collections, Transaktionen, Suche, Hintergrundtasks.|
 |`contextra`|Öffentliche API und Verdrahtung. Enthält keine Logik.|
 |`contextra-testkit`|Testhilfen: `FaultVfs`, Referenzmodell, deterministische Uhr, In-Memory-Ports.|
+|`contextra-testmacros`|Attribute `ctx_test` und `ctx_bench` zur Verknüpfung von Tests und Benchmarks mit Spezifikations-IDs.|
 |`contextra-lab`|Unabhängige Prüfinstanz für die Löschmessung, ohne Produktions-Decoder.|
 |`ctx-verify`|Eigenständiger Verifizierer für Löschberichte und Feldscans.|
 |`tests/arch`|Architektur-, Ring-, Namens- und Lint-Tests.|
@@ -395,7 +398,7 @@ Ring 3  contextra-erasure   contextra-engine
 Ring 2  contextra-mvcc  contextra-store  contextra-text  contextra-vector  contextra-rank
 Ring 1  contextra-sys  contextra-simd  contextra-durable-fs  contextra-crypto
 Ring 0  contextra-types  contextra-ports
-dev     testkit  lab  ctx-verify  tests/arch
+dev     testkit  testmacros  lab  ctx-verify  tests/arch
 ```
 
 |Regel|Inhalt|Test|
@@ -433,7 +436,7 @@ dev     testkit  lab  ctx-verify  tests/arch
 |contextra (Ring 4)|✓||||✓||||||||
 |engine|✓|✓|✓||✓|✓|✓|✓|✓|✓|✓|✓|
 
-`store` darf `Vfs` nur als Trait aus `ports` nutzen; die konkrete `RealVfs` wird in `engine`/`contextra` verdrahtet. `store`, `text` und `vector` erhalten Dateischlüssel ausschließlich über den Port `FileKeyring` (Implementierung `FileVault` in `erasure`, verdrahtet in `engine`). `contextra-sys` ist für `durable-fs`, `store` und (nur Prozesshärtung) `engine` zulässig; `vector` benötigt `sys` nur über den Port-Wrapper in `engine`. **Ergänzung 4.1.0 (D-88):** `engine` darf `sys` nur für die Prozesshärtung (D-63) nutzen; `vector` nutzt weder `sys` noch `mvcc` (Arena-Sperren über einen Port aus `ports`, implementiert in `engine`). Die Zeile `contextra` gilt zusätzlich zur Kante auf `engine` (die Matrix hat keine Engine-Spalte): Fassade → `engine`, `durable-fs`, `types`. `text` darf `crypto` nutzen. **Ergänzung 4.2.0 (D-95, D-97):** Die Fassade übergibt nur `RealVfs`, Uhr und CSPRNG; `engine` erzeugt den Tresor (`FileVault`). Dev-Abhängigkeiten folgen derselben Matrix (AR-14).
+`store` darf `Vfs` nur als Trait aus `ports` nutzen; die konkrete `RealVfs` wird in `engine`/`contextra` verdrahtet. `store`, `text` und `vector` erhalten Dateischlüssel ausschließlich über den Port `FileKeyring` (Implementierung `FileVault` in `erasure`, verdrahtet in `engine`). `contextra-sys` ist für `durable-fs`, `store` und (nur Prozesshärtung) `engine` zulässig; `vector` benötigt `sys` nur über den Port-Wrapper in `engine`. `engine` darf `sys` nur für die Prozesshärtung (D-63) nutzen; `vector` nutzt weder `sys` noch `mvcc` (Arena-Sperren über einen Port aus `ports`, implementiert in `engine`). Die Zeile `contextra` gilt zusätzlich zur Kante auf `engine` (die Matrix hat keine Engine-Spalte): Fassade → `engine`, `durable-fs`, `types`. `text` darf `crypto` nutzen. Die Fassade übergibt nur `RealVfs`, Uhr und CSPRNG; `engine` erzeugt den Tresor (`FileVault`). Dev-Abhängigkeiten folgen derselben Matrix (AR-14).
 
 ### 5.4 Laufzeitmodell
 
@@ -474,7 +477,7 @@ dev     testkit  lab  ctx-verify  tests/arch
   tmp/        Waisen werden beim Start entfernt
 ```
 
-Außerhalb des Datenverzeichnisses: das Ledger-Exemplar des Betreibers (`LedgerSink`, 11.8). Das Verzeichnis `keys/` aus 3.0.0 entfällt (D-80). Kein Datei- oder Verzeichnisname enthält etwas anderes als Tags, `file_id`, `erasure_id` oder feste Namen (T-RAW-6).
+Außerhalb des Datenverzeichnisses: das Ledger-Exemplar des Betreibers (`LedgerSink`, 11.8). Ein Verzeichnis `keys/` existiert nicht (D-80). Kein Datei- oder Verzeichnisname enthält etwas anderes als Tags, `file_id`, `erasure_id` oder feste Namen (T-RAW-6).
 
 ### 5.7 Konfiguration (`EngineBuilder`)
 
@@ -505,11 +508,14 @@ Fehlende Pflichtparameter oder Werte außerhalb der Grenzen sind `ConfigError` b
 
 |Budget|Wert|Messung|
 |---|---|---|
-|Erase-Produktcode (`contextra-erasure`, `store/src/erase`, `types/src/erasure`, `crypto/src/vault_cipher.rs`)|≤ 9.000 Zeilen (3.0.0: 7.000; +2.000 für Schlüsselhierarchie, Dateischlüssel-Slots, Ledger-Bereiche, Gate-Gruppen)|`tokei`|
-|`unwrap`/`expect`/`panic!`/`let _ =`/`#[allow]` im Produktionscode|nur sinkend (Ratchet); Ziel 0 in allen Kern-Crates ab Gate G-C. Die Ratchet-Datei `governance/ratchet.toml` wird mit WP-0.1 angelegt (F-20).|`governance/ratchet.toml`|
-|Clippy|0 Meldungen mit `-D warnings`|CI|
-|Produktcode Kern gesamt|Reduktion ≥ 30 % gegenüber der Basislinie von **101.943 Zeilen** [M] (ohne Testcode); der Rückbau nach D-84 liefert nur ≈ 12–15 % (F-36), der Rest muss aus `store` und `engine::collection` kommen|`tokei`|
-|`unsafe`|nur `sys`, `simd`|`forbid(unsafe_code)` sonst|
+|Produktionszeilen je Crate|Obergrenzen aus 3.1; nur sinkend (D-108)|`governance/ratchet.toml`, Zählwerkzeug D-107|
+|Erase-Produktcode (`contextra-erasure`, Purge-Primitive in `store/src/purge`, Löschtypen in `types/src/erasure`)|≤ 9.000 Zeilen im Crate `erasure`; Primitive und Typen zählen zu ihren Crates|Zählwerkzeug D-107|
+|`unwrap`/`expect`/`panic!`/`unreachable!`/`let _ =` auf `Result`/`#[allow]` im Produktionscode|0 in allen 14 Produktions-Crates ab Gate G-C|Zählwerkzeug D-107|
+|Clippy|0 Meldungen mit `-D warnings` (Workspace-Lints `deny` für `unwrap_used`, `expect_used`, `panic`, `indexing_slicing`)|CI|
+|`unsafe`|nur `sys` und `simd`; jede `unsafe`-Stelle hat `// SAFETY:` und einen Eintrag im Unsafe-Register|`forbid(unsafe_code)` sonst, T-UNSAFE-1|
+|Direkte Dateizugriffe (`std::fs`, `tokio::fs`, `File::open`, `OpenOptions`, `memmap2`)|0 außerhalb von `durable-fs`|T-LINT-2|
+|`block_on` im Produktionscode|0|T-LINT-2|
+|Externe Abhängigkeiten|nur Whitelist D-105|T-ARCH-4|
 
 ---
 
@@ -755,13 +761,13 @@ trait FileKeyring: Send + Sync {          // D-85
 
 **8.6 `crypto`** – AES-256-GCM-SIV (Records, Keyslots, Block-AEAD; D-80), Argon2id mit Grenzen (D-06), HKDF-SHA256, BLAKE3 keyed, HMAC-SHA256 (WAL-Kette), Ed25519. Nonce-Schema nach D-60. Alle Schlüssel `ZeroizeOnDrop`. Keine Feature-Schalter (D-05).
 
-**8.7 `mvcc`** – Sequenzen, Snapshots, SSI-Validierung. `min_read_snapshot` liefert `Option`; der Sentinel `u64::MAX` (F-07) entfällt: ohne offene Snapshots gilt `current_seq`, nie „alles sichtbar“. Snapshot-Registry nach `tenant_tag` (D-61).
+**8.7 `mvcc`** – Sequenzen, Snapshots, SSI-Validierung. `min_read_snapshot` liefert `Option`; der Sentinel `u64::MAX` entfällt: ohne offene Snapshots gilt `current_seq`, nie „alles sichtbar“. Snapshot-Registry nach `tenant_tag` (D-61).
 
 **8.8 `store`** – LSM: WAL (HMAC-Kette, verschlüsselt, nie umgeschrieben, D-73), Memtable, SSTable mit Block-AEAD, Manifest-Log, Kompaktion (kooperativ abbrechend, D-78), **Purge-Primitive** (`drain_range`, `rewrite_without`, `seal_wal_at`, `drop_wal_until`, `unlink_verified`). Nur über `TenantScopedStorage` erreichbar (AR-6). Kennt `Vfs`-Trait, nicht `RealVfs` (5.3). `Poisoned`-Flag (D-55). Gruppen-Commit mit ReadGate-Prüfung (D-57).
 
 **8.9 `text`** – Segmentierter BM25-Index (9.7): Textpuffer, Segmente, Merge, Rewrite je Zielsegment, Analyzer (D-81). Implementiert `TextIndex` und `ErasureLayer`.
 
-**8.10 `vector`** – HNSW mit Arena (D-86), Surrogat, Batch-Kantenreparatur, deterministischer Rebuild (D-77), verschlüsselter Snapshot (D-19) nur über `Vfs`. Kein `std::fs`, kein `memmap2` auf Klartext (F-13). Implementiert `VectorIndex` und `ErasureLayer`.
+**8.10 `vector`** – HNSW mit Arena (D-86), Surrogat, Batch-Kantenreparatur, deterministischer Rebuild (D-77), verschlüsselter Snapshot (D-19) nur über `Vfs`. Kein `std::fs`, kein `memmap2` auf Klartext. Implementiert `VectorIndex` und `ErasureLayer`.
 
 **8.11 `rank`** – nur RRF (D-26), `k_rrf = 60`, deterministische Tie-Breaks nach `doc_tag`.
 
@@ -976,7 +982,7 @@ Kanonisches JSON (F.10: sortierte Schlüssel, keine Gleitkommazahlen, UTF-8 NFC)
 
 ### 11.9 Rechnung und Gate G0: Warum Löschcluster-Schlüsselraum (Grundlage D-02, D-31, D-70, D-76) **[A/E]**
 
-**Rechnung.** Datenbank mit N = 150 SSTables, ein Dokument mit m = 45 Schlüsseln (Familien × Chunks × Versionen), Schlüssel hash-verteilt: `P(Datei betroffen) = 1 − (1 − 1/N)^m ≈ 1 − e^(−m/N) = 1 − e^(−0,3) ≈ 26 %`. Ein Purge schriebe ≈ 39 von 150 Dateien um (Write Amplification ∝ DB-Größe). Mit Cluster-Schlüsselraum liegt das Ziel pro Level in höchstens 1–2 Dateien (7 Level ⇒ ≤ 14 Dateien, praktisch 3–6). Subject-Ziele skalieren mit der Zielgröße, ein Mandant mit Dateien, die ihn ganz enthalten, ohne Rewrite. Batch (D-39): B Löschungen im Fenster berühren die Vereinigung der Dateimengen, nicht die Summe. Die Locator-Region der Vorfassung hätte diese Rechnung für Subject-Ziele neu eröffnet (D-70).
+**Rechnung.** Datenbank mit N = 150 SSTables, ein Dokument mit m = 45 Schlüsseln (Familien × Chunks × Versionen), Schlüssel hash-verteilt: `P(Datei betroffen) = 1 − (1 − 1/N)^m ≈ 1 − e^(−m/N) = 1 − e^(−0,3) ≈ 26 %`. Ein Purge schriebe ≈ 39 von 150 Dateien um (Write Amplification ∝ DB-Größe). Mit Cluster-Schlüsselraum liegt das Ziel pro Level in höchstens 1–2 Dateien (7 Level ⇒ ≤ 14 Dateien, praktisch 3–6). Subject-Ziele skalieren mit der Zielgröße, ein Mandant mit Dateien, die ihn ganz enthalten, ohne Rewrite. Batch (D-39): B Löschungen im Fenster berühren die Vereinigung der Dateimengen, nicht die Summe. Eine Locator-Region hätte diese Rechnung für Subject-Ziele neu eröffnet (D-70).
 
 **Gate G0 (verbindlich, als Prototyp mit D-70 und D-71 gefahren).** BM-ERASE-WA misst Dateien und Bytes je Erase auf 1 GiB und 10 GiB Testbestand für drei Zielarten (Einzeldokument, Subject mit 10³ Dokumenten, Collection). Bestehensschwellen (D-76):
 
@@ -995,7 +1001,7 @@ Kanonisches JSON (F.10: sortierte Schlüssel, keine Gleitkommazahlen, UTF-8 NFC)
 |3|Stufe 2 reicht nicht für Subject-Ziele|**Schlüsselvernichtung als Primärmittel, Rewrite entkoppelt:** Subject-Purge nur noch lazy bei Kompaktion, Gate und Schlüssel bleiben sofort; Abschluss wird `Completed(KeyOnly)` bis die Kompaktion alle Zieldateien erfasst hat (Frist `erase_sla`)|4.1, 11.2, 11.4, 12.5|`PurgeScalesWithDb` entfällt, `PurgeDeferred` neu|
 |4|Eigenbau-LSM nicht tragfähig|**Speicheradapter** (z. B. `redb`) hinter `StorageEngine`; Löschung = Schlüsselvernichtung plus Adapter-Löschung; physische Entfernung skaliert mit der DB|4.1, 5.1, 8.8, 9.1, 11.4, 11.9|`PurgeScalesWithDb` im Bericht|
 
-Der Wechsel der Stufe ist eine Entscheidung des Gates G0 mit Messprotokoll (WP-3.5); Anhang H wird dabei fortgeschrieben.
+Der Wechsel der Stufe ist eine Entscheidung des Gates G0 mit Messprotokoll (ADR); Anhang H wird dabei fortgeschrieben.
 
 ### 11.10 Mandanten-Offboarding (D-38)
 
@@ -1223,10 +1229,12 @@ Bare-Metal-Linux (x86_64, ≥ 8 Kerne, 32 GiB RAM), ext4 auf NVMe (`fsync_p50` �
 ||T-DEF-1|Keine Konfiguration ohne Verschlüsselung/Integrität|
 ||T-UNSAFE-1|`unsafe` nur `sys`/`simd`, Safe-Funktionen ohne offene Vorbedingung|
 ||T-LINT-1/2/3|Wortlaut-Lint; kein `block_on`/kein zweites `Vfs`; alte Begriffe E1–E3/E0–E4 entfernt|
-||T-API-1..3|Mandantenpflicht (trybuild), `RetentionAttestation`-Pflicht, `soft_delete`-Doc|
+||T-API-1..4|Mandantenpflicht (trybuild), `RetentionAttestation`-Pflicht, `soft_delete`-Doc, Golden-Test der Fehlertexte und `ErrorCode`-Werte (D-110)|
 ||T-PLAT-1|Startprobe verweigert unbekannte Dateisysteme|
 ||T-LIMIT-1|Kapazitätsgrenzen liefern `Limit::*`|
 ||T-TRACE-1|Rückverfolgbarkeit Spezifikation ↔ Test|
+||T-TRACE-2|Jedes Arbeitspaket in `docs/PLAN.md` nennt nur existierende Gate-, Test- und Benchmark-IDs aus dieser Spezifikation; kein Gate wird dort gelockert (D-99)|
+||T-SOAK-1|72-Stunden-Absturzschleife mit `FaultVfs` ohne Korruption, ohne verlorene bestätigte Commits, ohne stillen Teilzustand einer Löschung (D-109)|
 ||T-DOC-1|Abgeleitete Dokumente (D-98): Zweck-Sätze in `Cargo.toml`, `lib.rs` und erster Zeile der `README.md` sind wortgleich; außerhalb dieser Datei keine Begriffe aus 6.4; Pfad-, Workflow- und Crate-Verweise existieren; keine Zeitstempel, Agentenkennungen oder absoluten Pfade (D-91)|
 |Betrieb|T-SLA-1|`erase` bis `Gated` innerhalb D-30; SLA-Verletzung wird ausgewiesen|
 ||T-OPS-1/2|`health()` Felder; Plattenreserve|
@@ -1263,59 +1271,28 @@ Bare-Metal-Linux (x86_64, ≥ 8 Kerne, 32 GiB RAM), ext4 auf NVMe (`fsync_p50` �
 |**BM-RESTORE-OPEN**|Ledger-Prüfung beim `open` (10⁴ Einträge, Zeitregression)|≤ 1 s ohne Scan|
 |BM-KDF|Argon2id-Latenz Standardparameter|0,3 … 1,5 s|
 
-Zielwerte sind bis zum Lauf WP-6.1 Schwellen, keine Messungen (0). Regressionen blockieren.
+Zielwerte sind bis zum ersten Benchmarklauf (PLAN WP-6.1) Schwellen, keine Messungen (0). Regressionen blockieren.
 
 ### 15.3 Gates
 
 |Gate|Bedingung|
 |---|---|
-|G-A|`cargo check --workspace --all-targets --locked` grün, `cargo fmt --check` grün (F-01..03, F-32; D-93)|
-|G-B|Rückbau vollständig nach D-84 (0 Verweise auf `graph` etc.), Features/Tokio laut D-54, `deny` ohne offene Ausnahmen (F-05, F-06, F-16, F-17, F-23), ein `Vfs`-Trait|
-|G0|Speicherentscheid (11.9) als Prototyp mit D-70/D-71; Ergebnis mit Messprotokoll, Stufe der Fallbackleiter festgelegt|
-|G-C|Kern-Crates: 0 `unwrap/expect/panic/let _ =/allow`; Clippy `-D warnings`; Sentinel- und Delete-Race-Fixes (F-07, F-08); Pflichtverschlüsselung (F-09, F-21)|
+|G-A|`cargo check --workspace --all-targets --locked` grün, `cargo fmt --check` grün (D-93)|
+|G-B|Rückbau vollständig nach D-84 (0 Verweise auf `graph` etc.), Features/Tokio laut D-54, Abhängigkeiten laut D-105, `deny` und CI-Satz laut D-106 ohne offene Ausnahmen, ein `Vfs`-Trait, 0 direkte Dateizugriffe außerhalb `durable-fs`|
+|G0|Speicherentscheid (11.9) als Prototyp mit D-70, D-71 und D-101; Messprotokoll; Stufe der Fallbackleiter mechanisch nach D-76 festgelegt|
+|G-C|Alle 14 Produktions-Crates: 0 `unwrap/expect/panic/let _ =/allow` (Zählwerkzeug D-107); Clippy `-D warnings`; Snapshot-Sentinel- und Delete-Race-Fixes; Pflichtverschlüsselung ohne Downgrade-Pfad (D-05)|
 |G-D|Löschkern S0: T-ISO, T-GATE, T-VAULT, T-KEYCOV, T-FK, T-CRASH, T-RAW, T-PROOF, T-RESTORE grün; Lab MK1–MK3; Mutationstests ohne Überlebende; BM-ERASE-LAT, BM-ERASE-O1, BM-ERASE-WA erfüllt; HR-7 erfüllt|
 |G-E|S1 Textindex (T-TEXT-*, BM-TEXT, BM-ERASE-WA-TEXT mit Entscheidung D-71d)|
 |G-F|Keyslots/HEADER/Plattformprobe (T-KEYSLOT, T-HDR, T-KDF, T-PLAT)|
 |G-G|S2 Vektor (T-VEC-*, BM-VEC, BM-VEC-DEL, BM-VEC-REBUILD)|
-|G-H|Release: S0–S3 (oder Cut-Linie), alle T-* und BM-*, T-TRACE-1, SBOM, signierte Artefakte, Doku-Lint, Support-Dokumente, Evidenzbündel (HR-11)|
+|G-H|Release: S0–S3 (oder Cut-Linie nach D-102), alle T-* und BM-*, T-TRACE-1 und T-TRACE-2, Dauer- und Robustheitsnachweis T-SOAK-1 (D-109), SBOM, signierte Artefakte, Doku-Lint, Support-Dokumente, Evidenzbündel (HR-11)|
 |G-LEGAL|extern (6.7), blockiert nur Aussagen jenseits 6.4|
 
 Reihenfolge: A → B → G0 → C → D → F → E → G → H. G-LEGAL läuft parallel.
 
-### 15.4 Umsetzungsplan (Arbeitspakete)
+### 15.4 Umsetzungsplan
 
-Aufwände sind Schätzungen **[E]** in Personenwochen (PW) für ein Team mit zwei bis drei erfahrenen Rust-Entwicklern; sie sind keine Zusage. Jedes Arbeitspaket nennt ein Evidenzbündel (D-44: erst rot, dann grün).
-
-|WP|Inhalt|Ergebnis / Evidenz|Gate|PW|
-|---|---|---|---|---|
-|WP-0.1|Governance: `governance/ratchet.toml` (F-20), `governance/exceptions.toml`, PR-Vorlage (HR-12), `tests/arch`-Grundgerüst, Wortlaut-Lint, T-TRACE-1|Ratchet greift, Lint rot auf Altbestand|–|2|
-|WP-0.2|Toolchain-Regel D-82, `rust-toolchain.toml` aktualisieren, MSRV-Matrix, `cargo-semver-checks`, SBOM-Job|CI mit Pinning-Regel, kein `continue-on-error` auf Sicherheitsjobs (F-17)|G-A|1|
-|WP-0.3|Build wieder grün: Lizenz-Rest in `store/src/lsm/config.rs`, `mmap_readonly`-Aufrufer in `store` und `vector` auf `Vfs`-Lesen (D-94), `Cargo.lock` erneuern (D-93)|`check --workspace --all-targets --locked` grün für alle Lib-Targets|G-A|1|
-|WP-1.1|Rückbau Graph/Altlasten: 100 Verweise (F-05), `AutoExtractionMode`, Ports `embedding`/`reranker`/`query_rewriter`|0 Treffer im Grep|G-B|3|
-|WP-1.2|Branch `archive/v0-full` (D-22); Rückbauliste D-84 (Features, `acl_win32.rs`, `WasmMergeOperator`)|Feature-Skript grün (AR-9)|G-B|3|
-|WP-1.3|Tokio-Features (D-54), `deny.toml` aktualisieren (Bans, Advisories mit Ablaufdatum, tote `clarify`/`wrappers`)|`cargo tree -e normal` ohne `mio`/`socket2`|G-B|1|
-|WP-1.4|Ein `Vfs`: `durable-fs` auf `ports::Vfs`; `store`/`vector` ohne `std::fs` (F-13)|T-LINT-2 grün|G-B|4|
-|WP-1.5|Struktur und Namen: Fassade nach D-89 schneiden, `contextra_impl`→`instance`, Modul-/Namensregeln D-90, Crate-Köpfe D-91, Matrixkorrektur D-88 im Code, `tests/arch` T-ARCH-5..8, Folgedokumente nach D-98 aktualisieren, Sitzungsverläufe aus dem Quellbaum nehmen, T-DOC-1 einrichten|T-ARCH-5..8 und T-DOC-1 grün (Ratchet für Altbestand)|G-B|3|
-|WP-2.1|`contextra-engine` und Tests wieder kompilierbar (F-01, F-02), `fmt` (F-03)|`check --all-targets --locked` grün|G-A|6|
-|WP-3.1|`types`: `DocRef`, `DocHandle`, Tags mit Längenpräfix, Löschtypen, `KeyCoverage`, `DocId` entfernt; `ports`: Löschports; `erasure`-Skelett als Workspace-Mitglied (D-96)|T-KEY-1, T-DOCREF-1, T-ARCH-3|G0|3|
-|WP-3.2|`crypto`: D-06 Grenzen, D-52 Slot-AAD, D-60 Nonce-Schema, D-80 Algorithmenliste, `K_sign` abgeleitet|T-KDF-*, T-KEYSLOT-*, T-NONCE-1|G-F|3|
-|WP-3.3|`store`: Schlüsselraum 9.1, Envelope v2, WAL ohne Rewrite, `WalFloor`, Sentinel-Fix, Delete-Race-Fix, Pflichtverschlüsselung|T-ISO, T-WAL-*, T-ENC-*|G-C|10|
-|WP-3.4|**G0-Prototyp:** Schlüsselraum mit D-70/D-71, SSTable-Rewrite, BM-ERASE-WA/-WA-TEXT auf 1/10 GiB|Messprotokoll, Entscheid über Fallbackstufe|**G0**|4|
-|WP-3.5|Fortschreibung dieser Spezifikation nach G0 (Anhang H), falls Stufe > 0|SPEC 4.x|G0|1|
-|WP-4.1|`erasure`: Tresor (`FileVault`, F.3), `RecordSealer`/`FileKeyring`, Dateischlüssel-Lebenszyklus|T-VAULT-*, T-FK-*|G-D|8|
-|WP-4.2|`erasure`: Gate-Log, Gate-Gruppen-Commit, Saga, Journal, Recovery, Kompaktions-Kooperation|T-GATE-*, T-CRASH-*, T-GATEGROUP-1|G-D|10|
-|WP-4.3|Messung: `Scanner<Armed>`, `LayerWitness`, Bericht, Ledger/Restore-Guard|T-RAW-*, T-PROOF-1, T-RESTORE-*|G-D|6|
-|WP-4.4|`lab` und `ctx-verify` (unabhängige Parser nach Anhang F), Mutationstests|T-MUT-1, T-DIFF-1|G-D|8|
-|WP-5.1|`engine`: `TenantScopedStorage`, Collections, `DocRef`-API, Suchstrom mit Nachladen, Startsequenz 14.1|T-API-*, T-HYB-1|G-D|6|
-|WP-5.2|Plattformprobe, Prozesshärtung, `health()`/`Metrics`, Plattenreserve|T-PLAT-1, T-DUMP-1, T-OPS-*|G-F|4|
-|WP-6.1|Benchmark-Harness `ctx-bench`, Referenzhardware, erste Basislinien aller BM|Protokolle, Basislinie|G-D|4|
-|WP-7.1|`text`: Segmentindex, Analyzer `de/1`/`und/1`, BMW, Positionen, Entkopplung, Rewrite|T-TEXT-*, BM-TEXT, BM-ERASE-WA-TEXT|G-E|12|
-|WP-8.1|`vector`: Arena D-86, Surrogat, Kantenreparatur, Rebuild, verschlüsselter Snapshot über `Vfs`|T-VEC-*, BM-VEC*|G-G|12|
-|WP-8.2|`rank` (RRF), Hybridsuche|T-RANK-1, T-HYB-1|G-G|2|
-|WP-9.1|Doku: README (HR-3, 6.4), Rustdoc, `docs/OPERATIONS.md`, `docs/DSFA-BAUSTEIN.md` (Anhang G), Runbooks, `SECURITY.md`|T-LINT-1, T-LEIST-*|G-H|4|
-|WP-9.2|Release: signierte Artefakte, SBOM, Evidenzbündel, Fuzz-/Mutationsläufe, G-LEGAL-Stand|alle Gates|G-H|3|
-
-Kritischer Pfad: WP-1.x → WP-2.1 → WP-3.1..3.4 (G0) → WP-4.x → G-D. Summe ≈ 125 PW [E] (4.1.0: +3 PW für WP-1.5; 4.2.0: +2 PW für WP-0.3 und WP-3.1); bei drei Entwicklern ca. 42 Wochen bis G-H. Bei Cut-Linie entfallen WP-8.x (≈ 14 PW) im ersten Release.
+Der Umsetzungsplan (Arbeitspakete, Aufwände, Abnahme, kritischer Pfad) steht in `docs/PLAN.md` (D-99). Er ist abgeleitet und darf Gates, Tests und Verhalten dieser Spezifikation nicht ändern. Die Gates in 15.3 und die Reihenfolge A → B → G0 → C → D → F → E → G → H sind normativ.
 
 ---
 
@@ -1350,7 +1327,7 @@ SemVer; Format-Version getrennt (D-66). Je Hauptversion ≥ 5 Jahre Sicherheitsu
 
 ### 17.3 Schwachstellenmanagement
 
-`SECURITY.md`: Meldeweg (verschlüsselt), Frühwarnung 24 h und Meldung 72 h nach CRA Art. 14 bei aktiv ausgenutzten Schwachstellen, interne Fristen kritisch 7 d / hoch 30 d (HR-8), Advisory-Ausnahmen in `deny.toml` nur mit Ablaufdatum (F-17). CI ohne `continue-on-error` auf Sicherheitsgates.
+`SECURITY.md`: Meldeweg (verschlüsselt), Frühwarnung 24 h und Meldung 72 h nach CRA Art. 14 bei aktiv ausgenutzten Schwachstellen, interne Fristen kritisch 7 d / hoch 30 d (HR-8), Advisory-Ausnahmen in `deny.toml` nur mit Ablaufdatum. CI ohne `continue-on-error` auf Sicherheitsgates.
 
 ### 17.4 Runbooks (Pflichtlieferung)
 
@@ -1373,24 +1350,24 @@ README beginnt mit HR-3-Hinweis und Abschnitt 6.4; Rustdoc je Lösch-API mit Res
 
 ## Anhang A – Funktionsinventar
 
-|ID|Funktion|Stufe|
-|---|---|---|
-|FI-F01|Dokument-CRUD mit Mandanten und `DocRef`|S0|
-|FI-F02|Zeitreise und Snapshot|S0|
-|FI-F03|Startprobe Dateisystem, Plattformstufen|S0|
-|FI-F04|`erase` mit Gate, Tresor-Hierarchie, Purge, Bericht|S0|
-|FI-F05|Keyslots, Passphrasenwechsel|S0|
-|FI-F06|BM25-Suche mit Analyzer `de/1`, Phrasen|S1|
-|FI-F07|HNSW-Suche mit Surrogat, Kantenreparatur, Rebuild|S2|
-|FI-F08|Hybridsuche (RRF)|S3|
-|FI-F09|Restore-Guard, Ledger mit Bereichen|S0|
-|FI-F10|Gesundheitsstatus, Metriken|S0|
-|FI-F11|Dateischlüssel-Vernichtung (`FileKeyring`)|S0|
-|FI-F12|`Restricted` (Art. 18), `lift_restriction`|S0|
-|FI-F13|`ctx-verify report` und `scan`, Lab|S0|
-|FI-F14|Mandanten-Offboarding in O(1) bis `Gated`|S0|
+|ID|Funktion|Stufe|Crates|
+|---|---|---|---|
+|FI-F01|Dokument-CRUD mit Mandanten und `DocRef`|S0|`engine`, `store`, `types`|
+|FI-F02|Zeitreise und Snapshot|S0|`mvcc`, `store`, `engine`|
+|FI-F03|Startprobe Dateisystem, Plattformstufen|S0|`durable-fs`, `engine`|
+|FI-F04|`erase` mit Gate, Tresor-Hierarchie, Purge, Bericht|S0|`erasure`, `store`, `engine`|
+|FI-F05|Keyslots, Passphrasenwechsel|S0|`crypto`, `erasure`, `engine`|
+|FI-F06|BM25-Suche mit Analyzer `de/1`, Phrasen|S1|`text`|
+|FI-F07|HNSW-Suche mit Surrogat, Kantenreparatur, Rebuild|S2|`vector`, `simd`|
+|FI-F08|Hybridsuche (RRF)|S3|`rank`, `engine`|
+|FI-F09|Restore-Guard, Ledger mit Bereichen|S0|`erasure`|
+|FI-F10|Gesundheitsstatus, Metriken|S0|`engine`, `ports`|
+|FI-F11|Dateischlüssel-Vernichtung (`FileKeyring`)|S0|`erasure`, `store`, `text`, `vector`|
+|FI-F12|`Restricted` (Art. 18), `lift_restriction`|S0|`erasure`, `engine`|
+|FI-F13|`ctx-verify report` und `scan`, Lab|S0|`ctx-verify`, `lab`|
+|FI-F14|Mandanten-Offboarding in O(1) bis `Gated`|S0|`erasure`, `engine`|
 
-Fehlermodi: 13.2. Invarianten: 13.1.
+Fehlermodi: 13.2. Invarianten: 13.1. Öffentliche Operationen: 7. Crate-Inventar: 3.1.
 
 ## Anhang B – Leistungsbeschreibung (HR-6)
 
@@ -1457,21 +1434,25 @@ Konstanten: Tag 16 B, Salt 32 B, Nonce 12 B, Tresor-Slot 80 B, Segmentziel 8–3
 
 **Pflichttexte im Bericht:** (1) Signaturumfang (E-L11): „Die Signatur beweist Integrität und Herkunft aus dieser Installation, nicht die Wahrheit des Inhalts.“ (2) „Keine Rechtsberatung; die rechtliche Wertung obliegt dem Betreiber.“ (3) Außenaussage aus 6.4. (4) Klassen G/K/P je mit `reached` und `key_coverage` je Schicht. (5) `field_measurement` und `lab_evidence` getrennt.
 
-## Anhang E – Anzupassende Folgedokumente
+## Anhang E – Folgedokumente (Soll-Zustand und Pflege)
 
-|Dokument|Änderung|
+|Dokument|Soll|
 |---|---|
-|`docs/SPEC.md`|ersetzt durch diese Fassung 4.3.0|
-|`PLAN.md`|durch Verweis auf 15.4 ersetzen (kein eigenes Plandokument)|
-|`VETOES.md`|VETO-D01 aufheben, VETO-D01b einführen (Schlüsselvernichtung in v1)|
-|`CONSTITUTION.md`, `ARCHITECTURE.md`, `SOURCE_OF_TRUTH.md`, `AGENTS.md`, `crates/*/AGENTS.md`, `.agents/`|„keine Ebene B in v1“ streichen; Verweis auf die aktuelle SPEC-Fassung; **angleichen, nicht löschen (D-98):** `AGENTS.md` im Wurzelverzeichnis ist die Einstiegsdatei für Agenten; `crates/*/AGENTS.md` sind abgeleitete Crate-Hinweise; `.agents/` wird nach T-DOC-1 gepflegt|
-|`SECURITY.md`|CRA-Meldeweg, Fristen, Support-Zeitraum (D-67)|
-|`docs/DELETION-DSGVO.md`|an E-L1..E-L16 angleichen; Wortlaut-Lint|
-|`docs/FORMATS.md` (falls vorhanden)|löschen; Formate stehen in Anhang F|
-|`ADR-001`/`ADR-002`|ADR-002 ersetzt ADR-001 (D-01)|
-|`deny.toml`, Workflows|D-54-Bans, keine `continue-on-error` auf Sicherheitsgates, Advisory-Ablaufdaten|
-|`rust-toolchain.toml`|nach D-82 aktualisieren|
-|`README.md`|HR-3-Hinweis, Außenaussage 6.4|
+|`docs/SPEC.md`|diese Fassung|
+|`docs/PLAN.md`|Umsetzungsspezifikation (D-99)|
+|`AGENTS.md` (Wurzel)|Einstieg für Agenten: verweist auf `docs/SPEC.md` und `docs/PLAN.md`, nennt Arbeitsregeln (PLAN 2), enthält keinen Entwicklerpfad (D-98)|
+|`crates/*/AGENTS.md`, `crates/*/README.md`|Zweck-Satz wortgleich (D-97), Abschnittsverweis, Verbotsliste des Crates (3.1)|
+|`.agents/`, `.gemini/`, `.antigravity/`|nur Werkzeugkonfiguration; keine Sitzungsverläufe; Pfade und Befehle konsistent (T-DOC-1)|
+|`README.md`|Außenaussage nach 6.4, Hinweis HR-3, Plattformstufen, Schnellstart ohne `delete`|
+|`docs/SECURITY.md`|CRA-Meldeweg, Fristen, Support-Zeitraum (D-67)|
+|`docs/DELETION-DSGVO.md`|an E-L1 bis E-L16 angeglichen; Wortlaut-Lint|
+|`docs/ARCHITECTURE.md`, `docs/CONSTITUTION.md`, `docs/SOURCE_OF_TRUTH.md`, `docs/TYPE_REGISTRY.md`, `docs/API_SURFACE.md`, `docs/CONTRIBUTING.md`, `docs/unsafe-register.md`, `docs/CHANGELOG.md`|angeglichen: kein „keine Ebene B in v1“, Verweis auf diese Fassung; `API_SURFACE.md` wird aus Abschnitt 7 abgeleitet; `CONTRIBUTING.md` enthält die Build- und Testbefehle (ersetzt `COMPILATION.md`)|
+|`docs/VETOES.md`, `docs/adr/`|VETO-D01 aufgehoben, VETO-D01b eingeführt (Schlüsselvernichtung in v1); ADR-002 ersetzt ADR-001 (D-01); neue ADRs für jede Abweichung von 15.3|
+|`docs/OPERATIONS.md`, `docs/DSFA-BAUSTEIN.md`|Lieferdokumente (17.5, Anhang G)|
+|Protokolle früherer Prüfungen (`AUDIT_*`, `ENGINE_REVIEW`, `ERASURE_PROCESS_AUDIT`, `RECOVERY_ENGINEERING_AUDIT`, `ROOT_CAUSE_ANALYSIS`, `SIMD_KERNEL_AUDIT`, `VECTOR_INDEX_AUDIT`, `store-engine-review`, `IMPLEMENTATION_SPEC_PER_CRATE`, `Jules-Prompts/`, `analysis/`, `cleanup/`, `explain/`, `specs/`, `verification/`, `reports/`, `evidence/`)|nicht im Quellbaum (D-98 Abs. 3); archiviert im Branch `archive/audits` (D-22); Erkenntnisse sind in diese Spezifikation oder in ADRs eingeflossen|
+|`docs/postmortems/`|bleibt, soweit jeder Eintrag einen Test (T-…) nennt, der den Fehler dauerhaft verhindert; andere Einträge wandern ins Archiv|
+|`deny.toml`, `.github/workflows/`|D-54, D-105, D-106|
+|`rust-toolchain.toml`|D-104|
 
 ## Anhang F – Byte-Formate (normativ)
 
@@ -1622,77 +1603,14 @@ Kanonisierung: UTF-8 NFC, Objektschlüssel aufsteigend sortiert, keine Leerzeich
 
 ## Anhang H – Änderungshistorie
 
-### H.0 Änderungen 4.3.0 (Folgedokumente)
+|Version|Änderung|
+|---|---|
+|**5.0.0** (2026-11-03)|Konsolidierte Neufassung als reine Soll-Spezifikation. **Entfernt:** Ist-Befunde F-01 bis F-37 samt HEAD-Bezügen, Messwerte und Evidenzmarken zum Quelltextstand (wandern nach `docs/PLAN.md`), Revisionstabellen früherer Fassungen, den Umsetzungsplan 15.4 (wandert nach `docs/PLAN.md`), die „Ist“-Spalte von 5.1, das relative Rückbauziel von 5.8. **Neu:** Soll-Inventar (3), Repository-Inventar (3.2), D-99 bis D-110, T-TRACE-2, T-SOAK-1, T-API-4, Anhang A mit Crate-Zuordnung, neuer Anhang E. **Bestätigt:** D-88 bis D-98. **Entschieden:** G0-Grundlinie (D-101), Cut-Linie (D-102), G-LEGAL (D-103), Toolchain (D-104), Abhängigkeiten (D-105). **Unverändert:** Datenformate (Anhang F), Löschsemantik (11), Schlüsselhierarchie (10), Rechtsrahmen (6).|
+|4.3.0|Folgedokumente: D-92 entfällt, D-98 tritt an seine Stelle.|
+|4.2.0|Review am Stand `4e208c179`: Build-Disziplin (D-93), kein `mmap` (D-94), Tresor in `engine` (D-95), Skelett-Regel (D-96), Zweck-Sätze (D-97).|
+|4.1.0|Architekturprüfung: Matrixkorrektur (D-88), Fassadenschnitt (D-89), Namensregeln (D-90), Kopf- und Ringangaben (D-91).|
+|4.0.0|Review gegenüber 3.0.0: Schlüsselhierarchie (D-79), `DocRef` (D-70), Textsegmente (D-71), Messklassen (D-72), WAL ohne Umschreiben (D-73), Restore-Guard (D-74), Dateischlüssel-Vernichtung (D-85) u. a.|
 
-Anlass: Die Löschregel für Folgedokumente (D-92) war als Übergangsregel gedacht, bis die Dokumente aktualisiert sind. Mit der Auslieferung der aktualisierten Dokumente entfällt sie. **Nicht geändert:** Datenformate (Anhang F), Löschsemantik (11), Schlüsselhierarchie (10), Rechtsrahmen (6). **Vom Eigentümer zu bestätigen:** D-98.
+Jede künftige Änderung dieser Datei erhält hier eine Zeile mit Versionsnummer, Datum, Kern der Änderung und der Aussage, ob Datenformate, Löschsemantik, Schlüsselhierarchie oder Rechtsrahmen berührt sind.
 
-|Befund|Kern der Änderung|Neu/geändert|
-|---|---|---|
-|Löschregel für Folgedokumente (D-92) als Übergangsregel|D-92 entfällt; Folgedokumente werden gepflegt, nicht gelöscht|D-92 (entfällt), D-98, 4.6, Anhang E|
-|Quelle der Wahrheit im Kopf nennt Folgedokumente veraltet|Folgedokumente sind abgeleitet und mit der SPEC zu pflegen|Kopf, Zeile „Quelle der Wahrheit“|
-|T-ARCH-8 prüfte das Vorhandensein von Dokumenten|T-ARCH-8 prüft Sitzungsverläufe, Prüfprotokolle und Evidenz im Baum; die Konsistenz der Dokumente prüft T-DOC-1|15.1, T-DOC-1|
-|WP-1.5 sah das Entfernen von Dokumenten vor|WP-1.5 aktualisiert Dokumente und richtet T-DOC-1 ein|15.4|
-|F-37 führt `.agents/`, `.gemini/`, `.antigravity/` als Befund|F-37 bleibt als Ist-Befund bestehen. Die Werkzeugverzeichnisse sind nach D-98 zulässig; beanstandet bleiben Marker, Sitzungsverläufe und Evidenz im Baum|F-37 (Ist-Befund), D-98|
-
-### H.1 Änderungen 4.2.0 (Review am HEAD `4e208c179`)
-
-Prüfgrundlage: HEAD `4e208c1797e30e15508838de8e7ebea670f81175`, statisch **[V]** und `cargo check` der Lib-Targets **[M]**. **Nicht geändert:** Datenformate (Anhang F), Löschsemantik (11), Schlüsselhierarchie (10), Rechtsrahmen (6). **Vom Eigentümer zu bestätigen:** D-93 bis D-97.
-
-|Befund|Kern der Änderung|Neu/geändert|
-|---|---|---|
-|B-01 Build bricht an `store` und `vector`, Lockfile veraltet|Build-Disziplin, kein `mmap`, WP-0.3|F-32, D-93, D-94, 8.3, D-84, 15.4|
-|B-02 Löschkern fehlt vollständig|Skelett-Regel, Ports und Typen vor Implementierungen|F-33, D-96, WP-3.1|
-|B-03 Fassade: Abhängigkeiten, `RealVfs` ohne Verbraucher|Ist-Beschreibung; Soll bleibt D-88/D-89|F-34|
-|B-04 Matrix im Code verletzt, Ringköpfe falsch|Zweck-Sätze, Dev-Abhängigkeiten, Prüfung im Test|F-35, D-97, AR-14, 5.1a, T-ARCH-5, T-ARCH-6|
-|B-05 Rückbauumfang neu gezählt|Rückbau erreicht nur 12–15 % des 30-%-Budgets|F-36, 5.8|
-|B-06 Quellbaum-Hygiene, Wurzel-`AGENTS.md` widerspricht der Spezifikation|Befund ergänzt; Soll bleibt D-92|F-37|
-|B-07 Widerspruch D-89 gegen 5.3 (Tresor)|`engine` erzeugt den Tresor|D-95, 5.3, 8.14|
-|B-08 Zählung `rank` ohne Methode|Teilsummen, Methode genannt|F-31|
-|B-09 Zwei Überschriften „Anhang H“|Anhang H gegliedert in H.1 bis H.3|Anhang H|
-|B-10 Aufwand|WP-0.3 (+1 PW), WP-3.1 (+1 PW)|15.4|
-
-### H.2 Änderungen 4.1.0 (Architektur- und Strukturprüfung)
-
-Prüfgrundlage: HEAD `f8a3bbb24`, statisch **[V]**, ohne Build. **Nicht geändert:** Datenformate (Anhang F), Löschsemantik (11), Schlüsselhierarchie (10), Rechtsrahmen (6). **Vom Eigentümer zu bestätigen:** D-88 bis D-92 (Revisionsentscheidungen).
-
-|Befund|Kern der Änderung|Neu/geändert|
-|---|---|---|
-|A-01 Fassade widerspricht §7|Schnitt `api`/`wiring`/`error`, Entfallliste, Builder nach `engine`|F-26, D-89, 8.14, WP-1.5|
-|A-02 Matrix lückenhaft und im Code verletzt|`engine→sys` nur Prozesshärtung; `vector` ohne `sys`/`mvcc`; `text→crypto`; Zeile für `contextra`; kein Glob-Re-Export|F-27, D-88, AR-10, 5.3|
-|A-03 Ringangaben handgepflegt und falsch|Kopf-Pflicht, Prüfung gegen 5.1/5.3|F-28, D-91, AR-11, T-ARCH-5|
-|A-04 Befunde F-07/F-13 überholt|Korrektur mit Commit-Bezug; Sentinel in `mvcc/snapshot.rs:314`|F-29|
-|A-05 Namen ohne Aussage, gemischte Modulform|Namensregeln, `instance`, kein Alias|F-30, D-90, AR-13, T-ARCH-7|
-|A-06 Umfang gegenüber Soll nicht beziffert|Zählungen je Rückbaumodul und Restmuster|F-31, D-84 (Ergänzung)|
-|A-07 P5 ohne namentliche Ausnahmen|Ausnahmeliste: `process_hardening`, Feature `testing`|P5|
-|A-08 Doppelte Wahrheit durch Folgedokumente|Löschen statt Angleichen; eine `AGENTS.md`; Verläufe nicht im Baum|D-92, Anhang E, T-ARCH-8|
-|A-09 Aufwand|WP-1.5 (+3 PW)|15.4|
-
-Unverändert aus 4.0.0: R-01 bis R-17 (Abschnitt H.3) bleiben gültig.
-
----
-
-### H.3 Änderungen 4.0.0 gegenüber 3.0.0 (Review-Abgleich)
-
-|Befund|Kern der Änderung|Neu/geändert|
-|---|---|---|
-|R-01 Klasse K deckt nur einen Teil|`key_coverage` je Schicht; Aussage über „das System“ entfällt; Postings entkoppelt|D-01, D-69, 12.5, T-KEYCOV-1|
-|R-02 Locator-Region verstreut Ziele|Locator entfällt; `DocRef` mit Betroffenem|D-31, D-47, D-70, 9.1|
-|R-03 Textsegmente nach Einfügezeit verteilt|Ehrliches P11, adaptive Segmente, Bucket-Haken, Messung|D-49, D-71, BM-ERASE-WA-TEXT|
-|R-04 Messklassen in Produktion nicht einlösbar|MK1–MK3, EV0–EV4, `field_measurement` vs. `lab_evidence`, `ctx-verify scan`, `Scanner<Armed>`|D-35, D-72, 12|
-|R-05 WAL-Rewrite widerspricht Bitgleichheit|WAL nie umschreiben; `WalFloor`|D-73, I-3, F.4|
-|R-06 Restore-Guard|`backup_retention`, Bereiche, `gated_seq`, Zeitregression|D-48, D-74, 11.8|
-|R-07 Klartext-Pfade, keine Mandantendimension|Pfade mit Tags|D-75, 5.6|
-|R-08 „Final“ vs. G0-Fallback|Status mit Vorbehalten, messbares G0, Fallbackleiter|D-76, 11.9|
-|R-09 HNSW Nullen zerstört Navigation|Surrogat, Batch-Kantenreparatur, deterministischer Rebuild|D-18, D-77, D-86|
-|R-10 Gate serialisiert Writer, Kompaktion blockiert|Gate-Gruppen-Commit, kooperative Kompaktion|D-57, D-78, I-16, I-18|
-|R-11 Tresor O(m), RAM-Index|Schlüsselhierarchie `T/C/S/D`, Hash-Tabelle|D-33, D-79|
-|R-12 Krypto-Details|Argon2-Grenzen, Slot-AAD, `K_sign` abgeleitet, Algorithmensatz, Dateischlüssel|D-06, D-52, D-60, D-80, D-85|
-|R-13 Rechtsrahmen|ProdHaftG, CRA, EDPB 02/2026, DE-Normen, H9|6.2, 6.5, 6.6, 6.7|
-|R-14 Textsuche: Analyzer, Phrasen, Pruning|`de/1`, Positionen, Block-Max|D-81, 9.7|
-|R-15 Toolchain-Pin|MSRV getrennt von Build-Toolchain|D-82|
-|R-16 Spec-Hygiene|Zählungen, Begriffe, Quellenlage, Formate und Plan in dieser Datei|0, KF-9, 15.4, Anhang F|
-|R-17 Betrieb und Leistung|Kapazitätsgrenzen, Benchmarks, Gesundheit|D-83, D-87, 14, 15.2|
-
-Danach neu gegenüber der Review: Dateischlüssel-Vernichtung (D-85), Textbindung unter DEK (9.7), Fallbackleiter mit Stufen (11.9), Rückverfolgbarkeits-Test T-TRACE-1 (15.1), Umsetzungsplan (15.4), Byte-Formate (Anhang F).
-
-**Ende der Spezifikation 4.3.0.**
+**Ende der Spezifikation 5.0.0.**

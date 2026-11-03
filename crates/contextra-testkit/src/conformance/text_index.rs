@@ -211,12 +211,15 @@ where
 // REFERENCE IMPLEMENTATION (IN-MEMORY)
 // ============================================================================
 
+type UncommittedInsertsMap = Arc<RwLock<BTreeMap<TxId, Vec<(DocId, String)>>>>;
+type UncommittedDeletesMap = Arc<RwLock<BTreeMap<TxId, Vec<DocId>>>>;
+
 /// In-Memory Reference Implementation of [`TextIndex`].
 #[derive(Clone)]
 pub struct ReferenceTextIndex {
     docs: Arc<RwLock<BTreeMap<DocId, String>>>,
-    uncommitted_inserts: Arc<RwLock<BTreeMap<TxId, Vec<(DocId, String)>>>>,
-    uncommitted_deletes: Arc<RwLock<BTreeMap<TxId, Vec<DocId>>>>,
+    uncommitted_inserts: UncommittedInsertsMap,
+    uncommitted_deletes: UncommittedDeletesMap,
     last_tx: Arc<RwLock<TxId>>,
 }
 
@@ -449,12 +452,14 @@ pub async fn run_mutant_tests() -> std::result::Result<(), String> {
 mod tests {
     use super::*;
 
+    /// SPEC: PO-02
     #[tokio::test]
     async fn po_02_text_index_reference_passes() {
         let res = run_reference_test().await;
         assert!(res.is_ok(), "Reference implementation must pass: {res:?}");
     }
 
+    /// SPEC: PO-02
     #[tokio::test]
     async fn po_02_text_index_mutants_fail() {
         let res = run_mutant_tests().await;

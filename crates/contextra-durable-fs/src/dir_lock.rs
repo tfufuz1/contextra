@@ -6,6 +6,7 @@
 //! Ring-Zugehörigkeit: Ring 1 (Dateisystem-Durability).
 //! Wichtigste Typen:
 //! - [`DirLock`]: Exklusiver Sperr-Guard für das Datenverzeichnis.
+//! - [`LockMode`]: Konfiguration des Sperrmodus (`Normal` vs. `MemoryOnly`).
 //!
 //! Invarianten:
 //! - `INV-LOCK-1`: Ein Datenverzeichnis darf zu jedem Zeitpunkt nur von genau einem Prozess geöffnet sein (D-50).
@@ -21,6 +22,16 @@ use std::path::{Path, PathBuf};
 /// Fester Fehlertext bei Verzeichnis-Sperrkonflikten gemäß DF-05 und SPEC D-50.
 pub const DIR_LOCKED_MSG: &str = "Datenverzeichnis bereits in Benutzung";
 
+/// Sperrmodus für Verzeichnissperren.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LockMode {
+    /// Standard-Sperre: Erfordert ein unterstütztes lokales Dateisystem.
+    #[default]
+    Normal,
+    /// Reiner In-Memory-Modus: Umgeht Dateisystemprüfungen.
+    MemoryOnly,
+}
+
 // ANCHOR[contextra-durable-fs:DIR-LOCK-STRUCT-001]
 /// RAII-Guard für eine exklusive Verzeichnissperre auf der Datei `LOCK` im Datenverzeichnis.
 ///
@@ -28,14 +39,19 @@ pub const DIR_LOCKED_MSG: &str = "Datenverzeichnis bereits in Benutzung";
 /// Gibt den Lock beim Verlassen des Gültigkeitsbereichs (`Drop`) sicher frei.
 #[derive(Debug)]
 pub struct DirLock {
-    #[allow(dead_code)]
     lock_path: PathBuf,
     file: Option<File>,
+    mode: LockMode,
 }
 
 impl DirLock {
     // ANCHOR[contextra-durable-fs:DIR-LOCK-ACQUIRE-001]
-    /// Erwirbt einen exklusiven Lock auf `dir/LOCK` (DF-05, T-LOCK-1).
+    /// Erwirbt einen exklusiven Lock auf `dir/LOCK` im Standardmodus [`LockMode::Normal`] (DF-05, T-LOCK-1).
+    pub fn acquire(dir: &Path) -> std::io::Result<Self> {
+        Self::acquire_with_mode(dir, LockMode::Normal)
+    }
+
+    /// Erwirbt einen exklusiven Lock auf `dir/LOCK` im angegebenen [`LockMode`].
     ///
     /// Ablauf:
     /// 1. Dateisystem-Klasse via [`fs_class`] ermitteln.
@@ -45,10 +61,10 @@ impl DirLock {
     /// 4. Exklusiven, nicht-blockierenden Lock via [`File::try_lock`] anfordern.
     /// 5. Scheitert `try_lock` mit [`TryLockError::WouldBlock`], schlägt der Aufruf fail-closed
     ///    mit festem Text [`DIR_LOCKED_MSG`] fehl.
-    pub fn acquire(dir: &Path) -> std::io::Result<Self> {
+    pub fn acquire_with_mode(dir: &Path, mode: LockMode) -> std::io::Result<Self> {
         let class = fs_class(dir)?;
 
-        if !class.is_supported_local() {
+        if mode == LockMode::Normal && !class.is_supported_local() {
             let class_str = match class {
                 FsClass::Network => "network",
                 FsClass::Fuse => "fuse",
@@ -59,6 +75,14 @@ impl DirLock {
                 std::io::ErrorKind::Unsupported,
                 format!("directory locking rejected for filesystem class: {class_str}"),
             ));
+        }
+
+        if mode == LockMode::MemoryOnly {
+            return Ok(Self {
+                lock_path: dir.join("LOCK"),
+                file: None,
+                mode,
+            });
         }
 
         let lock_path = dir.join("LOCK");
@@ -83,6 +107,7 @@ impl DirLock {
             Ok(()) => Ok(Self {
                 lock_path,
                 file: Some(file),
+                mode,
             }),
             Err(TryLockError::WouldBlock) => Err(std::io::Error::new(
                 std::io::ErrorKind::WouldBlock,
@@ -94,15 +119,19 @@ impl DirLock {
 
     // ANCHOR[contextra-durable-fs:DIR-LOCK-PATH-001]
     /// Liefert den Pfad zur `LOCK`-Datei.
-    #[allow(dead_code)]
     #[must_use]
     pub fn lock_path(&self) -> &Path {
         &self.lock_path
     }
 
+    /// Liefert den aktiven [`LockMode`].
+    #[must_use]
+    pub fn mode(&self) -> LockMode {
+        self.mode
+    }
+
     // ANCHOR[contextra-durable-fs:DIR-LOCK-UNLOCK-001]
     /// Gibt die Verzeichnissperre explizit vorzeitig frei.
-    #[allow(dead_code)]
     pub fn unlock(mut self) {
         if let Some(file) = self.file.take() {
             let _ = file.unlock();

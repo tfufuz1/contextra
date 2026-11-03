@@ -50,7 +50,7 @@ impl VaultTable {
     /// Prüft, ob der Lastfaktor das Maximum überschreitet.
     pub fn load_exceeded(&self) -> bool {
         // (live + tombstones) / capacity > 0,7
-        (self.live + self.tombstones) * 10 > self.capacity * 7
+        (self.live + self.tombstones + 1) * 10 > self.capacity * 7
     }
 
     /// Liest rohe Slot-Bytes an Position `idx`.

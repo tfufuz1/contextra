@@ -367,12 +367,14 @@ pub async fn run_mutant_tests() -> std::result::Result<(), String> {
 mod tests {
     use super::*;
 
+    /// SPEC: PO-06
     #[tokio::test]
     async fn po_06_file_keyring_reference_passes() {
         let res = run_reference_test().await;
         assert!(res.is_ok(), "Reference must pass: {res:?}");
     }
 
+    /// SPEC: PO-06
     #[tokio::test]
     async fn po_06_file_keyring_mutants_fail() {
         let res = run_mutant_tests().await;

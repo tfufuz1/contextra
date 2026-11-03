@@ -8,6 +8,7 @@
 
 pub mod adaptive_ef;
 pub mod arena;
+pub mod deletion;
 pub mod sq8_bias;
 
 mod acorn_filtered;

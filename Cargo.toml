@@ -16,6 +16,7 @@ members = [
     "crates/contextra-engine",
     "crates/contextra",
     "crates/contextra-testkit",
+    "crates/contextra-testmacros",
     "crates/ctx-verify",
     "crates/contextra-lab",
     "crates/contextra-testmacros",
@@ -37,7 +38,6 @@ default-members = [
     "crates/contextra-engine",
     "crates/contextra",
     "crates/contextra-testkit",
-    "crates/contextra-testmacros",
     "tests/arch",
 ]
 
@@ -58,7 +58,7 @@ bincode = "1.3.3"
 flatbuffers = "24.3"
 
 # Async runtime
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "io-util", "fs"] }
 
 # Data structures
 bytes = "1"

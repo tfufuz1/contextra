@@ -1,5 +1,6 @@
+/// SPEC: T-TRACE-1
 #[test]
-fn ui_tests() {
+fn t_trace_1_ui_tests() {
     let t = trybuild::TestCases::new();
     t.pass("tests/ui/pass.rs");
     t.compile_fail("tests/ui/fail_missing_id.rs");

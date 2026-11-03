@@ -85,13 +85,27 @@ impl KeyHierarchy {
         let mut ledger_bytes = [0u8; 32];
         let mut hdr_bytes = [0u8; 32];
 
-        let _ = hkdf_expand(master_bytes, labels::ENC, &mut enc_bytes);
-        let _ = hkdf_expand(master_bytes, labels::IDX, &mut idx_bytes);
-        let _ = hkdf_expand(master_bytes, labels::UNIT, &mut unit_bytes);
-        let _ = hkdf_expand(master_bytes, labels::SIGN, &mut sign_bytes);
-        let _ = hkdf_expand(master_bytes, labels::WAL, &mut wal_bytes);
-        let _ = hkdf_expand(master_bytes, labels::LEDGER, &mut ledger_bytes);
-        let _ = hkdf_expand(master_bytes, labels::HDR, &mut hdr_bytes);
+        if hkdf_expand(master_bytes, labels::ENC, &mut enc_bytes).is_err() {
+            enc_bytes.fill(0);
+        }
+        if hkdf_expand(master_bytes, labels::IDX, &mut idx_bytes).is_err() {
+            idx_bytes.fill(0);
+        }
+        if hkdf_expand(master_bytes, labels::UNIT, &mut unit_bytes).is_err() {
+            unit_bytes.fill(0);
+        }
+        if hkdf_expand(master_bytes, labels::SIGN, &mut sign_bytes).is_err() {
+            sign_bytes.fill(0);
+        }
+        if hkdf_expand(master_bytes, labels::WAL, &mut wal_bytes).is_err() {
+            wal_bytes.fill(0);
+        }
+        if hkdf_expand(master_bytes, labels::LEDGER, &mut ledger_bytes).is_err() {
+            ledger_bytes.fill(0);
+        }
+        if hkdf_expand(master_bytes, labels::HDR, &mut hdr_bytes).is_err() {
+            hdr_bytes.fill(0);
+        }
 
         Self {
             enc: EncKey(SecretKey::new(enc_bytes)),
@@ -133,12 +147,18 @@ impl KeyHierarchy {
         &self.hdr
     }
 
+    pub fn master(&self) -> &MasterKey {
+        &self.master
+    }
+
     pub fn commit(&self, epoch: u32) -> CommitKey {
         let mut info = Vec::with_capacity(labels::COMMIT.len() + 4);
         info.extend_from_slice(labels::COMMIT);
         info.extend_from_slice(&epoch.to_be_bytes());
         let mut out = [0u8; 32];
-        let _ = hkdf_expand(self.master.as_bytes(), &info, &mut out);
+        if hkdf_expand(self.master.as_bytes(), &info, &mut out).is_err() {
+            out.fill(0);
+        }
         CommitKey(SecretKey::new(out))
     }
 
@@ -147,7 +167,9 @@ impl KeyHierarchy {
         info.push(kind as u8);
         info.extend_from_slice(&id);
         let mut out = [0u8; 32];
-        let _ = hkdf_expand(self.enc.0.as_bytes(), &info, &mut out);
+        if hkdf_expand(self.enc.0.as_bytes(), &info, &mut out).is_err() {
+            out.fill(0);
+        }
         FileKey(SecretKey::new(out))
     }
 
@@ -156,13 +178,17 @@ impl KeyHierarchy {
         info.extend_from_slice(labels::FKMASK);
         info.extend_from_slice(&id);
         let mut out = [0u8; 32];
-        let _ = hkdf_expand(self.enc.0.as_bytes(), &info, &mut out);
+        if hkdf_expand(self.enc.0.as_bytes(), &info, &mut out).is_err() {
+            out.fill(0);
+        }
         out
     }
 
     pub fn vault_mac(&self) -> VaultMacKey {
         let mut out = [0u8; 32];
-        let _ = hkdf_expand(self.enc.0.as_bytes(), labels::VAULT_MAC, &mut out);
+        if hkdf_expand(self.enc.0.as_bytes(), labels::VAULT_MAC, &mut out).is_err() {
+            out.fill(0);
+        }
         VaultMacKey(SecretKey::new(out))
     }
 }

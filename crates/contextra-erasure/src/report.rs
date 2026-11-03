@@ -11,5 +11,5 @@ pub use build::{
     LayerKeyCoverage, ProcessHardeningStatus, ReachStatus, WitnessEntry,
 };
 pub use signing::SignedReport;
-pub use canonical::{canonicalize_value, to_canonical_json, to_canonical_json_string};
+pub use canonical::{canonicalize_json, canonicalize_value, to_canonical_json, to_canonical_json_string};
 pub use risk::{evaluate_residual_risks, ResidualRiskEntry};

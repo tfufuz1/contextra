@@ -2,12 +2,20 @@
 //!
 //! Zweck: Durability-Tests für Handle-Poisoning (`INV-FSYNC-1`), `DirLock`-Dateisystemprüfungen und `atomic_replace`.
 
-use contextra_durable_fs::{atomic_replace, DirLock, DurableHandle, LockMode};
-use contextra_sys::{FlushKind, FsClass};
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::disallowed_methods
+)]
+
+use contextra_durable_fs::{atomic_replace, DirLock, LockMode, RealFile};
+use contextra_ports::vfs::VfsFile;
+use contextra_sys::FsClass;
 use std::fs::File;
 
 // ANCHOR[contextra-durable-fs:TEST-DUR-HANDLE-POISON]
-/// Prüft, dass ein vergiftetes DurableHandle weitere Lese- und Schreibzugriffe fail-closed abweist.
+/// Prüft, dass ein vergiftetes RealFile weitere Lese- und Schreibzugriffe fail-closed abweist (DF-03, INV-FSYNC-1).
 #[test]
 fn test_durable_handle_poisoning_on_failure() -> std::io::Result<()> {
     let temp_dir = std::env::temp_dir();
@@ -17,19 +25,30 @@ fn test_durable_handle_poisoning_on_failure() -> std::io::Result<()> {
     ));
 
     let file = File::create(&file_path)?;
-    let mut handle = DurableHandle::new(file);
+    let handle = RealFile::new(file);
 
     assert!(!handle.is_poisoned());
-    assert!(handle.get_ref().is_some());
 
-    handle.flush(FlushKind::DataOnly)?;
+    handle.sync_data()?;
 
     handle.poison();
     assert!(handle.is_poisoned());
-    assert!(handle.get_ref().is_none());
 
-    let err = handle.flush(FlushKind::DataOnly);
-    assert!(err.is_err());
+    let err = handle.sync_data();
+    match err {
+        Err(e) => {
+            let err_str = e.to_string();
+            assert!(err_str.contains("handle is poisoned"));
+        }
+        Ok(_) => panic!("expected poisoned handle error"),
+    }
+
+    let mut buf = [0u8; 10];
+    let read_err = handle.read_at(&mut buf, 0);
+    assert!(read_err.is_err());
+
+    let write_err = handle.write_at(&[1, 2, 3], 0);
+    assert!(write_err.is_err());
 
     let _ = std::fs::remove_file(file_path);
     Ok(())
@@ -72,7 +91,7 @@ fn test_dirlock_cloud_sync_rejection_and_memory_only_override() -> std::io::Resu
     let class = contextra_sys::fs_class(&cloud_dir)?;
     assert_eq!(class, FsClass::CloudSync);
 
-    let lock_res = DirLock::acquire(&cloud_dir, LockMode::Normal);
+    let lock_res = DirLock::acquire_with_mode(&cloud_dir, LockMode::Normal);
     assert!(lock_res.is_err());
 
     if let Err(err) = lock_res {
@@ -81,7 +100,7 @@ fn test_dirlock_cloud_sync_rejection_and_memory_only_override() -> std::io::Resu
         assert!(!err_msg.contains("OneDrive_Mock_"));
     }
 
-    let lock_mem = DirLock::acquire(&cloud_dir, LockMode::MemoryOnly)?;
+    let lock_mem = DirLock::acquire_with_mode(&cloud_dir, LockMode::MemoryOnly)?;
     assert_eq!(lock_mem.mode(), LockMode::MemoryOnly);
 
     if let Some(parent) = cloud_dir.parent() {

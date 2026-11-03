@@ -1,12 +1,13 @@
-//! # Atomare Dateioperationen und temporäre Bereinigung (`atomic`)
+//! # Atomare Austausch- und Schreiboperationen (`atomic`)
 //!
-//! Zweck: Implementierung crash-sicherer Datei-Austauschoperationen (`write_atomic`)
-//! und Bereinigung verwaister temporärer Dateien (`clean_tmp`) gemäß SPEC DF-02, DF-08, DF-12.
+//! Zweck: Atomare Datei-Ersetzungen (`write_atomic`, `atomic_replace`) und Bereinigung
+//! verwaister temporärer Dateien (`clean_tmp`) gemäß SPEC DF-02, DF-08, DF-12.
 //!
 //! Ring-Zugehörigkeit: Ring 1 (Dateisystem-Durability).
 //! Wichtigste Typen und Funktionen:
 //! - [`write_atomic`]: Schreibt Zieldateien atomar über eine temporäre Datei im selben Verzeichnis.
 //! - [`write_atomic_with_injector`]: Atomares Schreiben mit Injektionspunkten für Crash-Matrix-Prüfungen.
+//! - [`atomic_replace`]: Alias/Wrapper für atomaren Austausch.
 //! - [`clean_tmp`]: Leert `tmp/`-Ordner und entfernt temporäre Waisendateien beim Start.
 //!
 //! Invarianten:
@@ -163,6 +164,11 @@ pub fn create_dir_all_0700(path: &Path) -> std::io::Result<()> {
 /// 6. Jeder Einzelschritt meldet Fehler unverändert zurück.
 pub fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
     write_atomic_with_injector(path, data, &NoFault)
+}
+
+/// Ersetzt den Inhalt der Datei unter `path` atomar mit `bytes` (DF-02, Kompatibilität).
+pub fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    write_atomic(path, bytes)
 }
 
 // ANCHOR[contextra-durable-fs:WRITE-ATOMIC-WITH-INJECTOR]
