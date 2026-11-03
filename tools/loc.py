@@ -16,16 +16,18 @@ import json
 CORE_CRATES = [
     "contextra-types",
     "contextra-ports",
-    "contextra-mvcc",
+    "contextra-sys",
+    "contextra-simd",
+    "contextra-durable-fs",
     "contextra-crypto",
+    "contextra-mvcc",
+    "contextra-store",
     "contextra-vector",
     "contextra-text",
-    "contextra-store",
-    "contextra-checkpoint",
+    "contextra-rank",
+    "contextra-erasure",
     "contextra-engine",
-    "contextra-db",
     "contextra",
-    "contextra-mcp",
 ]
 
 def count_loc(filepath):

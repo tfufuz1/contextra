@@ -7,7 +7,6 @@
 #![cfg(not(loom))]
 use contextra_engine::Collection;
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
-// contextra_graph::CsrGraph entfernt per SPEC
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, Result, TxId};

@@ -13,7 +13,6 @@
 use contextra_engine::Collection;
 use contextra_engine::collection::{StoredDocument, StoredDocumentMeta};
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
-// contextra_graph::CsrGraph entfernt per SPEC
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats, VectorIndex};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};
