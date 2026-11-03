@@ -54,9 +54,11 @@ pub struct Fused {
 ///   - `top == 0` $\Rightarrow$ leere Rückgabe.
 ///   - Liste länger als 1.000 $\Rightarrow$ `Err(RankError::TooLarge)`.
 ///   - Duplikate innerhalb einer Teilliste $\Rightarrow$ `Err(RankError::Duplicate)`.
+///   - Überlauf bei Addition $\Rightarrow$ `Err(RankError::Overflow)`.
 ///
 /// # Errors
-/// Gibt `RankError` zurück, falls eine Liste zu lang ist oder interne Duplikate enthält.
+/// Gibt `RankError` zurück, falls eine Liste zu lang ist, interne Duplikate enthält oder
+/// ein arithmetischer Überlauf auftritt.
 pub fn rrf_fuse(lists: &[&[Candidate]], top: usize) -> Result<Vec<Fused>, RankError> {
     if top == 0 {
         return Ok(Vec::new());
@@ -85,20 +87,20 @@ pub fn rrf_fuse(lists: &[&[Candidate]], top: usize) -> Result<Vec<Fused>, RankEr
 
     for list in lists {
         for (idx, candidate) in list.iter().enumerate() {
-            let rank = (idx as u64).saturating_add(1);
-            let denom = (K_RRF as u64).saturating_add(rank);
-            let contrib = if denom > 0 {
-                FIXED_POINT_SCALE / denom
-            } else {
-                0
-            };
+            let rank = (idx as u64).checked_add(1).ok_or(RankError::Overflow)?;
+            let denom = (K_RRF as u64)
+                .checked_add(rank)
+                .ok_or(RankError::Overflow)?;
+            let contrib = FIXED_POINT_SCALE
+                .checked_div(denom)
+                .ok_or(RankError::Overflow)?;
 
             if let Some(pos) = accumulator
                 .iter()
                 .position(|(handle, _)| *handle == candidate.handle)
             {
                 if let Some(entry) = accumulator.get_mut(pos) {
-                    entry.1 = entry.1.saturating_add(contrib);
+                    entry.1 = entry.1.checked_add(contrib).ok_or(RankError::Overflow)?;
                 }
             } else {
                 accumulator.push((candidate.handle, contrib));

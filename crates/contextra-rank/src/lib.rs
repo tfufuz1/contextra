@@ -1,3 +1,5 @@
+//! Reciprocal Rank Fusion für die Hybridsuche.
+//!
 //! # Contextra Rank (`contextra-rank`)
 //!
 //! **Ring:** Ring 2 (Ranking & Fusion, SPEC §8.11, D-26)

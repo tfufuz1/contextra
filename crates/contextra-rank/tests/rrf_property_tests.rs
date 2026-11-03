@@ -7,7 +7,7 @@
     clippy::disallowed_types
 )]
 
-use contextra_rank::{rrf_fuse, unseen_bound, Candidate, DocHandle};
+use contextra_rank::{rrf_fuse, unseen_bound, Candidate, DocHandle, RankError};
 use proptest::prelude::*;
 use std::collections::BTreeSet;
 
@@ -33,17 +33,19 @@ fn arb_candidate_list(max_len: usize) -> impl Strategy<Value = Vec<Candidate>> {
 
 proptest! {
     /// SPEC: T-RANK-1 (Permutationsinvarianz)
-    /// Beliebige Vertauschung von Listen liefert bitgleiches Ergebnis.
+    /// Beliebige Vertauschung von Listen liefert bitgleiches Ergebnis,
+    /// einschließlich leerer und teilweiser Listen.
     #[test]
     fn prop_rrf_permutation_invariance(
-        l1 in arb_candidate_list(50),
-        l2 in arb_candidate_list(50),
-        l3 in arb_candidate_list(50),
+        l1 in arb_candidate_list(30),
+        l2 in arb_candidate_list(30),
+        l3 in arb_candidate_list(30),
+        l4 in arb_candidate_list(30),
         top in 0usize..100
     ) {
-        let lists_1: [&[Candidate]; 3] = [&l1, &l2, &l3];
-        let lists_2: [&[Candidate]; 3] = [&l2, &l3, &l1];
-        let lists_3: [&[Candidate]; 3] = [&l3, &l1, &l2];
+        let lists_1: [&[Candidate]; 4] = [&l1, &l2, &l3, &l4];
+        let lists_2: [&[Candidate]; 4] = [&l4, &l2, &l1, &l3];
+        let lists_3: [&[Candidate]; 4] = [&l3, &l1, &l4, &l2];
 
         let res1 = rrf_fuse(&lists_1, top).unwrap();
         let res2 = rrf_fuse(&lists_2, top).unwrap();
@@ -53,7 +55,23 @@ proptest! {
         prop_assert_eq!(&res1, &res3);
     }
 
-    /// SPEC: Monotonie
+    /// SPEC: T-RANK-1 (Duplikatinvarianz und Fehlerprüfung)
+    /// Listen mit internen Duplikaten werden immer mit `RankError::Duplicate` abgelehnt.
+    #[test]
+    fn prop_rrf_duplicate_rejection(
+        list in arb_candidate_list(20),
+        dup_handle in arb_doc_handle(),
+    ) {
+        // Liste mit mindestens einem Duplikat erstellen
+        let mut dup_list = list;
+        dup_list.push(Candidate { handle: dup_handle });
+        dup_list.push(Candidate { handle: dup_handle });
+
+        let res = rrf_fuse(&[&dup_list], 10);
+        prop_assert_eq!(res, Err(RankError::Duplicate));
+    }
+
+    /// SPEC: T-RANK-1 (Monotonie)
     /// Besserer Rang (kleinerer Index) führt zu strikt höherem oder gleichem Score.
     #[test]
     fn prop_rrf_monotonicity(
@@ -69,7 +87,7 @@ proptest! {
         }
     }
 
-    /// SPEC: RK-07 (unseen_bound Property)
+    /// SPEC: T-HYB-1 (unseen_bound Property)
     /// Für jedes Dokument, das in allen Listen erst nach depths[i] auftritt,
     /// darf der tatsächliche Score die unseen_bound nicht überschreiten.
     #[test]
@@ -97,7 +115,7 @@ proptest! {
         }
 
         let depths = [prefix1.len(), prefix2.len()];
-        let bound = unseen_bound(&depths);
+        let bound = unseen_bound(&depths).unwrap();
 
         let full_res = rrf_fuse(&[&full1, &full2], 1000).unwrap();
 
