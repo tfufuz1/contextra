@@ -1,4 +1,4 @@
-Unabhängige Prüfinstanz und Byte-Format-Parser für die Löschverifikation.
+Unabhängige Prüfinstanz für die Löschmessung, ohne Produktions-Decoder.
 
 # contextra-lab
 
