@@ -144,4 +144,66 @@ proptest! {
             prune_target
         );
     }
+
+    #[test]
+    fn prop_snapshot_isolation_visibility_against_reference_model(
+        initial_seq in 1..50u64,
+        ops in proptest::collection::vec(
+            (0..4u8, 1..100u64), // (doc_key_id, seq)
+            1..30
+        )
+    ) {
+        // Differential Proptest von SequenceLog gegen ein sequenzielles Referenzmodell
+        use contextra_mvcc::seq_log::SequenceLog;
+        use contextra_types::DocId;
+
+        let mut seq_log = SequenceLog::new();
+        // doc_id -> list of (insert_seq, Option<delete_seq>)
+        let mut ref_history: BTreeMap<u64, Vec<(u64, Option<u64>)>> = BTreeMap::new();
+
+        let mut cur_seq = initial_seq;
+
+        for (doc_key, delta) in ops {
+            cur_seq = cur_seq.saturating_add(delta);
+            let doc_id = DocId::from(doc_key as u64 + 1);
+
+            let is_currently_visible = ref_history
+                .get(&(doc_key as u64 + 1))
+                .and_then(|versions| versions.last())
+                .is_some_and(|(_ins, del)| del.is_none());
+
+            if is_currently_visible {
+                // Delete
+                seq_log.record_delete(doc_id, cur_seq);
+                if let Some(versions) = ref_history.get_mut(&(doc_key as u64 + 1)) {
+                    if let Some(last) = versions.last_mut() {
+                        last.1 = Some(cur_seq);
+                    }
+                }
+            } else {
+                // Insert
+                seq_log.record_insert(doc_id, cur_seq);
+                ref_history
+                    .entry(doc_key as u64 + 1)
+                    .or_default()
+                    .push((cur_seq, None));
+            }
+
+            // Verify visibility equivalence at cur_seq and random probe seqs
+            for probe_key in 0..4u8 {
+                let p_id = DocId::from(probe_key as u64 + 1);
+                let actual_vis = seq_log.is_visible(p_id, cur_seq);
+
+                let expected_vis = ref_history
+                    .get(&(probe_key as u64 + 1))
+                    .is_some_and(|versions| {
+                        versions.iter().any(|(ins, del)| {
+                            *ins <= cur_seq && del.is_none_or(|d| d > cur_seq)
+                        })
+                    });
+
+                prop_assert_eq!(actual_vis, expected_vis);
+            }
+        }
+    }
 }

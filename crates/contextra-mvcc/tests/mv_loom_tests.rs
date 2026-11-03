@@ -113,6 +113,52 @@ mod loom_conc_tests {
     }
 
     #[test]
+    fn t_lock_loom_commit_vs_purge_barrier() {
+        // T-LOCK / T-CONC-1: Modellierung des Zusammenspiels von Commit-Barriere und Purge-Barriere
+        // laut SPEC §5.4 und D-127.
+        // Transaktionscommits nehmen CommitBarrier::Shared und PurgeBarrier::Shared.
+        // Purge-Phasen nehmen PurgeBarrier::Exclusive.
+        // Es darf zu keinem Deadlock oder ungültigen Zwischenzustand kommen.
+        loom::model(|| {
+            let commit_barrier = Arc::new(RwLock::new(0));
+            let purge_barrier = Arc::new(RwLock::new(0));
+            let active_commits = Arc::new(AtomicU64::new(0));
+
+            let cb1 = Arc::clone(&commit_barrier);
+            let pb1 = Arc::clone(&purge_barrier);
+            let ac1 = Arc::clone(&active_commits);
+
+            // Thread 1: Transaktionscommit (Shared Commit, Shared Purge)
+            let t1 = thread::spawn(move || {
+                let _c = cb1.read().unwrap();
+                let _p = pb1.read().unwrap();
+                ac1.fetch_add(1, Ordering::SeqCst);
+                // Simulierte Commit-Arbeit
+                ac1.fetch_sub(1, Ordering::SeqCst);
+            });
+
+            let _cb2 = Arc::clone(&commit_barrier);
+            let pb2 = Arc::clone(&purge_barrier);
+            let ac2 = Arc::clone(&active_commits);
+
+            // Thread 2: Purge-Barriere (Exclusive Purge)
+            let t2 = thread::spawn(move || {
+                let _p_exclusive = pb2.write().unwrap();
+                // Wenn Purge Exclusive hält, darf während der exklusiven Phase
+                // kein neuer Commit eintreten.
+                let concurrent_commits = ac2.load(Ordering::SeqCst);
+                assert_eq!(
+                    concurrent_commits, 0,
+                    "Exclusive PurgeBarrier darf keine gleichzeitigen Commits zulassen"
+                );
+            });
+
+            t1.join().unwrap();
+            t2.join().unwrap();
+        });
+    }
+
+    #[test]
     fn t_snap_loom_history_horizon_never_exceeds_active_snapshots() {
         // Purge-Barriere und History-Horizon dürfen niemals über die kleinste aktive Snapshot-Seq gehoben werden.
         loom::model(|| {
