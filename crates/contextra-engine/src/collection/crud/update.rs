@@ -35,8 +35,6 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
         let res = match self.update_op(&db_tx, id, embedding, metadata).await {
             Ok(_) => {
                 db_tx.commit().await?;
-                self.check_and_trigger_community_detection(1);
-                drop(_guard);
                 Ok(())
             }
             Err(e) => {
