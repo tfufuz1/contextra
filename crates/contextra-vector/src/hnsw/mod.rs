@@ -16,6 +16,8 @@ mod config;
 mod core_insert;
 mod core_rebuild;
 mod core_search;
+pub mod deletion;
+mod erasure_layer_impl;
 mod types;
 mod vector_index_impl;
 
@@ -26,6 +28,7 @@ pub use adaptive_ef::{AdaptiveEfPolicy, AdaptiveEfStateMachine, AdaptiveEfStats}
 pub use arena::{BacklinkTable, HnswArena};
 pub use batch::{BatchContext, NeighborBacklink, PreparedInsert};
 pub use config::{HnswConfig, HnswConfigBuilder};
+pub use deletion::{DeletionStats, GhostFreeVectorIndex};
 pub use sq8_bias::Sq8Bias;
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,
