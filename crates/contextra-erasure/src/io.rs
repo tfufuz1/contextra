@@ -8,18 +8,11 @@ use contextra_ports::vfs::VfsFile;
 
 /// Schreibt einen vollständigen Puffer an eine Dateiposition und liefert einen Fehler,
 /// wenn weniger als `buf.len()` Bytes geschrieben wurden.
-pub fn write_all_at(
-    f: &dyn VfsFile,
-    buf: &[u8],
-    offset: u64,
-) -> Result<(), ErasureError> {
+pub fn write_all_at(f: &dyn VfsFile, buf: &[u8], offset: u64) -> Result<(), ErasureError> {
     let mut written = 0usize;
     while written < buf.len() {
         let n = f
-            .write_at(
-                buf.get(written..).unwrap_or(&[]),
-                offset + written as u64,
-            )
+            .write_at(buf.get(written..).unwrap_or(&[]), offset + written as u64)
             .map_err(ErasureError::Io)?;
         if n == 0 {
             return Err(ErasureError::Io(std::io::Error::new(
@@ -33,18 +26,11 @@ pub fn write_all_at(
 }
 
 /// Liest einen vollständigen Puffer von einer Dateiposition.
-pub fn read_exact_at(
-    f: &dyn VfsFile,
-    buf: &mut [u8],
-    offset: u64,
-) -> Result<(), ErasureError> {
+pub fn read_exact_at(f: &dyn VfsFile, buf: &mut [u8], offset: u64) -> Result<(), ErasureError> {
     let mut read = 0usize;
     while read < buf.len() {
         let n = f
-            .read_at(
-                buf.get_mut(read..).unwrap_or(&mut []),
-                offset + read as u64,
-            )
+            .read_at(buf.get_mut(read..).unwrap_or(&mut []), offset + read as u64)
             .map_err(ErasureError::Io)?;
         if n == 0 {
             return Err(ErasureError::Io(std::io::Error::new(

@@ -3,7 +3,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_erasure::gate::erased_set::ErasedSet;
-use contextra_ports::gate::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, ReadGate, Seq};
+use contextra_ports::gate::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, Seq};
 
 #[test]
 fn t_gate_1_erased_set_checks_and_compaction_policy() {

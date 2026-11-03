@@ -9,10 +9,9 @@
 //!   f) D-Slots der Zielmenge entfernen, F-Waisen prüfen
 //!   g) Cache-Eviction
 
-use crate::error::ErasureError;
 use super::cx::PurgeCx;
 use super::reserve::{check_disk_reserve, ReserveCheck};
-use contextra_types::erasure::PendingReason;
+use crate::error::ErasureError;
 
 /// Ergebnis eines Purge-Fensters.
 #[derive(Debug)]

@@ -4,8 +4,6 @@
 //! MK2: Rohscan inklusive tmp/, alte Segmente, WAL, Snapshots, scope/, Berichte.
 //! MK3: Schlüsselabwesenheit – Slot der höchsten Ebene genullt, DEK-Ableitung scheitert.
 
-use contextra_types::erasure::{LayerWitness, MeasureClass};
-
 /// Ergebnis einer MK1-Feldmessung (logische Prüfung).
 #[derive(Debug)]
 pub struct Mk1Result {

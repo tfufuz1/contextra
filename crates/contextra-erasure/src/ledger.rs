@@ -1,8 +1,48 @@
-//! Ledger-Modul (SPEC §11.8).
+//! Ledger-Modul (SPEC §11.8, ER-30).
 //!
 //! Ledger-Einträge, Hash-Kette und In-Memory/Datei-Sink außerhalb des Datenverzeichnisses.
+
 pub mod entry;
 pub mod sink;
 
-pub use entry::{LedgerEntry, GENESIS_HASH};
-pub use sink::InMemoryLedger;
+pub use entry::{LedgerEntry as ChainedLedgerEntry, GENESIS_HASH};
+pub use sink::InMemoryLedger as FileLedger;
+
+use contextra_ports::ledger::{LedgerEntry, LedgerSink, Timestamp};
+use parking_lot::RwLock;
+use std::sync::Arc;
+
+/// In-Memory-Implementierung von `LedgerSink` (für Ports-Kompatibilität).
+#[derive(Debug, Default, Clone)]
+pub struct InMemoryLedger {
+    entries: Arc<RwLock<Vec<LedgerEntry>>>,
+}
+
+impl InMemoryLedger {
+    /// Erstellt ein neues leeres In-Memory-Ledger.
+    pub fn new() -> Self {
+        Self {
+            entries: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+}
+
+impl LedgerSink for InMemoryLedger {
+    fn append(&self, e: &LedgerEntry) -> Result<(), String> {
+        let mut entries = self.entries.write();
+        entries.push(e.clone());
+        Ok(())
+    }
+
+    fn read_all(&self) -> Result<Vec<LedgerEntry>, String> {
+        let entries = self.entries.read();
+        Ok(entries.clone())
+    }
+
+    fn prune(&self, older_than: Timestamp) -> Result<usize, String> {
+        let mut entries = self.entries.write();
+        let initial_len = entries.len();
+        entries.retain(|e| e.completed_at >= older_than);
+        Ok(initial_len.saturating_sub(entries.len()))
+    }
+}

@@ -10,22 +10,21 @@ use contextra_types::erasure::{ResidualRisk, RiskCondition};
 ///
 /// Gibt immer die vollständige Liste aller zutreffenden Restrisiken zurück.
 pub fn evaluate_residual_risks(purge_complete: bool) -> Vec<ResidualRisk> {
-    let mut risks = Vec::new();
-
-    // Immer present (solange FileVault der Anker ist):
-    risks.push(ResidualRisk::FlashRemanence);
-    risks.push(ResidualRisk::FsJournalOrCow);
-    risks.push(ResidualRisk::WrappedKeyRemanence);
-    risks.push(ResidualRisk::FreedBlockRemanence);
-    risks.push(ResidualRisk::OldKeyslotRemanence);
-    risks.push(ResidualRisk::ProcessMemory);
-    risks.push(ResidualRisk::IndexTopologyInference);
-    risks.push(ResidualRisk::ReplicaWindow);
-    risks.push(ResidualRisk::ExternalCopies);
-    risks.push(ResidualRisk::ExternalProcessors);
-    risks.push(ResidualRisk::PseudonymCommitment);
-    risks.push(ResidualRisk::PurgeScalesWithDb);
-    risks.push(ResidualRisk::KeyCompromise);
+    let mut risks = vec![
+        ResidualRisk::FlashRemanence,
+        ResidualRisk::FsJournalOrCow,
+        ResidualRisk::WrappedKeyRemanence,
+        ResidualRisk::FreedBlockRemanence,
+        ResidualRisk::OldKeyslotRemanence,
+        ResidualRisk::ProcessMemory,
+        ResidualRisk::IndexTopologyInference,
+        ResidualRisk::ReplicaWindow,
+        ResidualRisk::ExternalCopies,
+        ResidualRisk::ExternalProcessors,
+        ResidualRisk::PseudonymCommitment,
+        ResidualRisk::PurgeScalesWithDb,
+        ResidualRisk::KeyCompromise,
+    ];
 
     // Bis Purge abgeschlossen:
     if !purge_complete {

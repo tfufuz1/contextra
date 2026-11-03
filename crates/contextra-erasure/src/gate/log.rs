@@ -3,8 +3,6 @@
 //! Das Log enthält `Add` und `Remove`-Einträge für Gates.
 //! Format: AEAD-geschützt, Hash-Kette, ein fsync je Gruppe.
 
-use crate::error::ErasureError;
-use contextra_ports::gate::{KeyBuf, Seq};
 use serde::{Deserialize, Serialize};
 
 /// Mögliche Eintragsarten im Gate-Log.
