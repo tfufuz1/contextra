@@ -182,14 +182,12 @@ async fn test_non_ssi_storage_engine_startup_behavior() -> Result<()> {
         })
         .expect("Failed to create HnswIndex"),
     );
-    let graph = Arc::new(contextra_graph::CsrGraph::new());
     let next_tx = Arc::new(std::sync::atomic::AtomicU64::new(1));
 
     let col = contextra_engine::Collection::new(
         "non_ssi_test".to_string(),
         non_ssi_storage,
         index,
-        graph,
         next_tx,
         4,
         contextra_text::Language::English,

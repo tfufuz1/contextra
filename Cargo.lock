@@ -628,9 +628,13 @@ dependencies = [
 name = "contextra-types"
 version = "0.1.0"
 dependencies = [
+ "ahash",
+ "bincode",
+ "blake3",
  "proptest",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
  "zeroize",
 ]
