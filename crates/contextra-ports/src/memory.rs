@@ -37,19 +37,20 @@ impl fmt::Debug for MemoryLockGuard {
 pub trait ArenaGuard: Send + Sync {
     /// Locks the specified memory slice into physical RAM (`mlock`), preventing swapping to disk.
     ///
-    /// # Errors
-    /// Returns [`ContextraError`](crate::ContextraError) if memory locking fails or is disallowed by OS limits.
+    /// # Fehler
+    /// Liefert [`ContextraError`](crate::ContextraError) falls das Sperren im RAM fehlschlägt oder durch OS-Limits verwehrt wird.
+    ///
+    /// # Crash
+    /// Reiner Speicherschutz im RAM gegen Swapping; keine Festplattenmutation.
     fn lock_memory(&self, ptr: *const u8, len: usize) -> Result<MemoryLockGuard>;
 
     /// Excludes the specified memory slice from OS core dumps (`MADV_DONTDUMP`).
     ///
-    /// # Errors
-    /// Returns [`ContextraError`](crate::ContextraError) if memory advising fails.
     /// # Fehler
-    /// Liefert Fehler falls madvise fehlschlägt.
+    /// Liefert [`ContextraError`](crate::ContextraError) falls madvise fehlschlägt.
     ///
     /// # Crash
-    /// Reiner Speicherschutz im RAM.
+    /// Reiner Speicherschutz im RAM; keine Festplattenmutation.
     fn protect_against_dumping(&self, ptr: *const u8, len: usize) -> Result<()>;
 }
 

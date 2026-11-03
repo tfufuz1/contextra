@@ -23,6 +23,10 @@ fn test_df_07_scrub_truth_table() {
         (false, true, false),  // Fall 4: Flash/SSD mit CoW -> No-Op
     ];
 
+    // Restrisiko-Nachweis: Überschreiben ist NIE ein Löschnachweis auf SSD oder CoW (D-83, DF-07)
+    // Auf Flash/SSD oder CoW entfällt Scrubbing ehrlich als No-Op, da FTL/Wear-Leveling
+    // und Out-of-Place Writes physisches Nullen unterlaufen.
+
     for (rotational, is_cow, should_scrub) in cases {
         let temp = TempDir::new().expect("TempDir failed");
         let file_path = temp.path().join("sensitive.bin");

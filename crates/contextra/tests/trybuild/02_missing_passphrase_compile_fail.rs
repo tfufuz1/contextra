@@ -1,4 +1,4 @@
-// Compile-Fail Test: Fehlende Passphrase verhindert Aufruf von .open() / .build()
+// Compile-Fail Test: Fehlende Passphrase verhindert Aufruf von .open() / .build() (SPEC 5.7, T-API-1)
 use contextra::Contextra;
 
 #[tokio::main]

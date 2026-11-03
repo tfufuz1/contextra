@@ -1,4 +1,4 @@
-// Compile-Fail Test: Fehlender TenantContext verhindert Zugriff auf Collection
+// Compile-Fail Test: Fehlender TenantContext verhindert Zugriff auf Collection (SPEC 7.1, D-07, T-API-1)
 use contextra::Contextra;
 
 #[tokio::main]

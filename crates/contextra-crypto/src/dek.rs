@@ -5,8 +5,16 @@ use crate::kdf::hkdf_expand;
 use crate::labels;
 use crate::secret::SecretKey;
 use sha2::{Digest, Sha256};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct Dek(pub SecretKey<32>);
+
+impl std::fmt::Debug for Dek {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Dek([REDACTED])")
+    }
+}
 
 pub type Salt = [u8; 32];
 pub type DocTag = [u8; 16];
