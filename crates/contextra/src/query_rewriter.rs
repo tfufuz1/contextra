@@ -10,7 +10,7 @@
 //!
 //! ## Ring-Zugehörigkeit
 //! - **Ring 4 (Fassade)**: Greift auf den Port `LlmTextGenerator` aus `contextra-ports` zu und
-//!   erweitert den Suchfluss von `contextra-db` um semantische Abfrageerweiterung.
+//!   erweitert den Suchfluss um semantische Abfrageerweiterung.
 //!
 //! ## Wichtigste Typen
 //! - [`LlmQueryRewriter`]: Der zentrale Rewriter mit konfigurierbaren Limits für Subqueries und Snippetlängen.

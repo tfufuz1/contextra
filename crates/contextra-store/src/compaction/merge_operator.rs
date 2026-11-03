@@ -8,8 +8,8 @@ pub trait MergeOperator: Send + Sync {
     /// Merges two raw byte values for the same key.
     ///
     /// # Fail-Safe Requirement
-    /// Implementations running untrusted guest code (e.g. WASM via `contextra-sandbox`) MUST
-    /// implement fail-safe handling: if execution fails (e.g. fuel exhaustion or trap),
+    /// Implementations running custom merge code MUST
+    /// implement fail-safe handling: if execution fails,
     /// the caller or operator must swallow the error for that single entry, log a `tracing::warn!`,
     /// and retain both original versions in the compacted SSTable without aborting the overall compaction.
     fn merge(&self, existing_val: &[u8], new_val: &[u8]) -> Result<Vec<u8>>;

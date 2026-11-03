@@ -6,6 +6,6 @@
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
 
 // FILE-CONTEXT
-// ZWECK: Placeholder — WasmMergeOperator wurde in WP-1.1 mit contextra-sandbox entfernt.
+// ZWECK: Placeholder — WasmMergeOperator wurde per SPEC D-84 entfernt.
 // INVARIANTEN: #![forbid(unsafe_code)]
 // SIEHE AUCH: SPEC D-24, D-84

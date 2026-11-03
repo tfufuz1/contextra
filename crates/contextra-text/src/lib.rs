@@ -20,8 +20,7 @@
 //! - **Normal**: `contextra-ports`, `contextra-types`, sowie Hilfs-Bibliotheken (`bincode`, `blake3`,
 //!   `bytes`, `futures`, `itoa`, `parking_lot`, `regex`, `serde`, `serde_json`, `thiserror`, `tracing`,
 //!   `unicode-segmentation`).
-//! - **Wird genutzt von**: `contextra-engine`
-//!   (SPEC D-24: `contextra-db`, `contextra-router`, `contextra-agent`, `contextra-bench` entfernt).
+//! - **Wird genutzt von**: `contextra-engine`.
 //!
 //! # Haupttypen
 //! - [`Bm25Scorer`]: Öffentliche Fassade zur Anbindung an den Port [`TextIndex`].

@@ -267,7 +267,7 @@ impl ContextChunk {
     }
 
     /// Kombinierter Token-Count (Heuristik: chars/4 ≈ Tokens).
-    /// Verwendet für Budget-Management in `contextra-db/src/context.rs`.
+    /// Verwendet für Budget-Management.
     pub fn combined_token_count(&self) -> usize {
         match &self.contextual_prefix {
             Some(p) if !p.is_empty() => self.token_count + p.len() / 4,

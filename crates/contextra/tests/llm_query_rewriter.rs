@@ -12,8 +12,7 @@
 //! - Prompt-Injection-Isolation via `<untrusted_context>`.
 
 use contextra::LlmQueryRewriter;
-use contextra_db::QueryRewriter;
-use contextra_ports::{BoxFuture, LlmTextGenerator};
+use contextra_ports::{BoxFuture, LlmTextGenerator, QueryRewriter};
 use contextra_types::error::ContextraError;
 use contextra_types::ScoredEntry;
 use std::sync::{Arc, Mutex};

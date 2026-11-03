@@ -6,13 +6,13 @@
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, kein ungeschützter globaler Zustand.
 
 // FILE-CONTEXT
-// ZWECK: Adaptive Decay Controller — WP 2.2: Typen aus contextra-adapt hierher kopiert (archiviert).
-// INVARIANTEN: Identische Logik wie contextra-adapt/src/decay_controller.rs (ADR-016).
+// ZWECK: Adaptive Decay Controller für zeitlichen Gedächtniszerfall.
+// INVARIANTEN: Reines In-Memory Scoring, deterministischer Exponentiellzerfall (ADR-016).
 // NICHT-OFFENSICHTLICH: Kein SystemTime — elapsed_tx = TxId-Differenz (deterministisch).
 
 //! Adaptive Decay Controller (Cache-Eviction mit Time-Weighted Decay) (F-01).
 //!
-//! Kopiert aus contextra-adapt (archiviert in WP 2.1), um die Kante zu entfernen.
+//! Implementierung des adaptiven Abkling-Controllers zur dynamischen Anpassung des Memory-Zerfalls.
 //! ADR-016: TxId-Differenz statt SystemTime (deterministisch, replay-safe).
 
 /// Inputs für den Adaptive Decay Controller.

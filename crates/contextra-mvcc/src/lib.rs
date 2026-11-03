@@ -17,7 +17,6 @@
 //! - `contextra-store`: Nutzt MVCC-Sequenzen für WAL-Synchronisation und Compaction-GC-Pruning.
 //! - `contextra-engine`: Koordiniert Transaktionen, ReadSets und SSI-Validierung vor Commits.
 //! - `contextra-vector`: Führt snapshot-isolierte Vektorsuchen (`_at`) durch.
-//! (Hinweis: `contextra-checkpoint` und `contextra-core` sind per SPEC D-24 entfernt.)
 //!
 //! ### Wovon hängt diese Crate ab? (Ausgehende Abhängigkeiten)
 //! - `contextra-types`: Domänentypen wie `TxId`, `DocId`, `ContextraError`.

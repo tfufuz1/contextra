@@ -2,7 +2,7 @@
 //!
 //! # Zweck & Architektur-Rolle: Ring 0
 //!
-//! Bei der Übertragung von Fehlern über FFI-Grenzen (z. B. zu Python via `contextra-py` oder
+//! Bei der Übertragung von Fehlern über FFI-Grenzen (z. B. zu Python über FFI oder
 //! Tauri/Web-Frontends via IPC) gehen bei einfachen String-Repräsentationen die Typinformationen
 //! und strukturierte Felder verloren.
 //!

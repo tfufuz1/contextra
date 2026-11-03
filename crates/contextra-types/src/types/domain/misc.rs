@@ -77,12 +77,11 @@ pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 
 /// Maximum number of search results that any hybrid/vector/text search may return.
 ///
-/// Callers in contextra-mcp and contextra-db both enforce this limit before forwarding k to HNSW/BM25.
+/// Enforces limit before forwarding k to HNSW/BM25.
 /// Duplicating the literal 1000 anywhere else in the workspace is prohibited — always import this constant.
 ///
-/// This cap is applied at the orchestration layer (contextra-db) before forwarding `k`
-/// to HNSW and BM25 sub-searches. All upstream layers (contextra-mcp, contextra-py,
-/// contextra-py) MUST reference this constant — never duplicate the literal `1000`.
+/// This cap is applied at the orchestration layer before forwarding `k`
+/// to HNSW and BM25 sub-searches. All upstream layers MUST reference this constant — never duplicate the literal `1000`.
 ///
 /// # DECISION-REF
 /// AGT-DB-003 — Boundary defence at Layer 2 against unbounded `k` from untrusted JSON-RPC.
@@ -177,7 +176,7 @@ impl Entity {
 /// Dieser Typ `contextra_types::Edge` ist die domänenzentrierte Hyperedge-Repräsentation in Ring 0
 /// mit Entitäts-IDs, Beziehungslabel, Quell-Dokumenten-ID und bitemporalen Gültigkeitsachsen
 /// (`tx_valid_from`/`tx_valid_to`, `business_valid_from`/`business_valid_to`).
-/// Im Gegensatz dazu ist `contextra_graph::csr::types::Edge` (bzw. `CsrEdge`) ein speicherkompakter
+/// Typ für Kanten.
 /// Adjazenz-Eintrag der CSR-Graphengine für hochperformante SIMD-Traversierungen.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 // ANCHOR[contextra-types:MISC-EDGE]
@@ -371,15 +370,13 @@ impl MemoryType {
 /// Configuration parameters for Thresholded Local Hyper-Flow Diffusion (TL-HFD, Spec §21.1).
 ///
 /// # Ring Architecture
-/// Defined in `contextra-types` (Ring 0) to avoid dependency on `contextra-graph` (Ring 1).
-/// Graph algorithms in `contextra-graph` map this configuration to `contextra_graph::TlHfdParams`.
+/// Defined in `contextra-types` (Ring 0).
 ///
 /// # Abgrenzung
 /// Dieser Typ `contextra_types::TlHfdParams` ist die Ring-0-Konfigurationsstruktur
 /// (`sigma`, `delta`, `gamma`, `max_iterations`, `max_top_k_expansion`, `max_hyperedge_sort_size`),
 /// die über API-Parameter und JSON-Optionen übergeben wird.
-/// Im Gegensatz dazu ist `contextra_graph::tl_hfd::params::TlHfdParams` die Graph-Engine-Spezifische
-/// Parameterstruktur in Ring 1 mit Ausführungs- und Diffusionsmatrix-Validierungen.
+/// Enthält Ausführungs- und Diffusionsmatrix-Parameter.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 // ANCHOR[contextra-types:MISC-TLHFD]
 pub struct TlHfdParams {

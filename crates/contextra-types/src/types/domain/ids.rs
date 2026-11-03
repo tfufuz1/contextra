@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 /// # Abgrenzung
 /// Dieser Typ `contextra_types::TenantId` ist der kanonische 64-Bit-Ganzzahl-Mandantenidentifikator
 /// in Ring 0 zur Durchsetzung der Mandantenisolation über LSM-Store, WAL und Indexe (INV-TENANT-1).
-/// Im Gegensatz dazu ist `contextra_privacy::processing_registry::TenantId` ein lokaler `String`-Alias
+/// Lokaler Alias
 /// für PII-Policy-Keying im Egress/Filter-Gateway.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
@@ -186,7 +186,7 @@ impl DocId {
     /// Minimum possible `DocId` value (`0`).
     ///
     /// Note: `DocId(0)` is conventionally treated as a sentinel/null value
-    /// by the MCP layer (`contextra-mcp/src/lib.rs` line 214 uses it as a
+    /// by upper layers as a
     /// fallback). Callers MUST propagate `from_key()` errors rather than
     /// silently producing `DocId(0)`.
     pub const MIN: Self = Self(0);
@@ -216,7 +216,7 @@ impl DocId {
     /// Durch die Trunkierung auf 64 Bit besteht bei sehr großen Dokumentenmengen (ca. 2^32 bzw. ~4 Milliarden Keys)
     /// eine theoretische Kollisionswahrscheinlichkeit von ~50% (Geburtstagsparadoxon).
     ///
-    /// Um stille Datenkorruption zu verhindern, führt die Orchestrierungsschicht (`contextra-db::Collection`)
+    /// Um stille Datenkorruption zu verhindern, führt die Orchestrierungsschicht
     /// bei Einfügeoperationen (`insert_op` / `update_op`) eine Kollisionsprüfung durch (Reverse-Lookup des `doc_key`).
     /// Sollte eine Kollision mit einem abweichenden Originalschlüssel erkannt werden, wird die Operation
     /// mit `ContextraError::Internal` abgelehnt (Fail-Safe statt Fail-Silent).

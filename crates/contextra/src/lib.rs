@@ -9,7 +9,7 @@
 //!
 //! ## Zweck & Architektur
 //! Die Fassade dient als zentrale Abstraktions- und Konfigurationsschicht für anwendende
-//! Systeme (wie z. B. `contextra-mcp` oder externe SDKs/Applikationen). Sie verbirgt die
+//! Systeme (z. B. externe SDKs oder Applikationen). Sie verbirgt die
 //! interne Komplexität der tieferen Schichten (Ring 0 bis 3) und stellt eine einheitliche,
 //! ergonomische Programmierschnittstelle (API) bereit.
 //!

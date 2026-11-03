@@ -385,7 +385,7 @@ mod tests {
     #[test]
     fn test_builder_custom_configuration() {
         let builder = ContextraBuilder::new(128)
-            .with_storage_path("/tmp/test_contextra_db")
+            .with_storage_path("/tmp/test_contextra_store")
             .with_max_elements(50000)
             .with_distance_metric(DistanceMetric::Euclidean)
             .with_encryption_passphrase("secret_pass")
@@ -394,7 +394,7 @@ mod tests {
         assert_eq!(builder.config.dimension, 128);
         assert_eq!(
             builder.storage_path,
-            PathBuf::from("/tmp/test_contextra_db")
+            PathBuf::from("/tmp/test_contextra_store")
         );
         assert_eq!(builder.config.max_elements, 50000);
         assert_eq!(builder.config.distance_metric, DistanceMetric::Euclidean);

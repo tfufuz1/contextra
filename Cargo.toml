@@ -114,15 +114,14 @@ yaml-rust2 = "0.9"
 toml = "0.8"
 
 # ── Archived Zone ──────────────────────────────────────────────────────────────
-# contextra-cluster, contextra-sandbox, contextra-saos-agent wurden in Phase 0 ausgelagert. <!-- crate-ref-ignore -->
-# contextra-embed    → ONNX-Embeddings (wird via Feature-Flag optional) <!-- crate-ref-ignore -->
+# Nicht-Kern-Komponenten wurden gemäß SPEC D-24 ausgelagert. <!-- crate-ref-ignore -->
 
 # 🧊 Frozen Zone — external deps for future reactivation
 # openraft = { version = "0.9", features = ["storage-v2", "serde"] }
 # tonic = { version = "0.12", features = ["tls"] }
 # prost = "0.13"
 #
-# Embedding & ML (activate with contextra-infer-onnx feature)
+# Embedding & ML
 # ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "tracing", "download-binaries", "tls-rustls", "copy-dylibs", "api-24"] }
 # hf-hub = { version = "0.3", default-features = false }
 # tokenizers = "0.19"
