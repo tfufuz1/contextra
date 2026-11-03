@@ -198,7 +198,9 @@ fn run_benchmarks() {
         Path::new("../../target/bench-report/contextra-durable-fs.json"),
     ];
     write_json_report(&[res_atomic, res_erase_wa], &report_paths);
-    println!("Benchmark report successfully written to target/bench-report/contextra-durable-fs.json");
+    println!(
+        "Benchmark report successfully written to target/bench-report/contextra-durable-fs.json"
+    );
 }
 
 #[test]

@@ -1,6 +1,11 @@
 //! Criterion benchmarks for contextra-durable-fs filesystem probing (DF-06, D-30).
 
-#![allow(clippy::expect_used, clippy::unwrap_used)]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::disallowed_methods,
+    clippy::cast_possible_truncation
+)]
 
 use contextra_durable_fs::probe::probe_dir;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

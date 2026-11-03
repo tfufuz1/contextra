@@ -6,8 +6,8 @@
 #![allow(unsafe_code)]
 
 use contextra_sys::{
-    apply_process_hardening, ensure_fd_limit, lock_pages, mark_dont_dump, set_fd_limit,
-    HardeningPolicy, SysError,
+    apply_process_hardening, ensure_fd_limit, lock_pages, mark_dont_dump, secure_zero_volatile,
+    set_fd_limit, HardeningPolicy, SysError,
 };
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -211,4 +211,82 @@ fn sy_10_no_panics_and_fixed_error_messages() {
 fn sy_07_fd_limits() {
     assert!(ensure_fd_limit(64));
     let _ = set_fd_limit(1024);
+}
+
+#[test]
+fn sy_07_secure_zero_volatile() {
+    let mut buf = [0x5A; 128];
+    secure_zero_volatile(&mut buf);
+    assert!(buf.iter().all(|&b| b == 0), "alle Bytes müssen 0 sein");
+
+    let mut empty: [u8; 0] = [];
+    secure_zero_volatile(&mut empty);
+}
+
+#[test]
+fn sy_07_secure_zero_volatile_optimization_levels_opt0_and_opt3() {
+    // Tests compiled child binary under opt-level 0 and opt-level 3
+    let root =
+        if std::path::Path::new("Cargo.toml").exists() && std::path::Path::new("crates").exists() {
+            std::path::PathBuf::from(".")
+        } else {
+            std::path::PathBuf::from("../..")
+        };
+    let test_src = root.join("crates/contextra-sys/tests/support/zeroize_probe.rs");
+    if !test_src.exists() {
+        return;
+    }
+
+    let deps_dir = root.join("target/debug/deps");
+    let libc_rlib = std::fs::read_dir(&deps_dir).ok().and_then(|mut entries| {
+        entries.find_map(|e| {
+            let p = e.ok()?.path();
+            let name = p.file_name()?.to_string_lossy();
+            if name.starts_with("liblibc-") && name.ends_with(".rlib") {
+                Some(p)
+            } else {
+                None
+            }
+        })
+    });
+
+    let sys_rlib = std::fs::read_dir(&deps_dir).ok().and_then(|mut entries| {
+        entries.find_map(|e| {
+            let p = e.ok()?.path();
+            let name = p.file_name()?.to_string_lossy();
+            if name.starts_with("libcontextra_sys-") && name.ends_with(".rlib") {
+                Some(p)
+            } else {
+                None
+            }
+        })
+    });
+
+    if let (Some(libc_p), Some(sys_p)) = (libc_rlib, sys_rlib) {
+        for opt in ["0", "3"] {
+            let bin_path = format!("/tmp/zeroize_probe_opt_{}", opt);
+            let mut cmd = Command::new("rustc");
+            cmd.arg(&test_src)
+                .arg(format!("-Copt-level={}", opt))
+                .arg("--edition=2021")
+                .arg("-L")
+                .arg(format!("dependency={}", deps_dir.display()))
+                .arg("--extern")
+                .arg(format!("libc={}", libc_p.display()))
+                .arg("--extern")
+                .arg(format!("contextra_sys={}", sys_p.display()))
+                .arg("-o")
+                .arg(&bin_path);
+            let out = cmd.output().expect("compile zeroize probe");
+            assert!(
+                out.status.success(),
+                "compilation failed for opt={}: {}",
+                opt,
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let run_out = Command::new(&bin_path).output().expect("run zeroize probe");
+            assert!(run_out.status.success(), "run failed for opt={}", opt);
+            let _ = std::fs::remove_file(bin_path);
+        }
+    }
 }

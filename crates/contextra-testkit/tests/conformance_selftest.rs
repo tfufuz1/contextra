@@ -254,6 +254,55 @@ impl MetricsSink for PanickingMetricsSink {
 // SELF-TESTS: REFERENCE GREEN & MUTANT RED
 // ============================================================================
 
+// ANCHOR[contextra-testkit:SELFTEST-RUN-KEY-001]
+#[tokio::test]
+async fn test_file_keyring_conformance_suite() {
+    assert!(file_keyring::run_reference_test().await.is_ok());
+    assert!(file_keyring::run_mutant_tests().await.is_ok());
+}
+
+// ANCHOR[contextra-testkit:SELFTEST-RUN-LED-001]
+#[tokio::test]
+async fn test_ledger_sink_conformance_suite() {
+    assert!(ledger_sink::run_reference_test().await.is_ok());
+    assert!(ledger_sink::run_mutant_tests().await.is_ok());
+}
+
+// ANCHOR[contextra-testkit:SELFTEST-RUN-GAT-001]
+#[test]
+fn test_read_gate_conformance_suite() {
+    assert!(read_gate::run_reference_test().is_ok());
+    assert!(read_gate::run_mutant_tests().is_ok());
+}
+
+// ANCHOR[contextra-testkit:SELFTEST-RUN-SEA-001]
+#[tokio::test]
+async fn test_record_sealer_conformance_suite() {
+    assert!(record_sealer::run_reference_test().await.is_ok());
+    assert!(record_sealer::run_mutant_tests().await.is_ok());
+}
+
+// ANCHOR[contextra-testkit:SELFTEST-RUN-STO-FULL-001]
+#[tokio::test]
+async fn test_storage_conformance_suite() {
+    assert!(storage::run_reference_test().await.is_ok());
+    assert!(storage::run_mutant_tests().await.is_ok());
+}
+
+// ANCHOR[contextra-testkit:SELFTEST-RUN-TXT-FULL-001]
+#[tokio::test]
+async fn test_text_index_conformance_suite() {
+    assert!(text_index::run_reference_test().await.is_ok());
+    assert!(text_index::run_mutant_tests().await.is_ok());
+}
+
+// ANCHOR[contextra-testkit:SELFTEST-RUN-VEC-FULL-001]
+#[tokio::test]
+async fn test_vector_index_conformance_suite() {
+    assert!(vector_index::run_reference_test().await.is_ok());
+    assert!(vector_index::run_mutant_tests().await.is_ok());
+}
+
 // ANCHOR[contextra-testkit:SELFTEST-RUN-STO-GREEN-001]
 // Prüft, dass die In-Memory-Speicher-Engine alle Verträge der StorageEngine-Suite besteht.
 #[tokio::test]
@@ -411,4 +460,46 @@ fn test_metrics_sink_conformance_mutant_red() {
         }
         Ok(_) => panic!("PanickingMetricsSink must fail metrics conformance"),
     }
+}
+
+// ============================================================================
+// SELF-TESTS: FILE_KEYRING, RECORD_SEALER, READ_GATE, LEDGER_SINK
+// ============================================================================
+
+#[tokio::test]
+async fn test_file_keyring_conformance_suite() {
+    let res = contextra_testkit::conformance::file_keyring::run_reference_test().await;
+    assert!(res.is_ok(), "FileKeyring reference must pass: {res:?}");
+    let mut_res = contextra_testkit::conformance::file_keyring::run_mutant_tests().await;
+    assert!(
+        mut_res.is_ok(),
+        "FileKeyring mutants must fail: {mut_res:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_record_sealer_conformance_suite() {
+    let res = contextra_testkit::conformance::record_sealer::run_reference_test().await;
+    assert!(res.is_ok(), "RecordSealer reference must pass: {res:?}");
+    let mut_res = contextra_testkit::conformance::record_sealer::run_mutant_tests().await;
+    assert!(
+        mut_res.is_ok(),
+        "RecordSealer mutants must fail: {mut_res:?}"
+    );
+}
+
+#[test]
+fn test_read_gate_conformance_suite() {
+    let res = contextra_testkit::conformance::read_gate::run_reference_test();
+    assert!(res.is_ok(), "ReadGate reference must pass: {res:?}");
+    let mut_res = contextra_testkit::conformance::read_gate::run_mutant_tests();
+    assert!(mut_res.is_ok(), "ReadGate mutants must fail: {mut_res:?}");
+}
+
+#[tokio::test]
+async fn test_ledger_sink_conformance_suite() {
+    let res = contextra_testkit::conformance::ledger_sink::run_reference_test().await;
+    assert!(res.is_ok(), "LedgerSink reference must pass: {res:?}");
+    let mut_res = contextra_testkit::conformance::ledger_sink::run_mutant_tests().await;
+    assert!(mut_res.is_ok(), "LedgerSink mutants must fail: {mut_res:?}");
 }
