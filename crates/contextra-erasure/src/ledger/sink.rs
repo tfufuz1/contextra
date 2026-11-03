@@ -83,7 +83,8 @@ impl InMemoryLedger {
     ///
     /// `cutoff_us`: Mikrosekunden UTC, Einträge mit `completed_at < cutoff_us` werden entfernt.
     pub fn prune(&mut self, cutoff_us: u64) {
-        self.entries.retain(|e| e.completed_at >= cutoff_us || e.completed_at == 0);
+        self.entries
+            .retain(|e| e.completed_at >= cutoff_us || e.completed_at == 0);
     }
 
     /// Gibt die höchste gesehene gate_seq zurück.

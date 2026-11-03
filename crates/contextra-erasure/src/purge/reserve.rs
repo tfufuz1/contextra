@@ -9,9 +9,17 @@ use crate::error::ErasureError;
 #[derive(Debug)]
 pub enum ReserveCheck {
     /// Ausreichend Speicherplatz vorhanden.
-    Sufficient { free_bytes: u64 },
+    Sufficient {
+        /// Freie Bytes.
+        free_bytes: u64,
+    },
     /// Zu wenig Speicherplatz (→ Pending(DiskReserve)).
-    Insufficient { free_bytes: u64, required_bytes: u64 },
+    Insufficient {
+        /// Freie Bytes.
+        free_bytes: u64,
+        /// Benötigte Bytes.
+        required_bytes: u64,
+    },
 }
 
 /// Prüft ob genug Speicherplatz für den Purge-Rewrite vorhanden ist.

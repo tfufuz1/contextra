@@ -48,15 +48,13 @@ impl ErasedSet {
 
     /// Fügt einen `Restricted`-Bereich hinzu.
     pub fn add_restricted(&mut self, lo: KeyBuf, hi: KeyBuf, gated_seq: Seq) {
-        self.restricted
-            .push(GateEntry { lo, hi, gated_seq });
+        self.restricted.push(GateEntry { lo, hi, gated_seq });
         self.restricted.sort_by_key(|e| e.lo);
     }
 
     /// Hebt eine Restriktion auf (ER-15).
     pub fn lift_restriction(&mut self, lo: &KeyBuf, hi: &KeyBuf) {
-        self.restricted
-            .retain(|e| &e.lo != lo || &e.hi != hi);
+        self.restricted.retain(|e| &e.lo != lo || &e.hi != hi);
     }
 
     /// Entfernt ein Erased-Gate (bei Completed, ER-12 / L-24).
@@ -105,9 +103,7 @@ impl ErasedSet {
             return RangeGate::RestrictedNeverDiscard;
         }
 
-        let has_erased = self.erased.iter().any(|e| {
-            e.lo < r.end && r.start < e.hi
-        });
+        let has_erased = self.erased.iter().any(|e| e.lo < r.end && r.start < e.hi);
         if has_erased {
             return RangeGate::ContainsErased;
         }

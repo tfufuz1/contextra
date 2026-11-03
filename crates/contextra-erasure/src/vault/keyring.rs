@@ -1,22 +1,4 @@
-//! FileKeyring-Implementierung (SPEC §11.5, D-85, I-9b, I-17).
-
-use crate::error::ErasureError;
-
-/// Stub-Implementierung für WP-4.1.
-pub struct VaultKeyring;
-
-impl VaultKeyring {
-    /// Erstellt eine neue Keyring-Instanz.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for VaultKeyring {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+//! InMemoryKeyring für Dateischlüssel nach SPEC D-85, PO-06.
 
 use contextra_ports::keys::{FileId, FileKey, FileKeyring, FileKind};
 use contextra_ports::BoxFuture;
@@ -24,7 +6,7 @@ use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-/// In-Memory-Implementierung von `FileKeyring` für Tests und Standalone-Betrieb.
+/// In-Memory-Implementierung von `FileKeyring` für Tests und Validierung.
 #[derive(Clone, Default)]
 pub struct InMemoryKeyring {
     keys: Arc<RwLock<BTreeMap<FileId, Vec<u8>>>>,

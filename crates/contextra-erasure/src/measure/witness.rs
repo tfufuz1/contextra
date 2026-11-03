@@ -2,16 +2,13 @@
 //!
 //! `LayerWitness` wird ausschließlich bei matches == 0 erzeugt (I-19, TY-10).
 
-use contextra_types::erasure::{Armed, ControlEvidence, LayerId, LayerWitness, MeasureClass, Scanner, Unarmed};
+use contextra_types::erasure::{Armed, ControlEvidence, LayerWitness, Scanner, Unarmed};
 use std::time::Duration;
 
 /// Erstellt einen bewaffneten Scanner nach Positivkontrolle (ER-25).
 ///
 /// Nur aus `src/measure` aufzurufen (L-5).
-pub fn arm_scanner(
-    scanner: Scanner<Unarmed>,
-    evidence: ControlEvidence,
-) -> Scanner<Armed> {
+pub(crate) fn arm_scanner(scanner: Scanner<Unarmed>, evidence: ControlEvidence) -> Scanner<Armed> {
     scanner.arm(evidence)
 }
 
@@ -19,7 +16,7 @@ pub fn arm_scanner(
 ///
 /// `matches == 0` → Ok(LayerWitness)
 /// `matches != 0` → Err(Residue)
-pub fn finish_scan(
+pub(crate) fn finish_scan(
     scanner: Scanner<Armed>,
     matches: u64,
     duration: Duration,

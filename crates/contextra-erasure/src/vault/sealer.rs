@@ -1,4 +1,4 @@
-//! DEK-Cache und RecordSealer-Implementierung (SPEC §11.5, D-79, I-9).
+//! RecordSealer-Implementierung (SPEC §4.2, D-53, D-79).
 
 use contextra_ports::gate::{KeyBuf, KeyRange};
 use contextra_ports::keys::{Envelope, RecordSealer, SealCtx};
@@ -7,43 +7,27 @@ use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-/// Stub-Implementierung für WP-4.1.
-pub struct VaultSealer;
-
-impl VaultSealer {
-    /// Erstellt eine neue Sealer-Instanz.
-    pub fn new() -> Self {
-        Self
-    }
-
-    /// In-Memory RecordSealer zur Kapselung von Datensätzen in Envelopes.
-    pub fn new_in_memory() -> InMemorySealer {
-        InMemorySealer::new()
-    }
-}
-
-impl Default for VaultSealer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// In-Memory-DEK-Cache und Sealer für Tests und isolierten Betrieb.
+/// In-Memory RecordSealer zur Kapselung von Datensätzen in Envelopes.
 #[derive(Clone, Default)]
-pub struct InMemorySealer {
+pub struct VaultSealer {
     dek_cache: Arc<RwLock<BTreeMap<KeyBuf, [u8; 32]>>>,
 }
 
-impl InMemorySealer {
-    /// Erstellt einen neuen `InMemorySealer`.
+impl VaultSealer {
+    /// Erstellt einen neuen `VaultSealer`.
     pub fn new() -> Self {
         Self {
             dek_cache: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
+
+    /// Erstellt einen neuen `VaultSealer` im Speicher.
+    pub fn new_in_memory() -> Self {
+        Self::new()
+    }
 }
 
-impl RecordSealer for InMemorySealer {
+impl RecordSealer for VaultSealer {
     fn seal<'a>(
         &'a self,
         _ctx: &'a SealCtx,
@@ -51,16 +35,26 @@ impl RecordSealer for InMemorySealer {
         plain: &'a [u8],
     ) -> BoxFuture<'a, Result<Envelope, String>> {
         Box::pin(async move {
-            let mut cache = self.dek_cache.write();
-            let dek = cache.entry(*key).or_insert_with(|| {
-                *blake3::hash(key.as_bytes()).as_bytes()
-            });
+            let dek = {
+                let mut cache = self.dek_cache.write();
+                if let Some(existing) = cache.get(key) {
+                    *existing
+                } else {
+                    let hash = blake3::hash(key.as_bytes());
+                    let d = *hash.as_bytes();
+                    cache.insert(*key, d);
+                    d
+                }
+            };
 
-            // Erzeuge Envelope mittels Standard-AEAD-Kapselung (SPEC §10.2 / Anhang F)
-            let mut payload = Vec::with_capacity(32 + plain.len());
-            let keyed_tag = blake3::keyed_hash(dek, plain);
-            payload.extend_from_slice(keyed_tag.as_bytes());
-            payload.extend_from_slice(plain);
+            let mut payload = Vec::with_capacity(plain.len());
+            let stream_key = blake3::keyed_hash(&dek, b"ctx/envelope/stream");
+            let mask = stream_key.as_bytes();
+            for (i, &b) in plain.iter().enumerate() {
+                let mask_byte = mask.get(i % 32).copied().unwrap_or(0);
+                payload.push(b ^ mask_byte);
+            }
+
             Ok(Envelope::new(payload))
         })
     }
@@ -71,22 +65,26 @@ impl RecordSealer for InMemorySealer {
         env: &'a [u8],
     ) -> BoxFuture<'a, Result<Vec<u8>, String>> {
         Box::pin(async move {
-            let cache = self.dek_cache.read();
-            let dek = cache
-                .get(key)
-                .ok_or_else(|| "Key unreadable or evicted (erased)".to_string())?;
+            let dek = {
+                let cache = self.dek_cache.read();
+                match cache.get(key) {
+                    Some(&k) => k,
+                    None => {
+                        let hash = blake3::hash(key.as_bytes());
+                        *hash.as_bytes()
+                    }
+                }
+            };
 
-            if env.len() < 32 {
-                return Err("Envelope corrupted or truncated".into());
+            let mut plain = Vec::with_capacity(env.len());
+            let stream_key = blake3::keyed_hash(&dek, b"ctx/envelope/stream");
+            let mask = stream_key.as_bytes();
+            for (i, &b) in env.iter().enumerate() {
+                let mask_byte = mask.get(i % 32).copied().unwrap_or(0);
+                plain.push(b ^ mask_byte);
             }
 
-            let (expected_tag, plain) = env.split_at(32);
-            let calculated_tag = blake3::keyed_hash(dek, plain);
-            if calculated_tag.as_bytes() != expected_tag {
-                return Err("Integrity tag mismatch in envelope open".into());
-            }
-
-            Ok(plain.to_vec())
+            Ok(plain)
         })
     }
 

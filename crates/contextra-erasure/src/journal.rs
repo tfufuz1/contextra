@@ -1,39 +1,42 @@
-//! Journal-Modul (SPEC §11.6).
-pub mod appendlog;
-pub mod record;
-pub mod reduce;
-pub mod epoch;
+//! Journal für Saga-Zustände (SPEC §11.6, ER-29, F.9).
 
-pub use record::{JournalEntry, SagaState};
-pub use appendlog::AppendLog;
-pub use epoch::Epoch;
+pub use crate::saga::SagaState;
+use serde::{Deserialize, Serialize};
 
-/// In-Memory-Journal für Löschvorgänge (Fassade über `AppendLog`).
+/// Ein Eintrag im Löschjournal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JournalEntry {
+    /// Löschungs-ID
+    pub erasure_id: [u8; 16],
+    /// Erreichter Saga-Zustand
+    pub state: SagaState,
+    /// Zeitstempel in Mikrosekunden
+    pub timestamp: u64,
+    /// Commitment-Hash
+    pub commit_hash: [u8; 32],
+}
+
+/// In-Memory-Abstraktion des Journals (Appendlog nach F.9).
+#[derive(Debug, Default)]
 pub struct ErasureJournal {
-    log: AppendLog,
+    entries: Vec<JournalEntry>,
 }
 
 impl ErasureJournal {
-    /// Erstellt ein leeres Journal.
+    /// Erstellt ein neues leeres Journal.
     pub fn new() -> Self {
         Self {
-            log: AppendLog::new(),
+            entries: Vec::new(),
         }
     }
 
-    /// Fügt einen Eintrag hinzu.
+    /// Fügt einen neuen Eintrag an.
     pub fn append(&mut self, entry: JournalEntry) {
-        self.log.append(entry);
+        self.entries.push(entry);
     }
 
-    /// Liefert alle Einträge.
+    /// Gibt alle Einträge zurück.
     pub fn entries(&self) -> &[JournalEntry] {
-        self.log.entries()
-    }
-}
-
-impl Default for ErasureJournal {
-    fn default() -> Self {
-        Self::new()
+        &self.entries
     }
 }

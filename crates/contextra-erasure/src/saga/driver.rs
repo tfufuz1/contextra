@@ -55,9 +55,7 @@ impl SagaDriver {
             SagaState::Pending => {
                 // Recovery: wiederholt den letzten bekannten Schritt
                 return Ok(StepOutcome::Pending(
-                    saga.pending_reason()
-                        .cloned()
-                        .unwrap_or(PendingReason::Io),
+                    saga.pending_reason().cloned().unwrap_or(PendingReason::Io),
                 ));
             }
             SagaState::Completed | SagaState::Refused => {
