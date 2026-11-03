@@ -3,6 +3,8 @@
 //! Validiert die kryptographischen Invarianten und Sicherheitsanforderungen für `rfc_vectors`.
 //! Prüft Zero-Panic, deterministische Ausführung und Fail-Closed-Verhalten.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+
 // FILE-CONTEXT
 // ZWECK: Verification of cryptographic primitives against official RFC and reference test vectors.
 // INVARIANTEN: AES-256-GCM-SIV against RFC 8452, HKDF against RFC 5869, HMAC-SHA256 against RFC 4231.

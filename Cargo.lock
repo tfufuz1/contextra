@@ -467,6 +467,7 @@ dependencies = [
  "contextra-ports",
  "contextra-types",
  "futures-util",
+ "hmac",
  "loom",
  "parking_lot",
  "proptest",

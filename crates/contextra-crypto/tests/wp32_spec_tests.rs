@@ -1,5 +1,7 @@
 //! Comprehensive test suite fulfilling all SPEC WP-3.2, T-KDF-1/2, T-KEYSLOT-1..4, T-NONCE-1, T-ENC-1..3, T-HDR-1, T-FMT-1, T-KEY-1, T-WAL-1, T-PROOF-1 requirements.
 
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
+
 use contextra_crypto::*;
 
 #[test]
@@ -256,7 +258,14 @@ fn test_cr12_chains_and_macs_t_wal_1_2() {
 
     let wal_tag = [0xEE; 16];
     let ct = b"wal ciphertext batch";
-    let w_mac = wal_mac(hierarchy.wal(), &prev, ct.len() as u32, 1, ct, &wal_tag);
+    let w_mac = wal_mac(
+        hierarchy.wal(),
+        &prev,
+        u32::try_from(ct.len()).unwrap_or(0),
+        1,
+        ct,
+        &wal_tag,
+    );
     assert_ne!(w_mac, [0u8; 32]);
 
     let l_mac = ledger_mac(hierarchy.ledger(), &next);
@@ -407,6 +416,59 @@ fn test_negative_matrix_bit_flip_and_truncation() {
             "Truncation to length {len} should fail auth"
         );
     }
+}
+
+struct DeterministicNonce([u8; 12]);
+impl NonceSource for DeterministicNonce {
+    fn fill_nonce(&mut self, dest: &mut [u8; 12]) {
+        *dest = self.0;
+    }
+}
+
+#[test]
+fn test_deterministic_nonce_source_injection() {
+    let key = SecretKey::<32>::new([0x88; 32]);
+    let dek = Dek(key);
+    let doc_tag = [0x55; 16];
+    let key_bytes = b"tenants/test/key";
+    let plain = b"deterministic payload";
+
+    let mut ns1 = DeterministicNonce([0xAA; 12]);
+    let mut ns2 = DeterministicNonce([0xAA; 12]);
+
+    let env1 = seal_record_with_nonce_source(&dek, doc_tag, key_bytes, plain, &mut ns1);
+    let env2 = seal_record_with_nonce_source(&dek, doc_tag, key_bytes, plain, &mut ns2);
+
+    assert_eq!(
+        env1, env2,
+        "Identical nonces must yield identical ciphertext in AES-GCM-SIV"
+    );
+
+    let opened = open_record(&dek, key_bytes, &env1).expect("open deterministic record");
+    assert_eq!(opened.as_slice(), plain);
+}
+
+#[test]
+fn test_no_secrets_leaked_in_display_or_debug() {
+    let secret_bytes = [0xAA; 32];
+    let master = MasterKey::new(secret_bytes);
+    let hierarchy = KeyHierarchy::from_master(master);
+    let secret = Secret::from_slice(b"super_secret_passphrase");
+
+    let dbg_secret = format!("{:?}", secret);
+    assert!(!dbg_secret.contains("super_secret_passphrase"));
+    assert!(dbg_secret.contains("[REDACTED]"));
+
+    let dbg_key = format!("{:?}", hierarchy.enc().0);
+    assert!(!dbg_key.contains("170")); // 0xAA = 170
+    assert!(dbg_key.contains("[REDACTED]"));
+
+    // Verify error display
+    assert_eq!(format!("{}", CryptoError::Auth), "Auth");
+    assert_eq!(format!("{}", CryptoError::Corrupt), "Corrupt");
+    assert_eq!(format!("{}", CryptoError::Config), "Config");
+    assert_eq!(format!("{}", CryptoError::Limit), "Limit");
+    assert_eq!(format!("{}", CryptoError::Internal), "Internal");
 }
 
 #[test]

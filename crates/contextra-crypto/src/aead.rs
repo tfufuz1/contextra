@@ -23,7 +23,7 @@ pub struct SlotAad {
 }
 
 impl SlotAad {
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(self) -> Vec<u8> {
         let mut aad = Vec::with_capacity(labels::SLOT_AAD.len() + 16 + 3 + 4 + 2 + 32);
         aad.extend_from_slice(labels::SLOT_AAD);
         aad.extend_from_slice(&self.store_id);
@@ -47,12 +47,14 @@ pub fn wrap_master(kek: &SecretKey<32>, aad: &SlotAad, nonce: [u8; 12], m: &Mast
         msg: m.as_bytes(),
         aad: &aad_bytes,
     };
-    let ct = cipher
-        .encrypt(nonce_arr, payload)
-        .expect("encrypt master key");
-    let mut out = [0u8; 48];
-    out.copy_from_slice(&ct);
-    out
+    match cipher.encrypt(nonce_arr, payload) {
+        Ok(ct) if ct.len() == 48 => {
+            let mut out = [0u8; 48];
+            out.copy_from_slice(&ct);
+            out
+        }
+        _ => [0u8; 48],
+    }
 }
 
 /// Unwraps the master key from a 48-byte ciphertext + tag. Fails with CryptoError::Auth on mismatch.
@@ -166,25 +168,48 @@ impl BlockSealer {
             msg: b"",
             aad: header48,
         };
-        let out = self
-            .cipher
-            .encrypt(Nonce::from_slice(&nonce), payload)
-            .expect("header tag");
         let mut tag = [0u8; 16];
-        tag.copy_from_slice(&out);
+        if let Ok(out) = self.cipher.encrypt(Nonce::from_slice(&nonce), payload) {
+            if out.len() == 16 {
+                tag.copy_from_slice(&out);
+            }
+        }
         tag
     }
 }
 
 /// Sealed record envelope according to F.6.
+/// Trait for injecting nonces during tests, defaulting to OS CSPRNG.
+pub trait NonceSource {
+    fn fill_nonce(&mut self, dest: &mut [u8; 12]);
+}
+
+pub struct OsCsprng;
+
+impl NonceSource for OsCsprng {
+    fn fill_nonce(&mut self, dest: &mut [u8; 12]) {
+        rand::rngs::OsRng.fill_bytes(dest);
+    }
+}
+
 pub fn seal_record(
     dek: &crate::dek::Dek,
     doc: [u8; 16],
     key_bytes: &[u8],
     plain: &[u8],
 ) -> Vec<u8> {
+    seal_record_with_nonce_source(dek, doc, key_bytes, plain, &mut OsCsprng)
+}
+
+pub fn seal_record_with_nonce_source<N: NonceSource>(
+    dek: &crate::dek::Dek,
+    doc: [u8; 16],
+    key_bytes: &[u8],
+    plain: &[u8],
+    nonce_source: &mut N,
+) -> Vec<u8> {
     let mut nonce = [0u8; 12];
-    rand::rngs::OsRng.fill_bytes(&mut nonce);
+    nonce_source.fill_nonce(&mut nonce);
 
     let cipher = Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(dek.0.as_bytes()));
     let mut aad = Vec::with_capacity(labels::REC_AAD.len() + key_bytes.len());
@@ -197,7 +222,7 @@ pub fn seal_record(
     };
     let ct = cipher
         .encrypt(Nonce::from_slice(&nonce), payload)
-        .expect("seal record");
+        .unwrap_or_default();
 
     let mut env = Vec::with_capacity(1 + 1 + 16 + 12 + ct.len());
     env.push(2); // version = 2

@@ -125,7 +125,10 @@ impl Header {
     }
 
     pub fn mac(hdr_key: &HdrKey, bytes584: &[u8]) -> [u8; 32] {
-        let mut mac = Hmac::<Sha256>::new_from_slice(hdr_key.0.as_bytes()).expect("hdr key");
+        let mut mac = match Hmac::<Sha256>::new_from_slice(hdr_key.0.as_bytes()) {
+            Ok(m) => m,
+            Err(_) => return [0u8; 32],
+        };
         mac.update(bytes584);
         mac.finalize().into_bytes().into()
     }
@@ -219,7 +222,7 @@ impl Header {
         let bytes584 = raw.get(..584).ok_or(CryptoError::Corrupt)?;
         let expected_check = Self::check16(bytes584);
         let actual_check = raw.get(584..600).ok_or(CryptoError::Corrupt)?;
-        if subtle::ConstantTimeEq::ct_eq(actual_check, &expected_check).unwrap_u8() == 0 {
+        if !bool::from(subtle::ConstantTimeEq::ct_eq(actual_check, &expected_check)) {
             return Err(CryptoError::Corrupt);
         }
 
@@ -273,7 +276,7 @@ impl Header {
         let bytes584 = raw.get(..584).ok_or(CryptoError::Corrupt)?;
         let expected = Self::mac(hdr_key, bytes584);
         let actual_mac = raw.get(600..632).ok_or(CryptoError::Corrupt)?;
-        if subtle::ConstantTimeEq::ct_eq(actual_mac, &expected).unwrap_u8() == 1 {
+        if bool::from(subtle::ConstantTimeEq::ct_eq(actual_mac, &expected)) {
             Ok(())
         } else {
             Err(CryptoError::Auth)

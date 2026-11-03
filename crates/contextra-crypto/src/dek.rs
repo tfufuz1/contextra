@@ -24,14 +24,14 @@ pub struct AncestorSalts {
 pub fn derive_dek(unit: &UnitKey, a: &AncestorSalts, doc: DocTag) -> Dek {
     let mut hasher = Sha256::new();
     hasher.update(labels::DEK_SALT);
-    hasher.update(&a.t);
-    hasher.update(&a.c);
+    hasher.update(a.t);
+    hasher.update(a.c);
     if let Some(s) = a.s {
-        hasher.update(&s);
+        hasher.update(s);
     } else {
-        hasher.update(&[0u8; 32]);
+        hasher.update([0u8; 32]);
     }
-    hasher.update(&a.d);
+    hasher.update(a.d);
     let salt: [u8; 32] = hasher.finalize().into();
 
     let mut out = [0u8; 32];

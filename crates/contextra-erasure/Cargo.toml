@@ -24,6 +24,7 @@ serde_json = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 blake3 = { workspace = true }
 sha2 = "0.10"
+hmac = "0.12"
 bytes = { workspace = true }
 parking_lot = { workspace = true }
 futures-util = "0.3"
