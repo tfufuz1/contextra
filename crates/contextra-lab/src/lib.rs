@@ -19,5 +19,6 @@
 
 pub mod crypto_ref;
 pub mod error;
+pub mod fixture;
 pub mod format;
 pub mod scanner;

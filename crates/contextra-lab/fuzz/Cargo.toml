@@ -66,3 +66,9 @@ name = "fuzz_report"
 path = "fuzz_targets/fuzz_report.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_scope"
+path = "fuzz_targets/fuzz_scope.rs"
+test = false
+doc = false

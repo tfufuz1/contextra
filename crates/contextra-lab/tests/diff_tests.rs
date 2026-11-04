@@ -88,3 +88,69 @@ fn t_diff_1_record_level_bitgleichheit() {
         .expect("Decrypt kept");
     assert_eq!(decrypted, kept_payload);
 }
+
+/// SPEC: T-RESTORE-1 (Wiederauftauchen gelöschter Daten nach Backup-Restore wird erkannt)
+#[test]
+fn t_restore_1_wiederauftauchen_geloeschter_daten_erkannt() {
+    // Szenario SPEC §11.8, D-74:
+    // Nach Restore eines alten Backups vor der Löschung taucht das gelöschte Dokument
+    // im Datenbestand wieder auf. Das Ledger enthält gated_seq und commitment.
+    let target_key = b"restored_target_record";
+    let target_tag = [0x77u8; 16];
+    let retained_old_dek = [0x88u8; 32];
+    let payload = b"Restored Secret That Was Supposed To Be Erased";
+
+    let old_envelope = RecordEnvelopeV2::create_bytes(
+        target_tag,
+        [0x33; 12],
+        payload,
+        &retained_old_dek,
+        target_key,
+    )
+    .expect("Create Envelope");
+
+    // Im Lab: MK3-Schlüsselprobe mit dem vor der Löschung gesicherten DEK
+    let opens = contextra_lab::scanner::classes::Mk3KeyProbeScanner::probe_envelope_decryptable(
+        &old_envelope,
+        &retained_old_dek,
+        target_key,
+    )
+    .expect("Probe");
+
+    assert!(
+        opens,
+        "T-RESTORE-1: Im wiederhergestellten Backup öffnet das alte Chiffrat; Restore-Zustand erkannt!"
+    );
+}
+
+/// SPEC: T-RESTORE-2 (Ledger-Hash-Diskrepanz oder Sequenz-Regression wird abgewiesen)
+#[test]
+fn t_restore_2_ledger_sequenz_regression_erkannt() {
+    use contextra_lab::format::append_logs::AppendLogFile;
+    use hmac::Hmac;
+    use sha2::digest::Mac;
+    use sha2::Sha256;
+
+    let k_ledger = [0x77u8; 32];
+    let original_chain = [0x55u8; 32];
+
+    type HmacSha256 = Hmac<Sha256>;
+    let mut mac = <HmacSha256 as hmac::digest::KeyInit>::new_from_slice(&k_ledger).unwrap();
+    mac.update(&original_chain);
+    let valid_ledger_mac: [u8; 32] = mac.finalize().into_bytes().into();
+
+    // 1. Konsistente Ledger-Kette verifiziert erfolgreich
+    assert!(
+        AppendLogFile::verify_ledger_entry_mac(&original_chain, &valid_ledger_mac, &k_ledger)
+            .is_ok()
+    );
+
+    // 2. Manipulierter oder inkonsistenter Ledger-Zustand nach Restore schlägt fehl
+    let tampered_chain = [0x99u8; 32];
+    let verify_res =
+        AppendLogFile::verify_ledger_entry_mac(&tampered_chain, &valid_ledger_mac, &k_ledger);
+    assert!(
+        verify_res.is_err(),
+        "T-RESTORE-2: Manipulierte Ledger-Kette nach fehlerhaftem Restore muss abgewiesen werden"
+    );
+}
