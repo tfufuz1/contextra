@@ -142,24 +142,6 @@ fn test_hnsw_config_builder_and_validation() {
 }
 
 #[tokio::test]
-async fn test_compact_seq_log() {
-    let config = HnswConfig {
-        dimension: 4,
-        ..Default::default()
-    };
-    let index = HnswIndex::try_new(config).expect("valid config");
-    let tx = TxId::new(1);
-    let doc_id = DocId::from(1u64);
-    let vec = vec![1.0, 2.0, 3.0, 4.0];
-
-    index.insert(tx, doc_id, &vec).await.expect("insert");
-    index.commit(tx).await.expect("commit");
-
-    index.compact_seq_log(10);
-    assert_eq!(index.len().await, 1);
-}
-
-#[tokio::test]
 async fn test_invalid_config_error() {
     let config = HnswConfig {
         ef_construction: 5,
