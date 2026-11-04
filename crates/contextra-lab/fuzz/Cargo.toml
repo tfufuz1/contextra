@@ -42,3 +42,27 @@ name = "fuzz_record_envelope"
 path = "fuzz_targets/fuzz_record_envelope.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_append_logs"
+path = "fuzz_targets/fuzz_append_logs.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_text_segment"
+path = "fuzz_targets/fuzz_text_segment.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_vector_snapshot"
+path = "fuzz_targets/fuzz_vector_snapshot.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_report"
+path = "fuzz_targets/fuzz_report.rs"
+test = false
+doc = false
