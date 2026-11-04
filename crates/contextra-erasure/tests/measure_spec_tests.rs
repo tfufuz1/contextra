@@ -7,14 +7,14 @@ use contextra_erasure::measure::positive_control::run_positive_control;
 use contextra_erasure::measure::witness::{arm_scanner, finish_scan};
 use contextra_ports::vfs::{Vfs, VfsFile, VfsOpenOptions};
 use contextra_types::erasure::{LayerId, MeasureClass, Scanner, Unarmed};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 #[derive(Default, Clone)]
 struct MemoryVfs {
-    files: Arc<Mutex<HashMap<PathBuf, Vec<u8>>>>,
+    files: Arc<Mutex<BTreeMap<PathBuf, Vec<u8>>>>,
 }
 
 struct MemoryVfsFile {
@@ -28,31 +28,35 @@ impl VfsFile for MemoryVfsFile {
         let content = files
             .get(&self.path)
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"))?;
-        let off = offset as usize;
+        let off = usize::try_from(offset).unwrap_or(0);
         if off >= content.len() {
             return Ok(0);
         }
-        let available = &content[off..];
+        let available = content.get(off..).unwrap_or(&[]);
         let to_copy = buf.len().min(available.len());
-        buf[..to_copy].copy_from_slice(&available[..to_copy]);
+        if let (Some(dest), Some(src)) = (buf.get_mut(..to_copy), available.get(..to_copy)) {
+            dest.copy_from_slice(src);
+        }
         Ok(to_copy)
     }
 
     fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize> {
         let mut files = self.files_mut_lock();
         let content = files.entry(self.path.clone()).or_default();
-        let off = offset as usize;
+        let off = usize::try_from(offset).unwrap_or(0);
         if content.len() < off + buf.len() {
             content.resize(off + buf.len(), 0);
         }
-        content[off..off + buf.len()].copy_from_slice(buf);
+        if let Some(dest) = content.get_mut(off..off + buf.len()) {
+            dest.copy_from_slice(buf);
+        }
         Ok(buf.len())
     }
 
     fn set_len(&self, len: u64) -> std::io::Result<()> {
         let mut files = self.files_mut_lock();
         let content = files.entry(self.path.clone()).or_default();
-        content.resize(len as usize, 0);
+        content.resize(usize::try_from(len).unwrap_or(0), 0);
         Ok(())
     }
 
@@ -74,10 +78,10 @@ impl VfsFile for MemoryVfsFile {
 }
 
 impl MemoryVfsFile {
-    fn files_lock(&self) -> std::sync::MutexGuard<'_, HashMap<PathBuf, Vec<u8>>> {
+    fn files_lock(&self) -> std::sync::MutexGuard<'_, BTreeMap<PathBuf, Vec<u8>>> {
         self.vfs.files.lock().unwrap()
     }
-    fn files_mut_lock(&self) -> std::sync::MutexGuard<'_, HashMap<PathBuf, Vec<u8>>> {
+    fn files_mut_lock(&self) -> std::sync::MutexGuard<'_, BTreeMap<PathBuf, Vec<u8>>> {
         self.vfs.files.lock().unwrap()
     }
 }
@@ -152,6 +156,7 @@ impl Vfs for MemoryVfs {
     }
 }
 
+/// SPEC: T-RAW-2
 #[test]
 fn test_t_raw_2_armed_scanner_and_positive_control() {
     let layer = LayerId::new([0x01; 16]);
@@ -179,6 +184,7 @@ fn test_t_raw_2_armed_scanner_and_positive_control() {
     assert_eq!(fail_witness.unwrap_err().matches, 2);
 }
 
+/// SPEC: T-RAW-1
 #[test]
 fn test_t_raw_1_mk1_structure_scan() {
     let vfs = Arc::new(MemoryVfs::default());
@@ -203,6 +209,7 @@ fn test_t_raw_1_mk1_structure_scan() {
     );
 }
 
+/// SPEC: T-RAW-4
 #[test]
 fn test_t_raw_4_mk2_raw_scan_needles_and_headers() {
     let vfs = Arc::new(MemoryVfs::default());
@@ -232,6 +239,7 @@ fn test_t_raw_4_mk2_raw_scan_needles_and_headers() {
     );
 }
 
+/// SPEC: T-RAW-3
 #[test]
 fn test_t_raw_3_mk3_key_probe() {
     // MK3: Top-Slot genullt, DEK liefert Erased, F-Slots abwesend

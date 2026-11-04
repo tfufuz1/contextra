@@ -13,7 +13,7 @@ use std::sync::Arc;
 // Lokale In-Memory Vfs für Tests
 #[derive(Default)]
 struct LocalMemVfs {
-    files: std::sync::Mutex<std::collections::HashMap<std::path::PathBuf, Vec<u8>>>,
+    files: std::sync::Mutex<std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>>,
 }
 
 impl contextra_ports::vfs::Vfs for LocalMemVfs {
@@ -53,6 +53,7 @@ impl contextra_ports::vfs::Vfs for LocalMemVfs {
     }
 }
 
+/// SPEC: T-RESTORE-1
 #[test]
 fn test_t_restore_1_finalize_sequence_and_ledger_failure() {
     let vfs = Arc::new(LocalMemVfs::default());
@@ -87,7 +88,11 @@ fn test_t_restore_1_finalize_sequence_and_ledger_failure() {
     // Prüfen ob Ledger-Eintrag existiert
     let entries = ledger.read_all().unwrap();
     assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].commitment, [0x88; 32]);
+    if let Some(first) = entries.first() {
+        assert_eq!(first.commitment, [0x88; 32]);
+    } else {
+        panic!("entries empty");
+    }
 
     // Wenn Ledger-Ziel fehlt -> MUSS zu Io-Fehler führen (Completed ohne Ledger ist verboten!)
     let outcome_no_ledger = finalize_erasure(&*vfs, None, &params);

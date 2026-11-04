@@ -6,4 +6,7 @@ fn t_trace_1_ui_tests() {
     t.compile_fail("tests/ui/fail_missing_id.rs");
     t.compile_fail("tests/ui/fail_invalid_prefix.rs");
     t.compile_fail("tests/ui/fail_bench_invalid_prefix.rs");
+    t.compile_fail("tests/ui/fail_empty_id.rs");
+    t.compile_fail("tests/ui/fail_duplicate_attr.rs");
+    t.compile_fail("tests/ui/fail_lowercase.rs");
 }

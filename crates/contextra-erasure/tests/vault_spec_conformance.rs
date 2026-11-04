@@ -18,11 +18,12 @@
 )]
 
 use contextra_erasure::vault::{
-    encode_metablock, open_vault_shard, rehash_shard, FileVault, SlotType, VaultShard,
-    VaultSlotData, VAULT_NUM_SHARDS, VAULT_SLOT_BASE, VAULT_SLOT_SIZE,
+    encode_metablock, open_vault_shard, rehash_shard, FileVault, MetablockParams, SlotType,
+    VaultShard, VaultSlotData, VAULT_NUM_SHARDS, VAULT_SLOT_BASE, VAULT_SLOT_SIZE,
 };
 use contextra_ports::keys::{FileId, FileKeyring, FileKind};
 
+/// SPEC: T-VAULT-1
 #[test]
 fn test_t_vault_sharding_distribution() {
     let mut vault = FileVault::new_in_memory(256);
@@ -53,6 +54,7 @@ fn test_t_vault_sharding_distribution() {
     );
 }
 
+/// SPEC: T-VAULT-1
 #[test]
 fn test_t_vault_rehash_and_zeroization_d111() {
     let vault_id = [0x33u8; 16];
@@ -108,6 +110,7 @@ fn test_t_vault_rehash_and_zeroization_d111() {
     }
 }
 
+/// SPEC: T-VAULT-1
 #[test]
 fn test_t_vault_open_metablock_and_scrub_cursor_d111() {
     let vault_id = [0x55u8; 16];
@@ -125,16 +128,16 @@ fn test_t_vault_open_metablock_and_scrub_cursor_d111() {
     raw_shard[0] = 10;
 
     // Metablock einsetzen
-    let meta = encode_metablock(
-        &vault_id,
-        0,
+    let meta = encode_metablock(MetablockParams {
+        vault_id: &vault_id,
+        shard_no: 0,
         cap_log2,
         live,
         tombstones,
         generation,
         scrub_cursor,
-        &mac_key,
-    );
+        mac_key: &mac_key,
+    });
     raw_shard[64..128].copy_from_slice(&meta);
 
     // Open durchführen (D-111 Abs. 8)
@@ -149,6 +152,7 @@ fn test_t_vault_open_metablock_and_scrub_cursor_d111() {
     assert_eq!(outcome.scrub_cursor, scrub_cursor);
 }
 
+/// SPEC: T-VAULT-1
 #[test]
 fn test_t_vault_shard_poisoning_d55() {
     let vault_id = [0x12u8; 16];
@@ -188,6 +192,7 @@ fn test_t_vault_shard_poisoning_d55() {
     );
 }
 
+/// SPEC: T-VAULT-1
 #[tokio::test]
 async fn test_t_fk_keyring_lifecycle_and_zeroize() {
     let keyring = contextra_erasure::vault::VaultKeyring::new_in_memory();

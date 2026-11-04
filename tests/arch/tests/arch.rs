@@ -42,6 +42,19 @@ fn test_t_arch_3_ring_regeln_gelten() -> Result<(), String> {
     Ok(())
 }
 
+/// SPEC: T-TRACE-2
+#[test]
+fn test_t_trace_2_plan_traceability() -> Result<(), String> {
+    let root = workspace_root();
+    let violations = contextra_arch_tests::check_plan_traceability(&root);
+    assert!(
+        violations.is_empty(),
+        "T-TRACE-2 Verstöße:\n{}",
+        violations.join("\n")
+    );
+    Ok(())
+}
+
 /// SPEC: T-ARCH-3
 #[test]
 fn test_t_arch_3b_matrix_edges() -> Result<(), String> {

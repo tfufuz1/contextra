@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-ISOLATION-ROOT]
 //! # Umfassende Isolations- und Nebenläufigkeitstests für `contextra-mvcc`
 //!
 //! Verifiziert die fundamentalen Garantien der Multi-Version Concurrency Control:
@@ -20,6 +19,7 @@ use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator};
 use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer, TxBufferConfig};
 use contextra_mvcc::SsiValidator;
 use contextra_testkit::ManualClock;
+use contextra_testmacros::ctx_test;
 use contextra_types::{ContextraError, DocId, TxId, TOMBSTONE_BIT};
 use parking_lot::RwLock;
 use std::sync::Arc;
@@ -29,7 +29,7 @@ use std::time::Duration;
 // --- 1. Write-Skew Protection Tests ---
 
 // Prüft die Erkennung von Write-Skew beim klassischen Bankkonto-Beispiel (A + B >= 0).
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_write_skew_classic_bank_account() {
     // Invariant: Account_A + Account_B >= 0. Initial balances: A = 100, B = 100.
     let validator = SequenceLogSsiValidator::new();
@@ -60,7 +60,7 @@ fn test_isolation_write_skew_classic_bank_account() {
 }
 
 // Prüft die Write-Skew-Erkennung, wenn Transaktionen dieselben Daten lesen, aber disjunkte Schlüssel schreiben.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_write_skew_overlapping_reads_disjoint_writes() {
     let validator = SequenceLogSsiValidator::new();
     let snap_seq = 20;
@@ -87,7 +87,7 @@ fn test_isolation_write_skew_overlapping_reads_disjoint_writes() {
 }
 
 // Prüft, dass disjunkte Lese- und Schreibmengen konfliktfrei nebeneinander committen können.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_write_skew_non_overlapping_read_sets_succeed() {
     let validator = SequenceLogSsiValidator::new();
 
@@ -111,7 +111,7 @@ fn test_isolation_write_skew_non_overlapping_read_sets_succeed() {
 // --- 2. Lost-Update Protection Tests ---
 
 // Prüft den Schutz vor Lost Updates bei gleichzeitigem Inkrementieren eines Zählers.
-#[test]
+#[ctx_test(id = "T-CONC-1")]
 fn test_isolation_lost_update_concurrent_counter_increment() {
     let validator = SequenceLogSsiValidator::new();
     let snap_seq = 50;
@@ -138,7 +138,7 @@ fn test_isolation_lost_update_concurrent_counter_increment() {
 }
 
 // Prüft atomares Validieren und Registrieren zur Vermeidung von Lost Updates bei nebenläufigen Commits.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_lost_update_atomic_validate_and_record() {
     let validator = SequenceLogSsiValidator::new();
     let snap_seq = 10;
@@ -169,7 +169,7 @@ fn test_isolation_lost_update_atomic_validate_and_record() {
 // --- 3. Phantom Protection Tests ---
 
 // Prüft, dass das Einfügen eines passenden Schlüssels in einen aktiven Bereichsscan-Präfix einen Phantom-Read-Konflikt auslöst.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_phantom_read_prefix_match_conflicts() {
     let validator = SequenceLogSsiValidator::new();
     let snap_seq = 30;
@@ -191,7 +191,7 @@ fn test_isolation_phantom_read_prefix_match_conflicts() {
 }
 
 // Prüft, dass Schreiboperationen auf nicht betroffene Präfixe keinen Konflikt für Bereichsleser erzeugen.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_phantom_read_unrelated_prefix_succeeds() {
     let validator = SequenceLogSsiValidator::new();
     let snap_seq = 30;
@@ -208,7 +208,7 @@ fn test_isolation_phantom_read_unrelated_prefix_succeeds() {
 }
 
 // Prüft den Phantom-Schutz bei mehreren registrierten Bereichs-Präfixen innerhalb einer Transaktion.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_phantom_read_multiple_range_prefixes() {
     let validator = SequenceLogSsiValidator::new();
     let snap_seq = 40;
@@ -228,7 +228,7 @@ fn test_isolation_phantom_read_multiple_range_prefixes() {
 // --- 4. Read-Only Snapshot Isolation Preservation Tests ---
 
 // Prüft, dass reine Lese-Transaktionen niemals durch spätere Schreiboperationen abgebrochen werden.
-#[test]
+#[ctx_test(id = "T-VER-1")]
 fn test_isolation_read_only_snapshot_never_aborted_by_writes() {
     let validator = SequenceLogSsiValidator::new();
     let snap_seq = 100;
@@ -248,7 +248,7 @@ fn test_isolation_read_only_snapshot_never_aborted_by_writes() {
 }
 
 // Prüft, dass eine Transaktion mit leerem ReadSet immer als konfliktfrei validiert wird.
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_isolation_read_only_snapshot_empty_read_set_always_valid() {
     let validator = SequenceLogSsiValidator::new();
 
@@ -267,7 +267,7 @@ fn test_isolation_read_only_snapshot_empty_read_set_always_valid() {
 // --- 5. Pin Expiration & Reaping with ManualClock Tests ---
 
 // Prüft das zeitgesteuerte Ablaufen und Bereinigen veralteter Snapshot-Pins im SequenceLog.
-#[test]
+#[ctx_test(id = "T-CONC-1")]
 fn test_isolation_pin_expiration_sequence_log_manual_clock() {
     let clock = Arc::new(ManualClock::new(1_000_000_000));
     let mut log =
@@ -293,7 +293,7 @@ fn test_isolation_pin_expiration_sequence_log_manual_clock() {
 }
 
 // Prüft das Ablaufen und Bereinigen veralteter Pins in der SnapshotRegistry mittels ManualClock.
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_isolation_pin_expiration_snapshot_registry_manual_clock() {
     let clock = Arc::new(ManualClock::new(10_000_000_000));
     let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
@@ -313,7 +313,7 @@ fn test_isolation_pin_expiration_snapshot_registry_manual_clock() {
 }
 
 // Prüft die Diagnoseabfrage des am längsten gehaltenen aktiven Snapshot-Pins.
-#[test]
+#[ctx_test(id = "T-CONC-1")]
 fn test_isolation_longest_active_pin_diagnostics_manual_clock() {
     let clock = Arc::new(ManualClock::new(1_000_000_000));
     let registry = Arc::new(SnapshotRegistry::with_clock(clock.clone()));
@@ -337,7 +337,7 @@ fn test_isolation_longest_active_pin_diagnostics_manual_clock() {
 // --- 6. SnapshotRegistry Lifecycle Tests ---
 
 // Prüft, dass das Droppen von SnapshotGuards in beliebiger Reihenfolge stets das korrekte Minimum erhält.
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_isolation_snapshot_registry_out_of_order_guard_drop() {
     let registry = Arc::new(SnapshotRegistry::new());
 
@@ -362,7 +362,7 @@ fn test_isolation_snapshot_registry_out_of_order_guard_drop() {
 }
 
 // Prüft die Referenzzählung der SnapshotRegistry, wenn mehrere Guards dieselbe Sequenznummer halten.
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_isolation_snapshot_registry_ref_counting_same_seq() {
     let registry = Arc::new(SnapshotRegistry::new());
 
@@ -384,7 +384,7 @@ fn test_isolation_snapshot_registry_ref_counting_same_seq() {
 // --- 7. SequenceLog Boundary, Tombstone & Compaction Tests ---
 
 // Prüft die transparente Maskierung des Tombstone-Bits im SequenceLog.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_seq_log_tombstone_bit_masking() {
     let mut log = SequenceLog::new();
     let doc = DocId::from(42);
@@ -399,7 +399,7 @@ fn test_isolation_seq_log_tombstone_bit_masking() {
 }
 
 // Prüft Randfälle bei der Sichtbarkeitsprüfung mit Sequenznummer 0 und u64::MAX.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_seq_log_boundary_seq_numbers() {
     let mut log = SequenceLog::new();
     let doc = DocId::from(999);
@@ -414,7 +414,7 @@ fn test_isolation_seq_log_boundary_seq_numbers() {
 }
 
 // Prüft, dass die Kompaktierung des SequenceLogs nur Versionen unterhalb des Schwellenwerts entfernt.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_seq_log_compaction_retains_active_versions() {
     let mut log = SequenceLog::new();
     let doc1 = DocId::from(1);
@@ -438,7 +438,7 @@ fn test_isolation_seq_log_compaction_retains_active_versions() {
 // --- 8. Multi-Threaded Concurrency Tests ---
 
 // Multi-Threaded Stresstest für die SnapshotRegistry unter paralleler Registrierung und Freigabe.
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_isolation_multithreaded_snapshot_registry_concurrency() {
     let registry = Arc::new(SnapshotRegistry::new());
     let num_threads = 8;
@@ -469,7 +469,7 @@ fn test_isolation_multithreaded_snapshot_registry_concurrency() {
 }
 
 // Multi-Threaded Stresstest für den SequenceLogSsiValidator bei parallelen Commit-Registrierungen.
-#[test]
+#[ctx_test(id = "T-CONC-1")]
 fn test_isolation_multithreaded_ssi_validator_concurrent_commits() {
     let validator = Arc::new(SequenceLogSsiValidator::new());
     let num_threads = 8;
@@ -496,7 +496,7 @@ fn test_isolation_multithreaded_ssi_validator_concurrent_commits() {
 }
 
 // Multi-Threaded Stresstest für den TxBuffer mit parallelen Schreibern über mehrere Shards.
-#[test]
+#[ctx_test(id = "T-CONC-1")]
 fn test_isolation_multithreaded_tx_buffer_sharded_concurrency() {
     let buffer = Arc::new(TxBuffer::<usize>::new_with_config(
         16,
@@ -537,7 +537,7 @@ fn test_isolation_multithreaded_tx_buffer_sharded_concurrency() {
 // --- 9. TxBuffer Capacity, Budget & Orphan Reaping Tests ---
 
 // Prüft die strikte Einhaltung des Limits gepufferter Operationen pro Transaktion.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_tx_buffer_bounded_ops_limit() {
     let config = TxBufferConfig {
         max_ops_per_tx: 3,
@@ -571,7 +571,7 @@ fn test_isolation_tx_buffer_bounded_ops_limit() {
 }
 
 // Prüft die Durchsetzung des Byte-Budgets für gepufferte Nutzdaten pro Transaktion.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_tx_buffer_tx_staged_bytes_budget() {
     let config = TxBufferConfig {
         max_tx_staged_bytes: 100,
@@ -594,7 +594,7 @@ fn test_isolation_tx_buffer_tx_staged_bytes_budget() {
 }
 
 // Prüft das Abräumen verwaister Transaktionen im TxBuffer mit ManualClock.
-#[test]
+#[ctx_test(id = "T-CONC-1")]
 fn test_isolation_tx_buffer_orphan_reaping_manual_clock() {
     let clock = Arc::new(ManualClock::new(10_000_000_000));
     let config = TxBufferConfig {
@@ -620,7 +620,7 @@ fn test_isolation_tx_buffer_orphan_reaping_manual_clock() {
 }
 
 // Prüft das korrekte Nachführen der minimalen Snapshot-Sequenznummer im ReadSet.
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_isolation_read_set_min_snapshot_seq_tracking() {
     let mut rs = ReadSet::new();
     assert_eq!(rs.min_snapshot_seq(), None);
@@ -636,7 +636,7 @@ fn test_isolation_read_set_min_snapshot_seq_tracking() {
 }
 
 // Prüft die Konflikterkennung des SSI-Validators in Verbindung mit einem aktiven SequenceLog.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_isolation_ssi_validator_with_sequence_log_conflict() {
     let seq_log = Arc::new(RwLock::new(SequenceLog::new()));
     let validator = SequenceLogSsiValidator::with_sequence_log(seq_log.clone());
