@@ -26,7 +26,7 @@ impl LayerId {
 
 impl fmt::Debug for LayerId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "LayerId({:02x?})", &self.0)
+        write!(f, "LayerId({:02x?})", self.0)
     }
 }
 
@@ -107,7 +107,7 @@ impl fmt::Debug for LayerScope {
         write!(
             f,
             "LayerScope {{ scope_id: {:02x?}, affected_units_count: {} }}",
-            &self.scope_id,
+            self.scope_id,
             self.affected_units.len()
         )
     }
@@ -209,7 +209,7 @@ impl fmt::Debug for LayerWitness {
         write!(
             f,
             "LayerWitness {{ witness_hash: {:02x?} }}",
-            &self.witness_hash
+            self.witness_hash
         )
     }
 }

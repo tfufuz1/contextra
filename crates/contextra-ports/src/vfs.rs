@@ -107,7 +107,7 @@ pub trait VfsFile: Send + Sync {
     /// Liefert `std::io::Error` bei Schreibfehlern oder Speicherplatzmangel.
     ///
     /// # Crash
-    /// Schreibt Datenblöcke; Persistenz wird erst durch nachfolgendes `sync_data` oder `sync_all` garantiert.
+    /// Schreibt Datenblöcke; Persistenz erfordert nachfolgendes `sync_data` oder `sync_all`.
     fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize>;
 
     /// Truncates or extends the underlying file length to `len` bytes.
@@ -151,10 +151,10 @@ pub trait VfsFile: Send + Sync {
     /// Flushes data blocks and metadata to disk (`fsync`).
     ///
     /// # Fehler
-    /// Liefert `std::io::Error` bei Synchronisationsfehlern. Scheitert `sync_all`, ist das Handle vergiftet (DF-03, D-55, T-FSYNC-1).
+    /// Liefert `std::io::Error` bei Synchronisationsfehlern. Scheitert `sync_all`, ist das Handle dauerhaft vergiftet und darf nicht weiterverwendet werden (D-55, I-10).
     ///
     /// # Crash
-    /// Garantiert Haltbarkeit aller Datenblöcke und Inode-Metadaten (z. B. Dateilänge).
+    /// Bewirkt Haltbarkeit aller Datenblöcke und Inode-Metadaten (z. B. Dateilänge).
     fn sync_all(&self) -> std::io::Result<()>;
 }
 
@@ -260,8 +260,7 @@ pub trait Vfs: Send + Sync + 'static {
     ///
     /// # Crash
     /// Atomarer Dateisystem-Rename; bei Systemabsturz existiert entweder der Quell- oder der Zielpfad.
-    fn rename(&self, from: &Path, to: &Path) -> Result<()> {
-        let _ = (from, to);
+    fn rename(&self, _from: &Path, _to: &Path) -> Result<()> {
         Err(crate::ContextraError::Io(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
             "atomic rename is not supported by default in this Vfs implementation",

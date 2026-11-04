@@ -52,6 +52,12 @@ pub mod ledger;
 pub mod memory;
 /// Metrics reporting port trait.
 pub mod metrics;
+/// Erase-Observer port trait and event representations (SPEC D-118).
+pub mod observer;
+/// Pre-gate execution hook port trait (SPEC D-115, D-117).
+pub mod pre_gate;
+/// Audit report signer port trait (SPEC D-130).
+pub mod report_signer;
 /// Random number generator port trait and SplitMix64 implementation.
 pub mod rng;
 /// Key-value storage engine traits.
@@ -81,6 +87,9 @@ pub use metrics::{
     HistogramSnapshot, InMemoryMetricsSink, MetricKey, MetricName, MetricSnapshot, Metrics,
     MetricsSink, MetricsSinkAdapter, NoopMetricsSink,
 };
+pub use observer::{ErasureEvent, ErasureObserver, ObservedPhase, ObserverError, TargetKind};
+pub use pre_gate::{PreGate, PreGateIntent, PreGateOutcome};
+pub use report_signer::{ReportSignature, ReportSigner, SignerError, SignerId};
 pub use rng::{Rng, SeededRng};
 pub use storage::{StorageEngine, StorageStats, MAX_SCAN_MERGE_ACCUMULATOR};
 pub use text_index::{TextIndex, TextIndexStats};
@@ -100,6 +109,9 @@ mod dyn_safety {
     fn _assert_dyn_commit_barrier(_: Option<&dyn CommitBarrier>) {}
     fn _assert_dyn_purge_barrier(_: Option<&dyn PurgeBarrier>) {}
     fn _assert_dyn_arena_guard(_: Option<&dyn ArenaGuard>) {}
+    fn _assert_dyn_erasure_observer(_: Option<&dyn ErasureObserver>) {}
+    fn _assert_dyn_report_signer(_: Option<&dyn ReportSigner>) {}
+    fn _assert_dyn_pre_gate(_: Option<&dyn PreGate>) {}
 
     #[test]
     fn test_dyn_safety_compiles() {
@@ -112,6 +124,9 @@ mod dyn_safety {
         _assert_dyn_commit_barrier(None);
         _assert_dyn_purge_barrier(None);
         _assert_dyn_arena_guard(None);
+        _assert_dyn_erasure_observer(None);
+        _assert_dyn_report_signer(None);
+        _assert_dyn_pre_gate(None);
     }
 
     /// SPEC: T-ARCH-3 / Rule 3

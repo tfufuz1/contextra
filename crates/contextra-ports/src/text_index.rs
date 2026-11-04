@@ -48,12 +48,11 @@ pub trait TextIndex: Send + Sync + 'static {
     /// Reiner historischer Snapshot-Lesezugriff; keine Mutation auf Festplatte.
     fn search_at(
         &self,
-        query: &str,
-        k: usize,
-        seq_no: u64,
+        _query: &str,
+        _k: usize,
+        _seq_no: u64,
     ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send {
         async move {
-            let _ = (query, k, seq_no);
             Err(ContextraError::capability_unsupported(
                 "snapshot_read_at",
                 "Text search snapshot isolation (search_at) is not supported by default — tracked in ADR-024",
@@ -148,7 +147,9 @@ pub trait TextIndex: Send + Sync + 'static {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::FutureExt;
 
+    /// SPEC: T-SEARCH-2
     #[test]
     fn test_text_index_stats_serialization() {
         let t_stats = TextIndexStats {
@@ -161,8 +162,9 @@ mod tests {
         assert_eq!(t_stats.num_documents, deser.num_documents);
     }
 
-    #[tokio::test]
-    async fn test_text_index_search_at_capability() {
+    /// SPEC: T-SEARCH-2
+    #[test]
+    fn test_text_index_search_at_capability() {
         struct TextIndexPlaceholder;
         impl TextIndex for TextIndexPlaceholder {
             async fn search(&self, _: &str, _: usize) -> Result<Vec<ScoredDocument>> {
@@ -201,7 +203,10 @@ mod tests {
             }
         }
         let text_index = TextIndexPlaceholder;
-        let res = text_index.search_at("test", 5, 1).await;
+        let res = text_index
+            .search_at("test", 5, 1)
+            .now_or_never()
+            .expect("now or never");
         assert!(
             !matches!(
                 res,
@@ -211,8 +216,9 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_text_index_defaults() {
+    /// SPEC: T-SEARCH-2
+    #[test]
+    fn test_text_index_defaults() {
         struct MockTextIndex;
         impl TextIndex for MockTextIndex {
             async fn search(&self, _: &str, _: usize) -> Result<Vec<ScoredDocument>> {
@@ -249,7 +255,10 @@ mod tests {
         }
 
         let index = MockTextIndex;
-        let res = index.search_at("query", 10, 42).await;
+        let res = index
+            .search_at("query", 10, 42)
+            .now_or_never()
+            .expect("now or never");
         match res {
             Err(ContextraError::CapabilityUnsupported { capability, reason }) => {
                 assert_eq!(capability, "snapshot_read_at");

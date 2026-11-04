@@ -102,12 +102,11 @@ pub trait VectorIndex: Send + Sync + 'static {
     /// Reiner historischer Snapshot-Lesezugriff; keine Mutation auf Festplatte.
     fn search_at(
         &self,
-        query: &[f32],
-        k: usize,
-        seq_no: u64,
+        _query: &[f32],
+        _k: usize,
+        _seq_no: u64,
     ) -> impl Future<Output = Result<Vec<ScoredDocument>>> + Send {
         async move {
-            let _ = (query, k, seq_no);
             Err(ContextraError::capability_unsupported(
                 "snapshot_read_at",
                 "Vector search snapshot isolation (search_at) is not supported by default — tracked in ADR-024",
@@ -241,7 +240,9 @@ pub trait VectorIndex: Send + Sync + 'static {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::FutureExt;
 
+    /// SPEC: T-SEARCH-2
     #[test]
     fn test_vector_index_stats_serialization() {
         let v_stats = VectorIndexStats {
@@ -256,8 +257,9 @@ mod tests {
         assert_eq!(v_stats.num_vectors, deser.num_vectors);
     }
 
-    #[tokio::test]
-    async fn test_hnsw_search_at_capability() {
+    /// SPEC: T-SEARCH-2
+    #[test]
+    fn test_hnsw_search_at_capability() {
         struct VectorIndexPlaceholder;
         impl VectorIndex for VectorIndexPlaceholder {
             async fn insert(&self, _: TxId, _: DocId, _: &[f32]) -> Result<()> {
@@ -298,7 +300,10 @@ mod tests {
             }
         }
         let index = VectorIndexPlaceholder;
-        let res = index.search_at(&[1.0, 0.0], 5, 1).await;
+        let res = index
+            .search_at(&[1.0, 0.0], 5, 1)
+            .now_or_never()
+            .expect("now or never");
         assert!(
             !matches!(
                 res,
@@ -310,8 +315,9 @@ mod tests {
         index.trigger_rebuild_async();
     }
 
-    #[tokio::test]
-    async fn test_vector_index_defaults() {
+    /// SPEC: T-SEARCH-2
+    #[test]
+    fn test_vector_index_defaults() {
         struct MockIndex(std::sync::atomic::AtomicUsize);
         impl VectorIndex for MockIndex {
             async fn insert(&self, _: TxId, _: DocId, _: &[f32]) -> Result<()> {
@@ -351,7 +357,7 @@ mod tests {
         }
 
         let index = MockIndex(std::sync::atomic::AtomicUsize::new(0));
-        assert!(index.is_empty().await);
+        assert!(index.is_empty().now_or_never().expect("is_empty"));
 
         let vectors = vec![
             (DocId(1), [1.0, 2.0].as_slice()),
@@ -359,13 +365,17 @@ mod tests {
         ];
         index
             .insert_batch(TxId(1), &vectors)
-            .await
+            .now_or_never()
+            .expect("insert_batch future")
             .expect("batch insert succeeds");
-        assert_eq!(index.len().await, 2);
-        assert!(!index.is_empty().await);
+        assert_eq!(index.len().now_or_never().expect("len"), 2);
+        assert!(!index.is_empty().now_or_never().expect("is_empty"));
 
         // Test search_filtered default error
-        let res = index.search_filtered(&[1.0], 1, Some(&|_| true)).await;
+        let res = index
+            .search_filtered(&[1.0], 1, Some(&|_| true))
+            .now_or_never()
+            .expect("search_filtered");
         match res {
             Err(ContextraError::CapabilityUnsupported { capability, .. }) => {
                 assert_eq!(capability, "vector_filtered_search");
@@ -374,7 +384,10 @@ mod tests {
         }
 
         // Test search_at default error
-        let res2 = index.search_at(&[1.0], 1, 42).await;
+        let res2 = index
+            .search_at(&[1.0], 1, 42)
+            .now_or_never()
+            .expect("search_at");
         match res2 {
             Err(ContextraError::CapabilityUnsupported { capability, reason }) => {
                 assert_eq!(capability, "snapshot_read_at");

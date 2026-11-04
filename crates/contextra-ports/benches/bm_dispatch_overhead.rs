@@ -25,58 +25,68 @@ struct FastStore {
 impl DynHotPort for FastStore {
     fn get<'a>(&'a self, _key: &'a [u8]) -> BoxFuture<'a, Option<u64>> {
         let v = self.val;
-        Box::pin(async move { Some(v) })
+        Box::pin(std::future::ready(Some(v)))
     }
 }
 
 impl StaticHotPort for FastStore {
     fn get(&self, _key: &[u8]) -> impl Future<Output = Option<u64>> + Send {
         let v = self.val;
-        async move { Some(v) }
+        std::future::ready(Some(v))
     }
 }
 
-async fn run_dyn_dispatch(port: &dyn DynHotPort, key: &[u8], iters: usize) -> u64 {
+fn poll_future_ready<F: Future>(f: F) -> Option<F::Output> {
+    let waker = futures_util::task::noop_waker();
+    let mut cx = std::task::Context::from_waker(&waker);
+    let mut pinned = std::pin::pin!(f);
+    match pinned.as_mut().poll(&mut cx) {
+        std::task::Poll::Ready(v) => Some(v),
+        std::task::Poll::Pending => None,
+    }
+}
+
+fn run_dyn_dispatch(port: &dyn DynHotPort, key: &[u8], iters: usize) -> u64 {
     let mut sum = 0u64;
     for _ in 0..iters {
-        if let Some(v) = port.get(key).await {
+        if let Some(Some(v)) = poll_future_ready(port.get(key)) {
             sum += v;
         }
     }
     sum
 }
 
-async fn run_static_dispatch<P: StaticHotPort>(port: &P, key: &[u8], iters: usize) -> u64 {
+fn run_static_dispatch<P: StaticHotPort>(port: &P, key: &[u8], iters: usize) -> u64 {
     let mut sum = 0u64;
     for _ in 0..iters {
-        if let Some(v) = port.get(key).await {
+        if let Some(Some(v)) = poll_future_ready(port.get(key)) {
             sum += v;
         }
     }
     sum
 }
 
-#[tokio::test]
-async fn bm_dispatch_overhead_measurement() {
+#[test]
+fn bm_dispatch_overhead_measurement() {
     let store = FastStore { val: 42 };
     let dyn_store: &dyn DynHotPort = &store;
     let key = b"benchmark_key";
     let iters = 200_000;
 
     // Warm-up
-    let _ = run_static_dispatch(&store, key, 5_000).await;
-    let _ = run_dyn_dispatch(dyn_store, key, 5_000).await;
+    let _ = run_static_dispatch(&store, key, 5_000);
+    let _ = run_dyn_dispatch(dyn_store, key, 5_000);
 
     // Messung Statischer Dispatch
     let start_static = Instant::now();
-    let static_res = run_static_dispatch(&store, key, iters).await;
+    let static_res = run_static_dispatch(&store, key, iters);
     let elapsed_static = start_static.elapsed();
     let ns_per_static = elapsed_static.as_nanos() as f64 / iters as f64;
     std::hint::black_box(static_res);
 
     // Messung Dynamischer Dispatch (dyn + BoxFuture Heap Allocation)
     let start_dyn = Instant::now();
-    let dyn_res = run_dyn_dispatch(dyn_store, key, iters).await;
+    let dyn_res = run_dyn_dispatch(dyn_store, key, iters);
     let elapsed_dyn = start_dyn.elapsed();
     let ns_per_dyn = elapsed_dyn.as_nanos() as f64 / iters as f64;
     std::hint::black_box(dyn_res);
