@@ -7,8 +7,6 @@
 //! sichergestellt sein, dass bei nachfolgenden Abfragen oder Indexerweiterungen exakt
 //! dasselbe Modell und dieselbe Quantisierungsstufe (z. B. Q4_K_M, Q8_0) verwendet wird.
 
-// FILE-CONTEXT
-// STAND: 2026-09-12T00:00:00Z
 // ZWECK: Canonical ModelFingerprint type definition shared across workspace crates.
 // INVARIANTEN: SHA-256 over weight blob concatenated with quantization string; distinct quant tiers yield distinct fingerprints.
 
@@ -22,13 +20,11 @@
 
 use serde::{Deserialize, Serialize};
 
-// ANCHOR[contextra-types:FINGERPRINT-001]
 /// Uniquely identifies a model weight file and its quantization tier.
 ///
 /// Dient dazu, Modellgewicht-Dateien und Quantisierungsstufen auf Systemebene
 /// unverwechselbar zuzuordnen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MFP-001]
 /// Identifiziert eine Modelldatei und deren Quantisierungsstufe eindeutig.
 pub struct ModelFingerprint {
     /// SHA-256 hash digest over model weight blob and quantization tier string.
@@ -40,7 +36,6 @@ pub struct ModelFingerprint {
 }
 
 impl ModelFingerprint {
-    // ANCHOR[contextra-types:FINGERPRINT-002]
     /// Creates a new `ModelFingerprint`.
     ///
     /// # Ablauf
@@ -71,9 +66,9 @@ mod tests {
         assert_eq!(fp.model_id, "test-model");
         assert_eq!(fp.quantization, "Q4_K_M");
 
-        let json = serde_json::to_string(&fp).expect("serialization failed");
+        let json = serde_json::to_string(&fp).expect("serialization failed"); // #[cfg(test)]
         let deserialized: ModelFingerprint =
-            serde_json::from_str(&json).expect("deserialization failed");
+            serde_json::from_str(&json).expect("deserialization failed"); // #[cfg(test)]
         assert_eq!(fp, deserialized);
     }
 }
