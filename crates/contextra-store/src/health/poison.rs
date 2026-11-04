@@ -31,7 +31,8 @@ impl PoisonState {
     pub fn check_healthy(&self) -> Result<()> {
         if self.is_poisoned() {
             Err(ContextraError::Storage(
-                "Storage engine is poisoned due to a previous fsync or I/O failure (SPEC D-55)".into(),
+                "Storage engine is poisoned due to a previous fsync or I/O failure (SPEC D-55)"
+                    .into(),
             ))
         } else {
             Ok(())

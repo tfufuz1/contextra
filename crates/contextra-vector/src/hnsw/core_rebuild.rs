@@ -854,14 +854,15 @@ impl HnswIndexCore {
                             let q_guard = self.cold.quantizer.read();
                             let q = q_guard.as_ref().ok_or_else(|| {
                                 ContextraError::Index(
-                                    "Quantizer missing during rebuild phase 2 delta replay"
-                                        .into(),
+                                    "Quantizer missing during rebuild phase 2 delta replay".into(),
                                 )
                             })?;
                             q.dequantize(v)?
                         }
                     };
-                    new_index.inner.do_insert(node.doc_id, &f32_vec, node.committed_tx)?;
+                    new_index
+                        .inner
+                        .do_insert(node.doc_id, &f32_vec, node.committed_tx)?;
                 }
             }
 
@@ -870,7 +871,13 @@ impl HnswIndexCore {
                     let ram_idx = (del_idx as usize) - buffer_count;
                     if let Some(node) = nodes.get(ram_idx) {
                         if node.committed_tx > snapshot_tx {
-                            if new_index.inner.hot.doc_to_node.read().contains_key(&node.doc_id.inner()) {
+                            if new_index
+                                .inner
+                                .hot
+                                .doc_to_node
+                                .read()
+                                .contains_key(&node.doc_id.inner())
+                            {
                                 new_index.inner.do_delete(node.doc_id)?;
                             }
                         }

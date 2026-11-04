@@ -288,7 +288,7 @@ impl LsmStorage {
     }
 
     /// Returns the current storage health status.
-        /// Gibt an, ob der Speicher nach einem I/O- oder Fsync-Fehler vergiftet ist (D-55).
+    /// Gibt an, ob der Speicher nach einem I/O- oder Fsync-Fehler vergiftet ist (D-55).
     pub fn is_poisoned(&self) -> bool {
         matches!(self.health(), StorageHealth::Poisoned)
     }

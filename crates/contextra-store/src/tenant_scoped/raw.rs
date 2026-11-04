@@ -1,8 +1,8 @@
 //! Rohe Speicherzugriffe unter Kapselung (SPEC §5.2 AR-6, T-ARCH-2).
 
+use crate::lsm::LsmStorage;
 use contextra_types::tags::TenantTag;
 use std::sync::Arc;
-use crate::lsm::LsmStorage;
 
 /// Kapselt den ungeschützten Zugriff ausschließlich für interne Wiederherstellungspfade.
 pub struct RawStorageHandle {

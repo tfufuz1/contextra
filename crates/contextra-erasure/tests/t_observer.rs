@@ -47,8 +47,8 @@ async fn t_obs_1_2_3_observer_lifecycle() {
 #[test]
 fn t_crash_3_disk_reserve_check() {
     // 1. Ausreichend
-    let check_ok = check_disk_reserve(10_000_000, 3_000_000)
-        .unwrap_or(ReserveCheck::Insufficient {
+    let check_ok =
+        check_disk_reserve(10_000_000, 3_000_000).unwrap_or(ReserveCheck::Insufficient {
             free_bytes: 0,
             required_bytes: 0,
         });
