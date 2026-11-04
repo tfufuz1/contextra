@@ -10,7 +10,10 @@ pub mod positive_control;
 pub mod scanner_flow;
 pub mod witness;
 
-pub use field::{Mk1Result, Mk2Result, Mk3Result};
+pub use field::{
+    read_file_verified, scan_mk1_structures, scan_mk2_raw, scan_mk3_keys, Mk1Result, Mk2Result,
+    Mk3Result, VerifiedVia,
+};
 pub use scanner_flow::run_scanner_flow;
 pub use witness::{arm_scanner, finish_scan};
 
