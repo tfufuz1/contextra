@@ -622,7 +622,7 @@ impl LsmStorage {
             pending_commit_queue: tokio::sync::Mutex::new(None),
             wal_queue_depth,
             pressure_rx,
-            intent_locks: std::sync::Mutex::new(std::collections::HashMap::new()),
+            intent_locks: std::sync::Mutex::new(std::collections::BTreeMap::new()),
             observer_registry: super::observer::ObserverRegistry::new(),
             clock: parking_lot::RwLock::new(Arc::new(contextra_ports::SystemClock::new())),
             ssi_validator: Arc::clone(&default_ssi_val)
@@ -812,7 +812,7 @@ impl LsmStorage {
                 sstables_lock.push(Arc::new(new_reader));
             } else if !surviving_entries.is_empty() {
                 for (k, v, seq, tx) in surviving_entries {
-                    state.memtable.put(Bytes::from(k), Bytes::from(v), seq, tx);
+                    state.memtable.put(k, v, seq, tx);
                 }
             }
 

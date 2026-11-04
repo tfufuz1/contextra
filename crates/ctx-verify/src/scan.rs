@@ -191,11 +191,15 @@ fn scan_dir_recursive(dir: &Path, target_bytes: &[u8]) -> Result<(), InvalidCode
                 Err(_) => return Err(InvalidCode::IoError),
             };
 
-            // Check if file name indicates vault
+            // Check if file name indicates vault shard (<nn>.vlt per SPEC F.3/D-111) or legacy vault.dat
             let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if filename == "vault.dat" {
+            let is_vault = filename == "vault.dat"
+                || (filename.ends_with(".vlt")
+                    && filename.len() == 6
+                    && filename[..2].chars().all(|c| c.is_ascii_digit()));
+            if is_vault {
                 // If vault contains active slot for target, MK3 fails
-                // F.3 slot layout check
+                // F.3 slot layout check (64-byte slots at offset 128 + 64*i)
                 if contains_active_vault_slot(&content, target_bytes) {
                     return Err(InvalidCode::Mk3KeyPresent);
                 }
@@ -218,24 +222,35 @@ fn contains_active_vault_slot(vault_data: &[u8], target_tag: &[u8]) -> bool {
     if target_tag.len() != 16 {
         return false;
     }
-    // F.3: header (128) + metablock (64) = 192, then 80-byte slots
-    // slot: 0: slot_type (1), 1..17: tag (16), 17..49: payload (32), 49: status (1: 0x01 aktiv, 0x02 tombstone)
-    if vault_data.len() < 192 {
+    // SPEC §11.5, Anhang F.3, D-111:
+    // Header (Offset 0..64, 64 B) + Metablock (Offset 64..128, 64 B) = 128 Bytes Base.
+    // Slots liegen ab Offset 128 + 64*i und sind jeweils 64 Byte groß.
+    // Slot Layout (64 Bytes):
+    // 0: slot_type (0x01 T, 0x02 C, 0x03 S, 0x04 D, 0x05 F, 0x06 E; 0x00 leer)
+    // 1: status (0x00 leer, 0x01 aktiv, 0x02 Grabstein)
+    // 2..8: gen (u48 big-endian, 6 Bytes)
+    // 8..24: tag (16 Bytes)
+    // 24..56: payload (32 Bytes Salt / Key)
+    // 56..64: mac (8 Bytes)
+    const VAULT_SLOT_BASE: usize = 128;
+    const VAULT_SLOT_SIZE: usize = 64;
+
+    if vault_data.len() < VAULT_SLOT_BASE {
         return false;
     }
 
-    let slots_data = match vault_data.get(192..) {
+    let slots_data = match vault_data.get(VAULT_SLOT_BASE..) {
         Some(s) => s,
         None => return false,
     };
 
-    for chunk in slots_data.chunks_exact(80) {
-        let tag = match chunk.get(1..17) {
-            Some(t) => t,
+    for chunk in slots_data.chunks_exact(VAULT_SLOT_SIZE) {
+        let status = match chunk.get(1) {
+            Some(s) => *s,
             None => continue,
         };
-        let status = match chunk.get(49) {
-            Some(s) => *s,
+        let tag = match chunk.get(8..24) {
+            Some(t) => t,
             None => continue,
         };
         if tag == target_tag && status == 0x01 {

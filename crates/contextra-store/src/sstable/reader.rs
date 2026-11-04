@@ -149,7 +149,8 @@ pub(super) fn may_contain_key_in_block_bloom(
         }
         let (h1, h2) = BloomFilter::hash_pair(key);
         for i in 0..7u64 {
-            let bit_idx = (h1.wrapping_add(i.wrapping_mul(h2)) as usize) % m;
+            let bit_idx =
+                usize::try_from(h1.wrapping_add(i.wrapping_mul(h2)) % (m as u64)).unwrap_or(0);
             let byte_idx = bit_idx / 8;
             let bit_mask = 1u8 << (bit_idx % 8);
             if let Some(&byte) = bloom_bytes.get(byte_idx) {
@@ -186,7 +187,8 @@ pub(super) fn may_contain_key_in_block_bloom(
                 *hash_bytes.get(i * 2 + 1).unwrap_or(&0),
             ]);
             let bit_idx = chunk as usize % 256;
-            if (bloom_words[bit_idx / 64] & (1u64 << (bit_idx % 64))) == 0 {
+            let word = bloom_words.get(bit_idx / 64).copied().unwrap_or(0);
+            if (word & (1u64 << (bit_idx % 64))) == 0 {
                 return false;
             }
         }
@@ -195,7 +197,7 @@ pub(super) fn may_contain_key_in_block_bloom(
         if bloom_bytes.len() < 8 {
             return false;
         }
-        let bloom = if let Ok(arr) = bloom_bytes[0..8].try_into() {
+        let bloom = if let Some(arr) = bloom_bytes.get(0..8).and_then(|s| s.try_into().ok()) {
             u64::from_le_bytes(arr)
         } else {
             return false;
@@ -411,13 +413,19 @@ impl SstableReader {
                     .map_err(|_| ContextraError::ParseError("Invalid index_offset".into()))?,
             )
         } else if trailer_len >= 54 {
+            let magic_slice = trailer_data
+                .get(50..54)
+                .ok_or_else(|| ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0))?;
             let magic_legacy =
-                u32::from_le_bytes(trailer_data[50..54].try_into().map_err(|_| {
+                u32::from_le_bytes(magic_slice.try_into().map_err(|_| {
                     ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0)
                 })?);
             if magic_legacy == SSTABLE_MAGIC_LEGACY {
+                let off_slice = trailer_data
+                    .get(42..50)
+                    .ok_or_else(|| ContextraError::ParseError("Invalid index offset".into()))?;
                 u64::from_le_bytes(
-                    trailer_data[42..50]
+                    off_slice
                         .try_into()
                         .map_err(|_| ContextraError::ParseError("Invalid index offset".into()))?,
                 )
@@ -480,12 +488,17 @@ impl SstableReader {
                         "Bloom filter data too short for CRC".into(),
                     ));
                 }
+                let crc_slice = bloom_data_raw
+                    .get(0..4)
+                    .ok_or_else(|| ContextraError::Serialization("Invalid CRC".into()))?;
                 let stored_crc = u32::from_le_bytes(
-                    bloom_data_raw[0..4]
+                    crc_slice
                         .try_into()
                         .map_err(|_| ContextraError::Serialization("Invalid CRC".into()))?,
                 );
-                let payload = &bloom_data_raw[4..];
+                let payload = bloom_data_raw.get(4..).ok_or_else(|| {
+                    ContextraError::Storage("corrupted bloom data: payload missing".into())
+                })?;
                 if crc32fast::hash(payload) != stored_crc {
                     return Err(ContextraError::checksum_mismatch(
                         path_buf.to_string_lossy(),
@@ -541,8 +554,11 @@ impl SstableReader {
                     "Index data too short for CRC".into(),
                 ));
             }
+            let crc_slice = index_bytes_raw
+                .get(0..4)
+                .ok_or_else(|| ContextraError::Serialization("Invalid CRC".into()))?;
             let stored_crc = u32::from_le_bytes(
-                index_bytes_raw[0..4]
+                crc_slice
                     .try_into()
                     .map_err(|_| ContextraError::Serialization("Invalid CRC".into()))?,
             );
@@ -563,11 +579,13 @@ impl SstableReader {
         let index_len = index_bytes.len();
 
         while pos + 10 <= index_len {
-            let key_len = usize::from(u16::from_le_bytes(
-                index_bytes[pos..pos + 2]
-                    .try_into()
-                    .map_err(|_| ContextraError::ParseError("corrupted index: key_len".into()))?,
-            ));
+            let klen_slice = index_bytes.get(pos..pos + 2).ok_or_else(|| {
+                ContextraError::ParseError("corrupted index: key_len slice".into())
+            })?;
+            let key_len =
+                usize::from(u16::from_le_bytes(klen_slice.try_into().map_err(|_| {
+                    ContextraError::ParseError("corrupted index: key_len".into())
+                })?));
             pos += 2;
 
             if pos + key_len + 8 > index_len {
@@ -579,8 +597,11 @@ impl SstableReader {
             let key = index_bytes.slice(pos..pos + key_len);
             pos += key_len;
 
+            let off_slice = index_bytes.get(pos..pos + 8).ok_or_else(|| {
+                ContextraError::ParseError("corrupted index: offset slice".into())
+            })?;
             let offset = u64::from_le_bytes(
-                index_bytes[pos..pos + 8]
+                off_slice
                     .try_into()
                     .map_err(|_| ContextraError::ParseError("corrupted index: offset".into()))?,
             );
@@ -601,13 +622,9 @@ impl SstableReader {
             ));
         }
 
-        let first_key = if !index.is_empty() {
-            let offset = index[0].1;
-            let next_offset = if index.len() > 1 {
-                index[1].1
-            } else {
-                index_offset
-            };
+        let first_key = if let Some(first_entry) = index.first() {
+            let offset = first_entry.1;
+            let next_offset = index.get(1).map(|e| e.1).unwrap_or(index_offset);
             let block = Self::read_block_at_file(
                 Arc::clone(&file),
                 offset,
@@ -622,10 +639,13 @@ impl SstableReader {
                     "corrupted block: header too short".into(),
                 ));
             }
+            let klen_slice = block
+                .get(0..2)
+                .ok_or_else(|| ContextraError::ParseError("corrupted block: klen slice".into()))?;
             let k_len =
-                usize::from(u16::from_le_bytes(block[0..2].try_into().map_err(
-                    |_| ContextraError::ParseError("corrupted block: k_len".into()),
-                )?));
+                usize::from(u16::from_le_bytes(klen_slice.try_into().map_err(|_| {
+                    ContextraError::ParseError("corrupted block: k_len".into())
+                })?));
             let end_k = 2usize.checked_add(k_len).ok_or_else(|| {
                 ContextraError::ParseError("corrupted block: k_len overflow".into())
             })?;
@@ -694,27 +714,32 @@ impl SstableReader {
         .map_err(|e| ContextraError::Storage(format!("Block read failed: {}", e)))?;
 
         let block_data = if let Some(km) = key_manager {
-            if data.len() < 12 {
-                return Err(ContextraError::Storage("Block too small for nonce".into()));
-            }
+            let nonce_slice = data
+                .get(0..12)
+                .ok_or_else(|| ContextraError::Storage("Block too small for nonce".into()))?;
             let mut nonce = [0u8; 12];
-            nonce.copy_from_slice(&data[0..12]);
-            let decrypted = km.decrypt_auto_nonce(&data[12..], &nonce)?;
+            nonce.copy_from_slice(nonce_slice);
+            let ct_slice = data
+                .get(12..)
+                .ok_or_else(|| ContextraError::Storage("Block data missing ciphertext".into()))?;
+            let decrypted = km.decrypt_auto_nonce(ct_slice, &nonce)?;
             Bytes::from(decrypted)
         } else {
             Bytes::from(data)
         };
 
         if has_crc {
-            if block_data.len() < 4 {
-                return Err(ContextraError::Storage("Block too small for CRC".into()));
-            }
+            let crc_slice = block_data
+                .get(0..4)
+                .ok_or_else(|| ContextraError::Storage("Block too small for CRC".into()))?;
             let stored_crc = u32::from_le_bytes(
-                block_data[0..4]
+                crc_slice
                     .try_into()
                     .map_err(|_| ContextraError::Serialization("Invalid CRC format".into()))?,
             );
-            let payload = &block_data[4..];
+            let payload = block_data.get(4..).ok_or_else(|| {
+                ContextraError::Storage("Block data missing payload after CRC".into())
+            })?;
             let computed_crc = crc32fast::hash(payload);
 
             if stored_crc != computed_crc {
@@ -771,20 +796,28 @@ impl SstableReader {
         };
 
         // Rewind start_idx to the earliest block whose last_key >= key (handles multi-block key spans)
-        while start_idx > 0 && self.index[start_idx - 1].0.as_ref() >= key {
-            start_idx -= 1;
+        while start_idx > 0 {
+            if let Some(prev) = self.index.get(start_idx - 1) {
+                if prev.0.as_ref() >= key {
+                    start_idx -= 1;
+                    continue;
+                }
+            }
+            break;
         }
 
         let max_seq_raw = max_seq & !contextra_types::TOMBSTONE_BIT;
         let is_v3 = self.format_version >= 3;
 
         for idx in start_idx..self.index.len() {
-            let (block_last_key, offset) = &self.index[idx];
-            let next_offset = if idx + 1 < self.index.len() {
-                self.index[idx + 1].1
-            } else {
-                self.index_offset
+            let Some((block_last_key, offset)) = self.index.get(idx) else {
+                continue;
             };
+            let next_offset = self
+                .index
+                .get(idx + 1)
+                .map(|e| e.1)
+                .unwrap_or(self.index_offset);
 
             let block_data = self.get_block(*offset, next_offset).await?;
 

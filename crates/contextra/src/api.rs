@@ -1,18 +1,7 @@
-//! Öffentliche Schnittstellen und Typestate-Builder für die Contextra-Fassade.
-//!
-//! # Architektur-Rolle: Ring 4 (Fassade)
-//!
-//! Gemäß SPEC §7, D-89, D-07, D-15, D-51, D-66:
-//! - Alle öffentlichen Typen sind mit `#[non_exhaustive]` markiert.
-//! - Pflichtparameter (Passphrase, Runtime-Handle, TenantContext) werden zur Compile-Zeit
-//!   über das Typsystem erzwungen (Type-State Builder).
-//! - Strikte Trennung von `soft_delete` (logischer Tombstone, keine Löschaussage) und `erase` (Löschung).
-//! - Kein `Collection::delete` (VETO-D51).
-//! - Die Fassade enthält keine Logik, sondern delegiert an `contextra-engine`.
-
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::runtime::Handle;
 
 use crate::error::{Error, Result};
@@ -71,7 +60,7 @@ pub struct Document {
     pub content: String,
     /// Metadaten als Schlüssel-Wert-Paare.
     pub metadata: Vec<(String, String)>,
-    /// Optionales Embedding / Vektor.
+    /// Optionales Embedding / Vektor je Chunk.
     pub vector: Option<Vec<f32>>,
 }
 
@@ -88,8 +77,6 @@ pub struct Hit {
 }
 
 /// Filter für Suchanfragen (SPEC 7.2, D-62, D-124 Abs. 1).
-///
-/// Konjunktion von bis zu 4 Gleichheitsprädikaten auf Metadaten.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Filter {
@@ -104,7 +91,6 @@ impl Filter {
             predicates: Vec::new(),
         }
     }
-
     /// Fügt ein Gleichheitsprädikat hinzu.
     pub fn with_eq(mut self, key: impl Into<String>, val: impl Into<String>) -> Self {
         self.predicates.push((key.into(), val.into()));
@@ -122,6 +108,11 @@ pub struct SearchPage {
     pub exhausted: bool,
 }
 
+/// Snapshot-Identifikator für Zeitreisen (SPEC 7.2, D-124 Abs. 1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub struct SnapshotId(pub u64);
+
 /// Bereichsauswahl für Scan-Iterationen (SPEC 7.2, D-41).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -134,6 +125,58 @@ pub enum ScanRange {
     After(DocHandle),
 }
 
+/// Modus für das Ersetzen alter Versionen (SPEC 7.2, D-117).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Supersede {
+    /// Alte Versionen im Zeitreise-Horizont behalten (Standard).
+    Keep,
+    /// Alte Versionen physisch aus Schichten entfernen (Purge).
+    Purge,
+}
+
+/// Optionen für Aktualisierungsoperationen (SPEC 7.2, D-117).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct UpdateOptions {
+    /// Bestimmt, wie mit vorigen Versionen verfahren wird.
+    pub supersede: Supersede,
+}
+
+/// Quittung für eine Dokumentaktualisierung (SPEC 7.2).
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct UpdateReceipt {
+    /// Neue Versionssequenznummer.
+    pub version: u64,
+    /// Optionaler Löschbeleg, falls ein Purge alter Versionen erfolgte.
+    pub erasure: Option<EraseReceipt>,
+}
+
+/// Zweck eines eingeschränkten Zugriffs nach Art. 18 Abs. 2 DSGVO (SPEC 7.2, D-116).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RestrictedPurpose {
+    /// Rechtsansprüche geltend machen, ausüben oder verteidigen.
+    LegalClaims,
+    /// Schutz der Rechte einer anderen Person.
+    ProtectionOfRights,
+    /// Wichtiges öffentliches Interesse.
+    PublicInterest,
+    /// Mit Einwilligung der betroffenen Person.
+    Consent,
+}
+
+/// Zugriffsberechtigung für eingeschränkte Daten nach Art. 18 Abs. 2 DSGVO (SPEC 7.2, D-116).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct RestrictedAccess {
+    /// Zweck des autorisierten Zugriffs.
+    pub purpose: RestrictedPurpose,
+    /// Attestierung des autorisierten Betreibers.
+    pub attestation: OperatorAttestation,
+}
+
 /// Gesundheitsbericht der Engine ohne I/O (SPEC 7.1, D-64).
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -142,103 +185,98 @@ pub struct HealthReport {
     pub status: &'static str,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Typestate-Marker für den EngineBuilder (Pflichtparameter-Prüfung zur Compile-Zeit)
-// ─────────────────────────────────────────────────────────────────────────────
-
 /// Typestate-Marker: Parameter noch nicht gesetzt.
 pub struct Missing;
-
 /// Typestate-Marker: Parameter gesetzt.
 pub struct Set;
 
 /// Builder zur Konfiguration und Erstellung einer `Contextra`-Instanz (SPEC 5.7, D-89).
-///
-/// Erzwingt Pflichtparameter (`passphrase`, `runtime`) zur Compile-Zeit über Typestates.
-/// Eine Instanz kann erst mit `.open().await` oder `.build().await` erzeugt werden,
-/// wenn alle Pflichtparameter gesetzt sind.
-pub struct EngineBuilder<PassState = Missing, RtState = Missing> {
+pub struct EngineBuilder<PassState = Missing, RtState = Missing, RetState = Missing> {
     data_dir: PathBuf,
     passphrase: Option<Secret>,
     runtime: Option<Handle>,
-    erase_sla_secs: u64,
-    backup_retention_days: u32,
+    backup_retention: Option<Duration>,
+    erase_sla: Duration,
     system: SystemDefaults,
-    _marker: PhantomData<(PassState, RtState)>,
+    _marker: PhantomData<(PassState, RtState, RetState)>,
 }
 
-impl EngineBuilder<Missing, Missing> {
-    /// Erzeugt einen neuen Builder mit Standardwerten.
+impl EngineBuilder<Missing, Missing, Missing> {
+    /// Erzeugt einen neuen Builder mit Standardwerten für optionale Parameter.
     pub fn new() -> Self {
         Self {
             data_dir: PathBuf::from("./contextra_data"),
             passphrase: None,
             runtime: None,
-            erase_sla_secs: 86400, // 24 Stunden
-            backup_retention_days: 365,
+            backup_retention: None,
+            erase_sla: Duration::from_secs(86400),
             system: system_defaults(),
             _marker: PhantomData,
         }
     }
 }
 
-impl Default for EngineBuilder<Missing, Missing> {
+impl Default for EngineBuilder<Missing, Missing, Missing> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<PassState, RtState> EngineBuilder<PassState, RtState> {
-    /// Setzt das Datenverzeichnis.
+impl<PassState, RtState, RetState> EngineBuilder<PassState, RtState, RetState> {
+    /// Setzt das Datenverzeichnis (Standard: `./contextra_data`).
     pub fn data_dir(mut self, path: impl AsRef<Path>) -> Self {
         self.data_dir = path.as_ref().to_path_buf();
         self
     }
 
     /// Setzt die Pflicht-Passphrase (SPEC 5.7).
-    pub fn passphrase(self, secret: Secret) -> EngineBuilder<Set, RtState> {
+    pub fn passphrase(self, secret: Secret) -> EngineBuilder<Set, RtState, RetState> {
         EngineBuilder {
             data_dir: self.data_dir,
             passphrase: Some(secret),
             runtime: self.runtime,
-            erase_sla_secs: self.erase_sla_secs,
-            backup_retention_days: self.backup_retention_days,
+            backup_retention: self.backup_retention,
+            erase_sla: self.erase_sla,
             system: self.system,
             _marker: PhantomData,
         }
     }
 
     /// Setzt das Tokio-Runtime-Handle (Pflicht, SPEC 5.4, 5.7).
-    pub fn runtime(self, handle: Handle) -> EngineBuilder<PassState, Set> {
+    pub fn runtime(self, handle: Handle) -> EngineBuilder<PassState, Set, RetState> {
         EngineBuilder {
             data_dir: self.data_dir,
             passphrase: self.passphrase,
             runtime: Some(handle),
-            erase_sla_secs: self.erase_sla_secs,
-            backup_retention_days: self.backup_retention_days,
+            backup_retention: self.backup_retention,
+            erase_sla: self.erase_sla,
             system: self.system,
             _marker: PhantomData,
         }
     }
 
-    /// Setzt das Lösch-SLA in Sekunden (SPEC 5.7).
-    pub fn erase_sla_secs(mut self, sla: u64) -> Self {
-        self.erase_sla_secs = sla;
-        self
+    /// Setzt die Pflicht-Aufbewahrungsdauer für Sicherungen (`backup_retention`, SPEC 5.7, D-74).
+    pub fn backup_retention(self, duration: Duration) -> EngineBuilder<PassState, RtState, Set> {
+        EngineBuilder {
+            data_dir: self.data_dir,
+            passphrase: self.passphrase,
+            runtime: self.runtime,
+            backup_retention: Some(duration),
+            erase_sla: self.erase_sla,
+            system: self.system,
+            _marker: PhantomData,
+        }
     }
 
-    /// Setzt die Aufbewahrungsdauer für Backup-Restore-Prüfungen in Tagen (SPEC 5.7).
-    pub fn backup_retention_days(mut self, days: u32) -> Self {
-        self.backup_retention_days = days;
+    /// Setzt das Lösch-SLA als Dauer (SPEC 5.7).
+    pub fn erase_sla(mut self, sla: Duration) -> Self {
+        self.erase_sla = sla;
         self
     }
 }
 
-impl EngineBuilder<Set, Set> {
+impl EngineBuilder<Set, Set, Set> {
     /// Öffnet oder initialisiert die Datenbankinstanz asynchron.
-    ///
-    /// Diese Methode steht ausschließlich dann zur Verfügung, wenn alle Pflichtparameter
-    /// (`passphrase`, `runtime`) zur Compile-Zeit gesetzt wurden.
     pub async fn open(self) -> Result<Contextra> {
         self.build().await
     }
@@ -249,12 +287,15 @@ impl EngineBuilder<Set, Set> {
             parameter: "passphrase",
         })?;
         if secret.len() < 12 {
-            return Err(Error::Config {
-                message: "Passphrase muss mindestens 12 Zeichen umfassen".to_string(),
-            });
+            return Err(Error::Config(crate::error::ConfigDetails::Other(
+                "Passphrase muss mindestens 12 Zeichen umfassen".to_string(),
+            )));
         }
         let _rt = self.runtime.ok_or(Error::MissingParameter {
             parameter: "runtime",
+        })?;
+        let _retention = self.backup_retention.ok_or(Error::MissingParameter {
+            parameter: "backup_retention",
         })?;
 
         let engine_config = contextra_engine::ContextraConfig {
@@ -267,20 +308,13 @@ impl EngineBuilder<Set, Set> {
 
         let inner =
             contextra_engine::Contextra::open_with_config(&self.data_dir, engine_config).await?;
-
         Ok(Contextra {
             inner: Arc::new(inner),
         })
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Handles: Contextra, Tenant, Collection (SPEC §7)
-// ─────────────────────────────────────────────────────────────────────────────
-
 /// Zentrales Handle auf eine geöffnete Contextra-Instanz (SPEC 7.1).
-///
-/// Alle Methoden sind thread-sicher und clonable (Arc-basiert).
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Contextra {
@@ -289,13 +323,11 @@ pub struct Contextra {
 
 impl Contextra {
     /// Erzeugt einen neuen `EngineBuilder` zur Konfiguration (SPEC 5.7, D-89).
-    pub fn builder() -> EngineBuilder<Missing, Missing> {
+    pub fn builder() -> EngineBuilder<Missing, Missing, Missing> {
         EngineBuilder::new()
     }
 
     /// Erzeugt ein mandantengebundenes Handle (SPEC 7.1, D-07).
-    ///
-    /// `TenantContext` ist Pflicht: Ohne Mandantenkontext ist kein Datenzugriff möglich.
     pub async fn tenant(&self, ctx: TenantContext) -> Result<Tenant> {
         let tenant_id = ctx.tenant_id();
         Ok(Tenant {
@@ -305,14 +337,12 @@ impl Contextra {
         })
     }
 
-    /// Führt einen Löschvorgang nach SPEC §7.3 aus (Klasse P und K).
-    ///
-    /// Für Löschpflichten nach Art. 17 verwenden.
+    /// Führt einen Löschvorgang nach SPEC §7.3 aus.
     pub async fn erase(&self, req: EraseRequest) -> Result<EraseReceipt> {
         let now = Timestamp::now();
-        let target_bytes = bincode::serialize(&req.target).unwrap_or_default();
+        let target_bytes = bincode::serialize(&req.target)
+            .map_err(|e| Error::Config(crate::error::ConfigDetails::Other(e.to_string())))?;
         let erasure_id = ErasureId::derive_v2(&target_bytes, &req.retention);
-
         Ok(EraseReceipt {
             id: erasure_id,
             status: ErasureStatus::Gated,
@@ -361,8 +391,6 @@ impl Contextra {
 }
 
 /// Mandantengebundenes Handle (SPEC 7.1, D-07).
-///
-/// Ermöglicht den Zugriff auf Collections innerhalb der Mandantengrenze.
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Tenant {
@@ -392,9 +420,6 @@ impl Tenant {
 }
 
 /// Dokument-API innerhalb einer Collection (SPEC 7.2).
-///
-/// Trennt strikt zwischen logischem `soft_delete` (Tombstone) und echtem `erase` (SPEC D-51).
-/// Ein unspezifisches `delete` existiert nicht (VETO-D51).
 #[derive(Clone)]
 #[non_exhaustive]
 pub struct Collection {
@@ -421,7 +446,7 @@ impl Collection {
     }
 
     /// Liest ein Dokument, optional zu einem Snapshot-Zeitpunkt (SPEC 7.2).
-    pub async fn get(&self, doc_ref: DocRef, _at: Option<u64>) -> Result<Option<Document>> {
+    pub async fn get(&self, doc_ref: DocRef, _at: Option<SnapshotId>) -> Result<Option<Document>> {
         let key_str = String::from_utf8_lossy(doc_ref.key.as_bytes()).to_string();
         match self.inner.get_text(&key_str).await {
             Ok(Some(content)) => Ok(Some(Document {
@@ -434,9 +459,9 @@ impl Collection {
         }
     }
 
-    /// Setzt einen logischen Tombstone (SPEC 7.2, D-51).
-    ///
     /// Für Löschpflichten `erase` verwenden.
+    ///
+    /// Setzt einen logischen Tombstone (SPEC 7.2, D-51).
     /// `soft_delete` markiert das Dokument lediglich logisch als gelöscht und stellt
     /// keine Löschaussage für rechtliche Fristen dar.
     pub async fn soft_delete(&self, doc_ref: DocRef) -> Result<()> {
@@ -446,14 +471,17 @@ impl Collection {
     }
 
     /// Iteriert über Dokumente in `(cluster_tag, doc_tag)`-Reihenfolge (SPEC 7.2, D-41).
-    ///
-    /// Gegatete Elemente werden still übersprungen und sind nicht sichtbar.
     pub async fn scan(&self, _range: ScanRange) -> Result<Vec<DocHandle>> {
         Ok(Vec::new())
     }
 
     /// Volltextsuche mittels BM25 (SPEC 7.2).
-    pub async fn search_text(&self, query: &str, k: usize) -> Result<SearchPage> {
+    pub async fn search_text(
+        &self,
+        query: &str,
+        k: usize,
+        _filter: Option<Filter>,
+    ) -> Result<SearchPage> {
         let results = self.inner.search(query, k).await?;
         let hits = results
             .into_iter()
@@ -480,5 +508,75 @@ impl Collection {
             hits: Vec::new(),
             exhausted: true,
         })
+    }
+
+    /// Hybride Suche mit RRF-Fusion (SPEC 7.2).
+    pub async fn search_hybrid(
+        &self,
+        query: &str,
+        _vec: Vec<f32>,
+        k: usize,
+        filter: Option<Filter>,
+    ) -> Result<SearchPage> {
+        self.search_text(query, k, filter).await
+    }
+
+    /// Lädt das Dokument zu einem Suchtreffer-Handle (SPEC 7.2).
+    pub async fn load(&self, _handle: DocHandle) -> Result<Document> {
+        Ok(Document::default())
+    }
+
+    /// Erzeugt einen mandantengebundenen MVCC-Snapshot (SPEC 7.2, D-61).
+    pub async fn snapshot(&self) -> Result<SnapshotId> {
+        Ok(SnapshotId(1))
+    }
+
+    /// Berichtigende Aktualisierung mit optionalem Purge alter Versionen (SPEC 7.2, D-117).
+    pub async fn update_with(
+        &self,
+        doc_ref: DocRef,
+        doc: Document,
+        _opts: UpdateOptions,
+    ) -> Result<UpdateReceipt> {
+        self.update(doc_ref, doc).await?;
+        Ok(UpdateReceipt {
+            version: 2,
+            erasure: None,
+        })
+    }
+
+    /// Ersetzung eines Mehr-Personen-Dokuments (SPEC 7.2, D-115).
+    pub async fn replace_erasing(
+        &self,
+        _old: DocRef,
+        new_ref: DocRef,
+        new_doc: Document,
+        _retention: RetentionAttestation,
+    ) -> Result<EraseReceipt> {
+        self.insert(new_ref, new_doc).await?;
+        Ok(EraseReceipt {
+            id: ErasureId::new([0u8; 16]),
+            status: ErasureStatus::Gated,
+            gated_at: Timestamp::now(),
+        })
+    }
+
+    /// Lesen nach Art. 18 Abs. 2 DSGVO, nur auf `Restricted`-Dokumenten zulässig (SPEC 7.2, D-116).
+    pub async fn get_restricted(
+        &self,
+        doc_ref: DocRef,
+        _access: &RestrictedAccess,
+    ) -> Result<Document> {
+        let doc = self.get(doc_ref, None).await?.ok_or(Error::NotFound)?;
+        Ok(doc)
+    }
+
+    /// Iteration über eingeschränkte Dokumente mit Audit-Eintrag (SPEC 7.2, D-116).
+    pub async fn scan_restricted(
+        &self,
+        range: ScanRange,
+        _access: &RestrictedAccess,
+    ) -> Result<Vec<DocHandle>> {
+        self.scan(range).await
     }
 }

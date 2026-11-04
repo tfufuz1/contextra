@@ -638,3 +638,116 @@ async fn test_reference_model_vs_in_memory_store_equivalence() {
         }
     }
 }
+
+// ============================================================================
+// MOVED TESTS FROM IN_MEMORY_STORE AND REFERENCE_MODEL
+// ============================================================================
+
+/// SPEC: PO-02
+#[tokio::test]
+async fn test_in_memory_store_put_get_commit() -> std::result::Result<(), Box<dyn std::error::Error>>
+{
+    let store = InMemoryStorageEngine::new();
+    let tx = contextra_types::TxId::new(1);
+
+    assert!(store.get(b"key1").await?.is_none());
+
+    store.put(tx, b"key1", b"value1").await?;
+    assert!(store.get(b"key1").await?.is_none());
+
+    store.commit(tx).await?;
+    let val = store.get(b"key1").await?;
+    assert_eq!(val, Some(bytes::Bytes::from_static(b"value1")));
+    Ok(())
+}
+
+/// SPEC: PO-02
+#[tokio::test]
+async fn test_in_memory_store_rollback() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let store = InMemoryStorageEngine::new();
+    let tx = contextra_types::TxId::new(2);
+
+    store.put(tx, b"key_rb", b"val").await?;
+    store.rollback(tx).await?;
+    store.commit(tx).await?;
+
+    assert!(store.get(b"key_rb").await?.is_none());
+    Ok(())
+}
+
+/// SPEC: T-CRASH-1
+#[test]
+fn test_reference_model_mvcc_isolation() {
+    let mut model = contextra_testkit::ReferenceModel::new();
+
+    model.put(b"k1", b"v1_seq1");
+    model.put(b"k2", b"v2_seq1");
+    let seq1 = model.commit();
+
+    model.put(b"k1", b"v1_seq2");
+    model.delete(b"k2");
+    let seq2 = model.commit();
+
+    assert_eq!(model.get_at(b"k1", seq1), Some(b"v1_seq1".to_vec()));
+    assert_eq!(model.get_at(b"k2", seq1), Some(b"v2_seq1".to_vec()));
+
+    assert_eq!(model.get_at(b"k1", seq2), Some(b"v1_seq2".to_vec()));
+    assert_eq!(model.get_at(b"k2", seq2), None);
+
+    assert_eq!(model.get_at(b"k1", 0), None);
+
+    let p_seq1 = model.scan_prefix_at(b"k", seq1);
+    assert_eq!(
+        p_seq1,
+        vec![
+            (b"k1".to_vec(), b"v1_seq1".to_vec()),
+            (b"k2".to_vec(), b"v2_seq1".to_vec())
+        ]
+    );
+
+    let p_seq2 = model.scan_prefix_at(b"k", seq2);
+    assert_eq!(p_seq2, vec![(b"k1".to_vec(), b"v1_seq2".to_vec())]);
+}
+
+/// SPEC: T-CRASH-1
+#[test]
+fn test_reference_model_sentinel_and_tombstones() {
+    let mut model = contextra_testkit::ReferenceModel::new();
+    assert_eq!(model.min_read_snapshot(), None);
+
+    model.open_snapshot(10);
+    model.open_snapshot(20);
+    assert_eq!(model.min_read_snapshot(), Some(10));
+
+    model.close_snapshot(10);
+    assert_eq!(model.min_read_snapshot(), Some(20));
+
+    model.close_snapshot(20);
+    assert_eq!(model.min_read_snapshot(), None);
+}
+
+/// SPEC: T-CRASH-1
+#[test]
+fn test_reference_model_property_self_consistency() {
+    use std::collections::BTreeMap;
+    let mut model = contextra_testkit::ReferenceModel::new();
+    let mut shadow: BTreeMap<Vec<u8>, Option<Vec<u8>>> = BTreeMap::new();
+
+    for i in 0..50u8 {
+        let k = vec![i % 5];
+        if i % 3 == 0 {
+            model.put_tombstone(&k);
+            shadow.insert(k, None);
+        } else {
+            let v = vec![i];
+            model.put(&k, &v);
+            shadow.insert(k, Some(v));
+        }
+        let seq = model.commit();
+
+        for (sk, sv) in &shadow {
+            assert_eq!(model.get_at(sk, seq), sv.clone());
+            assert_eq!(model.is_tombstone_at(sk, seq), sv.is_none());
+        }
+    }
+}

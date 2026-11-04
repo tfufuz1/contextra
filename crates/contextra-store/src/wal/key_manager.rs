@@ -104,7 +104,10 @@ impl KeyManager {
         let mut sub_key = [0u8; 32];
         let mut info = Vec::with_capacity(b"contextra-file-key-v1:".len() + 4 + file_id.len());
         info.extend_from_slice(b"contextra-file-key-v1:");
-        info.extend_from_slice(&(file_id.len() as u32).to_le_bytes());
+        let file_id_len = u32::try_from(file_id.len()).map_err(|_| {
+            ContextraError::InvalidInput("file_id exceeds u32::MAX bytes".to_string())
+        })?;
+        info.extend_from_slice(&file_id_len.to_le_bytes());
         info.extend_from_slice(file_id);
 
         hk.expand(&info, &mut sub_key)

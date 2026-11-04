@@ -61,8 +61,6 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 
 
 [dev-dependencies]
-contextra-testmacros = { workspace = true }
-contextra-store = { path = ".", features = ["test-hooks"] }
 contextra-testkit = { workspace = true }
 libc = "0.2"
 serde_json = { workspace = true }
