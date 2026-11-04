@@ -19,12 +19,12 @@ fn arb_doc_handle() -> impl Strategy<Value = DocHandle> {
 }
 
 fn arb_candidate_list(max_len: usize) -> impl Strategy<Value = Vec<Candidate>> {
-    prop::collection::vec(arb_doc_handle(), 0..=max_len).prop_map(|handles| {
+    prop::collection::vec((arb_doc_handle(), 0u32..5), 0..=max_len).prop_map(|entries| {
         let mut seen = BTreeSet::new();
         let mut list = Vec::new();
-        for h in handles {
-            if seen.insert(h) {
-                list.push(Candidate { handle: h });
+        for (h, chunk) in entries {
+            if seen.insert((h, chunk)) {
+                list.push(Candidate { handle: h, chunk });
             }
         }
         list
@@ -61,11 +61,12 @@ proptest! {
     fn prop_rrf_duplicate_rejection(
         list in arb_candidate_list(20),
         dup_handle in arb_doc_handle(),
+        dup_chunk in 0u32..5,
     ) {
-        // Liste mit mindestens einem Duplikat erstellen
+        // Liste mit mindestens einem Duplikat (gleicher handle und gleicher chunk) erstellen
         let mut dup_list = list;
-        dup_list.push(Candidate { handle: dup_handle });
-        dup_list.push(Candidate { handle: dup_handle });
+        dup_list.push(Candidate { handle: dup_handle, chunk: dup_chunk });
+        dup_list.push(Candidate { handle: dup_handle, chunk: dup_chunk });
 
         let res = rrf_fuse(&[&dup_list], 10);
         prop_assert_eq!(res, Err(RankError::Duplicate));
@@ -93,16 +94,16 @@ proptest! {
     #[test]
     fn prop_rrf_asymmetric_and_empty_lists(
         full_list in arb_candidate_list(40),
-        disjoint_handles in prop::collection::vec(arb_doc_handle(), 1..=20),
+        disjoint_entries in prop::collection::vec((arb_doc_handle(), 0u32..5), 1..=20),
         top in 1usize..100
     ) {
         let empty_list: [Candidate; 0] = [];
         // Erzeuge disjunkte zweite Liste
-        let full_set: BTreeSet<DocHandle> = full_list.iter().map(|c| c.handle).collect();
-        let disjoint_list: Vec<Candidate> = disjoint_handles
+        let full_set: BTreeSet<(DocHandle, u32)> = full_list.iter().map(|c| (c.handle, c.chunk)).collect();
+        let disjoint_list: Vec<Candidate> = disjoint_entries
             .into_iter()
-            .filter(|h| !full_set.contains(h))
-            .map(|h| Candidate { handle: h })
+            .filter(|entry| !full_set.contains(entry))
+            .map(|(handle, chunk)| Candidate { handle, chunk })
             .collect();
 
         // Fall 1: Eine volle Liste, eine leere Liste
@@ -116,38 +117,39 @@ proptest! {
     }
 
     /// SPEC: T-RANK-1 (Cross-List Duplikate / Schnittmengen)
-    /// Ein Dokument, das in mehreren Teillisten vorkommt, erhält die Summe der
+    /// Ein Dokument mit Chunk, das in mehreren Teillisten vorkommt, erhält die Summe der
     /// Einzel-RRF-Beiträge und erscheint genau einmal im fusionierten Ranking.
     #[test]
     fn prop_rrf_cross_list_intersection_score_sum(
         shared_handle in arb_doc_handle(),
+        shared_chunk in 0u32..5,
         l1_extra in arb_candidate_list(15),
         l2_extra in arb_candidate_list(15),
     ) {
-        // Baue Liste 1 mit shared_handle an Kopf
-        let mut l1 = vec![Candidate { handle: shared_handle }];
+        // Baue Liste 1 mit shared_handle/chunk an Kopf
+        let mut l1 = vec![Candidate { handle: shared_handle, chunk: shared_chunk }];
         for c in l1_extra {
-            if c.handle != shared_handle {
+            if (c.handle, c.chunk) != (shared_handle, shared_chunk) {
                 l1.push(c);
             }
         }
 
-        // Baue Liste 2 mit shared_handle an Position 2 (nach einem anderen Kandidaten, falls vorhanden)
+        // Baue Liste 2 mit shared_handle/chunk an Position 2 (nach einem anderen Kandidaten, falls vorhanden)
         let mut l2 = Vec::new();
-        let other_cand = l2_extra.iter().find(|c| c.handle != shared_handle).copied();
+        let other_cand = l2_extra.iter().find(|c| (c.handle, c.chunk) != (shared_handle, shared_chunk)).copied();
         if let Some(other) = other_cand {
             l2.push(other);
         }
-        l2.push(Candidate { handle: shared_handle });
+        l2.push(Candidate { handle: shared_handle, chunk: shared_chunk });
         for c in l2_extra {
-            if c.handle != shared_handle && Some(c) != other_cand {
+            if (c.handle, c.chunk) != (shared_handle, shared_chunk) && Some(c) != other_cand {
                 l2.push(c);
             }
         }
 
         let res = rrf_fuse(&[&l1, &l2], 50).unwrap();
-        let matches: Vec<_> = res.iter().filter(|f| f.handle == shared_handle).collect();
-        prop_assert_eq!(matches.len(), 1, "Shared document must appear exactly once");
+        let matches: Vec<_> = res.iter().filter(|f| f.handle == shared_handle && f.chunk == shared_chunk).collect();
+        prop_assert_eq!(matches.len(), 1, "Shared candidate must appear exactly once");
 
         // Berechne erwarteten kumulierten Score
         let rank_in_l1 = 1u64;
@@ -158,7 +160,7 @@ proptest! {
     }
 
     /// SPEC: T-HYB-1 (unseen_bound Property)
-    /// Für jedes Dokument, das in allen Listen erst nach depths[i] auftritt,
+    /// Für jeden Treffer (handle, chunk), der in allen Listen erst nach depths[i] auftritt,
     /// darf der tatsächliche Score die unseen_bound nicht überschreiten.
     #[test]
     fn prop_rrf_unseen_bound(
@@ -169,17 +171,17 @@ proptest! {
     ) {
         // Build full list = prefix + suffix (ensuring no internal duplicates)
         let mut full1 = prefix1.clone();
-        let mut set1: BTreeSet<DocHandle> = prefix1.iter().map(|c| c.handle).collect();
+        let mut set1: BTreeSet<(DocHandle, u32)> = prefix1.iter().map(|c| (c.handle, c.chunk)).collect();
         for c in suffix1 {
-            if set1.insert(c.handle) {
+            if set1.insert((c.handle, c.chunk)) {
                 full1.push(c);
             }
         }
 
         let mut full2 = prefix2.clone();
-        let mut set2: BTreeSet<DocHandle> = prefix2.iter().map(|c| c.handle).collect();
+        let mut set2: BTreeSet<(DocHandle, u32)> = prefix2.iter().map(|c| (c.handle, c.chunk)).collect();
         for c in suffix2 {
-            if set2.insert(c.handle) {
+            if set2.insert((c.handle, c.chunk)) {
                 full2.push(c);
             }
         }
@@ -191,8 +193,8 @@ proptest! {
 
         // Any candidate that was NOT in prefix1 and NOT in prefix2 must have score <= bound
         for item in full_res {
-            let in_p1 = prefix1.iter().any(|c| c.handle == item.handle);
-            let in_p2 = prefix2.iter().any(|c| c.handle == item.handle);
+            let in_p1 = prefix1.iter().any(|c| c.handle == item.handle && c.chunk == item.chunk);
+            let in_p2 = prefix2.iter().any(|c| c.handle == item.handle && c.chunk == item.chunk);
             if !in_p1 && !in_p2 {
                 prop_assert!(
                     item.score <= bound,
