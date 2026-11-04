@@ -39,7 +39,10 @@ mod tests {
         let mut probe = RestoreProbe::new();
         let key = b"test_key";
         let digest = blake3::hash(key);
-        assert!(probe.probe_key_consistency(key, digest.as_bytes()).unwrap());
+        assert!(matches!(
+            probe.probe_key_consistency(key, digest.as_bytes()),
+            Ok(true)
+        ));
         assert_eq!(probe.probed_count(), 1);
     }
 }

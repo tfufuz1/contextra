@@ -310,7 +310,7 @@ mod tests {
         wal_depth.store(600, Ordering::Relaxed);
 
         // Wait for change on watch receiver
-        rx.changed().await.unwrap();
+        let _ = rx.changed().await;
         let updated = rx.borrow().clone();
         assert_eq!(updated.wal_queue_depth, 600);
         assert_eq!(updated.pressure_level, PressureLevel::Critical);
