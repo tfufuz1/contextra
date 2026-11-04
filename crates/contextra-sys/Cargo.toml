@@ -13,12 +13,6 @@ ring = "1"
 libc = "0.2"
 tracing = { workspace = true }
 
-[dev-dependencies]
-proptest = "1.4"
-criterion = { version = "0.5", features = ["async_tokio"] }
-tempfile = "3"
-trybuild = "1.0"
-
 [lints.clippy]
 undocumented_unsafe_blocks = "deny"
 missing_safety_doc = "deny"

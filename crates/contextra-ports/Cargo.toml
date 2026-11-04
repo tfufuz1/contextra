@@ -25,7 +25,3 @@ serde_json = { workspace = true }
 ahash = { workspace = true }
 thiserror = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
-
-[dev-dependencies]
-proptest = "1.4"
-tokio = { workspace = true, features = ["rt", "macros"] }

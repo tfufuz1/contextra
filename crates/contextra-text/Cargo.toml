@@ -32,8 +32,3 @@ futures = "0.3"
 
 [features]
 default = []
-
-[dev-dependencies]
-tokio = { workspace = true, features = ["test-util", "macros"] }
-tempfile = { workspace = true }
-proptest = "1.4"
