@@ -25,7 +25,10 @@ impl<'a> TagPreimage<'a> {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         for p in &self.parts {
-            let len = u32::try_from(p.len()).unwrap_or(u32::MAX);
+            let len = match u32::try_from(p.len()) {
+                Ok(l) => l,
+                Err(_) => continue,
+            };
             out.extend_from_slice(&len.to_be_bytes());
             out.extend_from_slice(p);
         }

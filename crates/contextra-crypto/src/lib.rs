@@ -58,5 +58,5 @@ pub use labels::{
     VAULT_MAC, WAL,
 };
 pub use secret::{Secret, SecretKey};
-pub use sign::{sign_report, verify_report};
+pub use sign::{sign_report, verify_report, DerivedReportSigner};
 pub use tag::{tag, TagPreimage};
