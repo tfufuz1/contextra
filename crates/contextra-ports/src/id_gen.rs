@@ -56,6 +56,7 @@ mod tests {
 
     fn _assert_dyn_id_gen(_: Option<&dyn IdGen>) {}
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_sequential_id_gen_monotonic() {
         let gen = SequentialIdGen::new(10);
@@ -64,6 +65,7 @@ mod tests {
         assert_eq!(gen.next_id(), 12);
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_sequential_id_gen_concurrent_no_duplicates() {
         let gen = Arc::new(SequentialIdGen::new(1));
@@ -91,6 +93,7 @@ mod tests {
         assert_eq!(all_ids.len(), 8000);
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_arc_dyn_id_gen() {
         let gen: Arc<dyn IdGen> = Arc::new(SequentialIdGen::new(100));
