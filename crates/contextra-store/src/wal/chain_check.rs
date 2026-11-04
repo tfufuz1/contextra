@@ -4,25 +4,22 @@
 //! und ob die berechnete HMAC-Kette mit dem erwarteten Endwert übereinstimmt (SPEC 10.4, P14, P6).
 
 use contextra_types::{ContextraError, Result};
-use subtle::ConstantTimeEq;
 
 /// Verifiziert, dass der WAL-Tail nicht abgeschnitten oder manipuliert wurde,
 /// indem der letzte berechnete WAL-HMAC mit der im Manifest erwarteten
 /// High-Water-Mark verglichen wird.
 ///
-/// Truncation, Lücken, vertauschte Reihenfolge und Fremdschlüssel führen
-/// zu einem typisierten Fehler (`ContextraError::WalTruncationDetected`).
+/// Delegiert an die kanonische Krypto-Implementierung `contextra_crypto::verify_wal_chain_completeness`.
 pub fn verify_wal_chain_completeness(
     wal_tail_hmac: &[u8; 32],
     manifest_high_water_mark: &[u8; 32],
 ) -> Result<()> {
-    if wal_tail_hmac.ct_eq(manifest_high_water_mark).into() {
-        Ok(())
-    } else {
-        Err(ContextraError::wal_truncation_detected(
+    match contextra_crypto::verify_wal_chain_completeness(manifest_high_water_mark, wal_tail_hmac) {
+        Ok(()) => Ok(()),
+        Err(_) => Err(ContextraError::wal_truncation_detected(
             *manifest_high_water_mark,
             *wal_tail_hmac,
-        ))
+        )),
     }
 }
 

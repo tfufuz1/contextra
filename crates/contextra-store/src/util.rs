@@ -12,7 +12,7 @@ use std::path::Path;
 #[cfg(not(loom))]
 use crate::lsm::config::DurabilityMode;
 #[cfg(not(loom))]
-use std::fs::{File, TryLockError};
+use std::{fs::File, fs::TryLockError};
 
 pub(crate) use crate::fsync::fsync_parent_dir;
 

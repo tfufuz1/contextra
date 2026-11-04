@@ -143,7 +143,7 @@ impl fmt::Debug for LedgerEntry {
         write!(
             f,
             "LedgerEntry {{ gated_seq: {:?}, completed_at: {:?}, chain_hash: {:02x?} }}",
-            self.gated_seq, self.completed_at, &self.chain_hash
+            self.gated_seq, self.completed_at, self.chain_hash
         )
     }
 }

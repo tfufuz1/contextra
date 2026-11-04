@@ -58,36 +58,36 @@ async fn check_parity(wal_path: &std::path::Path, km: Option<Arc<KeyManager>>) {
 
     match open_res {
         Ok(wal) => {
-            let mmap_res = wal.replay_mmap().await;
+            let buffer_res = wal.replay_buffer().await;
             let stream_res = wal.replay_stream().await;
 
-            match (mmap_res, stream_res) {
-                (Ok((mmap_entries, _mmap_ver)), Ok(stream_entries)) => {
+            match (buffer_res, stream_res) {
+                (Ok((buffer_entries, _buffer_ver)), Ok(stream_entries)) => {
                     assert_eq!(
-                        mmap_entries.len(),
+                        buffer_entries.len(),
                         stream_entries.len(),
                         "Entry count mismatch for {:?}",
                         wal_path
                     );
-                    for (m, s) in mmap_entries.iter().zip(stream_entries.iter()) {
+                    for (m, s) in buffer_entries.iter().zip(stream_entries.iter()) {
                         assert_eq!(m.0, s.0, "seq_no mismatch");
                         assert_eq!(m.1, s.1, "entry mismatch");
                         assert_eq!(m.2, s.2, "end_pos mismatch");
                     }
                 }
-                (Err(e_mmap), Err(e_stream)) => {
+                (Err(e_buffer), Err(e_stream)) => {
                     assert!(
-                        error_class_matches(&e_mmap, &e_stream),
-                        "Error class mismatch between mmap ({:?}) and stream ({:?}) for {:?}",
-                        e_mmap,
+                        error_class_matches(&e_buffer, &e_stream),
+                        "Error class mismatch between buffer ({:?}) and stream ({:?}) for {:?}",
+                        e_buffer,
                         e_stream,
                         wal_path
                     );
                 }
-                (mmap_res, stream_res) => {
+                (buffer_res, stream_res) => {
                     panic!(
-                        "Parity failure: mmap_res={:?}, stream_res={:?} for path {:?}",
-                        mmap_res, stream_res, wal_path
+                        "Parity failure: buffer_res={:?}, stream_res={:?} for path {:?}",
+                        buffer_res, stream_res, wal_path
                     );
                 }
             }

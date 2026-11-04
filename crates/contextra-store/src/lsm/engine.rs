@@ -25,13 +25,14 @@ use tokio::sync::RwLock;
 pub enum StorageHealth {
     Healthy,
     FlushFailing,
+    Poisoned,
 }
 
 /// LSM-Tree based storage engine.
 // ANCHOR[contextra-store:LSM-ENG-001]
 /// Primaere Schnittstelle fuer den LSM-Baum mit get, put, delete und scan.
 pub struct LsmStorage {
-    pub(super) config: LsmConfig,
+    pub config: LsmConfig,
     pub(super) key_manager: Option<Arc<KeyManager>>,
     pub(crate) state: RwLock<LsmState>,
     /// SSTables stored separately for shared access with compaction engine.
@@ -39,11 +40,11 @@ pub struct LsmStorage {
     pub(super) tx_buffer: TxBuffer<(Vec<u8>, Vec<u8>)>,
     pub(super) budget: Arc<ResourceTracker>,
     pub(super) block_cache: Arc<BlockCache>,
-    pub(crate) wal: RwLock<Arc<Wal>>,
+    pub wal: RwLock<Arc<Wal>>,
     pub snapshot_registry: Arc<SnapshotRegistry>,
     /// Persistent CompactionEngine instance — retains counter across maybe_compact() calls.
     /// Prevents SSTable name collisions from fresh-counter ad-hoc instantiation (audit H-3).
-    pub(super) compaction_engine: Arc<CompactionEngine>,
+    pub compaction_engine: Arc<CompactionEngine>,
     pub(super) manifest: Arc<crate::manifest::Manifest>,
     pub(super) next_seq_no: AtomicU64,
     pub(super) last_committed_tx: AtomicU64,
@@ -287,6 +288,22 @@ impl LsmStorage {
     }
 
     /// Returns the current storage health status.
+        /// Gibt an, ob der Speicher nach einem I/O- oder Fsync-Fehler vergiftet ist (D-55).
+    pub fn is_poisoned(&self) -> bool {
+        matches!(self.health(), StorageHealth::Poisoned)
+    }
+
+    /// Vergiftet den Speicher nach einem schwerwiegenden I/O- oder Fsync-Fehler dauerhaft (D-55).
+    pub fn poison(&self) {
+        *self.health.write() = StorageHealth::Poisoned;
+    }
+
+    /// Versiegelt das aktive WAL-Segment (ST-04).
+    pub async fn seal_wal_at(&self) -> Result<crate::purge::backend::SealPoint> {
+        use crate::purge::backend::PurgePrimitives;
+        PurgePrimitives::seal_wal_at(self).await
+    }
+
     pub fn health(&self) -> StorageHealth {
         *self.health.read()
     }

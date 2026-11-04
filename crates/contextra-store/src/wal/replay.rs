@@ -90,7 +90,7 @@ impl Wal {
         &self,
         sink: &S,
     ) -> Result<Vec<(u64, WalEntry, u64)>> {
-        let (entries, _) = self.replay_mmap_with_sink(sink).await?;
+        let (entries, _) = self.replay_buffer_with_sink(sink).await?;
         Ok(entries)
     }
 
@@ -125,15 +125,15 @@ impl Wal {
         &self,
         file_size: u64,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        self.replay_mmap_with_size_and_version(file_size).await
+        self.replay_buffer_with_size_and_version(file_size).await
     }
 
     #[allow(clippy::type_complexity)]
-    async fn replay_mmap_with_size_and_version(
+    async fn replay_buffer_with_size_and_version(
         &self,
         file_size: u64,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        match self.replay_mmap().await {
+        match self.replay_buffer().await {
             Ok(res) => Ok(res),
             Err(e) => {
                 tracing::warn!(
@@ -156,13 +156,13 @@ impl Wal {
     /// Replays the WAL.
     /// Returns all valid entries with sequence numbers, entries, end offsets, and detected WAL version.
     #[allow(clippy::type_complexity)]
-    pub async fn replay_mmap(&self) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        self.replay_mmap_with_sink(&NoopReplayProgressSink).await
+    pub async fn replay_buffer(&self) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
+        self.replay_buffer_with_sink(&NoopReplayProgressSink).await
     }
 
     /// Replays the WAL with progress callback.
     #[allow(clippy::type_complexity)]
-    pub async fn replay_mmap_with_sink<S: ReplayProgressSink>(
+    pub async fn replay_buffer_with_sink<S: ReplayProgressSink>(
         &self,
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
@@ -176,28 +176,28 @@ impl Wal {
             return Ok((Vec::new(), WalVersion::V1));
         }
 
-        self.parse_mmap_slice_with_sink(&buffer, file_size, sink)
+        self.parse_buffer_slice_with_sink(&buffer, file_size, sink)
     }
 
     #[allow(dead_code, clippy::type_complexity)]
-    pub(crate) fn parse_mmap_slice(
+    pub(crate) fn parse_buffer_slice(
         &self,
-        mmap: &[u8],
+        slice: &[u8],
         file_size: u64,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
-        self.parse_mmap_slice_with_sink(mmap, file_size, &NoopReplayProgressSink)
+        self.parse_buffer_slice_with_sink(slice, file_size, &NoopReplayProgressSink)
     }
 
     #[allow(clippy::type_complexity)]
-    pub(crate) fn parse_mmap_slice_with_sink<S: ReplayProgressSink>(
+    pub(crate) fn parse_buffer_slice_with_sink<S: ReplayProgressSink>(
         &self,
-        mmap: &[u8],
+        slice: &[u8],
         file_size: u64,
         sink: &S,
     ) -> Result<(Vec<(u64, WalEntry, u64)>, WalVersion)> {
         let file_size_usize = usize::try_from(file_size).unwrap_or(usize::MAX);
-        let slice_len = file_size_usize.min(mmap.len());
-        let slice = mmap
+        let slice_len = file_size_usize.min(slice.len());
+        let slice = slice
             .get(..slice_len)
             .ok_or_else(|| ContextraError::wal_corruption(0, "Slice bounds exceeded"))?;
         let mut entries = Vec::new();
@@ -213,7 +213,7 @@ impl Wal {
     ///
     /// If slice reading or scanning encounters any error, it logs a warning (`tracing::warn!`)
     /// and automatically falls back to stream-based scanning (`scan_entries_with_callback`).
-    pub async fn scan_entries_mmap<F>(&self, file_size: u64, mut callback: F) -> Result<WalVersion>
+    pub async fn scan_entries_buffer<F>(&self, file_size: u64, mut callback: F) -> Result<WalVersion>
     where
         F: FnMut(u64, WalEntry, u64) -> bool,
     {
@@ -254,7 +254,7 @@ impl Wal {
             Err(e) => {
                 tracing::warn!(
                     error = ?e,
-                    "scan_entries_mmap: HMAC/integrity verify error during scan, falling back to stream"
+                    "scan_entries_buffer: HMAC/integrity verify error during scan, falling back to stream"
                 );
                 self.scan_entries_with_callback(file_size, callback).await
             }
@@ -714,7 +714,7 @@ mod tests {
 
     /// T-ID: T-WAL-1
     #[tokio::test]
-    async fn test_replay_mmap_and_scan_entries_match_replay() -> Result<()> {
+    async fn test_replay_buffer_and_scan_entries_match_replay() -> Result<()> {
         let dir = tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
         let wal_path = dir.path().join("test_replay_paths.wal");
 
@@ -737,14 +737,14 @@ mod tests {
 
         let wal_read = Wal::open_read_only(&wal_path, None).await?;
         let entries_replay = wal_read.replay().await?;
-        let (entries_mmap, _ver_mmap) = wal_read.replay_mmap().await?;
+        let (entries_buf, _ver_buf) = wal_read.replay_buffer().await?;
 
         assert_eq!(entries_replay.len(), 2);
-        assert_eq!(entries_replay.len(), entries_mmap.len());
-        assert_eq!(entries_replay[0].0, entries_mmap[0].0);
-        assert_eq!(entries_replay[1].0, entries_mmap[1].0);
-        assert_eq!(entries_replay[0].1.seq_no, entries_mmap[0].1.seq_no);
-        assert_eq!(entries_replay[1].1.seq_no, entries_mmap[1].1.seq_no);
+        assert_eq!(entries_replay.len(), entries_buf.len());
+        assert_eq!(entries_replay[0].0, entries_buf[0].0);
+        assert_eq!(entries_replay[1].0, entries_buf[1].0);
+        assert_eq!(entries_replay[0].1.seq_no, entries_buf[0].1.seq_no);
+        assert_eq!(entries_replay[1].1.seq_no, entries_buf[1].1.seq_no);
 
         let mut scanned_entries = Vec::new();
         let file_size = crate::wal::fs::metadata(&wal_path)
@@ -752,7 +752,7 @@ mod tests {
             .map_err(|e| ContextraError::Storage(e.to_string()))?
             .len();
         let ver_scan = wal_read
-            .scan_entries_mmap(file_size, |seq, entry, pos| {
+            .scan_entries_buffer(file_size, |seq, entry, pos| {
                 scanned_entries.push((seq, entry, pos));
                 true
             })
@@ -769,7 +769,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_empty_file_replay_mmap_yields_empty_v1() -> Result<()> {
+    async fn test_empty_file_replay_buffer_yields_empty_v1() -> Result<()> {
         let dir = tempdir().map_err(|e| ContextraError::Storage(e.to_string()))?;
         let wal_path = dir.path().join("empty.wal");
         tokio::fs::File::create(&wal_path)
@@ -777,7 +777,7 @@ mod tests {
             .map_err(|e| ContextraError::Storage(e.to_string()))?;
 
         let wal = Wal::open_read_only(&wal_path, None).await?;
-        let (entries, version) = wal.replay_mmap().await?;
+        let (entries, version) = wal.replay_buffer().await?;
 
         assert!(entries.is_empty());
         assert_eq!(version, WalVersion::V1);

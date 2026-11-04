@@ -1,31 +1,14 @@
-//! # contextra-store (Ring 1)
+//! # contextra-store (Ring 2)
 //!
-//! Die Crate `contextra-store` implementiert das persistente LSM-Tree-Speichertriebwerk
-//! (Log-Structured Merge-tree) fuer die Contextra-Plattform. Sie stellt die primaere
-//! Datenspeicherebene bereit und garantiert atomare Schreibvorgaenge, Konsistenz
-//! ueber Snapshots sowie Ausfallsicherheit durch Write-Ahead-Logging (WAL).
+//! Zweck: LSM-Speicher: WAL, Memtable, SSTables, Manifest, Kompaktion, Purge-Primitive.
 //!
-//! ## Architektur & Datenpfad
-//! - **Client / Engine:** Sendet atomare Schreiboperationen (Put, Delete) ueber Transaktionspuffer.
-//! - **WAL (Write-Ahead-Log):** Persistiert alle Mutationen sequentiell auf Festplatte inklusive
-//!   CRC32- und HMAC-Integritaetspruefung, bevor sie im RAM bestaetigt werden.
-//! - **MemTable:** Haltebereich im Arbeitsspeicher (SkipList / Sharded BTreeMap), der schnelle
-//!   Suchen und Einfuegungen bei geordneten Sequenznummern ermoeglicht.
-//! - **Flush & SSTable:** Bei Erreichen von Groessenschwellen wird die aktive MemTable eingefroren
-//!   und asynchron als unveraenderliche SSTable (Sorted String Table) auf Platte geschrieben.
-//! - **Compaction:** Hintergrundprozess, der SSTables hierarchisch (Leveled / Tiered) zusammenfuehrt,
-//!   Tombstones bereinigt und Lese- sowie Speicherverstaerkung minimiert.
+//! Ring: Ring 2.
+//! Erlaubte Abhängigkeiten: `contextra-types`, `contextra-ports`, `contextra-sys`, `contextra-crypto`, `contextra-mvcc`.
+//! Referenz: SPEC Abschnitt 5.1, 5.3, 8.8.
 //!
 //! ## Sicherheitsinvariante
 //! Die gesamte Crate erzwingt `#![forbid(unsafe_code)]` in Produktion. Es existieren keinerlei
 //! `unsafe`-Bloecke im Produktionscode.
-//!
-//! ## Ring-Hierarchie & Abhaengigkeiten
-//! - **Ring 1:** Kernkomponente des Speichersystems.
-//! - **Eingehende Abhaengigkeiten:** Wird genutzt von `contextra-engine` und der uebergeordneten
-//!   Facade `contextra` (SPEC D-24: entfernte Peripherie-Crates nicht aufgefuehrt).
-//! - **Ausgehende Abhaengigkeiten:** Nutzt `contextra-types`, `contextra-ports`, `contextra-crypto`,
-//!   `contextra-sys`, `contextra-mvcc`.
 
 #![deny(dead_code)]
 //! `Contextra` Store — LSM-Tree based storage engine.
@@ -68,9 +51,9 @@ pub mod health;
 pub mod purge;
 pub mod tenant_scoped;
 
-// WP-4.1 (UNIMPLEMENTED): mmap-basierter SSTable-Zugriff für Out-of-Core-Daten.
+// WP-4.1 (UNIMPLEMENTED): Vfs-basierter SSTable-Zugriff für Out-of-Core-Daten.
 // Aktuell: reguläres tokio::fs/std::fs File-I/O in sstable.rs.
-// Tracking-Issue: WP-4.1 (Out-of-Core mmap SSTable-Zugriff; siehe docs/PLAN.md)
+// Tracking-Issue: WP-4.1 (Out-of-Core Vfs SSTable-Zugriff; siehe docs/PLAN.md)
 // INVARIANTE: LSM-Kern bleibt blind gegenüber Indexstrukturen.
 
 #[cfg(not(loom))]

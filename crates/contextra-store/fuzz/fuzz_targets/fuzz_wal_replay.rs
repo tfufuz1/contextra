@@ -34,7 +34,7 @@ fuzz_target!(|data: &[u8]| {
                 .await
                 .map(|m| m.len())
                 .unwrap_or(0);
-            let _ = wal.scan_entries_mmap(file_size, |_, _, _| true).await;
+            let _ = wal.scan_entries_buffer(file_size, |_, _, _| true).await;
         }
     });
 });

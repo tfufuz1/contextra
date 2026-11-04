@@ -7,9 +7,10 @@ use std::path::Path;
 pub const MIN_DISK_RESERVE_BYTES: u64 = 1024 * 1024 * 1024;
 
 /// Struktur zur Berechnung und Überwachung der Plattenreserve.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DiskReserve {
-    required_bytes: u64,
+    pub required_bytes: u64,
+    pub available_bytes: u64,
 }
 
 impl DiskReserve {
@@ -21,12 +22,18 @@ impl DiskReserve {
         let required = MIN_DISK_RESERVE_BYTES.max(double_largest);
         Self {
             required_bytes: required,
+            available_bytes: 0,
         }
     }
 
     /// Liefert die geforderten Reserve-Bytes.
     pub fn required_bytes(&self) -> u64 {
         self.required_bytes
+    }
+
+    /// Prüft, ob ausreichend Speicherplatz vorhanden ist.
+    pub fn has_sufficient_space(&self) -> bool {
+        self.available_bytes >= self.required_bytes
     }
 
     /// Prüft den verfügbaren Speicherplatz auf dem Dateisystem von `path`.

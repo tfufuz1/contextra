@@ -27,6 +27,11 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
+[dev-dependencies]
+criterion = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
 [[test]]
 name = "tk_fault_vfs_conformance"
 path = "../../tests/tk_fault_vfs_conformance.rs"

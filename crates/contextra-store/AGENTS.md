@@ -50,6 +50,7 @@ WP-0.3 (Build), WP-1.4 (ohne `std::fs`), WP-3.3 (Schlüsselraum, Envelope v2, WA
 
 ```bash
 cargo test -p contextra-store --locked
+cargo test -p contextra-store --features test-hooks --locked
 cargo test --locked --test tk_conformance_storage
 cargo test -p contextra-arch-tests --locked
 ```
