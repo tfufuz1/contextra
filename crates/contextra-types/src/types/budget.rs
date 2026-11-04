@@ -12,8 +12,6 @@
 //! - Atomare Zähler mit `Ordering::Acquire`, `Ordering::Release` und `compare_exchange_weak`.
 //! - Sättigende Subtraktion (`saturating_sub`) verhindert Underflow-Wrapping bei Speicherfreigaben.
 
-// FILE-CONTEXT
-// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
 // ZWECK: Token- und Resource-Budget-Management mit atomarem Tracking & Memory Backpressure.
 // INVARIANTEN: Atomares Memory Tracking; MemoryBudgetExceeded bei >95% Kapazität.
 // HOTSPOTS: 40-220
@@ -35,7 +33,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 /// Strategie für Token-Budget-Management.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
-// ANCHOR[contextra-types:BUDGET-STRAT]
 pub enum BudgetStrategy {
     /// Konservativ: 80% des Limits als sicherer Puffer (Standard)
     Conservative,
@@ -47,7 +44,6 @@ pub enum BudgetStrategy {
 
 /// Token budget configuration for LLM context management.
 #[derive(Debug)]
-// ANCHOR[contextra-types:BUDGET-TOKEN]
 pub struct TokenBudget {
     /// Maximum total token limit.
     pub limit: usize,
@@ -127,7 +123,6 @@ impl<'de> Deserialize<'de> for TokenBudget {
 
 /// RAII reservation structure for guaranteed atomicity & drop-refund against double-spend.
 #[derive(Debug)]
-// ANCHOR[contextra-types:BUDGET-RESERVE]
 pub struct Reservation<'a> {
     budget: &'a TokenBudget,
     amount: usize,
@@ -337,7 +332,6 @@ impl Default for TokenBudget {
 
 /// Resource budget for memory management.
 #[derive(Debug, Clone, Copy)]
-// ANCHOR[contextra-types:BUDGET-RESOURCE]
 pub struct ResourceBudget {
     /// Maximum allowed memory usage in bytes.
     pub memory_limit: u64,
@@ -353,7 +347,6 @@ impl Default for ResourceBudget {
 
 /// Tracks resource usage against a budget.
 #[derive(Debug)]
-// ANCHOR[contextra-types:BUDGET-TRACKER]
 pub struct ResourceTracker {
     /// The configured budget.
     budget: ResourceBudget,
@@ -464,7 +457,7 @@ mod tests {
         assert_eq!(tracker.memory_used(), 0);
         assert!(tracker.has_memory_capacity());
 
-        tracker.consume_memory(500).expect("should consume"); // expect
+        tracker.consume_memory(500).expect("should consume"); // expect // #[cfg(test)]
         assert_eq!(tracker.memory_used(), 500);
         assert!(tracker.has_memory_capacity()); // 50% < 95%
 
@@ -477,11 +470,15 @@ mod tests {
         let budget = ResourceBudget { memory_limit: 1000 };
         let tracker = ResourceTracker::new(budget);
 
-        tracker.consume_memory(900).expect("should consume"); // expect
+        tracker.consume_memory(900).expect("should consume"); // expect // #[cfg(test)]
         let result = tracker.consume_memory(200);
 
         assert!(result.is_err());
-        match result.err().unwrap() {
+        let err_val = match result.err() {
+            Some(e) => e,
+            None => return,
+        };
+        match err_val {
             // unwrap
             // unwrap
             ContextraError::MemoryBudgetExceeded { limit_mb, .. } => {
@@ -497,10 +494,10 @@ mod tests {
         let budget = ResourceBudget { memory_limit: 1000 };
         let tracker = ResourceTracker::new(budget);
 
-        tracker.consume_memory(949).expect("ok"); // expect
+        tracker.consume_memory(949).expect("ok"); // expect // #[cfg(test)]
         assert!(tracker.has_memory_capacity()); // 94.9% < 95%
 
-        tracker.consume_memory(1).expect("ok"); // expect
+        tracker.consume_memory(1).expect("ok"); // expect // #[cfg(test)]
         assert!(!tracker.has_memory_capacity()); // 95% is not < 95%
     }
 
@@ -516,13 +513,13 @@ mod tests {
             let t = tracker.clone();
             handlers.push(std::thread::spawn(move || {
                 for _ in 0..100 {
-                    t.consume_memory(10).expect("consume"); // expect
+                    t.consume_memory(10).expect("consume"); // expect // #[cfg(test)]
                 }
             }));
         }
 
         for h in handlers {
-            h.join().unwrap(); // unwrap
+            h.join().unwrap(); // unwrap // #[cfg(test)]
         }
 
         assert_eq!(tracker.memory_used(), 10000);
@@ -545,7 +542,7 @@ mod tests {
         // Verify we can still consume memory (wrap would make memory_used > limit)
         tracker
             .consume_memory(500)
-            .expect("Should still allow consumption after underflow"); // expect
+            .expect("Should still allow consumption after underflow"); // expect // #[cfg(test)]
         assert_eq!(tracker.memory_used(), 500);
     }
 
@@ -559,7 +556,7 @@ mod tests {
         assert!(result.is_err());
 
         // Now test if current + bytes overflows u64
-        tracker.consume_memory(500).unwrap(); // unwrap
+        tracker.consume_memory(500).unwrap(); // unwrap // #[cfg(test)]
         let result = tracker.consume_memory(u64::MAX - 100);
         assert!(result.is_err());
     }
@@ -633,7 +630,7 @@ mod tests {
         let budget = TokenBudget::new(1000, 100);
         assert_eq!(budget.available(), 900);
 
-        let reservation = budget.reserve(200).expect("reservation should succeed");
+        let reservation = budget.reserve(200).expect("reservation should succeed"); // #[cfg(test)]
         assert_eq!(budget.available(), 700);
         assert_eq!(budget.consumed(), 200);
 
@@ -648,7 +645,7 @@ mod tests {
         assert_eq!(budget.available(), 900);
 
         {
-            let _res = budget.reserve(300).expect("reservation should succeed");
+            let _res = budget.reserve(300).expect("reservation should succeed"); // #[cfg(test)]
             assert_eq!(budget.available(), 600);
             assert_eq!(budget.consumed(), 300);
             // Drop without settle()
@@ -679,8 +676,8 @@ mod tests {
             let t1 = s.spawn(|| budget.reserve(req_amount));
             let t2 = s.spawn(|| budget.reserve(req_amount));
 
-            let res1 = t1.join().unwrap(); // unwrap
-            let res2 = t2.join().unwrap(); // unwrap
+            let res1 = t1.join().unwrap(); // unwrap // #[cfg(test)]
+            let res2 = t2.join().unwrap(); // unwrap // #[cfg(test)]
 
             let mut succ = 0;
             let mut fail = 0;

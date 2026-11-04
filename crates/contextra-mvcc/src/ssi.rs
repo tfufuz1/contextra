@@ -1,30 +1,8 @@
 //! # Serializable Snapshot Isolation (SSI) — Read-Set Tracking und Konfliktvalidierung
 //!
-//! Dieses Modul implementiert die serialisierbare Snapshot-Isolation (SSI) im Hauptspeicher.
-//! Transaktionen unter Standard-Snapshot-Isolation sind anfällig für bestimmte Anomalien
-//! wie *Write-Skew* (z. B. zwei parallele Transaktionen heben gleichzeitig Geld ab, weil beide
-//! den gemeinsamen Mindestkontostand zu ihrem Snapshot-Beginn noch erfüllt sehen).
+//! In-Memory SSI Read-Set Tracking, Write-Skew-Erkennung und Fail-Closed Pruning.
 //!
-//! SSI erkennt solche Konflikte, indem es während der Transaktion protokolliert, welche
-//! Schlüssel gelesen wurden ([`ReadSet`]), und vor dem Commit prüft, ob eine nebenläufige
-//! Transaktion diese Schlüssel in der Zwischenzeit verändert hat ([`SsiValidator`]).
-//!
-//! ## Relevanz im Gesamtsystem (Ring 0)
-//! - **Ring 0 (Kern)**: Reine In-Memory-Konflikterkennung ohne Abhängigkeit von Festplattenstrukturen.
-//! - **Phantom-Protection**: Schützt nicht nur Einzelpunkt-Lesezugriffe, sondern auch Bereichsleser
-//!   (Range Scans) durch Präfix-Tracking vor Phantom-Einfügungen.
-//! - **Fail-Closed Pruning**: Werden historische Commit-Informationen aus Speichermangel
-//!   bereinigt (geprunt), schlägt die Validierung älterer Transaktionen deterministisch
-//!   mit einem Konfliktfehler fehl (Fail-Closed-Sicherheitsarchitektur).
-//! - **Vergröberung (Coarsening, B-16)**: Um Speichergrenzen einzuhalten, ohne ältere
-//!   Transaktionen sofort abbrechen zu müssen, werden alte Schlüssel zu gemeinsamen
-//!   Präfixen aggregiert (0 % False Negatives, konservative Konflikterkennung).
-
-// ZWECK: In-memory SSI Read-Set Tracking, Write-Skew-Konfliktvalidierung, Fail-Closed Pruning und atomare Commit-Registrierung.
-// INVARIANTEN: INV-MVCC-SSI-1: Konfliktauflösung ist rein datengetrieben (Sequenznummernvergleich) und deterministisch.
-// HOTSPOTS: 35-220
-// NICHT-OFFENSICHTLICH: Pruning unter `committed_writes` Schreib-Lock sichert den atomaren Wasserstand. Fail-closed Protection verweigert Reads mit snapshot_seq < pruned_through.
-// SIEHE AUCH: crates/contextra-mvcc/src/seq_log.rs, crates/contextra-mvcc/src/tx_buffer.rs
+//! Invariante INV-MVCC-SSI-1: Konfliktauflösung ist rein datengetrieben und deterministisch.
 
 use crate::error::MvccError;
 use crate::error::{ContextraError, Result};
@@ -43,16 +21,7 @@ use std::time::Duration;
 /// Standard-Höchstgrenze für im Speicher gehaltene bestätigte Schreib-Schlüssel (1.000.000 Schlüssel).
 pub const DEFAULT_MAX_TRACKED_COMMIT_KEYS: usize = 1_000_000;
 
-/// Protokolliert gelesene Einzelschlüssel, Präfixe und deren jeweilige Snapshot-Sequenznummer für SSI.
-///
-/// ### Speicher- und Risikoanalyse:
-/// Der Speicherbedarf pro Transaktion wächst linear $O(R + P)$ mit der Anzahl der gelesenen Schlüssel $R$
-/// und Präfixe $P$. Bei massiven Lese-Transaktionen muss die Obergrenze über
-/// [`crate::tx_buffer::TxBuffer::try_register_read`] überwacht werden, um Speichererschöpfung zu verhindern.
-///
-/// ### Phantom-Schutz:
-/// Normale Einzelschlüssel-Leser registrieren Keys via [`ReadSet::record_read`]. Bereichsscans (Range Scans)
-/// müssen [`ReadSet::record_prefix`] aufrufen, um neu eingefügte Phantome zu erkennen.
+/// Protokolliert gelesene Einzelschlüssel, Präfixe und deren Snapshot-Sequenznummer für SSI.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ReadSet {
     /// Zuordnung von gelesenen Schlüsseln (Bytefolgen) zur zugehörigen Snapshot-Sequenznummer.
@@ -173,22 +142,9 @@ impl ReadSet {
     }
 }
 
-/// Schnittstelle (Trait) für die Validierung von Transaktionen unter Serializable Snapshot Isolation (SSI).
-///
-/// Prüft vor dem Festschreiben (Commit) einer Transaktion, ob nebenläufige Transaktionen
-/// Schlüssel oder Präfixe verändert haben, die im [`ReadSet`] dieser Transaktion enthalten sind.
+/// Schnittstelle (Trait) für die Validierung von Transaktionen unter SSI.
 pub trait SsiValidator {
     /// Validiert das [`ReadSet`] der Transaktion `tx_id`.
-    ///
-    /// ### Fehlerfälle:
-    /// Gibt `Err(ContextraError::Conflict(...))` zurück, falls:
-    /// - Ein Schlüssel im ReadSet nach dem Lese-Snapshot von einer anderen Transaktion committet wurde (Write-Skew).
-    /// - Ein neuer Schlüssel committet wurde, der auf einen gelesenen Bereichsscan-Präfix zutrifft (Phantom-Read).
-    /// - Der Snapshot-Wasserstand der Transaktion älter ist als die bereits bereinigte Historie (`pruned_through`).
-    ///
-    /// ### Nebenläufigkeits-Invariante:
-    /// Aufrufer koordinieren Validierung und Commit-Registrierung (z. B. via Commit-Gate-Lock),
-    /// um atomare, konfliktfreie Zustandsübergänge sicherzustellen.
     fn validate(&self, tx_id: TxId, read_set: &ReadSet) -> Result<()>;
 }
 
@@ -228,20 +184,7 @@ pub struct PruningBlockerInfo {
     pub is_pin_expired: bool,
 }
 
-/// Coarsens exact committed key lists into prefix summaries (e.g. LCP extraction).
-///
-/// # Architecture Decision & Invariant (B-16 / INV-MVCC-SSI-1)
-/// To prevent total outage when `DEFAULT_MAX_TRACKED_COMMIT_KEYS` capacity is reached (finding B-16),
-/// individual exact keys in older sequence buckets are coarsened into prefix summaries.
-///
-/// ## Soundness Invariant (0% False Negatives)
-/// Coarsening guarantees that no real write-skew conflict is ever missed:
-/// - Every original key $k$ in a coarsened bucket starts with at least one extracted prefix $p$.
-/// - Any point read or range prefix read that would have conflicted with $k$ is guaranteed to overlap
-///   with $p$.
-/// - False positives may occur (a commit may be conservatively flagged as a conflict), but false
-///   negatives are mathematically impossible.
-/// - Fail-closed protection remains intact under `INV-MVCC-SSI-1`.
+/// Coarsens exact committed key lists into prefix summaries (B-16 / INV-MVCC-SSI-1).
 fn coarsen_keys_to_prefixes(keys: &[Vec<u8>], max_prefixes: usize) -> Vec<Vec<u8>> {
     if keys.is_empty() {
         return Vec::new();
@@ -806,17 +749,8 @@ impl SequenceLogSsiValidator {
     }
 
     /// Zeichnet einen committeten Schlüssel zu einer Sequenznummer auf.
-    ///
-    /// ### Ablauf:
-    /// 1. Tombstone-Bit der Commit-Sequenznummer ausmaskieren.
-    /// 2. Schlüssel im Schreibregister unter Mutex eintragen.
-    /// 3. Kapazitätsprüfung durchführen: Liegt der Füllstand über 80 %, werden ältere Buckets
-    ///    automatisch zu Präfixen vergröbert (Coarsening).
     pub fn record_commit_key(&self, key: &[u8], commit_seq: u64) {
-        let commit_seq = commit_seq & !contextra_types::TOMBSTONE_BIT;
-        let mut writes = self.committed_writes.write();
-        writes.insert(key.to_vec(), commit_seq);
-        self.check_and_coarsen_if_needed(&mut writes);
+        self.record_commit_keys([key], commit_seq);
     }
 
     /// Zeichnet eine Menge committeter Schlüssel stapelweise (Batch) zu einer Commit-Sequenznummer auf.
@@ -1008,18 +942,7 @@ impl SequenceLogSsiValidator {
         Ok(())
     }
 
-    /// Atomically validates `read_set` and records `write_keys` at `commit_seq` under a single write lock.
-    /// Führt die Validierung und das Eintragen der Commit-Schlüssel atomar unter demselben Schreib-Lock aus.
-    ///
-    /// Verhindert Race Conditions zwischen der Validierung eines ReadSets und dem Hinzufügen
-    /// neuer Commits durch parallele Worker.
-    ///
-    /// ### Ablauf:
-    /// 1. Schreib-Sperre auf `committed_writes` anfordern.
-    /// 2. `pruned_through`-Wasserstand abfragen.
-    /// 3. Validierung gegen committed writes und range reads durchführen.
-    /// 4. Bei Erfolg: Alle Schlüssel mit `commit_seq` eintragen und Kapazität prüfen.
-    /// 5. Bei Konflikt: Sofortigen Abbruch mit `Err(ContextraError::Conflict)` zurückgeben.
+    /// Führt Validierung und Eintragen der Commit-Schlüssel atomar unter demselben Schreib-Lock aus.
     pub fn validate_and_record<'a>(
         &self,
         tx_id: TxId,
