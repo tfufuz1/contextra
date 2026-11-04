@@ -27,6 +27,3 @@ bincode = { workspace = true }
 blake3 = { workspace = true }
 ahash = { workspace = true }
 sha2 = "0.10"
-
-[dev-dependencies]
-proptest = "1.4"

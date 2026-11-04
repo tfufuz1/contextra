@@ -28,13 +28,6 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 
 [features]
 
-[dev-dependencies]
-tempfile = { workspace = true }
-tokio = { workspace = true, features = ["full", "test-util"] }
-proptest = "1.4"
-criterion = { workspace = true }
-loom = "0.7"
-
 [[bench]]
 name = "crypto_benchmarks"
 harness = false

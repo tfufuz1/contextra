@@ -18,13 +18,6 @@ contextra-ports = { workspace = true }
 contextra-sys = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "sync", "time", "macros"] }
 
-[dev-dependencies]
-contextra-testkit = { workspace = true }
-proptest = "1.6"
-criterion = { workspace = true }
-tempfile = { workspace = true }
-trybuild = "1"
-
 [[test]]
 name = "df_probe_tests"
 path = "tests/df_probe_tests.rs"

@@ -46,14 +46,6 @@ graph = []
 # bestätigt einschränkt.
 partial-index-rebuild = []
 
-[dev-dependencies]
-tokio = { workspace = true, features = ["full", "test-util"] }
-criterion = "0.5"
-tempfile = "3"
-proptest = "1.4"
-bincode = { workspace = true }
-loom = "0.7"
-
 [[bench]]
 name = "distance_bench"
 harness = false
