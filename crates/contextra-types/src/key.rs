@@ -53,8 +53,10 @@ pub enum Family {
     Manifest = 0x03,
     /// 0x04 reserviert (Locator entfällt laut D-70).
     ReservedLocator = 0x04,
-    /// Noch nicht segmentierte Textdeltas (0x05).
+    /// Noch nicht segmentierte Textdeltas (0x05, SPEC 9.2, D-121).
     TextBuf = 0x05,
+    /// Vektor-Envelope (0x06, SPEC 9.2, D-122).
+    Vec = 0x06,
 }
 
 impl Family {
