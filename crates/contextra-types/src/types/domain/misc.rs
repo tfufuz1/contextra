@@ -57,7 +57,6 @@ mod hex {
 
 /// Defines a frozen workflow state acting as a savepoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-WORKFLOW]
 pub struct WorkflowState {
     /// Associated transaction.
     pub tx: TxId,
@@ -68,11 +67,9 @@ pub struct WorkflowState {
 
 // INVARIANT: Bit 63 der SeqNo markiert Tombstones.
 /// Bit mask for identifying tombstones in sequence numbers.
-// ANCHOR[contextra-types:MISC-TOMBSTONE-BIT]
 pub const TOMBSTONE_BIT: u64 = 1 << 63;
 
 /// Reserved metadata key for sequence-based document TTL expiration.
-// ANCHOR[contextra-types:MISC-EXPIRY-KEY]
 pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 
 /// Maximum number of search results that any hybrid/vector/text search may return.
@@ -85,12 +82,10 @@ pub const EXPIRY_METADATA_KEY: &str = "__expires_at_seq";
 ///
 /// # DECISION-REF
 /// AGT-DB-003 — Boundary defence at Layer 2 against unbounded `k` from untrusted JSON-RPC.
-// ANCHOR[contextra-types:MISC-MAX-SEARCH-K]
 pub const MAX_SEARCH_K: usize = 1_000;
 
 /// Relationship types between Zettelkasten memory chunks (A-MEM).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-LINK]
 pub enum LinkRelation {
     /// Target memory provides more detail or context.
     Elaborates,
@@ -104,7 +99,6 @@ pub enum LinkRelation {
 
 /// A directional link to another memory chunk in the Zettelkasten.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-MEMLINK]
 pub struct MemoryLink {
     /// The target document ID.
     pub target: DocId,
@@ -116,7 +110,6 @@ pub struct MemoryLink {
 
 /// Represents a canonical node in the knowledge graph.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-ENTITY]
 pub struct Entity {
     /// Unique entity ID.
     pub id: EntityId,
@@ -178,7 +171,6 @@ impl Entity {
 /// (`tx_valid_from`/`tx_valid_to`, `business_valid_from`/`business_valid_to`).
 /// Bildet relationale Kantenstrukturen im Speicher ab.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-EDGE]
 pub struct Edge {
     /// Source entity identifier.
     pub from: EntityId,
@@ -301,7 +293,6 @@ impl Edge {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
-// ANCHOR[contextra-types:MISC-MEMTYPE]
 pub enum MemoryType {
     /// Episodisches Gedächtnis: Erlebnisse, Unterhaltungen, zeitlich verankerte Ereignisse.
     /// Retrieval: Zeitliche Nähe und Relevanz zur aktuellen Session.
@@ -374,7 +365,6 @@ impl MemoryType {
 /// # Zweck
 /// Konfigurationsstruktur für Diffusionsparameter (`sigma`, `delta`, `gamma`, etc.).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-TLHFD]
 pub struct TlHfdParams {
     /// Regularization parameter $\sigma > 0$ controlling diffusion scale (default: 0.1).
     #[serde(default = "default_tl_hfd_sigma")]
@@ -431,7 +421,6 @@ impl Default for TlHfdParams {
 /// Selection of algorithm strategy for Personalized PageRank (PPR).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-// ANCHOR[contextra-types:MISC-PPRALG]
 pub enum PprAlgorithm {
     /// Auto heuristic dispatch based on seed count (ForwardPush for <= 100 seeds, DensePowerIteration otherwise).
     #[default]
@@ -452,7 +441,6 @@ pub enum PprAlgorithm {
 
 /// Configuration parameters for Personalized PageRank (PPR).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-PPRCFG]
 pub struct PprConfig {
     /// Damping factor (probability of continuing random walk vs restarting). Default: 0.85.
     pub damping_factor: f32,
@@ -496,7 +484,6 @@ impl Default for PprConfig {
 /// BEGRÜNDUNG: arXiv:2608.01460 — Coverage-Kollaps unter Konfigurations-Drift.
 /// Q4 und Q8 bei identischem model_id erzeugen unterschiedliche Score-Verteilungen.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// ANCHOR[contextra-types:MISC-FINGERPRINT]
 pub struct ConfigFingerprint {
     /// LLM-Modell-ID (z.B. "llama-3.2-3b-instruct")
     pub model_id: String,
@@ -565,7 +552,6 @@ impl Default for ConfigFingerprint {
 /// Mode for automatic OpenIE entity extraction during document ingestion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-// ANCHOR[contextra-types:MISC-EXTRACTMODE]
 pub enum AutoExtractionMode {
     /// Automatic entity extraction is enabled.
     Enabled,

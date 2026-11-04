@@ -10,13 +10,10 @@
 //! - TxId Base Ranges trennen System- (`>= INTERNAL_BASE`) strikt von Collection-Transaktions-IDs.
 //! - Keine Erzeugung von Zeit oder Zufall ohne explizite Parameter oder Injektion.
 
-// ANCHOR[contextra-types:DOM-MOD-DOC]
 /// Dokumente, Chunks, Embeddings und Vektor-Distanzmetriken.
 mod document;
-// ANCHOR[contextra-types:DOM-MOD-IDS]
 /// Identifikatoren: DocId, EntityId, TxId, TenantId, CollectionId.
 mod ids;
-// ANCHOR[contextra-types:DOM-MOD-MISC]
 /// Wissensgraphen-Elemente (Entity, Edge), MemoryType, WorkflowState und Verfallskonstanten.
 mod misc;
 
