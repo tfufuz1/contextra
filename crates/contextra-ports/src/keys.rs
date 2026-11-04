@@ -4,24 +4,9 @@
 
 use crate::gate::{KeyBuf, KeyRange};
 use crate::BoxFuture;
+pub use contextra_types::FileId;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-
-/// Unique identifier for a durable storage file or SSTable.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct FileId(pub u64);
-
-impl FileId {
-    /// Creates a new `FileId`.
-    pub const fn new(id: u64) -> Self {
-        Self(id)
-    }
-
-    /// Returns the underlying numeric ID.
-    pub const fn as_u64(&self) -> u64 {
-        self.0
-    }
-}
 
 /// Kind of file managed by [`FileKeyring`] (SPEC §8.2, D-85).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

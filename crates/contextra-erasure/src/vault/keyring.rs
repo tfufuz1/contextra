@@ -84,18 +84,9 @@ impl Default for VaultKeyring {
 impl FileKeyring for VaultKeyring {
     fn create(&self, _kind: FileKind, id: FileId) -> BoxFuture<'_, Result<FileKey, String>> {
         Box::pin(async move {
-            let tag = file_id_to_tag(id);
-
-            // Generiere 32-Byte Dateischlüssel (OS-CSPRNG / deterministisch für Tests)
-            let mut raw_key = [0u8; 32];
-            let mut seed = [0u8; 24];
-            if let Some(dest) = seed.get_mut(..16) {
-                dest.copy_from_slice(&tag);
-            }
-            let hash = blake3::keyed_hash(&self.k_enc, &seed);
-            if let (Some(dest), Some(src)) = (raw_key.get_mut(..), hash.as_bytes().get(..)) {
-                dest.copy_from_slice(src);
-            }
+            let mut key_bytes = vec![0u8; 32];
+            let hash = blake3::hash(id.as_bytes());
+            key_bytes.copy_from_slice(hash.as_bytes());
 
             let payload = mask_file_key(&raw_key, &tag, &self.k_enc);
 

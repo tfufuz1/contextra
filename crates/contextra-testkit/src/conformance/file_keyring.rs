@@ -10,6 +10,7 @@
 //! 4. `po_06_reopen_verification_on_failure`: Neuöffnen-Prüfung nach dem Nullen des Slots (PO-06 / D-55).
 
 use contextra_ports::{BoxFuture, ContextraError, Result};
+pub use contextra_types::FileId;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::future::Future;
@@ -19,10 +20,6 @@ use std::sync::Arc;
 /// Numerical file kind descriptor (1..=10 per SPEC F.1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FileKind(pub u8);
-
-/// Unique 128-bit file identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FileId(pub u128);
 
 /// File key handle wrapping a 32-byte symmetric cryptographic key.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,7 +94,9 @@ where
     // Fall 1: PO-06 / D-85 create/open/destroy lifecycle
     {
         let keyring = factory().await;
-        let fid = FileId(1001);
+        let mut fid_bytes = [0u8; 16];
+        fid_bytes[0..8].copy_from_slice(&1001u64.to_le_bytes());
+        let fid = FileId::new(fid_bytes);
         let kind = FileKind(1); // SSTable
 
         let key = match keyring.create(kind, fid).await {
@@ -142,7 +141,9 @@ where
     // Fall 2: PO-06 Nach destroy ist open ein Fehler
     {
         let keyring = factory().await;
-        let fid = FileId(2002);
+        let mut fid_bytes = [0u8; 16];
+        fid_bytes[0..8].copy_from_slice(&2002u64.to_le_bytes());
+        let fid = FileId::new(fid_bytes);
         let _ = keyring.create(FileKind(2), fid).await;
 
         if let Err(e) = keyring.destroy(fid).await {
@@ -168,7 +169,9 @@ where
     // Fall 3: PO-06 Destroy ist idempotent
     {
         let keyring = factory().await;
-        let fid = FileId(3003);
+        let mut fid_bytes = [0u8; 16];
+        fid_bytes[0..8].copy_from_slice(&3003u64.to_le_bytes());
+        let fid = FileId::new(fid_bytes);
         let _ = keyring.create(FileKind(3), fid).await;
         let _ = keyring.destroy(fid).await;
 
@@ -182,7 +185,9 @@ where
         }
 
         // Destroy of non-existent key is also idempotent and safe
-        if let Err(e) = keyring.destroy(FileId(999_999)).await {
+        let mut non_existent_bytes = [0u8; 16];
+        non_existent_bytes[0..8].copy_from_slice(&999_999u64.to_le_bytes());
+        if let Err(e) = keyring.destroy(FileId::new(non_existent_bytes)).await {
             return Err(ConformanceFailure::new(
                 suite,
                 "po_06_destroy_idempotent",
@@ -194,7 +199,9 @@ where
     // Fall 4: PO-06 Neuöffnen-Prüfung (Lesende Verifikation des Fehlens)
     {
         let keyring = factory().await;
-        let fid = FileId(4004);
+        let mut fid_bytes = [0u8; 16];
+        fid_bytes[0..8].copy_from_slice(&4004u64.to_le_bytes());
+        let fid = FileId::new(fid_bytes);
         let _ = keyring.create(FileKind(4), fid).await;
         let _ = keyring.destroy(fid).await;
 
@@ -245,9 +252,8 @@ impl FileKeyring for ReferenceFileKeyring {
     fn create(&self, kind: FileKind, id: FileId) -> BoxFuture<'_, Result<FileKey>> {
         Box::pin(async move {
             let mut key_bytes = [0u8; 32];
-            // Synthetic reproducible key bytes
-            let id_bytes = id.0.to_le_bytes();
-            key_bytes[..16].copy_from_slice(&id_bytes);
+            // Synthetic reproducible key bytes: 16 bytes from id
+            key_bytes[..16].copy_from_slice(id.as_bytes());
             key_bytes[16..].fill(0x5A);
 
             self.keys.write().insert(id, (kind, key_bytes));
@@ -366,6 +372,31 @@ pub async fn run_mutant_tests() -> std::result::Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::any::TypeId;
+
+    /// SPEC: T-FK-1
+    #[test]
+    fn t_fk_1_file_id_canonical_type_identity() {
+        assert_eq!(
+            TypeId::of::<contextra_types::FileId>(),
+            TypeId::of::<contextra_ports::FileId>(),
+            "contextra_types::FileId and contextra_ports::FileId must be identical types"
+        );
+        assert_eq!(
+            TypeId::of::<contextra_types::FileId>(),
+            TypeId::of::<FileId>(),
+            "contextra_types::FileId and FileId in testkit must be identical types"
+        );
+
+        let raw = [77u8; 16];
+        let t_fid: contextra_types::FileId = contextra_types::FileId::new(raw);
+        let p_fid: contextra_ports::FileId = t_fid;
+        let tk_fid: FileId = p_fid;
+
+        assert_eq!(t_fid, p_fid);
+        assert_eq!(p_fid, tk_fid);
+        assert_eq!(tk_fid.as_bytes(), &raw);
+    }
 
     /// SPEC: PO-06
     #[tokio::test]

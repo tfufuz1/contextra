@@ -6,11 +6,38 @@ use contextra_erasure::vault::keyring::InMemoryKeyring;
 use contextra_erasure::vault::sealer::VaultSealer;
 use contextra_ports::gate::{KeyBuf, KeyRange};
 use contextra_ports::keys::{FileId, FileKeyring, FileKind, RecordSealer, SealCtx};
+use std::any::TypeId;
+
+/// SPEC: T-FK-1 (Kanonischer FileId-Typ aus contextra-types über ports und erasure identisch)
+#[test]
+fn t_fk_1_canonical_file_id_identity() {
+    // Static assertion: TypeId must match exactly
+    assert_eq!(
+        TypeId::of::<contextra_types::FileId>(),
+        TypeId::of::<contextra_ports::FileId>(),
+        "contextra_types::FileId and contextra_ports::FileId must be identical types"
+    );
+    assert_eq!(
+        TypeId::of::<contextra_types::FileId>(),
+        TypeId::of::<FileId>(),
+        "contextra_types::FileId and FileId in ports::keys must be identical types"
+    );
+
+    // Direct assignment without any conversion (compile-time type equivalence check)
+    let raw_bytes = [0x5Au8; 16];
+    let types_fid: contextra_types::FileId = contextra_types::FileId::new(raw_bytes);
+    let ports_fid: contextra_ports::FileId = types_fid;
+    let local_fid: FileId = ports_fid;
+
+    assert_eq!(types_fid, ports_fid);
+    assert_eq!(ports_fid, local_fid);
+    assert_eq!(local_fid.as_bytes(), &raw_bytes);
+}
 
 #[tokio::test]
 async fn t_fk_1_keyring_create_open_destroy() {
     let keyring = InMemoryKeyring::new();
-    let file_id = FileId::new(42);
+    let file_id = FileId::new([42u8; 16]);
 
     let key = keyring.open(file_id).await;
     assert!(key.is_err());
