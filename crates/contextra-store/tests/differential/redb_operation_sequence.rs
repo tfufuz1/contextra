@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use contextra_ports::StorageEngine;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
 use contextra_types::TxId;

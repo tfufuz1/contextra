@@ -221,7 +221,7 @@ pub(super) fn may_contain_key_in_block_bloom(
 // ANCHOR[contextra-store:SST-RDR-001]
 /// Liest SSTable-Dateien mit Block-Cache und Bloom-Filter-Unterstuetzung.
 pub struct SstableReader {
-    pub(super) file: Arc<std::fs::File>,
+    pub(super) file: Arc<dyn contextra_ports::vfs::VfsFile>,
     pub(super) index: Vec<(Bytes, u64)>,
     pub(super) metadata: SstableMetadata,
     /// Byte offset where the index data begins (= end of last block).
@@ -283,23 +283,11 @@ impl SstableReader {
             None
         };
 
-        let path_for_open = path_buf.clone();
-        let (file, file_size) =
-            tokio::task::spawn_blocking(move || -> std::io::Result<(std::fs::File, u64)> {
-                let file = std::fs::File::open(&path_for_open)?;
-                let metadata = file.metadata()?;
-                let file_size = metadata.len();
-                Ok((file, file_size))
-            })
-            .await
-            .map_err(|e| ContextraError::Storage(format!("Join error: {}", e)))?
-            .map_err(|e| ContextraError::Storage(format!("File open failed: {}", e)))?;
+        let (file, file_size) = crate::vfs::open_vfs_file(&path_buf).await?;
 
         if file_size < 12 {
             return Err(ContextraError::Storage("SSTable file too small".into()));
         }
-
-        let file = Arc::new(file);
 
         // Read trailer: last 54 bytes (v1..v4) or 52 bytes (v0)
         let trailer_data = {
@@ -309,7 +297,7 @@ impl SstableReader {
             tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
                 let mut buf = vec![0u8; read_len];
                 let offset = file_size.saturating_sub(54);
-                pread_exact(&f, &mut buf, offset)?;
+                pread_exact(&*f, &mut buf, offset)?;
                 Ok(buf)
             })
             .await
@@ -478,7 +466,7 @@ impl SstableReader {
                 let f = Arc::clone(&file);
                 tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
                     let mut buf = vec![0u8; bloom_read_len];
-                    pread_exact(&f, &mut buf, bloom_offset)?;
+                    pread_exact(&*f, &mut buf, bloom_offset)?;
                     Ok(buf)
                 })
                 .await
@@ -538,7 +526,7 @@ impl SstableReader {
 
             tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
                 let mut buf = vec![0u8; index_read_len];
-                pread_exact(&f, &mut buf, index_offset)?;
+                pread_exact(&*f, &mut buf, index_offset)?;
                 Ok(buf)
             })
             .await
@@ -679,7 +667,7 @@ impl SstableReader {
     }
 
     async fn read_block_at_file(
-        file: Arc<std::fs::File>,
+        file: Arc<dyn contextra_ports::vfs::VfsFile>,
         offset: u64,
         next_offset: u64,
         key_manager: &Option<Arc<KeyManager>>,
@@ -698,7 +686,7 @@ impl SstableReader {
 
         let data = tokio::task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
             let mut buf = vec![0u8; len];
-            pread_exact(&file, &mut buf, offset)?;
+            pread_exact(&*file, &mut buf, offset)?;
             Ok(buf)
         })
         .await

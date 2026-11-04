@@ -4,7 +4,7 @@ use contextra_testmacros::ctx_test;
 use contextra_ports::StorageEngine;
 use contextra_store::envelope::RecordEnvelopeV2;
 use contextra_store::lsm::{LsmConfig, LsmStorage};
-use contextra_types::key::{KeyBuf, Matcher, Region, Family};
+use contextra_types::key::{KeyBuf, Region, Family};
 use contextra_types::tags::{ClusterTag, CollTag, DocTag, TenantTag};
 use tempfile::TempDir;
 
@@ -117,8 +117,8 @@ async fn test_crash_saga_points() {
 #[ctx_test(id = "T-CRASH-2")]
 async fn test_crash_rewrite_old_valid() {
     let outcome = contextra_store::purge::backend::RewriteOutcome {
-        old_file: contextra_ports::keys::FileId([1u8; 16]),
-        new_file: contextra_ports::keys::FileId([2u8; 16]),
+        old_file: contextra_ports::keys::FileId(1),
+        new_file: contextra_ports::keys::FileId(2),
         records_copied: 10,
         records_purged: 2,
         bytes_written: 1024,
@@ -143,7 +143,7 @@ async fn test_crash_orphan_slots() {
     let floor = contextra_store::purge::backend::WalFloor {
         seq: 50,
         tail_mac: [0u8; 32],
-        removed_file_ids: vec![contextra_ports::keys::FileId([0u8; 16])],
+        removed_file_ids: vec![contextra_ports::keys::FileId(0)],
     };
     assert_eq!(floor.seq, 50);
     assert_eq!(floor.removed_file_ids.len(), 1);

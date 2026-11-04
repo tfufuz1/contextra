@@ -152,9 +152,9 @@ async fn test_sstable_bloom_integration() {
 }
 
 #[tokio::test]
-async fn test_mmap_read_correct_values() {
+async fn test_vfs_read_correct_values() {
     let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
-    let path = tmp.path().join("mmap_test.sst");
+    let path = tmp.path().join("vfs_test.sst");
     let bc = create_block_cache(1);
 
     let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // #[cfg(test)]
@@ -183,10 +183,10 @@ async fn test_mmap_read_correct_values() {
 }
 
 #[tokio::test]
-async fn test_mmap_concurrent_readers() {
+async fn test_vfs_concurrent_readers() {
     use std::sync::Arc;
     let tmp = TempDir::new().expect("temp dir"); // #[cfg(test)]
-    let path = tmp.path().join("mmap_concurrent.sst");
+    let path = tmp.path().join("vfs_concurrent.sst");
     let bc = create_block_cache(1);
 
     let mut builder = SstableBuilder::create(&path).await.expect("create builder"); // #[cfg(test)]

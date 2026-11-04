@@ -25,14 +25,14 @@ pub(crate) mod fs {
     pub use tokio::fs::*;
 }
 
-#[cfg(loom)]
+#[cfg(all(test, loom))]
 #[allow(dead_code)]
 pub(crate) mod fs {
     use std::path::Path;
 
     // INVARIANT-KONFORM: Exklusiv in loom (Single-Thread / Loom-Simulation) für Mock-File-I/O verwendet.
     pub async fn read<P: AsRef<Path>>(path: P) -> std::io::Result<Vec<u8>> {
-        std::fs::read(path)
+        tokio::fs::read(path)
     }
     // INVARIANT-KONFORM: Exklusiv in loom (Single-Thread / Loom-Simulation) für Mock-File-I/O verwendet.
     #[allow(dead_code)]
@@ -40,7 +40,7 @@ pub(crate) mod fs {
         path: P,
         contents: C,
     ) -> std::io::Result<()> {
-        std::fs::write(path, contents)
+        tokio::fs::write(path, contents)
     }
     pub async fn remove_file<P: AsRef<Path>>(path: P) -> std::io::Result<()> {
         let _ = path;
@@ -65,7 +65,7 @@ pub(crate) mod fs {
     // INVARIANT-KONFORM: Perm-Signatur in Loom-Mock-Typen.
     pub async fn set_permissions<P: AsRef<Path>>(
         path: P,
-        perm: std::fs::Permissions,
+        perm: tokio::fs::File,
     ) -> std::io::Result<()> {
         let _ = (path, perm);
         Ok(())
@@ -82,42 +82,42 @@ pub(crate) mod fs {
             0
         }
         // INVARIANT-KONFORM: Perm-Signatur und Mode-Konstruktion in Loom-Mock-Metadata.
-        pub fn permissions(&self) -> std::fs::Permissions {
+        pub fn permissions(&self) -> tokio::fs::File {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
                 // INVARIANT-KONFORM: Constructing Permissions from unix mode mask in Loom mock metadata.
-                std::fs::Permissions::from_mode(0o644)
+                tokio::fs::File::from_mode(0o644)
             }
             #[cfg(not(unix))]
             {
                 // INVARIANT-KONFORM: Non-unix fallback in Loom mock metadata without unwrap.
-                let mut perm_res = std::fs::metadata(".").map(|m| m.permissions());
+                let mut perm_res = tokio::fs::metadata(".").map(|m| m.permissions());
                 if perm_res.is_err() {
-                    perm_res = std::fs::metadata(std::env::temp_dir()).map(|m| m.permissions());
+                    perm_res = tokio::fs::metadata(std::env::temp_dir()).map(|m| m.permissions());
                 }
                 if perm_res.is_err() {
-                    perm_res = std::fs::metadata("NUL").map(|m| m.permissions());
+                    perm_res = tokio::fs::metadata("NUL").map(|m| m.permissions());
                 }
                 if let Ok(p) = perm_res {
                     p
                 } else {
                     let tmp = std::env::temp_dir().join("loom_perm.tmp");
-                    let p = std::fs::File::create(&tmp)
+                    let p = tokio::fs::File::create(&tmp)
                         .and_then(|f| f.metadata())
                         .map(|m| m.permissions());
-                    let _ = std::fs::remove_file(tmp);
+                    let _ = tokio::fs::remove_file(tmp);
                     p.unwrap_or_else(|_| {
-                        std::fs::metadata(std::env::current_dir().unwrap_or_default())
+                        tokio::fs::metadata(std::env::current_dir().unwrap_or_default())
                             .map(|m| m.permissions())
                             .unwrap_or_else(|_| {
-                                std::fs::metadata(".")
+                                tokio::fs::metadata(".")
                                     .map(|m| m.permissions())
                                     .unwrap_or_else(|_| {
-                                        std::fs::metadata(std::env::temp_dir())
+                                        tokio::fs::metadata(std::env::temp_dir())
                                             .map(|m| m.permissions())
                                             .unwrap_or_else(|_| {
-                                                std::fs::metadata(
+                                                tokio::fs::metadata(
                                                     std::env::current_exe().unwrap_or_default(),
                                                 )
                                                 .map(|m| m.permissions())
@@ -125,12 +125,12 @@ pub(crate) mod fs {
                                                     let local_tmp = std::path::PathBuf::from(
                                                         "loom_local_perm.tmp",
                                                     );
-                                                    let p2 = std::fs::File::create(&local_tmp)
+                                                    let p2 = tokio::fs::File::create(&local_tmp)
                                                         .and_then(|f| f.metadata())
                                                         .map(|m| m.permissions());
-                                                    let _ = std::fs::remove_file(local_tmp);
+                                                    let _ = tokio::fs::remove_file(local_tmp);
                                                     p2.unwrap_or_else(|_| loop {
-                                                        if let Ok(m) = std::fs::metadata(".") {
+                                                        if let Ok(m) = tokio::fs::metadata(".") {
                                                             return m.permissions();
                                                         }
                                                     })

@@ -1567,9 +1567,9 @@ async fn test_t_wal_1_deserialization_failure_rejected_in_authenticated_chunk() 
 }
 
 #[tokio::test]
-async fn test_mmap_slice_bounds_mismatch_no_panic() {
+async fn test_buffer_slice_bounds_mismatch_no_panic() {
     let dir = tempdir().expect("tempdir");
-    let wal_path = dir.path().join("mmap_bounds.wal");
+    let wal_path = dir.path().join("buffer_bounds.wal");
 
     {
         let wal = Wal::open(&wal_path).await.expect("open wal");
@@ -1591,12 +1591,12 @@ async fn test_mmap_slice_bounds_mismatch_no_panic() {
 
     // Pass a slice that is deliberately shorter than reported file_size
     let truncated_slice = &real_data[..real_data.len() / 2];
-    let res = wal.parse_mmap_slice(truncated_slice, real_file_size);
+    let res = wal.parse_buffer_slice(truncated_slice, real_file_size);
 
     // Verify it handles the truncated slice gracefully without panic
     assert!(
         res.is_ok() || matches!(res, Err(ContextraError::WalCorruption { .. })),
-        "parse_mmap_slice with slice shorter than file_size must not panic"
+        "parse_buffer_slice with slice shorter than file_size must not panic"
     );
 }
 
@@ -1656,7 +1656,7 @@ async fn test_single_entry_no_commit_marker_replay() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_wal_replay_stream_vs_mmap_parity() -> Result<()> {
+async fn test_wal_replay_stream_vs_buffer_parity() -> Result<()> {
     let dir = tempdir()?;
     let wal_path = dir.path().join("parity_test.wal");
 
@@ -1674,7 +1674,7 @@ async fn test_wal_replay_stream_vs_mmap_parity() -> Result<()> {
     let metadata = tokio::fs::metadata(&wal_path).await?;
     let file_size = metadata.len();
 
-    let (mmap_entries, mmap_version) = wal.replay_mmap().await?;
+    let (buffer_entries, buffer_version) = wal.replay_buffer().await?;
 
     let mut stream_entries = Vec::new();
     let stream_version = wal
@@ -1684,13 +1684,13 @@ async fn test_wal_replay_stream_vs_mmap_parity() -> Result<()> {
         })
         .await?;
 
-    assert_eq!(mmap_version, stream_version);
-    assert_eq!(mmap_entries.len(), stream_entries.len());
+    assert_eq!(buffer_version, stream_version);
+    assert_eq!(buffer_entries.len(), stream_entries.len());
 
-    for (mmap_item, stream_item) in mmap_entries.iter().zip(stream_entries.iter()) {
-        assert_eq!(mmap_item.0, stream_item.0);
-        assert_eq!(mmap_item.1, stream_item.1);
-        assert_eq!(mmap_item.2, stream_item.2);
+    for (buffer_item, stream_item) in buffer_entries.iter().zip(stream_entries.iter()) {
+        assert_eq!(buffer_item.0, stream_item.0);
+        assert_eq!(buffer_item.1, stream_item.1);
+        assert_eq!(buffer_item.2, stream_item.2);
     }
 
     Ok(())
