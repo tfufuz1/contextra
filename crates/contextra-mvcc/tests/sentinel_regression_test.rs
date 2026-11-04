@@ -76,3 +76,36 @@ fn test_t_mvcc_sentinel_compaction_without_snapshot_succeeds() {
         val_res
     );
 }
+
+#[test]
+fn test_sentinel_u64_i64_boundary_handling() {
+    // T-MVCC-SENTINEL-1: Verifiziert, dass Grenzwerte wie u64::MAX, i64::MAX as u64
+    // und Sequenznummern mit gesetztem MSB / Tombstone-Bit nie fälschlicherweise als
+    // i64::MAX interpretiert werden oder negatives Vorzeichen-Wrapping auslösen.
+    let validator = SequenceLogSsiValidator::new();
+
+    let i64_max_as_u64 = i64::MAX as u64;
+    let beyond_i64_max = (i64::MAX as u64) + 1;
+
+    // Prune mit i64::MAX as u64 ist eine gültige Sequenznummer (sofern kein Tombstone-Bit gesetzt)
+    let res = validator.prune_through_checked(Some(i64_max_as_u64));
+    assert!(res.is_ok());
+
+    // Prune mit u64::MAX muss fail-closed mit InvalidSequence abgelehnt werden
+    let res_max = validator.prune_through_checked(Some(u64::MAX));
+    assert_eq!(res_max, Err(MvccError::InvalidSequence(u64::MAX)));
+
+    // Prune mit beyond_i64_max (oberhalb Vorzeichengrenze von i64):
+    // Solange TOMBSTONE_BIT nicht kollidiert, bleibt es eine unsigned u64 Sequenz
+    let res_beyond = validator.prune_through_checked(Some(beyond_i64_max));
+    if (beyond_i64_max & TOMBSTONE_BIT) != 0 {
+        assert_eq!(res_beyond, Err(MvccError::InvalidSequence(beyond_i64_max)));
+    } else {
+        assert!(res_beyond.is_ok());
+    }
+
+    // Snapshot-Registry liefert bei leerem Zustand immer None, nie i64::MAX oder u64::MAX
+    let registry = SnapshotRegistry::new();
+    assert_eq!(registry.min_read_snapshot(), None);
+    assert_eq!(registry.min_for_compaction(100), 100);
+}

@@ -124,3 +124,36 @@ proptest! {
         prop_assert_eq!(registry.min_for_compaction(current_seq), current_seq);
     }
 }
+
+// T-SNAP-PURGE-1: Test „Purge unter laufendem Snapshot“ laut SPEC §9.5, D-11, D-51, D-127.
+// Leser auf einem aktiven Snapshot sehen entweder den konsistenten Altzustand
+// oder werden bei Purge-Kollision fail-closed widerrufen (`SnapshotRevoked`),
+// aber niemals einen unvollständigen/zerrissenen Zustand.
+#[test]
+fn test_snap_purge_under_active_snapshot() {
+    let registry = Arc::new(SnapshotRegistry::new());
+
+    // 1. Snapshot für Tenant A bei seq = 50 öffnen
+    let snap_50 = registry.open(TENANT_A, 50).expect("open snapshot 50");
+    assert_eq!(snap_50.seq(), Ok(50));
+
+    // 2. Snapshot für Tenant B bei seq = 50 öffnen
+    let snap_b_50 = registry.open(TENANT_B, 50).expect("open snapshot B 50");
+    assert_eq!(snap_b_50.seq(), Ok(50));
+
+    // 3. Purge-Operation auf Tenant A für Daten bis einschließlich gated_seq = 60
+    // Laut D-61 / D-127 widerruft dies nur Snapshots von Tenant A mit seq <= 60.
+    let count = registry.revoke_covering(TENANT_A, &(), 60);
+    assert_eq!(count, 1);
+
+    // 4. Prüfung der fail-closed Semantik:
+    // Snapshot von Tenant A muss als widerrufen fail-closed abgebrochen werden
+    assert_eq!(snap_50.seq(), Err(MvccError::SnapshotRevoked(50)));
+
+    // Snapshot von Tenant B darf unberührt bleiben (Mandantenisolation T-SNAP-1)
+    assert_eq!(snap_b_50.seq(), Ok(50));
+
+    // 5. Neuer Snapshot für Tenant A NACH dem Purge (seq = 70) ist aktiv und nicht widerrufen
+    let snap_70 = registry.open(TENANT_A, 70).expect("open snapshot 70");
+    assert_eq!(snap_70.seq(), Ok(70));
+}
