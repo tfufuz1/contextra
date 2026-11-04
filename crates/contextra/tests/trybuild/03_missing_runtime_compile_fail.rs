@@ -1,15 +1,15 @@
 // Compile-Fail Test: Fehlender Runtime-Handle verhindert Aufruf von .open() / .build() (SPEC 5.7, T-API-1)
 use contextra::{Contextra, Secret};
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() {
     let secret = Secret::new(b"sehr-sichere-passphrase-123".to_vec());
 
-    // Der Builder hat hier den Typ EngineBuilder<Set, Missing>
-    // Aufruf von .open() ist nur für EngineBuilder<Set, Set> definiert!
     let builder = Contextra::builder()
         .data_dir("./target/trybuild_test_db")
-        .passphrase(secret);
+        .passphrase(secret)
+        .backup_retention(Duration::from_secs(86400));
 
     let _db = builder.open().await;
 }

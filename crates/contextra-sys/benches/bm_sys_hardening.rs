@@ -21,9 +21,9 @@ fn calculate_percentiles(mut samples_ns: Vec<f64>) -> (f64, f64, f64) {
     let p95_idx = ((len * 0.95).floor() as usize).min(samples_ns.len() - 1);
     let p99_idx = ((len * 0.99).floor() as usize).min(samples_ns.len() - 1);
     (
-        samples_ns[p50_idx],
-        samples_ns[p95_idx],
-        samples_ns[p99_idx],
+        samples_ns.get(p50_idx).copied().unwrap_or(0.0),
+        samples_ns.get(p95_idx).copied().unwrap_or(0.0),
+        samples_ns.get(p99_idx).copied().unwrap_or(0.0),
     )
 }
 
