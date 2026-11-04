@@ -85,7 +85,7 @@ pub use rng::{Rng, SeededRng};
 pub use storage::{StorageEngine, StorageStats, MAX_SCAN_MERGE_ACCUMULATOR};
 pub use text_index::{TextIndex, TextIndexStats};
 pub use vector_index::{VectorIndex, VectorIndexStats};
-pub use vfs::{Vfs, VfsFile, VfsOpenOptions};
+pub use vfs::{VerifiedVia, Vfs, VfsFile, VfsOpenOptions};
 
 #[cfg(test)]
 mod dyn_safety {
