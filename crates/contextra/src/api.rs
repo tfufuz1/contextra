@@ -191,17 +191,23 @@ pub struct Missing;
 pub struct Set;
 
 /// Builder zur Konfiguration und Erstellung einer `Contextra`-Instanz (SPEC 5.7, D-89).
-pub struct EngineBuilder<PassState = Missing, RtState = Missing, RetState = Missing> {
+pub struct EngineBuilder<
+    PassState = Missing,
+    RtState = Missing,
+    RetState = Missing,
+    DimState = Missing,
+> {
     data_dir: PathBuf,
     passphrase: Option<Secret>,
     runtime: Option<Handle>,
     backup_retention: Option<Duration>,
+    dimension: Option<usize>,
     erase_sla: Duration,
     system: SystemDefaults,
-    _marker: PhantomData<(PassState, RtState, RetState)>,
+    _marker: PhantomData<(PassState, RtState, RetState, DimState)>,
 }
 
-impl EngineBuilder<Missing, Missing, Missing> {
+impl EngineBuilder<Missing, Missing, Missing, Missing> {
     /// Erzeugt einen neuen Builder mit Standardwerten für optionale Parameter.
     pub fn new() -> Self {
         Self {
@@ -209,6 +215,7 @@ impl EngineBuilder<Missing, Missing, Missing> {
             passphrase: None,
             runtime: None,
             backup_retention: None,
+            dimension: None,
             erase_sla: Duration::from_secs(86400),
             system: system_defaults(),
             _marker: PhantomData,
@@ -216,13 +223,13 @@ impl EngineBuilder<Missing, Missing, Missing> {
     }
 }
 
-impl Default for EngineBuilder<Missing, Missing, Missing> {
+impl Default for EngineBuilder<Missing, Missing, Missing, Missing> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<PassState, RtState, RetState> EngineBuilder<PassState, RtState, RetState> {
+impl<PassState, RtState, RetState, DimState> EngineBuilder<PassState, RtState, RetState, DimState> {
     /// Setzt das Datenverzeichnis (Standard: `./contextra_data`).
     pub fn data_dir(mut self, path: impl AsRef<Path>) -> Self {
         self.data_dir = path.as_ref().to_path_buf();
@@ -230,12 +237,13 @@ impl<PassState, RtState, RetState> EngineBuilder<PassState, RtState, RetState> {
     }
 
     /// Setzt die Pflicht-Passphrase (SPEC 5.7).
-    pub fn passphrase(self, secret: Secret) -> EngineBuilder<Set, RtState, RetState> {
+    pub fn passphrase(self, secret: Secret) -> EngineBuilder<Set, RtState, RetState, DimState> {
         EngineBuilder {
             data_dir: self.data_dir,
             passphrase: Some(secret),
             runtime: self.runtime,
             backup_retention: self.backup_retention,
+            dimension: self.dimension,
             erase_sla: self.erase_sla,
             system: self.system,
             _marker: PhantomData,
@@ -243,12 +251,13 @@ impl<PassState, RtState, RetState> EngineBuilder<PassState, RtState, RetState> {
     }
 
     /// Setzt das Tokio-Runtime-Handle (Pflicht, SPEC 5.4, 5.7).
-    pub fn runtime(self, handle: Handle) -> EngineBuilder<PassState, Set, RetState> {
+    pub fn runtime(self, handle: Handle) -> EngineBuilder<PassState, Set, RetState, DimState> {
         EngineBuilder {
             data_dir: self.data_dir,
             passphrase: self.passphrase,
             runtime: Some(handle),
             backup_retention: self.backup_retention,
+            dimension: self.dimension,
             erase_sla: self.erase_sla,
             system: self.system,
             _marker: PhantomData,
@@ -256,12 +265,30 @@ impl<PassState, RtState, RetState> EngineBuilder<PassState, RtState, RetState> {
     }
 
     /// Setzt die Pflicht-Aufbewahrungsdauer für Sicherungen (`backup_retention`, SPEC 5.7, D-74).
-    pub fn backup_retention(self, duration: Duration) -> EngineBuilder<PassState, RtState, Set> {
+    pub fn backup_retention(
+        self,
+        duration: Duration,
+    ) -> EngineBuilder<PassState, RtState, Set, DimState> {
         EngineBuilder {
             data_dir: self.data_dir,
             passphrase: self.passphrase,
             runtime: self.runtime,
             backup_retention: Some(duration),
+            dimension: self.dimension,
+            erase_sla: self.erase_sla,
+            system: self.system,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Setzt die Pflicht-Vektordimension (SPEC 5.7, D-89).
+    pub fn dimension(self, dim: usize) -> EngineBuilder<PassState, RtState, RetState, Set> {
+        EngineBuilder {
+            data_dir: self.data_dir,
+            passphrase: self.passphrase,
+            runtime: self.runtime,
+            backup_retention: self.backup_retention,
+            dimension: Some(dim),
             erase_sla: self.erase_sla,
             system: self.system,
             _marker: PhantomData,
@@ -275,7 +302,7 @@ impl<PassState, RtState, RetState> EngineBuilder<PassState, RtState, RetState> {
     }
 }
 
-impl EngineBuilder<Set, Set, Set> {
+impl EngineBuilder<Set, Set, Set, Set> {
     /// Öffnet oder initialisiert die Datenbankinstanz asynchron.
     pub async fn open(self) -> Result<Contextra> {
         self.build().await
@@ -297,12 +324,19 @@ impl EngineBuilder<Set, Set, Set> {
         let _retention = self.backup_retention.ok_or(Error::MissingParameter {
             parameter: "backup_retention",
         })?;
+        let dim = self.dimension.ok_or(Error::MissingParameter {
+            parameter: "dimension",
+        })?;
+
+        let pass_str = std::str::from_utf8(secret.expose_secret()).map_err(|_| {
+            Error::Config(crate::error::ConfigDetails::Other(
+                "Passphrase enthält ungültiges UTF-8".to_string(),
+            ))
+        })?;
 
         let engine_config = contextra_engine::ContextraConfig {
-            dimension: 768,
-            encryption_passphrase: Some(
-                String::from_utf8_lossy(secret.expose_secret()).to_string(),
-            ),
+            dimension: dim,
+            encryption_passphrase: Some(pass_str.to_string()),
             ..Default::default()
         };
 
@@ -323,7 +357,7 @@ pub struct Contextra {
 
 impl Contextra {
     /// Erzeugt einen neuen `EngineBuilder` zur Konfiguration (SPEC 5.7, D-89).
-    pub fn builder() -> EngineBuilder<Missing, Missing, Missing> {
+    pub fn builder() -> EngineBuilder<Missing, Missing, Missing, Missing> {
         EngineBuilder::new()
     }
 
@@ -338,45 +372,33 @@ impl Contextra {
     }
 
     /// Führt einen Löschvorgang nach SPEC §7.3 aus.
-    pub async fn erase(&self, req: EraseRequest) -> Result<EraseReceipt> {
-        let now = Timestamp::now();
-        let target_bytes = bincode::serialize(&req.target)
-            .map_err(|e| Error::Config(crate::error::ConfigDetails::Other(e.to_string())))?;
-        let erasure_id = ErasureId::derive_v2(&target_bytes, &req.retention);
-        Ok(EraseReceipt {
-            id: erasure_id,
-            status: ErasureStatus::Gated,
-            gated_at: now,
-        })
+    pub async fn erase(&self, _req: EraseRequest) -> Result<EraseReceipt> {
+        Err(Error::NotImplemented("erase"))
     }
 
     /// Prüft den Status einer laufenden oder abgeschlossenen Löschung (SPEC 7.1).
     pub async fn erase_status(&self, _id: ErasureId) -> Result<ErasureStatus> {
-        Ok(ErasureStatus::Purging)
+        Err(Error::NotImplemented("erase_status"))
     }
 
     /// Liefert den signierten Nachweisbericht für eine Löschung (SPEC 7.1, D-69).
-    pub async fn report(&self, id: ErasureId) -> Result<SignedReport> {
-        Ok(SignedReport {
-            erasure_id: id,
-            payload: Vec::new(),
-            signature: Vec::new(),
-        })
+    pub async fn report(&self, _id: ErasureId) -> Result<SignedReport> {
+        Err(Error::NotImplemented("report"))
     }
 
     /// Hebt eine Einschränkung (Art. 18) wieder auf (SPEC 7.1).
     pub async fn lift_restriction(&self, _id: ErasureId, _att: RetentionAttestation) -> Result<()> {
-        Ok(())
+        Err(Error::NotImplemented("lift_restriction"))
     }
 
     /// Bestätigt einen Ledger-Reset durch den Betreiber (SPEC 7.1).
     pub async fn acknowledge_ledger_reset(&self, _att: OperatorAttestation) -> Result<()> {
-        Ok(())
+        Err(Error::NotImplemented("acknowledge_ledger_reset"))
     }
 
     /// Ändert die Passphrase des Masterschlüssels (SPEC 7.1).
     pub async fn change_passphrase(&self, _old: &Secret, _new: &Secret) -> Result<()> {
-        Ok(())
+        Err(Error::NotImplemented("change_passphrase"))
     }
 
     /// Liefert einen schnellen Gesundheitsbericht ohne I/O (SPEC 7.1, D-64).
@@ -433,10 +455,23 @@ pub struct Collection {
 }
 
 impl Collection {
+    /// Validiert den Dokumentenschlüssel gemäß SPEC D-123 Abs. 5 (UTF-8, 1 bis 128 Byte).
+    fn validate_doc_key<'a>(key: &'a DocKey) -> Result<&'a str> {
+        let bytes = key.as_bytes();
+        if bytes.is_empty() || bytes.len() > 128 {
+            return Err(Error::Limit(crate::error::LimitDetails::QueryTooLarge));
+        }
+        std::str::from_utf8(bytes).map_err(|_| {
+            Error::Config(crate::error::ConfigDetails::Other(
+                "DocKey enthält ungültiges UTF-8".to_string(),
+            ))
+        })
+    }
+
     /// Fügt ein Dokument ein (SPEC 7.2).
     pub async fn insert(&self, doc_ref: DocRef, doc: Document) -> Result<()> {
-        let key_str = String::from_utf8_lossy(doc_ref.key.as_bytes()).to_string();
-        self.inner.insert_text(&key_str, &doc.content, None).await?;
+        let key_str = Self::validate_doc_key(&doc_ref.key)?;
+        self.inner.insert_text(key_str, &doc.content, None).await?;
         Ok(())
     }
 
@@ -447,8 +482,8 @@ impl Collection {
 
     /// Liest ein Dokument, optional zu einem Snapshot-Zeitpunkt (SPEC 7.2).
     pub async fn get(&self, doc_ref: DocRef, _at: Option<SnapshotId>) -> Result<Option<Document>> {
-        let key_str = String::from_utf8_lossy(doc_ref.key.as_bytes()).to_string();
-        match self.inner.get_text(&key_str).await {
+        let key_str = Self::validate_doc_key(&doc_ref.key)?;
+        match self.inner.get_text(key_str).await {
             Ok(Some(content)) => Ok(Some(Document {
                 content,
                 metadata: Vec::new(),
@@ -465,14 +500,14 @@ impl Collection {
     /// `soft_delete` markiert das Dokument lediglich logisch als gelöscht und stellt
     /// keine Löschaussage für rechtliche Fristen dar.
     pub async fn soft_delete(&self, doc_ref: DocRef) -> Result<()> {
-        let key_str = String::from_utf8_lossy(doc_ref.key.as_bytes()).to_string();
-        self.inner.delete(&key_str).await?;
+        let key_str = Self::validate_doc_key(&doc_ref.key)?;
+        self.inner.delete(key_str).await?;
         Ok(())
     }
 
     /// Iteriert über Dokumente in `(cluster_tag, doc_tag)`-Reihenfolge (SPEC 7.2, D-41).
     pub async fn scan(&self, _range: ScanRange) -> Result<Vec<DocHandle>> {
-        Ok(Vec::new())
+        Err(Error::NotImplemented("scan"))
     }
 
     /// Volltextsuche mittels BM25 (SPEC 7.2).
@@ -483,14 +518,18 @@ impl Collection {
         _filter: Option<Filter>,
     ) -> Result<SearchPage> {
         let results = self.inner.search(query, k).await?;
-        let hits = results
-            .into_iter()
-            .map(|r| Hit {
-                doc_tag: DocTag::new([0u8; 16]),
+        let mut hits = Vec::with_capacity(results.len());
+        for r in results {
+            let mut tag_arr = [1u8; 16];
+            let id_bytes = r.doc_id.as_bytes();
+            let len = id_bytes.len().min(16);
+            tag_arr[..len].copy_from_slice(&id_bytes[..len]);
+            hits.push(Hit {
+                doc_tag: DocTag::from_bytes(tag_arr),
                 chunk: 0,
                 score: r.score,
-            })
-            .collect();
+            });
+        }
         Ok(SearchPage {
             hits,
             exhausted: true,
@@ -504,10 +543,7 @@ impl Collection {
         _k: usize,
         _filter: Option<Filter>,
     ) -> Result<SearchPage> {
-        Ok(SearchPage {
-            hits: Vec::new(),
-            exhausted: true,
-        })
+        Err(Error::NotImplemented("search_vector"))
     }
 
     /// Hybride Suche mit RRF-Fusion (SPEC 7.2).
@@ -523,60 +559,51 @@ impl Collection {
 
     /// Lädt das Dokument zu einem Suchtreffer-Handle (SPEC 7.2).
     pub async fn load(&self, _handle: DocHandle) -> Result<Document> {
-        Ok(Document::default())
+        Err(Error::NotImplemented("load"))
     }
 
     /// Erzeugt einen mandantengebundenen MVCC-Snapshot (SPEC 7.2, D-61).
     pub async fn snapshot(&self) -> Result<SnapshotId> {
-        Ok(SnapshotId(1))
+        let seq = self.inner.snapshot_seq().await?;
+        Ok(SnapshotId(seq))
     }
 
     /// Berichtigende Aktualisierung mit optionalem Purge alter Versionen (SPEC 7.2, D-117).
     pub async fn update_with(
         &self,
-        doc_ref: DocRef,
-        doc: Document,
+        _doc_ref: DocRef,
+        _doc: Document,
         _opts: UpdateOptions,
     ) -> Result<UpdateReceipt> {
-        self.update(doc_ref, doc).await?;
-        Ok(UpdateReceipt {
-            version: 2,
-            erasure: None,
-        })
+        Err(Error::NotImplemented("update_with"))
     }
 
     /// Ersetzung eines Mehr-Personen-Dokuments (SPEC 7.2, D-115).
     pub async fn replace_erasing(
         &self,
         _old: DocRef,
-        new_ref: DocRef,
-        new_doc: Document,
+        _new_ref: DocRef,
+        _new_doc: Document,
         _retention: RetentionAttestation,
     ) -> Result<EraseReceipt> {
-        self.insert(new_ref, new_doc).await?;
-        Ok(EraseReceipt {
-            id: ErasureId::new([0u8; 16]),
-            status: ErasureStatus::Gated,
-            gated_at: Timestamp::now(),
-        })
+        Err(Error::NotImplemented("replace_erasing"))
     }
 
     /// Lesen nach Art. 18 Abs. 2 DSGVO, nur auf `Restricted`-Dokumenten zulässig (SPEC 7.2, D-116).
     pub async fn get_restricted(
         &self,
-        doc_ref: DocRef,
+        _doc_ref: DocRef,
         _access: &RestrictedAccess,
     ) -> Result<Document> {
-        let doc = self.get(doc_ref, None).await?.ok_or(Error::NotFound)?;
-        Ok(doc)
+        Err(Error::NotImplemented("get_restricted"))
     }
 
     /// Iteration über eingeschränkte Dokumente mit Audit-Eintrag (SPEC 7.2, D-116).
     pub async fn scan_restricted(
         &self,
-        range: ScanRange,
+        _range: ScanRange,
         _access: &RestrictedAccess,
     ) -> Result<Vec<DocHandle>> {
-        self.scan(range).await
+        Err(Error::NotImplemented("scan_restricted"))
     }
 }

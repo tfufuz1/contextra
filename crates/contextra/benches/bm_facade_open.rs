@@ -36,7 +36,8 @@ fn bm_facade_open(c: &mut Criterion) {
                 .data_dir(tmp.path())
                 .passphrase(secret)
                 .runtime(handle)
-                .backup_retention(Duration::from_secs(86400));
+                .backup_retention(Duration::from_secs(86400))
+                .dimension(768);
 
             std::hint::black_box(builder);
         });

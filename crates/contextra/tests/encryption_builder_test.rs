@@ -3,6 +3,7 @@
 use contextra::{Contextra, Error, Secret};
 use std::time::Duration;
 
+/// SPEC: T-API-1
 #[tokio::test]
 async fn test_short_passphrase_rejected() {
     let rt = tokio::runtime::Handle::current();
@@ -12,7 +13,8 @@ async fn test_short_passphrase_rejected() {
         .data_dir("./target/short_pass_test")
         .passphrase(short_secret)
         .runtime(rt)
-        .backup_retention(Duration::from_secs(86400));
+        .backup_retention(Duration::from_secs(86400))
+        .dimension(768);
 
     let result = builder.build().await;
     match result {

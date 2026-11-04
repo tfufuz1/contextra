@@ -66,6 +66,8 @@ pub enum ErrorCode {
     Refused = 12000,
     /// Interner Systemfehler.
     Internal = 13000,
+    /// Merkmal noch nicht implementiert (D-110).
+    NotImplemented = 14000,
 }
 
 impl ErrorCode {
@@ -201,6 +203,9 @@ pub enum Error {
     /// Interner Systemfehler.
     #[error("Interner Systemfehler. Systemzustand prüfen und Vorgang wiederholen.")]
     Internal,
+    /// Merkmal noch nicht implementiert (D-110).
+    #[error("Funktion noch nicht implementiert: {0}.")]
+    NotImplemented(&'static str),
 }
 
 impl Error {
@@ -243,6 +248,7 @@ impl Error {
             Error::Cancelled => ErrorCode::Cancelled,
             Error::Refused => ErrorCode::Refused,
             Error::Internal => ErrorCode::Internal,
+            Error::NotImplemented(_) => ErrorCode::NotImplemented,
         }
     }
 }

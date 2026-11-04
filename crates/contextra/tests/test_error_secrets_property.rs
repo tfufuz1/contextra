@@ -6,6 +6,8 @@
 use contextra::error::{ConfigDetails, ConflictDetails, LimitDetails};
 use contextra::Error;
 
+/// SPEC: T-API-4
+/// SPEC: T-LOG-1
 #[test]
 fn test_errors_do_not_leak_secrets() {
     let test_secret = "super_secret_plant_passphrase_xyz123";
@@ -27,6 +29,7 @@ fn test_errors_do_not_leak_secrets() {
         Error::Cancelled,
         Error::Refused,
         Error::Internal,
+        Error::NotImplemented("test_feature"),
     ];
 
     for err in errors {
