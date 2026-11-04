@@ -23,6 +23,7 @@ trybuild = "1.0"
 undocumented_unsafe_blocks = "deny"
 missing_safety_doc = "deny"
 await_holding_lock = "deny"
+indexing_slicing = "deny"
 
 [[test]]
 name = "sy_audit_unsafe"
