@@ -160,7 +160,28 @@ pub enum RefusalReason {
     InvalidParameters,
 }
 
-/// Status der Lösch-Saga (SPEC 7.4, 11.2).
+/// Phase eines Löschablaufs (SPEC §7.4, D-124 Abs. 5).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+pub enum Phase {
+    /// Intent-Registrierung.
+    Intent,
+    /// Gate-Setzung.
+    Gate,
+    /// Schlüsselvernichtung.
+    KeyDestroy,
+    /// Physisches Bereinigen.
+    Purge,
+    /// Unabhängige Nachweismessung.
+    Verify,
+    /// Dokument-Ersetzung (D-115).
+    Replace,
+    /// Version-Supersede (D-117).
+    Supersede,
+    /// Zugriffseinschränkung (Art. 18 DSGVO, D-116).
+    Restrict,
+}
+
+/// Status der Lösch-Saga (SPEC 7.4, 11.2, D-124 Abs. 5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum ErasureStatus {
     /// Auftrag empfangen und validiert.
@@ -175,8 +196,14 @@ pub enum ErasureStatus {
     Verifying,
     /// Löschung vollständig nachgewiesen und abgeschlossen.
     Completed,
+    /// Einschränkung der Verarbeitung aktiv (D-116, D-124).
+    Restricted,
+    /// Einschränkung aufgehoben (D-116, D-124).
+    Lifted,
     /// Verzögert mit sichtbarem Grund (nie still).
     Pending {
+        /// Phase, in der die Verzögerung auftrat.
+        phase: Phase,
         /// Grund für den Schwebezustand.
         reason: PendingReason,
     },

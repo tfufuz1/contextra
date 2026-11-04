@@ -23,7 +23,7 @@ pub struct EraseRequest {
     pub erasure_id: [u8; 16],
 }
 
-/// Saga-Zustand (SPEC §11.2, ER-29).
+/// Saga-Zustand (SPEC §11.2, §7.4, D-124 Abs. 5, ER-29).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum SagaState {
     /// Löschauftrag eingegangen.
@@ -38,6 +38,10 @@ pub enum SagaState {
     Verifying,
     /// Löschung vollständig abgeschlossen.
     Completed,
+    /// Zugriffsbeschränkung aktiv (Art. 18 DSGVO, D-116).
+    Restricted,
+    /// Zugriffsbeschränkung aufgehoben (D-116).
+    Lifted,
     /// Temporär verzögert (mit Grund).
     Pending,
     /// Endgültig verweigert (terminal, vor Gate).
@@ -47,18 +51,20 @@ pub enum SagaState {
 impl SagaState {
     /// Prüft ob dieser Zustand ein Endzustand ist.
     pub fn is_terminal(self) -> bool {
-        matches!(self, Self::Completed | Self::Refused)
+        matches!(self, Self::Completed | Self::Refused | Self::Lifted)
     }
 
-    /// Prüft ob ein Übergang zu `next` erlaubt ist (SPEC §11.2).
+    /// Prüft ob ein Übergang zu `next` erlaubt ist (SPEC §11.2, I-4, FW-9).
     pub fn can_transition_to(self, next: SagaState) -> bool {
         use SagaState::*;
         match (self, next) {
-            // Normalpfad
+            // Normalpfad Löschung
             (Requested, Gated) => true,
+            (Requested, Restricted) => true,
             (Requested, Refused) => true,
             (Requested, Pending) => true,
             (Gated, KeyDestroyed) => true,
+            (Gated, Purging) => true, // D-117: Superseded Version ohne KeyDestroy direkt zu Purging
             (Gated, Pending) => true,
             (KeyDestroyed, Purging) => true,
             (KeyDestroyed, Pending) => true,
@@ -66,12 +72,15 @@ impl SagaState {
             (Purging, Pending) => true,
             (Verifying, Completed) => true,
             (Verifying, Pending) => true,
-            // Pending kann zu jedem nicht-Refused weiterführen
+            // Restriktion (D-116)
+            (Restricted, Lifted) => true,
+            (Restricted, Gated) => true, // Erase hebt Restriktion durch Löschung auf (D-15, D-119)
+            (Restricted, Pending) => true,
+            // Pending kann nur zu den aktiven Schritten fortsetzen, NIE direkt zu Completed (FW-9, I-4)
             (Pending, Gated) => true,
             (Pending, KeyDestroyed) => true,
             (Pending, Purging) => true,
             (Pending, Verifying) => true,
-            (Pending, Completed) => true,
             // Idempotenz: gleicher Zustand ist kein Fehler
             (a, b) if a == b => true,
             _ => false,
@@ -88,6 +97,8 @@ impl std::fmt::Display for SagaState {
             Self::Purging => write!(f, "Purging"),
             Self::Verifying => write!(f, "Verifying"),
             Self::Completed => write!(f, "Completed"),
+            Self::Restricted => write!(f, "Restricted"),
+            Self::Lifted => write!(f, "Lifted"),
             Self::Pending => write!(f, "Pending"),
             Self::Refused => write!(f, "Refused"),
         }

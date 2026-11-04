@@ -34,6 +34,10 @@ pub enum ErasureError {
         to: String,
     },
 
+    /// Limit überschritten (SPEC §7.5).
+    #[error("erasure-limit: {0}")]
+    LimitExceeded(String),
+
     /// Plattenreserve unterschritten.
     #[error("erasure-disk-reserve: insufficient free space")]
     DiskReserve,

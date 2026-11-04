@@ -235,3 +235,28 @@ pub fn add_batch(
         gates_count: requests.len(),
     })
 }
+
+/// Prüft den Zugriff auf `Restricted`-Daten nach Art. 18 Abs. 2 (SPEC D-116, T-RESTR-2..4).
+///
+/// Stapelgrenze höchstens 1 000 Elemente (T-RESTR-4).
+pub fn evaluate_restricted_access(
+    purpose: &str,
+    is_restricted_only: bool,
+    batch_size: usize,
+) -> Result<bool, ErasureError> {
+    if batch_size > 1000 {
+        return Err(ErasureError::LimitExceeded(
+            "Restricted-Zugriffsstapel überschreitet 1000 Elemente".to_string(),
+        ));
+    }
+
+    if !is_restricted_only {
+        // T-RESTR-3: Wirkung nur auf Restricted, Erased gewinnt stets
+        return Ok(false);
+    }
+
+    match purpose {
+        "LegalClaims" | "DataSubjectConsent" => Ok(true),
+        _ => Ok(false),
+    }
+}

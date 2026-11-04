@@ -63,6 +63,8 @@ pub struct Mk3Result {
     pub dek_derivation_fails: bool,
     /// F-Slots der Zieldateien nicht mehr vorhanden.
     pub file_slots_absent: bool,
+    /// Art der Verifikation (D-113).
+    pub verified_via: VerifiedVia,
 }
 
 impl Mk3Result {
@@ -72,7 +74,7 @@ impl Mk3Result {
     }
 }
 
-/// Führt eine MK3-Schlüsselprüfung durch (SPEC §12.1).
+/// Führt MK3-Schlüsselprüfung durch (SPEC §12.3, Anhang F.3, D-79, D-113).
 pub fn scan_mk3_keys(
     top_slot_zeroed: bool,
     dek_derivation_fails: bool,
@@ -82,6 +84,7 @@ pub fn scan_mk3_keys(
         top_slot_zeroed,
         dek_derivation_fails,
         file_slots_absent,
+        verified_via: VerifiedVia::Cached,
     }
 }
 
