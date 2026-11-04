@@ -23,8 +23,6 @@ use contextra_simd::dispatch::{cosine_distance, dot_product_distance, euclidean_
 use contextra_simd::kernels::scalar::{
     cosine_distance_scalar, dot_product_scalar, euclidean_distance_scalar,
 };
-
-// ANCHOR[contextra-simd:BENCH-SIMD-DISTANCES]
 // Benchmark-Ablauf:
 // 1. Initialisiert synthetische Testvektoren für Dimensionen 128, 512 und 1536.
 // 2. Misst die Ausführungszeit von Skalar vs. SIMD-Dispatch im Criterion-Loop.

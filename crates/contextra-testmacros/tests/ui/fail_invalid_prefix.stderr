@@ -1,7 +1,5 @@
 error: invalid test ID `INVALID-PREFIX-1`: must start with prefix `T-` (e.g. `T-TRACE-1`)
- --> tests/ui/fail_invalid_prefix.rs:3:1
+ --> tests/ui/fail_invalid_prefix.rs:3:17
   |
 3 | #[ctx_test(id = "INVALID-PREFIX-1")]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the attribute macro `ctx_test` (in Nightly builds, run with -Z macro-backtrace for more info)
+  |                 ^^^^^^^^^^^^^^^^^^

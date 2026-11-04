@@ -1,10 +1,10 @@
-// ANCHOR[contextra-mvcc:TEST-PROPTEST-REFERENCE-MODEL]
 //! # Property-Tests gegen ein unabhängiges Referenzmodell
 //!
 //! Prüft Snapshot-Isolation und SSI-Konflikterkennung (Write-Skew) gegen ein
 //! einfaches BTreeMap-basiertes Referenzmodell.
 
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
+use contextra_testmacros::ctx_test;
 use contextra_types::TxId;
 use proptest::prelude::*;
 use std::collections::BTreeMap;
@@ -56,7 +56,7 @@ enum TxAction {
 }
 
 proptest! {
-    #[test]
+#[ctx_test(id = "T-TXN-1")]
     fn prop_ssi_validation_matches_reference_model(
         actions in proptest::collection::vec(
             prop_oneof![
@@ -110,7 +110,7 @@ proptest! {
         }
     }
 
-    #[test]
+#[ctx_test(id = "T-TXN-1")]
     fn prop_prune_through_checked_invariants(
         commits in proptest::collection::vec(1..500u64, 1..30),
         prune_target in 0..1000u64,
@@ -145,7 +145,7 @@ proptest! {
         );
     }
 
-    #[test]
+#[ctx_test(id = "T-SNAP-1")]
     fn prop_snapshot_isolation_visibility_against_reference_model(
         initial_seq in 1..50u64,
         ops in proptest::collection::vec(

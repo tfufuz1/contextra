@@ -1,84 +1,89 @@
 // FILE-CONTEXT
 // ZWECK: AVX-512 SIMD-Intrinsics für f32 und f32_bytes Distanzberechnungen.
-// INVARIANTEN: Target-Features guaranteed by caller or feature-checks.
+// INVARIANTEN: Kanonische Distanz nach SPEC D-122 (5b): 16 Teilsummen (Lane = Index mod 16),
+//             kein FMA, feste paarweise Reduktion 16 -> 8 -> 4 -> 2 -> 1. Alle Kernel sind bitgleich.
 
 //! # Modul `kernels::avx512`
 //!
-//! **Ring-Zugehörigkeit:** Ring 0 (Unsafe-Insel).
+//! **Ring-Zugehörigkeit:** Ring 1 (Unsafe-Insel).
 //!
 //! **Zweck:**
-//! Höchstleistungs-Vektordistanzberechnungen auf modernen x86_64-Serverprozessoren mittels
-//! AVX-512 (AVX-512 Foundation `avx512f`).
-//! AVX-512 operiert auf 512-Bit breiten ZMM-Vektorregistern:
-//! - Verarbeitet 16 x `f32` (16 x 32-Bit = 512 Bit) parallel pro SIMD-Befehl (`_mm512_loadu_ps`, `_mm512_fmadd_ps`).
-//!
-//! **Sicherheitsgarantien (Safety-Invariante):**
-//! Alle Funktionen in diesem Modul sind als `pub(crate) unsafe fn` deklariert und erfordern
-//! verifizierte CPU-Unterstützung für das jeweilige `target_feature`. Der Aufruf erfolgt
-//! strikt über `dispatch.rs`.
+//! AVX-512 Vektordistanzberechnung auf x86_64-Prozessoren.
+//! Ein 512-Bit ZMM-Register fasst genau 16 `f32`-Werte (16 x 32-Bit = 512 Bit).
+//! Gemäß SPEC D-122 (5b) erfolgt die Berechnung ohne FMA und mit 16 Teilsummen.
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-// ANCHOR[contextra-simd:AVX512-COSINE-F32]
-/// Calculates cosine distance between two float vectors using AVX-512 instructions.
+use crate::kernels::scalar::canonical_reduce_16;
+
+/// Berechnet die Kosinus-Distanz zwischen zwei f32-Vektoren mittels AVX-512.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx512f` instruction set extension.
-/// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
 pub(crate) unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
-    let mut dot_v = unsafe { _mm512_setzero_ps() };
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
-    let mut norm_a_v = unsafe { _mm512_setzero_ps() };
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
-    let mut norm_b_v = unsafe { _mm512_setzero_ps() };
-
-    while i + 16 <= len {
-        // SAFETY:
-        // 1. Feature: Target feature `avx512f` is enabled via function attribute.
-        // 2. Length/Tail: `i + 16 <= len` where `len == a.len() == b.len()` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)` point to 16 readable `f32` elements.
-        // 3. Alignment: `_mm512_loadu_ps` handles unaligned memory addresses safely.
-        let (va, vb) = unsafe {
-            (
-                _mm512_loadu_ps(a.as_ptr().add(i)),
-                _mm512_loadu_ps(b.as_ptr().add(i)),
-            )
-        };
-
-        // SAFETY: Target feature `avx512f` is enabled and vector registers are valid `__m512`.
-        dot_v = unsafe { _mm512_fmadd_ps(va, vb, dot_v) };
-        // SAFETY: Target feature `avx512f` is enabled and vector registers are valid `__m512`.
-        norm_a_v = unsafe { _mm512_fmadd_ps(va, va, norm_a_v) };
-        // SAFETY: Target feature `avx512f` is enabled and vector registers are valid `__m512`.
-        norm_b_v = unsafe { _mm512_fmadd_ps(vb, vb, norm_b_v) };
-
-        i += 16;
-    }
-
-    // SAFETY: Target feature `avx512f` is enabled and `dot_v`, `norm_a_v`, `norm_b_v` are valid `__m512` vector registers.
-    let (mut dot, mut norm_a, mut norm_b) = unsafe {
+    // SAFETY: CPU-Feature avx512f ist aktiv.
+    let (mut dot_v, mut norm_a_v, mut norm_b_v) = unsafe {
         (
-            hsum512_ps_avx(dot_v),
-            hsum512_ps_avx(norm_a_v),
-            hsum512_ps_avx(norm_b_v),
+            _mm512_setzero_ps(),
+            _mm512_setzero_ps(),
+            _mm512_setzero_ps(),
         )
     };
 
+    let (a_ptr, b_ptr) = (a.as_ptr(), b.as_ptr());
+
+    while i + 16 <= len {
+        // SAFETY: Pointer-Offsets [i, i+16) liegen innerhalb der Grenzen [0, len) und avx512f ist aktiv.
+        unsafe {
+            let (va, vb) = (_mm512_loadu_ps(a_ptr.add(i)), _mm512_loadu_ps(b_ptr.add(i)));
+
+            let (prod_dot, prod_na, prod_nb) = (
+                _mm512_mul_ps(va, vb),
+                _mm512_mul_ps(va, va),
+                _mm512_mul_ps(vb, vb),
+            );
+
+            dot_v = _mm512_add_ps(dot_v, prod_dot);
+            norm_a_v = _mm512_add_ps(norm_a_v, prod_na);
+            norm_b_v = _mm512_add_ps(norm_b_v, prod_nb);
+        }
+        i += 16;
+    }
+
+    let mut dot_lanes = [0.0f32; 16];
+    let mut norm_a_lanes = [0.0f32; 16];
+    let mut norm_b_lanes = [0.0f32; 16];
+
+    // SAFETY: Auslesen der 512-Bit Register in 16-Element Float-Puffer.
+    unsafe {
+        _mm512_storeu_ps(dot_lanes.as_mut_ptr(), dot_v);
+        _mm512_storeu_ps(norm_a_lanes.as_mut_ptr(), norm_a_v);
+        _mm512_storeu_ps(norm_b_lanes.as_mut_ptr(), norm_b_v);
+    }
+
     while i < len {
-        // SAFETY: `i < len` where `len == a.len() == b.len()` guarantees `i` is within bounds of slices `a` and `b`.
-        let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };
-        dot += x * y;
-        norm_a += x * x;
-        norm_b += y * y;
+        let lane = i % 16;
+        if let (Some(&x), Some(&y)) = (a.get(i), b.get(i)) {
+            if let Some(slot) = dot_lanes.get_mut(lane) {
+                *slot += x * y;
+            }
+            if let Some(slot) = norm_a_lanes.get_mut(lane) {
+                *slot += x * x;
+            }
+            if let Some(slot) = norm_b_lanes.get_mut(lane) {
+                *slot += y * y;
+            }
+        }
         i += 1;
     }
+
+    let dot = canonical_reduce_16(&dot_lanes);
+    let norm_a = canonical_reduce_16(&norm_a_lanes);
+    let norm_b = canonical_reduce_16(&norm_b_lanes);
 
     if norm_a == 0.0 || norm_b == 0.0 {
         return 1.0;
@@ -89,174 +94,165 @@ pub(crate) unsafe fn cosine_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
     1.0 - sim
 }
 
-// ANCHOR[contextra-simd:AVX512-EUCLIDEAN-F32]
-/// Calculates Euclidean distance between two float vectors using AVX-512 instructions.
+/// Berechnet die Euklidische Distanz zwischen zwei f32-Vektoren mittels AVX-512.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx512f` instruction set extension.
-/// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
 pub(crate) unsafe fn euclidean_distance_avx512(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
+    // SAFETY: CPU-Feature avx512f ist aktiv.
     let mut sum_v = unsafe { _mm512_setzero_ps() };
+    let (a_ptr, b_ptr) = (a.as_ptr(), b.as_ptr());
 
     while i + 16 <= len {
-        // SAFETY:
-        // 1. Feature: Target feature `avx512f` is enabled via function attribute.
-        // 2. Length/Tail: `i + 16 <= len` where `len == a.len() == b.len()` guarantees 16 readable `f32` elements.
-        // 3. Alignment: `_mm512_loadu_ps` handles unaligned memory addresses safely.
-        let (va, vb) = unsafe {
-            (
-                _mm512_loadu_ps(a.as_ptr().add(i)),
-                _mm512_loadu_ps(b.as_ptr().add(i)),
-            )
-        };
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512`.
-        let diff = unsafe { _mm512_sub_ps(va, vb) };
+        // SAFETY: Pointer-Offsets [i, i+16) liegen innerhalb der Grenzen [0, len) und avx512f ist aktiv.
+        unsafe {
+            let (va, vb) = (_mm512_loadu_ps(a_ptr.add(i)), _mm512_loadu_ps(b_ptr.add(i)));
+            let diff = _mm512_sub_ps(va, vb);
+            let prod = _mm512_mul_ps(diff, diff);
 
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512`.
-        sum_v = unsafe { _mm512_fmadd_ps(diff, diff, sum_v) };
-
+            sum_v = _mm512_add_ps(sum_v, prod);
+        }
         i += 16;
     }
 
-    // SAFETY: Target feature `avx512f` is enabled and `sum_v` is a valid `__m512` vector register.
-    let mut sum = unsafe { hsum512_ps_avx(sum_v) };
+    let mut sum_lanes = [0.0f32; 16];
+    // SAFETY: Auslesen des 512-Bit Registers in 16-Element Float-Puffer.
+    unsafe {
+        _mm512_storeu_ps(sum_lanes.as_mut_ptr(), sum_v);
+    }
 
     while i < len {
-        // SAFETY: `i < len` where `len == a.len() == b.len()` guarantees `i` is within bounds of both slices.
-        let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };
-        let diff = x - y;
-        sum += diff * diff;
+        let lane = i % 16;
+        if let (Some(&x), Some(&y)) = (a.get(i), b.get(i)) {
+            let diff = x - y;
+            if let Some(slot) = sum_lanes.get_mut(lane) {
+                *slot += diff * diff;
+            }
+        }
         i += 1;
     }
 
+    let sum = canonical_reduce_16(&sum_lanes);
     sum.sqrt()
 }
 
-// ANCHOR[contextra-simd:AVX512-DOT-F32]
-/// Calculates dot product between two float vectors using AVX-512 instructions.
+/// Berechnet die Skalarprodukt-Distanz zwischen zwei f32-Vektoren mittels AVX-512.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx512f` instruction set extension.
-/// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
 pub(crate) unsafe fn dot_product_avx512(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
+    // SAFETY: CPU-Feature avx512f ist aktiv.
     let mut dot_v = unsafe { _mm512_setzero_ps() };
+    let (a_ptr, b_ptr) = (a.as_ptr(), b.as_ptr());
 
     while i + 16 <= len {
-        // SAFETY:
-        // 1. Feature: Target feature `avx512f` is enabled via function attribute.
-        // 2. Length/Tail: `i + 16 <= len` where `len == a.len() == b.len()` guarantees 16 readable `f32` elements.
-        // 3. Alignment: `_mm512_loadu_ps` handles unaligned memory addresses safely.
-        let (va, vb) = unsafe {
-            (
-                _mm512_loadu_ps(a.as_ptr().add(i)),
-                _mm512_loadu_ps(b.as_ptr().add(i)),
-            )
-        };
+        // SAFETY: Pointer-Offsets [i, i+16) liegen innerhalb der Grenzen [0, len) und avx512f ist aktiv.
+        unsafe {
+            let (va, vb) = (_mm512_loadu_ps(a_ptr.add(i)), _mm512_loadu_ps(b_ptr.add(i)));
+            let prod = _mm512_mul_ps(va, vb);
 
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512`.
-        dot_v = unsafe { _mm512_fmadd_ps(va, vb, dot_v) };
-
+            dot_v = _mm512_add_ps(dot_v, prod);
+        }
         i += 16;
     }
 
-    // SAFETY: Target feature `avx512f` is enabled and `dot_v` is a valid `__m512` vector register.
-    let mut dot = unsafe { hsum512_ps_avx(dot_v) };
+    let mut dot_lanes = [0.0f32; 16];
+    // SAFETY: Auslesen des 512-Bit Registers in 16-Element Float-Puffer.
+    unsafe {
+        _mm512_storeu_ps(dot_lanes.as_mut_ptr(), dot_v);
+    }
 
     while i < len {
-        // SAFETY: `i < len` where `len == a.len() == b.len()` guarantees `i` is within bounds of both slices.
-        let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };
-        dot += x * y;
+        let lane = i % 16;
+        if let (Some(&x), Some(&y)) = (a.get(i), b.get(i)) {
+            if let Some(slot) = dot_lanes.get_mut(lane) {
+                *slot += x * y;
+            }
+        }
         i += 1;
     }
 
+    let dot = canonical_reduce_16(&dot_lanes);
     -dot
 }
 
-// ANCHOR[contextra-simd:AVX512-COSINE-F32-BYTES]
-/// Calculates cosine distance between an f32 vector and raw LE f32 bytes using AVX-512 instructions.
+/// Berechnet die Kosinus-Distanz zwischen f32-Slice und LE Byte-Slice mittels AVX-512.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx512f` instruction set extension.
-/// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
 pub(crate) unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
-    let mut dot_v = unsafe { _mm512_setzero_ps() };
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
-    let mut norm_a_v = unsafe { _mm512_setzero_ps() };
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
-    let mut norm_b_v = unsafe { _mm512_setzero_ps() };
-
-    while i + 16 <= len {
-        // SAFETY:
-        // 1. Feature: Target feature `avx512f` is enabled via function attribute.
-        // 2. Length/Tail: `i + 16 <= len` and `b_bytes.len() >= a.len() * 4` guarantee 16 readable `f32`s (64 bytes).
-        // 3. Alignment: `_mm512_loadu_ps` handles unaligned memory addresses safely.
-        let (va, vb) = unsafe {
-            (
-                _mm512_loadu_ps(a.as_ptr().add(i)),
-                _mm512_loadu_ps(b_bytes.as_ptr().add(i * 4) as *const f32),
-            )
-        };
-
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512`.
-        dot_v = unsafe { _mm512_fmadd_ps(va, vb, dot_v) };
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512`.
-        norm_a_v = unsafe { _mm512_fmadd_ps(va, va, norm_a_v) };
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512`.
-        norm_b_v = unsafe { _mm512_fmadd_ps(vb, vb, norm_b_v) };
-
-        i += 16;
-    }
-
-    // SAFETY: Target feature `avx512f` is enabled and vector registers are valid `__m512`.
-    let (mut dot, mut norm_a, mut norm_b) = unsafe {
+    // SAFETY: CPU-Feature avx512f ist aktiv.
+    let (mut dot_v, mut norm_a_v, mut norm_b_v) = unsafe {
         (
-            hsum512_ps_avx(dot_v),
-            hsum512_ps_avx(norm_a_v),
-            hsum512_ps_avx(norm_b_v),
+            _mm512_setzero_ps(),
+            _mm512_setzero_ps(),
+            _mm512_setzero_ps(),
         )
     };
 
+    let (a_ptr, b_ptr) = (a.as_ptr(), b_bytes.as_ptr().cast::<f32>());
+
+    while i + 16 <= len {
+        // SAFETY: Pointer-Offsets liegen innerhalb valider Grenzen und avx512f ist aktiv.
+        unsafe {
+            let (va, vb) = (_mm512_loadu_ps(a_ptr.add(i)), _mm512_loadu_ps(b_ptr.add(i)));
+
+            let (prod_dot, prod_na, prod_nb) = (
+                _mm512_mul_ps(va, vb),
+                _mm512_mul_ps(va, va),
+                _mm512_mul_ps(vb, vb),
+            );
+
+            dot_v = _mm512_add_ps(dot_v, prod_dot);
+            norm_a_v = _mm512_add_ps(norm_a_v, prod_na);
+            norm_b_v = _mm512_add_ps(norm_b_v, prod_nb);
+        }
+        i += 16;
+    }
+
+    let mut dot_lanes = [0.0f32; 16];
+    let mut norm_a_lanes = [0.0f32; 16];
+    let mut norm_b_lanes = [0.0f32; 16];
+
+    // SAFETY: Auslesen der 512-Bit Register in 16-Element Float-Puffer.
+    unsafe {
+        _mm512_storeu_ps(dot_lanes.as_mut_ptr(), dot_v);
+        _mm512_storeu_ps(norm_a_lanes.as_mut_ptr(), norm_a_v);
+        _mm512_storeu_ps(norm_b_lanes.as_mut_ptr(), norm_b_v);
+    }
+
     while i < len {
-        // SAFETY:
-        // 1. Length/Tail: `i < len` and `b_bytes.len() >= a.len() * 4` guarantee indices are within bounds.
-        // 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
-        let (x, b_val) = unsafe {
-            (
-                *a.get_unchecked(i),
-                f32::from_le_bytes([
-                    *b_bytes.get_unchecked(i * 4),
-                    *b_bytes.get_unchecked(i * 4 + 1),
-                    *b_bytes.get_unchecked(i * 4 + 2),
-                    *b_bytes.get_unchecked(i * 4 + 3),
-                ]),
-            )
-        };
-        dot += x * b_val;
-        norm_a += x * x;
-        norm_b += b_val * b_val;
+        let lane = i % 16;
+        let offset = i * 4;
+        if let (Some(&x), Some(chunk)) = (a.get(i), b_bytes.get(offset..offset + 4)) {
+            if let Ok(bytes) = chunk.try_into() {
+                let b_val = f32::from_le_bytes(bytes);
+                if let Some(slot) = dot_lanes.get_mut(lane) {
+                    *slot += x * b_val;
+                }
+                if let Some(slot) = norm_a_lanes.get_mut(lane) {
+                    *slot += x * x;
+                }
+                if let Some(slot) = norm_b_lanes.get_mut(lane) {
+                    *slot += b_val * b_val;
+                }
+            }
+        }
         i += 1;
     }
+
+    let dot = canonical_reduce_16(&dot_lanes);
+    let norm_a = canonical_reduce_16(&norm_a_lanes);
+    let norm_b = canonical_reduce_16(&norm_b_lanes);
 
     if norm_a == 0.0 || norm_b == 0.0 {
         return 1.0;
@@ -267,147 +263,98 @@ pub(crate) unsafe fn cosine_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8])
     1.0 - sim
 }
 
-// ANCHOR[contextra-simd:AVX512-EUCLIDEAN-F32-BYTES]
-/// Calculates Euclidean distance between an f32 vector and raw LE f32 bytes using AVX-512 instructions.
+/// Berechnet die Euklidische Distanz zwischen f32-Slice und LE Byte-Slice mittels AVX-512.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx512f` instruction set extension.
-/// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
 pub(crate) unsafe fn euclidean_distance_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
+    // SAFETY: CPU-Feature avx512f ist aktiv.
     let mut sum_v = unsafe { _mm512_setzero_ps() };
+    let (a_ptr, b_ptr) = (a.as_ptr(), b_bytes.as_ptr().cast::<f32>());
 
     while i + 16 <= len {
-        // SAFETY:
-        // 1. Feature: Target feature `avx512f` is enabled via function attribute.
-        // 2. Length/Tail: `i + 16 <= len` and `b_bytes.len() >= a.len() * 4` guarantee 16 readable `f32`s (64 bytes).
-        // 3. Alignment: `_mm512_loadu_ps` handles unaligned memory addresses safely.
-        let (va, vb) = unsafe {
-            (
-                _mm512_loadu_ps(a.as_ptr().add(i)),
-                _mm512_loadu_ps(b_bytes.as_ptr().add(i * 4) as *const f32),
-            )
-        };
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512`.
-        let diff = unsafe { _mm512_sub_ps(va, vb) };
+        // SAFETY: Pointer-Offsets liegen innerhalb valider Grenzen und avx512f ist aktiv.
+        unsafe {
+            let (va, vb) = (_mm512_loadu_ps(a_ptr.add(i)), _mm512_loadu_ps(b_ptr.add(i)));
+            let diff = _mm512_sub_ps(va, vb);
+            let prod = _mm512_mul_ps(diff, diff);
 
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512`.
-        sum_v = unsafe { _mm512_fmadd_ps(diff, diff, sum_v) };
-
+            sum_v = _mm512_add_ps(sum_v, prod);
+        }
         i += 16;
     }
 
-    // SAFETY: Target feature `avx512f` is enabled and `sum_v` is a valid `__m512` vector register.
-    let mut sum = unsafe { hsum512_ps_avx(sum_v) };
+    let mut sum_lanes = [0.0f32; 16];
+    // SAFETY: Auslesen des 512-Bit Registers in 16-Element Float-Puffer.
+    unsafe {
+        _mm512_storeu_ps(sum_lanes.as_mut_ptr(), sum_v);
+    }
 
     while i < len {
-        // SAFETY:
-        // 1. Length/Tail: `i < len` and `b_bytes.len() >= a.len() * 4` guarantee indices are within bounds.
-        // 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
-        let (x, b_val) = unsafe {
-            (
-                *a.get_unchecked(i),
-                f32::from_le_bytes([
-                    *b_bytes.get_unchecked(i * 4),
-                    *b_bytes.get_unchecked(i * 4 + 1),
-                    *b_bytes.get_unchecked(i * 4 + 2),
-                    *b_bytes.get_unchecked(i * 4 + 3),
-                ]),
-            )
-        };
-        let diff = x - b_val;
-        sum += diff * diff;
+        let lane = i % 16;
+        let offset = i * 4;
+        if let (Some(&x), Some(chunk)) = (a.get(i), b_bytes.get(offset..offset + 4)) {
+            if let Ok(bytes) = chunk.try_into() {
+                let b_val = f32::from_le_bytes(bytes);
+                let diff = x - b_val;
+                if let Some(slot) = sum_lanes.get_mut(lane) {
+                    *slot += diff * diff;
+                }
+            }
+        }
         i += 1;
     }
 
+    let sum = canonical_reduce_16(&sum_lanes);
     sum.sqrt()
 }
 
-// ANCHOR[contextra-simd:AVX512-DOT-F32-BYTES]
-/// Calculates dot product between an f32 vector and raw LE f32 bytes using AVX-512 instructions.
+/// Berechnet die Skalarprodukt-Distanz zwischen f32-Slice und LE Byte-Slice mittels AVX-512.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx512f` instruction set extension.
-/// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512f")]
 pub(crate) unsafe fn dot_product_f32_bytes_avx512(a: &[f32], b_bytes: &[u8]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target feature `avx512f` is verified by caller and enabled on function attribute.
+    // SAFETY: CPU-Feature avx512f ist aktiv.
     let mut dot_v = unsafe { _mm512_setzero_ps() };
+    let (a_ptr, b_ptr) = (a.as_ptr(), b_bytes.as_ptr().cast::<f32>());
 
     while i + 16 <= len {
-        // SAFETY:
-        // 1. Feature: Target feature `avx512f` is enabled via function attribute.
-        // 2. Length/Tail: `i + 16 <= len` and `b_bytes.len() >= a.len() * 4` guarantee readable memory for 16 `f32`s.
-        // 3. Alignment: `_mm512_loadu_ps` handles unaligned memory loads safely.
-        let (va, vb) = unsafe {
-            (
-                _mm512_loadu_ps(a.as_ptr().add(i)),
-                _mm512_loadu_ps(b_bytes.as_ptr().add(i * 4) as *const f32),
-            )
-        };
+        // SAFETY: Pointer-Offsets liegen innerhalb valider Grenzen und avx512f ist aktiv.
+        unsafe {
+            let (va, vb) = (_mm512_loadu_ps(a_ptr.add(i)), _mm512_loadu_ps(b_ptr.add(i)));
+            let prod = _mm512_mul_ps(va, vb);
 
-        // SAFETY: Target feature `avx512f` is enabled and registers are valid `__m512`.
-        dot_v = unsafe { _mm512_fmadd_ps(va, vb, dot_v) };
-
+            dot_v = _mm512_add_ps(dot_v, prod);
+        }
         i += 16;
     }
 
-    // SAFETY: Target feature `avx512f` is enabled and `dot_v` is a valid `__m512` vector register.
-    let mut dot = unsafe { hsum512_ps_avx(dot_v) };
+    let mut dot_lanes = [0.0f32; 16];
+    // SAFETY: Auslesen des 512-Bit Registers in 16-Element Float-Puffer.
+    unsafe {
+        _mm512_storeu_ps(dot_lanes.as_mut_ptr(), dot_v);
+    }
 
     while i < len {
-        // SAFETY:
-        // 1. Length/Tail: `i < len` and `b_bytes.len() >= a.len() * 4` guarantee indices are within bounds.
-        // 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
-        let (x, b_val) = unsafe {
-            (
-                *a.get_unchecked(i),
-                f32::from_le_bytes([
-                    *b_bytes.get_unchecked(i * 4),
-                    *b_bytes.get_unchecked(i * 4 + 1),
-                    *b_bytes.get_unchecked(i * 4 + 2),
-                    *b_bytes.get_unchecked(i * 4 + 3),
-                ]),
-            )
-        };
-        dot += x * b_val;
+        let lane = i % 16;
+        let offset = i * 4;
+        if let (Some(&x), Some(chunk)) = (a.get(i), b_bytes.get(offset..offset + 4)) {
+            if let Ok(bytes) = chunk.try_into() {
+                let b_val = f32::from_le_bytes(bytes);
+                if let Some(slot) = dot_lanes.get_mut(lane) {
+                    *slot += x * b_val;
+                }
+            }
+        }
         i += 1;
     }
 
+    let dot = canonical_reduce_16(&dot_lanes);
     -dot
-}
-
-// ANCHOR[contextra-simd:AVX512-HSUM512-PS]
-/// Horizontal sum of 16 x f32 values in a 512-bit AVX-512 vector register.
-///
-/// # Safety
-/// Caller must ensure that target CPU supports `avx512f` instruction set extension.
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx512f")]
-pub(crate) unsafe fn hsum512_ps_avx(v: __m512) -> f32 {
-    // SAFETY: Target feature `avx512f` is enabled. `_mm512_extractf32x8_ps` requires `unsafe` block for intrinsic target feature `avx512dq`.
-    let v256 = unsafe { _mm256_add_ps(_mm512_extractf32x8_ps(v, 0), _mm512_extractf32x8_ps(v, 1)) };
-    // SAFETY: Target feature `avx512f` is enabled and `v256` is a valid `__m256` register.
-    let vlow = unsafe { _mm256_castps256_ps128(v256) };
-    // SAFETY: Target feature `avx512f` is enabled and `v256` is a valid `__m256` register.
-    let vhigh = unsafe { _mm256_extractf128_ps(v256, 1) };
-    // SAFETY: Target feature `avx512f` is enabled and `vlow`, `vhigh` are valid `__m128` registers.
-    let v128 = unsafe { _mm_add_ps(vlow, vhigh) };
-    // SAFETY: Target feature `avx512f` is enabled and `v128` is a valid `__m128` register.
-    let v64 = unsafe { _mm_add_ps(v128, _mm_movehl_ps(v128, v128)) };
-    // SAFETY: Target feature `avx512f` is enabled and `v64` is a valid `__m128` register.
-    let v32 = unsafe { _mm_add_ss(v64, _mm_shuffle_ps(v64, v64, 0x55)) };
-    // SAFETY: Target feature `avx512f` is enabled and `v32` contains a valid scalar float at lane 0.
-    unsafe { _mm_cvtss_f32(v32) }
 }

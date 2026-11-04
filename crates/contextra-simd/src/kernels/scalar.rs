@@ -1,219 +1,222 @@
 // FILE-CONTEXT
-// ZWECK: Skalare Fallback-Implementierung der Distanzmetriken (f32, f32_bytes, u8, f32_u8).
-// INVARIANTEN: Mathematisch exakt und deterministisch; Null-Division-Schutz für Cosine.
+// ZWECK: Skalare kanonische Referenz-Implementierung der Distanzmetriken (f32, f32_bytes).
+// INVARIANTEN: Kanonische Distanz nach SPEC D-122 (5b): 16 Teilsummen (Lane = Index mod 16),
+//             kein FMA, feste paarweise Reduktion 16 -> 8 -> 4 -> 2 -> 1. Alle Kernel sind bitgleich.
 
 //! # Modul `kernels::scalar`
 //!
-//! **Ring-Zugehörigkeit:** Ring 0.
+//! **Ring-Zugehörigkeit:** Ring 1.
 //!
 //! **Zweck:**
-//! Plattformunabhängige Referenzimplementierung aller Distanzmetriken in reinem, sicherem Rust.
-//! Dieses Modul dient zwei Zwecken:
-//! 1. **Fallback:** Ausführung auf Plattformen ohne AVX2/AVX-512/NEON-Hardware-Support oder
-//!    bei Vektorlängen unterhalb der SIMD-Registerbreite.
-//! 2. **Orakel für Tests:** Differential- und Quertests vergleichen die Ergebnisse der
-//!    SIMD-Kernel bitgenau oder innerhalb definierter Fehlertoleranzen gegen diese Funktionen.
-//!
-//! **Unterstützte Metriken und Formate:**
-//! - Kosinus-Distanz ($1.0 - text{Kosinus-Ähnlichkeit}$), Euklidische Distanz ($\sqrt{\sum(a_i-b_i)^2}$)
-//!   und Skalarprodukt (negierter Vektor-Dot-Product) für `f32`.
-//! - Zero-Copy Byte-Slices (`&[u8]`) mit Little-Endian encodierten `f32`-Werten.
-//! - Ganzzahl-Vektoren (`&[u8]`) für kompakte Quantisierung (z. B. SQ8).
-//! - Gemischte Präzision (`f32` und `u8`) mit Dequantisierungs-Parametern ($lpha_i$, $\min_i$).
+//! Plattformunabhängige kanonische Referenzimplementierung aller Distanzmetriken in reinem, sicherem Rust.
 
-// ANCHOR[contextra-simd:SCAL-PARTS-U8]
-/// Struct holding raw integer sum components for u8 cosine similarity calculation.
+/// Feste paarweise Reduktion von 16 Teilsummen nach SPEC D-122 (5b).
+#[inline(always)]
+pub fn canonical_reduce_16(lanes: &[f32; 16]) -> f32 {
+    let [l0, l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13, l14, l15] = *lanes;
+    let r8_0 = l0 + l1;
+    let r8_1 = l2 + l3;
+    let r8_2 = l4 + l5;
+    let r8_3 = l6 + l7;
+    let r8_4 = l8 + l9;
+    let r8_5 = l10 + l11;
+    let r8_6 = l12 + l13;
+    let r8_7 = l14 + l15;
+
+    let r4_0 = r8_0 + r8_1;
+    let r4_1 = r8_2 + r8_3;
+    let r4_2 = r8_4 + r8_5;
+    let r4_3 = r8_6 + r8_7;
+
+    let r2_0 = r4_0 + r4_1;
+    let r2_1 = r4_2 + r4_3;
+
+    r2_0 + r2_1
+}
+
+/// Skalare kanonische Kosinus-Distanz auf `f32`-Slices.
+#[inline]
+pub fn cosine_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
+    let mut dot_lanes = [0.0f32; 16];
+    let mut norm_a_lanes = [0.0f32; 16];
+    let mut norm_b_lanes = [0.0f32; 16];
+
+    for (i, (&x, &y)) in a.iter().zip(b.iter()).enumerate() {
+        let lane = i % 16;
+        if let Some(slot) = dot_lanes.get_mut(lane) {
+            *slot += x * y;
+        }
+        if let Some(slot) = norm_a_lanes.get_mut(lane) {
+            *slot += x * x;
+        }
+        if let Some(slot) = norm_b_lanes.get_mut(lane) {
+            *slot += y * y;
+        }
+    }
+
+    let dot = canonical_reduce_16(&dot_lanes);
+    let norm_a = canonical_reduce_16(&norm_a_lanes);
+    let norm_b = canonical_reduce_16(&norm_b_lanes);
+
+    if norm_a == 0.0 || norm_b == 0.0 {
+        return 1.0;
+    }
+
+    let denom = norm_a.sqrt() * norm_b.sqrt();
+    let sim = (dot / denom).clamp(-1.0, 1.0);
+    1.0 - sim
+}
+
+/// Skalare kanonische Euklidische Distanz auf `f32`-Slices.
+#[inline]
+pub fn euclidean_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
+    let mut sum_lanes = [0.0f32; 16];
+
+    for (i, (&x, &y)) in a.iter().zip(b.iter()).enumerate() {
+        let lane = i % 16;
+        let diff = x - y;
+        if let Some(slot) = sum_lanes.get_mut(lane) {
+            *slot += diff * diff;
+        }
+    }
+
+    let sum = canonical_reduce_16(&sum_lanes);
+    sum.sqrt()
+}
+
+/// Skalare kanonische Skalarprodukt-Distanz (negiertes Dot Product) auf `f32`-Slices.
+#[inline]
+pub fn dot_product_scalar(a: &[f32], b: &[f32]) -> f32 {
+    let mut dot_lanes = [0.0f32; 16];
+
+    for (i, (&x, &y)) in a.iter().zip(b.iter()).enumerate() {
+        let lane = i % 16;
+        if let Some(slot) = dot_lanes.get_mut(lane) {
+            *slot += x * y;
+        }
+    }
+
+    let dot = canonical_reduce_16(&dot_lanes);
+    -dot
+}
+
+/// Skalare kanonische Kosinus-Distanz zwischen `f32`-Slice und LE `f32`-Byte-Slice.
+#[inline]
+pub fn cosine_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let mut dot_lanes = [0.0f32; 16];
+    let mut norm_a_lanes = [0.0f32; 16];
+    let mut norm_b_lanes = [0.0f32; 16];
+
+    for (i, &x) in a.iter().enumerate() {
+        let offset = i * 4;
+        let Some(chunk) = b_bytes.get(offset..offset + 4) else {
+            break;
+        };
+        let Ok(bytes) = chunk.try_into() else {
+            break;
+        };
+        let b_val = f32::from_le_bytes(bytes);
+        let lane = i % 16;
+        if let Some(slot) = dot_lanes.get_mut(lane) {
+            *slot += x * b_val;
+        }
+        if let Some(slot) = norm_a_lanes.get_mut(lane) {
+            *slot += x * x;
+        }
+        if let Some(slot) = norm_b_lanes.get_mut(lane) {
+            *slot += b_val * b_val;
+        }
+    }
+
+    let dot = canonical_reduce_16(&dot_lanes);
+    let norm_a = canonical_reduce_16(&norm_a_lanes);
+    let norm_b = canonical_reduce_16(&norm_b_lanes);
+
+    if norm_a == 0.0 || norm_b == 0.0 {
+        return 1.0;
+    }
+
+    let denom = norm_a.sqrt() * norm_b.sqrt();
+    let sim = (dot / denom).clamp(-1.0, 1.0);
+    1.0 - sim
+}
+
+/// Skalare kanonische Euklidische Distanz zwischen `f32`-Slice und LE `f32`-Byte-Slice.
+#[inline]
+pub fn euclidean_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let mut sum_lanes = [0.0f32; 16];
+
+    for (i, &x) in a.iter().enumerate() {
+        let offset = i * 4;
+        let Some(chunk) = b_bytes.get(offset..offset + 4) else {
+            break;
+        };
+        let Ok(bytes) = chunk.try_into() else {
+            break;
+        };
+        let b_val = f32::from_le_bytes(bytes);
+        let lane = i % 16;
+        let diff = x - b_val;
+        if let Some(slot) = sum_lanes.get_mut(lane) {
+            *slot += diff * diff;
+        }
+    }
+
+    let sum = canonical_reduce_16(&sum_lanes);
+    sum.sqrt()
+}
+
+/// Skalare kanonische Skalarprodukt-Distanz zwischen `f32`-Slice und LE `f32`-Byte-Slice.
+#[inline]
+pub fn dot_product_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
+    let mut dot_lanes = [0.0f32; 16];
+
+    for (i, &x) in a.iter().enumerate() {
+        let offset = i * 4;
+        let Some(chunk) = b_bytes.get(offset..offset + 4) else {
+            break;
+        };
+        let Ok(bytes) = chunk.try_into() else {
+            break;
+        };
+        let b_val = f32::from_le_bytes(bytes);
+        let lane = i % 16;
+        if let Some(slot) = dot_lanes.get_mut(lane) {
+            *slot += x * b_val;
+        }
+    }
+
+    let dot = canonical_reduce_16(&dot_lanes);
+    -dot
+}
+
+/// Normalisiert einen `f32`-Vektor in-place auf Einheitslänge.
+pub fn normalize_inplace(v: &mut [f32]) {
+    let mut norm_lanes = [0.0f32; 16];
+    for (i, &x) in v.iter().enumerate() {
+        let lane = i % 16;
+        if let Some(slot) = norm_lanes.get_mut(lane) {
+            *slot += x * x;
+        }
+    }
+    let norm_sq = canonical_reduce_16(&norm_lanes);
+    if norm_sq > 0.0 {
+        let inv_norm = 1.0 / norm_sq.sqrt();
+        for x in v.iter_mut() {
+            *x *= inv_norm;
+        }
+    }
+}
+
+/// Komponenten für ganzzahlige Kosinus-Ähnlichkeit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CosineSimilarityPartsU8 {
-    /// Accumulated dot product $\sum a_i b_i$.
     pub dot: u32,
-    /// Accumulated squared L2 norm $\sum a_i^2$.
     pub norm_a_sq: u32,
-    /// Accumulated squared L2 norm $\sum b_i^2$.
     pub norm_b_sq: u32,
 }
 
-// ANCHOR[contextra-simd:SCAL-PARTS-F32-U8]
-/// Struct holding raw float sum components for f32/u8 mixed cosine similarity calculation.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct CosineSimilarityPartsF32U8 {
-    /// Accumulated dot product $\sum a_i (b_i \text{ as } f32)$.
-    pub dot: f32,
-    /// Accumulated squared L2 norm $\sum a_i^2$.
-    pub norm_a_sq: f32,
-    /// Accumulated squared L2 norm $\sum (b_i \text{ as } f32)^2$.
-    pub norm_b_sq: f32,
-}
-
-// ANCHOR[contextra-simd:SCAL-COSINE-F32]
-/// Scalar reference implementation for cosine distance on `f32` slices.
-///
-/// # Semantics
-///
-/// Calculates $1.0 - \text{cosine\_similarity}(a, b)$. Cosine similarity is clamped to $[-1.0, 1.0]$.
-/// Zero-norm vectors safely return `1.0`.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = \min(a.len(), b.len())$.
-#[inline]
-pub fn cosine_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
-    let mut dot = 0.0f32;
-    let mut norm_a = 0.0f32;
-    let mut norm_b = 0.0f32;
-
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        dot += x * y;
-        norm_a += x * x;
-        norm_b += y * y;
-    }
-
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return 1.0;
-    }
-
-    let denom = norm_a.sqrt() * norm_b.sqrt();
-    let sim = (dot / denom).clamp(-1.0, 1.0);
-    1.0 - sim
-}
-
-// ANCHOR[contextra-simd:SCAL-EUCLIDEAN-F32]
-/// Scalar reference implementation for Euclidean distance on `f32` slices.
-///
-/// # Semantics
-///
-/// Calculates $\sqrt{\sum (a_i - b_i)^2}$.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = \min(a.len(), b.len())$.
-#[inline]
-pub fn euclidean_distance_scalar(a: &[f32], b: &[f32]) -> f32 {
-    let mut sum = 0.0f32;
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        let diff = x - y;
-        sum += diff * diff;
-    }
-    sum.sqrt()
-}
-
-// ANCHOR[contextra-simd:SCAL-DOT-F32]
-/// Scalar reference implementation for dot product distance on `f32` slices.
-///
-/// # Semantics
-///
-/// Calculates negated dot product $- \sum a_i b_i$.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = \min(a.len(), b.len())$.
-#[inline]
-pub fn dot_product_scalar(a: &[f32], b: &[f32]) -> f32 {
-    let mut dot = 0.0f32;
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        dot += x * y;
-    }
-    -dot
-}
-
-// ANCHOR[contextra-simd:SCAL-COSINE-F32-BYTES]
-/// Scalar reference implementation for cosine distance between `f32` slice and raw LE `f32` byte slice.
-///
-/// # Semantics
-///
-/// Decodes `f32` values from `b_bytes` via little-endian bytes and computes cosine distance against `a`.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = a.len()$.
-#[inline]
-#[allow(clippy::indexing_slicing)]
-pub fn cosine_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
-    let mut dot = 0.0f32;
-    let mut norm_a = 0.0f32;
-    let mut norm_b = 0.0f32;
-
-    for (i, &x) in a.iter().enumerate() {
-        if let Some(chunk) = b_bytes.get(i * 4..i * 4 + 4) {
-            if let Ok(bytes) = chunk.try_into() {
-                let b_val = f32::from_le_bytes(bytes);
-                dot += x * b_val;
-                norm_a += x * x;
-                norm_b += b_val * b_val;
-            }
-        }
-    }
-
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return 1.0;
-    }
-
-    let denom = norm_a.sqrt() * norm_b.sqrt();
-    let sim = (dot / denom).clamp(-1.0, 1.0);
-    1.0 - sim
-}
-
-// ANCHOR[contextra-simd:SCAL-EUCLIDEAN-F32-BYTES]
-/// Scalar reference implementation for Euclidean distance between `f32` slice and raw LE `f32` byte slice.
-///
-/// # Semantics
-///
-/// Decodes `f32` values from `b_bytes` via little-endian bytes and computes Euclidean distance against `a`.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = a.len()$.
-#[inline]
-#[allow(clippy::indexing_slicing)]
-pub fn euclidean_distance_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
-    let mut sum = 0.0f32;
-    for (i, &x) in a.iter().enumerate() {
-        if let Some(chunk) = b_bytes.get(i * 4..i * 4 + 4) {
-            if let Ok(bytes) = chunk.try_into() {
-                let b_val = f32::from_le_bytes(bytes);
-                let diff = x - b_val;
-                sum += diff * diff;
-            }
-        }
-    }
-    sum.sqrt()
-}
-
-// ANCHOR[contextra-simd:SCAL-DOT-F32-BYTES]
-/// Scalar reference implementation for dot product distance between `f32` slice and raw LE `f32` byte slice.
-///
-/// # Semantics
-///
-/// Decodes `f32` values from `b_bytes` via little-endian bytes and computes negated dot product against `a`.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = a.len()$.
-#[inline]
-#[allow(clippy::indexing_slicing)]
-pub fn dot_product_f32_bytes_scalar(a: &[f32], b_bytes: &[u8]) -> f32 {
-    let mut dot = 0.0f32;
-    for (i, &x) in a.iter().enumerate() {
-        if let Some(chunk) = b_bytes.get(i * 4..i * 4 + 4) {
-            if let Ok(bytes) = chunk.try_into() {
-                let b_val = f32::from_le_bytes(bytes);
-                dot += x * b_val;
-            }
-        }
-    }
-    -dot
-}
-
-// ANCHOR[contextra-simd:SCAL-DOT-U8]
-/// Scalar reference implementation for unsigned integer dot product between two `u8` byte slices.
-///
-/// # Semantics
-///
-/// Calculates $\sum a_i b_i$ with 32-bit unsigned accumulation.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = \min(a.len(), b.len())$.
+/// Skalare Referenz für ganzzahliges Skalarprodukt.
 #[inline]
 pub fn dot_product_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
     let mut dot = 0u32;
@@ -223,16 +226,7 @@ pub fn dot_product_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
     dot
 }
 
-// ANCHOR[contextra-simd:SCAL-EUCLIDEAN-SQ-U8]
-/// Scalar reference implementation for squared Euclidean distance between two `u8` byte slices.
-///
-/// # Semantics
-///
-/// Calculates $\sum (a_i - b_i)^2$ with 32-bit unsigned accumulation.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = \min(a.len(), b.len())$.
+/// Skalare Referenz für quadrierte euklidische Distanz auf u8.
 #[inline]
 pub fn euclidean_distance_sq_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
     let mut sum = 0u32;
@@ -244,16 +238,7 @@ pub fn euclidean_distance_sq_u8_scalar(a: &[u8], b: &[u8]) -> u32 {
     sum
 }
 
-// ANCHOR[contextra-simd:SCAL-COSINE-PARTS-U8]
-/// Scalar reference implementation for `u8` cosine similarity component parts.
-///
-/// # Semantics
-///
-/// Returns [`CosineSimilarityPartsU8`] containing dot product and squared norms.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = \min(a.len(), b.len())$.
+/// Skalare Referenz für Kosinus-Komponenten auf u8.
 #[inline]
 pub fn cosine_similarity_parts_u8_scalar(a: &[u8], b: &[u8]) -> CosineSimilarityPartsU8 {
     let mut dot = 0u32;
@@ -275,16 +260,7 @@ pub fn cosine_similarity_parts_u8_scalar(a: &[u8], b: &[u8]) -> CosineSimilarity
     }
 }
 
-// ANCHOR[contextra-simd:SCAL-DOT-F32-U8]
-/// Scalar reference implementation for mixed `f32`/`u8` dot product.
-///
-/// # Semantics
-///
-/// Calculates $\sum a_i (b_i \text{ as } f32)$.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = \min(a.len(), b.len())$.
+/// Kompatibilitäts-Funktion für gemischte f32/u8 Skalarprodukte.
 #[inline]
 pub fn dot_product_f32_u8(a: &[f32], b: &[u8]) -> f32 {
     let mut dot = 0.0f32;
@@ -294,16 +270,7 @@ pub fn dot_product_f32_u8(a: &[f32], b: &[u8]) -> f32 {
     dot
 }
 
-// ANCHOR[contextra-simd:SCAL-EUCLIDEAN-SQ-F32-U8]
-/// Scalar reference implementation for mixed `f32`/`u8` scalar dequantized squared Euclidean distance.
-///
-/// # Semantics
-///
-/// Calculates $\sum (a_i - (b_i \cdot \alpha_i + \min_i))^2$.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = \min(a.len(), b.len(), \alpha.len(), \min.len())$.
+/// Kompatibilitäts-Funktion für dequantisierte quadrierte euklidische Distanz.
 #[inline]
 pub fn euclidean_distance_sq_f32_u8(a: &[f32], b: &[u8], alphas: &[f32], mins: &[f32]) -> f32 {
     let mut sum = 0.0f32;
@@ -315,54 +282,4 @@ pub fn euclidean_distance_sq_f32_u8(a: &[f32], b: &[u8], alphas: &[f32], mins: &
         sum += diff * diff;
     }
     sum
-}
-
-// ANCHOR[contextra-simd:SCAL-COSINE-PARTS-F32-U8]
-/// Scalar reference implementation for mixed `f32`/`u8` cosine similarity component parts.
-///
-/// # Semantics
-///
-/// Returns [`CosineSimilarityPartsF32U8`] containing dot product and squared norms.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = \min(a.len(), b.len())$.
-#[inline]
-pub fn cosine_similarity_parts_f32_u8(a: &[f32], b: &[u8]) -> CosineSimilarityPartsF32U8 {
-    let mut dot = 0.0f32;
-    let mut norm_a_sq = 0.0f32;
-    let mut norm_b_sq = 0.0f32;
-
-    for (&x, &y_u8) in a.iter().zip(b.iter()) {
-        let y = y_u8 as f32;
-        dot += x * y;
-        norm_a_sq += x * x;
-        norm_b_sq += y * y;
-    }
-
-    CosineSimilarityPartsF32U8 {
-        dot,
-        norm_a_sq,
-        norm_b_sq,
-    }
-}
-
-// ANCHOR[contextra-simd:SCAL-NORMALIZE-INPLACE]
-/// Normalizes a vector in-place to unit L2 length.
-///
-/// # Semantics
-///
-/// Divides each element by $\sqrt{\sum v_i^2}$. Zero-norm vectors remain unmodified.
-///
-/// # Complexity
-///
-/// $O(N)$ time, $O(1)$ space where $N = v.len()$.
-pub fn normalize_inplace(v: &mut [f32]) {
-    let norm = v.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm > 0.0 {
-        let inv_norm = 1.0 / norm;
-        for x in v.iter_mut() {
-            *x *= inv_norm;
-        }
-    }
 }

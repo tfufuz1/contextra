@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-MV-AUDIT-ROOT]
 //! # Audit-Tests für `contextra-mvcc`
 //!
 //! Prüfungen:
@@ -9,6 +8,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use contextra_testmacros::ctx_test;
 use std::fs;
 use std::path::PathBuf;
 
@@ -16,7 +16,7 @@ fn manifest_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-#[test]
+#[ctx_test(id = "T-VER-1")]
 fn mv_audit_no_sentinel_in_error_text() {
     let error_file = manifest_dir().join("src/error.rs");
     let content = fs::read_to_string(&error_file).expect("read error.rs");
@@ -45,7 +45,7 @@ fn collect_rs_files(dir: &std::path::Path, files: &mut Vec<PathBuf>) {
     }
 }
 
-#[test]
+#[ctx_test(id = "T-VER-1")]
 fn mv_audit_grep_sentinel_whitelist() {
     // Whitelist allowed occurrences of u64::MAX in contextra-mvcc/src
     // Allowed occurrences:
@@ -90,7 +90,7 @@ fn mv_audit_grep_sentinel_whitelist() {
     }
 }
 
-#[test]
+#[ctx_test(id = "T-LOG-1")]
 fn mv_audit_no_vector_dep() {
     let cargo_toml = manifest_dir().join("Cargo.toml");
     let content = fs::read_to_string(&cargo_toml).expect("read Cargo.toml");
@@ -105,7 +105,7 @@ fn mv_audit_no_vector_dep() {
     );
 }
 
-#[test]
+#[ctx_test(id = "T-LOG-1")]
 fn mv_audit_t_log_1_no_user_content_leak() {
     use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
     use contextra_mvcc::ContextraError;

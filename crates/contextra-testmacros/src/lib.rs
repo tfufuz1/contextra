@@ -2,7 +2,7 @@
 //!
 //! Ring: Tooling (dev)
 //! Erlaubte Abhängigkeiten: keine Workspace-Abhängigkeiten (AR-1, AR-14)
-//! SPEC-Verweis: SPEC §5.1, §5.1a, §5.2, §15.1, L-6, D-91, D-97
+//! SPEC-Verweis: SPEC §5.1, §5.1a, §5.2, §15.1, L-6, D-91, D-97, D-100
 
 #![forbid(unsafe_code)]
 
@@ -13,26 +13,33 @@ use syn::{parse_macro_input, Expr, ExprLit, ItemFn, Lit, Meta, MetaNameValue, To
 
 struct MacroArgs {
     id: String,
+    span: proc_macro2::Span,
 }
 
 impl Parse for MacroArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut id = None;
+        let mut id_entry = None;
 
         while !input.is_empty() {
             if input.peek(syn::Ident) {
                 let meta = input.parse::<Meta>()?;
                 match meta {
                     Meta::NameValue(MetaNameValue {
-                        path,
+                        ref path,
                         value:
                             Expr::Lit(ExprLit {
-                                lit: Lit::Str(lit_str),
+                                lit: Lit::Str(ref lit_str),
                                 ..
                             }),
                         ..
                     }) if path.is_ident("id") => {
-                        id = Some(lit_str.value());
+                        if id_entry.is_some() {
+                            return Err(syn::Error::new_spanned(
+                                &meta,
+                                "duplicate argument `id` in attribute",
+                            ));
+                        }
+                        id_entry = Some((lit_str.value(), lit_str.span()));
                     }
                     _ => {
                         return Err(syn::Error::new_spanned(
@@ -52,11 +59,11 @@ impl Parse for MacroArgs {
             }
         }
 
-        let id = id.ok_or_else(|| {
+        let (id, span) = id_entry.ok_or_else(|| {
             syn::Error::new(input.span(), "missing mandatory argument `id = \"...\"`")
         })?;
 
-        Ok(Self { id })
+        Ok(Self { id, span })
     }
 }
 
@@ -73,11 +80,18 @@ fn validate_test_id(id: &str, span: proc_macro2::Span) -> syn::Result<()> {
             format!("invalid test ID `{id}`: must have a non-empty name after `T-`"),
         ));
     }
-    for c in id["T-".len()..].chars() {
-        if !c.is_ascii_alphanumeric() && c != '-' && c != '_' {
+    let rest = &id["T-".len()..];
+    for c in rest.chars() {
+        if c.is_ascii_lowercase() {
             return Err(syn::Error::new(
                 span,
-                format!("invalid character `{c}` in test ID `{id}`: allowed are alphanumeric, '-', and '_'"),
+                format!("invalid test ID `{id}`: lowercase characters not allowed"),
+            ));
+        }
+        if !c.is_ascii_uppercase() && !c.is_ascii_digit() && c != '-' && c != '_' {
+            return Err(syn::Error::new(
+                span,
+                format!("invalid character `{c}` in test ID `{id}`: allowed are uppercase alphanumeric, '-', and '_'"),
             ));
         }
     }
@@ -99,11 +113,18 @@ fn validate_bench_id(id: &str, span: proc_macro2::Span) -> syn::Result<()> {
             format!("invalid benchmark ID `{id}`: must have a non-empty name after `BM-`"),
         ));
     }
-    for c in id["BM-".len()..].chars() {
-        if !c.is_ascii_alphanumeric() && c != '-' && c != '_' {
+    let rest = &id["BM-".len()..];
+    for c in rest.chars() {
+        if c.is_ascii_lowercase() {
             return Err(syn::Error::new(
                 span,
-                format!("invalid character `{c}` in benchmark ID `{id}`: allowed are alphanumeric, '-', and '_'"),
+                format!("invalid benchmark ID `{id}`: lowercase characters not allowed"),
+            ));
+        }
+        if !c.is_ascii_uppercase() && !c.is_ascii_digit() && c != '-' && c != '_' {
+            return Err(syn::Error::new(
+                span,
+                format!("invalid character `{c}` in benchmark ID `{id}`: allowed are uppercase alphanumeric, '-', and '_'"),
             ));
         }
     }
@@ -119,7 +140,7 @@ pub fn ctx_test(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as MacroArgs);
     let item_fn = parse_macro_input!(input as ItemFn);
 
-    if let Err(err) = validate_test_id(&args.id, proc_macro2::Span::call_site()) {
+    if let Err(err) = validate_test_id(&args.id, args.span) {
         return err.to_compile_error().into();
     }
 
@@ -163,7 +184,7 @@ pub fn ctx_bench(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as MacroArgs);
     let item_fn = parse_macro_input!(input as ItemFn);
 
-    if let Err(err) = validate_bench_id(&args.id, proc_macro2::Span::call_site()) {
+    if let Err(err) = validate_bench_id(&args.id, args.span) {
         return err.to_compile_error().into();
     }
 
