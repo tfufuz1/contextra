@@ -51,7 +51,9 @@ impl BlockBuilder {
                     *bytes.get(i * 2 + 1).unwrap_or(&0),
                 ]);
                 let bit_idx = chunk as usize % 256;
-                self.v3_bloom[bit_idx / 64] |= 1u64 << (bit_idx % 64);
+                if let Some(word) = self.v3_bloom.get_mut(bit_idx / 64) {
+                    *word |= 1u64 << (bit_idx % 64);
+                }
             }
         }
     }
@@ -153,8 +155,10 @@ impl BlockBuilder {
             if num_bits > 0 {
                 for &(h1, h2) in &self.key_hashes {
                     for i in 0..7u64 {
-                        let bit_idx = (h1.wrapping_add(i.wrapping_mul(h2)) as usize) % num_bits;
-                        bloom_vec[bit_idx / 8] |= 1u8 << (bit_idx % 8);
+                        let bit_idx = usize::try_from(h1.wrapping_add(i.wrapping_mul(h2)) % (num_bits as u64)).unwrap_or(0);
+                        if let Some(byte) = bloom_vec.get_mut(bit_idx / 8) {
+                            *byte |= 1u8 << (bit_idx % 8);
+                        }
                     }
                 }
             }

@@ -30,12 +30,18 @@ impl SstableStream {
                     return Ok(None);
                 }
 
-                let offset = self.reader.index[self.block_idx].1;
-                let next_offset = if self.block_idx + 1 < self.reader.index.len() {
-                    self.reader.index[self.block_idx + 1].1
-                } else {
-                    self.reader.index_offset
-                };
+                let offset = self
+                    .reader
+                    .index
+                    .get(self.block_idx)
+                    .map(|entry| entry.1)
+                    .unwrap_or(0);
+                let next_offset = self
+                    .reader
+                    .index
+                    .get(self.block_idx + 1)
+                    .map(|entry| entry.1)
+                    .unwrap_or(self.reader.index_offset);
 
                 let block_data = self.reader.get_block(offset, next_offset).await?;
                 self.block_idx += 1;

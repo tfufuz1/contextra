@@ -241,17 +241,15 @@ impl CompactionEngine {
         let old_paths = {
             let mut ssts = sstables.write().await;
 
-            let start_opt = ssts.iter().position(|s| Arc::ptr_eq(s, &input_ssts[0]));
+            let first_input = input_ssts.first();
+            let start_opt = first_input.and_then(|fi| ssts.iter().position(|s| Arc::ptr_eq(s, fi)));
             let is_contiguous = match start_opt {
                 Some(start) => {
-                    if start + input_ssts.len() <= ssts.len() {
-                        input_ssts
+                    (start + input_ssts.len() <= ssts.len())
+                        && input_ssts
                             .iter()
                             .enumerate()
-                            .all(|(idx, inp)| Arc::ptr_eq(inp, &ssts[start + idx]))
-                    } else {
-                        false
-                    }
+                            .all(|(idx, inp)| ssts.get(start + idx).is_some_and(|s| Arc::ptr_eq(inp, s)))
                 }
                 None => false,
             };
@@ -301,8 +299,13 @@ impl CompactionEngine {
 
             debug_assert!(
                 ssts.windows(2)
-                    .all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
-                        <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
+                    .all(|w| match (w.first(), w.get(1)) {
+                        (Some(a), Some(b)) => {
+                            (a.metadata().max_seq & !TOMBSTONE_BIT)
+                                <= (b.metadata().max_seq & !TOMBSTONE_BIT)
+                        }
+                        _ => true,
+                    }),
                 "SSTable list must be sorted by max_seq in ascending order after compaction swap"
             );
 
@@ -384,7 +387,7 @@ impl CompactionEngine {
         // Base memory estimate for stream buffers and multi-way merge priority queue:
         // Each stream buffers at least 1 block (BLOCK_SIZE = 4KB), plus heap structures and
         // deserialized entry overhead (estimated as ~1.5x raw candidate file size).
-        let raw_overhead = (total_file_size as f64 * 1.5) as u64;
+        let raw_overhead = (total_file_size.saturating_mul(3)) / 2;
         let min_stream_buffer = (candidates.len() as u64) * 4096 * 4;
 
         raw_overhead + min_stream_buffer
@@ -521,7 +524,7 @@ impl CompactionEngine {
 
         // Token-Bucket-State für I/O-Rate-Limiting (§4.12 C-2)
         let mut io_token_bytes_written: u64 = 0;
-        let mut io_token_last_reset = std::time::Instant::now();
+        let mut io_token_last_reset = tokio::time::Instant::now();
 
         while let Some(item) = heap.pop() {
             if let Some(ct) = cancel_token {
@@ -550,7 +553,7 @@ impl CompactionEngine {
                 // FIND-STO-002: Budgeted Compaction
                 // Apply memory backpressure to prevent Compaction from OOMing the system
                 if !self.budget.has_memory_capacity() {
-                    let wait_start = std::time::Instant::now();
+                    let wait_start = tokio::time::Instant::now();
                     while !self.budget.has_memory_capacity() {
                         if wait_start.elapsed() >= self.config.max_backpressure_wait {
                             let limit_bytes =
@@ -637,16 +640,16 @@ impl CompactionEngine {
                                 Ok(merged_val) => {
                                     // Consume next_item from heap and advance its stream
                                     if let Some(popped_next) = heap.pop() {
-                                        if let Some((key, value, seq, tx)) =
-                                            streams[popped_next.source_idx].next_entry().await?
-                                        {
-                                            heap.push(HeapItem {
-                                                key,
-                                                value,
-                                                seq,
-                                                tx,
-                                                source_idx: popped_next.source_idx,
-                                            });
+                                        if let Some(stream) = streams.get_mut(popped_next.source_idx) {
+                                            if let Some((key, value, seq, tx)) = stream.next_entry().await? {
+                                                heap.push(HeapItem {
+                                                    key,
+                                                    value,
+                                                    seq,
+                                                    tx,
+                                                    source_idx: popped_next.source_idx,
+                                                });
+                                            }
                                         }
                                     }
 
@@ -670,12 +673,17 @@ impl CompactionEngine {
                                                     .min(std::time::Duration::from_millis(100));
                                                 tokio::time::sleep(delay).await;
                                                 let total_elapsed = io_token_last_reset.elapsed();
-                                                let allowed_bytes = (total_elapsed.as_secs_f64()
-                                                    * max_bps as f64)
-                                                    as u64;
+                                                let allowed_bytes = total_elapsed
+                                                    .as_secs()
+                                                    .saturating_mul(max_bps)
+                                                    .saturating_add(
+                                                        (u64::from(total_elapsed.subsec_nanos())
+                                                            .saturating_mul(max_bps))
+                                                            / 1_000_000_000,
+                                                    );
                                                 io_token_bytes_written = io_token_bytes_written
                                                     .saturating_sub(allowed_bytes);
-                                                io_token_last_reset = std::time::Instant::now();
+                                                io_token_last_reset = tokio::time::Instant::now();
                                             }
                                         }
                                     }
@@ -749,11 +757,17 @@ impl CompactionEngine {
                                     tokio::time::sleep(delay).await;
                                     // Deduct allowed bytes based on actual elapsed time instead of wiping to 0
                                     let total_elapsed = io_token_last_reset.elapsed();
-                                    let allowed_bytes =
-                                        (total_elapsed.as_secs_f64() * max_bps as f64) as u64;
+                                    let allowed_bytes = total_elapsed
+                                        .as_secs()
+                                        .saturating_mul(max_bps)
+                                        .saturating_add(
+                                            (u64::from(total_elapsed.subsec_nanos())
+                                                .saturating_mul(max_bps))
+                                                / 1_000_000_000,
+                                        );
                                     io_token_bytes_written =
                                         io_token_bytes_written.saturating_sub(allowed_bytes);
-                                    io_token_last_reset = std::time::Instant::now();
+                                    io_token_last_reset = tokio::time::Instant::now();
                                 }
                             }
                         }
@@ -762,14 +776,16 @@ impl CompactionEngine {
             }
 
             // Immediately fetch the next item from the source stream
-            if let Some((key, value, seq, tx)) = streams[item.source_idx].next_entry().await? {
-                heap.push(HeapItem {
-                    key,
-                    value,
-                    seq,
-                    tx,
-                    source_idx: item.source_idx,
-                });
+            if let Some(stream) = streams.get_mut(item.source_idx) {
+                if let Some((key, value, seq, tx)) = stream.next_entry().await? {
+                    heap.push(HeapItem {
+                        key,
+                        value,
+                        seq,
+                        tx,
+                        source_idx: item.source_idx,
+                    });
+                }
             }
         }
         builder.finish().await?;

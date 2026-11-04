@@ -24,8 +24,14 @@ impl SstableReader {
         };
 
         // Rewind start_idx to the earliest block whose last_key >= prefix
-        while start_idx > 0 && self.index[start_idx - 1].0.as_ref() >= prefix {
-            start_idx -= 1;
+        while start_idx > 0 {
+            if let Some(prev) = self.index.get(start_idx - 1) {
+                if prev.0.as_ref() >= prefix {
+                    start_idx -= 1;
+                    continue;
+                }
+            }
+            break;
         }
 
         for idx in start_idx..self.index.len() {

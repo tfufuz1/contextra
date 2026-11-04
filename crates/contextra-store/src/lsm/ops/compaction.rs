@@ -109,7 +109,7 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
             SstableBuilder::create_with_key_manager(&sst_path, storage.key_manager.clone()).await?;
 
         for (k, mut versions) in key_map {
-            versions.sort_by(|a, b| (b.1 & !TOMBSTONE_BIT).cmp(&(a.1 & !TOMBSTONE_BIT)));
+            versions.sort_by_key(|b| std::cmp::Reverse(b.1 & !TOMBSTONE_BIT));
             let retained = retain_key_versions(versions, |(_, seq, _)| *seq, floor_seq);
             for (v, seq, tx) in retained {
                 builder.add(&k, &v, seq, tx).await?;
@@ -169,8 +169,13 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         debug_assert!(
             sstables
                 .windows(2)
-                .all(|w| (w[0].metadata().max_seq & !TOMBSTONE_BIT)
-                    <= (w[1].metadata().max_seq & !TOMBSTONE_BIT)),
+                .all(|w| match (w.first(), w.get(1)) {
+                    (Some(a), Some(b)) => {
+                        (a.metadata().max_seq & !TOMBSTONE_BIT)
+                            <= (b.metadata().max_seq & !TOMBSTONE_BIT)
+                    }
+                    _ => true,
+                }),
             "SSTable list must be sorted by max_seq in ascending order after flush"
         );
 

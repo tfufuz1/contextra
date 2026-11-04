@@ -17,6 +17,8 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
+type PreparedBatchOps = (Vec<(WalOp, u64)>, Vec<(Vec<u8>, Vec<u8>, u64)>, u64);
+
 pub(super) async fn put(storage: &LsmStorage, tx_id: TxId, key: &[u8], value: &[u8]) -> Result<()> {
     validate_key(key)?;
     validate_value(value)?;
@@ -300,7 +302,7 @@ fn prepare_commit_ops(
     storage: &LsmStorage,
     tx_id: TxId,
     ops: &[IndexOp<(Vec<u8>, Vec<u8>)>],
-) -> Result<(Vec<(WalOp, u64)>, Vec<(Vec<u8>, Vec<u8>, u64)>, u64)> {
+) -> Result<PreparedBatchOps> {
     let mut wal_ops = Vec::with_capacity(ops.len() + 1);
     let mut mem_updates = Vec::with_capacity(ops.len());
 

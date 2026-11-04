@@ -251,7 +251,7 @@ impl Manifest {
                     }
                 }
             } else {
-                let avail = (file_size - (entry_pos + 4)) as usize;
+                let avail = usize::try_from(file_size.saturating_sub(entry_pos + 4)).unwrap_or(usize::MAX);
                 let mut partial_raw = vec![0u8; avail];
                 if let Err(e) = reader.read_exact(&mut partial_raw).await {
                     return Err(ContextraError::Storage(format!(
@@ -281,7 +281,7 @@ impl Manifest {
     /// Reconstructs the ordered list of currently valid SSTable file names (or path components)
     /// and their rank (shadowing order: smaller rank = older) from a sequence of manifest entries.
     pub fn reconstruct_valid_sstables(entries: &[ManifestEntry]) -> Vec<(PathBuf, u64)> {
-        let mut valid_map = std::collections::HashMap::new();
+        let mut valid_map = std::collections::BTreeMap::new();
         // `next_rank` führt eine reine Monotonie-über-die-Add-Historie und ist NICHT identisch mit dem
         // zur Kompaktierungszeit lokal berechneten `insertion_point` (siehe `lsm/ops/compaction.rs`).
         // Diese Diskrepanz zwischen den Zähldomänen ist bewusst folgenlos, weil `rank` bei der Recovery
@@ -355,11 +355,11 @@ impl Manifest {
     /// (explicitly removed via `Remove` or `Replace.removed`) and are not in the valid set.
     pub fn reconstruct_dead_sstables(
         entries: &[ManifestEntry],
-    ) -> std::collections::HashSet<PathBuf> {
+    ) -> std::collections::BTreeSet<PathBuf> {
         let valid = Self::reconstruct_valid_sstables(entries);
-        let valid_set: std::collections::HashSet<PathBuf> =
+        let valid_set: std::collections::BTreeSet<PathBuf> =
             valid.into_iter().map(|(p, _)| p).collect();
-        let mut dead_set = std::collections::HashSet::new();
+        let mut dead_set = std::collections::BTreeSet::new();
 
         for entry in entries {
             match entry {

@@ -298,10 +298,10 @@ where
                                 using_legacy_key = true;
                                 legacy_key_used.store(true, std::sync::atomic::Ordering::SeqCst);
                             } else {
-                                return Err(e.into());
+                                return Err(e);
                             }
                         } else {
-                            return Err(e.into());
+                            return Err(e);
                         }
                     }
 
@@ -447,10 +447,10 @@ where
                             using_legacy_key = true;
                             legacy_key_used.store(true, std::sync::atomic::Ordering::SeqCst);
                         } else {
-                            return Err(e.into());
+                            return Err(e);
                         }
                     } else {
-                        return Err(e.into());
+                        return Err(e);
                     }
                 }
 

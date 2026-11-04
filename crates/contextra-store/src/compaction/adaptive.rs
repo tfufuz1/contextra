@@ -260,9 +260,11 @@ pub(super) fn compute_key_overlap_score(window: &[Arc<SstableReader>]) -> usize 
     sorted.sort_by(|a, b| a.first_key().cmp(b.first_key()));
 
     let mut overlaps = 0;
-    for i in 0..sorted.len() - 1 {
-        if sorted[i + 1].first_key() <= sorted[i].last_key() {
-            overlaps += 1;
+    for window in sorted.windows(2) {
+        if let (Some(a), Some(b)) = (window.first(), window.get(1)) {
+            if b.first_key() <= a.last_key() {
+                overlaps += 1;
+            }
         }
     }
     overlaps
@@ -290,7 +292,9 @@ pub(super) fn select_stcs_candidates(
 
     for start in 0..ssts.len() {
         for end in (start + min_tier)..=ssts.len() {
-            let window = &ssts[start..end];
+            let Some(window) = ssts.get(start..end) else {
+                continue;
+            };
             let min_sz = window
                 .iter()
                 .map(|s| s.metadata().file_size)
@@ -327,7 +331,9 @@ pub(super) fn select_stcs_candidates(
     }
 
     if let Some((start, end)) = best_tier_range {
-        return Some(ssts[start..end].to_vec());
+        if let Some(slice) = ssts.get(start..end) {
+            return Some(slice.to_vec());
+        }
     }
 
     // 2. Fallback for large SSTable counts: select contiguous window of min_tier size prioritizing key overlap
@@ -336,9 +342,11 @@ pub(super) fn select_stcs_candidates(
         let mut best_fallback_overlap = 0usize;
         let mut min_fallback_size = u64::MAX;
 
-        for start in 0..=(ssts.len() - min_tier) {
+        for start in 0..=(ssts.len().saturating_sub(min_tier)) {
             let end = start + min_tier;
-            let window = &ssts[start..end];
+            let Some(window) = ssts.get(start..end) else {
+                continue;
+            };
             let total_size: u64 = window.iter().map(|s| s.metadata().file_size).sum();
             let overlap = compute_key_overlap_score(window);
 
@@ -353,7 +361,9 @@ pub(super) fn select_stcs_candidates(
         }
 
         if let Some(start) = best_fallback_start {
-            return Some(ssts[start..start + min_tier].to_vec());
+            if let Some(slice) = ssts.get(start..start + min_tier) {
+                return Some(slice.to_vec());
+            }
         }
     }
 
