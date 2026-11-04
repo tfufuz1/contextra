@@ -2,11 +2,12 @@
 
 use contextra_arch_tests::{
     check_clean_source_tree, check_crate_headers_and_descriptions, check_dependency_matrix_5_3,
-    check_exports_and_dev_dependencies, check_feature_hygiene, check_layering,
-    check_naming_and_facade_structure, check_network_dependencies, check_obsolete_evidence_terms,
-    check_ratchet_hygiene, check_raw_storage_isolation, check_session_marks_and_timestamps,
-    check_store_fs_usage, check_test_traceability, check_trademark_and_session_marks,
-    check_types_purity, check_unsafe, check_wording, load_crates,
+    check_double_modules, check_exports_and_dev_dependencies, check_feature_hygiene,
+    check_layering, check_naming_and_facade_structure, check_network_dependencies,
+    check_obsolete_evidence_terms, check_ratchet_hygiene, check_raw_storage_isolation,
+    check_session_marks_and_timestamps, check_store_fs_usage, check_test_traceability,
+    check_trademark_and_session_marks, check_types_purity, check_unsafe, check_wording,
+    load_crates,
 };
 use std::path::PathBuf;
 
