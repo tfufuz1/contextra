@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! # Loom-Modelle für SeqAllocator, Lockreihenfolge und History-Horizon (T-LOCK, T-CONC, T-SNAP)
 //!
 //! Modelliert:
@@ -9,6 +10,7 @@
 
 #[cfg(loom)]
 mod loom_conc_tests {
+    use contextra_testmacros::ctx_test;
     use loom::sync::atomic::{AtomicU64, Ordering};
     use loom::sync::{Arc, Mutex, RwLock};
     use loom::thread;
@@ -45,7 +47,7 @@ mod loom_conc_tests {
         }
     }
 
-    #[test]
+    #[ctx_test(id = "T-CONC-1")]
     fn t_conc_1_loom_seq_allocator_concurrent_monotonic() {
         loom::model(|| {
             let alloc = Arc::new(LoomSeqAllocator::new(10, 10));
@@ -70,7 +72,7 @@ mod loom_conc_tests {
         });
     }
 
-    #[test]
+    #[ctx_test(id = "T-CONC-1")]
     fn t_lock_loom_lock_order_hierarchy_full_spec_5_4() {
         // SPEC 5.4: Dokumentlock -> Commit-Barriere -> Purge-Barrier -> Journal
         loom::model(|| {
@@ -112,7 +114,7 @@ mod loom_conc_tests {
         });
     }
 
-    #[test]
+    #[ctx_test(id = "T-CONC-1")]
     fn t_lock_loom_commit_vs_purge_barrier() {
         // T-LOCK / T-CONC-1: Modellierung des Zusammenspiels von Commit-Barriere und Purge-Barriere
         // laut SPEC §5.4 und D-127.
@@ -158,7 +160,7 @@ mod loom_conc_tests {
         });
     }
 
-    #[test]
+    #[ctx_test(id = "T-VER-1")]
     fn t_snap_loom_history_horizon_never_exceeds_active_snapshots() {
         // Purge-Barriere und History-Horizon dürfen niemals über die kleinste aktive Snapshot-Seq gehoben werden.
         loom::model(|| {
@@ -198,7 +200,7 @@ mod loom_conc_tests {
         });
     }
 
-    #[test]
+    #[ctx_test(id = "T-CONC-1")]
     fn t_conc_loom_write_vs_purge_cluster_race() {
         // Modelliert das Race „Schreiben ↔ Purge desselben Clusters“ (SPEC D-57, D-78).
         // Invarianten:

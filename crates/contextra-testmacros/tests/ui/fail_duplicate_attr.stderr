@@ -1,0 +1,5 @@
+error: duplicate argument `id` in attribute
+ --> tests/ui/fail_duplicate_attr.rs:3:24
+  |
+3 | #[ctx_test(id = "T-A", id = "T-B")]
+  |                        ^^^^^^^^^^

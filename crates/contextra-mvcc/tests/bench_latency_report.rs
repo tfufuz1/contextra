@@ -8,6 +8,7 @@
 use contextra_mvcc::seq_log::SeqAllocator;
 use contextra_ports::gate::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, ReadGate, Seq};
 use contextra_ports::Clock;
+use contextra_testmacros::ctx_test;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -96,7 +97,7 @@ fn measure_latencies(num_samples: usize, with_purge: bool) -> (f64, f64, f64) {
     (p50, p99, p999)
 }
 
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_bm_write_during_erase_latency_benchmark() {
     let (quiet_p50, quiet_p99, quiet_p999) = measure_latencies(10_000, false);
     let (purge_p50, purge_p99, purge_p999) = measure_latencies(10_000, true);

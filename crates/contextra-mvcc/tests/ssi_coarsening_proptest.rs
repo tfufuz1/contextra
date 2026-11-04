@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-COARSENING-PROPTEST-ROOT]
 //! # Eigenschaftstest: 0 % False Negatives beim SSI-Coarsening
 //!
 //! Beweist mathematisch über Proptest, dass ein vergröberter (coarsened) Validator
@@ -8,13 +7,14 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{ReadSet, SequenceLogSsiValidator, SsiValidator, TxId};
+use contextra_testmacros::ctx_test;
 use proptest::prelude::*;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(50))]
 
     // Eigenschaftstest: Verifiziert, dass Coarsening keine echten Konflikte maskiert (0 % False Negatives).
-    #[test]
+#[ctx_test(id = "T-TXN-1")]
     fn prop_ssi_coarsening_zero_false_negatives(
         commit_keys in proptest::collection::vec("[a-z]{3}:[0-9]{3}", 20..100),
         read_keys in proptest::collection::vec("[a-z]{3}:[0-9]{3}", 5..20),
