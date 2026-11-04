@@ -1,8 +1,8 @@
 //! # Virtuelles Dateisystem mit deterministischer Fehlerinjektion (`fault_vfs`)
 //!
-//! Dieses Modul stellt mit [`FaultVfs`] ein In-Memory-Dateisystem bereit, das I/O-Fehler,
-//! Abstürze und `fsync`-Verweigerungen gezielt nach einer konfigurierbaren Anzahl von
-//! Operationen oder anhand eines deterministischen Plans injizieren kann.
+//! Dieses Modul stellt mit [`FaultVfs`] ein zweischichtiges In-Memory-Dateisystem (Cache und Medium) bereit,
+//! das I/O-Fehler, Abstürze, umsortierte Sektorpersistierung und `fsync`-Verweigerungen gezielt nach
+//! einer konfigurierbaren Anzahl von Operationen oder anhand eines deterministischen Plans injizieren kann.
 //!
 //! ## Ring & Architektur-Einordnung
 //! - **Ring:** Werkzeug / Tooling
@@ -12,13 +12,17 @@
 //!   System keinen Teilerfolg vortäuschen oder in einen inkonsistenten Zustand verfallen.
 //! - **T-FSYNC-1 / DF-03:** Ein `fsync`-Fehler auf einem Handle macht dieses dauerhaft fatal
 //!   (`Poisoned`). Weitere Aufrufe werden abgewiesen.
+//! - **D-113 Abs. 5:** Modellierung von Cache und Medium; `read` liest Cache, `read_verified`
+//!   liest Medium; `fsync` überträgt Cache auf Medium; Crash verwirft Cache und liefert Medium;
+//!   umsortierte Sektorpersistierung mit konfigurierbaren Sektorgrößen (512 B und 4 KiB).
 
 // FILE-CONTEXT
-// STAND: 2026-11-01
-// ZWECK: Deterministic I/O error injector and Virtual File System test utility.
+// STAND: 2026-11-04
+// ZWECK: Deterministic I/O error injector and two-layer (Cache & Medium) Virtual File System test utility.
 // INVARIANTEN: Zero real data corruption, deterministic fault triggers based on operation count, T-FSYNC-1 handle poisoning.
 
-use contextra_ports::{Vfs, VfsFile, VfsOpenOptions};
+use contextra_ports::rng::{Rng, SeededRng};
+use contextra_ports::vfs::{VerifiedVia, Vfs, VfsFile, VfsOpenOptions};
 use contextra_types::{ContextraError, Result};
 use parking_lot::RwLock;
 use std::collections::{BTreeMap, BTreeSet};
@@ -39,7 +43,7 @@ pub enum FaultOperation {
     Sync,
     /// Umbenennen (`rename`).
     Rename,
-    /// Löschen einer Datei (`remove_file`).
+    /// Löschen einer Datei (`remove_file`, `unlink`).
     Remove,
     /// Verzeichnisanlage (`create_dir_all`).
     CreateDir,
@@ -69,6 +73,27 @@ impl FaultPlan {
     }
 }
 
+/// Konfiguration für den Modus „umsortierte Sektorpersistierung“ (SPEC D-113 Abs. 5).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SectorReorderConfig {
+    /// Sektorgröße in Bytes (typisch 512 oder 4096).
+    pub sector_size: usize,
+    /// Deterministischer Seed für Pseudozufallsauswahl.
+    pub seed: u64,
+    /// Anteil der veränderten Sektoren, die beim Crash persistent werden (0.0 bis 1.0).
+    pub persisted_fraction: f64,
+}
+
+impl Default for SectorReorderConfig {
+    fn default() -> Self {
+        Self {
+            sector_size: 512,
+            seed: 0,
+            persisted_fraction: 0.5,
+        }
+    }
+}
+
 // ANCHOR[contextra-testkit:FAULT-CONFIG-STRUCT-001]
 /// Konfiguration für deterministische Fehlerinjektion in [`FaultVfs`].
 ///
@@ -92,6 +117,8 @@ pub struct FaultConfig {
     pub fail_all: bool,
     /// Crash-Punkt (nach N Operationen crashen und alle nachfolgenden ungeschriebenen Daten verwerfen).
     pub crash_after_ops: Option<usize>,
+    /// Konfiguration für umsortierte Sektorpersistierung bei Crash (D-113 Abs. 5).
+    pub sector_reorder: Option<SectorReorderConfig>,
 }
 
 /// In-Memory Repräsentation einer geöffneten Datei in [`FaultVfs`].
@@ -129,10 +156,10 @@ impl VfsFile for FaultFile {
         }
         self.vfs
             .check_fault(FaultOperation::Read, &self.vfs.read_count)?;
-        let files = self.vfs.files.read();
-        let data = files
+        let cache = self.vfs.cache.read();
+        let data = cache
             .get(&self.path)
-            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found"))?;
+            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found in cache"))?;
 
         let off = usize::try_from(offset)
             .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "Offset out of range"))?;
@@ -149,6 +176,35 @@ impl VfsFile for FaultFile {
         Ok(to_copy)
     }
 
+    fn read_verified(&self, offset: u64, len: usize) -> io::Result<(Vec<u8>, VerifiedVia)> {
+        self.check_poisoned()?;
+        if !self.options.read {
+            return Err(io::Error::new(
+                ErrorKind::PermissionDenied,
+                "File not open for reading",
+            ));
+        }
+        self.vfs
+            .check_fault(FaultOperation::Read, &self.vfs.read_count)?;
+        // D-113: read_verified liest strikt von der Mediumschicht, nicht aus dem Cache!
+        let medium = self.vfs.medium.read();
+        let data = medium
+            .get(&self.path)
+            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found on medium"))?;
+
+        let off = usize::try_from(offset)
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "Offset out of range"))?;
+
+        if off >= data.len() {
+            return Ok((Vec::new(), VerifiedVia::Direct));
+        }
+
+        let available = data.get(off..).unwrap_or(&[]);
+        let to_copy = std::cmp::min(len, available.len());
+        let res = available.get(..to_copy).unwrap_or(&[]).to_vec();
+        Ok((res, VerifiedVia::Direct))
+    }
+
     fn write_at(&self, buf: &[u8], offset: u64) -> io::Result<usize> {
         self.check_poisoned()?;
         if !self.options.write {
@@ -163,8 +219,15 @@ impl VfsFile for FaultFile {
         let off = usize::try_from(offset)
             .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "Offset out of range"))?;
 
-        let mut files = self.vfs.files.write();
-        let data = files.entry(self.path.clone()).or_default();
+        let mut cache = self.vfs.cache.write();
+        let data = cache.entry(self.path.clone()).or_insert_with(|| {
+            self.vfs
+                .medium
+                .read()
+                .get(&self.path)
+                .cloned()
+                .unwrap_or_default()
+        });
 
         if off + buf.len() > data.len() {
             data.resize(off + buf.len(), 0);
@@ -190,10 +253,15 @@ impl VfsFile for FaultFile {
         let target_len = usize::try_from(len)
             .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "Length out of range"))?;
 
-        let mut files = self.vfs.files.write();
-        let data = files
-            .get_mut(&self.path)
-            .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found"))?;
+        let mut cache = self.vfs.cache.write();
+        let data = cache.entry(self.path.clone()).or_insert_with(|| {
+            self.vfs
+                .medium
+                .read()
+                .get(&self.path)
+                .cloned()
+                .unwrap_or_default()
+        });
         data.resize(target_len, 0);
         Ok(())
     }
@@ -202,8 +270,8 @@ impl VfsFile for FaultFile {
         self.check_poisoned()?;
         self.vfs
             .check_fault(FaultOperation::Read, &self.vfs.read_count)?;
-        let files = self.vfs.files.read();
-        let data = files
+        let cache = self.vfs.cache.read();
+        let data = cache
             .get(&self.path)
             .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "File not found"))?;
         Ok(data.len() as u64)
@@ -215,7 +283,16 @@ impl VfsFile for FaultFile {
             .vfs
             .check_fault(FaultOperation::Sync, &self.vfs.sync_count)
         {
-            Ok(()) => Ok(()),
+            Ok(()) => {
+                let cache = self.vfs.cache.read();
+                if let Some(content) = cache.get(&self.path) {
+                    self.vfs
+                        .medium
+                        .write()
+                        .insert(self.path.clone(), content.clone());
+                }
+                Ok(())
+            }
             Err(e) => {
                 // T-FSYNC-1 / DF-03: Handle wird fatal vergiftet
                 self.poison();
@@ -230,7 +307,16 @@ impl VfsFile for FaultFile {
             .vfs
             .check_fault(FaultOperation::Sync, &self.vfs.sync_count)
         {
-            Ok(()) => Ok(()),
+            Ok(()) => {
+                let cache = self.vfs.cache.read();
+                if let Some(content) = cache.get(&self.path) {
+                    self.vfs
+                        .medium
+                        .write()
+                        .insert(self.path.clone(), content.clone());
+                }
+                Ok(())
+            }
             Err(e) => {
                 // T-FSYNC-1 / DF-03: Handle wird fatal vergiftet
                 self.poison();
@@ -241,14 +327,17 @@ impl VfsFile for FaultFile {
 }
 
 // ANCHOR[contextra-testkit:FAULT-VFS-STRUCT-001]
-/// Simuliertes In-Memory-Dateisystem mit deterministischer Fehlerinjektion.
+/// Simuliertes zweischichtiges In-Memory-Dateisystem mit deterministischer Fehlerinjektion.
 ///
 /// **Zweck:** Dient als I/O-Testunterlage für Speichermodule (z. B. WAL und LSM-Storage),
 /// um Fehlertoleranz und Absturzsicherheit ohne reale Festplattenfehler zu testen.
+/// Bildet Cache-Schicht und Medium-Schicht getrennt ab (D-113).
 #[derive(Debug, Clone, Default)]
 pub struct FaultVfs {
-    /// In-Memory Dateispeicher: Pfad -> Dateibytes.
-    files: Arc<RwLock<BTreeMap<PathBuf, Vec<u8>>>>,
+    /// In-Memory Seitencache (flüchtige Schreiboperationen): Pfad -> Dateibytes.
+    cache: Arc<RwLock<BTreeMap<PathBuf, Vec<u8>>>>,
+    /// In-Memory Medium (dauerhafter Speicherbestand): Pfad -> Dateibytes.
+    medium: Arc<RwLock<BTreeMap<PathBuf, Vec<u8>>>>,
     /// In-Memory Verzeichnisbaum.
     dirs: Arc<RwLock<BTreeSet<PathBuf>>>,
     /// Anzahl der versuchten Leseoperationen.
@@ -292,14 +381,117 @@ impl FaultVfs {
 
     // ANCHOR[contextra-testkit:FAULT-VFS-TRIGGER-CRASH-001]
     /// Simuliert einen abrupten Systemabsturz (Power-Cut).
+    ///
+    /// Verwirft alle nicht mit `sync`/`sync_data`/`sync_all` gesicherten Cache-Inhalte
+    /// und setzt den Cache auf den exakten Zustand des Mediums zurück.
+    /// Falls `sector_reorder` konfiguriert ist, werden veränderte Sektoren in deterministisch
+    /// pseudozufälliger Reihenfolge teilweise vorab auf das Medium übertragen (Torn Writes auf Sektorebene, D-113 Abs. 5).
     pub fn trigger_crash(&self) {
         self.crashed.store(true, Ordering::SeqCst);
+        self.apply_crash_state();
+    }
+
+    /// Simuliert einen Crash und sofortigen Neustart (Recovery), wodurch Operationen wieder zulässig sind,
+    /// jedoch alle ungesyncten Cache-Daten verloren sind (Medium-Zustand wird geladen).
+    pub fn crash_and_recover(&self) {
+        self.apply_crash_state();
+        self.crashed.store(false, Ordering::SeqCst);
+    }
+
+    fn apply_crash_state(&self) {
+        let cfg = self.config.read().clone();
+        if let Some(ref reorder) = cfg.sector_reorder {
+            let sector_size = if reorder.sector_size == 0 {
+                512
+            } else {
+                reorder.sector_size
+            };
+            let rng = SeededRng::new(reorder.seed);
+
+            let cache = self.cache.read();
+            let mut medium = self.medium.write();
+
+            for (path, cache_bytes) in cache.iter() {
+                let medium_bytes = medium.entry(path.clone()).or_default();
+                let max_len = std::cmp::max(cache_bytes.len(), medium_bytes.len());
+                let total_sectors = max_len.div_ceil(sector_size);
+
+                let mut changed_sectors = Vec::new();
+                for sec_idx in 0..total_sectors {
+                    let start = sec_idx * sector_size;
+                    let end = std::cmp::min(start + sector_size, max_len);
+
+                    let c_slice = if start < cache_bytes.len() {
+                        cache_bytes
+                            .get(start..std::cmp::min(end, cache_bytes.len()))
+                            .unwrap_or(&[])
+                    } else {
+                        &[]
+                    };
+                    let m_slice = if start < medium_bytes.len() {
+                        medium_bytes
+                            .get(start..std::cmp::min(end, medium_bytes.len()))
+                            .unwrap_or(&[])
+                    } else {
+                        &[]
+                    };
+
+                    if c_slice != m_slice {
+                        changed_sectors.push(sec_idx);
+                    }
+                }
+
+                if !changed_sectors.is_empty() {
+                    for i in (1..changed_sectors.len()).rev() {
+                        #[allow(clippy::cast_possible_truncation)]
+                        let j = (rng.next_u64() as usize) % (i + 1);
+                        changed_sectors.swap(i, j);
+                    }
+
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                    let persist_count = ((changed_sectors.len() as f64)
+                        * reorder.persisted_fraction)
+                        .round() as usize;
+                    let num_to_persist = std::cmp::min(persist_count, changed_sectors.len());
+                    let sectors_to_persist = changed_sectors.get(..num_to_persist).unwrap_or(&[]);
+
+                    if medium_bytes.len() < cache_bytes.len() {
+                        medium_bytes.resize(cache_bytes.len(), 0);
+                    }
+
+                    for &sec_idx in sectors_to_persist {
+                        let start = sec_idx * sector_size;
+                        let end = std::cmp::min(start + sector_size, cache_bytes.len());
+                        if start < cache_bytes.len() {
+                            if let Some(src) = cache_bytes.get(start..end) {
+                                if medium_bytes.len() < end {
+                                    medium_bytes.resize(end, 0);
+                                }
+                                if let Some(dst) = medium_bytes.get_mut(start..end) {
+                                    dst.copy_from_slice(src);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Cache auf Stand des Mediums zurücksetzen (ungesyncte Cache-Daten werden verworfen)
+        let medium = self.medium.read();
+        let mut cache = self.cache.write();
+        *cache = medium.clone();
+    }
+
+    /// Alias für `trigger_crash`.
+    pub fn crash(&self) {
+        self.trigger_crash();
     }
 
     // ANCHOR[contextra-testkit:FAULT-VFS-RESET-COUNTERS-001]
     /// Setzt die Operationszähler und den Crash-Status zurück.
     ///
-    /// Die bestehenden Dateiinhalte bleiben unverändert erhalten.
+    /// Die bestehenden Dateiinhalte auf dem Medium und im Cache bleiben erhalten.
     pub fn reset_counters(&self) {
         self.read_count.store(0, Ordering::SeqCst);
         self.write_count.store(0, Ordering::SeqCst);
@@ -322,7 +514,8 @@ impl FaultVfs {
 
         if let Some(limit) = cfg.crash_after_ops {
             if total >= limit {
-                self.crashed.store(true, Ordering::SeqCst);
+                drop(cfg);
+                self.trigger_crash();
                 return Err(io::Error::new(ErrorKind::BrokenPipe, "VFS simulated crash"));
             }
         }
@@ -390,21 +583,21 @@ impl FaultVfs {
     }
 
     // ANCHOR[contextra-testkit:FAULT-VFS-WRITE-FILE-001]
-    /// Schreibt Bytes an den angegebenen Pfad unter Berücksichtigung der Fehlerrichtlinien.
+    /// Schreibt Bytes in den Cache unter Berücksichtigung der Fehlerrichtlinien.
     pub fn write_file(&self, path: &Path, data: &[u8]) -> io::Result<()> {
         self.check_fault(FaultOperation::Write, &self.write_count)?;
         if let Some(parent) = path.parent() {
             self.create_dir_all_internal(parent)?;
         }
-        self.files.write().insert(path.to_path_buf(), data.to_vec());
+        self.cache.write().insert(path.to_path_buf(), data.to_vec());
         Ok(())
     }
 
     // ANCHOR[contextra-testkit:FAULT-VFS-READ-FILE-001]
-    /// Liest Bytes vom angegebenen Pfad unter Berücksichtigung der Fehlerrichtlinien.
+    /// Liest Bytes aus dem Cache unter Berücksichtigung der Fehlerrichtlinien.
     pub fn read_file(&self, path: &Path) -> io::Result<Vec<u8>> {
         self.check_fault(FaultOperation::Read, &self.read_count)?;
-        self.files
+        self.cache
             .read()
             .get(path)
             .cloned()
@@ -412,9 +605,13 @@ impl FaultVfs {
     }
 
     // ANCHOR[contextra-testkit:FAULT-VFS-SYNC-001]
-    /// Simuliert einen `fsync`-Aufruf zur dauerhaften Bestätigung auf dem Speichermedium.
+    /// Simuliert einen `fsync`-Aufruf zur dauerhaften Bestätigung aller Cache-Dateien auf dem Speichermedium.
     pub fn sync(&self) -> io::Result<()> {
-        self.check_fault(FaultOperation::Sync, &self.sync_count)
+        self.check_fault(FaultOperation::Sync, &self.sync_count)?;
+        let cache = self.cache.read();
+        let mut medium = self.medium.write();
+        *medium = cache.clone();
+        Ok(())
     }
 
     fn create_dir_all_internal(&self, path: &Path) -> io::Result<()> {
@@ -507,12 +704,20 @@ impl Vfs for FaultVfs {
                 if let Some(parent) = path.parent() {
                     self.create_dir_all(parent)?;
                 }
-                self.files.write().insert(path.to_path_buf(), Vec::new());
+                self.cache.write().insert(path.to_path_buf(), Vec::new());
             } else {
                 return Err(ContextraError::NotFound(String::new()));
             }
         } else if opts.truncate {
-            self.files.write().insert(path.to_path_buf(), Vec::new());
+            self.cache.write().insert(path.to_path_buf(), Vec::new());
+        } else {
+            // Falls in Medium, aber noch nicht im Cache: in den Cache laden
+            let mut cache = self.cache.write();
+            if !cache.contains_key(path) {
+                if let Some(data) = self.medium.read().get(path) {
+                    cache.insert(path.to_path_buf(), data.clone());
+                }
+            }
         }
 
         Ok(Box::new(FaultFile {
@@ -526,11 +731,30 @@ impl Vfs for FaultVfs {
     fn read(&self, path: &Path) -> Result<Vec<u8>> {
         self.check_fault(FaultOperation::Read, &self.read_count)
             .map_err(ContextraError::Io)?;
-        self.files
-            .read()
+        let cache = self.cache.read();
+        if let Some(data) = cache.get(path) {
+            return Ok(data.clone());
+        }
+        let medium = self.medium.read();
+        medium
             .get(path)
             .cloned()
             .ok_or_else(|| ContextraError::NotFound(String::new()))
+    }
+
+    fn read_at(&self, path: &Path, offset: u64, buf: &mut [u8]) -> Result<usize> {
+        let file = self.open(path, &VfsOpenOptions::read_only())?;
+        file.read_at(buf, offset).map_err(ContextraError::Io)
+    }
+
+    fn read_verified(
+        &self,
+        path: &Path,
+        offset: u64,
+        len: usize,
+    ) -> Result<(Vec<u8>, VerifiedVia)> {
+        let file = self.open(path, &VfsOpenOptions::read_only())?;
+        file.read_verified(offset, len).map_err(ContextraError::Io)
     }
 
     fn write_atomic(&self, path: &Path, data: &[u8]) -> Result<()> {
@@ -548,7 +772,11 @@ impl Vfs for FaultVfs {
         self.check_fault(FaultOperation::Rename, &self.rename_count)
             .map_err(ContextraError::Io)?;
 
-        self.files.write().insert(path.to_path_buf(), data.to_vec());
+        // Cache und Medium aktualisieren (da write_atomic voll synchronisiert ist)
+        self.cache.write().insert(path.to_path_buf(), data.to_vec());
+        self.medium
+            .write()
+            .insert(path.to_path_buf(), data.to_vec());
 
         if let Some(parent) = path.parent() {
             self.sync_dir(parent)?;
@@ -567,21 +795,29 @@ impl Vfs for FaultVfs {
     fn remove_file(&self, path: &Path) -> Result<()> {
         self.check_fault(FaultOperation::Remove, &self.remove_count)
             .map_err(ContextraError::Io)?;
-        let mut files = self.files.write();
-        if files.remove(path).is_some() {
+        let mut cache = self.cache.write();
+        let mut medium = self.medium.write();
+        let c_removed = cache.remove(path).is_some();
+        let m_removed = medium.remove(path).is_some();
+        if c_removed || m_removed {
             Ok(())
         } else {
             Err(ContextraError::NotFound(String::new()))
         }
     }
 
+    fn unlink(&self, path: &Path) -> Result<()> {
+        self.remove_file(path)
+    }
+
     fn rename(&self, from: &Path, to: &Path) -> Result<()> {
         self.check_fault(FaultOperation::Rename, &self.rename_count)
             .map_err(ContextraError::Io)?;
 
-        let mut files = self.files.write();
-        let data = files
+        let mut cache = self.cache.write();
+        let data = cache
             .remove(from)
+            .or_else(|| self.medium.read().get(from).cloned())
             .ok_or_else(|| ContextraError::NotFound(String::new()))?;
 
         if let Some(parent) = to.parent() {
@@ -589,13 +825,23 @@ impl Vfs for FaultVfs {
                 .map_err(ContextraError::Io)?;
         }
 
-        files.insert(to.to_path_buf(), data);
+        cache.insert(to.to_path_buf(), data.clone());
+
+        let mut medium = self.medium.write();
+        if medium.remove(from).is_some() {
+            medium.insert(to.to_path_buf(), data);
+        }
+
         Ok(())
     }
 
     fn exists(&self, path: &Path) -> Result<bool> {
-        let files = self.files.read();
-        if files.contains_key(path) {
+        let cache = self.cache.read();
+        if cache.contains_key(path) {
+            return Ok(true);
+        }
+        let medium = self.medium.read();
+        if medium.contains_key(path) {
             return Ok(true);
         }
         let dirs = self.dirs.read();
@@ -605,8 +851,12 @@ impl Vfs for FaultVfs {
     fn len(&self, path: &Path) -> Result<u64> {
         self.check_fault(FaultOperation::Read, &self.read_count)
             .map_err(ContextraError::Io)?;
-        let files = self.files.read();
-        files
+        let cache = self.cache.read();
+        if let Some(data) = cache.get(path) {
+            return Ok(data.len() as u64);
+        }
+        let medium = self.medium.read();
+        medium
             .get(path)
             .map(|data| data.len() as u64)
             .ok_or_else(|| ContextraError::NotFound(String::new()))
@@ -618,10 +868,11 @@ impl Vfs for FaultVfs {
             return Err(ContextraError::NotFound(String::new()));
         }
 
-        let files = self.files.read();
+        let cache = self.cache.read();
+        let medium = self.medium.read();
         let mut entries = Vec::new();
 
-        for file_path in files.keys() {
+        for file_path in cache.keys().chain(medium.keys()) {
             if file_path.parent() == Some(path) {
                 if let Some(name) = file_path.file_name() {
                     entries.push(name.to_string_lossy().to_string());
@@ -639,6 +890,10 @@ impl Vfs for FaultVfs {
         entries.sort();
         entries.dedup();
         Ok(entries)
+    }
+
+    fn list(&self, path: &Path) -> Result<Vec<String>> {
+        self.list_dir(path)
     }
 
     fn sync_dir(&self, path: &Path) -> Result<()> {

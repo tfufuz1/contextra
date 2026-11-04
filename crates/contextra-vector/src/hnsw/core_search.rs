@@ -123,26 +123,12 @@ impl HnswIndexCore {
 
             if has_dead_neighbors && current.index >= buffer_node_count {
                 let ram_idx = current.index - buffer_node_count;
-                let seq_log = self.cold.seq_log.read();
-                let min_retention_seq = seq_log.min_retention_seq();
                 let m = self.cold.config.m;
                 let layer_slice = self.hot.arena.get_ram_node_connections(ram_idx, layer, m);
                 let mut kept = Vec::with_capacity(layer_slice.len());
                 for &neighbor_u32 in &layer_slice {
                     if !deleted_snapshot.contains(neighbor_u32 as u64) {
                         kept.push(neighbor_u32);
-                    } else if let Some(min_ret_seq) = min_retention_seq {
-                        let neighbor_idx = neighbor_u32 as usize;
-                        if neighbor_idx >= buffer_node_count {
-                            let neighbor_ram_idx = neighbor_idx - buffer_node_count;
-                            if let Some(neighbor_node) = nodes_guard.get(neighbor_ram_idx) {
-                                if let Some(del_seq) = seq_log.deletion_seq(neighbor_node.doc_id) {
-                                    if del_seq >= min_ret_seq {
-                                        kept.push(neighbor_u32);
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
                 self.hot
@@ -350,12 +336,6 @@ impl HnswIndex {
         let nodes = self.inner.hot.nodes.read();
         let deleted = self.inner.cold.deleted_nodes.read();
 
-        let seq_log_guard = if snapshot_seq.is_some() {
-            Some(self.inner.cold.seq_log.read())
-        } else {
-            None
-        };
-
         for c in candidates.iter() {
             let node = nodes.get(c.index).ok_or_else(|| {
                 ContextraError::Index(format!("HNSW candidate node missing at index {}", c.index))
@@ -365,13 +345,7 @@ impl HnswIndex {
             }
             let doc_id = node.doc_id;
 
-            if let Some(snap_seq) = snapshot_seq {
-                if let Some(ref seq_log) = seq_log_guard {
-                    if !seq_log.is_visible(doc_id, snap_seq) {
-                        continue;
-                    }
-                }
-            } else if deleted.contains(c.index as u64) {
+            if deleted.contains(c.index as u64) {
                 continue;
             }
 

@@ -2,13 +2,13 @@ use roaring::RoaringTreemap;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use ahash::AHashMap;
-use contextra_mvcc::TxBuffer;
 use contextra_types::{ContextraError, DocId, Result};
 use parking_lot::{Mutex, RwLock};
 
 use super::arena::HnswArena;
 use super::config::HnswConfig;
 use super::sq8_bias::Sq8Bias;
+use super::staging::LocalTxBuffer;
 
 /// Sentinel-Wert für ungültigen / nicht gesetzten Entry-Point in HNSW.
 pub const SENTINEL_NO_ENTRY_POINT: u32 = u32::MAX;
@@ -70,20 +70,7 @@ impl<'a> Drop for RebuildGuard<'a> {
     }
 }
 
-pub struct SnapshotPinGuard<'a>(pub &'a HnswIndexCore, u64);
 
-impl<'a> SnapshotPinGuard<'a> {
-    pub(super) fn new(core: &'a HnswIndexCore, seq_no: u64) -> Self {
-        core.cold.seq_log.write().pin_snapshot(seq_no);
-        Self(core, seq_no)
-    }
-}
-
-impl<'a> Drop for SnapshotPinGuard<'a> {
-    fn drop(&mut self) {
-        self.0.cold.seq_log.write().unpin_snapshot(self.1);
-    }
-}
 
 /// The HNSW (Hierarchical Navigable Small World) vector index.
 #[derive(Clone)]
@@ -174,11 +161,10 @@ impl HnswHotCore {
 pub struct HnswColdCore {
     pub config: HnswConfig,
     pub validation_error: Option<String>,
-    pub tx_buffer: TxBuffer<Vec<f32>>,
+    pub tx_buffer: LocalTxBuffer,
     pub quantizer: RwLock<Option<crate::quantize::ScalarQuantizer>>,
     pub sq8_bias: RwLock<Sq8Bias>,
     pub buffer_index: RwLock<Option<crate::persistence::BufferIndex>>,
-    pub seq_log: RwLock<contextra_mvcc::SequenceLog>,
     pub rebuild_count: AtomicU64,
     pub visited_dead_nodes: AtomicU64,
     pub deleted_nodes: RwLock<RoaringTreemap>,
@@ -242,11 +228,10 @@ impl HnswIndex {
                 cold: HnswColdCore {
                     config,
                     validation_error: None,
-                    tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
+                    tx_buffer: LocalTxBuffer::new(),
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     buffer_index: RwLock::new(None),
-                    seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
@@ -314,11 +299,10 @@ impl HnswIndex {
                 cold: HnswColdCore {
                     config,
                     validation_error,
-                    tx_buffer: TxBuffer::new_with_config(16, std::time::Duration::from_secs(60)),
+                    tx_buffer: LocalTxBuffer::new(),
                     quantizer: RwLock::new(None),
                     sq8_bias: RwLock::new(Sq8Bias::default()),
                     buffer_index: RwLock::new(None),
-                    seq_log: RwLock::new(contextra_mvcc::SequenceLog::new()),
                     rebuild_count: AtomicU64::new(0),
                     visited_dead_nodes: AtomicU64::new(0),
                     deleted_nodes: RwLock::new(RoaringTreemap::new()),
@@ -459,17 +443,7 @@ impl HnswIndex {
         }
     }
 
-    pub fn compact_seq_log(&self, min_active_seqno: u64) {
-        self.inner.cold.seq_log.write().compact(min_active_seqno);
-    }
 
-    pub fn pin_snapshot(&self, seq_no: u64) {
-        self.inner.cold.seq_log.write().pin_snapshot(seq_no);
-    }
-
-    pub fn unpin_snapshot(&self, seq_no: u64) {
-        self.inner.cold.seq_log.write().unpin_snapshot(seq_no);
-    }
 
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {
         let map = self.inner.hot.doc_to_node.read();

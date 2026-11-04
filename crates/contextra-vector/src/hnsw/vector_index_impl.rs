@@ -1,14 +1,14 @@
 use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 
-use contextra_mvcc::IndexOp;
+use crate::hnsw::staging::LocalVectorOp;
 use contextra_ports::{VectorIndex, VectorIndexStats};
 use contextra_types::{ContextraError, DistanceMetric, DocId, Result, ScoredDocument, TxId};
 
 use super::batch::{BatchContext, SearchContext};
 use super::config::validate_vector;
 use super::sq8_bias::Sq8Bias;
-use super::types::{HnswIndex, HnswNode, SnapshotPinGuard, VectorData};
+use super::types::{HnswIndex, HnswNode, VectorData};
 
 impl VectorIndex for HnswIndex {
     async fn insert(&self, tx: TxId, id: DocId, embedding: &[f32]) -> Result<()> {
@@ -30,7 +30,7 @@ impl VectorIndex for HnswIndex {
 
         self.inner.cold.tx_buffer.stage(
             tx,
-            IndexOp::Insert {
+            LocalVectorOp::Insert {
                 doc_id: id,
                 data: embedding.to_vec(),
             },
@@ -235,9 +235,8 @@ impl VectorIndex for HnswIndex {
         }
         self.inner.cold.tx_buffer.stage(
             tx,
-            IndexOp::Delete {
+            LocalVectorOp::Delete {
                 doc_id: id,
-                data: None,
             },
         )?;
         Ok(())
@@ -256,7 +255,7 @@ impl VectorIndex for HnswIndex {
         if self.inner.cold.config.quantize && self.inner.cold.quantizer.read().is_none() {
             let mut train_data = Vec::with_capacity(256.min(ops.len()));
             for op in &ops {
-                if let IndexOp::Insert { data, .. } = op {
+                if let LocalVectorOp::Insert { data, .. } = op {
                     train_data.push(data.clone());
                     if train_data.len() >= 256 {
                         break;
@@ -302,7 +301,7 @@ impl VectorIndex for HnswIndex {
 
         for op in &ops {
             match op {
-                IndexOp::Insert { doc_id, data } => {
+                LocalVectorOp::Insert { doc_id, data } => {
                     let prepared = self.inner.compute_insert_with_context(
                         *doc_id,
                         data,
@@ -312,15 +311,8 @@ impl VectorIndex for HnswIndex {
                     )?;
                     prepared_inserts.push(prepared);
                 }
-                IndexOp::Delete { doc_id, .. } => {
+                LocalVectorOp::Delete { doc_id } => {
                     deletes_to_apply.push(*doc_id);
-                }
-                other => {
-                    return Err(ContextraError::Index(format!(
-                        "HNSW commit received unsupported IndexOp variant: {:?}. \
-                         Add a handler arm before enabling this operation.",
-                        std::mem::discriminant(other)
-                    )));
                 }
             }
         }
@@ -335,20 +327,6 @@ impl VectorIndex for HnswIndex {
             inserted_doc_ids.push(prepared.doc_id);
             self.inner.apply_insert(prepared, seq);
         }
-
-        let mut seq_log = self.inner.cold.seq_log.write();
-        for op in &ops {
-            match op {
-                IndexOp::Insert { doc_id, .. } => {
-                    seq_log.record_insert(*doc_id, seq);
-                }
-                IndexOp::Delete { doc_id, .. } => {
-                    seq_log.record_delete(*doc_id, seq);
-                }
-                _ => {}
-            }
-        }
-        drop(seq_log);
 
         if self.inner.is_rebuild_required() {
             tracing::warn!(
@@ -380,12 +358,11 @@ impl VectorIndex for HnswIndex {
     /// Verified by integration tests `crates/contextra-vector/tests/k02_snapshot_rebuild_determinism.rs` and
     /// `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs` across multiple deterministic seeds and
     /// targeted timing execution inside the critical rebuild swap window.
-    async fn search_at(&self, query: &[f32], k: usize, seq_no: u64) -> Result<Vec<ScoredDocument>> {
-        let _pin_guard = SnapshotPinGuard::new(&self.inner, seq_no);
-        let log = self.inner.cold.seq_log.read().clone();
-        let filter_fn = move |doc_id: DocId| -> bool { log.is_visible(doc_id, seq_no) };
-        self.search_filtered_internal(query, k, Some(&filter_fn), Some(seq_no))
-            .await
+    async fn search_at(&self, _query: &[f32], _k: usize, _seq_no: u64) -> Result<Vec<ScoredDocument>> {
+        Err(contextra_types::ContextraError::CapabilityUnsupported {
+            capability: "snapshot_read_at".to_string(),
+            reason: "Snapshot reads are decoupled from vector index per SPEC D-88".to_string(),
+        })
     }
 
     async fn rollback(&self, tx: TxId) -> Result<()> {
