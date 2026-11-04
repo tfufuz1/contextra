@@ -266,3 +266,34 @@ fn test_rfc_8032_ed25519_kat_and_verify_strict() {
         assert!(weak_vk.verify_strict(b"any message", &dummy_sig).is_err());
     }
 }
+
+#[test]
+fn test_blake3_official_kat_and_keyed_mode() {
+    // Official BLAKE3 standard test vectors (BLAKE3 specification / test_vectors.json)
+    // 1. Unkeyed hash of empty string:
+    // hash("") = af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262
+    let hash_empty = blake3::hash(b"");
+    assert_eq!(
+        hash_empty.to_hex().as_str(),
+        "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+        "BLAKE3 unkeyed empty vector mismatch"
+    );
+
+    // 2. Keyed hash of empty string using official test vector key: "whats the Elvish word for friend"
+    let key: [u8; 32] = *b"whats the Elvish word for friend";
+    let keyed_hash_empty = blake3::keyed_hash(&key, b"");
+    assert_eq!(
+        keyed_hash_empty.to_hex().as_str(),
+        "92b2b75604ed3c761f9d6f62392c8a9227ad0ea3f09573e783f1498a4ed60d26",
+        "BLAKE3 keyed hash empty vector mismatch"
+    );
+
+    // 3. Test tag function with length-prefixed TagPreimage
+    let idx_key = contextra_crypto::IdxKey(contextra_crypto::SecretKey::new(key));
+    let mut pre = contextra_crypto::TagPreimage::new();
+    pre.push(b"ctx/doc/v2");
+    pre.push(b"payload_tag");
+    let tag_res = contextra_crypto::tag(&idx_key, &pre);
+    assert_eq!(tag_res.len(), 16);
+    assert_ne!(tag_res, [0u8; 16]);
+}
