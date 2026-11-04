@@ -44,6 +44,8 @@ pub fn to_canonical_json_string<T: Serialize>(value: &T) -> Result<String, Erasu
 }
 
 /// Alias für `to_canonical_json_string` für Abwärtskompatibilität.
-pub fn canonicalize_json<T: serde::Serialize>(val: &T) -> Result<String, crate::error::ErasureError> {
+pub fn canonicalize_json<T: serde::Serialize>(
+    val: &T,
+) -> Result<String, crate::error::ErasureError> {
     to_canonical_json_string(val)
 }

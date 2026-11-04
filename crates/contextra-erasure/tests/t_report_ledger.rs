@@ -50,3 +50,25 @@ fn t_restore_1_ledger_and_guard() {
         "Seq > Floor ist legitime Neuanlage"
     );
 }
+
+#[test]
+fn t_report_residual_risks_and_appendix_d() {
+    use contextra_erasure::report::build::{build_report, ReachStatus};
+    use contextra_types::ids::ErasureId;
+
+    let id = ErasureId::new([0x33; 16]);
+    let report = build_report(id, 1000, 2000, vec![], 0, 0, false);
+    assert_eq!(report.field_measurement.mk1, ReachStatus::NotReached);
+    assert!(report
+        .residual_risks
+        .iter()
+        .any(|r| r.id == "RISK-TEXT-INDEX-UNTIL-PURGE"));
+
+    let report_purged = build_report(id, 1000, 2000, vec![], 1, 1024, true);
+    assert_eq!(report_purged.field_measurement.mk2, ReachStatus::Reached);
+    assert_eq!(report_purged.field_measurement.mk3, ReachStatus::Reached);
+    assert!(!report_purged
+        .residual_risks
+        .iter()
+        .any(|r| r.id == "RISK-TEXT-INDEX-UNTIL-PURGE"));
+}
