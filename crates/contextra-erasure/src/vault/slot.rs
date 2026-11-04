@@ -1,129 +1,224 @@
-//! Tresor-Slot-Layout, Validierung und Slot-Nullung (SPEC §11.5, Anhang F.3, ER-02, ER-05).
+//! Tresor-Slot-Layout, Validierung und Slot-Nullung (SPEC §11.5, Anhang F.3, D-111, D-125, I-23).
 //!
-//! Slot-Layout (80 Bytes):
-//!   Byte  0      – slot_type (1 B)
-//!   Byte  1..16  – tag (16 B)
-//!   Byte 17..48  – payload (32 B)
-//!   Byte 49      – status (1 B):  0x00 = leer, 0x01 = aktiv, 0x02 = Grabstein
-//!   Byte 50..55  – gen (u48, 6 B, little-endian)
-//!   Byte 56..79  – mac (24 B, HMAC-SHA256 der ersten 56 Bytes, gekürzt)
+//! Slot-Layout (64 Bytes, big-endian):
+//!   Byte  0      – slot_type (1 B): 0x01 T, 0x02 C, 0x03 S, 0x04 D, 0x05 F, 0x06 E; 0x00 leer
+//!   Byte  1      – status (1 B):    0x00 leer, 0x01 aktiv, 0x02 Grabstein
+//!   Byte  2..7   – gen (u48, 6 B, big-endian)
+//!   Byte  8..23  – tag (16 B)
+//!   Byte 24..55  – payload (32 B)
+//!   Byte 56..63  – mac (8 B, HMAC-SHA256(K_vm, vault_id || Bytes[0..56))[0..8])
 
 use crate::error::ErasureError;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
-/// Größe eines Tresor-Slots in Bytes (F.3, ER-02).
-pub const VAULT_SLOT_SIZE: usize = 80;
+/// Größe eines Tresor-Slots in Bytes (F.3, D-111, I-23).
+pub const VAULT_SLOT_SIZE: usize = 64;
 
-/// Slot-Status-Werte.
+/// Slot-Status-Werte (F.3).
 pub const STATUS_EMPTY: u8 = 0x00;
 /// Slot-Status: aktiv.
 pub const STATUS_ACTIVE: u8 = 0x01;
 /// Slot-Status: Grabstein (für lineare Sondierung).
 pub const STATUS_TOMBSTONE: u8 = 0x02;
 
-/// Byte-Offsets innerhalb eines Slots.
+/// Byte-Offsets innerhalb eines 64-Byte-Slots (F.3).
 pub mod off {
-    /// Offset des slot_type-Feldes.
+    /// Offset des slot_type-Feldes (Byte 0, 1 B).
     pub const SLOT_TYPE: usize = 0;
-    /// Offset des tag-Feldes.
-    pub const TAG: usize = 1;
-    /// Offset des payload-Feldes.
-    pub const PAYLOAD: usize = 17;
-    /// Offset des status-Feldes.
-    pub const STATUS: usize = 49;
-    /// Offset des gen-Feldes (u48, 6 Bytes).
-    pub const GEN: usize = 50;
-    /// Offset des mac-Feldes (24 Bytes).
+    /// Offset des status-Feldes (Byte 1, 1 B).
+    pub const STATUS: usize = 1;
+    /// Offset des gen-Feldes (Bytes 2..8, u48 big-endian, 6 B).
+    pub const GEN: usize = 2;
+    /// Offset des tag-Feldes (Bytes 8..24, 16 B).
+    pub const TAG: usize = 8;
+    /// Offset des payload-Feldes (Bytes 24..56, 32 B).
+    pub const PAYLOAD: usize = 24;
+    /// Offset des mac-Feldes (Bytes 56..64, 8 B).
     pub const MAC: usize = 56;
 }
 
-/// Typen von Tresor-Slots (F.3, ER-06).
+/// Typen von Tresor-Slots (F.3, D-33, D-79, D-85, D-111, D-125).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
 pub enum SlotType {
     /// Mandanten-Stamm-Slot.
-    Tenant = 0x54, // 'T'
+    Tenant = 0x01,
     /// Collection-Slot.
-    Collection = 0x43, // 'C'
+    Collection = 0x02,
     /// Betroffenen-Slot (Subject).
-    Subject = 0x53, // 'S'
+    Subject = 0x03,
     /// Dokument-Slot.
-    Document = 0x44, // 'D'
+    Document = 0x04,
     /// Datei-Schlüssel-Slot.
-    File = 0x46, // 'F'
+    File = 0x05,
+    /// Epochen-Schlüssel-Slot.
+    Epoch = 0x06,
 }
 
 impl SlotType {
     /// Konvertiert u8 in SlotType.
     pub fn from_u8(b: u8) -> Option<Self> {
         match b {
-            0x54 => Some(Self::Tenant),
-            0x43 => Some(Self::Collection),
-            0x53 => Some(Self::Subject),
-            0x44 => Some(Self::Document),
-            0x46 => Some(Self::File),
+            0x01 => Some(Self::Tenant),
+            0x02 => Some(Self::Collection),
+            0x03 => Some(Self::Subject),
+            0x04 => Some(Self::Document),
+            0x05 => Some(Self::File),
+            0x06 => Some(Self::Epoch),
             _ => None,
         }
     }
 }
 
 /// Entpackter Slot-Inhalt (in-memory).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SlotData {
     /// Slot-Typ.
     pub slot_type: SlotType,
     /// 16-Byte Tag.
     pub tag: [u8; 16],
-    /// 32-Byte Payload.
+    /// 32-Byte Payload (Salt oder maskierter Schlüssel).
     pub payload: [u8; 32],
-    /// Generationszähler.
+    /// Generationszähler (u48).
     pub gen: u64,
 }
 
-/// Serialisiert einen Slot in 80 Bytes (ohne MAC-Feld, das separat berechnet wird).
+/// Serialisiert einen aktiven Slot in 64 Bytes (ohne MAC-Feld).
 pub fn encode_slot_body(sd: &SlotData) -> [u8; VAULT_SLOT_SIZE] {
     let mut buf = [0u8; VAULT_SLOT_SIZE];
     buf[off::SLOT_TYPE] = sd.slot_type as u8;
-    buf[off::TAG..off::TAG + 16].copy_from_slice(&sd.tag);
-    buf[off::PAYLOAD..off::PAYLOAD + 32].copy_from_slice(&sd.payload);
     buf[off::STATUS] = STATUS_ACTIVE;
-    // gen: 6 Bytes little-endian
-    let gen_bytes = sd.gen.to_le_bytes();
-    buf[off::GEN..off::GEN + 6].copy_from_slice(&gen_bytes[..6]);
+    // gen: 6 Bytes big-endian (u48)
+    let gen_be = sd.gen.to_be_bytes();
+    if let (Some(dest), Some(src)) = (buf.get_mut(off::GEN..off::TAG), gen_be.get(2..8)) {
+        dest.copy_from_slice(src);
+    }
+    if let Some(dest) = buf.get_mut(off::TAG..off::PAYLOAD) {
+        dest.copy_from_slice(&sd.tag);
+    }
+    if let Some(dest) = buf.get_mut(off::PAYLOAD..off::MAC) {
+        dest.copy_from_slice(&sd.payload);
+    }
     buf
 }
 
-/// Deserialisiert einen Slot aus 80 Bytes. Gibt `None` bei leeren Slots zurück,
-/// `Err(Corrupt)` bei MAC-Fehler.
+/// Berechnet den 8-Byte Slot-MAC nach SPEC F.3:
+/// `HMAC-SHA256(K_vm, vault_id ‖ Bytes[0..56))[0..8]`.
+pub fn compute_slot_mac(mac_key: &[u8; 32], vault_id: &[u8; 16], slot_pre_mac: &[u8]) -> [u8; 8] {
+    let mut out = [0u8; 8];
+    if let Ok(mut hmac) = <Hmac<Sha256> as Mac>::new_from_slice(mac_key) {
+        <Hmac<Sha256> as Mac>::update(&mut hmac, vault_id);
+        <Hmac<Sha256> as Mac>::update(&mut hmac, slot_pre_mac);
+        let full = <Hmac<Sha256> as Mac>::finalize(hmac).into_bytes();
+        if let (Some(src), Some(dest)) = (full.get(..8), out.get_mut(..8)) {
+            dest.copy_from_slice(src);
+        }
+    }
+    out
+}
+
+/// Erstellt das kanonische Grabstein-Abbild (tombstone_image) nach SPEC D-111 Abs. 3 / F.3:
+/// Alle Bytes 0 außer `status = 0x02`, MAC über das Abbild mit `vault_id`.
+pub fn tombstone_image(vault_id: &[u8; 16], mac_key: &[u8; 32]) -> [u8; VAULT_SLOT_SIZE] {
+    let mut buf = [0u8; VAULT_SLOT_SIZE];
+    buf[off::STATUS] = STATUS_TOMBSTONE;
+    if let Some(pre) = buf.get(..off::MAC) {
+        let mac = compute_slot_mac(mac_key, vault_id, pre);
+        if let Some(dest) = buf.get_mut(off::MAC..off::MAC + 8) {
+            dest.copy_from_slice(&mac);
+        }
+    }
+    buf
+}
+
+/// Deserialisiert einen Slot aus 64 Bytes nach SPEC F.3.
+/// Gibt `Ok(None)` bei leeren oder Grabstein-Slots zurück,
+/// `Err(Corrupt)` bei ungültigem Status oder ungültigem MAC.
 pub fn decode_slot(
     raw: &[u8; VAULT_SLOT_SIZE],
+    vault_id: &[u8; 16],
     mac_key: &[u8; 32],
 ) -> Result<Option<SlotData>, ErasureError> {
-    let status = raw[off::STATUS];
+    let status = match raw.get(off::STATUS) {
+        Some(&s) => s,
+        None => return Err(ErasureError::Corrupt),
+    };
+
     match status {
-        STATUS_EMPTY => return Ok(None),
-        STATUS_TOMBSTONE => return Ok(None),
+        STATUS_EMPTY => {
+            // Ein komplett leerer Slot
+            if raw.iter().all(|&b| b == 0) {
+                return Ok(None);
+            }
+            return Err(ErasureError::Corrupt);
+        }
+        STATUS_TOMBSTONE => {
+            // Grabstein-Prüfung nach D-111 Abs. 3:
+            // Bytes 0 und 2..56 müssen 0 sein, Byte 1 ist 0x02, MAC muss gültig sein
+            let pre = match raw.get(..off::MAC) {
+                Some(p) => p,
+                None => return Err(ErasureError::Corrupt),
+            };
+            let expected_mac = compute_slot_mac(mac_key, vault_id, pre);
+            let mac_slice = match raw.get(off::MAC..off::MAC + 8) {
+                Some(m) => m,
+                None => return Err(ErasureError::Corrupt),
+            };
+            if mac_slice != expected_mac {
+                return Err(ErasureError::Corrupt);
+            }
+            if raw.get(off::SLOT_TYPE).copied() != Some(0) {
+                return Err(ErasureError::Corrupt);
+            }
+            let body = match raw.get(off::GEN..off::MAC) {
+                Some(b) => b,
+                None => return Err(ErasureError::Corrupt),
+            };
+            if body.iter().any(|&b| b != 0) {
+                return Err(ErasureError::Corrupt);
+            }
+            return Ok(None);
+        }
         STATUS_ACTIVE => {}
         _ => return Err(ErasureError::Corrupt),
     }
 
-    // MAC-Prüfung: HMAC-SHA256 der ersten 56 Bytes, gekürzt auf 24 Bytes
-    let expected_mac = compute_slot_mac(mac_key, &raw[..56]);
-    if raw[off::MAC..off::MAC + 24] != expected_mac {
+    // MAC-Prüfung für aktiven Slot: HMAC-SHA256(K_vm, vault_id || Bytes[0..56))[0..8]
+    let pre = match raw.get(..off::MAC) {
+        Some(p) => p,
+        None => return Err(ErasureError::Corrupt),
+    };
+    let expected_mac = compute_slot_mac(mac_key, vault_id, pre);
+    let mac_slice = match raw.get(off::MAC..off::MAC + 8) {
+        Some(m) => m,
+        None => return Err(ErasureError::Corrupt),
+    };
+    if mac_slice != expected_mac {
         return Err(ErasureError::Corrupt);
     }
 
-    let slot_type_byte = raw[off::SLOT_TYPE];
+    let slot_type_byte = match raw.get(off::SLOT_TYPE) {
+        Some(&b) => b,
+        None => return Err(ErasureError::Corrupt),
+    };
     let slot_type = SlotType::from_u8(slot_type_byte).ok_or(ErasureError::Corrupt)?;
 
     let mut tag = [0u8; 16];
-    tag.copy_from_slice(&raw[off::TAG..off::TAG + 16]);
+    if let (Some(dest), Some(src)) = (tag.get_mut(..), raw.get(off::TAG..off::PAYLOAD)) {
+        dest.copy_from_slice(src);
+    }
 
     let mut payload = [0u8; 32];
-    payload.copy_from_slice(&raw[off::PAYLOAD..off::PAYLOAD + 32]);
+    if let (Some(dest), Some(src)) = (payload.get_mut(..), raw.get(off::PAYLOAD..off::MAC)) {
+        dest.copy_from_slice(src);
+    }
 
     let mut gen_bytes = [0u8; 8];
-    gen_bytes[..6].copy_from_slice(&raw[off::GEN..off::GEN + 6]);
-    let gen = u64::from_le_bytes(gen_bytes);
+    if let (Some(dest), Some(src)) = (gen_bytes.get_mut(2..8), raw.get(off::GEN..off::TAG)) {
+        dest.copy_from_slice(src);
+    }
+    let gen = u64::from_be_bytes(gen_bytes);
 
     Ok(Some(SlotData {
         slot_type,
@@ -133,31 +228,31 @@ pub fn decode_slot(
     }))
 }
 
-/// Berechnet den Slot-MAC: HMAC-SHA256(K_vm, Bytes[0..56])[0..24].
-pub fn compute_slot_mac(mac_key: &[u8; 32], body: &[u8]) -> [u8; 24] {
-    use hmac::{Hmac, Mac};
-    use sha2::Sha256;
-    let mut out = [0u8; 24];
-    if let Ok(mut hmac) = <Hmac<Sha256> as Mac>::new_from_slice(mac_key) {
-        <Hmac<Sha256> as Mac>::update(&mut hmac, body);
-        let full: [u8; 32] = <Hmac<Sha256> as Mac>::finalize(hmac).into_bytes().into();
-        out.copy_from_slice(&full[..24]);
-    }
-    out
-}
-
-/// Bestimmt die Slot-Position im Slot-Array durch BLAKE3-Hash.
-/// `BLAKE3(slot_type ‖ tag)[0..8] mod capacity` → lineares Sondieren.
-pub fn slot_probe_start(slot_type: SlotType, tag: &[u8; 16], capacity: usize) -> usize {
+/// Bestimmt Shard und Startindex für lineare Sondierung nach SPEC D-111 Abs. 1:
+/// `h = BLAKE3(slot_type ‖ tag)`
+/// `shard = h[0] >> 4` (0..15)
+/// `i = u64_be(h[1..9]) mod 2^cap_log2`
+pub fn slot_probe_start(slot_type: SlotType, tag: &[u8; 16], capacity: usize) -> (u8, usize) {
     if capacity == 0 {
-        return 0;
+        return (0, 0);
     }
     let mut hasher = blake3::Hasher::new();
     hasher.update(&[slot_type as u8]);
     hasher.update(tag);
     let h = hasher.finalize();
-    let mut le_bytes = [0u8; 8];
-    le_bytes.copy_from_slice(&h.as_bytes()[..8]);
-    let idx = u64::from_le_bytes(le_bytes);
-    usize::try_from(idx % (capacity as u64)).unwrap_or(0)
+    let bytes = h.as_bytes();
+
+    let shard = match bytes.first() {
+        Some(&b) => b >> 4,
+        None => 0,
+    };
+
+    let mut idx_bytes = [0u8; 8];
+    if let (Some(dest), Some(src)) = (idx_bytes.get_mut(..), bytes.get(1..9)) {
+        dest.copy_from_slice(src);
+    }
+    let hash_val = u64::from_be_bytes(idx_bytes);
+    let idx = usize::try_from(hash_val % (capacity as u64)).unwrap_or(0);
+
+    (shard, idx)
 }

@@ -60,13 +60,71 @@ lru = "0.16.3"
 uuid = { version = "1", features = ["v4"] }
 tokio-util = { version = "0.7.18", features = ["rt"] }
 
+
+[dev-dependencies]
+contextra-testkit = { workspace = true }
+libc = "0.2"
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["full", "test-util"] }
+tempfile = { workspace = true }
+criterion = { version = "0.5", features = ["async_tokio"] }
+proptest = "1.4"
+loom = "0.7"
+futures = "0.3"
+redb = "2"
+
 [[test]]
 name = "differential_redb"
 path = "tests/differential/redb_operation_sequence.rs"
 
 [[test]]
+name = "commit_core_batch_rollback"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "commit_rollback_batch_scoped"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "compaction_contiguous_selection"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "flush_recovery_lifecycle"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "group_commit_fault_injection"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "group_commit_overlapping_batch_rollback"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "metrics_sink_test"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "no_test_hooks_in_release_api"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "ssi_write_skew_integration"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "wal_key_lifecycle"
+required-features = ["test-hooks"]
+
+[[test]]
+name = "wal_truncate_ordering"
+required-features = ["test-hooks"]
+
+[[test]]
 name = "wal_truncation_and_legacy_isolation"
 path = "tests/wal_truncation_and_legacy_isolation.rs"
+required-features = ["test-hooks"]
 
 [[bench]]
 name = "sstable_bench"

@@ -412,3 +412,310 @@ async fn test_manifest_explicit_rollover() {
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded[0], entry1);
 }
+
+#[tokio::test]
+async fn test_sl1_two_separate_entries_tear_in_torn_write_vs_sst_swap() {
+    let dir = tempdir().expect("tempdir");
+    let manifest_path = dir.path().join("MANIFEST");
+    let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
+    let old_sst = PathBuf::from("sst-old.sst");
+    let new_sst = PathBuf::from("sst-new.sst");
+    manifest
+        .append(&ManifestEntry::Add {
+            path: old_sst.clone(),
+            max_tx: 10,
+        })
+        .await
+        .expect("append initial");
+    manifest
+        .append(&ManifestEntry::Add {
+            path: new_sst.clone(),
+            max_tx: 20,
+        })
+        .await
+        .expect("append add new");
+    let loaded = Manifest::load(&manifest_path).await.expect("load");
+    let valid = Manifest::reconstruct_valid_sstables(&loaded);
+    assert_eq!(
+        valid.len(),
+        2,
+        "Two separate entries tear under torn-write: both old and new SSTables remain active!"
+    );
+
+    let dir_b = tempdir().expect("tempdir");
+    let manifest_b_path = dir_b.path().join("MANIFEST");
+    let manifest_b = Manifest::open(&manifest_b_path)
+        .await
+        .expect("open manifest_b");
+    manifest_b
+        .append(&ManifestEntry::Add {
+            path: old_sst.clone(),
+            max_tx: 10,
+        })
+        .await
+        .expect("append initial b");
+    let sst_swap = ManifestEntry::SstSwap {
+        add: vec![new_sst.clone()],
+        remove: vec![old_sst.clone()],
+    };
+    manifest_b.append(&sst_swap).await.expect("append sst_swap");
+    drop(manifest_b);
+
+    // If SstSwap is torn (truncated at tail), the whole swap is discarded and old SSTable remains valid
+    let mut file_bytes = tokio::fs::read(&manifest_b_path).await.expect("read file");
+    file_bytes.truncate(file_bytes.len() - 5);
+    tokio::fs::write(&manifest_b_path, file_bytes)
+        .await
+        .expect("truncate");
+
+    let loaded_b = Manifest::load(&manifest_b_path).await.expect("load b");
+    let valid_b = Manifest::reconstruct_valid_sstables(&loaded_b);
+    assert_eq!(
+        valid_b.len(),
+        1,
+        "Atomic SstSwap tail-torn write must discard the incomplete swap as a whole"
+    );
+    assert_eq!(
+        valid_b[0].0, old_sst,
+        "Old SSTable must remain active if SstSwap was torn"
+    );
+}
+
+#[tokio::test]
+async fn test_wal_floor_manifest_entry_roundtrip_and_current_floor() {
+    use contextra_ports::keys::FileId;
+
+    let dir = tempdir().expect("tempdir");
+    let manifest_path = dir.path().join("MANIFEST");
+
+    let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
+
+    let floor1 = ManifestEntry::WalFloor {
+        seq: 100,
+        tail_mac: [0x42; 32],
+        removed_file_ids: vec![FileId::new([1u8; 16]), FileId::new([2u8; 16])],
+    };
+    let floor2 = ManifestEntry::WalFloor {
+        seq: 200,
+        tail_mac: [0x77; 32],
+        removed_file_ids: vec![FileId::new([3u8; 16])],
+    };
+
+    manifest.append(&floor1).await.expect("append floor1");
+    manifest.append(&floor2).await.expect("append floor2");
+
+    let loaded = Manifest::load(&manifest_path).await.expect("load manifest");
+    assert_eq!(loaded.len(), 2);
+    assert_eq!(loaded[0], floor1);
+    assert_eq!(loaded[1], floor2);
+
+    let cur = Manifest::current_wal_floor(&loaded);
+    assert!(cur.is_some());
+    let cur_floor = cur.expect("current floor");
+    assert_eq!(cur_floor.seq, 200);
+    assert_eq!(cur_floor.tail_mac, [0x77; 32]);
+    assert_eq!(cur_floor.removed_file_ids, vec![FileId::new([3u8; 16])]);
+
+    // Direct API: append_wal_floor
+    manifest
+        .append_wal_floor(300, [0x88; 32], vec![FileId::new([4u8; 16])])
+        .await
+        .expect("append_wal_floor");
+
+    let reloaded = Manifest::load(&manifest_path).await.expect("reloaded");
+    let cur2 = Manifest::current_wal_floor(&reloaded).expect("floor 3");
+    assert_eq!(cur2.seq, 300);
+    assert_eq!(cur2.tail_mac, [0x88; 32]);
+    assert_eq!(cur2.removed_file_ids, vec![FileId::new([4u8; 16])]);
+}
+
+#[tokio::test]
+async fn test_text_commit_manifest_entry_roundtrip_and_query() {
+    use contextra_ports::keys::FileId;
+
+    let dir = tempdir().expect("tempdir");
+    let manifest_path = dir.path().join("MANIFEST");
+
+    let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
+
+    let tc1 = ManifestEntry::TextCommit {
+        add: Some(FileId::new([10u8; 16])),
+        remove: vec![FileId::new([1u8; 16]), FileId::new([2u8; 16])],
+        floor_seq: 150,
+    };
+    manifest.append(&tc1).await.expect("append tc1");
+
+    manifest
+        .append_text_commit(
+            Some(FileId::new([20u8; 16])),
+            vec![FileId::new([10u8; 16])],
+            250,
+        )
+        .await
+        .expect("append_text_commit");
+
+    let loaded = Manifest::load(&manifest_path)
+        .await
+        .expect("load text commit");
+    assert_eq!(loaded.len(), 2);
+    assert_eq!(loaded[0], tc1);
+
+    let cur_tc = Manifest::current_text_commit(&loaded).expect("current tc");
+    assert_eq!(cur_tc.add, Some(FileId::new([20u8; 16])));
+    assert_eq!(cur_tc.remove, vec![FileId::new([10u8; 16])]);
+    assert_eq!(cur_tc.floor_seq, 250);
+
+    let all_tc = Manifest::extract_text_commits(&loaded);
+    assert_eq!(all_tc.len(), 2);
+    assert_eq!(all_tc[0].floor_seq, 150);
+    assert_eq!(all_tc[1].floor_seq, 250);
+}
+
+#[test]
+fn test_candidates_intersecting_interval_query() {
+    use super::core::ManifestIntervalIndex;
+
+    let mut idx = ManifestIntervalIndex::new();
+    idx.insert("sst-01.sst", [10u8; 65], [30u8; 65]);
+    idx.insert("sst-02.sst", [40u8; 65], [60u8; 65]);
+    idx.insert("sst-03.sst", [70u8; 65], [90u8; 65]);
+
+    // Query intersecting [25, 45]: should return sst-01 and sst-02
+    let res = idx.candidates_intersecting([25u8; 65], [45u8; 65]);
+    assert_eq!(res.len(), 2);
+    assert!(res.contains(&PathBuf::from("sst-01.sst")));
+    assert!(res.contains(&PathBuf::from("sst-02.sst")));
+    assert!(!res.contains(&PathBuf::from("sst-03.sst")));
+
+    // Query non-intersecting
+    let empty_res = idx.candidates_intersecting([61u8; 65], [69u8; 65]);
+    assert!(empty_res.is_empty());
+}
+
+#[test]
+fn test_t_fmt_1_golden_and_fuzz_safety() {
+    use contextra_ports::keys::FileId;
+
+    let entries = vec![
+        ManifestEntry::WalFloor {
+            seq: 42,
+            tail_mac: [0xaa; 32],
+            removed_file_ids: vec![FileId::new([1u8; 16]), FileId::new([2u8; 16])],
+        },
+        ManifestEntry::TextCommit {
+            add: Some(FileId::new([99u8; 16])),
+            remove: vec![FileId::new([5u8; 16]), FileId::new([6u8; 16])],
+            floor_seq: 400,
+        },
+        ManifestEntry::SstSwap {
+            add: vec![PathBuf::from("a1.sst"), PathBuf::from("a2.sst")],
+            remove: vec![PathBuf::from("r1.sst")],
+        },
+    ];
+
+    for entry in entries {
+        let bytes = entry.to_bytes().expect("to_bytes");
+        // Frame structure: [len: 4] [crc: 4] [payload...]
+        assert!(bytes.len() >= 8);
+        let decoded = ManifestEntry::from_bytes(&bytes[4..]).expect("from_bytes");
+        assert_eq!(entry, decoded);
+
+        // Bit-flip test: ensure corrupt crc is rejected without panic
+        let mut corrupted = bytes.clone();
+        corrupted[4] ^= 0xff;
+        assert!(
+            ManifestEntry::from_bytes(&corrupted[4..]).is_err(),
+            "Bit-flip in CRC must be rejected fail-closed"
+        );
+
+        // Payload corruption
+        let mut corrupted_payload = bytes.clone();
+        if corrupted_payload.len() > 9 {
+            corrupted_payload[9] ^= 0x55;
+            assert!(
+                ManifestEntry::from_bytes(&corrupted_payload[4..]).is_err(),
+                "Corrupted payload must fail CRC check"
+            );
+        }
+
+        // Truncated payload
+        assert!(
+            ManifestEntry::from_bytes(&bytes[4..bytes.len() - 1]).is_err(),
+            "Truncated payload must be rejected"
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_recovery_crash_before_and_after_wal_floor_fsync() {
+    use contextra_ports::keys::FileId;
+
+    let dir = tempdir().expect("tempdir");
+    let manifest_path = dir.path().join("MANIFEST");
+
+    let manifest = Manifest::open(&manifest_path).await.expect("open manifest");
+
+    manifest
+        .append(&ManifestEntry::Add {
+            path: PathBuf::from("sst-1.sst"),
+            max_tx: 50,
+        })
+        .await
+        .expect("append add");
+
+    // Case 1: Crash before WalFloor fsync (interrupted during write)
+    let incomplete_floor = ManifestEntry::WalFloor {
+        seq: 50,
+        tail_mac: [0x55; 32],
+        removed_file_ids: vec![FileId::new([10u8; 16]), FileId::new([11u8; 16])],
+    };
+    let mut raw_bytes = incomplete_floor.to_bytes().expect("to_bytes");
+    // Simulate crash before fsync / torn write: write only partial bytes
+    raw_bytes.truncate(raw_bytes.len() - 12);
+    let mut file = tokio::fs::OpenOptions::new()
+        .append(true)
+        .open(&manifest_path)
+        .await
+        .expect("open file");
+    tokio::io::AsyncWriteExt::write_all(&mut file, &raw_bytes)
+        .await
+        .expect("write partial");
+    drop(file);
+    drop(manifest);
+
+    // On reopen: torn WalFloor at EOF must be discarded safely
+    let loaded = Manifest::load(&manifest_path)
+        .await
+        .expect("load after crash before fsync");
+    assert_eq!(loaded.len(), 1, "Incomplete WalFloor must be discarded");
+    assert!(
+        Manifest::current_wal_floor(&loaded).is_none(),
+        "Floor must not be visible if crash happened before fsync"
+    );
+
+    // Case 2: Crash after fsync: WalFloor is durable and valid
+    let dir2 = tempdir().expect("tempdir");
+    let manifest2_path = dir2.path().join("MANIFEST");
+    let reopened_manifest = Manifest::open(&manifest2_path).await.expect("reopen");
+    reopened_manifest
+        .append_wal_floor(
+            60,
+            [0x99; 32],
+            vec![FileId::new([10u8; 16]), FileId::new([11u8; 16])],
+        )
+        .await
+        .expect("append_wal_floor with durable fsync");
+    drop(reopened_manifest);
+
+    let loaded2 = Manifest::load(&manifest2_path)
+        .await
+        .expect("load after crash after fsync");
+    assert_eq!(loaded2.len(), 1);
+    let cur_floor = Manifest::current_wal_floor(&loaded2).expect("floor exists");
+    assert_eq!(cur_floor.seq, 60);
+    assert_eq!(cur_floor.tail_mac, [0x99; 32]);
+    assert_eq!(
+        cur_floor.removed_file_ids,
+        vec![FileId::new([10u8; 16]), FileId::new([11u8; 16])]
+    );
+}
