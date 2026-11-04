@@ -107,15 +107,15 @@ pub struct EraseSaga {
 
 impl Default for EraseSaga {
     fn default() -> Self {
-        Self::new()
+        Self::new(ErasureId::new([0u8; 16]))
     }
 }
 
 impl EraseSaga {
-    /// Erstellt eine neue Saga im Zustand `Requested` mit Null-ID.
-    pub fn new() -> Self {
+    /// Erstellt eine neue Saga mit gegebener ErasureId im Zustand `Requested`.
+    pub fn new(erasure_id: ErasureId) -> Self {
         Self {
-            erasure_id: ErasureId::new([0u8; 16]),
+            erasure_id,
             state: SagaState::Requested,
             pending_reason: None,
         }
@@ -123,11 +123,7 @@ impl EraseSaga {
 
     /// Erstellt eine neue Saga mit gegebener ErasureId im Zustand `Requested`.
     pub fn with_id(erasure_id: ErasureId) -> Self {
-        Self {
-            erasure_id,
-            state: SagaState::Requested,
-            pending_reason: None,
-        }
+        Self::new(erasure_id)
     }
 
     /// Erstellt eine Saga mit einem vorgegebenen Zustand (Recovery-Pfad).

@@ -2,19 +2,26 @@
 //!
 //! Enthält `FileVault`, die öffentliche Fassade über `VaultTable`.
 
-pub mod table;
-pub mod slot;
-pub mod sealer;
 pub mod keyring;
-pub mod rehash;
 pub mod open;
+pub mod rehash;
+pub mod sealer;
+pub mod slot;
+pub mod table;
 
 use crate::error::ErasureError;
 use slot::SlotData;
-pub use slot::{SlotType, SlotType as VaultSlotType, VAULT_SLOT_SIZE};
-use table::{VaultTable, VAULT_SLOT_BASE};
+use table::VaultTable;
 
-/// Öffentlich re-exportierte Konstanten für Tests und externe Crates.
+pub use keyring::InMemoryKeyring;
+pub use open::{open_vault, VaultOpenOutcome};
+pub use rehash::rehash;
+pub use sealer::VaultSealer;
+pub use slot::{
+    compute_slot_mac, decode_slot, encode_slot_body, slot_probe_start, SlotData as VaultSlotData,
+    SlotType as VaultSlotType, SlotType, STATUS_ACTIVE, STATUS_EMPTY, STATUS_TOMBSTONE,
+    VAULT_SLOT_SIZE,
+};
 pub use table::VAULT_SLOT_BASE;
 
 /// In-Memory-Tresor (Fassade über `VaultTable`).
@@ -67,11 +74,7 @@ impl FileVault {
     }
 
     /// Vernichtet einen Slot (ER-05): Nullung + Grabstein + Verifikation.
-    pub fn destroy_slot(
-        &mut self,
-        slot_type: SlotType,
-        tag: [u8; 16],
-    ) -> Result<(), ErasureError> {
+    pub fn destroy_slot(&mut self, slot_type: SlotType, tag: [u8; 16]) -> Result<(), ErasureError> {
         self.table.destroy(slot_type, &tag)
     }
 
