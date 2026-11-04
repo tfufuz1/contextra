@@ -1,12 +1,12 @@
 // FILE-CONTEXT
-// ZWECK: ErasureLayer implementation for HNSW vector index (SPEC §8.10, §8.2, D-77).
-// INVARIANTEN: on_gate zeroizes RAM vector bytes & injects surrogate; purge performs batch edge repair and frees slots; witness verifies zero residuals.
+// ZWECK: ErasureLayer trait implementation for HNSW vector index.
+// INVARIANTEN: Cryptographic erasure layer scope resolution and purged state witnessing.
+// HOTSPOTS: purge, witness, on_gate
 
-use contextra_ports::erasure::{
-    Armed, EraseTarget, ErasureLayer, KeyCoverage, LayerId, LayerScope, LayerWitness, PurgeCx,
-    PurgeOutcome, Scanner,
+use contextra_ports::{
+    Armed, BoxFuture, EraseTarget, ErasureLayer, KeyCoverage, LayerId, LayerScope, LayerWitness,
+    PurgeCx, PurgeOutcome, Scanner,
 };
-use contextra_ports::BoxFuture;
 use contextra_types::DocId;
 use zeroize::Zeroize;
 
@@ -90,10 +90,10 @@ impl ErasureLayer for HnswIndex {
         let this = self.clone();
         let units = scope.affected_units().to_vec();
         Box::pin(async move {
-            let mmap_node_count = this
+            let buffer_node_count = this
                 .inner
                 .cold
-                .mmap_index
+                .buffer_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -103,8 +103,8 @@ impl ErasureLayer for HnswIndex {
                 let ep_opt = this.inner.hot.get_entry_point();
                 let nodes_read = this.inner.hot.nodes.read();
                 ep_opt.and_then(|ep| {
-                    if ep >= mmap_node_count {
-                        let ram_idx = ep - mmap_node_count;
+                    if ep >= buffer_node_count {
+                        let ram_idx = ep - buffer_node_count;
                         nodes_read.get(ram_idx).and_then(|n| match &n.vector {
                             VectorData::F32(v) => Some(v.clone()),
                             VectorData::U8(_) => None,
@@ -125,8 +125,8 @@ impl ErasureLayer for HnswIndex {
                 let node_idx_opt = doc_map.get(&(doc_raw as u128)).copied();
 
                 if let Some(target_idx) = node_idx_opt {
-                    if target_idx >= mmap_node_count {
-                        let ram_idx = target_idx - mmap_node_count;
+                    if target_idx >= buffer_node_count {
+                        let ram_idx = target_idx - buffer_node_count;
                         if let Some(node) = nodes_write.get_mut(ram_idx) {
                             match &mut node.vector {
                                 VectorData::F32(v) => {
@@ -150,17 +150,21 @@ impl ErasureLayer for HnswIndex {
         })
     }
 
-    fn purge(&self, scope: &LayerScope, _cx: &PurgeCx) -> BoxFuture<'_, Result<PurgeOutcome, String>> {
+    fn purge(
+        &self,
+        scope: &LayerScope,
+        _cx: &PurgeCx,
+    ) -> BoxFuture<'_, Result<PurgeOutcome, String>> {
         let this = self.clone();
         let units = scope.affected_units().to_vec();
         Box::pin(async move {
             let mut purged_count = 0u64;
             let mut bytes_reclaimed = 0u64;
 
-            let mmap_node_count = this
+            let buffer_node_count = this
                 .inner
                 .cold
-                .mmap_index
+                .buffer_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -178,8 +182,8 @@ impl ErasureLayer for HnswIndex {
                     let mut mut_self = this.clone();
                     if let Ok(_stats) = mut_self.remove_with_graph_repair(doc_id) {
                         purged_count += 1;
-                        if idx >= mmap_node_count {
-                            let ram_idx = idx - mmap_node_count;
+                        if idx >= buffer_node_count {
+                            let ram_idx = idx - buffer_node_count;
                             let max_layer = this
                                 .inner
                                 .hot
@@ -188,7 +192,10 @@ impl ErasureLayer for HnswIndex {
                                 .get(ram_idx)
                                 .map(|n| n.max_layer)
                                 .unwrap_or(0);
-                            this.inner.hot.arena.zeroize_and_free_node(ram_idx, max_layer, m);
+                            this.inner
+                                .hot
+                                .arena
+                                .zeroize_and_free_node(ram_idx, max_layer, m);
                             bytes_reclaimed += (this.inner.cold.config.dimension * 4) as u64;
                         }
                     }
@@ -210,10 +217,10 @@ impl ErasureLayer for HnswIndex {
         Box::pin(async move {
             let doc_map = this.inner.hot.doc_to_node.read();
             let deleted = this.inner.cold.deleted_nodes.read();
-            let mmap_node_count = this
+            let buffer_node_count = this
                 .inner
                 .cold
-                .mmap_index
+                .buffer_index
                 .read()
                 .as_ref()
                 .map(|m| m.header.node_count() as usize)
@@ -233,8 +240,8 @@ impl ErasureLayer for HnswIndex {
                         residual_found = true;
                         break;
                     }
-                    if idx >= mmap_node_count {
-                        let ram_idx = idx - mmap_node_count;
+                    if idx >= buffer_node_count {
+                        let ram_idx = idx - buffer_node_count;
                         if let Some(node) = nodes_read.get(ram_idx) {
                             match &node.vector {
                                 VectorData::F32(v) => {
@@ -256,7 +263,9 @@ impl ErasureLayer for HnswIndex {
             }
 
             if residual_found {
-                return Err("Residue detected during witness scan: node not purged or memory dirty".into());
+                return Err(
+                    "Residue detected during witness scan: node not purged or memory dirty".into(),
+                );
             }
 
             let mut hasher = blake3::Hasher::new();
