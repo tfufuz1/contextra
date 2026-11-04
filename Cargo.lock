@@ -461,6 +461,7 @@ dependencies = [
  "contextra-crypto",
  "contextra-ports",
  "contextra-types",
+ "ed25519-dalek",
  "futures-util",
  "hmac",
  "loom",
@@ -564,8 +565,8 @@ dependencies = [
  "contextra-store",
  "contextra-sys",
  "contextra-testkit",
+ "contextra-testmacros",
  "contextra-types",
- "contextra-vector",
  "crc32fast",
  "criterion",
  "futures",
@@ -582,7 +583,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "subtle",
  "tempfile",
  "thiserror",
  "tokio",
@@ -590,6 +590,7 @@ dependencies = [
  "tracing",
  "uuid",
  "windows-sys",
+ "zeroize",
 ]
 
 [[package]]

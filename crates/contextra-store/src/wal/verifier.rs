@@ -3,7 +3,6 @@
 use contextra_types::{ContextraError, Result};
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Stateful wrapper around HMAC-SHA256 initialized with WAL domain separation.
@@ -145,8 +144,8 @@ impl IntegrityVerifier {
         }
 
         let computed = mac.finalize();
-        if computed.ct_eq(&entry.checksum).unwrap_u8() == 0
-            || entry.prev_hmac.ct_eq(&self.last_hmac).unwrap_u8() == 0
+        if contextra_crypto::verify_chain_complete(&computed, &entry.checksum).is_err()
+            || contextra_crypto::verify_chain_complete(&entry.prev_hmac, &self.last_hmac).is_err()
         {
             return Err(ContextraError::wal_corruption(
                 offset,
@@ -211,8 +210,8 @@ impl IntegrityVerifier {
         }
 
         let computed = mac.finalize();
-        if computed.ct_eq(&entry.checksum).unwrap_u8() == 0
-            || entry.prev_hmac.ct_eq(&self.last_hmac).unwrap_u8() == 0
+        if contextra_crypto::verify_chain_complete(&computed, &entry.checksum).is_err()
+            || contextra_crypto::verify_chain_complete(&entry.prev_hmac, &self.last_hmac).is_err()
         {
             return Err(ContextraError::wal_corruption(
                 offset,

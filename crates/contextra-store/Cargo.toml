@@ -10,7 +10,7 @@ rust-version.workspace = true
 description = "LSM-Speicher: WAL, Memtable, SSTables, Manifest, Kompaktion, Purge-Primitive."
 
 [package.metadata.contextra]
-ring = "1"
+ring = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
@@ -39,15 +39,9 @@ sha2 = "0.10"
 hmac = "0.12"
 aes-gcm-siv = "0.11"
 hkdf = "0.12"
-subtle = "2.6"
 ahash = { workspace = true }
 quick_cache = { version = "0.6", optional = true }
 contextra-crypto = { workspace = true }
-aes-gcm-siv = "0.11"
-hmac = "0.12"
-sha2 = "0.10"
-hkdf = "0.12"
-subtle = "2.6"
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 bytes = { workspace = true }
 blake3 = { workspace = true }
@@ -67,9 +61,9 @@ tokio-util = { version = "0.7.18", features = ["rt"] }
 
 
 [dev-dependencies]
+contextra-testmacros = { workspace = true }
 contextra-store = { path = ".", features = ["test-hooks"] }
 contextra-testkit = { workspace = true }
-contextra-vector = { workspace = true }
 libc = "0.2"
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }

@@ -7,6 +7,7 @@ use crate::compaction::{CompactionEngine, MergeOperator};
 use crate::memtable::MemTable;
 use crate::sstable::{create_block_cache_with_shards, SstableReader};
 use crate::util::DirLock;
+use crate::wal::KeyManager;
 use crate::wal::{Wal, WalOp};
 use contextra_mvcc::{SnapshotRegistry, TxBuffer};
 use contextra_ports::{ResourceBudget, ResourceTracker};
