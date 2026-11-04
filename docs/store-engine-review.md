@@ -3,7 +3,7 @@
 > **Datum:** 2026-11-02
 > **Rolle:** Storage-Engine-Ingenieur (RocksDB/Pebble/LevelDB-Internals, redb als Referenz)
 > **Scope:** systematische Analyse aller Implementierungsebenen in `crates/contextra-store`
-> **Normative Referenz:** SPEC 4.3.0
+> **Normative Referenz:** SPEC 
 
 ---
 
@@ -400,4 +400,4 @@ Die Rollenbeschreibung fordert ausschließlich das 78-Byte-KeyBuf-Schema (`regio
 
 ---
 
-*Dieser Report ist abgeleitet aus dem Ist-Zustand des Repositorys (2026-11-02); normative Grundlage bleibt SPEC 4.3.0. Bei Widerspruch gilt die SPEC.*
+*Dieser Report ist abgeleitet aus dem Ist-Zustand des Repositorys (2026-11-02); normative Grundlage bleibt SPEC . Bei Widerspruch gilt die SPEC.*

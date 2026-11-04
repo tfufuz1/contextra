@@ -3,7 +3,7 @@
 **Datum:** 2026-11-02
 **Prüfer:** ANN-Forscher/-Ingenieur (HNSW/DiskANN/ACORN), autonome Analyse
 **Basis:** Quellcode-Stand `crates/contextra-vector/` (alle `src/`- und `tests/`-Dateien)
-**Normativ:** `docs/SPEC.md` 4.3.0; bei Widerspruch gilt SPEC.
+**Normativ:** `docs/SPEC.md` ; bei Widerspruch gilt SPEC.
 
 ---
 
@@ -414,7 +414,7 @@ Dequantisierung → `do_insert` → Requantisierung mit ggf. neu kalibrierten Gr
 
 ---
 
-*Ende des Audits. Normativ: `docs/SPEC.md` 4.3.0.*
+*Ende des Audits. Normativ: `docs/SPEC.md` .*
 
 ---
 

@@ -1,7 +1,7 @@
 # Modulinventar und Abgrenzung: contextra-engine (Ring 3)
 
 > **Datum:** 2026-11-02
-> **Normative Grundlage:** SPEC 4.3.0, SPEC §5 (Ringmatrix), SPEC D-84 (Rückbauliste), SPEC §14.1/14.3 (Lifecycle)
+> **Normative Grundlage:** SPEC , SPEC §5 (Ringmatrix), SPEC D-84 (Rückbauliste), SPEC §14.1/14.3 (Lifecycle)
 > **Status:** Analysiert & Entschieden
 
 ---

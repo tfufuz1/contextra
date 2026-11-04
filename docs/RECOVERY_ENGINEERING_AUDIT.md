@@ -2,7 +2,7 @@
 
 > **Datum:** 2026-11-02
 > **Rolle:** Recovery-Ingenieur (ARIES-Prinzipien, Journaling, deterministische Crash-Simulation)
-> **Normativ:** `docs/SPEC.md` 4.3.0 > `docs/VETOES.md` > `docs/CONSTITUTION.md` > `AGENTS.md`
+> **Normativ:** `docs/SPEC.md`  > `docs/VETOES.md` > `docs/CONSTITUTION.md` > `AGENTS.md`
 > **Scope:** ARIES-Prinzipien, Idempotenz $R(R(s)) = R(s)$, Crash-Punkt-Enumeration, Dir-Fsync, I-9 Invariante, Plattenreserve
 
 ---

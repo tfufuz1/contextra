@@ -1,6 +1,6 @@
 # Grundregeln für Jules
 
-Nicht normativ. Maßgeblich: [`docs/SPEC.md`](../../docs/SPEC.md) (Version 4.3.0), [`AGENTS.md`](../../AGENTS.md) und `docs/VETOES.md`.
+Nicht normativ. Maßgeblich: [`docs/SPEC.md`](../../docs/SPEC.md) , [`AGENTS.md`](../../AGENTS.md) und `docs/VETOES.md`.
 
 ## A. Arbeitsmodus: selbstständig entscheiden und pausenlos ausführen
 

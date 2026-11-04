@@ -1,0 +1,193 @@
+nr,gruppe,schritt,status,rc,sekunden,detail,log,befehl,hinweis
+0,B-befunde,befund_cfg_features_undefiniert,PASS,,0.2,keine undefinierten Features,logs/000_befund_cfg_features_undefiniert.log,,cfg(feature) ohne Definition: Code und Tests werden still nie kompiliert
+1,B-befunde,befund_default_members,INFO,,0.0,"members=19 default-members=16; nicht in default-members (von `cargo test` ohne --workspace nicht erfasst): ['contextra-lab', 'contextra-testmacros', 'ctx-verify']",logs/001_befund_default_members.log,,welche Crates `cargo test` ohne --workspace ueberspringt
+2,B-befunde,befund_maturity_claims,INFO,,0.0,stable=9 beta=6 Eintraege ohne Crate=0,logs/002_befund_maturity_claims.log,,
+3,B-befunde,befund_bench_fuzz_dateien,PASS,,0.0,0 fehlende Dateien/Verzeichnisse,logs/003_befund_bench_fuzz_dateien.log,,
+4,0-basis,toolchain_preflight,PASS,,0.1,cargo 1.97.0 (c980f4866 2026-06-30) | Pin 1.97.0,logs/004_toolchain_preflight.log,,"Gate: schlaegt er fehl, werden alle cargo-Schritte SKIPPED"
+5,0-basis,toolchain_versionen,INFO,0,0.4,,logs/005_toolchain_versionen.log,bash -c rustc -Vv; cargo -V; cargo clippy -V; cargo fmt -V; rustup show active-toolchain; true,
+6,0-basis,cargo_fetch,PASS,0,0.6,,logs/006_cargo_fetch.log,cargo fetch --locked,
+7,0-basis,cargo_tree_duplicates,INFO,0,0.3,,logs/007_cargo_tree_duplicates.log,cargo tree --workspace --duplicates,
+8,1-statisch,fmt_check,FAIL,1,2.4,,logs/008_fmt_check.log,cargo fmt --all -- --check,
+9,1-statisch,check_alle_targets,FAIL,101,16.3,errors=37,logs/009_check_alle_targets.log,cargo check --workspace --all-targets --locked --keep-going,
+10,1-statisch,check_no_default_features,FAIL,101,41.2,errors=17,logs/010_check_no_default_features.log,cargo check --workspace --no-default-features --locked --keep-going,
+11,1-statisch,doc,FAIL,101,7.2,,logs/011_doc.log,cargo doc --workspace --no-deps --locked,
+12,1-statisch,clippy_lib__contextra,FAIL,101,8.9,errors=5 warnings=0,logs/012_clippy_lib__contextra.log,cargo clippy -p contextra --lib --locked -- -D warnings,
+13,1-statisch,clippy_alle_targets__contextra,FAIL,101,8.4,errors=5 warnings=0,logs/013_clippy_alle_targets__contextra.log,cargo clippy -p contextra --all-targets --locked -- -D warnings,
+14,1-statisch,clippy_lib__contextra-arch-tests,PASS,0,10.9,errors=0 warnings=0,logs/014_clippy_lib__contextra-arch-tests.log,cargo clippy -p contextra-arch-tests --lib --locked -- -D warnings,
+15,1-statisch,clippy_alle_targets__contextra-arch-tests,PASS,0,1.3,errors=0 warnings=0,logs/015_clippy_alle_targets__contextra-arch-tests.log,cargo clippy -p contextra-arch-tests --all-targets --locked -- -D warnings,
+16,1-statisch,clippy_lib__contextra-crypto,PASS,0,26.6,errors=0 warnings=0,logs/016_clippy_lib__contextra-crypto.log,cargo clippy -p contextra-crypto --lib --locked -- -D warnings,
+17,1-statisch,clippy_alle_targets__contextra-crypto,PASS,0,29.0,errors=0 warnings=0,logs/017_clippy_alle_targets__contextra-crypto.log,cargo clippy -p contextra-crypto --all-targets --locked -- -D warnings,
+18,1-statisch,clippy_lib__contextra-durable-fs,FAIL,101,10.9,errors=5 warnings=0,logs/018_clippy_lib__contextra-durable-fs.log,cargo clippy -p contextra-durable-fs --lib --locked -- -D warnings,
+19,1-statisch,clippy_alle_targets__contextra-durable-fs,FAIL,101,14.6,errors=5 warnings=0,logs/019_clippy_alle_targets__contextra-durable-fs.log,cargo clippy -p contextra-durable-fs --all-targets --locked -- -D warnings,
+20,1-statisch,clippy_lib__contextra-engine,FAIL,101,1.3,errors=5 warnings=0,logs/020_clippy_lib__contextra-engine.log,cargo clippy -p contextra-engine --lib --locked -- -D warnings,
+21,1-statisch,clippy_alle_targets__contextra-engine,FAIL,101,9.7,errors=5 warnings=0,logs/021_clippy_alle_targets__contextra-engine.log,cargo clippy -p contextra-engine --all-targets --locked -- -D warnings,
+22,1-statisch,clippy_lib__contextra-erasure,FAIL,101,5.6,errors=5 warnings=0,logs/022_clippy_lib__contextra-erasure.log,cargo clippy -p contextra-erasure --lib --locked -- -D warnings,
+23,1-statisch,clippy_alle_targets__contextra-erasure,FAIL,101,11.9,errors=5 warnings=0,logs/023_clippy_alle_targets__contextra-erasure.log,cargo clippy -p contextra-erasure --all-targets --locked -- -D warnings,
+24,1-statisch,clippy_lib__contextra-lab,PASS,0,11.8,errors=0 warnings=0,logs/024_clippy_lib__contextra-lab.log,cargo clippy -p contextra-lab --lib --locked -- -D warnings,
+25,1-statisch,clippy_alle_targets__contextra-lab,FAIL,101,6.3,errors=2 warnings=1,logs/025_clippy_alle_targets__contextra-lab.log,cargo clippy -p contextra-lab --all-targets --locked -- -D warnings,
+26,1-statisch,clippy_lib__contextra-mvcc,FAIL,101,1.2,errors=5 warnings=0,logs/026_clippy_lib__contextra-mvcc.log,cargo clippy -p contextra-mvcc --lib --locked -- -D warnings,
+27,1-statisch,clippy_alle_targets__contextra-mvcc,FAIL,101,2.1,errors=5 warnings=1,logs/027_clippy_alle_targets__contextra-mvcc.log,cargo clippy -p contextra-mvcc --all-targets --locked -- -D warnings,
+28,1-statisch,clippy_lib__contextra-ports,FAIL,101,5.6,errors=5 warnings=0,logs/028_clippy_lib__contextra-ports.log,cargo clippy -p contextra-ports --lib --locked -- -D warnings,
+29,1-statisch,clippy_alle_targets__contextra-ports,FAIL,101,10.0,errors=6 warnings=1,logs/029_clippy_alle_targets__contextra-ports.log,cargo clippy -p contextra-ports --all-targets --locked -- -D warnings,
+30,1-statisch,clippy_lib__contextra-rank,PASS,0,7.6,errors=0 warnings=0,logs/030_clippy_lib__contextra-rank.log,cargo clippy -p contextra-rank --lib --locked -- -D warnings,
+31,1-statisch,clippy_alle_targets__contextra-rank,PASS,0,7.7,errors=0 warnings=0,logs/031_clippy_alle_targets__contextra-rank.log,cargo clippy -p contextra-rank --all-targets --locked -- -D warnings,
+32,1-statisch,clippy_lib__contextra-simd,PASS,0,5.5,errors=0 warnings=0,logs/032_clippy_lib__contextra-simd.log,cargo clippy -p contextra-simd --lib --locked -- -D warnings,
+33,1-statisch,clippy_alle_targets__contextra-simd,PASS,0,9.0,errors=0 warnings=0,logs/033_clippy_alle_targets__contextra-simd.log,cargo clippy -p contextra-simd --all-targets --locked -- -D warnings,
+34,1-statisch,clippy_lib__contextra-store,FAIL,101,7.1,errors=5 warnings=0,logs/034_clippy_lib__contextra-store.log,cargo clippy -p contextra-store --lib --locked -- -D warnings,
+35,1-statisch,clippy_alle_targets__contextra-store,FAIL,101,6.5,errors=5 warnings=0,logs/035_clippy_alle_targets__contextra-store.log,cargo clippy -p contextra-store --all-targets --locked -- -D warnings,
+36,1-statisch,clippy_lib__contextra-sys,PASS,0,8.5,errors=0 warnings=0,logs/036_clippy_lib__contextra-sys.log,cargo clippy -p contextra-sys --lib --locked -- -D warnings,
+37,1-statisch,clippy_alle_targets__contextra-sys,PASS,0,23.5,errors=0 warnings=0,logs/037_clippy_alle_targets__contextra-sys.log,cargo clippy -p contextra-sys --all-targets --locked -- -D warnings,
+38,1-statisch,clippy_lib__contextra-testkit,FAIL,101,1.7,errors=5 warnings=0,logs/038_clippy_lib__contextra-testkit.log,cargo clippy -p contextra-testkit --lib --locked -- -D warnings,
+39,1-statisch,clippy_alle_targets__contextra-testkit,FAIL,101,9.9,errors=5 warnings=0,logs/039_clippy_alle_targets__contextra-testkit.log,cargo clippy -p contextra-testkit --all-targets --locked -- -D warnings,
+40,1-statisch,clippy_lib__contextra-testmacros,PASS,0,2.6,errors=0 warnings=0,logs/040_clippy_lib__contextra-testmacros.log,cargo clippy -p contextra-testmacros --lib --locked -- -D warnings,
+41,1-statisch,clippy_alle_targets__contextra-testmacros,PASS,0,9.5,errors=0 warnings=0,logs/041_clippy_alle_targets__contextra-testmacros.log,cargo clippy -p contextra-testmacros --all-targets --locked -- -D warnings,
+42,1-statisch,clippy_lib__contextra-text,FAIL,101,9.8,errors=5 warnings=0,logs/042_clippy_lib__contextra-text.log,cargo clippy -p contextra-text --lib --locked -- -D warnings,
+43,1-statisch,clippy_alle_targets__contextra-text,FAIL,101,6.0,errors=5 warnings=0,logs/043_clippy_alle_targets__contextra-text.log,cargo clippy -p contextra-text --all-targets --locked -- -D warnings,
+44,1-statisch,clippy_lib__contextra-types,PASS,0,0.3,errors=0 warnings=0,logs/044_clippy_lib__contextra-types.log,cargo clippy -p contextra-types --lib --locked -- -D warnings,
+45,1-statisch,clippy_alle_targets__contextra-types,PASS,0,8.1,errors=0 warnings=0,logs/045_clippy_alle_targets__contextra-types.log,cargo clippy -p contextra-types --all-targets --locked -- -D warnings,
+46,1-statisch,clippy_lib__contextra-vector,FAIL,101,1.4,errors=5 warnings=0,logs/046_clippy_lib__contextra-vector.log,cargo clippy -p contextra-vector --lib --locked -- -D warnings,
+47,1-statisch,clippy_alle_targets__contextra-vector,FAIL,101,9.1,errors=5 warnings=0,logs/047_clippy_alle_targets__contextra-vector.log,cargo clippy -p contextra-vector --all-targets --locked -- -D warnings,
+48,1-statisch,clippy_lib__ctx-verify,PASS,0,2.2,errors=0 warnings=0,logs/048_clippy_lib__ctx-verify.log,cargo clippy -p ctx-verify --lib --locked -- -D warnings,
+49,1-statisch,clippy_alle_targets__ctx-verify,PASS,0,1.3,errors=0 warnings=0,logs/049_clippy_alle_targets__ctx-verify.log,cargo clippy -p ctx-verify --all-targets --locked -- -D warnings,
+50,1-statisch,feature_matrix_hack,FAIL,1,210.8,,logs/050_feature_matrix_hack.log,cargo hack check --each-feature --workspace --no-dev-deps --keep-going,
+51,1-statisch,deny,FAIL,2,2.2,,logs/051_deny.log,cargo deny check,
+52,1-statisch,audit,PASS,0,3.9,,logs/052_audit.log,cargo audit,
+53,1-statisch,panic_flaeche_lib,FAIL,101,25.2,errors=17 warnings=24,logs/053_panic_flaeche_lib.log,cargo clippy --workspace --lib --locked --keep-going -- -W clippy::unwrap_used -W clippy::expect_used -W clippy::panic -W clippy::todo -W clippy::unimplemented -W clippy::indexing_slicing,Panic-Stellen im Produktivcode (ohne #[cfg(test)]); Auswertung: panic_flaeche.csv
+54,1-statisch,unsafe_inventar,PASS,,0.2,keine Verstoesse,logs/054_unsafe_inventar.log,,gegen capabilities.toml (unsafe_island)
+55,2-tests,test_lib__contextra,FAIL,101,74.6,passed=0 failed=0 ignored=0 | COMPILE-FEHLER,logs/055_test_lib__contextra.log,cargo test -p contextra --lib --locked --no-fail-fast,
+56,2-tests,test_integration__contextra,FAIL,101,22.1,passed=0 failed=0 ignored=0 | COMPILE-FEHLER,logs/056_test_integration__contextra.log,cargo test -p contextra --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+57,2-tests,test_doc__contextra,FAIL,101,9.5,passed=0 failed=0 ignored=0 | COMPILE-FEHLER,logs/057_test_doc__contextra.log,cargo test -p contextra --doc --locked --no-fail-fast,
+58,2-tests,nextest__contextra,FAIL,101,7.8,nextest: keine Summary-Zeile gefunden,logs/058_nextest__contextra.log,cargo nextest run -p contextra --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+59,2-tests,test_lib__contextra-arch-tests,PASS,0,19.3,passed=30 failed=0 ignored=0,logs/059_test_lib__contextra-arch-tests.log,cargo test -p contextra-arch-tests --lib --locked --no-fail-fast,
+60,2-tests,test_integration__contextra-arch-tests,FAIL,101,7.6,"passed=47 failed=2 ignored=0 | FAILED: test_t_arch_3b_matrix_edges, test_t_lint_3_obsolete_evidence_terms",logs/060_test_integration__contextra-arch-tests.log,cargo test -p contextra-arch-tests --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+61,2-tests,test_doc__contextra-arch-tests,PASS,0,0.4,passed=0 failed=0 ignored=0 | KEINE TESTS AUSGEFUEHRT,logs/061_test_doc__contextra-arch-tests.log,cargo test -p contextra-arch-tests --doc --locked --no-fail-fast,
+62,2-tests,nextest__contextra-arch-tests,FAIL,100,2.9,"passed=47 failed=2 | FAILED: (37/49) contextra-arch-tests::arch test_t_arch_3b_matrix_edges, (47/49) contextra-arch-tests::arch test_t_lint_3_obsolete_evidence_terms",logs/062_nextest__contextra-arch-tests.log,cargo nextest run -p contextra-arch-tests --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+63,2-tests,test_lib__contextra-crypto,PASS,0,53.3,passed=0 failed=0 ignored=0 | KEINE TESTS AUSGEFUEHRT,logs/063_test_lib__contextra-crypto.log,cargo test -p contextra-crypto --lib --locked --no-fail-fast,
+64,2-tests,test_integration__contextra-crypto,PASS,0,26.3,passed=39 failed=0 ignored=0,logs/064_test_integration__contextra-crypto.log,cargo test -p contextra-crypto --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+65,2-tests,test_doc__contextra-crypto,PASS,0,0.6,passed=1 failed=0 ignored=0,logs/065_test_doc__contextra-crypto.log,cargo test -p contextra-crypto --doc --locked --no-fail-fast,
+66,2-tests,nextest__contextra-crypto,PASS,0,18.8,passed=39 failed=0,logs/066_nextest__contextra-crypto.log,cargo nextest run -p contextra-crypto --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+67,2-tests,test_lib__contextra-durable-fs,PENDING,,0.0,,logs/067_test_lib__contextra-durable-fs.log,cargo test -p contextra-durable-fs --lib --locked --no-fail-fast,
+68,2-tests,test_integration__contextra-durable-fs,PENDING,,0.0,,,cargo test -p contextra-durable-fs --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+69,2-tests,test_doc__contextra-durable-fs,PENDING,,0.0,,,cargo test -p contextra-durable-fs --doc --locked --no-fail-fast,
+70,2-tests,nextest__contextra-durable-fs,PENDING,,0.0,,,cargo nextest run -p contextra-durable-fs --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+71,2-tests,test_lib__contextra-engine,PENDING,,0.0,,,cargo test -p contextra-engine --lib --locked --no-fail-fast,
+72,2-tests,test_integration__contextra-engine,PENDING,,0.0,,,cargo test -p contextra-engine --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+73,2-tests,test_doc__contextra-engine,PENDING,,0.0,,,cargo test -p contextra-engine --doc --locked --no-fail-fast,
+74,2-tests,nextest__contextra-engine,PENDING,,0.0,,,cargo nextest run -p contextra-engine --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+75,2-tests,test_lib__contextra-erasure,PENDING,,0.0,,,cargo test -p contextra-erasure --lib --locked --no-fail-fast,
+76,2-tests,test_integration__contextra-erasure,PENDING,,0.0,,,cargo test -p contextra-erasure --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+77,2-tests,test_doc__contextra-erasure,PENDING,,0.0,,,cargo test -p contextra-erasure --doc --locked --no-fail-fast,
+78,2-tests,nextest__contextra-erasure,PENDING,,0.0,,,cargo nextest run -p contextra-erasure --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+79,2-tests,test_lib__contextra-lab,PENDING,,0.0,,,cargo test -p contextra-lab --lib --locked --no-fail-fast,
+80,2-tests,test_integration__contextra-lab,PENDING,,0.0,,,cargo test -p contextra-lab --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+81,2-tests,test_doc__contextra-lab,PENDING,,0.0,,,cargo test -p contextra-lab --doc --locked --no-fail-fast,
+82,2-tests,nextest__contextra-lab,PENDING,,0.0,,,cargo nextest run -p contextra-lab --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+83,2-tests,test_lib__contextra-mvcc,PENDING,,0.0,,,cargo test -p contextra-mvcc --lib --locked --no-fail-fast,
+84,2-tests,test_integration__contextra-mvcc,PENDING,,0.0,,,cargo test -p contextra-mvcc --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+85,2-tests,test_doc__contextra-mvcc,PENDING,,0.0,,,cargo test -p contextra-mvcc --doc --locked --no-fail-fast,
+86,2-tests,nextest__contextra-mvcc,PENDING,,0.0,,,cargo nextest run -p contextra-mvcc --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+87,2-tests,test_lib__contextra-ports,PENDING,,0.0,,,cargo test -p contextra-ports --lib --locked --no-fail-fast,
+88,2-tests,test_integration__contextra-ports,PENDING,,0.0,,,cargo test -p contextra-ports --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+89,2-tests,test_doc__contextra-ports,PENDING,,0.0,,,cargo test -p contextra-ports --doc --locked --no-fail-fast,
+90,2-tests,nextest__contextra-ports,PENDING,,0.0,,,cargo nextest run -p contextra-ports --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+91,2-tests,test_lib__contextra-rank,PENDING,,0.0,,,cargo test -p contextra-rank --lib --locked --no-fail-fast,
+92,2-tests,test_integration__contextra-rank,PENDING,,0.0,,,cargo test -p contextra-rank --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+93,2-tests,test_doc__contextra-rank,PENDING,,0.0,,,cargo test -p contextra-rank --doc --locked --no-fail-fast,
+94,2-tests,nextest__contextra-rank,PENDING,,0.0,,,cargo nextest run -p contextra-rank --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+95,2-tests,test_lib__contextra-simd,PENDING,,0.0,,,cargo test -p contextra-simd --lib --locked --no-fail-fast,
+96,2-tests,test_integration__contextra-simd,PENDING,,0.0,,,cargo test -p contextra-simd --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+97,2-tests,test_doc__contextra-simd,PENDING,,0.0,,,cargo test -p contextra-simd --doc --locked --no-fail-fast,
+98,2-tests,nextest__contextra-simd,PENDING,,0.0,,,cargo nextest run -p contextra-simd --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+99,2-tests,test_lib__contextra-store,PENDING,,0.0,,,cargo test -p contextra-store --lib --locked --no-fail-fast,
+100,2-tests,test_integration__contextra-store,PENDING,,0.0,,,cargo test -p contextra-store --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+101,2-tests,test_doc__contextra-store,PENDING,,0.0,,,cargo test -p contextra-store --doc --locked --no-fail-fast,
+102,2-tests,nextest__contextra-store,PENDING,,0.0,,,cargo nextest run -p contextra-store --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+103,2-tests,test_lib__contextra-sys,PENDING,,0.0,,,cargo test -p contextra-sys --lib --locked --no-fail-fast,
+104,2-tests,test_integration__contextra-sys,PENDING,,0.0,,,cargo test -p contextra-sys --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+105,2-tests,test_doc__contextra-sys,PENDING,,0.0,,,cargo test -p contextra-sys --doc --locked --no-fail-fast,
+106,2-tests,nextest__contextra-sys,PENDING,,0.0,,,cargo nextest run -p contextra-sys --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+107,2-tests,test_lib__contextra-testkit,PENDING,,0.0,,,cargo test -p contextra-testkit --lib --locked --no-fail-fast,
+108,2-tests,test_integration__contextra-testkit,PENDING,,0.0,,,cargo test -p contextra-testkit --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+109,2-tests,test_doc__contextra-testkit,PENDING,,0.0,,,cargo test -p contextra-testkit --doc --locked --no-fail-fast,
+110,2-tests,nextest__contextra-testkit,PENDING,,0.0,,,cargo nextest run -p contextra-testkit --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+111,2-tests,test_lib__contextra-testmacros,PENDING,,0.0,,,cargo test -p contextra-testmacros --lib --locked --no-fail-fast,
+112,2-tests,test_integration__contextra-testmacros,PENDING,,0.0,,,cargo test -p contextra-testmacros --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+113,2-tests,test_doc__contextra-testmacros,PENDING,,0.0,,,cargo test -p contextra-testmacros --doc --locked --no-fail-fast,
+114,2-tests,nextest__contextra-testmacros,PENDING,,0.0,,,cargo nextest run -p contextra-testmacros --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+115,2-tests,test_lib__contextra-text,PENDING,,0.0,,,cargo test -p contextra-text --lib --locked --no-fail-fast,
+116,2-tests,test_integration__contextra-text,PENDING,,0.0,,,cargo test -p contextra-text --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+117,2-tests,test_doc__contextra-text,PENDING,,0.0,,,cargo test -p contextra-text --doc --locked --no-fail-fast,
+118,2-tests,nextest__contextra-text,PENDING,,0.0,,,cargo nextest run -p contextra-text --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+119,2-tests,test_lib__contextra-types,PENDING,,0.0,,,cargo test -p contextra-types --lib --locked --no-fail-fast,
+120,2-tests,test_integration__contextra-types,PENDING,,0.0,,,cargo test -p contextra-types --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+121,2-tests,test_doc__contextra-types,PENDING,,0.0,,,cargo test -p contextra-types --doc --locked --no-fail-fast,
+122,2-tests,nextest__contextra-types,PENDING,,0.0,,,cargo nextest run -p contextra-types --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+123,2-tests,test_lib__contextra-vector,PENDING,,0.0,,,cargo test -p contextra-vector --lib --locked --no-fail-fast,
+124,2-tests,test_integration__contextra-vector,PENDING,,0.0,,,cargo test -p contextra-vector --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+125,2-tests,test_doc__contextra-vector,PENDING,,0.0,,,cargo test -p contextra-vector --doc --locked --no-fail-fast,
+126,2-tests,nextest__contextra-vector,PENDING,,0.0,,,cargo nextest run -p contextra-vector --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+127,2-tests,test_lib__ctx-verify,PENDING,,0.0,,,cargo test -p ctx-verify --lib --locked --no-fail-fast,
+128,2-tests,test_integration__ctx-verify,PENDING,,0.0,,,cargo test -p ctx-verify --tests --locked --no-fail-fast,umfasst auch lib-Tests; Duplikate gewollt
+129,2-tests,test_doc__ctx-verify,PENDING,,0.0,,,cargo test -p ctx-verify --doc --locked --no-fail-fast,
+130,2-tests,nextest__ctx-verify,PENDING,,0.0,,,cargo nextest run -p ctx-verify --locked --no-fail-fast --retries 0,je Test eigener Prozess: deckt Test-Interferenz auf
+131,2-tests,test_gesamt_debug,PENDING,,0.0,,,cargo test --workspace --all-targets --locked --no-fail-fast,
+132,2-tests,test_gesamt_release,PENDING,,0.0,,,cargo test --workspace --release --locked --no-fail-fast,Release deckt Overflow-/Optimierungsfehler auf (z. B. simd u8)
+133,3-testbarkeit,testbarkeit_crates,PENDING,,0.0,,,,"Tests je Crate, ignorierte/assertionlose Tests, Testnachweis der pub-Funktionen"
+134,3-testbarkeit,testbarkeit_funktionen,PENDING,,0.0,,,,"Komplexitaet, Testnachweis, direkte Umweltzugriffe je Funktion (FAIL ab Komplexitaet 25)"
+135,3-testbarkeit,testbarkeit_verwaiste_dateien,PENDING,,0.0,,,,Test-/Benchdateien ohne Crate-Zuordnung laufen nie
+136,3-testbarkeit,liste_tests__contextra,PENDING,,0.0,,,cargo test -p contextra --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+137,3-testbarkeit,liste_tests__contextra-arch-tests,PENDING,,0.0,,,cargo test -p contextra-arch-tests --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+138,3-testbarkeit,liste_tests__contextra-crypto,PENDING,,0.0,,,cargo test -p contextra-crypto --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+139,3-testbarkeit,liste_tests__contextra-durable-fs,PENDING,,0.0,,,cargo test -p contextra-durable-fs --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+140,3-testbarkeit,liste_tests__contextra-engine,PENDING,,0.0,,,cargo test -p contextra-engine --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+141,3-testbarkeit,liste_tests__contextra-erasure,PENDING,,0.0,,,cargo test -p contextra-erasure --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+142,3-testbarkeit,liste_tests__contextra-lab,PENDING,,0.0,,,cargo test -p contextra-lab --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+143,3-testbarkeit,liste_tests__contextra-mvcc,PENDING,,0.0,,,cargo test -p contextra-mvcc --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+144,3-testbarkeit,liste_tests__contextra-ports,PENDING,,0.0,,,cargo test -p contextra-ports --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+145,3-testbarkeit,liste_tests__contextra-rank,PENDING,,0.0,,,cargo test -p contextra-rank --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+146,3-testbarkeit,liste_tests__contextra-simd,PENDING,,0.0,,,cargo test -p contextra-simd --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+147,3-testbarkeit,liste_tests__contextra-store,PENDING,,0.0,,,cargo test -p contextra-store --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+148,3-testbarkeit,liste_tests__contextra-sys,PENDING,,0.0,,,cargo test -p contextra-sys --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+149,3-testbarkeit,liste_tests__contextra-testkit,PENDING,,0.0,,,cargo test -p contextra-testkit --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+150,3-testbarkeit,liste_tests__contextra-testmacros,PENDING,,0.0,,,cargo test -p contextra-testmacros --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+151,3-testbarkeit,liste_tests__contextra-text,PENDING,,0.0,,,cargo test -p contextra-text --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+152,3-testbarkeit,liste_tests__contextra-types,PENDING,,0.0,,,cargo test -p contextra-types --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+153,3-testbarkeit,liste_tests__contextra-vector,PENDING,,0.0,,,cargo test -p contextra-vector --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+154,3-testbarkeit,liste_tests__ctx-verify,PENDING,,0.0,,,cargo test -p ctx-verify --tests --locked -- --list,was cargo tatsaechlich als Test kennt (gegen statische Zaehlung)
+155,3-testbarkeit,coverage,PENDING,,0.0,,,cargo llvm-cov --workspace --locked --no-fail-fast --json --ignore-filename-regex /(tests|benches|fuzz|examples)/ --output-path /home/freddy/Projekte/contextra/evidence/audit-20261104T013540Z-762807450/coverage.json,
+156,3-testbarkeit,coverage_funktionen,PENDING,,0.0,,,,"Funktionsabdeckung je Crate, nie ausgefuehrte Funktionen"
+157,4-bench,bench__contextra-mvcc__mvcc_bench,PENDING,,0.0,,,cargo bench -p contextra-mvcc --bench mvcc_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+158,4-bench,bench__contextra-crypto__crypto_benchmarks,PENDING,,0.0,,,cargo bench -p contextra-crypto --bench crypto_benchmarks --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+159,4-bench,bench__contextra-vector__distance_bench,PENDING,,0.0,,,cargo bench -p contextra-vector --bench distance_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+160,4-bench,bench__contextra-vector__sq8_bench,PENDING,,0.0,,,cargo bench -p contextra-vector --bench sq8_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+161,4-bench,bench__contextra-vector__hnsw_bench,PENDING,,0.0,,,cargo bench -p contextra-vector --bench hnsw_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+162,4-bench,bench__contextra-vector__hnsw_delete_search_bench,PENDING,,0.0,,,cargo bench -p contextra-vector --bench hnsw_delete_search_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+163,4-bench,bench__contextra-vector__audit_benchmarks,PENDING,,0.0,,,cargo bench -p contextra-vector --bench audit_benchmarks --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+164,4-bench,bench__contextra-vector__flush_threshold_amplification,PENDING,,0.0,,,cargo bench -p contextra-vector --bench flush_threshold_amplification --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+165,4-bench,bench__contextra-vector__partial_rebuild_recall_bench,PENDING,,0.0,,,cargo bench -p contextra-vector --bench partial_rebuild_recall_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+166,4-bench,bench__contextra-vector__distance_nan_impact_bench,PENDING,,0.0,,,cargo bench -p contextra-vector --bench distance_nan_impact_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+167,4-bench,bench__contextra-vector__filtered_search_selectivity_bench,PENDING,,0.0,,,cargo bench -p contextra-vector --bench filtered_search_selectivity_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+168,4-bench,bench__contextra-store__sstable_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench sstable_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+169,4-bench,bench__contextra-store__memtable_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench memtable_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+170,4-bench,bench__contextra-store__wal_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench wal_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+171,4-bench,bench__contextra-store__lsm_concurrency_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench lsm_concurrency_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+172,4-bench,bench__contextra-store__block_cache_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench block_cache_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+173,4-bench,bench__contextra-store__redb_comparative_bench,PENDING,,0.0,,,cargo bench -p contextra-store --bench redb_comparative_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+174,4-bench,bench__contextra-simd__simd_bench,PENDING,,0.0,,,cargo bench -p contextra-simd --bench simd_bench --locked,locomo/long_mem_eval brauchen evtl. externe Daten
+175,5-tief,fuzz__crypto__wal_hmac_chain_verify_fuzz,PENDING,,0.0,,,cargo +nightly fuzz run wal_hmac_chain_verify_fuzz -- -max_total_time=120,
+176,5-tief,fuzz__store__fuzz_compaction_interleave,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_compaction_interleave -- -max_total_time=120,
+177,5-tief,fuzz__store__fuzz_manifest_load,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_manifest_load -- -max_total_time=120,
+178,5-tief,fuzz__store__fuzz_memtable_concurrent,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_memtable_concurrent -- -max_total_time=120,
+179,5-tief,fuzz__store__fuzz_recovery_arbitrary_state,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_recovery_arbitrary_state -- -max_total_time=120,
+180,5-tief,fuzz__store__fuzz_sstable_binary_search,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_sstable_binary_search -- -max_total_time=120,
+181,5-tief,fuzz__store__fuzz_wal_replay,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_wal_replay -- -max_total_time=120,
+182,5-tief,fuzz__store__wal_mutation_chaos,PENDING,,0.0,,,cargo +nightly fuzz run wal_mutation_chaos -- -max_total_time=120,
+183,5-tief,fuzz__store__wal_roundtrip,PENDING,,0.0,,,cargo +nightly fuzz run wal_roundtrip -- -max_total_time=120,
+184,5-tief,fuzz__text__fuzz_bm25_tokenize,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_bm25_tokenize -- -max_total_time=120,
+185,5-tief,fuzz__text__fuzz_tokenizer_smoke,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_tokenizer_smoke -- -max_total_time=120,
+186,5-tief,fuzz__vector__fuzz_hnsw_persistence,PENDING,,0.0,,,cargo +nightly fuzz run fuzz_hnsw_persistence -- -max_total_time=120,
+187,5-tief,fuzz__vector__hnsw_insert_search,PENDING,,0.0,,,cargo +nightly fuzz run hnsw_insert_search -- -max_total_time=120,
+188,5-tief,mutation_tier0_1,PENDING,,0.0,,,cargo mutants --config .cargo/mutants.toml --timeout 120,
+189,5-tief,loom_mvcc,PENDING,,0.0,,,cargo test -p contextra-mvcc --release --locked,
+190,5-tief,miri_vector_scalar,PENDING,,0.0,,,cargo +nightly miri test -p contextra-vector --lib,
+191,5-tief,asan_vector,PENDING,,0.0,,,cargo +nightly test -p contextra-vector --target x86_64-unknown-linux-gnu,

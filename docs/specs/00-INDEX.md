@@ -7,7 +7,7 @@ Dieses Dokument ist die Einstiegsseite der Implementierungsspezifikationen. Es g
 |Punkt|Festlegung|
 |---|---|
 |Status|**Abgeleitetes Dokument** im Sinne von D-98. Normativ ist ausschließlich `docs/SPEC.md` (Version 5.1.0). Bei Widerspruch gilt die SPEC; der Widerspruch ist ein Defekt dieses Dokuments.|
-|Basis Soll|`docs/SPEC.md` 4.3.0, Soll-Zustand für Release 1.0.0|
+|Basis Soll|`docs/SPEC.md` , Soll-Zustand für Release 1.0.0|
 |Basis Ist|`main` @ `1454bbec0` (Merge PR #5520, SIMD-VNNI-Rückbau). Die SPEC selbst stützt sich auf `4e208c179`; Abweichungen sind in den Crate-Dateien als Ist-Stand vermerkt.|
 |Prüfmodus Ist|Quelltext gelesen, Manifeste ausgewertet, Muster gezählt (**[V]**). **Nicht gebaut, nicht getestet:** Im Analysecontainer gibt es keine Rust-Toolchain. Build-, Test- und Benchmarkwerte stammen aus der SPEC (3.0.0, **[M]**) und sind nicht wiederholt.|
 |Marke **[SPEC x.y / D-nn]**|Vorgabe ist wörtlich aus der SPEC abgeleitet; der Anker nennt den Abschnitt oder die Entscheidung.|

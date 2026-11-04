@@ -108,4 +108,4 @@ Definition of Done (Index Abschnitt 8) und: Grep `vnni|dpbusd` = 0; jede `unsafe
 ## 10. Offene Punkte
 
 - **SI-05:** Die SPEC fordert nur Kernel plus Referenz (8.4). Ob `distance_prevalidated` neben `distance` nötig ist, entscheidet WP-8.1 anhand von BM-VEC (Kosten des O(n)-Endlichkeitsscans je Kandidat); ohne messbaren Gewinn entfällt die Variante (P8, P9).
-- Zulässige Abweichung für Cosine (SI-02) ist ein Entwurf **[E]**; die SPEC nennt nur „Cross-Check“ (T-SIMD-1). Die Grenze `ε ≤ 1e-4` stammt aus der Altdatei `IMPLEMENTATION_SPEC_PER_CRATE.md` und ist dort ebenfalls nicht aus der SPEC 4.3.0 abgeleitet.
+- Zulässige Abweichung für Cosine (SI-02) ist ein Entwurf **[E]**; die SPEC nennt nur „Cross-Check“ (T-SIMD-1). Die Grenze `ε ≤ 1e-4` stammt aus der Altdatei `IMPLEMENTATION_SPEC_PER_CRATE.md` und ist dort ebenfalls nicht aus der SPEC  abgeleitet.
