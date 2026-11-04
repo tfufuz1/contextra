@@ -9,6 +9,7 @@
 #![allow(clippy::panic, clippy::expect_used)]
 
 use contextra_ports::gate::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, ReadGate, Seq};
+use contextra_testmacros::ctx_test;
 use parking_lot::RwLock;
 use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -59,7 +60,7 @@ fn make_cluster_key(cluster_id: u8) -> KeyBuf {
     KeyBuf::new([cluster_id; 16])
 }
 
-#[test]
+#[ctx_test(id = "T-CONC-1")]
 fn test_deterministic_race_write_vs_purge_same_cluster() {
     let target_cluster = [0xAA; 16];
 

@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-DETERMINISM-PROPTEST-ROOT]
 //! # Eigenschaftstest: 100 % Determinismus der SSI-Validierung
 //!
 //! Beweist, dass wiederholte Ausführungen identischer Transaktionsereignisse
@@ -7,6 +6,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{ReadSet, SequenceLogSsiValidator, SsiValidator, TxId};
+use contextra_testmacros::ctx_test;
 use proptest::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -75,7 +75,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
 
     // Eigenschaftstest: Verifiziert, dass die Validierung bei gleichen Ereignissen zu 100 % identische Ergebnisse liefert.
-    #[test]
+#[ctx_test(id = "T-TXN-1")]
     fn prop_ssi_validation_is_100_percent_deterministic(
         seed_keys in proptest::collection::vec(proptest::collection::vec(0..255u8, 1..16), 1..10),
         events in proptest::collection::vec(

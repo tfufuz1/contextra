@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-B16-ROOT]
 //! # Regressionstests für Befund B-16 (Kapazitätserschöpfung und Coarsening)
 //!
 //! Verifiziert, dass das Erreichen von `DEFAULT_MAX_TRACKED_COMMIT_KEYS` nicht mehr
@@ -8,9 +7,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{ReadSet, SequenceLogSsiValidator, SsiValidator, TxId};
+use contextra_testmacros::ctx_test;
 
 // Prüft, dass das Erreichen der maximalen Schlüsselkapazität durch Coarsening gelöst wird und nicht blockiert.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_b16_reproduction_capacity_total_outage_resolved() {
     let max_keys = 100;
     let validator = SequenceLogSsiValidator::new_with_bounds(max_keys);
@@ -36,7 +36,7 @@ fn test_b16_reproduction_capacity_total_outage_resolved() {
 }
 
 // Prüft, dass vergröberte Buckets echte Schreibkonflikte weiterhin zuverlässig (ohne False Negatives) abfangen.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_b16_coarsening_prevents_false_negatives() {
     let max_keys = 10;
     let validator = SequenceLogSsiValidator::new_with_bounds(max_keys);
@@ -72,7 +72,7 @@ fn test_b16_coarsening_prevents_false_negatives() {
 }
 
 // Prüft, dass langlaufende gepinnte Snapshots, die das Pruning behindern, als Diagnosealarm erkannt werden.
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_long_lived_snapshot_pin_blocker_alarm() {
     use contextra_mvcc::SnapshotRegistry;
     use contextra_testkit::ManualClock;
@@ -112,7 +112,7 @@ fn test_long_lived_snapshot_pin_blocker_alarm() {
 }
 
 // Prüft, dass das Fail-Closed-Verhalten für Lese-Snapshots älter als pruned_through auch nach Coarsening greift.
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_fail_closed_snapshot_pruned_still_enforced_after_coarsening() {
     let validator = SequenceLogSsiValidator::new_with_bounds(10);
 

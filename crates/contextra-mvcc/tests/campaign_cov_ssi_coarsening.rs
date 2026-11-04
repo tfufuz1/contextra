@@ -1,10 +1,8 @@
-// ANCHOR[contextra-mvcc:TEST-CAMPAIGN-COV-SSI-ROOT]
 //! # Kampagnen-Test für SSI-Coarsening und Pruning-Blocker-Diagnose
 //!
 //! Prüft die gezielte Testabdeckung des Schwellenwerts (80 % Kapazität) im
 //! `SequenceLogSsiValidator` und verifiziert die Diagnose aktiver Snapshot-Blocker.
 
-// FILE-CONTEXT
 // ZWECK: Campaign coverage test for SequenceLogSsiValidator coarsening and pruning blocker diagnostics.
 // INVARIANTEN: Coarsening occurs at 80% capacity limit without false negatives for write-skew detection.
 // NICHT-OFFENSICHTLICH: Uses independent oracle (R4) validating fail-closed conflict classification post-coarsening.
@@ -14,11 +12,12 @@
 use contextra_mvcc::snapshot::SnapshotRegistry;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator};
 use contextra_mvcc::SsiValidator;
+use contextra_testmacros::ctx_test;
 use contextra_types::TxId;
 use std::sync::Arc;
 
 // Prüft das Auslösen der Vergröberung (Coarsening) bei 80 % Füllstand und die Diagnose des blockierenden Snapshots.
-#[test]
+#[ctx_test(id = "T-CONC-1")]
 fn test_ssi_coarsening_trigger_and_diagnose_pruning_blocker() {
     let registry = Arc::new(SnapshotRegistry::new());
     // Create an active snapshot at seq 0 to hold back pruning

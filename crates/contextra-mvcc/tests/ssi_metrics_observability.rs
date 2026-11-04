@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-METRICS-OBSERVABILITY-ROOT]
 //! # Observability- und Metrik-Tests für SSI
 //!
 //! Verifiziert die Aufzeichnung von Kennzahlen an den MetricsSink-Port:
@@ -12,11 +11,12 @@ use contextra_mvcc::SequenceLogSsiValidator;
 use contextra_mvcc::SnapshotRegistry;
 use contextra_ports::MetricsSink;
 use contextra_testkit::{ManualClock, MetricEvent, TestMetricsSink};
+use contextra_testmacros::ctx_test;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
 // Prüft die Emission von Füllstands- und Coarsening-Gauges beim Überschreiten der 80 %-Schwelle.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_ssi_metrics_observability_threshold_and_coarsening() {
     let test_sink = Arc::new(TestMetricsSink::new());
     let sink_container: Arc<RwLock<Arc<dyn MetricsSink>>> =
@@ -63,7 +63,7 @@ fn test_ssi_metrics_observability_threshold_and_coarsening() {
 }
 
 // Prüft die metrische Erfassung der Haltedauer überalterter Snapshot-Pins.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_ssi_metrics_observability_long_pin_duration() {
     let test_sink = Arc::new(TestMetricsSink::new());
     let sink_container: Arc<RwLock<Arc<dyn MetricsSink>>> =
@@ -104,7 +104,7 @@ fn test_ssi_metrics_observability_long_pin_duration() {
 }
 
 // Prüft das unterbrechungsfreie Austauschen (Hot-Swap) des MetricsSink während des Betriebs.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_ssi_metrics_observability_hot_swap_consistency() {
     let sink1 = Arc::new(TestMetricsSink::new());
     let sink_container: Arc<RwLock<Arc<dyn MetricsSink>>> =
