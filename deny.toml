@@ -51,6 +51,7 @@ deny = [
         "contextra-ports",
         "contextra-rank",
         "contextra-store",
+        "contextra-testmacros",
         "contextra-testkit",
         "contextra-text",
         "contextra-vector",

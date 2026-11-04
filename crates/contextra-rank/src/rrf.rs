@@ -20,13 +20,16 @@ pub struct DocHandle {
     pub doc_tag: [u8; 16],
 }
 
-/// Ein Kandidat einer bereits gefilterten Teilliste (RK-04, RK-05).
+/// Ein Kandidat einer bereits gefilterten Teilliste (RK-04, RK-05, D-124).
 ///
 /// Der Rang entspricht der 1-basierten Position innerhalb der Liste.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Die Identität eines Treffers ist `(doc_tag, chunk)` (SPEC D-124, T-HYB-2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Candidate {
     /// Eindeutiger Dokument-Handle.
     pub handle: DocHandle,
+    /// Chunk-Index innerhalb des Dokuments (D-124).
+    pub chunk: u32,
 }
 
 /// Festkomma-Ganzzahl-Repräsentation des fusionierten RRF-Scores (RK-02).
@@ -37,10 +40,13 @@ pub struct Candidate {
 pub struct RrfScore(pub u64);
 
 /// Ein fusionierter Treffer mit Rang und berechnetem Festkomma-Score.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Die Identität eines Treffers ist `(doc_tag, chunk)` (SPEC D-124, T-HYB-2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Fused {
     /// Eindeutiger Dokument-Handle des Treffers.
     pub handle: DocHandle,
+    /// Chunk-Index innerhalb des Dokuments (D-124).
+    pub chunk: u32,
     /// Akkumulierter Festkomma-Score.
     pub score: RrfScore,
 }
@@ -49,7 +55,8 @@ pub struct Fused {
 ///
 /// - Glättungsfaktor: $k = 60$ (fest).
 /// - Beitrag je Teilliste: $\lfloor 2^{40} / (60 + \text{Rang}) \rfloor$.
-/// - Tie-Break (RK-03): Score absteigend, dann `doc_tag` aufsteigend, dann `cluster_tag` aufsteigend.
+/// - Tie-Break (RK-03): Score absteigend, dann `doc_tag` aufsteigend, dann `chunk` aufsteigend,
+///   dann `cluster_tag` aufsteigend.
 /// - Validierung (RK-06):
 ///   - `top == 0` $\Rightarrow$ leere Rückgabe.
 ///   - Liste länger als 1.000 $\Rightarrow$ `Err(RankError::TooLarge)`.
@@ -64,15 +71,16 @@ pub fn rrf_fuse(lists: &[&[Candidate]], top: usize) -> Result<Vec<Fused>, RankEr
         return Ok(Vec::new());
     }
 
-    // Phase 1: Validierung aller Teillisten (RK-06)
+    // Phase 1: Validierung aller Teillisten (RK-06, D-124 Identität (doc_tag, chunk))
     for list in lists {
         if list.len() > MAX_CANDIDATES_PER_LIST {
             return Err(RankError::TooLarge);
         }
         if list.len() > 1 {
-            let mut sorted_handles: Vec<DocHandle> = list.iter().map(|c| c.handle).collect();
-            sorted_handles.sort_unstable();
-            for window in sorted_handles.windows(2) {
+            let mut sorted_keys: Vec<(DocHandle, u32)> =
+                list.iter().map(|c| (c.handle, c.chunk)).collect();
+            sorted_keys.sort_unstable();
+            for window in sorted_keys.windows(2) {
                 if let [a, b] = window {
                     if a == b {
                         return Err(RankError::Duplicate);
@@ -83,7 +91,7 @@ pub fn rrf_fuse(lists: &[&[Candidate]], top: usize) -> Result<Vec<Fused>, RankEr
     }
 
     // Phase 2: Akkumulation der Beiträge über alle Listen (RK-02)
-    let mut accumulator: Vec<(DocHandle, u64)> = Vec::new();
+    let mut accumulator: Vec<(DocHandle, u32, u64)> = Vec::new();
 
     for list in lists {
         for (idx, candidate) in list.iter().enumerate() {
@@ -95,33 +103,36 @@ pub fn rrf_fuse(lists: &[&[Candidate]], top: usize) -> Result<Vec<Fused>, RankEr
                 .checked_div(denom)
                 .ok_or(RankError::Overflow)?;
 
-            if let Some(pos) = accumulator
-                .iter()
-                .position(|(handle, _)| *handle == candidate.handle)
-            {
+            if let Some(pos) = accumulator.iter().position(|(handle, chunk, _)| {
+                *handle == candidate.handle && *chunk == candidate.chunk
+            }) {
                 if let Some(entry) = accumulator.get_mut(pos) {
-                    entry.1 = entry.1.checked_add(contrib).ok_or(RankError::Overflow)?;
+                    entry.2 = entry.2.checked_add(contrib).ok_or(RankError::Overflow)?;
                 }
             } else {
-                accumulator.push((candidate.handle, contrib));
+                accumulator.push((candidate.handle, candidate.chunk, contrib));
             }
         }
     }
 
-    // Phase 3: Totale Ordnung herstellen (RK-03)
-    accumulator.sort_unstable_by(|(handle_a, score_a), (handle_b, score_b)| {
-        score_b
-            .cmp(score_a)
-            .then_with(|| handle_a.doc_tag.cmp(&handle_b.doc_tag))
-            .then_with(|| handle_a.cluster_tag.cmp(&handle_b.cluster_tag))
-    });
+    // Phase 3: Totale Ordnung herstellen (RK-03, SPEC §8.11, D-124)
+    accumulator.sort_unstable_by(
+        |(handle_a, chunk_a, score_a), (handle_b, chunk_b, score_b)| {
+            score_b
+                .cmp(score_a)
+                .then_with(|| handle_a.doc_tag.cmp(&handle_b.doc_tag))
+                .then_with(|| chunk_a.cmp(chunk_b))
+                .then_with(|| handle_a.cluster_tag.cmp(&handle_b.cluster_tag))
+        },
+    );
 
     // Phase 4: Begrenzung auf `top`
     let result_len = accumulator.len().min(top);
     let mut fused = Vec::with_capacity(result_len);
-    for &(handle, score) in accumulator.iter().take(result_len) {
+    for &(handle, chunk, score) in accumulator.iter().take(result_len) {
         fused.push(Fused {
             handle,
+            chunk,
             score: RrfScore(score),
         });
     }

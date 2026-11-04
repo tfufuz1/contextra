@@ -25,12 +25,14 @@ fn main() {
                 cluster_tag: [0; 16],
                 doc_tag: doc_tag1,
             },
+            chunk: 0,
         });
         list2.push(Candidate {
             handle: DocHandle {
                 cluster_tag: [0; 16],
                 doc_tag: doc_tag2,
             },
+            chunk: 0,
         });
     }
 

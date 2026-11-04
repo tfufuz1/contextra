@@ -404,7 +404,7 @@ fn t_alice_missing_parent_dir_fsync_detected() {
     struct AliceCrashSimVfs {
         inner: FaultVfs,
         uncommitted_files:
-            std::sync::Arc<parking_lot::RwLock<std::collections::HashSet<std::path::PathBuf>>>,
+            std::sync::Arc<parking_lot::RwLock<std::collections::BTreeSet<std::path::PathBuf>>>,
     }
 
     impl AliceCrashSimVfs {
@@ -412,7 +412,7 @@ fn t_alice_missing_parent_dir_fsync_detected() {
             Self {
                 inner: FaultVfs::new(),
                 uncommitted_files: std::sync::Arc::new(parking_lot::RwLock::new(
-                    std::collections::HashSet::new(),
+                    std::collections::BTreeSet::new(),
                 )),
             }
         }
@@ -462,11 +462,14 @@ fn t_alice_missing_parent_dir_fsync_detected() {
     // 1. Ehrliches Programm: Schreibt Datei, ruft sync_data() und sync_dir() auf.
     // Nach Crash & Recovery muss die Datei vorhanden sein.
     let honest_sim = AliceCrashSimVfs::new();
-    honest_sim.inner.create_dir_all(dir).unwrap();
+    honest_sim
+        .inner
+        .create_dir_all(dir)
+        .expect("create_dir_all must succeed");
     let honest_file = dir.join("honest.dat");
     honest_sim
         .open_and_write(&honest_file, b"HONEST_DATA")
-        .unwrap();
+        .expect("write honest_file must succeed");
     honest_sim
         .sync_dir(dir)
         .expect("Honest program syncs parent directory");
@@ -479,11 +482,14 @@ fn t_alice_missing_parent_dir_fsync_detected() {
     // 2. Fehlerhaftes Programm (ALICE-Bug): Schreibt Datei, ruft sync_data() auf, vergisst aber sync_dir().
     // Nach Crash & Recovery MUSS der Datenverlust auffallen (Datei ist weg!).
     let buggy_sim = AliceCrashSimVfs::new();
-    buggy_sim.inner.create_dir_all(dir).unwrap();
+    buggy_sim
+        .inner
+        .create_dir_all(dir)
+        .expect("create_dir_all must succeed");
     let buggy_file = dir.join("buggy.dat");
     buggy_sim
         .open_and_write(&buggy_file, b"BUGGY_DATA")
-        .unwrap();
+        .expect("write buggy_file must succeed");
     // ALICE-Bug: buggy_sim.sync_dir(dir) wird unterlassen!
     buggy_sim.simulate_power_cut_crash();
 
