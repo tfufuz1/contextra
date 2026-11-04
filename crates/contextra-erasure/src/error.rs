@@ -65,4 +65,24 @@ pub enum ErasureError {
     /// Interner Fehler (ungültige Zustandsübergänge, Assertions).
     #[error("erasure-internal: {0}")]
     Internal(String),
+
+    /// Ersatzdokument fehlt vor Gate-Schritt (SPEC D-115, FM-19).
+    #[error("erasure-replace: replacement missing")]
+    ReplacementMissing,
+
+    /// Berichtigte Version fehlt vor Gate-Schritt (SPEC D-117).
+    #[error("erasure-supersede: update missing")]
+    UpdateMissing,
+
+    /// Ersetzung verweigert wegen Identitätskollision von Alt- und Neudokument (SPEC D-115).
+    #[error("erasure-replace: old and new document share same identity")]
+    SameIdentity,
+
+    /// Zugriff auf eingeschränkte Daten unzulässig oder Zweck nicht erfüllt (SPEC D-116).
+    #[error("erasure-restricted: access violation")]
+    RestrictionViolated(String),
+
+    /// Vor Auslieferung eingeschränkter Daten ist zwingend ein Audit-Eintrag erforderlich (SPEC D-116, I-26).
+    #[error("erasure-restricted: audit entry required before read")]
+    RestrictedReadAuditRequired,
 }

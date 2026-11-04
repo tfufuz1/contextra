@@ -1,5 +1,4 @@
 // FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
 // ZWECK: Tests for contextra-sys perm module (SY-09, SY-10)
 // INVARIANTEN: Zero panic, fixed error messages without paths in Display, owner and mode checks
 

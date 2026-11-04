@@ -1,5 +1,4 @@
 // FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
 // ZWECK: Tests for contextra-sys hardening module (SY-01, SY-02, SY-07, SY-08, SY-10, T-DUMP-1, T-SEC-2, T-UNSAFE-1)
 // INVARIANTEN: Zero panic in library code, fixed error messages, child process test coverage
 
