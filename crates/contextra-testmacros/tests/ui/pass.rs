@@ -12,6 +12,7 @@ async fn test_async_tokio_pass() {
 
 // Interoperabilität mit Testframeworks wie proptest/custom test attribute:
 // Wenn bereits ein Testattribut wie #[test] vorhanden ist, erzeugt ctx_test kein doppeltes Attribut.
+/// SPEC: T-TRACE-1
 #[ctx_test(id = "T-TRACE-1")]
 #[test]
 fn test_with_explicit_test_attr() {
