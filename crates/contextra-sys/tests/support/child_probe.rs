@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
-// ZWECK: Child probe helper for contextra-sys hardening tests (T-DUMP-1, T-SEC-2)
-// INVARIANTEN: Zero panic, fixed exit codes, parses command-line arguments to test process hardening in isolation
-
 use std::env;
 use std::fs::File;
 use std::io::Read;

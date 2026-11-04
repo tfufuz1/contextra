@@ -11,6 +11,7 @@
 
 use contextra_mvcc::error::MvccError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
+use contextra_testmacros::ctx_test;
 use contextra_types::TxId;
 use contextra_types::TOMBSTONE_BIT;
 use std::collections::{BTreeMap, BTreeSet};
@@ -110,7 +111,7 @@ impl ElleHistoryChecker {
     }
 }
 
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_elle_checker_detects_write_skew_cycle() {
     let mut history = ElleHistoryChecker::new();
 
@@ -141,7 +142,7 @@ fn test_elle_checker_detects_write_skew_cycle() {
     );
 }
 
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_ssi_prevents_on_call_doctor_write_skew() {
     // Szenario: Zwei Ärzte im Bereitschaftsdienst (Doc A, Doc B).
     // Invariante: Mindestens ein Arzt muss im Dienst sein.
@@ -179,7 +180,7 @@ fn test_ssi_prevents_on_call_doctor_write_skew() {
     );
 }
 
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_ssi_fekete_read_only_anomaly_detection() {
     // Read-only-Anomalie (Fekete et al.):
     // T1 (Write) -> T2 (Write) -> T3 (Read-Only)
@@ -204,7 +205,7 @@ fn test_ssi_fekete_read_only_anomaly_detection() {
     );
 }
 
-#[test]
+#[ctx_test(id = "T-VER-1")]
 fn test_sentinel_boundary_values_and_tombstone_bit() {
     let validator = SequenceLogSsiValidator::new();
 

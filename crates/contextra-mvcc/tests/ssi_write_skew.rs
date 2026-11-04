@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-WRITE-SKEW-ROOT]
 //! # Write-Skew Isolations- und Konflikttests
 //!
 //! Demonstriert die klassische Write-Skew-Anomalie und stellt sicher, dass der
@@ -7,9 +6,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use contextra_mvcc::{ContextraError, SequenceLogSsiValidator, SsiValidator, TxBuffer, TxId};
+use contextra_testmacros::ctx_test;
 
 // Prüft die Erkennung und Abweisung des klassischen Write-Skews bei überkreuzten Lese- und Schreibzugriffen.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_classic_write_skew_conflict_detected() {
     let validator = SequenceLogSsiValidator::new();
     let buffer = TxBuffer::<String>::new();
@@ -63,7 +63,7 @@ fn test_classic_write_skew_conflict_detected() {
 }
 
 // Prüft, dass disjunkte Lese- und Schreibmengen ohne Fehlalarm erfolgreich committen.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_disjoint_read_write_sets_succeed() {
     let validator = SequenceLogSsiValidator::new();
     let buffer = TxBuffer::<String>::new();
@@ -109,7 +109,7 @@ fn test_disjoint_read_write_sets_succeed() {
 // Mindestens ein Arzt muss im Dienst bleiben. Zwei Ärzte versuchen gleichzeitig sich abzumelden.
 // Bei gewöhnlicher Snapshot-Isolation melden sich beide ab (Invariante verletzt).
 // SSI nach Cahill erkennt die rw-Antidependenz und bricht die zweite Transaktion ab.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_cahill_write_skew_doctor_on_call() {
     let validator = SequenceLogSsiValidator::new();
     let buffer = TxBuffer::<String>::new();
@@ -153,7 +153,7 @@ fn test_cahill_write_skew_doctor_on_call() {
 // Kontostand A + Kontostand B >= 0. Tx1 bucht von A ab, Tx2 bucht von B ab.
 // Bei SI können beide abbuchen und das gemeinsame Kreditlimit überschreiten.
 // Unter SSI bricht die zweite Transaktion deterministisch ab.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_cahill_credit_limit_transfer() {
     let validator = SequenceLogSsiValidator::new();
     let buffer = TxBuffer::<String>::new();
@@ -193,7 +193,7 @@ fn test_cahill_credit_limit_transfer() {
 }
 
 // Cahill Benchmark 3: Phantom-Prädikat mit Bereichskonflikten (Range / Prefix Read Set).
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_cahill_phantom_predicate() {
     let validator = SequenceLogSsiValidator::new();
     let buffer = TxBuffer::<String>::new();

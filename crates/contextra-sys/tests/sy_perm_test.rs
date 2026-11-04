@@ -1,21 +1,18 @@
-// FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
-// ZWECK: Tests for contextra-sys perm module (SY-09, SY-10)
-// INVARIANTEN: Zero panic, fixed error messages without paths in Display, owner and mode checks
-
 #![allow(unsafe_code)]
+
+#[path = "support/test_env.rs"]
+mod test_env;
 
 use contextra_sys::{set_mode, verify_owner_only, SysError};
 use std::fs::File;
 use std::io::Write;
+use test_env::TestDir;
 
+/// SPEC: T-SEC-2
 #[test]
 fn sy_09_perm_set_mode_and_verify_owner_only() {
-    let dir = std::env::temp_dir();
-    let file_path = dir.join(format!(
-        "contextra_sys_perm_test_{}.bin",
-        std::process::id()
-    ));
+    let dir = TestDir::new();
+    let file_path = dir.path().join("contextra_sys_perm_test.bin");
     {
         let mut f = File::create(&file_path).unwrap();
         f.write_all(b"secure mode test").unwrap();
@@ -33,19 +30,17 @@ fn sy_09_perm_set_mode_and_verify_owner_only() {
     );
 
     // Create a directory and set mode to 0o700
-    let test_dir = dir.join(format!("contextra_sys_perm_dir_{}", std::process::id()));
+    let test_dir = dir.path().join("contextra_sys_perm_dir");
     let _ = std::fs::create_dir(&test_dir);
     assert!(set_mode(&test_dir, 0o700).is_ok());
     assert!(verify_owner_only(&test_dir).is_ok());
-
-    let _ = std::fs::remove_dir(test_dir);
-    let _ = std::fs::remove_file(file_path);
 }
 
+/// SPEC: T-SEC-2
 #[test]
 fn sy_09_perm_reject_group_or_world_accessible() {
-    let dir = std::env::temp_dir();
-    let file_path = dir.join(format!("contextra_sys_perm_bad_{}.bin", std::process::id()));
+    let dir = TestDir::new();
+    let file_path = dir.path().join("contextra_sys_perm_bad.bin");
     {
         let mut f = File::create(&file_path).unwrap();
         f.write_all(b"bad permissions").unwrap();
@@ -68,23 +63,21 @@ fn sy_09_perm_reject_group_or_world_accessible() {
         std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o604)).unwrap();
         assert!(verify_owner_only(&file_path).is_err());
     }
-
-    let _ = std::fs::remove_file(file_path);
 }
 
+/// SPEC: T-SEC-2
 #[test]
 fn sy_09_perm_invalid_modes() {
-    let dir = std::env::temp_dir();
-    let file_path = dir.join(format!("contextra_sys_perm_inv_{}.bin", std::process::id()));
+    let dir = TestDir::new();
+    let file_path = dir.path().join("contextra_sys_perm_inv.bin");
     let _ = File::create(&file_path);
 
     // Only 0o700 and 0o600 are allowed by set_mode according to Spec §3 & §5
     let res = set_mode(&file_path, 0o777);
     assert!(res.is_err());
-
-    let _ = std::fs::remove_file(file_path);
 }
 
+/// SPEC: T-SEC-2
 #[test]
 fn sy_10_perm_fixed_error_messages_no_path() {
     let nonexistent = std::path::Path::new("/nonexistent/perm/path/test");

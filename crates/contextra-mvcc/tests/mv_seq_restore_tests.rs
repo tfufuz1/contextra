@@ -8,9 +8,10 @@
 
 use contextra_mvcc::error::MvccError;
 use contextra_mvcc::seq_log::SeqAllocator;
+use contextra_testmacros::ctx_test;
 use proptest::prelude::*;
 
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn mv_06_seq_allocator_next_seq_formula() {
     let allocator = SeqAllocator::new(10, 20);
     // max(10, 20) + 1 = 21
@@ -24,7 +25,7 @@ fn mv_06_seq_allocator_next_seq_formula() {
     assert_eq!(s2, 22);
 }
 
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn mv_10_seq_allocator_checked_overflow_error() {
     let allocator = SeqAllocator::new(u64::MAX, 0);
     // Darf niemals wrappen! Muss Err zurückgeben.
@@ -40,7 +41,7 @@ fn mv_10_seq_allocator_checked_overflow_error() {
     assert!(res2.is_err(), "Overflow via ledger_floor must return Err");
 }
 
-#[test]
+#[ctx_test(id = "T-RESTORE-3")]
 fn t_restore_3_strict_monotonic_across_restores() {
     let allocator = SeqAllocator::new(100, 100);
     assert_eq!(allocator.next_seq().expect("seq"), 101);
@@ -62,7 +63,7 @@ fn t_restore_3_strict_monotonic_across_restores() {
 }
 
 proptest! {
-    #[test]
+#[ctx_test(id = "T-RESTORE-3")]
     fn t_restore_3_proptest_monotonicity(
         initial_cur in 0u64..1_000_000,
         initial_floor in 0u64..1_000_000,

@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-CAMPAIGN-J42-SSI-ROOT]
 //! # Kampagne J-42: SSI Read-Set & Write-Skew Isolations-Audit
 //!
 //! Formale Prüfung des Write-Skew-Orakels und Gegenprüfung gegen fehlerhafte
@@ -6,9 +5,10 @@
 
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::TxId;
+use contextra_testmacros::ctx_test;
 
 // Prüft die formale Erkennung von Write-Skew-Anomalien über das unabhängige Orakel.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 #[allow(clippy::expect_used)]
 fn test_campaign_j42_ssi_write_skew_oracle_verification() {
     // Independent Oracle: Write Skew occurs when Tx1 reads A and writes B, Tx2 reads B and writes A concurrently.
@@ -36,7 +36,7 @@ fn test_campaign_j42_ssi_write_skew_oracle_verification() {
 }
 
 // Gegenprobe: Verifiziert, dass ein absichtlich unvollständiges ReadSet die Konflikterkennung verfehlt (Beweis für die Wirksamkeit des ReadSets).
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_campaign_j42_ssi_counter_factual_mutation_check() {
     // R10 Counter-Test: Demonstrates that if an empty ReadSet is passed (as occurs when LSM get() skips ReadSet registration),
     // the SSI validator fails to catch the conflict!

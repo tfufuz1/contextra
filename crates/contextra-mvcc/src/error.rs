@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:ERROR-ROOT]
 //! # MVCC Fehlerdefinitionen (`MvccError`)
 //!
 //! Typisierte Fehler für Transaktionsverwaltung, SSI-Validierung und Sequenzbehandlung.

@@ -7,22 +7,27 @@
 //! Plattform- und Verifikationstests fuer contextra-sys
 //! (SY-04, SY-05, SY-06, SY-07, SY-08, SY-09, SY-10, T-PLAT-1, T-DUMP-1, T-SEC-2, T-FSYNC-1, T-OPS-2, T-LOG-1).
 
+#[path = "support/test_env.rs"]
+mod test_env;
+
 use std::fs::File;
 use std::io::Write;
+use std::os::unix::io::FromRawFd;
 use std::path::Path;
-use tempfile::tempdir;
+use test_env::TestDir;
 
 use contextra_sys::{
     apply_process_hardening, ensure_fd_limit, flush_dir, flush_dir_sync, flush_file,
     flush_file_sync, fs_class, lock_pages, mark_dont_dump, rename_durable, rename_durable_sync,
     set_fd_limit, set_mode, set_restrictive_file_acl, verify_file_acl_owner_only,
-    verify_owner_only, FlushKind, HardeningPolicy, SyncFailure, SysError,
+    verify_owner_only, write_all_durable, FlushKind, HardeningPolicy, SyncFailure, SysError,
 };
 
+/// SPEC: T-PLAT-1
 /// SY-04 & T-PLAT-1: Dateisystemklassifikation fuer Startprobe.
 #[test]
 fn sy_platform_04_t_plat_1_fs_class() {
-    let dir = tempdir().expect("tempdir");
+    let dir = TestDir::new();
     let class = fs_class(dir.path()).expect("fs_class");
     assert!(
         class.is_supported_local(),
@@ -35,6 +40,7 @@ fn sy_platform_04_t_plat_1_fs_class() {
     assert!(res.is_err());
 }
 
+/// SPEC: T-FSYNC-1
 /// SY-05 & T-FSYNC-1: Ein Fehler aus fsync/flush_dir wird unveraendert gemeldet.
 #[test]
 fn sy_platform_05_t_fsync_1_error_unmodified() {
@@ -44,12 +50,24 @@ fn sy_platform_05_t_fsync_1_error_unmodified() {
 
     let io_err = flush_dir(non_existent).expect_err("io error propagation");
     assert_eq!(io_err.kind(), std::io::ErrorKind::NotFound);
+
+    // EBADF-Fehlerprüfung: Ungültiger Dateideskriptor meldet OsError(EBADF) bzw. I/O Error
+    // SAFETY: Deskriptor 999_999 ist absichtlich ungültig für die Fehlerpfadprüfung und wird via forget vor drop geschützt.
+    let bad_file = unsafe { File::from_raw_fd(999_999) };
+    let bad_res = flush_file_sync(&bad_file, FlushKind::All);
+    assert!(
+        matches!(bad_res, Err(SyncFailure::OsError(libc::EBADF))),
+        "Ungültiger Deskriptor muss EBADF melden, erhalten: {:?}",
+        bad_res
+    );
+    std::mem::forget(bad_file);
 }
 
+/// SPEC: T-FSYNC-1
 /// SY-06: Durability Flush Roundtrip mit Datei und Verzeichnis.
 #[test]
 fn sy_platform_06_durability_flush_roundtrip() {
-    let dir = tempdir().expect("tempdir");
+    let dir = TestDir::new();
     let file_path = dir.path().join("test.bin");
 
     let mut file = File::create(&file_path).expect("create file");
@@ -59,6 +77,7 @@ fn sy_platform_06_durability_flush_roundtrip() {
     flush_file(&file, FlushKind::Data).expect("flush data");
     flush_file(&file, FlushKind::All).expect("flush all");
     flush_file_sync(&file, FlushKind::All).expect("flush all sync");
+    flush_file_sync(&file, FlushKind::Data).expect("flush data sync");
 
     // Directory flush
     flush_dir(dir.path()).expect("flush dir");
@@ -74,6 +93,24 @@ fn sy_platform_06_durability_flush_roundtrip() {
     assert!(renamed2.exists());
 }
 
+/// SPEC: T-FSYNC-1
+/// SY-06: Robustes Schreiben von Puffern mit write_all_durable und partieller Schreibprüfung.
+#[test]
+fn sy_platform_06_write_all_durable() {
+    let dir = TestDir::new();
+    let file_path = dir.path().join("write_durable.bin");
+    let mut file = File::create(&file_path).expect("create file");
+
+    let payload = b"Hello Contextra Durable Write";
+    write_all_durable(&mut file, payload).expect("write_all_durable");
+    flush_file(&file, FlushKind::All).expect("flush all");
+
+    drop(file);
+    let read_back = std::fs::read(&file_path).expect("read file");
+    assert_eq!(read_back, payload);
+}
+
+/// SPEC: T-DUMP-1
 /// SY-07, SY-08, T-DUMP-1, T-SEC-2: Prozesshaertung (RLIMIT_CORE = 0, DUMPABLE, DONTDUMP, mlock).
 #[test]
 fn sy_platform_07_08_t_dump_1_t_sec_2_hardening() {
@@ -99,10 +136,11 @@ fn sy_platform_07_08_t_dump_1_t_sec_2_hardening() {
     assert!(set_fd_limit(1024));
 }
 
+/// SPEC: T-SEC-2
 /// SY-09 & T-OPS-2: Dateiberechtigungen (0o700/0o600) und verify_owner_only.
 #[test]
 fn sy_platform_09_t_ops_2_permissions() {
-    let dir = tempdir().expect("tempdir");
+    let dir = TestDir::new();
     let file_path = dir.path().join("secure_file.bin");
     std::fs::write(&file_path, b"secret").expect("write secret");
 
@@ -130,6 +168,7 @@ fn sy_platform_09_t_ops_2_permissions() {
     }
 }
 
+/// SPEC: T-SEC-2
 /// SY-10 & T-LOG-1: Fehlertexte fest, ohne Pfade oder Nutzerinhalte in Debug/Display.
 #[test]
 fn sy_platform_10_t_log_1_error_text_fixed_no_paths() {
@@ -149,10 +188,11 @@ fn sy_platform_10_t_log_1_error_text_fixed_no_paths() {
     );
 }
 
+/// SPEC: T-SEC-2
 /// SY-05 & SY-09: Fehlerfall-Prüfungen für ungültige Modi und ungültige Handles.
 #[test]
 fn sy_platform_invalid_mode_and_unsupported() {
-    let dir = tempfile::tempdir().expect("tempdir");
+    let dir = TestDir::new();
     let file_path = dir.path().join("invalid_mode.bin");
     std::fs::write(&file_path, b"test").expect("write test");
 

@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
-// ZWECK: Zentrales Fehler- und Statusmodul fuer contextra-sys (Ring 1 / SY-10)
-// INVARIANTEN: Zero-Panic; feste, statische Fehlermeldungen ohne Pfad- oder Nutzerinhalte in Display.
-
 //! # Modul: Fehler- und Statustypen (`error`)
 //!
 //! Stellt typisierte, sichere Fehler- und Ergebnistypen bereit, die niemals
