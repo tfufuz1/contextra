@@ -25,7 +25,7 @@ impl FileKeyring for InMemoryKeyring {
     fn create(&self, _kind: FileKind, id: FileId) -> BoxFuture<'_, Result<FileKey, String>> {
         Box::pin(async move {
             let mut key_bytes = vec![0u8; 32];
-            let hash = blake3::hash(&id.as_u64().to_le_bytes());
+            let hash = blake3::hash(id.as_bytes());
             key_bytes.copy_from_slice(hash.as_bytes());
 
             let mut lock = self.keys.write();

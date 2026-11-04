@@ -65,12 +65,13 @@ proptest! {
     #[test]
     fn test_file_key_zeroize_on_drop(
         secret in prop::collection::vec(any::<u8>(), 32..=64),
-        file_id in any::<u64>(),
+        file_id_bytes in prop::array::uniform16(any::<u8>()),
     ) {
         let mut cloned = secret.clone();
-        let key = FileKey::new(cloned.clone(), FileId::new(file_id));
+        let file_id = FileId::new(file_id_bytes);
+        let key = FileKey::new(cloned.clone(), file_id);
         prop_assert_eq!(key.as_bytes(), secret.as_slice());
-        prop_assert_eq!(key.file_id(), FileId::new(file_id));
+        prop_assert_eq!(key.file_id(), file_id);
 
         // Ensure Debug does not leak raw bytes
         let debug = format!("{:?}", key);
