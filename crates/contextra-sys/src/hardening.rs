@@ -1,5 +1,4 @@
 // FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
 // ZWECK: Prozess- und Speicherhaertung gemaess D-63 / WP-5.2 / SY-07 / SY-08
 // INVARIANTEN: Zero-Panic; globale Nebeneffekte auf Debugger & Coredumps dokumentiert
 
