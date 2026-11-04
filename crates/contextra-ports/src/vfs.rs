@@ -25,6 +25,17 @@ use crate::Result;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// Method via which medium verification was performed (SPEC D-113).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum VerifiedVia {
+    /// Read bypassed page cache via Direct I/O (`O_DIRECT` or `F_NOCACHE`).
+    Direct,
+    /// Read performed after page cache eviction hint (`posix_fadvise(POSIX_FADV_DONTNEED)`).
+    CacheDropped,
+    /// Read performed through ordinary cache path (fallback if direct I/O or drop unsupported).
+    Cached,
+}
+
 /// Options configuring how a file is opened via [`Vfs::open`].
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct VfsOpenOptions {
@@ -72,6 +83,24 @@ pub trait VfsFile: Send + Sync {
     /// Reiner positioneller Lesezugriff; verändert keine Dateimetadaten oder persistente Zustände.
     fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize>;
 
+    /// Reads verified data from storage medium bypassing or dropping the page cache (SPEC D-113).
+    ///
+    /// In accordance with SPEC D-113:
+    /// Returns read bytes and classification `VerifiedVia ∈ {Direct, CacheDropped, Cached}`.
+    /// Default implementation reads positionally via `read_at` classified as `VerifiedVia::Cached`.
+    ///
+    /// # Fehler
+    /// Liefert `std::io::Error` bei I/O-Fehlern oder Leseproblemen.
+    ///
+    /// # Crash
+    /// Reiner Lesezugriff zur Verifikation von Slots oder Medienblöcken.
+    fn read_verified(&self, offset: u64, len: usize) -> std::io::Result<(Vec<u8>, VerifiedVia)> {
+        let mut buf = vec![0u8; len];
+        let n = self.read_at(&mut buf, offset)?;
+        buf.truncate(n);
+        Ok((buf, VerifiedVia::Cached))
+    }
+
     /// Writes data from `buf` to byte offset `offset` without moving the file pointer.
     ///
     /// # Fehler
@@ -113,16 +142,16 @@ pub trait VfsFile: Send + Sync {
     /// Flushes data blocks to disk (`fdatasync`).
     ///
     /// # Fehler
-    /// Liefert `std::io::Error` bei fehlschlagendem Flush. Bei Sync-Fehlern muss der Aufrufer das Handle vergiften (P14, D-55).
+    /// Liefert `std::io::Error` bei fehlschlagendem Flush. Bei Sync-Fehlern muss das Handle vergiftet werden (DF-03, D-55, T-FSYNC-1).
     ///
     /// # Crash
-    /// Garantiert die Haltbarkeit (Durability) der geschriebenen Datenblöcke bis zum Aufrufzeitpunkt.
+    /// Garantiert die Haltbarkeit der geschriebenen Datenblöcke bis zum Aufrufzeitpunkt.
     fn sync_data(&self) -> std::io::Result<()>;
 
     /// Flushes data blocks and metadata to disk (`fsync`).
     ///
     /// # Fehler
-    /// Liefert `std::io::Error` bei Synchronisationsfehlern. Scheitert `sync_all`, ist das Handle unwiederbringlich vergiftet.
+    /// Liefert `std::io::Error` bei Synchronisationsfehlern. Scheitert `sync_all`, ist das Handle vergiftet (DF-03, D-55, T-FSYNC-1).
     ///
     /// # Crash
     /// Garantiert Haltbarkeit aller Datenblöcke und Inode-Metadaten (z. B. Dateilänge).
@@ -132,7 +161,7 @@ pub trait VfsFile: Send + Sync {
 /// Abstract object-safe Virtual File System interface.
 ///
 /// Implements required file operations for LSM storage engine, SSTables, WAL sidecars,
-/// and vector index file persistence.
+/// vault slot storage, and vector index persistence (SPEC 3.1, D-113, DF-01..DF-03).
 pub trait Vfs: Send + Sync + 'static {
     /// Opens a file according to the specified options.
     ///
@@ -149,6 +178,32 @@ pub trait Vfs: Send + Sync + 'static {
             std::io::ErrorKind::Unsupported,
             "positional VfsFile open is not supported by default in this Vfs implementation",
         )))
+    }
+
+    /// Reads data from byte offset `offset` into `buf` for file at `path`.
+    ///
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) bei I/O-Fehlern.
+    fn read_at(&self, path: &Path, offset: u64, buf: &mut [u8]) -> Result<usize> {
+        let file = self.open(path, &VfsOpenOptions::read_only())?;
+        file.read_at(buf, offset).map_err(crate::ContextraError::Io)
+    }
+
+    /// Reads verified bytes directly from media or cache-dropped layer (SPEC D-113).
+    ///
+    /// Returns the verified byte payload and the verification classification `VerifiedVia`.
+    ///
+    /// # Fehler
+    /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) bei Lesefehlern.
+    fn read_verified(
+        &self,
+        path: &Path,
+        offset: u64,
+        len: usize,
+    ) -> Result<(Vec<u8>, VerifiedVia)> {
+        let file = self.open(path, &VfsOpenOptions::read_only())?;
+        file.read_verified(offset, len)
+            .map_err(crate::ContextraError::Io)
     }
 
     /// Reads the entire contents of a file at `path`.
@@ -187,11 +242,16 @@ pub trait Vfs: Send + Sync + 'static {
     ///
     /// # Fehler
     /// Liefert [`ContextraError::Io`](crate::error::ContextraError::Io) oder [`ContextraError::NotFound`](crate::error::ContextraError::NotFound)
-    /// falls das Löschen fehlschlägt oder die Datei fehlt.
+    /// falls das Entfernen fehlschlägt oder die Datei fehlt.
     ///
     /// # Crash
     /// Entfernt Verzeichniseintrag; Persistenz erfordert `sync_dir` des übergeordneten Verzeichnisses.
     fn remove_file(&self, path: &Path) -> Result<()>;
+
+    /// Canonical alias for removing a file (SPEC D-113 / Purge-Primitive).
+    fn unlink(&self, path: &Path) -> Result<()> {
+        self.remove_file(path)
+    }
 
     /// Atomically renames a file from `from` to `to`.
     ///
@@ -249,6 +309,11 @@ pub trait Vfs: Send + Sync + 'static {
     /// Reiner Lesezugriff auf Verzeichniseinträge.
     fn list_dir(&self, path: &Path) -> Result<Vec<String>>;
 
+    /// Canonical alias for listing entries in directory `path` (SPEC 3.1).
+    fn list(&self, path: &Path) -> Result<Vec<String>> {
+        self.list_dir(path)
+    }
+
     /// Flushes directory metadata to persistent storage for durable file additions and renames.
     ///
     /// # Fehler
@@ -262,6 +327,19 @@ pub trait Vfs: Send + Sync + 'static {
 impl<T: Vfs + ?Sized> Vfs for Arc<T> {
     fn open(&self, path: &Path, opts: &VfsOpenOptions) -> Result<Box<dyn VfsFile>> {
         (**self).open(path, opts)
+    }
+
+    fn read_at(&self, path: &Path, offset: u64, buf: &mut [u8]) -> Result<usize> {
+        (**self).read_at(path, offset, buf)
+    }
+
+    fn read_verified(
+        &self,
+        path: &Path,
+        offset: u64,
+        len: usize,
+    ) -> Result<(Vec<u8>, VerifiedVia)> {
+        (**self).read_verified(path, offset, len)
     }
 
     fn read(&self, path: &Path) -> Result<Vec<u8>> {
@@ -278,6 +356,10 @@ impl<T: Vfs + ?Sized> Vfs for Arc<T> {
 
     fn remove_file(&self, path: &Path) -> Result<()> {
         (**self).remove_file(path)
+    }
+
+    fn unlink(&self, path: &Path) -> Result<()> {
+        (**self).unlink(path)
     }
 
     fn rename(&self, from: &Path, to: &Path) -> Result<()> {
@@ -298,6 +380,10 @@ impl<T: Vfs + ?Sized> Vfs for Arc<T> {
 
     fn list_dir(&self, path: &Path) -> Result<Vec<String>> {
         (**self).list_dir(path)
+    }
+
+    fn list(&self, path: &Path) -> Result<Vec<String>> {
+        (**self).list(path)
     }
 
     fn sync_dir(&self, path: &Path) -> Result<()> {

@@ -13,6 +13,7 @@ pub use build::{
 };
 pub use canonical::{canonicalize_value, to_canonical_json, to_canonical_json_string};
 pub use risk::{evaluate_residual_risks, ResidualRiskEntry};
+pub use signing::ReportSigner;
 
 use crate::error::ErasureError;
 use ed25519_dalek::{Signer, SigningKey};
