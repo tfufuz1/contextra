@@ -85,6 +85,37 @@ pub struct SlotData {
 }
 
 /// Serialisiert einen aktiven Slot in 64 Bytes (ohne MAC-Feld).
+/// Kodiert einen vollständigen Tresor-Slot inkl. MAC (F.3, D-111).
+pub fn encode_slot(
+    vault_id: &[u8; 16],
+    slot_type: SlotType,
+    status: u8,
+    gen: u64,
+    tag: &[u8; 16],
+    payload: &[u8; 32],
+    mac_key: &[u8; 32],
+) -> [u8; VAULT_SLOT_SIZE] {
+    let mut buf = [0u8; VAULT_SLOT_SIZE];
+    buf[off::SLOT_TYPE] = slot_type as u8;
+    buf[off::STATUS] = status;
+    let gen_bytes = gen.to_be_bytes();
+    if let (Some(dest), Some(src)) = (buf.get_mut(off::GEN..off::GEN + 6), gen_bytes.get(2..8)) {
+        dest.copy_from_slice(src);
+    }
+    if let Some(dest) = buf.get_mut(off::TAG..off::TAG + 16) {
+        dest.copy_from_slice(tag);
+    }
+    if let Some(dest) = buf.get_mut(off::PAYLOAD..off::PAYLOAD + 32) {
+        dest.copy_from_slice(payload);
+    }
+    let mac = compute_slot_mac(mac_key, vault_id, &buf[0..56]);
+    if let Some(dest) = buf.get_mut(off::MAC..off::MAC + 8) {
+        dest.copy_from_slice(&mac);
+    }
+    buf
+}
+
+/// Serialisiert die Nutzlast eines Slots (ohne MAC).
 pub fn encode_slot_body(sd: &SlotData) -> [u8; VAULT_SLOT_SIZE] {
     let mut buf = [0u8; VAULT_SLOT_SIZE];
     buf[off::SLOT_TYPE] = sd.slot_type as u8;

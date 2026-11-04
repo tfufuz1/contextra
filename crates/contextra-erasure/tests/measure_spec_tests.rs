@@ -256,3 +256,20 @@ fn test_t_raw_3_mk3_key_probe() {
         "Vergessener F-Slot muss als unsauber erkannt werden"
     );
 }
+
+/// SPEC: T-VERIFY-1, T-VERIFY-2
+#[test]
+fn test_t_verify_1_and_2_medium_verification() {
+    use contextra_erasure::measure::field::VerifiedVia;
+
+    let scan = scan_mk3_keys(true, true, true);
+    // T-VERIFY-2: verified_via korrekt im Scan-Ergebnis
+    assert_eq!(scan.verified_via, VerifiedVia::Cached);
+
+    // T-VERIFY-1: Fehlgeschlagene Verifikation (Medium zeigt alten Slot)
+    let failed_scan = scan_mk3_keys(false, true, true);
+    assert!(
+        !failed_scan.is_clean(),
+        "Medium mit altem Slot muss als fehlerhaft erkannt werden"
+    );
+}

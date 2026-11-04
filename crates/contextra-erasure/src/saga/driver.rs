@@ -58,8 +58,12 @@ impl SagaDriver {
                     saga.pending_reason().cloned().unwrap_or(PendingReason::Io),
                 ));
             }
-            SagaState::Completed | SagaState::Refused => {
+            SagaState::Completed | SagaState::Refused | SagaState::Lifted => {
                 return Ok(StepOutcome::Terminal(saga.state()))
+            }
+            SagaState::Restricted => {
+                // Restricted wartet auf Lifted oder Erase (D-116, D-119).
+                return Ok(StepOutcome::Terminal(SagaState::Restricted));
             }
         };
 
