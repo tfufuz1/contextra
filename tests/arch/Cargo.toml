@@ -4,7 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish = false
-description = "Architekturtests: Ring-Schichtung (SPEC §3.2 Regel 1, NFR-3) und Unsafe-Inseln (Regel 6, NFR-2)"
+description = "Architektur-, Ring-, Namens- und Lint-Tests."
+
+[package.metadata.contextra]
+ring = "tooling"
 
 [dependencies]
 toml = { workspace = true }

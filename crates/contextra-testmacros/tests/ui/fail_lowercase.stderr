@@ -1,0 +1,5 @@
+error: invalid test ID `T-lowercase-1`: lowercase characters not allowed
+ --> tests/ui/fail_lowercase.rs:3:17
+  |
+3 | #[ctx_test(id = "T-lowercase-1")]
+  |                 ^^^^^^^^^^^^^^^

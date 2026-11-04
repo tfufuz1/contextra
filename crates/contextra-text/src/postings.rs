@@ -93,17 +93,33 @@ impl PostingBlock {
         if bytes.len() < 8 {
             return Err(ContextraError::Index("Corrupted block".into()));
         }
-        let max_doc_ord = bytes.get(..4).and_then(|s| s.try_into().ok()).map(u32::from_be_bytes).ok_or_else(|| ContextraError::Index("Corrupted max_doc_ord".into()))?;
-        let max_tf_norm = bytes.get(4..6).and_then(|s| s.try_into().ok()).map(u16::from_be_bytes).ok_or_else(|| ContextraError::Index("Corrupted max_tf_norm".into()))?;
-        let count = bytes.get(6..8).and_then(|s| s.try_into().ok()).map(u16::from_be_bytes).map(|c| c as usize).ok_or_else(|| ContextraError::Index("Corrupted count".into()))?;
+        let max_doc_ord = bytes
+            .get(..4)
+            .and_then(|s| s.try_into().ok())
+            .map(u32::from_be_bytes)
+            .ok_or_else(|| ContextraError::Index("Corrupted max_doc_ord".into()))?;
+        let max_tf_norm = bytes
+            .get(4..6)
+            .and_then(|s| s.try_into().ok())
+            .map(u16::from_be_bytes)
+            .ok_or_else(|| ContextraError::Index("Corrupted max_tf_norm".into()))?;
+        let count = bytes
+            .get(6..8)
+            .and_then(|s| s.try_into().ok())
+            .map(u16::from_be_bytes)
+            .map(|c| c as usize)
+            .ok_or_else(|| ContextraError::Index("Corrupted count".into()))?;
 
         let mut offset = 8;
         let mut doc_ords = Vec::with_capacity(count);
         let mut last_ord = 0u32;
 
         for _ in 0..count {
-            let slice = bytes.get(offset..).ok_or_else(|| ContextraError::Index("Corrupted slice".into()))?;
-            let (delta, read) = decode_vbyte(slice).ok_or_else(|| ContextraError::Index("Corrupted delta".into()))?;
+            let slice = bytes
+                .get(offset..)
+                .ok_or_else(|| ContextraError::Index("Corrupted slice".into()))?;
+            let (delta, read) = decode_vbyte(slice)
+                .ok_or_else(|| ContextraError::Index("Corrupted delta".into()))?;
             offset += read;
             let delta_u32 = u32::try_from(delta).unwrap_or(u32::MAX);
             let ord = last_ord.saturating_add(delta_u32);
@@ -113,8 +129,11 @@ impl PostingBlock {
 
         let mut tfs = Vec::with_capacity(count);
         for _ in 0..count {
-            let slice = bytes.get(offset..).ok_or_else(|| ContextraError::Index("Corrupted slice".into()))?;
-            let (tf, read) = decode_vbyte(slice).ok_or_else(|| ContextraError::Index("Corrupted tf".into()))?;
+            let slice = bytes
+                .get(offset..)
+                .ok_or_else(|| ContextraError::Index("Corrupted slice".into()))?;
+            let (tf, read) =
+                decode_vbyte(slice).ok_or_else(|| ContextraError::Index("Corrupted tf".into()))?;
             offset += read;
             let tf_u32 = u32::try_from(tf).unwrap_or(u32::MAX);
             tfs.push(tf_u32);
@@ -123,15 +142,21 @@ impl PostingBlock {
         let positions = if has_positions {
             let mut all_pos = Vec::with_capacity(count);
             for _ in 0..count {
-                let slice = bytes.get(offset..).ok_or_else(|| ContextraError::Index("Corrupted slice".into()))?;
-                let (pcount, read) = decode_vbyte(slice).ok_or_else(|| ContextraError::Index("Corrupted pos count".into()))?;
+                let slice = bytes
+                    .get(offset..)
+                    .ok_or_else(|| ContextraError::Index("Corrupted slice".into()))?;
+                let (pcount, read) = decode_vbyte(slice)
+                    .ok_or_else(|| ContextraError::Index("Corrupted pos count".into()))?;
                 offset += read;
                 let pcount_usize = usize::try_from(pcount).unwrap_or(usize::MAX);
                 let mut doc_pos = Vec::with_capacity(pcount_usize);
                 let mut last_pos = 0u32;
                 for _ in 0..pcount_usize {
-                    let pslice = bytes.get(offset..).ok_or_else(|| ContextraError::Index("Corrupted pslice".into()))?;
-                    let (delta, pread) = decode_vbyte(pslice).ok_or_else(|| ContextraError::Index("Corrupted pos delta".into()))?;
+                    let pslice = bytes
+                        .get(offset..)
+                        .ok_or_else(|| ContextraError::Index("Corrupted pslice".into()))?;
+                    let (delta, pread) = decode_vbyte(pslice)
+                        .ok_or_else(|| ContextraError::Index("Corrupted pos delta".into()))?;
                     offset += pread;
                     let delta_u32 = u32::try_from(delta).unwrap_or(u32::MAX);
                     let pos = last_pos.saturating_add(delta_u32);

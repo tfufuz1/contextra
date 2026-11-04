@@ -1,5 +1,4 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-// ANCHOR[contextra-mvcc:TEST-SENTINEL-REGRESSION]
 //! # Regressionstest T-MVCC-SENTINEL (Befund D-C02 / B-11)
 //!
 //! Prüft die Behebung des Snapshot-Sentinel-Fehlers an der Wurzel:
@@ -11,10 +10,11 @@
 use contextra_mvcc::error::MvccError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::SnapshotRegistry;
+use contextra_testmacros::ctx_test;
 use contextra_types::{TxId, TOMBSTONE_BIT};
 use std::sync::Arc;
 
-#[test]
+#[ctx_test(id = "T-VER-1")]
 fn test_sentinel_prune_through_checked_none_and_invalid() {
     let validator = SequenceLogSsiValidator::new();
 
@@ -35,7 +35,7 @@ fn test_sentinel_prune_through_checked_none_and_invalid() {
     assert_eq!(validator.pruned_through(), 0);
 }
 
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_t_mvcc_sentinel_compaction_without_snapshot_succeeds() {
     let validator = SequenceLogSsiValidator::new();
     let snapshot_registry = Arc::new(SnapshotRegistry::new());
@@ -77,7 +77,7 @@ fn test_t_mvcc_sentinel_compaction_without_snapshot_succeeds() {
     );
 }
 
-#[test]
+#[ctx_test(id = "T-VER-1")]
 fn test_sentinel_u64_i64_boundary_handling() {
     // T-MVCC-SENTINEL-1: Verifiziert, dass Grenzwerte wie u64::MAX, i64::MAX as u64
     // und Sequenznummern mit gesetztem MSB / Tombstone-Bit nie fälschlicherweise als
