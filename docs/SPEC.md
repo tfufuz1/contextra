@@ -2109,7 +2109,7 @@ Kanonisierung: UTF-8 NFC, Objektschlüssel aufsteigend sortiert, keine Leerzeich
 |---|---|
 |**5.1.0** (2026-11-03)|Nachtrag zu 5.0.0, integriert. **Neu:** Entscheidungen D-111 bis D-132 (Abschnitt 4.7), Anhang I (Befundverfolgung). **Geändert:** Tresor 16 Shards, 64-B-Slots, atomare Vernichtung, abbrechbarer Rehash, Slot `E` (D-111, D-125); Tresor außerhalb des Datenverzeichnisses (D-112); Textindex mit Einheit Chunk, Mitgliedschaft und Flush-Protokoll (D-121); Vektor-Quelle LSM und deterministischer Rebuild (D-122); Familien und Schlüsselraum (D-123); Snapshot-Widerruf und WAL-Reihenfolge (D-127); Release-Regelfall Cut-Linie (D-129); Repo-Befund zu D-82 und D-104 (Pin 1.94.0 gegen 1.97.0). **Ergänzt:** `replace_erasing` (D-115), Zugriff nach Art. 18 Abs. 2 (D-116), Berichtigung mit Purge (D-117), Erase-Observer (D-118), `ErasureId` (D-119), Lesesemantik (D-120), Restore-Guard-Algorithmus (D-126), I/O-Spuren (D-128), Signierport (D-130), G-LEGAL 15 bis 17 (D-131), Stufe-4-Spike (D-132). **Korrigiert:** Fallbackstufe 1 (KF-14), Entfernen des Lösch-Bitmap im Segment, Tresor-Präfixscan in 11.10. **Unverändert:** Datenformate außer F.2, F.3, F.4, F.7, F.8, F.9; Rechtsrahmen 6.4 (Außenaussage); Löschsemantik außer I-21 bis I-27.|
 |**5.0.0** (2026-11-03)|Konsolidierte Neufassung als reine Soll-Spezifikation. **Entfernt:** Ist-Befunde F-01 bis F-37 samt HEAD-Bezügen, Messwerte und Evidenzmarken zum Quelltextstand (wandern nach `docs/PLAN.md`), Revisionstabellen früherer Fassungen, den Umsetzungsplan 15.4 (wandert nach `docs/PLAN.md`), die „Ist“-Spalte von 5.1, das relative Rückbauziel von 5.8. **Neu:** Soll-Inventar (3), Repository-Inventar (3.2), D-99 bis D-110, T-TRACE-2, T-SOAK-1, T-API-4, Anhang A mit Crate-Zuordnung, neuer Anhang E. **Bestätigt:** D-88 bis D-98. **Entschieden:** G0-Grundlinie (D-101), Cut-Linie (D-102), G-LEGAL (D-103), Toolchain (D-104), Abhängigkeiten (D-105). **Unverändert:** Datenformate (Anhang F), Löschsemantik (11), Schlüsselhierarchie (10), Rechtsrahmen (6).|
-|4.3.0|Folgedokumente: D-92 entfällt, D-98 tritt an seine Stelle.|
+||Folgedokumente: D-92 entfällt, D-98 tritt an seine Stelle.|
 |4.2.0|Review am Stand `4e208c179`: Build-Disziplin (D-93), kein `mmap` (D-94), Tresor in `engine` (D-95), Skelett-Regel (D-96), Zweck-Sätze (D-97).|
 |4.1.0|Architekturprüfung: Matrixkorrektur (D-88), Fassadenschnitt (D-89), Namensregeln (D-90), Kopf- und Ringangaben (D-91).|
 |4.0.0|Review gegenüber 3.0.0: Schlüsselhierarchie (D-79), `DocRef` (D-70), Textsegmente (D-71), Messklassen (D-72), WAL ohne Umschreiben (D-73), Restore-Guard (D-74), Dateischlüssel-Vernichtung (D-85) u. a.|
@@ -2200,7 +2200,7 @@ Der Abgleich fand am geklonten Stand statt. Einige Befunde des Reviews waren ver
 
 | Befund | Status | Maßnahme |
 |---|---|---|
-| `docs/SPEC.md` im Repo ist 4.3.0 | **Nicht bestätigt.** Der geklonte Stand enthält bereits 5.0.0 | Diese Fassung ersetzt die Datei |
+| `docs/SPEC.md` im Repo ist  | **Nicht bestätigt.** Der geklonte Stand enthält bereits 5.0.0 | Diese Fassung ersetzt die Datei |
 | `docs/PLAN.md` fehlt | bestätigt | D-99; Anlage vor dem Gate G-A |
 | Toolchain-Pin `1.94.0` | bestätigt; verletzt D-82 | D-104: Pin `1.97.0`, Prüfung am Release-Kandidaten |
 | Tokio-Features `io-util`, `fs` im Workspace | bestätigt; verletzt D-54 | Gate G-B |

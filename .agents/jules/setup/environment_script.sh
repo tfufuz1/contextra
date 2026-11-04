@@ -2,7 +2,7 @@
 # =============================================================================
 # Contextra — Jules Environment Setup (schwer, snapshot-fähig, idempotent)
 # Ziel: Jules-VM (Ubuntu 24.04, rustup/Node/Python/Go/Java/Docker vorinstalliert)
-# Stand: SPEC 4.3.0. Geprüft gegen HEAD 909ff27; veraltete Verweise (contextra-wire, contextra-mcp) entfernt.
+# Stand: SPEC . Geprüft gegen HEAD 909ff27; veraltete Verweise (contextra-wire, contextra-mcp) entfernt.
 # Läuft bei "Run and Snapshot". Danach wird nur der SNAPSHOT wiederverwendet —
 # alles Zeitabhängige (Commits, Tags, Claims, PRs) steckt deshalb in
 # refresh-context.sh, das bei JEDEM Task-Start läuft.

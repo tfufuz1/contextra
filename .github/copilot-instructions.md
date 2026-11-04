@@ -1,6 +1,6 @@
 # Copilot-Anweisungen für Contextra
 
-Nicht normativ. Normativ ist ausschließlich `docs/SPEC.md` (Version 4.3.0); bei Widerspruch gilt die SPEC. Gemeinsame Regeln und Fachprofile: `AGENTS.md` im Wurzelverzeichnis und `crates/<crate>/AGENTS.md`.
+Nicht normativ. Normativ ist ausschließlich `docs/SPEC.md` ; bei Widerspruch gilt die SPEC. Gemeinsame Regeln und Fachprofile: `AGENTS.md` im Wurzelverzeichnis und `crates/<crate>/AGENTS.md`.
 
 Contextra ist eine eingebettete Rust-Bibliothek (Single-Node, kein Server) für lokales Wissen und Gedächtnis von Agenten- und RAG-Systemen: Dokumente, BM25-Suche, HNSW-Vektorsuche, RRF-Hybridsuche, MVCC-Zeitreisen und ein gemessener, unabhängig prüfbarer Löschprozess. Der Build-Status ändert sich; ermittle ihn mit `cargo check --workspace --all-targets --locked`, nimm ihn nicht aus Dokumenten an.
 
