@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:SEQ-LOG-ROOT]
 //! # Sequenz-Log (`SequenceLog`) für snapshot-isolierte Index-Suchen (`_at`-Familie)
 //!
 //! Dieses Modul implementiert ein leichtgewichtiges, speicherinternes Versionsprotokoll
@@ -14,8 +13,6 @@
 //! - **Port-Nutzung**: Verwendet den [`Clock`]-Port (`contextra-ports`) für deterministische
 //!   Zeitbestimmung (wichtig für TTL-Prüfungen von Snapshot-Pins ohne direkte Systemuhr-Abhängigkeit).
 
-// FILE-CONTEXT
-// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
 // ZWECK: Shared Versioned Sequence Log für Snapshot-isolierte Index-Suchen (_at Familie).
 // INVARIANTEN: Sichtbarkeitsprüfung: insert_seq <= as_of && (delete_seq.is_none() || delete_seq > as_of).
 // HOTSPOTS: 20-75
@@ -29,12 +26,10 @@ use contextra_ports::{Clock, SystemClock};
 
 use contextra_types::DocId;
 
-// ANCHOR[contextra-mvcc:SEQ-LOG-CONST]
 /// Standard-Lebensdauer für Snapshot-Pins (5 Minuten), bevor Diagnose-Warnungen für
 /// blockierende oder verwaiste Pins ausgelöst werden.
 pub const DEFAULT_MAX_PIN_DURATION: Duration = Duration::from_secs(300);
 
-// ANCHOR[contextra-mvcc:SEQ-LOG-ENTRY]
 /// Ein versionierter Protokolleintrag für die Snapshot-Isolation (`_at`-Familie).
 ///
 /// Jeder Eintrag repräsentiert die Lebensspanne einer Dokumentversion:
@@ -60,7 +55,6 @@ pub struct SeqLogEntry {
 }
 
 impl SeqLogEntry {
-    // ANCHOR[contextra-mvcc:SEQ-LOG-VISIBILITY]
     /// Prüft in O(1), ob dieser Protokolleintrag zu einem bestimmten Snapshot-Stand `as_of` sichtbar ist.
     ///
     /// ### Ablauf der Sichtbarkeitsprüfung:
@@ -83,7 +77,6 @@ impl SeqLogEntry {
     }
 }
 
-// ANCHOR[contextra-mvcc:SEQ-LOG-CHANGE]
 /// Repräsentiert eine historische Änderung (Einfügen oder Löschen) im Sequenz-Log für Delta-Replays.
 ///
 /// Wird von Abfragen wie [`SequenceLog::changes_since`] erzeugt, um Indizes
@@ -122,7 +115,6 @@ impl SeqLogChange {
     }
 }
 
-// ANCHOR[contextra-mvcc:SEQ-LOG-STRUCT]
 /// Verwaltet das chronologische Sequenz-Protokoll und Sichtbarkeitsfilter für Indexstrukturen.
 ///
 /// ### Funktionsweise:
@@ -168,14 +160,12 @@ impl Default for SequenceLog {
 }
 
 impl SequenceLog {
-    // ANCHOR[contextra-mvcc:SEQ-LOG-NEW]
     /// Erstellt ein neues, leeres `SequenceLog` mit der Standard-Systemuhr [`SystemClock`]
     /// und einer maximalen Pin-Dauer von 5 Minuten.
     pub fn new() -> Self {
         Self::with_clock(Arc::new(SystemClock::new()))
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-WITH-CLOCK]
     /// Erstellt ein neues, leeres `SequenceLog` mit einer benutzerdefinierten Implementierung
     /// des [`Clock`]-Ports (z. B. `ManualClock` in deterministischen Tests).
     pub fn with_clock(clock: Arc<dyn Clock>) -> Self {
@@ -215,7 +205,6 @@ impl SequenceLog {
         self.max_pin_duration
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-PIN]
     /// Pinnt eine historische Sequenznummer, um zu verhindern, dass die Hintergrund-Bereinigung
     /// (Rebuild/Compaction) gelöschte Knoten entfernt, die für diesen Stand noch sichtbar sein müssen.
     ///
@@ -236,7 +225,6 @@ impl SequenceLog {
             .push(at_nanos);
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-UNPIN]
     /// Gibt einen gepinnten Snapshot wieder frei.
     ///
     /// ### Ablauf:
@@ -256,7 +244,6 @@ impl SequenceLog {
         }
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-EXPIRED-PINS]
     /// Findet alle gepinnten Sequenznummern, deren Haltezeit `max_pin_duration` überschreitet,
     /// bezogen auf den übergebenen Monotonie-Zeitstempel `now_nanos`.
     ///
@@ -281,7 +268,6 @@ impl SequenceLog {
         self.expired_pins_at(self.clock.monotonic_nanos())
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-REAP-PINS]
     /// Bereinigt (entpinnt) alle Pins, die die Maximaldauer bezüglich `now_nanos` überschritten haben.
     ///
     /// ### Ablauf:
@@ -302,7 +288,6 @@ impl SequenceLog {
         self.reap_expired_pins_at(now_nanos)
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-MIN-RETENTION]
     /// Berechnet die kleinste aktuell gepinnte Sequenznummer für Aufbewahrungs- und Pruning-Zwecke.
     ///
     /// Gibt `None` zurück, falls aktuell kein einziger Snapshot gepinnt ist.
@@ -338,7 +323,6 @@ impl SequenceLog {
         self.deletions.get(&doc_id).copied()
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-RECORD-INSERT]
     /// Zeichnet eine Einfügeoperation für ein Dokument zu einer Sequenznummer auf.
     ///
     /// ### Ablauf:
@@ -364,7 +348,6 @@ impl SequenceLog {
         });
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-RECORD-DELETE]
     /// Zeichnet eine Löschoperation für ein Dokument zu einer Sequenznummer auf.
     ///
     /// ### Ablauf:
@@ -383,7 +366,6 @@ impl SequenceLog {
         }
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-IS-VISIBLE]
     /// Prüft, ob ein Dokument zu einer bestimmten Sequenznummer `seq_no` im Index sichtbar ist.
     ///
     /// Ein Dokument ist sichtbar, wenn es vor oder bei `seq_no` eingefügt wurde und nicht
@@ -407,7 +389,6 @@ impl SequenceLog {
         inserted && !deleted
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-COMPACT]
     /// Verdichtet (kompaktiert) das Sequenz-Log und entfernt historische Versionen,
     /// deren Löschung strikt kleiner als `min_active_seqno` ist.
     ///
@@ -449,7 +430,6 @@ impl SequenceLog {
         self.entries.is_empty()
     }
 
-    // ANCHOR[contextra-mvcc:SEQ-LOG-CHANGES-SINCE]
     /// Liefert alle Änderungen (Einfügungen und Löschungen), die strikt nach `snapshot_seq`
     /// stattgefunden haben, aufsteigend sortiert nach Sequenznummer.
     ///

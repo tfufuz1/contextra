@@ -325,6 +325,14 @@ pub const KNOWN_DEVIATIONS: &[Deviation] = &[
     Deviation { crate_name: "contextra", rule: "T-TRACE-1:test-traceability", work_package: "WP-1.5", reason: "Bestehende Tests werden in WP-1.5 mit SPEC-IDs annotiert" },
     Deviation { crate_name: "contextra-testkit", rule: "T-TRACE-1:test-traceability", work_package: "WP-0.1", reason: "Bestehende Tests werden in WP-0.1 mit SPEC-IDs annotiert" },
 
+    // T-TRACE-2: PLAN.md Altbestand an nicht in SPEC 5.1.0 definierten IDs
+    Deviation {
+        crate_name: "workspace",
+        rule: "T-TRACE-2:T-ZERO-1",
+        work_package: "WP-0.1",
+        reason: "T-ZERO-1 in PLAN.md zitiert; wird in WP-0.1 auf SPEC-konforme Zählwerkzeug-Referenz (D-107 / Gate G-C) angepasst",
+    },
+
     // T-LINT-3: Wording / Evidenzbegriffe Altbestand
     Deviation { crate_name: "contextra-simd", rule: "T-LINT-3:wording", work_package: "WP-8.1", reason: "Wortlaut im Altbestand wird in WP-8.1 bereinigt" },
     Deviation { crate_name: "contextra-store", rule: "T-LINT-3:wording", work_package: "WP-3.3", reason: "Wortlaut im Altbestand wird in WP-3.3 bereinigt" },

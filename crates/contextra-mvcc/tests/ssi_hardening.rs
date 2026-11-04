@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-HARDENING-ROOT]
 //! # Härtungs- und Concurrency-Tests für Serializable Snapshot Isolation (SSI)
 //!
 //! Prüft Pruning-Mechanik, atomares Validate-and-Record, Fail-Closed-Verhalten
@@ -9,12 +8,13 @@
 use contextra_mvcc::error::ContextraError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::tx_buffer::TxBuffer;
+use contextra_testmacros::ctx_test;
 use contextra_types::TxId;
 use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
 // Prüft die strikte Atomarität von validate_and_record unter nebenläufiger Thread-Verschränkung.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_validate_and_record_atomicity() {
     for _ in 0..500 {
         let validator = SequenceLogSsiValidator::new();
@@ -55,7 +55,7 @@ fn test_validate_and_record_atomicity() {
 }
 
 // Prüft die genaue Funktionsweise von prune_through und das Entfernen historischer Sequenzen.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_prune_through_mechanics() {
     let validator = SequenceLogSsiValidator::new();
     validator.record_commit_key(b"key1", 10);
@@ -79,7 +79,7 @@ fn test_prune_through_mechanics() {
 }
 
 // Prüft das Fail-Closed-Verhalten: Transaktionen mit Snapshots älter als pruned_through werden deterministisch abgewiesen.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_fail_closed_validation() {
     let validator = SequenceLogSsiValidator::new();
     validator.record_commit_key(b"key1", 5);
@@ -107,7 +107,7 @@ fn test_fail_closed_validation() {
 }
 
 // Prüft die Ermittlung des kleinsten Lese-Snapshots über mehrere Shards hinweg.
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_min_read_snapshot_across_shards() {
     let buffer = TxBuffer::<String>::new_with_config(64, Duration::from_secs(30));
     assert_eq!(buffer.min_read_snapshot(), None);
@@ -131,7 +131,7 @@ fn test_min_read_snapshot_across_shards() {
 }
 
 // Prüft die Durchsetzung von max_keys bei try_register_read und das Aktualisieren bestehender Schlüssel.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn test_try_register_read_limit_and_updates() {
     let buffer = TxBuffer::<String>::new();
     let tx = TxId::new(100);
@@ -159,7 +159,7 @@ fn test_try_register_read_limit_and_updates() {
 
 proptest::proptest! {
     // Eigenschaftstest: Verifiziert, dass Bereinigungen unterhalb des Wasserstands die Validierung oberhalb unberührt lassen.
-    #[test]
+#[ctx_test(id = "T-TXN-1")]
     fn prop_prune_equivalence_above_watermark(
         commits in proptest::collection::vec((proptest::collection::vec(0..255u8, 1..8), 1..100u64), 1..30),
         prune_bound in 1..50u64,

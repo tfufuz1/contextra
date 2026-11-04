@@ -388,6 +388,7 @@ pub trait StorageEngine: Send + Sync + 'static {
 mod tests {
     use super::*;
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_storage_stats_serialization() -> Result<()> {
         let s_stats = StorageStats {

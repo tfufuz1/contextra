@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-SSI-FORGET-AND-BOUNDS-ROOT]
 //! # Tests für SSI forget_from, Kapazitätsgrenzen und Phantom-Präfix-Konflikte
 //!
 //! Verifiziert das selektive Vergessen fehlgeschlagener Batches, die Einhaltung
@@ -7,10 +6,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
+use contextra_testmacros::ctx_test;
 use contextra_types::{ContextraError, TxId};
 
 // Prüft, dass forget_from alle Schreibregistrierungen eines abgebrochenen Batches ab einer Sequenznummer entfernt.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn forget_from_removes_keys_of_failed_batch() {
     let validator = SequenceLogSsiValidator::new();
     let tx1 = TxId::new(1);
@@ -38,7 +38,7 @@ fn forget_from_removes_keys_of_failed_batch() {
 }
 
 // Prüft, dass die Anzahl der getrackten Commit-Schlüssel das konfigurierte Limit nicht überschreitet.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn committed_writes_bounded() {
     let max_keys = 5;
     let validator = SequenceLogSsiValidator::new_with_bounds(max_keys);
@@ -68,7 +68,7 @@ fn committed_writes_bounded() {
 }
 
 // Prüft, dass das Hinzufügen eines passenden Schlüssels einen Konflikt mit einem gelesenen Präfix erzeugt.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn phantom_prefix_conflict() {
     let validator = SequenceLogSsiValidator::new();
     let tx_a = TxId::new(100);

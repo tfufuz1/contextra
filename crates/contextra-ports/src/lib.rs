@@ -22,10 +22,8 @@ use std::future::Future;
 use std::pin::Pin;
 
 // AR-10: Nur Typen re-exportieren, die in Trait-Signaturen vorkommen
-pub use contextra_types::filter::FilterExpr;
 pub use contextra_types::{
-    ConfigFingerprint, ContextChunk, ContextraError, DistanceMetric, DocId, ModelFingerprint,
-    ResourceBudget, ResourceTracker, Result, ScoredDocument, TenantContext, TenantId, TxId,
+    ContextraError, DocId, ResourceBudget, ResourceTracker, Result, ScoredDocument, TxId,
 };
 
 /// Type alias for a pinned, heap-allocated `Future` that is `Send` and dyn-compatible.
@@ -112,7 +110,13 @@ mod dyn_safety {
     fn _assert_dyn_erasure_observer(_: Option<&dyn ErasureObserver>) {}
     fn _assert_dyn_report_signer(_: Option<&dyn ReportSigner>) {}
     fn _assert_dyn_pre_gate(_: Option<&dyn PreGate>) {}
+    fn _assert_dyn_erasure_layer(_: Option<&dyn ErasureLayer>) {}
+    fn _assert_dyn_read_gate(_: Option<&dyn ReadGate>) {}
+    fn _assert_dyn_record_sealer(_: Option<&dyn RecordSealer>) {}
+    fn _assert_dyn_file_keyring(_: Option<&dyn FileKeyring>) {}
+    fn _assert_dyn_ledger_sink(_: Option<&dyn LedgerSink>) {}
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_dyn_safety_compiles() {
         _assert_dyn_storage(None);
@@ -127,6 +131,11 @@ mod dyn_safety {
         _assert_dyn_erasure_observer(None);
         _assert_dyn_report_signer(None);
         _assert_dyn_pre_gate(None);
+        _assert_dyn_erasure_layer(None);
+        _assert_dyn_read_gate(None);
+        _assert_dyn_record_sealer(None);
+        _assert_dyn_file_keyring(None);
+        _assert_dyn_ledger_sink(None);
     }
 
     /// SPEC: T-ARCH-3 / Rule 3

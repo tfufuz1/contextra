@@ -2,7 +2,7 @@ Schnittstellen (Traits) zwischen den Schichten: Speicher, Index, Dateisystem, Ze
 
 ## Status
 
-Ring 0. Ist-Zustand: vorhanden; Altports `graph`, `checkpoint`, `license`, `attention`, `plugin` entfernt; `embedding`, `reranker`, `query_rewriter` noch vorhanden; Löschports fehlen. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
+Ring 0. Ist-Zustand: Produktionsreife für Release 1.0.0; Altports `graph`, `checkpoint`, `license`, `attention`, `plugin`, `embedding`, `reranker`, `query_rewriter` entfernt; alle Löschports (`ErasureLayer`, `ReadGate`, `RecordSealer`, `FileKeyring`, `LedgerSink`, `ErasureObserver`, `PreGate`, `ReportSigner`) nach SPEC 8.2 und 3.1 vorhanden.
 
 ## Abhängigkeiten
 

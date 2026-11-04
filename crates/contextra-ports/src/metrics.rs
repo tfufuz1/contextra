@@ -424,6 +424,7 @@ impl<T: MetricsSink + ?Sized> MetricsSink for Arc<T> {
 mod tests {
     use super::*;
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_static_metrics_adapter() {
         let sink = Arc::new(InMemoryMetricsSink::new());
@@ -445,6 +446,7 @@ mod tests {
         assert_eq!(hist_snap.min, Some(0.003));
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_noop_metrics_sink() {
         let sink = NoopMetricsSink;
@@ -453,6 +455,7 @@ mod tests {
         sink.record_histogram("test_hist", 1.23, &[]);
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_in_memory_metrics_sink_counters_and_gauges() {
         let sink = InMemoryMetricsSink::new();
@@ -469,6 +472,7 @@ mod tests {
         assert_eq!(snap.gauges.get(&gauge_key), Some(&0.75));
     }
 
+    /// SPEC: T-ARCH-6
     #[test]
     fn test_in_memory_metrics_sink_histograms() {
         let sink = InMemoryMetricsSink::new();

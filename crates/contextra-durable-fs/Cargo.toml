@@ -61,6 +61,10 @@ path = "tests/basic.rs"
 name = "t_verify_tests"
 path = "tests/t_verify_tests.rs"
 
+[[test]]
+name = "df_conformance_tests"
+path = "tests/df_conformance_tests.rs"
+
 [[bench]]
 name = "bm_dfs_probe"
 harness = false

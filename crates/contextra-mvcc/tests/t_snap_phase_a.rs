@@ -10,13 +10,14 @@
 
 use contextra_mvcc::error::MvccError;
 use contextra_mvcc::snapshot::{SnapshotRegistry, TenantTag, MAX_SNAPSHOTS_PER_TENANT};
+use contextra_testmacros::ctx_test;
 use proptest::prelude::*;
 use std::sync::Arc;
 
 const TENANT_A: TenantTag = [1u8; 16];
 const TENANT_B: TenantTag = [2u8; 16];
 
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn t_snap_1_two_tenants_revocation_isolation() {
     let registry = Arc::new(SnapshotRegistry::new());
 
@@ -46,7 +47,7 @@ fn t_snap_1_two_tenants_revocation_isolation() {
     assert!(!registry.is_revoked_tenant(TENANT_B, 150));
 }
 
-#[test]
+#[ctx_test(id = "T-CONC-1")]
 fn t_ver_1_immediate_revocation_checks_before_block() {
     let registry = Arc::new(SnapshotRegistry::new());
     let handle = registry.open(TENANT_A, 100).expect("open");
@@ -64,7 +65,7 @@ fn t_ver_1_immediate_revocation_checks_before_block() {
     assert_eq!(err, MvccError::SnapshotRevoked(100));
 }
 
-#[test]
+#[ctx_test(id = "T-LIMIT-1")]
 fn t_limit_1_max_1024_snapshots_per_tenant() {
     let registry = Arc::new(SnapshotRegistry::new());
     let mut handles_a = Vec::with_capacity(MAX_SNAPSHOTS_PER_TENANT);
@@ -91,7 +92,7 @@ fn t_limit_1_max_1024_snapshots_per_tenant() {
 }
 
 proptest! {
-    #[test]
+#[ctx_test(id = "T-VER-1")]
     fn prop_kein_sentinel_empty_registry_is_none_compaction_is_current(
         seqs in proptest::collection::vec(1..1000u64, 0..30),
         current_seq in 1..2000u64
@@ -129,7 +130,7 @@ proptest! {
 // Leser auf einem aktiven Snapshot sehen entweder den konsistenten Altzustand
 // oder werden bei Purge-Kollision fail-closed widerrufen (`SnapshotRevoked`),
 // aber niemals einen unvollständigen/zerrissenen Zustand.
-#[test]
+#[ctx_test(id = "T-SNAP-1")]
 fn test_snap_purge_under_active_snapshot() {
     let registry = Arc::new(SnapshotRegistry::new());
 

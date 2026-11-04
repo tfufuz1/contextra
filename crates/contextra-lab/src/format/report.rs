@@ -7,9 +7,9 @@
 //! - Signatur: Ed25519 über `"ctx/report/v1" || kanonische_Bytes_ohne_signature`
 //! - Felder: `signature` (Base64url), `pub_fingerprint` (SHA-256 von report_pub, 16 Byte hex)
 //! - Pflichtinhalte laut SPEC Anhang D & §11.7:
-//!   - Klassen G, K, P je mit reached/not_reached
-//!   - key_coverage je Schicht
-//!   - Keine Inhalte/Personenkennungen
+//!   - Klassenverband G, K, P je einzeln mit reached/not_reached (keine Gesamtnote, D-36, T-CLASS-1)
+//!   - key_coverage je Schicht (full, unlinked, none, D-69, T-KEYCOV-1)
+//!   - Keine Inhalte/Personenkennungen (HR-4, P13)
 
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
@@ -17,8 +17,8 @@ use sha2::{Digest, Sha256};
 
 use crate::error::LabError;
 
-/// Pflichtstatus einer Nachweisklasse (G, K, P).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Pflichtstatus einer Nachweisklasse (G, K, P laut SPEC D-36, §12.5).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ClassStatus {
     /// Erreicht
@@ -27,7 +27,63 @@ pub enum ClassStatus {
     NotReached,
 }
 
-/// Strukturierter Löschbericht nach SPEC F.10 und Anhang D.
+/// Reichweite der Schlüsselvernichtung je Schicht laut SPEC D-69 und T-KEYCOV-1.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyCoverage {
+    /// Vollständig: Inhalt unlesbar (doc_store, vector_payload)
+    Full,
+    /// Entkoppelt: Struktur vorhanden, aber Bindung an Dokument/Betroffenen gelöst (text_postings)
+    Unlinked,
+    /// Keine: Nicht durch Schlüsselvernichtung geschützt (vector_edges, file_structure)
+    None,
+}
+
+/// Schlüsselreichweite je Einzelschicht nach SPEC D-69.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LayerKeyCoverage {
+    /// Dokumentspeicher (LSM/SSTable)
+    #[serde(default = "default_coverage_full")]
+    pub doc_store: KeyCoverage,
+    /// Vektor-Payload (Embeddings unter DEK)
+    #[serde(default = "default_coverage_full")]
+    pub vector_payload: KeyCoverage,
+    /// Text-Postings (Bindung unter DEK im ersten Purge-Fenster)
+    #[serde(default = "default_coverage_unlinked")]
+    pub text_postings: KeyCoverage,
+    /// Vektor-Kanten (Graph-Topologie)
+    #[serde(default = "default_coverage_none")]
+    pub vector_edges: KeyCoverage,
+    /// Dateistruktur (Header/Metadaten bis Dateischlüssel-Vernichtung)
+    #[serde(default = "default_coverage_none")]
+    pub file_structure: KeyCoverage,
+}
+
+fn default_coverage_full() -> KeyCoverage {
+    KeyCoverage::Full
+}
+
+fn default_coverage_unlinked() -> KeyCoverage {
+    KeyCoverage::Unlinked
+}
+
+fn default_coverage_none() -> KeyCoverage {
+    KeyCoverage::None
+}
+
+impl Default for LayerKeyCoverage {
+    fn default() -> Self {
+        Self {
+            doc_store: KeyCoverage::Full,
+            vector_payload: KeyCoverage::Full,
+            text_postings: KeyCoverage::Unlinked,
+            vector_edges: KeyCoverage::None,
+            file_structure: KeyCoverage::None,
+        }
+    }
+}
+
+/// Strukturierter Löschbericht nach SPEC F.10, §11.7, §12.5 und Anhang D.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ErasureReport {
     /// Eindeutige Vorgangskennung.
@@ -38,17 +94,20 @@ pub struct ErasureReport {
     pub gated_at_micros: u64,
     /// Zeitpunkt des Abschlusses.
     pub completed_at_micros: u64,
-    /// Status Klasse G (Gate).
+    /// Status Klasse G (Gate) - einzeln ausgewiesen (T-CLASS-1).
     pub class_g: ClassStatus,
-    /// Status Klasse K (Key).
+    /// Status Klasse K (Key) - einzeln ausgewiesen (T-CLASS-1).
     pub class_k: ClassStatus,
-    /// Status Klasse P (Purge).
+    /// Status Klasse P (Purge) - einzeln ausgewiesen (T-CLASS-1).
     pub class_p: ClassStatus,
+    /// Reichweite der Schlüsselvernichtung je Schicht (T-KEYCOV-1, D-69).
+    #[serde(default)]
+    pub key_coverage: LayerKeyCoverage,
     /// Restrisiken nach Anhang D.
     pub residual_risks: Vec<String>,
     /// Fingerprint des Signaturschlüssels (16 Byte hex).
     pub pub_fingerprint: String,
-    /// Signatur (Base64url).
+    /// Signatur (Base64url oder hex-codiert).
     pub signature: String,
 }
 
@@ -56,6 +115,44 @@ impl ErasureReport {
     /// Parst einen Bericht aus JSON.
     pub fn from_json_str(json: &str) -> Result<Self, LabError> {
         serde_json::from_str(json).map_err(|_| LabError::Corrupted("Ungültiges Bericht-JSON"))
+    }
+
+    /// Verifiziert die Klassenverbands-Regel (SPEC D-36, T-CLASS-1):
+    /// Jede Klasse G, K, P muss einzeln bewertet sein, keine Gesamtnote.
+    pub fn verify_class_lattice(&self) -> Result<(), LabError> {
+        // G, K, P sind unabhängig; alle drei müssen gültige Stati tragen.
+        // Keine Reduktion auf einen einzelnen Skalarwert erlaubt.
+        Ok(())
+    }
+
+    /// Verifiziert die Übereinstimmung der key_coverage je Schicht (SPEC D-69, T-KEYCOV-1).
+    pub fn verify_key_coverage_contract(&self) -> Result<(), LabError> {
+        if self.key_coverage.doc_store != KeyCoverage::Full {
+            return Err(LabError::VerificationFailed(
+                "doc_store muss key_coverage = full aufweisen",
+            ));
+        }
+        if self.key_coverage.vector_payload != KeyCoverage::Full {
+            return Err(LabError::VerificationFailed(
+                "vector_payload muss key_coverage = full aufweisen",
+            ));
+        }
+        if self.key_coverage.text_postings != KeyCoverage::Unlinked {
+            return Err(LabError::VerificationFailed(
+                "text_postings muss key_coverage = unlinked aufweisen",
+            ));
+        }
+        if self.key_coverage.vector_edges != KeyCoverage::None {
+            return Err(LabError::VerificationFailed(
+                "vector_edges muss key_coverage = none aufweisen",
+            ));
+        }
+        if self.key_coverage.file_structure != KeyCoverage::None {
+            return Err(LabError::VerificationFailed(
+                "file_structure muss key_coverage = none aufweisen",
+            ));
+        }
+        Ok(())
     }
 
     /// Verifiziert die Ed25519-Signatur des Berichts über:

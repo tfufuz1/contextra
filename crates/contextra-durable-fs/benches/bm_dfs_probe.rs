@@ -87,11 +87,7 @@ fn write_real_bench_report(dir: &Path) {
         .copied()
         .unwrap_or(p50_fsync);
 
-    let throughput = if p50_startup > 0 {
-        1_000_000 / p50_startup
-    } else {
-        1000
-    };
+    let throughput = 1_000_000u64.checked_div(p50_startup).unwrap_or(1000);
 
     let json_content = format!(
         r#"{{
