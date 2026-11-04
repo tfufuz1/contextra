@@ -113,6 +113,52 @@ mod loom_conc_tests {
     }
 
     #[test]
+    fn t_lock_loom_commit_vs_purge_barrier() {
+        // T-LOCK / T-CONC-1: Modellierung des Zusammenspiels von Commit-Barriere und Purge-Barriere
+        // laut SPEC §5.4 und D-127.
+        // Transaktionscommits nehmen CommitBarrier::Shared und PurgeBarrier::Shared.
+        // Purge-Phasen nehmen PurgeBarrier::Exclusive.
+        // Es darf zu keinem Deadlock oder ungültigen Zwischenzustand kommen.
+        loom::model(|| {
+            let commit_barrier = Arc::new(RwLock::new(0));
+            let purge_barrier = Arc::new(RwLock::new(0));
+            let active_commits = Arc::new(AtomicU64::new(0));
+
+            let cb1 = Arc::clone(&commit_barrier);
+            let pb1 = Arc::clone(&purge_barrier);
+            let ac1 = Arc::clone(&active_commits);
+
+            // Thread 1: Transaktionscommit (Shared Commit, Shared Purge)
+            let t1 = thread::spawn(move || {
+                let _c = cb1.read().unwrap();
+                let _p = pb1.read().unwrap();
+                ac1.fetch_add(1, Ordering::SeqCst);
+                // Simulierte Commit-Arbeit
+                ac1.fetch_sub(1, Ordering::SeqCst);
+            });
+
+            let _cb2 = Arc::clone(&commit_barrier);
+            let pb2 = Arc::clone(&purge_barrier);
+            let ac2 = Arc::clone(&active_commits);
+
+            // Thread 2: Purge-Barriere (Exclusive Purge)
+            let t2 = thread::spawn(move || {
+                let _p_exclusive = pb2.write().unwrap();
+                // Wenn Purge Exclusive hält, darf während der exklusiven Phase
+                // kein neuer Commit eintreten.
+                let concurrent_commits = ac2.load(Ordering::SeqCst);
+                assert_eq!(
+                    concurrent_commits, 0,
+                    "Exclusive PurgeBarrier darf keine gleichzeitigen Commits zulassen"
+                );
+            });
+
+            t1.join().unwrap();
+            t2.join().unwrap();
+        });
+    }
+
+    #[test]
     fn t_snap_loom_history_horizon_never_exceeds_active_snapshots() {
         // Purge-Barriere und History-Horizon dürfen niemals über die kleinste aktive Snapshot-Seq gehoben werden.
         loom::model(|| {
@@ -149,6 +195,67 @@ mod loom_conc_tests {
 
             t1.join().unwrap();
             t2.join().unwrap();
+        });
+    }
+
+    #[test]
+    fn t_conc_loom_write_vs_purge_cluster_race() {
+        // Modelliert das Race „Schreiben ↔ Purge desselben Clusters“ (SPEC D-57, D-78).
+        // Invarianten:
+        // 1. Commit-Barriere wird shared (Schreiben) bzw. exclusive (Gate-Aktivierung) gehalten.
+        // 2. Unter der exklusiven Barriere wird der Cluster im ReadGate als 'erased' markiert.
+        // 3. Nach Wiederfreigabe der Barriere weist der Schreiber bei Prüfung des ReadGate
+        //    Schreibversuche in den Cluster deterministisch ab (Erased).
+        loom::model(|| {
+            let commit_barrier = Arc::new(RwLock::new(()));
+            let cluster_gated = Arc::new(loom::sync::atomic::AtomicBool::new(false));
+            let cluster_purged = Arc::new(loom::sync::atomic::AtomicBool::new(false));
+            let write_accepted = Arc::new(loom::sync::atomic::AtomicBool::new(false));
+
+            let cb_writer = Arc::clone(&commit_barrier);
+            let gated_writer = Arc::clone(&cluster_gated);
+            let purged_writer = Arc::clone(&cluster_purged);
+            let accepted_writer = Arc::clone(&write_accepted);
+
+            // Thread 1: Writer / Gruppen-Commit-Phase
+            let writer = thread::spawn(move || {
+                let _permit = cb_writer.read().unwrap();
+                // Leader-Phase: ReadGate prüfen
+                if gated_writer.load(Ordering::Acquire) {
+                    // Abweisung mit Erased
+                    return;
+                }
+                // Schreiben in Cluster
+                assert!(
+                    !purged_writer.load(Ordering::Acquire),
+                    "Schreiben darf niemals in einen physisch gepurgten Cluster gelangen!"
+                );
+                accepted_writer.store(true, Ordering::Release);
+            });
+
+            let cb_eraser = Arc::clone(&commit_barrier);
+            let gated_eraser = Arc::clone(&cluster_gated);
+            let purged_eraser = Arc::clone(&cluster_purged);
+
+            // Thread 2: Erasure / Purge auf demselben Cluster
+            let eraser = thread::spawn(move || {
+                // Phase 1: Gate-Gruppen-Commit mit exklusiver Barriere
+                {
+                    let _exclusive_permit = cb_eraser.write().unwrap();
+                    gated_eraser.store(true, Ordering::Release);
+                }
+                // Phase 2: Physischer Purge des Clusters
+                purged_eraser.store(true, Ordering::Release);
+            });
+
+            writer.join().unwrap();
+            eraser.join().unwrap();
+
+            // Verifikation der Nachbedingung:
+            // Wenn der Schreibzugriff akzeptiert wurde, MUSS er vor der Gate-Aktivierung erfolgt sein.
+            // Der Cluster ist am Ende immer gated und purged.
+            assert!(cluster_gated.load(Ordering::Acquire));
+            assert!(cluster_purged.load(Ordering::Acquire));
         });
     }
 }
