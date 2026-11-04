@@ -82,7 +82,14 @@ fn bench_kdf_default_params(c: &mut Criterion) {
     // D-68 standard: 128 MiB (131072 KiB), t = 3, p = 4
     let params_default = KdfParams::DEFAULT;
     group.bench_function("argon2id_default_128mib_t3_p4", |b| {
-        b.iter(|| derive_kek(black_box(&pass), black_box(&salt), black_box(&params_default)).unwrap());
+        b.iter(|| {
+            derive_kek(
+                black_box(&pass),
+                black_box(&salt),
+                black_box(&params_default),
+            )
+            .unwrap()
+        });
     });
 
     group.finish();

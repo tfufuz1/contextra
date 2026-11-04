@@ -22,6 +22,7 @@ fn workspace_root() -> PathBuf {
     }
 }
 
+/// SPEC: T-UNSAFE-1
 /// T-UNSAFE-1 & SY-01: Prüft, dass unsafe ausschließlich in sys und simd vorkommt
 /// und alle anderen Crates #![forbid(unsafe_code)] erzwingen.
 #[test]
@@ -61,6 +62,7 @@ fn sy_audit_01_t_unsafe_1_workspace_scan() {
     }
 }
 
+/// SPEC: T-UNSAFE-1
 /// SY-01: Jeder unsafe-Block in contextra-sys trägt einen // SAFETY:-Kommentar.
 #[test]
 fn sy_audit_01_each_unsafe_block_has_safety_comment() {
@@ -95,6 +97,7 @@ fn sy_audit_01_each_unsafe_block_has_safety_comment() {
     }
 }
 
+/// SPEC: T-UNSAFE-1
 /// SY-01: Jede pub unsafe fn in contextra-sys hat einen '# Safety'-Abschnitt in der Dokumentation.
 #[test]
 fn sy_audit_01_pub_unsafe_fn_has_safety_doc() {
@@ -129,6 +132,7 @@ fn sy_audit_01_pub_unsafe_fn_has_safety_doc() {
     }
 }
 
+/// SPEC: T-UNSAFE-1
 /// SY-02: Kein Crate mit forbid(unsafe_code) ruft eine unsafe fn aus contextra-sys auf.
 #[test]
 fn sy_audit_02_no_forbid_crate_calls_unsafe_fn_from_sys() {
@@ -145,6 +149,7 @@ fn sy_audit_02_no_forbid_crate_calls_unsafe_fn_from_sys() {
     }
 }
 
+/// SPEC: T-UNSAFE-1
 /// Drift-Prüfung Quelltext vs. docs/unsafe-register.md
 #[test]
 fn sy_audit_01_unsafe_register_drift_check() {

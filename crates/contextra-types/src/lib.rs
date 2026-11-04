@@ -16,21 +16,16 @@
 
 pub mod erasure;
 pub mod error;
-pub mod error_dto;
 pub mod file;
 pub mod filter;
 pub mod ids;
 pub mod key;
 pub mod labels;
 pub mod limits;
-pub mod model_fingerprint;
 pub mod refs;
-pub mod retrieval_strategy;
-pub mod schema;
 pub mod secret;
 pub mod tags;
 pub mod tenant_scope;
-pub mod tombstone;
 pub mod types;
 
 pub use erasure::{
@@ -43,7 +38,6 @@ pub use error::{
     CacheDirective, ConfigError, Conflict, ContextraError, Error, HnswDeletionError, Limit, Result,
     StepId,
 };
-pub use error_dto::ContextraErrorDto;
 pub use file::{AlgIds, FileKind, FormatVersion};
 pub use filter::FilterExpr;
 pub use ids::{ErasureId, FileId, GateId, Seq, StoreId, Timestamp};
@@ -60,24 +54,17 @@ pub use limits::{
     MAX_DIMENSION, MAX_DOCS_PER_STORE, MAX_DOC_BYTES_DEFAULT, MAX_DOC_BYTES_HARD, MAX_K,
     MAX_QUERY_TERMS, MAX_SNAPSHOTS_PER_TENANT,
 };
-pub use model_fingerprint::ModelFingerprint;
 pub use refs::{
     CollectionRef, DocHandle, DocKey, DocRef, OperatorRef, SubjectRef, TenantContext, TenantRef,
     MAX_REF_LEN,
 };
-pub use retrieval_strategy::RetrievalStrategy;
-pub use schema::{DocIdWidth, ManifestSchemaVersion};
 pub use secret::Secret;
 pub use tags::{ClusterTag, CollTag, DocTag, NameTag, SubjectTag, TagPreimage, TenantTag, TermTag};
 pub use tenant_scope::{TenantScopeViolation, TenantScoped};
-pub use tombstone::{SeqBitTombstone, TombstoneSemanticsCheck};
 pub use types::{
-    budget, domain, importance, saos, AutoExtractionMode, BudgetStrategy, CollectionId,
-    ConfigFingerprint, ContextChunk, ContextWindow, DecayFunction, DistanceMetric, DocId, Edge,
-    Embedding, Entity, EntityId, FusionStrategy, FusionWeights, GraphTraversalStrategy,
-    HybridQuery, HybridQueryBuilder, ImportanceScore, LinkRelation, MemoryImportance, MemoryLink,
-    MemoryType, OnSignalFailure, PprAlgorithm, PprConfig, QueryOptions, QueryOptionsBuilder,
-    QueryRewriteOutput, RerankResult, Reservation, ResourceBudget, ResourceTracker, ScoredDocument,
-    ScoredEntry, Signal, SignalFusionStrategies, TenantId, TlHfdParams, TokenBudget, TxId,
-    WorkflowState, EXPIRY_METADATA_KEY, MAX_SEARCH_K, TOMBSTONE_BIT,
+    budget, domain, importance, AutoExtractionMode, CollectionId, ConfigFingerprint, DecayFunction,
+    DistanceMetric, DocId, Edge, Embedding, Entity, EntityId, ImportanceScore, LinkRelation,
+    MemoryImportance, MemoryLink, MemoryType, PprAlgorithm, PprConfig, ResourceBudget,
+    ResourceTracker, ScoredDocument, TenantId, TlHfdParams, TxId, WorkflowState,
+    EXPIRY_METADATA_KEY, MAX_SEARCH_K, TOMBSTONE_BIT,
 };

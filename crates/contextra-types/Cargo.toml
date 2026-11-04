@@ -13,8 +13,6 @@ description = "Reine Datentypen: IDs, Tags, Schlüssel, Fehler, Löschtypen. Kei
 ring = "0"
 
 [features]
-# Deprecated feature flags retained as no-op stubs during workspace migration.
-# Will be fully pruned per WP-1.2 / D-84.
 docid-128 = []
 auto-extraction-opt-out = []
 
@@ -27,3 +25,6 @@ bincode = { workspace = true }
 blake3 = { workspace = true }
 ahash = { workspace = true }
 sha2 = "0.10"
+
+[dev-dependencies]
+proptest = "1.4"

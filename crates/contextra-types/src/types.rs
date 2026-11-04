@@ -9,38 +9,20 @@
 //! - `importance`: Relevanzbewertung und zeitlicher Verfall (Decay) von Erinnerungen.
 //! - `saos`: Einheitliche 4-Signal-Suchabfragestrukturen (Semantik, BM25-Text, Graph, Recency).
 
-// ANCHOR[contextra-types:TYPES-BUDGET]
 /// Memory and token resource budget management types.
-// ANCHOR[contextra-types:MOD-BUDGET]
 pub mod budget;
-// ANCHOR[contextra-types:TYPES-DOMAIN]
 /// Fundamental domain models (`DocId`, `TxId`, `Entity`, `DistanceMetric`, etc.).
-// ANCHOR[contextra-types:MOD-DOMAIN]
 pub mod domain;
-// ANCHOR[contextra-types:TYPES-FILTER]
 /// Structured metadata expression filter types.
-// ANCHOR[contextra-types:MOD-FILTER]
-pub mod filter;
-// ANCHOR[contextra-types:TYPES-IMPORTANCE]
 /// Memory importance and recency decay scoring types.
-// ANCHOR[contextra-types:MOD-IMPORTANCE]
 pub mod importance;
-// ANCHOR[contextra-types:TYPES-SAOS]
+pub use crate::filter::FilterExpr;
 /// Unified 4-signal search query and context types.
-// ANCHOR[contextra-types:MOD-SAOS]
-pub mod saos;
-
-pub use budget::{BudgetStrategy, Reservation, ResourceBudget, ResourceTracker, TokenBudget};
+pub use budget::{ResourceBudget, ResourceTracker};
 pub use domain::{
     AutoExtractionMode, CollectionId, ConfigFingerprint, DistanceMetric, DocId, Edge, Embedding,
     Entity, EntityId, LinkRelation, MemoryLink, MemoryType, PprAlgorithm, PprConfig, RerankResult,
     ScoredDocument, TenantId, TlHfdParams, TxId, WorkflowState, EXPIRY_METADATA_KEY, MAX_SEARCH_K,
     TOMBSTONE_BIT,
 };
-pub use filter::FilterExpr;
 pub use importance::{DecayFunction, ImportanceScore, MemoryImportance};
-pub use saos::{
-    ContextChunk, ContextWindow, FusionStrategy, FusionWeights, GraphTraversalStrategy,
-    HybridQuery, HybridQueryBuilder, OnSignalFailure, QueryOptions, QueryOptionsBuilder,
-    QueryRewriteOutput, ScoredEntry, Signal, SignalFusionStrategies,
-};

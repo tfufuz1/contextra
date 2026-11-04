@@ -70,7 +70,7 @@ fn po_04_record_sealer_and_file_keyring_dyn_compatible() {
 #[tokio::test]
 async fn po_06_file_keyring_destroy_contract() {
     let keyring = MockFileKeyring;
-    let file_id = FileId::new(42);
+    let file_id = FileId::new([42u8; 16]);
     let res = keyring.destroy(file_id).await;
     assert!(res.is_ok());
 }
@@ -78,7 +78,7 @@ async fn po_06_file_keyring_destroy_contract() {
 #[test]
 fn po_08_file_key_no_debug_leak() {
     let secret_bytes = vec![0xDE, 0xAD, 0xBE, 0xEF];
-    let file_key = FileKey::new(secret_bytes, FileId::new(1));
+    let file_key = FileKey::new(secret_bytes, FileId::new([1u8; 16]));
     let debug_output = format!("{:?}", file_key);
 
     assert!(!debug_output.contains("DEADBEEF"));

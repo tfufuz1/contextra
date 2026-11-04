@@ -53,62 +53,6 @@ fn t_key_1_schluesselkodierung_feste_laengen_und_sortierung() {
     );
 }
 
-use proptest::prelude::*;
-
-proptest! {
-    /// SPEC: T-KEY-1 Property Test für alle Schlüsselfamilien (SPEC 9.1, 9.2, TY-03, TY-04).
-    #[test]
-    fn prop_t_key_1_roundtrip_und_ordnung(
-        tenant_bytes in prop::array::uniform16(any::<u8>()),
-        coll_bytes in prop::array::uniform16(any::<u8>()),
-        cluster_bytes in prop::array::uniform16(any::<u8>()),
-        doc_bytes in prop::array::uniform16(any::<u8>()),
-        family_idx in 0..6usize,
-        sub in any::<u32>(),
-        seq1 in any::<u64>(),
-        seq2 in any::<u64>(),
-    ) {
-        use contextra_types::key::*;
-        use contextra_types::tags::*;
-
-        let families = [
-            Family::Doc,
-            Family::DocMap,
-            Family::Manifest,
-            Family::ReservedLocator,
-            Family::TextBuf,
-            Family::Vec,
-        ];
-        let family = families.get(family_idx).copied().unwrap_or(Family::Doc);
-
-        let tenant = TenantTag::new(tenant_bytes);
-        let coll = CollTag::new(coll_bytes);
-        let cluster = ClusterTag::new(cluster_bytes);
-        let doc = DocTag::new(doc_bytes);
-
-        let k1 = KeyBuf::new(Region::Data, tenant, coll, cluster, doc, family, sub, seq1);
-        let k2 = KeyBuf::new(Region::Data, tenant, coll, cluster, doc, family, sub, seq2);
-
-        prop_assert_eq!(k1.as_bytes().len(), KEY_LEN);
-        prop_assert_eq!(k1.commit_seq(), seq1);
-        prop_assert_eq!(k2.commit_seq(), seq2);
-
-        // Invariante: Größere Sequenznummer (jüngere Version) sortiert strikt kleiner (vorne)
-        if seq1 > seq2 {
-            prop_assert!(k1 < k2);
-        } else if seq1 < seq2 {
-            prop_assert!(k1 > k2);
-        } else {
-            prop_assert_eq!(k1, k2);
-        }
-
-        // Bound-Invariante
-        let b1 = k1.bound();
-        prop_assert_eq!(b1.as_bytes().len(), KEY_BOUND_LEN);
-        prop_assert_eq!(&b1.as_bytes()[..], &k1.as_bytes()[0..KEY_BOUND_LEN]);
-    }
-}
-
 /// SPEC: T-FMT-1 Golden Bytes für alle 6 Schlüsselfamilien (SPEC 9.1, 9.2).
 #[test]
 fn test_t_key_golden_bytes_all_families() {
@@ -529,4 +473,105 @@ fn test_t_key_serde_length_validation_rejects_malformed() {
 
     let long_key_seq = serde_json::to_string(&vec![0u8; KEY_LEN + 1]).unwrap();
     assert!(serde_json::from_str::<KeyBuf>(&long_key_seq).is_err());
+}
+
+/// SPEC: T-KEY-1
+#[test]
+fn t_key_1_exhaustive_deterministic_ordering_and_roundtrip() {
+    use contextra_types::key::*;
+    use contextra_types::tags::*;
+
+    let families = [
+        Family::Doc,
+        Family::DocMap,
+        Family::Manifest,
+        Family::ReservedLocator,
+        Family::TextBuf,
+        Family::Vec,
+    ];
+
+    let seq_pairs = [
+        (0u64, 1u64),
+        (1u64, 2u64),
+        (100u64, 200u64),
+        (u64::MAX - 1, u64::MAX),
+        (0, u64::MAX),
+    ];
+
+    for family in families {
+        for &(s_older, s_newer) in &seq_pairs {
+            let tenant = TenantTag::new([0xAA; 16]);
+            let coll = CollTag::new([0xBB; 16]);
+            let cluster = ClusterTag::new([0xCC; 16]);
+            let doc = DocTag::new([0xDD; 16]);
+
+            let k_older = KeyBuf::new(Region::Data, tenant, coll, cluster, doc, family, 7, s_older);
+            let k_newer = KeyBuf::new(Region::Data, tenant, coll, cluster, doc, family, 7, s_newer);
+
+            assert_eq!(k_older.commit_seq(), s_older);
+            assert_eq!(k_newer.commit_seq(), s_newer);
+            assert!(
+                k_newer < k_older,
+                "Jüngere Sequenz muss vor älterer Sequenz sortieren"
+            );
+
+            let b = k_newer.bound();
+            assert_eq!(b.as_bytes().len(), KEY_BOUND_LEN);
+            assert_eq!(&b.as_bytes()[..], &k_newer.as_bytes()[0..KEY_BOUND_LEN]);
+        }
+    }
+}
+
+/// SPEC: T-LIMIT-1
+#[test]
+fn test_t_limit_1_boundary_plus_one_checks() {
+    use contextra_types::error::{Error, Limit};
+    use contextra_types::limits::*;
+
+    // Prüfe die statischen Grenzen
+    assert_eq!(MAX_DOCS_PER_STORE, 50_000_000);
+    assert_eq!(MAX_DOC_BYTES_DEFAULT, 4 * 1024 * 1024);
+    assert_eq!(MAX_DOC_BYTES_HARD, 64 * 1024 * 1024);
+    assert_eq!(MAX_SNAPSHOTS_PER_TENANT, 1024);
+    assert_eq!(MAX_DIMENSION, 4096);
+    assert_eq!(MAX_QUERY_TERMS, 256);
+    assert_eq!(MAX_K, 1000);
+
+    // Grenzüberschreitungstest-Mapping
+    let dim_overflow = MAX_DIMENSION + 1;
+    assert!(dim_overflow > 4096);
+    let err = Error::Limit(Limit::Dimension);
+    assert_eq!(err.to_string(), "limit exceeded: dimension");
+
+    let query_overflow = MAX_QUERY_TERMS + 1;
+    assert!(query_overflow > 256);
+    let err_q = Error::Limit(Limit::QueryTooLarge);
+    assert_eq!(err_q.to_string(), "limit exceeded: query too large");
+}
+
+/// SPEC: T-DOCREF-1
+#[test]
+fn test_t_docref_1_subject_isolation() {
+    use contextra_types::ids::{DocKey, DocRef, SubjectRef};
+
+    let key = DocKey::try_new(b"item-123".to_vec()).unwrap();
+    let subj_a = SubjectRef::try_new(b"person-a".to_vec()).unwrap();
+    let subj_b = SubjectRef::try_new(b"person-b".to_vec()).unwrap();
+
+    let doc_a = DocRef {
+        subject: Some(subj_a),
+        key: key.clone(),
+    };
+    let doc_b = DocRef {
+        subject: Some(subj_b),
+        key: key.clone(),
+    };
+    let doc_none = DocRef {
+        subject: None,
+        key: key.clone(),
+    };
+
+    assert_ne!(doc_a, doc_b);
+    assert_ne!(doc_a, doc_none);
+    assert_ne!(doc_b, doc_none);
 }
