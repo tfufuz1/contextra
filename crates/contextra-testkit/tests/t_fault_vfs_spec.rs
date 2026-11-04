@@ -305,3 +305,80 @@ fn test_fault_vfs_soak_driver_ci_smoke() -> Result<(), Box<dyn std::error::Error
 
     Ok(())
 }
+
+// ============================================================================
+// MOVED UNIT TESTS FROM FAULT_VFS
+// ============================================================================
+
+/// SPEC: T-FSYNC-1
+#[test]
+fn test_fault_vfs_write_limit() {
+    let vfs = FaultVfs::new();
+    vfs.set_config(FaultConfig {
+        fail_writes_after: Some(2),
+        ..Default::default()
+    });
+
+    let p1 = Path::new("file1.txt");
+    let p2 = Path::new("file2.txt");
+    let p3 = Path::new("file3.txt");
+
+    assert!(vfs.write_file(p1, b"hello").is_ok());
+    assert!(vfs.write_file(p2, b"world").is_ok());
+    let res3 = vfs.write_file(p3, b"fail");
+    assert!(matches!(res3, Err(e) if e.kind() == std::io::ErrorKind::WriteZero));
+}
+
+/// SPEC: T-FSYNC-1
+#[test]
+fn test_fault_vfs_sync_failure() {
+    let vfs = FaultVfs::new();
+    vfs.set_config(FaultConfig {
+        fail_syncs_after: Some(1),
+        ..Default::default()
+    });
+
+    assert!(vfs.sync().is_ok());
+    assert!(vfs.sync().is_err());
+}
+
+/// SPEC: T-FSYNC-1
+#[test]
+fn test_fault_vfs_vfs_trait_contract() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let vfs = FaultVfs::new();
+    let base_dir = Path::new("/var/data");
+    vfs.create_dir_all(base_dir)?;
+
+    let file_path = base_dir.join("test.wal");
+    vfs.write_atomic(&file_path, b"test-payload")?;
+    assert!(vfs.exists(&file_path)?);
+    assert_eq!(vfs.len(&file_path)?, 12);
+
+    let data = vfs.read(&file_path)?;
+    assert_eq!(data, b"test-payload");
+
+    let entries = vfs.list_dir(base_dir)?;
+    assert_eq!(entries, vec!["test.wal".to_string()]);
+
+    vfs.sync_dir(base_dir)?;
+    vfs.remove_file(&file_path)?;
+    assert!(!vfs.exists(&file_path)?);
+    Ok(())
+}
+
+/// SPEC: T-FSYNC-1
+#[test]
+fn test_fault_vfs_crash_matrix_iteration() {
+    let outcomes = FaultVfs::for_each_crash_point(|vfs, crash_idx| {
+        let path = Path::new("/data/matrix.log");
+        let res = vfs.write_atomic(path, b"matrix-entry");
+        (crash_idx, res.is_ok())
+    });
+
+    assert!(!outcomes.is_empty());
+    let first = outcomes.first();
+    assert!(matches!(first, Some((0, (_, false)))));
+
+    let last = outcomes.last();
+    assert!(matches!(last, Some((_, (_, true)))));
+}
