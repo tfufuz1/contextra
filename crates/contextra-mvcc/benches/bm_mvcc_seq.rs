@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:BENCH-SEQ]
 //! # Criterion-Benchmarks für SeqAllocator und TxBuffer
 //!
 //! Benchmarks:

@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:BENCH-SSI-ROOT]
 //! # Benchmark BM-MVCC-SSI-VALIDATE
 //!
 //! Benchmark für die SSI-Validierung (`SequenceLogSsiValidator::validate`):
