@@ -41,17 +41,17 @@ use contextra_ports::{
 #[cfg(not(loom))]
 use contextra_store::LsmStorage;
 #[cfg(not(loom))]
-use contextra_text::inverted::InvertedIndex;
-#[cfg(not(loom))]
 use contextra_text::Language;
+#[cfg(not(loom))]
+use contextra_text::inverted::InvertedIndex;
 use contextra_types::{DocId, Result, TxId};
 #[cfg(not(loom))]
 use contextra_vector::HnswIndex;
 use serde::{Deserialize, Serialize};
 #[cfg(not(loom))]
-use std::sync::atomic::{AtomicBool, AtomicU64};
-#[cfg(not(loom))]
 use std::sync::Arc;
+#[cfg(not(loom))]
+use std::sync::atomic::{AtomicBool, AtomicU64};
 
 /// Configuration for a collection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -628,23 +628,5 @@ impl<S: StorageEngine, V: VectorIndex> Collection<S, V> {
     /// Loads text index statistics from storage.
     pub async fn load_text_stats(&self) -> Result<()> {
         self.text_index.load_stats().await
-    }
-
-    /// Setzt den Schwellenwert für die automatische Community-Erkennung (Stub/No-Op).
-    pub fn set_community_detection_trigger_threshold(&self, _threshold: u64) {}
-
-    /// Builder-Methode zum Setzen des Schwellenwerts für die Community-Erkennung (Stub/No-Op).
-    pub fn with_community_detection_trigger_threshold(self, _threshold: u64) -> Self {
-        self
-    }
-
-    /// Liefert den aktuellen Schwellenwert für die Community-Erkennung (gibt 0 zurück).
-    pub fn community_detection_trigger_threshold(&self) -> u64 {
-        0
-    }
-
-    /// Liefert die Anzahl der Mutationen seit dem letzten Community-Erkennungslauf (gibt 0 zurück).
-    pub fn mutations_since_community_detection(&self) -> u64 {
-        0
     }
 }

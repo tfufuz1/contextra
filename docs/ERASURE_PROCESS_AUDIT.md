@@ -1,7 +1,7 @@
 # Technischer Auditbericht: Löschprozesse & Schichtmodell
 
 > **Rolle:** Leitender Ingenieur für technische Löschprozesse mit Datenschutzrecht-Verständnis (Art. 5 Abs. 2, 17, 25, 32 DSGVO; keine Rechtsberatung).
-> **Normative Grundlage:** `docs/SPEC.md` v4.3.0 (insb. §§ 6, 11, 12, 13, 16 und Anhänge B, D, F).
+> **Normative Grundlage:** `docs/SPEC.md` v (insb. §§ 6, 11, 12, 13, 16 und Anhänge B, D, F).
 > **Prüfstand:** Workspace HEAD (Stand: 2026-11-02).
 > **Evidenz-Prinzip:** Aussagen sind EV0 bis zum Beleg durch Quelltext (EV1) und lokale Ausführung (EV2). Zero-Trust: Fehlende Schichten gelten als „nicht erfasst“.
 

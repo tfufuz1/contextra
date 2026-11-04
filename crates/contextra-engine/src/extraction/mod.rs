@@ -21,7 +21,7 @@ pub mod tests;
 pub mod types;
 
 pub use open_ie::extract_triples;
-pub use rule_based::{RuleBasedExtractor, MAX_EXTRACTION_TEXT_LENGTH};
+pub use rule_based::{MAX_EXTRACTION_TEXT_LENGTH, RuleBasedExtractor};
 pub use types::{EntityExtractionConfig, ExtractedTriple, ExtractorMode};
 
 use contextra_ports::{BoxFuture, LlmTextGenerator};
@@ -50,12 +50,12 @@ impl EntityExtractor for OpenIeExtractor {
         config: &'a EntityExtractionConfig,
     ) -> BoxFuture<'a, Result<Vec<ExtractedTriple>>> {
         Box::pin(async move {
-            let gen = generator.ok_or_else(|| {
+            let r#gen = generator.ok_or_else(|| {
                 ContextraError::InvalidInput(
                     "LlmTextGenerator missing for OpenIeExtractor".to_string(),
                 )
             })?;
-            open_ie::extract_triples(text, gen, config).await
+            open_ie::extract_triples(text, r#gen, config).await
         })
     }
 }

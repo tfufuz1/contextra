@@ -122,12 +122,7 @@ impl ParsedTextTarget {
                 return ParsedTextTarget::Document(DocId::from(id));
             }
         }
-        #[cfg(not(feature = "docid-128"))]
         if let Ok(id) = target_id.parse::<u64>() {
-            return ParsedTextTarget::Document(DocId::from(id));
-        }
-        #[cfg(feature = "docid-128")]
-        if let Ok(id) = target_id.parse::<u128>() {
             return ParsedTextTarget::Document(DocId::from(id));
         }
         ParsedTextTarget::Collection(target_id.to_string())

@@ -1,6 +1,6 @@
 # Contextra – Ablauf einer Jules-Sitzung
 
-Nicht normativ. Maßgeblich: [`docs/SPEC.md`](../../docs/SPEC.md) (Version 4.3.0). Repository: `tfufuz1/contextra`.
+Nicht normativ. Maßgeblich: [`docs/SPEC.md`](../../docs/SPEC.md) . Repository: `tfufuz1/contextra`.
 
 Die Sitzung läuft ohne Unterbrechung, bis die Arbeitsliste abgearbeitet oder ein Stopp nach `PREAMBLE.md`, Abschnitt B, eingetreten ist. Sobald der Implementierungsplan erstellt ist, führt Jules alle Schritte pausenlos und selbstständig aus. Es erfolgen keine Rückfragen an den Nutzer, keine Unterbrechungen zur Einholung von Zwischenbestätigungen und keine Pausen. Die Arbeitsliste im Repository ist die Quelle der Wahrheit. GitHub-Issues sind eine optionale Ergänzung und keine Voraussetzung.
 

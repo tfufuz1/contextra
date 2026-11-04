@@ -46,7 +46,7 @@ pub use compute_pool::ComputePool;
 #[cfg(feature = "experimental-diskann")]
 pub use diskann::{DiskAnnConfig, DiskAnnFallbackPolicy, DiskAnnIndex};
 pub use hnsw::{DeletionStats, GhostFreeVectorIndex, HnswConfig, HnswIndex, RebuildStatus};
-pub use persistence::{HnswHeader, MmapIndex};
+pub use persistence::{BufferIndex, HnswHeader};
 pub use quantize::ScalarQuantizer;
 #[cfg(feature = "experimental-rabitq")]
 pub use quantize_rabitq::RaBitQQuantizer;

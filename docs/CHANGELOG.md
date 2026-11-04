@@ -19,7 +19,7 @@ Dieses Dokument verzeichnet Änderungen am Projekt. Normativ ist [`SPEC.md`](SPE
 - Alle 40 Markdown-Dateien unter `.agents/` überarbeitet. Die Sitzungsprotokolle `JULES_LOG.md` und `JULES_LOG_2.md` sind auf einen Hinweis reduziert; der Inhalt bleibt in der Git-Historie.
 - Fehlende Workflows und Pfade in den Agentendokumenten korrigiert (`mutation-testing.yml`, `post-merge-verification.yml`, `tests/layering.rs`, `.jules/`).
 
-- SPEC auf **4.3.0** aktualisiert (Anhang H.0). D-92 (Löschen von Folgedokumenten) entfällt; die Folgedokumente werden gepflegt (D-98). Der Test T-DOC-1 prüft ihre Konsistenz mit der SPEC.
+- SPEC auf **** aktualisiert (Anhang H.0). D-92 (Löschen von Folgedokumenten) entfällt; die Folgedokumente werden gepflegt (D-98). Der Test T-DOC-1 prüft ihre Konsistenz mit der SPEC.
 - `docs/SOURCE_OF_TRUTH.md` führt den Pflegestand statt einer Löschliste.
 
 ### Bekannter Ist-Zustand (kein Release)

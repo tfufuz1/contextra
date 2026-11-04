@@ -76,7 +76,7 @@ pub fn flush_file_sync(file: &File, kind: FlushKind) -> std::result::Result<(), 
     {
         loop {
             // SAFETY: `fd` ist ein gültiger, geöffneter Dateideskriptor aus `file.as_raw_fd()`.
-            // Die Deskriptorlebensdauer wird durch die unveränderliche Referenz `&File` garantiert.
+            // Die Deskriptorlebensdauer ist durch die unveränderliche Referenz `&File` gesichert.
             let res = unsafe {
                 match kind {
                     FlushKind::Data | FlushKind::DataOnly => libc::fdatasync(fd),

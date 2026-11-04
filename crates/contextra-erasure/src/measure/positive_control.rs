@@ -22,7 +22,9 @@ pub fn run_positive_control(pattern: &[u8]) -> Option<ControlEvidence> {
     let prefix_noise = blake3::hash(b"ctx/positive-control/prefix-noise");
     let suffix_noise = blake3::hash(b"ctx/positive-control/suffix-noise");
 
-    let mut scratch = Vec::with_capacity(prefix_noise.as_bytes().len() + pattern.len() + suffix_noise.as_bytes().len());
+    let mut scratch = Vec::with_capacity(
+        prefix_noise.as_bytes().len() + pattern.len() + suffix_noise.as_bytes().len(),
+    );
     scratch.extend_from_slice(prefix_noise.as_bytes());
     let pattern_offset = scratch.len();
     scratch.extend_from_slice(pattern);

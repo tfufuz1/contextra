@@ -21,7 +21,7 @@ use contextra_types::{ContextraError, Result};
 
 // ANCHOR[contextra-text:BM25-001]
 /// Standard-k1-Parameter für die Termfrequenz-Sättigung in BM25 (1.5).
-pub const BM25_K1: f32 = 1.5;
+pub const BM25_K1: f32 = 1.2;
 
 // ANCHOR[contextra-text:BM25-002]
 /// Standard-b-Parameter für die Dokumentlängen-Normalisierung in BM25 (0.75).
@@ -363,7 +363,7 @@ mod tests {
     #[test]
     fn test_bm25_default() {
         let default_bm25 = BM25::default();
-        assert_eq!(default_bm25.k1, 1.5);
+        assert_eq!(default_bm25.k1, 1.2);
         assert_eq!(default_bm25.b, 0.75);
     }
 

@@ -11,7 +11,7 @@
 //! - Handle-Poisoning atomar: Fehler bei I/O oder fsync vergiften das Dateihandle (`RealFile`) dauerhaft (DF-03, INV-FSYNC-1).
 //! - Dateirechte: Verzeichnisse erzwingen Modus `0700`, Datendateien erzwingen Modus `0600`.
 
-use contextra_ports::vfs::{Vfs, VfsFile, VfsOpenOptions};
+use contextra_ports::vfs::{VerifiedVia, Vfs, VfsFile, VfsOpenOptions};
 use contextra_ports::{ContextraError, Result};
 use contextra_sys::{flush_dir, flush_file, rename_durable, FlushKind};
 use std::fs::{self, File, OpenOptions};
@@ -84,6 +84,14 @@ impl VfsFile for RealFile {
             file.read(buf)
         })();
         self.poison_on_err(res)
+    }
+
+    fn read_verified(&self, offset: u64, len: usize) -> std::io::Result<(Vec<u8>, VerifiedVia)> {
+        self.check_not_poisoned()?;
+        let mut buf = vec![0u8; len];
+        let n = self.read_at(&mut buf, offset)?;
+        buf.truncate(n);
+        Ok((buf, VerifiedVia::Cached))
     }
 
     fn write_at(&self, buf: &[u8], offset: u64) -> std::io::Result<usize> {
@@ -196,6 +204,21 @@ impl Vfs for RealVfs {
         Ok(Box::new(RealFile::new(file)))
     }
 
+    fn read_at(&self, path: &Path, offset: u64, buf: &mut [u8]) -> Result<usize> {
+        let file = self.open(path, &VfsOpenOptions::read_only())?;
+        file.read_at(buf, offset).map_err(ContextraError::Io)
+    }
+
+    fn read_verified(
+        &self,
+        path: &Path,
+        offset: u64,
+        len: usize,
+    ) -> Result<(Vec<u8>, VerifiedVia)> {
+        let file = self.open(path, &VfsOpenOptions::read_only())?;
+        file.read_verified(offset, len).map_err(ContextraError::Io)
+    }
+
     fn read(&self, path: &Path) -> Result<Vec<u8>> {
         if !path.exists() {
             return Err(ContextraError::NotFound("file not found".to_string()));
@@ -288,6 +311,20 @@ impl Vfs for RealVfs {
         Ok(())
     }
 
+    fn unlink(&self, path: &Path) -> Result<()> {
+        self.remove_file(path)
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> Result<()> {
+        rename_durable(from, to).map_err(ContextraError::Io)?;
+        if let Some(parent) = to.parent() {
+            if parent.exists() {
+                flush_dir(parent).map_err(ContextraError::Io)?;
+            }
+        }
+        Ok(())
+    }
+
     fn exists(&self, path: &Path) -> Result<bool> {
         Ok(path.exists())
     }
@@ -318,6 +355,10 @@ impl Vfs for RealVfs {
         }
         names.sort();
         Ok(names)
+    }
+
+    fn list(&self, path: &Path) -> Result<Vec<String>> {
+        self.list_dir(path)
     }
 
     fn sync_dir(&self, path: &Path) -> Result<()> {

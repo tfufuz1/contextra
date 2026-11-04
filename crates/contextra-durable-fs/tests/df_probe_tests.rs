@@ -257,15 +257,31 @@ fn test_t_plat_1_verdict_truth_table_refused_filesystems() {
         ProbeVerdict::Refused(UnsupportedFilesystem::Windows)
     );
 
-    // Unknown
+    // Unknown filesystem type (z. B. unbekannte Mounts, dm/md/LVM ohne Erkennung)
     let probe_unknown = FsProbe {
         detected_fs: DetectedFs::Unknown,
+        rotational: None, // Fehlerfall: Rotationsstatus unbekannt
         ..base.clone()
     };
     assert_eq!(
         verdict(&probe_unknown),
-        ProbeVerdict::Refused(UnsupportedFilesystem::Unknown)
+        ProbeVerdict::Refused(UnsupportedFilesystem::Unknown),
+        "Unknown filesystem must be refused with Refused(Unknown)"
     );
+
+    // Unterstütztes ext4 Dateisystem, aber rotational = None (unbekannt bei Device-Mapper/LVM)
+    let probe_ext4_unknown_rot = FsProbe {
+        detected_fs: DetectedFs::Ext4,
+        rotational: None, // Medium-Art unbekannt
+        ..base.clone()
+    };
+    if cfg!(target_os = "linux") {
+        assert_eq!(
+            verdict(&probe_ext4_unknown_rot),
+            ProbeVerdict::Supported(Tier::Tier1),
+            "Tier 1 supported on Linux ext4 even if rotational status is unknown (defaults to conservative no-op for scrub)"
+        );
+    }
 
     // Broken atomic rename
     let probe_broken_rename = FsProbe {

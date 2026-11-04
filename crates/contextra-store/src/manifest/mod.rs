@@ -12,8 +12,8 @@ mod rollover;
 #[cfg(test)]
 mod tests;
 
-pub use core::Manifest;
-pub use entry::ManifestEntry;
+pub use core::{Manifest, ManifestIntervalIndex, TextCommitInfo, WalFloor};
+pub use entry::{ManifestEntry, OP_TAG_SST_SWAP, OP_TAG_TEXT_COMMIT, OP_TAG_WAL_FLOOR};
 
 /// Maximum allowed payload size for a single manifest entry (1 MB).
 pub const MAX_MANIFEST_ENTRY_SIZE: u32 = 1024 * 1024;

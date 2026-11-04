@@ -1,20 +1,19 @@
 //! Journal für Saga-Zustände (SPEC §11.6, ER-29, F.9).
 
-pub use crate::saga::SagaState;
-use serde::{Deserialize, Serialize};
+pub mod appendlog;
+pub mod epoch;
+pub mod record;
+pub mod reduce;
 
-/// Ein Eintrag im Löschjournal.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct JournalEntry {
-    /// Löschungs-ID
-    pub erasure_id: [u8; 16],
-    /// Erreichter Saga-Zustand
-    pub state: SagaState,
-    /// Zeitstempel in Mikrosekunden
-    pub timestamp: u64,
-    /// Commitment-Hash
-    pub commit_hash: [u8; 32],
-}
+pub use crate::saga::SagaState;
+pub use appendlog::AppendLog;
+pub use epoch::Epoch;
+pub use record::JournalEntry;
+pub use reduce::reduce;
+
+use crate::saga::EraseSaga;
+use contextra_types::ids::ErasureId;
+use std::collections::BTreeMap;
 
 /// In-Memory-Abstraktion des Journals (Appendlog nach F.9).
 #[derive(Debug, Default)]
@@ -38,5 +37,24 @@ impl ErasureJournal {
     /// Gibt alle Einträge zurück.
     pub fn entries(&self) -> &[JournalEntry] {
         &self.entries
+    }
+
+    /// Rekonstruiert den Zustand aller noch nicht abgeschlossenen Sagas aus dem Journal (SPEC §11.2, §11.6).
+    ///
+    /// Jede nicht-vollendete Löschung (nicht `Completed` oder `Refused`) wird zurückgegeben,
+    /// damit sie beim nächsten Schritt fortgesetzt werden kann.
+    pub fn recover_open_sagas(&self) -> Vec<EraseSaga> {
+        let mut latest_state: BTreeMap<[u8; 16], (SagaState, u64)> = BTreeMap::new();
+        for e in &self.entries {
+            latest_state.insert(e.erasure_id, (e.state, e.timestamp));
+        }
+
+        let mut recovered = Vec::new();
+        for (id_bytes, (state, _ts)) in latest_state {
+            if !state.is_terminal() {
+                recovered.push(EraseSaga::with_state(ErasureId::new(id_bytes), state));
+            }
+        }
+        recovered
     }
 }

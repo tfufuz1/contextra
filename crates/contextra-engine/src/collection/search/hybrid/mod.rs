@@ -10,7 +10,7 @@
 
 mod query;
 
-use super::{extract_effective_importance, Collection};
+use super::{Collection, extract_effective_importance};
 use contextra_ports::{Reranker, StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{DocId, Result, TxId};
 

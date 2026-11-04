@@ -1,6 +1,6 @@
 # .agents – Kontext für Agenten
 
-Dieser Ordner enthält Kontext für KI-Agenten (Jules, Claude, Antigravity, Gemini). **Er ist nicht normativ.** Normativ ist ausschließlich [`docs/SPEC.md`](../docs/SPEC.md), Version 4.3.0. Nach D-98 gehört der Ordner zum Repository und wird mit der SPEC gepflegt; T-DOC-1 prüft die Konsistenz.
+Dieser Ordner enthält Kontext für KI-Agenten (Jules, Claude, Antigravity, Gemini). **Er ist nicht normativ.** Normativ ist ausschließlich [`docs/SPEC.md`](../docs/SPEC.md), Version . Nach D-98 gehört der Ordner zum Repository und wird mit der SPEC gepflegt; T-DOC-1 prüft die Konsistenz.
 
 ## Ladeordnung für Agenten
 

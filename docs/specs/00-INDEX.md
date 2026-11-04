@@ -6,8 +6,8 @@ Dieses Dokument ist die Einstiegsseite der Implementierungsspezifikationen. Es g
 
 |Punkt|Festlegung|
 |---|---|
-|Status|**Abgeleitetes Dokument** im Sinne von D-98. Normativ ist ausschließlich `docs/SPEC.md` (Version 4.3.0). Bei Widerspruch gilt die SPEC; der Widerspruch ist ein Defekt dieses Dokuments.|
-|Basis Soll|`docs/SPEC.md` 4.3.0, Soll-Zustand für Release 1.0.0|
+|Status|**Abgeleitetes Dokument** im Sinne von D-98. Normativ ist ausschließlich `docs/SPEC.md` (Version 5.1.0). Bei Widerspruch gilt die SPEC; der Widerspruch ist ein Defekt dieses Dokuments.|
+|Basis Soll|`docs/SPEC.md` , Soll-Zustand für Release 1.0.0|
 |Basis Ist|`main` @ `1454bbec0` (Merge PR #5520, SIMD-VNNI-Rückbau). Die SPEC selbst stützt sich auf `4e208c179`; Abweichungen sind in den Crate-Dateien als Ist-Stand vermerkt.|
 |Prüfmodus Ist|Quelltext gelesen, Manifeste ausgewertet, Muster gezählt (**[V]**). **Nicht gebaut, nicht getestet:** Im Analysecontainer gibt es keine Rust-Toolchain. Build-, Test- und Benchmarkwerte stammen aus der SPEC (3.0.0, **[M]**) und sind nicht wiederholt.|
 |Marke **[SPEC x.y / D-nn]**|Vorgabe ist wörtlich aus der SPEC abgeleitet; der Anker nennt den Abschnitt oder die Entscheidung.|
@@ -111,9 +111,9 @@ Die Stufen S0 bis S3 sind die Produktstufen aus SPEC 1.3.
 
 ## 6. Abweichungen der bestehenden `docs/IMPLEMENTATION_SPEC_PER_CRATE.md`
 
-Die vorhandene Datei im Repository nennt sich „SOLL-Zustand“ und bezieht sich auf **SPEC v2.0.0**. Sie widerspricht der SPEC 4.3.0 an mindestens diesen Stellen; die Dateien dieses Pakets ersetzen sie (Aktualisierung nach D-98 empfohlen):
+Die vorhandene Datei im Repository nennt sich „SOLL-Zustand“ und bezieht sich auf **SPEC v2.0.0**. Sie widerspricht der SPEC 5.1.0 an mindestens diesen Stellen; die Dateien dieses Pakets ersetzen sie (Aktualisierung nach D-98 empfohlen):
 
-|Altdatei|Widerspruch zur SPEC 4.3.0|SPEC-Anker|
+|Altdatei|Widerspruch zur SPEC 5.1.0|SPEC-Anker|
 |---|---|---|
 |Abschnitt 1: `Region` mit `Loc=0x02`|Die Region `LOC` entfällt, Code 0x02 bleibt reserviert.|D-70, D-31, 9.1|
 |Abschnitt 1: `TxId(u64)`, `Seq(NonZeroU64)`, `SecretBytes` als Löschtyp-Umfeld; `ErasureReport` als Typ in `types`|Löschtypen laut 8.1: `ErasureId`, `EraseTarget`, `LayerWitness`, `ResidualRisk`, `KeyCoverage`; Bericht ist kanonisches JSON (F.10) im Löschkern.|8.1, 11.7, F.10|

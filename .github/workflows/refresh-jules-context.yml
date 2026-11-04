@@ -1,7 +1,7 @@
 # .github/workflows/refresh-jules-context.yml
 # Erzeugt .agents/jules/context/SESSION_START.md als Artefakt und prüft, ob das Setup läuft.
 #
-# Änderung gegenüber der Vorfassung (SPEC 4.3.0):
+# Änderung gegenüber der Vorfassung (SPEC ):
 #   - Pfade von `agents/` auf `.agents/` korrigiert (vorher lief der Job ins Leere).
 #   - Der Commit-Schritt auf main ist entfernt. SESSION_START.md steht in .gitignore und
 #     wird nicht versioniert; ein `git add` hätte nichts festgehalten, nur Rauschen erzeugt.

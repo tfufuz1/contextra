@@ -68,10 +68,25 @@ pub(super) fn is_valid_tail_truncation_candidate(claimed_len: usize, partial: &[
                 }
             }
             3 => {
-                // Replace: min size 30 bytes
-                if claimed_len < 30 {
+                // Op-Tag 3: WalFloor (SPEC F.4: 0x03) oder Replace (min size 30 bytes)
+                // WalFloor: len(u32) || type(u8) || seq(u64) || tail_mac(32) || count(u32) || count * 8
+                // Min size WalFloor: 4 + 1 + 8 + 32 + 4 = 49 bytes.
+                if remaining.len() >= 44 {
+                    if let Some(cnt_slice) = remaining.get(40..44) {
+                        if let Ok(cnt_bytes) = cnt_slice.try_into() {
+                            let count = u32::from_le_bytes(cnt_bytes) as usize;
+                            let expected_wal_floor_len = 4 + 1 + 8 + 32 + 4 + count * 8;
+                            if claimed_len == expected_wal_floor_len {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                if claimed_len < 30 && claimed_len < 49 {
                     return false;
                 }
+
                 if remaining.len() >= 20 {
                     if let Some(added_slice) = remaining.get(16..20) {
                         if let Ok(added_bytes) = added_slice.try_into() {
@@ -110,6 +125,103 @@ pub(super) fn is_valid_tail_truncation_candidate(claimed_len: usize, partial: &[
                                             }
                                         }
                                         if all_removed_parsed && claimed_len != calculated_len {
+                                            return false;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            4 => {
+                // WalCheckpoint: exact size 4 + 1 + 32 = 37 bytes
+                if claimed_len != 37 {
+                    return false;
+                }
+            }
+            6 => {
+                // 0x06 (OP_TAG_TEXT_COMMIT): min size 4 + 1 + 8 + 1 + 8 + 4 = 26 bytes
+                if claimed_len < 26 {
+                    return false;
+                }
+                if remaining.len() >= 21 {
+                    if let Some(rem_cnt_slice) = remaining.get(17..21) {
+                        if let Ok(rem_cnt_bytes) = rem_cnt_slice.try_into() {
+                            let rem_cnt = u32::from_le_bytes(rem_cnt_bytes) as usize;
+                            let expected_total_len = 4 + 1 + 8 + 1 + 8 + 4 + rem_cnt * 8;
+                            if claimed_len != expected_total_len {
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+            7 => {
+                // 0x07 (OP_TAG_SST_SWAP): min size 4 + 1 + 4 + 4 = 13 bytes
+                if claimed_len < 13 {
+                    return false;
+                }
+                if remaining.len() >= 4 {
+                    if let Some(add_cnt_slice) = remaining.get(0..4) {
+                        if let Ok(add_cnt_bytes) = add_cnt_slice.try_into() {
+                            let add_cnt = u32::from_le_bytes(add_cnt_bytes) as usize;
+                            let mut offset = 4;
+                            let mut calculated_len = 4 + 1 + 4;
+                            let mut all_add_parsed = true;
+                            for _ in 0..add_cnt {
+                                if remaining.len() >= offset + 4 {
+                                    if let Some(p_len_slice) = remaining.get(offset..offset + 4) {
+                                        if let Ok(p_len_bytes) = p_len_slice.try_into() {
+                                            let p_len = u32::from_le_bytes(p_len_bytes) as usize;
+                                            offset += 4 + p_len;
+                                            calculated_len += 4 + p_len;
+                                        } else {
+                                            all_add_parsed = false;
+                                            break;
+                                        }
+                                    } else {
+                                        all_add_parsed = false;
+                                        break;
+                                    }
+                                } else {
+                                    all_add_parsed = false;
+                                    break;
+                                }
+                            }
+
+                            if all_add_parsed && remaining.len() >= offset + 4 {
+                                calculated_len += 4;
+                                if let Some(rem_cnt_slice) = remaining.get(offset..offset + 4) {
+                                    if let Ok(rem_cnt_bytes) = rem_cnt_slice.try_into() {
+                                        let rem_cnt = u32::from_le_bytes(rem_cnt_bytes) as usize;
+                                        let mut rem_offset = offset + 4;
+                                        let mut all_rem_parsed = true;
+                                        for _ in 0..rem_cnt {
+                                            if remaining.len() >= rem_offset + 4 {
+                                                if let Some(p_len_slice) =
+                                                    remaining.get(rem_offset..rem_offset + 4)
+                                                {
+                                                    if let Ok(p_len_bytes) = p_len_slice.try_into()
+                                                    {
+                                                        let p_len = u32::from_le_bytes(p_len_bytes)
+                                                            as usize;
+                                                        rem_offset += 4 + p_len;
+                                                        calculated_len += 4 + p_len;
+                                                    } else {
+                                                        all_rem_parsed = false;
+                                                        break;
+                                                    }
+                                                } else {
+                                                    all_rem_parsed = false;
+                                                    break;
+                                                }
+                                            } else {
+                                                all_rem_parsed = false;
+                                                break;
+                                            }
+                                        }
+                                        if all_rem_parsed && claimed_len != calculated_len {
                                             return false;
                                         }
                                     }

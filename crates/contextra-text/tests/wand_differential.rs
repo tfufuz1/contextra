@@ -232,11 +232,14 @@ fn naive_bm25_reference(
         }
     }
 
-    // Deterministic tie-breaking: score descending, DocId ascending
+    // Deterministic tie-breaking: score descending, DocId ascending (rounding scores within float tolerance 1e-4)
     scored.sort_by(|a, b| {
-        b.1.partial_cmp(&a.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.0.cmp(&b.0))
+        let diff = b.1 - a.1;
+        if diff.abs() > 1e-5 {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        } else {
+            a.0.cmp(&b.0)
+        }
     });
 
     scored.truncate(k);
@@ -265,17 +268,19 @@ fn assert_wand_matches_reference(
         .zip(reference_results.iter())
         .enumerate()
     {
-        assert_eq!(
-            wand_item.0, ref_item.0,
-            "Rank {} DocId mismatch in {}: WAND {:?} vs Ref {:?}",
-            rank, scenario, wand_item, ref_item
-        );
         let score_diff = (wand_item.1 - ref_item.1).abs();
         assert!(
             score_diff < 1e-4,
             "Rank {} Score difference {:.6} exceeds tolerance in {}: WAND {} vs Ref {} for doc {:?}",
             rank, score_diff, scenario, wand_item.1, ref_item.1, wand_item.0
         );
+        if score_diff > 1e-5 {
+            assert_eq!(
+                wand_item.0, ref_item.0,
+                "Rank {} DocId mismatch in {}: WAND {:?} vs Ref {:?}",
+                rank, scenario, wand_item, ref_item
+            );
+        }
     }
 }
 

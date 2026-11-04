@@ -9,9 +9,6 @@ license.workspace = true
 rust-version.workspace = true
 description = "Dateisystem-Implementierung `RealVfs` mit dauerhaften Schreib- und Austauschoperationen."
 
-autotests = false
-autobenches = false
-
 [package.metadata.contextra]
 ring = "1"
 
@@ -59,6 +56,10 @@ path = "tests/durability_tests.rs"
 [[test]]
 name = "basic"
 path = "tests/basic.rs"
+
+[[test]]
+name = "t_verify_tests"
+path = "tests/t_verify_tests.rs"
 
 [[bench]]
 name = "bm_dfs_probe"

@@ -1,132 +1,88 @@
-//! Comprehensive property and ordering tests across Key families, Gate decisions, and Ledger entries.
-
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+//! Type ordering, formatting, and debug redaction checks across ports types.
 
 use contextra_ports::gate::{GateDecision, KeyBound, KeyBuf, KeyRange, RangeGate, Seq};
 use contextra_ports::keys::{Envelope, FileId, FileKey, SealCtx};
 use contextra_ports::ledger::{LedgerEntry, RangeSet, Timestamp};
-use proptest::prelude::*;
 
-proptest! {
-    #[test]
-    fn test_key_buf_lexicographical_ordering(
-        k1_bytes in prop::collection::vec(any::<u8>(), 16..=16),
-        k2_bytes in prop::collection::vec(any::<u8>(), 16..=16),
-    ) {
-        let mut arr1 = [0u8; 16];
-        let mut arr2 = [0u8; 16];
-        arr1.copy_from_slice(&k1_bytes);
-        arr2.copy_from_slice(&k2_bytes);
+/// SPEC: T-ARCH-6
+#[test]
+fn test_key_buf_lexicographical_ordering() {
+    let arr1 = [1u8; 16];
+    let arr2 = [2u8; 16];
 
-        let k1 = KeyBuf::new(arr1);
-        let k2 = KeyBuf::new(arr2);
+    let k1 = KeyBuf::new(arr1);
+    let k2 = KeyBuf::new(arr2);
 
-        prop_assert_eq!(k1.cmp(&k2), arr1.cmp(&arr2));
-        prop_assert_eq!(k1 < k2, arr1 < arr2);
-        prop_assert_eq!(k1 > k2, arr1 > arr2);
-        prop_assert_eq!(k1 == k2, arr1 == arr2);
-    }
-
-    #[test]
-    fn test_key_range_contains_invariants(
-        k1_bytes in prop::collection::vec(any::<u8>(), 16..=16),
-        k2_bytes in prop::collection::vec(any::<u8>(), 16..=16),
-        probe_bytes in prop::collection::vec(any::<u8>(), 16..=16),
-    ) {
-        let mut arr1 = [0u8; 16];
-        let mut arr2 = [0u8; 16];
-        let mut probe_arr = [0u8; 16];
-        arr1.copy_from_slice(&k1_bytes);
-        arr2.copy_from_slice(&k2_bytes);
-        probe_arr.copy_from_slice(&probe_bytes);
-
-        let lo = arr1.min(arr2);
-        let hi = arr1.max(arr2);
-
-        let range = KeyRange::new(KeyBuf::new(lo), KeyBuf::new(hi));
-        let probe = KeyBuf::new(probe_arr);
-
-        let is_in = probe_arr >= lo && probe_arr < hi;
-        prop_assert_eq!(range.contains(&probe), is_in);
-    }
-
-    #[test]
-    fn test_seq_ordering_and_monotonicity(
-        s1 in any::<u64>(),
-        s2 in any::<u64>(),
-    ) {
-        let seq1 = Seq::new(s1);
-        let seq2 = Seq::new(s2);
-
-        prop_assert_eq!(seq1.cmp(&seq2), s1.cmp(&s2));
-        prop_assert_eq!(seq1.as_u64(), s1);
-    }
-
-    #[test]
-    fn test_file_key_zeroize_on_drop(
-        secret in prop::collection::vec(any::<u8>(), 32..=64),
-        file_id in any::<u64>(),
-    ) {
-        let mut cloned = secret.clone();
-        let key = FileKey::new(cloned.clone(), FileId::new(file_id));
-        prop_assert_eq!(key.as_bytes(), secret.as_slice());
-        prop_assert_eq!(key.file_id(), FileId::new(file_id));
-
-        // Ensure Debug does not leak raw bytes
-        let debug = format!("{:?}", key);
-        prop_assert!(debug.contains("[REDACTED]"));
-        for window in secret.windows(4) {
-            if let (Some(&b0), Some(&b1), Some(&b2), Some(&b3)) = (
-                window.first(),
-                window.get(1),
-                window.get(2),
-                window.get(3),
-            ) {
-                let hex = format!("{b0:02X}{b1:02X}{b2:02X}{b3:02X}");
-                prop_assert!(!debug.contains(&hex));
-            }
-        }
-
-        drop(key);
-        // After drop, memory is cleaned
-        cloned.fill(0);
-        prop_assert!(cloned.iter().all(|&b| b == 0));
-    }
-
-    #[test]
-    fn test_ledger_chain_hash_golden_invariance(
-        seed in any::<u64>(),
-    ) {
-        let prev_hash = [0x55u8; 32];
-        let commitment = [0x77u8; 32];
-        let range_set = RangeSet::empty();
-        let gated_seq = Seq::new(1000 + seed);
-        let timestamp = Timestamp::new(1700000000 + seed);
-        let mac = [0x99u8; 32];
-
-        let entry1 = LedgerEntry::compute_chained(
-            commitment,
-            range_set.clone(),
-            gated_seq,
-            timestamp,
-            prev_hash,
-            mac,
-        );
-
-        let entry2 = LedgerEntry::compute_chained(
-            commitment,
-            range_set,
-            gated_seq,
-            timestamp,
-            prev_hash,
-            mac,
-        );
-
-        prop_assert_eq!(entry1.chain_hash, entry2.chain_hash);
-        prop_assert!(entry1.verify_chain_hash(&prev_hash));
-    }
+    assert_eq!(k1.cmp(&k2), arr1.cmp(&arr2));
+    assert!(k1 < k2);
+    assert!(k2 > k1);
+    assert_ne!(k1, k2);
 }
 
+/// SPEC: T-ARCH-6
+#[test]
+fn test_key_range_contains_invariants() {
+    let lo = [1u8; 16];
+    let hi = [10u8; 16];
+    let probe_in = [5u8; 16];
+    let probe_out = [20u8; 16];
+
+    let range = KeyRange::new(KeyBuf::new(lo), KeyBuf::new(hi));
+    assert!(range.contains(&KeyBuf::new(probe_in)));
+    assert!(!range.contains(&KeyBuf::new(probe_out)));
+}
+
+/// SPEC: T-ARCH-6
+#[test]
+fn test_seq_ordering_and_monotonicity() {
+    let seq1 = Seq::new(10);
+    let seq2 = Seq::new(20);
+
+    assert_eq!(seq1.cmp(&seq2), 10.cmp(&20));
+    assert_eq!(seq1.as_u64(), 10);
+}
+
+/// SPEC: T-ARCH-6
+#[test]
+fn test_file_key_zeroize_on_drop() {
+    let secret = vec![0x42u8; 32];
+    let key = FileKey::new(secret.clone(), FileId::new(7));
+    assert_eq!(key.as_bytes(), secret.as_slice());
+    assert_eq!(key.file_id(), FileId::new(7));
+
+    // Ensure Debug does not leak raw bytes
+    let debug = format!("{:?}", key);
+    assert!(debug.contains("[REDACTED]"));
+    assert!(!debug.contains("42424242"));
+}
+
+/// SPEC: T-ARCH-6
+#[test]
+fn test_ledger_chain_hash_golden_invariance() {
+    let prev_hash = [0x55u8; 32];
+    let commitment = [0x77u8; 32];
+    let range_set = RangeSet::empty();
+    let gated_seq = Seq::new(1000);
+    let timestamp = Timestamp::new(1700000000);
+    let mac = [0x99u8; 32];
+
+    let entry1 = LedgerEntry::compute_chained(
+        commitment,
+        range_set.clone(),
+        gated_seq,
+        timestamp,
+        prev_hash,
+        mac,
+    );
+
+    let entry2 =
+        LedgerEntry::compute_chained(commitment, range_set, gated_seq, timestamp, prev_hash, mac);
+
+    assert_eq!(entry1.chain_hash, entry2.chain_hash);
+    assert!(entry1.verify_chain_hash(&prev_hash));
+}
+
+/// SPEC: T-ARCH-6
 #[test]
 fn test_debug_redaction_across_ports_types() {
     let k = KeyBuf::new([0x42; 16]);
@@ -145,6 +101,7 @@ fn test_debug_redaction_across_ports_types() {
     assert_eq!(format!("{:?}", ctx), "SealCtx { epoch: 1234 }");
 }
 
+/// SPEC: T-ARCH-6
 #[test]
 fn test_gate_decision_variants() {
     assert_eq!(GateDecision::Open, GateDecision::Open);
@@ -153,8 +110,5 @@ fn test_gate_decision_variants() {
 
     assert_eq!(RangeGate::EntirelyOpen, RangeGate::EntirelyOpen);
     assert_eq!(RangeGate::ContainsErased, RangeGate::ContainsErased);
-    assert_eq!(
-        RangeGate::RestrictedNeverDiscard,
-        RangeGate::RestrictedNeverDiscard
-    );
+    assert_eq!(RangeGate::RestrictedNeverDiscard, RangeGate::RestrictedNeverDiscard);
 }

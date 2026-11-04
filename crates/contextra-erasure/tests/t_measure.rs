@@ -2,7 +2,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_erasure::measure::positive_control::{run_positive_control, verify_scanner_integrity};
+use contextra_erasure::measure::positive_control::{
+    run_positive_control, verify_scanner_integrity,
+};
 use contextra_erasure::measure::{
     arm_scanner, finish_scan, run_scanner_flow, EvidenceKind, MeasurementCoordinator,
     UnarmedScanner,

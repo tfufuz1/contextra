@@ -75,7 +75,6 @@ impl Contextra {
             language,
         );
         col.set_tenant_id(tenant_id);
-        col.set_community_detection_trigger_threshold(self.community_detection_threshold);
         col.set_metrics_sink(self.metrics_sink.read().clone());
 
         if let Some(emb) = self.embedder.read().as_ref() {
@@ -180,7 +179,6 @@ impl Contextra {
             self.dimension,
             language,
         );
-        col.set_community_detection_trigger_threshold(self.community_detection_threshold);
         col.set_metrics_sink(self.metrics_sink.read().clone());
 
         if let Some(emb) = self.embedder.read().as_ref() {

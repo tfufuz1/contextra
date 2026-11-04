@@ -11,8 +11,8 @@ use super::fixtures::*;
 async fn hybrid_search_caps_k_at_max_search_k() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -54,8 +54,8 @@ async fn hybrid_search_caps_k_at_max_search_k() {
 async fn test_hybrid_search_k_clamping_boundaries() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -103,8 +103,8 @@ async fn test_hybrid_search_k_clamping_boundaries() {
 async fn test_hybrid_search_reranked_none() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -164,8 +164,8 @@ async fn test_collection_with_diskann_index_hybrid_search() {
     use contextra_text::Language;
     use contextra_types::DocId;
     use contextra_vector::{DiskAnnConfig, DiskAnnIndex};
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -282,8 +282,8 @@ async fn test_hybrid_search_with_query_memory_type_filter() {
     use contextra_types::{HybridQuery, MemoryType};
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
 
     let dir = tempfile::tempdir().unwrap(); // unwrap
     let storage = Arc::new(
@@ -397,8 +397,8 @@ async fn test_hybrid_search_with_query_memory_type_filter() {
 async fn test_hybrid_search_fusion_capping_and_resilient_anchors() -> contextra_types::Result<()> {
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_vector::{HnswConfig, HnswIndex};
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
     let lsm_config = LsmConfig {
@@ -449,8 +449,8 @@ async fn test_hybrid_search_with_strategy_score_normalized_ranking() -> contextr
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{FusionStrategy, SignalFusionStrategies};
     use contextra_vector::{HnswConfig, HnswIndex};
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
     let storage = Arc::new(
@@ -519,8 +519,8 @@ async fn test_hybrid_search_mixed_signal_fusion_strategies() -> contextra_types:
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{FusionStrategy, SignalFusionStrategies};
     use contextra_vector::{HnswConfig, HnswIndex};
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
     let storage = Arc::new(
@@ -605,8 +605,8 @@ async fn test_hybrid_search_single_fusion_strategy_regression_parity() -> contex
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::{FusionStrategy, SignalFusionStrategies};
     use contextra_vector::{HnswConfig, HnswIndex};
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
     let storage = Arc::new(
@@ -681,8 +681,8 @@ async fn test_hybrid_search_fusion_strategy_rrf_golden_parity() -> contextra_typ
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
     let storage = Arc::new(
@@ -748,8 +748,8 @@ async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_typ
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
     let storage = Arc::new(
@@ -836,13 +836,13 @@ async fn test_hybrid_search_score_normalized_reorders_results() -> contextra_typ
 }
 
 #[tokio::test]
-async fn test_hybrid_search_score_normalized_constant_scores_fallback_to_rrf(
-) -> contextra_types::Result<()> {
+async fn test_hybrid_search_score_normalized_constant_scores_fallback_to_rrf()
+-> contextra_types::Result<()> {
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
     let storage = Arc::new(
@@ -903,8 +903,8 @@ async fn test_hybrid_search_score_normalized_determinism_100_runs() -> contextra
     use contextra_store::lsm::{LsmConfig, LsmStorage};
     use contextra_types::FusionStrategy;
     use contextra_vector::{HnswConfig, HnswIndex};
-    use std::sync::atomic::AtomicU64;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
 
     let dir = tempfile::TempDir::new().map_err(contextra_types::ContextraError::from)?;
     let storage = Arc::new(

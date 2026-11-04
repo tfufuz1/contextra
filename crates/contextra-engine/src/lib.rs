@@ -31,15 +31,15 @@ impl Default for VectorDeleteMode {
     }
 }
 #[cfg(not(loom))]
-pub use contextra_store::lsm::DurabilityMode;
-#[cfg(not(loom))]
 use contextra_store::LsmStorage;
+#[cfg(not(loom))]
+pub use contextra_store::lsm::DurabilityMode;
 use contextra_types::{DocId, TenantId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg(not(loom))]
 pub mod background_workers;
@@ -165,21 +165,6 @@ pub use contextra_ports::DriftStatusProvider;
 /// Alias für `ContextraStats` zur Abwärtskompatibilität.
 pub type DbStats = ContextraStats;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-// ANCHOR[contextra-engine:CMD-001]
-/// Konfiguration für Community-Erkennungs- und Graph-Clustering-Algorithmen.
-pub struct CommunityDetectionConfig {
-    pub auto_trigger_threshold: u64,
-}
-
-impl Default for CommunityDetectionConfig {
-    fn default() -> Self {
-        Self {
-            auto_trigger_threshold: 100,
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 // ANCHOR[contextra-engine:EMB-001]
 /// Wählbares Backend zur Berechnung von Text-Embeddings.
@@ -245,7 +230,6 @@ pub struct ContextraConfig {
     pub memtable_size_limit: usize,
     pub expiry_reaper_interval: std::time::Duration,
     pub orphan_registry_path: Option<std::path::PathBuf>,
-    pub community_detection: CommunityDetectionConfig,
     pub embedding_backend: EmbeddingBackend,
     pub consolidation_enabled: bool,
     pub consolidation_interval: std::time::Duration,
@@ -303,7 +287,6 @@ impl std::fmt::Debug for ContextraConfig {
             .field("memtable_size_limit", &self.memtable_size_limit)
             .field("expiry_reaper_interval", &self.expiry_reaper_interval)
             .field("orphan_registry_path", &self.orphan_registry_path)
-            .field("community_detection", &self.community_detection)
             .field("embedding_backend", &self.embedding_backend)
             .field("consolidation_enabled", &self.consolidation_enabled)
             .field("consolidation_interval", &self.consolidation_interval)
@@ -337,7 +320,6 @@ impl Default for ContextraConfig {
             memtable_size_limit: 64 * 1024 * 1024,
             expiry_reaper_interval: std::time::Duration::from_secs(60),
             orphan_registry_path: None,
-            community_detection: CommunityDetectionConfig::default(),
             embedding_backend: EmbeddingBackend::default(),
             consolidation_enabled: true,
             consolidation_interval: std::time::Duration::from_secs(6 * 3600),
@@ -366,7 +348,6 @@ pub struct Contextra {
     dimension: usize,
     config: ContextraConfig,
     expiry_reaper_interval: std::time::Duration,
-    community_detection_threshold: u64,
     collections: tokio::sync::RwLock<ahash::AHashMap<String, Arc<Collection<LsmStorage>>>>,
     tenant_collections: tokio::sync::RwLock<TenantCollectionMap>,
     cancel_token: tokio_util::sync::CancellationToken,

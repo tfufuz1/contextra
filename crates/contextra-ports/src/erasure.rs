@@ -26,7 +26,7 @@ impl LayerId {
 
 impl fmt::Debug for LayerId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "LayerId({:02x?})", &self.0)
+        write!(f, "LayerId({:02x?})", self.0)
     }
 }
 
@@ -107,7 +107,7 @@ impl fmt::Debug for LayerScope {
         write!(
             f,
             "LayerScope {{ scope_id: {:02x?}, affected_units_count: {} }}",
-            &self.scope_id,
+            self.scope_id,
             self.affected_units.len()
         )
     }
@@ -209,7 +209,7 @@ impl fmt::Debug for LayerWitness {
         write!(
             f,
             "LayerWitness {{ witness_hash: {:02x?} }}",
-            &self.witness_hash
+            self.witness_hash
         )
     }
 }
@@ -235,6 +235,12 @@ pub enum KeyCoverage {
 ///   must yield safe, repeatable outcomes without double-freeing or state corruption.
 pub trait ErasureLayer: Send + Sync {
     /// Returns the unique layer identifier.
+    ///
+    /// # Fehler
+    /// Keine; statische Identifikator-Abfrage.
+    ///
+    /// # Crash
+    /// Reiner Statusabruf ohne persistente Seiteneffekte.
     fn id(&self) -> LayerId;
 
     /// Resolves the concrete scope affected by the erase target before gating.
@@ -280,5 +286,11 @@ pub trait ErasureLayer: Send + Sync {
     ) -> BoxFuture<'_, Result<LayerWitness, String>>;
 
     /// Reports the key coverage classification (full | unlinked | none).
+    ///
+    /// # Fehler
+    /// Keine; statische Klassifikationsabfrage.
+    ///
+    /// # Crash
+    /// Reiner Statusabruf ohne Mutation.
     fn key_coverage(&self) -> KeyCoverage;
 }
