@@ -1,7 +1,7 @@
 # Contextra Voll-Audit
 
 - Commit: `762807450` (2026-11-04 02:35:33 +0100), Branch `main`, hinter origin: 0, ungespeicherte Aenderungen: True
-- Start: 2026-11-04T01:52:53+00:00  Dauer: 29.9 min
+- Start: 2026-11-04T01:52:53+00:00  Dauer: 22.8 min
 - Toolchain-Pin: `1.97.0`; Preflight: **PASS** (cargo 1.97.0 (c980f4866 2026-06-30) | Pin 1.97.0)
 - Host: Linux-7.2.7-1-liquorix-amd64-x86_64-with-glibc2.41 | 8 CPUs | MemTotal:       10121012 kB
 - Nutzer: freddy
@@ -80,86 +80,6 @@ Hinweis: Bei `befund_*`-Schritten bedeutet FAIL, dass der Befund **vorliegt**. `
 | `liste_tests__contextra-store` | FAIL | 7.3 | 0 Tests gelistet | `logs/147_liste_tests__contextra-store.log` |
 | `liste_tests__contextra-text` | FAIL | 3.5 | 0 Tests gelistet | `logs/151_liste_tests__contextra-text.log` |
 | `liste_tests__contextra-vector` | FAIL | 5.9 | 0 Tests gelistet | `logs/153_liste_tests__contextra-vector.log` |
-
-## Panic-Flaeche im Produktivcode (Clippy, lib, ohne Tests)
-
-| Crate | unwrap | expect | panic | todo | index | Summe |
-|---|---:|---:|---:|---:|---:|---:|
-| `ctx-verify` | 0 | 0 | 0 | 0 | 1 | 1 |
-
-## unsafe-Inventar gegen capabilities.toml
-
-- `contextra-erasure`: 0 Zeilen, island=False, nicht in capabilities.toml
-- `contextra-lab`: 0 Zeilen, island=False, nicht in capabilities.toml
-- `contextra-simd`: 223 Zeilen, island=True, ok
-- `contextra-sys`: 19 Zeilen, island=True, ok
-- `contextra-testmacros`: 0 Zeilen, island=False, nicht in capabilities.toml
-- `ctx-verify`: 0 Zeilen, island=False, nicht in capabilities.toml
-
-## Testbarkeit je Crate (statisch)
-
-| crate | tests_unit | tests_integration | doctests | ignoriert | tests_ohne_assertion | pub_fns | pub_mit_nachweis | pub_ohne_nachweis | nachweis_quote | urteil |
-|---|---|---|---|---|---|---|---|---|---|---|
-| contextra | 0 | 6 | 0 | 0 | 2 | 31 | 17 | 5 | 0.55 | ok |
-| contextra-arch-tests | 30 | 19 | 0 | 0 | 2 | 23 | 20 | 3 | 0.87 | ok |
-| contextra-crypto | 0 | 41 | 1 | 0 | 2 | 57 | 39 | 6 | 0.68 | ok |
-| contextra-durable-fs | 0 | 31 | 0 | 0 | 0 | 24 | 16 | 6 | 0.67 | ok |
-| contextra-engine | 147 | 88 | 1 | 0 | 1 | 256 | 155 | 66 | 0.61 | ok |
-| contextra-erasure | 0 | 18 | 0 | 0 | 0 | 138 | 55 | 52 | 0.4 | schwach |
-| contextra-lab | 0 | 25 | 0 | 0 | 0 | 45 | 39 | 3 | 0.87 | ok |
-| contextra-mvcc | 52 | 102 | 0 | 0 | 0 | 132 | 96 | 17 | 0.73 | ok |
-| contextra-ports | 25 | 24 | 0 | 0 | 5 | 51 | 20 | 4 | 0.39 | schwach |
-| contextra-rank | 0 | 18 | 0 | 0 | 0 | 2 | 2 | 0 | 1.0 | ok |
-| contextra-simd | 13 | 68 | 2 | 0 | 0 | 31 | 30 | 1 | 0.97 | ok |
-| contextra-store | 258 | 311 | 1 | 11 | 10 | 336 | 191 | 79 | 0.57 | ok |
-| contextra-sys | 0 | 28 | 0 | 0 | 0 | 22 | 18 | 4 | 0.82 | ok |
-| contextra-testkit | 30 | 53 | 0 | 0 | 0 | 117 | 55 | 26 | 0.47 | schwach |
-| contextra-testmacros | 0 | 1 | 0 | 0 | 1 | 2 | 1 | 1 | 0.5 | ok |
-| contextra-text | 111 | 104 | 0 | 1 | 8 | 124 | 69 | 15 | 0.56 | ok |
-| contextra-types | 125 | 79 | 0 | 0 | 1 | 218 | 156 | 12 | 0.72 | ok |
-| contextra-vector | 109 | 159 | 0 | 0 | 6 | 194 | 114 | 55 | 0.59 | ok |
-| ctx-verify | 0 | 26 | 0 | 0 | 4 | 18 | 13 | 5 | 0.72 | ok |
-
-## Statisch gezaehlte Tests gegen `cargo test -- --list`
-
-Differenz > 0: Tests im Quelltext, die cargo nicht kennt (Feature/Plattform/cfg). Differenz < 0: Tests aus Makros oder nicht erkannten Attributen.
-
-| crate | statisch | gelistet | differenz |
-|---|---|---|---|
-| contextra-arch-tests | 49 | 49 | 0 |
-| contextra-crypto | 41 | 39 | 2 |
-| contextra-durable-fs | 31 | 31 | 0 |
-| contextra-erasure | 18 | 18 | 0 |
-| contextra-lab | 25 | 25 | 0 |
-| contextra-mvcc | 154 | 146 | 8 |
-| contextra-ports | 49 | 49 | 0 |
-| contextra-rank | 18 | 18 | 0 |
-| contextra-simd | 81 | 81 | 0 |
-| contextra-sys | 28 | 28 | 0 |
-| contextra-testkit | 83 | 83 | 0 |
-| contextra-testmacros | 1 | 1 | 0 |
-| contextra-types | 204 | 204 | 0 |
-| ctx-verify | 26 | 26 | 0 |
-
-## Reife-Behauptung vs. Beleg (capabilities.toml gegen diesen Lauf)
-
-| Crate | behauptet | lib-Tests | Clippy lib | Urteil |
-|---|---|---|---|---|
-| `contextra` | stable | FAIL | FAIL | **Behauptung ohne Beleg** |
-| `contextra-arch-tests` | stable | PASS | PASS | ok |
-| `contextra-crypto` | beta | PASS | PASS | ok |
-| `contextra-durable-fs` | stable | PASS | FAIL | **Behauptung ohne Beleg** |
-| `contextra-engine` | beta | FAIL | FAIL | **Behauptung ohne Beleg** |
-| `contextra-mvcc` | stable | PASS | FAIL | **Behauptung ohne Beleg** |
-| `contextra-ports` | stable | PASS | FAIL | **Behauptung ohne Beleg** |
-| `contextra-rank` | stable | PASS | PASS | ok |
-| `contextra-simd` | beta | PASS | PASS | ok |
-| `contextra-store` | beta | FAIL | FAIL | **Behauptung ohne Beleg** |
-| `contextra-sys` | stable | PASS | PASS | ok |
-| `contextra-testkit` | stable | PASS | FAIL | **Behauptung ohne Beleg** |
-| `contextra-text` | beta | PASS | FAIL | **Behauptung ohne Beleg** |
-| `contextra-types` | stable | PASS | PASS | ok |
-| `contextra-vector` | beta | FAIL | FAIL | **Behauptung ohne Beleg** |
 
 ## Alle Schritte
 
