@@ -1,88 +1,96 @@
 // FILE-CONTEXT
-// ZWECK: AVX2 SIMD-Intrinsics für f32, f32_bytes und u8 Distanzberechnungen.
-// INVARIANTEN: Target-Feature "avx2", "fma" vor Aufruf via Feature-Check verifiziert.
+// ZWECK: AVX2 SIMD-Intrinsics für f32 und f32_bytes Distanzberechnungen.
+// INVARIANTEN: Kanonische Distanz nach SPEC D-122 (5b): 16 Teilsummen (Lane = Index mod 16),
+//             kein FMA, feste paarweise Reduktion 16 -> 8 -> 4 -> 2 -> 1. Alle Kernel sind bitgleich.
 
 //! # Modul `kernels::avx2`
 //!
-//! **Ring-Zugehörigkeit:** Ring 0 (Unsafe-Insel).
+//! **Ring-Zugehörigkeit:** Ring 1 (Unsafe-Insel).
 //!
 //! **Zweck:**
-//! Hochoptimierte Vektordistanzberechnung auf x86_64-Prozessoren mit AVX2 (Advanced Vector Extensions 2)
-//! und FMA (Fused Multiply-Add).
-//! AVX2 operiert auf 256-Bit YMM-Vektorregistern:
-//! - Verarbeitet 8 x `f32` (8 x 32-Bit = 256 Bit) parallel pro Taktzyklus (`_mm256_loadu_ps`, `_mm256_fmadd_ps`).
-//! - Verarbeitet bis zu 32 x `u8` parallel mit vorzeichenloser Multiplikation und Akkumulation (`_mm256_maddubs_epi16`).
-//!
-//! **Sicherheitsgarantien (Safety-Invariante):**
-//! Alle Funktionen in diesem Modul sind als `pub(crate) unsafe fn` deklariert und mit
-//! `#[target_feature(enable = "avx2", enable = "fma")]` versehen. Der Aufruf darf ausschließlich
-//! über das sichere Runtime-Dispatch-System in `dispatch.rs` nach Prüfung der CPU-Befehlssatzerweiterung erfolgen.
+//! Hochoptimierte Vektordistanzberechnung auf x86_64-Prozessoren mit AVX2.
+//! Gemäß SPEC D-122 (5b) erfolgt die Berechnung ohne FMA und mit 16 Teilsummen,
+//! sodass die Ergebnisse bitidentisch zur Skalar-Referenz sind.
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-use crate::kernels::scalar::CosineSimilarityPartsU8;
+use crate::kernels::scalar::canonical_reduce_16;
 
-// ANCHOR[contextra-simd:AVX2-COSINE-F32]
-/// Calculates cosine distance between two float vectors using AVX2 and FMA instructions.
+/// Berechnet die Kosinus-Distanz zwischen zwei f32-Vektoren mittels AVX2.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx2` and `fma` instruction set extensions.
-/// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2", enable = "fma")]
+#[target_feature(enable = "avx2")]
 pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target features `avx2` and `fma` are verified by caller and enabled on function attribute.
-    let mut dot_v = unsafe { _mm256_setzero_ps() };
-    // SAFETY: Target features `avx2` and `fma` are verified by caller and enabled on function attribute.
-    let mut norm_a_v = unsafe { _mm256_setzero_ps() };
-    // SAFETY: Target features `avx2` and `fma` are verified by caller and enabled on function attribute.
-    let mut norm_b_v = unsafe { _mm256_setzero_ps() };
+    // SAFETY: CPU-Feature avx2 ist aktiv.
+    let (mut dot_0, mut dot_1) = unsafe { (_mm256_setzero_ps(), _mm256_setzero_ps()) };
+    // SAFETY: CPU-Feature avx2 ist aktiv.
+    let (mut norm_a_0, mut norm_a_1) = unsafe { (_mm256_setzero_ps(), _mm256_setzero_ps()) };
+    // SAFETY: CPU-Feature avx2 ist aktiv.
+    let (mut norm_b_0, mut norm_b_1) = unsafe { (_mm256_setzero_ps(), _mm256_setzero_ps()) };
 
-    while i + 8 <= len {
-        // SAFETY:
-        // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
-        // 2. Length/Tail: `i + 8 <= len` where `len == a.len() == b.len()` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)` are valid for reading 8 contiguous `f32` elements.
-        // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory addresses safely.
-        let (va, vb) = unsafe {
-            (
-                _mm256_loadu_ps(a.as_ptr().add(i)),
-                _mm256_loadu_ps(b.as_ptr().add(i)),
-            )
-        };
+    let (a_ptr, b_ptr) = (a.as_ptr(), b.as_ptr());
 
-        // SAFETY: Target features `avx2` and `fma` are enabled and vector registers are valid `__m256`.
-        dot_v = unsafe { _mm256_fmadd_ps(va, vb, dot_v) };
-        // SAFETY: Target features `avx2` and `fma` are enabled and vector registers are valid `__m256`.
-        norm_a_v = unsafe { _mm256_fmadd_ps(va, va, norm_a_v) };
-        // SAFETY: Target features `avx2` and `fma` are enabled and vector registers are valid `__m256`.
-        norm_b_v = unsafe { _mm256_fmadd_ps(vb, vb, norm_b_v) };
+    while i + 16 <= len {
+        // SAFETY: Pointer-Offsets [i, i+16) liegen innerhalb der Grenzen [0, len) und avx2 ist aktiv.
+        unsafe {
+            let (va0, vb0, va1, vb1) = (
+                _mm256_loadu_ps(a_ptr.add(i)),
+                _mm256_loadu_ps(b_ptr.add(i)),
+                _mm256_loadu_ps(a_ptr.add(i + 8)),
+                _mm256_loadu_ps(b_ptr.add(i + 8)),
+            );
 
-        i += 8;
+            let (prod_dot0, prod_dot1) = (_mm256_mul_ps(va0, vb0), _mm256_mul_ps(va1, vb1));
+            let (prod_na0, prod_na1) = (_mm256_mul_ps(va0, va0), _mm256_mul_ps(va1, va1));
+            let (prod_nb0, prod_nb1) = (_mm256_mul_ps(vb0, vb0), _mm256_mul_ps(vb1, vb1));
+
+            dot_0 = _mm256_add_ps(dot_0, prod_dot0);
+            dot_1 = _mm256_add_ps(dot_1, prod_dot1);
+            norm_a_0 = _mm256_add_ps(norm_a_0, prod_na0);
+            norm_a_1 = _mm256_add_ps(norm_a_1, prod_na1);
+            norm_b_0 = _mm256_add_ps(norm_b_0, prod_nb0);
+            norm_b_1 = _mm256_add_ps(norm_b_1, prod_nb1);
+        }
+        i += 16;
     }
 
-    // SAFETY: Target feature `avx2` is enabled and `dot_v`, `norm_a_v`, `norm_b_v` are valid `__m256` vector registers.
-    let (mut dot, mut norm_a, mut norm_b) = unsafe {
-        (
-            hsum256_ps_avx(dot_v),
-            hsum256_ps_avx(norm_a_v),
-            hsum256_ps_avx(norm_b_v),
-        )
-    };
+    let mut dot_lanes = [0.0f32; 16];
+    let mut norm_a_lanes = [0.0f32; 16];
+    let mut norm_b_lanes = [0.0f32; 16];
+
+    // SAFETY: Auslesen der 256-Bit Register in 16-Element Float-Puffer.
+    unsafe {
+        _mm256_storeu_ps(dot_lanes.as_mut_ptr(), dot_0);
+        _mm256_storeu_ps(dot_lanes.as_mut_ptr().add(8), dot_1);
+        _mm256_storeu_ps(norm_a_lanes.as_mut_ptr(), norm_a_0);
+        _mm256_storeu_ps(norm_a_lanes.as_mut_ptr().add(8), norm_a_1);
+        _mm256_storeu_ps(norm_b_lanes.as_mut_ptr(), norm_b_0);
+        _mm256_storeu_ps(norm_b_lanes.as_mut_ptr().add(8), norm_b_1);
+    }
 
     while i < len {
-        // SAFETY:
-        // 1. Length/Tail: `i < len` where `len == a.len() == b.len()` guarantees `i` is within bounds of slices `a` and `b`.
-        let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };
-        dot += x * y;
-        norm_a += x * x;
-        norm_b += y * y;
+        let lane = i % 16;
+        if let (Some(&x), Some(&y)) = (a.get(i), b.get(i)) {
+            if let Some(slot) = dot_lanes.get_mut(lane) {
+                *slot += x * y;
+            }
+            if let Some(slot) = norm_a_lanes.get_mut(lane) {
+                *slot += x * x;
+            }
+            if let Some(slot) = norm_b_lanes.get_mut(lane) {
+                *slot += y * y;
+            }
+        }
         i += 1;
     }
+
+    let dot = canonical_reduce_16(&dot_lanes);
+    let norm_a = canonical_reduce_16(&norm_a_lanes);
+    let norm_b = canonical_reduce_16(&norm_b_lanes);
 
     if norm_a == 0.0 || norm_b == 0.0 {
         return 1.0;
@@ -93,174 +101,191 @@ pub(crate) unsafe fn cosine_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
     1.0 - sim
 }
 
-// ANCHOR[contextra-simd:AVX2-EUCLIDEAN-F32]
-/// Calculates Euclidean distance between two float vectors using AVX2 and FMA instructions.
+/// Berechnet die Euklidische Distanz zwischen zwei f32-Vektoren mittels AVX2.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx2` and `fma` instruction set extensions.
-/// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2", enable = "fma")]
+#[target_feature(enable = "avx2")]
 pub(crate) unsafe fn euclidean_distance_avx2(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target features `avx2` and `fma` are verified by caller and enabled on function attribute.
-    let mut sum_v = unsafe { _mm256_setzero_ps() };
+    // SAFETY: CPU-Feature avx2 ist aktiv.
+    let (mut sum_0, mut sum_1) = unsafe { (_mm256_setzero_ps(), _mm256_setzero_ps()) };
 
-    while i + 8 <= len {
-        // SAFETY:
-        // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
-        // 2. Length/Tail: `i + 8 <= len` where `len == a.len() == b.len()` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)` point to 8 readable `f32` elements.
-        // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory addresses safely.
-        let (va, vb) = unsafe {
-            (
-                _mm256_loadu_ps(a.as_ptr().add(i)),
-                _mm256_loadu_ps(b.as_ptr().add(i)),
-            )
-        };
-        // SAFETY: Target feature `avx2` is enabled and `va`, `vb` are valid `__m256` vector registers.
-        let diff = unsafe { _mm256_sub_ps(va, vb) };
+    let (a_ptr, b_ptr) = (a.as_ptr(), b.as_ptr());
 
-        // SAFETY: Target features `avx2` and `fma` are enabled and vector registers are valid `__m256`.
-        sum_v = unsafe { _mm256_fmadd_ps(diff, diff, sum_v) };
+    while i + 16 <= len {
+        // SAFETY: Pointer-Offsets [i, i+16) liegen innerhalb der Grenzen [0, len) und avx2 ist aktiv.
+        unsafe {
+            let (va0, vb0, va1, vb1) = (
+                _mm256_loadu_ps(a_ptr.add(i)),
+                _mm256_loadu_ps(b_ptr.add(i)),
+                _mm256_loadu_ps(a_ptr.add(i + 8)),
+                _mm256_loadu_ps(b_ptr.add(i + 8)),
+            );
 
-        i += 8;
+            let (diff0, diff1) = (_mm256_sub_ps(va0, vb0), _mm256_sub_ps(va1, vb1));
+
+            let (prod0, prod1) = (_mm256_mul_ps(diff0, diff0), _mm256_mul_ps(diff1, diff1));
+
+            sum_0 = _mm256_add_ps(sum_0, prod0);
+            sum_1 = _mm256_add_ps(sum_1, prod1);
+        }
+        i += 16;
     }
 
-    // SAFETY: Target feature `avx2` is enabled and `sum_v` is a valid `__m256` vector register.
-    let mut sum = unsafe { hsum256_ps_avx(sum_v) };
+    let mut sum_lanes = [0.0f32; 16];
+    // SAFETY: Auslesen der 256-Bit Register in 16-Element Float-Puffer.
+    unsafe {
+        _mm256_storeu_ps(sum_lanes.as_mut_ptr(), sum_0);
+        _mm256_storeu_ps(sum_lanes.as_mut_ptr().add(8), sum_1);
+    }
 
     while i < len {
-        // SAFETY: `i < len` where `len == a.len() == b.len()` guarantees `i` is within bounds of slices `a` and `b`.
-        let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };
-        let diff = x - y;
-        sum += diff * diff;
+        let lane = i % 16;
+        if let (Some(&x), Some(&y)) = (a.get(i), b.get(i)) {
+            let diff = x - y;
+            if let Some(slot) = sum_lanes.get_mut(lane) {
+                *slot += diff * diff;
+            }
+        }
         i += 1;
     }
 
+    let sum = canonical_reduce_16(&sum_lanes);
     sum.sqrt()
 }
 
-// ANCHOR[contextra-simd:AVX2-DOT-F32]
-/// Calculates dot product between two float vectors using AVX2 and FMA instructions.
+/// Berechnet die Skalarprodukt-Distanz zwischen zwei f32-Vektoren mittels AVX2.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx2` and `fma` instruction set extensions.
-/// 2. `a` and `b` have equal lengths (`a.len() == b.len()`).
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2", enable = "fma")]
+#[target_feature(enable = "avx2")]
 pub(crate) unsafe fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target features `avx2` and `fma` are verified by caller and enabled on function attribute.
-    let mut dot_v = unsafe { _mm256_setzero_ps() };
+    // SAFETY: CPU-Feature avx2 ist aktiv.
+    let (mut dot_0, mut dot_1) = unsafe { (_mm256_setzero_ps(), _mm256_setzero_ps()) };
 
-    while i + 8 <= len {
-        // SAFETY:
-        // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
-        // 2. Length/Tail: `i + 8 <= len` where `len == a.len() == b.len()` guarantees `a.as_ptr().add(i)` and `b.as_ptr().add(i)` point to 8 readable `f32` elements.
-        // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory addresses safely.
-        let (va, vb) = unsafe {
-            (
-                _mm256_loadu_ps(a.as_ptr().add(i)),
-                _mm256_loadu_ps(b.as_ptr().add(i)),
-            )
-        };
+    let (a_ptr, b_ptr) = (a.as_ptr(), b.as_ptr());
 
-        // SAFETY: Target features `avx2` and `fma` are enabled and vector registers are valid `__m256`.
-        dot_v = unsafe { _mm256_fmadd_ps(va, vb, dot_v) };
+    while i + 16 <= len {
+        // SAFETY: Pointer-Offsets [i, i+16) liegen innerhalb der Grenzen [0, len) und avx2 ist aktiv.
+        unsafe {
+            let (va0, vb0, va1, vb1) = (
+                _mm256_loadu_ps(a_ptr.add(i)),
+                _mm256_loadu_ps(b_ptr.add(i)),
+                _mm256_loadu_ps(a_ptr.add(i + 8)),
+                _mm256_loadu_ps(b_ptr.add(i + 8)),
+            );
 
-        i += 8;
+            let (prod0, prod1) = (_mm256_mul_ps(va0, vb0), _mm256_mul_ps(va1, vb1));
+
+            dot_0 = _mm256_add_ps(dot_0, prod0);
+            dot_1 = _mm256_add_ps(dot_1, prod1);
+        }
+        i += 16;
     }
 
-    // SAFETY: Target feature `avx2` is enabled and `dot_v` is a valid `__m256` vector register.
-    let mut dot = unsafe { hsum256_ps_avx(dot_v) };
+    let mut dot_lanes = [0.0f32; 16];
+    // SAFETY: Auslesen der 256-Bit Register in 16-Element Float-Puffer.
+    unsafe {
+        _mm256_storeu_ps(dot_lanes.as_mut_ptr(), dot_0);
+        _mm256_storeu_ps(dot_lanes.as_mut_ptr().add(8), dot_1);
+    }
 
     while i < len {
-        // SAFETY: `i < len` where `len == a.len() == b.len()` guarantees `i` is within bounds of slices `a` and `b`.
-        let (x, y) = unsafe { (*a.get_unchecked(i), *b.get_unchecked(i)) };
-        dot += x * y;
+        let lane = i % 16;
+        if let (Some(&x), Some(&y)) = (a.get(i), b.get(i)) {
+            if let Some(slot) = dot_lanes.get_mut(lane) {
+                *slot += x * y;
+            }
+        }
         i += 1;
     }
 
+    let dot = canonical_reduce_16(&dot_lanes);
     -dot
 }
 
-// ANCHOR[contextra-simd:AVX2-COSINE-F32-BYTES]
-/// Calculates cosine distance between an f32 vector and raw LE f32 bytes using AVX2 and FMA instructions.
+/// Berechnet die Kosinus-Distanz zwischen f32-Slice und LE Byte-Slice mittels AVX2.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx2` and `fma` instruction set extensions.
-/// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2", enable = "fma")]
+#[target_feature(enable = "avx2")]
 pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target features `avx2` and `fma` are verified by caller and enabled on function attribute.
-    let mut dot_v = unsafe { _mm256_setzero_ps() };
-    // SAFETY: Target features `avx2` and `fma` are verified by caller and enabled on function attribute.
-    let mut norm_a_v = unsafe { _mm256_setzero_ps() };
-    // SAFETY: Target features `avx2` and `fma` are verified by caller and enabled on function attribute.
-    let mut norm_b_v = unsafe { _mm256_setzero_ps() };
+    // SAFETY: CPU-Feature avx2 ist aktiv.
+    let (mut dot_0, mut dot_1) = unsafe { (_mm256_setzero_ps(), _mm256_setzero_ps()) };
+    // SAFETY: CPU-Feature avx2 ist aktiv.
+    let (mut norm_a_0, mut norm_a_1) = unsafe { (_mm256_setzero_ps(), _mm256_setzero_ps()) };
+    // SAFETY: CPU-Feature avx2 ist aktiv.
+    let (mut norm_b_0, mut norm_b_1) = unsafe { (_mm256_setzero_ps(), _mm256_setzero_ps()) };
 
-    while i + 8 <= len {
-        // SAFETY:
-        // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
-        // 2. Length/Tail: `i + 8 <= len` and `b_bytes.len() >= a.len() * 4` guarantee `a.as_ptr().add(i)` and `b_bytes.as_ptr().add(i * 4)` point to readable memory for 8 `f32`s (32 bytes).
-        // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory loads safely.
-        let (va, vb) = unsafe {
-            (
-                _mm256_loadu_ps(a.as_ptr().add(i)),
-                _mm256_loadu_ps(b_bytes.as_ptr().add(i * 4) as *const f32),
-            )
-        };
+    let (a_ptr, b_ptr) = (a.as_ptr(), b_bytes.as_ptr().cast::<f32>());
 
-        // SAFETY: Target features `avx2` and `fma` are enabled and vector registers are valid `__m256`.
-        dot_v = unsafe { _mm256_fmadd_ps(va, vb, dot_v) };
-        // SAFETY: Target features `avx2` and `fma` are enabled and vector registers are valid `__m256`.
-        norm_a_v = unsafe { _mm256_fmadd_ps(va, va, norm_a_v) };
-        // SAFETY: Target features `avx2` and `fma` are enabled and vector registers are valid `__m256`.
-        norm_b_v = unsafe { _mm256_fmadd_ps(vb, vb, norm_b_v) };
+    while i + 16 <= len {
+        // SAFETY: Pointer-Offsets liegen innerhalb valider Grenzen und avx2 ist aktiv.
+        unsafe {
+            let (va0, vb0, va1, vb1) = (
+                _mm256_loadu_ps(a_ptr.add(i)),
+                _mm256_loadu_ps(b_ptr.add(i)),
+                _mm256_loadu_ps(a_ptr.add(i + 8)),
+                _mm256_loadu_ps(b_ptr.add(i + 8)),
+            );
 
-        i += 8;
+            let (prod_dot0, prod_dot1) = (_mm256_mul_ps(va0, vb0), _mm256_mul_ps(va1, vb1));
+            let (prod_na0, prod_na1) = (_mm256_mul_ps(va0, va0), _mm256_mul_ps(va1, va1));
+            let (prod_nb0, prod_nb1) = (_mm256_mul_ps(vb0, vb0), _mm256_mul_ps(vb1, vb1));
+
+            dot_0 = _mm256_add_ps(dot_0, prod_dot0);
+            dot_1 = _mm256_add_ps(dot_1, prod_dot1);
+            norm_a_0 = _mm256_add_ps(norm_a_0, prod_na0);
+            norm_a_1 = _mm256_add_ps(norm_a_1, prod_na1);
+            norm_b_0 = _mm256_add_ps(norm_b_0, prod_nb0);
+            norm_b_1 = _mm256_add_ps(norm_b_1, prod_nb1);
+        }
+        i += 16;
     }
 
-    // SAFETY: Target feature `avx2` is enabled and `dot_v`, `norm_a_v`, `norm_b_v` are valid `__m256` vector registers.
-    let (mut dot, mut norm_a, mut norm_b) = unsafe {
-        (
-            hsum256_ps_avx(dot_v),
-            hsum256_ps_avx(norm_a_v),
-            hsum256_ps_avx(norm_b_v),
-        )
-    };
+    let mut dot_lanes = [0.0f32; 16];
+    let mut norm_a_lanes = [0.0f32; 16];
+    let mut norm_b_lanes = [0.0f32; 16];
+
+    // SAFETY: Auslesen der 256-Bit Register in 16-Element Float-Puffer.
+    unsafe {
+        _mm256_storeu_ps(dot_lanes.as_mut_ptr(), dot_0);
+        _mm256_storeu_ps(dot_lanes.as_mut_ptr().add(8), dot_1);
+        _mm256_storeu_ps(norm_a_lanes.as_mut_ptr(), norm_a_0);
+        _mm256_storeu_ps(norm_a_lanes.as_mut_ptr().add(8), norm_a_1);
+        _mm256_storeu_ps(norm_b_lanes.as_mut_ptr(), norm_b_0);
+        _mm256_storeu_ps(norm_b_lanes.as_mut_ptr().add(8), norm_b_1);
+    }
 
     while i < len {
-        // SAFETY:
-        // 1. Length/Tail: `i < len` and `b_bytes.len() >= a.len() * 4` guarantee indices are within bounds of `a` and `b_bytes`.
-        // 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
-        let (x, b_val) = unsafe {
-            (
-                *a.get_unchecked(i),
-                f32::from_le_bytes([
-                    *b_bytes.get_unchecked(i * 4),
-                    *b_bytes.get_unchecked(i * 4 + 1),
-                    *b_bytes.get_unchecked(i * 4 + 2),
-                    *b_bytes.get_unchecked(i * 4 + 3),
-                ]),
-            )
-        };
-        dot += x * b_val;
-        norm_a += x * x;
-        norm_b += b_val * b_val;
+        let lane = i % 16;
+        let offset = i * 4;
+        if let (Some(&x), Some(chunk)) = (a.get(i), b_bytes.get(offset..offset + 4)) {
+            if let Ok(bytes) = chunk.try_into() {
+                let b_val = f32::from_le_bytes(bytes);
+                if let Some(slot) = dot_lanes.get_mut(lane) {
+                    *slot += x * b_val;
+                }
+                if let Some(slot) = norm_a_lanes.get_mut(lane) {
+                    *slot += x * x;
+                }
+                if let Some(slot) = norm_b_lanes.get_mut(lane) {
+                    *slot += b_val * b_val;
+                }
+            }
+        }
         i += 1;
     }
+
+    let dot = canonical_reduce_16(&dot_lanes);
+    let norm_a = canonical_reduce_16(&norm_a_lanes);
+    let norm_b = canonical_reduce_16(&norm_b_lanes);
 
     if norm_a == 0.0 || norm_b == 0.0 {
         return 1.0;
@@ -271,383 +296,117 @@ pub(crate) unsafe fn cosine_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -
     1.0 - sim
 }
 
-// ANCHOR[contextra-simd:AVX2-EUCLIDEAN-F32-BYTES]
-/// Calculates Euclidean distance between an f32 vector and raw LE f32 bytes using AVX2 and FMA instructions.
+/// Berechnet die Euklidische Distanz zwischen f32-Slice und LE Byte-Slice mittels AVX2.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx2` and `fma` instruction set extensions.
-/// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2", enable = "fma")]
+#[target_feature(enable = "avx2")]
 pub(crate) unsafe fn euclidean_distance_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target features `avx2` and `fma` are verified by caller and enabled on function attribute.
-    let mut sum_v = unsafe { _mm256_setzero_ps() };
+    // SAFETY: CPU-Feature avx2 ist aktiv.
+    let (mut sum_0, mut sum_1) = unsafe { (_mm256_setzero_ps(), _mm256_setzero_ps()) };
 
-    while i + 8 <= len {
-        // SAFETY:
-        // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
-        // 2. Length/Tail: `i + 8 <= len` and `b_bytes.len() >= a.len() * 4` guarantee `a.as_ptr().add(i)` and `b_bytes.as_ptr().add(i * 4)` point to readable memory for 8 `f32`s (32 bytes).
-        // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory loads safely.
-        let (va, vb) = unsafe {
-            (
-                _mm256_loadu_ps(a.as_ptr().add(i)),
-                _mm256_loadu_ps(b_bytes.as_ptr().add(i * 4) as *const f32),
-            )
-        };
-        // SAFETY: Target feature `avx2` is enabled and `va`, `vb` are valid `__m256` vector registers.
-        let diff = unsafe { _mm256_sub_ps(va, vb) };
+    let (a_ptr, b_ptr) = (a.as_ptr(), b_bytes.as_ptr().cast::<f32>());
 
-        // SAFETY: Target features `avx2` and `fma` are enabled and vector registers are valid `__m256`.
-        sum_v = unsafe { _mm256_fmadd_ps(diff, diff, sum_v) };
+    while i + 16 <= len {
+        // SAFETY: Pointer-Offsets liegen innerhalb valider Grenzen und avx2 ist aktiv.
+        unsafe {
+            let (va0, vb0, va1, vb1) = (
+                _mm256_loadu_ps(a_ptr.add(i)),
+                _mm256_loadu_ps(b_ptr.add(i)),
+                _mm256_loadu_ps(a_ptr.add(i + 8)),
+                _mm256_loadu_ps(b_ptr.add(i + 8)),
+            );
 
-        i += 8;
+            let (diff0, diff1) = (_mm256_sub_ps(va0, vb0), _mm256_sub_ps(va1, vb1));
+
+            let (prod0, prod1) = (_mm256_mul_ps(diff0, diff0), _mm256_mul_ps(diff1, diff1));
+
+            sum_0 = _mm256_add_ps(sum_0, prod0);
+            sum_1 = _mm256_add_ps(sum_1, prod1);
+        }
+        i += 16;
     }
 
-    // SAFETY: Target feature `avx2` is enabled and `sum_v` is a valid `__m256` vector register.
-    let mut sum = unsafe { hsum256_ps_avx(sum_v) };
+    let mut sum_lanes = [0.0f32; 16];
+    // SAFETY: Auslesen der 256-Bit Register in 16-Element Float-Puffer.
+    unsafe {
+        _mm256_storeu_ps(sum_lanes.as_mut_ptr(), sum_0);
+        _mm256_storeu_ps(sum_lanes.as_mut_ptr().add(8), sum_1);
+    }
 
     while i < len {
-        // SAFETY:
-        // 1. Length/Tail: `i < len` and `b_bytes.len() >= a.len() * 4` guarantee indices are within bounds.
-        // 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
-        let (x, b_val) = unsafe {
-            (
-                *a.get_unchecked(i),
-                f32::from_le_bytes([
-                    *b_bytes.get_unchecked(i * 4),
-                    *b_bytes.get_unchecked(i * 4 + 1),
-                    *b_bytes.get_unchecked(i * 4 + 2),
-                    *b_bytes.get_unchecked(i * 4 + 3),
-                ]),
-            )
-        };
-        let diff = x - b_val;
-        sum += diff * diff;
+        let lane = i % 16;
+        let offset = i * 4;
+        if let (Some(&x), Some(chunk)) = (a.get(i), b_bytes.get(offset..offset + 4)) {
+            if let Ok(bytes) = chunk.try_into() {
+                let b_val = f32::from_le_bytes(bytes);
+                let diff = x - b_val;
+                if let Some(slot) = sum_lanes.get_mut(lane) {
+                    *slot += diff * diff;
+                }
+            }
+        }
         i += 1;
     }
 
+    let sum = canonical_reduce_16(&sum_lanes);
     sum.sqrt()
 }
 
-// ANCHOR[contextra-simd:AVX2-DOT-F32-BYTES]
-/// Calculates dot product between an f32 vector and raw LE f32 bytes using AVX2 and FMA instructions.
+/// Berechnet die Skalarprodukt-Distanz zwischen f32-Slice und LE Byte-Slice mittels AVX2.
 ///
-/// # Safety
-/// Caller must ensure that:
-/// 1. Target CPU supports `avx2` and `fma` instruction set extensions.
-/// 2. `b_bytes` contains at least `a.len() * 4` readable bytes.
+/// # Safety: CPU-Erweiterung und Pufferlängen müssen vorab validiert sein.
 #[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2", enable = "fma")]
+#[target_feature(enable = "avx2")]
 pub(crate) unsafe fn dot_product_f32_bytes_avx2(a: &[f32], b_bytes: &[u8]) -> f32 {
-    let len = a.len();
-    let mut i = 0;
+    let (len, mut i) = (a.len(), 0);
 
-    // SAFETY: Target features `avx2` and `fma` are verified by caller and enabled on function attribute.
-    let mut dot_v = unsafe { _mm256_setzero_ps() };
+    // SAFETY: CPU-Feature avx2 ist aktiv.
+    let (mut dot_0, mut dot_1) = unsafe { (_mm256_setzero_ps(), _mm256_setzero_ps()) };
 
-    while i + 8 <= len {
-        // SAFETY:
-        // 1. Feature: Target features `avx2` and `fma` are enabled via function attribute.
-        // 2. Length/Tail: `i + 8 <= len` and `b_bytes.len() >= a.len() * 4` guarantee readable memory.
-        // 3. Alignment: `_mm256_loadu_ps` handles unaligned memory loads safely.
-        let (va, vb) = unsafe {
-            (
-                _mm256_loadu_ps(a.as_ptr().add(i)),
-                _mm256_loadu_ps(b_bytes.as_ptr().add(i * 4) as *const f32),
-            )
-        };
+    let (a_ptr, b_ptr) = (a.as_ptr(), b_bytes.as_ptr().cast::<f32>());
 
-        // SAFETY: Target features `avx2` and `fma` are enabled and vector registers are valid `__m256`.
-        dot_v = unsafe { _mm256_fmadd_ps(va, vb, dot_v) };
+    while i + 16 <= len {
+        // SAFETY: Pointer-Offsets liegen innerhalb valider Grenzen und avx2 ist aktiv.
+        unsafe {
+            let (va0, vb0, va1, vb1) = (
+                _mm256_loadu_ps(a_ptr.add(i)),
+                _mm256_loadu_ps(b_ptr.add(i)),
+                _mm256_loadu_ps(a_ptr.add(i + 8)),
+                _mm256_loadu_ps(b_ptr.add(i + 8)),
+            );
 
-        i += 8;
+            let (prod0, prod1) = (_mm256_mul_ps(va0, vb0), _mm256_mul_ps(va1, vb1));
+
+            dot_0 = _mm256_add_ps(dot_0, prod0);
+            dot_1 = _mm256_add_ps(dot_1, prod1);
+        }
+        i += 16;
     }
 
-    // SAFETY: Target feature `avx2` is enabled and `dot_v` is a valid `__m256` vector register.
-    let mut dot = unsafe { hsum256_ps_avx(dot_v) };
+    let mut dot_lanes = [0.0f32; 16];
+    // SAFETY: Auslesen der 256-Bit Register in 16-Element Float-Puffer.
+    unsafe {
+        _mm256_storeu_ps(dot_lanes.as_mut_ptr(), dot_0);
+        _mm256_storeu_ps(dot_lanes.as_mut_ptr().add(8), dot_1);
+    }
 
     while i < len {
-        // SAFETY:
-        // 1. Length/Tail: `i < len` and `b_bytes.len() >= a.len() * 4` guarantee indices are within bounds.
-        // 2. Alignment: `from_le_bytes` constructs `f32` from unaligned byte slice.
-        let (x, b_val) = unsafe {
-            (
-                *a.get_unchecked(i),
-                f32::from_le_bytes([
-                    *b_bytes.get_unchecked(i * 4),
-                    *b_bytes.get_unchecked(i * 4 + 1),
-                    *b_bytes.get_unchecked(i * 4 + 2),
-                    *b_bytes.get_unchecked(i * 4 + 3),
-                ]),
-            )
-        };
-        dot += x * b_val;
+        let lane = i % 16;
+        let offset = i * 4;
+        if let (Some(&x), Some(chunk)) = (a.get(i), b_bytes.get(offset..offset + 4)) {
+            if let Ok(bytes) = chunk.try_into() {
+                let b_val = f32::from_le_bytes(bytes);
+                if let Some(slot) = dot_lanes.get_mut(lane) {
+                    *slot += x * b_val;
+                }
+            }
+        }
         i += 1;
     }
 
+    let dot = canonical_reduce_16(&dot_lanes);
     -dot
-}
-
-// ANCHOR[contextra-simd:AVX2-HSUM256-PS]
-/// Horizontal sum of 8 x f32 values in a 256-bit AVX vector register.
-///
-/// # Safety
-/// Caller must ensure that target CPU supports `avx2` instruction set extension.
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2")]
-pub(crate) unsafe fn hsum256_ps_avx(v: __m256) -> f32 {
-    // SAFETY: Target feature `avx2` is enabled and `v` is a valid `__m256` register.
-    let vlow = unsafe { _mm256_castps256_ps128(v) };
-    // SAFETY: Target feature `avx2` is enabled and `v` is a valid `__m256` register.
-    let vhigh = unsafe { _mm256_extractf128_ps(v, 1) };
-    // SAFETY: Target feature `avx2` is enabled and `vlow`, `vhigh` are valid `__m128` registers.
-    let v128 = unsafe { _mm_add_ps(vlow, vhigh) };
-    // SAFETY: Target feature `avx2` is enabled and `v128` is a valid `__m128` register.
-    let v64 = unsafe { _mm_add_ps(v128, _mm_movehl_ps(v128, v128)) };
-    // SAFETY: Target feature `avx2` is enabled and `v64` is a valid `__m128` register.
-    let v32 = unsafe { _mm_add_ss(v64, _mm_shuffle_ps(v64, v64, 0x55)) };
-    // SAFETY: Target feature `avx2` is enabled and `v32` contains a valid scalar float at lane 0.
-    unsafe { _mm_cvtss_f32(v32) }
-}
-
-// ANCHOR[contextra-simd:AVX2-DOT-U8]
-/// Calculates dot product between two byte vectors using AVX2 instructions.
-///
-/// # Safety
-/// Caller must ensure that target CPU supports `avx2` instruction set extension.
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2")]
-pub(crate) unsafe fn dot_product_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
-    let len = a.len().min(b.len());
-    let mut i = 0;
-
-    // SAFETY: Target feature `avx2` is verified by caller and enabled on function attribute.
-    let mut sum_v = unsafe { _mm256_setzero_si256() };
-    // SAFETY: Target feature `avx2` is verified by caller and enabled on function attribute.
-    let zero = unsafe { _mm256_setzero_si256() };
-
-    while i + 32 <= len {
-        // SAFETY:
-        // 1. Feature: Target feature `avx2` is enabled via function attribute.
-        // 2. Length/Tail: `i + 32 <= len` where `len = min(a.len(), b.len())` guarantees 32 readable `u8` elements.
-        // 3. Alignment: `_mm256_loadu_si256` handles unaligned byte loads safely.
-        let (va, vb) = unsafe {
-            (
-                _mm256_loadu_si256(a.as_ptr().add(i) as *const __m256i),
-                _mm256_loadu_si256(b.as_ptr().add(i) as *const __m256i),
-            )
-        };
-
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let va_lo = unsafe { _mm256_unpacklo_epi8(va, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let vb_lo = unsafe { _mm256_unpacklo_epi8(vb, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let prod_lo = unsafe { _mm256_madd_epi16(va_lo, vb_lo) };
-
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let va_hi = unsafe { _mm256_unpackhi_epi8(va, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let vb_hi = unsafe { _mm256_unpackhi_epi8(vb, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let prod_hi = unsafe { _mm256_madd_epi16(va_hi, vb_hi) };
-
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        sum_v = unsafe { _mm256_add_epi32(sum_v, prod_lo) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        sum_v = unsafe { _mm256_add_epi32(sum_v, prod_hi) };
-
-        i += 32;
-    }
-
-    // SAFETY: Target feature `avx2` is enabled and `sum_v` is a valid `__m256i` vector register.
-    let mut sum = u32::from_ne_bytes(unsafe { hsum256_epi32_avx2(sum_v) }.to_ne_bytes());
-
-    while i < len {
-        // SAFETY: `i < len` where `len = min(a.len(), b.len())` guarantees `i` is within bounds.
-        let (x, y) = unsafe { (*a.get_unchecked(i) as u32, *b.get_unchecked(i) as u32) };
-        sum += x * y;
-        i += 1;
-    }
-
-    sum
-}
-
-// ANCHOR[contextra-simd:AVX2-EUCLIDEAN-SQ-U8]
-/// Calculates squared Euclidean distance between two byte vectors using AVX2 instructions.
-///
-/// # Safety
-/// Caller must ensure that target CPU supports `avx2` instruction set extension.
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2")]
-pub(crate) unsafe fn euclidean_distance_sq_u8_avx2(a: &[u8], b: &[u8]) -> u32 {
-    let len = a.len().min(b.len());
-    let mut i = 0;
-
-    // SAFETY: Target feature `avx2` is verified by caller and enabled on function attribute.
-    let mut sum_v = unsafe { _mm256_setzero_si256() };
-    // SAFETY: Target feature `avx2` is verified by caller and enabled on function attribute.
-    let zero = unsafe { _mm256_setzero_si256() };
-
-    while i + 32 <= len {
-        // SAFETY:
-        // 1. Feature: Target feature `avx2` is enabled via function attribute.
-        // 2. Length/Tail: `i + 32 <= len` guarantees 32 readable `u8` elements in `a` and `b`.
-        // 3. Alignment: `_mm256_loadu_si256` handles unaligned byte loads safely.
-        let (va, vb) = unsafe {
-            (
-                _mm256_loadu_si256(a.as_ptr().add(i) as *const __m256i),
-                _mm256_loadu_si256(b.as_ptr().add(i) as *const __m256i),
-            )
-        };
-
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let va_lo = unsafe { _mm256_unpacklo_epi8(va, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let vb_lo = unsafe { _mm256_unpacklo_epi8(vb, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let diff_lo = unsafe { _mm256_sub_epi16(va_lo, vb_lo) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let prod_lo = unsafe { _mm256_madd_epi16(diff_lo, diff_lo) };
-
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let va_hi = unsafe { _mm256_unpackhi_epi8(va, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let vb_hi = unsafe { _mm256_unpackhi_epi8(vb, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let diff_hi = unsafe { _mm256_sub_epi16(va_hi, vb_hi) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let prod_hi = unsafe { _mm256_madd_epi16(diff_hi, diff_hi) };
-
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        sum_v = unsafe { _mm256_add_epi32(sum_v, prod_lo) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        sum_v = unsafe { _mm256_add_epi32(sum_v, prod_hi) };
-
-        i += 32;
-    }
-
-    // SAFETY: Target feature `avx2` is enabled and `sum_v` is a valid `__m256i` vector register.
-    let mut sum = u32::from_ne_bytes(unsafe { hsum256_epi32_avx2(sum_v) }.to_ne_bytes());
-
-    while i < len {
-        // SAFETY: `i < len` where `len = min(a.len(), b.len())` guarantees `i` is within bounds.
-        let diff = unsafe { (*a.get_unchecked(i) as i32) - (*b.get_unchecked(i) as i32) };
-        let abs_diff = diff.unsigned_abs();
-        sum += abs_diff * abs_diff;
-        i += 1;
-    }
-
-    sum
-}
-
-// ANCHOR[contextra-simd:AVX2-COSINE-PARTS-U8]
-/// Calculates cosine similarity parts (dot, norm_a_sq, norm_b_sq) for byte vectors using AVX2 instructions.
-///
-/// # Safety
-/// Caller must ensure that target CPU supports `avx2` instruction set extension.
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2")]
-pub(crate) unsafe fn cosine_similarity_parts_u8_avx2(
-    a: &[u8],
-    b: &[u8],
-) -> CosineSimilarityPartsU8 {
-    let len = a.len().min(b.len());
-    let mut i = 0;
-
-    // SAFETY: Target feature `avx2` is verified by caller and enabled on function attribute.
-    let mut dot_v = unsafe { _mm256_setzero_si256() };
-    // SAFETY: Target feature `avx2` is verified by caller and enabled on function attribute.
-    let mut norm_a_v = unsafe { _mm256_setzero_si256() };
-    // SAFETY: Target feature `avx2` is verified by caller and enabled on function attribute.
-    let mut norm_b_v = unsafe { _mm256_setzero_si256() };
-    // SAFETY: Target feature `avx2` is verified by caller and enabled on function attribute.
-    let zero = unsafe { _mm256_setzero_si256() };
-
-    while i + 32 <= len {
-        // SAFETY:
-        // 1. Feature: Target feature `avx2` is enabled via function attribute.
-        // 2. Length/Tail: `i + 32 <= len` guarantees 32 readable `u8` elements in `a` and `b`.
-        // 3. Alignment: `_mm256_loadu_si256` handles unaligned byte loads safely.
-        let (va, vb) = unsafe {
-            (
-                _mm256_loadu_si256(a.as_ptr().add(i) as *const __m256i),
-                _mm256_loadu_si256(b.as_ptr().add(i) as *const __m256i),
-            )
-        };
-
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let va_lo = unsafe { _mm256_unpacklo_epi8(va, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let vb_lo = unsafe { _mm256_unpacklo_epi8(vb, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        dot_v = unsafe { _mm256_add_epi32(dot_v, _mm256_madd_epi16(va_lo, vb_lo)) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        norm_a_v = unsafe { _mm256_add_epi32(norm_a_v, _mm256_madd_epi16(va_lo, va_lo)) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        norm_b_v = unsafe { _mm256_add_epi32(norm_b_v, _mm256_madd_epi16(vb_lo, vb_lo)) };
-
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let va_hi = unsafe { _mm256_unpackhi_epi8(va, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        let vb_hi = unsafe { _mm256_unpackhi_epi8(vb, zero) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        dot_v = unsafe { _mm256_add_epi32(dot_v, _mm256_madd_epi16(va_hi, vb_hi)) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        norm_a_v = unsafe { _mm256_add_epi32(norm_a_v, _mm256_madd_epi16(va_hi, va_hi)) };
-        // SAFETY: Target feature `avx2` is enabled and registers are valid `__m256i`.
-        norm_b_v = unsafe { _mm256_add_epi32(norm_b_v, _mm256_madd_epi16(vb_hi, vb_hi)) };
-
-        i += 32;
-    }
-
-    // SAFETY: Target feature `avx2` is enabled and vector registers are valid `__m256i`.
-    let (mut dot, mut norm_a_sq, mut norm_b_sq) = unsafe {
-        (
-            u32::from_ne_bytes(hsum256_epi32_avx2(dot_v).to_ne_bytes()),
-            u32::from_ne_bytes(hsum256_epi32_avx2(norm_a_v).to_ne_bytes()),
-            u32::from_ne_bytes(hsum256_epi32_avx2(norm_b_v).to_ne_bytes()),
-        )
-    };
-
-    while i < len {
-        // SAFETY: `i < len` where `len = min(a.len(), b.len())` guarantees `i` is within bounds.
-        let (x, y) = unsafe { (*a.get_unchecked(i) as u32, *b.get_unchecked(i) as u32) };
-        dot += x * y;
-        norm_a_sq += x * x;
-        norm_b_sq += y * y;
-        i += 1;
-    }
-
-    CosineSimilarityPartsU8 {
-        dot,
-        norm_a_sq,
-        norm_b_sq,
-    }
-}
-
-// ANCHOR[contextra-simd:AVX2-HSUM256-EPI32]
-/// Horizontal sum of 8 x 32-bit signed integers in a 256-bit AVX2 vector register.
-///
-/// # Safety
-/// Caller must ensure that target CPU supports `avx2` instruction set extension.
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx2")]
-pub(crate) unsafe fn hsum256_epi32_avx2(v: __m256i) -> i32 {
-    // SAFETY: Target feature `avx2` is enabled and `v` is a valid `__m256i` register.
-    let vlow = unsafe { _mm256_castsi256_si128(v) };
-    // SAFETY: Target feature `avx2` is enabled and `v` is a valid `__m256i` register.
-    let vhigh = unsafe { _mm256_extracti128_si256(v, 1) };
-    // SAFETY: Target feature `avx2` is enabled and `vlow`, `vhigh` are valid `__m128i` registers.
-    let v128 = unsafe { _mm_add_epi32(vlow, vhigh) };
-    // SAFETY: Target feature `avx2` is enabled and `v128` is a valid `__m128i` register.
-    let v64 = unsafe { _mm_add_epi32(v128, _mm_srli_si128(v128, 8)) };
-    // SAFETY: Target feature `avx2` is enabled and `v64` is a valid `__m128i` register.
-    let v32 = unsafe { _mm_add_epi32(v64, _mm_srli_si128(v64, 4)) };
-    // SAFETY: Target feature `avx2` is enabled and `v32` contains a valid 32-bit int at lane 0.
-    unsafe { _mm_cvtsi128_si32(v32) }
 }
