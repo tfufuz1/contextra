@@ -3,6 +3,7 @@
 use contextra::{Contextra, Error, Secret};
 use std::time::Duration;
 
+/// SPEC: T-API-1
 #[tokio::test]
 async fn test_short_passphrase_rejected() {
     let rt = tokio::runtime::Handle::current();
