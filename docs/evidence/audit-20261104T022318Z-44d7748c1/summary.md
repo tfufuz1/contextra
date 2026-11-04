@@ -1,17 +1,17 @@
 # Contextra Voll-Audit
 
 - Commit: `44d7748c1` (2026-11-04 03:23:02 +0100), Branch `main`, hinter origin: 0, ungespeicherte Aenderungen: False
-- Start: 2026-11-04T02:23:18+00:00  Dauer: 19.7 min
+- Start: 2026-11-04T02:23:18+00:00  Dauer: 20.1 min
 - Toolchain-Pin: `1.97.0`; Preflight: **PASS** (cargo 1.97.0 (c980f4866 2026-06-30) | Pin 1.97.0)
 - Host: Linux-7.2.7-1-liquorix-amd64-x86_64-with-glibc2.41 | 8 CPUs | MemTotal:       10121012 kB
 - Nutzer: freddy
 
 ## Gesamt
 
-- **FAIL**: 87
+- **FAIL**: 93
 - **INFO**: 7
 - **PASS**: 55
-- **PENDING**: 43
+- **PENDING**: 37
 
 Hinweis: Bei `befund_*`-Schritten bedeutet FAIL, dass der Befund **vorliegt**. `INFO` ist eine Messung oder ein Hinweis ohne Urteil.
 
@@ -106,6 +106,12 @@ Hinweis: Bei `befund_*`-Schritten bedeutet FAIL, dass der Befund **vorliegt**. `
 | `liste_tests__contextra-simd` | FAIL | 0.4 | 0 Tests gelistet | `logs/146_liste_tests__contextra-simd.log` |
 | `liste_tests__contextra-store` | FAIL | 14.1 | 0 Tests gelistet | `logs/147_liste_tests__contextra-store.log` |
 | `liste_tests__contextra-sys` | FAIL | 0.3 | 0 Tests gelistet | `logs/148_liste_tests__contextra-sys.log` |
+| `liste_tests__contextra-testkit` | FAIL | 7.0 | 0 Tests gelistet | `logs/149_liste_tests__contextra-testkit.log` |
+| `liste_tests__contextra-testmacros` | FAIL | 0.3 | 0 Tests gelistet | `logs/150_liste_tests__contextra-testmacros.log` |
+| `liste_tests__contextra-text` | FAIL | 9.0 | 0 Tests gelistet | `logs/151_liste_tests__contextra-text.log` |
+| `liste_tests__contextra-types` | FAIL | 4.9 | 0 Tests gelistet | `logs/152_liste_tests__contextra-types.log` |
+| `liste_tests__contextra-vector` | FAIL | 4.5 | 0 Tests gelistet | `logs/153_liste_tests__contextra-vector.log` |
+| `liste_tests__ctx-verify` | FAIL | 0.6 | 0 Tests gelistet | `logs/154_liste_tests__ctx-verify.log` |
 
 ## Alle Schritte
 
@@ -260,12 +266,12 @@ Hinweis: Bei `befund_*`-Schritten bedeutet FAIL, dass der Befund **vorliegt**. `
 | 3-testbarkeit | `liste_tests__contextra-simd` | FAIL | 0.4 | 0 Tests gelistet |
 | 3-testbarkeit | `liste_tests__contextra-store` | FAIL | 14.1 | 0 Tests gelistet |
 | 3-testbarkeit | `liste_tests__contextra-sys` | FAIL | 0.3 | 0 Tests gelistet |
-| 3-testbarkeit | `liste_tests__contextra-testkit` | PENDING | 0.0 |  |
-| 3-testbarkeit | `liste_tests__contextra-testmacros` | PENDING | 0.0 |  |
-| 3-testbarkeit | `liste_tests__contextra-text` | PENDING | 0.0 |  |
-| 3-testbarkeit | `liste_tests__contextra-types` | PENDING | 0.0 |  |
-| 3-testbarkeit | `liste_tests__contextra-vector` | PENDING | 0.0 |  |
-| 3-testbarkeit | `liste_tests__ctx-verify` | PENDING | 0.0 |  |
+| 3-testbarkeit | `liste_tests__contextra-testkit` | FAIL | 7.0 | 0 Tests gelistet |
+| 3-testbarkeit | `liste_tests__contextra-testmacros` | FAIL | 0.3 | 0 Tests gelistet |
+| 3-testbarkeit | `liste_tests__contextra-text` | FAIL | 9.0 | 0 Tests gelistet |
+| 3-testbarkeit | `liste_tests__contextra-types` | FAIL | 4.9 | 0 Tests gelistet |
+| 3-testbarkeit | `liste_tests__contextra-vector` | FAIL | 4.5 | 0 Tests gelistet |
+| 3-testbarkeit | `liste_tests__ctx-verify` | FAIL | 0.6 | 0 Tests gelistet |
 | 3-testbarkeit | `coverage` | PENDING | 0.0 |  |
 | 3-testbarkeit | `coverage_funktionen` | PENDING | 0.0 |  |
 | 4-bench | `bench__contextra-mvcc__mvcc_bench` | PENDING | 0.0 |  |
