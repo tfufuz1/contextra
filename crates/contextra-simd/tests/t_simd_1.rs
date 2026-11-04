@@ -12,7 +12,7 @@
 //! **Zweck (SPEC §8.4, §15, D-28):**
 //! Implementiert die normative Testbatterie **T-SIMD-1**:
 //! - Mindestens 100.000 Vektoren je f32-Kernel (L2 / Euclidean, Cosine, Dot Product).
-//! - Getestet werden Vektoren mit Längen 0..=2048, inklusive Edge Cases: NaN, Inf, Denormals, Nullen,
+//! - Getestet werden Vektoren mit Längen 0..=4096, inklusive Edge Cases: NaN, Inf, Denormals, Nullen,
 //!   extreme Werte sowie unaligned Slices.
 //! - Relative Abweichung $\le 10^{-4}$ gegen die unveränderliche Skalar-Referenz für Vektoren mit Norm $\le 10^3$.
 //! - Deterministischer PRNG-Seed mit Ausgabe von Seed und Iterationsindex im Fehlerfall.
@@ -124,15 +124,15 @@ fn test_t_simd_1_100k_vectors_per_kernel_against_scalar() {
         let _guard = OverrideGuard::set(forced_path);
 
         // Batch-Vektorpuffer um Reallokationen zu minimieren
-        let mut buf_a = Vec::with_capacity(2048);
-        let mut buf_b = Vec::with_capacity(2048);
+        let mut buf_a = Vec::with_capacity(4096);
+        let mut buf_b = Vec::with_capacity(4096);
 
         for iter in 0..NUM_VECTORS {
-            // Längenverteilung deckt 0..=2048 ab:
+            // Längenverteilung deckt 0..=4096 ab:
             // - Häufige SIMD-Grenzen (0..64)
             // - Mittlere Embeddings (128, 256, 384, 512, 768)
-            // - Große Embeddings (1024, 1536, 2048)
-            let len = match iter % 20 {
+            // - Große Embeddings (1024, 1536, 2048, 4096)
+            let len = match iter % 22 {
                 0 => 0,
                 1 => 1,
                 2 => 7,
@@ -152,7 +152,9 @@ fn test_t_simd_1_100k_vectors_per_kernel_against_scalar() {
                 16 => 512,
                 17 => 768,
                 18 => 1536,
-                _ => (rng.next_u64() % 2049) as usize,
+                19 => 2048,
+                20 => 4096,
+                _ => (rng.next_u64() % 4097) as usize,
             };
 
             buf_a.clear();

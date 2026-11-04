@@ -16,8 +16,6 @@
 //! - `ImportanceScore` ist strikt auf `[0.0, 1.0]` begrenzt. `NaN` wird sicher zu `0.0`.
 //! - Reine, nebenwirkungsfreie Berechnungen ohne Panics (Zero-Panic-Garantie).
 
-// FILE-CONTEXT
-// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
 // ZWECK: Memory Importance Scoring und Recency-Decay Berechnungen (ADR-025).
 // INVARIANTEN: ImportanceScore ist auf [0.0, 1.0] geclampt; NaN wird zu 0.0 (Zero-Panic).
 // HOTSPOTS: 15-120
@@ -33,7 +31,6 @@ use serde::{Deserialize, Serialize};
 
 /// Scores the importance of a memory item on a normalized scale of `0.0` to `1.0`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:IMP-SCORE]
 pub struct ImportanceScore(f32);
 
 impl ImportanceScore {
@@ -64,7 +61,6 @@ impl Default for ImportanceScore {
 /// Recency-decay mathematical function for episodic relevance.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 #[non_exhaustive]
-// ANCHOR[contextra-types:IMP-DECAY]
 pub enum DecayFunction {
     /// No recency decay (factor remains 1.0).
     #[default]
@@ -182,7 +178,6 @@ impl DecayFunction {
 
 /// Tracks the importance score and decay parameters of a document.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:IMP-MEM]
 pub struct MemoryImportance {
     /// Base LLM or heuristic evaluation score.
     pub base_score: ImportanceScore,

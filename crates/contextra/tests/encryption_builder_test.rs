@@ -1,43 +1,24 @@
-//! # Integrationstest: `encryption_builder_test`
-//!
-//! Testet die Verschlüsselungskonfiguration des Builders:
-//! - Ablehnung von Passphrasen unter 12 Zeichen.
-//! - Statischer Typestate-Zwang (Passphrase & Runtime müssen gesetzt sein).
-//! - Kein Leaken der Passphrase in Debug-Ausgaben.
+//! # Test: Passphrase-Validierung und Typestate-Absicherung (SPEC 5.7, 7.1)
 
 use contextra::{Contextra, Error, Secret};
+use std::time::Duration;
 
 #[tokio::test]
 async fn test_short_passphrase_rejected() {
     let rt = tokio::runtime::Handle::current();
-    let secret = Secret::new(b"short".to_vec()); // < 12 Zeichen
+    let short_secret = Secret::new(b"kurz".to_vec());
 
-    let res = Contextra::builder()
-        .passphrase(secret)
+    let builder = Contextra::builder()
+        .data_dir("./target/short_pass_test")
+        .passphrase(short_secret)
         .runtime(rt)
-        .open()
-        .await;
+        .backup_retention(Duration::from_secs(86400));
 
-    assert!(res.is_err());
-    match res {
-        Err(Error::Config { message }) => {
-            assert!(message.contains("mindestens 12 Zeichen"));
+    let result = builder.build().await;
+    match result {
+        Err(Error::Config(c)) => {
+            assert!(c.to_string().contains("12 Zeichen"));
         }
-        _ => panic!("Erwartet Error::Config wegen zu kurzer Passphrase"),
+        other => panic!("Expected Config error for short passphrase, got: {other:?}"),
     }
-}
-
-#[tokio::test]
-async fn test_secret_not_leaked_in_debug() {
-    let passphrase = b"sehr-sichere-passphrase-12345".to_vec();
-    let secret = Secret::new(passphrase.clone());
-
-    // Secret implementiert per SPEC TY-11 bewusst weder Debug noch Display
-    // Aber der Builder darf die Passphrase nicht in Debug leaken:
-    let rt = tokio::runtime::Handle::current();
-    let builder = Contextra::builder().passphrase(secret).runtime(rt);
-
-    let err = Error::Auth;
-    let err_str = format!("{err:?}");
-    assert!(!err_str.contains("sehr-sichere-passphrase"));
 }

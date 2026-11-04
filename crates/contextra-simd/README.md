@@ -2,7 +2,7 @@ Vektor-Distanzfunktionen (L2, Dot, Cosine) mit SIMD-Kernen und Skalar-Referenz.
 
 ## Status
 
-Ring 1. Ist-Zustand: vorhanden, 13/13 Lib-Tests in 3.0.0; u8-VNNI-Pfad zu entfernen. Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
+Ring 1. Ist-Zustand: produktionsreif, u8-VNNI-Pfad entfernt (D-28). Soll-Zustand nach [`docs/SPEC.md`](../../docs/SPEC.md), Abschnitt 5.1 und 8.
 
 ## Abhängigkeiten
 
