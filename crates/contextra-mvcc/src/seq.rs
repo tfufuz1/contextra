@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:SEQ-ROOT]
 //! # Sequenzallokator (`SeqAllocator`)
 //!
 //! Verwaltet monoton steigende Sequenznummern für Transaktionen und Versionen.

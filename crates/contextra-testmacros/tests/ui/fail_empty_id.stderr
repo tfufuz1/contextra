@@ -1,0 +1,5 @@
+error: invalid test ID ``: must start with prefix `T-` (e.g. `T-TRACE-1`)
+ --> tests/ui/fail_empty_id.rs:3:17
+  |
+3 | #[ctx_test(id = "")]
+  |                 ^^

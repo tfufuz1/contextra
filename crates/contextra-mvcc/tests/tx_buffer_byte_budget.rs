@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-TX-BUFFER-BYTE-BUDGET-ROOT]
 //! # Byte-Budget- und Speichergrenzen-Tests für den `TxBuffer`
 //!
 //! Stellt sicher, dass das Überschreiten des Byte-Budgets pro Transaktion und
@@ -6,11 +5,12 @@
 //! vollständig freigegeben wird.
 
 use contextra_mvcc::tx_buffer::{IndexOp, TxBuffer, TxBufferConfig, STAGING_ENTRY_OVERHEAD_BYTES};
+use contextra_testmacros::ctx_test;
 use contextra_types::{ContextraError, DocId, TxId};
 use std::time::Duration;
 
 // Prüft, dass das Überschreiten des Byte-Budgets einer Transaktion mit einem Fehler abgewiesen wird.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn tx_buffer_byte_budget_exceeded() {
     assert_eq!(STAGING_ENTRY_OVERHEAD_BYTES, 32);
 
@@ -47,7 +47,7 @@ fn tx_buffer_byte_budget_exceeded() {
 }
 
 // Prüft, dass der reservierte Byte-Speicher bei drain, discard und orphan reaping wieder freigegeben wird.
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn tx_buffer_byte_budget_freed_on_drain_discard_reap() {
     let config = TxBufferConfig {
         max_tx_staged_bytes: 1024,

@@ -1,4 +1,3 @@
-// ANCHOR[contextra-mvcc:TEST-MV-SSI-PROPS]
 //! # SSI-Validierungs- und Isolations-Tests gegen Referenzmodell (MV-09, MV-10)
 //!
 //! Prüft:
@@ -13,11 +12,12 @@ use contextra_mvcc::error::MvccError;
 use contextra_mvcc::ssi::{ReadSet, SequenceLogSsiValidator, SsiValidator};
 use contextra_mvcc::ContextraError;
 use contextra_testkit::reference_model::ReferenceModel;
+use contextra_testmacros::ctx_test;
 use contextra_types::TxId;
 use proptest::prelude::*;
 use std::collections::BTreeMap;
 
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn mv_09_write_write_antidependency_detection() {
     let validator = SequenceLogSsiValidator::new();
     let tx1 = TxId::new(10);
@@ -49,7 +49,7 @@ fn mv_09_write_write_antidependency_detection() {
     );
 }
 
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn mv_09_read_write_antidependency_write_skew() {
     let validator = SequenceLogSsiValidator::new();
     let tx1 = TxId::new(101);
@@ -81,7 +81,7 @@ fn mv_09_read_write_antidependency_write_skew() {
     );
 }
 
-#[test]
+#[ctx_test(id = "T-TXN-1")]
 fn mv_10_zero_panic_checked_counters_and_overflow_protection() {
     let validator = SequenceLogSsiValidator::new_with_bounds(100);
     let tx = TxId::new(999);
@@ -119,7 +119,7 @@ enum OracleAction {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(50))]
 
-    #[test]
+#[ctx_test(id = "T-TXN-1")]
     fn prop_mv_09_ssi_validation_oracle_with_reference_model(
         actions in proptest::collection::vec(
             prop_oneof![
