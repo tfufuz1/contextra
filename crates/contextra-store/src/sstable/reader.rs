@@ -149,7 +149,8 @@ pub(super) fn may_contain_key_in_block_bloom(
         }
         let (h1, h2) = BloomFilter::hash_pair(key);
         for i in 0..7u64 {
-            let bit_idx = usize::try_from(h1.wrapping_add(i.wrapping_mul(h2)) % (m as u64)).unwrap_or(0);
+            let bit_idx =
+                usize::try_from(h1.wrapping_add(i.wrapping_mul(h2)) % (m as u64)).unwrap_or(0);
             let byte_idx = bit_idx / 8;
             let bit_mask = 1u8 << (bit_idx % 8);
             if let Some(&byte) = bloom_bytes.get(byte_idx) {
@@ -412,17 +413,17 @@ impl SstableReader {
                     .map_err(|_| ContextraError::ParseError("Invalid index_offset".into()))?,
             )
         } else if trailer_len >= 54 {
-            let magic_slice = trailer_data.get(50..54).ok_or_else(|| {
-                ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0)
-            })?;
+            let magic_slice = trailer_data
+                .get(50..54)
+                .ok_or_else(|| ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0))?;
             let magic_legacy =
                 u32::from_le_bytes(magic_slice.try_into().map_err(|_| {
                     ContextraError::checksum_mismatch(path_buf.to_string_lossy(), 0)
                 })?);
             if magic_legacy == SSTABLE_MAGIC_LEGACY {
-                let off_slice = trailer_data.get(42..50).ok_or_else(|| {
-                    ContextraError::ParseError("Invalid index offset".into())
-                })?;
+                let off_slice = trailer_data
+                    .get(42..50)
+                    .ok_or_else(|| ContextraError::ParseError("Invalid index offset".into()))?;
                 u64::from_le_bytes(
                     off_slice
                         .try_into()
@@ -487,9 +488,9 @@ impl SstableReader {
                         "Bloom filter data too short for CRC".into(),
                     ));
                 }
-                let crc_slice = bloom_data_raw.get(0..4).ok_or_else(|| {
-                    ContextraError::Serialization("Invalid CRC".into())
-                })?;
+                let crc_slice = bloom_data_raw
+                    .get(0..4)
+                    .ok_or_else(|| ContextraError::Serialization("Invalid CRC".into()))?;
                 let stored_crc = u32::from_le_bytes(
                     crc_slice
                         .try_into()
@@ -553,9 +554,9 @@ impl SstableReader {
                     "Index data too short for CRC".into(),
                 ));
             }
-            let crc_slice = index_bytes_raw.get(0..4).ok_or_else(|| {
-                ContextraError::Serialization("Invalid CRC".into())
-            })?;
+            let crc_slice = index_bytes_raw
+                .get(0..4)
+                .ok_or_else(|| ContextraError::Serialization("Invalid CRC".into()))?;
             let stored_crc = u32::from_le_bytes(
                 crc_slice
                     .try_into()
@@ -581,11 +582,10 @@ impl SstableReader {
             let klen_slice = index_bytes.get(pos..pos + 2).ok_or_else(|| {
                 ContextraError::ParseError("corrupted index: key_len slice".into())
             })?;
-            let key_len = usize::from(u16::from_le_bytes(
-                klen_slice
-                    .try_into()
-                    .map_err(|_| ContextraError::ParseError("corrupted index: key_len".into()))?,
-            ));
+            let key_len =
+                usize::from(u16::from_le_bytes(klen_slice.try_into().map_err(|_| {
+                    ContextraError::ParseError("corrupted index: key_len".into())
+                })?));
             pos += 2;
 
             if pos + key_len + 8 > index_len {
@@ -639,13 +639,13 @@ impl SstableReader {
                     "corrupted block: header too short".into(),
                 ));
             }
-            let klen_slice = block.get(0..2).ok_or_else(|| {
-                ContextraError::ParseError("corrupted block: klen slice".into())
-            })?;
+            let klen_slice = block
+                .get(0..2)
+                .ok_or_else(|| ContextraError::ParseError("corrupted block: klen slice".into()))?;
             let k_len =
-                usize::from(u16::from_le_bytes(klen_slice.try_into().map_err(
-                    |_| ContextraError::ParseError("corrupted block: k_len".into()),
-                )?));
+                usize::from(u16::from_le_bytes(klen_slice.try_into().map_err(|_| {
+                    ContextraError::ParseError("corrupted block: k_len".into())
+                })?));
             let end_k = 2usize.checked_add(k_len).ok_or_else(|| {
                 ContextraError::ParseError("corrupted block: k_len overflow".into())
             })?;
@@ -714,14 +714,14 @@ impl SstableReader {
         .map_err(|e| ContextraError::Storage(format!("Block read failed: {}", e)))?;
 
         let block_data = if let Some(km) = key_manager {
-            let nonce_slice = data.get(0..12).ok_or_else(|| {
-                ContextraError::Storage("Block too small for nonce".into())
-            })?;
+            let nonce_slice = data
+                .get(0..12)
+                .ok_or_else(|| ContextraError::Storage("Block too small for nonce".into()))?;
             let mut nonce = [0u8; 12];
             nonce.copy_from_slice(nonce_slice);
-            let ct_slice = data.get(12..).ok_or_else(|| {
-                ContextraError::Storage("Block data missing ciphertext".into())
-            })?;
+            let ct_slice = data
+                .get(12..)
+                .ok_or_else(|| ContextraError::Storage("Block data missing ciphertext".into()))?;
             let decrypted = km.decrypt_auto_nonce(ct_slice, &nonce)?;
             Bytes::from(decrypted)
         } else {
@@ -729,9 +729,9 @@ impl SstableReader {
         };
 
         if has_crc {
-            let crc_slice = block_data.get(0..4).ok_or_else(|| {
-                ContextraError::Storage("Block too small for CRC".into())
-            })?;
+            let crc_slice = block_data
+                .get(0..4)
+                .ok_or_else(|| ContextraError::Storage("Block too small for CRC".into()))?;
             let stored_crc = u32::from_le_bytes(
                 crc_slice
                     .try_into()

@@ -155,7 +155,10 @@ impl BlockBuilder {
             if num_bits > 0 {
                 for &(h1, h2) in &self.key_hashes {
                     for i in 0..7u64 {
-                        let bit_idx = usize::try_from(h1.wrapping_add(i.wrapping_mul(h2)) % (num_bits as u64)).unwrap_or(0);
+                        let bit_idx = usize::try_from(
+                            h1.wrapping_add(i.wrapping_mul(h2)) % (num_bits as u64),
+                        )
+                        .unwrap_or(0);
                         if let Some(byte) = bloom_vec.get_mut(bit_idx / 8) {
                             *byte |= 1u8 << (bit_idx % 8);
                         }

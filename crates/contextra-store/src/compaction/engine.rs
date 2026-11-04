@@ -246,10 +246,9 @@ impl CompactionEngine {
             let is_contiguous = match start_opt {
                 Some(start) => {
                     (start + input_ssts.len() <= ssts.len())
-                        && input_ssts
-                            .iter()
-                            .enumerate()
-                            .all(|(idx, inp)| ssts.get(start + idx).is_some_and(|s| Arc::ptr_eq(inp, s)))
+                        && input_ssts.iter().enumerate().all(|(idx, inp)| {
+                            ssts.get(start + idx).is_some_and(|s| Arc::ptr_eq(inp, s))
+                        })
                 }
                 None => false,
             };
@@ -298,14 +297,13 @@ impl CompactionEngine {
             ssts.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
 
             debug_assert!(
-                ssts.windows(2)
-                    .all(|w| match (w.first(), w.get(1)) {
-                        (Some(a), Some(b)) => {
-                            (a.metadata().max_seq & !TOMBSTONE_BIT)
-                                <= (b.metadata().max_seq & !TOMBSTONE_BIT)
-                        }
-                        _ => true,
-                    }),
+                ssts.windows(2).all(|w| match (w.first(), w.get(1)) {
+                    (Some(a), Some(b)) => {
+                        (a.metadata().max_seq & !TOMBSTONE_BIT)
+                            <= (b.metadata().max_seq & !TOMBSTONE_BIT)
+                    }
+                    _ => true,
+                }),
                 "SSTable list must be sorted by max_seq in ascending order after compaction swap"
             );
 
@@ -640,8 +638,12 @@ impl CompactionEngine {
                                 Ok(merged_val) => {
                                     // Consume next_item from heap and advance its stream
                                     if let Some(popped_next) = heap.pop() {
-                                        if let Some(stream) = streams.get_mut(popped_next.source_idx) {
-                                            if let Some((key, value, seq, tx)) = stream.next_entry().await? {
+                                        if let Some(stream) =
+                                            streams.get_mut(popped_next.source_idx)
+                                        {
+                                            if let Some((key, value, seq, tx)) =
+                                                stream.next_entry().await?
+                                            {
                                                 heap.push(HeapItem {
                                                     key,
                                                     value,

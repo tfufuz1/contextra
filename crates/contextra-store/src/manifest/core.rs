@@ -251,7 +251,8 @@ impl Manifest {
                     }
                 }
             } else {
-                let avail = usize::try_from(file_size.saturating_sub(entry_pos + 4)).unwrap_or(usize::MAX);
+                let avail =
+                    usize::try_from(file_size.saturating_sub(entry_pos + 4)).unwrap_or(usize::MAX);
                 let mut partial_raw = vec![0u8; avail];
                 if let Err(e) = reader.read_exact(&mut partial_raw).await {
                     return Err(ContextraError::Storage(format!(

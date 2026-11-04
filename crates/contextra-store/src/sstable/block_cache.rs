@@ -335,7 +335,12 @@ impl BlockCache {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.first_shard.len() + self.additional_shards.iter().map(|s| s.len()).sum::<usize>()
+        self.first_shard.len()
+            + self
+                .additional_shards
+                .iter()
+                .map(|s| s.len())
+                .sum::<usize>()
     }
 
     #[inline]

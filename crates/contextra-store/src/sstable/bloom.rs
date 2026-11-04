@@ -70,7 +70,10 @@ impl BloomFilter {
     pub fn insert(&mut self, key: &[u8]) {
         let (h1, h2) = Self::hash_pair(key);
         for i in 0..self.num_hashes {
-            let bit_idx = usize::try_from(h1.wrapping_add((i as u64).wrapping_mul(h2)) % (self.num_bits as u64)).unwrap_or(0);
+            let bit_idx = usize::try_from(
+                h1.wrapping_add((i as u64).wrapping_mul(h2)) % (self.num_bits as u64),
+            )
+            .unwrap_or(0);
             if let Some(word) = self.bits.get_mut(bit_idx / 64) {
                 *word |= 1u64 << (bit_idx % 64);
             }
@@ -84,7 +87,10 @@ impl BloomFilter {
         }
         let (h1, h2) = Self::hash_pair(key);
         for i in 0..self.num_hashes {
-            let bit_idx = usize::try_from(h1.wrapping_add((i as u64).wrapping_mul(h2)) % (self.num_bits as u64)).unwrap_or(0);
+            let bit_idx = usize::try_from(
+                h1.wrapping_add((i as u64).wrapping_mul(h2)) % (self.num_bits as u64),
+            )
+            .unwrap_or(0);
             let word = self.bits.get(bit_idx / 64).copied().unwrap_or(0);
             if (word & (1u64 << (bit_idx % 64))) == 0 {
                 return false;
@@ -130,16 +136,19 @@ impl BloomFilter {
         let hashes_slice = data.get(0..8).ok_or_else(|| {
             ContextraError::Storage("corrupted bloom filter: too short for num_hashes".into())
         })?;
-        let num_hashes = usize::try_from(u64::from_le_bytes(hashes_slice.try_into().map_err(|_| {
-            ContextraError::ParseError("corrupted bloom filter: invalid num_hashes".into())
-        })?)).map_err(|_| ContextraError::Storage("num_hashes exceeds usize".into()))?;
+        let num_hashes = usize::try_from(u64::from_le_bytes(hashes_slice.try_into().map_err(
+            |_| ContextraError::ParseError("corrupted bloom filter: invalid num_hashes".into()),
+        )?))
+        .map_err(|_| ContextraError::Storage("num_hashes exceeds usize".into()))?;
 
         let bits_slice = data.get(8..16).ok_or_else(|| {
             ContextraError::Storage("corrupted bloom filter: too short for num_bits".into())
         })?;
-        let num_bits = usize::try_from(u64::from_le_bytes(bits_slice.try_into().map_err(|_| {
-            ContextraError::ParseError("corrupted bloom filter: invalid num_bits".into())
-        })?)).map_err(|_| ContextraError::Storage("num_bits exceeds usize".into()))?;
+        let num_bits =
+            usize::try_from(u64::from_le_bytes(bits_slice.try_into().map_err(|_| {
+                ContextraError::ParseError("corrupted bloom filter: invalid num_bits".into())
+            })?))
+            .map_err(|_| ContextraError::Storage("num_bits exceeds usize".into()))?;
 
         if num_hashes == 0 || num_hashes > 64 {
             return Err(ContextraError::Storage(format!(
@@ -177,13 +186,13 @@ impl BloomFilter {
         let mut offset = 16;
         for _ in 0..required_words {
             let word_slice = data.get(offset..offset + 8).ok_or_else(|| {
-                ContextraError::Storage("corrupted bloom filter: unexpected EOF reading words".into())
+                ContextraError::Storage(
+                    "corrupted bloom filter: unexpected EOF reading words".into(),
+                )
             })?;
-            bits.push(u64::from_le_bytes(
-                word_slice.try_into().map_err(|_| {
-                    ContextraError::ParseError("corrupted bloom filter: invalid word".into())
-                })?,
-            ));
+            bits.push(u64::from_le_bytes(word_slice.try_into().map_err(|_| {
+                ContextraError::ParseError("corrupted bloom filter: invalid word".into())
+            })?));
             offset += 8;
         }
         Ok(Self {

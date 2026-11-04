@@ -167,15 +167,13 @@ pub(super) async fn flush(storage: &LsmStorage) -> Result<()> {
         sstables.sort_by_key(|sst| sst.metadata().max_seq & !TOMBSTONE_BIT);
 
         debug_assert!(
-            sstables
-                .windows(2)
-                .all(|w| match (w.first(), w.get(1)) {
-                    (Some(a), Some(b)) => {
-                        (a.metadata().max_seq & !TOMBSTONE_BIT)
-                            <= (b.metadata().max_seq & !TOMBSTONE_BIT)
-                    }
-                    _ => true,
-                }),
+            sstables.windows(2).all(|w| match (w.first(), w.get(1)) {
+                (Some(a), Some(b)) => {
+                    (a.metadata().max_seq & !TOMBSTONE_BIT)
+                        <= (b.metadata().max_seq & !TOMBSTONE_BIT)
+                }
+                _ => true,
+            }),
             "SSTable list must be sorted by max_seq in ascending order after flush"
         );
 

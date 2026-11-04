@@ -25,8 +25,6 @@ pub enum DurabilityMode {
     MemoryOnly,
 }
 
-
-
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum DurabilityConfigError {
     #[error("DurabilityMode::{mode:?} is incompatible with feature '{feature}': {reason}")]
