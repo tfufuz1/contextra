@@ -13,20 +13,23 @@
 //! - **Ring 1 (Kern / Unsafe-Insel):** Darf von hoeheren Ringen eingebunden werden.
 //! - **Abhaengigkeiten:** `libc`, `tracing`.
 //!
-//! ## Kernkomponenten
-//! 1. [`durability`]: Haltbare Dateisystem-Synchronisation (`flush_file`, `flush_dir`, `rename_durable`).
-//! 2. [`fs_probe`]: Dateisystemerkennung fuer die Startprobe (`fs_class`).
-//! 3. [`hardening`]: Prozess- und Speicherhaertung (`apply_process_hardening`, `mark_dont_dump`, `lock_pages`).
-//! 4. [`perm`]: Dateiberechtigungen und Eigentuemer-Verifikation (`set_mode`, `verify_owner_only`).
-//! 5. [`error`]: Fehler- und Statustypen (`SysError`, `SyncFailure`, `UnsupportedKind`).
+//! ## Kernkomponenten (Soll-Module nach SPEC 3.1 & 8.3)
+//! 1. [`sync`]: Synchronisation auf Speichermedien (`fsync`, `fdatasync`, `F_FULLFSYNC`, `flush_dir`).
+//! 2. [`rename`]: Dauerhaftes Umbenennen (`rename_durable`).
+//! 3. [`memlock`]: Speicherhaertung (`lock_pages`, `mark_dont_dump`, `secure_zero_volatile`).
+//! 4. [`hardening`]: Prozesshaertung (`apply_process_hardening`, `RLIMIT_CORE`, `PR_SET_DUMPABLE`).
+//! 5. [`perm`]: Dateiberechtigungen und Eigentuemer-Verifikation (`set_mode`, `verify_owner_only`).
 
 pub mod durability;
 pub mod error;
 pub mod fs_probe;
 pub mod hardening;
+pub mod memlock;
 pub mod perm;
+pub mod rename;
+pub mod sync;
 
-// Oeffentliche Re-Exporte gemaess Spezifikation 03-contextra-sys.md
+// Oeffentliche Re-Exporte gemaess Spezifikation 03-contextra-sys.md & SPEC 3.1
 pub use durability::{
     durable_flush_dir, durable_flush_file, flush_dir, flush_dir_sync, flush_file, flush_file_sync,
     rename_durable, rename_durable_sync, write_all_durable, FlushKind,
