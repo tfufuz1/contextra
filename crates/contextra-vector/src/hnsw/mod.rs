@@ -33,6 +33,5 @@ pub use deletion::{DeletionStats, GhostFreeVectorIndex};
 pub use sq8_bias::Sq8Bias;
 pub use types::{
     Candidate, HnswColdCore, HnswHotCore, HnswIndex, HnswIndexCore, HnswNode, RebuildGuard,
-    RebuildStatus, VectorData, HNSW_REBUILD_DELETION_RATIO,
-    SENTINEL_NO_ENTRY_POINT,
+    RebuildStatus, VectorData, HNSW_REBUILD_DELETION_RATIO, SENTINEL_NO_ENTRY_POINT,
 };

@@ -11,3 +11,7 @@ pub use cx::PurgeCx;
 pub use order::{LayerPurgeOrder, PurgePriority};
 pub use reserve::{check_disk_reserve, ReserveCheck};
 pub use window::{run_window, WindowOutcome};
+
+pub use contextra_ports::observer::{
+    ErasureEvent, ErasureObserver, ObservedPhase, ObserverError, TargetKind,
+};

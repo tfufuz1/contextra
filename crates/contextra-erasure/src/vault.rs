@@ -15,8 +15,8 @@ use table::VaultTable;
 
 pub use keyring::{file_id_to_tag, mask_file_key, InMemoryKeyring, VaultKeyring};
 pub use open::{
-    compute_metablock_mac, encode_metablock, open_vault, open_vault_shard, VaultOpenOutcome,
-    VAULT_METABLOCK_SIZE,
+    compute_metablock_mac, encode_metablock, open_vault, open_vault_shard, MetablockParams,
+    VaultOpenOutcome, VAULT_METABLOCK_SIZE,
 };
 pub use rehash::{rehash, rehash_shard, RehashOutcome};
 pub use sealer::VaultSealer;
@@ -67,7 +67,12 @@ impl FileVault {
             .max(4);
         let mut shards = Vec::with_capacity(VAULT_NUM_SHARDS);
         for i in 0..VAULT_NUM_SHARDS {
-            shards.push(VaultTable::new_shard(i as u8, shard_cap, vault_id, mac_key));
+            shards.push(VaultTable::new_shard(
+                u8::try_from(i).unwrap_or(0),
+                shard_cap,
+                vault_id,
+                mac_key,
+            ));
         }
         Self {
             shards,

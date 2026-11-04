@@ -57,17 +57,37 @@ pub fn compute_metablock_mac(mac_key: &[u8; 32], meta_pre_mac: &[u8]) -> [u8; 8]
     out
 }
 
+/// Parameter für einen Metablock (64 Bytes) nach SPEC F.3.
+#[derive(Debug, Clone, Copy)]
+pub struct MetablockParams<'a> {
+    /// 16-Byte Tresor-ID.
+    pub vault_id: &'a [u8; 16],
+    /// Shard-Nummer (0..15).
+    pub shard_no: u8,
+    /// Zweierlogarithmus der Shard-Kapazität.
+    pub cap_log2: u8,
+    /// Anzahl lebender Einträge.
+    pub live: u64,
+    /// Anzahl Grabsteine.
+    pub tombstones: u64,
+    /// Shard-Generation.
+    pub generation: u64,
+    /// Scrub-Cursor.
+    pub scrub_cursor: u64,
+    /// 32-Byte MAC-Schlüssel.
+    pub mac_key: &'a [u8; 32],
+}
+
 /// Encodiert einen Metablock (64 Bytes) nach SPEC F.3.
-pub fn encode_metablock(
-    vault_id: &[u8; 16],
-    shard_no: u8,
-    cap_log2: u8,
-    live: u64,
-    tombstones: u64,
-    generation: u64,
-    scrub_cursor: u64,
-    mac_key: &[u8; 32],
-) -> [u8; VAULT_METABLOCK_SIZE] {
+pub fn encode_metablock(params: MetablockParams<'_>) -> [u8; VAULT_METABLOCK_SIZE] {
+    let vault_id = params.vault_id;
+    let shard_no = params.shard_no;
+    let cap_log2 = params.cap_log2;
+    let live = params.live;
+    let tombstones = params.tombstones;
+    let generation = params.generation;
+    let scrub_cursor = params.scrub_cursor;
+    let mac_key = params.mac_key;
     let mut buf = [0u8; VAULT_METABLOCK_SIZE];
     if let Some(dest) = buf.get_mut(0..16) {
         dest.copy_from_slice(vault_id);

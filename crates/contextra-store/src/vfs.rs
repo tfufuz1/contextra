@@ -4,9 +4,9 @@
 
 use contextra_ports::vfs::{Vfs, VfsFile, VfsOpenOptions};
 use contextra_types::{ContextraError, Result};
+use std::fs as std_file_type;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::{fs as std_file_type};
 
 /// In-crate VfsFile implementation backed by OS file handle for positional reads.
 pub struct StorePosixFile {
@@ -26,12 +26,18 @@ impl VfsFile for StorePosixFile {
         #[cfg(unix)]
         {
             use std::os::unix::fs::FileExt;
-            let guard = self.inner.lock().map_err(|_| std::io::Error::other("mutex poisoned"))?;
+            let guard = self
+                .inner
+                .lock()
+                .map_err(|_| std::io::Error::other("mutex poisoned"))?;
             guard.read_at(buf, offset)
         }
         #[cfg(not(unix))]
         {
-            let mut guard = self.inner.lock().map_err(|_| std::io::Error::other("mutex poisoned"))?;
+            let mut guard = self
+                .inner
+                .lock()
+                .map_err(|_| std::io::Error::other("mutex poisoned"))?;
             guard.seek(SeekFrom::Start(offset))?;
             use std::io::Read;
             guard.read(buf)
@@ -42,12 +48,18 @@ impl VfsFile for StorePosixFile {
         #[cfg(unix)]
         {
             use std::os::unix::fs::FileExt;
-            let guard = self.inner.lock().map_err(|_| std::io::Error::other("mutex poisoned"))?;
+            let guard = self
+                .inner
+                .lock()
+                .map_err(|_| std::io::Error::other("mutex poisoned"))?;
             guard.write_at(buf, offset)
         }
         #[cfg(not(unix))]
         {
-            let mut guard = self.inner.lock().map_err(|_| std::io::Error::other("mutex poisoned"))?;
+            let mut guard = self
+                .inner
+                .lock()
+                .map_err(|_| std::io::Error::other("mutex poisoned"))?;
             guard.seek(SeekFrom::Start(offset))?;
             use std::io::Write;
             guard.write(buf)
@@ -55,22 +67,34 @@ impl VfsFile for StorePosixFile {
     }
 
     fn set_len(&self, len: u64) -> std::io::Result<()> {
-        let guard = self.inner.lock().map_err(|_| std::io::Error::other("mutex poisoned"))?;
+        let guard = self
+            .inner
+            .lock()
+            .map_err(|_| std::io::Error::other("mutex poisoned"))?;
         guard.set_len(len)
     }
 
     fn len(&self) -> std::io::Result<u64> {
-        let guard = self.inner.lock().map_err(|_| std::io::Error::other("mutex poisoned"))?;
+        let guard = self
+            .inner
+            .lock()
+            .map_err(|_| std::io::Error::other("mutex poisoned"))?;
         guard.metadata().map(|m| m.len())
     }
 
     fn sync_data(&self) -> std::io::Result<()> {
-        let guard = self.inner.lock().map_err(|_| std::io::Error::other("mutex poisoned"))?;
+        let guard = self
+            .inner
+            .lock()
+            .map_err(|_| std::io::Error::other("mutex poisoned"))?;
         guard.sync_data()
     }
 
     fn sync_all(&self) -> std::io::Result<()> {
-        let guard = self.inner.lock().map_err(|_| std::io::Error::other("mutex poisoned"))?;
+        let guard = self
+            .inner
+            .lock()
+            .map_err(|_| std::io::Error::other("mutex poisoned"))?;
         guard.sync_all()
     }
 }

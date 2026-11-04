@@ -14,7 +14,7 @@ use std::sync::Arc;
 // Eigenständiger In-Memory Vfs für Tests
 #[derive(Default)]
 struct LocalMemVfs {
-    files: std::sync::Mutex<std::collections::HashMap<std::path::PathBuf, Vec<u8>>>,
+    files: std::sync::Mutex<std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>>,
 }
 impl contextra_ports::vfs::Vfs for LocalMemVfs {
     fn read(&self, path: &Path) -> contextra_ports::Result<Vec<u8>> {
@@ -53,6 +53,7 @@ impl contextra_ports::vfs::Vfs for LocalMemVfs {
     }
 }
 
+/// SPEC: T-REPORT-1
 #[test]
 fn test_t_report_1_canonical_format_and_signing() {
     let erasure_id = ErasureId::new([0x42; 16]);
@@ -72,6 +73,7 @@ fn test_t_report_1_canonical_format_and_signing() {
     assert_eq!(signed.canonical_body, canonical_json);
 }
 
+/// SPEC: T-REPORT-1
 #[test]
 fn test_t_report_1_write_and_verify_report_file() {
     let vfs = Arc::new(LocalMemVfs::default());

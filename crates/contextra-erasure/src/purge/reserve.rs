@@ -6,7 +6,7 @@
 use crate::error::ErasureError;
 
 /// Ergebnis der Speicherplatzprüfung.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ReserveCheck {
     /// Ausreichend Speicherplatz vorhanden.
     Sufficient {
@@ -23,17 +23,18 @@ pub enum ReserveCheck {
 }
 
 /// Prüft ob genug Speicherplatz für den Purge-Rewrite vorhanden ist.
-///
-/// In der Produktionsimplementierung fragt diese Funktion das VFS nach freiem Speicher.
-/// Hier: Stub, der immer `Sufficient` zurückgibt (WP-4.2-Implementierung folgt).
 pub fn check_disk_reserve(
-    min_free_bytes: u64,
-    estimated_rewrite_bytes: u64,
+    available_bytes: u64,
+    required_bytes: u64,
 ) -> Result<ReserveCheck, ErasureError> {
-    // Stub: Produktiv via Vfs::available_space()
-    let _ = estimated_rewrite_bytes;
-    // Konservative Schätzung: Immer ausreichend im Stub
-    Ok(ReserveCheck::Sufficient {
-        free_bytes: min_free_bytes.saturating_mul(10),
-    })
+    if available_bytes >= required_bytes {
+        Ok(ReserveCheck::Sufficient {
+            free_bytes: available_bytes,
+        })
+    } else {
+        Ok(ReserveCheck::Insufficient {
+            free_bytes: available_bytes,
+            required_bytes,
+        })
+    }
 }

@@ -213,7 +213,11 @@ impl Wal {
     ///
     /// If slice reading or scanning encounters any error, it logs a warning (`tracing::warn!`)
     /// and automatically falls back to stream-based scanning (`scan_entries_with_callback`).
-    pub async fn scan_entries_buffer<F>(&self, file_size: u64, mut callback: F) -> Result<WalVersion>
+    pub async fn scan_entries_buffer<F>(
+        &self,
+        file_size: u64,
+        mut callback: F,
+    ) -> Result<WalVersion>
     where
         F: FnMut(u64, WalEntry, u64) -> bool,
     {

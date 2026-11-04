@@ -233,12 +233,10 @@ impl VectorIndex for HnswIndex {
                 err
             )));
         }
-        self.inner.cold.tx_buffer.stage(
-            tx,
-            LocalVectorOp::Delete {
-                doc_id: id,
-            },
-        )?;
+        self.inner
+            .cold
+            .tx_buffer
+            .stage(tx, LocalVectorOp::Delete { doc_id: id })?;
         Ok(())
     }
 
@@ -358,7 +356,12 @@ impl VectorIndex for HnswIndex {
     /// Verified by integration tests `crates/contextra-vector/tests/k02_snapshot_rebuild_determinism.rs` and
     /// `crates/contextra-vector/tests/hnsw_rebuild_search_consistency.rs` across multiple deterministic seeds and
     /// targeted timing execution inside the critical rebuild swap window.
-    async fn search_at(&self, _query: &[f32], _k: usize, _seq_no: u64) -> Result<Vec<ScoredDocument>> {
+    async fn search_at(
+        &self,
+        _query: &[f32],
+        _k: usize,
+        _seq_no: u64,
+    ) -> Result<Vec<ScoredDocument>> {
         Err(contextra_types::ContextraError::CapabilityUnsupported {
             capability: "snapshot_read_at".to_string(),
             reason: "Snapshot reads are decoupled from vector index per SPEC D-88".to_string(),

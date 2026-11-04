@@ -7,11 +7,13 @@ use contextra_erasure::vault::slot::{
     SlotType, STATUS_ACTIVE, STATUS_TOMBSTONE, VAULT_SLOT_SIZE,
 };
 
+/// SPEC: T-VAULT-1
 #[test]
 fn test_vault_slot_size_d111() {
     assert_eq!(VAULT_SLOT_SIZE, 64);
 }
 
+/// SPEC: T-VAULT-1
 #[test]
 fn test_slot_type_all_d125() {
     assert_eq!(SlotType::from_u8(0x01), Some(SlotType::Tenant));
@@ -22,6 +24,7 @@ fn test_slot_type_all_d125() {
     assert_eq!(SlotType::from_u8(0x06), Some(SlotType::Epoch));
 }
 
+/// SPEC: T-VAULT-1
 #[test]
 fn test_slot_encode_decode_roundtrip_f3() {
     let vault_id = [0x77u8; 16];
@@ -54,6 +57,7 @@ fn test_slot_encode_decode_roundtrip_f3() {
     assert_eq!(decoded, Some(sd));
 }
 
+/// SPEC: T-VAULT-1
 #[test]
 fn test_tombstone_image_and_verification_d111() {
     let vault_id = [0x42u8; 16];
@@ -77,6 +81,7 @@ fn test_tombstone_image_and_verification_d111() {
     assert!(err.is_err(), "manipulierter Grabstein muss Corrupt liefern");
 }
 
+/// SPEC: T-VAULT-1
 #[test]
 fn test_slot_probe_start_d111() {
     let tag = [0x11u8; 16];

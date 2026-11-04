@@ -139,7 +139,8 @@ impl LsmStorage {
                     if (seq & !TOMBSTONE_BIT) > (entry.1 & !TOMBSTONE_BIT) {
                         *entry = (v, seq);
                     }
-                    if check_accumulator && map.len() > contextra_ports::storage::MAX_SCAN_MERGE_ACCUMULATOR
+                    if check_accumulator
+                        && map.len() > contextra_ports::storage::MAX_SCAN_MERGE_ACCUMULATOR
                     {
                         return Err(ContextraError::LimitExceeded {
                             limit: contextra_ports::storage::MAX_SCAN_MERGE_ACCUMULATOR,
@@ -181,7 +182,8 @@ impl LsmStorage {
         // 2. Immutable memtables (older -> newer)
         for mt in &state.immutable_memtables {
             scan_memtable(mt, &mut map);
-            if check_accumulator && map.len() > contextra_ports::storage::MAX_SCAN_MERGE_ACCUMULATOR {
+            if check_accumulator && map.len() > contextra_ports::storage::MAX_SCAN_MERGE_ACCUMULATOR
+            {
                 return Err(ContextraError::LimitExceeded {
                     limit: contextra_ports::storage::MAX_SCAN_MERGE_ACCUMULATOR,
                     context: format!(

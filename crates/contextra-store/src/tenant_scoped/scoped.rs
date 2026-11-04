@@ -43,10 +43,7 @@ impl TenantScopedStorage {
 }
 
 impl PurgePrimitives for TenantScopedStorage {
-    fn drain_range<'a>(
-        &'a self,
-        matcher: &'a Matcher,
-    ) -> BoxFuture<'a, Result<DrainStats>> {
+    fn drain_range<'a>(&'a self, matcher: &'a Matcher) -> BoxFuture<'a, Result<DrainStats>> {
         PurgePrimitives::drain_range(&*self.inner, matcher)
     }
 
@@ -54,10 +51,7 @@ impl PurgePrimitives for TenantScopedStorage {
         PurgePrimitives::seal_wal_at(&*self.inner)
     }
 
-    fn drop_wal_until<'a>(
-        &'a self,
-        f_seq: u64,
-    ) -> BoxFuture<'a, Result<WalFloor>> {
+    fn drop_wal_until<'a>(&'a self, f_seq: u64) -> BoxFuture<'a, Result<WalFloor>> {
         PurgePrimitives::drop_wal_until(&*self.inner, f_seq)
     }
 
@@ -70,10 +64,7 @@ impl PurgePrimitives for TenantScopedStorage {
         PurgePrimitives::rewrite_without(&*self.inner, file_id, matcher, reserve)
     }
 
-    fn unlink_verified<'a>(
-        &'a self,
-        file_id: FileId,
-    ) -> BoxFuture<'a, Result<()>> {
+    fn unlink_verified<'a>(&'a self, file_id: FileId) -> BoxFuture<'a, Result<()>> {
         PurgePrimitives::unlink_verified(&*self.inner, file_id)
     }
 }

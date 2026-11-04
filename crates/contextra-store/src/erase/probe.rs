@@ -14,7 +14,11 @@ impl RestoreProbe {
     }
 
     /// Prüft die Konsistenz des wiederhergestellten Schlüsselraums gegen gespeicherte Prüfsummen.
-    pub fn probe_key_consistency(&mut self, key: &[u8], expected_digest: &[u8; 32]) -> Result<bool> {
+    pub fn probe_key_consistency(
+        &mut self,
+        key: &[u8],
+        expected_digest: &[u8; 32],
+    ) -> Result<bool> {
         self.probed_count += 1;
         let actual_digest = blake3::hash(key);
         Ok(actual_digest.as_bytes() == expected_digest)

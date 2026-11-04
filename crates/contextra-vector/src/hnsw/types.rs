@@ -70,8 +70,6 @@ impl<'a> Drop for RebuildGuard<'a> {
     }
 }
 
-
-
 /// The HNSW (Hierarchical Navigable Small World) vector index.
 #[derive(Clone)]
 pub struct HnswIndex {
@@ -442,8 +440,6 @@ impl HnswIndex {
             });
         }
     }
-
-
 
     pub fn all_doc_ids_from_map(&self) -> Vec<DocId> {
         let map = self.inner.hot.doc_to_node.read();

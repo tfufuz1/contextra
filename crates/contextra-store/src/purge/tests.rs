@@ -1,9 +1,9 @@
 //! Tests für Purge-Primitive (SPEC §8.8, §11.4).
 
-use bytes::Bytes;
 use crate::memtable::MemTable;
 use crate::purge::drain::drain_memtable;
-use contextra_types::key::{KeyBuf, Matcher, MatcherItem, Region, Family};
+use bytes::Bytes;
+use contextra_types::key::{Family, KeyBuf, Matcher, MatcherItem, Region};
 use contextra_types::tags::{ClusterTag, CollTag, DocTag, TenantTag};
 
 #[test]
@@ -15,11 +15,39 @@ fn test_drain_memtable_matching_range() {
     let doc1 = DocTag::new([4u8; 16]);
     let doc2 = DocTag::new([5u8; 16]);
 
-    let key1 = KeyBuf::new(Region::Data, tenant, coll, cluster, doc1, Family::Doc, 0, 100);
-    let key2 = KeyBuf::new(Region::Data, tenant, coll, cluster, doc2, Family::Doc, 0, 101);
+    let key1 = KeyBuf::new(
+        Region::Data,
+        tenant,
+        coll,
+        cluster,
+        doc1,
+        Family::Doc,
+        0,
+        100,
+    );
+    let key2 = KeyBuf::new(
+        Region::Data,
+        tenant,
+        coll,
+        cluster,
+        doc2,
+        Family::Doc,
+        0,
+        101,
+    );
 
-    memtable.put(Bytes::copy_from_slice(key1.as_bytes()), Bytes::from_static(b"val1"), 100, 0);
-    memtable.put(Bytes::copy_from_slice(key2.as_bytes()), Bytes::from_static(b"val2"), 101, 0);
+    memtable.put(
+        Bytes::copy_from_slice(key1.as_bytes()),
+        Bytes::from_static(b"val1"),
+        100,
+        0,
+    );
+    memtable.put(
+        Bytes::copy_from_slice(key2.as_bytes()),
+        Bytes::from_static(b"val2"),
+        101,
+        0,
+    );
 
     let matcher = Matcher::new(vec![MatcherItem::Exact(key1.clone())]);
 
