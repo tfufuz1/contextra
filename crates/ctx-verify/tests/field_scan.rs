@@ -76,16 +76,18 @@ fn t_raw_1_field_scan_mk3_key_present_in_vault_detected() {
     ];
     let target_hex = hex::encode(target_bytes);
 
-    // Create mock vault.dat: header (128) + metablock (64) = 192 bytes
-    let mut vault_data = vec![0u8; 192];
-    // Add slot: 80 bytes
-    let mut slot = vec![0u8; 80];
+    // Create mock shard file (00.vlt) per SPEC F.3 / D-111:
+    // header (64) + metablock (64) = 128 bytes base
+    let mut vault_data = vec![0u8; 128];
+    // Add 64-byte slot:
+    // 0: slot_type (0x04 D), 1: status (0x01 active), 2..8: gen, 8..24: tag, 24..56: payload, 56..64: mac
+    let mut slot = vec![0u8; 64];
     slot[0] = 0x04; // slot_type D
-    slot[1..17].copy_from_slice(&target_bytes); // tag
-    slot[49] = 0x01; // status aktiv! (not tombstoned 0x02)
+    slot[1] = 0x01; // status aktiv! (not tombstoned 0x02)
+    slot[8..24].copy_from_slice(&target_bytes); // tag
     vault_data.extend_from_slice(&slot);
 
-    fs::write(vault_dir.join("vault.dat"), vault_data).unwrap();
+    fs::write(vault_dir.join("00.vlt"), vault_data).unwrap();
 
     let mut pass_file = tempfile::NamedTempFile::new().unwrap();
     pass_file.write_all(b"super_secret_passphrase").unwrap();
@@ -189,19 +191,19 @@ fn t_mut_1_planted_residues_trigger_findings() {
         );
     }
 
-    // 2. Mutant MK3: Planted active key in vault.dat
+    // 2. Mutant MK3: Planted active key in vault shard 00.vlt
     {
         let dir = tempdir().unwrap();
         let data_dir = dir.path().join("data");
         fs::create_dir_all(&data_dir).unwrap();
 
-        let mut vault_data = vec![0u8; 192];
-        let mut slot = vec![0u8; 80];
-        slot[0] = 0x01; // slot type
-        slot[1..17].copy_from_slice(&target_bytes);
-        slot[49] = 0x01; // active slot status
+        let mut vault_data = vec![0u8; 128];
+        let mut slot = vec![0u8; 64];
+        slot[0] = 0x01; // slot type T
+        slot[1] = 0x01; // active slot status
+        slot[8..24].copy_from_slice(&target_bytes);
         vault_data.extend_from_slice(&slot);
-        fs::write(data_dir.join("vault.dat"), vault_data).unwrap();
+        fs::write(data_dir.join("00.vlt"), vault_data).unwrap();
 
         let mut pass_file = tempfile::NamedTempFile::new().unwrap();
         pass_file.write_all(b"secret").unwrap();
