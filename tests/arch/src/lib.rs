@@ -1,4 +1,6 @@
-//! Architekturprüfungen für das Contextra-Workspace.
+//! Architektur-, Ring-, Namens- und Lint-Tests.
+//!
+//! Paket `contextra-arch-tests`, Ring dev / tooling (SPEC §5.1a, §5.2).
 //!
 //! - Ring-Regel (SPEC §3.2 Regel 1, NFR-3, T-ARCH-3): Eine Abhängigkeit darf nie auf einen höheren Ring
 //!   zeigen. Ring 0 darf `tokio` nicht enthalten. Tooling-Crates dürfen nicht von Produktcrates
@@ -679,13 +681,25 @@ pub fn check_wording(root: &Path) -> Vec<String> {
 /// Gemäß SPEC muss diese Liste leer sein; jeder Eintrag bedarf der Begründung.
 pub const DIRECT_FS_ALLOWLIST: &[(&str, &str)] = &[];
 
-/// Prüft T-LINT-2: Kein `std::fs` oder `tokio::fs` außerhalb von `contextra-sys` und `contextra-durable-fs`.
+/// Prüft T-LINT-2: Kein `std::fs`, `tokio::fs`, `memmap2`, `File::open`, `OpenOptions` außerhalb von `contextra-sys` und `contextra-durable-fs`,
+/// sowie kein `block_on` im gesamten Bibliothekscode (D-03, D-04, D-94).
 pub fn check_store_fs_usage(root: &Path) -> Vec<String> {
     let mut violations = Vec::new();
     let crates_dir = root.join("crates");
     let Ok(entries) = fs::read_dir(&crates_dir) else {
         return violations;
     };
+
+    let forbidden_fs_patterns = [
+        ("std::fs", "Direkte Dateisystemnutzung 'std::fs' statt Vfs"),
+        (
+            "tokio::fs",
+            "Direkte Dateisystemnutzung 'tokio::fs' statt Vfs",
+        ),
+        ("memmap2", "Verbotenes Speicher-Mapping 'memmap2' (D-94)"),
+        ("File::open", "Direktes 'File::open' statt Vfs"),
+        ("OpenOptions::new", "Direktes 'OpenOptions' statt Vfs"),
+    ];
 
     for entry in entries.flatten() {
         let crate_path = entry.path();
@@ -695,10 +709,7 @@ pub fn check_store_fs_usage(root: &Path) -> Vec<String> {
             .to_string_lossy()
             .to_string();
 
-        // sys und durable-fs sind die einzigen legitimierten FS-Inseln
-        if crate_name == "contextra-sys" || crate_name == "contextra-durable-fs" {
-            continue;
-        }
+        let is_fs_island = crate_name == "contextra-sys" || crate_name == "contextra-durable-fs";
 
         let src_dir = crate_path.join("src");
         if !src_dir.is_dir() {
@@ -723,19 +734,33 @@ pub fn check_store_fs_usage(root: &Path) -> Vec<String> {
                 if code.starts_with("//") {
                     continue;
                 }
-                if code.contains("std::fs") || code.contains("tokio::fs") {
-                    if DIRECT_FS_ALLOWLIST
-                        .iter()
-                        .any(|(c, pattern)| *c == crate_name && rel.contains(pattern))
-                    {
-                        continue;
-                    }
+
+                // Kein block_on im gesamten Produktionscode (D-03)
+                if code.contains("block_on(") {
                     violations.push(format!(
-                        "T-LINT-2 verletzt: {}:{}: Direkte Dateisystemnutzung '{}' statt Vfs (außerhalb durable-fs/sys verboten)",
+                        "T-LINT-2 verletzt: {}:{}: Verbotener Aufruf 'block_on' im Bibliothekscode (D-03)",
                         rel,
-                        line_idx + 1,
-                        code
+                        line_idx + 1
                     ));
+                }
+
+                if !is_fs_island {
+                    for (pattern, msg) in &forbidden_fs_patterns {
+                        if code.contains(pattern) {
+                            if DIRECT_FS_ALLOWLIST
+                                .iter()
+                                .any(|(c, p)| *c == crate_name && rel.contains(p))
+                            {
+                                continue;
+                            }
+                            violations.push(format!(
+                                "T-LINT-2 verletzt: {}:{}: {} (außerhalb durable-fs/sys verboten)",
+                                rel,
+                                line_idx + 1,
+                                msg
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -1394,6 +1419,78 @@ pub fn check_trademark_and_session_marks(root: &Path, crates: &[Krate]) -> Vec<S
 
 /// Prüft T-LINT-3:
 /// Veraltete Evidenzbegriffe (E1 bis E3, E0 bis E4 als alte Messklassen/Evidenzstufen) und unzulässige Aussagen nach SPEC §6.4.
+/// Prüft T-TRACE-2:
+/// docs/PLAN.md nennt nur existierende SPEC-IDs aus docs/SPEC.md (T-TRACE-2, SPEC §15.1, D-99).
+pub fn check_plan_traceability(root: &Path) -> Vec<String> {
+    let mut violations = Vec::new();
+    let spec_path = root.join("docs/SPEC.md");
+    let plan_path = root.join("docs/PLAN.md");
+
+    let Ok(spec_text) = fs::read_to_string(&spec_path) else {
+        violations.push("T-TRACE-2 verletzt: docs/SPEC.md nicht lesbar".to_string());
+        return violations;
+    };
+    let Ok(plan_text) = fs::read_to_string(&plan_path) else {
+        violations.push("T-TRACE-2 verletzt: docs/PLAN.md nicht lesbar".to_string());
+        return violations;
+    };
+
+    // Extrahiere alle IDs aus docs/SPEC.md: T-..., BM-..., D-..., AR-..., HR-...
+    let mut spec_ids = std::collections::BTreeSet::new();
+    for word in spec_text.split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_') {
+        let trimmed = word.trim();
+        if trimmed.starts_with("T-")
+            || trimmed.starts_with("BM-")
+            || trimmed.starts_with("D-")
+            || trimmed.starts_with("AR-")
+            || trimmed.starts_with("HR-")
+        {
+            spec_ids.insert(trimmed.to_string());
+        }
+    }
+
+    // Extrahiere IDs aus docs/PLAN.md und prüfe auf Existenz in SPEC
+    for (line_idx, line) in plan_text.lines().enumerate() {
+        for word in line.split(|c: char| !c.is_alphanumeric() && c != '-' && c != '_') {
+            let id = word.trim();
+            if id.is_empty() {
+                continue;
+            }
+            if id.ends_with("-*") || id.ends_with("..") {
+                continue;
+            }
+
+            let is_id = (id.starts_with("T-")
+                && id.chars().nth(2).is_some_and(|c| c.is_ascii_alphabetic()))
+                || (id.starts_with("BM-")
+                    && id.chars().skip(3).all(|c| {
+                        c.is_ascii_uppercase() || c.is_ascii_digit() || c == '-' || c == '_'
+                    }))
+                || (id.starts_with("AR-") && id.chars().skip(3).all(|c| c.is_ascii_digit()))
+                || (id.starts_with("HR-") && id.chars().skip(3).all(|c| c.is_ascii_digit()));
+
+            if is_id {
+                let exists = spec_ids.contains(id)
+                    || spec_ids.iter().any(|s| s.starts_with(id))
+                    || spec_text.contains(id);
+
+                if !exists {
+                    let rule = format!("T-TRACE-2:{id}");
+                    if !known_deviations::is_deviation_allowed("workspace", &rule) {
+                        violations.push(format!(
+                            "T-TRACE-2 verletzt: docs/PLAN.md:{}: Genannte ID '{}' existiert nicht in docs/SPEC.md",
+                            line_idx + 1,
+                            id
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    violations
+}
+
 pub fn check_obsolete_evidence_terms(root: &Path, crates: &[Krate]) -> Vec<String> {
     let mut violations = Vec::new();
     let obsolete_patterns = [
@@ -2339,6 +2436,48 @@ mod tests {
         assert!(
             v.iter().any(|msg| msg.contains("T-TRACE-1")),
             "Mutant: Test ohne SPEC-ID muss rot werden: {v:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_selftest_trace_2_plan_nicht_existierende_id_wird_rot() {
+        let tmp = std::env::temp_dir().join("t_selftest_trace_2");
+        let _ = fs::remove_dir_all(&tmp);
+        let docs = tmp.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+
+        // SPEC definiert nur T-ARCH-1
+        fs::write(docs.join("SPEC.md"), "### T-ARCH-1\n").unwrap();
+        // PLAN verweist auf T-PHANTOM-99
+        fs::write(docs.join("PLAN.md"), "WP-1.1 prüft T-PHANTOM-99.\n").unwrap();
+
+        let v = check_plan_traceability(&tmp);
+        assert!(
+            v.iter()
+                .any(|msg| msg.contains("T-TRACE-2") && msg.contains("T-PHANTOM-99")),
+            "Mutant: PLAN.md mit Phantom-ID muss rot werden: {v:?}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn t_selftest_lint_2_block_on_wird_rot() {
+        let tmp = std::env::temp_dir().join("t_selftest_lint_2_block_on");
+        let _ = fs::remove_dir_all(&tmp);
+        let src = tmp.join("crates/contextra-vector/src");
+        fs::create_dir_all(&src).unwrap();
+        fs::write(
+            src.join("lib.rs"),
+            "fn wait() { futures::executor::block_on(async {}); }\n",
+        )
+        .unwrap();
+
+        let v = check_store_fs_usage(&tmp);
+        assert!(
+            v.iter()
+                .any(|msg| msg.contains("T-LINT-2") && msg.contains("block_on")),
+            "Mutant: block_on in Produktionscode muss rot werden: {v:?}"
         );
         let _ = fs::remove_dir_all(&tmp);
     }
