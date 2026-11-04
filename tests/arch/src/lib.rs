@@ -1577,13 +1577,12 @@ pub fn check_double_modules(crates: &[Krate]) -> Vec<String> {
 
 /// Prüft T-GOV-1:
 /// Ratchet- und Ausnahmen-Hygiene.
-/// Verhindert Stale-Einträge in .agents/governance/ratchet.toml (Crates im Ratchet, die im Workspace nicht existieren).
+/// Verhindert Stale-Einträge in governance/ratchet.toml (Crates im Ratchet, die im Workspace nicht existieren).
 pub fn check_ratchet_hygiene(root: &Path, crates: &[Krate]) -> Vec<String> {
     let mut violations = Vec::new();
-    let ratchet_path = root.join(".agents/governance/ratchet.toml");
+    let ratchet_path = root.join("governance/ratchet.toml");
     if !ratchet_path.is_file() {
-        violations
-            .push("T-GOV-1 verletzt: .agents/governance/ratchet.toml existiert nicht".to_string());
+        violations.push("T-GOV-1 verletzt: governance/ratchet.toml existiert nicht".to_string());
         return violations;
     }
     let Ok(content) = fs::read_to_string(&ratchet_path) else {
@@ -2295,7 +2294,7 @@ mod tests {
     fn t_selftest_stale_ratchet_wird_rot() {
         let tmp = std::env::temp_dir().join("t_selftest_stale_ratchet");
         let _ = fs::remove_dir_all(&tmp);
-        let gov_dir = tmp.join(".agents/governance");
+        let gov_dir = tmp.join("governance");
         fs::create_dir_all(&gov_dir).unwrap();
 
         fs::write(
