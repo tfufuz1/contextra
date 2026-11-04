@@ -39,23 +39,31 @@ pub mod analyzer;
 pub mod bm25;
 pub mod buffer;
 pub mod domain;
+pub mod erasure;
 pub mod inverted;
+pub mod member;
 pub mod morphology;
+pub mod phrase;
 pub mod posting_list;
+pub mod postings;
 pub mod segment;
+pub mod stats;
 pub mod stream;
 pub mod tokenizer;
 pub mod wand;
 
 pub use analyzer::{
-    compute_term_tag, AnalyzedDocument, AnalyzedToken, Analyzer, AnalyzerId, GermanAnalyzer,
-    UndAnalyzer,
+    compute_term_tag, get_analyzer, Analyzer, GermanAnalyzer, UndAnalyzer, UndeterminedAnalyzer,
 };
-pub use buffer::{purge_segments, TextBuffer, TextBufferEntry, TextDocHandle, TextPurgeOutcome};
+pub use buffer::{open_binding_envelope, seal_binding_envelope, TextBufRecord, TextBuffer};
+pub use erasure::TextErasureLayer;
+pub use member::{compute_member_hash, MembershipBlock};
+pub use phrase::match_phrase_positions;
+pub use postings::PostingBlock;
 pub use segment::{
-    BlockMeta, DocumentEntry, SegmentBuilder, SegmentHeader, SegmentPosting, SegmentPostingBlock,
-    SegmentReader, POSTING_BLOCK_SIZE,
+    DictEntry, DocEntry, SegmentHeader, SegmentReader, SegmentWriter, POSTING_BLOCK_SIZE,
 };
+pub use stats::SegmentStats;
 
 pub use bm25::{score_term_bm25f, FieldId, FieldWeight, BM25, BM25F};
 pub use domain::{DomainVocabulary, LegalDomainVocabulary, MedicalDomainVocabulary};

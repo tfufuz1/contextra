@@ -5,7 +5,10 @@ pub fn match_phrase_positions(term_positions: &[&[u32]]) -> bool {
         return false;
     }
     if term_positions.len() == 1 {
-        return term_positions.first().map(|p| !p.is_empty()).unwrap_or(false);
+        return term_positions
+            .first()
+            .map(|p| !p.is_empty())
+            .unwrap_or(false);
     }
 
     let first = match term_positions.first() {

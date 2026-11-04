@@ -32,9 +32,7 @@ impl ErasureLayer for TextErasureLayer {
     }
 
     fn resolve(&self, _t: &EraseTarget) -> BoxFuture<'_, Result<LayerScope, String>> {
-        Box::pin(async move {
-            Ok(LayerScope::empty())
-        })
+        Box::pin(async move { Ok(LayerScope::empty()) })
     }
 
     fn on_gate(&self, _s: &LayerScope) -> BoxFuture<'_, Result<(), String>> {
@@ -42,9 +40,7 @@ impl ErasureLayer for TextErasureLayer {
     }
 
     fn purge(&self, _s: &LayerScope, _cx: &PurgeCx) -> BoxFuture<'_, Result<PurgeOutcome, String>> {
-        Box::pin(async move {
-            Ok(PurgeOutcome::new(0, 0))
-        })
+        Box::pin(async move { Ok(PurgeOutcome::new(0, 0)) })
     }
 
     fn witness(
@@ -52,9 +48,7 @@ impl ErasureLayer for TextErasureLayer {
         _s: &LayerScope,
         _sc: &Scanner<Armed>,
     ) -> BoxFuture<'_, Result<LayerWitness, String>> {
-        Box::pin(async move {
-            Ok(LayerWitness::empty())
-        })
+        Box::pin(async move { Ok(LayerWitness::empty()) })
     }
 
     fn key_coverage(&self) -> KeyCoverage {
