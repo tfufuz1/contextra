@@ -452,14 +452,6 @@ impl<T: Clone> TxBuffer<T> {
     }
 
     /// Puffert eine Operation und erzwingt Obergrenzen für Operationsanzahl und Byte-Budgets.
-    ///
-    /// ### Ablauf:
-    /// 1. Berechne geschätzten Speicherbedarf der Operation in Bytes (`op_bytes`).
-    /// 2. Shard exklusiv sperren.
-    /// 3. Prüfen: Überschreitet `tx` ihr lokales Byte-Budget (`max_tx_staged_bytes`)?
-    /// 4. Prüfen: Wird das globale Byte-Budget (`max_total_staged_bytes`) überschritten?
-    /// 5. Prüfen: Wird die maximale Anzahl an Operationen pro Transaktion (`max_ops_per_tx`) überschritten?
-    /// 6. Operation in den Shard-Puffer einhängen, Zähler aktualisieren und atomaren globalen Speicherstand erhöhen.
     pub fn stage_bounded(&self, tx: TxId, op: IndexOp<T>) -> Result<()>
     where
         T: StagedOpSize,
