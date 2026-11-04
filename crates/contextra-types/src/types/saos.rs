@@ -11,8 +11,6 @@
 //! - `FusionStrategy`: Fusionsalgorithmen (RRF = Reciprocal Rank Fusion, Score-Normalisierung).
 //! - `ContextChunk` & `ContextWindow`: Für LLMs aufbereitete Textsegmente inklusive Tokenzählung und Zettelkasten-Links.
 
-// FILE-CONTEXT
-// STAND: 2026-08-30T18:51:56Z (SESSION: e459bd5f)
 // ZWECK: Multi-Signal HybridQuery, FusionWeights, ContextWindow und ContextChunk Repräsentation.
 // INVARIANTEN: FusionWeights::new normalisiert die Summe auf ~1.0 (Summe in [0.999, 1.001]).
 // HOTSPOTS: 30-320
@@ -26,7 +24,6 @@ use serde::{Deserialize, Serialize};
 
 /// Strategy used for search result signal fusion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-FUSIONSTRAT]
 pub enum FusionStrategy {
     /// Reciprocal Rank Fusion (default strategy per ADR-003).
     /// Robust against score scale mismatch and partial signal degradation.
@@ -39,7 +36,6 @@ pub enum FusionStrategy {
 
 /// Strategy configuration mapping per retrieval signal (vector, text, graph).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-// ANCHOR[contextra-types:SAOS-SIGNALSTRAT]
 pub struct SignalFusionStrategies {
     /// Strategy used for vector search signal fusion.
     pub vector: FusionStrategy,
@@ -122,7 +118,6 @@ impl<'de> Deserialize<'de> for SignalFusionStrategies {
 
 /// Strategy used for graph retrieval in hybrid search queries.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-GRAPHTRAV]
 pub enum GraphTraversalStrategy {
     /// Multi-hop BFS traversal with hop score decay (default max_hops = 3).
     Hops {
@@ -148,7 +143,6 @@ impl Default for GraphTraversalStrategy {
 
 /// Normalized fusion weights for hybrid search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-WEIGHTS]
 pub struct FusionWeights {
     vector: f32,
     text: f32,
@@ -226,7 +220,6 @@ impl FusionWeights {
 
 /// A chunk of context for LLM budget allocation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-CHUNK]
 pub struct ContextChunk {
     /// Document identifier associated with this chunk.
     pub doc_id: DocId,
@@ -285,7 +278,6 @@ impl ContextChunk {
 
 /// An aggregated context window constrained by a token budget.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-WINDOW]
 pub struct ContextWindow {
     /// List of included context chunks.
     pub chunks: Vec<ContextChunk>,
@@ -315,7 +307,6 @@ impl std::fmt::Display for ContextWindow {
 /// Im Gegensatz dazu ist `contextra_rank::fusion::types::Signal` eine interne Signal-Repräsentation
 /// der Rank-Engine zur Gewichtsmodulation und Z-Score/RRF-Kalibrierung.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-SIGNAL]
 pub enum Signal {
     /// Dense vector embedding search signal.
     Vector,
@@ -348,7 +339,6 @@ impl std::fmt::Display for Signal {
 /// *Note*: An empty but valid result from a signal (e.g. no documents matched BM25 or zero vector)
 /// is NOT a signal failure and does not trigger this behavior.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-FAILPOLICY]
 pub enum OnSignalFailure {
     /// Abort hybrid search and return an error on signal failure (Default per Spec Teil 6.5 P1).
     #[default]
@@ -359,7 +349,6 @@ pub enum OnSignalFailure {
 
 /// Output of a query rewriter containing text, semantic, and graph anchor reformulations.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-REWRITE]
 pub struct QueryRewriteOutput {
     /// Textual reformulation intended for BM25 keyword search.
     pub text_query: Option<String>,
@@ -406,7 +395,6 @@ impl QueryRewriteOutput {
 
 /// Evaluated result for hybrid/4-signal search.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-SCOREDENTRY]
 pub struct ScoredEntry {
     /// Unique result identifier.
     pub id: String,
@@ -418,7 +406,6 @@ pub struct ScoredEntry {
 
 /// A unified query traversing multiple index signals.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// ANCHOR[contextra-types:SAOS-HYBRIDQUERY]
 pub struct HybridQuery {
     /// Optional full-text query string.
     pub text_query: Option<String>,
@@ -487,7 +474,6 @@ impl HybridQuery {
 /// an eine aktive `Collection`-Instanz mit Storage- und Vektorindex-Handles gebunden und führt
 /// die Abfrage über `.execute()` direkt auf der Datenbank aus.
 #[derive(Default)]
-// ANCHOR[contextra-types:SAOS-BUILDER]
 pub struct HybridQueryBuilder {
     text_query: Option<String>,
     vector_query: Option<Vec<f32>>,
@@ -639,7 +625,7 @@ mod tests {
 
     #[test]
     fn test_fusion_weights_valid() {
-        let w = FusionWeights::new(0.5, 0.5, 0.0).expect("valid"); // expect
+        let w = FusionWeights::new(0.5, 0.5, 0.0).expect("valid"); // expect // #[cfg(test)]
         assert_eq!(w.vector(), 0.5);
         assert_eq!(w.text(), 0.5);
     }
@@ -679,7 +665,7 @@ mod tests {
             .with_text_query("test query")
             .with_k(10)
             .build()
-            .unwrap();
+            .unwrap(); // #[cfg(test)]
         let eps = 1e-5f32;
         assert!((query.fusion_weights.vector() - 1.0 / 3.0).abs() < eps);
         assert!((query.fusion_weights.text() - 1.0 / 3.0).abs() < eps);
@@ -693,10 +679,10 @@ mod tests {
             .with_vector_query(vec![0.1, 0.2])
             .with_k(5)
             .build()
-            .expect("build ok"); // expect
+            .expect("build ok"); // expect // #[cfg(test)]
 
-        assert_eq!(query.text_query.unwrap(), "test query"); // unwrap
-        assert_eq!(query.vector_query.unwrap(), vec![0.1, 0.2]); // unwrap
+        assert_eq!(query.text_query.unwrap(), "test query"); // unwrap // #[cfg(test)]
+        assert_eq!(query.vector_query.unwrap(), vec![0.1, 0.2]); // unwrap // #[cfg(test)]
         assert_eq!(query.k, 5);
         // Default weights: balanced 1/3 each
         let eps = 1e-5f32;
@@ -707,18 +693,18 @@ mod tests {
 
     #[test]
     fn test_hybrid_query_builder_custom_weights() {
-        let weights = FusionWeights::new(0.4, 0.5, 0.1).unwrap(); // unwrap
+        let weights = FusionWeights::new(0.4, 0.5, 0.1).unwrap(); // unwrap // #[cfg(test)]
         let query = HybridQuery::builder()
             .with_fusion_weights(weights.clone())
             .build()
-            .unwrap(); // unwrap
+            .unwrap(); // unwrap // #[cfg(test)]
 
         assert_eq!(query.fusion_weights, weights);
     }
 
     #[test]
     fn test_hybrid_query_builder_defaults() {
-        let query = HybridQuery::builder().build().unwrap(); // unwrap
+        let query = HybridQuery::builder().build().unwrap(); // unwrap // #[cfg(test)]
         assert_eq!(query.k, 10);
         let eps = 1e-5f32;
         assert!((query.fusion_weights.vector() - 1.0 / 3.0).abs() < eps);
@@ -804,14 +790,14 @@ mod tests {
             total_tokens: 1,
             truncated: false,
         };
-        let ser = serde_json::to_string(&window).unwrap(); // unwrap
-        let deser: ContextWindow = serde_json::from_str(&ser).unwrap(); // unwrap
+        let ser = serde_json::to_string(&window).unwrap(); // unwrap // #[cfg(test)]
+        let deser: ContextWindow = serde_json::from_str(&ser).unwrap(); // unwrap // #[cfg(test)]
         assert_eq!(deser.total_tokens, 1);
         assert_eq!(deser.chunks.len(), 1);
         assert!(deser
             .chunks
             .first()
-            .expect("chunk")
+            .expect("chunk") // #[cfg(test)]
             .contextual_prefix
             .is_none());
     }
@@ -867,7 +853,7 @@ mod tests {
     #[test]
     fn test_serde_backward_compat_no_prefix_field() {
         let json = r#"{"doc_id":1,"content":"X","relevance":0.5,"token_count":1}"#;
-        let chunk: ContextChunk = serde_json::from_str(json).expect("deserialize"); // expect
+        let chunk: ContextChunk = serde_json::from_str(json).expect("deserialize"); // expect // #[cfg(test)]
         assert!(chunk.contextual_prefix.is_none());
     }
 
@@ -919,7 +905,7 @@ mod tests {
             .with_include_superseded(true)
             .with_k(25)
             .build()
-            .expect("build hybrid query"); // expect
+            .expect("build hybrid query"); // expect // #[cfg(test)]
 
         assert_eq!(query.text_query.as_deref(), Some("knowledge graph"));
         assert_eq!(query.vector_query.as_deref(), Some(&[0.5, 0.5][..]));

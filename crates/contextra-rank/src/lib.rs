@@ -26,4 +26,4 @@ pub mod rrf;
 
 pub use bound::unseen_bound;
 pub use error::RankError;
-pub use rrf::{rrf_fuse, Candidate, DocHandle, Fused, RrfScore, K_RRF};
+pub use rrf::{fuse, rrf_fuse, Candidate, DocHandle, Fused, Ranked, RankedList, RrfScore, K_RRF};

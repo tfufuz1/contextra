@@ -5,6 +5,15 @@ use crate::error::RankError;
 /// Glättungsfaktor $k = 60$ für Reciprocal Rank Fusion (SPEC §8.11, Anhang C, RK-01).
 pub const K_RRF: u32 = 60;
 
+/// Alias für eine Kandidatenliste (SPEC §3.1).
+pub type RankedList<'a> = &'a [Candidate];
+
+/// Alias für das fusionierte Gesamtergebnis (SPEC §3.1).
+pub type Ranked = Vec<Fused>;
+
+/// Alias für [`rrf_fuse`] gemäß SPEC §3.1 (`fuse(&[RankedList], k) -> Ranked`).
+pub use rrf_fuse as fuse;
+
 /// Höchstgrenze für Kandidaten je Liste (SPEC D-87, RK-06).
 const MAX_CANDIDATES_PER_LIST: usize = 1000;
 

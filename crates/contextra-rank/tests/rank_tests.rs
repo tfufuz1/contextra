@@ -2,7 +2,10 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing)]
 
-use contextra_rank::{rrf_fuse, unseen_bound, Candidate, DocHandle, RankError, RrfScore, K_RRF};
+use contextra_rank::{
+    fuse, rrf_fuse, unseen_bound, Candidate, DocHandle, RankError, Ranked, RankedList, RrfScore,
+    K_RRF,
+};
 
 /// SPEC: T-RANK-1
 /// SPEC: T-RANK-1
@@ -351,6 +354,24 @@ fn t_rank_1_golden_ranking_four_lists_exact() {
 /// Die Fusion verändert sie nie, trennt unterschiedliche Chunks desselben Dokuments,
 /// und summiert identische `(handle, chunk)`-Kombinationen across Listen.
 /// SPEC: T-HYB-2
+/// SPEC: T-RANK-1
+#[test]
+fn t_rank_1_fuse_alias_and_types_parity() {
+    let cand = Candidate {
+        handle: DocHandle {
+            cluster_tag: [1; 16],
+            doc_tag: [2; 16],
+        },
+        chunk: 0,
+    };
+    let list: &[Candidate] = &[cand];
+    let ranked_list: RankedList = list;
+    let res: Ranked = fuse(&[ranked_list], 10).expect("fuse should succeed");
+    assert_eq!(res.len(), 1);
+    assert_eq!(res[0].handle.doc_tag, [2; 16]);
+}
+
+/// SPEC: T-RANK-1
 #[test]
 fn t_hyb_2_hit_identity_doc_tag_chunk_preservation() {
     let handle = DocHandle {
