@@ -307,7 +307,10 @@ impl Manifest {
                         .unwrap_or_else(|| path.clone());
                     valid_map.remove(&key);
                 }
-                ManifestEntry::RollbackComplete { .. } | ManifestEntry::WalCheckpoint { .. } => {}
+                ManifestEntry::RollbackComplete { .. }
+                | ManifestEntry::WalCheckpoint { .. }
+                | ManifestEntry::WalFloor { .. }
+                | ManifestEntry::TextCommit { .. } => {}
                 ManifestEntry::Replace { removed, added, .. } => {
                     for p in removed {
                         let key = p
@@ -322,6 +325,23 @@ impl Manifest {
                         .unwrap_or_else(|| added.clone());
                     valid_map.insert(key, next_rank);
                     next_rank += 1;
+                }
+                ManifestEntry::SstSwap { add, remove } => {
+                    for p in remove {
+                        let key = p
+                            .file_name()
+                            .map(PathBuf::from)
+                            .unwrap_or_else(|| p.clone());
+                        valid_map.remove(&key);
+                    }
+                    for p in add {
+                        let key = p
+                            .file_name()
+                            .map(PathBuf::from)
+                            .unwrap_or_else(|| p.clone());
+                        valid_map.insert(key, next_rank);
+                        next_rank += 1;
+                    }
                 }
             }
         }
@@ -363,9 +383,22 @@ impl Manifest {
                         }
                     }
                 }
+                ManifestEntry::SstSwap { remove, .. } => {
+                    for p in remove {
+                        let key = p
+                            .file_name()
+                            .map(PathBuf::from)
+                            .unwrap_or_else(|| p.clone());
+                        if !valid_set.contains(&key) {
+                            dead_set.insert(key);
+                        }
+                    }
+                }
                 ManifestEntry::Add { .. }
                 | ManifestEntry::RollbackComplete { .. }
-                | ManifestEntry::WalCheckpoint { .. } => {}
+                | ManifestEntry::WalCheckpoint { .. }
+                | ManifestEntry::WalFloor { .. }
+                | ManifestEntry::TextCommit { .. } => {}
             }
         }
 
@@ -384,5 +417,226 @@ impl Manifest {
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+}
+
+use contextra_ports::keys::FileId;
+
+/// Strukturierter WAL-Floor für Recovery und Verkettungsprüfung (F.4, ST-04).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WalFloor {
+    pub seq: u64,
+    pub tail_mac: [u8; 32],
+    pub removed_file_ids: Vec<FileId>,
+}
+
+/// Strukturierte Text-Commit-Informationen (F.4, D-121).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextCommitInfo {
+    pub add: Option<FileId>,
+    pub remove: Vec<FileId>,
+    pub floor_seq: u64,
+}
+
+impl Manifest {
+    /// Hängt einen WalFloor-Eintrag an und erzwingt Durability via flush + fsync (F.4).
+    pub async fn append_wal_floor(
+        &self,
+        seq: u64,
+        tail_mac: [u8; 32],
+        removed_file_ids: Vec<FileId>,
+    ) -> Result<()> {
+        let entry = ManifestEntry::WalFloor {
+            seq,
+            tail_mac,
+            removed_file_ids,
+        };
+        self.append(&entry).await
+    }
+
+    /// Liefert den aktuellsten (letzten) WalFloor aus den Manifest-Einträgen.
+    pub fn current_wal_floor(entries: &[ManifestEntry]) -> Option<WalFloor> {
+        for entry in entries.iter().rev() {
+            if let ManifestEntry::WalFloor {
+                seq,
+                tail_mac,
+                removed_file_ids,
+            } = entry
+            {
+                return Some(WalFloor {
+                    seq: *seq,
+                    tail_mac: *tail_mac,
+                    removed_file_ids: removed_file_ids.clone(),
+                });
+            }
+        }
+        None
+    }
+
+    /// Hängt einen TextCommit-Eintrag an und führt flush + fsync aus (F.4 / D-121).
+    pub async fn append_text_commit(
+        &self,
+        add: Option<FileId>,
+        remove: Vec<FileId>,
+        floor_seq: u64,
+    ) -> Result<()> {
+        let entry = ManifestEntry::TextCommit {
+            add,
+            remove,
+            floor_seq,
+        };
+        self.append(&entry).await
+    }
+
+    /// Liefert den aktuellsten (letzten) TextCommit aus den Manifest-Einträgen.
+    pub fn current_text_commit(entries: &[ManifestEntry]) -> Option<TextCommitInfo> {
+        for entry in entries.iter().rev() {
+            if let ManifestEntry::TextCommit {
+                add,
+                remove,
+                floor_seq,
+            } = entry
+            {
+                return Some(TextCommitInfo {
+                    add: *add,
+                    remove: remove.clone(),
+                    floor_seq: *floor_seq,
+                });
+            }
+        }
+        None
+    }
+
+    /// Extrahiert alle TextCommit-Einträge in logischer Reihenfolge.
+    pub fn extract_text_commits(entries: &[ManifestEntry]) -> Vec<TextCommitInfo> {
+        let mut list = Vec::new();
+        for entry in entries {
+            if let ManifestEntry::TextCommit {
+                add,
+                remove,
+                floor_seq,
+            } = entry
+            {
+                list.push(TextCommitInfo {
+                    add: *add,
+                    remove: remove.clone(),
+                    floor_seq: *floor_seq,
+                });
+            }
+        }
+        list
+    }
+
+    /// Hängt einen atomaren SSTable-Tausch (SstSwap) an (ADR SL-1 ausstehend).
+    pub async fn append_sst_swap(&self, add: &[PathBuf], remove: &[PathBuf]) -> Result<()> {
+        let entry = ManifestEntry::SstSwap {
+            add: add.to_vec(),
+            remove: remove.to_vec(),
+        };
+        self.append(&entry).await
+    }
+}
+
+/// Knoten eines augmentierten Intervall-Suchbaums zur O(log n + k) Kandidatenermittlung (SPEC 5.5).
+#[derive(Debug, Clone)]
+struct IntervalNode {
+    path: PathBuf,
+    lo: Vec<u8>,
+    hi: Vec<u8>,
+    max_hi: Vec<u8>,
+    left: Option<Box<IntervalNode>>,
+    right: Option<Box<IntervalNode>>,
+}
+
+impl IntervalNode {
+    fn new(path: PathBuf, lo: Vec<u8>, hi: Vec<u8>) -> Self {
+        let max_hi = hi.clone();
+        Self {
+            path,
+            lo,
+            hi,
+            max_hi,
+            left: None,
+            right: None,
+        }
+    }
+
+    fn insert(&mut self, path: PathBuf, lo: Vec<u8>, hi: Vec<u8>) {
+        if hi > self.max_hi {
+            self.max_hi = hi.clone();
+        }
+
+        if lo < self.lo {
+            match self.left {
+                Some(ref mut l) => l.insert(path, lo, hi),
+                None => self.left = Some(Box::new(IntervalNode::new(path, lo, hi))),
+            }
+        } else {
+            match self.right {
+                Some(ref mut r) => r.insert(path, lo, hi),
+                None => self.right = Some(Box::new(IntervalNode::new(path, lo, hi))),
+            }
+        }
+    }
+
+    fn query(&self, query_lo: &[u8], query_hi: &[u8], results: &mut Vec<PathBuf>) {
+        if self.max_hi.as_slice() < query_lo {
+            return;
+        }
+
+        if let Some(ref l) = self.left {
+            if l.max_hi.as_slice() >= query_lo {
+                l.query(query_lo, query_hi, results);
+            }
+        }
+
+        if self.lo.as_slice() <= query_hi && self.hi.as_slice() >= query_lo {
+            results.push(self.path.clone());
+        }
+
+        if query_hi >= self.lo.as_slice() {
+            if let Some(ref r) = self.right {
+                r.query(query_lo, query_hi, results);
+            }
+        }
+    }
+}
+
+/// Schnellprüfungs-Index für Manifest-SSTable-Intervalle in O(log n + k) (SPEC 5.5).
+#[derive(Debug, Clone, Default)]
+pub struct ManifestIntervalIndex {
+    root: Option<Box<IntervalNode>>,
+}
+
+impl ManifestIntervalIndex {
+    /// Erzeugt einen neuen leeren Intervallindex.
+    pub fn new() -> Self {
+        Self { root: None }
+    }
+
+    /// Fügt ein Dateipfad-Intervall [lo, hi] in den Index ein.
+    pub fn insert(&mut self, path: impl Into<PathBuf>, lo: impl AsRef<[u8]>, hi: impl AsRef<[u8]>) {
+        let p = path.into();
+        let lo_vec = lo.as_ref().to_vec();
+        let hi_vec = hi.as_ref().to_vec();
+        match self.root {
+            Some(ref mut r) => r.insert(p, lo_vec, hi_vec),
+            None => self.root = Some(Box::new(IntervalNode::new(p, lo_vec, hi_vec))),
+        }
+    }
+
+    /// Ermittelt alle Kandidatendateien, deren Intervall [lo, hi] den Bereich [query_lo, query_hi] schneidet.
+    ///
+    /// Komplexität: O(log n + k), wobei k die Anzahl der schneidenden Treffer ist.
+    pub fn candidates_intersecting(
+        &self,
+        query_lo: impl AsRef<[u8]>,
+        query_hi: impl AsRef<[u8]>,
+    ) -> Vec<PathBuf> {
+        let mut results = Vec::new();
+        if let Some(ref r) = self.root {
+            r.query(query_lo.as_ref(), query_hi.as_ref(), &mut results);
+        }
+        results
     }
 }
