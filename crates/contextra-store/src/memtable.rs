@@ -153,7 +153,8 @@ impl MemTable {
             });
             freed_bytes += removed_bytes;
         }
-        self.size.fetch_sub(freed_bytes, std::sync::atomic::Ordering::Relaxed);
+        self.size
+            .fetch_sub(freed_bytes, std::sync::atomic::Ordering::Relaxed);
     }
     /// Creates a new empty MemTable with `SHARD_COUNT` independent shards.
     pub fn new() -> Self {

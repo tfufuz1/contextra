@@ -845,10 +845,10 @@ fn test_t_keycov_hierarchy_erasure_irrecoverability() {
     let hierarchy = KeyHierarchy::from_master(master);
 
     let ancestor_salts = AncestorSalts {
-        t: [0x11; 32], // Tenant salt
-        c: [0x22; 32], // Collection salt
+        t: [0x11; 32],       // Tenant salt
+        c: [0x22; 32],       // Collection salt
         s: Some([0x33; 32]), // Subject salt
-        d: [0x44; 32], // Document salt
+        d: [0x44; 32],       // Document salt
     };
     let doc_tag = [0xAA; 16];
 
@@ -928,7 +928,6 @@ fn test_t_keycov_hierarchy_erasure_irrecoverability() {
     );
 }
 
-
 #[test]
 fn test_t_log_1_secret_freedom_in_debug_and_display() {
     // CR-10 / T-LOG-1 / HR-4:
@@ -969,10 +968,22 @@ fn test_t_log_1_secret_freedom_in_debug_and_display() {
     ];
 
     for dbg in &debug_outputs {
-        assert!(dbg.contains("[REDACTED]"), "Debug output must be masked: {dbg}");
-        assert!(!dbg.contains("122"), "Debug output leaked decimal byte 122 (0x7A): {dbg}");
-        assert!(!dbg.contains("7a"), "Debug output leaked hex byte 7a: {dbg}");
-        assert!(!dbg.contains("7A"), "Debug output leaked hex byte 7A: {dbg}");
+        assert!(
+            dbg.contains("[REDACTED]"),
+            "Debug output must be masked: {dbg}"
+        );
+        assert!(
+            !dbg.contains("122"),
+            "Debug output leaked decimal byte 122 (0x7A): {dbg}"
+        );
+        assert!(
+            !dbg.contains("7a"),
+            "Debug output leaked hex byte 7a: {dbg}"
+        );
+        assert!(
+            !dbg.contains("7A"),
+            "Debug output leaked hex byte 7A: {dbg}"
+        );
     }
 
     // Verify CryptoError Display and Debug
@@ -986,7 +997,13 @@ fn test_t_log_1_secret_freedom_in_debug_and_display() {
     for err in errors {
         let disp = format!("{err}");
         let dbg = format!("{err:?}");
-        assert!(!disp.contains("0x"), "Error display leaked memory/addresses: {disp}");
-        assert!(!dbg.contains("0x"), "Error debug leaked memory/addresses: {dbg}");
+        assert!(
+            !disp.contains("0x"),
+            "Error display leaked memory/addresses: {disp}"
+        );
+        assert!(
+            !dbg.contains("0x"),
+            "Error debug leaked memory/addresses: {dbg}"
+        );
     }
 }

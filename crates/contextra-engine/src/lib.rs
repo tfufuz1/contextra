@@ -31,15 +31,15 @@ impl Default for VectorDeleteMode {
     }
 }
 #[cfg(not(loom))]
-use contextra_store::LsmStorage;
-#[cfg(not(loom))]
 pub use contextra_store::lsm::DurabilityMode;
+#[cfg(not(loom))]
+use contextra_store::LsmStorage;
 use contextra_types::{DocId, TenantId};
 use contextra_vector::{HnswConfig, HnswIndex};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 #[cfg(not(loom))]
 pub mod background_workers;

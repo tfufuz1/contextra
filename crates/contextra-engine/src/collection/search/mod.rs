@@ -12,7 +12,7 @@ mod hydrate;
 
 pub use hydrate::apply_read_gate;
 
-use super::{Collection, StoredDocument, StoredDocumentMeta, extract_effective_importance};
+use super::{extract_effective_importance, Collection, StoredDocument, StoredDocumentMeta};
 pub use crate::temporal_filter::{
-    FusionResult, apply_temporal_validity_filter, apply_temporal_validity_filter_at,
+    apply_temporal_validity_filter, apply_temporal_validity_filter_at, FusionResult,
 };

@@ -45,6 +45,7 @@
 #[cfg(not(loom))]
 pub mod compaction;
 pub mod engine;
+pub mod envelope;
 pub mod fsync;
 #[cfg(not(loom))]
 pub mod lsm;
@@ -59,9 +60,8 @@ pub mod system_pressure;
 #[cfg(not(loom))]
 pub mod tenant_codec;
 pub(crate) mod util;
-pub mod wal;
 pub mod vfs;
-pub mod envelope;
+pub mod wal;
 
 pub mod erase;
 pub mod health;

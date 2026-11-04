@@ -10,9 +10,9 @@ use crate::Collection;
 use bytes::Bytes;
 use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{DocId, TxId};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 /// A transaction wrapper that ensures atomic multi-index commits across LSM-Store, HNSW-Index, and Text-Index.
 pub struct DbTransaction<S: StorageEngine, V: VectorIndex = contextra_vector::HnswIndex> {

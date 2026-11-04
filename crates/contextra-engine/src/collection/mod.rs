@@ -41,17 +41,17 @@ use contextra_ports::{
 #[cfg(not(loom))]
 use contextra_store::LsmStorage;
 #[cfg(not(loom))]
-use contextra_text::Language;
-#[cfg(not(loom))]
 use contextra_text::inverted::InvertedIndex;
+#[cfg(not(loom))]
+use contextra_text::Language;
 use contextra_types::{DocId, Result, TxId};
 #[cfg(not(loom))]
 use contextra_vector::HnswIndex;
 use serde::{Deserialize, Serialize};
 #[cfg(not(loom))]
-use std::sync::Arc;
-#[cfg(not(loom))]
 use std::sync::atomic::{AtomicBool, AtomicU64};
+#[cfg(not(loom))]
+use std::sync::Arc;
 
 /// Configuration for a collection.
 #[derive(Debug, Clone, Serialize, Deserialize)]

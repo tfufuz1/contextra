@@ -33,8 +33,8 @@ async fn test_collection_embedder_async_embed() {
 async fn test_input_guards_boundary_validation() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -138,8 +138,8 @@ async fn test_doc_id_collision_rejected() {
     use contextra_store::LsmStorage;
     use contextra_types::{ContextraError, DocId, TxId};
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -345,8 +345,8 @@ fn test_importance_metadata_integration_and_filtering() {
 async fn test_invalid_doc_ids_rejected() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -395,8 +395,8 @@ async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contex
 {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();
@@ -444,8 +444,8 @@ async fn test_collection_mandatory_matrix_happy_path_hand_calculated() -> contex
 async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_types::Result<()> {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();
@@ -484,8 +484,8 @@ async fn test_collection_mandatory_matrix_empty_inputs() -> contextra_types::Res
 async fn test_collection_mandatory_matrix_error_paths() -> contextra_types::Result<()> {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();
@@ -530,8 +530,8 @@ async fn test_collection_mandatory_matrix_error_paths() -> contextra_types::Resu
 async fn test_apm7_utf8_multibyte_boundary_handling() -> contextra_types::Result<()> {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();

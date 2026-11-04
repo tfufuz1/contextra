@@ -1,6 +1,11 @@
 //! Spezifikationstests für den segmentbasierten BM25-Volltextindex laut SPEC 9.7, 8.9, D-20, D-49, D-69, D-71, D-81, F.7.
 
-#![allow(clippy::expect_used, clippy::unwrap_used, clippy::indexing_slicing, clippy::assertions_on_constants)]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    clippy::assertions_on_constants
+)]
 
 use contextra_crypto::dek::Dek;
 use contextra_crypto::hierarchy::FileKey;
@@ -20,8 +25,15 @@ fn test_t_text_analyzer_1_goldenset() {
     assert_eq!(analyzer.lang(), *b"de\0");
 
     let tokens = analyzer.analyze("Donaudampfschifffahrt und Schloßstraße mit Übermut");
-    assert!(tokens.contains(&"donaudampfschifffahrt".to_string()) || tokens.contains(&"schiff".to_string()));
-    assert!(tokens.contains(&"schlossstrasse".to_string()) || tokens.contains(&"schloss".to_string()) || tokens.contains(&"strasse".to_string()));
+    assert!(
+        tokens.contains(&"donaudampfschifffahrt".to_string())
+            || tokens.contains(&"schiff".to_string())
+    );
+    assert!(
+        tokens.contains(&"schlossstrasse".to_string())
+            || tokens.contains(&"schloss".to_string())
+            || tokens.contains(&"strasse".to_string())
+    );
     assert!(!tokens.contains(&"und".to_string()));
     assert!(!tokens.contains(&"mit".to_string()));
 }
@@ -32,7 +44,9 @@ fn test_t_text_phrase_1() {
     let term2_pos = [11u32, 40u32];
     let term3_pos = [12u32, 90u32];
 
-    assert!(match_phrase_positions(&[&term1_pos, &term2_pos, &term3_pos]));
+    assert!(match_phrase_positions(&[
+        &term1_pos, &term2_pos, &term3_pos
+    ]));
 
     let term_unmatched = [50u32, 60u32];
     assert!(!match_phrase_positions(&[&term1_pos, &term_unmatched]));
@@ -56,17 +70,26 @@ fn test_t_text_1_segment_search() {
     let file_id = [42u8; 16];
     let file_key1 = FileKey::new([7u8; 32]);
     let file_key2 = FileKey::new([7u8; 32]);
-    let sealed = writer.seal_to_bytes(file_id, file_key1).expect("Sealing must succeed");
+    let sealed = writer
+        .seal_to_bytes(file_id, file_key1)
+        .expect("Sealing must succeed");
 
-    let reader = SegmentReader::open_from_bytes(&sealed, file_id, file_key2).expect("Reading must succeed");
+    let reader =
+        SegmentReader::open_from_bytes(&sealed, file_id, file_key2).expect("Reading must succeed");
     assert_eq!(reader.header.doc_count, 1);
     assert_eq!(reader.header.total_len, 120);
     assert_eq!(reader.docs.len(), 1);
     assert_eq!(reader.docs.first().map(|d| d.doc_ord), Some(0));
     assert_eq!(reader.docs.first().map(|d| d.doclen), Some(120));
-    assert_eq!(reader.docs.first().map(|d| d.binding_envelope.clone()), Some(vec![1, 2, 3, 4]));
+    assert_eq!(
+        reader.docs.first().map(|d| d.binding_envelope.clone()),
+        Some(vec![1, 2, 3, 4])
+    );
     assert_eq!(reader.postings.len(), 1);
-    assert_eq!(reader.postings.first().map(|p| p.doc_ords.clone()), Some(vec![0]));
+    assert_eq!(
+        reader.postings.first().map(|p| p.doc_ords.clone()),
+        Some(vec![0])
+    );
 }
 
 #[test]
@@ -108,7 +131,10 @@ fn test_t_text_4_and_t_keycov_1_unlinked() {
 
     let destroyed_dek = Dek(SecretKey::new([0x00; 32]));
     let res = open_binding_envelope(&destroyed_dek, file_id, doc_ord, &envelope);
-    assert!(res.is_err(), "Postings must be unlinked when DEK is destroyed");
+    assert!(
+        res.is_err(),
+        "Postings must be unlinked when DEK is destroyed"
+    );
 }
 
 #[test]

@@ -10,9 +10,9 @@
 // INVARIANTEN: Schema-Integrität; Vollständigkeit aller Memories & Relationen; Nur lesender Zugriff.
 // STAND: TS:2026-09-12
 
-use crate::Contextra;
-use crate::collection::{Collection, StoredDocument, extract_effective_importance, extract_text};
+use crate::collection::{extract_effective_importance, extract_text, Collection, StoredDocument};
 use crate::filter::extract_memory_type;
+use crate::Contextra;
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{MemoryLink, MemoryType, Result};
 use serde::{Deserialize, Serialize};
@@ -367,11 +367,10 @@ mod tests {
 
         let err = db.import_memories(invalid_doc).await;
         assert!(err.is_err());
-        assert!(
-            err.unwrap_err()
-                .to_string()
-                .contains("Incompatible export schema version")
-        );
+        assert!(err
+            .unwrap_err()
+            .to_string()
+            .contains("Incompatible export schema version"));
     }
 }
 

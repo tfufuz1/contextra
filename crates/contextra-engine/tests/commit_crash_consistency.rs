@@ -10,15 +10,15 @@
 // INVARIANTEN: No orphaned index entries (Text/Graph/Vector) can exist without a corresponding storage record.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use contextra_engine::Collection;
 use contextra_engine::collection::{StoredDocument, StoredDocumentMeta};
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
+use contextra_engine::Collection;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats, VectorIndex};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Entity, EntityId, Result, TxId};
 use contextra_vector::HnswIndex;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
 use tempfile::tempdir;
 
 struct FaultyStorage<S: StorageEngine> {

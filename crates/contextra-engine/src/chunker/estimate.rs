@@ -11,7 +11,7 @@
 // NICHT-OFFENSICHTLICH: Codeblöcke nutzen erhöhten Multiplikator (1.8x).
 // STAND: TS:2026-10-29T00:00:00Z
 
-use super::blocks::{CodeFence, is_closing_fence, parse_opening_fence};
+use super::blocks::{is_closing_fence, parse_opening_fence, CodeFence};
 
 /// Approximate character count per token (BPE ratio).
 pub(crate) const CHARS_PER_TOKEN: usize = 4;

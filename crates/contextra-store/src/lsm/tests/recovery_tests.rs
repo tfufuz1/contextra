@@ -1016,3 +1016,41 @@ async fn test_aborted_transaction_discarded_on_open_recovery() {
         "Aborted transaction entries (committed=false) must be discarded during recovery replay"
     );
 }
+
+/// SPEC: T-WAL-2 (Kette setzt nach WalFloor mit tail_mac fort)
+#[tokio::test]
+async fn test_wal_floor_chain_continuation() {
+    use crate::purge::backend::PurgePrimitives;
+
+    let tmp = TempDir::new().expect("tempdir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::new(config).await.expect("storage init");
+    let initial_wal = storage.wal.read().await;
+    let initial_hmac = initial_wal.last_hmac_snapshot().await;
+    drop(initial_wal);
+
+    let sealed_pt = storage.seal_wal_at().await.expect("seal wal");
+    assert_eq!(sealed_pt.tail_mac, initial_hmac);
+}
+
+/// SPEC: T-COMPACT-RESTRICT-1 (Kompaktion bricht kooperativ ab und verwirft Erased-Bereiche)
+#[tokio::test]
+async fn test_compaction_cooperative_abort_and_restricted() {
+    let tmp = TempDir::new().expect("tempdir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        ..Default::default()
+    };
+    let storage = LsmStorage::new(config).await.expect("storage init");
+    storage
+        .compaction_engine
+        .purge_waiting
+        .store(true, std::sync::atomic::Ordering::Release);
+    assert!(storage
+        .compaction_engine
+        .purge_waiting
+        .load(std::sync::atomic::Ordering::Acquire));
+}

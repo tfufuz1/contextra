@@ -11,8 +11,8 @@ use super::fixtures::*;
 async fn test_insert_with_ttl_and_reap_expired_documents() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -78,8 +78,8 @@ async fn test_insert_with_ttl_and_reap_expired_documents() {
 async fn test_insert_typed_episodic_has_decay_metadata() {
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
 
     let dir = tempfile::tempdir().unwrap(); // unwrap
     let storage = Arc::new(
@@ -126,8 +126,8 @@ async fn test_insert_typed_episodic_has_decay_metadata() {
 async fn test_insert_typed_working_has_ttl_metadata() {
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
 
     let dir = tempfile::tempdir().unwrap(); // unwrap
     let storage = Arc::new(
@@ -174,8 +174,8 @@ async fn test_insert_typed_working_has_ttl_metadata() {
 async fn test_insert_backward_compatible_has_semantic_default() {
     use contextra_store::{LsmConfig, LsmStorage};
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
 
     let dir = tempfile::tempdir().unwrap(); // unwrap
     let storage = Arc::new(
@@ -224,8 +224,8 @@ async fn test_put_kv_if_absent_rollback_failure_returns_conflict_error() {
     use contextra_ports::{BoxFuture, StorageEngine};
     use contextra_types::{Result, TxId};
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
 
     struct FailingRollbackMockStorage;
 

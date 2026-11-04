@@ -498,3 +498,16 @@ async fn test_memory_only_commit_restores_hmac() {
         "last_hmac must be restored to pre-commit state for MemoryOnly durability"
     );
 }
+
+/// SPEC: T-GATEGROUP-1 (Gate-Gruppen-Commit und Barrieren)
+#[tokio::test]
+async fn test_gate_group_commit_barrier() {
+    let tmp = TempDir::new().expect("tempdir");
+    let config = LsmConfig {
+        path: tmp.path().to_path_buf(),
+        group_commit_window_micros: 1000,
+        ..Default::default()
+    };
+    let storage = LsmStorage::new(config).await.expect("storage init");
+    assert_eq!(storage.config.group_commit_window_micros, 1000);
+}

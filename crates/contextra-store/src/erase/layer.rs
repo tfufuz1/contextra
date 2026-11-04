@@ -31,15 +31,11 @@ impl<P: PurgePrimitives> ErasureLayer for DocStoreLayer<P> {
     }
 
     fn resolve(&self, _t: &EraseTarget) -> BoxFuture<'_, std::result::Result<LayerScope, String>> {
-        Box::pin(async move {
-            Ok(LayerScope::empty())
-        })
+        Box::pin(async move { Ok(LayerScope::empty()) })
     }
 
     fn on_gate(&self, _s: &LayerScope) -> BoxFuture<'_, std::result::Result<(), String>> {
-        Box::pin(async move {
-            Ok(())
-        })
+        Box::pin(async move { Ok(()) })
     }
 
     fn purge(
@@ -58,9 +54,7 @@ impl<P: PurgePrimitives> ErasureLayer for DocStoreLayer<P> {
         _s: &LayerScope,
         _sc: &Scanner<Armed>,
     ) -> BoxFuture<'_, std::result::Result<LayerWitness, String>> {
-        Box::pin(async move {
-            Ok(LayerWitness::empty())
-        })
+        Box::pin(async move { Ok(LayerWitness::empty()) })
     }
 
     fn key_coverage(&self) -> KeyCoverage {

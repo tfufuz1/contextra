@@ -11,7 +11,7 @@
 // NICHT-OFFENSICHTLICH: Verwendet Sliding-Window-Fallback für übergroße Absätze.
 // STAND: TS:2026-10-29T00:00:00Z
 
-use super::blocks::{MarkdownBlock, parse_markdown_blocks};
+use super::blocks::{parse_markdown_blocks, MarkdownBlock};
 use super::estimate::estimate_tokens;
 use super::sections::RawSection;
 use super::windows::chunk_text_with_overlap;
