@@ -1,17 +1,3 @@
-//! Standard-Systemverdrahtung für die Contextra-Fassade.
-//!
-//! # Architektur-Rolle: Ring 4 (Fassade)
-//!
-//! Gemäß SPEC D-89, D-95 und §8.14:
-//! Die Fassade stellt `system_defaults()` bereit, welche die Standard-Implementierungen
-//! der Basis-Ports verdrahtet:
-//! - `RealVfs` aus `contextra-durable-fs` (I/O nur über Vfs, Regel 5)
-//! - `SystemClock` aus `contextra-ports`
-//! - `OsRng` (OS-CSPRNG Adapter)
-//!
-//! Die Erzeugung des Schlüsseltresors erfolgt in `contextra-engine` (D-95).
-//! Die Fassade enthält keine Logik.
-
 use contextra_durable_fs::RealVfs;
 use contextra_ports::clock::Clock;
 use contextra_ports::clock::SystemClock;
@@ -33,13 +19,14 @@ impl OsRng {
 impl Rng for OsRng {
     fn next_u64(&self) -> u64 {
         let mut buf = [0u8; 8];
-        getrandom::getrandom(&mut buf).unwrap_or_default();
+        if getrandom::getrandom(&mut buf).is_err() {
+            buf.fill(0);
+        }
         u64::from_le_bytes(buf)
     }
 
     fn fill_bytes(&self, dest: &mut [u8]) {
         if getrandom::getrandom(dest).is_err() {
-            // Im extrem unwahrscheinlichen Fehlerfall Nullen als sicherer Fallback
             dest.fill(0);
         }
     }
