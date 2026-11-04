@@ -1,5 +1,4 @@
 // FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
 // ZWECK: Dateisystem-Erkennung und -Klassifikation fuer die Startprobe (Ring 1 / D-56 / T-PLAT-1)
 // INVARIANTEN: Zero-Panic; keine Pfade in Display; Unterstuetzung fuer Ext4, Xfs, Apfs, Btrfs, Zfs
 
