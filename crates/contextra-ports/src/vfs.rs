@@ -122,7 +122,7 @@ pub trait VfsFile: Send + Sync {
     /// Flushes data blocks and metadata to disk (`fsync`).
     ///
     /// # Fehler
-    /// Liefert `std::io::Error` bei Synchronisationsfehlern. Scheitert `sync_all`, ist das Handle unwiederbringlich vergiftet.
+    /// Liefert `std::io::Error` bei Synchronisationsfehlern. Scheitert `sync_all`, ist das Handle dauerhaft vergiftet und darf nicht weiterverwendet werden (D-55, I-10).
     ///
     /// # Crash
     /// Garantiert Haltbarkeit aller Datenblöcke und Inode-Metadaten (z. B. Dateilänge).
