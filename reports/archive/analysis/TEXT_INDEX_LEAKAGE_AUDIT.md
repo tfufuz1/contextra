@@ -4,7 +4,7 @@
 > **Datum:** 2026-11-02
 > **Rolle:** Information-Retrieval-Ingenieur mit Kenntnis von Searchable-Encryption-Leakage-Profilen
 > **Crate:** `contextra-text` (Ring 2, Ist-Kopf `lib.rs` nennt fehlerhaft Ring 0)
-> **Normative Basis:** `docs/SPEC.md` v > `docs/VETOES.md` > `docs/CONSTITUTION.md` > `AGENTS.md`
+> **Normative Basis:** `docs/SPEC.md` v4.3.0 > `docs/VETOES.md` > `docs/CONSTITUTION.md` > `AGENTS.md`
 > **Evidenzstufen:** EV0 (Behauptung) → EV1 (Quelltext) → EV2 (Lokaler Lauf) → EV3 (Mutationsprüfung) → EV4 (Lab/Beweis)
 
 ---
