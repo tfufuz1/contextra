@@ -735,30 +735,14 @@ impl HnswIndexCore {
                 .map(|m| m.header.node_count() as usize)
                 .unwrap_or(0);
             let deleted_nodes = self.cold.deleted_nodes.read();
-            let seq_log = self.cold.seq_log.read();
-            let min_retention_seq = seq_log.min_retention_seq();
             let snapshot_tx = self.hot.last_tx_id.load(Ordering::SeqCst);
             let mut all = Vec::with_capacity(nodes.len());
             for (i, node) in nodes.iter().enumerate() {
                 let global_idx = buffer_count + i;
                 if node.committed_tx <= snapshot_tx {
-                    let is_deleted = deleted_nodes.contains(global_idx as u64)
-                        && seq_log
-                            .deletion_seq(node.doc_id)
-                            .is_none_or(|del_seq| del_seq <= snapshot_tx);
+                    let is_deleted = deleted_nodes.contains(global_idx as u64);
                     if !is_deleted {
                         all.push((node.doc_id, node.vector.clone(), node.committed_tx, false));
-                    } else if let Some(min_ret_seq) = min_retention_seq {
-                        if let Some(del_seq) = seq_log.deletion_seq(node.doc_id) {
-                            if del_seq >= min_ret_seq {
-                                all.push((
-                                    node.doc_id,
-                                    node.vector.clone(),
-                                    node.committed_tx,
-                                    true,
-                                ));
-                            }
-                        }
                     }
                 }
             }
@@ -767,7 +751,6 @@ impl HnswIndexCore {
 
         let rng = self.cold.rng.clone();
         let new_index = HnswIndex::try_new_with_rng(config, rng)?;
-        *new_index.inner.cold.seq_log.write() = self.cold.seq_log.read().clone();
 
         {
             let buffer_guard = self.cold.buffer_index.read();
@@ -851,53 +834,47 @@ impl HnswIndexCore {
     fn rebuild_phase2_merge_and_swap(&self, new_index: HnswIndex, snapshot_tx: u64) -> Result<()> {
         let _write_lock = self.hot.write_mutex.lock();
 
-        let delta_changes = self.cold.seq_log.read().changes_since(snapshot_tx);
+        {
+            let buffer_count = self
+                .cold
+                .buffer_index
+                .read()
+                .as_ref()
+                .map(|m| m.header.node_count() as usize)
+                .unwrap_or(0);
+            let deleted_nodes = self.cold.deleted_nodes.read();
+            let nodes = self.hot.nodes.read();
 
-        for change in delta_changes {
-            match change {
-                contextra_mvcc::SeqLogChange::Insert { doc_id, seq } => {
-                    let vector_opt = {
-                        let doc_map = self.hot.doc_to_node.read();
-                        let buffer_count = self
-                            .cold
-                            .buffer_index
-                            .read()
-                            .as_ref()
-                            .map(|m| m.header.node_count() as usize)
-                            .unwrap_or(0);
-                        if let Some(&global_idx) = doc_map.get(&doc_id.inner()) {
-                            if global_idx >= buffer_count {
-                                let ram_idx = global_idx - buffer_count;
-                                let nodes = self.hot.nodes.read();
-                                nodes.get(ram_idx).map(|n| n.vector.clone())
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
+            for (i, node) in nodes.iter().enumerate() {
+                let global_idx = (buffer_count + i) as u64;
+                if node.committed_tx > snapshot_tx && !deleted_nodes.contains(global_idx) {
+                    let f32_vec = match &node.vector {
+                        VectorData::F32(v) => v.clone(),
+                        VectorData::U8(v) => {
+                            let q_guard = self.cold.quantizer.read();
+                            let q = q_guard.as_ref().ok_or_else(|| {
+                                ContextraError::Index(
+                                    "Quantizer missing during rebuild phase 2 delta replay"
+                                        .into(),
+                                )
+                            })?;
+                            q.dequantize(v)?
                         }
                     };
-
-                    if let Some(vector) = vector_opt {
-                        let f32_vec = match vector {
-                            VectorData::F32(v) => v,
-                            VectorData::U8(v) => {
-                                let q_guard = self.cold.quantizer.read();
-                                let q = q_guard.as_ref().ok_or_else(|| {
-                                    ContextraError::Index(
-                                        "Quantizer missing during rebuild phase 2 delta replay"
-                                            .into(),
-                                    )
-                                })?;
-                                q.dequantize(&v)?
-                            }
-                        };
-
-                        new_index.inner.do_insert(doc_id, &f32_vec, seq)?;
-                    }
+                    new_index.inner.do_insert(node.doc_id, &f32_vec, node.committed_tx)?;
                 }
-                contextra_mvcc::SeqLogChange::Delete { doc_id, .. } => {
-                    new_index.inner.do_delete(doc_id)?;
+            }
+
+            for del_idx in deleted_nodes.iter() {
+                if (del_idx as usize) >= buffer_count {
+                    let ram_idx = (del_idx as usize) - buffer_count;
+                    if let Some(node) = nodes.get(ram_idx) {
+                        if node.committed_tx > snapshot_tx {
+                            if new_index.inner.hot.doc_to_node.read().contains_key(&node.doc_id.inner()) {
+                                new_index.inner.do_delete(node.doc_id)?;
+                            }
+                        }
+                    }
                 }
             }
         }

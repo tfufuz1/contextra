@@ -15,10 +15,8 @@ ring = "0"
 [dependencies]
 contextra-types = { workspace = true }
 contextra-ports = { workspace = true }
-contextra-mvcc = { workspace = true }
 contextra-crypto = { workspace = true }
 contextra-simd = { workspace = true }
-contextra-sys = { workspace = true }
 subtle = "2.6"
 ahash = { workspace = true }
 parking_lot = { workspace = true }
@@ -107,3 +105,8 @@ required-features = ["experimental-diskann"]
 [[test]]
 name = "recall_audit"
 required-features = ["experimental-diskann"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+tempfile = { workspace = true }
+bincode = { workspace = true }
