@@ -243,6 +243,28 @@ fn test_keyslot_lifecycle_and_rekey_o1_t_keyslot_1_2_3() {
     assert_eq!(unwrapped2_after.as_bytes(), master.as_bytes());
 }
 
+#[test]
+fn test_t_kdf_1_passphrase_length_validation() {
+    // SPEC §5.7: Passphrase length >= 12 bytes required. Passphrase < 12 bytes fails with Config.
+    let short_pass = Secret::from_slice(b"short");
+    assert!(short_pass.as_bytes().len() < MIN_PASSPHRASE_LEN);
+    let salt = [0x11; 32];
+    let params = KdfParams::DEFAULT;
+
+    let res = derive_kek(&short_pass, &salt, &params);
+    assert_eq!(
+        res.err(),
+        Some(CryptoError::Config),
+        "Passphrase shorter than 12 bytes must fail closed with Config"
+    );
+
+    // Exact minimum length 12 bytes succeeds
+    let valid_min_pass = Secret::from_slice(b"123456789012");
+    assert_eq!(valid_min_pass.as_bytes().len(), 12);
+    let res_ok = derive_kek(&valid_min_pass, &salt, &params);
+    assert!(res_ok.is_ok(), "12-byte passphrase must succeed");
+}
+
 /// SPEC: T-SIG-1
 #[test]
 fn test_t_sig_1_report_signature_spec_conformance() {

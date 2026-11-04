@@ -14,6 +14,9 @@ pub const MAX_T: u8 = 16;
 pub const MIN_P: u8 = 1;
 pub const MAX_P: u8 = 16;
 
+/// Minimum passphrase length in bytes per SPEC §5.7.
+pub const MIN_PASSPHRASE_LEN: usize = 12;
+
 /// Argon2id parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct KdfParams {
@@ -60,6 +63,9 @@ impl KdfParams {
 
 /// Derives a Key Encryption Key (KEK) using Argon2id.
 pub fn derive_kek(pass: &Secret, salt: &[u8; 32], params: &KdfParams) -> Result<SecretKey<32>> {
+    if pass.as_bytes().len() < MIN_PASSPHRASE_LEN {
+        return Err(CryptoError::Config);
+    }
     let argon2_params = Params::new(
         params.m_kib,
         u32::from(params.t),

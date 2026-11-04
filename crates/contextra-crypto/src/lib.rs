@@ -49,7 +49,8 @@ pub use hierarchy::{
     SignSeed, UnitKey, VaultMacKey, WalKey,
 };
 pub use kdf::{
-    derive_kek, hkdf_expand, KdfParams, MAX_M_KIB, MAX_P, MAX_T, MIN_M_KIB, MIN_P, MIN_T,
+    derive_kek, hkdf_expand, KdfParams, MAX_M_KIB, MAX_P, MAX_T, MIN_M_KIB, MIN_P,
+    MIN_PASSPHRASE_LEN, MIN_T,
 };
 pub use labels::{
     COLL_TAG, COMMIT, DEK, DEK_SALT, DOC_TAG, ENC, FILE, FKMASK, HDR, IDX, LEDGER, NAME_TAG,
