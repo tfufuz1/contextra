@@ -161,4 +161,39 @@ pub trait ReadGate: Send + Sync {
     /// # Crash
     /// Reiner RAM-Lookup; keine Mutation.
     fn gated_seq(&self, k: &KeyBuf) -> Option<Seq>;
+
+    /// Returns the monotonic gate epoch counter (SPEC §11.3, D-120, I-21).
+    ///
+    /// Incremented before key destruction to allow linearized read verification.
+    fn gate_epoch(&self) -> u64 {
+        0
+    }
+
+    /// Evaluates whether a 16-byte `KeyBuf` is covered by an active gate (Erased or Restricted) (SPEC I-2).
+    ///
+    /// Used by replay filters and commit leader phase.
+    fn covers(&self, k: &KeyBuf) -> bool {
+        match self.check(k) {
+            GateDecision::Erased | GateDecision::Restricted => true,
+            GateDecision::Open => false,
+        }
+    }
+
+    /// Evaluates point gate status of a canonical 78-byte raw key (SPEC 9.1, D-123).
+    fn check_raw(&self, _raw: &[u8; 78]) -> GateDecision {
+        GateDecision::Open
+    }
+
+    /// Evaluates whether a canonical 78-byte raw key is covered by an active gate (SPEC I-2, I-21, D-123).
+    fn covers_raw(&self, raw: &[u8; 78]) -> bool {
+        match self.check_raw(raw) {
+            GateDecision::Erased | GateDecision::Restricted => true,
+            GateDecision::Open => false,
+        }
+    }
+
+    /// Retrieves the sequence number at which a 78-byte raw key was gated, if any.
+    fn gated_seq_raw(&self, _raw: &[u8; 78]) -> Option<Seq> {
+        None
+    }
 }
