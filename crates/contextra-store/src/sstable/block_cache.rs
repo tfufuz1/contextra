@@ -106,7 +106,9 @@ impl BlockCacheBackend for SieveCacheBackend {
                 s.hand = 0;
             }
 
-            let node = s.nodes[s.hand].clone();
+            let Some(node) = s.nodes.get(s.hand).cloned() else {
+                break;
+            };
 
             let hand = s.hand;
             if let Some(map_node) = s.map.get(&node.key) {
@@ -276,7 +278,8 @@ pub type BlockCacheShard = LruBlockCacheBackend;
 pub type BlockCacheShard = QuickCacheBlockCacheBackend;
 
 pub struct BlockCache {
-    shards: Vec<BlockCacheShard>,
+    first_shard: BlockCacheShard,
+    additional_shards: Vec<BlockCacheShard>,
     hash_builder: ahash::RandomState,
 }
 
@@ -286,15 +289,17 @@ impl BlockCache {
     }
 
     pub fn new_with_shards(capacity_per_shard: usize, num_shards: usize) -> Self {
-        let num_shards = num_shards.max(1);
         let cap_shard = capacity_per_shard.max(1);
+        let num_shards = num_shards.max(1);
 
-        let shards = (0..num_shards)
+        let first_shard = BlockCacheShard::new(cap_shard);
+        let additional_shards = (1..num_shards)
             .map(|_| BlockCacheShard::new(cap_shard))
             .collect();
 
         Self {
-            shards,
+            first_shard,
+            additional_shards,
             hash_builder: ahash::RandomState::new(),
         }
     }
@@ -302,13 +307,20 @@ impl BlockCache {
     #[inline]
     pub fn shard_idx(&self, file_id: u64, offset: u64) -> usize {
         let hash = self.hash_builder.hash_one((file_id, offset));
-        (hash as usize) % self.shards.len()
+        let total_shards = 1 + self.additional_shards.len();
+        (usize::try_from(hash).unwrap_or(0)) % total_shards
     }
 
     #[inline]
     fn shard(&self, file_id: u64, offset: u64) -> &BlockCacheShard {
         let idx = self.shard_idx(file_id, offset);
-        &self.shards[idx]
+        if idx == 0 {
+            &self.first_shard
+        } else {
+            self.additional_shards
+                .get(idx - 1)
+                .unwrap_or(&self.first_shard)
+        }
     }
 
     #[inline]
@@ -323,7 +335,7 @@ impl BlockCache {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.shards.iter().map(|s| s.len()).sum()
+        self.first_shard.len() + self.additional_shards.iter().map(|s| s.len()).sum::<usize>()
     }
 
     #[inline]

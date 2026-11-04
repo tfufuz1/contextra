@@ -34,13 +34,30 @@ impl BloomFilter {
         let n = n.min(100_000_000);
 
         // m = bits needed
-        let m = (-(n as f64) * p.ln() / (2.0f64.ln().powi(2))).ceil() as usize;
+        let m_float = (-(n as f64) * p.ln() / (2.0f64.ln().powi(2))).ceil();
+        let m = if m_float < 64.0 || !m_float.is_finite() {
+            64usize
+        } else if m_float > (128.0 * 1024.0 * 1024.0 * 8.0) {
+            128 * 1024 * 1024 * 8
+        } else {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let val = m_float as u64;
+            usize::try_from(val).unwrap_or(usize::MAX)
+        };
 
         // Hard upper bound on bloom filter bits (128 MB = 1_073_741_824 bits)
         const MAX_BITS: usize = 128 * 1024 * 1024 * 8;
         let num_bits = m.next_multiple_of(64).clamp(64, MAX_BITS);
-        let num_hashes = ((num_bits as f64 / n as f64) * 2.0f64.ln()).round() as usize;
-        let num_hashes = num_hashes.clamp(1, 16);
+        let k_float = ((num_bits as f64 / n as f64) * 2.0f64.ln()).round();
+        let num_hashes = if k_float < 1.0 || !k_float.is_finite() {
+            1usize
+        } else if k_float > 16.0 {
+            16usize
+        } else {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let val = k_float as u64;
+            usize::try_from(val).unwrap_or(16).clamp(1, 16)
+        };
 
         Self {
             bits: vec![0u64; num_bits / 64],
@@ -53,10 +70,10 @@ impl BloomFilter {
     pub fn insert(&mut self, key: &[u8]) {
         let (h1, h2) = Self::hash_pair(key);
         for i in 0..self.num_hashes {
-            // Double Hashing: bit_idx = (h1 + i * h2) % num_bits
-            // Garantiert gleichmäßige Verteilung ohne Wiederholungen für i < num_bits
-            let bit_idx = h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize % self.num_bits;
-            self.bits[bit_idx / 64] |= 1u64 << (bit_idx % 64);
+            let bit_idx = usize::try_from(h1.wrapping_add((i as u64).wrapping_mul(h2)) % (self.num_bits as u64)).unwrap_or(0);
+            if let Some(word) = self.bits.get_mut(bit_idx / 64) {
+                *word |= 1u64 << (bit_idx % 64);
+            }
         }
     }
 
@@ -67,8 +84,9 @@ impl BloomFilter {
         }
         let (h1, h2) = Self::hash_pair(key);
         for i in 0..self.num_hashes {
-            let bit_idx = h1.wrapping_add((i as u64).wrapping_mul(h2)) as usize % self.num_bits;
-            if (self.bits[bit_idx / 64] & (1u64 << (bit_idx % 64))) == 0 {
+            let bit_idx = usize::try_from(h1.wrapping_add((i as u64).wrapping_mul(h2)) % (self.num_bits as u64)).unwrap_or(0);
+            let word = self.bits.get(bit_idx / 64).copied().unwrap_or(0);
+            if (word & (1u64 << (bit_idx % 64))) == 0 {
                 return false;
             }
         }
@@ -109,12 +127,19 @@ impl BloomFilter {
                 "corrupted bloom filter: too short".into(),
             ));
         }
-        let num_hashes = u64::from_le_bytes(data[0..8].try_into().map_err(|_| {
+        let hashes_slice = data.get(0..8).ok_or_else(|| {
+            ContextraError::Storage("corrupted bloom filter: too short for num_hashes".into())
+        })?;
+        let num_hashes = usize::try_from(u64::from_le_bytes(hashes_slice.try_into().map_err(|_| {
             ContextraError::ParseError("corrupted bloom filter: invalid num_hashes".into())
-        })?) as usize;
-        let num_bits = u64::from_le_bytes(data[8..16].try_into().map_err(|_| {
+        })?)).map_err(|_| ContextraError::Storage("num_hashes exceeds usize".into()))?;
+
+        let bits_slice = data.get(8..16).ok_or_else(|| {
+            ContextraError::Storage("corrupted bloom filter: too short for num_bits".into())
+        })?;
+        let num_bits = usize::try_from(u64::from_le_bytes(bits_slice.try_into().map_err(|_| {
             ContextraError::ParseError("corrupted bloom filter: invalid num_bits".into())
-        })?) as usize;
+        })?)).map_err(|_| ContextraError::Storage("num_bits exceeds usize".into()))?;
 
         if num_hashes == 0 || num_hashes > 64 {
             return Err(ContextraError::Storage(format!(
@@ -151,8 +176,11 @@ impl BloomFilter {
         let mut bits = Vec::with_capacity(required_words);
         let mut offset = 16;
         for _ in 0..required_words {
+            let word_slice = data.get(offset..offset + 8).ok_or_else(|| {
+                ContextraError::Storage("corrupted bloom filter: unexpected EOF reading words".into())
+            })?;
             bits.push(u64::from_le_bytes(
-                data[offset..offset + 8].try_into().map_err(|_| {
+                word_slice.try_into().map_err(|_| {
                     ContextraError::ParseError("corrupted bloom filter: invalid word".into())
                 })?,
             ));

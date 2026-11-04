@@ -17,7 +17,10 @@ pub(super) fn pread_exact(
                 "failed to fill whole buffer",
             ));
         }
-        buf = &mut buf[n..];
+        let Some(next_buf) = buf.get_mut(n..) else {
+            break;
+        };
+        buf = next_buf;
         offset += n as u64;
     }
     Ok(())

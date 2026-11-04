@@ -114,7 +114,3 @@ required-features = ["experimental-diskann"]
 name = "recall_audit"
 required-features = ["experimental-diskann"]
 
-[dev-dependencies]
-tokio = { workspace = true, features = ["full"] }
-tempfile = { workspace = true }
-bincode = { workspace = true }

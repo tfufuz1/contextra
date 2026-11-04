@@ -15,20 +15,17 @@ use std::time::Duration;
 ///
 /// Nur `Full` ist zulässig (D-05). `WalNoHmac` und `MemoryOnly` wurden entfernt,
 /// da sie die WAL-Integrität abschwächen würden (F-21, D-05).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[non_exhaustive]
 pub enum DurabilityMode {
     /// Vollständige Persistenz mit HMAC-Kette (einzige zulässige Variante, D-05).
+    #[default]
     Full,
     /// Nur für In-Memory-Tests ohne Dateisystem-I/O.
     MemoryOnly,
 }
 
-impl Default for DurabilityMode {
-    fn default() -> Self {
-        Self::Full
-    }
-}
+
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum DurabilityConfigError {

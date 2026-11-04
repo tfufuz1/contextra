@@ -1020,8 +1020,6 @@ async fn test_aborted_transaction_discarded_on_open_recovery() {
 /// SPEC: T-WAL-2 (Kette setzt nach WalFloor mit tail_mac fort)
 #[tokio::test]
 async fn test_wal_floor_chain_continuation() {
-    use crate::purge::backend::PurgePrimitives;
-
     let tmp = TempDir::new().expect("tempdir");
     let config = LsmConfig {
         path: tmp.path().to_path_buf(),

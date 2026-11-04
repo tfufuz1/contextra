@@ -152,7 +152,7 @@ impl Wal {
     /// Internal helper to retrieve or derive the 256-bit integrity key for HMAC chaining.
     pub(crate) fn get_integrity_key(&self) -> Result<[u8; 32]> {
         if let Some(km) = &self.key_manager {
-            km.integrity_key().map_err(Into::into)
+            km.integrity_key()
         } else if let Some(key) = self.fallback_integrity_key {
             Ok(key)
         } else {
@@ -170,10 +170,7 @@ impl Wal {
 
     #[cfg(any(test, feature = "test-hooks"))]
     pub fn legacy_integrity_key_for_test() -> [u8; 32] {
-        match legacy_integrity_key() {
-            Ok(key) => key,
-            Err(_) => [0u8; 32],
-        }
+        legacy_integrity_key().unwrap_or_default()
     }
 
     /// Loads or creates the unencrypted file-local integrity key (`.wal_integrity_key`).
