@@ -7,7 +7,7 @@
 
 use super::internal::{validate_doc_id, validate_embedding};
 use crate::collection::{
-    Collection, StoredDocument, StoredDocumentMeta, ensure_importance_metadata, extract_text,
+    ensure_importance_metadata, extract_text, Collection, StoredDocument, StoredDocumentMeta,
 };
 use contextra_ports::{StorageEngine, VectorIndex};
 use contextra_types::{DocId, EntityId, Result};

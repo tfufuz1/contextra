@@ -19,14 +19,14 @@ mod orphan_workers;
 #[cfg(test)]
 mod tests;
 
-pub use config::{OrphanCleanupBackoffConfig, OrphanCleanupIndex, calculate_rebuild_cooldown};
-#[allow(deprecated)]
-pub use expiry_workers::{MAX_EXPIRED_PER_TICK, start_expiry_cleanup_worker, start_expiry_reaper};
+pub use config::{calculate_rebuild_cooldown, OrphanCleanupBackoffConfig, OrphanCleanupIndex};
 #[cfg(feature = "background-maintenance")]
 #[allow(deprecated)]
 pub use expiry_workers::{start_decay_cleanup_worker, start_thermostat_reaper};
 #[allow(deprecated)]
+pub use expiry_workers::{start_expiry_cleanup_worker, start_expiry_reaper, MAX_EXPIRED_PER_TICK};
+#[allow(deprecated)]
 pub use orphan_workers::{
-    MAX_ORPHANS_PER_TICK, start_orphan_cleanup_worker, start_orphan_cleanup_worker_with_config,
-    start_orphan_reaper,
+    start_orphan_cleanup_worker, start_orphan_cleanup_worker_with_config, start_orphan_reaper,
+    MAX_ORPHANS_PER_TICK,
 };

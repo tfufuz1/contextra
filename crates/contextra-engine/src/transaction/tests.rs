@@ -11,8 +11,8 @@ use crate::Collection;
 use contextra_store::LsmStorage;
 use contextra_types::DocId;
 use contextra_vector::HnswIndex;
-use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use tempfile::tempdir;
 
 async fn create_test_collection() -> Collection<LsmStorage, HnswIndex> {

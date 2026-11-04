@@ -35,9 +35,7 @@ async fn test_secret_not_leaked_in_debug() {
     // Secret implementiert per SPEC TY-11 bewusst weder Debug noch Display
     // Aber der Builder darf die Passphrase nicht in Debug leaken:
     let rt = tokio::runtime::Handle::current();
-    let builder = Contextra::builder()
-        .passphrase(secret)
-        .runtime(rt);
+    let builder = Contextra::builder().passphrase(secret).runtime(rt);
 
     let err = Error::Auth;
     let err_str = format!("{err:?}");

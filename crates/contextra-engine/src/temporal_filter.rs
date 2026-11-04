@@ -91,7 +91,11 @@ fn parse_u64_val(v: &Value) -> Option<u64> {
     if let Some(n) = v.as_u64() {
         Some(n)
     } else if let Some(n) = v.as_i64() {
-        if n >= 0 { Some(n as u64) } else { None }
+        if n >= 0 {
+            Some(n as u64)
+        } else {
+            None
+        }
     } else if let Some(s) = v.as_str() {
         s.trim().parse::<u64>().ok()
     } else {

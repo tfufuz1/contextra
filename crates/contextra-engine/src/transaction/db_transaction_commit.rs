@@ -11,11 +11,11 @@ use super::compensating_actions::{
 };
 use super::db_transaction::DbTransaction;
 use super::intent::CommitIntent;
-use crate::metrics_names::{COMMIT_LATENCY, record_histogram_safe};
+use crate::metrics_names::{record_histogram_safe, COMMIT_LATENCY};
 use contextra_ports::{StorageEngine, TextIndex, VectorIndex};
 use contextra_types::{ContextraError, Result, TxId};
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 impl<S: StorageEngine, V: VectorIndex> DbTransaction<S, V> {
     // ANCHOR[contextra-engine:COM-021]

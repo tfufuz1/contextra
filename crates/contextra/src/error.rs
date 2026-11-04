@@ -7,8 +7,8 @@
 //! Fehlertexte enthalten konkrete Handlungsempfehlungen für den Betreiber (SPEC §6.4),
 //! geben niemals Geheimnisse preis und verwenden keine nach SPEC §6.4 verbotenen Begriffe.
 
-use std::fmt;
 pub use contextra_types::error::{ConfigError, Conflict, Limit};
+use std::fmt;
 
 /// Öffentlicher Fehlertyp der Fassade.
 ///

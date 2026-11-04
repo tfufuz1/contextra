@@ -11,8 +11,8 @@ use super::fixtures::*;
 async fn test_search_dimension_mismatch_rejected() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -49,12 +49,12 @@ async fn test_search_dimension_mismatch_rejected() {
 }
 
 #[tokio::test]
-async fn test_search_k_zero_returns_canonical_error_message()
--> std::result::Result<(), Box<dyn std::error::Error>> {
+async fn test_search_k_zero_returns_canonical_error_message(
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir()?;
@@ -105,13 +105,13 @@ async fn test_search_k_zero_returns_canonical_error_message()
 }
 
 #[tokio::test]
-async fn test_query_builder_query_config_include_superseded_displacement()
--> contextra_types::Result<()> {
+async fn test_query_builder_query_config_include_superseded_displacement(
+) -> contextra_types::Result<()> {
     use contextra_store::LsmStorage;
     use contextra_types::{DocId, HybridQuery};
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -182,13 +182,13 @@ async fn test_query_builder_query_config_include_superseded_displacement()
 }
 
 #[tokio::test]
-async fn test_post_rrf_supersedes_displacement_truncation_preserves_k()
--> contextra_types::Result<()> {
+async fn test_post_rrf_supersedes_displacement_truncation_preserves_k(
+) -> contextra_types::Result<()> {
     use contextra_store::LsmStorage;
     use contextra_types::DocId;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();

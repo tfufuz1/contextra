@@ -48,10 +48,8 @@ pub trait PurgePrimitives: Send + Sync + 'static {
     fn seal_wal_at<'a>(&'a self) -> contextra_ports::BoxFuture<'a, Result<SealPoint>>;
 
     /// Segmente <= f_seq als Ganzes entfernen (Dateischlüssel vernichten, unlink) (ST-04).
-    fn drop_wal_until<'a>(
-        &'a self,
-        f_seq: u64,
-    ) -> contextra_ports::BoxFuture<'a, Result<WalFloor>>;
+    fn drop_wal_until<'a>(&'a self, f_seq: u64)
+        -> contextra_ports::BoxFuture<'a, Result<WalFloor>>;
 
     /// Kopiert Nicht-Ziel-Records als byteidentische Envelopes in eine neue Datei (ST-07).
     fn rewrite_without<'a>(
@@ -62,8 +60,6 @@ pub trait PurgePrimitives: Send + Sync + 'static {
     ) -> contextra_ports::BoxFuture<'a, Result<RewriteOutcome>>;
 
     /// Manifest-Swap dauerhaft -> F-Slot nullen -> unlink und Verzeichnis-fsync (ST-07, ST-08, ST-09).
-    fn unlink_verified<'a>(
-        &'a self,
-        file_id: FileId,
-    ) -> contextra_ports::BoxFuture<'a, Result<()>>;
+    fn unlink_verified<'a>(&'a self, file_id: FileId)
+        -> contextra_ports::BoxFuture<'a, Result<()>>;
 }

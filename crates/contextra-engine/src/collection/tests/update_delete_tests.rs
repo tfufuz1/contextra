@@ -11,8 +11,8 @@ use super::fixtures::*;
 async fn test_update_document_importance_persists_model_id_provenance() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -65,8 +65,8 @@ async fn test_expiry_cleanup_deletes_decayed_working_memory() {
     use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -133,8 +133,8 @@ async fn test_expiry_cleanup_never_deletes_semantic_no_decay() {
     use contextra_types::{DecayFunction, ImportanceScore, MemoryImportance, TxId};
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -197,8 +197,8 @@ async fn test_ttl_missing_created_at_does_not_expire() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -243,8 +243,8 @@ async fn test_ttl_zero_does_not_expire() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -289,8 +289,8 @@ async fn test_ttl_overflow_does_not_expire() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
     use serde_json::json;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap(); // unwrap
@@ -336,8 +336,8 @@ async fn test_t_del_lock_held_during_delete_op_and_commit() {
     // delete_op + commit halten.
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use std::time::Duration;
     use tempfile::tempdir;
 
@@ -403,8 +403,8 @@ async fn test_t_del_lock_held_during_delete_op_and_commit() {
 async fn test_delete_write_race_same_cluster() {
     use contextra_store::LsmStorage;
     use contextra_vector::HnswIndex;
-    use std::sync::Arc;
     use std::sync::atomic::AtomicU64;
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     let dir = tempdir().unwrap();

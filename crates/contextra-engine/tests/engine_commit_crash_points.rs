@@ -5,14 +5,14 @@
 //! Gehört zur Testsuite von `contextra-engine`.
 
 #![cfg(not(loom))]
-use contextra_engine::Collection;
 use contextra_engine::transaction::{CommitIntent, DbTransaction};
+use contextra_engine::Collection;
 use contextra_ports::{BoxFuture, StorageEngine, StorageStats};
 use contextra_store::{LsmConfig, LsmStorage};
 use contextra_types::{ContextraError, DocId, Edge, Entity, EntityId, Result, TxId};
 use contextra_vector::HnswIndex;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
 use tempfile::tempdir;
 
 struct FaultyStorage<S: StorageEngine> {

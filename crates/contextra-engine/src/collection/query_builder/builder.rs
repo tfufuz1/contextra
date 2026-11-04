@@ -5,8 +5,8 @@
 //! **Architektur:** Gehört zur Crate `contextra-engine` (Ring 2).
 //! Eingehaltene Invarianten: Fail-Closed bei Fehlern, strikte Mandanten- und Indexisolation.
 
-use super::Collection;
 use super::strategy::SearchStrategy;
+use super::Collection;
 #[allow(deprecated)]
 use crate::filter::MetadataFilter;
 use crate::fusion::SignalFailurePolicy;

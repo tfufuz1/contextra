@@ -50,14 +50,18 @@ impl RecordEnvelopeV2 {
             ));
         }
 
-        let version = *bytes.first().ok_or_else(|| ContextraError::Storage("empty envelope".into()))?;
+        let version = *bytes
+            .first()
+            .ok_or_else(|| ContextraError::Storage("empty envelope".into()))?;
         if version != ENVELOPE_V2_VERSION {
             return Err(ContextraError::Storage(format!(
                 "RecordEnvelopeV2: Ungültige Version {version}, erwartet 2 (Legacy v1 nicht unterstützt)"
             )));
         }
 
-        let alg_id = *bytes.get(1).ok_or_else(|| ContextraError::Storage("missing alg_id".into()))?;
+        let alg_id = *bytes
+            .get(1)
+            .ok_or_else(|| ContextraError::Storage("missing alg_id".into()))?;
         if alg_id != ENVELOPE_V2_ALG_ID {
             return Err(ContextraError::Storage(format!(
                 "RecordEnvelopeV2: Nicht unterstützte alg_id {alg_id}"
@@ -65,20 +69,28 @@ impl RecordEnvelopeV2 {
         }
 
         let mut doc_tag_bytes = [0u8; 16];
-        let doc_tag_slice = bytes.get(2..18).ok_or_else(|| ContextraError::Storage("invalid doc_tag slice".into()))?;
+        let doc_tag_slice = bytes
+            .get(2..18)
+            .ok_or_else(|| ContextraError::Storage("invalid doc_tag slice".into()))?;
         doc_tag_bytes.copy_from_slice(doc_tag_slice);
         let doc_tag = DocTag::new(doc_tag_bytes);
 
         let mut nonce = [0u8; NONCE_LEN];
-        let nonce_slice = bytes.get(18..30).ok_or_else(|| ContextraError::Storage("invalid nonce slice".into()))?;
+        let nonce_slice = bytes
+            .get(18..30)
+            .ok_or_else(|| ContextraError::Storage("invalid nonce slice".into()))?;
         nonce.copy_from_slice(nonce_slice);
 
         let ct_len = bytes.len().saturating_sub(HEADER_LEN + AEAD_TAG_LEN);
-        let ct_slice = bytes.get(30..30 + ct_len).ok_or_else(|| ContextraError::Storage("invalid ct slice".into()))?;
+        let ct_slice = bytes
+            .get(30..30 + ct_len)
+            .ok_or_else(|| ContextraError::Storage("invalid ct slice".into()))?;
         let ciphertext = ct_slice.to_vec();
 
         let mut aead_tag = [0u8; AEAD_TAG_LEN];
-        let tag_slice = bytes.get(30 + ct_len..).ok_or_else(|| ContextraError::Storage("invalid tag slice".into()))?;
+        let tag_slice = bytes
+            .get(30 + ct_len..)
+            .ok_or_else(|| ContextraError::Storage("invalid tag slice".into()))?;
         aead_tag.copy_from_slice(tag_slice);
 
         Ok(Self {

@@ -265,8 +265,8 @@ impl EngineBuilder<Set, Set> {
             ..Default::default()
         };
 
-        let inner = contextra_engine::Contextra::open_with_config(&self.data_dir, engine_config)
-            .await?;
+        let inner =
+            contextra_engine::Contextra::open_with_config(&self.data_dir, engine_config).await?;
 
         Ok(Contextra {
             inner: Arc::new(inner),
@@ -335,11 +335,7 @@ impl Contextra {
     }
 
     /// Hebt eine Einschränkung (Art. 18) wieder auf (SPEC 7.1).
-    pub async fn lift_restriction(
-        &self,
-        _id: ErasureId,
-        _att: RetentionAttestation,
-    ) -> Result<()> {
+    pub async fn lift_restriction(&self, _id: ErasureId, _att: RetentionAttestation) -> Result<()> {
         Ok(())
     }
 
@@ -404,9 +400,7 @@ impl Tenant {
 pub struct Collection {
     inner: Arc<
         contextra_engine::Collection<
-            contextra_store::tenant_codec::TenantScopedStorage<
-                Arc<contextra_store::LsmStorage>,
-            >,
+            contextra_store::tenant_codec::TenantScopedStorage<Arc<contextra_store::LsmStorage>>,
         >,
     >,
     tenant_id: contextra_types::TenantId,
@@ -417,9 +411,7 @@ impl Collection {
     /// Fügt ein Dokument ein (SPEC 7.2).
     pub async fn insert(&self, doc_ref: DocRef, doc: Document) -> Result<()> {
         let key_str = String::from_utf8_lossy(doc_ref.key.as_bytes()).to_string();
-        self.inner
-            .insert_text(&key_str, &doc.content, None)
-            .await?;
+        self.inner.insert_text(&key_str, &doc.content, None).await?;
         Ok(())
     }
 

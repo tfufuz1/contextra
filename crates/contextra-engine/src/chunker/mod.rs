@@ -27,7 +27,7 @@ pub use windows::{chunk_text, chunk_text_with_overlap};
 use contextra_types::{ContextChunk, DocId};
 use serde_json::json;
 
-use blocks::{CodeFence, is_closing_fence, is_table_row, parse_opening_fence};
+use blocks::{is_closing_fence, is_table_row, parse_opening_fence, CodeFence};
 use estimate::CHARS_PER_TOKEN;
 use sections::RawSection;
 use split::split_raw_section;

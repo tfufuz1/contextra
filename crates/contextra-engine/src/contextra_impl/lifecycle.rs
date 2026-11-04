@@ -461,8 +461,8 @@ impl Contextra {
 #[cfg(test)]
 mod consolidation_launcher_tests {
     use crate::*;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::Arc;
     use tempfile::tempdir;
 
     #[tokio::test]

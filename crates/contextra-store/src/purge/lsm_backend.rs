@@ -8,10 +8,7 @@ use contextra_ports::BoxFuture;
 use contextra_types::{key::Matcher, Result};
 
 impl PurgePrimitives for LsmStorage {
-    fn drain_range<'a>(
-        &'a self,
-        _matcher: &'a Matcher,
-    ) -> BoxFuture<'a, Result<DrainStats>> {
+    fn drain_range<'a>(&'a self, _matcher: &'a Matcher) -> BoxFuture<'a, Result<DrainStats>> {
         Box::pin(async move {
             // Drain matching items from active memtable
             let state = self.state.write().await;
@@ -34,10 +31,7 @@ impl PurgePrimitives for LsmStorage {
         })
     }
 
-    fn drop_wal_until<'a>(
-        &'a self,
-        f_seq: u64,
-    ) -> BoxFuture<'a, Result<WalFloor>> {
+    fn drop_wal_until<'a>(&'a self, f_seq: u64) -> BoxFuture<'a, Result<WalFloor>> {
         Box::pin(async move {
             let wal = self.wal.read().await;
             let tail_mac = wal.last_hmac_snapshot().await;
@@ -66,12 +60,7 @@ impl PurgePrimitives for LsmStorage {
         })
     }
 
-    fn unlink_verified<'a>(
-        &'a self,
-        _file_id: FileId,
-    ) -> BoxFuture<'a, Result<()>> {
-        Box::pin(async move {
-            Ok(())
-        })
+    fn unlink_verified<'a>(&'a self, _file_id: FileId) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move { Ok(()) })
     }
 }
