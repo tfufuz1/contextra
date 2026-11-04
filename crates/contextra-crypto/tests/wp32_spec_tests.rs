@@ -40,31 +40,54 @@ proptest! {
 #[test]
 fn test_cr02_kdf_bounds_and_constructors_t_kdf_1_2() {
     // T-KDF-1: m in [65536, 4194304] KiB, t in [3, 16], p in [1, 16]
-    // from_header returns Corrupt
+    // Boundary tests: min-1, min, max, max+1 for m, t, p
     assert_eq!(
         KdfParams::from_header(65535, 3, 4),
         Err(CryptoError::Corrupt)
     );
+    assert!(KdfParams::from_header(65536, 3, 4).is_ok());
+    assert!(KdfParams::from_header(4194304, 3, 4).is_ok());
     assert_eq!(
         KdfParams::from_header(4194305, 3, 4),
         Err(CryptoError::Corrupt)
     );
+
     assert_eq!(
         KdfParams::from_header(65536, 2, 4),
         Err(CryptoError::Corrupt)
     );
+    assert!(KdfParams::from_header(65536, 3, 4).is_ok());
+    assert!(KdfParams::from_header(65536, 16, 4).is_ok());
     assert_eq!(
         KdfParams::from_header(65536, 17, 4),
         Err(CryptoError::Corrupt)
     );
+
     assert_eq!(
         KdfParams::from_header(65536, 3, 0),
         Err(CryptoError::Corrupt)
     );
+    assert!(KdfParams::from_header(65536, 3, 1).is_ok());
+    assert!(KdfParams::from_header(65536, 3, 16).is_ok());
     assert_eq!(
         KdfParams::from_header(65536, 3, 17),
         Err(CryptoError::Corrupt)
     );
+
+    // Passphrase length tests per SPEC §5.8 / Table 852: len < 12 => Config
+    let salt = [0x5au8; 32];
+    let params = KdfParams::from_config(65536, 3, 1).unwrap();
+
+    let short_pass = Secret::from_slice(b"short11byte");
+    assert_eq!(short_pass.as_bytes().len(), 11);
+    assert_eq!(
+        derive_kek(&short_pass, &salt, &params).unwrap_err(),
+        CryptoError::Config
+    );
+
+    let exact_12_pass = Secret::from_slice(b"passphrase12");
+    assert_eq!(exact_12_pass.as_bytes().len(), 12);
+    assert!(derive_kek(&exact_12_pass, &salt, &params).is_ok());
 
     // from_config returns Config
     assert_eq!(
@@ -137,12 +160,16 @@ fn test_cr09_label_table_constants() {
 
 #[test]
 fn test_cr04_slot_aad_binding_t_keyslot_4() {
-    // CR-04 & T-KEYSLOT-4: Copying slot to different store fails with Auth
+    // CR-04 & T-KEYSLOT-1..4:
+    // T-KEYSLOT-1: Slot hinzufügen/entfernen
+    // T-KEYSLOT-2: Passphrasenwechsel ohne Neuverschlüsselung (O(1))
+    // T-KEYSLOT-3: KDF-Wechsel
+    // T-KEYSLOT-4: AAD-Bindung: kopierter oder herabgesetzter Slot scheitert
     let master = MasterKey::generate_random();
-    let kek = SecretKey::<32>::new([0x42; 32]);
+    let kek1 = SecretKey::<32>::new([0x42; 32]);
     let store_id = [1u8; 16];
-    let nonce = [7u8; 12];
-    let aad = SlotAad {
+    let nonce1 = [7u8; 12];
+    let aad1 = SlotAad {
         store_id,
         slot_id: 1,
         anchor_id: 1,
@@ -153,25 +180,58 @@ fn test_cr04_slot_aad_binding_t_keyslot_4() {
         slot_salt: [0x55; 32],
     };
 
-    let wrapped = wrap_master(&kek, &aad, nonce, &master);
-    let unwrapped = unwrap_master(&kek, &aad, nonce, &wrapped);
-    assert!(unwrapped.is_ok());
+    let wrapped1 = wrap_master(&kek1, &aad1, nonce1, &master);
+    let unwrapped1 = unwrap_master(&kek1, &aad1, nonce1, &wrapped1);
+    assert!(unwrapped1.is_ok());
 
     // Copy to foreign store
-    let mut foreign_aad = aad;
+    let mut foreign_aad = aad1;
     foreign_aad.store_id = [2u8; 16];
     assert!(matches!(
-        unwrap_master(&kek, &foreign_aad, nonce, &wrapped),
+        unwrap_master(&kek1, &foreign_aad, nonce1, &wrapped1),
         Err(CryptoError::Auth)
     ));
 
     // Tamper parameter m_kib
-    let mut tampered_aad = aad;
+    let mut tampered_aad = aad1;
     tampered_aad.m_kib = 65536;
     assert!(matches!(
-        unwrap_master(&kek, &tampered_aad, nonce, &wrapped),
+        unwrap_master(&kek1, &tampered_aad, nonce1, &wrapped1),
         Err(CryptoError::Auth)
     ));
+
+    // T-KEYSLOT-2 & T-KEYSLOT-3: Passphrase change & KDF change in O(1) without re-encrypting data
+    let kek2 = SecretKey::<32>::new([0x99; 32]);
+    let nonce2 = [8u8; 12];
+    let aad2 = SlotAad {
+        store_id,
+        slot_id: 2,
+        anchor_id: 1,
+        kdf_id: 1,
+        m_kib: 262144, // 256 MiB
+        t: 4,
+        p: 2,
+        slot_salt: [0xAA; 32],
+    };
+    let wrapped2 = wrap_master(&kek2, &aad2, nonce2, &master);
+
+    // Both slots yield identical MasterKey
+    let unwrap_slot2 = unwrap_master(&kek2, &aad2, nonce2, &wrapped2).expect("slot 2 unwrap");
+    assert_eq!(unwrap_slot2.as_bytes(), master.as_bytes());
+
+    // T-KEYSLOT-1: Simulate slot removal (zeroing out slot 1)
+    let zeroed_slot = [0u8; 48];
+    assert_eq!(
+        unwrap_master(&kek1, &aad1, nonce1, &zeroed_slot).unwrap_err(),
+        CryptoError::Auth
+    );
+    // Slot 2 remains fully functional
+    assert_eq!(
+        unwrap_master(&kek2, &aad2, nonce2, &wrapped2)
+            .unwrap()
+            .as_bytes(),
+        master.as_bytes()
+    );
 }
 
 #[test]
@@ -237,7 +297,9 @@ fn test_cr07_dek_derivation_and_record_envelope_v2_t_enc_1_t_vault_2() {
 
 #[test]
 fn test_cr08_k_sign_derived_and_report_signature_t_proof_1() {
-    // CR-08: K_sign is derived via HKDF(K_master, "ctx/sign/v1") and never stored
+    // CR-08 & T-SIG-1 & T-PROOF-1:
+    // K_sign is derived via HKDF(K_master, "ctx/sign/v1") and never stored.
+    // ReportSigner port conformance, strict verification, and error paths.
     let master = MasterKey::generate_random();
     let hierarchy = KeyHierarchy::from_master(master);
 
@@ -256,6 +318,52 @@ fn test_cr08_k_sign_derived_and_report_signature_t_proof_1() {
     assert_eq!(
         verify_report(&pubkey, &tampered_report, &sig).unwrap_err(),
         CryptoError::Auth
+    );
+
+    // T-SIG-1: ReportSigner trait conformance via DerivedReportSigner
+    let signer = DerivedReportSigner::new(SignSeed(SecretKey::new(
+        *hierarchy.sign_seed().0.as_bytes(),
+    )));
+    assert_eq!(signer.signer_id(), SIGNER_ID_DERIVED);
+    assert_eq!(signer.public_key(), pubkey);
+
+    let report_sig = signer
+        .sign_canonical(report_content)
+        .expect("sign canonical");
+    assert_eq!(report_sig, sig);
+    assert!(verify_report(&signer.public_key(), report_content, &report_sig).is_ok());
+
+    // Mutated signature fails verify_strict with Auth
+    let mut bad_sig = report_sig;
+    bad_sig[0] ^= 0x01;
+    assert_eq!(
+        verify_report(&signer.public_key(), report_content, &bad_sig).unwrap_err(),
+        CryptoError::Auth
+    );
+}
+
+#[test]
+fn test_t_def_1_and_t_cfg_1_mandatory_crypto() {
+    // T-DEF-1 & T-CFG-1 (D-05, HR-13, SPEC 8.6):
+    // Cryptography and integrity are mandatory, cannot be disabled via options or fallbacks.
+    // HEADER with unknown or downgrade algorithm IDs must return Corrupt.
+    let mut header_raw = [0u8; HEADER_SIZE];
+    header_raw[0..8].copy_from_slice(HEADER_MAGIC);
+    header_raw[8..10].copy_from_slice(&HEADER_FORMAT_VERSION.to_be_bytes());
+    header_raw[10] = HEADER_KIND;
+
+    // Test reserved alg_id = 2 (ChaCha20-Poly1305, D-80) fails with Corrupt
+    header_raw[11..15].copy_from_slice(&[2, 0, 1, 1]);
+    assert_eq!(
+        Header::decode_checked(&header_raw).unwrap_err(),
+        CryptoError::Corrupt
+    );
+
+    // Test zeroed alg_id = 0 (Plaintext mode attempt) fails with Corrupt
+    header_raw[11..15].copy_from_slice(&[0, 0, 0, 0]);
+    assert_eq!(
+        Header::decode_checked(&header_raw).unwrap_err(),
+        CryptoError::Corrupt
     );
 }
 
@@ -845,10 +953,10 @@ fn test_t_keycov_hierarchy_erasure_irrecoverability() {
     let hierarchy = KeyHierarchy::from_master(master);
 
     let ancestor_salts = AncestorSalts {
-        t: [0x11; 32], // Tenant salt
-        c: [0x22; 32], // Collection salt
+        t: [0x11; 32],       // Tenant salt
+        c: [0x22; 32],       // Collection salt
         s: Some([0x33; 32]), // Subject salt
-        d: [0x44; 32], // Document salt
+        d: [0x44; 32],       // Document salt
     };
     let doc_tag = [0xAA; 16];
 
@@ -928,7 +1036,6 @@ fn test_t_keycov_hierarchy_erasure_irrecoverability() {
     );
 }
 
-
 #[test]
 fn test_t_log_1_secret_freedom_in_debug_and_display() {
     // CR-10 / T-LOG-1 / HR-4:
@@ -969,10 +1076,22 @@ fn test_t_log_1_secret_freedom_in_debug_and_display() {
     ];
 
     for dbg in &debug_outputs {
-        assert!(dbg.contains("[REDACTED]"), "Debug output must be masked: {dbg}");
-        assert!(!dbg.contains("122"), "Debug output leaked decimal byte 122 (0x7A): {dbg}");
-        assert!(!dbg.contains("7a"), "Debug output leaked hex byte 7a: {dbg}");
-        assert!(!dbg.contains("7A"), "Debug output leaked hex byte 7A: {dbg}");
+        assert!(
+            dbg.contains("[REDACTED]"),
+            "Debug output must be masked: {dbg}"
+        );
+        assert!(
+            !dbg.contains("122"),
+            "Debug output leaked decimal byte 122 (0x7A): {dbg}"
+        );
+        assert!(
+            !dbg.contains("7a"),
+            "Debug output leaked hex byte 7a: {dbg}"
+        );
+        assert!(
+            !dbg.contains("7A"),
+            "Debug output leaked hex byte 7A: {dbg}"
+        );
     }
 
     // Verify CryptoError Display and Debug
@@ -986,7 +1105,13 @@ fn test_t_log_1_secret_freedom_in_debug_and_display() {
     for err in errors {
         let disp = format!("{err}");
         let dbg = format!("{err:?}");
-        assert!(!disp.contains("0x"), "Error display leaked memory/addresses: {disp}");
-        assert!(!dbg.contains("0x"), "Error debug leaked memory/addresses: {dbg}");
+        assert!(
+            !disp.contains("0x"),
+            "Error display leaked memory/addresses: {disp}"
+        );
+        assert!(
+            !dbg.contains("0x"),
+            "Error debug leaked memory/addresses: {dbg}"
+        );
     }
 }

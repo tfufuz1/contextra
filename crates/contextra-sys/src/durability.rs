@@ -1,9 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
-// ZWECK: Platform-aware low-level durability primitives for file and directory flushes (Ring 1 / SPEC 03-contextra-sys.md)
-// INVARIANTEN: Zero panic; SyncFailure error propagation; fail-closed on unsupported targets; EINTR handling
-// SIEHE AUCH: AGENTS.md, docs/SPEC.md §7.7 (INV-DURABILITY-PRIM-1)
-
 //! # Modul: Dauerhaftigkeit und physische Synchronisation (`durability`)
 //!
 //! Dieses Modul stellt Grundfunktionen (Primitiven) zur Verfügung,
@@ -44,7 +38,6 @@ pub enum FlushKind {
     DataAndMetadata,
 }
 
-// ANCHOR[contextra-sys:DUR-FLUSH-FILE-001]
 /// Flasht Dateiinhalt und optional Metadaten auf den physischen Datenträger gemäß den Garantien der Zielplattform.
 ///
 /// # Ablauf
@@ -137,7 +130,6 @@ pub fn flush_file_sync(file: &File, kind: FlushKind) -> std::result::Result<(), 
     }
 }
 
-// ANCHOR[contextra-sys:DUR-FLUSH-DIR-001]
 /// Flasht ein Verzeichnis persistent auf den Datenträger.
 ///
 /// # Ablauf
@@ -178,7 +170,6 @@ pub fn rename_durable_sync(from: &Path, to: &Path) -> std::result::Result<(), Sy
     Ok(())
 }
 
-// ANCHOR[contextra-sys:DUR-WRITE-ALL-001]
 /// Schreibt die gesamten Bytes aus `buf` zuverlässig in `file`, unter robuster Behandlung partieller Schreibvorgänge und Signal-Unterbrechungen.
 ///
 /// # Ablauf

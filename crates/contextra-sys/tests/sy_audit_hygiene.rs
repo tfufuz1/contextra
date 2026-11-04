@@ -22,6 +22,7 @@ fn workspace_root() -> PathBuf {
     }
 }
 
+/// SPEC: T-ARCH-3
 /// SY-03 & SY-04: Grep im gesamten Crate contextra-sys nach verbotenen Begriffen
 /// (windows, mmap, acl_win32, memmap2) ergibt 0 Treffer.
 #[test]
@@ -64,6 +65,7 @@ fn sy_audit_03_04_grep_forbidden_terms_is_zero() {
     }
 }
 
+/// SPEC: T-ARCH-4
 /// SY-11 & T-ARCH-4: Keine Netzwerk- oder Zeitzugriffe; Single-Node-Garantie.
 #[test]
 fn sy_audit_11_t_arch_4_no_network_or_time_dependencies() {

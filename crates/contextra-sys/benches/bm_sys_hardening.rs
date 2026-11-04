@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
-// ZWECK: Benchmarks BM-SYS-LOCK-PAGES and BM-SYS-APPLY-HARDENING for contextra-sys
-// INVARIANTEN: Deterministic seed, writes JSON report to target/bench-report/contextra-sys.json
-
 #![allow(clippy::disallowed_methods)]
 
 use std::fs;

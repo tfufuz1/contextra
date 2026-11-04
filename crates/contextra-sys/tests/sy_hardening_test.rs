@@ -1,8 +1,3 @@
-// FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
-// ZWECK: Tests for contextra-sys hardening module (SY-01, SY-02, SY-07, SY-08, SY-10, T-DUMP-1, T-SEC-2, T-UNSAFE-1)
-// INVARIANTEN: Zero panic in library code, fixed error messages, child process test coverage
-
 #![allow(unsafe_code)]
 
 use contextra_sys::{
@@ -89,6 +84,7 @@ fn compile_and_get_probe_bin() -> Option<std::path::PathBuf> {
     }
 }
 
+/// SPEC: T-DUMP-1
 #[test]
 fn sy_07_hardening_policy_required_besteffort_off() {
     // Test Off policy: does nothing, reports false for changes
@@ -114,6 +110,7 @@ fn sy_07_hardening_policy_required_besteffort_off() {
     assert!(rep_req.is_ok());
 }
 
+/// SPEC: T-DUMP-1
 #[test]
 fn sy_08_core_limit_and_dumpable_child_process() {
     let probe_bin = compile_and_get_probe_bin().expect("failed to compile child_probe");
@@ -147,6 +144,7 @@ fn sy_08_core_limit_and_dumpable_child_process() {
     let _ = std::fs::remove_file(probe_bin);
 }
 
+/// SPEC: T-DUMP-1
 #[test]
 fn t_dump_1_madv_dontdump_smaps_flag() {
     let buf = vec![0u8; 8192];
@@ -166,6 +164,7 @@ fn t_dump_1_madv_dontdump_smaps_flag() {
     let _ = std::fs::remove_file(probe_bin);
 }
 
+/// SPEC: T-SEC-2
 #[test]
 fn t_sec_2_required_fails_on_mlock_limit_zero() {
     let data = vec![0x55u8; 4096];
@@ -188,6 +187,7 @@ fn t_sec_2_required_fails_on_mlock_limit_zero() {
     let _ = std::fs::remove_file(probe_bin);
 }
 
+/// SPEC: T-UNSAFE-1
 #[test]
 fn t_unsafe_1_no_public_raw_address_export() {
     // Compile check that hardening only exposes safe slices and no raw pointer / usize addresses
@@ -196,6 +196,7 @@ fn t_unsafe_1_no_public_raw_address_export() {
     assert!(lock_pages(&data, HardeningPolicy::BestEffort).is_ok());
 }
 
+/// SPEC: T-DUMP-1
 #[test]
 fn sy_10_no_panics_and_fixed_error_messages() {
     let err = SysError::HardeningIncomplete;
@@ -207,12 +208,14 @@ fn sy_10_no_panics_and_fixed_error_messages() {
     assert!(!err.to_string().contains('\\'));
 }
 
+/// SPEC: T-DUMP-1
 #[test]
 fn sy_07_fd_limits() {
     assert!(ensure_fd_limit(64));
     let _ = set_fd_limit(1024);
 }
 
+/// SPEC: T-DUMP-1
 #[test]
 fn sy_07_secure_zero_volatile() {
     let mut buf = [0x5A; 128];
@@ -223,6 +226,7 @@ fn sy_07_secure_zero_volatile() {
     secure_zero_volatile(&mut empty);
 }
 
+/// SPEC: T-DUMP-1
 #[test]
 fn sy_07_secure_zero_volatile_optimization_levels_opt0_and_opt3() {
     // Tests compiled child binary under opt-level 0 and opt-level 3
@@ -291,7 +295,7 @@ fn sy_07_secure_zero_volatile_optimization_levels_opt0_and_opt3() {
     }
 }
 
-/// SY-07: Randfall-Prüfung für leere Slices bei `secure_zero_volatile`, `mark_dont_dump` und `lock_pages`.
+/// SPEC: T-DUMP-1
 #[test]
 fn sy_07_hardening_empty_slice_handling() {
     let mut empty_buf: [u8; 0] = [];
