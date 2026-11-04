@@ -153,5 +153,8 @@ fn test_gate_decision_variants() {
 
     assert_eq!(RangeGate::EntirelyOpen, RangeGate::EntirelyOpen);
     assert_eq!(RangeGate::ContainsErased, RangeGate::ContainsErased);
-    assert_eq!(RangeGate::RestrictedNeverDiscard, RangeGate::RestrictedNeverDiscard);
+    assert_eq!(
+        RangeGate::RestrictedNeverDiscard,
+        RangeGate::RestrictedNeverDiscard
+    );
 }

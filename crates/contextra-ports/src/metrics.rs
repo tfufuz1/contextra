@@ -19,12 +19,27 @@ use std::sync::{Arc, RwLock};
 /// components without creating direct dependencies on specific metrics libraries.
 pub trait MetricsSink: Send + Sync + 'static {
     /// Records a counter metric increment.
+    /// # Fehler
+    /// Keine; Aufzeichnung erfolgt non-blocking.
+    ///
+    /// # Crash
+    /// Flüchtige Metrikerfassung im RAM.
     fn record_counter(&self, name: &str, value: u64, labels: &[(&str, &str)]);
 
     /// Records a gauge metric absolute value.
+    /// # Fehler
+    /// Keine; atomare Aktualisierung.
+    ///
+    /// # Crash
+    /// Flüchtige Metrikerfassung im RAM.
     fn record_gauge(&self, name: &str, value: f64, labels: &[(&str, &str)]);
 
     /// Records a histogram observation value.
+    /// # Fehler
+    /// Keine; Histogramm-Update.
+    ///
+    /// # Crash
+    /// Flüchtige Metrikerfassung im RAM.
     fn record_histogram(&self, name: &str, value: f64, labels: &[(&str, &str)]);
 }
 

@@ -1,10 +1,6 @@
 //! Benchmark BM-DISPATCH-OVERHEAD: Messung statischer vs. dyn-Dispatch (ns/Aufruf) auf Heißpfad-Ports (D-03).
 
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::disallowed_methods
-)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::disallowed_methods)]
 
 use std::future::Future;
 use std::pin::Pin;
@@ -85,9 +81,7 @@ async fn bm_dispatch_overhead_measurement() {
     let ns_per_dyn = elapsed_dyn.as_nanos() as f64 / iters as f64;
     std::hint::black_box(dyn_res);
 
-    println!(
-        "\n=================== DISPATCH OVERHEAD PROTOKOLL (D-03) ==================="
-    );
+    println!("\n=================== DISPATCH OVERHEAD PROTOKOLL (D-03) ===================");
     println!("Iterationen: {}", iters);
     println!(
         "Statischer Dispatch (impl Future/AFIT): {:.2} ns/op | 0 Allokationen/op",
@@ -102,9 +96,7 @@ async fn bm_dispatch_overhead_measurement() {
         ns_per_dyn - ns_per_static,
         ns_per_dyn / ns_per_static.max(0.001)
     );
-    println!(
-        "=========================================================================\n"
-    );
+    println!("=========================================================================\n");
 
     assert!(ns_per_dyn > 0.0);
     assert!(ns_per_static >= 0.0);

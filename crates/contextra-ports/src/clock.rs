@@ -9,9 +9,21 @@ pub trait Clock: Send + Sync + 'static {
     /// Returns the current wall-clock time as nanoseconds since the Unix epoch.
     ///
     /// Returns `0` if system time is before the epoch instead of panicking.
+    ///
+    /// # Fehler
+    /// Keine; Abfrage der Systemzeit ist unfehlbar.
+    ///
+    /// # Crash
+    /// Reiner Zeitzugriff ohne Seiteneffekte.
     fn now_unix_nanos(&self) -> u64;
 
     /// Returns nanoseconds elapsed since a monotonic baseline reference point.
+    ///
+    /// # Fehler
+    /// Keine; monotoner Takt ist unfehlbar.
+    ///
+    /// # Crash
+    /// Monoton wachsender Zeitgeber; keine Zustandsänderung.
     fn monotonic_nanos(&self) -> u64;
 }
 
