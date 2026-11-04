@@ -49,7 +49,8 @@ pub use hierarchy::{
     SignSeed, UnitKey, VaultMacKey, WalKey,
 };
 pub use kdf::{
-    derive_kek, hkdf_expand, KdfParams, MAX_M_KIB, MAX_P, MAX_T, MIN_M_KIB, MIN_P, MIN_T,
+    derive_kek, hkdf_expand, KdfParams, MAX_M_KIB, MAX_P, MAX_T, MIN_M_KIB, MIN_P,
+    MIN_PASSPHRASE_BYTES, MIN_T,
 };
 pub use labels::{
     COLL_TAG, COMMIT, DEK, DEK_SALT, DOC_TAG, ENC, FILE, FKMASK, HDR, IDX, LEDGER, NAME_TAG,
@@ -57,5 +58,8 @@ pub use labels::{
     VAULT_MAC, WAL,
 };
 pub use secret::{Secret, SecretKey};
-pub use sign::{sign_report, verify_report};
+pub use sign::{
+    sign_report, verify_report, DerivedReportSigner, ReportSigner, SIGNER_ID_DERIVED,
+    SIGNER_ID_OPERATOR,
+};
 pub use tag::{tag, TagPreimage};

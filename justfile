@@ -41,6 +41,10 @@ pre-push: check test gates
 crate CRATE:
     cargo check -p {{CRATE}} && cargo test -p {{CRATE}} --locked
 
+# Run contextra-store tests with test-hooks
+test-store-hooks:
+    cargo test -p contextra-store --features test-hooks --locked
+
 # Run a single crate's tests under Loom (concurrency model checker)
 loom CRATE:
     RUSTFLAGS="--cfg loom" cargo test -p {{CRATE}} --locked
