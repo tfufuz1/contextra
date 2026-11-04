@@ -3,7 +3,8 @@
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
-    clippy::needless_borrows_for_generic_args
+    clippy::needless_borrows_for_generic_args,
+    clippy::cast_possible_truncation
 )]
 //! T-MUT-1: Mutationstests für die Mess- und Verifikationslogik (SPEC §12.3, T-MUT-1).
 //!
