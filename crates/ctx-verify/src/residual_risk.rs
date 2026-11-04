@@ -21,6 +21,10 @@ pub enum ResidualRisk {
     PurgeScalesWithDb,
     PurgeDeferred,
     KeyCompromise,
+    VerifiedViaCache,
+    BackupKeyMaterial,
+    ReplacementOverlap,
+    SupersededWithSameKey,
 }
 
 impl ResidualRisk {
@@ -41,6 +45,10 @@ impl ResidualRisk {
             Self::PurgeScalesWithDb => "PurgeScalesWithDb",
             Self::PurgeDeferred => "PurgeDeferred",
             Self::KeyCompromise => "KeyCompromise",
+            Self::VerifiedViaCache => "VerifiedViaCache",
+            Self::BackupKeyMaterial => "BackupKeyMaterial",
+            Self::ReplacementOverlap => "ReplacementOverlap",
+            Self::SupersededWithSameKey => "SupersededWithSameKey",
         }
     }
 
@@ -61,6 +69,10 @@ impl ResidualRisk {
             "PurgeScalesWithDb" => Some(Self::PurgeScalesWithDb),
             "PurgeDeferred" => Some(Self::PurgeDeferred),
             "KeyCompromise" => Some(Self::KeyCompromise),
+            "VerifiedViaCache" => Some(Self::VerifiedViaCache),
+            "BackupKeyMaterial" => Some(Self::BackupKeyMaterial),
+            "ReplacementOverlap" => Some(Self::ReplacementOverlap),
+            "SupersededWithSameKey" => Some(Self::SupersededWithSameKey),
             _ => None,
         }
     }
