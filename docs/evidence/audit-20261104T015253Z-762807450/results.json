@@ -10,7 +10,7 @@
     "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
     "start": "2026-11-04T01:52:53+00:00",
     "t_start_epoch": 1793757173.1238315,
-    "duration_min": 22.8
+    "duration_min": 29.9
   },
   "steps": [
     {
@@ -1881,7 +1881,7 @@
       "rc": null,
       "sekunden": 0.0,
       "detail": "",
-      "log": "",
+      "log": "logs/155_coverage.log",
       "befehl": "cargo llvm-cov --workspace --locked --no-fail-fast --json --ignore-filename-regex /(tests|benches|fuzz|examples)/ --output-path /home/freddy/Projekte/contextra/docs/evidence/audit-20261104T015253Z-762807450/coverage.json",
       "hinweis": ""
     },
