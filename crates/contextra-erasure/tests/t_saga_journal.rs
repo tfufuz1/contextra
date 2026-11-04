@@ -162,4 +162,23 @@ async fn t_crash_matrix_recovery_table() {
         pending_saga.pending_reason(),
         Some(&PendingReason::DiskReserve)
     );
+
+    // FW-9 & I-4: Übergang (Pending, Completed) ohne Zeugen MUSS abgewiesen werden!
+    let illegal_completed = pending_saga.transition_to(SagaState::Completed);
+    assert!(
+        illegal_completed.is_err(),
+        "FW-9: Übergang von Pending direkt zu Completed ohne Zeugen muss unmöglich sein"
+    );
+
+    // Restriktion (D-116, D-124): Requested -> Restricted -> Lifted
+    let mut restr_saga = EraseSaga::new(ErasureId::new([0x22; 16]));
+    restr_saga
+        .transition_to(SagaState::Restricted)
+        .expect("transition to Restricted");
+    assert_eq!(restr_saga.state(), SagaState::Restricted);
+    restr_saga
+        .transition_to(SagaState::Lifted)
+        .expect("transition to Lifted");
+    assert_eq!(restr_saga.state(), SagaState::Lifted);
+    assert!(restr_saga.is_terminal());
 }

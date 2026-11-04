@@ -8,7 +8,7 @@ pub mod machine;
 pub mod retention;
 
 pub use driver::{SagaDriver, StepOutcome};
-pub use idempotency::is_same_request;
+pub use idempotency::{derive_open_key, is_same_request};
 pub use machine::{EraseRequest, EraseSaga, SagaState};
 pub use retention::{is_restrict_allowed, is_retention_active};
 
