@@ -92,20 +92,37 @@ impl HeaderSlot {
             wrapped_master.copy_from_slice(src);
         }
 
-        let m_kib = bytes
-            .get(4..8)
-            .and_then(|s| s.try_into().ok())
-            .map(u32::from_be_bytes)
-            .unwrap_or(0);
+        let m_kib = match bytes.get(4..8).and_then(|s| s.try_into().ok()) {
+            Some(arr) => u32::from_be_bytes(arr),
+            None => 0,
+        };
 
         Self {
-            slot_id: bytes.first().copied().unwrap_or(0),
-            anchor_id: bytes.get(1).copied().unwrap_or(0),
-            kdf_id: bytes.get(2).copied().unwrap_or(0),
-            status: bytes.get(3).copied().unwrap_or(0),
+            slot_id: match bytes.first() {
+                Some(&b) => b,
+                None => 0,
+            },
+            anchor_id: match bytes.get(1) {
+                Some(&b) => b,
+                None => 0,
+            },
+            kdf_id: match bytes.get(2) {
+                Some(&b) => b,
+                None => 0,
+            },
+            status: match bytes.get(3) {
+                Some(&b) => b,
+                None => 0,
+            },
             m_kib,
-            t: bytes.get(8).copied().unwrap_or(0),
-            p: bytes.get(9).copied().unwrap_or(0),
+            t: match bytes.get(8) {
+                Some(&b) => b,
+                None => 0,
+            },
+            p: match bytes.get(9) {
+                Some(&b) => b,
+                None => 0,
+            },
             slot_salt,
             nonce,
             wrapped_master,

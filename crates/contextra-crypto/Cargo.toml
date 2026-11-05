@@ -22,6 +22,7 @@ hkdf = "0.12"
 subtle = "2.6"
 blake3 = { workspace = true }
 contextra-types = { workspace = true }
+contextra-ports = { workspace = true }
 rand = { workspace = true }
 zeroize = { version = "1.8.2", features = ["zeroize_derive"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }

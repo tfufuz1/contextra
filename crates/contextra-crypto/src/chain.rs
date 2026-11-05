@@ -115,7 +115,7 @@ pub fn ledger_mac(k: &LedgerKey, chain: &[u8; 32]) -> [u8; 32] {
 /// Returns `Err(CryptoError::Corrupt)` if the tail does not match the expected state (truncation,
 /// omitted frames, reordering, or tampering).
 pub fn verify_chain_complete(expected_tail: &[u8; 32], actual_tail: &[u8; 32]) -> Result<()> {
-    if expected_tail.ct_eq(actual_tail).unwrap_u8() == 1 {
+    if bool::from(expected_tail.ct_eq(actual_tail)) {
         Ok(())
     } else {
         Err(CryptoError::Corrupt)

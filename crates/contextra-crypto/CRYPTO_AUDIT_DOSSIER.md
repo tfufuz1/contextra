@@ -23,6 +23,17 @@ Es werden ausschließlich standardisierte, moderne Kryptoprimitive eingesetzt. E
 
 ---
 
+## 1.1 Berichtssignatur-Port & Standardimplementierung (`DerivedReportSigner`, D-130, F.10, T-SIG-1)
+
+Die Signierung von Löschberichten ist hexagonal über den Port `ReportSigner` (`contextra-ports`) abstrahiert:
+- **Standardimplementierung (`DerivedReportSigner`):** Signiert mit `K_sign = HKDF-Expand(K_master, "ctx/sign/v1", 32)`.
+- **Signer-ID (`signer_id`):** `0` (abgeleiteter interner Schlüssel `K_sign` per SPEC F.10). Signer-ID `1` ist für externe Signierer / HSMs reserviert.
+- **Signatur-Domain:** `"ctx/report/v1" ‖ kanonische_Bytes_ohne_signature`.
+- **Signatur-Format:** 64 Bytes Ed25519, unpadded Base64url-kodiert (`signature_base64`).
+- **Verifizierungs-Fingerprint:** SHA-256 des 32-Byte Verifying-Keys, erste 16 Bytes / 32 Hex-Zeichen (`pub_fingerprint`).
+
+---
+
 ## 2. KDF-Parameter & Speichergrenzen (Argon2id, D-06, D-68, FM-16, T-KDF-1/2)
 
 Um Denial-of-Service-Angriffe durch manipulierte Header vor der Authentifizierung abzuwehren (CWE-770), werden alle KDF-Parameter **vor** jeder Speicherallokation oder Berechnung strikt validiert.

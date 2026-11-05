@@ -296,6 +296,33 @@ fn test_t_sig_1_report_signature_spec_conformance() {
     );
 }
 
+/// SPEC: T-SIG-1
+#[tokio::test]
+async fn test_t_sig_1_derived_report_signer_port() {
+    use contextra_ports::report_signer::ReportSigner;
+
+    let master = MasterKey::generate_random();
+    let hierarchy = KeyHierarchy::from_master(master);
+    let signer = DerivedReportSigner::new(hierarchy.sign_seed());
+
+    assert_eq!(signer.signer_id(), 0);
+
+    let canon_report = b"{\"completed_at\":1000,\"erasure_id\":\"01020304-0506-0708-090a-0b0c0d0e0f10\",\"signer_id\":0}";
+    let report_sig = signer
+        .sign_report(canon_report)
+        .await
+        .expect("signing report must succeed");
+
+    assert_eq!(report_sig.signer_id, 0);
+    assert_eq!(report_sig.pub_fingerprint.len(), 32);
+    assert!(!report_sig.signature_base64.contains('='));
+
+    // Verify the raw signature matches verify_report
+    let raw_sig = sign_report(hierarchy.sign_seed(), canon_report);
+    let pubkey = signer.verifying_key().to_bytes();
+    assert!(verify_report(&pubkey, canon_report, &raw_sig).is_ok());
+}
+
 /// SPEC: T-CFG-1, T-DEF-1
 #[test]
 fn test_t_cfg_1_and_t_def_1_no_security_downgrade() {
