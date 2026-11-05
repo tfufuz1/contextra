@@ -1,5 +1,4 @@
 // FILE-CONTEXT
-// STAND: 2026-11-02T00:00:00Z
 // ZWECK: Sichere Dateiberechtigungen (0o700 / 0o600) und Eigentuemer-Verifikation (Ring 1 / SY-09)
 // INVARIANTEN: Zero-Panic; keine Pfade in Display
 
