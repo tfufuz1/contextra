@@ -11,10 +11,10 @@ pub mod scanner_flow;
 pub mod witness;
 
 pub use field::{
-    read_file_verified, scan_mk1_structures, scan_mk2_raw, scan_mk3_keys, Mk1Result, Mk2Result,
-    Mk3Result, VerifiedVia,
+    collect_all_files, read_file_verified, scan_mk1_structures, scan_mk2_raw, scan_mk3_keys,
+    Mk1Result, Mk2Result, Mk3Result, ScanPlan, StructureDecoder, VerifiedVia,
 };
-pub use scanner_flow::run_scanner_flow;
+pub use scanner_flow::{run_scanner_flow, scan_with_control};
 pub use witness::{arm_scanner, finish_scan};
 
 // Re-Export der Typen aus `types` für Aufrufer innerhalb dieses Moduls
@@ -25,6 +25,7 @@ pub use contextra_types::erasure::{
 use crate::error::ErasureError;
 
 /// Art des Positivkontroll-Nachweises (ER-25).
+#[deprecated(note = "Verwende contextra_types::erasure::ControlEvidence über die Positivkontrolle")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvidenceKind {
     /// Muster wurde erfolgreich in der Kontrolldatei nachgewiesen
@@ -32,11 +33,14 @@ pub enum EvidenceKind {
 }
 
 /// Nachweis über erfolgreiche Positivkontrolle für Test-Scanner.
+#[deprecated(note = "Verwende contextra_types::erasure::ControlEvidence über die Positivkontrolle")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LocalControlEvidence {
+    #[allow(deprecated)]
     kind: EvidenceKind,
 }
 
+#[allow(deprecated)]
 impl LocalControlEvidence {
     /// Gibt die Art des Nachweises zurück.
     pub fn kind(&self) -> EvidenceKind {
@@ -45,9 +49,11 @@ impl LocalControlEvidence {
 }
 
 /// Scanner im Zustand `Unarmed` (noch nicht scharfgeschaltet).
+#[deprecated(note = "Verwende contextra_types::erasure::Scanner<Unarmed>")]
 #[derive(Debug, Default)]
 pub struct UnarmedScanner;
 
+#[allow(deprecated)]
 impl UnarmedScanner {
     /// Erstellt einen neuen unbewaffneten Scanner.
     pub fn new() -> Self {
@@ -59,7 +65,7 @@ impl UnarmedScanner {
         &self,
         pattern: &[u8],
     ) -> Result<LocalControlEvidence, ErasureError> {
-        if !pattern.is_empty() {
+        if positive_control::run_positive_control(pattern).is_some() {
             Ok(LocalControlEvidence {
                 kind: EvidenceKind::Observed,
             })
@@ -77,9 +83,11 @@ impl UnarmedScanner {
 }
 
 /// Scanner im Zustand `Armed` (scharfgeschaltet für Residuenprüfung).
+#[deprecated(note = "Verwende contextra_types::erasure::Scanner<Armed>")]
 #[derive(Debug)]
 pub struct ArmedScanner;
 
+#[allow(deprecated)]
 impl ArmedScanner {
     /// Schließt den Scan ab. Gibt `TestWitness` NUR zurück, wenn `matches == 0` (ER-25).
     pub fn finish(&self, matches: u64) -> Result<TestWitness, ErasureError> {
@@ -95,11 +103,13 @@ impl ArmedScanner {
 }
 
 /// Hilfstyp für Zeugen-Prüfung in Tests.
+#[deprecated(note = "Verwende contextra_types::erasure::LayerWitness")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TestWitness {
     hash: [u8; 32],
 }
 
+#[allow(deprecated)]
 impl TestWitness {
     /// Liefert den Zeugen-Hash.
     pub fn witness_hash(&self) -> &[u8; 32] {

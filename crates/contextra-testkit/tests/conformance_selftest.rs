@@ -11,6 +11,7 @@
 //!    und mit den exakten Testfall-Namen abgewiesen werden (`assert_eq!(failure.test_case, ...)`).
 
 #![allow(clippy::panic, clippy::unwrap_used)]
+use contextra_testkit::conformance::erasure_layer;
 
 use contextra_ports::{
     BoxFuture, Clock, MetricsSink, Rng, SeededRng, StorageEngine, StorageStats, TextIndex,
@@ -493,4 +494,17 @@ fn test_metrics_sink_conformance_mutant_red() {
         }
         Ok(_) => panic!("PanickingMetricsSink must fail metrics conformance"),
     }
+}
+
+// ANCHOR[contextra-testkit:SELFTEST-RUN-ERA-001]
+/// SPEC: PO-05
+#[tokio::test]
+async fn test_erasure_layer_conformance_suite() {
+    let res = erasure_layer::run_reference_test().await;
+    assert!(res.is_ok(), "ErasureLayer reference must pass: {res:?}");
+    let mut_res = erasure_layer::run_mutant_tests().await;
+    assert!(
+        mut_res.is_ok(),
+        "ErasureLayer mutants must fail: {mut_res:?}"
+    );
 }

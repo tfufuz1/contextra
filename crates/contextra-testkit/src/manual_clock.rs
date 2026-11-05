@@ -107,6 +107,21 @@ impl ManualClock {
     pub fn now_system_time(&self) -> SystemTime {
         UNIX_EPOCH + Duration::from_nanos(self.now_nanos())
     }
+
+    /// Stellt die Uhr um genau das konfigurierte SLA-Fenster (`erase_sla`) vor (SPEC D-30, D-83, T-SLA-1).
+    pub fn advance_sla_window(&self, sla: Duration) {
+        self.advance(sla);
+    }
+
+    /// Stellt die Uhr um das konfigurierte Batch-Fenster (`batch_window`) vor (SPEC D-39, D-83, BM-ERASE-BATCH).
+    pub fn advance_batch_window(&self, batch: Duration) {
+        self.advance(batch);
+    }
+
+    /// Springt über die SLA-Frist hinaus (`erase_sla + 1s`), um SLA-Verletzungen (`SlaExceeded`) deterministisch zu prüfen.
+    pub fn jump_past_sla(&self, sla: Duration) {
+        self.advance(sla.saturating_add(Duration::from_secs(1)));
+    }
 }
 
 // ANCHOR[contextra-testkit:MANUAL-CLOCK-TRAIT-IMPL-001]
